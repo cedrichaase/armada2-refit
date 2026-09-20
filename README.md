@@ -48,6 +48,7 @@ needs editing — `target.conf` already carries the right flags for every nebula
 | `size` | output edge **per face/quadrant**, not per atlas. One skybox face fills the whole viewport, so this is what the eye sees |
 | `uniform` | sky-atlas only: match every tile to the whole stock texture rather than its own quadrant. Needed when all four tiles are one seamless image, otherwise the differing quadrant means put a brightness step at each cube-face join |
 | `monohue` | rebuild all channels from luminance using the stock hue ratio. Only valid on single-hue textures; removes chroma invention by construction |
+| `blend` | per cent of the AI layer kept over Lanczos in `src/`. Read and written by `upscale-stock.sh`, so a set tuned away from the default keeps that setting. `mbgrg` is the only one at 20 |
 | `keepcolour` | puff only: skip the greyscale conversion. `Mnebula2` is the one stock puff with its own colour |
 | `fill` | puff only: percent of the quadrant the subject occupies (default 92) |
 
@@ -615,7 +616,12 @@ channel back to the stock face's mean → TGA. About $0.005 and 17 seconds per f
 
 **Keep `ai/`, and the blend becomes free.** `--reblend` rebuilds `src/` from the `ai/`
 layer already on disk, offline and at no cost, so the one dial that is genuinely a
-matter of taste can be turned as often as you like. `MBG02` predates this and its
+matter of taste can be turned as often as you like. It is deterministic: a reblend at
+the same setting reproduces the TGA byte-for-byte (the PNG in `src/` gets a fresh
+timestamp, so compare pixels, not md5sums). The setting lives in `target.conf` as
+`blend=`, not in a comment — otherwise a bare `--reblend` silently reverts a
+deliberately lowered set to the default, which is exactly what would have happened to
+`mbgrg`. `MBG02` predates this and its
 intermediates were scratch; re-tuning its blend still means paying to upscale again.
 
 ### Invention falls off steeply with the scale factor
