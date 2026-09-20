@@ -995,9 +995,13 @@ slices back to per-unit `ai/` files, and the blend stage downstream is unchanged
 
 | target | n | stock → built | route |
 |---|---|---|---|
-| `UIicon` | 382 | 64 → 256 | `sheet=7x8`, 8 sheets |
-| `UImid` | 26 | 128 → 512 | `sheet=3x32`, 3 sheets |
-| `UIpanel` | 136 | 256 → 512 | individual at 1MP (4x), downsampled by `size=512` |
+| `UIicon` | 382 | 64 → **256** | `sheet=7x8`, 8 sheets |
+| `UImid` | 26 | 128 → **256** | `sheet=3x32`, 3 sheets |
+| `UIpanel` | 136 | 256 → **256** | individual at 1MP (4x), *supersampled* back down |
+
+**256 is a hard engine ceiling, not a choice — see below.** `UIpanel` therefore ships at
+stock's own size, but resolved from a 4x upscale and downsampled rather than resampled
+from stock: cleaner edges for the same bytes.
 
 The panels are **not** sheeted. They are 9-slice pieces whose edges are load-bearing —
 they abut each other on screen — and a neighbour across a gutter is a risk with no
@@ -1005,11 +1009,41 @@ payoff when one panel already fills a 4x request on its own.
 
 Sizes come from how big the things are actually drawn. `paletteSingleButtonArea` is
 80x80 in the canvas, x1.2 on screen = 96px, so a 64px icon is magnified 1.5x and 256
-leaves it 2.7x oversampled with headroom for 4K. Panels are drawn near 1:1, so 512 is
-already 1.7x oversampled; 1024 would have been 579MB of nothing.
+leaves it 2.7x oversampled. That is comfortable, and it is also the most the engine will
+take.
 
 All 544 verified: no channel mean off by more than 1, no alpha mean off by more than 1,
 no channel-count change, and every TGA header byte-identical to the file it replaces.
+
+### A UI sprite over 256x256 crashes the game
+
+This is the second hard crash this project has caused, and like the first it is a limit
+that announces itself only by killing the process.
+
+The first build shipped `UImid` and `UIpanel` at **512**. The game then crashed on every
+campaign start -- Klingon and Borg both -- at the cinematic-to-HUD transition, which is
+exactly when `gui_<race>.cfg` is parsed and the race's whole UI texture set loads. The
+madExcept dump faults at `rep movsd` inside `Armada2.exe` at `0x4e97fd`: a memcpy, which
+is what an allocation that was too small and never checked looks like.
+
+The census that settled it: **exactly one stock texture in the entire game is 512x512**
+-- `WshladSW.tga`, a weapon texture -- and **no stock `@tmaterial=interface` sprite
+exceeds 256x256.** 2001-era UI code sizing a scratch buffer for the largest UI texture
+it shipped with is the obvious reading, and 512 is the first time in the game's life
+that buffer was asked to hold four times its content.
+
+Reverting the 162 files at 512 and keeping the 382 icons at 256 fixed it, confirmed in
+game. What this does *not* distinguish is a per-texture cap from exhaustion of the
+resident UI set as a whole (the 512 build was 247MB of UI against stock's 43MB; the
+shipped one is 125MB). It did not need distinguishing -- the same ceiling fixes both.
+
+**3D model textures are not affected.** 2048 skybox faces, 2048 planets and a 4096 atlas
+have all been running for weeks. The limit is specific to the sprite/UI path.
+
+`maxsize=N` in `target.conf` now makes this machine-readable: `a2tex install` measures
+every output first and refuses the **whole target** if any file exceeds it, the same
+pre-flight shape as the mip-chain guard and for the same reason -- a partial install is
+the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
 
 ### Deliberately left stock
 

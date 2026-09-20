@@ -55,7 +55,14 @@ DXVK on every launch and reverts the d3d8 chain fix.**
    impossible by construction rather than by argument.
 3. **Always glob both extension cases.** `$(ls "$n.tga" "$n.TGA" 2>/dev/null | head -1 || true)`
    — and note the `|| true`: under `set -o pipefail` the failing `ls` aborts the script.
-4. **Don't touch `Sprites/nebula.spr`.** UVs are normalised against `@reference=128`, so
+4. **Never install a UI sprite larger than 256x256.** `@tmaterial=interface` textures at
+   512 **crash the game** at the cinematic-to-HUD transition (`rep movsd` in
+   `Armada2.exe` -- a memcpy into a buffer that is too small). Exactly one stock texture
+   in the game is 512 (`WshladSW`, a weapon) and no stock interface sprite is over 256.
+   3D model textures are unaffected -- 2048 skyboxes and a 4096 atlas run fine -- so this
+   is the sprite path specifically. `maxsize=N` in `target.conf` enforces it: `install`
+   refuses the whole target. The three UI targets declare `maxsize=256`.
+5. **Don't touch `Sprites/nebula.spr`.** UVs are normalised against `@reference=128`, so
    they are fractions and larger textures land on the same quadrants unchanged. Editing
    it is never the fix.
 
@@ -277,8 +284,10 @@ most maps place; the eleven `M*` maps are the *named story* planets. All 16 inst
 2048. They are a **four-lobe gore unwrap, not equirectangular** — the horizontal-wrap
 reasoning from the `M*` maps does not apply; what matters is no bleed across the gores.
 
-**544 UI textures are installed** as `UIicon` (382, 64→256), `UImid` (26, 128→512) and
-`UIpanel` (136, 256→512). The small ones went up as **contact sheets** — `sheet=GxP` in
+**544 UI textures are installed** as `UIicon` (382, 64→256), `UImid` (26, 128→256) and
+`UIpanel` (136, 256→256 — stock's size, but supersampled from a 4x upscale rather than
+resampled from stock). They were first shipped at 512 and that **crashed the game**; see
+hard rule 4. The small ones went up as **contact sheets** — `sheet=GxP` in
 `target.conf` — and that is a *quality* decision, not a cost one: the app takes
 `megapixels` as an integer, so 1 is the floor, and 1MP from a 64px icon is a 16x lift.
 49 icons in a 512px sheet at 4MP is a 4x lift, and it keeps stock's shapes where the 16x
