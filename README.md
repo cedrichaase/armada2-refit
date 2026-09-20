@@ -28,8 +28,15 @@ Four layers per target, and the order matters:
 | `src/` | what `a2tex build` reads: `ai/` blended over a plain Lanczos upscale, or hand-supplied art |
 | `out/` | the finished TGA, ready for `a2tex install` |
 
-`src/` and `out/` are both derivable, so both are gitignored; `ai/` is gitignored only
-because 135 faces of it is 0.84 GB. Back it up rather than regenerate it.
+A target with `alpha=ai` gets a fifth, `src-alpha/`: the upscaled alpha plate, blended
+the same way, one PNG per face. It is its own directory rather than another file in
+`src/` because `build_sky_faces` requires exactly one `src/` image per stock face, and
+an extra `<base>.alpha.png` would trip that count check as a "needs 3 images, found 6"
+skip — which reads like a missing file, not like a design.
+
+`src/`, `src-alpha/` and `out/` are all derivable, so all three are gitignored; `ai/` is
+gitignored only because 135 faces of it is 0.84 GB. Back it up rather than regenerate
+it.
 
     ./a2tex list                       every target, its config and state
     ./a2tex build [target...] [-j N]   default: every target that has files in src/
@@ -56,6 +63,7 @@ needs editing — `target.conf` already carries the right flags for every nebula
 | `sheet` | `GxP`: pack the units into GxG contact sheets with a P-pixel gutter and upscale the sheet, then slice back. A quality setting before a cost one — the app's `megapixels` is an integer, so a lone 64px icon gets a 16x lift at the 1MP floor where a 512px sheet of 49 gets 4x |
 | `maxsize` | refuse to install this target if any output is wider than N. `install` measures first and refuses the **whole** target. The UI targets declare 256, because a `@tmaterial=interface` sprite above that **crashes the game** |
 | `blackedge` | force the outer N texels of the image and of each 2x2 quadrant to exact black. Additive sprite atlases only — `Mmoon`, whose sun quadrants would otherwise draw a faintly glowing square. Runs on the RGB plate **before** alpha is attached |
+| `alpha` | `ai` sends the **alpha plate** through the upscaler too, at the same blend, leaving the result in `src-alpha/`. Off by default and wrong for a coverage mask; correct for a hull texture, whose alpha is a self-illumination map. See the hull section |
 | `install` | `no` means built but deliberately not shipped. `UImid` is the case: it carries the fog-of-war and minimap textures, and doubling them froze the game |
 | `note` | free text, ignored by the tooling — why this target is configured the way it is |
 
@@ -67,11 +75,11 @@ silently corrupt each other when two targets run at once.
 
 ## Current state
 
-**51 targets, 725 files built, 699 shipped.** `./a2tex verify` checks every one of them
+**52 targets, 734 files built, 708 shipped.** `./a2tex verify` checks every one of them
 against the file it replaces, from the raw TGA bytes, and currently reports **0
-problems** over 717 textures — the count differs because the 8 mip levels are checked as
-part of their base rather than on their own. Run it after every build and before every
-install.
+problems** over 720 textures — the count differs because the 14 mip levels are checked
+as part of their base rather than on their own. Run it after every build and before
+every install.
 
 | class | targets | files | state |
 |---|---|---|---|
@@ -81,6 +89,7 @@ install.
 | class planets | 2 | 16 | installed. `PB_CLSS*` grounds and `PA_*` cloud layers, 2048 |
 | moons / suns / rings | 4 | 8 | installed. The first **32-bit** textures here. `mdmoon` carries a rebuilt 4-level chain |
 | UI | 3 | 544 | **confirmed in game**, 518 of them. Icons 64→256 via contact sheets, panels at 256. `UImid` (26) is `install=no` — see the crash section |
+| hull | 1 | 9 | installed, unseen. The Sovereign: `Fbattle`, `FEntE`, `Fbattle_b` at 1024 with rebuilt 2-level chains, and the first target whose **alpha goes through the upscaler** (`alpha=ai`) |
 
 Four things cost a crash, a freeze or a visible artifact, and each one is written up
 below rather than only fixed: **a UI sprite over 256x256 crashes the game**, **doubling
@@ -88,7 +97,7 @@ a fog-of-war or minimap texture freezes it**, **compositing onto an alpha-bearin
 corrupts colour**, and **`earth.tga`'s fourth byte is padding, not alpha**.
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
-lot. `Textures/RGB` went from 205 MB to 2.42 GB.
+lot. `Textures/RGB` went from 205 MB to 2.4 GB.
 
 Originals are backed up twice: beside each file in the game directory as
 `<name>.a2neb-backup`, and here in each `targets/<NAME>/stock/`.
@@ -1167,7 +1176,86 @@ It samples nothing — the first version strided every 11th pixel and reported �
 on high-variance icons, the same magnitude as a real defect, which makes a tolerance
 meaningless. Strided slice sums over the whole plane are exact and fast enough.
 
-Current state: **717 textures, 0 problems.**
+Current state: **720 textures, 0 problems.**
+
+## The first hull texture: the Sovereign, and alpha that is not a mask
+
+`Fbattle` (the Sovereign-class battleship), `FEntE` (the *Enterprise*-E, also used by
+`fedpod16.sod`) and `Fbattle_b` (the Borg-assimilated variant). All three are 256x256,
+32-bit, with a **2-level** hand-authored chain — `_1` at 128 and `_2` at 64. Built at
+**1024** with `mips=2`, so the chain comes out 1024 / 512 / 256.
+
+`Fbattle_b` is worth a note: no SOD references it. The engine finds it by name when a
+Sovereign is assimilated, which is why it is in the target even though nothing points at
+it. Any hull target has to look for the `_b` sibling itself; there are 100 of them in
+the set.
+
+### Why this ship first
+
+It is the smallest self-contained hull set in the game that is also the most
+recognisable, which is exactly what a first target of a new class should be: three files
+and six mips, one model each, and a result that is obvious on screen rather than
+something that needs a measurement to see. It also happens to carry every property the
+class has — 32-bit alpha, a hand-authored chain, a `_b` variant, and hull lettering the
+upscaler can get wrong — so nothing about it is a special case that would fail to
+generalise.
+
+### 1024, not 2048
+
+The app takes `megapixels` as an integer and rounds the scale factor, so a 256px source
+is 4x at 1MP and 8x at 4MP — and both cost $0.005. The size was chosen on **memory**,
+not price. Armada2.exe is a 32-bit LAA process; the textures already account for 2.4 GB.
+At 1024 a 32-bit base plus its chain is 5.3 MB, so the Sovereign set is 16 MB. At 2048
+the same three files would be 64 MB, and the ~600 hull bases behind them would be
+unreachable at any size. 4x is also where this model's invention is mildest — see
+"Invention falls off steeply with the scale factor" above.
+
+### The alpha is a self-illumination map, and it does go through the upscaler
+
+The standing rule in `attach_alpha()` is that **alpha never goes through the generative
+upscaler**: a coverage mask has no texture, only edges, Lanczos resolves an edge exactly,
+and a model that invents detail into a mask invents holes in the object. That rule was
+written against the moons, and it is still right for them.
+
+A hull texture breaks its premise. This alpha is 81% exact zero with 234 distinct values
+above it, and what it actually holds is a **night-lights map**: rows of lit windows down
+the saucer rims, the deflector, the nacelle and impulse glow. That is picture content
+with real high-frequency structure, co-registered with the windows painted into the RGB
+— and Lanczos at 4x smears a row of 1px window dots into a bar.
+
+So `alpha=ai` was added, off by default and set per target. It extracts the stock alpha,
+sends it through the same model at the same `--mp`, blends it at the same `blend%` and
+leaves the plate in `src-alpha/`, which `attach_alpha()` takes as its fifth argument.
+The `tgapad.py` padding case still outranks it: a padding byte is not a picture.
+
+Measured over all three files, AI alpha against the Lanczos alpha it replaces:
+
+| | Fbattle | FEntE | Fbattle_b |
+|---|---|---|---|
+| mean, Lanczos → AI → blend 35% | 11.61 → 11.29 → 11.49 | 13.12 → 12.72 → 12.97 | 11.61 → 11.29 → 11.49 |
+| **invented** — AI > 40 where Lanczos < 10 | 0.001% | 0.001% | 0.001% |
+| **sharpened** — Lanczos > 40 where AI < 10 | 0.759% | 0.974% | 0.759% |
+
+Invention is the number that decides it, and it is a rounding error: the model adds
+essentially no light where stock has none. The 0.76–0.97% in the other direction is not
+loss but the point of the exercise — Lanczos spreads each window's brightness into a
+soft halo, and the AI puts it back in the window. Counted the naive way that reads as
+"a percent of the glow disappeared", which is why both directions are measured.
+
+### One blend dial, not two
+
+Invention on the **colour** plate is not a rounding error. The model reads faint grey
+smudges on the hull as lettering and draws plausible glyphs into them, and it rounds
+stock's square windows into lozenges. At `blend=35` those stay smudges; at 50 they are
+legible; at 100 they are confident and wrong. `NCC-1701-E` itself survives all the way
+to 100 — it is large enough to be read correctly — but the invented markings around it
+do not.
+
+So the colour wants a low blend and the alpha, measured at zero invention, could take a
+high one. They are still driven by **one** `blend=`, deliberately: the lit windows in
+alpha and the painted windows in RGB must stay consistent with each other, and a crisp
+light in a soft socket is its own artifact. The measurement is recorded here so a later
+pass can split the dial with evidence rather than by taste.
 
 ## Beyond the nebulae
 
@@ -1178,16 +1266,19 @@ scripts should be read:
 - **1113 of 2115 textures are 32-bit with a live alpha channel.** No longer a blocker:
   `write_tga()` takes its depth from the stock file and `attach_alpha()` carries the
   mask across. Proved on four textures, not four hundred — see the planets-and-moons
-  section above for what that cost.
+  section above for what that cost. On a **hull** texture that channel is not a mask at
+  all but a night-lights map, and `alpha=ai` upscales it like colour; the Sovereign
+  section above has the measurement.
 - **363 hand-authored mip chains** (782 files) must be regenerated, not ignored.
   `gen_mips()` does this for every kind now, colour and alpha separately.
 - **Fonts, UI, cursors, wireframes and minimap art must never be hallucinated into.**
 - Upscaling every base texture 4x would take the set from 205 MB to about 10 GB;
-  the 699 textures done so far already account for 2.42 GB.
+  the 708 textures done so far already account for 2.4 GB. On the hull class this is the
+  binding constraint, not cost — see "1024, not 2048" above.
 
 ## Still open
 
-**699 textures are shipped and verified.** Every one is derived from its own stock art —
+**708 textures are shipped and verified.** Every one is derived from its own stock art —
 **none of the generated art shipped in the end.** The nebula systems, the planets and
 the UI are all confirmed rendering in game; what remains unseen is narrow.
 
@@ -1198,6 +1289,12 @@ Needing a look in game:
   texture — the class of mistake that crashed the Klingon campaign.
 - **Whether the comm and objectives pop-ups land centred.** They moved with the
   widescreen canvas change in `SETUP.md` and have not been opened since.
+- **The Sovereign.** The first hull texture and the first `alpha=ai` anywhere. Build a
+  `fbattle` or take the *Enterprise* into a Federation mission and look at the saucer
+  rim windows and the deflector — the alpha is what is new, and it is what will show a
+  mistake. A hull texture is a 3D model texture, so the 256px UI ceiling does not apply
+  to it, and 2048 skyboxes have been running for weeks; a crash here would be a new
+  fact, not a repeat.
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
@@ -1226,12 +1323,17 @@ Genuinely outstanding:
   `ferwireframe`, …) are ordinary interface sprites of the same class as the 382 that
   work. Splitting them into their own target would recover a 2x on 17 icons, for one
   more launch to verify. Marginal, and nobody has asked.
-- **Next is hull textures** — 611 carry a live alpha channel and most have mip chains.
-  Both blockers now have working code behind them; what is untested is the *scale*
-  (~1300 base textures, and sheets only help where a whole group shares one size), and
-  whether alpha on a hull texture (specular, team-colour masking) tolerates a Lanczos
-  upscale as well as a cutout mask does. There are also `*bump` textures throughout the
-  set, which are normal or bump maps and must not be treated as colour.
+- **The rest of the hull class.** The Sovereign proved the shape of it: 256x256, 32-bit,
+  a short hand-authored chain, a `_b` Borg variant nothing references, and an alpha that
+  is a night-lights map rather than a mask. What is still untested is the **scale** —
+  ~600 hull bases, and contact sheets only help where a whole group shares one size,
+  which at 256px they largely do. Memory is the real ceiling: at 1024 the whole class is
+  roughly 3 GB on top of the 2.4 GB already spent, inside a 32-bit LAA process, so it
+  wants doing by faction or by ship class and checking as it goes, not in one pass.
+  There are also `*bump` textures throughout the set, which are normal or bump maps and
+  must not be treated as colour, and the alpha on a **station** or **weapon** texture has
+  not been looked at — `alpha=ai` is justified for a night-lights map and for nothing
+  else yet.
 
 Closed since the last revision of this list, recorded so they are not re-opened:
 

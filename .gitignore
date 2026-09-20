@@ -2,3 +2,6 @@
 targets/*/out/
 targets/*/ai/
 targets/*/src/
+targets/*/src-alpha/
+targets/*/.alpha-units/
+targets/*/.units/
