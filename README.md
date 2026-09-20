@@ -63,8 +63,11 @@ silently corrupt each other when two targets run at once.
 |---|---|
 | `Mnebula4` | **installed** — 512x512, verified in game, looks good |
 | `MBG02` | **installed** — 4096x4096 atlas, face 2048, candidate D |
-| 22 six-face skybox sets | built from their own upscaled stock faces, face 2048 |
+| 22 six-face skybox sets, 133 faces | **installed** — upscaled from their own stock faces, face 2048. Not yet seen in game |
 | 7 puff atlases | stock — they need art, and that is the remaining work |
+
+Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
+lot. `Textures/RGB` went from 254 MB to 1.9 GB.
 
 Originals are backed up twice: beside each file in the game directory as
 `<name>.a2neb-backup`, and here in each `targets/<NAME>/stock/`.
@@ -592,8 +595,11 @@ Two files are not part of any set:
   blob or a small galaxy. This is the same category as the fonts and UI in
   `REMASTERING.md`: leave it alone.
 - **`MbgBaku1.tga` is not a duplicate of `MbgBaku.1.tga`.** Different content (58/38/54
-  against 68/33/20), different row origin, and no set of six around it. An orphan; left
-  out of the `MbgBaku` target.
+  against 68/33/20), different row origin, and no set of six around it — an orphan. It
+  is nonetheless carried as a 7th file in the `MbgBaku` target, which is correct rather
+  than accidental: `sky-faces` pairs `src/` to `stock/` by sorted name, `MbgBaku.N` sorts
+  before `MbgBaku1` in both lists, and it gets its own upscale matched to its own means
+  (50, 57/37/54). A set does not have to be exactly six files.
 
 ## Upscaling a skybox from its own stock faces
 
@@ -670,6 +676,54 @@ byte-for-byte.
 written and nothing complains. Parse the JSONL instead — each result line carries an
 `index`, the 0-based line of the input file, which is the only reliable way to map a
 result back to its input, because results come back out of order. Then `curl` the URLs.
+
+### A zero target channel must be annihilated, not left alone
+
+The worst bug of the skybox pass, and it was invisible to every per-set check because
+only one texture in the game triggers it. `MbgOmega`'s stock blue is **exactly** 0 on all
+six faces. In `fit()` the per-channel gain is `g = min(MAXGAIN, t/v)`, which is 0 when the
+target mean `t` is 0, and the only guard was against dividing by zero:
+
+    print(round(100/g,4) if g>0 else 100)      # 100 == -level 0%,100% == identity
+
+So the channel that most needed to be removed was the one channel passed through
+untouched. `MbgOmega` built with blue at **33–88/255** against stock's 0 — an amber sky
+rendered violet. `fit()` now blanks the channel outright, on both the per-channel and the
+`MONOHUE` path, and says so:
+
+    MbgOmega.1.png: B target mean is 0, channel blanked
+
+The general lesson: a fallback chosen to avoid an arithmetic error is still a *choice
+about the image*, and "do nothing" is the wrong choice exactly when the target is zero.
+Audited across every stocked texture, `MbgOmega`'s six faces are the only ones in the
+game with an exactly-zero channel — `MbgKlin4`, which looks identical in `a2tex diff`
+(`17/8/0`), is really 0.22–0.45 and scaled correctly all along.
+
+### Two checks that are weaker than they look
+
+- **R-G deviation is insensitive on a strongly-hued plate.** `MbgKling`'s stock R-G is
+  242 and `MbgBaku`'s 140 — dominated by real hue, so invented noise cannot move the
+  ratio. Near-parity on those sets is not strong evidence; on `mbgaqu` (R-G ~31) the same
+  check is genuinely sensitive. Where the metric is weak, the high-frequency-energy
+  comparison carries the signal instead.
+- **"maxima below 255" cannot pass on a set whose stock already clips.** `MbgKling`,
+  `MbgBaku`, `MbgCard` and three `MbgDom1` faces have stock maxima of 255 (stars). The
+  criterion is really **"no clipping beyond stock"**, measured as the saturated-pixel
+  *share*: on `MbgKling`/`MbgBaku`/`MbgDom1` that share fell (0.71% against stock 1.34%),
+  on `MbgCard` it rose 1.4–2.5x, which is what an 8x upscale of point highlights does —
+  it spreads each clipped star over more pixels. `mbgpur2` is the one face that clips
+  where stock does not (0.037% of pixels), and the blend is not the lever: plain Lanczos
+  with zero AI contribution already reaches 254–255 there.
+
+### Pair `src/` to `stock/` by name, not by sort position
+
+`build_sky_faces` used to `sort` both lists independently and pair by index. That is not
+a pairing rule: glibc collation ignores punctuation, so `MbgBaku.1` / `MbgBaku1` /
+`MbgBaku.2` tie and are separated only by a byte-level tiebreak. It agreed on both sides
+here, which is luck. Two names differing only in punctuation would silently swap two
+faces of a cube — a failure that looks like bad art rather than a bug. Pairing is now by
+name, falling back to sort order (with a warning) for hand-supplied art whose names do
+not match.
 
 ## Beyond the nebulae
 
