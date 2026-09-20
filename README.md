@@ -576,7 +576,8 @@ Outputs are URLs; `curl -sL -o` them. Klein returns `.jpg` even when asked for p
 
 ## The skybox sets: a census
 
-There are **23 skybox sets, 136 files**, all 256x256 24-bit except the `MBG02` atlas.
+There are **24 skybox sets, 135 files**, all 256x256 24-bit except the `MBG02` atlas.
+23 of those sets were upscaled (134 files); `Mbgstars` is the one left stock.
 Reading the background field out of all 72 `.bzn` maps (recipe in the engine-reference
 section above) accounts for every map and says which sets actually matter:
 
@@ -855,25 +856,42 @@ scripts should be read:
 
 ## Still open
 
-**The skyboxes are finished.** All 23 sets are built, installed and **confirmed in game
-by the user** — not merely measured. That closes the class.
+**Both nebula systems are finished.** 23 skybox sets (134 files, confirmed in game) and
+8 puff atlases (12 files, counting `Mnebula2`'s four rebuilt mip levels) — 142 distinct
+textures in all. Every one is derived
+from its own stock art — **none of the generated art shipped in the end.**
 
-What remains:
+Needing a look in game:
 
-- **The 7 map-plane puff atlases.** `Mnebula4` is installed; `Mnebula1`, `Mnebula2`,
-  `Mnebula3`, `Mnebula5`, `MFluidicNeb`, `mtachyonneb` and `Mlatinum` still have no
-  `src/`. Unlike the skyboxes these cannot be upscaled from stock in the same way and be
-  interesting — they are 128px quadrants isolated on black, and the whole point of
-  replacing them is better filament structure, which means generated art. See
-  `PROMPTS.md`.
-- **`Mbgstars` stays stock, on purpose.** Sparse starfield; a generative upscaler turns a
-  1px star into a blob. Plain Lanczos is the only safe option and buys little.
+- **The 8 puff atlases have not been seen yet** beyond `Mnebula2`'s crash, which is
+  fixed. They are the drifting cloud billboards on the map plane; `Mlatinum` is the
+  yellow resource cloud.
+
+Accepted as-is, with reasons, so they are not re-litigated:
+
+- **`Mbgstars` stays stock.** Sparse starfield — an upscaler turns a 1px star into a
+  blob. Plain Lanczos is the only safe option and buys nothing.
 - **`mbgpur2` clips** at 0.037% of pixels where stock does not. Plain Lanczos already
-  reaches 254–255 on those star cores, so the blend is not the lever. Accepted.
-- **`mbgrg` is the one set at `blend=20`** rather than 35, because its two darkest faces
-  measured HF 2.98 and 2.85 against a 3.0 threshold. Taste, not correctness.
-- The **d3d8/DXVK regression in `SETUP.md`** is still unfixed and still blocked on Heroic
-  being closed.
+  reaches 254-255 on those star cores, so the blend is not the lever.
+- **`mbgrg` is the one skybox at `blend=20`**, because its two darkest faces measured HF
+  2.98 and 2.85 against a 3.0 threshold. Taste, not correctness.
+- **`Mnebula4` and `MFluidicNeb` are identical**, as in stock — the same file, and the
+  upscaler is deterministic, so two independent runs produced byte-identical output.
+- **`MbgBaku` carries 7 files, not 6.** `MbgBaku1` is an orphan, not a duplicate; it is
+  processed correctly as a seventh unit.
+
+Genuinely outstanding:
+
+- **The d3d8/DXVK regression in `SETUP.md`**, unfixed and still blocked on Heroic being
+  closed. The cutscene-crash fix has consequently never been tested.
+- **`Mnebula4`'s generated art is preserved but unused** — `targets/Mnebula4/src-generated/`
+  and `archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen` to
+  return to it.
+- **`PROMPTS.md` is now unexercised.** Nothing in the game currently uses generated art,
+  so those prompts are untested against the current pipeline.
+- **Next class by screen area is planets and large props** — see `REMASTERING.md`. The
+  blocker beyond it is hull textures, where 611 files carry a live alpha channel that
+  `write_tga()` would destroy and most have mip chains.
 
 Closed since the last revision of this list, recorded so they are not re-opened:
 
@@ -884,3 +902,12 @@ Closed since the last revision of this list, recorded so they are not re-opened:
 - ~~1024x1024 textures are untested~~ — 4096x4096 is confirmed working in game.
 - ~~`build.sh` requires exactly 4 images per atlas~~ — the `puff` and `sky-atlas` kinds
   repeat the supplied images, so one is enough.
+- ~~A puff cannot usefully be upscaled from its own stock, because the point of replacing
+  it is filament structure a 128px quadrant does not contain~~ — argued here, then
+  disproved. All 8 were upscaled from stock and the result beat the generated art on
+  every measure taken, including on `Mnebula4`, where both existed.
+- ~~R, G and B means are identical for map puffs~~ — true for most of the set, but
+  `Mnebula1` is 28/26/22 and `Mnebula2` is 33/9/8. Match the stock file, not the rule.
+- ~~Generative upscaling is non-deterministic, so two runs give free variety~~ —
+  `Mnebula4` and `MFluidicNeb` are byte-identical stock files, upscaled in two separate
+  runs, and produced byte-identical `ai/` layers and byte-identical output.

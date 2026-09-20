@@ -196,7 +196,14 @@ Don't insist on four distinct generations.
 ## State
 
 **A 4096x4096 atlas (48 MB TGA) is confirmed working in game.** Texture size is not a
-constraint worth worrying about here; face resolution is.
+constraint worth worrying about here; face resolution is. **But a texture with a
+hand-authored mip chain is a hard exception** — there the base size is pinned to the
+chain, and changing one without the other crashes the game. `mips=N` in `target.conf`.
+
+**Everything installed by this project is derived from its own stock art.** None of the
+generated art shipped: `Mnebula4` was the only texture built both ways, and the stock
+upscale won. Reach for `PROMPTS.md` only when stock is too small or damaged to carry
+detail.
 
 **`SIZE` is per-face, and the face fills the whole viewport** — sizing the atlas is not
 the same thing and was the reason a 4x increase still looked soft. See the resolution
