@@ -224,7 +224,13 @@ both — MBG02 byte-for-byte against the accepted candidate D.
 installed, and verified rendered, not just measured. `Mbgstars` is deliberately left
 stock (starfield). Do not re-open this without a specific reason.
 
-**The puffs are done too**, and the claim above them — that a puff could not usefully be
+**`Mnebula2` has a hand-authored mip chain (`Mnebula2_1..._4`, each half the previous)
+and upscaling its base while leaving the chain alone CRASHED the game** in the Klingon
+campaign. It is reverted to stock. `a2tex install` now refuses this case outright. It is
+the only one of the 142 textures installed here with a chain — but `REMASTERING.md`
+counts 347 of them across the full set, so check before every future install.
+
+**7 of the 8 puffs are done**, and the claim above them — that a puff could not usefully be
 upscaled from its own stock — was wrong. All 8 atlases are now `source=stock`,
 1024x1024, installed. `Mnebula4`'s earlier generated art is preserved in
 `targets/Mnebula4/src-generated/` and `archive/mnebula4-generated/`; put it back in

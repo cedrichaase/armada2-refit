@@ -66,7 +66,8 @@ silently corrupt each other when two targets run at once.
 | `Mnebula4` | **installed** — 512x512, verified in game, looks good |
 | `MBG02` | **installed** — 4096x4096 atlas, face 2048, candidate D |
 | 22 six-face skybox sets, 133 faces | **installed and confirmed in game** — upscaled from their own stock faces, face 2048 |
-| 8 puff atlases | **installed** — upscaled from their own stock quadrants, 1024x1024 (512/quadrant). Not yet seen in game |
+| 7 puff atlases | **installed** — upscaled from their own stock quadrants, 1024x1024 (512/quadrant) |
+| `Mnebula2` | **reverted to stock.** It has a hand-authored mip chain; upscaling the base alone crashed the game. See the mip-chain section |
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
 lot. `Textures/RGB` went from 254 MB to 1.9 GB.
@@ -771,6 +772,49 @@ faint additive seam that the rebuild removes.
 **The upscaler is deterministic.** `Mnebula4` and `MFluidicNeb` are byte-identical stock
 files, were upscaled in two independent runs, and produced byte-identical `ai/` layers
 and byte-identical output. Do not expect run-to-run variation to give you free variety.
+
+## Mip chains, and the crash they caused
+
+**`Mnebula2` is the only one of the 142 textures installed here that has a hand-authored
+mip chain, and upscaling its base while leaving that chain alone crashed the game.**
+
+A mip chain is the set of pre-shrunk copies of a texture the GPU uses when the surface
+is small on screen. Without them, drawing a 1024px texture across ten screen pixels
+makes each pixel grab one essentially arbitrary texel, and the result crawls and
+sparkles as the camera moves. The hardware picks the level whose texel density matches
+the pixel density and blends between two of them. Normally the driver generates the
+chain automatically by repeated box-filtering; Armada II instead lets an artist ship one
+explicitly, as sibling files:
+
+    Mnebula2.TGA    128x128     level 0
+    Mnebula2_1.tga   64x64      level 1
+    Mnebula2_2.tga   32x32      level 2
+    Mnebula2_3.tga   16x16      level 3
+    Mnebula2_4.tga    8x8       level 4
+
+Each level is exactly half the previous one. That is not a convention, it is what the
+API requires, and it is why the crash happened: a 1024x1024 base above a 64x64 level 1
+is not a valid chain, and creating the texture fails. The d3d8to9 -> DXVK path is
+stricter about this than the original runtime would have been.
+
+**Why hand-author a chain at all?** Because averaging is the wrong shrink for some
+images. An additive nebula puff box-filtered down loses its bright core and fades toward
+grey mush, and since the blend is additive, a duller small mip means the nebula visibly
+*dims* as the camera pulls back. An artist can keep the core punchy and the total light
+roughly constant instead. The same logic covers alpha-tested foliage (averaging alpha
+eats the coverage) and anything that has to stay readable when tiny. In 2001 there was
+also a practical reason: driver mip generation varied between cards, so shipping the
+levels guaranteed what players saw.
+
+**The guard.** `a2tex install` now refuses any texture that has `_N` siblings when the
+base size would change, and says so. To upscale such a texture properly you must
+regenerate the whole chain in the same step — for a 1024 base that is `_1` 512 down to
+`_4` 64, or the full seven levels down to 8x8 if you want to keep the chain bottoming
+out where stock's does.
+
+`REMASTERING.md` counts **347 hand-authored chains, 782 files**, across the whole texture
+set. For the nebulae it is a single texture; for the hull textures it will be most of
+them.
 
 ## Beyond the nebulae
 
