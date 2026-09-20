@@ -51,6 +51,49 @@ below), so it was written directly into `ARMADA.PRF`, line 5:
 Backup at `ARMADA.PRF.bak` (151 bytes). The game rewrites the file on exit (now 154
 bytes) and the resolution persists.
 
+### The UI stretch, and where it actually comes from
+
+`STA2WidescreenPatch` fixes the 3D view. It does **not** fix the UI, which at 3440x1440
+comes out 1.79x too wide — correct only at 4:3. That stretch is not in the patch, not in
+`Armada2.exe`, and not in the sprite files. It is in `misc/gui_<race>.cfg`:
+
+    // we no longer assume that these files have a resolution of 640x480
+    // it can now be specified here
+    screenWidth = 1600
+    screenHeight = 1200
+
+Every coordinate in `misc/gui_interface.cfg` and `misc/gui_glob16x12.cfg` is an absolute
+pixel position in that canvas — measured across all 356 four-number entries: no `x+w`
+exceeds 1600, no `y+h` exceeds 1215. The engine scales the canvas to the back buffer
+**independently on each axis**. At 3440x1440 that is 2.15x across against 1.20x down,
+and 2.15/1.20 = 1.79. At 4:3 the two factors are equal, which is exactly why 4:3 is the
+only aspect that looks right.
+
+`tools/ui-widescreen.py` re-declares the canvas as `1200 x display aspect` — 2867x1200
+here — so both scale factors come out at 1.20 and the UI keeps the size it has today
+instead of shrinking. Re-declaring alone is not enough: the extra 1267px all appear on
+the right, so it also moves the right-anchored and centred panels. 19 values in 8 files,
+nothing else touched, CRLF and tab alignment preserved byte-for-byte.
+
+    tools/ui-widescreen.py --dry-run     # show the 19 changes
+    tools/ui-widescreen.py               # apply, reading the resolution from ARMADA.PRF
+    tools/ui-widescreen.py --revert      # restore from the *.a2neb-backup beside each
+
+The format keeps screen placement in a handful of `<name>PanelArea` keys and makes
+everything else relative to its panel, which is why the change is so small — and why
+the sub-element coordinates must **not** be touched.
+
+**Not handled: the bridge display** (`bridgePanelRect`, `*_bridgeBackgroundRect` and
+their layer rects, `gui_glob16x12.cfg` lines 393-536). It is a full-screen 1600x1200
+backdrop assembled from six tiles with overlay sprites placed against it, so it cannot
+be widened without either stretching the art — the thing being removed — or re-tiling
+it. Left stock, which leaves it pillarboxed left rather than stretched.
+
+**Untested in game at the time of writing.** The model behind it (per-axis scaling from
+a declared canvas) is inferred from the file format and the symptom, not observed; if it
+is wrong the likely failure is panels in the wrong place rather than a crash, and
+`--revert` is one command.
+
 ## Patch Project 1.2.5
 
 **The NSIS installer refuses to run against a GOG install**, with

@@ -271,8 +271,17 @@ reason rule 2 above changed. `blackedge=N` exists for `Mmoon` alone: its three s
 sprites are additive, so a stray 1-3/255 on a quadrant boundary draws a glowing square.
 `Mdmoonglo`/`Mdmoonglo4` stay stock — soft gradients, nothing to recover.
 
+**The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
+declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to
+the back buffer independently on each axis — 2.15x across against 1.20x down at
+3440x1440. `tools/ui-widescreen.py` re-declares the canvas and moves the right-anchored
+and centred panels; `--revert` undoes it. Details and the one unhandled case (the bridge
+display) are in `SETUP.md`. **Applied but not yet seen in game.**
+
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
-`targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them.
+`targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs
+have their own `.a2neb-backup` in `misc/` and are reverted by `ui-widescreen.py`, not by
+`a2tex`.
 
 (An older note here claimed the installed `Mnebula4.TGA` was still top-down. Measured:
 it is `1800`, the same as `out/Mnebula4.tga` and the same as every stock puff. All nine

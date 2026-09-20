@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Re-author Armada II's UI layout for a non-4:3 display.
+
+    tools/ui-widescreen.py                 rewrite for the resolution in ARMADA.PRF
+    tools/ui-widescreen.py --res 3440x1440 rewrite for a resolution you name
+    tools/ui-widescreen.py --dry-run       print what would change, touch nothing
+    tools/ui-widescreen.py --revert        restore the stock configs
+
+WHY THE UI IS STRETCHED
+
+The layout is not compiled into Armada2.exe and it is not in the sprite files.  It is in
+misc/gui_<race>.cfg, and each of those ends with:
+
+    // we no longer assume that these files have a resolution of 640x480
+    // it can now be specified here
+    screenWidth = 1600
+    screenHeight = 1200
+
+Every coordinate in misc/gui_interface.cfg and misc/gui_glob16x12.cfg is an absolute
+pixel position in that 1600x1200 canvas -- measured: no x+w exceeds 1600 and no y+h
+exceeds 1215.  The engine scales that canvas to the back buffer INDEPENDENTLY ON EACH
+AXIS.  At 3440x1440 that is 2.15x across and 1.20x down, so every panel, icon and glyph
+comes out 1.79x too wide.  At 4:3 the two factors are equal and nothing is distorted,
+which is exactly what the symptom looks like from the outside.
+
+WHAT THIS CHANGES
+
+Height stays at 1200 and the width is re-declared as 1200 * display aspect -- 2867 for
+3440x1440.  Both scale factors then come out at 1.20, so the UI keeps the size it has
+today and simply stops being stretched.  (Declaring the native 3440x1440 instead would
+also be undistorted, but at 1:1 the whole UI would suddenly be 20% smaller.)
+
+Re-declaring the canvas alone is not enough: the extra 1267px of width all appear on the
+right, so anything anchored to the right edge or to the centre has to move with it.  That
+is the table below, and it is deliberately short -- the format keeps screen placement in
+a handful of `<name>PanelArea` keys and makes everything else relative to its panel, so
+the sub-element coordinates must NOT be touched.
+
+NOT HANDLED: the bridge display (`bridgePanelRect`, `*_bridgeBackgroundRect` and their
+layer rects, gui_glob16x12.cfg lines 393-536).  It is a full-screen 1600x1200 backdrop
+assembled from six tiles with overlay sprites placed against it, so it cannot be widened
+without either stretching the art -- the thing we are removing -- or re-tiling it.  Left
+stock, which leaves it pillarboxed to the left rather than stretched.
+"""
+import argparse, os, re, shutil, sys
+
+GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
+BAK = '.a2neb-backup'
+STOCK_W, STOCK_H = 1600, 1200
+
+# key -> anchor.  'right' keeps the gap to the right edge, 'centre' keeps the offset from
+# the centre line, 'left' is unchanged and listed only so the survey below is complete.
+ANCHOR = {
+    'gui_interface.cfg': {
+        'resourcePanelArea':  'left',    # top-left, x=0
+        'minimapPanelArea':   'left',    # bottom-left, x=0
+        'buttonPanelArea':    'right',   # top-right, 11px gap
+        'cinematicPanelArea': 'right',   # bottom-right, flush
+        'infoPanelArea':      'centre',  # bottom-centre ship display
+        'infoPanelArea_0':    'centre',
+        'infoPanelArea_1':    'centre',
+        'infoPanelArea_2':    'centre',
+    },
+    'gui_glob16x12.cfg': {
+        'dropPlayerPanelArea':    'centre',
+        'loadingPlayerPanelArea': 'centre',
+        'pauseGamePanelArea':     'centre',
+        'objectivesPanelArea':    'centre',
+        'commPanelArea':          'centre',
+        'replayPanelArea':        'right',
+    },
+}
+# Bare `key = <x>` scalars, with the element width needed to anchor them.
+SCALAR = {
+    'gui_glob16x12.cfg': {
+        'popupPaletteXB': ('right', 245),   # 3 columns x 80 + gaps, flush right at 1595
+    },
+}
+RACE_CFGS = ['gui_bor.cfg', 'gui_cardassian.cfg', 'gui_fed.cfg', 'gui_kli.cfg',
+             'gui_rom.cfg', 'gui_species8472.cfg']
+
+RECT = re.compile(r'^(\s*)(\w+)(\s*=\s*)(-?\d+)(\s+)(-?\d+\s+-?\d+\s+-?\d+)(\s*)$')
+SCAL = re.compile(r'^(\s*)(\w+)(\s*=\s*)(-?\d+)(\s*)$')
+
+
+def prf_resolution(path):
+    """Width and height out of ARMADA.PRF, which is line-oriented plain text."""
+    for line in open(path, encoding='latin-1', errors='replace'):
+        f = line.split()
+        # the display line is  <floats...> <w> <h> <bpp> <n>
+        for i in range(len(f) - 3):
+            try:
+                w, h, bpp = int(f[i]), int(f[i + 1]), int(f[i + 2])
+            except ValueError:
+                continue
+            if 320 <= w <= 16384 and 240 <= h <= 16384 and bpp in (16, 32):
+                return w, h
+    return None
+
+
+def rewrite(path, canvas_w, rects, scalars, race, dry):
+    shift_r = canvas_w - STOCK_W
+    shift_c = shift_r // 2
+    src = path + BAK if os.path.exists(path + BAK) else path
+    if not dry and src == path:
+        shutil.copy2(path, path + BAK)
+        src = path + BAK
+    out, changes = [], []
+    # newline='' keeps the CRLF line endings these files ship with.
+    with open(src, encoding='latin-1', newline='') as fh:
+        for line in fh:
+            body, nl = line.rstrip('\r\n'), line[len(line.rstrip('\r\n')):]
+            code = body.split('//')[0]
+            m = RECT.match(code)
+            if m and m.group(2) in rects:
+                anchor = rects[m.group(2)]
+                x = int(m.group(4))
+                nx = {'right': canvas_w - (STOCK_W - x),
+                      'centre': x + shift_c, 'left': x}[anchor]
+                if nx != x:
+                    changes.append(f"  {m.group(2):26} x {x} -> {nx}  ({anchor})")
+                    body = (m.group(1) + m.group(2) + m.group(3) + str(nx) +
+                            m.group(5) + m.group(6) + m.group(7) + body[len(code):])
+            elif (m2 := SCAL.match(code)) and m2.group(2) in scalars:
+                anchor, width = scalars[m2.group(2)]
+                x = int(m2.group(4))
+                nx = canvas_w - (STOCK_W - x) if anchor == 'right' else x + shift_c
+                if nx != x:
+                    changes.append(f"  {m2.group(2):26} x {x} -> {nx}  ({anchor})")
+                    body = (m2.group(1) + m2.group(2) + m2.group(3) + str(nx) +
+                            m2.group(5) + body[len(code):])
+            elif race and (m3 := SCAL.match(code)) and m3.group(2) == 'screenWidth':
+                x = int(m3.group(4))
+                if x != canvas_w:
+                    changes.append(f"  screenWidth                x {x} -> {canvas_w}")
+                    body = (m3.group(1) + m3.group(2) + m3.group(3) + str(canvas_w) +
+                            m3.group(5) + body[len(code):])
+            out.append(body + nl)
+    if changes:
+        print(f"{os.path.basename(path)}")
+        print('\n'.join(changes))
+    if not dry and changes:
+        with open(path, 'w', encoding='latin-1', newline='') as fh:
+            fh.write(''.join(out))
+    return len(changes)
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument('--res')
+    ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--revert', action='store_true')
+    ap.add_argument('-h', '--help', action='store_true')
+    a = ap.parse_args()
+    if a.help:
+        print(__doc__); return
+    misc = os.path.join(GAME, 'misc')
+    if not os.path.isdir(misc):
+        sys.exit(f"no {misc} -- set A2_GAME")
+
+    if a.revert:
+        n = 0
+        for f in sorted(os.listdir(misc)):
+            b = os.path.join(misc, f)
+            if b.endswith(BAK):
+                shutil.copy2(b, b[:-len(BAK)])
+                print(f"reverted {f[:-len(BAK)]}"); n += 1
+        print(f"{n} file(s) restored" if n else "nothing to revert")
+        return
+
+    if a.res:
+        w, h = (int(v) for v in a.res.lower().split('x'))
+    else:
+        r = prf_resolution(os.path.join(GAME, 'ARMADA.PRF'))
+        if not r:
+            sys.exit("could not read a resolution from ARMADA.PRF -- pass --res WxH")
+        w, h = r
+    canvas_w = round(STOCK_H * w / h)
+    print(f"display {w}x{h} -> UI canvas {canvas_w}x{STOCK_H} "
+          f"(scale {w/canvas_w:.4f} x {h/STOCK_H:.4f}); stock was "
+          f"{STOCK_W}x{STOCK_H} (scale {w/STOCK_W:.4f} x {h/STOCK_H:.4f})")
+    if canvas_w == STOCK_W:
+        print("display is 4:3 -- nothing to do"); return
+
+    total = 0
+    for f, keys in ANCHOR.items():
+        total += rewrite(os.path.join(misc, f), canvas_w, keys,
+                         SCALAR.get(f, {}), False, a.dry_run)
+    for f in RACE_CFGS:
+        total += rewrite(os.path.join(misc, f), canvas_w, {}, {}, True, a.dry_run)
+    print(f"\n{total} value(s) {'would change' if a.dry_run else 'changed'}. "
+          f"Stock is beside each file as *{BAK}; --revert restores it.")
+
+
+main()
