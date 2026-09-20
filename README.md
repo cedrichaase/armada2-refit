@@ -13,8 +13,9 @@ Textures live in `Textures/RGB/` (flat, 2115 `.tga` files, 205 MB stock).
 
     a2tex                 the only entry point
     lib/                  common.sh (fit, TGA writing), puff.sh, sky.sh
-    tools/                bottomup.py, upscale-stock.sh, huespread.py,
-                          make-seamless.sh, gen-nebula.sh
+    tools/                bottomup.py, upscale-stock.sh, huespread.py, verify.py,
+                          make-seamless.sh, gen-nebula.sh, tgapad.py,
+                          ui-widescreen.py, fix-enterprise-registry.py
     targets/<NAME>/       target.conf, stock/, ai/, src/, out/  -- one per texture
     archive/              candidates and comparisons that cost credits to make
     .scratch/             transient, safe to delete at any time
@@ -89,7 +90,7 @@ every install.
 | class planets | 2 | 16 | installed. `PB_CLSS*` grounds and `PA_*` cloud layers, 2048 |
 | moons / suns / rings | 4 | 8 | installed. The first **32-bit** textures here. `mdmoon` carries a rebuilt 4-level chain |
 | UI | 3 | 544 | **confirmed in game**, 518 of them. Icons 64→256 via contact sheets, panels at 256. `UImid` (26) is `install=no` — see the crash section |
-| hull | 1 | 9 | **confirmed in game.** The Sovereign: `Fbattle`, `FEntE`, `Fbattle_b` at 1024 with rebuilt 2-level chains, and the first target whose **alpha goes through the upscaler** (`alpha=ai`). `blend=70`, not the usual 35 — see why below |
+| hull | 1 | 9 | **confirmed in game.** The Sovereign: `Fbattle`, `FEntE`, `Fbattle_b` at 1024 with rebuilt 2-level chains, and the first target whose **alpha goes through the upscaler** (`alpha=ai`). `blend=70`, not the usual 35, and the registry's two Cs re-cut by hand — see why below |
 
 Four things cost a crash, a freeze or a visible artifact, and each one is written up
 below rather than only fixed: **a UI sprite over 256x256 crashes the game**, **doubling
@@ -1286,6 +1287,42 @@ must stay consistent with each other, and a crisp light in a soft socket is its 
 artifact. The measurement is recorded above so a later pass can split the dial with
 evidence rather than by taste.
 
+### The registry: the one place the model had to be corrected by hand
+
+Stock's `NCC-1701-E` is **three texels tall**. At that size a C and an O are the same
+pixels, so the string in stock is an illegible smear — the legible registry on the ship
+today is *entirely* the upscaler's reconstruction. It got eight of ten glyphs right and
+closed both Cs into O shapes, so the *Enterprise* flew as `NOO-1701E`.
+
+This is the "never hallucinate into letterforms" rule from `REMASTERING.md` arriving on a
+texture that is not a font atlas, and it needed a different answer than "leave it stock":
+leaving it stock means an illegible smear, and no filter can do better, because the
+aperture was never resolved in the source to begin with. Re-setting the type would mean
+inventing a typeface.
+
+So `tools/fix-enterprise-registry.py` does the minimum that is certainly correct — it
+cuts the aperture back into the two glyphs the model closed and touches nothing else.
+The string is mirrored in the atlas (the UVs flip it back), so each C opens to the
+**left** there:
+
+    glyph rows      908..920      the box, 13px tall, at 1024
+    aperture rows   912..916      5px, centred on the glyph at y=914 (~38% of height)
+    C1 left stroke  x 156..158    core x157, exterior x155, interior x159
+    C2 left stroke  x 175..177    core x176, exterior x174, interior x178
+
+Each aperture row is filled by interpolating across the stroke from the exterior sample
+column to the interior one, per channel. Both sides are the same light hull grey, so the
+cut disappears into the plate rather than needing a matched fill colour. The script
+verifies the core column is actually dark and the flanks actually light before it writes
+anything, which both catches a moved glyph and makes a second run a refusal rather than
+a second cut.
+
+**This is a one-off and is meant to stay one.** The *Enterprise* is iconic enough that
+wrong lettering reads as a bug; no other hull texture in the game carries type anyone can
+name. **Re-run it after any `--reblend`** — `src/` is derived and gitignored, so a
+re-blend rewrites the plate and takes the fix with it. The order is `upscale-stock.sh
+--reblend` → the script → `./a2tex build` → `install`.
+
 ### What this class cannot fix
 
 Even at 70 the gain is real but modest, and that is the honest ceiling. The upscaler
@@ -1329,9 +1366,8 @@ Needing a look in game:
   texture — the class of mistake that crashed the Klingon campaign.
 - **Whether the comm and objectives pop-ups land centred.** They moved with the
   widescreen canvas change in `SETUP.md` and have not been opened since.
-- **The Sovereign at `blend=70`.** Seen in game at 35 and it read as stock; 70 is
-  installed and has not been looked at yet. 85 is one free `--reblend` away if 70 is
-  still short.
+- **The Sovereign's registry.** `blend=70` is confirmed in game and clearly better; the
+  two C apertures were then re-cut by hand and that build has not been looked at yet.
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
