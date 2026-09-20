@@ -36,10 +36,17 @@ DXVK on every launch and reverts the d3d8 chain fix.**
    silently destroy it. `bottomup.py` rejects non-24-bit input, which is the only reason
    that has not already bitten. See `REMASTERING.md`.
    For 24-bit nebula work: `-alpha off -type TrueColor -compress None`, then
-   `./bottomup.py <file>`. Verify the header after writing; a format mismatch will not
-   announce itself. ImageMagick 7 cannot be told to write bottom-up TGAs — every
+   `tools/bottomup.py <file>`. Verify the header after writing; a format mismatch will
+   not announce itself. ImageMagick 7 cannot be told to write bottom-up TGAs — every
    `-define tga:image-origin=...` spelling is ignored — so the row flip must be a
    post-pass. `bottomup.py` is in-place and idempotent.
+   **Stock is not uniformly bottom-up — that earlier claim was measured and is false.**
+   Of the 135 skybox faces, 53 are `0x00` and 82 are `0x20`, and the split runs *within*
+   a single set: `MbgBorg.2` and `.5` are bottom-up while the other four faces are
+   top-down. Both render correctly in the retail game, so the engine honours the
+   descriptor. `write_tga()` takes the stock file as its third argument and copies
+   *its* origin (`bottomup.py --like`), which makes an accidental vertical flip
+   impossible by construction rather than by argument.
 3. **Always glob both extension cases.** `$(ls "$n.tga" "$n.TGA" 2>/dev/null | head -1 || true)`
    — and note the `|| true`: under `set -o pipefail` the failing `ls` aborts the script.
 4. **Don't touch `Sprites/nebula.spr`.** UVs are normalised against `@reference=128`, so
@@ -63,10 +70,16 @@ reference's green/blue gain a silent no-op. Neither `-type TrueColor` nor
 `-colorspace sRGB` fixes it; only the on-disk format does. `fit()` refuses a reference
 with a zero green and blue channel for this reason.
 
-Watch for `local a=$1 b="$a"` — the whole `local` expands before any assignment lands,
-so `b` gets the *old* `a`. This cost a debugging round in `a2tex`.
+Two bash traps that have each cost a debugging round here:
 
-## Generative upscaling, in three rules
+- `local a=$1 b="$a"` — the whole `local` expands before any assignment lands, so `b`
+  gets the *old* `a`.
+- `read -r w h < <(magick ... -format '%w %h' info:)` — `read` returns 1 at EOF without
+  a trailing newline, and under `set -e` that **aborts the script silently**. It killed
+  `upscale-stock.sh` between the paid upscale and the blend, leaving a full `ai/` and an
+  empty `src/`. Put `\n` in the format.
+
+## Generative upscaling, in five rules
 
 1. **`enhance_details` / `enhance_realism` are not a quality dial.** Off makes invented
    detail *more* visible, not less — the output is sharper, so the hallucinations read
@@ -76,7 +89,23 @@ so `b` gets the *old* `a`. This cost a debugging round in `a2tex`.
    own value catches invented chroma (MBG02: stock 1.89, Lanczos 1.97, AI 5.90).
 3. **`MONOHUE=1` only on single-hue textures.** It rebuilds colour from luminance and so
    removes chroma invention by construction — but on a multi-hue texture it flattens
-   real colour. Check hue spread first.
+   real colour. Check hue spread first, with `tools/huespread.py` — **not** with the
+   plain `-colorspace HSL -channel H -separate` standard deviation, which is dominated
+   by hue noise in the near-black areas that make up most of a skybox and scores
+   single-hue plates like `MbgDom1` at 102°. `huespread.py` weights each pixel's hue by
+   the chroma it actually carries; `MBG02`, the one accepted `MONOHUE=1`, scores 0.8°.
+4. **How much a generative upscaler invents depends on the scale factor, steeply.**
+   `MBG02` was 16x from a 128px quadrant and tripled its R-G deviation (1.89 → 5.90).
+   The 6-face sets are 8x from 256px and the same model at the same settings invents
+   *no* measurable chroma: `MbgBorg`'s R-G ratio against stock is 0.998–1.000 across all
+   six faces. So `MONOHUE` is needed for the atlas and is **not** needed for the 6-face
+   sets, where per-channel matching keeps the real hue variation instead of flattening
+   it. Measure before reaching for it.
+5. **Keep the AI layer.** `targets/<T>/` holds three layers: `stock/` (original),
+   `ai/` (the raw upscale — what the credits bought), `src/` (`ai/` blended over
+   Lanczos — what `a2tex build` reads). `tools/upscale-stock.sh --reblend --blend N`
+   re-derives `src/` offline and free. For `MBG02` those layers were scratch and were
+   deleted, which is why its blend percentage became expensive to re-tune.
 
 ## The four things most easily got wrong
 
@@ -115,9 +144,9 @@ Measure, don't eyeball. Every quality decision here has a number behind it:
 | Chroma invention | R-G deviation vs the stock file's (MBG02: 1.89). A generative upscale triples it; `MONOHUE=1` fixes it |
 | Seamless-able? | only homogeneous sources. Five methods failed on composed ones — see README before trying a sixth |
 | Tile self-seam | L\|R and T\|B RMSE below stock's 0.023 / 0.058 — `make-seamless.sh` |
-| TGA descriptor byte | `0x00` after `./bottomup.py` — ImageMagick writes `0x20` |
+| TGA descriptor byte | **the same as the stock file's** — `bottomup.py --like`. ImageMagick always writes `0x20`; stock is a mix |
 | Is it an atlas? | diff columns at x=127\|128 and y=127\|128 vs a baseline column |
-| Corner notches | 24x24 corner mean — `0` on the 6-face sets, non-zero on `MBG02` |
+| Corner notches | 24x24 corner mean — `0` on the 6-face sets, non-zero on `MBG02`. Upscaling stock preserves them for free |
 
 **ImageMagick is Q16 here, so `-threshold N` means N/65535, not N/255.** Writing
 `-threshold 40` to mean "40/255" thresholds at 0.15/255 instead and reports nearly the
@@ -171,17 +200,18 @@ constraint worth worrying about here; face resolution is.
 
 **`SIZE` is per-face, and the face fills the whole viewport** — sizing the atlas is not
 the same thing and was the reason a 4x increase still looked soft. See the resolution
-table in `README.md`. Prebuilt candidates at 2048 and 4096 are in `compare/`; swap with
-`./a2tex build` + `./a2tex install`.
+table in `README.md`. Prebuilt `MBG02` candidates are in `archive/mbg02-candidates/`;
+swap with `./a2tex build` + `./a2tex install`.
 
 **`MBG02` is settled: candidate D, accepted by the user.** Stock art, AI-upscaled,
 blended 35% toward Lanczos, `monohue=1`, face 2048 in a 4096x4096 atlas. `./a2tex build
 MBG02` reproduces it byte-for-byte from `targets/MBG02/src/`. The other three candidates
 are in `archive/mbg02-candidates/` and can be copied straight over the game file.
 
-Only the blend percentage is still open to taste, and re-blending needs the Lanczos and
-AI layers, which were scratch and are gone — redoing it means re-upscaling the four stock
-quadrants (~$0.16).
+Only its blend percentage is still expensive to change: `MBG02` predates the `ai/` layer,
+so its Lanczos and AI intermediates were scratch and are gone. Re-tuning it means
+re-upscaling the four stock quadrants (~$0.16). Every later target keeps `ai/` precisely
+so this does not recur.
 
 Do not re-litigate the alternatives without reading `README.md` first: generated sources
 (B, C) were tried and the user preferred stock's own composition.
@@ -190,28 +220,27 @@ Do not re-litigate the alternatives without reading `README.md` first: generated
 both — MBG02 byte-for-byte against the accepted candidate D.
 
 Targets exist and are stocked for all 7 puff atlases (including `Mlatinum`, the latinum
-resource cloud, which is a nebula puff like the rest) and 5 skybox sets. Eleven of the
-thirteen have no `src/` yet — that is the work remaining, and it is all art, not code.
+resource cloud, which is a nebula puff like the rest) and **all 22 six-face skybox sets**
+plus the `MBG02` atlas. The puffs still have no `src/` — that work is art, not code. The
+skyboxes are being upscaled from their own stock faces with `tools/upscale-stock.sh`,
+which needs no art at all.
 
 **Dilithium is not a nebula.** It is a moon: `mdmoon.tga` (256x256) plus the glow
 `Mdmoonglo4` (64x64) and the "Dmoon nimbus pulse" animation in `Sprites/animation.spr`.
 No target was made for it; the nebula-looking resource cloud people mean is usually
-`Mlatinum`, which is covered. `MBG02` is 1024x1024, built
-from a user-supplied ChatGPT image (`source-MBG02-chatgpt.png`), made seamless, and
-built with `UNIFORM=1` so all four tiles are identical — see the cube-seam section of
-`README.md` before changing that. It matches stock on all three channels; it has **not
-yet been seen in game**. Everything else is stock. Originals are
-backed up in the game directory (`.a2neb-backup`) and in each `targets/<NAME>/stock/`.
+`Mlatinum`, which is covered.
 
-The installed `Mnebula4.TGA` predates `bottomup.py`, so it is still top-down (`0x20`)
-while `out/Mnebula4.tga` has since been rebuilt bottom-up. Both render; reinstalling is
-optional. `MBG02` has a verified build path (tested against synthetic input — all four
-quadrants landed exactly on the stock means 11/16/17/16) and its prompts are in
-`PROMPTS.md`.
+Originals are backed up in the game directory (`.a2neb-backup`) and in each
+`targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them.
 
-Known gap: the `sky-faces` kind does not reproduce the **corner notches** the 6-face sets
-have, so generated `MbgBorg`/`MbgDom1`/`MbgKling` faces will have square corners where
-stock has black ones. `MBG02` is unaffected — it has no notches.
+(An older note here claimed the installed `Mnebula4.TGA` was still top-down. Measured:
+it is `1800`, the same as `out/Mnebula4.tga` and the same as every stock puff. All nine
+puff sources are bottom-up; only the skyboxes are mixed.)
+
+The old "corner notches are not reproduced" gap is **closed, and was only ever a gap for
+*generated* faces.** Upscaling a set's own stock faces keeps the composition — notches
+included — by construction: `MbgBorg.1`'s 24x24 corner mean is 0 in stock and 0 in the
+2048px build.
 
 Open items are listed at the end of `README.md`; the plan for the rest of the game's
 textures is in `REMASTERING.md`.

@@ -13,10 +13,23 @@ Textures live in `Textures/RGB/` (flat, ~2100 files).
 
     a2tex                 the only entry point
     lib/                  common.sh (fit, TGA writing), puff.sh, sky.sh
-    tools/                bottomup.py, make-seamless.sh, gen-nebula.sh
-    targets/<NAME>/       target.conf, stock/, src/, out/   -- one directory per texture
+    tools/                bottomup.py, upscale-stock.sh, huespread.py,
+                          make-seamless.sh, gen-nebula.sh
+    targets/<NAME>/       target.conf, stock/, ai/, src/, out/  -- one per texture
     archive/              candidates and comparisons that cost credits to make
     .scratch/             transient, safe to delete at any time
+
+Four layers per target, and the order matters:
+
+| | |
+|---|---|
+| `stock/` | the pristine original, copied out of the game. Never written |
+| `ai/` | the raw generative upscale, one file per face. **This is what the credits bought** — it is the only layer that cannot be recreated for free, and it is not in git |
+| `src/` | what `a2tex build` reads: `ai/` blended over a plain Lanczos upscale, or hand-supplied art |
+| `out/` | the finished TGA, ready for `a2tex install` |
+
+`src/` and `out/` are both derivable, so both are gitignored; `ai/` is gitignored only
+because 135 faces of it is 0.84 GB. Back it up rather than regenerate it.
 
     ./a2tex list                       every target, its config and state
     ./a2tex build [target...] [-j N]   default: every target that has files in src/
@@ -49,7 +62,9 @@ silently corrupt each other when two targets run at once.
 | | |
 |---|---|
 | `Mnebula4` | **installed** — 512x512, verified in game, looks good |
-| Everything else | stock |
+| `MBG02` | **installed** — 4096x4096 atlas, face 2048, candidate D |
+| 22 six-face skybox sets | built from their own upscaled stock faces, face 2048 |
+| 7 puff atlases | stock — they need art, and that is the remaining work |
 
 Originals are backed up twice: beside each file in the game directory as
 `<name>.a2neb-backup`, and here in each `targets/<NAME>/stock/`.
@@ -488,10 +503,23 @@ zero**. This is not hypothetical: the shipped source came back with `mean.r` of 
 against `mean.b` of 91 — effectively no red at all — and no gain could reach stock's
 R8, leaving the sky cyan.
 
-When a channel's mean falls below `FLOOR` (0.15) of the strongest channel, it is
-rebuilt *from* the strongest channel scaled to the target mean. That keeps blacks black
-— unlike adding a constant — and preserves structure. The build prints a note when it
-fires.
+It is rebuilt *from* the strongest channel, scaled to the target mean. That keeps blacks
+black — unlike adding a constant — and preserves structure. The build prints a note when
+it fires.
+
+**The trigger is absolute, not relative — this was corrected.** The original test was
+"below `FLOOR` (0.15) of the strongest channel", which is a *ratio*, and so it misfires
+on any strongly single-hue plate. The Borg sky is G69 / B3: its blue is perfectly real
+and perfectly scalable, but it is 4% of green, so the relative test threw it away and
+rebuilt blue from green on all six faces. The test is now
+
+    synthesise if   v < 1.0/255   or   t/v > MAXGAIN
+
+— the channel is effectively zero, or the gain needed to reach the target is beyond what
+a stretch can do without banding. **Dimming a faint channel is always safe; only lifting
+is dangerous**, and the ratio test could not tell the two apart. Neither shipped texture
+changed: `Mnebula4` is greyscale and `MBG02` takes the `MONOHUE` path, so synthesis
+fires on neither.
 
 ## Procedural fallback: `gen-nebula.sh`
 
@@ -535,6 +563,113 @@ on composing a subject. Check `size`/`aspect_ratio` before spending — Seedream
 is 2560x1440, not square; only its 4K is.
 
 Outputs are URLs; `curl -sL -o` them. Klein returns `.jpg` even when asked for png.
+
+## The skybox sets: a census
+
+There are **23 skybox sets, 136 files**, all 256x256 24-bit except the `MBG02` atlas.
+Reading the background field out of all 72 `.bzn` maps (recipe in the engine-reference
+section above) accounts for every map and says which sets actually matter:
+
+| maps | set | | maps | set |
+|---|---|---|---|---|
+| 16 | `MBG02` (14 as `mbg02.sod`, 2 as `mbgblue.sod` — byte-identical models) | | 5 | `mbgdk` |
+| 9 | `mbgpur` | | 4 | `mbgkl` |
+| 6 | `MbgBorg` | | 2 | `mbgflu` |
+| 6 | `mbgred` | | 2 | `mbggb` |
+| 6 | `MbgKling` | | 1 | `MbgBaku` |
+| 5 | `mbgrg` | | 0 | `MbgCard`, `MbgDom2`, `MbgIkol`, `MbgKlin2`, |
+| 5 | `mbgaqu` | | | `MbgKlin3`, `MbgKlin4`, `MbgOmega`, `MbgRom1`, |
+| 5 | `MbgDom1` | | | `MbgRom2`, `MbgRom3`, `Mbgstars` |
+
+Thirteen sets cover all 72 stock maps; eleven are unused by the shipped campaign and
+skirmish maps and are presumably there for mods and the map editor.
+
+Two files are not part of any set:
+
+- **`Mbgstars.tga` is a starfield, and must not go near a generative upscaler.** Mean 3,
+  maximum 255, and only 4% of its pixels above 32/255 — it is sparse bright points on
+  black. An upscaler has no way to keep a 1px star a point; it turns each one into a
+  blob or a small galaxy. This is the same category as the fonts and UI in
+  `REMASTERING.md`: leave it alone.
+- **`MbgBaku1.tga` is not a duplicate of `MbgBaku.1.tga`.** Different content (58/38/54
+  against 68/33/20), different row origin, and no set of six around it. An orphan; left
+  out of the `MbgBaku` target.
+
+## Upscaling a skybox from its own stock faces
+
+This is the `MBG02` candidate-D recipe applied to the 6-face sets, and it needs **no
+generated art at all** — the source is the game's own texture.
+
+    tools/upscale-stock.sh [--blend N] [--mp N] [--reblend] [--force] TARGET...
+    ./a2tex build TARGET
+
+Per face: `stock/` 256x256 → generative upscale to 2048x2048 → blended `--blend`%
+(default 35) over a plain Lanczos upscale of the same stock face → `fit()` matches every
+channel back to the stock face's mean → TGA. About $0.005 and 17 seconds per face.
+
+**Keep `ai/`, and the blend becomes free.** `--reblend` rebuilds `src/` from the `ai/`
+layer already on disk, offline and at no cost, so the one dial that is genuinely a
+matter of taste can be turned as often as you like. `MBG02` predates this and its
+intermediates were scratch; re-tuning its blend still means paying to upscale again.
+
+### Invention falls off steeply with the scale factor
+
+The finding that drove `MONOHUE` was measured at **16x from a 128px** `MBG02` quadrant,
+where the upscaler tripled the R-G deviation. The 6-face sets are **8x from 256px**, and
+the same model at the same settings invents nothing measurable:
+
+| | R-G deviation vs stock | high-frequency energy |
+|---|---|---|
+| `MBG02` quadrant, 16x from 128px | 1.89 → 5.90 (**3.1x**) | 0.594 → 2.016 |
+| `MbgBorg` faces, 8x from 256px | ratio **0.998 – 1.000**, all six faces | 2.80 → 14.78 raw, 5.94 at blend 35 |
+
+So `MONOHUE=1` is right for the atlas and **wrong for the 6-face sets** — there is no
+chroma invention for it to remove, and it would flatten the real hue variation that
+per-channel matching preserves. Measure before reaching for it, with
+`tools/huespread.py`, not with the raw HSL hue standard deviation (see below).
+
+### Measuring hue spread honestly
+
+`magick F.tga -colorspace HSL -channel H -separate -format '%[fx:standard_deviation]'`
+is the obvious test and it is **misleading on a skybox**. Hue is undefined for near-black
+and near-grey pixels, a skybox is mostly near-black, and the noise in the dead areas
+dominates the number: `MbgDom1`, a single-hue violet plate, scores 102 that way.
+
+`tools/huespread.py` weights each pixel's hue by the chroma it actually carries
+(saturation x luminance) and takes the circular standard deviation. On the same files:
+
+| set | raw HSL sd | weighted | set | raw HSL sd | weighted |
+|---|---|---|---|---|---|
+| `MBG02` | 30 | **0.8°** | `MbgDom1` | 102 | 40.8° |
+| `mbgflu` | 2 | 3.9° | `mbgpur` | 99 | 54.6° |
+| `MbgKlin4` | 11 | 3.4° | `MbgCard` | 77 | 72.9° |
+| `MbgKling` | 93 | 10.5° | `mbgkl` | 83 | 122.6° (mean 2/255 — noise) |
+
+`MBG02`, the one texture whose `MONOHUE=1` a human accepted, scores 0.8°. Under about
+25° a plate is effectively single-hue. On a set as dark as `mbgkl` the number means
+nothing either way and the decision has to come from the invention measurements.
+
+### The stock row origin is mixed, and the build now matches it per file
+
+`bottomup.py`'s original docstring claimed every stock TGA is bottom-up. **Measured, that
+is false**: of the 135 skybox faces, 53 are `0x00` (bottom-up) and 82 are `0x20`
+(top-down) — and the split runs *within* a single set, with `MbgBorg.2` and `.5`
+bottom-up against the other four top-down. Both render correctly in the retail game, so
+the engine honours the descriptor byte.
+
+All nine puff sources, by contrast, are uniformly `0x00`.
+
+`write_tga()` now takes the file being replaced as a third argument and copies its
+origin via `bottomup.py --like`, so a replacement can never be flipped relative to the
+original. The round trip is byte-exact, and both shipped textures still reproduce
+byte-for-byte.
+
+### `belt` batch notes
+
+`--download` is **silently ignored** when `--batch` is combined with `--json`; nothing is
+written and nothing complains. Parse the JSONL instead — each result line carries an
+`index`, the 0-based line of the input file, which is the only reliable way to map a
+result back to its input, because results come back out of order. Then `curl` the URLs.
 
 ## Beyond the nebulae
 

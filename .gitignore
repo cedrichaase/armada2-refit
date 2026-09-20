@@ -1,2 +1,4 @@
 .scratch/
 targets/*/out/
+targets/*/ai/
+targets/*/src/
