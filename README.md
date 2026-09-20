@@ -5,7 +5,7 @@ higher-resolution generated art. Built against the GOG release running under
 Heroic/Proton on Arch.
 
 Game directory: `/home/cedric/Games/Heroic/Star Trek Armada II`
-Textures live in `Textures/RGB/` (flat, ~2100 files).
+Textures live in `Textures/RGB/` (flat, 2115 `.tga` files, 205 MB stock).
 
 ---
 
@@ -44,7 +44,7 @@ needs editing — `target.conf` already carries the right flags for every nebula
 
 | key | meaning |
 |---|---|
-| `kind` | `puff` (2x2 atlas, additive, engine-tinted), `sky-atlas` (2x2, keeps colour), `sky-faces` (N files, one image each) |
+| `kind` | `puff` (2x2 atlas, additive, engine-tinted), `sky-atlas` (2x2, keeps colour), `sky-faces` (N files, one image each), `plain` (alias for `sky-faces`, for targets that are not skies) |
 | `size` | output edge **per face/quadrant**, not per atlas. One skybox face fills the whole viewport, so this is what the eye sees |
 | `uniform` | sky-atlas only: match every tile to the whole stock texture rather than its own quadrant. Needed when all four tiles are one seamless image, otherwise the differing quadrant means put a brightness step at each cube-face join |
 | `monohue` | rebuild all channels from luminance using the stock hue ratio. Only valid on single-hue textures; removes chroma invention by construction |
@@ -53,6 +53,11 @@ needs editing — `target.conf` already carries the right flags for every nebula
 | `mips` | number of hand-authored mip levels the stock texture has. The build emits `<name>_1..N`, each exactly half the previous. **Required** for any texture with `_N` siblings — `install` refuses the base otherwise |
 | `keepcolour` | puff only: skip the greyscale conversion. `Mnebula2` is the one stock puff with its own colour |
 | `fill` | puff only: percent of the quadrant the subject occupies (default 92) |
+| `sheet` | `GxP`: pack the units into GxG contact sheets with a P-pixel gutter and upscale the sheet, then slice back. A quality setting before a cost one — the app's `megapixels` is an integer, so a lone 64px icon gets a 16x lift at the 1MP floor where a 512px sheet of 49 gets 4x |
+| `maxsize` | refuse to install this target if any output is wider than N. `install` measures first and refuses the **whole** target. The UI targets declare 256, because a `@tmaterial=interface` sprite above that **crashes the game** |
+| `blackedge` | force the outer N texels of the image and of each 2x2 quadrant to exact black. Additive sprite atlases only — `Mmoon`, whose sun quadrants would otherwise draw a faintly glowing square. Runs on the RGB plate **before** alpha is attached |
+| `install` | `no` means built but deliberately not shipped. `UImid` is the case: it carries the fog-of-war and minimap textures, and doubling them froze the game |
+| `note` | free text, ignored by the tooling — why this target is configured the way it is |
 
 ### Parallel builds
 
@@ -62,20 +67,28 @@ silently corrupt each other when two targets run at once.
 
 ## Current state
 
-| | |
-|---|---|
-| `Mnebula4` | **installed** — 512x512, verified in game, looks good |
-| `MBG02` | **installed** — 4096x4096 atlas, face 2048, candidate D |
-| 22 six-face skybox sets, 133 faces | **installed and confirmed in game** — upscaled from their own stock faces, face 2048 |
-| 8 puff atlases | **installed** — upscaled from their own stock quadrants, 1024x1024 (512/quadrant) |
-| `Mnebula2` | installed **with a rebuilt 4-level mip chain** (`mips=4`). Upscaling its base alone had crashed the game |
-| 11 named planet maps | **installed** — `kind=plain`, 2048x2048, upscaled from their own stock |
-| 4 moon / sun / ring textures | **installed** — the first **32-bit** textures this pipeline has touched |
-| 16 class-planet textures | **installed** — `PB_CLSS*` grounds and `PA_*` cloud layers, 2048x2048 |
-| 544 UI textures | **installed** — icons 64→256 and 128→512 via contact sheets, panels 256→512 |
+**51 targets, 725 files built, 699 shipped.** `./a2tex verify` checks every one of them
+against the file it replaces, from the raw TGA bytes, and currently reports **0
+problems** over 717 textures — the count differs because the 8 mip levels are checked as
+part of their base rather than on their own. Run it after every build and before every
+install.
+
+| class | targets | files | state |
+|---|---|---|---|
+| skyboxes | 23 | 134 | **confirmed in game.** 22 six-face sets at face 2048, plus the `MBG02` 4096 atlas (candidate D) |
+| map puffs | 8 | 12 | **confirmed in game.** 1024x1024, 512 per quadrant, upscaled from their own quadrants. Includes `Mnebula2`'s rebuilt 4-level chain (`mips=4`) — upscaling its base alone had crashed the Klingon campaign |
+| named planets | 11 | 11 | **confirmed in game.** `kind=plain`, 2048, from their own stock |
+| class planets | 2 | 16 | installed. `PB_CLSS*` grounds and `PA_*` cloud layers, 2048 |
+| moons / suns / rings | 4 | 8 | installed. The first **32-bit** textures here. `mdmoon` carries a rebuilt 4-level chain |
+| UI | 3 | 544 | **confirmed in game**, 518 of them. Icons 64→256 via contact sheets, panels at 256. `UImid` (26) is `install=no` — see the crash section |
+
+Four things cost a crash, a freeze or a visible artifact, and each one is written up
+below rather than only fixed: **a UI sprite over 256x256 crashes the game**, **doubling
+a fog-of-war or minimap texture freezes it**, **compositing onto an alpha-bearing image
+corrupts colour**, and **`earth.tga`'s fourth byte is padding, not alpha**.
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
-lot. `Textures/RGB` went from 254 MB to 2.0 GB.
+lot. `Textures/RGB` went from 205 MB to 2.42 GB.
 
 Originals are backed up twice: beside each file in the game directory as
 `<name>.a2neb-backup`, and here in each `targets/<NAME>/stock/`.
@@ -781,7 +794,7 @@ and byte-identical output. Do not expect run-to-run variation to give you free v
 
 ## Mip chains, and the crash they caused
 
-**`Mnebula2` is the only one of the 142 textures installed here that has a hand-authored
+**`Mnebula2` was the first texture installed here with a hand-authored
 mip chain, and upscaling its base while leaving that chain alone crashed the game.**
 
 A mip chain is the set of pre-shrunk copies of a texture the GPU uses when the surface
@@ -842,7 +855,7 @@ The rebuilt chain against stock's, per level:
 Stock never forced its mip edges to black, and box-filter bleed makes them worse at every
 level; the rebuild is better than stock on that axis by a wide margin.
 
-`REMASTERING.md` counts **347 hand-authored chains, 782 files**, across the whole texture
+`REMASTERING.md` counts **363 hand-authored chains, 782 files**, across the whole texture
 set. For the nebulae it is a single texture; for the hull textures it will be most of
 them.
 
@@ -1158,33 +1171,33 @@ Current state: **717 textures, 0 problems.**
 
 ## Beyond the nebulae
 
-`REMASTERING.md` carries the measured inventory of all 2120 textures and what would be
+`REMASTERING.md` carries the measured inventory of all 2115 textures and what would be
 needed to apply this pipeline to them. The short version, because it changes how these
 scripts should be read:
 
-- **1113 of 2118 textures are 32-bit with a live alpha channel.** No longer a blocker:
+- **1113 of 2115 textures are 32-bit with a live alpha channel.** No longer a blocker:
   `write_tga()` takes its depth from the stock file and `attach_alpha()` carries the
   mask across. Proved on four textures, not four hundred — see the planets-and-moons
   section above for what that cost.
-- **347 hand-authored mip chains** (782 files) must be regenerated, not ignored.
+- **363 hand-authored mip chains** (782 files) must be regenerated, not ignored.
   `gen_mips()` does this for every kind now, colour and alpha separately.
 - **Fonts, UI, cursors, wireframes and minimap art must never be hallucinated into.**
-- Upscaling every base texture 4x would take the set from 254 MB to about 12 GB.
+- Upscaling every base texture 4x would take the set from 205 MB to about 10 GB;
+  the 699 textures done so far already account for 2.42 GB.
 
 ## Still open
 
-**Both nebula systems are finished.** 23 skybox sets (134 files, confirmed in game) and
-8 puff atlases (12 files, counting `Mnebula2`'s four rebuilt mip levels) — 142 distinct
-textures in all. Every one is derived
-from its own stock art — **none of the generated art shipped in the end.**
+**699 textures are shipped and verified.** Every one is derived from its own stock art —
+**none of the generated art shipped in the end.** The nebula systems, the planets and
+the UI are all confirmed rendering in game; what remains unseen is narrow.
 
 Needing a look in game:
 
-- **The 8 puff atlases have not been seen yet** beyond `Mnebula2`'s crash, which is
-  fixed. They are the drifting cloud billboards on the map plane; `Mlatinum` is the
-  yellow resource cloud.
-- **The 15 planet and moon textures have not been seen yet.** `mdmoon` is the one to
-  look at first: it is on nearly every map, and it is a rebuilt mip chain.
+- **The 16 class planets** (`PB_CLSS*`, `PA_*`) and **`mdmoon`.** `mdmoon` is the one to
+  check first: it is on nearly every map, and it is a rebuilt mip chain on a 32-bit
+  texture — the class of mistake that crashed the Klingon campaign.
+- **Whether the comm and objectives pop-ups land centred.** They moved with the
+  widescreen canvas change in `SETUP.md` and have not been opened since.
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
@@ -1208,11 +1221,11 @@ Genuinely outstanding:
   return to it.
 - **`PROMPTS.md` is now unexercised.** Nothing in the game currently uses generated art,
   so those prompts are untested against the current pipeline.
-- **`mdmoon` has not been seen in game.** It is the second texture here to ship a
-  rebuilt mip chain and the first 32-bit one — the class of mistake that crashed the
-  Klingon campaign.
-- **The 544 UI textures have not been seen in game.** Nor have the 16 class planets,
-  though the named planets and the UI *layout* fix are both confirmed.
+- **`UImid`'s 17 non-map textures are built but unshipped.** The target is `install=no`
+  because of the 9 fog/minimap textures in it; the other 17 (`gbfpod100`, `shipinfo`,
+  `ferwireframe`, …) are ordinary interface sprites of the same class as the 382 that
+  work. Splitting them into their own target would recover a 2x on 17 icons, for one
+  more launch to verify. Marginal, and nobody has asked.
 - **Next is hull textures** — 611 carry a live alpha channel and most have mip chains.
   Both blockers now have working code behind them; what is untested is the *scale*
   (~1300 base textures, and sheets only help where a whole group shares one size), and
@@ -1233,6 +1246,15 @@ Closed since the last revision of this list, recorded so they are not re-opened:
   it is filament structure a 128px quadrant does not contain~~ — argued here, then
   disproved. All 8 were upscaled from stock and the result beat the generated art on
   every measure taken, including on `Mnebula4`, where both existed.
+- ~~`Mnebula2` is the only installed texture with a hand-authored chain~~ — `mdmoon` is
+  the second, and the first 32-bit one.
+- ~~Verifying a build once is enough~~ — `Mmoon` was verified, passed, and then the
+  build changed (`blackedge` was added) and only the new property was re-checked. It
+  shipped with every quadrant's RGB several times stock's and rendered as a white box
+  around a sun sprite. `./a2tex verify` exists so this is one command, not a habit.
+- ~~ImageMagick is a sufficient tool for checking the output~~ — not where alpha is
+  involved. Its opinions about associated alpha are what caused the `Mmoon` bug, so it
+  cannot be the thing that checks for it. `tools/verify.py` reads the raw bytes.
 - ~~R, G and B means are identical for map puffs~~ — true for most of the set, but
   `Mnebula1` is 28/26/22 and `Mnebula2` is 33/9/8. Match the stock file, not the rule.
 - ~~Generative upscaling is non-deterministic, so two runs give free variety~~ —

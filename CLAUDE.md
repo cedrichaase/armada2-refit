@@ -19,7 +19,8 @@ DXVK on every launch and reverts the d3d8 chain fix.**
 
 - Game: `/home/cedric/Games/Heroic/Star Trek Armada II` — GOG release, patch 1.1 plus
   Patch Project 1.2.5, run through Heroic with Proton-CachyOS.
-- Textures: `Textures/RGB/`, flat, ~2100 files, **mixed `.tga` / `.TGA` case**.
+- Textures: `Textures/RGB/`, flat, **2115 `.tga` files, 205 MB stock**, **mixed
+  `.tga` / `.TGA` case**.
 - Available: ImageMagick 7 (`magick`), `python3`, `ffmpeg`.
   **Not available: numpy, PIL.** Do image work through ImageMagick, not Python.
 - Scratchpad for intermediates; this directory is the user's, keep it tidy.
@@ -31,7 +32,7 @@ DXVK on every launch and reverts the d3d8 chain fix.**
    on first touch. `./a2tex revert all` undoes everything.
 2. **Match the stock TGA format exactly**: image type 2, uncompressed, no ID field, no
    colour map — and **the same bit depth as the file you are replacing.** The nebula
-   textures are 24-bit; **1113 of the 2118 textures in the game are 32-bit with a live
+   textures are 24-bit; **1113 of the 2115 textures in the game are 32-bit with a live
    alpha channel.** `write_tga()` now reads the depth off the stock file it is given as
    its third argument and writes to match, and `attach_alpha()` carries the stock mask
    across, Lanczos-upscaled. **The alpha never goes through the generative upscaler** —
@@ -263,7 +264,7 @@ and upscaling its base while leaving the chain alone CRASHED the game** in the K
 campaign. Fixed with `mips=4` in its `target.conf`: the build emits the whole chain and
 `install` validates it pre-flight, refusing the entire target rather than writing a
 partial one. `revert <target>` restores the chain too. It is the only one of the 142
-textures installed here with a chain — but `REMASTERING.md` counts 347 across the full
+textures installed here with a chain — but `REMASTERING.md` counts 363 across the full
 set, so `mips=` will be needed constantly once this moves to hull textures.
 
 **All 8 puffs are done**, and the claim above them — that a puff could not usefully be

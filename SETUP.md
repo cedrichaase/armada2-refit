@@ -89,10 +89,11 @@ backdrop assembled from six tiles with overlay sprites placed against it, so it 
 be widened without either stretching the art — the thing being removed — or re-tiling
 it. Left stock, which leaves it pillarboxed left rather than stretched.
 
-**Untested in game at the time of writing.** The model behind it (per-axis scaling from
-a declared canvas) is inferred from the file format and the symptom, not observed; if it
-is wrong the likely failure is panels in the wrong place rather than a crash, and
-`--revert` is one command.
+**Confirmed in game.** The model behind it — per-axis scaling from a declared canvas —
+was inferred from the file format and the symptom before it was tested, and it was
+right: icons square, minimap square, panels flush against the real screen edges instead
+of stranded at the 1600px mark. What has *not* been reopened since the change is the
+comm and objectives pop-ups, which moved with it.
 
 ## Patch Project 1.2.5
 
