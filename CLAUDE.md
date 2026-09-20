@@ -75,7 +75,40 @@ DXVK on every launch and reverts the d3d8 chain fix.**
    3D model textures are unaffected -- 2048 skyboxes and a 4096 atlas run fine -- so this
    is the sprite path specifically. `maxsize=N` in `target.conf` enforces it: `install`
    refuses the whole target. The three UI targets declare `maxsize=256`.
-5. **Don't touch `Sprites/nebula.spr`.** UVs are normalised against `@reference=128`, so
+5. **A mip chain is spelled the way STOCK spells it, and that is not always `_N`.**
+   `fcruise1_B`'s levels are `fcruise1_B1` and `fcruise1_B2`; `fresearch`'s are
+   `fresearch1` and `fresearch2` — no underscore. Both are real hand-authored chains,
+   confirmed by box-downsampling the base and measuring RMSE against the sibling
+   (0.022/0.026 and 0.033/0.054, inside the 0.017–0.067 band the ordinary underscore
+   chains occupy). The engine looks a chain up **by name**, so writing `fcruise1_B_1`
+   produces a file nothing reads and leaves stock's 128px level under a 1024px base —
+   the invalid chain that crashed the Klingon campaign, arrived at while believing the
+   chain was rebuilt. `mip_name()` in `lib/common.sh` is the single authority; it tries
+   both spellings and **validates by width**, which is why it cannot be a regex over
+   names: `FluidicRift2` is 128 beside a 256 `FluidicRift`, level 2 by name and level 1
+   by size, so it is not a mip of it at all.
+   Stock also ships siblings that are named like levels and are not sized like them —
+   `Fsensor_B_1`/`_2` are both 128 beside a 128 `Fsensor_B`, and `FpremNew_B_2` is 128
+   where level 2 wants 64. (Each pair is byte-identical to itself, which is what a
+   placeholder looks like.) `mip_strays()` enumerates them and `a2tex install` refuses
+   the target rather than leaving one stale beside a bigger base.
+   **`mips=auto`** takes the depth per texture from stock instead of one number per
+   target, so a target can hold `fdestroy` (two levels) and `fdestroy_b` (none) at once.
+   It reproduced the shipped Sovereign build byte-for-byte.
+
+6. **`--mp` is not the scale factor, and the mismatch is silent.** The app rounds
+   `sqrt(mp*1e6/(w*h))` to an integer, so `--mp 4` on a 256px source returns **2048, an
+   8x lift**, not 4x — and it caps at 2048, so a sheet edge that does not divide 2048
+   comes back at a non-integer ratio the slicer truncates to 1x. Anything comparing an
+   `ai/` plate against a Lanczos layer must read the plate's size off the file. Building
+   the Lanczos layer at an assumed 1024 and compositing a 2048 plate onto it does not
+   error: ImageMagick composites at the origin, so the comparison is the top-left
+   quarter of one plate against the whole of the other. It reads as catastrophic
+   erasure — markings "vanish" because they are outside the crop — and it produced a
+   confident, wrong conclusion here that `blend=70` was destroying the Galaxy's
+   deflector dish. `tools/measure-invention.sh` reads the size off the plate.
+
+7. **Don't touch `Sprites/nebula.spr`.** UVs are normalised against `@reference=128`, so
    they are fractions and larger textures land on the same quadrants unchanged. Editing
    it is never the fix.
 
@@ -83,6 +116,19 @@ DXVK on every launch and reverts the d3d8 chain fix.**
 
 One entry point, `./a2tex` — `list`, `build [-j N]`, `install`, `revert`, `diff`,
 `verify`.
+
+Two checkers beside it:
+
+- **`tools/selftest-mips.py`** pins mip-chain *name* resolution against the real texture
+  directory, in both implementations — bash `mip_name`/`mip_strays` and python
+  `mip_parent`/`stock_mip`. A disagreement between them is how a level gets written
+  under a name nothing reads, which is a crash and not a blemish. Run it after touching
+  either.
+- **`tools/measure-invention.sh <target>`** reports, per texture and per blend, how much
+  the generative layer invents and how much it erases, at the on-screen size. Use it to
+  set `blend=`, not your eye at 1:1 — and read its header before writing any comparison
+  of your own, because the `--mp`-is-not-the-scale-factor trap it documents produced a
+  confident wrong answer here.
 
 **Run `./a2tex verify` after every build, before installing, and after any change to how
 a build works.** It checks every output against its stock file *from the raw TGA bytes*

@@ -9,3 +9,6 @@ targets/*/ai/
 targets/*/src/
 targets/*/src-alpha/
 targets/*/.alpha-units/
+
+# selftest-mips.py imports verify.py as a module
+__pycache__/

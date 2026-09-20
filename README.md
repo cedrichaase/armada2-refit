@@ -1363,6 +1363,203 @@ for. A `dxvk.conf` beside the exe with `d3d9.samplerAnisotropy = 16` would sharp
 oblique surface in the game at once, for free, and is reversible by deleting the file.
 Untried — it touches the graphics stack, which has an open regression in `SETUP.md`.
 
+## The Federation hull class, after the Sovereign
+
+The Sovereign proved the shape of a hull target. Extending it to the rest of the
+Federation ships turned up four things it could not have shown, because they are
+properties of the *set* rather than of one texture.
+
+### The set, measured
+
+76 base textures carry an `F`/`f` prefix once fonts, wireframes, `fedui*`, `Fguib04`/
+`Fguif04`, the Ferengi strays and the two 8472 `FluidicRift` plates are excluded — a
+count that still includes the three orphans stock leaves behind (`FpremNew_B_2`,
+`Fsensor_B_1`, `Fsensor_B_2`), which present as bases because they are not valid levels
+of anything. Scoped to **ships** — matched
+by scanning every `.sod` for the texture name as a plain string, then mapping the SOD to
+its `odf/ships/*.odf` `unitName` — the working set is 44 bases in six targets:
+
+| target | files | source | built | alpha | note |
+|---|---|---|---|---|---|
+| `FedCapital` | 14 | 256 | 1024 | `ai` | Galaxy hull+saucer, Akira, Steamrunner, Intrepid, Nebula A+B, and Borg siblings |
+| `FedCombat` | 13 | 256 | 1024 | `ai` | Defiant, Sabre, Aegian, Iwo Jima, Incursion, Venture |
+| `FedSupport` | 10 | 256 | 1024 | `ai` | Cargo, Colony, Repair |
+| `FedMask` | 3 | 256 | 1024 | Lanczos | `Ffreight`, `fdata` — alpha is coverage, not light |
+| `FedFlat` | 2 | 256 | 1024 | none | `Fconst` — 24-bit, no alpha at all |
+| `FedSmall` | 2 | 128 | 512 | Lanczos | `Fbee`, `fedpod10` — 128px sources, so their own `size=` |
+
+All six are built, verified and **installed**; what none of them has had yet is a look
+in game. `./a2tex revert all` undoes every target this project has ever installed, and
+`./a2tex revert FedCapital` (or any one name) undoes just that one, chain included.
+
+### The test that actually separates a light map from a mask
+
+`alpha=ai` is justified for a night-lights map and for nothing else. The Sovereign
+section above reasons from "81% exact zero with 234 distinct values", and that generalises
+badly on its own: `fcargo` is 98.3% zero with 205 distinct values and *is* a light map —
+a freighter simply has few windows — while `Ffreight` has 212 distinct values and is a
+mask.
+
+Two other tests were tried and are recorded here because they do not work:
+
+- **Co-registration by luminance** — mean RGB luminance under lit texels against unlit
+  ones. The Sovereign, the known positive, scores **1.02**. Hull markings are small and
+  sit on light grey, so they barely move a mean. Useless as a discriminator.
+- **Fraction of graded values** — `fcargo` (1.7% between the extremes) and `Fbattle`
+  (27%) are the same kind of channel, four hundred windows apart.
+
+What does separate them, cleanly and cheaply: **is the RGB painted where the alpha is
+zero?** A coverage mask hides a region the artist never painted, so the colour under it
+is black. A self-illumination map is a second layer over hull art that is painted
+everywhere.
+
+| | alpha = 0 | luminance there | reading |
+|---|---|---|---|
+| `Fbattle` (Sovereign) | 81.2% | 150.1 | hull art continues underneath — light map |
+| `F_GalaxyHull` | 89.7% | 100–160 | light map |
+| `fcargo` | 98.3% | 101.7 | light map, sparse |
+| `fdata` | 97.5% | — | 2 distinct alpha values; no picture content either way |
+| `Ffreight` | **0.0%** | *undefined* | mostly opaque — see below |
+
+**`Ffreight` is the one this test cannot answer, and an earlier revision of this section
+claimed it could.** That revision reported its luminance-under-transparent as 0.0 and
+called the question settled. It has **no alpha-zero texels at all** — 0% zero, 97.2%
+exactly 255 — so the 0.0 was a mean over an empty set, printed by a guard that returns
+zero rather than dividing by it. A number computed from nothing is not evidence, and it
+happened to agree with the conclusion already expected, which is how it survived a
+reading.
+
+It stays out of `alpha=ai` regardless, on the geometry rather than on that number: a
+night-lights map is *mostly dark* with graded structure in the light, and `Ffreight` is
+mostly opaque with 2.8% graded. Whether that channel is a soft-edged coverage mask or a
+specular map is still unknown, and `alpha=ai` is justified for a night-lights map and
+for nothing else yet.
+
+### Stock ships duplicates, and they must stay duplicates
+
+A byte-identity sweep over the Federation set:
+
+    fcolony.tga == ftransco.tga          (and their whole chains)
+    F_GalaxySaucer.tga == fspecialA.tga  (the Nebula reuses the Galaxy saucer)
+    FpremNew_B_1.TGA == FpremNew_B_2.TGA
+    Fsensor_B_1.TGA == Fsensor_B_2.TGA
+
+The first two are processed as separate units and their outputs come back
+byte-identical, as `Mnebula4` and `MFluidicNeb` do — the upscaler is deterministic, so a
+*difference* between them would be the signal worth chasing.
+
+The last two are the tell for the irregular siblings: a "level 1" and a "level 2" that
+are the same file, at the same size as their base, are a placeholder rather than a
+chain. See hard rule 5 in `CLAUDE.md`; `a2tex install` refuses those targets.
+
+Worth noting what this sweep *disproved*. The census table showed `fcruise2_B` and
+`Fcruise2` with identical alpha statistics — %zero, distinct count and mean all equal —
+and several other `_B` pairs likewise. They are not identical files. Matching summary
+statistics is not identity, and grouping them as duplicates on that basis would have
+shipped one ship's hull on another.
+
+### `blend=70` holds, but not for the reason it was nearly rejected for
+
+The first pass at this concluded, with a measurement and two rendered contact strips,
+that 70 was destroying the Galaxy's deflector dish, the Bussard collectors and the
+impulse strips, and that the whole class needed a blend near zero. That conclusion was
+**wrong**, and the way it was wrong is worth more than the result.
+
+`--mp 4` on a 256px source returns **2048**, not 1024 — the megapixel figure is not the
+scale factor. The comparison built its Lanczos layer at an assumed 1024 and composited
+the 2048 `ai/` plate onto it. ImageMagick does not object; it composites at the origin.
+So every "blend 70" image was the **top-left quarter** of the AI plate laid over the
+whole Lanczos plate, and the markings that appeared to have been erased were simply
+outside the crop. Judged at the plate's real size, the same textures at blend 70 measure:
+
+| | erased | invented |
+|---|---|---|
+| `F_GalaxyHull` | 0.013% | 0.116% |
+| `fcruise1` | 0.100% | 0.170% |
+| `Fcruise2` | 0.020% | 0.119% |
+| *`Fbattle` (accepted at 70)* | *0.016%* | *0.095%* |
+
+Same regime as the Sovereign, so 70 carries over. `tools/measure-invention.sh` now reads
+the plate size off the file, reports both directions at the on-screen size, and carries
+the trap in its header comment.
+
+The measure itself is new and is saturation-based, not luminance-based: **erased** is a
+saturated marking in the Lanczos layer that the blend does not have, **invented** is one
+in the blend that Lanczos does not. Both directions, because the Sovereign section
+already records how misleading one direction alone is.
+
+### 8x then downsampled beats 4x, which reads backwards
+
+`FedCapital` was run at `--mp 4` (an 8x lift to 2048, brought to 1024 by `fit()`) and
+the same fourteen textures at `--mp 1` (4x to 1024, the Sovereign's own setting).
+Measured at 340px, blend 70, the 8x is level or slightly cleaner on every row —
+`F_GalaxyHull` 0.013%/0.116% against 0.100%/0.161%.
+
+That contradicts CLAUDE.md rule 4 only in appearance. Rule 4 compares lifts at their
+**native output sizes**; here the larger lift is halved on the way to `size=`, and that
+downsample is itself an invention filter. The rejected 4x layers are kept in
+`archive/fedcapital-4x-lift/` with the full table.
+
+### The metric has a benign false positive, and a real bug hid behind a name
+
+Two things surfaced only because the per-target work was fanned out and each target's
+numbers were read against the others'.
+
+**`invented` over-reports by counting intensification.** `Ffreight_B` measured 1.322%
+invented at blend 70, ten times `FedCapital`'s range, and `fdata` 1.011%. Neither is
+inventing anything. `fdata`'s alpha hides 97.5% of its plate, and restricting the
+measure to the 2.5% the engine draws gives **0.012%**. `Ffreight_B` is opaque
+throughout, but its "invention" is the model saturating markings stock already has: a
+desaturated panel sitting between the two thresholds crosses the upper one and scores,
+though it is the right marking in the right place. Requiring an invented pixel to be
+more than 2px from *any* saturated stock pixel — the `displaced` column — separates the
+two: `fsrepairb` 0.578% → 0.042%, `fcruise1` 0.170% → 0.010%. Chroma confirms it
+independently; R-G deviation against stock is 0.98–1.02 on every flagged texture.
+
+**`verify.py` was silently skipping textures whose name is another texture's name plus a
+digit.** `fdestroy2` is the Sabre Class; `fdestroy` is the Defiant. Folding mip levels
+back onto their base by *name* read the Sabre as "level 2 of the Defiant" and dropped it
+from the checked set entirely — no header check, no channel means, no chain check, and
+**no failure**: just 12 textures reported where 13 were built. Across the repo it was
+hiding 43, 42 of them in the UI targets (`commMenu11`, `gbbresear2`, and 28 more).
+
+The fix is the same width test `mip_name` already used — level 2 of a 1024px base is
+256px, and `fdestroy2` is 1024 — and the lesson is one this project keeps relearning in
+new clothes: **a checker that can skip work must say how much it checked.** The count
+line was always printed and always believed; nothing compared it against how many
+textures the target actually holds.
+
+### What the class cost the tooling
+
+Four changes, all of which apply to every faction that follows:
+
+- `mip_name()` / `mip_strays()` / `stock_bases()` in `lib/common.sh`, and the install
+  and revert paths in `a2tex` rebuilt on top of them. The old glob, `${a}_[0-9]*`,
+  could not see two of the chains in this set at all — the guard against the
+  Klingon-campaign crash was blind to them, and `revert` would have restored a base
+  while leaving its levels upscaled.
+- Mip levels are matched to **their own** stock file for header as well as name.
+  `fresearch` is a 32-bit base (`desc 0x08`) over two 24-bit levels (`desc 0x00`), and
+  taking depth from the base wrote a chain stock never shipped. `verify.py` checks
+  per-level headers now; it previously skipped levels entirely.
+- `mips=auto`, because one number per target cannot describe a set where `fdestroy` has
+  two levels and `fdestroy_b` has none.
+- `stock/` now carries each texture's levels so a target is self-describing about its
+  chain spelling — and `stock_bases()` keeps them out of both the src-image count and
+  the **paid** upscale. Without it `FedCapital` alone would have bought 28 upscales of
+  art that `gen_mips` then overwrites by downsampling the base.
+
+- `alphafilter=` in `target.conf`, default Lanczos so nothing already built moves.
+  Lanczos rings, and on a mask that is mostly zero with small isolated opaque blobs the
+  ringing clips asymmetrically — the undershoot below 0 has nowhere to go — so the
+  channel mean rises. `fedpod10` (91.1% zero, 8.5% opaque, 13 distinct values) drifts
+  22.24 → 23.36 at 4x and fails verify's tolerance of 1.0; Mitchell gives 22.43,
+  Triangle 22.24 exactly. It is one texture's geometry and not a property of masks —
+  `Fbee`, `fdata`, `Ffreight` and `mdmoon` are all masks and all drift under 0.16 — so
+  the knob is per target rather than automatic, which also leaves shipped targets alone.
+
+`tools/selftest-mips.py` pins all of this against the real texture directory.
+
 ## Beyond the nebulae
 
 `REMASTERING.md` carries the measured inventory of all 2115 textures and what would be
@@ -1397,6 +1594,12 @@ Needing a look in game:
   widescreen canvas change in `SETUP.md` and have not been opened since.
 - **The Sovereign's registry.** `blend=70` is confirmed in game and clearly better; the
   two C apertures were then re-cut by hand and that build has not been looked at yet.
+- **All 44 Federation ship textures.** Built, verified and installed, never yet seen in
+  game. The first thing to look at is a Galaxy or an Akira at ordinary RTS zoom, and the
+  second is anything Borg-assimilated, since the `_B` plates are the ones with no SOD
+  pointing at them and so the ones a naming mistake would hide. Resident texture load is
+  now 2.47 GB in a 32-bit LAA process, up from 2.27 GB — if anything is going to fall
+  over on memory, this is the pass that does it.
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
@@ -1432,9 +1635,15 @@ Genuinely outstanding:
   `ferwireframe`, …) are ordinary interface sprites of the same class as the 382 that
   work. Splitting them into their own target would recover a 2x on 17 icons, for one
   more launch to verify. Marginal, and nobody has asked.
-- **The rest of the hull class.** The Sovereign proved the shape of it: 256x256, 32-bit,
-  a short hand-authored chain, a `_b` Borg variant nothing references, and an alpha that
-  is a night-lights map rather than a mask. What is still untested is the **scale** —
+- **The rest of the hull class, beyond the Federation.** The Federation ships are done
+  and are covered by their own section above; what remains is the other factions. The
+  Federation pass measured the memory question rather than estimating it: its 44 bases
+  and their chains come to **220 MB** at 1024 — `FedCapital`'s 73.5 MB measured on
+  disk, the rest computed from the same 5.25 MB per 32-bit 1024 base-plus-chain —
+  against the 2.27 GB already resident, which fits — and did: the texture directory
+  measures **2.47 GB** resident with all six targets installed, the +0.20 GB predicted — and confirms that the whole hull class at once would not.
+  Doing it by faction is the right unit. Still untested for the other factions is the
+  **scale** —
   ~600 hull bases, and contact sheets only help where a whole group shares one size,
   which at 256px they largely do. Memory is the real ceiling: at 1024 the whole class is
   roughly 3 GB on top of the 2.27 GB already spent, inside a 32-bit LAA process, so it
