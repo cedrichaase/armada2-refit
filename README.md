@@ -511,19 +511,22 @@ It is rebuilt *from* the strongest channel, scaled to the target mean. That keep
 black — unlike adding a constant — and preserves structure. The build prints a note when
 it fires.
 
-**The trigger is absolute, not relative — this was corrected.** The original test was
-"below `FLOOR` (0.15) of the strongest channel", which is a *ratio*, and so it misfires
-on any strongly single-hue plate. The Borg sky is G69 / B3: its blue is perfectly real
-and perfectly scalable, but it is 4% of green, so the relative test threw it away and
-rebuilt blue from green on all six faces. The test is now
+**The trigger took two goes to get right, and both wrong versions failed the same way:
+by firing on the safe direction.** `t` is the target mean, `v` the source's.
 
-    synthesise if   v < 1.0/255   or   t/v > MAXGAIN
+| test | what it broke |
+|---|---|
+| `v < 0.15 * strongest` (original) | a *ratio*, so it misfires on any strongly single-hue plate. The Borg sky is G69/B3 — its blue is real and scalable at 4% of green, and this threw it away and rebuilt blue from green on all six faces |
+| `v < 1.0 or t/v > MAXGAIN` | the absolute floor still fires on *dimming*. `MbgKlin4`'s blue is v 0.39 → t 0.32, a gain of **0.82**, and it was still discarded and rebuilt from red — on `MbgKlin4`, `MbgKlin2`, `MbgDom2` and `MbgRom2` |
+| `v <= 0 or t/v > MAXGAIN` (current) | — |
 
-— the channel is effectively zero, or the gain needed to reach the target is beyond what
-a stretch can do without banding. **Dimming a faint channel is always safe; only lifting
-is dangerous**, and the ratio test could not tell the two apart. Neither shipped texture
-changed: `Mnebula4` is greyscale and `MBG02` takes the `MONOHUE` path, so synthesis
-fires on neither.
+    synthesise if   v <= 0   or   t/v > MAXGAIN
+
+The channel literally cannot be scaled, or the gain needed is beyond what a stretch does
+without banding. **Dimming a faint channel is always safe; only lifting is dangerous**,
+and any test with a floor on `v` alone cannot tell the two apart. Synthesis now fires on
+no skybox set at all. Neither shipped texture ever changed: `Mnebula4` is greyscale and
+`MBG02` takes the `MONOHUE` path.
 
 ## Procedural fallback: `gen-nebula.sh`
 
