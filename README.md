@@ -49,6 +49,7 @@ needs editing — `target.conf` already carries the right flags for every nebula
 | `uniform` | sky-atlas only: match every tile to the whole stock texture rather than its own quadrant. Needed when all four tiles are one seamless image, otherwise the differing quadrant means put a brightness step at each cube-face join |
 | `monohue` | rebuild all channels from luminance using the stock hue ratio. Only valid on single-hue textures; removes chroma invention by construction |
 | `blend` | per cent of the AI layer kept over Lanczos in `src/`. Read and written by `upscale-stock.sh`, so a set tuned away from the default keeps that setting. `mbgrg` is the only one at 20 |
+| `source` | puff only: `gen` (default) treats `src/` as generated art of unknown framing — trim, square, inset to `fill`%, stretch the noise floor. `stock` treats it as this atlas's own upscaled quadrants and skips all of that, **including the greyscale conversion** |
 | `keepcolour` | puff only: skip the greyscale conversion. `Mnebula2` is the one stock puff with its own colour |
 | `fill` | puff only: percent of the quadrant the subject occupies (default 92) |
 
@@ -65,7 +66,7 @@ silently corrupt each other when two targets run at once.
 | `Mnebula4` | **installed** — 512x512, verified in game, looks good |
 | `MBG02` | **installed** — 4096x4096 atlas, face 2048, candidate D |
 | 22 six-face skybox sets, 133 faces | **installed and confirmed in game** — upscaled from their own stock faces, face 2048 |
-| 7 puff atlases | stock — they need art, and that is the remaining work |
+| 8 puff atlases | **installed** — upscaled from their own stock quadrants, 1024x1024 (512/quadrant). Not yet seen in game |
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
 lot. `Textures/RGB` went from 254 MB to 1.9 GB.
@@ -733,6 +734,43 @@ here, which is luck. Two names differing only in punctuation would silently swap
 faces of a cube — a failure that looks like bad art rather than a bug. Pairing is now by
 name, falling back to sort order (with a warning) for hand-supplied art whose names do
 not match.
+
+## Upscaling the puffs from their own quadrants
+
+Same idea as the skyboxes, three differences that matter.
+
+**The unit is a quadrant, not a file.** A puff is one 128x128 atlas whose four 64x64
+quadrants are carved by `Sprites/nebula.spr` at `@reference=128`. `upscale-stock.sh`
+slices them into `.units/` and the rest of the flow is shared with `sky-faces`.
+
+**64px is small, so `--mp 1`, not the default 4.** 4 MP from a 64px quadrant is a 32x
+lift. 1 MP is 16x, downsampled to 512/quadrant — an 8x delivered lift, the same ratio
+that invented nothing on the skyboxes.
+
+**`source=stock` skips the greyscale conversion, and that is not an optimisation.**
+Greyscale exists because the engine tints these sprites, so coloured *generated* art
+would be tinted twice. When the source is the stock art it already carries stock's exact
+colour, and grey-then-re-tint is a lossy round trip. Measured on `Mnebula1`, whose stock
+is 28/26/22 rather than neutral:
+
+| | gains | peak R | clipped px |
+|---|---|---|---|
+| greyscale, then `fit()` rebuilds the warmth | 0.93–0.96 | 255 (stock 246) | 109 |
+| keep the source's colour | 0.97–1.00 | 248 | **0** |
+
+Rebuilding a warm tint by stretching red back out of grey is what clipped it. Note this
+also means the CLAUDE.md rule "R, G and B means identical for map puffs" describes most
+of the set but **not all of it**: `Mnebula1` is 28/26/22 and `Mnebula2` is 33/9/8. Match
+the stock file, not the rule.
+
+**Quadrant edges come out at exactly 0** on all eight atlases — the vignette still runs,
+and it has to: stock's own quadrant borders reach 11/255, and the sprite UVs
+(`0 0 64 64` of a 128px reference) sample the edge pixels exactly, so stock itself has a
+faint additive seam that the rebuild removes.
+
+**The upscaler is deterministic.** `Mnebula4` and `MFluidicNeb` are byte-identical stock
+files, were upscaled in two independent runs, and produced byte-identical `ai/` layers
+and byte-identical output. Do not expect run-to-run variation to give you free variety.
 
 ## Beyond the nebulae
 

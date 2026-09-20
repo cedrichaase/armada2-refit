@@ -138,7 +138,7 @@ Measure, don't eyeball. Every quality decision here has a number behind it:
 | Mean luminance | match the stock file it replaces (additive blend ⇒ mean ≈ light contributed) |
 | Quadrant edge maxima | `0` for map puffs |
 | Peak | below 255 — anything at 255 is clipping |
-| Greyscale | R, G, B means identical (map puffs only) |
+| Greyscale | R, G, B means identical — true for most puffs but **not** `Mnebula1` (28/26/22) or `Mnebula2` (33/9/8). Match the stock file, not the rule |
 | Skybox hue | each of R, G, B matches the stock file's channel mean — `fit()` in `lib/common.sh` does this |
 | Face resolution | `size=` in `target.conf` = per-FACE pixels; one face fills the viewport, so this is what the eye sees |
 | Chroma invention | R-G deviation vs the stock file's (MBG02: 1.89). A generative upscale triples it; `MONOHUE=1` fixes it |
@@ -224,10 +224,14 @@ both — MBG02 byte-for-byte against the accepted candidate D.
 installed, and verified rendered, not just measured. `Mbgstars` is deliberately left
 stock (starfield). Do not re-open this without a specific reason.
 
-What remains is the 7 puff atlases, which still have no `src/`. That work is **art, not
-code**: unlike a skybox, a puff cannot usefully be upscaled from its own stock, because
-the point of replacing it is filament structure a 128px quadrant does not contain. See
-`PROMPTS.md`.
+**The puffs are done too**, and the claim above them — that a puff could not usefully be
+upscaled from its own stock — was wrong. All 8 atlases are now `source=stock`,
+1024x1024, installed. `Mnebula4`'s earlier generated art is preserved in
+`targets/Mnebula4/src-generated/` and `archive/mnebula4-generated/`; put it back in
+`src/` and set `source=gen` to return to it.
+
+Generated art via `PROMPTS.md` remains the route for anything where stock composition is
+not worth keeping — but measure the upscale first, because on both classes here it won.
 
 **Dilithium is not a nebula.** It is a moon: `mdmoon.tga` (256x256) plus the glow
 `Mdmoonglo4` (64x64) and the "Dmoon nimbus pulse" animation in `Sprites/animation.spr`.
