@@ -89,7 +89,7 @@ every install.
 | class planets | 2 | 16 | installed. `PB_CLSS*` grounds and `PA_*` cloud layers, 2048 |
 | moons / suns / rings | 4 | 8 | installed. The first **32-bit** textures here. `mdmoon` carries a rebuilt 4-level chain |
 | UI | 3 | 544 | **confirmed in game**, 518 of them. Icons 64→256 via contact sheets, panels at 256. `UImid` (26) is `install=no` — see the crash section |
-| hull | 1 | 9 | installed, unseen. The Sovereign: `Fbattle`, `FEntE`, `Fbattle_b` at 1024 with rebuilt 2-level chains, and the first target whose **alpha goes through the upscaler** (`alpha=ai`) |
+| hull | 1 | 9 | **confirmed in game.** The Sovereign: `Fbattle`, `FEntE`, `Fbattle_b` at 1024 with rebuilt 2-level chains, and the first target whose **alpha goes through the upscaler** (`alpha=ai`). `blend=70`, not the usual 35 — see why below |
 
 Four things cost a crash, a freeze or a visible artifact, and each one is written up
 below rather than only fixed: **a UI sprite over 256x256 crashes the game**, **doubling
@@ -475,6 +475,15 @@ clearly. Enhance-on merely blurs its own inventions. Measured on quadrant 0:
 **Dial 1 — blend toward Lanczos.** `-define compose:args=N -compose blend` between a
 plain Lanczos upscale and the AI one attenuates every invention uniformly. 35% keeps a
 visible sharpness gain while pushing the fern close to invisible.
+
+**Set the dial on a render at the object's real on-screen size.** 35 is right for a
+skybox because a skybox face fills the viewport — 1:1 and the game agree about what is
+visible. A *ship* does not: a Sovereign draws about 340 px wide, its saucer takes 140 of
+256 texels, and the invented hull glyphs that 35 exists to suppress land at well under a
+pixel. Judged at 1:1, 35 looked careful; in game it was indistinguishable from stock.
+That target now runs at 70. Crop the region, resize it to the pixel width the object
+actually occupies, and compare *there* — for anything drawn small, the invention budget
+is much larger than pixel-peeping suggests. See the Sovereign section below.
 
 **Dial 2 — `MONOHUE=1`.** Rebuilds all three channels from *luminance* using the
 reference's hue ratio. Valid whenever the stock texture is effectively single-hue, which
@@ -1242,20 +1251,51 @@ loss but the point of the exercise — Lanczos spreads each window's brightness 
 soft halo, and the AI puts it back in the window. Counted the naive way that reads as
 "a percent of the glow disappeared", which is why both directions are measured.
 
+### Judge the blend at the size the thing is drawn, not at 1:1
+
+This shipped at `blend=35` first, and in game it was **indistinguishable from stock**.
+That was the right number arrived at the wrong way.
+
+The model does invent on the colour plate: it reads faint grey smudges on the hull as
+lettering and draws plausible glyphs into them, and it rounds stock's square windows
+into lozenges. At 35 those stay smudges; at 60 they are legible; at 100 they are
+confident and wrong. (`NCC-1701-E` itself survives all the way to 100 — it is large
+enough to be read correctly. It is the invented markings *around* it that do not.) So 35
+looked like the careful choice.
+
+It was chosen by pixel-peeping at 1:1, which is not a viewing distance this game has. A
+Sovereign at ordinary RTS zoom draws about 340 px wide, and the saucer top-view occupies
+roughly 140 of stock's 256 texels — so those invented glyphs land at well under a pixel
+and are invisible, while the sharpening given up to suppress them is the only thing the
+eye had to go on. Rendering the same crop down to 340 px makes the whole argument
+visible at a glance: stock, 35, 60 and 85 in a row, and 35 sits on top of stock.
+
+**Now 70.** Re-blending is free and offline — `ai/` is on disk, so `--reblend --blend 70`
+costs nothing and changes no pixels that were paid for. The general rule this target
+adds: *tune the invention dial on a render at the object's real on-screen size.* Every
+earlier target in this project was a skybox, a planet or a UI sprite — things drawn at or
+near 1:1, where pixel-peeping and the game agree. A hull texture is the first class where
+they do not.
+
 ### One blend dial, not two
 
-Invention on the **colour** plate is not a rounding error. The model reads faint grey
-smudges on the hull as lettering and draws plausible glyphs into them, and it rounds
-stock's square windows into lozenges. At `blend=35` those stay smudges; at 50 they are
-legible; at 100 they are confident and wrong. `NCC-1701-E` itself survives all the way
-to 100 — it is large enough to be read correctly — but the invented markings around it
-do not.
+The colour plate wants a blend low enough to keep invention plausible; the alpha,
+measured at 0.001% invention, could take a much higher one. They are still driven by
+**one** `blend=`, deliberately: the lit windows in alpha and the painted windows in RGB
+must stay consistent with each other, and a crisp light in a soft socket is its own
+artifact. The measurement is recorded above so a later pass can split the dial with
+evidence rather than by taste.
 
-So the colour wants a low blend and the alpha, measured at zero invention, could take a
-high one. They are still driven by **one** `blend=`, deliberately: the lit windows in
-alpha and the painted windows in RGB must stay consistent with each other, and a crisp
-light in a soft socket is its own artifact. The measurement is recorded here so a later
-pass can split the dial with evidence rather than by taste.
+### What this class cannot fix
+
+Even at 70 the gain is real but modest, and that is the honest ceiling. The upscaler
+cleans and sharpens; it does not manufacture structure that was never in 256x256. The
+larger remaining lever is not the texture at all — the saucer is viewed at a steep
+oblique angle, which is precisely where **anisotropic filtering** decides sharpness, and
+`dxcfg.ini` currently leaves it at `application`, i.e. whatever a 2001 renderer asked
+for. A `dxvk.conf` beside the exe with `d3d9.samplerAnisotropy = 16` would sharpen every
+oblique surface in the game at once, for free, and is reversible by deleting the file.
+Untried — it touches the graphics stack, which has an open regression in `SETUP.md`.
 
 ## Beyond the nebulae
 
@@ -1289,12 +1329,9 @@ Needing a look in game:
   texture — the class of mistake that crashed the Klingon campaign.
 - **Whether the comm and objectives pop-ups land centred.** They moved with the
   widescreen canvas change in `SETUP.md` and have not been opened since.
-- **The Sovereign.** The first hull texture and the first `alpha=ai` anywhere. Build a
-  `fbattle` or take the *Enterprise* into a Federation mission and look at the saucer
-  rim windows and the deflector — the alpha is what is new, and it is what will show a
-  mistake. A hull texture is a 3D model texture, so the 256px UI ceiling does not apply
-  to it, and 2048 skyboxes have been running for weeks; a crash here would be a new
-  fact, not a repeat.
+- **The Sovereign at `blend=70`.** Seen in game at 35 and it read as stock; 70 is
+  installed and has not been looked at yet. 85 is one free `--reblend` away if 70 is
+  still short.
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
