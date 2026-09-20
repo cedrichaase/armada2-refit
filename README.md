@@ -1070,6 +1070,92 @@ the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
   reported success and did nothing. Same family as the non-matching-glob trap in
   CLAUDE.md hard rule 3; both greps in `upscale-stock.sh` now end in `|| true`.
 
+## Two crashes, a freeze, and a white box: what the UI pass actually cost
+
+Worth reading before touching another class. All four were found in game, none by the
+checks that were in place at the time, and each one changed the tooling.
+
+### 1. A UI sprite over 256x256 crashes the game
+
+Covered above. The lesson that generalises: **census the largest size stock ships for
+the class you are about to touch.** `maxsize=N` in `target.conf` now enforces it.
+
+### 2. Doubling a fog-of-war or minimap texture freezes the game
+
+`UImid` went 128 -> 256 and the game stopped crashing and started *hanging*, at the same
+moment -- the cinematic-to-HUD transition. It was not memory: the build that worked was
+121MB of UI and the one that hung was 125MB. And it was not `UIpanel`, whose 136 files
+are dimensionally identical to the files they replace.
+
+`UImid` was the only target in that install whose **dimensions** changed, and it carried
+
+    Gfog  Gshroud  Gminimap  Gmabelt  Gmneb1..5  Gshadow
+
+which are not panel art at all. They are the fog-of-war, shroud and minimap-overlay
+textures, swept into a "UI" list purely because they are reachable from `gui_map.spr`
+and `gui_global.spr`. Those systems are created exactly when the HUD appears and then
+run every frame; something in them is written against a fixed cell size, and doubling
+the texture spins rather than faults.
+
+`REMASTERING.md` had carried a warning about minimap art which this session dismissed on
+the grounds that `Gmneb*` are flat single-hue blobs. They are — but **"safe to upscale
+as an image" and "safe to change the size of" are different questions**, and conflating
+them cost a diagnosis. The whole target is now `install=no`: built, kept for
+reproducibility, never shipped.
+
+### 3. blackedge corrupted Mmoon, and the verification could not see it
+
+In game: a white box around the yellow sun sprite. In the file: every quadrant's RGB
+mean several times stock's (Yellowsun 31 -> 228), while the **alpha** was perfect.
+
+The cause is the associated-alpha trap for the third time in this project. `blackedge`
+composed its mask onto the plate *after* `attach_alpha` had attached alpha, so
+ImageMagick worked in premultiplied space and un-premultiplied on write, dividing colour
+back out by a small alpha. `-channel RGB` does not prevent it. The fix is ordering:
+blackedge now runs on the RGB-only plate, before alpha is attached.
+
+**The rule that keeps coming back: colour and alpha are handled apart and joined only at
+the very end.** It has now bitten in `upscale-stock.sh` (the Lanczos layer at mean 137
+against stock's 43), in `gen_mips` (avoided by construction), and here.
+
+The more uncomfortable half is why it shipped. `Mmoon` *was* verified and passed — and
+then `blackedge` was added, and only the newly-added property (quadrant edges at 0) was
+re-checked. **Changing a build invalidates the whole invariant set, not just the part
+you changed.** More discipline is not the fix; one command is.
+
+### 4. earth.tga's fourth byte is padding, not alpha
+
+Caught by that new command on its first run. `earth.tga` is the only file in the game
+with `bpp=32` and a descriptor declaring **zero alpha bits** — 24-bit colour in a 32-bit
+container, where the fourth byte is padding. ImageMagick reads it as opaque, so
+`-alpha extract` returns 255 where stock stores 0. `tools/tgapad.py` detects the case
+and `attach_alpha` reproduces the padding byte instead.
+
+### `./a2tex verify`
+
+`tools/verify.py` checks every built texture against the stock file it replaces, **from
+the raw TGA bytes**:
+
+| check | |
+|---|---|
+| header | idlen / colour-map / image-type / bpp / descriptor identical to stock |
+| size | a power of two, and a whole multiple of stock |
+| maxsize | honours `maxsize=` |
+| channels | exact raw mean R, G, B and A within 1.0 of stock's |
+| mips | if `mips=N`, exactly N levels each half the previous |
+| installed | the file in the game directory is byte-identical to `out/` |
+
+Raw bytes rather than ImageMagick **because of alpha**: ImageMagick has opinions about
+associated versus unassociated alpha, and those opinions are what corrupted `Mmoon`. A
+checker built on the library that holds the opinion cannot reliably see the damage. The
+engine reads bytes; so does this.
+
+It samples nothing — the first version strided every 11th pixel and reported ±3 errors
+on high-variance icons, the same magnitude as a real defect, which makes a tolerance
+meaningless. Strided slice sums over the whole plane are exact and fast enough.
+
+Current state: **717 textures, 0 problems.**
+
 ## Beyond the nebulae
 
 `REMASTERING.md` carries the measured inventory of all 2120 textures and what would be

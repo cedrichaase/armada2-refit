@@ -37,7 +37,11 @@ DXVK on every launch and reverts the d3d8 chain fix.**
    across, Lanczos-upscaled. **The alpha never goes through the generative upscaler** —
    a mask has only edges, which Lanczos resolves exactly, and a model that invents
    plausible detail into a mask invents holes in the object.
-   **Resize colour and alpha separately, always.** Resizing an RGBA image associates
+   **Resize *and composite* colour and alpha separately, always.** Joining them early
+   and touching the result is the single most repeated mistake in this project — it has
+   bitten three times (the Lanczos layer in `upscale-stock.sh`, `gen_mips`, and
+   `blackedge` on `Mmoon`, which rendered as a white box around a sun sprite in game).
+   Colour and alpha are handled apart and joined only at the very end. Resizing an RGBA image associates
    alpha and then un-associates it, dividing colour back out by a near-zero alpha; that
    put `Mmoon`'s Lanczos layer at mean 137 against stock's 43, and `fit()` then *hid* it
    by scaling the whole plate to match the mean. See `REMASTERING.md`.
@@ -68,7 +72,17 @@ DXVK on every launch and reverts the d3d8 chain fix.**
 
 ## The pipeline
 
-One entry point, `./a2tex` — `list`, `build [-j N]`, `install`, `revert`, `diff`.
+One entry point, `./a2tex` — `list`, `build [-j N]`, `install`, `revert`, `diff`,
+`verify`.
+
+**Run `./a2tex verify` after every build, before installing, and after any change to how
+a build works.** It checks every output against its stock file *from the raw TGA bytes*
+— header, power-of-two size, `maxsize`, exact per-channel means, mip chain, and whether
+the installed copy still matches. Raw bytes because ImageMagick's opinions about
+associated alpha are what corrupted `Mmoon` in the first place, so it cannot be the
+thing that checks for it. `Mmoon` shipped broken because it *was* verified, and then the
+build changed and only the newly-added property was re-checked: **changing a build
+invalidates the whole invariant set, not just the part you changed.**
 A target is `targets/<NAME>/` holding `target.conf`, `stock/`, `src/`, `out/`.
 **To add work, drop images in `src/` and build.** Do not write new per-texture scripts;
 add a target directory instead.
@@ -284,7 +298,12 @@ most maps place; the eleven `M*` maps are the *named story* planets. All 16 inst
 2048. They are a **four-lobe gore unwrap, not equirectangular** — the horizontal-wrap
 reasoning from the `M*` maps does not apply; what matters is no bleed across the gores.
 
-**544 UI textures are installed** as `UIicon` (382, 64→256), `UImid` (26, 128→256) and
+**`UImid` is `install=no` and must stay that way.** It carries `Gfog`, `Gshroud`,
+`Gminimap`, `Gmabelt` and `Gmneb1-5` — the fog-of-war and minimap textures, not panel
+art — and doubling them 128→256 **froze the game** at the moment the HUD appears. "Safe
+to upscale as an image" and "safe to change the size of" are different questions.
+
+**518 UI textures are installed** as `UIicon` (382, 64→256), `UImid` (26, 128→256) and
 `UIpanel` (136, 256→256 — stock's size, but supersampled from a 4x upscale rather than
 resampled from stock). They were first shipped at 512 and that **crashed the game**; see
 hard rule 4. The small ones went up as **contact sheets** — `sheet=GxP` in
