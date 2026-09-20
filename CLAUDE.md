@@ -219,11 +219,15 @@ Do not re-litigate the alternatives without reading `README.md` first: generated
 `Mnebula4` (map puff) and `MBG02` (skybox) are installed, and `./a2tex build` reproduces
 both — MBG02 byte-for-byte against the accepted candidate D.
 
-Targets exist and are stocked for all 7 puff atlases (including `Mlatinum`, the latinum
-resource cloud, which is a nebula puff like the rest) and **all 22 six-face skybox sets**
-plus the `MBG02` atlas. The puffs still have no `src/` — that work is art, not code. The
-skyboxes are being upscaled from their own stock faces with `tools/upscale-stock.sh`,
-which needs no art at all.
+**The skybox class is finished and confirmed in game by the user.** All 23 sets — the
+`MBG02` atlas plus 22 six-face sets, 134 files — are upscaled from their own stock art,
+installed, and verified rendered, not just measured. `Mbgstars` is deliberately left
+stock (starfield). Do not re-open this without a specific reason.
+
+What remains is the 7 puff atlases, which still have no `src/`. That work is **art, not
+code**: unlike a skybox, a puff cannot usefully be upscaled from its own stock, because
+the point of replacing it is filament structure a 128px quadrant does not contain. See
+`PROMPTS.md`.
 
 **Dilithium is not a nebula.** It is a moon: `mdmoon.tga` (256x256) plus the glow
 `Mdmoonglo4` (64x64) and the "Dmoon nimbus pulse" animation in `Sprites/animation.spr`.

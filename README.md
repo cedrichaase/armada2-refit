@@ -64,7 +64,7 @@ silently corrupt each other when two targets run at once.
 |---|---|
 | `Mnebula4` | **installed** — 512x512, verified in game, looks good |
 | `MBG02` | **installed** — 4096x4096 atlas, face 2048, candidate D |
-| 22 six-face skybox sets, 133 faces | **installed** — upscaled from their own stock faces, face 2048. Not yet seen in game |
+| 22 six-face skybox sets, 133 faces | **installed and confirmed in game** — upscaled from their own stock faces, face 2048 |
 | 7 puff atlases | stock — they need art, and that is the remaining work |
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
@@ -748,18 +748,32 @@ scripts should be read:
 
 ## Still open
 
-- **`MBG02` is FINAL** — candidate D (stock upscaled, 35% blend, `MONOHUE=1`, face
-  2048), accepted. `./a2tex build MBG02` reproduces it byte-for-byte.
-- **`MBG02` was previously installed** (1024x1024, seamless, `UNIFORM=1`, per-channel
-  matched to stock with red synthesised from blue). Not yet seen in game — the thing to
-  check is whether four identical faces read as repetition from inside the map.
-- Peak brightness is short: built max 86 against stock 152. The mean and hue are exact;
-  stock simply has a few isolated hot pixels the source does not. `MbgBorg` is the next best target: six faces, four
-  missions, brightest of the three.
-- The `MbgBorg`/`MbgDom1`/`MbgKling` prompts still describe a centred core only in
-  prose; the **corner notches are not yet reproduced by the `sky-faces` kind**, which would
-  need a corner mask. Generated faces for those sets will have square corners where
-  stock has black ones. Not yet seen in game, so the visual cost is unknown.
-- ~~`build.sh` requires exactly 4 images per atlas~~ — done: the `puff` and `sky-atlas`
-  kinds now repeat the supplied images to fill four quadrants, so 1 image is enough.
-- 1024x1024 textures are untested.
+**The skyboxes are finished.** All 23 sets are built, installed and **confirmed in game
+by the user** — not merely measured. That closes the class.
+
+What remains:
+
+- **The 7 map-plane puff atlases.** `Mnebula4` is installed; `Mnebula1`, `Mnebula2`,
+  `Mnebula3`, `Mnebula5`, `MFluidicNeb`, `mtachyonneb` and `Mlatinum` still have no
+  `src/`. Unlike the skyboxes these cannot be upscaled from stock in the same way and be
+  interesting — they are 128px quadrants isolated on black, and the whole point of
+  replacing them is better filament structure, which means generated art. See
+  `PROMPTS.md`.
+- **`Mbgstars` stays stock, on purpose.** Sparse starfield; a generative upscaler turns a
+  1px star into a blob. Plain Lanczos is the only safe option and buys little.
+- **`mbgpur2` clips** at 0.037% of pixels where stock does not. Plain Lanczos already
+  reaches 254–255 on those star cores, so the blend is not the lever. Accepted.
+- **`mbgrg` is the one set at `blend=20`** rather than 35, because its two darkest faces
+  measured HF 2.98 and 2.85 against a 3.0 threshold. Taste, not correctness.
+- The **d3d8/DXVK regression in `SETUP.md`** is still unfixed and still blocked on Heroic
+  being closed.
+
+Closed since the last revision of this list, recorded so they are not re-opened:
+
+- ~~`MBG02` peak brightness is short, built 86 against stock 152~~ — that was the
+  *generated* source. Candidate D peaks at 160 against stock's 152.
+- ~~Corner notches are not reproduced by `sky-faces`~~ — only ever a problem for
+  generated faces; upscaling stock preserves them by construction.
+- ~~1024x1024 textures are untested~~ — 4096x4096 is confirmed working in game.
+- ~~`build.sh` requires exactly 4 images per atlas~~ — the `puff` and `sky-atlas` kinds
+  repeat the supplied images, so one is enough.
