@@ -69,9 +69,11 @@ silently corrupt each other when two targets run at once.
 | 22 six-face skybox sets, 133 faces | **installed and confirmed in game** — upscaled from their own stock faces, face 2048 |
 | 8 puff atlases | **installed** — upscaled from their own stock quadrants, 1024x1024 (512/quadrant) |
 | `Mnebula2` | installed **with a rebuilt 4-level mip chain** (`mips=4`). Upscaling its base alone had crashed the game |
+| 11 planet maps | **installed** — `kind=plain`, 2048x2048, upscaled from their own stock |
+| 4 moon / sun / ring textures | **installed** — the first **32-bit** textures this pipeline has touched |
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
-lot. `Textures/RGB` went from 254 MB to 1.9 GB.
+lot. `Textures/RGB` went from 254 MB to 2.0 GB.
 
 Originals are backed up twice: beside each file in the game directory as
 `<name>.a2neb-backup`, and here in each `targets/<NAME>/stock/`.
@@ -842,15 +844,108 @@ level; the rebuild is better than stock on that axis by a wide margin.
 set. For the nebulae it is a single texture; for the hull textures it will be most of
 them.
 
+## Planets and moons, and the first 32-bit textures
+
+Fifteen textures, done in two passes. They are the first thing here that is not a
+nebula, and the second pass is what finally made the pipeline alpha-aware.
+
+### The eleven planet maps
+
+`Mearth` `Mearthbg` `Mbaku` `MBarisa` `Mborgpl` `MEridon` `MKrios` `MLankal` `MRemus`
+`MRomulus` `MQonos` — all 256x256, 24-bit, **no alpha and no mip chain**, which makes
+each one structurally identical to a single skybox face. They run the `sky-faces` code
+under the alias `kind=plain`; a planet target reading `kind=sky-faces` looked like a
+mistake, and that was the whole reason for the alias.
+
+They are **equirectangular sphere maps**, so two things matter that did not for a
+skybox:
+
+- **They wrap horizontally**, and the upscaler does not know that — it sees two picture
+  borders. Measured before and after: column 0 against the last column, compared with
+  two columns the same distance apart in the middle of the picture (one *stock* texel =
+  8 built columns, not 1, or the baseline is unfairly tight). Stock's wrap difference is
+  0.6-1.1x its local variation; the 2048 builds come out at 1.0-1.45x. The seam is
+  inside the range of normal variation and no wrap-padding pass was needed.
+- **The poles are the stretched top and bottom bands**, where a huge number of texels
+  cover very little sphere. Nothing was done about this; it costs resolution but
+  reproduces stock exactly.
+
+Measured across all eleven: every channel mean matches stock (one off-by-one on
+`MLankal`'s red), R-G deviation is within 1% of stock's own on every file, and no file
+clips where stock does not — `Mearth` has 20.8% of pixels at 255 against stock's 20.9%,
+which is its polar ice, inherited rather than introduced.
+
+**`MQonos` is the one at `blend=15`.** Difference maps against the Lanczos layer are
+the useful tool here: on ten of them the AI's contribution *follows existing structure*
+— coastlines on `Mbaku` and `MRemus`, Borg circuitry on `Mearthbg`, lava veins on
+`MKrios`, band turbulence on `MBarisa` and `MLankal`. On `MQonos` it was sparse, long,
+free-floating hairlines over an otherwise empty field: invention, not recovery, and
+visible against a smooth surface. That is what the dial is for.
+
+### The four 32-bit ones
+
+| | | |
+|---|---|---|
+| `mdmoon` | 256x256 + **4 mips** | the dilithium moon; alpha is a network of fissures |
+| `Mmoon` | 256x256, 2x2 atlas | the moon (`alphathreshold`) and three suns (`additive`) |
+| `Mbakurng` | 256x256 | the Ba'ku ring; alpha is the band mask |
+| `earth` | 128x128 | a pre-rendered Earth billboard; alpha bits **0**, so unused |
+
+Four things had to change, and all of them are the general 32-bit problem, not
+something about moons:
+
+1. **`bottomup.py` accepts 32-bit.** The stride is `w * bpp/8`, and — this is the part
+   that is easy to miss — the descriptor's **low nibble is the alpha bit count**, not
+   padding. `--like` now copies the reference's *whole* descriptor when the depths
+   match, because stock is not consistent even there: the moons carry `0x08` and
+   `earth.tga` carries `0x00` at the same 32 bpp.
+2. **`write_tga()` takes its depth from the stock file**, exactly as it already took its
+   row origin. With no stock file the old 24-bit behaviour stands, which is what every
+   nebula target relies on.
+3. **`attach_alpha()` carries the stock alpha across, Lanczos-upscaled, and the alpha
+   never goes near the upscaler.** Alpha here is a mask — a fissure network, a hard
+   cutout disc — and a model that invents plausible detail into a mask invents holes in
+   the object. There is also nothing to recover: a mask has no texture, only edges, and
+   Lanczos resolves an edge exactly.
+4. **Colour and alpha are resized separately, everywhere.** This is not fastidiousness.
+   Resizing an RGBA image associates alpha and then un-associates it, dividing colour
+   back out by a near-zero alpha — and the Lanczos layer for `Mmoon` came out at mean
+   137 against stock's 43 because of exactly that. The failure is nasty because
+   `fit()` *hides* it: it scales the whole plate down to make the mean match, so the
+   only symptom is a correct average over a picture that is uniformly too dark.
+
+`mdmoon`'s chain is rebuilt with `mips=4`, 1024/512/256/128, colour and alpha box-
+filtered separately. Its colour mean holds 57 flat at every level, matching stock's 57;
+its alpha holds 230 where stock's chain *drops* 230 -> 203 as it shrinks. That drop is
+the artist thickening the fissures so they stay visible at distance, and it is
+deliberately not reproduced, for the same reason the peak lift is not: stock's drop
+starts below 128px, and this chain bottoms out *at* 128px.
+
+`Mmoon` needed one thing the others did not. Its three sun sprites are
+`@tmaterial=additive`, so black is transparent and any stray value on a quadrant
+boundary draws a faintly glowing square around the sprite. Stock is exactly 0 on all
+eight boundary lines; the upscale came back 1-3. `blackedge=8` forces the outer 8 texels
+of each quadrant to black — 8 because stock's tightest quadrant has a guaranteed
+all-black margin of exactly one texel, times the 8x scale. It restores stock's own
+values and cannot clip real art. It applies to **additive atlases only**.
+
+### What was left alone
+
+`Mdmoonglo` (8x8) and `Mdmoonglo4` (64x64) are soft radial gradients with no structure
+to recover; Lanczos and a generative upscale give the same thing, so they stay stock.
+
 ## Beyond the nebulae
 
 `REMASTERING.md` carries the measured inventory of all 2120 textures and what would be
 needed to apply this pipeline to them. The short version, because it changes how these
 scripts should be read:
 
-- **1113 of 2118 textures are 32-bit with a live alpha channel.** `write_tga()` ends in `-alpha off -type TrueColor`, which is right for the 24-bit
-  additive nebula textures and would destroy everything else.
+- **1113 of 2118 textures are 32-bit with a live alpha channel.** No longer a blocker:
+  `write_tga()` takes its depth from the stock file and `attach_alpha()` carries the
+  mask across. Proved on four textures, not four hundred — see the planets-and-moons
+  section above for what that cost.
 - **347 hand-authored mip chains** (782 files) must be regenerated, not ignored.
+  `gen_mips()` does this for every kind now, colour and alpha separately.
 - **Fonts, UI, cursors, wireframes and minimap art must never be hallucinated into.**
 - Upscaling every base texture 4x would take the set from 254 MB to about 12 GB.
 
@@ -866,6 +961,8 @@ Needing a look in game:
 - **The 8 puff atlases have not been seen yet** beyond `Mnebula2`'s crash, which is
   fixed. They are the drifting cloud billboards on the map plane; `Mlatinum` is the
   yellow resource cloud.
+- **The 15 planet and moon textures have not been seen yet.** `mdmoon` is the one to
+  look at first: it is on nearly every map, and it is a rebuilt mip chain.
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
@@ -889,9 +986,14 @@ Genuinely outstanding:
   return to it.
 - **`PROMPTS.md` is now unexercised.** Nothing in the game currently uses generated art,
   so those prompts are untested against the current pipeline.
-- **Next class by screen area is planets and large props** — see `REMASTERING.md`. The
-  blocker beyond it is hull textures, where 611 files carry a live alpha channel that
-  `write_tga()` would destroy and most have mip chains.
+- **Planets and moons are done** (15 files) and **have not been seen in game yet.**
+  That includes `mdmoon`, which is the second texture here to ship a rebuilt mip chain
+  and the first 32-bit one — the class of mistake that crashed the Klingon campaign.
+- **Next class by screen area is large props, then hull textures** — 611 of those carry
+  a live alpha channel and most have mip chains. Both of those blockers now have
+  working code behind them; what is untested is the *scale*, and whether alpha on a hull
+  texture (specular, team-colour masking) tolerates a Lanczos upscale as well as a
+  cutout mask does.
 
 Closed since the last revision of this list, recorded so they are not re-opened:
 

@@ -31,10 +31,16 @@ DXVK on every launch and reverts the d3d8 chain fix.**
    on first touch. `./a2tex revert all` undoes everything.
 2. **Match the stock TGA format exactly**: image type 2, uncompressed, no ID field, no
    colour map — and **the same bit depth as the file you are replacing.** The nebula
-   textures are 24-bit, but **1113 of the 2118 textures in the game are 32-bit with a
-   live alpha channel**, and the `-alpha off -type TrueColor` in these scripts would
-   silently destroy it. `bottomup.py` rejects non-24-bit input, which is the only reason
-   that has not already bitten. See `REMASTERING.md`.
+   textures are 24-bit; **1113 of the 2118 textures in the game are 32-bit with a live
+   alpha channel.** `write_tga()` now reads the depth off the stock file it is given as
+   its third argument and writes to match, and `attach_alpha()` carries the stock mask
+   across, Lanczos-upscaled. **The alpha never goes through the generative upscaler** —
+   a mask has only edges, which Lanczos resolves exactly, and a model that invents
+   plausible detail into a mask invents holes in the object.
+   **Resize colour and alpha separately, always.** Resizing an RGBA image associates
+   alpha and then un-associates it, dividing colour back out by a near-zero alpha; that
+   put `Mmoon`'s Lanczos layer at mean 137 against stock's 43, and `fit()` then *hid* it
+   by scaling the whole plate to match the mean. See `REMASTERING.md`.
    For 24-bit nebula work: `-alpha off -type TrueColor -compress None`, then
    `tools/bottomup.py <file>`. Verify the header after writing; a format mismatch will
    not announce itself. ImageMagick 7 cannot be told to write bottom-up TGAs — every
@@ -252,6 +258,18 @@ not worth keeping — but measure the upscale first, because on both classes her
 `Mdmoonglo4` (64x64) and the "Dmoon nimbus pulse" animation in `Sprites/animation.spr`.
 No target was made for it; the nebula-looking resource cloud people mean is usually
 `Mlatinum`, which is covered.
+
+**Planets and moons are done — 15 textures, installed, not yet seen in game.** Eleven
+24-bit planet maps at `kind=plain` (an alias for `sky-faces`: one file, no alpha, no
+chain — structurally a single skybox face), all at face 2048, all from their own stock.
+`MQonos` is the one at `blend=15`; on the other ten the AI's contribution follows
+existing structure, on `MQonos` it was free-floating hairlines over a smooth surface.
+
+Then four **32-bit** ones — `mdmoon` (+ a rebuilt 4-level chain), `Mmoon`, `Mbakurng`,
+`earth` — which are the first alpha-bearing textures this pipeline has touched and the
+reason rule 2 above changed. `blackedge=N` exists for `Mmoon` alone: its three sun
+sprites are additive, so a stray 1-3/255 on a quadrant boundary draws a glowing square.
+`Mdmoonglo`/`Mdmoonglo4` stay stock — soft gradients, nothing to recover.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them.
