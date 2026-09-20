@@ -50,6 +50,7 @@ needs editing — `target.conf` already carries the right flags for every nebula
 | `monohue` | rebuild all channels from luminance using the stock hue ratio. Only valid on single-hue textures; removes chroma invention by construction |
 | `blend` | per cent of the AI layer kept over Lanczos in `src/`. Read and written by `upscale-stock.sh`, so a set tuned away from the default keeps that setting. `mbgrg` is the only one at 20 |
 | `source` | puff only: `gen` (default) treats `src/` as generated art of unknown framing — trim, square, inset to `fill`%, stretch the noise floor. `stock` treats it as this atlas's own upscaled quadrants and skips all of that, **including the greyscale conversion** |
+| `mips` | number of hand-authored mip levels the stock texture has. The build emits `<name>_1..N`, each exactly half the previous. **Required** for any texture with `_N` siblings — `install` refuses the base otherwise |
 | `keepcolour` | puff only: skip the greyscale conversion. `Mnebula2` is the one stock puff with its own colour |
 | `fill` | puff only: percent of the quadrant the subject occupies (default 92) |
 
@@ -66,8 +67,8 @@ silently corrupt each other when two targets run at once.
 | `Mnebula4` | **installed** — 512x512, verified in game, looks good |
 | `MBG02` | **installed** — 4096x4096 atlas, face 2048, candidate D |
 | 22 six-face skybox sets, 133 faces | **installed and confirmed in game** — upscaled from their own stock faces, face 2048 |
-| 7 puff atlases | **installed** — upscaled from their own stock quadrants, 1024x1024 (512/quadrant) |
-| `Mnebula2` | **reverted to stock.** It has a hand-authored mip chain; upscaling the base alone crashed the game. See the mip-chain section |
+| 8 puff atlases | **installed** — upscaled from their own stock quadrants, 1024x1024 (512/quadrant) |
+| `Mnebula2` | installed **with a rebuilt 4-level mip chain** (`mips=4`). Upscaling its base alone had crashed the game |
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
 lot. `Textures/RGB` went from 254 MB to 1.9 GB.
@@ -806,11 +807,35 @@ eats the coverage) and anything that has to stay readable when tiny. In 2001 the
 also a practical reason: driver mip generation varied between cards, so shipping the
 levels guaranteed what players saw.
 
-**The guard.** `a2tex install` now refuses any texture that has `_N` siblings when the
-base size would change, and says so. To upscale such a texture properly you must
-regenerate the whole chain in the same step — for a 1024 base that is `_1` 512 down to
-`_4` 64, or the full seven levels down to 8x8 if you want to keep the chain bottoming
-out where stock's does.
+**The fix.** `mips=N` in `target.conf` makes the build emit the chain alongside the
+base, and `a2tex install` validates it: a texture with `_N` siblings whose base size
+changes is installed only if this build supplies every level at exactly half the one
+above. The check is a **pre-flight over the whole target**, not per file — the mips sort
+before the base, so an in-loop check installed `_1`/`_2`/`_4` and only then refused the
+base, leaving a stock base under upscaled mips. That is the same invalid chain, inverted.
+`a2tex revert <target>` restores the chain too, for the same reason: `stock/` holds only
+the base, so it used to leave 512px mips over a 128px base — reached by the command
+meant to make things safe.
+
+**Use a Box filter, and no peak lift.** At exact powers of two a box filter is a pure
+area average, so it preserves the mean — and with additive blending the mean *is* the
+light contributed, so a filter that dims the small levels makes the nebula fade as the
+camera pulls back. Stock's authored chain does lift the peak at its two smallest levels
+(16px: 228 against a box filter's 217), but reproducing that as a per-level `-level`
+compounds — it drifted the mean 33 → 37 over four levels where stock holds 33 — and it
+lifted the quadrant edges off black. It only matters at sizes a 1024 base never reaches.
+
+The rebuilt chain against stock's, per level:
+
+| | stock | rebuilt |
+|---|---|---|
+| sizes | 128 / 64 / 32 / 16 / 8 | 1024 / 512 / 256 / 128 / 64 |
+| mean | 33, 33, 33, 34, 36 | 33 at every level |
+| peak | 249, 255, 246, 228, 175 | 253, 251, 250, 249, 248 |
+| worst quadrant edge | 11, 14, 19, 47, 78 | 0, 0, 1, 2, 7 |
+
+Stock never forced its mip edges to black, and box-filter bleed makes them worse at every
+level; the rebuild is better than stock on that axis by a wide margin.
 
 `REMASTERING.md` counts **347 hand-authored chains, 782 files**, across the whole texture
 set. For the nebulae it is a single texture; for the hull textures it will be most of
