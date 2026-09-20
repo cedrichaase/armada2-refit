@@ -271,6 +271,21 @@ reason rule 2 above changed. `blackedge=N` exists for `Mmoon` alone: its three s
 sprites are additive, so a stray 1-3/255 on a quadrant boundary draws a glowing square.
 `Mdmoonglo`/`Mdmoonglo4` stay stock — soft gradients, nothing to recover.
 
+**The class planets are a second family the `M*` names do not cover.** `PB_CLSS[DHJKLM]1/2`
+(grounds) and `PA_BORG/ECFR/ECNA` (32-bit cloud layers) are what the ODFs bind and what
+most maps place; the eleven `M*` maps are the *named story* planets. All 16 installed at
+2048. They are a **four-lobe gore unwrap, not equirectangular** — the horizontal-wrap
+reasoning from the `M*` maps does not apply; what matters is no bleed across the gores.
+
+**544 UI textures are installed** as `UIicon` (382, 64→256), `UImid` (26, 128→512) and
+`UIpanel` (136, 256→512). The small ones went up as **contact sheets** — `sheet=GxP` in
+`target.conf` — and that is a *quality* decision, not a cost one: the app takes
+`megapixels` as an integer, so 1 is the floor, and 1MP from a 64px icon is a 16x lift.
+49 icons in a 512px sheet at 4MP is a 4x lift, and it keeps stock's shapes where the 16x
+route restyles them. Panels are deliberately NOT sheeted — they are 9-slice pieces whose
+edges abut on screen. Cursors, `colors`, `logos`, `gminicon`, `gminisys` and `MBuild`
+are deliberately stock; reasons in `README.md`.
+
 **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
 declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to
 the back buffer independently on each axis — 2.15x across against 1.20x down at

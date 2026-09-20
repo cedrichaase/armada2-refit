@@ -69,8 +69,10 @@ silently corrupt each other when two targets run at once.
 | 22 six-face skybox sets, 133 faces | **installed and confirmed in game** — upscaled from their own stock faces, face 2048 |
 | 8 puff atlases | **installed** — upscaled from their own stock quadrants, 1024x1024 (512/quadrant) |
 | `Mnebula2` | installed **with a rebuilt 4-level mip chain** (`mips=4`). Upscaling its base alone had crashed the game |
-| 11 planet maps | **installed** — `kind=plain`, 2048x2048, upscaled from their own stock |
+| 11 named planet maps | **installed** — `kind=plain`, 2048x2048, upscaled from their own stock |
 | 4 moon / sun / ring textures | **installed** — the first **32-bit** textures this pipeline has touched |
+| 16 class-planet textures | **installed** — `PB_CLSS*` grounds and `PA_*` cloud layers, 2048x2048 |
+| 544 UI textures | **installed** — icons 64→256 and 128→512 via contact sheets, panels 256→512 |
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
 lot. `Textures/RGB` went from 254 MB to 2.0 GB.
@@ -934,6 +936,106 @@ values and cannot clip real art. It applies to **additive atlases only**.
 `Mdmoonglo` (8x8) and `Mdmoonglo4` (64x64) are soft radial gradients with no structure
 to recover; Lanczos and a generative upscale give the same thing, so they stay stock.
 
+## The class planets: the ones actually on the maps
+
+The eleven `M*` maps above are the **named story** planets — Earth, Qo'noS, Romulus,
+Remus, Ba'ku and friends. They are not what most maps place. That is a second family
+bound in the ODFs:
+
+    groundTextureName     = "PB_CLSSD" | "PB_CLSSH" | "PB_CLSSK" | "PB_CLSSL" | "PB_CLSSM"
+    atmosphereTextureName = "PB_CLSSJ"
+
+Class D, H, J, K, L, M — the engine appends `1` or `2` for the two variants of each, so
+eleven `PB_*` files — plus five `PA_*` cloud layers (`PA_BORG1/2`, `PA_ECFR0`,
+`PA_ECNA1/2`) which are 32-bit, alpha being cloud density. The user reported a planet
+looking "muddy" after the named set was done; it was `PB_CLSSH1`, still stock, 256px
+carrying a sphere about 600px across — a 4.7x magnification. At 2048 the same sphere is
+*minified*, which is the whole difference.
+
+**These are not equirectangular.** They are a four-lobe gore unwrap — two mirrored
+diamonds with unused black wedges between them — so the horizontal-wrap reasoning from
+the `M*` maps does not transfer. What matters instead is that the upscaler not bleed
+across the lobe boundaries, and the difference maps against the Lanczos layer show it
+does not: the contribution stops dead at the gore edges and follows terrain inside them.
+`PB_CLSSJ`, a soft-banded gas giant, gets almost nothing, which is the right answer for
+a source with no structure to recover.
+
+Channel means match stock on all sixteen and R-G deviation comes out at or slightly
+*below* stock's own on every file.
+
+## The UI: 544 textures, and why they went up in sheets
+
+**The stretch had to be fixed first** — see `SETUP.md`. Upscaling a UI drawn through a
+1600x1200 canvas stretched 1.79x sideways would have been sharpening the wrong picture.
+
+`Sprites/gui_*.spr` and `cursor.spr` resolve to 569 distinct textures. Almost all of
+them are `@tmaterial=interface` or `default`, neither of which forbids filtering — the
+`#No filtering, ever.` bar that rules out the fonts does not apply here. 2285 of the
+2317 resolvable sprite entries have `@reference` equal to their texture's real width, so
+the UVs are true fractions and a bigger texture lands on the same rectangle; the 32
+exceptions are all cursors, where `@reference` is the *frame* size of a horizontal
+strip, which is equally scale-invariant.
+
+### Sheets are a quality decision
+
+The upscaler takes `megapixels` as an **integer**, so 1 is the floor — and 1MP from a
+64x64 icon is a 16x lift, the regime where this model invents most. Packing 49 icons
+into one 512px sheet (7x7 cells, 8px gutters: `8 + 7*(64+8) = 512` exactly) and asking
+for 4MP returns 2048: a **4x** lift, the gentlest used anywhere in this project.
+
+The app rounds to an integer scale factor — `scale = round(sqrt(mp*1e6/(w*h)))` — so a
+sheet edge and a megapixel target pin the lift exactly. Verified against the same icon
+taken both routes: the sheet keeps stock's shapes where the 16x individual upscale
+restyles them (the two hands in `gbtrade` gain plausible but wrong fingers). It also
+costs 1/49th as much, which is not the argument but is not nothing: 408 textures for
+$0.055.
+
+`sheet=GxP` in `target.conf` turns it on. `tools/upscale-stock.sh` packs, uploads,
+slices back to per-unit `ai/` files, and the blend stage downstream is unchanged.
+
+| target | n | stock → built | route |
+|---|---|---|---|
+| `UIicon` | 382 | 64 → 256 | `sheet=7x8`, 8 sheets |
+| `UImid` | 26 | 128 → 512 | `sheet=3x32`, 3 sheets |
+| `UIpanel` | 136 | 256 → 512 | individual at 1MP (4x), downsampled by `size=512` |
+
+The panels are **not** sheeted. They are 9-slice pieces whose edges are load-bearing —
+they abut each other on screen — and a neighbour across a gutter is a risk with no
+payoff when one panel already fills a 4x request on its own.
+
+Sizes come from how big the things are actually drawn. `paletteSingleButtonArea` is
+80x80 in the canvas, x1.2 on screen = 96px, so a 64px icon is magnified 1.5x and 256
+leaves it 2.7x oversampled with headroom for 4K. Panels are drawn near 1:1, so 512 is
+already 1.7x oversampled; 1024 would have been 579MB of nothing.
+
+All 544 verified: no channel mean off by more than 1, no alpha mean off by more than 1,
+no channel-count change, and every TGA header byte-identical to the file it replaces.
+
+### Deliberately left stock
+
+- **20 cursors.** Drawn at native pixel size, non-square (so `fit()` would square them),
+  and deliberate pixel art.
+- **`colors`** — an 8x8 colour lookup table. Interpolating it blends the cells.
+- **`logos`** — Activision, Bink, GameSpy and Mad Doc trademarks, on a splash screen
+  shown once. Invented shapes where there is a right answer, for no gain.
+- **`gminicon`, `gminisys`** — 32x32, drawn at minimap blip scale.
+- **`MBuild`** — the line-art build overlay: `add_nomipf`, and the only UI texture in
+  the game with a mip chain.
+- **The 12 font atlases**, for the reasons in `REMASTERING.md`, which have not changed.
+
+### Two bugs this pass found
+
+- **`fit()`'s greyscale guard was a heuristic and had a false positive.** It refused any
+  reference whose green and blue means were both 0 — meant to catch a 2-channel PNG
+  written without `PNG24:`. `Gmneb2`, the red minimap nebula icon, is genuinely 107/0/0,
+  and the guard `die`d on it: the target shipped 25 of 26 files and the only symptom was
+  a blank column in the build report. It now tests the actual on-disk channel count,
+  which is what it always meant.
+- **`sheet=$(grep …)` with no match exits 1**, and under `set -euo pipefail` that kills
+  the script *at the assignment*, before anything has been printed. A 136-file upscale
+  reported success and did nothing. Same family as the non-matching-glob trap in
+  CLAUDE.md hard rule 3; both greps in `upscale-stock.sh` now end in `|| true`.
+
 ## Beyond the nebulae
 
 `REMASTERING.md` carries the measured inventory of all 2120 textures and what would be
@@ -986,14 +1088,17 @@ Genuinely outstanding:
   return to it.
 - **`PROMPTS.md` is now unexercised.** Nothing in the game currently uses generated art,
   so those prompts are untested against the current pipeline.
-- **Planets and moons are done** (15 files) and **have not been seen in game yet.**
-  That includes `mdmoon`, which is the second texture here to ship a rebuilt mip chain
-  and the first 32-bit one — the class of mistake that crashed the Klingon campaign.
-- **Next class by screen area is large props, then hull textures** — 611 of those carry
-  a live alpha channel and most have mip chains. Both of those blockers now have
-  working code behind them; what is untested is the *scale*, and whether alpha on a hull
-  texture (specular, team-colour masking) tolerates a Lanczos upscale as well as a
-  cutout mask does.
+- **`mdmoon` has not been seen in game.** It is the second texture here to ship a
+  rebuilt mip chain and the first 32-bit one — the class of mistake that crashed the
+  Klingon campaign.
+- **The 544 UI textures have not been seen in game.** Nor have the 16 class planets,
+  though the named planets and the UI *layout* fix are both confirmed.
+- **Next is hull textures** — 611 carry a live alpha channel and most have mip chains.
+  Both blockers now have working code behind them; what is untested is the *scale*
+  (~1300 base textures, and sheets only help where a whole group shares one size), and
+  whether alpha on a hull texture (specular, team-colour masking) tolerates a Lanczos
+  upscale as well as a cutout mask does. There are also `*bump` textures throughout the
+  set, which are normal or bump maps and must not be treated as colour.
 
 Closed since the last revision of this list, recorded so they are not re-opened:
 
