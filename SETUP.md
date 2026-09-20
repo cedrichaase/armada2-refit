@@ -158,12 +158,48 @@ Consequences:
 2. **The cutscene-crash fix was therefore never actually tested** — it was reverted
    before the next play session.
 
+Re-checked 2026-09-21 and still true. `syswow64/d3d8.dll` is 320548 bytes with the same
+mtime as `d3d9.dll`, both rewritten at the last launch; `autoInstallDxvk` is still
+`true`; `WINEDLLOVERRIDES` is still `winmm=n,b;d3d8=n,b`.
+
+So the chain actually in effect is **the proxy into DXVK's own d3d8**, not into the GOG
+translator:
+
+    Armada2.exe
+      -> <game dir>/d3d8.dll          Patch Project proxy      45056
+      -> syswow64/d3d8.dll            DXVK d3d8                320548
+      -> Vulkan
+
+Worth knowing rather than only regretting: DXVK's native d3d8 is what the whole texture
+project has actually been rendering through, and it has handled 2048 skyboxes, a 4096
+atlas and 1024 hull textures without complaint.
+
 Remedies, in order of preference:
 
 - Set `autoInstallDxvk` to `false` (Heroic closed), then restore the translator:
   `cp "<game dir>/d3d8.dll.gog-backup" "<prefix>/pfx/drive_c/windows/syswow64/d3d8.dll"`
   DXVK's `d3d9.dll` stays in place; only the d3d8 slot needs to stop being managed.
 - Or re-copy the translator after every launch, which is fragile.
+
+### Anisotropic filtering — untried, and probably the cheapest visual win left
+
+`dxcfg.ini` sets `anisotropic=application`, i.e. whatever a 2001 renderer asks for, which
+is likely none. Everything drawn at a steep angle to the camera — which in a top-down RTS
+means every ship hull and every planet surface — is therefore sampled with plain
+trilinear filtering and blurs along the axis of foreshortening.
+
+DXVK can force it regardless of what the application asks. A `dxvk.conf` beside
+`Armada2.exe`:
+
+    d3d9.samplerAnisotropy = 16
+
+DXVK's d3d8 runs on its d3d9 backend, so the `d3d9.*` key is the right one under the
+chain that is actually live above. It costs nothing, applies to every texture in the
+game at once, and is reversible by deleting the file.
+
+**Not done.** It is the one renderer-side change with an obvious upside, but it touches
+the graphics stack while the regression above is open, so it should be tried on its own,
+with nothing else changing, so that a bad result is attributable.
 
 ### Also outstanding
 

@@ -1,6 +1,8 @@
 # Working in this directory
 
-Tooling for replacing Star Trek: Armada II nebula textures with generated art.
+Tooling for replacing Star Trek: Armada II textures with higher-resolution art. It
+started with the nebulae and has since covered the skyboxes, the planets, the UI and the
+first hull texture; the name and much of the vocabulary are still nebula-shaped.
 
 **Read `README.md` first.** It holds the engine reference — sprite format, the two
 nebula systems, texture inventory, pitfalls. Do not re-derive any of it; it was
@@ -19,8 +21,9 @@ DXVK on every launch and reverts the d3d8 chain fix.**
 
 - Game: `/home/cedric/Games/Heroic/Star Trek Armada II` — GOG release, patch 1.1 plus
   Patch Project 1.2.5, run through Heroic with Proton-CachyOS.
-- Textures: `Textures/RGB/`, flat, **2115 `.tga` files, 205 MB stock**, **mixed
-  `.tga` / `.TGA` case**.
+- Textures: `Textures/RGB/`, flat, **2115 `.tga` files, 196 MB stock**, **mixed
+  `.tga` / `.TGA` case**. (196 MB is the byte total; `du` says 205 MB, because 2115
+  small files carry ~9 MB of block slack. Both figures appear in older notes.)
 - Available: ImageMagick 7 (`magick`), `python3`, `ffmpeg`.
   **Not available: numpy, PIL.** Do image work through ImageMagick, not Python.
 - Scratchpad for intermediates; this directory is the user's, keep it tidy.
@@ -35,9 +38,14 @@ DXVK on every launch and reverts the d3d8 chain fix.**
    textures are 24-bit; **1113 of the 2115 textures in the game are 32-bit with a live
    alpha channel.** `write_tga()` now reads the depth off the stock file it is given as
    its third argument and writes to match, and `attach_alpha()` carries the stock mask
-   across, Lanczos-upscaled. **The alpha never goes through the generative upscaler** —
-   a mask has only edges, which Lanczos resolves exactly, and a model that invents
-   plausible detail into a mask invents holes in the object.
+   across, Lanczos-upscaled. **Alpha does not go through the generative upscaler unless
+   the target says so** — a *mask* has only edges, which Lanczos resolves exactly, and a
+   model that invents plausible detail into a mask invents holes in the object. The test
+   is what the channel *means*, not that it is the fourth one: on a hull texture the
+   alpha is a self-illumination map — lit windows, deflector and nacelle glow — which is
+   picture content, and `alpha=ai` in `target.conf` upscales it like colour, into
+   `src-alpha/`. Measured on the Sovereign at 0.001% invented light. Opt-in per target,
+   and it stays opt-in.
    **Resize *and composite* colour and alpha separately, always.** Joining them early
    and touching the result is the single most repeated mistake in this project — it has
    bitten three times (the Lanczos layer in `upscale-stock.sh`, `gen_mips`, and
@@ -84,7 +92,9 @@ associated alpha are what corrupted `Mmoon` in the first place, so it cannot be 
 thing that checks for it. `Mmoon` shipped broken because it *was* verified, and then the
 build changed and only the newly-added property was re-checked: **changing a build
 invalidates the whole invariant set, not just the part you changed.**
-A target is `targets/<NAME>/` holding `target.conf`, `stock/`, `src/`, `out/`.
+A target is `targets/<NAME>/` holding `target.conf`, `stock/`, `src/`, `out/` — plus
+`src-alpha/` when it sets `alpha=ai`. Everything but `stock/` and `target.conf` is
+derived and gitignored.
 **To add work, drop images in `src/` and build.** Do not write new per-texture scripts;
 add a target directory instead.
 
@@ -129,7 +139,14 @@ Two bash traps that have each cost a debugging round here:
    six faces. So `MONOHUE` is needed for the atlas and is **not** needed for the 6-face
    sets, where per-channel matching keeps the real hue variation instead of flattening
    it. Measure before reaching for it.
-5. **Keep the AI layer.** `targets/<T>/` holds three layers: `stock/` (original),
+5. **Set the blend on a render at the object's REAL ON-SCREEN SIZE.** 35 is right for a
+   skybox because a face fills the viewport — 1:1 and the game agree about what is
+   visible. A ship does not: a Sovereign draws ~340px wide, its saucer takes 140 of 256
+   texels, and the invented hull glyphs that 35 exists to suppress land at well under a
+   pixel. Judged at 1:1 that target looked careful; in game it was indistinguishable
+   from stock, and it now runs at 70. Crop the region, resize it to the width the object
+   actually occupies, and compare *there*.
+6. **Keep the AI layer.** `targets/<T>/` holds three layers: `stock/` (original),
    `ai/` (the raw upscale — what the credits bought), `src/` (`ai/` blended over
    Lanczos — what `a2tex build` reads). `tools/upscale-stock.sh --reblend --blend N`
    re-derives `src/` offline and free. For `MBG02` those layers were scratch and were
@@ -263,9 +280,9 @@ stock (starfield). Do not re-open this without a specific reason.
 and upscaling its base while leaving the chain alone CRASHED the game** in the Klingon
 campaign. Fixed with `mips=4` in its `target.conf`: the build emits the whole chain and
 `install` validates it pre-flight, refusing the entire target rather than writing a
-partial one. `revert <target>` restores the chain too. It is the only one of the 142
-textures installed here with a chain — but `REMASTERING.md` counts 363 across the full
-set, so `mips=` will be needed constantly once this moves to hull textures.
+partial one. `revert <target>` restores the chain too. It was the first of several: `mdmoon` carries a rebuilt
+4-level chain and the Sovereign's three textures carry 2-level ones. `REMASTERING.md`
+counts 363 chains across the full set, so `mips=` is needed constantly on hull work.
 
 **All 8 puffs are done**, and the claim above them — that a puff could not usefully be
 upscaled from its own stock — was wrong. All 8 atlases are now `source=stock`,
@@ -281,7 +298,7 @@ not worth keeping — but measure the upscale first, because on both classes her
 No target was made for it; the nebula-looking resource cloud people mean is usually
 `Mlatinum`, which is covered.
 
-**Planets and moons are done — 15 textures, installed, not yet seen in game.** Eleven
+**Planets and moons are done — 15 textures, installed and confirmed in game.** Eleven
 24-bit planet maps at `kind=plain` (an alias for `sky-faces`: one file, no alpha, no
 chain — structurally a single skybox face), all at face 2048, all from their own stock.
 `MQonos` is the one at `blend=15`; on the other ten the AI's contribution follows
@@ -320,7 +337,7 @@ declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that c
 the back buffer independently on each axis — 2.15x across against 1.20x down at
 3440x1440. `tools/ui-widescreen.py` re-declares the canvas and moves the right-anchored
 and centred panels; `--revert` undoes it. Details and the one unhandled case (the bridge
-display) are in `SETUP.md`. **Applied but not yet seen in game.**
+display) are in `SETUP.md`. **Applied and confirmed in game.**
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs
@@ -335,6 +352,24 @@ The old "corner notches are not reproduced" gap is **closed, and was only ever a
 *generated* faces.** Upscaling a set's own stock faces keeps the composition — notches
 included — by construction: `MbgBorg.1`'s 24x24 corner mean is 0 in stock and 0 in the
 2048px build.
+
+**The hull class has started: the Sovereign.** `Fbattle`, `FEntE` and `Fbattle_b` at
+1024 with rebuilt 2-level chains, confirmed in game. Three things it established, all
+written up in `README.md`:
+
+- **Hull alpha is a self-illumination map, not a mask** — hence `alpha=ai`, and the
+  amendment to hard rule 2 above.
+- **`blend=70`, not 35** — see generative rule 5. The first target where pixel-peeping
+  and the game disagreed.
+- **`tools/fix-enterprise-registry.py`** re-cuts the two `C` apertures the model closed
+  in `NCC-1701-E`. Stock's registry is 3 texels tall and illegible, so "leave it stock"
+  buys nothing and no filter can recover an aperture that was never resolved. A
+  deliberate one-off — no other hull texture carries type anyone can name. **Re-run it
+  after any `--reblend`**, before `build`; `src/` is derived and a re-blend discards it.
+
+**1024, not 2048, on hull work.** Both cost $0.005, so this is a memory decision:
+Armada2.exe is a 32-bit LAA process, the textures already hold 2.27 GB, and at 2048 a
+single ship's three files would be 64 MB against 16 MB at 1024.
 
 Open items are listed at the end of `README.md`; the plan for the rest of the game's
 textures is in `REMASTERING.md`.

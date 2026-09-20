@@ -5,7 +5,11 @@ higher-resolution generated art. Built against the GOG release running under
 Heroic/Proton on Arch.
 
 Game directory: `/home/cedric/Games/Heroic/Star Trek Armada II`
-Textures live in `Textures/RGB/` (flat, 2115 `.tga` files, 205 MB stock).
+Textures live in `Textures/RGB/` (flat, 2115 `.tga` files, 196 MB stock).
+
+> Sizes here are **byte totals**, not `du`. `du` reports 205 MB for the same stock set,
+> because 2115 small files carry about 9 MB of filesystem block slack. Older notes in
+> these documents quote the `du` figure; where the two disagree, this is why.
 
 ---
 
@@ -17,8 +21,11 @@ Textures live in `Textures/RGB/` (flat, 2115 `.tga` files, 205 MB stock).
                           make-seamless.sh, gen-nebula.sh, tgapad.py,
                           ui-widescreen.py, fix-enterprise-registry.py
     targets/<NAME>/       target.conf, stock/, ai/, src/, out/  -- one per texture
-    archive/              candidates and comparisons that cost credits to make
-    .scratch/             transient, safe to delete at any time
+                          (+ src-alpha/ when the target sets alpha=ai)
+    archive/              material that cannot be regenerated cheaply or at all --
+                          upscale candidates, reference plates, stock mip chains, and
+                          the madExcept capture of the end-of-mission crash
+    .scratch/             transient, safe to delete at any time, and periodically is
 
 Four layers per target, and the order matters:
 
@@ -29,15 +36,32 @@ Four layers per target, and the order matters:
 | `src/` | what `a2tex build` reads: `ai/` blended over a plain Lanczos upscale, or hand-supplied art |
 | `out/` | the finished TGA, ready for `a2tex install` |
 
-A target with `alpha=ai` gets a fifth, `src-alpha/`: the upscaled alpha plate, blended
+What each layer costs on disk, across all 52 targets, and what it takes to lose it:
+
+| layer | size | committed | to recreate |
+|---|---|---|---|
+| `stock/` | 76 MB | **yes** | copy out of the game, or from `.a2neb-backup` |
+| `ai/` | 869 MB | no | **money** — this is the only layer credits bought |
+| `src/` | 534 MB | no (see below) | free and offline: `--reblend` |
+| `src-alpha/` | 0.7 MB | no | free and offline: `--reblend` |
+| `out/` | 2.2 GB | no | free: `./a2tex build` |
+
+**Back up `ai/`.** Everything else in `targets/` is either committed or one command away;
+`ai/` is neither.
+
+`targets/MBG02/src/` is the one exception to `src/` being derived, and it is committed on
+purpose: `MBG02` predates the `ai/` layer, its intermediates were scratch and are gone,
+and those four tiles are the only remaining way to reproduce the accepted candidate D
+byte-for-byte. `.gitignore` says so too.
+
+A target with `alpha=ai` gets a further directory, `src-alpha/`: the upscaled alpha plate, blended
 the same way, one PNG per face. It is its own directory rather than another file in
 `src/` because `build_sky_faces` requires exactly one `src/` image per stock face, and
 an extra `<base>.alpha.png` would trip that count check as a "needs 3 images, found 6"
 skip — which reads like a missing file, not like a design.
 
 `src/`, `src-alpha/` and `out/` are all derivable, so all three are gitignored; `ai/` is
-gitignored only because 135 faces of it is 0.84 GB. Back it up rather than regenerate
-it.
+gitignored only because it is 869 MB.
 
     ./a2tex list                       every target, its config and state
     ./a2tex build [target...] [-j N]   default: every target that has files in src/
@@ -98,7 +122,12 @@ a fog-of-war or minimap texture freezes it**, **compositing onto an alpha-bearin
 corrupts colour**, and **`earth.tga`'s fourth byte is padding, not alpha**.
 
 Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
-lot. `Textures/RGB` went from 205 MB to 2.4 GB.
+lot. `Textures/RGB` went from 196 MB to 2.27 GB.
+
+There are **734 backups against 708 shipped files.** The 26 extra are `UImid`, which was
+installed, froze the game, and was reverted; its backups stay beside the stock files they
+restored. `./a2tex verify` skips `install=no` targets for exactly this reason, and the 26
+game files have been confirmed byte-identical to their backups.
 
 Originals are backed up twice: beside each file in the game directory as
 `<name>.a2neb-backup`, and here in each `targets/<NAME>/stock/`.
@@ -1214,7 +1243,7 @@ generalise.
 
 The app takes `megapixels` as an integer and rounds the scale factor, so a 256px source
 is 4x at 1MP and 8x at 4MP — and both cost $0.005. The size was chosen on **memory**,
-not price. Armada2.exe is a 32-bit LAA process; the textures already account for 2.4 GB.
+not price. Armada2.exe is a 32-bit LAA process; the textures already hold 2.27 GB.
 At 1024 a 32-bit base plus its chain is 5.3 MB, so the Sovereign set is 16 MB. At 2048
 the same three files would be 64 MB, and the ~600 hull bases behind them would be
 unreachable at any size. 4x is also where this model's invention is mildest — see
@@ -1349,8 +1378,8 @@ scripts should be read:
 - **363 hand-authored mip chains** (782 files) must be regenerated, not ignored.
   `gen_mips()` does this for every kind now, colour and alpha separately.
 - **Fonts, UI, cursors, wireframes and minimap art must never be hallucinated into.**
-- Upscaling every base texture 4x would take the set from 205 MB to about 10 GB;
-  the 708 textures done so far already account for 2.4 GB. On the hull class this is the
+- Upscaling every base texture 4x would take the set from 196 MB to about 10 GB;
+  the 708 textures done so far already account for 2.27 GB. On the hull class this is the
   binding constraint, not cost — see "1024, not 2048" above.
 
 ## Still open
@@ -1386,6 +1415,13 @@ Genuinely outstanding:
 
 - **The d3d8/DXVK regression in `SETUP.md`**, unfixed and still blocked on Heroic being
   closed. The cutscene-crash fix has consequently never been tested.
+- **The end-of-mission crash** — a `Wine C++ Runtime Library` R6025 box on finishing a
+  mission, then madExcept. Captured in `archive/error-mission-finish/`. **It first
+  occurred before any modding**, so it is not this project's, and nothing here has been
+  shown to affect it either way. Recorded so it is not mistaken for a texture problem.
+- **Anisotropic filtering is untried**, and is probably the cheapest visual win left —
+  it would sharpen every oblique surface in the game at once, hull textures most of all,
+  for free and reversibly. Recipe and the reason for holding off are in `SETUP.md`.
 - **`Mnebula4`'s generated art is preserved but unused** — `targets/Mnebula4/src-generated/`
   and `archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen` to
   return to it.
@@ -1401,7 +1437,7 @@ Genuinely outstanding:
   is a night-lights map rather than a mask. What is still untested is the **scale** —
   ~600 hull bases, and contact sheets only help where a whole group shares one size,
   which at 256px they largely do. Memory is the real ceiling: at 1024 the whole class is
-  roughly 3 GB on top of the 2.4 GB already spent, inside a 32-bit LAA process, so it
+  roughly 3 GB on top of the 2.27 GB already spent, inside a 32-bit LAA process, so it
   wants doing by faction or by ship class and checking as it goes, not in one pass.
   There are also `*bump` textures throughout the set, which are normal or bump maps and
   must not be treated as colour, and the alpha on a **station** or **weapon** texture has

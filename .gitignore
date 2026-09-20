@@ -1,7 +1,11 @@
+# Derived layers. stock/ and target.conf are the only committed parts of a target --
+# except targets/MBG02/src/, which is tracked ON PURPOSE: MBG02 predates the ai/ layer,
+# its AI and Lanczos intermediates were scratch and are gone, and those four tiles are
+# the only remaining way to reproduce the accepted candidate D byte-for-byte. Do not
+# "tidy" them away; regenerating them costs ~$0.16 and a re-tune.
 .scratch/
 targets/*/out/
 targets/*/ai/
 targets/*/src/
 targets/*/src-alpha/
 targets/*/.alpha-units/
-targets/*/.units/
