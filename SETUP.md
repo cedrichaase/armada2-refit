@@ -1,0 +1,204 @@
+# Star Trek: Armada II — Heroic / Proton setup notes
+
+Everything learned getting the GOG release running well on Arch + Hyprland. Separate
+from the texture work in `README.md` / `CLAUDE.md`, though the d3d8 section matters to
+anything touching the renderer.
+
+## The install
+
+| | |
+|---|---|
+| Game | `/home/cedric/Games/Heroic/Star Trek Armada II` |
+| Prefix | `/home/cedric/Games/Heroic/Prefixes/Star Trek Armada II` |
+| Heroic config | `~/.config/heroic/GamesConfig/1174788223.json` |
+| Runner | Proton-CachyOS-latest |
+| Base | GOG release = Armada II + patch 1.1, plus Patch Project 1.2.5 |
+| GPU | RX 5700 XT (Navi 10 / gfx1010), 8 GB — Vulkan fine, **ROCm effectively unsupported** |
+
+## Heroic configuration
+
+**Heroic rewrites `1174788223.json` when it exits.** Only edit it while Heroic is fully
+closed, or the change is silently lost. Backup: `1174788223.json.bak-20260920`.
+
+Current environment:
+
+    WINEDLLOVERRIDES = winmm=n,b;d3d8=n,b
+
+`n,b` = native first, then builtin. Wine searches the application directory before the
+system directory, so this is what makes Wine load the game-directory `winmm.dll`
+(the ASI loader) and `d3d8.dll` (the Patch Project proxy) instead of its own.
+
+## Widescreen
+
+`STA2WidescreenPatch` v1.0 ships two files into the game directory:
+
+    STA2WidescreenPatch.asi      9216      the patch itself
+    winmm.dll                    2169856   Ultimate ASI Loader (ThirteenAG)
+
+It only loads because of the `winmm=n,b` override above. Without it Wine uses its
+builtin winmm, the loader never runs, and the patch is inert with no error.
+
+**Setting the resolution:** the in-game graphics menu was unusable (see Hyprland,
+below), so it was written directly into `ARMADA.PRF`, line 5:
+
+    0.5 0.5 5 5 5 4 3440 1440 32 1 <NUL> 0 1 0.625 <CR>
+                    ^^^^ ^^^^ ^^
+                    w    h    bpp
+
+    perl -0777 -pi -e 'binmode STDOUT; s/ 1024 768 32 / 3440 1440 32 /' ARMADA.PRF
+
+**The file contains an embedded NUL byte** — use binary-safe tooling, not `sed`.
+Backup at `ARMADA.PRF.bak` (151 bytes). The game rewrites the file on exit (now 154
+bytes) and the resolution persists.
+
+## Patch Project 1.2.5
+
+**The NSIS installer refuses to run against a GOG install**, with
+*"Make sure you have Armada II with Patch 1.1 installed in the target directory."*
+This is a known GOG incompatibility, not a broken download
+(installer md5 `8216c620fb17331a3d647f550ccfa723`).
+
+**Workaround:** download the ZIP distribution of the same version and copy `install/*`
+into the game directory by hand:
+
+    Armada2Hook.dll   1865728
+    Armada2Hook.mad    105160     MadExcept crash-reporter data
+    d3d8.dll            45056     proxy — see below
+    FOmsvc.dll         167936
+
+`Armada2.exe` is **not** modified — 1.2.5 is the "loader-free" release, confirmed by
+diffing against the original.
+
+## The d3d8 chain
+
+The fiddliest part of the setup. **Two different things both want to be `d3d8.dll`:**
+
+- **GOG's** `d3d8.dll` (1101824) is a full **d3d8to9 translator** — it implements
+  Direct3D 8 on top of Direct3D 9.
+- **Patch Project's** `d3d8.dll` (45056) is a **proxy** that exports only
+  `Direct3DCreate8`, and loads the real implementation from the **system directory**
+  via `GetSystemDirectoryA`.
+
+Because the proxy looks in the system directory, the two can be stacked rather than
+chosen between:
+
+    Armada2.exe
+      -> <game dir>/d3d8.dll          Patch Project proxy      45056
+      -> syswow64/d3d8.dll            GOG d3d8to9 translator   1101824
+      -> syswow64/d3d9.dll            DXVK                     7798798
+      -> Vulkan
+
+GOG's original was moved aside in the game directory as `d3d8.dll.gog-backup`, and
+DXVK's own d3d8 was backed up as `syswow64/d3d8.dll.dxvk-backup`.
+
+### PCGamingWiki's advice is wrong for this build
+
+It suggests renaming the patch's `d3d8.dll` to `dinput.dll` to dodge the conflict.
+Verified against this executable:
+
+    objdump -p Armada2.exe | grep -i dinput     # no matches
+
+The exe imports **no** dinput or dinput8 at all, so a `dinput.dll` would never be
+loaded and the patch would be silently inert.
+
+### ⚠ This fix does not currently survive a launch
+
+`autoInstallDxvk` is `true`, and **Heroic redeploys DXVK's DLLs into the prefix on every
+launch**, overwriting the GOG translator. Confirmed: `syswow64/d3d8.dll` is back to
+320548 bytes (DXVK's exact size) with the same mtime as `d3d9.dll`, `d3d11.dll` and
+`dxgi.dll` — a bulk redeploy.
+
+Consequences:
+
+1. The chain above is **not in effect right now**.
+2. **The cutscene-crash fix was therefore never actually tested** — it was reverted
+   before the next play session.
+
+Remedies, in order of preference:
+
+- Set `autoInstallDxvk` to `false` (Heroic closed), then restore the translator:
+  `cp "<game dir>/d3d8.dll.gog-backup" "<prefix>/pfx/drive_c/windows/syswow64/d3d8.dll"`
+  DXVK's `d3d9.dll` stays in place; only the d3d8 slot needs to stop being managed.
+- Or re-copy the translator after every launch, which is fragile.
+
+### Also outstanding
+
+`d3d9=n,b` has never been added to `WINEDLLOVERRIDES`. Without it the translator may
+resolve to Wine's builtin d3d9 rather than DXVK's. Target value:
+
+    winmm=n,b;d3d8=n,b;d3d9=n,b
+
+## Hyprland / window management
+
+**Symptom:** the game opened a second window; the settings menu drew in one while input
+stayed grabbed by the other, so the menu was visible but could not be clicked. Focus
+kept snapping back to a black fullscreen frame.
+
+**Fix:** a Wine virtual desktop, so everything renders inside one window. Appended to
+`<prefix>/pfx/user.reg` (backup `user.reg.bak-a2`):
+
+    [Software\\Wine\\Explorer]
+    "Desktop"="Default"
+
+    [Software\\Wine\\Explorer\\Desktops]
+    "Default"="3440x1440"
+
+**Alternative if the virtual desktop ever causes trouble** (it is the prime suspect for
+the cutscene crash if the d3d8 chain turns out not to be the cause): revert it with
+`cp user.reg.bak-a2 user.reg` and use Omarchy window rules instead — `o.window(...)`
+with `fullscreen = true`, pattern at
+`/usr/share/omarchy/default/hypr/apps/retroarch.lua`. Note the window class is
+`steam_proton`, which is not unique to this game, so scope the rule by title.
+
+## Known issues
+
+- **Cutscene crash.** Finishing Federation mission 1 threw a DirectX-related error and
+  crashed when the completion cutscene tried to play. Startup videos (`Intro.bik`) play
+  fine, so Bink itself works; the hypothesis is a D3D8 device reset on the transition
+  from live 3D to fullscreen video. No diagnostics were produced at all — `Logs/` empty,
+  no coredump, no MadExcept report, no Heroic session log. **Unresolved**, and per the
+  section above the intended fix is not currently installed.
+
+## Campaign progress format
+
+`save/shell.set`, 78 bytes. Backup at `save/shell.set.bak`.
+
+- Stock: all zeros except offset 11 = `0x01`.
+- Setting **all** bytes to `0x01` unlocked the first **two** missions of every campaign.
+- So the bytes are **progress counters** (value = missions completed), not booleans.
+  `0x09`/`0x0A` should open all ten.
+- Offset 11 is *not* the Federation counter — it held `1` while only mission 1 was
+  selectable.
+
+`mshell.set` in the game directory is the mission list: 40 entries, six tutorial plus
+ten each for Federation, Klingon and Borg.
+
+## Gotchas
+
+- **`pgrep -f "Armada2.exe"` matches its own command line** and reports a false positive.
+  Use `pgrep -x Armada2.exe`. Likewise `pkill -f startrekarmada2` killed its own shell
+  (exit 144).
+- **`md5sum` wedges on Wine-backed paths** — it blocked in `unix_stream_read_generic`
+  partway through a manifest. For before/after comparison use
+  `find -printf '%s\t%TY-%Tm-%Td\t%p\n'` instead; size+mtime is enough and is instant.
+- **Heroic overwrites its per-game JSON on exit.** Close it before editing.
+- **Web sources:** moddb.com and pcgamingwiki.com return HTTP 403 to automated fetches;
+  armadafiles.com has a broken TLS certificate (altnames are `*.kasserver.com`) — reach
+  it over plain `http` with `curl`.
+
+## Verification recipes
+
+    # what is actually in the d3d8 slot? 320548 = DXVK, 1101824 = GOG d3d8to9
+    stat -c '%s %y' "<prefix>/pfx/drive_c/windows/syswow64/d3d8.dll"
+
+    # did DXVK redeploy? these four sharing an mtime means yes
+    cd "<prefix>/pfx/drive_c/windows/syswow64" && stat -c '%n %y' d3d8.dll d3d9.dll d3d11.dll dxgi.dll
+
+    # what does the exe actually import?
+    objdump -p Armada2.exe | grep -i 'DLL Name'
+
+    # current overrides, without opening Heroic
+    python3 -c "import json;print(json.load(open('$HOME/.config/heroic/GamesConfig/1174788223.json'))['1174788223']['enviromentOptions'])"
+
+    # is the game really running?
+    pgrep -x Armada2.exe
