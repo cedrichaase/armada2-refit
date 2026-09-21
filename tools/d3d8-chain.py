@@ -171,13 +171,23 @@ def install(which):
         shutil.copy2(dst, bak)
         print('backed up existing d3d8 -> %s' % os.path.basename(bak))
 
-    # Heroic must stop managing the slot, or the next launch reverts this.
-    # Leave it managed when returning to stock.
-    path, changed = set_auto_dxvk(which != 'wine')
-    if changed:
-        print('autoInstallDxvk -> %s  (%s)' % (which != 'wine', path))
+    # Heroic must STOP managing the slot when we install by hand, or its redeploy on
+    # the next launch puts the builtin back -- which is the documented regression, and
+    # is what autoInstallDxvk=True has been doing all along.  Returning to stock hands
+    # the slot back to Heroic.  (This read `which != 'wine'` at first, i.e. exactly
+    # backwards: it would have left Heroic free to undo the change it had just made.)
+    want_auto = (which == 'wine')
+    path, changed = set_auto_dxvk(want_auto)
+    print('autoInstallDxvk -> %s%s' % (want_auto, '' if changed else ' (already)'))
 
+    # The DXVK and Wine sources are mode 555, and copy2 carries the mode across -- so a
+    # plain copy makes the destination read-only and the NEXT run dies with EACCES.
+    # Remove the target first and restore a writable mode, so --use is re-runnable.
+    if os.path.exists(dst):
+        os.chmod(dst, 0o644)
+        os.remove(dst)
     shutil.copy2(src, dst)
+    os.chmod(dst, 0o644)
     print('installed %s\n' % identify(dst))
     status()
 
