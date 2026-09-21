@@ -662,6 +662,62 @@ method is one change at a time and three keys at once is not attributable:
 `dxvk.conf`, so it cannot be left on by accident. Expect the GPU to be near-idle — a 2001
 engine against an RX 5700 XT — and all three stages to be free.
 
+#### Telling whether a renderer setting did anything
+
+Asked after stage 1 went in and the answer was not obvious by eye. It is two separate
+questions and they need separate tools, because "the setting was ignored" and "the
+setting worked and is subtle" look identical in game.
+
+**Is it applied?** A `dxvk.conf` key DXVK does not recognise is *silently ignored* — no
+error, no warning. DXVK does print its effective configuration at startup, so ask it:
+
+    tools/dxvk-logging.py --on       # adds DXVK_LOG_LEVEL/DXVK_LOG_PATH to Heroic
+    # launch the game once
+    tools/dxvk-logging.py --check    # report the effective configuration
+    tools/dxvk-logging.py --off      # take the logging back out
+
+**Heroic must be closed** for `--on`/`--off`: it rewrites `GamesConfig` on exit and
+would discard the edit. The script refuses rather than losing the change silently, and
+backs the file up regardless. Note Heroic's key is spelled `enviromentOptions`, missing
+an `n` — matching its typo is required.
+
+**Did it change the picture?** `tools/ab-shot.sh` grabs frames and diffs them
+numerically, so the answer is a number rather than an impression:
+
+    tools/ab-shot.sh grab before
+    # change one thing, relaunch, return to the same save without moving the camera
+    tools/ab-shot.sh grab after
+    tools/ab-shot.sh diff before after 600 400 1200 300     # W H X Y, region only
+
+Aim at a region, not the whole frame: a whole-frame diff of this game is dominated by
+ships drifting and sprites animating between the two grabs, which will swamp the effect
+and make any setting look like it did something.
+
+#### Why anisotropic filtering is structurally quiet in THIS game
+
+Worth stating plainly, because the usual "AF transforms an old game" advice assumes
+content this game does not have. AF only acts on surfaces **oblique to the camera**, and
+it is a correction to *mip selection* — so it can only touch geometry that is both
+mipmapped and foreshortened.
+
+- **The dominant visual layer here is immune by construction.** Map nebulae, resource
+  clouds, weapons and explosions are camera-facing **billboards**. A billboard is never
+  oblique — that is what makes it a billboard — so AF cannot affect any of it. In a
+  frame like the one that prompted this, that is most of what the eye is drawn to.
+- **What AF *can* reach is small on screen.** Hull flanks, planet limbs and the skybox
+  at grazing angles. A Sovereign draws ~340px wide in a top-down RTS, so its
+  near-grazing side surfaces are a few dozen pixels tall. Real, and not dramatic.
+
+So a subtle result at stage 1 is the expected result, not evidence of a broken setting —
+which is exactly why `--check` exists to separate the two.
+
+**The corollary is the useful part: stage 2 should be the visible one here.** A mip LOD
+bias is not conditional on obliquity — it shifts mip selection for *every* mipmapped
+surface, camera-facing billboards included. That is precisely the layer AF cannot touch
+and precisely where the upscaled art lives. Expect stage 2 to do more for this game's
+appearance than stage 1, which inverts the usual ordering. Stage 1 still goes first:
+AF is what keeps the sharper mips stage 2 selects from aliasing on the oblique surfaces.
+
 #### Tier 2 — anti-aliasing, which cannot come from config
 
 **DXVK 3.1.1 has no MSAA-forcing option.** The full `d3d9.*` key list was read out of the
