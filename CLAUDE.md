@@ -418,6 +418,39 @@ to sub-pixel accuracy. **`popupPaletteXA` is the one key that deliberately does 
 reproduce stock**: stock's 355 against `infoPanelArea`'s 360 is a five-pixel overhang
 that nobody sees at 4:3 and that reads as a misalignment against a 1056px-wide panel, so
 it takes an `infopanel` anchor and goes flush. Derivation in `SETUP.md`.
+**And the cursors are a third screen reference again** — not the canvas, not the
+palette's 1600, but a hard-coded **800x600**, measured off the source texels at
+4.30x/2.40x, so they draw 1.79x too wide like everything else did.
+**There are two cursor draw paths and they size themselves differently**, which one
+in-game test settled: rewriting `Sprites/cursor.spr` so `W`/`U`/`@referenceWidth` scaled
+together fixed *only* the part of the selected-ship cursor that sits on the map plane.
+Every UI-layer cursor was untouched, because that one is a **hardware cursor** —
+`Armada2.exe` imports Win32 `SetCursor`/`LoadCursorA`/`SetSystemCursor` and references
+D3D8 `SetCursorProperties`, and the engine composes its surface from the sprite's
+**texel extent**, which no `.spr` number can reach. So horizontal density is pinned at
+4.30 px/texel and **the only lever is the art**. `tools/cursor-aspect.py` squashes the
+art 32 -> 18 texels across inside its unchanged cell, **about each sprite's `@origin`
+hotspot** so the click point does not move; that serves both paths, so `cursor.spr` is
+deliberately left stock — applying both would square the art twice. Cost is horizontal
+texels (28 -> 16 describing a shape), not block size, which is fixed by the reference.
+20 textures, 24-bit type 2 descriptor `0x00` headers matched byte-for-byte, colour key
+(`@skip=(0,0,0)`) verified to grow and the art verified not to gain rows. **The resample
+filter must be interpolating** — Mitchell blurs at vertical scale 1.0 and bled the art a
+row each way onto the key; Catrom is exact. **Confirmed in game.** Note this
+corrects README's claim that cursors are "drawn at native pixel size" — they are drawn
+at 4.3x. Derivation in `SETUP.md`. **`./a2tex revert all` restores these too**, since it
+sweeps every `*.a2neb-backup` in `Textures/RGB`.
+**An AI upscale cannot help the cursors, and `armada2.map` proves it rather than
+suggesting it**: `ST3D_DeviceDirectX8::DrawCursor` (`0x623bd0`) is `xor eax,eax; ret`
+— the cursor is a real D3D8 hardware cursor — and `SetCursor` (`0x625c90`) allocates its
+texture at `texW * [device+0x18]` by `texH * [device+0x1c]`, then `UpdateCursor`
+(`0x625b00`) `CopyRects` a UV sub-rect of *that* 1:1. So the engine magnifies the cursor
+itself by a constant, and doubling the source texels doubles the cursor at **identical**
+density (4.30 screen px per source texel either way). **The lever for sharpness is those
+two device floats, not the art** — set them equal and the aspect is fixed at the source
+with stock art and no squash; set them to 1.0 with 4x art and the cursor is crisp. Both
+are an ASI hook of the same shape as `tools/menuscale/`. Not attempted; do not go
+looking for an art-side answer, there isn't one.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs

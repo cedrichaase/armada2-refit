@@ -1108,8 +1108,22 @@ the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
 
 ### Deliberately left stock
 
-- **20 cursors.** Drawn at native pixel size, non-square (so `fit()` would square them),
-  and deliberate pixel art.
+- **20 cursors** — still not *upscaled*, but no longer untouched, and the reason given
+  here was wrong. Deliberate pixel art, and the strips are non-square (so `fit()` would
+  square them); but **"drawn at native pixel size" is false.** At 3440x1440 a 32x32
+  frame draws at ~138x77 screen px, a 4.30x/2.40x blow-up, because the cursor code
+  scales against a hard-coded 800x600 — so they were 1.79x too wide like everything
+  else. `tools/cursor-aspect.py` squashes the art to 18 texels across, about each
+  sprite's `@origin` hotspot, which is the *only* lever: the UI cursor is a hardware
+  cursor sized from the sprite's texel extent, so no `.spr` number reaches it and the
+  4.30 px/texel horizontal density is fixed no matter what. **An AI upscale cannot help
+  them**, and that is now read out of the binary rather than inferred: `DrawCursor` is
+  `xor eax,eax; ret`, and `SetCursor` allocates the cursor texture at
+  `texW * [device+0x18]` by `texH * [device+0x1c]` — so the engine magnifies it itself
+  by a constant, and more source texels just draws a bigger cursor at the same density.
+  The lever for sharpness is those two device floats, which is code (an ASI hook like
+  `tools/menuscale/`), not art. Derivation, and the in-game test that established the
+  two draw paths, are in `SETUP.md`.
 - **`colors`** — an 8x8 colour lookup table. Interpolating it blends the cells.
 - **`logos`** — Activision, Bink, GameSpy and Mad Doc trademarks, on a splash screen
   shown once. Invented shapes where there is a right answer, for no gain.
