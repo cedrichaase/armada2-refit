@@ -1,0 +1,10 @@
+LIBRARY GDI32.dll
+EXPORTS
+CreateCompatibleDC@4
+CreateCompatibleBitmap@12
+SelectObject@8
+DeleteObject@4
+DeleteDC@4
+StretchBlt@44
+SetStretchBltMode@8
+PatBlt@24
