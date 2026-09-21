@@ -145,11 +145,31 @@ def set_logging(on, hud=False, fix_override=False):
 
 def check_log():
     """Report DXVK's effective configuration and whether our keys survived."""
-    candidates = [f for f in os.listdir(GAME)
-                  if re.search(r'_d3d(8|9)\.log$', f, re.I)]
+    all_logs = [f for f in os.listdir(GAME) if f.lower().endswith('.log')]
+    other = [f for f in all_logs
+             if re.search(r'_(d3d9|d3d8|d3d11|dxgi)\.log$', f, re.I)
+             and not f.lower().startswith('armada2')]
+    candidates = [f for f in all_logs
+                  if re.search(r'^armada2.*_d3d(8|9)\.log$', f, re.I)]
+
     if not candidates:
-        print('No DXVK log in %s.' % GAME)
-        print('Run --on, launch the game once, then re-run --check.')
+        print('No DXVK log for Armada2 in %s.' % GAME)
+        if other:
+            # A log from some OTHER process proves the env reached the prefix and that
+            # DXVK works there, which narrows the fault to this game specifically.
+            print('\nBut DXVK did log for another process:')
+            for f in sorted(other):
+                head = open(os.path.join(GAME, f), errors='replace').readline().strip()
+                print('    %-24s %s' % (f, head))
+            print('  -> DXVK_LOG_PATH reached the prefix and DXVK works in it.')
+            print('     So the gap is specific to Armada2.exe.')
+        print('\nThe most common cause is NOT a broken chain:')
+        print('  Armada2.exe imports d3d8.dll statically, but the Patch Project proxy')
+        print('  only loads the real d3d8 when Direct3DCreate8 is first called -- and')
+        print('  the menu shell is GDI and never calls it. A launch that stayed in the')
+        print('  menus therefore produces no DXVK log, whatever the chain is doing.')
+        print('\n  Relaunch and get into the 3D VIEW (start a skirmish, wait for ships)')
+        print('  before quitting, then re-run --check.')
         return 1
 
     wanted = {}
