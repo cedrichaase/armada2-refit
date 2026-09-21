@@ -226,9 +226,29 @@ The whole chain, per frame:
         * dt
         * SCROLL_COEFFICIENT / (OVERVIEW_INIT_HEIGHT + |OVERVIEW_INIT_HEIGHT - camHeight|)
 
-`ramp` starts at `INITIAL_SCROLL_SPEED` (1.0), grows by `dt` each frame and clamps at
-`MAX_SCROLL_SPEED` (2.0), so the effective multiplier walks 3 → 6 over one second of
-held scrolling and resets the moment you stop.
+`ramp` starts at `INITIAL_SCROLL_SPEED`, grows by `dt` each frame, clamps at
+`MAX_SCROLL_SPEED` and **resets the moment you stop**.
+
+**That ramp is a bigger part of "unwieldy" than the top speed is.** Stock ships
+`INITIAL_SCROLL_SPEED = 1` against `MAX_SCROLL_SPEED = 2`, so held scrolling walks 3 → 6
+over a full second — but a short corrective nudge, which is most scrolling, *never leaves
+the floor*. Every quick movement runs at half the speed the game is willing to give you,
+after a wind-up. Setting `INITIAL_SCROLL_SPEED = MAX_SCROLL_SPEED` clamps the ramp flat
+on frame one: full speed immediately, no wind-up, and nothing else in the path changes.
+
+### Every navigation path funnels through Pan
+
+Worth knowing before tuning anything, because it is not obvious from the names:
+`ParabolicCamera::Scroll` (`0x4dfbb0`) is nine instructions that forward straight to
+`Pan` via vtable slot `+0x38`. So edge-scroll (slot `+0x38` directly), the arrow keys and
+**right-mouse-drag** (`cOverViewImp::mMouseRightDrag`, slot `+0x3c`) all end up in the
+same `Pan`, and **`SCROLL_COEFFICIENT` is the one multiplier that scales all three**. It
+is the knob to reach for when the per-device sliders are not enough — and the only one
+that also touches right-drag, which bypasses both profile speeds entirely.
+
+`FASTSCROLL_COEFFICIENT` (0.005) is right-drag's own scale factor, applied before `Pan`.
+Left alone here: `SCROLL_COEFFICIENT` already lifts that path, and right-drag is direct
+manipulation where a 1:1 feel against the cursor is the point.
 
 ### The two speeds live in ARMADA.PRF, not in any config file
 
@@ -277,22 +297,44 @@ Raised to 20 here.
 
 ### What is set
 
-| Where | Key | Stock | Now |
-|---|---|---|---|
-| `ARMADA.PRF` line 2 field 3 | `mouse_scroll_speed` | 1 | **3** (slider 30/50) |
-| `ARMADA.PRF` line 2 field 4 | `keyboard_scroll_speed` | 2 | **8** (slider 7/20) |
-| `RTS_CFG.h:40` | `SCROLL_BORDER_WIDTH` | 2 | **20** |
+| Where | Key | Stock | Now | Effect |
+|---|---|---|---|---|
+| `ARMADA.PRF` line 2 field 3 | `mouse_scroll_speed` | 1 | **3** (slider 30/50) | 3x, edge-scroll |
+| `ARMADA.PRF` line 2 field 4 | `keyboard_scroll_speed` | 2 | **8** (slider 7/20) | 4x, arrow keys |
+| `RTS_CFG.h:40` | `SCROLL_BORDER_WIDTH` | 2 | **20** | usable edge band |
+| `RTS_CFG.h:41` | `SCROLL_COEFFICIENT` | 90000 | **180000** | 2x, *every* path |
+| `RTS_CFG.h:50` | `INITIAL_SCROLL_SPEED` | 1 | **2.0** | 2x on short scrolls, no wind-up |
+
+Compounding, a short edge-scroll nudge lands around 12x stock and a held one around 6x —
+the gap closes because stock's held scroll already earned its ramp. Right-drag gets the
+2x from `SCROLL_COEFFICIENT` only.
 
 Both files have a `.a2neb-backup` beside them; `cp X.a2neb-backup X` reverts either.
 **Edit `ARMADA.PRF` only while the game is closed** — it is rewritten on exit, so a live
 game will clobber the change. Tuning further is best done from the in-game slider, which
 writes the same fields.
 
-If the sliders still are not enough, `SCROLL_COEFFICIENT` (`RTS_CFG.h`, 90000) is a
-straight linear multiplier on every pan and scales both input devices at once. One
-caveat: the EXE hashes `RTS_CFG.h` across clients — *"EXE / RTS_CFG.h files do not match
-node %d"* — so any change to that file has to be mirrored on every machine in a
+One caveat on `RTS_CFG.h`: the EXE hashes it across clients — *"EXE / RTS_CFG.h files do
+not match node %d"* — so any change there has to be mirrored on every machine in a
 multiplayer game. `ARMADA.PRF` is per-user and carries no such constraint.
+
+### Telling whether a change actually landed
+
+Both files are read **at launch**, so nothing applies to a running game. Beyond that the
+two behave differently, and confusing them wastes a round trip:
+
+- **`RTS_CFG.h`** is parsed fresh every launch (`0x490d73` opens it by name; a name the
+  EXE's table does not know is silently ignored and keeps the compiled default). Edit it
+  any time.
+- **`ARMADA.PRF` is rewritten when the game exits normally**, from the values held in
+  memory. So edit it only with the game closed, or the exit will clobber you. Its mtime
+  is the tell: if it has not moved since your edit, the game has not completed a normal
+  exit since — a crash or a kill saves nothing.
+
+The cheapest confirmation is the options screen itself: **Options → Game Settings**, and
+read the slider positions. Mouse sitting at 30 of 50 rather than 10, and keyboard at 7 of
+20 rather than hard left, means the profile edit is live. Neither `RTS_CFG.h` value shows
+in any UI — those you judge by feel.
 
 ## Patch Project 1.2.5
 
