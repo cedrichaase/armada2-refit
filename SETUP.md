@@ -639,6 +639,7 @@ method is one change at a time and three keys at once is not attributable:
     tools/renderer-config.sh              # stage 1: anisotropic filtering only
     tools/renderer-config.sh --stage 2    # + mip LOD bias
     tools/renderer-config.sh --stage 3    # + seamless cube filtering
+    tools/renderer-config.sh --bias -0.25 # milder stage 2 bias (default -0.5)
     tools/renderer-config.sh --show       # what is installed now
     tools/renderer-config.sh --remove     # delete dxvk.conf, full revert
 
@@ -653,7 +654,10 @@ method is one change at a time and three keys at once is not attributable:
   picks a blurrier mip than the art can support. **Only safe with AF already on** —
   without it a negative bias aliases rather than sharpens, which is why it is a separate
   stage and not part of stage 1. `d3d9.clampNegativeLodBias` is the guard if it
-  overshoots.
+  overshoots. **The failure mode is shimmer on movement, not blur when
+  still** — and in this game it shows on the billboard layer first, so if the map crawls
+  while scrolling, halve the bias with `--bias -0.25` before abandoning the stage.
+  Below about -1.0 it aliases faster than AF can clean up.
 - **`d3d9.seamlessCubes = True`** (stage 3). Filters across cube-map face edges. Directly
   relevant to the finished skybox class: many maps bind a `.sod` cube model, and a
   face-edge seam gets *more* visible at 2048/face, not less.
