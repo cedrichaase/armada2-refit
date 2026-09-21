@@ -414,7 +414,9 @@ written up in `README.md`:
   after any `--reblend`**, before `build`; `src/` is derived and a re-blend discards it.
 
 **1024, not 2048, on hull work.** Both cost $0.005, so this is a memory decision:
-Armada2.exe is a 32-bit LAA process, the textures already hold 2.27 GB, and at 2048 a
+Armada2.exe is a 32-bit LAA process and `Textures/RGB` holds 2.27 GB **on disk** -- not
+a memory figure, and the README section "2.27 GB resident was never a memory figure"
+corrects the reasoning that treated it as one. At 2048 a
 single ship's three files would be 64 MB against 16 MB at 1024.
 
 Open items are listed at the end of `README.md`; the plan for the rest of the game's

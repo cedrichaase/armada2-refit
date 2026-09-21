@@ -1243,7 +1243,11 @@ generalise.
 
 The app takes `megapixels` as an integer and rounds the scale factor, so a 256px source
 is 4x at 1MP and 8x at 4MP — and both cost $0.005. The size was chosen on **memory**,
-not price. Armada2.exe is a 32-bit LAA process; the textures already hold 2.27 GB.
+not price -- or so it was argued at the time. Armada2.exe is a 32-bit LAA process and
+`Textures/RGB` held 2.27 GB. **That second figure is disk, not memory, and the argument
+leans on it as though the two were the same.** See "2.27 GB resident was never a memory
+figure" below; the conclusion (1024, not 2048) still stands on disk cost and on invention
+falling off with scale factor, but not on the memory reasoning as written.
 At 1024 a 32-bit base plus its chain is 5.3 MB, so the Sovereign set is 16 MB. At 2048
 the same three files would be 64 MB, and the ~600 hull bases behind them would be
 unreachable at any size. 4x is also where this model's invention is mildest — see
@@ -1529,6 +1533,39 @@ new clothes: **a checker that can skip work must say how much it checked.** The 
 line was always printed and always believed; nothing compared it against how many
 textures the target actually holds.
 
+### "2.27 GB resident" was never a memory figure
+
+Every sizing decision in this project up to here rested on a sentence that says the
+textures "already hold 2.27 GB" inside a 32-bit LAA process, and the Sovereign's choice
+of 1024 over 2048 was made on it. **It is the size of `Textures/RGB` on disk.** Nothing
+established that Armada II holds all 2115 of them in memory at once, and there is good
+reason to think it does not: a Federation-versus-Klingon match has no cause to load
+Cardassian hulls.
+
+What is actually known, now that it has been looked at:
+
+- `ART_CFG.h` in the game directory is read at runtime and carries
+  `int ST3D_PRELOAD_TEXTURES = 1;`, alongside `GameOpenPreLoad() took %d seconds.` in
+  the executable. So there **is** a preload pass — but it runs per game, against what
+  that game needs, not across the whole directory.
+- The renderer is the d3d8 → d3d9 → DXVK chain from `SETUP.md`, so textures live in
+  **VRAM**, which on this machine is 8 GB (Navi 10). The 32-bit address space holds
+  DXVK's bookkeeping and staging, not the texture bodies.
+- The disk total did pass 2 GB some time ago and nothing has fallen over.
+
+So the ceiling is **unmeasured**, and the disk total is a poor proxy for it — an upper
+bound on a quantity that is probably several times smaller in practice. The figure that
+matters is the per-match working set, which is roughly two factions' hulls plus the map
+and the UI, not the sum over every faction.
+
+The honest test is to launch a heavy match — two remastered factions, a big map — and
+watch RSS and VRAM. Until someone does that, sizing by "how much is on disk" is
+cargo-culting a number that was never measured. If it ever does bite, the lever is
+`ST3D_PRELOAD_TEXTURES = 0`: lazy loading, paying in stutter instead of memory.
+
+The figures below are kept because disk cost is still real — it is just not the same
+question as memory.
+
 ### What the class cost the tooling
 
 Four changes, all of which apply to every faction that follows:
@@ -1598,8 +1635,9 @@ Needing a look in game:
   game. The first thing to look at is a Galaxy or an Akira at ordinary RTS zoom, and the
   second is anything Borg-assimilated, since the `_B` plates are the ones with no SOD
   pointing at them and so the ones a naming mistake would hide. Resident texture load is
-  now 2.47 GB in a 32-bit LAA process, up from 2.27 GB — if anything is going to fall
-  over on memory, this is the pass that does it.
+  now 2.47 GB **on disk**, up from 2.27 GB. That is not a memory figure and should not
+  be read as one — see the subsection on it above. Whether memory is a constraint at all
+  is still unmeasured; the test is a heavy match with RSS and VRAM watched.
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
@@ -1640,13 +1678,14 @@ Genuinely outstanding:
   Federation pass measured the memory question rather than estimating it: its 44 bases
   and their chains come to **220 MB** at 1024 — `FedCapital`'s 73.5 MB measured on
   disk, the rest computed from the same 5.25 MB per 32-bit 1024 base-plus-chain —
-  against the 2.27 GB already resident, which fits — and did: the texture directory
-  measures **2.47 GB** resident with all six targets installed, the +0.20 GB predicted — and confirms that the whole hull class at once would not.
+  on top of the 2.27 GB already on disk: the directory measures **2.47 GB** with all six
+  targets installed, the +0.20 GB predicted. Disk, not memory.
   Doing it by faction is the right unit. Still untested for the other factions is the
   **scale** —
   ~600 hull bases, and contact sheets only help where a whole group shares one size,
   which at 256px they largely do. Memory is the real ceiling: at 1024 the whole class is
-  roughly 3 GB on top of the 2.27 GB already spent, inside a 32-bit LAA process, so it
+  roughly 3 GB of disk on top of the 2.27 GB already spent -- a real cost, though not
+  the memory ceiling it was once read as -- so it
   wants doing by faction or by ship class and checking as it goes, not in one pass.
   There are also `*bump` textures throughout the set, which are normal or bump maps and
   must not be treated as colour, and the alpha on a **station** or **weapon** texture has
