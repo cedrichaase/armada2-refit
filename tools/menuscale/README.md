@@ -149,11 +149,42 @@ itself and links against import libraries generated from the `.def` files with
 why it defines its own `strlen`/`memcpy`/`memset`: clang lowers a byte loop and a struct
 assignment to those even under `-ffreestanding -fno-builtin`.
 
+## Known issue: menu animations stall while the cursor is moving
+
+**Reported in game, not yet diagnosed.** The animated elements on the menu screens
+(`bitmaps/main/MainBk_flare.bik`, `singleplayer.bik`, `Multiplayer.bik`) appear to stop
+while the mouse is being moved, and resume when it stops.
+
+The leading hypothesis is cost per mouse-move, and it is a hypothesis — **nothing here
+has been measured.** `present()` runs on every outermost `ReleaseDC`, and a mouse-move
+makes the shell redraw the widget under the cursor, so each `WM_MOUSEMOVE` costs a
+**full-frame 800x600 -> 1920x1440 `StretchBlt` in HALFTONE**, not a redraw of the part
+that changed. A stream of mouse-moves could then starve whatever drives the animation.
+
+Three cheap experiments, in the order that actually discriminates:
+
+1. **`install.sh --remove`, then watch stock.** Establishes whether this is a regression
+   at all. A 2001 GDI shell flooding its own message queue on mouse-move is entirely
+   plausible stock behaviour, and if it stalls without the plugin there is nothing here
+   to fix.
+2. **`Mode=1`** (centre, do not scale). No DC redirection happens at all in that mode,
+   so `present()` never runs. If the stall survives `Mode=1`, the blit is not the cause.
+3. **`Smooth=0`** (COLORONCOLOR instead of HALFTONE). Much cheaper resampling. If that
+   alone fixes it, the cost hypothesis is right and the fix is to make `present()`
+   cheaper rather than rarer.
+
+If it is the cost, the real fix is to stop presenting a whole frame per `ReleaseDC` —
+either coalesce (mark dirty, present at most once per timer tick) or scale only the
+rectangle that changed. Both are more bookkeeping than the current code has, which is
+why neither was done up front.
+
 ## Not done
 
 - **Confirmed rendered:** the main menu and the single-player/campaign screen. The
   options, load/save and multiplayer screens go through the same two code paths and
   are expected to follow, but have not been seen scaled.
+- **Hover and click are confirmed to land correctly**; nothing has been measured about
+  how *fast* they are. See the animation stall above.
 - **Real child controls** (edit boxes, list boxes — the multiplayer screens use them)
   are separate HWNDs that Windows draws itself. They are not covered by the offscreen
   redirect and will sit unscaled. The main screens are custom-drawn `ShellButton`

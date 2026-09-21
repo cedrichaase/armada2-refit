@@ -1745,6 +1745,18 @@ that should not be — 192 of those referenced by nothing in the game at all.
 
 Genuinely outstanding:
 
+- **Menu animations stall while the cursor is moving.** Reported in game after
+  `MenuScale.asi` went in, not yet diagnosed, and **not yet shown to be a regression** —
+  the first test is to remove the plugin and watch stock, because a 2001 GDI shell
+  flooding its own message queue on mouse-move is plausible stock behaviour. The
+  hypothesis and the three experiments that discriminate between the causes are in
+  `tools/menuscale/README.md`. Everything else about the menus is confirmed: they scale,
+  they centre, and input follows the picture.
+- **The options, load/save and multiplayer menu screens have not been seen scaled.**
+  They go through the same two code paths as the two screens that are confirmed, so they
+  are expected to follow. The multiplayer screens are the ones to doubt: they use real
+  Win32 child controls, which Windows draws itself and the offscreen redirect does not
+  cover.
 - **The d3d8/DXVK regression in `SETUP.md`**, unfixed and still blocked on Heroic being
   closed. The cutscene-crash fix has consequently never been tested.
 - **The end-of-mission crash** — a `Wine C++ Runtime Library` R6025 box on finishing a
