@@ -2,9 +2,18 @@
 """Turn DXVK's own logging on or off, and read back what it actually applied.
 
     dxvk-logging.py --on         add DXVK_LOG_LEVEL/DXVK_LOG_PATH to Heroic's game config
-    dxvk-logging.py --off        take them out again
+    dxvk-logging.py --diagnose   --on, plus the DXVK HUD and d3d9=n,b in WINEDLLOVERRIDES
+    dxvk-logging.py --off        take all of it back out again (complete revert)
     dxvk-logging.py --status     show the env Heroic will pass
     dxvk-logging.py --check      read the log and report the EFFECTIVE configuration
+
+--diagnose is the one to reach for when a dxvk.conf setting appears to do nothing.
+It answers three questions in one launch, in the order that makes each next one
+meaningful:
+
+    HUD visible?          no  -> DXVK is not in the chain; no dxvk.conf key can work
+    log file written?     no  -> DXVK's d3d9 layer never loaded
+    keys in --check?      no  -> DXVK ran but never found or read dxvk.conf
 
 Why this exists: a dxvk.conf key that DXVK does not read is *silently ignored*.  There
 is no error, no warning, and in game it looks exactly like "the setting did nothing" --
@@ -31,7 +40,16 @@ import time
 GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
 CONFIG_DIR = os.path.expanduser('~/.config/heroic/GamesConfig')
 ENV_KEY = 'enviromentOptions'          # Heroic's typo, deliberate -- see docstring
-MANAGED = ('DXVK_LOG_LEVEL', 'DXVK_LOG_PATH')
+MANAGED = ('DXVK_LOG_LEVEL', 'DXVK_LOG_PATH', 'DXVK_HUD')
+OVERRIDE_KEY = 'WINEDLLOVERRIDES'
+
+# DXVK's d3d8.dll imports d3d9.dll by name (confirmed with objdump), so every d3d9.*
+# key in dxvk.conf is read by a layer that only exists if Wine loads DXVK's d3d9 rather
+# than its own builtin WineD3D.  The override string here has only ever carried
+# `winmm=n,b;d3d8=n,b`, and setting WINEDLLOVERRIDES at all replaces whatever Proton
+# would otherwise have set -- so the d3d9 slot may never have been native.  That is the
+# first thing --diagnose rules in or out.
+D3D9_OVERRIDE = 'd3d9=n,b'
 
 
 def heroic_running():
@@ -74,7 +92,24 @@ def show_status():
     print('\nlog: %s' % ('present' if os.path.exists(log) else 'not written yet'))
 
 
-def set_logging(on):
+def _set_d3d9_override(entries, want):
+    """Add or remove d3d9=n,b in WINEDLLOVERRIDES, preserving everything else."""
+    for e in entries:
+        if e.get('key') != OVERRIDE_KEY:
+            continue
+        parts = [p for p in str(e.get('value', '')).split(';') if p.strip()]
+        parts = [p for p in parts if not p.strip().startswith('d3d9=')]
+        if want:
+            parts.append(D3D9_OVERRIDE)
+        e['value'] = ';'.join(parts)
+        return e['value']
+    if want:
+        entries.append({'key': OVERRIDE_KEY, 'value': D3D9_OVERRIDE})
+        return D3D9_OVERRIDE
+    return None
+
+
+def set_logging(on, hud=False, fix_override=False):
     if heroic_running():
         raise SystemExit('Heroic is running -- close it first, or it will discard this '
                          'edit when it exits.')
@@ -85,14 +120,27 @@ def set_logging(on):
     if on:
         entries.append({'key': 'DXVK_LOG_LEVEL', 'value': 'info'})
         entries.append({'key': 'DXVK_LOG_PATH', 'value': GAME})
+        if hud:
+            # If this overlay does not appear in game, DXVK is not in the chain at all
+            # and no dxvk.conf key can possibly have had an effect.  That is a binary
+            # answer that needs no log parsing and no judgement.
+            entries.append({'key': 'DXVK_HUD', 'value': 'version,devinfo'})
+    # The override is restored on --off as well, so --off is a complete revert.
+    _set_d3d9_override(entries, want=bool(on and fix_override))
+
     with open(path, 'w') as fh:
         json.dump(data, fh, indent=2)
-    print('%s DXVK logging in %s' % ('enabled' if on else 'disabled', path))
+    print('%s DXVK diagnostics in %s' % ('enabled' if on else 'disabled', path))
     print('backup: %s.bak-dxvklog' % path)
     for e in entries:
         print('  %s = %s' % (e['key'], e['value']))
     if on:
-        print('\nNow launch the game, then re-run with --check.')
+        print('\nNow launch the game.')
+        if hud:
+            print('  1. Does a DXVK version/device overlay appear in the corner?')
+            print('     No  -> DXVK is not in the chain; nothing in dxvk.conf can work.')
+            print('     Yes -> DXVK is running; the question is whether it read dxvk.conf.')
+        print('  2. Quit, then run: %s --check' % sys.argv[0])
 
 
 def check_log():
@@ -155,6 +203,8 @@ def main():
         return 0
     if args[0] == '--on':
         set_logging(True)
+    elif args[0] == '--diagnose':
+        set_logging(True, hud=True, fix_override=True)
     elif args[0] == '--off':
         set_logging(False)
     elif args[0] == '--status':

@@ -675,10 +675,29 @@ setting worked and is subtle" look identical in game.
 **Is it applied?** A `dxvk.conf` key DXVK does not recognise is *silently ignored* — no
 error, no warning. DXVK does print its effective configuration at startup, so ask it:
 
-    tools/dxvk-logging.py --on       # adds DXVK_LOG_LEVEL/DXVK_LOG_PATH to Heroic
+    tools/dxvk-logging.py --diagnose  # logging + HUD + d3d9=n,b, all at once
     # launch the game once
-    tools/dxvk-logging.py --check    # report the effective configuration
-    tools/dxvk-logging.py --off      # take the logging back out
+    tools/dxvk-logging.py --check     # report the effective configuration
+    tools/dxvk-logging.py --off       # take all of it back out again
+
+`--diagnose` answers three questions in one launch, ordered so each makes the next
+meaningful:
+
+| observation | conclusion |
+|---|---|
+| no DXVK HUD overlay in game | DXVK is not in the chain; **no** `dxvk.conf` key can work |
+| HUD shown, but no log file | DXVK's d3d9 layer never loaded |
+| log written, keys absent from `--check` | DXVK ran but never found or read `dxvk.conf` |
+| keys present in `--check` | it is applied, and the effect really is that subtle |
+
+**Why `d3d9=n,b` is part of the diagnosis.** DXVK's `d3d8.dll` imports `d3d9.dll` by
+name — confirmed with `objdump`, not assumed — so every `d3d9.*` key is read by a layer
+that only exists if Wine resolves `d3d9` to DXVK's build rather than its own builtin
+WineD3D. This prefix has only ever carried `winmm=n,b;d3d8=n,b`, and setting
+`WINEDLLOVERRIDES` at all *replaces* whatever Proton would have set, so the d3d9 slot
+may never have been native. That is the leading suspect whenever a `d3d9.*` key appears
+to do nothing here, and it is the same gap the "Also outstanding" note below has
+recorded, untested, all along. `--off` restores the original override string too.
 
 **Heroic must be closed** for `--on`/`--off`: it rewrites `GamesConfig` on exit and
 would discard the edit. The script refuses rather than losing the change silently, and
