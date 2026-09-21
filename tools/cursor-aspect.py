@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Un-stretch Armada II's mouse cursors on a non-4:3 display.
 
-    tools/cursor-aspect.py                 rewrite for the resolution in ARMADA.PRF
-    tools/cursor-aspect.py --res 3440x1440 rewrite for a resolution you name
+    tools/cursor-aspect.py                 rebuild for the resolution in ARMADA.PRF
+    tools/cursor-aspect.py --res 3440x1440 rebuild for a resolution you name
     tools/cursor-aspect.py --dry-run       print what would change, touch nothing
-    tools/cursor-aspect.py --revert        restore the stock Sprites/cursor.spr
+    tools/cursor-aspect.py --revert        restore the stock cursor textures
 
-WHY THE CURSORS ARE STILL STRETCHED
+WHY THE CURSORS ARE STRETCHED
 
 `tools/ui-widescreen.py` fixed the panels, the icons and the glyphs by re-declaring the
 1600x1200 layout canvas in `misc/gui_<race>.cfg`.  The cursors did not move, so they are
 not on that canvas -- the same way `popupPaletteXA`/`XB` are not (see `SETUP.md`).  This
-is the second place the engine keeps a screen reference of its own.
+is the third screen reference the engine keeps.
 
-Measured off the two 3440x1440 screenshots, against the source texels:
+Measured off two 3440x1440 screenshots, against the source texels:
 
 | | source (texels) | screen (px) | x | y |
 |---|---|---|---|---|
@@ -22,68 +22,98 @@ Measured off the two 3440x1440 screenshots, against the source texels:
 
 Both source shapes are exactly square -- `Curs_Move`'s bright content is 28x28 texels at
 offset (2,2) in every one of its five frames -- and both land on screen at about 1.8:1.
-The scale pair is ~4.3 across against ~2.4 down, which is a **800x600** reference
-stretched independently on each axis: 3440/800 = 4.30 and 1440/600 = 2.40.  (A 1600x1200
-reference with the sprite's 32 units counted double is arithmetically the same thing and
-is not distinguishable from outside; it does not change the fix.)  The two thresholded
-measurements sit 3-4% under that in *both* axes, which is the faint outer antialiased
-ring being cut off, not model error -- it cancels in the ratio, and the ratio is what
-matters: 4.30/2.40 = **1.79**, the same number the UI was stretched by, because 1.79 is
-just (display aspect) / (4:3).
+The scale pair is ~4.3 across against ~2.4 down: a **800x600** reference stretched
+independently on each axis, 3440/800 = 4.30 and 1440/600 = 2.40.  (A 1600x1200
+reference with the sprite's 32 units counted double is the same arithmetic and is not
+distinguishable from outside.)  The thresholded measurements sit 3-4% under that in
+*both* axes -- the faint outer antialiased ring falling below the threshold, not model
+error.  It cancels in the ratio, and the ratio is what matters: 4.30/2.40 = **1.79**,
+the same number the UI was stretched by, because 1.79 is just (display aspect) / (4:3).
 
-WHAT THIS CHANGES
+WHY THE FIX IS IN THE ART AND NOT IN cursor.spr
 
-A cursor has no rect in any cfg -- `Sprites/cursor.spr` is the only place its size is
-written down, as the `W H` pair (32 32 on every one of the 32 entries).  So W is both
-the UV width and the drawn width, and the two can be separated: scale `W`, `U` and
-`@referenceWidth` by the same ratio and the UV rect is **bit-for-bit the fraction of the
-texture it was** -- U/refW and W/refW are unchanged -- while the drawn rect narrows.
+There are two cursor draw paths and they size themselves differently.  Rewriting
+`Sprites/cursor.spr` so that `W`, `U` and `@referenceWidth` scaled together -- UV rect
+bit-identical, drawn rect narrowed, `W 32 -> 18` -- was tried first and **confirmed in
+game to fix only one of them**: the part of the selected-ship cursor that sits on the
+map plane came out square, and every cursor on the UI layer was untouched.
 
-At 3440x1440 the ratio is 1/1.79 = 0.558, so W 32 -> 18 (18/32 = 0.5625, 0.8% wide,
-about one screen pixel at cursor size).  The cursor goes from 137x77 screen px to 77x77.
-Nothing is resampled and no texture is touched, so this costs **no resolution at all** --
-the same 32 texels are simply drawn into a square instead of a stretched rectangle.
+That pins it.  The UI cursor is a **hardware cursor**: `Armada2.exe` imports Win32
+`SetCursor`/`LoadCursorA`/`SetSystemCursor` and references D3D8 `SetCursorProperties`,
+and the engine composes that cursor's surface itself from the sprite's **texel extent**,
+which no `.spr` number can reach.  (`cursors/*.cur` are the shell's own 32x32 Win32
+cursors -- `cursor1.cur` is a *red* arrow, not the in-game pale delta -- so they are not
+this.)  So the drawn size is `texels x (screenW/800, screenH/600)`, the horizontal texel
+density is fixed at 4.30 px/texel whatever we do, and the only lever left is how many
+texels the art spans.
 
-`H`, `V` and `@referenceHeight` are deliberately left alone.  Scaling the height *up*
-instead (H 32 -> 57) would square the cursor just as well and is equally exact, but it
-leaves a 137x137 cursor, which is large at 1440p; narrowing gives the ordinary 77x77.
+Squashing the **art** horizontally by 1/1.79 inside its unchanged 32x32 cell fixes
+*both* paths at once, which is why `cursor.spr` is left stock: the map-plane path draws
+those same texels into the same 1.79-stretched rect, so one correction at the source
+serves both.  Keeping the `.spr` change as well would square the art twice and leave the
+map-plane cursor too narrow.
 
-W is forced **even** so that `@origin`'s 16 stays an integer.  Every other value the
-ratio touches -- U in {0,32,64,96,128,160} and refW in {64,128,160,192,224,256} -- is a
-multiple of 32, so k/32 lands exactly on integers and no frame boundary moves.
+WHAT THIS COSTS, HONESTLY
 
-`@anim=cursorNx1` resolves to `@auto=row` in `Sprites/tex_anim.spr`, which steps along
-the row by the sprite's own width, so the frames follow W down and stay aligned.
+Horizontal texels.  At 3440x1440 the art is resampled 32 -> 18 across, so a shape
+described by 28 texels is described by 16 afterwards.  The on-screen *block* size does
+not change -- it is 4.30 px/texel before and after, set by the reference, not by us --
+so the cursor does not get blockier; it gets **coarser**, fewer steps describing the
+same outline, and it gets smaller, which is the point: the delta goes from 77x53 screen
+px to 43x53, the move reticle from 120x67 to 68x67.
 
-IF THIS TURNS OUT TO BE A NO-OP
+The alternative is to resample the other way -- stretch the art *vertically* by 1.79 and
+scale `H`/`@referenceHeight` with it.  That is information-preserving and equally
+square, and it was rejected on size: it leaves a 138x138 cursor, which is enormous at
+1440p.  The density is the same either way; only the size differs.
 
-The one thing that cannot be settled without running the game is whether the engine
-takes the drawn size from `W H` or from the texel extent the UVs select -- both fit the
-measurements above identically, because stock has W equal to the frame's texel width.
-If it is the texel extent, this rewrite changes nothing visible (the UVs are unchanged
-by construction), and the fallback is to pre-squash the cursor *art* horizontally by
-0.558 inside its cell, about the `@origin` hotspot so the click point does not move.
-That one is certain to work but costs horizontal resolution, which is why it is not
-what this tool does first.  Do not reach for it until this has been tried in game.
+Each cell is squashed **about its own `@origin` hotspot**, not about its centre, so the
+click point does not move: `c_arrow`/`c_select`/`standard_cursor` are `@origin=(0,0)`
+and squash toward the left edge, keeping the delta's tip on the pixel it points at;
+every other entry is `@origin=(16,16)` and squashes toward the middle.
+
+`CursorA.tga` is left stock: no sprite file references it and the exe has no string for
+it.  It appears to be an unused leftover.
+
+FORMAT
+
+Stock cursors are uniform -- all 21 are TGA image type 2, 24-bit, no ID field, no colour
+map, descriptor 0x00 (bottom-up), and colour-keyed on exact black via `@skip=(0,0,0)`
+in `cursor.spr`.  Output matches, and the header is checked against stock after writing.
+
+Because black is the key, the resample must not bleed the art onto it.  The filter has
+to be **interpolating**: ImageMagick resizes each axis in turn and a cell's height is
+unchanged here, so the vertical pass runs at scale 1.0 and must be an identity.  Catrom
+and Lanczos pass through their sample points and are; Mitchell approximates and blurs
+even at scale 1.0, which measurably grew the art's bbox one row in each direction.  With
+Catrom the vertical extent and y-offset come out identical to stock in all 20 textures.
+Every run reports the art bbox and the key's pixel count before and after, and flags a
+texture whose art gained rows or whose key failed to grow.
 """
-import argparse, os, re, shutil, sys
+import argparse, os, re, shutil, subprocess, sys
 
 GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
 BAK = '.a2neb-backup'
+TEX = 'Textures/RGB'
 SPR = 'Sprites/cursor.spr'
-# The reference the cursor code scales against, measured above.  Only its aspect is
-# used, so the 1600x1200-counted-double reading gives the same answer.
+HERE = os.path.dirname(os.path.abspath(__file__))
+# The reference the cursor code scales against, measured above.  Only its aspect is used.
 REF_W, REF_H = 800, 600
+# Catrom, not Mitchell.  ImageMagick resizes each axis in turn, and a cell's HEIGHT is
+# unchanged here -- so the vertical pass runs at scale 1.0 and must be an identity.
+# Interpolating filters (Catrom, Lanczos) pass through their sample points and are;
+# approximating ones (Mitchell) blur even at scale 1.0, which measurably bled the art 1
+# row further in each direction and would have put a dark fringe on the colour key.
+FILTER = 'Catrom'
 
-# name texture U V W H <tail>.  Some lines separate with spaces rather than tabs, so the
-# separators are captured individually and put back verbatim.
 ENTRY = re.compile(r'^(\s*)(\S+)(\s+)(\S+)(\s+)(\d+)(\s+)(\d+)(\s+)(\d+)(\s+)(\d+)(.*)$')
-REFW = re.compile(r'^(\s*@referenceWidth\s*=\s*)(\d+)(\s*)$')
-ORIGIN = re.compile(r'(@origin=\()(\d+)(,\s*\d+\))')
+
+
+def run(*args):
+    return subprocess.run(args, check=True, capture_output=True, text=True).stdout
 
 
 def prf_resolution(path):
-    """Width and height out of ARMADA.PRF, which is line-oriented plain text."""
     for line in open(path, encoding='latin-1', errors='replace'):
         f = line.split()
         for i in range(len(f) - 3):
@@ -96,59 +126,88 @@ def prf_resolution(path):
     return None
 
 
-def scale_x(v, num, den):
-    """Scale an x-space value, refusing to round it off."""
-    if v * num % den:
-        sys.exit(f"{v} * {num}/{den} is not an integer -- would move a frame boundary")
-    return v * num // den
+def parse_spr(path):
+    """texture stem (lowercased) -> (frame w, frame h, hotspot x), from cursor.spr."""
+    out = {}
+    for line in open(path, encoding='latin-1', newline=''):
+        b = line.rstrip('\r\n')
+        if b.lstrip().startswith(('#', '@')):
+            continue
+        if not (m := ENTRY.match(b)):
+            continue
+        tex = m.group(4).lower()
+        w, h = int(m.group(10)), int(m.group(12))
+        ox = 0
+        if mo := re.search(r'@origin=\((\d+),\s*(\d+)\)', m.group(13)):
+            ox = int(mo.group(1))
+        if tex in out and out[tex] != (w, h, ox):
+            sys.exit(f"{tex}: entries disagree on frame/hotspot: "
+                     f"{out[tex]} vs {(w, h, ox)}")
+        out[tex] = (w, h, ox)
+    return out
 
 
-def rewrite(path, num, den, dry):
-    src = path + BAK if os.path.exists(path + BAK) else path
-    if not dry and src == path:
-        shutil.copy2(path, path + BAK)
-        src = path + BAK
-    out, changes = [], []
-    # newline='' keeps the CRLF line endings this file ships with.
-    with open(src, encoding='latin-1', newline='') as fh:
-        for line in fh:
-            body, nl = line.rstrip('\r\n'), line[len(line.rstrip('\r\n')):]
-            if body.lstrip().startswith('#'):
-                out.append(body + nl)
-                continue
-            if m := REFW.match(body):
-                v = int(m.group(2))
-                nv = scale_x(v, num, den)
-                if nv != v:
-                    changes.append(f"  @referenceWidth            {v} -> {nv}")
-                    body = m.group(1) + str(nv) + m.group(3)
-            elif m := ENTRY.match(body):
-                u, w = int(m.group(6)), int(m.group(10))
-                nu, nw = scale_x(u, num, den), scale_x(w, num, den)
-                tail = m.group(13)
-                ntail, no = tail, None
-                if mo := ORIGIN.search(tail):
-                    ox = int(mo.group(2))
-                    no = scale_x(ox, num, den)
-                    if no != ox:
-                        ntail = tail[:mo.start()] + mo.group(1) + str(no) + \
-                            mo.group(3) + tail[mo.end():]
-                if (nu, nw, ntail) != (u, w, tail):
-                    ox = f", origin x {mo.group(2)} -> {no}" if no is not None \
-                        and no != int(mo.group(2)) else ""
-                    changes.append(f"  {m.group(2):20} U {u} -> {nu}, "
-                                   f"W {w} -> {nw}{ox}")
-                    body = (m.group(1) + m.group(2) + m.group(3) + m.group(4) +
-                            m.group(5) + str(nu) + m.group(7) + m.group(8) +
-                            m.group(9) + str(nw) + m.group(11) + m.group(12) + ntail)
-            out.append(body + nl)
-    if changes:
-        print(os.path.basename(path))
-        print('\n'.join(changes))
-    if not dry and changes:
-        with open(path, 'w', encoding='latin-1', newline='') as fh:
-            fh.write(''.join(out))
-    return len(changes)
+def find_tga(texdir, stem):
+    """Both extension cases -- stock Textures/RGB is mixed."""
+    for f in os.listdir(texdir):
+        if f.lower() == stem + '.tga':
+            return os.path.join(texdir, f)
+    return None
+
+
+def header(path):
+    with open(path, 'rb') as fh:
+        h = fh.read(18)
+    return h[0], h[1], h[2], h[16], h[17]     # idlen, cmaptype, imagetype, bpp, desc
+
+
+def ro(path):
+    """Read spelling for ImageMagick.  The *.a2neb-backup files have no usable
+    extension, so the format has to be named or IM refuses them -- and it refuses them
+    by raising, which is how a silent mis-measurement would otherwise hide."""
+    return f"TGA:{path}"
+
+
+def nonblack_bbox(path):
+    """Bounding box of everything that is not the exact-black key colour."""
+    return run('magick', ro(path), '-fill', 'white', '-fuzz', '0',
+               '-opaque', 'black', '-negate', '-format', '%@', 'info:').strip()
+
+
+def black_count(path):
+    """Pixels at exactly (0,0,0) -- the colour key, so this is the transparent count."""
+    hist = run('magick', ro(path), '-depth', '8', '-format', '%c', 'histogram:info:')
+    for line in hist.splitlines():
+        if '#000000' in line:
+            return int(line.strip().split(':')[0])
+    return 0
+
+
+def squash_texture(src, dst, cols, rows, fw, fh, ox, k, scratch):
+    """Rebuild the strip with every cell squashed to k wide about its hotspot x."""
+    pad_l = ox - ox * k // fw
+    cells = []
+    for r in range(rows):
+        row = []
+        for c in range(cols):
+            cell = os.path.join(scratch, f"c{r}_{c}.png")
+            cmd = ['magick', ro(src), '-crop', f"{fw}x{fh}+{c*fw}+{r*fh}", '+repage',
+                   '-filter', FILTER, '-resize', f"{k}x{fh}!",
+                   '-background', 'black']
+            if pad_l:
+                cmd += ['-gravity', 'East', '-extent', f"{k+pad_l}x{fh}"]
+            cmd += ['-gravity', 'West', '-extent', f"{fw}x{fh}", f"PNG24:{cell}"]
+            run(*cmd)
+            row.append(cell)
+        rowfile = os.path.join(scratch, f"r{r}.png")
+        run('magick', *row, '+append', f"PNG24:{rowfile}")
+        cells.append(rowfile)
+    merged = os.path.join(scratch, 'merged.png')
+    run('magick', *cells, '-append', f"PNG24:{merged}")
+    run('magick', merged, '-alpha', 'off', '-type', 'TrueColor',
+        '-compress', 'None', f"TGA:{dst}")
+    run(sys.executable, os.path.join(HERE, 'bottomup.py'), '--like', src, dst)
+    return pad_l
 
 
 def main():
@@ -160,16 +219,23 @@ def main():
     a = ap.parse_args()
     if a.help:
         print(__doc__); return
-    spr = os.path.join(GAME, SPR)
-    if not os.path.isfile(spr):
-        sys.exit(f"no {spr} -- set A2_GAME")
+    texdir = os.path.join(GAME, TEX)
+    if not os.path.isdir(texdir):
+        sys.exit(f"no {texdir} -- set A2_GAME")
+
+    spr = parse_spr(os.path.join(GAME, SPR))
 
     if a.revert:
-        if os.path.exists(spr + BAK):
-            shutil.copy2(spr + BAK, spr)
-            print(f"reverted {SPR}")
-        else:
-            print("nothing to revert")
+        n = 0
+        for f in sorted(os.listdir(texdir)):
+            if not f.endswith(BAK):
+                continue
+            if f[:-len(BAK)].lower().replace('.tga', '') not in spr:
+                continue
+            b = os.path.join(texdir, f)
+            shutil.copy2(b, b[:-len(BAK)])
+            print(f"reverted {f[:-len(BAK)]}"); n += 1
+        print(f"{n} cursor texture(s) restored" if n else "nothing to revert")
         return
 
     if a.res:
@@ -181,28 +247,82 @@ def main():
         w, h = r
 
     stretch = (w / h) / (REF_W / REF_H)
-    print(f"display {w}x{h} -> cursor scale {w/REF_W:.4f} x {h/REF_H:.4f} "
-          f"against the {REF_W}x{REF_H} reference; cursors are "
-          f"{stretch:.4f}x too wide")
+    print(f"display {w}x{h} -> cursor scale {w/REF_W:.4f} x {h/REF_H:.4f} against the "
+          f"{REF_W}x{REF_H} reference; cursors are {stretch:.4f}x too wide")
     if abs(stretch - 1) < 1e-9:
         print("display is 4:3 -- nothing to do"); return
     if stretch < 1:
-        sys.exit("display is taller than 4:3; narrowing W is the wrong correction "
-                 "-- this tool only handles the widescreen case")
+        sys.exit("display is taller than 4:3 -- this tool only handles widescreen")
 
-    den = 32                               # stock W, and the step every x value uses
-    num = round(den / stretch)
-    num -= num % 2                         # keep @origin's 16 an integer
-    if num < 2:
-        sys.exit(f"correction {den}/{stretch:.3f} rounds to {num} -- too extreme")
-    print(f"W {den} -> {num} ({num/den:.4f} against the ideal {1/stretch:.4f}, "
-          f"{abs(num/den*stretch-1)*100:.1f}% off square); "
-          f"cursor {den*w/REF_W:.0f}x{den*h/REF_H:.0f} -> "
-          f"{num*w/REF_W:.0f}x{den*h/REF_H:.0f} screen px\n")
+    fw = 32
+    k = round(fw / stretch)
+    k -= k % 2                      # keeps the 16px hotspot's left pad integral
+    print(f"frame {fw} -> {k} texels across ({k/fw:.4f} against the ideal "
+          f"{1/stretch:.4f}, {abs(k/fw*stretch-1)*100:.1f}% off square); "
+          f"horizontal density stays {w/REF_W:.2f} px/texel\n")
 
-    n = rewrite(spr, num, den, a.dry_run)
-    print(f"\n{n} value(s) {'would change' if a.dry_run else 'changed'}. "
-          f"Stock is beside it as {SPR}{BAK}; --revert restores it.")
+    scratch = os.path.join(os.environ.get('TMPDIR', '/tmp'), f"a2cursor.{os.getpid()}")
+    os.makedirs(scratch, exist_ok=True)
+    done = bad = 0
+    try:
+        for stem in sorted(spr):
+            src = find_tga(texdir, stem)
+            if not src:
+                print(f"  {stem:22} MISSING"); bad += 1; continue
+            fwid, fhgt, ox = spr[stem]
+            tw, th = (int(v) for v in run('magick', src, '-format', '%w %h\n',
+                                          'info:').split())
+            if tw % fwid or th % fhgt:
+                print(f"  {os.path.basename(src):22} {tw}x{th} is not a whole number "
+                      f"of {fwid}x{fhgt} frames -- skipped"); bad += 1; continue
+            cols, rows = tw // fwid, th // fhgt
+            bak = src + BAK
+            stock = bak if os.path.exists(bak) else src
+            before = nonblack_bbox(stock)
+            if a.dry_run:
+                print(f"  {os.path.basename(src):22} {tw}x{th} "
+                      f"{cols}x{rows} frames, hotspot x={ox}, art {before}")
+                done += 1
+                continue
+            if not os.path.exists(bak):
+                shutil.copy2(src, bak)
+            # From here stock MUST be the backup: src is about to be overwritten, and
+            # letting stock alias it is how the before/after numbers silently become
+            # the same measurement taken twice.
+            stock = bak
+            blk_b = black_count(stock)
+            tmp = os.path.join(scratch, 'out.tga')
+            pad = squash_texture(stock, tmp, cols, rows, fwid, fhgt, ox, k, scratch)
+            if header(tmp) != header(stock):
+                print(f"  {os.path.basename(src):22} HEADER MISMATCH "
+                      f"{header(tmp)} vs stock {header(stock)}"); bad += 1; continue
+            shutil.copy2(tmp, src)
+            after, blk_a = nonblack_bbox(src), black_count(src)
+            # The art must land inside the squashed window and nowhere else: same rows
+            # as stock (no vertical bleed onto the colour key), and more black than
+            # stock (the cell is narrower now, so the key must have grown).
+            sw, sh, sx, sy = map(int, re.match(
+                r'(\d+)x(\d+)\+(\d+)\+(\d+)', before).groups())
+            aw, ah, ax, ay = map(int, re.match(
+                r'(\d+)x(\d+)\+(\d+)\+(\d+)', after).groups())
+            flag = ''
+            if (ah, ay) != (sh, sy):
+                flag += '  VERTICAL BLEED'; bad += 1
+            if blk_a < blk_b:
+                flag += '  KEY SHRANK'; bad += 1
+            print(f"  {os.path.basename(src):22} {cols}x{rows} frames, ox={ox}, "
+                  f"pad {pad}  art {before} -> {after}  "
+                  f"key {blk_b} -> {blk_a} (+{blk_a-blk_b}){flag}")
+            done += 1
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+    print(f"\n{done} texture(s) {'would change' if a.dry_run else 'rebuilt'}"
+          f"{f', {bad} problem(s)' if bad else ''}. "
+          f"Stock is beside each as *{BAK}; --revert restores them.")
+    if not a.dry_run:
+        print("cursor.spr is deliberately left stock -- the squash serves both draw "
+              "paths.")
 
 
 main()

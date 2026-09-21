@@ -1108,14 +1108,17 @@ the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
 
 ### Deliberately left stock
 
-- **20 cursors.** Deliberate pixel art, and the strips are non-square (so `fit()` would
-  square them). **The "drawn at native pixel size" half of this claim was wrong** and is
-  corrected in `SETUP.md`: at 3440x1440 a 32x32 cursor frame draws at ~138x77 screen px,
-  a 4.30x/2.40x blow-up, because the cursor code scales against a hard-coded 800x600.
-  That is the *stretch* `tools/cursor-aspect.py` fixes, and it fixes it in
-  `Sprites/cursor.spr` without touching a texture. Leaving the art stock is still the
-  call — but "it is drawn 1:1, so there is nothing to gain" is not the reason, and a
-  cursor upscale is now a live option rather than a closed one.
+- **20 cursors** — still not *upscaled*, but no longer untouched, and the reason given
+  here was wrong. Deliberate pixel art, and the strips are non-square (so `fit()` would
+  square them); but **"drawn at native pixel size" is false.** At 3440x1440 a 32x32
+  frame draws at ~138x77 screen px, a 4.30x/2.40x blow-up, because the cursor code
+  scales against a hard-coded 800x600 — so they were 1.79x too wide like everything
+  else. `tools/cursor-aspect.py` squashes the art to 18 texels across, about each
+  sprite's `@origin` hotspot, which is the *only* lever: the UI cursor is a hardware
+  cursor sized from the sprite's texel extent, so no `.spr` number reaches it and the
+  4.30 px/texel horizontal density is fixed no matter what. An actual upscale would not
+  help for the same reason — more texels would simply draw a bigger cursor. Derivation
+  and the in-game test that established the two draw paths are in `SETUP.md`.
 - **`colors`** — an 8x8 colour lookup table. Interpolating it blends the cells.
 - **`logos`** — Activision, Bink, GameSpy and Mad Doc trademarks, on a splash screen
   shown once. Invented shapes where there is a right answer, for no gain.

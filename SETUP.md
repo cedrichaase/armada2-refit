@@ -165,46 +165,97 @@ Both sources are square — `Curs_Move`'s bright content is 28x28 texels at offs
 in every one of its five frames — and both draw at about **1.8:1**. The scale pair,
 ~4.3 across against ~2.4 down, is an **800x600** reference scaled per-axis:
 `3440/800 = 4.30`, `1440/600 = 2.40`. (A 1600x1200 reference with the sprite's 32 units
-counted double is the same arithmetic and is not distinguishable from outside. It does
-not change the fix.) Both measurements sit 3-4% under that in *both* axes, which is the
-faint outer antialiased ring falling below the threshold, not model error — it cancels
-in the ratio, and the ratio is the thing: `4.30/2.40 = 1.79`, the same number as the UI,
-because 1.79 is just (display aspect) / (4:3).
+counted double is the same arithmetic and is not distinguishable from outside.) Both
+measurements sit 3-4% under that in *both* axes, which is the faint outer antialiased
+ring falling below the threshold, not model error — it cancels in the ratio, and the
+ratio is the thing: `4.30/2.40 = 1.79`, the same number as the UI, because 1.79 is just
+(display aspect) / (4:3).
 
-**A cursor has no rect in any cfg.** `Sprites/cursor.spr` is the only place its size is
-written down, as the `W H` pair — `32 32` on all 32 entries. So W is both the UV width
-and the drawn width, and the two separate cleanly: scale `W`, `U` and `@referenceWidth`
-by one ratio and the UV rect stays *bit-identical* (`U/refW` and `W/refW` unchanged)
-while the drawn rect narrows. `tools/cursor-aspect.py`:
+##### There are two cursor draw paths, and only one of them reads cursor.spr
 
-    tools/cursor-aspect.py --dry-run     # show the 41 changes
-    tools/cursor-aspect.py               # apply, reading the resolution from ARMADA.PRF
-    tools/cursor-aspect.py --revert      # restore Sprites/cursor.spr.a2neb-backup
+The first attempt rewrote `Sprites/cursor.spr` so that `W`, `U` and `@referenceWidth`
+scaled together — UV rect bit-identical, drawn rect narrowed, `W 32 -> 18`. **In game it
+fixed exactly one of the two paths**: the part of the selected-ship cursor that sits on
+the map plane came out square, and every cursor on the UI layer was untouched.
 
-At 3440x1440 the ratio is `1/1.79 = 0.558`, so `W 32 -> 18` — 0.5625, 0.8% wide, about
-one screen pixel at cursor size. The cursor goes 138x77 -> **77x77**. Nothing is
-resampled and no texture is touched, so this costs **no resolution**: the same 32 texels
-are drawn into a square instead of a stretched rectangle.
+That is the measurement that settles the mechanism, and it was worth making:
 
-W is forced **even** so `@origin`'s 16 stays integral. Every other value the ratio
-touches — `U` in {0,32,64,96,128,160}, `refW` in {64,128,160,192,224,256} — is a
-multiple of 32, so `k/32` lands exactly and no frame boundary moves. Verified: 33
-entries, 0 UV mismatches, hotspot fractions preserved, 80 lines / 80 CRs / 289 tabs
-unchanged, `--revert` byte-identical to stock, and re-running is idempotent. 16:9 and
-21:9 come out exact (W 24 and 18, 0.0% off square); a 5:4 display is refused rather than
-narrowed the wrong way.
+- **The map-plane part is drawn from the `.spr` `W H` pair.** It responded to W.
+- **The UI-layer cursor is a hardware cursor.** `Armada2.exe` imports Win32
+  `SetCursor` / `LoadCursorA` / `SetSystemCursor` *and* references D3D8
+  `SetCursorProperties`; the engine composes that cursor's surface itself from the
+  sprite's **texel extent**, which no number in a `.spr` can reach.
+  (`cursors/*.cur` are the shell's own 32x32 Win32 cursors — `cursor1.cur` is a *red*
+  arrow, not the in-game pale delta — so they are not this.)
 
-**Height is deliberately untouched.** Scaling `H 32 -> 57` would square the cursor just
-as exactly, but leaves it 138x138 — large at 1440p. Narrowing gives the ordinary 77x77.
+So the drawn size is `texels x (screenW/800, screenH/600)`. The horizontal texel density
+is pinned at **4.30 px/texel** by the reference no matter what we do, and the only lever
+left is how many texels the art spans.
 
-**Not yet confirmed in game.** The one thing the measurements cannot settle is whether
-the engine takes the drawn size from `W H` or from the texel extent the UVs select —
-stock has W equal to the frame's texel width, so both models fit identically. If it is
-the texel extent this rewrite is a silent no-op (the UVs are unchanged *by
-construction*, so it cannot make anything worse), and the fallback is to pre-squash the
-cursor **art** by 0.558 inside its cell, about the `@origin` hotspot so the click point
-does not move. That is certain to work but costs horizontal resolution, which is why it
-is not what the tool does first. Don't reach for it until this has been seen rendered.
+##### So the correction goes in the art, and cursor.spr goes back to stock
+
+`tools/cursor-aspect.py` squashes the **art** horizontally by `1/1.79` inside its
+unchanged 32x32 cell. That fixes *both* paths at once — the map-plane path draws those
+same texels into the same 1.79-stretched rect — which is why the `.spr` rewrite was
+reverted rather than kept. Keeping both would square the art twice and leave the
+map-plane cursor too narrow.
+
+    tools/cursor-aspect.py --dry-run     # 20 textures, frame grids and hotspots
+    tools/cursor-aspect.py               # rebuild, reading the resolution from ARMADA.PRF
+    tools/cursor-aspect.py --revert      # restore from the *.a2neb-backup beside each
+
+At 3440x1440 the frame goes `32 -> 18` texels across (0.5625 against the ideal 0.5581,
+0.8% off square). Each cell is squashed **about its own `@origin` hotspot**, not its
+centre, so the click point does not move: `c_arrow` / `c_select` / `standard_cursor` are
+`@origin=(0,0)` and squash toward the left edge, keeping the delta's tip on the pixel it
+points at; the other 29 entries are `@origin=(16,16)` and squash toward the middle.
+
+**What it costs, honestly: horizontal texels.** A shape described by 28 texels is
+described by 16 afterwards. The on-screen *block* size does not change — 4.30 px/texel
+before and after — so the cursor does not get blockier, it gets **coarser**, fewer steps
+describing the same outline, and it gets smaller, which is the point: the delta goes
+from 77x53 screen px to 43x53, the move reticle from 120x67 to 68x67.
+
+The alternative is to resample the other way — stretch the art *vertically* by 1.79 and
+scale `H` / `@referenceHeight` with it. That preserves every original texel and is
+equally square, and it was rejected on size alone: it leaves a **138x138** cursor, which
+is enormous at 1440p. The density is identical either way; only the size differs.
+
+##### Two things this got wrong first, both caught by measuring
+
+- **The filter has to be interpolating, not approximating.** ImageMagick resizes each
+  axis in turn, and a cell's *height* is unchanged here — so the vertical pass runs at
+  scale 1.0 and must be an identity. Mitchell is not: it blurred, and the art's bbox
+  grew one row in each direction, which on a colour-keyed sprite is a dark fringe on
+  the key. Catrom and Lanczos pass through their sample points and are exact. With
+  Catrom the vertical extent and y-offset are **identical to stock in all 20 textures**.
+- **`stock` must be the backup, not the file being overwritten.** The first run copied
+  `src` to the backup, rebuilt, overwrote `src`, and then compared `stock` against
+  `src` — by then the same file. Every before/after number came out identical, which is
+  what that bug looks like: not a wrong number, the *same* number twice.
+
+Black is the colour key (`@skip=(0,0,0)` in `cursor.spr`), so the guard is that the key
+must **grow** — the cell is narrower now — and the art must not gain rows. Both are
+checked per texture and reported; the key grew in all 20 (+103 to +1878 px).
+
+Stock cursors are uniform and the output matches byte-for-byte in the header: TGA image
+type 2, 24-bit, no ID field, no colour map, descriptor `0x00` (bottom-up), via
+`bottomup.py --like`. Geometry is exact by construction rather than by eye — for
+`Curs_Move` the art lands at `144x28+8+2`, exactly the predicted `7 + 2*0.5625 = 8` to
+`7 + 29*0.5625 = 23` per cell. (A thresholded centroid reads the on-screen ratio as 1.04
+rather than 1.006, because Catrom softens the horizontal edges and a thresholded blob
+widens; the vertical pass is an identity, so the bias is one-sided. Don't re-tune off
+that number.)
+
+`CursorA.tga` is left stock: no sprite file references it and the exe has no string for
+it — an unused leftover. `--revert` filters by the 20 stems `cursor.spr` actually names,
+so it will not touch the `fi**ncurs**ion*` hull backups that share the glob.
+
+**Note that `./a2tex revert all` also restores these**, since it sweeps every
+`*.a2neb-backup` in `Textures/RGB`. That is the right behaviour — revert all means
+stock — but it means the cursor fix has to be re-applied afterwards.
+
+**Not yet confirmed in game.**
 
 ## Patch Project 1.2.5
 

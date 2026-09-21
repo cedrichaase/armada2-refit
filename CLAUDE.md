@@ -401,13 +401,25 @@ it takes an `infopanel` anchor and goes flush. Derivation in `SETUP.md`.
 **And the cursors are a third screen reference again** — not the canvas, not the
 palette's 1600, but a hard-coded **800x600**, measured off the source texels at
 4.30x/2.40x, so they draw 1.79x too wide like everything else did.
-`tools/cursor-aspect.py` fixes it in `Sprites/cursor.spr` alone: `W`, `U` and
-`@referenceWidth` scale by one ratio, so the UV rect stays bit-identical while the drawn
-rect narrows (`W 32 -> 18` at 3440x1440, cursor 138x77 -> 77x77). **No texture is
-touched and no pixel is resampled.** Applied, not yet seen in game; if it turns out the
-engine sizes cursors from the texel extent rather than `W H` it is a silent no-op, and
-the fallback is in `SETUP.md`. Note this corrects README's claim that cursors are "drawn
-at native pixel size" — they are drawn at 4.3x.
+**There are two cursor draw paths and they size themselves differently**, which one
+in-game test settled: rewriting `Sprites/cursor.spr` so `W`/`U`/`@referenceWidth` scaled
+together fixed *only* the part of the selected-ship cursor that sits on the map plane.
+Every UI-layer cursor was untouched, because that one is a **hardware cursor** —
+`Armada2.exe` imports Win32 `SetCursor`/`LoadCursorA`/`SetSystemCursor` and references
+D3D8 `SetCursorProperties`, and the engine composes its surface from the sprite's
+**texel extent**, which no `.spr` number can reach. So horizontal density is pinned at
+4.30 px/texel and **the only lever is the art**. `tools/cursor-aspect.py` squashes the
+art 32 -> 18 texels across inside its unchanged cell, **about each sprite's `@origin`
+hotspot** so the click point does not move; that serves both paths, so `cursor.spr` is
+deliberately left stock — applying both would square the art twice. Cost is horizontal
+texels (28 -> 16 describing a shape), not block size, which is fixed by the reference.
+20 textures, 24-bit type 2 descriptor `0x00` headers matched byte-for-byte, colour key
+(`@skip=(0,0,0)`) verified to grow and the art verified not to gain rows. **The resample
+filter must be interpolating** — Mitchell blurs at vertical scale 1.0 and bled the art a
+row each way onto the key; Catrom is exact. Applied, not yet seen in game. Note this
+corrects README's claim that cursors are "drawn at native pixel size" — they are drawn
+at 4.3x. Derivation in `SETUP.md`. **`./a2tex revert all` restores these too**, since it
+sweeps every `*.a2neb-backup` in `Textures/RGB`.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs
