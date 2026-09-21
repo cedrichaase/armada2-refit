@@ -419,7 +419,8 @@ under condensed metrics and garble every glyph. The cost is horizontal sampling 
 quad is `texels x scale`, so there is no other lever — and the tier was pinned by the
 headers, since the 1600x1200 rival fit needs a `FontFinal4_30` that does not exist.
 Derivation, the measurement table and the rounding error are in `SETUP.md`.
-**Built and measured; not yet confirmed in game.**
+**Applied and confirmed in game**: `OBJECTIVES:` went 619.5 → 323.5 screen px against
+325.2 predicted, 0.5%, at an unchanged 32.7 px cap.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs

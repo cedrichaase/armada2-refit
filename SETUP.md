@@ -218,6 +218,18 @@ sizes actually drawn at this resolution land at 0.5235 (24) and 0.5281 (16). `sz
 worst at 0.5584 because its glyphs are 3–8 texels wide, and it belongs to the 640x480
 tier, so it is not drawn here.
 
+**Confirmed in game.** `OBJECTIVES:` measures 323.5 screen px wide against 325.2
+predicted — 0.5% — with the cap height unchanged at 32.7 px, exactly as intended, and the
+glyph aspect back to 9.89 against the atlas's authored 10.04. The briefing paragraph
+reflowed from five lines to three, which is the same prediction seen from the other side.
+
+One thing the model does not capture, and it is **stock behaviour, not a condensing
+artefact**: measured line widths run a few percent over the sum of the advance widths,
+because **the engine rounds each glyph's advance up to a whole screen pixel**. The drift
+is 0.36 screen px per glyph condensed against 0.28 stock — the same effect at the same
+per-glyph rate, just accumulated over the longer lines a condensed font fits. Do not
+"correct" it in the `.spr`; the widths are right.
+
 **The backups are `.a2font-backup`, not `.a2neb-backup`, deliberately.** `a2tex revert
 all` restores every `Textures/RGB/*.a2neb-backup`; if the atlases went back to stock while
 the condensed `.spr` files stayed, every `u` and width would point into the wrong place in
