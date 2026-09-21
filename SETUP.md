@@ -255,7 +255,44 @@ so it will not touch the `fi**ncurs**ion*` hull backups that share the glob.
 `*.a2neb-backup` in `Textures/RGB`. That is the right behaviour — revert all means
 stock — but it means the cursor fix has to be re-applied afterwards.
 
-**Not yet confirmed in game.**
+**Confirmed in game** — no longer stretched.
+
+##### An AI upscale cannot help these, and the binary says exactly why
+
+Asked for, and the answer is no — not as an art change. `armada2.map` makes the cursor
+path readable rather than guessable, and it is short:
+
+- **`ST3D_DeviceDirectX8::DrawCursor` (`0x623bd0`) is `xor eax,eax; ret`.** It draws
+  nothing. The cursor is a real **D3D8 hardware cursor**, set via
+  `SetCursorProperties`, not a quad the renderer composites.
+- **`ST3D_DeviceDirectX8::SetCursor` (`0x625c90`) allocates the cursor texture
+  pre-scaled.** With the synchronous flag at `[device+0xe0]` clear — the live path — it
+  computes
+
+      width  = round( texW * [device+0x18] )
+      height = round( texH * [device+0x1c] )
+
+  and creates the texture at that size. **Those two floats are the 4.30 and the 2.40.**
+  (The other branch, flag set, creates it at the texture's own `[tex+0x1c]`/`[tex+0x20]`
+  — unscaled — and `UpdateCursor` early-returns without blitting, so it is not this.)
+- **`ST3D_DeviceDirectX8::UpdateCursor` (`0x625b00`) then does `CopyRects`** — a 1:1
+  pixel copy, no filtering — of the sub-rect `[a, b, a+c, b+d]` where
+  `c = texW_scaled * sprite.w` and `d = texH_scaled * sprite.h`, into the cursor surface.
+
+So the on-screen cursor is `source texels x [device+0x18]` wide. **The engine does the
+magnification itself, into a real texture, and the scale factor is a constant.** Double
+the source texels and the cursor comes out twice as big at *identical* density — 4.30
+screen px per source texel either way. There is no art change that buys sharpness,
+which is why the squash is framed as choosing a size rather than trading quality.
+
+**The lever for sharpness is `[device+0x18]` / `[device+0x1c]`, not the textures.** Set
+them to 1.0 and upscale the art 4x and the cursor would be a genuinely crisp 128px
+drawn from real texels instead of a 4.3x blow-up; set them *equal* to each other and the
+aspect is fixed properly, at the source, with stock art and no squash at all. Both are
+code, not data — an ASI hook of the same shape as `tools/menuscale/`, which is why this
+is now worth considering rather than impossible. Not attempted.
+
+Until then, `cursor-aspect.py`'s squash is the whole of what art can do.
 
 ## Patch Project 1.2.5
 

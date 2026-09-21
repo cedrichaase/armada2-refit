@@ -1116,9 +1116,14 @@ the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
   else. `tools/cursor-aspect.py` squashes the art to 18 texels across, about each
   sprite's `@origin` hotspot, which is the *only* lever: the UI cursor is a hardware
   cursor sized from the sprite's texel extent, so no `.spr` number reaches it and the
-  4.30 px/texel horizontal density is fixed no matter what. An actual upscale would not
-  help for the same reason — more texels would simply draw a bigger cursor. Derivation
-  and the in-game test that established the two draw paths are in `SETUP.md`.
+  4.30 px/texel horizontal density is fixed no matter what. **An AI upscale cannot help
+  them**, and that is now read out of the binary rather than inferred: `DrawCursor` is
+  `xor eax,eax; ret`, and `SetCursor` allocates the cursor texture at
+  `texW * [device+0x18]` by `texH * [device+0x1c]` — so the engine magnifies it itself
+  by a constant, and more source texels just draws a bigger cursor at the same density.
+  The lever for sharpness is those two device floats, which is code (an ASI hook like
+  `tools/menuscale/`), not art. Derivation, and the in-game test that established the
+  two draw paths, are in `SETUP.md`.
 - **`colors`** — an 8x8 colour lookup table. Interpolating it blends the cells.
 - **`logos`** — Activision, Bink, GameSpy and Mad Doc trademarks, on a splash screen
   shown once. Invented shapes where there is a right answer, for no gain.
