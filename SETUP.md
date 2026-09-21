@@ -609,25 +609,121 @@ Remedies, in order of preference:
   DXVK's `d3d9.dll` stays in place; only the d3d8 slot needs to stop being managed.
 - Or re-copy the translator after every launch, which is fragile.
 
-### Anisotropic filtering — untried, and probably the cheapest visual win left
+### Renderer-side enhancements
 
-`dxcfg.ini` sets `anisotropic=application`, i.e. whatever a 2001 renderer asks for, which
-is likely none. Everything drawn at a steep angle to the camera — which in a top-down RTS
-means every ship hull and every planet surface — is therefore sampled with plain
-trilinear filtering and blurs along the axis of foreshortening.
+Everything in this section is global — it applies to every texture and every model at
+once, costs nothing per-asset, and is reversible by deleting one file. All of it is
+independent of the texture pipeline. Verified against **DXVK 3.1.1**, the version Heroic
+actually deploys (`~/.config/heroic/tools/dxvk/dxvk-3.1.1/`), by reading the config keys
+out of the shipped `d3d9.dll` rather than from documentation — the key list below is what
+this binary honours, not what some DXVK version honours.
 
-DXVK can force it regardless of what the application asks. A `dxvk.conf` beside
-`Armada2.exe`:
+#### This does not have to wait for the d3d8 regression
 
-    d3d9.samplerAnisotropy = 16
+An earlier revision of this file said the graphics stack should not be touched while the
+chain regression above is open. For `dxvk.conf` specifically **that is wrong, and the
+reason matters**: both possible chains end in DXVK's `d3d9.dll`.
 
-DXVK's d3d8 runs on its d3d9 backend, so the `d3d9.*` key is the right one under the
-chain that is actually live above. It costs nothing, applies to every texture in the
-game at once, and is reversible by deleting the file.
+    proxy -> DXVK d3d8   -> DXVK d3d9 -> Vulkan      (live today)
+    proxy -> GOG d3d8to9 -> DXVK d3d9 -> Vulkan      (after the regression fix)
 
-**Not done.** It is the one renderer-side change with an obvious upside, but it touches
-the graphics stack while the regression above is open, so it should be tried on its own,
-with nothing else changing, so that a bad result is attributable.
+`d3d9.*` keys are read by the d3d9 layer, which is present and is DXVK's in both. So a
+`dxvk.conf` change is attributable regardless of which `d3d8.dll` won the last launch,
+and does not need the regression closed first. The AA routes below are the ones that do.
+
+#### Tier 1 — `dxvk.conf`, free and reversible
+
+`tools/renderer-config.sh` writes it, in **cumulative stages**, because this project's
+method is one change at a time and three keys at once is not attributable:
+
+    tools/renderer-config.sh              # stage 1: anisotropic filtering only
+    tools/renderer-config.sh --stage 2    # + mip LOD bias
+    tools/renderer-config.sh --stage 3    # + seamless cube filtering
+    tools/renderer-config.sh --show       # what is installed now
+    tools/renderer-config.sh --remove     # delete dxvk.conf, full revert
+
+- **`d3d9.samplerAnisotropy = 16`** (stage 1). `dxcfg.ini` asks for `application`, i.e.
+  whatever a 2001 renderer requests, which is likely none. In a top-down RTS every hull
+  and every planet is drawn at a steep angle to the camera, so all of it is sampled with
+  plain trilinear and blurs along the axis of foreshortening. This is the single biggest
+  free win and the one to judge on its own.
+- **`d3d9.samplerLodBias = -0.5`** (stage 2). Biases mip selection toward the sharper
+  level. This matters *because of the texture work*, not independently of it: there is
+  now 1024–2048 art under a camera that views the map plane obliquely, and trilinear
+  picks a blurrier mip than the art can support. **Only safe with AF already on** —
+  without it a negative bias aliases rather than sharpens, which is why it is a separate
+  stage and not part of stage 1. `d3d9.clampNegativeLodBias` is the guard if it
+  overshoots.
+- **`d3d9.seamlessCubes = True`** (stage 3). Filters across cube-map face edges. Directly
+  relevant to the finished skybox class: many maps bind a `.sod` cube model, and a
+  face-edge seam gets *more* visible at 2048/face, not less.
+
+`DXVK_HUD=fps,frametimes` is the measuring aid; it is deliberately **not** written into
+`dxvk.conf`, so it cannot be left on by accident. Expect the GPU to be near-idle — a 2001
+engine against an RX 5700 XT — and all three stages to be free.
+
+#### Tier 2 — anti-aliasing, which cannot come from config
+
+**DXVK 3.1.1 has no MSAA-forcing option.** The full `d3d9.*` key list was read out of the
+binary; there is no `forceSwapchainMSAA` or equivalent. `d3d9.forceSampleRateShading`
+exists but only does anything once MSAA is already on. So AA needs one of three routes:
+
+1. **`dxcfg.ini`'s own `antialiasing=` key**, which sits right beside the `anisotropic=`
+   one. Cheapest to try — but **currently inert**: `dxcfg.ini` is read by the GOG
+   d3d8to9 translator, which the Heroic redeploy has knocked out of the chain. This route
+   *does* depend on the regression fix, and is an argument for doing it that the earlier
+   write-up did not have. Its accepted values are unknown — `dxcfg.exe`'s strings are
+   packed and yielded nothing — so they have to be found by testing.
+2. **An ASI hook on `IDirect3D8::CreateDevice`** setting `MultiSampleType`. Squarely
+   inside the toolchain `tools/menuscale/` already proves — clang + lld-link + the
+   Ultimate ASI Loader that is already carrying two plugins — and `armada2.map` gives the
+   call site. The most likely to work, and the most work.
+3. **Supersampling by rendering above display resolution.** Looks free given the GPU
+   headroom and **is not**. The whole UI layer is tuned to 3440x1440:
+   `ui-widescreen.py`'s canvas arithmetic, the `popupPaletteXA` correction and
+   `MenuScale.asi`'s desktop-size read would all need re-deriving. Recorded so it is not
+   mistaken for a quick win.
+
+#### Tier 3 — post-processing
+
+**vkBasalt** is the realistic layer. ReShade under a four-deep d3d8 -> d3d9 -> DXVK chain
+is fragile and would be a fourth thing in a stack that already has an open regression.
+vkBasalt is **AUR-only** here (`gamescope` is in `extra`; `vkbasalt`, `lib32-vkbasalt`
+and `reshade-shaders` are not in the official repos), and **`lib32-vkbasalt` is the one
+that matters** — `Armada2.exe` is 32-bit, so the 64-bit layer alone does nothing.
+
+It operates on the final swapchain image, and that decides what is possible: CAS
+sharpening, FXAA/SMAA, LUT/tonemapping and depth-independent bloom all work; anything
+needing depth does not.
+
+**Bloom is the one worth doing**, and the reason is specific to this game rather than
+general taste. Armada II's visual language is almost entirely additive sprites — nebulae,
+weapons, engine glows — and the latinum clouds already clip to flat white where
+overlapping billboards composite past 255. That clipping is stock-faithful and cannot be
+fixed in the texture, because the per-channel mean *is* the light contributed and
+lowering it breaks the match against stock. Bloom converts that blowout from "the texture
+ran out of range" into "that is a bright object", which is the correct read and which no
+amount of texture work can produce.
+
+#### Tier 0 — ambient occlusion, which is the wrong tool here
+
+Two objections; the second is the decisive one.
+
+The practical one: depth-buffer access through d3d8 -> d3d9 -> DXVK is exactly where
+ReShade's depth detection is least reliable.
+
+The real one is about content. **AO darkens contact points and creases, and this scene
+has neither.** Ships float in vacuum against a skybox — nothing touches anything, there
+is no ground plane, no architecture, no interior corners. The 2001 hull models are
+low-poly, so there are barely any geometric creases to occlude either, and what detail
+exists is *painted into the diffuse map*, where AO cannot see it. The cost is high and
+the return is faint rim-darkening on ship silhouettes.
+
+The same reasoning rules out most lighting-based effects: the game has close to no
+lighting model to enhance. That is why the texture work has so much leverage here and
+why shader tricks have so little — and it is worth stating explicitly, because "add AO
+and bloom" is the reflex suggestion for any old game and only half of it survives
+contact with this one.
 
 ### Also outstanding
 

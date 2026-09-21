@@ -1777,9 +1777,21 @@ Genuinely outstanding:
   mission, then madExcept. Captured in `archive/error-mission-finish/`. **It first
   occurred before any modding**, so it is not this project's, and nothing here has been
   shown to affect it either way. Recorded so it is not mistaken for a texture problem.
-- **Anisotropic filtering is untried**, and is probably the cheapest visual win left —
-  it would sharpen every oblique surface in the game at once, hull textures most of all,
-  for free and reversibly. Recipe and the reason for holding off are in `SETUP.md`.
+- **Renderer-side enhancements are installed at stage 1 and await a play session.**
+  `tools/renderer-config.sh` writes `dxvk.conf`; stage 1 is 16x anisotropic filtering
+  alone, which sharpens every oblique surface in the game at once — in a top-down RTS,
+  every hull and every planet. Stages 2 (mip LOD bias) and 3 (seamless cubes) are
+  written but **not installed**, deliberately: one change at a time, so a bad result is
+  attributable. `--remove` reverts completely. The earlier note here held this back
+  behind the d3d8 regression; that was wrong, because both possible chains end in
+  DXVK's `d3d9.dll`, so `d3d9.*` keys apply either way. Full reasoning, plus the
+  anti-aliasing, post-processing and ambient-occlusion verdicts, in `SETUP.md`,
+  "Renderer-side enhancements".
+- **Anti-aliasing has no config route.** DXVK 3.1.1 ships no MSAA-forcing key — checked
+  against the binary Heroic deploys, not the documentation. It needs either the d3d8
+  regression closed (which would make `dxcfg.ini`'s own `antialiasing=` key live again)
+  or an ASI hook on `IDirect3D8::CreateDevice`. Probably the largest remaining visual
+  win after the texture work, and the one that costs real effort.
 - **`Mnebula4`'s generated art is preserved but unused** — `targets/Mnebula4/src-generated/`
   and `archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen` to
   return to it.
