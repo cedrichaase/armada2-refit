@@ -4,7 +4,7 @@
     tools/ui-font-condense.py                  condense for the resolution in ARMADA.PRF
     tools/ui-font-condense.py --res 3440x1440  condense for a resolution you name
     tools/ui-font-condense.py --factor 0.558   override the computed factor
-    tools/ui-font-condense.py --method resample  the old Lanczos squeeze, with --filter
+    tools/ui-font-condense.py --method runs    the rejected crisp variant; see below
     tools/ui-font-condense.py --dry-run        print what would change, touch nothing
     tools/ui-font-condense.py --preview OUT    render stock vs condensed as the game
                                                will draw them, and touch nothing
@@ -74,53 +74,63 @@ point-samples it up 2.6875x.  Text comes out correctly proportioned but horizont
 chunkier than it is today.  There is no way around that from data alone: the
 destination quad is (texels x scale), so the only lever on width is texels.
 
-HOW THE GLYPHS ARE CONDENSED, AND WHY NOT BY RESAMPLING  (--method, default runs)
+HOW THE GLYPHS ARE CONDENSED  (--method, default resample)
 
-The first version of this tool squeezed the alpha with a Lanczos resize.  That was the
-wrong instinct, and the reason is the point sampling.  The two axes magnify by very
-different amounts -- 2.6875x across, 1.40625x down -- so a part-covered texel behaves
-differently on each.  Down, it spans about one screen pixel and reads as a real soft
-edge.  Across, it is painted as a flat 2.7px block: it does not soften anything, it
-just puts a grey slab where a stroke edge should be.  Resampling turns every stem into
-grey slabs, because stock's stems are ONE texel wide and 0.5233 of a texel cannot be
-drawn.  Measured on FontFinal4_24a: stock has 6000 fully-opaque texels, the Lanczos
-condense left 1572, and hundreds of texels picked up an alpha 1-4 ringing halo.  On
-screen that is the washed-out, muddy text this was meant to fix.
+The default squeezes each glyph's alpha with a Lanczos resize (--filter picks another;
+Triangle is softer, Box loses sub-texel stem placement).  That is what ships and what
+is confirmed in game.
 
-Thresholding instead is no answer either: at 45% it erases '!', '"', 'I', 'i' and 'l'
-at sizes 10-13, and at 50% it erases 31 glyphs, all of them the one-texel ones.
+A CRISPER ALTERNATIVE WAS BUILT, MEASURED, AND REJECTED IN GAME  (--method runs)
 
-So the default method works a scanline at a time (condense_row).  It finds the ink
-runs on the stock line, maps their ends by the factor, gives every run AT LEAST ONE
-texel, keeps the gaps stock had between runs, and fills each run flat at that line's
-own peak alpha.  Crisp across, stock's own vertical shading kept, nothing can drop
-out, and the stroke count per line is invariant -- the glyph cannot break up.
+Keep this section.  The argument for `runs` is genuinely strong on paper, every static
+metric favours it, and it still looked worse on the user's screen -- so the next person
+to notice the text is soft can find out that the experiment has already been run
+instead of repeating it.
 
-Run WIDTHS are floored, not rounded, and one glyph settled that.  '1' at 16pt is a
-2-texel stem under a 3-texel half-tone base serif; rounding sends those to 1 and 2, a
-foot twice the width of the stem and hanging off its right, and the silhouette reads
-as a bracket -- "1187" renders as "[187" in the resource counters.  Flooring sends
-both to 1, the foot sits square under the stem, and the digit reads.  It costs 10% of
-the ink budget, which at this texel count is the right trade.
+The argument was: the engine point-samples, and the axes magnify very differently --
+2.6875x across against 1.40625x down.  Down, a part-covered texel spans about a screen
+pixel and reads as a real soft edge.  Across, it is painted as a flat 2.7px block, so
+it softens nothing and merely puts a grey slab where a stroke edge should be.  Since
+stock's stems are ONE texel wide, 0.5233 of a texel cannot be drawn, and a resize turns
+every stem into such a slab: on FontFinal4_24a stock has 6000 fully-opaque texels, the
+Lanczos condense leaves 1572, and hundreds more pick up an alpha 1-4 ringing halo.
+
+Thresholding is no answer either: at 45% it erases '!', '"', 'I', 'i' and 'l' at sizes
+10-13, and at 50% it erases 31 glyphs, all of them the one-texel ones.
+
+So `runs` works a scanline at a time (condense_row): find the ink runs on the stock
+line, map their ends by the factor, give every run AT LEAST ONE texel, keep the gaps
+stock had between runs, and fill each run flat at that line's own peak alpha.  Crisp
+across, stock's vertical shading kept, nothing can drop out, and the stroke count per
+line is invariant so a glyph cannot break up.  Run WIDTHS are floored rather than
+rounded because rounding gives '1' -- a 2-texel stem under a 3-texel half-tone base
+serif -- a foot twice its stem hanging to the right, and "1187" renders as "[187".
 
 Measured over all 1792 glyphs, ink against what the factor predicts:
 
     method                  ink/expected   erased   thinned   fattened
-    Lanczos resample            1.028         0        0          0      (but grey)
+    Lanczos resample            1.028         0        0          0      <- default
     Box + threshold 35%         1.224         0        2        227
     Box + threshold 45%         1.074         6       29         64
     Box + threshold 50%         0.904        31      120          4
-    runs, width rounded         1.007         0        1         25      (but "[187")
-    runs, width floored         0.900         0        9         16      <- default
+    runs, width rounded         1.007         0        1         25      (and "[187")
+    runs, width floored         0.900         0        9         16      (rejected)
 
-Ink is a WEIGHT check, not a legibility check.  The Lanczos row scores best on it and
-worst on screen, because it keeps the right amount of coverage while spreading it into
-grey.  Do not re-tune this table without looking at a render.
+`runs` also takes FontFinal4_24a from 1572 fully-opaque texels back to 3948 against
+stock's 6000, and the alpha plane back to 14 discrete levels from 256.
 
-On FontFinal4_24a the default takes fully-opaque texels from 1572 (Lanczos) back to
-3948, against stock's 6000, and the alpha plane back to 14 discrete levels from 256.
+AND NONE OF THAT SETTLED IT.  Judged in the actual game the crisp variant looked worse
+than the soft one, and the user asked for the Lanczos build back.  The plausible reason
+is that the reasoning above models the engine as a bare point-sampled blit, and the
+real text is tinted, drawn over lit panel art, and read at a normal viewing distance --
+conditions under which a grey slab reads as a soft edge after all and hard 2.7px blocks
+read as jagged.  The offline renders in this repo's history reproduced the sampling but
+not the context.
 
-`--method resample` keeps the old path, with --filter, for comparison.
+THE LESSON, which is the part worth keeping: the static metrics here -- ink ratio,
+opaque-texel count, dropout count, alpha level count -- all favoured the variant that
+lost.  They measure weight and structure, not legibility.  Do not change the font's
+appearance on the strength of this table.  Put it in the game and look at it.
 
 BACKUPS DO NOT USE .a2neb-backup, DELIBERATELY
 
@@ -564,7 +574,7 @@ def main():
     ap.add_argument('--res')
     ap.add_argument('--factor', type=float)
     ap.add_argument('--filter', default='Lanczos')
-    ap.add_argument('--method', choices=('runs', 'resample'), default='runs')
+    ap.add_argument('--method', choices=('runs', 'resample'), default='resample')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--revert', action='store_true')
     ap.add_argument('--check', action='store_true')
