@@ -18,11 +18,10 @@ WS="${WS:-5}"
 TAG="${1:-shot}"
 mkdir -p "$OUT"
 
-for p in Armada2.exe explorer.exe services.exe rpcss.exe plugplay.exe \
-         winedevice.exe svchost.exe umu.exe wineserver; do
-    pkill -x "$p" 2>/dev/null || true
-done
-sleep 3
+# Not `pkill -x Armada2.exe`: Wine calls the process "Main", so that matches
+# nothing and every run leaks an instance that keeps playing the menu music.
+QUIET=1 bash "$here/stop-game.sh"
+sleep 1
 rm -f "/home/cedric/Games/Heroic/Star Trek Armada II/MenuScale.log"
 
 nohup bash "$here/run-wine.sh" > "$OUT/$TAG.wine.log" 2>&1 &

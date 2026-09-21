@@ -117,13 +117,22 @@ i.e. `llvm-dlltool` needs `--kill-at`, because the `.def` files carry stdcall-de
 names but kernel32/user32/gdi32 export them undecorated.
 
 `capture.sh` runs the game on its own Hyprland workspace and photographs it; `shot.sh`
-grabs one frame and puts the desktop back where it was.
+grabs one frame and puts the desktop back where it was; `stop-game.sh` shuts the game
+and its Wine session down properly.
 
 Two traps that cost real time here, both recorded so they are not rediscovered:
 
-- **`pgrep -x Armada2.exe` does not match** under this launch path, even while the game
-  is plainly running and writing to `MenuScale.log`. Track the window, not the process.
-  (`README.md`'s note that `pgrep -f` self-matches is still true and separate.)
+- **Wine reports the process `comm` as `Main`, not `Armada2.exe`.** So
+  `pgrep -x Armada2.exe` matches nothing even while the game is plainly running and
+  writing to `MenuScale.log`. This is not cosmetic: it made the harness report "game
+  DOWN" for a game that was up, and it made every run's `pkill -x Armada2.exe` cleanup
+  a no-op, so instances accumulated — seven of them over half an hour, each with no
+  window, each still holding a PipeWire stream and audibly playing the menu music.
+  `pkill -f Armada2.exe` does match, but also matches its own shell (see `SETUP.md`),
+  so **`stop-game.sh`** collects PIDs with `ps` and kills them individually. It also
+  drops stale PipeWire nodes, which survive the process and stay in state `running`.
+  Wine helpers are matched by `WINEPREFIX` out of `/proc/<pid>/environ`, so it cannot
+  take down an unrelated Wine application.
 - **Hyprland 0.56 routes `hyprctl dispatch` through Lua**, so
   `hyprctl dispatch movetoworkspacesilent 5,class:...` is a Lua *syntax error* — and a
   silent one if stderr is redirected. Use
