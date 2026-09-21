@@ -1619,6 +1619,68 @@ Four changes, all of which apply to every faction that follows:
 
 `tools/selftest-mips.py` pins all of this against the real texture directory.
 
+## The other five factions, and a texture that is two things at once
+
+Klingon, Romulan, Cardassian, Borg and Species 8472 — **198 textures in 12 targets**,
+built, verified and installed on the recipe the Federation pinned: 256px sources to 1024,
+`mips=auto`, `blend=70`, `alpha=ai` where the channel is a night-lights map.
+
+Grouping was done by `tools/classify-alpha.py` rather than by hand, because at this scale
+hand-classification is where mistakes come from. Each faction splits into a `Lit` target
+(alpha is picture content) and a `Plain` one (coverage mask, binary mask, or no alpha at
+all), plus three cross-faction targets for the odd source sizes — `size=` is per target,
+so a 128px plate cannot share one with a 256px plate.
+
+### borgUI3: the ceiling that `maxsize=` cannot enforce
+
+`@tmaterial=interface` sprites above 256x256 crash the game, and `maxsize=256` in
+`target.conf` has enforced that since the UI pass. It is not sufficient, and this faction
+pass found out how.
+
+**`borgUI3` is both things.** It is an interface sprite in `Sprites/gui_borg.spr` *and*
+it is referenced by `Borpod16.SOD`. The faction census collects "textures a SOD points
+at", so it was collected as a Borg hull texture, placed in `BorgPlain` — a target with no
+`maxsize`, because hull targets have no reason to declare one — and **installed at
+1024x1024**. It sat in the game directory that way until the verify that follows an
+install reported `borgUI3: installed file differs from out/`, which is `UIpanel` noticing
+that something had overwritten its 256px copy.
+
+The lesson is not "add maxsize to hull targets". It is that **a texture's target
+membership does not tell you what the engine thinks it is**, and `maxsize` is a target
+opting in to a rule it has to know applies. The rule has to be applied by what the
+texture *is*:
+
+- `tools/interface-textures.py` reads every `.spr` in `Sprites/`, tracking
+  `@tmaterial` as state, and prints the 267 textures declared under `interface`.
+- `a2tex install` now refuses any output over 256px whose name is in that set,
+  independently of the target's own `maxsize`.
+
+An audit of every installed texture against that set found `borgUI3` and nothing else.
+`UIpanel`'s 256px build was restored and `borgUI3` removed from `BorgPlain` entirely.
+
+### What the fan-out was worth
+
+Five agents, one per faction. Two things are worth recording honestly.
+
+They found a real bug the author missed: `verify.py` was silently folding `fdestroy2`
+(the Sabre) into `fdestroy` (the Defiant) as a mip level and dropping it from the checked
+set — no failure, just a count one short — and across the repo it was hiding 43 textures.
+An agent traced the cause correctly and refused to touch shared code, as instructed.
+
+And **two of the three collisions in this project's history were caused by the author, not
+the agents**, both by starting work on a target whose agent was still running. Neither
+corrupted anything, because `build_sky_faces` refuses a target whose src image count does
+not match its stock base count — but the symptom, `SKIP -- needs 24 images, found 25`,
+reads like a missing texture rather than a collision. The cause was `upscale-stock.sh`
+writing `src/.lz-<name>.png`, a fixed path inside a directory whose file *count* is
+load-bearing. `lib/common.sh` has carried the rule since `-j` was introduced — "every
+function takes its scratch directory as an argument and writes nothing to a fixed path" —
+and that script had never followed it. It uses a `mktemp -d` now.
+
+All four remaining agents ultimately died on API timeouts, after their upscales and
+builds had landed. `CardassianLit` was rebuilt from scratch and diffed against the build
+that had raced: byte-identical.
+
 ## Beyond the nebulae
 
 `REMASTERING.md` carries the measured inventory of all 2115 textures and what would be
