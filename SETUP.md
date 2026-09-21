@@ -573,6 +573,52 @@ Verified against this executable:
 The exe imports **no** dinput or dinput8 at all, so a `dinput.dll` would never be
 loaded and the patch would be silently inert.
 
+### ⚠ CORRECTION: 320548 is Wine's builtin d3d8, not DXVK's
+
+**The section below is wrong about what is in the prefix, and the error inverted the
+whole diagnosis.** It records `syswow64/d3d8.dll` at 320548 bytes as "DXVK's exact
+size". It is not. Measured with `sha256`, not with size folklore:
+
+| file | bytes | what it actually is |
+|---|---:|---|
+| `syswow64/d3d8.dll` | 320548 | **byte-identical to Wine's builtin d3d8** |
+| `syswow64/d3d8.dll.dxvk-backup` | 320548 | the builtin as well — the backup never held DXVK |
+| DXVK d3d8 (Proton's) | 1658894 | ~1.66 MB, and has never been in this prefix |
+| DXVK d3d8 (Heroic's 3.1.1) | 1687566 | likewise |
+| `syswow64/d3d9.dll` | 7798798 | genuinely DXVK (Proton's), but **bypassed** |
+
+So the chain that has actually been running is:
+
+    Armada2.exe
+      -> <game dir>/d3d8.dll      Patch Project proxy   45056
+      -> syswow64/d3d8.dll        WINE BUILTIN d3d8     320548
+      -> wined3d
+      -> OpenGL
+
+**DXVK is not in this game's render chain and never has been.** Wine's d3d8 talks to
+`wined3d` directly; it never loads `d3d9.dll`, so the DXVK d3d9 sitting in the prefix is
+never reached. That is why no `d3d9.*` key in `dxvk.conf` changed anything, why the DXVK
+HUD never appeared, and why `--diagnose` produced a `xalia_dxgi.log` (a different
+process, which does use DXVK) but no `Armada2_d3d9.log`.
+
+It also means the entire texture project — 2048 skyboxes, a 4096 atlas, 1024 hulls — has
+been rendering through wined3d/OpenGL, not Vulkan. Worth knowing before any of it is
+attributed to DXVK.
+
+`tools/d3d8-chain.py` exists so this cannot recur: it identifies every link by hashing
+it against the candidates actually present on the machine and **names** what it found,
+reporting `UNKNOWN` rather than guessing. Never identify one of these by size again.
+
+    tools/d3d8-chain.py --status      identify the live chain
+    tools/d3d8-chain.py --use dxvk    DXVK d3d8 -> DXVK d3d9 -> Vulkan
+    tools/d3d8-chain.py --use gog     GOG d3d8to9 -> DXVK d3d9 -> Vulkan
+    tools/d3d8-chain.py --revert      back to Wine's builtin, Heroic managing it again
+
+`--use` also sets `autoInstallDxvk`, so it needs Heroic closed, and it refuses before
+touching anything rather than half-applying.
+
+### The original note, kept for the record
+
 ### ⚠ This fix does not currently survive a launch
 
 `autoInstallDxvk` is `true`, and **Heroic redeploys DXVK's DLLs into the prefix on every
