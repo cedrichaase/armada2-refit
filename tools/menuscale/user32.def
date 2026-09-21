@@ -15,3 +15,6 @@ ScreenToClient@8
 IsWindow@4
 GetSystemMetrics@4
 GetWindowRect@8
+SetWindowLongA@12
+CallWindowProcA@20
+DefWindowProcA@16

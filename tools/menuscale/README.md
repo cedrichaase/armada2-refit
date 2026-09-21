@@ -49,8 +49,16 @@ that is already in `WINEDLLOVERRIDES`.
      main menu actually lives.*
    - **design-sized dialogs** (fixed sizes at fixed offsets, e.g. `353x293 @140,70`) —
      position and size scaled, content stretched to fill.
-3. **Maps the mouse back**, so `WM_MOUSE*` lParam and `GetClientRect` agree with what
-   was drawn.
+3. **Maps the mouse back** by subclassing each dialog's window procedure, so
+   `WM_MOUSE*` lParam and `GetClientRect` agree with what was drawn.
+
+   It has to be a subclass, not a `GetMessageA`/`PeekMessageA` hook. Every shell
+   screen is a **modal** dialog — `DialogBoxParamA` has 36 call sites in
+   `Armada2.exe` (`do_mainMenu` among them) against 2 for `CreateDialogParamA` — and
+   a modal dialog is pumped by user32's own internal loop, which dispatches straight
+   to the dialog procedure and never hands the message to the application. The
+   message-loop hook scaled the picture perfectly and left every click *and hover*
+   registering on the stock 800x600 position.
 
 Only class `#32770` (Win32 dialog) windows are touched. The 3D window is not a dialog,
 so gameplay, the HUD and the Bink videos are untouched by construction.
@@ -134,10 +142,9 @@ assignment to those even under `-ffreestanding -fno-builtin`.
 
 ## Not done
 
-- **Only the main menu is confirmed rendered.** The options, load/save, campaign-select
-  and multiplayer screens go through the same two code paths and are expected to
-  follow, but have not been seen scaled.
-- **Mouse mapping is implemented but not verified by clicking.**
+- **Confirmed rendered:** the main menu and the single-player/campaign screen. The
+  options, load/save and multiplayer screens go through the same two code paths and
+  are expected to follow, but have not been seen scaled.
 - **Real child controls** (edit boxes, list boxes — the multiplayer screens use them)
   are separate HWNDs that Windows draws itself. They are not covered by the offscreen
   redirect and will sit unscaled. The main screens are custom-drawn `ShellButton`

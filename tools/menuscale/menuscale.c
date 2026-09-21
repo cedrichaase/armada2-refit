@@ -83,6 +83,8 @@ typedef char               *LPSTR;
 typedef struct { LONG left, top, right, bottom; } RECT;
 typedef struct { LONG x, y; } POINT;
 
+typedef LONG_PTR (__stdcall *WNDPROC)(HWND, UINT, WPARAM, LPARAM);
+
 typedef struct {
     HDC  hdc;
     BOOL fErase;
@@ -127,6 +129,9 @@ __declspec(dllimport) BOOL    __stdcall ScreenToClient(HWND, POINT *);
 __declspec(dllimport) BOOL    __stdcall IsWindow(HWND);
 __declspec(dllimport) INT     __stdcall GetSystemMetrics(INT);
 __declspec(dllimport) BOOL    __stdcall GetWindowRect(HWND, RECT *);
+__declspec(dllimport) LONG    __stdcall SetWindowLongA(HWND, INT, LONG);
+__declspec(dllimport) LONG_PTR __stdcall CallWindowProcA(WNDPROC, HWND, UINT, WPARAM, LPARAM);
+__declspec(dllimport) LONG_PTR __stdcall DefWindowProcA(HWND, UINT, WPARAM, LPARAM);
 
 __declspec(dllimport) HDC     __stdcall CreateCompatibleDC(HDC);
 __declspec(dllimport) HBITMAP __stdcall CreateCompatibleBitmap(HDC, INT, INT);
@@ -156,6 +161,7 @@ __declspec(dllimport) BOOL    __stdcall PatBlt(HDC, INT, INT, INT, INT, DWORD);
 
 #define WM_MOUSEFIRST 0x0200
 #define WM_MOUSELAST  0x0209
+#define GWL_WNDPROC   (-4)
 
 /* ---- the three CRT symbols the compiler synthesises ------------------- */
 /* Even with -ffreestanding -fno-builtin, clang lowers a byte loop to strlen
@@ -248,8 +254,6 @@ static INT  (__stdcall *o_ReleaseDC)(HWND, HDC);
 static BOOL (__stdcall *o_GetClientRect)(HWND, RECT *);
 static BOOL (__stdcall *o_MoveWindow)(HWND, INT, INT, INT, INT, BOOL);
 static BOOL (__stdcall *o_SetWindowPos)(HWND, HWND, INT, INT, INT, INT, UINT);
-static BOOL (__stdcall *o_GetMessageA)(MSG *, HWND, UINT, UINT);
-static BOOL (__stdcall *o_PeekMessageA)(MSG *, HWND, UINT, UINT, UINT);
 
 static int is_dialog(HWND h)
 {
@@ -318,12 +322,17 @@ typedef struct {
     HDC     dcReal[MAXDEPTH];
     int     depth;
     int     announced;
+    WNDPROC oldProc;            /* set while this window is subclassed     */
 } Slot;
 
 static Slot g_slot[MAXSLOT];
 
+static void subclass(Slot *s);
+static void unsubclass(Slot *s);
+
 static void slot_free(Slot *s)
 {
+    unsubclass(s);
     if (s->mem) {
         SelectObject(s->mem, s->oldbmp);
         DeleteObject(s->bmp);
@@ -331,7 +340,7 @@ static void slot_free(Slot *s)
     }
     s->hwnd = NULLPTR; s->mem = NULLPTR; s->bmp = NULLPTR; s->oldbmp = NULLPTR;
     s->paintReal = NULLPTR; s->depth = 0; s->announced = 0; s->dw = 0; s->dh = 0;
-    s->letterbox = 0;
+    s->letterbox = 0; s->oldProc = NULLPTR;
 }
 
 /* Only windows we have repositioned are scaled; everything else is left be. */
@@ -457,12 +466,13 @@ static Slot *claim_letterbox(HWND h)
 {
     Slot *s = slot_claim(h);
     if (!s) return s;
-    if (s->letterbox && s->dw == g_designW && s->dh == g_designH) return s;
+    if (s->letterbox && s->dw == g_designW && s->dh == g_designH) { subclass(s); return s; }
     slot_free(s);
     s->hwnd = h;
     s->dw = g_designW;
     s->dh = g_designH;
     s->letterbox = 1;
+    subclass(s);
     return s;
 }
 
@@ -495,6 +505,7 @@ static void reposition(HWND h, int *x, int *y, int *w, int *ht, int havePos, int
             slot_free(s);
             s->hwnd = h; s->dw = dw; s->dh = dh; s->letterbox = 0;
         }
+        subclass(s);
         *w  = *w  * g_num / g_den;
         *ht = *ht * g_num / g_den;
     }
@@ -681,42 +692,75 @@ static void slot_placement(Slot *s, int *ox, int *oy, int *dw, int *dh)
     *oy = (rh - *dh) / 2;
 }
 
-static void maybe_map(MSG *m)
+/*
+ * Input has to be transformed in the WINDOW PROCEDURE, not in the message
+ * loop.
+ *
+ * The obvious place is a GetMessageA/PeekMessageA hook, and it does not work:
+ * every shell screen is a MODAL dialog.  DialogBoxParamA has 36 call sites in
+ * Armada2.exe (do_mainMenu among them) against 2 for CreateDialogParamA, and
+ * a modal dialog is pumped by user32's own internal loop, which dispatches
+ * straight to the dialog procedure without ever handing the message to the
+ * application.  Hooking the loop therefore scaled the picture correctly and
+ * left every click landing on the stock 800x600 position.
+ *
+ * Subclassing catches both kinds, so the message-loop hooks are gone rather
+ * than kept alongside -- with both in place a modeless dialog's coordinates
+ * would be transformed twice.
+ */
+static LONG_PTR __stdcall my_WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
-    Slot *s;
-    int x, y, ox, oy, dw, dh;
+    Slot *s = slot_get(h);
+    WNDPROC prev;
 
-    if (g_mode != MODE_SCALE || !m) return;
-    if (m->message < WM_MOUSEFIRST || m->message > WM_MOUSELAST) return;
-    s = slot_get(m->hwnd);
-    if (!s || s->dw <= 0) return;
+    /* Should not happen -- a slot is always unsubclassed before it is reused
+     * -- but returning a made-up value from a dialog procedure wedges the
+     * dialog, so fall back to the default handler rather than guess. */
+    if (!s || !s->oldProc) return DefWindowProcA(h, msg, wp, lp);
+    prev = s->oldProc;
 
-    slot_placement(s, &ox, &oy, &dw, &dh);
-    if (dw <= 0 || dh <= 0) return;
+    if (g_mode == MODE_SCALE && s->dw > 0 &&
+        msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) {
+        int ox, oy, dw, dh, x, y;
 
-    x = (int)(short)(m->lParam & 0xFFFF);
-    y = (int)(short)((m->lParam >> 16) & 0xFFFF);
-    x = (x - ox) * s->dw / dw;
-    y = (y - oy) * s->dh / dh;
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x > s->dw - 1) x = s->dw - 1;
-    if (y > s->dh - 1) y = s->dh - 1;
-    m->lParam = (LPARAM)(((DWORD)(y & 0xFFFF) << 16) | (DWORD)(x & 0xFFFF));
+        slot_placement(s, &ox, &oy, &dw, &dh);
+        if (dw > 0 && dh > 0) {
+            x = (int)(short)(lp & 0xFFFF);
+            y = (int)(short)((lp >> 16) & 0xFFFF);
+            x = (x - ox) * s->dw / dw;
+            y = (y - oy) * s->dh / dh;
+            if (x < 0) x = 0;
+            if (y < 0) y = 0;
+            if (x > s->dw - 1) x = s->dw - 1;
+            if (y > s->dh - 1) y = s->dh - 1;
+            lp = (LPARAM)(((DWORD)(y & 0xFFFF) << 16) | (DWORD)(x & 0xFFFF));
+        }
+    }
+
+    return CallWindowProcA(prev, h, msg, wp, lp);
 }
 
-static BOOL __stdcall my_GetMessageA(MSG *m, HWND h, UINT a, UINT b)
+static int g_subclassed = 0;
+
+static void subclass(Slot *s)
 {
-    BOOL r = o_GetMessageA(m, h, a, b);
-    if (r) maybe_map(m);
-    return r;
+    if (!s || s->oldProc) return;
+    s->oldProc = (WNDPROC)(LONG_PTR)SetWindowLongA(s->hwnd, GWL_WNDPROC,
+                                                   (LONG)(LONG_PTR)my_WndProc);
+    if (s->oldProc && g_logging) {
+        char b[96];
+        b[0] = 0;
+        s_cat(b, "  subclassed for input, dialog #"); s_num(b, ++g_subclassed);
+        logline(b);
+    }
 }
 
-static BOOL __stdcall my_PeekMessageA(MSG *m, HWND h, UINT a, UINT b, UINT f)
+static void unsubclass(Slot *s)
 {
-    BOOL r = o_PeekMessageA(m, h, a, b, f);
-    if (r) maybe_map(m);
-    return r;
+    if (!s || !s->oldProc) return;
+    if (IsWindow(s->hwnd))
+        SetWindowLongA(s->hwnd, GWL_WNDPROC, (LONG)(LONG_PTR)s->oldProc);
+    s->oldProc = NULLPTR;
 }
 
 /* ---- the front-end display mode --------------------------------------- */
@@ -937,8 +981,6 @@ static void startup(void)
     o_GetClientRect = (void *)patch_iat(base, "USER32.dll", "GetClientRect", my_GetClientRect);
     o_MoveWindow    = (void *)patch_iat(base, "USER32.dll", "MoveWindow",    my_MoveWindow);
     o_SetWindowPos  = (void *)patch_iat(base, "USER32.dll", "SetWindowPos",  my_SetWindowPos);
-    o_GetMessageA   = (void *)patch_iat(base, "USER32.dll", "GetMessageA",   my_GetMessageA);
-    o_PeekMessageA  = (void *)patch_iat(base, "USER32.dll", "PeekMessageA",  my_PeekMessageA);
 
     /* A hook that failed to bind is never called, but the originals are used
      * unconditionally elsewhere, so give every one of them a real target. */
@@ -949,8 +991,6 @@ static void startup(void)
     if (!o_GetClientRect) o_GetClientRect = GetClientRect;
     if (!o_MoveWindow)    o_MoveWindow    = MoveWindow;
     if (!o_SetWindowPos)  o_SetWindowPos  = SetWindowPos;
-    /* o_GetMessageA / o_PeekMessageA need no fallback: if the patch did not
-     * take, the game still calls the real import and our wrapper never runs. */
 
     b[0] = 0;
     s_cat(b, "--- MenuScale mode=");  s_num(b, g_mode);
@@ -961,8 +1001,8 @@ static void startup(void)
     s_cat(b, " hooks=");
     s_num(b, (o_BeginPaint?1:0) + (o_EndPaint?1:0) + (o_GetDC?1:0) +
              (o_ReleaseDC?1:0) + (o_GetClientRect?1:0) + (o_MoveWindow?1:0) +
-             (o_SetWindowPos?1:0) + (o_GetMessageA?1:0) + (o_PeekMessageA?1:0));
-    s_cat(b, "/9");
+             (o_SetWindowPos?1:0));
+    s_cat(b, "/7  input: wndproc subclass");
     logline(b);
 }
 
