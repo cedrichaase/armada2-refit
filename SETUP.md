@@ -605,6 +605,22 @@ It also means the entire texture project — 2048 skyboxes, a 4096 atlas, 1024 h
 been rendering through wined3d/OpenGL, not Vulkan. Worth knowing before any of it is
 attributed to DXVK.
 
+**And the prefix is not a durable place to fix it.** Proton's `default_pfx` holds
+`syswow64/d3d8.dll` and `d3d9.dll` as **symlinks** to its own Wine builtins and restores
+them on prefix sync. A DXVK `d3d8` written into `syswow64` was verified by hash, then
+was Wine's builtin again after a single launch — with `autoInstallDxvk` already false,
+so Heroic was not the cause that time. Proton was.
+
+The durable slot is the **game directory**, which nothing manages and which Wine
+searches *before* the system directory — the same mechanism that already makes the
+game-directory `winmm.dll` and `d3d8.dll` load at all. So `--use dxvk` puts DXVK's
+`d3d8.dll` **and** `d3d9.dll` beside `Armada2.exe`, replacing the Patch Project proxy
+(kept as `d3d8.dll.proxy-backup`) and making the prefix irrelevant to the outcome.
+
+`autoInstallDxvk` also turns out to be the whole of the "regression" recorded below:
+set to true it redeploys over the slot on every launch, which is it working as designed
+rather than misbehaving.
+
 `tools/d3d8-chain.py` exists so this cannot recur: it identifies every link by hashing
 it against the candidates actually present on the machine and **names** what it found,
 reporting `UNKNOWN` rather than guessing. Never identify one of these by size again.
