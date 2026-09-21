@@ -4,6 +4,7 @@
     tools/ui-font-condense.py                  condense for the resolution in ARMADA.PRF
     tools/ui-font-condense.py --res 3440x1440  condense for a resolution you name
     tools/ui-font-condense.py --factor 0.558   override the computed factor
+    tools/ui-font-condense.py --method resample  the old Lanczos squeeze, with --filter
     tools/ui-font-condense.py --dry-run        print what would change, touch nothing
     tools/ui-font-condense.py --preview OUT    render stock vs condensed as the game
                                                will draw them, and touch nothing
@@ -72,6 +73,54 @@ THE COST is horizontal sampling.  The atlas keeps its texel grid, so a glyph tha
 point-samples it up 2.6875x.  Text comes out correctly proportioned but horizontally
 chunkier than it is today.  There is no way around that from data alone: the
 destination quad is (texels x scale), so the only lever on width is texels.
+
+HOW THE GLYPHS ARE CONDENSED, AND WHY NOT BY RESAMPLING  (--method, default runs)
+
+The first version of this tool squeezed the alpha with a Lanczos resize.  That was the
+wrong instinct, and the reason is the point sampling.  The two axes magnify by very
+different amounts -- 2.6875x across, 1.40625x down -- so a part-covered texel behaves
+differently on each.  Down, it spans about one screen pixel and reads as a real soft
+edge.  Across, it is painted as a flat 2.7px block: it does not soften anything, it
+just puts a grey slab where a stroke edge should be.  Resampling turns every stem into
+grey slabs, because stock's stems are ONE texel wide and 0.5233 of a texel cannot be
+drawn.  Measured on FontFinal4_24a: stock has 6000 fully-opaque texels, the Lanczos
+condense left 1572, and hundreds of texels picked up an alpha 1-4 ringing halo.  On
+screen that is the washed-out, muddy text this was meant to fix.
+
+Thresholding instead is no answer either: at 45% it erases '!', '"', 'I', 'i' and 'l'
+at sizes 10-13, and at 50% it erases 31 glyphs, all of them the one-texel ones.
+
+So the default method works a scanline at a time (condense_row).  It finds the ink
+runs on the stock line, maps their ends by the factor, gives every run AT LEAST ONE
+texel, keeps the gaps stock had between runs, and fills each run flat at that line's
+own peak alpha.  Crisp across, stock's own vertical shading kept, nothing can drop
+out, and the stroke count per line is invariant -- the glyph cannot break up.
+
+Run WIDTHS are floored, not rounded, and one glyph settled that.  '1' at 16pt is a
+2-texel stem under a 3-texel half-tone base serif; rounding sends those to 1 and 2, a
+foot twice the width of the stem and hanging off its right, and the silhouette reads
+as a bracket -- "1187" renders as "[187" in the resource counters.  Flooring sends
+both to 1, the foot sits square under the stem, and the digit reads.  It costs 10% of
+the ink budget, which at this texel count is the right trade.
+
+Measured over all 1792 glyphs, ink against what the factor predicts:
+
+    method                  ink/expected   erased   thinned   fattened
+    Lanczos resample            1.028         0        0          0      (but grey)
+    Box + threshold 35%         1.224         0        2        227
+    Box + threshold 45%         1.074         6       29         64
+    Box + threshold 50%         0.904        31      120          4
+    runs, width rounded         1.007         0        1         25      (but "[187")
+    runs, width floored         0.900         0        9         16      <- default
+
+Ink is a WEIGHT check, not a legibility check.  The Lanczos row scores best on it and
+worst on screen, because it keeps the right amount of coverage while spreading it into
+grey.  Do not re-tune this table without looking at a render.
+
+On FontFinal4_24a the default takes fully-opaque texels from 1572 (Lanczos) back to
+3948, against stock's 6000, and the alpha plane back to 14 discrete levels from 256.
+
+`--method resample` keeps the old path, with --filter, for comparison.
 
 BACKUPS DO NOT USE .a2neb-backup, DELIBERATELY
 
@@ -202,6 +251,122 @@ def relayout(glyphs, atlas_w):
     return new
 
 
+def alpha_plane(path):
+    """(w, h, bytes) of the alpha channel, read through ImageMagick so the TGA origin
+    bit is honoured exactly as it is everywhere else here."""
+    raw = subprocess.run(['magick', readable(path), '-alpha', 'extract', '-depth', '8',
+                          '-compress', 'None', 'PGM:-'],
+                         capture_output=True, check=True).stdout
+    fields, i = [], 0
+    while len(fields) < 4:                           # magic, w, h, maxval
+        j = raw.index(b'\n', i)
+        line, i = raw[i:j], j + 1
+        if not line.startswith(b'#'):
+            fields += line.split()
+    w, h = int(fields[1]), int(fields[2])
+    px = bytes(int(v) for v in raw[i:].split())
+    if len(px) != w * h:
+        die(f"{os.path.basename(path)}: read {len(px)} alpha samples, wanted {w*h}")
+    return w, h, px
+
+
+def condense_row(s, nw):
+    """One scanline of stock glyph alpha -> nw texels of condensed alpha.
+
+    Horizontal antialiasing is worthless here and vertical antialiasing is not.  The
+    engine point-samples and magnifies 2.6875x across but only 1.40625x down, so a
+    part-covered texel does not soften an edge across -- it just paints a grey 2.7px
+    block -- while down it still spans about one screen pixel and reads as a real
+    soft edge.  So each ink run on the line is mapped to whole texels and filled flat
+    at that line's own peak alpha: crisp across, stock's own shading preserved down.
+
+    Every run is given at least one texel.  That is what keeps '!', '"', 'I', 'i',
+    'l', '|', "'", '.' and ':' alive at sizes 10-13, where the stroke is already one
+    texel wide and 0.5233 of a texel is below any threshold."""
+    sw = len(s)
+    out = [0] * nw
+    peak = max(s)
+    if peak == 0:
+        return out
+    cut = max(1, peak // 2)                          # runs are relative to this line
+    f = nw / sw
+    runs, a = [], None
+    for x in range(sw + 1):
+        ink = x < sw and s[x] >= cut
+        if ink and a is None:
+            a = x
+        elif not ink and a is not None:
+            runs.append((a, x))
+            a = None
+    prev_end = -1
+    for a, b in runs:
+        val = max(s[a:b])
+        # Floor the WIDTH, round the position.  Rounding the width lets a half-tone
+        # serif out-grow the stem it hangs off: '1' at 16pt has a 2-texel stem under a
+        # 3-texel base serif, and rounding sends those to 1 and 2 -- a foot twice the
+        # stem, protruding right, which reads as '[' (measured: "1187" -> "[187").
+        # Flooring sends both to 1 and the foot sits square under the stem.
+        nwid = max(1, int((b - a) * f))              # a stroke may never disappear
+        na = int(a * f + 0.5)
+        nb = na + nwid
+        if na <= prev_end:                           # keep the gap stock had here
+            na = prev_end + 1
+            nb = na + nwid
+        if nb > nw:                                  # out of width: slide left, then
+            nb = nw                                  # give up the gap rather than
+            na = min(na, nb - 1)                     # drop the stroke
+            if na <= prev_end:
+                na = max(0, prev_end)
+        na = max(0, na)
+        for x in range(na, nb):
+            if out[x] < val:
+                out[x] = val
+        prev_end = nb
+    return out
+
+
+def rebuild_atlas_runs(atlas, cell, glyphs, new, dry):
+    """Rewrite the alpha plane run by run -- see condense_row.  The RGB plane is a
+    constant white and is rebuilt as one; colour and alpha never meet until the join."""
+    dst = texture(atlas)
+    src = source_of(dst)
+    w, h, px = alpha_plane(src)
+    buf = bytearray(w * h)
+    done = set()
+    for _, _, u, v, gw in glyphs:
+        key = (u, v, gw)
+        if key in done:
+            continue
+        done.add(key)
+        nu, nw = new[key]
+        for dy in range(cell):
+            y = v + dy
+            if y >= h:
+                break
+            row = px[y * w + u:y * w + min(u + gw, w)]
+            if not row:
+                continue
+            for x, val in enumerate(condense_row(row, nw)):
+                xx = nu + x
+                if val and xx < w and buf[y * w + xx] < val:
+                    buf[y * w + xx] = val
+    if dry:
+        return len(done)
+    tmp = dst + '.alpha.pgm'
+    with open(tmp, 'wb') as fh:
+        fh.write(b'P5\n%d %d\n255\n' % (w, h))
+        fh.write(bytes(buf))
+    if src == dst:                                   # first touch: keep the stock atlas
+        shutil.copy2(dst, dst + BAK)
+        src = dst + BAK
+    run(['magick', '-size', f'{w}x{h}', 'xc:white', tmp, '-alpha', 'off',
+         '-compose', 'CopyOpacity', '-composite', '-type', 'TrueColorAlpha',
+         '-compress', 'None', 'TGA:' + dst])
+    os.remove(tmp)
+    run([sys.executable, os.path.join(HERE, 'bottomup.py'), '--like', src, dst])
+    return len(done)
+
+
 def rebuild_atlas(atlas, cell, glyphs, new, dry, filt):
     """Rewrite the alpha plane.  The RGB plane is a constant white and is rebuilt as
     one, not resampled -- colour and alpha never meet until the final join."""
@@ -252,7 +417,7 @@ def header_of(path):
     return d[16], d[17]
 
 
-def do_size(sz, factor, dry, filt):
+def do_size(sz, factor, dry, filt, method):
     spr = os.path.join(GAME, 'Sprites', f'FontFinal4_{sz}.spr')
     if not os.path.exists(spr):
         return None
@@ -275,7 +440,10 @@ def do_size(sz, factor, dry, filt):
             mw = WLINE.match(lines[iw].rstrip('\r'))
             cr = '\r' if lines[iw].endswith('\r') else ''
             lines[iw] = (mw.group(1) + str(nw) + mw.group(3)) + cr
-        n = rebuild_atlas(atlas, cell, glyphs, new, dry, filt)
+        if method == 'runs':
+            n = rebuild_atlas_runs(atlas, cell, glyphs, new, dry)
+        else:
+            n = rebuild_atlas(atlas, cell, glyphs, new, dry, filt)
         total += n
         report.append(f"    {atlas:20} cell {cell:2d}  {n:3d} glyphs")
     if not dry:
@@ -330,8 +498,10 @@ def do_check():
     return 1 if bad else 0
 
 
-def do_preview(out, factor, sx, sy, filt):
+def do_preview(out, factor, sx, sy, method):
     """Render one line the way the engine will: point-sampled, (sx, sy) apart."""
+    if method != 'runs':
+        print("note: --preview always previews the run method; --method is ignored")
     sample = 'OBJECTIVES:'
     # Build both from the SAME source (the backup, if we have already applied) so the
     # preview is honest about what the change does rather than about what is installed.
@@ -347,20 +517,34 @@ def do_preview(out, factor, sx, sy, filt):
         if ch and ch not in chars:
             chars[ch] = (u, v, gw)
     src = source_of(texture(atlas))
+    aw, ah, apx = alpha_plane(src)
     strips = []
     for tag, f in (('stock (what is on screen now)', 1.0), ('condensed', factor)):
-        cmd = ['magick', '-size', f'{int(sum(round(chars[c][2]*f) for c in sample))}x{cell}',
-               'xc:black']
+        total = sum(max(1, round(chars[c][2] * f)) for c in sample)
+        buf = bytearray(total * cell)
         x = 0
         for c in sample:
             u, v, gw = chars[c]
             nw = max(1, round(gw * f))
-            cmd += ['(', readable(src), '-alpha', 'extract', '-crop', f'{gw}x{cell}+{u}+{v}',
-                    '+repage', '-filter', filt, '-resize', f'{nw}x{cell}!', ')',
-                    '-geometry', f'+{x}+0', '-composite']
+            for dy in range(cell):
+                y = v + dy
+                if y >= ah:
+                    break
+                row = apx[y * aw + u:y * aw + min(u + gw, aw)]
+                if not row:
+                    continue
+                vals = list(row) if nw == gw else condense_row(row, nw)
+                for i, val in enumerate(vals[:nw]):
+                    if val:
+                        buf[dy * total + x + i] = val
             x += nw
         strip = f'{out}.{tag.split()[0]}.png'
-        run(cmd + ['PNG24:' + strip])
+        pgm = strip + '.pgm'
+        with open(pgm, 'wb') as fh:
+            fh.write(b'P5\n%d %d\n255\n' % (total, cell))
+            fh.write(bytes(buf))
+        run(['magick', pgm, 'PNG24:' + strip])
+        os.remove(pgm)
         # the engine point-samples: no filtering, ever
         run(['magick', strip, '-filter', 'Point', '-resize',
              f'{round(x*sx)}x{round(cell*sy)}!', '-bordercolor', 'black',
@@ -380,6 +564,7 @@ def main():
     ap.add_argument('--res')
     ap.add_argument('--factor', type=float)
     ap.add_argument('--filter', default='Lanczos')
+    ap.add_argument('--method', choices=('runs', 'resample'), default='runs')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--revert', action='store_true')
     ap.add_argument('--check', action='store_true')
@@ -416,12 +601,12 @@ def main():
         return
 
     if a.preview:
-        do_preview(a.preview, factor, sx, sy, a.filter)
+        do_preview(a.preview, factor, sx, sy, a.method)
         return
 
     total = 0
     for sz in SIZES:
-        r = do_size(sz, factor, a.dry_run, a.filter)
+        r = do_size(sz, factor, a.dry_run, a.filter, a.method)
         if r is None:
             continue
         n, report = r

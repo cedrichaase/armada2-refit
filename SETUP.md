@@ -209,8 +209,50 @@ is rebuilt and only the `u`/width numbers move. 1792 glyphs across 8 sizes.
 destination quad is `texels x scale`, so the only lever on width is texels: a glyph that
 was 28 texels wide is now 15, and `@tmaterial=font #No filtering, ever.` means the engine
 point-samples it back up 2.6875x. Text is correctly proportioned and horizontally
-chunkier. Lanczos held the stems best of the three filters tried (`--filter`; Triangle is
-softer, Box loses sub-texel stem placement).
+chunkier.
+
+**How those texels are filled is a separate question, and resampling was the wrong
+answer.** The first version squeezed the alpha with a Lanczos resize and the result read
+as washed-out and muddy in game. The reason is the point sampling, and it turns on the
+two axes magnifying by very different amounts. Down, at 1.40625x, a part-covered texel
+spans about one screen pixel and reads as a real soft edge. Across, at 2.6875x, it is
+painted as a flat 2.7px block — it softens nothing, it just puts a grey slab where a
+stroke edge should be. **Horizontal antialiasing buys nothing at this scale.** And stock's
+stems are *one texel* wide, so a 0.5233 resize asks for half a texel and gets a grey slab
+every time: on `FontFinal4_24a` the fully-opaque texel count went 6000 → 1572, with
+hundreds of texels picking up an alpha 1–4 Lanczos ringing halo.
+
+Thresholding is not the answer either — at 45% it erases `!` `"` `I` `i` `l` and at 50%
+it erases 31 glyphs, all of them the ones that are already one texel wide.
+
+So `--method runs` (the default) works a scanline at a time: find the ink runs on the
+stock line, map their ends by the factor, give every run **at least one texel**, keep the
+gaps stock had between runs, and fill each run flat at that line's own peak alpha. Crisp
+across, stock's own shading kept down, nothing can drop out, and the stroke count per line
+is invariant so a glyph cannot break up. `--method resample` keeps the old path.
+
+**Run widths are floored, not rounded, and one glyph settled it.** `1` at 16pt is a
+2-texel stem under a 3-texel half-tone base serif. Rounding sends those to 1 and 2 — a
+foot twice the stem, hanging off its right — and the silhouette reads as a bracket:
+`1187` renders as `[187` in the resource counters. Flooring sends both to 1, the foot sits
+square under the stem, and the digit reads. It costs 10% of the ink budget, which at this
+texel count is the right trade.
+
+| method | ink/expected | erased | thinned | fattened |
+|---|---|---|---|---|
+| Lanczos resample | 1.028 | 0 | 0 | 0 |
+| Box + threshold 35% | 1.224 | 0 | 2 | 227 |
+| Box + threshold 45% | 1.074 | 6 | 29 | 64 |
+| Box + threshold 50% | 0.904 | 31 | 120 | 4 |
+| runs, width rounded | 1.007 | 0 | 1 | 25 |
+| **runs, width floored** | **0.900** | **0** | **9** | **16** |
+
+Ink is measured over all 1792 glyphs against what the factor predicts, and it is a
+**weight** check, not a legibility check — the Lanczos row scores best on it and worst on
+screen, because it keeps the right *amount* of coverage while spreading it into grey. Do
+not re-tune this table without looking at a render. The shipped method takes `24a` back to
+3948 opaque texels against stock's 6000, and the alpha plane back to 14 discrete levels
+from 256.
 
 Per-glyph integer rounding costs a little accuracy: measured over the whole charset the
 realised factor is 0.514–0.558 against the 0.5233 target, biased slightly narrow. The two

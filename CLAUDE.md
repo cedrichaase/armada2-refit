@@ -418,6 +418,20 @@ not touched — 1.40625 against 1.20 is the same 1.171875 the game has at 4:3.
 under condensed metrics and garble every glyph. The cost is horizontal sampling — the
 quad is `texels x scale`, so there is no other lever — and the tier was pinned by the
 headers, since the 1600x1200 rival fit needs a `FontFinal4_30` that does not exist.
+
+**Do not condense the glyph art by resampling it.** That was the first attempt and it
+read as washed-out and muddy in game. The engine point-samples, and the axes magnify by
+very different amounts: down at 1.40625x a part-covered texel is a real soft edge, across
+at 2.6875x it is a flat 2.7px grey slab that softens nothing. Stock's stems are **one
+texel**, so a 0.5233 resize asks for half a texel and gets a slab — `FontFinal4_24a` went
+from 6000 opaque texels to 1572, plus an alpha 1–4 ringing halo. Thresholding instead
+erases the one-texel glyphs (`!` `"` `I` `i` `l` `|` `'` `.` `:`) at sizes 10–13. The
+default `--method runs` maps each scanline's ink runs, guarantees every run **at least one
+texel**, and fills it flat at that line's peak alpha — crisp across, stock's shading kept
+down, no dropouts, back to 3948 opaque texels. **Run widths are floored, not rounded**,
+because rounding gives `1` a foot twice its stem width and `1187` renders as `[187`. Ink
+is a weight check, not a legibility check; the table in `SETUP.md` is not to be re-tuned
+without looking at a render.
 Derivation, the measurement table and the rounding error are in `SETUP.md`.
 **Applied and confirmed in game**: `OBJECTIVES:` went 619.5 → 323.5 screen px against
 325.2 predicted, 0.5%, at an unchanged 32.7 px cap.
