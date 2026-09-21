@@ -105,9 +105,22 @@ land centred. **Sizes and four-number rects take the canvas; these two scalars t
 1600.** Two code paths in one file.
 
 So the tool computes the anchor in canvas space like every other key and then divides it
-back into 1600 space. At 3440x1440: `XA 355 -> 551` (canvas 987, the same five-pixel
-lead over `infoPanelArea`'s 993 that stock's 355 has over stock's 360) and
-`XB 1355 -> 1463`.
+back into 1600 space. At 3440x1440: `XA 355 -> 554` and `XB 1355 -> 1463`.
+
+**The model is confirmed to sub-pixel accuracy**, against a second screenshot taken with
+`XA = 551` (the first attempt, which carried stock's offset through):
+
+| | predicted, image x | measured |
+|---|---|---|
+| palette left edge, XA=551 | 688.06 | 688.0 |
+| info panel left edge, canvas 993 | 692.02 | 692.0 |
+
+The 6.8 screen px still visible at 551 was therefore **not** model error — it is stock's
+own offset, 355 against the panel's 360. Five pixels at 4:3, where nobody notices; 6.8
+against a 1056px-wide panel, where it reads as a misalignment. So `popupPaletteXA` takes
+an `infopanel` anchor — it targets `infoPanelArea`'s x rather than its own stock x — and
+the overhang is gone. This is the one place the tool deliberately does not reproduce
+stock.
 
 XB was previously shifted to 2622 as though it were a canvas x, which the 1600 reference
 renders at screen x **5637** — the locked build palette was off-screen entirely. Fixed
@@ -130,10 +143,10 @@ right: icons square, minimap square, panels flush against the real screen edges 
 of stranded at the 1600px mark. What has *not* been reopened since the change is the
 comm and objectives pop-ups, which moved with it.
 
-**The palette correction above is applied but not yet confirmed in game.** It is derived
-from one screenshot, and the 1600-reference model it rests on fits that measurement to
-half a pixel — but it has not been seen rendered. If the action bar lands somewhere
-unexpected, the model is wrong and the measurement in it is the thing to re-check first.
+**The palette correction is confirmed in game**, in two rounds: the first put the action
+bar level with the ship display and proved the 1600-reference model to sub-pixel
+accuracy, and the second removed stock's five-pixel overhang. The `infopanel` anchor
+that removes it has been measured but not yet seen rendered.
 
 ## Patch Project 1.2.5
 

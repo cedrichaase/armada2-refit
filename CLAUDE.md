@@ -393,8 +393,11 @@ display) are in `SETUP.md`. **Applied and confirmed in game.**
 those two bare scalars as a fraction of a hard-coded **1600**, measured, while every
 rect in the same file (the button sizes included) takes the declared canvas. That is why
 the action bar sat left of the ship display and why the locked build palette was pushed
-off-screen at x 5637. Both corrected; the derivation is in `SETUP.md` and this one is
-applied but **not yet confirmed in game**.
+off-screen at x 5637. Both corrected, and the model is confirmed in game and measured
+to sub-pixel accuracy. **`popupPaletteXA` is the one key that deliberately does not
+reproduce stock**: stock's 355 against `infoPanelArea`'s 360 is a five-pixel overhang
+that nobody sees at 4:3 and that reads as a misalignment against a 1056px-wide panel, so
+it takes an `infopanel` anchor and goes flush. Derivation in `SETUP.md`.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs

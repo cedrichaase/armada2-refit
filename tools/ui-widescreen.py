@@ -49,10 +49,14 @@ looks like.  Rects in the same file are NOT affected: the palette buttons stay s
 dialogs land centred.  Sizes and rects take the canvas; these two scalars take 1600.
 
 So the anchor is computed in canvas space like every other key and then divided back
-into 1600 space.  At 3440x1440: XA 355 -> 551 (canvas 987, five canvas px left of
-infoPanelArea's 993, the same lead it has in stock) and XB 1355 -> 1463.  The old code
-shifted XB to 2622 as if it were a canvas x, which the 1600 reference renders at screen
-x 5637 -- the locked build palette was off-screen entirely.
+into 1600 space.  At 3440x1440: XA 355 -> 554 and XB 1355 -> 1463.  The old code shifted
+XB to 2622 as if it were a canvas x, which the 1600 reference renders at screen x 5637
+-- the locked build palette was off-screen entirely.
+
+The model was then confirmed against a second screenshot at XA=551: palette left edge
+predicted at image x 688.06, measured 688.0; info panel left predicted 692.02, measured
+692.0.  What was left over at 551 was not model error but STOCK's own offset -- 355
+against the panel's 360 -- so XA takes the 'infopanel' anchor and drops it.
 
 NOT HANDLED: `popupPaletteYA` / `popupPaletteYB`.  The vertical axis is not distorted at
 any resolution (screenHeight stays 1200), so they need no correction -- but note that
@@ -99,12 +103,17 @@ ANCHOR = {
 # code reads them in.  `width` is the element width, for the 'right' anchor.
 SCALAR = {
     'gui_glob16x12.cfg': {
-        'popupPaletteXA': ('centre', 408),  # follows infoPanelArea, 5px to its left
+        'popupPaletteXA': ('infopanel', 408),
         'popupPaletteXB': ('right', 245),   # 3 columns x 80 + gaps, flush right at 1595
     },
 }
 # Keys whose value is a fraction of 1600 rather than a canvas x.
 REF1600 = {'popupPaletteXA', 'popupPaletteXB'}
+# The 'infopanel' anchor targets infoPanelArea's x rather than the key's own stock x.
+# Stock puts the palette at 355 against the panel's 360 -- a five-pixel overhang that is
+# 5px at 4:3 and goes unnoticed, and that reads as a misalignment once the panel is 1056
+# screen px wide.  Measured and dropped: flush is what it should have been.
+INFO_PANEL_X = 360
 RACE_CFGS = ['gui_bor.cfg', 'gui_cardassian.cfg', 'gui_fed.cfg', 'gui_kli.cfg',
              'gui_rom.cfg', 'gui_species8472.cfg']
 
@@ -153,7 +162,9 @@ def rewrite(path, canvas_w, rects, scalars, race, dry):
             elif (m2 := SCAL.match(code)) and m2.group(2) in scalars:
                 anchor, width = scalars[m2.group(2)]
                 x = int(m2.group(4))
-                nx = canvas_w - (STOCK_W - x) if anchor == 'right' else x + shift_c
+                nx = {'right': canvas_w - (STOCK_W - x),
+                      'infopanel': INFO_PANEL_X + shift_c,
+                      'centre': x + shift_c}[anchor]
                 if m2.group(2) in REF1600:
                     # nx is where we want it on the canvas; the palette code will read
                     # the number as a fraction of 1600, so divide it back out.
