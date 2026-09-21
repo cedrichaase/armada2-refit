@@ -1566,6 +1566,28 @@ cargo-culting a number that was never measured. If it ever does bite, the lever 
 The figures below are kept because disk cost is still real — it is just not the same
 question as memory.
 
+### The measurement ranks textures; it does not decide them
+
+`tools/measure-invention.sh` has four known false positives, all found the same way — by
+rendering a texture whose numbers had condemned it. It assumes markings are small and
+localised on a neutral field, and over-reports wherever that does not hold:
+
+| | case | what it reads | what is happening |
+|---|---|---|---|
+| 1 | intensification | high `invented` | the model saturating a marking stock already has — this is what `displaced` subtracts |
+| 2 | large flat colour | high `displaced` | `Fsensor`, gold chevrons on white, reads 5.2% displaced and is simply crisper; a region that grows by more than the 2px dilation still scores |
+| 3 | additive glow on black | high `erased` | `Ftransport`, rows of light blobs, reads 8.8–11.6% erased. Lanczos spreads each blob into a halo and the model puts the light back in the blob. The halo's loss is the point of the exercise |
+| 4 | no saturated markings | **flat, near zero** | `8472_passive2` reads 0.037–0.040% invented from blend 20 to 100 while visibly gaining speckle. The metric cannot see it |
+
+Case 3 has a proper check behind it: for an additive texture the channel mean *is* the
+light contributed, and `verify.py` compares raw per-channel means against stock within
+1.0. Case 4 is the dangerous one, because **a clean number there is not evidence**. On
+organic or near-greyscale art the blend has to be set on a render.
+
+The honest summary is that this tool is a ranker. It says which textures to look at, in
+what order. It has never once decided a blend correctly on its own, and three of the four
+station textures it flagged loudest turned out to be improvements.
+
 ### What the class cost the tooling
 
 Four changes, all of which apply to every faction that follows:
