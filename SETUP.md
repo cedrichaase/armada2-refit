@@ -294,6 +294,68 @@ is now worth considering rather than impossible. Not attempted.
 
 Until then, `cursor-aspect.py`'s squash is the whole of what art can do.
 
+## The menus are a different UI, and a different problem
+
+**`gui_*.cfg` is the in-game HUD. It has nothing to do with the menus.** The main menu,
+options, load/save, campaign select and multiplayer screens are a separate system — the
+*shell* — and the widescreen work above does not touch them. They rendered in the
+top-left 800x600 of the 3440x1440 screen.
+
+Full write-up, build and usage: **`tools/menuscale/README.md`**. The two facts worth
+having here, because both are counter-intuitive and both were measured:
+
+**1. Nothing in any config file can scale the shell.** Every menu is a Win32 dialog
+drawn with GDI at hard-coded pixel coordinates, from 800x600 8-bit BMPs in `bitmaps/`.
+`Armada2.exe` imports `GDI32!BitBlt` and **no `StretchBlt`, and no
+`SetWorldTransform`** — there is no scale factor in the shell to change. It also never
+goes near Direct3D, so the d3d8 proxy, DXVK and `dxcfg.ini` cannot reach it either.
+
+**2. The menus were not sitting in a big screen — they were filling a small one.** This
+is the part that looks like something else entirely. `GetSystemMetrics(SM_CXSCREEN)`
+returns **800** at the main menu, and the game's own window is 800x600 at 0,0. The
+engine asks for an 800x600x16 display mode for the front end, hard-coded in two places
+in `ST3D_GraphicsEngine::SetActiveDisplay_Internal`:
+
+    push 0x10 ; push 600 ; push 800
+    call ST3D_DisplayDevice::FindDisplayMode(int w, int h, int bpp)
+
+Wine then parks that small screen in the corner of the virtual desktop, because a
+tiling compositor will not let the desktop window shrink to match it. So there was
+nowhere to scale *into*, and raising that mode alone changes nothing either — the shell
+would still draw its 800x600 in the corner. Both halves are needed.
+
+`MenuScale.asi` does both: it rewrites that mode to the desktop size *in memory*
+(`Armada2.exe` on disk is never touched) and scales the shell into the room it creates.
+It loads through the Ultimate ASI Loader, the same `winmm=n,b` override that already
+carries `STA2WidescreenPatch.asi`, so it needs no setup of its own.
+
+    tools/menuscale/install.sh            # install
+    tools/menuscale/install.sh --mode 0   # install, observe and log only
+    tools/menuscale/install.sh --remove   # complete uninstall
+
+**`--remove` is a complete uninstall.** The plugin only ever *adds* `MenuScale.asi`,
+`MenuScale.ini` and `MenuScale.log` to the game directory — there is no backup to keep
+and nothing to revert, unlike `ui-widescreen.py`.
+
+**Confirmed in game at 3440x1440:** main menu and single-player/campaign screen, both
+at 1920x1440, centred, pillarboxed — upscaled, never stretched. Input follows the
+picture. Open items are listed at the end of `README.md`.
+
+### Two command-line switches worth knowing
+
+`Armada2.exe` carries its own switch table, recovered from the binary — `nointro`,
+`window`, `res`, `resolution`, `bpp`, `fullscreen`, `shelltest` and ~40 more; the full
+list is in `tools/menuscale/README.md`.
+
+**`-nointro` skips `Intro.bik` (35 MB) and the three logo reels.** Worth adding to
+Heroic's launch arguments; it front-loads every launch otherwise.
+
+**The leading `-` or `/` is not optional, and getting it wrong is not an error.** The
+parser checks the first character of each token and only then matches the switch table;
+anything else is stored as the **mission name**. A bare `nointro` therefore starts a
+match on a mission that does not exist, which presents as a game with a HUD and no map
+— not as a rejected argument. That cost a round of confused debugging here.
+
 ## Patch Project 1.2.5
 
 **The NSIS installer refuses to run against a GOG install**, with
@@ -454,9 +516,27 @@ ten each for Federation, Klingon and Borg.
 
 ## Gotchas
 
-- **`pgrep -f "Armada2.exe"` matches its own command line** and reports a false positive.
-  Use `pgrep -x Armada2.exe`. Likewise `pkill -f startrekarmada2` killed its own shell
-  (exit 144).
+- **Neither obvious way of finding the game process works**, and the advice that used to
+  stand here — "use `pgrep -x Armada2.exe`" — is **wrong**:
+  - `pgrep -f "Armada2.exe"` matches its own command line and reports a false positive.
+    Likewise `pkill -f startrekarmada2` killed its own shell (exit 144).
+  - `pgrep -x Armada2.exe` matches **nothing, even while the game is running**, because
+    **Wine reports the process `comm` as `Main`.** This is not cosmetic. It made a test
+    harness report "game DOWN" for a game that was plainly up — producing several
+    confident, wrong conclusions about the game exiting on its own — and it made a
+    `pkill -x Armada2.exe` cleanup a silent no-op, so **seven orphaned instances
+    accumulated over half an hour**, none with a window, each still holding a PipeWire
+    stream and audibly playing the menu music.
+
+  Collect PIDs with `ps` and kill them individually:
+
+      ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'
+
+  **`tools/menuscale/stop-game.sh` does this properly** — it also kills the Wine helpers
+  for this prefix only (matched by `WINEPREFIX` out of `/proc/<pid>/environ`, so an
+  unrelated Wine app cannot be caught in it), and drops stale PipeWire nodes, which
+  outlive the process, stay in state `running`, and keep playing. Killing the processes
+  is *not* enough on its own.
 - **`md5sum` wedges on Wine-backed paths** — it blocked in `unix_stream_read_generic`
   partway through a manifest. For before/after comparison use
   `find -printf '%s\t%TY-%Tm-%Td\t%p\n'` instead; size+mtime is enough and is instant.
@@ -479,5 +559,11 @@ ten each for Federation, Klingon and Borg.
     # current overrides, without opening Heroic
     python3 -c "import json;print(json.load(open('$HOME/.config/heroic/GamesConfig/1174788223.json'))['1174788223']['enviromentOptions'])"
 
-    # is the game really running?
-    pgrep -x Armada2.exe
+    # is the game really running?  NOT `pgrep -x Armada2.exe` -- Wine calls it "Main"
+    ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'
+
+    # stop it, its Wine session, and any stale audio node it left behind
+    tools/menuscale/stop-game.sh
+
+    # did the menu scaler load, and what did it patch?
+    cat "<game dir>/MenuScale.log"

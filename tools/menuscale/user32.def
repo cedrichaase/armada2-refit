@@ -1,0 +1,20 @@
+LIBRARY USER32.dll
+EXPORTS
+BeginPaint@8
+EndPaint@8
+GetDC@4
+ReleaseDC@8
+GetClientRect@8
+GetClassNameA@12
+InvalidateRect@12
+MoveWindow@24
+SetWindowPos@28
+GetWindow@8
+ClientToScreen@8
+ScreenToClient@8
+IsWindow@4
+GetSystemMetrics@4
+GetWindowRect@8
+SetWindowLongA@12
+CallWindowProcA@20
+DefWindowProcA@16

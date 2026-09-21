@@ -31,6 +31,13 @@ DXVK on every launch and reverts the d3d8 chain fix.**
   small files carry ~9 MB of block slack. Both figures appear in older notes.)
 - Available: ImageMagick 7 (`magick`), `python3`, `ffmpeg`.
   **Not available: numpy, PIL.** Do image work through ImageMagick, not Python.
+- **32-bit Windows DLLs can be built here**, which is not obvious: there is no MSVC and
+  no mingw, but `clang` + `lld-link` + `llvm-dlltool` are installed and that is enough
+  for an ASI plugin. Declare the Win32 prototypes yourself, generate import libraries
+  from `.def` files (**`llvm-dlltool --kill-at`** — the `.def` carries decorated names,
+  the real DLLs export undecorated ones), and link `/nodefaultlib`. See
+  `tools/menuscale/build.sh`. `objdump` also reads `pei-i386`, and the game ships
+  `armada2.map` — a full symbol map — so `Armada2.exe` can be read rather than guessed at.
 - Scratchpad for intermediates; this directory is the user's, keep it tidy.
 
 ## Hard rules
@@ -382,6 +389,19 @@ hard rule 4. The small ones went up as **contact sheets** — `sheet=GxP` in
 route restyles them. Panels are deliberately NOT sheeted — they are 9-slice pieces whose
 edges abut on screen. Cursors, `colors`, `logos`, `gminicon`, `gminisys` and `MBuild`
 are deliberately stock; reasons in `README.md`.
+
+**The menus are a third UI, separate from both the HUD and the textures, and they need
+code.** Every menu is a Win32 dialog drawn with GDI at hard-coded coordinates from
+800x600 BMPs; `Armada2.exe` imports `BitBlt` and **no `StretchBlt`**, and the shell
+never touches Direct3D — so no config file, no `gui_*.cfg` and nothing in the
+d3d8/DXVK chain can scale it. The reason they sat in the corner is stranger than it
+looks: **the engine asks for an 800x600 display mode for the front end**
+(`ST3D_GraphicsEngine::SetActiveDisplay_Internal`, hard-coded, two sites), so the shell
+was *filling a small screen*, not sitting in a big one. `tools/menuscale/` holds
+`MenuScale.asi`, which raises that mode in memory and scales the shell into it;
+`install.sh --remove` is a complete uninstall. **Confirmed in game.** Details in
+`SETUP.md`, full write-up in `tools/menuscale/README.md`. Do not re-derive the
+`gui_*.cfg` reasoning here — that is the HUD, a different system.
 
 **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
 declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to
