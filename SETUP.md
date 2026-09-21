@@ -210,6 +210,90 @@ anything else is stored as the **mission name**. A bare `nointro` therefore star
 match on a mission that does not exist, which presents as a game with a HUD and no map
 — not as a rejected argument. That cost a round of confused debugging here.
 
+## Map scrolling
+
+The stock scroll feel is slow because **two of the three knobs ship at or near their
+minimum**, and the one that matters most is a per-user setting the game already exposes
+in its own options screen. Derived from `Armada2.exe` + `armada2.map`, not guessed:
+`cOverViewImp::mCheckCameraPan` (`0x5244f0`) and `ParabolicCamera::Pan` (`0x4dfa50`).
+
+The whole chain, per frame:
+
+    pan = edgeOrKeyFactor
+        * UserProfile.<mouse|keyboard>_scroll_speed     // ARMADA.PRF, set by the slider
+        * SCROLL_ACCELERATION                           // RTS_CFG.h, 3
+        * ramp                                          // INITIAL_SCROLL_SPEED -> MAX_SCROLL_SPEED
+        * dt
+        * SCROLL_COEFFICIENT / (OVERVIEW_INIT_HEIGHT + |OVERVIEW_INIT_HEIGHT - camHeight|)
+
+`ramp` starts at `INITIAL_SCROLL_SPEED` (1.0), grows by `dt` each frame and clamps at
+`MAX_SCROLL_SPEED` (2.0), so the effective multiplier walks 3 → 6 over one second of
+held scrolling and resets the moment you stop.
+
+### The two speeds live in ARMADA.PRF, not in any config file
+
+`GameConfiguration::LoadProfile` (`0x53dc00`) reads **line 2 of `ARMADA.PRF`** as eleven
+whitespace-separated values. Fields 3 and 4 are the scroll speeds:
+
+    2 3 1 2 0 0 1 0.28 1 1 0
+        ^ ^
+        | keyboard_scroll_speed
+        mouse_scroll_speed
+
+(Confirmed three ways: fields 1/2/7/9/10 match the constructor's defaults at `0x53da80`,
+field 4 matches `KEYBOARD_SCROLL_RATE = 2.0` from `RTS_CFG.h`, and field 8 matches
+`cfgMOUSE_HOLD_LEVEL = 0.28` from the same file.)
+
+Both are also **sliders in the game's own Options → Game Settings screen**, and the
+slider is the supported way to tune them. The mappings, from `GameSettings.obj`:
+
+| Setting | Slider range | Stored value | Stock | Headroom |
+|---|---|---|---|---|
+| `mouse_scroll_speed` | 1–50 | `slider / 10` | 1.0 (slider 10) | up to **5.0**, a 5x lift |
+| `keyboard_scroll_speed` | 1–20 | `slider + 1` | 2.0 (**slider 1 — the minimum**) | up to **21.0**, a 10.5x lift |
+
+So no binary patching and no config surgery is needed for speed: the keyboard slider
+ships pinned to its lowest setting and the mouse slider to a fifth of its range.
+
+`LoadProfile` clamps only the difficulty field (0–2); the two scroll floats are read
+unclamped, so `ARMADA.PRF` can hold values above the slider maxima — but opening the
+options screen rewrites them back into range, so don't rely on it.
+
+**`MOUSE_SCROLL_RATE` is not settable from `RTS_CFG.h`.** The name is absent from the
+EXE's lookup table (`KEYBOARD_SCROLL_RATE` is present), so the global keeps its compiled
+1.0 and is only ever used as the seed for a *fresh* profile. Once `ARMADA.PRF` exists,
+the profile wins for both. Editing `KEYBOARD_SCROLL_RATE` in `RTS_CFG.h` likewise does
+nothing to an existing profile.
+
+### SCROLL_BORDER_WIDTH is the other half of "unwieldy"
+
+`RTS_CFG.h` ships `SCROLL_BORDER_WIDTH = 2` — the mouse must be within **2 pixels** of a
+screen edge for edge-scrolling to engage at all, and the factor ramps linearly across
+that band. The EXE's own compiled-in default is **20**, so stock's 2 is the config
+file overriding the engine down to a hair's width. At 3440x1440 that is the difference
+between a usable edge and one you have to hunt for.
+
+Raised to 20 here.
+
+### What is set
+
+| Where | Key | Stock | Now |
+|---|---|---|---|
+| `ARMADA.PRF` line 2 field 3 | `mouse_scroll_speed` | 1 | **3** (slider 30/50) |
+| `ARMADA.PRF` line 2 field 4 | `keyboard_scroll_speed` | 2 | **8** (slider 7/20) |
+| `RTS_CFG.h:40` | `SCROLL_BORDER_WIDTH` | 2 | **20** |
+
+Both files have a `.a2neb-backup` beside them; `cp X.a2neb-backup X` reverts either.
+**Edit `ARMADA.PRF` only while the game is closed** — it is rewritten on exit, so a live
+game will clobber the change. Tuning further is best done from the in-game slider, which
+writes the same fields.
+
+If the sliders still are not enough, `SCROLL_COEFFICIENT` (`RTS_CFG.h`, 90000) is a
+straight linear multiplier on every pan and scales both input devices at once. One
+caveat: the EXE hashes `RTS_CFG.h` across clients — *"EXE / RTS_CFG.h files do not match
+node %d"* — so any change to that file has to be mirrored on every machine in a
+multiplayer game. `ARMADA.PRF` is per-user and carries no such constraint.
+
 ## Patch Project 1.2.5
 
 **The NSIS installer refuses to run against a GOG install**, with
