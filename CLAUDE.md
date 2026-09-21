@@ -389,6 +389,12 @@ the back buffer independently on each axis — 2.15x across against 1.20x down a
 3440x1440. `tools/ui-widescreen.py` re-declares the canvas and moves the right-anchored
 and centred panels; `--revert` undoes it. Details and the one unhandled case (the bridge
 display) are in `SETUP.md`. **Applied and confirmed in game.**
+**But `popupPaletteXA`/`XB` are the exception to the canvas** — the palette code reads
+those two bare scalars as a fraction of a hard-coded **1600**, measured, while every
+rect in the same file (the button sizes included) takes the declared canvas. That is why
+the action bar sat left of the ship display and why the locked build palette was pushed
+off-screen at x 5637. Both corrected; the derivation is in `SETUP.md` and this one is
+applied but **not yet confirmed in game**.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs

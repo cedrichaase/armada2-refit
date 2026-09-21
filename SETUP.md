@@ -72,16 +72,51 @@ only aspect that looks right.
 `tools/ui-widescreen.py` re-declares the canvas as `1200 x display aspect` — 2867x1200
 here — so both scale factors come out at 1.20 and the UI keeps the size it has today
 instead of shrinking. Re-declaring alone is not enough: the extra 1267px all appear on
-the right, so it also moves the right-anchored and centred panels. 19 values in 8 files,
+the right, so it also moves the right-anchored and centred panels. 20 values in 8 files,
 nothing else touched, CRLF and tab alignment preserved byte-for-byte.
 
-    tools/ui-widescreen.py --dry-run     # show the 19 changes
+    tools/ui-widescreen.py --dry-run     # show the 20 changes
     tools/ui-widescreen.py               # apply, reading the resolution from ARMADA.PRF
     tools/ui-widescreen.py --revert      # restore from the *.a2neb-backup beside each
 
 The format keeps screen placement in a handful of `<name>PanelArea` keys and makes
 everything else relative to its panel, which is why the change is so small — and why
 the sub-element coordinates must **not** be touched.
+
+#### The popup palette is not on the canvas
+
+The action bar — the row of command buttons for the selected unit — is the one element
+that does **not** obey `screenWidth`, and it was missed on the first pass. It sat far
+left of the ship display instead of level with it.
+
+`popupPaletteXA` / `popupPaletteXB` in `gui_glob16x12.cfg` are bare scalars, and the
+palette code reads them as a fraction of a **hard-coded 1600**, not of the declared
+canvas. Measured off a 3440x1440 screenshot with `screenWidth` already at 2867, scale
+calibrated against the resource bar, the button panel and the ship display (all three
+within 1px of what 2867 predicts):
+
+| | measured | canvas model | 1600 model |
+|---|---|---|---|
+| palette left edge, screen x | 762.7 | 426 | **763.25** |
+
+Rects in the same file are *not* affected — the palette's own `paletteSingleButtonArea`
+(80x80) draws square at ~96px, a clean 1440/1200, and the pause and objectives dialogs
+land centred. **Sizes and four-number rects take the canvas; these two scalars take
+1600.** Two code paths in one file.
+
+So the tool computes the anchor in canvas space like every other key and then divides it
+back into 1600 space. At 3440x1440: `XA 355 -> 551` (canvas 987, the same five-pixel
+lead over `infoPanelArea`'s 993 that stock's 355 has over stock's 360) and
+`XB 1355 -> 1463`.
+
+XB was previously shifted to 2622 as though it were a canvas x, which the 1600 reference
+renders at screen x **5637** — the locked build palette was off-screen entirely. Fixed
+by the same change.
+
+`popupPaletteYA`/`YB` are left alone: the vertical axis is never distorted, since
+`screenHeight` stays 1200. Note for anyone tempted to tidy it — the measured button row
+sits ~33 canvas px *above* `YA * 1440/1200`, which is unexplained and is stock
+behaviour. Don't "fix" it without a measurement.
 
 **Not handled: the bridge display** (`bridgePanelRect`, `*_bridgeBackgroundRect` and
 their layer rects, `gui_glob16x12.cfg` lines 393-536). It is a full-screen 1600x1200
@@ -94,6 +129,11 @@ was inferred from the file format and the symptom before it was tested, and it w
 right: icons square, minimap square, panels flush against the real screen edges instead
 of stranded at the 1600px mark. What has *not* been reopened since the change is the
 comm and objectives pop-ups, which moved with it.
+
+**The palette correction above is applied but not yet confirmed in game.** It is derived
+from one screenshot, and the 1600-reference model it rests on fits that measurement to
+half a pixel — but it has not been seen rendered. If the action bar lands somewhere
+unexpected, the model is wrong and the measurement in it is the thing to re-check first.
 
 ## Patch Project 1.2.5
 

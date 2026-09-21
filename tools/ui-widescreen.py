@@ -36,6 +36,29 @@ is the table below, and it is deliberately short -- the format keeps screen plac
 a handful of `<name>PanelArea` keys and makes everything else relative to its panel, so
 the sub-element coordinates must NOT be touched.
 
+THE PALETTE IS NOT ON THE CANVAS
+
+`popupPaletteXA` / `popupPaletteXB` in gui_glob16x12.cfg are bare scalars, and the
+palette code does not put them through the canvas scaler.  Measured off a 3440x1440
+screenshot with screenWidth already at 2867: the action bar's left edge landed at screen
+x 762.7, and 355 * 3440/1600 = 763.25.  The reference is a hard-coded 1600, not
+screenWidth -- so declaring a wider canvas moves every panel and leaves the palette
+where it was, which is what "the action bar does not line up with the ship display"
+looks like.  Rects in the same file are NOT affected: the palette buttons stay square
+(80x80 measured as ~96x96 screen px, a clean 1440/1200), and the pause and objectives
+dialogs land centred.  Sizes and rects take the canvas; these two scalars take 1600.
+
+So the anchor is computed in canvas space like every other key and then divided back
+into 1600 space.  At 3440x1440: XA 355 -> 551 (canvas 987, five canvas px left of
+infoPanelArea's 993, the same lead it has in stock) and XB 1355 -> 1463.  The old code
+shifted XB to 2622 as if it were a canvas x, which the 1600 reference renders at screen
+x 5637 -- the locked build palette was off-screen entirely.
+
+NOT HANDLED: `popupPaletteYA` / `popupPaletteYB`.  The vertical axis is not distorted at
+any resolution (screenHeight stays 1200), so they need no correction -- but note that
+the measured row sits ~33 canvas px above YA * 1440/1200, which is unexplained.  Do not
+"fix" that without a measurement; it is stock behaviour.
+
 NOT HANDLED: the bridge display (`bridgePanelRect`, `*_bridgeBackgroundRect` and their
 layer rects, gui_glob16x12.cfg lines 393-536).  It is a full-screen 1600x1200 backdrop
 assembled from six tiles with overlay sprites placed against it, so it cannot be widened
@@ -70,12 +93,18 @@ ANCHOR = {
         'replayPanelArea':        'right',
     },
 }
-# Bare `key = <x>` scalars, with the element width needed to anchor them.
+# Bare `key = <x>` scalars.  These two are NOT in canvas coordinates -- see
+# "THE PALETTE IS NOT ON THE CANVAS" above -- so their target is computed in canvas
+# space like everything else and then divided back into the 1600 space the palette
+# code reads them in.  `width` is the element width, for the 'right' anchor.
 SCALAR = {
     'gui_glob16x12.cfg': {
+        'popupPaletteXA': ('centre', 408),  # follows infoPanelArea, 5px to its left
         'popupPaletteXB': ('right', 245),   # 3 columns x 80 + gaps, flush right at 1595
     },
 }
+# Keys whose value is a fraction of 1600 rather than a canvas x.
+REF1600 = {'popupPaletteXA', 'popupPaletteXB'}
 RACE_CFGS = ['gui_bor.cfg', 'gui_cardassian.cfg', 'gui_fed.cfg', 'gui_kli.cfg',
              'gui_rom.cfg', 'gui_species8472.cfg']
 
@@ -125,6 +154,10 @@ def rewrite(path, canvas_w, rects, scalars, race, dry):
                 anchor, width = scalars[m2.group(2)]
                 x = int(m2.group(4))
                 nx = canvas_w - (STOCK_W - x) if anchor == 'right' else x + shift_c
+                if m2.group(2) in REF1600:
+                    # nx is where we want it on the canvas; the palette code will read
+                    # the number as a fraction of 1600, so divide it back out.
+                    nx = round(nx * STOCK_W / canvas_w)
                 if nx != x:
                     changes.append(f"  {m2.group(2):26} x {x} -> {nx}  ({anchor})")
                     body = (m2.group(1) + m2.group(2) + m2.group(3) + str(nx) +
