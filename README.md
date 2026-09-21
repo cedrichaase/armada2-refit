@@ -1108,8 +1108,14 @@ the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
 
 ### Deliberately left stock
 
-- **20 cursors.** Drawn at native pixel size, non-square (so `fit()` would square them),
-  and deliberate pixel art.
+- **20 cursors.** Deliberate pixel art, and the strips are non-square (so `fit()` would
+  square them). **The "drawn at native pixel size" half of this claim was wrong** and is
+  corrected in `SETUP.md`: at 3440x1440 a 32x32 cursor frame draws at ~138x77 screen px,
+  a 4.30x/2.40x blow-up, because the cursor code scales against a hard-coded 800x600.
+  That is the *stretch* `tools/cursor-aspect.py` fixes, and it fixes it in
+  `Sprites/cursor.spr` without touching a texture. Leaving the art stock is still the
+  call — but "it is drawn 1:1, so there is nothing to gain" is not the reason, and a
+  cursor upscale is now a live option rather than a closed one.
 - **`colors`** — an 8x8 colour lookup table. Interpolating it blends the cells.
 - **`logos`** — Activision, Bink, GameSpy and Mad Doc trademarks, on a splash screen
   shown once. Invented shapes where there is a right answer, for no gain.

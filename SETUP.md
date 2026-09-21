@@ -148,6 +148,64 @@ bar level with the ship display and proved the 1600-reference model to sub-pixel
 accuracy, and the second removed stock's five-pixel overhang. The `infopanel` anchor
 that removes it has been measured but not yet seen rendered.
 
+#### The cursors are not on the canvas either
+
+The mouse cursors stayed stretched after all of the above — the same sideways smear the
+panels and glyphs had. They are the **third** screen reference in this game, after the
+declared canvas and the palette's hard-coded 1600.
+
+Measured off two 3440x1440 screenshots, against the source texels:
+
+| | source (texels) | on screen (px) | x | y |
+|---|---|---|---|---|
+| `Curs_Move`, arc centroid spacing | 24.5 x 24.4 | 104.6 x 56.0 | 4.27 | 2.30 |
+| `Curs_24` `c_select`, delta bbox | 16 x 21 | 66 x 49 | 4.13 | 2.33 |
+
+Both sources are square — `Curs_Move`'s bright content is 28x28 texels at offset (2,2)
+in every one of its five frames — and both draw at about **1.8:1**. The scale pair,
+~4.3 across against ~2.4 down, is an **800x600** reference scaled per-axis:
+`3440/800 = 4.30`, `1440/600 = 2.40`. (A 1600x1200 reference with the sprite's 32 units
+counted double is the same arithmetic and is not distinguishable from outside. It does
+not change the fix.) Both measurements sit 3-4% under that in *both* axes, which is the
+faint outer antialiased ring falling below the threshold, not model error — it cancels
+in the ratio, and the ratio is the thing: `4.30/2.40 = 1.79`, the same number as the UI,
+because 1.79 is just (display aspect) / (4:3).
+
+**A cursor has no rect in any cfg.** `Sprites/cursor.spr` is the only place its size is
+written down, as the `W H` pair — `32 32` on all 32 entries. So W is both the UV width
+and the drawn width, and the two separate cleanly: scale `W`, `U` and `@referenceWidth`
+by one ratio and the UV rect stays *bit-identical* (`U/refW` and `W/refW` unchanged)
+while the drawn rect narrows. `tools/cursor-aspect.py`:
+
+    tools/cursor-aspect.py --dry-run     # show the 41 changes
+    tools/cursor-aspect.py               # apply, reading the resolution from ARMADA.PRF
+    tools/cursor-aspect.py --revert      # restore Sprites/cursor.spr.a2neb-backup
+
+At 3440x1440 the ratio is `1/1.79 = 0.558`, so `W 32 -> 18` — 0.5625, 0.8% wide, about
+one screen pixel at cursor size. The cursor goes 138x77 -> **77x77**. Nothing is
+resampled and no texture is touched, so this costs **no resolution**: the same 32 texels
+are drawn into a square instead of a stretched rectangle.
+
+W is forced **even** so `@origin`'s 16 stays integral. Every other value the ratio
+touches — `U` in {0,32,64,96,128,160}, `refW` in {64,128,160,192,224,256} — is a
+multiple of 32, so `k/32` lands exactly and no frame boundary moves. Verified: 33
+entries, 0 UV mismatches, hotspot fractions preserved, 80 lines / 80 CRs / 289 tabs
+unchanged, `--revert` byte-identical to stock, and re-running is idempotent. 16:9 and
+21:9 come out exact (W 24 and 18, 0.0% off square); a 5:4 display is refused rather than
+narrowed the wrong way.
+
+**Height is deliberately untouched.** Scaling `H 32 -> 57` would square the cursor just
+as exactly, but leaves it 138x138 — large at 1440p. Narrowing gives the ordinary 77x77.
+
+**Not yet confirmed in game.** The one thing the measurements cannot settle is whether
+the engine takes the drawn size from `W H` or from the texel extent the UVs select —
+stock has W equal to the frame's texel width, so both models fit identically. If it is
+the texel extent this rewrite is a silent no-op (the UVs are unchanged *by
+construction*, so it cannot make anything worse), and the fallback is to pre-squash the
+cursor **art** by 0.558 inside its cell, about the `@origin` hotspot so the click point
+does not move. That is certain to work but costs horizontal resolution, which is why it
+is not what the tool does first. Don't reach for it until this has been seen rendered.
+
 ## Patch Project 1.2.5
 
 **The NSIS installer refuses to run against a GOG install**, with

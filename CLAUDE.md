@@ -398,6 +398,16 @@ to sub-pixel accuracy. **`popupPaletteXA` is the one key that deliberately does 
 reproduce stock**: stock's 355 against `infoPanelArea`'s 360 is a five-pixel overhang
 that nobody sees at 4:3 and that reads as a misalignment against a 1056px-wide panel, so
 it takes an `infopanel` anchor and goes flush. Derivation in `SETUP.md`.
+**And the cursors are a third screen reference again** — not the canvas, not the
+palette's 1600, but a hard-coded **800x600**, measured off the source texels at
+4.30x/2.40x, so they draw 1.79x too wide like everything else did.
+`tools/cursor-aspect.py` fixes it in `Sprites/cursor.spr` alone: `W`, `U` and
+`@referenceWidth` scale by one ratio, so the UV rect stays bit-identical while the drawn
+rect narrows (`W 32 -> 18` at 3440x1440, cursor 138x77 -> 77x77). **No texture is
+touched and no pixel is resampled.** Applied, not yet seen in game; if it turns out the
+engine sizes cursors from the texel extent rather than `W H` it is a silent no-op, and
+the fallback is in `SETUP.md`. Note this corrects README's claim that cursors are "drawn
+at native pixel size" — they are drawn at 4.3x.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs
