@@ -38,6 +38,11 @@ DXVK on every launch and reverts the d3d8 chain fix.**
 1. **Never write into `Textures/RGB/` directly.** `./a2tex build` writes to
    `targets/<NAME>/out/`; `./a2tex install` copies it across, making a `.a2neb-backup`
    on first touch. `./a2tex revert all` undoes everything.
+   **The one sanctioned exception is `tools/ui-font-condense.py`**, which rewrites the
+   twelve `FontFinal4_*` atlases in place because its edit is paired with the `.spr`
+   metrics beside them in `Sprites/` and so cannot live in a target. It owns its own
+   backups under `.a2font-backup` — a *different* suffix, precisely so `a2tex revert
+   all` cannot restore a stock atlas under condensed metrics. See `SETUP.md`.
 2. **Match the stock TGA format exactly**: image type 2, uncompressed, no ID field, no
    colour map — and **the same bit depth as the file you are replacing.** The nebula
    textures are 24-bit; **1113 of the 2115 textures in the game are 32-bit with a live
@@ -398,6 +403,23 @@ to sub-pixel accuracy. **`popupPaletteXA` is the one key that deliberately does 
 reproduce stock**: stock's 355 against `infoPanelArea`'s 360 is a five-pixel overhang
 that nobody sees at 4:3 and that reads as a misalignment against a 1056px-wide panel, so
 it takes an `infopanel` anchor and goes flush. Derivation in `SETUP.md`.
+
+**The font does not ride on the canvas either, and the canvas fix is what exposed it.**
+The in-game font is a bitmap sprite — `Font%s%d.spr`, eight sizes in `Sprites/`, each a
+**solid white RGB atlas with the glyphs entirely in alpha** — and its quads scale by
+back-buffer / **1280x1024**, a hard-coded tier, whatever `screenWidth` says. At 3440x1440
+that is 2.6875x across against 1.40625x down: every glyph **1.911x too wide**, and 2.24x
+too wide for a panel that now scales at 1.20. The vertical axis is already right and is
+not touched — 1.40625 against 1.20 is the same 1.171875 the game has at 4:3.
+`tools/ui-font-condense.py` squeezes glyph art *and* advance widths by `1.25 * H / W`
+(0.5233 here) so the engine's own stretch lands them back at their authored proportions;
+`--revert` undoes it, `--check` verifies `.spr` and `.tga` still agree. **Its backups are
+`.a2font-backup` on purpose**: `a2tex revert all` would otherwise restore stock atlases
+under condensed metrics and garble every glyph. The cost is horizontal sampling — the
+quad is `texels x scale`, so there is no other lever — and the tier was pinned by the
+headers, since the 1600x1200 rival fit needs a `FontFinal4_30` that does not exist.
+Derivation, the measurement table and the rounding error are in `SETUP.md`.
+**Built and measured; not yet confirmed in game.**
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs

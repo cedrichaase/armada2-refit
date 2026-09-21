@@ -148,6 +148,83 @@ bar level with the ship display and proved the 1600-reference model to sub-pixel
 accuracy, and the second removed stock's five-pixel overhang. The `infopanel` anchor
 that removes it has been measured but not yet seen rendered.
 
+### The font does not ride on the canvas either, and that is the canvas fix's bill
+
+Re-declaring the canvas un-stretches every panel, icon and rect. **It does not touch the
+text**, which comes out huge and visibly wide — and that is not a leftover of the old
+bug, it is a new mismatch the fix created.
+
+The in-game font is a bitmap sprite, not a system font. `Armada2.exe` builds the name
+
+    Font%s%d.spr        %s = "Final4_", %d = a point size
+
+and `Sprites/` ships eight of them — 10, 12, 13, 15, 16, 19, 20, 24. Each is an atlas:
+`Textures/RGB/FontFinal4_<size><page>.tga` is **solid white RGB with the glyphs entirely
+in alpha** (measured: mean R=G=B=255, mean A=35.5), and the `.spr` carries a per-glyph
+`(u,v)` offset table and a per-glyph advance-width table. The `*Color` keys in
+`gui_glob16x12.cfg` tint the white.
+
+Those atlases are authored for a **1280x1024** tier, and the font path scales glyph quads
+by back-buffer / 1280x1024 — **2.6875x across against 1.40625x down** at 3440x1440,
+whatever `screenWidth` says. Measured against the advance tables, off a 3440x1440
+screenshot:
+
+| element | font | predicted | measured |
+|---|---|---|---|
+| `OBJECTIVES:` (header) | 24 | 620.9 x 32.3 px | 619.5 x 32.7 |
+| `BRIEFING SUMMARY:` | 24 | 962.2 px wide | 960.2 |
+| `The Borg Queen and a ...` | 16 | 1355 px wide | 1368 |
+| `4000` (resource bar) | 16 | 137.1 x 21.1 px | 135.9 x 22.4 |
+
+So every glyph is drawn 2.6875/1.40625 = **1.911x too wide**, and against a canvas that
+now scales at 1.20 it is also 2.24x too wide for the panel around it.
+
+**The vertical axis is already correct and is not touched.** 1.40625 against the canvas's
+1.20 is a ratio of 1.171875, and that ratio is stock: at 4:3 the font scales by H/1024
+against a canvas of H/1200, the same 1.171875. The game has always drawn text 17% taller
+than its layout coordinates imply.
+
+**Why 1280x1024 and not 1600x1200.** A rival fit — glyphs scaled by back-buffer /
+1600x1200, the stock canvas — matches the body text and the line pitch just as well,
+because `sz16 x 2.6875` and `sz20 x 2.15` differ by 1.3% and nothing measurable here
+separates them. Word-wrap does not separate them either; both reproduce all five
+paragraph breaks. **The headers do.** At 2.15x across, `OBJECTIVES:` at 619.5 screen px
+needs an atlas 288 texels wide with a 27-texel cap — a ~30pt font. `FontFinal4_30` does
+not exist. At 2.6875x it is `sz24` (231 x 23) to 0.2%, the largest atlas shipped, which
+is what the largest tier should reach for.
+
+**`tools/ui-font-condense.py`** squeezes each glyph's art and its advance width by
+`(H/1024)/(W/1280)` = `1.25 * H / W` — 0.5233 here — so the engine's own 1.911x stretch
+lands the glyph back at its authored proportions. Cell height, atlas size, page layout,
+row assignment, frame counts and the white RGB plane are untouched; only the alpha plane
+is rebuilt and only the `u`/width numbers move. 1792 glyphs across 8 sizes.
+
+    tools/ui-font-condense.py --preview /tmp/p.png   # stock vs condensed, at game scale
+    tools/ui-font-condense.py --dry-run
+    tools/ui-font-condense.py
+    tools/ui-font-condense.py --check                # do .spr and .tga still agree?
+    tools/ui-font-condense.py --revert
+
+**The cost is horizontal sampling, and it is unavoidable from data alone.** The
+destination quad is `texels x scale`, so the only lever on width is texels: a glyph that
+was 28 texels wide is now 15, and `@tmaterial=font #No filtering, ever.` means the engine
+point-samples it back up 2.6875x. Text is correctly proportioned and horizontally
+chunkier. Lanczos held the stems best of the three filters tried (`--filter`; Triangle is
+softer, Box loses sub-texel stem placement).
+
+Per-glyph integer rounding costs a little accuracy: measured over the whole charset the
+realised factor is 0.514–0.558 against the 0.5233 target, biased slightly narrow. The two
+sizes actually drawn at this resolution land at 0.5235 (24) and 0.5281 (16). `sz10` is the
+worst at 0.5584 because its glyphs are 3–8 texels wide, and it belongs to the 640x480
+tier, so it is not drawn here.
+
+**The backups are `.a2font-backup`, not `.a2neb-backup`, deliberately.** `a2tex revert
+all` restores every `Textures/RGB/*.a2neb-backup`; if the atlases went back to stock while
+the condensed `.spr` files stayed, every `u` and width would point into the wrong place in
+a wider glyph — garbled text, out of the command that is supposed to be the safe way out.
+A distinct suffix keeps a2tex out of it, the same division ui-widescreen.py already has
+with `misc/`. `--check` is what catches a mismatch if one ever happens.
+
 ## Patch Project 1.2.5
 
 **The NSIS installer refuses to run against a GOG install**, with
