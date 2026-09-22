@@ -573,6 +573,68 @@ Verified against this executable:
 The exe imports **no** dinput or dinput8 at all, so a `dinput.dll` would never be
 loaded and the patch would be silently inert.
 
+### ⚠ CORRECTION: 320548 is Wine's builtin d3d8, not DXVK's
+
+**The section below is wrong about what is in the prefix, and the error inverted the
+whole diagnosis.** It records `syswow64/d3d8.dll` at 320548 bytes as "DXVK's exact
+size". It is not. Measured with `sha256`, not with size folklore:
+
+| file | bytes | what it actually is |
+|---|---:|---|
+| `syswow64/d3d8.dll` | 320548 | **byte-identical to Wine's builtin d3d8** |
+| `syswow64/d3d8.dll.dxvk-backup` | 320548 | the builtin as well — the backup never held DXVK |
+| DXVK d3d8 (Proton's) | 1658894 | ~1.66 MB, and has never been in this prefix |
+| DXVK d3d8 (Heroic's 3.1.1) | 1687566 | likewise |
+| `syswow64/d3d9.dll` | 7798798 | genuinely DXVK (Proton's), but **bypassed** |
+
+So the chain that has actually been running is:
+
+    Armada2.exe
+      -> <game dir>/d3d8.dll      Patch Project proxy   45056
+      -> syswow64/d3d8.dll        WINE BUILTIN d3d8     320548
+      -> wined3d
+      -> OpenGL
+
+**DXVK is not in this game's render chain and never has been.** Wine's d3d8 talks to
+`wined3d` directly; it never loads `d3d9.dll`, so the DXVK d3d9 sitting in the prefix is
+never reached. That is why no `d3d9.*` key in `dxvk.conf` changed anything, why the DXVK
+HUD never appeared, and why `--diagnose` produced a `xalia_dxgi.log` (a different
+process, which does use DXVK) but no `Armada2_d3d9.log`.
+
+It also means the entire texture project — 2048 skyboxes, a 4096 atlas, 1024 hulls — has
+been rendering through wined3d/OpenGL, not Vulkan. Worth knowing before any of it is
+attributed to DXVK.
+
+**And the prefix is not a durable place to fix it.** Proton's `default_pfx` holds
+`syswow64/d3d8.dll` and `d3d9.dll` as **symlinks** to its own Wine builtins and restores
+them on prefix sync. A DXVK `d3d8` written into `syswow64` was verified by hash, then
+was Wine's builtin again after a single launch — with `autoInstallDxvk` already false,
+so Heroic was not the cause that time. Proton was.
+
+The durable slot is the **game directory**, which nothing manages and which Wine
+searches *before* the system directory — the same mechanism that already makes the
+game-directory `winmm.dll` and `d3d8.dll` load at all. So `--use dxvk` puts DXVK's
+`d3d8.dll` **and** `d3d9.dll` beside `Armada2.exe`, replacing the Patch Project proxy
+(kept as `d3d8.dll.proxy-backup`) and making the prefix irrelevant to the outcome.
+
+`autoInstallDxvk` also turns out to be the whole of the "regression" recorded below:
+set to true it redeploys over the slot on every launch, which is it working as designed
+rather than misbehaving.
+
+`tools/d3d8-chain.py` exists so this cannot recur: it identifies every link by hashing
+it against the candidates actually present on the machine and **names** what it found,
+reporting `UNKNOWN` rather than guessing. Never identify one of these by size again.
+
+    tools/d3d8-chain.py --status      identify the live chain
+    tools/d3d8-chain.py --use dxvk    DXVK d3d8 -> DXVK d3d9 -> Vulkan
+    tools/d3d8-chain.py --use gog     GOG d3d8to9 -> DXVK d3d9 -> Vulkan
+    tools/d3d8-chain.py --revert      back to Wine's builtin, Heroic managing it again
+
+`--use` also sets `autoInstallDxvk`, so it needs Heroic closed, and it refuses before
+touching anything rather than half-applying.
+
+### The original note, kept for the record
+
 ### ⚠ This fix does not currently survive a launch
 
 `autoInstallDxvk` is `true`, and **Heroic redeploys DXVK's DLLs into the prefix on every
@@ -609,25 +671,290 @@ Remedies, in order of preference:
   DXVK's `d3d9.dll` stays in place; only the d3d8 slot needs to stop being managed.
 - Or re-copy the translator after every launch, which is fragile.
 
-### Anisotropic filtering — untried, and probably the cheapest visual win left
+### Renderer-side enhancements
 
-`dxcfg.ini` sets `anisotropic=application`, i.e. whatever a 2001 renderer asks for, which
-is likely none. Everything drawn at a steep angle to the camera — which in a top-down RTS
-means every ship hull and every planet surface — is therefore sampled with plain
-trilinear filtering and blurs along the axis of foreshortening.
+Everything in this section is global — it applies to every texture and every model at
+once, costs nothing per-asset, and is reversible by deleting one file. All of it is
+independent of the texture pipeline. Verified against **DXVK 3.1.1**, the version Heroic
+actually deploys (`~/.config/heroic/tools/dxvk/dxvk-3.1.1/`), by reading the config keys
+out of the shipped `d3d9.dll` rather than from documentation — the key list below is what
+this binary honours, not what some DXVK version honours.
 
-DXVK can force it regardless of what the application asks. A `dxvk.conf` beside
-`Armada2.exe`:
+#### This does not have to wait for the d3d8 regression
+
+An earlier revision of this file said the graphics stack should not be touched while the
+chain regression above is open. For `dxvk.conf` specifically **that is wrong, and the
+reason matters**: both possible chains end in DXVK's `d3d9.dll`.
+
+    proxy -> DXVK d3d8   -> DXVK d3d9 -> Vulkan      (live today)
+    proxy -> GOG d3d8to9 -> DXVK d3d9 -> Vulkan      (after the regression fix)
+
+`d3d9.*` keys are read by the d3d9 layer, which is present and is DXVK's in both. So a
+`dxvk.conf` change is attributable regardless of which `d3d8.dll` won the last launch,
+and does not need the regression closed first. The AA routes below are the ones that do.
+
+#### Tier 1 — `dxvk.conf`, free and reversible
+
+`tools/renderer-config.sh` writes it, in **cumulative stages**, because this project's
+method is one change at a time and three keys at once is not attributable.
+**All three stages are installed and confirmed in game.** It verifies every key against
+the `d3d9.dll` that actually loads — the one in the game directory — before writing,
+because a key DXVK does not recognise is silently ignored:
+
+    tools/renderer-config.sh              # stage 1: anisotropic filtering only
+    tools/renderer-config.sh --stage 2    # + mip LOD bias
+    tools/renderer-config.sh --stage 3    # + seamless cube filtering
+    tools/renderer-config.sh --bias -0.25 # milder stage 2 bias (default -0.5)
+    tools/renderer-config.sh --show       # what is installed now
+    tools/renderer-config.sh --remove     # delete dxvk.conf, full revert
+
+- **`d3d9.samplerAnisotropy = 16`** (stage 1). `dxcfg.ini` asks for `application`, i.e.
+  whatever a 2001 renderer requests, which is likely none. In a top-down RTS every hull
+  and every planet is drawn at a steep angle to the camera, so all of it is sampled with
+  plain trilinear and blurs along the axis of foreshortening. This is the single biggest
+  free win and the one to judge on its own.
+- **`d3d9.samplerLodBias = -0.5`** (stage 2). Biases mip selection toward the sharper
+  level. This matters *because of the texture work*, not independently of it: there is
+  now 1024–2048 art under a camera that views the map plane obliquely, and trilinear
+  picks a blurrier mip than the art can support. **Only safe with AF already on** —
+  without it a negative bias aliases rather than sharpens, which is why it is a separate
+  stage and not part of stage 1. `d3d9.clampNegativeLodBias` is the guard if it
+  overshoots. **The failure mode is shimmer on movement, not blur when
+  still** — and in this game it shows on the billboard layer first, so if the map crawls
+  while scrolling, halve the bias with `--bias -0.25` before abandoning the stage.
+  Below about -1.0 it aliases faster than AF can clean up.
+- **`d3d9.seamlessCubes = True`** (stage 3). Filters across cube-map face edges. Directly
+  relevant to the finished skybox class: many maps bind a `.sod` cube model, and a
+  face-edge seam gets *more* visible at 2048/face, not less.
+
+`DXVK_HUD=fps,frametimes` is the measuring aid; it is deliberately **not** written into
+`dxvk.conf`, so it cannot be left on by accident. Expect the GPU to be near-idle — a 2001
+engine against an RX 5700 XT — and all three stages to be free.
+
+#### Telling whether a renderer setting did anything
+
+Asked after stage 1 went in and the answer was not obvious by eye. It is two separate
+questions and they need separate tools, because "the setting was ignored" and "the
+setting worked and is subtle" look identical in game.
+
+**Is it applied?** A `dxvk.conf` key DXVK does not recognise is *silently ignored* — no
+error, no warning. DXVK does print its effective configuration at startup, so ask it:
+
+    tools/dxvk-logging.py --diagnose  # logging + HUD + d3d9=n,b, all at once
+    # launch the game once
+    tools/dxvk-logging.py --check     # report the effective configuration
+    tools/dxvk-logging.py --off       # take all of it back out again
+
+`--diagnose` answers three questions in one launch, ordered so each makes the next
+meaningful:
+
+| observation | conclusion |
+|---|---|
+| no DXVK HUD overlay in game | DXVK is not in the chain; **no** `dxvk.conf` key can work |
+| HUD shown, but no log file | DXVK's d3d9 layer never loaded |
+| log written, keys absent from `--check` | DXVK ran but never found or read `dxvk.conf` |
+| keys present in `--check` | it is applied, and the effect really is that subtle |
+
+**Why `d3d9=n,b` is part of the diagnosis.** DXVK's `d3d8.dll` imports `d3d9.dll` by
+name — confirmed with `objdump`, not assumed — so every `d3d9.*` key is read by a layer
+that only exists if Wine resolves `d3d9` to DXVK's build rather than its own builtin
+WineD3D. This prefix has only ever carried `winmm=n,b;d3d8=n,b`, and setting
+`WINEDLLOVERRIDES` at all *replaces* whatever Proton would have set, so the d3d9 slot
+may never have been native. That is the leading suspect whenever a `d3d9.*` key appears
+to do nothing here, and it is the same gap the "Also outstanding" note below has
+recorded, untested, all along. `--off` restores the original override string too.
+
+**Heroic must be closed** for `--on`/`--off`: it rewrites `GamesConfig` on exit and
+would discard the edit. The script refuses rather than losing the change silently, and
+backs the file up regardless. Note Heroic's key is spelled `enviromentOptions`, missing
+an `n` — matching its typo is required.
+
+**Did it change the picture?** `tools/ab-shot.sh` grabs frames and diffs them
+numerically, so the answer is a number rather than an impression:
+
+    tools/ab-shot.sh grab before
+    # change one thing, relaunch, return to the same save without moving the camera
+    tools/ab-shot.sh grab after
+    tools/ab-shot.sh diff before after 600 400 1200 300     # W H X Y, region only
+
+Aim at a region, not the whole frame: a whole-frame diff of this game is dominated by
+ships drifting and sprites animating between the two grabs, which will swamp the effect
+and make any setting look like it did something.
+
+#### Why anisotropic filtering is structurally quiet in THIS game
+
+Worth stating plainly, because the usual "AF transforms an old game" advice assumes
+content this game does not have. AF only acts on surfaces **oblique to the camera**, and
+it is a correction to *mip selection* — so it can only touch geometry that is both
+mipmapped and foreshortened.
+
+- **The dominant visual layer here is immune by construction.** Map nebulae, resource
+  clouds, weapons and explosions are camera-facing **billboards**. A billboard is never
+  oblique — that is what makes it a billboard — so AF cannot affect any of it. In a
+  frame like the one that prompted this, that is most of what the eye is drawn to.
+- **What AF *can* reach is small on screen.** Hull flanks, planet limbs and the skybox
+  at grazing angles. A Sovereign draws ~340px wide in a top-down RTS, so its
+  near-grazing side surfaces are a few dozen pixels tall. Real, and not dramatic.
+
+So a subtle result at stage 1 is the expected result, not evidence of a broken setting —
+which is exactly why `--check` exists to separate the two.
+
+**The corollary is the useful part: stage 2 should be the visible one here.** A mip LOD
+bias is not conditional on obliquity — it shifts mip selection for *every* mipmapped
+surface, camera-facing billboards included. That is precisely the layer AF cannot touch
+and precisely where the upscaled art lives. Expect stage 2 to do more for this game's
+appearance than stage 1, which inverts the usual ordering. Stage 1 still goes first:
+AF is what keeps the sharper mips stage 2 selects from aliasing on the oblique surfaces.
+
+#### RESOLVED: DXVK works, and the Wine virtual desktop was the blocker
+
+**Confirmed in game at 3440x1440, with all of `dxvk.conf` applied — stages 1, 2 and 3.**
+The log for the working launch: config found, **no errors at all**,
+`last mode set: 3440x1440`, and all four keys under "Effective configuration":
 
     d3d9.samplerAnisotropy = 16
+    d3d9.samplerLodBias = -0.5
+    d3d9.clampNegativeLodBias = False
+    d3d9.seamlessCubes = True
 
-DXVK's d3d8 runs on its d3d9 backend, so the `d3d9.*` key is the right one under the
-chain that is actually live above. It costs nothing, applies to every texture in the
-game at once, and is reversible by deleting the file.
+The working configuration, all four parts required together:
 
-**Not done.** It is the one renderer-side change with an obvious upside, but it touches
-the graphics stack while the regression above is open, so it should be tried on its own,
-with nothing else changing, so that a bad result is attributable.
+| part | value | why |
+|---|---|---|
+| `GAME/d3d8.dll` | DXVK d3d8 | the prefix is not durable — Proton restores it from symlinks |
+| `GAME/d3d9.dll` | DXVK d3d9 | DXVK's d3d8 imports `d3d9.dll` by name |
+| `WINEDLLOVERRIDES` | `winmm=n,b;d3d8=n,b;d3d9=n,b` | without the d3d9 entry Wine resolves it to builtin WineD3D |
+| Wine virtual desktop | **off** | inside it DXVK's `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 |
+
+Set it up with `tools/d3d8-chain.py --use dxvk` and
+`tools/virtual-desktop.py --off`; reverse with `--revert` and `--on`.
+
+**The `d3d9=n,b` override is load-bearing, not diagnostic.** It arrived as part of
+`dxvk-logging.py --diagnose`, so `--off` used to strip it — which would have silently
+broken the chain the moment diagnostics were switched off. Ownership now sits with
+`d3d8-chain.py` (`--use` adds it, `--revert` removes it) and the logging tool only ever
+adds, never removes.
+
+**The two-window focus bug the virtual desktop was added for did not return** under
+DXVK. If it ever does, the alternative is Omarchy window rules — see the Hyprland
+section.
+
+#### How it was found — kept because the method is the lesson
+
+Settled by measurement, after three wrong explanations for "I can't see a difference".
+
+**The settings were never the problem, and neither was subtlety.** With DXVK's `d3d8.dll`
+and `d3d9.dll` in the game directory the HUD appeared and `Armada2_d3d9.log` reported:
+
+    info:  Found config file: dxvk.conf
+    info:  Effective configuration:
+    info:    d3d9.samplerAnisotropy = 16
+    info:    d3d9.samplerLodBias = -0.5
+    info:    d3d9.clampNegativeLodBias = False
+
+So `dxvk.conf` is found and every key applies, once DXVK is actually reached.
+
+**But the game then collapses to 640x480.** The same log:
+
+    err:   D3D9: EnterFullscreenMode: Failed to change display mode   (x4)
+    err:   D3D9: Failed to set initial fullscreen state               (x4)
+
+It alternates 3440x1440 and 640x480 across 25 mode sets and ends on 640x480;
+`MenuScale.log`'s last line agrees, reporting `screen 640x480`. So the engine asks for
+exclusive fullscreen, DXVK cannot change the display mode, and the fallback wins.
+
+**The prime suspect is the Wine virtual desktop** (`Software\\Wine\\Explorer`,
+`Desktop=Default`, `Default=3440x1440`). wined3d never needed a real mode change inside
+it; DXVK calls `ChangeDisplaySettingsEx` and it fails. The Hyprland section below
+already records reverting the virtual desktop as the documented alternative, using
+Omarchy window rules instead — that is the next experiment, and it is one launch.
+
+**Current state: reverted to the stock chain so the game is playable.**
+`tools/d3d8-chain.py --revert` put the Patch Project proxy back; Direct3D 8 is wined3d
+on OpenGL again and `dxvk.conf` is inert. The DXVK chain is one command away
+(`--use dxvk`) whenever the fullscreen question is worth another launch.
+
+**Note that the renderer question is now separable from the texture question.** Nothing
+about the texture work depends on any of this: it has always rendered through
+wined3d/OpenGL and continues to.
+
+#### Tier 2 — anti-aliasing, still the largest visual win left
+
+**DXVK 3.x ships no MSAA-forcing key.** Read out of the binary that actually loads, not
+from documentation: there is no `forceSwapchainMSAA` or equivalent.
+`d3d9.forceSampleRateShading` exists but only does anything once MSAA is already on. So
+AA cannot come from `dxvk.conf`, and the three routes are now these — note that the
+cheapest one died when the chain changed:
+
+1. **~~`dxcfg.ini`'s own `antialiasing=` key~~ — dead.** It is read by the GOG d3d8to9
+   translator, and the working chain replaced the translator with DXVK's own d3d8.
+   `dxcfg.ini` is inert and will stay inert unless the chain moves to
+   `d3d8-chain.py --use gog`, which is a real option (GOG d3d8to9 → DXVK d3d9 → Vulkan)
+   and would make both `anisotropic=` and `antialiasing=` live again. Untested, and its
+   accepted values are unknown because `dxcfg.exe`'s strings are packed.
+2. **An ASI hook on `IDirect3D8::CreateDevice`**, setting `MultiSampleType`. Squarely
+   inside the toolchain `tools/menuscale/` already proves — clang + lld-link + the
+   Ultimate ASI Loader that is already carrying two plugins — and `armada2.map` gives
+   the call site. **The most likely to work, and now the most attractive**: DXVK
+   implements D3D8 multisampling properly on Vulkan, which wined3d's D3D8 path did not
+   reliably do, so this became a better bet the moment the chain changed.
+3. **Post-process AA via vkBasalt** — see Tier 3. FXAA/SMAA rather than MSAA, so it
+   softens edges rather than resolving them, but it costs no code at all.
+
+**Supersampling by rendering above display resolution remains a trap.** It looks free
+given the GPU headroom and is not: `ui-widescreen.py`'s canvas arithmetic, the
+`popupPaletteXA` correction and `MenuScale.asi`'s desktop-size read are all tuned to
+3440x1440 and would need re-deriving.
+
+#### Tier 3 — post-processing, which only became possible tonight
+
+**This was impossible until the chain changed, and that is the point.** vkBasalt is a
+**Vulkan layer**. Until DXVK went in, Direct3D 8 landed on wined3d/**OpenGL**, so
+vkBasalt had nothing to attach to — any attempt would have done nothing, with no error
+to explain why. Now that the game renders through Vulkan, the whole post-processing
+family is reachable for the first time.
+
+vkBasalt is **AUR-only** here (`gamescope` is in `extra`; `vkbasalt`, `lib32-vkbasalt`
+and `reshade-shaders` are not in the official repos), and **`lib32-vkbasalt` is the one
+that matters** — `Armada2.exe` is 32-bit, so the 64-bit layer alone does nothing. Enable
+per-game with `ENABLE_VKBASALT=1` in Heroic's environment, the same place
+`tools/dxvk-logging.py` writes its variables.
+
+It operates on the final swapchain image, and that decides what is possible: CAS
+sharpening, FXAA/SMAA, LUT/tonemapping and depth-independent bloom all work; anything
+needing depth does not.
+
+**Bloom is the one worth doing**, and the reason is specific to this game rather than
+general taste. Armada II's visual language is almost entirely additive sprites —
+nebulae, weapons, engine glows — and the latinum clouds already clip to flat white where
+overlapping billboards composite past 255. That clipping is stock-faithful and cannot be
+fixed in the texture, because the per-channel mean *is* the light contributed and
+lowering it breaks the match against stock. Bloom converts that blowout from "the
+texture ran out of range" into "that is a bright object", which is the correct read and
+which no amount of texture work can produce.
+
+Judge it the way `tools/measure-invention.sh` judges a blend, not at 1:1 — and
+`tools/ab-shot.sh` will diff two launches numerically.
+
+#### Tier 0 — ambient occlusion, which is the wrong tool here
+
+Unchanged by any of the above, and the reasoning is worth keeping because "add AO and
+bloom" is the reflex suggestion for any old game and only half of it survives contact
+with this one.
+
+The practical objection: depth-buffer access through d3d8 → d3d9 → DXVK is exactly where
+ReShade's depth detection is least reliable.
+
+The real objection is about content. **AO darkens contact points and creases, and this
+scene has neither.** Ships float in vacuum against a skybox — nothing touches anything,
+there is no ground plane, no architecture, no interior corners. The 2001 hull models are
+low-poly, so there are barely any geometric creases to occlude either, and what detail
+exists is *painted into the diffuse map*, where AO cannot see it. The cost is high and
+the return is faint rim-darkening on ship silhouettes.
+
+The same reasoning rules out most lighting-based effects: the game has close to no
+lighting model to enhance. That is why the texture work has so much leverage here and
+why shader tricks have so little.
 
 ### Also outstanding
 

@@ -1777,9 +1777,37 @@ Genuinely outstanding:
   mission, then madExcept. Captured in `archive/error-mission-finish/`. **It first
   occurred before any modding**, so it is not this project's, and nothing here has been
   shown to affect it either way. Recorded so it is not mistaken for a texture problem.
-- **Anisotropic filtering is untried**, and is probably the cheapest visual win left —
-  it would sharpen every oblique surface in the game at once, hull textures most of all,
-  for free and reversibly. Recipe and the reason for holding off are in `SETUP.md`.
+- **DXVK now renders the game, and `dxvk.conf` applies.** Confirmed in game at
+  3440x1440 with 16x anisotropic filtering and a -0.5 mip LOD bias live, no DXVK
+  errors. Four things are required together and all four are in place:
+  DXVK's `d3d8.dll` **and** `d3d9.dll` in the **game directory** (the prefix is not
+  durable — Proton restores it from symlinks), `d3d9=n,b` in `WINEDLLOVERRIDES`, and
+  the **Wine virtual desktop off** — inside it DXVK's display-mode change fails and the
+  game collapses to 640x480. `tools/d3d8-chain.py` and `tools/virtual-desktop.py` set
+  and reverse all of it; full write-up in `SETUP.md`.
+  **This corrects a claim that stood in these notes for a long time:**
+  `syswow64/d3d8.dll` at 320548 bytes was recorded as DXVK's; it is byte-identical to
+  *Wine's builtin*, so until now the game — and every texture in it — rendered through
+  wined3d/OpenGL, never Vulkan.
+- **All three renderer stages are installed and confirmed in game** — 16x anisotropic
+  filtering, a -0.5 mip LOD bias and `seamlessCubes`, verified applied in DXVK's own log
+  with no errors. **They have not been separated**, though: they went live across three
+  launches but were never A/B'd, so how much each contributes is unmeasured.
+  `tools/renderer-config.sh --stage 1` and `tools/ab-shot.sh` are what settle it, and
+  the expectation on record is that the LOD bias does more here than AF, because the
+  dominant visual layer is camera-facing billboards that AF cannot touch.
+- **Post-processing became possible tonight and is untried.** vkBasalt is a *Vulkan*
+  layer, so while the game ran on wined3d/OpenGL it could never have worked — that is
+  new, not merely undone. **Bloom is the one worth doing**: the additive sprite layer
+  already clips to flat white where billboards composite past 255, and that cannot be
+  fixed in the texture without breaking the mean-matches-stock invariant. Needs
+  `lib32-vkbasalt` from the AUR (32-bit process) and `ENABLE_VKBASALT=1`.
+- **Anti-aliasing is the largest visual win left and still needs code.** DXVK ships no
+  MSAA-forcing key — checked against the binary that loads. The `dxcfg.ini`
+  `antialiasing=` route died with the chain change (it is read by the GOG translator,
+  which DXVK's d3d8 replaced), so it is an ASI hook on `IDirect3D8::CreateDevice`
+  setting `MultiSampleType` — the same shape as `tools/menuscale/`, and a better bet
+  than before since DXVK implements D3D8 multisampling properly on Vulkan.
 - **`Mnebula4`'s generated art is preserved but unused** — `targets/Mnebula4/src-generated/`
   and `archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen` to
   return to it.

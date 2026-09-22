@@ -12,3 +12,4 @@ targets/*/.alpha-units/
 
 # selftest-mips.py imports verify.py as a module
 __pycache__/
+archive/ab/
