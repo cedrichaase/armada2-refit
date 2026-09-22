@@ -803,6 +803,45 @@ and precisely where the upscaled art lives. Expect stage 2 to do more for this g
 appearance than stage 1, which inverts the usual ordering. Stage 1 still goes first:
 AF is what keeps the sharper mips stage 2 selects from aliasing on the oblique surfaces.
 
+#### What actually happened when DXVK was finally put in the chain
+
+Settled by measurement, after three wrong explanations for "I can't see a difference".
+
+**The settings were never the problem, and neither was subtlety.** With DXVK's `d3d8.dll`
+and `d3d9.dll` in the game directory the HUD appeared and `Armada2_d3d9.log` reported:
+
+    info:  Found config file: dxvk.conf
+    info:  Effective configuration:
+    info:    d3d9.samplerAnisotropy = 16
+    info:    d3d9.samplerLodBias = -0.5
+    info:    d3d9.clampNegativeLodBias = False
+
+So `dxvk.conf` is found and every key applies, once DXVK is actually reached.
+
+**But the game then collapses to 640x480.** The same log:
+
+    err:   D3D9: EnterFullscreenMode: Failed to change display mode   (x4)
+    err:   D3D9: Failed to set initial fullscreen state               (x4)
+
+It alternates 3440x1440 and 640x480 across 25 mode sets and ends on 640x480;
+`MenuScale.log`'s last line agrees, reporting `screen 640x480`. So the engine asks for
+exclusive fullscreen, DXVK cannot change the display mode, and the fallback wins.
+
+**The prime suspect is the Wine virtual desktop** (`Software\\Wine\\Explorer`,
+`Desktop=Default`, `Default=3440x1440`). wined3d never needed a real mode change inside
+it; DXVK calls `ChangeDisplaySettingsEx` and it fails. The Hyprland section below
+already records reverting the virtual desktop as the documented alternative, using
+Omarchy window rules instead — that is the next experiment, and it is one launch.
+
+**Current state: reverted to the stock chain so the game is playable.**
+`tools/d3d8-chain.py --revert` put the Patch Project proxy back; Direct3D 8 is wined3d
+on OpenGL again and `dxvk.conf` is inert. The DXVK chain is one command away
+(`--use dxvk`) whenever the fullscreen question is worth another launch.
+
+**Note that the renderer question is now separable from the texture question.** Nothing
+about the texture work depends on any of this: it has always rendered through
+wined3d/OpenGL and continues to.
+
 #### Tier 2 — anti-aliasing, which cannot come from config
 
 **DXVK 3.1.1 has no MSAA-forcing option.** The full `d3d9.*` key list was read out of the

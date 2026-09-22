@@ -182,7 +182,20 @@ def install(which):
     # Fail before ANY side effect if the flag needs changing and Heroic is up: doing
     # half a chain switch is worse than doing none.  An earlier version checked inside
     # set_auto_dxvk() and left a backup behind after refusing.
-    set_auto_dxvk(which == 'wine')
+    #
+    # EXCEPT when returning to stock.  Getting back to a working game must never be
+    # blocked by Heroic being open: the flag is irrelevant to the WineD3D chain (the
+    # proxy loads the prefix's builtin either way), so restoring the DLLs is always
+    # allowed and only the flag waits.
+    if which == 'wine':
+        try:
+            set_auto_dxvk(True)
+        except SystemExit as exc:
+            print('note: %s' % exc)
+            print('      Restoring the DLLs anyway -- the flag does not affect the '
+                  'stock chain.')
+    else:
+        set_auto_dxvk(False)
 
     # INSTALL INTO THE GAME DIRECTORY, NOT THE PREFIX.
     #
@@ -216,8 +229,7 @@ def install(which):
             os.chmod(gamed9, 0o644)
             os.remove(gamed9)
             print('removed game-directory d3d9.dll')
-        set_auto_dxvk(True)
-        print('autoInstallDxvk -> True')
+        print('autoInstallDxvk left as-is (does not affect the stock chain)')
     elif which == 'dxvk':
         for src in (dxvk8, dxvk9):
             if not os.path.exists(src):
@@ -225,16 +237,12 @@ def install(which):
         _place(dxvk8, gamed8)
         _place(dxvk9, gamed9)
         # Both DXVK DLLs now sit beside the exe, so the prefix can do what it likes.
-        set_auto_dxvk(False)
-        print('autoInstallDxvk -> False')
     elif which == 'gog':
         gog = os.path.join(GAME, 'd3d8.dll.gog-backup')
         if not os.path.exists(gog):
             raise SystemExit('GOG translator not present: %s' % gog)
         _place(gog, gamed8)
         _place(dxvk9, gamed9)
-        set_auto_dxvk(False)
-        print('autoInstallDxvk -> False')
 
     print()
     status()

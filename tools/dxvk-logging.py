@@ -188,9 +188,17 @@ def check_log():
         print('=== %s  (%.0f min old)' % (name, age))
         text = open(path, errors='replace').read()
 
-        # DXVK prints each applied override as "key = value" under a header.
-        applied = dict(re.findall(r'^\s*(d3d9\.\w+|d3d8\.\w+|dxvk\.\w+)\s*:?=\s*(\S+)',
-                                  text, re.M))
+        # DXVK prefixes EVERY line with its log level -- "info:    d3d9.foo = bar".
+        # The first version of this anchored the key to the start of the line and so
+        # reported every applied key as NOT APPLIED while the log plainly listed them
+        # under "Effective configuration:".  Allow the level prefix.
+        applied = dict(re.findall(
+            r'^(?:\w+:)?\s*(d3d9\.\w+|d3d8\.\w+|dxvk\.\w+)\s*=\s*(\S+)', text, re.M))
+        if 'Found config file' in text:
+            for line in text.splitlines():
+                if 'Found config file' in line:
+                    print('  %s' % line.split('info:')[-1].strip())
+                    break
         if applied:
             print('  effective configuration reported by DXVK:')
             for k, v in sorted(applied.items()):
@@ -209,10 +217,27 @@ def check_log():
                     print('    %-28s NOT APPLIED  <-- dxvk.conf was not read, or the '
                           'key was ignored' % k)
                     rc = 1
-        # Anisotropy is also visible in how DXVK describes the device's sampler limits.
-        m = re.search(r'maxSamplerAnisotropy\s*:?=?\s*(\d+)', text)
-        if m:
-            print('  device maxSamplerAnisotropy: %s' % m.group(1))
+        # A config that applied cleanly still says nothing about whether the game is
+        # usable.  Surface DXVK's own errors and the swapchain sizes it settled on,
+        # because "the keys applied" and "the game renders at the right size" are
+        # different questions and the second one bit here.
+        errs = {}
+        for line in text.splitlines():
+            if line.startswith('err:'):
+                errs[line.strip()] = errs.get(line.strip(), 0) + 1
+        if errs:
+            print('  DXVK reported errors:')
+            for line, n in sorted(errs.items(), key=lambda kv: -kv[1]):
+                print('    %3dx %s' % (n, line[5:].strip()))
+
+        sizes = re.findall(r'Setting display mode:\s*(\d+x\d+)', text)
+        if sizes:
+            counts = {}
+            for s in sizes:
+                counts[s] = counts.get(s, 0) + 1
+            print('  display modes set: %s'
+                  % ', '.join('%s x%d' % (s, n) for s, n in sorted(counts.items())))
+            print('  last mode set:     %s' % sizes[-1])
     return rc
 
 
