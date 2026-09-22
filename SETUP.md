@@ -803,7 +803,35 @@ and precisely where the upscaled art lives. Expect stage 2 to do more for this g
 appearance than stage 1, which inverts the usual ordering. Stage 1 still goes first:
 AF is what keeps the sharper mips stage 2 selects from aliasing on the oblique surfaces.
 
-#### What actually happened when DXVK was finally put in the chain
+#### RESOLVED: DXVK works, and the Wine virtual desktop was the blocker
+
+**Confirmed in game at 3440x1440, with all of `dxvk.conf` applied.** The log for the
+working launch: config found, all three keys under "Effective configuration", **no
+errors at all**, and `last mode set: 3440x1440`.
+
+The working configuration, all four parts required together:
+
+| part | value | why |
+|---|---|---|
+| `GAME/d3d8.dll` | DXVK d3d8 | the prefix is not durable — Proton restores it from symlinks |
+| `GAME/d3d9.dll` | DXVK d3d9 | DXVK's d3d8 imports `d3d9.dll` by name |
+| `WINEDLLOVERRIDES` | `winmm=n,b;d3d8=n,b;d3d9=n,b` | without the d3d9 entry Wine resolves it to builtin WineD3D |
+| Wine virtual desktop | **off** | inside it DXVK's `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 |
+
+Set it up with `tools/d3d8-chain.py --use dxvk` and
+`tools/virtual-desktop.py --off`; reverse with `--revert` and `--on`.
+
+**The `d3d9=n,b` override is load-bearing, not diagnostic.** It arrived as part of
+`dxvk-logging.py --diagnose`, so `--off` used to strip it — which would have silently
+broken the chain the moment diagnostics were switched off. Ownership now sits with
+`d3d8-chain.py` (`--use` adds it, `--revert` removes it) and the logging tool only ever
+adds, never removes.
+
+**The two-window focus bug the virtual desktop was added for did not return** under
+DXVK. If it ever does, the alternative is Omarchy window rules — see the Hyprland
+section.
+
+#### How it was found — kept because the method is the lesson
 
 Settled by measurement, after three wrong explanations for "I can't see a difference".
 

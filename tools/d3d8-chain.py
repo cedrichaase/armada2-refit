@@ -106,6 +106,53 @@ def find_config():
     raise SystemExit('no Heroic config found for an Armada II prefix')
 
 
+ENV_KEY = 'enviromentOptions'          # Heroic's typo; matching it is required
+OVERRIDE_KEY = 'WINEDLLOVERRIDES'
+D3D9_OVERRIDE = 'd3d9=n,b'
+
+
+def set_d3d9_override(want):
+    """Add or remove d3d9=n,b in WINEDLLOVERRIDES, preserving everything else.
+
+    DXVK's d3d8.dll imports d3d9.dll by name. Without native-first on the d3d9 slot,
+    Wine resolves it to builtin WineD3D and DXVK's d3d8 has nothing to sit on -- so
+    this belongs to the chain, not to the diagnostics that first introduced it.
+    """
+    path, data, key = find_config()
+    entries = data[key].setdefault(ENV_KEY, [])
+    before = json.dumps(entries, sort_keys=True)
+
+    target = None
+    for e in entries:
+        if e.get('key') == OVERRIDE_KEY:
+            target = e
+            break
+    parts = [p for p in str(target.get('value', '')).split(';')
+             if p.strip()] if target else []
+    parts = [p for p in parts if not p.strip().startswith('d3d9=')]
+    if want:
+        parts.append(D3D9_OVERRIDE)
+    value = ';'.join(parts)
+
+    if target is not None:
+        target['value'] = value
+    elif want:
+        entries.append({'key': OVERRIDE_KEY, 'value': value})
+
+    if json.dumps(entries, sort_keys=True) == before:
+        return False
+    if heroic_running():
+        raise SystemExit('Heroic is running, and WINEDLLOVERRIDES needs the d3d9 entry '
+                         '%s -- close Heroic fully and re-run.'
+                         % ('added' if want else 'removed'))
+    if not os.path.exists(path + '.bak-a2chain'):
+        shutil.copy2(path, path + '.bak-a2chain')
+    with open(path, 'w') as fh:
+        json.dump(data, fh, indent=2)
+    print('WINEDLLOVERRIDES -> %s' % value)
+    return True
+
+
 def set_auto_dxvk(value):
     path, data, key = find_config()
     # Check whether a change is actually needed BEFORE demanding Heroic be closed.
@@ -220,6 +267,9 @@ def install(which):
         if identify(gamed8) == 'Patch Project proxy':
             shutil.copy2(gamed8, proxy_bak)
             print('backed up Patch Project proxy -> %s' % os.path.basename(proxy_bak))
+
+    # The d3d9 override is part of the DXVK chain, not of the diagnostics.
+    set_d3d9_override(which != 'wine')
 
     if which == 'wine':
         # Restore the proxy and remove the DXVK d3d9 we added beside it.

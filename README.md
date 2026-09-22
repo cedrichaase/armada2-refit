@@ -1777,21 +1777,22 @@ Genuinely outstanding:
   mission, then madExcept. Captured in `archive/error-mission-finish/`. **It first
   occurred before any modding**, so it is not this project's, and nothing here has been
   shown to affect it either way. Recorded so it is not mistaken for a texture problem.
-- **Renderer-side enhancements are installed at stage 1 and await a play session.**
-  `tools/renderer-config.sh` writes `dxvk.conf`; stage 1 is 16x anisotropic filtering
-  alone, which sharpens every oblique surface in the game at once — in a top-down RTS,
-  every hull and every planet. Stages 2 (mip LOD bias) and 3 (seamless cubes) are
-  written but **not installed**, deliberately: one change at a time, so a bad result is
-  attributable. `--remove` reverts completely. The earlier note here held this back
-  behind the d3d8 regression; that was wrong, because both possible chains end in
-  DXVK's `d3d9.dll`, so `d3d9.*` keys apply either way. Full reasoning, plus the
-  anti-aliasing, post-processing and ambient-occlusion verdicts, in `SETUP.md`,
-  "Renderer-side enhancements".
-- **Anti-aliasing has no config route.** DXVK 3.1.1 ships no MSAA-forcing key — checked
-  against the binary Heroic deploys, not the documentation. It needs either the d3d8
-  regression closed (which would make `dxcfg.ini`'s own `antialiasing=` key live again)
-  or an ASI hook on `IDirect3D8::CreateDevice`. Probably the largest remaining visual
-  win after the texture work, and the one that costs real effort.
+- **DXVK now renders the game, and `dxvk.conf` applies.** Confirmed in game at
+  3440x1440 with 16x anisotropic filtering and a -0.5 mip LOD bias live, no DXVK
+  errors. Four things are required together and all four are in place:
+  DXVK's `d3d8.dll` **and** `d3d9.dll` in the **game directory** (the prefix is not
+  durable — Proton restores it from symlinks), `d3d9=n,b` in `WINEDLLOVERRIDES`, and
+  the **Wine virtual desktop off** — inside it DXVK's display-mode change fails and the
+  game collapses to 640x480. `tools/d3d8-chain.py` and `tools/virtual-desktop.py` set
+  and reverse all of it; full write-up in `SETUP.md`.
+  **This corrects a claim that stood in these notes for a long time:**
+  `syswow64/d3d8.dll` at 320548 bytes was recorded as DXVK's; it is byte-identical to
+  *Wine's builtin*, so until now the game — and every texture in it — rendered through
+  wined3d/OpenGL, never Vulkan.
+- **Stage 3 (`seamlessCubes`) is untried, and stages 1 and 2 have not been separated.**
+  Both went live in the same launch, so which of anisotropic filtering and the LOD bias
+  is doing the visible work is unmeasured. `tools/renderer-config.sh --stage 1` and
+  `tools/ab-shot.sh` are what settle it.
 - **`Mnebula4`'s generated art is preserved but unused** — `targets/Mnebula4/src-generated/`
   and `archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen` to
   return to it.

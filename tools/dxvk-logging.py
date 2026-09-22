@@ -125,8 +125,14 @@ def set_logging(on, hud=False, fix_override=False):
             # and no dxvk.conf key can possibly have had an effect.  That is a binary
             # answer that needs no log parsing and no judgement.
             entries.append({'key': 'DXVK_HUD', 'value': 'version,devinfo'})
-    # The override is restored on --off as well, so --off is a complete revert.
-    _set_d3d9_override(entries, want=bool(on and fix_override))
+    # Only ADD the override here, never remove it.  `d3d9=n,b` began as part of the
+    # diagnosis but is now load-bearing: DXVK's d3d8 imports d3d9.dll, and without the
+    # native-first override Wine resolves that to builtin WineD3D and the chain breaks.
+    # Stripping it when diagnostics are switched off would silently undo the fix, so
+    # ownership of the override belongs to d3d8-chain.py (--use adds it, --revert
+    # removes it) and this tool leaves it alone.
+    if on and fix_override:
+        _set_d3d9_override(entries, want=True)
 
     with open(path, 'w') as fh:
         json.dump(data, fh, indent=2)
