@@ -90,12 +90,17 @@ fi
 # Heroic deploys.  A key DXVK does not know is silently ignored, so a typo here would
 # read in game as "the setting did nothing" -- the same class of silent failure that
 # ImageMagick's TGA origin handling caused on the texture side.
-# Heroic records the build it deploys in tools/dxvk/latest_dxvk, so read that rather
-# than guessing at the newest directory.  Note the fallback strips the trailing slash
-# before sorting: `sort -V` ranks "dxvk-3.1/" ABOVE "dxvk-3.1.1/", so globbing with a
-# trailing slash and taking the tail silently picks the OLDER build.
+# Check against the d3d9.dll that ACTUALLY LOADS, which since the chain moved into the
+# game directory is the one sitting beside Armada2.exe -- Proton's DXVK, not the build
+# Heroic keeps in its tools directory.  Verifying against the wrong build is how a key
+# the live DXVK does not know would still be reported "ok"; all four happen to exist in
+# both, but that is luck, not a guarantee.
 dxvk_dll() {
     local root="$HOME/.config/heroic/tools/dxvk" d name
+    if [ -f "$GAME/d3d9.dll" ]; then
+        echo "$GAME/d3d9.dll"
+        return 0
+    fi
     if [ -r "$root/latest_dxvk" ]; then
         name=$(tr -d '[:space:]' < "$root/latest_dxvk")
         [ -n "$name" ] && [ -f "$root/$name/x32/d3d9.dll" ] && { echo "$root/$name/x32/d3d9.dll"; return 0; }
@@ -111,7 +116,14 @@ verify_keys() {
         echo "  (no Heroic DXVK build found -- skipping key verification)"
         return 0
     fi
-    echo "  against $(basename "$(dirname "$(dirname "$dll")")")"
+    # Name what was actually checked. Deriving a label from the path's grandparent
+    # printed "Heroic" for a DLL in the game directory, which is both wrong and the
+    # kind of wrong that reads as right.
+    if [ "$dll" = "$GAME/d3d9.dll" ]; then
+        echo "  against the d3d9.dll in the game directory (the one that loads)"
+    else
+        echo "  against $(basename "$(dirname "$(dirname "$dll")")") (not in the chain)"
+    fi
 
     # Read the DLL's strings ONCE into a variable and match with bash's own pattern
     # test.  Do NOT write this as `strings ... | grep -qxF "$k"`: grep -q exits on the
