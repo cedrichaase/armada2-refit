@@ -19,8 +19,15 @@ Do not hand-edit it and do not re-derive its numbers in prose; re-run the tool.
 
 `SETUP.md` covers the Heroic/Proton side — DLL overrides, the widescreen patch, the
 d3d8 proxy chain, the Hyprland virtual desktop, the save format. Read it before
-touching anything renderer-adjacent. **It records a live regression: Heroic redeploys
-DXVK on every launch and reverts the d3d8 chain fix.**
+touching anything renderer-adjacent. **The game now renders through DXVK/Vulkan, and it
+did not before** — `syswow64/d3d8.dll` was recorded there as DXVK's on the strength of
+its byte count and is in fact byte-identical to *Wine's builtin*, so every texture this
+project has ever shipped was drawn by wined3d/OpenGL. The working chain keeps DXVK's
+`d3d8.dll` **and** `d3d9.dll` in the **game directory** (the prefix is not durable —
+Proton restores it from symlinks) with the Wine virtual desktop **off**.
+`tools/d3d8-chain.py --status` identifies every link **by hash**; never identify one of
+these by size. The old "Heroic redeploys DXVK and reverts the fix" regression was
+`autoInstallDxvk` working as designed, not a bug.
 
 ## Environment
 

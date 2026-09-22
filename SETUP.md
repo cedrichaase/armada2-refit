@@ -696,7 +696,10 @@ and does not need the regression closed first. The AA routes below are the ones 
 #### Tier 1 — `dxvk.conf`, free and reversible
 
 `tools/renderer-config.sh` writes it, in **cumulative stages**, because this project's
-method is one change at a time and three keys at once is not attributable:
+method is one change at a time and three keys at once is not attributable.
+**All three stages are installed and confirmed in game.** It verifies every key against
+the `d3d9.dll` that actually loads — the one in the game directory — before writing,
+because a key DXVK does not recognise is silently ignored:
 
     tools/renderer-config.sh              # stage 1: anisotropic filtering only
     tools/renderer-config.sh --stage 2    # + mip LOD bias
@@ -805,9 +808,14 @@ AF is what keeps the sharper mips stage 2 selects from aliasing on the oblique s
 
 #### RESOLVED: DXVK works, and the Wine virtual desktop was the blocker
 
-**Confirmed in game at 3440x1440, with all of `dxvk.conf` applied.** The log for the
-working launch: config found, all three keys under "Effective configuration", **no
-errors at all**, and `last mode set: 3440x1440`.
+**Confirmed in game at 3440x1440, with all of `dxvk.conf` applied — stages 1, 2 and 3.**
+The log for the working launch: config found, **no errors at all**,
+`last mode set: 3440x1440`, and all four keys under "Effective configuration":
+
+    d3d9.samplerAnisotropy = 16
+    d3d9.samplerLodBias = -0.5
+    d3d9.clampNegativeLodBias = False
+    d3d9.seamlessCubes = True
 
 The working configuration, all four parts required together:
 
@@ -870,68 +878,83 @@ on OpenGL again and `dxvk.conf` is inert. The DXVK chain is one command away
 about the texture work depends on any of this: it has always rendered through
 wined3d/OpenGL and continues to.
 
-#### Tier 2 — anti-aliasing, which cannot come from config
+#### Tier 2 — anti-aliasing, still the largest visual win left
 
-**DXVK 3.1.1 has no MSAA-forcing option.** The full `d3d9.*` key list was read out of the
-binary; there is no `forceSwapchainMSAA` or equivalent. `d3d9.forceSampleRateShading`
-exists but only does anything once MSAA is already on. So AA needs one of three routes:
+**DXVK 3.x ships no MSAA-forcing key.** Read out of the binary that actually loads, not
+from documentation: there is no `forceSwapchainMSAA` or equivalent.
+`d3d9.forceSampleRateShading` exists but only does anything once MSAA is already on. So
+AA cannot come from `dxvk.conf`, and the three routes are now these — note that the
+cheapest one died when the chain changed:
 
-1. **`dxcfg.ini`'s own `antialiasing=` key**, which sits right beside the `anisotropic=`
-   one. Cheapest to try — but **currently inert**: `dxcfg.ini` is read by the GOG
-   d3d8to9 translator, which the Heroic redeploy has knocked out of the chain. This route
-   *does* depend on the regression fix, and is an argument for doing it that the earlier
-   write-up did not have. Its accepted values are unknown — `dxcfg.exe`'s strings are
-   packed and yielded nothing — so they have to be found by testing.
-2. **An ASI hook on `IDirect3D8::CreateDevice`** setting `MultiSampleType`. Squarely
+1. **~~`dxcfg.ini`'s own `antialiasing=` key~~ — dead.** It is read by the GOG d3d8to9
+   translator, and the working chain replaced the translator with DXVK's own d3d8.
+   `dxcfg.ini` is inert and will stay inert unless the chain moves to
+   `d3d8-chain.py --use gog`, which is a real option (GOG d3d8to9 → DXVK d3d9 → Vulkan)
+   and would make both `anisotropic=` and `antialiasing=` live again. Untested, and its
+   accepted values are unknown because `dxcfg.exe`'s strings are packed.
+2. **An ASI hook on `IDirect3D8::CreateDevice`**, setting `MultiSampleType`. Squarely
    inside the toolchain `tools/menuscale/` already proves — clang + lld-link + the
-   Ultimate ASI Loader that is already carrying two plugins — and `armada2.map` gives the
-   call site. The most likely to work, and the most work.
-3. **Supersampling by rendering above display resolution.** Looks free given the GPU
-   headroom and **is not**. The whole UI layer is tuned to 3440x1440:
-   `ui-widescreen.py`'s canvas arithmetic, the `popupPaletteXA` correction and
-   `MenuScale.asi`'s desktop-size read would all need re-deriving. Recorded so it is not
-   mistaken for a quick win.
+   Ultimate ASI Loader that is already carrying two plugins — and `armada2.map` gives
+   the call site. **The most likely to work, and now the most attractive**: DXVK
+   implements D3D8 multisampling properly on Vulkan, which wined3d's D3D8 path did not
+   reliably do, so this became a better bet the moment the chain changed.
+3. **Post-process AA via vkBasalt** — see Tier 3. FXAA/SMAA rather than MSAA, so it
+   softens edges rather than resolving them, but it costs no code at all.
 
-#### Tier 3 — post-processing
+**Supersampling by rendering above display resolution remains a trap.** It looks free
+given the GPU headroom and is not: `ui-widescreen.py`'s canvas arithmetic, the
+`popupPaletteXA` correction and `MenuScale.asi`'s desktop-size read are all tuned to
+3440x1440 and would need re-deriving.
 
-**vkBasalt** is the realistic layer. ReShade under a four-deep d3d8 -> d3d9 -> DXVK chain
-is fragile and would be a fourth thing in a stack that already has an open regression.
+#### Tier 3 — post-processing, which only became possible tonight
+
+**This was impossible until the chain changed, and that is the point.** vkBasalt is a
+**Vulkan layer**. Until DXVK went in, Direct3D 8 landed on wined3d/**OpenGL**, so
+vkBasalt had nothing to attach to — any attempt would have done nothing, with no error
+to explain why. Now that the game renders through Vulkan, the whole post-processing
+family is reachable for the first time.
+
 vkBasalt is **AUR-only** here (`gamescope` is in `extra`; `vkbasalt`, `lib32-vkbasalt`
 and `reshade-shaders` are not in the official repos), and **`lib32-vkbasalt` is the one
-that matters** — `Armada2.exe` is 32-bit, so the 64-bit layer alone does nothing.
+that matters** — `Armada2.exe` is 32-bit, so the 64-bit layer alone does nothing. Enable
+per-game with `ENABLE_VKBASALT=1` in Heroic's environment, the same place
+`tools/dxvk-logging.py` writes its variables.
 
 It operates on the final swapchain image, and that decides what is possible: CAS
 sharpening, FXAA/SMAA, LUT/tonemapping and depth-independent bloom all work; anything
 needing depth does not.
 
 **Bloom is the one worth doing**, and the reason is specific to this game rather than
-general taste. Armada II's visual language is almost entirely additive sprites — nebulae,
-weapons, engine glows — and the latinum clouds already clip to flat white where
+general taste. Armada II's visual language is almost entirely additive sprites —
+nebulae, weapons, engine glows — and the latinum clouds already clip to flat white where
 overlapping billboards composite past 255. That clipping is stock-faithful and cannot be
 fixed in the texture, because the per-channel mean *is* the light contributed and
-lowering it breaks the match against stock. Bloom converts that blowout from "the texture
-ran out of range" into "that is a bright object", which is the correct read and which no
-amount of texture work can produce.
+lowering it breaks the match against stock. Bloom converts that blowout from "the
+texture ran out of range" into "that is a bright object", which is the correct read and
+which no amount of texture work can produce.
+
+Judge it the way `tools/measure-invention.sh` judges a blend, not at 1:1 — and
+`tools/ab-shot.sh` will diff two launches numerically.
 
 #### Tier 0 — ambient occlusion, which is the wrong tool here
 
-Two objections; the second is the decisive one.
+Unchanged by any of the above, and the reasoning is worth keeping because "add AO and
+bloom" is the reflex suggestion for any old game and only half of it survives contact
+with this one.
 
-The practical one: depth-buffer access through d3d8 -> d3d9 -> DXVK is exactly where
+The practical objection: depth-buffer access through d3d8 → d3d9 → DXVK is exactly where
 ReShade's depth detection is least reliable.
 
-The real one is about content. **AO darkens contact points and creases, and this scene
-has neither.** Ships float in vacuum against a skybox — nothing touches anything, there
-is no ground plane, no architecture, no interior corners. The 2001 hull models are
+The real objection is about content. **AO darkens contact points and creases, and this
+scene has neither.** Ships float in vacuum against a skybox — nothing touches anything,
+there is no ground plane, no architecture, no interior corners. The 2001 hull models are
 low-poly, so there are barely any geometric creases to occlude either, and what detail
 exists is *painted into the diffuse map*, where AO cannot see it. The cost is high and
 the return is faint rim-darkening on ship silhouettes.
 
 The same reasoning rules out most lighting-based effects: the game has close to no
 lighting model to enhance. That is why the texture work has so much leverage here and
-why shader tricks have so little — and it is worth stating explicitly, because "add AO
-and bloom" is the reflex suggestion for any old game and only half of it survives
-contact with this one.
+why shader tricks have so little.
 
 ### Also outstanding
 

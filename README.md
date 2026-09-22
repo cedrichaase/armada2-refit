@@ -1789,10 +1789,25 @@ Genuinely outstanding:
   `syswow64/d3d8.dll` at 320548 bytes was recorded as DXVK's; it is byte-identical to
   *Wine's builtin*, so until now the game — and every texture in it — rendered through
   wined3d/OpenGL, never Vulkan.
-- **Stage 3 (`seamlessCubes`) is untried, and stages 1 and 2 have not been separated.**
-  Both went live in the same launch, so which of anisotropic filtering and the LOD bias
-  is doing the visible work is unmeasured. `tools/renderer-config.sh --stage 1` and
-  `tools/ab-shot.sh` are what settle it.
+- **All three renderer stages are installed and confirmed in game** — 16x anisotropic
+  filtering, a -0.5 mip LOD bias and `seamlessCubes`, verified applied in DXVK's own log
+  with no errors. **They have not been separated**, though: they went live across three
+  launches but were never A/B'd, so how much each contributes is unmeasured.
+  `tools/renderer-config.sh --stage 1` and `tools/ab-shot.sh` are what settle it, and
+  the expectation on record is that the LOD bias does more here than AF, because the
+  dominant visual layer is camera-facing billboards that AF cannot touch.
+- **Post-processing became possible tonight and is untried.** vkBasalt is a *Vulkan*
+  layer, so while the game ran on wined3d/OpenGL it could never have worked — that is
+  new, not merely undone. **Bloom is the one worth doing**: the additive sprite layer
+  already clips to flat white where billboards composite past 255, and that cannot be
+  fixed in the texture without breaking the mean-matches-stock invariant. Needs
+  `lib32-vkbasalt` from the AUR (32-bit process) and `ENABLE_VKBASALT=1`.
+- **Anti-aliasing is the largest visual win left and still needs code.** DXVK ships no
+  MSAA-forcing key — checked against the binary that loads. The `dxcfg.ini`
+  `antialiasing=` route died with the chain change (it is read by the GOG translator,
+  which DXVK's d3d8 replaced), so it is an ASI hook on `IDirect3D8::CreateDevice`
+  setting `MultiSampleType` — the same shape as `tools/menuscale/`, and a better bet
+  than before since DXVK implements D3D8 multisampling properly on Vulkan.
 - **`Mnebula4`'s generated art is preserved but unused** — `targets/Mnebula4/src-generated/`
   and `archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen` to
   return to it.
