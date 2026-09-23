@@ -1796,12 +1796,10 @@ Genuinely outstanding:
   `tools/renderer-config.sh --stage 1` and `tools/ab-shot.sh` are what settle it, and
   the expectation on record is that the LOD bias does more here than AF, because the
   dominant visual layer is camera-facing billboards that AF cannot touch.
-- **Post-processing became possible tonight and is untried.** vkBasalt is a *Vulkan*
-  layer, so while the game ran on wined3d/OpenGL it could never have worked — that is
-  new, not merely undone. **Bloom is the one worth doing**: the additive sprite layer
-  already clips to flat white where billboards composite past 255, and that cannot be
-  fixed in the texture without breaking the mean-matches-stock invariant. Needs
-  `lib32-vkbasalt` from the AUR (32-bit process) and `ENABLE_VKBASALT=1`.
+- **Bloom is installed and confirmed in game** — vkBasalt + MagicBloom, threshold 6,
+  intensity 0.08, Home toggles it live. Built per-user by `tools/vkbasalt/build.sh`,
+  configured by `tools/postfx.py`; details and the measurements behind the numbers in
+  `SETUP.md`, Tier 3. What is left in the post-processing family is SMAA/CAS, untried.
 - **Anti-aliasing is the largest visual win left and still needs code.** DXVK ships no
   MSAA-forcing key — checked against the binary that loads. The `dxcfg.ini`
   `antialiasing=` route died with the chain change (it is read by the GOG translator,
