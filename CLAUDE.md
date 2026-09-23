@@ -431,8 +431,9 @@ was *filling a small screen*, not sitting in a big one. `tools/menuscale/` holds
 menu included: each is `DialogBoxParamA` with a `WS_POPUP` template, which Wine turns
 into a second X11 window that Hyprland tiles and focuses. `MenuScale.asi` with
 `Embed=1` (the default it ships with) re-creates each one as a `WS_CHILD` of the game
-window, so the game is one window from launch to exit. Checked in a test launch, not yet
-played. **GetDC/ReleaseDC do not pair in this game**: `ShellButton::UpdateButton` has
+window, so the game is one window from launch to exit. **Confirmed in game, "much
+improved".** Open: the Admiral's Log (modeless `CreateDialogParamA`, not yet hooked) and
+unscaled text boxes. **GetDC/ReleaseDC do not pair in this game**: `ShellButton::UpdateButton` has
 its `ReleaseDC` NOP'd out, so nothing in `menuscale.c` may assume they do. Both are in
 `tools/menuscale/README.md`.
 

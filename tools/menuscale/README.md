@@ -65,7 +65,7 @@ so gameplay, the HUD and the Bink videos are untouched by construction.
 
 ## One window: `Embed=1`
 
-**Confirmed in a test launch, not yet played:** the game is one OS window from
+**Confirmed in game by the user (2026-09-23): "much improved".** Also checked in test launches: the game is one OS window from
 launch to exit, main menu, Options and its nested screens, and the in-mission
 Options menu, Save Game and Return to Game included.
 
@@ -107,6 +107,24 @@ each handled, each measured:
 `CreateDialogParamA` (two sites, both the admiral's log, one already a
 `WS_CHILD` template) is left alone. `Embed=0` restores separate windows; the
 `DialogBoxParamA` hook then only logs.
+
+**The cursor.** The 3D window's `WindowProc` answers every `WM_SETCURSOR` with
+`SetCursor(NULL)` (`0x488881`), so the engine's sprite cursor can show in play. A child's
+`DefWindowProc` asks its parent first, so once embedded, the arrow vanished over every
+menu (measured: `GetCursorInfo` handle NULL). The dialog wrapper now sets the class cursor
+of the window under the pointer itself, as a top-level dialog did. Checked on the main
+menu and Options. The in-mission menu, and the sprite cursor returning after Return to
+Game, are left to the user's play-through.
+
+### Open: the Admiral's Log still shows a window inside the window
+
+Reported in game: a border around the centre content. `AdmiralsLogDlgProc` builds its
+panes itself. It calls `CreateDialogParamA(shell_hInstance, 0x123, ..., 
+ScreenInformation::CallDialogProc)` at `0x5e3c04`, positioned via `ClientToScreen`
+(it's modeless, so the `DialogBoxParamA` hook never sees it), plus two `CreateWindowExA`
+(`0x5e394e`, and `0x5e3b7b` with style `0x5000000b`). Next step: hook
+`CreateDialogParamA` the same way as `DialogBoxParamA` (WS_POPUP -> WS_CHILD, no modal
+bookkeeping), then read the two `CreateWindowExA` styles.
 
 ## GetDC and ReleaseDC do not pair up in this game
 
@@ -269,7 +287,8 @@ why neither was done up front.
   are separate HWNDs that Windows draws itself. They are not covered by the offscreen
   redirect and will sit unscaled. The main screens are custom-drawn `ShellButton`
   bitmaps and are fine. **Seen:** Save Game's name field (`Edit`, 476x28 at design
-  176,551) draws at 1:1 in the left pillarbox. Embed does not change this. The fix is
+  176,551) draws at 1:1 at its unscaled position. The user confirms this in game for
+all text boxes, and they are still usable. Embed does not change this. The fix is
   to map child-control geometry through the same fit, plus a scaled font.
 - **Menus drawn inside the renderer** (the Direct3D route) was considered and
   deferred. Embed gets one OS window without it, and the GDI child draws correctly over
