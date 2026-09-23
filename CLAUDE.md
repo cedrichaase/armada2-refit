@@ -28,6 +28,11 @@ Proton restores it from symlinks) with the Wine virtual desktop **off**.
 `tools/d3d8-chain.py --status` identifies every link **by hash**; never identify one of
 these by size. The old "Heroic redeploys DXVK and reverts the fix" regression was
 `autoInstallDxvk` working as designed, not a bug.
+**Bloom is on**, through vkBasalt — a Vulkan layer, so possible only since the DXVK
+change. `tools/vkbasalt/build.sh` builds it per-user and 32-bit; `tools/postfx.py`
+configures it and refuses any effect its offline compiler (`fxcheck`) rejects. Home
+toggles it in game. Threshold 6 / intensity 0.08, accepted by the user; the table
+behind those numbers is in `SETUP.md`, Tier 3.
 
 ## Environment
 

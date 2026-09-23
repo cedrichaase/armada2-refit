@@ -906,7 +906,7 @@ given the GPU headroom and is not: `ui-widescreen.py`'s canvas arithmetic, the
 `popupPaletteXA` correction and `MenuScale.asi`'s desktop-size read are all tuned to
 3440x1440 and would need re-deriving.
 
-#### Tier 3 — post-processing, which only became possible tonight
+#### Tier 3 — post-processing: bloom done, the rest untried
 
 **This was impossible until the chain changed, and that is the point.** vkBasalt is a
 **Vulkan layer**. Until DXVK went in, Direct3D 8 landed on wined3d/**OpenGL**, so
@@ -914,11 +914,66 @@ vkBasalt had nothing to attach to — any attempt would have done nothing, with 
 to explain why. Now that the game renders through Vulkan, the whole post-processing
 family is reachable for the first time.
 
-vkBasalt is **AUR-only** here (`gamescope` is in `extra`; `vkbasalt`, `lib32-vkbasalt`
-and `reshade-shaders` are not in the official repos), and **`lib32-vkbasalt` is the one
-that matters** — `Armada2.exe` is 32-bit, so the 64-bit layer alone does nothing. Enable
-per-game with `ENABLE_VKBASALT=1` in Heroic's environment, the same place
-`tools/dxvk-logging.py` writes its variables.
+**Done: bloom is installed and confirmed in game** — MagicBloom through vkBasalt,
+threshold 6, intensity 0.08, accepted by the user after one step up from 0.05.
+**Home toggles it live**, which makes it the one renderer setting in this project with a
+same-frame A/B.
+
+    tools/vkbasalt/build.sh          # build + install the layer (per-user, pinned)
+    tools/postfx.py --on             # write config, prove it compiles, enable in Heroic
+    tools/postfx.py --set --intensity 0.08 --threshold 6    # retune; relaunch to see
+    tools/postfx.py --check          # read vkBasalt's log from the last launch
+    tools/postfx.py --off            # disable for the game
+    tools/vkbasalt/build.sh --remove # uninstall everything
+
+How it is put together, and why each piece is that way:
+
+- **Built from source into `~/.local`, not from the AUR.** `lib32-vkbasalt` wants a
+  sudo password and installs system-wide; the build needs only what is already here
+  (`g++ -m32`, `lib32-libx11`, `glslang`) plus meson/ninja in a venv and headers fetched
+  by commit. Every source is pinned by SHA. vkBasalt 0.3.2.10 (2023, the last tag)
+  does not build against current Vulkan-Headers — `vk_layer.h` left that repo — so the
+  headers are pinned to SDK 1.3.250.
+- **32-bit only**, because a Vulkan layer loads into the process that calls Vulkan, and
+  that is the i386 game. This holds because Proton-CachyOS uses *old* WoW64 unless
+  `PROTON_USE_WOW64=1` is set — **under new WoW64 the Unix side is 64-bit and this
+  layer would silently never load.** If that variable ever appears, build a 64-bit one.
+- **The manifest is inert without `ENABLE_VKBASALT=1`**, which `postfx.py` sets in this
+  game's Heroic environment only, beside `VKBASALT_CONFIG_FILE` and a log file.
+- **Nothing lives in the game directory.** vkBasalt's config parser drops spaces and
+  warns against them in shader paths, and the game directory is `Star Trek Armada II`;
+  config, wrapper, shaders and log are all under `~/.local/share/a2-vkbasalt/`.
+- **Shaders are split across two branches of crosire/reshade-shaders**, which is not
+  obvious: the single-file bloom shaders are on `legacy`, and `legacy` ships **no
+  `ReShade.fxh`** — the headers every one of them includes are on `master`.
+- **`fxcheck`** (`tools/vkbasalt/fxcheck.cpp`) links the layer's own `libreshade.a` and
+  compiles an effect with vkBasalt's exact macros and codegen flags, offline.
+  `postfx.py` refuses to enable an effect it cannot compile, and refuses any config key
+  the compiled effect does not expose. Both failures are otherwise *silent* in game — an
+  absent effect, an ignored key — which is the DXVK lesson applied in advance. It caught
+  the missing headers on its first run; the output also passes `spirv-val`.
+- **`MagicBloom` is wrapped, not used as shipped** (`A2Bloom.fx`, written by
+  `postfx.py`): eye adaptation off, because it rescales bloom by average frame
+  brightness and would pulse as the camera pans between empty space and a nebula; lens
+  dirt off, because there is no lens. Those are preprocessor switches, which
+  `vkBasalt.conf` cannot set.
+
+**The numbers were measured before the first launch**, by approximating the shader —
+threshold power, 8-level blur pyramid, Hable tonemap at MagicBloom's fixed 100x, screen
+blend — in ImageMagick on a real frame:
+
+| threshold / intensity | latinum | fog of war | HUD | whole frame |
+|---|---|---|---|---|
+| 2 / 1 (MagicBloom's defaults) | — | — | — | mean +123/255, 99.7% of pixels changed |
+| 4 / 0.1 | +27.2 | +6.5 | +6.3 | |
+| 6 / 0.1 | +22.5 | +0.7 | +3.8 | |
+| 6 / 0.03 | +7.7 | +0.2 | +1.2 | |
+
+The threshold is an *exponent* on colour, so it decides **what** blooms and intensity
+decides **how much**. At 6 the glow lands on the additive sprites that already clip and
+leaves the grey shroud alone (31:1); at 4 the shroud hazes over (4:1). The HUD is in
+the frame vkBasalt sees, so it can bloom too; the high threshold is also what keeps
+that small. The shader's own defaults would have made the frame milky.
 
 It operates on the final swapchain image, and that decides what is possible: CAS
 sharpening, FXAA/SMAA, LUT/tonemapping and depth-independent bloom all work; anything
@@ -956,12 +1011,10 @@ The same reasoning rules out most lighting-based effects: the game has close to 
 lighting model to enhance. That is why the texture work has so much leverage here and
 why shader tricks have so little.
 
-### Also outstanding
+### No longer outstanding
 
-`d3d9=n,b` has never been added to `WINEDLLOVERRIDES`. Without it the translator may
-resolve to Wine's builtin d3d9 rather than DXVK's. Target value:
-
-    winmm=n,b;d3d8=n,b;d3d9=n,b
+`d3d9=n,b` is in `WINEDLLOVERRIDES` — `winmm=n,b;d3d8=n,b;d3d9=n,b`, confirmed in
+Heroic's config. It is part of the working DXVK chain above.
 
 ## Hyprland / window management
 

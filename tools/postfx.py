@@ -3,7 +3,7 @@
 
     postfx.py --on                  write the config, prove it compiles, enable for the game
     postfx.py --set                 rewrite the config only (no Heroic change needed)
-        --intensity F               bloom strength           (default 0.05)
+        --intensity F               bloom strength           (default 0.08)
         --threshold F               how bright a pixel must be to bloom (default 6.0)
     postfx.py --off                 disable for the game (config left in place)
     postfx.py --status              what is installed and enabled
@@ -28,7 +28,8 @@ game (approximated in ImageMagick, pyramid and tonemap included) they lift the m
 
 At 6 the bloom lands on what already clips (the additive sprites) and leaves the grey
 shroud alone, 31:1; at 4 that selectivity falls to 4:1 and the shroud hazes over.
-0.05 is half the stronger row, a start to tune from, not an answer.
+The first launch ran at 0.05 (half the stronger row); the user raised it once to 0.08
+and kept it -- accepted in game, 2026-09-23.  That is the default now.
 
 The HUD is part of the frame vkBasalt sees -- a post-process layer runs on the final
 image, UI and all -- so bright UI elements can bloom too.  A high threshold is also
@@ -220,7 +221,7 @@ def main():
     g.add_argument('--off', action='store_true')
     g.add_argument('--status', action='store_true')
     g.add_argument('--check', action='store_true')
-    ap.add_argument('--intensity', type=float, default=0.05)
+    ap.add_argument('--intensity', type=float, default=0.08)
     ap.add_argument('--threshold', type=float, default=6.0)
     a = ap.parse_args()
 
