@@ -1806,6 +1806,11 @@ Genuinely outstanding:
   which DXVK's d3d8 replaced), so it is an ASI hook on `IDirect3D8::CreateDevice`
   setting `MultiSampleType` — the same shape as `tools/menuscale/`, and a better bet
   than before since DXVK implements D3D8 multisampling properly on Vulkan.
+- **Ships pop in during cutscenes: understood, deliberately left alone.** This is
+  object culling, not the far plane. Each mission script sets its own cutscene culling
+  distance, between 1000 and 6000, so `ART_CFG.h` cannot reach it. All 52 call sites,
+  with the file offset of each float, and a one-float patch recipe are in `SETUP.md`,
+  "Draw distance". Change one mission when one cutscene bothers you.
 - **`Mnebula4`'s generated art is preserved but unused** — `targets/Mnebula4/src-generated/`
   and `archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen` to
   return to it.
