@@ -39,3 +39,7 @@ WindowFromPoint@8
 PostMessageA@16
 SetTimer@16
 MapVirtualKeyA@8
+GetClassLongA@8
+SetCursor@4
+LoadCursorA@8
+GetCursorInfo@4

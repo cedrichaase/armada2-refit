@@ -148,6 +148,9 @@ __declspec(dllimport) HWND    __stdcall GetParent(HWND);
 __declspec(dllimport) HWND    __stdcall GetAncestor(HWND, UINT);
 __declspec(dllimport) BOOL    __stdcall IsChild(HWND, HWND);
 __declspec(dllimport) LONG    __stdcall GetWindowLongA(HWND, INT);
+__declspec(dllimport) DWORD   __stdcall GetClassLongA(HWND, INT);
+__declspec(dllimport) HANDLE  __stdcall SetCursor(HANDLE);
+__declspec(dllimport) HANDLE  __stdcall LoadCursorA(HINSTANCE, LPCSTR);
 __declspec(dllimport) HHOOK   __stdcall SetWindowsHookExA(INT, HOOKPROC, HINSTANCE, DWORD);
 __declspec(dllimport) LONG_PTR __stdcall CallNextHookEx(HHOOK, INT, WPARAM, LPARAM);
 
@@ -523,6 +526,11 @@ static void present(Slot *s, HDC real)
 #define WH_GETMESSAGE    3
 #define WM_NULL          0x0000
 #define WM_INITDIALOG    0x0110
+#define WM_SETCURSOR     0x0020
+#define HTCLIENT         1
+#define GCL_HCURSOR      (-12)
+#define DWL_MSGRESULT    0
+#define IDC_ARROW_ID     32512
 #define WM_DESTROY       0x0002
 #define WM_NCDESTROY     0x0082
 #define WM_KEYFIRST      0x0100
@@ -637,6 +645,23 @@ static LONG_PTR __stdcall embed_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     }
 
     r = e->proc ? e->proc(h, msg, wp, lp) : 0;
+
+    /* The cursor.  DefWindowProc on a CHILD asks its parent first, and the
+     * parent is now the 3D window, whose WindowProc (0x488881) answers every
+     * WM_SETCURSOR with SetCursor(NULL) -- in play the engine draws its own
+     * sprite cursor.  So the arrow vanished over every embedded menu.  A
+     * top-level dialog never asked; do what its DefWindowProc did instead:
+     * the class cursor of the window under the pointer (arrow, or I-beam
+     * over an edit box), without consulting the parent. */
+    if (msg == WM_SETCURSOR && !r) {
+        HANDLE cur = NULLPTR;
+        if ((lp & 0xFFFF) == HTCLIENT && wp)
+            cur = (HANDLE)(UINT_PTR)GetClassLongA((HWND)wp, GCL_HCURSOR);
+        if (!cur) cur = LoadCursorA(NULLPTR, (LPCSTR)(UINT_PTR)IDC_ARROW_ID);
+        SetCursor(cur);
+        SetWindowLongA(h, DWL_MSGRESULT, TRUE);
+        return TRUE;
+    }
 
     if (msg == WM_INITDIALOG) {
         HWND top = GetAncestor(h, GA_ROOT);

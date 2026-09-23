@@ -8,6 +8,8 @@
  *   probe post X Y      post a left click straight to the window under X,Y
  *                       (bypasses input routing -- for reaching a stock
  *                       screen when routed input does not land)
+ *   probe cursor X Y    move the pointer to X,Y and report GetCursorInfo:
+ *                       whether a cursor is showing, and its handle
  *   probe key VK        press and release one virtual key (27 = Escape)
  *
  * Input goes through SendInput, so it is routed by wineserver's own
@@ -49,6 +51,9 @@ __declspec(dllimport) UINT  __stdcall SendInput(UINT, INPUT *, int);
 __declspec(dllimport) BOOL  __stdcall SetCursorPos(int, int);
 __declspec(dllimport) void  __stdcall Sleep(DWORD);
 __declspec(dllimport) UINT  __stdcall MapVirtualKeyA(UINT, UINT);
+typedef struct { DWORD cbSize, flags; HANDLE hCursor; LONG x, y; } CURSORINFO;
+__declspec(dllimport) BOOL  __stdcall GetCursorInfo(CURSORINFO *);
+__declspec(dllimport) HANDLE __stdcall LoadCursorA(HANDLE, LPCSTR);
 typedef struct { LONG x, y; } POINT;
 __declspec(dllimport) HWND  __stdcall WindowFromPoint(POINT);
 __declspec(dllimport) BOOL  __stdcall ScreenToClient(HWND, POINT *);
@@ -198,7 +203,7 @@ void __stdcall start(void)
         EnumWindows(each_tree, (LONG_PTR)GetForegroundWindow());
     } else if (p[0] == 'l') {
         EnumWindows(each, (LONG_PTR)GetForegroundWindow());
-    } else if (p[0] == 'c') {
+    } else if (p[0] == 'c' && p[1] == 'l') {
         long x, y;
         p = word(p);
         x = atoi_(&p); y = atoi_(&p);
@@ -217,6 +222,24 @@ void __stdcall start(void)
         PostMessageA(h, 0x0201, 1, lp); Sleep(80);        /* LBUTTONDOWN */
         PostMessageA(h, 0x0202, 0, lp);                   /* LBUTTONUP   */
         put("posted to "); hex((DWORD)h); put(" at client "); num(pt.x); put(","); num(pt.y); put("\r\n");
+    } else if (p[0] == 'c' && p[1] == 'u') {
+        CURSORINFO ci;
+        long x, y;
+        p = word(p);
+        x = atoi_(&p); y = atoi_(&p);
+        SetCursorPos((int)x - 3, (int)y);
+        Sleep(100);
+        mouse(0x0001);                                  /* MOVE, 0,0: a real input event */
+        SetCursorPos((int)x, (int)y);
+        Sleep(300);
+        memset(&ci, 0, sizeof ci);
+        ci.cbSize = sizeof ci;
+        GetCursorInfo(&ci);
+        put("cursor at "); num(ci.x); put(","); num(ci.y);
+        put(ci.flags & 1 ? " showing" : " hidden");
+        put(" handle "); hex((DWORD)(LONG_PTR)ci.hCursor);
+        put(ci.hCursor == LoadCursorA(0, (LPCSTR)32512) ? " (IDC_ARROW)" : ci.hCursor ? " (other)" : " (none)");
+        put("\r\n");
     } else if (p[0] == 'k') {
         long vk;
         p = word(p);
