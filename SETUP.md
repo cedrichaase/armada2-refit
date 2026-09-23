@@ -878,7 +878,30 @@ on OpenGL again and `dxvk.conf` is inert. The DXVK chain is one command away
 about the texture work depends on any of this: it has always rendered through
 wined3d/OpenGL and continues to.
 
-#### Tier 2 — anti-aliasing, still the largest visual win left
+#### Tier 2 — anti-aliasing: route 2 built, `tools/msaa/`
+
+**Route 2 is built and installed: `MSAA.asi`, 8x, not yet seen in game.**
+
+    tools/msaa/install.sh                 # build + install (Samples=8)
+    tools/msaa/install.sh --samples 4     # or 2; 0 patches nothing
+    tools/msaa/install.sh --remove        # three files out, stock behaviour back
+
+It redirects the two `call GetWindowHandle` that sit just before
+`IDirect3D8::CreateDevice` in `ST3D_DeviceDirectX8::CreateDevice` (`0x6235d0`). At
+that point `edi` is the present-parameters struct. The plugin then sets:
+- the highest sample count the device accepts for both the colour and D16 depth
+  formats
+- `SwapEffect=DISCARD`
+- a non-lockable back buffer
+
+`Reset` reuses the same struct, so a device loss keeps MSAA. `MSAA.log` records what
+each device creation actually got. The renderer was read end to end first: nothing
+renders off-screen, and the one back-buffer read-back is the minimap copy
+(`CopyOffscreenToTexture`). That copy works only because DXVK's D3D8 CopyRects
+resolves a multisampled source through `StretchRect`. So **check the minimap first**
+when judging it. Full reasoning in `tools/msaa/README.md`.
+
+What follows is the analysis that chose the route.
 
 **DXVK 3.x ships no MSAA-forcing key.** Read out of the binary that actually loads, not
 from documentation: there is no `forceSwapchainMSAA` or equivalent.

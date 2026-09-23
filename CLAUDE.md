@@ -33,6 +33,10 @@ change. `tools/vkbasalt/build.sh` builds it per-user and 32-bit; `tools/postfx.p
 configures it and refuses any effect its offline compiler (`fxcheck`) rejects. Home
 toggles it in game. Threshold 6 / intensity 0.08, accepted by the user; the table
 behind those numbers is in `SETUP.md`, Tier 3.
+**MSAA is an ASI hook, `tools/msaa/`**, because nothing in DXVK or `dxcfg.ini` can
+turn it on. It edits the engine's present parameters just before
+`IDirect3D8::CreateDevice`. Installed at 8x and **not yet confirmed in game**; the
+minimap is the one thing that could break (`tools/msaa/README.md`).
 
 ## Environment
 

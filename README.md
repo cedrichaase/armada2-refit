@@ -1800,12 +1800,13 @@ Genuinely outstanding:
   intensity 0.08, Home toggles it live. Built per-user by `tools/vkbasalt/build.sh`,
   configured by `tools/postfx.py`; details and the measurements behind the numbers in
   `SETUP.md`, Tier 3. What is left in the post-processing family is SMAA/CAS, untried.
-- **Anti-aliasing is the largest visual win left and still needs code.** DXVK ships no
-  MSAA-forcing key — checked against the binary that loads. The `dxcfg.ini`
-  `antialiasing=` route died with the chain change (it is read by the GOG translator,
-  which DXVK's d3d8 replaced), so it is an ASI hook on `IDirect3D8::CreateDevice`
-  setting `MultiSampleType` — the same shape as `tools/menuscale/`, and a better bet
-  than before since DXVK implements D3D8 multisampling properly on Vulkan.
+- **Anti-aliasing: `MSAA.asi` is built and installed (8x), awaiting its first launch.**
+  `tools/msaa/`. It hooks the engine's own `CreateDevice` path and sets
+  `MultiSampleType`, `SwapEffect=DISCARD` and a non-lockable back buffer. DXVK has no
+  key for this, and the `dxcfg.ini` route died with the chain change. `MSAA.log`
+  says what the device actually got. The first thing to check in game is the
+  **minimap**: it is the one back-buffer read-back, and it relies on DXVK's CopyRects
+  resolving a multisampled source. Details in `tools/msaa/README.md`.
 - **`Mnebula4`'s generated art is preserved but unused** — `targets/Mnebula4/src-generated/`
   and `archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen` to
   return to it.
