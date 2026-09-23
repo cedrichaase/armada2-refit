@@ -8,6 +8,24 @@
 An ASI plugin of the same shape as `tools/menuscale/`, loaded by the same
 Ultimate ASI Loader (`winmm` override). It patches `Armada2.exe` in memory only.
 
+**Confirmed in game at 8x on 2026-09-23.** The first launch's `MSAA.log`:
+
+    --- MSAA samples=8  sites patched 2/2
+    CreateDevice 3440x1440 fmt 22 depth 80 fullscreen swap 2 flags 0x00000001  -> MSAA 8x, swap DISCARD, flags 0x00000000
+    CreateDevice 640x480 fmt 22 depth 80 fullscreen swap 2 flags 0x00000001  -> MSAA 8x, swap DISCARD, flags 0x00000000
+    CreateDevice 3440x1440 fmt 22 depth 80 fullscreen swap 2 flags 0x00000001  -> MSAA 8x, swap DISCARD, flags 0x00000000
+
+That is `X8R8G8B8` (22) over `D16` (80), and DXVK's log is free of errors, CopyRects
+included. The 640x480 device is the fullscreen fallback that `SETUP.md` already
+records, not something the plugin does. The engine creates the device several times
+per launch, and the hook covers each one, because every creation goes through the
+same function.
+
+**Alt-tab does not exercise `Reset` here.** DXVK signals device loss on focus loss
+only with `d3d9.deviceLossOnFocusLoss = True`, which is off by default and not set
+in `dxvk.conf`. So the in-place edit that `Reset` would reuse is correct, but under
+this chain it is never called.
+
 ## Why code, and why MSAA rather than SMAA/FXAA
 
 The engine creates its D3D8 device with `MultiSampleType = NONE` hard-coded.
