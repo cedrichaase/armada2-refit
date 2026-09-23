@@ -132,6 +132,33 @@ __declspec(dllimport) BOOL    __stdcall GetWindowRect(HWND, RECT *);
 __declspec(dllimport) LONG    __stdcall SetWindowLongA(HWND, INT, LONG);
 __declspec(dllimport) LONG_PTR __stdcall CallWindowProcA(WNDPROC, HWND, UINT, WPARAM, LPARAM);
 __declspec(dllimport) LONG_PTR __stdcall DefWindowProcA(HWND, UINT, WPARAM, LPARAM);
+__declspec(dllimport) UINT_PTR __stdcall SetTimer(HWND, UINT_PTR, UINT, void (__stdcall *)(HWND, UINT, UINT_PTR, DWORD));
+
+typedef LONG_PTR (__stdcall *DLGPROC)(HWND, UINT, WPARAM, LPARAM);
+typedef LONG_PTR (__stdcall *HOOKPROC)(INT, WPARAM, LPARAM);
+typedef HANDLE HINSTANCE;
+typedef HANDLE HRSRC;
+typedef HANDLE HGLOBAL;
+typedef HANDLE HHOOK;
+
+__declspec(dllimport) LONG_PTR __stdcall DialogBoxIndirectParamA(HINSTANCE, const void *, HWND, DLGPROC, LPARAM);
+__declspec(dllimport) BOOL    __stdcall EnableWindow(HWND, BOOL);
+__declspec(dllimport) BOOL    __stdcall IsWindowEnabled(HWND);
+__declspec(dllimport) HWND    __stdcall GetParent(HWND);
+__declspec(dllimport) HWND    __stdcall GetAncestor(HWND, UINT);
+__declspec(dllimport) BOOL    __stdcall IsChild(HWND, HWND);
+__declspec(dllimport) LONG    __stdcall GetWindowLongA(HWND, INT);
+__declspec(dllimport) HHOOK   __stdcall SetWindowsHookExA(INT, HOOKPROC, HINSTANCE, DWORD);
+__declspec(dllimport) LONG_PTR __stdcall CallNextHookEx(HHOOK, INT, WPARAM, LPARAM);
+
+__declspec(dllimport) HRSRC   __stdcall FindResourceA(HMODULE, LPCSTR, LPCSTR);
+__declspec(dllimport) HGLOBAL __stdcall LoadResource(HMODULE, HRSRC);
+__declspec(dllimport) void   *__stdcall LockResource(HGLOBAL);
+__declspec(dllimport) DWORD   __stdcall SizeofResource(HMODULE, HRSRC);
+__declspec(dllimport) HANDLE  __stdcall GetProcessHeap(void);
+__declspec(dllimport) void   *__stdcall HeapAlloc(HANDLE, DWORD, UINT);
+__declspec(dllimport) BOOL    __stdcall HeapFree(HANDLE, DWORD, void *);
+__declspec(dllimport) DWORD   __stdcall GetCurrentThreadId(void);
 
 __declspec(dllimport) HDC     __stdcall CreateCompatibleDC(HDC);
 __declspec(dllimport) HBITMAP __stdcall CreateCompatibleBitmap(HDC, INT, INT);
@@ -158,6 +185,7 @@ __declspec(dllimport) BOOL    __stdcall PatBlt(HDC, INT, INT, INT, INT, DWORD);
 #define GW_OWNER      4
 #define SWP_NOSIZE    0x0001
 #define SWP_NOMOVE    0x0002
+#define SWP_NOACTIVATE 0x0010
 
 #define WM_MOUSEFIRST 0x0200
 #define WM_MOUSELAST  0x0209
@@ -240,6 +268,7 @@ static int g_designH  = 600;
 static int g_integer  = 0;   /* snap to a whole-number scale factor         */
 static int g_smooth   = 1;   /* HALFTONE rather than nearest-neighbour      */
 static int g_shellMode = 1;  /* raise the engine's 800x600 front-end mode   */
+static int g_embed    = 0;   /* modal dialogs become children of their owner */
 
 /* ---- the fit ---------------------------------------------------------- */
 
@@ -309,7 +338,6 @@ static void compute_fit(HWND owner)
 /* ---- per-dialog offscreen surfaces ------------------------------------ */
 
 #define MAXSLOT  12
-#define MAXDEPTH 8
 
 typedef struct {
     HWND    hwnd;
@@ -319,8 +347,7 @@ typedef struct {
     HBITMAP bmp;
     HGDIOBJ oldbmp;
     HDC     paintReal;
-    HDC     dcReal[MAXDEPTH];
-    int     depth;
+    int     dirty;              /* drawn into since it was last presented */
     int     announced;
     WNDPROC oldProc;            /* set while this window is subclassed     */
 } Slot;
@@ -339,7 +366,7 @@ static void slot_free(Slot *s)
         DeleteDC(s->mem);
     }
     s->hwnd = NULLPTR; s->mem = NULLPTR; s->bmp = NULLPTR; s->oldbmp = NULLPTR;
-    s->paintReal = NULLPTR; s->depth = 0; s->announced = 0; s->dw = 0; s->dh = 0;
+    s->paintReal = NULLPTR; s->dirty = 0; s->announced = 0; s->dw = 0; s->dh = 0;
     s->letterbox = 0; s->oldProc = NULLPTR;
 }
 
@@ -365,6 +392,23 @@ static Slot *slot_claim(HWND h)
     slot_free(&g_slot[0]);
     g_slot[0].hwnd = h;
     return &g_slot[0];
+}
+
+/* Trace the first few paint events per window: which path, and whether the
+ * surface was presented.  Enough to see how a screen actually reaches the
+ * glass without flooding the log on every mouse-move.  Trace=1 in the ini. */
+static int g_trace = 0;
+
+static void trace(const char *what, HWND h)
+{
+    static HWND last; static int n;
+    char b[96];
+    if (!g_trace || !g_logging) return;
+    if (h != last) { last = h; n = 0; }
+    if (++n > 12) return;
+    b[0] = 0;
+    s_cat(b, "    trace "); s_cat(b, what); s_cat(b, " hwnd "); s_num(b, (long)(UINT_PTR)h);
+    logline(b);
 }
 
 static HDC slot_surface(Slot *s, HDC real)
@@ -420,6 +464,296 @@ static void present(Slot *s, HDC real)
         logline(b);
         s->announced = 1;
     }
+}
+
+/* ---- embedding: one OS window instead of one per menu ----------------- */
+/*
+ * Every shell screen -- and every IN-GAME menu: do_escapeMenu, save/load,
+ * graphics and sound options, yes/no -- is
+ *
+ *     DialogBoxParamA(shell_hInstance, id, <3D window>, proc, lp)
+ *
+ * with a WS_POPUP template (measured: every template in .rsrc but one).  An
+ * owned popup is a separate top-level window, which on Windows sits quietly
+ * on top of the fullscreen game.  Under Wine each one is its own X11 window,
+ * and the compositor treats it as a new application window: MenuScale.log
+ * recorded menus at 3410x1378 and 1696x1378 -- the screen less Hyprland's
+ * gaps, and a half-screen tile.  Focus then moves off the fullscreen 3D
+ * window, which is what DXVK's fullscreen handling reacts to.
+ *
+ * With Embed=1 the template is rewritten WS_POPUP -> WS_CHILD before the
+ * dialog is created, so it becomes a child of the window that would have
+ * owned it and Wine never creates a second X window.  Three consequences are
+ * handled here, each of them something the game would otherwise notice:
+ *
+ *   input     DialogBox disables its owner BEFORE creating the dialog (Wine
+ *             does this even for a WS_CHILD template), and hit-testing never
+ *             descends into a disabled window -- so a child of the disabled
+ *             owner would get no input at all.  The owner's top-level is
+ *             re-enabled at WM_INITDIALOG, and modality is kept instead by a
+ *             WH_GETMESSAGE filter that turns mouse and keyboard input aimed
+ *             outside the innermost embedded dialog into WM_NULL.
+ *   geometry  the game positions dialogs in SCREEN coordinates (it
+ *             ClientToScreen()s against the owner).  A child's MoveWindow
+ *             takes PARENT-client coordinates, so the final position is
+ *             converted just before the real call.
+ *   owner     a child has no owner, so GetWindow(GW_OWNER) would return NULL
+ *             where the game expects its 3D window.  Answered with the parent
+ *             for the dialogs embedded here.
+ *
+ * Only DialogBoxParamA is embedded.  CreateDialogParamA (two sites, both the
+ * admiral's log, one of which is already a WS_CHILD template) is left alone.
+ */
+
+#define WS_POPUP         0x80000000UL
+#define WS_CHILD         0x40000000UL
+#define WS_CLIPSIBLINGS  0x04000000UL
+#define WS_CLIPCHILDREN  0x02000000UL
+#define WS_CAPTION       0x00C00000UL
+#define WS_SYSMENU       0x00080000UL
+#define WS_THICKFRAME    0x00040000UL
+#define DS_SYSMODAL      0x00000002UL
+#define DS_MODALFRAME    0x00000080UL
+#define DS_SETFOREGROUND 0x00000200UL
+#define WS_EX_TOPMOST    0x00000008UL
+#define WS_EX_APPWINDOW  0x00040000UL
+#define GWL_STYLE        (-16)
+#define GA_ROOT          2
+#define RT_DIALOG_ID     5
+#define WH_GETMESSAGE    3
+#define WM_NULL          0x0000
+#define WM_INITDIALOG    0x0110
+#define WM_DESTROY       0x0002
+#define WM_NCDESTROY     0x0082
+#define WM_KEYFIRST      0x0100
+#define WM_KEYLAST       0x0109
+#define WM_NCMOUSEFIRST  0x00A0
+#define WM_NCMOUSELAST   0x00AD
+#define WM_MOUSEALL_LAST 0x020E    /* through WM_MOUSEHWHEEL */
+
+#define MAXEMB 16
+
+typedef struct {
+    HWND    hwnd;
+    DLGPROC proc;               /* the game's dialog procedure             */
+    HWND    owner;              /* the owner the game asked for            */
+    int     modal;              /* 1 once WM_INITDIALOG has run            */
+} Emb;
+
+static Emb     g_emb[MAXEMB];
+static DLGPROC g_pendingProc;   /* handed to the next unknown window       */
+static HWND    g_pendingOwner;
+static HHOOK   g_filter;
+static int     g_embedded;      /* count, for the log                      */
+
+static HWND (__stdcall *o_GetWindow)(HWND, UINT);
+static void start_flush(void);
+static LONG_PTR (__stdcall *o_DialogBoxParamA)(HINSTANCE, LPCSTR, HWND, DLGPROC, LPARAM);
+
+static Emb *emb_get(HWND h)
+{
+    int i;
+    if (!h) return NULLPTR;
+    for (i = 0; i < MAXEMB; i++)
+        if (g_emb[i].hwnd == h) return &g_emb[i];
+    return NULLPTR;
+}
+
+static int is_embedded(HWND h) { return emb_get(h) != NULLPTR; }
+
+/* The window the game thinks of as this dialog's owner. */
+static HWND anchor_of(HWND h)
+{
+    return is_embedded(h) ? GetParent(h) : GetWindow(h, GW_OWNER);
+}
+
+/* Screen coordinates, as the game computed them, -> what MoveWindow wants. */
+static void to_parent(HWND h, int *x, int *y)
+{
+    POINT p;
+    if (!is_embedded(h)) return;
+    p.x = *x; p.y = *y;
+    ScreenToClient(GetParent(h), &p);
+    *x = (int)p.x; *y = (int)p.y;
+}
+
+/* Innermost embedded modal dialog still alive -- the one that owns input. */
+static HWND top_modal(void)
+{
+    int i, best = -1;
+    for (i = 0; i < MAXEMB; i++)
+        if (g_emb[i].hwnd && g_emb[i].modal && IsWindow(g_emb[i].hwnd))
+            if (best < 0 || g_emb[i].modal > g_emb[best].modal) best = i;
+    return best < 0 ? NULLPTR : g_emb[best].hwnd;
+}
+
+/* Is h the dialog, one of its controls, or a popup a control owns (a combo
+ * box's drop-down list is a top-level window owned by the combo)? */
+static int inside(HWND dlg, HWND h)
+{
+    int n;
+    for (n = 0; h && n < 8; n++) {
+        if (h == dlg || IsChild(dlg, h)) return 1;
+        h = GetWindow(h, GW_OWNER);
+    }
+    return 0;
+}
+
+static LONG_PTR __stdcall input_filter(INT code, WPARAM wp, LPARAM lp)
+{
+    if (code >= 0 && lp) {
+        MSG *m = (MSG *)lp;
+        UINT k = m->message;
+        if (m->hwnd &&
+            ((k >= WM_MOUSEFIRST && k <= WM_MOUSEALL_LAST) ||
+             (k >= WM_NCMOUSEFIRST && k <= WM_NCMOUSELAST) ||
+             (k >= WM_KEYFIRST && k <= WM_KEYLAST))) {
+            HWND dlg = top_modal();
+            if (dlg && !inside(dlg, m->hwnd)) m->message = WM_NULL;
+        }
+    }
+    return CallNextHookEx(g_filter, code, wp, lp);
+}
+
+static int g_modalSeq = 0;
+
+static LONG_PTR __stdcall embed_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
+{
+    Emb *e = emb_get(h);
+    LONG_PTR r;
+    int i;
+
+    if (!e) {
+        /* First message for a dialog created below -- WM_SETFONT or
+         * WM_INITDIALOG.  Creation is synchronous and nested dialogs are only
+         * ever opened after their parent has had its first message, so the
+         * pending procedure is unambiguous. */
+        for (i = 0; i < MAXEMB; i++)
+            if (!g_emb[i].hwnd || !IsWindow(g_emb[i].hwnd)) break;
+        if (i == MAXEMB) i = 0;
+        e = &g_emb[i];
+        e->hwnd = h; e->proc = g_pendingProc; e->owner = g_pendingOwner; e->modal = 0;
+        g_pendingProc = NULLPTR; g_pendingOwner = NULLPTR;
+    }
+
+    r = e->proc ? e->proc(h, msg, wp, lp) : 0;
+
+    if (msg == WM_INITDIALOG) {
+        HWND top = GetAncestor(h, GA_ROOT);
+        if (top && top != h && !IsWindowEnabled(top)) EnableWindow(top, TRUE);
+        /* A dialog opened from another menu is NOT made a child of that menu:
+         * for a modal dialog Wine walks the owner up to its top-level window
+         * first, so both end up siblings under the 3D window -- and the new
+         * one was measured BELOW the one that opened it, clipped away by
+         * WS_CLIPSIBLINGS.  An owned popup always sits above its owner, so
+         * put it there. */
+        o_SetWindowPos(h, NULLPTR /* HWND_TOP */, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        e->modal = ++g_modalSeq;
+        start_flush();
+        if (g_logging) {
+            RECT wr;
+            char b[192];
+            wr.left = wr.top = wr.right = wr.bottom = 0;
+            GetWindowRect(h, &wr);
+            b[0] = 0;
+            s_cat(b, "embedded dialog #"); s_num(b, ++g_embedded);
+            s_cat(b, " as child, ");       s_num(b, wr.right - wr.left);
+            s_cat(b, "x");                 s_num(b, wr.bottom - wr.top);
+            s_cat(b, " @");                s_num(b, wr.left);
+            s_cat(b, ",");                 s_num(b, wr.top);
+            logline(b);
+        }
+    } else if (msg == WM_NCDESTROY) {
+        e->hwnd = NULLPTR; e->proc = NULLPTR; e->owner = NULLPTR; e->modal = 0;
+    }
+    return r;
+}
+
+/* A modifiable copy of the dialog template with its top-level styling
+ * replaced by child styling.  NULL means "create it the stock way". */
+static BYTE *child_template(HINSTANCE inst, LPCSTR name)
+{
+    HRSRC   rs;
+    HGLOBAL g;
+    BYTE   *src, *copy;
+    DWORD   sz, *style, *ex;
+
+    rs = FindResourceA((HMODULE)inst, name, (LPCSTR)(UINT_PTR)RT_DIALOG_ID);
+    if (!rs) return NULLPTR;
+    g   = LoadResource((HMODULE)inst, rs);
+    src = g ? (BYTE *)LockResource(g) : NULLPTR;
+    sz  = SizeofResource((HMODULE)inst, rs);
+    if (!src || sz < 18) return NULLPTR;
+
+    copy = (BYTE *)HeapAlloc(GetProcessHeap(), 0, sz);
+    if (!copy) return NULLPTR;
+    memcpy(copy, src, sz);
+
+    if (*(WORD *)copy == 1 && *(WORD *)(copy + 2) == 0xFFFF) {
+        ex = (DWORD *)(copy + 8); style = (DWORD *)(copy + 12);   /* DLGTEMPLATEEX */
+    } else {
+        style = (DWORD *)copy;    ex = (DWORD *)(copy + 4);       /* DLGTEMPLATE   */
+    }
+    if (*style & WS_CHILD) { HeapFree(GetProcessHeap(), 0, copy); return NULLPTR; }
+
+    *style &= ~(WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME |
+                DS_MODALFRAME | DS_SYSMODAL | DS_SETFOREGROUND);
+    *style |= WS_CHILD | WS_CLIPSIBLINGS;
+    *ex    &= ~(WS_EX_TOPMOST | WS_EX_APPWINDOW);
+    return copy;
+}
+
+static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND owner,
+                                             DLGPROC proc, LPARAM lp)
+{
+    BYTE    *tpl;
+    LONG_PTR r;
+
+    if (g_logging) {
+        char b[160];
+        b[0] = 0;
+        s_cat(b, "DialogBoxParamA template ");
+        if ((UINT_PTR)name < 0x10000) s_num(b, (long)(UINT_PTR)name); else s_cat(b, name);
+        s_cat(b, (owner && is_dialog(owner)) ? " owner=dialog" : owner ? " owner=window" : " owner=none");
+        logline(b);
+    }
+
+    if (!g_embed || g_mode == MODE_LOG || !owner || !proc)
+        return o_DialogBoxParamA(inst, name, owner, proc, lp);
+
+    tpl = child_template(inst, name);
+    if (!tpl) return o_DialogBoxParamA(inst, name, owner, proc, lp);
+
+    if (!g_filter)
+        g_filter = SetWindowsHookExA(WH_GETMESSAGE, input_filter, NULLPTR, GetCurrentThreadId());
+
+    /* The parent paints nothing over its menus: it is the D3D window, or a
+     * dialog whose content MenuScale blits through GetDC. */
+    SetWindowLongA(owner, GWL_STYLE, GetWindowLongA(owner, GWL_STYLE) | (LONG)WS_CLIPCHILDREN);
+
+    g_pendingProc = proc;
+    g_pendingOwner = owner;
+    r = DialogBoxIndirectParamA(inst, tpl, owner, embed_proc, lp);
+    g_pendingProc = NULLPTR;
+    g_pendingOwner = NULLPTR;
+    HeapFree(GetProcessHeap(), 0, tpl);
+    if (g_logging) {
+        char b[96];
+        b[0] = 0;
+        s_cat(b, "  embedded dialog returned "); s_num(b, (long)r);
+        logline(b);
+    }
+    return r;
+}
+
+/* The game asks for a dialog's owner to position it and to talk to the 3D
+ * window.  An embedded dialog has a parent instead; report that. */
+static HWND __stdcall my_GetWindow(HWND h, UINT cmd)
+{
+    Emb *e = emb_get(h);
+    if (cmd == GW_OWNER && e) return e->owner ? e->owner : GetParent(h);
+    return o_GetWindow(h, cmd);
 }
 
 /* ---- geometry hooks --------------------------------------------------- */
@@ -478,7 +812,7 @@ static Slot *claim_letterbox(HWND h)
 
 static void reposition(HWND h, int *x, int *y, int *w, int *ht, int havePos, int haveSize)
 {
-    HWND  owner = GetWindow(h, GW_OWNER);
+    HWND  owner = anchor_of(h);
     POINT pt;
     Slot *s;
 
@@ -546,6 +880,7 @@ static BOOL __stdcall my_MoveWindow(HWND h, INT x, INT y, INT w, INT ht, BOOL rp
         s_cat(b, " @"); s_num(b, x); s_cat(b, ","); s_num(b, y);
         logline(b);
     }
+    to_parent(h, &x, &y);
     return o_MoveWindow(h, x, y, w, ht, rp);
 }
 
@@ -562,6 +897,7 @@ static BOOL __stdcall my_SetWindowPos(HWND h, HWND after, INT x, INT y, INT w, I
             reposition(h, &x, &y, &w, &ht, havePos, haveSize);
         }
     }
+    if (!(f & SWP_NOMOVE)) to_parent(h, &x, &y);
     return o_SetWindowPos(h, after, x, y, w, ht, f);
 }
 
@@ -583,6 +919,7 @@ static HDC __stdcall my_BeginPaint(HWND h, PAINTSTRUCT *ps)
 
     real = o_BeginPaint(h, ps);
     if (!real) return real;
+    trace("BeginPaint", h);
 
     mem = slot_surface(s, real);
     if (!mem) return real;
@@ -606,11 +943,85 @@ static BOOL __stdcall my_EndPaint(HWND h, const PAINTSTRUCT *ps)
     if (!s || !s->paintReal) return o_EndPaint(h, ps);
 
     present(s, s->paintReal);
+    s->dirty = 0;
+    trace("EndPaint present", h);
 
     local = *ps;                 /* hand user32 back the DC it created */
     local.hdc = s->paintReal;
     s->paintReal = NULLPTR;
     return o_EndPaint(h, &local);
+}
+
+/*
+ * GetDC/ReleaseDC do NOT pair up in this game, so nothing here may rely on
+ * them pairing.  ShellButton::UpdateButton (0x5a4a10) takes GetDC(hDlg),
+ * draws the button, and then falls into eight NOPs at 0x5a4adb where its
+ * push/push/call ReleaseDC used to be -- patched out, so every button redraw
+ * leaks the DC.  The first version of this plugin kept the real DC on a stack
+ * and presented only when the outermost one came back: one leak pinned the
+ * stack, nothing drawn after it ever reached the screen (the Options screen
+ * showed its background and no buttons), and after eight leaks the game was
+ * handed real DCs and drew 1:1 in the corner.
+ *
+ * So no real DC is held.  GetDC hands out the design surface and marks it
+ * dirty; ReleaseDC presents at once through a DC of our own; and a thread
+ * timer presents whatever is still dirty, which is what catches the leaks.
+ */
+#define FLUSH_MS 30
+
+static UINT_PTR g_flushTimer;
+static void __stdcall flush_dirty(HWND, UINT, UINT_PTR, DWORD);
+
+static void start_flush(void)
+{
+    if (!g_flushTimer) g_flushTimer = SetTimer(NULLPTR, 0, FLUSH_MS, flush_dirty);
+}
+
+static void present_now(Slot *s)
+{
+    HDC real = o_GetDC(s->hwnd);
+    if (!real) return;
+    present(s, real);
+    o_ReleaseDC(s->hwnd, real);
+    s->dirty = 0;
+}
+
+/*
+ * A full-screen menu embedded as a child is sized once, when it opens.  If
+ * the game window changes size under it -- measured: Hyprland re-tiles the
+ * game to 3410x1378 whenever it loses focus and drops fullscreen -- the menu
+ * kept its 3440x1440 and hung off the bottom, "Return to Game" included.
+ * Track the parent's client area instead.  The letterbox fit is recomputed
+ * from the window size on every present, so the picture follows.
+ */
+static void follow_parent(Slot *s)
+{
+    RECT pr, wr;
+    HWND parent;
+    int  pw, ph;
+
+    if (!s->letterbox || !is_embedded(s->hwnd)) return;
+    parent = GetParent(s->hwnd);
+    if (!parent || !o_GetClientRect(parent, &pr) || !GetWindowRect(s->hwnd, &wr)) return;
+    pw = (int)(pr.right - pr.left);
+    ph = (int)(pr.bottom - pr.top);
+    if (pw <= 0 || ph <= 0) return;
+    if (pw == (int)(wr.right - wr.left) && ph == (int)(wr.bottom - wr.top)) return;
+    o_MoveWindow(s->hwnd, 0, 0, pw, ph, TRUE);   /* parent-client coordinates */
+    s->dirty = 1;
+}
+
+static void __stdcall flush_dirty(HWND h, UINT msg, UINT_PTR id, DWORD t)
+{
+    int i;
+    (void)h; (void)msg; (void)id; (void)t;
+    for (i = 0; i < MAXSLOT; i++)
+        if (g_slot[i].hwnd && IsWindow(g_slot[i].hwnd)) follow_parent(&g_slot[i]);
+    for (i = 0; i < MAXSLOT; i++)
+        if (g_slot[i].hwnd && g_slot[i].dirty && g_slot[i].mem) {
+            if (IsWindow(g_slot[i].hwnd)) present_now(&g_slot[i]);
+            else g_slot[i].dirty = 0;
+        }
 }
 
 static HDC __stdcall my_GetDC(HWND h)
@@ -620,30 +1031,40 @@ static HDC __stdcall my_GetDC(HWND h)
 
     if (g_mode != MODE_SCALE) return o_GetDC(h);
     s = slot_get(h);
-    if (!s || s->dw <= 0 || s->depth >= MAXDEPTH) return o_GetDC(h);
+    if (!s || s->dw <= 0) return o_GetDC(h);
 
-    real = o_GetDC(h);
-    if (!real) return real;
+    if (!s->mem) {
+        real = o_GetDC(h);
+        if (!real) return real;
+        mem = slot_surface(s, real);
+        o_ReleaseDC(h, real);
+        if (!mem) return o_GetDC(h);
+    }
+    trace("GetDC", h);
 
-    mem = slot_surface(s, real);
-    if (!mem) return real;
-
-    s->dcReal[s->depth++] = real;
-    return mem;
+    s->dirty = 1;
+    start_flush();
+    return s->mem;
 }
 
 static INT __stdcall my_ReleaseDC(HWND h, HDC dc)
 {
     Slot *s;
-    HDC real;
+    int i;
 
     if (g_mode != MODE_SCALE) return o_ReleaseDC(h, dc);
     s = slot_get(h);
-    if (!s || dc != s->mem || s->depth <= 0) return o_ReleaseDC(h, dc);
+    if (!s || dc != s->mem) {
+        /* Released against a different window than it was taken from. */
+        s = NULLPTR;
+        for (i = 0; i < MAXSLOT; i++)
+            if (g_slot[i].mem && g_slot[i].mem == dc) { s = &g_slot[i]; break; }
+        if (!s) return o_ReleaseDC(h, dc);
+    }
 
-    real = s->dcReal[--s->depth];
-    if (s->depth == 0) present(s, real);      /* only the outermost one */
-    return o_ReleaseDC(h, real);
+    present_now(s);
+    trace("ReleaseDC present", h);
+    return 1;
 }
 
 /*
@@ -941,6 +1362,8 @@ static void startup(void)
     g_smooth  = (int)GetPrivateProfileIntA("MenuScale", "Smooth",       1,   ini);
     g_shellMode = (int)GetPrivateProfileIntA("MenuScale", "RaiseShellMode", 1, ini);
     g_logging = (int)GetPrivateProfileIntA("MenuScale", "Log",          1,   ini);
+    g_embed   = (int)GetPrivateProfileIntA("MenuScale", "Embed",        0,   ini);
+    g_trace   = (int)GetPrivateProfileIntA("MenuScale", "Trace",        0,   ini);
 
     if (g_designW < 16) g_designW = 800;
     if (g_designH < 16) g_designH = 600;
@@ -981,6 +1404,12 @@ static void startup(void)
     o_GetClientRect = (void *)patch_iat(base, "USER32.dll", "GetClientRect", my_GetClientRect);
     o_MoveWindow    = (void *)patch_iat(base, "USER32.dll", "MoveWindow",    my_MoveWindow);
     o_SetWindowPos  = (void *)patch_iat(base, "USER32.dll", "SetWindowPos",  my_SetWindowPos);
+    /* Installed even with Embed=0: it then only logs and passes through,
+     * which is what makes a stock run comparable line for line. */
+    if (g_mode != MODE_LOG) {
+        o_DialogBoxParamA = (void *)patch_iat(base, "USER32.dll", "DialogBoxParamA", my_DialogBoxParamA);
+        o_GetWindow       = (void *)patch_iat(base, "USER32.dll", "GetWindow",       my_GetWindow);
+    }
 
     /* A hook that failed to bind is never called, but the originals are used
      * unconditionally elsewhere, so give every one of them a real target. */
@@ -991,6 +1420,10 @@ static void startup(void)
     if (!o_GetClientRect) o_GetClientRect = GetClientRect;
     if (!o_MoveWindow)    o_MoveWindow    = MoveWindow;
     if (!o_SetWindowPos)  o_SetWindowPos  = SetWindowPos;
+    if (!o_GetWindow)     o_GetWindow     = GetWindow;
+    /* Embedding needs both hooks or neither: an embedded dialog the game
+     * cannot find the owner of is worse than a separate window. */
+    if (!o_DialogBoxParamA) g_embed = 0;
 
     b[0] = 0;
     s_cat(b, "--- MenuScale mode=");  s_num(b, g_mode);
@@ -1002,7 +1435,7 @@ static void startup(void)
     s_num(b, (o_BeginPaint?1:0) + (o_EndPaint?1:0) + (o_GetDC?1:0) +
              (o_ReleaseDC?1:0) + (o_GetClientRect?1:0) + (o_MoveWindow?1:0) +
              (o_SetWindowPos?1:0));
-    s_cat(b, "/7  input: wndproc subclass");
+    s_cat(b, "/7  input: wndproc subclass  embed="); s_num(b, g_embed);
     logline(b);
 }
 

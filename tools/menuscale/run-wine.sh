@@ -14,7 +14,7 @@ PREFIX="${A2_PREFIX:-/home/cedric/Games/Heroic/Prefixes/Star Trek Armada II}"
 PROTON="${A2_PROTON:-$HOME/.config/heroic/tools/proton/Proton-CachyOS-latest}"
 
 export WINEPREFIX="$PREFIX/pfx"
-export WINEDLLOVERRIDES="winmm=n,b;d3d8=n,b"
+export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-winmm=n,b;d3d8=n,b;d3d9=n,b}"
 export WINEDEBUG="${WINEDEBUG:--all}"
 
 # Armada2.exe carries its own switch table (found in the binary):

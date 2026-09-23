@@ -63,6 +63,70 @@ that is already in `WINEDLLOVERRIDES`.
 Only class `#32770` (Win32 dialog) windows are touched. The 3D window is not a dialog,
 so gameplay, the HUD and the Bink videos are untouched by construction.
 
+## One window: `Embed=1`
+
+**Confirmed in a test launch, not yet played:** the game is one OS window from
+launch to exit, main menu, Options and its nested screens, and the in-mission
+Options menu, Save Game and Return to Game included.
+
+Every menu, the in-game ones included, is
+`DialogBoxParamA(shell_hInstance, id, <3D window>, proc, lp)` with a `WS_POPUP`
+template (every template in `.rsrc` but one). `do_escapeMenu` is the same call
+with the same template as the main menu, 291. An owned popup is a separate
+top-level window. On Windows that is invisible; under Wine it is a second X11
+window that Hyprland tiles and focuses like a new application. Measured without
+Embed: Wine lists two visible top-level windows, `hyprctl clients` two
+`steam_proton` clients, and opening Options re-tiled **both** to 3410x1378
+@15,47, the screen less gaps. Injected clicks usually did not reach the popup
+at all.
+
+`Embed=1` hooks `DialogBoxParamA`, rewrites the template `WS_POPUP` ->
+`WS_CHILD`, and creates it with `DialogBoxIndirectParamA` so it becomes a child
+of the game window. Wine then creates no second X window. Four things follow,
+each handled, each measured:
+
+- **Input.** `DialogBox` disables its owner *before* creating the dialog (Wine
+  does this even for a `WS_CHILD` template), and hit-testing never descends into
+  a disabled window, so the child would get no input. The top-level is
+  re-enabled at `WM_INITDIALOG`. Modality is kept by a `WH_GETMESSAGE` filter
+  that turns mouse and key input aimed outside the innermost menu into `WM_NULL`.
+- **Z-order.** For a modal dialog Wine walks the owner up to its top-level, so
+  a menu opened *from* a menu (Options -> Graphics Settings, template 1) is a
+  **sibling** of the one that opened it, not its child. It was created **below**
+  it and clipped away by `WS_CLIPSIBLINGS`. Each embedded menu is raised to the
+  top at `WM_INITDIALOG`, which is where an owned popup always is.
+- **Geometry and owner.** The game positions menus in screen coordinates via
+  `GetWindow(hDlg, GW_OWNER)`. A child has no owner, so `GW_OWNER` is answered
+  with the owner the game asked for, and positions are converted to
+  parent-client coordinates just before the real `MoveWindow`/`SetWindowPos`.
+- **Resizing.** A full-screen menu is sized once. When the game window is
+  resized under it, as Hyprland does when the game drops fullscreen on focus
+  loss, it used to hang off the bottom (Return to Game unreachable). Embedded
+  full-screen menus now follow their parent's client area.
+
+`CreateDialogParamA` (two sites, both the admiral's log, one already a
+`WS_CHILD` template) is left alone. `Embed=0` restores separate windows; the
+`DialogBoxParamA` hook then only logs.
+
+## GetDC and ReleaseDC do not pair up in this game
+
+`ShellButton::UpdateButton` (`0x5a4a10`) takes `GetDC(hDlg)`, draws the button,
+and falls into **eight NOPs at `0x5a4adb`** where its `push; push; call
+ReleaseDC` used to be. It was patched out, so every button redraw leaks the DC.
+
+The first version of this plugin kept the real DC on a stack and presented only
+when the outermost one came back. One leak pinned the stack, so **nothing drawn
+after it ever reached the screen**: the Options screen showed its background
+and no buttons, **with or without Embed**. After eight leaks the game was handed
+real DCs and drew 1:1 in the corner. This predates Embed and affected every
+screen built from `ShellButton`s, which is most of them past the main menu.
+
+Now no real DC is held. `GetDC` hands out the design surface and marks it dirty,
+`ReleaseDC` presents at once through a DC of the plugin's own, and a 30 ms
+thread timer presents whatever is still dirty. The timer is what catches the
+leaks. `Trace=1` logs the first paint events per dialog, which is how this was
+found.
+
 ## Use
 
     tools/menuscale/build.sh              # clang + lld-link, 32-bit PE, no CRT
@@ -105,6 +169,22 @@ each token and only then matches the switch table; anything else is stored as th
 exist — which presents as a game with a HUD and no map, not as a rejected argument.
 
 ## Test harness
+
+`probe.exe` (`run-probe.sh`) runs inside the game's own Wine session and is how
+every Embed claim above was checked without a human at the mouse:
+
+    run-probe.sh tree          top-level windows and every descendant
+    run-probe.sh click X Y     SetCursorPos + SendInput, routed by wineserver
+    run-probe.sh key VK        with the scancode: in a mission the game reads
+                               the keyboard by scancode, and a VK-only Esc never
+                               reaches the menu binding (Space still skipped the
+                               cutscene, which is what made this confusing)
+    run-probe.sh post X Y      post a click straight to the window under X,Y
+
+`capture.sh` takes `NOSHOT=1` to launch without photographing, and
+`A2_ARGS="-nointro a2_fed01.bzn"` starts a mission directly. **The `.bzn` is
+required**: without it the name does not resolve and you get the HUD with no
+map. Missions open with an in-engine cutscene, and Space skips it.
 
 `run-wine.sh` launches the game with Proton's bundled Wine directly against the existing
 prefix, skipping Heroic and the proton wrapper. It is the only launch path that prints
@@ -180,12 +260,17 @@ why neither was done up front.
 
 ## Not done
 
-- **Confirmed rendered:** the main menu and the single-player/campaign screen. The
-  options, load/save and multiplayer screens go through the same two code paths and
-  are expected to follow, but have not been seen scaled.
+- **Confirmed rendered:** the main menu, the single-player/campaign screen, Options,
+  Graphics Settings, and in a mission the Options menu and Save Game. Multiplayer
+  has not been seen scaled.
 - **Hover and click are confirmed to land correctly**; nothing has been measured about
   how *fast* they are. See the animation stall above.
 - **Real child controls** (edit boxes, list boxes — the multiplayer screens use them)
   are separate HWNDs that Windows draws itself. They are not covered by the offscreen
   redirect and will sit unscaled. The main screens are custom-drawn `ShellButton`
-  bitmaps and are fine.
+  bitmaps and are fine. **Seen:** Save Game's name field (`Edit`, 476x28 at design
+  176,551) draws at 1:1 in the left pillarbox. Embed does not change this. The fix is
+  to map child-control geometry through the same fit, plus a scaled font.
+- **Menus drawn inside the renderer** (the Direct3D route) was considered and
+  deferred. Embed gets one OS window without it, and the GDI child draws correctly over
+  the DXVK surface because the game loop is blocked while any menu is open.
