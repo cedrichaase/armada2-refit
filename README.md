@@ -1800,7 +1800,7 @@ Genuinely outstanding:
   intensity 0.08, Home toggles it live. Built per-user by `tools/vkbasalt/build.sh`,
   configured by `tools/postfx.py`; details and the measurements behind the numbers in
   `SETUP.md`, Tier 3. What is left in the post-processing family is SMAA/CAS, untried.
-- **Anti-aliasing: `MSAA.asi` is built and installed (8x), awaiting its first launch.**
+- **Anti-aliasing: `MSAA.asi`, 8x, installed and confirmed in game (2026-09-23).**
   `tools/msaa/`. It hooks the engine's own `CreateDevice` path and sets
   `MultiSampleType`, `SwapEffect=DISCARD` and a non-lockable back buffer. DXVK has no
   key for this, and the `dxcfg.ini` route died with the chain change. `MSAA.log`

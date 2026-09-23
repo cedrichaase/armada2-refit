@@ -35,7 +35,7 @@ toggles it in game. Threshold 6 / intensity 0.08, accepted by the user; the tabl
 behind those numbers is in `SETUP.md`, Tier 3.
 **MSAA is an ASI hook, `tools/msaa/`**, because nothing in DXVK or `dxcfg.ini` can
 turn it on. It edits the engine's present parameters just before
-`IDirect3D8::CreateDevice`. Installed at 8x and **not yet confirmed in game**; the
+`IDirect3D8::CreateDevice`. Installed at 8x and **confirmed in game** (2026-09-23); the
 minimap is the one thing that could break (`tools/msaa/README.md`).
 
 ## Environment

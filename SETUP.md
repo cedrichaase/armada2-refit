@@ -880,7 +880,9 @@ wined3d/OpenGL and continues to.
 
 #### Tier 2 — anti-aliasing: route 2 built, `tools/msaa/`
 
-**Route 2 is built and installed: `MSAA.asi`, 8x, not yet seen in game.**
+**Route 2 is built, installed and confirmed in game: `MSAA.asi`, 8x.** The first launch
+logged 8x on all three device creations (3440x1440, the 640x480 fallback, 3440x1440
+again) and DXVK logged no errors.
 
     tools/msaa/install.sh                 # build + install (Samples=8)
     tools/msaa/install.sh --samples 4     # or 2; 0 patches nothing
