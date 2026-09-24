@@ -11,7 +11,7 @@
 # report "game DOWN" for a game that was up.
 #
 # `pkill -f Armada2.exe` would match, but it also matches its own shell (see
-# SETUP.md), so collect PIDs with ps and kill them individually instead.
+# platform/README.md, Gotchas), so collect PIDs with ps and kill them individually instead.
 #
 # The Wine helpers are matched by WINEPREFIX read from /proc/<pid>/environ, so
 # this cannot take down an unrelated Wine application.

@@ -8,7 +8,7 @@
 WHY IT MATTERS HERE
 
 The virtual desktop was added to fix a two-window focus bug: the settings menu drew in
-one window while input stayed grabbed by another (see SETUP.md, Hyprland section).
+one window while input stayed grabbed by another (see platform/README.md, Hyprland section).
 
 It is also the prime suspect for DXVK's fullscreen failure. Inside a virtual desktop
 wined3d never needs a real display-mode change, but DXVK calls ChangeDisplaySettingsEx

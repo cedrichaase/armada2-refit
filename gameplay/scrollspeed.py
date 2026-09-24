@@ -2,7 +2,7 @@
 """Read and set Armada II's map-scroll knobs without the in-game options screen.
 
 The options screen is the supported way to change the two per-device speeds, but it is
-a GDI dialog that is not always usable (see SETUP.md, "The menus are a different UI").
+a GDI dialog that is not always usable (see menus/README.md).
 This reaches the same two values directly, plus the RTS_CFG.h knobs the UI never
 exposed at all.
 
@@ -12,7 +12,7 @@ exposed at all.
     gameplay/scrollspeed.py --revert             # back to the .a2neb-backup copies
 
 Both files are read at LAUNCH, so nothing applies to a running game.
-Full derivation, and what each knob actually multiplies, is in SETUP.md.
+Full derivation, and what each knob actually multiplies, is in gameplay/README.md.
 """
 
 import argparse

@@ -389,7 +389,7 @@ Two traps that cost real time here, both recorded so they are not rediscovered:
   DOWN" for a game that was up, and it made every run's `pkill -x Armada2.exe` cleanup
   a no-op, so instances accumulated — seven of them over half an hour, each with no
   window, each still holding a PipeWire stream and audibly playing the menu music.
-  `pkill -f Armada2.exe` does match, but also matches its own shell (see `SETUP.md`),
+  `pkill -f Armada2.exe` does match, but also matches its own shell (see `platform/README.md`, Gotchas),
   so **`stop-game.sh`** collects PIDs with `ps` and kills them individually. It also
   drops stale PipeWire nodes, which survive the process and stay in state `running`.
   Wine helpers are matched by `WINEPREFIX` out of `/proc/<pid>/environ`, so it cannot

@@ -9,7 +9,7 @@
 
 WHY THIS EXISTS
 
-SETUP.md recorded that `syswow64/d3d8.dll` at 320548 bytes was "DXVK's exact size" and
+SETUP.md (now platform/README.md) recorded that `syswow64/d3d8.dll` at 320548 bytes was "DXVK's exact size" and
 built a whole regression narrative on it.  It is not DXVK.  320548 is the size of
 *Wine's builtin d3d8*, and the file saved beside it as `d3d8.dll.dxvk-backup` is
 byte-identical to the builtin as well.  DXVK's d3d8 is ~1.66 MB.
@@ -255,7 +255,7 @@ def install(which):
     #
     # Wine searches the application directory before the system directory, which is
     # already what makes the game-directory winmm.dll and d3d8.dll load at all (see
-    # SETUP.md). Nothing manages the game directory, so that is where this belongs.
+    # platform/README.md). Nothing manages the game directory, so that is where this belongs.
     dxvk8 = os.path.join(PROTON, 'dxvk/i386-windows/d3d8.dll')
     dxvk9 = os.path.join(PROTON, 'dxvk/i386-windows/d3d9.dll')
     gamed8 = os.path.join(GAME, 'd3d8.dll')

@@ -10,7 +10,7 @@ WHY THE CURSORS ARE STRETCHED
 
 `hud/ui-widescreen.py` fixed the panels, the icons and the glyphs by re-declaring the
 1600x1200 layout canvas in `misc/gui_<race>.cfg`.  The cursors did not move, so they are
-not on that canvas -- the same way `popupPaletteXA`/`XB` are not (see `SETUP.md`).  This
+not on that canvas -- the same way `popupPaletteXA`/`XB` are not (see `hud/README.md`).  This
 is the third screen reference the engine keeps.
 
 Measured off two 3440x1440 screenshots, against the source texels:
