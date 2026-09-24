@@ -511,5 +511,11 @@ a memory figure, and the README section "2.27 GB resident was never a memory fig
 corrects the reasoning that treated it as one. At 2048 a
 single ship's three files would be 64 MB against 16 MB at 1024.
 
+**The mission loading screen is a 3D model, not a sprite** — six quads in `SOD/logo.SOD`
+carrying `LOADING1..6`, fitted to the screen height. `targets/LOADING` widens it to fill
+21:9: `tools/loading-panel.sh` outpaints the art (`bria/expand`), `tools/logo-sod.py`
+widens the quads to `panel=` units, and `a2tex install`/`revert` move the two together —
+never ship one without the other. Details in `README.md`.
+
 Open items are listed at the end of `README.md`; the plan for the rest of the game's
 textures is in `REMASTERING.md`.

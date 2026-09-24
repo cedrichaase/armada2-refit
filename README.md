@@ -1695,6 +1695,45 @@ All four remaining agents ultimately died on API timeouts, after their upscales 
 builds had landed. `CardassianLit` was rebuilt from scratch and diffed against the build
 that had raced: byte-identical.
 
+## The mission loading screen, widened
+
+The loading screen is **not a sprite and not a menu** — it is a 3D scene, which is why
+it can be widened at all. `RenderLoopAssetLoadStatusUpdate` (`0x598ba0`) draws
+`mbg02.sod` (the skybox, centred on the camera) and then `logo.sod` 700 units in front of
+it, through the ordinary perspective camera. `logo.sod` is six flat quads, 288 units
+square, in a 3x2 grid — 864x576, exactly the 3:2 of `LOADING1..6` (256px, 32-bit,
+alpha a flat 255). The camera fits that to the screen **height**: at 3440x1440 it spans
+x 646..2792, measured off `before.mp4`, and the MBG02 skybox shows either side.
+Because it is a model texture, hard rule 4's 256 ceiling does not apply; the tiles go
+to 1024.
+
+Widening is a geometry change **and** new art, never one alone. `tools/logo-sod.py`
+scales the quads' x coordinates to `panel=` units in `targets/LOADING/target.conf`
+(1400; 3440x1440 needs 1385) — same byte count, same UVs, every vertex checked against
+the stock grid first. `tools/loading-panel.sh` makes the art: the six tiles assembled,
+AI-upscaled 4x and blended 35 over Lanczos (the skybox recipe — the panel fills the
+screen height, so 1:1 is what is seen), then **outpainted** with `bria/expand` to the
+panel's aspect, then the blended plate feathered back over the centre so the model's
+contribution is the sides only, then cut into six squares, each a third of the width
+squashed square. `a2tex install LOADING` installs the SOD with the textures, and both
+reverts put it back, because stock art on a wide panel is stretched and wide art on the
+stock panel is squashed.
+
+What the outpaint needed, measured:
+
+- **A feathered paste, not a hard one.** bria does not return the region it was given
+  untouched (RMSE 0.015 against its own input), and a hard paste drew a line through
+  Earth at the left seam: column mean 133 → 127 in one pixel. A 96px fade inside the
+  original region is step-free.
+- **A prompt that names the planet.** "Nebula and stars" continued Earth's limb
+  correctly and then read its night side as sky and filled it with stars — a
+  see-through planet. Describing the night side as a solid surface fixed it on the
+  first try.
+
+`fit=none` is new for this target: each tile is a third of a wider picture, not its
+namesake, so per-tile channel matching would put a brightness step at every join, and
+`verify` compares only alpha for it.
+
 ## Beyond the nebulae
 
 `REMASTERING.md` carries the measured inventory of all 2115 textures and what would be
