@@ -3,7 +3,8 @@
 The in-game HUD: its layout canvas (`hud/ui-widescreen.py`, which rewrites
 `misc/gui_<race>.cfg`) and the cursors (`hud/cursor-aspect.py`, which reshapes
 the cursor art in `Textures/RGB` — `a2mod` counts that under textures, because
-that is where the files land). The menus are a different system: `menus/`.
+that is where the files land). The menus are a different system: `menus/`. The text
+is a third: the font ignores the canvas, and its fix is in `font/`.
 
 ## The UI stretch, and where it actually comes from
 

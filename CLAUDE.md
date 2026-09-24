@@ -15,6 +15,7 @@ layers; the folder named for each is where its code and notes live.
 | `textures/` | the texture pipeline: `lib/`, 84 `targets/`, `tools/` | `textures/README.md` |
 | `models/` | `SOD` geometry — the widened loading screen | `textures/README.md`, loading-screen section |
 | `hud/` | in-game HUD layout and the cursors | `hud/README.md` |
+| `font/` | the condensed in-game bitmap font | `font/README.md` |
 | `menus/` | `MenuScale.asi` — the shell menus and their backdrops | `menus/README.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `cutscenes/` | `binkproxy/` and the replacement `movies/` | `cutscenes/binkproxy/README.md` |
@@ -22,8 +23,7 @@ layers; the folder named for each is where its code and notes live.
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton | `platform/README.md` |
 | `gameplay/` | map scroll speed | `gameplay/README.md` |
 
-The font layer lives on the unmerged `worktree-font-condense` branch; it belongs in
-`font/`. `./a2tex` and `./a2mod` are the two entry points and stay at the root.
+`./a2tex` and `./a2mod` are the two entry points and stay at the root.
 `a2tex` exports `ROOT=textures/`, so everything under `textures/` addresses
 `$ROOT/lib`, `$ROOT/targets` and `$ROOT/tools` as it always did.
 
@@ -84,6 +84,11 @@ minimap is the one thing that could break (`msaa/README.md`).
 1. **Never write into `Textures/RGB/` directly.** `./a2tex build` writes to
    `textures/targets/<NAME>/out/`; `./a2tex install` copies it across, making a `.a2neb-backup`
    on first touch. `./a2tex revert all` undoes everything.
+   **The one sanctioned exception is `font/ui-font-condense.py`**, which rewrites the
+   twelve `FontFinal4_*` atlases in place because its edit is paired with the `.spr`
+   metrics beside them in `Sprites/` and so cannot live in a target. It owns its own
+   backups under `.a2font-backup` — a *different* suffix, precisely so `a2tex revert
+   all` cannot restore a stock atlas under condensed metrics. See `font/README.md`.
 2. **Match the stock TGA format exactly**: image type 2, uncompressed, no ID field, no
    colour map — and **the same bit depth as the file you are replacing.** The nebula
    textures are 24-bit; **1113 of the 2115 textures in the game are 32-bit with a live
@@ -548,6 +553,39 @@ only thing that spends. Stock `.bik` files stay in the game directory and are on
 The installed `Intro` is Bria 2x + `minterpolate` to 30 fps; switching it to Topaz Apollo
 is `interp=apollo` plus one paid run. `a2mod` switches it all as the `cutscenes` layer. Open questions
 (the MSAA hook versus a locked back buffer) are in its README.
+
+**The font does not ride on the canvas either, and the canvas fix is what exposed it.**
+The in-game font is a bitmap sprite — `Font%s%d.spr`, eight sizes in `Sprites/`, each a
+**solid white RGB atlas with the glyphs entirely in alpha** — and its quads scale by
+back-buffer / **1280x1024**, a hard-coded tier, whatever `screenWidth` says. At 3440x1440
+that is 2.6875x across against 1.40625x down: every glyph **1.911x too wide**, and 2.24x
+too wide for a panel that now scales at 1.20. The vertical axis is already right and is
+not touched — 1.40625 against 1.20 is the same 1.171875 the game has at 4:3.
+`font/ui-font-condense.py` squeezes glyph art *and* advance widths by `1.25 * H / W`
+(0.5233 here) so the engine's own stretch lands them back at their authored proportions;
+`--revert` undoes it, `--check` verifies `.spr` and `.tga` still agree. **Its backups are
+`.a2font-backup` on purpose**: `a2tex revert all` would otherwise restore stock atlases
+under condensed metrics and garble every glyph. The cost is horizontal sampling — the
+quad is `texels x scale`, so there is no other lever — and the tier was pinned by the
+headers, since the 1600x1200 rival fit needs a `FontFinal4_30` that does not exist.
+
+**A crisper condense was built, measured, and rejected in game. Don't re-ship it.**
+`--method runs` replaces the Lanczos squeeze with a per-scanline run mapper: it guarantees
+every ink run at least one texel and fills it flat at that line's peak alpha, on the
+argument that the engine point-samples and horizontal AA therefore buys nothing (across,
+at 2.6875x, a part-covered texel is a flat 2.7px grey slab; down, at 1.40625x, it is a
+real soft edge). It wins on every static metric — `FontFinal4_24a` goes from 1572 opaque
+texels back to 3948 against stock's 6000, the alpha plane from 256 levels back to 14, zero
+dropouts where thresholding erases the one-texel glyphs (`!` `"` `I` `i` `l` `|` `'` `.`
+`:`) at sizes 10–13. **In the game it looked worse**, and the user asked for the Lanczos
+build back; `--method resample` is the default again. The reasoning modelled a bare
+point-sampled blit, but the real text is tinted, sits over lit panel art and is read at a
+normal distance. **The lesson: ink ratio, opaque-texel count and dropout count measure
+weight and structure, not legibility — they all favoured the variant that lost. Never
+change the font's appearance on the strength of that table; put it in the game and look.**
+Derivation, the measurement table and the rounding error are in `font/README.md`.
+**Applied and confirmed in game**: `OBJECTIVES:` went 619.5 → 323.5 screen px against
+325.2 predicted, 0.5%, at an unchanged 32.7 px cap.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `textures/targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs

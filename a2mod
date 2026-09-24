@@ -9,9 +9,9 @@
 WHY A SNAPSHOT AND NOT A REINSTALL
 
 The obvious design -- `a2tex revert all`, then `a2tex install` and each tool's
-installer -- does not reproduce what is installed.  Two installed layers live only on
-unmerged branches (MenuScale's Embed=1 build, the condensed font), and the textures
-depend on textures/targets/*/out, which only the main checkout has.  A reinstall from whatever
+installer -- does not reproduce what is installed.  Installed layers have lived only on
+unmerged branches before (MenuScale's Embed=1 build and the condensed font both did),
+and the textures depend on textures/targets/*/out, which only the main checkout has.  A reinstall from whatever
 branch happens to be checked out would quietly swap in something else, and a
 before/after taken across that is comparing the wrong "after".
 
@@ -23,7 +23,7 @@ records a hash of every modded file, and `remastered` checks each one on the way
 WHAT COUNTS AS A CHANGE
 
     textures      Textures/RGB/*.a2neb-backup  -- a2tex, and the cursor-aspect art
-    font          *.a2font-backup              -- ui-font-condense
+    font          *.a2font-backup              -- font/ui-font-condense.py
     models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel)
     hud layout    misc/*.a2neb-backup          -- ui-widescreen (canvas, palette)
     menu scale    MenuScale.asi/.ini, MenuScale/*.bmp -- added files, stock has none

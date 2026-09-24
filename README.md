@@ -21,7 +21,7 @@ here with its own README.
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | a `binkw32.dll` proxy that plays upscaled AV1 movies full screen |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
-| font | font | a condensed UI font; on the `worktree-font-condense` branch, not yet merged |
+| [`font/`](font/README.md) | font | the in-game bitmap font condensed so text is not drawn 1.9x too wide |
 
 Not switched by `a2mod`, because the layers above stand on them:
 
