@@ -517,6 +517,9 @@ static void slot_placement(Slot *s, int *ox, int *oy, int *dw, int *dh);
 #define LR_CREATEDIBSECTION 0x2000
 #define ID_TOL      2       /* "still the stock pixel", for identification  */
 #define ID_PERCENT  50      /* share of sample points that must agree       */
+#define MAXSOFT     4       /* soften rectangles per backdrop                */
+#define SOFT_R      12      /* design px a cut glow is continued outwards    */
+#define SOFT_K      3       /* ... sampled from a (2K+1) box at its edge     */
 
 typedef struct {
     char    stock[320];     /* bitmaps\...\x.bmp, the shell's own file       */
@@ -524,6 +527,8 @@ typedef struct {
     int     tried, bad;
     DWORD  *px;             /* stock pixels, design size, top-down           */
     HBITMAP bmp;            /* the DIB section px lives in                   */
+    int     nsoft;          /* N.soften= rectangles, design px, x0 y0 x1 y1  */
+    int     soft[MAXSOFT][4];
 } Backdrop;
 
 static Backdrop g_bd[MAXBD];
@@ -546,6 +551,7 @@ static struct {
     int    *bx, *by;        /* screen pixel -> bilinear tap (design) ...     */
     int    *fx, *fy;        /* ... and its weight on the next tap, 0..256    */
     WORD   *wt;             /* design size: detail weight, 0..256            */
+    DWORD  *fp;             /* design size: the frame, soften rings applied  */
     HWND    shown;          /* window the whole screen was last blitted to   */
     int     since;          /* presents since this backdrop was prepared     */
     int     frames, reports;
@@ -723,9 +729,10 @@ static int bd_prepare(int idx, HDC real, int rw, int rh, int ox, int oy, int dw,
     g_c.fy  = (int *)vm_alloc((UINT)dh * 4);
     if (!g_c.wt)   g_c.wt   = (WORD *)vm_alloc((UINT)g_designW * (UINT)g_designH * 2);
     if (!g_c.prev) g_c.prev = (DWORD *)vm_alloc((UINT)g_designW * (UINT)g_designH * 4);
+    if (!g_c.fp)   g_c.fp   = (DWORD *)vm_alloc((UINT)g_designW * (UINT)g_designH * 4);
     g_c.dc  = g_c.bmp ? CreateCompatibleDC(real) : NULLPTR;
     if (!g_c.bmp || !g_c.hi || !g_c.lo || !g_c.xm || !g_c.ym || !g_c.bx || !g_c.by ||
-        !g_c.fx || !g_c.fy || !g_c.wt || !g_c.prev || !g_c.dc) {
+        !g_c.fx || !g_c.fy || !g_c.wt || !g_c.prev || !g_c.fp || !g_c.dc) {
         bd_log("out of memory preparing", b->plate);
         DeleteObject(plate); bd_release(); b->bad = 1; return 0;
     }
@@ -821,6 +828,67 @@ static int bd_end(const int *b, int n, int d)
 }
 
 /*
+ * Soften the edge of an animation whose glow is cut off by its own rectangle.
+ *
+ * TutorialGlow.bik, on the campaign screen, is 320x200 with the background baked
+ * in and a blue halo that runs right up to the rectangle: 59/255 off stock along
+ * its left edge, 56 along the top.  In the stock game the left cut sat on the
+ * screen's black frame and hid; the plate paints nebula there, so it shows as a
+ * hard line.  For each rectangle listed as N.soften=, the pixels in a ring
+ * SOFT_R wide outside it that still show untouched background (frame == stock)
+ * get the difference at the nearest edge -- averaged over a small box, which
+ * smooths away codec noise -- carried on and fading linearly to nothing.  Their
+ * detail weight stays 1, so the plate shows through the continued glow exactly
+ * as it does through the one inside.  A rectangle with nothing drawn in it
+ * differs from stock by nothing, so this costs the idle screen nothing.
+ */
+static void bd_soften(const Backdrop *b, const DWORD *f, const DWORD *st,
+                      int ax, int ay, int bx, int by)
+{
+    int n, x, y;
+    for (n = 0; n < b->nsoft; n++) {
+        const int *r = b->soft[n];
+        int x0 = r[0] - SOFT_R, y0 = r[1] - SOFT_R, x1 = r[2] + SOFT_R, y1 = r[3] + SOFT_R;
+        if (x0 < ax) x0 = ax;
+        if (y0 < ay) y0 = ay;
+        if (x1 > bx + 1) x1 = bx + 1;
+        if (y1 > by + 1) y1 = by + 1;
+        for (y = y0; y < y1; y++)
+            for (x = x0; x < x1; x++) {
+                int k = y * g_designW + x, tx, ty, qx, qy, i, j, cnt = 0, a, sh;
+                int sum[3] = { 0, 0, 0 };
+                DWORD v = 0;
+                if (f[k] != st[k]) continue;
+                tx = x < r[0] ? r[0] - x : x >= r[2] ? x - r[2] + 1 : 0;
+                ty = y < r[1] ? r[1] - y : y >= r[3] ? y - r[3] + 1 : 0;
+                if (!tx && !ty) continue;                  /* inside: untouched */
+                qx = x < r[0] ? r[0] : x >= r[2] ? r[2] - 1 : x;
+                qy = y < r[1] ? r[1] : y >= r[3] ? r[3] - 1 : y;
+                for (j = qy - SOFT_K; j <= qy + SOFT_K; j++) {
+                    if (j < r[1] || j >= r[3]) continue;
+                    for (i = qx - SOFT_K; i <= qx + SOFT_K; i++) {
+                        int q = j * g_designW + i;
+                        if (i < r[0] || i >= r[2]) continue;
+                        for (sh = 0; sh < 3; sh++)
+                            sum[sh] += (int)((f[q] >> (8 * sh)) & 255) - (int)((st[q] >> (8 * sh)) & 255);
+                        cnt++;
+                    }
+                }
+                if (!cnt) continue;
+                a = (SOFT_R + 1 - tx) * (SOFT_R + 1 - ty);  /* of (R+1)^2 */
+                for (sh = 0; sh < 3; sh++) {
+                    int c = (int)((f[k] >> (8 * sh)) & 255) +
+                            sum[sh] * a / (cnt * (SOFT_R + 1) * (SOFT_R + 1));
+                    if (c < 0) c = 0;
+                    if (c > 255) c = 255;
+                    v |= (DWORD)c << (8 * sh);
+                }
+                g_c.fp[k] = v;
+            }
+    }
+}
+
+/*
  * Present a full-screen dialog over its backdrop.  Returns 0 -- and the caller
  * falls back to black pillarboxes and a plain stretch -- whenever the screen on
  * show is not a listed backdrop or anything about it cannot be prepared.
@@ -875,6 +943,21 @@ static int bd_present(Slot *s, HDC real, int full, int rw, int rh, int ox, int o
         }
     }
 
+    /* A change that reaches a soften rectangle or its ring redoes both. */
+    for (i = 0; bx >= 0 && i < g_bd[best].nsoft; i++) {
+        const int *r = g_bd[best].soft[i];
+        if (ax < r[2] + SOFT_R && bx >= r[0] - SOFT_R && ay < r[3] + SOFT_R && by >= r[1] - SOFT_R) {
+            if (ax > r[0] - SOFT_R) ax = r[0] - SOFT_R;
+            if (ay > r[1] - SOFT_R) ay = r[1] - SOFT_R;
+            if (bx < r[2] + SOFT_R - 1) bx = r[2] + SOFT_R - 1;
+            if (by < r[3] + SOFT_R - 1) by = r[3] + SOFT_R - 1;
+        }
+    }
+    if (ax < 0) ax = 0;
+    if (ay < 0) ay = 0;
+    if (bx > g_designW - 1) bx = g_designW - 1;
+    if (by > g_designH - 1) by = g_designH - 1;
+
     if (bx >= 0) {
         /* detail weights and the frame copy, over the changed pixels only */
         for (y = ay; y <= by; y++)
@@ -883,7 +966,9 @@ static int bd_present(Slot *s, HDC real, int full, int rw, int rh, int ox, int o
                 int d = pxdiff(f[k], st[k]);
                 g_c.wt[k] = (WORD)(d >= tol ? 0 : ((tol - d) << 8) / tol);
                 g_c.prev[k] = f[k];
+                g_c.fp[k] = f[k];
             }
+        bd_soften(&g_bd[best], f, st, ax, ay, bx, by);
         g_c.valid = 1;
 
         sx0 = bd_first(g_c.bx, dw, ax); sx1 = bd_end(g_c.bx, dw, bx + 1);
@@ -894,7 +979,7 @@ static int bd_present(Slot *s, HDC real, int full, int rw, int rh, int ox, int o
             const DWORD *lp = g_c.lo + y * dw;
             const WORD  *wr = g_c.wt + g_c.ym[y] * g_designW;
             for (x = sx0; x < sx1; x++) {
-                DWORD v = bd_bilerp(f, x, y), r = 0;
+                DWORD v = bd_bilerp(g_c.fp, x, y), r = 0;
                 int   w = wr[g_c.xm[x]], sh;
                 if (w) {
                     for (sh = 0; sh <= 16; sh += 8) {
@@ -1901,7 +1986,7 @@ static void build_paths(char *ini)
  */
 static void bd_list(const char *ini)
 {
-    char key[4], val[256], m[96];
+    char key[16], val[256], m[96];
     int  i, k;
 
     for (i = 1; i <= 9 && g_nbd < MAXBD; i++) {
@@ -1918,6 +2003,29 @@ static void bd_list(const char *ini)
         memset(b, 0, sizeof *b);
         s_cat(b->stock, g_dir); s_cat(b->stock, val);
         s_cat(b->plate, g_dir); s_cat(b->plate, "MenuScale\\"); s_cat(b->plate, base);
+
+        /* N.soften=x,y,w,h ...: see bd_soften */
+        key[1] = '.'; key[2] = 0; s_cat(key, "soften");
+        val[0] = 0;
+        GetPrivateProfileStringA("Backdrops", key, "", val, sizeof val, ini);
+        {
+            int v[4], nv = 0, cur = -1;
+            for (k = 0; ; k++) {
+                char c = val[k];
+                if (c >= '0' && c <= '9') { cur = (cur < 0 ? 0 : cur * 10) + (c - '0'); continue; }
+                if (cur >= 0) {
+                    v[nv++] = cur; cur = -1;
+                    if (nv == 4) {
+                        if (b->nsoft < MAXSOFT && v[2] > 0 && v[3] > 0) {
+                            int *r = b->soft[b->nsoft++];
+                            r[0] = v[0]; r[1] = v[1]; r[2] = v[0] + v[2]; r[3] = v[1] + v[3];
+                        }
+                        nv = 0;
+                    }
+                }
+                if (!c) break;
+            }
+        }
     }
     m[0] = 0;
     s_cat(m, "backdrops listed: "); s_num(m, g_nbd);

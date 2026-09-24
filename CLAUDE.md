@@ -444,8 +444,10 @@ background baked in. It is 7.8 ms per present, because only the dirty rectangle 
 redone. Plates are built by `tools/menuscale/backdrop.sh`. The campaign screen's art
 sits inside a drawn black frame, which an outpaint only continues. So `field=`
 outpaints from the open part alone, and the plate paints over the frame, which is stock
-background to the compositor. The main menu is composited as designed in a test run.
-The campaign plate has been checked offline only. **Neither has been seen in game yet.**
+background to the compositor. Both **seen in game** (2026-09-24). One defect showed:
+the Tutorials hover glow (`TutorialGlow.bik`) is cut off by its own rectangle, which
+the old frame used to hide. `2.soften=` in `MenuScale.ini` carries that halo outwards
+(`bd_soften`). The fix is simulated offline, not yet seen in game.
 
 **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
 declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to

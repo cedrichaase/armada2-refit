@@ -210,6 +210,24 @@ in `backdrops/*.conf`:
   the bottom left, which `clone=` covers with the patch of sky beneath it. The
   others are kept in `ai/` as `expanded-*.png`.
 
+**Glows cut off by their own rectangle (`N.soften=`).** Hovering Tutorials plays
+`single/TutorialGlow.bik`, 320x200 at (28,20). It has the background baked in, and
+its blue halo runs right up to the rectangle. Measured against stock along its
+edges it is off by 56, 12, 59 and 26 (top, bottom, left, right). The stock game
+hid the left cut on the black frame, which the plate now paints over, so it
+showed as a hard box (seen in game). The other three campaign glows fade out
+inside their rectangles (1–3 at the edges), and so do the main menu's hover
+bitmaps (RMSE 0 at the edges).
+Each `N.soften=x,y,w,h` rectangle gets a ring 12 design px wide around it. There,
+wherever the frame still equals stock, the difference at the nearest edge (a 7x7
+box average, which smooths codec noise) is carried on and fades linearly to
+nothing. The ring keeps detail weight 1, so the plate shows through. With nothing
+drawn in the rectangle, the difference is zero and nothing changes. An offline
+simulation of the hover frame shows the box gone; not yet seen in game.
+Fading inwards instead would eat the panel's left bar, which starts 4px inside.
+A generic "continue every long edge" rule cannot tell a halo from the grey button
+bars, hence the explicit list.
+
 The options, load/save and multiplayer screens are metal frames on black, so they
 are left as they are.
 
