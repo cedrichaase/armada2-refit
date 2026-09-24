@@ -145,6 +145,15 @@ minimap is the one thing that could break (`tools/msaa/README.md`).
 One entry point, `./a2tex` — `list`, `build [-j N]`, `install`, `revert`, `diff`,
 `verify`.
 
+**`./a2mod stock` / `./a2mod remastered` / `./a2mod status`** flips the *whole game*
+for before/after: textures, font, HUD layout, MenuScale, MSAA, `dxvk.conf` and bloom
+at launch. DXVK, the ASI loader, the widescreen patch and the scroll-speed files stay
+as they are in both states. It **snapshots** rather than reinstalls: modded files move
+to `$GAME/.a2mod/` and back, hash-checked, because some installed layers exist only
+on unmerged branches and a reinstall would not reproduce them. While in stock,
+anything installed over a stock file makes `remastered` refuse. Do not delete
+`$GAME/.a2mod` while in stock.
+
 Two checkers beside it:
 
 - **`tools/selftest-mips.py`** pins mip-chain *name* resolution against the real texture
