@@ -225,9 +225,9 @@ The working configuration, all four parts required together:
 | `WINEDLLOVERRIDES` | `winmm=n,b;d3d8=n,b;d3d9=n,b` | without the d3d9 entry Wine resolves it to builtin WineD3D |
 | Wine virtual desktop | **off** | inside it DXVK's `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 |
 
-Set it up with `platform/d3d8-chain.py --use dxvk` (reverse with `--revert`) and
-`platform/virtual-desktop.py --off`. The virtual desktop stays off in both states: it
-is superseded by `MenuScale.asi`'s `Embed=1` (see "Hyprland / window management").
+Set it up with `platform/d3d8-chain.py --use dxvk` (reverse with `--revert`). The
+virtual desktop stays off in both states: it is superseded by `MenuScale.asi`'s
+`Embed=1` (see "Hyprland / window management", which also has the check).
 
 **The `d3d9=n,b` override is load-bearing, not diagnostic.** It arrived as part of
 `dxvk-logging.py --diagnose`, so `--off` used to strip it — which would have silently
@@ -297,9 +297,20 @@ See `menus/README.md`, "One window: `Embed=1`".
 this bug: `"Desktop"="Default"` under `[Software\\Wine\\Explorer]` in
 `<prefix>/pfx/user.reg`, which put everything in one window. It is incompatible with
 DXVK: inside it `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 (see
-above). `platform/virtual-desktop.py --status` confirms it is off, and `--off` removes it
-from a prefix that still has it. Do not turn it back on to fix a window problem; fix
-the window in `menuscale.c`.
+above). Do not turn it back on to fix a window problem; fix the window in
+`menuscale.c`.
+
+To check it is off (a fresh prefix never has it):
+
+    grep -F -A3 '[Software\\Wine\\Explorer]' "<prefix>/pfx/user.reg"
+
+No output, or no `"Desktop"=` line under that key, means off. A plain
+`grep '"Desktop"='` is wrong for this: the Shell Folders keys carry unrelated `"Desktop"`
+values. The `[Software\\Wine\\Explorer\\Desktops]` key that remains in this prefix only
+defines a size and does nothing without that value. To remove the value, delete that one
+line with Heroic and the game closed — while `wineserver` runs, Wine rewrites `user.reg`
+from memory and discards the edit. (`platform/virtual-desktop.py` did this until
+platform 2.0.0.)
 
 ## Known issues
 

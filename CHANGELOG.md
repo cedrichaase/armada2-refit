@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 2.0.0 — 2026-09-25
+
+Layers: platform 2.0.0.
+
+### Removed
+- `platform/virtual-desktop.py`. The Wine virtual desktop is superseded by `Embed=1`
+  (see `platform/CHANGELOG.md`).
+
+Installed state unchanged; nothing to see in game.
+
 ## 1.0.0 — 2026-09-25
 
 Baseline: the first versioned release. Every layer starts at 1.0.0. The project

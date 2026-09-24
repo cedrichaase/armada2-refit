@@ -2,9 +2,20 @@
 
 What `a2mod` never switches: DXVK in the d3d8 chain, the ASI loader, the widescreen
 patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain.py`,
-`dxvk-logging.py`, `virtual-desktop.py`, `ab-shot.sh`). Versioning rules:
+`dxvk-logging.py`, `ab-shot.sh`). Versioning rules:
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
+
+## 2.0.0 — 2026-09-25
+
+### Removed
+- `virtual-desktop.py`. The Wine virtual desktop is superseded by `MenuScale.asi`'s
+  `Embed=1` and must stay off for DXVK, so a tool that could turn it back on was a
+  hazard. `README.md` ("Hyprland / window management") has the check that replaces
+  `--status`. MAJOR because a tool is removed. The installed game is unaffected: this
+  prefix's virtual desktop was already off, and nothing else in it changes.
+
+Installed state unchanged; nothing to see in game.
 
 ## 1.0.0 — 2026-09-25
 
