@@ -448,6 +448,11 @@ background to the compositor. Both **seen in game** (2026-09-24). One defect sho
 the Tutorials hover glow (`TutorialGlow.bik`) is cut off by its own rectangle, which
 the old frame used to hide. `2.soften=` in `MenuScale.ini` carries that halo outwards
 (`bd_soften`). A `keep=` rectangle keeps the panel bar from the upscale rather than the outpaint. **Confirmed in game** (2026-09-25).
+The main menu plate was then redone because its outpaint drew two big flared stars that
+pulled the eye off the menu. It is now **seed 6 of a star-free prompt, with the sides
+faded to near-black (`fade=12`) and the blue haze removed (`dehaze=100`)**. The haze
+comes from stock's own corners, and no prompt kept it out. Accepted by the user
+(2026-09-25). Seeds 1, 2 and 6 are kept in `ai/`; 3–5 were rejected and deleted.
 
 **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
 declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to
