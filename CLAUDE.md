@@ -436,6 +436,14 @@ improved".** Open: the Admiral's Log (modeless `CreateDialogParamA`, not yet hoo
 unscaled text boxes. **GetDC/ReleaseDC do not pair in this game**: `ShellButton::UpdateButton` has
 its `ReleaseDC` NOP'd out, so nothing in `menuscale.c` may assume they do. Both are in
 `tools/menuscale/README.md`.
+**The main menu has a hi-res, outpainted backdrop** (`Backdrops=1`), which fills the
+pillarboxes. A bigger BMP cannot do it, because the shell draws 1:1 into 800x600.
+MenuScale composites it per frame instead: `stretch(frame) + w·(plate − stretch(stock))`.
+It is a weight, not a mask, because `MainBk_flare.bik` *is* the logo band with the
+background baked in. It is 7.8 ms per present, because only the dirty rectangle is
+redone. Plates are built by `tools/menuscale/backdrop.sh`. The single-player screen
+gets the centre only (`outpaint=no`, framed art). Composited as designed in a test
+run, **not yet seen in game**.
 
 **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
 declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to

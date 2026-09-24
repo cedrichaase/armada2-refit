@@ -20,3 +20,8 @@ Sleep@4
 GetStdHandle@4
 GetCommandLineA@0
 ExitProcess@4
+GetPrivateProfileStringA@24
+VirtualAlloc@16
+VirtualFree@12
+QueryPerformanceCounter@4
+QueryPerformanceFrequency@4

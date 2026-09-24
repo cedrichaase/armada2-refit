@@ -8,3 +8,8 @@ DeleteDC@4
 StretchBlt@44
 SetStretchBltMode@8
 PatBlt@24
+CreateDIBSection@24
+GetDIBits@28
+BitBlt@36
+GdiFlush@0
+GetObjectA@12

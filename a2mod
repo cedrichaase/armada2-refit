@@ -26,7 +26,7 @@ WHAT COUNTS AS A CHANGE
     font          *.a2font-backup              -- ui-font-condense
     models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel)
     hud layout    misc/*.a2neb-backup          -- ui-widescreen (canvas, palette)
-    menu scale    MenuScale.asi/.ini           -- added files, stock has none
+    menu scale    MenuScale.asi/.ini, MenuScale/*.bmp -- added files, stock has none
     msaa          MSAA.asi/.ini                -- added files
     cutscenes     binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
                   animations/<Name>.mp4/.wav beside a <Name>.bik  -- tools/binkproxy
@@ -139,6 +139,12 @@ def discover():
         stem, ext = os.path.splitext(f)
         if ext.lower() in MOVIE_EXTS and stem.lower() in biks:
             found.append({'rel': f'{MOVIE_DIR}/{f}', 'kind': 'added', 'layer': 'cutscenes'})
+    # MenuScale's backdrop plates (tools/menuscale/backdrop.sh), one per menu screen.
+    plates = os.path.join(GAME, 'MenuScale')
+    if os.path.isdir(plates):
+        for f in sorted(os.listdir(plates)):
+            if f.lower().endswith('.bmp'):
+                found.append({'rel': f'MenuScale/{f}', 'kind': 'added', 'layer': 'menu scale'})
     return sorted(found, key=lambda e: e['rel'])
 
 
@@ -293,6 +299,7 @@ def to_remastered(dry, force):
     for e in entries:
         snap = os.path.join(SNAP, e['rel'])
         if os.path.exists(snap):
+            os.makedirs(os.path.dirname(os.path.join(GAME, e['rel'])), exist_ok=True)
             os.replace(snap, os.path.join(GAME, e['rel']))
     # Check every file on the way in by FULL hash -- not the size+mtime shortcut that
     # status uses.  This is the step that makes "byte for byte" a measurement.

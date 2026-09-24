@@ -145,6 +145,86 @@ thread timer presents whatever is still dirty. The timer is what catches the
 leaks. `Trace=1` logs the first paint events per dialog, which is how this was
 found.
 
+## Backdrops: hi-res art, and the pillarboxes filled
+
+The main menu's background is upscaled 4x and outpainted to 2.4:1. The pillarboxes
+show the outpainted sides, and the centre shows the upscale wherever the shell is
+still drawing the stock background. **Not yet seen in game by a person.** A test run
+at 3440x1440 composited it as designed; the numbers are below.
+
+**Why the art cannot simply replace the BMP.** The shell draws each screen at 1:1
+into the 800x600 design surface: first the stock background, then buttons, hover
+states, text and Bink animations on top. A bigger `mainbkgr.bmp` would still be drawn
+800x600 of it. So MenuScale composites the picture itself, per frame, from the
+frame the shell drew:
+
+- **Which screen:** a 40x30 grid of the frame is sampled against each stock BMP
+  listed under `[Backdrops]`. The listed screen that matches exactly (within 2/255)
+  at 50% or more of the points is the one on show.
+- **Sides:** these come from the plate `MenuScale/<same name>.bmp`, scaled so its
+  centre 4:3 lands exactly on the stretched design area.
+- **Centre:** `out = stretch(frame) + w · (plate − stretch(stock))` per pixel, with
+  `w` falling linearly from 1 to 0 as the frame's pixel departs from stock by up to
+  `DetailTolerance` (48). On untouched background the stretches cancel and the
+  result *is* the plate. Under an opaque overlay, such as a hover highlight or text
+  100+ off stock, it is the stretched frame exactly as before.
+
+**It is a weight and not a mask because of the flare.** `MainBk_flare.bik` is not
+drawn over the logo. It *is* the logo band: 800x145 at y 210, with the background
+baked in, through a lossy codec. It sits a mean 8/255 off stock, and 94% of its pixels
+are within 24. An exact-match mask would have left the logo, the thing anyone looks
+at, as the one low-res band on the screen. With the weight, the band measures
+mean |Laplacian| 56.4, against 60.6 for the plate and 35.7 for a plain stretch.
+
+**Cost, measured.** Doing the whole centre per present (a GDI `HALFTONE`
+`StretchBlt` of the frame plus the composite over 2.76M pixels) took **59 ms**, and
+the flare runs at 30 fps. Two changes brought it to **7.8 ms**:
+
+- **The stretch is done in C, bilinear, with fixed taps.** Every screen pixel is
+  then a fixed function of the design pixels under it. A GDI stretch of a
+  sub-rectangle filters its edges differently from a stretch of the whole.
+- **Only what changed is redone.** The frame is diffed against the last one
+  composited, and only the screen rectangle the changed design pixels reach is
+  recomputed and blitted. That is about 88k screen pixels per present on average.
+
+The stretched stock is built with the same function, which is what makes
+untouched background come out *exactly* as the plate. Measured on a dumped frame:
+the sides have RMSE 0 against the plate, and so does the lower centre, labels
+included.
+
+**Which screens.** Only screens with open art are outpainted, and they are listed
+in `backdrops/*.conf`:
+
+- **`mainbkgr`:** nebula to the edges. Outpainted, and the joins are step-free
+  (column means 39→36→35 and 44→45 across them).
+- **`singleplay`:** `outpaint=no`, so it gets the hi-res centre and black sides.
+  Its grid field sits inside a black margin, and outpainting it continued the
+  border and then started a different sky beyond it. Black pillarboxes read as
+  the same margin.
+
+The options, load/save and multiplayer screens are metal frames on black, so they
+are left as they are.
+
+**Building a plate:** `tools/menuscale/backdrop.sh <name>` uses the same recipe as
+`tools/loading-panel.sh`, and keeps its paid layers in `backdrops/<name>/ai/`.
+
+1. Upscale the stock 4x with `bria/increase-resolution`. pruna hung in "running"
+   for 10 minutes on the day this was built.
+2. Blend 35% over Lanczos.
+3. Outpaint at 2048x1536 → 3680x1536 with `bria/expand`, which caps a canvas at
+   5000px.
+4. Feather the full 4x centre back in over 64px.
+5. Resize to exactly 3450x1440, centre 1920 at x 765. The plate is authored at
+   the screen height, so at 1440 it goes on 1:1.
+
+`--reblend` re-derives it offline. `install.sh` copies each built plate to
+`MenuScale/`, and `a2mod` moves them with the rest of the menu scale layer.
+
+**Testing without taking over the desktop.** Set `DumpBackdrop=1` and launch with
+`NOSHOT=1 capture.sh`. MenuScale then writes the composed screen to
+`MenuScale-backdrop<n>.bmp` ~60 presents after each backdrop first shows. `shot.sh`
+has to switch the visible workspace to grab a frame, and this does not.
+
 ## Use
 
     tools/menuscale/build.sh              # clang + lld-link, 32-bit PE, no CRT
@@ -153,8 +233,9 @@ found.
     tools/menuscale/install.sh --remove   # take it out again
 
 `install.sh --remove` restores stock behaviour exactly: the plugin only ever *adds*
-`MenuScale.asi`, `MenuScale.ini` and `MenuScale.log` to the game directory, so there is
-no backup to keep and nothing to revert.
+`MenuScale.asi`, `MenuScale.ini`, `MenuScale.log` and the backdrop plates in
+`MenuScale/` to the game directory, so there is no backup to keep and nothing to
+revert.
 
 `MenuScale.ini` keys are documented in the file. The ones worth knowing:
 
@@ -164,6 +245,7 @@ no backup to keep and nothing to revert.
 | `IntegerScale` | `1` snaps to a whole factor (2x = 1600x1200) — crisper, leaves a band |
 | `Smooth` | `1` HALFTONE, `0` nearest neighbour |
 | `RaiseShellMode` | `0` leaves the engine's 800x600 front-end mode alone |
+| `Backdrops` | `0` black pillarboxes and a plain stretch, as before the backdrops |
 
 **If anything misbehaves, `Mode=0` is a safe diagnostic and `--remove` is a full
 uninstall.** `MenuScale.log`, beside `Armada2.exe`, records what it patched and every
@@ -258,6 +340,10 @@ has been measured.** `present()` runs on every outermost `ReleaseDC`, and a mous
 makes the shell redraw the widget under the cursor, so each `WM_MOUSEMOVE` costs a
 **full-frame 800x600 -> 1920x1440 `StretchBlt` in HALFTONE**, not a redraw of the part
 that changed. A stream of mouse-moves could then starve whatever drives the animation.
+
+On a screen with a backdrop this no longer applies in that form. There, `present()`
+redoes only the changed rectangle, measured at 7.8 ms per present (see
+"Backdrops"). A fix for the other screens could follow the same pattern.
 
 Three cheap experiments, in the order that actually discriminates:
 
