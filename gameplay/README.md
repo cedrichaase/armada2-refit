@@ -1,4 +1,11 @@
-# Map scrolling
+# Gameplay — map scrolling and draw distance
+
+Engine settings that change how the game plays rather than how it looks, which is
+why `a2mod` leaves them alone in both states: the map-scroll knobs in `ARMADA.PRF` and
+`RTS_CFG.h` (`gameplay/scrollspeed.py`, applied), and the cutscene draw distance, which
+is understood and deliberately not changed.
+
+## Map scrolling
 
 The stock scroll feel is slow because **two of the three knobs ship at or near their
 minimum**, and the one that matters most is a per-user setting the game already exposes
@@ -40,7 +47,7 @@ by `SCROLL_COEFFICIENT` instead:
 - `SCROLL_COEFFICIENT` scales both ends together, so it is the knob for "everything is
   too slow", and the one to raise when lowering the floor would otherwise cost you.
 
-## Every navigation path funnels through Pan
+### Every navigation path funnels through Pan
 
 Worth knowing before tuning anything, because it is not obvious from the names:
 `ParabolicCamera::Scroll` (`0x4dfbb0`) is nine instructions that forward straight to
@@ -54,7 +61,7 @@ that also touches right-drag, which bypasses both profile speeds entirely.
 Left alone here: `SCROLL_COEFFICIENT` already lifts that path, and right-drag is direct
 manipulation where a 1:1 feel against the cursor is the point.
 
-## The two speeds live in ARMADA.PRF, not in any config file
+### The two speeds live in ARMADA.PRF, not in any config file
 
 `GameConfiguration::LoadProfile` (`0x53dc00`) reads **line 2 of `ARMADA.PRF`** as eleven
 whitespace-separated values. Fields 3 and 4 are the scroll speeds:
@@ -89,7 +96,7 @@ EXE's lookup table (`KEYBOARD_SCROLL_RATE` is present), so the global keeps its 
 the profile wins for both. Editing `KEYBOARD_SCROLL_RATE` in `RTS_CFG.h` likewise does
 nothing to an existing profile.
 
-## SCROLL_BORDER_WIDTH is the other half of "unwieldy"
+### SCROLL_BORDER_WIDTH is the other half of "unwieldy"
 
 `RTS_CFG.h` ships `SCROLL_BORDER_WIDTH = 2` — the mouse must be within **2 pixels** of a
 screen edge for edge-scrolling to engage at all, and the factor ramps linearly across
@@ -99,7 +106,7 @@ between a usable edge and one you have to hunt for.
 
 Raised to 20 here.
 
-## What is set
+### What is set
 
 | Where | Key | Stock | Now | Effect |
 |---|---|---|---|---|
@@ -131,7 +138,7 @@ One caveat on `RTS_CFG.h`: the EXE hashes it across clients — *"EXE / RTS_CFG.
 not match node %d"* — so any change there has to be mirrored on every machine in a
 multiplayer game. `ARMADA.PRF` is per-user and carries no such constraint.
 
-## Telling whether a change actually landed
+### Telling whether a change actually landed
 
 Both files are read **at launch**, so nothing applies to a running game. Beyond that the
 two behave differently, and confusing them wastes a round trip:
@@ -164,3 +171,157 @@ match on the process's own command line. Under Heroic the real process is the la
 six-deep stack — `umu_run.py`, `srt-bwrap`, `pv-adverb`, `proton`, `umu.exe`, and finally
 `X:\Games\...\Armada2.exe` — so "did it actually quit" is a question worth checking
 rather than assuming; see also the note that Wine calls the process `Main`.
+
+## Draw distance: why ships pop in during cutscenes
+
+**Investigated and deliberately not changed** (2026-09-23). The cheap version of the fix
+is to edit one float in one mission script, and the recipe for that is below. The general
+version, an ASI hook, was judged not worth building for a cosmetic effect.
+
+### What pops them in: object culling, not the far plane
+
+The far clip plane is 20000 (`FAR_CLIPPING_PLANE`). Objects vanish long before that,
+because `GameObjectInstance::DistanceCull` (`0x4d5bb0`) hides anything further than a
+**culling distance D** from the camera:
+
+- Distance is measured with the **height axis weighted by 0.25**. That is why a
+  near-top-down RTS camera almost never trips it and a low cutscene camera trips it
+  constantly.
+- `D = cfgOBJECT_CULLING_DISTANCE` (`0x6fcac0`), multiplied by **0.7** in one camera
+  mode. The flag is at `[[0x76b5ac]+0x80]+0x40`; which mode it is has not been
+  identified.
+- For an object whose radius exceeds 100 (`[obj+0x40]`), D becomes
+  `D × radius / 100`. So small ships pop first and big stations last.
+
+All constants were read out of `Armada2.exe`, not guessed. `armada2.map` names every
+function above.
+
+### Why ART_CFG.h does not reach the cutscenes
+
+`ART_CFG.h` sets `cfgOBJECT_CULLING_DISTANCE = 2800.0`; the exe's built-in default is
+2000. The loader (`0x491b7a`) stores the value and **copies it to
+`cfgDEFAULT_OBJECT_CULLING_DISTANCE`** (`0x6fcac4`). That affects normal play only.
+
+The mission scripts (`missions/*S.dsl`) are compiled Win32 DLLs. They drive the engine
+through the `ScriptInterfaceImp` vtable (`0x6af380`), and three of its slots matter here:
+
+| slot | offset | method | effect |
+|---|---|---|---|
+| 305 | `+0x4c4` | `SetClippingDistance(float)` | writes `CINERACTIVE_FAR_CLIPPING_PLANE` (`0x6fcab4`), which the cutscene camera copies into the far plane when it is built (`0x64b874`) and restores afterwards (`0x64b986`) |
+| 306 | `+0x4c8` | `SetObjectCullingDistance(float)` | overwrites D |
+| 307 | `+0x4cc` | `RestoreObjectCullingDistance()` | copies the `ART_CFG.h` value back into D |
+
+**Every campaign mission and both tutorials set their own D for their cutscenes**, as
+a float immediate. The values run from 1000 to 6000. They override `ART_CFG.h` for the
+length of the cutscene, and `Restore` hands control back afterwards. Two side notes:
+
+- `CINERACTIVE_FAR_CLIPPING_PLANE` in `ART_CFG.h` is **dead**: that string is not in the
+  exe, and only scripts set the value.
+- The `.drl` files make none of these calls.
+
+### Every call site, with the byte to change
+
+`File offset` is the offset in the `.dsl` **file** of the 4-byte little-endian float
+operand of the `push imm32` (opcode `68`) that feeds the call. Every row was checked:
+the byte before each offset is `0x68`, and the four bytes at it decode to the listed
+value.
+
+| mission | call | value | file offset |
+|---|---|---|---|
+| a2_borg01S | cull | 1500 | `0x13a76` |
+| a2_borg02S | cull | 3000 | `0x7b87` |
+| a2_borg03S | **clip** | 4000 | `0x10032` |
+| a2_borg03S | cull | 6000 | `0x10053` |
+| a2_borg03S | cull | 4000 | `0x1142c` |
+| a2_borg04S | cull | 3000 | `0x6f86` |
+| a2_borg04S | cull | 3000 | `0xd2d0` |
+| a2_borg05S | cull | 3000 | `0xcb97` |
+| a2_borg06S | cull | **1000** | `0x9b19` |
+| a2_borg07S | cull | 6000 | `0xa35b` |
+| a2_borg07S | cull | 3000 | `0xfbfe` |
+| a2_borg08S | cull | 3000 | `0x8af1` |
+| a2_borg08S | cull | 1200 | `0x974a` |
+| a2_borg09S | cull | 4000 | `0x9766` |
+| a2_borg10S | cull | 6000 | `0x119ab` |
+| a2_fed01S | cull | 2000 | `0xafb9` |
+| a2_fed01S | cull | 1800 | `0xc768` |
+| a2_fed02S | cull | 2500 | `0xc524` |
+| a2_fed03S | **clip** | 6000 | `0xe4b2` |
+| a2_fed03S | cull | 6000 | `0xe4d3` |
+| a2_fed04S | cull | 3000 | `0x1152b` |
+| a2_fed05S | cull | 1500 | `0xcddc` |
+| a2_fed06S | cull | 4000 | `0xb536` |
+| a2_fed06S | cull | 3000 | `0x13f5c` |
+| a2_fed07S | cull | 3000 | `0x7b97` |
+| a2_fed08S | cull | 3000 | `0x6791` |
+| a2_fed09S | **clip** | 4000 | `0x12222` |
+| a2_fed09S | cull | 4000 | `0x12243` |
+| a2_fed09S | cull | 4000 | `0x13ce6` |
+| a2_fed10S | cull | 3500 | `0xe996` |
+| a2_fed10S | cull | 3000 | `0xf537` |
+| a2_fed10S | cull | 4500 | `0xf6e5` |
+| a2_fed10S | cull | 3000 | `0xf939` |
+| a2_kling01S | cull | 1500 | `0xf215` |
+| a2_kling02S | cull | 3000 | `0x8e88` |
+| a2_kling03S | **clip** | 4000 | `0x9ab2` |
+| a2_kling03S | cull | 4000 | `0x9ad3` |
+| a2_kling04S | **clip** | 4000 | `0xb322` |
+| a2_kling04S | cull | 5000 | `0xb343` |
+| a2_kling05S | cull | 2000 | `0xc57b` |
+| a2_kling06S | cull | 5000 | `0xd059` |
+| a2_kling07S | cull | 3000 | `0x80be` |
+| a2_kling07S | cull | 3000 | `0xa2f8` |
+| a2_kling08S | cull | 3000 | `0x80ca` |
+| a2_kling08S | cull | 4000 | `0x89da` |
+| a2_kling08S | cull | 3000 | `0x8b97` |
+| a2_kling09S | cull | 4000 | `0x9d06` |
+| a2_kling10S | cull | 2000 | `0x11422` |
+| a2_kling10S | cull | **1000** | `0x11d3c` |
+| a2_kling10S | cull | 3000 | `0x12647` |
+| a2_tutorial3s | cull | 3000 | `0x64f6` |
+| a2_tutorial4s | cull | 3000 | `0x5e66` |
+
+### Changing one
+
+```sh
+cd "/home/cedric/Games/Heroic/Star Trek Armada II/missions"
+f=a2_borg06S.dsl; off=0x9b19; new=6000
+[ -e "$f.a2neb-backup" ] || cp -p "$f" "$f.a2neb-backup"
+python3 - "$f" "$off" "$new" <<'EOF'
+import struct, sys
+f, off, new = sys.argv[1], int(sys.argv[2], 0), float(sys.argv[3])
+d = bytearray(open(f, 'rb').read())
+assert d[off - 1] == 0x68, 'not a push imm32 -- wrong offset or wrong file'
+print('old', struct.unpack_from('<f', d, off)[0], '-> new', new)
+struct.pack_into('<f', d, off, new)
+open(f, 'wb').write(d)
+EOF
+```
+
+Common values: 6000 = `0x45bb8000`, 10000 = `0x461c4000`, 20000 = `0x469c4000`.
+**`./a2tex revert all` does not know about these files**; restore one by copying its
+`.a2neb-backup` back.
+
+Caveats, all unverified until someone tries one in game:
+
+- **Where a mission also calls `clip`, raise that too.** A culling distance beyond
+  the far plane buys nothing. The cutscene far plane is otherwise the 20000 default.
+- **Which call belongs to which cutscene is not known.** File order is not necessarily
+  play order. In a mission with several calls, change one, watch, and note the result
+  here.
+- **The very low values may be deliberate.** 1000 and 1200 in particular may be hiding
+  ships staged off-camera until their entrance, and raising them would reveal those
+  early. That is the first thing to watch for.
+- **Whether the engine checksums mission DLLs is not known.** Nothing suggests it,
+  but it has not been tested. If a patched mission fails to load, that is why.
+- `cfgOBJECT_CULLING_DISTANCE` in `ART_CFG.h` is the knob for **normal play**, and
+  what every cutscene restores to. That the root `ART_CFG.h` is the file actually read
+  is inferred (2800 in the file against 2000 in the exe), not shown in game.
+
+### The general fix, not built
+
+The general fix is an ASI hook with the same structure as `menus/`. It would
+patch the two setters at `0x4578a0` and `0x457890` to store
+`max(script value, floor)`. That covers every mission at once, with no per-file edits.
+It was not built: the effect is cosmetic, and per-mission edits cover the one or two
+cutscenes where the pop-in is actually noticed.

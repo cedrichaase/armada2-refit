@@ -28,7 +28,7 @@ Not switched by `a2mod`, because the layers above stand on them:
 | Folder | What it is |
 |---|---|
 | [`platform/`](platform/README.md) | Heroic and Proton, the DXVK d3d8 chain, the ASI loader, the widescreen patch |
-| [`gameplay/`](gameplay/README.md) | map scroll speed |
+| [`gameplay/`](gameplay/README.md) | map scroll speed; the cutscene draw distance (understood, not changed) |
 
 ## Entry points
 

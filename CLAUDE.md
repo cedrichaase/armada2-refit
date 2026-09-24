@@ -21,7 +21,7 @@ layers; the folder named for each is where its code and notes live.
 | `cutscenes/` | `binkproxy/` and the replacement `movies/` | `cutscenes/binkproxy/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton | `platform/README.md` |
-| `gameplay/` | map scroll speed | `gameplay/README.md` |
+| `gameplay/` | map scroll speed; cutscene draw distance (notes only) | `gameplay/README.md` |
 
 `./a2tex` and `./a2mod` are the two entry points and stay at the root.
 `a2tex` exports `ROOT=textures/`, so everything under `textures/` addresses
