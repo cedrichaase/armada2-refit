@@ -477,6 +477,21 @@ with stock art and no squash; set them to 1.0 with 4x art and the cursor is cris
 are an ASI hook of the same shape as `tools/menuscale/`. Not attempted; do not go
 looking for an art-side answer, there isn't one.
 
+**The launch movies play through `tools/binkproxy/`, a replacement `binkw32.dll`.**
+It plays `animations/<Name>.mp4` (AV1) + `<Name>.wav` in place of `<Name>.bik`, forwards
+everything else to the real DLL (renamed `binkw32_orig.dll`), and raises
+`PlayIntroMovie`'s hard-coded **640x480** mode to the desktop so all four launch reels
+scale to fill the screen. Re-encoding to a bigger `.bik` would not have worked: that path
+copies frames 1:1 into a 640x480 back buffer. **H.264, VP9 and AAC do not decode under
+Proton outside Steam** (the media converter path); AV1 does, so the build writes
+AV1 plus a WAV. **Movies live in `movies/<Name>/`, laid out like a texture target**:
+`movie.conf` committed, `ai/upscale` and `ai/interp` paid and never overwritten, `src/`
+and `out/` derived. `build-movie.sh` rebuilds from `ai/` offline; `ai-movie.sh` is the
+only thing that spends. Stock `.bik` files stay in the game directory and are only read.
+The installed `Intro` is Bria 2x + `minterpolate` to 30 fps; switching it to Topaz Apollo
+is `interp=apollo` plus one paid run. `a2mod` switches it all as the `cutscenes` layer. Open questions
+(the MSAA hook versus a locked back buffer) are in its README.
+
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
 `targets/<NAME>/stock/`; `./a2tex revert all` restores every one of them. The UI configs
 have their own `.a2neb-backup` in `misc/` and are reverted by `ui-widescreen.py`, not by
