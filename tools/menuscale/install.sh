@@ -6,8 +6,9 @@
 #   install.sh --remove     take it out again
 #
 # Nothing in the game directory is modified: this only adds MenuScale.asi,
-# MenuScale.ini and (at run time) MenuScale.log.  Removing those three files
-# restores the stock behaviour exactly, so there is no backup to keep.
+# MenuScale.ini, the backdrop plates in MenuScale/ and (at run time)
+# MenuScale.log.  Removing those restores the stock behaviour exactly, so there
+# is no backup to keep.
 set -euo pipefail
 
 GAME="${A2_GAME_DIR:-/home/cedric/Games/Heroic/Star Trek Armada II}"
@@ -28,14 +29,37 @@ done
 
 if [ "$remove" = 1 ]; then
     rm -f "$GAME/MenuScale.asi" "$GAME/MenuScale.ini" "$GAME/MenuScale.log"
+    rm -f "$GAME"/MenuScale/*.bmp
+    rmdir "$GAME/MenuScale" 2>/dev/null || true
     echo "removed MenuScale from $GAME"
     exit 0
 fi
 
 [ -f "$here/build/MenuScale.asi" ] || bash "$here/build.sh"
 
-cp "$here/build/MenuScale.asi" "$GAME/MenuScale.asi"
-cp "$here/MenuScale.ini"       "$GAME/MenuScale.ini"
+# put SRC DST -- copy beside the target, then rename over it. A game that is running
+# has MenuScale.asi mapped; cp would rewrite that file in place under it, where a
+# rename leaves the running copy on its old inode until the next launch.
+put () { cp "$1" "$2.new" && mv -f "$2.new" "$2"; }
+
+put "$here/build/MenuScale.asi" "$GAME/MenuScale.asi"
+put "$here/MenuScale.ini"       "$GAME/MenuScale.ini"
+
+# Backdrop plates, built by backdrop.sh, named after the stock BMP they stand for
+# (the name MenuScale.ini's [Backdrops] list resolves to). A screen without one
+# keeps black pillarboxes.
+for conf in "$here"/backdrops/*.conf; do
+    name=$(basename "$conf" .conf)
+    plate="$here/backdrops/$name/wide.bmp"
+    src=$(grep -E '^source=' "$conf" | cut -d= -f2-)
+    if [ -f "$plate" ]; then
+        mkdir -p "$GAME/MenuScale"
+        put "$plate" "$GAME/MenuScale/$(basename "$src")"
+        echo "backdrop: $name -> MenuScale/$(basename "$src")"
+    else
+        echo "backdrop: $name not built (tools/menuscale/backdrop.sh $name) -- black sides"
+    fi
+done
 
 if [ -n "$mode" ]; then
     sed -i "s/^Mode=.*/Mode=$mode/" "$GAME/MenuScale.ini"

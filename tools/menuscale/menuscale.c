@@ -85,6 +85,21 @@ typedef struct { LONG x, y; } POINT;
 
 typedef LONG_PTR (__stdcall *WNDPROC)(HWND, UINT, WPARAM, LPARAM);
 
+typedef struct { DWORD lo; LONG hi; } LARGE_INTEGER;
+
+typedef struct {
+    DWORD biSize; LONG biWidth; LONG biHeight; WORD biPlanes; WORD biBitCount;
+    DWORD biCompression; DWORD biSizeImage; LONG biXPelsPerMeter; LONG biYPelsPerMeter;
+    DWORD biClrUsed; DWORD biClrImportant;
+} BITMAPINFOHEADER;
+
+typedef struct { BITMAPINFOHEADER h; DWORD colors[4]; } BITMAPINFO;
+
+typedef struct {
+    LONG bmType; LONG bmWidth; LONG bmHeight; LONG bmWidthBytes;
+    WORD bmPlanes; WORD bmBitsPixel; void *bmBits;
+} BITMAP;
+
 typedef struct {
     HDC  hdc;
     BOOL fErase;
@@ -113,6 +128,12 @@ __declspec(dllimport) BOOL    __stdcall WriteFile(HANDLE, const void *, DWORD, D
 __declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWORD);
 __declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
+__declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
+__declspec(dllimport) void   *__stdcall VirtualAlloc(void *, UINT, DWORD, DWORD);
+__declspec(dllimport) BOOL    __stdcall VirtualFree(void *, UINT, DWORD);
+__declspec(dllimport) BOOL    __stdcall QueryPerformanceCounter(LARGE_INTEGER *);
+__declspec(dllimport) BOOL    __stdcall QueryPerformanceFrequency(LARGE_INTEGER *);
+__declspec(dllimport) HANDLE  __stdcall LoadImageA(HANDLE, LPCSTR, UINT, INT, INT, UINT);
 
 __declspec(dllimport) HDC     __stdcall BeginPaint(HWND, PAINTSTRUCT *);
 __declspec(dllimport) BOOL    __stdcall EndPaint(HWND, const PAINTSTRUCT *);
@@ -132,6 +153,36 @@ __declspec(dllimport) BOOL    __stdcall GetWindowRect(HWND, RECT *);
 __declspec(dllimport) LONG    __stdcall SetWindowLongA(HWND, INT, LONG);
 __declspec(dllimport) LONG_PTR __stdcall CallWindowProcA(WNDPROC, HWND, UINT, WPARAM, LPARAM);
 __declspec(dllimport) LONG_PTR __stdcall DefWindowProcA(HWND, UINT, WPARAM, LPARAM);
+__declspec(dllimport) UINT_PTR __stdcall SetTimer(HWND, UINT_PTR, UINT, void (__stdcall *)(HWND, UINT, UINT_PTR, DWORD));
+
+typedef LONG_PTR (__stdcall *DLGPROC)(HWND, UINT, WPARAM, LPARAM);
+typedef LONG_PTR (__stdcall *HOOKPROC)(INT, WPARAM, LPARAM);
+typedef HANDLE HINSTANCE;
+typedef HANDLE HRSRC;
+typedef HANDLE HGLOBAL;
+typedef HANDLE HHOOK;
+
+__declspec(dllimport) LONG_PTR __stdcall DialogBoxIndirectParamA(HINSTANCE, const void *, HWND, DLGPROC, LPARAM);
+__declspec(dllimport) BOOL    __stdcall EnableWindow(HWND, BOOL);
+__declspec(dllimport) BOOL    __stdcall IsWindowEnabled(HWND);
+__declspec(dllimport) HWND    __stdcall GetParent(HWND);
+__declspec(dllimport) HWND    __stdcall GetAncestor(HWND, UINT);
+__declspec(dllimport) BOOL    __stdcall IsChild(HWND, HWND);
+__declspec(dllimport) LONG    __stdcall GetWindowLongA(HWND, INT);
+__declspec(dllimport) DWORD   __stdcall GetClassLongA(HWND, INT);
+__declspec(dllimport) HANDLE  __stdcall SetCursor(HANDLE);
+__declspec(dllimport) HANDLE  __stdcall LoadCursorA(HINSTANCE, LPCSTR);
+__declspec(dllimport) HHOOK   __stdcall SetWindowsHookExA(INT, HOOKPROC, HINSTANCE, DWORD);
+__declspec(dllimport) LONG_PTR __stdcall CallNextHookEx(HHOOK, INT, WPARAM, LPARAM);
+
+__declspec(dllimport) HRSRC   __stdcall FindResourceA(HMODULE, LPCSTR, LPCSTR);
+__declspec(dllimport) HGLOBAL __stdcall LoadResource(HMODULE, HRSRC);
+__declspec(dllimport) void   *__stdcall LockResource(HGLOBAL);
+__declspec(dllimport) DWORD   __stdcall SizeofResource(HMODULE, HRSRC);
+__declspec(dllimport) HANDLE  __stdcall GetProcessHeap(void);
+__declspec(dllimport) void   *__stdcall HeapAlloc(HANDLE, DWORD, UINT);
+__declspec(dllimport) BOOL    __stdcall HeapFree(HANDLE, DWORD, void *);
+__declspec(dllimport) DWORD   __stdcall GetCurrentThreadId(void);
 
 __declspec(dllimport) HDC     __stdcall CreateCompatibleDC(HDC);
 __declspec(dllimport) HBITMAP __stdcall CreateCompatibleBitmap(HDC, INT, INT);
@@ -141,6 +192,11 @@ __declspec(dllimport) BOOL    __stdcall DeleteDC(HDC);
 __declspec(dllimport) BOOL    __stdcall StretchBlt(HDC, INT, INT, INT, INT, HDC, INT, INT, INT, INT, DWORD);
 __declspec(dllimport) INT     __stdcall SetStretchBltMode(HDC, INT);
 __declspec(dllimport) BOOL    __stdcall PatBlt(HDC, INT, INT, INT, INT, DWORD);
+__declspec(dllimport) HBITMAP __stdcall CreateDIBSection(HDC, const BITMAPINFO *, UINT, void **, HANDLE, DWORD);
+__declspec(dllimport) INT     __stdcall GetDIBits(HDC, HBITMAP, UINT, UINT, void *, BITMAPINFO *, UINT);
+__declspec(dllimport) BOOL    __stdcall BitBlt(HDC, INT, INT, INT, INT, HDC, INT, INT, DWORD);
+__declspec(dllimport) BOOL    __stdcall GdiFlush(void);
+__declspec(dllimport) INT     __stdcall GetObjectA(HGDIOBJ, INT, void *);
 
 #define PAGE_READWRITE        0x04
 #define GENERIC_WRITE         0x40000000
@@ -158,6 +214,7 @@ __declspec(dllimport) BOOL    __stdcall PatBlt(HDC, INT, INT, INT, INT, DWORD);
 #define GW_OWNER      4
 #define SWP_NOSIZE    0x0001
 #define SWP_NOMOVE    0x0002
+#define SWP_NOACTIVATE 0x0010
 
 #define WM_MOUSEFIRST 0x0200
 #define WM_MOUSELAST  0x0209
@@ -187,6 +244,7 @@ void *memset(void *d, int c, unsigned int n)
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
 static char g_logpath[320];
+static char g_dir[320];     /* the game directory, with its trailing slash */
 static int  g_logging = 1;
 
 static int s_len(const char *s) { int n = 0; while (s[n]) n++; return n; }
@@ -240,6 +298,7 @@ static int g_designH  = 600;
 static int g_integer  = 0;   /* snap to a whole-number scale factor         */
 static int g_smooth   = 1;   /* HALFTONE rather than nearest-neighbour      */
 static int g_shellMode = 1;  /* raise the engine's 800x600 front-end mode   */
+static int g_embed    = 0;   /* modal dialogs become children of their owner */
 
 /* ---- the fit ---------------------------------------------------------- */
 
@@ -308,8 +367,27 @@ static void compute_fit(HWND owner)
 
 /* ---- per-dialog offscreen surfaces ------------------------------------ */
 
+#define DIB_RGB_COLORS 0
+
+/* A top-down 32-bit DIB section: pixel (x,y) is bits[y*w + x], 0x00RRGGBB. */
+static HBITMAP dib32(HDC ref, int w, int h, DWORD **bits)
+{
+    BITMAPINFO bi;
+    void *p = NULLPTR;
+    HBITMAP b;
+
+    memset(&bi, 0, sizeof bi);
+    bi.h.biSize = sizeof bi.h;
+    bi.h.biWidth = w;
+    bi.h.biHeight = -h;
+    bi.h.biPlanes = 1;
+    bi.h.biBitCount = 32;
+    b = CreateDIBSection(ref, &bi, DIB_RGB_COLORS, &p, NULLPTR, 0);
+    *bits = b ? (DWORD *)p : NULLPTR;
+    return b;
+}
+
 #define MAXSLOT  12
-#define MAXDEPTH 8
 
 typedef struct {
     HWND    hwnd;
@@ -317,10 +395,10 @@ typedef struct {
     int     letterbox;          /* 1: window is full-screen, fit inside it */
     HDC     mem;
     HBITMAP bmp;
+    DWORD  *bits;               /* letterbox: the surface's pixels, top-down */
     HGDIOBJ oldbmp;
     HDC     paintReal;
-    HDC     dcReal[MAXDEPTH];
-    int     depth;
+    int     dirty;              /* drawn into since it was last presented */
     int     announced;
     WNDPROC oldProc;            /* set while this window is subclassed     */
 } Slot;
@@ -338,8 +416,8 @@ static void slot_free(Slot *s)
         DeleteObject(s->bmp);
         DeleteDC(s->mem);
     }
-    s->hwnd = NULLPTR; s->mem = NULLPTR; s->bmp = NULLPTR; s->oldbmp = NULLPTR;
-    s->paintReal = NULLPTR; s->depth = 0; s->announced = 0; s->dw = 0; s->dh = 0;
+    s->hwnd = NULLPTR; s->mem = NULLPTR; s->bmp = NULLPTR; s->oldbmp = NULLPTR; s->bits = NULLPTR;
+    s->paintReal = NULLPTR; s->dirty = 0; s->announced = 0; s->dw = 0; s->dh = 0;
     s->letterbox = 0; s->oldProc = NULLPTR;
 }
 
@@ -367,13 +445,34 @@ static Slot *slot_claim(HWND h)
     return &g_slot[0];
 }
 
+/* Trace the first few paint events per window: which path, and whether the
+ * surface was presented.  Enough to see how a screen actually reaches the
+ * glass without flooding the log on every mouse-move.  Trace=1 in the ini. */
+static int g_trace = 0;
+
+static void trace(const char *what, HWND h)
+{
+    static HWND last; static int n;
+    char b[96];
+    if (!g_trace || !g_logging) return;
+    if (h != last) { last = h; n = 0; }
+    if (++n > 12) return;
+    b[0] = 0;
+    s_cat(b, "    trace "); s_cat(b, what); s_cat(b, " hwnd "); s_num(b, (long)(UINT_PTR)h);
+    logline(b);
+}
+
 static HDC slot_surface(Slot *s, HDC real)
 {
     if (s->mem) return s->mem;
     if (s->dw <= 0 || s->dh <= 0) return NULLPTR;
     s->mem = CreateCompatibleDC(real);
     if (!s->mem) return NULLPTR;
-    s->bmp = CreateCompatibleBitmap(real, s->dw, s->dh);
+    /* A full-screen dialog draws into a 32-bit DIB section rather than a
+     * device-compatible bitmap, so the backdrop compositor can read what the
+     * shell drew without a GetDIBits copy per frame. */
+    if (s->letterbox) s->bmp = dib32(real, s->dw, s->dh, &s->bits);
+    else              s->bmp = CreateCompatibleBitmap(real, s->dw, s->dh);
     if (!s->bmp) { DeleteDC(s->mem); s->mem = NULLPTR; return NULLPTR; }
     s->oldbmp = SelectObject(s->mem, s->bmp);
     PatBlt(s->mem, 0, 0, s->dw, s->dh, BLACKNESS);
@@ -382,7 +481,556 @@ static HDC slot_surface(Slot *s, HDC real)
 
 static void slot_placement(Slot *s, int *ox, int *oy, int *dw, int *dh);
 
-static void present(Slot *s, HDC real)
+/* ---- backdrops -------------------------------------------------------- */
+/*
+ * Hi-res, widescreen art behind a full-screen dialog.
+ *
+ * The shell draws each screen 1:1 into the 800x600 surface above: its stock
+ * background BMP first, then buttons, hover states, text and Bink animations
+ * over it.  Only the composed frame ever reaches us, so a hi-res picture
+ * cannot simply be swapped in -- the shell would still draw 800x600 of it.
+ * Instead, for a screen listed under [Backdrops] in MenuScale.ini:
+ *
+ *   which screen   the frame is sampled against each listed stock BMP; the one
+ *                  it still matches exactly at most sample points is on show.
+ *   sides          come from the plate MenuScale\<name>.bmp, an outpainted
+ *                  2.4:1 version whose centre 4:3 is the upscaled stock.
+ *   centre         out = stretch(frame) + w * (plate - stretch(stock)),
+ *                  per pixel, with w falling from 1 to 0 as the frame departs
+ *                  from the stock pixel under it (DetailTolerance).  Where the
+ *                  shell shows untouched background this IS the plate; where
+ *                  it has drawn something opaque on top it is the stretched
+ *                  frame exactly as before.
+ *
+ * The middle case is why it is a weight and not a mask.  MainBk_flare.bik
+ * replays the main menu's whole logo band (800x145 at y 210) with the
+ * background baked in, through a lossy codec: mean 8/255 off stock, 94% of
+ * pixels within 24.  An exact-match mask would leave the logo -- the thing
+ * anyone looks at -- as the one low-res band on the screen.
+ */
+#define MAXBD 8
+#define MEM_COMMIT          0x1000
+#define MEM_RESERVE         0x2000
+#define MEM_RELEASE         0x8000
+#define IMAGE_BITMAP        0
+#define LR_LOADFROMFILE     0x0010
+#define LR_CREATEDIBSECTION 0x2000
+#define ID_TOL      2       /* "still the stock pixel", for identification  */
+#define ID_PERCENT  50      /* share of sample points that must agree       */
+#define MAXSOFT     4       /* soften rectangles per backdrop                */
+#define SOFT_R      12      /* design px a cut glow is continued outwards    */
+#define SOFT_K      3       /* ... sampled 2K+1 px along its outermost row   */
+
+typedef struct {
+    char    stock[320];     /* bitmaps\...\x.bmp, the shell's own file       */
+    char    plate[320];     /* MenuScale\x.bmp                               */
+    int     tried, bad;
+    DWORD  *px;             /* stock pixels, design size, top-down           */
+    HBITMAP bmp;            /* the DIB section px lives in                   */
+    int     nsoft;          /* N.soften= rectangles, design px, x0 y0 x1 y1  */
+    int     soft[MAXSOFT][4];
+} Backdrop;
+
+static Backdrop g_bd[MAXBD];
+static int g_nbd       = 0;
+static int g_backdrops = 1;
+static int g_tol       = 48;
+
+/* The composed screen for the backdrop on show, cached per geometry. */
+static struct {
+    int     idx;
+    int     rw, rh, ox, oy, dw, dh;
+    HDC     dc;
+    HBITMAP bmp;
+    HGDIOBJ old;
+    DWORD  *out;            /* rw x rh: plate sides + composed centre        */
+    DWORD  *hi, *lo;        /* dw x dh: plate centre, stretched stock        */
+    DWORD  *prev;           /* design size: the frame last composited        */
+    int     valid;          /* prev and out's centre agree with each other   */
+    int    *xm, *ym;        /* screen pixel -> nearest design pixel          */
+    int    *bx, *by;        /* screen pixel -> bilinear tap (design) ...     */
+    int    *fx, *fy;        /* ... and its weight on the next tap, 0..256    */
+    WORD   *wt;             /* design size: detail weight, 0..256            */
+    DWORD  *fp;             /* design size: the frame, soften rings applied  */
+    HWND    shown;          /* window the whole screen was last blitted to   */
+    int     since;          /* presents since this backdrop was prepared     */
+    int     frames, reports;
+    DWORD   ticks, area;
+} g_c;                      /* idx is set to -1 in startup() */
+
+static void *vm_alloc(UINT n) { return VirtualAlloc(NULLPTR, n, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE); }
+static void  vm_free(void *p) { if (p) VirtualFree(p, 0, MEM_RELEASE); }
+
+static int pxdiff(DWORD a, DWORD b)
+{
+    int d0 = (int)(a & 255)         - (int)(b & 255);
+    int d1 = (int)((a >> 8) & 255)  - (int)((b >> 8) & 255);
+    int d2 = (int)((a >> 16) & 255) - (int)((b >> 16) & 255);
+    if (d0 < 0) d0 = -d0;
+    if (d1 < 0) d1 = -d1;
+    if (d2 < 0) d2 = -d2;
+    if (d1 > d0) d0 = d1;
+    return d2 > d0 ? d2 : d0;
+}
+
+static void bd_log(const char *what, const char *path)
+{
+    char b[400];
+    b[0] = 0; s_cat(b, "backdrop: "); s_cat(b, what); s_cat(b, " "); s_cat(b, path);
+    logline(b);
+}
+
+/* The stock BMP as 32-bit pixels, loaded once, the first time it is needed. */
+static int bd_load(Backdrop *b)
+{
+    HBITMAP src;
+    BITMAP  bm;
+    HDC     scr, a, c;
+    HGDIOBJ oa, oc;
+    DWORD  *bits = NULLPTR;
+
+    if (b->tried) return b->px != NULLPTR;
+    b->tried = 1;
+    src = (HBITMAP)LoadImageA(NULLPTR, b->stock, IMAGE_BITMAP, 0, 0,
+                              LR_LOADFROMFILE | LR_CREATEDIBSECTION);
+    if (!src) { bd_log("cannot load", b->stock); return 0; }
+    memset(&bm, 0, sizeof bm);
+    GetObjectA(src, sizeof bm, &bm);
+    if (bm.bmWidth != g_designW || (bm.bmHeight < 0 ? -bm.bmHeight : bm.bmHeight) != g_designH) {
+        bd_log("not design-sized, ignored:", b->stock);
+        DeleteObject(src);
+        return 0;
+    }
+    scr = GetDC(NULLPTR);
+    b->bmp = dib32(scr, g_designW, g_designH, &bits);
+    if (b->bmp) {
+        a = CreateCompatibleDC(scr); c = CreateCompatibleDC(scr);
+        oa = SelectObject(a, src);   oc = SelectObject(c, b->bmp);
+        BitBlt(c, 0, 0, g_designW, g_designH, a, 0, 0, SRCCOPY);
+        SelectObject(a, oa); SelectObject(c, oc);
+        DeleteDC(a); DeleteDC(c);
+        GdiFlush();
+        b->px = bits;
+    }
+    ReleaseDC(NULLPTR, scr);
+    DeleteObject(src);
+    return b->px != NULLPTR;
+}
+
+/* Per cent of a 40x30 grid of sample points where frame f still shows stock. */
+static int bd_match(const DWORD *f, const DWORD *st)
+{
+    int i, j, hit = 0;
+    for (j = 0; j < 30; j++)
+        for (i = 0; i < 40; i++) {
+            int x = i * g_designW / 40 + g_designW / 80;
+            int y = j * g_designH / 30 + g_designH / 60;
+            if (pxdiff(f[y * g_designW + x], st[y * g_designW + x]) <= ID_TOL) hit++;
+        }
+    return hit * 100 / 1200;
+}
+
+/* Copy the centre rectangle of the composed screen into a dw x dh buffer. */
+static void bd_grab(DWORD *dst)
+{
+    int y;
+    for (y = 0; y < g_c.dh; y++)
+        memcpy(dst + y * g_c.dw, g_c.out + (g_c.oy + y) * g_c.rw + g_c.ox, (unsigned)g_c.dw * 4);
+}
+
+static void bd_release(void)
+{
+    if (g_c.dc) { SelectObject(g_c.dc, g_c.old); DeleteDC(g_c.dc); }
+    if (g_c.bmp) DeleteObject(g_c.bmp);
+    vm_free(g_c.hi); vm_free(g_c.lo); vm_free(g_c.xm); vm_free(g_c.ym);
+    vm_free(g_c.bx); vm_free(g_c.by); vm_free(g_c.fx); vm_free(g_c.fy);
+    g_c.dc = NULLPTR; g_c.bmp = NULLPTR; g_c.old = NULLPTR; g_c.out = NULLPTR;
+    g_c.hi = NULLPTR; g_c.lo = NULLPTR; g_c.xm = NULLPTR; g_c.ym = NULLPTR;
+    g_c.bx = NULLPTR; g_c.by = NULLPTR; g_c.fx = NULLPTR; g_c.fy = NULLPTR;
+    g_c.idx = -1; g_c.shown = NULLPTR; g_c.since = 0; g_c.valid = 0;
+}
+
+/*
+ * The stretch is done here, bilinear, rather than by StretchBlt.  Two reasons,
+ * both measured: a HALFTONE StretchBlt of the whole 800x600 frame on every
+ * Bink frame put the composite at 59 ms a present against the flare's 33 ms;
+ * and a GDI stretch of a SUB-rectangle filters its edges differently from a
+ * stretch of the whole, so it cannot be used to redo just the part that
+ * changed.  Here every screen pixel is a fixed function of the design pixels
+ * under it, whatever rectangle is being redone.
+ */
+static void bd_taps(int n, int design, int *b, int *f)
+{
+    int i;
+    for (i = 0; i < n; i++) {
+        /* centre of screen pixel i in design pixels, x256, minus half a pixel */
+        int u = (int)(((2 * i + 1) * design * 256) / (2 * n)) - 128;
+        if (u < 0) u = 0;
+        b[i] = u >> 8;
+        f[i] = u & 255;
+        if (b[i] >= design - 1) { b[i] = design - 1; f[i] = 0; }
+    }
+}
+
+/* Bilinear sample of a design-sized frame at screen pixel (x, y). */
+static DWORD bd_bilerp(const DWORD *src, int x, int y)
+{
+    int   x0 = g_c.bx[x], y0 = g_c.by[y], fx = g_c.fx[x], fy = g_c.fy[y];
+    int   x1 = fx ? x0 + 1 : x0, y1 = fy ? y0 + 1 : y0;
+    DWORD a = src[y0 * g_designW + x0], b = src[y0 * g_designW + x1];
+    DWORD c = src[y1 * g_designW + x0], d = src[y1 * g_designW + x1];
+    /* red and blue in one word, 16-bit lanes; green in another */
+    DWORD rbT = (((a & 0xFF00FF) * (DWORD)(256 - fx) + (b & 0xFF00FF) * (DWORD)fx) >> 8) & 0xFF00FF;
+    DWORD rbB = (((c & 0xFF00FF) * (DWORD)(256 - fx) + (d & 0xFF00FF) * (DWORD)fx) >> 8) & 0xFF00FF;
+    DWORD gT  = (((a & 0xFF00) >> 8) * (DWORD)(256 - fx) + ((b & 0xFF00) >> 8) * (DWORD)fx) >> 8;
+    DWORD gB  = (((c & 0xFF00) >> 8) * (DWORD)(256 - fx) + ((d & 0xFF00) >> 8) * (DWORD)fx) >> 8;
+    DWORD rb  = ((rbT * (DWORD)(256 - fy) + rbB * (DWORD)fy) >> 8) & 0xFF00FF;
+    DWORD g   = (gT * (DWORD)(256 - fy) + gB * (DWORD)fy) >> 8;
+    return rb | (g << 8);
+}
+
+static int bd_prepare(int idx, HDC real, int rw, int rh, int ox, int oy, int dw, int dh)
+{
+    Backdrop *b = &g_bd[idx];
+    HBITMAP plate;
+    BITMAP  bm;
+    HDC     pdc;
+    HGDIOBJ po;
+    int     pw, ph, cw, x0, i, x, y;
+    char    m[400];
+
+    if (g_c.idx == idx && g_c.rw == rw && g_c.rh == rh && g_c.ox == ox &&
+        g_c.oy == oy && g_c.dw == dw && g_c.dh == dh) return 1;
+    bd_release();
+    if (b->bad) return 0;
+
+    plate = (HBITMAP)LoadImageA(NULLPTR, b->plate, IMAGE_BITMAP, 0, 0,
+                                LR_LOADFROMFILE | LR_CREATEDIBSECTION);
+    if (!plate) { bd_log("cannot load", b->plate); b->bad = 1; return 0; }
+    memset(&bm, 0, sizeof bm);
+    GetObjectA(plate, sizeof bm, &bm);
+    pw = (int)bm.bmWidth;
+    ph = (int)(bm.bmHeight < 0 ? -bm.bmHeight : bm.bmHeight);
+    cw = ph * g_designW / g_designH;          /* the plate's own 4:3 centre */
+    x0 = (pw - cw) / 2;
+    if (ph <= 0 || pw < cw) {
+        bd_log("narrower than the design aspect, ignored:", b->plate);
+        DeleteObject(plate); b->bad = 1; return 0;
+    }
+
+    g_c.bmp = dib32(real, rw, rh, &g_c.out);
+    g_c.hi  = (DWORD *)vm_alloc((UINT)dw * (UINT)dh * 4);
+    g_c.lo  = (DWORD *)vm_alloc((UINT)dw * (UINT)dh * 4);
+    g_c.xm  = (int *)vm_alloc((UINT)dw * 4);
+    g_c.ym  = (int *)vm_alloc((UINT)dh * 4);
+    g_c.bx  = (int *)vm_alloc((UINT)dw * 4);
+    g_c.by  = (int *)vm_alloc((UINT)dh * 4);
+    g_c.fx  = (int *)vm_alloc((UINT)dw * 4);
+    g_c.fy  = (int *)vm_alloc((UINT)dh * 4);
+    if (!g_c.wt)   g_c.wt   = (WORD *)vm_alloc((UINT)g_designW * (UINT)g_designH * 2);
+    if (!g_c.prev) g_c.prev = (DWORD *)vm_alloc((UINT)g_designW * (UINT)g_designH * 4);
+    if (!g_c.fp)   g_c.fp   = (DWORD *)vm_alloc((UINT)g_designW * (UINT)g_designH * 4);
+    g_c.dc  = g_c.bmp ? CreateCompatibleDC(real) : NULLPTR;
+    if (!g_c.bmp || !g_c.hi || !g_c.lo || !g_c.xm || !g_c.ym || !g_c.bx || !g_c.by ||
+        !g_c.fx || !g_c.fy || !g_c.wt || !g_c.prev || !g_c.fp || !g_c.dc) {
+        bd_log("out of memory preparing", b->plate);
+        DeleteObject(plate); bd_release(); b->bad = 1; return 0;
+    }
+    g_c.old = SelectObject(g_c.dc, g_c.bmp);
+    g_c.rw = rw; g_c.rh = rh; g_c.ox = ox; g_c.oy = oy; g_c.dw = dw; g_c.dh = dh;
+
+    /* The plate, scaled so its centre 4:3 lands exactly on the design area.
+     * Anything it does not cover -- a screen wider than the plate -- stays
+     * black, as before.  At the height it was authored for this is 1:1. */
+    PatBlt(g_c.dc, 0, 0, rw, rh, BLACKNESS);
+    pdc = CreateCompatibleDC(real);
+    po  = SelectObject(pdc, plate);
+    SetStretchBltMode(g_c.dc, HALFTONE);
+    StretchBlt(g_c.dc, ox - x0 * dh / ph, oy, pw * dh / ph, dh, pdc, 0, 0, pw, ph, SRCCOPY);
+    SelectObject(pdc, po); DeleteDC(pdc); DeleteObject(plate);
+    GdiFlush();
+    bd_grab(g_c.hi);
+
+    for (i = 0; i < dw; i++) g_c.xm[i] = i * g_designW / dw;
+    for (i = 0; i < dh; i++) g_c.ym[i] = i * g_designH / dh;
+    bd_taps(dw, g_designW, g_c.bx, g_c.fx);
+    bd_taps(dh, g_designH, g_c.by, g_c.fy);
+
+    /* Stock, stretched by the very function the frame is stretched with, so
+     * that on untouched background the two cancel exactly and out == plate. */
+    for (y = 0; y < dh; y++)
+        for (x = 0; x < dw; x++)
+            g_c.lo[y * dw + x] = bd_bilerp(b->px, x, y);
+    g_c.idx = idx;
+
+    m[0] = 0;
+    s_cat(m, "backdrop: "); s_cat(m, b->plate);
+    s_cat(m, " "); s_num(m, pw); s_cat(m, "x"); s_num(m, ph);
+    s_cat(m, " -> "); s_num(m, pw * dh / ph); s_cat(m, "x"); s_num(m, dh);
+    s_cat(m, " at "); s_num(m, ox - x0 * dh / ph); s_cat(m, ","); s_num(m, oy);
+    logline(m);
+    return 1;
+}
+
+/*
+ * DumpBackdrop=1: write the composed screen to MenuScale-backdrop<n>.bmp beside
+ * Armada2.exe, once per backdrop, a couple of seconds after it first shows (so
+ * the Bink and the buttons are on it).  A test harness that does not have to
+ * take the visible workspace away from whoever is at the desktop, which
+ * shot.sh does.
+ */
+static int g_dump = 0;
+
+static void bd_dump(int idx)
+{
+    static int done[MAXBD];
+    char   path[340];
+    BYTE   hdr[54];
+    HANDLE h;
+    DWORD  wrote, bytes;
+
+    if (!g_dump || done[idx]) return;
+    done[idx] = 1;
+    bytes = (DWORD)g_c.rw * (DWORD)g_c.rh * 4;
+    memset(hdr, 0, sizeof hdr);
+    hdr[0] = 'B'; hdr[1] = 'M';
+    *(DWORD *)(hdr + 2)  = 54 + bytes;
+    *(DWORD *)(hdr + 10) = 54;
+    *(DWORD *)(hdr + 14) = 40;
+    *(LONG  *)(hdr + 18) = g_c.rw;
+    *(LONG  *)(hdr + 22) = -g_c.rh;          /* top-down, like the buffer */
+    *(WORD  *)(hdr + 26) = 1;
+    *(WORD  *)(hdr + 28) = 32;
+    path[0] = 0; s_cat(path, g_dir); s_cat(path, "MenuScale-backdrop"); s_num(path, idx + 1);
+    s_cat(path, ".bmp");
+    h = CreateFileA(path, GENERIC_WRITE, 0, NULLPTR, 2 /* CREATE_ALWAYS */, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+    if (h == INVALID_HANDLE_VALUE) return;
+    WriteFile(h, hdr, sizeof hdr, &wrote, NULLPTR);
+    WriteFile(h, g_c.out, bytes, &wrote, NULLPTR);
+    CloseHandle(h);
+    bd_log("dumped", path);
+}
+
+/* First screen pixel along an axis whose bilinear tap reaches design pixel d. */
+static int bd_first(const int *b, int n, int d)
+{
+    int i;
+    for (i = 0; i < n; i++) if (b[i] + 1 >= d) return i;
+    return n;
+}
+
+/* One past the last screen pixel whose tap starts before design pixel d. */
+static int bd_end(const int *b, int n, int d)
+{
+    int i;
+    for (i = n; i > 0; i--) if (b[i - 1] < d) return i;
+    return 0;
+}
+
+/*
+ * Soften the edge of an animation whose glow is cut off by its own rectangle.
+ *
+ * TutorialGlow.bik, on the campaign screen, is 320x200 with the background baked
+ * in and a blue halo that runs right up to the rectangle: 59/255 off stock along
+ * its left edge, 56 along the top.  In the stock game the left cut sat on the
+ * screen's black frame and hid; the plate paints nebula there, so it shows as a
+ * hard line.  For each rectangle listed as N.soften=, the pixels in a ring
+ * SOFT_R wide outside it that still show untouched background (frame == stock)
+ * get the difference at the nearest edge -- averaged along the edge, which
+ * smooths away codec noise -- carried on and fading linearly to nothing.  Their
+ * detail weight stays 1, so the plate shows through the continued glow exactly
+ * as it does through the one inside.  A rectangle with nothing drawn in it
+ * differs from stock by nothing, so this costs the idle screen nothing.
+ */
+static void bd_soften(const Backdrop *b, const DWORD *f, const DWORD *st,
+                      int ax, int ay, int bx, int by)
+{
+    int n, x, y;
+    for (n = 0; n < b->nsoft; n++) {
+        const int *r = b->soft[n];
+        int x0 = r[0] - SOFT_R, y0 = r[1] - SOFT_R, x1 = r[2] + SOFT_R, y1 = r[3] + SOFT_R;
+        if (x0 < ax) x0 = ax;
+        if (y0 < ay) y0 = ay;
+        if (x1 > bx + 1) x1 = bx + 1;
+        if (y1 > by + 1) y1 = by + 1;
+        for (y = y0; y < y1; y++)
+            for (x = x0; x < x1; x++) {
+                int k = y * g_designW + x, tx, ty, qx, qy, i, j, cnt = 0, a, sh;
+                int sum[3] = { 0, 0, 0 };
+                DWORD v = 0;
+                if (f[k] != st[k]) continue;
+                tx = x < r[0] ? r[0] - x : x >= r[2] ? x - r[2] + 1 : 0;
+                ty = y < r[1] ? r[1] - y : y >= r[3] ? y - r[3] + 1 : 0;
+                if (!tx && !ty) continue;                  /* inside: untouched */
+                qx = x < r[0] ? r[0] : x >= r[2] ? r[2] - 1 : x;
+                qy = y < r[1] ? r[1] : y >= r[3] ? r[3] - 1 : y;
+                /* the outermost row or column only, 2K+1 along it: sampling
+                 * deeper copies whatever the glow surrounds -- a panel bar 2px
+                 * in -- outwards as a ghost of it */
+                for (j = ty ? qy : qy - SOFT_K; j <= (ty ? qy : qy + SOFT_K); j++) {
+                    if (j < r[1] || j >= r[3]) continue;
+                    for (i = tx ? qx : qx - SOFT_K; i <= (tx ? qx : qx + SOFT_K); i++) {
+                        int q = j * g_designW + i;
+                        if (i < r[0] || i >= r[2]) continue;
+                        for (sh = 0; sh < 3; sh++)
+                            sum[sh] += (int)((f[q] >> (8 * sh)) & 255) - (int)((st[q] >> (8 * sh)) & 255);
+                        cnt++;
+                    }
+                }
+                if (!cnt) continue;
+                a = (SOFT_R + 1 - tx) * (SOFT_R + 1 - ty);  /* of (R+1)^2 */
+                for (sh = 0; sh < 3; sh++) {
+                    int c = (int)((f[k] >> (8 * sh)) & 255) +
+                            sum[sh] * a / (cnt * (SOFT_R + 1) * (SOFT_R + 1));
+                    if (c < 0) c = 0;
+                    if (c > 255) c = 255;
+                    v |= (DWORD)c << (8 * sh);
+                }
+                g_c.fp[k] = v;
+            }
+    }
+}
+
+/*
+ * Present a full-screen dialog over its backdrop.  Returns 0 -- and the caller
+ * falls back to black pillarboxes and a plain stretch -- whenever the screen on
+ * show is not a listed backdrop or anything about it cannot be prepared.
+ *
+ * Only what changed is redone.  The frame is diffed against the last one
+ * composited, and the stretch, the detail transfer and the blit to the window
+ * are all confined to the screen rectangle that the changed design pixels
+ * reach: a Bink frame is the 800x145 flare band, a hover is one button.  The
+ * whole screen goes out on WM_PAINT (`full`) or when the window changes.
+ */
+static int bd_present(Slot *s, HDC real, int full, int rw, int rh, int ox, int oy, int dw, int dh)
+{
+    const DWORD *f = s->bits, *st;
+    int i, x, y, best = -1, bestm = -1, tol = g_tol;
+    int ax = g_designW, ay = g_designH, bx = -1, by = -1;      /* dirty, design */
+    int sx0, sx1, sy0, sy1;                                    /* dirty, screen */
+    LARGE_INTEGER t0, t1, fq;
+
+    if (!g_backdrops || !g_nbd || !f || s->dw != g_designW || s->dh != g_designH) return 0;
+    GdiFlush();
+
+    if (g_c.idx >= 0 && g_bd[g_c.idx].px && bd_match(f, g_bd[g_c.idx].px) >= ID_PERCENT)
+        best = g_c.idx;
+    else
+        for (i = 0; i < g_nbd; i++) {
+            int m;
+            if (g_bd[i].bad || !bd_load(&g_bd[i])) continue;
+            m = bd_match(f, g_bd[i].px);
+            if (m >= ID_PERCENT && m > bestm) { bestm = m; best = i; }
+        }
+    if (best < 0) { g_c.valid = 0; return 0; }
+    if (!bd_prepare(best, real, rw, rh, ox, oy, dw, dh)) return 0;
+    st = g_bd[best].px;
+    if (tol < 1) tol = 1;
+
+    QueryPerformanceCounter(&t0);
+
+    /* What changed since the last composite, as a design-space rectangle. */
+    if (!g_c.valid) {
+        ax = 0; ay = 0; bx = g_designW - 1; by = g_designH - 1;
+    } else {
+        for (y = 0; y < g_designH; y++) {
+            const DWORD *a = f + y * g_designW, *p = g_c.prev + y * g_designW;
+            int l = 0, r = g_designW - 1;
+            while (l <= r && a[l] == p[l]) l++;
+            if (l > r) continue;
+            while (a[r] == p[r]) r--;
+            if (l < ax) ax = l;
+            if (r > bx) bx = r;
+            if (y < ay) ay = y;
+            by = y;
+        }
+    }
+
+    /* A change that reaches a soften rectangle or its ring redoes both. */
+    for (i = 0; bx >= 0 && i < g_bd[best].nsoft; i++) {
+        const int *r = g_bd[best].soft[i];
+        if (ax < r[2] + SOFT_R && bx >= r[0] - SOFT_R && ay < r[3] + SOFT_R && by >= r[1] - SOFT_R) {
+            if (ax > r[0] - SOFT_R) ax = r[0] - SOFT_R;
+            if (ay > r[1] - SOFT_R) ay = r[1] - SOFT_R;
+            if (bx < r[2] + SOFT_R - 1) bx = r[2] + SOFT_R - 1;
+            if (by < r[3] + SOFT_R - 1) by = r[3] + SOFT_R - 1;
+        }
+    }
+    if (ax < 0) ax = 0;
+    if (ay < 0) ay = 0;
+    if (bx > g_designW - 1) bx = g_designW - 1;
+    if (by > g_designH - 1) by = g_designH - 1;
+
+    if (bx >= 0) {
+        /* detail weights and the frame copy, over the changed pixels only */
+        for (y = ay; y <= by; y++)
+            for (x = ax; x <= bx; x++) {
+                int k = y * g_designW + x;
+                int d = pxdiff(f[k], st[k]);
+                g_c.wt[k] = (WORD)(d >= tol ? 0 : ((tol - d) << 8) / tol);
+                g_c.prev[k] = f[k];
+                g_c.fp[k] = f[k];
+            }
+        bd_soften(&g_bd[best], f, st, ax, ay, bx, by);
+        g_c.valid = 1;
+
+        sx0 = bd_first(g_c.bx, dw, ax); sx1 = bd_end(g_c.bx, dw, bx + 1);
+        sy0 = bd_first(g_c.by, dh, ay); sy1 = bd_end(g_c.by, dh, by + 1);
+        for (y = sy0; y < sy1; y++) {
+            DWORD       *o  = g_c.out + (oy + y) * rw + ox;
+            const DWORD *hp = g_c.hi + y * dw;
+            const DWORD *lp = g_c.lo + y * dw;
+            const WORD  *wr = g_c.wt + g_c.ym[y] * g_designW;
+            for (x = sx0; x < sx1; x++) {
+                DWORD v = bd_bilerp(g_c.fp, x, y), r = 0;
+                int   w = wr[g_c.xm[x]], sh;
+                if (w) {
+                    for (sh = 0; sh <= 16; sh += 8) {
+                        int c = (int)((v >> sh) & 255) +
+                                ((w * ((int)((hp[x] >> sh) & 255) - (int)((lp[x] >> sh) & 255))) >> 8);
+                        if (c < 0) c = 0;
+                        if (c > 255) c = 255;
+                        r |= (DWORD)c << sh;
+                    }
+                    v = r;
+                }
+                o[x] = v;
+            }
+        }
+        g_c.area += (DWORD)((sx1 - sx0) * (sy1 - sy0) / 1000);
+    } else {
+        sx0 = sx1 = sy0 = sy1 = 0;
+    }
+
+    if (++g_c.since == 60) bd_dump(best);
+
+    if (full || g_c.shown != s->hwnd) {
+        BitBlt(real, 0, 0, rw, rh, g_c.dc, 0, 0, SRCCOPY);
+        g_c.shown = s->hwnd;
+    } else if (sx1 > sx0 && sy1 > sy0) {
+        BitBlt(real, ox + sx0, oy + sy0, sx1 - sx0, sy1 - sy0, g_c.dc, ox + sx0, oy + sy0, SRCCOPY);
+    }
+
+    /* Cost per present, logged a few times.  Every Bink frame and every hover
+     * comes through here, and the README's animation-stall note is about
+     * exactly this kind of per-frame cost, so it is measured, not assumed. */
+    QueryPerformanceCounter(&t1);
+    if (g_logging && g_c.reports < 4 && QueryPerformanceFrequency(&fq) && fq.lo >= 1000000) {
+        g_c.ticks += (t1.lo - t0.lo) / (fq.lo / 1000000);
+        if (++g_c.frames == 60) {
+            char m[160];
+            m[0] = 0;
+            s_cat(m, "backdrop: composite ");
+            s_num(m, (long)(g_c.ticks / 60)); s_cat(m, " us per present, ");
+            s_num(m, (long)(g_c.area / 60));  s_cat(m, "k screen px redone, mean of 60");
+            logline(m);
+            g_c.frames = 0; g_c.ticks = 0; g_c.area = 0; g_c.reports++;
+        }
+    }
+    return 1;
+}
+
+static void present(Slot *s, HDC real, int full)
 {
     RECT r;
     int  rw, rh, ox = 0, oy = 0, dw, dh;
@@ -395,6 +1043,14 @@ static void present(Slot *s, HDC real)
     if (rw <= 0 || rh <= 0) return;
 
     slot_placement(s, &ox, &oy, &dw, &dh);
+
+    if (s->letterbox && bd_present(s, real, full, rw, rh, ox, oy, dw, dh)) {
+        if (!s->announced) {
+            logline("  paint over backdrop");
+            s->announced = 1;
+        }
+        return;
+    }
 
     if (s->letterbox) {
         /* A full-screen dialog: the WINDOW is already the right size, so the
@@ -420,6 +1076,318 @@ static void present(Slot *s, HDC real)
         logline(b);
         s->announced = 1;
     }
+}
+
+/* ---- embedding: one OS window instead of one per menu ----------------- */
+/*
+ * Every shell screen -- and every IN-GAME menu: do_escapeMenu, save/load,
+ * graphics and sound options, yes/no -- is
+ *
+ *     DialogBoxParamA(shell_hInstance, id, <3D window>, proc, lp)
+ *
+ * with a WS_POPUP template (measured: every template in .rsrc but one).  An
+ * owned popup is a separate top-level window, which on Windows sits quietly
+ * on top of the fullscreen game.  Under Wine each one is its own X11 window,
+ * and the compositor treats it as a new application window: MenuScale.log
+ * recorded menus at 3410x1378 and 1696x1378 -- the screen less Hyprland's
+ * gaps, and a half-screen tile.  Focus then moves off the fullscreen 3D
+ * window, which is what DXVK's fullscreen handling reacts to.
+ *
+ * With Embed=1 the template is rewritten WS_POPUP -> WS_CHILD before the
+ * dialog is created, so it becomes a child of the window that would have
+ * owned it and Wine never creates a second X window.  Three consequences are
+ * handled here, each of them something the game would otherwise notice:
+ *
+ *   input     DialogBox disables its owner BEFORE creating the dialog (Wine
+ *             does this even for a WS_CHILD template), and hit-testing never
+ *             descends into a disabled window -- so a child of the disabled
+ *             owner would get no input at all.  The owner's top-level is
+ *             re-enabled at WM_INITDIALOG, and modality is kept instead by a
+ *             WH_GETMESSAGE filter that turns mouse and keyboard input aimed
+ *             outside the innermost embedded dialog into WM_NULL.
+ *   geometry  the game positions dialogs in SCREEN coordinates (it
+ *             ClientToScreen()s against the owner).  A child's MoveWindow
+ *             takes PARENT-client coordinates, so the final position is
+ *             converted just before the real call.
+ *   owner     a child has no owner, so GetWindow(GW_OWNER) would return NULL
+ *             where the game expects its 3D window.  Answered with the parent
+ *             for the dialogs embedded here.
+ *
+ * Only DialogBoxParamA is embedded.  CreateDialogParamA (two sites, both the
+ * admiral's log, one of which is already a WS_CHILD template) is left alone.
+ */
+
+#define WS_POPUP         0x80000000UL
+#define WS_CHILD         0x40000000UL
+#define WS_CLIPSIBLINGS  0x04000000UL
+#define WS_CLIPCHILDREN  0x02000000UL
+#define WS_CAPTION       0x00C00000UL
+#define WS_SYSMENU       0x00080000UL
+#define WS_THICKFRAME    0x00040000UL
+#define DS_SYSMODAL      0x00000002UL
+#define DS_MODALFRAME    0x00000080UL
+#define DS_SETFOREGROUND 0x00000200UL
+#define WS_EX_TOPMOST    0x00000008UL
+#define WS_EX_APPWINDOW  0x00040000UL
+#define GWL_STYLE        (-16)
+#define GA_ROOT          2
+#define RT_DIALOG_ID     5
+#define WH_GETMESSAGE    3
+#define WM_NULL          0x0000
+#define WM_INITDIALOG    0x0110
+#define WM_SETCURSOR     0x0020
+#define HTCLIENT         1
+#define GCL_HCURSOR      (-12)
+#define DWL_MSGRESULT    0
+#define IDC_ARROW_ID     32512
+#define WM_DESTROY       0x0002
+#define WM_NCDESTROY     0x0082
+#define WM_KEYFIRST      0x0100
+#define WM_KEYLAST       0x0109
+#define WM_NCMOUSEFIRST  0x00A0
+#define WM_NCMOUSELAST   0x00AD
+#define WM_MOUSEALL_LAST 0x020E    /* through WM_MOUSEHWHEEL */
+
+#define MAXEMB 16
+
+typedef struct {
+    HWND    hwnd;
+    DLGPROC proc;               /* the game's dialog procedure             */
+    HWND    owner;              /* the owner the game asked for            */
+    int     modal;              /* 1 once WM_INITDIALOG has run            */
+} Emb;
+
+static Emb     g_emb[MAXEMB];
+static DLGPROC g_pendingProc;   /* handed to the next unknown window       */
+static HWND    g_pendingOwner;
+static HHOOK   g_filter;
+static int     g_embedded;      /* count, for the log                      */
+
+static HWND (__stdcall *o_GetWindow)(HWND, UINT);
+static void start_flush(void);
+static LONG_PTR (__stdcall *o_DialogBoxParamA)(HINSTANCE, LPCSTR, HWND, DLGPROC, LPARAM);
+
+static Emb *emb_get(HWND h)
+{
+    int i;
+    if (!h) return NULLPTR;
+    for (i = 0; i < MAXEMB; i++)
+        if (g_emb[i].hwnd == h) return &g_emb[i];
+    return NULLPTR;
+}
+
+static int is_embedded(HWND h) { return emb_get(h) != NULLPTR; }
+
+/* The window the game thinks of as this dialog's owner. */
+static HWND anchor_of(HWND h)
+{
+    return is_embedded(h) ? GetParent(h) : GetWindow(h, GW_OWNER);
+}
+
+/* Screen coordinates, as the game computed them, -> what MoveWindow wants. */
+static void to_parent(HWND h, int *x, int *y)
+{
+    POINT p;
+    if (!is_embedded(h)) return;
+    p.x = *x; p.y = *y;
+    ScreenToClient(GetParent(h), &p);
+    *x = (int)p.x; *y = (int)p.y;
+}
+
+/* Innermost embedded modal dialog still alive -- the one that owns input. */
+static HWND top_modal(void)
+{
+    int i, best = -1;
+    for (i = 0; i < MAXEMB; i++)
+        if (g_emb[i].hwnd && g_emb[i].modal && IsWindow(g_emb[i].hwnd))
+            if (best < 0 || g_emb[i].modal > g_emb[best].modal) best = i;
+    return best < 0 ? NULLPTR : g_emb[best].hwnd;
+}
+
+/* Is h the dialog, one of its controls, or a popup a control owns (a combo
+ * box's drop-down list is a top-level window owned by the combo)? */
+static int inside(HWND dlg, HWND h)
+{
+    int n;
+    for (n = 0; h && n < 8; n++) {
+        if (h == dlg || IsChild(dlg, h)) return 1;
+        h = GetWindow(h, GW_OWNER);
+    }
+    return 0;
+}
+
+static LONG_PTR __stdcall input_filter(INT code, WPARAM wp, LPARAM lp)
+{
+    if (code >= 0 && lp) {
+        MSG *m = (MSG *)lp;
+        UINT k = m->message;
+        if (m->hwnd &&
+            ((k >= WM_MOUSEFIRST && k <= WM_MOUSEALL_LAST) ||
+             (k >= WM_NCMOUSEFIRST && k <= WM_NCMOUSELAST) ||
+             (k >= WM_KEYFIRST && k <= WM_KEYLAST))) {
+            HWND dlg = top_modal();
+            if (dlg && !inside(dlg, m->hwnd)) m->message = WM_NULL;
+        }
+    }
+    return CallNextHookEx(g_filter, code, wp, lp);
+}
+
+static int g_modalSeq = 0;
+
+static LONG_PTR __stdcall embed_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
+{
+    Emb *e = emb_get(h);
+    LONG_PTR r;
+    int i;
+
+    if (!e) {
+        /* First message for a dialog created below -- WM_SETFONT or
+         * WM_INITDIALOG.  Creation is synchronous and nested dialogs are only
+         * ever opened after their parent has had its first message, so the
+         * pending procedure is unambiguous. */
+        for (i = 0; i < MAXEMB; i++)
+            if (!g_emb[i].hwnd || !IsWindow(g_emb[i].hwnd)) break;
+        if (i == MAXEMB) i = 0;
+        e = &g_emb[i];
+        e->hwnd = h; e->proc = g_pendingProc; e->owner = g_pendingOwner; e->modal = 0;
+        g_pendingProc = NULLPTR; g_pendingOwner = NULLPTR;
+    }
+
+    r = e->proc ? e->proc(h, msg, wp, lp) : 0;
+
+    /* The cursor.  DefWindowProc on a CHILD asks its parent first, and the
+     * parent is now the 3D window, whose WindowProc (0x488881) answers every
+     * WM_SETCURSOR with SetCursor(NULL) -- in play the engine draws its own
+     * sprite cursor.  So the arrow vanished over every embedded menu.  A
+     * top-level dialog never asked; do what its DefWindowProc did instead:
+     * the class cursor of the window under the pointer (arrow, or I-beam
+     * over an edit box), without consulting the parent. */
+    if (msg == WM_SETCURSOR && !r) {
+        HANDLE cur = NULLPTR;
+        if ((lp & 0xFFFF) == HTCLIENT && wp)
+            cur = (HANDLE)(UINT_PTR)GetClassLongA((HWND)wp, GCL_HCURSOR);
+        if (!cur) cur = LoadCursorA(NULLPTR, (LPCSTR)(UINT_PTR)IDC_ARROW_ID);
+        SetCursor(cur);
+        SetWindowLongA(h, DWL_MSGRESULT, TRUE);
+        return TRUE;
+    }
+
+    if (msg == WM_INITDIALOG) {
+        HWND top = GetAncestor(h, GA_ROOT);
+        if (top && top != h && !IsWindowEnabled(top)) EnableWindow(top, TRUE);
+        /* A dialog opened from another menu is NOT made a child of that menu:
+         * for a modal dialog Wine walks the owner up to its top-level window
+         * first, so both end up siblings under the 3D window -- and the new
+         * one was measured BELOW the one that opened it, clipped away by
+         * WS_CLIPSIBLINGS.  An owned popup always sits above its owner, so
+         * put it there. */
+        o_SetWindowPos(h, NULLPTR /* HWND_TOP */, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        e->modal = ++g_modalSeq;
+        start_flush();
+        if (g_logging) {
+            RECT wr;
+            char b[192];
+            wr.left = wr.top = wr.right = wr.bottom = 0;
+            GetWindowRect(h, &wr);
+            b[0] = 0;
+            s_cat(b, "embedded dialog #"); s_num(b, ++g_embedded);
+            s_cat(b, " as child, ");       s_num(b, wr.right - wr.left);
+            s_cat(b, "x");                 s_num(b, wr.bottom - wr.top);
+            s_cat(b, " @");                s_num(b, wr.left);
+            s_cat(b, ",");                 s_num(b, wr.top);
+            logline(b);
+        }
+    } else if (msg == WM_NCDESTROY) {
+        e->hwnd = NULLPTR; e->proc = NULLPTR; e->owner = NULLPTR; e->modal = 0;
+    }
+    return r;
+}
+
+/* A modifiable copy of the dialog template with its top-level styling
+ * replaced by child styling.  NULL means "create it the stock way". */
+static BYTE *child_template(HINSTANCE inst, LPCSTR name)
+{
+    HRSRC   rs;
+    HGLOBAL g;
+    BYTE   *src, *copy;
+    DWORD   sz, *style, *ex;
+
+    rs = FindResourceA((HMODULE)inst, name, (LPCSTR)(UINT_PTR)RT_DIALOG_ID);
+    if (!rs) return NULLPTR;
+    g   = LoadResource((HMODULE)inst, rs);
+    src = g ? (BYTE *)LockResource(g) : NULLPTR;
+    sz  = SizeofResource((HMODULE)inst, rs);
+    if (!src || sz < 18) return NULLPTR;
+
+    copy = (BYTE *)HeapAlloc(GetProcessHeap(), 0, sz);
+    if (!copy) return NULLPTR;
+    memcpy(copy, src, sz);
+
+    if (*(WORD *)copy == 1 && *(WORD *)(copy + 2) == 0xFFFF) {
+        ex = (DWORD *)(copy + 8); style = (DWORD *)(copy + 12);   /* DLGTEMPLATEEX */
+    } else {
+        style = (DWORD *)copy;    ex = (DWORD *)(copy + 4);       /* DLGTEMPLATE   */
+    }
+    if (*style & WS_CHILD) { HeapFree(GetProcessHeap(), 0, copy); return NULLPTR; }
+
+    *style &= ~(WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME |
+                DS_MODALFRAME | DS_SYSMODAL | DS_SETFOREGROUND);
+    *style |= WS_CHILD | WS_CLIPSIBLINGS;
+    *ex    &= ~(WS_EX_TOPMOST | WS_EX_APPWINDOW);
+    return copy;
+}
+
+static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND owner,
+                                             DLGPROC proc, LPARAM lp)
+{
+    BYTE    *tpl;
+    LONG_PTR r;
+
+    if (g_logging) {
+        char b[160];
+        b[0] = 0;
+        s_cat(b, "DialogBoxParamA template ");
+        if ((UINT_PTR)name < 0x10000) s_num(b, (long)(UINT_PTR)name); else s_cat(b, name);
+        s_cat(b, (owner && is_dialog(owner)) ? " owner=dialog" : owner ? " owner=window" : " owner=none");
+        logline(b);
+    }
+
+    if (!g_embed || g_mode == MODE_LOG || !owner || !proc)
+        return o_DialogBoxParamA(inst, name, owner, proc, lp);
+
+    tpl = child_template(inst, name);
+    if (!tpl) return o_DialogBoxParamA(inst, name, owner, proc, lp);
+
+    if (!g_filter)
+        g_filter = SetWindowsHookExA(WH_GETMESSAGE, input_filter, NULLPTR, GetCurrentThreadId());
+
+    /* The parent paints nothing over its menus: it is the D3D window, or a
+     * dialog whose content MenuScale blits through GetDC. */
+    SetWindowLongA(owner, GWL_STYLE, GetWindowLongA(owner, GWL_STYLE) | (LONG)WS_CLIPCHILDREN);
+
+    g_pendingProc = proc;
+    g_pendingOwner = owner;
+    r = DialogBoxIndirectParamA(inst, tpl, owner, embed_proc, lp);
+    g_pendingProc = NULLPTR;
+    g_pendingOwner = NULLPTR;
+    HeapFree(GetProcessHeap(), 0, tpl);
+    if (g_logging) {
+        char b[96];
+        b[0] = 0;
+        s_cat(b, "  embedded dialog returned "); s_num(b, (long)r);
+        logline(b);
+    }
+    return r;
+}
+
+/* The game asks for a dialog's owner to position it and to talk to the 3D
+ * window.  An embedded dialog has a parent instead; report that. */
+static HWND __stdcall my_GetWindow(HWND h, UINT cmd)
+{
+    Emb *e = emb_get(h);
+    if (cmd == GW_OWNER && e) return e->owner ? e->owner : GetParent(h);
+    return o_GetWindow(h, cmd);
 }
 
 /* ---- geometry hooks --------------------------------------------------- */
@@ -478,7 +1446,7 @@ static Slot *claim_letterbox(HWND h)
 
 static void reposition(HWND h, int *x, int *y, int *w, int *ht, int havePos, int haveSize)
 {
-    HWND  owner = GetWindow(h, GW_OWNER);
+    HWND  owner = anchor_of(h);
     POINT pt;
     Slot *s;
 
@@ -546,6 +1514,7 @@ static BOOL __stdcall my_MoveWindow(HWND h, INT x, INT y, INT w, INT ht, BOOL rp
         s_cat(b, " @"); s_num(b, x); s_cat(b, ","); s_num(b, y);
         logline(b);
     }
+    to_parent(h, &x, &y);
     return o_MoveWindow(h, x, y, w, ht, rp);
 }
 
@@ -562,6 +1531,7 @@ static BOOL __stdcall my_SetWindowPos(HWND h, HWND after, INT x, INT y, INT w, I
             reposition(h, &x, &y, &w, &ht, havePos, haveSize);
         }
     }
+    if (!(f & SWP_NOMOVE)) to_parent(h, &x, &y);
     return o_SetWindowPos(h, after, x, y, w, ht, f);
 }
 
@@ -583,6 +1553,7 @@ static HDC __stdcall my_BeginPaint(HWND h, PAINTSTRUCT *ps)
 
     real = o_BeginPaint(h, ps);
     if (!real) return real;
+    trace("BeginPaint", h);
 
     mem = slot_surface(s, real);
     if (!mem) return real;
@@ -605,12 +1576,86 @@ static BOOL __stdcall my_EndPaint(HWND h, const PAINTSTRUCT *ps)
     s = slot_get(h);
     if (!s || !s->paintReal) return o_EndPaint(h, ps);
 
-    present(s, s->paintReal);
+    present(s, s->paintReal, 1);
+    s->dirty = 0;
+    trace("EndPaint present", h);
 
     local = *ps;                 /* hand user32 back the DC it created */
     local.hdc = s->paintReal;
     s->paintReal = NULLPTR;
     return o_EndPaint(h, &local);
+}
+
+/*
+ * GetDC/ReleaseDC do NOT pair up in this game, so nothing here may rely on
+ * them pairing.  ShellButton::UpdateButton (0x5a4a10) takes GetDC(hDlg),
+ * draws the button, and then falls into eight NOPs at 0x5a4adb where its
+ * push/push/call ReleaseDC used to be -- patched out, so every button redraw
+ * leaks the DC.  The first version of this plugin kept the real DC on a stack
+ * and presented only when the outermost one came back: one leak pinned the
+ * stack, nothing drawn after it ever reached the screen (the Options screen
+ * showed its background and no buttons), and after eight leaks the game was
+ * handed real DCs and drew 1:1 in the corner.
+ *
+ * So no real DC is held.  GetDC hands out the design surface and marks it
+ * dirty; ReleaseDC presents at once through a DC of our own; and a thread
+ * timer presents whatever is still dirty, which is what catches the leaks.
+ */
+#define FLUSH_MS 30
+
+static UINT_PTR g_flushTimer;
+static void __stdcall flush_dirty(HWND, UINT, UINT_PTR, DWORD);
+
+static void start_flush(void)
+{
+    if (!g_flushTimer) g_flushTimer = SetTimer(NULLPTR, 0, FLUSH_MS, flush_dirty);
+}
+
+static void present_now(Slot *s)
+{
+    HDC real = o_GetDC(s->hwnd);
+    if (!real) return;
+    present(s, real, 0);
+    o_ReleaseDC(s->hwnd, real);
+    s->dirty = 0;
+}
+
+/*
+ * A full-screen menu embedded as a child is sized once, when it opens.  If
+ * the game window changes size under it -- measured: Hyprland re-tiles the
+ * game to 3410x1378 whenever it loses focus and drops fullscreen -- the menu
+ * kept its 3440x1440 and hung off the bottom, "Return to Game" included.
+ * Track the parent's client area instead.  The letterbox fit is recomputed
+ * from the window size on every present, so the picture follows.
+ */
+static void follow_parent(Slot *s)
+{
+    RECT pr, wr;
+    HWND parent;
+    int  pw, ph;
+
+    if (!s->letterbox || !is_embedded(s->hwnd)) return;
+    parent = GetParent(s->hwnd);
+    if (!parent || !o_GetClientRect(parent, &pr) || !GetWindowRect(s->hwnd, &wr)) return;
+    pw = (int)(pr.right - pr.left);
+    ph = (int)(pr.bottom - pr.top);
+    if (pw <= 0 || ph <= 0) return;
+    if (pw == (int)(wr.right - wr.left) && ph == (int)(wr.bottom - wr.top)) return;
+    o_MoveWindow(s->hwnd, 0, 0, pw, ph, TRUE);   /* parent-client coordinates */
+    s->dirty = 1;
+}
+
+static void __stdcall flush_dirty(HWND h, UINT msg, UINT_PTR id, DWORD t)
+{
+    int i;
+    (void)h; (void)msg; (void)id; (void)t;
+    for (i = 0; i < MAXSLOT; i++)
+        if (g_slot[i].hwnd && IsWindow(g_slot[i].hwnd)) follow_parent(&g_slot[i]);
+    for (i = 0; i < MAXSLOT; i++)
+        if (g_slot[i].hwnd && g_slot[i].dirty && g_slot[i].mem) {
+            if (IsWindow(g_slot[i].hwnd)) present_now(&g_slot[i]);
+            else g_slot[i].dirty = 0;
+        }
 }
 
 static HDC __stdcall my_GetDC(HWND h)
@@ -620,30 +1665,40 @@ static HDC __stdcall my_GetDC(HWND h)
 
     if (g_mode != MODE_SCALE) return o_GetDC(h);
     s = slot_get(h);
-    if (!s || s->dw <= 0 || s->depth >= MAXDEPTH) return o_GetDC(h);
+    if (!s || s->dw <= 0) return o_GetDC(h);
 
-    real = o_GetDC(h);
-    if (!real) return real;
+    if (!s->mem) {
+        real = o_GetDC(h);
+        if (!real) return real;
+        mem = slot_surface(s, real);
+        o_ReleaseDC(h, real);
+        if (!mem) return o_GetDC(h);
+    }
+    trace("GetDC", h);
 
-    mem = slot_surface(s, real);
-    if (!mem) return real;
-
-    s->dcReal[s->depth++] = real;
-    return mem;
+    s->dirty = 1;
+    start_flush();
+    return s->mem;
 }
 
 static INT __stdcall my_ReleaseDC(HWND h, HDC dc)
 {
     Slot *s;
-    HDC real;
+    int i;
 
     if (g_mode != MODE_SCALE) return o_ReleaseDC(h, dc);
     s = slot_get(h);
-    if (!s || dc != s->mem || s->depth <= 0) return o_ReleaseDC(h, dc);
+    if (!s || dc != s->mem) {
+        /* Released against a different window than it was taken from. */
+        s = NULLPTR;
+        for (i = 0; i < MAXSLOT; i++)
+            if (g_slot[i].mem && g_slot[i].mem == dc) { s = &g_slot[i]; break; }
+        if (!s) return o_ReleaseDC(h, dc);
+    }
 
-    real = s->dcReal[--s->depth];
-    if (s->depth == 0) present(s, real);      /* only the outermost one */
-    return o_ReleaseDC(h, real);
+    present_now(s);
+    trace("ReleaseDC present", h);
+    return 1;
 }
 
 /*
@@ -921,9 +1976,64 @@ static void build_paths(char *ini)
     if (n <= 0) { ini[0] = 0; g_logpath[0] = 0; return; }
     for (i = 0; i < n; i++) if (path[i] == '\\' || path[i] == '/') cut = i + 1;
     path[cut] = 0;
+    g_dir[0] = 0; s_cat(g_dir, path);
 
     ini[0] = 0;       s_cat(ini, path);       s_cat(ini, "MenuScale.ini");
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "MenuScale.log");
+}
+
+/*
+ * [Backdrops] in MenuScale.ini: N=<stock BMP, relative to the game directory>.
+ * The plate for it is MenuScale\<same file name>.  A screen that is not listed
+ * -- or whose plate is missing -- keeps black pillarboxes, as before.
+ */
+static void bd_list(const char *ini)
+{
+    char key[16], val[256], m[96];
+    int  i, k;
+
+    for (i = 1; i <= 9 && g_nbd < MAXBD; i++) {
+        Backdrop   *b;
+        const char *base;
+
+        key[0] = (char)('0' + i); key[1] = 0;
+        val[0] = 0;
+        GetPrivateProfileStringA("Backdrops", key, "", val, sizeof val, ini);
+        if (!val[0] || s_len(g_dir) + s_len(val) + 12 >= (int)sizeof g_bd[0].stock) continue;
+        base = val;
+        for (k = 0; val[k]; k++) if (val[k] == '\\' || val[k] == '/') base = val + k + 1;
+        b = &g_bd[g_nbd++];
+        memset(b, 0, sizeof *b);
+        s_cat(b->stock, g_dir); s_cat(b->stock, val);
+        s_cat(b->plate, g_dir); s_cat(b->plate, "MenuScale\\"); s_cat(b->plate, base);
+
+        /* N.soften=x,y,w,h ...: see bd_soften */
+        key[1] = '.'; key[2] = 0; s_cat(key, "soften");
+        val[0] = 0;
+        GetPrivateProfileStringA("Backdrops", key, "", val, sizeof val, ini);
+        {
+            int v[4], nv = 0, cur = -1;
+            for (k = 0; ; k++) {
+                char c = val[k];
+                if (c >= '0' && c <= '9') { cur = (cur < 0 ? 0 : cur * 10) + (c - '0'); continue; }
+                if (cur >= 0) {
+                    v[nv++] = cur; cur = -1;
+                    if (nv == 4) {
+                        if (b->nsoft < MAXSOFT && v[2] > 0 && v[3] > 0) {
+                            int *r = b->soft[b->nsoft++];
+                            r[0] = v[0]; r[1] = v[1]; r[2] = v[0] + v[2]; r[3] = v[1] + v[3];
+                        }
+                        nv = 0;
+                    }
+                }
+                if (!c) break;
+            }
+        }
+    }
+    m[0] = 0;
+    s_cat(m, "backdrops listed: "); s_num(m, g_nbd);
+    s_cat(m, "  detail tolerance "); s_num(m, g_tol);
+    logline(m);
 }
 
 static void startup(void)
@@ -941,6 +2051,11 @@ static void startup(void)
     g_smooth  = (int)GetPrivateProfileIntA("MenuScale", "Smooth",       1,   ini);
     g_shellMode = (int)GetPrivateProfileIntA("MenuScale", "RaiseShellMode", 1, ini);
     g_logging = (int)GetPrivateProfileIntA("MenuScale", "Log",          1,   ini);
+    g_embed   = (int)GetPrivateProfileIntA("MenuScale", "Embed",        0,   ini);
+    g_trace   = (int)GetPrivateProfileIntA("MenuScale", "Trace",        0,   ini);
+    g_dump    = (int)GetPrivateProfileIntA("MenuScale", "DumpBackdrop", 0,   ini);
+    g_backdrops = (int)GetPrivateProfileIntA("MenuScale", "Backdrops",  1,   ini);
+    g_tol     = (int)GetPrivateProfileIntA("MenuScale", "DetailTolerance", 48, ini);
 
     if (g_designW < 16) g_designW = 800;
     if (g_designH < 16) g_designH = 600;
@@ -981,6 +2096,12 @@ static void startup(void)
     o_GetClientRect = (void *)patch_iat(base, "USER32.dll", "GetClientRect", my_GetClientRect);
     o_MoveWindow    = (void *)patch_iat(base, "USER32.dll", "MoveWindow",    my_MoveWindow);
     o_SetWindowPos  = (void *)patch_iat(base, "USER32.dll", "SetWindowPos",  my_SetWindowPos);
+    /* Installed even with Embed=0: it then only logs and passes through,
+     * which is what makes a stock run comparable line for line. */
+    if (g_mode != MODE_LOG) {
+        o_DialogBoxParamA = (void *)patch_iat(base, "USER32.dll", "DialogBoxParamA", my_DialogBoxParamA);
+        o_GetWindow       = (void *)patch_iat(base, "USER32.dll", "GetWindow",       my_GetWindow);
+    }
 
     /* A hook that failed to bind is never called, but the originals are used
      * unconditionally elsewhere, so give every one of them a real target. */
@@ -991,6 +2112,10 @@ static void startup(void)
     if (!o_GetClientRect) o_GetClientRect = GetClientRect;
     if (!o_MoveWindow)    o_MoveWindow    = MoveWindow;
     if (!o_SetWindowPos)  o_SetWindowPos  = SetWindowPos;
+    if (!o_GetWindow)     o_GetWindow     = GetWindow;
+    /* Embedding needs both hooks or neither: an embedded dialog the game
+     * cannot find the owner of is worse than a separate window. */
+    if (!o_DialogBoxParamA) g_embed = 0;
 
     b[0] = 0;
     s_cat(b, "--- MenuScale mode=");  s_num(b, g_mode);
@@ -1002,8 +2127,11 @@ static void startup(void)
     s_num(b, (o_BeginPaint?1:0) + (o_EndPaint?1:0) + (o_GetDC?1:0) +
              (o_ReleaseDC?1:0) + (o_GetClientRect?1:0) + (o_MoveWindow?1:0) +
              (o_SetWindowPos?1:0));
-    s_cat(b, "/7  input: wndproc subclass");
+    s_cat(b, "/7  input: wndproc subclass  embed="); s_num(b, g_embed);
     logline(b);
+
+    g_c.idx = -1;
+    if (g_mode == MODE_SCALE && g_backdrops) bd_list(ini);
 }
 
 BOOL __stdcall DllMain(HMODULE mod, DWORD reason, void *reserved)

@@ -63,6 +63,211 @@ that is already in `WINEDLLOVERRIDES`.
 Only class `#32770` (Win32 dialog) windows are touched. The 3D window is not a dialog,
 so gameplay, the HUD and the Bink videos are untouched by construction.
 
+## One window: `Embed=1`
+
+**Confirmed in game by the user (2026-09-23): "much improved".** Also checked in test launches: the game is one OS window from
+launch to exit, main menu, Options and its nested screens, and the in-mission
+Options menu, Save Game and Return to Game included.
+
+Every menu, the in-game ones included, is
+`DialogBoxParamA(shell_hInstance, id, <3D window>, proc, lp)` with a `WS_POPUP`
+template (every template in `.rsrc` but one). `do_escapeMenu` is the same call
+with the same template as the main menu, 291. An owned popup is a separate
+top-level window. On Windows that is invisible; under Wine it is a second X11
+window that Hyprland tiles and focuses like a new application. Measured without
+Embed: Wine lists two visible top-level windows, `hyprctl clients` two
+`steam_proton` clients, and opening Options re-tiled **both** to 3410x1378
+@15,47, the screen less gaps. Injected clicks usually did not reach the popup
+at all.
+
+`Embed=1` hooks `DialogBoxParamA`, rewrites the template `WS_POPUP` ->
+`WS_CHILD`, and creates it with `DialogBoxIndirectParamA` so it becomes a child
+of the game window. Wine then creates no second X window. Four things follow,
+each handled, each measured:
+
+- **Input.** `DialogBox` disables its owner *before* creating the dialog (Wine
+  does this even for a `WS_CHILD` template), and hit-testing never descends into
+  a disabled window, so the child would get no input. The top-level is
+  re-enabled at `WM_INITDIALOG`. Modality is kept by a `WH_GETMESSAGE` filter
+  that turns mouse and key input aimed outside the innermost menu into `WM_NULL`.
+- **Z-order.** For a modal dialog Wine walks the owner up to its top-level, so
+  a menu opened *from* a menu (Options -> Graphics Settings, template 1) is a
+  **sibling** of the one that opened it, not its child. It was created **below**
+  it and clipped away by `WS_CLIPSIBLINGS`. Each embedded menu is raised to the
+  top at `WM_INITDIALOG`, which is where an owned popup always is.
+- **Geometry and owner.** The game positions menus in screen coordinates via
+  `GetWindow(hDlg, GW_OWNER)`. A child has no owner, so `GW_OWNER` is answered
+  with the owner the game asked for, and positions are converted to
+  parent-client coordinates just before the real `MoveWindow`/`SetWindowPos`.
+- **Resizing.** A full-screen menu is sized once. When the game window is
+  resized under it, as Hyprland does when the game drops fullscreen on focus
+  loss, it used to hang off the bottom (Return to Game unreachable). Embedded
+  full-screen menus now follow their parent's client area.
+
+`CreateDialogParamA` (two sites, both the admiral's log, one already a
+`WS_CHILD` template) is left alone. `Embed=0` restores separate windows; the
+`DialogBoxParamA` hook then only logs.
+
+**The cursor.** The 3D window's `WindowProc` answers every `WM_SETCURSOR` with
+`SetCursor(NULL)` (`0x488881`), so the engine's sprite cursor can show in play. A child's
+`DefWindowProc` asks its parent first, so once embedded, the arrow vanished over every
+menu (measured: `GetCursorInfo` handle NULL). The dialog wrapper now sets the class cursor
+of the window under the pointer itself, as a top-level dialog did. Checked on the main
+menu and Options. The in-mission menu, and the sprite cursor returning after Return to
+Game, are left to the user's play-through.
+
+### Open: the Admiral's Log still shows a window inside the window
+
+Reported in game: a border around the centre content. `AdmiralsLogDlgProc` builds its
+panes itself. It calls `CreateDialogParamA(shell_hInstance, 0x123, ..., 
+ScreenInformation::CallDialogProc)` at `0x5e3c04`, positioned via `ClientToScreen`
+(it's modeless, so the `DialogBoxParamA` hook never sees it), plus two `CreateWindowExA`
+(`0x5e394e`, and `0x5e3b7b` with style `0x5000000b`). Next step: hook
+`CreateDialogParamA` the same way as `DialogBoxParamA` (WS_POPUP -> WS_CHILD, no modal
+bookkeeping), then read the two `CreateWindowExA` styles.
+
+## GetDC and ReleaseDC do not pair up in this game
+
+`ShellButton::UpdateButton` (`0x5a4a10`) takes `GetDC(hDlg)`, draws the button,
+and falls into **eight NOPs at `0x5a4adb`** where its `push; push; call
+ReleaseDC` used to be. It was patched out, so every button redraw leaks the DC.
+
+The first version of this plugin kept the real DC on a stack and presented only
+when the outermost one came back. One leak pinned the stack, so **nothing drawn
+after it ever reached the screen**: the Options screen showed its background
+and no buttons, **with or without Embed**. After eight leaks the game was handed
+real DCs and drew 1:1 in the corner. This predates Embed and affected every
+screen built from `ShellButton`s, which is most of them past the main menu.
+
+Now no real DC is held. `GetDC` hands out the design surface and marks it dirty,
+`ReleaseDC` presents at once through a DC of the plugin's own, and a 30 ms
+thread timer presents whatever is still dirty. The timer is what catches the
+leaks. `Trace=1` logs the first paint events per dialog, which is how this was
+found.
+
+## Backdrops: hi-res art, and the pillarboxes filled
+
+The main menu's background is upscaled 4x and outpainted to 2.4:1. The pillarboxes
+show the outpainted sides, and the centre shows the upscale wherever the shell is
+still drawing the stock background. **Not yet seen in game by a person.** A test run
+at 3440x1440 composited it as designed; the numbers are below.
+
+**Why the art cannot simply replace the BMP.** The shell draws each screen at 1:1
+into the 800x600 design surface: first the stock background, then buttons, hover
+states, text and Bink animations on top. A bigger `mainbkgr.bmp` would still be drawn
+800x600 of it. So MenuScale composites the picture itself, per frame, from the
+frame the shell drew:
+
+- **Which screen:** a 40x30 grid of the frame is sampled against each stock BMP
+  listed under `[Backdrops]`. The listed screen that matches exactly (within 2/255)
+  at 50% or more of the points is the one on show.
+- **Sides:** these come from the plate `MenuScale/<same name>.bmp`, scaled so its
+  centre 4:3 lands exactly on the stretched design area.
+- **Centre:** `out = stretch(frame) + w · (plate − stretch(stock))` per pixel, with
+  `w` falling linearly from 1 to 0 as the frame's pixel departs from stock by up to
+  `DetailTolerance` (48). On untouched background the stretches cancel and the
+  result *is* the plate. Under an opaque overlay, such as a hover highlight or text
+  100+ off stock, it is the stretched frame exactly as before.
+
+**It is a weight and not a mask because of the flare.** `MainBk_flare.bik` is not
+drawn over the logo. It *is* the logo band: 800x145 at y 210, with the background
+baked in, through a lossy codec. It sits a mean 8/255 off stock, and 94% of its pixels
+are within 24. An exact-match mask would have left the logo, the thing anyone looks
+at, as the one low-res band on the screen. With the weight, the band measures
+mean |Laplacian| 56.4, against 60.6 for the plate and 35.7 for a plain stretch.
+
+**Cost, measured.** Doing the whole centre per present (a GDI `HALFTONE`
+`StretchBlt` of the frame plus the composite over 2.76M pixels) took **59 ms**, and
+the flare runs at 30 fps. Two changes brought it to **7.8 ms**:
+
+- **The stretch is done in C, bilinear, with fixed taps.** Every screen pixel is
+  then a fixed function of the design pixels under it. A GDI stretch of a
+  sub-rectangle filters its edges differently from a stretch of the whole.
+- **Only what changed is redone.** The frame is diffed against the last one
+  composited, and only the screen rectangle the changed design pixels reach is
+  recomputed and blitted. That is about 88k screen pixels per present on average.
+
+The stretched stock is built with the same function, which is what makes
+untouched background come out *exactly* as the plate. Measured on a dumped frame:
+the sides have RMSE 0 against the plate, and so does the lower centre, labels
+included.
+
+**Which screens.** Only screens with open art are outpainted, and they are listed
+in `backdrops/*.conf`:
+
+- **`mainbkgr`:** nebula to the edges. Outpainted, and the joins are step-free
+  (column means 39→36→35 and 44→45 across them).
+- **`singleplay`** (campaign selection): a star-chart grid over nebula, inside a
+  drawn black frame that is hard-edged at x 28 and x 771. Outpainting the whole
+  screen continued the frame and then started a different sky beyond it. So
+  `field=32,0,768,600` hands the outpaint the open field alone. The plate replaces
+  the frame too: MenuScale shows the plate wherever the shell draws stock
+  background, and the frame is stock background. The joins are step-free (column
+  means 43→45→48 and 83→86→81).
+  Of four expands (about $0.02 each): seed 1 invented a lens-flare sun, and seed 3
+  was clean but its grid stopped at the old frame. Seed 2 is the chosen one: its
+  grid continues outwards. It also wrote a line of fake glyphs into empty sky at
+  the bottom left, which `clone=` covers with the patch of sky beneath it. The
+  others are kept in `ai/` as `expanded-*.png`.
+  **A field edge must not cut through UI art.** The Tutorials panel's left bar
+  starts at x 30, and `field=` starts at 32, so the model was handed a bar cut
+  open at its edge. It extended the bar 6.5 design px leftwards into what became
+  plate-only area. Idle, that looks like a slightly wider bar; hovered, the glow
+  video redraws the bar at 30, and the extension showed beside it as a second
+  sliver (seen in game). The field is kept, since changing it would mean paying
+  for a new outpaint and losing seed 2. A second `clone=` with a 2px feather
+  covers the extension with the sky above-left of it, up to exactly stock's bar
+  edge (raw-outpaint x 893). That left the bar itself: its first 27 design px
+  were the outpaint's redrawn copy, blended into the upscale's across the
+  feather. Two slightly misaligned drawings of one edge gave wobbly, chamfered
+  corners when idle, which showed when toggling the hover (seen in game).
+  `keep=29,16,60,212` makes the plate take the upscaled stock over that bar, so
+  its corners are stock's.
+
+**Glows cut off by their own rectangle (`N.soften=`).** Hovering Tutorials plays
+`single/TutorialGlow.bik`, 320x200 at (28,20). It has the background baked in, and
+its blue halo runs right up to the rectangle. Measured against stock along its
+edges it is off by 56, 12, 59 and 26 (top, bottom, left, right). The stock game
+hid the left cut on the black frame, which the plate now paints over, so it
+showed as a hard box (seen in game). The other three campaign glows fade out
+inside their rectangles (1–3 at the edges), and so do the main menu's hover
+bitmaps (RMSE 0 at the edges).
+Each `N.soften=x,y,w,h` rectangle gets a ring 12 design px wide around it. There,
+wherever the frame still equals stock, the difference at the nearest edge is
+carried on and fades linearly to nothing. It is averaged over 7px *along* the
+outermost row or column, which smooths codec noise. The first version averaged a
+7x7 box reaching 3px *into* the rectangle, and copied the panel bar that starts
+2px in outwards as a ghost bar (seen in game). The ring keeps detail weight 1, so the plate shows through. With nothing
+drawn in the rectangle, the difference is zero and nothing changes. An offline
+simulation of the hover frame shows the box gone; not yet seen in game.
+Fading inwards instead would eat the panel's left bar, which starts 4px inside.
+A generic "continue every long edge" rule cannot tell a halo from the grey button
+bars, hence the explicit list.
+
+The options, load/save and multiplayer screens are metal frames on black, so they
+are left as they are.
+
+**Building a plate:** `tools/menuscale/backdrop.sh <name>` uses the same recipe as
+`tools/loading-panel.sh`, and keeps its paid layers in `backdrops/<name>/ai/`.
+
+1. Upscale the stock 4x with `bria/increase-resolution`. pruna hung in "running"
+   for 10 minutes on the day this was built.
+2. Blend 35% over Lanczos.
+3. Outpaint at 2048x1536 → 3680x1536 with `bria/expand`, which caps a canvas at
+   5000px. With `field=`, the model sees only that rectangle of the art.
+4. Apply any `clone=` patches, then feather the full 4x centre back in over 64px,
+   inside the field.
+5. Resize to exactly 3450x1440, centre 1920 at x 765. The plate is authored at
+   the screen height, so at 1440 it goes on 1:1.
+
+`--reblend` re-derives it offline. `install.sh` copies each built plate to
+`MenuScale/`, and `a2mod` moves them with the rest of the menu scale layer.
+
+**Testing without taking over the desktop.** Set `DumpBackdrop=1` and launch with
+`NOSHOT=1 capture.sh`. MenuScale then writes the composed screen to
+`MenuScale-backdrop<n>.bmp` ~60 presents after each backdrop first shows. `shot.sh`
+has to switch the visible workspace to grab a frame, and this does not.
+
 ## Use
 
     tools/menuscale/build.sh              # clang + lld-link, 32-bit PE, no CRT
@@ -71,8 +276,9 @@ so gameplay, the HUD and the Bink videos are untouched by construction.
     tools/menuscale/install.sh --remove   # take it out again
 
 `install.sh --remove` restores stock behaviour exactly: the plugin only ever *adds*
-`MenuScale.asi`, `MenuScale.ini` and `MenuScale.log` to the game directory, so there is
-no backup to keep and nothing to revert.
+`MenuScale.asi`, `MenuScale.ini`, `MenuScale.log` and the backdrop plates in
+`MenuScale/` to the game directory, so there is no backup to keep and nothing to
+revert.
 
 `MenuScale.ini` keys are documented in the file. The ones worth knowing:
 
@@ -82,6 +288,7 @@ no backup to keep and nothing to revert.
 | `IntegerScale` | `1` snaps to a whole factor (2x = 1600x1200) — crisper, leaves a band |
 | `Smooth` | `1` HALFTONE, `0` nearest neighbour |
 | `RaiseShellMode` | `0` leaves the engine's 800x600 front-end mode alone |
+| `Backdrops` | `0` black pillarboxes and a plain stretch, as before the backdrops |
 
 **If anything misbehaves, `Mode=0` is a safe diagnostic and `--remove` is a full
 uninstall.** `MenuScale.log`, beside `Armada2.exe`, records what it patched and every
@@ -105,6 +312,22 @@ each token and only then matches the switch table; anything else is stored as th
 exist — which presents as a game with a HUD and no map, not as a rejected argument.
 
 ## Test harness
+
+`probe.exe` (`run-probe.sh`) runs inside the game's own Wine session and is how
+every Embed claim above was checked without a human at the mouse:
+
+    run-probe.sh tree          top-level windows and every descendant
+    run-probe.sh click X Y     SetCursorPos + SendInput, routed by wineserver
+    run-probe.sh key VK        with the scancode: in a mission the game reads
+                               the keyboard by scancode, and a VK-only Esc never
+                               reaches the menu binding (Space still skipped the
+                               cutscene, which is what made this confusing)
+    run-probe.sh post X Y      post a click straight to the window under X,Y
+
+`capture.sh` takes `NOSHOT=1` to launch without photographing, and
+`A2_ARGS="-nointro a2_fed01.bzn"` starts a mission directly. **The `.bzn` is
+required**: without it the name does not resolve and you get the HUD with no
+map. Missions open with an in-engine cutscene, and Space skips it.
 
 `run-wine.sh` launches the game with Proton's bundled Wine directly against the existing
 prefix, skipping Heroic and the proton wrapper. It is the only launch path that prints
@@ -161,6 +384,10 @@ makes the shell redraw the widget under the cursor, so each `WM_MOUSEMOVE` costs
 **full-frame 800x600 -> 1920x1440 `StretchBlt` in HALFTONE**, not a redraw of the part
 that changed. A stream of mouse-moves could then starve whatever drives the animation.
 
+On a screen with a backdrop this no longer applies in that form. There, `present()`
+redoes only the changed rectangle, measured at 7.8 ms per present (see
+"Backdrops"). A fix for the other screens could follow the same pattern.
+
 Three cheap experiments, in the order that actually discriminates:
 
 1. **`install.sh --remove`, then watch stock.** Establishes whether this is a regression
@@ -180,12 +407,18 @@ why neither was done up front.
 
 ## Not done
 
-- **Confirmed rendered:** the main menu and the single-player/campaign screen. The
-  options, load/save and multiplayer screens go through the same two code paths and
-  are expected to follow, but have not been seen scaled.
+- **Confirmed rendered:** the main menu, the single-player/campaign screen, Options,
+  Graphics Settings, and in a mission the Options menu and Save Game. Multiplayer
+  has not been seen scaled.
 - **Hover and click are confirmed to land correctly**; nothing has been measured about
   how *fast* they are. See the animation stall above.
 - **Real child controls** (edit boxes, list boxes — the multiplayer screens use them)
   are separate HWNDs that Windows draws itself. They are not covered by the offscreen
   redirect and will sit unscaled. The main screens are custom-drawn `ShellButton`
-  bitmaps and are fine.
+  bitmaps and are fine. **Seen:** Save Game's name field (`Edit`, 476x28 at design
+  176,551) draws at 1:1 at its unscaled position. The user confirms this in game for
+all text boxes, and they are still usable. Embed does not change this. The fix is
+  to map child-control geometry through the same fit, plus a scaled font.
+- **Menus drawn inside the renderer** (the Direct3D route) was considered and
+  deferred. Embed gets one OS window without it, and the GDI child draws correctly over
+  the DXVK surface because the game loop is blocked while any menu is open.

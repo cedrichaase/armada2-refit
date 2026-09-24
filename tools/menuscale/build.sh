@@ -32,5 +32,13 @@ lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/MenuScale.asi" \
          "$out/menuscale.obj" "$out/kernel32.lib" "$out/user32.lib" "$out/gdi32.lib"
 
+# probe.exe: a test tool that lists the game's windows and injects input from
+# inside its Wine session -- see probe.c and run-probe.sh.  Not installed.
+clang --target=i386-pc-windows-msvc -O2 -Wall -Wextra \
+      -ffreestanding -fno-builtin -fno-stack-protector -mno-stack-arg-probe \
+      -c "$here/probe.c" -o "$out/probe.obj"
+lld-link /subsystem:console /machine:x86 /nodefaultlib /entry:start@0 \
+         /out:"$out/probe.exe" "$out/probe.obj" "$out/kernel32.lib" "$out/user32.lib"
+
 echo "built $out/MenuScale.asi"
 objdump -f "$out/MenuScale.asi" | sed -n '2,4p'

@@ -62,7 +62,10 @@ for _ in $(seq 1 60); do
     sleep 1
 done
 
-for t in 1 2 3; do
+# NOSHOT=1 launches and waits without photographing: shot.sh has to switch
+# the visible workspace to grab a frame, which takes the screen away from
+# whoever is using it.  MenuScale's DumpFrames=1 is the quiet alternative.
+[ "${NOSHOT:-0}" = 1 ] || for t in 1 2 3; do
     bash "$here/shot.sh" "$OUT/$TAG-$t.png" >/dev/null 2>&1 || true
     sleep 4
     alive || { echo "window gone by shot $t"; break; }

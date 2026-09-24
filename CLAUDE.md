@@ -427,6 +427,27 @@ was *filling a small screen*, not sitting in a big one. `tools/menuscale/` holds
 `install.sh --remove` is a complete uninstall. **Confirmed in game.** Details in
 `SETUP.md`, full write-up in `tools/menuscale/README.md`. Do not re-derive the
 `gui_*.cfg` reasoning here — that is the HUD, a different system.
+**Every menu is a separate OS window unless `Embed=1`**, the in-game Options
+menu included: each is `DialogBoxParamA` with a `WS_POPUP` template, which Wine turns
+into a second X11 window that Hyprland tiles and focuses. `MenuScale.asi` with
+`Embed=1` (the default it ships with) re-creates each one as a `WS_CHILD` of the game
+window, so the game is one window from launch to exit. **Confirmed in game, "much
+improved".** Open: the Admiral's Log (modeless `CreateDialogParamA`, not yet hooked) and
+unscaled text boxes. **GetDC/ReleaseDC do not pair in this game**: `ShellButton::UpdateButton` has
+its `ReleaseDC` NOP'd out, so nothing in `menuscale.c` may assume they do. Both are in
+`tools/menuscale/README.md`.
+**The main menu and the campaign selection screen have hi-res, outpainted backdrops** (`Backdrops=1`), which fills the
+pillarboxes. A bigger BMP cannot do it, because the shell draws 1:1 into 800x600.
+MenuScale composites it per frame instead: `stretch(frame) + w·(plate − stretch(stock))`.
+It is a weight, not a mask, because `MainBk_flare.bik` *is* the logo band with the
+background baked in. It is 7.8 ms per present, because only the dirty rectangle is
+redone. Plates are built by `tools/menuscale/backdrop.sh`. The campaign screen's art
+sits inside a drawn black frame, which an outpaint only continues. So `field=`
+outpaints from the open part alone, and the plate paints over the frame, which is stock
+background to the compositor. Both **seen in game** (2026-09-24). One defect showed:
+the Tutorials hover glow (`TutorialGlow.bik`) is cut off by its own rectangle, which
+the old frame used to hide. `2.soften=` in `MenuScale.ini` carries that halo outwards
+(`bd_soften`). The fix is simulated offline, not yet seen in game.
 
 **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
 declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to
