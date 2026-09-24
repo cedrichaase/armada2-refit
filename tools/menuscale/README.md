@@ -217,7 +217,12 @@ in `backdrops/*.conf`:
   sliver (seen in game). The field is kept, since changing it would mean paying
   for a new outpaint and losing seed 2. A second `clone=` with a 2px feather
   covers the extension with the sky above-left of it, up to exactly stock's bar
-  edge (raw-outpaint x 893).
+  edge (raw-outpaint x 893). That left the bar itself: its first 27 design px
+  were the outpaint's redrawn copy, blended into the upscale's across the
+  feather. Two slightly misaligned drawings of one edge gave wobbly, chamfered
+  corners when idle, which showed when toggling the hover (seen in game).
+  `keep=29,16,60,212` makes the plate take the upscaled stock over that bar, so
+  its corners are stock's.
 
 **Glows cut off by their own rectangle (`N.soften=`).** Hovering Tutorials plays
 `single/TutorialGlow.bik`, 320x200 at (28,20). It has the background baked in, and
