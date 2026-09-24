@@ -10,6 +10,13 @@ targets/*/src/
 targets/*/src-alpha/
 targets/*/.alpha-units/
 
+# Replacement movies (tools/binkproxy): only movie.conf is committed.  ai/ is PAID
+# output -- never deleted or overwritten by any script; src/ and out/ are derived.
+# The stock .bik stays in the game directory and is only ever read.
+movies/*/ai/
+movies/*/src/
+movies/*/out/
+
 # selftest-mips.py imports verify.py as a module
 __pycache__/
 archive/ab/

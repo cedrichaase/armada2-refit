@@ -483,9 +483,13 @@ everything else to the real DLL (renamed `binkw32_orig.dll`), and raises
 `PlayIntroMovie`'s hard-coded **640x480** mode to the desktop so all four launch reels
 scale to fill the screen. Re-encoding to a bigger `.bik` would not have worked: that path
 copies frames 1:1 into a 640x480 back buffer. **H.264, VP9 and AAC do not decode under
-Proton outside Steam** (the media converter path); AV1 does, so `make-movie.sh` writes
-AV1 plus a WAV. The installed `Intro` is the Bria-upscaled, `minterpolate`d 30 fps cut in
-`archive/cutscene-intro/`. `a2mod` switches it as the `cutscenes` layer. Open questions
+Proton outside Steam** (the media converter path); AV1 does, so the build writes
+AV1 plus a WAV. **Movies live in `movies/<Name>/`, laid out like a texture target**:
+`movie.conf` committed, `ai/upscale` and `ai/interp` paid and never overwritten, `src/`
+and `out/` derived. `build-movie.sh` rebuilds from `ai/` offline; `ai-movie.sh` is the
+only thing that spends. Stock `.bik` files stay in the game directory and are only read.
+The installed `Intro` is Bria 2x + `minterpolate` to 30 fps; switching it to Topaz Apollo
+is `interp=apollo` plus one paid run. `a2mod` switches it all as the `cutscenes` layer. Open questions
 (the MSAA hook versus a locked back buffer) are in its README.
 
 Originals are backed up in the game directory (`.a2neb-backup`) and in each
