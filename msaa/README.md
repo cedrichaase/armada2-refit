@@ -1,11 +1,11 @@
 # MSAA.asi — multisample anti-aliasing
 
-    tools/msaa/install.sh               # build + install, 8x
-    tools/msaa/install.sh --samples 4   # a different count; 0 = patch nothing
-    tools/msaa/install.sh --remove      # complete uninstall (three files)
+    msaa/install.sh               # build + install, 8x
+    msaa/install.sh --samples 4   # a different count; 0 = patch nothing
+    msaa/install.sh --remove      # complete uninstall (three files)
     cat "…/Star Trek Armada II/MSAA.log"   # what the last launch actually got
 
-An ASI plugin of the same shape as `tools/menuscale/`, loaded by the same
+An ASI plugin of the same shape as `menus/`, loaded by the same
 Ultimate ASI Loader (`winmm` override). It patches `Armada2.exe` in memory only.
 
 **Confirmed in game at 8x on 2026-09-23.** The first launch's `MSAA.log`:
@@ -82,4 +82,4 @@ MSAA smooths geometry edges: hulls, stations, planets, the skybox cube.
 **Alpha-tested edges are not smoothed**, meaning sprite cut-outs and any texture
 whose silhouette comes from alpha rather than polygons. Nothing in DXVK forces
 alpha-to-coverage. If those still crawl, SMAA through vkBasalt on top is the next
-step, and `tools/postfx.py` already has the machinery for it.
+step, and `postfx/postfx.py` already has the machinery for it.

@@ -16,7 +16,7 @@ Two separate facts, both measured, and the second is the one that matters:
    factor anywhere in the shell to change. It also never goes near Direct3D, so the
    d3d8 proxy, DXVK and `dxcfg.ini` cannot touch it either. `misc/gui_*.cfg` is the
    *in-game HUD* canvas — a different system, already handled by
-   `tools/ui-widescreen.py`.
+   `hud/ui-widescreen.py`.
 
 2. **The engine asks for an 800x600 screen while the menus are up.** This is the real
    reason, and it is not what it looks like. `GetSystemMetrics(SM_CXSCREEN)` returns
@@ -285,8 +285,8 @@ bars, hence the explicit list.
 The options, load/save and multiplayer screens are metal frames on black, so they
 are left as they are.
 
-**Building a plate:** `tools/menuscale/backdrop.sh <name>` uses the same recipe as
-`tools/loading-panel.sh`, and keeps its paid layers in `backdrops/<name>/ai/`.
+**Building a plate:** `menus/backdrop.sh <name>` uses the same recipe as
+`models/loading-panel.sh`, and keeps its paid layers in `backdrops/<name>/ai/`.
 
 1. Upscale the stock 4x with `bria/increase-resolution`. pruna hung in "running"
    for 10 minutes on the day this was built.
@@ -308,10 +308,10 @@ has to switch the visible workspace to grab a frame, and this does not.
 
 ## Use
 
-    tools/menuscale/build.sh              # clang + lld-link, 32-bit PE, no CRT
-    tools/menuscale/install.sh            # copy .asi + .ini into the game directory
-    tools/menuscale/install.sh --mode 0   # install, but only observe and log
-    tools/menuscale/install.sh --remove   # take it out again
+    menus/build.sh              # clang + lld-link, 32-bit PE, no CRT
+    menus/install.sh            # copy .asi + .ini into the game directory
+    menus/install.sh --mode 0   # install, but only observe and log
+    menus/install.sh --remove   # take it out again
 
 `install.sh --remove` restores stock behaviour exactly: the plugin only ever *adds*
 `MenuScale.asi`, `MenuScale.ini`, `MenuScale.log` and the backdrop plates in

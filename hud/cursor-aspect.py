@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Un-stretch Armada II's mouse cursors on a non-4:3 display.
 
-    tools/cursor-aspect.py                 rebuild for the resolution in ARMADA.PRF
-    tools/cursor-aspect.py --res 3440x1440 rebuild for a resolution you name
-    tools/cursor-aspect.py --dry-run       print what would change, touch nothing
-    tools/cursor-aspect.py --revert        restore the stock cursor textures
+    hud/cursor-aspect.py                 rebuild for the resolution in ARMADA.PRF
+    hud/cursor-aspect.py --res 3440x1440 rebuild for a resolution you name
+    hud/cursor-aspect.py --dry-run       print what would change, touch nothing
+    hud/cursor-aspect.py --revert        restore the stock cursor textures
 
 WHY THE CURSORS ARE STRETCHED
 
-`tools/ui-widescreen.py` fixed the panels, the icons and the glyphs by re-declaring the
+`hud/ui-widescreen.py` fixed the panels, the icons and the glyphs by re-declaring the
 1600x1200 layout canvas in `misc/gui_<race>.cfg`.  The cursors did not move, so they are
 not on that canvas -- the same way `popupPaletteXA`/`XB` are not (see `SETUP.md`).  This
 is the third screen reference the engine keeps.
@@ -206,7 +206,7 @@ def squash_texture(src, dst, cols, rows, fw, fh, ox, k, scratch):
     run('magick', *cells, '-append', f"PNG24:{merged}")
     run('magick', merged, '-alpha', 'off', '-type', 'TrueColor',
         '-compress', 'None', f"TGA:{dst}")
-    run(sys.executable, os.path.join(HERE, 'bottomup.py'), '--like', src, dst)
+    run(sys.executable, os.path.join(HERE, '..', 'textures', 'tools', 'bottomup.py'), '--like', src, dst)
     return pad_l
 
 

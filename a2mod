@@ -11,7 +11,7 @@ WHY A SNAPSHOT AND NOT A REINSTALL
 The obvious design -- `a2tex revert all`, then `a2tex install` and each tool's
 installer -- does not reproduce what is installed.  Two installed layers live only on
 unmerged branches (MenuScale's Embed=1 build, the condensed font), and the textures
-depend on targets/*/out, which only the main checkout has.  A reinstall from whatever
+depend on textures/targets/*/out, which only the main checkout has.  A reinstall from whatever
 branch happens to be checked out would quietly swap in something else, and a
 before/after taken across that is comparing the wrong "after".
 
@@ -29,7 +29,7 @@ WHAT COUNTS AS A CHANGE
     menu scale    MenuScale.asi/.ini, MenuScale/*.bmp -- added files, stock has none
     msaa          MSAA.asi/.ini                -- added files
     cutscenes     binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
-                  animations/<Name>.mp4/.wav beside a <Name>.bik  -- tools/binkproxy
+                  animations/<Name>.mp4/.wav beside a <Name>.bik  -- cutscenes/binkproxy
     renderer      dxvk.conf                    -- AF, LOD bias, seamless cubes
     bloom         vkBasalt.conf enableOnLaunch -- see below
 
@@ -76,7 +76,7 @@ ADDED = [('MenuScale.asi', 'menu scale'), ('MenuScale.ini', 'menu scale'),
          ('dxvk.conf', 'renderer')]
 LAYERS = ['textures', 'models', 'font', 'hud layout', 'menu scale', 'msaa', 'cutscenes',
           'renderer', 'other']
-# Replacement movies are whatever pairs tools/binkproxy installed: <Name>.mp4 / .wav
+# Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
 MOVIE_DIR = 'animations'
 MOVIE_EXTS = ('.mp4', '.wav')
@@ -139,7 +139,7 @@ def discover():
         stem, ext = os.path.splitext(f)
         if ext.lower() in MOVIE_EXTS and stem.lower() in biks:
             found.append({'rel': f'{MOVIE_DIR}/{f}', 'kind': 'added', 'layer': 'cutscenes'})
-    # MenuScale's backdrop plates (tools/menuscale/backdrop.sh), one per menu screen.
+    # MenuScale's backdrop plates (menus/backdrop.sh), one per menu screen.
     plates = os.path.join(GAME, 'MenuScale')
     if os.path.isdir(plates):
         for f in sorted(os.listdir(plates)):

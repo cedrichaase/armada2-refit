@@ -57,7 +57,7 @@ for conf in "$here"/backdrops/*.conf; do
         put "$plate" "$GAME/MenuScale/$(basename "$src")"
         echo "backdrop: $name -> MenuScale/$(basename "$src")"
     else
-        echo "backdrop: $name not built (tools/menuscale/backdrop.sh $name) -- black sides"
+        echo "backdrop: $name not built (menus/backdrop.sh $name) -- black sides"
     fi
 done
 

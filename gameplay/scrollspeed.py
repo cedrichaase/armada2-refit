@@ -6,10 +6,10 @@ a GDI dialog that is not always usable (see SETUP.md, "The menus are a different
 This reaches the same two values directly, plus the RTS_CFG.h knobs the UI never
 exposed at all.
 
-    tools/scrollspeed.py                      # show current values
-    tools/scrollspeed.py --mouse 5            # edge-scroll speed
-    tools/scrollspeed.py --coefficient 400000 # every pan path at once
-    tools/scrollspeed.py --revert             # back to the .a2neb-backup copies
+    gameplay/scrollspeed.py                      # show current values
+    gameplay/scrollspeed.py --mouse 5            # edge-scroll speed
+    gameplay/scrollspeed.py --coefficient 400000 # every pan path at once
+    gameplay/scrollspeed.py --revert             # back to the .a2neb-backup copies
 
 Both files are read at LAUNCH, so nothing applies to a running game.
 Full derivation, and what each knob actually multiplies, is in SETUP.md.

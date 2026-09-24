@@ -69,15 +69,15 @@ exceeds 1600, no `y+h` exceeds 1215. The engine scales the canvas to the back bu
 and 2.15/1.20 = 1.79. At 4:3 the two factors are equal, which is exactly why 4:3 is the
 only aspect that looks right.
 
-`tools/ui-widescreen.py` re-declares the canvas as `1200 x display aspect` — 2867x1200
+`hud/ui-widescreen.py` re-declares the canvas as `1200 x display aspect` — 2867x1200
 here — so both scale factors come out at 1.20 and the UI keeps the size it has today
 instead of shrinking. Re-declaring alone is not enough: the extra 1267px all appear on
 the right, so it also moves the right-anchored and centred panels. 20 values in 8 files,
 nothing else touched, CRLF and tab alignment preserved byte-for-byte.
 
-    tools/ui-widescreen.py --dry-run     # show the 20 changes
-    tools/ui-widescreen.py               # apply, reading the resolution from ARMADA.PRF
-    tools/ui-widescreen.py --revert      # restore from the *.a2neb-backup beside each
+    hud/ui-widescreen.py --dry-run     # show the 20 changes
+    hud/ui-widescreen.py               # apply, reading the resolution from ARMADA.PRF
+    hud/ui-widescreen.py --revert      # restore from the *.a2neb-backup beside each
 
 The format keeps screen placement in a handful of `<name>PanelArea` keys and makes
 everything else relative to its panel, which is why the change is so small — and why
@@ -194,15 +194,15 @@ left is how many texels the art spans.
 
 ##### So the correction goes in the art, and cursor.spr goes back to stock
 
-`tools/cursor-aspect.py` squashes the **art** horizontally by `1/1.79` inside its
+`hud/cursor-aspect.py` squashes the **art** horizontally by `1/1.79` inside its
 unchanged 32x32 cell. That fixes *both* paths at once — the map-plane path draws those
 same texels into the same 1.79-stretched rect — which is why the `.spr` rewrite was
 reverted rather than kept. Keeping both would square the art twice and leave the
 map-plane cursor too narrow.
 
-    tools/cursor-aspect.py --dry-run     # 20 textures, frame grids and hotspots
-    tools/cursor-aspect.py               # rebuild, reading the resolution from ARMADA.PRF
-    tools/cursor-aspect.py --revert      # restore from the *.a2neb-backup beside each
+    hud/cursor-aspect.py --dry-run     # 20 textures, frame grids and hotspots
+    hud/cursor-aspect.py               # rebuild, reading the resolution from ARMADA.PRF
+    hud/cursor-aspect.py --revert      # restore from the *.a2neb-backup beside each
 
 At 3440x1440 the frame goes `32 -> 18` texels across (0.5625 against the ideal 0.5581,
 0.8% off square). Each cell is squashed **about its own `@origin` hotspot**, not its
@@ -289,7 +289,7 @@ which is why the squash is framed as choosing a size rather than trading quality
 them to 1.0 and upscale the art 4x and the cursor would be a genuinely crisp 128px
 drawn from real texels instead of a 4.3x blow-up; set them *equal* to each other and the
 aspect is fixed properly, at the source, with stock art and no squash at all. Both are
-code, not data — an ASI hook of the same shape as `tools/menuscale/`, which is why this
+code, not data — an ASI hook of the same shape as `menus/`, which is why this
 is now worth considering rather than impossible. Not attempted.
 
 Until then, `cursor-aspect.py`'s squash is the whole of what art can do.
@@ -301,7 +301,7 @@ options, load/save, campaign select and multiplayer screens are a separate syste
 *shell* — and the widescreen work above does not touch them. They rendered in the
 top-left 800x600 of the 3440x1440 screen.
 
-Full write-up, build and usage: **`tools/menuscale/README.md`**. The two facts worth
+Full write-up, build and usage: **`menus/README.md`**. The two facts worth
 having here, because both are counter-intuitive and both were measured:
 
 **1. Nothing in any config file can scale the shell.** Every menu is a Win32 dialog
@@ -329,9 +329,9 @@ would still draw its 800x600 in the corner. Both halves are needed.
 It loads through the Ultimate ASI Loader, the same `winmm=n,b` override that already
 carries `STA2WidescreenPatch.asi`, so it needs no setup of its own.
 
-    tools/menuscale/install.sh            # install
-    tools/menuscale/install.sh --mode 0   # install, observe and log only
-    tools/menuscale/install.sh --remove   # complete uninstall
+    menus/install.sh            # install
+    menus/install.sh --mode 0   # install, observe and log only
+    menus/install.sh --remove   # complete uninstall
 
 **`--remove` is a complete uninstall.** The plugin only ever *adds* `MenuScale.asi`,
 `MenuScale.ini` and `MenuScale.log` to the game directory — there is no backup to keep
@@ -345,7 +345,7 @@ picture. Open items are listed at the end of `README.md`.
 
 `Armada2.exe` carries its own switch table, recovered from the binary — `nointro`,
 `window`, `res`, `resolution`, `bpp`, `fullscreen`, `shelltest` and ~40 more; the full
-list is in `tools/menuscale/README.md`.
+list is in `menus/README.md`.
 
 **`-nointro` skips `Intro.bik` (35 MB) and the three logo reels.** Worth adding to
 Heroic's launch arguments; it front-loads every launch otherwise.
@@ -475,7 +475,7 @@ to the point, the *spread between them* goes from 2x to 8x — holding now accel
 instead of crawling at one speed. Right-drag is 10x and stays linear: it calls `Pan`
 directly and never touches the ramp, which is correct for direct manipulation.
 
-`tools/scrollspeed.py` reads and writes all of these; run it with no arguments to print
+`gameplay/scrollspeed.py` reads and writes all of these; run it with no arguments to print
 the current state, and `--revert` to restore both backups. Use it rather than editing by
 hand — it keeps `ARMADA.PRF`'s CRLF and field count intact and tells you the slider
 position each value corresponds to.
@@ -506,7 +506,7 @@ two behave differently, and confusing them wastes a round trip:
 
 The cheapest confirmation is the options screen: **Options → Game Settings**, and read
 the slider positions against the table above. Neither `RTS_CFG.h` value shows in any UI —
-those you judge by feel. When the menus themselves are not usable, `tools/scrollspeed.py`
+those you judge by feel. When the menus themselves are not usable, `gameplay/scrollspeed.py`
 with no arguments prints the same information from the files.
 
 **Compare the game's start time against the file mtimes** — that is the one check that
@@ -621,14 +621,14 @@ game-directory `winmm.dll` and `d3d8.dll` load at all. So `--use dxvk` puts DXVK
 set to true it redeploys over the slot on every launch, which is it working as designed
 rather than misbehaving.
 
-`tools/d3d8-chain.py` exists so this cannot recur: it identifies every link by hashing
+`platform/d3d8-chain.py` exists so this cannot recur: it identifies every link by hashing
 it against the candidates actually present on the machine and **names** what it found,
 reporting `UNKNOWN` rather than guessing. Never identify one of these by size again.
 
-    tools/d3d8-chain.py --status      identify the live chain
-    tools/d3d8-chain.py --use dxvk    DXVK d3d8 -> DXVK d3d9 -> Vulkan
-    tools/d3d8-chain.py --use gog     GOG d3d8to9 -> DXVK d3d9 -> Vulkan
-    tools/d3d8-chain.py --revert      back to Wine's builtin, Heroic managing it again
+    platform/d3d8-chain.py --status      identify the live chain
+    platform/d3d8-chain.py --use dxvk    DXVK d3d8 -> DXVK d3d9 -> Vulkan
+    platform/d3d8-chain.py --use gog     GOG d3d8to9 -> DXVK d3d9 -> Vulkan
+    platform/d3d8-chain.py --revert      back to Wine's builtin, Heroic managing it again
 
 `--use` also sets `autoInstallDxvk`, so it needs Heroic closed, and it refuses before
 touching anything rather than half-applying.
@@ -695,18 +695,18 @@ and does not need the regression closed first. The AA routes below are the ones 
 
 #### Tier 1 — `dxvk.conf`, free and reversible
 
-`tools/renderer-config.sh` writes it, in **cumulative stages**, because this project's
+`postfx/renderer-config.sh` writes it, in **cumulative stages**, because this project's
 method is one change at a time and three keys at once is not attributable.
 **All three stages are installed and confirmed in game.** It verifies every key against
 the `d3d9.dll` that actually loads — the one in the game directory — before writing,
 because a key DXVK does not recognise is silently ignored:
 
-    tools/renderer-config.sh              # stage 1: anisotropic filtering only
-    tools/renderer-config.sh --stage 2    # + mip LOD bias
-    tools/renderer-config.sh --stage 3    # + seamless cube filtering
-    tools/renderer-config.sh --bias -0.25 # milder stage 2 bias (default -0.5)
-    tools/renderer-config.sh --show       # what is installed now
-    tools/renderer-config.sh --remove     # delete dxvk.conf, full revert
+    postfx/renderer-config.sh              # stage 1: anisotropic filtering only
+    postfx/renderer-config.sh --stage 2    # + mip LOD bias
+    postfx/renderer-config.sh --stage 3    # + seamless cube filtering
+    postfx/renderer-config.sh --bias -0.25 # milder stage 2 bias (default -0.5)
+    postfx/renderer-config.sh --show       # what is installed now
+    postfx/renderer-config.sh --remove     # delete dxvk.conf, full revert
 
 - **`d3d9.samplerAnisotropy = 16`** (stage 1). `dxcfg.ini` asks for `application`, i.e.
   whatever a 2001 renderer requests, which is likely none. In a top-down RTS every hull
@@ -740,10 +740,10 @@ setting worked and is subtle" look identical in game.
 **Is it applied?** A `dxvk.conf` key DXVK does not recognise is *silently ignored* — no
 error, no warning. DXVK does print its effective configuration at startup, so ask it:
 
-    tools/dxvk-logging.py --diagnose  # logging + HUD + d3d9=n,b, all at once
+    platform/dxvk-logging.py --diagnose  # logging + HUD + d3d9=n,b, all at once
     # launch the game once
-    tools/dxvk-logging.py --check     # report the effective configuration
-    tools/dxvk-logging.py --off       # take all of it back out again
+    platform/dxvk-logging.py --check     # report the effective configuration
+    platform/dxvk-logging.py --off       # take all of it back out again
 
 `--diagnose` answers three questions in one launch, ordered so each makes the next
 meaningful:
@@ -769,13 +769,13 @@ would discard the edit. The script refuses rather than losing the change silentl
 backs the file up regardless. Note Heroic's key is spelled `enviromentOptions`, missing
 an `n` — matching its typo is required.
 
-**Did it change the picture?** `tools/ab-shot.sh` grabs frames and diffs them
+**Did it change the picture?** `platform/ab-shot.sh` grabs frames and diffs them
 numerically, so the answer is a number rather than an impression:
 
-    tools/ab-shot.sh grab before
+    platform/ab-shot.sh grab before
     # change one thing, relaunch, return to the same save without moving the camera
-    tools/ab-shot.sh grab after
-    tools/ab-shot.sh diff before after 600 400 1200 300     # W H X Y, region only
+    platform/ab-shot.sh grab after
+    platform/ab-shot.sh diff before after 600 400 1200 300     # W H X Y, region only
 
 For a before/after of the project as a whole rather than one setting, `./a2mod stock`
 and `./a2mod remastered` flip every visual layer at once in about 4 s, with DXVK kept
@@ -832,8 +832,8 @@ The working configuration, all four parts required together:
 | `WINEDLLOVERRIDES` | `winmm=n,b;d3d8=n,b;d3d9=n,b` | without the d3d9 entry Wine resolves it to builtin WineD3D |
 | Wine virtual desktop | **off** | inside it DXVK's `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 |
 
-Set it up with `tools/d3d8-chain.py --use dxvk` and
-`tools/virtual-desktop.py --off`; reverse with `--revert` and `--on`.
+Set it up with `platform/d3d8-chain.py --use dxvk` and
+`platform/virtual-desktop.py --off`; reverse with `--revert` and `--on`.
 
 **The `d3d9=n,b` override is load-bearing, not diagnostic.** It arrived as part of
 `dxvk-logging.py --diagnose`, so `--off` used to strip it — which would have silently
@@ -876,7 +876,7 @@ already records reverting the virtual desktop as the documented alternative, usi
 Omarchy window rules instead — that is the next experiment, and it is one launch.
 
 **Current state: reverted to the stock chain so the game is playable.**
-`tools/d3d8-chain.py --revert` put the Patch Project proxy back; Direct3D 8 is wined3d
+`platform/d3d8-chain.py --revert` put the Patch Project proxy back; Direct3D 8 is wined3d
 on OpenGL again and `dxvk.conf` is inert. The DXVK chain is one command away
 (`--use dxvk`) whenever the fullscreen question is worth another launch.
 
@@ -884,15 +884,15 @@ on OpenGL again and `dxvk.conf` is inert. The DXVK chain is one command away
 about the texture work depends on any of this: it has always rendered through
 wined3d/OpenGL and continues to.
 
-#### Tier 2 — anti-aliasing: route 2 built, `tools/msaa/`
+#### Tier 2 — anti-aliasing: route 2 built, `msaa/`
 
 **Route 2 is built, installed and confirmed in game: `MSAA.asi`, 8x.** The first launch
 logged 8x on all three device creations (3440x1440, the 640x480 fallback, 3440x1440
 again) and DXVK logged no errors.
 
-    tools/msaa/install.sh                 # build + install (Samples=8)
-    tools/msaa/install.sh --samples 4     # or 2; 0 patches nothing
-    tools/msaa/install.sh --remove        # three files out, stock behaviour back
+    msaa/install.sh                 # build + install (Samples=8)
+    msaa/install.sh --samples 4     # or 2; 0 patches nothing
+    msaa/install.sh --remove        # three files out, stock behaviour back
 
 It redirects the two `call GetWindowHandle` that sit just before
 `IDirect3D8::CreateDevice` in `ST3D_DeviceDirectX8::CreateDevice` (`0x6235d0`). At
@@ -907,7 +907,7 @@ each device creation actually got. The renderer was read end to end first: nothi
 renders off-screen, and the one back-buffer read-back is the minimap copy
 (`CopyOffscreenToTexture`). That copy works only because DXVK's D3D8 CopyRects
 resolves a multisampled source through `StretchRect`. So **check the minimap first**
-when judging it. Full reasoning in `tools/msaa/README.md`.
+when judging it. Full reasoning in `msaa/README.md`.
 
 What follows is the analysis that chose the route.
 
@@ -924,7 +924,7 @@ cheapest one died when the chain changed:
    and would make both `anisotropic=` and `antialiasing=` live again. Untested, and its
    accepted values are unknown because `dxcfg.exe`'s strings are packed.
 2. **An ASI hook on `IDirect3D8::CreateDevice`**, setting `MultiSampleType`. Squarely
-   inside the toolchain `tools/menuscale/` already proves — clang + lld-link + the
+   inside the toolchain `menus/` already proves — clang + lld-link + the
    Ultimate ASI Loader that is already carrying two plugins — and `armada2.map` gives
    the call site. **The most likely to work, and now the most attractive**: DXVK
    implements D3D8 multisampling properly on Vulkan, which wined3d's D3D8 path did not
@@ -950,12 +950,12 @@ threshold 6, intensity 0.08, accepted by the user after one step up from 0.05.
 **Home toggles it live**, which makes it the one renderer setting in this project with a
 same-frame A/B.
 
-    tools/vkbasalt/build.sh          # build + install the layer (per-user, pinned)
-    tools/postfx.py --on             # write config, prove it compiles, enable in Heroic
-    tools/postfx.py --set --intensity 0.08 --threshold 6    # retune; relaunch to see
-    tools/postfx.py --check          # read vkBasalt's log from the last launch
-    tools/postfx.py --off            # disable for the game
-    tools/vkbasalt/build.sh --remove # uninstall everything
+    postfx/vkbasalt/build.sh          # build + install the layer (per-user, pinned)
+    postfx/postfx.py --on             # write config, prove it compiles, enable in Heroic
+    postfx/postfx.py --set --intensity 0.08 --threshold 6    # retune; relaunch to see
+    postfx/postfx.py --check          # read vkBasalt's log from the last launch
+    postfx/postfx.py --off            # disable for the game
+    postfx/vkbasalt/build.sh --remove # uninstall everything
 
 How it is put together, and why each piece is that way:
 
@@ -977,7 +977,7 @@ How it is put together, and why each piece is that way:
 - **Shaders are split across two branches of crosire/reshade-shaders**, which is not
   obvious: the single-file bloom shaders are on `legacy`, and `legacy` ships **no
   `ReShade.fxh`** — the headers every one of them includes are on `master`.
-- **`fxcheck`** (`tools/vkbasalt/fxcheck.cpp`) links the layer's own `libreshade.a` and
+- **`fxcheck`** (`postfx/vkbasalt/fxcheck.cpp`) links the layer's own `libreshade.a` and
   compiles an effect with vkBasalt's exact macros and codegen flags, offline.
   `postfx.py` refuses to enable an effect it cannot compile, and refuses any config key
   the compiled effect does not expose. Both failures are otherwise *silent* in game — an
@@ -1019,8 +1019,8 @@ lowering it breaks the match against stock. Bloom converts that blowout from "th
 texture ran out of range" into "that is a bright object", which is the correct read and
 which no amount of texture work can produce.
 
-Judge it the way `tools/measure-invention.sh` judges a blend, not at 1:1 — and
-`tools/ab-shot.sh` will diff two launches numerically.
+Judge it the way `textures/tools/measure-invention.sh` judges a blend, not at 1:1 — and
+`platform/ab-shot.sh` will diff two launches numerically.
 
 #### Tier 0 — ambient occlusion, which is the wrong tool here
 
@@ -1110,7 +1110,7 @@ ten each for Federation, Klingon and Borg.
 
       ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'
 
-  **`tools/menuscale/stop-game.sh` does this properly** — it also kills the Wine helpers
+  **`menus/stop-game.sh` does this properly** — it also kills the Wine helpers
   for this prefix only (matched by `WINEPREFIX` out of `/proc/<pid>/environ`, so an
   unrelated Wine app cannot be caught in it), and drops stale PipeWire nodes, which
   outlive the process, stay in state `running`, and keep playing. Killing the processes
@@ -1141,7 +1141,7 @@ ten each for Federation, Klingon and Borg.
     ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'
 
     # stop it, its Wine session, and any stale audio node it left behind
-    tools/menuscale/stop-game.sh
+    menus/stop-game.sh
 
     # did the menu scaler load, and what did it patch?
     cat "<game dir>/MenuScale.log"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build MSAA.asi -- a 32-bit Windows DLL, cross-compiled on Linux.
-# Same toolchain and same reasons as tools/menuscale/build.sh: no CRT
+# Same toolchain and same reasons as menus/build.sh: no CRT
 # (/nodefaultlib), Win32 prototypes declared in the source, import library
 # generated from kernel32.def.  --kill-at is required; see that script.
 set -euo pipefail

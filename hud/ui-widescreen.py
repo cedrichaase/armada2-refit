@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Re-author Armada II's UI layout for a non-4:3 display.
 
-    tools/ui-widescreen.py                 rewrite for the resolution in ARMADA.PRF
-    tools/ui-widescreen.py --res 3440x1440 rewrite for a resolution you name
-    tools/ui-widescreen.py --dry-run       print what would change, touch nothing
-    tools/ui-widescreen.py --revert        restore the stock configs
+    hud/ui-widescreen.py                 rewrite for the resolution in ARMADA.PRF
+    hud/ui-widescreen.py --res 3440x1440 rewrite for a resolution you name
+    hud/ui-widescreen.py --dry-run       print what would change, touch nothing
+    hud/ui-widescreen.py --revert        restore the stock configs
 
 WHY THE UI IS STRETCHED
 

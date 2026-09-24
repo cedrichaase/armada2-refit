@@ -16,7 +16,7 @@
 # A 64-bit layer would sit there unused.
 #
 # The layer does nothing unless ENABLE_VKBASALT=1 is in the environment
-# (its manifest says so), and tools/postfx.py sets that for this game alone.
+# (its manifest says so), and postfx/postfx.py sets that for this game alone.
 set -euo pipefail
 
 WORK="${XDG_CACHE_HOME:-$HOME/.cache}/a2-vkbasalt"            # sources + build tree
@@ -136,7 +136,7 @@ so="$WORK/build32/src/libvkbasalt.so"
 file -b "$so" | grep -q 'ELF 32-bit' || { echo "built library is not 32-bit: $(file -b "$so")" >&2; exit 1; }
 
 # fxcheck: the layer's own shader compiler as a command-line tool, linked against the
-# libreshade.a just built -- so tools/postfx.py can prove an effect compiles before the
+# libreshade.a just built -- so postfx/postfx.py can prove an effect compiles before the
 # game is launched, rather than finding out from an absent effect.
 g++ -m32 -std=c++2a -O1 $inc -I"$WORK/vkBasalt/src/reshade" \
     "$(dirname "${BASH_SOURCE[0]}")/fxcheck.cpp" \
@@ -172,4 +172,4 @@ echo "  layer    $MANIFEST"
 echo "  library  $LIBDIR/libvkbasalt.so"
 echo "  shaders  $SHADERS/{Shaders,Textures}"
 echo
-echo "Inert until enabled for the game: tools/postfx.py --on"
+echo "Inert until enabled for the game: postfx/postfx.py --on"
