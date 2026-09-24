@@ -1730,6 +1730,12 @@ What the outpaint needed, measured:
   see-through planet. Describing the night side as a solid surface fixed it on the
   first try.
 
+The upscale is **`bria/increase-resolution`, not the project's usual pruna model** —
+pruna returned 503s for the whole session this was built in. `upscaler=` in
+`target.conf` selects it; `upscaler=pruna` plus `tools/loading-panel.sh --force` goes
+back. The 35% blend toward Lanczos bounds what either model invents, so this is not
+expected to matter, but it is the one target built on a different upscaler.
+
 `fit=none` is new for this target: each tile is a third of a wider picture, not its
 namesake, so per-tile channel matching would put a brightness step at every join, and
 `verify` compares only alpha for it.
@@ -1775,6 +1781,10 @@ Needing a look in game:
   now 2.47 GB **on disk**, up from 2.27 GB. That is not a memory figure and should not
   be read as one — see the subsection on it above. Whether memory is a constraint at all
   is still unmeasured; the test is a heavy match with RSS and VRAM watched.
+
+- **The widened loading screen** (`LOADING` + `SOD/logo.SOD`). Installed and verified,
+  approved from the preview, not yet seen in game. Launch any mission: the panel should
+  reach both screen edges with no skybox showing, and nothing should be squashed.
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
