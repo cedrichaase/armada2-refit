@@ -519,7 +519,7 @@ static void slot_placement(Slot *s, int *ox, int *oy, int *dw, int *dh);
 #define ID_PERCENT  50      /* share of sample points that must agree       */
 #define MAXSOFT     4       /* soften rectangles per backdrop                */
 #define SOFT_R      12      /* design px a cut glow is continued outwards    */
-#define SOFT_K      3       /* ... sampled from a (2K+1) box at its edge     */
+#define SOFT_K      3       /* ... sampled 2K+1 px along its outermost row   */
 
 typedef struct {
     char    stock[320];     /* bitmaps\...\x.bmp, the shell's own file       */
@@ -836,7 +836,7 @@ static int bd_end(const int *b, int n, int d)
  * screen's black frame and hid; the plate paints nebula there, so it shows as a
  * hard line.  For each rectangle listed as N.soften=, the pixels in a ring
  * SOFT_R wide outside it that still show untouched background (frame == stock)
- * get the difference at the nearest edge -- averaged over a small box, which
+ * get the difference at the nearest edge -- averaged along the edge, which
  * smooths away codec noise -- carried on and fading linearly to nothing.  Their
  * detail weight stays 1, so the plate shows through the continued glow exactly
  * as it does through the one inside.  A rectangle with nothing drawn in it
@@ -864,9 +864,12 @@ static void bd_soften(const Backdrop *b, const DWORD *f, const DWORD *st,
                 if (!tx && !ty) continue;                  /* inside: untouched */
                 qx = x < r[0] ? r[0] : x >= r[2] ? r[2] - 1 : x;
                 qy = y < r[1] ? r[1] : y >= r[3] ? r[3] - 1 : y;
-                for (j = qy - SOFT_K; j <= qy + SOFT_K; j++) {
+                /* the outermost row or column only, 2K+1 along it: sampling
+                 * deeper copies whatever the glow surrounds -- a panel bar 2px
+                 * in -- outwards as a ghost of it */
+                for (j = ty ? qy : qy - SOFT_K; j <= (ty ? qy : qy + SOFT_K); j++) {
                     if (j < r[1] || j >= r[3]) continue;
-                    for (i = qx - SOFT_K; i <= qx + SOFT_K; i++) {
+                    for (i = tx ? qx : qx - SOFT_K; i <= (tx ? qx : qx + SOFT_K); i++) {
                         int q = j * g_designW + i;
                         if (i < r[0] || i >= r[2]) continue;
                         for (sh = 0; sh < 3; sh++)

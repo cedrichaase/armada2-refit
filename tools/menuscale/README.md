@@ -209,6 +209,15 @@ in `backdrops/*.conf`:
   grid continues outwards. It also wrote a line of fake glyphs into empty sky at
   the bottom left, which `clone=` covers with the patch of sky beneath it. The
   others are kept in `ai/` as `expanded-*.png`.
+  **A field edge must not cut through UI art.** The Tutorials panel's left bar
+  starts at x 30, and `field=` starts at 32, so the model was handed a bar cut
+  open at its edge. It extended the bar 6.5 design px leftwards into what became
+  plate-only area. Idle, that looks like a slightly wider bar; hovered, the glow
+  video redraws the bar at 30, and the extension showed beside it as a second
+  sliver (seen in game). The field is kept, since changing it would mean paying
+  for a new outpaint and losing seed 2. A second `clone=` with a 2px feather
+  covers the extension with the sky above-left of it, up to exactly stock's bar
+  edge (raw-outpaint x 893).
 
 **Glows cut off by their own rectangle (`N.soften=`).** Hovering Tutorials plays
 `single/TutorialGlow.bik`, 320x200 at (28,20). It has the background baked in, and
@@ -219,9 +228,11 @@ showed as a hard box (seen in game). The other three campaign glows fade out
 inside their rectangles (1–3 at the edges), and so do the main menu's hover
 bitmaps (RMSE 0 at the edges).
 Each `N.soften=x,y,w,h` rectangle gets a ring 12 design px wide around it. There,
-wherever the frame still equals stock, the difference at the nearest edge (a 7x7
-box average, which smooths codec noise) is carried on and fades linearly to
-nothing. The ring keeps detail weight 1, so the plate shows through. With nothing
+wherever the frame still equals stock, the difference at the nearest edge is
+carried on and fades linearly to nothing. It is averaged over 7px *along* the
+outermost row or column, which smooths codec noise. The first version averaged a
+7x7 box reaching 3px *into* the rectangle, and copied the panel bar that starts
+2px in outwards as a ghost bar (seen in game). The ring keeps detail weight 1, so the plate shows through. With nothing
 drawn in the rectangle, the difference is zero and nothing changes. An offline
 simulation of the hover frame shows the box gone; not yet seen in game.
 Fading inwards instead would eat the panel's left bar, which starts 4px inside.

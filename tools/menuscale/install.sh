@@ -37,8 +37,13 @@ fi
 
 [ -f "$here/build/MenuScale.asi" ] || bash "$here/build.sh"
 
-cp "$here/build/MenuScale.asi" "$GAME/MenuScale.asi"
-cp "$here/MenuScale.ini"       "$GAME/MenuScale.ini"
+# put SRC DST -- copy beside the target, then rename over it. A game that is running
+# has MenuScale.asi mapped; cp would rewrite that file in place under it, where a
+# rename leaves the running copy on its old inode until the next launch.
+put () { cp "$1" "$2.new" && mv -f "$2.new" "$2"; }
+
+put "$here/build/MenuScale.asi" "$GAME/MenuScale.asi"
+put "$here/MenuScale.ini"       "$GAME/MenuScale.ini"
 
 # Backdrop plates, built by backdrop.sh, named after the stock BMP they stand for
 # (the name MenuScale.ini's [Backdrops] list resolves to). A screen without one
@@ -49,7 +54,7 @@ for conf in "$here"/backdrops/*.conf; do
     src=$(grep -E '^source=' "$conf" | cut -d= -f2-)
     if [ -f "$plate" ]; then
         mkdir -p "$GAME/MenuScale"
-        cp "$plate" "$GAME/MenuScale/$(basename "$src")"
+        put "$plate" "$GAME/MenuScale/$(basename "$src")"
         echo "backdrop: $name -> MenuScale/$(basename "$src")"
     else
         echo "backdrop: $name not built (tools/menuscale/backdrop.sh $name) -- black sides"
