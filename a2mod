@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+"""Switch the whole game between stock and remastered, for before/after comparisons.
+
+    ./a2mod status        which state each layer is in
+    ./a2mod stock         put every visual change aside; the game looks as shipped
+    ./a2mod remastered    bring them back, byte for byte
+    ./a2mod stock -n      (either direction) print what would happen, touch nothing
+
+WHY A SNAPSHOT AND NOT A REINSTALL
+
+The obvious design -- `a2tex revert all`, then `a2tex install` and each tool's
+installer -- does not reproduce what is installed.  Two installed layers live only on
+unmerged branches (MenuScale's Embed=1 build, the condensed font), and the textures
+depend on targets/*/out, which only the main checkout has.  A reinstall from whatever
+branch happens to be checked out would quietly swap in something else, and a
+before/after taken across that is comparing the wrong "after".
+
+So `stock` MOVES every modded file into $GAME/.a2mod/remastered/ and puts stock back
+from the backups the tools already keep; `remastered` moves them back.  Same
+filesystem, so these are renames: instant, and exact by construction.  The manifest
+records a hash of every modded file, and `remastered` checks each one on the way back.
+
+WHAT COUNTS AS A CHANGE
+
+    textures      Textures/RGB/*.a2neb-backup  -- a2tex, and the cursor-aspect art
+    font          *.a2font-backup              -- ui-font-condense
+    hud layout    misc/*.a2neb-backup          -- ui-widescreen (canvas, palette)
+    menu scale    MenuScale.asi/.ini           -- added files, stock has none
+    msaa          MSAA.asi/.ini                -- added files
+    renderer      dxvk.conf                    -- AF, LOD bias, seamless cubes
+    bloom         vkBasalt.conf enableOnLaunch -- see below
+
+DELIBERATELY NOT SWITCHED, in both states:
+
+    DXVK itself (d3d8.dll/d3d9.dll in the game dir) -- plumbing, not a look; stock
+        wined3d is a different renderer and would make the comparison two changes.
+    The ASI loader (winmm.dll) and STA2WidescreenPatch.asi -- base setup; the menu
+        and MSAA hooks cannot load without the loader.
+    ARMADA.PRF, RTS_CFG.h -- scroll speed and options.  Gameplay, not visual.
+    The Heroic side and the vkBasalt layer itself.
+
+BLOOM is switched with vkBasalt's own `enableOnLaunch`, not with `postfx.py --off`:
+that edits Heroic's GamesConfig, which Heroic rewrites on exit, so it refuses while
+Heroic is open.  enableOnLaunch=False launches with the effect bypassed -- and Home
+still toggles it, which is the one live A/B this game has.
+
+The game must not be running.  Anything that writes the game directory while in stock
+(`a2tex install`, a tool's installer) is caught on the way back: `remastered` refuses
+a file that is no longer stock rather than overwrite it.  Deleting $GAME/.a2mod while
+in stock loses the only copy of the unmerged layers -- run `remastered` first.
+"""
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
+STORE = os.path.join(GAME, '.a2mod')
+SNAP = os.path.join(STORE, 'remastered')
+STATE = os.path.join(STORE, 'state.json')
+VKCONF = os.path.join(os.environ.get('XDG_DATA_HOME', os.path.expanduser('~/.local/share')),
+                      'a2-vkbasalt', 'vkBasalt.conf')
+
+BACKUPS = ('.a2neb-backup', '.a2font-backup')
+# Backups that exist but are not a visual change -- see "deliberately not switched".
+EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
+ADDED = [('MenuScale.asi', 'menu scale'), ('MenuScale.ini', 'menu scale'),
+         ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
+         ('dxvk.conf', 'renderer')]
+LAYERS = ['textures', 'font', 'hud layout', 'menu scale', 'msaa', 'renderer', 'other']
+
+
+def sha(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def layer_of(rel, suffix):
+    if suffix == '.a2font-backup':
+        return 'font'
+    top = rel.split('/')[0]
+    if rel.startswith('Textures/RGB/'):
+        return 'textures'
+    if top == 'misc':
+        return 'hud layout'
+    return 'other'
+
+
+def discover():
+    """Every file this project changed, as it stands now.  Walks the backups rather
+    than a list of targets, so it sees whatever any tool on any branch installed."""
+    found = []
+    for dirpath, dirs, files in os.walk(GAME):
+        if dirpath == GAME:
+            dirs[:] = [d for d in dirs if d != '.a2mod']
+        for f in files:
+            suffix = next((s for s in BACKUPS if f.endswith(s)), None)
+            if not suffix:
+                continue
+            path = os.path.join(dirpath, f[:-len(suffix)])
+            rel = os.path.relpath(path, GAME)
+            if os.path.basename(rel) in EXCLUDE or not os.path.exists(path):
+                continue
+            bak = path + suffix
+            # A backup beside a file still identical to it is not a change
+            # (Sprites/cursor.spr: tried, reverted, backup left behind).
+            if os.path.getsize(path) == os.path.getsize(bak) and sha(path) == sha(bak):
+                continue
+            found.append({'rel': rel, 'kind': 'replaced', 'backup': rel + suffix,
+                          'layer': layer_of(rel, suffix)})
+    for name, layer in ADDED:
+        if os.path.exists(os.path.join(GAME, name)):
+            found.append({'rel': name, 'kind': 'added', 'layer': layer})
+    return sorted(found, key=lambda e: e['rel'])
+
+
+def game_running():
+    r = subprocess.run(['pgrep', '-if', r'armada2\.exe'], capture_output=True)
+    return r.returncode == 0
+
+
+def load_state():
+    try:
+        with open(STATE) as fh:
+            return json.load(fh)
+    except FileNotFoundError:
+        return None
+
+
+def save_state(st):
+    os.makedirs(STORE, exist_ok=True)
+    tmp = STATE + '.tmp'
+    with open(tmp, 'w') as fh:
+        json.dump(st, fh, indent=1)
+    os.replace(tmp, STATE)
+
+
+def stat_key(path):
+    s = os.stat(path)
+    return [s.st_size, s.st_mtime_ns]
+
+
+def is_mod(path, e):
+    """Current file is the recorded modded one.  A move keeps size and mtime, so that
+    is the fast path; anything else is settled by hash."""
+    if not os.path.exists(path):
+        return False
+    if stat_key(path) == e['stat']:
+        return True
+    return os.path.getsize(path) == e['stat'][0] and sha(path) == e['sha']
+
+
+def is_stock(path, e):
+    if e['kind'] == 'added':
+        return not os.path.exists(path)
+    if not os.path.exists(path):
+        return False
+    bak = os.path.join(GAME, e['backup'])
+    return os.path.getsize(path) == os.path.getsize(bak) and sha(path) == sha(bak)
+
+
+# --- bloom ---------------------------------------------------------------------------
+
+def bloom_get():
+    try:
+        with open(VKCONF) as fh:
+            for line in fh:
+                k, _, v = line.partition('=')
+                if k.strip() == 'enableOnLaunch':
+                    return v.strip()
+    except FileNotFoundError:
+        return None
+    return 'True'          # vkBasalt's default when the key is absent
+
+
+def bloom_set(value):
+    with open(VKCONF) as fh:
+        lines = fh.read().splitlines()
+    out, done = [], False
+    for line in lines:
+        if line.partition('=')[0].strip() == 'enableOnLaunch':
+            line, done = f'enableOnLaunch = {value}', True
+        out.append(line)
+    if not done:
+        out.append(f'enableOnLaunch = {value}')
+    with open(VKCONF, 'w') as fh:
+        fh.write('\n'.join(out) + '\n')
+
+
+# --- commands --------------------------------------------------------------------------
+
+def to_stock(dry):
+    st = load_state()
+    if st and st['state'] == 'stock':
+        # Finish an interrupted switch, or confirm there is nothing to do.
+        entries = st['entries']
+        print('already stock -- checking it is complete')
+    else:
+        entries = discover()
+        if not entries:
+            sys.exit('nothing to switch -- no modded files found in the game directory')
+        print(f'hashing {len(entries)} modded files ...', flush=True)
+        for e in entries:
+            p = os.path.join(GAME, e['rel'])
+            e['sha'], e['stat'] = sha(p), stat_key(p)
+        st = {'state': 'stock', 'since': time.strftime('%Y-%m-%d %H:%M:%S'),
+              'entries': entries, 'bloom': bloom_get()}
+    if dry:
+        report(entries, 'would put aside')
+        print(f'bloom: enableOnLaunch {st["bloom"]} -> False')
+        return
+    # State first, so an interruption leaves a record of what was in flight.
+    save_state(st)
+    moved = 0
+    for e in entries:
+        src = os.path.join(GAME, e['rel'])
+        dst = os.path.join(SNAP, e['rel'])
+        if not os.path.exists(dst):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            os.rename(src, dst)
+            moved += 1
+        if e['kind'] == 'replaced' and not is_stock(src, e):
+            shutil.copy2(os.path.join(GAME, e['backup']), src)
+        elif e['kind'] == 'added' and os.path.exists(src):
+            sys.exit(f'{e["rel"]} reappeared in the game dir while it was set aside -- '
+                     f'check it by hand')
+    if st['bloom'] is not None:
+        bloom_set('False')
+    print(f'stock: {moved} files set aside in {SNAP}')
+    status()
+
+
+def to_remastered(dry, force):
+    st = load_state()
+    if not st or st['state'] != 'stock':
+        print('already remastered -- nothing set aside')
+        status()
+        return
+    entries = st['entries']
+    # Pre-flight, before anything moves: every file must still be stock and every
+    # snapshot must still be the file that was set aside.
+    bad = []
+    for e in entries:
+        cur = os.path.join(GAME, e['rel'])
+        snap = os.path.join(SNAP, e['rel'])
+        if os.path.exists(snap):
+            if not is_mod(snap, e):
+                bad.append(f'{e["rel"]}: the set-aside copy has changed')
+            elif not is_stock(cur, e):
+                bad.append(f'{e["rel"]}: no longer stock in the game dir '
+                           f'(something installed over it)')
+        elif not is_mod(cur, e):
+            bad.append(f'{e["rel"]}: set-aside copy missing and the game file is not it')
+    if bad and not force:
+        print('REFUSED -- nothing was moved:')
+        for b in bad[:20]:
+            print('   ', b)
+        if len(bad) > 20:
+            print(f'    ... and {len(bad) - 20} more')
+        sys.exit('re-run with --force to let the set-aside copies win')
+    if dry:
+        report(entries, 'would restore')
+        print(f'bloom: enableOnLaunch -> {st["bloom"]}')
+        return
+    for e in entries:
+        snap = os.path.join(SNAP, e['rel'])
+        if os.path.exists(snap):
+            os.replace(snap, os.path.join(GAME, e['rel']))
+    # Check every file on the way in by FULL hash -- not the size+mtime shortcut that
+    # status uses.  This is the step that makes "byte for byte" a measurement.
+    print(f'verifying {len(entries)} files by hash ...', flush=True)
+    wrong = [e['rel'] for e in entries if sha(os.path.join(GAME, e['rel'])) != e['sha']]
+    if wrong:
+        sys.exit(f'{len(wrong)} files do not match the manifest after restore, e.g. {wrong[:5]}')
+    if st['bloom'] is not None:
+        bloom_set(st['bloom'])
+    st['state'] = 'remastered'
+    st['since'] = time.strftime('%Y-%m-%d %H:%M:%S')
+    save_state(st)
+    for d, _, _ in sorted(os.walk(SNAP), reverse=True):
+        try:
+            os.rmdir(d)
+        except OSError:
+            pass
+    print(f'remastered: {len(entries)} files restored and verified against the manifest')
+    status()
+
+
+def report(entries, verb):
+    by = {}
+    for e in entries:
+        by.setdefault(e['layer'], []).append(e)
+    for layer in LAYERS:
+        if layer in by:
+            print(f'  {verb:<16} {layer:<11} {len(by[layer]):>5} files')
+
+
+def status():
+    st = load_state()
+    entries = st['entries'] if st else None
+    if entries is None:
+        # Never switched: describe what is there, all of it remastered by definition.
+        live = discover()
+        print(f'state: remastered (never switched -- no snapshot yet)')
+        report(live, 'remastered')
+    else:
+        print(f'state: {st["state"]}  (since {st["since"]})')
+        by = {}
+        for e in entries:
+            cur = os.path.join(GAME, e['rel'])
+            if st['state'] == 'stock':
+                s = 'stock' if is_stock(cur, e) else 'MODIFIED'
+            else:
+                s = 'remastered' if is_mod(cur, e) else 'CHANGED'
+            by.setdefault(e['layer'], {}).setdefault(s, 0)
+            by[e['layer']][s] += 1
+        for layer in LAYERS:
+            if layer in by:
+                parts = ', '.join(f'{n} {s}' for s, n in sorted(by[layer].items()))
+                print(f'  {layer:<11} {parts}')
+    b = bloom_get()
+    print(f'  {"bloom":<11} ' + ('vkBasalt not configured' if b is None else
+                                 f'{"on" if b == "True" else "off"} at launch (Home toggles)'))
+    print(f'  {"dxvk":<11} unchanged in both states')
+
+
+def main():
+    args = sys.argv[1:]
+    dry = '-n' in args or '--dry-run' in args
+    force = '--force' in args
+    cmd = next((a for a in args if not a.startswith('-')), 'status')
+    if cmd in ('-h', 'help') or '-h' in args or '--help' in args:
+        print(__doc__)
+        return
+    if not os.path.isdir(GAME):
+        sys.exit(f'no game directory at {GAME} -- set A2_GAME')
+    if cmd == 'status':
+        status()
+        return
+    if cmd not in ('stock', 'remastered'):
+        sys.exit(f'unknown command {cmd!r} -- see ./a2mod --help')
+    if game_running() and not dry:
+        sys.exit('refusing: Armada2.exe is running -- quit the game first')
+    if cmd == 'stock':
+        to_stock(dry)
+    else:
+        to_remastered(dry, force)
+
+
+if __name__ == '__main__':
+    main()

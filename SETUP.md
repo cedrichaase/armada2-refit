@@ -777,6 +777,12 @@ numerically, so the answer is a number rather than an impression:
     tools/ab-shot.sh grab after
     tools/ab-shot.sh diff before after 600 400 1200 300     # W H X Y, region only
 
+For a before/after of the project as a whole rather than one setting, `./a2mod stock`
+and `./a2mod remastered` flip every visual layer at once in about 4 s, with DXVK kept
+in both states, so the two grabs differ only in what this project changed. Quit the game
+between them; Heroic can stay open. Bloom is bypassed at launch in stock, and Home
+still toggles it.
+
 Aim at a region, not the whole frame: a whole-frame diff of this game is dominated by
 ships drifting and sprites animating between the two grabs, which will swamp the effect
 and make any setting look like it did something.
