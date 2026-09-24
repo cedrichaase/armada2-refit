@@ -197,10 +197,18 @@ in `backdrops/*.conf`:
 
 - **`mainbkgr`:** nebula to the edges. Outpainted, and the joins are step-free
   (column means 39→36→35 and 44→45 across them).
-- **`singleplay`:** `outpaint=no`, so it gets the hi-res centre and black sides.
-  Its grid field sits inside a black margin, and outpainting it continued the
-  border and then started a different sky beyond it. Black pillarboxes read as
-  the same margin.
+- **`singleplay`** (campaign selection): a star-chart grid over nebula, inside a
+  drawn black frame that is hard-edged at x 28 and x 771. Outpainting the whole
+  screen continued the frame and then started a different sky beyond it. So
+  `field=32,0,768,600` hands the outpaint the open field alone. The plate replaces
+  the frame too: MenuScale shows the plate wherever the shell draws stock
+  background, and the frame is stock background. The joins are step-free (column
+  means 43→45→48 and 83→86→81).
+  Of four expands (about $0.02 each): seed 1 invented a lens-flare sun, and seed 3
+  was clean but its grid stopped at the old frame. Seed 2 is the chosen one: its
+  grid continues outwards. It also wrote a line of fake glyphs into empty sky at
+  the bottom left, which `clone=` covers with the patch of sky beneath it. The
+  others are kept in `ai/` as `expanded-*.png`.
 
 The options, load/save and multiplayer screens are metal frames on black, so they
 are left as they are.
@@ -212,8 +220,9 @@ are left as they are.
    for 10 minutes on the day this was built.
 2. Blend 35% over Lanczos.
 3. Outpaint at 2048x1536 → 3680x1536 with `bria/expand`, which caps a canvas at
-   5000px.
-4. Feather the full 4x centre back in over 64px.
+   5000px. With `field=`, the model sees only that rectangle of the art.
+4. Apply any `clone=` patches, then feather the full 4x centre back in over 64px,
+   inside the field.
 5. Resize to exactly 3450x1440, centre 1920 at x 765. The plate is authored at
    the screen height, so at 1440 it goes on 1:1.
 
