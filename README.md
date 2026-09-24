@@ -39,6 +39,12 @@ Each of the other layers installs and removes itself with its own script: `insta
 in `menus/`, `msaa/` and `cutscenes/binkproxy/`, or a `--revert` flag on the Python
 tools. See the layer's README.
 
+## Versions
+
+Each layer folder has a `CHANGELOG.md` with its own semver version. The root
+[`CHANGELOG.md`](CHANGELOG.md) versions the modpack as a whole and lists the layer
+versions it bundles.
+
 `promo/` holds the before/after footage (videos not in git). `archive/` holds material
 that is paid for or cannot be regenerated; nothing in it is on
 a build path. `CLAUDE.md` is the working brief for Claude Code sessions in this repo.

@@ -8,7 +8,9 @@ vocabulary in `textures/` is still nebula-shaped.
 
 The repo is laid out by **`a2mod` layer**: each folder is one thing `./a2mod` switches
 between stock and remastered, and each has its own README. `./a2mod status` names the
-layers; the folder named for each is where its code and notes live.
+layers; the folder named for each is where its code and notes live. Each folder also has a
+`CHANGELOG.md`, and the root `CHANGELOG.md` is the project's. See "Changelogs and
+versions" below; keeping them current is part of every change.
 
 | Folder | What it is | Start with |
 |---|---|---|
@@ -60,6 +62,47 @@ behind those numbers is in `postfx/README.md`, Tier 3.
 turn it on. It edits the engine's present parameters just before
 `IDirect3D8::CreateDevice`. Installed at 8x and **confirmed in game** (2026-09-23); the
 minimap is the one thing that could break (`msaa/README.md`).
+
+## Changelogs and versions
+
+Every layer folder in the table above has a `CHANGELOG.md` with its own semver version.
+The root `CHANGELOG.md` versions the project as a whole. **A commit that changes a layer
+updates that layer's changelog and the root one in the same commit**, with the version
+bumped. A changelog that is updated "later" gets forgotten.
+
+**What gets an entry:** anything that changes what a layer installs into the game, how
+it builds, or its interface (CLI flags, `target.conf`/`.ini`/`.conf` keys, backup
+names). This includes tuning changes like a new blend, seed or threshold, and a revert
+of shipped work. **No entry:** changes to docs and notes only, `archive/`, `promo/`,
+and scratch work that installs nothing.
+
+**Which part to bump:**
+
+| Bump | When | Examples here |
+|---|---|---|
+| MAJOR | an existing install cannot move to it by just re-installing: the install/revert contract, backup suffix or `a2mod` snapshot layout changes; a key or flag is removed or renamed; paid `ai/` layers are invalidated; the layer newly requires something of `platform/` | a new backup suffix; dropping `blend=` for another key |
+| MINOR | new content or capability: new targets or texture classes installed, a new menu handled, a new key, flag or tool | the five faction targets; `Embed=1`; `NoiseFloor=` |
+| PATCH | a fix or re-tune behind the same interface | Sovereign blend 35 → 70; main-menu plate seed 6; the `Mmoon` sun-box fix |
+
+The **project version** takes the largest bump among the layers the change touches.
+Changes that belong to no one layer, such as `a2mod`, the repo layout or a cross-layer
+convention, bump only the root. Every root entry lists the new version of each layer it
+touches, for example `menus 1.1.0, textures 1.0.1`.
+
+**Entry format.** Newest first, headed `## X.Y.Z — YYYY-MM-DD`, then `Added` / `Changed`
+/ `Fixed` / `Removed` as needed. Each item is one or two lines saying *what* changed,
+naming the key or target, with the commit hash once there is one. The *why* stays in
+the layer's README. Do not copy derivations into a changelog.
+
+**In-game status goes in the entry.** End every entry with "Installed, not yet seen in
+game" or "Confirmed in game". When the user confirms later, append `Confirmed in game
+YYYY-MM-DD` to that entry and do not bump. This is the one permitted edit to an entry
+that has already been released. A rejection is not a status line. It is a new entry
+that reverts the change, like the font's `--method runs`.
+
+**Parallel worktrees** will both claim the next number. Whichever branch merges second
+renumbers its entries (layer and root) while resolving the conflict. Never leave two
+entries with the same version.
 
 ## Environment
 
@@ -350,6 +393,9 @@ image in all four quadrants and reads fine, because billboards overlap at many s
 Don't insist on four distinct generations.
 
 ## State
+
+For what changed when, and whether it has been seen in game, read the layer's
+`CHANGELOG.md`. This section keeps what an agent must know before touching that work.
 
 **A 4096x4096 atlas (48 MB TGA) is confirmed working in game.** Texture size is not a
 constraint worth worrying about here; face resolution is. **But a texture with a
