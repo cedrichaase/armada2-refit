@@ -20,3 +20,6 @@ cutscenes/movies/*/out/
 # selftest-mips.py imports verify.py as a module
 __pycache__/
 archive/ab/
+
+# Promotional footage (promo/README.md): 447 MB of video, kept out of git
+promo/*.mp4

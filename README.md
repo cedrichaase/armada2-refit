@@ -39,5 +39,6 @@ Each of the other layers installs and removes itself with its own script: `insta
 in `menus/`, `msaa/` and `cutscenes/binkproxy/`, or a `--revert` flag on the Python
 tools. See the layer's README.
 
-`archive/` holds material that is paid for or cannot be regenerated; nothing in it is on
+`promo/` holds the before/after footage (videos not in git). `archive/` holds material
+that is paid for or cannot be regenerated; nothing in it is on
 a build path. `CLAUDE.md` is the working brief for Claude Code sessions in this repo.
