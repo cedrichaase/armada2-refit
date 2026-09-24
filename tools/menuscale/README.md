@@ -176,6 +176,16 @@ are within 24. An exact-match mask would have left the logo, the thing anyone lo
 at, as the one low-res band on the screen. With the weight, the band measures
 mean |Laplacian| 56.4, against 60.6 for the plate and 35.7 for a plain stretch.
 
+**The weight carries codec offsets through, hence `NoiseFloor`.** The hover Binks
+(`singleplayer.bik` 320x168 at (14,31), `InstantAction.bik` 320x200 at (480,0)) also
+bake the background in, and theirs decodes darker than `mainbkgr.bmp`: -1.7/-1.5/-2.0
+per channel, uniform out to the rectangle's edge. `stretch(frame) + w·(plate − stock)`
+reproduces that as a plate 2/255 darker, so the whole rectangle dimmed on hover,
+visibly when toggling. A frame pixel within `NoiseFloor` (6) of stock is now taken
+as stock, ramping back to the frame by 12: the offset falls to -0.2, the background
+there is the plate exactly, and the art, 16+ off, is untouched. `bd_soften` continues
+the snapped edge rather than the raw one.
+
 **Cost, measured.** Doing the whole centre per present (a GDI `HALFTONE`
 `StretchBlt` of the frame plus the composite over 2.76M pixels) took **59 ms**, and
 the flare runs at 30 fps. Two changes brought it to **7.8 ms**:

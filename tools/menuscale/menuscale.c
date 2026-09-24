@@ -535,6 +535,7 @@ static Backdrop g_bd[MAXBD];
 static int g_nbd       = 0;
 static int g_backdrops = 1;
 static int g_tol       = 48;
+static int g_floor     = 6;     /* NoiseFloor: see bd_snap */
 
 /* The composed screen for the backdrop on show, cached per geometry. */
 static struct {
@@ -571,6 +572,29 @@ static int pxdiff(DWORD a, DWORD b)
     if (d2 < 0) d2 = -d2;
     if (d1 > d0) d0 = d1;
     return d2 > d0 ? d2 : d0;
+}
+
+/*
+ * A frame pixel within the noise floor of stock IS stock.  The hover Binks
+ * (singleplayer.bik, InstantAction.bik) replay their rectangle with the
+ * background baked in, and the codec left it darker: -1.7/-1.5/-2.0 per
+ * channel against mainbkgr.bmp, measured on the decoded frames, and uniform out
+ * to the rectangle's edges.  The detail transfer carries that offset through
+ * onto the plate, so the whole rectangle dims while the button is hovered.
+ * Snapping d <= floor to stock, ramped back to the frame by d = 2*floor,
+ * leaves it at -0.2 and shows the plate exactly there; the art is 16+ off.
+ */
+static DWORD bd_snap(DWORD f, DWORD st, int d)
+{
+    DWORD r = 0;
+    int sh;
+    if (g_floor <= 0 || d >= 2 * g_floor) return f;
+    if (d <= g_floor) return st;
+    for (sh = 0; sh <= 16; sh += 8) {
+        int a = (int)((st >> sh) & 255), b = (int)((f >> sh) & 255);
+        r |= (DWORD)(a + (b - a) * (d - g_floor) / g_floor) << sh;
+    }
+    return r;
 }
 
 static void bd_log(const char *what, const char *path)
@@ -873,7 +897,8 @@ static void bd_soften(const Backdrop *b, const DWORD *f, const DWORD *st,
                         int q = j * g_designW + i;
                         if (i < r[0] || i >= r[2]) continue;
                         for (sh = 0; sh < 3; sh++)
-                            sum[sh] += (int)((f[q] >> (8 * sh)) & 255) - (int)((st[q] >> (8 * sh)) & 255);
+                            /* fp, not f: the edge row after bd_snap */
+                            sum[sh] += (int)((g_c.fp[q] >> (8 * sh)) & 255) - (int)((st[q] >> (8 * sh)) & 255);
                         cnt++;
                     }
                 }
@@ -966,10 +991,11 @@ static int bd_present(Slot *s, HDC real, int full, int rw, int rh, int ox, int o
         for (y = ay; y <= by; y++)
             for (x = ax; x <= bx; x++) {
                 int k = y * g_designW + x;
-                int d = pxdiff(f[k], st[k]);
+                DWORD v = bd_snap(f[k], st[k], pxdiff(f[k], st[k]));
+                int d = pxdiff(v, st[k]);
                 g_c.wt[k] = (WORD)(d >= tol ? 0 : ((tol - d) << 8) / tol);
                 g_c.prev[k] = f[k];
-                g_c.fp[k] = f[k];
+                g_c.fp[k] = v;
             }
         bd_soften(&g_bd[best], f, st, ax, ay, bx, by);
         g_c.valid = 1;
@@ -2033,6 +2059,7 @@ static void bd_list(const char *ini)
     m[0] = 0;
     s_cat(m, "backdrops listed: "); s_num(m, g_nbd);
     s_cat(m, "  detail tolerance "); s_num(m, g_tol);
+    s_cat(m, "  noise floor "); s_num(m, g_floor);
     logline(m);
 }
 
@@ -2056,6 +2083,7 @@ static void startup(void)
     g_dump    = (int)GetPrivateProfileIntA("MenuScale", "DumpBackdrop", 0,   ini);
     g_backdrops = (int)GetPrivateProfileIntA("MenuScale", "Backdrops",  1,   ini);
     g_tol     = (int)GetPrivateProfileIntA("MenuScale", "DetailTolerance", 48, ini);
+    g_floor   = (int)GetPrivateProfileIntA("MenuScale", "NoiseFloor", 6, ini);
 
     if (g_designW < 16) g_designW = 800;
     if (g_designH < 16) g_designH = 600;
