@@ -27,6 +27,8 @@ WHAT COUNTS AS A CHANGE
     hud layout    misc/*.a2neb-backup          -- ui-widescreen (canvas, palette)
     menu scale    MenuScale.asi/.ini           -- added files, stock has none
     msaa          MSAA.asi/.ini                -- added files
+    cutscenes     binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
+                  animations/<Name>.mp4/.wav beside a <Name>.bik  -- tools/binkproxy
     renderer      dxvk.conf                    -- AF, LOD bias, seamless cubes
     bloom         vkBasalt.conf enableOnLaunch -- see below
 
@@ -69,8 +71,14 @@ BACKUPS = ('.a2neb-backup', '.a2font-backup')
 EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
 ADDED = [('MenuScale.asi', 'menu scale'), ('MenuScale.ini', 'menu scale'),
          ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
+         ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'font', 'hud layout', 'menu scale', 'msaa', 'renderer', 'other']
+LAYERS = ['textures', 'font', 'hud layout', 'menu scale', 'msaa', 'cutscenes', 'renderer',
+          'other']
+# Replacement movies are whatever pairs tools/binkproxy installed: <Name>.mp4 / .wav
+# beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
+MOVIE_DIR = 'animations'
+MOVIE_EXTS = ('.mp4', '.wav')
 
 
 def sha(path):
@@ -87,6 +95,8 @@ def layer_of(rel, suffix):
     top = rel.split('/')[0]
     if rel.startswith('Textures/RGB/'):
         return 'textures'
+    if rel == 'binkw32.dll':
+        return 'cutscenes'
     if top == 'misc':
         return 'hud layout'
     return 'other'
@@ -117,6 +127,15 @@ def discover():
     for name, layer in ADDED:
         if os.path.exists(os.path.join(GAME, name)):
             found.append({'rel': name, 'kind': 'added', 'layer': layer})
+    try:
+        movies = os.listdir(os.path.join(GAME, MOVIE_DIR))
+    except FileNotFoundError:
+        movies = []
+    biks = {os.path.splitext(f)[0].lower() for f in movies if f.lower().endswith('.bik')}
+    for f in movies:
+        stem, ext = os.path.splitext(f)
+        if ext.lower() in MOVIE_EXTS and stem.lower() in biks:
+            found.append({'rel': f'{MOVIE_DIR}/{f}', 'kind': 'added', 'layer': 'cutscenes'})
     return sorted(found, key=lambda e: e['rel'])
 
 
