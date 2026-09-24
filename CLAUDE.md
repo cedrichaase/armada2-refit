@@ -453,6 +453,10 @@ pulled the eye off the menu. It is now **seed 6 of a star-free prompt, with the 
 faded to near-black (`fade=12`) and the blue haze removed (`dehaze=100`)**. The haze
 comes from stock's own corners, and no prompt kept it out. Accepted by the user
 (2026-09-25). Seeds 1, 2 and 6 are kept in `ai/`; 3–5 were rejected and deleted.
+The hover Binks (`singleplayer.bik`, `InstantAction.bik`) bake in a background ~2/255
+darker than the BMP, and the compositor carried that onto the plate, so the rectangle
+dimmed on hover. `NoiseFloor=6` treats near-stock frame pixels as stock. **Confirmed in
+game** (2026-09-25).
 
 **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
 declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to
