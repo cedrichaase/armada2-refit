@@ -24,6 +24,7 @@ WHAT COUNTS AS A CHANGE
 
     textures      Textures/RGB/*.a2neb-backup  -- a2tex, and the cursor-aspect art
     font          *.a2font-backup              -- ui-font-condense
+    models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel)
     hud layout    misc/*.a2neb-backup          -- ui-widescreen (canvas, palette)
     menu scale    MenuScale.asi/.ini           -- added files, stock has none
     msaa          MSAA.asi/.ini                -- added files
@@ -70,7 +71,7 @@ EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
 ADDED = [('MenuScale.asi', 'menu scale'), ('MenuScale.ini', 'menu scale'),
          ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'font', 'hud layout', 'menu scale', 'msaa', 'renderer', 'other']
+LAYERS = ['textures', 'models', 'font', 'hud layout', 'menu scale', 'msaa', 'renderer', 'other']
 
 
 def sha(path):
@@ -89,6 +90,8 @@ def layer_of(rel, suffix):
         return 'textures'
     if top == 'misc':
         return 'hud layout'
+    if top == 'SOD':
+        return 'models'
     return 'other'
 
 
