@@ -457,6 +457,10 @@ The hover Binks (`singleplayer.bik`, `InstantAction.bik`) bake in a background ~
 darker than the BMP, and the compositor carried that onto the plate, so the rectangle
 dimmed on hover. `NoiseFloor=6` treats near-stock frame pixels as stock. **Confirmed in
 game** (2026-09-25).
+Switching menus flashed the next screen's 800x600 background 1:1 in the top-left corner
+for ~100 ms: the shell's own anti-flicker code (`SetCurrentBackground`/`SnapShotBackground`)
+paints it onto the 3D window behind the dialogs. `Underlay=0` NOPs those two draws by
+signature, so one menu cuts straight to the next. **Confirmed in game** (2026-09-25).
 
 **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
 declares `screenWidth = 1600 / screenHeight = 1200` and the engine scales that canvas to
