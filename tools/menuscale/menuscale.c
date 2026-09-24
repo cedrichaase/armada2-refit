@@ -1936,6 +1936,88 @@ static int patch_shell_mode(BYTE *base, int w, int h, int bpp)
     return hits;
 }
 
+/* ---- the shell's underlay --------------------------------------------- */
+/*
+ * Between one menu closing and the next presenting, an 800x600 picture showed
+ * 1:1 in the top-left corner for 100-120 ms -- the old menu, then the new
+ * menu's bare background, or plain black.  Measured off a 60 fps recording.
+ * None of it passes through the dialogs, so nothing above could scale it:
+ *
+ *   SetCurrentBackground(hDlg, ShellBitmap *)       0x6083f0
+ *     keeps an 800x600 copy of the screen's background -- the stock BMP, or
+ *     with NULL a BitBlt snapshot of the dialog (black, when it is taken
+ *     before the dialog has drawn) -- and then draws it onto the 3D WINDOW,
+ *     the dialogs' parent, at 0,0 through DrawTransparentBitmap (0x608100).
+ *   SnapShotBackground()                            0x608530
+ *     draws the same copy there again; every dialog's close path calls it
+ *     just before CleanCurrentBackground() frees it.
+ *
+ * At 800x600 that was the shell's anti-flicker: the parent already showed the
+ * next screen when a dialog went away.  Scaled, the parent draw is the
+ * artifact, and the parent otherwise keeps the last scaled frame -- so without
+ * it one menu cuts straight to the next.  Only the two draws onto the parent
+ * are removed: the copy itself is still made, because ShellButton reads it to
+ * restore the background under a button.  Each is a cdecl call whose caller
+ * pops the arguments (add esp,0x18), so five NOPs leave the stack as it was.
+ */
+typedef struct { int len, at; BYTE sig[16]; } CallSite;
+
+static const CallSite k_underlaySites[2] = {
+    /* SetCurrentBackground +0xed: push 0,0xff00ff,0; mov esi,eax; push 0,edx,esi; call */
+    { 16, 15, { 0x6A, 0x00, 0x68, 0xFF, 0x00, 0xFF, 0x00, 0x6A, 0x00,
+                0x8B, 0xF0, 0x6A, 0x00, 0x52, 0x56, 0xE8 } },
+    /* SnapShotBackground +0x25: push 0xff00ff,0,0,eax,esi; call */
+    { 12, 11, { 0x68, 0xFF, 0x00, 0xFF, 0x00, 0x6A, 0x00, 0x6A, 0x00,
+                0x50, 0x56, 0xE8 } }
+};
+
+static BYTE *find_text(BYTE *base, const BYTE *sig, int len)
+{
+    DWORD  pe    = *(DWORD *)(base + 0x3C);
+    BYTE  *nt    = base + pe;
+    WORD   nsec  = *(WORD *)(nt + 6);
+    WORD   optsz = *(WORD *)(nt + 20);
+    BYTE  *sec   = nt + 24 + optsz;
+    int    i, k;
+
+    for (i = 0; i < (int)nsec; i++, sec += 40) {
+        BYTE *p, *end;
+        if (sec[0] != '.' || sec[1] != 't' || sec[2] != 'e' || sec[3] != 'x') continue;
+        p   = base + *(DWORD *)(sec + 12);
+        end = p + *(DWORD *)(sec + 8) - len;
+        for (; p <= end; p++) {
+            for (k = 0; k < len; k++)
+                if (p[k] != sig[k]) break;
+            if (k == len) return p;
+        }
+    }
+    return NULLPTR;
+}
+
+/* Both sites or neither, and only if both call the same function: a half
+ * patch, or a match in some other build that calls something else, is worse
+ * than the corner flash. */
+static int patch_underlay(BYTE *base)
+{
+    BYTE *call[2];
+    DWORD old;
+    int   n;
+
+    for (n = 0; n < 2; n++) {
+        BYTE *p = find_text(base, k_underlaySites[n].sig, k_underlaySites[n].len);
+        if (!p) return 0;
+        call[n] = p + k_underlaySites[n].at;
+    }
+    if (call[0] + 5 + *(LONG *)(call[0] + 1) != call[1] + 5 + *(LONG *)(call[1] + 1))
+        return 0;
+    for (n = 0; n < 2; n++) {
+        if (!VirtualProtect(call[n], 5, 0x40 /* EXECUTE_READWRITE */, &old)) return n;
+        memset(call[n], 0x90, 5);
+        VirtualProtect(call[n], 5, old, &old);
+    }
+    return 2;
+}
+
 /* ---- IAT patching ----------------------------------------------------- */
 
 static int same_name(const char *a, const char *b)
@@ -2117,7 +2199,17 @@ static void startup(void)
         logline(m);
     }
 
-    o_BeginPaint    = (void *)patch_iat(base, "USER32.dll", "BeginPaint",    my_BeginPaint);
+    if (g_mode == MODE_SCALE &&
+        !GetPrivateProfileIntA("MenuScale", "Underlay", 0, ini)) {
+        char m[64];
+        m[0] = 0;
+        s_cat(m, "shell underlay removed, sites patched ");
+        s_num(m, patch_underlay(base));
+        s_cat(m, "/2");
+        logline(m);
+    }
+
+    o_BeginPaint   = (void *)patch_iat(base, "USER32.dll", "BeginPaint",    my_BeginPaint);
     o_EndPaint      = (void *)patch_iat(base, "USER32.dll", "EndPaint",      my_EndPaint);
     o_GetDC         = (void *)patch_iat(base, "USER32.dll", "GetDC",         my_GetDC);
     o_ReleaseDC     = (void *)patch_iat(base, "USER32.dll", "ReleaseDC",     my_ReleaseDC);

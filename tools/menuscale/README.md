@@ -145,6 +145,34 @@ thread timer presents whatever is still dirty. The timer is what catches the
 leaks. `Trace=1` logs the first paint events per dialog, which is how this was
 found.
 
+## The 1:1 flash between menus: `Underlay=0`
+
+When the user switched between the main and single-player menus, an 800x600 picture showed
+1:1 in the top-left corner for 100–120 ms. It was measured off a 60 fps recording:
+- Main → single player showed the main menu for 2 frames, then single player's bare
+  background for 4.
+- The way back showed plain black for 7.
+
+None of it passes through a dialog, so nothing above could scale it. The source is the
+shell's own anti-flicker code:
+- **`SetCurrentBackground`** (`0x6083f0`) keeps an 800x600 copy of each screen's
+  background. That copy is either the stock BMP or a `BitBlt` snapshot of the dialog. The
+  snapshot is black when it is taken before the dialog has drawn. The function then draws
+  the copy onto the **3D window**, the dialogs' parent, at 0,0 through
+  `DrawTransparentBitmap` (`0x608100`).
+- **`SnapShotBackground`** (`0x608530`) draws it there again. Every dialog's close path
+  calls it just before `CleanCurrentBackground`.
+
+At 800x600, the parent already held the next screen when a dialog went away. Scaled, that
+draw is the flash. Without it, the parent keeps the last scaled frame, and one menu cuts
+straight to the next.
+
+Only the two `call`s onto the parent are NOP'd, in memory and matched by signature. Both
+sites must match and both must call the same function, or nothing is patched. The copy
+itself is still made, because seven sites in `ShellButton` and its siblings read it to
+restore the background under a button. The caller pops the arguments (`add esp,0x18`), so
+the stack is unchanged. `Underlay=1` restores stock.
+
 ## Backdrops: hi-res art, and the pillarboxes filled
 
 The main menu's background is upscaled 4x and outpainted to 2.4:1. The pillarboxes
