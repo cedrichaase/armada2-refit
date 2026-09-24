@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
-"""Turn the Wine virtual desktop on or off for this prefix.
+"""Check, or remove, the Wine virtual desktop in this prefix. It must stay OFF.
 
     virtual-desktop.py --status   what the prefix is set to
     virtual-desktop.py --off      run on the real display (no virtual desktop)
-    virtual-desktop.py --on       run inside a virtual desktop again
+    virtual-desktop.py --on       put it back -- kept only to undo --off; do not use it
+                                  to fix a window problem
 
-WHY IT MATTERS HERE
+WHY IT IS OFF
 
-The virtual desktop was added to fix a two-window focus bug: the settings menu drew in
-one window while input stayed grabbed by another (see platform/README.md, Hyprland section).
+The virtual desktop was the first fix for a two-window focus bug: the settings menu
+drew in one window while input stayed grabbed by another. That bug is fixed properly by
+MenuScale.asi with Embed=1, which re-creates every menu as a child of the game window
+(menus/README.md, "One window: Embed=1").
 
-It is also the prime suspect for DXVK's fullscreen failure. Inside a virtual desktop
-wined3d never needs a real display-mode change, but DXVK calls ChangeDisplaySettingsEx
-and it fails:
+And the virtual desktop breaks DXVK. Inside it wined3d never needs a real display-mode
+change, but DXVK calls ChangeDisplaySettingsEx and it fails:
 
     err:   D3D9: EnterFullscreenMode: Failed to change display mode
     err:   D3D9: Failed to set initial fullscreen state
 
-after which the engine falls back and the game ends up at 640x480.
-
-So these two settings are coupled: the virtual desktop may be what makes the window
-behave and what stops DXVK working. If --off brings the focus bug back, the documented
-alternative is Omarchy window rules (`o.window(...)` with `fullscreen = true`, scoped by
-title -- the window class `steam_proton` is not unique to this game).
+after which the engine falls back and the game ends up at 640x480. Details in
+platform/README.md.
 
 SAFETY
 

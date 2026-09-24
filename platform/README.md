@@ -225,8 +225,9 @@ The working configuration, all four parts required together:
 | `WINEDLLOVERRIDES` | `winmm=n,b;d3d8=n,b;d3d9=n,b` | without the d3d9 entry Wine resolves it to builtin WineD3D |
 | Wine virtual desktop | **off** | inside it DXVK's `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 |
 
-Set it up with `platform/d3d8-chain.py --use dxvk` and
-`platform/virtual-desktop.py --off`; reverse with `--revert` and `--on`.
+Set it up with `platform/d3d8-chain.py --use dxvk` (reverse with `--revert`) and
+`platform/virtual-desktop.py --off`. The virtual desktop stays off in both states: it
+is superseded by `MenuScale.asi`'s `Embed=1` (see "Hyprland / window management").
 
 **The `d3d9=n,b` override is load-bearing, not diagnostic.** It arrived as part of
 `dxvk-logging.py --diagnose`, so `--off` used to strip it — which would have silently
@@ -234,9 +235,8 @@ broken the chain the moment diagnostics were switched off. Ownership now sits wi
 `d3d8-chain.py` (`--use` adds it, `--revert` removes it) and the logging tool only ever
 adds, never removes.
 
-**The two-window focus bug the virtual desktop was added for did not return** under
-DXVK. If it ever does, the alternative is Omarchy window rules — see the Hyprland
-section.
+**The two-window focus bug the virtual desktop was added for** is fixed by
+`MenuScale.asi`'s `Embed=1` — see the Hyprland section.
 
 ### How it was found — kept because the method is the lesson
 
@@ -264,14 +264,11 @@ exclusive fullscreen, DXVK cannot change the display mode, and the fallback wins
 
 **The prime suspect is the Wine virtual desktop** (`Software\\Wine\\Explorer`,
 `Desktop=Default`, `Default=3440x1440`). wined3d never needed a real mode change inside
-it; DXVK calls `ChangeDisplaySettingsEx` and it fails. The Hyprland section below
-already records reverting the virtual desktop as the documented alternative, using
-Omarchy window rules instead — that is the next experiment, and it is one launch.
+it; DXVK calls `ChangeDisplaySettingsEx` and it fails. Turning it off was the next
+experiment, and it was the fix (above).
 
-**Current state: reverted to the stock chain so the game is playable.**
-`platform/d3d8-chain.py --revert` put the Patch Project proxy back; Direct3D 8 is wined3d
-on OpenGL again and `dxvk.conf` is inert. The DXVK chain is one command away
-(`--use dxvk`) whenever the fullscreen question is worth another launch.
+(While that was open, the chain was reverted to stock so the game stayed playable.
+That is history, not the current state.)
 
 **Note that the renderer question is now separable from the texture question.** Nothing
 about the texture work depends on any of this: it has always rendered through
@@ -289,21 +286,20 @@ Heroic's config. It is part of the working DXVK chain above.
 stayed grabbed by the other, so the menu was visible but could not be clicked. Focus
 kept snapping back to a black fullscreen frame.
 
-**Fix:** a Wine virtual desktop, so everything renders inside one window. Appended to
-`<prefix>/pfx/user.reg` (backup `user.reg.bak-a2`):
+**Cause:** every menu, the in-game Options included, is a `WS_POPUP` dialog, which Wine
+turns into a second X11 window that Hyprland tiles and focuses like a new application.
 
-    [Software\\Wine\\Explorer]
-    "Desktop"="Default"
+**Fix: `MenuScale.asi` with `Embed=1`** (the default it ships with) re-creates each
+menu as a child of the game window, so the game is one OS window from launch to exit.
+See `menus/README.md`, "One window: `Embed=1`".
 
-    [Software\\Wine\\Explorer\\Desktops]
-    "Default"="3440x1440"
-
-**Alternative if the virtual desktop ever causes trouble** (it is the prime suspect for
-the cutscene crash if the d3d8 chain turns out not to be the cause): revert it with
-`cp user.reg.bak-a2 user.reg` and use Omarchy window rules instead — `o.window(...)`
-with `fullscreen = true`, pattern at
-`/usr/share/omarchy/default/hypr/apps/retroarch.lua`. Note the window class is
-`steam_proton`, which is not unique to this game, so scope the rule by title.
+**The Wine virtual desktop is superseded and must stay off.** It was the first fix for
+this bug: `"Desktop"="Default"` under `[Software\\Wine\\Explorer]` in
+`<prefix>/pfx/user.reg`, which put everything in one window. It is incompatible with
+DXVK: inside it `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 (see
+above). `platform/virtual-desktop.py --status` confirms it is off, and `--off` removes it
+from a prefix that still has it. Do not turn it back on to fix a window problem; fix
+the window in `menuscale.c`.
 
 ## Known issues
 

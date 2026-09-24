@@ -328,7 +328,7 @@ static int is_dialog(HWND h)
  *
  * The reference is the SCREEN, not the owner window.  Measured: while the
  * menus are up, the game's own window is itself only 800x600, parked at the
- * top-left of the Wine desktop -- the engine does not go to the play
+ * top-left of the desktop -- the engine does not go to the play
  * resolution until a mission loads.  Fitting to the owner therefore produced
  * "scale 800/800", a no-op.  SM_CXSCREEN/SM_CYSCREEN report the desktop
  * (3440x1440 here), which is the area the menus should actually fill.
@@ -1855,8 +1855,8 @@ static void unsubclass(Slot *s)
  *     call ST3D_DisplayDevice::FindDisplayMode(int w, int h, int bpp)
  *
  * two sites, both the same twelve bytes.  So the shell has nowhere to be
- * scaled INTO: it already fills its screen, and Wine simply parks that small
- * screen in the corner of the virtual desktop.  Raising the front-end mode to
+ * scaled INTO: it already fills its screen, and that small screen simply sits
+ * in the corner of the real one.  Raising the front-end mode to
  * the desktop size gives the scaler its room; on its own it changes nothing,
  * because the shell would still draw its 800x600 in the corner.
  *

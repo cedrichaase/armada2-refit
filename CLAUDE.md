@@ -46,7 +46,7 @@ Required reading, by task:
   `textures/tools/inventory.py --md` from the game directory and this repo. Do not
   hand-edit it and do not re-derive its numbers in prose; re-run the tool.
 - **Anything renderer-adjacent: `platform/README.md`** — DLL overrides, the widescreen
-  patch, the d3d8 chain, the Hyprland virtual desktop, the save format.
+  patch, the d3d8 chain, window management under Hyprland, the save format.
 
 ## Changelogs and versions
 
@@ -509,7 +509,10 @@ only ever read.
   `syswow64/d3d8.dll` was recorded as DXVK's on the strength of its byte count and was
   *Wine's builtin*. The working chain keeps DXVK's `d3d8.dll` **and** `d3d9.dll` in the
   **game directory** (the prefix is not durable — Proton restores it from symlinks),
-  `d3d9=n,b` in the overrides, and the Wine virtual desktop **off**.
+  `d3d9=n,b` in the overrides, and the Wine virtual desktop **off**. The virtual desktop
+  is **superseded**: it was once the fix for menus opening as separate windows, which
+  `MenuScale.asi`'s `Embed=1` now solves inside the game window. Never turn it back on
+  to fix a window problem — fix it in `menuscale.c`.
   `platform/d3d8-chain.py --status` identifies every link **by hash; never identify one
   by size.** "Heroic redeploys DXVK" is `autoInstallDxvk` working as designed.
 - **Bloom** is vkBasalt, possible only because the chain is Vulkan. `postfx/postfx.py`

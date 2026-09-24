@@ -21,9 +21,10 @@ Two separate facts, both measured, and the second is the one that matters:
 2. **The engine asks for an 800x600 screen while the menus are up.** This is the real
    reason, and it is not what it looks like. `GetSystemMetrics(SM_CXSCREEN)` returns
    **800** at the main menu, and the game's own window is 800x600 at 0,0. The shell is
-   not drawing small inside a big screen — it is *filling a small screen*, which Wine
-   then parks in the corner of the virtual desktop because a tiling compositor will not
-   let the desktop window shrink to match. The mode is hard-coded:
+   not drawing small inside a big screen — it is *filling a small screen*. (Measured when
+   the prefix still ran a Wine virtual desktop, since superseded by `Embed=1`: Wine
+   parked that small screen in the desktop's corner, because a tiling compositor will
+   not let the desktop window shrink to match.) The mode is hard-coded:
 
        ST3D_GraphicsEngine::SetActiveDisplay_Internal
          push 0x10 ; push 600 ; push 800
