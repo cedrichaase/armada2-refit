@@ -11,7 +11,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 - `EscapeReturns=1` (default): Esc in the in-mission menu acts as Return to Game, so
   Esc both opens and closes it. Needs `Embed=1`; `0` leaves Esc stock. (`96f5ac1`)
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-25.
 
 ## 2.0.2 — 2026-09-25
 
