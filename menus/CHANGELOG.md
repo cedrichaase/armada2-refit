@@ -12,7 +12,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
   left the keyboard focus `NULL` when it returned, so every key was dropped until a
   restart. The focus is now restored to the window that held it. (`32656d7`)
 
-Installed, not yet seen in game. Confirmed in game 2026-09-25.
+Confirmed in game 2026-09-25.
 
 ## 2.0.1 — 2026-09-25
 
@@ -51,8 +51,7 @@ it disassembled identically to what was installed.
 MAJOR because the installed file names and the ini section changed. Migrated in the
 game directory on 2026-09-25: `MenuScale/` renamed to `Menus/` (plates byte-identical),
 `install.sh` run, and the `a2mod` manifest entries renamed. The plugin was load-tested
-under Proton's Wine (new names read, legacy guard fires). Installed, not yet seen in
-game. Confirmed in game 2026-09-25.
+under Proton's Wine (new names read, legacy guard fires). Confirmed in game 2026-09-25.
 
 ## 1.0.0 — 2026-09-25
 

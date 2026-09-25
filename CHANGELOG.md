@@ -13,7 +13,7 @@ Layers: menus 2.0.2.
 - In a mission, Esc opens Options again after it has been closed, and the keyboard
   works again after any in-game menu (see `menus/CHANGELOG.md`, `32656d7`).
 
-Installed, not yet seen in game. Confirmed in game 2026-09-25.
+Confirmed in game 2026-09-25.
 
 ## 3.0.1 — 2026-09-25
 
@@ -38,7 +38,7 @@ Layers: menus 2.0.0.
   reads old manifests' layer name as `menus`, and after restoring a pre-rename
   snapshot it says to run `menus/install.sh`.
 
-Installed, not yet seen in game. Confirmed in game 2026-09-25.
+Confirmed in game 2026-09-25.
 
 ## 2.0.0 — 2026-09-25
 
