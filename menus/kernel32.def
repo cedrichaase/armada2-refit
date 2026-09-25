@@ -25,3 +25,4 @@ VirtualAlloc@16
 VirtualFree@12
 QueryPerformanceCounter@4
 QueryPerformanceFrequency@4
+GetFileAttributesA@4

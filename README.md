@@ -17,7 +17,7 @@ here with its own README.
 | [`textures/`](textures/README.md) | textures | about 1,660 textures upscaled from their own stock art: skyboxes, nebulae, planets, UI, hulls |
 | [`models/`](models/logo-sod.py) | models | the mission loading screen, widened to fill 21:9 |
 | [`hud/`](hud/README.md) | hud layout | the in-game HUD re-laid out for widescreen; the cursors un-stretched |
-| [`menus/`](menus/README.md) | menu scale | `MenuScale.asi`: the 800x600 shell menus scaled to fill the screen, with outpainted backdrops |
+| [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops |
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | a `binkw32.dll` proxy that plays upscaled AV1 movies full screen |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
@@ -38,6 +38,12 @@ Not switched by `a2mod`, because the layers above stand on them:
 Each of the other layers installs and removes itself with its own script: `install.sh`
 in `menus/`, `msaa/` and `cutscenes/binkproxy/`, or a `--revert` flag on the Python
 tools. See the layer's README.
+
+## Versions
+
+Each layer folder has a `CHANGELOG.md` with its own semver version. The root
+[`CHANGELOG.md`](CHANGELOG.md) versions the modpack as a whole and lists the layer
+versions it bundles.
 
 `promo/` holds the before/after footage (videos not in git). `archive/` holds material
 that is paid for or cannot be regenerated; nothing in it is on

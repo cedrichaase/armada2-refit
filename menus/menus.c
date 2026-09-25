@@ -1,6 +1,21 @@
 /*
- * MenuScale.asi -- scale Star Trek: Armada II's 800x600 GDI shell up to the
- * real back buffer, uniformly and centred.
+ * Menus.asi -- fix Star Trek: Armada II's front-end menus (the GDI "shell").
+ * Called MenuScale.asi until menus 2.0.0; it outgrew the name.
+ *
+ * What it does, each part a section below:
+ *
+ *   display mode  raise the engine's hard-coded 800x600 front-end mode to the
+ *                 desktop, so there is a screen to scale into
+ *   scaling       draw every 800x600 dialog fitted and centred, and map input
+ *                 back (the three transforms under WHAT THIS DOES)
+ *   embedding     Embed=1: re-create every menu as a child of the game window,
+ *                 so the game is one OS window instead of one per menu
+ *   backdrops     Backdrops=1: composite hi-res outpainted plates behind the
+ *                 full-screen menus, filling the pillarboxes
+ *   underlay      Underlay=0: stop the shell painting each background 1:1 onto
+ *                 the 3D window, which flashed in the corner between menus
+ *
+ * The rest of this comment is about the scaling, which came first.
  *
  * WHY THIS HAS TO BE CODE
  * -----------------------
@@ -48,8 +63,8 @@
  * repositioned are touched.  The 3D window is not a dialog, so gameplay, the
  * HUD and the Bink videos are untouched by construction.
  *
- * Settings live in MenuScale.ini beside Armada2.exe; Mode=0 makes this a pure
- * logger and Mode=1 centres without scaling.  See MenuScale.ini for the keys.
+ * Settings live in Menus.ini beside Armada2.exe; Mode=0 makes this a pure
+ * logger and Mode=1 centres without scaling.  See Menus.ini for the keys.
  *
  * All arithmetic is 32-bit integer on purpose: this links with /nodefaultlib
  * and there is no CRT to provide 64-bit or floating-point helpers.  The
@@ -133,6 +148,7 @@ __declspec(dllimport) void   *__stdcall VirtualAlloc(void *, UINT, DWORD, DWORD)
 __declspec(dllimport) BOOL    __stdcall VirtualFree(void *, UINT, DWORD);
 __declspec(dllimport) BOOL    __stdcall QueryPerformanceCounter(LARGE_INTEGER *);
 __declspec(dllimport) BOOL    __stdcall QueryPerformanceFrequency(LARGE_INTEGER *);
+__declspec(dllimport) DWORD   __stdcall GetFileAttributesA(LPCSTR);
 __declspec(dllimport) HANDLE  __stdcall LoadImageA(HANDLE, LPCSTR, UINT, INT, INT, UINT);
 
 __declspec(dllimport) HDC     __stdcall BeginPaint(HWND, PAINTSTRUCT *);
@@ -328,7 +344,7 @@ static int is_dialog(HWND h)
  *
  * The reference is the SCREEN, not the owner window.  Measured: while the
  * menus are up, the game's own window is itself only 800x600, parked at the
- * top-left of the Wine desktop -- the engine does not go to the play
+ * top-left of the desktop -- the engine does not go to the play
  * resolution until a mission loads.  Fitting to the owner therefore produced
  * "scale 800/800", a no-op.  SM_CXSCREEN/SM_CYSCREEN report the desktop
  * (3440x1440 here), which is the area the menus should actually fill.
@@ -489,11 +505,11 @@ static void slot_placement(Slot *s, int *ox, int *oy, int *dw, int *dh);
  * background BMP first, then buttons, hover states, text and Bink animations
  * over it.  Only the composed frame ever reaches us, so a hi-res picture
  * cannot simply be swapped in -- the shell would still draw 800x600 of it.
- * Instead, for a screen listed under [Backdrops] in MenuScale.ini:
+ * Instead, for a screen listed under [Backdrops] in Menus.ini:
  *
  *   which screen   the frame is sampled against each listed stock BMP; the one
  *                  it still matches exactly at most sample points is on show.
- *   sides          come from the plate MenuScale\<name>.bmp, an outpainted
+ *   sides          come from the plate Menus\<name>.bmp, an outpainted
  *                  2.4:1 version whose centre 4:3 is the upscaled stock.
  *   centre         out = stretch(frame) + w * (plate - stretch(stock)),
  *                  per pixel, with w falling from 1 to 0 as the frame departs
@@ -523,7 +539,7 @@ static void slot_placement(Slot *s, int *ox, int *oy, int *dw, int *dh);
 
 typedef struct {
     char    stock[320];     /* bitmaps\...\x.bmp, the shell's own file       */
-    char    plate[320];     /* MenuScale\x.bmp                               */
+    char    plate[320];     /* Menus\x.bmp                                   */
     int     tried, bad;
     DWORD  *px;             /* stock pixels, design size, top-down           */
     HBITMAP bmp;            /* the DIB section px lives in                   */
@@ -797,7 +813,7 @@ static int bd_prepare(int idx, HDC real, int rw, int rh, int ox, int oy, int dw,
 }
 
 /*
- * DumpBackdrop=1: write the composed screen to MenuScale-backdrop<n>.bmp beside
+ * DumpBackdrop=1: write the composed screen to Menus-backdrop<n>.bmp beside
  * Armada2.exe, once per backdrop, a couple of seconds after it first shows (so
  * the Bink and the buttons are on it).  A test harness that does not have to
  * take the visible workspace away from whoever is at the desktop, which
@@ -825,7 +841,7 @@ static void bd_dump(int idx)
     *(LONG  *)(hdr + 22) = -g_c.rh;          /* top-down, like the buffer */
     *(WORD  *)(hdr + 26) = 1;
     *(WORD  *)(hdr + 28) = 32;
-    path[0] = 0; s_cat(path, g_dir); s_cat(path, "MenuScale-backdrop"); s_num(path, idx + 1);
+    path[0] = 0; s_cat(path, g_dir); s_cat(path, "Menus-backdrop"); s_num(path, idx + 1);
     s_cat(path, ".bmp");
     h = CreateFileA(path, GENERIC_WRITE, 0, NULLPTR, 2 /* CREATE_ALWAYS */, FILE_ATTRIBUTE_NORMAL, NULLPTR);
     if (h == INVALID_HANDLE_VALUE) return;
@@ -1114,7 +1130,7 @@ static void present(Slot *s, HDC real, int full)
  * with a WS_POPUP template (measured: every template in .rsrc but one).  An
  * owned popup is a separate top-level window, which on Windows sits quietly
  * on top of the fullscreen game.  Under Wine each one is its own X11 window,
- * and the compositor treats it as a new application window: MenuScale.log
+ * and the compositor treats it as a new application window: Menus.log
  * recorded menus at 3410x1378 and 1696x1378 -- the screen less Hyprland's
  * gaps, and a half-screen tile.  Focus then moves off the fullscreen 3D
  * window, which is what DXVK's fullscreen handling reacts to.
@@ -1389,7 +1405,7 @@ static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND o
         g_filter = SetWindowsHookExA(WH_GETMESSAGE, input_filter, NULLPTR, GetCurrentThreadId());
 
     /* The parent paints nothing over its menus: it is the D3D window, or a
-     * dialog whose content MenuScale blits through GetDC. */
+     * dialog whose content Menus blits through GetDC. */
     SetWindowLongA(owner, GWL_STYLE, GetWindowLongA(owner, GWL_STYLE) | (LONG)WS_CLIPCHILDREN);
 
     g_pendingProc = proc;
@@ -1855,8 +1871,8 @@ static void unsubclass(Slot *s)
  *     call ST3D_DisplayDevice::FindDisplayMode(int w, int h, int bpp)
  *
  * two sites, both the same twelve bytes.  So the shell has nowhere to be
- * scaled INTO: it already fills its screen, and Wine simply parks that small
- * screen in the corner of the virtual desktop.  Raising the front-end mode to
+ * scaled INTO: it already fills its screen, and that small screen simply sits
+ * in the corner of the real one.  Raising the front-end mode to
  * the desktop size gives the scaler its room; on its own it changes nothing,
  * because the shell would still draw its 800x600 in the corner.
  *
@@ -2086,13 +2102,27 @@ static void build_paths(char *ini)
     path[cut] = 0;
     g_dir[0] = 0; s_cat(g_dir, path);
 
-    ini[0] = 0;       s_cat(ini, path);       s_cat(ini, "MenuScale.ini");
-    g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "MenuScale.log");
+    ini[0] = 0;       s_cat(ini, path);       s_cat(ini, "Menus.ini");
+    g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "Menus.log");
 }
 
 /*
- * [Backdrops] in MenuScale.ini: N=<stock BMP, relative to the game directory>.
- * The plate for it is MenuScale\<same file name>.  A screen that is not listed
+ * This plugin was MenuScale.asi until menus 2.0.0.  The ASI loader loads every
+ * *.asi in the directory, so a MenuScale.asi left beside this one -- a stale
+ * install, or an a2mod snapshot restored from before the rename -- would hook
+ * every function twice.  Neither copy can undo the other, so this one stands
+ * down and says why in its log.
+ */
+static int legacy_present(void)
+{
+    char p[340];
+    p[0] = 0; s_cat(p, g_dir); s_cat(p, "MenuScale.asi");
+    return GetFileAttributesA(p) != 0xFFFFFFFFu;
+}
+
+/*
+ * [Backdrops] in Menus.ini: N=<stock BMP, relative to the game directory>.
+ * The plate for it is Menus\<same file name>.  A screen that is not listed
  * -- or whose plate is missing -- keeps black pillarboxes, as before.
  */
 static void bd_list(const char *ini)
@@ -2113,7 +2143,7 @@ static void bd_list(const char *ini)
         b = &g_bd[g_nbd++];
         memset(b, 0, sizeof *b);
         s_cat(b->stock, g_dir); s_cat(b->stock, val);
-        s_cat(b->plate, g_dir); s_cat(b->plate, "MenuScale\\"); s_cat(b->plate, base);
+        s_cat(b->plate, g_dir); s_cat(b->plate, "Menus\\"); s_cat(b->plate, base);
 
         /* N.soften=x,y,w,h ...: see bd_soften */
         key[1] = '.'; key[2] = 0; s_cat(key, "soften");
@@ -2153,19 +2183,26 @@ static void startup(void)
 
     build_paths(ini);
 
-    g_mode    = (int)GetPrivateProfileIntA("MenuScale", "Mode",         MODE_SCALE, ini);
-    g_designW = (int)GetPrivateProfileIntA("MenuScale", "DesignWidth",  800, ini);
-    g_designH = (int)GetPrivateProfileIntA("MenuScale", "DesignHeight", 600, ini);
-    g_integer = (int)GetPrivateProfileIntA("MenuScale", "IntegerScale", 0,   ini);
-    g_smooth  = (int)GetPrivateProfileIntA("MenuScale", "Smooth",       1,   ini);
-    g_shellMode = (int)GetPrivateProfileIntA("MenuScale", "RaiseShellMode", 1, ini);
-    g_logging = (int)GetPrivateProfileIntA("MenuScale", "Log",          1,   ini);
-    g_embed   = (int)GetPrivateProfileIntA("MenuScale", "Embed",        0,   ini);
-    g_trace   = (int)GetPrivateProfileIntA("MenuScale", "Trace",        0,   ini);
-    g_dump    = (int)GetPrivateProfileIntA("MenuScale", "DumpBackdrop", 0,   ini);
-    g_backdrops = (int)GetPrivateProfileIntA("MenuScale", "Backdrops",  1,   ini);
-    g_tol     = (int)GetPrivateProfileIntA("MenuScale", "DetailTolerance", 48, ini);
-    g_floor   = (int)GetPrivateProfileIntA("MenuScale", "NoiseFloor", 6, ini);
+    if (legacy_present()) {
+        logline("--- Menus: MenuScale.asi (the pre-2.0.0 name of this plugin) is "
+                "also installed; standing down so nothing is hooked twice. "
+                "Remove it: menus/install.sh does.");
+        return;
+    }
+
+    g_mode   = (int)GetPrivateProfileIntA("Menus", "Mode",         MODE_SCALE, ini);
+    g_designW = (int)GetPrivateProfileIntA("Menus", "DesignWidth",  800, ini);
+    g_designH = (int)GetPrivateProfileIntA("Menus", "DesignHeight", 600, ini);
+    g_integer = (int)GetPrivateProfileIntA("Menus", "IntegerScale", 0,   ini);
+    g_smooth  = (int)GetPrivateProfileIntA("Menus", "Smooth",       1,   ini);
+    g_shellMode = (int)GetPrivateProfileIntA("Menus", "RaiseShellMode", 1, ini);
+    g_logging = (int)GetPrivateProfileIntA("Menus", "Log",          1,   ini);
+    g_embed   = (int)GetPrivateProfileIntA("Menus", "Embed",        0,   ini);
+    g_trace   = (int)GetPrivateProfileIntA("Menus", "Trace",        0,   ini);
+    g_dump    = (int)GetPrivateProfileIntA("Menus", "DumpBackdrop", 0,   ini);
+    g_backdrops = (int)GetPrivateProfileIntA("Menus", "Backdrops",  1,   ini);
+    g_tol     = (int)GetPrivateProfileIntA("Menus", "DetailTolerance", 48, ini);
+    g_floor   = (int)GetPrivateProfileIntA("Menus", "NoiseFloor", 6, ini);
 
     if (g_designW < 16) g_designW = 800;
     if (g_designH < 16) g_designH = 600;
@@ -2178,9 +2215,9 @@ static void startup(void)
      * DllMain time the mode change has not happened yet, so GetSystemMetrics
      * still reports the real desktop -- which is the size we want. */
     if (g_mode != MODE_LOG && g_shellMode) {
-        int sw = (int)GetPrivateProfileIntA("MenuScale", "ShellWidth",  0, ini);
-        int sh = (int)GetPrivateProfileIntA("MenuScale", "ShellHeight", 0, ini);
-        int sb = (int)GetPrivateProfileIntA("MenuScale", "ShellBpp",   32, ini);
+        int sw = (int)GetPrivateProfileIntA("Menus", "ShellWidth",  0, ini);
+        int sh = (int)GetPrivateProfileIntA("Menus", "ShellHeight", 0, ini);
+        int sb = (int)GetPrivateProfileIntA("Menus", "ShellBpp",   32, ini);
         char m[192];
 
         if (sw < g_designW) sw = GetSystemMetrics(SM_CXSCREEN);
@@ -2200,7 +2237,7 @@ static void startup(void)
     }
 
     if (g_mode == MODE_SCALE &&
-        !GetPrivateProfileIntA("MenuScale", "Underlay", 0, ini)) {
+        !GetPrivateProfileIntA("Menus", "Underlay", 0, ini)) {
         char m[64];
         m[0] = 0;
         s_cat(m, "shell underlay removed, sites patched ");
@@ -2238,7 +2275,7 @@ static void startup(void)
     if (!o_DialogBoxParamA) g_embed = 0;
 
     b[0] = 0;
-    s_cat(b, "--- MenuScale mode=");  s_num(b, g_mode);
+    s_cat(b, "--- Menus mode=");  s_num(b, g_mode);
     s_cat(b, " design=");             s_num(b, g_designW);
     s_cat(b, "x");                    s_num(b, g_designH);
     s_cat(b, " integer=");            s_num(b, g_integer);

@@ -1,6 +1,6 @@
 /*
  * probe.exe -- look at and poke the running game from inside its own Wine
- * session.  A test tool for MenuScale, not part of the plugin.
+ * session.  A test tool for Menus.asi, not part of the plugin.
  *
  *   probe list          every visible top-level window: class, style, rect
  *   probe tree          the same, with every descendant window indented

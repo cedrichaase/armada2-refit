@@ -10,7 +10,7 @@ WHY A SNAPSHOT AND NOT A REINSTALL
 
 The obvious design -- `a2tex revert all`, then `a2tex install` and each tool's
 installer -- does not reproduce what is installed.  Installed layers have lived only on
-unmerged branches before (MenuScale's Embed=1 build and the condensed font both did),
+unmerged branches before (the menus layer's Embed=1 build and the condensed font both did),
 and the textures depend on textures/targets/*/out, which only the main checkout has.  A reinstall from whatever
 branch happens to be checked out would quietly swap in something else, and a
 before/after taken across that is comparing the wrong "after".
@@ -26,7 +26,8 @@ WHAT COUNTS AS A CHANGE
     font          *.a2font-backup              -- font/ui-font-condense.py
     models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel)
     hud layout    misc/*.a2neb-backup          -- ui-widescreen (canvas, palette)
-    menu scale    MenuScale.asi/.ini, MenuScale/*.bmp -- added files, stock has none
+    menus         Menus.asi/.ini, Menus/*.bmp  -- added files, stock has none
+                  (MenuScale.* before menus 2.0.0 -- still recognised, see LEGACY_MENUS)
     msaa          MSAA.asi/.ini                -- added files
     cutscenes     binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
                   animations/<Name>.mp4/.wav beside a <Name>.bik  -- cutscenes/binkproxy
@@ -70,11 +71,17 @@ VKCONF = os.path.join(os.environ.get('XDG_DATA_HOME', os.path.expanduser('~/.loc
 BACKUPS = ('.a2neb-backup', '.a2font-backup')
 # Backups that exist but are not a visual change -- see "deliberately not switched".
 EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
-ADDED = [('MenuScale.asi', 'menu scale'), ('MenuScale.ini', 'menu scale'),
+# The menus plugin was MenuScale.asi (with .ini and a MenuScale/ plate folder) before
+# menus 2.0.0.  menus/install.sh removes the old names, but a stale copy -- or one
+# restored from a snapshot taken before the rename -- is still a modded file, so it
+# is found and set aside like the new ones rather than left live in stock.
+LEGACY_MENUS = 'MenuScale'
+ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
+         ('MenuScale.asi', 'menus'), ('MenuScale.ini', 'menus'),
          ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'font', 'hud layout', 'menu scale', 'msaa', 'cutscenes',
+LAYERS = ['textures', 'models', 'font', 'hud layout', 'menus', 'msaa', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
@@ -139,12 +146,13 @@ def discover():
         stem, ext = os.path.splitext(f)
         if ext.lower() in MOVIE_EXTS and stem.lower() in biks:
             found.append({'rel': f'{MOVIE_DIR}/{f}', 'kind': 'added', 'layer': 'cutscenes'})
-    # MenuScale's backdrop plates (menus/backdrop.sh), one per menu screen.
-    plates = os.path.join(GAME, 'MenuScale')
-    if os.path.isdir(plates):
-        for f in sorted(os.listdir(plates)):
-            if f.lower().endswith('.bmp'):
-                found.append({'rel': f'MenuScale/{f}', 'kind': 'added', 'layer': 'menu scale'})
+    # The menus layer's backdrop plates (menus/backdrop.sh), one per menu screen.
+    for d in ('Menus', LEGACY_MENUS):
+        plates = os.path.join(GAME, d)
+        if os.path.isdir(plates):
+            for f in sorted(os.listdir(plates)):
+                if f.lower().endswith('.bmp'):
+                    found.append({'rel': f'{d}/{f}', 'kind': 'added', 'layer': 'menus'})
     return sorted(found, key=lambda e: e['rel'])
 
 
@@ -156,9 +164,14 @@ def game_running():
 def load_state():
     try:
         with open(STATE) as fh:
-            return json.load(fh)
+            st = json.load(fh)
     except FileNotFoundError:
         return None
+    # Manifests written before menus 2.0.0 call the layer 'menu scale'.
+    for e in st.get('entries', []):
+        if e.get('layer') == 'menu scale':
+            e['layer'] = 'menus'
+    return st
 
 
 def save_state(st):
@@ -318,6 +331,10 @@ def to_remastered(dry, force):
         except OSError:
             pass
     print(f'remastered: {len(entries)} files restored and verified against the manifest')
+    if any(e['rel'].split('/')[0].startswith(LEGACY_MENUS) for e in entries):
+        print(f'note: this snapshot predates the menus rename and restored {LEGACY_MENUS}.*; '
+              f'run menus/install.sh to replace it with Menus.asi (a Menus.asi beside it '
+              f'stands down rather than hook twice)')
     status()
 
 

@@ -22,13 +22,13 @@ mkdir -p "$OUT"
 # nothing and every run leaks an instance that keeps playing the menu music.
 QUIET=1 bash "$here/stop-game.sh"
 sleep 1
-rm -f "/home/cedric/Games/Heroic/Star Trek Armada II/MenuScale.log"
+rm -f "/home/cedric/Games/Heroic/Star Trek Armada II/Menus.log"
 
 nohup bash "$here/run-wine.sh" > "$OUT/$TAG.wine.log" 2>&1 &
 
 # Liveness is tracked by the WINDOW, not by pgrep.  `pgrep -x Armada2.exe`
 # does not match here even while the game is plainly running and writing to
-# MenuScale.log, and believing it produced several wrong "the game exited"
+# Menus.log, and believing it produced several wrong "the game exited"
 # conclusions.  The window is the thing we are photographing anyway.
 alive() { hyprctl clients -j | grep -q steam_proton; }
 onws()  { hyprctl clients -j | python3 -c "
@@ -58,20 +58,20 @@ done
 # Wait for the shell to actually lay a dialog out before photographing it --
 # the log tells us when, which beats guessing at a delay.
 for _ in $(seq 1 60); do
-    grep -q "MoveWindow" "/home/cedric/Games/Heroic/Star Trek Armada II/MenuScale.log" 2>/dev/null && break
+    grep -q "MoveWindow" "/home/cedric/Games/Heroic/Star Trek Armada II/Menus.log" 2>/dev/null && break
     sleep 1
 done
 
 # NOSHOT=1 launches and waits without photographing: shot.sh has to switch
 # the visible workspace to grab a frame, which takes the screen away from
-# whoever is using it.  MenuScale's DumpFrames=1 is the quiet alternative.
+# whoever is using it.  Menus.asi's DumpFrames=1 is the quiet alternative.
 [ "${NOSHOT:-0}" = 1 ] || for t in 1 2 3; do
     bash "$here/shot.sh" "$OUT/$TAG-$t.png" >/dev/null 2>&1 || true
     sleep 4
     alive || { echo "window gone by shot $t"; break; }
 done
 
-echo "--- MenuScale.log"
-cat "/home/cedric/Games/Heroic/Star Trek Armada II/MenuScale.log" 2>/dev/null || true
+echo "--- Menus.log"
+cat "/home/cedric/Games/Heroic/Star Trek Armada II/Menus.log" 2>/dev/null || true
 echo "--- shots"
 ls -1 "$OUT/$TAG"-*.png 2>/dev/null || true

@@ -195,7 +195,7 @@ cheapest one died when the chain changed:
 
 **Supersampling by rendering above display resolution remains a trap.** It looks free
 given the GPU headroom and is not: `ui-widescreen.py`'s canvas arithmetic, the
-`popupPaletteXA` correction and `MenuScale.asi`'s desktop-size read are all tuned to
+`popupPaletteXA` correction and `Menus.asi`'s desktop-size read are all tuned to
 3440x1440 and would need re-deriving.
 
 ## Tier 3 — post-processing: bloom done, the rest untried
