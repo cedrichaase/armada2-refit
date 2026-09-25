@@ -111,9 +111,9 @@ each handled, each measured:
   loss, it used to hang off the bottom (Return to Game unreachable). Embedded
   full-screen menus now follow their parent's client area.
 
-`CreateDialogParamA` (two sites, both the admiral's log, one already a
-`WS_CHILD` template) is left alone. `Embed=0` restores separate windows; the
-`DialogBoxParamA` hook then only logs.
+`CreateDialogParamA` is embedded the same way, without the modal bookkeeping. Its
+one call site is the Admiral's Log (below). `Embed=0` restores separate windows; both
+hooks then only log.
 
 **The cursor.** The 3D window's `WindowProc` answers every `WM_SETCURSOR` with
 `SetCursor(NULL)` (`0x488881`), so the engine's sprite cursor can show in play. A child's
@@ -123,15 +123,59 @@ of the window under the pointer itself, as a top-level dialog did. Checked on th
 menu and Options. The in-mission menu, and the sprite cursor returning after Return to
 Game, are left to the user's play-through.
 
-### Open: the Admiral's Log still shows a window inside the window
+### The Admiral's Log
 
-Reported in game: a border around the centre content. `AdmiralsLogDlgProc` builds its
-panes itself. It calls `CreateDialogParamA(shell_hInstance, 0x123, ..., 
-ScreenInformation::CallDialogProc)` at `0x5e3c04`, positioned via `ClientToScreen`
-(it's modeless, so the `DialogBoxParamA` hook never sees it), plus two `CreateWindowExA`
-(`0x5e394e`, and `0x5e3b7b` with style `0x5000000b`). Next step: hook
-`CreateDialogParamA` the same way as `DialogBoxParamA` (WS_POPUP -> WS_CHILD, no modal
-bookkeeping), then read the two `CreateWindowExA` styles.
+The log was the one shell screen still wrong after Embed, in three ways, and all three
+came from it being built from real windows where every other screen draws
+`ShellButton` bitmaps into itself. Reported with a screen recording on 2026-09-25:
+the score table stayed on top of every menu after the log closed, and the log's
+buttons sat 1:1 in the top-left corner while its backdrop was scaled.
+
+`AdmiralsLogDlgProc` (`0x5e22c0`) is opened by `do_admiralsLog` as an ordinary
+`DialogBoxParamA(0x880)`, full-screen, so the log itself was always letterboxed. In
+its `WM_INITDIALOG` it then creates:
+
+- **Eight tab panes**: `CreateDialogParamA(shell_hInstance, 0x123, hDlg,
+  ScreenInformation::CallDialogProc)` at `0x5e3c04`, then `SetWindowPos` in screen
+  coordinates (`ClientToScreen(hDlg)` of `dialogWinRect`). Template `0x123` is a
+  plain `WS_POPUP` with no controls, the main menu's. **The game never destroys the
+  panes.** It relies on an owned popup dying with its owner. Once the log is a
+  `WS_CHILD`, that breaks: a popup's owner is always a top-level window, so the panes
+  were owned by the 3D window, outlived the log, and sat over every later menu. Each
+  was also its own X11 window, which is the "window inside the window" border
+  (Hyprland's frame).
+- **The player list and the eight tabs**: `CreateWindowExA("button", ...,
+  0x5000200b / 0x5000000b, x, y, w, h, hDlg)` at `0x5e394e` and `0x5e3b7b`, i.e.
+  `WS_CHILD | WS_VISIBLE | BS_OWNERDRAW` at design coordinates. **Save** and **Done**
+  are the same kind of button. The Ships and Battles panes add more (`0x5f7e4f`,
+  `0x5e9b63`). A child window is not drawn through its parent's DC, so the design
+  surface never saw them.
+
+The fix, in `menus.c`:
+
+- `CreateDialogParamA` goes through `child_template()` like `DialogBoxParamA`, so the
+  panes are children of the log and die with it.
+- A dialog whose anchor is a letterboxed dialog is fitted through *that dialog's*
+  placement, not the screen's. It is the same answer while the game fills the
+  screen, and the right one when Hyprland has re-tiled it.
+- **Owner-drawn buttons** of any scaled dialog have their geometry mapped at
+  `CreateWindowExA`/`MoveWindow`/`SetWindowPos`. Any created before their dialog was
+  scaled are adopted from their current, still-design, position. Their pixels come
+  from the parent's `WM_DRAWITEM`, which draws only through `DRAWITEMSTRUCT.hDC` and
+  `.rcItem`. The subclass hands it a design-sized memory DC and stretches the result
+  onto the button.
+- **A stock bug the memory DC exposes.** The tab and Save/Done helper (`0x5e93a0`)
+  ends by selecting the bitmap its own memory DC started with, the 1x1 default,
+  into **`dis->hDC`** (`0x5e94d7`) instead of back into its memory DC. Into a window
+  DC that fails harmlessly. Into ours it swapped the surface out after the drawing
+  had landed, and those buttons came out as plain grey button face. `ctl_draw`
+  re-selects its bitmap after the call. The player-list helper (`0x5e9510`) does not
+  do this, which is how the two were told apart: `GetPixel` on the surface read a
+  colour for one and `CLR_INVALID` for the other.
+
+Checked in game (2026-09-25): the log scaled and centred with everything in place,
+from both Options and the end of a mission. Tab clicks switch panes, and Done leaves
+exactly one dialog. After aborting a skirmish, Done returns to a clean main menu.
 
 ## GetDC and ReleaseDC do not pair up in this game
 
@@ -374,6 +418,16 @@ every Embed claim above was checked without a human at the mouse:
 required**: without it the name does not resolve and you get the HUD with no
 map. Missions open with an in-engine cutscene, and Space skips it.
 
+**For an in-game menu, launch a skirmish map instead** (`A2_ARGS="-nointro
+mp02eye.bzn"`, with `WAITLOG=0`). It has no script, so there is no cutscene and no
+briefing, and the game takes input about 3 s after its window appears. `WAITLOG=0`
+skips `capture.sh`'s wait for a menu to lay out, which otherwise sits out its whole
+minute because no menu opens. Then press Esc once a second until `Menus.log` shows a
+`DialogBoxParamA` line: that is Options, open. A game started on a map **quits
+when the mission ends** (abort included), because there is no shell to return to.
+To test a return to the menus, start from the main menu: Instant Action, then
+LAUNCH.
+
 `run-wine.sh` launches the game with Proton's bundled Wine directly against the existing
 prefix, skipping Heroic and the proton wrapper. It is the only launch path that prints
 Wine's diagnostics to a terminal — which is how `Unable to load MenuScale.asi. Error:
@@ -458,12 +512,13 @@ why neither was done up front.
 - **Hover and click are confirmed to land correctly**; nothing has been measured about
   how *fast* they are. See the animation stall above.
 - **Real child controls** (edit boxes, list boxes — the multiplayer screens use them)
-  are separate HWNDs that Windows draws itself. They are not covered by the offscreen
-  redirect and will sit unscaled. The main screens are custom-drawn `ShellButton`
-  bitmaps and are fine. **Seen:** Save Game's name field (`Edit`, 476x28 at design
-  176,551) draws at 1:1 at its unscaled position. The user confirms this in game for
-all text boxes, and they are still usable. Embed does not change this. The fix is
-  to map child-control geometry through the same fit, plus a scaled font.
+  are separate HWNDs that Windows draws itself. Owner-drawn buttons are the exception
+  and are scaled (see "The Admiral's Log"). The rest are not covered by the offscreen
+  redirect and sit unscaled. The main screens are custom-drawn `ShellButton` bitmaps
+  and are fine. **Seen:** Save Game's name field (`Edit`, 476x28 at design 176,551)
+  draws at 1:1 at its unscaled position. The user confirms this in game for all text
+  boxes, and they are still usable. Embed does not change this. The fix is to map
+  their geometry the way the owner-drawn buttons' is, plus a scaled font.
 - **Menus drawn inside the renderer** (the Direct3D route) was considered and
   deferred. Embed gets one OS window without it, and the GDI child draws correctly over
   the DXVK surface because the game loop is blocked while any menu is open.

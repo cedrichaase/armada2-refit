@@ -5,6 +5,22 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 2.0.1 — 2026-09-25
+
+### Fixed
+- The Admiral's Log's tab panes (`CreateDialogParamA`) are embedded as children of the
+  log, so they close with it. They had outlived it, owned by the 3D window, and the
+  score table stayed on top of every menu afterwards.
+- The log's owner-drawn buttons (player list, tabs, Save/Done, and those in the Ships
+  and Battles panes) are scaled and placed with the rest of the screen, instead of
+  drawing 1:1 in the top-left corner. New `CreateWindowExA` hook, and a design-sized
+  `WM_DRAWITEM` surface.
+- A dialog inside a letterboxed dialog is fitted through that dialog's placement
+  rather than the screen's.
+
+Checked in test launches (Options and end-of-mission log, tabs, Done, return to the
+main menu). Installed, not yet seen in game.
+
 ## 2.0.0 — 2026-09-25
 
 The plugin is renamed from `MenuScale` to `Menus`, because scaling is about a third of

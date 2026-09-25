@@ -13,3 +13,4 @@ GetDIBits@28
 BitBlt@36
 GdiFlush@0
 GetObjectA@12
+GetCurrentObject@8

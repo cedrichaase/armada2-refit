@@ -179,6 +179,10 @@ typedef HANDLE HGLOBAL;
 typedef HANDLE HHOOK;
 
 __declspec(dllimport) LONG_PTR __stdcall DialogBoxIndirectParamA(HINSTANCE, const void *, HWND, DLGPROC, LPARAM);
+__declspec(dllimport) HWND    __stdcall CreateDialogParamA(HINSTANCE, LPCSTR, HWND, DLGPROC, LPARAM);
+__declspec(dllimport) HWND    __stdcall CreateDialogIndirectParamA(HINSTANCE, const void *, HWND, DLGPROC, LPARAM);
+__declspec(dllimport) HWND    __stdcall CreateWindowExA(DWORD, LPCSTR, LPCSTR, DWORD, INT, INT, INT, INT,
+                                                        HWND, HANDLE, HINSTANCE, void *);
 __declspec(dllimport) BOOL    __stdcall EnableWindow(HWND, BOOL);
 __declspec(dllimport) BOOL    __stdcall IsWindowEnabled(HWND);
 __declspec(dllimport) HWND    __stdcall GetParent(HWND);
@@ -213,6 +217,7 @@ __declspec(dllimport) INT     __stdcall GetDIBits(HDC, HBITMAP, UINT, UINT, void
 __declspec(dllimport) BOOL    __stdcall BitBlt(HDC, INT, INT, INT, INT, HDC, INT, INT, DWORD);
 __declspec(dllimport) BOOL    __stdcall GdiFlush(void);
 __declspec(dllimport) INT     __stdcall GetObjectA(HGDIOBJ, INT, void *);
+__declspec(dllimport) HGDIOBJ __stdcall GetCurrentObject(HDC, UINT);
 
 #define PAGE_READWRITE        0x04
 #define GENERIC_WRITE         0x40000000
@@ -403,7 +408,7 @@ static HBITMAP dib32(HDC ref, int w, int h, DWORD **bits)
     return b;
 }
 
-#define MAXSLOT  12
+#define MAXSLOT  24     /* the Admiral's Log alone holds nine: itself and 8 panes */
 
 typedef struct {
     HWND    hwnd;
@@ -1155,8 +1160,14 @@ static void present(Slot *s, HDC real, int full)
  *             where the game expects its 3D window.  Answered with the parent
  *             for the dialogs embedded here.
  *
- * Only DialogBoxParamA is embedded.  CreateDialogParamA (two sites, both the
- * admiral's log, one of which is already a WS_CHILD template) is left alone.
+ * CreateDialogParamA is embedded too.  It has one call site (0x5e3c04): the
+ * Admiral's Log creates its eight tab panes with it, from the WS_POPUP
+ * template 0x123 with the log as parent, and never destroys them -- it relies
+ * on an owned popup dying with its owner.  Once the log itself is a WS_CHILD
+ * that no longer holds: a popup's owner is always a top-level window, so the
+ * panes were owned by the 3D window, outlived the log, and sat on top of every
+ * menu after it.  As children of the log they die with it, as in stock.  They
+ * are modeless, so none of the modal bookkeeping below applies to them.
  */
 
 #define WS_POPUP         0x80000000UL
@@ -1197,16 +1208,19 @@ typedef struct {
     DLGPROC proc;               /* the game's dialog procedure             */
     HWND    owner;              /* the owner the game asked for            */
     int     modal;              /* 1 once WM_INITDIALOG has run            */
+    int     modeless;           /* from CreateDialogParamA: never modal    */
 } Emb;
 
 static Emb     g_emb[MAXEMB];
 static DLGPROC g_pendingProc;   /* handed to the next unknown window       */
 static HWND    g_pendingOwner;
+static int     g_pendingModeless;
 static HHOOK   g_filter;
 static int     g_embedded;      /* count, for the log                      */
 
 static HWND (__stdcall *o_GetWindow)(HWND, UINT);
 static void start_flush(void);
+static void ctl_adopt(HWND parent);
 static LONG_PTR (__stdcall *o_DialogBoxParamA)(HINSTANCE, LPCSTR, HWND, DLGPROC, LPARAM);
 
 static Emb *emb_get(HWND h)
@@ -1292,7 +1306,8 @@ static LONG_PTR __stdcall embed_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (i == MAXEMB) i = 0;
         e = &g_emb[i];
         e->hwnd = h; e->proc = g_pendingProc; e->owner = g_pendingOwner; e->modal = 0;
-        g_pendingProc = NULLPTR; g_pendingOwner = NULLPTR;
+        e->modeless = g_pendingModeless;
+        g_pendingProc = NULLPTR; g_pendingOwner = NULLPTR; g_pendingModeless = 0;
     }
 
     r = e->proc ? e->proc(h, msg, wp, lp) : 0;
@@ -1314,8 +1329,18 @@ static LONG_PTR __stdcall embed_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return TRUE;
     }
 
-    if (msg == WM_INITDIALOG) {
+    if (msg == WM_INITDIALOG && e->modeless) {
+        ctl_adopt(h);
+        if (g_logging) {
+            char b[96];
+            b[0] = 0;
+            s_cat(b, "embedded modeless dialog as child of ");
+            s_num(b, (long)(UINT_PTR)GetParent(h));
+            logline(b);
+        }
+    } else if (msg == WM_INITDIALOG) {
         HWND top = GetAncestor(h, GA_ROOT);
+        ctl_adopt(h);
         if (top && top != h && !IsWindowEnabled(top)) EnableWindow(top, TRUE);
         /* A dialog opened from another menu is NOT made a child of that menu:
          * for a modal dialog Wine walks the owner up to its top-level window
@@ -1341,7 +1366,7 @@ static LONG_PTR __stdcall embed_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             logline(b);
         }
     } else if (msg == WM_NCDESTROY) {
-        e->hwnd = NULLPTR; e->proc = NULLPTR; e->owner = NULLPTR; e->modal = 0;
+        e->hwnd = NULLPTR; e->proc = NULLPTR; e->owner = NULLPTR; e->modal = 0; e->modeless = 0;
     }
     return r;
 }
@@ -1423,6 +1448,43 @@ static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND o
     return r;
 }
 
+static HWND (__stdcall *o_CreateDialogParamA)(HINSTANCE, LPCSTR, HWND, DLGPROC, LPARAM);
+
+/* The Admiral's Log's tab panes -- see the note at the top of this section. */
+static HWND __stdcall my_CreateDialogParamA(HINSTANCE inst, LPCSTR name, HWND parent,
+                                            DLGPROC proc, LPARAM lp)
+{
+    BYTE *tpl;
+    HWND  h;
+
+    if (g_logging) {
+        char b[160];
+        b[0] = 0;
+        s_cat(b, "CreateDialogParamA template ");
+        if ((UINT_PTR)name < 0x10000) s_num(b, (long)(UINT_PTR)name); else s_cat(b, name);
+        s_cat(b, (parent && is_dialog(parent)) ? " parent=dialog" : parent ? " parent=window" : " parent=none");
+        logline(b);
+    }
+
+    if (!g_embed || g_mode == MODE_LOG || !parent || !proc)
+        return o_CreateDialogParamA(inst, name, parent, proc, lp);
+
+    tpl = child_template(inst, name);
+    if (!tpl) return o_CreateDialogParamA(inst, name, parent, proc, lp);
+
+    SetWindowLongA(parent, GWL_STYLE, GetWindowLongA(parent, GWL_STYLE) | (LONG)WS_CLIPCHILDREN);
+
+    g_pendingProc = proc;
+    g_pendingOwner = parent;
+    g_pendingModeless = 1;
+    h = CreateDialogIndirectParamA(inst, tpl, parent, embed_proc, lp);
+    g_pendingProc = NULLPTR;
+    g_pendingOwner = NULLPTR;
+    g_pendingModeless = 0;
+    HeapFree(GetProcessHeap(), 0, tpl);
+    return h;
+}
+
 /* The game asks for a dialog's owner to position it and to talk to the 3D
  * window.  An embedded dialog has a parent instead; report that. */
 static HWND __stdcall my_GetWindow(HWND h, UINT cmd)
@@ -1430,6 +1492,225 @@ static HWND __stdcall my_GetWindow(HWND h, UINT cmd)
     Emb *e = emb_get(h);
     if (cmd == GW_OWNER && e) return e->owner ? e->owner : GetParent(h);
     return o_GetWindow(h, cmd);
+}
+
+/* ---- owner-drawn child controls --------------------------------------- */
+/*
+ * The Admiral's Log is the one shell screen built from real child windows.
+ * Everywhere else a button is a ShellButton bitmap drawn through GetDC into
+ * the dialog itself, which the design surface catches.  AdmiralsLogDlgProc
+ * instead creates its player list and its eight tabs as
+ *
+ *     CreateWindowExA(0, "button", ..., WS_CHILD|WS_VISIBLE|BS_OWNERDRAW,
+ *                     x, y, w, h, hDlg, ...)            (0x5e394e, 0x5e3b7b)
+ *
+ * and the Ships and Battles panes do the same (0x5f7e4f, 0x5e9b63).  A child
+ * window is not drawn through its parent's DC, so these sat 1:1 at their
+ * design coordinates in the top-left of the screen while the log around them
+ * was scaled.
+ *
+ * An owner-drawn button is the one kind of control that can be scaled whole.
+ * Its geometry is mapped through its parent's fit, as a dialog's is.  Its
+ * pixels come from the parent's WM_DRAWITEM, which draws only through
+ * DRAWITEMSTRUCT.hDC and .rcItem (0x5e9510); those are swapped for a
+ * design-sized surface, and the result is stretched onto the real button.
+ *
+ * Other controls -- the edit boxes -- draw themselves in their own font and
+ * are left alone: README, "Real child controls".
+ */
+#define MAXCTL        96
+#define BS_TYPEMASK   0x0000000FUL
+#define BS_OWNERDRAW  0x0000000BUL
+#define WM_DRAWITEM   0x002B
+#define GW_HWNDNEXT   2
+#define GW_CHILD      5
+#define CW_USEDEFAULT ((INT)0x80000000)
+#define OBJ_FONT      6
+
+typedef struct {
+    UINT  CtlType, CtlID, itemID, itemAction, itemState;
+    HWND  hwndItem;
+    HDC   hDC;
+    RECT  rcItem;
+    DWORD itemData;
+} DRAWITEMSTRUCT;
+
+typedef struct {
+    HWND hwnd, parent;
+    int  x, y, w, h;            /* design rectangle, parent's design space */
+} Ctl;
+
+static Ctl g_ctl[MAXCTL];
+static int g_ctlLogged;
+
+static HWND (__stdcall *o_CreateWindowExA)(DWORD, LPCSTR, LPCSTR, DWORD, INT, INT, INT, INT,
+                                           HWND, HANDLE, HINSTANCE, void *);
+
+static int same_name_ci(const char *a, const char *b);
+
+static Ctl *ctl_get(HWND h)
+{
+    int i;
+    if (!h) return NULLPTR;
+    for (i = 0; i < MAXCTL; i++)
+        if (g_ctl[i].hwnd == h) return &g_ctl[i];
+    return NULLPTR;
+}
+
+static Ctl *ctl_add(HWND h, HWND parent, int x, int y, int w, int ht)
+{
+    int i;
+    Ctl *c = ctl_get(h);
+    for (i = 0; !c && i < MAXCTL; i++)
+        if (!g_ctl[i].hwnd || !IsWindow(g_ctl[i].hwnd)) c = &g_ctl[i];
+    if (!c) return NULLPTR;               /* full: it stays unscaled */
+    c->hwnd = h; c->parent = parent;
+    c->x = x; c->y = y; c->w = w; c->h = ht;
+    return c;
+}
+
+/* A dialog we are scaling, i.e. one whose children live in design space. */
+static Slot *scaled_parent(HWND parent)
+{
+    Slot *s = slot_get(parent);
+    return (g_mode == MODE_SCALE && s && s->dw > 0 && s->dh > 0) ? s : NULLPTR;
+}
+
+static int ownerdraw_button(LPCSTR cls, DWORD style)
+{
+    return (style & WS_CHILD) && (style & BS_TYPEMASK) == BS_OWNERDRAW &&
+           cls && (UINT_PTR)cls >= 0x10000 && same_name_ci(cls, "button");
+}
+
+static int is_ownerdraw_button(HWND h)
+{
+    char cls[16];
+    if (GetClassNameA(h, cls, 16) <= 0) return 0;
+    return ownerdraw_button(cls, (DWORD)GetWindowLongA(h, GWL_STYLE));
+}
+
+/* Design rectangle -> parent-client pixels.  Edges are mapped, not sizes, so
+ * the tabs, which abut, still abut. */
+static void ctl_rect(Slot *p, int x, int y, int w, int ht, int *rx, int *ry, int *rw, int *rh)
+{
+    int ox, oy, dw, dh;
+    slot_placement(p, &ox, &oy, &dw, &dh);
+    *rx = ox + x * dw / p->dw;
+    *ry = oy + y * dh / p->dh;
+    *rw = ox + (x + w)  * dw / p->dw - *rx;
+    *rh = oy + (y + ht) * dh / p->dh - *ry;
+}
+
+static void ctl_log(const char *what, const Ctl *c, int rx, int ry, int rw, int rh)
+{
+    char b[160];
+    if (!g_logging || g_ctlLogged >= 48) return;
+    g_ctlLogged++;
+    b[0] = 0;
+    s_cat(b, "  "); s_cat(b, what); s_cat(b, " button ");
+    s_num(b, c->w); s_cat(b, "x"); s_num(b, c->h);
+    s_cat(b, " @"); s_num(b, c->x); s_cat(b, ","); s_num(b, c->y);
+    s_cat(b, "  ->  "); s_num(b, rw); s_cat(b, "x"); s_num(b, rh);
+    s_cat(b, " @"); s_num(b, rx); s_cat(b, ","); s_num(b, ry);
+    logline(b);
+}
+
+/* Put every owner-drawn button of a scaled dialog where the fit says --
+ * including any created before the dialog was being scaled, which are still
+ * at their design position and so can be read back as design coordinates.
+ * Called whenever the dialog's own geometry changes. */
+static void ctl_adopt(HWND parent)
+{
+    Slot *p = scaled_parent(parent);
+    HWND  c;
+    int   n;
+
+    if (!p) return;
+    for (c = o_GetWindow(parent, GW_CHILD), n = 0; c && n < 256; c = o_GetWindow(c, GW_HWNDNEXT), n++) {
+        Ctl *k = ctl_get(c);
+        int  rx, ry, rw, rh;
+
+        if (k && k->parent != parent) k = NULLPTR;   /* a recycled handle */
+        if (!k) {
+            RECT  wr;
+            POINT pt;
+            if (!is_ownerdraw_button(c) || !GetWindowRect(c, &wr)) continue;
+            pt.x = wr.left; pt.y = wr.top;
+            ScreenToClient(parent, &pt);
+            k = ctl_add(c, parent, (int)pt.x, (int)pt.y,
+                        (int)(wr.right - wr.left), (int)(wr.bottom - wr.top));
+            if (!k) continue;
+            ctl_rect(p, k->x, k->y, k->w, k->h, &rx, &ry, &rw, &rh);
+            ctl_log("adopted", k, rx, ry, rw, rh);
+        } else {
+            ctl_rect(p, k->x, k->y, k->w, k->h, &rx, &ry, &rw, &rh);
+        }
+        o_MoveWindow(c, rx, ry, rw, rh, TRUE);
+    }
+}
+
+static HWND __stdcall my_CreateWindowExA(DWORD ex, LPCSTR cls, LPCSTR name, DWORD style,
+                                         INT x, INT y, INT w, INT ht, HWND parent,
+                                         HANDLE menu, HINSTANCE inst, void *param)
+{
+    Slot *p = NULLPTR;
+    HWND  h;
+    int   rx = x, ry = y, rw = w, rh = ht;
+
+    if (ownerdraw_button(cls, style) && x != CW_USEDEFAULT && w != CW_USEDEFAULT &&
+        (p = scaled_parent(parent)) != NULLPTR)
+        ctl_rect(p, x, y, w, ht, &rx, &ry, &rw, &rh);
+
+    h = o_CreateWindowExA(ex, cls, name, style, rx, ry, rw, rh, parent, menu, inst, param);
+
+    if (h && p) {
+        Ctl *c = ctl_add(h, parent, x, y, w, ht);
+        if (c) ctl_log("created", c, rx, ry, rw, rh);
+    }
+    return h;
+}
+
+/* Draw a button through a surface of its design size, then stretch it on. */
+static LONG_PTR ctl_draw(const Ctl *c, WNDPROC prev, HWND h, UINT msg, WPARAM wp, DRAWITEMSTRUCT *d)
+{
+    HDC      real = d->hDC, mem;
+    HBITMAP  bmp;
+    HGDIOBJ  oldbmp, oldfont;
+    RECT     rr = d->rcItem;
+    LONG_PTR r;
+
+    mem = CreateCompatibleDC(real);
+    bmp = mem ? CreateCompatibleBitmap(real, c->w, c->h) : NULLPTR;
+    if (!bmp) {
+        if (mem) DeleteDC(mem);
+        return CallWindowProcA(prev, h, msg, wp, (LPARAM)d);
+    }
+    oldbmp  = SelectObject(mem, bmp);
+    oldfont = SelectObject(mem, GetCurrentObject(real, OBJ_FONT));
+    PatBlt(mem, 0, 0, c->w, c->h, BLACKNESS);
+
+    d->hDC = mem;
+    d->rcItem.left = 0; d->rcItem.top = 0; d->rcItem.right = c->w; d->rcItem.bottom = c->h;
+    r = CallWindowProcA(prev, h, msg, wp, (LPARAM)d);
+    d->hDC = real;
+    d->rcItem = rr;
+
+    /* The tab and Save/Done helper (0x5e93a0) ends by selecting the bitmap
+     * its own memory DC started with -- the 1x1 default -- into hDC, not back
+     * into its memory DC.  Into a window DC that is a harmless failure; into
+     * this one it swaps the surface out after the drawing has landed on it.
+     * Put it back. */
+    SelectObject(mem, bmp);
+
+    SetStretchBltMode(real, g_smooth ? HALFTONE : COLORONCOLOR);
+    StretchBlt(real, rr.left, rr.top, rr.right - rr.left, rr.bottom - rr.top,
+               mem, 0, 0, c->w, c->h, SRCCOPY);
+
+    SelectObject(mem, oldfont);
+    SelectObject(mem, oldbmp);
+    DeleteObject(bmp);
+    DeleteDC(mem);
+    return r;
 }
 
 /* ---- geometry hooks --------------------------------------------------- */
@@ -1490,19 +1771,32 @@ static void reposition(HWND h, int *x, int *y, int *w, int *ht, int havePos, int
 {
     HWND  owner = anchor_of(h);
     POINT pt;
-    Slot *s;
+    Slot *s, *a;
+    int   nx, dx, ny, dy, ox, oy;
 
     compute_fit(owner);
     describe_owner(owner);
 
+    /* The fit is the screen's -- unless the dialog sits in a full-screen one
+     * (the Admiral's Log's panes do), whose content is fitted to its own
+     * window, which is not the screen when Hyprland has re-tiled the game.
+     * Then it is that window's. */
+    nx = ny = g_num; dx = dy = g_den; ox = g_ox; oy = g_oy;
+    a = owner ? slot_get(owner) : NULLPTR;
+    if (g_mode == MODE_SCALE && a && a->letterbox && a->dw > 0 && a->dh > 0) {
+        int pw, ph;
+        slot_placement(a, &ox, &oy, &pw, &ph);
+        nx = pw; dx = a->dw; ny = ph; dy = a->dh;
+    }
+
     if (havePos && owner) {
         pt.x = *x; pt.y = *y;
         ScreenToClient(owner, &pt);              /* -> design coordinates */
-        pt.x = (int)pt.x * g_num / g_den;
-        pt.y = (int)pt.y * g_num / g_den;
+        pt.x = (int)pt.x * nx / dx + ox;         /* scale, and centre */
+        pt.y = (int)pt.y * ny / dy + oy;
         ClientToScreen(owner, &pt);              /* -> screen, origin intact */
-        *x = (int)pt.x + g_ox;                   /* centre, in screen space */
-        *y = (int)pt.y + g_oy;
+        *x = (int)pt.x;
+        *y = (int)pt.y;
     }
 
     if (haveSize) {
@@ -1516,13 +1810,38 @@ static void reposition(HWND h, int *x, int *y, int *w, int *ht, int havePos, int
             s->hwnd = h; s->dw = dw; s->dh = dh; s->letterbox = 0;
         }
         subclass(s);
-        *w  = *w  * g_num / g_den;
-        *ht = *ht * g_num / g_den;
+        *w  = *w  * nx / dx;
+        *ht = *ht * ny / dy;
     }
+}
+
+/* An owner-drawn button of a scaled dialog, moved by the game in design
+ * coordinates: remember them and map them.  NULL for anything else. */
+static Ctl *ctl_moved(HWND h)
+{
+    HWND  parent;
+    Ctl  *c;
+
+    if (g_mode != MODE_SCALE || !h) return NULLPTR;
+    parent = GetParent(h);
+    if (!scaled_parent(parent)) return NULLPTR;
+    c = ctl_get(h);
+    if (c && c->parent == parent) return c;
+    if (!is_ownerdraw_button(h)) return NULLPTR;
+    return ctl_add(h, parent, 0, 0, 0, 0);
 }
 
 static BOOL __stdcall my_MoveWindow(HWND h, INT x, INT y, INT w, INT ht, BOOL rp)
 {
+    Ctl *c = ctl_moved(h);
+    BOOL r;
+
+    if (c) {
+        c->x = x; c->y = y; c->w = w; c->h = ht;
+        ctl_rect(slot_get(c->parent), x, y, w, ht, &x, &y, &w, &ht);
+        return o_MoveWindow(h, x, y, w, ht, rp);
+    }
+
     if (g_mode == MODE_SCALE && is_dialog(h) && !is_design_sized(w, ht)) {
         /* A full-screen dialog -- init_screen_pos sizes these to the whole
          * client area.  Its GEOMETRY is already right and must not be
@@ -1557,11 +1876,26 @@ static BOOL __stdcall my_MoveWindow(HWND h, INT x, INT y, INT w, INT ht, BOOL rp
         logline(b);
     }
     to_parent(h, &x, &y);
-    return o_MoveWindow(h, x, y, w, ht, rp);
+    r = o_MoveWindow(h, x, y, w, ht, rp);
+    if (slot_get(h)) ctl_adopt(h);
+    return r;
 }
 
 static BOOL __stdcall my_SetWindowPos(HWND h, HWND after, INT x, INT y, INT w, INT ht, UINT f)
 {
+    Ctl *c;
+    BOOL r;
+
+    if (!(f & SWP_NOMOVE) || !(f & SWP_NOSIZE)) {
+        c = ctl_moved(h);
+        if (c) {
+            if (!(f & SWP_NOMOVE)) { c->x = x; c->y = y; }
+            if (!(f & SWP_NOSIZE)) { c->w = w; c->h = ht; }
+            ctl_rect(slot_get(c->parent), c->x, c->y, c->w, c->h, &x, &y, &w, &ht);
+            return o_SetWindowPos(h, after, x, y, w, ht, f & ~(UINT)(SWP_NOMOVE | SWP_NOSIZE));
+        }
+    }
+
     if (g_mode != MODE_LOG && is_dialog(h)) {
         int havePos  = (f & SWP_NOMOVE) ? 0 : 1;
         int haveSize = (f & SWP_NOSIZE) ? 0 : 1;
@@ -1574,7 +1908,9 @@ static BOOL __stdcall my_SetWindowPos(HWND h, HWND after, INT x, INT y, INT w, I
         }
     }
     if (!(f & SWP_NOMOVE)) to_parent(h, &x, &y);
-    return o_SetWindowPos(h, after, x, y, w, ht, f);
+    r = o_SetWindowPos(h, after, x, y, w, ht, f);
+    if ((~f & (SWP_NOMOVE | SWP_NOSIZE)) && slot_get(h)) ctl_adopt(h);
+    return r;
 }
 
 /* ---- paint hooks ------------------------------------------------------ */
@@ -1684,6 +2020,7 @@ static void follow_parent(Slot *s)
     if (pw <= 0 || ph <= 0) return;
     if (pw == (int)(wr.right - wr.left) && ph == (int)(wr.bottom - wr.top)) return;
     o_MoveWindow(s->hwnd, 0, 0, pw, ph, TRUE);   /* parent-client coordinates */
+    ctl_adopt(s->hwnd);
     s->dirty = 1;
 }
 
@@ -1752,8 +2089,13 @@ static BOOL __stdcall my_GetClientRect(HWND h, RECT *r)
 {
     if (g_mode == MODE_SCALE && r) {
         Slot *s = slot_get(h);
+        Ctl  *c = s ? NULLPTR : ctl_get(h);
         if (s && s->dw > 0) {
             r->left = 0; r->top = 0; r->right = s->dw; r->bottom = s->dh;
+            return TRUE;
+        }
+        if (c && c->w > 0 && c->h > 0 && GetParent(h) == c->parent) {
+            r->left = 0; r->top = 0; r->right = c->w; r->bottom = c->h;
             return TRUE;
         }
     }
@@ -1815,6 +2157,13 @@ static LONG_PTR __stdcall my_WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
      * dialog, so fall back to the default handler rather than guess. */
     if (!s || !s->oldProc) return DefWindowProcA(h, msg, wp, lp);
     prev = s->oldProc;
+
+    if (g_mode == MODE_SCALE && msg == WM_DRAWITEM && lp) {
+        DRAWITEMSTRUCT *d = (DRAWITEMSTRUCT *)lp;
+        Ctl *c = ctl_get(d->hwndItem);
+        if (c && c->parent == h && c->w > 0 && c->h > 0 && d->hDC)
+            return ctl_draw(c, prev, h, msg, wp, d);
+    }
 
     if (g_mode == MODE_SCALE && s->dw > 0 &&
         msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) {
@@ -2258,6 +2607,8 @@ static void startup(void)
     if (g_mode != MODE_LOG) {
         o_DialogBoxParamA = (void *)patch_iat(base, "USER32.dll", "DialogBoxParamA", my_DialogBoxParamA);
         o_GetWindow       = (void *)patch_iat(base, "USER32.dll", "GetWindow",       my_GetWindow);
+        o_CreateDialogParamA = (void *)patch_iat(base, "USER32.dll", "CreateDialogParamA", my_CreateDialogParamA);
+        o_CreateWindowExA    = (void *)patch_iat(base, "USER32.dll", "CreateWindowExA",    my_CreateWindowExA);
     }
 
     /* A hook that failed to bind is never called, but the originals are used
@@ -2270,6 +2621,8 @@ static void startup(void)
     if (!o_MoveWindow)    o_MoveWindow    = MoveWindow;
     if (!o_SetWindowPos)  o_SetWindowPos  = SetWindowPos;
     if (!o_GetWindow)     o_GetWindow     = GetWindow;
+    if (!o_CreateDialogParamA) o_CreateDialogParamA = CreateDialogParamA;
+    if (!o_CreateWindowExA)    o_CreateWindowExA    = CreateWindowExA;
     /* Embedding needs both hooks or neither: an embedded dialog the game
      * cannot find the owner of is worse than a separate window. */
     if (!o_DialogBoxParamA) g_embed = 0;

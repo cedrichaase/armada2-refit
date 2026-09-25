@@ -56,8 +56,10 @@ done
 [ "$started" = 0 ] && echo "window never appeared" || echo "window on ws $WS"
 
 # Wait for the shell to actually lay a dialog out before photographing it --
-# the log tells us when, which beats guessing at a delay.
-for _ in $(seq 1 60); do
+# the log tells us when, which beats guessing at a delay.  WAITLOG=0 skips
+# this: launched straight into a map, no menu opens, and it would sit out the
+# whole minute.
+[ "${WAITLOG:-1}" = 0 ] || for _ in $(seq 1 60); do
     grep -q "MoveWindow" "/home/cedric/Games/Heroic/Star Trek Armada II/Menus.log" 2>/dev/null && break
     sleep 1
 done

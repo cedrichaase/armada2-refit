@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.0.1 — 2026-09-25
+
+Layers: menus 2.0.1.
+
+### Fixed
+- The Admiral's Log: its score table no longer stays on screen after it closes, and
+  its buttons are scaled with it rather than 1:1 in the corner (see
+  `menus/CHANGELOG.md`).
+
+Installed, not yet seen in game.
+
 ## 3.0.0 — 2026-09-25
 
 Layers: menus 2.0.0.
