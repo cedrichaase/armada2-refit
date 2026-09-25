@@ -12,7 +12,7 @@ Layers: menus 2.0.1.
 ### Fixed
 - The Admiral's Log: its score table no longer stays on screen after it closes, and
   its buttons are scaled with it rather than 1:1 in the corner (see
-  `menus/CHANGELOG.md`).
+  `menus/CHANGELOG.md`, `c9f7f9f`).
 
 Installed, not yet seen in game.
 
