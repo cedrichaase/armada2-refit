@@ -5,6 +5,14 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 2.1.0 — 2026-09-25
+
+### Added
+- `EscapeReturns=1` (default): Esc in the in-mission menu acts as Return to Game, so
+  Esc both opens and closes it. Needs `Embed=1`; `0` leaves Esc stock.
+
+Installed, not yet seen in game.
+
 ## 2.0.2 — 2026-09-25
 
 ### Fixed

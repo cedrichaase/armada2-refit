@@ -125,6 +125,17 @@ each handled, each measured:
 one call site is the Admiral's Log (below). `Embed=0` restores separate windows; both
 hooks then only log.
 
+**Esc closes the in-mission menu (`EscapeReturns=1`).** In stock, Esc opens the
+in-mission menu and does nothing inside it: `EscapeMenuDlgProc` (0x5cddb0) has no
+`WM_COMMAND` case, so the `IDCANCEL` a dialog makes of Esc is ignored. Embedded, Esc
+doesn't even reach the menu, which holds no focus. The modality filter now catches a
+fresh Esc press (not an auto-repeat) while that menu is the innermost one, and feeds
+its procedure a left click on Return to Game. That runs the same sound, result code
+and `EndDialog` as the mouse. The procedure and the button's rectangle (x 5, y 568,
+172x22 in 800x600) are found by signature in `Armada2.exe` and read from its
+operands; if either fails to match, the log says so and Esc stays stock. Esc inside
+a nested menu, such as Graphics Settings, does nothing, as before. Needs `Embed=1`.
+
 **The cursor.** The 3D window's `WindowProc` answers every `WM_SETCURSOR` with
 `SetCursor(NULL)` (`0x488881`), so the engine's sprite cursor can show in play. A child's
 `DefWindowProc` asks its parent first, so once embedded, the arrow vanished over every

@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.1.0 — 2026-09-25
+
+Layers: menus 2.1.0.
+
+### Added
+- In a mission, Esc now also closes the Options menu and returns to the game
+  (`EscapeReturns=`, see `menus/CHANGELOG.md`).
+
+Installed, not yet seen in game.
+
 ## 3.0.2 — 2026-09-25
 
 Layers: menus 2.0.2.
