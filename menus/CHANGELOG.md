@@ -18,8 +18,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 - A dialog inside a letterboxed dialog is fitted through that dialog's placement
   rather than the screen's. (`c9f7f9f`)
 
-Checked in test launches (Options and end-of-mission log, tabs, Done, return to the
-main menu). Installed, not yet seen in game.
+Confirmed in game 2026-09-25.
 
 ## 2.0.0 — 2026-09-25
 

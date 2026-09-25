@@ -173,9 +173,10 @@ The fix, in `menus.c`:
   do this, which is how the two were told apart: `GetPixel` on the surface read a
   colour for one and `CLR_INVALID` for the other.
 
-Checked in game (2026-09-25): the log scaled and centred with everything in place,
-from both Options and the end of a mission. Tab clicks switch panes, and Done leaves
-exactly one dialog. After aborting a skirmish, Done returns to a clean main menu.
+**Confirmed in game by the user (2026-09-25).** The log is scaled and centred with
+everything in place, from both Options and the end of a mission. Tab clicks switch
+panes, and Done leaves exactly one dialog. After aborting a skirmish, Done returns to a
+clean main menu.
 
 ## GetDC and ReleaseDC do not pair up in this game
 

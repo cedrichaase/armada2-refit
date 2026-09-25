@@ -14,7 +14,7 @@ Layers: menus 2.0.1.
   its buttons are scaled with it rather than 1:1 in the corner (see
   `menus/CHANGELOG.md`, `c9f7f9f`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-25.
 
 ## 3.0.0 — 2026-09-25
 
