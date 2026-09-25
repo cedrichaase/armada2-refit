@@ -5,6 +5,15 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 2.0.2 — 2026-09-25
+
+### Fixed
+- Esc reopens the in-mission Options menu after it has been closed. An embedded menu
+  left the keyboard focus `NULL` when it returned, so every key was dropped until a
+  restart. The focus is now restored to the window that held it.
+
+Installed, not yet seen in game.
+
 ## 2.0.1 — 2026-09-25
 
 ### Fixed

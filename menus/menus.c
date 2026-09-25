@@ -186,6 +186,8 @@ __declspec(dllimport) HWND    __stdcall CreateWindowExA(DWORD, LPCSTR, LPCSTR, D
 __declspec(dllimport) BOOL    __stdcall EnableWindow(HWND, BOOL);
 __declspec(dllimport) BOOL    __stdcall IsWindowEnabled(HWND);
 __declspec(dllimport) HWND    __stdcall GetParent(HWND);
+__declspec(dllimport) HWND    __stdcall GetFocus(void);
+__declspec(dllimport) HWND    __stdcall SetFocus(HWND);
 __declspec(dllimport) HWND    __stdcall GetAncestor(HWND, UINT);
 __declspec(dllimport) BOOL    __stdcall IsChild(HWND, HWND);
 __declspec(dllimport) LONG    __stdcall GetWindowLongA(HWND, INT);
@@ -1159,6 +1161,17 @@ static void present(Slot *s, HDC real, int full)
  *   owner     a child has no owner, so GetWindow(GW_OWNER) would return NULL
  *             where the game expects its 3D window.  Answered with the parent
  *             for the dialogs embedded here.
+ *   focus     the keyboard is read from WM_KEYDOWN/UP on the 3D window
+ *             (ProcessKeyboardMessages), so it must hold the focus.  A popup
+ *             hands it back as a side effect of re-activating its owner on
+ *             close; a child never deactivated anything, so the focus the
+ *             dialog took stays NULL after it is gone and every keystroke is
+ *             dropped -- Esc opened the in-mission menu once and never again,
+ *             while the mouse, routed by position, still worked.  The focus
+ *             is put back where it was when the dialog returns, which also
+ *             sends the WM_SETFOCUS on which the game clears its key state
+ *             (0x48887a: ClearKeyboardState) -- the Esc key-up went to the
+ *             dialog, not to the game.
  *
  * CreateDialogParamA is embedded too.  It has one call site (0x5e3c04): the
  * Admiral's Log creates its eight tab panes with it, from the WS_POPUP
@@ -1410,6 +1423,7 @@ static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND o
 {
     BYTE    *tpl;
     LONG_PTR r;
+    HWND     focus;
 
     if (g_logging) {
         char b[160];
@@ -1433,16 +1447,22 @@ static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND o
      * dialog whose content Menus blits through GetDC. */
     SetWindowLongA(owner, GWL_STYLE, GetWindowLongA(owner, GWL_STYLE) | (LONG)WS_CLIPCHILDREN);
 
+    focus = GetFocus();
     g_pendingProc = proc;
     g_pendingOwner = owner;
     r = DialogBoxIndirectParamA(inst, tpl, owner, embed_proc, lp);
     g_pendingProc = NULLPTR;
     g_pendingOwner = NULLPTR;
     HeapFree(GetProcessHeap(), 0, tpl);
+    /* See "focus" above.  Only a focus that existed: a dialog opened from a
+     * menu that itself held none (Options -> Graphics Settings) leaves the
+     * keyboard as it found it. */
+    if (focus && IsWindow(focus) && GetFocus() != focus) SetFocus(focus);
     if (g_logging) {
         char b[96];
         b[0] = 0;
         s_cat(b, "  embedded dialog returned "); s_num(b, (long)r);
+        s_cat(b, ", focus "); s_num(b, (long)(UINT_PTR)GetFocus());
         logline(b);
     }
     return r;

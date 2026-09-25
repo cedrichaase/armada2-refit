@@ -89,7 +89,7 @@ at all.
 
 `Embed=1` hooks `DialogBoxParamA`, rewrites the template `WS_POPUP` ->
 `WS_CHILD`, and creates it with `DialogBoxIndirectParamA` so it becomes a child
-of the game window. Wine then creates no second X window. Four things follow,
+of the game window. Wine then creates no second X window. Five things follow,
 each handled, each measured:
 
 - **Input.** `DialogBox` disables its owner *before* creating the dialog (Wine
@@ -110,6 +110,16 @@ each handled, each measured:
   resized under it, as Hyprland does when the game drops fullscreen on focus
   loss, it used to hang off the bottom (Return to Game unreachable). Embedded
   full-screen menus now follow their parent's client area.
+- **Keyboard focus.** The game reads keys only as `WM_KEYDOWN`/`UP` on the 3D
+  window (`ProcessKeyboardMessages`), so that window must hold the focus. A popup
+  gives it back as a side effect of re-activating its owner when it closes; a child
+  never deactivated anything, and Wine left the focus `NULL` after it was gone.
+  Every keystroke was then dropped: Esc opened the in-mission menu once and never
+  again, while HUD clicks, routed by position, still worked. The focus is put back
+  where it was when the menu returns. That also sends the `WM_SETFOCUS` on which
+  the game runs `ClearKeyboardState`, since the Esc key-up went to the menu and
+  not to the game. A menu opened from a menu that held no focus leaves it alone.
+  (`probe focus` shows the active and focus windows.)
 
 `CreateDialogParamA` is embedded the same way, without the modal bookkeeping. Its
 one call site is the Admiral's Log (below). `Embed=0` restores separate windows; both
@@ -413,6 +423,8 @@ every Embed claim above was checked without a human at the mouse:
                                reaches the menu binding (Space still skipped the
                                cutscene, which is what made this confusing)
     run-probe.sh post X Y      post a click straight to the window under X,Y
+    run-probe.sh focus         the game thread's active, focus and capture windows:
+                               where a keypress will go
 
 `capture.sh` takes `NOSHOT=1` to launch without photographing, and
 `A2_ARGS="-nointro a2_fed01.bzn"` starts a mission directly. **The `.bzn` is

@@ -47,3 +47,7 @@ LoadImageA@24
 CreateDialogParamA@20
 CreateDialogIndirectParamA@20
 CreateWindowExA@48
+GetGUIThreadInfo@8
+GetWindowThreadProcessId@8
+GetFocus@0
+SetFocus@4
