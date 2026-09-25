@@ -12,7 +12,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
   left the keyboard focus `NULL` when it returned, so every key was dropped until a
   restart. The focus is now restored to the window that held it. (`32656d7`)
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. Confirmed in game 2026-09-25.
 
 ## 2.0.1 — 2026-09-25
 
