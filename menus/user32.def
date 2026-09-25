@@ -44,3 +44,6 @@ SetCursor@4
 LoadCursorA@8
 GetCursorInfo@4
 LoadImageA@24
+CreateDialogParamA@20
+CreateDialogIndirectParamA@20
+CreateWindowExA@48
