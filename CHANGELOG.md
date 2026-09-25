@@ -11,7 +11,7 @@ Layers: menus 2.1.0.
 
 ### Added
 - In a mission, Esc now also closes the Options menu and returns to the game
-  (`EscapeReturns=`, see `menus/CHANGELOG.md`).
+  (`EscapeReturns=`, see `menus/CHANGELOG.md`, `96f5ac1`).
 
 Installed, not yet seen in game.
 
