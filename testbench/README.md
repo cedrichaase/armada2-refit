@@ -149,3 +149,43 @@ and `cc` (for `a2input`), `pactl`, Heroic's Proton-CachyOS and umu, and `claude`
 judged and agent steps. Optional: `wayvnc`, `wf-recorder`, `tigervnc`. The texture
 pipeline's "no numpy" rule is about what that pipeline may assume. The bench is
 separate and needs opencv.
+
+## Further improvements
+
+Not built yet; each is recorded with what is known so far.
+
+**Cases in parallel (`--jobs N`).** `a2test run` runs its cases one after another
+(`cmd_run` in `bench/cli.py`), though a case already shares nothing with another: its
+own reflink clone and prefix (so its own wineserver), its own headless sway, Xwayland
+and `a2input`. The constraints on doing it:
+
+- The reference case (4:3) finishes first; the other aspects compare against its
+  shots, then run side by side. A 4-case scenario goes from ~8 to ~4 minutes, and
+  separate scenarios can overlap entirely.
+- Parallelise *inside* one run, not by starting two `a2test run`s: both repoint
+  `results/latest`, and run folders are named to the second, so two runs started in
+  the same second share one. `report.write` needs a lock once cases finish concurrently.
+- Two or three games at once on this machine (12 cores, 15 GB, one GPU). Past that,
+  fixed waits ("Wait 45 seconds") risk turning flaky.
+- Judge calls arrive in bursts, and a Claude session limit has already stopped an
+  agent step mid-run.
+- Unchecked: whether the prepare scripts or `a2mod stock` write anything into the repo
+  (they run with `cwd` at the repo root). Check that before two run at once.
+
+**A cheaper model for judged steps.** With no `A2TEST_MODEL` the judge takes the
+`claude` CLI's default, which is Opus here: $0.11–0.21 per judged step, about 50 so far.
+Most assertions never reach a model (OCR, the stretch measurement, bars, logs), so this
+is only the layout judgments and agent steps. Sonnet is the candidate. Haiku was
+considered, but the judgments that matter are fine ones: a panel a few percent off, or a
+small copy of the log in a corner. A false pass there costs more than the tokens saved.
+Before switching:
+
+- Re-judge stored shots from past runs with `A2TEST_MODEL=sonnet` and compare the
+  verdicts with Opus's, including the known failures (stretched HUD at 16:9 and wider,
+  pillarbox bars). A way to re-judge without launching the game may need adding.
+- Agent steps (many turns of reading the screen and clicking, where a slip costs a
+  two-minute launch) may want to stay on the stronger model. That needs a second
+  variable, e.g. `A2TEST_AGENT_MODEL`, since `A2TEST_MODEL` sets both today.
+- Unmeasured: how much of each call's cost is the `claude` CLI's own start-up context
+  rather than the judgment. If it is most of it, a model switch saves less than list
+  prices suggest.
