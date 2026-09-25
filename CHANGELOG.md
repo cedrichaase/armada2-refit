@@ -17,7 +17,7 @@ Layers: menus 2.0.0.
   reads old manifests' layer name as `menus`, and after restoring a pre-rename
   snapshot it says to run `menus/install.sh`.
 
-Installed, not yet seen in game.
+Installed, not yet seen in game. Confirmed in game 2026-09-25.
 
 ## 2.0.0 — 2026-09-25
 

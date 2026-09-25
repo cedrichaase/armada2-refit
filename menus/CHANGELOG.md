@@ -28,7 +28,7 @@ MAJOR because the installed file names and the ini section changed. Migrated in 
 game directory on 2026-09-25: `MenuScale/` renamed to `Menus/` (plates byte-identical),
 `install.sh` run, and the `a2mod` manifest entries renamed. The plugin was load-tested
 under Proton's Wine (new names read, legacy guard fires). Installed, not yet seen in
-game.
+game. Confirmed in game 2026-09-25.
 
 ## 1.0.0 — 2026-09-25
 
