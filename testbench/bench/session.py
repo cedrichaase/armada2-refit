@@ -48,13 +48,46 @@ def pid_alive(pid):
 
 
 def kill_group(pid, sig=signal.SIGTERM):
-    """Everything here is started with setsid, so its pid is its process group."""
-    if not pid:
+    """Everything here is started with setsid, so its pid is its process group -- but a
+    pid out of session.json may be long gone and reused.  Only a group that pid still
+    LEADS, and never the bench's own, is signalled."""
+    if not pid or pid in (os.getpid(), os.getpgrp()):
         return
     try:
-        os.killpg(pid, sig)
+        pgid = os.getpgid(pid)
+    except OSError:
+        pgid = pid          # the leader has exited; its group may live on without it
+        if not _group_has_members(pgid):
+            return
+    if pgid != pid or pgid == os.getpgrp():
+        return
+    try:
+        os.killpg(pgid, sig)
     except OSError:
         pass
+
+
+def _group_pids(pgid):
+    out = set()
+    if not pgid:
+        return out
+    for d in glob.glob('/proc/[0-9]*/stat'):
+        try:
+            if int(Path(d).read_text().rsplit(')', 1)[1].split()[2]) == pgid:
+                out.add(int(d.split('/')[2]))
+        except (OSError, ValueError, IndexError):
+            continue
+    return out
+
+
+def _group_has_members(pgid):
+    for d in glob.glob('/proc/[0-9]*/stat'):
+        try:
+            if int(Path(d).read_text().rsplit(')', 1)[1].split()[2]) == pgid:
+                return True
+        except (OSError, ValueError, IndexError):
+            continue
+    return False
 
 
 class GameError(Exception):
@@ -83,7 +116,7 @@ class Session:
         state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod,
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
-                     exception_mtime=None, vnc_port=None, null_sink=None)
+                     exception_mtime=None, vnc_port=None)
         sess = cls(state, work / 'session.json')
         sess.save()
         (artifacts_dir / 'session.json').write_text(json.dumps({'statefile': str(sess.statefile)}))
@@ -374,9 +407,12 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             env.update(ENABLE_VKBASALT='1', VKBASALT_CONFIG_FILE=str(vkconf),
                        VKBASALT_LOG_FILE=str(logs / 'vkBasalt.log'), VKBASALT_LOG_LEVEL='info')
         if not self.s['audio']:
-            sink = self._null_sink()
-            if sink:
-                env['PULSE_SINK'] = sink
+            # Silence by having no audio driver at all.  PULSE_SINK at a private null
+            # sink was tried first and does NOT work: winepulse connects each stream to
+            # the device it picks itself (the server default), and the user heard the
+            # menu music and the Borg cutscene through their speakers.  With the drivers
+            # disabled the game never opens a stream; assert_silent() checks that.
+            env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';winepulse.drv=d;winealsa.drv=d'
         (logs / 'launch-env.txt').write_text(
             f'cwd: {g}\nargv: python3 {config.UMU} {g / "Armada2.exe"} {args}\n\n' +
             ''.join(f'{k}={v}\n' for k, v in sorted(env.items())))
@@ -398,19 +434,42 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             time.sleep(0.1)
         else:
             raise GameError('Armada2.exe did not appear within 120s; see logs/wine.log')
-        self.log.action(f'launched Armada2.exe {args} through umu (pid {self.game_pid()})')
+        self.log.action(f'launched Armada2.exe {args} through umu (pid {self.game_pid()})' +
+                        ('' if self.s['audio'] else ', audio drivers disabled'))
+        if not self.s['audio']:
+            self.assert_silent()
 
-    def _null_sink(self):
-        """Mute the run without touching the user's audio: a private null sink, gone at teardown."""
-        name = f'a2test-{self.s["id"]}'
-        r = subprocess.run(['pactl', 'load-module', 'module-null-sink', f'sink_name={name}',
-                            f'sink_properties=device.description={name}'],
-                           capture_output=True, text=True)
-        if r.returncode:
-            return None
-        self.s['null_sink'] = r.stdout.strip()
-        self.save()
-        return name
+    def audio_streams(self):
+        """PipeWire/Pulse playback streams owned by any process of this session."""
+        pids = set(self.game_pids())
+        pids.update(_group_pids(self.s['pids'].get('launcher')))
+        r = subprocess.run(['pactl', '--format=json', 'list', 'sink-inputs'], capture_output=True, text=True)
+        try:
+            items = json.loads(r.stdout or '[]')
+        except json.JSONDecodeError:
+            return []
+        out = []
+        for it in items:
+            props = it.get('properties', {})
+            try:
+                pid = int(props.get('application.process.id', -1))
+            except ValueError:
+                pid = -1
+            if pid in pids:
+                out.append(f'#{it.get("index")} {props.get("application.name", "")} (pid {pid})')
+        return out
+
+    def assert_silent(self, seconds=6):
+        """The user hears whatever a run plays.  Watch the first seconds, when the menu
+        music starts, and stop everything if a stream of ours appears."""
+        end = time.time() + seconds
+        while time.time() < end:
+            found = self.audio_streams()
+            if found:
+                self.stop_game()
+                raise GameError('the game opened an audio stream on the real output '
+                                f'({", ".join(found)}); stopped it at once')
+            time.sleep(0.25)
 
     def game_pids(self):
         """The game process of THIS session: argv[0] is the Windows path of its
@@ -564,8 +623,6 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                             break
                         time.sleep(0.1)
                     kill_group(pid, signal.SIGKILL)
-            if self.s.get('null_sink'):
-                subprocess.run(['pactl', 'unload-module', self.s['null_sink']], capture_output=True)
             self.s['ended'] = now()
             self.save()
             shutil.copy2(self.statefile, self.dir / 'logs' / 'session-state.json')

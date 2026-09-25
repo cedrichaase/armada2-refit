@@ -20,7 +20,7 @@ a2test -- run Armada II headless and test it end to end
       --res 16:9,4:3,2560x1080         override the scenario's resolutions
       --vnc                            view-only VNC per case (vncviewer localhost:5910)
       --record                         record each case to run.mp4 (wf-recorder)
-      --audio                          let the game make sound (default: private null sink)
+      --audio                          let the game make sound (default: no audio driver)
       --keep                           keep the game/prefix clone after the case
       --no-claude                      judged steps become REVIEW, agent steps fail
       --tolerance 0.05                 allowed stretch for the measured checks
@@ -46,7 +46,16 @@ Results: {results}
 """.format(results=config.RESULTS)
 
 
+def _terminate(signum, frame):
+    # unwind like Ctrl-C, so every `finally` runs and each session tears down: a killed
+    # run otherwise leaves a game and a sway behind (measured)
+    raise KeyboardInterrupt(f'signal {signum}')
+
+
 def main(argv=None):
+    import signal
+    signal.signal(signal.SIGTERM, _terminate)
+    signal.signal(signal.SIGHUP, _terminate)
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in ('help', '-h', '--help'):
         print(HELP)

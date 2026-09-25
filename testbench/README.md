@@ -32,7 +32,7 @@ copy, and can run while the game is being played.
 | prepare | `ARMADA.PRF` line 5 set to the resolution, then `hud/ui-widescreen.py`, `hud/cursor-aspect.py`, `font/ui-font-condense.py` with `--res` and `A2_GAME=<clone>`. For `Mod: stock`, `a2mod stock` on the clone instead | those three layers are built for one resolution; a test at another aspect with 21:9 layers would test the wrong thing |
 | display | `sway` with `WLR_BACKENDS=headless`, one output at exactly the resolution, `xwayland force` | the game gets the same Xwayland path it has under Hyprland, and nothing appears on the desktop |
 | input | `input/a2input`: a wlr virtual pointer and virtual keyboard on sway's seat, fed through a FIFO | see "Input" |
-| game | `umu_run.py` with Heroic's environment, the clone as `WINEPREFIX`/`STEAM_COMPAT_DATA_PATH`; muted through a private PipeWire null sink | see "Launch" |
+| game | `umu_run.py` with Heroic's environment, the clone as `WINEPREFIX`/`STEAM_COMPAT_DATA_PATH`; silent: `winepulse.drv=d;winealsa.drv=d` | see "Traps" |
 | capture | `grim -o HEADLESS-1` | what the compositor actually shows, scaling included |
 | teardown | Proton's `wineserver -k` on the clone, the launcher's process group, sway; logs gathered; clone deleted | |
 
@@ -47,6 +47,15 @@ channels), `Menus.log`, `MSAA.log`, `BinkProxy.log`, `Armada2_d3d9.log` and
 anything new in the game's `Logs/`.
 
 ## Traps, each measured here
+
+- **A run must be silent, and `PULSE_SINK` does not make it so.** The first version
+  pointed `PULSE_SINK` at a private null sink and never checked it. winepulse ignores
+  it: it connects every stream to the device it chooses itself (the server's default).
+  The user heard the menu music and the Borg cutscene through their speakers during
+  runs they could not see. The bench now disables Wine's audio drivers for the game
+  (`winepulse.drv=d;winealsa.drv=d`, unless `--audio`), and after every launch it
+  watches `pactl list sink-inputs` for a stream from the session's processes. If one
+  appears, it stops the game at once and fails the case.
 
 - **XTest input does not work.** In headless sway the seat has no devices. `xdotool`
   moves Xwayland's core pointer, and Wine even logs the `ButtonPress`, but the frame

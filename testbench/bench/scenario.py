@@ -611,6 +611,12 @@ class Case:
     # -- helpers for steps
 
     def assert_alive(self):
+        if not self.sess.s['audio']:
+            found = self.sess.audio_streams()
+            if found:
+                self.sess.stop_game()
+                raise StepFailed('the game opened an audio stream on the real output '
+                                 f'({", ".join(found)}); stopped it at once')
         if not self.sess.running():
             raise StepFailed('the game is no longer running' + (' (it crashed: exception.txt was written)'
                                                                  if self.sess.crashed() else ''))
