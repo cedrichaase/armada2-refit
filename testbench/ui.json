@@ -1,0 +1,50 @@
+{
+  "_about": "Named screens and click targets for scenario steps. Screens are recognised by text OCR must find on them. Targets are in the shell's 800x600 DESIGN space (Menus.asi maps them to the screen; see Case.design_to_screen) and were measured off bench screenshots. Menu buttons are the pictures, not the labels under them: the labels are painted into the background and do not take clicks.",
+  "screens": {
+    "main": {
+      "aliases": ["main menu", "title", "title screen"],
+      "text": ["SINGLE PLAYER", "INSTANT ACTION"],
+      "timeout": 120
+    },
+    "single player": {
+      "aliases": ["single player menu", "campaign", "campaign selection", "single player screen"],
+      "text": ["PREVIOUS MENU", "LOAD GAME"]
+    },
+    "mission selection": {
+      "aliases": ["select mission", "mission list", "mission select"],
+      "text": ["Cancel"]
+    },
+    "briefing": {
+      "aliases": ["mission briefing", "objectives", "mission"],
+      "text": ["BRIEFING SUMMARY", "OBJECTIVES"],
+      "timeout": 300,
+      "_note": "a campaign mission opens on its briefing, after a ~70 s opening cinematic that Esc does not skip"
+    },
+    "options": {
+      "aliases": ["in-mission menu", "in-game menu", "options menu", "pause menu", "in-mission options"],
+      "text": ["Graphics Settings", "Exit to Windows"]
+    },
+    "admiral's log": {
+      "aliases": ["admirals log", "log", "score"],
+      "text": ["GAME POINTS", "MILITARY"]
+    }
+  },
+  "targets": {
+    "single player": {"at": [141, 111], "aliases": ["single player emblem", "main menu single player"]},
+    "instant action": {"at": [641, 89], "aliases": ["instant action cube"]},
+    "multiplayer": {"at": [161, 478], "aliases": ["multiplayer turbolift"]},
+    "options": {"at": [522, 433], "aliases": ["options panel"]},
+    "exit": {"at": [725, 439], "aliases": ["exit panel", "quit"]},
+    "replay intro": {"at": [528, 533]},
+    "credits": {"at": [725, 533]},
+    "tutorial": {"at": [186, 111], "aliases": ["starfleet academy", "academy"]},
+    "federation campaign": {"at": [589, 106], "aliases": ["federation"]},
+    "klingon campaign": {"at": [186, 444], "aliases": ["klingon"]},
+    "borg campaign": {"at": [589, 439], "aliases": ["borg"]},
+    "previous menu": {"at": [113, 580], "aliases": ["back"]},
+    "load game": {"at": [686, 580]},
+    "first mission": {"at": [385, 132], "aliases": ["first mission in the list", "mission 1"]},
+    "mission ok": {"at": [329, 484], "aliases": ["mission selection ok", "select mission ok", "o.k."]},
+    "mission cancel": {"at": [439, 484], "aliases": ["mission selection cancel"]}
+  }
+}

@@ -30,8 +30,17 @@ it bundles.
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton | `platform/README.md` |
 | `gameplay/` | map scroll speed; cutscene draw distance (notes only) | `gameplay/README.md` |
+| `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
 
-`./a2tex` and `./a2mod` are the two entry points and stay at the root.
+`./a2tex` and `./a2mod` are the two entry points and stay at the root, with `./a2test`
+beside them for testing.
+
+**To see a change working in the game without taking over the user's screen, use the
+test bench**: `./a2test session start --res 21:9`, then `./a2test drive shot` / `click` /
+`key` / `step "…"`, and read the screenshots. It runs on a reflink clone of the install
+and a headless display. Write regression scenarios in `testbench/scenarios/` for fixes
+worth keeping fixed. A bench pass is evidence for the user, not their sign-off
+("Finishing work" still applies).
 `a2tex` exports `ROOT=textures/`, so everything under `textures/` addresses
 `$ROOT/lib`, `$ROOT/targets` and `$ROOT/tools` as it always did.
 

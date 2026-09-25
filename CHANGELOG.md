@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.2.0 — 2026-09-25
+
+Layers: testbench 1.0.0 (new).
+
+### Added
+- `./a2test`: the test bench. Headless runs of the game at any resolution on a clone of
+  the install, driven by plain-text scenarios, with a screenshot-and-log report per run
+  (see `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
 ## 3.1.0 — 2026-09-25
 
 Layers: menus 2.1.0.

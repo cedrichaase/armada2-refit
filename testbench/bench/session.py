@@ -1,0 +1,621 @@
+"""One bench session: a private copy of the game on a private headless display.
+
+    clone     reflink copies of the game directory and the Wine prefix -- the user's
+              install is never written, and a run can do anything to its copy
+    prepare   the resolution into ARMADA.PRF; the resolution-dependent layers (HUD
+              canvas, cursors, font) rebuilt for it; or a2mod stock
+    display   sway, headless, one output at exactly the resolution under test, with
+              Xwayland inside it -- the same Xwayland path the game takes under Hyprland
+    input     a2input: a virtual pointer and keyboard on that sway's seat
+    game      launched through umu, exactly as Heroic launches it
+    teardown  game, display and input stopped; logs gathered; the clone deleted
+
+A session outlives the process that started it (`a2test session start` returns while
+the game keeps running), so everything needed to reattach is in session.json.
+"""
+import datetime
+import fcntl
+import glob
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import time
+from pathlib import Path
+
+from . import config
+from .log import Log
+
+
+def now():
+    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def pid_alive(pid):
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    # a zombie is not alive
+    try:
+        return Path(f'/proc/{pid}/stat').read_text().split(') ', 1)[1][0] != 'Z'
+    except OSError:
+        return False
+
+
+def kill_group(pid, sig=signal.SIGTERM):
+    """Everything here is started with setsid, so its pid is its process group."""
+    if not pid:
+        return
+    try:
+        os.killpg(pid, sig)
+    except OSError:
+        pass
+
+
+class GameError(Exception):
+    pass
+
+
+class Session:
+    def __init__(self, state, statefile):
+        self.s = state
+        self.statefile = Path(statefile)
+        self.dir = Path(state['dir'])            # artifacts: kept
+        self.work = Path(state['work'])          # clone, sockets, fifos: deleted
+        self.res = tuple(state['res'])
+        self.log = Log(self.dir)
+
+    # ------------------------------------------------------------------ lifecycle
+
+    @classmethod
+    def create(cls, artifacts_dir, res, mod='remastered', vnc=False, record=False,
+               audio=False, keep=False, label=''):
+        sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-') + f'{os.getpid() % 100000}'
+        work = config.CACHE / 'sessions' / sid
+        artifacts_dir = Path(artifacts_dir)
+        for d in (work, artifacts_dir / 'shots', artifacts_dir / 'logs'):
+            d.mkdir(parents=True, exist_ok=True)
+        state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod,
+                     vnc=vnc, record=record, audio=audio, keep=keep, label=label,
+                     created=now(), pids={}, env={}, shots=0, game_started=None,
+                     exception_mtime=None, vnc_port=None, null_sink=None)
+        sess = cls(state, work / 'session.json')
+        sess.save()
+        (artifacts_dir / 'session.json').write_text(json.dumps({'statefile': str(sess.statefile)}))
+        sess.log.meta(session=sid, resolution=config.res_name(res),
+                      aspect=config.aspect_name(res), mod=mod, label=label, started=now())
+        return sess
+
+    @classmethod
+    def load(cls, statefile):
+        state = json.loads(Path(statefile).read_text())
+        return cls(state, statefile)
+
+    def save(self):
+        tmp = self.statefile.with_suffix('.tmp')
+        tmp.write_text(json.dumps(self.s, indent=1))
+        tmp.replace(self.statefile)
+
+    @property
+    def game_dir(self):
+        return self.work / 'game'
+
+    @property
+    def prefix_dir(self):
+        return self.work / 'prefix'
+
+    # ------------------------------------------------------------------ clone + prepare
+
+    def clone(self):
+        t = time.time()
+        for src, dst in ((config.GAME, self.game_dir), (config.PREFIX, self.prefix_dir)):
+            if not src.is_dir():
+                raise GameError(f'no {src}')
+            r = subprocess.run(['cp', '-a', '--reflink=always', str(src), str(dst)],
+                               capture_output=True, text=True)
+            if r.returncode:
+                raise GameError(f'reflink clone of {src} failed (must be btrfs, same '
+                                f'filesystem as {config.CACHE}): {r.stderr.strip()}')
+        # vkBasalt's config lives outside the game directory, and a2mod toggles it; the
+        # session gets its own copy so neither touches the user's.
+        if config.VKBASALT.is_dir():
+            shutil.copytree(config.VKBASALT, self.work / 'xdg' / 'a2-vkbasalt', symlinks=True)
+        exc = self.game_dir / 'exception.txt'
+        self.s['exception_mtime'] = exc.stat().st_mtime if exc.exists() else None
+        self.save()
+        self.log.action(f'cloned the game and prefix (reflink) in {time.time() - t:.1f}s',
+                        detail=f'{config.GAME} -> {self.game_dir}\n{config.PREFIX} -> {self.prefix_dir}')
+
+    def prepare(self):
+        w, h = self.res
+        set_prf_resolution(self.game_dir / 'ARMADA.PRF', w, h)
+        self.log.action(f'ARMADA.PRF resolution set to {w}x{h}')
+        env = dict(os.environ, A2_GAME=str(self.game_dir), A2_GAME_DIR=str(self.game_dir),
+                   XDG_DATA_HOME=str(self.work / 'xdg'), TMPDIR=str(self.work))
+        plog = self.dir / 'logs' / 'prepare.log'
+        if self.s['mod'] == 'stock':
+            steps = [[str(config.REPO / 'a2mod'), 'stock']]
+        else:
+            # The three layers that are built for one resolution.  Each rebuilds from its
+            # own stock backups, so running them at any resolution is safe on the clone.
+            steps = [[str(config.REPO / 'hud/ui-widescreen.py'), '--res', f'{w}x{h}'],
+                     [str(config.REPO / 'hud/cursor-aspect.py'), '--res', f'{w}x{h}'],
+                     [str(config.REPO / 'font/ui-font-condense.py'), '--res', f'{w}x{h}']]
+        with open(plog, 'a') as f:
+            for cmd in steps:
+                f.write(f'$ {" ".join(cmd)}\n')
+                f.flush()
+                r = subprocess.run(cmd, env=env, stdout=f, stderr=subprocess.STDOUT,
+                                   cwd=str(config.REPO))
+                f.write(f'[exit {r.returncode}]\n\n')
+                name = Path(cmd[0]).name
+                if r.returncode:
+                    self.log.action(f'prepare: {name} failed (exit {r.returncode})',
+                                    status='fail', detail=f'see logs/prepare.log')
+                    raise GameError(f'{name} failed; see {plog}')
+                self.log.action(f'prepare: {name} {" ".join(cmd[1:])}', detail='logs/prepare.log')
+
+    # ------------------------------------------------------------------ display
+
+    def start_display(self):
+        w, h = self.res
+        rt = self.work / 'rt'
+        rt.mkdir(mode=0o700, exist_ok=True)
+        envfile = self.work / 'sway.env'
+        conf = self.work / 'sway.conf'
+        conf.write_text(f"""\
+# generated by the Armada II test bench
+output HEADLESS-1 mode --custom {w}x{h}@60Hz
+output HEADLESS-1 bg #000000 solid_color
+default_border none
+default_floating_border none
+focus_follows_mouse no
+xwayland force
+seat seat0 hide_cursor 0
+exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
+""")
+        env = dict(HOME=str(config.HOME), PATH=os.environ['PATH'], XDG_RUNTIME_DIR=str(rt),
+                   WLR_BACKENDS='headless', WLR_HEADLESS_OUTPUTS='1',
+                   WLR_LIBINPUT_NO_DEVICES='1', WLR_RENDER_DRM_DEVICE=_render_node())
+        slog = open(self.dir / 'logs' / 'sway.log', 'w')
+        p = subprocess.Popen(['sway', '-c', str(conf)], env=env, stdout=slog, stderr=subprocess.STDOUT,
+                             stdin=subprocess.DEVNULL, start_new_session=True, cwd=str(self.work))
+        self.s['pids']['sway'] = p.pid
+        for _ in range(100):
+            if envfile.exists():
+                break
+            if p.poll() is not None:
+                raise GameError('sway exited during start-up; see logs/sway.log')
+            time.sleep(0.1)
+        else:
+            raise GameError('sway did not come up in 10s; see logs/sway.log')
+        senv = dict(l.split('=', 1) for l in envfile.read_text().splitlines() if '=' in l)
+        self.s['env'] = dict(DISPLAY=senv['DISPLAY'], SWAYSOCK=senv['SWAYSOCK'],
+                             WAYLAND_DISPLAY=str(rt / senv['WAYLAND_DISPLAY']),
+                             XDG_RUNTIME_DIR=str(rt))
+        self.save()
+        self.log.action(f'headless display up: sway output HEADLESS-1 at {w}x{h}, '
+                        f'Xwayland {self.s["env"]["DISPLAY"]}')
+        self.start_input()
+        if self.s['vnc']:
+            self.start_vnc()
+        if self.s['record']:
+            self.start_recording()
+
+    def wl_env(self):
+        e = self.s['env']
+        return dict(os.environ, WAYLAND_DISPLAY=e['WAYLAND_DISPLAY'],
+                    XDG_RUNTIME_DIR=e['XDG_RUNTIME_DIR'], SWAYSOCK=e['SWAYSOCK'])
+
+    def swaymsg(self, *args):
+        return subprocess.run(['swaymsg', '-s', self.s['env']['SWAYSOCK'], *args],
+                              capture_output=True, text=True).stdout
+
+    def start_input(self):
+        build_input()
+        infifo, outfifo = self.work / 'input.in', self.work / 'input.out'
+        for f in (infifo, outfifo):
+            if not f.exists():
+                os.mkfifo(f)
+        # O_RDWR on both ends: the daemon never sees EOF between clients, and a client's
+        # open never blocks waiting for the other side.
+        fin = os.open(infifo, os.O_RDWR)
+        fout = os.open(outfifo, os.O_RDWR)
+        err = open(self.dir / 'logs' / 'input.log', 'w')
+        p = subprocess.Popen([str(config.INPUT_BIN), str(self.res[0]), str(self.res[1])],
+                             stdin=fin, stdout=fout, stderr=err, env=self.wl_env(),
+                             start_new_session=True)
+        os.close(fin)
+        os.close(fout)
+        self.s['pids']['input'] = p.pid
+        self.save()
+        if self._input_reply(timeout=5) != 'ready':
+            raise GameError('a2input did not start; see logs/input.log')
+
+    def start_vnc(self):
+        if not shutil.which('wayvnc'):
+            self.log.note('VNC requested but wayvnc is not installed (pacman -S wayvnc); continuing without it',
+                          status='warn')
+            return
+        port = config.VNC_BASE_PORT
+        while _port_busy(port):
+            port += 1
+        vlog = open(self.dir / 'logs' / 'wayvnc.log', 'w')
+        p = subprocess.Popen(['wayvnc', '--disable-input', '-o', 'HEADLESS-1', '127.0.0.1', str(port)],
+                             env=self.wl_env(), stdout=vlog, stderr=subprocess.STDOUT,
+                             start_new_session=True)
+        self.s['pids']['vnc'] = p.pid
+        self.s['vnc_port'] = port
+        self.save()
+        self.log.note(f'VNC (view-only) on 127.0.0.1:{port} -- e.g. `vncviewer localhost:{port}`')
+        print(f'  watch: vncviewer localhost:{port}', flush=True)
+
+    def start_recording(self):
+        if not shutil.which('wf-recorder'):
+            self.log.note('recording requested but wf-recorder is not installed (pacman -S wf-recorder)',
+                          status='warn')
+            return
+        out = self.dir / 'run.mp4'
+        rlog = open(self.dir / 'logs' / 'wf-recorder.log', 'w')
+        p = subprocess.Popen(['wf-recorder', '-o', 'HEADLESS-1', '-y', '-r', '15', '-f', str(out)],
+                             env=self.wl_env(), stdout=rlog, stderr=subprocess.STDOUT,
+                             stdin=subprocess.DEVNULL, start_new_session=True)
+        self.s['pids']['record'] = p.pid
+        self.save()
+        self.log.note('recording the run to run.mp4')
+
+    # ------------------------------------------------------------------ input
+
+    def _input_reply(self, timeout=10):
+        fd = os.open(self.work / 'input.out', os.O_RDONLY | os.O_NONBLOCK)
+        buf = b''
+        end = time.time() + timeout
+        try:
+            while time.time() < end:
+                try:
+                    chunk = os.read(fd, 4096)
+                except BlockingIOError:
+                    chunk = b''
+                buf += chunk
+                if b'\n' in buf:
+                    return buf.split(b'\n', 1)[0].decode()
+                time.sleep(0.01)
+        finally:
+            os.close(fd)
+        return None
+
+    def input(self, cmd):
+        """Send one command to a2input and wait for its answer."""
+        if not pid_alive(self.s['pids'].get('input')):
+            raise GameError('the input daemon is not running')
+        with open(self.work / 'input.lock', 'w') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            # drop any answer a previous, interrupted client never collected
+            fd = os.open(self.work / 'input.out', os.O_RDONLY | os.O_NONBLOCK)
+            try:
+                while os.read(fd, 4096):
+                    pass
+            except BlockingIOError:
+                pass
+            finally:
+                os.close(fd)
+            with open(self.work / 'input.in', 'w') as f:
+                f.write(cmd.rstrip('\n') + '\n')
+            r = self._input_reply(timeout=30)
+        if r != 'ok':
+            raise GameError(f'input "{cmd}": {r or "no answer"}')
+
+    def move(self, x, y):
+        self.input(f'move {int(round(x))} {int(round(y))}')
+        self.s['cursor'] = [int(round(x)), int(round(y))]
+        self.save()
+
+    def glide(self, x, y, steps=8):
+        """Move there in a few steps: the menu buttons only light up (and the shell only
+        tracks the hover) on WM_MOUSEMOVE inside them, which a single jump can skip."""
+        cx, cy = self.s.get('cursor') or [x - 40, y]
+        for i in range(1, steps + 1):
+            self.move(cx + (x - cx) * i / steps, cy + (y - cy) * i / steps)
+            time.sleep(0.02)
+
+    def click(self, x, y, button=1, double=False):
+        self.glide(x, y)
+        time.sleep(0.15)
+        for _ in range(2 if double else 1):
+            self.input(f'down {button}')
+            time.sleep(0.08)
+            self.input(f'up {button}')
+            time.sleep(0.08)
+
+    def key(self, combo):
+        self.input(f'key {combo}')
+
+    def type(self, text):
+        self.input(f'type {text}')
+
+    def wheel(self, n):
+        self.input(f'wheel {n}')
+
+    # ------------------------------------------------------------------ game
+
+    def launch(self, args='-nointro'):
+        if self.game_pid():
+            raise GameError('the game is already running in this session')
+        g = self.game_dir
+        for name in ('Menus.log', 'MSAA.log', 'BinkProxy.log', 'Armada2_d3d9.log'):
+            try:
+                (g / name).unlink()
+            except FileNotFoundError:
+                pass
+        logs = self.dir / 'logs'
+        e = self.s['env']
+        env = {k: v for k, v in os.environ.items()
+               if k not in ('WAYLAND_DISPLAY', 'SWAYSOCK', 'WINEPREFIX', 'LD_PRELOAD')}
+        env.update(
+            DISPLAY=e['DISPLAY'],
+            GAMEID='umu-0', STORE='gog', PROTONPATH=str(config.PROTON),
+            WINEPREFIX=str(self.prefix_dir), STEAM_COMPAT_DATA_PATH=str(self.prefix_dir),
+            STEAM_COMPAT_INSTALL_PATH=str(g),
+            STEAM_COMPAT_CLIENT_INSTALL_PATH=str(config.HOME / '.local/share/.steam/steam'),
+            STEAM_COMPAT_APP_ID='0', SteamAppId='0', SteamGameId='a2test',
+            UMU_RUNTIME_UPDATE='0',
+            WINEDLLOVERRIDES=config.DLL_OVERRIDES,
+            WINEDEBUG=os.environ.get('A2TEST_WINEDEBUG', '-all,err+all'),
+            WINE_FULLSCREEN_FSR='0',
+            DXVK_LOG_PATH=str(logs), DXVK_LOG_LEVEL='info',
+        )
+        vkconf = self.work / 'xdg' / 'a2-vkbasalt' / 'vkBasalt.conf'
+        if vkconf.exists():
+            env.update(ENABLE_VKBASALT='1', VKBASALT_CONFIG_FILE=str(vkconf),
+                       VKBASALT_LOG_FILE=str(logs / 'vkBasalt.log'), VKBASALT_LOG_LEVEL='info')
+        if not self.s['audio']:
+            sink = self._null_sink()
+            if sink:
+                env['PULSE_SINK'] = sink
+        (logs / 'launch-env.txt').write_text(
+            f'cwd: {g}\nargv: python3 {config.UMU} {g / "Armada2.exe"} {args}\n\n' +
+            ''.join(f'{k}={v}\n' for k, v in sorted(env.items())))
+        wlog = open(logs / 'wine.log', 'a')
+        wlog.write(f'--- {now()} launch Armada2.exe {args}\n')
+        wlog.flush()
+        p = subprocess.Popen(['python3', str(config.UMU), str(g / 'Armada2.exe'), *args.split()],
+                             env=env, cwd=str(g), stdout=wlog, stderr=subprocess.STDOUT,
+                             stdin=subprocess.DEVNULL, start_new_session=True)
+        self.s['pids']['launcher'] = p.pid
+        self.s['game_started'] = time.time()
+        self.s['launch_args'] = args
+        self.save()
+        for _ in range(1200):
+            if self.game_pid():
+                break
+            if p.poll() is not None:
+                raise GameError(f'the launcher exited ({p.returncode}) before the game started; see logs/wine.log')
+            time.sleep(0.1)
+        else:
+            raise GameError('Armada2.exe did not appear within 120s; see logs/wine.log')
+        self.log.action(f'launched Armada2.exe {args} through umu (pid {self.game_pid()})')
+
+    def _null_sink(self):
+        """Mute the run without touching the user's audio: a private null sink, gone at teardown."""
+        name = f'a2test-{self.s["id"]}'
+        r = subprocess.run(['pactl', 'load-module', 'module-null-sink', f'sink_name={name}',
+                            f'sink_properties=device.description={name}'],
+                           capture_output=True, text=True)
+        if r.returncode:
+            return None
+        self.s['null_sink'] = r.stdout.strip()
+        self.save()
+        return name
+
+    def game_pids(self):
+        """The game process of THIS session: argv[0] is the Windows path of its
+        Armada2.exe (`X:\\...\\Armada2.exe`), and its environment names this session's
+        prefix.
+
+        Matching "Armada2.exe anywhere in the command line" is wrong in a way that looks
+        like a crash: umu_run.py, the proton script and umu.exe all carry it as an
+        argument and are gone within seconds, while the real game process appears ~4 s
+        after launch.  Latching onto one of those made the game "stop running" 2-8 s in,
+        every time, while it went on running unwatched (and outlived its teardown).
+        Wine names the process `Armada2.exe` under umu but `Main` elsewhere
+        (menus/stop-game.sh), so the name is not used either."""
+        out = []
+        pfx = str(self.prefix_dir).encode()
+        for d in glob.glob('/proc/[0-9]*'):
+            try:
+                argv0 = Path(d, 'cmdline').read_bytes().split(b'\0', 1)[0]
+                if not (argv0.endswith(b'\\Armada2.exe') or argv0.endswith(b'/Armada2.exe')):
+                    continue
+                if pfx in Path(d, 'environ').read_bytes():
+                    out.append(int(d.rsplit('/', 1)[1]))
+            except OSError:
+                continue
+        return [p for p in out if pid_alive(p)]
+
+    def game_pid(self):
+        p = self.game_pids()
+        return p[0] if p else None
+
+    def running(self):
+        return self.game_pid() is not None
+
+    def crashed(self):
+        """exception.txt is where the game's crash handler writes; it ships non-empty,
+        so a crash is a change of mtime."""
+        exc = self.game_dir / 'exception.txt'
+        if not exc.exists():
+            return False
+        return exc.stat().st_mtime != self.s.get('exception_mtime')
+
+    def isolation_check(self):
+        """Prove the game reads its own copy: no open file or mapping of the real install."""
+        real = str(config.GAME)
+        pid = self.game_pid()
+        if not pid:
+            return None
+        hits = set()
+        try:
+            for line in Path(f'/proc/{pid}/maps').read_text().splitlines():
+                if real in line:
+                    hits.add(line.split(None, 5)[-1])
+            for fd in Path(f'/proc/{pid}/fd').iterdir():
+                try:
+                    t = os.readlink(fd)
+                    if t.startswith(real):
+                        hits.add(t)
+                except OSError:
+                    pass
+        except OSError:
+            return None
+        return sorted(hits)
+
+    def quit_game(self, timeout=20):
+        """Ask nicely (WM_DELETE_WINDOW -> WM_CLOSE), then stop the prefix.  Returns
+        True if the game closed on its own."""
+        if not self.running():
+            return True
+        self.swaymsg('[class="steam_proton"]', 'kill')
+        for _ in range(timeout * 4):
+            if not self.running():
+                return True
+            time.sleep(0.25)
+        self.stop_game()
+        return False
+
+    def stop_game(self):
+        env = dict(os.environ, WINEPREFIX=str(self.prefix_dir / 'pfx'))
+        ws = config.PROTON / 'files/bin/wineserver'
+        if ws.exists():
+            subprocess.run([str(ws), '-k'], env=env, capture_output=True, timeout=30)
+        kill_group(self.s['pids'].get('launcher'))
+        for _ in range(40):
+            if not self.game_pids():
+                break
+            time.sleep(0.25)
+        for p in self.game_pids():
+            try:
+                os.kill(p, signal.SIGKILL)
+            except OSError:
+                pass
+        kill_group(self.s['pids'].get('launcher'), signal.SIGKILL)
+
+    # ------------------------------------------------------------------ capture
+
+    def screenshot(self, name='shot'):
+        self.s['shots'] += 1
+        self.save()
+        safe = re.sub(r'[^A-Za-z0-9_.-]+', '-', name).strip('-') or 'shot'
+        path = self.dir / 'shots' / f'{self.s["shots"]:03d}-{safe}.png'
+        r = subprocess.run(['grim', '-o', 'HEADLESS-1', str(path)], env=self.wl_env(),
+                           capture_output=True, text=True)
+        if r.returncode:
+            raise GameError(f'grim failed: {r.stderr.strip()}')
+        return path
+
+    def last_shot(self):
+        shots = sorted((self.dir / 'shots').glob('*.png'))
+        return shots[-1] if shots else None
+
+    def game_log(self, name):
+        """A log the instrumented code writes beside Armada2.exe, or one of ours."""
+        for p in (self.game_dir / name, self.dir / 'logs' / name):
+            if p.exists():
+                return p.read_text(errors='replace')
+        return None
+
+    def collect_logs(self):
+        dst = self.dir / 'logs'
+        g = self.game_dir
+        for name in ('Menus.log', 'MSAA.log', 'BinkProxy.log', 'ARMADA.PRF', 'Menus.ini',
+                     'MSAA.ini', 'dxvk.conf'):
+            if (g / name).exists():
+                shutil.copy2(g / name, dst / name)
+        if self.crashed():
+            shutil.copy2(g / 'exception.txt', dst / 'exception.txt')
+        started = self.s.get('game_started') or 0
+        if (g / 'Logs').is_dir():
+            for f in (g / 'Logs').iterdir():
+                if f.is_file() and f.stat().st_mtime >= started:
+                    (dst / 'game-Logs').mkdir(exist_ok=True)
+                    shutil.copy2(f, dst / 'game-Logs' / f.name)
+
+    def teardown(self):
+        try:
+            # unconditionally: whatever the liveness check believes, nothing of this
+            # prefix may outlive the session (it would keep rewriting a deleted clone)
+            if self.s['pids'].get('launcher') or self.running():
+                self.stop_game()
+        finally:
+            try:
+                self.collect_logs()
+            except Exception as e:  # never let log collection keep a display alive
+                self.log.note(f'collecting logs failed: {e}', status='warn')
+            for k in ('record', 'vnc', 'input', 'sway'):
+                pid = self.s['pids'].get(k)
+                if pid_alive(pid):
+                    kill_group(pid, signal.SIGINT if k == 'record' else signal.SIGTERM)
+                    for _ in range(40):
+                        if not pid_alive(pid):
+                            break
+                        time.sleep(0.1)
+                    kill_group(pid, signal.SIGKILL)
+            if self.s.get('null_sink'):
+                subprocess.run(['pactl', 'unload-module', self.s['null_sink']], capture_output=True)
+            self.s['ended'] = now()
+            self.save()
+            shutil.copy2(self.statefile, self.dir / 'logs' / 'session-state.json')
+            if not self.s['keep']:
+                for _ in range(5):
+                    shutil.rmtree(self.work, ignore_errors=True)
+                    if not self.work.exists():
+                        break
+                    time.sleep(1)
+
+
+# ---------------------------------------------------------------------- helpers
+
+def set_prf_resolution(prf, w, h):
+    """ARMADA.PRF line 5 holds `... <w> <h> <bpp> ...` and the file carries an embedded
+    NUL, so this works on bytes (platform/README.md, "Setting the resolution").  Fields 7
+    and 8 of that line, the same walk hud/ui-widescreen.py's reader does."""
+    data = Path(prf).read_bytes()
+    lines = data.split(b'\r\n')
+    f = lines[4].split(b' ')
+    if len(f) < 9 or not (f[6].isdigit() and f[7].isdigit()):
+        raise GameError(f'unexpected ARMADA.PRF line 5: {lines[4]!r}')
+    f[6], f[7] = str(w).encode(), str(h).encode()
+    lines[4] = b' '.join(f)
+    Path(prf).write_bytes(b'\r\n'.join(lines))
+
+
+def build_input():
+    src = [config.INPUT_SRC / n for n in ('a2input.c', 'build.sh', 'wlr-virtual-pointer-unstable-v1.xml',
+                                          'virtual-keyboard-unstable-v1.xml')]
+    if config.INPUT_BIN.exists() and all(s.stat().st_mtime <= config.INPUT_BIN.stat().st_mtime for s in src):
+        return
+    r = subprocess.run(['bash', str(config.INPUT_SRC / 'build.sh')], capture_output=True, text=True)
+    if r.returncode:
+        raise GameError(f'building a2input failed:\n{r.stdout}{r.stderr}')
+
+
+def _render_node():
+    nodes = sorted(glob.glob('/dev/dri/renderD*'))
+    return os.environ.get('A2TEST_RENDER_NODE', nodes[0] if nodes else '')
+
+
+def _port_busy(port):
+    import socket
+    with socket.socket() as s:
+        return s.connect_ex(('127.0.0.1', port)) == 0
+
+
+def _comm(pid):
+    try:
+        return Path(f'/proc/{pid}/comm').read_text().strip()
+    except OSError:
+        return ''
