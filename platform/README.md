@@ -226,7 +226,7 @@ The working configuration, all four parts required together:
 | Wine virtual desktop | **off** | inside it DXVK's `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 |
 
 Set it up with `platform/d3d8-chain.py --use dxvk` (reverse with `--revert`). The
-virtual desktop stays off in both states: it is superseded by `MenuScale.asi`'s
+virtual desktop stays off in both states: it is superseded by `Menus.asi`'s
 `Embed=1` (see "Hyprland / window management", which also has the check).
 
 **The `d3d9=n,b` override is load-bearing, not diagnostic.** It arrived as part of
@@ -236,7 +236,7 @@ broken the chain the moment diagnostics were switched off. Ownership now sits wi
 adds, never removes.
 
 **The two-window focus bug the virtual desktop was added for** is fixed by
-`MenuScale.asi`'s `Embed=1` — see the Hyprland section.
+`Menus.asi`'s `Embed=1` — see the Hyprland section.
 
 ### How it was found — kept because the method is the lesson
 
@@ -289,7 +289,7 @@ kept snapping back to a black fullscreen frame.
 **Cause:** every menu, the in-game Options included, is a `WS_POPUP` dialog, which Wine
 turns into a second X11 window that Hyprland tiles and focuses like a new application.
 
-**Fix: `MenuScale.asi` with `Embed=1`** (the default it ships with) re-creates each
+**Fix: `Menus.asi` with `Embed=1`** (the default it ships with) re-creates each
 menu as a child of the game window, so the game is one OS window from launch to exit.
 See `menus/README.md`, "One window: `Embed=1`".
 
@@ -298,7 +298,7 @@ this bug: `"Desktop"="Default"` under `[Software\\Wine\\Explorer]` in
 `<prefix>/pfx/user.reg`, which put everything in one window. It is incompatible with
 DXVK: inside it `ChangeDisplaySettingsEx` fails and the game falls back to 640x480 (see
 above). Do not turn it back on to fix a window problem; fix the window in
-`menuscale.c`.
+`menus.c`.
 
 To check it is off (a fresh prefix never has it):
 
@@ -386,6 +386,6 @@ ten each for Federation, Klingon and Borg.
     # stop it, its Wine session, and any stale audio node it left behind
     menus/stop-game.sh
 
-    # did the menu scaler load, and what did it patch?
-    cat "<game dir>/MenuScale.log"
+    # did Menus.asi load, and what did it patch?
+    cat "<game dir>/Menus.log"
 

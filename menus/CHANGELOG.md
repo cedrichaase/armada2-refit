@@ -5,6 +5,31 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 2.0.0 — 2026-09-25
+
+The plugin is renamed from `MenuScale` to `Menus`, because scaling is about a third of
+what it does. Its code is unchanged apart from names and one guard: before the rename
+it disassembled identically to what was installed.
+
+### Changed
+- `menuscale.c` → `menus.c`, and the installed files `MenuScale.asi`/`.ini`/`.log` →
+  `Menus.asi`/`.ini`/`.log`. The ini section is now `[Menus]`, the plates folder
+  `Menus/`, and backdrop dumps are `Menus-backdrop<n>.bmp`. All ini keys are unchanged.
+- `a2mod` layer `menu scale` → `menus`.
+
+### Added
+- `Menus.asi` stands down, and logs why, if a `MenuScale.asi` is beside it: the ASI
+  loader loads every `*.asi`, so both would hook everything.
+- `install.sh` removes the old `MenuScale.*` files on install and on `--remove`. When a
+  plate isn't built in the current checkout, it keeps the installed one instead of
+  claiming the sides will be black.
+
+MAJOR because the installed file names and the ini section changed. Migrated in the
+game directory on 2026-09-25: `MenuScale/` renamed to `Menus/` (plates byte-identical),
+`install.sh` run, and the `a2mod` manifest entries renamed. The plugin was load-tested
+under Proton's Wine (new names read, legacy guard fires). Installed, not yet seen in
+game.
+
 ## 1.0.0 — 2026-09-25
 
 Baseline: the first versioned release. Everything below is confirmed in game.

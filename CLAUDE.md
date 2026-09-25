@@ -24,7 +24,7 @@ it bundles.
 | `models/` | `SOD` geometry — the widened loading screen | `textures/README.md`, loading-screen section |
 | `hud/` | in-game HUD layout and the cursors | `hud/README.md` |
 | `font/` | the condensed in-game bitmap font | `font/README.md` |
-| `menus/` | `MenuScale.asi` — the shell menus and their backdrops | `menus/README.md` |
+| `menus/` | `Menus.asi` — the shell menus and their backdrops | `menus/README.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `cutscenes/` | `binkproxy/` and the replacement `movies/` | `cutscenes/binkproxy/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
@@ -209,7 +209,7 @@ Two entry points at the root:
 - **`./a2tex`** — `list`, `build [-j N]`, `install`, `revert`, `diff`, `verify` — the
   texture pipeline.
 - **`./a2mod stock` / `remastered` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, MenuScale, MSAA, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the scroll-speed files stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -481,11 +481,15 @@ both; **never ship one without the other.**
   `BitBlt` and **no `StretchBlt`**, and the shell never touches Direct3D — so no
   `gui_*.cfg`, config file or d3d8/DXVK setting can scale it. The engine asks for an
   **800x600 display mode for the front end**, so the shell was *filling a small screen*;
-  `MenuScale.asi` raises that mode in memory and scales the shell into it.
+  `Menus.asi` raises that mode in memory and scales the shell into it.
 - Every menu is a separate OS window unless **`Embed=1`**, which re-creates each as a
   `WS_CHILD` of the game window.
+- **`Menus.asi` was `MenuScale.asi` before menus 2.0.0, and the two must never be
+  installed together**: the ASI loader loads every `*.asi`, so both would hook
+  everything. `menus/install.sh` removes the old names, `Menus.asi` stands down if it
+  sees one, and `a2mod` still recognises `MenuScale.*` so a stale copy is set aside.
 - **GetDC/ReleaseDC do not pair in this game**: `ShellButton::UpdateButton` has its
-  `ReleaseDC` NOP'd out, so nothing in `menuscale.c` may assume they do.
+  `ReleaseDC` NOP'd out, so nothing in `menus.c` may assume they do.
 - **Backdrops are composited per frame**, because the shell draws 1:1 into 800x600 and a
   bigger BMP cannot help: `stretch(frame) + w·(plate − stretch(stock))`. A weight, not a
   mask, because `MainBk_flare.bik` *is* the logo band with the background baked in.
@@ -511,8 +515,8 @@ only ever read.
   **game directory** (the prefix is not durable — Proton restores it from symlinks),
   `d3d9=n,b` in the overrides, and the Wine virtual desktop **off**. The virtual desktop
   is **superseded**: it was once the fix for menus opening as separate windows, which
-  `MenuScale.asi`'s `Embed=1` now solves inside the game window. Never turn it back on
-  to fix a window problem — fix it in `menuscale.c`.
+  `Menus.asi`'s `Embed=1` now solves inside the game window. Never turn it back on
+  to fix a window problem — fix it in `menus.c`.
   `platform/d3d8-chain.py --status` identifies every link **by hash; never identify one
   by size.** "Heroic redeploys DXVK" is `autoInstallDxvk` working as designed.
 - **Bloom** is vkBasalt, possible only because the chain is Vulkan. `postfx/postfx.py`

@@ -1,6 +1,12 @@
-# MenuScale — making Armada II's menus fill the screen
+# Menus — Armada II's front-end menus
 
-The menus render in the top-left 800x600 of a 3440x1440 screen. This makes them fill
+`Menus.asi` fixes the game's GDI menu shell: it raises the front-end display mode,
+scales the menus to fill the screen, embeds them in the game window (`Embed=1`),
+composites hi-res backdrops behind them and removes the menu-switch flash. It was
+`MenuScale.asi` until menus 2.0.0 (see `CHANGELOG.md`), which is the name older
+logs and notes use; it had outgrown it.
+
+The scaling came first. The menus render in the top-left 800x600 of a 3440x1440 screen. This makes them fill
 the height, centred, at 4:3, with black pillarboxes. Nothing is stretched.
 
 **Confirmed in game**, on the main menu, at 3440x1440.
@@ -35,7 +41,7 @@ Two separate facts, both measured, and the second is the one that matters:
 
 ## What it does
 
-`MenuScale.asi` is loaded by the Ultimate ASI Loader (`winmm.dll`) — the same loader
+`Menus.asi` is loaded by the Ultimate ASI Loader (`winmm.dll`) — the same loader
 `STA2WidescreenPatch.asi` uses, so it needs no setup beyond the `winmm=n,b` override
 that is already in `WINEDLLOVERRIDES`.
 
@@ -184,13 +190,13 @@ at 3440x1440 composited it as designed; the numbers are below.
 **Why the art cannot simply replace the BMP.** The shell draws each screen at 1:1
 into the 800x600 design surface: first the stock background, then buttons, hover
 states, text and Bink animations on top. A bigger `mainbkgr.bmp` would still be drawn
-800x600 of it. So MenuScale composites the picture itself, per frame, from the
+800x600 of it. So Menus.asi composites the picture itself, per frame, from the
 frame the shell drew:
 
 - **Which screen:** a 40x30 grid of the frame is sampled against each stock BMP
   listed under `[Backdrops]`. The listed screen that matches exactly (within 2/255)
   at 50% or more of the points is the one on show.
-- **Sides:** these come from the plate `MenuScale/<same name>.bmp`, scaled so its
+- **Sides:** these come from the plate `Menus/<same name>.bmp`, scaled so its
   centre 4:3 lands exactly on the stretched design area.
 - **Centre:** `out = stretch(frame) + w · (plate − stretch(stock))` per pixel, with
   `w` falling linearly from 1 to 0 as the frame's pixel departs from stock by up to
@@ -240,7 +246,7 @@ in `backdrops/*.conf`:
   drawn black frame that is hard-edged at x 28 and x 771. Outpainting the whole
   screen continued the frame and then started a different sky beyond it. So
   `field=32,0,768,600` hands the outpaint the open field alone. The plate replaces
-  the frame too: MenuScale shows the plate wherever the shell draws stock
+  the frame too: Menus.asi shows the plate wherever the shell draws stock
   background, and the frame is stock background. The joins are step-free (column
   means 43→45→48 and 83→86→81).
   Of four expands (about $0.02 each): seed 1 invented a lens-flare sun, and seed 3
@@ -300,11 +306,11 @@ are left as they are.
    the screen height, so at 1440 it goes on 1:1.
 
 `--reblend` re-derives it offline. `install.sh` copies each built plate to
-`MenuScale/`, and `a2mod` moves them with the rest of the menu scale layer.
+`Menus/`, and `a2mod` moves them with the rest of the menus layer.
 
 **Testing without taking over the desktop.** Set `DumpBackdrop=1` and launch with
-`NOSHOT=1 capture.sh`. MenuScale then writes the composed screen to
-`MenuScale-backdrop<n>.bmp` ~60 presents after each backdrop first shows. `shot.sh`
+`NOSHOT=1 capture.sh`. Menus.asi then writes the composed screen to
+`Menus-backdrop<n>.bmp` ~60 presents after each backdrop first shows. `shot.sh`
 has to switch the visible workspace to grab a frame, and this does not.
 
 ## Use
@@ -315,11 +321,11 @@ has to switch the visible workspace to grab a frame, and this does not.
     menus/install.sh --remove   # take it out again
 
 `install.sh --remove` restores stock behaviour exactly: the plugin only ever *adds*
-`MenuScale.asi`, `MenuScale.ini`, `MenuScale.log` and the backdrop plates in
-`MenuScale/` to the game directory, so there is no backup to keep and nothing to
+`Menus.asi`, `Menus.ini`, `Menus.log` and the backdrop plates in
+`Menus/` to the game directory, so there is no backup to keep and nothing to
 revert.
 
-`MenuScale.ini` keys are documented in the file. The ones worth knowing:
+`Menus.ini` keys are documented in the file. The ones worth knowing:
 
 | key | meaning |
 |---|---|
@@ -330,7 +336,7 @@ revert.
 | `Backdrops` | `0` black pillarboxes and a plain stretch, as before the backdrops |
 
 **If anything misbehaves, `Mode=0` is a safe diagnostic and `--remove` is a full
-uninstall.** `MenuScale.log`, beside `Armada2.exe`, records what it patched and every
+uninstall.** `Menus.log`, beside `Armada2.exe`, records what it patched and every
 dialog it moved.
 
 ## Command-line switches
@@ -386,7 +392,7 @@ Two traps that cost real time here, both recorded so they are not rediscovered:
 
 - **Wine reports the process `comm` as `Main`, not `Armada2.exe`.** So
   `pgrep -x Armada2.exe` matches nothing even while the game is plainly running and
-  writing to `MenuScale.log`. This is not cosmetic: it made the harness report "game
+  writing to `Menus.log`. This is not cosmetic: it made the harness report "game
   DOWN" for a game that was up, and it made every run's `pkill -x Armada2.exe` cleanup
   a no-op, so instances accumulated — seven of them over half an hour, each with no
   window, each still holding a PipeWire stream and audibly playing the menu music.

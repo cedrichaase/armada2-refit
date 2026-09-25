@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.0.0 — 2026-09-25
+
+Layers: menus 2.0.0.
+
+### Changed
+- The menus plugin is renamed `MenuScale.asi` → `Menus.asi`, with its ini, log and
+  plates folder (see `menus/CHANGELOG.md`).
+- `a2mod`: the layer `menu scale` is now `menus`. It still recognises the old
+  `MenuScale.*` files, so a stale copy is set aside in stock rather than left live. It
+  reads old manifests' layer name as `menus`, and after restoring a pre-rename
+  snapshot it says to run `menus/install.sh`.
+
+Installed, not yet seen in game.
+
 ## 2.0.0 — 2026-09-25
 
 Layers: platform 2.0.0.
