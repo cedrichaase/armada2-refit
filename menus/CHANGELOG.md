@@ -10,7 +10,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 ### Fixed
 - Esc reopens the in-mission Options menu after it has been closed. An embedded menu
   left the keyboard focus `NULL` when it returned, so every key was dropped until a
-  restart. The focus is now restored to the window that held it.
+  restart. The focus is now restored to the window that held it. (`32656d7`)
 
 Installed, not yet seen in game.
 

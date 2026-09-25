@@ -11,7 +11,7 @@ Layers: menus 2.0.2.
 
 ### Fixed
 - In a mission, Esc opens Options again after it has been closed, and the keyboard
-  works again after any in-game menu (see `menus/CHANGELOG.md`).
+  works again after any in-game menu (see `menus/CHANGELOG.md`, `32656d7`).
 
 Installed, not yet seen in game.
 
