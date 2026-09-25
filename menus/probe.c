@@ -11,6 +11,8 @@
  *   probe cursor X Y    move the pointer to X,Y and report GetCursorInfo:
  *                       whether a cursor is showing, and its handle
  *   probe key VK        press and release one virtual key (27 = Escape)
+ *   probe focus         the foreground thread's active, focus and capture
+ *                       windows (GetGUIThreadInfo): where a keypress goes
  *
  * Input goes through SendInput, so it is routed by wineserver's own
  * hit-testing -- the same path a real click takes, which is the thing the
@@ -57,6 +59,10 @@ __declspec(dllimport) HANDLE __stdcall LoadCursorA(HANDLE, LPCSTR);
 typedef struct { LONG x, y; } POINT;
 __declspec(dllimport) HWND  __stdcall WindowFromPoint(POINT);
 __declspec(dllimport) BOOL  __stdcall ScreenToClient(HWND, POINT *);
+typedef struct { DWORD cbSize, flags; HWND hwndActive, hwndFocus, hwndCapture,
+                 hwndMenuOwner, hwndMoveSize, hwndCaret; RECT rcCaret; } GUITHREADINFO;
+__declspec(dllimport) BOOL  __stdcall GetGUIThreadInfo(DWORD, GUITHREADINFO *);
+__declspec(dllimport) DWORD __stdcall GetWindowThreadProcessId(HWND, DWORD *);
 __declspec(dllimport) BOOL  __stdcall PostMessageA(HWND, UINT, unsigned int, LONG_PTR);
 __declspec(dllimport) HANDLE __stdcall GetStdHandle(DWORD);
 __declspec(dllimport) BOOL  __stdcall WriteFile(HANDLE, const void *, DWORD, DWORD *, void *);
@@ -146,6 +152,16 @@ static BOOL __stdcall each_child(HWND h, LONG_PTR unused)
     put(" @"); num(r.left); put(","); num(r.top); put("\r\n");
     if (g_n > 3600) flush();
     return 1;
+}
+
+/* "0x1234 ClassName" -- or "none". */
+static void name(HWND h)
+{
+    char cls[64];
+    if (!h) { put("none"); return; }
+    cls[0] = 0;
+    GetClassNameA(h, cls, 64);
+    hex((DWORD)(LONG_PTR)h); put(" "); put(cls);
 }
 
 static BOOL __stdcall each_tree(HWND h, LONG_PTR fg)
@@ -246,8 +262,21 @@ void __stdcall start(void)
         vk = atoi_(&p);
         key((WORD)vk, 0); Sleep(80); key((WORD)vk, 2);  /* KEYEVENTF_KEYUP */
         put("key "); num(vk); put("\r\n");
+    } else if (p[0] == 'f') {
+        GUITHREADINFO gi;
+        HWND fg = GetForegroundWindow();
+        memset(&gi, 0, sizeof gi);
+        gi.cbSize = sizeof gi;
+        put("foreground "); name(fg); put("\r\n");
+        if (fg && GetGUIThreadInfo(GetWindowThreadProcessId(fg, 0), &gi)) {
+            put("active     "); name(gi.hwndActive);  put("\r\n");
+            put("focus      "); name(gi.hwndFocus);   put("\r\n");
+            put("capture    "); name(gi.hwndCapture); put("\r\n");
+        } else {
+            put("GetGUIThreadInfo failed\r\n");
+        }
     } else {
-        put("usage: probe list | click X Y | key VK\r\n");
+        put("usage: probe list | tree | click X Y | post X Y | cursor X Y | key VK | focus\r\n");
     }
     flush();
     ExitProcess(0);

@@ -82,9 +82,10 @@ the layer's README. Do not copy derivations into a changelog, and do not copy st
 changelogs are for.
 
 **In-game status goes in the entry.** End every entry with "Installed, not yet seen in
-game" or "Confirmed in game". When the user confirms later, append `Confirmed in game
-YYYY-MM-DD` to that entry and do not bump. This is the one permitted edit to an entry
-that has already been released. A rejection is not a status line. It is a new entry
+game" or "Confirmed in game". When the user confirms later, **replace** "Installed, not
+yet seen in game" with `Confirmed in game YYYY-MM-DD` and do not bump. Don't keep both:
+an entry that still says "not yet seen" after it has been seen is misleading. This is the
+one permitted edit to an entry that has already been released. A rejection is not a status line. It is a new entry
 that reverts the change, like the font's `--method runs`.
 
 **Parallel worktrees** will both claim the next number. Whichever branch merges second
@@ -97,8 +98,9 @@ Work is done when the user has confirmed it working in game **and** signed it of
 done. A test launch, or a passing `verify`, does not count. Then, without being asked
 again, finish in this order:
 
-1. **Record the confirmation** on the branch: `Confirmed in game YYYY-MM-DD` in the
-   layer and root changelogs (above), and commit.
+1. **Record the confirmation** on the branch: `Confirmed in game YYYY-MM-DD` in place
+   of "Installed, not yet seen in game", in the layer and root changelogs (above), and
+   commit.
 2. **Merge into `master`** from the main checkout, with
    `git merge --no-ff <branch> -m "Merge <branch>: <what>"`. Resolve version clashes as
    "Parallel worktrees" says. There is no remote, so there is nothing to push.

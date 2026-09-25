@@ -89,7 +89,7 @@ at all.
 
 `Embed=1` hooks `DialogBoxParamA`, rewrites the template `WS_POPUP` ->
 `WS_CHILD`, and creates it with `DialogBoxIndirectParamA` so it becomes a child
-of the game window. Wine then creates no second X window. Four things follow,
+of the game window. Wine then creates no second X window. Five things follow,
 each handled, each measured:
 
 - **Input.** `DialogBox` disables its owner *before* creating the dialog (Wine
@@ -110,10 +110,31 @@ each handled, each measured:
   resized under it, as Hyprland does when the game drops fullscreen on focus
   loss, it used to hang off the bottom (Return to Game unreachable). Embedded
   full-screen menus now follow their parent's client area.
+- **Keyboard focus.** The game reads keys only as `WM_KEYDOWN`/`UP` on the 3D
+  window (`ProcessKeyboardMessages`), so that window must hold the focus. A popup
+  gives it back as a side effect of re-activating its owner when it closes; a child
+  never deactivated anything, and Wine left the focus `NULL` after it was gone.
+  Every keystroke was then dropped: Esc opened the in-mission menu once and never
+  again, while HUD clicks, routed by position, still worked. The focus is put back
+  where it was when the menu returns. That also sends the `WM_SETFOCUS` on which
+  the game runs `ClearKeyboardState`, since the Esc key-up went to the menu and
+  not to the game. A menu opened from a menu that held no focus leaves it alone.
+  (`probe focus` shows the active and focus windows.)
 
 `CreateDialogParamA` is embedded the same way, without the modal bookkeeping. Its
 one call site is the Admiral's Log (below). `Embed=0` restores separate windows; both
 hooks then only log.
+
+**Esc closes the in-mission menu (`EscapeReturns=1`).** In stock, Esc opens the
+in-mission menu and does nothing inside it: `EscapeMenuDlgProc` (0x5cddb0) has no
+`WM_COMMAND` case, so the `IDCANCEL` a dialog makes of Esc is ignored. Embedded, Esc
+doesn't even reach the menu, which holds no focus. The modality filter now catches a
+fresh Esc press (not an auto-repeat) while that menu is the innermost one, and feeds
+its procedure a left click on Return to Game. That runs the same sound, result code
+and `EndDialog` as the mouse. The procedure and the button's rectangle (x 5, y 568,
+172x22 in 800x600) are found by signature in `Armada2.exe` and read from its
+operands; if either fails to match, the log says so and Esc stays stock. Esc inside
+a nested menu, such as Graphics Settings, does nothing, as before. Needs `Embed=1`.
 
 **The cursor.** The 3D window's `WindowProc` answers every `WM_SETCURSOR` with
 `SetCursor(NULL)` (`0x488881`), so the engine's sprite cursor can show in play. A child's
@@ -413,6 +434,8 @@ every Embed claim above was checked without a human at the mouse:
                                reaches the menu binding (Space still skipped the
                                cutscene, which is what made this confusing)
     run-probe.sh post X Y      post a click straight to the window under X,Y
+    run-probe.sh focus         the game thread's active, focus and capture windows:
+                               where a keypress will go
 
 `capture.sh` takes `NOSHOT=1` to launch without photographing, and
 `A2_ARGS="-nointro a2_fed01.bzn"` starts a mission directly. **The `.bzn` is

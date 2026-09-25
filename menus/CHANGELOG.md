@@ -5,6 +5,23 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 2.1.0 — 2026-09-25
+
+### Added
+- `EscapeReturns=1` (default): Esc in the in-mission menu acts as Return to Game, so
+  Esc both opens and closes it. Needs `Embed=1`; `0` leaves Esc stock. (`96f5ac1`)
+
+Confirmed in game 2026-09-25.
+
+## 2.0.2 — 2026-09-25
+
+### Fixed
+- Esc reopens the in-mission Options menu after it has been closed. An embedded menu
+  left the keyboard focus `NULL` when it returned, so every key was dropped until a
+  restart. The focus is now restored to the window that held it. (`32656d7`)
+
+Confirmed in game 2026-09-25.
+
 ## 2.0.1 — 2026-09-25
 
 ### Fixed
@@ -42,8 +59,7 @@ it disassembled identically to what was installed.
 MAJOR because the installed file names and the ini section changed. Migrated in the
 game directory on 2026-09-25: `MenuScale/` renamed to `Menus/` (plates byte-identical),
 `install.sh` run, and the `a2mod` manifest entries renamed. The plugin was load-tested
-under Proton's Wine (new names read, legacy guard fires). Installed, not yet seen in
-game. Confirmed in game 2026-09-25.
+under Proton's Wine (new names read, legacy guard fires). Confirmed in game 2026-09-25.
 
 ## 1.0.0 — 2026-09-25
 

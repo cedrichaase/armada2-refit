@@ -186,6 +186,9 @@ __declspec(dllimport) HWND    __stdcall CreateWindowExA(DWORD, LPCSTR, LPCSTR, D
 __declspec(dllimport) BOOL    __stdcall EnableWindow(HWND, BOOL);
 __declspec(dllimport) BOOL    __stdcall IsWindowEnabled(HWND);
 __declspec(dllimport) HWND    __stdcall GetParent(HWND);
+__declspec(dllimport) HWND    __stdcall GetFocus(void);
+__declspec(dllimport) HWND    __stdcall SetFocus(HWND);
+__declspec(dllimport) BOOL    __stdcall PostMessageA(HWND, UINT, WPARAM, LPARAM);
 __declspec(dllimport) HWND    __stdcall GetAncestor(HWND, UINT);
 __declspec(dllimport) BOOL    __stdcall IsChild(HWND, HWND);
 __declspec(dllimport) LONG    __stdcall GetWindowLongA(HWND, INT);
@@ -320,6 +323,7 @@ static int g_integer  = 0;   /* snap to a whole-number scale factor         */
 static int g_smooth   = 1;   /* HALFTONE rather than nearest-neighbour      */
 static int g_shellMode = 1;  /* raise the engine's 800x600 front-end mode   */
 static int g_embed    = 0;   /* modal dialogs become children of their owner */
+static int g_escReturns = 1; /* Esc in the in-mission menu = Return to Game   */
 
 /* ---- the fit ---------------------------------------------------------- */
 
@@ -1159,6 +1163,17 @@ static void present(Slot *s, HDC real, int full)
  *   owner     a child has no owner, so GetWindow(GW_OWNER) would return NULL
  *             where the game expects its 3D window.  Answered with the parent
  *             for the dialogs embedded here.
+ *   focus     the keyboard is read from WM_KEYDOWN/UP on the 3D window
+ *             (ProcessKeyboardMessages), so it must hold the focus.  A popup
+ *             hands it back as a side effect of re-activating its owner on
+ *             close; a child never deactivated anything, so the focus the
+ *             dialog took stays NULL after it is gone and every keystroke is
+ *             dropped -- Esc opened the in-mission menu once and never again,
+ *             while the mouse, routed by position, still worked.  The focus
+ *             is put back where it was when the dialog returns, which also
+ *             sends the WM_SETFOCUS on which the game clears its key state
+ *             (0x48887a: ClearKeyboardState) -- the Esc key-up went to the
+ *             dialog, not to the game.
  *
  * CreateDialogParamA is embedded too.  It has one call site (0x5e3c04): the
  * Admiral's Log creates its eight tab panes with it, from the WS_POPUP
@@ -1201,6 +1216,14 @@ static void present(Slot *s, HDC real, int full)
 #define WM_NCMOUSELAST   0x00AD
 #define WM_MOUSEALL_LAST 0x020E    /* through WM_MOUSEHWHEEL */
 
+#define WM_KEYDOWN       0x0100
+#define WM_SYSKEYDOWN    0x0104
+#define WM_LBUTTONDOWN   0x0201
+#define WM_LBUTTONUP     0x0202
+#define MK_LBUTTON       0x0001
+#define VK_ESCAPE        0x1B
+#define WM_A2_ESCAPE     0x8A2E    /* WM_APP + n: Esc, handed to the menu    */
+
 #define MAXEMB 16
 
 typedef struct {
@@ -1217,6 +1240,8 @@ static HWND    g_pendingOwner;
 static int     g_pendingModeless;
 static HHOOK   g_filter;
 static int     g_embedded;      /* count, for the log                      */
+static DLGPROC g_escProc;       /* EscapeMenuDlgProc, or NULL: not found   */
+static LPARAM  g_escClick;      /* centre of Return to Game, design coords */
 
 static HWND (__stdcall *o_GetWindow)(HWND, UINT);
 static void start_flush(void);
@@ -1277,6 +1302,19 @@ static LONG_PTR __stdcall input_filter(INT code, WPARAM wp, LPARAM lp)
     if (code >= 0 && lp) {
         MSG *m = (MSG *)lp;
         UINT k = m->message;
+        /* Esc in the in-mission menu -- see "Esc" at find_escape_menu().  A
+         * fresh press only: the auto-repeat of the Esc that opened the menu
+         * must not close it again. */
+        if ((k == WM_KEYDOWN || k == WM_SYSKEYDOWN) && m->wParam == VK_ESCAPE &&
+            !(m->lParam & 0x40000000) && g_escProc) {
+            HWND dlg = top_modal();
+            Emb *e = emb_get(dlg);
+            if (e && e->proc == g_escProc) {
+                PostMessageA(dlg, WM_A2_ESCAPE, 0, 0);
+                m->message = WM_NULL;
+                k = WM_NULL;
+            }
+        }
         if (m->hwnd &&
             ((k >= WM_MOUSEFIRST && k <= WM_MOUSEALL_LAST) ||
              (k >= WM_NCMOUSEFIRST && k <= WM_NCMOUSELAST) ||
@@ -1308,6 +1346,17 @@ static LONG_PTR __stdcall embed_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         e->hwnd = h; e->proc = g_pendingProc; e->owner = g_pendingOwner; e->modal = 0;
         e->modeless = g_pendingModeless;
         g_pendingProc = NULLPTR; g_pendingOwner = NULLPTR; g_pendingModeless = 0;
+    }
+
+    if (msg == WM_A2_ESCAPE) {
+        /* A click on Return to Game, through the menu's own procedure: the
+         * same sound, result code and EndDialog as the mouse. */
+        if (e->proc && e->proc == g_escProc) {
+            if (g_logging) logline("Esc -> Return to Game");
+            e->proc(h, WM_LBUTTONDOWN, MK_LBUTTON, g_escClick);
+            e->proc(h, WM_LBUTTONUP, 0, g_escClick);
+        }
+        return TRUE;
     }
 
     r = e->proc ? e->proc(h, msg, wp, lp) : 0;
@@ -1410,6 +1459,7 @@ static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND o
 {
     BYTE    *tpl;
     LONG_PTR r;
+    HWND     focus;
 
     if (g_logging) {
         char b[160];
@@ -1433,16 +1483,22 @@ static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND o
      * dialog whose content Menus blits through GetDC. */
     SetWindowLongA(owner, GWL_STYLE, GetWindowLongA(owner, GWL_STYLE) | (LONG)WS_CLIPCHILDREN);
 
+    focus = GetFocus();
     g_pendingProc = proc;
     g_pendingOwner = owner;
     r = DialogBoxIndirectParamA(inst, tpl, owner, embed_proc, lp);
     g_pendingProc = NULLPTR;
     g_pendingOwner = NULLPTR;
     HeapFree(GetProcessHeap(), 0, tpl);
+    /* See "focus" above.  Only a focus that existed: a dialog opened from a
+     * menu that itself held none (Options -> Graphics Settings) leaves the
+     * keyboard as it found it. */
+    if (focus && IsWindow(focus) && GetFocus() != focus) SetFocus(focus);
     if (g_logging) {
         char b[96];
         b[0] = 0;
         s_cat(b, "  embedded dialog returned "); s_num(b, (long)r);
+        s_cat(b, ", focus "); s_num(b, (long)(UINT_PTR)GetFocus());
         logline(b);
     }
     return r;
@@ -2362,6 +2418,54 @@ static BYTE *find_text(BYTE *base, const BYTE *sig, int len)
 /* Both sites or neither, and only if both call the same function: a half
  * patch, or a match in some other build that calls something else, is worse
  * than the corner flash. */
+/* ---- Esc closes the in-mission menu ------------------------------------ */
+/*
+ * Esc opens the in-mission menu (do_escapeMenu) and, in stock, does nothing
+ * inside it: EscapeMenuDlgProc (0x5cddb0) handles no WM_COMMAND, so the
+ * IDCANCEL a dialog makes of Esc is ignored.  Embedded, Esc never reaches the
+ * menu at all -- the menu holds no focus, so the key goes to the 3D window
+ * and the modality filter drops it.  EscapeReturns=1 catches it there instead
+ * and has the menu act as if Return to Game were clicked.
+ *
+ * Both halves are found by signature and read, not assumed:
+ *
+ *   do_escapeMenu   push <proc>; call; mov ecx,[hInst]; push eax;
+ *                   push 0x123; push ecx; call [DialogBoxParamA]
+ *   Return to Game  mov edx,[h]; ... mov ecx,[w]; ... push 0x238 (y);
+ *                   push 5 (x); ... call ShellButton::ShellButton;
+ *                   mov [0x7a6bb8],eax      (0x5cea52..0x5cea98)
+ *
+ * The click lands on the button's centre, (91,579) in 800x600, in the menu's
+ * own design coordinates -- which is what its procedure hit-tests, whatever
+ * the scaling.  Anything that does not match leaves Esc as it was.
+ */
+static void find_escape_menu(BYTE *base)
+{
+    static const BYTE callSig[] = { 0x8B, 0x0D, 0xA0, 0x8B, 0x7A, 0x00, 0x50,
+                                    0x68, 0x23, 0x01, 0x00, 0x00, 0x51, 0xFF, 0x15 };
+    static const BYTE btnSig[]  = { 0x68, 0x38, 0x02, 0x00, 0x00, 0x6A, 0x05,
+                                    0x52, 0x8B, 0x15 };
+    BYTE *p = find_text(base, callSig, (int)sizeof callSig);
+    BYTE *q = find_text(base, btnSig,  (int)sizeof btnSig);
+    LONG  x, y, w, hgt;
+
+    if (!p || !q) return;
+    if (p[-10] != 0x68 || p[-5] != 0xE8) return;                  /* push; call */
+    if (q[-0x23] != 0x8B || q[-0x22] != 0x15 ||                   /* mov edx,[h] */
+        q[-0x16] != 0x8B || q[-0x15] != 0x0D ||                   /* mov ecx,[w] */
+        q[0x1A] != 0xE8 || q[0x23] != 0xA3) return;               /* call; mov [],eax */
+
+    x   = (LONG)(signed char)q[6];
+    y   = *(LONG *)(q + 1);
+    w   = **(LONG **)(q - 0x14);
+    hgt = **(LONG **)(q - 0x21);
+    if (x < 0 || y < 0 || w <= 0 || hgt <= 0 ||
+        x + w > g_designW || y + hgt > g_designH) return;
+
+    g_escProc  = (DLGPROC)*(DWORD *)(p - 9);
+    g_escClick = (LPARAM)(((DWORD)(y + hgt / 2) << 16) | (DWORD)(x + w / 2));
+}
+
 static int patch_underlay(BYTE *base)
 {
     BYTE *call[2];
@@ -2547,6 +2651,7 @@ static void startup(void)
     g_shellMode = (int)GetPrivateProfileIntA("Menus", "RaiseShellMode", 1, ini);
     g_logging = (int)GetPrivateProfileIntA("Menus", "Log",          1,   ini);
     g_embed   = (int)GetPrivateProfileIntA("Menus", "Embed",        0,   ini);
+    g_escReturns = (int)GetPrivateProfileIntA("Menus", "EscapeReturns", 1, ini);
     g_trace   = (int)GetPrivateProfileIntA("Menus", "Trace",        0,   ini);
     g_dump    = (int)GetPrivateProfileIntA("Menus", "DumpBackdrop", 0,   ini);
     g_backdrops = (int)GetPrivateProfileIntA("Menus", "Backdrops",  1,   ini);
@@ -2592,6 +2697,21 @@ static void startup(void)
         s_cat(m, "shell underlay removed, sites patched ");
         s_num(m, patch_underlay(base));
         s_cat(m, "/2");
+        logline(m);
+    }
+
+    if (g_mode != MODE_LOG && g_embed && g_escReturns) {
+        char m[96];
+        find_escape_menu(base);
+        m[0] = 0;
+        s_cat(m, "Esc in the in-mission menu: ");
+        if (g_escProc) {
+            s_cat(m, "Return to Game at ");
+            s_num(m, (long)(g_escClick & 0xFFFF)); s_cat(m, ",");
+            s_num(m, (long)((DWORD)g_escClick >> 16));
+        } else {
+            s_cat(m, "menu not found, left stock");
+        }
         logline(m);
     }
 

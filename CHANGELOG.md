@@ -5,6 +5,26 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.1.0 — 2026-09-25
+
+Layers: menus 2.1.0.
+
+### Added
+- In a mission, Esc now also closes the Options menu and returns to the game
+  (`EscapeReturns=`, see `menus/CHANGELOG.md`, `96f5ac1`).
+
+Confirmed in game 2026-09-25.
+
+## 3.0.2 — 2026-09-25
+
+Layers: menus 2.0.2.
+
+### Fixed
+- In a mission, Esc opens Options again after it has been closed, and the keyboard
+  works again after any in-game menu (see `menus/CHANGELOG.md`, `32656d7`).
+
+Confirmed in game 2026-09-25.
+
 ## 3.0.1 — 2026-09-25
 
 Layers: menus 2.0.1.
@@ -28,7 +48,7 @@ Layers: menus 2.0.0.
   reads old manifests' layer name as `menus`, and after restoring a pre-rename
   snapshot it says to run `menus/install.sh`.
 
-Installed, not yet seen in game. Confirmed in game 2026-09-25.
+Confirmed in game 2026-09-25.
 
 ## 2.0.0 — 2026-09-25
 
