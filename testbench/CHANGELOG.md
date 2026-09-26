@@ -8,7 +8,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ## 1.5.0 — 2026-09-26
 
 ### Added
-- `HUD.log` is collected with each case's logs.
+- `HUD.log` and `HUD.ini` are collected with each case's logs.
 
 ### Changed
 - The remastered prepare step is `hud/install.sh` (`HUD.asi`), the same for every

@@ -8,7 +8,7 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
 ## 2.0.0 — 2026-09-26
 
 ### Added
-- `HUD.asi` (`hud.c`, `build.sh`, `install.sh`, `HUD.ini`): the canvas and palette, the
+- `HUD.asi` (`hud.c`, `build.sh`, `install.sh`, `HUD.ini`, `1524bb9`): the canvas and palette, the
   font and the hardware cursor corrected in the engine at run time, for the display
   mode actually set, with every game file stock. `HUD.ini` switches each part
   (`Canvas=`, `Font=`, `Cursor=`) and `Log=` writes `HUD.log`.
