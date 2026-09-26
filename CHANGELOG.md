@@ -5,6 +5,28 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 5.1.0 — 2026-09-27
+
+Layers: hud 2.1.1, menus 4.0.0, msaa 1.0.1, postfx 1.0.1, platform 2.0.2, gameplay 1.0.1,
+testbench 1.8.0.
+
+### Added
+- `a2env.sh` / `a2env.py`: one place that says where the game, its prefix and Proton
+  are — environment, then `~/.config/armada2-remastered.conf`, then Heroic's default. No
+  file names a user's home directory any more.
+- `./install`: every layer this repository owns, into `$A2_GAME`.
+- `a2test session start --install PATH` / `a2test run --install PATH`, repeatable: public
+  and private checkouts stacked into the clone (see `testbench/CHANGELOG.md`).
+
+### Changed
+- `A2_GAME` everywhere; `A2_GAME_DIR` and `A2_DIR` are still read. The backdrop plates
+  are installed by the private repository, not `menus/install.sh`.
+
+Installs nothing different into the game. Checked on the bench: public and private
+worktrees stacked into a clone reproduced the installed game (1677 textures and both
+plates byte-identical; plugins differing only in their build timestamp), launched to the
+main menu at 16:9, and left the real install untouched.
+
 ## 5.0.0 — 2026-09-26
 
 Layers: platform 2.0.1, menus 3.0.0.

@@ -9,7 +9,10 @@ time, and all of it reverts.
 game, original or derived (`publish/README.md`). The upscaled textures, the upscaled
 intro and the menu backdrop plates are a separate, private project for that reason.
 
-Game directory: `/home/cedric/Games/Heroic/Star Trek Armada II`
+Game directory: wherever `./a2env.sh` says — Heroic's default,
+`~/Games/Heroic/Star Trek Armada II`, unless `A2_GAME` or
+`~/.config/armada2-remastered.conf` (`A2_GAME=`, `A2_PREFIX=`, `A2_PROTON=` lines) says
+otherwise.
 
 ## The layers
 
@@ -34,8 +37,10 @@ Not switched by `a2mod`, because the layers above stand on them:
 
 ## Entry points
 
+    ./install                               install every layer in this repository
     ./a2mod status | stock | remastered     switch every layer at once
     ./a2test ...                            the game headless, for testing (testbench/)
+    ./a2env.sh                              print where the game, prefix and Proton are
 
 Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
 `menus/` and `msaa/`, or a `--revert` flag on the Python tools.

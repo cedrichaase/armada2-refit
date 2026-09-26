@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Install every layer this repository owns into the game directory ($A2_GAME, resolved
+# by a2env.sh), each through its own installer:
+#
+#   hud        hud/install.sh
+#   menus      menus/install.sh              Menus.asi; the backdrop plates are the
+#                                            private repository's
+#   msaa       msaa/install.sh
+#   renderer   postfx/renderer-config.sh     dxvk.conf at stage 3, as shipped
+#
+# Not here: bloom, which is switched in Heroic's launch environment rather than the game
+# directory (postfx/postfx.py), and gameplay/, which a2mod leaves alone.
+#
+# The private repository has a ./install of its own. The test bench runs each checkout's
+# ./install, in order, into its clone of the game (a2test session start --install PATH).
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+. "$here/a2env.sh"
+[ -d "$A2_GAME" ] || { echo "no game directory at $A2_GAME (see a2env.sh)" >&2; exit 1; }
+echo "== public $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> $A2_GAME"
+"$here/hud/install.sh"
+"$here/menus/install.sh"
+"$here/msaa/install.sh"
+"$here/postfx/renderer-config.sh" --stage 3

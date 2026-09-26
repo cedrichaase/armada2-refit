@@ -37,7 +37,9 @@ import subprocess
 import sys
 import time
 
-GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import a2env  # noqa: E402  (the repository root, for where the game is)
+GAME = a2env.GAME
 CONFIG_DIR = os.path.expanduser('~/.config/heroic/GamesConfig')
 ENV_KEY = 'enviromentOptions'          # Heroic's typo, deliberate -- see docstring
 MANAGED = ('DXVK_LOG_LEVEL', 'DXVK_LOG_PATH', 'DXVK_HUD')

@@ -5,6 +5,22 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 4.0.0 — 2026-09-27
+
+### Removed
+- `install.sh` no longer installs the backdrop plates, and `A2_BACKDROPS` is gone: the
+  private repository's `./install` (its `menus/install-plates.sh`) puts them in
+  `Menus/`. `install.sh` leaves `Menus/` alone; `--remove` still clears it. MAJOR
+  because installing the menus layer from this repository alone no longer brings the
+  plates.
+
+### Changed
+- The game directory comes from `a2env.sh` (`A2_GAME`; `A2_GAME_DIR` still read), and
+  `run-wine.sh`, `run-probe.sh`, `stop-game.sh` and `capture.sh` take the prefix and
+  Proton from it too.
+
+The installed plugin and plates are unchanged.
+
 ## 3.0.0 — 2026-09-26
 
 ### Removed

@@ -17,7 +17,8 @@
 # this cannot take down an unrelated Wine application.
 set -uo pipefail
 
-PREFIX="${A2_PREFIX:-/home/cedric/Games/Heroic/Prefixes/Star Trek Armada II}"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
+PREFIX="$A2_PREFIX"
 quiet="${QUIET:-0}"
 say() { [ "$quiet" = 1 ] || echo "$@"; }
 

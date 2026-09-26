@@ -92,7 +92,9 @@ texture whose art gained rows or whose key failed to grow.
 """
 import argparse, os, re, shutil, subprocess, sys
 
-GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import a2env  # noqa: E402  (the repository root, for where the game is)
+GAME = a2env.GAME
 BAK = '.a2neb-backup'
 TEX = 'Textures/RGB'
 SPR = 'Sprites/cursor.spr'

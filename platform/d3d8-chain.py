@@ -33,12 +33,12 @@ import shutil
 import subprocess
 import sys
 
-GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
-PREFIX = os.environ.get(
-    'A2_PREFIX', '/home/cedric/Games/Heroic/Prefixes/Star Trek Armada II')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import a2env  # noqa: E402  (the repository root, for where the game is)
+GAME = a2env.GAME
+PREFIX = a2env.PREFIX
 SYSWOW = os.path.join(PREFIX, 'pfx/drive_c/windows/syswow64')
-PROTON = os.path.expanduser(
-    '~/.config/heroic/tools/proton/Proton-CachyOS-latest/files/lib/wine')
+PROTON = os.path.join(a2env.PROTON, 'files/lib/wine')
 CONFIG_DIR = os.path.expanduser('~/.config/heroic/GamesConfig')
 BACKUP_SUFFIX = '.a2chain-backup'
 

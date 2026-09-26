@@ -585,7 +585,8 @@ class Case:
         t0 = time.time()
         self.sess = Session.create(self.dir, self.res, mod=self.mod, stock_shell=self.scn.stock_shell, vnc=self.opts.get('vnc'),
                                    record=self.opts.get('record'), audio=self.opts.get('audio'),
-                                   keep=self.opts.get('keep'), label=self.name)
+                                   keep=self.opts.get('keep'), label=self.name,
+                                   installs=self.opts.get('installs') if self.mod == 'remastered' else None)
         self.log.meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps))
         status = 'pass'
         try:

@@ -12,6 +12,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../a2env.sh"
 OUT="${OUT:-${CLAUDE_JOB_DIR:-/tmp}/tmp}"
 MON="${MON:-DP-3}"
 WS="${WS:-5}"
@@ -22,7 +23,7 @@ mkdir -p "$OUT"
 # nothing and every run leaks an instance that keeps playing the menu music.
 QUIET=1 bash "$here/stop-game.sh"
 sleep 1
-rm -f "/home/cedric/Games/Heroic/Star Trek Armada II/Menus.log"
+rm -f "$A2_GAME/Menus.log"
 
 nohup bash "$here/run-wine.sh" > "$OUT/$TAG.wine.log" 2>&1 &
 
@@ -60,7 +61,7 @@ done
 # this: launched straight into a map, no menu opens, and it would sit out the
 # whole minute.
 [ "${WAITLOG:-1}" = 0 ] || for _ in $(seq 1 60); do
-    grep -q "MoveWindow" "/home/cedric/Games/Heroic/Star Trek Armada II/Menus.log" 2>/dev/null && break
+    grep -q "MoveWindow" "$A2_GAME/Menus.log" 2>/dev/null && break
     sleep 1
 done
 
@@ -74,6 +75,6 @@ done
 done
 
 echo "--- Menus.log"
-cat "/home/cedric/Games/Heroic/Star Trek Armada II/Menus.log" 2>/dev/null || true
+cat "$A2_GAME/Menus.log" 2>/dev/null || true
 echo "--- shots"
 ls -1 "$OUT/$TAG"-*.png 2>/dev/null || true

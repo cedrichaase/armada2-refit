@@ -5,6 +5,15 @@ cutscene draw-distance notes. `a2mod` does not switch this folder. Versioning ru
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The derivation is
 in [`README.md`](README.md).
 
+## 1.0.1 — 2026-09-27
+
+### Changed
+- `scrollspeed.py` (`A2_DIR` still read) find the game through `a2env.sh` / `a2env.py` (`A2_GAME`, then
+  `~/.config/armada2-remastered.conf`, then Heroic's default) instead of a hard-coded
+  path.
+
+Installs nothing different; nothing to see in game.
+
 ## 1.0.0 — 2026-09-25
 
 Baseline: the first versioned release.

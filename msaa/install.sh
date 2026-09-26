@@ -10,7 +10,8 @@
 # uninstall, so there is no backup to keep.
 set -euo pipefail
 
-GAME="${A2_GAME_DIR:-/home/cedric/Games/Heroic/Star Trek Armada II}"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
+GAME="$A2_GAME"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 samples=""

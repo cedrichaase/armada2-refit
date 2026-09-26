@@ -1,5 +1,6 @@
 """Paths, resolutions and knobs.  Everything overridable from the environment."""
 import os
+import sys
 from pathlib import Path
 
 HOME = Path.home()
@@ -7,9 +8,11 @@ BENCH = Path(__file__).resolve().parent.parent          # testbench/
 REPO = BENCH.parent                                     # the checkout the bench runs from
 A2TEST = REPO / 'a2test'
 
-GAME = Path(os.environ.get('A2_GAME', HOME / 'Games/Heroic/Star Trek Armada II'))
-PREFIX = Path(os.environ.get('A2_PREFIX', HOME / 'Games/Heroic/Prefixes/Star Trek Armada II'))
-PROTON = Path(os.environ.get('A2_PROTON', HOME / '.config/heroic/tools/proton/Proton-CachyOS-latest'))
+sys.path.insert(0, str(REPO))
+import a2env  # noqa: E402  (the repository root: where the game is, a2env.sh has the rules)
+GAME = Path(a2env.GAME)
+PREFIX = Path(a2env.PREFIX)
+PROTON = Path(a2env.PROTON)
 UMU = Path(os.environ.get('A2_UMU', HOME / '.config/heroic/tools/runtimes/umu/umu_run.py'))
 VKBASALT = Path(os.environ.get('XDG_DATA_HOME', HOME / '.local/share')) / 'a2-vkbasalt'
 

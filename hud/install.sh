@@ -16,7 +16,8 @@
 # uninstall of the plugin -- the HUD is then stock, stretched on a wide screen.
 set -euo pipefail
 
-GAME="${A2_GAME_DIR:-${A2_GAME:-/home/cedric/Games/Heroic/Star Trek Armada II}}"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
+GAME="$A2_GAME"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export A2_GAME="$GAME"
 

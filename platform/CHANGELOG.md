@@ -6,6 +6,15 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 2.0.2 — 2026-09-27
+
+### Changed
+- `d3d8-chain.py` (and the prefix and Proton) and `dxvk-logging.py` find the game through `a2env.sh` / `a2env.py` (`A2_GAME`, then
+  `~/.config/armada2-remastered.conf`, then Heroic's default) instead of a hard-coded
+  path.
+
+Installs nothing different; nothing to see in game.
+
 ## 2.0.1 — 2026-09-26
 
 ### Changed

@@ -9,9 +9,8 @@
 # Heroic swallows that; this does not.
 set -euo pipefail
 
-GAME="${A2_GAME_DIR:-/home/cedric/Games/Heroic/Star Trek Armada II}"
-PREFIX="${A2_PREFIX:-/home/cedric/Games/Heroic/Prefixes/Star Trek Armada II}"
-PROTON="${A2_PROTON:-$HOME/.config/heroic/tools/proton/Proton-CachyOS-latest}"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
+GAME="$A2_GAME" PREFIX="$A2_PREFIX" PROTON="$A2_PROTON"
 
 export WINEPREFIX="$PREFIX/pfx"
 export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-winmm=n,b;d3d8=n,b;d3d9=n,b}"
