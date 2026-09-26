@@ -275,10 +275,12 @@ def _space(c, m):
         return c.design_to_screen(x, y)
     if sp == 'hud':
         return c.hud_to_screen(x, y)
+    if sp == 'hud-right':
+        return c.hud_right_to_screen(x, y)
     return x, y
 
 
-SPACE = r'(?P<space>design |hud )?'
+SPACE = r'(?P<space>design |hud-right |hud )?'
 
 
 @step(r'^' + BTN + r' at ' + SPACE + r'(?:\(?)(?P<x>\d+)\s*,\s*(?P<y>\d+)\)?$')
@@ -308,10 +310,20 @@ def s_click_named(c, m):
     t = c.target(m.group('name'))
     if t is None:
         return c.delegate(m.string)
-    x, y = c.design_to_screen(*t['at']) if t.get('space', 'design') == 'design' else t['at']
+    x, y = c.to_screen(t.get('space', 'design'), *t['at'])
     b, dbl = _button(m)
     c.sess.click(x, y, button=b, double=dbl)
     return f'clicked the {t["name"]} at screen {x},{y}'
+
+
+@step(r'^drag (?:the mouse )?from ' + SPACE.replace('space', 'space0') + r'(?P<x0>\d+)\s*,\s*(?P<y0>\d+)'
+      r' to ' + SPACE + r'(?P<x>\d+)\s*,\s*(?P<y>\d+)$')
+def s_drag(c, m):
+    x1, y1 = _space(c, m)
+    sp0 = (m.group('space0') or '').strip().lower()
+    x0, y0 = c.to_screen(sp0 or 'screen', int(m.group('x0')), int(m.group('y0')))
+    c.sess.drag(x0, y0, x1, y1)
+    return f'dragged from screen {x0},{y0} to {x1},{y1}'
 
 
 @step(r'^(?:move the mouse|hover|move the pointer) (?:to|over) ' + SPACE + r'(?P<x>\d+)\s*,\s*(?P<y>\d+)$')
@@ -741,6 +753,27 @@ class Case:
             return int(ox + x * w / 800), int(oy + y * h / 600)
         W, H = self.res
         return int(x * W / 800), int(y * H / 600)
+
+    def to_screen(self, space, x, y):
+        """A ui.json target's point in its own space: design, hud, hud-right or screen."""
+        if space == 'design':
+            return self.design_to_screen(x, y)
+        if space == 'hud':
+            return self.hud_to_screen(x, y)
+        if space == 'hud-right':
+            return self.hud_right_to_screen(x, y)
+        return x, y
+
+    def hud_right_to_screen(self, x, y):
+        """HUD canvas units for an element anchored top RIGHT, given where stock's
+        1600-wide canvas puts it (the command bar's buttons, for one).  Remastered
+        declares the canvas round(1200*W/H) wide and moves right-anchored panels by the
+        extra width (hud/README.md), then scales by H/1200; stock scales by W/1600."""
+        W, H = self.res
+        if self.mod == 'stock':
+            return int(x * W / 1600), int(y * H / 1200)
+        canvas = (2 * 1200 * W + H) // (2 * H)
+        return int((x + canvas - 1600) * H / 1200), int(y * H / 1200)
 
     def hud_to_screen(self, x, y):
         """HUD canvas units (1600x1200 as stock declares it) for an element anchored top

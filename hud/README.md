@@ -28,6 +28,7 @@ detail; this is the map.
 |---|---|---|
 | **Canvas and palette** | the two `ParameterDB` constructors' calls to `mLoad` (`0x53414c`, `0x5341b4`) | After a DB loads, if it holds `infoPanelArea` it is the GUI one (`gui_<race>.cfg` includes `gui_interface.cfg`, which includes `gui_glob16x12.cfg`). Its declared canvas width at `+0x2c` becomes `round(1200·W/H)`, and the anchored panel and palette values get exactly `ui-widescreen.py`'s edit, in memory. |
 | **Font** | `FontNewScreenWidth`'s one caller, `SetActiveDisplay_Internal` (`0x62c5d7`), and `FontInit` (`0x48440c`) | `ST3D_Font+0x28`, the horizontal scale, becomes `+0x2c · 1.25·H/W` for the three MetaFonts. Glyph quad, pen advance, line width and word-wrap all multiply by `+0x28`, so this condenses glyphs and spacing together — what the file condense did by editing every `.spr` width. |
+| **Seams** | `ST3D_Sprite::DrawScaled2D`'s snap block (`0x63aeca`) and the `je` that skips it (`0x63aec8`), and `ParameterDB::Get(DBRectangle)`'s entry (`0x5358f0`) | Both edges of every 2D sprite go to `floor(v) + 0.5`, a pixel boundary, so tiles meet and MSAA draws no line outside them; a rect's width and height are taken from its converted far edge. See "Seams between tiles". |
 | **Cursors** | `RefreshDisplay`'s `DrawScaled2D` call (`0x6246fa`), and `SetCursor` (`0x625dd9`) | Under DXVK the cursor is the *synchronous* one: the engine draws the sprite itself each frame, after `SetScaleFactor2D(&device+0x18)` = W/800 by H/600. For that one draw the x scale becomes the y scale and the position is re-expressed so the hotspot stays on the pointer; the scale is put back after. The hardware path, if a setup ever takes it, gets `fmuls 0x18(%esi)` → `fmuls 0x1c(%esi)` in `SetCursor`. |
 
 What was established to get there, so it need not be re-derived:
@@ -65,6 +66,79 @@ What it does differently from the files, on purpose: the font's glyph art stays 
 and is drawn narrower, instead of being resampled to fewer texels and point-sampled back
 up. At 3440x1440 that is 1.41 screen px per texel on both axes rather than 2.69 across,
 so the text keeps every stock texel. Judge it in game (see "The font").
+
+## Seams between tiles
+
+Faint lines ran through the briefing panel (a 5x4 grid of 256x256 `uiObjectives`
+sprites, drawn by `StandardBackground`) at every aspect but 4:3, and along the joins
+of HUD panels built from pieces: the 3D view showing through a 1–2 px gap between
+two quads. The textures were not it: stock and remastered tiles match their
+neighbours across every edge to within 2–3 levels, the same as any two interior
+columns. Measured by replacing the tiles in a bench clone with a flat red/green
+checkerboard with each edge texel marked, MSAA off: at 16:10 every tile drew 255 px
+wide, starting at 352, 608, 865, 1120 and 1376 — gaps at 607, 863–864 and 1375.
+
+Two roundings in the engine, each harmless alone at a whole-number scale:
+
+- **`DrawScaled2D` snaps the position but not the size.** With sprite flag `0x80`
+  (set on UI sprites) it moves x and y to `floor(v) + 0.25` screen px and keeps the
+  unsnapped width. D3D9 pixel centres are at integers, so a quad covers pixels
+  `floor(x) + 1` through `floor(x + w)`, and one ending at `x + w` short of the next
+  tile's snapped start leaves a column uncovered. At 16:10 a 213-unit rect is 255.6 px:
+  tile 0 at 351.6 covers 352–606, tile 1 starts at 608. This is stock behaviour at any
+  mode where W/1600 or H/1200 is fractional, 1024x768 included; 800x600 (0.5) and
+  1600x1200 (1.0) never show it.
+- **`Get(DBRectangle)` rounds x, y, w and h separately** when it converts a rect from
+  the declared canvas into the 1600x1200 space (the conversion is `mConvertRectangle`
+  inlined, `floor(v · (1600/canvas) + 0.5)` each). At a 1920 canvas, 256 wide at 512
+  converts to x 427 and w 213, ending at 640 where the next tile starts at 640 — but
+  256 at 256 gives 213 + 213 = 426 against the next tile's 427. That unit is the second
+  pixel of the 863–864 gap. Only a canvas other than 1600x1200 converts, so this one
+  exists only because `HUD.asi` re-declares the canvas.
+
+`HUD.asi` snaps the far edge the same way as the near one and draws the quad between
+them (at `+ 0.5`, not stock's `+ 0.25`: below), and takes a rect's w and h as the converted far edge minus the converted near one.
+x and y are converted exactly as the engine does (the original function runs with the
+canvas set to stock, and the conversion is reproduced, scale rounded to float first),
+so they are bit-identical to stock and w and h move by at most one unit. After it, the
+test pattern's edge texels abut at every join at 16:10 and 16:9, both axes; the bench's
+count of 1-px vertical lines in the briefing screenshot fell by 24–42 at each wide aspect (214 → 177 at 16:9), and 4:3 is
+unchanged. `Seams=0` in `HUD.ini` turns it off.
+
+**A second line, with MSAA: stock snaps to `+ 0.25`, a quarter-pixel short of a pixel
+boundary.** With the gaps closed, the user still saw faint lines in game, over the
+flat grey of unexplored space in the Federation mission (`testbench/scenarios/hud.md`
+now runs there): along the briefing's outer edge, around the minimap frame, at the
+command-bar joints. Each was one pixel *outside* a sprite — at 21:9 column 989 and
+row 96, where the briefing's first pixels are 990 and 97 — about 7 levels darker than
+the fog. Not the art: the installed tiles' alpha is byte-identical to stock at every
+edge, and 0 in those columns. Not texture wrap at the quad edge either: tiles made
+transparent but for an opaque right column and bottom row put nothing on their left or
+top edges. It was MSAA: the same art with `MSAA.ini` `Samples=0` has no line, and with 8
+it does. A quad from `n + 0.25` covers a quarter of pixel `n`, so some of its samples
+count, and MSAA shades that pixel once, at its centre — outside the quad, where the
+texture coordinate has run past 0 and wrapped to the sprite's far edge. The snap now
+puts both edges at `floor(v) + 0.5`, the boundary between two pixels: no sample is
+half-way, the pixels covered without MSAA are the same, and at 1:1 each pixel centre
+lands on a texel centre instead of a quarter off it. With MSAA 8 the column and row
+read exactly the fog colour after it.
+
+**Not every sprite was snapped.** The user then found the same lines around the action
+bar, the command buttons shown for a selected unit. Those sprites lack flag `0x80`, so
+`DrawScaled2D` jumped over the snap (`je` at `0x63aec8`) and drew them where the float
+maths put them — fractional edges, and MSAA's line along each. The `je` is NOP'd, so every
+2D sprite is snapped: at most half a pixel of movement, for sprites that are all flat
+screen-space UI (3D-placed sprites go through `DrawScaled3D`). The gaps between the
+buttons are fog-coloured after it, and the bench's `hud` scenario now selects a unit and
+judges the action bar over the fog.
+
+The 3D view stops one row short of the screen at 3440x1440 (row 1439 is black under the
+fog); the minimap panel's base looks dark there because nothing is drawn behind it. That
+is the viewport, not the HUD, and is not handled here.
+
+Not seams, and left alone: the faint olive grid behind the briefing text in stock is the
+map grid showing through the panel, whose alpha is 217; the white bracket and lines in
+the minimap are the camera's view outline.
 
 ## The layout canvas: where the UI stretch comes from
 

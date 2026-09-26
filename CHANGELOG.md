@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 4.2.0 — 2026-09-26
+
+Layers: hud 2.1.0, testbench 1.7.0.
+
+### Fixed
+- UI tiles meet edge to edge at every aspect: the thin grid lines through the mission
+  briefing and the fine lines at HUD panel joins are gone, and so are the faint lines
+  MSAA drew just outside UI sprites (see `hud/CHANGELOG.md`).
+
+### Changed
+- The test bench's `hud` scenario runs at the Federation briefing over unexplored space,
+  where such lines show (see `testbench/CHANGELOG.md`).
+
+Confirmed in game 2026-09-26.
+
 ## 4.1.1 — 2026-09-26
 
 Layers: testbench 1.6.1.

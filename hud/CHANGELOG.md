@@ -5,6 +5,27 @@ before that `ui-widescreen.py`, `cursor-aspect.py` and (as the separate `font` l
 `ui-font-condense.py`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The derivations are in [`README.md`](README.md).
 
+## 2.1.0 — 2026-09-26
+
+### Added
+- `Seams=` in `HUD.ini` (default 1).
+
+### Fixed
+- No more 1–2 px gaps between UI tiles where the scale is fractional — the lines through
+  the briefing panel and along the joins of pieced HUD frames at 16:10, 16:9 and 21:9.
+  `HUD.asi` snaps a sprite's far edge like its near one in `DrawScaled2D` (`0x63aeca`)
+  and converts a rect's far edge rather than its width in `Get(DBRectangle)`
+  (`0x5358f0`).
+- No faint line one pixel outside UI sprites with MSAA on — along the briefing's edge,
+  the minimap frame and the command bar, plainest over unexplored space. Snapped edges go
+  to `floor(v) + 0.5` (a pixel boundary) instead of stock's `+ 0.25`, which left a
+  quarter-covered pixel that MSAA shaded with a wrapped texture coordinate.
+- The same lines around the action bar's command buttons: sprites without flag `0x80`
+  were never snapped and drew at fractional positions. Every 2D sprite is now snapped
+  (the `je` at `0x63aec8` that skipped the block is NOP'd).
+
+Confirmed in game 2026-09-26.
+
 ## 2.0.1 — 2026-09-26
 
 ### Fixed
