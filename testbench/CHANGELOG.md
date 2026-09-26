@@ -5,6 +5,20 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.6.0 — 2026-09-26
+
+### Changed
+- OCR is PaddleOCR's PP-OCRv3 scene-text model through `cv2.dnn` (`bench/ppocr.py`),
+  in place of tesseract's three preprocessing passes: 100% of 547 phrase instances in
+  86 bench frames against tesseract's 93.6%, ~0.8 s a frame. Its two ONNX models are
+  fetched on first use into `~/.cache/a2test/models`, pinned by revision and sha256.
+
+### Removed
+- tesseract, and with it the 2x second look of 1.5.1 (`vision.retry_scale`,
+  `find_text_in`) and `ocr(scale=, fast=)`. tesseract is no longer a requirement.
+
+Installs nothing into the game. Not yet signed off.
+
 ## 1.5.1 — 2026-09-26
 
 ### Changed

@@ -98,15 +98,25 @@ anything new in the game's `Logs/`.
   background and take no clicks; the emblem above them does. Named targets in
   `ui.json` are the pictures, in 800x600 design space. They are mapped to the screen
   with the transform Menus.asi logs (`MoveWindow 800x600 @0,0 -> WxH @X,Y`).
-- **OCR needs three passes.** Bright text on space reads best as-is. Grey-on-grey shell
-  buttons (the in-mission Options) read only after an adaptive threshold (as-is:
-  nothing). Mixed screens read best with the background subtracted. Every pass
-  contributes; a phrase is matched within one pass's reading. Frames up to 1200 px
-  tall are upscaled 2x first; 1440-tall ones are not, because at 1.5x "Graphics
-  Settings" was lost that 1.0x reads at 91%. OCR still misses short grey words
-  ("Save"), so a check should not hang on one.
+- **OCR is a scene-text model, not tesseract.** Tesseract reads documents, dark on
+  light; game text is every colour on every ground. It needed three preprocessing
+  passes (as-is, background subtracted, adaptive threshold) and upscaling tuned per
+  height, and still read the 21:9 mission list's "Werewolf Pack" (dark on a bright blue
+  button) as "B er If Pack". Scored on 547 phrase instances in 86 bench frames across
+  every screen the scenarios use, at 800x600 to 3440x1440 (labelled from tesseract's
+  own readings, which favours it): tesseract's three passes found 93.6%, the best five
+  of ten preprocessings 97.3%, **PaddleOCR's PP-OCRv3 100%**, in 0.8 s a frame (1.2 s
+  max), with no upscaling and no false hits. It runs on `cv2.dnn`, so it needs no
+  package the bench did not already have; `bench/ppocr.py` fetches its two ONNX models
+  (Apache-2.0) into `~/.cache/a2test/models` on first use, pinned by revision and
+  sha256. Tesseract is gone rather than kept as a fallback: it found nothing PP-OCR
+  missed.
+- **Tesseract starts an OpenMP thread per core in every process.** Sixteen in parallel
+  (the comparison above) finished 18 of 1720 reads in ten minutes; with
+  `OMP_THREAD_LIMIT=1` each, twelve in parallel finished all 1720.
+  Set it for anything that runs tesseract in parallel.
 - **OCR boxes cannot measure shape.** The same word's box came back 28 px tall in one
-  pass and 36 in another: a phantom 30% stretch. Text is only *located* by OCR in the
+  tesseract pass and 36 in another: a phantom 30% stretch. Text is only *located* by OCR in the
   reference shot. Its shape is measured by the template match, like any patch.
 - **Dark art is not a pillarbox.** The main menu's plate fades to near-black space at
   21:9, and a "mostly dark column" test called that 267 px of black bar. A bar is a
@@ -169,7 +179,8 @@ the bench warns and carries on.
 
 ## Requirements
 
-`sway`, `grim`, `tesseract` (+ `eng`), `python-opencv` (numpy with it), `wayland-scanner`
+`sway`, `grim`, `python-opencv` (numpy with it; its `dnn` module runs the OCR models),
+`wayland-scanner`
 and `cc` (for `a2input`), `pactl`, Heroic's Proton-CachyOS and umu, and `claude` for
 judged and agent steps. Optional: `wayvnc`, `wf-recorder`, `tigervnc`. The texture
 pipeline's "no numpy" rule is about what that pipeline may assume. The bench is

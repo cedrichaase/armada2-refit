@@ -47,7 +47,7 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 
 | Check | How |
 |---|---|
-| `Expect "TEXT" is visible` / `… is not visible` | OCR (three preprocessing passes), fuzzy match |
+| `Expect "TEXT" is visible` / `… is not visible` | OCR (PP-OCR), fuzzy match |
 | `Expect the main menu` (any `ui.json` screen) | OCR signature |
 | `Expect the game is still running` / `Expect the game to have exited` | process table |
 | `Expect no crash` | `exception.txt` untouched |

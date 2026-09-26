@@ -293,7 +293,7 @@ def s_click_at(c, m):
 def s_click_text(c, m):
     path = c.fresh_shot('before-click')
     words = vision.ocr(path)
-    box = vision.find_text_in(path, m.group('text'), words)
+    box = vision.find_text(words, m.group('text'))
     if not box:
         raise StepFailed(f'"{m.group("text")}" is not on screen (OCR read: '
                          f'{", ".join(sorted({w["text"] for w in words}))[:300]})')
@@ -358,14 +358,14 @@ def s_note(c, m):
 def s_expect_text(c, m):
     path = c.fresh_shot(f'check-{c.n}')
     words = vision.ocr(path)
-    box = vision.find_text_in(path, m.group('text'), words)
+    box = vision.find_text(words, m.group('text'))
     ok = (box is None) if m.group('neg') else (box is not None)
     detail = (f'found "{box["text"]}" at {box["x"]},{box["y"]} (score {box["score"]})' if box
               else 'not found; OCR read: ' + ', '.join(sorted({w["text"] for w in words}))[:400])
     shots = [path]
     if box:
         shots = [vision.annotate(path, path.with_name(path.stem + '-found.png'), [dict(box, label=m.group('text'))])]
-    return c.checked(ok, detail, shots, how='OCR (tesseract) + fuzzy phrase match')
+    return c.checked(ok, detail, shots, how='OCR (PP-OCR) + fuzzy phrase match')
 
 
 @step(r'^expect the game (?:to be |is )?(?:still )?running$')
@@ -689,9 +689,7 @@ class Case:
             self.assert_alive()
             import subprocess
             subprocess.run(['grim', '-o', 'HEADLESS-1', str(tmp)], env=self.sess.wl_env(), capture_output=True)
-            found = fn(vision.ocr(tmp, fast=True)) or fn(vision.ocr(tmp))
-            if not found and (sc := vision.retry_scale(tmp)):
-                found = fn(vision.ocr(tmp, scale=sc))
+            found = fn(vision.ocr(tmp))
             if found:
                 return found, tmp
             if time.time() > end:
