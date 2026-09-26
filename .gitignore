@@ -23,3 +23,6 @@ archive/ab/
 
 # Promotional footage (promo/README.md): 447 MB of video, kept out of git
 promo/*.mp4
+
+# a2test's input helper, built on first use from testbench/input/
+testbench/input/a2input
