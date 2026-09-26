@@ -1,6 +1,6 @@
 """What the bench can measure off a screenshot, without asking a model.
 
-    ocr()             tesseract's words and boxes
+    ocr()             the words on screen and their boxes (PP-OCR)
     find_text()       a phrase on screen, tolerant of OCR's usual misreads
     measure_stretch() how much wider than it should be something is drawn, against
                       the same thing in a 4:3 reference shot
@@ -20,35 +20,24 @@ at 21:9 measures ~1.79 (hud/README.md's 2.15 / 1.20).
 """
 import difflib
 import re
-import subprocess
 from pathlib import Path
 
 import cv2
 import numpy as np
 
+from . import ppocr
+
 
 # ---------------------------------------------------------------------- OCR
 
-def _passes(gray):
-    """The game's text comes in three kinds that no single preprocessing reads: bright
-    text on space (the briefing, the HUD numbers) reads best as it is; grey-on-grey
-    shell buttons (the in-mission Options) only after an adaptive threshold; mixed
-    screens (campaign selection) best with the background subtracted.  Measured on
-    bench screenshots -- see testbench/README.md, "OCR"."""
-    yield 'gray', gray
-    bg = cv2.GaussianBlur(gray, (0, 0), 15)
-    yield 'tophat', 255 - cv2.normalize(cv2.subtract(gray, bg), None, 0, 255, cv2.NORM_MINMAX)
-    yield 'adaptive', 255 - cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                                  cv2.THRESH_BINARY, 31, -10)
+def ocr(path, region=None):
+    """Words on screen: [{text, conf, x, y, w, h, line, src}] in screen pixels.
 
-
-def ocr(path, region=None, scale=None, fast=False):
-    """Words on screen: [{text, conf, x, y, w, h, line}] in screen pixels.
-
-    Game text is small; tesseract reads it better at >= ~24 px cap height, so shots
-    are upscaled first (and boxes mapped back).  Every preprocessing pass contributes
-    its words; `line` is namespaced by pass, so a phrase is matched within one pass's
-    reading and never stitched from two.  fast=True runs the first two passes only."""
+    Read by PP-OCR (ppocr.py), a scene-text model: it reads light-on-dark, dark-on-light
+    and coloured text as it is.  Tesseract, a document reader, needed three
+    preprocessing passes and still missed 6% of the phrases PP-OCR reads
+    (testbench/README.md, "OCR").  `line` groups the words of one detected line, so a
+    phrase is matched within a line and never stitched across two."""
     img = cv2.imread(str(path))
     if img is None:
         raise ValueError(f'cannot read {path}')
@@ -57,36 +46,12 @@ def ocr(path, region=None, scale=None, fast=False):
         x, y, w, h = region
         img = img[y:y + h, x:x + w]
         ox, oy = x, y
-    if scale is None:
-        # measured: at 1440 the shell's text is already big enough, and a 1.5x
-        # upscale loses "Graphics Settings" that 1.0x reads at 91% confidence
-        # ... and at 800x600 (the stock baseline) 2x misses the shell's 8 px button
-        # text that 3x and 4x read at 90% ("Werewolf Pack", 2026-09-26)
-        scale = 4.0 if img.shape[0] <= 700 else 2.0 if img.shape[0] <= 1200 else 1.0
-    big = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    gray = cv2.cvtColor(big, cv2.COLOR_BGR2GRAY)
-    procs = []
-    for name, im in _passes(gray):
-        if fast and name == 'adaptive':
-            break
-        ok, png = cv2.imencode('.png', im)
-        procs.append((name, subprocess.Popen(['tesseract', 'stdin', 'stdout', '--psm', '11', 'tsv'],
-                                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                             stderr=subprocess.DEVNULL), png.tobytes()))
-    words = []
-    for name, p, data in procs:
-        out, _ = p.communicate(data)
-        for row in out.decode(errors='replace').splitlines()[1:]:
-            f = row.split('\t')
-            if len(f) < 12 or not f[11].strip():
-                continue
-            conf = float(f[10])
-            if conf < 30:
-                continue
-            words.append(dict(text=f[11].strip(), conf=round(conf, 1),
-                              x=int(int(f[6]) / scale) + ox, y=int(int(f[7]) / scale) + oy,
-                              w=max(1, int(int(f[8]) / scale)), h=max(1, int(int(f[9]) / scale)),
-                              line=(name, int(f[2]), int(f[3]), int(f[4])), src=name))
+    if not ppocr.available():
+        raise RuntimeError(f'OCR models unavailable: {ppocr.error()}')
+    words = ppocr.ocr(img)
+    for w in words:
+        w['x'] += ox
+        w['y'] += oy
     return words
 
 
@@ -105,7 +70,7 @@ def _norm(s):
 
 
 def lines(words):
-    """Words grouped into tesseract's lines, left to right."""
+    """Words grouped into their OCR lines, left to right."""
     out = {}
     for w in words:
         out.setdefault(w['line'], []).append(w)

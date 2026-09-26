@@ -5,6 +5,37 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.6.0 — 2026-09-26
+
+### Changed
+- OCR is PaddleOCR's PP-OCRv3 scene-text model through `cv2.dnn` (`bench/ppocr.py`),
+  in place of tesseract's three preprocessing passes: 100% of 547 phrase instances in
+  86 bench frames against tesseract's 93.6%, ~0.8 s a frame. Its two ONNX models are
+  fetched on first use into `~/.cache/a2test/models`, pinned by revision and sha256.
+
+### Removed
+- tesseract, and with it the 2x second look of 1.5.1 (`vision.retry_scale`,
+  `find_text_in`) and `ocr(scale=, fast=)`. tesseract is no longer a requirement.
+- `hud.md`'s cursor check (1.5.1). It never measured the cursor: the game had hidden
+  its pointer by the time of the shot, in stock as well, so its 0.96–1.00 "passes"
+  were the empty background matching itself. Why the pointer disappears is open
+  (`README.md`).
+
+Installs nothing into the game. Confirmed working 2026-09-26.
+
+## 1.5.1 — 2026-09-26
+
+### Changed
+- `hud.md` checks the cursor: the pointer is parked in empty space and the region
+  around it is matched against stock 800x600, like a HUD panel.
+
+### Fixed
+- Text search takes a second look at 2x on frames over 1200 high when 1x misses
+  (`vision.retry_scale`): at 3440x1440 the mission list's "Werewolf Pack" read as
+  "B er If Pack" twice in a row.
+
+Installs nothing into the game. Confirmed working 2026-09-26.
+
 ## 1.5.0 — 2026-09-26
 
 ### Added

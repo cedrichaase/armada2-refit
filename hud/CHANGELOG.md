@@ -5,6 +5,15 @@ before that `ui-widescreen.py`, `cursor-aspect.py` and (as the separate `font` l
 `ui-font-condense.py`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The derivations are in [`README.md`](README.md).
 
+## 2.0.1 — 2026-09-26
+
+### Fixed
+- The cursor is no longer drawn 1.79x wide under DXVK. The game draws it itself (the
+  synchronous path, `RefreshDisplay`), which 2.0.0 did not reach: `HUD.asi` now wraps
+  that draw (`0x6246fa`) with a square scale and a hotspot-preserving position.
+
+Confirmed in game 2026-09-26.
+
 ## 2.0.0 — 2026-09-26
 
 ### Added

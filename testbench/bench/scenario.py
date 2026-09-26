@@ -365,7 +365,7 @@ def s_expect_text(c, m):
     shots = [path]
     if box:
         shots = [vision.annotate(path, path.with_name(path.stem + '-found.png'), [dict(box, label=m.group('text'))])]
-    return c.checked(ok, detail, shots, how='OCR (tesseract) + fuzzy phrase match')
+    return c.checked(ok, detail, shots, how='OCR (PP-OCR) + fuzzy phrase match')
 
 
 @step(r'^expect the game (?:to be |is )?(?:still )?running$')
@@ -689,7 +689,7 @@ class Case:
             self.assert_alive()
             import subprocess
             subprocess.run(['grim', '-o', 'HEADLESS-1', str(tmp)], env=self.sess.wl_env(), capture_output=True)
-            found = fn(vision.ocr(tmp, fast=True)) or fn(vision.ocr(tmp))
+            found = fn(vision.ocr(tmp))
             if found:
                 return found, tmp
             if time.time() > end:

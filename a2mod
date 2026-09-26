@@ -163,8 +163,30 @@ def discover():
 
 
 def game_running():
-    r = subprocess.run(['pgrep', '-if', r'armada2\.exe'], capture_output=True)
-    return r.returncode == 0
+    """Is Armada2.exe running from THIS game directory?  Any Armada2.exe used to count,
+    which made the test bench's `a2mod stock` on a clone refuse whenever the real game
+    was open.  A game belongs to GAME if its working directory is GAME or its
+    STEAM_COMPAT_INSTALL_PATH names it (Heroic/umu set both).  A process that cannot be
+    inspected still counts: refusing is the safe mistake."""
+    r = subprocess.run(['pgrep', '-if', r'armada2\.exe'], capture_output=True, text=True)
+    if r.returncode:
+        return False
+    game = os.path.realpath(GAME)
+    for pid in r.stdout.split():
+        try:
+            if os.path.realpath(os.readlink(f'/proc/{pid}/cwd')) == game:
+                return True
+            with open(f'/proc/{pid}/environ', 'rb') as fh:
+                env = fh.read().split(b'\0')
+        except OSError:
+            if os.path.exists(f'/proc/{pid}'):
+                return True
+            continue
+        for kv in env:
+            if kv.startswith(b'STEAM_COMPAT_INSTALL_PATH='):
+                if os.path.realpath(kv.split(b'=', 1)[1].decode(errors='replace')) == game:
+                    return True
+    return False
 
 
 def load_state():

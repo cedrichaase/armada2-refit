@@ -434,7 +434,7 @@ def cmd_drive(argv):
         import subprocess
         while time.time() < end:
             subprocess.run(['grim', '-o', 'HEADLESS-1', str(p)], env=s.wl_env(), capture_output=True)
-            box = vision.find_text(vision.ocr(p, fast=True), text)
+            box = vision.find_text(vision.ocr(p), text)
             if box:
                 log.action(f'"{text}" appeared at {box["x"]},{box["y"]}')
                 print(f'found at {box["x"]},{box["y"]} {box["w"]}x{box["h"]}')

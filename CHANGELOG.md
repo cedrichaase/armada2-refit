@@ -5,6 +5,31 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 4.1.0 — 2026-09-26
+
+Layers: testbench 1.6.0.
+
+### Changed
+- The test bench reads the screen with a scene-text model (PP-OCR) instead of
+  tesseract (see `testbench/CHANGELOG.md`).
+
+### Removed
+- The bench's cursor check from 4.0.1: it never saw the cursor (`testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Confirmed working 2026-09-26.
+
+## 4.0.1 — 2026-09-26
+
+Layers: hud 2.0.1, testbench 1.5.1.
+
+### Fixed
+- The cursor is drawn at its stock proportions at any aspect (see `hud/CHANGELOG.md`),
+  and the test bench's `hud` scenario now checks it.
+- `a2mod` counts the game as running only if it runs from its own game directory, so
+  the test bench can switch a clone to stock while the real game is open.
+
+Confirmed in game 2026-09-26.
+
 ## 4.0.0 — 2026-09-26
 
 Layers: hud 2.0.0, testbench 1.5.0.
