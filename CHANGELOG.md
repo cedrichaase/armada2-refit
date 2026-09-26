@@ -18,7 +18,7 @@ Layers: hud 2.1.0, testbench 1.7.0.
 - The test bench's `hud` scenario runs at the Federation briefing over unexplored space,
   where such lines show (see `testbench/CHANGELOG.md`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-26.
 
 ## 4.1.1 — 2026-09-26
 

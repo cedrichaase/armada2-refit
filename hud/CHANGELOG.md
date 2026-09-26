@@ -24,7 +24,7 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
   were never snapped and drew at fractional positions. Every 2D sprite is now snapped
   (the `je` at `0x63aec8` that skipped the block is NOP'd).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-26.
 
 ## 2.0.1 — 2026-09-26
 
