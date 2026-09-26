@@ -3,6 +3,7 @@
 Resolutions: 4:3, 16:10, 16:9, 21:9
 Mod: remastered
 Reference: 4:3 stock
+Stock shell: embed
 Timeout: 12 min
 
 Measured at the first Borg mission's briefing, where the faction (and so the HUD art)

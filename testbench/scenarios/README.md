@@ -11,6 +11,7 @@ Mod: remastered                           (or stock: a2mod stock, on the clone)
 Launch: -nointro a2_borg01                (Armada2.exe arguments; default -nointro)
 Reference: 4:3 stock                      (what "compared with" means; default 4:3 in
                                            this scenario's own mod state)
+Stock shell: embed                        (stock cases only: keep Menus.asi, Embed=1 only)
 Timeout: 12 min
 
 Any prose is description.

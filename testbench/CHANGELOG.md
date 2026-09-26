@@ -28,6 +28,9 @@ Installs nothing into the game. Not yet signed off.
 - A case cut short by Ctrl-C/SIGTERM is an error, not a PASS.
 - A comparison with no baseline (the reference case failed or never ran) is SKIP with
   the reason, not inconclusive; judged comparisons likewise, not judged blind.
+- `Stock shell: embed` (scenario header): stock cases keep `Menus.asi` with `Embed=1`
+  and nothing else, so the stock menus take injected clicks. Stock clicks are scaled
+  to the screen (the 800x600 shell mode fills the output).
 - The audio watchdog ignores streams not yet linked to a sink and treats every
   `a2test-` null sink as silent (a false alarm stopped a case).
 - Session ids gain a per-process counter (timestamp and pid collide across threads);

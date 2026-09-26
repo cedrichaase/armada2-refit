@@ -110,7 +110,7 @@ class Session:
 
     @classmethod
     def create(cls, artifacts_dir, res, mod='remastered', vnc=False, record=False,
-               audio=False, keep=False, label=''):
+               audio=False, keep=False, label='', stock_shell=None):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
             n = next(_SID_SEQ)
@@ -119,7 +119,7 @@ class Session:
         artifacts_dir = Path(artifacts_dir)
         for d in (work, artifacts_dir / 'shots', artifacts_dir / 'logs'):
             d.mkdir(parents=True, exist_ok=True)
-        state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod,
+        state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
                      exception_mtime=None, vnc_port=None)
@@ -198,6 +198,23 @@ class Session:
                                     status='fail', detail=f'see logs/prepare.log')
                     raise GameError(f'{name} failed; see {plog}')
                 self.log.action(f'prepare: {name} {" ".join(cmd[1:])}', detail='logs/prepare.log')
+        if self.s['mod'] == 'stock' and self.s.get('stock_shell') == 'embed':
+            self.embed_stock_shell()
+
+    def embed_stock_shell(self):
+        """Stock, except that the menus are one window with the game (menus/README.md,
+        "One window"). Without Embed each menu is its own X11 window and injected clicks
+        mostly never reach it: the stock Borg campaign click did nothing, twice
+        (2026-09-26). Menus.asi goes back with nothing else on: no scaling, the stock
+        800x600 shell mode, no backdrops, stock Esc. The HUD, font and cursors, which the
+        stock baseline exists for, stay stock."""
+        shutil.copy2(config.GAME / 'Menus.asi', self.game_dir / 'Menus.asi')
+        (self.game_dir / 'Menus.ini').write_text(
+            '; written by the Armada II test bench: stock shell, embedded only\r\n'
+            '[Menus]\r\nMode=1\r\nDesignWidth=800\r\nDesignHeight=600\r\nIntegerScale=1\r\n'
+            'Smooth=0\r\nRaiseShellMode=0\r\nEmbed=1\r\nEscapeReturns=0\r\nUnderlay=0\r\n'
+            'Log=1\r\nTrace=0\r\nBackdrops=0\r\n')
+        self.log.action('stock shell embedded: Menus.asi with Embed=1 and nothing else, so menus take clicks')
 
     # ------------------------------------------------------------------ display
 

@@ -2,6 +2,7 @@
 
 Resolutions: 4:3, 21:9
 Mod: stock
+Stock shell: embed
 Timeout: 12 min
 
 A test that only ever passes proves nothing. This runs the game with every visual layer

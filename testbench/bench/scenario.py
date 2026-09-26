@@ -47,6 +47,7 @@ class Scenario:
     launch: str = '-nointro'
     reference: str = config.REFERENCE_ASPECT
     timeout: int = 900
+    stock_shell: str = ''          # 'embed': stock cases keep Menus.asi for Embed only
     description: str = ''
     steps: list = field(default_factory=list)
 
@@ -85,7 +86,7 @@ def case_dirname(res, mod, scn_mod):
     return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
 
 
-HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout)\s*:\s*(.+)$', re.I)
+HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell)\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
 
 
@@ -139,7 +140,8 @@ def parse(path):
                     mod=hdr.get('mod', 'remastered').lower(),
                     launch=hdr.get('launch', '-nointro').strip('`'),
                     reference=hdr.get('reference', config.REFERENCE_ASPECT),
-                    timeout=timeout, description=' '.join(desc), steps=steps)
+                    timeout=timeout, description=' '.join(desc), steps=steps,
+                    stock_shell=hdr.get('stock shell', '').strip().lower())
 
 
 # ---------------------------------------------------------------------- step table
@@ -565,7 +567,7 @@ class Case:
 
     def run(self):
         t0 = time.time()
-        self.sess = Session.create(self.dir, self.res, mod=self.mod, vnc=self.opts.get('vnc'),
+        self.sess = Session.create(self.dir, self.res, mod=self.mod, stock_shell=self.scn.stock_shell, vnc=self.opts.get('vnc'),
                                    record=self.opts.get('record'), audio=self.opts.get('audio'),
                                    keep=self.opts.get('keep'), label=self.name)
         self.log.meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps))
@@ -722,6 +724,12 @@ class Case:
         """The shell's 800x600 design space to screen pixels.  Menus.asi logs the mapping
         it applied ('MoveWindow 800x600 @0,0 -> 1440x1080 @240,0'); without it (stock),
         the 800x600 display mode fills the output, stretched."""
+        if self.mod == 'stock':
+            # the stock 800x600 shell mode fills the output, stretched -- also with the
+            # embed-only Menus.asi (`Stock shell: embed`), whose log maps 800x600 onto the
+            # 800x600 MODE, not onto the screen: clicking that 1:1 missed (2026-09-26)
+            W, H = self.res
+            return int(x * W / 800), int(y * H / 600)
         body = self.sess.game_log('Menus.log') or ''
         found = re.findall(r'MoveWindow 800x600 @0,0\s+->\s+(\d+)x(\d+) @(-?\d+),(-?\d+)', body)
         if found:
