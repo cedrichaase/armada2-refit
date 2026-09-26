@@ -2,12 +2,12 @@
 
 A remaster of Star Trek: Armada II — the GOG release, patch 1.1 plus Patch Project
 1.2.5, run through Heroic with Proton on Arch + Hyprland. The layers here fix what the
-engine does at modern resolutions — the HUD, the menus, the cutscenes, anti-aliasing,
-bloom — at run time, and all of it reverts.
+engine does at modern resolutions — the HUD, the menus, anti-aliasing, bloom — at run
+time, and all of it reverts.
 
 **This repository holds no game content**: no textures, models, video or data from the
-game, original or derived (`publish/README.md`). The upscaled textures are a separate,
-private project for that reason.
+game, original or derived (`publish/README.md`). The upscaled textures, the upscaled
+intro and the menu backdrop plates are a separate, private project for that reason.
 
 Game directory: `/home/cedric/Games/Heroic/Star Trek Armada II`
 
@@ -22,9 +22,8 @@ here with its own README.
 | [`hud/`](hud/README.md) | hud | `HUD.asi`: the in-game HUD layout, font and cursors undistorted at any aspect, at run time |
 | [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops |
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
-| [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | a `binkw32.dll` proxy that plays upscaled AV1 movies full screen |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
-| — | textures, models | upscaled textures and the widened loading screen; built in the private texture repository, switched here by `a2mod` |
+| — | textures, models, cutscenes | upscaled textures, the widened loading screen, and the upscaled intro with the `binkw32.dll` proxy that plays it; built in the private repository, switched here by `a2mod` |
 
 Not switched by `a2mod`, because the layers above stand on them:
 
@@ -39,7 +38,7 @@ Not switched by `a2mod`, because the layers above stand on them:
     ./a2test ...                            the game headless, for testing (testbench/)
 
 Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
-`menus/`, `msaa/` and `cutscenes/binkproxy/`, or a `--revert` flag on the Python tools.
+`menus/` and `msaa/`, or a `--revert` flag on the Python tools.
 See the layer's README.
 
 ## Versions

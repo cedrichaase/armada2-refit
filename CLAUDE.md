@@ -1,22 +1,23 @@
 # Working in this directory
 
-Tooling for remastering Star Trek: Armada II — the HUD, the menus, the cutscenes,
-anti-aliasing and bloom, and `a2mod`, which switches the whole game between stock and
+Tooling for remastering Star Trek: Armada II — the HUD, the menus, anti-aliasing and
+bloom, and `a2mod`, which switches the whole game between stock and
 remastered.
 
 **This repository is published.** It holds code, configuration and docs only — nothing
 derived from the game's own files (hard rule 4, `publish/README.md`). The **texture
 work** — the `a2tex` pipeline, its 84 targets, the loading-screen model, the archive and
-the promo footage — lives in the private repository **`~/armada2-remastered-private`**,
-which holds the game's own art and is never published. Texture and model tasks happen
-there, under its own `CLAUDE.md`.
+the promo footage — the **cutscenes** (`binkproxy` and the upscaled intro) and the **menu
+backdrop plates** (`backdrop.sh`) live in the private repository **`~/armada2-remastered-private`**,
+which holds the game's own art and is never published. Tasks on those happen there,
+under its own `CLAUDE.md`.
 
 ## Layout
 
 The repo is laid out by **`a2mod` layer**: each folder is one thing `./a2mod` switches
 between stock and remastered (or, for `platform/` and `gameplay/`, something it
-deliberately leaves alone). `./a2mod status` names the layers — including `textures`
-and `models`, which `a2mod` switches in the game directory although their source lives
+deliberately leaves alone). `./a2mod status` names the layers — including `textures`,
+`models` and `cutscenes`, which `a2mod` switches in the game directory although their source lives
 in the private repository. Every folder has:
 
 - a **`README.md`** — how the layer works and *why*: derivations, measurements, traps;
@@ -30,9 +31,8 @@ it bundles.
 | Folder | What it is | Start with |
 |---|---|---|
 | `hud/` | `HUD.asi` — the in-game HUD layout, font and cursors at any aspect | `hud/README.md` |
-| `menus/` | `Menus.asi` — the shell menus and their backdrops | `menus/README.md` |
+| `menus/` | `Menus.asi` — the shell menus, compositing the backdrop plates built in the private repository | `menus/README.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
-| `cutscenes/` | `binkproxy/` and the replacement `movies/` | `cutscenes/binkproxy/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton | `platform/README.md` |
 | `gameplay/` | map scroll speed; cutscene draw distance (notes only) | `gameplay/README.md` |
@@ -242,19 +242,10 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 - **Backdrops are composited per frame**, because the shell draws 1:1 into 800x600 and a
   bigger BMP cannot help: `stretch(frame) + w·(plate − stretch(stock))`. A weight, not a
   mask, because `MainBk_flare.bik` *is* the logo band with the background baked in.
-  Plates come from `menus/backdrop.sh`; `field=`, `clone=`, `keep=`, `fade=`,
-  `dehaze=` and `N.soften=` are documented in `menus/README.md`. The main menu's paid
-  seeds are kept in `ai/`.
-
-### cutscenes
-
-`cutscenes/binkproxy/` is a replacement `binkw32.dll` that plays
-`animations/<Name>.mp4` + `.wav` in place of `<Name>.bik` and raises
-`PlayIntroMovie`'s hard-coded 640x480 mode, which a bigger `.bik` could never escape.
-**H.264, VP9 and AAC do not decode under Proton outside Steam; AV1 does.** Movies live in
-`cutscenes/movies/<Name>/`, laid out like a texture target: `ai/` is paid and never
-overwritten, and **`ai-movie.sh` is the only script that spends**. Stock `.bik` files are
-only ever read.
+  Plates come from `menus/backdrop.sh` in the private repository (`menus/BACKDROPS.md`
+  there has `field=`, `clone=`, `keep=`, `fade=`, `dehaze=` and the paid seeds);
+  `install.sh` reads them from there. `N.soften=` is a `Menus.ini` key, documented in
+  `menus/README.md`.
 
 ### msaa, postfx, platform
 

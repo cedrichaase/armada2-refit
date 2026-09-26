@@ -18,6 +18,9 @@ set -euo pipefail
 
 GAME="${A2_GAME_DIR:-/home/cedric/Games/Heroic/Star Trek Armada II}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The plates are the game's own art, upscaled and outpainted, so they and backdrop.sh
+# live in the private repository (README.md, "Backdrops"); A2_BACKDROPS overrides.
+BACKDROPS="${A2_BACKDROPS:-$HOME/armada2-remastered-private/menus/backdrops}"
 
 mode=""
 remove=0
@@ -67,19 +70,21 @@ put "$here/Menus.ini"       "$GAME/Menus.ini"
 # Backdrop plates, built by backdrop.sh, named after the stock BMP they stand for
 # (the name Menus.ini's [Backdrops] list resolves to). A screen without one
 # keeps black pillarboxes.
-for conf in "$here"/backdrops/*.conf; do
+[ -d "$BACKDROPS" ] || echo "backdrop: no plates at $BACKDROPS (A2_BACKDROPS) -- keeping what is installed"
+for conf in "$BACKDROPS"/*.conf; do
+    [ -e "$conf" ] || continue
     name=$(basename "$conf" .conf)
-    plate="$here/backdrops/$name/wide.bmp"
+    plate="$BACKDROPS/$name/wide.bmp"
     src=$(grep -E '^source=' "$conf" | cut -d= -f2-)
     if [ -f "$plate" ]; then
         mkdir -p "$GAME/Menus"
         put "$plate" "$GAME/Menus/$(basename "$src")"
         echo "backdrop: $name -> Menus/$(basename "$src")"
     elif [ -f "$GAME/Menus/$(basename "$src")" ]; then
-        # Plates are gitignored, so a worktree has none: keep what is installed.
+        # Plates are gitignored, so a checkout may have none: keep what is installed.
         echo "backdrop: $name not built here -- keeping the installed Menus/$(basename "$src")"
     else
-        echo "backdrop: $name not built (menus/backdrop.sh $name) -- black sides"
+        echo "backdrop: $name not built (private repo: menus/backdrop.sh $name) -- black sides"
     fi
 done
 

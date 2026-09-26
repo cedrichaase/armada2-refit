@@ -5,6 +5,20 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 3.0.0 — 2026-09-26
+
+### Removed
+- `backdrop.sh` and `backdrops/*.conf` moved to the private repository
+  (`~/armada2-remastered-private/menus/`, with the plates and paid seeds and
+  `BACKDROPS.md`): the plates are the game's own art, upscaled. MAJOR because a tool
+  leaves this layer.
+
+### Changed
+- `install.sh` reads the built plates from the private repository; `A2_BACKDROPS`
+  overrides the path. Without it, the installed plates are kept.
+
+The installed plugin and plates are unchanged; nothing to see in game.
+
 ## 2.1.0 — 2026-09-25
 
 ### Added

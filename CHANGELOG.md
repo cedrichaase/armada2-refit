@@ -7,13 +7,15 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 5.0.0 — 2026-09-26
 
-Layers: platform 2.0.1.
+Layers: platform 2.0.1, menus 3.0.0.
 
 ### Removed
 - The texture work — `a2tex`, `textures/`, `models/`, `archive/`, `promo/` — moved to
   the private repository `~/armada2-remastered-private`, because it cannot exist
-  without the game's own textures. This repository's history was rewritten without
-  it; changelog hashes were remapped (`publish/README.md`, "The split").
+  without the game's own textures. So did `cutscenes/` (binkproxy with the upscaled
+  intro) and the menu backdrop pipeline (`menus/backdrop.sh`, see
+  `menus/CHANGELOG.md`). This repository's history was rewritten without them;
+  changelog hashes were remapped (`publish/README.md`, "The split").
 
 ### Added
 - `publish/`: the rule that nothing derived from the game's files is committed, and
@@ -24,8 +26,8 @@ Layers: platform 2.0.1.
 - `platform/ab-shot.sh` captures to `platform/ab/` (`A2_AB_DIR` overrides), not
   `archive/ab/`.
 
-`a2mod` still switches the textures and models layers in the game directory. Installs
-nothing different into the game.
+`a2mod` still switches the textures, models and cutscenes layers in the game directory.
+Installs nothing different into the game.
 
 ## 4.2.0 — 2026-09-26
 
