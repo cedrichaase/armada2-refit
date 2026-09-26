@@ -38,7 +38,7 @@ Confirmed in game 2026-09-26.
 ## 2.0.0 — 2026-09-26
 
 ### Added
-- `HUD.asi` (`hud.c`, `build.sh`, `install.sh`, `HUD.ini`, `392bb99`): the canvas and palette, the
+- `HUD.asi` (`hud.c`, `build.sh`, `install.sh`, `HUD.ini`, `f5f6721`): the canvas and palette, the
   font and the hardware cursor corrected in the engine at run time, for the display
   mode actually set, with every game file stock. `HUD.ini` switches each part
   (`Canvas=`, `Font=`, `Cursor=`) and `Log=` writes `HUD.log`.
@@ -71,8 +71,8 @@ Baseline: the first versioned release.
 ## Before versioning
 
 ### 2026-09-25
-- Moved to `hud/`. The HUD sections of `SETUP.md` became `README.md` (`c46a493`,
-  `f99d05a`).
+- Moved to `hud/`. The HUD sections of `SETUP.md` became `README.md` (`7daf6d8`,
+  `a38d137`).
 
 ### 2026-09-21
 - The action bar anchor is corrected against the hard-coded 1600 (`1a34f25`) and made
@@ -101,7 +101,7 @@ Baseline: the first versioned release.
 
 #### 2026-09-25
 - Ported into `font/` when the `worktree-font-condense` branch merged. The installed
-  files rebuild from stock byte-for-byte (`30e716e`).
+  files rebuild from stock byte-for-byte (`15d55b4`).
 
 #### 2026-09-21
 - The condense landed (`72b4aee`) and was confirmed in game: `OBJECTIVES:` measured

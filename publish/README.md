@@ -53,8 +53,10 @@ stock textures and every archive plate. On 2026-09-26:
   paths — and, in a second pass the same day, the cutscenes and the menu backdrop
   pipeline — and every binary removed, and commits left empty by that dropped. `check.sh`
   passes on every commit. Hashes cited in this repository's changelogs were remapped to
-  the rewritten commits in the same step; a hash that still resolves nowhere here names
-  a texture commit, and resolves in the private repository.
+  the rewritten commits in the same step. A cited commit the rewrite dropped (one that
+  held only private work) was given its original hash, which resolves in the private
+  repository: `927f993` in the root changelog, `79695b2`, `8a3562c` and `d3e1ccb` in
+  `menus/CHANGELOG.md`.
 - **The pre-split repository** is kept whole as
   `~/armada2-remastered-pre-split-2026-09-26.bundle` (`git clone` it to look).
 
