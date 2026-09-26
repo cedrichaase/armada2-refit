@@ -6,6 +6,14 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 2.0.1 — 2026-09-26
+
+### Changed
+- `ab-shot.sh` writes its captures to `platform/ab/` (`A2_AB_DIR` overrides) instead
+  of `archive/ab/`, which left this repository with the texture work.
+
+Installed state unchanged; nothing to see in game.
+
 ## 2.0.0 — 2026-09-25
 
 ### Removed

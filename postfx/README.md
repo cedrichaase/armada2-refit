@@ -280,7 +280,7 @@ lowering it breaks the match against stock. Bloom converts that blowout from "th
 texture ran out of range" into "that is a bright object", which is the correct read and
 which no amount of texture work can produce.
 
-Judge it the way `textures/tools/measure-invention.sh` judges a blend, not at 1:1 — and
+Judge it the way the texture repository's `textures/tools/measure-invention.sh` judges a blend, not at 1:1 — and
 `platform/ab-shot.sh` will diff two launches numerically.
 
 ## Tier 0 — ambient occlusion, which is the wrong tool here
