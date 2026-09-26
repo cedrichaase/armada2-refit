@@ -14,7 +14,7 @@ Layers: testbench 1.6.1.
   checks the cursor again. It runs 5 games at once by default (see
   `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 4.1.0 — 2026-09-26
 

@@ -19,7 +19,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `hud.md` checks the cursor again, within ±10% (removed in 1.6.0 because it never saw
   the cursor): 0.94–1.02 of stock at every aspect; stock at 21:9 measures 1.79x.
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 1.6.0 — 2026-09-26
 
