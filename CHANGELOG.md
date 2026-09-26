@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 4.0.0 — 2026-09-26
+
+Layers: hud 2.0.0, testbench 1.5.0.
+
+### Changed
+- The `font` layer is merged into `hud`, which is now `HUD.asi`: the HUD layout, font
+  and cursors corrected at run time for any display mode (`1524bb9`; see `hud/CHANGELOG.md`).
+  `a2mod` reports one `hud` layer and reads older manifests' `font` / `hud layout`
+  entries as `hud`. MAJOR: a layer name is gone and `hud` now needs the ASI loader.
+- The test bench installs `HUD.asi` once for every case (see `testbench/CHANGELOG.md`).
+
+Confirmed in game 2026-09-26.
+
 ## 3.6.0 — 2026-09-26
 
 Layers: testbench 1.4.0.
@@ -13,7 +26,7 @@ Layers: testbench 1.4.0.
 - The test bench's HUD scenario accepts the condensed font within ±10% of stock (see
   `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.5.0 — 2026-09-26
 
@@ -24,7 +37,7 @@ Layers: testbench 1.3.0.
   through a per-session null sink, and can drive the stock menus (see
   `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.4.1 — 2026-09-26
 
@@ -33,7 +46,7 @@ Layers: testbench 1.2.1.
 ### Changed
 - The test bench judges on Sonnet by default (see `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.4.0 — 2026-09-26
 
@@ -43,7 +56,7 @@ Layers: testbench 1.2.0.
 - `a2test run --jobs N`: cases run in parallel, three games at once by default (see
   `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.3.0 — 2026-09-26
 
@@ -53,7 +66,7 @@ Layers: testbench 1.1.0.
 - The test bench measures the HUD and font against stock 4:3 rather than remastered
   4:3 (see `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet run.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.2.0 — 2026-09-25
 
@@ -64,7 +77,7 @@ Layers: testbench 1.0.0 (new).
   the install, driven by plain-text scenarios, with a screenshot-and-log report per run
   (see `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.1.0 — 2026-09-25
 

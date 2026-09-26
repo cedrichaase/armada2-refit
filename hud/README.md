@@ -1,12 +1,66 @@
-# HUD layout — the in-game UI at widescreen
+# HUD — the in-game UI, its font and its cursors at any aspect
 
-The in-game HUD: its layout canvas (`hud/ui-widescreen.py`, which rewrites
-`misc/gui_<race>.cfg`) and the cursors (`hud/cursor-aspect.py`, which reshapes
-the cursor art in `Textures/RGB` — `a2mod` counts that under textures, because
-that is where the files land). The menus are a different system: `menus/`. The text
-is a third: the font ignores the canvas, and its fix is in `font/`.
+The in-game HUD has three things that are drawn against a fixed 4:3 (or 5:4) reference
+and come out stretched on a wide screen: the **layout canvas** (1600x1200), the **font**
+(1280x1024) and the **cursors** (800x600). `HUD.asi` corrects all three inside the engine,
+at run time, from the display mode that is actually set. The menus are a different
+system: `menus/`.
 
-## The UI stretch, and where it actually comes from
+    hud/install.sh             build HUD.asi, revert the file-based fixes, install
+    hud/install.sh --remove    take it out (the HUD is then stock: stretched)
+
+Until hud 2.0.0 the same three corrections were made by rewriting game files for one
+resolution — `ui-widescreen.py`, `ui-font-condense.py` and `cursor-aspect.py`, below.
+Each baked in the aspect `ARMADA.PRF` had when it ran, so a different resolution drew
+the HUD, text and cursors too narrow until someone ran them again. They stay here as
+the derivation of what the plugin does and as the `--revert` that `install.sh` runs; do
+not install them alongside it — every correction would be applied twice. `HUD.asi`
+stands down part by part if it finds them (see `HUD.log`).
+
+## HUD.asi — the same three corrections, in the engine
+
+Addresses are this build's `Armada2.exe` (1.1 + Patch Project 1.2.5), read off
+`armada2.map`; the plugin checks each site's bytes before writing and leaves that part
+inert, and says so in `HUD.log`, if they differ. The source comment in `hud.c` carries the
+detail; this is the map.
+
+| Part | Hook | What it does |
+|---|---|---|
+| **Canvas and palette** | the two `ParameterDB` constructors' calls to `mLoad` (`0x53414c`, `0x5341b4`) | After a DB loads, if it holds `infoPanelArea` it is the GUI one (`gui_<race>.cfg` includes `gui_interface.cfg`, which includes `gui_glob16x12.cfg`). Its declared canvas width at `+0x2c` becomes `round(1200·W/H)`, and the anchored panel and palette values get exactly `ui-widescreen.py`'s edit, in memory. |
+| **Font** | `FontNewScreenWidth`'s one caller, `SetActiveDisplay_Internal` (`0x62c5d7`), and `FontInit` (`0x48440c`) | `ST3D_Font+0x28`, the horizontal scale, becomes `+0x2c · 1.25·H/W` for the three MetaFonts. Glyph quad, pen advance, line width and word-wrap all multiply by `+0x28`, so this condenses glyphs and spacing together — what the file condense did by editing every `.spr` width. |
+| **Cursors** | `SetCursor` (`0x625dd9`): `fmuls 0x18(%esi)` → `fmuls 0x1c(%esi)` | The hardware cursor's texture is created at `texW · H/600` instead of `texW · W/800`. The hotspot is a fraction of that texture, so it follows. |
+
+What was established to get there, so it need not be re-derived:
+
+- **`Get(DBRectangle)` converts every rect at read time** from the DB's declared canvas
+  (`+0x2c`/`+0x30`) into `cfgSCREEN_WIDTH x cfgSCREEN_HEIGHT` — `RTS_CFG.h`'s 1600x1200
+  — which is then scaled to the back buffer per axis (`mConvertRectangle`, `0x535ad0`).
+  That fixed 1600 is the "hard-coded 1600" the palette reads against. It has 33 readers
+  in the exe, the font's draw path among them; **do not change `cfgSCREEN_WIDTH`** to
+  fix the canvas.
+- A DB's value strings are parsed at `Get` time. The plugin points an edited entry at a
+  buffer of its own; the destructor frees the line buffers (`+0x20`) and bucket table
+  (`+0x28`) as blocks, never an entry's value, so that is safe.
+- **`FontNewScreenWidth` runs on every mode change**, with the `ST3D_DisplayMode`
+  `{W, H, bpp}` in `ecx` at the call. The font therefore follows a resolution change
+  mid-session. The GUI DB is loaded when a mission starts, so **the layout follows at
+  the next mission**.
+- `ST3D_Font`s are constructed in exactly one place (`cFontSet::Load`), and only the
+  three MetaFonts' current fonts draw text, so those three are all there is to fix.
+- `[device+0x18]`/`[device+0x1c]` are W/800 and H/600 and also map cursor positions;
+  the plugin leaves them alone and changes only the one multiply that sizes the cursor
+  texture.
+- **Unconfirmed: the map-plane cursor.** The art-side squash fixed two cursor draw paths
+  (below), and the `.spr` experiment showed the second one reads `cursor.spr`'s `W H`.
+  Every `cursor.spr` entry is `@cursor`, and the second path was not found statically.
+  If a cursor part on the map plane is still wide in game, that is it.
+
+What it does differently from the files, on purpose: the font's glyph art stays stock
+and is drawn narrower, instead of being resampled to fewer texels and point-sampled back
+up. At 3440x1440 that is 1.41 screen px per texel on both axes rather than 2.69 across,
+so the text keeps every stock texel. Judge it in game (see "The font").
+
+## The layout canvas: where the UI stretch comes from
 
 `STA2WidescreenPatch` fixes the 3D view. It does **not** fix the UI, which at 3440x1440
 comes out 1.79x too wide — correct only at 4:3. That stretch is not in the patch, not in
@@ -248,3 +302,149 @@ code, not data — an ASI hook of the same shape as `menus/`, which is why this
 is now worth considering rather than impossible. Not attempted.
 
 Until then, `cursor-aspect.py`'s squash is the whole of what art can do.
+
+## The font
+
+Until hud 2.0.0 this was its own `font` layer; `HUD.asi` now applies the same factor
+at run time (above). What follows is the derivation, and the file-based condense that
+`install.sh` reverts.
+
+`hud/ui-font-condense.py` condenses the in-game bitmap font so it is not drawn 1.9x too
+wide at 21:9. Its backups are `.a2font-backup`, not `.a2neb-backup`, so that `a2tex`
+can never revert them (the end of this section). It follows from the canvas change
+above.
+
+### The font does not ride on the canvas either, and that is the canvas fix's bill
+
+Re-declaring the canvas un-stretches every panel, icon and rect. **It does not touch the
+text**, which comes out huge and visibly wide — and that is not a leftover of the old
+bug, it is a new mismatch the fix created.
+
+The in-game font is a bitmap sprite, not a system font. `Armada2.exe` builds the name
+
+    Font%s%d.spr        %s = "Final4_", %d = a point size
+
+and `Sprites/` ships eight of them — 10, 12, 13, 15, 16, 19, 20, 24. Each is an atlas:
+`Textures/RGB/FontFinal4_<size><page>.tga` is **solid white RGB with the glyphs entirely
+in alpha** (measured: mean R=G=B=255, mean A=35.5), and the `.spr` carries a per-glyph
+`(u,v)` offset table and a per-glyph advance-width table. The `*Color` keys in
+`gui_glob16x12.cfg` tint the white.
+
+Those atlases are authored for a **1280x1024** tier, and the font path scales glyph quads
+by back-buffer / 1280x1024 — **2.6875x across against 1.40625x down** at 3440x1440,
+whatever `screenWidth` says. Measured against the advance tables, off a 3440x1440
+screenshot:
+
+| element | font | predicted | measured |
+|---|---|---|---|
+| `OBJECTIVES:` (header) | 24 | 620.9 x 32.3 px | 619.5 x 32.7 |
+| `BRIEFING SUMMARY:` | 24 | 962.2 px wide | 960.2 |
+| `The Borg Queen and a ...` | 16 | 1355 px wide | 1368 |
+| `4000` (resource bar) | 16 | 137.1 x 21.1 px | 135.9 x 22.4 |
+
+So every glyph is drawn 2.6875/1.40625 = **1.911x too wide**, and against a canvas that
+now scales at 1.20 it is also 2.24x too wide for the panel around it.
+
+**The vertical axis is already correct and is not touched.** 1.40625 against the canvas's
+1.20 is a ratio of 1.171875, and that ratio is stock: at 4:3 the font scales by H/1024
+against a canvas of H/1200, the same 1.171875. The game has always drawn text 17% taller
+than its layout coordinates imply.
+
+**Why 1280x1024 and not 1600x1200.** A rival fit — glyphs scaled by back-buffer /
+1600x1200, the stock canvas — matches the body text and the line pitch just as well,
+because `sz16 x 2.6875` and `sz20 x 2.15` differ by 1.3% and nothing measurable here
+separates them. Word-wrap does not separate them either; both reproduce all five
+paragraph breaks. **The headers do.** At 2.15x across, `OBJECTIVES:` at 619.5 screen px
+needs an atlas 288 texels wide with a 27-texel cap — a ~30pt font. `FontFinal4_30` does
+not exist. At 2.6875x it is `sz24` (231 x 23) to 0.2%, the largest atlas shipped, which
+is what the largest tier should reach for.
+
+**`hud/ui-font-condense.py`** squeezes each glyph's art and its advance width by
+`(H/1024)/(W/1280)` = `1.25 * H / W` — 0.5233 here — so the engine's own 1.911x stretch
+lands the glyph back at its authored proportions. Cell height, atlas size, page layout,
+row assignment, frame counts and the white RGB plane are untouched; only the alpha plane
+is rebuilt and only the `u`/width numbers move. 1792 glyphs across 8 sizes.
+
+    hud/ui-font-condense.py --preview /tmp/p.png   # stock vs condensed, at game scale
+    hud/ui-font-condense.py --dry-run
+    hud/ui-font-condense.py
+    hud/ui-font-condense.py --check                # do .spr and .tga still agree?
+    hud/ui-font-condense.py --revert
+
+**The cost is horizontal sampling, and it is unavoidable from data alone.** The
+destination quad is `texels x scale`, so the only lever on width is texels: a glyph that
+was 28 texels wide is now 15, and `@tmaterial=font #No filtering, ever.` means the engine
+point-samples it back up 2.6875x. Text is correctly proportioned and horizontally
+chunkier.
+
+Lanczos held the stems best of the three filters tried (`--filter`; Triangle is softer,
+Box loses sub-texel stem placement).
+
+**A crisper alternative was built, measured, and rejected in game — `--method runs`.**
+Keep it and keep this note: every static metric favoured it and it still looked worse on
+screen, so the next person who finds the text soft can learn that the experiment has
+already been run.
+
+The argument was that horizontal antialiasing buys nothing here. The axes magnify very
+differently — 2.6875x across against 1.40625x down — so downward a part-covered texel
+spans about a screen pixel and reads as a real soft edge, while across it is painted as a
+flat 2.7px block that softens nothing and merely puts a grey slab where a stroke edge
+should be. Stock's stems are *one texel* wide, so a 0.5233 resize asks for half a texel
+and gets a slab every time: on `FontFinal4_24a` the fully-opaque texel count goes
+6000 → 1572, with hundreds more picking up an alpha 1–4 ringing halo. Thresholding is no
+answer either — at 45% it erases `!` `"` `I` `i` `l` and at 50% it erases 31 glyphs, all
+of them the ones already one texel wide. So `runs` works a scanline at a time: map the
+stock line's ink runs by the factor, give every run **at least one texel**, keep stock's
+gaps, and fill each run flat at that line's own peak alpha — crisp across, stock's shading
+kept down, no dropouts, and an invariant stroke count per line. Widths are floored rather
+than rounded because rounding gives `1` a foot twice its stem width and `1187` renders as
+`[187`.
+
+| method | ink/expected | erased | thinned | fattened |
+|---|---|---|---|---|
+| **Lanczos resample** — ships | **1.028** | **0** | **0** | **0** |
+| Box + threshold 35% | 1.224 | 0 | 2 | 227 |
+| Box + threshold 45% | 1.074 | 6 | 29 | 64 |
+| Box + threshold 50% | 0.904 | 31 | 120 | 4 |
+| runs, width rounded | 1.007 | 0 | 1 | 25 |
+| runs, width floored — rejected | 0.900 | 0 | 9 | 16 |
+
+`runs` also takes `24a` from 1572 opaque texels back to 3948 against stock's 6000, and the
+alpha plane back to 14 discrete levels from 256.
+
+**And none of that settled it.** Judged in the actual game the crisp variant looked worse
+than the soft one. The likely reason is that the reasoning models the engine as a bare
+point-sampled blit, while the real text is tinted, drawn over lit panel art and read at a
+normal viewing distance — conditions under which a grey slab reads as a soft edge after
+all and hard 2.7px blocks read as jagged. The offline renders reproduced the sampling but
+not the context.
+
+**The lesson is the part worth keeping:** ink ratio, opaque-texel count, dropout count and
+alpha-level count all favoured the variant that lost. They measure weight and structure,
+not legibility. Do not change the font's appearance on the strength of that table — put it
+in the game and look at it.
+
+Per-glyph integer rounding costs a little accuracy: measured over the whole charset the
+realised factor is 0.514–0.558 against the 0.5233 target, biased slightly narrow. The two
+sizes actually drawn at this resolution land at 0.5235 (24) and 0.5281 (16). `sz10` is the
+worst at 0.5584 because its glyphs are 3–8 texels wide, and it belongs to the 640x480
+tier, so it is not drawn here.
+
+**Confirmed in game.** `OBJECTIVES:` measures 323.5 screen px wide against 325.2
+predicted — 0.5% — with the cap height unchanged at 32.7 px, exactly as intended, and the
+glyph aspect back to 9.89 against the atlas's authored 10.04. The briefing paragraph
+reflowed from five lines to three, which is the same prediction seen from the other side.
+
+One thing the model does not capture, and it is **stock behaviour, not a condensing
+artefact**: measured line widths run a few percent over the sum of the advance widths,
+because **the engine rounds each glyph's advance up to a whole screen pixel**. The drift
+is 0.36 screen px per glyph condensed against 0.28 stock — the same effect at the same
+per-glyph rate, just accumulated over the longer lines a condensed font fits. Do not
+"correct" it in the `.spr`; the widths are right.
+
+**The backups are `.a2font-backup`, not `.a2neb-backup`, deliberately.** `a2tex revert
+all` restores every `Textures/RGB/*.a2neb-backup`; if the atlases went back to stock while
+the condensed `.spr` files stayed, every `u` and width would point into the wrong place in
+a wider glyph — garbled text, out of the command that is supposed to be the safe way out.
+A distinct suffix keeps a2tex out of it, the same division ui-widescreen.py already has
+with `misc/`. `--check` is what catches a mismatch if one ever happens.

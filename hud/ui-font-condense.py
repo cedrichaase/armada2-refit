@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Un-stretch Armada II's bitmap UI font on a non-5:4 display.
 
-    font/ui-font-condense.py                  condense for the resolution in ARMADA.PRF
-    font/ui-font-condense.py --res 3440x1440  condense for a resolution you name
-    font/ui-font-condense.py --factor 0.558   override the computed factor
-    font/ui-font-condense.py --method runs    the rejected crisp variant; see below
-    font/ui-font-condense.py --dry-run        print what would change, touch nothing
-    font/ui-font-condense.py --preview OUT    render stock vs condensed as the game
+    hud/ui-font-condense.py                  condense for the resolution in ARMADA.PRF
+    hud/ui-font-condense.py --res 3440x1440  condense for a resolution you name
+    hud/ui-font-condense.py --factor 0.558   override the computed factor
+    hud/ui-font-condense.py --method runs    the rejected crisp variant; see below
+    hud/ui-font-condense.py --dry-run        print what would change, touch nothing
+    hud/ui-font-condense.py --preview OUT    render stock vs condensed as the game
                                                will draw them, and touch nothing
-    font/ui-font-condense.py --revert         restore the stock atlases and metrics
-    font/ui-font-condense.py --check          report whether .spr and .tga agree
+    hud/ui-font-condense.py --revert         restore the stock atlases and metrics
+    hud/ui-font-condense.py --check          report whether .spr and .tga agree
 
 WHY THE TEXT IS STRETCHED AND OVERSIZED
 
@@ -626,7 +626,7 @@ def main():
     verb = "would rewrite" if a.dry_run else "rewrote"
     print(f"{verb} {total} glyphs across {len(SIZES)} sizes")
     if not a.dry_run:
-        print("run  font/ui-font-condense.py --revert  to undo "
+        print("run  hud/ui-font-condense.py --revert  to undo "
               "(a2tex revert all does NOT cover these)")
 
 

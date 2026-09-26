@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.5.0 — 2026-09-26
+
+### Added
+- `HUD.log` and `HUD.ini` are collected with each case's logs.
+
+### Changed
+- The remastered prepare step is `hud/install.sh` (`HUD.asi`), the same for every
+  case, in place of `ui-widescreen.py`, `cursor-aspect.py` and `ui-font-condense.py`
+  run with `--res` per case.
+
+Installs nothing into the game. Confirmed working 2026-09-26.
+
 ## 1.4.0 — 2026-09-26
 
 ### Added
@@ -14,7 +26,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `hud.md`: the three font checks pass within ±10% (measured 0.91–0.94 of stock, judged
   fine by the user in game); the HUD regions stay at ±5%.
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 1.3.0 — 2026-09-26
 
@@ -47,7 +59,7 @@ Installs nothing into the game. Not yet signed off.
 
 Installs nothing into the game. Measured run 20260926-030021: stock 800x600 PASS;
 remastered HUD within 2% of stock at 4:3, 16:10, 16:9 and 21:9, font 0.91-0.94x.
-Not yet signed off.
+Confirmed working 2026-09-26.
 
 ## 1.2.1 — 2026-09-26
 
@@ -55,7 +67,7 @@ Not yet signed off.
 - Judged and agent steps run on Sonnet by default (`--model sonnet`), not the `claude`
   CLI's default (Opus here). `A2TEST_MODEL` still overrides it; empty restores the CLI's.
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 1.2.0 — 2026-09-26
 
@@ -70,7 +82,7 @@ Installs nothing into the game. Not yet signed off.
 - Session ids gain a per-process counter (timestamp and pid collide across threads);
   VNC ports are claimed under a lock; `a2input` is built once before any case starts.
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 1.1.0 — 2026-09-26
 
@@ -83,7 +95,7 @@ Installs nothing into the game. Not yet signed off.
 - `hud.md` measures the HUD and font against **stock** 4:3, the shape they were drawn
   for, instead of remastered 4:3. The judge brief no longer excuses a condensed font.
 
-Installs nothing into the game. Not yet run.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 1.0.0 — 2026-09-25
 
@@ -100,5 +112,5 @@ Installs nothing into the game. Not yet run.
   and `Include`.
 - `ui.json`: screen signatures and click targets in 800x600 design space.
 
-Installs nothing into the game. Validated by a bench run at 4:3, 16:10, 16:9 and 21:9;
-not yet signed off.
+Installs nothing into the game. Validated by a bench run at 4:3, 16:10, 16:9 and 21:9.
+Confirmed working 2026-09-26.
