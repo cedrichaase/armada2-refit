@@ -121,6 +121,24 @@ def union(ws):
                 conf=round(sum(w['conf'] for w in ws) / len(ws), 1))
 
 
+def retry_scale(path):
+    """The scale to try again at when a phrase is not found, or None.  Frames over
+    1200 high are read at 1x (ocr()), which at 3440x1440 read the mission list's
+    "Werewolf Pack" as "B er If Pack", twice in a row, where 2x reads it cleanly
+    (2026-09-26).  The 1x default stays -- 1.5x once lost "Graphics Settings" at 1440
+    -- so 2x is a second look, never the first."""
+    img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    return 2.0 if img is not None and img.shape[0] > 1200 else None
+
+
+def find_text_in(path, phrase, words=None):
+    """find_text on `path`, with a second look at retry_scale() if the first misses."""
+    box = find_text(words if words is not None else ocr(path), phrase)
+    if box is None and (sc := retry_scale(path)):
+        box = find_text(ocr(path, scale=sc), phrase)
+    return box
+
+
 def find_text(words, phrase, threshold=0.8):
     """Best match for `phrase` among runs of consecutive words on one line.  Returns
     a box dict with a `score`, or None.  Case and punctuation are ignored, and OCR's

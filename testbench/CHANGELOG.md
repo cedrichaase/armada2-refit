@@ -11,6 +11,11 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `hud.md` checks the cursor: the pointer is parked in empty space and the region
   around it is matched against stock 800x600, like a HUD panel.
 
+### Fixed
+- Text search takes a second look at 2x on frames over 1200 high when 1x misses
+  (`vision.retry_scale`): at 3440x1440 the mission list's "Werewolf Pack" read as
+  "B er If Pack" twice in a row.
+
 Installs nothing into the game. Not yet signed off.
 
 ## 1.5.0 — 2026-09-26
