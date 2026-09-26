@@ -14,8 +14,8 @@ settings, anti-aliasing and bloom (the Tiers) in `postfx/README.md`, and the men
 
 | | |
 |---|---|
-| Game | `/home/cedric/Games/Heroic/Star Trek Armada II` |
-| Prefix | `/home/cedric/Games/Heroic/Prefixes/Star Trek Armada II` |
+| Game | `~/Games/Heroic/Star Trek Armada II` (`A2_GAME`, see `a2env.sh`) |
+| Prefix | `~/Games/Heroic/Prefixes/Star Trek Armada II` (`A2_PREFIX`) |
 | Heroic config | `~/.config/heroic/GamesConfig/1174788223.json` |
 | Runner | Proton-CachyOS-latest |
 | Base | GOG release = Armada II + patch 1.1, plus Patch Project 1.2.5 |

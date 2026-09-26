@@ -97,6 +97,17 @@ class GameError(Exception):
     pass
 
 
+def checkout_provenance(path):
+    """A checkout given to --install: its absolute path and the commit it is at, with
+    `-dirty` when it has uncommitted changes -- the report records exactly this."""
+    p = Path(path).expanduser().resolve()
+    if not os.access(p / 'install', os.X_OK):
+        raise GameError(f'{p}: no executable ./install (not a checkout of either repository?)')
+    r = subprocess.run(['git', '-C', str(p), 'describe', '--always', '--dirty', '--abbrev=10'],
+                       capture_output=True, text=True)
+    return dict(path=str(p), describe=r.stdout.strip() if r.returncode == 0 else 'not a git checkout')
+
+
 class Session:
     def __init__(self, state, statefile):
         self.s = state
@@ -110,7 +121,7 @@ class Session:
 
     @classmethod
     def create(cls, artifacts_dir, res, mod='remastered', vnc=False, record=False,
-               audio=False, keep=False, label='', stock_shell=None):
+               audio=False, keep=False, label='', stock_shell=None, installs=None):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
             n = next(_SID_SEQ)
@@ -119,7 +130,9 @@ class Session:
         artifacts_dir = Path(artifacts_dir)
         for d in (work, artifacts_dir / 'shots', artifacts_dir / 'logs'):
             d.mkdir(parents=True, exist_ok=True)
+        installs = [checkout_provenance(p) for p in (installs or [])]
         state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
+                     installs=installs,
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
                      exception_mtime=None, vnc_port=None)
@@ -127,7 +140,8 @@ class Session:
         sess.save()
         (artifacts_dir / 'session.json').write_text(json.dumps({'statefile': str(sess.statefile)}))
         sess.log.meta(session=sid, resolution=config.res_name(res),
-                      aspect=config.aspect_name(res), mod=mod, label=label, started=now())
+                      aspect=config.aspect_name(res), mod=mod, label=label, started=now(),
+                      **({'installs': [f"{i['path']} @ {i['describe']}" for i in installs]} if installs else {}))
         return sess
 
     @classmethod
@@ -177,8 +191,16 @@ class Session:
         env = dict(os.environ, A2_GAME=str(self.game_dir), A2_GAME_DIR=str(self.game_dir),
                    XDG_DATA_HOME=str(self.work / 'xdg'), TMPDIR=str(self.work))
         plog = self.dir / 'logs' / 'prepare.log'
+        installs = self.s.get('installs') or []
         if self.s['mod'] == 'stock':
             steps = [[str(config.REPO / 'a2mod'), 'stock']]
+        elif installs:
+            # Checkouts stacked with --install: a known baseline first -- stock, whatever
+            # the user's install happens to carry -- then each checkout's ./install, in
+            # the order given, into the clone. So what the case shows is those commits
+            # and nothing else, and the report names them.
+            steps = [[str(config.REPO / 'a2mod'), 'stock']] + \
+                    [[str(Path(i['path']) / 'install')] for i in installs]
         else:
             # HUD.asi fixes the HUD, font and cursors at run time for whatever mode
             # is set, so the install takes no resolution: the same install is what
@@ -190,9 +212,12 @@ class Session:
                 f.write(f'$ {" ".join(cmd)}\n')
                 f.flush()
                 r = subprocess.run(cmd, env=env, stdout=f, stderr=subprocess.STDOUT,
-                                   cwd=str(config.REPO))
+                                   cwd=str(Path(cmd[0]).parent))
                 f.write(f'[exit {r.returncode}]\n\n')
                 name = Path(cmd[0]).name
+                if name == 'install':
+                    i = next(i for i in installs if Path(i['path']) / 'install' == Path(cmd[0]))
+                    name = f"{i['path']}/install @ {i['describe']}"
                 if r.returncode:
                     self.log.action(f'prepare: {name} failed (exit {r.returncode})',
                                     status='fail', detail=f'see logs/prepare.log')

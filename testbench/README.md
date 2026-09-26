@@ -12,6 +12,8 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test list
 
     ./a2test session start --res 16:10       # a live session to drive by hand
+    ./a2test session start --install ~/armada2-remastered \
+                           --install ~/armada2-remastered-private   # public + private, stacked
     ./a2test drive shot menu                 #   prints the PNG path
     ./a2test drive click-text "Single Player"
     ./a2test drive step 'Wait for the single player screen'
@@ -41,7 +43,7 @@ copy, and can run while the game is being played.
 | Stage | What | Why this way |
 |---|---|---|
 | clone | `cp -a --reflink=always` of the game (4.5 GB) and the prefix (558 MB) into `~/.cache/a2test/sessions/<id>/` | btrfs: 0.7 s and no space. Must be the same filesystem as the game |
-| prepare | `ARMADA.PRF` line 5 set to the resolution, then `hud/install.sh` with `A2_GAME=<clone>`: `HUD.asi` in, the file-based HUD, font and cursor fixes reverted. For `Mod: stock`, `a2mod stock` on the clone instead | `HUD.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims. (Before hud 2.0.0 this ran three scripts with `--res` per case, since those were built for one resolution.) |
+| prepare | `ARMADA.PRF` line 5 set to the resolution, then `hud/install.sh` with `A2_GAME=<clone>`: `HUD.asi` in, the file-based HUD, font and cursor fixes reverted. For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order, so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted) | `HUD.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims. (Before hud 2.0.0 this ran three scripts with `--res` per case, since those were built for one resolution.) |
 | display | `sway` with `WLR_BACKENDS=headless`, one output at exactly the resolution, `xwayland force` | the game gets the same Xwayland path it has under Hyprland, and nothing appears on the desktop |
 | input | `input/a2input`: a wlr virtual pointer and virtual keyboard on sway's seat, fed through a FIFO | see "Input" |
 | game | `umu_run.py` with Heroic's environment, the clone as `WINEPREFIX`/`STEAM_COMPAT_DATA_PATH`; silent: `winepulse.drv=d;winealsa.drv=d` | see "Traps" |

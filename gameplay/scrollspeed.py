@@ -22,7 +22,9 @@ import shutil
 import subprocess
 import sys
 
-GAME = os.environ.get("A2_DIR", "/home/cedric/Games/Heroic/Star Trek Armada II")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import a2env  # noqa: E402  (the repository root, for where the game is)
+GAME = a2env.GAME
 PRF = "ARMADA.PRF"
 CFG = "RTS_CFG.h"
 BAK = ".a2neb-backup"

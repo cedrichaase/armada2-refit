@@ -25,11 +25,15 @@ a2test -- run Armada II headless and test it end to end
       --audio                          let the game make sound (default: no audio driver)
       --keep                           keep the game/prefix clone after the case
       --no-claude                      judged steps become REVIEW, agent steps fail
+      --install PATH                   remastered cases: stock, then PATH/install, in
+                                       order; repeatable (see session start)
       --tolerance 0.05                 allowed stretch for the measured checks
   a2test check SCENARIO...             parse only: show how each step would run
   a2test list                          scenarios in testbench/scenarios/
 
-  a2test session start [--res R] [--mod stock] [--vnc] [--no-launch]
+  a2test session start [--res R] [--mod stock] [--install PATH]... [--vnc] [--no-launch]
+      --install PATH                   start from stock, then run PATH/install into the
+                                       clone; repeat to stack checkouts (public, private)
   a2test session stop [--keep]         quit, gather logs, write the report
   a2test session list
   a2test drive shot [NAME]             print the screenshot's path
@@ -99,6 +103,7 @@ def cmd_run(argv):
     ap.add_argument('--no-claude', action='store_true')
     ap.add_argument('--tolerance', type=float, default=0.05)
     ap.add_argument('--out')
+    ap.add_argument('--install', action='append', default=[], metavar='PATH')
     ap.add_argument('-j', '--jobs', type=int, default=config.JOBS,
                     help=f'game instances at once (default {config.JOBS}; 1 = one case at a time)')
     a = ap.parse_args(argv)
@@ -118,7 +123,7 @@ def cmd_run(argv):
                 command='a2test run ' + ' '.join(shlex.quote(x) for x in argv), repo=str(config.REPO))
     stop = threading.Event()
     opts = dict(vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep, no_claude=a.no_claude,
-                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1)
+                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install)
     print(f'run {run_id} -> {run_dir}', flush=True)
     # Each scenario's reference case runs first, so every other case has something to
     # compare with; once it is done, that scenario's other cases join the queue. Up to
@@ -277,12 +282,15 @@ def cmd_session(argv):
         ap.add_argument('--no-launch', action='store_true')
         ap.add_argument('--args', default='-nointro')
         ap.add_argument('--label', default='interactive')
+        ap.add_argument('--install', action='append', default=[], metavar='PATH')
         a = ap.parse_args(rest)
+        if a.install and a.mod == 'stock':
+            ap.error('--install builds a remastered state; it cannot go with --mod stock')
         res = config.parse_res(a.res)
         sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
         s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
-                           label=a.label)
+                           label=a.label, installs=a.install)
         s.clone()
         s.prepare()
         s.start_display()

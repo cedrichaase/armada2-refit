@@ -40,7 +40,14 @@ it bundles.
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
-testing.
+testing, `./install`, which installs every layer this repository owns, and `a2env.sh` /
+`a2env.py`, which say where the game is.
+
+**Never hard-code a path to the game, its prefix or Proton.** Source `a2env.sh` (shell)
+or `import a2env` (Python, with the repository root on `sys.path`): they resolve
+`A2_GAME`, `A2_PREFIX` and `A2_PROTON` from the environment, then
+`~/.config/armada2-remastered.conf`, then Heroic's default location. The private
+repository carries identical copies; keep them in step.
 
 **To see a change working in the game without taking over the user's screen, use the
 test bench**: `./a2test session start --res 21:9`, then `./a2test drive shot` / `click` /
@@ -48,6 +55,11 @@ test bench**: `./a2test session start --res 21:9`, then `./a2test drive shot` / 
 and a headless display. Write regression scenarios in `testbench/scenarios/` for fixes
 worth keeping fixed. A bench pass is evidence for the user, not their sign-off
 ("Finishing work" still applies).
+**To test public and private work together**, stack checkouts:
+`./a2test session start --install <public checkout> --install <private checkout>` (or
+`a2test run ... --install ...`) starts the clone from stock and runs each checkout's
+`./install` into it, in order; the report records each checkout's commit. A private
+worktree installs only what it has built, since `out/` and the plates are gitignored.
 
 Required reading, by task:
 
@@ -123,7 +135,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 
 ## Environment
 
-- Game: `/home/cedric/Games/Heroic/Star Trek Armada II` — GOG release, patch 1.1 plus
+- Game: `$A2_GAME` (`./a2env.sh` prints it; here, Heroic's `~/Games/Heroic/Star Trek Armada II`) — GOG release, patch 1.1 plus
   Patch Project 1.2.5, run through Heroic with Proton-CachyOS.
 - Textures: `Textures/RGB/`, flat, **2115 `.tga` files, 196 MB stock**, **mixed
   `.tga` / `.TGA` case**. (196 MB is the byte total; `du` says 205 MB, because 2115
@@ -243,8 +255,8 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   bigger BMP cannot help: `stretch(frame) + w·(plate − stretch(stock))`. A weight, not a
   mask, because `MainBk_flare.bik` *is* the logo band with the background baked in.
   Plates come from `menus/backdrop.sh` in the private repository (`menus/BACKDROPS.md`
-  there has `field=`, `clone=`, `keep=`, `fade=`, `dehaze=` and the paid seeds);
-  `install.sh` reads them from there. `N.soften=` is a `Menus.ini` key, documented in
+  there has `field=`, `clone=`, `keep=`, `fade=`, `dehaze=` and the paid seeds), and
+  its `./install` puts them in the game's `Menus/`; `menus/install.sh` leaves them be. `N.soften=` is a `Menus.ini` key, documented in
   `menus/README.md`.
 
 ### msaa, postfx, platform

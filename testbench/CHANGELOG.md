@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.8.0 — 2026-09-27
+
+### Added
+- `--install PATH`, repeatable, on `session start` and `run`: the clone starts from
+  stock (`a2mod stock`), then each `PATH/install` runs into it in order, so public and
+  private checkouts can be tested together without touching the real install. The
+  session log records each checkout's commit (`installs=`, `-dirty` if uncommitted).
+
+### Changed
+- The game, prefix and Proton come from `a2env.py`.
+
+Checked: public and private worktrees stacked, launched to the main menu at 16:9.
+
 ## 1.7.0 — 2026-09-26
 
 ### Added

@@ -143,7 +143,9 @@ ui-widescreen.py, which owns its own backups in misc/.
 """
 import argparse, os, re, shutil, subprocess, sys
 
-GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import a2env  # noqa: E402  (the repository root, for where the game is)
+GAME = a2env.GAME
 BAK = '.a2font-backup'
 # The tier the glyph quads are scaled against.  Measured, not documented anywhere --
 # see "WHY 1280x1024 AND NOT 1600x1200" above.

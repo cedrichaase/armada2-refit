@@ -26,8 +26,8 @@ ASI Loader (MIT), vkBasalt (zlib), crosire's reshade-shaders (per-file), the
 `STA2WidescreenPatch`, Patch Project 1.2.5 — is not in the repository either. A release
 package may bundle the first four with their notices, and links to the last two.
 
-`a2mod` still switches the `textures`, `models` and `cutscenes` layers, and
-`menus/install.sh` installs the backdrop plates from the private repository: it works on the game
+`a2mod` still switches the `textures`, `models` and `cutscenes` layers, and the
+private repository's `./install` puts the backdrop plates in `Menus/`: it works on the game
 directory only (`.a2neb-backup` files, `$GAME/.a2mod/`) and needs none of their source or art.
 
 ### How it is enforced
@@ -67,8 +67,6 @@ stock textures and every archive plate. On 2026-09-26:
   a `THIRD-PARTY.md` naming what a release bundles.
 - **The author email** is on every commit. If it should not be public, rewrite it with
   a mailmap before the first push — after that, it is too late.
-- **Hard-coded paths.** Many scripts name `/home/cedric/...`, mostly as a default game
-  directory. They should all read `A2_GAME` before anyone else can run the tooling.
 - **`CLAUDE.md`** is the working brief for agent sessions. It publishes fine; decide
   whether it should.
 

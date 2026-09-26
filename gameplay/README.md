@@ -284,7 +284,7 @@ value.
 ### Changing one
 
 ```sh
-cd "/home/cedric/Games/Heroic/Star Trek Armada II/missions"
+. ./a2env.sh; cd "$A2_GAME/missions"
 f=a2_borg06S.dsl; off=0x9b19; new=6000
 [ -e "$f.a2neb-backup" ] || cp -p "$f" "$f.a2neb-backup"
 python3 - "$f" "$off" "$new" <<'EOF'

@@ -308,9 +308,9 @@ plate: `mainbkgr` (the main menu) and `singleplay` (campaign selection). The pla
 are the game's own art, upscaled and outpainted, so their recipe and pipeline
 (`backdrop.sh`, the `backdrops/*.conf` keys `field=`, `clone=`, `keep=`, `fade=`,
 `dehaze=`, and the paid seeds) live in the private repository, in
-`menus/BACKDROPS.md`. `install.sh` takes the built plates from there
-(`A2_BACKDROPS` overrides the path) and copies each to `Menus/`; `a2mod` moves them
-with the rest of the menus layer.
+`menus/BACKDROPS.md`. Its `./install` copies each built plate to `Menus/`, which
+`install.sh` here leaves alone and `--remove` clears; `a2mod` moves them with the rest
+of the menus layer.
 
 **Glows cut off by their own rectangle (`N.soften=`).** Hovering Tutorials plays
 `single/TutorialGlow.bik`, 320x200 at (28,20). It has the background baked in, and

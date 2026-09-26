@@ -21,7 +21,8 @@
 # of that build's d3d9.dll -- see --verify-keys.
 set -euo pipefail
 
-GAME="${A2_GAME:-${A2_GAME_DIR:-/home/cedric/Games/Heroic/Star Trek Armada II}}"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
+GAME="$A2_GAME"
 CONF="$GAME/dxvk.conf"
 # A fixed identifier, not a path: installed dxvk.conf files carry it, and it is how
 # this script recognises its own file.  It predates the move to postfx/; keep it.

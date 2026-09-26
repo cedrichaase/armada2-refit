@@ -4,6 +4,15 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`README.md`](README.md).
 
+## 1.0.1 — 2026-09-27
+
+### Changed
+- `install.sh` find the game through `a2env.sh` / `a2env.py` (`A2_GAME`, then
+  `~/.config/armada2-remastered.conf`, then Heroic's default) instead of a hard-coded
+  path.
+
+Installs nothing different; nothing to see in game.
+
 ## 1.0.0 — 2026-09-25
 
 Baseline: the first versioned release.

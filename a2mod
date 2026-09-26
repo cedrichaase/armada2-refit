@@ -63,7 +63,8 @@ import subprocess
 import sys
 import time
 
-GAME = os.environ.get('A2_GAME', '/home/cedric/Games/Heroic/Star Trek Armada II')
+import a2env  # noqa: E402  (beside this script: where the game is)
+GAME = a2env.GAME
 STORE = os.path.join(GAME, '.a2mod')
 SNAP = os.path.join(STORE, 'remastered')
 STATE = os.path.join(STORE, 'state.json')
