@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.4.1 — 2026-09-26
+
+Layers: testbench 1.2.1.
+
+### Changed
+- The test bench judges on Sonnet by default (see `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
 ## 3.4.0 — 2026-09-26
 
 Layers: testbench 1.2.0.

@@ -152,7 +152,7 @@ assertion reads the screenshot and the same-named reference shot, and returns pa
 fail or inconclusive, with its reasoning and cost in the report. An agent step drives
 the live session through `a2test drive` until it reports done or failed; every command
 it runs is logged like any other. `--no-claude` turns judged steps into REVIEW, left
-for a person, and makes agent steps fail. `A2TEST_MODEL` picks the model. The judge
+for a person, and makes agent steps fail. The model is **Sonnet** (`--model sonnet`) for judged and agent steps alike. `A2TEST_MODEL` picks another, and `A2TEST_MODEL=` (empty) leaves it to the `claude` CLI's default. The judge
 prompt carries a short brief of what is *supposed* to look odd (pillarbox areas, fog of
 war, the 21:9-tuned font). Add to it when it flags something known.
 
@@ -176,20 +176,18 @@ separate and needs opencv.
 
 Not built yet. Each is recorded with what is known so far.
 
-**A cheaper model for judged steps.** With no `A2TEST_MODEL` the judge takes the
-`claude` CLI's default, which is Opus here: $0.11–0.21 per judged step, about 50 so far.
-Most assertions never reach a model (OCR, the stretch measurement, bars, logs), so this
-is only the layout judgments and agent steps. Sonnet is the candidate. Haiku was
-considered, but the judgments that matter are fine ones: a panel a few percent off, or a
-small copy of the log in a corner. A false pass there costs more than the tokens saved.
-Before switching:
+**Sonnet, checked against Opus.** The judge ran on Opus until testbench 1.2.1 (the
+CLI's default here, $0.11–0.21 per judged step, about 50 steps by then) and now runs on
+Sonnet. Haiku was considered, but the judgments that matter are fine ones: a panel a few
+percent off, or a small copy of the log in a corner. A false pass there costs more than
+the tokens saved. Still open:
 
-- Re-judge stored shots from past runs with `A2TEST_MODEL=sonnet` and compare the
-  verdicts with Opus's, including the known failures (stretched HUD at 16:9 and wider,
-  pillarbox bars). A way to re-judge without launching the game may need adding.
+- Re-judge stored shots from past Opus runs with Sonnet and compare the verdicts,
+  including the known failures (stretched HUD at 16:9 and wider, pillarbox bars). A way
+  to re-judge without launching the game may need adding.
 - Agent steps (many turns of reading the screen and clicking, where a slip costs a
-  two-minute launch) may want to stay on the stronger model. That needs a second
-  variable, e.g. `A2TEST_AGENT_MODEL`, since `A2TEST_MODEL` sets both today.
+  two-minute launch) may want the stronger model back. That needs a second variable,
+  e.g. `A2TEST_AGENT_MODEL`, since `A2TEST_MODEL` sets both today.
 - Unmeasured: how much of each call's cost is the `claude` CLI's own start-up context
-  rather than the judgment. If it is most of it, a model switch saves less than list
-  prices suggest.
+  rather than the judgment. If it is most of it, the switch saves less than list prices
+  suggest.

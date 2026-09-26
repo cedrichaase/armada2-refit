@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.2.1 — 2026-09-26
+
+### Changed
+- Judged and agent steps run on Sonnet by default (`--model sonnet`), not the `claude`
+  CLI's default (Opus here). `A2TEST_MODEL` still overrides it; empty restores the CLI's.
+
+Installs nothing into the game. Not yet signed off.
+
 ## 1.2.0 — 2026-09-26
 
 ### Added
