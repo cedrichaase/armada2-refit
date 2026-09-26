@@ -7,6 +7,12 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 ## 1.8.1 — 2026-09-27
 
+### Fixed
+- A stacked private `./install` finds its builds: the session passes the real
+  `A2_DATA` through, resolved before it points `XDG_DATA_HOME` at its own scratch
+  directory (which `A2_DATA`'s default hangs off). Without it every private layer
+  reported "not built" and the clone stayed stock.
+
 ### Changed
 - `README.md`'s stacked-install example uses the sibling checkouts, `.` and
   `../armada2-remastered-private`. A private worktree now installs the same builds as
