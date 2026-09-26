@@ -587,7 +587,8 @@ class Case:
                 stop = self.opts.get('stop')
                 if stop is not None and stop.is_set():
                     aborted = 'the run was interrupted'
-                    self.results.append(dict(n=i, text=text, status='skip', detail=aborted))
+                    # an error, not a skip: a case cut short must not read as PASS
+                    self.results.append(dict(n=i, text=text, status='error', detail=aborted))
                     continue
                 if time.time() - t0 > self.scn.timeout:
                     aborted = f'scenario timeout ({self.scn.timeout}s)'

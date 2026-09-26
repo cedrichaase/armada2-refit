@@ -21,9 +21,11 @@ Installs nothing into the game. Not yet signed off.
   Ctrl-C / SIGTERM stops every running game and waits for its teardown.
 
 ### Fixed
-- Silent runs: `winepipewire.drv` (Proton-CachyOS's PipeWire driver, which this
-  prefix uses) is disabled too, the clone's `user.reg` gets `Audio=""`, and a watchdog
-  mutes and stops the game if a stream of the session's appears at any point in a case.
+- Silent runs: the game gets a per-session null sink as Wine's default output
+  (`DefaultOutput` in the clone's registry) instead of losing its audio drivers, since
+  it crashes at start-up without a device. A `pactl subscribe` watchdog moves, mutes
+  and stops any stream of the session's that lands elsewhere.
+- A case cut short by Ctrl-C/SIGTERM is an error, not a PASS.
 - Session ids gain a per-process counter (timestamp and pid collide across threads);
   VNC ports are claimed under a lock; `a2input` is built once before any case starts.
 

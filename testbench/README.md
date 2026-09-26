@@ -58,21 +58,22 @@ anything new in the game's `Logs/`.
 
 ## Traps, each measured here
 
-- **A run must be silent, and `PULSE_SINK` does not make it so.** The first version
-  pointed `PULSE_SINK` at a private null sink and never checked it. winepulse ignores
-  it: it connects every stream to the device it chooses itself (the server's default).
-  The user heard the menu music and the Borg cutscene through their speakers during
-  runs they could not see. Disabling `winepulse.drv` and `winealsa.drv` was not enough
-  either: Proton-CachyOS ships **`winepipewire.drv`**, and this prefix uses it (its
-  devices are under `Software\\Wine\\Drivers\\winepipewire.drv` in `user.reg`). The
-  stock reference case played the menu music through it. So, unless `--audio`:
-  every Wine audio driver is disabled in `WINEDLLOVERRIDES`, the clone's `user.reg`
-  gets `Audio=""` (what `winetricks sound=disabled` sets), and a watchdog checks
-  `pactl list sink-inputs` every 0.25 s for the whole case. It matches the session's
-  pids and an `a2test.session` marker (`PULSE_PROP`/`PIPEWIRE_PROPS`), because under
-  umu's container the pids may not match the host's. A stream is muted at once, the game
-  is stopped, and the case fails.
-
+- **A run must be silent, and three obvious ways to do it fail.** Each was measured.
+  `PULSE_SINK` at a null sink: winepulse ignores it and plays to the server's default,
+  and the user heard the menu music and the Borg cutscene. Disabling `winepulse.drv` and
+  `winealsa.drv`: Proton-CachyOS's **`winepipewire.drv`**, which this prefix uses, played
+  the stock case's menu music. Disabling every driver (or `Audio=""`): Armada2.exe dies at
+  start-up without an audio device (`virtual_setup_exception stack overflow`). What works:
+  each session loads its own null sink on the real server (`a2test-<session>`, unloaded in
+  teardown). In the clone's `user.reg` it is pre-registered under a GUID of ours
+  (`Drivers\\<drv>\\devices\\0,<sink>`) and named as `DefaultOutput` and
+  `DefaultVoiceOutput` for `winepipewire.drv` and `winepulse.drv`. mmdevapi reads those
+  as `{0.0.0.00000000}.{GUID}`. A watchdog follows `pactl subscribe` for the whole case.
+  It recognises the game's streams by pid (host or container, from `NSpid`), by an
+  `a2test.session` marker, or by their being on the null sink. It logs where the audio
+  went, and any stream of ours elsewhere is moved to the null sink, muted, and the game
+  stopped. The last part is tested with a marked stream at volume 0. The first real
+  launch after this change is what shows the routing itself works.
 - **XTest input does not work.** In headless sway the seat has no devices. `xdotool`
   moves Xwayland's core pointer, and Wine even logs the `ButtonPress`, but the frame
   stays pixel-identical: with no keyboard on the seat nothing holds focus, and no

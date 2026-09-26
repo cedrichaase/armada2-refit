@@ -24,6 +24,7 @@ import shutil
 import signal
 import subprocess
 import threading
+import uuid
 import time
 from pathlib import Path
 
@@ -414,18 +415,20 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             env.update(ENABLE_VKBASALT='1', VKBASALT_CONFIG_FILE=str(vkconf),
                        VKBASALT_LOG_FILE=str(logs / 'vkBasalt.log'), VKBASALT_LOG_LEVEL='info')
         if not self.s['audio']:
-            # Silence by having no audio driver at all.  PULSE_SINK at a private null
-            # sink was tried first and does NOT work: winepulse connects each stream to
-            # the device it picks itself (the server default), and the user heard the
-            # menu music and the Borg cutscene through their speakers.  With the drivers
-            # disabled the game never opens a stream; assert_silent() checks that.
-            # Proton-CachyOS also ships winepipewire.drv, a native PipeWire driver, and the
-            # prefix uses it: disabling only pulse and alsa let the stock reference case
-            # play the menu music (2026-09-26).  So every driver is disabled, the prefix's
-            # own driver list is emptied (what `winetricks sound=disabled` does), and a
-            # watchdog mutes and stops the game if a stream appears anyway.
-            env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';' + ';'.join(f'{d}=d' for d in AUDIO_DRIVERS)
-            set_reg_value(self.prefix_dir / 'pfx' / 'user.reg', r'Software\\Wine\\Drivers', 'Audio', '')
+            # Silence by giving the game a device that plays nowhere.  History, all measured:
+            # - PULSE_SINK at a null sink: winepulse ignores it and uses the server default;
+            #   the user heard the menu music and the Borg cutscene.
+            # - Disabling winepulse and winealsa: Proton-CachyOS's winepipewire.drv, which
+            #   this prefix uses, still played the menu music (2026-09-26).
+            # - Disabling every driver: Armada2.exe dies at start-up without an audio
+            #   device (`virtual_setup_exception stack overflow`, every case).
+            # So: a null sink of this session's on the real server, pre-registered in the
+            # clone's registry under our own GUID and made Wine's default output
+            # (mmdevapi reads Software\Wine\Drivers\<drv>\DefaultOutput).  The watchdog
+            # checks the game's stream lands there and moves it there if not.
+            sink = self.start_null_sink()
+            env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';winealsa.drv=d;wineoss.drv=d'
+            route_wine_audio(self.prefix_dir / 'pfx' / 'user.reg', sink)
         # a marker the watchdog can match whatever pid namespace the game ends up in
         env['PULSE_PROP'] = f'a2test.session={self.s["id"]}'
         env['PIPEWIRE_PROPS'] = f'{{ a2test.session = "{self.s["id"]}" }}'
@@ -451,60 +454,112 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         else:
             raise GameError('Armada2.exe did not appear within 120s; see logs/wine.log')
         self.log.action(f'launched Armada2.exe {args} through umu (pid {self.game_pid()})' +
-                        ('' if self.s['audio'] else ', audio drivers disabled'))
+                        ('' if self.s['audio'] else f', audio to the null sink {self.s["null_sink"]["name"]}'))
         if not self.s['audio']:
-            self.assert_silent()
             threading.Thread(target=self._audio_watchdog, daemon=True).start()
+            self.assert_silent()
 
-    def audio_streams(self):
-        """PipeWire/Pulse playback streams owned by any process of this session."""
+    # ------------------------------------------------------------------ audio
+
+    def start_null_sink(self):
+        """A sink on the real server that plays nowhere, one per session (parallel cases
+        each get their own). Unloaded in teardown."""
+        name = f'a2test-{self.s["id"]}'
+        r = subprocess.run(['pactl', 'load-module', 'module-null-sink', f'sink_name={name}',
+                            f'sink_properties=device.description={name}'],
+                           capture_output=True, text=True)
+        if r.returncode:
+            raise GameError(f'could not create the silent sink: {r.stderr.strip()}')
+        self.s['null_sink'] = dict(name=name, module=int(r.stdout.strip()))
+        self.save()
+        return name
+
+    def stop_null_sink(self):
+        ns = self.s.get('null_sink')
+        if ns:
+            subprocess.run(['pactl', 'unload-module', str(ns['module'])], capture_output=True)
+
+    def _our_pids(self):
+        """This session's processes, by host pid and by their pid inside umu's container
+        (the pid a PipeWire client reports is the one it sees)."""
         pids = set(self.game_pids())
         pids.update(_group_pids(self.s['pids'].get('launcher')))
-        r = subprocess.run(['pactl', '--format=json', 'list', 'sink-inputs'], capture_output=True, text=True)
-        try:
-            items = json.loads(r.stdout or '[]')
-        except json.JSONDecodeError:
-            return []
+        for pid in list(pids):
+            try:
+                for line in Path(f'/proc/{pid}/status').read_text().splitlines():
+                    if line.startswith('NSpid:'):
+                        pids.update(int(x) for x in line.split()[1:])
+            except OSError:
+                pass
+        return pids
+
+    def audio_streams(self):
+        """This session's playback streams: [(index, sink name, label)]."""
+        pids = self._our_pids()
+        sinks = _pactl_json('sinks')
+        names = {it.get('index'): it.get('name') for it in sinks}
         out = []
-        for it in items:
+        for it in _pactl_json('sink-inputs'):
             props = it.get('properties', {})
             try:
                 pid = int(props.get('application.process.id', -1))
             except ValueError:
                 pid = -1
-            if pid in pids or props.get('a2test.session') == self.s['id']:
-                out.append(f'#{it.get("index")} {props.get("application.name", "")} (pid {pid})')
+            sink = names.get(it.get('sink'), '')
+            ns = self.s.get('null_sink') or {}
+            if pid in pids or props.get('a2test.session') == self.s['id'] or sink == ns.get('name'):
+                out.append((it.get('index'), sink, f'#{it.get("index")} {props.get("application.name", "")} '
+                                                    f'(pid {pid}) on {sink}'))
         return out
 
+    def _silence(self):
+        """Move any stream of ours that is not on our null sink onto it, and mute it.
+        Returns the ones that had to be moved: each is a leak."""
+        ns = (self.s.get('null_sink') or {}).get('name')
+        leaks = []
+        for idx, sink, label in self.audio_streams():
+            if sink != ns:
+                subprocess.run(['pactl', 'set-sink-input-mute', str(idx), '1'], capture_output=True)
+                if ns:
+                    subprocess.run(['pactl', 'move-sink-input', str(idx), ns], capture_output=True)
+                leaks.append(label)
+            elif not self.s.get('audio_routed'):
+                self.s['audio_routed'] = label
+                self.log.action(f"the game's audio goes to the silent sink: {label}")
+        return leaks
+
     def _audio_watchdog(self):
-        """For the whole case, not just its first seconds: music starts on later screens
-        too.  Mute first (instant), then stop the game; the next step fails on that."""
-        while self.running():
-            found = self.audio_streams()
-            if found:
-                for f in found:
-                    subprocess.run(['pactl', 'set-sink-input-mute', f.split()[0].lstrip('#'), '1'],
-                                   capture_output=True)
-                self.log.action(f'the game opened an audio stream ({", ".join(found)}): muted it and '
-                                'stopped the game', status='fail')
+        """For the whole case. `pactl subscribe` reports each new stream as it is created,
+        so a stray one is moved and muted within milliseconds; the game is then stopped
+        and the next step fails on it."""
+        sub = subprocess.Popen(['pactl', 'subscribe'], stdout=subprocess.PIPE, text=True,
+                               stderr=subprocess.DEVNULL)
+        self._audio_sub = sub            # teardown kills it: readline() may wait on the next event
+        try:
+            leaks = self._silence()
+            while not leaks and self.running():
+                line = sub.stdout.readline()
+                if not line:
+                    break
+                if 'sink-input' in line and ("'new'" in line or "'change'" in line):
+                    leaks = self._silence()
+            if leaks:
+                self.log.action(f'the game played to a real output ({", ".join(leaks)}): moved to the '
+                                'silent sink, muted, and stopped the game', status='fail')
                 self.stop_game()
-                return
-            time.sleep(0.25)
+        finally:
+            sub.kill()
 
     def assert_silent(self, seconds=6):
-        """The user hears whatever a run plays.  Watch the first seconds, when the menu
-        music starts, and stop everything if a stream of ours appears."""
+        """The first seconds, synchronously, so a leak fails the launch itself."""
         end = time.time() + seconds
         while time.time() < end:
-            found = self.audio_streams()
-            if found:
-                for f in found:
-                    subprocess.run(['pactl', 'set-sink-input-mute', f.split()[0].lstrip('#'), '1'],
-                                   capture_output=True)
+            leaks = self._silence()
+            if leaks:
                 self.stop_game()
-                raise GameError('the game opened an audio stream on the real output '
-                                f'({", ".join(found)}); stopped it at once')
-            time.sleep(0.25)
+                raise GameError(f'the game played to a real output ({", ".join(leaks)}); moved, muted '
+                                'and stopped it')
+            time.sleep(0.1)
 
     def game_pids(self):
         """The game process of THIS session: argv[0] is the Windows path of its
@@ -645,6 +700,10 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             if self.s['pids'].get('launcher') or self.running():
                 self.stop_game()
         finally:
+            sub = getattr(self, '_audio_sub', None)
+            if sub:
+                sub.kill()
+            self.stop_null_sink()
             try:
                 self.collect_logs()
             except Exception as e:  # never let log collection keep a display alive
@@ -685,15 +744,35 @@ def set_prf_resolution(prf, w, h):
     Path(prf).write_bytes(b'\r\n'.join(lines))
 
 
-AUDIO_DRIVERS = ('winepulse.drv', 'winealsa.drv', 'winepipewire.drv', 'wineoss.drv')
+def _pactl_json(what):
+    r = subprocess.run(['pactl', '--format=json', 'list', what], capture_output=True, text=True)
+    try:
+        return json.loads(r.stdout or '[]')
+    except json.JSONDecodeError:
+        return []
 
 
-def set_reg_value(reg, key, name, value):
-    """Set a string value in a Wine .reg file (wineserver not running): `key` as the
-    file spells it, with doubled backslashes."""
+def route_wine_audio(user_reg, sink):
+    """Make `sink` Wine's default output in this prefix. mmdevapi names an endpoint
+    `{0.0.0.00000000}.{GUID}` and keeps each device's GUID under
+    Software\\Wine\\Drivers\\<drv>\\devices\\0,<sink>; pre-registering one of ours lets
+    DefaultOutput name it before Wine has ever seen the sink."""
+    u = uuid.uuid4()
+    endpoint = '{0.0.0.00000000}.{' + str(u).upper() + '}'
+    guid = 'hex:' + ','.join(f'{b:02x}' for b in u.bytes_le)
+    for drv in ('winepipewire.drv', 'winepulse.drv'):
+        base = r'Software\\Wine\\Drivers\\' + drv
+        set_reg_value(user_reg, base + r'\\devices\\0,' + sink, 'guid', guid, raw=True)
+        for name in ('DefaultOutput', 'DefaultVoiceOutput'):
+            set_reg_value(user_reg, base, name, endpoint)
+
+
+def set_reg_value(reg, key, name, value, raw=False):
+    """Set a value in a Wine .reg file (wineserver not running): `key` as the file
+    spells it, with doubled backslashes. A string unless `raw` (e.g. 'hex:01,02')."""
     reg = Path(reg)
     text = reg.read_text(encoding='utf-8', errors='surrogateescape')
-    line = f'"{name}"="{value}"'
+    line = f'"{name}"=' + (value if raw else f'"{value}"')
     m = re.search(r'^\[' + re.escape(key) + r'\][^\n]*\n', text, re.M | re.I)
     if not m:
         text = text.rstrip('\n') + f'\n\n[{key}]\n{line}\n'
@@ -702,7 +781,7 @@ def set_reg_value(reg, key, name, value):
         end = len(text) if end < 0 else end + 1
         body = text[m.end():end]
         rx = re.compile(r'^"' + re.escape(name) + r'"=.*$', re.M | re.I)
-        body = rx.sub(line, body, 1) if rx.search(body) else line + '\n' + body
+        body = rx.sub(lambda _: line, body, 1) if rx.search(body) else line + '\n' + body
         text = text[:m.end()] + body + text[end:]
     reg.write_text(text, encoding='utf-8', errors='surrogateescape')
 
