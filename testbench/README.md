@@ -141,10 +141,12 @@ that OCR locates in the reference. `stock-control.md` is the control that shows 
 measurement can fail.
 
 **What the reference is.** For the HUD, cursors and font the baseline is **stock at
-4:3**: the shape the original game drew them in. Remastered 4:3 is not a baseline,
-because the mod changes things at 4:3 too (the font is condensed at every resolution),
-and a comparison against it would pass anything the mod gets consistently wrong.
-`hud.md` says `Reference: 4:3 stock`.
+800x600**: the shape and resolution the original game was designed for. Remastered 4:3
+is not a baseline, because the mod changes things at 4:3 too (the font is condensed at
+every resolution), and a comparison against it would pass anything the mod gets
+consistently wrong. At 800x600 the front end's own 800x600 mode fills the screen, so
+clicks map 1:1 and the game quits through its menus. At 1600x1200, stock did neither.
+`hud.md` says `Reference: 800x600 stock` and `Stock shell: embed`.
 
 ## Judged and agent steps
 
