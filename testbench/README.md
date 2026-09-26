@@ -115,6 +115,13 @@ anything new in the game's `Logs/`.
   (the comparison above) finished 18 of 1720 reads in ten minutes; with
   `OMP_THREAD_LIMIT=1` each, twelve in parallel finished all 1720.
   Set it for anything that runs tesseract in parallel.
+- **In a mission the game hides its own cursor, and the bench cannot yet get it back.**
+  Right after the briefing appears, a pointer move draws the arrow where it was sent
+  (a direct `move 60 400` drew it at 62,403 at 1600x1200). After a longer glide across
+  the screen it vanished and stayed gone through further absolute moves, relative
+  moves (`zwlr_virtual_pointer_v1_motion`) and a click, while the game kept rendering
+  -- in stock too, so not `HUD.asi`. A cursor check must first prove the arrow is in
+  its frame: 1.5.1's matched empty background against empty background and "passed".
 - **OCR boxes cannot measure shape.** The same word's box came back 28 px tall in one
   tesseract pass and 36 in another: a phantom 30% stretch. Text is only *located* by OCR in the
   reference shot. Its shape is measured by the template match, like any patch.

@@ -13,6 +13,9 @@ Layers: testbench 1.6.0.
 - The test bench reads the screen with a scene-text model (PP-OCR) instead of
   tesseract (see `testbench/CHANGELOG.md`).
 
+### Removed
+- The bench's cursor check from 4.0.1: it never saw the cursor (`testbench/CHANGELOG.md`).
+
 Installs nothing into the game. Not yet signed off.
 
 ## 4.0.1 — 2026-09-26

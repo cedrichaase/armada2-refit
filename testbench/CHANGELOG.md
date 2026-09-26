@@ -16,6 +16,10 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Removed
 - tesseract, and with it the 2x second look of 1.5.1 (`vision.retry_scale`,
   `find_text_in`) and `ocr(scale=, fast=)`. tesseract is no longer a requirement.
+- `hud.md`'s cursor check (1.5.1). It never measured the cursor: the game had hidden
+  its pointer by the time of the shot, in stock as well, so its 0.96–1.00 "passes"
+  were the empty background matching itself. Why the pointer disappears is open
+  (`README.md`).
 
 Installs nothing into the game. Not yet signed off.
 
