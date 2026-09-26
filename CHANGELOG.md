@@ -16,7 +16,7 @@ Layers: testbench 1.6.0.
 ### Removed
 - The bench's cursor check from 4.0.1: it never saw the cursor (`testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 4.0.1 — 2026-09-26
 
@@ -28,7 +28,7 @@ Layers: hud 2.0.1, testbench 1.5.1.
 - `a2mod` counts the game as running only if it runs from its own game directory, so
   the test bench can switch a clone to stock while the real game is open.
 
-Not installed yet, not yet seen in game.
+Confirmed in game 2026-09-26.
 
 ## 4.0.0 — 2026-09-26
 

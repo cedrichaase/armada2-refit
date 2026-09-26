@@ -21,7 +21,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   were the empty background matching itself. Why the pointer disappears is open
   (`README.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 1.5.1 — 2026-09-26
 
@@ -34,7 +34,7 @@ Installs nothing into the game. Not yet signed off.
   (`vision.retry_scale`): at 3440x1440 the mission list's "Werewolf Pack" read as
   "B er If Pack" twice in a row.
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 1.5.0 — 2026-09-26
 

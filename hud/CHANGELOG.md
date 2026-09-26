@@ -12,7 +12,7 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
   synchronous path, `RefreshDisplay`), which 2.0.0 did not reach: `HUD.asi` now wraps
   that draw (`0x6246fa`) with a square scale and a hotspot-preserving position.
 
-Not installed yet, not yet seen in game.
+Confirmed in game 2026-09-26.
 
 ## 2.0.0 — 2026-09-26
 
