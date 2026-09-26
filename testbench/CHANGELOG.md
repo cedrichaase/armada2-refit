@@ -26,6 +26,9 @@ Installs nothing into the game. Not yet signed off.
   it crashes at start-up without a device. A `pactl subscribe` watchdog moves, mutes
   and stops any stream of the session's that lands elsewhere.
 - A case cut short by Ctrl-C/SIGTERM is an error, not a PASS.
+- Prepare reverts the HUD layout and cursors before applying a resolution. At 4:3 both
+  scripts do nothing, so a 4:3 case measured the install's 21:9 layout (HUD 0.56x).
+- `hud.md` measures against stock at **800x600**; OCR reads frames up to 700 px at 4x.
 - A comparison with no baseline (the reference case failed or never ran) is SKIP with
   the reason, not inconclusive; judged comparisons likewise, not judged blind.
 - `Stock shell: embed` (scenario header): stock cases keep `Menus.asi` with `Embed=1`

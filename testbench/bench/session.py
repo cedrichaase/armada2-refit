@@ -182,7 +182,12 @@ class Session:
         else:
             # The three layers that are built for one resolution.  Each rebuilds from its
             # own stock backups, so running them at any resolution is safe on the clone.
-            steps = [[str(config.REPO / 'hud/ui-widescreen.py'), '--res', f'{w}x{h}'],
+            # --revert first: at 4:3 both scripts print "nothing to do" and leave whatever
+            # the install carries -- here the user's 21:9 layout, a canvas 2867 wide, which
+            # measured as a HUD 0.56x as wide as stock at 4:3 (2026-09-26)
+            steps = [[str(config.REPO / 'hud/ui-widescreen.py'), '--revert'],
+                     [str(config.REPO / 'hud/ui-widescreen.py'), '--res', f'{w}x{h}'],
+                     [str(config.REPO / 'hud/cursor-aspect.py'), '--revert'],
                      [str(config.REPO / 'hud/cursor-aspect.py'), '--res', f'{w}x{h}'],
                      [str(config.REPO / 'font/ui-font-condense.py'), '--res', f'{w}x{h}']]
         with open(plog, 'a') as f:
