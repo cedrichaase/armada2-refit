@@ -70,6 +70,12 @@ stock reference is then a case of its own (`1600x1200-stock` in the results), ru
 first. The scenario's own 4:3 case runs as well and is measured against it rather than
 skipped. In a reference-only case, judged steps are SKIP; it only supplies screenshots.
 
+If the reference case fails before it takes the shot, the comparisons that needed it
+are SKIP too, and each one says why ("the stock 4:3 reference case failed at step 6").
+A missing baseline is the reference case's failure, not an unclear result in this case.
+Judged steps that ask for a comparison are skipped the same way rather than sent to the
+judge with nothing to compare against.
+
 ## Judged and delegated steps
 
 - **`Check that …` / `Verify …` / `Make sure …`** that is none of the above is *judged*:

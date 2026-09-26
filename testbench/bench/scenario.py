@@ -432,7 +432,7 @@ def s_text_stretch(c, m):
         return c.reference_itself(ref)
     ref_case, ref_shot, path = c.reference_pair(ref)
     if ref_shot is None:
-        return c.no_reference(ref_case)
+        return c.no_reference(ref)
     phrase = m.group('text')
     a = vision.find_text(vision.ocr(ref_shot), phrase)
     if not a:
@@ -467,7 +467,7 @@ def s_stretch(c, m):
         return c.reference_itself(ref)
     ref_case, ref_shot, path = c.reference_pair(ref, m.group('shot'))
     if ref_shot is None:
-        return c.no_reference(ref_case)
+        return c.no_reference(ref)
     region = tuple(int(m.group(k)) for k in 'xywh') if m.group('x') else None
     r = vision.measure_stretch(ref_shot, path, region)
     if r['score'] < 0.5:
@@ -776,9 +776,24 @@ class Case:
                                    [], how='comparison with the reference')
 
     def no_reference(self, ref):
-        return self.checked(None, f'no {ref} reference shot to compare with -- run the {ref} case of this '
-                                  f'scenario first (a2test run adds it automatically)',
-                            how='comparison with the reference')
+        """No reference shot: SKIP, not inconclusive. Nothing is wrong with this case; the
+        baseline was never taken, and the reference case's own result says why."""
+        return self.checked_status('skip', self.why_no_reference(ref), [], how='comparison with the reference')
+
+    def why_no_reference(self, ref):
+        label = ref_label(ref)
+        ref_dir = self.reference_dirs.get(ref)
+        if ref_dir is None:
+            return f'no {label} reference case ran in this run, so there is nothing to compare with'
+        try:
+            r = json.loads((Path(ref_dir) / 'result.json').read_text())
+        except (OSError, ValueError):
+            return f'the {label} reference case left no result, so there is nothing to compare with'
+        bad = next((x for x in r.get('steps', []) if x.get('status') in ('fail', 'error')), None)
+        if bad:
+            return (f'the {label} reference case failed at step {bad.get("n")} ({bad.get("text")}), so '
+                    'there is no baseline to compare with')
+        return f'the {label} reference case took no shot of this name, so there is nothing to compare with'
 
     def judge_step(self, what):
         path = self.sess.last_shot()
@@ -799,8 +814,8 @@ class Case:
         if len(images) == 1 and re.search(r'\breference\b|compared (?:with|to)', what, re.I):
             # asked to compare, with nothing to compare against: a judge left alone here
             # judges against its own idea of the baseline, and passes (seen with Sonnet)
-            return self.checked_status('inconclusive', f'no {ref_label(ref)} reference shot to compare with',
-                                       [p for _, p in images], how='comparison with the reference')
+            return self.checked_status('skip', self.why_no_reference(ref), [p for _, p in images],
+                                       how='comparison with the reference')
         if self.opts.get('no_claude') or not judge.available():
             return self.checked_status('review', 'left for a person to judge from the screenshot(s)',
                                        [p for _, p in images], how='human review (no Claude)')

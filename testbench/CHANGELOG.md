@@ -26,6 +26,10 @@ Installs nothing into the game. Not yet signed off.
   it crashes at start-up without a device. A `pactl subscribe` watchdog moves, mutes
   and stops any stream of the session's that lands elsewhere.
 - A case cut short by Ctrl-C/SIGTERM is an error, not a PASS.
+- A comparison with no baseline (the reference case failed or never ran) is SKIP with
+  the reason, not inconclusive; judged comparisons likewise, not judged blind.
+- The audio watchdog ignores streams not yet linked to a sink and treats every
+  `a2test-` null sink as silent (a false alarm stopped a case).
 - Session ids gain a per-process counter (timestamp and pid collide across threads);
   VNC ports are claimed under a lock; `a2input` is built once before any case starts.
 
