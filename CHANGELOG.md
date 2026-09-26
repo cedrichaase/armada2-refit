@@ -16,7 +16,7 @@ Layers: hud 2.0.0, testbench 1.5.0.
   entries as `hud`. MAJOR: a layer name is gone and `hud` now needs the ASI loader.
 - The test bench installs `HUD.asi` once for every case (see `testbench/CHANGELOG.md`).
 
-Not installed yet, not yet seen in game.
+Confirmed in game 2026-09-26.
 
 ## 3.6.0 — 2026-09-26
 
@@ -26,7 +26,7 @@ Layers: testbench 1.4.0.
 - The test bench's HUD scenario accepts the condensed font within ±10% of stock (see
   `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.5.0 — 2026-09-26
 
@@ -37,7 +37,7 @@ Layers: testbench 1.3.0.
   through a per-session null sink, and can drive the stock menus (see
   `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.4.1 — 2026-09-26
 
@@ -46,7 +46,7 @@ Layers: testbench 1.2.1.
 ### Changed
 - The test bench judges on Sonnet by default (see `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.4.0 — 2026-09-26
 
@@ -56,7 +56,7 @@ Layers: testbench 1.2.0.
 - `a2test run --jobs N`: cases run in parallel, three games at once by default (see
   `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.3.0 — 2026-09-26
 
@@ -66,7 +66,7 @@ Layers: testbench 1.1.0.
 - The test bench measures the HUD and font against stock 4:3 rather than remastered
   4:3 (see `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet run.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.2.0 — 2026-09-25
 
@@ -77,7 +77,7 @@ Layers: testbench 1.0.0 (new).
   the install, driven by plain-text scenarios, with a screenshot-and-log report per run
   (see `testbench/CHANGELOG.md`).
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 3.1.0 — 2026-09-25
 

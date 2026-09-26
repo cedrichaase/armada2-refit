@@ -24,8 +24,7 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
 - The file-based scripts are no longer what installs; they remain as the derivation and
   as the `--revert` that `install.sh` runs.
 
-Not installed yet, not yet seen in game. The map-plane cursor path is unconfirmed (see
-`README.md`).
+Confirmed in game 2026-09-26.
 
 ## 1.0.0 — 2026-09-25
 
