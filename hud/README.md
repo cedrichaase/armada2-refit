@@ -28,6 +28,7 @@ detail; this is the map.
 |---|---|---|
 | **Canvas and palette** | the two `ParameterDB` constructors' calls to `mLoad` (`0x53414c`, `0x5341b4`) | After a DB loads, if it holds `infoPanelArea` it is the GUI one (`gui_<race>.cfg` includes `gui_interface.cfg`, which includes `gui_glob16x12.cfg`). Its declared canvas width at `+0x2c` becomes `round(1200·W/H)`, and the anchored panel and palette values get exactly `ui-widescreen.py`'s edit, in memory. |
 | **Font** | `FontNewScreenWidth`'s one caller, `SetActiveDisplay_Internal` (`0x62c5d7`), and `FontInit` (`0x48440c`) | `ST3D_Font+0x28`, the horizontal scale, becomes `+0x2c · 1.25·H/W` for the three MetaFonts. Glyph quad, pen advance, line width and word-wrap all multiply by `+0x28`, so this condenses glyphs and spacing together — what the file condense did by editing every `.spr` width. |
+| **Seams** | `ST3D_Sprite::DrawScaled2D`'s snap block (`0x63aeca`), and `ParameterDB::Get(DBRectangle)`'s entry (`0x5358f0`) | A snapped sprite's far edge is snapped like its near one, so tiles meet; a rect's width and height are taken from its converted far edge. See "Seams between tiles". |
 | **Cursors** | `RefreshDisplay`'s `DrawScaled2D` call (`0x6246fa`), and `SetCursor` (`0x625dd9`) | Under DXVK the cursor is the *synchronous* one: the engine draws the sprite itself each frame, after `SetScaleFactor2D(&device+0x18)` = W/800 by H/600. For that one draw the x scale becomes the y scale and the position is re-expressed so the hotspot stays on the pointer; the scale is put back after. The hardware path, if a setup ever takes it, gets `fmuls 0x18(%esi)` → `fmuls 0x1c(%esi)` in `SetCursor`. |
 
 What was established to get there, so it need not be re-derived:
@@ -65,6 +66,48 @@ What it does differently from the files, on purpose: the font's glyph art stays 
 and is drawn narrower, instead of being resampled to fewer texels and point-sampled back
 up. At 3440x1440 that is 1.41 screen px per texel on both axes rather than 2.69 across,
 so the text keeps every stock texel. Judge it in game (see "The font").
+
+## Seams between tiles
+
+Faint lines ran through the briefing panel (a 5x4 grid of 256x256 `uiObjectives`
+sprites, drawn by `StandardBackground`) at every aspect but 4:3, and along the joins
+of HUD panels built from pieces: the 3D view showing through a 1–2 px gap between
+two quads. The textures were not it: stock and remastered tiles match their
+neighbours across every edge to within 2–3 levels, the same as any two interior
+columns. Measured by replacing the tiles in a bench clone with a flat red/green
+checkerboard with each edge texel marked, MSAA off: at 16:10 every tile drew 255 px
+wide, starting at 352, 608, 865, 1120 and 1376 — gaps at 607, 863–864 and 1375.
+
+Two roundings in the engine, each harmless alone at a whole-number scale:
+
+- **`DrawScaled2D` snaps the position but not the size.** With sprite flag `0x80`
+  (set on UI sprites) it moves x and y to `floor(v) + 0.25` screen px and keeps the
+  unsnapped width. D3D9 pixel centres are at integers, so a quad covers pixels
+  `floor(x) + 1` through `floor(x + w)`, and one ending at `x + w` short of the next
+  tile's snapped start leaves a column uncovered. At 16:10 a 213-unit rect is 255.6 px:
+  tile 0 at 351.6 covers 352–606, tile 1 starts at 608. This is stock behaviour at any
+  mode where W/1600 or H/1200 is fractional, 1024x768 included; 800x600 (0.5) and
+  1600x1200 (1.0) never show it.
+- **`Get(DBRectangle)` rounds x, y, w and h separately** when it converts a rect from
+  the declared canvas into the 1600x1200 space (the conversion is `mConvertRectangle`
+  inlined, `floor(v · (1600/canvas) + 0.5)` each). At a 1920 canvas, 256 wide at 512
+  converts to x 427 and w 213, ending at 640 where the next tile starts at 640 — but
+  256 at 256 gives 213 + 213 = 426 against the next tile's 427. That unit is the second
+  pixel of the 863–864 gap. Only a canvas other than 1600x1200 converts, so this one
+  exists only because `HUD.asi` re-declares the canvas.
+
+`HUD.asi` snaps the far edge the same way as the near one and draws the quad between
+them, and takes a rect's w and h as the converted far edge minus the converted near one.
+x and y are converted exactly as the engine does (the original function runs with the
+canvas set to stock, and the conversion is reproduced, scale rounded to float first),
+so they are bit-identical to stock and w and h move by at most one unit. After it, the
+test pattern's edge texels abut at every join at 16:10 and 16:9, both axes; the bench's
+count of 1-px vertical lines in the briefing screenshot fell by 24–42 at each wide aspect (214 → 177 at 16:9), and 4:3 is
+unchanged. `Seams=0` in `HUD.ini` turns it off.
+
+Not seams, and left alone: the faint olive grid behind the briefing text in stock is the
+map grid showing through the panel, whose alpha is 217; the white bracket and lines in
+the minimap are the camera's view outline.
 
 ## The layout canvas: where the UI stretch comes from
 

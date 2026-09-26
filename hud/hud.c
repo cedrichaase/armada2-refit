@@ -79,6 +79,28 @@
  *
  * [dev+0x18] itself is never changed -- it also maps cursor positions.
  *
+ * 4. SEAMS -- tiled panels drawn edge to edge
+ * --------------------------------------------
+ * A panel such as the briefing is a grid of 256x256 sprites (StandardBackground,
+ * 0x50a820), and two roundings in the engine open 1-2 px gaps between them
+ * wherever a scale is not a whole number -- the 3D view shows through.
+ *
+ * ST3D_Sprite::DrawScaled2D (0x63ada0) snaps a sprite's position to
+ * floor(v) + 0.25 screen px when its flag 0x80 is set (0x63aeca), but keeps the
+ * unsnapped width, so each quad loses up to 1 px on its right and bottom.  That
+ * block becomes a call that snaps the far edge the same way and sets the width
+ * to the distance between the two snapped edges: neighbours then share an edge.
+ * Stock has this at any non-integer 2D scale (1024x768 included); it is invisible
+ * only where W/1600 and H/1200 give whole pixels.
+ *
+ * Get(DBRectangle) (0x5358f0) converts x, y, w and h into the 1600 space each
+ * with its own round(), so a rect's right edge can miss the next one's left by
+ * a unit.  Its entry is detoured: the original runs with the canvas set to
+ * stock (no conversion), then x and y are converted exactly as the engine does
+ * and w and h become the converted far edge minus the converted near one.  x and
+ * y are bit-identical to stock; w and h move by at most one unit.  Only a
+ * canvas other than 1600x1200 converts, so this changes nothing at 4:3.
+ *
  * STANDING DOWN
  * -------------
  * Applying a correction twice distorts as badly as not at all, so each part
@@ -91,7 +113,8 @@
  * inert and says so in HUD.log.
  *
  * All arithmetic that yields an integer is integer: /nodefaultlib means no CRT,
- * so no float -> int helper.  Floats are only multiplied and stored.
+ * so no float -> int helper.  The one exception, part 4's floor, is an fistp
+ * under a round-down control word (ifloor).
  */
 
 typedef unsigned char       BYTE;
@@ -153,6 +176,9 @@ int _fltused = 0;
 #define ADDR_DRAW_SCALED_2D  0x63ada0   /* ST3D_Sprite::DrawScaled2D */
 #define ADDR_SCALE_2D        0x7ad6e8   /* ST3D_Sprite's 2D scale {x, y} */
 #define SPRITE_ORIGIN_X      0x30       /* ST3D_Sprite: hotspot x, texels */
+#define SITE_SNAP            0x63aeca   /* DrawScaled2D: floor(x)+.25, floor(y)+.25 */
+#define SITE_SNAP_END        0x63aefa   /* ... and where that block ends */
+#define ADDR_GET_RECT        0x5358f0   /* ParameterDB::Get(const char *, DBRectangle *, const DBRectangle &) */
 
 #define FONT_SX   0x28                  /* ST3D_Font: x scale */
 #define FONT_SY   0x2c                  /* ST3D_Font: y scale */
@@ -247,7 +273,7 @@ static int div_floor(int a, int b)
 /* ---- state ------------------------------------------------------------ */
 
 static int g_W, g_H;            /* the display mode last set */
-static int g_doFont = 1, g_doCanvas = 1, g_doCursor = 1;
+static int g_doFont = 1, g_doCanvas = 1, g_doCursor = 1, g_doSeams = 1;
 
 /* ---- 1. font ---------------------------------------------------------- */
 
@@ -498,6 +524,122 @@ static int redirect_call(DWORD at, void *to)
     return write_bytes(at, b, 5);
 }
 
+/* ---- 4. seams --------------------------------------------------------- */
+
+/* floor(v), as an int: fistp under a round-down control word. */
+static int ifloor(double v)
+{
+    unsigned short cw, down;
+    int r;
+    __asm__ volatile ("fnstcw %0" : "=m"(cw));
+    down = (unsigned short)((cw & ~0x0C00) | 0x0400);
+    __asm__ volatile ("fldcw %1\n\tfldl %2\n\tfistpl %0\n\tfldcw %3"
+                      : "=m"(r) : "m"(down), "m"(v), "m"(cw));
+    return r;
+}
+
+/* Replaces DrawScaled2D's snap block (0x63aeca-0x63aefa), called with its frame:
+ * [bp-0x24] x and [bp-0x20] y are screen px, [bp-0x8] w and [bp-0x4] h are still
+ * unscaled -- the code after the block multiplies them by the 2D scale. */
+void __cdecl snap_hook(BYTE *bp)
+{
+    float *x = (float *)(bp - 0x24), *y = (float *)(bp - 0x20);
+    float *w = (float *)(bp - 0x08), *h = (float *)(bp - 0x04);
+    float *scale = (float *)ADDR_SCALE_2D;
+    double l = ifloor(*x) + 0.25, t = ifloor(*y) + 0.25;
+
+    if (scale[0] > 0.0f)
+        *w = (float)((ifloor(*x + *w * scale[0]) + 0.25 - l) / scale[0]);
+    if (scale[1] > 0.0f)
+        *h = (float)((ifloor(*y + *h * scale[1]) + 0.25 - t) / scale[1]);
+    *x = (float)l;
+    *y = (float)t;
+}
+
+/* Get(DBRectangle)'s first 9 bytes -- push ebp; mov ebp,esp; sub esp,0x104 --
+ * then a jmp back past them. */
+static const BYTE k_get_rect_head[9] = { 0x55, 0x8B, 0xEC, 0x81, 0xEC, 0x04, 0x01, 0x00, 0x00 };
+static BYTE g_get_rect_tramp[16];
+
+typedef BYTE (__attribute__((thiscall)) *GetRectFn)(void *, const char *, int *, const int *);
+
+/* v converted into the 1600 space exactly as the inlined mConvertRectangle does:
+ * floor(v * (float)(stock / canvas) + 0.5), the scale rounded to float first. */
+static int convert(int v, int stock, int canvas)
+{
+    float f = (float)((double)stock / (double)canvas);   /* x87 at 53 bits, then stored */
+    return ifloor((double)v * (double)f + 0.5);
+}
+
+BYTE __attribute__((thiscall)) get_rect_hook(void *db, const char *key, int *r, const int *def)
+{
+    int  *canvas = (int *)((BYTE *)db + DB_W);     /* +0x2c width, +0x30 height */
+    int   cw = canvas[0], ch = canvas[1];
+    BYTE  ok;
+
+    if (cw == STOCK_W && ch == STOCK_H)
+        return ((GetRectFn)(void *)g_get_rect_tramp)(db, key, r, def);
+
+    canvas[0] = STOCK_W; canvas[1] = STOCK_H;
+    ok = ((GetRectFn)(void *)g_get_rect_tramp)(db, key, r, def);
+    canvas[0] = cw; canvas[1] = ch;
+    if (ok && cw > 0 && ch > 0) {       /* not found: the default, unconverted, as stock */
+        int x = convert(r[0], STOCK_W, cw), y = convert(r[1], STOCK_H, ch);
+        r[2] = convert(r[0] + r[2], STOCK_W, cw) - x;
+        r[3] = convert(r[1] + r[3], STOCK_H, ch) - y;
+        r[0] = x; r[1] = y;
+    }
+    return ok;
+}
+
+static int same_bytes(DWORD at, const BYTE *b, int n)
+{
+    int i;
+    for (i = 0; i < n; i++) if (((const BYTE *)at)[i] != b[i]) return 0;
+    return 1;
+}
+
+/* The snap block as this build has it. */
+static const BYTE k_snap[0x30] = {
+    0xD9, 0x45, 0xDC, 0x83, 0xEC, 0x08, 0xDD, 0x1C, 0x24, 0xFF, 0x15, 0x64,
+    0x80, 0x7B, 0x00, 0xDC, 0x05, 0x78, 0xEA, 0x6A, 0x00, 0xD9, 0x5D, 0xDC,
+    0xD9, 0x45, 0xE0, 0xDD, 0x1C, 0x24, 0xFF, 0x15, 0x64, 0x80, 0x7B, 0x00,
+    0xDC, 0x05, 0x78, 0xEA, 0x6A, 0x00, 0x83, 0xC4, 0x08, 0xD9, 0x5D, 0xE0,
+};
+
+static int patch_seams(void)
+{
+    BYTE  b[0x30];
+    DWORD rel, old;
+    int   i;
+
+    /* snap: push ebp; call snap_hook; add esp,4; jmp SITE_SNAP_END; nops */
+    for (i = 0; i < 0x30; i++) b[i] = 0x90;
+    b[0] = 0x55;
+    rel = (DWORD)snap_hook - (SITE_SNAP + 1 + 5);
+    b[1] = 0xE8; b[2] = (BYTE)rel; b[3] = (BYTE)(rel >> 8); b[4] = (BYTE)(rel >> 16); b[5] = (BYTE)(rel >> 24);
+    b[6] = 0x83; b[7] = 0xC4; b[8] = 0x04;
+    b[9] = 0xEB; b[10] = (BYTE)(SITE_SNAP_END - (SITE_SNAP + 11));
+
+    /* trampoline: Get's head, then jmp ADDR_GET_RECT + 9 */
+    for (i = 0; i < 9; i++) g_get_rect_tramp[i] = k_get_rect_head[i];
+    rel = (ADDR_GET_RECT + 9) - ((DWORD)g_get_rect_tramp + 14);
+    g_get_rect_tramp[9] = 0xE9;
+    g_get_rect_tramp[10] = (BYTE)rel; g_get_rect_tramp[11] = (BYTE)(rel >> 8);
+    g_get_rect_tramp[12] = (BYTE)(rel >> 16); g_get_rect_tramp[13] = (BYTE)(rel >> 24);
+    if (!VirtualProtect(g_get_rect_tramp, sizeof g_get_rect_tramp, PAGE_EXECUTE_READWRITE, &old))
+        return 0;
+
+    if (!write_bytes(SITE_SNAP, b, 0x30)) return 0;
+    {
+        BYTE j[9];
+        rel = (DWORD)get_rect_hook - (ADDR_GET_RECT + 5);
+        j[0] = 0xE9; j[1] = (BYTE)rel; j[2] = (BYTE)(rel >> 8); j[3] = (BYTE)(rel >> 16); j[4] = (BYTE)(rel >> 24);
+        j[5] = j[6] = j[7] = j[8] = 0x90;
+        return write_bytes(ADDR_GET_RECT, j, 9);
+    }
+}
+
 static void report(const char *what, const char *state)
 {
     char m[200];
@@ -529,6 +671,7 @@ static void startup(void)
     g_doFont   = (int)GetPrivateProfileIntA("HUD", "Font",   1, ini);
     g_doCanvas = (int)GetPrivateProfileIntA("HUD", "Canvas", 1, ini);
     g_doCursor = (int)GetPrivateProfileIntA("HUD", "Cursor", 1, ini);
+    g_doSeams  = (int)GetPrivateProfileIntA("HUD", "Seams",  1, ini);
     logline("--- HUD.asi");
 
     /* font */
@@ -576,6 +719,17 @@ static void startup(void)
         else
             report("cursor", "NOT PATCHED: VirtualProtect failed");
     }
+
+    /* seams */
+    if (!g_doSeams)
+        report("seams", "off (Seams=0)");
+    else if (!same_bytes(SITE_SNAP, k_snap, 0x30) ||
+             !same_bytes(ADDR_GET_RECT, k_get_rect_head, 9))
+        report("seams", "NOT PATCHED: sites differ from this build");
+    else if (patch_seams())
+        report("seams", "patched (sprite far edges snapped; rects converted by edge)");
+    else
+        report("seams", "NOT PATCHED: VirtualProtect failed");
 }
 
 BOOL __stdcall DllMain(HMODULE mod, DWORD reason, void *reserved)
