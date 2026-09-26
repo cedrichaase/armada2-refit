@@ -8,7 +8,7 @@
 #     of extensions a renamed file could slip past;
 #   - the texture work, the cutscenes and the menu backdrop pipeline, at any of the
 #     paths they have ever had: they belong to the private repository,
-#     ~/armada2-remastered-private;
+#     private repository (../armada2-remastered-private);
 #   - game file formats by extension.
 # .gitignore keeps these out by default; this catches `git add -f`.
 set -uo pipefail

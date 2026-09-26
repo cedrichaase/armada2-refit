@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.8.1 — 2026-09-27
+
+### Changed
+- `README.md`'s stacked-install example uses the sibling checkouts, `.` and
+  `../armada2-remastered-private`. A private worktree now installs the same builds as
+  any other private checkout: they live in `$A2_DATA`.
+
+Installs nothing into the game.
+
 ## 1.8.0 — 2026-09-27
 
 ### Added

@@ -6,6 +6,13 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 2.0.3 — 2026-09-27
+
+### Changed
+- `README.md` no longer points at `gameplay/`, which is gone.
+
+Installs nothing different; nothing to see in game.
+
 ## 2.0.2 — 2026-09-27
 
 ### Changed

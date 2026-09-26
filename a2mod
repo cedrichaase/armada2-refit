@@ -42,7 +42,7 @@ DELIBERATELY NOT SWITCHED, in both states:
         wined3d is a different renderer and would make the comparison two changes.
     The ASI loader (winmm.dll) and STA2WidescreenPatch.asi -- base setup; the menu
         and MSAA hooks cannot load without the loader.
-    ARMADA.PRF, RTS_CFG.h -- scroll speed and options.  Gameplay, not visual.
+    ARMADA.PRF, RTS_CFG.h -- the player's options, set in game.  Not visual.
     The Heroic side and the vkBasalt layer itself.
 
 BLOOM is switched with vkBasalt's own `enableOnLaunch`, not with `postfx.py --off`:

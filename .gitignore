@@ -3,7 +3,7 @@
 # stock copies, upscales, screenshots, footage -- is committed, whatever path it sits
 # at. publish/README.md has the reasoning; publish/check.sh enforces it. The texture
 # work, which cannot avoid such files, is the private repository
-# ~/armada2-remastered-private.
+# private repository (../armada2-remastered-private).
 *.tga
 *.TGA
 *.png

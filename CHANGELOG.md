@@ -5,6 +5,24 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 6.0.0 — 2026-09-27
+
+Layers: platform 2.0.3, testbench 1.8.1; gameplay removed.
+
+### Removed
+- The `gameplay` layer: `scrollspeed.py` and its notes on map scrolling and the
+  cutscene draw distance. The scroll speeds are set in game now that the menus work,
+  and the draw-distance notes changed nothing. MAJOR: a layer is gone. It never touched
+  what `a2mod` switches; whatever it last wrote to `RTS_CFG.h` and `ARMADA.PRF` stays in
+  the game directory beside its `.a2neb-backup`.
+
+### Added
+- `A2_DATA` in `a2env.sh` / `a2env.py`: where assets live (default
+  `~/.local/share/armada2-remastered`, `%LOCALAPPDATA%` on Windows), never a working
+  tree. The private repository keeps every stock copy, paid layer and build there.
+
+Installs nothing different into the game.
+
 ## 5.1.0 — 2026-09-27
 
 Layers: hud 2.1.1, menus 4.0.0, msaa 1.0.1, postfx 1.0.1, platform 2.0.2, gameplay 1.0.1,

@@ -9,7 +9,7 @@
 #   renderer   postfx/renderer-config.sh     dxvk.conf at stage 3, as shipped
 #
 # Not here: bloom, which is switched in Heroic's launch environment rather than the game
-# directory (postfx/postfx.py), and gameplay/, which a2mod leaves alone.
+# directory (postfx/postfx.py).
 #
 # The private repository has a ./install of its own. The test bench runs each checkout's
 # ./install, in order, into its clone of the game (a2test session start --install PATH).

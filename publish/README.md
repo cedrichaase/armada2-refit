@@ -82,6 +82,5 @@ the way:
   down on any other build rather than patch the wrong bytes.
 - **`MSAA.asi` should default off without DXVK**: the minimap's `CopyRects` from a
   multisampled surface is illegal in native D3D8 (`msaa/README.md`).
-- **`scrollspeed.py` edits game files.** Move it into run time, or leave it out.
 - **Untested**: Windows 11, a desktop other than Hyprland, and running without Patch
   Project 1.2.5 or the widescreen patch.
