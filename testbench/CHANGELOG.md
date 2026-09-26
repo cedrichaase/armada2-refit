@@ -5,6 +5,39 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.3.0 — 2026-09-26
+
+### Added
+- `Stock shell: embed` (scenario header): stock cases keep `Menus.asi` with `Embed=1`
+  and nothing else, so the stock menus take injected clicks (without it the Borg
+  campaign click never registered, at 1600x1200 or 800x600). `hud.md` and
+  `stock-control.md` use it.
+
+### Changed
+- `hud.md` measures against stock at **800x600**, the resolution the game was designed
+  for; regions are in 800x600 pixels.
+- A comparison with no baseline (the reference case failed or never ran) is SKIP with
+  the reason, not inconclusive. Judged comparisons are skipped the same way rather than
+  judged blind.
+
+### Fixed
+- Silent runs: each session gets its own null sink, made Wine's default output
+  (`DefaultOutput` under a pre-registered GUID in the clone's `user.reg`), because the
+  game crashes at start-up with no audio device. A `pactl subscribe` watchdog moves,
+  mutes and stops any session stream that lands elsewhere; streams not yet linked, and
+  streams on any `a2test-` sink, are not leaks.
+- Prepare runs `--revert` before `ui-widescreen.py` and `cursor-aspect.py`: at 4:3 both
+  do nothing, so a 4:3 case measured the install's 21:9 layout (HUD 0.56x).
+- Stock clicks are scaled to the screen: the 800x600 shell mode fills the output.
+- OCR reads frames up to 700 px tall at 4x; 2x missed 8 px shell text at 800x600.
+- A shot belongs to a case by path, not string prefix (`1600x1200-stock` matched
+  `1600x1200`).
+- A case cut short by Ctrl-C/SIGTERM is an error, not a PASS.
+
+Installs nothing into the game. Measured run 20260926-030021: stock 800x600 PASS;
+remastered HUD within 2% of stock at 4:3, 16:10, 16:9 and 21:9, font 0.91-0.94x.
+Not yet signed off.
+
 ## 1.2.1 — 2026-09-26
 
 ### Changed
@@ -21,21 +54,8 @@ Installs nothing into the game. Not yet signed off.
   Ctrl-C / SIGTERM stops every running game and waits for its teardown.
 
 ### Fixed
-- Silent runs: the game gets a per-session null sink as Wine's default output
-  (`DefaultOutput` in the clone's registry) instead of losing its audio drivers, since
-  it crashes at start-up without a device. A `pactl subscribe` watchdog moves, mutes
-  and stops any stream of the session's that lands elsewhere.
-- A case cut short by Ctrl-C/SIGTERM is an error, not a PASS.
-- Prepare reverts the HUD layout and cursors before applying a resolution. At 4:3 both
-  scripts do nothing, so a 4:3 case measured the install's 21:9 layout (HUD 0.56x).
-- `hud.md` measures against stock at **800x600**; OCR reads frames up to 700 px at 4x.
-- A comparison with no baseline (the reference case failed or never ran) is SKIP with
-  the reason, not inconclusive; judged comparisons likewise, not judged blind.
-- `Stock shell: embed` (scenario header): stock cases keep `Menus.asi` with `Embed=1`
-  and nothing else, so the stock menus take injected clicks. Stock clicks are scaled
-  to the screen (the 800x600 shell mode fills the output).
-- The audio watchdog ignores streams not yet linked to a sink and treats every
-  `a2test-` null sink as silent (a false alarm stopped a case).
+- Silent runs: `winepipewire.drv` disabled alongside pulse and alsa. (Superseded in
+  1.3.0: with no driver at all the game crashes at start-up.)
 - Session ids gain a per-process counter (timestamp and pid collide across threads);
   VNC ports are claimed under a lock; `a2input` is built once before any case starts.
 
