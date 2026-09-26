@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.4.0 — 2026-09-26
+
+### Added
+- `… within N%` on a stretch check: that step's tolerance, in place of `--tolerance`.
+
+### Changed
+- `hud.md`: the three font checks pass within ±10% (measured 0.91–0.94 of stock, judged
+  fine by the user in game); the HUD regions stay at ±5%.
+
+Installs nothing into the game. Not yet signed off.
+
 ## 1.3.0 — 2026-09-26
 
 ### Added

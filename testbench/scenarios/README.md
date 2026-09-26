@@ -55,6 +55,7 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Check that the screenshot is not stretched compared with 4:3` | template match of the reference shot over horizontal scales; vertical fixed at H/H_ref |
 | `… the hud is not stretched compared with 4:3 in region X,Y,W,H` | same, for a patch in reference pixels |
 | `Check that "TEXT" is not stretched compared with 4:3` | OCR finds the phrase in the reference shot; the template match measures that patch here |
+| `… within 10%` (after any stretch check) | that step's tolerance, in place of `--tolerance` (default ±5%) |
 | `… is stretched …` | the control form: passes only if it IS stretched |
 | `Expect no black bars` / `Expect black bars` | bounding box of non-black pixels |
 | `Expect no large flat grey areas` | untextured non-black blocks (don't use on a map: fog of war is flat grey) |

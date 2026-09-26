@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.6.0 — 2026-09-26
+
+Layers: testbench 1.4.0.
+
+### Changed
+- The test bench's HUD scenario accepts the condensed font within ±10% of stock (see
+  `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
 ## 3.5.0 — 2026-09-26
 
 Layers: testbench 1.3.0.

@@ -21,14 +21,19 @@ pixels (800x600): the start of the resource bar, the inside of the left (minimap
 and the inside of the right panel. The template match finds each one wherever it sits
 at the other resolutions, scaled by H/600.
 
+The font is allowed ±10% where the HUD gets ±5%. `font/ui-font-condense.py` aims
+for the glyphs' own 1280x1024 shape, which is 0.9375 of stock's width at 4:3, and it
+measured 0.91–0.94 at every aspect ratio. The user judged it fine in game
+(2026-09-26). ±10% still catches the font drawn stretched (stock at 21:9 is ~1.79x).
+
 1. Include "_enter-borg-mission".
 2. Take a screenshot called "briefing".
 3. Check that the hud is not stretched compared with stock 800x600 in region 0,0,150,23.
 4. Check that the hud is not stretched compared with stock 800x600 in region 0,415,80,185.
 5. Check that the hud is not stretched compared with stock 800x600 in region 720,415,80,185.
-6. Check that "BRIEFING SUMMARY" is not stretched compared with stock 800x600.
-7. Check that "OBJECTIVES" is not stretched compared with stock 800x600.
-8. Check that "Werewolf Pack" is not stretched compared with stock 800x600.
+6. Check that "BRIEFING SUMMARY" is not stretched compared with stock 800x600 within 10%.
+7. Check that "OBJECTIVES" is not stretched compared with stock 800x600 within 10%.
+8. Check that "Werewolf Pack" is not stretched compared with stock 800x600 within 10%.
 9. Check that the HUD panels and the briefing keep the same proportions as in the stock 800x600 reference: round and square elements stay round and square, and nothing looks horizontally stretched or squeezed compared with it.
 10. Quit the game.
 11. Expect no crash.

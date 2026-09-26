@@ -419,11 +419,13 @@ def s_expect_screen(c, m):
                      how='OCR signature of the screen (testbench/ui.json)')
 
 
+TOLERANCE = r'(?:,? within (?:\+/-|±)?(?P<tol>\d+(?:\.\d+)?) ?%)?'   # per-step, else --tolerance
+
 STRETCH_REF = (r'(?: compared (?:with|to) (?:the )?(?:(?P<refmod>stock|remastered) )?(?P<ref>[\w:]+)'
                r'(?: reference)?)?')
 
 
-@step(r'^(?:check|expect|verify)(?: that)? ' + Q.format('text') + r' (?P<verb>is not |isn\'t |is un|is )stretched' + STRETCH_REF + r'$')
+@step(r'^(?:check|expect|verify)(?: that)? ' + Q.format('text') + r' (?P<verb>is not |isn\'t |is un|is )stretched' + STRETCH_REF + TOLERANCE + r'$')
 def s_text_stretch(c, m):
     """Same text, same shape.  OCR only LOCATES the phrase in the reference shot; the
     shape is measured by the template match, as for any other patch.  (Measuring it
@@ -448,21 +450,22 @@ def s_text_stretch(c, m):
                                f'(correlation {r["score"]}, estimate {r["stretch"]})', [path, ref_shot],
                          how='OCR locates, template match measures', measure=r)
     k = r['stretch']
-    ok = abs(k - 1) <= c.tolerance
+    tol = c.tol_of(m)
+    ok = abs(k - 1) <= tol
     if m.group('verb').strip() == 'is':       # a control: this one SHOULD be stretched
-        ok = k - 1 > c.tolerance
+        ok = k - 1 > tol
     th = r['sy'] * region[3]
     found = dict(x=r['at'][0], y=r['at'][1], w=int(region[2] * r['sy'] * k), h=int(th), label=phrase)
     ann = vision.annotate(path, path.with_name(path.stem + '-text.png'), [found])
     return c.checked(ok, f'"{phrase}" is drawn {k:.3f}x as wide as at {ref_case} for the same height '
-                         f'(correlation {r["score"]}); tolerance ±{c.tolerance:.0%}',
+                         f'(correlation {r["score"]}); tolerance ±{tol:.0%}',
                      [ann, ref_shot], how='OCR locates the phrase in the reference; template match over '
                                           'horizontal scales measures it here', measure=r)
 
 
 @step(r'^(?:check|expect|verify)(?: that)? (?:the )?(?:screen(?:shot)?|picture|frame|menu|hud|shot ' + Q.format('shot') + r')'
       r' (?P<verb>is not |isn\'t |is un|is )stretched' + STRETCH_REF +
-      r'(?: (?:in|for) (?:the )?region (?P<x>\d+),\s*(?P<y>\d+),\s*(?P<w>\d+),\s*(?P<h>\d+))?$')
+      r'(?: (?:in|for) (?:the )?region (?P<x>\d+),\s*(?P<y>\d+),\s*(?P<w>\d+),\s*(?P<h>\d+))?' + TOLERANCE + r'$')
 def s_stretch(c, m):
     ref = c.ref_of(m)
     if c.is_reference(ref):
@@ -476,11 +479,12 @@ def s_stretch(c, m):
         return c.checked(None, f'no confident match (correlation {r["score"]}); stretch estimate {r["stretch"]}',
                          [path, ref_shot], how='template match of the reference patch over horizontal scales',
                          measure=r)
-    ok = abs(r['stretch'] - 1) <= c.tolerance
+    tol = c.tol_of(m)
+    ok = abs(r['stretch'] - 1) <= tol
     if m.group('verb').strip() == 'is':
-        ok = r['stretch'] - 1 > c.tolerance
+        ok = r['stretch'] - 1 > tol
     return c.checked(ok, f'drawn {r["stretch"]:.3f}x as wide as at {ref_case} for the same height '
-                         f'(correlation {r["score"]}); tolerance ±{c.tolerance:.0%}',
+                         f'(correlation {r["score"]}); tolerance ±{tol:.0%}',
                      [path, ref_shot], how='template match of the reference patch over horizontal scales, '
                                            'vertical scale fixed at H/H_ref', measure=r)
 
@@ -745,6 +749,10 @@ class Case:
         W, H = self.res
         sx = W / 1600 if self.mod == 'stock' else H / 1200
         return int(x * sx), int(y * H / 1200)
+
+    def tol_of(self, m):
+        """A step's own `within 10%`, else the run's --tolerance."""
+        return float(m.group('tol')) / 100 if m.group('tol') else self.tolerance
 
     def ref_of(self, m):
         """The (res, mod) a stretch step compares with: its own words, else the scenario's."""
