@@ -13,6 +13,10 @@ import a2env  # noqa: E402  (the repository root: where the game is, a2env.sh ha
 GAME = Path(a2env.GAME)
 PREFIX = Path(a2env.PREFIX)
 PROTON = Path(a2env.PROTON)
+# Where the private repository's assets and builds are. Resolved HERE, before a session
+# points XDG_DATA_HOME at its own scratch dir -- A2_DATA's default hangs off it, so a
+# stacked private ./install would otherwise look in an empty directory.
+DATA = Path(a2env.DATA)
 UMU = Path(os.environ.get('A2_UMU', HOME / '.config/heroic/tools/runtimes/umu/umu_run.py'))
 VKBASALT = Path(os.environ.get('XDG_DATA_HOME', HOME / '.local/share')) / 'a2-vkbasalt'
 

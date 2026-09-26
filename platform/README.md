@@ -6,7 +6,7 @@ of the setup every other layer stands on, and the part `a2mod` never switches â€
 `STA2WidescreenPatch.asi`. The d3d8 section matters to anything touching the renderer.
 
 What used to sit beside this in one `SETUP.md` now lives with its layer: the HUD
-layout and cursors in `hud/README.md`, map scrolling in `gameplay/README.md`, renderer
+layout and cursors in `hud/README.md`, renderer
 settings, anti-aliasing and bloom (the Tiers) in `postfx/README.md`, and the menus in
 `menus/README.md`.
 

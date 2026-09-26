@@ -8,15 +8,16 @@ remastered.
 derived from the game's own files (hard rule 4, `publish/README.md`). The **texture
 work** — the `a2tex` pipeline, its 84 targets, the loading-screen model, the archive and
 the promo footage — the **cutscenes** (`binkproxy` and the upscaled intro) and the **menu
-backdrop plates** (`backdrop.sh`) live in the private repository **`~/armada2-remastered-private`**,
+backdrop plates** (`backdrop.sh`) live in the private repository, the sibling checkout
+**`../armada2-remastered-private`**,
 which holds the game's own art and is never published. Tasks on those happen there,
 under its own `CLAUDE.md`.
 
 ## Layout
 
 The repo is laid out by **`a2mod` layer**: each folder is one thing `./a2mod` switches
-between stock and remastered (or, for `platform/` and `gameplay/`, something it
-deliberately leaves alone). `./a2mod status` names the layers — including `textures`,
+between stock and remastered (or, for `platform/`, something it deliberately leaves
+alone). `./a2mod status` names the layers — including `textures`,
 `models` and `cutscenes`, which `a2mod` switches in the game directory although their source lives
 in the private repository. Every folder has:
 
@@ -35,7 +36,6 @@ it bundles.
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton | `platform/README.md` |
-| `gameplay/` | map scroll speed; cutscene draw distance (notes only) | `gameplay/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
@@ -45,7 +45,8 @@ testing, `./install`, which installs every layer this repository owns, and `a2en
 
 **Never hard-code a path to the game, its prefix or Proton.** Source `a2env.sh` (shell)
 or `import a2env` (Python, with the repository root on `sys.path`): they resolve
-`A2_GAME`, `A2_PREFIX` and `A2_PROTON` from the environment, then
+`A2_GAME`, `A2_PREFIX`, `A2_PROTON` and `A2_DATA` (where assets live, default
+`~/.local/share/armada2-remastered`; never a working tree) from the environment, then
 `~/.config/armada2-remastered.conf`, then Heroic's default location. The private
 repository carries identical copies; keep them in step.
 
@@ -58,8 +59,9 @@ worth keeping fixed. A bench pass is evidence for the user, not their sign-off
 **To test public and private work together**, stack checkouts:
 `./a2test session start --install <public checkout> --install <private checkout>` (or
 `a2test run ... --install ...`) starts the clone from stock and runs each checkout's
-`./install` into it, in order; the report records each checkout's commit. A private
-worktree installs only what it has built, since `out/` and the plates are gitignored.
+`./install` into it, in order; the report records each checkout's commit. The private
+builds live in `$A2_DATA` (`a2env.sh`), not in a checkout, so any private checkout or
+worktree installs the same ones.
 
 Required reading, by task:
 
@@ -179,7 +181,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
    every image, video and game format, so it takes a `git add -f` to break this; don't.
    `publish/check.sh` fails on any binary in the index; run it before committing anything
    unusual. Material worth keeping that may not be published goes in the private
-   repository, `~/armada2-remastered-private/`.
+   repository, `../armada2-remastered-private/`.
 
 ## a2mod
 

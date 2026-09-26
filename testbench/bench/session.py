@@ -189,6 +189,7 @@ class Session:
         set_prf_resolution(self.game_dir / 'ARMADA.PRF', w, h)
         self.log.action(f'ARMADA.PRF resolution set to {w}x{h}')
         env = dict(os.environ, A2_GAME=str(self.game_dir), A2_GAME_DIR=str(self.game_dir),
+                   A2_DATA=str(config.DATA),
                    XDG_DATA_HOME=str(self.work / 'xdg'), TMPDIR=str(self.work))
         plog = self.dir / 'logs' / 'prepare.log'
         installs = self.s.get('installs') or []
