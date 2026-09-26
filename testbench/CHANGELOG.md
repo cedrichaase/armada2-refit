@@ -23,7 +23,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   ship portrait. The pointer is parked in the fog before the shot. It then selects a
   unit by dragging a box over the fleet and judges the action bar over the fog.
 
-Installs nothing into the game. Not yet signed off.
+Installs nothing into the game. Confirmed working 2026-09-26.
 
 ## 1.6.1 — 2026-09-26
 
