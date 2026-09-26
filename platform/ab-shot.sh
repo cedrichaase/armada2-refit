@@ -2,7 +2,7 @@
 # Capture and numerically compare two in-game frames, so "did that setting do anything"
 # gets an answer instead of an impression.
 #
-#   ab-shot.sh grab <label>          capture the screen now -> archive/ab/<label>.png
+#   ab-shot.sh grab <label>          capture the screen now -> platform/ab/<label>.png
 #   ab-shot.sh diff <a> <b>          compare two labels: RMSE, peak, and a diff image
 #   ab-shot.sh diff <a> <b> W H X Y  compare one region only (see below)
 #   ab-shot.sh list                  show what has been captured
@@ -30,7 +30,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="$here/archive/ab"
+OUT="${A2_AB_DIR:-$here/platform/ab}"
 OUTPUT="${A2_OUTPUT:-DP-3}"
 
 usage() { sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }

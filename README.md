@@ -1,8 +1,13 @@
 # Armada II remastered
 
 A remaster of Star Trek: Armada II — the GOG release, patch 1.1 plus Patch Project
-1.2.5, run through Heroic with Proton on Arch + Hyprland. Everything here is derived
-from the game's own art and binary, and all of it reverts.
+1.2.5, run through Heroic with Proton on Arch + Hyprland. The layers here fix what the
+engine does at modern resolutions — the HUD, the menus, the cutscenes, anti-aliasing,
+bloom — at run time, and all of it reverts.
+
+**This repository holds no game content**: no textures, models, video or data from the
+game, original or derived (`publish/README.md`). The upscaled textures are a separate,
+private project for that reason.
 
 Game directory: `/home/cedric/Games/Heroic/Star Trek Armada II`
 
@@ -14,13 +19,12 @@ here with its own README.
 
 | Folder | Layer | What it changes |
 |---|---|---|
-| [`textures/`](textures/README.md) | textures | about 1,660 textures upscaled from their own stock art: skyboxes, nebulae, planets, UI, hulls |
-| [`models/`](models/logo-sod.py) | models | the mission loading screen, widened to fill 21:9 |
 | [`hud/`](hud/README.md) | hud | `HUD.asi`: the in-game HUD layout, font and cursors undistorted at any aspect, at run time |
 | [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops |
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | a `binkw32.dll` proxy that plays upscaled AV1 movies full screen |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
+| — | textures, models | upscaled textures and the widened loading screen; built in the private texture repository, switched here by `a2mod` |
 
 Not switched by `a2mod`, because the layers above stand on them:
 
@@ -32,11 +36,11 @@ Not switched by `a2mod`, because the layers above stand on them:
 ## Entry points
 
     ./a2mod status | stock | remastered     switch every layer at once
-    ./a2tex list | build | install | revert | verify     the texture pipeline
+    ./a2test ...                            the game headless, for testing (testbench/)
 
-Each of the other layers installs and removes itself with its own script: `install.sh`
-in `menus/`, `msaa/` and `cutscenes/binkproxy/`, or a `--revert` flag on the Python
-tools. See the layer's README.
+Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
+`menus/`, `msaa/` and `cutscenes/binkproxy/`, or a `--revert` flag on the Python tools.
+See the layer's README.
 
 ## Versions
 
@@ -44,6 +48,5 @@ Each layer folder has a `CHANGELOG.md` with its own semver version. The root
 [`CHANGELOG.md`](CHANGELOG.md) versions the modpack as a whole and lists the layer
 versions it bundles.
 
-`promo/` holds the before/after footage (videos not in git). `archive/` holds material
-that is paid for or cannot be regenerated; nothing in it is on
-a build path. `CLAUDE.md` is the working brief for Claude Code sessions in this repo.
+`publish/` says what this repository may contain and why. `CLAUDE.md` is the working
+brief for Claude Code sessions in this repo.

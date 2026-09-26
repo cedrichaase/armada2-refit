@@ -359,7 +359,7 @@ The options, load/save and multiplayer screens are metal frames on black, so the
 are left as they are.
 
 **Building a plate:** `menus/backdrop.sh <name>` uses the same recipe as
-`models/loading-panel.sh`, and keeps its paid layers in `backdrops/<name>/ai/`.
+`models/loading-panel.sh` in the private texture repository, and keeps its paid layers in `backdrops/<name>/ai/`.
 
 1. Upscale the stock 4x with `bria/increase-resolution`. pruna hung in "running"
    for 10 minutes on the day this was built.
