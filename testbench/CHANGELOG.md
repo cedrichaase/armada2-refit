@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.1.0 — 2026-09-26
+
+### Added
+- `Reference: <aspect> <mod>` and `compared with stock 4:3`: a reference can name its
+  mod state. A reference in the other state runs first as its own case
+  (`<res>-stock`); the scenario's own 4:3 case is then measured, not skipped.
+
+### Changed
+- `hud.md` measures the HUD and font against **stock** 4:3, the shape they were drawn
+  for, instead of remastered 4:3. The judge brief no longer excuses a condensed font.
+
+Installs nothing into the game. Not yet run.
+
 ## 1.0.0 — 2026-09-25
 
 ### Added

@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from . import config, report, vision
-from .scenario import STEPS, Case, normalise, parse
+from .scenario import STEPS, Case, normalise, parse, ref_label
 from .session import GameError, Session
 
 HELP = """\
@@ -116,19 +116,22 @@ def cmd_run(argv):
     print(f'run {run_id} -> {run_dir}', flush=True)
     for scn in scns:
         res = [config.parse_res(r) for r in a.res.split(',')] if a.res else list(scn.resolutions)
-        ref = config.parse_res(scn.reference)
+        ref = scn.ref_key()
         needs_ref = any(re.search(r'stretch|compared (with|to)|reference', s, re.I) for s in scn.steps)
-        # the reference runs first, so every other case has something to compare with
-        if needs_ref and ref not in res:
-            res.insert(0, ref)
-            print(f'  (adding the {scn.reference} reference case: this scenario compares against it)')
-        res.sort(key=lambda r: r != ref)
+        cases = [(tuple(r), scn.mod) for r in res]
+        # the reference runs first, so every other case has something to compare with.
+        # A reference in the other mod state (`Reference: 4:3 stock`) is a case of its
+        # own; the scenario's own 4:3 case then runs too and is measured against it.
+        if needs_ref and ref not in cases:
+            cases.insert(0, ref)
+            print(f'  (adding the {ref_label(ref)} reference case: this scenario compares against it)')
+        cases.sort(key=lambda k: k != ref)
         ref_dirs = {}
-        for r in res:
-            print(f'\n== {scn.title} @ {config.res_name(r)} ({config.aspect_name(r)}, {scn.mod})', flush=True)
-            case = Case(scn, r, run_dir, opts, ref_dirs)
+        for r, mod in cases:
+            print(f'\n== {scn.title} @ {config.res_name(r)} ({config.aspect_name(r)}, {mod})', flush=True)
+            case = Case(scn, r, run_dir, opts, ref_dirs, mod=mod)
             st = case.run()
-            ref_dirs[config.res_name(r)] = case.dir
+            ref_dirs[(r, mod)] = case.dir
             print(f'   -> {st.upper()} in {case.duration:.0f}s', flush=True)
             report.write(run_dir, meta)        # keep the report current while a long run goes on
     page = report.write(run_dir, meta)
@@ -273,7 +276,7 @@ def _adhoc_step(s, text):
     c = Case.__new__(Case)
     c.scn = Scenario(path=Path('interactive.md'), title='interactive', resolutions=[s.res],
                      mod=s.s['mod'], steps=[text])
-    c.res, c.sess, c.opts, c.dir = s.res, s, {}, s.dir
+    c.res, c.mod, c.sess, c.opts, c.dir = s.res, s.s["mod"], s, {}, s.dir
     c.reference_dirs, c.tolerance, c.n, c.results = {}, 0.05, 1, []
     c.ui = json.loads((config.BENCH / 'ui.json').read_text())
     return c.run_step(text)

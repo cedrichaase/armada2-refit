@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.3.0 — 2026-09-26
+
+Layers: testbench 1.1.0.
+
+### Added
+- The test bench measures the HUD and font against stock 4:3 rather than remastered
+  4:3 (see `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet run.
+
 ## 3.2.0 — 2026-09-25
 
 Layers: testbench 1.0.0 (new).

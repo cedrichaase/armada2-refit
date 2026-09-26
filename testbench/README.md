@@ -123,6 +123,12 @@ correlation of 0.995. Text uses the same measurement, on the patch around the ph
 that OCR locates in the reference. `stock-control.md` is the control that shows the
 measurement can fail.
 
+**What the reference is.** For the HUD, cursors and font the baseline is **stock at
+4:3**: the shape the original game drew them in. Remastered 4:3 is not a baseline,
+because the mod changes things at 4:3 too (the font is condensed at every resolution),
+and a comparison against it would pass anything the mod gets consistently wrong.
+`hud.md` says `Reference: 4:3 stock`.
+
 ## Judged and agent steps
 
 Steps that name no measurable check go to `claude -p` (`bench/judge.py`). A judged

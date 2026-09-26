@@ -45,13 +45,14 @@ remaster mod. Facts about how it is SUPPOSED to look, so they are not mistaken f
 - The in-game HUD is laid out on a canvas the mod re-declares for the display's aspect,
   so HUD panels keep their stock proportions: square icons stay square, round things
   stay round.
-- The in-game font is condensed by the mod. The condensation is tuned to look right at
-  21:9, so at narrower aspects (4:3 especially) the glyphs look somewhat squeezed. That
-  is known and expected; judge only what the assertion asks.
+- The in-game font is condensed by the mod, per resolution, so that it is not drawn
+  stretched across. Its shape is judged against the stock game at 4:3; glyphs visibly
+  narrower or wider than there are a finding, not something to excuse.
 - On a map, a large flat grey area in the 3D view (typically lower right, since a map
   opens scrolled to its top-left corner) is FOG OF WAR over unexplored space, not a
   missing texture. The minimap shows the same grey for unexplored areas.
 - Without the mod ("stock"), everything 2D is stretched horizontally to fill a wide screen.
+  At 4:3, stock is the shape the HUD, cursors and font were drawn for: the baseline.
 Judge only what the assertion asks. If the screenshot does not show enough to decide,
 answer "inconclusive" and say what is missing, rather than guessing."""
 

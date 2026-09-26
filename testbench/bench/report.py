@@ -156,7 +156,7 @@ code {{ font:13px ui-monospace, monospace; }}
                     continue
                 names.setdefault(n, []).append((c, p))
         for n, items in names.items():
-            if len({c['resolution'] for c, _ in items}) < 2:
+            if len({(c['resolution'], c['mod']) for c, _ in items}) < 2:
                 continue
             gal.append(f'<h3>{_esc(scn)} — “{_esc(n)}”</h3><div class="gallery">')
             for c, p in items:

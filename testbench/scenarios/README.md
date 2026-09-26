@@ -9,7 +9,8 @@ A scenario is a markdown file here. `./a2test run <name>` runs it once per resol
 Resolutions: 4:3, 16:10, 16:9, 21:9       (aspects or WxH; "all" = these four)
 Mod: remastered                           (or stock: a2mod stock, on the clone)
 Launch: -nointro a2_borg01                (Armada2.exe arguments; default -nointro)
-Reference: 4:3                            (what "compared with" means; default 4:3)
+Reference: 4:3 stock                      (what "compared with" means; default 4:3 in
+                                           this scenario's own mod state)
 Timeout: 12 min
 
 Any prose is description.
@@ -58,9 +59,16 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Expect no large flat grey areas` | untextured non-black blocks (don't use on a map: fog of war is flat grey) |
 
 A comparison step uses this case's latest screenshot and the reference case's shot with
-the same name, so take a named screenshot first. `a2test run` runs the reference
-resolution first, adding it if the scenario doesn't list it. In the reference case
-itself these checks are SKIP.
+the same name, so take a named screenshot first. `a2test run` runs the reference case
+first, adding it if the scenario doesn't list it. In the reference case itself these
+checks are SKIP.
+
+A reference can name a mod state: `Reference: 4:3 stock`, or in one step, `compared
+with stock 4:3`. Anything whose target shape is the original game's (the HUD, the
+cursors, the font) should use stock 4:3, since that is how it was drawn to be seen. A
+stock reference is then a case of its own (`1600x1200-stock` in the results), run
+first. The scenario's own 4:3 case runs as well and is measured against it rather than
+skipped. In a reference-only case, judged steps are SKIP; it only supplies screenshots.
 
 ## Judged and delegated steps
 

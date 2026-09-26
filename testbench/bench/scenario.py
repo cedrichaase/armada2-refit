@@ -54,6 +54,36 @@ class Scenario:
     def slug(self):
         return self.path.stem
 
+    def ref_key(self, text=None, mod=None):
+        """(resolution, mod) of a reference.  `Reference: 4:3 stock` names both; a bare
+        aspect runs in the scenario's own mod state.  A step may name its own reference
+        ('compared with stock 4:3'); naming only the aspect of the scenario's reference
+        means that reference, mod and all."""
+        words = (self.reference if text is None else text).lower().split()
+        mods = [w for w in words if w in MODS]
+        rest = [w for w in words if w not in MODS]
+        res = tuple(config.parse_res(rest[0] if rest else config.REFERENCE_ASPECT))
+        if mod or mods:
+            return res, (mod or mods[0])
+        own = self.ref_key() if text is not None else None
+        if own and own[0] == res:
+            return own
+        return res, self.mod
+
+
+MODS = ('stock', 'remastered')
+
+
+def ref_label(key):
+    res, mod = key
+    return f'{mod} {config.aspect_name(res)}'
+
+
+def case_dirname(res, mod, scn_mod):
+    """A case in the scenario's own mod state is named by resolution alone; a reference
+    case in the other state gets the mod as a suffix, so both can sit side by side."""
+    return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
+
 
 HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout)\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
@@ -387,7 +417,8 @@ def s_expect_screen(c, m):
                      how='OCR signature of the screen (testbench/ui.json)')
 
 
-STRETCH_REF = r'(?: compared (?:with|to) (?:the )?(?P<ref>[\w:]+)(?: reference)?)?'
+STRETCH_REF = (r'(?: compared (?:with|to) (?:the )?(?:(?P<refmod>stock|remastered) )?(?P<ref>[\w:]+)'
+               r'(?: reference)?)?')
 
 
 @step(r'^(?:check|expect|verify)(?: that)? ' + Q.format('text') + r' (?P<verb>is not |isn\'t |is un|is )stretched' + STRETCH_REF + r'$')
@@ -396,9 +427,10 @@ def s_text_stretch(c, m):
     shape is measured by the template match, as for any other patch.  (Measuring it
     from OCR boxes was tried first and is too noisy: the same word's box came back
     28 px tall in one pass and 36 in another, which reads as a 30% stretch.)"""
-    if c.is_reference(m.group('ref')):
-        return c.reference_itself(m.group('ref'))
-    ref_case, ref_shot, path = c.reference_pair(m.group('ref'))
+    ref = c.ref_of(m)
+    if c.is_reference(ref):
+        return c.reference_itself(ref)
+    ref_case, ref_shot, path = c.reference_pair(ref)
     if ref_shot is None:
         return c.no_reference(ref_case)
     phrase = m.group('text')
@@ -430,9 +462,10 @@ def s_text_stretch(c, m):
       r' (?P<verb>is not |isn\'t |is un|is )stretched' + STRETCH_REF +
       r'(?: (?:in|for) (?:the )?region (?P<x>\d+),\s*(?P<y>\d+),\s*(?P<w>\d+),\s*(?P<h>\d+))?$')
 def s_stretch(c, m):
-    if c.is_reference(m.group('ref')):
-        return c.reference_itself(m.group('ref'))
-    ref_case, ref_shot, path = c.reference_pair(m.group('ref'), m.group('shot'))
+    ref = c.ref_of(m)
+    if c.is_reference(ref):
+        return c.reference_itself(ref)
+    ref_case, ref_shot, path = c.reference_pair(ref, m.group('shot'))
     if ref_shot is None:
         return c.no_reference(ref_case)
     region = tuple(int(m.group(k)) for k in 'xywh') if m.group('x') else None
@@ -503,13 +536,15 @@ def s_judge(c, m):
 class Case:
     """One scenario at one resolution: a session from clone to teardown."""
 
-    def __init__(self, scn, res, run_dir, opts, reference_dirs):
+    def __init__(self, scn, res, run_dir, opts, reference_dirs, mod=None):
         self.scn = scn
         self.res = res
+        self.mod = mod or scn.mod                 # a reference case may run in the other state
         self.opts = opts
-        self.name = f'{scn.slug}@{config.res_name(res)}'
-        self.dir = Path(run_dir) / scn.slug / config.res_name(res)
-        self.reference_dirs = reference_dirs      # aspect name -> case dir, filled as cases finish
+        dirname = case_dirname(res, self.mod, scn.mod)
+        self.name = f'{scn.slug}@{dirname}'
+        self.dir = Path(run_dir) / scn.slug / dirname
+        self.reference_dirs = reference_dirs      # (res, mod) -> case dir, filled as cases finish
         self.tolerance = opts.get('tolerance', 0.05)
         self.n = 0
         self.results = []
@@ -524,7 +559,7 @@ class Case:
 
     def run(self):
         t0 = time.time()
-        self.sess = Session.create(self.dir, self.res, mod=self.scn.mod, vnc=self.opts.get('vnc'),
+        self.sess = Session.create(self.dir, self.res, mod=self.mod, vnc=self.opts.get('vnc'),
                                    record=self.opts.get('record'), audio=self.opts.get('audio'),
                                    keep=self.opts.get('keep'), label=self.name)
         self.log.meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps))
@@ -577,7 +612,7 @@ class Case:
         self.duration = time.time() - t0
         (self.dir / 'result.json').write_text(json.dumps(dict(
             case=self.name, scenario=self.scn.title, file=str(self.scn.path), resolution=config.res_name(self.res),
-            aspect=config.aspect_name(self.res), mod=self.scn.mod, status=status,
+            aspect=config.aspect_name(self.res), mod=self.mod, status=status,
             duration=round(self.duration, 1), steps=self.results), indent=1))
         return status
 
@@ -689,13 +724,22 @@ class Case:
         left.  Remastered re-declares the canvas 1200 high at the display's aspect, so
         both axes scale by H/1200; stock scales across by W/1600 (hud/README.md)."""
         W, H = self.res
-        sx = W / 1600 if self.scn.mod == 'stock' else H / 1200
+        sx = W / 1600 if self.mod == 'stock' else H / 1200
         return int(x * sx), int(y * H / 1200)
 
+    def ref_of(self, m):
+        """The (res, mod) a stretch step compares with: its own words, else the scenario's."""
+        if not m.group('ref'):
+            return self.scn.ref_key()
+        return self.scn.ref_key(m.group('ref'), m.group('refmod'))
+
+    @property
+    def only_reference(self):
+        """A case in the other mod state that exists only to supply reference shots."""
+        return self.mod != self.scn.mod
+
     def reference_pair(self, ref, shot_name=None):
-        """(reference aspect, its shot of the same name, this case's shot)."""
-        ref = ref or self.scn.reference
-        ref_res = config.parse_res(ref)
+        """(reference label, its shot of the same name, this case's shot)."""
         if shot_name:
             mine = sorted(self.dir.glob(f'shots/*-{_safe(shot_name)}.png'))
             path = mine[-1] if mine else None
@@ -706,38 +750,41 @@ class Case:
             if path is None:
                 path = self.shot(f'check-{self.n}')
             shot_name = re.sub(r'^\d+-', '', path.stem)
-        ref_dir = self.reference_dirs.get(config.res_name(ref_res))
+        ref_dir = self.reference_dirs.get(ref)
         if ref_dir is None:
-            return ref, None, path
+            return ref_label(ref), None, path
         cands = sorted(Path(ref_dir).glob(f'shots/*-{_safe(shot_name)}.png'))
-        if tuple(ref_res) == tuple(self.res):
-            return ref, path, path
-        return ref, (cands[-1] if cands else None), path
+        return ref_label(ref), (cands[-1] if cands else None), path
 
     def is_reference(self, ref=None):
-        return tuple(config.parse_res(ref or self.scn.reference)) == tuple(self.res)
+        return (ref or self.scn.ref_key()) == (tuple(self.res), self.mod)
 
     def reference_itself(self, ref=None):
-        return self.checked_status('skip', f'this is the {ref or self.scn.reference} reference case: '
+        return self.checked_status('skip', f'this is the {ref_label(ref or self.scn.ref_key())} reference case: '
                                            'the other cases are measured against its screenshot',
-                                   [], how='comparison with the reference aspect')
+                                   [], how='comparison with the reference')
 
     def no_reference(self, ref):
         return self.checked(None, f'no {ref} reference shot to compare with -- run the {ref} case of this '
                                   f'scenario first (a2test run adds it automatically)',
-                            how='comparison with the reference aspect')
+                            how='comparison with the reference')
 
     def judge_step(self, what):
         path = self.sess.last_shot()
         if path is None or self._last_action_after(path):
             path = self.shot(f'check-{self.n}')
-        images = [(f'this run at {config.res_name(self.res)} ({config.aspect_name(self.res)})', path)]
+        images = [(f'this run at {config.res_name(self.res)} ({config.aspect_name(self.res)}, {self.mod})', path)]
         shot_name = re.sub(r'^\d+-', '', path.stem)
-        ref_dir = self.reference_dirs.get(config.res_name(config.parse_res(self.scn.reference)))
+        if self.only_reference:
+            return self.checked_status('skip', f'this {ref_label((tuple(self.res), self.mod))} case only supplies '
+                                               'reference shots; judged steps are for the cases under test',
+                                       [path], how='comparison with the reference')
+        ref = self.scn.ref_key()
+        ref_dir = self.reference_dirs.get(ref)
         if ref_dir and Path(ref_dir).resolve() != self.dir.resolve():
             cands = sorted(Path(ref_dir).glob(f'shots/*-{_safe(shot_name)}.png'))
             if cands:
-                images.append((f'the same moment in the {self.scn.reference} reference run', cands[-1]))
+                images.append((f'the same moment in the {ref_label(ref)} reference run', cands[-1]))
         if self.opts.get('no_claude') or not judge.available():
             return self.checked_status('review', 'left for a person to judge from the screenshot(s)',
                                        [p for _, p in images], how='human review (no Claude)')
@@ -780,7 +827,7 @@ class Case:
 
     def context(self):
         return {'resolution': f'{config.res_name(self.res)} ({config.aspect_name(self.res)})',
-                'mod state': self.scn.mod, 'scenario': self.scn.title,
+                'mod state': self.mod, 'scenario': self.scn.title,
                 'step': f'{self.n} of {len(self.scn.steps)}'}
 
 
