@@ -19,7 +19,7 @@ Baseline: the first versioned release.
 ## Before versioning
 
 ### 2026-09-25
-- Moved to `gameplay/` (`c46a493`). The draw-distance notes were merged in (`efed551`).
+- Moved to `gameplay/` (`7daf6d8`). The draw-distance notes were merged in (`e648a3a`).
 
 ### 2026-09-23
 - Cutscene draw distance documented (`e46940f`).

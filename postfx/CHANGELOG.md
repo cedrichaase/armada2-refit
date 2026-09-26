@@ -22,7 +22,7 @@ Baseline: the first versioned release. Both layers are confirmed in game.
 ### 2026-09-25
 - Moved to `postfx/`. The generated-file markers keep their old
   `tools/renderer-config.sh` spelling, because an installed `dxvk.conf` is matched by
-  that marker (`c46a493`, `7ae0fb7`).
+  that marker (`7daf6d8`, `ad7bda9`).
 
 ### 2026-09-23
 - Bloom through vkBasalt (`706c4df`). Accepted in game at intensity 0.08 (`ddd6d40`).

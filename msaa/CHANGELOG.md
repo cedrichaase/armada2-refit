@@ -18,7 +18,7 @@ Baseline: the first versioned release.
 ## Before versioning
 
 ### 2026-09-25
-- Moved from `tools/msaa/` to `msaa/` (`c46a493`).
+- Moved from `tools/msaa/` to `msaa/` (`7daf6d8`).
 
 ### 2026-09-23
 - `MSAA.asi` added (`586dd9d`). Confirmed in game, with no DXVK errors (`1aa0208`,

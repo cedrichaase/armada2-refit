@@ -39,8 +39,8 @@ Baseline: the first versioned release.
 ## Before versioning
 
 ### 2026-09-25
-- Moved to `platform/`. The rest of `SETUP.md` became `README.md` (`c46a493`,
-  `f99d05a`).
+- Moved to `platform/`. The rest of `SETUP.md` became `README.md` (`7daf6d8`,
+  `a38d137`).
 
 ### 2026-09-22
 - Found that `syswow64/d3d8.dll` was Wine's builtin, not DXVK, so the game had been
