@@ -7,7 +7,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test run main-menu hud font          # scenarios in testbench/scenarios/
     ./a2test run main-menu --res 16:9,21:9   # override the resolutions
     ./a2test run admirals-log --vnc          # ... and watch it (view-only VNC)
-    ./a2test run hud --jobs 1                # one game at a time (default: 3 at once)
+    ./a2test run hud --jobs 1                # one game at a time (default: 5 at once)
     ./a2test check hud                       # how each step would run, no launch
     ./a2test list
 
@@ -21,14 +21,16 @@ Reports go to `~/.local/share/a2test/results/<run>/`, with `latest` pointing at 
 newest. Each holds `index.html` (look at it), `report.md` (read or paste it),
 `results.json`, and per case `log.txt`, `shots/` and `logs/`.
 
-**Cases run in parallel**, up to `--jobs N` games at once (default 3, or
+**Cases run in parallel**, up to `--jobs N` games at once (default 5, or
 `A2TEST_JOBS`). Each case already has its own clone, prefix (and so wineserver),
 headless sway, Xwayland and `a2input`, so nothing is shared but the machine. A
 scenario's reference case runs first, and its other cases join the queue once it is
 done. Console lines are prefixed with their case. Ctrl-C or SIGTERM stops every running
-game and waits for each case to tear down. The limit of three is set by the machine
-(12 cores, 15 GB, one GPU). Past that, fixed waits such as "Wait 45 seconds" risk
-turning flaky.
+game and waits for each case to tear down. Five fit this machine (12 cores, 15 GB,
+one GPU): 18 cases of five scenarios at five at once, with the user's own game also
+running, left at least 5.5 GB available and swap untouched, at a peak load of 17
+(run 20260926-142801). Past that, fixed waits such as "Wait 45 seconds" risk turning
+flaky.
 
 **The user's install is never written.** Every case runs on a reflink clone of the
 game directory and the prefix, so a run is free to re-tune, break or `a2mod stock` its
@@ -115,13 +117,17 @@ anything new in the game's `Logs/`.
   (the comparison above) finished 18 of 1720 reads in ten minutes; with
   `OMP_THREAD_LIMIT=1` each, twelve in parallel finished all 1720.
   Set it for anything that runs tesseract in parallel.
-- **In a mission the game hides its own cursor, and the bench cannot yet get it back.**
-  Right after the briefing appears, a pointer move draws the arrow where it was sent
-  (a direct `move 60 400` drew it at 62,403 at 1600x1200). After a longer glide across
-  the screen it vanished and stayed gone through further absolute moves, relative
-  moves (`zwlr_virtual_pointer_v1_motion`) and a click, while the game kept rendering
-  -- in stock too, so not `HUD.asi`. A cursor check must first prove the arrow is in
-  its frame: 1.5.1's matched empty background against empty background and "passed".
+- **In a mission the pointer moves by relative motion only.** The game keeps its own
+  cursor there and moves it by (absolute pointer position - a reference point it fixes
+  once and then tries to warp back to). Xwayland cannot warp a virtual pointer, so each
+  absolute move arrived as a jump from that stale point: moving +50 across four times
+  drew the cursor +200, +250, +300, +350 across and +100 down each time, and every hud
+  shot's cursor ended up in the corner at 0,0. `a2input rel` (relative motion) moved it
+  exactly, so `Session.move` sends the difference from the last known position; only a
+  session's first move is absolute. Wine's `MouseWarpOverride=disable` changed nothing,
+  so the warp is not DirectInput's. (It looked at first like the game *hid* its cursor: the
+  arrow sat in the top-left corner over the resource bar, where a frame difference
+  mistook it for the animated icon.)
 - **OCR boxes cannot measure shape.** The same word's box came back 28 px tall in one
   tesseract pass and 36 in another: a phantom 30% stretch. Text is only *located* by OCR in the
   reference shot. Its shape is measured by the template match, like any patch.

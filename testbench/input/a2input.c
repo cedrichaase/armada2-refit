@@ -16,6 +16,7 @@
  *   a2input WIDTH HEIGHT          reads one command per line on stdin, answers "ok" or
  *                                 "err <why>" on stdout for each:
  *     move X Y                    absolute, in output pixels
+ *     rel DX DY                   relative motion, in output pixels
  *     down B | up B               B = 1 left, 2 middle, 3 right
  *     wheel N                     N notches, positive = down
  *     key COMBO                   tap, e.g. Escape, Return, F10, a, ctrl+s, alt+F4
@@ -212,6 +213,9 @@ int main(int argc, char **argv) {
             if (a < 0) a = 0;
             if (b < 0) b = 0;
             zwlr_virtual_pointer_v1_motion_absolute(ptr, now_ms(), (uint32_t)a, (uint32_t)b, w, h);
+            zwlr_virtual_pointer_v1_frame(ptr);
+        } else if (sscanf(line, "rel %d %d", &a, &b) == 2) {
+            zwlr_virtual_pointer_v1_motion(ptr, now_ms(), wl_fixed_from_int(a), wl_fixed_from_int(b));
             zwlr_virtual_pointer_v1_frame(ptr);
         } else if (sscanf(line, "down %d", &a) == 1 && a >= 1 && a <= 3) {
             zwlr_virtual_pointer_v1_button(ptr, now_ms(), buttons[a], WL_POINTER_BUTTON_STATE_PRESSED);

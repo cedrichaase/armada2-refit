@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 4.1.1 — 2026-09-26
+
+Layers: testbench 1.6.1.
+
+### Fixed
+- The test bench's pointer lands where it is sent in a mission, and its `hud` scenario
+  checks the cursor again. It runs 5 games at once by default (see
+  `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Confirmed working 2026-09-26.
+
 ## 4.1.0 — 2026-09-26
 
 Layers: testbench 1.6.0.

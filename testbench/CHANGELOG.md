@@ -5,6 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.6.1 — 2026-09-26
+
+### Changed
+- `a2test run --jobs` defaults to 5 (was 3): measured with 5 at once plus the user's own
+  game running, at least 5.5 GB stayed available and swap was untouched.
+
+### Fixed
+- The pointer lands where it is sent in a mission. `Session.move` sends the difference
+  from the last known position as relative motion (new `a2input rel DX DY`); an absolute
+  move reached the game as a jump from a stale reference point, so every in-mission move
+  ended with the cursor in the top-left corner.
+- `hud.md` checks the cursor again, within ±10% (removed in 1.6.0 because it never saw
+  the cursor): 0.94–1.02 of stock at every aspect; stock at 21:9 measures 1.79x.
+
+Installs nothing into the game. Confirmed working 2026-09-26.
+
 ## 1.6.0 — 2026-09-26
 
 ### Changed
