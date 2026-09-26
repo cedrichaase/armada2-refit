@@ -658,11 +658,11 @@ class Case:
 
     def assert_alive(self):
         if not self.sess.s['audio']:
-            found = self.sess.audio_streams()
-            if found:
+            leaks = self.sess._silence()          # streams on the session's null sink are fine
+            if leaks:
                 self.sess.stop_game()
-                raise StepFailed('the game opened an audio stream on the real output '
-                                 f'({", ".join(found)}); stopped it at once')
+                raise StepFailed('the game played to a real output '
+                                 f'({", ".join(leaks)}); moved, muted and stopped it')
         if not self.sess.running():
             raise StepFailed('the game is no longer running' + (' (it crashed: exception.txt was written)'
                                                                  if self.sess.crashed() else ''))
