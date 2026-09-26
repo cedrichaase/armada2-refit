@@ -22,13 +22,13 @@ Baseline: the first versioned release. Both layers are confirmed in game.
 ### 2026-09-25
 - Moved to `postfx/`. The generated-file markers keep their old
   `tools/renderer-config.sh` spelling, because an installed `dxvk.conf` is matched by
-  that marker (`c3ae017`, `e7863b9`).
+  that marker (`c46a493`, `7ae0fb7`).
 
 ### 2026-09-23
-- Bloom through vkBasalt (`82b5f9b`). Accepted in game at intensity 0.08 (`f0443d5`).
+- Bloom through vkBasalt (`706c4df`). Accepted in game at intensity 0.08 (`ddd6d40`).
 
 ### 2026-09-22
-- `renderer-config.sh`: stage 1, 16x AF (`8f289ca`), and stage 2, the LOD bias
-  (`d593388`). Neither could take effect until DXVK was actually in the chain (see
+- `renderer-config.sh`: stage 1, 16x AF (`6ff0235`), and stage 2, the LOD bias
+  (`a9cd708`). Neither could take effect until DXVK was actually in the chain (see
   `platform/CHANGELOG.md`). Stage 3, `seamlessCubes`, followed, and all three were
-  confirmed in game (`c89c074`, `518f69c`).
+  confirmed in game (`b5510bb`, `255e995`).

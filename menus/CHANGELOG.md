@@ -9,7 +9,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 
 ### Added
 - `EscapeReturns=1` (default): Esc in the in-mission menu acts as Return to Game, so
-  Esc both opens and closes it. Needs `Embed=1`; `0` leaves Esc stock. (`96f5ac1`)
+  Esc both opens and closes it. Needs `Embed=1`; `0` leaves Esc stock. (`460a06a`)
 
 Confirmed in game 2026-09-25.
 
@@ -18,7 +18,7 @@ Confirmed in game 2026-09-25.
 ### Fixed
 - Esc reopens the in-mission Options menu after it has been closed. An embedded menu
   left the keyboard focus `NULL` when it returned, so every key was dropped until a
-  restart. The focus is now restored to the window that held it. (`32656d7`)
+  restart. The focus is now restored to the window that held it. (`54ad62c`)
 
 Confirmed in game 2026-09-25.
 
@@ -33,7 +33,7 @@ Confirmed in game 2026-09-25.
   drawing 1:1 in the top-left corner. New `CreateWindowExA` hook, and a design-sized
   `WM_DRAWITEM` surface.
 - A dialog inside a letterboxed dialog is fitted through that dialog's placement
-  rather than the screen's. (`c9f7f9f`)
+  rather than the screen's. (`2f0f9b9`)
 
 Confirmed in game 2026-09-25.
 
@@ -79,25 +79,25 @@ Baseline: the first versioned release. Everything below is confirmed in game.
 ## Before versioning
 
 ### 2026-09-25
-- `Underlay=0` (`59f27dc`) and `NoiseFloor=` (`d16fb2d`). Both confirmed in game.
+- `Underlay=0` (`ab6ceab`) and `NoiseFloor=` (`96875e5`). Both confirmed in game.
 - Main-menu plate redone to be free of stars: seed 6 with `fade=`/`dehaze=`. Accepted
-  by the user (`79695b2`, `8a3562c`).
+  by the user (`5ba10e4`, `3debaed`).
 - Campaign screen: the ghost bar beside the Tutorials panel fixed, and `keep=`
-  rectangles added. `install.sh` renames files into place (`e8f7ab9`, `d3e1ccb`).
-- Moved from `tools/menuscale/` to `menus/` (`c3ae017`).
+  rectangles added. `install.sh` renames files into place (`ed012a1`, `101daba`).
+- Moved from `tools/menuscale/` to `menus/` (`c46a493`).
 
 ### 2026-09-24
-- Hi-res outpainted backdrops (`3c8d736`), the campaign screen from its open field
-  (`15d8cf0`), and `N.soften=` for the Tutorials glow (`e9ecc15`).
+- Hi-res outpainted backdrops (`e753f42`), the campaign screen from its open field
+  (`a51638a`), and `N.soften=` for the Tutorials glow (`f5dd368`).
 
 ### 2026-09-23
 - `Embed=1`: one OS window for every menu. Fixed the blank screens caused by leaked
-  DCs, and kept the OS cursor over embedded menus. Confirmed in game (`a2d14a8`,
-  `fda8bcd`, `e70a7de`).
+  DCs, and kept the OS cursor over embedded menus. Confirmed in game (`0c42d5a`,
+  `e3939d1`, `475aa3b`).
 
 ### 2026-09-21
-- `MenuScale.asi`: display mode raised, shell scaled. Confirmed in game (`4caeeed`).
+- `MenuScale.asi`: display mode raised, shell scaled. Confirmed in game (`b937b2c`).
 - Fixed: hover and clicks landed on stock positions, because modal dialogs bypass the
-  message loop. Input mapping moved into the window procedure (`f5eb1f1`).
+  message loop. Input mapping moved into the window procedure (`e67902c`).
 - `stop-game.sh`: Wine names the process `Main`, so `pkill -x Armada2.exe` had been
-  killing nothing (`4617a77`).
+  killing nothing (`57de920`).

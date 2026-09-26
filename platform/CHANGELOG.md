@@ -39,16 +39,16 @@ Baseline: the first versioned release.
 ## Before versioning
 
 ### 2026-09-25
-- Moved to `platform/`. The rest of `SETUP.md` became `README.md` (`c3ae017`,
-  `9d6bf1b`).
+- Moved to `platform/`. The rest of `SETUP.md` became `README.md` (`c46a493`,
+  `f99d05a`).
 
 ### 2026-09-22
 - Found that `syswow64/d3d8.dll` was Wine's builtin, not DXVK, so the game had been
-  rendering through wined3d/OpenGL the whole time (`afb8cd0`).
-- `d3d8-chain.py` (`afb8cd0`, `4114699`). DXVK moved into the game directory, because
-  the prefix is not durable (`b287056`).
+  rendering through wined3d/OpenGL the whole time (`70ca2ec`).
+- `d3d8-chain.py` (`70ca2ec`, `859b0ee`). DXVK moved into the game directory, because
+  the prefix is not durable (`d79a7f3`).
 - `virtual-desktop.py` turned the Wine virtual desktop off. With it on, exclusive
-  fullscreen failed under DXVK and the game dropped to 640x480 (`f8101d6`, `b848258`).
-- DXVK renders the game. Confirmed in game (`da1d15f`).
+  fullscreen failed under DXVK and the game dropped to 640x480 (`d9f7c58`, `9465bd1`).
+- DXVK renders the game. Confirmed in game (`1021bbb`).
 - `dxvk-logging.py` and `ab-shot.sh`: separate "the setting was ignored" from "the
-  setting is subtle" (`5e428ac`, `539da5a`, `e232fb4`).
+  setting is subtle" (`19c2c68`, `2578807`, `fb6c388`).

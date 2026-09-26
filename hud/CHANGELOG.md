@@ -38,7 +38,7 @@ Confirmed in game 2026-09-26.
 ## 2.0.0 — 2026-09-26
 
 ### Added
-- `HUD.asi` (`hud.c`, `build.sh`, `install.sh`, `HUD.ini`, `1524bb9`): the canvas and palette, the
+- `HUD.asi` (`hud.c`, `build.sh`, `install.sh`, `HUD.ini`, `392bb99`): the canvas and palette, the
   font and the hardware cursor corrected in the engine at run time, for the display
   mode actually set, with every game file stock. `HUD.ini` switches each part
   (`Canvas=`, `Font=`, `Cursor=`) and `Log=` writes `HUD.log`.
@@ -71,18 +71,18 @@ Baseline: the first versioned release.
 ## Before versioning
 
 ### 2026-09-25
-- Moved to `hud/`. The HUD sections of `SETUP.md` became `README.md` (`c3ae017`,
-  `9d6bf1b`).
+- Moved to `hud/`. The HUD sections of `SETUP.md` became `README.md` (`c46a493`,
+  `f99d05a`).
 
 ### 2026-09-21
-- The action bar anchor is corrected against the hard-coded 1600 (`9e73db3`) and made
-  flush with the info panel (`3c7dd63`).
+- The action bar anchor is corrected against the hard-coded 1600 (`1a34f25`) and made
+  flush with the info panel (`19a09ca`).
 - Cursors: a first attempt rewrote `cursor.spr` and fixed only the map-plane cursor
-  (`46aa0f4`). It was replaced by squashing the art, which covers both draw paths
-  (`b49c9da`). Confirmed in game (`24260de`).
+  (`1c7be05`). It was replaced by squashing the art, which covers both draw paths
+  (`bdbe2af`). Confirmed in game (`e74cd41`).
 
 ### 2026-09-20
-- `ui-widescreen.py`: the layout canvas re-declared. Confirmed in game (`d5223bd`).
+- `ui-widescreen.py`: the layout canvas re-declared. Confirmed in game (`27fff6f`).
 
 ## The font layer, before it merged into hud
 
@@ -101,10 +101,10 @@ Baseline: the first versioned release.
 
 #### 2026-09-25
 - Ported into `font/` when the `worktree-font-condense` branch merged. The installed
-  files rebuild from stock byte-for-byte (`36ce1a7`).
+  files rebuild from stock byte-for-byte (`30e716e`).
 
 #### 2026-09-21
-- The condense landed (`e124156`) and was confirmed in game: `OBJECTIVES:` measured
-  within 0.5% of the prediction (`c5487c8`).
-- `--method runs` became the default (`b6941ef`). It was rejected in game and
-  `resample` became the default again (`c81f534`).
+- The condense landed (`72b4aee`) and was confirmed in game: `OBJECTIVES:` measured
+  within 0.5% of the prediction (`5d5bd99`).
+- `--method runs` became the default (`bef4682`). It was rejected in game and
+  `resample` became the default again (`aef7faa`).

@@ -84,7 +84,7 @@ Layers: hud 2.0.0, testbench 1.5.0.
 
 ### Changed
 - The `font` layer is merged into `hud`, which is now `HUD.asi`: the HUD layout, font
-  and cursors corrected at run time for any display mode (`1524bb9`; see `hud/CHANGELOG.md`).
+  and cursors corrected at run time for any display mode (`392bb99`; see `hud/CHANGELOG.md`).
   `a2mod` reports one `hud` layer and reads older manifests' `font` / `hud layout`
   entries as `hud`. MAJOR: a layer name is gone and `hud` now needs the ASI loader.
 - The test bench installs `HUD.asi` once for every case (see `testbench/CHANGELOG.md`).
@@ -158,7 +158,7 @@ Layers: menus 2.1.0.
 
 ### Added
 - In a mission, Esc now also closes the Options menu and returns to the game
-  (`EscapeReturns=`, see `menus/CHANGELOG.md`, `96f5ac1`).
+  (`EscapeReturns=`, see `menus/CHANGELOG.md`, `460a06a`).
 
 Confirmed in game 2026-09-25.
 
@@ -168,7 +168,7 @@ Layers: menus 2.0.2.
 
 ### Fixed
 - In a mission, Esc opens Options again after it has been closed, and the keyboard
-  works again after any in-game menu (see `menus/CHANGELOG.md`, `32656d7`).
+  works again after any in-game menu (see `menus/CHANGELOG.md`, `54ad62c`).
 
 Confirmed in game 2026-09-25.
 
@@ -179,7 +179,7 @@ Layers: menus 2.0.1.
 ### Fixed
 - The Admiral's Log: its score table no longer stays on screen after it closes, and
   its buttons are scaled with it rather than 1:1 in the corner (see
-  `menus/CHANGELOG.md`, `c9f7f9f`).
+  `menus/CHANGELOG.md`, `2f0f9b9`).
 
 Confirmed in game 2026-09-25.
 
@@ -233,17 +233,17 @@ Every layer that `a2mod` switches is installed and confirmed in game at this rel
 Project-level history from git. Layer work is in each layer's changelog.
 
 ### 2026-09-25
-- `promo/` holds the before/after footage, kept out of git (`a4adb73`).
+- `promo/` holds the before/after footage, kept out of git (`891154b`).
   `archive/intro-upscaler-comparison/` committed (`927f993`).
 - Restructured into one folder per `a2mod` layer. `SETUP.md` was split into the layer
-  READMEs, and the old root README became `textures/README.md` (`c3ae017`, `9d6bf1b`).
-- The font and draw-distance branches merged into the new layout (`36ce1a7`,
-  `5d9454a`).
+  READMEs, and the old root README became `textures/README.md` (`c46a493`, `f99d05a`).
+- The font and draw-distance branches merged into the new layout (`30e716e`,
+  `efed551`).
 
 ### 2026-09-24
 - `./a2mod`: switches the whole game between stock and remastered by snapshot, with
-  every file hash-checked (`4393a1b`). The `models` and `cutscenes` layers were added
-  to it (`1c178f9`).
+  every file hash-checked (`53a5d0f`). The `models` and `cutscenes` layers were added
+  to it (`8a75050`).
 
 ### 2026-09-20
-- Project started as a nebula and skybox texture pipeline (`c0d3f9b`).
+- Project started as a nebula and skybox texture pipeline (`2dd4ee8`).

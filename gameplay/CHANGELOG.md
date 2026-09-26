@@ -19,13 +19,13 @@ Baseline: the first versioned release.
 ## Before versioning
 
 ### 2026-09-25
-- Moved to `gameplay/` (`c3ae017`). The draw-distance notes were merged in (`5d9454a`).
+- Moved to `gameplay/` (`c46a493`). The draw-distance notes were merged in (`efed551`).
 
 ### 2026-09-23
-- Cutscene draw distance documented (`d1a3d76`).
+- Cutscene draw distance documented (`e46940f`).
 
 ### 2026-09-22
-- Profile scroll speeds and the edge band raised (`985b0d7`). `SCROLL_COEFFICIENT`
-  raised, and the ramp flattened (`e39e89d`).
+- Profile scroll speeds and the edge band raised (`cbe455d`). `SCROLL_COEFFICIENT`
+  raised, and the ramp flattened (`f150737`).
 - The flat ramp removed acceleration, so it was restored with a higher ceiling.
-  `scrollspeed.py` added (`a201ec5`).
+  `scrollspeed.py` added (`bffde2c`).
