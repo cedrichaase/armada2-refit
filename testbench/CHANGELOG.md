@@ -112,5 +112,5 @@ Installs nothing into the game. Confirmed working 2026-09-26.
   and `Include`.
 - `ui.json`: screen signatures and click targets in 800x600 design space.
 
-Installs nothing into the game. Validated by a bench run at 4:3, 16:10, 16:9 and 21:9;
-not yet signed off.
+Installs nothing into the game. Validated by a bench run at 4:3, 16:10, 16:9 and 21:9.
+Confirmed working 2026-09-26.
