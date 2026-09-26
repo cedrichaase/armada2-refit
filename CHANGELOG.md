@@ -5,6 +5,67 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.6.0 — 2026-09-26
+
+Layers: testbench 1.4.0.
+
+### Changed
+- The test bench's HUD scenario accepts the condensed font within ±10% of stock (see
+  `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
+## 3.5.0 — 2026-09-26
+
+Layers: testbench 1.3.0.
+
+### Changed
+- The test bench measures the HUD and font against stock at 800x600, runs silently
+  through a per-session null sink, and can drive the stock menus (see
+  `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
+## 3.4.1 — 2026-09-26
+
+Layers: testbench 1.2.1.
+
+### Changed
+- The test bench judges on Sonnet by default (see `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
+## 3.4.0 — 2026-09-26
+
+Layers: testbench 1.2.0.
+
+### Added
+- `a2test run --jobs N`: cases run in parallel, three games at once by default (see
+  `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
+## 3.3.0 — 2026-09-26
+
+Layers: testbench 1.1.0.
+
+### Added
+- The test bench measures the HUD and font against stock 4:3 rather than remastered
+  4:3 (see `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet run.
+
+## 3.2.0 — 2026-09-25
+
+Layers: testbench 1.0.0 (new).
+
+### Added
+- `./a2test`: the test bench. Headless runs of the game at any resolution on a clone of
+  the install, driven by plain-text scenarios, with a screenshot-and-log report per run
+  (see `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
 ## 3.1.0 — 2026-09-25
 
 Layers: menus 2.1.0.
