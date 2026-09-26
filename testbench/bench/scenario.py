@@ -699,7 +699,7 @@ class Case:
                        how=how, measure=measure)
         self._check_result = dict(status=status, detail=detail, how=how, measure=measure,
                                   shots=[str(Path(s).resolve().relative_to(self.dir.resolve()))
-                                         if str(Path(s).resolve()).startswith(str(self.dir.resolve())) else str(s)
+                                         if Path(s).resolve().is_relative_to(self.dir.resolve()) else str(s)
                                          for s in shots])
         return detail
 
@@ -841,9 +841,9 @@ class Case:
         self.log.check(self.scn.steps[self.n - 1], status, detail=detail, shots=shots, how=how)
         self._check_result = dict(status=status, detail=detail, how=how,
                                   shots=[str(Path(s).resolve().relative_to(self.dir.resolve())) for s in shots
-                                         if str(Path(s).resolve()).startswith(str(self.dir.resolve()))] +
+                                         if Path(s).resolve().is_relative_to(self.dir.resolve())] +
                                         [str(s) for s in shots
-                                         if not str(Path(s).resolve()).startswith(str(self.dir.resolve()))])
+                                         if not Path(s).resolve().is_relative_to(self.dir.resolve())])
         return detail
 
     def _last_action_after(self, shot):
