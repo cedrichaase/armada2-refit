@@ -10,8 +10,9 @@ Measured at the first Borg mission's briefing, where the faction (and so the HUD
 is always the same. See `_enter-borg-mission.md` for why a direct map launch will not do.
 The HUD panels stay visible around the briefing, and the briefing is in the in-game font.
 
-`hud/ui-widescreen.py` re-declares the layout canvas per aspect. `font/ui-font-condense.py`
-condenses the font for the resolution. The bench re-runs both for each case.
+`HUD.asi` re-declares the layout canvas and condenses the font at run time, for the
+mode the game is in. Every remastered case runs the same install (`hud/install.sh`,
+which takes no resolution), so a pass at every aspect is the claim being tested.
 
 The baseline is **stock at 800x600**, the resolution the game was designed around:
 the front end runs in its own 800x600 mode, so nothing is stretched and clicks map 1:1.
@@ -21,7 +22,7 @@ pixels (800x600): the start of the resource bar, the inside of the left (minimap
 and the inside of the right panel. The template match finds each one wherever it sits
 at the other resolutions, scaled by H/600.
 
-The font is allowed ±10% where the HUD gets ±5%. `font/ui-font-condense.py` aims
+The font is allowed ±10% where the HUD gets ±5%. The condense (1.25·H/W) aims
 for the glyphs' own 1280x1024 shape, which is 0.9375 of stock's width at 4:3, and it
 measured 0.91–0.94 at every aspect ratio. The user judged it fine in game
 (2026-09-26). ±10% still catches the font drawn stretched (stock at 21:9 is ~1.79x).

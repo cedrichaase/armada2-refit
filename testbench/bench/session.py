@@ -180,16 +180,11 @@ class Session:
         if self.s['mod'] == 'stock':
             steps = [[str(config.REPO / 'a2mod'), 'stock']]
         else:
-            # The three layers that are built for one resolution.  Each rebuilds from its
-            # own stock backups, so running them at any resolution is safe on the clone.
-            # --revert first: at 4:3 both scripts print "nothing to do" and leave whatever
-            # the install carries -- here the user's 21:9 layout, a canvas 2867 wide, which
-            # measured as a HUD 0.56x as wide as stock at 4:3 (2026-09-26)
-            steps = [[str(config.REPO / 'hud/ui-widescreen.py'), '--revert'],
-                     [str(config.REPO / 'hud/ui-widescreen.py'), '--res', f'{w}x{h}'],
-                     [str(config.REPO / 'hud/cursor-aspect.py'), '--revert'],
-                     [str(config.REPO / 'hud/cursor-aspect.py'), '--res', f'{w}x{h}'],
-                     [str(config.REPO / 'font/ui-font-condense.py'), '--res', f'{w}x{h}']]
+            # HUD.asi fixes the HUD, font and cursors at run time for whatever mode
+            # is set, so the install takes no resolution: the same install is what
+            # every case runs, which is the point.  install.sh first reverts the
+            # three file-based fixes it replaced, which the user's install may carry.
+            steps = [[str(config.REPO / 'hud/install.sh')]]
         with open(plog, 'a') as f:
             for cmd in steps:
                 f.write(f'$ {" ".join(cmd)}\n')
@@ -410,7 +405,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         if self.game_pid():
             raise GameError('the game is already running in this session')
         g = self.game_dir
-        for name in ('Menus.log', 'MSAA.log', 'BinkProxy.log', 'Armada2_d3d9.log'):
+        for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'BinkProxy.log', 'Armada2_d3d9.log'):
             try:
                 (g / name).unlink()
             except FileNotFoundError:
@@ -704,8 +699,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.game_dir
-        for name in ('Menus.log', 'MSAA.log', 'BinkProxy.log', 'ARMADA.PRF', 'Menus.ini',
-                     'MSAA.ini', 'dxvk.conf'):
+        for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'BinkProxy.log', 'ARMADA.PRF', 'Menus.ini',
+                     'MSAA.ini', 'HUD.ini', 'dxvk.conf'):
             if (g / name).exists():
                 shutil.copy2(g / name, dst / name)
         if self.crashed():

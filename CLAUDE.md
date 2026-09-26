@@ -22,8 +22,7 @@ it bundles.
 |---|---|---|
 | `textures/` | the texture pipeline: `lib/`, 84 `targets/`, `tools/` | `textures/README.md` |
 | `models/` | `SOD` geometry — the widened loading screen | `textures/README.md`, loading-screen section |
-| `hud/` | in-game HUD layout and the cursors | `hud/README.md` |
-| `font/` | the condensed in-game bitmap font | `font/README.md` |
+| `hud/` | `HUD.asi` — the in-game HUD layout, font and cursors at any aspect | `hud/README.md` |
 | `menus/` | `Menus.asi` — the shell menus and their backdrops | `menus/README.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `cutscenes/` | `binkproxy/` and the replacement `movies/` | `cutscenes/binkproxy/README.md` |
@@ -145,7 +144,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
    `textures/targets/<NAME>/out/`; `./a2tex install` copies it across, making a `.a2neb-backup`
    on first touch. `./a2tex revert all` sweeps every `*.a2neb-backup` in `Textures/RGB` —
    the cursors included — and restores it.
-   **The one sanctioned exception is `font/ui-font-condense.py`**, which rewrites the
+   **The one sanctioned exception is `hud/ui-font-condense.py`**, which rewrites the
    twelve `FontFinal4_*` atlases in place because its edit is paired with the `.spr`
    metrics beside them in `Sprites/` and so cannot live in a target. It owns its own
    backups under `.a2font-backup` — a *different* suffix, precisely so `a2tex revert
@@ -475,6 +474,13 @@ both; **never ship one without the other.**
 
 ### hud
 
+- **`HUD.asi` makes all three corrections below at run time**, from the display mode
+  actually set, with the game files stock. The three scripts are its derivation and its
+  `--revert`; **never install them alongside it** — every correction would apply
+  twice. `hud/install.sh` reverts them and the plugin stands down per part if it finds
+  them. `hud/README.md` has the hook table and what was established to get there.
+- **Do not change `cfgSCREEN_WIDTH` (`RTS_CFG.h`) to fix the canvas.** It is the fixed
+  1600 every rect is converted into and the palette reads against, with 33 readers.
 - **The UI stretch is a layout-canvas bug, not a texture problem.** `misc/gui_<race>.cfg`
   declares a 1600x1200 canvas that the engine scales to the back buffer per axis.
   `hud/ui-widescreen.py` re-declares it and moves the anchored panels. The bridge
@@ -490,13 +496,11 @@ both; **never ship one without the other.**
   key at vertical scale 1.0; Catrom is exact.
 - **No art-side answer makes the cursors sharper.** `armada2.map` shows the engine
   allocates the cursor at `texW * [device+0x18]` by `texH * [device+0x1c]` and copies
-  1:1, so more texels just draw a bigger cursor. The lever is those two device floats —
-  an ASI hook of the same shape as `menus/`. Not attempted.
-
-### font
-
+  1:1, so more texels just draw a bigger cursor. `HUD.asi` sizes the cursor from
+  `[device+0x1c]` on both axes; setting both floats to 1.0 with 4x art would be the
+  route to a sharper cursor. Not attempted.
 - The font ignores the canvas too: its quads scale by back-buffer / **1280x1024**, a
-  hard-coded tier. `font/ui-font-condense.py` squeezes glyph art and advance widths by
+  hard-coded tier. `hud/ui-font-condense.py` squeezes glyph art and advance widths by
   `1.25 * H / W`; the vertical axis is already right and is not touched. `--check`
   verifies `.spr` and `.tga` still agree. Its backups are `.a2font-backup` (hard rule 1).
 - **`--method runs` was built, measured, and rejected in game. Don't re-ship it.** It won

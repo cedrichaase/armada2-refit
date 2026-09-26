@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.5.0 — 2026-09-26
+
+### Added
+- `HUD.log` is collected with each case's logs.
+
+### Changed
+- The remastered prepare step is `hud/install.sh` (`HUD.asi`), the same for every
+  case, in place of `ui-widescreen.py`, `cursor-aspect.py` and `ui-font-condense.py`
+  run with `--res` per case.
+
+Installs nothing into the game. Not yet signed off.
+
 ## 1.4.0 — 2026-09-26
 
 ### Added

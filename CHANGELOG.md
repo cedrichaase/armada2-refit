@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 4.0.0 — 2026-09-26
+
+Layers: hud 2.0.0, testbench 1.5.0.
+
+### Changed
+- The `font` layer is merged into `hud`, which is now `HUD.asi`: the HUD layout, font
+  and cursors corrected at run time for any display mode (see `hud/CHANGELOG.md`).
+  `a2mod` reports one `hud` layer and reads older manifests' `font` / `hud layout`
+  entries as `hud`. MAJOR: a layer name is gone and `hud` now needs the ASI loader.
+- The test bench installs `HUD.asi` once for every case (see `testbench/CHANGELOG.md`).
+
+Not installed yet, not yet seen in game.
+
 ## 3.6.0 — 2026-09-26
 
 Layers: testbench 1.4.0.

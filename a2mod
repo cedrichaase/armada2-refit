@@ -22,10 +22,12 @@ records a hash of every modded file, and `remastered` checks each one on the way
 
 WHAT COUNTS AS A CHANGE
 
-    textures      Textures/RGB/*.a2neb-backup  -- a2tex, and the cursor-aspect art
-    font          *.a2font-backup              -- font/ui-font-condense.py
+    textures      Textures/RGB/*.a2neb-backup  -- a2tex
     models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel)
-    hud layout    misc/*.a2neb-backup          -- ui-widescreen (canvas, palette)
+    hud           HUD.asi/.ini                 -- added files: layout, font, cursors
+                  (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
+                  *.a2font-backup from ui-font-condense and the Curs_* art from
+                  cursor-aspect -- still recognised, filed under 'hud')
     menus         Menus.asi/.ini, Menus/*.bmp  -- added files, stock has none
                   (MenuScale.* before menus 2.0.0 -- still recognised, see LEGACY_MENUS)
     msaa          MSAA.asi/.ini                -- added files
@@ -78,10 +80,11 @@ EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
 LEGACY_MENUS = 'MenuScale'
 ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('MenuScale.asi', 'menus'), ('MenuScale.ini', 'menus'),
+         ('HUD.asi', 'hud'), ('HUD.ini', 'hud'),
          ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'font', 'hud layout', 'menus', 'msaa', 'cutscenes',
+LAYERS = ['textures', 'models', 'hud', 'menus', 'msaa', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
@@ -99,14 +102,17 @@ def sha(path):
 
 def layer_of(rel, suffix):
     if suffix == '.a2font-backup':
-        return 'font'
+        return 'hud'
     top = rel.split('/')[0]
+    # cursor-aspect.py's squashed art, from before HUD.asi (hud 2.0.0)
+    if rel.lower().startswith('textures/rgb/curs_'):
+        return 'hud'
     if rel.startswith('Textures/RGB/'):
         return 'textures'
     if rel == 'binkw32.dll':
         return 'cutscenes'
     if top == 'misc':
-        return 'hud layout'
+        return 'hud'
     if top == 'SOD':
         return 'models'
     return 'other'
@@ -167,10 +173,16 @@ def load_state():
             st = json.load(fh)
     except FileNotFoundError:
         return None
-    # Manifests written before menus 2.0.0 call the layer 'menu scale'.
+    # Layer names older manifests use: 'menu scale' before menus 2.0.0; 'font',
+    # 'hud layout' and (for the cursor art) 'textures' before hud 2.0.0 merged them.
     for e in st.get('entries', []):
         if e.get('layer') == 'menu scale':
             e['layer'] = 'menus'
+        elif e.get('layer') in ('font', 'hud layout'):
+            e['layer'] = 'hud'
+        elif e.get('layer') == 'textures' and \
+                e.get('rel', '').lower().startswith('textures/rgb/curs_'):
+            e['layer'] = 'hud'
     return st
 
 

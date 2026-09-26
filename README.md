@@ -16,12 +16,11 @@ here with its own README.
 |---|---|---|
 | [`textures/`](textures/README.md) | textures | about 1,660 textures upscaled from their own stock art: skyboxes, nebulae, planets, UI, hulls |
 | [`models/`](models/logo-sod.py) | models | the mission loading screen, widened to fill 21:9 |
-| [`hud/`](hud/README.md) | hud layout | the in-game HUD re-laid out for widescreen; the cursors un-stretched |
+| [`hud/`](hud/README.md) | hud | `HUD.asi`: the in-game HUD layout, font and cursors undistorted at any aspect, at run time |
 | [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops |
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | a `binkw32.dll` proxy that plays upscaled AV1 movies full screen |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
-| [`font/`](font/README.md) | font | the in-game bitmap font condensed so text is not drawn 1.9x too wide |
 
 Not switched by `a2mod`, because the layers above stand on them:
 
