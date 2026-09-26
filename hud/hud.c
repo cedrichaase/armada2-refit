@@ -91,6 +91,10 @@
  * block becomes a call that snaps both edges, to floor(v) + 0.5 -- a pixel
  * boundary, so MSAA sees no half-covered pixel outside the sprite (SNAP, below) --
  * and sets the width to the distance between them: neighbours then share an edge.
+ * Sprites without flag 0x80 -- the action bar's buttons among them -- skipped the
+ * block and drew at fractional positions, with the same MSAA line along each edge;
+ * the `je` that skips it (0x63aec8) is NOP'd, so every 2D sprite is snapped.  3D
+ * sprites are DrawScaled3D and untouched.
  * Stock has this at any non-integer 2D scale (1024x768 included); it is invisible
  * only where W/1600 and H/1200 give whole pixels.
  *
@@ -179,6 +183,7 @@ int _fltused = 0;
 #define SPRITE_ORIGIN_X      0x30       /* ST3D_Sprite: hotspot x, texels */
 #define SITE_SNAP            0x63aeca   /* DrawScaled2D: floor(x)+.25, floor(y)+.25 */
 #define SITE_SNAP_END        0x63aefa   /* ... and where that block ends */
+#define SITE_SNAP_SKIP       0x63aec8   /* je SITE_SNAP_END: skip it without flag 0x80 */
 #define ADDR_GET_RECT        0x5358f0   /* ParameterDB::Get(const char *, DBRectangle *, const DBRectangle &) */
 
 #define FONT_SX   0x28                  /* ST3D_Font: x scale */
@@ -609,6 +614,9 @@ static int same_bytes(DWORD at, const BYTE *b, int n)
     return 1;
 }
 
+/* `je SITE_SNAP_END`: without flag 0x80 a sprite is not snapped at all. */
+static const BYTE k_snap_skip[2] = { 0x74, 0x30 };
+
 /* The snap block as this build has it. */
 static const BYTE k_snap[0x30] = {
     0xD9, 0x45, 0xDC, 0x83, 0xEC, 0x08, 0xDD, 0x1C, 0x24, 0xFF, 0x15, 0x64,
@@ -641,6 +649,10 @@ static int patch_seams(void)
         return 0;
 
     if (!write_bytes(SITE_SNAP, b, 0x30)) return 0;
+    {
+        static const BYTE nops[2] = { 0x90, 0x90 };
+        if (!write_bytes(SITE_SNAP_SKIP, nops, 2)) return 0;
+    }
     {
         BYTE j[9];
         rel = (DWORD)get_rect_hook - (ADDR_GET_RECT + 5);
@@ -733,11 +745,12 @@ static void startup(void)
     /* seams */
     if (!g_doSeams)
         report("seams", "off (Seams=0)");
-    else if (!same_bytes(SITE_SNAP, k_snap, 0x30) ||
+    else if (!same_bytes(SITE_SNAP_SKIP, k_snap_skip, 2) ||
+             !same_bytes(SITE_SNAP, k_snap, 0x30) ||
              !same_bytes(ADDR_GET_RECT, k_get_rect_head, 9))
         report("seams", "NOT PATCHED: sites differ from this build");
     else if (patch_seams())
-        report("seams", "patched (sprite far edges snapped; rects converted by edge)");
+        report("seams", "patched (every 2D sprite snapped to pixel boundaries; rects converted by edge)");
     else
         report("seams", "NOT PATCHED: VirtualProtect failed");
 }

@@ -38,7 +38,15 @@ first honest run measured 0.94–1.02 where the arrows themselves, measured dire
 one width-to-height ratio to 0.6% (0.782–0.787 at 4:3, 16:10, 16:9 and 21:9). An
 uncorrected cursor is 1.20x wide at 16:10, 1.33x at 16:9 and 1.79x at 21:9.
 
-The thin-line check is judged, and it is the weakest one here: the lines hud 2.1.0 removed
+Then the action bar: the command buttons shown for a selected unit are sprites of their
+own (no flag 0x80, so the engine never snapped them), and they had the same lines until
+hud 2.1.0 snapped every 2D sprite. The briefing is closed, the minimap is clicked at the
+fleet's corner (a left-anchored HUD point, so the same map point at every aspect), a box
+is dragged over most of the 3D view to select whatever of the fleet is in it — a fixed
+click on one ship missed, since the camera does not land the same way twice — and the
+minimap is clicked into the fog again; the selection stays.
+
+The thin-line checks are judged, and they are the weakest ones here: the lines hud 2.1.0 removed
 were one pixel wide and ~7 levels off the fog, and the judge reads the shot at its own
 size. The measurement behind that fix is in `hud/README.md`, "Seams between tiles".
 
@@ -59,9 +67,19 @@ measured 0.91–0.94 at every aspect ratio. The user judged it fine in game
 10. Check that "Invasion" is not stretched compared with stock 800x600 within 10%.
 11. Check that the HUD panels and the briefing keep the same proportions as in the stock 800x600 reference: round and square elements stay round and square, and nothing looks horizontally stretched or squeezed compared with it.
 12. Check that no thin lines are visible against the flat grey background: none along the outer edges of the HUD panels, the minimap frame or the briefing panel, and none running through the briefing panel where its tiles meet. The white trapezoid inside the minimap is the camera's view outline and belongs there.
-13. Move the mouse to hud 60,400.
+13. Click "OK".
 14. Wait 2 seconds.
-15. Take a screenshot called "cursor".
-16. Check that the hud is not stretched compared with stock 800x600 in region 24,194,44,44 within 10%.
-17. Quit the game.
-18. Expect no crash.
+15. Click at hud 25,1130.
+16. Wait 2 seconds.
+17. Drag from hud 250,60 to hud-right 1500,800.
+18. Wait 2 seconds.
+19. Click the minimap fog.
+20. Wait 2 seconds.
+21. Move the mouse to hud 60,400.
+22. Wait 2 seconds.
+23. Take a screenshot called "action bar".
+24. Check that a row of square command buttons is shown above the unit panel at the bottom, and that no thin lines are visible against the flat grey background between those buttons, along their sides or under them.
+25. Take a screenshot called "cursor".
+26. Check that the hud is not stretched compared with stock 800x600 in region 24,194,44,44 within 10%.
+27. Quit the game.
+28. Expect no crash.

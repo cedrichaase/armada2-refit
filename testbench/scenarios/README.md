@@ -37,6 +37,7 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Click "TEXT"` / `Right-click …` / `Double-click …` | OCR, then click the centre |
 | `Click at 100,200` / `… at design 400,300` / `… at hud 25,27` / `… at hud-right 1500,26` | screen pixels, 800x600 shell space, HUD canvas (1200 high, top-left), or HUD canvas anchored top right at its stock 1600-wide position |
 | `Move the mouse to …` / `Hover over …` | same four coordinate spaces |
+| `Drag from hud 400,300 to hud 1400,900` | press, glide with the button held, release (a selection box); either end in any of the four spaces |
 | `Press Escape` / `Press ctrl+s` / `Press Return 3 times` | virtual keyboard; xkb key names |
 | `Type "TEXT"` | |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |

@@ -13,12 +13,15 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `hud-right` coordinate space for steps (`Click at hud-right X,Y`) and `ui.json`
   targets: HUD canvas units anchored top right, at stock's 1600-wide position. Targets
   `objectives` (the checkmark) and `minimap fog`; a target may name any space.
+- `Drag from … to …` step (`Session.drag`): press, glide with the button held, release —
+  a selection box in a mission.
 
 ### Changed
 - `hud.md` runs at the Federation briefing over the fog instead of the Borg one in front
   of space, and judges that no thin lines show along panel edges or tile joins. Its third
   HUD region is the command bar (`660,0,140,28`): the right panel is mostly the moving
-  ship portrait. The pointer is parked in the fog before the shot.
+  ship portrait. The pointer is parked in the fog before the shot. It then selects a
+  unit by dragging a box over the fleet and judges the action bar over the fog.
 
 Installs nothing into the game. Not yet signed off.
 

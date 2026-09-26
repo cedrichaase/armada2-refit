@@ -404,6 +404,18 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             self.input(f'up {button}')
             time.sleep(0.08)
 
+    def drag(self, x0, y0, x1, y1, button=1):
+        """Press at one point, glide to the other with the button held, release: a
+        selection box in a mission."""
+        self.glide(x0, y0)
+        time.sleep(0.15)
+        self.input(f'down {button}')
+        time.sleep(0.1)
+        self.glide(x1, y1, steps=16)
+        time.sleep(0.15)
+        self.input(f'up {button}')
+        time.sleep(0.1)
+
     def key(self, combo):
         self.input(f'key {combo}')
 

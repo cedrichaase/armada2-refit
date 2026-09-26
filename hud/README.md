@@ -28,7 +28,7 @@ detail; this is the map.
 |---|---|---|
 | **Canvas and palette** | the two `ParameterDB` constructors' calls to `mLoad` (`0x53414c`, `0x5341b4`) | After a DB loads, if it holds `infoPanelArea` it is the GUI one (`gui_<race>.cfg` includes `gui_interface.cfg`, which includes `gui_glob16x12.cfg`). Its declared canvas width at `+0x2c` becomes `round(1200·W/H)`, and the anchored panel and palette values get exactly `ui-widescreen.py`'s edit, in memory. |
 | **Font** | `FontNewScreenWidth`'s one caller, `SetActiveDisplay_Internal` (`0x62c5d7`), and `FontInit` (`0x48440c`) | `ST3D_Font+0x28`, the horizontal scale, becomes `+0x2c · 1.25·H/W` for the three MetaFonts. Glyph quad, pen advance, line width and word-wrap all multiply by `+0x28`, so this condenses glyphs and spacing together — what the file condense did by editing every `.spr` width. |
-| **Seams** | `ST3D_Sprite::DrawScaled2D`'s snap block (`0x63aeca`), and `ParameterDB::Get(DBRectangle)`'s entry (`0x5358f0`) | Both edges of a snapped sprite go to `floor(v) + 0.5`, a pixel boundary, so tiles meet and MSAA draws no line outside them; a rect's width and height are taken from its converted far edge. See "Seams between tiles". |
+| **Seams** | `ST3D_Sprite::DrawScaled2D`'s snap block (`0x63aeca`) and the `je` that skips it (`0x63aec8`), and `ParameterDB::Get(DBRectangle)`'s entry (`0x5358f0`) | Both edges of every 2D sprite go to `floor(v) + 0.5`, a pixel boundary, so tiles meet and MSAA draws no line outside them; a rect's width and height are taken from its converted far edge. See "Seams between tiles". |
 | **Cursors** | `RefreshDisplay`'s `DrawScaled2D` call (`0x6246fa`), and `SetCursor` (`0x625dd9`) | Under DXVK the cursor is the *synchronous* one: the engine draws the sprite itself each frame, after `SetScaleFactor2D(&device+0x18)` = W/800 by H/600. For that one draw the x scale becomes the y scale and the position is re-expressed so the hotspot stays on the pointer; the scale is put back after. The hardware path, if a setup ever takes it, gets `fmuls 0x18(%esi)` → `fmuls 0x1c(%esi)` in `SetCursor`. |
 
 What was established to get there, so it need not be re-derived:
@@ -122,6 +122,15 @@ puts both edges at `floor(v) + 0.5`, the boundary between two pixels: no sample 
 half-way, the pixels covered without MSAA are the same, and at 1:1 each pixel centre
 lands on a texel centre instead of a quarter off it. With MSAA 8 the column and row
 read exactly the fog colour after it.
+
+**Not every sprite was snapped.** The user then found the same lines around the action
+bar, the command buttons shown for a selected unit. Those sprites lack flag `0x80`, so
+`DrawScaled2D` jumped over the snap (`je` at `0x63aec8`) and drew them where the float
+maths put them — fractional edges, and MSAA's line along each. The `je` is NOP'd, so every
+2D sprite is snapped: at most half a pixel of movement, for sprites that are all flat
+screen-space UI (3D-placed sprites go through `DrawScaled3D`). The gaps between the
+buttons are fog-coloured after it, and the bench's `hud` scenario now selects a unit and
+judges the action bar over the fog.
 
 The 3D view stops one row short of the screen at 3440x1440 (row 1439 is black under the
 fog); the minimap panel's base looks dark there because nothing is drawn behind it. That

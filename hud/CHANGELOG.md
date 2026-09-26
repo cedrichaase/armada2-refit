@@ -20,6 +20,9 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
   the minimap frame and the command bar, plainest over unexplored space. Snapped edges go
   to `floor(v) + 0.5` (a pixel boundary) instead of stock's `+ 0.25`, which left a
   quarter-covered pixel that MSAA shaded with a wrapped texture coordinate.
+- The same lines around the action bar's command buttons: sprites without flag `0x80`
+  were never snapped and drew at fractional positions. Every 2D sprite is now snapped
+  (the `je` at `0x63aec8` that skipped the block is NOP'd).
 
 Installed, not yet seen in game.
 

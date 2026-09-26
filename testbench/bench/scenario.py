@@ -316,6 +316,16 @@ def s_click_named(c, m):
     return f'clicked the {t["name"]} at screen {x},{y}'
 
 
+@step(r'^drag (?:the mouse )?from ' + SPACE.replace('space', 'space0') + r'(?P<x0>\d+)\s*,\s*(?P<y0>\d+)'
+      r' to ' + SPACE + r'(?P<x>\d+)\s*,\s*(?P<y>\d+)$')
+def s_drag(c, m):
+    x1, y1 = _space(c, m)
+    sp0 = (m.group('space0') or '').strip().lower()
+    x0, y0 = c.to_screen(sp0 or 'screen', int(m.group('x0')), int(m.group('y0')))
+    c.sess.drag(x0, y0, x1, y1)
+    return f'dragged from screen {x0},{y0} to {x1},{y1}'
+
+
 @step(r'^(?:move the mouse|hover|move the pointer) (?:to|over) ' + SPACE + r'(?P<x>\d+)\s*,\s*(?P<y>\d+)$')
 def s_move(c, m):
     x, y = _space(c, m)
