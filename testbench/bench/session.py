@@ -16,12 +16,14 @@ the game keeps running), so everything needed to reattach is in session.json.
 import datetime
 import fcntl
 import glob
+import itertools
 import json
 import os
 import re
 import shutil
 import signal
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -108,7 +110,10 @@ class Session:
     @classmethod
     def create(cls, artifacts_dir, res, mod='remastered', vnc=False, record=False,
                audio=False, keep=False, label=''):
-        sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-') + f'{os.getpid() % 100000}'
+        # timestamp and pid alone collide when a run starts cases in parallel threads
+        with _SID_LOCK:
+            n = next(_SID_SEQ)
+        sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-') + f'{os.getpid() % 100000}' + (f'-{n}' if n else '')
         work = config.CACHE / 'sessions' / sid
         artifacts_dir = Path(artifacts_dir)
         for d in (work, artifacts_dir / 'shots', artifacts_dir / 'logs'):
@@ -275,9 +280,11 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             self.log.note('VNC requested but wayvnc is not installed (pacman -S wayvnc); continuing without it',
                           status='warn')
             return
-        port = config.VNC_BASE_PORT
-        while _port_busy(port):
-            port += 1
+        with _VNC_LOCK:            # parallel cases: a port one of them has claimed may not be bound yet
+            port = config.VNC_BASE_PORT
+            while port in _VNC_CLAIMED or _port_busy(port):
+                port += 1
+            _VNC_CLAIMED.add(port)
         vlog = open(self.dir / 'logs' / 'wayvnc.log', 'w')
         p = subprocess.Popen(['wayvnc', '--disable-input', '-o', 'HEADLESS-1', '127.0.0.1', str(port)],
                              env=self.wl_env(), stdout=vlog, stderr=subprocess.STDOUT,
@@ -412,7 +419,16 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             # the device it picks itself (the server default), and the user heard the
             # menu music and the Borg cutscene through their speakers.  With the drivers
             # disabled the game never opens a stream; assert_silent() checks that.
-            env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';winepulse.drv=d;winealsa.drv=d'
+            # Proton-CachyOS also ships winepipewire.drv, a native PipeWire driver, and the
+            # prefix uses it: disabling only pulse and alsa let the stock reference case
+            # play the menu music (2026-09-26).  So every driver is disabled, the prefix's
+            # own driver list is emptied (what `winetricks sound=disabled` does), and a
+            # watchdog mutes and stops the game if a stream appears anyway.
+            env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';' + ';'.join(f'{d}=d' for d in AUDIO_DRIVERS)
+            set_reg_value(self.prefix_dir / 'pfx' / 'user.reg', r'Software\\Wine\\Drivers', 'Audio', '')
+        # a marker the watchdog can match whatever pid namespace the game ends up in
+        env['PULSE_PROP'] = f'a2test.session={self.s["id"]}'
+        env['PIPEWIRE_PROPS'] = f'{{ a2test.session = "{self.s["id"]}" }}'
         (logs / 'launch-env.txt').write_text(
             f'cwd: {g}\nargv: python3 {config.UMU} {g / "Armada2.exe"} {args}\n\n' +
             ''.join(f'{k}={v}\n' for k, v in sorted(env.items())))
@@ -438,6 +454,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                         ('' if self.s['audio'] else ', audio drivers disabled'))
         if not self.s['audio']:
             self.assert_silent()
+            threading.Thread(target=self._audio_watchdog, daemon=True).start()
 
     def audio_streams(self):
         """PipeWire/Pulse playback streams owned by any process of this session."""
@@ -455,9 +472,24 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 pid = int(props.get('application.process.id', -1))
             except ValueError:
                 pid = -1
-            if pid in pids:
+            if pid in pids or props.get('a2test.session') == self.s['id']:
                 out.append(f'#{it.get("index")} {props.get("application.name", "")} (pid {pid})')
         return out
+
+    def _audio_watchdog(self):
+        """For the whole case, not just its first seconds: music starts on later screens
+        too.  Mute first (instant), then stop the game; the next step fails on that."""
+        while self.running():
+            found = self.audio_streams()
+            if found:
+                for f in found:
+                    subprocess.run(['pactl', 'set-sink-input-mute', f.split()[0].lstrip('#'), '1'],
+                                   capture_output=True)
+                self.log.action(f'the game opened an audio stream ({", ".join(found)}): muted it and '
+                                'stopped the game', status='fail')
+                self.stop_game()
+                return
+            time.sleep(0.25)
 
     def assert_silent(self, seconds=6):
         """The user hears whatever a run plays.  Watch the first seconds, when the menu
@@ -466,6 +498,9 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         while time.time() < end:
             found = self.audio_streams()
             if found:
+                for f in found:
+                    subprocess.run(['pactl', 'set-sink-input-mute', f.split()[0].lstrip('#'), '1'],
+                                   capture_output=True)
                 self.stop_game()
                 raise GameError('the game opened an audio stream on the real output '
                                 f'({", ".join(found)}); stopped it at once')
@@ -648,6 +683,32 @@ def set_prf_resolution(prf, w, h):
     f[6], f[7] = str(w).encode(), str(h).encode()
     lines[4] = b' '.join(f)
     Path(prf).write_bytes(b'\r\n'.join(lines))
+
+
+AUDIO_DRIVERS = ('winepulse.drv', 'winealsa.drv', 'winepipewire.drv', 'wineoss.drv')
+
+
+def set_reg_value(reg, key, name, value):
+    """Set a string value in a Wine .reg file (wineserver not running): `key` as the
+    file spells it, with doubled backslashes."""
+    reg = Path(reg)
+    text = reg.read_text(encoding='utf-8', errors='surrogateescape')
+    line = f'"{name}"="{value}"'
+    m = re.search(r'^\[' + re.escape(key) + r'\][^\n]*\n', text, re.M | re.I)
+    if not m:
+        text = text.rstrip('\n') + f'\n\n[{key}]\n{line}\n'
+    else:
+        end = text.find('\n[', m.end())
+        end = len(text) if end < 0 else end + 1
+        body = text[m.end():end]
+        rx = re.compile(r'^"' + re.escape(name) + r'"=.*$', re.M | re.I)
+        body = rx.sub(line, body, 1) if rx.search(body) else line + '\n' + body
+        text = text[:m.end()] + body + text[end:]
+    reg.write_text(text, encoding='utf-8', errors='surrogateescape')
+
+
+_SID_SEQ, _SID_LOCK = itertools.count(), threading.Lock()
+_VNC_CLAIMED, _VNC_LOCK = set(), threading.Lock()
 
 
 def build_input():

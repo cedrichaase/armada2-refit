@@ -35,6 +35,7 @@ ASPECTS = {
 DEFAULT_ASPECTS = ['4:3', '16:10', '16:9', '21:9']
 REFERENCE_ASPECT = '4:3'   # the stock game's native shape: nothing is stretched at 4:3
 
+JOBS = int(os.environ.get('A2TEST_JOBS', 3))   # game instances at once (a2test run --jobs)
 VNC_BASE_PORT = int(os.environ.get('A2TEST_VNC_PORT', 5910))
 JUDGE_MODEL = os.environ.get('A2TEST_MODEL')    # None = claude's own default
 

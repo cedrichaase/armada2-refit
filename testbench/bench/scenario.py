@@ -555,6 +555,12 @@ class Case:
     def log(self):
         return self.sess.log
 
+    def say(self, msg, head=False):
+        """Console progress. With --jobs above 1 cases interleave, so each line names its case."""
+        if self.opts.get('tag'):
+            msg = f'[{self.name}] {msg.lstrip()}'
+        print(('\n' if head else '') + msg, flush=True)
+
     # -- running
 
     def run(self):
@@ -569,7 +575,7 @@ class Case:
             self.sess.prepare()
             self.sess.start_display()
             if self.sess.s.get('vnc_port'):
-                print(f'    VNC: vncviewer localhost:{self.sess.s["vnc_port"]}', flush=True)
+                self.say(f'    VNC: vncviewer localhost:{self.sess.s["vnc_port"]}')
             aborted = None
             for i, text in enumerate(self.scn.steps, 1):
                 self.n = i
@@ -578,15 +584,19 @@ class Case:
                     self.log.step(i, text)
                     self.log.note(f'skipped: {aborted}', status='skip')
                     continue
+                stop = self.opts.get('stop')
+                if stop is not None and stop.is_set():
+                    aborted = 'the run was interrupted'
+                    self.results.append(dict(n=i, text=text, status='skip', detail=aborted))
+                    continue
                 if time.time() - t0 > self.scn.timeout:
                     aborted = f'scenario timeout ({self.scn.timeout}s)'
                     self.results.append(dict(n=i, text=text, status='skip', detail=aborted))
                     continue
                 r = self.run_step(text)
                 self.results.append(r)
-                print(f'    {r["status"].upper():<12} {i}. {text}' +
-                      (f'  -- {r["detail"].splitlines()[0][:110]}' if r.get('detail') and r['status'] != 'ok' else ''),
-                      flush=True)
+                self.say(f'    {r["status"].upper():<12} {i}. {text}' +
+                         (f'  -- {r["detail"].splitlines()[0][:110]}' if r.get('detail') and r['status'] != 'ok' else ''))
                 if r['status'] == 'error':
                     aborted = f'step {i} could not be carried out'
                     try:
@@ -595,7 +605,7 @@ class Case:
                         pass
         except Exception as e:
             self.results.append(dict(n=0, text='set-up', status='error', detail=f'{e}'))
-            print(f'    ERROR        set-up: {e}', flush=True)
+            self.say(f'    ERROR        set-up: {e}')
         finally:
             if self.sess:
                 crashed = self.sess.crashed()

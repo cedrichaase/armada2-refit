@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 3.4.0 — 2026-09-26
+
+Layers: testbench 1.2.0.
+
+### Added
+- `a2test run --jobs N`: cases run in parallel, three games at once by default (see
+  `testbench/CHANGELOG.md`).
+
+Installs nothing into the game. Not yet signed off.
+
 ## 3.3.0 — 2026-09-26
 
 Layers: testbench 1.1.0.

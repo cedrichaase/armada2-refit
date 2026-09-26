@@ -5,6 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.2.0 — 2026-09-26
+
+### Added
+- `a2test run --jobs N` (`-j`, `A2TEST_JOBS`): up to N cases at once, default 3. A
+  scenario's reference case runs first; its other cases are queued once it is done.
+  Ctrl-C / SIGTERM stops every running game and waits for its teardown.
+
+### Fixed
+- Silent runs: `winepipewire.drv` (Proton-CachyOS's PipeWire driver, which this
+  prefix uses) is disabled too, the clone's `user.reg` gets `Audio=""`, and a watchdog
+  mutes and stops the game if a stream of the session's appears at any point in a case.
+- Session ids gain a per-process counter (timestamp and pid collide across threads);
+  VNC ports are claimed under a lock; `a2input` is built once before any case starts.
+
+Installs nothing into the game. Not yet signed off.
+
 ## 1.1.0 — 2026-09-26
 
 ### Added

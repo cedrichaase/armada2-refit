@@ -1,17 +1,19 @@
 """a2test -- the command line.  `a2test help` for the summary; testbench/README.md for the why."""
 import argparse
+import concurrent.futures
 import datetime
 import json
 import os
 import re
 import shlex
 import sys
+import threading
 import time
 from pathlib import Path
 
 from . import config, report, vision
 from .scenario import STEPS, Case, normalise, parse, ref_label
-from .session import GameError, Session
+from .session import GameError, Session, build_input
 
 HELP = """\
 a2test -- run Armada II headless and test it end to end
@@ -97,7 +99,10 @@ def cmd_run(argv):
     ap.add_argument('--no-claude', action='store_true')
     ap.add_argument('--tolerance', type=float, default=0.05)
     ap.add_argument('--out')
+    ap.add_argument('-j', '--jobs', type=int, default=config.JOBS,
+                    help=f'game instances at once (default {config.JOBS}; 1 = one case at a time)')
     a = ap.parse_args(argv)
+    a.jobs = max(1, a.jobs)
     scns = [parse(_find_scenario(s)) for s in a.scenarios]
     run_id = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     run_dir = Path(a.out) if a.out else config.RESULTS / run_id
@@ -111,29 +116,88 @@ def cmd_run(argv):
         pass
     meta = dict(run=run_id, started=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 command='a2test run ' + ' '.join(shlex.quote(x) for x in argv), repo=str(config.REPO))
+    stop = threading.Event()
     opts = dict(vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep, no_claude=a.no_claude,
-                tolerance=a.tolerance)
+                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1)
     print(f'run {run_id} -> {run_dir}', flush=True)
+    # Each scenario's reference case runs first, so every other case has something to
+    # compare with; once it is done, that scenario's other cases join the queue. Up to
+    # --jobs cases run at once, each on its own clone, prefix, sway and a2input.
+    ready, later = [], {}
     for scn in scns:
         res = [config.parse_res(r) for r in a.res.split(',')] if a.res else list(scn.resolutions)
         ref = scn.ref_key()
         needs_ref = any(re.search(r'stretch|compared (with|to)|reference', s, re.I) for s in scn.steps)
         cases = [(tuple(r), scn.mod) for r in res]
-        # the reference runs first, so every other case has something to compare with.
         # A reference in the other mod state (`Reference: 4:3 stock`) is a case of its
         # own; the scenario's own 4:3 case then runs too and is measured against it.
         if needs_ref and ref not in cases:
             cases.insert(0, ref)
-            print(f'  (adding the {ref_label(ref)} reference case: this scenario compares against it)')
+            print(f'  (adding the {ref_label(ref)} reference case to {scn.slug}: it compares against it)')
         cases.sort(key=lambda k: k != ref)
         ref_dirs = {}
-        for r, mod in cases:
-            print(f'\n== {scn.title} @ {config.res_name(r)} ({config.aspect_name(r)}, {mod})', flush=True)
-            case = Case(scn, r, run_dir, opts, ref_dirs, mod=mod)
+        jobs = [(scn, r, mod, ref_dirs) for r, mod in cases]
+        if needs_ref:
+            ready.append(jobs[0])
+            later[(scn.slug, jobs[0][1], jobs[0][2])] = jobs[1:]
+        else:
+            ready += jobs
+    print(f'{len(ready) + sum(len(v) for v in later.values())} case(s), '
+          f'up to {a.jobs} at once', flush=True)
+    build_input()                  # once, before any case would race to compile it
+
+    active, lock = set(), threading.Lock()
+
+    def run_one(scn, r, mod, ref_dirs):
+        case = Case(scn, r, run_dir, opts, ref_dirs, mod=mod)
+        with lock:
+            active.add(case)
+        case.say(f'== {scn.title} @ {config.res_name(r)} ({config.aspect_name(r)}, {mod})', head=True)
+        try:
             st = case.run()
-            ref_dirs[(r, mod)] = case.dir
-            print(f'   -> {st.upper()} in {case.duration:.0f}s', flush=True)
-            report.write(run_dir, meta)        # keep the report current while a long run goes on
+        finally:
+            with lock:
+                active.discard(case)
+        case.say(f'   -> {st.upper()} in {case.duration:.0f}s')
+        return case
+
+    running = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=a.jobs) as pool:
+        try:
+            while ready or running:
+                while ready and len(running) < a.jobs and not stop.is_set():
+                    job = ready.pop(0)
+                    running[pool.submit(run_one, *job)] = job
+                if not running:
+                    break
+                # a short timeout keeps the main thread responsive to Ctrl-C / SIGTERM
+                done, _ = concurrent.futures.wait(running, timeout=1,
+                                                  return_when=concurrent.futures.FIRST_COMPLETED)
+                for f in done:
+                    scn, r, mod, ref_dirs = running.pop(f)
+                    try:
+                        case = f.result()
+                        ref_dirs[(r, mod)] = case.dir
+                    except Exception as e:
+                        print(f'  ERROR {scn.slug} @ {config.res_name(r)}: {e}', flush=True)
+                    ready += later.pop((scn.slug, r, mod), [])
+                    report.write(run_dir, meta)        # keep the report current while a long run goes on
+        except KeyboardInterrupt:
+            # Signals reach only this thread. Stop the games so every worker's steps fail
+            # fast and its own `finally` tears its session down, then wait for that.
+            stop.set()
+            print(f'\ninterrupted: stopping {len(active)} running case(s)', flush=True)
+            with lock:
+                for case in list(active):
+                    try:
+                        if case.sess:
+                            case.sess.stop_game()
+                    except Exception:
+                        pass
+            concurrent.futures.wait(running, timeout=120)
+            report.write(run_dir, meta)
+            print(f'report (partial): {run_dir / "index.html"}', flush=True)
+            return 130
     page = report.write(run_dir, meta)
     cases = report.collect(run_dir)
     counts = report.summary_counts(cases)

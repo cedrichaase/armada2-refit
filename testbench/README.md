@@ -7,6 +7,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test run main-menu hud font          # scenarios in testbench/scenarios/
     ./a2test run main-menu --res 16:9,21:9   # override the resolutions
     ./a2test run admirals-log --vnc          # ... and watch it (view-only VNC)
+    ./a2test run hud --jobs 1                # one game at a time (default: 3 at once)
     ./a2test check hud                       # how each step would run, no launch
     ./a2test list
 
@@ -19,6 +20,15 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
 Reports go to `~/.local/share/a2test/results/<run>/`, with `latest` pointing at the
 newest. Each holds `index.html` (look at it), `report.md` (read or paste it),
 `results.json`, and per case `log.txt`, `shots/` and `logs/`.
+
+**Cases run in parallel**, up to `--jobs N` games at once (default 3, or
+`A2TEST_JOBS`). Each case already has its own clone, prefix (and so wineserver),
+headless sway, Xwayland and `a2input`, so nothing is shared but the machine. A
+scenario's reference case runs first, and its other cases join the queue once it is
+done. Console lines are prefixed with their case. Ctrl-C or SIGTERM stops every running
+game and waits for each case to tear down. The limit of three is set by the machine
+(12 cores, 15 GB, one GPU). Past that, fixed waits such as "Wait 45 seconds" risk
+turning flaky.
 
 **The user's install is never written.** Every case runs on a reflink clone of the
 game directory and the prefix, so a run is free to re-tune, break or `a2mod stock` its
@@ -52,10 +62,16 @@ anything new in the game's `Logs/`.
   pointed `PULSE_SINK` at a private null sink and never checked it. winepulse ignores
   it: it connects every stream to the device it chooses itself (the server's default).
   The user heard the menu music and the Borg cutscene through their speakers during
-  runs they could not see. The bench now disables Wine's audio drivers for the game
-  (`winepulse.drv=d;winealsa.drv=d`, unless `--audio`), and after every launch it
-  watches `pactl list sink-inputs` for a stream from the session's processes. If one
-  appears, it stops the game at once and fails the case.
+  runs they could not see. Disabling `winepulse.drv` and `winealsa.drv` was not enough
+  either: Proton-CachyOS ships **`winepipewire.drv`**, and this prefix uses it (its
+  devices are under `Software\\Wine\\Drivers\\winepipewire.drv` in `user.reg`). The
+  stock reference case played the menu music through it. So, unless `--audio`:
+  every Wine audio driver is disabled in `WINEDLLOVERRIDES`, the clone's `user.reg`
+  gets `Audio=""` (what `winetricks sound=disabled` sets), and a watchdog checks
+  `pactl list sink-inputs` every 0.25 s for the whole case. It matches the session's
+  pids and an `a2test.session` marker (`PULSE_PROP`/`PIPEWIRE_PROPS`), because under
+  umu's container the pids may not match the host's. A stream is muted at once, the game
+  is stopped, and the case fails.
 
 - **XTest input does not work.** In headless sway the seat has no devices. `xdotool`
   moves Xwayland's core pointer, and Wine even logs the `ButtonPress`, but the frame
@@ -158,25 +174,7 @@ separate and needs opencv.
 
 ## Further improvements
 
-Not built yet; each is recorded with what is known so far.
-
-**Cases in parallel (`--jobs N`).** `a2test run` runs its cases one after another
-(`cmd_run` in `bench/cli.py`), though a case already shares nothing with another: its
-own reflink clone and prefix (so its own wineserver), its own headless sway, Xwayland
-and `a2input`. The constraints on doing it:
-
-- The reference case (4:3) finishes first; the other aspects compare against its
-  shots, then run side by side. A 4-case scenario goes from ~8 to ~4 minutes, and
-  separate scenarios can overlap entirely.
-- Parallelise *inside* one run, not by starting two `a2test run`s: both repoint
-  `results/latest`, and run folders are named to the second, so two runs started in
-  the same second share one. `report.write` needs a lock once cases finish concurrently.
-- Two or three games at once on this machine (12 cores, 15 GB, one GPU). Past that,
-  fixed waits ("Wait 45 seconds") risk turning flaky.
-- Judge calls arrive in bursts, and a Claude session limit has already stopped an
-  agent step mid-run.
-- Unchecked: whether the prepare scripts or `a2mod stock` write anything into the repo
-  (they run with `cwd` at the repo root). Check that before two run at once.
+Not built yet. Each is recorded with what is known so far.
 
 **A cheaper model for judged steps.** With no `A2TEST_MODEL` the judge takes the
 `claude` CLI's default, which is Opus here: $0.11–0.21 per judged step, about 50 so far.
