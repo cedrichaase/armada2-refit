@@ -64,15 +64,20 @@
  * mission takes effect on the HUD layout at the next mission (the font follows
  * at once).
  *
- * 3. CURSORS -- one displacement byte
- * -----------------------------------
- * The cursor is a D3D8 hardware cursor.  ST3D_DeviceDirectX8::SetCursor
- * (0x625c90) creates its texture at texW * [dev+0x18] by texH * [dev+0x1c] --
- * W/800 by H/600 -- and UpdateCursor (0x625b00) copies 1:1 and takes the
- * hotspot as a fraction of that scaled texture.  `fmuls 0x18(%esi)` at 0x625dd9
- * becomes `fmuls 0x1c(%esi)`: the stock art at H/600 on both axes, hotspot
- * carried along.  [dev+0x18] itself is untouched -- it also maps cursor
- * positions.
+ * 3. CURSORS -- two paths, [dev+0xe0] chooses
+ * ---------------------------------------------
+ * Synchronous (set -- the path under DXVK): SetCursor makes no hardware cursor;
+ * RefreshDisplay (0x624630) draws the sprite itself each frame after
+ * SetScaleFactor2D(&dev+0x18), i.e. W/800 by H/600.  Its DrawScaled2D call
+ * (0x6246fa) is wrapped: x scale = y scale for that draw, position re-expressed
+ * so the hotspot stays on the pointer, scale restored after (see 3b below).
+ *
+ * Hardware (clear): SetCursor (0x625c90) creates a D3D8 cursor texture at
+ * texW * [dev+0x18] by texH * [dev+0x1c] and UpdateCursor (0x625b00) copies 1:1,
+ * hotspot a fraction of that texture.  `fmuls 0x18(%esi)` at 0x625dd9 becomes
+ * `fmuls 0x1c(%esi)`: stock art at H/600 on both axes, hotspot carried along.
+ *
+ * [dev+0x18] itself is never changed -- it also maps cursor positions.
  *
  * STANDING DOWN
  * -------------
@@ -144,6 +149,10 @@ int _fltused = 0;
 #define SITE_MLOAD_A         0x53414c   /* ParameterDB(const cPrjID &) */
 #define SITE_MLOAD_B         0x5341b4   /* ParameterDB(const char *) */
 #define SITE_CURSOR_SCALE    0x625dd9   /* SetCursor: fmuls 0x18(%esi) */
+#define SITE_CURSOR_DRAW     0x6246fa   /* RefreshDisplay: call DrawScaled2D */
+#define ADDR_DRAW_SCALED_2D  0x63ada0   /* ST3D_Sprite::DrawScaled2D */
+#define ADDR_SCALE_2D        0x7ad6e8   /* ST3D_Sprite's 2D scale {x, y} */
+#define SPRITE_ORIGIN_X      0x30       /* ST3D_Sprite: hotspot x, texels */
 
 #define FONT_SX   0x28                  /* ST3D_Font: x scale */
 #define FONT_SY   0x2c                  /* ST3D_Font: y scale */
@@ -429,6 +438,37 @@ void __attribute__((thiscall)) mload_hook(void *db, const char *name)
     fix_gui_db((BYTE *)db);
 }
 
+/* ---- 3b. the synchronous (software) cursor ---------------------------- */
+
+/* With [device+0xe0] set -- SetSynchronousCursor, and the path taken under DXVK --
+ * SetCursor makes no hardware cursor.  RefreshDisplay (0x624630) draws the cursor
+ * sprite itself every frame: SetScaleFactor2D(&device+0x18), i.e. W/800 by H/600,
+ * then DrawScaled2D at (pos/scale - hotspot).  Its one DrawScaled2D call is wrapped:
+ * for that call only, the x scale is the y scale, and the position is re-expressed
+ * so the hotspot still lands on the pointer.  The scale is put back afterwards --
+ * RefreshDisplay leaves it set, and later 2D drawing reads it. */
+typedef void (__attribute__((thiscall)) *DrawFn)(void *, float *, float, float);
+
+static int g_swCursorSeen;
+
+void __attribute__((thiscall)) cursor_draw_hook(void *sprite, float *pos, float w, float h)
+{
+    float *scale = (float *)ADDR_SCALE_2D;
+    float  sx = scale[0], sy = scale[1];
+
+    if (!g_swCursorSeen) { g_swCursorSeen = 1; logline("cursor: software path drawn"); }
+    if (sx > 0.0f && sy > 0.0f && sx != sy) {
+        float ox = *(float *)((BYTE *)sprite + SPRITE_ORIGIN_X);
+        /* pos.x = x/sx - ox; want x/sy - ox */
+        pos[0] = (pos[0] + ox) * sx / sy - ox;
+        scale[0] = sy;
+        ((DrawFn)ADDR_DRAW_SCALED_2D)(sprite, pos, w, h);
+        scale[0] = sx;
+        return;
+    }
+    ((DrawFn)ADDR_DRAW_SCALED_2D)(sprite, pos, w, h);
+}
+
 /* ---- patching --------------------------------------------------------- */
 
 static int write_bytes(DWORD at, const BYTE *b, int n)
@@ -528,8 +568,11 @@ static void startup(void)
                              "installed -- revert it first");
         else if (p[0] != 0xD8 || p[1] != 0x4E || p[2] != 0x18)
             report("cursor", "NOT PATCHED: site differs from this build");
-        else if (write_bytes(SITE_CURSOR_SCALE + 2, to, 1))
-            report("cursor", "patched (x scale = H/600)");
+        else if (!is_call(SITE_CURSOR_DRAW, ADDR_DRAW_SCALED_2D))
+            report("cursor", "NOT PATCHED: software-cursor site differs from this build");
+        else if (write_bytes(SITE_CURSOR_SCALE + 2, to, 1) &&
+                 redirect_call(SITE_CURSOR_DRAW, (void *)cursor_draw_hook))
+            report("cursor", "patched, hardware and software paths (x scale = H/600)");
         else
             report("cursor", "NOT PATCHED: VirtualProtect failed");
     }

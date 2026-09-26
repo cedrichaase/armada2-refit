@@ -496,9 +496,9 @@ both; **never ship one without the other.**
   key at vertical scale 1.0; Catrom is exact.
 - **No art-side answer makes the cursors sharper.** `armada2.map` shows the engine
   allocates the cursor at `texW * [device+0x18]` by `texH * [device+0x1c]` and copies
-  1:1, so more texels just draw a bigger cursor. `HUD.asi` sizes the cursor from
-  `[device+0x1c]` on both axes; setting both floats to 1.0 with 4x art would be the
-  route to a sharper cursor. Not attempted.
+  1:1, so more texels just draw a bigger cursor. **Under DXVK the cursor is not the
+  hardware one**: `[device+0xe0]` is set and `RefreshDisplay` draws the sprite itself
+  under the global 2D scale; `HUD.asi` fixes both paths (`hud/README.md`).
 - The font ignores the canvas too: its quads scale by back-buffer / **1280x1024**, a
   hard-coded tier. `hud/ui-font-condense.py` squeezes glyph art and advance widths by
   `1.25 * H / W`; the vertical axis is already right and is not touched. `--check`

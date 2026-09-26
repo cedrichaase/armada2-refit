@@ -22,6 +22,12 @@ pixels (800x600): the start of the resource bar, the inside of the left (minimap
 and the inside of the right panel. The template match finds each one wherever it sits
 at the other resolutions, scaled by H/600.
 
+The cursor is measured on its own: the pointer is parked at HUD point 60,400 — empty
+space left of the briefing at every aspect, and 30,200 in the stock 800x600 frame — and
+the region around it is matched like a HUD panel. The game draws this cursor itself
+(the synchronous path, under DXVK), so it is in the screenshot; stock at 21:9 draws it
+~1.79x wide.
+
 The font is allowed ±10% where the HUD gets ±5%. The condense (1.25·H/W) aims
 for the glyphs' own 1280x1024 shape, which is 0.9375 of stock's width at 4:3, and it
 measured 0.91–0.94 at every aspect ratio. The user judged it fine in game
@@ -36,5 +42,9 @@ measured 0.91–0.94 at every aspect ratio. The user judged it fine in game
 7. Check that "OBJECTIVES" is not stretched compared with stock 800x600 within 10%.
 8. Check that "Werewolf Pack" is not stretched compared with stock 800x600 within 10%.
 9. Check that the HUD panels and the briefing keep the same proportions as in the stock 800x600 reference: round and square elements stay round and square, and nothing looks horizontally stretched or squeezed compared with it.
-10. Quit the game.
-11. Expect no crash.
+10. Move the mouse to hud 60,400.
+11. Wait 2 seconds.
+12. Take a screenshot called "cursor".
+13. Check that the hud is not stretched compared with stock 800x600 in region 24,194,44,44.
+14. Quit the game.
+15. Expect no crash.

@@ -28,7 +28,7 @@ detail; this is the map.
 |---|---|---|
 | **Canvas and palette** | the two `ParameterDB` constructors' calls to `mLoad` (`0x53414c`, `0x5341b4`) | After a DB loads, if it holds `infoPanelArea` it is the GUI one (`gui_<race>.cfg` includes `gui_interface.cfg`, which includes `gui_glob16x12.cfg`). Its declared canvas width at `+0x2c` becomes `round(1200·W/H)`, and the anchored panel and palette values get exactly `ui-widescreen.py`'s edit, in memory. |
 | **Font** | `FontNewScreenWidth`'s one caller, `SetActiveDisplay_Internal` (`0x62c5d7`), and `FontInit` (`0x48440c`) | `ST3D_Font+0x28`, the horizontal scale, becomes `+0x2c · 1.25·H/W` for the three MetaFonts. Glyph quad, pen advance, line width and word-wrap all multiply by `+0x28`, so this condenses glyphs and spacing together — what the file condense did by editing every `.spr` width. |
-| **Cursors** | `SetCursor` (`0x625dd9`): `fmuls 0x18(%esi)` → `fmuls 0x1c(%esi)` | The hardware cursor's texture is created at `texW · H/600` instead of `texW · W/800`. The hotspot is a fraction of that texture, so it follows. |
+| **Cursors** | `RefreshDisplay`'s `DrawScaled2D` call (`0x6246fa`), and `SetCursor` (`0x625dd9`) | Under DXVK the cursor is the *synchronous* one: the engine draws the sprite itself each frame, after `SetScaleFactor2D(&device+0x18)` = W/800 by H/600. For that one draw the x scale becomes the y scale and the position is re-expressed so the hotspot stays on the pointer; the scale is put back after. The hardware path, if a setup ever takes it, gets `fmuls 0x18(%esi)` → `fmuls 0x1c(%esi)` in `SetCursor`. |
 
 What was established to get there, so it need not be re-derived:
 
@@ -47,13 +47,19 @@ What was established to get there, so it need not be re-derived:
   the next mission**.
 - `ST3D_Font`s are constructed in exactly one place (`cFontSet::Load`), and only the
   three MetaFonts' current fonts draw text, so those three are all there is to fix.
-- `[device+0x18]`/`[device+0x1c]` are W/800 and H/600 and also map cursor positions;
-  the plugin leaves them alone and changes only the one multiply that sizes the cursor
-  texture.
-- **Unconfirmed: the map-plane cursor.** The art-side squash fixed two cursor draw paths
-  (below), and the `.spr` experiment showed the second one reads `cursor.spr`'s `W H`.
-  Every `cursor.spr` entry is `@cursor`, and the second path was not found statically.
-  If a cursor part on the map plane is still wide in game, that is it.
+- **There are two cursor paths, and the one in use is not the hardware cursor.**
+  `[device+0xe0]` (`SetSynchronousCursor`) chooses. Clear: `SetCursor` builds a D3D
+  hardware cursor texture at `texW·[dev+0x18]` by `texH·[dev+0x1c]`. Set: `SetCursor`
+  makes no hardware cursor and `RefreshDisplay` (`0x624630`) draws the sprite as a 2D
+  quad under the global 2D scale (`0x7ad6e8`), which it sets to `&device+0x18` and does
+  not restore. hud 2.0.0 patched only the hardware path, and the cursor stayed 1.79x wide
+  in game — that is how the second path was found. The `.spr` experiment's "map-plane"
+  cursor below is this path: it draws the sprite's `W H`.
+- `[device+0x18]`/`[device+0x1c]` are W/800 and H/600 and also map cursor positions
+  (`SetCursorPosition` divides by them); the plugin changes neither, only what one
+  multiply and one draw read.
+- The 2D scale is also set by `ST3D_Camera::SetViewport` and `ResizeViewportToExtents`,
+  and read by every `ST3D_Sprite` 2D draw and by the font, so the cursor hook restores it.
 
 What it does differently from the files, on purpose: the font's glyph art stays stock
 and is drawn narrower, instead of being resampled to fewer texels and point-sampled back

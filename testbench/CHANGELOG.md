@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.5.1 — 2026-09-26
+
+### Changed
+- `hud.md` checks the cursor: the pointer is parked in empty space and the region
+  around it is matched against stock 800x600, like a HUD panel.
+
+Installs nothing into the game. Not yet signed off.
+
 ## 1.5.0 — 2026-09-26
 
 ### Added
