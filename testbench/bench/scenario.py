@@ -796,6 +796,11 @@ class Case:
             cands = sorted(Path(ref_dir).glob(f'shots/*-{_safe(shot_name)}.png'))
             if cands:
                 images.append((f'the same moment in the {ref_label(ref)} reference run', cands[-1]))
+        if len(images) == 1 and re.search(r'\breference\b|compared (?:with|to)', what, re.I):
+            # asked to compare, with nothing to compare against: a judge left alone here
+            # judges against its own idea of the baseline, and passes (seen with Sonnet)
+            return self.checked_status('inconclusive', f'no {ref_label(ref)} reference shot to compare with',
+                                       [p for _, p in images], how='comparison with the reference')
         if self.opts.get('no_claude') or not judge.available():
             return self.checked_status('review', 'left for a person to judge from the screenshot(s)',
                                        [p for _, p in images], how='human review (no Claude)')

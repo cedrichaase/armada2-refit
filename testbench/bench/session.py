@@ -518,7 +518,9 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         ns = (self.s.get('null_sink') or {}).get('name')
         leaks = []
         for idx, sink, label in self.audio_streams():
-            if sink != ns:
+            if not sink:
+                continue      # not linked to any sink yet, so inaudible; its 'change' event comes back here
+            if sink != ns and not sink.startswith('a2test-'):   # any session's null sink is silent
                 subprocess.run(['pactl', 'set-sink-input-mute', str(idx), '1'], capture_output=True)
                 if ns:
                     subprocess.run(['pactl', 'move-sink-input', str(idx), ns], capture_output=True)
