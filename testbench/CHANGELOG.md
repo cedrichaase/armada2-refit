@@ -5,6 +5,23 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.7.0 — 2026-09-26
+
+### Added
+- `_enter-federation-mission` fragment: Federation mission 1's briefing, reopened with
+  the camera over unexplored space (minimap click, then the command bar's checkmark).
+- `hud-right` coordinate space for steps (`Click at hud-right X,Y`) and `ui.json`
+  targets: HUD canvas units anchored top right, at stock's 1600-wide position. Targets
+  `objectives` (the checkmark) and `minimap fog`; a target may name any space.
+
+### Changed
+- `hud.md` runs at the Federation briefing over the fog instead of the Borg one in front
+  of space, and judges that no thin lines show along panel edges or tile joins. Its third
+  HUD region is the command bar (`660,0,140,28`): the right panel is mostly the moving
+  ship portrait. The pointer is parked in the fog before the shot.
+
+Installs nothing into the game. Not yet signed off.
+
 ## 1.6.1 — 2026-09-26
 
 ### Changed

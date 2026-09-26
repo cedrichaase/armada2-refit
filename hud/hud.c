@@ -88,8 +88,9 @@
  * ST3D_Sprite::DrawScaled2D (0x63ada0) snaps a sprite's position to
  * floor(v) + 0.25 screen px when its flag 0x80 is set (0x63aeca), but keeps the
  * unsnapped width, so each quad loses up to 1 px on its right and bottom.  That
- * block becomes a call that snaps the far edge the same way and sets the width
- * to the distance between the two snapped edges: neighbours then share an edge.
+ * block becomes a call that snaps both edges, to floor(v) + 0.5 -- a pixel
+ * boundary, so MSAA sees no half-covered pixel outside the sprite (SNAP, below) --
+ * and sets the width to the distance between them: neighbours then share an edge.
  * Stock has this at any non-integer 2D scale (1024x768 included); it is invisible
  * only where W/1600 and H/1200 give whole pixels.
  *
@@ -538,6 +539,15 @@ static int ifloor(double v)
     return r;
 }
 
+/* Where a snapped edge lands, past floor(v).  D3D9 pixel centres are at integers, so
+ * n + 0.5 is the boundary between two pixels: coverage is whole pixels, and at a 1:1
+ * scale each pixel centre falls on a texel centre.  Stock's 0.25 covers the same
+ * pixels without MSAA, but with it a quarter of the pixel before the quad is inside:
+ * some samples count, and that pixel is shaded at its centre, outside the quad, where
+ * the texture coordinate has wrapped to the sprite's far edge -- a faint line along
+ * every UI sprite, plainest over the flat grey of unexplored space. */
+#define SNAP 0.5
+
 /* Replaces DrawScaled2D's snap block (0x63aeca-0x63aefa), called with its frame:
  * [bp-0x24] x and [bp-0x20] y are screen px, [bp-0x8] w and [bp-0x4] h are still
  * unscaled -- the code after the block multiplies them by the 2D scale. */
@@ -546,12 +556,12 @@ void __cdecl snap_hook(BYTE *bp)
     float *x = (float *)(bp - 0x24), *y = (float *)(bp - 0x20);
     float *w = (float *)(bp - 0x08), *h = (float *)(bp - 0x04);
     float *scale = (float *)ADDR_SCALE_2D;
-    double l = ifloor(*x) + 0.25, t = ifloor(*y) + 0.25;
+    double l = ifloor(*x) + SNAP, t = ifloor(*y) + SNAP;
 
     if (scale[0] > 0.0f)
-        *w = (float)((ifloor(*x + *w * scale[0]) + 0.25 - l) / scale[0]);
+        *w = (float)((ifloor(*x + *w * scale[0]) + SNAP - l) / scale[0]);
     if (scale[1] > 0.0f)
-        *h = (float)((ifloor(*y + *h * scale[1]) + 0.25 - t) / scale[1]);
+        *h = (float)((ifloor(*y + *h * scale[1]) + SNAP - t) / scale[1]);
     *x = (float)l;
     *y = (float)t;
 }

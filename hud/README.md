@@ -28,7 +28,7 @@ detail; this is the map.
 |---|---|---|
 | **Canvas and palette** | the two `ParameterDB` constructors' calls to `mLoad` (`0x53414c`, `0x5341b4`) | After a DB loads, if it holds `infoPanelArea` it is the GUI one (`gui_<race>.cfg` includes `gui_interface.cfg`, which includes `gui_glob16x12.cfg`). Its declared canvas width at `+0x2c` becomes `round(1200·W/H)`, and the anchored panel and palette values get exactly `ui-widescreen.py`'s edit, in memory. |
 | **Font** | `FontNewScreenWidth`'s one caller, `SetActiveDisplay_Internal` (`0x62c5d7`), and `FontInit` (`0x48440c`) | `ST3D_Font+0x28`, the horizontal scale, becomes `+0x2c · 1.25·H/W` for the three MetaFonts. Glyph quad, pen advance, line width and word-wrap all multiply by `+0x28`, so this condenses glyphs and spacing together — what the file condense did by editing every `.spr` width. |
-| **Seams** | `ST3D_Sprite::DrawScaled2D`'s snap block (`0x63aeca`), and `ParameterDB::Get(DBRectangle)`'s entry (`0x5358f0`) | A snapped sprite's far edge is snapped like its near one, so tiles meet; a rect's width and height are taken from its converted far edge. See "Seams between tiles". |
+| **Seams** | `ST3D_Sprite::DrawScaled2D`'s snap block (`0x63aeca`), and `ParameterDB::Get(DBRectangle)`'s entry (`0x5358f0`) | Both edges of a snapped sprite go to `floor(v) + 0.5`, a pixel boundary, so tiles meet and MSAA draws no line outside them; a rect's width and height are taken from its converted far edge. See "Seams between tiles". |
 | **Cursors** | `RefreshDisplay`'s `DrawScaled2D` call (`0x6246fa`), and `SetCursor` (`0x625dd9`) | Under DXVK the cursor is the *synchronous* one: the engine draws the sprite itself each frame, after `SetScaleFactor2D(&device+0x18)` = W/800 by H/600. For that one draw the x scale becomes the y scale and the position is re-expressed so the hotspot stays on the pointer; the scale is put back after. The hardware path, if a setup ever takes it, gets `fmuls 0x18(%esi)` → `fmuls 0x1c(%esi)` in `SetCursor`. |
 
 What was established to get there, so it need not be re-derived:
@@ -97,13 +97,35 @@ Two roundings in the engine, each harmless alone at a whole-number scale:
   exists only because `HUD.asi` re-declares the canvas.
 
 `HUD.asi` snaps the far edge the same way as the near one and draws the quad between
-them, and takes a rect's w and h as the converted far edge minus the converted near one.
+them (at `+ 0.5`, not stock's `+ 0.25`: below), and takes a rect's w and h as the converted far edge minus the converted near one.
 x and y are converted exactly as the engine does (the original function runs with the
 canvas set to stock, and the conversion is reproduced, scale rounded to float first),
 so they are bit-identical to stock and w and h move by at most one unit. After it, the
 test pattern's edge texels abut at every join at 16:10 and 16:9, both axes; the bench's
 count of 1-px vertical lines in the briefing screenshot fell by 24–42 at each wide aspect (214 → 177 at 16:9), and 4:3 is
 unchanged. `Seams=0` in `HUD.ini` turns it off.
+
+**A second line, with MSAA: stock snaps to `+ 0.25`, a quarter-pixel short of a pixel
+boundary.** With the gaps closed, the user still saw faint lines in game, over the
+flat grey of unexplored space in the Federation mission (`testbench/scenarios/hud.md`
+now runs there): along the briefing's outer edge, around the minimap frame, at the
+command-bar joints. Each was one pixel *outside* a sprite — at 21:9 column 989 and
+row 96, where the briefing's first pixels are 990 and 97 — about 7 levels darker than
+the fog. Not the art: the installed tiles' alpha is byte-identical to stock at every
+edge, and 0 in those columns. Not texture wrap at the quad edge either: tiles made
+transparent but for an opaque right column and bottom row put nothing on their left or
+top edges. It was MSAA: the same art with `MSAA.ini` `Samples=0` has no line, and with 8
+it does. A quad from `n + 0.25` covers a quarter of pixel `n`, so some of its samples
+count, and MSAA shades that pixel once, at its centre — outside the quad, where the
+texture coordinate has run past 0 and wrapped to the sprite's far edge. The snap now
+puts both edges at `floor(v) + 0.5`, the boundary between two pixels: no sample is
+half-way, the pixels covered without MSAA are the same, and at 1:1 each pixel centre
+lands on a texel centre instead of a quarter off it. With MSAA 8 the column and row
+read exactly the fog colour after it.
+
+The 3D view stops one row short of the screen at 3440x1440 (row 1439 is black under the
+fog); the minimap panel's base looks dark there because nothing is drawn behind it. That
+is the viewport, not the HUD, and is not handled here.
 
 Not seams, and left alone: the faint olive grid behind the briefing text in stock is the
 map grid showing through the panel, whose alpha is 217; the white bracket and lines in

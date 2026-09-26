@@ -76,6 +76,14 @@ anything new in the game's `Logs/`.
   went, and any stream of ours elsewhere is moved to the null sink, muted, and the game
   stopped. The last part is tested with a marked stream at volume 0. The first real
   launch after this change is what shows the routing itself works.
+  **Open: the routing is not airtight.** Besides its main stream (`Star Trek Armada 2`,
+  pid -1, which has always landed on the null sink) the game sometimes opens a second
+  one named `Armada2.exe`, with its real pid. In the logs of ~170 launches on
+  2026-09-26 that one reached the null sink five times and the default output twice
+  (run `session-20260926-173731`: `alsa_output…analog-stereo`, within the first 6 s).
+  The watchdog muted and moved it and stopped the game each time, but for that moment it
+  was on the user's output. Why the pre-registered default is not taken by that stream
+  is not yet known.
 - **XTest input does not work.** In headless sway the seat has no devices. `xdotool`
   moves Xwayland's core pointer, and Wine even logs the `ButtonPress`, but the frame
   stays pixel-identical: with no keyboard on the seat nothing holds focus, and no

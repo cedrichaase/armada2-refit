@@ -16,6 +16,10 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
   `HUD.asi` snaps a sprite's far edge like its near one in `DrawScaled2D` (`0x63aeca`)
   and converts a rect's far edge rather than its width in `Get(DBRectangle)`
   (`0x5358f0`).
+- No faint line one pixel outside UI sprites with MSAA on — along the briefing's edge,
+  the minimap frame and the command bar, plainest over unexplored space. Snapped edges go
+  to `floor(v) + 0.5` (a pixel boundary) instead of stock's `+ 0.25`, which left a
+  quarter-covered pixel that MSAA shaded with a wrapped texture coordinate.
 
 Installed, not yet seen in game.
 

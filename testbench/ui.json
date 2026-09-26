@@ -1,5 +1,5 @@
 {
-  "_about": "Named screens and click targets for scenario steps. Screens are recognised by text OCR must find on them. Targets are in the shell's 800x600 DESIGN space (Menus.asi maps them to the screen; see Case.design_to_screen) and were measured off bench screenshots. Menu buttons are the pictures, not the labels under them: the labels are painted into the background and do not take clicks.",
+  "_about": "Named screens and click targets for scenario steps. Screens are recognised by text OCR must find on them. Targets are in the shell's 800x600 DESIGN space unless they name another `space` (hud: HUD canvas units anchored top left; hud-right: anchored top right, at stock's 1600-wide position) (Menus.asi maps them to the screen; see Case.design_to_screen) and were measured off bench screenshots. Menu buttons are the pictures, not the labels under them: the labels are painted into the background and do not take clicks.",
   "screens": {
     "main": {
       "aliases": ["main menu", "title", "title screen"],
@@ -45,6 +45,8 @@
     "load game": {"at": [686, 580]},
     "first mission": {"at": [385, 132], "aliases": ["first mission in the list", "mission 1"]},
     "mission ok": {"at": [329, 484], "aliases": ["mission selection ok", "select mission ok", "o.k."]},
-    "mission cancel": {"at": [439, 484], "aliases": ["mission selection cancel"]}
+    "mission cancel": {"at": [439, 484], "aliases": ["mission selection cancel"]},
+    "objectives": {"at": [1500, 26], "space": "hud-right", "aliases": ["briefing", "checkmark", "objectives checkmark"], "_note": "in a mission: the checkmark in the top-right command bar, which reopens the briefing. HUD canvas units, anchored right"},
+    "minimap fog": {"at": [200, 900], "space": "hud", "aliases": ["minimap"], "_note": "in Federation mission 1: a point of the minimap far from the fleet, all unexplored at the start; clicking it moves the camera over flat grey fog"}
   }
 }

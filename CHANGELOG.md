@@ -7,11 +7,16 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 4.2.0 — 2026-09-26
 
-Layers: hud 2.1.0.
+Layers: hud 2.1.0, testbench 1.7.0.
 
 ### Fixed
 - UI tiles meet edge to edge at every aspect: the thin grid lines through the mission
-  briefing and the fine lines at HUD panel joins are gone (see `hud/CHANGELOG.md`).
+  briefing and the fine lines at HUD panel joins are gone, and so are the faint lines
+  MSAA drew just outside UI sprites (see `hud/CHANGELOG.md`).
+
+### Changed
+- The test bench's `hud` scenario runs at the Federation briefing over unexplored space,
+  where such lines show (see `testbench/CHANGELOG.md`).
 
 Installed, not yet seen in game.
 
