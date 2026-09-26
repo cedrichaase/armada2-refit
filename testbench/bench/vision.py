@@ -60,7 +60,9 @@ def ocr(path, region=None, scale=None, fast=False):
     if scale is None:
         # measured: at 1440 the shell's text is already big enough, and a 1.5x
         # upscale loses "Graphics Settings" that 1.0x reads at 91% confidence
-        scale = 2.0 if img.shape[0] <= 1200 else 1.0
+        # ... and at 800x600 (the stock baseline) 2x misses the shell's 8 px button
+        # text that 3x and 4x read at 90% ("Werewolf Pack", 2026-09-26)
+        scale = 4.0 if img.shape[0] <= 700 else 2.0 if img.shape[0] <= 1200 else 1.0
     big = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
     gray = cv2.cvtColor(big, cv2.COLOR_BGR2GRAY)
     procs = []
