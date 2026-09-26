@@ -369,8 +369,22 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             raise GameError(f'input "{cmd}": {r or "no answer"}')
 
     def move(self, x, y):
-        self.input(f'move {int(round(x))} {int(round(y))}')
-        self.s['cursor'] = [int(round(x)), int(round(y))]
+        """Put the pointer at x,y -- by relative motion once its position is known.
+        In a mission the game keeps its own cursor and moves it by (absolute position -
+        a reference point it fixes once, then tries to warp back to); Xwayland cannot
+        warp a virtual pointer, so absolute moves arrived as ever-growing jumps and the
+        cursor piled into the corner (+50 across drew +200, +250, +300 ...).  Relative
+        motion moved it exactly, and moves the compositor's pointer the same way, so
+        the shell's Win32 menus see the same position (measured 2026-09-26)."""
+        w, h = self.res
+        x = min(max(int(round(x)), 0), w - 1)
+        y = min(max(int(round(y)), 0), h - 1)
+        cur = self.s.get('cursor')
+        if cur is None:
+            self.input(f'move {x} {y}')
+        elif (x, y) != tuple(cur):
+            self.input(f'rel {x - cur[0]} {y - cur[1]}')
+        self.s['cursor'] = [x, y]
         self.save()
 
     def glide(self, x, y, steps=8):
