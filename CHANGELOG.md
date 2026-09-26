@@ -11,7 +11,7 @@ Layers: hud 2.0.0, testbench 1.5.0.
 
 ### Changed
 - The `font` layer is merged into `hud`, which is now `HUD.asi`: the HUD layout, font
-  and cursors corrected at run time for any display mode (see `hud/CHANGELOG.md`).
+  and cursors corrected at run time for any display mode (`1524bb9`; see `hud/CHANGELOG.md`).
   `a2mod` reports one `hud` layer and reads older manifests' `font` / `hud layout`
   entries as `hud`. MAJOR: a layer name is gone and `hud` now needs the ASI loader.
 - The test bench installs `HUD.asi` once for every case (see `testbench/CHANGELOG.md`).
