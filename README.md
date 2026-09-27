@@ -1,33 +1,102 @@
-# Armada II remastered
+# Armada II Remastered
 
-A remaster of Star Trek: Armada II — the GOG release, patch 1.1 plus Patch Project
-1.2.5, run through Heroic with Proton on Arch + Hyprland. The code layers fix what the
-engine does at modern resolutions — the HUD, the menus, anti-aliasing, bloom — at run
-time, and all of it reverts. The asset layers — upscaled textures, the widened loading
-screen, an upscaled intro, widescreen menu backdrops — are a **pipeline for making your
-own**: extract the stock art from your install, upscale or replace it, build, install —
-or pack it up for someone else to install. [`textures/PACKS.md`](textures/PACKS.md) is
-the short path.
+**Make Star Trek: Armada II (2001) enjoyable on a modern system, without turning it
+into a different game.**
 
-**This repository holds no game content**: no textures, models, video or data from the
-game, original or derived (`publish/README.md`) — only the code and the recipes. What
-you build lives in `A2_DATA`, outside any checkout. Without it, every layer still works:
-the asset layers install nothing and the game keeps its own art.
+Armada II still plays well, but it was built for a 4:3 CRT at 1024x768. At a modern
+resolution the HUD stretches, the menus sit in an 800x600 box, edges shimmer without
+anti-aliasing, and the art falls apart at 4K. This project fixes these problems one at
+a time, and every fix can be undone.
 
-Where things are — `./a2env.sh` prints it; each is taken from the environment, then
-`~/.config/armada2-remastered.conf` (`KEY=value` lines), then the default:
+## Goals
+
+- **Enjoyable on modern systems.** Widescreen and ultrawide without stretching, the
+  menus filling the screen, anti-aliasing, and a working Vulkan renderer under Proton.
+- **Faithful to the original.** Every remastered texture, backdrop and movie is made
+  from the game's own art, so the composition, colour and style stay the same.
+  Generated detail is measured and held back rather than taken as it comes. The engine
+  files stay stock: the fixes are applied in memory at run time. `./a2mod stock` puts
+  the whole game back the way it shipped, for a before/after comparison.
+- **Share the tooling.** Most of the work went into tools for reading the engine,
+  measuring textures and testing the game headless, and they're here too. So are the
+  notes on what the engine actually does, with the dead ends included. They should be
+  useful to anyone modding this game or others like it.
+
+## Features
+
+| | |
+|---|---|
+| **Stretch-free HUD** | `HUD.asi` lays out the in-game HUD, font and cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets |
+| **Full-screen menus** | `Menus.asi` scales the 800x600 shell menus to fill the screen and draws them inside the game window, over widescreen backdrops extended from the originals |
+| **Anti-aliasing** | `MSAA.asi` turns on up to 8x multisample anti-aliasing, which the game has no option for |
+| **Bloom and renderer tuning** | vkBasalt bloom, plus anisotropic filtering and LOD bias through `dxvk.conf` |
+| **Texture replacement** | `./a2tex`, a pipeline that extracts the stock art from your install, upscales or replaces it, checks the result against the engine's format rules, and installs it. It also packs the result up so others can install it. There are 84 ready recipes: skyboxes, nebulae, planets, UI and ship hulls |
+| **Video replacement** | a replacement `binkw32.dll` that plays the launch reels full screen and plays AV1 replacements in place of the original Bink movies, plus a pipeline to build them |
+| **Widened loading screen** | the 3D loading-screen model, rebuilt for widescreen |
+| **One switch** | `./a2mod stock` / `remastered` flips every layer at once for before/after comparisons |
+| **Headless test bench** | `./a2test` runs the game on a copy of the install on a virtual display at any resolution, and takes screenshots and runs regression scenarios |
+
+## No game content in this repository
+
+This repository holds **code, configuration, recipes and documentation only**. It
+contains no textures, models, video or data from the game, whether original or derived
+([`publish/README.md`](publish/README.md)). The asset pipelines work from **your own
+copy** of the game: you extract the stock art, build, and install. Builds live in
+`A2_DATA`, outside the repository.
+
+Every layer works without assets. With nothing built, the asset layers install nothing
+and the game keeps its own art, while the HUD, menus, MSAA and bloom still apply.
+[`textures/PACKS.md`](textures/PACKS.md) is the short path to building your own
+texture pack.
+
+## Requirements
+
+**The game:** Star Trek: Armada II, **GOG release** (patch 1.1), with:
+
+- **Armada II Patch Project 1.2.5**, the community patch. Its installer refuses GOG
+  installs, so copy the ZIP distribution into the game directory by hand
+  ([`platform/README.md`](platform/README.md#patch-project-125)).
+- **`STA2WidescreenPatch` v1.0**, which unlocks widescreen resolutions and ships the
+  [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (`winmm.dll`)
+  that loads this project's `.asi` plugins.
+
+**The platform:** developed and tested on Linux (Arch, Hyprland), with the game run
+through [Heroic](https://heroicgameslauncher.com/) and Proton:
+
+- [DXVK](https://github.com/doitsujin/dxvk)'s `d3d8.dll` and `d3d9.dll` in the game
+  directory, so the game renders through Vulkan. MSAA, bloom and the renderer settings
+  depend on it. `platform/d3d8-chain.py --use dxvk` sets it up.
+- [vkBasalt](https://github.com/DadSchoorse/vkBasalt) for bloom. It is Linux-only.
+- For building: `clang`, `lld-link` and `llvm-dlltool` for the plugins (no MSVC or
+  mingw needed), ImageMagick 7, Python 3 and `ffmpeg`.
+- Optional, for generative upscaling:
+  [`belt`](https://inference.sh), the inference.sh CLI. Upscaling costs credits, so
+  everything else runs without it.
+
+[`platform/README.md`](platform/README.md) covers the full setup: Heroic's DLL
+overrides, the d3d8 chain, setting the resolution, and window management under Hyprland.
+
+## Quick start
+
+    ./a2env.sh                    # check where it thinks the game, prefix and Proton are
+    ./install                     # build and install every layer
+    ./a2mod status                # what is installed, layer by layer
+    ./a2mod stock                 # back to the game as it shipped
+    ./a2mod remastered            # and forward again
+
+Paths are taken from the environment, then `~/.config/armada2-remastered.conf`
+(`KEY=value` lines), then the defaults:
 
 | | Default |
 |---|---|
 | `A2_GAME` | Heroic's `~/Games/Heroic/Star Trek Armada II` |
 | `A2_PREFIX`, `A2_PROTON` | Heroic's prefix and Proton for it |
-| `A2_DATA` | `~/.local/share/armada2-remastered` (`%LOCALAPPDATA%` on Windows): extracted stock art, paid AI layers, builds. **Back up its `ai/` folders**; everything else is rebuilt by a command |
+| `A2_DATA` | `~/.local/share/armada2-remastered` (`%LOCALAPPDATA%` on Windows): extracted stock art, paid AI layers, builds. **Back up its `ai/` folders**; everything else can be rebuilt with a command |
 
 ## The layers
 
-The modpack is a stack of independent layers. `./a2mod` switches the whole stack
-between stock and remastered for before/after comparisons, and each layer has a folder
-here with its own README.
+The mod is a stack of independent layers, each in its own folder with its own README
+(how it works and why) and changelog.
 
 | Folder | Layer | What it changes |
 |---|---|---|
@@ -35,15 +104,18 @@ here with its own README.
 | [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops ([`BACKDROPS.md`](menus/BACKDROPS.md) builds them) |
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
-| [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets — skyboxes, nebulae, planets, UI, hulls — each a recipe to upscale from the game's own art |
+| [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe to upscale from the game's own art |
 | [`models/`](models/CHANGELOG.md) | models | the loading-screen model, widened with its `LOADING` art |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | `binkproxy`, a `binkw32.dll` that plays launch reels full screen and AV1 replacements in place of `.bik` movies, and the movie pipeline |
 
-Not switched by `a2mod`, because the layers above stand on them:
+`a2mod` does not switch these, because the layers above depend on them or they install
+nothing:
 
 | Folder | What it is |
 |---|---|
 | [`platform/`](platform/README.md) | Heroic and Proton, the DXVK d3d8 chain, the ASI loader, the widescreen patch |
+| [`testbench/`](testbench/README.md) | `./a2test`: the game headless at any resolution, scenarios, reports |
+| [`publish/`](publish/README.md) | what this repository may contain, and the check that enforces it |
 
 ## Entry points
 
@@ -54,14 +126,18 @@ Not switched by `a2mod`, because the layers above stand on them:
     ./a2env.sh                              print where the game, prefix, Proton and assets are
 
 Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
-`menus/`, `msaa/` and `cutscenes/binkproxy/`, `a2tex install`/`revert`, or a
-`--revert` flag on the Python tools. See the layer's README.
+`menus/`, `msaa/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
+a `--revert` flag on the Python tools. The layer's README has the details.
 
 ## Versions
 
 Each layer folder has a `CHANGELOG.md` with its own semver version. The root
-[`CHANGELOG.md`](CHANGELOG.md) versions the modpack as a whole and lists the layer
+[`CHANGELOG.md`](CHANGELOG.md) versions the mod as a whole and lists the layer
 versions it bundles.
 
-`publish/` says what this repository may contain and why. `CLAUDE.md` is the working
-brief for Claude Code sessions in this repo.
+`CLAUDE.md` is the working brief for Claude Code sessions in this repository.
+
+---
+
+*Star Trek: Armada II is © Activision; Star Trek is a trademark of CBS Studios / Paramount.
+This is an unofficial fan project, not affiliated with or endorsed by either.*
