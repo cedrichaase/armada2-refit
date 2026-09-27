@@ -4,12 +4,11 @@
 # Fails, listing each offender, if the tree holds anything this repository must not
 # redistribute (publish/README.md):
 #   - any binary file at all. Nothing publishable here is binary -- the code is C,
-#     Python and shell, and every build output is derived -- so the rule needs no list
-#     of extensions a renamed file could slip past;
-#   - the texture work, the cutscenes and the menu backdrop pipeline, at any of the
-#     paths they have ever had: they belong to the private repository,
-#     private repository (../armada2-remastered-private);
-#   - game file formats by extension.
+#     Python and shell, the recipes are text, and every build output is derived and
+#     lives in A2_DATA -- so the rule needs no list of extensions a renamed file could
+#     slip past;
+#   - game file formats by extension, and anything under a target's, movie's or
+#     backdrop's data directory (where assets lived before A2_DATA).
 # .gitignore keeps these out by default; this catches `git add -f`.
 set -uo pipefail
 if [ "${1:-}" = -C ]; then cd "$2" || exit 2; shift 2; else cd "$(dirname "$0")/.."; fi
@@ -28,10 +27,9 @@ done <<< "$numstat"
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   case "$p" in
-    a2tex|textures/*|models/*|archive/*|promo/*|targets/*|lib/*|error-mission-finish/*|\
-    cutscenes/*|movies/*|tools/binkproxy/*|menus/backdrop.sh|menus/backdrops/*|\
-    tools/menuscale/backdrop.sh|tools/menuscale/backdrops/*)
-                                               echo "private     $p"; bad=1 ;;
+    archive/*|promo/*|textures/.scratch/*|textures/targets/*/*/*|\
+    cutscenes/movies/*/*/*|menus/backdrops/*/*)
+                                               echo "asset path  $p"; bad=1 ;;
   esac
   case "${p,,}" in
     *.tga|*.png|*.jpg|*.jpeg|*.webp|*.bmp|*.mp4|*.mkv|*.bik|*.wav|*.sod|*.spr|*.bzn|*.a2neb-backup)

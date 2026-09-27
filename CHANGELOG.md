@@ -5,6 +5,37 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 6.2.0 — 2026-09-27
+
+Layers: textures 2.1.0.
+
+### Added
+- Texture packs: `a2tex pack` and `a2tex install --pack`, and `textures/PACKS.md`, the
+  short path from extracting stock art to sharing a pack (see `textures/CHANGELOG.md`).
+
+Installs nothing different into the game.
+
+## 6.1.0 — 2026-09-27
+
+Layers: textures 2.0.1, models 2.0.0, cutscenes 2.0.0 (joined), menus 4.1.0, testbench 1.9.0.
+
+### Added
+- The texture pipeline (`./a2tex`, `textures/`), the loading-screen model (`models/`),
+  the cutscene proxy and movie pipeline (`cutscenes/`) and the menu backdrop pipeline
+  (`menus/backdrop.sh`, `install-plates.sh`, the `backdrops/*.conf` recipes), from the
+  private repository: code, recipes and docs, in one commit without their history
+  (`publish/README.md`, "The merge"). Their assets stay in `A2_DATA`.
+- `./install` installs every layer. The asset layers install what is built in
+  `A2_DATA`; with nothing built they say so and the game keeps its own art. The test
+  bench's `no-assets` scenario checks exactly that, and passes.
+
+### Changed
+- `publish/check.sh` no longer refuses the texture, cutscene and backdrop paths; it
+  refuses any binary, any game format, and anything inside a data directory a
+  checkout from before `A2_DATA` may still hold (also in `.gitignore`).
+
+Installs nothing different into the game.
+
 ## 6.0.0 — 2026-09-27
 
 Layers: platform 2.0.3, testbench 1.8.1; gameplay removed.

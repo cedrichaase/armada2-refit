@@ -1,0 +1,9 @@
+LIBRARY WINMM.dll
+EXPORTS
+waveOutOpen@24
+waveOutPrepareHeader@12
+waveOutUnprepareHeader@12
+waveOutWrite@12
+waveOutReset@4
+waveOutClose@4
+waveOutSetVolume@8

@@ -5,6 +5,16 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 4.1.0 — 2026-09-27
+
+### Added
+- The backdrop pipeline joins the layer: `backdrop.sh` builds each plate from its
+  recipe `backdrops/<name>.conf` into `$A2_DATA/backdrops/<name>/`, and
+  `install-plates.sh` (run by `./install`) copies the built ones to `Menus/`.
+  `BACKDROPS.md` documents it.
+
+The installed plugin and plates are unchanged.
+
 ## 4.0.0 — 2026-09-27
 
 ### Removed

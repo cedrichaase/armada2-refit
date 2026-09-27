@@ -12,6 +12,8 @@ Launch: -nointro a2_borg01                (Armada2.exe arguments; default -noint
 Reference: 4:3 stock                      (what "compared with" means; default 4:3 in
                                            this scenario's own mod state)
 Stock shell: embed                        (stock cases only: keep Menus.asi, Embed=1 only)
+Assets: none                              (install this checkout with an empty A2_DATA:
+                                           the game as without a texture pack)
 Timeout: 12 min
 
 Any prose is description.

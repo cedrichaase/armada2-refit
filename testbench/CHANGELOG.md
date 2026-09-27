@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.9.0 — 2026-09-27
+
+### Added
+- `Assets: none` in a scenario's header: the case installs this checkout from stock
+  with an empty `A2_DATA`, the game as someone without a texture pack gets it.
+- `scenarios/no-assets.md`, which runs that case: every asset layer installs nothing
+  and says so, the cutscene proxy passes every movie to the real DLL, and the game
+  reaches its own stock main menu with black sides. Passes.
+
+Installs nothing into the game.
+
 ## 1.8.1 — 2026-09-27
 
 ### Fixed

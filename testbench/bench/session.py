@@ -121,7 +121,7 @@ class Session:
 
     @classmethod
     def create(cls, artifacts_dir, res, mod='remastered', vnc=False, record=False,
-               audio=False, keep=False, label='', stock_shell=None, installs=None):
+               audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
             n = next(_SID_SEQ)
@@ -130,9 +130,14 @@ class Session:
         artifacts_dir = Path(artifacts_dir)
         for d in (work, artifacts_dir / 'shots', artifacts_dir / 'logs'):
             d.mkdir(parents=True, exist_ok=True)
+        # assets='none': the game as someone without a texture pack gets it -- A2_DATA is
+        # an empty directory, and this checkout's ./install runs into the clone unless
+        # --install names others.
+        if assets == 'none' and mod == 'remastered' and not installs:
+            installs = [config.REPO]
         installs = [checkout_provenance(p) for p in (installs or [])]
         state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
-                     installs=installs,
+                     installs=installs, assets=assets,
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
                      exception_mtime=None, vnc_port=None)
@@ -141,6 +146,7 @@ class Session:
         (artifacts_dir / 'session.json').write_text(json.dumps({'statefile': str(sess.statefile)}))
         sess.log.meta(session=sid, resolution=config.res_name(res),
                       aspect=config.aspect_name(res), mod=mod, label=label, started=now(),
+                      **({'assets': assets} if assets else {}),
                       **({'installs': [f"{i['path']} @ {i['describe']}" for i in installs]} if installs else {}))
         return sess
 
@@ -188,8 +194,12 @@ class Session:
         w, h = self.res
         set_prf_resolution(self.game_dir / 'ARMADA.PRF', w, h)
         self.log.action(f'ARMADA.PRF resolution set to {w}x{h}')
+        data = config.DATA
+        if self.s.get('assets') == 'none':
+            data = self.work / 'no-assets'
+            data.mkdir(exist_ok=True)
         env = dict(os.environ, A2_GAME=str(self.game_dir), A2_GAME_DIR=str(self.game_dir),
-                   A2_DATA=str(config.DATA),
+                   A2_DATA=str(data),
                    XDG_DATA_HOME=str(self.work / 'xdg'), TMPDIR=str(self.work))
         plog = self.dir / 'logs' / 'prepare.log'
         installs = self.s.get('installs') or []

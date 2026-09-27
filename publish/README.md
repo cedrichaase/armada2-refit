@@ -4,8 +4,9 @@ This repository is meant to be public. Armada II is not ours: its art, video, mo
 data belong to Activision and the Star Trek marks to Paramount. So the rule is simple
 and has no exceptions:
 
-**Nothing derived from the game's own files is committed.** Code, configuration and docs
-are.
+**Nothing derived from the game's own files is committed.** Code, configuration, recipes
+and docs are. Every asset — stock art extracted from the player's own install, AI
+upscales, builds — lives in `A2_DATA` (`a2env.sh`), outside any checkout.
 
 (A working position, not legal advice. It is the conservative reading: an upscale of
 copyrighted art is a derivative of it, whoever paid for the upscale, and a binary delta
@@ -18,27 +19,28 @@ from a 256px stock file to a 1024px plate *is* the plate.)
 | `HUD.asi`, `Menus.asi`, `MSAA.asi` — their C source | yes | our code. It patches the game at run time and ships none of it; the byte arrays in the sources are short instruction signatures, checked before each patch |
 | the Python and shell tooling, `.ini`/`.conf` files | yes | ours |
 | docs and changelogs | yes | ours. They quote the odd config line, which is commentary |
-| **the texture work** — `a2tex`, `textures/`, `models/`, `archive/`, `promo/` | **no** | it cannot work without the game's own textures in `stock/`, and everything it makes is derived from them. It is the private repository **`~/armada2-remastered-private`** |
-| **the cutscenes** — `binkproxy` and the upscaled intro — and **the menu backdrop pipeline** — `backdrop.sh`, its plates and paid seeds | **no** | the intro and the plates are the game's own video and art, upscaled; they moved to the private repository with the code that makes and plays them |
+| the texture pipeline (`a2tex`, `textures/lib`, `tools`), `models/`, `binkproxy`, the movie and backdrop pipelines | yes | ours. They read the game's files from the player's own install and write only into `A2_DATA` and the game directory |
+| the recipes — each target's `target.conf` and `stock.sha256`, `movie.conf`, `backdrops/*.conf` | yes | parameters, file names and SHA-256 hashes of stock files: facts about the game, not its content. The hashes are how `a2tex stock` knows it extracted the right bytes |
+| **any asset** — stock copies, AI upscales, intermediates, builds, the intro, the plates, the paid seeds, the archive of candidates and comparisons, the promo footage | **no** | the game's own art and video, or derived from them. They live in `A2_DATA` |
 
 Third-party code this project *uses* but does not contain — DXVK (zlib), the Ultimate
 ASI Loader (MIT), vkBasalt (zlib), crosire's reshade-shaders (per-file), the
 `STA2WidescreenPatch`, Patch Project 1.2.5 — is not in the repository either. A release
 package may bundle the first four with their notices, and links to the last two.
 
-`a2mod` still switches the `textures`, `models` and `cutscenes` layers, and the
-private repository's `./install` puts the backdrop plates in `Menus/`: it works on the game
-directory only (`.a2neb-backup` files, `$GAME/.a2mod/`) and needs none of their source or art.
+`a2mod` switches every layer on the game directory only (`.a2neb-backup` files,
+`$GAME/.a2mod/`) and needs no asset to do it.
 
 ### How it is enforced
 
 - **`.gitignore`** ignores every image, video and game format anywhere. Committing one
   takes a deliberate `git add -f`.
+- **`.gitignore`** also ignores every data directory a checkout from before `A2_DATA`
+  may still have (`textures/targets/*/*/`, `cutscenes/movies/*/*/`,
+  `menus/backdrops/*/`, `textures/.scratch/`).
 - **`publish/check.sh [-C <repo>] [<commit>]`** fails on any **binary** file in the
-  index (or the commit), and on any path the private work has ever had (`textures/`,
-  `models/`, `archive/`, `promo/`, `a2tex`, `cutscenes/`, `menus/backdrop.sh`,
-  `menus/backdrops/`, and the layout before 2026-09-25's `targets/`, `lib/`,
-  `error-mission-finish/`, `movies/`, `tools/binkproxy/`, `tools/menuscale/backdrop*`). No publishable file here is
+  index (or the commit), on any game format by extension, and on any path inside those
+  data directories or the old `archive/` and `promo/`. No publishable file here is
   binary, so the binary test catches a renamed image without a list of extensions.
 
 ## The split, 2026-09-26
@@ -59,6 +61,15 @@ stock textures and every archive plate. On 2026-09-26:
   `menus/CHANGELOG.md`.
 - **The pre-split repository** is kept whole as
   `~/armada2-remastered-pre-split-2026-09-26.bundle` (`git clone` it to look).
+
+## The merge, 2026-09-27
+
+A day later the split was undone the other way round: once no asset lived in a checkout
+any more (every one moved to `A2_DATA`), the private repository held only code, recipes
+and docs, so they came here — in one commit, not with their history, which is full of
+stock art. Commit hashes cited in the `textures/`, `models/` and `cutscenes/`
+changelogs, and the pre-split hashes above, refer to that private history and do not
+resolve here.
 
 ## Before the first push — open
 

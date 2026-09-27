@@ -1,24 +1,34 @@
 #!/usr/bin/env bash
-# Install every layer this repository owns into the game directory ($A2_GAME, resolved
-# by a2env.sh), each through its own installer:
+# Install every layer into the game directory ($A2_GAME, resolved by a2env.sh), each
+# through its own installer:
 #
 #   hud        hud/install.sh
-#   menus      menus/install.sh              Menus.asi; the backdrop plates are the
-#                                            private repository's
+#   menus      menus/install.sh              Menus.asi
+#              menus/install-plates.sh       the backdrop plates built in $A2_DATA
 #   msaa       msaa/install.sh
 #   renderer   postfx/renderer-config.sh     dxvk.conf at stage 3, as shipped
+#   textures,  ./a2tex install               every target built in $A2_DATA/textures; the
+#   models                                   loading-screen model rides with LOADING
+#   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
+#                                            $A2_DATA/movies
+#
+# The code layers need nothing but this checkout. The asset layers install what is
+# BUILT in A2_DATA (a2env.sh; default ~/.local/share/armada2-remastered): with nothing
+# built -- anyone who has not made a texture pack -- each says so, installs nothing, and
+# the game keeps its own art. That is a supported state, not an error.
 #
 # Not here: bloom, which is switched in Heroic's launch environment rather than the game
-# directory (postfx/postfx.py).
-#
-# The private repository has a ./install of its own. The test bench runs each checkout's
-# ./install, in order, into its clone of the game (a2test session start --install PATH).
+# directory (postfx/postfx.py). The test bench runs this into its clone of the game
+# (a2test session start --install PATH).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 . "$here/a2env.sh"
 [ -d "$A2_GAME" ] || { echo "no game directory at $A2_GAME (see a2env.sh)" >&2; exit 1; }
-echo "== public $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> $A2_GAME"
+echo "== $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> $A2_GAME (assets: $A2_DATA)"
 "$here/hud/install.sh"
 "$here/menus/install.sh"
+"$here/menus/install-plates.sh"
 "$here/msaa/install.sh"
 "$here/postfx/renderer-config.sh" --stage 3
+"$here/a2tex" install
+"$here/cutscenes/binkproxy/install.sh"

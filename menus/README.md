@@ -305,12 +305,12 @@ included.
 
 **Which screens, and how their plates are built.** Only screens with open art get a
 plate: `mainbkgr` (the main menu) and `singleplay` (campaign selection). The plates
-are the game's own art, upscaled and outpainted, so their recipe and pipeline
-(`backdrop.sh`, the `backdrops/*.conf` keys `field=`, `clone=`, `keep=`, `fade=`,
-`dehaze=`, and the paid seeds) live in the private repository, in
-`menus/BACKDROPS.md`. Its `./install` copies each built plate to `Menus/`, which
-`install.sh` here leaves alone and `--remove` clears; `a2mod` moves them with the rest
-of the menus layer.
+are the game's own art, upscaled and outpainted, so only their recipes are here
+(`backdrops/<name>.conf`); `backdrop.sh` builds each into `$A2_DATA/backdrops/<name>/`.
+[`BACKDROPS.md`](BACKDROPS.md) has the keys (`field=`, `clone=`, `keep=`, `fade=`,
+`dehaze=`) and the paid seeds. `install-plates.sh` (run by `./install`) copies each
+built plate to `Menus/`, which `install.sh` leaves alone and `--remove` clears; `a2mod`
+moves them with the rest of the menus layer.
 
 **Glows cut off by their own rectangle (`N.soften=`).** Hovering Tutorials plays
 `single/TutorialGlow.bik`, 320x200 at (28,20). It has the background baked in, and
