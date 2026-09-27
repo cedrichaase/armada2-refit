@@ -16,7 +16,7 @@ Layers: hud 2.2.0, testbench 1.10.0.
 ### Added
 - `testbench/scenarios/hud-mode-switch.md`, its regression test.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-27.
 
 ## 6.2.1 — 2026-09-27
 

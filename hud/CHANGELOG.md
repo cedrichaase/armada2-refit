@@ -21,7 +21,7 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
   are skipped during it, so the fog of war stays; and the briefing's file name and
   objective completion are handed across it, as a saved game's `Load` does.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-27.
 
 ## 2.1.1 — 2026-09-27
 
