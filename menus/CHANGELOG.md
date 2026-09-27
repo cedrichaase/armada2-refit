@@ -12,7 +12,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
   that stock draws on past its rectangle into the art is kept inside the box, in a
   narrower cut of its own font (`DrawTextExA` hook). One box ships, for Game Setup
   (template 2096): "Shroud Off, Fog Off" / "Shroud On, Fog On" and "Random Placement"
-  no longer run over the minimap's frame. Menus.log records `label` lines.
+  no longer run over the minimap's frame. Menus.log records `label` lines (9838ca6).
 
 Installed, not yet seen in game.
 

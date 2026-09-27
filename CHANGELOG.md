@@ -12,7 +12,7 @@ Layers: menus 4.3.0, testbench 1.11.0.
 ### Added
 - Game Setup's option labels no longer run over the minimap's frame: `[Labels]` in
   `Menus.ini` keeps them inside the art (see `menus/CHANGELOG.md`), with a bench scenario
-  that pins it (`testbench/CHANGELOG.md`).
+  that pins it (`testbench/CHANGELOG.md`). 9838ca6.
 
 Installed, not yet seen in game.
 

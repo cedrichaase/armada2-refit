@@ -9,7 +9,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 ### Added
 - `scenarios/game-setup-labels.md`: Instant Action's Game Setup, with the option labels
-  held clear of the minimap frame, before and after the map is revealed (menus 4.3.0).
+  held clear of the minimap frame, before and after the map is revealed (menus 4.3.0; 9838ca6).
 
 Installs nothing into the game.
 
