@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.10.0 — 2026-09-27
+
+### Added
+- The check `Expect "TEXT" is visible inside design X,Y,W,H [and at least N design px
+  tall]`: OCR, with the phrase's position and height held to a rectangle in the shell's
+  design space.
+- The `multiplayer connection` screen in `ui.json`, and `scenarios/multiplayer-name.md`,
+  which checks the scaled name field (menus 4.2.0). Red on menus 4.1.0 (steps 6 and 13, at
+  1600x1200 and 3440x1440), green on 4.2.0.
+
+Installs nothing into the game.
+
 ## 1.9.0 — 2026-09-27
 
 ### Added

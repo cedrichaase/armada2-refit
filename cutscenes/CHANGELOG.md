@@ -4,6 +4,16 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.0.1 — 2026-09-27
+
+### Fixed
+- `binkproxy/install.sh` refuses only while the game runs from the directory it installs
+  into (working directory or `STEAM_COMPAT_INSTALL_PATH`, as `a2mod`'s `game_running()`).
+  Any running `Armada2.exe` used to count, so the test bench's `--install` into a clone
+  failed whenever the real game was open.
+
+Installs nothing different into the game.
+
 ## 2.0.0 — 2026-09-27
 
 ### Changed

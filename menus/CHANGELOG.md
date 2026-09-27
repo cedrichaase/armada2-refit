@@ -5,6 +5,16 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 4.2.0 — 2026-09-27
+
+### Added
+- Edit boxes are scaled with their dialog: the geometry is mapped like an owner-drawn
+  button's, and the font is scaled by the same factor, in TrueType (Microsoft Sans Serif
+  in place of the raster MS Sans Serif). The multiplayer name field now sits in its frame
+  at 2.4x instead of 1:1 in the top-left corner. Menus.log records `edit` lines.
+
+Confirmed in game 2026-09-27.
+
 ## 4.1.0 — 2026-09-27
 
 ### Added

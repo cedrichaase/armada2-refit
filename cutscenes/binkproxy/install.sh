@@ -29,7 +29,24 @@ while [ $# -gt 0 ]; do
 done
 
 [ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
-if pgrep -if 'armada2\.exe' >/dev/null; then echo "the game is running -- quit it first" >&2; exit 1; fi
+# Is Armada2.exe running from THIS game directory? As a2mod's game_running(): its working
+# directory is GAME, or its STEAM_COMPAT_INSTALL_PATH names it (Heroic/umu set both). Any
+# Armada2.exe used to count, which failed the test bench's install into a clone whenever
+# the real game was open. A process that cannot be inspected still counts.
+game_running() {
+    local game pid ip
+    game=$(realpath "$GAME")
+    for pid in $(pgrep -if 'armada2\.exe' || true); do
+        [ -e "/proc/$pid" ] || continue
+        [ -r "/proc/$pid/environ" ] || return 0
+        [ "$(realpath "/proc/$pid/cwd" 2>/dev/null || true)" = "$game" ] && return 0
+        ip=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null |
+             sed -n 's/^STEAM_COMPAT_INSTALL_PATH=//p' | head -1 || true)
+        [ -n "$ip" ] && [ "$(realpath "$ip" 2>/dev/null || true)" = "$game" ] && return 0
+    done
+    return 1
+}
+if game_running; then echo "the game is running -- quit it first" >&2; exit 1; fi
 
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
 # Either extension case (hard rule 3).  Not `ls a b`: that fails when either is missing.

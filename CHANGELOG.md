@@ -5,6 +5,28 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 6.3.0 — 2026-09-27
+
+Layers: menus 4.2.0, testbench 1.10.0.
+
+### Added
+- The menus' edit boxes (the multiplayer name, Save Game's name) are scaled with their
+  dialog, font included (see `menus/CHANGELOG.md`), with a bench scenario that pins it
+  (`testbench/CHANGELOG.md`).
+
+Confirmed in game 2026-09-27.
+
+## 6.2.2 — 2026-09-27
+
+Layers: cutscenes 2.0.1.
+
+### Fixed
+- The cutscene installer no longer refuses because some other copy of the game is
+  running, which failed `a2test --install` while the real game was open (see
+  `cutscenes/CHANGELOG.md`).
+
+Installs nothing different into the game.
+
 ## 6.2.1 — 2026-09-27
 
 Layers: none (publish/ is versioned by the root).

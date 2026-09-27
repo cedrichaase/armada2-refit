@@ -191,6 +191,44 @@ The log is scaled and centred with everything in place, from both Options and th
 of a mission. Tab clicks switch panes, and Done leaves exactly one dialog; after
 aborting a skirmish, Done returns to a clean main menu.
 
+## Edit boxes
+
+The text fields, such as the player name on Multiplayer Connection (template 2162; an
+`Edit` 399x32 at design 208,171) and Save Game's name (476x28 at 176,551), are real
+`Edit` windows. The shell draws the frame around each into the dialog, which the design
+surface scales. The edit itself is a child window that draws itself, so it sat 1:1 at
+its design coordinates: at 21:9, in the top-left corner of the screen, in a font sized
+for 800x600, and the scaled frame stayed empty.
+
+The fix treats an edit like an owner-drawn button for geometry. Its design rectangle is
+mapped through the dialog's fit when it is created, moved or adopted. Its pixels cannot
+go through a surface, because it draws its own text, caret and selection and takes its
+own clicks. So it keeps drawing itself, at the mapped size, with a font scaled by the same
+factor:
+
+- **The font.** The game gives the name field MS Sans Serif at -11 and Save Game's field
+  Arial at -11 (both read out of Menus.log). `ctl_font` reads the font back
+  (`WM_GETFONT`; the system font if there is none) and creates it at `lfHeight × dh /
+  600`. The edit is subclassed so that a later `WM_SETFONT` is scaled too, and
+  `WM_GETFONT` still returns the game's own font.
+- **Not the raster face.** MS Sans Serif is a raster font. Asked for -26 at 3440x1440,
+  it came back at its largest bitmap: "Player" measured 21 px tall on screen against the
+  41 that 2.4x stock wants, and hardly bigger than at 1600x1200. The scaled font asks for
+  **Microsoft Sans Serif**, the TrueType successor drawn to the same metrics, with
+  `OUT_TT_ONLY_PRECIS`. "Player" then measures 85x37 on screen, against 84 wide for stock's
+  35 px × 2.4.
+- **Colour** needs nothing. The shell answers `WM_CTLCOLOREDIT` on the dialog
+  (`Screen::ControlColorEdit`, `0x5a3360`: its text colour, a transparent background
+  mode, a stock brush), and that reaches the game through the dialog subclass as before.
+  The dialog has `WS_CLIPCHILDREN`, so presenting the design surface never paints over
+  the edit.
+
+The game places the name field twice. It creates the field somewhere else (the log shows
+`adopted edit 149x36 @180,37`), then moves it into the frame with `MoveWindow` in design
+coordinates, which `ctl_moved` maps. `testbench/scenarios/multiplayer-name.md` checks
+that "Player" lies inside the field at stock's size, and that a name typed after
+clicking into the field shows up there.
+
 ## GetDC and ReleaseDC do not pair up in this game
 
 `ShellButton::UpdateButton` (`0x5a4a10`) takes `GetDC(hDlg)`, draws the button,
@@ -484,17 +522,14 @@ rectangle that changed, as the backdrop path does.
 
 - **Confirmed rendered:** the main menu, the single-player/campaign screen, Options,
   Graphics Settings, and in a mission the Options menu and Save Game. Multiplayer
-  has not been seen scaled.
+  Connection has been seen scaled on the bench only; the screens past it have not.
 - **Hover and click are confirmed to land correctly**; nothing has been measured about
   how *fast* they are. See the animation stall above.
-- **Real child controls** (edit boxes, list boxes — the multiplayer screens use them)
-  are separate HWNDs that Windows draws itself. Owner-drawn buttons are the exception
-  and are scaled (see "The Admiral's Log"). The rest are not covered by the offscreen
-  redirect and sit unscaled. The main screens are custom-drawn `ShellButton` bitmaps
-  and are fine. **Seen:** Save Game's name field (`Edit`, 476x28 at design 176,551)
-  draws at 1:1 at its unscaled position. The user confirms this in game for all text
-  boxes, and they are still usable. Embed does not change this. The fix is to map
-  their geometry the way the owner-drawn buttons' is, plus a scaled font.
+- **Other real child controls.** Owner-drawn buttons and edit boxes are scaled (see
+  "The Admiral's Log" and "Edit boxes"). Anything else, such as a list box or combo box
+  on the GameSpy or lobby screens, is a separate HWND that Windows draws itself, and
+  still sits 1:1 at its design position. None has been seen yet. Adding a class is one
+  line in `ctl_kind()`, if its own font is all it needs.
 - **Menus drawn inside the renderer** (the Direct3D route) was considered and
   deferred. Embed gets one OS window without it, and the GDI child draws correctly over
   the DXVK surface because the game loop is blocked while any menu is open.

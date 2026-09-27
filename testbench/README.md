@@ -154,6 +154,11 @@ anything new in the game's `Logs/`.
 - **Fog of war is flat grey.** A map opens scrolled to its top-left corner, so its
   unexplored area fills part of the 3D view with flat grey, and so does the minimap.
   The flat-area check will flag it. Don't use that check on a map.
+- **`a2test drive` drives the newest active session on the machine**, and every case
+  of an `a2test run` counts as one. With another job running scenarios, a `drive` after
+  your own `session start` went to *that* job's game (2026-09-27: an Escape and two
+  clicks landed in a `hud-mode-switch` case). When anything else may be using the bench,
+  set `A2TEST_SESSION` to the `state:` path `session start` prints.
 - **The briefing's OK button did not take a click** in one session, though Esc did.
   Not investigated.
 
