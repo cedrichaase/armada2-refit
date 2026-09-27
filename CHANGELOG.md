@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 6.2.2 — 2026-09-27
+
+Layers: cutscenes 2.0.1.
+
+### Fixed
+- The cutscene installer no longer refuses because some other copy of the game is
+  running, which failed `a2test --install` while the real game was open (see
+  `cutscenes/CHANGELOG.md`).
+
+Installs nothing different into the game.
+
 ## 6.2.1 — 2026-09-27
 
 Layers: none (publish/ is versioned by the root).
