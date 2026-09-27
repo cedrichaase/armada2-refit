@@ -229,6 +229,47 @@ coordinates, which `ctl_moved` maps. `testbench/scenarios/multiplayer-name.md` c
 that "Player" lies inside the field at stock's size, and that a name typed after
 clicking into the field shows up there.
 
+## Labels that run into the art: `[Labels]`
+
+On Game Setup (Instant Action, and every multiplayer setup: all of them are template
+2096), "Shroud Off, Fog Off" and "Random Placement" run over the left border of the
+minimap's frame, and under the map once it shows. This is stock. It is there at 800x600
+without the plugin, and the face is the game's own: the shell asks for Arial Bold
+(`ShellFonts` makes it at cell heights 8 to 20), and the Arial Bold in Proton's prefix is
+Liberation Sans under that name, drawn to Arial's metrics.
+
+Every shell label is one `DrawTextExA`. `ShellButton::DrawLabelText` passes
+`DT_SINGLELINE | DT_VCENTER | DT_NOCLIP` (`0x124`, or `0x125`/`0x126` centred or
+right-aligned), so text wider than its rectangle is drawn on past it. **The rectangles
+cannot say where a label must stop.** Logged on this screen, the options' rectangles
+are 87 px, and nearly every label in the shell overruns its rectangle harmlessly
+("Resources: Normal" is 101 px in 87). "Shroud Off, Fog Off" meanwhile asks for 136 px,
+across the frame. Fitting labels to their rectangles would squeeze labels that touch
+nothing and miss the one that collides. The limit is in the art, so it is configured
+there:
+
+- `[Labels]`, `N=template,x,y,w,h` in design pixels. A left-aligned, single-line label
+  whose rectangle starts inside the box, while that template is the innermost menu, is
+  kept inside the box's right edge. The template is the one `DialogBoxParamA` was
+  last asked for and has not yet returned from (every menu is modal).
+- The shipped box is `2096,520,130,95,125`. The frame's border is at x 618–621 (read off
+  stock at 800x600), and the options' labels start at 523, so they get 92 px.
+- **How a label is fitted.** It is drawn in a narrower cut of its own font (`lfWidth`
+  below `tmAveCharWidth`), then with `ExtTextOutA` and per-character advances scaled so
+  the last few pixels come out of the spacing. One step of `lfWidth` is ~15% at these
+  sizes (7 → 6 for Arial Bold at 12). Taking the cut that fits outright put "Random
+  Placement" at 81 px in 92 of room, visibly narrower than "SELECT MAP" above it. So the
+  widest cut within 8% of the room is taken, and the spacing does the rest: 95 → 92 and
+  96 → 92. The vertical position is `DrawText`'s own for `DT_VCENTER`.
+- A label that fits, a label outside every box, anything with `&` (a mnemonic prefix),
+  and every other flag combination go to the real call. `LabelFit=0` removes the hook.
+
+**The minimap preview is blank while "Minimap Hidden" is set.** That is a game rule
+(the players do not see the map), and the preview follows it, observed on the bench:
+choosing a map changes the name and player count but not the frame. Clicking the option
+reveals the map, and the option then disappears. It is one-way in stock too, and only
+the host can do it. Nothing here changes that.
+
 ## GetDC and ReleaseDC do not pair up in this game
 
 `ShellButton::UpdateButton` (`0x5a4a10`) takes `GetDC(hDlg)`, draws the button,

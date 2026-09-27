@@ -5,6 +5,17 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 4.3.0 — 2026-09-27
+
+### Added
+- `[Labels]` in `Menus.ini` (`N=template,x,y,w,h`) and `LabelFit=` in `[Menus]`: a label
+  that stock draws on past its rectangle into the art is kept inside the box, in a
+  narrower cut of its own font (`DrawTextExA` hook). One box ships, for Game Setup
+  (template 2096): "Shroud Off, Fog Off" / "Shroud On, Fog On" and "Random Placement"
+  no longer run over the minimap's frame. Menus.log records `label` lines (9838ca6).
+
+Confirmed in game 2026-09-27.
+
 ## 4.2.0 — 2026-09-27
 
 ### Added
