@@ -43,33 +43,16 @@ package may bundle the first four with their notices, and links to the last two.
   data directories or the old `archive/` and `promo/`. No publishable file here is
   binary, so the binary test catches a renamed image without a list of extensions.
 
-## The split, 2026-09-26
+## Commit hashes in the changelogs
 
-Until then, this repository and the texture work were one, and its history held 1669
-stock textures and every archive plate. On 2026-09-26:
+This repository's history was rewritten without any binary, and `check.sh` passes on
+every commit. The texture, model, cutscene and backdrop work joined it in one commit,
+without its history, which is full of stock art. So not every cited hash resolves here:
 
-- **`~/armada2-remastered-private`** was made from the full, unfiltered history, then
-  trimmed at its tip to the texture work. Commit hashes cited in the `textures/` and
-  `models/` changelogs resolve there.
-- **This repository's history was rewritten**: every commit, with the texture work's
-  paths — and, in a second pass the same day, the cutscenes and the menu backdrop
-  pipeline — and every binary removed, and commits left empty by that dropped. `check.sh`
-  passes on every commit. Hashes cited in this repository's changelogs were remapped to
-  the rewritten commits in the same step. A cited commit the rewrite dropped (one that
-  held only private work) was given its original hash, which resolves in the private
-  repository: `927f993` in the root changelog, `79695b2`, `8a3562c` and `d3e1ccb` in
-  `menus/CHANGELOG.md`.
-- **The pre-split repository** is kept whole as
-  `~/armada2-remastered-pre-split-2026-09-26.bundle` (`git clone` it to look).
-
-## The merge, 2026-09-27
-
-A day later the split was undone the other way round: once no asset lived in a checkout
-any more (every one moved to `A2_DATA`), the private repository held only code, recipes
-and docs, so they came here — in one commit, not with their history, which is full of
-stock art. Commit hashes cited in the `textures/`, `models/` and `cutscenes/`
-changelogs, and the pre-split hashes above, refer to that private history and do not
-resolve here.
+- Hashes in the `textures/`, `models/` and `cutscenes/` changelogs, and `927f993` in the
+  root changelog and `79695b2`, `8a3562c` and `d3e1ccb` in `menus/CHANGELOG.md`, are in
+  that unfiltered history, which is not published and does not resolve here.
+- Every other hash resolves in this repository.
 
 ## Before the first push — open
 

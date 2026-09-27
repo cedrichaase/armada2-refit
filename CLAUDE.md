@@ -152,7 +152,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
   Patch Project 1.2.5, run through Heroic with Proton-CachyOS.
 - Textures: `Textures/RGB/`, flat, **2115 `.tga` files, 196 MB stock**, **mixed
   `.tga` / `.TGA` case**. (196 MB is the byte total; `du` says 205 MB, because 2115
-  small files carry ~9 MB of block slack. Both figures appear in older notes.)
+  small files carry ~9 MB of block slack.)
 - Available: ImageMagick 7 (`magick`), `python3`, `ffmpeg`.
   **Not available: numpy, PIL.** Do image work through ImageMagick, not Python.
 - **32-bit Windows DLLs can be built here**, which is not obvious: there is no MSVC and
@@ -536,14 +536,14 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 
 ### msaa, postfx, platform
 
-- **The game renders through DXVK/Vulkan, and did not until 2026-09-22** —
-  `syswow64/d3d8.dll` was recorded as DXVK's on the strength of its byte count and was
-  *Wine's builtin*. The working chain keeps DXVK's `d3d8.dll` **and** `d3d9.dll` in the
-  **game directory** (the prefix is not durable — Proton restores it from symlinks),
-  `d3d9=n,b` in the overrides, and the Wine virtual desktop **off**. The virtual desktop
-  is **superseded**: it was once the fix for menus opening as separate windows, which
-  `Menus.asi`'s `Embed=1` now solves inside the game window. Never turn it back on
-  to fix a window problem — fix it in `menus.c`.
+- **The game renders through DXVK/Vulkan.** The chain keeps DXVK's `d3d8.dll` **and**
+  `d3d9.dll` in the **game directory** (the prefix is not durable — Proton restores it
+  from symlinks), `d3d9=n,b` in the overrides, and the Wine virtual desktop **off**.
+  The stock `syswow64/d3d8.dll` is *Wine's builtin*, and was once taken for DXVK's on
+  the strength of its byte count. The virtual desktop also puts the menus in one window,
+  but DXVK cannot set a display mode inside it; `Menus.asi`'s `Embed=1` does that job
+  inside the game window. Never turn it on to fix a window problem — fix it in
+  `menus.c`.
   `platform/d3d8-chain.py --status` identifies every link **by hash; never identify one
   by size.** "Heroic redeploys DXVK" is `autoInstallDxvk` working as designed.
 - **Bloom** is vkBasalt, possible only because the chain is Vulkan. `postfx/postfx.py`
@@ -583,8 +583,8 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `gminisys` and `MBuild` stay stock; reasons in `textures/README.md`.
 - **Hulls: 1024, not 2048.** Both cost $0.005; the decision stands on disk (one ship's
   three files are 16 MB at 1024, 64 MB at 2048) and on invention rising with the lift.
-  `Textures/RGB`'s 2.27 GB is an **on-disk** figure, not a memory one —
-  `textures/README.md` corrects the reasoning that once treated it as one.
+  The size of `Textures/RGB` is an **on-disk** figure, not a memory one —
+  `textures/README.md`, "2.27 GB resident was never a memory figure".
 - **`textures/tools/fix-enterprise-registry.py`** re-cuts the two `C` apertures the model
   closed in `NCC-1701-E`. A deliberate one-off. **Re-run it after any `--reblend` of
   that target, before `build`** — `src/` is derived and a re-blend discards the fix.

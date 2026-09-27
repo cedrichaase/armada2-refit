@@ -9,13 +9,15 @@ system: `menus/`.
     hud/install.sh             build HUD.asi, revert the file-based fixes, install
     hud/install.sh --remove    take it out (the HUD is then stock: stretched)
 
-Until hud 2.0.0 the same three corrections were made by rewriting game files for one
-resolution — `ui-widescreen.py`, `ui-font-condense.py` and `cursor-aspect.py`, below.
-Each baked in the aspect `ARMADA.PRF` had when it ran, so a different resolution drew
-the HUD, text and cursors too narrow until someone ran them again. They stay here as
-the derivation of what the plugin does and as the `--revert` that `install.sh` runs; do
-not install them alongside it — every correction would be applied twice. `HUD.asi`
-stands down part by part if it finds them (see `HUD.log`).
+The same three corrections can be made by rewriting game files for one resolution —
+`ui-widescreen.py`, `ui-font-condense.py` and `cursor-aspect.py`, below. Each bakes in
+the aspect `ARMADA.PRF` has when it runs, so a different resolution draws the HUD, text
+and cursors too narrow until they are run again, which is why the plugin replaced them.
+They stay here as the derivation of what the plugin does and as the `--revert` that
+`install.sh` runs; do not install them alongside it — every correction would be applied
+twice. `HUD.asi` stands down part by part if it finds them (see `HUD.log`). Most of this
+file derives the corrections through those scripts; read their sections for the *why*,
+and the table below for what the plugin actually hooks.
 
 ## HUD.asi — the same three corrections, in the engine
 
@@ -53,9 +55,9 @@ What was established to get there, so it need not be re-derived:
   hardware cursor texture at `texW·[dev+0x18]` by `texH·[dev+0x1c]`. Set: `SetCursor`
   makes no hardware cursor and `RefreshDisplay` (`0x624630`) draws the sprite as a 2D
   quad under the global 2D scale (`0x7ad6e8`), which it sets to `&device+0x18` and does
-  not restore. hud 2.0.0 patched only the hardware path, and the cursor stayed 1.79x wide
-  in game — that is how the second path was found. The `.spr` experiment's "map-plane"
-  cursor below is this path: it draws the sprite's `W H`.
+  not restore. Under DXVK the flag is set, so patching only the hardware path leaves the
+  cursor 1.79x wide in game. The `.spr` experiment's "map-plane" cursor below is this
+  path: it draws the sprite's `W H`.
 - `[device+0x18]`/`[device+0x1c]` are W/800 and H/600 and also map cursor positions
   (`SetCursorPosition` divides by them); the plugin changes neither, only what one
   multiply and one draw read.
@@ -106,10 +108,9 @@ count of 1-px vertical lines in the briefing screenshot fell by 24–42 at each 
 unchanged. `Seams=0` in `HUD.ini` turns it off.
 
 **A second line, with MSAA: stock snaps to `+ 0.25`, a quarter-pixel short of a pixel
-boundary.** With the gaps closed, the user still saw faint lines in game, over the
-flat grey of unexplored space in the Federation mission (`testbench/scenarios/hud.md`
-now runs there): along the briefing's outer edge, around the minimap frame, at the
-command-bar joints. Each was one pixel *outside* a sprite — at 21:9 column 989 and
+boundary.** With the gaps closed, faint lines remain over the flat grey of unexplored
+space in the Federation mission (`testbench/scenarios/hud.md` runs there): along the
+briefing's outer edge, around the minimap frame, at the command-bar joints. Each was one pixel *outside* a sprite — at 21:9 column 989 and
 row 96, where the briefing's first pixels are 990 and 97 — about 7 levels darker than
 the fog. Not the art: the installed tiles' alpha is byte-identical to stock at every
 edge, and 0 in those columns. Not texture wrap at the quad edge either: tiles made
@@ -117,20 +118,20 @@ transparent but for an opaque right column and bottom row put nothing on their l
 top edges. It was MSAA: the same art with `MSAA.ini` `Samples=0` has no line, and with 8
 it does. A quad from `n + 0.25` covers a quarter of pixel `n`, so some of its samples
 count, and MSAA shades that pixel once, at its centre — outside the quad, where the
-texture coordinate has run past 0 and wrapped to the sprite's far edge. The snap now
-puts both edges at `floor(v) + 0.5`, the boundary between two pixels: no sample is
+texture coordinate has run past 0 and wrapped to the sprite's far edge. The snap puts
+both edges at `floor(v) + 0.5`, the boundary between two pixels: no sample is
 half-way, the pixels covered without MSAA are the same, and at 1:1 each pixel centre
 lands on a texel centre instead of a quarter off it. With MSAA 8 the column and row
 read exactly the fog colour after it.
 
-**Not every sprite was snapped.** The user then found the same lines around the action
+**Every sprite is snapped, not only UI ones.** The same lines show around the action
 bar, the command buttons shown for a selected unit. Those sprites lack flag `0x80`, so
-`DrawScaled2D` jumped over the snap (`je` at `0x63aec8`) and drew them where the float
-maths put them — fractional edges, and MSAA's line along each. The `je` is NOP'd, so every
-2D sprite is snapped: at most half a pixel of movement, for sprites that are all flat
-screen-space UI (3D-placed sprites go through `DrawScaled3D`). The gaps between the
-buttons are fog-coloured after it, and the bench's `hud` scenario now selects a unit and
-judges the action bar over the fog.
+stock `DrawScaled2D` jumps over the snap (`je` at `0x63aec8`) and draws them where the
+float maths puts them — fractional edges, and MSAA's line along each. The `je` is
+NOP'd, so every 2D sprite is snapped: at most half a pixel of movement, for sprites that
+are all flat screen-space UI (3D-placed sprites go through `DrawScaled3D`). The gaps
+between the buttons are fog-coloured after it, and the bench's `hud` scenario selects a
+unit and judges the action bar over the fog.
 
 The 3D view stops one row short of the screen at 3440x1440 (row 1439 is black under the
 fog); the minimap panel's base looks dark there because nothing is drawn behind it. That
@@ -175,8 +176,8 @@ the sub-element coordinates must **not** be touched.
 ### The popup palette is not on the canvas
 
 The action bar — the row of command buttons for the selected unit — is the one element
-that does **not** obey `screenWidth`, and it was missed on the first pass. It sat far
-left of the ship display instead of level with it.
+that does **not** obey `screenWidth`. Re-declaring the canvas alone leaves it far left
+of the ship display instead of level with it.
 
 `popupPaletteXA` / `popupPaletteXB` in `gui_glob16x12.cfg` are bare scalars, and the
 palette code reads them as a fraction of a **hard-coded 1600**, not of the declared
@@ -211,9 +212,9 @@ an `infopanel` anchor — it targets `infoPanelArea`'s x rather than its own sto
 the overhang is gone. This is the one place the tool deliberately does not reproduce
 stock.
 
-XB was previously shifted to 2622 as though it were a canvas x, which the 1600 reference
-renders at screen x **5637** — the locked build palette was off-screen entirely. Fixed
-by the same change.
+XB shifted as though it were a canvas x (to 2622 here) is rendered by the 1600
+reference at screen x **5637** — the locked build palette off-screen entirely. The same
+1600-space handling covers it.
 
 `popupPaletteYA`/`YB` are left alone: the vertical axis is never distorted, since
 `screenHeight` stays 1200. Note for anyone tempted to tidy it — the measured button row
@@ -226,22 +227,20 @@ backdrop assembled from six tiles with overlay sprites placed against it, so it 
 be widened without either stretching the art — the thing being removed — or re-tiling
 it. Left stock, which leaves it pillarboxed left rather than stretched.
 
-**Confirmed in game.** The model behind it — per-axis scaling from a declared canvas —
-was inferred from the file format and the symptom before it was tested, and it was
-right: icons square, minimap square, panels flush against the real screen edges instead
-of stranded at the 1600px mark. What has *not* been reopened since the change is the
-comm and objectives pop-ups, which moved with it.
-
-**The palette correction is confirmed in game**, in two rounds: the first put the action
-bar level with the ship display and proved the 1600-reference model to sub-pixel
-accuracy, and the second removed stock's five-pixel overhang. The `infopanel` anchor
-that removes it has been measured but not yet seen rendered.
+The model behind it — per-axis scaling from a declared canvas — was inferred from the
+file format and the symptom before it was tested, and it was right: icons square,
+minimap square, panels flush against the real screen edges instead of stranded at the
+1600px mark, and the action bar level with the ship display.
 
 ### The cursors are not on the canvas either
 
-The mouse cursors stayed stretched after all of the above — the same sideways smear the
+The mouse cursors stay stretched after all of the above — the same sideways smear the
 panels and glyphs had. They are the **third** screen reference in this game, after the
 declared canvas and the palette's hard-coded 1600.
+
+`HUD.asi` corrects them in the engine, at the scale the cursor is drawn with (the hook
+table above). What follows is how the reference was measured and the art-side squash,
+`cursor-aspect.py`, which is the plugin's derivation and its `--revert`.
 
 Measured off two 3440x1440 screenshots, against the source texels:
 
@@ -262,32 +261,30 @@ ratio is the thing: `4.30/2.40 = 1.79`, the same number as the UI, because 1.79 
 
 #### There are two cursor draw paths, and only one of them reads cursor.spr
 
-The first attempt rewrote `Sprites/cursor.spr` so that `W`, `U` and `@referenceWidth`
-scaled together — UV rect bit-identical, drawn rect narrowed, `W 32 -> 18`. **In game it
-fixed exactly one of the two paths**: the part of the selected-ship cursor that sits on
-the map plane came out square, and every cursor on the UI layer was untouched.
+Rewriting `Sprites/cursor.spr` so that `W`, `U` and `@referenceWidth` scale together —
+UV rect bit-identical, drawn rect narrowed, `W 32 -> 18` — **fixes exactly one of the
+two paths** in game: the part of the selected-ship cursor that sits on the map plane
+comes out square, and every cursor on the UI layer is untouched.
 
-That is the measurement that settles the mechanism, and it was worth making:
+That is the measurement that settles the mechanism:
 
-- **The map-plane part is drawn from the `.spr` `W H` pair.** It responded to W.
-- **The UI-layer cursor is a hardware cursor.** `Armada2.exe` imports Win32
-  `SetCursor` / `LoadCursorA` / `SetSystemCursor` *and* references D3D8
-  `SetCursorProperties`; the engine composes that cursor's surface itself from the
-  sprite's **texel extent**, which no number in a `.spr` can reach.
-  (`cursors/*.cur` are the shell's own 32x32 Win32 cursors — `cursor1.cur` is a *red*
-  arrow, not the in-game pale delta — so they are not this.)
+- **The map-plane part is drawn from the `.spr` `W H` pair.** It responds to W.
+- **The UI-layer cursor is sized from the sprite's texel extent**, which no number in a
+  `.spr` can reach — whether the engine builds a D3D8 hardware cursor from it or, as
+  under DXVK, draws the sprite itself under the 2D scale (see "An AI upscale cannot
+  help these", below). (`cursors/*.cur` are the shell's own 32x32 Win32 cursors —
+  `cursor1.cur` is a *red* arrow, not the in-game pale delta — so they are not this.)
 
-So the drawn size is `texels x (screenW/800, screenH/600)`. The horizontal texel density
-is pinned at **4.30 px/texel** by the reference no matter what we do, and the only lever
-left is how many texels the art spans.
+So the drawn size is `texels x (screenW/800, screenH/600)`. Short of code, the
+horizontal texel density is pinned at **4.30 px/texel**, and the only lever left in the
+art is how many texels it spans.
 
-#### So the correction goes in the art, and cursor.spr goes back to stock
+#### The art-side correction: squash the art, keep cursor.spr stock
 
 `hud/cursor-aspect.py` squashes the **art** horizontally by `1/1.79` inside its
 unchanged 32x32 cell. That fixes *both* paths at once — the map-plane path draws those
-same texels into the same 1.79-stretched rect — which is why the `.spr` rewrite was
-reverted rather than kept. Keeping both would square the art twice and leave the
-map-plane cursor too narrow.
+same texels into the same 1.79-stretched rect — which is why `cursor.spr` stays stock.
+Changing both would square the art twice and leave the map-plane cursor too narrow.
 
     hud/cursor-aspect.py --dry-run     # 20 textures, frame grids and hotspots
     hud/cursor-aspect.py               # rebuild, reading the resolution from ARMADA.PRF
@@ -310,7 +307,7 @@ scale `H` / `@referenceHeight` with it. That preserves every original texel and 
 equally square, and it was rejected on size alone: it leaves a **138x138** cursor, which
 is enormous at 1440p. The density is identical either way; only the size differs.
 
-#### Two things this got wrong first, both caught by measuring
+#### Two traps in the squash, both caught by measuring
 
 - **The filter has to be interpolating, not approximating.** ImageMagick resizes each
   axis in turn, and a cell's *height* is unchanged here — so the vertical pass runs at
@@ -318,10 +315,10 @@ is enormous at 1440p. The density is identical either way; only the size differs
   grew one row in each direction, which on a colour-keyed sprite is a dark fringe on
   the key. Catrom and Lanczos pass through their sample points and are exact. With
   Catrom the vertical extent and y-offset are **identical to stock in all 20 textures**.
-- **`stock` must be the backup, not the file being overwritten.** The first run copied
-  `src` to the backup, rebuilt, overwrote `src`, and then compared `stock` against
-  `src` — by then the same file. Every before/after number came out identical, which is
-  what that bug looks like: not a wrong number, the *same* number twice.
+- **`stock` must be the backup, not the file being overwritten.** Copy `src` to the
+  backup, rebuild, overwrite `src`, then compare `stock` against `src`, and they are by
+  then the same file. Every before/after number comes out identical, which is what that
+  bug looks like: not a wrong number, the *same* number twice.
 
 Black is the colour key (`@skip=(0,0,0)` in `cursor.spr`), so the guard is that the key
 must **grow** — the cell is narrower now — and the art must not gain rows. Both are
@@ -342,52 +339,45 @@ so it will not touch the `fi**ncurs**ion*` hull backups that share the glob.
 
 **Note that `./a2tex revert all` also restores these**, since it sweeps every
 `*.a2neb-backup` in `Textures/RGB`. That is the right behaviour — revert all means
-stock — but it means the cursor fix has to be re-applied afterwards.
-
-**Confirmed in game** — no longer stretched.
+stock — and with `HUD.asi` installed the squashed art is not wanted anyway.
 
 #### An AI upscale cannot help these, and the binary says exactly why
 
-Asked for, and the answer is no — not as an art change. `armada2.map` makes the cursor
-path readable rather than guessable, and it is short:
+`armada2.map` makes the cursor path readable rather than guessable, and it is short.
+`[device+0xe0]` (`SetSynchronousCursor`) picks one of two paths:
 
-- **`ST3D_DeviceDirectX8::DrawCursor` (`0x623bd0`) is `xor eax,eax; ret`.** It draws
-  nothing. The cursor is a real **D3D8 hardware cursor**, set via
-  `SetCursorProperties`, not a quad the renderer composites.
-- **`ST3D_DeviceDirectX8::SetCursor` (`0x625c90`) allocates the cursor texture
-  pre-scaled.** With the synchronous flag at `[device+0xe0]` clear — the live path — it
-  computes
+- **Flag clear: a D3D8 hardware cursor.** `ST3D_DeviceDirectX8::DrawCursor`
+  (`0x623bd0`) is `xor eax,eax; ret` — it draws nothing — and
+  `ST3D_DeviceDirectX8::SetCursor` (`0x625c90`) allocates the cursor texture pre-scaled:
 
       width  = round( texW * [device+0x18] )
       height = round( texH * [device+0x1c] )
 
-  and creates the texture at that size. **Those two floats are the 4.30 and the 2.40.**
-  (The other branch, flag set, creates it at the texture's own `[tex+0x1c]`/`[tex+0x20]`
-  — unscaled — and `UpdateCursor` early-returns without blitting, so it is not this.)
-- **`ST3D_DeviceDirectX8::UpdateCursor` (`0x625b00`) then does `CopyRects`** — a 1:1
-  pixel copy, no filtering — of the sub-rect `[a, b, a+c, b+d]` where
-  `c = texW_scaled * sprite.w` and `d = texH_scaled * sprite.h`, into the cursor surface.
+  **Those two floats are the 4.30 and the 2.40.** `UpdateCursor` (`0x625b00`) then does
+  `CopyRects` — a 1:1 pixel copy, no filtering — of the sub-rect `[a, b, a+c, b+d]`
+  where `c = texW_scaled * sprite.w` and `d = texH_scaled * sprite.h`, into the cursor
+  surface.
+- **Flag set — the path taken under DXVK: the engine draws the sprite itself.**
+  `SetCursor` makes no hardware cursor and `UpdateCursor` returns early;
+  `RefreshDisplay` (`0x624630`) draws the cursor as a 2D quad after setting the global
+  2D scale to the same `[device+0x18]`/`[device+0x1c]` pair.
 
-So the on-screen cursor is `source texels x [device+0x18]` wide. **The engine does the
-magnification itself, into a real texture, and the scale factor is a constant.** Double
-the source texels and the cursor comes out twice as big at *identical* density — 4.30
-screen px per source texel either way. There is no art change that buys sharpness,
-which is why the squash is framed as choosing a size rather than trading quality.
+Either way the on-screen cursor is `source texels x [device+0x18]` wide. **The engine
+does the magnification itself, and the scale factor is a constant.** Double the source
+texels and the cursor comes out twice as big at *identical* density — 4.30 screen px per
+source texel either way. There is no art change that buys sharpness, which is why the
+squash is framed as choosing a size rather than trading quality.
 
-**The lever for sharpness is `[device+0x18]` / `[device+0x1c]`, not the textures.** Set
-them to 1.0 and upscale the art 4x and the cursor would be a genuinely crisp 128px
-drawn from real texels instead of a 4.3x blow-up; set them *equal* to each other and the
-aspect is fixed properly, at the source, with stock art and no squash at all. Both are
-code, not data — an ASI hook of the same shape as `menus/`, which is why this
-is now worth considering rather than impossible. Not attempted.
-
-Until then, `cursor-aspect.py`'s squash is the whole of what art can do.
+**The lever is the scale, not the textures.** Making the two factors *equal* fixes the
+aspect at the source, with stock art and no squash — which is what `HUD.asi` does, on
+both paths. Setting them to 1.0 and upscaling the art 4x would make the cursor a
+genuinely crisp 128px drawn from real texels instead of a 4.3x blow-up; that is not
+done.
 
 ## The font
 
-Until hud 2.0.0 this was its own `font` layer; `HUD.asi` now applies the same factor
-at run time (above). What follows is the derivation, and the file-based condense that
-`install.sh` reverts.
+`HUD.asi` applies the font correction at run time (above). What follows is the
+derivation, and the file-based condense that `install.sh` reverts.
 
 `hud/ui-font-condense.py` condenses the in-game bitmap font so it is not drawn 1.9x too
 wide at 21:9. Its backups are `.a2font-backup`, not `.a2neb-backup`, so that `a2tex`
@@ -510,7 +500,7 @@ sizes actually drawn at this resolution land at 0.5235 (24) and 0.5281 (16). `sz
 worst at 0.5584 because its glyphs are 3–8 texels wide, and it belongs to the 640x480
 tier, so it is not drawn here.
 
-**Confirmed in game.** `OBJECTIVES:` measures 323.5 screen px wide against 325.2
+Measured in game, condensed: `OBJECTIVES:` is 323.5 screen px wide against 325.2
 predicted — 0.5% — with the cap height unchanged at 32.7 px, exactly as intended, and the
 glyph aspect back to 9.89 against the atlas's authored 10.04. The briefing paragraph
 reflowed from five lines to three, which is the same prediction seen from the other side.

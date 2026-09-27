@@ -1,6 +1,6 @@
 # Changelog — menus
 
-`MenuScale.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game
+`Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game
 window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
