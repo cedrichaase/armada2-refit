@@ -224,6 +224,11 @@ __declspec(dllimport) HGDIOBJ __stdcall GetCurrentObject(HDC, UINT);
 __declspec(dllimport) HGDIOBJ __stdcall GetStockObject(INT);
 __declspec(dllimport) HGDIOBJ __stdcall CreateFontIndirectA(const void *);
 __declspec(dllimport) LONG_PTR __stdcall SendMessageA(HWND, UINT, WPARAM, LPARAM);
+__declspec(dllimport) BOOL    __stdcall GetTextExtentExPointA(HDC, LPCSTR, INT, INT, INT *, INT *, POINT *);
+__declspec(dllimport) BOOL    __stdcall ExtTextOutA(HDC, INT, INT, UINT, const RECT *, LPCSTR, UINT, const INT *);
+__declspec(dllimport) UINT    __stdcall SetTextAlign(HDC, UINT);
+__declspec(dllimport) BOOL    __stdcall GetTextMetricsA(HDC, void *);
+__declspec(dllimport) INT     __stdcall DrawTextExA(HDC, LPSTR, INT, RECT *, UINT, void *);
 
 #define PAGE_READWRITE        0x04
 #define GENERIC_WRITE         0x40000000
@@ -1245,6 +1250,7 @@ static HHOOK   g_filter;
 static int     g_embedded;      /* count, for the log                      */
 static DLGPROC g_escProc;       /* EscapeMenuDlgProc, or NULL: not found   */
 static LPARAM  g_escClick;      /* centre of Return to Game, design coords */
+static UINT    g_curTpl;        /* innermost DialogBoxParamA template, or 0 */
 
 static HWND (__stdcall *o_GetWindow)(HWND, UINT);
 static void start_flush(void);
@@ -1457,8 +1463,22 @@ static BYTE *child_template(HINSTANCE inst, LPCSTR name)
     return copy;
 }
 
+static LONG_PTR dialog_box(HINSTANCE inst, LPCSTR name, HWND owner, DLGPROC proc, LPARAM lp);
+
+/* Every menu is modal, so the template of the innermost one is what is
+ * drawing; [Labels] boxes are keyed by it. */
 static LONG_PTR __stdcall my_DialogBoxParamA(HINSTANCE inst, LPCSTR name, HWND owner,
                                              DLGPROC proc, LPARAM lp)
+{
+    UINT     prev = g_curTpl;
+    LONG_PTR r;
+    g_curTpl = (UINT_PTR)name < 0x10000 ? (UINT)(UINT_PTR)name : 0;
+    r = dialog_box(inst, name, owner, proc, lp);
+    g_curTpl = prev;
+    return r;
+}
+
+static LONG_PTR dialog_box(HINSTANCE inst, LPCSTR name, HWND owner, DLGPROC proc, LPARAM lp)
 {
     BYTE    *tpl;
     LONG_PTR r;
@@ -2624,6 +2644,184 @@ static int patch_underlay(BYTE *base)
     return 2;
 }
 
+/* ---- labels that overrun into the art --------------------------------- */
+/*
+ * Every shell label is one DrawTextExA call, and the option labels pass
+ * DT_SINGLELINE | DT_NOCLIP: text wider than its rectangle is drawn on past
+ * it.  That is harmless almost everywhere -- the rectangle is a nominal
+ * button size, 87 px for Game Setup's options, and most labels overrun it --
+ * except where art stands in the way.  On Game Setup (template 2096, which
+ * serves Instant Action and every multiplayer setup) "Shroud Off, Fog Off"
+ * and "Random Placement" run over the minimap's frame (x 618-621) and, once
+ * the map is shown, under the map.  The same overrun is there at 800x600
+ * without this plugin, in the game's own Arial Bold (Proton ships Liberation
+ * Sans under that name, to Arial's metrics).  "Shroud Off, Fog Off" asks for
+ * a 136 px rectangle that crosses the frame itself, so the rectangles cannot
+ * say where a label has to stop; the art can.
+ *
+ * [Labels] in Menus.ini lists design boxes, N=template,x,y,w,h.  A
+ * left-aligned label whose rectangle starts inside a box, while that template
+ * is the innermost menu, is kept inside the box's right edge: drawn in a
+ * narrower cut of its own font (lfWidth), and spaced to land on the edge
+ * exactly.  A label that fits is drawn by the game as before.
+ */
+#define DT_CENTER      0x0001
+#define DT_RIGHT       0x0002
+#define DT_VCENTER     0x0004
+#define DT_BOTTOM      0x0008
+#define DT_SINGLELINE  0x0020
+#define DT_NOCLIP      0x0100
+#define DT_NOPREFIX    0x0800
+#define TA_TOPLEFT     0          /* TA_LEFT | TA_TOP | TA_NOUPDATECP */
+#define OBJ_FONT       6
+#define FIT_MAXLEN     160
+#define FIT_SLACK      8          /* percent left to the spacing */
+#define MAXLBOX        8
+
+typedef struct {
+    LONG tmHeight, tmAscent, tmDescent, tmInternalLeading, tmExternalLeading;
+    LONG tmAveCharWidth, tmMaxCharWidth, tmWeight, tmOverhang;
+    LONG tmDigitizedAspectX, tmDigitizedAspectY;
+    BYTE tmFirstChar, tmLastChar, tmDefaultChar, tmBreakChar;
+    BYTE tmItalic, tmUnderlined, tmStruckOut, tmPitchAndFamily, tmCharSet;
+} TEXTMETRICA;
+
+typedef struct { UINT tpl; int x0, y0, x1, y1; } LabelBox;
+
+static INT (__stdcall *o_DrawTextExA)(HDC, LPSTR, INT, RECT *, UINT, void *);
+static int      g_labelFit = 1;
+static LabelBox g_lbox[MAXLBOX];
+static int      g_nlbox;
+static DWORD    g_fitSeen[48];     /* each fitted label is logged once        */
+static int      g_fitLogged;
+
+static void fit_log(LPCSTR s, int n, int cx, int room, int lfw, int ave)
+{
+    char  b[FIT_MAXLEN + 96];
+    int   i;
+    DWORD h = 2166136261UL ^ (DWORD)(room * 7919 + lfw);
+    for (i = 0; i < n; i++) h = (h ^ (BYTE)s[i]) * 16777619UL;
+    if (!g_logging || g_fitLogged >= 48) return;
+    for (i = 0; i < g_fitLogged; i++) if (g_fitSeen[i] == h) return;
+    g_fitSeen[g_fitLogged++] = h;
+    b[0] = 0;
+    s_cat(b, "label \"");
+    i = s_len(b);
+    while (n-- > 0) b[i++] = *s++;
+    b[i] = 0;
+    s_cat(b, "\" "); s_num(b, cx); s_cat(b, " px, room "); s_num(b, room);
+    s_cat(b, ": char width "); s_num(b, lfw); s_cat(b, " of "); s_num(b, ave);
+    logline(b);
+}
+
+static const LabelBox *label_box(const RECT *r)
+{
+    int i;
+    for (i = 0; i < g_nlbox; i++) {
+        const LabelBox *b = &g_lbox[i];
+        if (b->tpl == g_curTpl && r->left >= b->x0 && r->left < b->x1 &&
+            r->top >= b->y0 && r->top < b->y1)
+            return b;
+    }
+    return NULLPTR;
+}
+
+static INT __stdcall my_DrawTextExA(HDC dc, LPSTR s, INT n, RECT *r, UINT f, void *dtp)
+{
+    const UINT plain = DT_VCENTER | DT_BOTTOM | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX;
+    const LabelBox *box;
+    INT         cum[FIT_MAXLEN], dx[FIT_MAXLEN];
+    POINT       sz;
+    TEXTMETRICA tm;
+    LOGFONTA    lf;
+    HGDIOBJ     cur, font = NULLPTR, old = NULLPTR;
+    int         room, i, prev, y, w;
+    UINT        oldAlign;
+
+    if (!g_nlbox || !g_curTpl || !dc || !s || !r || dtp ||
+        (f & (DT_SINGLELINE | DT_NOCLIP)) != (DT_SINGLELINE | DT_NOCLIP) || (f & ~plain))
+        return o_DrawTextExA(dc, s, n, r, f, dtp);
+    if (n < 0) n = s_len(s);
+    if (n <= 1 || n > FIT_MAXLEN || !(box = label_box(r)))
+        return o_DrawTextExA(dc, s, n, r, f, dtp);
+    if (!(f & DT_NOPREFIX))
+        for (i = 0; i < n; i++)
+            if (s[i] == '&') return o_DrawTextExA(dc, s, n, r, f, dtp);
+    room = box->x1 - r->left;
+    if (!GetTextExtentExPointA(dc, s, n, 0, NULLPTR, cum, &sz) || sz.x <= room)
+        return o_DrawTextExA(dc, s, n, r, f, dtp);
+
+    /* A narrower cut of the same face: the widest lfWidth that comes within
+     * FIT_SLACK percent of the room.  At the shell's sizes one step of lfWidth
+     * is ~15% (7 -> 6 for Arial Bold at 12): asking for a cut that fits
+     * outright took "Random Placement" from 103 px to 81 in 92 of room, much
+     * narrower than its neighbours.  The last few pixels come out of the
+     * spacing below instead. */
+    cur = GetCurrentObject(dc, OBJ_FONT);
+    memset(&lf, 0, sizeof lf);
+    if (cur && GetObjectA(cur, sizeof lf, &lf) > 0 && GetTextMetricsA(dc, &tm) && tm.tmAveCharWidth > 1) {
+        w = tm.tmAveCharWidth * room / sz.x + 1;
+        for (; w >= tm.tmAveCharWidth * 3 / 4 && w > 0; w--) {
+            POINT s2;
+            HGDIOBJ f2;
+            if (w >= tm.tmAveCharWidth) continue;
+            lf.lfWidth = w;
+            f2 = CreateFontIndirectA(&lf);
+            if (!f2) break;
+            if (font) { SelectObject(dc, old); DeleteObject(font); }
+            font = f2;
+            old = SelectObject(dc, font);
+            if (GetTextExtentExPointA(dc, s, n, 0, NULLPTR, cum, &s2)) sz.x = s2.x;
+            if (sz.x * 100 <= room * (100 + FIT_SLACK)) break;
+        }
+    }
+    fit_log(s, n, sz.x, room, font ? (int)lf.lfWidth : 0, (int)tm.tmAveCharWidth);
+
+    w = sz.x < room ? sz.x : room;
+    for (i = 0, prev = 0; i < n; i++) {
+        int to = (cum[i] * w + sz.x / 2) / sz.x;
+        dx[i] = to - prev;
+        prev  = to;
+    }
+    /* Where DrawText itself puts one line (Wine's user32 and Windows agree). */
+    if (f & DT_VCENTER)     y = r->top + (r->bottom - r->top) / 2 - sz.y / 2;
+    else if (f & DT_BOTTOM) y = r->bottom - sz.y;
+    else                    y = r->top;
+    oldAlign = SetTextAlign(dc, TA_TOPLEFT);
+    ExtTextOutA(dc, r->left, y, 0, NULLPTR, s, (UINT)n, dx);
+    SetTextAlign(dc, oldAlign);
+    if (font) { SelectObject(dc, old); DeleteObject(font); }
+    return sz.y;
+}
+
+/* [Labels] N=template,x,y,w,h: see above. */
+static void label_list(const char *ini)
+{
+    char key[4], val[96], m[64];
+    int  i, k;
+
+    for (i = 1; i <= 9 && g_nlbox < MAXLBOX; i++) {
+        int v[5], nv = 0, cur = -1;
+        key[0] = (char)('0' + i); key[1] = 0;
+        val[0] = 0;
+        GetPrivateProfileStringA("Labels", key, "", val, sizeof val, ini);
+        for (k = 0; nv < 5; k++) {
+            char c = val[k];
+            if (c >= '0' && c <= '9') { cur = (cur < 0 ? 0 : cur * 10) + (c - '0'); continue; }
+            if (cur >= 0) { v[nv++] = cur; cur = -1; }
+            if (!c) break;
+        }
+        if (nv == 5 && v[0] && v[3] > 0 && v[4] > 0) {
+            LabelBox *b = &g_lbox[g_nlbox++];
+            b->tpl = (UINT)v[0];
+            b->x0 = v[1]; b->y0 = v[2]; b->x1 = v[1] + v[3]; b->y1 = v[2] + v[4];
+        }
+    }
+    m[0] = 0;
+    s_cat(m, "label boxes listed: "); s_num(m, g_nlbox);
+    logline(m);
+}
+
 /* ---- IAT patching ----------------------------------------------------- */
 
 static int same_name(const char *a, const char *b)
@@ -2791,6 +2989,7 @@ static void startup(void)
     g_escReturns = (int)GetPrivateProfileIntA("Menus", "EscapeReturns", 1, ini);
     g_trace   = (int)GetPrivateProfileIntA("Menus", "Trace",        0,   ini);
     g_dump    = (int)GetPrivateProfileIntA("Menus", "DumpBackdrop", 0,   ini);
+    g_labelFit = (int)GetPrivateProfileIntA("Menus", "LabelFit",     1,   ini);
     g_backdrops = (int)GetPrivateProfileIntA("Menus", "Backdrops",  1,   ini);
     g_tol     = (int)GetPrivateProfileIntA("Menus", "DetailTolerance", 48, ini);
     g_floor   = (int)GetPrivateProfileIntA("Menus", "NoiseFloor", 6, ini);
@@ -2866,6 +3065,11 @@ static void startup(void)
         o_GetWindow       = (void *)patch_iat(base, "USER32.dll", "GetWindow",       my_GetWindow);
         o_CreateDialogParamA = (void *)patch_iat(base, "USER32.dll", "CreateDialogParamA", my_CreateDialogParamA);
         o_CreateWindowExA    = (void *)patch_iat(base, "USER32.dll", "CreateWindowExA",    my_CreateWindowExA);
+        if (g_labelFit) {
+            label_list(ini);
+            if (g_nlbox)
+                o_DrawTextExA = (void *)patch_iat(base, "USER32.dll", "DrawTextExA",       my_DrawTextExA);
+        }
     }
 
     /* A hook that failed to bind is never called, but the originals are used
@@ -2880,6 +3084,7 @@ static void startup(void)
     if (!o_GetWindow)     o_GetWindow     = GetWindow;
     if (!o_CreateDialogParamA) o_CreateDialogParamA = CreateDialogParamA;
     if (!o_CreateWindowExA)    o_CreateWindowExA    = CreateWindowExA;
+    if (!o_DrawTextExA)        o_DrawTextExA        = DrawTextExA;
     /* Embedding needs both hooks or neither: an embedded dialog the game
      * cannot find the owner of is worse than a separate window. */
     if (!o_DialogBoxParamA) g_embed = 0;

@@ -16,3 +16,7 @@ GetObjectA@12
 GetCurrentObject@8
 GetStockObject@4
 CreateFontIndirectA@4
+GetTextExtentExPointA@28
+ExtTextOutA@32
+SetTextAlign@8
+GetTextMetricsA@8

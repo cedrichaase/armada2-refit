@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.11.0 — 2026-09-27
+
+### Added
+- `scenarios/game-setup-labels.md`: Instant Action's Game Setup, with the option labels
+  held clear of the minimap frame, before and after the map is revealed (menus 4.3.0).
+
+Installs nothing into the game.
+
 ## 1.10.0 — 2026-09-27
 
 ### Added

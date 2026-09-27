@@ -52,3 +52,4 @@ GetWindowThreadProcessId@8
 GetFocus@0
 SetFocus@4
 SendMessageA@16
+DrawTextExA@24
