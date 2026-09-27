@@ -73,9 +73,8 @@ resolve here.
 
 ## Before the first push — open
 
-- **A licence.** There is none yet, so the code is all-rights-reserved by default. MIT
-  or zlib would match the tools it sits beside (the ASI loader, DXVK). Add `LICENSE` and
-  a `THIRD-PARTY.md` naming what a release bundles.
+- **`THIRD-PARTY.md`**, naming what a release bundles. The repository itself is MIT
+  (`LICENSE`, added 2026-09-27), matching the tools it sits beside.
 - **The author email** is on every commit. If it should not be public, rewrite it with
   a mailmap before the first push — after that, it is too late.
 - **`CLAUDE.md`** is the working brief for agent sessions. It publishes fine; decide

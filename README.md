@@ -65,3 +65,9 @@ versions it bundles.
 
 `publish/` says what this repository may contain and why. `CLAUDE.md` is the working
 brief for Claude Code sessions in this repo.
+
+## Licence
+
+The code, recipes and docs in this repository are MIT-licensed ([`LICENSE`](LICENSE)).
+That covers nothing of the game's: Star Trek: Armada II, its art and its files belong
+to their owners, and this repository holds none of them.
