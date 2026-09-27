@@ -1,0 +1,348 @@
+#!/usr/bin/env bash
+# Armada II texture pipeline.
+#
+#   ./a2tex list                        every target, its config and state
+#   ./a2tex build [target...] [-j N]    build (default: every target with src/)
+#   ./a2tex install [target...]         copy out/ into the game, backing up first
+#   ./a2tex revert [target...|all]      restore stock from the backups
+#   ./a2tex diff [target...]            measured comparison against stock
+#   ./a2tex verify [target...]          full invariant check, from the raw TGA bytes
+#   ./a2tex stock [target...]           fill stock/ from the game, checked against stock.sha256
+#   ./a2tex stock --manifest target...  (re)write stock.sha256 from what is in stock/
+#
+# A target is a RECIPE in the repository and a WORK directory outside it:
+#
+#   textures/targets/<T>/   target.conf, stock.sha256        committed; no pixels, ever
+#   $A2_DATA/textures/<T>/  stock/   the game's own art, filled from the player's install
+#                           ai/      PAID upscaler output -- never overwritten; back it up
+#                           src/, src-alpha/, .units/, .alpha-units/   derived from the above
+#                           out/     the build, what `install` copies into the game
+#
+# A2_DATA comes from a2env.sh (default ~/.local/share/armada2-remastered). A checkout or
+# worktree holds no assets, so every one of them builds from and into the same place.
+# Every subcommand that reads stock/ fills it first. Builds run in isolated scratch dirs,
+# so -j is safe.
+set -uo pipefail
+# ROOT is the texture layer (textures/), which is what its lib/ and tools/ expect;
+# REPO is the repository, for the one call that crosses into another layer.
+REPO=$(cd "$(dirname "$0")" && pwd); ROOT="$REPO/textures"; export ROOT
+. "$REPO/a2env.sh"; GAME=$A2_GAME
+DATA="$A2_DATA/textures"; export DATA   # work directories, one per target
+TEX="$GAME/Textures/RGB"
+BAK=.a2neb-backup
+. "$ROOT/lib/common.sh"; . "$ROOT/lib/puff.sh"; . "$ROOT/lib/sky.sh"
+
+targets () { (cd "$ROOT/targets" && ls -d */ 2>/dev/null | tr -d /); }
+conf () { # conf <target> <key> <default>
+  local v; v=$(grep -E "^$2=" "$ROOT/targets/$1/target.conf" 2>/dev/null | head -1 | cut -d= -f2-)
+  printf '%s' "${v:-$3}"
+}
+
+# stock/ is the game's own art, so it lives in the work directory and never in git --
+# stock.sha256 pins it and stock/ is (re)filled from the player's install -- the .a2neb-backup where this project has installed
+# over a file, the live file otherwise -- and accepted only if the hash matches. A
+# mismatch is never "close enough": a stock/ that is not stock makes verify compare
+# against the wrong bytes and makes revert restore the wrong chain.
+#
+# Every subcommand that reads stock/ calls this first, quietly, for the targets it
+# touches. It has to: `revert <target>` walks stock/ to decide what to restore, and on
+# an empty stock/ it would restore nothing and report nothing.
+declare -A TEXLC=()
+fill_stock () { # fill_stock <quiet 0|1> <target>...
+  local quiet=$1; shift
+  local t d h n c got rc=0 filled
+  if [ ${#TEXLC[@]} -eq 0 ]; then
+    [ -d "$TEX" ] || die "no game textures at $TEX (see a2env.sh)"
+    while IFS= read -r c; do TEXLC[${c,,}]+="$c"$'\n'; done < <(ls "$TEX")
+  fi
+  for t in "$@"; do
+    [ -f "$ROOT/targets/$t/stock.sha256" ] || continue
+    d="$DATA/$t"; mkdir -p "$d/stock"; filled=0
+    while read -r h n; do
+      [ -f "$d/stock/$n" ] && [ "$(sha256sum < "$d/stock/$n" | cut -c1-64)" = "$h" ] && continue
+      got=""
+      # The backup first: once installed over, the live file is ours, not stock.
+      while IFS= read -r c; do
+        [ -n "$c" ] || continue
+        [ "$(sha256sum < "$TEX/$c" | cut -c1-64)" = "$h" ] && { got=$c; break; }
+      done < <(printf '%s' "${TEXLC[${n,,}$BAK]:-}"; printf '%s' "${TEXLC[${n,,}]:-}")
+      if [ -n "$got" ]; then
+        cp --reflink=auto "$TEX/$got" "$d/stock/$n"; filled=$((filled+1))
+      else
+        echo "MISSING $t/stock/$n -- no file in $TEX matches stock.sha256" >&2; rc=1
+      fi
+    done < "$ROOT/targets/$t/stock.sha256"
+    [ "$quiet" = 1 ] || [ "$filled" = 0 ] || echo "stock  $t  $filled file(s) from the game"
+  done
+  return $rc
+}
+need_stock () { # every target named, or every target
+  local -a l=("$@"); [ ${#l[@]} -gt 0 ] || mapfile -t l < <(targets)
+  fill_stock 1 "${l[@]}" || die "stock/ is incomplete -- see MISSING above. The game install must be the GOG release (textures/README.md)."
+}
+
+build_one () {
+  # NOTE: separate statements. `local a=$1 b=$a` does not see the new $a -- the whole
+  # `local` is expanded before any assignment takes effect.
+  local t=$1
+  local dir="$DATA/$t"   # the libraries read stock/ and src/ and write out/ under it
+  # Explicit cleanup, not `trap RETURN`: under `xargs bash -c` the trap does not fire
+  # and the scratch dirs leak. Each build gets its own, which is what makes -j safe.
+  #
+  # mkdir -p first: on a fresh A2_DATA .scratch/ does not exist, mktemp then fails, and
+  # `$tmp` expands EMPTY rather than aborting -- every path below becomes
+  # /<base>.rgb.png and the build reports "built <target> | x:0→" for each face, which
+  # reads like bad art rather than a missing directory.
+  mkdir -p "$DATA/.scratch"
+  local tmp; tmp=$(mktemp -d "$DATA/.scratch/$t.XXXXXX") || die "$t: cannot make scratch dir"
+  export SIZE=$(conf "$t" size 512) UNIFORM=$(conf "$t" uniform 0) \
+         MONOHUE=$(conf "$t" monohue 0) KEEPCOLOUR=$(conf "$t" keepcolour 0) \
+         FILL=$(conf "$t" fill 92) SOURCE=$(conf "$t" source gen) \
+         MIPS=$(conf "$t" mips 0) BLACKEDGE=$(conf "$t" blackedge 0) \
+         AFILTER=$(conf "$t" alphafilter Lanczos) FIT=$(conf "$t" fit match)
+  local rc=0
+  case "$(conf "$t" kind puff)" in
+    puff)      build_puff      "$t" "$dir" "$tmp" || rc=$? ;;
+    sky-atlas) build_sky_atlas "$t" "$dir" "$tmp" || rc=$? ;;
+    sky-faces) build_sky_faces "$t" "$dir" "$tmp" || rc=$? ;;
+    # A planet map is a single 24-bit file with no alpha and no mips -- structurally
+    # identical to one skybox face, so it runs the same code. `plain` is an alias, not a
+    # new path: naming a planet target `kind=sky-faces` reads like a mistake.
+    plain)     build_sky_faces "$t" "$dir" "$tmp" || rc=$? ;;
+    *) rm -rf "$tmp"; die "$t: unknown kind" ;;
+  esac
+  rm -rf "$tmp"
+  return $rc
+}
+
+case "${1:-list}" in
+list)
+  printf "%-14s %-10s %-6s %-22s %s\n" TARGET KIND FACE FLAGS STATE
+  for t in $(targets); do
+    d="$DATA/$t"; n=$(ls "$d/src" 2>/dev/null | wc -l)
+    st="stock"; [ -n "$(ls "$d/out" 2>/dev/null)" ] && st="built"
+    [ "$n" = 0 ] && src="no src" || src="$n src"
+    f=""; [ "$(conf "$t" uniform 0)" = 1 ] && f+="uniform "
+    [ "$(conf "$t" monohue 0)" = 1 ] && f+="monohue "
+    [ "$(conf "$t" keepcolour 0)" = 1 ] && f+="keepcolour "
+    printf "%-14s %-10s %-6s %-22s %s, %s\n" "$t" "$(conf "$t" kind puff)" \
+      "$(conf "$t" size 512)" "${f:--}" "$st" "$src"
+  done ;;
+build)
+  shift; J=1; list=()
+  while [ $# -gt 0 ]; do case $1 in -j) J=$2; shift 2;; -j*) J=${1#-j}; shift;; *) list+=("$1"); shift;; esac; done
+  [ ${#list[@]} -eq 0 ] && mapfile -t list < <(for t in $(targets); do
+      [ -n "$(ls "$DATA/$t/src" 2>/dev/null)" ] && echo "$t"; done)
+  [ ${#list[@]} -eq 0 ] && { echo "nothing to build -- no target has files in src/"; exit 0; }
+  need_stock "${list[@]}"
+  export -f build_one conf fit write_tga die note tex_path blank_channel \
+            tga_bpp attach_alpha gen_mips mip_name mip_strays stock_bases build_puff build_sky_atlas build_sky_faces
+  export ROOT DATA MAXGAIN FLOOR
+  printf '%s\n' "${list[@]}" | xargs -P "$J" -I{} bash -c 'build_one {}'
+  ;;
+install)
+  # Default: every target with a build. Not every target: with nothing built -- a fresh
+  # A2_DATA, the case ./install must survive -- there is nothing to install, and filling
+  # stock/ for all of them first would only cost time, or fail on an install that is not
+  # the GOG release.
+  shift; list=("$@")
+  [ ${#list[@]} -eq 0 ] && mapfile -t list < <(for t in $(targets); do
+      compgen -G "$DATA/$t/out/*.tga" >/dev/null && echo "$t"; done)
+  [ ${#list[@]} -eq 0 ] && { echo "nothing to install -- no target is built in $DATA"; exit 0; }
+  need_stock "${list[@]}"
+  # Every texture the engine treats as an interface sprite, computed once. Above 256
+  # these CRASH the game, and `maxsize=` in target.conf only protects a texture whose
+  # target knows it is UI. borgUI3 is an interface sprite in Sprites/gui_borg.spr AND is
+  # referenced by Borpod16.SOD, so the faction census collected it as a hull texture,
+  # put it in a hull target with no maxsize, and it installed at 1024. Target membership
+  # does not tell you what the engine thinks a texture is; the sprite files do.
+  IFACE=$(mktemp); "$ROOT/tools/interface-textures.py" > "$IFACE" 2>/dev/null || true
+  for t in "${list[@]}"; do
+    # install=no: built, deliberately NOT shipped. UImid is the case -- it carries
+    # Gfog, Gshroud, Gminimap, Gmabelt and Gmneb1-5, which are not panel art but the
+    # fog-of-war and minimap textures, and doubling them to 256 froze the game at the
+    # moment the HUD appears. The build is kept so the finding stays reproducible.
+    if [ "$(conf "$t" install no_key)" = no ]; then
+      echo "skipped $t -- target.conf says install=no"; continue
+    fi
+    # PRE-FLIGHT, before a single file is written. Checking inside the loop is not
+    # enough: the mips sort before the base, so a target with a broken chain installed
+    # _1/_2/_4 and only then refused the base -- leaving a stock base under upscaled
+    # mips, which is the same invalid chain the guard exists to prevent, just inverted.
+    skip=0
+    # maxsize=N: refuse to install this target if any output is wider than N.
+    #
+    # Not a style rule. `@tmaterial=interface` sprites at 512x512 CRASH the game at the
+    # cinematic-to-HUD transition, in a `rep movsd` inside Armada2.exe -- a memcpy into
+    # a buffer that is not big enough. Exactly one stock texture in the whole game is
+    # 512 (WshladSW, a weapon), and no stock interface sprite is over 256, so 2001-era
+    # UI code sizing a scratch buffer for the largest UI texture it shipped with is the
+    # obvious reading. 3D model textures are unaffected: 2048 skyboxes and a 4096 atlas
+    # have been running for weeks. Whether the real ceiling is per-texture or the total
+    # resident UI set was not distinguished -- the same limit fixes both.
+    ms=$(conf "$t" maxsize 0)
+    if [ "$ms" != 0 ]; then
+      for f in "$DATA/$t/out"/*.tga; do
+        [ -e "$f" ] || continue
+        w=$(magick "$f" -format '%w' info:)
+        if [ "$w" -gt "$ms" ]; then
+          echo "REFUSED $t -- $(basename "$f") is ${w}px and the target declares maxsize=$ms."
+          echo "        Interface sprites above 256 crash the game; see README.md."
+          echo "        NOTHING from this target was installed."
+          skip=1; break
+        fi
+      done
+    fi
+    [ "$skip" = 1 ] && continue
+
+    # The interface ceiling, applied by what the texture IS rather than by which target
+    # happens to hold it. This is deliberately not `maxsize`: maxsize is a target opting
+    # in, and the whole failure mode here was a target that had no idea it was carrying
+    # a UI sprite.
+    for f in "$DATA/$t/out"/*.tga; do
+      [ -e "$f" ] || continue
+      a=$(basename "$f" .tga)
+      grep -qxF "$a" "$IFACE" 2>/dev/null || continue
+      w=$(magick "$f" -format '%w' info:)
+      if [ "$w" -gt 256 ]; then
+        echo "REFUSED $t -- $a is ${w}px and is an @tmaterial=interface sprite."
+        echo "        Interface sprites above 256 crash the game at the cinematic-to-HUD"
+        echo "        transition. It is probably also referenced by a SOD, which is how it"
+        echo "        ended up in a hull target; see textures/tools/interface-textures.py."
+        echo "        NOTHING from this target was installed."
+        skip=1; break
+      fi
+    done
+    [ "$skip" = 1 ] && continue
+
+    for f in "$DATA/$t/out"/*.tga; do
+      [ -e "$f" ] || continue
+      a=$(basename "$f" .tga); dst=$(cd "$TEX" && tex_path "$a"); [ -z "$dst" ] && continue
+      # Enumerate the stock chain by WALKING LEVELS and resolving each with mip_name,
+      # which tries both spellings and validates by width. The glob this replaces --
+      # ${a}_[0-9]* -- matched neither fcruise1_B1/_B2 nor fresearch1/2, both of which
+      # are real hand-authored chains written without the underscore (confirmed by
+      # RMSE against a box downsample of the base). So the one guard standing between
+      # this project and the crash that took out the Klingon campaign could not see
+      # two of the chains in the Federation set at all.
+      mips=""; n=0; mn=""
+      while [ "$n" -lt 12 ]; do
+        mn=$(mip_name "$TEX/$dst" $((n+1))); [ -n "$mn" ] || break
+        n=$((n+1)); mips+="$mn "
+      done
+      bw=$(magick "$f" -format '%w' info:); sw=$(magick "$TEX/$dst" -format '%w' info:)
+      [ "$bw" = "$sw" ] && continue
+      # Siblings named like levels but not sized like them. Checked BEFORE the chain
+      # itself, and whether or not a valid chain was found, because the danger is the
+      # stale file left behind rather than the chain we rebuilt correctly.
+      strays=$(cd "$TEX" && mip_strays "$TEX/$dst" "$n")
+      if [ -n "$strays" ]; then
+        echo "REFUSED $t -- $a has sibling(s) named like mip levels that are not levels"
+        echo "        of it by size: $(echo "$strays" | tr '\n' ' ')"
+        echo "        Upscaling $a would leave them stale beside a bigger base. Stock"
+        echo "        ships a few of these (Fsensor_B, FpremNew_B); decide per texture"
+        echo "        rather than letting the size-based chain walk skip them."
+        echo "        NOTHING from this target was installed."
+        skip=1; break
+      fi
+      [ "$n" -gt 0 ] || continue
+      ok=1; want=$bw; lvl=1
+      while [ "$lvl" -le "$n" ]; do
+        want=$((want/2)); mn=$(mip_name "$TEX/$dst" "$lvl")
+        m="$DATA/$t/out/${mn}.tga"
+        if [ ! -f "$m" ] || [ "$(magick "$m" -format '%w' info:)" != "$want" ]; then ok=0; break; fi
+        lvl=$((lvl+1))
+      done
+      if [ "$ok" != 1 ]; then
+        echo "REFUSED $t -- $a has a mip chain ($mips) and the base"
+        echo "        would change ${sw}px -> ${bw}px without a matching rebuilt chain."
+        echo "        Set mips=N in target.conf. See the mip-chain section of README.md."
+        echo "        NOTHING from this target was installed."
+        skip=1; break
+      fi
+    done
+    [ "$skip" = 1 ] && continue
+
+    for f in "$DATA/$t/out"/*.tga; do
+      [ -e "$f" ] || continue
+      a=$(basename "$f" .tga); dst=$(cd "$TEX" && tex_path "$a")
+      [ -z "$dst" ] && { echo "?? no stock $a"; continue; }
+      dst="$TEX/$dst"
+
+      # A hand-authored mip chain is base/2, /4, /8, ... as <name>_1, _2, ... Installing
+      # a bigger base while those stay at their old size leaves the engine with an
+      # inconsistent chain, and it CRASHES -- this is not theoretical: a 1024x1024
+      # Mnebula2 over its stock 64/32/16/8 mips crashed the Klingon campaign whenever
+      # the ion nebula came on screen. Refuse rather than ship it.
+      [ -f "$dst$BAK" ] || cp -p "$dst" "$dst$BAK"
+      cp "$f" "$dst"; echo "installed $(basename "$dst")  ($t)"
+    done
+    # panel=N: the target's art is cut for a model widened to N units (LOADING and
+    # SOD/logo.SOD). Art and geometry are one change -- the wide art on the stock quads
+    # is squashed to 3:2, the stock art on the wide quads is stretched -- so they are
+    # installed together, and reverted together below.
+    pn=$(conf "$t" panel "")
+    [ -n "$pn" ] && "$REPO/models/logo-sod.py" --width "$pn"
+  done
+  rm -f "$IFACE" ;;
+revert)
+  shift
+  if [ "${1:-all}" = all ]; then
+    for b in "$TEX"/*$BAK; do [ -e "$b" ] || continue; cp "$b" "${b%$BAK}"; echo "reverted $(basename "${b%$BAK}")"; done
+    # The widened loading panel's model, which must never outlive its art -- see panel=.
+    "$REPO/models/logo-sod.py" --revert
+  else
+    need_stock "$@"
+    for t in "$@"; do
+      [ -n "$(conf "$t" panel "")" ] && "$REPO/models/logo-sod.py" --revert
+      for f in "$DATA/$t/stock"/*; do
+      [ -e "$f" ] || continue; a=$(basename "$f"); b="$TEX/$a$BAK"
+      [ -f "$b" ] && { cp "$b" "$TEX/$a"; echo "reverted $a"; }
+      # Also the mip chain. stock/ holds only the base, so reverting a target used to
+      # restore a 128px base while leaving 512px mips in place -- the invalid chain that
+      # crashes the game, reached by the command meant to make things safe.
+      n="${a%.*}"
+      # Both chain spellings, for the reason in mip_name: a revert that restores the
+      # base and leaves the levels upscaled is the same invalid chain, inverted -- and
+      # it would be reached by the command whose whole job is making things safe.
+      # Over-matching is bounded by construction: these globs only ever match *$BAK
+      # files, and a backup exists only where this project installed something.
+      for m in "$TEX/${n}_"[0-9]*$BAK "$TEX/${n}"[0-9]*$BAK; do
+        [ -e "$m" ] || continue; o=$(basename "${m%$BAK}")
+        cp "$m" "$TEX/$o"; echo "reverted $o"
+      done
+    done; done
+  fi ;;
+verify)
+  shift; need_stock "$@"; exec "$ROOT/tools/verify.py" "$@" ;;
+diff)
+  shift; list=("$@"); [ ${#list[@]} -eq 0 ] && mapfile -t list < <(targets)
+  need_stock "${list[@]}"
+  printf "%-20s %-30s %s\n" FILE BUILT STOCK
+  for t in "${list[@]}"; do
+    for f in "$DATA/$t/out"/*.tga; do
+      [ -e "$f" ] || continue; a=$(basename "$f" .tga)
+      s=$(cd "$DATA/$t/stock" && tex_path "$a"); [ -z "$s" ] && continue
+      fmt='%wx%h mean=%[fx:int(255*mean)] %[fx:int(255*mean.r)]/%[fx:int(255*mean.g)]/%[fx:int(255*mean.b)]'
+      printf "%-20s %-30s %s\n" "$a" \
+        "$(magick "$f" -format "$fmt" info:)" \
+        "$(magick "$DATA/$t/stock/$s" -format "$fmt" info:)"
+    done
+  done ;;
+stock)
+  shift
+  if [ "${1:-}" = --manifest ]; then
+    shift; [ $# -gt 0 ] || die "--manifest takes the target(s) to write it for"
+    for t in "$@"; do
+      d="$DATA/$t"; m="$ROOT/targets/$t/stock.sha256"
+      [ -n "$(ls "$d/stock" 2>/dev/null)" ] || die "$t: $d/stock/ is empty"
+      (cd "$d/stock" && sha256sum -- *) | sort -k2 > "$m"
+      echo "manifest  $t  $(wc -l < "$m") file(s)"
+    done
+  else
+    list=("$@"); [ ${#list[@]} -eq 0 ] && mapfile -t list < <(targets)
+    fill_stock 0 "${list[@]}" || die "stock/ is incomplete -- see MISSING above"
+    echo "stock/ complete for ${#list[@]} target(s)"
+  fi ;;
+*) sed -n '2,25p' "$0" | sed 's/^# \?//' ;;
+esac

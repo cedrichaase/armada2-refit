@@ -11,8 +11,7 @@ the game, ${XDG_DATA_HOME:-~/.local/share}/armada2-remastered for DATA
 A2_GAME_DIR and A2_DIR are still read for A2_GAME. A script in a subdirectory imports
 it with the repository root put on sys.path first.
 
-The private repository carries an identical copy; keep a2env.sh, a2env.py and both
-copies in step.   python3 a2env.py   prints what this machine resolves to.
+Keep it in step with a2env.sh.   python3 a2env.py   prints what this machine resolves to.
 """
 import os
 

@@ -15,8 +15,7 @@
 # where Heroic puts a GOG install. A2_GAME_DIR and A2_DIR, the names some scripts used
 # before, are still read for A2_GAME.
 #
-# The private repository carries an identical copy of this file and of a2env.py; keep
-# the three in step.
+# a2env.py is its Python half; keep the two in step.
 #
 #   ./a2env.sh      print what this machine resolves to
 

@@ -1,9 +1,8 @@
 # This repository is published, so it holds only what may be redistributed: code,
-# configuration and docs. Nothing derived from the game's own art, video or data --
-# stock copies, upscales, screenshots, footage -- is committed, whatever path it sits
-# at. publish/README.md has the reasoning; publish/check.sh enforces it. The texture
-# work, which cannot avoid such files, is the private repository
-# private repository (../armada2-remastered-private).
+# configuration, recipes and docs. Nothing derived from the game's own art, video or
+# data -- stock copies, upscales, screenshots, footage -- is committed, whatever path it
+# sits at. publish/README.md has the reasoning; publish/check.sh enforces it. Assets
+# live in $A2_DATA (a2env.sh), never in a checkout.
 *.tga
 *.TGA
 *.png
@@ -21,6 +20,13 @@
 *.SOD
 *.spr
 *.a2neb-backup
+
+# Where assets lived before A2_DATA: a checkout from then may still have these, and
+# nothing in them may be committed.
+textures/.scratch/
+textures/targets/*/*/
+cutscenes/movies/*/*/
+menus/backdrops/*/
 
 # platform/ab-shot.sh captures
 platform/ab/

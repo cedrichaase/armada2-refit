@@ -48,6 +48,7 @@ class Scenario:
     reference: str = config.REFERENCE_ASPECT
     timeout: int = 900
     stock_shell: str = ''          # 'embed': stock cases keep Menus.asi for Embed only
+    assets: str = ''               # 'none': install this checkout with an empty A2_DATA
     description: str = ''
     steps: list = field(default_factory=list)
 
@@ -86,7 +87,7 @@ def case_dirname(res, mod, scn_mod):
     return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
 
 
-HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell)\s*:\s*(.+)$', re.I)
+HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?)\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
 
 
@@ -141,7 +142,8 @@ def parse(path):
                     launch=hdr.get('launch', '-nointro').strip('`'),
                     reference=hdr.get('reference', config.REFERENCE_ASPECT),
                     timeout=timeout, description=' '.join(desc), steps=steps,
-                    stock_shell=hdr.get('stock shell', '').strip().lower())
+                    stock_shell=hdr.get('stock shell', '').strip().lower(),
+                    assets=hdr.get('asset', '').strip().lower())
 
 
 # ---------------------------------------------------------------------- step table
@@ -583,7 +585,8 @@ class Case:
 
     def run(self):
         t0 = time.time()
-        self.sess = Session.create(self.dir, self.res, mod=self.mod, stock_shell=self.scn.stock_shell, vnc=self.opts.get('vnc'),
+        self.sess = Session.create(self.dir, self.res, mod=self.mod, stock_shell=self.scn.stock_shell,
+                                   assets=self.scn.assets or None, vnc=self.opts.get('vnc'),
                                    record=self.opts.get('record'), audio=self.opts.get('audio'),
                                    keep=self.opts.get('keep'), label=self.name,
                                    installs=self.opts.get('installs') if self.mod == 'remastered' else None)

@@ -7,7 +7,7 @@
 #
 # Nothing in the game directory is modified: this only adds Menus.asi,
 # Menus.ini and (at run time) Menus.log. The backdrop plates in Menus/ come from
-# the private repository's ./install; --remove takes them out with the rest.
+# install-plates.sh (run by ./install); --remove takes them out with the rest.
 # Removing those restores the stock behaviour exactly, so there is no backup
 # to keep.
 #
@@ -67,9 +67,9 @@ put "$here/build/Menus.asi" "$GAME/Menus.asi"
 put "$here/Menus.ini"       "$GAME/Menus.ini"
 
 # The backdrop plates in Menus/ are left as they are. They are the game's own art,
-# upscaled, so the private repository builds and installs them (its ./install);
-# a screen without one keeps black pillarboxes.
-ls "$GAME/Menus"/*.bmp >/dev/null 2>&1 || echo "no backdrop plates in Menus/ -- black sides (the private repository installs them)"
+# upscaled, so they are built into A2_DATA (backdrop.sh) and installed by
+# install-plates.sh; a screen without one keeps black pillarboxes.
+ls "$GAME/Menus"/*.bmp >/dev/null 2>&1 || echo "no backdrop plates in Menus/ -- black sides (menus/install-plates.sh installs them)"
 
 if [ -n "$mode" ]; then
     sed -i "s/^Mode=.*/Mode=$mode/" "$GAME/Menus.ini"
