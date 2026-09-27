@@ -11,7 +11,7 @@ Layers: hud 2.2.0, testbench 1.10.0.
 
 ### Fixed
 - The HUD follows a display mode changed in the middle of a mission, instead of
-  keeping the old mode's layout until the next one (see `hud/CHANGELOG.md`).
+  keeping the old mode's layout until the next one (`9873980`; see `hud/CHANGELOG.md`).
 
 ### Added
 - `testbench/scenarios/hud-mode-switch.md`, its regression test.

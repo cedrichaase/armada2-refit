@@ -8,7 +8,7 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
 ## 2.2.0 — 2026-09-27
 
 ### Added
-- `Relayout=` in `HUD.ini` (default 1).
+- `Relayout=` in `HUD.ini` (default 1, `9873980`).
 
 ### Fixed
 - The HUD follows a display mode changed in a mission (Graphics Settings). Before, it

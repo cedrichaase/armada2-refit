@@ -10,7 +10,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - `scenarios/hud-mode-switch.md`: switches to 1600x1200 in Graphics Settings in the
   middle of the Federation mission, at 4:3 and 21:9, and measures the HUD, the briefing
-  and its text against the 4:3 case. Fails before hud 2.2.0, passes with it.
+  and its text against the 4:3 case. Fails before hud 2.2.0, passes with it (`9873980`).
 - `ui.json`: the `display mode` target, the Graphics Settings mode box.
 
 Installs nothing into the game.
