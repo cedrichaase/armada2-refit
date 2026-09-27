@@ -14,3 +14,5 @@ BitBlt@36
 GdiFlush@0
 GetObjectA@12
 GetCurrentObject@8
+GetStockObject@4
+CreateFontIndirectA@4

@@ -382,6 +382,40 @@ def s_expect_text(c, m):
     return c.checked(ok, detail, shots, how='OCR (PP-OCR) + fuzzy phrase match')
 
 
+@step(r'^(?:expect|check|verify)(?: that)? ' + Q.format('text') +
+      r' (?:is |to be |appears )?(?:visible |shown |drawn )?(?:inside|within|in) design '
+      r'(?P<x>\d+)\s*,\s*(?P<y>\d+)\s*,\s*(?P<w>\d+)\s*,\s*(?P<h>\d+)'
+      r'(?:,? and at least (?P<min>\d+) design px tall)?$')
+def s_expect_text_in(c, m):
+    """Text where the shell's design puts it, at the size it has there.  The rectangle
+    is in 800x600 design space and mapped as Menus.asi maps it; the height, if asked
+    for, is the OCR box's, mapped back into design pixels.  A real child control that
+    is not scaled (an edit box) draws its text 1:1 at its design coordinates, in the
+    corner, which fails both."""
+    path = c.fresh_shot(f'check-{c.n}')
+    words = vision.ocr(path)
+    box = vision.find_text(words, m.group('text'))
+    x, y, w, h = (int(m.group(k)) for k in 'xywh')
+    x0, y0 = c.design_to_screen(x, y)
+    x1, y1 = c.design_to_screen(x + w, y + h)
+    area = dict(x=x0, y=y0, w=x1 - x0, h=y1 - y0, label=f'design {x},{y},{w},{h}')
+    if not box:
+        ann = vision.annotate(path, path.with_name(path.stem + '-area.png'), [area])
+        return c.checked(False, 'not found; OCR read: ' + ', '.join(sorted({wd["text"] for wd in words}))[:400],
+                         [ann], how='OCR (PP-OCR) + fuzzy phrase match, design rectangle mapped as Menus.asi maps it')
+    cx, cy = box['x'] + box['w'] / 2, box['y'] + box['h'] / 2
+    inside = x0 <= cx <= x1 and y0 <= cy <= y1
+    design_h = box['h'] * h / max(1, y1 - y0)
+    tall = m.group('min') is None or design_h >= int(m.group('min'))
+    ann = vision.annotate(path, path.with_name(path.stem + '-found.png'),
+                          [area, dict(box, label=m.group('text'))])
+    detail = (f'found "{box["text"]}" at screen {box["x"]},{box["y"]} {box["w"]}x{box["h"]}, centre '
+              f'{"inside" if inside else "OUTSIDE"} {x0},{y0}-{x1},{y1}; {design_h:.1f} design px tall'
+              + (f' (at least {m.group("min")} wanted)' if m.group('min') else ''))
+    return c.checked(inside and tall, detail, [ann],
+                     how='OCR (PP-OCR) + fuzzy phrase match, design rectangle mapped as Menus.asi maps it')
+
+
 @step(r'^expect the game (?:to be |is )?(?:still )?running$')
 def s_expect_running(c, m):
     return c.checked(c.sess.running() and not c.sess.crashed(),

@@ -51,6 +51,7 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | Check | How |
 |---|---|
 | `Expect "TEXT" is visible` / `… is not visible` | OCR (PP-OCR), fuzzy match |
+| `Expect "TEXT" is visible inside design X,Y,W,H` / `… and at least N design px tall` | OCR; the phrase's centre must fall in that 800x600 design rectangle, mapped as Menus.asi maps it, and its box, mapped back, must be N design px tall. Catches a control left unscaled in the corner |
 | `Expect the main menu` (any `ui.json` screen) | OCR signature |
 | `Expect the game is still running` / `Expect the game to have exited` | process table |
 | `Expect no crash` | `exception.txt` untouched |

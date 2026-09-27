@@ -221,6 +221,9 @@ __declspec(dllimport) BOOL    __stdcall BitBlt(HDC, INT, INT, INT, INT, HDC, INT
 __declspec(dllimport) BOOL    __stdcall GdiFlush(void);
 __declspec(dllimport) INT     __stdcall GetObjectA(HGDIOBJ, INT, void *);
 __declspec(dllimport) HGDIOBJ __stdcall GetCurrentObject(HDC, UINT);
+__declspec(dllimport) HGDIOBJ __stdcall GetStockObject(INT);
+__declspec(dllimport) HGDIOBJ __stdcall CreateFontIndirectA(const void *);
+__declspec(dllimport) LONG_PTR __stdcall SendMessageA(HWND, UINT, WPARAM, LPARAM);
 
 #define PAGE_READWRITE        0x04
 #define GENERIC_WRITE         0x40000000
@@ -1550,38 +1553,50 @@ static HWND __stdcall my_GetWindow(HWND h, UINT cmd)
     return o_GetWindow(h, cmd);
 }
 
-/* ---- owner-drawn child controls --------------------------------------- */
+/* ---- child controls --------------------------------------------------- */
 /*
- * The Admiral's Log is the one shell screen built from real child windows.
- * Everywhere else a button is a ShellButton bitmap drawn through GetDC into
- * the dialog itself, which the design surface catches.  AdmiralsLogDlgProc
- * instead creates its player list and its eight tabs as
+ * A child window is not drawn through its parent's DC, so the design surface
+ * never sees it: left alone, a control of a scaled dialog sits 1:1 at its
+ * design coordinates in the top-left of the screen while the dialog around
+ * it is scaled.  Two kinds are handled.
+ *
+ * Owner-drawn buttons.  The Admiral's Log is built from them where every
+ * other screen draws ShellButton bitmaps into itself.  AdmiralsLogDlgProc
+ * creates its player list and its eight tabs as
  *
  *     CreateWindowExA(0, "button", ..., WS_CHILD|WS_VISIBLE|BS_OWNERDRAW,
  *                     x, y, w, h, hDlg, ...)            (0x5e394e, 0x5e3b7b)
  *
- * and the Ships and Battles panes do the same (0x5f7e4f, 0x5e9b63).  A child
- * window is not drawn through its parent's DC, so these sat 1:1 at their
- * design coordinates in the top-left of the screen while the log around them
- * was scaled.
- *
- * An owner-drawn button is the one kind of control that can be scaled whole.
- * Its geometry is mapped through its parent's fit, as a dialog's is.  Its
+ * and the Ships and Battles panes do the same (0x5f7e4f, 0x5e9b63).  Their
+ * geometry is mapped through the parent's fit, as a dialog's is.  Their
  * pixels come from the parent's WM_DRAWITEM, which draws only through
  * DRAWITEMSTRUCT.hDC and .rcItem (0x5e9510); those are swapped for a
  * design-sized surface, and the result is stretched onto the real button.
  *
- * Other controls -- the edit boxes -- draw themselves in their own font and
- * are left alone: README, "Real child controls".
+ * Edit boxes -- the multiplayer name field, Save Game's name.  An edit draws
+ * itself (text, caret, selection) and takes its own clicks, so its pixels
+ * cannot go through a surface.  Its geometry is mapped the same way, and it
+ * is handed a font scaled by the same factor: the font the game gave it, or
+ * the system font it falls back to without one.  The edit is subclassed so a
+ * WM_SETFONT sent later is scaled too, and WM_GETFONT still answers with the
+ * game's own font.  The shell colours it through WM_CTLCOLOREDIT on the
+ * dialog (Screen::ControlColorEdit, 0x5a3360), which needs nothing.
  */
 #define MAXCTL        96
 #define BS_TYPEMASK   0x0000000FUL
 #define BS_OWNERDRAW  0x0000000BUL
 #define WM_DRAWITEM   0x002B
+#define WM_SETFONT    0x0030
+#define WM_GETFONT    0x0031
 #define GW_HWNDNEXT   2
 #define GW_CHILD      5
 #define CW_USEDEFAULT ((INT)0x80000000)
 #define OBJ_FONT      6
+#define SYSTEM_FONT   13
+#define OUT_TT_ONLY_PRECIS 7
+
+#define CTL_OWNERDRAW 1
+#define CTL_EDIT      2
 
 typedef struct {
     UINT  CtlType, CtlID, itemID, itemAction, itemState;
@@ -1592,8 +1607,20 @@ typedef struct {
 } DRAWITEMSTRUCT;
 
 typedef struct {
-    HWND hwnd, parent;
-    int  x, y, w, h;            /* design rectangle, parent's design space */
+    LONG lfHeight, lfWidth, lfEscapement, lfOrientation, lfWeight;
+    BYTE lfItalic, lfUnderline, lfStrikeOut, lfCharSet;
+    BYTE lfOutPrecision, lfClipPrecision, lfQuality, lfPitchAndFamily;
+    char lfFaceName[32];
+} LOGFONTA;
+
+typedef struct {
+    HWND    hwnd, parent;
+    int     x, y, w, h;         /* design rectangle, parent's design space */
+    int     kind;               /* CTL_OWNERDRAW or CTL_EDIT               */
+    WNDPROC oldProc;            /* edits: the subclassed window procedure  */
+    HGDIOBJ base;               /* edits: the font the game set, or NULL   */
+    HGDIOBJ font;               /* edits: ours, base scaled by fnum/fden   */
+    int     fnum, fden;
 } Ctl;
 
 static Ctl g_ctl[MAXCTL];
@@ -1613,14 +1640,19 @@ static Ctl *ctl_get(HWND h)
     return NULLPTR;
 }
 
-static Ctl *ctl_add(HWND h, HWND parent, int x, int y, int w, int ht)
+static Ctl *ctl_add(HWND h, HWND parent, int kind, int x, int y, int w, int ht)
 {
     int i;
     Ctl *c = ctl_get(h);
     for (i = 0; !c && i < MAXCTL; i++)
-        if (!g_ctl[i].hwnd || !IsWindow(g_ctl[i].hwnd)) c = &g_ctl[i];
+        if (!g_ctl[i].hwnd || !IsWindow(g_ctl[i].hwnd)) {
+            c = &g_ctl[i];
+            /* A dead edit's font is ours to free; nothing can select it now. */
+            if (c->font) DeleteObject(c->font);
+            memset(c, 0, sizeof *c);
+        }
     if (!c) return NULLPTR;               /* full: it stays unscaled */
-    c->hwnd = h; c->parent = parent;
+    c->hwnd = h; c->parent = parent; c->kind = kind;
     c->x = x; c->y = y; c->w = w; c->h = ht;
     return c;
 }
@@ -1632,17 +1664,20 @@ static Slot *scaled_parent(HWND parent)
     return (g_mode == MODE_SCALE && s && s->dw > 0 && s->dh > 0) ? s : NULLPTR;
 }
 
-static int ownerdraw_button(LPCSTR cls, DWORD style)
+/* Which kind of control this is, 0 for one we leave alone. */
+static int ctl_kind(LPCSTR cls, DWORD style)
 {
-    return (style & WS_CHILD) && (style & BS_TYPEMASK) == BS_OWNERDRAW &&
-           cls && (UINT_PTR)cls >= 0x10000 && same_name_ci(cls, "button");
+    if (!(style & WS_CHILD) || !cls || (UINT_PTR)cls < 0x10000) return 0;
+    if ((style & BS_TYPEMASK) == BS_OWNERDRAW && same_name_ci(cls, "button")) return CTL_OWNERDRAW;
+    if (same_name_ci(cls, "edit")) return CTL_EDIT;
+    return 0;
 }
 
-static int is_ownerdraw_button(HWND h)
+static int ctl_kind_of(HWND h)
 {
     char cls[16];
     if (GetClassNameA(h, cls, 16) <= 0) return 0;
-    return ownerdraw_button(cls, (DWORD)GetWindowLongA(h, GWL_STYLE));
+    return ctl_kind(cls, (DWORD)GetWindowLongA(h, GWL_STYLE));
 }
 
 /* Design rectangle -> parent-client pixels.  Edges are mapped, not sizes, so
@@ -1663,7 +1698,7 @@ static void ctl_log(const char *what, const Ctl *c, int rx, int ry, int rw, int 
     if (!g_logging || g_ctlLogged >= 48) return;
     g_ctlLogged++;
     b[0] = 0;
-    s_cat(b, "  "); s_cat(b, what); s_cat(b, " button ");
+    s_cat(b, "  "); s_cat(b, what); s_cat(b, c->kind == CTL_EDIT ? " edit " : " button ");
     s_num(b, c->w); s_cat(b, "x"); s_num(b, c->h);
     s_cat(b, " @"); s_num(b, c->x); s_cat(b, ","); s_num(b, c->y);
     s_cat(b, "  ->  "); s_num(b, rw); s_cat(b, "x"); s_num(b, rh);
@@ -1671,10 +1706,107 @@ static void ctl_log(const char *what, const Ctl *c, int rx, int ry, int rw, int 
     logline(b);
 }
 
-/* Put every owner-drawn button of a scaled dialog where the fit says --
- * including any created before the dialog was being scaled, which are still
- * at their design position and so can be read back as design coordinates.
- * Called whenever the dialog's own geometry changes. */
+/* Scale n by num/den, rounding half away from zero, keeping n's sign (a
+ * negative lfHeight asks for a character height, a positive one a cell). */
+static LONG ctl_scale(LONG n, int num, int den)
+{
+    LONG a = n < 0 ? -n : n;
+    a = (a * num + den / 2) / den;
+    if (n && !a) a = 1;
+    return n < 0 ? -a : a;
+}
+
+/* Give an edit the font it has in design space, scaled by what its dialog is
+ * scaled by.  Rebuilt only when the scale or the game's font changes. */
+static void ctl_font(Ctl *c, Slot *p, int force)
+{
+    LOGFONTA lf;
+    HGDIOBJ  src, font, old;
+    int      ox, oy, dw, dh;
+    char     b[160];
+
+    if (c->kind != CTL_EDIT || !c->oldProc || !p) return;
+    slot_placement(p, &ox, &oy, &dw, &dh);
+    if (dh <= 0 || p->dh <= 0) return;
+    if (!force && c->font && c->fnum == dh && c->fden == p->dh) return;
+
+    src = c->base ? c->base : GetStockObject(SYSTEM_FONT);
+    memset(&lf, 0, sizeof lf);
+    if (!src || GetObjectA(src, sizeof lf, &lf) <= 0) return;
+    if (!lf.lfHeight) return;             /* no size to scale: leave it be */
+    lf.lfHeight = ctl_scale(lf.lfHeight, dh, p->dh);
+    lf.lfWidth  = ctl_scale(lf.lfWidth,  dh, p->dh);
+    /* The shell's edits use MS Sans Serif, a raster font: asked for 2.4x its
+     * design size it comes back at its largest bitmap, 21 px on screen where
+     * 41 was wanted (measured, 3440x1440).  Microsoft Sans Serif is its
+     * TrueType successor, drawn to the same metrics; any other face is only
+     * held to TrueType. */
+    if (same_name_ci(lf.lfFaceName, "MS Sans Serif")) {
+        static const char tt[] = "Microsoft Sans Serif";
+        memcpy(lf.lfFaceName, tt, sizeof tt);
+    }
+    lf.lfOutPrecision = OUT_TT_ONLY_PRECIS;
+    font = CreateFontIndirectA(&lf);
+    if (!font) return;
+
+    old = c->font;
+    c->font = font; c->fnum = dh; c->fden = p->dh;
+    CallWindowProcA(c->oldProc, c->hwnd, WM_SETFONT, (WPARAM)font, TRUE);
+    if (old) DeleteObject(old);
+
+    if (g_logging && g_ctlLogged < 48) {
+        g_ctlLogged++;
+        b[0] = 0;
+        s_cat(b, "  edit font \""); s_cat(b, lf.lfFaceName);
+        s_cat(b, c->base ? "\"" : "\" (system)");
+        s_cat(b, " height "); s_num(b, lf.lfHeight);
+        s_cat(b, " = design x "); s_num(b, dh); s_cat(b, "/"); s_num(b, p->dh);
+        logline(b);
+    }
+}
+
+static LONG_PTR __stdcall ctl_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
+{
+    Ctl     *c = ctl_get(h);
+    WNDPROC  prev;
+    LONG_PTR r;
+
+    if (!c || !c->oldProc) return DefWindowProcA(h, msg, wp, lp);
+    prev = c->oldProc;
+
+    if (msg == WM_SETFONT) {
+        Slot *p = scaled_parent(c->parent);
+        c->base = (HGDIOBJ)wp;
+        if (p) { ctl_font(c, p, 1); if (c->font) return 0; }
+    } else if (msg == WM_GETFONT && c->font) {
+        return (LONG_PTR)c->base;
+    } else if (msg == WM_NCDESTROY) {
+        SetWindowLongA(h, GWL_WNDPROC, (LONG)(LONG_PTR)prev);
+        r = CallWindowProcA(prev, h, msg, wp, lp);
+        if (c->font) DeleteObject(c->font);
+        memset(c, 0, sizeof *c);
+        return r;
+    }
+    return CallWindowProcA(prev, h, msg, wp, lp);
+}
+
+/* Set up what a control needs beyond its geometry: an edit's subclass and
+ * font.  The font the game already gave it is read back first. */
+static void ctl_prepare(Ctl *c, Slot *p)
+{
+    if (c->kind != CTL_EDIT) return;
+    if (!c->oldProc) {
+        c->base = (HGDIOBJ)SendMessageA(c->hwnd, WM_GETFONT, 0, 0);
+        c->oldProc = (WNDPROC)(LONG_PTR)SetWindowLongA(c->hwnd, GWL_WNDPROC,
+                                                      (LONG)(LONG_PTR)ctl_proc);
+    }
+    ctl_font(c, p, 0);
+}
+
+/* Put every control of a scaled dialog where the fit says -- including any
+ * created before the dialog was being scaled, which are still at their
+ * design position and so can be read back as design coordinates.  Called
+ * whenever the dialog's own geometry changes. */
 static void ctl_adopt(HWND parent)
 {
     Slot *p = scaled_parent(parent);
@@ -1684,16 +1816,16 @@ static void ctl_adopt(HWND parent)
     if (!p) return;
     for (c = o_GetWindow(parent, GW_CHILD), n = 0; c && n < 256; c = o_GetWindow(c, GW_HWNDNEXT), n++) {
         Ctl *k = ctl_get(c);
-        int  rx, ry, rw, rh;
+        int  rx, ry, rw, rh, kind;
 
         if (k && k->parent != parent) k = NULLPTR;   /* a recycled handle */
         if (!k) {
             RECT  wr;
             POINT pt;
-            if (!is_ownerdraw_button(c) || !GetWindowRect(c, &wr)) continue;
+            if (!(kind = ctl_kind_of(c)) || !GetWindowRect(c, &wr)) continue;
             pt.x = wr.left; pt.y = wr.top;
             ScreenToClient(parent, &pt);
-            k = ctl_add(c, parent, (int)pt.x, (int)pt.y,
+            k = ctl_add(c, parent, kind, (int)pt.x, (int)pt.y,
                         (int)(wr.right - wr.left), (int)(wr.bottom - wr.top));
             if (!k) continue;
             ctl_rect(p, k->x, k->y, k->w, k->h, &rx, &ry, &rw, &rh);
@@ -1702,6 +1834,7 @@ static void ctl_adopt(HWND parent)
             ctl_rect(p, k->x, k->y, k->w, k->h, &rx, &ry, &rw, &rh);
         }
         o_MoveWindow(c, rx, ry, rw, rh, TRUE);
+        ctl_prepare(k, p);
     }
 }
 
@@ -1712,16 +1845,17 @@ static HWND __stdcall my_CreateWindowExA(DWORD ex, LPCSTR cls, LPCSTR name, DWOR
     Slot *p = NULLPTR;
     HWND  h;
     int   rx = x, ry = y, rw = w, rh = ht;
+    int   kind = ctl_kind(cls, style);
 
-    if (ownerdraw_button(cls, style) && x != CW_USEDEFAULT && w != CW_USEDEFAULT &&
+    if (kind && x != CW_USEDEFAULT && w != CW_USEDEFAULT &&
         (p = scaled_parent(parent)) != NULLPTR)
         ctl_rect(p, x, y, w, ht, &rx, &ry, &rw, &rh);
 
     h = o_CreateWindowExA(ex, cls, name, style, rx, ry, rw, rh, parent, menu, inst, param);
 
     if (h && p) {
-        Ctl *c = ctl_add(h, parent, x, y, w, ht);
-        if (c) ctl_log("created", c, rx, ry, rw, rh);
+        Ctl *c = ctl_add(h, parent, kind, x, y, w, ht);
+        if (c) { ctl_log("created", c, rx, ry, rw, rh); ctl_prepare(c, p); }
     }
     return h;
 }
@@ -1871,20 +2005,23 @@ static void reposition(HWND h, int *x, int *y, int *w, int *ht, int havePos, int
     }
 }
 
-/* An owner-drawn button of a scaled dialog, moved by the game in design
- * coordinates: remember them and map them.  NULL for anything else. */
+/* A control of a scaled dialog (owner-drawn button, edit), moved by the game
+ * in design coordinates: remember them and map them.  NULL for anything else. */
 static Ctl *ctl_moved(HWND h)
 {
     HWND  parent;
     Ctl  *c;
+    int   kind;
 
     if (g_mode != MODE_SCALE || !h) return NULLPTR;
     parent = GetParent(h);
     if (!scaled_parent(parent)) return NULLPTR;
     c = ctl_get(h);
     if (c && c->parent == parent) return c;
-    if (!is_ownerdraw_button(h)) return NULLPTR;
-    return ctl_add(h, parent, 0, 0, 0, 0);
+    if (!(kind = ctl_kind_of(h))) return NULLPTR;
+    c = ctl_add(h, parent, kind, 0, 0, 0, 0);
+    if (c) ctl_prepare(c, scaled_parent(parent));
+    return c;
 }
 
 static BOOL __stdcall my_MoveWindow(HWND h, INT x, INT y, INT w, INT ht, BOOL rp)

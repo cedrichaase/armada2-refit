@@ -10,6 +10,10 @@
       "aliases": ["single player menu", "campaign", "campaign selection", "single player screen"],
       "text": ["PREVIOUS MENU", "LOAD GAME"]
     },
+    "multiplayer connection": {
+      "aliases": ["multiplayer", "multiplayer menu", "multiplayer screen"],
+      "text": ["MULTIPLAYER CONNECTION", "Enter Name"]
+    },
     "mission selection": {
       "aliases": ["select mission", "mission list", "mission select"],
       "text": ["Cancel"]
