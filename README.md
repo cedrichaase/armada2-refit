@@ -12,11 +12,12 @@ a time, and every fix can be undone.
 
 - **Enjoyable on modern systems.** Widescreen and ultrawide without stretching, the
   menus filling the screen, anti-aliasing, and a working Vulkan renderer under Proton.
-- **Faithful to the original.** Every remastered texture, backdrop and movie is made
-  from the game's own art, so the composition, colour and style stay the same.
-  Generated detail is measured and held back rather than taken as it comes. The engine
-  files stay stock: the fixes are applied in memory at run time. `./a2mod stock` puts
-  the whole game back the way it shipped, for a before/after comparison.
+- **Faithful to the original.** The mod is modular. The core fixes (HUD, menus,
+  anti-aliasing) make the game work at modern resolutions without changing how it looks
+  or feels: they replace no art and patch no engine files, only fix the engine in
+  memory at run time. Visual changes such as new textures, backdrops and movies are
+  separate, optional layers, and they aim to be subtle. `./a2mod stock` puts the whole
+  game back the way it shipped, for a before/after comparison.
 - **Share the tooling.** Most of the work went into tools for reading the engine,
   measuring textures and testing the game headless, and they're here too. So are the
   notes on what the engine actually does, with the dead ends included. They should be
@@ -27,10 +28,10 @@ a time, and every fix can be undone.
 | | |
 |---|---|
 | **Stretch-free HUD** | `HUD.asi` lays out the in-game HUD, font and cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets |
-| **Full-screen menus** | `Menus.asi` scales the 800x600 shell menus to fill the screen and draws them inside the game window, over widescreen backdrops extended from the originals |
+| **Full-screen menus** | `Menus.asi` scales the 800x600 shell menus to fill the screen and draws them inside the game window, with optional widescreen backdrops (black sides without them) |
 | **Anti-aliasing** | `MSAA.asi` turns on up to 8x multisample anti-aliasing, which the game has no option for |
 | **Bloom and renderer tuning** | vkBasalt bloom, plus anisotropic filtering and LOD bias through `dxvk.conf` |
-| **Texture replacement** | `./a2tex`, a pipeline that extracts the stock art from your install, upscales or replaces it, checks the result against the engine's format rules, and installs it. It also packs the result up so others can install it. There are 84 ready recipes: skyboxes, nebulae, planets, UI and ship hulls |
+| **Texture replacement** | `./a2tex`, a pipeline for replacement textures, whether upscaled, generated or drawn by hand. It checks each one against the engine's format rules (bit depth, mip chains, size limits), installs it with a backup, and packs a set so others can install it. There are 84 recipes so far: skyboxes, nebulae, planets, UI and ship hulls |
 | **Video replacement** | a replacement `binkw32.dll` that plays the launch reels full screen and plays AV1 replacements in place of the original Bink movies, plus a pipeline to build them |
 | **Widened loading screen** | the 3D loading-screen model, rebuilt for widescreen |
 | **One switch** | `./a2mod stock` / `remastered` flips every layer at once for before/after comparisons |
@@ -40,9 +41,10 @@ a time, and every fix can be undone.
 
 This repository holds **code, configuration, recipes and documentation only**. It
 contains no textures, models, video or data from the game, whether original or derived
-([`publish/README.md`](publish/README.md)). The asset pipelines work from **your own
-copy** of the game: you extract the stock art, build, and install. Builds live in
-`A2_DATA`, outside the repository.
+([`publish/README.md`](publish/README.md)). The asset pipelines start from **your own
+copy** of the game: they extract the stock art as the reference each replacement is
+checked against, then build and install. Builds live in `A2_DATA`, outside the
+repository.
 
 Every layer works without assets. With nothing built, the asset layers install nothing
 and the game keeps its own art, while the HUD, menus, MSAA and bloom still apply.
@@ -104,7 +106,7 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 | [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops ([`BACKDROPS.md`](menus/BACKDROPS.md) builds them) |
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
-| [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe to upscale from the game's own art |
+| [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
 | [`models/`](models/CHANGELOG.md) | models | the loading-screen model, widened with its `LOADING` art |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | `binkproxy`, a `binkw32.dll` that plays launch reels full screen and AV1 replacements in place of `.bik` movies, and the movie pipeline |
 
