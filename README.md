@@ -12,12 +12,12 @@ a time, and every fix can be undone.
 
 - **Enjoyable on modern systems.** Widescreen and ultrawide without stretching, the
   menus filling the screen, anti-aliasing, and a working Vulkan renderer under Proton.
-- **Faithful to the original.** The mod is modular. The core fixes (HUD, menus,
-  anti-aliasing) make the game work at modern resolutions without changing how it looks
-  or feels: they replace no art and patch no engine files, only fix the engine in
-  memory at run time. Visual changes such as new textures, backdrops and movies are
-  separate, optional layers, and they aim to be subtle. `./a2mod stock` puts the whole
-  game back the way it shipped, for a before/after comparison.
+- **Faithful to the original.** The game can look better, but it should still feel
+  like Armada II. The same atmosphere and style, and nothing that pulls you out of it.
+  The mod is modular. The core fixes (HUD, menus, anti-aliasing) replace no art and
+  patch no files on disk. New textures, backdrops and movies are separate, optional
+  layers. `./a2mod stock` puts the whole game back the way it shipped, for a
+  before/after comparison.
 - **Share the tooling.** Most of the work went into tools for reading the engine,
   measuring textures and testing the game headless, and they're here too. So are the
   notes on what the engine actually does, with the dead ends included. They should be
