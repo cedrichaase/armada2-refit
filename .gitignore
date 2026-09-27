@@ -19,6 +19,7 @@
 *.sod
 *.SOD
 *.spr
+*.map
 *.a2neb-backup
 
 # Where assets lived before A2_DATA: a checkout from then may still have these, and

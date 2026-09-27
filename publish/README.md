@@ -18,7 +18,8 @@ from a 256px stock file to a 1024px plate *is* the plate.)
 |---|---|---|
 | `HUD.asi`, `Menus.asi`, `MSAA.asi` — their C source | yes | our code. It patches the game at run time and ships none of it; the byte arrays in the sources are short instruction signatures, checked before each patch |
 | the Python and shell tooling, `.ini`/`.conf` files | yes | ours |
-| docs and changelogs | yes | ours. They quote the odd config line, which is commentary |
+| docs and changelogs | yes | ours. They quote the odd config line, which is commentary, and name functions and addresses from `armada2.map` — see "Engine findings" below |
+| `armada2.map`, disassembly or decompilation listings, hex dumps of game code | **no** | the game's own code, or a mechanical translation of it. `check.sh` refuses `*.map` |
 | the texture pipeline (`a2tex`, `textures/lib`, `tools`), `models/`, `binkproxy`, the movie and backdrop pipelines | yes | ours. They read the game's files from the player's own install and write only into `A2_DATA` and the game directory |
 | the recipes — each target's `target.conf` and `stock.sha256`, `movie.conf`, `backdrops/*.conf` | yes | parameters, file names and SHA-256 hashes of stock files: facts about the game, not its content. The hashes are how `a2tex stock` knows it extracted the right bytes |
 | **any asset** — stock copies, AI upscales, intermediates, builds, the intro, the plates, the paid seeds, the archive of candidates and comparisons, the promo footage | **no** | the game's own art and video, or derived from them. They live in `A2_DATA` |
@@ -30,6 +31,30 @@ package may bundle the first four with their notices, and links to the last two.
 
 `a2mod` switches every layer on the game directory only (`.a2neb-backup` files,
 `$GAME/.a2mod/`) and needs no asset to do it.
+
+### Engine findings
+
+Much of this project was learned by reading `Armada2.exe` with the symbol map the game
+ships. Two things keep publishing that on the right side of the line (again a working
+position, not legal advice):
+
+- **Describe, don't reproduce.** Copyright protects a program's expression, not its
+  functionality (CJEU, *SAS Institute v World Programming*, C-406/10, 2012). A sentence
+  saying "`[device+0x18]` holds the horizontal scale" is a fact about the program in our
+  own words. A listing of the instructions that read it is the program's code. Names,
+  addresses, a single instruction in a sentence and the short signatures a plugin checks
+  before patching are the first kind. The map file, listings and dumps are the second.
+- **Tie each finding to a plugin.** In Germany, as elsewhere in the EU, disassembly is
+  allowed to make an independently created program interoperate with another
+  (UrhG §69e, Software Directive art. 6), and what it yields may be passed on only as far
+  as that interoperability needs. The plugins here are those programs. So a finding from
+  the disassembly lives in the README of the layer whose code uses it, beside the hook
+  it justifies. Engine trivia no plugin needs stays out. This limit does not apply to what
+  was learned by observing, studying and testing the running game (UrhG §69d(3)), such as
+  the test bench, texture measurements and crash reproductions, and a licence term
+  cannot override either provision (§69g(2)).
+
+`CLAUDE.md`, hard rule 9, is the working form of both.
 
 ### How it is enforced
 

@@ -263,6 +263,28 @@ Until the sign-off, the work stays on its branch and in its worktree.
    image, video and game format, and every data directory a pre-`A2_DATA` checkout may
    still have, so it takes a `git add -f` to break this; don't. `publish/check.sh`
    fails on any binary in the index; run it before committing anything unusual.
+9. **Describe the engine, never reproduce it — and only where a plugin needs it.** The
+   same applies to the code: what `Armada2.exe` is, as opposed to what it does, stays
+   out of the repository (`publish/README.md`, "Engine findings").
+   - **Allowed** in docs, comments and changelogs: function and symbol names from
+     `armada2.map`, addresses and field offsets, a single instruction named in a
+     sentence (`call 0x62bc70`), a config or `.spr` line quoted in passing, and in the
+     C sources the short byte signatures a plugin checks before it patches.
+   - **Never, at any path**: `armada2.map` or any excerpt of it longer than a name, a
+     disassembly or decompilation listing (not even a few lines in a code block), a hex
+     dump, a reconstructed struct or function body, or a game file quoted beyond a few
+     lines. Say what the code does in your own words. `publish/check.sh` refuses
+     `*.map`; the rest is on you.
+   - **Every finding read out of the disassembly belongs to a plugin.** It is published
+     because a plugin in this repository needs it to work with `Armada2.exe`: that is
+     the purpose German law (UrhG §69e) allows disassembly for, and the only purpose
+     it allows passing the results on for. So write it in the README of the layer whose
+     code uses it, next to the hook it justifies, and name the hook. A dead end that
+     shaped a hook is part of that justification and stays. A finding no plugin uses —
+     engine trivia, a curiosity found on the way — goes in the scratchpad, not the
+     repository. What was learned by **observing** the running game or measuring its
+     files (the test bench, texture statistics, crash reproduction) is not limited in
+     this way.
 
 ## a2mod
 
