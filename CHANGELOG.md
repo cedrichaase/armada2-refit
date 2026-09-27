@@ -14,7 +14,7 @@ Layers: menus 4.2.0, testbench 1.10.0.
   dialog, font included (see `menus/CHANGELOG.md`), with a bench scenario that pins it
   (`testbench/CHANGELOG.md`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-27.
 
 ## 6.2.2 — 2026-09-27
 

@@ -13,7 +13,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
   in place of the raster MS Sans Serif). The multiplayer name field now sits in its frame
   at 2.4x instead of 1:1 in the top-left corner. Menus.log records `edit` lines.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-27.
 
 ## 4.1.0 — 2026-09-27
 
