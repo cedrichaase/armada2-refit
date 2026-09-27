@@ -5,6 +5,21 @@ into `Textures/RGB/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 versions". Newest first. The reasoning behind each change is in [`README.md`](README.md),
 not here.
 
+## 2.1.0 — 2026-09-27
+
+### Added
+- `a2tex pack NAME [target...]`: the built targets in `$A2_DATA/packs/NAME.zip`, with a
+  `pack.txt` of name, date, commit and every file's SHA-256 (`tools/pack.py`).
+- `a2tex install --pack FILE [target...]`: refuses a pack with a missing, extra or
+  altered file, then runs the ordinary install from it, every guard included.
+- `a2tex extract`, the same command as `a2tex stock`.
+- `PACKS.md`: making textures and packs, the short path through the pipeline.
+
+Installs nothing different. Checked on the bench: a pack of `MBG02`, `LOADING` and
+`Fsovereign` made from the real builds, installed into a clone with no assets, is
+byte-identical to the installed game, `logo.SOD` included; a pack with one flipped byte
+is refused and installs nothing.
+
 ## 2.0.1 — 2026-09-27
 
 ### Fixed

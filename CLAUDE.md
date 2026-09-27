@@ -70,6 +70,8 @@ Required reading, by task:
 
 - **Anything renderer-adjacent: `platform/README.md`** — DLL overrides, the widescreen
   patch, the d3d8 chain, window management under Hyprland, the save format.
+- **Making textures or packs, as a user would: `textures/PACKS.md`**, the short path
+  through the pipeline. Keep it true when the commands change.
 - **Any texture work, or anything that touches a texture file** (the font atlases, the
   cursors): `textures/README.md`. It holds the engine reference — TGA format, mip
   chains, what counts as an interface sprite, the two nebula systems. Do not re-derive

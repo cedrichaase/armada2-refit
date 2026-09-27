@@ -4,11 +4,16 @@
 #   ./a2tex list                        every target, its config and state
 #   ./a2tex build [target...] [-j N]    build (default: every target with src/)
 #   ./a2tex install [target...]         copy out/ into the game, backing up first
+#   ./a2tex install --pack FILE [target...]   the same, from a texture pack
 #   ./a2tex revert [target...|all]      restore stock from the backups
 #   ./a2tex diff [target...]            measured comparison against stock
 #   ./a2tex verify [target...]          full invariant check, from the raw TGA bytes
-#   ./a2tex stock [target...]           fill stock/ from the game, checked against stock.sha256
+#   ./a2tex stock [target...]           extract stock/ from the game, checked against
+#                                       stock.sha256 (`extract` is the same command)
 #   ./a2tex stock --manifest target...  (re)write stock.sha256 from what is in stock/
+#   ./a2tex pack NAME [target...]       zip the built targets into $A2_DATA/packs/NAME.zip
+#
+# Making textures, and packs of them: textures/PACKS.md.
 #
 # A target is a RECIPE in the repository and a WORK directory outside it:
 #
@@ -141,6 +146,19 @@ build)
   printf '%s\n' "${list[@]}" | xargs -P "$J" -I{} bash -c 'build_one {}'
   ;;
 install)
+  # --pack FILE: every hash in the pack checked, unpacked to a scratch dir, and DATA
+  # pointed at it -- so a pack goes through exactly the install below, every guard
+  # included. stock/ is filled there too, and thrown away with it.
+  if [ "${2:-}" = --pack ]; then
+    [ -f "${3:-}" ] || die "--pack takes a pack file (a2tex pack makes one)"
+    PACKDIR=$(mktemp -d); trap 'rm -rf "$PACKDIR"' EXIT
+    "$ROOT/tools/pack.py" open "$3" "$PACKDIR" || die "$3: refused"
+    DATA="$PACKDIR/textures"; export DATA
+    set -- install "${@:4}"
+    for t in $(ls "$DATA"); do
+      [ -d "$ROOT/targets/$t" ] || echo "skipped $t -- in the pack, but this checkout has no recipe for it"
+    done
+  fi
   # Default: every target with a build. Not every target: with nothing built -- a fresh
   # A2_DATA, the case ./install must survive -- there is nothing to install, and filling
   # stock/ for all of them first would only cost time, or fail on an install that is not
@@ -329,7 +347,19 @@ diff)
         "$(magick "$DATA/$t/stock/$s" -format "$fmt" info:)"
     done
   done ;;
-stock)
+pack)
+  shift; name=${1:-}; [ -n "$name" ] && [ "${name#-}" = "$name" ] || die "usage: a2tex pack NAME [target...]"
+  shift; list=("$@")
+  # Default: every built target that is installed -- install=no is built to keep a
+  # finding reproducible, not to ship.
+  [ ${#list[@]} -eq 0 ] && mapfile -t list < <(for t in $(targets); do
+      [ "$(conf "$t" install yes)" = no ] && continue
+      compgen -G "$DATA/$t/out/*.tga" >/dev/null && echo "$t"; done)
+  [ ${#list[@]} -gt 0 ] || die "nothing to pack -- no target is built in $DATA"
+  mkdir -p "$A2_DATA/packs"
+  exec "$ROOT/tools/pack.py" make "$A2_DATA/packs/$name.zip" "$name" "$DATA" \
+       "$(git -C "$REPO" describe --always --dirty 2>/dev/null || echo '?')" "${list[@]}" ;;
+stock|extract)
   shift
   if [ "${1:-}" = --manifest ]; then
     shift; [ $# -gt 0 ] || die "--manifest takes the target(s) to write it for"
@@ -344,5 +374,5 @@ stock)
     fill_stock 0 "${list[@]}" || die "stock/ is incomplete -- see MISSING above"
     echo "stock/ complete for ${#list[@]} target(s)"
   fi ;;
-*) sed -n '2,25p' "$0" | sed 's/^# \?//' ;;
+*) sed -n '2,29p' "$0" | sed 's/^# \?//' ;;
 esac

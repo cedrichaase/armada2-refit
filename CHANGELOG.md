@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 6.2.0 — 2026-09-27
+
+Layers: textures 2.1.0.
+
+### Added
+- Texture packs: `a2tex pack` and `a2tex install --pack`, and `textures/PACKS.md`, the
+  short path from extracting stock art to sharing a pack (see `textures/CHANGELOG.md`).
+
+Installs nothing different into the game.
+
 ## 6.1.0 — 2026-09-27
 
 Layers: textures 2.0.1, models 2.0.0, cutscenes 2.0.0 (joined), menus 4.1.0, testbench 1.9.0.

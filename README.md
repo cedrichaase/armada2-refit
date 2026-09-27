@@ -5,7 +5,9 @@ A remaster of Star Trek: Armada II — the GOG release, patch 1.1 plus Patch Pro
 engine does at modern resolutions — the HUD, the menus, anti-aliasing, bloom — at run
 time, and all of it reverts. The asset layers — upscaled textures, the widened loading
 screen, an upscaled intro, widescreen menu backdrops — are a **pipeline for making your
-own**: extract the stock art from your install, upscale or replace it, build, install.
+own**: extract the stock art from your install, upscale or replace it, build, install —
+or pack it up for someone else to install. [`textures/PACKS.md`](textures/PACKS.md) is
+the short path.
 
 **This repository holds no game content**: no textures, models, video or data from the
 game, original or derived (`publish/README.md`) — only the code and the recipes. What
@@ -47,7 +49,7 @@ Not switched by `a2mod`, because the layers above stand on them:
 
     ./install                               install every layer
     ./a2mod status | stock | remastered     switch every layer at once
-    ./a2tex stock | build | install | ...   the texture pipeline (textures/README.md)
+    ./a2tex extract | build | install | pack | ...   the texture pipeline (textures/PACKS.md)
     ./a2test ...                            the game headless, for testing (testbench/)
     ./a2env.sh                              print where the game, prefix, Proton and assets are
 
