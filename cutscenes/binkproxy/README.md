@@ -149,16 +149,21 @@ Measured on the installed intro: 900 frames through the fit path at
 decode of the same file gave RMSE 0.015. `Activision.bik` through the
 pass-through path came out pillarboxed to exactly 1920x1440.
 
-## Not yet known (needs the game)
+## What depends on the setup
 
-- **Whether the back buffer can be locked with MSAA on.** `msaa` clears
+The intro plays full screen in game here with `MSAA.asi` installed, so on this setup
+both of these hold. On another, `BinkProxy.log` says which failed:
+
+- **The back buffer has to lock with MSAA on.** `msaa` clears
   `LOCKABLE_BACKBUFFER` on the grounds that "the engine never locks it", but
   this path does lock it. A failed lock is caught (`IsBadWritePtr` on the first
   and last row) and logged as `back buffer not writable; frame skipped`. If
   that line appears, the reels play black, and the fix belongs in `msaa`,
   not here.
-- **Whether the raised mode is found.** `FindDisplayMode` has to list the
-  desktop size. Menus.asi depends on the same thing for the shell, and that
-  works.
+- **The raised mode has to be found.** `FindDisplayMode` has to list the
+  desktop size. Menus.asi depends on the same thing for the shell.
+
+## Not yet tried
+
 - **In-game cinematics** (`BinkThread`) can take replacements too. The code
   path is generic, but only the intro has been tried.

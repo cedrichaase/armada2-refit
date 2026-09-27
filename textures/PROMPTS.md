@@ -116,8 +116,7 @@ the rules are almost inverted:
 | 4 per atlas, order irrelevant   | **One image per face, order matters**    |
 | 64x64 source                    | 256x256 source                           |
 
-**There is no horizontal band.** An earlier draft of this file claimed every face
-carries a galactic-plane band across the middle. Measured, that is false. The 6-face
+**There is no horizontal band** across the middle of a face; measured. The 6-face
 sets (`MbgDom1`, `MbgBorg`, `MbgKling`) are built around a **bright core in the centre
 of the frame**, fading outward, with a hard **black notch cut out of each of the four
 corners** — corner 24x24 blocks measure exactly 0 while the centre measures 47-55. Ask
@@ -164,15 +163,16 @@ for something this dark directly gives muddy, low-contrast sludge; a rich image 
 down keeps its structure. Stock only uses about 48 distinct levels anyway, so the
 dimming costs nothing you can see.
 
-### What actually shipped
+### The best generated MBG02 candidate
 
 **ChatGPT (the web UI) produced the best image of anything tried**, better than any
-model reachable through `belt`. It is archived as `source-MBG02-chatgpt.png`; the
-seamless version actually built from is `source-MBG02-seamless.png`.
+model reachable through `belt`. It lost to stock's own art, upscaled (candidate D), and
+is kept as `$A2_DATA/archive/reference/source-MBG02-chatgpt.png`; the seamless version
+built from it is `source-MBG02-seamless.png` beside it.
 
 | Route | Outcome |
 |---|---|
-| **ChatGPT web UI** | **used** — dense filament web, even coverage, good scale variation |
+| **ChatGPT web UI** | **best** — dense filament web, even coverage, good scale variation |
 | `openai/gpt-image-2-5-flare` (high, $0.053) | same idea but a too-regular honeycomb of uniform cells; no scale variation |
 | `pruna/flux-2-klein-4b` ($0.001) | good composition, but wispy plasma — 21% pure black against stock's 9.8% |
 | `bytedance/seedream-4-5` ($0.04) | best *gas*, but always a composed subject and a photographic plate border. Usable via off-centre 4K crops |
@@ -191,7 +191,7 @@ the same seamless copy, see README):
 > Pure saturated blue on black, no cyan, no teal, no purple, no white except the
 > faintest highlights on the brightest filaments. No stars, no planets, no text.
 
-**Ask for "fractal detail at many scales".** It is what separates the shipped image
+**Ask for "fractal detail at many scales".** It is what separates the best image
 from the gpt-image honeycomb — without it models produce cells of one uniform size.
 
 **Neither hue nor tiling needs to be right.** The source had *no red channel at all*
@@ -249,7 +249,7 @@ centred core" works better than re-running from scratch.
 
 **The corner notches have to come from the prompt.** Stock cuts a hard black notch out
 of all four corners of every face in these sets (a 24x24 corner block measures exactly
-0). the build does not mask them in, so the "corners fade to pure black" clause
-above is currently the only thing producing them, and it will give a soft fade rather
+0). The build does not mask them in, so the "corners fade to pure black" clause
+above is the only thing producing them, and it will give a soft fade rather
 than stock's hard cut. If that reads wrong in game, the fix is a corner mask in the
 build script, not a longer prompt.

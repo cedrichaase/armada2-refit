@@ -3,13 +3,12 @@
 `Menus.asi` fixes the game's GDI menu shell: it raises the front-end display mode,
 scales the menus to fill the screen, embeds them in the game window (`Embed=1`),
 composites hi-res backdrops behind them and removes the menu-switch flash. It was
-`MenuScale.asi` until menus 2.0.0 (see `CHANGELOG.md`), which is the name older
-logs and notes use; it had outgrown it.
+`MenuScale.asi` until menus 2.0.0; the two must never be installed together, so
+`install.sh` removes the old files and `Menus.asi` stands down if it finds one.
 
-The scaling came first. The menus render in the top-left 800x600 of a 3440x1440 screen. This makes them fill
-the height, centred, at 4:3, with black pillarboxes. Nothing is stretched.
-
-**Confirmed in game**, on the main menu, at 3440x1440.
+Stock, the menus render in the top-left 800x600 of a 3440x1440 screen. `Menus.asi`
+makes them fill the height, centred, at 4:3. Nothing is stretched: the pillarboxes are
+black, or show the backdrop plate where one is built.
 
 ## Why no config can fix this
 
@@ -27,10 +26,8 @@ Two separate facts, both measured, and the second is the one that matters:
 2. **The engine asks for an 800x600 screen while the menus are up.** This is the real
    reason, and it is not what it looks like. `GetSystemMetrics(SM_CXSCREEN)` returns
    **800** at the main menu, and the game's own window is 800x600 at 0,0. The shell is
-   not drawing small inside a big screen — it is *filling a small screen*. (Measured when
-   the prefix still ran a Wine virtual desktop, since superseded by `Embed=1`: Wine
-   parked that small screen in the desktop's corner, because a tiling compositor will
-   not let the desktop window shrink to match.) The mode is hard-coded:
+   not drawing small inside a big screen — it is *filling a small screen*. The mode is
+   hard-coded:
 
        ST3D_GraphicsEngine::SetActiveDisplay_Internal
          push 0x10 ; push 600 ; push 800
@@ -72,9 +69,8 @@ so gameplay, the HUD and the Bink videos are untouched by construction.
 
 ## One window: `Embed=1`
 
-**Confirmed in game by the user (2026-09-23): "much improved".** Also checked in test launches: the game is one OS window from
-launch to exit, main menu, Options and its nested screens, and the in-mission
-Options menu, Save Game and Return to Game included.
+The game is one OS window from launch to exit: main menu, Options and its nested
+screens, and the in-mission Options menu, Save Game and Return to Game included.
 
 Every menu, the in-game ones included, is
 `DialogBoxParamA(shell_hInstance, id, <3D window>, proc, lp)` with a `WS_POPUP`
@@ -108,14 +104,14 @@ each handled, each measured:
   parent-client coordinates just before the real `MoveWindow`/`SetWindowPos`.
 - **Resizing.** A full-screen menu is sized once. When the game window is
   resized under it, as Hyprland does when the game drops fullscreen on focus
-  loss, it used to hang off the bottom (Return to Game unreachable). Embedded
-  full-screen menus now follow their parent's client area.
+  loss, it would hang off the bottom (Return to Game unreachable). Embedded
+  full-screen menus follow their parent's client area.
 - **Keyboard focus.** The game reads keys only as `WM_KEYDOWN`/`UP` on the 3D
   window (`ProcessKeyboardMessages`), so that window must hold the focus. A popup
   gives it back as a side effect of re-activating its owner when it closes; a child
-  never deactivated anything, and Wine left the focus `NULL` after it was gone.
-  Every keystroke was then dropped: Esc opened the in-mission menu once and never
-  again, while HUD clicks, routed by position, still worked. The focus is put back
+  never deactivates anything, and Wine leaves the focus `NULL` after it is gone.
+  Every keystroke is then dropped: Esc opens the in-mission menu once and never
+  again, while HUD clicks, routed by position, still work. So the focus is put back
   where it was when the menu returns. That also sends the `WM_SETFOCUS` on which
   the game runs `ClearKeyboardState`, since the Esc key-up went to the menu and
   not to the game. A menu opened from a menu that held no focus leaves it alone.
@@ -128,7 +124,7 @@ hooks then only log.
 **Esc closes the in-mission menu (`EscapeReturns=1`).** In stock, Esc opens the
 in-mission menu and does nothing inside it: `EscapeMenuDlgProc` (0x5cddb0) has no
 `WM_COMMAND` case, so the `IDCANCEL` a dialog makes of Esc is ignored. Embedded, Esc
-doesn't even reach the menu, which holds no focus. The modality filter now catches a
+doesn't even reach the menu, which holds no focus. The modality filter catches a
 fresh Esc press (not an auto-repeat) while that menu is the innermost one, and feeds
 its procedure a left click on Return to Game. That runs the same sound, result code
 and `EndDialog` as the mouse. The procedure and the button's rectangle (x 5, y 568,
@@ -138,19 +134,16 @@ a nested menu, such as Graphics Settings, does nothing, as before. Needs `Embed=
 
 **The cursor.** The 3D window's `WindowProc` answers every `WM_SETCURSOR` with
 `SetCursor(NULL)` (`0x488881`), so the engine's sprite cursor can show in play. A child's
-`DefWindowProc` asks its parent first, so once embedded, the arrow vanished over every
-menu (measured: `GetCursorInfo` handle NULL). The dialog wrapper now sets the class cursor
-of the window under the pointer itself, as a top-level dialog did. Checked on the main
-menu and Options. The in-mission menu, and the sprite cursor returning after Return to
-Game, are left to the user's play-through.
+`DefWindowProc` asks its parent first, so once embedded, the arrow would vanish over
+every menu (measured: `GetCursorInfo` handle NULL). The dialog wrapper sets the class
+cursor of the window under the pointer itself, as a top-level dialog does.
 
 ### The Admiral's Log
 
-The log was the one shell screen still wrong after Embed, in three ways, and all three
-came from it being built from real windows where every other screen draws
-`ShellButton` bitmaps into itself. Reported with a screen recording on 2026-09-25:
-the score table stayed on top of every menu after the log closed, and the log's
-buttons sat 1:1 in the top-left corner while its backdrop was scaled.
+The log needs its own handling, because it is built from real windows where every
+other screen draws `ShellButton` bitmaps into itself. Embedded naively, the score table
+stays on top of every menu after the log closes, and the log's buttons sit 1:1 in the
+top-left corner while its backdrop is scaled.
 
 `AdmiralsLogDlgProc` (`0x5e22c0`) is opened by `do_admiralsLog` as an ordinary
 `DialogBoxParamA(0x880)`, full-screen, so the log itself was always letterboxed. In
@@ -194,10 +187,9 @@ The fix, in `menus.c`:
   do this, which is how the two were told apart: `GetPixel` on the surface read a
   colour for one and `CLR_INVALID` for the other.
 
-**Confirmed in game by the user (2026-09-25).** The log is scaled and centred with
-everything in place, from both Options and the end of a mission. Tab clicks switch
-panes, and Done leaves exactly one dialog. After aborting a skirmish, Done returns to a
-clean main menu.
+The log is scaled and centred with everything in place, from both Options and the end
+of a mission. Tab clicks switch panes, and Done leaves exactly one dialog; after
+aborting a skirmish, Done returns to a clean main menu.
 
 ## GetDC and ReleaseDC do not pair up in this game
 
@@ -205,14 +197,14 @@ clean main menu.
 and falls into **eight NOPs at `0x5a4adb`** where its `push; push; call
 ReleaseDC` used to be. It was patched out, so every button redraw leaks the DC.
 
-The first version of this plugin kept the real DC on a stack and presented only
-when the outermost one came back. One leak pinned the stack, so **nothing drawn
-after it ever reached the screen**: the Options screen showed its background
-and no buttons, **with or without Embed**. After eight leaks the game was handed
-real DCs and drew 1:1 in the corner. This predates Embed and affected every
-screen built from `ShellButton`s, which is most of them past the main menu.
+So nothing may wait for a `ReleaseDC`. Keeping the real DC on a stack and presenting
+only when the outermost one comes back fails at the first leak: the stack is pinned,
+**nothing drawn after it reaches the screen** (Options shows its background and no
+buttons), and after eight leaks the game is handed real DCs and draws 1:1 in the
+corner — on every screen built from `ShellButton`s, which is most of them past the
+main menu.
 
-Now no real DC is held. `GetDC` hands out the design surface and marks it dirty,
+So no real DC is held. `GetDC` hands out the design surface and marks it dirty,
 `ReleaseDC` presents at once through a DC of the plugin's own, and a 30 ms
 thread timer presents whatever is still dirty. The timer is what catches the
 leaks. `Trace=1` logs the first paint events per dialog, which is how this was
@@ -220,8 +212,9 @@ found.
 
 ## The 1:1 flash between menus: `Underlay=0`
 
-When the user switched between the main and single-player menus, an 800x600 picture showed
-1:1 in the top-left corner for 100–120 ms. It was measured off a 60 fps recording:
+With `Underlay=1` (stock), switching between the main and single-player menus shows
+an 800x600 picture 1:1 in the top-left corner for 100–120 ms. Measured off a 60 fps
+recording:
 - Main → single player showed the main menu for 2 frames, then single player's bare
   background for 4.
 - The way back showed plain black for 7.
@@ -250,8 +243,8 @@ the stack is unchanged. `Underlay=1` restores stock.
 
 The main menu's background is upscaled 4x and outpainted to 2.4:1. The pillarboxes
 show the outpainted sides, and the centre shows the upscale wherever the shell is
-still drawing the stock background. **Not yet seen in game by a person.** A test run
-at 3440x1440 composited it as designed; the numbers are below.
+still drawing the stock background. The campaign selection screen has a plate too
+(below).
 
 **Why the art cannot simply replace the BMP.** The shell draws each screen at 1:1
 into the 800x600 design surface: first the stock background, then buttons, hover
@@ -282,7 +275,7 @@ mean |Laplacian| 56.4, against 60.6 for the plate and 35.7 for a plain stretch.
 bake the background in, and theirs decodes darker than `mainbkgr.bmp`: -1.7/-1.5/-2.0
 per channel, uniform out to the rectangle's edge. `stretch(frame) + w·(plate − stock)`
 reproduces that as a plate 2/255 darker, so the whole rectangle dimmed on hover,
-visibly when toggling. A frame pixel within `NoiseFloor` (6) of stock is now taken
+visibly when toggling. A frame pixel within `NoiseFloor` (6) of stock is taken
 as stock, ramping back to the frame by 12: the offset falls to -0.2, the background
 there is the plate exactly, and the art, 16+ off, is untouched. `bd_soften` continues
 the snapped edge rather than the raw one.
@@ -316,18 +309,17 @@ moves them with the rest of the menus layer.
 `single/TutorialGlow.bik`, 320x200 at (28,20). It has the background baked in, and
 its blue halo runs right up to the rectangle. Measured against stock along its
 edges it is off by 56, 12, 59 and 26 (top, bottom, left, right). The stock game
-hid the left cut on the black frame, which the plate now paints over, so it
-showed as a hard box (seen in game). The other three campaign glows fade out
-inside their rectangles (1–3 at the edges), and so do the main menu's hover
-bitmaps (RMSE 0 at the edges).
+hides the left cut on the black frame, which the plate paints over, so without help
+it shows as a hard box. The other three campaign glows fade out inside their
+rectangles (1–3 at the edges), and so do the main menu's hover bitmaps (RMSE 0 at the
+edges).
 Each `N.soften=x,y,w,h` rectangle gets a ring 12 design px wide around it. There,
 wherever the frame still equals stock, the difference at the nearest edge is
 carried on and fades linearly to nothing. It is averaged over 7px *along* the
-outermost row or column, which smooths codec noise. The first version averaged a
-7x7 box reaching 3px *into* the rectangle, and copied the panel bar that starts
-2px in outwards as a ghost bar (seen in game). The ring keeps detail weight 1, so the plate shows through. With nothing
-drawn in the rectangle, the difference is zero and nothing changes. An offline
-simulation of the hover frame shows the box gone; not yet seen in game.
+outermost row or column, which smooths codec noise; averaging a 7x7 box reaching 3px
+*into* the rectangle instead copies the panel bar that starts 2px in outwards as a
+ghost bar. The ring keeps detail weight 1, so the plate shows through. With nothing
+drawn in the rectangle, the difference is zero and nothing changes.
 Fading inwards instead would eat the panel's left bar, which starts 4px inside.
 A generic "continue every long edge" rule cannot tell a halo from the grey button
 bars, hence the explicit list.
@@ -360,7 +352,7 @@ revert.
 | `IntegerScale` | `1` snaps to a whole factor (2x = 1600x1200) — crisper, leaves a band |
 | `Smooth` | `1` HALFTONE, `0` nearest neighbour |
 | `RaiseShellMode` | `0` leaves the engine's 800x600 front-end mode alone |
-| `Backdrops` | `0` black pillarboxes and a plain stretch, as before the backdrops |
+| `Backdrops` | `0` black pillarboxes and a plain stretch, no plates |
 
 **If anything misbehaves, `Mode=0` is a safe diagnostic and `--remove` is a full
 uninstall.** `Menus.log`, beside `Armada2.exe`, records what it patched and every
@@ -415,8 +407,8 @@ LAUNCH.
 
 `run-wine.sh` launches the game with Proton's bundled Wine directly against the existing
 prefix, skipping Heroic and the proton wrapper. It is the only launch path that prints
-Wine's diagnostics to a terminal — which is how `Unable to load MenuScale.asi. Error:
-317` turned out to be
+Wine's diagnostics to a terminal — which is how an ASI loader's `Unable to load
+<name>.asi. Error: 317` turned out to be
 
     wine: Call from ... to unimplemented function KERNEL32.dll.GetModuleFileNameA@12
 
@@ -458,17 +450,17 @@ assignment to those even under `-ffreestanding -fno-builtin`.
 
 ## Known issue: menu animations stall while the cursor is moving
 
-**Reported in game, not yet diagnosed.** The animated elements on the menu screens
+**Reported in game, not diagnosed.** The animated elements on the menu screens
 (`bitmaps/main/MainBk_flare.bik`, `singleplayer.bik`, `Multiplayer.bik`) appear to stop
 while the mouse is being moved, and resume when it stops.
 
 The leading hypothesis is cost per mouse-move, and it is a hypothesis — **nothing here
-has been measured.** `present()` runs on every outermost `ReleaseDC`, and a mouse-move
+has been measured.** `present()` runs on every `ReleaseDC`, and a mouse-move
 makes the shell redraw the widget under the cursor, so each `WM_MOUSEMOVE` costs a
 **full-frame 800x600 -> 1920x1440 `StretchBlt` in HALFTONE**, not a redraw of the part
 that changed. A stream of mouse-moves could then starve whatever drives the animation.
 
-On a screen with a backdrop this no longer applies in that form. There, `present()`
+On a screen with a backdrop this does not apply in that form. There, `present()`
 redoes only the changed rectangle, measured at 7.8 ms per present (see
 "Backdrops"). A fix for the other screens could follow the same pattern.
 
@@ -485,9 +477,8 @@ Three cheap experiments, in the order that actually discriminates:
    cheaper rather than rarer.
 
 If it is the cost, the real fix is to stop presenting a whole frame per `ReleaseDC` —
-either coalesce (mark dirty, present at most once per timer tick) or scale only the
-rectangle that changed. Both are more bookkeeping than the current code has, which is
-why neither was done up front.
+either coalesce (mark dirty and leave it to the 30 ms timer) or scale only the
+rectangle that changed, as the backdrop path does.
 
 ## Not done
 

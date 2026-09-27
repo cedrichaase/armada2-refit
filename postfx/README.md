@@ -13,24 +13,18 @@ actually deploys (`~/.config/heroic/tools/dxvk/dxvk-3.1.1/`), by reading the con
 out of the shipped `d3d9.dll` rather than from documentation — the key list below is what
 this binary honours, not what some DXVK version honours.
 
-## This does not have to wait for the d3d8 regression
-
-An earlier revision of this file said the graphics stack should not be touched while the
-chain regression above is open. For `dxvk.conf` specifically **that is wrong, and the
-reason matters**: both possible chains end in DXVK's `d3d9.dll`.
-
-    proxy -> DXVK d3d8   -> DXVK d3d9 -> Vulkan      (live today)
-    proxy -> GOG d3d8to9 -> DXVK d3d9 -> Vulkan      (after the regression fix)
-
-`d3d9.*` keys are read by the d3d9 layer, which is present and is DXVK's in both. So a
-`dxvk.conf` change is attributable regardless of which `d3d8.dll` won the last launch,
-and does not need the regression closed first. The AA routes below are the ones that do.
+All of it stands on the render chain in `platform/README.md`: DXVK's `d3d8.dll` and
+`d3d9.dll` in the game directory. `d3d9.*` keys are read by DXVK's d3d9 layer, which is
+in the chain whichever `d3d8.dll` sits in front of it (`d3d8-chain.py --use dxvk` or
+`--use gog`).
 
 ## Tier 1 — `dxvk.conf`, free and reversible
 
 `postfx/renderer-config.sh` writes it, in **cumulative stages**, because this project's
 method is one change at a time and three keys at once is not attributable.
-**All three stages are installed and confirmed in game.** It verifies every key against
+All three stages are installed. They went live across three launches and were never
+A/B'd one at a time, so how much each contributes is unmeasured; `--stage N` and
+`platform/ab-shot.sh` are what would settle it. It verifies every key against
 the `d3d9.dll` that actually loads — the one in the game directory — before writing,
 because a key DXVK does not recognise is silently ignored:
 
@@ -41,8 +35,8 @@ because a key DXVK does not recognise is silently ignored:
     postfx/renderer-config.sh --show       # what is installed now
     postfx/renderer-config.sh --remove     # delete dxvk.conf, full revert
 
-- **`d3d9.samplerAnisotropy = 16`** (stage 1). `dxcfg.ini` asks for `application`, i.e.
-  whatever a 2001 renderer requests, which is likely none. In a top-down RTS every hull
+- **`d3d9.samplerAnisotropy = 16`** (stage 1). Without it the game gets whatever a 2001
+  renderer requests, which is likely none. In a top-down RTS every hull
   and every planet is drawn at a steep angle to the camera, so all of it is sampled with
   plain trilinear and blurs along the axis of foreshortening. This is the single biggest
   free win and the one to judge on its own.
@@ -66,9 +60,8 @@ engine against an RX 5700 XT — and all three stages to be free.
 
 ## Telling whether a renderer setting did anything
 
-Asked after stage 1 went in and the answer was not obvious by eye. It is two separate
-questions and they need separate tools, because "the setting was ignored" and "the
-setting worked and is subtle" look identical in game.
+Two separate questions, and they need separate tools, because "the setting was
+ignored" and "the setting worked and is subtle" look identical in game.
 
 **Is it applied?** A `dxvk.conf` key DXVK does not recognise is *silently ignored* — no
 error, no warning. DXVK does print its effective configuration at startup, so ask it:
@@ -91,11 +84,10 @@ meaningful:
 **Why `d3d9=n,b` is part of the diagnosis.** DXVK's `d3d8.dll` imports `d3d9.dll` by
 name — confirmed with `objdump`, not assumed — so every `d3d9.*` key is read by a layer
 that only exists if Wine resolves `d3d9` to DXVK's build rather than its own builtin
-WineD3D. This prefix has only ever carried `winmm=n,b;d3d8=n,b`, and setting
-`WINEDLLOVERRIDES` at all *replaces* whatever Proton would have set, so the d3d9 slot
-may never have been native. That is the leading suspect whenever a `d3d9.*` key appears
-to do nothing here, and it is the same gap the "Also outstanding" note below has
-recorded, untested, all along. `--off` restores the original override string too.
+WineD3D. Setting `WINEDLLOVERRIDES` at all *replaces* whatever Proton would have set, so
+without that entry the d3d9 slot is not native. The working chain carries it
+permanently (`d3d8-chain.py` owns it); `--diagnose` adds it only in case it is missing,
+and `--off` never removes it.
 
 **Heroic must be closed** for `--on`/`--off`: it rewrites `GamesConfig` on exit and
 would discard the edit. The script refuses rather than losing the change silently, and
@@ -145,11 +137,10 @@ and precisely where the upscaled art lives. Expect stage 2 to do more for this g
 appearance than stage 1, which inverts the usual ordering. Stage 1 still goes first:
 AF is what keeps the sharper mips stage 2 selects from aliasing on the oblique surfaces.
 
-## Tier 2 — anti-aliasing: route 2 built, `msaa/`
+## Tier 2 — anti-aliasing: route 2, `msaa/`
 
-**Route 2 is built, installed and confirmed in game: `MSAA.asi`, 8x.** The first launch
-logged 8x on all three device creations (3440x1440, the 640x480 fallback, 3440x1440
-again) and DXVK logged no errors.
+**Route 2 is `MSAA.asi`, 8x.** `MSAA.log` shows 8x on every device creation (3440x1440,
+the launch reels' 640x480, 3440x1440 again) and DXVK logs no errors.
 
     msaa/install.sh                 # build + install (Samples=8)
     msaa/install.sh --samples 4     # or 2; 0 patches nothing
@@ -170,46 +161,39 @@ renders off-screen, and the one back-buffer read-back is the minimap copy
 resolves a multisampled source through `StretchRect`. So **check the minimap first**
 when judging it. Full reasoning in `msaa/README.md`.
 
-What follows is the analysis that chose the route.
+Why that route, of the three:
 
 **DXVK 3.x ships no MSAA-forcing key.** Read out of the binary that actually loads, not
 from documentation: there is no `forceSwapchainMSAA` or equivalent.
 `d3d9.forceSampleRateShading` exists but only does anything once MSAA is already on. So
-AA cannot come from `dxvk.conf`, and the three routes are now these — note that the
-cheapest one died when the chain changed:
+AA cannot come from `dxvk.conf`, and the routes are:
 
-1. **~~`dxcfg.ini`'s own `antialiasing=` key~~ — dead.** It is read by the GOG d3d8to9
-   translator, and the working chain replaced the translator with DXVK's own d3d8.
-   `dxcfg.ini` is inert and will stay inert unless the chain moves to
-   `d3d8-chain.py --use gog`, which is a real option (GOG d3d8to9 → DXVK d3d9 → Vulkan)
-   and would make both `anisotropic=` and `antialiasing=` live again. Untested, and its
-   accepted values are unknown because `dxcfg.exe`'s strings are packed.
-2. **An ASI hook on `IDirect3D8::CreateDevice`**, setting `MultiSampleType`. Squarely
-   inside the toolchain `menus/` already proves — clang + lld-link + the
-   Ultimate ASI Loader that is already carrying two plugins — and `armada2.map` gives
-   the call site. **The most likely to work, and now the most attractive**: DXVK
-   implements D3D8 multisampling properly on Vulkan, which wined3d's D3D8 path did not
-   reliably do, so this became a better bet the moment the chain changed.
+1. **`dxcfg.ini`'s own `antialiasing=` key — inert.** It is read by the GOG d3d8to9
+   translator, which is not in the chain; DXVK's own d3d8 is. It would come back only
+   with `d3d8-chain.py --use gog` (GOG d3d8to9 → DXVK d3d9 → Vulkan), which would make
+   both `anisotropic=` and `antialiasing=` live again. Untested, and its accepted values
+   are unknown because `dxcfg.exe`'s strings are packed.
+2. **An ASI hook on `IDirect3D8::CreateDevice`**, setting `MultiSampleType` — the one
+   taken. Squarely inside the toolchain `menus/` proves — clang + lld-link + the
+   Ultimate ASI Loader — and `armada2.map` gives the call site. DXVK implements D3D8
+   multisampling properly on Vulkan, which wined3d's D3D8 path did not reliably do.
 3. **Post-process AA via vkBasalt** — see Tier 3. FXAA/SMAA rather than MSAA, so it
    softens edges rather than resolving them, but it costs no code at all.
 
-**Supersampling by rendering above display resolution remains a trap.** It looks free
-given the GPU headroom and is not: `ui-widescreen.py`'s canvas arithmetic, the
-`popupPaletteXA` correction and `Menus.asi`'s desktop-size read are all tuned to
-3440x1440 and would need re-deriving.
+**Supersampling by rendering above display resolution is a trap.** It looks free given
+the GPU headroom and is not: nothing in this chain scales a mode larger than the screen
+down to it, and the HUD, menu and cursor corrections all treat the display mode as the
+screen.
 
 ## Tier 3 — post-processing: bloom done, the rest untried
 
-**This was impossible until the chain changed, and that is the point.** vkBasalt is a
-**Vulkan layer**. Until DXVK went in, Direct3D 8 landed on wined3d/**OpenGL**, so
-vkBasalt had nothing to attach to — any attempt would have done nothing, with no error
-to explain why. Now that the game renders through Vulkan, the whole post-processing
-family is reachable for the first time.
+**This is possible only because the chain is Vulkan.** vkBasalt is a **Vulkan layer**.
+On the stock chain, Direct3D 8 lands on wined3d/**OpenGL**, so vkBasalt has nothing to
+attach to — it does nothing, with no error to explain why.
 
-**Done: bloom is installed and confirmed in game** — MagicBloom through vkBasalt,
-threshold 6, intensity 0.08, accepted by the user after one step up from 0.05.
-**Home toggles it live**, which makes it the one renderer setting in this project with a
-same-frame A/B.
+**Bloom** is MagicBloom through vkBasalt, threshold 6, intensity 0.08. **Home toggles
+it live**, which makes it the one renderer setting in this project with a same-frame
+A/B. CAS sharpening and FXAA/SMAA are untried.
 
     postfx/vkbasalt/build.sh          # build + install the layer (per-user, pinned)
     postfx/postfx.py --on             # write config, prove it compiles, enable in Heroic
@@ -280,12 +264,12 @@ lowering it breaks the match against stock. Bloom converts that blowout from "th
 texture ran out of range" into "that is a bright object", which is the correct read and
 which no amount of texture work can produce.
 
-Judge it the way the texture repository's `textures/tools/measure-invention.sh` judges a blend, not at 1:1 — and
+Judge it the way `textures/tools/measure-invention.sh` judges a blend, not at 1:1 — and
 `platform/ab-shot.sh` will diff two launches numerically.
 
 ## Tier 0 — ambient occlusion, which is the wrong tool here
 
-Unchanged by any of the above, and the reasoning is worth keeping because "add AO and
+The reasoning is worth keeping because "add AO and
 bloom" is the reflex suggestion for any old game and only half of it survives contact
 with this one.
 

@@ -43,7 +43,7 @@ copy, and can run while the game is being played.
 | Stage | What | Why this way |
 |---|---|---|
 | clone | `cp -a --reflink=always` of the game (4.5 GB) and the prefix (558 MB) into `~/.cache/a2test/sessions/<id>/` | btrfs: 0.7 s and no space. Must be the same filesystem as the game |
-| prepare | `ARMADA.PRF` line 5 set to the resolution, then `hud/install.sh` with `A2_GAME=<clone>`: `HUD.asi` in, the file-based HUD, font and cursor fixes reverted. For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order, so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted) | `HUD.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims. (Before hud 2.0.0 this ran three scripts with `--res` per case, since those were built for one resolution.) |
+| prepare | `ARMADA.PRF` line 5 set to the resolution, then `hud/install.sh` with `A2_GAME=<clone>`: `HUD.asi` in, the file-based HUD, font and cursor fixes reverted. For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order, so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted) | `HUD.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims |
 | display | `sway` with `WLR_BACKENDS=headless`, one output at exactly the resolution, `xwayland force` | the game gets the same Xwayland path it has under Hyprland, and nothing appears on the desktop |
 | input | `input/a2input`: a wlr virtual pointer and virtual keyboard on sway's seat, fed through a FIFO | see "Input" |
 | game | `umu_run.py` with Heroic's environment, the clone as `WINEPREFIX`/`STEAM_COMPAT_DATA_PATH`; silent: `winepulse.drv=d;winealsa.drv=d` | see "Traps" |
@@ -76,8 +76,7 @@ anything new in the game's `Logs/`.
   It recognises the game's streams by pid (host or container, from `NSpid`), by an
   `a2test.session` marker, or by their being on the null sink. It logs where the audio
   went, and any stream of ours elsewhere is moved to the null sink, muted, and the game
-  stopped. The last part is tested with a marked stream at volume 0. The first real
-  launch after this change is what shows the routing itself works.
+  stopped. The last part is tested with a marked stream at volume 0.
   **Open: the routing is not airtight.** Besides its main stream (`Star Trek Armada 2`,
   pid -1, which has always landed on the null sink) the game sometimes opens a second
   one named `Armada2.exe`, with its real pid. In the logs of ~170 launches on
@@ -85,7 +84,7 @@ anything new in the game's `Logs/`.
   (run `session-20260926-173731`: `alsa_output…analog-stereo`, within the first 6 s).
   The watchdog muted and moved it and stopped the game each time, but for that moment it
   was on the user's output. Why the pre-registered default is not taken by that stream
-  is not yet known.
+  is not known.
 - **XTest input does not work.** In headless sway the seat has no devices. `xdotool`
   moves Xwayland's core pointer, and Wine even logs the `ButtonPress`, but the frame
   stays pixel-identical: with no keyboard on the seat nothing holds focus, and no
@@ -99,10 +98,10 @@ anything new in the game's `Logs/`.
 - **Which process is the game.** `umu_run.py`, the proton script and `umu.exe` all
   carry `Armada2.exe` as an argument and exit within seconds. The real game process,
   argv[0] `X:\…\Armada2.exe`, appears about 4 s after launch. Matching on "the command
-  line contains Armada2.exe" latched onto a short-lived one, reported the game dead
-  2–8 s in, and left the real game running unwatched past its teardown. Only argv[0]
-  identifies it. The Wine errors in those runs' `wine.log` (`failed to update … wine.inf`)
-  were a red herring, not the cause.
+  line contains Armada2.exe" latches onto a short-lived one, reports the game dead
+  2–8 s in, and leaves the real game running unwatched past its teardown. Only argv[0]
+  identifies it. The Wine errors in `wine.log` (`failed to update … wine.inf`) are a
+  red herring, not the cause.
 - **The game ignores WM_CLOSE.** It is still up 20 s after one. `Quit the game`
   therefore goes through its menus: in a mission Esc, "Exit to Windows", "Yes"; on the
   main menu the Exit panel, then "Yes".
@@ -121,26 +120,23 @@ anything new in the game's `Logs/`.
   max), with no upscaling and no false hits. It runs on `cv2.dnn`, so it needs no
   package the bench did not already have; `bench/ppocr.py` fetches its two ONNX models
   (Apache-2.0) into `~/.cache/a2test/models` on first use, pinned by revision and
-  sha256. Tesseract is gone rather than kept as a fallback: it found nothing PP-OCR
-  missed.
-- **Tesseract starts an OpenMP thread per core in every process.** Sixteen in parallel
-  (the comparison above) finished 18 of 1720 reads in ten minutes; with
-  `OMP_THREAD_LIMIT=1` each, twelve in parallel finished all 1720.
-  Set it for anything that runs tesseract in parallel.
+  sha256. Tesseract is not kept as a fallback: it found nothing PP-OCR missed. (If it
+  is ever run in parallel again for a comparison, set `OMP_THREAD_LIMIT=1`: it starts an
+  OpenMP thread per core in every process, and sixteen at once finished 18 of 1720
+  reads in ten minutes.)
 - **In a mission the pointer moves by relative motion only.** The game keeps its own
   cursor there and moves it by (absolute pointer position - a reference point it fixes
   once and then tries to warp back to). Xwayland cannot warp a virtual pointer, so each
-  absolute move arrived as a jump from that stale point: moving +50 across four times
-  drew the cursor +200, +250, +300, +350 across and +100 down each time, and every hud
-  shot's cursor ended up in the corner at 0,0. `a2input rel` (relative motion) moved it
-  exactly, so `Session.move` sends the difference from the last known position; only a
-  session's first move is absolute. Wine's `MouseWarpOverride=disable` changed nothing,
-  so the warp is not DirectInput's. (It looked at first like the game *hid* its cursor: the
-  arrow sat in the top-left corner over the resource bar, where a frame difference
-  mistook it for the animated icon.)
-- **OCR boxes cannot measure shape.** The same word's box came back 28 px tall in one
-  tesseract pass and 36 in another: a phantom 30% stretch. Text is only *located* by OCR in the
-  reference shot. Its shape is measured by the template match, like any patch.
+  absolute move arrives as a jump from that stale point: moving +50 across four times
+  draws the cursor +200, +250, +300, +350 across and +100 down each time, and the
+  cursor ends up in the corner at 0,0 — where it looks as if the game *hid* it, since
+  a frame difference mistakes it for the animated resource-bar icon. `a2input rel`
+  (relative motion) moves it exactly, so `Session.move` sends the difference from the
+  last known position; only a session's first move is absolute. Wine's
+  `MouseWarpOverride=disable` changes nothing, so the warp is not DirectInput's.
+- **OCR boxes cannot measure shape.** The same word's box can come back 28 px tall in
+  one pass and 36 in another: a phantom 30% stretch. Text is only *located* by OCR in
+  the reference shot. Its shape is measured by the template match, like any patch.
 - **Dark art is not a pillarbox.** The main menu's plate fades to near-black space at
   21:9, and a "mostly dark column" test called that 267 px of black bar. A bar is a
   column with *no* pixel above 4/255.
@@ -151,8 +147,8 @@ anything new in the game's `Logs/`.
 - **A direct map launch deals a random faction.** One run drew the Federation,
   Cardassian and Romulan HUDs across its cases, and their panels have different shapes
   (the Federation's minimap panel is about half as wide as the Romulan's). A comparison
-  across resolutions then measures different sprites. The user caught it from the
-  screenshots. Anything compared across resolutions goes in through the Borg campaign
+  across resolutions then measures different sprites. Anything compared across
+  resolutions goes in through the Borg campaign
   (`Include "_enter-borg-mission"`), which is always Borg. The Admiral's Log and the
   in-mission menu are shell UI and faction-independent, so they keep the fast launch.
 - **Fog of war is flat grey.** A map opens scrolled to its top-left corner, so its
@@ -197,7 +193,7 @@ war, the 21:9-tuned font). Add to it when it flags something known.
 `--vnc` (per case) or `session start --vnc` starts a view-only `wayvnc` on the headless
 output: `vncviewer localhost:5910` (the port is printed; it counts up if busy). `--record`
 writes each case to `run.mp4` with `wf-recorder`. Both are optional and need `wayvnc`,
-`wf-recorder` and a viewer (`tigervnc`), none of which is installed yet. Without them
+`wf-recorder` and a viewer (`tigervnc`), none of which is installed here. Without them
 the bench warns and carries on.
 
 ## Requirements
@@ -213,11 +209,10 @@ separate and needs opencv.
 
 Not built yet. Each is recorded with what is known so far.
 
-**Sonnet, checked against Opus.** The judge ran on Opus until testbench 1.2.1 (the
-CLI's default here, $0.11–0.21 per judged step, about 50 steps by then) and now runs on
-Sonnet. Haiku was considered, but the judgments that matter are fine ones: a panel a few
-percent off, or a small copy of the log in a corner. A false pass there costs more than
-the tokens saved. Still open:
+**Sonnet, checked against Opus.** The judge runs on Sonnet; Opus, the CLI's default
+here, costs $0.11–0.21 per judged step. Haiku was considered, but the judgments that
+matter are fine ones: a panel a few percent off, or a small copy of the log in a
+corner. A false pass there costs more than the tokens saved. Still open:
 
 - Re-judge stored shots from past Opus runs with Sonnet and compare the verdicts,
   including the known failures (stretched HUD at 16:9 and wider, pillarbox bars). A way

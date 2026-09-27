@@ -1,17 +1,17 @@
 # Textures — the pipeline and the engine reference
 
 Tooling and reference notes for replacing Star Trek: Armada II's textures with
-higher-resolution art. It began with the nebulae, and most of the early sections still
-read that way; it now covers skyboxes, planets, the UI, hulls and the loading screen.
-Built against the GOG release running under Heroic/Proton on Arch.
+higher-resolution art: nebulae, skyboxes, planets, the UI, hulls, weapons and effects,
+and the loading screen. The nebulae come first because the engine reference and most
+of the method were established on them. Built against the GOG release running under
+Heroic/Proton on Arch.
 
 Game directory: wherever `./a2env.sh` says — Heroic's default, `~/Games/Heroic/Star Trek Armada II`,
 unless `A2_GAME` or `~/.config/armada2-remastered.conf` says otherwise (the repository root's `a2env.sh`).
 Textures live in `Textures/RGB/` (flat, 2115 `.tga` files, 196 MB stock).
 
 > Sizes here are **byte totals**, not `du`. `du` reports 205 MB for the same stock set,
-> because 2115 small files carry about 9 MB of filesystem block slack. Older notes in
-> these documents quote the `du` figure; where the two disagree, this is why.
+> because 2115 small files carry about 9 MB of filesystem block slack.
 
 ---
 
@@ -39,8 +39,8 @@ checkout and worktree builds from and into the same one, and nothing in it is ev
 committed: it holds the game's own art and what is made from it.
 
 Paths in this document are from the repository root unless they are plainly inside a
-target. The HUD and cursor scripts that used to sit in `tools/` are in `hud/`; the
-loading-screen geometry is in `models/`.
+target. The HUD, font and cursor scripts are in `hud/`; the loading-screen geometry is
+in `models/`.
 
 Four layers per target, all in its work directory, and the order matters:
 
@@ -51,15 +51,16 @@ Four layers per target, all in its work directory, and the order matters:
 | `src/` | what `a2tex build` reads: `ai/` blended over a plain Lanczos upscale, or hand-supplied art |
 | `out/` | the finished TGA, ready for `a2tex install` |
 
-What each layer costs on disk, across all 52 targets, and what it takes to lose it:
+What it takes to lose each layer (`du -sh "$A2_DATA"/textures/*/<layer>` for what each
+costs on disk):
 
-| layer | size | to recreate |
-|---|---|---|
-| `stock/` | 76 MB | free: `./a2tex stock` copies it out of the game, or its `.a2neb-backup` |
-| `ai/` | 869 MB | **money** — this is the only layer credits bought |
-| `src/` | 534 MB | free and offline: `--reblend` (see below) |
-| `src-alpha/` | 0.7 MB | free and offline: `--reblend` |
-| `out/` | 2.2 GB | free: `./a2tex build` |
+| layer | to recreate |
+|---|---|
+| `stock/` | free: `./a2tex stock` copies it out of the game, or its `.a2neb-backup` |
+| `ai/` | **money** — this is the only layer credits bought |
+| `src/` | free and offline: `--reblend` (see below) |
+| `src-alpha/` | free and offline: `--reblend` |
+| `out/` | free: `./a2tex build` |
 
 **Back up `ai/`** — every `$A2_DATA/*/*/ai/`, for the movies and backdrops too.
 Everything else is one command away; `ai/` is not.
@@ -96,7 +97,11 @@ needs editing — `target.conf` already carries the right flags for every nebula
 | `monohue` | rebuild all channels from luminance using the stock hue ratio. Only valid on single-hue textures; removes chroma invention by construction |
 | `blend` | per cent of the AI layer kept over Lanczos in `src/`. Read and written by `upscale-stock.sh`, so a set tuned away from the default keeps that setting. `mbgrg` is the only one at 20 |
 | `source` | puff only: `gen` (default) treats `src/` as generated art of unknown framing — trim, square, inset to `fill`%, stretch the noise floor. `stock` treats it as this atlas's own upscaled quadrants and skips all of that, **including the greyscale conversion** |
-| `mips` | number of hand-authored mip levels the stock texture has. The build emits `<name>_1..N`, each exactly half the previous. **Required** for any texture with `_N` siblings — `install` refuses the base otherwise |
+| `mips` | number of hand-authored mip levels the stock texture has, or `auto` to take the depth per texture from stock. The build emits the whole chain, each level exactly half the previous, spelled as stock spells it (`mip_name()`). **Required** for any texture with a chain — `install` refuses the base otherwise |
+| `alphafilter` | the resize filter for the alpha plate (default `Lanczos`). `Mitchell` where Lanczos ringing on a sparse mask drifts the alpha mean — `fedpod10` is the case (`FedSmall`, `BorgPlain`, `XenoLit64`) |
+| `fit` | `match` (default) matches each channel to its stock file; `none` resizes only, for tiles that are a third of a wider picture rather than their namesake (`LOADING`) |
+| `panel` | the width, in model units, of the widened loading-screen model this art is cut for; `a2tex install` writes `SOD/logo.SOD` to match (`LOADING` only) |
+| `upscaler` | which paid upscaler `models/loading-panel.sh` uses (`bria`, or `pruna` for the project default) |
 | `keepcolour` | puff only: skip the greyscale conversion. `Mnebula2` is the one stock puff with its own colour |
 | `fill` | puff only: percent of the quadrant the subject occupies (default 92) |
 | `sheet` | `GxP`: pack the units into GxG contact sheets with a P-pixel gutter and upscale the sheet, then slice back. A quality setting before a cost one — the app's `megapixels` is an integer, so a lone 64px icon gets a 16x lift at the 1MP floor where a 512px sheet of 49 gets 4x |
@@ -109,43 +114,41 @@ needs editing — `target.conf` already carries the right flags for every nebula
 ### Parallel builds
 
 `-j` is safe. Every build gets its own `mktemp -d` scratch directory and writes nothing
-to a fixed path — the previous scripts shared `work/_s.png` and `work/_q0.png`, which
-silently corrupt each other when two targets run at once.
+to a fixed path. Two builds sharing one scratch file corrupt each other silently, so
+keep it that way.
 
 ## Current state
 
-**52 targets, 734 files built, 708 shipped.** `./a2tex verify` checks every one of them
-against the file it replaces, from the raw TGA bytes, and currently reports **0
-problems** over 720 textures — the count differs because the 14 mip levels are checked
-as part of their base rather than on their own. Run it after every build and before
-every install.
+Every class below is installed and confirmed in game; `CHANGELOG.md` records what
+changed since and whether it has been seen. The numbers live in tools, not here:
+`./a2tex list` for the targets, `./a2tex verify` for every built texture checked against
+the file it replaces from the raw TGA bytes (run it after every build and before every
+install), and `INVENTORY.md` for what is done, what could be and what should not be.
 
-| class | targets | files | state |
-|---|---|---|---|
-| skyboxes | 23 | 134 | **confirmed in game.** 22 six-face sets at face 2048, plus the `MBG02` 4096 atlas (candidate D) |
-| map puffs | 8 | 12 | **confirmed in game.** 1024x1024, 512 per quadrant, upscaled from their own quadrants. Includes `Mnebula2`'s rebuilt 4-level chain (`mips=4`) — upscaling its base alone had crashed the Klingon campaign |
-| named planets | 11 | 11 | **confirmed in game.** `kind=plain`, 2048, from their own stock |
-| class planets | 2 | 16 | installed. `PB_CLSS*` grounds and `PA_*` cloud layers, 2048 |
-| moons / suns / rings | 4 | 8 | installed. The first **32-bit** textures here. `mdmoon` carries a rebuilt 4-level chain |
-| UI | 3 | 544 | **confirmed in game**, 518 of them. Icons 64→256 via contact sheets, panels at 256. `UImid` (26) is `install=no` — see the crash section |
-| hull | 1 | 9 | **confirmed in game.** The Sovereign: `Fbattle`, `FEntE`, `Fbattle_b` at 1024 with rebuilt 2-level chains, and the first target whose **alpha goes through the upscaler** (`alpha=ai`). `blend=70`, not the usual 35, and the registry's two Cs re-cut by hand — see why below |
+| class | what is installed |
+|---|---|
+| skyboxes | 22 six-face sets at face 2048, plus the `MBG02` 4096 atlas (candidate D) |
+| map puffs | 1024x1024, 512 per quadrant, upscaled from their own quadrants. Includes `Mnebula2`'s rebuilt 4-level chain (`mips=4`) — upscaling its base alone had crashed the Klingon campaign |
+| named planets | `kind=plain`, 2048, from their own stock |
+| class planets | `PB_CLSS*` grounds and `PA_*` cloud layers, 2048 |
+| moons / suns / rings | the first **32-bit** textures here. `mdmoon` carries a rebuilt 4-level chain |
+| UI | icons 64→256 via contact sheets, panels at 256. `UImid` is `install=no` — see the crash section |
+| hulls and stations | every faction, at 1024 with rebuilt chains; hull alpha goes through the upscaler (`alpha=ai`) at `blend=70`, not the usual 35 — the Sovereign section has why |
+| weapons, effects, props, map features | the final run; see `INVENTORY.md` for what was left and why |
+| loading screen | `LOADING`, shipped with `SOD/logo.SOD` (the `models` layer) |
 
 Four things cost a crash, a freeze or a visible artifact, and each one is written up
 below rather than only fixed: **a UI sprite over 256x256 crashes the game**, **doubling
 a fog-of-war or minimap texture freezes it**, **compositing onto an alpha-bearing image
 corrupts colour**, and **`earth.tga`'s fourth byte is padding, not alpha**.
 
-Every installed file has a `.a2neb-backup` beside it; `./a2tex revert all` undoes the
-lot. `Textures/RGB` went from 196 MB to 2.27 GB.
-
-There are **734 backups against 708 shipped files.** The 26 extra are `UImid`, which was
-installed, froze the game, and was reverted; its backups stay beside the stock files they
-restored. `./a2tex verify` skips `install=no` targets for exactly this reason, and the 26
-game files have been confirmed byte-identical to their backups.
-
 Originals are backed up twice: beside each file in the game directory as
 `<name>.a2neb-backup`, and in each `$A2_DATA/textures/<NAME>/stock/`.
 `./a2tex revert all` restores everything.
+
+There are more backups than shipped files: `UImid`'s 26 were installed once, froze the
+game, and were reverted, and their backups stay beside the stock files they restored.
+`./a2tex verify` skips `install=no` targets for exactly this reason.
 
 ---
 
@@ -205,17 +208,19 @@ fill the frame.
 
 ### Texture format
 
-- **24-bit uncompressed TGA, image type 2**, no ID field, no colour map.
+- **Uncompressed TGA, image type 2**, no ID field, no colour map. The nebulae and skyboxes
+  are 24-bit; 1113 of the 2115 textures are 32-bit with a live alpha channel. Match the
+  depth of the file being replaced (`write_tga()` does).
 - The engine **reads dimensions from the TGA header** — sizes are not hardcoded.
 - **4096x4096 is confirmed working in game** (48 MB uncompressed, as `MBG02`). Sizes are
   read from the header; the stock install's largest is a single 512x512 (`WshladSW.tga`)
   but that is not a limit. Above 4096 is untested.
-- **Row order.** Every stock file has descriptor byte `0x00` (bottom-left origin).
-  ImageMagick 7 always writes `0x20` (top-down) and offers no option to change it —
-  `-define tga:image-origin=...` is silently ignored. `Mnebula4` shipped as `0x20` and
-  rendered correctly, so the engine does appear to honour the flag, but the build
-  scripts now run `./bottomup.py` as a last step to reverse the rows and clear bit 5,
-  so output matches stock byte for byte. It is in-place and idempotent.
+- **Row order.** Stock is a mix of descriptor byte `0x00` (bottom-left origin) and
+  `0x20` (top-down) — even within one skybox set; see "Row origin" below. The engine
+  honours either. ImageMagick 7 always writes `0x20` and offers no option to change it
+  — `-define tga:image-origin=...` is silently ignored — so `write_tga()` finishes with
+  `textures/tools/bottomup.py --like <stock>`, which copies the stock file's origin. It
+  is in-place and idempotent.
 - File extension case is inconsistent — both `.tga` and `.TGA` occur, sometimes for
   files in the same set. Always glob both.
 
@@ -249,7 +254,8 @@ fill the frame.
 | `mtachyonneb` | tachyon | greyscale |
 
 `Mnebula2_1` through `_4` (64, 32, 16, 8 px) are a hand-authored mip chain for
-`Mnebula2` only. Left alone; they are only used when drawn small.
+`Mnebula2`, the only puff with one. The build regenerates it with the base (`mips=4`):
+a bigger base over the stock chain crashed the Klingon campaign.
 
 ### Skybox
 
@@ -259,8 +265,8 @@ fill the frame.
 - **Not seamless.** Matching every face edge against every other in both orientations
   gives a best fit of 0.077 RMSE against an unrelated baseline of 0.204 — better than
   chance, nowhere near continuous. Per-face generation is therefore fine.
-- **There is no horizontal band.** An earlier draft of these notes said every face
-  carries a galactic-plane band; measured, that is false. See below.
+- **There is no horizontal band.** The faces do not carry a galactic-plane band;
+  measured.
 
 #### Two naming conventions, and how to read them out of a `.bzn`
 
@@ -282,8 +288,8 @@ two forms, and **only the first is a SOD**:
     EOF
 
 **Do not use `strings` for this.** It misses the prefix form entirely — `strings | grep
-'\.sod'` returns nothing for 38 of the 72 maps, which is what produced the earlier and
-wrong note that those maps "name no background model". Worse, it returns misleading
+'\.sod'` returns nothing for 38 of the 72 maps, which makes them look as though they
+name no background model. Worse, it returns misleading
 fragments: `a2_fed03` shows `s.sod` and `a2_borg01` shows `e.sod`, which are the tails
 of a longer name left in the buffer (`mbgstars.sod` and `mbgblue.sod` respectively)
 after a shorter one was written over the front of it. Read the field, don't scan it.
@@ -307,8 +313,8 @@ after a shorter one was written over the front of it. Read the field, don't scan
 | `mbggb` | 2 | prefix |
 | `mbgbaku.sod` | 1 | SOD, 6 faces |
 
-Nothing is unaccounted for. The eight lowercase `mbg*0`-`5` texture sets, previously
-unexplained, are exactly the prefix-form backgrounds.
+Nothing is unaccounted for. The eight lowercase `mbg*0`-`5` texture sets are exactly the
+prefix-form backgrounds.
 
 #### SOD internals
 
@@ -337,13 +343,13 @@ The full set across all factions is 22 backgrounds / 135 files.
 
 #### `MBG02` is a 2x2 atlas, not a face
 
-The single biggest correction to the earlier notes. `MBG02.tga` is 256x256 holding
+`MBG02.tga` is 256x256 holding
 **four 128x128 tiles**, exactly like the map-puff atlases; the cube faces sample
 quadrants out of it. Two independent confirmations: the largest column-to-column and
 row-to-row differences anywhere in the texture are at x=127|128 (2.22) and y=127|128
 (3.54) against a 1.77 baseline, and overlaying those two lines on the image puts them
-precisely on visible breaks in the cloud. It therefore needs **four** generated
-images, and `kind=sky-atlas` routes it through the atlas path.
+precisely on visible breaks in the cloud. It therefore needs **four** source images,
+one per tile, and `kind=sky-atlas` routes it through the atlas path.
 
 Per-quadrant stock means, which the build matches tile by tile:
 
@@ -414,7 +420,8 @@ Each of these cost real time.
 
 ## Verification recipes
 
-    # TGA header — must read 24bpp, imagetype 2
+    # TGA header — imagetype 2, and the same bpp as the stock file it replaces
+    # (./a2tex verify checks this and more for every built texture)
     python3 -c "
     import struct; d=open('F.tga','rb').read(18)
     w,h=struct.unpack_from('<HH',d,12)
@@ -429,8 +436,8 @@ Each of these cost real time.
     # is it actually greyscale? R, G and B means will be identical
     magick F.tga -format 'R%[fx:int(255*mean.r)] G%[fx:int(255*mean.g)] B%[fx:int(255*mean.b)]\n' info:
 
-    # which background model does a map use?
-    strings -a bzn/a2_fed07.bzn | grep -ioE 'mbg[a-z0-9_]*\.sod' | sort -u
+    # which background does a map use? read the .bzn field, never `strings` --
+    # the recipe is under "Two naming conventions" above
 
 ---
 
@@ -449,10 +456,10 @@ is not what the eye sees. Size the *face*, not the atlas:
 | **2048** | **4096** | **48 MB** | **0.7x — below 1:1** |
 
 `size=` in `target.conf` sets it. **A 4096x4096 atlas — a 48 MB
-uncompressed TGA — loads and renders fine**, confirmed in game. That retires the old
-"512 is proven safe, 1024 is untested" note entirely: this engine reads the dimensions
-from the TGA header and does not care how large they are, at least up to 4096 through
-the d3d8to9 -> DXVK chain. Prebuilt candidates are in `$A2_DATA/archive/mbg02-candidates/`.
+uncompressed TGA — loads and renders fine**, confirmed in game under both wined3d and
+DXVK: this engine reads the dimensions from the TGA header and does not care how large
+they are, at least up to 4096. The rejected candidates are in
+`$A2_DATA/archive/mbg02-candidates/`.
 
 ## Can you just upscale the stock texture?
 
@@ -461,9 +468,8 @@ was *classical* upscaling — Lanczos cannot invent detail the source lacks, and
 already does bilinear. A **generative** upscaler is a different operation: it
 hallucinates plausible structure. `pruna/p-image-upscale` at $0.005-0.04 does this.
 
-It was tried properly: each stock 128x128 quadrant upscaled 16x to 4222px
-(`enhance_details` and `enhance_realism` on), reassembled. Verdict: **better than
-stock, worse than a generated source.**
+Each stock 128x128 quadrant upscaled 16x to 4222px (`enhance_details` and
+`enhance_realism` on), reassembled — candidate A:
 
 - It is genuinely sharper than stock and keeps the original composition exactly.
 - But 16x from 128px is beyond what the model can invent — the result is still soft and
@@ -472,11 +478,16 @@ stock, worse than a generated source.**
   blue plate, plus a fern-like artifact in one corner. Per-channel matching pulls the
   hue back but the mottling stays.
 
-Kept as candidate A because it is the only option that preserves the stock art exactly.
-Candidate B (a generated source, upscaled from 1254px, a much gentler 3.4x) has far
-finer filament structure.
+Raw, it lost on filament structure to a generated source upscaled a gentler 3.4x
+(candidate B). Controlled — blended toward Lanczos and rebuilt from luminance, the next
+section — it became candidate D, which **won and ships**: stock's own composition beat
+the generated art.
 
 ## Seamless tiling only works on homogeneous sources
+
+This and the next two sections are about **generated** tiles (`source=gen`, candidates B
+and C). The shipped `MBG02` is stock's own four quadrants upscaled, which join as stock
+does, so none of it applies to it.
 
 `make-seamless.sh` heals invisibly on a fractal, homogeneous texture and **cannot** heal
 a source with large-scale composition — a bright plume, a big dark void. Five approaches
@@ -549,7 +560,7 @@ hue with a third of the high-frequency invention of candidate A.
 Observed in game: the six faces meet at visible edges, so a tile that does not join
 itself shows a hard line at every cube edge. This drives three decisions.
 
-**1. The source is made seamlessly tileable** — `./make-seamless.sh <in> <out> [feather]`.
+**1. The source is made seamlessly tileable** — `textures/tools/make-seamless.sh <in> <out> [feather]`.
 Rolling by exactly half puts formerly-adjacent pixels at the left and right borders, so
 the outer boundary becomes seamless for free and the discontinuity moves to the centre
 cross, where it can be healed without touching the edges. The heal blends in a
@@ -585,7 +596,7 @@ mean 15, R8 G7 B30, and a self-seam of 0.0169 against stock's 0.0227.
 ## Channel synthesis: when a channel is zero
 
 `fit()` matches each channel by multiplication, and **zero times anything is
-zero**. This is not hypothetical: the shipped source came back with `mean.r` of 0.49
+zero**. This is not hypothetical: a generated `MBG02` source came back with `mean.r` of 0.49
 against `mean.b` of 91 — effectively no red at all — and no gain could reach stock's
 R8, leaving the sky cyan.
 
@@ -606,13 +617,12 @@ by firing on the safe direction.** `t` is the target mean, `v` the source's.
 
 The channel literally cannot be scaled, or the gain needed is beyond what a stretch does
 without banding. **Dimming a faint channel is always safe; only lifting is dangerous**,
-and any test with a floor on `v` alone cannot tell the two apart. Synthesis now fires on
-no skybox set at all. Neither shipped texture ever changed: `Mnebula4` is greyscale and
-`MBG02` takes the `MONOHUE` path.
+and any test with a floor on `v` alone cannot tell the two apart. Synthesis fires on no
+skybox set at all; `MBG02` takes the `MONOHUE` path and the puffs are greyscale.
 
 ## Procedural fallback: `gen-nebula.sh`
 
-    ./gen-nebula.sh <seed> <out.png> [size] [r] [g] [b]
+    textures/tools/gen-nebula.sh <seed> <out.png> [size] [r] [g] [b]
 
 Multi-octave fractal plasma, crushed toward black, with a screened filament layer and
 exact per-channel colour weights (`0.27 0.23 1.00` reproduces MBG02's measured R8 G7
@@ -631,14 +641,15 @@ Three alternatives were tried and all were worse:
 | Full-resolution `+noise Random` blurred at 1.2/2.6/5.0px | reads as speckle and fake stars, not gas |
 
 The weights in the script are the tuned version. Don't re-tune without re-reading this
-table. **A real image model is the right answer for this texture** — confirmed: the shipped
-`MBG02` is model-generated. The fallback is for when one is not reachable.
+table. **When new art is needed, a real image model is the right answer** — the generated
+`MBG02` candidates came from one. The fallback is for when one is not reachable. (No
+generated art ships: `MBG02` is its own stock, upscaled.)
 
-### inference.sh / `belt` — the route that produced the shipped MBG02
+### inference.sh / `belt` — the upscaler and image-model route
 
-`belt` is at `~/.local/bin/belt` and authorized. **`MBG02` was generated this way and
-is installed.** Total spend for the whole exercise, including four models' worth of
-failed experiments: **$0.31**.
+`belt` is at `~/.local/bin/belt` and authorized. Every paid upscale in this project runs
+through it, and so did the generated `MBG02` candidates — total spend for those,
+including four models' worth of failed experiments: **$0.31**.
 
     belt balance                      # refuses to submit at $0.00, with a clear error
     belt app get <id>                 # input schema
@@ -747,20 +758,18 @@ dominates the number: `MbgDom1`, a single-hue violet plate, scores 102 that way.
 25° a plate is effectively single-hue. On a set as dark as `mbgkl` the number means
 nothing either way and the decision has to come from the invention measurements.
 
-### The stock row origin is mixed, and the build now matches it per file
+### Row origin: stock is mixed, and the build matches it per file
 
-`bottomup.py`'s original docstring claimed every stock TGA is bottom-up. **Measured, that
-is false**: of the 135 skybox faces, 53 are `0x00` (bottom-up) and 82 are `0x20`
-(top-down) — and the split runs *within* a single set, with `MbgBorg.2` and `.5`
-bottom-up against the other four top-down. Both render correctly in the retail game, so
-the engine honours the descriptor byte.
+Stock TGAs are **not** uniformly bottom-up: of the 135 skybox faces, 53 are `0x00`
+(bottom-up) and 82 are `0x20` (top-down) — and the split runs *within* a single set,
+with `MbgBorg.2` and `.5` bottom-up against the other four top-down. Both render
+correctly in the retail game, so the engine honours the descriptor byte.
 
 All nine puff sources, by contrast, are uniformly `0x00`.
 
-`write_tga()` now takes the file being replaced as a third argument and copies its
-origin via `bottomup.py --like`, so a replacement can never be flipped relative to the
-original. The round trip is byte-exact, and both shipped textures still reproduce
-byte-for-byte.
+`write_tga()` takes the file being replaced as a third argument and copies its origin
+via `bottomup.py --like`, so a replacement can never be flipped relative to the
+original. The round trip is byte-exact.
 
 ### `belt` batch notes
 
@@ -809,13 +818,12 @@ game with an exactly-zero channel — `MbgKlin4`, which looks identical in `a2te
 
 ### Pair `src/` to `stock/` by name, not by sort position
 
-`build_sky_faces` used to `sort` both lists independently and pair by index. That is not
-a pairing rule: glibc collation ignores punctuation, so `MbgBaku.1` / `MbgBaku1` /
-`MbgBaku.2` tie and are separated only by a byte-level tiebreak. It agreed on both sides
-here, which is luck. Two names differing only in punctuation would silently swap two
-faces of a cube — a failure that looks like bad art rather than a bug. Pairing is now by
-name, falling back to sort order (with a warning) for hand-supplied art whose names do
-not match.
+`build_sky_faces` pairs by name, falling back to sort order (with a warning) for
+hand-supplied art whose names do not match. Sorting both lists independently and
+pairing by index is not a pairing rule: glibc collation ignores punctuation, so
+`MbgBaku.1` / `MbgBaku1` / `MbgBaku.2` tie and are separated only by a byte-level
+tiebreak. Two names differing only in punctuation would silently swap two faces of a
+cube — a failure that looks like bad art rather than a bug.
 
 ## Upscaling the puffs from their own quadrants
 
@@ -875,8 +883,7 @@ explicitly, as sibling files:
 
 Each level is exactly half the previous one. That is not a convention, it is what the
 API requires, and it is why the crash happened: a 1024x1024 base above a 64x64 level 1
-is not a valid chain, and creating the texture fails. The d3d8to9 -> DXVK path is
-stricter about this than the original runtime would have been.
+is not a valid chain, and creating the texture fails.
 
 **Why hand-author a chain at all?** Because averaging is the wrong shrink for some
 images. An additive nebula puff box-filtered down loses its bright core and fades toward
@@ -893,9 +900,9 @@ changes is installed only if this build supplies every level at exactly half the
 above. The check is a **pre-flight over the whole target**, not per file — the mips sort
 before the base, so an in-loop check installed `_1`/`_2`/`_4` and only then refused the
 base, leaving a stock base under upscaled mips. That is the same invalid chain, inverted.
-`a2tex revert <target>` restores the chain too, for the same reason: `stock/` holds only
-the base, so it used to leave 512px mips over a 128px base — reached by the command
-meant to make things safe.
+`a2tex revert <target>` restores the chain too, for the same reason: restoring only the
+base would leave 512px mips over a 128px base — reached by the command meant to make
+things safe.
 
 **Use a Box filter, and no peak lift.** At exact powers of two a box filter is a pure
 area average, so it preserves the mean — and with additive blending the mean *is* the
@@ -918,8 +925,7 @@ Stock never forced its mip edges to black, and box-filter bleed makes them worse
 level; the rebuild is better than stock on that axis by a wide margin.
 
 `REMASTERING.md` counts **363 hand-authored chains, 782 files**, across the whole texture
-set. For the nebulae it is a single texture; for the hull textures it will be most of
-them.
+set. For the nebulae it is a single texture; for the hull textures it is most of them.
 
 ## Planets and moons, and the first 32-bit textures
 
@@ -1122,22 +1128,16 @@ the bug, not a lesser version of it. The three UI targets declare `maxsize=256`.
 
 ### Deliberately left stock
 
-- **20 cursors** — still not *upscaled*, but no longer untouched, and the reason given
-  here was wrong. Deliberate pixel art, and the strips are non-square (so `fit()` would
-  square them); but **"drawn at native pixel size" is false.** At 3440x1440 a 32x32
-  frame draws at ~138x77 screen px, a 4.30x/2.40x blow-up, because the cursor code
-  scales against a hard-coded 800x600 — so they were 1.79x too wide like everything
-  else. `hud/cursor-aspect.py` squashes the art to 18 texels across, about each
-  sprite's `@origin` hotspot, which is the *only* lever: the UI cursor is a hardware
-  cursor sized from the sprite's texel extent, so no `.spr` number reaches it and the
-  4.30 px/texel horizontal density is fixed no matter what. **An AI upscale cannot help
-  them**, and that is now read out of the binary rather than inferred: `DrawCursor` is
-  `xor eax,eax; ret`, and `SetCursor` allocates the cursor texture at
-  `texW * [device+0x18]` by `texH * [device+0x1c]` — so the engine magnifies it itself
-  by a constant, and more source texels just draws a bigger cursor at the same density.
-  The lever for sharpness is those two device floats, which is code (an ASI hook like
-  `menus/`), not art. Derivation, and the in-game test that established the
-  two draw paths, are in `hud/README.md`.
+- **20 cursors** — not upscaled. Deliberate pixel art, and the strips are non-square
+  (so `fit()` would square them). They are not drawn at native pixel size: at 3440x1440
+  a 32x32 frame draws at ~138x77 screen px, because the cursor code scales against a
+  hard-coded 800x600, so they come out 1.79x too wide like everything else. `HUD.asi`
+  corrects that at run time (`hud/cursor-aspect.py` is its derivation and never
+  installed beside it). **An AI upscale cannot help them**, read out of the binary:
+  `SetCursor` allocates the cursor texture at `texW * [device+0x18]` by
+  `texH * [device+0x1c]`, so the engine magnifies it itself by a constant, and more
+  source texels just draws a bigger cursor at the same density. The lever for sharpness
+  is code, not art. Derivation, and the two draw paths, are in `hud/README.md`.
 - **`colors`** — an 8x8 colour lookup table. Interpolating it blends the cells.
 - **`logos`** — Activision, Bink, GameSpy and Mad Doc trademarks, on a splash screen
   shown once. Invented shapes where there is a right answer, for no gain.
@@ -1186,10 +1186,10 @@ and `gui_global.spr`. Those systems are created exactly when the HUD appears and
 run every frame; something in them is written against a fixed cell size, and doubling
 the texture spins rather than faults.
 
-`REMASTERING.md` had carried a warning about minimap art which this session dismissed on
-the grounds that `Gmneb*` are flat single-hue blobs. They are — but **"safe to upscale
-as an image" and "safe to change the size of" are different questions**, and conflating
-them cost a diagnosis. The whole target is now `install=no`: built, kept for
+`REMASTERING.md` carries a warning about minimap art, and it is easy to dismiss on the
+grounds that `Gmneb*` are flat single-hue blobs. They are — but **"safe to upscale as an
+image" and "safe to change the size of" are different questions**, and conflating them
+cost a diagnosis. The whole target is now `install=no`: built, kept for
 reproducibility, never shipped.
 
 ### 3. blackedge corrupted Mmoon, and the verification could not see it
@@ -1239,11 +1239,8 @@ associated versus unassociated alpha, and those opinions are what corrupted `Mmo
 checker built on the library that holds the opinion cannot reliably see the damage. The
 engine reads bytes; so does this.
 
-It samples nothing — the first version strided every 11th pixel and reported ±3 errors
-on high-variance icons, the same magnitude as a real defect, which makes a tolerance
-meaningless. Strided slice sums over the whole plane are exact and fast enough.
-
-Current state: **720 textures, 0 problems.**
+It samples nothing — striding every 11th pixel reports ±3 errors on high-variance icons,
+the same magnitude as a real defect, which makes a tolerance meaningless. Strided slice sums over the whole plane are exact and fast enough.
 
 ## The first hull texture: the Sovereign, and alpha that is not a mask
 
@@ -1270,12 +1267,9 @@ generalise.
 ### 1024, not 2048
 
 The app takes `megapixels` as an integer and rounds the scale factor, so a 256px source
-is 4x at 1MP and 8x at 4MP — and both cost $0.005. The size was chosen on **memory**,
-not price -- or so it was argued at the time. Armada2.exe is a 32-bit LAA process and
-`Textures/RGB` held 2.27 GB. **That second figure is disk, not memory, and the argument
-leans on it as though the two were the same.** See "2.27 GB resident was never a memory
-figure" below; the conclusion (1024, not 2048) still stands on disk cost and on invention
-falling off with scale factor, but not on the memory reasoning as written.
+is 4x at 1MP and 8x at 4MP — and both cost $0.005. So the size is not chosen on price.
+It stands on **disk cost** and on invention rising with the lift — not on memory, which
+is unmeasured (see "2.27 GB resident was never a memory figure" below).
 At 1024 a 32-bit base plus its chain is 5.3 MB, so the Sovereign set is 16 MB. At 2048
 the same three files would be 64 MB, and the ~600 hull bases behind them would be
 unreachable at any size. 4x is also where this model's invention is mildest — see
@@ -1380,20 +1374,18 @@ a second cut.
 
 **This is a one-off and is meant to stay one.** The *Enterprise* is iconic enough that
 wrong lettering reads as a bug; no other hull texture in the game carries type anyone can
-name. **Re-run it after any `--reblend`** — `src/` is derived and gitignored, so a
-re-blend rewrites the plate and takes the fix with it. The order is `upscale-stock.sh
+name. **Re-run it after any `--reblend`** — `src/` is derived, so a re-blend rewrites
+the plate and takes the fix with it. The order is `upscale-stock.sh
 --reblend` → the script → `./a2tex build` → `install`.
 
 ### What this class cannot fix
 
 Even at 70 the gain is real but modest, and that is the honest ceiling. The upscaler
 cleans and sharpens; it does not manufacture structure that was never in 256x256. The
-larger remaining lever is not the texture at all — the saucer is viewed at a steep
-oblique angle, which is precisely where **anisotropic filtering** decides sharpness, and
-`dxcfg.ini` currently leaves it at `application`, i.e. whatever a 2001 renderer asked
-for. A `dxvk.conf` beside the exe with `d3d9.samplerAnisotropy = 16` would sharpen every
-oblique surface in the game at once, for free, and is reversible by deleting the file.
-Untried — it touches the graphics stack, which has an open regression in `platform/README.md`.
+larger lever is not the texture at all — the saucer is viewed at a steep oblique angle,
+which is precisely where **anisotropic filtering** decides sharpness. That is the
+renderer layer's `dxvk.conf` (`d3d9.samplerAnisotropy = 16`, `postfx/README.md`), which
+sharpens every oblique surface in the game at once.
 
 ## The Federation hull class, after the Sovereign
 
@@ -1420,8 +1412,7 @@ its `odf/ships/*.odf` `unitName` — the working set is 44 bases in six targets:
 | `FedFlat` | 2 | 256 | 1024 | none | `Fconst` — 24-bit, no alpha at all |
 | `FedSmall` | 2 | 128 | 512 | Lanczos | `Fbee`, `fedpod10` — 128px sources, so their own `size=` |
 
-All six are built, verified and **installed**; what none of them has had yet is a look
-in game. `./a2tex revert all` undoes every target this project has ever installed, and
+`./a2tex revert all` undoes every target this project has ever installed, and
 `./a2tex revert FedCapital` (or any one name) undoes just that one, chain included.
 
 ### The test that actually separates a light map from a mask
@@ -1453,13 +1444,12 @@ everywhere.
 | `fdata` | 97.5% | — | 2 distinct alpha values; no picture content either way |
 | `Ffreight` | **0.0%** | *undefined* | mostly opaque — see below |
 
-**`Ffreight` is the one this test cannot answer, and an earlier revision of this section
-claimed it could.** That revision reported its luminance-under-transparent as 0.0 and
-called the question settled. It has **no alpha-zero texels at all** — 0% zero, 97.2%
-exactly 255 — so the 0.0 was a mean over an empty set, printed by a guard that returns
-zero rather than dividing by it. A number computed from nothing is not evidence, and it
-happened to agree with the conclusion already expected, which is how it survived a
-reading.
+**`Ffreight` is the one this test cannot answer.** It has **no alpha-zero texels at
+all** — 0% zero, 97.2% exactly 255 — so a naive run reports its luminance-under-
+transparent as 0.0: a mean over an empty set, printed by a guard that returns zero
+rather than dividing by it. A number computed from nothing is not evidence, and this one
+happens to agree with the conclusion expected, which is how it once got read as
+settling the question.
 
 It stays out of `alpha=ai` regardless, on the geometry rather than on that number: a
 night-lights map is *mostly dark* with graded structure in the light, and `Ffreight` is
@@ -1563,14 +1553,13 @@ textures the target actually holds.
 
 ### "2.27 GB resident" was never a memory figure
 
-Every sizing decision in this project up to here rested on a sentence that says the
-textures "already hold 2.27 GB" inside a 32-bit LAA process, and the Sovereign's choice
-of 1024 over 2048 was made on it. **It is the size of `Textures/RGB` on disk.** Nothing
+It is tempting to size textures against a figure like "the textures already hold
+2.27 GB" inside a 32-bit LAA process. **That is the size of `Textures/RGB` on disk.** Nothing
 established that Armada II holds all 2115 of them in memory at once, and there is good
 reason to think it does not: a Federation-versus-Klingon match has no cause to load
 Cardassian hulls.
 
-What is actually known, now that it has been looked at:
+What is actually known:
 
 - `ART_CFG.h` in the game directory is read at runtime and carries
   `int ST3D_PRELOAD_TEXTURES = 1;`, alongside `GameOpenPreLoad() took %d seconds.` in
@@ -1579,7 +1568,7 @@ What is actually known, now that it has been looked at:
 - The renderer is the d3d8 → d3d9 → DXVK chain from `platform/README.md`, so textures live in
   **VRAM**, which on this machine is 8 GB (Navi 10). The 32-bit address space holds
   DXVK's bookkeeping and staging, not the texture bodies.
-- The disk total did pass 2 GB some time ago and nothing has fallen over.
+- The disk total is well past 2 GB and nothing has fallen over.
 
 So the ceiling is **unmeasured**, and the disk total is a poor proxy for it — an upper
 bound on a quantity that is probably several times smaller in practice. The figure that
@@ -1589,10 +1578,8 @@ and the UI, not the sum over every faction.
 The honest test is to launch a heavy match — two remastered factions, a big map — and
 watch RSS and VRAM. Until someone does that, sizing by "how much is on disk" is
 cargo-culting a number that was never measured. If it ever does bite, the lever is
-`ST3D_PRELOAD_TEXTURES = 0`: lazy loading, paying in stutter instead of memory.
-
-The figures below are kept because disk cost is still real — it is just not the same
-question as memory.
+`ST3D_PRELOAD_TEXTURES = 0`: lazy loading, paying in stutter instead of memory. Disk
+cost is still real — it is just not the same question as memory.
 
 ### The measurement ranks textures; it does not decide them
 
@@ -1628,10 +1615,10 @@ Four changes, all of which apply to every faction that follows:
 - Mip levels are matched to **their own** stock file for header as well as name.
   `fresearch` is a 32-bit base (`desc 0x08`) over two 24-bit levels (`desc 0x00`), and
   taking depth from the base wrote a chain stock never shipped. `verify.py` checks
-  per-level headers now; it previously skipped levels entirely.
+  per-level headers.
 - `mips=auto`, because one number per target cannot describe a set where `fdestroy` has
   two levels and `fdestroy_b` has none.
-- `stock/` now carries each texture's levels so a target is self-describing about its
+- `stock/` carries each texture's levels so a target is self-describing about its
   chain spelling — and `stock_bases()` keeps them out of both the src-image count and
   the **paid** upscale. Without it `FedCapital` alone would have bought 28 upscales of
   art that `gen_mips` then overwrites by downsampling the base.
@@ -1686,29 +1673,6 @@ texture *is*:
 An audit of every installed texture against that set found `borgUI3` and nothing else.
 `UIpanel`'s 256px build was restored and `borgUI3` removed from `BorgPlain` entirely.
 
-### What the fan-out was worth
-
-Five agents, one per faction. Two things are worth recording honestly.
-
-They found a real bug the author missed: `verify.py` was silently folding `fdestroy2`
-(the Sabre) into `fdestroy` (the Defiant) as a mip level and dropping it from the checked
-set — no failure, just a count one short — and across the repo it was hiding 43 textures.
-An agent traced the cause correctly and refused to touch shared code, as instructed.
-
-And **two of the three collisions in this project's history were caused by the author, not
-the agents**, both by starting work on a target whose agent was still running. Neither
-corrupted anything, because `build_sky_faces` refuses a target whose src image count does
-not match its stock base count — but the symptom, `SKIP -- needs 24 images, found 25`,
-reads like a missing texture rather than a collision. The cause was `upscale-stock.sh`
-writing `src/.lz-<name>.png`, a fixed path inside a directory whose file *count* is
-load-bearing. `textures/lib/common.sh` has carried the rule since `-j` was introduced — "every
-function takes its scratch directory as an argument and writes nothing to a fixed path" —
-and that script had never followed it. It uses a `mktemp -d` now.
-
-All four remaining agents ultimately died on API timeouts, after their upscales and
-builds had landed. `CardassianLit` was rebuilt from scratch and diffed against the build
-that had raced: byte-identical.
-
 ## The mission loading screen, widened
 
 The loading screen is **not a sprite and not a menu** — it is a 3D scene, which is why
@@ -1744,62 +1708,62 @@ What the outpaint needed, measured:
   see-through planet. Describing the night side as a solid surface fixed it on the
   first try.
 
-The upscale is **`bria/increase-resolution`, not the project's usual pruna model** —
-pruna returned 503s for the whole session this was built in. `upscaler=` in
+The upscale is **`bria/increase-resolution`, not the project's usual pruna model**,
+because pruna was unavailable when it was built. `upscaler=` in
 `target.conf` selects it; `upscaler=pruna` plus `models/loading-panel.sh --force` goes
 back. The 35% blend toward Lanczos bounds what either model invents, so this is not
 expected to matter, but it is the one target built on a different upscaler.
 
-**Confirmed in game (2026-09-24)** at 3440x1440.
-
-`fit=none` is new for this target: each tile is a third of a wider picture, not its
+`fit=none` exists for this target: each tile is a third of a wider picture, not its
 namesake, so per-tile channel matching would put a brightness step at every join, and
 `verify` compares only alpha for it.
 
 ## Beyond the nebulae
 
-`REMASTERING.md` carries the measured inventory of all 2115 textures and what would be
-needed to apply this pipeline to them. The short version, because it changes how these
+`REMASTERING.md` carries the measured inventory of all 2115 textures and what applying
+this pipeline to each class takes. The short version, because it changes how these
 scripts should be read:
 
-- **1113 of 2115 textures are 32-bit with a live alpha channel.** No longer a blocker:
-  `write_tga()` takes its depth from the stock file and `attach_alpha()` carries the
-  mask across. Proved on four textures, not four hundred — see the planets-and-moons
-  section above for what that cost. On a **hull** texture that channel is not a mask at
-  all but a night-lights map, and `alpha=ai` upscales it like colour; the Sovereign
-  section above has the measurement.
+- **1113 of 2115 textures are 32-bit with a live alpha channel.** `write_tga()` takes
+  its depth from the stock file and `attach_alpha()` carries the mask across. On a
+  **hull** texture that channel is not a mask at all but a night-lights map, and
+  `alpha=ai` upscales it like colour; `textures/tools/classify-alpha.py` tells the two
+  apart.
 - **363 hand-authored mip chains** (782 files) must be regenerated, not ignored.
-  `gen_mips()` does this for every kind now, colour and alpha separately.
-- **Fonts, UI, cursors, wireframes and minimap art must never be hallucinated into.**
-- Upscaling every base texture 4x would take the set from 196 MB to about 10 GB;
-  the 708 textures done so far already account for 2.27 GB. On the hull class this is the
-  binding constraint, not cost — see "1024, not 2048" above.
+  `gen_mips()` does this for every kind, colour and alpha separately.
+- **Fonts, UI, cursors, wireframes and minimap art must never be hallucinated into**,
+  and bump/normal maps are vectors, not colour (`INVENTORY.md`, "Should not be done").
+- Upscaling every base texture 4x would take the set from 196 MB to about 10 GB. On the
+  hull class disk is the binding constraint, not cost — see "1024, not 2048" above.
 
-## Still open
+## Open
 
-**708 textures are shipped and verified.** Every one is derived from its own stock art —
-**none of the generated art shipped in the end.** The nebula systems, the planets and
-the UI are all confirmed rendering in game; what remains unseen is narrow.
+**What is left is inventoried, not guessed.** `INVENTORY.md`, generated by
+`textures/tools/inventory.py --md`, classifies all 2115 texture files as done,
+could-be-done or should-not-be, with the reason for each category and the files in it.
+Re-run it rather than quoting its numbers. Beyond its *could* list:
 
-Needing a look in game:
+- **Memory is unmeasured.** The test is a heavy match with RSS and VRAM watched; see
+  "2.27 GB resident was never a memory figure" above.
+- **`UImid`'s 17 non-map textures are built but unshipped.** The target is `install=no`
+  because of the 9 fog/minimap textures in it; the other 17 (`gbfpod100`, `shipinfo`,
+  `ferwireframe`, …) are ordinary interface sprites of the same class as the 382 that
+  work. Splitting them into their own target would recover a 2x on 17 icons, for one
+  more launch to verify. Marginal, and nobody has asked.
+- **`PROMPTS.md` is unexercised.** Nothing in the game uses generated art, so those
+  prompts are untested against the current pipeline.
+- **`Mnebula4`'s generated art is preserved but unused** —
+  `$A2_DATA/textures/Mnebula4/src-generated/` and
+  `$A2_DATA/archive/mnebula4-generated/`. Move it back into `src/` and set `source=gen`
+  to return to it.
 
-- **The 16 class planets** (`PB_CLSS*`, `PA_*`) and **`mdmoon`.** `mdmoon` is the one to
-  check first: it is on nearly every map, and it is a rebuilt mip chain on a 32-bit
-  texture — the class of mistake that crashed the Klingon campaign.
-- **Whether the comm and objectives pop-ups land centred.** They moved with the
-  widescreen canvas change in `hud/README.md` and have not been opened since.
-- **The Sovereign's registry.** `blend=70` is confirmed in game and clearly better; the
-  two C apertures were then re-cut by hand and that build has not been looked at yet.
-- **All 44 Federation ship textures.** Built, verified and installed, never yet seen in
-  game. The first thing to look at is a Galaxy or an Akira at ordinary RTS zoom, and the
-  second is anything Borg-assimilated, since the `_B` plates are the ones with no SOD
-  pointing at them and so the ones a naming mistake would hide. Resident texture load is
-  now 2.47 GB **on disk**, up from 2.27 GB. That is not a memory figure and should not
-  be read as one — see the subsection on it above. Whether memory is a constraint at all
-  is still unmeasured; the test is a heavy match with RSS and VRAM watched.
+## Settled
 
 Accepted as-is, with reasons, so they are not re-litigated:
 
+- **Upscaling stock beat generated art everywhere both existed.** All 8 puffs were
+  upscaled from their own quadrants and won on every measure taken, including on
+  `Mnebula4`; `MBG02`'s candidate D beat the generated candidates B and C.
 - **`Mbgstars` stays stock.** Sparse starfield — an upscaler turns a 1px star into a
   blob. Plain Lanczos is the only safe option and buys nothing.
 - **`mbgpur2` clips** at 0.037% of pixels where stock does not. Plain Lanczos already
@@ -1810,117 +1774,3 @@ Accepted as-is, with reasons, so they are not re-litigated:
   upscaler is deterministic, so two independent runs produced byte-identical output.
 - **`MbgBaku` carries 7 files, not 6.** `MbgBaku1` is an orphan, not a duplicate; it is
   processed correctly as a seventh unit.
-
-**What is left is inventoried, not guessed.** `INVENTORY.md`, generated by
-`textures/tools/inventory.py --md`, classifies all 2115 texture files as done, could-be-done or
-should-not-be, with the reason for each category and the list of files in it. The
-summary: 1517 installed, 189 mip levels that follow a skipped base, 97 that could be
-done (weapons and effects are the largest group, and the largest remaining win), and 312
-that should not be — 192 of those referenced by nothing in the game at all.
-
-Genuinely outstanding:
-
-- **Menu animations stall while the cursor is moving.** Reported in game after
-  `MenuScale.asi` went in, not yet diagnosed, and **not yet shown to be a regression** —
-  the first test is to remove the plugin and watch stock, because a 2001 GDI shell
-  flooding its own message queue on mouse-move is plausible stock behaviour. The
-  hypothesis and the three experiments that discriminate between the causes are in
-  `menus/README.md`. Everything else about the menus is confirmed: they scale,
-  they centre, and input follows the picture.
-- **The options, load/save and multiplayer menu screens have not been seen scaled.**
-  They go through the same two code paths as the two screens that are confirmed, so they
-  are expected to follow. The multiplayer screens are the ones to doubt: they use real
-  Win32 child controls, which Windows draws itself and the offscreen redirect does not
-  cover.
-- **The d3d8/DXVK regression in `platform/README.md`**, unfixed and still blocked on Heroic being
-  closed. The cutscene-crash fix has consequently never been tested.
-- **The end-of-mission crash** — a `Wine C++ Runtime Library` R6025 box on finishing a
-  mission, then madExcept. Captured in `$A2_DATA/archive/error-mission-finish/`. **It first
-  occurred before any modding**, so it is not this project's, and nothing here has been
-  shown to affect it either way. Recorded so it is not mistaken for a texture problem.
-- **DXVK now renders the game, and `dxvk.conf` applies.** Confirmed in game at
-  3440x1440 with 16x anisotropic filtering and a -0.5 mip LOD bias live, no DXVK
-  errors. Four things are required together and all four are in place:
-  DXVK's `d3d8.dll` **and** `d3d9.dll` in the **game directory** (the prefix is not
-  durable — Proton restores it from symlinks), `d3d9=n,b` in `WINEDLLOVERRIDES`, and
-  the **Wine virtual desktop off** — inside it DXVK's display-mode change fails and the
-  game collapses to 640x480. `platform/d3d8-chain.py` sets
-  and reverses the chain; full write-up in `platform/README.md`.
-  **This corrects a claim that stood in these notes for a long time:**
-  `syswow64/d3d8.dll` at 320548 bytes was recorded as DXVK's; it is byte-identical to
-  *Wine's builtin*, so until now the game — and every texture in it — rendered through
-  wined3d/OpenGL, never Vulkan.
-- **All three renderer stages are installed and confirmed in game** — 16x anisotropic
-  filtering, a -0.5 mip LOD bias and `seamlessCubes`, verified applied in DXVK's own log
-  with no errors. **They have not been separated**, though: they went live across three
-  launches but were never A/B'd, so how much each contributes is unmeasured.
-  `postfx/renderer-config.sh --stage 1` and `platform/ab-shot.sh` are what settle it, and
-  the expectation on record is that the LOD bias does more here than AF, because the
-  dominant visual layer is camera-facing billboards that AF cannot touch.
-- **Bloom is installed and confirmed in game** — vkBasalt + MagicBloom, threshold 6,
-  intensity 0.08, Home toggles it live. Built per-user by `postfx/vkbasalt/build.sh`,
-  configured by `postfx/postfx.py`; details and the measurements behind the numbers in
-  `postfx/README.md`, Tier 3. What is left in the post-processing family is SMAA/CAS, untried.
-- **Anti-aliasing: `MSAA.asi`, 8x, installed and confirmed in game (2026-09-23).**
-  `msaa/`. It hooks the engine's own `CreateDevice` path and sets
-  `MultiSampleType`, `SwapEffect=DISCARD` and a non-lockable back buffer. DXVK has no
-  key for this, and the `dxcfg.ini` route died with the chain change. `MSAA.log`
-  says what the device actually got. The first thing to check in game is the
-  **minimap**: it is the one back-buffer read-back, and it relies on DXVK's CopyRects
-  resolving a multisampled source. Details in `msaa/README.md`.
-- **`Mnebula4`'s generated art is preserved but unused** — `$A2_DATA/textures/Mnebula4/src-generated/`
-  and `$A2_DATA/archive/mnebula4-generated/`. Move it back into `src/`
-  and set `source=gen` to return to it.
-- **`PROMPTS.md` is now unexercised.** Nothing in the game currently uses generated art,
-  so those prompts are untested against the current pipeline.
-- **`UImid`'s 17 non-map textures are built but unshipped.** The target is `install=no`
-  because of the 9 fog/minimap textures in it; the other 17 (`gbfpod100`, `shipinfo`,
-  `ferwireframe`, …) are ordinary interface sprites of the same class as the 382 that
-  work. Splitting them into their own target would recover a 2x on 17 icons, for one
-  more launch to verify. Marginal, and nobody has asked.
-- **The rest of the hull class, beyond the Federation.** The Federation ships are done
-  and are covered by their own section above; what remains is the other factions. The
-  Federation pass measured the memory question rather than estimating it: its 44 bases
-  and their chains come to **220 MB** at 1024 — `FedCapital`'s 73.5 MB measured on
-  disk, the rest computed from the same 5.25 MB per 32-bit 1024 base-plus-chain —
-  on top of the 2.27 GB already on disk: the directory measures **2.47 GB** with all six
-  targets installed, the +0.20 GB predicted. Disk, not memory.
-  Doing it by faction is the right unit. Still untested for the other factions is the
-  **scale** —
-  ~600 hull bases, and contact sheets only help where a whole group shares one size,
-  which at 256px they largely do. Memory is the real ceiling: at 1024 the whole class is
-  roughly 3 GB of disk on top of the 2.27 GB already spent -- a real cost, though not
-  the memory ceiling it was once read as -- so it
-  wants doing by faction or by ship class and checking as it goes, not in one pass.
-  There are also `*bump` textures throughout the set, which are normal or bump maps and
-  must not be treated as colour, and the alpha on a **station** or **weapon** texture has
-  not been looked at — `alpha=ai` is justified for a night-lights map and for nothing
-  else yet.
-
-Closed since the last revision of this list, recorded so they are not re-opened:
-
-- ~~`MBG02` peak brightness is short, built 86 against stock 152~~ — that was the
-  *generated* source. Candidate D peaks at 160 against stock's 152.
-- ~~Corner notches are not reproduced by `sky-faces`~~ — only ever a problem for
-  generated faces; upscaling stock preserves them by construction.
-- ~~1024x1024 textures are untested~~ — 4096x4096 is confirmed working in game.
-- ~~`build.sh` requires exactly 4 images per atlas~~ — the `puff` and `sky-atlas` kinds
-  repeat the supplied images, so one is enough.
-- ~~A puff cannot usefully be upscaled from its own stock, because the point of replacing
-  it is filament structure a 128px quadrant does not contain~~ — argued here, then
-  disproved. All 8 were upscaled from stock and the result beat the generated art on
-  every measure taken, including on `Mnebula4`, where both existed.
-- ~~`Mnebula2` is the only installed texture with a hand-authored chain~~ — `mdmoon` is
-  the second, and the first 32-bit one.
-- ~~Verifying a build once is enough~~ — `Mmoon` was verified, passed, and then the
-  build changed (`blackedge` was added) and only the new property was re-checked. It
-  shipped with every quadrant's RGB several times stock's and rendered as a white box
-  around a sun sprite. `./a2tex verify` exists so this is one command, not a habit.
-- ~~ImageMagick is a sufficient tool for checking the output~~ — not where alpha is
-  involved. Its opinions about associated alpha are what caused the `Mmoon` bug, so it
-  cannot be the thing that checks for it. `textures/tools/verify.py` reads the raw bytes.
-- ~~R, G and B means are identical for map puffs~~ — true for most of the set, but
-  `Mnebula1` is 28/26/22 and `Mnebula2` is 33/9/8. Match the stock file, not the rule.
-- ~~Generative upscaling is non-deterministic, so two runs give free variety~~ —
-  `Mnebula4` and `MFluidicNeb` are byte-identical stock files, upscaled in two separate
-  runs, and produced byte-identical `ai/` layers and byte-identical output.

@@ -6,8 +6,8 @@ Launch: -nointro a2_borg01
 
 Regression tests for menus 2.1.0 (`EscapeReturns=1`: Esc in the in-mission menu acts as
 Return to Game) and menus 2.0.2 (Esc reopens the in-mission menu after it has been
-closed. The keyboard focus used to be left NULL, so every key was dropped until a
-restart).
+closed: an embedded menu left the keyboard focus NULL, so every key was dropped until
+a restart).
 
 1. Launch the game.
 2. Wait 45 seconds.

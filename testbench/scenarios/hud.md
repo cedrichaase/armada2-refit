@@ -11,8 +11,8 @@ art) is always the same, reopened with the camera over unexplored space
 (`_enter-federation-mission.md`). The HUD panels stay visible around the briefing, the
 briefing is in the in-game font, and behind both is the flat grey of the fog, where a
 line along a sprite's edge shows plainly. The Federation HUD is the plainest of the four
-for the same reason. (Until testbench 1.7.0 this ran at the Borg briefing, in front of
-space: the lines hud 2.1.0 fixes were there and could hardly be seen.)
+for the same reason. (In front of space, as at the Borg briefing, the lines hud 2.1.0
+fixes are there and can hardly be seen.)
 
 `HUD.asi` re-declares the layout canvas and condenses the font at run time, for the
 mode the game is in. Every remastered case runs the same install (`hud/install.sh`,
@@ -31,9 +31,9 @@ left on the command bar's checkmark, whose hover highlight would spoil that temp
 The cursor is measured on its own: the pointer is parked at HUD point 60,400 (30,200
 in the stock 800x600 frame) and the region around it is matched like a HUD panel. The
 game draws this cursor itself (the synchronous path, under DXVK), so it is in the
-screenshot; stock at 21:9 draws it ~1.79x wide. Until testbench 1.6.1 the pointer never
-got there (`README.md`, "Traps"): the check matched empty background and meant nothing.
-It is allowed ±10%: the stock arrow is 19x23 px at 800x600, so one pixel is ~5%, and the
+screenshot; stock at 21:9 draws it ~1.79x wide. The pointer gets there only by relative
+motion (`README.md`, "Traps"); sent there absolutely, the check would match empty
+background and mean nothing. It is allowed ±10%: the stock arrow is 19x23 px at 800x600, so one pixel is ~5%, and the
 first honest run measured 0.94–1.02 where the arrows themselves, measured directly, keep
 one width-to-height ratio to 0.6% (0.782–0.787 at 4:3, 16:10, 16:9 and 21:9). An
 uncorrected cursor is 1.20x wide at 16:10, 1.33x at 16:9 and 1.79x at 21:9.

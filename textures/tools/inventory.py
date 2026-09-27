@@ -166,9 +166,11 @@ COMMENTARY = {
    "would add no information -- the same verdict this project reached for `Mbgstars`: "
    "safe, and buys nothing. Borg carries 29 of these, which is most of why Borg's "
    "coverage is the lowest of any faction.",
- 'cursor -- drawn at native size, deliberate pixel art':
-   "**No.** Drawn at exactly their native pixel size, non-square, hand-placed pixels. "
-   "There is no magnification to fight, so any resampling is pure loss.",
+ 'cursor -- deliberate pixel art, magnified by the engine':
+   "**No.** Non-square, hand-placed pixels. The engine magnifies the cursor itself by a "
+   "constant (`[device+0x18]`), so more texels only draw a bigger cursor at the same "
+   "density; resampling buys nothing and loses the pixel art. `HUD.asi` fixes their "
+   "aspect in code (`hud/README.md`).",
  'font atlas -- @tmaterial=font, sampled nearest-neighbour':
    "**No, and the engine forbids it.** `@tmaterial=font` means nearest-neighbour "
    "sampling: an 8x atlas makes the GPU pick one texel out of each 8x8 block, which is "
@@ -253,7 +255,7 @@ def main():
         elif 'font' in low or 'font' in mat:
             v, why = 'SHOULD NOT', 'font atlas -- @tmaterial=font, sampled nearest-neighbour'
         elif low.startswith('curs'):
-            v, why = 'SHOULD NOT', 'cursor -- drawn at native size, deliberate pixel art'
+            v, why = 'SHOULD NOT', 'cursor -- deliberate pixel art, magnified by the engine'
         elif 'bump' in low:
             v, why = 'SHOULD NOT', 'bump / normal map -- encodes vectors, not colour'
         elif not us and not mat:

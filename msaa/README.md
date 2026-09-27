@@ -8,7 +8,7 @@
 An ASI plugin of the same shape as `menus/`, loaded by the same
 Ultimate ASI Loader (`winmm` override). It patches `Armada2.exe` in memory only.
 
-**Confirmed in game at 8x on 2026-09-23.** The first launch's `MSAA.log`:
+A launch's `MSAA.log` at 8x:
 
     --- MSAA samples=8  sites patched 2/2
     CreateDevice 3440x1440 fmt 22 depth 80 fullscreen swap 2 flags 0x00000001  -> MSAA 8x, swap DISCARD, flags 0x00000000
@@ -16,8 +16,9 @@ Ultimate ASI Loader (`winmm` override). It patches `Armada2.exe` in memory only.
     CreateDevice 3440x1440 fmt 22 depth 80 fullscreen swap 2 flags 0x00000001  -> MSAA 8x, swap DISCARD, flags 0x00000000
 
 That is `X8R8G8B8` (22) over `D16` (80), and DXVK's log is free of errors, CopyRects
-included. The 640x480 device is the fullscreen fallback that `platform/README.md` already
-records, not something the plugin does. The engine creates the device several times
+included. The 640x480 device is the mode `PlayIntroMovie` hard-codes for the launch
+reels (`cutscenes/binkproxy/README.md` raises it), not something the plugin does. The
+engine creates the device several times
 per launch, and the hook covers each one, because every creation goes through the
 same function.
 
@@ -30,7 +31,7 @@ this chain it is never called.
 
 The engine creates its D3D8 device with `MultiSampleType = NONE` hard-coded.
 DXVK 3.x has no key that forces MSAA, and `dxcfg.ini`'s `antialiasing=` belongs
-to the GOG translator the chain no longer uses (`postfx/README.md`, Tier 2). vkBasalt could
+to the GOG translator, which is not in the chain (`postfx/README.md`, Tier 2). vkBasalt could
 run SMAA or FXAA. But those estimate edges from the finished frame, HUD text
 included. MSAA resolves real geometric coverage and leaves flat UI quads as they
 are, so it's the right tool for hull silhouettes.

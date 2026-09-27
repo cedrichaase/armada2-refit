@@ -11,10 +11,10 @@ Re-run it rather than trusting a number below.
 
 | verdict | files | |
 |---|---:|---|
-| **done** | 1697 | installed by this project |
+| **done** | 1677 | installed by this project |
 | **follows** | 106 | mip levels of a skipped texture; they follow their base and are not separate decisions |
 | **could** | 20 | nothing stops it — a scope or value decision |
-| **should not** | 292 | there is a reason, below |
+| **should not** | 312 | there is a reason, below |
 
 Note that **done** counts files, not textures: a 1024px base and its two
 rebuilt mip levels are three files. `./a2tex verify` reports textures.
@@ -42,7 +42,6 @@ By the target that owns it. `./a2tex list` shows them all; each target's
 | `KlingonPlain` | 33 |
 | `BorgLit` | 30 |
 | `FedSupport` | 30 |
-| `(installed before targets existed)` | 28 |
 | `FedStationLit` | 27 |
 | `UImid` | 26 |
 | `Props` | 19 |
@@ -55,6 +54,7 @@ By the target that owns it. `./a2tex list` shows them all; each target's
 | `FedMask` | 9 |
 | `Fsovereign` | 9 |
 | `HeroLit` | 9 |
+| `(installed before targets existed)` | 8 |
 | `HullMisc` | 7 |
 | `MbgBaku` | 7 |
 | `FedFlat` | 6 |
@@ -164,6 +164,12 @@ By the target that owns it. `./a2tex list` shows them all; each target's
 
 `BSUFBottomBump`, `BSUFTopBump`, `BassimilatorBump`, `badvassxbump`, `badvassybump`, `badvasszbump`, `bassault_Hbump`, `bassault_Lbump`, `bassmatbbump`, `bassmatpbump`, `bbasebump`, `bbattlebump`, `bcolonybump`, `bcruise1bump`, `bfrigatebump`, `bhubabump`, `bhubbbump`, `bintercptrbump`, `bmamaplbump_1`, `bmamaplbump_2`, `bpanelbump`, `brecxbump`, `brecybump`, `breczbump`, `bscoutbump`, `btacticalbbump`, `btacticalbump`, `btacticalcbump`, `btechassbump`
 
+### 21 — cursor -- deliberate pixel art, magnified by the engine
+
+**No.** Non-square, hand-placed pixels. The engine magnifies the cursor itself by a constant (`[device+0x18]`), so more texels only draw a bigger cursor at the same density; resampling buys nothing and loses the pixel art. `HUD.asi` fixes their aspect in code (`hud/README.md`).
+
+`Curs_24`, `Curs_Attk`, `Curs_Guard`, `Curs_Move`, `Curs_NoAnim`, `Curs_NoAttk`, `Curs_NoSpecWp`, `Curs_NoTransAttack`, `Curs_Patrl`, `Curs_Rally`, `Curs_SpecWp`, `Curs_Trans`, `Curs_transattack`, `Curs_worm`, `Curs_wrmin`, `Curs_wrmout`, `CursorA`, `curs_mining`, `curs_noanim2`, `curs_repair`, `curs_warp`
+
 ### 12 — font atlas -- @tmaterial=font, sampled nearest-neighbour
 
 **No, and the engine forbids it.** `@tmaterial=font` means nearest-neighbour sampling: an 8x atlas makes the GPU pick one texel out of each 8x8 block, which is a point-sampled glyph, not a sharper one. Glyphs also ship one atlas per point size precisely because they are drawn 1:1. And unlike gas, a glyph has a right answer -- an invented stroke turns an 8 into a B.
@@ -175,12 +181,6 @@ By the target that owns it. `./a2tex list` shows them all; each target's
 **Could, carefully.** Stock ships `_1` and `_2` at the same size and byte-identical -- a copy-paste error in the original packaging, not a chain. The engine tolerates it today. Mirroring that duplication at the new scale reproduces the relationship rather than inventing one, and is probably safe; it was held back because a wrong mip chain is a hard crash rather than a blemish. Affects assimilated-station variants, visible only after a Borg capture.
 
 `FpremNew_B`, `Fsensor_B`, `Kconst_B`, `Kresear_B`, `Ksensor_B`, `Ksuperbl_B`, `Rresear_B`, `WshladSW`, `csensor_B`, `ctrading_b`
-
-### 1 — cursor -- drawn at native size, deliberate pixel art
-
-**No.** Drawn at exactly their native pixel size, non-square, hand-placed pixels. There is no magnification to fight, so any resampling is pure loss.
-
-`CursorA`
 
 ### 1 — colour lookup table -- interpolating it blends the cells
 
