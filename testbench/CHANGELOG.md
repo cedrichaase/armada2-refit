@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 1.10.0 — 2026-09-27
+
+### Added
+- `scenarios/hud-mode-switch.md`: switches to 1600x1200 in Graphics Settings in the
+  middle of the Federation mission, at 4:3 and 21:9, and measures the HUD, the briefing
+  and its text against the 4:3 case. Fails before hud 2.2.0, passes with it.
+- `ui.json`: the `display mode` target, the Graphics Settings mode box.
+
+Installs nothing into the game.
+
 ## 1.9.0 — 2026-09-27
 
 ### Added

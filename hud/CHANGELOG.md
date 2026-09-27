@@ -5,6 +5,24 @@ before that `ui-widescreen.py`, `cursor-aspect.py` and (as the separate `font` l
 `ui-font-condense.py`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The derivations are in [`README.md`](README.md).
 
+## 2.2.0 — 2026-09-27
+
+### Added
+- `Relayout=` in `HUD.ini` (default 1).
+
+### Fixed
+- The HUD follows a display mode changed in a mission (Graphics Settings). Before, it
+  kept the layout of the mode the mission started in: from 21:9 to 1600x1200 every
+  panel drew at 0.56 of its width. `HUD.asi` now rebuilds the panels that read rects
+  (`Cleanup`, `Init`, `PostLoad`, as between missions) with the canvas for the new mode,
+  from the `SimulateAll` call in `Program::DisplayInputProcess` (`0x48380a`). The
+  overview, which holds the unit groups, is not rebuilt; `MapRadar`'s calls to
+  `Scanner::CleanupGrids`, `Scanner::InitializeGrids` and `Terrain_Geometry::PostLoad`
+  are skipped during it, so the fog of war stays; and the briefing's file name and
+  objective completion are handed across it, as a saved game's `Load` does.
+
+Installed, not yet seen in game.
+
 ## 2.1.1 — 2026-09-27
 
 ### Changed

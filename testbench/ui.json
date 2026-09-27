@@ -43,6 +43,7 @@
     "borg campaign": {"at": [589, 439], "aliases": ["borg"]},
     "previous menu": {"at": [113, 580], "aliases": ["back"]},
     "load game": {"at": [686, 580]},
+    "display mode": {"at": [289, 191], "aliases": ["display mode box", "display mode dropdown", "resolution"], "_note": "Graphics Settings: the selected display mode; a click opens the list of modes"},
     "first mission": {"at": [385, 132], "aliases": ["first mission in the list", "mission 1"]},
     "mission ok": {"at": [329, 484], "aliases": ["mission selection ok", "select mission ok", "o.k."]},
     "mission cancel": {"at": [439, 484], "aliases": ["mission selection cancel"]},
