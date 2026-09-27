@@ -32,7 +32,7 @@ while IFS= read -r p; do
                                                echo "asset path  $p"; bad=1 ;;
   esac
   case "${p,,}" in
-    *.tga|*.png|*.jpg|*.jpeg|*.webp|*.bmp|*.mp4|*.mkv|*.bik|*.wav|*.sod|*.spr|*.bzn|*.a2neb-backup)
+    *.tga|*.png|*.jpg|*.jpeg|*.webp|*.bmp|*.mp4|*.mkv|*.bik|*.wav|*.sod|*.spr|*.bzn|*.map|*.a2neb-backup)
                                                echo "game format $p"; bad=1 ;;
   esac
 done <<< "$paths"

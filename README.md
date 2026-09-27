@@ -139,13 +139,17 @@ versions it bundles.
 
 `CLAUDE.md` is the working brief for Claude Code sessions in this repository.
 
-## Licence
+## Licence and trademarks
 
 The code, recipes and docs in this repository are MIT-licensed ([`LICENSE`](LICENSE)).
 That covers nothing of the game's: Star Trek: Armada II, its art and its files belong
 to their owners, and this repository holds none of them.
 
----
+**This is an unofficial fan project.** It is not affiliated with, endorsed by or
+supported by Activision, CBS Studios or Paramount. Star Trek: Armada II is © Activision;
+Star Trek and related marks are trademarks of CBS Studios / Paramount. The names appear
+here only to say which game this works with. The project uses none of their logos or
+artwork, and nothing it produces should be presented as official.
 
-*Star Trek: Armada II is © Activision; Star Trek is a trademark of CBS Studios / Paramount.
-This is an unofficial fan project, not affiliated with or endorsed by either.*
+The engine notes in the layer READMEs describe what `Armada2.exe` does, in our own
+words, so that the plugins here can work with it. They quote no code from it.

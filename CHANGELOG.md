@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 6.2.1 — 2026-09-27
+
+Layers: none (publish/ is versioned by the root).
+
+### Fixed
+- `publish/check.sh` refuses `*.map`, and `.gitignore` ignores it: `armada2.map` is text,
+  so the binary test let it through. The rules for engine findings are in
+  `publish/README.md`, "Engine findings", and `CLAUDE.md`, hard rule 9.
+
+Installs nothing different into the game.
+
 ## 6.2.0 — 2026-09-27
 
 Layers: textures 2.1.0.
