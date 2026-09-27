@@ -31,6 +31,7 @@ detail; this is the map.
 | **Canvas and palette** | the two `ParameterDB` constructors' calls to `mLoad` (`0x53414c`, `0x5341b4`) | After a DB loads, if it holds `infoPanelArea` it is the GUI one (`gui_<race>.cfg` includes `gui_interface.cfg`, which includes `gui_glob16x12.cfg`). Its declared canvas width at `+0x2c` becomes `round(1200·W/H)`, and the anchored panel and palette values get exactly `ui-widescreen.py`'s edit, in memory. |
 | **Font** | `FontNewScreenWidth`'s one caller, `SetActiveDisplay_Internal` (`0x62c5d7`), and `FontInit` (`0x48440c`) | `ST3D_Font+0x28`, the horizontal scale, becomes `+0x2c · 1.25·H/W` for the three MetaFonts. Glyph quad, pen advance, line width and word-wrap all multiply by `+0x28`, so this condenses glyphs and spacing together — what the file condense did by editing every `.spr` width. |
 | **Seams** | `ST3D_Sprite::DrawScaled2D`'s snap block (`0x63aeca`) and the `je` that skips it (`0x63aec8`), and `ParameterDB::Get(DBRectangle)`'s entry (`0x5358f0`) | Both edges of every 2D sprite go to `floor(v) + 0.5`, a pixel boundary, so tiles meet and MSAA draws no line outside them; a rect's width and height are taken from its converted far edge. See "Seams between tiles". |
+| **Re-layout** | the `SimulateAll` call in `Program::DisplayInputProcess` (`0x48380a`); in `MapRadar`, the calls to `Scanner::CleanupGrids` (`0x4eb28a`), `Scanner::InitializeGrids` (`0x4eaf14`) and `Terrain_Geometry::PostLoad` (`0x4eb146`) | After a display mode change in a mission, once the GUI DB's canvas is not the one the new mode wants, the panels that read rects are rebuilt as the game rebuilds them between missions — `Cleanup`, `Init`, `PostLoad` — with the canvas edit made again for the new mode. The three `MapRadar` calls are skipped while it runs, so the fog of war survives. See "A mode changed in a mission". |
 | **Cursors** | `RefreshDisplay`'s `DrawScaled2D` call (`0x6246fa`), and `SetCursor` (`0x625dd9`) | Under DXVK the cursor is the *synchronous* one: the engine draws the sprite itself each frame, after `SetScaleFactor2D(&device+0x18)` = W/800 by H/600. For that one draw the x scale becomes the y scale and the position is re-expressed so the hotspot stays on the pointer; the scale is put back after. The hardware path, if a setup ever takes it, gets `fmuls 0x18(%esi)` → `fmuls 0x1c(%esi)` in `SetCursor`. |
 
 What was established to get there, so it need not be re-derived:
@@ -46,8 +47,8 @@ What was established to get there, so it need not be re-derived:
   (`+0x28`) as blocks, never an entry's value, so that is safe.
 - **`FontNewScreenWidth` runs on every mode change**, with the `ST3D_DisplayMode`
   `{W, H, bpp}` in `ecx` at the call. The font therefore follows a resolution change
-  mid-session. The GUI DB is loaded when a mission starts, so **the layout follows at
-  the next mission**.
+  mid-session. The GUI DB is loaded when a mission starts, and the panels read their
+  rects from it then, so the layout follows only through the re-layout below.
 - `ST3D_Font`s are constructed in exactly one place (`cFontSet::Load`), and only the
   three MetaFonts' current fonts draw text, so those three are all there is to fix.
 - **There are two cursor paths, and the one in use is not the hardware cursor.**
@@ -68,6 +69,49 @@ What it does differently from the files, on purpose: the font's glyph art stays 
 and is drawn narrower, instead of being resampled to fewer texels and point-sampled back
 up. At 3440x1440 that is 1.41 screen px per texel on both axes rather than 2.69 across,
 so the text keeps every stock texel. Judge it in game (see "The font").
+
+## A mode changed in a mission
+
+Before hud 2.2.0, a display mode chosen in Graphics Settings during a mission left the
+HUD laid out for the old one. From 21:9 to 1600x1200 the game drew 4:3, pillarboxed,
+with every panel at 1600/2867 = 0.56 of its width; the other way round it drew stock's
+stretch. Stock never needs to lay out again, because its 1600x1200 space is the same at
+every mode. The canvas `HUD.asi` declares is fitted to one aspect.
+
+Changing the GUI DB at the mode change would not have been enough: **every panel reads
+its rects once, in its `PostLoad`** (`DisplayInterface::LoadRectangle`, from 15
+panel classes), and keeps them. The game rebuilds panels only between missions:
+`GameClose` runs `CleanupAll`, the next mission `InitAll` and `PostLoadAll`, which also
+deletes and re-creates the GUI DB. So after a mode change `HUD.asi` runs that cycle —
+`Cleanup`, `Init`, `PostLoad` — on the panels that read rects, from the `SimulateAll`
+call at the top of a frame, with the DB's edit undone and made again in between.
+
+Not the whole cycle, because it is also where the game ends a mission's state:
+
+- **`cOverViewImp::Cleanup` empties the ten unit groups** (Ctrl+number). The overview
+  reads no rects and is not rebuilt.
+- **`MapRadar`'s cycle resets the fog of war**: `Cleanup` frees the sensor grids
+  (`Scanner::CleanupGrids`), `PostLoad` builds empty ones (`Scanner::InitializeGrids`)
+  and rebuilds the terrain mesh (`Terrain_Geometry::PostLoad`). Those three calls are
+  skipped during a re-layout; the minimap panel is rebuilt around the grids it had.
+- **`CinematicView::Cleanup` ends a cinematic in progress** (stops Bink, releases the
+  script step). The re-layout waits until none is playing.
+- **`Init` is needed, not only `Cleanup` and `PostLoad`**: `CinematicView::Cleanup`
+  deletes its camera and only `Init` makes one. Without it the first version crashed on
+  the next frame, in `CinematicView::Render` calling `SetFarPlane` on a null camera.
+- `PostLoadAll` clears four flag bytes of each panel (`+0x16` is hidden) before its
+  `PostLoad`; the re-layout clears them the same way and then puts the player's back.
+- **The briefing came back empty** in the first version. `ObjectivesDisplay::Cleanup`
+  clears the objectives and resets `s_lastFilename`, the file their text came from, and
+  its `PostLoad` reads the text back only when that is set, then applies each
+  objective's completion from `s_loadedFulfilledObjectives` and frees it. That is how a
+  saved game's `Load` leaves them; in a running mission neither is there. The re-layout
+  keeps the file name across `Cleanup` and hands over the completion flags, one byte
+  per objective from the display's `+0x5c..+0x60`, in a block from the game's own
+  `operator new`, which `PostLoad` deletes.
+
+`Relayout=0` in `HUD.ini` turns it off; the layout then follows at the next mission.
+`testbench/scenarios/hud-mode-switch.md` is the regression test.
 
 ## Seams between tiles
 

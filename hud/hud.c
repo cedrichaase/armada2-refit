@@ -60,9 +60,9 @@
  * buffer here.  The destructor frees the DB's line buffers (+0x20) and bucket
  * table (+0x28) as blocks, never an entry's value, so this is safe.
  *
- * The GUI DB is loaded when a mission starts, so a resolution changed during a
- * mission takes effect on the HUD layout at the next mission (the font follows
- * at once).
+ * The GUI DB is loaded when a mission starts (DisplayInterface::PostLoadAll), and
+ * the panels read their rects from it then; a mode changed during a mission is
+ * part 5's.
  *
  * 3. CURSORS -- two paths, [dev+0xe0] chooses
  * ---------------------------------------------
@@ -105,6 +105,38 @@
  * and w and h become the converted far edge minus the converted near one.  x and
  * y are bit-identical to stock; w and h move by at most one unit.  Only a
  * canvas other than 1600x1200 converts, so this changes nothing at 4:3.
+ *
+ * 5. RE-LAYOUT -- a display mode changed in the middle of a mission
+ * -----------------------------------------------------------------
+ * Every panel reads its rects once, in its PostLoad (through
+ * DisplayInterface::LoadRectangle, 0x51b430), and keeps them converted from the
+ * canvas of that moment.  Stock needs nothing more -- its 1600x1200 space is the
+ * same at every mode -- but a canvas fitted to one aspect is wrong at another: from
+ * 21:9 to 1600x1200 every panel drew at 1600/2867 of its width.  The game rebuilds
+ * panels only between missions (CleanupAll 0x51a8c0, InitAll 0x51a640,
+ * PostLoadAll 0x51a6e0), so the SimulateAll call in Program::DisplayInputProcess
+ * (0x48380a) is wrapped: when the canvas the GUI DB holds is not the one the mode
+ * now wants, the panels that read rects get Cleanup, Init and PostLoad (vtable
+ * +0x14, +0x04, +0x10), as the game does, with the GUI DB's edit undone and made
+ * again between Cleanup and PostLoad.  PostLoadAll clears four flag bytes (+0x14,
+ * +0x15, +0x16 hidden, +0x20) before each PostLoad; they are cleared and then put
+ * back, so a panel the player had open or hidden stays so.
+ *
+ * Only those panels, and not the whole cycle, because CleanupAll also ends the
+ * game's state with the HUD: cOverViewImp::Cleanup empties the ten unit groups,
+ * and it reads no rects, so it is left alone.  Of the rest, MapRadar is the one
+ * whose cycle touches game state -- its Cleanup frees the sensor grids
+ * (Scanner::CleanupGrids, call at 0x4eb28a) and its PostLoad makes empty ones
+ * (Scanner::InitializeGrids, 0x4eaf14) and rebuilds the terrain mesh
+ * (Terrain_Geometry::PostLoad, 0x4eb146), which would lose everything explored;
+ * the three calls are wrapped and skipped during a re-layout.  CinematicView's
+ * Cleanup ends a cinematic that is playing (+0x24), so the re-layout waits for
+ * none to be.  ObjectivesDisplay's Cleanup forgets which file its text came from,
+ * so its PostLoad would bring the briefing back empty; the file name and each
+ * objective's completion are handed over as a saved game's Load leaves them
+ * (objectives_keep, below).  Init is not optional: CinematicView's
+ * Cleanup deletes its camera and only Init makes one (a null camera in its Render
+ * crashed the first version).
  *
  * STANDING DOWN
  * -------------
@@ -185,6 +217,28 @@ int _fltused = 0;
 #define SITE_SNAP_END        0x63aefa   /* ... and where that block ends */
 #define SITE_SNAP_SKIP       0x63aec8   /* je SITE_SNAP_END: skip it without flag 0x80 */
 #define ADDR_GET_RECT        0x5358f0   /* ParameterDB::Get(const char *, DBRectangle *, const DBRectangle &) */
+#define ADDR_GUI_DB          0x76502c   /* the GUI ParameterDB *, made in PostLoadAll */
+#define ADDR_DISPLAY_LIST    0x764ff0   /* DisplayInterface::s_pDisplayList */
+#define ADDR_SIMULATE_ALL    0x51a940   /* DisplayInterface::SimulateAll(int, float) */
+#define SITE_SIMULATE_ALL    0x48380a   /* in Program::DisplayInputProcess */
+#define ADDR_INIT_GRIDS      0x493e50   /* Scanner::InitializeGrids(int) */
+#define ADDR_CLEANUP_GRIDS   0x4940c0   /* Scanner::CleanupGrids() */
+#define ADDR_TERRAIN_POSTLOAD 0x593140  /* Terrain_Geometry::PostLoad() */
+#define SITE_INIT_GRIDS      0x4eaf14   /* in MapRadar::PostLoad */
+#define SITE_TERRAIN_POSTLOAD 0x4eb146  /* in MapRadar::PostLoad */
+#define SITE_CLEANUP_GRIDS   0x4eb28a   /* in MapRadar::Cleanup */
+#define ADDR_POSTLOAD_CINEMATIC 0x4e59b0 /* CinematicView::PostLoad */
+#define CINEMATIC_PLAYING    0x24       /* CinematicView: the cinematic running, or 0 */
+#define ADDR_POSTLOAD_OBJECTIVES 0x50ca50 /* ObjectivesDisplay::PostLoad */
+#define ADDR_OBJ_FILENAME    0x76495c   /* ObjectivesDisplay::s_lastFilename, char[200] */
+#define OBJ_FILENAME_LEN     0xc8
+#define ADDR_OBJ_FULFILLED   0x764a24   /* ObjectivesDisplay::s_loadedFulfilledObjectives, bool * */
+#define OBJ_DONE_BEGIN       0x5c       /* ObjectivesDisplay: completion, a byte per objective */
+#define OBJ_DONE_END         0x60
+#define ADDR_NEW             0x652710   /* operator new */
+#define VT_INIT              0x04       /* DisplayInterface vtable: Init */
+#define VT_POSTLOAD          0x10       /* DisplayInterface vtable: PostLoad */
+#define VT_CLEANUP           0x14       /* DisplayInterface vtable: Cleanup */
 
 #define FONT_SX   0x28                  /* ST3D_Font: x scale */
 #define FONT_SY   0x2c                  /* ST3D_Font: y scale */
@@ -279,7 +333,7 @@ static int div_floor(int a, int b)
 /* ---- state ------------------------------------------------------------ */
 
 static int g_W, g_H;            /* the display mode last set */
-static int g_doFont = 1, g_doCanvas = 1, g_doCursor = 1, g_doSeams = 1;
+static int g_doFont = 1, g_doCanvas = 1, g_doCursor = 1, g_doSeams = 1, g_doRelayout = 1;
 
 /* ---- 1. font ---------------------------------------------------------- */
 
@@ -368,6 +422,11 @@ static const Anchor k_anchor[] = {
 
 static char g_vals[N_ANCHOR][96];
 
+/* The GUI DB this plugin edited, and each edited key's stock value string, so the
+ * edit can be undone and made again for a new display mode (part 5). */
+static BYTE *g_gui_db;
+static char *g_orig[N_ANCHOR];
+
 static Entry *db_find(BYTE *db, const char *key)
 {
     BYTE *table = *(BYTE **)(db + DB_TABLE);
@@ -399,6 +458,9 @@ static void fix_gui_db(BYTE *db)
     char m[200];
 
     if (!db_find(db, "infoPanelArea")) return;          /* not the GUI DB */
+    if (db != g_gui_db)
+        for (i = 0; i < N_ANCHOR; i++) g_orig[i] = NULLPTR;
+    g_gui_db = NULLPTR;
 
     m[0] = 0;
     s_cat(m, "GUI config: declares ");
@@ -423,6 +485,7 @@ static void fix_gui_db(BYTE *db)
     s_num(m, g_W); s_cat(m, "x"); s_num(m, g_H);
     s_cat(m, " -> canvas "); s_num(m, canvas); s_cat(m, "x"); s_num(m, STOCK_H);
     logline(m);
+    g_gui_db = db;                                      /* ours to re-lay out */
     if (canvas == STOCK_W) return;                      /* 4:3: stock is right */
 
     *(int *)(db + DB_W) = canvas;
@@ -449,6 +512,7 @@ static void fix_gui_db(BYTE *db)
         out[0] = 0;
         s_num(out, nx);
         s_cat(out, rest);
+        g_orig[i] = e->val;
         e->val = out;
         moved++;
 
@@ -468,6 +532,191 @@ void __attribute__((thiscall)) mload_hook(void *db, const char *name)
 {
     ((MLoadFn)ADDR_MLOAD)(db, name);
     fix_gui_db((BYTE *)db);
+}
+
+/* ---- 5. re-layout after a mode change in a mission --------------------- */
+
+/* The panels whose PostLoad reads rects from the GUI DB (through
+ * DisplayInterface::LoadRectangle), by the PostLoad in their vtable.  The
+ * overview (cOverViewImp) reads none, and its Cleanup empties the player's ten
+ * unit groups, so it is not here -- nor is anything else not listed. */
+static const DWORD k_relayout[] = {
+    0x4eff80,   /* ShipDisplay */
+    0x4fe670,   /* ButtonPanel */
+    0x512880,   /* CommDisplay */
+    0x4ffc40,   /* ReplayPanel */
+    0x505000,   /* CursorInterface */
+    0x4eadf0,   /* MapRadar */
+    0x515f80,   /* DropPlayerBox */
+    ADDR_POSTLOAD_CINEMATIC,
+    ADDR_POSTLOAD_OBJECTIVES,
+    0x517050,   /* PauseBox */
+    0x517b10,   /* MessageDisplay */
+    0x4ff450,   /* ResourcePanel */
+    0x518820,   /* LoadPercentageBox */
+    0x4fa990,   /* PopupPaletteImp */
+    0x507940,   /* SelectionDisplay */
+};
+#define N_RELAYOUT ((int)(sizeof k_relayout / sizeof k_relayout[0]))
+
+static int g_relayout;      /* inside a re-layout: the minimap keeps its grids */
+
+typedef void (__cdecl *GridsInitFn)(int);
+typedef void (__cdecl *GridsCleanFn)(void);
+typedef void (__attribute__((thiscall)) *MethodFn)(void *);
+
+/* MapRadar's Cleanup frees the sensor grids -- the fog of war -- and its PostLoad
+ * builds empty ones and the terrain mesh again.  Between two missions that is right;
+ * in the middle of one it would forget everything explored. */
+void __cdecl grids_init_hook(int n)       { if (!g_relayout) ((GridsInitFn)ADDR_INIT_GRIDS)(n); }
+void __cdecl grids_cleanup_hook(void)     { if (!g_relayout) ((GridsCleanFn)ADDR_CLEANUP_GRIDS)(); }
+void __attribute__((thiscall)) terrain_postload_hook(void *t)
+{
+    if (!g_relayout) ((MethodFn)ADDR_TERRAIN_POSTLOAD)(t);
+}
+
+static int relayout_panel(BYTE *di)
+{
+    DWORD pl = (*(DWORD **)di)[VT_POSTLOAD / 4];
+    int   i;
+    for (i = 0; i < N_RELAYOUT; i++) if (k_relayout[i] == pl) return 1;
+    return 0;
+}
+
+/* Walk DisplayInterface::s_pDisplayList (a std::list: head node at +4, a node's
+ * next at +0 and value at +8), calling fn on every panel re-laid out.  Returns
+ * how many, or -1 if a cinematic is playing (CinematicView +0x24). */
+static int each_panel(int vt_slot)
+{
+    BYTE *list = *(BYTE **)ADDR_DISPLAY_LIST;
+    BYTE *head, *n;
+    int   count = 0;
+
+    if (!list || !(head = *(BYTE **)(list + 4))) return 0;
+    for (n = *(BYTE **)head; n && n != head; n = *(BYTE **)n) {
+        BYTE *di = *(BYTE **)(n + 8);
+        if (!di || !relayout_panel(di)) continue;
+        if (!vt_slot) {
+            if ((*(DWORD **)di)[VT_POSTLOAD / 4] == ADDR_POSTLOAD_CINEMATIC &&
+                *(void **)(di + CINEMATIC_PLAYING))
+                return -1;
+        } else if (vt_slot == VT_POSTLOAD) {
+            /* PostLoadAll clears these before PostLoad; the player's state is kept */
+            BYTE f14 = di[0x14], f15 = di[0x15], f16 = di[0x16], f20 = di[0x20];
+            di[0x14] = di[0x15] = di[0x16] = di[0x20] = 0;
+            ((MethodFn)(*(DWORD **)di)[VT_POSTLOAD / 4])(di);
+            di[0x14] = f14; di[0x15] = f15; di[0x16] = f16; di[0x20] = f20;
+        } else {
+            ((MethodFn)(*(DWORD **)di)[vt_slot / 4])(di);
+        }
+        count++;
+    }
+    return count;
+}
+
+/* ObjectivesDisplay::Cleanup empties the objectives and resets s_lastFilename, the
+ * file its text came from, and its PostLoad reads the text back only when that is
+ * set -- then applies each objective's completion from s_loadedFulfilledObjectives,
+ * which a saved game's Load fills, and frees it.  Mid-mission neither is there, so
+ * the briefing came back empty: both are handed over as a Load would leave them,
+ * the flags in a block from the game's own operator new, which PostLoad deletes. */
+typedef void *(__cdecl *NewFn)(unsigned int);
+
+static char g_objFile[OBJ_FILENAME_LEN];
+static BYTE g_objDone[256];
+static int  g_objCount = -1;
+
+static BYTE *objectives_panel(void)
+{
+    BYTE *list = *(BYTE **)ADDR_DISPLAY_LIST;
+    BYTE *head, *n;
+    if (!list || !(head = *(BYTE **)(list + 4))) return NULLPTR;
+    for (n = *(BYTE **)head; n && n != head; n = *(BYTE **)n) {
+        BYTE *di = *(BYTE **)(n + 8);
+        if (di && (*(DWORD **)di)[VT_POSTLOAD / 4] == ADDR_POSTLOAD_OBJECTIVES) return di;
+    }
+    return NULLPTR;
+}
+
+static void objectives_keep(void)
+{
+    BYTE *od = objectives_panel(), *b, *e;
+    int   i;
+
+    g_objCount = -1;
+    for (i = 0; i < OBJ_FILENAME_LEN; i++) g_objFile[i] = ((char *)ADDR_OBJ_FILENAME)[i];
+    if (!od || !g_objFile[0] || *(void **)ADDR_OBJ_FULFILLED) return;
+    b = *(BYTE **)(od + OBJ_DONE_BEGIN);
+    e = *(BYTE **)(od + OBJ_DONE_END);
+    g_objCount = (b && e > b) ? (int)(e - b) : 0;
+    if (g_objCount > (int)sizeof g_objDone) g_objCount = (int)sizeof g_objDone;
+    for (i = 0; i < g_objCount; i++) g_objDone[i] = b[i];
+}
+
+static void objectives_restore(void)
+{
+    BYTE *done;
+    int   i;
+
+    for (i = 0; i < OBJ_FILENAME_LEN; i++) ((char *)ADDR_OBJ_FILENAME)[i] = g_objFile[i];
+    if (g_objCount < 0) return;
+    done = (BYTE *)((NewFn)ADDR_NEW)((unsigned int)(g_objCount > 0 ? g_objCount : 1));
+    if (!done) return;
+    for (i = 0; i < g_objCount; i++) done[i] = g_objDone[i];
+    if (!g_objCount) done[0] = 0;
+    *(BYTE **)ADDR_OBJ_FULFILLED = done;
+}
+
+/* Panels keep the rects they read at PostLoad, converted from the canvas the GUI DB
+ * declared then; a new display mode needs a new canvas and so new rects.  The game
+ * rebuilds panels only between missions (CleanupAll, PostLoadAll), so after a mode
+ * change in a mission the panels that read rects are rebuilt here, the same way,
+ * with the GUI DB's edit made again for the new mode. */
+static void maybe_relayout(void)
+{
+    BYTE *db = *(BYTE **)ADDR_GUI_DB;
+    int   want, have, i, n;
+    char  m[200];
+
+    if (!g_doRelayout || !db || db != g_gui_db || !g_W || !g_H) return;
+    want = div_round(STOCK_H * g_W, g_H);
+    have = *(int *)(db + DB_W);
+    if (want == have) return;
+    if (each_panel(0) < 0) return;          /* not during a cinematic: try next frame */
+
+    m[0] = 0;
+    s_cat(m, "display "); s_num(m, g_W); s_cat(m, "x"); s_num(m, g_H);
+    s_cat(m, " in a mission: HUD laid out again, canvas ");
+    s_num(m, have); s_cat(m, " -> "); s_num(m, want);
+    logline(m);
+
+    g_relayout = 1;
+    objectives_keep();
+    n = each_panel(VT_CLEANUP);
+    each_panel(VT_INIT);                    /* e.g. CinematicView's camera, which Cleanup deletes */
+    for (i = 0; i < N_ANCHOR; i++) {        /* the DB back to stock ... */
+        Entry *e;
+        if (g_orig[i] && (e = db_find(db, k_anchor[i].key)) && e->val == g_vals[i])
+            e->val = g_orig[i];
+        g_orig[i] = NULLPTR;
+    }
+    *(int *)(db + DB_W) = STOCK_W;
+    fix_gui_db(db);                         /* ... and edited for this mode */
+    objectives_restore();
+    each_panel(VT_POSTLOAD);
+    g_relayout = 0;
+
+    m[0] = 0;
+    s_cat(m, "  "); s_num(m, n); s_cat(m, " panel(s) rebuilt");
+    logline(m);
+}
+
+typedef void (__cdecl *SimulateAllFn)(int, float);
+
+void __cdecl simulate_all_hook(int a, float t)
+{
+    maybe_relayout();
+    ((SimulateAllFn)ADDR_SIMULATE_ALL)(a, t);
 }
 
 /* ---- 3b. the synchronous (software) cursor ---------------------------- */
@@ -694,6 +943,7 @@ static void startup(void)
     g_doCanvas = (int)GetPrivateProfileIntA("HUD", "Canvas", 1, ini);
     g_doCursor = (int)GetPrivateProfileIntA("HUD", "Cursor", 1, ini);
     g_doSeams  = (int)GetPrivateProfileIntA("HUD", "Seams",  1, ini);
+    g_doRelayout = (int)GetPrivateProfileIntA("HUD", "Relayout", 1, ini);
     logline("--- HUD.asi");
 
     /* font */
@@ -721,6 +971,23 @@ static void startup(void)
         report("canvas", "patched");
     else
         report("canvas", "NOT PATCHED: VirtualProtect failed");
+
+    /* re-layout -- follows the canvas, so needs its hooks */
+    if (!g_doCanvas || !g_doRelayout)
+        g_doRelayout = 0, report("relayout", "off (Canvas=0 or Relayout=0): "
+                                             "a mode change in a mission shows at the next");
+    else if (!is_call(SITE_SIMULATE_ALL, ADDR_SIMULATE_ALL) ||
+             !is_call(SITE_INIT_GRIDS, ADDR_INIT_GRIDS) ||
+             !is_call(SITE_TERRAIN_POSTLOAD, ADDR_TERRAIN_POSTLOAD) ||
+             !is_call(SITE_CLEANUP_GRIDS, ADDR_CLEANUP_GRIDS))
+        g_doRelayout = 0, report("relayout", "NOT PATCHED: call sites differ from this build");
+    else if (redirect_call(SITE_INIT_GRIDS, (void *)grids_init_hook) &&
+             redirect_call(SITE_TERRAIN_POSTLOAD, (void *)terrain_postload_hook) &&
+             redirect_call(SITE_CLEANUP_GRIDS, (void *)grids_cleanup_hook) &&
+             redirect_call(SITE_SIMULATE_ALL, (void *)simulate_all_hook))
+        report("relayout", "patched (the HUD follows a mode change in a mission)");
+    else
+        g_doRelayout = 0, report("relayout", "NOT PATCHED: VirtualProtect failed");
 
     /* cursor */
     {

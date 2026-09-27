@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 6.5.0 — 2026-09-27
+
+Layers: hud 2.2.0, testbench 1.12.0.
+
+### Fixed
+- The HUD follows a display mode changed in the middle of a mission, instead of
+  keeping the old mode's layout until the next one (`9873980`; see `hud/CHANGELOG.md`).
+
+### Added
+- `testbench/scenarios/hud-mode-switch.md`, its regression test.
+
+Confirmed in game 2026-09-27.
+
 ## 6.4.0 — 2026-09-27
 
 Layers: menus 4.3.0, testbench 1.11.0.
