@@ -14,7 +14,7 @@ Layers: menus 4.3.0, testbench 1.11.0.
   `Menus.ini` keeps them inside the art (see `menus/CHANGELOG.md`), with a bench scenario
   that pins it (`testbench/CHANGELOG.md`). 9838ca6.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-27.
 
 ## 6.3.0 — 2026-09-27
 

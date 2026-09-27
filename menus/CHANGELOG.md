@@ -14,7 +14,7 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
   (template 2096): "Shroud Off, Fog Off" / "Shroud On, Fog On" and "Random Placement"
   no longer run over the minimap's frame. Menus.log records `label` lines (9838ca6).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-09-27.
 
 ## 4.2.0 — 2026-09-27
 
