@@ -8,6 +8,8 @@
 #                                   milder -- try -0.25 if the map shimmers on scroll)
 #   renderer-config.sh --show       print what is installed now
 #   renderer-config.sh --remove     delete dxvk.conf -- complete revert
+#   renderer-config.sh --print      write the file to stdout instead; needs no game and
+#                                   verifies no keys (publish/package.sh ships it)
 #
 # Stages are CUMULATIVE and deliberately separate: this project's method is one change
 # at a time so that a bad result is attributable, and three keys at once is not.
@@ -43,17 +45,18 @@ while [ $# -gt 0 ]; do
         --bias)   bias="$2"; shift ;;
         --show)   action=show ;;
         --remove) action=remove ;;
+        --print)  action=print ;;
         --verify-keys) action=verify ;;
         --force)  force=1 ;;
-        -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
     shift
 done
 
-[ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
-
 case "$stage" in 1|2|3) ;; *) echo "stage must be 1, 2 or 3" >&2; exit 2 ;; esac
+
+[ "$action" = print ] || [ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
 
 # ---------------------------------------------------------------- show / remove
 
@@ -160,19 +163,9 @@ if [ "$action" = verify ]; then
     exit $?
 fi
 
-# ---------------------------------------------------------------- install
+# ---------------------------------------------------------------- the file
 
-if [ -f "$CONF" ] && ! grep -qF "$MARKER" "$CONF" && [ "$force" != 1 ]; then
-    echo "refusing: $CONF already exists and was not written by this script." >&2
-    echo "Inspect it, then re-run with --force to overwrite." >&2
-    exit 1
-fi
-
-echo "verifying stage $stage keys:"
-mapfile -t ks < <(keys_for_stage "$stage")
-verify_keys "${ks[@]}" || { echo "aborting: DXVK does not know one of these keys" >&2; exit 1; }
-
-{
+conf_text() {
     echo "$MARKER"
     echo "# stage: $stage   (re-run with --stage N to change; --remove to revert)"
     echo "# Why each key is here: postfx/README.md."
@@ -207,7 +200,26 @@ verify_keys "${ks[@]}" || { echo "aborting: DXVK does not know one of these keys
         echo "# more visible at 2048/face, not less."
         echo "d3d9.seamlessCubes = True"
     fi
-} > "$CONF"
+}
+
+if [ "$action" = print ]; then
+    conf_text
+    exit 0
+fi
+
+# ---------------------------------------------------------------- install
+
+if [ -f "$CONF" ] && ! grep -qF "$MARKER" "$CONF" && [ "$force" != 1 ]; then
+    echo "refusing: $CONF already exists and was not written by this script." >&2
+    echo "Inspect it, then re-run with --force to overwrite." >&2
+    exit 1
+fi
+
+echo "verifying stage $stage keys:"
+mapfile -t ks < <(keys_for_stage "$stage")
+verify_keys "${ks[@]}" || { echo "aborting: DXVK does not know one of these keys" >&2; exit 1; }
+
+conf_text > "$CONF"
 
 echo
 echo "wrote $CONF (stage $stage):"

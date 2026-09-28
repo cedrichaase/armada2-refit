@@ -34,6 +34,7 @@ because a key DXVK does not recognise is silently ignored:
     postfx/renderer-config.sh --bias -0.25 # milder stage 2 bias (default -0.5)
     postfx/renderer-config.sh --show       # what is installed now
     postfx/renderer-config.sh --remove     # delete dxvk.conf, full revert
+    postfx/renderer-config.sh --print --stage 3   # the file on stdout; the release zip's copy
 
 - **`d3d9.samplerAnisotropy = 16`** (stage 1). Without it the game gets whatever a 2001
   renderer requests, which is likely none. In a top-down RTS every hull
@@ -201,8 +202,17 @@ A/B. CAS sharpening and FXAA/SMAA are untried.
     postfx/postfx.py --check          # read vkBasalt's log from the last launch
     postfx/postfx.py --off            # disable for the game
     postfx/vkbasalt/build.sh --remove # uninstall everything
+    postfx/postfx.py --export DIR     # the release zip's bloom files (below)
 
 How it is put together, and why each piece is that way:
+
+- **The release zip carries the same bloom, for any vkBasalt and for ReShade.**
+  `--export` writes the wrapper, a `vkBasalt.conf` with its paths left as `@BLOOM@`,
+  and `A2Bloom.ini`, a ReShade preset that sets the two `MAGICBLOOM_*` switches itself
+  and so needs no wrapper. The defaults (`INTENSITY`, `THRESHOLD`) live in `postfx.py`
+  alone. The shaders are not ours to redistribute (`ReShadeUI.fxh` carries no licence),
+  so the zip's installers fetch them from the commits `build.sh` pins, checked by hash
+  (`publish/installer/shaders.txt`).
 
 - **Built from source into `~/.local`, not from the AUR.** `lib32-vkbasalt` wants a
   sudo password and installs system-wide; the build needs only what is already here

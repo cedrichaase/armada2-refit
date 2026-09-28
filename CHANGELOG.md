@@ -5,6 +5,24 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 7.2.0 — 2026-09-28
+
+Layers: postfx 1.1.0.
+
+### Added
+- The release zip, now `armada2-refit-<version>.zip`, carries the renderer and bloom too:
+  `game/` holds the four plugins, their `.ini` files and `dxvk.conf` (stage 3), and
+  `bloom/` holds bloom for vkBasalt and as a ReShade preset (`postfx.py --export`).
+- Installers in the zip, from `publish/installer/`: `install.sh` (Linux, Wine/Proton)
+  and `install.ps1` / `install.bat` (Windows). They find the game, back up the stock
+  `binkw32.dll`, install MSAA only beside DXVK's `d3d8.dll`, and leave a foreign
+  `dxvk.conf` alone. `--bloom` / `-Bloom` fetch the shaders, pinned and hash-checked.
+  `--uninstall` / `-Uninstall` put the game back.
+- CI runs both installers against a mock game (`test.sh`, and `test.ps1` on a Windows
+  runner) before anything is released.
+
+Installed, not yet seen in game.
+
 ## 7.1.0 — 2026-09-28
 
 ### Added

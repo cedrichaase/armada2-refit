@@ -104,9 +104,11 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 
 **Building.** The plugins are 32-bit Windows DLLs, built with `clang` + `lld-link` +
 `llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`.
-**Prebuilt**, all four with their `.ini` files are in the zip on each
-[release](https://github.com/cedrichaase/armada2-refit/releases), laid out for the game
-directory; `publish/package.sh` builds the same zip locally.
+**Prebuilt**, the zip on each
+[release](https://github.com/cedrichaase/armada2-refit/releases) has all four with their
+`.ini` files, `dxvk.conf` and the bloom config. It also has installers that do this
+section for you: `install.sh` on Linux, `install.bat` on Windows (`README.txt` in the
+zip). `publish/package.sh` builds the same zip locally.
 
 **Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1 + Patch Project 1.2.5,
 plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game
@@ -136,7 +138,7 @@ Windows.
 | Layer | Install | Why DXVK |
 |---|---|---|
 | MSAA | `msaa/build/MSAA.asi`, `msaa/MSAA.ini` | The minimap copies from the back buffer. Native D3D8 does not allow that from a multisampled surface, and DXVK resolves it. Without DXVK expect a black minimap ([`msaa/README.md`](msaa/README.md)) |
-| Renderer | `postfx/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. On Windows copy the generated file by hand |
+| Renderer | `postfx/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. The release zip has it ready, in `game/` |
 
 ### 3. Linux only: vkBasalt, launched through Heroic
 
