@@ -95,6 +95,58 @@ Paths are taken from the environment, then `~/.config/armada2-refit.conf`
 | `A2_PREFIX`, `A2_PROTON` | Heroic's prefix and Proton for it |
 | `A2_DATA` | `~/.local/share/armada2-refit` (`%LOCALAPPDATA%` on Windows): extracted stock art, paid AI layers, builds. **Back up its `ai/` folders**; everything else can be rebuilt with a command |
 
+## Installing by hand, layer by layer
+
+`./install` does all of this for you on Linux with Heroic. These notes cover each code
+layer on its own. Textures, backdrops, movies and the loading screen are left out
+because they need assets built from your own copy of the game (`textures/PACKS.md`).
+The layers are grouped from "copy a file, works anywhere" to "needs a specific stack".
+
+**Building.** The plugins are 32-bit Windows DLLs, built with `clang` + `lld-link` +
+`llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`. There are
+no prebuilt releases yet. To install on Windows, build them on Linux (or WSL) and copy
+the files across.
+
+**Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1 + Patch Project 1.2.5,
+plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game
+directory. The plugins patch the exe in memory only, after checking byte signatures. If
+you have a different exe, they do nothing and say so in their `.log`. Under Wine or
+Proton the loader only runs with the `winmm=n,b` DLL override
+([`platform/README.md`](platform/README.md#heroic-configuration)). Without it, nothing
+loads and nothing reports an error. On Windows no override is needed.
+
+### 1. Copy into the game directory. Any renderer, Windows or Wine/Proton
+
+| Layer | Copy | Notes |
+|---|---|---|
+| HUD | `hud/build/HUD.asi`, `hud/HUD.ini` | Don't also run `hud/ui-widescreen.py`, `ui-font-condense.py` or `cursor-aspect.py`; they are its file-based predecessors. Handles both cursor paths: D3D8's hardware cursor and the sprite path DXVK takes |
+| Menus | `menus/build/Menus.asi`, `menus/Menus.ini` | GDI only, so the renderer doesn't matter. Delete any old `MenuScale.asi`. Without backdrop plates it draws black sides |
+| Cutscenes (launch reels) | `cutscenes/binkproxy/build/binkw32.dll`, `BinkProxy.ini` | First rename the stock `binkw32.dll` to `binkw32_orig.dll`, because the proxy forwards to it. With no `.mp4` beside a `.bik` it only scales the launch reels to full screen. Replacement movies are AV1 through Media Foundation: under Proton that works (GStreamer + dav1d), and on Windows it presumably needs the AV1 Video Extension |
+
+Uninstall by deleting the files you copied (plus the `.log` each one writes), and for
+the Bink proxy by renaming `binkw32_orig.dll` back.
+
+### 2. Needs DXVK as the game's renderer
+
+DXVK's `d3d8.dll` and `d3d9.dll` go in the game directory, with `d3d8=n,b;d3d9=n,b`
+under Wine/Proton (`platform/d3d8-chain.py --use dxvk`). The same two DLLs also work on
+Windows.
+
+| Layer | Install | Why DXVK |
+|---|---|---|
+| MSAA | `msaa/build/MSAA.asi`, `msaa/MSAA.ini` | The minimap copies from the back buffer. Native D3D8 does not allow that from a multisampled surface, and DXVK resolves it. Without DXVK expect a black minimap ([`msaa/README.md`](msaa/README.md)) |
+| Renderer | `postfx/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. On Windows copy the generated file by hand |
+
+### 3. Linux only: vkBasalt, launched through Heroic
+
+| Layer | Install | Needs |
+|---|---|---|
+| Bloom | `postfx/vkbasalt/build.sh`, then `postfx/postfx.py --on` | DXVK (vkBasalt is a Vulkan layer), a per-user vkBasalt build, and Heroic: `--on` sets `ENABLE_VKBASALT=1` in the game's Heroic config, so quit Heroic first. Home toggles it in game |
+
+The helper scripts (`./install`, `./a2mod`, the per-layer `install.sh`) are bash and
+assume Linux. They find the game through `a2env.sh`, which defaults to Heroic's paths.
+Any other layout works if you set `A2_GAME` / `A2_PREFIX`.
+
 ## The layers
 
 The mod is a stack of independent layers, each in its own folder with its own README
