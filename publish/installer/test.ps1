@@ -74,19 +74,19 @@ Check "DXVK's d3d8.dll left" (((Text (G "d3d8.dll")) -eq "dxvk") -and ($out | Wh
 
 Write-Host "== what it did not write is left alone: a loader, a dxvk.conf, a ReShade preset"
 $H = Join-Path $T "other"; Mock $H
-function H([string]$n) { Join-Path $H $n }
-Set-Content (H "winmm.dll") "myloader"
-Set-Content (H "dxvk.conf") "d3d9.foo = 1"
-Set-Content (H "ReShade.ini") "[GENERAL]"
-Set-Content (H "ReShadePreset.ini") "Techniques=Mine"
+function O([string]$n) { Join-Path $H $n }
+Set-Content (O "winmm.dll") "myloader"
+Set-Content (O "dxvk.conf") "d3d9.foo = 1"
+Set-Content (O "ReShade.ini") "[GENERAL]"
+Set-Content (O "ReShadePreset.ini") "Techniques=Mine"
 Install @($H) | Out-Null
-Check "own loader kept, patch added" (((Text (H "winmm.dll")) -eq "myloader") -and (Test-Path (H "STA2WidescreenPatch.asi")))
-Check "own preset kept on install" ((Text (H "ReShadePreset.ini")) -eq "Techniques=Mine")
-Check "A2Bloom.ini beside it" (Test-Path (H "A2Bloom.ini"))
+Check "own loader kept, patch added" (((Text (O "winmm.dll")) -eq "myloader") -and (Test-Path (O "STA2WidescreenPatch.asi")))
+Check "own preset kept on install" ((Text (O "ReShadePreset.ini")) -eq "Techniques=Mine")
+Check "A2Bloom.ini beside it" (Test-Path (O "A2Bloom.ini"))
 Install @("-Uninstall", $H) | Out-Null
-Check "own loader kept, patch removed" (((Text (H "winmm.dll")) -eq "myloader") -and -not (Test-Path (H "STA2WidescreenPatch.asi")))
-Check "foreign dxvk.conf kept" ((Text (H "dxvk.conf")) -eq "d3d9.foo = 1")
-Check "own preset kept on uninstall" ((Text (H "ReShadePreset.ini")) -eq "Techniques=Mine")
-Check "GOG's d3d8.dll back" ((Text (H "d3d8.dll")) -eq "gogd3d8to9")
+Check "own loader kept, patch removed" (((Text (O "winmm.dll")) -eq "myloader") -and -not (Test-Path (O "STA2WidescreenPatch.asi")))
+Check "foreign dxvk.conf kept" ((Text (O "dxvk.conf")) -eq "d3d9.foo = 1")
+Check "own preset kept on uninstall" ((Text (O "ReShadePreset.ini")) -eq "Techniques=Mine")
+Check "GOG's d3d8.dll back" ((Text (O "d3d8.dll")) -eq "gogd3d8to9")
 Remove-Item -Recurse -Force $T
 Write-Host "all passed"
