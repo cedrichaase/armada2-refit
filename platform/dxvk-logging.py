@@ -172,10 +172,9 @@ def check_log():
             print('  -> DXVK_LOG_PATH reached the prefix and DXVK works in it.')
             print('     So the gap is specific to Armada2.exe.')
         print('\nThe most common cause is NOT a broken chain:')
-        print('  Armada2.exe imports d3d8.dll statically, but the Patch Project proxy')
-        print('  only loads the real d3d8 when Direct3DCreate8 is first called -- and')
-        print('  the menu shell is GDI and never calls it. A launch that stayed in the')
-        print('  menus therefore produces no DXVK log, whatever the chain is doing.')
+        print('  the menu shell is GDI and may never create Direct3D, which is when')
+        print('  DXVK starts its log. A launch that stayed in the menus can therefore')
+        print('  produce no DXVK log, whatever the chain is doing.')
         print('\n  Relaunch and get into the 3D VIEW (start a skirmish, wait for ships)')
         print('  before quitting, then re-run --check.')
         return 1

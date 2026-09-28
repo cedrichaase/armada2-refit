@@ -16,7 +16,7 @@ bloom (the Tiers) in `postfx/README.md`; the menus in `menus/README.md`.
 | Prefix | `~/Games/Heroic/Prefixes/Star Trek Armada II` (`A2_PREFIX`) |
 | Heroic config | `~/.config/heroic/GamesConfig/1174788223.json` |
 | Runner | Proton-CachyOS-latest |
-| Base | GOG release = Armada II + patch 1.1, plus Patch Project 1.2.5 |
+| Base | GOG release = Armada II + patch 1.1 |
 | GPU | RX 5700 XT (Navi 10 / gfx1010), 8 GB — Vulkan fine, **ROCm effectively unsupported** |
 
 ## Heroic configuration
@@ -40,6 +40,9 @@ its own. `platform/d3d8-chain.py` owns the `d3d9` entry and `autoInstallDxvk` (b
     STA2WidescreenPatch.asi      9216      the patch itself
     winmm.dll                    2169856   Ultimate ASI Loader (ThirteenAG)
 
+The same two files, unmodified, are vendored in `platform/vendor/STA2WidescreenPatch-1.0/`
+with their MIT licences; the release zip installs them from there (`publish/README.md`).
+
 It only loads because of the `winmm=n,b` override above. Without it Wine uses its
 builtin winmm, the loader never runs, and the patch is inert with no error.
 
@@ -54,24 +57,6 @@ directly into `ARMADA.PRF`, line 5:
 
 **The file contains an embedded NUL byte** — use binary-safe tooling, not `sed`. The
 game rewrites the file on exit and the resolution persists.
-
-## Patch Project 1.2.5
-
-**The NSIS installer refuses to run against a GOG install**, with
-*"Make sure you have Armada II with Patch 1.1 installed in the target directory."*
-This is a known GOG incompatibility, not a broken download
-(installer md5 `8216c620fb17331a3d647f550ccfa723`).
-
-**Workaround:** download the ZIP distribution of the same version and copy `install/*`
-into the game directory by hand:
-
-    Armada2Hook.dll   1865728
-    Armada2Hook.mad    105160     MadExcept crash-reporter data
-    d3d8.dll            45056     proxy — see below
-    FOmsvc.dll         167936
-
-`Armada2.exe` is **not** modified — 1.2.5 is the "loader-free" release, confirmed by
-diffing against the original.
 
 ## The d3d8 chain
 
@@ -97,34 +82,33 @@ Four parts, all required together:
     platform/d3d8-chain.py --status      identify the live chain, every link by hash
     platform/d3d8-chain.py --use dxvk    DXVK d3d8 -> DXVK d3d9 -> Vulkan
     platform/d3d8-chain.py --use gog     GOG d3d8to9 -> DXVK d3d9 -> Vulkan
-    platform/d3d8-chain.py --revert      the stock chain, Heroic managing DXVK again
+    platform/d3d8-chain.py --use wine    Wine's builtin d3d8 -> wined3d -> OpenGL
+    platform/d3d8-chain.py --revert      the GOG release as shipped, Heroic managing DXVK again
 
-`--use` keeps the Patch Project proxy it replaces as `d3d8.dll.proxy-backup`, adds the
-`d3d9=n,b` override and sets `autoInstallDxvk` false, so it needs Heroic closed; it
-refuses before touching anything rather than half-applying. `--revert` restores the
-proxy and removes the override.
+`--use` keeps GOG's `d3d8.dll` as `d3d8.dll.gog-backup` the first time it replaces it
+(it knows GOG's file by hash), sets the `d3d9=n,b` override for DXVK and GOG and
+`autoInstallDxvk` false, so it needs Heroic closed; it refuses before touching anything
+rather than half-applying, and refuses outright to replace a `d3d8.dll` it cannot
+identify. `--revert` puts GOG's `d3d8.dll` back, removes the game-directory `d3d9.dll`
+and the override, and turns `autoInstallDxvk` back on.
 
 ### What can sit in the d3d8 slot
 
-Three different things want to be `d3d8.dll`:
+Two different things want to be the game directory's `d3d8.dll`, and with neither
+there the prefix's is used:
 
 - **GOG's** `d3d8.dll` (1101824) is a full **d3d8to9 translator** — it implements
   Direct3D 8 on top of Direct3D 9.
-- **Patch Project's** `d3d8.dll` (45056) is a **proxy** that exports only
-  `Direct3DCreate8`, and loads the real implementation from the **system directory**
-  via `GetSystemDirectoryA`.
 - **DXVK's** `d3d8.dll` (~1.66 MB) implements Direct3D 8 on Vulkan through its own d3d9.
+- **Wine's builtin** `d3d8.dll` (320548), in the prefix, talks to `wined3d` directly and
+  never loads `d3d9.dll`, so a DXVK d3d9 in the prefix is not reached from it.
 
-The stock chain, which `--revert` returns to, is the proxy into the prefix:
+The GOG release as shipped, which `--revert` returns to, is GOG's translator on the
+prefix's d3d9 — Heroic's DXVK while `autoInstallDxvk` is on, else Wine's:
 
     Armada2.exe
-      -> <game dir>/d3d8.dll      Patch Project proxy   45056
-      -> syswow64/d3d8.dll        Wine builtin d3d8     320548
-      -> wined3d
-      -> OpenGL
-
-Wine's builtin d3d8 talks to `wined3d` directly and never loads `d3d9.dll`, so a DXVK
-d3d9 in the prefix is not reached from it.
+      -> <game dir>/d3d8.dll      GOG d3d8to9           1101824
+      -> syswow64/d3d9.dll        Heroic's DXVK d3d9, or Wine builtin -> wined3d
 
 ### Traps
 
@@ -146,10 +130,6 @@ d3d9 in the prefix is not reached from it.
 - **The `d3d9=n,b` override is load-bearing, not diagnostic.** `dxvk-logging.py
   --diagnose` also adds it, but the logging tool only ever adds; `d3d8-chain.py` owns
   removing it, so switching diagnostics off cannot break the chain.
-- **PCGamingWiki's advice is wrong for this build.** It suggests renaming the patch's
-  `d3d8.dll` to `dinput.dll` to dodge the conflict. `objdump -p Armada2.exe | grep -i
-  dinput` finds nothing: the exe imports no dinput or dinput8, so a `dinput.dll` is never
-  loaded and the patch would be silently inert.
 
 ### When a renderer setting seems to do nothing
 

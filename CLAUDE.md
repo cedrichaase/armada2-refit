@@ -38,7 +38,7 @@ it bundles.
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | `SOD` geometry — the widened loading screen | `textures/README.md`, loading-screen section |
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
-| `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton | `platform/README.md` |
+| `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
@@ -149,8 +149,8 @@ Until the sign-off, the work stays on its branch and in its worktree.
 
 ## Environment
 
-- Game: `$A2_GAME` (`./a2env.sh` prints it; here, Heroic's `~/Games/Heroic/Star Trek Armada II`) — GOG release, patch 1.1 plus
-  Patch Project 1.2.5, run through Heroic with Proton-CachyOS.
+- Game: `$A2_GAME` (`./a2env.sh` prints it; here, Heroic's `~/Games/Heroic/Star Trek Armada II`) — GOG release, patch 1.1, run
+  through Heroic with Proton-CachyOS.
 - Textures: `Textures/RGB/`, flat, **2115 `.tga` files, 196 MB stock**, **mixed
   `.tga` / `.TGA` case**. (196 MB is the byte total; `du` says 205 MB, because 2115
   small files carry ~9 MB of block slack.)
@@ -264,6 +264,12 @@ Until the sign-off, the work stays on its branch and in its worktree.
    image, video and game format, and every data directory a pre-`A2_DATA` checkout may
    still have, so it takes a `git add -f` to break this; don't. `publish/check.sh`
    fails on any binary in the index; run it before committing anything unusual.
+   **The one exception is third-party binaries whose licence expressly allows
+   redistribution** (MIT, zlib and the like; "freeware" or no licence does not count).
+   They are vendored unmodified under `platform/vendor/<name>-<version>/`, beside their
+   licence text and a `SOURCE.txt` that says where they came from and lists each
+   file's sha256, and `check.sh` accepts a binary there only if both are present and
+   the hash matches.
 9. **Describe the engine, never reproduce it — and only where a plugin needs it.** The
    same applies to the code: what `Armada2.exe` is, as opposed to what it does, stays
    out of the repository (`publish/README.md`, "Engine findings").

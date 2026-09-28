@@ -197,7 +197,7 @@ __declspec(dllimport) BOOL    __stdcall FindClose(HANDLE);
 /* The MSVC target references this whenever floating point is used. */
 int _fltused = 0;
 
-/* ---- addresses in this build (Armada2.exe, patch 1.1 + Patch Project 1.2.5) */
+/* ---- addresses in this build (Armada2.exe, GOG patch 1.1) */
 
 #define ADDR_FONT_NEW_WIDTH  0x4773e0   /* FontNewScreenWidth(int) */
 #define ADDR_FONT_INIT       0x4770b0   /* FontInit(int) */

@@ -1,5 +1,6 @@
-# Every push and pull request: check that the new commits are publishable, and build
-# the plugins into a zip (publish/package.sh) kept as a workflow artifact.
+# Every push and pull request: check that the new commits are publishable, build the
+# release zip (publish/package.sh) kept as a workflow artifact, and run its installers
+# against a mock game on Linux and Windows (publish/installer/test.sh, test.ps1).
 # A push to main whose root CHANGELOG.md version has no release yet also tags vX.Y.Z and
 # publishes a GitHub Release with that zip. publish/README.md, "Release packages".
 name: CI
@@ -37,7 +38,7 @@ jobs:
           done
           exit $fail
 
-  plugins:
+  package:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.pkg.outputs.version }}
@@ -52,28 +53,43 @@ jobs:
         id: pkg
         run: |
           zip=$(publish/package.sh dist)
-          echo "version=$(basename "$zip" | sed 's/^armada2-refit-\(.*\)-plugins\.zip$/\1/')" >> "$GITHUB_OUTPUT"
+          echo "version=$(basename "$zip" | sed 's/^armada2-refit-\(.*\)\.zip$/\1/')" >> "$GITHUB_OUTPUT"
           unzip -l "$zip"
+      - name: install.sh against a mock game
+        run: publish/installer/test.sh dist/*.zip
       - uses: actions/upload-artifact@v7
         with:
-          name: armada2-refit-plugins-${{ github.sha }}
+          name: armada2-refit-${{ github.sha }}
           path: dist/*.zip
           if-no-files-found: error
 
+  windows-installer:
+    needs: package
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-${{ github.sha }}
+          path: dist
+      - name: install.ps1 against a mock game
+        shell: powershell
+        run: publish/installer/test.ps1 (Get-Item dist/*.zip).FullName
+
   release:
-    needs: [publishable, plugins]
+    needs: [publishable, package, windows-installer]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ needs.plugins.outputs.version }}
+      VERSION: ${{ needs.package.outputs.version }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
-          name: armada2-refit-plugins-${{ github.sha }}
+          name: armada2-refit-${{ github.sha }}
           path: dist
       - name: Release vX.Y.Z if it does not exist yet
         run: |

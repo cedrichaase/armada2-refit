@@ -1,0 +1,1 @@
+STA2WidescreenPatch|1.0|Ligushka; bundles Ultimate ASI Loader 4.68 by ThirteenAG|MIT (both)|https://github.com/Ligushka/STA2WidescreenPatch/releases/tag/v1.0|STA2WidescreenPatch.asi winmm.dll UltimateASILoader-license.txt

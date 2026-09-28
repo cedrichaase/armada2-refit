@@ -12,7 +12,7 @@ This page is the short path. The why, and every trap already walked into, is in
 
 ## What you need
 
-- The GOG release of Armada II, patch 1.1 plus Patch Project 1.2.5 — the release every
+- The GOG release of Armada II, patch 1.1 — the release every
   `stock.sha256` was taken from. `./a2env.sh` must print its directory as `A2_GAME`.
 - ImageMagick 7 (`magick`) and `python3`. No numpy, no PIL.
 - For generative upscaling only: [`belt`](https://inference.sh), the inference.sh CLI,

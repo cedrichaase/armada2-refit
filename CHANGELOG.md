@@ -5,6 +5,38 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.0.0 — 2026-09-28
+
+Layers: platform 3.0.0, postfx 1.1.0.
+
+### Added
+- The release zip, now `armada2-refit-<version>.zip`, carries the renderer and bloom too:
+  `game/` holds the four plugins, their `.ini` files and `dxvk.conf` (stage 3), and
+  `bloom/` holds bloom for vkBasalt and as a ReShade preset (`postfx.py --export`).
+- Installers in the zip, from `publish/installer/`: `install.sh` (Linux, Wine/Proton)
+  and `install.ps1` / `install.bat` (Windows). They take no options but `--uninstall`.
+  They find the game, back up the stock `binkw32.dll`, install MSAA only beside DXVK's
+  `d3d8.dll` (told by content), and leave a foreign `dxvk.conf` alone. They set up
+  bloom when vkBasalt or ReShade is installed, fetching the shaders pinned and
+  hash-checked.
+- The installers also install the prerequisites when missing (`prereqs.txt`):
+  STA2WidescreenPatch 1.0 with the Ultimate ASI Loader 4.68, bundled because both are
+  MIT. They never overwrite a file, and `--uninstall` removes only what they added and
+  nobody changed since. `CREDITS.txt` in the zip names each author, licence and source.
+- Third-party binaries whose licence expressly allows it are vendored in
+  `platform/vendor/` with their licences and hashes, and `publish/check.sh` accepts a
+  binary only there, only with a licence file and only matching `SOURCE.txt`.
+- CI runs both installers against a mock game (`test.sh`, and `test.ps1` on a Windows
+  runner) before anything is released.
+
+### Removed
+- Patch Project 1.2.5 is no longer a requirement, anywhere: nothing here used it, and
+  with DXVK in the `d3d8.dll` slot it was never loaded. `platform/d3d8-chain.py
+  --revert` now returns to GOG's own `d3d8.dll` rather than to its proxy (platform
+  3.0.0).
+
+Installed, not yet seen in game.
+
 ## 7.1.0 — 2026-09-28
 
 ### Added

@@ -24,10 +24,20 @@ from a 256px stock file to a 1024px plate *is* the plate.)
 | the recipes — each target's `target.conf` and `stock.sha256`, `movie.conf`, `backdrops/*.conf` | yes | parameters, file names and SHA-256 hashes of stock files: facts about the game, not its content. The hashes are how `a2tex stock` knows it extracted the right bytes |
 | **any asset** — stock copies, AI upscales, intermediates, builds, the intro, the plates, the paid seeds, the archive of candidates and comparisons, the promo footage | **no** | the game's own art and video, or derived from them. They live in `A2_DATA` |
 
-Third-party code this project *uses* but does not contain — DXVK (zlib), the Ultimate
-ASI Loader (MIT), vkBasalt (zlib), crosire's reshade-shaders (per-file), the
-`STA2WidescreenPatch`, Patch Project 1.2.5 — is not in the repository either. A release
-package may bundle the first four with their notices, and links to the last two.
+Third-party code is in the repository and the release zip **only where its licence
+expressly allows redistribution**. It is vendored unmodified under
+`platform/vendor/<name>-<version>/` with its licence text and a `SOURCE.txt` (where it
+came from, and each file's sha256), and `check.sh` accepts a binary nowhere else. Today
+that is `STA2WidescreenPatch` 1.0 (MIT) with the Ultimate ASI Loader 4.68 it bundles
+(MIT).
+
+| Third-party | Licence | Here |
+|---|---|---|
+| `STA2WidescreenPatch` 1.0, Ultimate ASI Loader 4.68 | MIT | vendored; in the zip |
+| MagicBloom, ReShade's `.fxh` headers | MIT; CC0 and none | no: fetched with bloom, since `ReShadeUI.fxh` states no licence and the three go together |
+| DXVK, vkBasalt | zlib | not yet: whether the installers should use them is open (below) |
+
+`CREDITS.txt` in the zip names each author, licence and source.
 
 `a2mod` switches every layer on the game directory only (`.a2neb-backup` files,
 `$GAME/.a2mod/`) and needs no asset to do it.
@@ -91,34 +101,83 @@ without its history, which is full of stock art. So not every cited hash resolve
 ## Release packages
 
 Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the four
-plugins and writes `armada2-refit-<version>-plugins.zip`, laid out as the game directory
-wants it: `HUD.asi`, `Menus.asi`, `MSAA.asi` and `binkw32.dll`, each with its `.ini`,
-plus `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`.
-It is our code only, compiled; nothing of the game and none of the test tools. The
-version is the root `CHANGELOG.md`'s newest entry.
+plugins and writes `armada2-refit-<version>.zip`:
+
+- `game/`: what goes beside `Armada2.exe`, which is `HUD.asi`, `Menus.asi`, `MSAA.asi`
+  and `binkw32.dll`, each with its `.ini`, and `dxvk.conf` at stage 3
+  (`postfx/renderer-config.sh --print`);
+- `bloom/`: `postfx/postfx.py --export`, which is the same bloom for vkBasalt and as a
+  ReShade preset, and `shaders.txt`;
+- `install.sh` (Linux) and `install.ps1` + `install.bat` (Windows), from
+  `publish/installer/`;
+- `prereqs.txt`, what the installers download first, and `CREDITS.txt`, generated from
+  it and from `shaders.txt`;
+- `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`.
+
+It is our code only, compiled, and our configuration. It holds nothing of the game,
+none of the test tools, and **no third-party shader**. `ReShadeUI.fxh` carries no
+licence, so the installers fetch MagicBloom and ReShade's two headers from the
+commits `postfx/vkbasalt/build.sh` pins. They are checked against the hashes in
+`shaders.txt`, and `package.sh` refuses a pin `build.sh` does not share. The version
+is the root `CHANGELOG.md`'s newest entry.
+
+The installers stand alone, and **ask nothing**: no flags but `--uninstall`, no
+prompts unless they cannot find the game. Each installs what can work on the machine
+and names what it skipped. What they cannot do themselves, installing vkBasalt or
+ReShade, is documented in `README.txt` and optional. They do the same on both systems:
+
+- find the game: the argument, else the folder they were unzipped into, else Heroic's
+  default or GOG's registry entry;
+- install the prerequisites in `prereqs.txt` that are missing: `STA2WidescreenPatch`
+  1.0, which brings the Ultimate ASI Loader 4.68 as `winmm.dll`, from the zip's
+  `vendor/` -- the same files as on the install this project is developed on, byte for
+  byte. **A file already there is never overwritten**, and what was added is recorded
+  with its hash in `armada2-refit-prereqs.txt` in the game directory;
+- on Windows, warn if Microsoft's Visual C++ runtime (x86) is missing, which the
+  widescreen patch needs. Installing it takes administrator rights and an unpinned
+  download, so they only name it;
+- keep the stock `binkw32.dll` as `binkw32_orig.dll`, which the proxy forwards to, and
+  as `binkw32.dll.a2neb-backup`, the name `cutscenes/binkproxy/install.sh` uses;
+- install `MSAA.asi` only when the `d3d8.dll` in the game directory is DXVK's, told
+  by its content: GOG puts a `d3d8.dll` there too. Without DXVK the
+  minimap goes black;
+- set up bloom when a vkBasalt layer (Linux) or ReShade's `ReShade.ini` (Windows) is
+  there. On Windows the preset also becomes `ReShadePreset.ini` when the player has
+  none, which is the preset ReShade loads by default, so there is no step in the
+  overlay. A failed download skips bloom and does not fail the install;
+- write `dxvk.conf` only over one that carries `renderer-config.sh`'s marker;
+- keep a changed `.ini` as `.ini.bak`;
+- with `--uninstall` / `-Uninstall`, put all of it back. A prerequisite file goes only
+  if its hash still matches the record, so nothing replaced since is removed.
+
+`publish/installer/test.sh` and `test.ps1` run them against a mock game of placeholder
+files, so they prove the file handling, not that anything loads. They download the
+bloom shaders for real, so CI also notices when a pinned one moves.
 
 **CI** (`.github/workflows/ci.yml`) runs on every push and pull request:
 
 - `check.sh` on each new commit, so a binary or a game file fails the push;
-- `package.sh`, with the zip kept as a workflow artifact, named by commit;
+- `package.sh`, with the zip kept as a workflow artifact, named by commit, and both
+  installers run against a mock game: `test.sh` on Linux, `test.ps1` on a Windows
+  runner;
 - on `main` only, when the root version has no release yet: tag `vX.Y.Z` and publish a
   GitHub Release with the zip, the changelog entry as its notes. An entry that still
   says "not yet seen in game" goes out as a pre-release. So **bumping the root version
   and pushing `main` is what releases**; a push that does not bump it releases nothing.
 
-Overwriting no game file except `binkw32.dll` (renamed to `binkw32_orig.dll` first,
-`README.txt` says so), uninstalling is deleting what was copied.
-
 ### Next
 
-A fuller package would also bundle `winmm.dll` (the ASI loader), `dxvk.conf`,
-optionally DXVK and the bloom shader for ReShade (Windows) and vkBasalt (Linux), with
-their notices (`THIRD-PARTY.md`). On Linux one launcher setting,
-`WINEDLLOVERRIDES="winmm=n,b"`. What stands in the way:
+**Open: DXVK.** Bundling it is allowed (zlib), and the installers could put it in the
+game directory in place of GOG's `d3d8.dll`, which would install MSAA everywhere and
+make `dxvk.conf` apply. Not decided yet. On Linux the launcher settings
+(`WINEDLLOVERRIDES`, and bloom's two variables) are still the player's job; `install.sh`
+prints them. What stands in the way:
 
 - **No plugin checks which `Armada2.exe` it is in.** Each should verify the exe and stand
   down on any other build rather than patch the wrong bytes.
-- **`MSAA.asi` should default off without DXVK**: the minimap's `CopyRects` from a
-  multisampled surface is illegal in native D3D8 (`msaa/README.md`).
-- **Untested**: Windows 11, a desktop other than Hyprland, and running without Patch
-  Project 1.2.5 or the widescreen patch.
+- **`MSAA.asi` still defaults on wherever it is installed.** The installers leave it out
+  without DXVK, but copied by hand beside native D3D8 it blacks out the minimap: the
+  minimap's `CopyRects` from a multisampled surface is illegal there (`msaa/README.md`).
+- **The ReShade preset has never run.** Only the vkBasalt path is seen in game.
+- **Untested**: Windows 11, a desktop other than Hyprland, and running without the
+  widescreen patch.

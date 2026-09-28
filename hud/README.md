@@ -21,7 +21,7 @@ and the table below for what the plugin actually hooks.
 
 ## HUD.asi — the same three corrections, in the engine
 
-Addresses are this build's `Armada2.exe` (1.1 + Patch Project 1.2.5), read off
+Addresses are this build's `Armada2.exe` (GOG, patch 1.1), read off
 `armada2.map`; the plugin checks each site's bytes before writing and leaves that part
 inert, and says so in `HUD.log`, if they differ. The source comment in `hud.c` carries the
 detail; this is the map.

@@ -6,6 +6,19 @@ configured by `postfx.py`). They are versioned together as one folder. Versionin
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The tables behind
 the numbers are in [`README.md`](README.md).
 
+## 1.1.0 — 2026-09-28
+
+### Added
+- `renderer-config.sh --print`: the `dxvk.conf` it would write, on stdout, with no game
+  directory and no key check. The release zip ships stage 3 this way.
+- `postfx.py --export DIR`: the release zip's bloom files — the `A2Bloom.fx` wrapper, a
+  `vkBasalt.conf` with `@BLOOM@` for its directory, and `A2Bloom.ini`, the same bloom as
+  a ReShade preset. The accepted defaults are now the constants `INTENSITY` and
+  `THRESHOLD`.
+
+What `./install` and `postfx.py --on` install is unchanged. The zip's copies, and the
+ReShade preset above all, are not yet seen in game.
+
 ## 1.0.1 — 2026-09-27
 
 ### Changed

@@ -6,6 +6,30 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.0.0 — 2026-09-28
+
+### Added
+- `vendor/STA2WidescreenPatch-1.0/`: `STA2WidescreenPatch.asi` (Ligushka, MIT) and
+  the Ultimate ASI Loader 4.68 as `winmm.dll` (ThirteenAG, MIT), unmodified from the
+  v1.0 GitHub release, with both licences and a `SOURCE.txt` of hashes. The release
+  zip's installers install them from here. The first binaries in the repository;
+  `publish/check.sh` accepts them because of their licence file and `SOURCE.txt`.
+
+### Changed
+- Patch Project 1.2.5 is no longer part of the platform. `d3d8-chain.py` knows GOG's
+  `d3d8.dll` by hash and keeps it as `d3d8.dll.gog-backup` the first time `--use`
+  replaces it; `--revert` returns to the GOG release as shipped (its d3d8to9 in the game
+  directory, no game-directory `d3d9.dll`, no `d3d9` override, `autoInstallDxvk` on)
+  instead of to Patch Project's proxy, and `--use wine` empties the game-directory slot.
+  `--use` refuses to replace a `d3d8.dll` it cannot identify.
+
+### Removed
+- `d3d8.dll.proxy-backup`: no longer written, read or restored. One left over from
+  earlier versions is left where it is.
+
+`d3d8-chain.py` is exercised on a scratch game directory; the vendored files are the
+ones on the development install, byte for byte. Installed, not yet seen in game.
+
 ## 2.0.3 — 2026-09-27
 
 ### Changed
