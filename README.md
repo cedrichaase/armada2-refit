@@ -53,19 +53,14 @@ texture pack.
 
 ## Requirements
 
-**The game:** Star Trek: Armada II, **GOG release** (patch 1.1), with:
+**The game:** Star Trek: Armada II, **GOG release** (patch 1.1), with
+**[`STA2WidescreenPatch`](https://github.com/Ligushka/STA2WidescreenPatch) v1.0** by
+Ligushka, which unlocks widescreen resolutions and ships the
+[Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (`winmm.dll`)
+by ThirteenAG that loads this project's `.asi` plugins.
 
-- **Armada II Patch Project 1.2.5**, the community patch by the Fleet Operations
-  Development Team. Its installer refuses GOG installs, so copy the ZIP distribution into
-  the game directory by hand
-  ([`platform/README.md`](platform/README.md#patch-project-125)).
-- **[`STA2WidescreenPatch`](https://github.com/Ligushka/STA2WidescreenPatch) v1.0** by
-  Ligushka, which unlocks widescreen resolutions and ships the
-  [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (`winmm.dll`)
-  by ThirteenAG that loads this project's `.asi` plugins.
-
-The release zip's installers download and install both when they are missing, pinned by
-hash; its `CREDITS.txt` lists where each comes from.
+Both are MIT, so they are bundled: the release zip's installers install them when they
+are missing, and its `CREDITS.txt` says where they come from.
 
 **The platform:** developed and tested on Linux (Arch, Hyprland), with the game run
 through [Heroic](https://heroicgameslauncher.com/) and Proton:
@@ -115,7 +110,7 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 section for you: `install.sh` on Linux, `install.bat` on Windows (`README.txt` in the
 zip). `publish/package.sh` builds the same zip locally.
 
-**Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1 + Patch Project 1.2.5,
+**Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1,
 plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game
 directory. The plugins patch the exe in memory only, after checking byte signatures. If
 you have a different exe, they do nothing and say so in their `.log`. Under Wine or

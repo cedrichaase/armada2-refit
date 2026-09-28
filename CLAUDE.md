@@ -149,8 +149,8 @@ Until the sign-off, the work stays on its branch and in its worktree.
 
 ## Environment
 
-- Game: `$A2_GAME` (`./a2env.sh` prints it; here, Heroic's `~/Games/Heroic/Star Trek Armada II`) — GOG release, patch 1.1 plus
-  Patch Project 1.2.5, run through Heroic with Proton-CachyOS.
+- Game: `$A2_GAME` (`./a2env.sh` prints it; here, Heroic's `~/Games/Heroic/Star Trek Armada II`) — GOG release, patch 1.1, run
+  through Heroic with Proton-CachyOS.
 - Textures: `Textures/RGB/`, flat, **2115 `.tga` files, 196 MB stock**, **mixed
   `.tga` / `.TGA` case**. (196 MB is the byte total; `du` says 205 MB, because 2115
   small files carry ~9 MB of block slack.)

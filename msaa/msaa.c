@@ -127,7 +127,7 @@ typedef struct {
 typedef HRESULT (__stdcall *CheckMS_t)(void *self, UINT adapter, DWORD devType,
                                        DWORD fmt, BOOL windowed, DWORD msType);
 
-/* ---- addresses in this build (Armada2.exe, patch 1.1 + Patch Project 1.2.5) */
+/* ---- addresses in this build (Armada2.exe, GOG patch 1.1) */
 
 #define ADDR_SM_PD3D        0x7ab870    /* ST3D_DeviceDirectX8::sm_pD3D */
 #define ADDR_GETWINDOW      0x62bc70    /* ST3D_GraphicsEngine::GetWindowHandle */

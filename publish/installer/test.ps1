@@ -1,8 +1,8 @@
 # Run the package's install.ps1 against a mock game directory.   test.ps1 <zip>
 #
 # test.sh's twin, for Windows; CI runs it on a Windows runner. The game is a few
-# placeholder files, so this proves what the installer downloads, copies, backs up and
-# puts back -- not that anything loads. Needs network.
+# placeholder files, so this proves what the installer copies, backs up and puts back --
+# not that anything loads. Needs network, for the bloom shaders.
 param([Parameter(Mandatory)][string]$Zip)
 $ErrorActionPreference = "Stop"
 $T = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid())
@@ -32,9 +32,7 @@ Write-Host "== install on a GOG game: prerequisites, no DXVK, no ReShade"
 Install @($G) | Out-Null
 Check "winmm.dll" ((Sha (G "winmm.dll")) -eq "baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5")
 Check "STA2WidescreenPatch.asi" ((Sha (G "STA2WidescreenPatch.asi")) -eq "193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5")
-Check "Armada2Hook.dll" ((Sha (G "Armada2Hook.dll")) -eq "3bc507362a6b063d912c0a54894ec7b049f52677dcd30f2c533abc39e3ecacbe")
-Check "d3d8.dll is Patch Project's" ((Sha (G "d3d8.dll")) -eq "c6838e26c00a8aac4e1a60d514afd96e18305bfb112f14f0c07d5b6dd95455e4")
-Check "GOG's d3d8.dll kept" ((Text (G "d3d8.dll.gog-backup")) -eq "gogd3d8to9")
+Check "GOG's d3d8.dll untouched" (((Text (G "d3d8.dll")) -eq "gogd3d8to9") -and -not (Test-Path (G "d3d8.dll.gog-backup")))
 Check "no MSAA.asi" (-not (Test-Path (G "MSAA.asi")))
 Check "no bloom" (-not (Test-Path (G "A2Bloom.ini")))
 Check "binkw32.dll is the proxy" ((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy")
@@ -46,7 +44,7 @@ Set-Content (G "d3d8.dll") "dxvk"
 Set-Content (G "ReShade.ini") "[GENERAL]"
 Add-Content (G "HUD.ini") "; mine"
 $out = Install @($G)
-Check "Patch Project already installed" ($out | Where-Object { $_ -like "*Patch Project: already installed" })
+Check "prerequisites already installed" ($out | Where-Object { $_ -like "*STA2WidescreenPatch: already installed" })
 Check "MSAA.asi" (Test-Path (G "MSAA.asi"))
 Check "HUD.ini.bak kept" ((Get-Content (G "HUD.ini.bak") -Raw) -match "; mine")
 Check "binkw32_orig.dll still stock" ((Text (G "binkw32_orig.dll")) -eq "stockbink")
@@ -63,14 +61,16 @@ Check "found the game" ($out | Where-Object { $_ -like "installing into *Star Tr
 Remove-Item -Recurse (G "pkg")
 
 Write-Host "== uninstall: what it added goes, what changed since stays"
+Set-Content (G "UltimateASILoader-license.txt") "mine"
 $out = Install @("-Uninstall", $G)
 Check "binkw32.dll is stock again" ((Text (G "binkw32.dll")) -eq "stockbink")
 Check "no binkw32 copies" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")))
 foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "BinkProxy.ini", "dxvk.conf",
-               "A2Bloom.ini", "ReShadePreset.ini", "winmm.dll", "STA2WidescreenPatch.asi", "Armada2Hook.dll", "armada2-refit-prereqs.txt") {
+               "A2Bloom.ini", "ReShadePreset.ini", "winmm.dll", "STA2WidescreenPatch.asi", "armada2-refit-prereqs.txt") {
     Check "$f removed" (-not (Test-Path (G $f)))
 }
-Check "DXVK's d3d8.dll left" (((Text (G "d3d8.dll")) -eq "dxvk") -and ($out | Where-Object { $_ -like "*left d3d8.dll*" }))
+Check "changed file left" (((Text (G "UltimateASILoader-license.txt")) -eq "mine") -and ($out | Where-Object { $_ -like "*left UltimateASILoader-license.txt*" }))
+Check "DXVK's d3d8.dll left" ((Text (G "d3d8.dll")) -eq "dxvk")
 
 Write-Host "== what it did not write is left alone: a loader, a dxvk.conf, a ReShade preset"
 $H = Join-Path $T "other"; Mock $H

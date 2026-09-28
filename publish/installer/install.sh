@@ -5,9 +5,8 @@
 #   ./install.sh --uninstall [<game dir>]   take all of it out again
 #
 # No choices to make: what can work here is installed, the rest is skipped and says why.
-# First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch, and
-# Patch Project 1.2.5), bundled or downloaded and hash-checked, each only if missing. MSAA.asi
-# goes in when DXVK's d3d8.dll is in the game directory (without DXVK the minimap goes
+# First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
+# in vendor/, each file only if missing. MSAA.asi goes in when DXVK's d3d8.dll is in the game directory (without DXVK the minimap goes
 # black); bloom is set up when a vkBasalt layer is installed.
 #
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
@@ -48,7 +47,7 @@ BLOOM_MARKER="# written by armada2-refit install.sh"
 MANIFEST="$game/armada2-refit-prereqs.txt"   # what the prerequisites step added
 
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
-# DXVK by content, never by name: Patch Project and GOG each put a d3d8.dll there too.
+# DXVK by content, never by name: GOG puts a d3d8.dll there too.
 is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
 
 # ------------------------------------------------------------------ uninstall
@@ -71,13 +70,12 @@ if [ "$action" = uninstall ]; then
     fi
     # The prerequisites, newest record first; a file changed since is left, and said so.
     if [ -f "$MANIFEST" ]; then
-        tac "$MANIFEST" | while read -r how f sum backup; do
+        tac "$MANIFEST" | while read -r f sum; do
             [ -e "$game/$f" ] || continue
             if [ "$(sha256sum "$game/$f" | cut -d' ' -f1)" != "$sum" ]; then
                 echo "  left $f: it changed since it was installed"; continue
             fi
             rm -f "$game/$f"
-            if [ "$how" = moved ] && [ -e "$game/$backup" ]; then mv "$game/$backup" "$game/$f"; fi
         done
         rm -f "$MANIFEST"
     fi
@@ -94,66 +92,25 @@ echo "installing into $game"
 
 # ------------------------------------------------------------------ prerequisites
 
-# The ASI loader, STA2WidescreenPatch and Patch Project 1.2.5 (prereqs.txt). One whose
-# licence allows it is in the zip, under vendor/<name>/ (its url is "-"); the others are
-# downloaded from where their authors publish them, pinned by SHA-256.
-# A file already in the game directory is never overwritten. What this adds is recorded
-# in $MANIFEST with its hash, so --uninstall takes out only that, and only unchanged.
-record() { echo "$1 $2 $(sha256sum "$game/$2" | cut -d' ' -f1)${3:+ $3}" >> "$MANIFEST"; }
+# The ASI loader and STA2WidescreenPatch (prereqs.txt), in vendor/<name>/ because their
+# licence allows it. A file already in the game directory is never overwritten. What this
+# adds is recorded in $MANIFEST with its hash, so --uninstall takes out only that, and
+# only unchanged.
+record() { echo "$1 $(sha256sum "$game/$1" | cut -d' ' -f1)" >> "$MANIFEST"; }
 
-unpack() {   # zip dir
-    if command -v unzip >/dev/null; then unzip -q -o "$1" -d "$2"
-    else python3 -m zipfile -e "$1" "$2"; fi
-}
-
-fetch() {   # url sha256 out -- or a file with that hash in the package's downloads/
-    local url="$1" sum="$2" out="$3" f
-    for f in "$here"/downloads/*; do
-        [ -f "$f" ] && echo "$sum  $f" | sha256sum --quiet -c - >/dev/null 2>&1 && { cp "$f" "$out"; return 0; }
-    done
-    if command -v curl >/dev/null; then curl -fsSL -o "$out" "$url" || return 1
-    else wget -qO "$out" "$url" || return 1; fi
-    echo "$sum  $out" | sha256sum --quiet -c - >/dev/null 2>&1
-}
-
-prereq() {   # name|version|author|licence|page|url|sha256|members
-    local name ver author lic page url sum members m b src dir
-    IFS='|' read -r name ver author lic page url sum members <<< "$1"
-    b="${members%% *}"; b="${b##*/}"
-    if [ -e "$game/$b" ]; then echo "  $name: already installed"; return 0; fi
-    if [ "$url" = - ]; then
-        dir="$here/vendor/$name"
-    else
-        fetch "$url" "$sum" "$work/$name.zip" || {
-            echo "could not download $name $ver. Get it from $page," >&2
-            echo "put the zip in $here/downloads/ and run this again." >&2
-            exit 1; }
-        unpack "$work/$name.zip" "$work/$name"
-        dir="$work/$name"
-    fi
-    for m in $members; do
-        b="${m##*/}"; src="$dir/$m"
-        if [ "$b" = d3d8.dll ] && [ -e "$game/d3d8.dll" ]; then
-            if is_dxvk "$game/d3d8.dll"; then
-                # DXVK keeps the slot; the proxy waits where platform/d3d8-chain.py keeps it.
-                if [ ! -e "$game/d3d8.dll.proxy-backup" ]; then
-                    cp "$src" "$game/d3d8.dll.proxy-backup"; record added d3d8.dll.proxy-backup
-                fi
-            elif [ ! -e "$game/d3d8.dll.gog-backup" ]; then
-                # GOG's d3d8to9: Patch Project's own instructions replace it.
-                mv "$game/d3d8.dll" "$game/d3d8.dll.gog-backup"
-                cp "$src" "$game/d3d8.dll"; record moved d3d8.dll d3d8.dll.gog-backup
-            fi
-        elif [ ! -e "$game/$b" ]; then
-            cp "$src" "$game/$b"; record added "$b"
-        fi
+prereq() {   # name|version|author|licence|page|files
+    local name ver author lic page files f
+    IFS='|' read -r name ver author lic page files <<< "$1"
+    f="${files%% *}"
+    if [ -e "$game/$f" ]; then echo "  $name: already installed"; return 0; fi
+    for f in $files; do
+        [ -e "$game/$f" ] || { cp "$here/vendor/$name/$f" "$game/$f"; record "$f"; }
     done
     echo "  $name $ver -- $author; $lic"
     echo "      from $page"
 }
 
 echo "prerequisites:"
-work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
 while IFS= read -r line; do [ -n "$line" ] && prereq "$line"; done < "$here/prereqs.txt"
 echo "the mod:"
 

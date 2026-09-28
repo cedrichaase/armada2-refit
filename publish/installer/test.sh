@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Run the package's install.sh against a mock game directory.   test.sh <zip>
 #
-# The game is a few placeholder files, so this proves what the installer downloads,
-# copies, backs up and puts back -- not that anything loads. CI runs it on every push;
-# test.ps1 is the same for install.ps1. Downloads the prerequisites and the bloom
-# shaders, so it needs network -- and so it also notices a download that has moved.
+# The game is a few placeholder files, so this proves what the installer copies, backs
+# up and puts back -- not that anything loads. CI runs it on every push; test.ps1 is the
+# same for install.ps1. Downloads the bloom shaders, so it needs network -- and so it
+# also notices a download that has moved.
 set -euo pipefail
 zip="$(realpath "$1")"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
@@ -26,9 +26,7 @@ echo "== install on a GOG game: prerequisites, no DXVK, no vkBasalt"
 "$P/install.sh" "$G" >/dev/null
 check '[ "$(sum "$G/winmm.dll")" = baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5 ]'
 check '[ "$(sum "$G/STA2WidescreenPatch.asi")" = 193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5 ]'
-check '[ "$(sum "$G/Armada2Hook.dll")" = 3bc507362a6b063d912c0a54894ec7b049f52677dcd30f2c533abc39e3ecacbe ]'
-check '[ "$(sum "$G/d3d8.dll")" = c6838e26c00a8aac4e1a60d514afd96e18305bfb112f14f0c07d5b6dd95455e4 ]'
-check '[ "$(cat "$G/d3d8.dll.gog-backup")" = gogd3d8to9 ]'
+check '[ "$(cat "$G/d3d8.dll")" = gogd3d8to9 ] && [ ! -e "$G/d3d8.dll.gog-backup" ]'
 check '[ ! -e "$G/MSAA.asi" ]'
 [ -n "$syslayer" ] || check '[ ! -e "$B" ]'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
@@ -39,7 +37,7 @@ echo "== DXVK takes the d3d8 slot; reinstall with a vkBasalt layer and an edited
 echo dxvk > "$G/d3d8.dll"; echo "; mine" >> "$G/HUD.ini"
 mkdir -p "$XDG_DATA_HOME/vulkan/implicit_layer.d"; echo '{}' > "$XDG_DATA_HOME/vulkan/implicit_layer.d/vkBasalt.x86.json"
 "$P/install.sh" "$G" > "$T/out"
-check 'grep -q "Patch Project: already installed" "$T/out"'
+check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
 check '[ -e "$G/MSAA.asi" ]'
 check 'grep -q "; mine" "$G/HUD.ini.bak"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
@@ -53,12 +51,14 @@ check 'grep -q "^installing into $G\$" "$T/out"'
 rm -rf "$G/pkg"
 
 echo "== uninstall: what it added goes, what changed since stays"
+echo mine > "$G/UltimateASILoader-license.txt"
 "$P/install.sh" --uninstall "$G" > "$T/out"
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check '[ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/binkw32.dll.a2neb-backup" ]'
 check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|MSAA)\.ini$")" ]'
-check '[ ! -e "$G/winmm.dll" ] && [ ! -e "$G/Armada2Hook.dll" ] && [ ! -e "$G/armada2-refit-prereqs.txt" ]'
-check '[ "$(cat "$G/d3d8.dll")" = dxvk ] && grep -q "left d3d8.dll" "$T/out"'
+check '[ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-prereqs.txt" ]'
+check '[ "$(cat "$G/UltimateASILoader-license.txt")" = mine ] && grep -q "left UltimateASILoader-license.txt" "$T/out"'
+check '[ "$(cat "$G/d3d8.dll")" = dxvk ]'
 check '[ ! -e "$B" ]'
 
 echo "== what it did not write is left alone: a loader, a dxvk.conf"

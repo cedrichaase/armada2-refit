@@ -5,9 +5,9 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 7.2.0 — 2026-09-28
+## 8.0.0 — 2026-09-28
 
-Layers: platform 2.1.0, postfx 1.1.0.
+Layers: platform 3.0.0, postfx 1.1.0.
 
 ### Added
 - The release zip, now `armada2-refit-<version>.zip`, carries the renderer and bloom too:
@@ -21,16 +21,19 @@ Layers: platform 2.1.0, postfx 1.1.0.
   hash-checked.
 - The installers also install the prerequisites when missing (`prereqs.txt`):
   STA2WidescreenPatch 1.0 with the Ultimate ASI Loader 4.68, bundled because both are
-  MIT, and Patch Project 1.2.5, which states no licence and so is downloaded from where
-  it is published, pinned by SHA-256.
+  MIT. They never overwrite a file, and `--uninstall` removes only what they added and
+  nobody changed since. `CREDITS.txt` in the zip names each author, licence and source.
 - Third-party binaries whose licence expressly allows it are vendored in
   `platform/vendor/` with their licences and hashes, and `publish/check.sh` accepts a
-  binary only there, only with a licence file and only matching `SOURCE.txt`. They never overwrite a
-  file except GOG's `d3d8.dll`, which is kept as `d3d8.dll.gog-backup`, and `--uninstall`
-  removes only what they added and nobody changed since. `CREDITS.txt` in the zip
-  names each author, licence and source.
+  binary only there, only with a licence file and only matching `SOURCE.txt`.
 - CI runs both installers against a mock game (`test.sh`, and `test.ps1` on a Windows
   runner) before anything is released.
+
+### Removed
+- Patch Project 1.2.5 is no longer a requirement, anywhere: nothing here used it, and
+  with DXVK in the `d3d8.dll` slot it was never loaded. `platform/d3d8-chain.py
+  --revert` now returns to GOG's own `d3d8.dll` rather than to its proxy (platform
+  3.0.0).
 
 Installed, not yet seen in game.
 

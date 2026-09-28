@@ -4,8 +4,12 @@
     d3d8-chain.py --status        identify every link by CONTENT, not by size folklore
     d3d8-chain.py --use dxvk      DXVK's d3d8 -> DXVK's d3d9 -> Vulkan
     d3d8-chain.py --use gog       GOG's d3d8to9 -> DXVK's d3d9 -> Vulkan
-    d3d8-chain.py --use wine      Wine's builtin d3d8 -> wined3d -> OpenGL  (stock)
-    d3d8-chain.py --revert        same as --use wine, plus re-enable Heroic's DXVK
+    d3d8-chain.py --use wine      Wine's builtin d3d8 -> wined3d -> OpenGL
+    d3d8-chain.py --revert        the GOG release as shipped: its d3d8to9 in the game
+                                  directory, the prefix's d3d9, Heroic's DXVK re-enabled
+
+--use keeps GOG's d3d8.dll as d3d8.dll.gog-backup the first time it replaces it, and
+refuses to replace a d3d8.dll it cannot identify.
 
 WHY THIS EXISTS
 
@@ -41,6 +45,10 @@ SYSWOW = os.path.join(PREFIX, 'pfx/drive_c/windows/syswow64')
 PROTON = os.path.join(a2env.PROTON, 'files/lib/wine')
 CONFIG_DIR = os.path.expanduser('~/.config/heroic/GamesConfig')
 BACKUP_SUFFIX = '.a2chain-backup'
+# GOG's d3d8.dll (its d3d8to9 translator) as the GOG release ships it. Known by hash so
+# that it is recognised, and backed up, before anything has ever replaced it.
+GOG_D3D8TO9 = '735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719'
+GOG_BACKUP = os.path.join(GAME, 'd3d8.dll.gog-backup')
 
 
 def sha(path):
@@ -58,13 +66,6 @@ def candidates():
         'wine builtin d3d9':  os.path.join(PROTON, 'i386-windows/d3d9.dll'),
         'DXVK d3d8 (proton)': os.path.join(PROTON, 'dxvk/i386-windows/d3d8.dll'),
         'DXVK d3d9 (proton)': os.path.join(PROTON, 'dxvk/i386-windows/d3d9.dll'),
-        'GOG d3d8to9':        os.path.join(GAME, 'd3d8.dll.gog-backup'),
-        # Once the proxy has been replaced, GAME/d3d8.dll is no longer the proxy, so
-        # the backup is the only remaining reference for what a proxy looks like.
-        # Without this entry --status reports its own backup as UNKNOWN and cannot
-        # confirm the way back is intact.
-        'Patch Project proxy': os.path.join(GAME, 'd3d8.dll.proxy-backup'),
-        'Patch Project proxy (in place)': os.path.join(GAME, 'd3d8.dll'),
     }
     heroic = os.path.expanduser('~/.config/heroic/tools/dxvk')
     latest = os.path.join(heroic, 'latest_dxvk')
@@ -81,6 +82,8 @@ def identify(path):
     h = sha(path)
     if h is None:
         return '(missing)'
+    if h == GOG_D3D8TO9:
+        return 'GOG d3d8to9'
     for name, cand in candidates().items():
         if sha(cand) == h:
             return name
@@ -178,10 +181,8 @@ def status():
     print('    d3d8.dll   %s' % identify(gamed8))
     print('    d3d9.dll   %s' % (identify(gamed9)
                                  if os.path.exists(gamed9) else '(absent)'))
-    proxy_bak = os.path.join(GAME, 'd3d8.dll.proxy-backup')
-    if os.path.exists(proxy_bak):
-        print('    (way back: d3d8.dll.proxy-backup holds the %s)'
-              % identify(proxy_bak))
+    if os.path.exists(GOG_BACKUP):
+        print('    (way back: d3d8.dll.gog-backup holds the %s)' % identify(GOG_BACKUP))
     print('PREFIX syswow64 (Proton resets these from symlinks on sync -- NOT durable)')
     print('    d3d8.dll   %s' % identify(os.path.join(SYSWOW, 'd3d8.dll')))
     print('    d3d9.dll   %s' % identify(os.path.join(SYSWOW, 'd3d9.dll')))
@@ -192,14 +193,13 @@ def status():
         pass
 
     # What the game actually gets is the game-directory d3d8, because of the
-    # d3d8=n,b override plus Wine's application-directory-first search.
+    # d3d8=n,b override plus Wine's application-directory-first search -- or, with
+    # none there, the prefix's.
     live = identify(gamed8)
+    if live == '(missing)':
+        live = identify(os.path.join(SYSWOW, 'd3d8.dll'))
     print()
-    if live.startswith('Patch Project'):
-        print('=> The proxy forwards to the PREFIX d3d8, which Proton keeps resetting')
-        print('   to Wine\'s builtin -- so Direct3D 8 lands on wined3d/OpenGL and no')
-        print('   d3d9.* key in dxvk.conf can have any effect.')
-    elif live.startswith('wine builtin'):
+    if live.startswith('wine builtin'):
         print('=> Direct3D 8 is implemented by WINED3D, running on OpenGL.')
         print('   DXVK is NOT in this game\'s chain, so no d3d9.* key in dxvk.conf')
         print('   can have any effect, and the DXVK HUD will never appear.')
@@ -226,21 +226,40 @@ def _place(src, dst):
 
 
 def install(which):
+    """which: dxvk, gog, wine, or stock (--revert)."""
+    gamed8 = os.path.join(GAME, 'd3d8.dll')
+    gamed9 = os.path.join(GAME, 'd3d9.dll')
+
+    # Never replace or remove a d3d8.dll that is not one of ours to switch between:
+    # anything else in that slot is someone's own choice, and there is no way back to it.
+    have = identify(gamed8)
+    if have.startswith('UNKNOWN'):
+        raise SystemExit('game-directory d3d8.dll is %s -- not DXVK, Wine\'s or GOG\'s. '
+                         'Move it aside yourself first.' % have)
+    gog_there = have == 'GOG d3d8to9' or os.path.exists(GOG_BACKUP)
+    if which in ('stock', 'gog') and not gog_there:
+        raise SystemExit('GOG\'s d3d8.dll is neither in the game directory nor kept as %s'
+                         % os.path.basename(GOG_BACKUP))
+    dxvk8 = os.path.join(PROTON, 'dxvk/i386-windows/d3d8.dll')
+    dxvk9 = os.path.join(PROTON, 'dxvk/i386-windows/d3d9.dll')
+    for src in {'dxvk': (dxvk8, dxvk9), 'gog': (dxvk9,)}.get(which, ()):
+        if not os.path.exists(src):
+            raise SystemExit('source not present: %s' % src)
+
     # Fail before ANY side effect if the flag needs changing and Heroic is up: doing
     # half a chain switch is worse than doing none.  An earlier version checked inside
     # set_auto_dxvk() and left a backup behind after refusing.
     #
     # EXCEPT when returning to stock.  Getting back to a working game must never be
-    # blocked by Heroic being open: the flag is irrelevant to the WineD3D chain (the
-    # proxy loads the prefix's builtin either way), so restoring the DLLs is always
-    # allowed and only the flag waits.
-    if which == 'wine':
+    # blocked by Heroic being open: restoring the DLLs is always allowed and only the
+    # flag waits.
+    if which == 'stock':
         try:
             set_auto_dxvk(True)
         except SystemExit as exc:
             print('note: %s' % exc)
-            print('      Restoring the DLLs anyway -- the flag does not affect the '
-                  'stock chain.')
+            print('      Restoring the DLLs anyway; re-run with Heroic closed to set '
+                  'the flag too.')
     else:
         set_auto_dxvk(False)
 
@@ -256,42 +275,37 @@ def install(which):
     # Wine searches the application directory before the system directory, which is
     # already what makes the game-directory winmm.dll and d3d8.dll load at all (see
     # platform/README.md). Nothing manages the game directory, so that is where this belongs.
-    dxvk8 = os.path.join(PROTON, 'dxvk/i386-windows/d3d8.dll')
-    dxvk9 = os.path.join(PROTON, 'dxvk/i386-windows/d3d9.dll')
-    gamed8 = os.path.join(GAME, 'd3d8.dll')
-    gamed9 = os.path.join(GAME, 'd3d9.dll')
-    proxy_bak = os.path.join(GAME, 'd3d8.dll.proxy-backup')
-
-    # Preserve the Patch Project proxy once, and never overwrite that backup.
-    if not os.path.exists(proxy_bak) and os.path.exists(gamed8):
-        if identify(gamed8) == 'Patch Project proxy':
-            shutil.copy2(gamed8, proxy_bak)
-            print('backed up Patch Project proxy -> %s' % os.path.basename(proxy_bak))
+    # Keep GOG's d3d8to9 once, and never overwrite that backup: it is the way back.
+    if have == 'GOG d3d8to9' and not os.path.exists(GOG_BACKUP):
+        shutil.copy2(gamed8, GOG_BACKUP)
+        print('backed up GOG\'s d3d8.dll -> %s' % os.path.basename(GOG_BACKUP))
 
     # The d3d9 override is part of the DXVK chain, not of the diagnostics.
-    set_d3d9_override(which != 'wine')
+    set_d3d9_override(which in ('dxvk', 'gog'))
 
-    if which == 'wine':
-        # Restore the proxy and remove the DXVK d3d9 we added beside it.
-        if os.path.exists(proxy_bak):
-            _place(proxy_bak, gamed8)
-        if os.path.exists(gamed9):
-            os.chmod(gamed9, 0o644)
-            os.remove(gamed9)
-            print('removed game-directory d3d9.dll')
-        print('autoInstallDxvk left as-is (does not affect the stock chain)')
+    def remove(path):
+        if os.path.exists(path):
+            os.chmod(path, 0o644)
+            os.remove(path)
+            print('removed game-directory %s' % os.path.basename(path))
+
+    if which == 'stock':
+        # GOG's own d3d8to9 back, on the prefix's d3d9: Heroic's DXVK or Wine's.
+        if have != 'GOG d3d8to9':
+            _place(GOG_BACKUP, gamed8)
+        remove(gamed9)
+    elif which == 'wine':
+        # Nothing in the game directory: the prefix's d3d8, which is Wine's builtin
+        # once autoInstallDxvk is off.
+        remove(gamed8)
+        remove(gamed9)
     elif which == 'dxvk':
-        for src in (dxvk8, dxvk9):
-            if not os.path.exists(src):
-                raise SystemExit('source not present: %s' % src)
         _place(dxvk8, gamed8)
         _place(dxvk9, gamed9)
         # Both DXVK DLLs now sit beside the exe, so the prefix can do what it likes.
     elif which == 'gog':
-        gog = os.path.join(GAME, 'd3d8.dll.gog-backup')
-        if not os.path.exists(gog):
-            raise SystemExit('GOG translator not present: %s' % gog)
-        _place(gog, gamed8)
+        if have != 'GOG d3d8to9':
+            _place(GOG_BACKUP, gamed8)
         _place(dxvk9, gamed9)
 
     print()
@@ -310,7 +324,7 @@ def main():
             raise SystemExit('--use takes dxvk, gog or wine')
         install(args[1])
     elif args[0] == '--revert':
-        install('wine')
+        install('stock')
     else:
         raise SystemExit('unknown arguments: %s' % ' '.join(args))
     return 0

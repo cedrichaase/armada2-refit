@@ -34,7 +34,6 @@ that is `STA2WidescreenPatch` 1.0 (MIT) with the Ultimate ASI Loader 4.68 it bun
 | Third-party | Licence | Here |
 |---|---|---|
 | `STA2WidescreenPatch` 1.0, Ultimate ASI Loader 4.68 | MIT | vendored; in the zip |
-| Patch Project 1.2.5 | none stated ("freeware") | no: the installers download it, pinned by hash |
 | MagicBloom, ReShade's `.fxh` headers | MIT; CC0 and none | no: fetched with bloom, since `ReShadeUI.fxh` states no licence and the three go together |
 | DXVK, vkBasalt | zlib | not yet: whether the installers should use them is open (below) |
 
@@ -130,24 +129,17 @@ ReShade, is documented in `README.txt` and optional. They do the same on both sy
 - find the game: the argument, else the folder they were unzipped into, else Heroic's
   default or GOG's registry entry;
 - install the prerequisites in `prereqs.txt` that are missing: `STA2WidescreenPatch`
-  1.0, which brings the Ultimate ASI Loader 4.68 as `winmm.dll` (bundled, from
-  `vendor/`), and Patch Project 1.2.5 (downloaded: the ZIP from armadafiles.com, the
-  page the widescreen patch's own README links; its NSIS installer refuses GOG
-  installs), checked against a pinned SHA-256. Both match the install this project is
-  developed on byte for byte. A zip with the right hash in `downloads/` beside the
-  installer is used instead of a download, for offline installs. **A file already there is never overwritten**,
-  with one exception: GOG's `d3d8.dll` (d3d8to9) gives way to Patch Project's proxy, as
-  Patch Project's instructions say, and is kept as `d3d8.dll.gog-backup`. A DXVK
-  `d3d8.dll` stays, and the proxy goes to `d3d8.dll.proxy-backup`, where
-  `platform/d3d8-chain.py` keeps it. What was added is recorded with its hash in
-  `armada2-refit-prereqs.txt` in the game directory;
+  1.0, which brings the Ultimate ASI Loader 4.68 as `winmm.dll`, from the zip's
+  `vendor/` -- the same files as on the install this project is developed on, byte for
+  byte. **A file already there is never overwritten**, and what was added is recorded
+  with its hash in `armada2-refit-prereqs.txt` in the game directory;
 - on Windows, warn if Microsoft's Visual C++ runtime (x86) is missing, which the
   widescreen patch needs. Installing it takes administrator rights and an unpinned
   download, so they only name it;
 - keep the stock `binkw32.dll` as `binkw32_orig.dll`, which the proxy forwards to, and
   as `binkw32.dll.a2neb-backup`, the name `cutscenes/binkproxy/install.sh` uses;
 - install `MSAA.asi` only when the `d3d8.dll` in the game directory is DXVK's, told
-  by its content: Patch Project and GOG put a `d3d8.dll` there too. Without DXVK the
+  by its content: GOG puts a `d3d8.dll` there too. Without DXVK the
   minimap goes black;
 - set up bloom when a vkBasalt layer (Linux) or ReShade's `ReShade.ini` (Windows) is
   there. On Windows the preset also becomes `ReShadePreset.ini` when the player has
@@ -159,8 +151,8 @@ ReShade, is documented in `README.txt` and optional. They do the same on both sy
   if its hash still matches the record, so nothing replaced since is removed.
 
 `publish/installer/test.sh` and `test.ps1` run them against a mock game of placeholder
-files, so they prove the downloads and the file handling, not that anything loads.
-They download for real, so CI also notices when a pinned download moves.
+files, so they prove the file handling, not that anything loads. They download the
+bloom shaders for real, so CI also notices when a pinned one moves.
 
 **CI** (`.github/workflows/ci.yml`) runs on every push and pull request:
 
@@ -176,15 +168,10 @@ They download for real, so CI also notices when a pinned download moves.
 ### Next
 
 **Open: DXVK.** Bundling it is allowed (zlib), and the installers could put it in the
-game directory, which would install MSAA everywhere and make `dxvk.conf` apply. But
-Patch Project's `d3d8.dll` proxy is what loads `Armada2Hook.dll`, so DXVK in the
-`d3d8.dll` slot means Patch Project does not load at all -- as on the development
-install today. That is a choice between the two, not a default to slip in.
- On Linux the launcher settings
+game directory in place of GOG's `d3d8.dll`, which would install MSAA everywhere and
+make `dxvk.conf` apply. Not decided yet. On Linux the launcher settings
 (`WINEDLLOVERRIDES`, and bloom's two variables) are still the player's job; `install.sh`
-prints them. Patch Project comes from a mirror over plain HTTP, whose certificate does
-not match; the hash is what makes that safe, and a second mirror would make it
-sturdier. What stands in the way:
+prints them. What stands in the way:
 
 - **No plugin checks which `Armada2.exe` it is in.** Each should verify the exe and stand
   down on any other build rather than patch the wrong bytes.
@@ -192,5 +179,5 @@ sturdier. What stands in the way:
   without DXVK, but copied by hand beside native D3D8 it blacks out the minimap: the
   minimap's `CopyRects` from a multisampled surface is illegal there (`msaa/README.md`).
 - **The ReShade preset has never run.** Only the vkBasalt path is seen in game.
-- **Untested**: Windows 11, a desktop other than Hyprland, and running without Patch
-  Project 1.2.5 or the widescreen patch.
+- **Untested**: Windows 11, a desktop other than Hyprland, and running without the
+  widescreen patch.

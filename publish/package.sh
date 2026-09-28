@@ -52,11 +52,9 @@ for c in $(awk '{print $2}' "$root/publish/installer/shaders.txt"); do
         || { echo "shaders.txt pins $c, which postfx/vkbasalt/build.sh does not" >&2; exit 1; }
 done
 cp "$root/publish/installer/install.sh" "$root/publish/installer/install.ps1" "$d/"
-# What the installers put in first. Bundled (url "-") comes from platform/vendor/, whose
-# licence allows it; the rest is downloaded, pinned by hash.
+# What the installers put in first, from platform/vendor/: its licence allows bundling.
 cp "$root/publish/installer/prereqs.txt" "$d/"
-while IFS='|' read -r pname pver _ _ _ purl _; do
-    [ "$purl" = - ] || continue
+while IFS='|' read -r pname pver _; do
     mkdir -p "$d/vendor/$pname"
     cp "$root/platform/vendor/$pname-$pver/"* "$d/vendor/$pname/"
 done < "$root/publish/installer/prereqs.txt"
@@ -94,12 +92,10 @@ The stock binkw32.dll is kept as binkw32_orig.dll, which the proxy forwards to, 
 binkw32.dll.a2neb-backup. An existing dxvk.conf the package did not write is left alone,
 and an .ini you had changed is kept as .ini.bak.
 
-FIRST, WHAT IT NEEDS -- downloaded by the installer if missing (CREDITS.txt)
-  STA2WidescreenPatch 1.0 with the Ultimate ASI Loader (winmm.dll) that loads the plugins,
-  and Armada II Patch Project 1.2.5. Each comes from where its authors publish it, is
-  checked against a pinned SHA-256, and never overwrites a file already there. Offline?
-  Put the zips from the pages in CREDITS.txt into a downloads/ folder beside the
-  installer. --uninstall takes out what it added, and nothing it found.
+FIRST, WHAT IT NEEDS -- in vendor/, installed if missing (CREDITS.txt)
+  STA2WidescreenPatch 1.0 with the Ultimate ASI Loader (winmm.dll) that loads the
+  plugins. A file already there is never overwritten, and --uninstall takes out what it
+  added, and nothing it found.
   Windows also needs Microsoft's Visual C++ runtime (x86) for the widescreen patch; the
   installer says so if it is missing.
 
@@ -130,17 +126,16 @@ EOF
 # Credits for everything the installers fetch, from the same lists they read.
 {
     echo "Armada II Refit installs these beside its own work. Thank you to all of them."
-    echo "Those whose licence allows it are in this zip, in vendor/ with their licence"
-    echo "text; the others are downloaded from where their authors publish them, checked"
-    echo "against the SHA-256 in prereqs.txt or bloom/shaders.txt."
+    echo "The prerequisites are in this zip, in vendor/ with their licence text. The bloom"
+    echo "shaders are downloaded from where their authors publish them, checked against the"
+    echo "SHA-256 in bloom/shaders.txt."
     echo
-    while IFS='|' read -r pname pver pauthor plic ppage purl _; do
+    while IFS='|' read -r pname pver pauthor plic ppage _; do
         [ -n "$pname" ] || continue
         echo "$pname $pver"
         echo "    by       $pauthor"
         echo "    licence  $plic"
-        if [ "$purl" = - ]; then echo "    in       vendor/$pname/, as published at $ppage"
-        else echo "    from     $ppage (downloaded)"; fi
+        echo "    in       vendor/$pname/, as published at $ppage"
         echo
     done < "$root/publish/installer/prereqs.txt"
     echo "MagicBloom (bloom, only with vkBasalt or ReShade)"

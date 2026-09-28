@@ -5,8 +5,8 @@ Armada II Refit -- install the release package into the game, on Windows.
   install.bat -Uninstall [<game dir>]      take all of it out again
 
 No choices to make: what can work here is installed, the rest is skipped and says why.
-First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch, and Patch
-Project 1.2.5), bundled or downloaded and hash-checked, each only if it is missing. MSAA.asi goes in when DXVK's d3d8.dll is in the
+First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled in
+vendor\, each file only if it is missing. MSAA.asi goes in when DXVK's d3d8.dll is in the
 game directory -- without DXVK the minimap goes black. The bloom preset goes in when ReShade is installed for the game;
 installing ReShade is optional and by hand (README.txt), then run this again.
 
@@ -48,7 +48,7 @@ if (Get-Process -Name armada2 -ErrorAction SilentlyContinue) { throw "Armada2.ex
 function G([string]$n) { Join-Path $GameDir $n }
 $Manifest = G "armada2-refit-prereqs.txt"   # what the prerequisites step added
 function Get-Sha([string]$f) { (Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLower() }
-# DXVK by content, never by name: Patch Project and GOG each put a d3d8.dll there too.
+# DXVK by content, never by name: GOG puts a d3d8.dll there too.
 function Test-Dxvk([string]$f) {
     (Test-Path -LiteralPath $f) -and
         ([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($f)) -match "(?i)dxvk")
@@ -89,11 +89,10 @@ if ($Uninstall) {
         $records = @(Get-Content -LiteralPath $Manifest)
         [array]::Reverse($records)
         foreach ($r in $records) {
-            $how, $f, $sum, $backup = $r -split " "
+            $f, $sum = $r -split " "
             if (-not (Test-Path -LiteralPath (G $f))) { continue }
             if ((Get-Sha (G $f)) -ne $sum) { Write-Host "  left ${f}: it changed since it was installed"; continue }
             Remove-Item -LiteralPath (G $f)
-            if ($how -eq "moved" -and (Test-Path -LiteralPath (G $backup))) { Move-Item -LiteralPath (G $backup) (G $f) }
         }
         Remove-Item -LiteralPath $Manifest
     }
@@ -111,67 +110,25 @@ Write-Host "installing into $GameDir"
 
 # ------------------------------------------------------------------ prerequisites
 
-# The ASI loader, STA2WidescreenPatch and Patch Project 1.2.5 (prereqs.txt). One whose
-# licence allows it is in the zip, under vendor\<name>\ (its url is "-"); the others are
-# downloaded from where their authors publish them, pinned by SHA-256.
-# A file already in the game directory is never overwritten. What this adds is recorded
-# in $Manifest with its hash, so -Uninstall takes out only that, and only unchanged.
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$work = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid())
-New-Item -ItemType Directory $work | Out-Null
-function Add-Record([string]$how, [string]$f, [string]$backup = "") {
-    Add-Content -LiteralPath $Manifest ("$how $f $(Get-Sha (G $f)) $backup".Trim())
-}
-# The zip at $url, or a file with the same hash in the package's downloads\ folder.
-function Get-Zip([string]$url, [string]$sum, [string]$out) {
-    $dl = Join-Path $here "downloads"
-    if (Test-Path -LiteralPath $dl) {
-        foreach ($f in Get-ChildItem -LiteralPath $dl -File) {
-            if ((Get-Sha $f.FullName) -eq $sum) { Copy-Item -LiteralPath $f.FullName $out; return $true }
-        }
-    }
-    try { Invoke-WebRequest -UseBasicParsing -OutFile $out -Uri $url } catch { return $false }
-    return ((Get-Sha $out) -eq $sum)
-}
-
+# The ASI loader and STA2WidescreenPatch (prereqs.txt), in vendor\<name>\ because their
+# licence allows it. A file already in the game directory is never overwritten. What this
+# adds is recorded in $Manifest with its hash, so -Uninstall takes out only that, and
+# only unchanged.
 Write-Host "prerequisites:"
 foreach ($line in Get-Content -LiteralPath (Join-Path $here "prereqs.txt")) {
     if (-not $line.Trim()) { continue }
-    $name, $ver, $author, $lic, $page, $url, $sum, $members = $line -split "\|"
-    $members = $members -split " "
-    if (Test-Path -LiteralPath (G (Split-Path -Leaf $members[0]))) { Write-Host "  ${name}: already installed"; continue }
-    if ($url -eq "-") {
-        $x = Join-Path $here "vendor\$name"
-    } else {
-        $zip = Join-Path $work "$name.zip"
-        if (-not (Get-Zip $url $sum $zip)) {
-            throw "could not download $name $ver. Get it from $page, put the zip in $(Join-Path $here 'downloads') and run this again."
-        }
-        $x = Join-Path $work $name
-        Expand-Archive -LiteralPath $zip -DestinationPath $x
-    }
-    foreach ($m in $members) {
-        $b = Split-Path -Leaf $m; $src = Join-Path $x $m
-        if ($b -eq "d3d8.dll" -and (Test-Path -LiteralPath (G "d3d8.dll"))) {
-            if (Test-Dxvk (G "d3d8.dll")) {
-                # DXVK keeps the slot; the proxy waits where platform/d3d8-chain.py keeps it.
-                if (-not (Test-Path -LiteralPath (G "d3d8.dll.proxy-backup"))) {
-                    Copy-Item -LiteralPath $src (G "d3d8.dll.proxy-backup"); Add-Record "added" "d3d8.dll.proxy-backup"
-                }
-            } elseif (-not (Test-Path -LiteralPath (G "d3d8.dll.gog-backup"))) {
-                # GOG's d3d8to9: Patch Project's own instructions replace it.
-                Move-Item -LiteralPath (G "d3d8.dll") (G "d3d8.dll.gog-backup")
-                Copy-Item -LiteralPath $src (G "d3d8.dll"); Add-Record "moved" "d3d8.dll" "d3d8.dll.gog-backup"
-            }
-        } elseif (-not (Test-Path -LiteralPath (G $b))) {
-            Copy-Item -LiteralPath $src (G $b); Add-Record "added" $b
+    $name, $ver, $author, $lic, $page, $files = $line -split "\|"
+    $files = $files -split " "
+    if (Test-Path -LiteralPath (G $files[0])) { Write-Host "  ${name}: already installed"; continue }
+    foreach ($f in $files) {
+        if (-not (Test-Path -LiteralPath (G $f))) {
+            Copy-Item -LiteralPath (Join-Path $here "vendor\$name\$f") (G $f)
+            Add-Content -LiteralPath $Manifest "$f $(Get-Sha (G $f))"
         }
     }
     Write-Host "  $name $ver -- $author; $lic"
     Write-Host "      from $page"
 }
-
-Remove-Item -Recurse -Force $work
 
 # STA2WidescreenPatch.asi needs Microsoft's Visual C++ runtime (VCRUNTIME140.dll), which
 # almost every Windows has. Installing it takes administrator rights and an unpinned
