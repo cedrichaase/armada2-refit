@@ -16,8 +16,15 @@ Layers: postfx 1.1.0.
 - Installers in the zip, from `publish/installer/`: `install.sh` (Linux, Wine/Proton)
   and `install.ps1` / `install.bat` (Windows). They take no options but `--uninstall`.
   They find the game, back up the stock `binkw32.dll`, install MSAA only beside DXVK's
-  `d3d8.dll`, and leave a foreign `dxvk.conf` alone. They set up bloom when vkBasalt or
-  ReShade is installed, fetching the shaders pinned and hash-checked.
+  `d3d8.dll` (told by content), and leave a foreign `dxvk.conf` alone. They set up
+  bloom when vkBasalt or ReShade is installed, fetching the shaders pinned and
+  hash-checked.
+- The installers also install the prerequisites when missing, downloaded from where
+  their authors publish them and pinned by SHA-256 (`prereqs.txt`): STA2WidescreenPatch
+  1.0 with the Ultimate ASI Loader 4.68, and Patch Project 1.2.5. They never overwrite a
+  file except GOG's `d3d8.dll`, which is kept as `d3d8.dll.gog-backup`, and `--uninstall`
+  removes only what they added and nobody changed since. `CREDITS.txt` in the zip
+  names each author, licence and source.
 - CI runs both installers against a mock game (`test.sh`, and `test.ps1` on a Windows
   runner) before anything is released.
 

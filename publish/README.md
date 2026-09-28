@@ -26,8 +26,10 @@ from a 256px stock file to a 1024px plate *is* the plate.)
 
 Third-party code this project *uses* but does not contain — DXVK (zlib), the Ultimate
 ASI Loader (MIT), vkBasalt (zlib), crosire's reshade-shaders (per-file), the
-`STA2WidescreenPatch`, Patch Project 1.2.5 — is not in the repository either. A release
-package may bundle the first four with their notices, and links to the last two.
+`STA2WidescreenPatch` (MIT), Patch Project 1.2.5 (no licence stated) — is not in the
+repository, nor in the release zip. The zip's installers download what they need from
+where its authors publish it, pinned by hash, and `CREDITS.txt` names each author,
+licence and source.
 
 `a2mod` switches every layer on the game directory only (`.a2neb-backup` files,
 `$GAME/.a2mod/`) and needs no asset to do it.
@@ -100,6 +102,8 @@ plugins and writes `armada2-refit-<version>.zip`:
   ReShade preset, and `shaders.txt`;
 - `install.sh` (Linux) and `install.ps1` + `install.bat` (Windows), from
   `publish/installer/`;
+- `prereqs.txt`, what the installers download first, and `CREDITS.txt`, generated from
+  it and from `shaders.txt`;
 - `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`.
 
 It is our code only, compiled, and our configuration. It holds nothing of the game,
@@ -116,9 +120,25 @@ ReShade, is documented in `README.txt` and optional. They do the same on both sy
 
 - find the game: the argument, else the folder they were unzipped into, else Heroic's
   default or GOG's registry entry;
+- install the prerequisites in `prereqs.txt` that are missing: `STA2WidescreenPatch`
+  1.0, which brings the Ultimate ASI Loader 4.68 as `winmm.dll` (from its GitHub
+  release), and Patch Project 1.2.5 (the ZIP from armadafiles.com, the page the
+  widescreen patch's own README links; its NSIS installer refuses GOG installs). Each is
+  checked against a pinned SHA-256; both match the install this project is developed
+  on byte for byte. A zip with the right hash in `downloads/` beside the installer is
+  used instead, for offline installs. **A file already there is never overwritten**,
+  with one exception: GOG's `d3d8.dll` (d3d8to9) gives way to Patch Project's proxy, as
+  Patch Project's instructions say, and is kept as `d3d8.dll.gog-backup`. A DXVK
+  `d3d8.dll` stays, and the proxy goes to `d3d8.dll.proxy-backup`, where
+  `platform/d3d8-chain.py` keeps it. What was added is recorded with its hash in
+  `armada2-refit-prereqs.txt` in the game directory;
+- on Windows, warn if Microsoft's Visual C++ runtime (x86) is missing, which the
+  widescreen patch needs. Installing it takes administrator rights and an unpinned
+  download, so they only name it;
 - keep the stock `binkw32.dll` as `binkw32_orig.dll`, which the proxy forwards to, and
   as `binkw32.dll.a2neb-backup`, the name `cutscenes/binkproxy/install.sh` uses;
-- install `MSAA.asi` only beside a `d3d8.dll` in the game directory. Without DXVK the
+- install `MSAA.asi` only when the `d3d8.dll` in the game directory is DXVK's, told
+  by its content: Patch Project and GOG put a `d3d8.dll` there too. Without DXVK the
   minimap goes black;
 - set up bloom when a vkBasalt layer (Linux) or ReShade's `ReShade.ini` (Windows) is
   there. On Windows the preset also becomes `ReShadePreset.ini` when the player has
@@ -126,10 +146,12 @@ ReShade, is documented in `README.txt` and optional. They do the same on both sy
   overlay. A failed download skips bloom and does not fail the install;
 - write `dxvk.conf` only over one that carries `renderer-config.sh`'s marker;
 - keep a changed `.ini` as `.ini.bak`;
-- with `--uninstall` / `-Uninstall`, put all of it back.
+- with `--uninstall` / `-Uninstall`, put all of it back. A prerequisite file goes only
+  if its hash still matches the record, so nothing replaced since is removed.
 
-`publish/installer/test.sh` and `test.ps1` run them against a mock game: three
-placeholder files, so they prove the file handling, not that anything loads.
+`publish/installer/test.sh` and `test.ps1` run them against a mock game of placeholder
+files, so they prove the downloads and the file handling, not that anything loads.
+They download for real, so CI also notices when a pinned download moves.
 
 **CI** (`.github/workflows/ci.yml`) runs on every push and pull request:
 
@@ -144,10 +166,11 @@ placeholder files, so they prove the file handling, not that anything loads.
 
 ### Next
 
-A fuller package would also bundle `winmm.dll` (the ASI loader) and optionally DXVK,
-with their notices (`THIRD-PARTY.md`). On Linux the launcher settings
-(`WINEDLLOVERRIDES="winmm=n,b"`, and bloom's two variables) are still the player's job;
-`install.sh` prints them. What stands in the way:
+The installers could also set up DXVK. On Linux the launcher settings
+(`WINEDLLOVERRIDES`, and bloom's two variables) are still the player's job; `install.sh`
+prints them. Patch Project comes from a mirror over plain HTTP, whose certificate does
+not match; the hash is what makes that safe, and a second mirror would make it
+sturdier. What stands in the way:
 
 - **No plugin checks which `Armada2.exe` it is in.** Each should verify the exe and stand
   down on any other build rather than patch the wrong bytes.

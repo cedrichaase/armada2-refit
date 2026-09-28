@@ -6,6 +6,7 @@
 #   game/     what goes beside Armada2.exe: the four plugins and their .ini, dxvk.conf
 #   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
 #   install.sh  install.ps1  install.bat     publish/installer/, for Linux and Windows
+#   prereqs.txt  CREDITS.txt  what they download first, and who made it
 #   README.txt  LICENSE  SHA256SUMS
 # <version> is the root CHANGELOG.md's newest entry. Only our own code goes in: no asset,
 # nothing from the game, no third-party shader, none of the test tools (probe.exe,
@@ -50,6 +51,8 @@ for c in $(awk '{print $2}' "$root/publish/installer/shaders.txt"); do
         || { echo "shaders.txt pins $c, which postfx/vkbasalt/build.sh does not" >&2; exit 1; }
 done
 cp "$root/publish/installer/install.sh" "$root/publish/installer/install.ps1" "$d/"
+# What the installers download first, pinned by hash: never in the zip itself.
+cp "$root/publish/installer/prereqs.txt" "$d/"
 # cmd.exe wants CRLF.
 sed 's/$/\r/' "$root/publish/installer/install.bat" > "$d/install.bat"
 cp "$root/LICENSE" "$d/"
@@ -84,13 +87,21 @@ The stock binkw32.dll is kept as binkw32_orig.dll, which the proxy forwards to, 
 binkw32.dll.a2neb-backup. An existing dxvk.conf the package did not write is left alone,
 and an .ini you had changed is kept as .ini.bak.
 
-NEEDS
-  Star Trek: Armada II, GOG patch 1.1 + Patch Project 1.2.5, and the Ultimate ASI Loader
-  (winmm.dll) that STA2WidescreenPatch puts in the game directory. Under Wine/Proton the
-  loader runs only with WINEDLLOVERRIDES=winmm=n,b in the launcher. A plugin that does
-  not recognise Armada2.exe patches nothing and says so in its .log.
-  Never install HUD.asi alongside the file-based fixes (hud/ui-widescreen.py and
-  friends): every correction would apply twice.
+FIRST, WHAT IT NEEDS -- downloaded by the installer if missing (CREDITS.txt)
+  STA2WidescreenPatch 1.0 with the Ultimate ASI Loader (winmm.dll) that loads the plugins,
+  and Armada II Patch Project 1.2.5. Each comes from where its authors publish it, is
+  checked against a pinned SHA-256, and never overwrites a file already there. Offline?
+  Put the zips from the pages in CREDITS.txt into a downloads/ folder beside the
+  installer. --uninstall takes out what it added, and nothing it found.
+  Windows also needs Microsoft's Visual C++ runtime (x86) for the widescreen patch; the
+  installer says so if it is missing.
+
+NEEDS FROM YOU
+  Star Trek: Armada II, GOG release (patch 1.1). Under Wine/Proton, the DLL overrides
+  the installer prints, in the launcher. A plugin that does not recognise Armada2.exe
+  patches nothing and says so in its .log. Never install HUD.asi alongside the
+  file-based fixes (hud/ui-widescreen.py and friends): every correction would apply
+  twice.
 
 OPTIONAL, BY HAND -- only if you want what the installer skipped
   Bloom needs a post-processing layer the installer cannot install for you. Set it up,
@@ -109,7 +120,32 @@ Full notes: README.md in the repository, "Installing by hand, layer by layer".
 MIT licence (LICENSE). An unofficial fan project; nothing of the game is included.
 EOF
 
-(cd "$d" && sha256sum -- game/* bloom/* > SHA256SUMS)
+# Credits for everything the installers fetch, from the same lists they read.
+{
+    echo "Armada II Refit downloads these when you install it. None of them is in this"
+    echo "zip; each comes from where its authors publish it, checked against the SHA-256"
+    echo "in prereqs.txt or bloom/shaders.txt. Thank you to all of them."
+    echo
+    while IFS='|' read -r pname pver pauthor plic ppage _; do
+        [ -n "$pname" ] || continue
+        echo "$pname $pver"
+        echo "    by       $pauthor"
+        echo "    licence  $plic"
+        echo "    from     $ppage"
+        echo
+    done < "$root/publish/installer/prereqs.txt"
+    echo "MagicBloom (bloom, only with vkBasalt or ReShade)"
+    echo "    by       luluco250"
+    echo "    licence  MIT (in the file's header)"
+    echo "    from     https://github.com/crosire/reshade-shaders (legacy branch)"
+    echo
+    echo "ReShade.fxh, ReShadeUI.fxh (bloom, only with vkBasalt or ReShade)"
+    echo "    by       crosire and the ReShade contributors"
+    echo "    licence  CC0 (ReShade.fxh); none stated (ReShadeUI.fxh)"
+    echo "    from     https://github.com/crosire/reshade-shaders"
+} > "$d/CREDITS.txt"
+
+(cd "$d" && sha256sum -- game/* bloom/* prereqs.txt > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")
 echo "$out/$name.zip"

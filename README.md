@@ -55,12 +55,17 @@ texture pack.
 
 **The game:** Star Trek: Armada II, **GOG release** (patch 1.1), with:
 
-- **Armada II Patch Project 1.2.5**, the community patch. Its installer refuses GOG
-  installs, so copy the ZIP distribution into the game directory by hand
+- **Armada II Patch Project 1.2.5**, the community patch by the Fleet Operations
+  Development Team. Its installer refuses GOG installs, so copy the ZIP distribution into
+  the game directory by hand
   ([`platform/README.md`](platform/README.md#patch-project-125)).
-- **`STA2WidescreenPatch` v1.0**, which unlocks widescreen resolutions and ships the
+- **[`STA2WidescreenPatch`](https://github.com/Ligushka/STA2WidescreenPatch) v1.0** by
+  Ligushka, which unlocks widescreen resolutions and ships the
   [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (`winmm.dll`)
-  that loads this project's `.asi` plugins.
+  by ThirteenAG that loads this project's `.asi` plugins.
+
+The release zip's installers download and install both when they are missing, pinned by
+hash; its `CREDITS.txt` lists where each comes from.
 
 **The platform:** developed and tested on Linux (Arch, Hyprland), with the game run
 through [Heroic](https://heroicgameslauncher.com/) and Proton:
