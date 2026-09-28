@@ -5,9 +5,9 @@ the rules.
     import a2env; a2env.GAME, a2env.PREFIX, a2env.PROTON, a2env.DATA
 
 Each is taken from the environment, then ${XDG_CONFIG_HOME:-~/.config}/
-armada2-remastered.conf (A2_CONF overrides), then the default: Heroic's location for
-the game, ${XDG_DATA_HOME:-~/.local/share}/armada2-remastered for DATA
-(%LOCALAPPDATA%\\armada2-remastered on Windows).
+armada2-refit.conf (A2_CONF overrides), then the default: Heroic's location for
+the game, ${XDG_DATA_HOME:-~/.local/share}/armada2-refit for DATA
+(%LOCALAPPDATA%\\armada2-refit on Windows).
 A2_GAME_DIR and A2_DIR are still read for A2_GAME. A script in a subdirectory imports
 it with the repository root put on sys.path first.
 
@@ -23,14 +23,14 @@ _DEFAULTS = {
     'A2_DATA': os.path.join(
         os.environ.get('LOCALAPPDATA') if os.name == 'nt' and os.environ.get('LOCALAPPDATA')
         else os.environ.get('XDG_DATA_HOME') or os.path.join(_HOME, '.local/share'),
-        'armada2-remastered'),
+        'armada2-refit'),
 }
 
 
 def _conf():
     path = os.environ.get('A2_CONF') or os.path.join(
         os.environ.get('XDG_CONFIG_HOME') or os.path.join(_HOME, '.config'),
-        'armada2-remastered.conf')
+        'armada2-refit.conf')
     out = {}
     try:
         with open(path) as f:

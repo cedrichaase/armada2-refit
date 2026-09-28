@@ -36,7 +36,7 @@ Installs nothing different.
   `textures/targets/<T>/` (`target.conf`, `stock.sha256`) and a work directory in
   `$A2_DATA/textures/<T>/` (`stock/`, `ai/`, `src/`, `src-alpha/`, `out/`, and the
   unit directories); scratch is `$A2_DATA/textures/.scratch/`. `A2_DATA` comes from
-  `a2env.sh` (default `~/.local/share/armada2-remastered`), so every checkout and
+  `a2env.sh` (default `~/.local/share/armada2-refit`), so every checkout and
   worktree builds from and into the same place. `a2tex`, `lib/` (by the directory
   `a2tex` hands it), `verify.py`, `upscale-stock.sh`, `measure-invention.sh` and
   `fix-enterprise-registry.py` follow; `inventory.py` reads target membership from the
@@ -69,7 +69,7 @@ the intro, both plates).
 
 ### Changed
 - `a2tex` and `tools/` find the game through `a2env.sh` / `a2env.py` (`A2_GAME`, then
-  `~/.config/armada2-remastered.conf`, then Heroic's default) instead of a hard-coded
+  `~/.config/armada2-refit.conf`, then Heroic's default) instead of a hard-coded
   path; `classify-alpha.py`'s `A2_TEX` defaults to `$A2_GAME/Textures/RGB`.
 
 Installs nothing different. Checked on the bench: the stacked install reproduced every

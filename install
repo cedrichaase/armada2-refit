@@ -13,7 +13,7 @@
 #                                            $A2_DATA/movies
 #
 # The code layers need nothing but this checkout. The asset layers install what is
-# BUILT in A2_DATA (a2env.sh; default ~/.local/share/armada2-remastered): with nothing
+# BUILT in A2_DATA (a2env.sh; default ~/.local/share/armada2-refit): with nothing
 # built -- anyone who has not made a texture pack -- each says so, installs nothing, and
 # the game keeps its own art. That is a supported state, not an error.
 #

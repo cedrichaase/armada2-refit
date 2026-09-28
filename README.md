@@ -1,4 +1,4 @@
-# Armada II Remastered
+# Armada II Refit
 
 **Make Star Trek: Armada II (2001) enjoyable on a modern system, without turning it
 into a different game.**
@@ -34,7 +34,7 @@ a time, and every fix can be undone.
 | **Texture replacement** | `./a2tex`, a pipeline for replacement textures, whether upscaled, generated or drawn by hand. It checks each one against the engine's format rules (bit depth, mip chains, size limits), installs it with a backup, and packs a set so others can install it. There are 84 recipes so far: skyboxes, nebulae, planets, UI and ship hulls |
 | **Video replacement** | a replacement `binkw32.dll` that plays the launch reels full screen and plays AV1 replacements in place of the original Bink movies, plus a pipeline to build them |
 | **Widened loading screen** | the 3D loading-screen model, rebuilt for widescreen |
-| **One switch** | `./a2mod stock` / `remastered` flips every layer at once for before/after comparisons |
+| **One switch** | `./a2mod stock` / `refit` flips every layer at once for before/after comparisons |
 | **Headless test bench** | `./a2test` runs the game on a copy of the install on a virtual display at any resolution, and takes screenshots and runs regression scenarios |
 
 ## No game content in this repository
@@ -84,16 +84,16 @@ overrides, the d3d8 chain, setting the resolution, and window management under H
     ./install                     # build and install every layer
     ./a2mod status                # what is installed, layer by layer
     ./a2mod stock                 # back to the game as it shipped
-    ./a2mod remastered            # and forward again
+    ./a2mod refit                 # and forward again
 
-Paths are taken from the environment, then `~/.config/armada2-remastered.conf`
+Paths are taken from the environment, then `~/.config/armada2-refit.conf`
 (`KEY=value` lines), then the defaults:
 
 | | Default |
 |---|---|
 | `A2_GAME` | Heroic's `~/Games/Heroic/Star Trek Armada II` |
 | `A2_PREFIX`, `A2_PROTON` | Heroic's prefix and Proton for it |
-| `A2_DATA` | `~/.local/share/armada2-remastered` (`%LOCALAPPDATA%` on Windows): extracted stock art, paid AI layers, builds. **Back up its `ai/` folders**; everything else can be rebuilt with a command |
+| `A2_DATA` | `~/.local/share/armada2-refit` (`%LOCALAPPDATA%` on Windows): extracted stock art, paid AI layers, builds. **Back up its `ai/` folders**; everything else can be rebuilt with a command |
 
 ## The layers
 
@@ -122,7 +122,7 @@ nothing:
 ## Entry points
 
     ./install                               install every layer
-    ./a2mod status | stock | remastered     switch every layer at once
+    ./a2mod status | stock | refit          switch every layer at once
     ./a2tex extract | build | install | pack | ...   the texture pipeline (textures/PACKS.md)
     ./a2test ...                            the game headless, for testing (testbench/)
     ./a2env.sh                              print where the game, prefix, Proton and assets are

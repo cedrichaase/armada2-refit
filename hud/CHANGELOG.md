@@ -27,7 +27,7 @@ Confirmed in game 2026-09-27.
 
 ### Changed
 - `install.sh`, `cursor-aspect.py`, `ui-font-condense.py` and `ui-widescreen.py` find the game through `a2env.sh` / `a2env.py` (`A2_GAME`, then
-  `~/.config/armada2-remastered.conf`, then Heroic's default) instead of a hard-coded
+  `~/.config/armada2-refit.conf`, then Heroic's default) instead of a hard-coded
   path.
 
 Installs nothing different; nothing to see in game.

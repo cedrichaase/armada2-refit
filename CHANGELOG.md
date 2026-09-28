@@ -1,9 +1,22 @@
-# Changelog — Armada II remastered
+# Changelog — Armada II Refit
 
 The project as a whole: the modpack's version, which layer versions it bundles, and
 changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
+
+## 7.0.0 — 2026-09-28
+
+Layers: testbench 2.0.0.
+
+### Changed
+- The project is renamed **Armada II Refit**, from Armada II Remastered. `a2env.sh` and
+  `a2env.py` default to `~/.config/armada2-refit.conf` and `~/.local/share/armada2-refit`;
+  the old names are no longer read.
+- `./a2mod refit` replaces `./a2mod remastered`, and the snapshot folder is
+  `$GAME/.a2mod/refit/`; a `state.json` that says `remastered` has to be edited to `refit`.
+
+Installs nothing new; no game-side change to confirm.
 
 ## 6.5.0 — 2026-09-27
 
@@ -106,7 +119,7 @@ Layers: platform 2.0.3, testbench 1.8.1; gameplay removed.
 
 ### Added
 - `A2_DATA` in `a2env.sh` / `a2env.py`: where assets live (default
-  `~/.local/share/armada2-remastered`, `%LOCALAPPDATA%` on Windows), never a working
+  `~/.local/share/armada2-refit`, `%LOCALAPPDATA%` on Windows), never a working
   tree. The private repository keeps every stock copy, paid layer and build there.
 
 Installs nothing different into the game.
@@ -118,7 +131,7 @@ testbench 1.8.0.
 
 ### Added
 - `a2env.sh` / `a2env.py`: one place that says where the game, its prefix and Proton
-  are — environment, then `~/.config/armada2-remastered.conf`, then Heroic's default. No
+  are — environment, then `~/.config/armada2-refit.conf`, then Heroic's default. No
   file names a user's home directory any more.
 - `./install`: every layer this repository owns, into `$A2_GAME`.
 - `a2test session start --install PATH` / `a2test run --install PATH`, repeatable: public
@@ -139,7 +152,7 @@ Layers: platform 2.0.1, menus 3.0.0.
 
 ### Removed
 - The texture work — `a2tex`, `textures/`, `models/`, `archive/`, `promo/` — moved to
-  the private repository `~/armada2-remastered-private`, because it cannot exist
+  the private repository `~/armada2-refit-private`, because it cannot exist
   without the game's own textures. So did `cutscenes/` (binkproxy with the upscaled
   intro) and the menu backdrop pipeline (`menus/backdrop.sh`, see
   `menus/CHANGELOG.md`). This repository's history was rewritten without them;
@@ -266,7 +279,7 @@ Installs nothing into the game. Confirmed working 2026-09-26.
 Layers: testbench 1.1.0.
 
 ### Added
-- The test bench measures the HUD and font against stock 4:3 rather than remastered
+- The test bench measures the HUD and font against stock 4:3 rather than refit
   4:3 (see `testbench/CHANGELOG.md`).
 
 Installs nothing into the game. Confirmed working 2026-09-26.
@@ -371,7 +384,7 @@ Project-level history from git. Layer work is in each layer's changelog.
   `e648a3a`).
 
 ### 2026-09-24
-- `./a2mod`: switches the whole game between stock and remastered by snapshot, with
+- `./a2mod`: switches the whole game between stock and refit by snapshot, with
   every file hash-checked (`53a5d0f`). The `models` and `cutscenes` layers were added
   to it (`704388e`).
 

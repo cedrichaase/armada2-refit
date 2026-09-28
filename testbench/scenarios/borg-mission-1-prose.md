@@ -1,7 +1,7 @@
 # Launch the first Borg mission, written as a person would say it
 
 Resolutions: 16:9
-Mod: remastered
+Mod: refit
 Timeout: 20 min
 
 The same test as `borg-mission-1.md`, in plain prose. Steps 2 and 3 match no

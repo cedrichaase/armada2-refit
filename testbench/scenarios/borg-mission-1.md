@@ -1,7 +1,7 @@
 # Launch the first Borg mission from the menus, then quit
 
 Resolutions: 16:9
-Mod: remastered
+Mod: refit
 Timeout: 12 min
 
 The whole front-end path a player takes into a campaign, in deterministic steps: every

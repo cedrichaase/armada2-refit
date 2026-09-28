@@ -1,7 +1,7 @@
 # The multiplayer name field is scaled with its menu
 
 Resolutions: 4:3, 21:9
-Mod: remastered
+Mod: refit
 Reference: 800x600 stock
 Stock shell: embed
 

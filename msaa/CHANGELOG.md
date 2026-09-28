@@ -8,7 +8,7 @@ Details are in [`README.md`](README.md).
 
 ### Changed
 - `install.sh` find the game through `a2env.sh` / `a2env.py` (`A2_GAME`, then
-  `~/.config/armada2-remastered.conf`, then Heroic's default) instead of a hard-coded
+  `~/.config/armada2-refit.conf`, then Heroic's default) instead of a hard-coded
   path.
 
 Installs nothing different; nothing to see in game.

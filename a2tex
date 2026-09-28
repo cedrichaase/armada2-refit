@@ -23,7 +23,7 @@
 #                           src/, src-alpha/, .units/, .alpha-units/   derived from the above
 #                           out/     the build, what `install` copies into the game
 #
-# A2_DATA comes from a2env.sh (default ~/.local/share/armada2-remastered). A checkout or
+# A2_DATA comes from a2env.sh (default ~/.local/share/armada2-refit). A checkout or
 # worktree holds no assets, so every one of them builds from and into the same place.
 # Every subcommand that reads stock/ fills it first. Builds run in isolated scratch dirs,
 # so -j is safe.

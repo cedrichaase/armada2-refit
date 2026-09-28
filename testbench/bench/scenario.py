@@ -4,7 +4,7 @@ A scenario is a markdown file (testbench/scenarios/README.md has the grammar):
 
     # Main menu is not stretched
     Resolutions: 4:3, 16:10, 16:9, 21:9
-    Mod: remastered
+    Mod: refit
 
     Free prose here is description and is ignored.
 
@@ -43,7 +43,7 @@ class Scenario:
     path: Path
     title: str
     resolutions: list
-    mod: str = 'remastered'
+    mod: str = 'refit'
     launch: str = '-nointro'
     reference: str = config.REFERENCE_ASPECT
     timeout: int = 900
@@ -73,7 +73,7 @@ class Scenario:
         return res, self.mod
 
 
-MODS = ('stock', 'remastered')
+MODS = ('stock', 'refit')
 
 
 def ref_label(key):
@@ -138,7 +138,7 @@ def parse(path):
     m = re.match(r'(\d+)\s*(min|m)', timeout)
     timeout = int(m.group(1)) * 60 if m else int(re.sub(r'\D', '', timeout) or 900)
     return Scenario(path=path, title=title, resolutions=resolutions,
-                    mod=hdr.get('mod', 'remastered').lower(),
+                    mod=hdr.get('mod', 'refit').lower(),
                     launch=hdr.get('launch', '-nointro').strip('`'),
                     reference=hdr.get('reference', config.REFERENCE_ASPECT),
                     timeout=timeout, description=' '.join(desc), steps=steps,
@@ -469,7 +469,7 @@ def s_expect_screen(c, m):
 
 TOLERANCE = r'(?:,? within (?:\+/-|±)?(?P<tol>\d+(?:\.\d+)?) ?%)?'   # per-step, else --tolerance
 
-STRETCH_REF = (r'(?: compared (?:with|to) (?:the )?(?:(?P<refmod>stock|remastered) )?(?P<ref>[\w:]+)'
+STRETCH_REF = (r'(?: compared (?:with|to) (?:the )?(?:(?P<refmod>stock|refit) )?(?P<ref>[\w:]+)'
                r'(?: reference)?)?')
 
 
@@ -623,7 +623,7 @@ class Case:
                                    assets=self.scn.assets or None, vnc=self.opts.get('vnc'),
                                    record=self.opts.get('record'), audio=self.opts.get('audio'),
                                    keep=self.opts.get('keep'), label=self.name,
-                                   installs=self.opts.get('installs') if self.mod == 'remastered' else None)
+                                   installs=self.opts.get('installs') if self.mod == 'refit' else None)
         self.log.meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps))
         status = 'pass'
         try:
@@ -804,7 +804,7 @@ class Case:
 
     def hud_right_to_screen(self, x, y):
         """HUD canvas units for an element anchored top RIGHT, given where stock's
-        1600-wide canvas puts it (the command bar's buttons, for one).  Remastered
+        1600-wide canvas puts it (the command bar's buttons, for one).  Refit
         declares the canvas round(1200*W/H) wide and moves right-anchored panels by the
         extra width (hud/README.md), then scales by H/1200; stock scales by W/1600."""
         W, H = self.res
@@ -815,7 +815,7 @@ class Case:
 
     def hud_to_screen(self, x, y):
         """HUD canvas units (1600x1200 as stock declares it) for an element anchored top
-        left.  Remastered re-declares the canvas 1200 high at the display's aspect, so
+        left.  Refit re-declares the canvas 1200 high at the display's aspect, so
         both axes scale by H/1200; stock scales across by W/1600 (hud/README.md)."""
         W, H = self.res
         sx = W / 1600 if self.mod == 'stock' else H / 1200

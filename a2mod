@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Switch the whole game between stock and remastered, for before/after comparisons.
+"""Switch the whole game between stock and refit, for before/after comparisons.
 
     ./a2mod status        which state each layer is in
     ./a2mod stock         put every visual change aside; the game looks as shipped
-    ./a2mod remastered    bring them back, byte for byte
+    ./a2mod refit         bring them back, byte for byte
     ./a2mod stock -n      (either direction) print what would happen, touch nothing
 
 WHY A SNAPSHOT AND NOT A REINSTALL
@@ -15,10 +15,10 @@ and the textures depend on textures/targets/*/out, which only the main checkout 
 branch happens to be checked out would quietly swap in something else, and a
 before/after taken across that is comparing the wrong "after".
 
-So `stock` MOVES every modded file into $GAME/.a2mod/remastered/ and puts stock back
-from the backups the tools already keep; `remastered` moves them back.  Same
+So `stock` MOVES every modded file into $GAME/.a2mod/refit/ and puts stock back
+from the backups the tools already keep; `refit` moves them back.  Same
 filesystem, so these are renames: instant, and exact by construction.  The manifest
-records a hash of every modded file, and `remastered` checks each one on the way back.
+records a hash of every modded file, and `refit` checks each one on the way back.
 
 WHAT COUNTS AS A CHANGE
 
@@ -51,9 +51,9 @@ Heroic is open.  enableOnLaunch=False launches with the effect bypassed -- and H
 still toggles it, which is the one live A/B this game has.
 
 The game must not be running.  Anything that writes the game directory while in stock
-(`a2tex install`, a tool's installer) is caught on the way back: `remastered` refuses
+(`a2tex install`, a tool's installer) is caught on the way back: `refit` refuses
 a file that is no longer stock rather than overwrite it.  Deleting $GAME/.a2mod while
-in stock loses the only copy of the unmerged layers -- run `remastered` first.
+in stock loses the only copy of the unmerged layers -- run `refit` first.
 """
 import hashlib
 import json
@@ -66,7 +66,7 @@ import time
 import a2env  # noqa: E402  (beside this script: where the game is)
 GAME = a2env.GAME
 STORE = os.path.join(GAME, '.a2mod')
-SNAP = os.path.join(STORE, 'remastered')
+SNAP = os.path.join(STORE, 'refit')
 STATE = os.path.join(STORE, 'state.json')
 VKCONF = os.path.join(os.environ.get('XDG_DATA_HOME', os.path.expanduser('~/.local/share')),
                       'a2-vkbasalt', 'vkBasalt.conf')
@@ -312,10 +312,10 @@ def to_stock(dry):
     status()
 
 
-def to_remastered(dry, force):
+def to_refit(dry, force):
     st = load_state()
     if not st or st['state'] != 'stock':
-        print('already remastered -- nothing set aside')
+        print('already refit -- nothing set aside')
         status()
         return
     entries = st['entries']
@@ -357,7 +357,7 @@ def to_remastered(dry, force):
         sys.exit(f'{len(wrong)} files do not match the manifest after restore, e.g. {wrong[:5]}')
     if st['bloom'] is not None:
         bloom_set(st['bloom'])
-    st['state'] = 'remastered'
+    st['state'] = 'refit'
     st['since'] = time.strftime('%Y-%m-%d %H:%M:%S')
     save_state(st)
     for d, _, _ in sorted(os.walk(SNAP), reverse=True):
@@ -365,7 +365,7 @@ def to_remastered(dry, force):
             os.rmdir(d)
         except OSError:
             pass
-    print(f'remastered: {len(entries)} files restored and verified against the manifest')
+    print(f'refit: {len(entries)} files restored and verified against the manifest')
     if any(e['rel'].split('/')[0].startswith(LEGACY_MENUS) for e in entries):
         print(f'note: this snapshot predates the menus rename and restored {LEGACY_MENUS}.*; '
               f'run menus/install.sh to replace it with Menus.asi (a Menus.asi beside it '
@@ -386,10 +386,10 @@ def status():
     st = load_state()
     entries = st['entries'] if st else None
     if entries is None:
-        # Never switched: describe what is there, all of it remastered by definition.
+        # Never switched: describe what is there, all of it refit by definition.
         live = discover()
-        print(f'state: remastered (never switched -- no snapshot yet)')
-        report(live, 'remastered')
+        print(f'state: refit (never switched -- no snapshot yet)')
+        report(live, 'refit')
     else:
         print(f'state: {st["state"]}  (since {st["since"]})')
         by = {}
@@ -398,7 +398,7 @@ def status():
             if st['state'] == 'stock':
                 s = 'stock' if is_stock(cur, e) else 'MODIFIED'
             else:
-                s = 'remastered' if is_mod(cur, e) else 'CHANGED'
+                s = 'refit' if is_mod(cur, e) else 'CHANGED'
             by.setdefault(e['layer'], {}).setdefault(s, 0)
             by[e['layer']][s] += 1
         for layer in LAYERS:
@@ -424,14 +424,14 @@ def main():
     if cmd == 'status':
         status()
         return
-    if cmd not in ('stock', 'remastered'):
+    if cmd not in ('stock', 'refit'):
         sys.exit(f'unknown command {cmd!r} -- see ./a2mod --help')
     if game_running() and not dry:
         sys.exit('refusing: Armada2.exe is running -- quit the game first')
     if cmd == 'stock':
         to_stock(dry)
     else:
-        to_remastered(dry, force)
+        to_refit(dry, force)
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ of the method were established on them. Built against the GOG release running un
 Heroic/Proton on Arch.
 
 Game directory: wherever `./a2env.sh` says — Heroic's default, `~/Games/Heroic/Star Trek Armada II`,
-unless `A2_GAME` or `~/.config/armada2-remastered.conf` says otherwise (the repository root's `a2env.sh`).
+unless `A2_GAME` or `~/.config/armada2-refit.conf` says otherwise (the repository root's `a2env.sh`).
 Textures live in `Textures/RGB/` (flat, 2115 `.tga` files, 196 MB stock).
 
 > Sizes here are **byte totals**, not `du`. `du` reports 205 MB for the same stock set,
@@ -34,7 +34,7 @@ Textures live in `Textures/RGB/` (flat, 2115 `.tga` files, 196 MB stock).
                           Never in a checkout: it is derived from the game's art
 
 `A2_DATA` is resolved by `a2env.sh` at the repository root: the environment, then
-`~/.config/armada2-remastered.conf`, then `~/.local/share/armada2-remastered`. Every
+`~/.config/armada2-refit.conf`, then `~/.local/share/armada2-refit`. Every
 checkout and worktree builds from and into the same one, and nothing in it is ever
 committed: it holds the game's own art and what is made from it.
 
@@ -1575,7 +1575,7 @@ bound on a quantity that is probably several times smaller in practice. The figu
 matters is the per-match working set, which is roughly two factions' hulls plus the map
 and the UI, not the sum over every faction.
 
-The honest test is to launch a heavy match — two remastered factions, a big map — and
+The honest test is to launch a heavy match — two refit factions, a big map — and
 watch RSS and VRAM. Until someone does that, sizing by "how much is on disk" is
 cargo-culting a number that was never measured. If it ever does bite, the lever is
 `ST3D_PRELOAD_TEXTURES = 0`: lazy loading, paying in stutter instead of memory. Disk

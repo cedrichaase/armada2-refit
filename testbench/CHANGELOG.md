@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.0.0 — 2026-09-28
+
+### Changed
+- The modded state is called `refit`, after the project: `Mod: refit` in a scenario and
+  `--mod refit` on the command line, in place of `remastered`, which is no longer read.
+  Every scenario in `scenarios/` is updated.
+
+Installs nothing; no game-side change to confirm.
+
 ## 1.12.0 — 2026-09-27
 
 ### Added
@@ -56,7 +65,7 @@ Installs nothing into the game.
 
 ### Changed
 - `README.md`'s stacked-install example uses the sibling checkouts, `.` and
-  `../armada2-remastered-private`. A private worktree now installs the same builds as
+  `../armada2-refit-private`. A private worktree now installs the same builds as
   any other private checkout: they live in `$A2_DATA`.
 
 Installs nothing into the game.
@@ -147,7 +156,7 @@ Installs nothing into the game. Confirmed working 2026-09-26.
 - `HUD.log` and `HUD.ini` are collected with each case's logs.
 
 ### Changed
-- The remastered prepare step is `hud/install.sh` (`HUD.asi`), the same for every
+- The refit prepare step is `hud/install.sh` (`HUD.asi`), the same for every
   case, in place of `ui-widescreen.py`, `cursor-aspect.py` and `ui-font-condense.py`
   run with `--res` per case.
 
@@ -194,7 +203,7 @@ Installs nothing into the game. Confirmed working 2026-09-26.
 - A case cut short by Ctrl-C/SIGTERM is an error, not a PASS.
 
 Installs nothing into the game. Measured run 20260926-030021: stock 800x600 PASS;
-remastered HUD within 2% of stock at 4:3, 16:10, 16:9 and 21:9, font 0.91-0.94x.
+refit HUD within 2% of stock at 4:3, 16:10, 16:9 and 21:9, font 0.91-0.94x.
 Confirmed working 2026-09-26.
 
 ## 1.2.1 — 2026-09-26
@@ -229,7 +238,7 @@ Installs nothing into the game. Confirmed working 2026-09-26.
 
 ### Changed
 - `hud.md` measures the HUD and font against **stock** 4:3, the shape they were drawn
-  for, instead of remastered 4:3. The judge brief no longer excuses a condensed font.
+  for, instead of refit 4:3. The judge brief no longer excuses a condensed font.
 
 Installs nothing into the game. Confirmed working 2026-09-26.
 

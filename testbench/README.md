@@ -175,7 +175,7 @@ that OCR locates in the reference. `stock-control.md` is the control that shows 
 measurement can fail.
 
 **What the reference is.** For the HUD, cursors and font the baseline is **stock at
-800x600**: the shape and resolution the original game was designed for. Remastered 4:3
+800x600**: the shape and resolution the original game was designed for. Refit 4:3
 is not a baseline, because the mod changes things at 4:3 too (the font is condensed at
 every resolution), and a comparison against it would pass anything the mod gets
 consistently wrong. At 800x600 the front end's own 800x600 mode fills the screen, so

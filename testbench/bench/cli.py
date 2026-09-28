@@ -25,7 +25,7 @@ a2test -- run Armada II headless and test it end to end
       --audio                          let the game make sound (default: no audio driver)
       --keep                           keep the game/prefix clone after the case
       --no-claude                      judged steps become REVIEW, agent steps fail
-      --install PATH                   remastered cases: stock, then PATH/install, in
+      --install PATH                   refit cases: stock, then PATH/install, in
                                        order; repeatable (see session start)
       --tolerance 0.05                 allowed stretch for the measured checks
   a2test check SCENARIO...             parse only: show how each step would run
@@ -274,7 +274,7 @@ def cmd_session(argv):
     if sub == 'start':
         ap = argparse.ArgumentParser(prog='a2test session start')
         ap.add_argument('--res', default='16:9')
-        ap.add_argument('--mod', default='remastered', choices=['remastered', 'stock'])
+        ap.add_argument('--mod', default='refit', choices=['refit', 'stock'])
         ap.add_argument('--vnc', action='store_true')
         ap.add_argument('--record', action='store_true')
         ap.add_argument('--audio', action='store_true')
@@ -285,7 +285,7 @@ def cmd_session(argv):
         ap.add_argument('--install', action='append', default=[], metavar='PATH')
         a = ap.parse_args(rest)
         if a.install and a.mod == 'stock':
-            ap.error('--install builds a remastered state; it cannot go with --mod stock')
+            ap.error('--install builds a refit state; it cannot go with --mod stock')
         res = config.parse_res(a.res)
         sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
