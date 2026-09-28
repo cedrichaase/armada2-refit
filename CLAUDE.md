@@ -135,12 +135,12 @@ again, finish in this order:
 1. **Record the confirmation** on the branch: `Confirmed in game YYYY-MM-DD` in place
    of "Installed, not yet seen in game", in the layer and root changelogs (above), and
    commit.
-2. **Merge into `master`** from the main checkout, with
+2. **Merge into `main`** from the main checkout, with
    `git merge --no-ff <branch> -m "Merge <branch>: <what>"`. Resolve version clashes as
    "Parallel worktrees" says. There is no remote, so there is nothing to push.
 3. **Clean up.** Remove the worktree (`git worktree remove`) and delete its branch
    (`git branch -d`). Then do the same for any other worktree whose branch
-   `git branch --merged master` lists. Use only the safe forms, never `--force` or
+   `git branch --merged main` lists. Use only the safe forms, never `--force` or
    `-D`. If one refuses because of uncommitted changes or unmerged commits, leave it
    and tell the user.
 
