@@ -6,7 +6,8 @@
 #   game/     what goes beside Armada2.exe: the four plugins and their .ini, dxvk.conf
 #   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
 #   install.sh  install.ps1  install.bat     publish/installer/, for Linux and Windows
-#   prereqs.txt  CREDITS.txt  what they download first, and who made it
+#   vendor/   third-party files whose licence allows bundling (platform/vendor/)
+#   prereqs.txt  CREDITS.txt  what they install first, and who made it
 #   README.txt  LICENSE  SHA256SUMS
 # <version> is the root CHANGELOG.md's newest entry. Only our own code goes in: no asset,
 # nothing from the game, no third-party shader, none of the test tools (probe.exe,
@@ -51,14 +52,20 @@ for c in $(awk '{print $2}' "$root/publish/installer/shaders.txt"); do
         || { echo "shaders.txt pins $c, which postfx/vkbasalt/build.sh does not" >&2; exit 1; }
 done
 cp "$root/publish/installer/install.sh" "$root/publish/installer/install.ps1" "$d/"
-# What the installers download first, pinned by hash: never in the zip itself.
+# What the installers put in first. Bundled (url "-") comes from platform/vendor/, whose
+# licence allows it; the rest is downloaded, pinned by hash.
 cp "$root/publish/installer/prereqs.txt" "$d/"
+while IFS='|' read -r pname pver _ _ _ purl _; do
+    [ "$purl" = - ] || continue
+    mkdir -p "$d/vendor/$pname"
+    cp "$root/platform/vendor/$pname-$pver/"* "$d/vendor/$pname/"
+done < "$root/publish/installer/prereqs.txt"
 # cmd.exe wants CRLF.
 sed 's/$/\r/' "$root/publish/installer/install.bat" > "$d/install.bat"
 cp "$root/LICENSE" "$d/"
 
 # Every binary must be a 32-bit PE: a host-arch object here would load nowhere.
-for f in "$d"/game/*.asi "$d"/game/*.dll; do
+for f in "$d"/game/*.asi "$d"/game/*.dll "$d"/vendor/*/*.asi "$d"/vendor/*/*.dll; do
     objdump -f "$f" | grep -q 'file format pei-i386' \
         || { echo "not a 32-bit PE: $f" >&2; exit 1; }
 done
@@ -122,16 +129,18 @@ EOF
 
 # Credits for everything the installers fetch, from the same lists they read.
 {
-    echo "Armada II Refit downloads these when you install it. None of them is in this"
-    echo "zip; each comes from where its authors publish it, checked against the SHA-256"
-    echo "in prereqs.txt or bloom/shaders.txt. Thank you to all of them."
+    echo "Armada II Refit installs these beside its own work. Thank you to all of them."
+    echo "Those whose licence allows it are in this zip, in vendor/ with their licence"
+    echo "text; the others are downloaded from where their authors publish them, checked"
+    echo "against the SHA-256 in prereqs.txt or bloom/shaders.txt."
     echo
-    while IFS='|' read -r pname pver pauthor plic ppage _; do
+    while IFS='|' read -r pname pver pauthor plic ppage purl _; do
         [ -n "$pname" ] || continue
         echo "$pname $pver"
         echo "    by       $pauthor"
         echo "    licence  $plic"
-        echo "    from     $ppage"
+        if [ "$purl" = - ]; then echo "    in       vendor/$pname/, as published at $ppage"
+        else echo "    from     $ppage (downloaded)"; fi
         echo
     done < "$root/publish/installer/prereqs.txt"
     echo "MagicBloom (bloom, only with vkBasalt or ReShade)"
@@ -145,7 +154,7 @@ EOF
     echo "    from     https://github.com/crosire/reshade-shaders"
 } > "$d/CREDITS.txt"
 
-(cd "$d" && sha256sum -- game/* bloom/* prereqs.txt > SHA256SUMS)
+(cd "$d" && sha256sum -- game/* bloom/* vendor/*/* prereqs.txt > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")
 echo "$out/$name.zip"

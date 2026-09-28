@@ -6,7 +6,7 @@
 #
 # No choices to make: what can work here is installed, the rest is skipped and says why.
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch, and
-# Patch Project 1.2.5), downloaded and hash-checked, each only if it is missing. MSAA.asi
+# Patch Project 1.2.5), bundled or downloaded and hash-checked, each only if missing. MSAA.asi
 # goes in when DXVK's d3d8.dll is in the game directory (without DXVK the minimap goes
 # black); bloom is set up when a vkBasalt layer is installed.
 #
@@ -94,8 +94,9 @@ echo "installing into $game"
 
 # ------------------------------------------------------------------ prerequisites
 
-# The ASI loader, STA2WidescreenPatch and Patch Project 1.2.5 (prereqs.txt): downloaded
-# from where their authors publish them, pinned by SHA-256, never redistributed here.
+# The ASI loader, STA2WidescreenPatch and Patch Project 1.2.5 (prereqs.txt). One whose
+# licence allows it is in the zip, under vendor/<name>/ (its url is "-"); the others are
+# downloaded from where their authors publish them, pinned by SHA-256.
 # A file already in the game directory is never overwritten. What this adds is recorded
 # in $MANIFEST with its hash, so --uninstall takes out only that, and only unchanged.
 record() { echo "$1 $2 $(sha256sum "$game/$2" | cut -d' ' -f1)${3:+ $3}" >> "$MANIFEST"; }
@@ -116,17 +117,22 @@ fetch() {   # url sha256 out -- or a file with that hash in the package's downlo
 }
 
 prereq() {   # name|version|author|licence|page|url|sha256|members
-    local name ver author lic page url sum members m b src
+    local name ver author lic page url sum members m b src dir
     IFS='|' read -r name ver author lic page url sum members <<< "$1"
     b="${members%% *}"; b="${b##*/}"
     if [ -e "$game/$b" ]; then echo "  $name: already installed"; return 0; fi
-    fetch "$url" "$sum" "$work/$name.zip" || {
-        echo "could not download $name $ver. Get it from $page," >&2
-        echo "put the zip in $here/downloads/ and run this again." >&2
-        exit 1; }
-    unpack "$work/$name.zip" "$work/$name"
+    if [ "$url" = - ]; then
+        dir="$here/vendor/$name"
+    else
+        fetch "$url" "$sum" "$work/$name.zip" || {
+            echo "could not download $name $ver. Get it from $page," >&2
+            echo "put the zip in $here/downloads/ and run this again." >&2
+            exit 1; }
+        unpack "$work/$name.zip" "$work/$name"
+        dir="$work/$name"
+    fi
     for m in $members; do
-        b="${m##*/}"; src="$work/$name/$m"
+        b="${m##*/}"; src="$dir/$m"
         if [ "$b" = d3d8.dll ] && [ -e "$game/d3d8.dll" ]; then
             if is_dxvk "$game/d3d8.dll"; then
                 # DXVK keeps the slot; the proxy waits where platform/d3d8-chain.py keeps it.

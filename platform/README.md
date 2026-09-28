@@ -40,6 +40,9 @@ its own. `platform/d3d8-chain.py` owns the `d3d9` entry and `autoInstallDxvk` (b
     STA2WidescreenPatch.asi      9216      the patch itself
     winmm.dll                    2169856   Ultimate ASI Loader (ThirteenAG)
 
+The same two files, unmodified, are vendored in `platform/vendor/STA2WidescreenPatch-1.0/`
+with their MIT licences; the release zip installs them from there (`publish/README.md`).
+
 It only loads because of the `winmm=n,b` override above. Without it Wine uses its
 builtin winmm, the loader never runs, and the patch is inert with no error.
 

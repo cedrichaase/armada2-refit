@@ -6,6 +6,18 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 2.1.0 — 2026-09-28
+
+### Added
+- `vendor/STA2WidescreenPatch-1.0/`: `STA2WidescreenPatch.asi` (Ligushka, MIT) and
+  the Ultimate ASI Loader 4.68 as `winmm.dll` (ThirteenAG, MIT), unmodified from the
+  v1.0 GitHub release, with both licences and a `SOURCE.txt` of hashes. The release
+  zip's installers install them from here. The first binaries in the repository;
+  `publish/check.sh` accepts them because of their licence file and `SOURCE.txt`.
+
+The same files as on the development install, byte for byte; installing them is new
+only for the release zip, which is not yet seen in game.
+
 ## 2.0.3 — 2026-09-27
 
 ### Changed

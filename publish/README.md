@@ -24,12 +24,21 @@ from a 256px stock file to a 1024px plate *is* the plate.)
 | the recipes — each target's `target.conf` and `stock.sha256`, `movie.conf`, `backdrops/*.conf` | yes | parameters, file names and SHA-256 hashes of stock files: facts about the game, not its content. The hashes are how `a2tex stock` knows it extracted the right bytes |
 | **any asset** — stock copies, AI upscales, intermediates, builds, the intro, the plates, the paid seeds, the archive of candidates and comparisons, the promo footage | **no** | the game's own art and video, or derived from them. They live in `A2_DATA` |
 
-Third-party code this project *uses* but does not contain — DXVK (zlib), the Ultimate
-ASI Loader (MIT), vkBasalt (zlib), crosire's reshade-shaders (per-file), the
-`STA2WidescreenPatch` (MIT), Patch Project 1.2.5 (no licence stated) — is not in the
-repository, nor in the release zip. The zip's installers download what they need from
-where its authors publish it, pinned by hash, and `CREDITS.txt` names each author,
-licence and source.
+Third-party code is in the repository and the release zip **only where its licence
+expressly allows redistribution**. It is vendored unmodified under
+`platform/vendor/<name>-<version>/` with its licence text and a `SOURCE.txt` (where it
+came from, and each file's sha256), and `check.sh` accepts a binary nowhere else. Today
+that is `STA2WidescreenPatch` 1.0 (MIT) with the Ultimate ASI Loader 4.68 it bundles
+(MIT).
+
+| Third-party | Licence | Here |
+|---|---|---|
+| `STA2WidescreenPatch` 1.0, Ultimate ASI Loader 4.68 | MIT | vendored; in the zip |
+| Patch Project 1.2.5 | none stated ("freeware") | no: the installers download it, pinned by hash |
+| MagicBloom, ReShade's `.fxh` headers | MIT; CC0 and none | no: fetched with bloom, since `ReShadeUI.fxh` states no licence and the three go together |
+| DXVK, vkBasalt | zlib | not yet: whether the installers should use them is open (below) |
+
+`CREDITS.txt` in the zip names each author, licence and source.
 
 `a2mod` switches every layer on the game directory only (`.a2neb-backup` files,
 `$GAME/.a2mod/`) and needs no asset to do it.
@@ -121,12 +130,12 @@ ReShade, is documented in `README.txt` and optional. They do the same on both sy
 - find the game: the argument, else the folder they were unzipped into, else Heroic's
   default or GOG's registry entry;
 - install the prerequisites in `prereqs.txt` that are missing: `STA2WidescreenPatch`
-  1.0, which brings the Ultimate ASI Loader 4.68 as `winmm.dll` (from its GitHub
-  release), and Patch Project 1.2.5 (the ZIP from armadafiles.com, the page the
-  widescreen patch's own README links; its NSIS installer refuses GOG installs). Each is
-  checked against a pinned SHA-256; both match the install this project is developed
-  on byte for byte. A zip with the right hash in `downloads/` beside the installer is
-  used instead, for offline installs. **A file already there is never overwritten**,
+  1.0, which brings the Ultimate ASI Loader 4.68 as `winmm.dll` (bundled, from
+  `vendor/`), and Patch Project 1.2.5 (downloaded: the ZIP from armadafiles.com, the
+  page the widescreen patch's own README links; its NSIS installer refuses GOG
+  installs), checked against a pinned SHA-256. Both match the install this project is
+  developed on byte for byte. A zip with the right hash in `downloads/` beside the
+  installer is used instead of a download, for offline installs. **A file already there is never overwritten**,
   with one exception: GOG's `d3d8.dll` (d3d8to9) gives way to Patch Project's proxy, as
   Patch Project's instructions say, and is kept as `d3d8.dll.gog-backup`. A DXVK
   `d3d8.dll` stays, and the proxy goes to `d3d8.dll.proxy-backup`, where
@@ -166,7 +175,12 @@ They download for real, so CI also notices when a pinned download moves.
 
 ### Next
 
-The installers could also set up DXVK. On Linux the launcher settings
+**Open: DXVK.** Bundling it is allowed (zlib), and the installers could put it in the
+game directory, which would install MSAA everywhere and make `dxvk.conf` apply. But
+Patch Project's `d3d8.dll` proxy is what loads `Armada2Hook.dll`, so DXVK in the
+`d3d8.dll` slot means Patch Project does not load at all -- as on the development
+install today. That is a choice between the two, not a default to slip in.
+ On Linux the launcher settings
 (`WINEDLLOVERRIDES`, and bloom's two variables) are still the player's job; `install.sh`
 prints them. Patch Project comes from a mirror over plain HTTP, whose certificate does
 not match; the hash is what makes that safe, and a second mirror would make it

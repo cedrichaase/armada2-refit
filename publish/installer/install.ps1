@@ -6,8 +6,7 @@ Armada II Refit -- install the release package into the game, on Windows.
 
 No choices to make: what can work here is installed, the rest is skipped and says why.
 First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch, and Patch
-Project 1.2.5, plus Microsoft's Visual C++ runtime if it is missing), downloaded and
-checked, each only if it is missing. MSAA.asi goes in when DXVK's d3d8.dll is in the
+Project 1.2.5), bundled or downloaded and hash-checked, each only if it is missing. MSAA.asi goes in when DXVK's d3d8.dll is in the
 game directory -- without DXVK the minimap goes black. The bloom preset goes in when ReShade is installed for the game;
 installing ReShade is optional and by hand (README.txt), then run this again.
 
@@ -112,8 +111,9 @@ Write-Host "installing into $GameDir"
 
 # ------------------------------------------------------------------ prerequisites
 
-# The ASI loader, STA2WidescreenPatch and Patch Project 1.2.5 (prereqs.txt): downloaded
-# from where their authors publish them, pinned by SHA-256, never redistributed here.
+# The ASI loader, STA2WidescreenPatch and Patch Project 1.2.5 (prereqs.txt). One whose
+# licence allows it is in the zip, under vendor\<name>\ (its url is "-"); the others are
+# downloaded from where their authors publish them, pinned by SHA-256.
 # A file already in the game directory is never overwritten. What this adds is recorded
 # in $Manifest with its hash, so -Uninstall takes out only that, and only unchanged.
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -140,12 +140,16 @@ foreach ($line in Get-Content -LiteralPath (Join-Path $here "prereqs.txt")) {
     $name, $ver, $author, $lic, $page, $url, $sum, $members = $line -split "\|"
     $members = $members -split " "
     if (Test-Path -LiteralPath (G (Split-Path -Leaf $members[0]))) { Write-Host "  ${name}: already installed"; continue }
-    $zip = Join-Path $work "$name.zip"
-    if (-not (Get-Zip $url $sum $zip)) {
-        throw "could not download $name $ver. Get it from $page, put the zip in $(Join-Path $here 'downloads') and run this again."
+    if ($url -eq "-") {
+        $x = Join-Path $here "vendor\$name"
+    } else {
+        $zip = Join-Path $work "$name.zip"
+        if (-not (Get-Zip $url $sum $zip)) {
+            throw "could not download $name $ver. Get it from $page, put the zip in $(Join-Path $here 'downloads') and run this again."
+        }
+        $x = Join-Path $work $name
+        Expand-Archive -LiteralPath $zip -DestinationPath $x
     }
-    $x = Join-Path $work $name
-    Expand-Archive -LiteralPath $zip -DestinationPath $x
     foreach ($m in $members) {
         $b = Split-Path -Leaf $m; $src = Join-Path $x $m
         if ($b -eq "d3d8.dll" -and (Test-Path -LiteralPath (G "d3d8.dll"))) {

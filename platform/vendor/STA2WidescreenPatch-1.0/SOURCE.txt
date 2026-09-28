@@ -1,0 +1,14 @@
+STA2WidescreenPatch 1.0 -- by Ligushka, MIT (LICENSE)
+    https://github.com/Ligushka/STA2WidescreenPatch/releases/tag/v1.0
+    from STA2WidescreenPatch.zip, sha256 56ce373798a73afdfdada9e277c5a87bfff5f4156775cb89f147b13ae53b68e1
+    LICENSE from the repository at the v1.0 tag, commit 46a72e2d3092dca2e303682cc5167d30e54067dc
+
+It bundles the Ultimate ASI Loader 4.68 (x86) as winmm.dll -- by ThirteenAG, MIT
+(UltimateASILoader-license.txt, as shipped in the zip)
+    https://github.com/ThirteenAG/Ultimate-ASI-Loader
+
+Unmodified. publish/check.sh allows a binary in the repository only here, under
+platform/vendor/, and only with its sha256 listed below:
+
+193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5  STA2WidescreenPatch.asi
+baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5  winmm.dll

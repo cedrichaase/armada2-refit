@@ -7,7 +7,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 7.2.0 — 2026-09-28
 
-Layers: postfx 1.1.0.
+Layers: platform 2.1.0, postfx 1.1.0.
 
 ### Added
 - The release zip, now `armada2-refit-<version>.zip`, carries the renderer and bloom too:
@@ -19,9 +19,13 @@ Layers: postfx 1.1.0.
   `d3d8.dll` (told by content), and leave a foreign `dxvk.conf` alone. They set up
   bloom when vkBasalt or ReShade is installed, fetching the shaders pinned and
   hash-checked.
-- The installers also install the prerequisites when missing, downloaded from where
-  their authors publish them and pinned by SHA-256 (`prereqs.txt`): STA2WidescreenPatch
-  1.0 with the Ultimate ASI Loader 4.68, and Patch Project 1.2.5. They never overwrite a
+- The installers also install the prerequisites when missing (`prereqs.txt`):
+  STA2WidescreenPatch 1.0 with the Ultimate ASI Loader 4.68, bundled because both are
+  MIT, and Patch Project 1.2.5, which states no licence and so is downloaded from where
+  it is published, pinned by SHA-256.
+- Third-party binaries whose licence expressly allows it are vendored in
+  `platform/vendor/` with their licences and hashes, and `publish/check.sh` accepts a
+  binary only there, only with a licence file and only matching `SOURCE.txt`. They never overwrite a
   file except GOG's `d3d8.dll`, which is kept as `d3d8.dll.gog-backup`, and `--uninstall`
   removes only what they added and nobody changed since. `CREDITS.txt` in the zip
   names each author, licence and source.
