@@ -17,7 +17,7 @@ jobs:
   publishable:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Every new commit is publishable (publish/check.sh)
@@ -42,7 +42,7 @@ jobs:
     outputs:
       version: ${{ steps.pkg.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install clang, lld-link and llvm-dlltool
         run: |
           sudo apt-get update -qq
@@ -54,7 +54,7 @@ jobs:
           zip=$(publish/package.sh dist)
           echo "version=$(basename "$zip" | sed 's/^armada2-refit-\(.*\)-plugins\.zip$/\1/')" >> "$GITHUB_OUTPUT"
           unzip -l "$zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: armada2-refit-plugins-${{ github.sha }}
           path: dist/*.zip
@@ -70,8 +70,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ needs.plugins.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: armada2-refit-plugins-${{ github.sha }}
           path: dist
