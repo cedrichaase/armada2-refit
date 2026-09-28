@@ -1,7 +1,7 @@
 # Campaign selection screen renders correctly at every aspect ratio
 
 Resolutions: 4:3, 16:10, 16:9, 21:9
-Mod: remastered
+Mod: refit
 
 The single-player screen has the second backdrop plate (menus 1.0.0, `[Backdrops] 2=`,
 with `2.soften=` for the Tutorials glow). It is reached by clicking the emblem, not the

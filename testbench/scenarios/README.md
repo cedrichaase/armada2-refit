@@ -7,7 +7,7 @@ A scenario is a markdown file here. `./a2test run <name>` runs it once per resol
 # Title of the test
 
 Resolutions: 4:3, 16:10, 16:9, 21:9       (aspects or WxH; "all" = these four)
-Mod: remastered                           (or stock: a2mod stock, on the clone)
+Mod: refit                           (or stock: a2mod stock, on the clone)
 Launch: -nointro a2_borg01                (Armada2.exe arguments; default -nointro)
 Reference: 4:3 stock                      (what "compared with" means; default 4:3 in
                                            this scenario's own mod state)

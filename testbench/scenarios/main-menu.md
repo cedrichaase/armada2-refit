@@ -1,7 +1,7 @@
 # Main menu renders correctly at every aspect ratio
 
 Resolutions: 4:3, 16:10, 16:9, 21:9
-Mod: remastered
+Mod: refit
 
 The shell is 800x600 art. Menus.asi scales it to the screen height and centres it. The
 outpainted backdrop plate fills the rest of the screen (menus 1.0.0, `Backdrops=1`), so

@@ -1,7 +1,7 @@
 # The in-mission HUD and font keep their shape at every aspect ratio
 
 Resolutions: 4:3, 16:10, 16:9, 21:9
-Mod: remastered
+Mod: refit
 Reference: 800x600 stock
 Stock shell: embed
 Timeout: 12 min
@@ -15,12 +15,12 @@ for the same reason. (In front of space, as at the Borg briefing, the lines hud 
 fixes are there and can hardly be seen.)
 
 `HUD.asi` re-declares the layout canvas and condenses the font at run time, for the
-mode the game is in. Every remastered case runs the same install (`hud/install.sh`,
+mode the game is in. Every refit case runs the same install (`hud/install.sh`,
 which takes no resolution), so a pass at every aspect is the claim being tested.
 
 The baseline is **stock at 800x600**, the resolution the game was designed around:
 the front end runs in its own 800x600 mode, so nothing is stretched and clicks map 1:1.
-It is not the remastered 4:3 case, so that case is measured too, and any change the mod
+It is not the refit 4:3 case, so that case is measured too, and any change the mod
 makes at 4:3 counts against it like a stretch at 21:9 would. Regions are in reference
 pixels (800x600): the start of the resource bar, the inside of the left (minimap) panel,
 and the command bar at the top right (the right panel is mostly the ship portrait, which

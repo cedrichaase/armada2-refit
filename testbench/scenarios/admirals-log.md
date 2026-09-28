@@ -1,7 +1,7 @@
 # The Admiral's Log renders correctly on a map, at every aspect ratio
 
 Resolutions: 4:3, 16:10, 16:9, 21:9
-Mod: remastered
+Mod: refit
 Launch: -nointro a2_borg01
 
 Regression test for menus 2.0.1. The log's tab panes are embedded as its children, so

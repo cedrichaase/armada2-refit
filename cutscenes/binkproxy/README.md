@@ -27,7 +27,7 @@ the buffer. Nothing in the game's config reaches either number.
     cutscenes/binkproxy/install.sh                              # DLL + every built movie
     cutscenes/binkproxy/install.sh --remove                     # full uninstall
 
-`./a2mod stock` / `remastered` switches the whole thing as the `cutscenes`
+`./a2mod stock` / `refit` switches the whole thing as the `cutscenes`
 layer: the DLL through its `.a2neb-backup`, plus `binkw32_orig.dll`,
 `BinkProxy.ini` and every `animations/*.mp4`/`.wav` that stands beside a
 `.bik`.
@@ -36,7 +36,7 @@ layer: the DLL through its `.a2neb-backup`, plus `binkw32_orig.dll`,
 
 Laid out like a texture target, and for the same reason: keep the paid layer, so
 everything downstream of it can be changed for free. The recipe is committed; every
-layer is in `A2_DATA` (`a2env.sh`, default `~/.local/share/armada2-remastered`), never
+layer is in `A2_DATA` (`a2env.sh`, default `~/.local/share/armada2-refit`), never
 in the checkout.
 
 | | | |

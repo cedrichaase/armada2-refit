@@ -118,7 +118,7 @@ Not the whole cycle, because it is also where the game ends a mission's state:
 Faint lines ran through the briefing panel (a 5x4 grid of 256x256 `uiObjectives`
 sprites, drawn by `StandardBackground`) at every aspect but 4:3, and along the joins
 of HUD panels built from pieces: the 3D view showing through a 1–2 px gap between
-two quads. The textures were not it: stock and remastered tiles match their
+two quads. The textures were not it: stock and refit tiles match their
 neighbours across every edge to within 2–3 levels, the same as any two interior
 columns. Measured by replacing the tiles in a bench clone with a flat red/green
 checkerboard with each edge texel marked, MSAA off: at 16:10 every tile drew 255 px

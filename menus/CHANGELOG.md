@@ -56,7 +56,7 @@ The installed plugin and plates are unchanged.
 
 ### Removed
 - `backdrop.sh` and `backdrops/*.conf` moved to the private repository
-  (`~/armada2-remastered-private/menus/`, with the plates and paid seeds and
+  (`~/armada2-refit-private/menus/`, with the plates and paid seeds and
   `BACKDROPS.md`): the plates are the game's own art, upscaled. MAJOR because a tool
   leaves this layer.
 

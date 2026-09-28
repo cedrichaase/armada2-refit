@@ -1,7 +1,7 @@
 # The game runs with every layer installed and no assets built
 
 Resolutions: 16:9
-Mod: remastered
+Mod: refit
 Assets: none
 
 What someone gets who installs this repository without making a texture pack. `A2_DATA`

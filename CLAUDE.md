@@ -3,14 +3,14 @@
 Tooling for remastering Star Trek: Armada II — the HUD, the menus, anti-aliasing and
 bloom as run-time plugins; the texture pipeline (`a2tex`), the widened loading screen,
 the cutscene proxy and the movie and menu-backdrop pipelines; and `a2mod`, which
-switches the whole game between stock and remastered.
+switches the whole game between stock and refit.
 
 **This repository is published.** It holds code, configuration, recipes and docs only —
 nothing derived from the game's own files (hard rule 8, `publish/README.md`). **Every
 asset lives in `$A2_DATA`**, never in a working tree: the stock art extracted from the
 player's own install, the paid `ai/` layers, every intermediate and every build, one
 work directory per texture target, movie and menu backdrop. `A2_DATA` comes from
-`a2env.sh` (default `~/.local/share/armada2-remastered`), and every checkout and
+`a2env.sh` (default `~/.local/share/armada2-refit`), and every checkout and
 worktree shares it. **Every layer must work without assets**: with nothing built, an
 asset layer installs nothing and says so, and the game keeps its own art.
 `./a2test run no-assets` checks it; run it after changing any installer.
@@ -18,7 +18,7 @@ asset layer installs nothing and says so, and the game keeps its own art.
 ## Layout
 
 The repo is laid out by **`a2mod` layer**: each folder is one thing `./a2mod` switches
-between stock and remastered (or, for `platform/`, something it deliberately leaves
+between stock and refit (or, for `platform/`, something it deliberately leaves
 alone). `./a2mod status` names the layers. Every folder has:
 
 - a **`README.md`** — how the layer works and *why*: derivations, measurements, traps;
@@ -51,8 +51,8 @@ testing, `./a2tex` for textures, `./install`, which installs every layer, and
 **Never hard-code a path to the game, its prefix or Proton.** Source `a2env.sh` (shell)
 or `import a2env` (Python, with the repository root on `sys.path`): they resolve
 `A2_GAME`, `A2_PREFIX`, `A2_PROTON` and `A2_DATA` (where assets live, default
-`~/.local/share/armada2-remastered`; never a working tree) from the environment, then
-`~/.config/armada2-remastered.conf`, then the default location.
+`~/.local/share/armada2-refit`; never a working tree) from the environment, then
+`~/.config/armada2-refit.conf`, then the default location.
 
 **To see a change working in the game without taking over the user's screen, use the
 test bench**: `./a2test session start --res 21:9`, then `./a2test drive shot` / `click` /
@@ -288,20 +288,20 @@ Until the sign-off, the work stays on its branch and in its worktree.
 
 ## a2mod
 
-**`./a2mod stock` / `remastered` / `status`** flips the *whole game* for
+**`./a2mod stock` / `refit` / `status`** flips the *whole game* for
   before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
   installed layers exist only on unmerged branches and a reinstall would not reproduce
-  them. While in stock, anything installed over a stock file makes `remastered` refuse.
+  them. While in stock, anything installed over a stock file makes `refit` refuse.
   Do not delete `$GAME/.a2mod` while in stock.
 
 ## The texture pipeline
 
 **`./a2tex`** — `list`, `build [-j N]`, `install`, `revert`, `diff`, `verify`, `stock` —
 the texture pipeline. `./a2mod` switches the installed result between stock and
-remastered for before/after.
+refit for before/after.
 
 Two checkers beside them:
 
@@ -330,7 +330,7 @@ A target is a **recipe** in `textures/targets/<NAME>/` — `target.conf` and
 `$A2_DATA/textures/<NAME>/` holding `stock/`, `ai/`, `src/`, `out/`, plus `src-alpha/`
 when it sets `alpha=ai`. **No pixel is ever committed, and no asset is ever written
 into a checkout**: `A2_DATA` comes from `a2env.sh` (default
-`~/.local/share/armada2-remastered`), and every checkout and worktree shares it.
+`~/.local/share/armada2-refit`), and every checkout and worktree shares it.
 `./a2tex stock` fills `stock/` from the game install (the `.a2neb-backup`, else the
 live file), accepting a file only if it matches `stock.sha256`, and every `a2tex`
 subcommand that reads `stock/` does it first. A **new target** gets its stock copied

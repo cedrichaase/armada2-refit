@@ -1,7 +1,7 @@
 # Esc opens and closes the in-mission menu, repeatedly
 
 Resolutions: 16:9
-Mod: remastered
+Mod: refit
 Launch: -nointro a2_borg01
 
 Regression tests for menus 2.1.0 (`EscapeReturns=1`: Esc in the in-mission menu acts as

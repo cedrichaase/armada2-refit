@@ -1,7 +1,7 @@
 # Game Setup's option labels stay clear of the minimap
 
 Resolutions: 4:3, 21:9
-Mod: remastered
+Mod: refit
 
 Regression test for `[Labels]` in `Menus.ini` (menus 4.3.0). On Instant Action's Game
 Setup, stock draws "Shroud Off, Fog Off" and "Random Placement" on past their

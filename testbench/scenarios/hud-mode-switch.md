@@ -1,7 +1,7 @@
 # The HUD follows a display mode changed in the middle of a mission
 
 Resolutions: 4:3, 21:9
-Mod: remastered
+Mod: refit
 Reference: 4:3
 Timeout: 14 min
 

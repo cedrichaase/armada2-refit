@@ -120,7 +120,7 @@ class Session:
     # ------------------------------------------------------------------ lifecycle
 
     @classmethod
-    def create(cls, artifacts_dir, res, mod='remastered', vnc=False, record=False,
+    def create(cls, artifacts_dir, res, mod='refit', vnc=False, record=False,
                audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
@@ -133,7 +133,7 @@ class Session:
         # assets='none': the game as someone without a texture pack gets it -- A2_DATA is
         # an empty directory, and this checkout's ./install runs into the clone unless
         # --install names others.
-        if assets == 'none' and mod == 'remastered' and not installs:
+        if assets == 'none' and mod == 'refit' and not installs:
             installs = [config.REPO]
         installs = [checkout_provenance(p) for p in (installs or [])]
         state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,

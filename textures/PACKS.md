@@ -3,7 +3,7 @@
 This repository ships no textures. It ships the **recipes** — 84 targets in
 `targets/<NAME>/`, each a `target.conf` and a `stock.sha256` — and the pipeline that
 turns the game's own art into replacements. Everything it makes lives in `A2_DATA`
-(`../a2env.sh`; default `~/.local/share/armada2-remastered`), never in the checkout.
+(`../a2env.sh`; default `~/.local/share/armada2-refit`), never in the checkout.
 
 This page is the short path. The why, and every trap already walked into, is in
 [`README.md`](README.md) (the engine reference), [`REMASTERING.md`](REMASTERING.md)
@@ -69,7 +69,7 @@ density and fill right.
 
 `install` refuses a target outright rather than install part of it when a build would
 crash the game: an interface sprite over 256px, or a base texture resized without its
-hand-authored mip chain. `./a2mod stock` / `remastered` switches the whole game for a
+hand-authored mip chain. `./a2mod stock` / `refit` switches the whole game for a
 before/after either way.
 
 **A new target** is a directory under `targets/` with a `target.conf` (keys:

@@ -103,7 +103,7 @@ numerically, so the answer is a number rather than an impression:
     platform/ab-shot.sh diff before after 600 400 1200 300     # W H X Y, region only
 
 For a before/after of the project as a whole rather than one setting, `./a2mod stock`
-and `./a2mod remastered` flip every visual layer at once in about 4 s, with DXVK kept
+and `./a2mod refit` flip every visual layer at once in about 4 s, with DXVK kept
 in both states, so the two grabs differ only in what this project changed. Quit the game
 between them; Heroic can stay open. Bloom is bypassed at launch in stock, and Home
 still toggles it.
