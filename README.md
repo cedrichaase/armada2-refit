@@ -103,9 +103,10 @@ because they need assets built from your own copy of the game (`textures/PACKS.m
 The layers are grouped from "copy a file, works anywhere" to "needs a specific stack".
 
 **Building.** The plugins are 32-bit Windows DLLs, built with `clang` + `lld-link` +
-`llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`. There are
-no prebuilt releases yet. To install on Windows, build them on Linux (or WSL) and copy
-the files across.
+`llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`.
+**Prebuilt**, all four with their `.ini` files are in the zip on each
+[release](https://github.com/cedrichaase/armada2-refit/releases), laid out for the game
+directory; `publish/package.sh` builds the same zip locally.
 
 **Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1 + Patch Project 1.2.5,
 plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game

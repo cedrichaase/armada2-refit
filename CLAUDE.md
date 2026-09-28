@@ -137,7 +137,8 @@ again, finish in this order:
    commit.
 2. **Merge into `main`** from the main checkout, with
    `git merge --no-ff <branch> -m "Merge <branch>: <what>"`. Resolve version clashes as
-   "Parallel worktrees" says. There is no remote, so there is nothing to push.
+   "Parallel worktrees" says. Don't push unless the user asks: a push to `main` that
+   bumps the root version publishes a GitHub Release (`publish/README.md`).
 3. **Clean up.** Remove the worktree (`git worktree remove`) and delete its branch
    (`git branch -d`). Then do the same for any other worktree whose branch
    `git branch --merged main` lists. Use only the safe forms, never `--force` or
