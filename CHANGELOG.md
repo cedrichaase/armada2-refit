@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 7.1.0 — 2026-09-28
+
+### Added
+- `publish/package.sh`: builds `HUD.asi`, `Menus.asi`, `MSAA.asi` and `binkw32.dll` into
+  `armada2-refit-<version>-plugins.zip`, with their `.ini` files, `README.txt`,
+  `LICENSE` and `SHA256SUMS`.
+- CI (`.github/workflows/ci.yml`): `publish/check.sh` on every new commit, the plugin
+  zip as a workflow artifact on every push and pull request, and a `vX.Y.Z` GitHub
+  Release when `main` reaches a root version not yet released.
+
+Installs nothing new; no game-side change to confirm.
+
 ## 7.0.0 — 2026-09-28
 
 Layers: testbench 2.0.0.

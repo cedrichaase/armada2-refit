@@ -88,13 +88,33 @@ without its history, which is full of stock art. So not every cited hash resolve
 - **`CLAUDE.md`** is the working brief for agent sessions. It publishes fine; decide
   whether it should.
 
-## The release package (next)
+## Release packages
 
-Separate from the repository: a zip that mirrors the game folder and overwrites no game
-file, so uninstalling is deleting it. The plugins, `winmm.dll` (the ASI loader),
-`dxvk.conf`, optionally DXVK and the bloom shader for ReShade (Windows) and vkBasalt
-(Linux). On Linux one launcher setting, `WINEDLLOVERRIDES="winmm=n,b"`. What stands in
-the way:
+Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the four
+plugins and writes `armada2-refit-<version>-plugins.zip`, laid out as the game directory
+wants it: `HUD.asi`, `Menus.asi`, `MSAA.asi` and `binkw32.dll`, each with its `.ini`,
+plus `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`.
+It is our code only, compiled; nothing of the game and none of the test tools. The
+version is the root `CHANGELOG.md`'s newest entry.
+
+**CI** (`.github/workflows/ci.yml`) runs on every push and pull request:
+
+- `check.sh` on each new commit, so a binary or a game file fails the push;
+- `package.sh`, with the zip kept as a workflow artifact, named by commit;
+- on `main` only, when the root version has no release yet: tag `vX.Y.Z` and publish a
+  GitHub Release with the zip, the changelog entry as its notes. An entry that still
+  says "not yet seen in game" goes out as a pre-release. So **bumping the root version
+  and pushing `main` is what releases**; a push that does not bump it releases nothing.
+
+Overwriting no game file except `binkw32.dll` (renamed to `binkw32_orig.dll` first,
+`README.txt` says so), uninstalling is deleting what was copied.
+
+### Next
+
+A fuller package would also bundle `winmm.dll` (the ASI loader), `dxvk.conf`,
+optionally DXVK and the bloom shader for ReShade (Windows) and vkBasalt (Linux), with
+their notices (`THIRD-PARTY.md`). On Linux one launcher setting,
+`WINEDLLOVERRIDES="winmm=n,b"`. What stands in the way:
 
 - **No plugin checks which `Armada2.exe` it is in.** Each should verify the exe and stand
   down on any other build rather than patch the wrong bytes.
