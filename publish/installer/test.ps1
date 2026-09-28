@@ -22,17 +22,19 @@ function Install([string[]]$a) {
     if ($LASTEXITCODE) { throw "install.ps1 $a exited $LASTEXITCODE" }
 }
 
-Write-Host "== install, no DXVK"
+Write-Host "== install, no DXVK, no ReShade"
 Install @($G)
 Check "no MSAA.asi" (-not (Test-Path (G "MSAA.asi")))
+Check "no bloom" (-not (Test-Path (G "A2Bloom.ini")))
 Check "binkw32.dll is the proxy" ((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy")
 Check "binkw32_orig.dll is stock" ((Get-Content (G "binkw32_orig.dll")) -eq "stockbink")
 Check "dxvk.conf installed" ((Get-FileHash (G "dxvk.conf")).Hash -eq (Get-FileHash (Join-Path $P "game\dxvk.conf")).Hash)
 
-Write-Host "== reinstall with DXVK, an edited .ini, and bloom"
+Write-Host "== reinstall with DXVK, ReShade and an edited .ini"
 Set-Content (G "d3d8.dll") "dxvk"
+Set-Content (G "ReShade.ini") "[GENERAL]"
 Add-Content (G "HUD.ini") "; mine"
-Install @("-Bloom", $G)
+Install @($G)
 Check "MSAA.asi" (Test-Path (G "MSAA.asi"))
 Check "HUD.ini.bak kept" ((Get-Content (G "HUD.ini.bak") -Raw) -match "; mine")
 Check "binkw32_orig.dll still stock" ((Get-Content (G "binkw32_orig.dll")) -eq "stockbink")
@@ -40,6 +42,7 @@ foreach ($f in "MagicBloom.fx", "ReShade.fxh", "ReShadeUI.fxh") {
     Check "shader $f" ((Get-Item (G "reshade-shaders\Shaders\$f")).Length -gt 0)
 }
 Check "A2Bloom.ini" (Test-Path (G "A2Bloom.ini"))
+Check "and as ReShadePreset.ini" ((Get-FileHash (G "ReShadePreset.ini")).Hash -eq (Get-FileHash (G "A2Bloom.ini")).Hash)
 
 Write-Host "== unzipped into the game directory, run with no argument"
 Copy-Item -Recurse $P (G "pkg")
@@ -51,14 +54,18 @@ Write-Host "== uninstall"
 Install @("-Uninstall", $G)
 Check "binkw32.dll is stock again" ((Get-Content (G "binkw32.dll")) -eq "stockbink")
 Check "no binkw32 copies" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")))
-foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "BinkProxy.ini", "dxvk.conf", "A2Bloom.ini") {
+foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "BinkProxy.ini", "dxvk.conf", "A2Bloom.ini", "ReShadePreset.ini") {
     Check "$f removed" (-not (Test-Path (G $f)))
 }
 
-Write-Host "== a dxvk.conf it did not write is left alone"
+Write-Host "== a dxvk.conf and a ReShade preset it did not write are left alone"
 Set-Content (G "dxvk.conf") "d3d9.foo = 1"
+Set-Content (G "ReShadePreset.ini") "Techniques=Mine"
 Install @($G)
+Check "own preset kept on install" ((Get-Content (G "ReShadePreset.ini")) -eq "Techniques=Mine")
+Check "A2Bloom.ini beside it" (Test-Path (G "A2Bloom.ini"))
 Install @("-Uninstall", $G)
 Check "foreign dxvk.conf kept" ((Get-Content (G "dxvk.conf")) -eq "d3d9.foo = 1")
+Check "own preset kept on uninstall" ((Get-Content (G "ReShadePreset.ini")) -eq "Techniques=Mine")
 Remove-Item -Recurse -Force $T
 Write-Host "all passed"

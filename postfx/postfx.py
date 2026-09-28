@@ -168,7 +168,7 @@ def export(out):
     os.makedirs(out, exist_ok=True)
     files = {
         'A2Bloom.fx': WRAPPER_SRC.format(marker='// Armada II Refit: postfx/postfx.py --export'),
-        # install.sh --bloom replaces @BLOOM@ with where it put the shaders.
+        # The zip's install.sh replaces @BLOOM@ with where it put the shaders.
         'vkBasalt.conf.in': conf_text(INTENSITY, THRESHOLD, share='@BLOOM@', header=[
             '# Armada II Refit bloom through vkBasalt (postfx/postfx.py --export).',
             '# Home toggles it in game.']),

@@ -68,8 +68,9 @@ https://github.com/cedrichaase/armada2-refit
 INSTALL
   Windows:          double-click install.bat (or: install.bat "C:\path\to\the game")
   Linux, Proton:    ./install.sh "/path/to/the game"
-Both find the game themselves when the package is unzipped into the game directory,
-take --uninstall / -Uninstall to undo everything, and --bloom / -Bloom to add bloom.
+There is nothing to choose: each installs what can work on this machine and says what
+it skipped and why. Both find the game themselves when the package is unzipped into
+the game directory. Undo everything with --uninstall (install.bat -Uninstall).
 
 WHAT GOES IN (game/, copied beside Armada2.exe)
   HUD.asi      + HUD.ini        hud $(version "$root/hud/CHANGELOG.md")        in-game HUD, font and cursors at any aspect
@@ -91,12 +92,18 @@ NEEDS
   Never install HUD.asi alongside the file-based fixes (hud/ui-widescreen.py and
   friends): every correction would apply twice.
 
-BLOOM (bloom/; the installers fetch MagicBloom and ReShade's headers, pinned by hash)
-  Linux:    a 32-bit vkBasalt (lib32-vkbasalt on Arch). --bloom writes its config to
-            ~/.local/share/armada2-refit-bloom and prints the two variables to set.
-  Windows:  ReShade (reshade.me), installed for Armada2.exe -- for Vulkan when DXVK is in
-            the game directory. -Bloom adds the A2Bloom.ini preset and the shaders; pick it in the overlay.
-  Home toggles the effect. Not yet seen in game through this package.
+OPTIONAL, BY HAND -- only if you want what the installer skipped
+  Bloom needs a post-processing layer the installer cannot install for you. Set it up,
+  then run the installer again; it finds it and does the rest (downloading MagicBloom
+  and ReShade's headers from GitHub, pinned by hash).
+    Linux:    install a 32-bit vkBasalt (lib32-vkbasalt on Arch). The installer then
+              prints two variables to add to the launcher.
+    Windows:  install ReShade (reshade.me) for Armada2.exe -- for Vulkan when DXVK's DLLs
+              are in the game directory. No effect packages are needed. If you already
+              had a ReShade preset, pick A2Bloom.ini in ReShade's overlay.
+  Home toggles bloom in game. Not yet seen in game through this package.
+  MSAA: if DXVK comes from somewhere other than the game directory (Proton's own, say),
+  the installer cannot see it; copy game/MSAA.asi and game/MSAA.ini across yourself.
 
 Full notes: README.md in the repository, "Installing by hand, layer by layer".
 MIT licence (LICENSE). An unofficial fan project; nothing of the game is included.

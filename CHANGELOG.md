@@ -14,10 +14,10 @@ Layers: postfx 1.1.0.
   `game/` holds the four plugins, their `.ini` files and `dxvk.conf` (stage 3), and
   `bloom/` holds bloom for vkBasalt and as a ReShade preset (`postfx.py --export`).
 - Installers in the zip, from `publish/installer/`: `install.sh` (Linux, Wine/Proton)
-  and `install.ps1` / `install.bat` (Windows). They find the game, back up the stock
-  `binkw32.dll`, install MSAA only beside DXVK's `d3d8.dll`, and leave a foreign
-  `dxvk.conf` alone. `--bloom` / `-Bloom` fetch the shaders, pinned and hash-checked.
-  `--uninstall` / `-Uninstall` put the game back.
+  and `install.ps1` / `install.bat` (Windows). They take no options but `--uninstall`.
+  They find the game, back up the stock `binkw32.dll`, install MSAA only beside DXVK's
+  `d3d8.dll`, and leave a foreign `dxvk.conf` alone. They set up bloom when vkBasalt or
+  ReShade is installed, fetching the shaders pinned and hash-checked.
 - CI runs both installers against a mock game (`test.sh`, and `test.ps1` on a Windows
   runner) before anything is released.
 

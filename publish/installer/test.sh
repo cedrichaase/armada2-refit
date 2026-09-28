@@ -16,16 +16,20 @@ export XDG_DATA_HOME="$T/share"
 B="$XDG_DATA_HOME/armada2-refit-bloom"
 check () { if eval "$1"; then echo "ok    $1"; else echo "FAIL  $1" >&2; exit 1; fi; }
 
-echo "== install, no DXVK"
+syslayer=$(ls /etc/vulkan/implicit_layer.d/*[Bb]asalt* /usr/share/vulkan/implicit_layer.d/*[Bb]asalt* 2>/dev/null || true)
+
+echo "== install, no DXVK, no vkBasalt"
 "$P/install.sh" "$G" >/dev/null
 check '[ ! -e "$G/MSAA.asi" ]'
+[ -n "$syslayer" ] || check '[ ! -e "$B" ]'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 check 'cmp -s "$P/game/dxvk.conf" "$G/dxvk.conf"'
 
-echo "== reinstall with DXVK, an edited .ini, and bloom"
+echo "== reinstall with DXVK, a vkBasalt layer and an edited .ini"
 echo dxvk > "$G/d3d8.dll"; echo "; mine" >> "$G/HUD.ini"
-"$P/install.sh" --bloom "$G" >/dev/null
+mkdir -p "$XDG_DATA_HOME/vulkan/implicit_layer.d"; echo '{}' > "$XDG_DATA_HOME/vulkan/implicit_layer.d/vkBasalt.x86.json"
+"$P/install.sh" "$G" >/dev/null
 check '[ -e "$G/MSAA.asi" ]'
 check 'grep -q "; mine" "$G/HUD.ini.bak"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'

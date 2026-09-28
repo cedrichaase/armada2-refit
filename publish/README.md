@@ -104,12 +104,15 @@ plugins and writes `armada2-refit-<version>.zip`:
 
 It is our code only, compiled, and our configuration. It holds nothing of the game,
 none of the test tools, and **no third-party shader**. `ReShadeUI.fxh` carries no
-licence, so `--bloom` / `-Bloom` fetch MagicBloom and ReShade's two headers from the
+licence, so the installers fetch MagicBloom and ReShade's two headers from the
 commits `postfx/vkbasalt/build.sh` pins. They are checked against the hashes in
 `shaders.txt`, and `package.sh` refuses a pin `build.sh` does not share. The version
 is the root `CHANGELOG.md`'s newest entry.
 
-The installers stand alone and do the same on both systems:
+The installers stand alone, and **ask nothing**: no flags but `--uninstall`, no
+prompts unless they cannot find the game. Each installs what can work on the machine
+and names what it skipped. What they cannot do themselves, installing vkBasalt or
+ReShade, is documented in `README.txt` and optional. They do the same on both systems:
 
 - find the game: the argument, else the folder they were unzipped into, else Heroic's
   default or GOG's registry entry;
@@ -117,6 +120,10 @@ The installers stand alone and do the same on both systems:
   as `binkw32.dll.a2neb-backup`, the name `cutscenes/binkproxy/install.sh` uses;
 - install `MSAA.asi` only beside a `d3d8.dll` in the game directory. Without DXVK the
   minimap goes black;
+- set up bloom when a vkBasalt layer (Linux) or ReShade's `ReShade.ini` (Windows) is
+  there. On Windows the preset also becomes `ReShadePreset.ini` when the player has
+  none, which is the preset ReShade loads by default, so there is no step in the
+  overlay. A failed download skips bloom and does not fail the install;
 - write `dxvk.conf` only over one that carries `renderer-config.sh`'s marker;
 - keep a changed `.ini` as `.ini.bak`;
 - with `--uninstall` / `-Uninstall`, put all of it back.

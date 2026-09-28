@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Armada II Refit -- install the release package into the game, on Linux (Wine/Proton).
 #
-#   ./install.sh [<game dir>]               install the plugins and dxvk.conf
-#   ./install.sh --bloom [<game dir>]       also set up bloom through vkBasalt
+#   ./install.sh [<game dir>]               install
 #   ./install.sh --uninstall [<game dir>]   take all of it out again
 #
-#   --msaa / --no-msaa   MSAA.asi is installed only when DXVK's d3d8.dll is in the game
-#                        directory (without DXVK the minimap goes black); these override
+# No choices to make: what can work here is installed, the rest is skipped and says why.
+# MSAA.asi goes in when DXVK's d3d8.dll is in the game directory (without DXVK the
+# minimap goes black); bloom is set up when a vkBasalt layer is installed.
 #
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
 # parent if the package was unzipped into the game, else $A2_GAME, else Heroic's
@@ -16,13 +16,10 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-action=install bloom=0 msaa=auto game=""
+action=install game=""
 while [ $# -gt 0 ]; do
     case "$1" in
-        --bloom)     bloom=1 ;;
         --uninstall) action=uninstall ;;
-        --msaa)      msaa=1 ;;
-        --no-msaa)   msaa=0 ;;
         -h|--help)   sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)          echo "unknown option: $1" >&2; exit 2 ;;
         *)           game="$1" ;;
@@ -93,14 +90,11 @@ put HUD.asi; put HUD.ini
 rm -f "$game/MenuScale.asi" "$game/MenuScale.ini"   # Menus.asi's old name; never both
 put Menus.asi; put Menus.ini
 
-if [ "$msaa" = auto ]; then
-    if [ -f "$game/d3d8.dll" ]; then msaa=1; else msaa=0; fi
-fi
-if [ "$msaa" = 1 ]; then
+if [ -f "$game/d3d8.dll" ]; then
     put MSAA.asi; put MSAA.ini
 else
     rm -f "$game/MSAA.asi"
-    echo "  MSAA.asi skipped: no d3d8.dll (DXVK) in the game directory (--msaa overrides)"
+    echo "  MSAA.asi skipped: no d3d8.dll (DXVK) in the game directory"
 fi
 
 # The proxy forwards every call to the stock DLL as binkw32_orig.dll.
@@ -120,34 +114,43 @@ fi
 
 # ------------------------------------------------------------------ bloom
 
-if [ "$bloom" = 1 ]; then
-    echo "bloom -> $BLOOM"
-    case "$BLOOM" in *' '*|*'#'*) echo "vkBasalt cannot read a path with a space or '#': $BLOOM" >&2; exit 1 ;; esac
-    mkdir -p "$BLOOM/Shaders" "$BLOOM/Textures"
-    # The shaders are not ours to redistribute, so they come from upstream, pinned by
-    # commit and checked by hash: <sha256> <commit> <file>.
+# Needs a 32-bit vkBasalt layer (lib32-vkbasalt on Arch; or postfx/vkbasalt/build.sh in
+# the repository) -- the game is a 32-bit process. Without one, bloom is skipped.
+bloom=0
+for d in "${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d" \
+         /etc/vulkan/implicit_layer.d /usr/share/vulkan/implicit_layer.d; do
+    ls "$d"/*[Bb]asalt*.json >/dev/null 2>&1 && bloom=1
+done
+
+# The shaders are not ours to redistribute, so they come from upstream, pinned by commit
+# and checked by hash (<sha256> <commit> <file>). Bloom is optional: a failure skips it.
+fetch_shaders() {
+    local sum commit file dst url
     while read -r sum commit file; do
         [ -n "$sum" ] || continue
         dst="$BLOOM/Shaders/$file"
-        if ! echo "$sum  $dst" | sha256sum --quiet -c - >/dev/null 2>&1; then
-            url="https://raw.githubusercontent.com/crosire/reshade-shaders/$commit/Shaders/$file"
-            if command -v curl >/dev/null; then curl -fsSL -o "$dst" "$url"; else wget -qO "$dst" "$url"; fi
-            echo "$sum  $dst" | sha256sum --quiet -c - || { echo "download does not match: $file" >&2; exit 1; }
-        fi
-        echo "  Shaders/$file"
+        echo "$sum  $dst" | sha256sum --quiet -c - >/dev/null 2>&1 && continue
+        url="https://raw.githubusercontent.com/crosire/reshade-shaders/$commit/Shaders/$file"
+        if command -v curl >/dev/null; then curl -fsSL -o "$dst" "$url" || return 1
+        else wget -qO "$dst" "$url" || return 1; fi
+        echo "$sum  $dst" | sha256sum --quiet -c - >/dev/null 2>&1 || { rm -f "$dst"; return 1; }
     done < "$here/bloom/shaders.txt"
-    cp "$here/bloom/A2Bloom.fx" "$BLOOM/A2Bloom.fx"
-    sed -e "s|@BLOOM@|$BLOOM|g" -e "1i$BLOOM_MARKER" "$here/bloom/vkBasalt.conf.in" > "$BLOOM/vkBasalt.conf"
-    echo "  vkBasalt.conf"
+}
 
-    # A 32-bit vkBasalt layer has to be installed for the game (a 32-bit process) to load
-    # it: lib32-vkbasalt on Arch, or build it (postfx/vkbasalt/build.sh in the repository).
-    layer=0
-    for d in "${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d" \
-             /etc/vulkan/implicit_layer.d /usr/share/vulkan/implicit_layer.d; do
-        ls "$d"/*[Bb]asalt*.json >/dev/null 2>&1 && layer=1
-    done
-    [ "$layer" = 1 ] || echo "  WARNING: no vkBasalt layer found -- install a 32-bit vkBasalt (lib32-vkbasalt on Arch)"
+if [ "$bloom" = 0 ]; then
+    echo "  bloom skipped: no vkBasalt layer installed (optional -- README.txt)"
+else
+    case "$BLOOM" in *' '*|*'#'*) bloom=0; echo "  bloom skipped: vkBasalt cannot read the path $BLOOM" ;; esac
+fi
+if [ "$bloom" = 1 ]; then
+    mkdir -p "$BLOOM/Shaders" "$BLOOM/Textures"
+    if fetch_shaders; then
+        cp "$here/bloom/A2Bloom.fx" "$BLOOM/A2Bloom.fx"
+        sed -e "s|@BLOOM@|$BLOOM|g" -e "1i$BLOOM_MARKER" "$here/bloom/vkBasalt.conf.in" > "$BLOOM/vkBasalt.conf"
+        echo "  bloom, in $BLOOM"
+    else
+        bloom=0; echo "  bloom skipped: could not download its shaders from GitHub"
+    fi
 fi
 
 # ------------------------------------------------------------------ what is left
@@ -159,8 +162,8 @@ echo "In the launcher (Heroic: Game settings -> Advanced -> Environment variable
 echo "launch options, then %command%), set:"
 echo "    WINEDLLOVERRIDES=winmm=n,b"
 if [ "$bloom" = 1 ]; then
+    echo "and for bloom (Home toggles it in game):"
     echo "    ENABLE_VKBASALT=1"
     echo "    VKBASALT_CONFIG_FILE=$BLOOM/vkBasalt.conf"
-    echo "Home toggles bloom in game."
 fi
 echo "Uninstall: $0 --uninstall \"$game\""

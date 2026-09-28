@@ -1,12 +1,13 @@
 <#
 Armada II Refit -- install the release package into the game, on Windows.
 
-  install.bat [<game dir>]                 install the plugins and dxvk.conf
-  install.bat -Bloom [<game dir>]          also put the bloom preset in for ReShade
+  install.bat [<game dir>]                 install
   install.bat -Uninstall [<game dir>]      take all of it out again
 
-  -Msaa / -NoMsaa   MSAA.asi is installed only when a d3d8.dll (DXVK) is in the game
-                    directory -- without DXVK the minimap goes black; these override
+No choices to make: what can work here is installed, the rest is skipped and says why.
+MSAA.asi goes in when a d3d8.dll (DXVK) is in the game directory -- without DXVK the
+minimap goes black. The bloom preset goes in when ReShade is installed for the game;
+installing ReShade is optional and by hand (README.txt), then run this again.
 
 The game directory is the one holding Armada2.exe: the argument, else this folder's
 parent if the package was unzipped into the game, else the GOG install found in the
@@ -14,10 +15,7 @@ registry, else it asks. PowerShell 5.1 or later; install.bat runs it.
 #>
 param(
     [string]$GameDir = "",
-    [switch]$Bloom,
-    [switch]$Uninstall,
-    [switch]$Msaa,
-    [switch]$NoMsaa
+    [switch]$Uninstall
 )
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -71,6 +69,11 @@ if ($Uninstall) {
             Write-Warning "binkw32.dll is the proxy and there is no stock copy -- restore it by hand"
         }
     }
+    # ReShadePreset.ini only if it is still ours, unchanged.
+    if ((Test-Path -LiteralPath (G "ReShadePreset.ini")) -and
+        (Get-FileHash -LiteralPath (G "ReShadePreset.ini")).Hash -eq (Get-FileHash -LiteralPath (Join-Path $here "bloom\A2Bloom.ini")).Hash) {
+        Remove-Item -LiteralPath (G "ReShadePreset.ini")
+    }
     foreach ($n in "BinkProxy.ini", "BinkProxy.log", "A2Bloom.ini") { Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue }
     if (Test-OurDxvkConf) { Remove-Item -LiteralPath (G "dxvk.conf") }
     Write-Host "uninstalled from $GameDir"
@@ -103,14 +106,11 @@ Put "HUD.asi"; Put "HUD.ini"
 foreach ($n in "MenuScale.asi", "MenuScale.ini") { Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue }   # Menus.asi's old name
 Put "Menus.asi"; Put "Menus.ini"
 
-$withMsaa = Test-Path -LiteralPath (G "d3d8.dll")
-if ($Msaa) { $withMsaa = $true }
-if ($NoMsaa) { $withMsaa = $false }
-if ($withMsaa) {
+if (Test-Path -LiteralPath (G "d3d8.dll")) {
     Put "MSAA.asi"; Put "MSAA.ini"
 } else {
     Remove-Item -LiteralPath (G "MSAA.asi") -ErrorAction SilentlyContinue
-    Write-Host "  MSAA.asi skipped: no d3d8.dll (DXVK) in the game directory (-Msaa overrides)"
+    Write-Host "  MSAA.asi skipped: no d3d8.dll (DXVK) in the game directory "
 }
 
 # The proxy forwards every call to the stock DLL as binkw32_orig.dll.
@@ -130,33 +130,46 @@ if ((Test-Path -LiteralPath (G "dxvk.conf")) -and -not (Test-OurDxvkConf)) {
 
 # ------------------------------------------------------------------ bloom
 
-if ($Bloom) {
-    # ReShade finds its shaders in reshade-shaders\Shaders beside the game. They are not
-    # ours to redistribute, so any that are missing come from upstream, pinned by commit
-    # and checked by hash; ones already there (ReShade's own) are left alone.
+# Only when ReShade is installed for the game: its setup leaves ReShade.ini beside the
+# exe, and it finds shaders in reshade-shaders\Shaders there. They are not ours to
+# redistribute, so any that are missing come from upstream, pinned by commit and checked
+# by hash; ones already there (ReShade's own) are left alone. Bloom is optional: a
+# failure skips it.
+function Install-Bloom {
     $sh = G "reshade-shaders\Shaders"
     New-Item -ItemType Directory -Force -Path $sh | Out-Null
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     foreach ($line in Get-Content -LiteralPath (Join-Path $here "bloom\shaders.txt")) {
         if (-not $line.Trim()) { continue }
         $sum, $commit, $file = $line -split "\s+"
         $dst = Join-Path $sh $file
-        if (Test-Path -LiteralPath $dst) { Write-Host "  reshade-shaders\Shaders\$file (already there)"; continue }
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -UseBasicParsing -OutFile $dst `
-            -Uri "https://raw.githubusercontent.com/crosire/reshade-shaders/$commit/Shaders/$file"
+        if (Test-Path -LiteralPath $dst) { continue }
+        $url = "https://raw.githubusercontent.com/crosire/reshade-shaders/$commit/Shaders/$file"
+        Invoke-WebRequest -UseBasicParsing -OutFile $dst -Uri $url
         if ((Get-FileHash -Algorithm SHA256 -LiteralPath $dst).Hash -ne $sum) {
             Remove-Item -LiteralPath $dst; throw "download does not match: $file"
         }
-        Write-Host "  reshade-shaders\Shaders\$file"
     }
     Copy-Item -LiteralPath (Join-Path $here "bloom\A2Bloom.ini") (G "A2Bloom.ini") -Force
-    Write-Host "  A2Bloom.ini"
-    if (-not (Get-ChildItem -LiteralPath $GameDir -Filter "ReShade*.ini" | Where-Object Name -ne "ReShadePreset.ini")) {
-        Write-Host ""
-        Write-Host "Bloom needs ReShade (reshade.me) installed for Armada2.exe -- for Vulkan when DXVK is"
-        Write-Host "in the game directory. Then open its overlay (Home) and pick the A2Bloom.ini preset."
-    } else {
-        Write-Host "In ReShade's overlay (Home), pick the A2Bloom.ini preset."
+    # ReShade loads ReShadePreset.ini unless told otherwise, so with no preset of the
+    # player's own, ours takes that name and bloom needs no step in the overlay.
+    if (-not (Test-Path -LiteralPath (G "ReShadePreset.ini"))) {
+        Copy-Item -LiteralPath (G "A2Bloom.ini") (G "ReShadePreset.ini")
+        return $true
+    }
+    return $false
+}
+if (-not (Test-Path -LiteralPath (G "ReShade.ini"))) {
+    Write-Host "  bloom skipped: ReShade is not installed (optional -- README.txt)"
+} else {
+    try {
+        if (Install-Bloom) {
+            Write-Host "  bloom, as ReShade's preset (ReShadePreset.ini)"
+        } else {
+            Write-Host "  A2Bloom.ini -- you have a ReShade preset already; pick this one in its overlay"
+        }
+    } catch {
+        Write-Host "  bloom skipped: $($_.Exception.Message)"
     }
 }
 
