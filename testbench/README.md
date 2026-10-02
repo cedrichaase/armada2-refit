@@ -13,6 +13,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
 
     ./a2test session start --res 16:10       # a live session to drive by hand
     ./a2test session start --install .       # this checkout's ./install, from stock
+    ./a2test session start --res 800x600 --mod stock --stock-shell embed   # the stock baseline, menus clickable
     A2_DATA=$(mktemp -d) ./a2test session start --install .   # ... as without any assets
     ./a2test drive shot menu                 #   prints the PNG path
     ./a2test drive click-text "Single Player"

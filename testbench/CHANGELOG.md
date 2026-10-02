@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.1.0 — 2026-10-02
+
+### Added
+- `a2test session start --stock-shell embed`: a stock session with the embed-only
+  `Menus.asi`, as `Stock shell: embed` gives a scenario, so menus past the main one take
+  clicks by hand too.
+
+### Fixed
+- `a2test drive click|move --design` crashed (`'Case' object has no attribute 'mod'`).
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.0.0 — 2026-09-28
 
 ### Changed

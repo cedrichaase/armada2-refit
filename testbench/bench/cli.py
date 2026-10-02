@@ -31,7 +31,8 @@ a2test -- run Armada II headless and test it end to end
   a2test check SCENARIO...             parse only: show how each step would run
   a2test list                          scenarios in testbench/scenarios/
 
-  a2test session start [--res R] [--mod stock] [--install PATH]... [--vnc] [--no-launch]
+  a2test session start [--res R] [--mod stock [--stock-shell embed]] [--install PATH]...
+                       [--vnc] [--no-launch]
       --install PATH                   start from stock, then run PATH/install into the
                                        clone; repeat to stack checkouts (public, private)
   a2test session stop [--keep]         quit, gather logs, write the report
@@ -283,14 +284,17 @@ def cmd_session(argv):
         ap.add_argument('--args', default='-nointro')
         ap.add_argument('--label', default='interactive')
         ap.add_argument('--install', action='append', default=[], metavar='PATH')
+        ap.add_argument('--stock-shell', choices=['embed'], default=None)
         a = ap.parse_args(rest)
+        if a.stock_shell and a.mod != 'stock':
+            ap.error('--stock-shell goes with --mod stock')
         if a.install and a.mod == 'stock':
             ap.error('--install builds a refit state; it cannot go with --mod stock')
         res = config.parse_res(a.res)
         sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
         s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
-                           label=a.label, installs=a.install)
+                           label=a.label, installs=a.install, stock_shell=a.stock_shell)
         s.clone()
         s.prepare()
         s.start_display()
@@ -365,7 +369,7 @@ def cmd_drive(argv):
         x, y = int(float(args[0])), int(float(args[1]))
         if design:
             c = Case.__new__(Case)
-            c.sess, c.res = s, s.res
+            c.sess, c.res, c.mod = s, s.res, s.s.get('mod', 'refit')
             x, y = Case.design_to_screen(c, x, y)
         return x, y
 
