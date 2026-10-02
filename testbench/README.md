@@ -162,6 +162,12 @@ anything new in the game's `Logs/`.
   set `A2TEST_SESSION` to the `state:` path `session start` prints.
 - **The briefing's OK button did not take a click** in one session, though Esc did.
   Not investigated.
+- **Open: something outlives a clone.** The multiplayer name typed in one session pair
+  ("asdfasdfasdf", 2026-10-02) was already in the Enter Name field of a pair cloned
+  afterwards. It is not in the user's install or prefix, and not anywhere in the new
+  clone's game or prefix as text, hex or UTF-16. Where the game keeps it is not known, so
+  do not assume a fresh session starts with the multiplayer name, or anything stored
+  beside it, at stock.
 
 ## The stretch measurement
 
