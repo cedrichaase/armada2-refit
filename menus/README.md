@@ -562,15 +562,38 @@ rectangle that changed, as the backdrop path does.
 ## Not done
 
 - **Confirmed rendered:** the main menu, the single-player/campaign screen, Options,
-  Graphics Settings, and in a mission the Options menu and Save Game. Multiplayer
-  Connection has been seen scaled on the bench only; the screens past it have not.
+  Graphics Settings, and in a mission the Options menu and Save Game.
+- **Seen on the bench only** (2026-10-02, every screen against stock at 800x600, three
+  findings below): Sound and Game Settings, Credits, Replay Intro, Instant Action's Game
+  Setup (its drop-downs, the Advanced panel, SELECT MAP's list box), Load Game, the four
+  mission lists, the in-mission menu (Admiral's Log Score and Military tabs, the
+  confirmations), and Multiplayer as far as the LAN and Internet lobbies (Current Games,
+  Show all, chat, Players In Room, Create Game, Help). The lobbies' list boxes, combo
+  boxes and scroll bars scale with their dialog. Not reached: the multiplayer game setup
+  as host or guest (the bench has no network, so every host or join ends in a connection
+  error, in stock too), a skirmish's LAUNCH, Save/Load Settings, and the other six
+  Admiral's Log tabs.
+- **Known wrong, not yet fixed** (bench, 2026-10-02):
+  - *The Manual IP field is not painted until it is clicked.* "Internet - Manual IP"
+    opens with a bare black panel where stock draws a bordered field. One click and it
+    draws, takes typing and keeps its scaled font; the edit is adopted (Menus.log). Why
+    this edit misses its first paint, and Enter Name and Save Game's do not, is not known.
+  - *The Technology Tree is in a proportional font*, so its ASCII branches no longer line
+    up. Its edit uses raster "Courier" (`edit font "Courier" height 29`), and `ctl_font`
+    holds every scaled face to TrueType but maps only MS Sans Serif to its successor
+    ("Not the raster face", above). Courier comes back as some proportional TrueType face.
+    Mapping it to Courier New, or keeping `FIXED_PITCH`, should fix it.
+  - *Options' version label "1.1"* (bottom of the panel, main menu and in a mission) is
+    not drawn anywhere on screen. Probably a control kind `ctl_kind()` does not handle;
+    not checked.
 - **Hover and click are confirmed to land correctly**; nothing has been measured about
   how *fast* they are. See the animation stall above.
 - **Other real child controls.** Owner-drawn buttons and edit boxes are scaled (see
-  "The Admiral's Log" and "Edit boxes"). Anything else, such as a list box or combo box
-  on the GameSpy or lobby screens, is a separate HWND that Windows draws itself, and
-  still sits 1:1 at its design position. None has been seen yet. Adding a class is one
-  line in `ctl_kind()`, if its own font is all it needs.
+  "The Admiral's Log" and "Edit boxes"). Anything else is a separate HWND that Windows
+  draws itself, and would sit 1:1 at its design position. None has been seen doing so:
+  the lobbies' list and combo boxes come out scaled with their dialog (how is not
+  checked).
+  Adding a class is one line in `ctl_kind()`, if its own font is all it needs.
 - **Menus drawn inside the renderer** (the Direct3D route) was considered and
   deferred. Embed gets one OS window without it, and the GDI child draws correctly over
   the DXVK surface because the game loop is blocked while any menu is open.
