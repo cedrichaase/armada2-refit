@@ -217,6 +217,15 @@ factor:
   **Microsoft Sans Serif**, the TrueType successor drawn to the same metrics, with
   `OUT_TT_ONLY_PRECIS`. "Player" then measures 85x37 on screen, against 84 wide for stock's
   35 px × 2.4.
+- **Courier keeps its pitch.** The in-mission Technology Tree is an edit in raster
+  Courier (`edit font "Courier" height 29`), showing an ASCII tree whose branches
+  line up only in a fixed pitch. Held to TrueType by name alone, it came back
+  proportional and the branches drifted under the wrong parents. It is now asked for as
+  **Courier New** with `FIXED_PITCH | FF_MODERN` (Proton ships `cour.ttf`). Courier New
+  is also narrower than the raster cut at the same height: about 6.6 design px a
+  character against 8. So it gets the raster font's own `tmAveCharWidth`, scaled
+  (`width 19` at 3440x1440). "Starbase---Pulse Cannon" then spans 182 design px,
+  against stock's 183.
 - **Colour** needs nothing. The shell answers `WM_CTLCOLOREDIT` on the dialog
   (`Screen::ControlColorEdit`, `0x5a3360`: its text colour, a transparent background
   mode, a stock brush), and that reaches the game through the dialog subclass as before.
@@ -288,6 +297,35 @@ So no real DC is held. `GetDC` hands out the design surface and marks it dirty,
 thread timer presents whatever is still dirty. The timer is what catches the
 leaks. `Trace=1` logs the first paint events per dialog, which is how this was
 found.
+
+## What a menu draws last: pushing Wine's window surface
+
+An embedded menu is a child of the 3D window. It draws into that window's Wine *window
+surface*, an off-screen copy that Wine pushes to the screen only at certain moments:
+when a drawing call ends more than ~50 ms after the first one still pending, or when
+the thread goes idle. Under the 3D window the idle push evidently does not come
+(inferred from what was measured below, not traced into Wine), so whatever a menu drew
+**last**, in a burst under 50 ms, stayed off screen until
+something else drew. Two findings of the 2026-10-02 bench sweep were this:
+
+- **Options' version label "1.1"** (main menu and in a mission). `EscapeMenuDlgProc`
+  (`0x5cddb0`) paints its background between `BeginPaint` and `EndPaint`. It then draws
+  the buttons through `GetDC`, and last the title and the version label
+  (`TextLabel::DrawLabelText`, `0x5a77e0`), a `TextLabel` built at design 0,519,800x10.
+  Instrumented, the label's `DrawTextExA` drew 13 px of white text into the design
+  surface on every paint, and the present copied it onto the window's real DC (reading
+  the DC back found it), yet the screen never showed it. The same label was missing in
+  a stock run with only `Embed=1`, so the cause is the embedding, not the scaling.
+- **The Manual IP field** stayed a black panel until it was clicked. It is an edit,
+  which paints itself last when its dialog opens.
+
+The check itself fixed it: reading the window's pixels back is a drawing call too, and
+the readout took long enough to push everything out. So `flush_dirty`, the 30 ms timer
+above, now ends every tick with `settle_surface`: one `GetPixel` through the innermost
+embedded menu's DC. Every embedded menu shares the 3D window's surface, so one read per
+tick covers them all, edits included. With nothing pending it pushes nothing.
+`testbench/scenarios/menu-repaints.md` checks both, and the Technology Tree's font
+("Edit boxes").
 
 ## The 1:1 flash between menus: `Underlay=0`
 
@@ -564,7 +602,7 @@ rectangle that changed, as the backdrop path does.
 - **Confirmed rendered:** the main menu, the single-player/campaign screen, Options,
   Graphics Settings, and in a mission the Options menu and Save Game.
 - **Seen on the bench only** (2026-10-02, every screen against stock at 800x600, three
-  findings below): Sound and Game Settings, Credits, Replay Intro, Instant Action's Game
+  findings, next item): Sound and Game Settings, Credits, Replay Intro, Instant Action's Game
   Setup (its drop-downs, the Advanced panel, SELECT MAP's list box), Load Game, the four
   mission lists, the in-mission menu (Admiral's Log Score and Military tabs, the
   confirmations), and Multiplayer as far as the LAN and Internet lobbies (Current Games,
@@ -573,19 +611,10 @@ rectangle that changed, as the backdrop path does.
   as host or guest (the bench has no network, so every host or join ends in a connection
   error, in stock too), a skirmish's LAUNCH, Save/Load Settings, and the other six
   Admiral's Log tabs.
-- **Known wrong, not yet fixed** (bench, 2026-10-02):
-  - *The Manual IP field is not painted until it is clicked.* "Internet - Manual IP"
-    opens with a bare black panel where stock draws a bordered field. One click and it
-    draws, takes typing and keeps its scaled font; the edit is adopted (Menus.log). Why
-    this edit misses its first paint, and Enter Name and Save Game's do not, is not known.
-  - *The Technology Tree is in a proportional font*, so its ASCII branches no longer line
-    up. Its edit uses raster "Courier" (`edit font "Courier" height 29`), and `ctl_font`
-    holds every scaled face to TrueType but maps only MS Sans Serif to its successor
-    ("Not the raster face", above). Courier comes back as some proportional TrueType face.
-    Mapping it to Courier New, or keeping `FIXED_PITCH`, should fix it.
-  - *Options' version label "1.1"* (bottom of the panel, main menu and in a mission) is
-    not drawn anywhere on screen. Probably a control kind `ctl_kind()` does not handle;
-    not checked.
+- **Fixed on the bench only** (menus 4.3.1, 2026-10-02): the three findings of that
+  sweep, Options' missing "1.1", the Manual IP field left unpainted until clicked
+  ("What a menu draws last"), and the Technology Tree's proportional font ("Edit
+  boxes"). Not yet seen in game.
 - **Hover and click are confirmed to land correctly**; nothing has been measured about
   how *fast* they are. See the animation stall above.
 - **Other real child controls.** Owner-drawn buttons and edit boxes are scaled (see

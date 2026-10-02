@@ -20,3 +20,4 @@ GetTextExtentExPointA@28
 ExtTextOutA@32
 SetTextAlign@8
 GetTextMetricsA@8
+GetPixel@12

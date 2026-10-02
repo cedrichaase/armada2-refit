@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.2.0 — 2026-10-02
+
+Layers: menus 4.3.1, testbench 2.2.0.
+
+### Fixed
+- Options' version label "1.1" and the Manual IP field reach the screen again, and the
+  Technology Tree keeps its fixed-pitch font (menus 4.3.1).
+- `scenarios/multiplayer-name.md` no longer expects the default name; a clone starts
+  with the player's saved one (testbench 2.2.0).
+
+### Added
+- `scenarios/menu-repaints.md`, which checks the three (testbench 2.2.0).
+
+Installed, not yet seen in game.
+
 ## 8.1.0 — 2026-10-02
 
 Layers: testbench 2.1.0.

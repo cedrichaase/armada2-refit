@@ -228,6 +228,7 @@ __declspec(dllimport) BOOL    __stdcall GetTextExtentExPointA(HDC, LPCSTR, INT, 
 __declspec(dllimport) BOOL    __stdcall ExtTextOutA(HDC, INT, INT, UINT, const RECT *, LPCSTR, UINT, const INT *);
 __declspec(dllimport) UINT    __stdcall SetTextAlign(HDC, UINT);
 __declspec(dllimport) BOOL    __stdcall GetTextMetricsA(HDC, void *);
+__declspec(dllimport) DWORD   __stdcall GetPixel(HDC, INT, INT);
 __declspec(dllimport) INT     __stdcall DrawTextExA(HDC, LPSTR, INT, RECT *, UINT, void *);
 
 #define PAGE_READWRITE        0x04
@@ -1614,6 +1615,8 @@ static HWND __stdcall my_GetWindow(HWND h, UINT cmd)
 #define OBJ_FONT      6
 #define SYSTEM_FONT   13
 #define OUT_TT_ONLY_PRECIS 7
+#define FIXED_PITCH   1
+#define FF_MODERN     0x30
 
 #define CTL_OWNERDRAW 1
 #define CTL_EDIT      2
@@ -1632,6 +1635,14 @@ typedef struct {
     BYTE lfOutPrecision, lfClipPrecision, lfQuality, lfPitchAndFamily;
     char lfFaceName[32];
 } LOGFONTA;
+
+typedef struct {
+    LONG tmHeight, tmAscent, tmDescent, tmInternalLeading, tmExternalLeading;
+    LONG tmAveCharWidth, tmMaxCharWidth, tmWeight, tmOverhang;
+    LONG tmDigitizedAspectX, tmDigitizedAspectY;
+    BYTE tmFirstChar, tmLastChar, tmDefaultChar, tmBreakChar;
+    BYTE tmItalic, tmUnderlined, tmStruckOut, tmPitchAndFamily, tmCharSet;
+} TEXTMETRICA;
 
 typedef struct {
     HWND    hwnd, parent;
@@ -1759,11 +1770,30 @@ static void ctl_font(Ctl *c, Slot *p, int force)
     /* The shell's edits use MS Sans Serif, a raster font: asked for 2.4x its
      * design size it comes back at its largest bitmap, 21 px on screen where
      * 41 was wanted (measured, 3440x1440).  Microsoft Sans Serif is its
-     * TrueType successor, drawn to the same metrics; any other face is only
-     * held to TrueType. */
+     * TrueType successor, drawn to the same metrics.  The Technology Tree's
+     * edit is raster Courier, and its ASCII tree needs a fixed pitch: held to
+     * TrueType by name alone it came back proportional and the branches no
+     * longer lined up, so it becomes Courier New, asked for as fixed pitch.
+     * Courier New is narrower than the raster cut at the same height (6.6
+     * design px a character against 8, measured), so it is also given the
+     * raster font's own character width, scaled.  Any other face is only held
+     * to TrueType. */
     if (same_name_ci(lf.lfFaceName, "MS Sans Serif")) {
         static const char tt[] = "Microsoft Sans Serif";
         memcpy(lf.lfFaceName, tt, sizeof tt);
+    } else if (same_name_ci(lf.lfFaceName, "Courier")) {
+        static const char tt[] = "Courier New";
+        HDC         m = CreateCompatibleDC(NULLPTR);
+        TEXTMETRICA tm;
+        if (m) {
+            HGDIOBJ was = SelectObject(m, src);
+            if (GetTextMetricsA(m, &tm) && tm.tmAveCharWidth > 0)
+                lf.lfWidth = ctl_scale(tm.tmAveCharWidth, dh, p->dh);
+            SelectObject(m, was);
+            DeleteDC(m);
+        }
+        memcpy(lf.lfFaceName, tt, sizeof tt);
+        lf.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
     }
     lf.lfOutPrecision = OUT_TT_ONLY_PRECIS;
     font = CreateFontIndirectA(&lf);
@@ -1780,6 +1810,7 @@ static void ctl_font(Ctl *c, Slot *p, int force)
         s_cat(b, "  edit font \""); s_cat(b, lf.lfFaceName);
         s_cat(b, c->base ? "\"" : "\" (system)");
         s_cat(b, " height "); s_num(b, lf.lfHeight);
+        if (lf.lfWidth) { s_cat(b, " width "); s_num(b, lf.lfWidth); }
         s_cat(b, " = design x "); s_num(b, dh); s_cat(b, "/"); s_num(b, p->dh);
         logline(b);
     }
@@ -2237,6 +2268,31 @@ static void follow_parent(Slot *s)
     s->dirty = 1;
 }
 
+/*
+ * An embedded menu draws into the game window's Wine window surface, an
+ * off-screen copy that Wine pushes to the screen only now and then: when a
+ * drawing call finishes more than ~50 ms after the first unflushed one, or
+ * when the thread goes idle.  Under the 3D window the idle push evidently
+ * does not come (inferred, not traced into Wine): whatever a menu drew LAST
+ * stayed off screen until something else drew: Options' version label "1.1" (the last thing its WM_PAINT
+ * draws) never appeared, and the Manual IP field (an edit, painting itself
+ * last) stayed a black panel until it was clicked.  Both were on the
+ * window's DC -- reading pixels back from it found them.
+ *
+ * So every tick also touches the surface: one pixel read through the
+ * innermost menu's DC.  It is a drawing call like any other, and once the
+ * pending drawing is old enough it is the one that pushes it out.  All the
+ * embedded menus are children of the same window and share its surface.
+ */
+static void settle_surface(void)
+{
+    HWND h = top_modal();
+    HDC  dc;
+    if (!h || !(dc = o_GetDC(h))) return;
+    GetPixel(dc, 0, 0);
+    o_ReleaseDC(h, dc);
+}
+
 static void __stdcall flush_dirty(HWND h, UINT msg, UINT_PTR id, DWORD t)
 {
     int i;
@@ -2248,6 +2304,7 @@ static void __stdcall flush_dirty(HWND h, UINT msg, UINT_PTR id, DWORD t)
             if (IsWindow(g_slot[i].hwnd)) present_now(&g_slot[i]);
             else g_slot[i].dirty = 0;
         }
+    settle_surface();
 }
 
 static HDC __stdcall my_GetDC(HWND h)
@@ -2677,14 +2734,6 @@ static int patch_underlay(BYTE *base)
 #define FIT_MAXLEN     160
 #define FIT_SLACK      8          /* percent left to the spacing */
 #define MAXLBOX        8
-
-typedef struct {
-    LONG tmHeight, tmAscent, tmDescent, tmInternalLeading, tmExternalLeading;
-    LONG tmAveCharWidth, tmMaxCharWidth, tmWeight, tmOverhang;
-    LONG tmDigitizedAspectX, tmDigitizedAspectY;
-    BYTE tmFirstChar, tmLastChar, tmDefaultChar, tmBreakChar;
-    BYTE tmItalic, tmUnderlined, tmStruckOut, tmPitchAndFamily, tmCharSet;
-} TEXTMETRICA;
 
 typedef struct { UINT tpl; int x0, y0, x1, y1; } LabelBox;
 
