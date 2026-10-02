@@ -5,6 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.2.0 — 2026-10-02
+
+### Added
+- `scenarios/menu-repaints.md`: Options' "1.1" (main menu and in a mission), an address
+  typed into the Manual IP field, and the Technology Tree's fixed pitch, at 21:9
+  (menus 4.3.1). Red on menus 4.3.0 (steps 6, 35 and 39), green on 4.3.1. The field's
+  first paint is the `manual ip` shot, for the eye.
+
+### Fixed
+- `scenarios/multiplayer-name.md` no longer expects the field to read "Player": a clone
+  starts with the player's own saved name (`save/shell.set`), so the field is cleared
+  before the name is typed.
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.1.0 — 2026-10-02
 
 ### Added

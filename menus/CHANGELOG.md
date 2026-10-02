@@ -5,6 +5,19 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 4.3.1 — 2026-10-02
+
+### Fixed
+- What an embedded menu draws last reaches the screen: the 30 ms flush timer also reads
+  one pixel through the innermost menu's DC, which pushes Wine's window surface. Options'
+  version label "1.1" (main menu and in a mission) is drawn again, and the Manual IP
+  field is painted when its dialog opens instead of on the first click.
+- The Technology Tree's edit keeps a fixed pitch: raster Courier is scaled as Courier
+  New, `FIXED_PITCH`, at the raster font's own character width, so its ASCII branches
+  line up as in stock. Menus.log's `edit font` line gives the width.
+
+Installed, not yet seen in game.
+
 ## 4.3.0 — 2026-09-27
 
 ### Added
