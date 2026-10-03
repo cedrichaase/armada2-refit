@@ -12,7 +12,7 @@ Layers: models 3.0.0, testbench 2.8.1.
 ### Added
 - Planets are drawn round: `Planets.asi` makes the engine tessellate them for the
   resolution in use instead of for 640x480 (models 3.0.0). `./install` runs
-  `models/install.sh`, and `a2mod` switches the plugin with the `models` layer.
+  `models/install.sh`, and `a2mod` switches the plugin with the `models` layer (88887e3).
 - `scenarios/no-assets.md` checks the plugin patched both sites (testbench 2.8.1).
 
 Installed, not yet seen in game.

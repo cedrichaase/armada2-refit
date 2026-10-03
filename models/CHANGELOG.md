@@ -11,7 +11,7 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 - `Planets.asi` (`planets.c`, `build.sh`, `Planets.ini`): the engine tessellates planets,
   ground and cloud shell, finely enough for a modern resolution. `Detail=` divides its
   facet tolerance (default 8; 1 = stock). Installed by `install.sh`, which `./install`
-  now runs. MAJOR: the layer now needs the ASI loader from `platform/`.
+  now runs. MAJOR: the layer now needs the ASI loader from `platform/` (88887e3).
 - `a2mod` switches `Planets.asi`/`.ini` as part of this layer.
 
 Installed, not yet seen in game.
