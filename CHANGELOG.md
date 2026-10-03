@@ -12,7 +12,7 @@ Layers: online 0.1.0.
 ### Added
 - `online/`, the start of online multiplayer: `Online.asi` traces the game's DirectPlay
   8 calls, and `reference-dplay.sh` sets up a bench clone with Microsoft's DirectPlay to
-  trace against (online 0.1.0). Not part of `./install` or `a2mod` yet.
+  trace against (online 0.1.0, 14867b0). Not part of `./install` or `a2mod` yet.
 
 Installed, not yet seen in game.
 

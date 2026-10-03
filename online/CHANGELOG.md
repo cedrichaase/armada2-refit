@@ -9,7 +9,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
 ### Added
 - `Online.asi`, trace only: it wraps the `IDirectPlay8Peer` that `NetworkManager.dll`
   creates and logs every call, message and address to `Online.log`. It changes nothing.
-  Keys `Log=` and `Payload=` in `Online.ini`.
+  Keys `Log=` and `Payload=` in `Online.ini` (14867b0).
 - `install.sh` (and `--remove`). Not run by `./install`.
 - `reference-dplay.sh`, which sets up a test-bench clone with Microsoft's DirectPlay
   (downloaded into `$A2_DATA/reference/directx/`) and `Online.asi`.
