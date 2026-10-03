@@ -258,9 +258,10 @@ items can still stall at the third.
   refunded twice or missed.
 - **Refund on destruction.** When a building is destroyed, everything in its queue is
   refunded in full, the item in progress included. The same applies when a
-  construction ship with queued structures is destroyed. A building that is
-  *captured* or *assimilated* should refund its old owner too. That is not decided
-  yet, but it is the consistent reading.
+  construction ship with queued structures is destroyed.
+- **Refund on capture or assimilation.** The old owner gets its whole queue back,
+  exactly as if the building had been destroyed. The new owner takes the building over
+  with an empty queue (decided 2026-10-03).
 - **Officers and crew are part of the check.** An order is refused if the player is
   short of officers or crew, counted the same way as the resources: what's free, minus
   what's already queued. Crew is a quantity in the bank, so it is charged on enqueue and
@@ -301,15 +302,11 @@ builds it for free. The new save layout must be designed so that:
 This makes the layer's eventual changelog a MAJOR version on the day it ships, because
 saves made with it need it to load.
 
-**Open questions.**
-
-- Captured or assimilated buildings: refund the old owner, and the new owner inherits
-  an empty queue?
-
 **Done when.** With 500 dilithium and an item costing 300, the first order drops the
 bank to 200 and the second is refused. Cancelling the first restores 500. The
 voice-over never plays during a normal build-up on the bench. A two-player bench game
 with nine orders and three cancels ends with both peers showing the same bank.
-Destroying a yard with three paid items returns all three costs. An order with too few
+Destroying a yard with three paid items returns all three costs, and so does losing it
+to capture or assimilation, which leaves the new owner an empty queue. An order with too few
 officers is refused. A save made mid-queue loads with the same bank and queues, and
 nothing is charged a second time.
