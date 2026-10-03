@@ -40,6 +40,7 @@ it bundles.
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
+| `online/` | `Online.asi` — online multiplayer, in progress: so far a trace of the game's DirectPlay 8. Not in `./install` or `a2mod` yet | `online/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
@@ -624,6 +625,18 @@ The loading screen is a 3D model, not a sprite: six quads in `SOD/logo.SOD` carr
 `LOADING1..6`. The `LOADING` target (art, `models/loading-panel.sh`) and
 `models/logo-sod.py` (quads, `panel=`) ship together — `a2tex install`/`revert` move
 both; **never ship one without the other.**
+
+### online
+
+- **Multiplayer does not work under Proton at all**, LAN included: Wine's builtin
+  `dpnet.dll` stubs `IDirectPlay8Peer::Host` and `EnumHosts`. Microsoft's DirectPlay
+  works. It is **not redistributable**: `online/reference-dplay.sh` puts it into a bench
+  **clone** only, from `$A2_DATA/reference/directx/`. Never into the real prefix, never
+  into the repo.
+- The plan, the decisions (our own protocol, public + self-hostable server, a new
+  *Internet – Online* menu entry, join codes first) and the traced DirectPlay surface
+  are in `online/README.md`. Read it before designing anything here.
+- **No code from DirectPlay Lite**: it is GPL-2.0 and this repo is MIT.
 
 ### cutscenes
 

@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.3.0 — 2026-10-03
+
+Layers: online 0.1.0.
+
+### Added
+- `online/`, the start of online multiplayer: `Online.asi` traces the game's DirectPlay
+  8 calls, and `reference-dplay.sh` sets up a bench clone with Microsoft's DirectPlay to
+  trace against (online 0.1.0). Not part of `./install` or `a2mod` yet.
+
+Installed, not yet seen in game.
+
 ## 8.2.0 — 2026-10-02
 
 Layers: menus 4.3.1, testbench 2.2.0.

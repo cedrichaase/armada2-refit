@@ -173,6 +173,7 @@ nothing:
 | [`platform/`](platform/README.md) | Heroic and Proton, the DXVK d3d8 chain, the ASI loader, the widescreen patch |
 | [`testbench/`](testbench/README.md) | `./a2test`: the game headless at any resolution, scenarios, reports |
 | [`publish/`](publish/README.md) | what this repository may contain, and the check that enforces it |
+| [`online/`](online/README.md) | online multiplayer without port forwarding, in progress: `Online.asi` only traces the game's DirectPlay traffic so far, and is not part of `./install` |
 
 ## Entry points
 
