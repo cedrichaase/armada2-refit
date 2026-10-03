@@ -31,9 +31,14 @@ AGENT_SCHEMA = {
     'properties': {
         'outcome': {'type': 'string', 'enum': ['done', 'failed']},
         'summary': {'type': 'string', 'description': 'what you did and what you saw'},
+        'lessons': {'type': 'array', 'items': {'type': 'string'},
+                    'description': 'what the next agent should know to do this faster: '
+                                   'controls, positions, traps; one fact per item'},
     },
     'required': ['outcome', 'summary'],
 }
+
+GAMEPLAY = Path(__file__).resolve().parent.parent / 'GAMEPLAY.md'
 
 GAME_BRIEF = """\
 The game is Star Trek: Armada II (2001), a real-time strategy game, running with a
@@ -109,6 +114,10 @@ only through the harness commands below.
 
 {GAME_BRIEF}
 
+What earlier agents learnt about playing a match (observed; positions are at 1920x1080):
+
+{GAMEPLAY.read_text() if GAMEPLAY.exists() else '(none yet)'}
+
 This run:
 """ + '\n'.join(f'- {k}: {v}' for k, v in context.items()) + f"""
 
@@ -136,7 +145,8 @@ How to work:
   re-check before concluding something failed.
 - Do only this step. Do not quit the game unless the step says so.
 - Finish with outcome "done" if the step was accomplished (and the last screenshot
-  shows it), or "failed" with what went wrong."""
+  shows it), or "failed" with what went wrong. Either way, put in "lessons" what you
+  found out that the notes above lack or get wrong, so the next agent is quicker."""
     env = dict(os.environ, A2TEST_SESSION=str(session.statefile))
     allowed = [f'Bash({a2} drive:*)', f'Bash({a2} drive *)', 'Read']
     return _run(prompt, cwd, AGENT_SCHEMA, allowed, extra_dirs=[session.dir],
