@@ -6,6 +6,7 @@
 #   menus      menus/install.sh              Menus.asi
 #              menus/install-plates.sh       the backdrop plates built in $A2_DATA
 #   msaa       msaa/install.sh
+#   qol        qol/install.sh                QOL.asi: right-drag pan speed
 #   renderer   postfx/renderer-config.sh     dxvk.conf at stage 3, as shipped
 #   textures,  ./a2tex install               every target built in $A2_DATA/textures; the
 #   models                                   loading-screen model rides with LOADING
@@ -30,6 +31,7 @@ echo "== $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> 
 "$here/menus/install.sh"
 "$here/menus/install-plates.sh"
 "$here/msaa/install.sh"
+"$here/qol/install.sh"
 "$here/postfx/renderer-config.sh" --stage 3
 "$here/a2tex" install
 "$here/models/install.sh"

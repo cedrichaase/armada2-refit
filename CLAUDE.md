@@ -34,6 +34,7 @@ it bundles.
 | `hud/` | `HUD.asi` — the in-game HUD layout, font and cursors at any aspect | `hud/README.md` |
 | `menus/` | `Menus.asi` — the shell menus — and `backdrop.sh`, which builds the widescreen plates it composites | `menus/README.md`, `menus/BACKDROPS.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
+| `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed so far), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`) and `Planets.asi`, the planets' tessellation | `models/README.md` |
@@ -297,7 +298,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -580,6 +581,20 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   refuses any effect `fxcheck` cannot compile.
 - **MSAA is an ASI hook** because nothing in DXVK or `dxcfg.ini` can turn it on. The
   minimap is the one thing that could break (`msaa/README.md`).
+
+### qol
+
+- **Two plugins, by what other players need.** `QOL.asi` holds only changes that stay
+  on this player's machine (camera, keys, which ordinary command a key sends): a player
+  with it can play a player without it. Anything that changes what every node simulates
+  (QOL-7's pay-on-enqueue; bigger groups if they travel over the network) goes in a
+  separate rules plugin that every player must run, checked when a network game is set
+  up. Never put a rules change into `QOL.asi`. Which idea is which: `qol/README.md`.
+- **Never edit `RTS_CFG.h` for a QOL change.** Network games compare a CRC of its bytes
+  ("EXE / RTS_CFG.h files do not match node %d"), so an edited file locks the player
+  out of games with stock players. Scale the value in memory after the parse, as
+  `QOL.asi` does for `FASTSCROLL_COEFFICIENT` (right-drag only). `ARMADA.PRF` carries no
+  such check.
 
 ### textures
 
