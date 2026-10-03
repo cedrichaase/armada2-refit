@@ -8,10 +8,10 @@
 # NetworkManager.dll is patched in memory only.  Removing the three files is a
 # complete uninstall, so there is no backup to keep.
 #
-# Not run by ./install yet: Internet - Online runs on our own transport, but
-# without the server a host must still be reachable as on a LAN (README.md).  On a stock Proton prefix that traffic is Wine's builtin
-# dpnet.dll, which cannot host; online/reference-dplay.sh sets up a bench clone
-# with Microsoft's instead.
+# Not run by ./install yet: not seen in game.  Internet - Online runs on our
+# own transport and finds players through Server= (c20e.de by default); the
+# other connection types stay on Wine's builtin dpnet.dll, which cannot host
+# (README.md).
 set -euo pipefail
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"

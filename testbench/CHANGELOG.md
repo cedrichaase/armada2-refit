@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.7.1 — 2026-10-03
+
+### Fixed
+- `a2test drive step` failed on every step (`'Case' object has no attribute
+  'sessions'`) since scenarios with `Players:` (2.4.0).
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.7.0 — 2026-10-03
 
 ### Added

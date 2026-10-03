@@ -361,7 +361,7 @@ def _adhoc_step(s, text):
     c.scn = Scenario(path=Path('interactive.md'), title='interactive', resolutions=[s.res],
                      mod=s.s['mod'], steps=[text])
     c.res, c.mod, c.sess, c.opts, c.dir = s.res, s.s["mod"], s, {}, s.dir
-    c.reference_dirs, c.tolerance, c.n, c.results = {}, 0.05, 1, []
+    c.reference_dirs, c.tolerance, c.n, c.results, c.sessions = {}, 0.05, 1, [], {}
     c.ui = json.loads((config.BENCH / 'ui.json').read_text())
     return c.run_step(text)
 

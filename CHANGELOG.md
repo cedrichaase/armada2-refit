@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.9.1 — 2026-10-03
+
+Layers: testbench 2.7.1.
+
+### Fixed
+- `a2test drive step` works again (testbench 2.7.1).
+
+Installs nothing; no game-side change to confirm.
+
 ## 8.9.0 — 2026-10-03
 
 Layers: online 0.5.0.
