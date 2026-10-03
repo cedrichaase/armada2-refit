@@ -8,6 +8,9 @@ The game's 3D geometry, where the refit changes it:
   in `textures/README.md`, in the loading-screen section.
 - **Planets**, `Planets.asi` (`planets.c`): the engine tessellates them finely enough
   for a modern resolution. Below.
+- **Hull lighting**, `hull-bump.py`: the Federation hulls are lit per pixel through the
+  engine's own dot3 bump path. Below. Not part of `./install` yet: run
+  `models/hull-bump.py --install` (`--revert`, `--status`).
 
 `./install` runs `install.sh`, which builds and installs `Planets.asi` and `Planets.ini`.
 `a2mod` switches both, and the `SOD` backups, as the `models` layer.
@@ -70,3 +73,59 @@ With `Detail=8` it is a clean circle, the cloud shell included.
 `testbench/scenarios/no-assets.md` checks that both sites are patched.
 
 Built like the other plugins (`menus/build.sh`): clang, `lld-link`, no CRT.
+
+## Hull lighting
+
+### What the engine does
+
+Traced with `testbench/d3dtrace` (its README has the frame breakdown). Every hull is
+lit **per vertex on the CPU** and reaches Direct3D pre-transformed, with no normals.
+The exception is a mesh whose material names a bump map. With *Graphics Settings →
+Bump Mapping* on (the default), such a mesh is drawn through a dot3 vertex shader in
+four passes: per-pixel N·L for each of the two directional lights, then the texture,
+then the night-lights. In stock only the Borg have bump maps.
+
+### How a SOD asks for it
+
+Read from the 167 bump-mapped materials in the 25 Borg SODs, all spelled alike: the
+lighting material `opaque` is **type 6** with **two** textures, the diffuse with word
+`0` and then the bump map with word `0x200`. A plain material is type 4 with one
+texture. The bump map is a 24-bit greyscale height map. The engine takes the normals
+from its slope at load.
+
+`hull-bump.py` rewrites the 59 plain `opaque` materials of the 36 Federation SODs in
+`hull-bump.sha256` that way, from the stock bytes, with a `.a2neb-backup` of each.
+
+### Why the height map is flat
+
+A height map derived from the hull art was tried first: a high-pass of each texture's
+luminance. It turns every painted speck into relief. In game the user called it
+"ugly as hell": "it adds a lot of detail where there should be none". The lighting
+itself read as better. A **flat** map keeps the per-pixel lighting and adds no relief,
+because a constant height has zero slope everywhere. So every material names one
+8x8 mid-grey map, `Textures/RGB/a2flatbump.tga`.
+
+It is the one file this layer adds to `Textures/RGB`, and it gets its own name on
+purpose. A stock texture that happens to be one colour (`Gshroud`, `Mdmoonglo`) would
+also be flat. But it is a real texture, and whether the engine caches a texture loaded
+as a bump map under the same name as the colour texture is not known. A clash would
+draw the fog of war as a normal map, or light a hull from a wrong direction. A
+unique name rules that out. `a2mod` switches the file with the SODs, and the texture
+inventory skips it.
+
+### Measured
+
+First Federation mission, 1920x1080, refit, one camera. Grey mean / standard deviation
+over each ship:
+
+| | Bump Mapping off (stock path) | `hull-bump` |
+|---|---|---|
+| Enterprise-E | 52.3 / 70.3 | 43.0 / 60.7 |
+| Akira | 69.2 / 71.9 | 54.5 / 55.5 |
+
+Smooth light and shade across saucers and nacelles, painted detail unchanged, and
+**18–21% darker**. The dot3 passes add no ambient or emissive term. The CPU path adds
+the material's (0.18, 0.065, 0.065), the warm lift stock hulls have. Restoring it means
+replacing the dot3 passes' colour maths in a plugin. *Bump Mapping: Off* in game
+returns the hulls to the stock path at any time.
+

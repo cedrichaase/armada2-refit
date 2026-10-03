@@ -200,10 +200,15 @@ COMMENTARY = {
 }
 
 
+# Files this project adds to Textures/RGB, which are not stock art: models/hull-bump.py.
+ADDED = {'a2flatbump.tga'}
+
+
 def main():
     mats, users, kinds = sprite_materials(), sod_users(), odf_kinds()
     files = [f for f in sorted(os.listdir(TEX))
-             if f.endswith(('.tga', '.TGA')) and not f.endswith('.a2neb-backup')]
+             if f.endswith(('.tga', '.TGA')) and not f.endswith('.a2neb-backup')
+             and f.lower() not in ADDED]
     names = {f.rsplit('.', 1)[0] for f in files}
     byname = {f.rsplit('.', 1)[0]: f for f in files}
 

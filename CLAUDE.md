@@ -179,6 +179,10 @@ Until the sign-off, the work stays on its branch and in its worktree.
    all` cannot restore a stock atlas under condensed metrics and garble every glyph.
    The UI configs in `misc/` also have `.a2neb-backup`s, but are reverted by
    `hud/ui-widescreen.py --revert`, not by `a2tex`.
+   **The one file added rather than replaced is `a2flatbump.tga`**, from
+   `models/hull-bump.py`: a flat height map no stock texture shares a name with, which
+   the hull SODs it patches all name. It replaces nothing, so it has no backup;
+   `--revert` deletes it and `a2mod` lists it as an added `models` file.
 2. **Match the stock TGA format exactly**: image type 2, uncompressed, no ID field, no
    colour map — and **the same bit depth as the file you are replacing.** The nebula
    textures are 24-bit; **1113 of the 2115 textures in the game are 32-bit with a live
@@ -625,6 +629,12 @@ The loading screen is a 3D model, not a sprite: six quads in `SOD/logo.SOD` carr
 `LOADING1..6`. The `LOADING` target (art, `models/loading-panel.sh`) and
 `models/logo-sod.py` (quads, `panel=`) ship together — `a2tex install`/`revert` move
 both; **never ship one without the other.**
+
+**Federation hulls can be lit per pixel by the engine itself**: a SOD material spelled
+the Borg way (type 6, a second texture with word `0x200`) goes through the dot3 path.
+`models/hull-bump.py` does it with a *flat* height map; one derived from the hull art
+was rejected in game. It is 18–21% darker, because the dot3 passes have no ambient term
+(`models/README.md`, "Hull lighting").
 
 **The planets' shape is not in their SOD.** `Planet_Database` builds its own sphere and
 re-tessellates it per frame against a facet tolerance set for 640x480; a 5120-triangle

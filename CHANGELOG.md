@@ -7,14 +7,17 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 9.1.0 — 2026-10-03
 
-Layers: testbench 2.9.0.
+Layers: models 3.1.0, testbench 2.9.0.
 
 ### Added
+- `models/hull-bump.py`: Federation hulls lit per pixel through the engine's own dot3
+  bump path, with one flat height map, `a2flatbump.tga` (models 3.1.0). `a2mod` switches
+  that file with the `models` layer, and `textures/tools/inventory.py` does not count it
+  as stock art.
 - `testbench/d3dtrace/`: a bench-only Direct3D 8 tracer, which showed how the engine
-  lights a frame, and `sod-bump.py`, which puts a clone's hulls on the engine's dot3
-  bump path (testbench 2.9.0).
+  lights a frame (testbench 2.9.0).
 
-Installs nothing; no game-side change to confirm.
+Installed, not yet seen in game.
 
 ## 9.0.0 — 2026-10-03
 
