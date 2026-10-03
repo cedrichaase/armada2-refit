@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>a2test sessions</title>
+<style>
+  :root { --bg: #0b0b0d; --tile: #000; --fg: #c9c9cf; --dim: #74747c; --edge: #26262c; --ok: #5fbf77; --off: #c9a13f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 12px/1.3 ui-monospace, "JetBrains Mono", monospace; overflow: hidden; }
+  #grid { display: grid; gap: 4px; padding: 4px; height: 100%; }
+  .tile { position: relative; background: var(--tile); border: 1px solid var(--edge); min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; }
+  .cap { display: flex; gap: 10px; padding: 3px 6px; white-space: nowrap; overflow: hidden; border-bottom: 1px solid var(--edge); }
+  .cap .where { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .cap .meta { color: var(--dim); }
+  .cap .game.on { color: var(--ok); } .cap .game.off { color: var(--off); }
+  .screen { flex: 1; min-height: 0; position: relative; }
+  .screen > div { position: absolute; inset: 0; }
+  .msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); pointer-events: none; }
+  #empty { position: fixed; inset: 0; display: grid; place-items: center; color: var(--dim); font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="grid"></div>
+<div id="empty">no live a2test sessions -- waiting</div>
+<script type="module">
+import RFB from 'https://cdn.jsdelivr.net/gh/novnc/noVNC@v1.6.0/core/rfb.js';
+import { initLogging } from 'https://cdn.jsdelivr.net/gh/novnc/noVNC@v1.6.0/core/util/logging.js';
+if (location.search.includes('debug')) initLogging('debug');   // noVNC to the console
+
+const grid = document.getElementById('grid');
+const empty = document.getElementById('empty');
+const tiles = new Map();   // id -> {el, rfb, port, retry}
+
+function connect(t) {
+  t.msg.textContent = 'connecting…';
+  const rfb = new RFB(t.screen, `ws://${location.host}/ws/${t.id}`, { shared: true });
+  rfb.viewOnly = true;
+  rfb.scaleViewport = true;
+  rfb.background = '#000';
+  rfb.addEventListener('connect', () => { t.msg.textContent = ''; });
+  rfb.addEventListener('disconnect', () => {
+    t.rfb = null;
+    if (!tiles.has(t.id)) return;
+    t.msg.textContent = 'disconnected – retrying';
+    t.retry = setTimeout(() => tiles.has(t.id) && connect(t), 2000);
+  });
+  t.rfb = rfb;
+}
+
+function add(s) {
+  const el = document.createElement('div');
+  el.className = 'tile';
+  el.innerHTML = `<div class="cap"><span class="where"></span><span class="meta"></span><span class="game"></span></div>
+    <div class="screen"></div><div class="msg"></div>`;
+  const t = { id: s.id, port: s.port, el, screen: el.querySelector('.screen'), msg: el.querySelector('.msg') };
+  grid.appendChild(el);
+  tiles.set(s.id, t);
+  connect(t);
+  return t;
+}
+
+function remove(id) {
+  const t = tiles.get(id);
+  tiles.delete(id);
+  clearTimeout(t.retry);
+  if (t.rfb) t.rfb.disconnect();
+  t.el.remove();
+}
+
+// columns that make the tiles largest for the window's shape and the sessions' aspect
+function layout(list) {
+  const n = list.length;
+  empty.style.display = n ? 'none' : 'grid';
+  empty.textContent = 'no live a2test sessions -- waiting';
+  if (!n) return;
+  const ar = list.reduce((a, s) => a + s.res[0] / s.res[1], 0) / n;
+  const W = innerWidth, H = innerHeight, CAP = 20;
+  let best = 1, bestArea = 0;
+  for (let c = 1; c <= n; c++) {
+    const r = Math.ceil(n / c);
+    const tw = W / c, th = H / r - CAP;
+    const w = Math.min(tw, th * ar);
+    if (w * (w / ar) > bestArea) { bestArea = w * (w / ar); best = c; }
+  }
+  grid.style.gridTemplateColumns = `repeat(${best}, minmax(0, 1fr))`;
+  grid.style.gridTemplateRows = `repeat(${Math.ceil(n / best)}, minmax(0, 1fr))`;
+}
+
+let last = [];
+async function poll() {
+  try {
+    const list = await (await fetch('/sessions.json', { cache: 'no-store' })).json();
+    const ids = new Set(list.map(s => s.id));
+    for (const id of [...tiles.keys()]) if (!ids.has(id)) remove(id);
+    for (const s of list) {
+      let t = tiles.get(s.id);
+      if (t && t.port !== s.port) { remove(s.id); t = null; }
+      if (!t) t = add(s);
+      t.el.querySelector('.where').textContent = s.where;
+      t.el.querySelector('.meta').textContent = `${s.res[0]}x${s.res[1]} ${s.mod}`;
+      const g = t.el.querySelector('.game');
+      g.textContent = s.game ? 'game running' : 'no game';
+      g.className = 'game ' + (s.game ? 'on' : 'off');
+    }
+    last = list;
+    layout(list);
+    document.title = `a2test sessions (${list.length})`;
+  } catch (e) {
+    empty.style.display = 'grid';
+    empty.textContent = 'watcher not running (./a2test watch)';
+  }
+}
+addEventListener('resize', () => layout(last));
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>

@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.3.0 — 2026-10-03
+
+### Added
+- `a2test watch`: every live session, view-only, tiled in one Chromium window. The watcher
+  starts its own `wayvnc` per session and bridges noVNC's WebSockets to them. Sessions
+  come and go on their own. Options `--no-open` and `--port`, and `A2TEST_WATCH_PORT`.
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.2.0 — 2026-10-02
 
 ### Added

@@ -37,6 +37,8 @@ a2test -- run Armada II headless and test it end to end
                                        clone; repeat to stack checkouts (public, private)
   a2test session stop [--keep]         quit, gather logs, write the report
   a2test session list
+  a2test watch [--no-open]             every live session, view-only, tiled in one
+                                       window (wayvnc + noVNC; needs wayvnc)
   a2test drive shot [NAME]             print the screenshot's path
   a2test drive click X Y [--design] [--button 3] [--double]
   a2test drive click-text "TEXT"
@@ -84,6 +86,9 @@ def main(argv=None):
             return cmd_session(rest)
         if cmd == 'drive':
             return cmd_drive(rest)
+        if cmd == 'watch':
+            from . import watch
+            return watch.main(rest, _active_sessions)
     except GameError as e:
         print(f'a2test: {e}', file=sys.stderr)
         return 1
