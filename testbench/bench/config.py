@@ -44,6 +44,7 @@ REFERENCE_ASPECT = '4:3'   # the stock game's native shape: nothing is stretched
 
 JOBS = int(os.environ.get('A2TEST_JOBS', 5))   # game instances at once (a2test run --jobs)
 VNC_BASE_PORT = int(os.environ.get('A2TEST_VNC_PORT', 5910))
+WATCH_PORT = int(os.environ.get('A2TEST_WATCH_PORT', 5950))   # a2test watch: the page; wayvnc from +1
 JUDGE_MODEL = os.environ.get('A2TEST_MODEL', 'sonnet')   # judged and agent steps; '' = claude's own default
 
 
