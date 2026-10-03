@@ -251,8 +251,11 @@ items can still stall at the third.
   start-of-build cost check and its voice-over: an item that was paid on enqueue can't
   fail it.
 - **Refund on cancel: always 100%.** Cancelling refunds the item's whole cost, whether
-  it is still waiting or already in progress. Whatever partial refund stock gives for
-  an item in progress is replaced, not added to, so nothing is refunded twice.
+  it is still waiting or already in progress. Stock already refunds an in-progress
+  item in full (per the user, 2026-10-03), so that path stays as it is. Only the
+  waiting items, which stock never charged, need our refund. Check on the bench that
+  stock's refund matches what we charged, including crew and officers, so nothing is
+  refunded twice or missed.
 - **Refund on destruction.** When a building is destroyed, everything in its queue is
   refunded in full, the item in progress included. The same applies when a
   construction ship with queued structures is destroyed. A building that is
@@ -300,8 +303,6 @@ saves made with it need it to load.
 
 **Open questions.**
 
-- What does stock refund today when an in-progress item is cancelled? Measure it, so
-  the 100% rule replaces it exactly.
 - Captured or assimilated buildings: refund the old owner, and the new owner inherits
   an empty queue?
 
