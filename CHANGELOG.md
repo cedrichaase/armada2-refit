@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.1.0 — 2026-10-03
+
+Layers: qol 1.0.0 (new), testbench 2.9.0.
+
+### Added
+- The `qol` layer: `QOL.asi` doubles the right-click-drag pan speed (`PanSpeed=` in
+  `QOL.ini`), scaled in memory so `RTS_CFG.h` stays stock and network games still
+  accept the player (qol 1.0.0, 8a8248b). `./install` runs `qol/install.sh`, `a2mod`
+  switches it, and the release package and both installers carry it.
+- The gameplay ideas move from the root `IDEAS.md` to `qol/README.md`, split into
+  changes that stay compatible with stock players (`QOL.asi`) and rule changes every
+  player needs (a future rules plugin).
+- Scenario step `Right-drag from X,Y to X,Y` (testbench 2.9.0).
+
+Installed, not yet seen in game.
+
 ## 9.0.0 — 2026-10-03
 
 Layers: models 3.0.0, testbench 2.8.1.

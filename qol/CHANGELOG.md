@@ -10,7 +10,8 @@ versions". Newest first. Details, and the planned changes, are in
 ### Added
 - `QOL.asi`, `QOL.ini`: right-click-drag pan speed, `PanSpeed=` (default 2, 0.25–10, 1
   leaves it alone). `RTS_CFG.h`'s `FASTSCROLL_COEFFICIENT` is scaled in memory as the
-  game parses it, so the file stays stock and network games still accept the player.
+  game parses it, so the file stays stock and network games still accept the player
+  (8a8248b).
 - `install.sh` (`--pan-speed X`, `--remove`), and `rts-cfg-check.py`, which `install.sh`
   runs with `--fix` to put a hand-edited `FASTSCROLL_COEFFICIENT` back to stock.
 - The ideas from the root `IDEAS.md` (QOL-1 to QOL-7) move to `README.md`, each marked

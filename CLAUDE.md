@@ -298,7 +298,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
