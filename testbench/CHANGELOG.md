@@ -11,7 +11,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `scenarios/multiplayer-online-match.md`: host, join, chat and a match through
   *Internet – Online* on our own transport, under plain Proton (online 0.3.0), and
   `multiplayer-online-loss.md`, the same with 10% of datagrams dropped. Their steps are
-  the fragment `_online-match.md`.
+  the fragment `_online-match.md` (6cbeed9).
 
 Installs nothing; no game-side change to confirm.
 

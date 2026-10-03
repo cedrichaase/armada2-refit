@@ -10,7 +10,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
 - Our own `IDirectPlay8Peer` over UDP (`peer.c`): a game started from *Internet –
   Online* runs on it instead of DirectPlay's, which under Proton cannot host. A star
   through the host, one reliable ordered stream per connection. Keys `Port=` (2302) and
-  `Loss=` (testing: drop that percentage of datagrams) in `Online.ini`.
+  `Loss=` (testing: drop that percentage of datagrams) in `Online.ini` (6cbeed9).
 - `bench-asi.sh`: `Online.asi` alone into a test-bench clone, with `--loss N`.
 
 Installed, not yet seen in game.

@@ -14,7 +14,7 @@ Layers: online 0.3.0, testbench 2.5.0.
   own UDP transport instead of DirectPlay, so hosting and joining work under Proton
   without Microsoft's DLLs (online 0.3.0). No server yet: the host must be reachable as
   on a LAN. Bench scenarios for a whole match, with and without packet loss (testbench
-  2.5.0). `Online.asi` is still not part of `./install`.
+  2.5.0). `Online.asi` is still not part of `./install` (6cbeed9).
 
 Installed, not yet seen in game.
 
