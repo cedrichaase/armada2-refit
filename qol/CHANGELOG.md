@@ -17,4 +17,4 @@ versions". Newest first. Details, and the planned changes, are in
 - The ideas from the root `IDEAS.md` (QOL-1 to QOL-7) move to `README.md`, each marked
   for `QOL.asi` or for a future rules plugin that every player in a game needs.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.

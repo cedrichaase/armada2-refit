@@ -19,7 +19,7 @@ Layers: qol 1.0.0 (new), testbench 2.9.0.
   player needs (a future rules plugin).
 - Scenario step `Right-drag from X,Y to X,Y` (testbench 2.9.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 9.0.0 — 2026-10-03
 
