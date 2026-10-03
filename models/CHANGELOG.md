@@ -14,7 +14,7 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
   now runs. MAJOR: the layer now needs the ASI loader from `platform/` (88887e3).
 - `a2mod` switches `Planets.asi`/`.ini` as part of this layer.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 2.0.0 — 2026-09-27
 

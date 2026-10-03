@@ -15,7 +15,7 @@ Layers: models 3.0.0, testbench 2.8.1.
   `models/install.sh`, and `a2mod` switches the plugin with the `models` layer (88887e3).
 - `scenarios/no-assets.md` checks the plugin patched both sites (testbench 2.8.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 8.10.0 — 2026-10-03
 
