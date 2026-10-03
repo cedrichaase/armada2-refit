@@ -12,7 +12,7 @@ Details are in [`README.md`](README.md).
   column 0 are refilled from their neighbours, sample for sample. New `MSAA.ini` key
   `EdgeFill=` (default 1) (719a8c3).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 1.0.1 — 2026-09-27
 
