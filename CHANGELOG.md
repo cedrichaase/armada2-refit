@@ -42,7 +42,7 @@ Layers: online 0.5.0.
 - The online server runs publicly at `c20e.de:2399`, and `Online.asi` uses it by
   default (`Server=c20e.de`) for join codes and the relay (online 0.5.0, f8012c9).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 8.8.0 — 2026-10-03
 
@@ -55,7 +55,7 @@ Layers: online 0.4.0, testbench 2.7.0.
   joining by code, directly and through the relay (testbench 2.7.0). `Online.asi` is
   still not part of `./install` (2f2255a).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 8.7.0 — 2026-10-03
 
@@ -68,7 +68,7 @@ Layers: online 0.3.0, testbench 2.6.0.
   on a LAN. Bench scenarios for a whole match, with and without packet loss (testbench
   2.6.0). `Online.asi` is still not part of `./install` (6cbeed9).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 8.6.0 — 2026-10-03
 
@@ -80,7 +80,7 @@ Layers: online 0.2.0, testbench 2.5.0.
   0.2.0), with a bench scenario (testbench 2.5.0). `Online.asi` is still not part of
   `./install` (fd40da4).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 8.5.0 — 2026-10-03
 
@@ -102,7 +102,7 @@ Layers: online 0.1.0.
   8 calls, and `reference-dplay.sh` sets up a bench clone with Microsoft's DirectPlay to
   trace against (online 0.1.0, 14867b0). Not part of `./install` or `a2mod` yet.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 8.3.0 — 2026-10-03
 

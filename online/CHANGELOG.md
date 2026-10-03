@@ -12,7 +12,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
 - `bench-asi.sh` empties `Server=` unless given `--server`: the bench never talks to the
   public server (f8012c9).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 0.4.0 — 2026-10-03
 
@@ -27,7 +27,7 @@ Installed, not yet seen in game.
   GAME SETUP.
 - `bench-asi.sh --server` (a local server for the bench) and `--relay` (`Direct=0`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 0.3.0 — 2026-10-03
 
@@ -38,7 +38,7 @@ Installed, not yet seen in game.
   `Loss=` (testing: drop that percentage of datagrams) in `Online.ini` (6cbeed9).
 - `bench-asi.sh`: `Online.asi` alone into a test-bench clone, with `--loss N`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 0.2.0 — 2026-10-03
 
@@ -48,7 +48,7 @@ Installed, not yet seen in game.
   connects as Manual IP does. Key `Entry=` in `Online.ini` (1 by default; 0 leaves the
   screen stock) (fd40da4).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.
 
 ## 0.1.0 — 2026-10-03
 
@@ -60,4 +60,4 @@ Installed, not yet seen in game.
 - `reference-dplay.sh`, which sets up a test-bench clone with Microsoft's DirectPlay
   (downloaded into `$A2_DATA/reference/directx/`) and `Online.asi`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-03.

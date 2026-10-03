@@ -12,8 +12,14 @@ without Microsoft's DirectPlay. Through the server named in `Online.ini` (the pu
 at `c20e.de` unless changed), the host gets a join code and players type it to join:
 directly where the routers allow it, through the server's relay where not. With
 `Server=` empty, players join by address as on a LAN. The server is
-`server/a2online-server.py`; nothing has crossed a real router yet. Every other connection type keeps the game's DirectPlay, traced but
-unchanged. `./install` does not install it yet.
+`server/a2online-server.py`. Every other connection type keeps the game's DirectPlay,
+traced but unchanged. `./install` does not install it yet.
+
+**Seen in game (2026-10-03):** a player's own install joined a bench game on the same
+machine by join code, through the public server at `c20e.de`, and played the match. That confirms the menu entry, the transport, the join code and the default
+server. It does **not** cover two networks: on one machine the direct path always wins,
+so neither hole punching through a real router nor the relay has been seen outside the
+bench ("Not yet established" under milestone 2).
 
 ## The goal
 
@@ -70,8 +76,9 @@ two instances on one machine host, find the game, join, chat, and play a match.
 `CoCreateInstance`, so its one import-table slot sees every DirectPlay object the game
 creates: an `IDirectPlay8Peer` (`CLSID_DirectPlay8Peer`), never Client/Server, and
 `IDirectPlay8Address` objects. `NetworkManager.dll` also references DirectPlay Voice.
-The voice classes were not created in the trace below; that is still to be checked
-with voice switched on.
+The voice classes were not created in the trace below. Voice is not part of this layer
+(see "The plan"); what remains is to check that an online game survives a player
+switching the game's voice on.
 
 ### What the game calls (trace, 2026-10-03)
 
@@ -115,7 +122,8 @@ The trace stops with both instances still in the match, so leaving is not in it.
 - Leaving, dropping, and the host quitting: `DestroyPlayer`, `TerminateSession`, host
   migration.
 - Passwords, and 3 or more players. Two peers do not show how a full mesh is built.
-- DirectPlay Voice.
+- What the game does with voice switched on (only that it must not break an online
+  game; voice itself is out of scope).
 - Whether a refit install and a stock install can share a game (the game compares CRCs).
 
 ## The menu entry
@@ -283,7 +291,7 @@ told `--server`.
 1. ~~Does multiplayer work under Proton?~~ No (above).
 2. ~~A reference, and the trace.~~ Microsoft's DirectPlay on a bench clone, and
    `Online.asi` logging it (above). Still to trace: leaving, passwords, 3 players,
-   voice.
+   and that switching voice on does no harm.
 3. ~~Two instances on the bench as a scenario.~~
    `./a2test run multiplayer-two-players` hosts, joins, chats both ways and plays a
    match, unattended, and checks both traces (below). Milestone 1 swaps its `Setup:`
@@ -296,8 +304,65 @@ told `--server`.
 6. ~~Milestone 2:~~ the server, hole punching, relay fallback and join codes (above).
    `./a2test run multiplayer-online-code` joins by code over the direct path,
    `multiplayer-online-relay` through the relay with 5% loss. The public instance runs
-   at `c20e.de`. Still to do: the first games across real routers.
-7. **Milestone 3:** the server-backed game list. **Milestone 4:** voice, if anyone wants it.
+   at `c20e.de`. Confirmed in game on one machine, 2026-10-03. Still to do: the first
+   games across real routers.
+7. **Milestone 3:** the server-backed game list (next section).
+
+**Not planned: voice chat.** DirectPlay Voice is not going to be reimplemented. Players
+already have Discord, Steam and the like for that, and they work across every game.
+
+## The game list (milestone 3, planned)
+
+Join codes need the host to pass the code on outside the game. Milestone 3 lets a player
+find open games in the game itself: the Internet Game screen's *Current Games* list,
+which today shows only the game at a typed address, filled from the server with every
+game hosted through it. The aim is the old GameSpy experience: open the screen, see the
+games, pick one, join. Codes stay, for games not meant for strangers.
+
+What it involves:
+
+- **Hosts publish a summary.** The host already sends `SV_HOST` every 10 s. It gets the
+  game's own summary added: the reply data its game handler gives an
+  `ENUM_HOSTS_QUERY` (74 bytes in the trace: game name, players, map). `peer.c` asks its
+  own game for it, as a local query, so the summary is always the game's own and
+  nothing about its layout has to be known. The server keeps the latest per game and
+  drops it with the code, after 40 s of silence or on `SV_BYE`.
+- **A new message pair, `SV_LIST` / `SV_GAMES`.** A player who opens the list sends
+  `SV_LIST`. The server answers with every listed game: its relay id, code and summary,
+  across as many datagrams as it takes (the 1100-byte fragment size applies).
+- **Into the game's list.** The player opens the Internet Game screen through *Internet
+  – Online* with a blank field. Instead of searching no address, `EnumHosts` then asks the
+  server, every 500 ms as the search does now, and each listed game reaches the game as
+  an `ENUM_HOSTS_RESPONSE` carrying its summary. *Create Game* stays where it is.
+  Because the game ages its list by the 1.5 s enum interval ("Our transport"), a game
+  must be re-delivered within that interval or it disappears, so the server's answer is
+  cached and re-delivered, not the server asked faster.
+- **Joining from the list** is a join by code: picking a game hands `Connect` that
+  game's address, which `peer.c` turns into the `SV_JOIN` / punch / relay path of
+  milestone 2. Nothing about connecting changes.
+- **Ping.** The list has a ping column. A round trip to the server says nothing about
+  the host, so either the column shows the server's view or each listed host gets a
+  probe; to be decided once the list works.
+- **Opting out.** A key in `Online.ini` (a working name: `List=0`) hosts without being
+  listed, with a code only.
+- **Games in progress.** A game whose match has started cannot be joined. It has to
+  leave the list, either because the host stops answering enum queries then (to be
+  traced) or because `peer.c` tells the server.
+- **Limits.** The server caps how many games it lists and how often a source address
+  may ask, as it already caps hosting and the relay.
+
+To be established before building it:
+
+- How the game shows an entry: which fields of the 74-byte reply and of the session
+  description it reads for the name, player count and map.
+- What the host does with enum queries once the match has started.
+- Whether a refit and a stock install can share a game (the game compares CRCs). If not,
+  the list should show only games a player can actually join, which means the summary
+  needs something to compare.
+
+Tests: `selftest.py` grows a host that lists and a player that reads it back, and a
+bench scenario (`multiplayer-online-list`) hosts with the bench server, joins from the
+list, and plays a match.
 
 ## Running the trace
 
