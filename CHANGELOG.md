@@ -12,7 +12,7 @@ Layers: testbench 2.3.0.
 ### Added
 - Bench scenarios with several games (`Players:`, `Setup:`), and
   `multiplayer-two-players.md`, which hosts, joins and plays a match unattended
-  (testbench 2.3.0).
+  (testbench 2.3.0, 245d1f6).
 
 Installs nothing; no game-side change to confirm.
 
