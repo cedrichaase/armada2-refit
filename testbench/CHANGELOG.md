@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.9.0 — 2026-10-03
+
+### Added
+- Scenario step `Right-drag from X,Y to X,Y`: the drag step with the right button held,
+  which pans the map in a mission.
+- `QOL.log` and `QOL.ini` are collected with the other plugins' logs.
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.8.1 — 2026-10-03
 
 ### Changed

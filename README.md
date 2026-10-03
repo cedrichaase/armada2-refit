@@ -123,6 +123,7 @@ loads and nothing reports an error. On Windows no override is needed.
 | Layer | Copy | Notes |
 |---|---|---|
 | HUD | `hud/build/HUD.asi`, `hud/HUD.ini` | Don't also run `hud/ui-widescreen.py`, `ui-font-condense.py` or `cursor-aspect.py`; they are its file-based predecessors. Handles both cursor paths: D3D8's hardware cursor and the sprite path DXVK takes |
+| Quality of life | `qol/build/QOL.asi`, `qol/QOL.ini` | Right-drag pan speed (`PanSpeed=`, default 2x). Leave `RTS_CFG.h` stock: network games compare it, and the plugin scales the value in memory ([`qol/README.md`](qol/README.md)) |
 | Menus | `menus/build/Menus.asi`, `menus/Menus.ini` | GDI only, so the renderer doesn't matter. Delete any old `MenuScale.asi`. Without backdrop plates it draws black sides |
 | Cutscenes (launch reels) | `cutscenes/binkproxy/build/binkw32.dll`, `BinkProxy.ini` | First rename the stock `binkw32.dll` to `binkw32_orig.dll`, because the proxy forwards to it. With no `.mp4` beside a `.bik` it only scales the launch reels to full screen. Replacement movies are AV1 through Media Foundation: under Proton that works (GStreamer + dav1d), and on Windows it presumably needs the AV1 Video Extension |
 
@@ -160,6 +161,7 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 | [`hud/`](hud/README.md) | hud | `HUD.asi`: the in-game HUD layout, font and cursors undistorted at any aspect, at run time |
 | [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops ([`BACKDROPS.md`](menus/BACKDROPS.md) builds them) |
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
+| [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (so far the right-drag pan speed), and the plan for hotkeys, control groups and production queues |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
 | [`models/`](models/CHANGELOG.md) | models | the loading-screen model, widened with its `LOADING` art |
@@ -175,9 +177,6 @@ nothing:
 | [`publish/`](publish/README.md) | what this repository may contain, and the check that enforces it |
 | [`online/`](online/README.md) | online multiplayer without port forwarding, in progress: `Online.asi` adds *Internet – Online*, which runs the game on its own UDP transport, with join codes, hole punching and a relay through a self-hostable server (`online/server/`; the public one is `c20e.de`); not part of `./install` |
 
-Gameplay changes not yet built (hotkeys, control groups, production queues, pan speed)
-are collected in [`IDEAS.md`](IDEAS.md).
-
 ## Entry points
 
     ./install                               install every layer
@@ -187,7 +186,7 @@ are collected in [`IDEAS.md`](IDEAS.md).
     ./a2env.sh                              print where the game, prefix, Proton and assets are
 
 Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
-`menus/`, `msaa/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
+`menus/`, `msaa/`, `qol/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
 a `--revert` flag on the Python tools. The layer's README has the details.
 
 ## Versions

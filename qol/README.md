@@ -1,9 +1,41 @@
-# Ideas: gameplay quality of life
+# qol — gameplay quality of life
 
-Changes to how Armada II *plays*, as opposed to how it looks. None of these is built
-yet. Each entry says what is wrong today, what we want, what is already known, and what
-still has to be measured. When an idea gets built, its layer's README takes over the
-*why* and this file just links to it.
+Changes to how Armada II *plays*, as opposed to how it looks: the controls, the camera,
+control groups, production. One of them is built (QOL-2, the right-drag pan speed, in
+`QOL.asi`); the rest are planned here, each with what is wrong today, what we want, what
+is already known and what still has to be measured. What is installed, at which
+version, and whether it has been seen in game is in [`CHANGELOG.md`](CHANGELOG.md).
+
+    qol/install.sh                  build QOL.asi and install it with QOL.ini
+    qol/install.sh --pan-speed 3    ... with PanSpeed=3
+    qol/install.sh --remove         take it out (QOL.asi, QOL.ini, QOL.log)
+    qol/rts-cfg-check.py [--fix]    is RTS_CFG.h stock where QOL.asi needs it to be?
+
+`./install` runs `qol/install.sh`; `./a2mod stock` / `refit` switches `QOL.asi` and
+`QOL.ini` like the other plugins.
+
+## Two plugins: what other players need too
+
+A change either stays on this player's machine or it changes the game every machine in a
+network game simulates, and the two cannot ship in one plugin:
+
+- **`QOL.asi` — stock-compatible.** The camera, the keys, which ordinary command a key
+  press turns into. A player with it can join a player without it, and nothing they
+  simulate differs. Installed by default. QOL-1, 2, 4, 5 and 6 belong here.
+- **A rules plugin (`QOLRules.asi`, not built yet) — every player needs it.** Changes to
+  what the game *does* with a command: when the bank is charged, what a group can
+  hold if that travels over the network. Every node must run it with the same settings,
+  so it needs a check when a network game is set up (the `online/` layer is the place)
+  and it must refuse or stand down rather than desync. QOL-7 belongs here, and QOL-3 if
+  bigger groups change what is sent.
+
+The test for which side an idea falls on is the network game: would a stock player and
+a player with the plugin, given the same orders, end up in the same game? If yes,
+`QOL.asi`. If not, the rules plugin.
+
+`RTS_CFG.h` is a trap on the compatible side: network games compare a CRC of its bytes
+(below), so even a camera setting edited *in the file* locks a player out of games with
+stock players. Compatible changes are made in memory and leave the file stock.
 
 Status values: **idea** (not investigated), **scoped** (approach known, nothing built),
 **in progress**, **done** (link to the layer).
@@ -11,7 +43,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | ID | Idea | Surface | First step | Status |
 |---|---|---|---|---|
 | [QOL-1](#qol-1-grid-hotkeys-for-the-button-bar) | Grid hotkeys for the button bar | `Input.map`, then maybe HUD layout | Remap the build slots, try on the bench | idea |
-| [QOL-2](#qol-2-configurable-right-drag-pan-speed) | Configurable right-drag pan speed | `RTS_CFG.h`, then an options slider | Try the existing `RTS_CFG.h` experiment | scoped |
+| [QOL-2](#qol-2-configurable-right-drag-pan-speed) | Configurable right-drag pan speed | `QOL.asi`, `PanSpeed=` | A slider in the options screen | **done** (`QOL.asi`); slider open |
 | [QOL-3](#qol-3-larger-control-groups) | Larger control groups | code | Measure the cap | idea |
 | [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | code, `Input.map` | Check what Shift+number does today | idea |
 | [QOL-5](#qol-5-buildings-in-control-groups) | Buildings in control groups | code | Check what Ctrl+number does on a building | idea |
@@ -39,14 +71,13 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
   game files. A change to them ships as a script that edits the player's own copy, with
   a backup and `--revert`, the way `hud/ui-widescreen.py` edits `misc/gui_*.cfg`.
   It never ships as a modified copy of the file.
-- **Where it lives.** These belong together in one new layer, say `controls/`, with one
-  plugin (`Controls.asi`) and one `.ini`, switched by `a2mod` like the others. QOL-2's
-  first step may be just a config edit. The layer gets its README and CHANGELOG when the
-  first idea is built.
+- **Which plugin.** See "Two plugins" above; each idea below says which.
 
 ---
 
 ## QOL-1: Grid hotkeys for the button bar
+
+*`QOL.asi`, stock-compatible (a key remap needs no plugin at all).*
 
 **Problem.** The button bar's hotkeys are hard to use without looking. Each building's
 build menu binds its items to `F1`–`F12` by slot. The menus themselves sit on letters
@@ -88,12 +119,14 @@ in a real game, the user doesn't have to look down.
 
 ## QOL-2: Configurable right-drag pan speed
 
+*`QOL.asi`, stock-compatible. Built: `PanSpeed=` in `QOL.ini`, default 2.*
+
 **Problem.** Right-click-drag panning is slow on a large map at high resolution.
 
-**Wanted.** A *Pan speed* slider in the game's options. If that is too hard, the
-existing mouse scroll speed slider should drive right-drag panning too.
+**Wanted.** A *Pan speed* slider in the game's options. Until then, a setting.
 
-**Today.** The speeds are plain values in `RTS_CFG.h`, under `CAMERA CONTROL`:
+**The values.** The scroll speeds are plain values in `RTS_CFG.h`, under
+`CAMERA CONTROL`:
 
 | Key | Stock | What it does |
 |---|---|---|
@@ -102,27 +135,49 @@ existing mouse scroll speed slider should drive right-drag panning too.
 | `MAX_SCROLL_SPEED` / `INITIAL_SCROLL_SPEED` | 2.0 / 1 | ceiling and floor of the held-scroll ramp |
 | `SCROLL_BORDER_WIDTH` | 2 | the edge-scroll band, in pixels |
 
-There is already an experiment in the install, `RTS_CFG.h.scrollspeed`, with right-drag
-at 3× (0.015). It is not the live file. Nothing records whether it was played.
+The edge and keyboard scroll speeds the options screen sets live in `ARMADA.PRF`, not
+here; right-drag ignores both, so `FASTSCROLL_COEFFICIENT` is the one value for it.
 
-**Approach.**
+**Why not edit the file.** Editing `FASTSCROLL_COEFFICIENT` works, and the removed
+`gameplay/` layer did it (with the other scroll values, at 3x). But a network game
+compares a CRC of `RTS_CFG.h`'s bytes between nodes:
+`TransportNetwork::ProcessPacketCRC` (`0x560af0`) reports *"EXE / RTS_CFG.h files do
+not match node %d"*, and the CRC it compares is `CrcFile` on `rts_cfg.h` (called at
+`0x55e63b`, beside the one for the exe). So an edited file shuts the player out of every
+game with someone whose file is stock — for a value that only moves this player's
+camera, and so cannot desync anything.
 
-1. **Config edit.** Scale `FASTSCROLL_COEFFICIENT` alone, since it is the right-drag
-   path and touches nothing else. Ship it as a script with a backup and `--revert`.
-   `a2mod` treats `RTS_CFG.h` as the player's own file, so the script must change only
-   this one key.
-2. **Read at run time.** A `PanSpeed=` key in the layer's `.ini`, applied by the plugin
-   where the game reads the coefficient. This is the step before a slider, and needs no
-   file edit.
-3. **Slider.** The options screen is a shell menu: a Win32 dialog, which `Menus.asi`
+**How `QOL.asi` does it.** The `RTS_CFG.h` parser looks each key up by name; for
+`FASTSCROLL_COEFFICIENT`, if found, it stores the parsed value with one
+`fstp dword [0x70fbb4]` (at `0x491777`). Those six bytes become `call pan_stub; nop`:
+the stub multiplies the value by `PanSpeed` and does the store itself. The only reads of
+`0x70fbb4` are the two multiplies in `cOverViewImp::mMouseRightDrag` (`0x5268d7`,
+`0x5268f5`), the x and y of the pan, so nothing but right-drag changes. Each parse scales
+its own fresh value, so a second parse cannot compound it; a file without the key keeps
+the compiled default, unscaled. The site's bytes are checked first, so another
+`Armada2.exe` leaves the plugin inert and says so in `QOL.log`.
+
+`ASI` plugins load before the game reads `RTS_CFG.h`, so the patch is always in place
+for the parse. Seen on the bench (2026-10-03): `QOL.log` reads
+`RTS_CFG.h parsed: right-drag FASTSCROLL_COEFFICIENT now 0.0100 (file value x 2.00)`
+with the clone's file still at the stock 0.005, and a 200 px right-drag in the first
+Federation mission moved the view about 160 px.
+
+`install.sh` runs `rts-cfg-check.py --fix` first: if the live file's
+`FASTSCROLL_COEFFICIENT` differs from the stock `RTS_CFG.h.a2neb-backup` beside it (a hand
+edit, or the old `gameplay/scrollspeed.py`), that one line goes back to stock, since the
+plugin would otherwise scale the edit. Every other line is the player's and is left
+alone, with a warning if the file still differs from stock.
+
+**Still open.**
+
+1. **The slider.** The options screen is a shell menu, a Win32 dialog that `Menus.asi`
    already hooks (`menus/README.md`). A new slider means a new control on that dialog,
-   saved with the other options (`ARMADA.PRF`), and read by step 2. The fallback is to
-   take the mouse scroll speed slider's value and apply it to the right-drag
-   coefficient.
-
-**Open questions.** Is the game's scroll-speed slider stored in `ARMADA.PRF`, and what
-does it scale today? Does a right-drag pan's speed depend on resolution? If so, the
-default should scale with the back buffer, as the HUD does.
+   saved with the other options (`ARMADA.PRF`, which carries no network check), and read
+   by `QOL.asi` in place of `PanSpeed=`. The fallback is to apply the mouse scroll
+   speed slider's value to right-drag too.
+2. **Resolution.** Does a right-drag pan's speed depend on the resolution? If so, the
+   default should scale with the back buffer, as the HUD does.
 
 **Done when.** At 3440×1440, one right-drag gesture crosses a useful part of the map,
 and the setting survives a restart.
@@ -130,6 +185,8 @@ and the setting survives a restart.
 ---
 
 ## QOL-3: Larger control groups
+
+*Rules plugin if bigger groups change what is sent; `QOL.asi` if not. Measure first.*
 
 **Problem.** A control group (`Ctrl+number` to store, `number` to recall) holds only a
 few units. A fleet has to be split across several groups.
@@ -158,6 +215,8 @@ two-player bench game.
 
 ## QOL-4: Shift+number adds to a group
 
+*`QOL.asi`, stock-compatible.*
+
 **Wanted.** As in StarCraft II, `Shift+number` adds the current selection to that group
 and keeps what is already in it. (`Ctrl+number` keeps its meaning: replace the group.)
 
@@ -179,6 +238,8 @@ it.
 
 ## QOL-5: Buildings in control groups
 
+*`QOL.asi`, stock-compatible, if a group stays local; measure.*
+
 **Wanted.** `Ctrl+number` stores a building (a shipyard, a research station) like a
 ship, and `number` selects it again, so its build menu is one key away.
 
@@ -196,6 +257,8 @@ shipyard is open.
 ---
 
 ## QOL-6: Production spread across a group of buildings
+
+*`QOL.asi`, stock-compatible: one ordinary order to the chosen building.*
 
 **Wanted.** Several buildings of the same kind in one group, for example three
 Federation shipyards on `4`. A build order given to the group goes to *one* of them,
@@ -228,6 +291,8 @@ gets three, and the units come out in the expected order.
 ---
 
 ## QOL-7: Pay when queuing, refund on cancel
+
+*Rules plugin: every player needs it.*
 
 **Problem.** Anything can be queued at any time. The cost is checked only when the queue
 reaches that item. The check then fails, and the advisor's voice-over announces it,

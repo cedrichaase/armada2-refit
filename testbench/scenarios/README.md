@@ -44,6 +44,7 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Click at 100,200` / `… at design 400,300` / `… at hud 25,27` / `… at hud-right 1500,26` | screen pixels, 800x600 shell space, HUD canvas (1200 high, top-left), or HUD canvas anchored top right at its stock 1600-wide position |
 | `Move the mouse to …` / `Hover over …` | same four coordinate spaces |
 | `Drag from hud 400,300 to hud 1400,900` | press, glide with the button held, release (a selection box); either end in any of the four spaces |
+| `Right-drag from 960,500 to 760,500` | the same with the right button: pans the map in a mission |
 | `Press Escape` / `Press ctrl+s` / `Press Return 3 times` | virtual keyboard; xkb key names |
 | `Type "TEXT"` | |
 | `Type this machine's address` | the source address of the default route: what the game shows as "Local IP Address", and where every player of a case is |

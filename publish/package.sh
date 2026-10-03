@@ -29,6 +29,7 @@ commit="$(git -C "$root" rev-parse --short HEAD)"
 bash "$root/hud/build.sh"              >/dev/null
 bash "$root/menus/build.sh"            >/dev/null
 bash "$root/msaa/build.sh"             >/dev/null
+bash "$root/qol/build.sh"              >/dev/null
 bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
 
 name="armada2-refit-$ver"
@@ -39,6 +40,7 @@ mkdir -p "$d/game" "$d/bloom"
 cp "$root/hud/build/HUD.asi"                "$root/hud/HUD.ini"                 "$d/game/"
 cp "$root/menus/build/Menus.asi"            "$root/menus/Menus.ini"             "$d/game/"
 cp "$root/msaa/build/MSAA.asi"              "$root/msaa/MSAA.ini"               "$d/game/"
+cp "$root/qol/build/QOL.asi"                "$root/qol/QOL.ini"                 "$d/game/"
 cp "$root/cutscenes/binkproxy/build/binkw32.dll" "$root/cutscenes/binkproxy/BinkProxy.ini" "$d/game/"
 # dxvk.conf as ./install writes it (stage 3); only DXVK reads it.
 bash "$root/postfx/renderer-config.sh" --print --stage 3 > "$d/game/dxvk.conf"
