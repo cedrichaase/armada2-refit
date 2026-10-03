@@ -10,7 +10,7 @@ Details are in [`README.md`](README.md).
 - The one-pixel line along the top and the left of the 3D view under MSAA, which
   collected the map grid's colour as the camera panned. After each `Present`, row 0 and
   column 0 are refilled from their neighbours, sample for sample. New `MSAA.ini` key
-  `EdgeFill=` (default 1).
+  `EdgeFill=` (default 1) (719a8c3).
 
 Installed, not yet seen in game.
 

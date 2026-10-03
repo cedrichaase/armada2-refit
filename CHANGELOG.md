@@ -11,7 +11,7 @@ Layers: msaa 1.1.0.
 
 ### Fixed
 - Under MSAA, the top row and left column of the 3D view no longer collect grid lines
-  as the camera pans; new `MSAA.ini` key `EdgeFill=` (msaa 1.1.0).
+  as the camera pans; new `MSAA.ini` key `EdgeFill=` (msaa 1.1.0, 719a8c3).
 
 Installed, not yet seen in game.
 
