@@ -10,10 +10,11 @@ Ultimate ASI Loader (`winmm` override). It patches `Armada2.exe` in memory only.
 
 A launch's `MSAA.log` at 8x:
 
-    --- MSAA samples=8  sites patched 2/2
+    --- MSAA samples=8  sites patched 2/2, edge fill on
     CreateDevice 3440x1440 fmt 22 depth 80 fullscreen swap 2 flags 0x00000001  -> MSAA 8x, swap DISCARD, flags 0x00000000
     CreateDevice 640x480 fmt 22 depth 80 fullscreen swap 2 flags 0x00000001  -> MSAA 8x, swap DISCARD, flags 0x00000000
     CreateDevice 3440x1440 fmt 22 depth 80 fullscreen swap 2 flags 0x00000001  -> MSAA 8x, swap DISCARD, flags 0x00000000
+    edge fill: row 0 and column 0 of 3440x1440 at 8x, after each Present
 
 That is `X8R8G8B8` (22) over `D16` (80), and DXVK's log is free of errors, CopyRects
 included. The 640x480 device is the mode `PlayIntroMovie` hard-codes for the launch
@@ -76,6 +77,47 @@ the log says so.
 - **Nothing switches it off.** `D3DRS_MULTISAMPLEANTIALIAS` (161) defaults to
   TRUE, and the engine never sets it. The three `push 0xa1` in the exe are two
   dialog procs and a debug helper.
+
+## The top row and left column (`EdgeFill=`)
+
+With MSAA on, a one-pixel line appeared along the top and the left of the 3D view in a
+mission. It filled up with the map grid's colour as the camera panned: yellow dots in
+column 0, a flat grey row 0 over the fog. Measured on the bench at 3440x1440 after the
+same pan, in the first Federation mission:
+
+| | column 0 | column 1 | fog row 0 | fog row 1 |
+|---|---|---|---|---|
+| `Samples=8` | 61,55,0 | 0,0,0 | 70,70,70 | 74,80,96 |
+| `Samples=0` | 0,0,0 | 0,0,0 | equal | equal |
+| `Samples=8`, edge fill | 0,0,0 | 0,0,0 | 74,80,96 | 74,80,96 |
+
+**Why.** DXVK maps a D3D8/9 viewport to Vulkan offset by +0.49 px in x and y (D3D9
+puts pixel centres on integers), and every primitive is clipped to the viewport, so
+the scene covers from 0.49 onward. Without MSAA, pixel 0's single sample sits at 0.5
+and is covered. With 8x, the samples in the left half of column 0 and the top half of
+row 0 never are. The engine clears only depth in a mission (`ClearDepthBuffer`,
+`0x623bf0`, flags `ZBUFFER`) and relies on the scene to overwrite every colour pixel,
+so those samples keep whatever last reached them. That is the grid's lines, whose
+width runs past the viewport edge. Each resolve then mixes the stale half in. No
+D3D8 viewport can start below 0, and `dxvk.conf` has no key for the offset.
+
+**The fix.** `ST3D_DeviceDirectX8::RefreshDisplay` ends every frame with one `Present`
+(`call [edx+0x3c]` at `0x624735`, then the frame counter `inc [esi+0xa4]`). The plugin
+replaces those two instructions with a jump to a stub. The stub presents, copies row 1
+onto row 0 and column 1 onto column 0, increments the counter and jumps back. The copy
+is sample for sample: same sample count, so DXVK's `StretchRect` copies rather than
+resolves. The samples the next frame covers are drawn over. The ones it cannot reach
+hold the neighbouring pixel from one frame earlier. HUD pixels on screen are therefore
+unchanged, and the stale grid colour that was under the HUD's left edge is gone too.
+DXVK refuses `CopyRects` within one surface, so each strip goes through a 1-pixel-thick
+render target. It is created and released in the same call, so nothing outlives a frame
+and device re-creation or `Reset` is unaffected. The site is byte-checked like the
+others, and `EdgeFill=0` leaves it alone. Clearing those samples to black instead was
+rejected: that leaves a half-brightness edge, which is a dark line over the fog.
+
+Not this fix: the 3D view also stops one pixel short on the **right and bottom**
+(column 3439 and row 1439 black at 3440x1440, with or without MSAA). That is the
+engine's own viewport, constant, and unchanged here.
 
 ## Limits
 
