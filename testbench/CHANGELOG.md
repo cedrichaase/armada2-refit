@@ -12,7 +12,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   placing a structure, mining, the traps), from the first agent that mined resources.
   Every agent step's prompt includes it.
 - Agent steps report `lessons`, written into the case's log and appended to
-  `agent-lessons.md` in the results directory.
+  `agent-lessons.md` in the results directory (af3c97c).
 
 Installs nothing; no game-side change to confirm.
 

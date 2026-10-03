@@ -11,7 +11,7 @@ Layers: testbench 2.8.0.
 
 ### Added
 - Bench agents get `testbench/GAMEPLAY.md`, notes on playing a match, and report their
-  own lessons for it (testbench 2.8.0).
+  own lessons for it (testbench 2.8.0, af3c97c).
 
 Installs nothing; no game-side change to confirm.
 
