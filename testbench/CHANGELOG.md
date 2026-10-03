@@ -10,7 +10,8 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - Scenario step `Right-drag from X,Y to X,Y`: the drag step with the right button held,
   which pans the map in a mission.
-- `QOL.log` and `QOL.ini` are collected with the other plugins' logs.
+- `QOL.log` and `QOL.ini` are collected with the other plugins' logs, and
+  `scenarios/no-assets.md` checks that `QOL.asi` scaled the right-drag pan speed.
 
 Installs nothing; no game-side change to confirm.
 
