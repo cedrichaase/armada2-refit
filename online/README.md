@@ -118,8 +118,10 @@ The trace stops with both instances still in the match, so leaving is not in it.
 2. ~~A reference, and the trace.~~ Microsoft's DirectPlay on a bench clone, and
    `Online.asi` logging it (above). Still to trace: leaving, passwords, 3 players,
    voice.
-3. **Two instances on the bench as a scenario,** so host and join can be checked without
-   a human. Today it is the manual procedure below.
+3. ~~Two instances on the bench as a scenario.~~
+   `./a2test run multiplayer-two-players` hosts, joins, chats both ways and plays a
+   match, unattended, and checks both traces (below). Milestone 1 swaps its `Setup:`
+   for our own transport and runs the same steps.
 4. **The menu entry:** *Internet – Online* on the Multiplayer Connection screen.
 5. **Milestone 1:** our `IDirectPlay8Peer` over plain UDP on a LAN, with a whole 2-player
    match on the bench.
@@ -131,7 +133,15 @@ The trace stops with both instances still in the match, so leaving is not in it.
 On the bench, with two clones, using Microsoft's DirectPlay as the reference. Its DLLs are
 not redistributable. `reference-dplay.sh` downloads the DirectX redistributable that
 `winetricks directplay` uses into `$A2_DATA/reference/directx/` (checked against its
-sha256) and installs the DLLs into a **clone's** prefix, never the real one:
+sha256) and installs the DLLs into a **clone's** prefix, never the real one.
+
+Unattended, as a scenario (`testbench/scenarios/multiplayer-two-players.md`, whose
+`Setup:` runs `reference-dplay.sh` on each clone):
+
+    ./a2test run multiplayer-two-players --no-claude
+    # each game's trace: <results>/multiplayer-two-players/1920x1080/<player>/logs/Online.log
+
+By hand, to look around in between:
 
     ./a2test session start --res 16:9 --no-launch      # twice: host and joiner
     online/reference-dplay.sh <state.json of each>     # Microsoft DirectPlay + Online.asi

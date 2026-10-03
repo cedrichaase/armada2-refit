@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.3.0 — 2026-10-03
+
+### Added
+- Scenario headers `Players:` (one game per player, steps prefixed with the player's
+  name) and `Setup:` (a repository script run on each clone before launch), and the step
+  `Type this machine's address`.
+- `scenarios/multiplayer-two-players.md`: host, join, chat both ways and a 2-player
+  match over TCP/IP, with Microsoft's DirectPlay and `Online.asi` in each clone.
+- The game's `Online.log` and `Online.ini` are gathered with the other logs.
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.2.0 — 2026-10-02
 
 ### Added

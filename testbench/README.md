@@ -35,6 +35,11 @@ running, left at least 5.5 GB available and swap untouched, at a peak load of 17
 (run 20260926-142801). Past that, fixed waits such as "Wait 45 seconds" risk turning
 flaky.
 
+**A case can run several games** (`Players: host, joiner`), each with all of the above
+to itself, steps addressed by player name (`scenarios/README.md`, "Several players").
+`multiplayer-two-players` hosts, joins and plays a match that way in under four
+minutes; it counts as one job but runs two games.
+
 **The user's install is never written.** Every case runs on a reflink clone of the
 game directory and the prefix, so a run is free to re-tune, break or `a2mod stock` its
 copy, and can run while the game is being played.

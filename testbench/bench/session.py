@@ -762,7 +762,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         dst = self.dir / 'logs'
         g = self.game_dir
         for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'BinkProxy.log', 'ARMADA.PRF', 'Menus.ini',
-                     'MSAA.ini', 'HUD.ini', 'dxvk.conf'):
+                     'MSAA.ini', 'HUD.ini', 'dxvk.conf', 'Online.log', 'Online.ini'):
             if (g / name).exists():
                 shutil.copy2(g / name, dst / name)
         if self.crashed():

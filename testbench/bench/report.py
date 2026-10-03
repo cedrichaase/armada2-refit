@@ -194,18 +194,21 @@ code {{ font:13px ui-monospace, monospace; }}
                                  f'<figcaption>{_esc(p.name)}</figcaption></figure>')
                 parts.append('</div>')
             parts.append('</div>')
-        logs = sorted((cd / 'logs').glob('*')) if (cd / 'logs').is_dir() else []
+        # a case with `Players:` keeps each game's logs and shots under <case>/<player>/
+        logs = sorted(cd.glob('logs/*')) + sorted(cd.glob('*/logs/*'))
         if logs:
             parts.append('<details><summary class="muted">logs from this case</summary><ul>' +
-                         ''.join(f'<li><a href="{_esc(c["dir"])}/logs/{_esc(l.name)}">{_esc(l.name)}</a> '
+                         ''.join(f'<li><a href="{_esc(c["dir"])}/{_esc(l.relative_to(cd))}">'
+                                 f'{_esc(l.relative_to(cd))}</a> '
                                  f'<span class="muted">{l.stat().st_size if l.is_file() else ""} B</span></li>'
                                  for l in logs) + '</ul></details>')
-        allshots = sorted((cd / 'shots').glob('*.png'))
+        allshots = sorted(cd.glob('shots/*.png')) + sorted(cd.glob('*/shots/*.png'))
         if allshots:
             parts.append(f'<details><summary class="muted">all {len(allshots)} screenshots</summary><div class="shots">' +
-                         ''.join(f'<figure><a href="{_esc(c["dir"])}/shots/{_esc(p.name)}"><img loading="lazy" '
-                                 f'src="{_esc(c["dir"])}/shots/{_esc(p.name)}"></a><figcaption>{_esc(p.name)}'
-                                 f'</figcaption></figure>' for p in allshots) + '</div></details>')
+                         ''.join(f'<figure><a href="{_esc(c["dir"])}/{_esc(p.relative_to(cd))}"><img loading="lazy" '
+                                 f'src="{_esc(c["dir"])}/{_esc(p.relative_to(cd))}"></a><figcaption>'
+                                 f'{_esc(p.relative_to(cd))}</figcaption></figure>' for p in allshots) +
+                         '</div></details>')
         parts.append('</section>')
     parts.append('</main></body></html>')
     return '\n'.join(parts)
