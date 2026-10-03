@@ -16,23 +16,25 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | code, `Input.map` | Check what Shift+number does today | idea |
 | [QOL-5](#qol-5-buildings-in-control-groups) | Buildings in control groups | code | Check what Ctrl+number does on a building | idea |
 | [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | code | Check what a build order does with several yards selected | idea |
-| [QOL-7](#qol-7-refuse-to-queue-what-cannot-be-paid-for) | Refuse to queue what can't be paid for | code | Settle the rule (below), then find the enqueue path | idea |
+| [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | code, every peer | Measure stock's charge and refund rules | scoped |
 
 ## Things that apply to all of them
 
 - **Multiplayer.** Anything that changes *what commands are issued* must keep issuing
   the stock commands, so that a refit player can play against a stock player and every
-  peer simulates the same game. QOL-4, 5, 6 and 7 should be pure client-side decisions,
+  peer simulates the same game. QOL-4, 5 and 6 should be pure client-side decisions,
   resolved into ordinary commands before they leave the machine. QOL-3 might not be.
+  **QOL-7 is not**: it changes when the bank is charged, and every peer simulates the
+  bank, so every player needs it.
   If a bigger group changes the size of a command the game sends, it changes the
   protocol, and both sides would need the plugin. Test each one with
   `./a2test run multiplayer-two-players` and the `multiplayer-online-*` scenarios.
 - **Saves.** Control groups are saved with the game. Anything that changes what a group
   can hold (QOL-3, QOL-5) has to load and save correctly. It also has to fail safe in
   two cases: a refit save loaded with `./a2mod stock`, and a stock save loaded in refit.
-- **The AI.** It builds and selects through the same game objects. Changes to queues
-  (QOL-6, QOL-7) must apply to the player's input only, never to the AI's own build
-  logic.
+- **The AI.** It builds and selects through the same game objects. QOL-6 must apply to
+  the player's input only, never to the AI's own build logic. QOL-7 is a rule of the
+  game, so the AI plays by it too (see QOL-7).
 - **No game files in the repository** (hard rule 8). `Input.map` and `RTS_CFG.h` are
   game files. A change to them ships as a script that edits the player's own copy, with
   a backup and `--revert`, the way `hud/ui-widescreen.py` edits `misc/gui_*.cfg`.
@@ -225,39 +227,64 @@ gets three, and the units come out in the expected order.
 
 ---
 
-## QOL-7: Refuse to queue what can't be paid for
+## QOL-7: Pay when queuing, refund on cancel
 
 **Problem.** Anything can be queued at any time. The cost is checked only when the queue
 reaches that item. The check then fails, and the advisor's voice-over announces it,
 often several times in a row. Construction ships do the same with queued structures.
 
-**Wanted.** An order that can't be paid for is refused when it is given, quietly, and
-the queue only ever holds what will build.
+**Wanted (decided 2026-10-03).** Resources leave the bank **the moment an item is
+queued**, not when it starts building. An order the bank can't cover is refused right
+away, so the queue only ever holds what is already paid for. **Cancelling a queued
+item refunds its cost in full.** This is rule B ("stock minus what is already queued")
+taken all the way: there is nothing to reserve, because the bank already shows what's
+left. Rule A, which checks only the current stock, was rejected because five queued
+items can still stall at the third.
 
-**The rule to settle first.** Two possibilities:
+**What it takes.**
 
-- **A, checked against the current stock.** Refuse if dilithium, metal, latinum,
-  biomatter, crew or officers are short for *this* item now. This is simple, but five
-  queued Akiras pass the check one at a time and then stall at the third.
-- **B, checked against stock minus what is already queued.** Refuse if the stock can't
-  cover this item *plus* everything already queued but not yet paid for. This is
-  stricter, and it is the one that removes the stall. When QOL-6 spreads orders, the
-  sum must cover every producer of the player, not just the chosen one.
-
-B matches what was asked for ("the queue only holds what will build"). The cost of B is
-that a player can't queue ahead of their income. That may be fine; ask before choosing.
+- **Charge on enqueue.** When a player's order adds an item to a queue (shipyards,
+  research, construction ships), check the bank against that item's cost. If it falls
+  short, drop the order. Otherwise subtract the cost and queue the item.
+- **Don't charge twice.** The game charges an item when it *starts* building, and that
+  charge has to stop for items we have already paid for. The same goes for the game's
+  start-of-build cost check and its voice-over: an item that was paid on enqueue can't
+  fail it.
+- **Refund on cancel.** Cancelling an item that hasn't started refunds its whole cost.
+  For the item in progress, the refund has to agree with the stock rules, whatever
+  those are (measure them), so that we never refund twice.
+- **Spreading orders (QOL-6) needs no extra rule.** Each order is charged when it is
+  placed, whichever building it goes to.
 
 **Feedback.** No voice-over. Use the button's own disabled state, a short click, or one
 line in the chat box (`notice()`, as `online/` does). Never a window of our own.
 
-**Approach.** Hook the point where a player's order adds an item to a queue (shipyards,
-research, construction ships), apply the rule, and drop the order if it fails. The
-game's own check when a build starts stays as it is, as a backstop.
+**Multiplayer: this one is not client-side.** Every peer simulates the bank. If only one
+side charges on enqueue, the banks drift apart and the game desyncs. So the charge,
+the refund and the start-of-build exception must run identically on every machine,
+from the order as it arrives. That means every player in a game needs the plugin,
+and the game has to refuse to start, or fall back to stock rules, when one doesn't
+have it. The `online/` layer is the natural place to agree on this when a game is set
+up. Single player and skirmish against the AI don't have this problem.
 
-**Open questions.** Is the cost charged when an item *starts* building or when it is
-*queued*? The voice-over suggests "starts". Measure it on the bench. Officers and crew
-are not quite resources: crew regenerates, and officers are a cap. Do they take part in
-the rule?
+**The AI.** It queues through the same objects. The simplest rule is that it plays by
+the same rule (charged on enqueue). That is fair, and it is deterministic as long as
+every peer runs the plugin. Exempting it would mean telling its orders apart from a
+player's. Measure whether the AI's build planning breaks when the bank drops early.
+It may hold back a queue it would otherwise build in time.
 
-**Done when.** With 500 dilithium and an item costing 300, the second order is refused
-under rule B. The voice-over never plays during a normal build-up on the bench.
+**Open questions.**
+
+- Does stock refund an in-progress item on cancel, and how much?
+- What happens to a paid queue when its building is destroyed: is it refunded or lost?
+  Today nothing is lost, because nothing in the queue was paid. Under this rule
+  something must be decided. Ask.
+- Officers and crew are not quite resources: crew regenerates, and officers are a cap.
+  Are they charged on enqueue too, or left to the start-of-build check?
+- Saves have to keep the "already paid" mark on every queued item. Otherwise a load
+  either charges twice or builds for free.
+
+**Done when.** With 500 dilithium and an item costing 300, the first order drops the
+bank to 200 and the second is refused. Cancelling the first restores 500. The
+voice-over never plays during a normal build-up on the bench. A two-player bench game
+with nine orders and three cancels ends with both peers showing the same bank.
