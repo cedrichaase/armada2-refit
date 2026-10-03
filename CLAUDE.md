@@ -36,7 +36,7 @@ it bundles.
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
-| `models/` | `SOD` geometry — the widened loading screen | `textures/README.md`, loading-screen section |
+| `models/` | 3D geometry — the widened loading screen (`SOD`) and `Planets.asi`, the planets' tessellation | `models/README.md` |
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
@@ -625,6 +625,11 @@ The loading screen is a 3D model, not a sprite: six quads in `SOD/logo.SOD` carr
 `LOADING1..6`. The `LOADING` target (art, `models/loading-panel.sh`) and
 `models/logo-sod.py` (quads, `panel=`) ship together — `a2tex install`/`revert` move
 both; **never ship one without the other.**
+
+**The planets' shape is not in their SOD.** `Planet_Database` builds its own sphere and
+re-tessellates it per frame against a facet tolerance set for 640x480; a 5120-triangle
+`PB_CLSS*.sod` drew pixel for pixel like stock. `Planets.asi` lowers that tolerance
+(`Detail=`). Don't re-try new planet meshes: `models/README.md`.
 
 ### online
 

@@ -24,6 +24,7 @@ WHAT COUNTS AS A CHANGE
 
     textures      Textures/RGB/*.a2neb-backup  -- a2tex
     models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel)
+                  Planets.asi/.ini             -- added files: planet tessellation
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
                   (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
                   *.a2font-backup from ui-font-condense and the Curs_* art from
@@ -83,6 +84,7 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('MenuScale.asi', 'menus'), ('MenuScale.ini', 'menus'),
          ('HUD.asi', 'hud'), ('HUD.ini', 'hud'),
          ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
+         ('Planets.asi', 'models'), ('Planets.ini', 'models'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
 LAYERS = ['textures', 'models', 'hud', 'menus', 'msaa', 'cutscenes',

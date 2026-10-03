@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.8.1 — 2026-10-03
+
+### Changed
+- `scenarios/no-assets.md` checks that `Planets.asi` patched both of its sites (88887e3).
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.8.0 — 2026-10-03
 
 ### Added

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# The models layer's own part of ./install: Planets.asi, which makes the engine
+# tessellate planets finely enough for a modern resolution (models/planets.c).
+#
+#   install.sh                build, then install
+#   install.sh --detail N     install and set Detail=N (1 = stock)
+#   install.sh --remove       take it out again
+#
+# Adds Planets.asi, Planets.ini and (at run time) Planets.log, and nothing else;
+# the exe is patched in memory only, so removing the three files is a complete
+# uninstall. Needs nothing from A2_DATA. The loading-screen model is not here: it
+# ships with its art, the LOADING texture target, and ./a2tex install moves both.
+set -euo pipefail
+
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/a2env.sh"
+GAME="$A2_GAME"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+detail=""
+remove=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --remove) remove=1 ;;
+        --detail) detail="$2"; shift ;;
+        *) echo "unknown argument: $1" >&2; exit 2 ;;
+    esac
+    shift
+done
+
+[ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
+
+if [ "$remove" = 1 ]; then
+    rm -f "$GAME/Planets.asi" "$GAME/Planets.ini" "$GAME/Planets.log"
+    echo "removed Planets from $GAME"
+    exit 0
+fi
+
+bash "$here/build.sh" >/dev/null
+
+cp "$here/build/Planets.asi" "$GAME/Planets.asi"
+cp "$here/Planets.ini"       "$GAME/Planets.ini"
+if [ -n "$detail" ]; then
+    sed -i "s/^Detail=.*/Detail=$detail/" "$GAME/Planets.ini"
+fi
+rm -f "$GAME/Planets.log"
+echo "installed Planets.asi into $GAME ($(grep '^Detail=' "$GAME/Planets.ini"))"

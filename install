@@ -9,6 +9,7 @@
 #   renderer   postfx/renderer-config.sh     dxvk.conf at stage 3, as shipped
 #   textures,  ./a2tex install               every target built in $A2_DATA/textures; the
 #   models                                   loading-screen model rides with LOADING
+#   models     models/install.sh             Planets.asi, planet tessellation
 #   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
 #                                            $A2_DATA/movies
 #
@@ -31,4 +32,5 @@ echo "== $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> 
 "$here/msaa/install.sh"
 "$here/postfx/renderer-config.sh" --stage 3
 "$here/a2tex" install
+"$here/models/install.sh"
 "$here/cutscenes/binkproxy/install.sh"
