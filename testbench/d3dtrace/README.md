@@ -69,3 +69,43 @@ Observed on 2026-10-03, first Borg mission, 1920x1080, refit, with MSAA (session
   ship's box): 13.0/32.3 vs 12.6/29.7, 9.4/16.7 vs 14.0/25.0, 6.8/15.2 vs 10.4/22.3,
   20.0/35.3 vs 23.5/37.6. On means darker hulls, by up to a third, and no visible relief
   at that size. Both paths render correctly under DXVK.
+
+## Experiment A: Federation hulls on the bump path
+
+`sod-bump.py` puts models on the dot3 path in a bench clone, to see what the engine's
+per-pixel lighting does for hulls that never had it.
+
+    ./a2test session start --res 16:9 --install . --install testbench/d3dtrace --no-launch
+    testbench/d3dtrace/sod-bump.py ~/.cache/a2test/sessions/<id>/game --height flat
+    ./a2test drive launch        # then the Federation campaign, first mission
+
+**How a SOD asks for a bump map.** This was read from the files. Every bump-mapped
+material in the Borg SODs (167 of them, in 25 files) is spelled the same way.
+The lighting material is `opaque` with type **6** and **two** textures: the diffuse
+with word `0`, then `<diffuse>bump` with word `0x200`. A plain material is type **4**
+with one texture. The bump texture is a 24-bit greyscale **height map** (R = G = B),
+256x256 like the stock diffuse, and the engine derives the normals at load. Rewriting a
+Federation material that way (4 → 6, 1 → 2, one entry inserted) loads without
+complaint. The engine draws the hull through the dot3 shader, and *Bump Mapping:
+Off* still drops it back to the stock CPU path.
+
+Results, first Federation mission, 1920x1080, refit (session `20261003-223538`),
+Enterprise-E and Akira crops at one camera. The table gives grey mean / standard
+deviation:
+
+| Height map | Look | Enterprise | Akira |
+|---|---|---|---|
+| Bump Mapping off (stock CPU path) | flat, warm pinkish lift | 52.3 / 70.3 | 69.2 / 71.9 |
+| `highpass` (K 3, blur 4) | crinkled foil: every painted speck becomes relief, dark blotches | not measured (different restart) | — |
+| `flat` | smooth per-pixel light and shade, painted detail unchanged, neutral grey | 43.0 / 60.7 | 54.5 / 55.5 |
+
+- **Generated relief is wrong for these hulls.** The user saw the `highpass` version
+  in game and called it ugly: "it adds a lot of detail where there should be none".
+  The lighting itself read as improved.
+- **`flat` keeps that improvement without the relief, but is 18–21% darker.** The dot3
+  passes multiply light into the texture and add no ambient or emissive term. The CPU
+  path adds the material's (0.18, 0.065, 0.065), which is the warm lift on stock hulls.
+  The Borg are darker under bump mapping for the same reason (the table above).
+  Fixing that means replacing the dot3 passes' colour maths: step B.
+- `Restart Mission` reloads the height maps, so variants can be swapped within a
+  session.

@@ -11,7 +11,8 @@ Layers: testbench 2.9.0.
 
 ### Added
 - `testbench/d3dtrace/`: a bench-only Direct3D 8 tracer, which showed how the engine
-  lights a frame (testbench 2.9.0).
+  lights a frame, and `sod-bump.py`, which puts a clone's hulls on the engine's dot3
+  bump path (testbench 2.9.0).
 
 Installs nothing; no game-side change to confirm.
 

@@ -12,6 +12,8 @@ versions". Newest first. The why is in [`README.md`](README.md).
   clones only (`--install testbench/d3dtrace`), and `summarize.py`, which groups a
   traced frame's draws by lighting path. A session's `D3DTrace.log` is gathered with the
   other logs.
+- `testbench/d3dtrace/sod-bump.py`: puts a clone's models on the engine's dot3 bump path
+  (SOD material type 4 → 6 plus a `<texture>bump` height map, `--height flat|highpass`).
 
 ## 2.8.1 — 2026-10-03
 
