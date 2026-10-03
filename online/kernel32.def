@@ -1,0 +1,20 @@
+LIBRARY KERNEL32.dll
+EXPORTS
+GetModuleHandleA@4
+GetModuleFileNameA@12
+VirtualProtect@16
+CreateFileA@28
+WriteFile@20
+GetPrivateProfileIntA@16
+GetTickCount@0
+GetCurrentThreadId@0
+InitializeCriticalSection@4
+EnterCriticalSection@4
+LeaveCriticalSection@4
+GetProcessHeap@0
+HeapAlloc@12
+CreateThread@24
+WaitForSingleObject@8
+CloseHandle@4
+HeapFree@12
+GetPrivateProfileStringA@24

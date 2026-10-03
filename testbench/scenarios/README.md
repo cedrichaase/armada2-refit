@@ -14,6 +14,10 @@ Reference: 4:3 stock                      (what "compared with" means; default 4
 Stock shell: embed                        (stock cases only: keep Menus.asi, Embed=1 only)
 Assets: none                              (install this checkout with an empty A2_DATA:
                                            the game as without a texture pack)
+Players: host, joiner                     (one game per player; see "Several players")
+Setup: online/bench-asi.sh --loss 10      (a script of this repo, run on each clone
+                                           before launch, with its session state file
+                                           and then any words after the script's name)
 Timeout: 12 min
 
 Any prose is description.
@@ -42,9 +46,25 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Drag from hud 400,300 to hud 1400,900` | press, glide with the button held, release (a selection box); either end in any of the four spaces |
 | `Press Escape` / `Press ctrl+s` / `Press Return 3 times` | virtual keyboard; xkb key names |
 | `Type "TEXT"` | |
+| `Type this machine's address` | the source address of the default route: what the game shows as "Local IP Address", and where every player of a case is |
+| `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
 | `Note "TEXT"` | a line in the log |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |
+
+## Several players
+
+`Players: host, joiner` runs one game per name, each on its own clone, prefix,
+display and input, under `<case>/<player>/`. A step that starts with a player's name
+runs on that player's game (`Host: Click "Create Game"`); a step without one runs on
+each game in turn and stops at the first that does not pass (`Launch the game`,
+`Expect no crash`). The steps run in the order written, so a wait on one player's
+screen is how the scenario waits for something the other one did. The case keeps one
+step log, each line tagged with its player. Such a case is still one job for
+`--jobs`, but runs as many games as it has players. `multiplayer-two-players.md` is
+the example. The one time two such cases started together (four games), one game's
+audio reached the real output before the bench's guard stopped it (run
+20261003-165008). The other case passed, and that one passed when run again alone.
 
 ## Checks (measured)
 

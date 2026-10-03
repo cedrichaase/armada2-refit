@@ -40,6 +40,7 @@ it bundles.
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
+| `online/` | `Online.asi` — online multiplayer, in progress: the *Internet – Online* menu entry, our own `IDirectPlay8Peer` over UDP (`peer.c`), and `server/a2online-server.py` for join codes, hole punching and the relay, public at `c20e.de:2399` (the default `Server=`; the bench blanks it). Not in `./install` or `a2mod` yet | `online/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
@@ -624,6 +625,37 @@ The loading screen is a 3D model, not a sprite: six quads in `SOD/logo.SOD` carr
 `LOADING1..6`. The `LOADING` target (art, `models/loading-panel.sh`) and
 `models/logo-sod.py` (quads, `panel=`) ship together — `a2tex install`/`revert` move
 both; **never ship one without the other.**
+
+### online
+
+- **Multiplayer does not work under Proton at all**, LAN included: Wine's builtin
+  `dpnet.dll` stubs `IDirectPlay8Peer::Host` and `EnumHosts`. Microsoft's DirectPlay
+  works. It is **not redistributable**: `online/reference-dplay.sh` puts it into a bench
+  **clone** only, from `$A2_DATA/reference/directx/`. Never into the real prefix, never
+  into the repo.
+- The plan, the decisions (our own protocol, public + self-hostable server, a new
+  *Internet – Online* menu entry, join codes first) and the traced DirectPlay surface
+  are in `online/README.md`. Read it before designing anything here.
+- **No code from DirectPlay Lite**: it is GPL-2.0 and this repo is MIT.
+- ***Internet – Online* takes the IPX button's place** (IPX cannot work anywhere this
+  runs); don't add a fifth button. Its hooks and why are in `online/README.md`, "The
+  menu entry". `./a2test run multiplayer-online-entry multiplayer-two-players` checks the
+  entry and the stock Manual IP path, two games each.
+- **`peer.c` is our DirectPlay**, used only when *Internet – Online* is chosen; it must
+  keep delivering the messages the trace shows, in that order. Two things the game
+  depends on that are easy to break: `Close` completes a pending search with
+  `ASYNC_OP_COMPLETE (USERCANCEL)` (without it quitting crashes), and `GetSPCaps` keeps
+  reporting DirectPlay's 1.5 s enum interval (the game ages its game list by it). Every
+  vtable slot needs its exact argument count (`__stdcall`). After any change run
+  `./a2test run multiplayer-online-match` and `multiplayer-online-loss` (10% loss).
+- **The server's peers are addresses too.** A relayed peer is `0.x.y.z` port 1 (its
+  server id), so the game and the rest of `peer.c` treat it as any address; `raw_send`
+  is the one place that wraps it for the server. Server changes: run
+  `online/server/selftest.py`, then `./a2test run multiplayer-online-code
+  multiplayer-online-relay` (direct path; relay with 5% loss).
+- **Messages to the player go in the game's chat boxes** (`notice()` in `online.c`),
+  never in a window of our own; a line waits for its screen's `Chat::Init`, which empties
+  the box.
 
 ### cutscenes
 

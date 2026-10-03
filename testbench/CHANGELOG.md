@@ -5,6 +5,49 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.7.0 — 2026-10-03
+
+### Added
+- Step `Type what follows "TEXT" in "LOG" of PLAYER`: the word after TEXT in a log
+  of that player's game (a join code), typed into this one's.
+- `scenarios/multiplayer-online-code.md` (joining by join code, direct path) and
+  `multiplayer-online-relay.md` (the same through the server's relay, 5% loss); the
+  match fragment is now `_online-setup.md` + `_online-play.md`, with the joiner's typing
+  step between them.
+- `OnlineServer.log` is collected with the other logs (2f2255a).
+
+Installs nothing; no game-side change to confirm.
+
+## 2.6.0 — 2026-10-03
+
+### Added
+- `scenarios/multiplayer-online-match.md`: host, join, chat and a match through
+  *Internet – Online* on our own transport, under plain Proton (online 0.3.0), and
+  `multiplayer-online-loss.md`, the same with 10% of datagrams dropped. Their steps are
+  the fragment `_online-match.md` (6cbeed9).
+
+Installs nothing; no game-side change to confirm.
+
+## 2.5.0 — 2026-10-03
+
+### Added
+- `scenarios/multiplayer-online-entry.md`: both players host and join through
+  *Internet – Online* (online 0.2.0), then chat both ways (fd40da4).
+
+Installs nothing; no game-side change to confirm.
+
+## 2.4.0 — 2026-10-03
+
+### Added
+- Scenario headers `Players:` (one game per player, steps prefixed with the player's
+  name) and `Setup:` (a repository script run on each clone before launch), and the step
+  `Type this machine's address` (245d1f6).
+- `scenarios/multiplayer-two-players.md`: host, join, chat both ways and a 2-player
+  match over TCP/IP, with Microsoft's DirectPlay and `Online.asi` in each clone.
+- The game's `Online.log` and `Online.ini` are gathered with the other logs.
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.3.0 — 2026-10-03
 
 ### Added

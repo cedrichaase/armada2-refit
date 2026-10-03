@@ -235,9 +235,12 @@ def cmd_check(argv):
     for s in argv:
         scn = parse(_find_scenario(s))
         print(f'{scn.title}\n  resolutions: {", ".join(config.res_name(r) + " (" + config.aspect_name(r) + ")" for r in scn.resolutions)}'
-              f'\n  mod: {scn.mod}   launch: {scn.launch}   reference: {scn.reference}')
+              f'\n  mod: {scn.mod}   launch: {scn.launch}   reference: {scn.reference}' +
+              (f'\n  players: {", ".join(scn.players)}' if scn.players else '') +
+              (f'   setup: {scn.setup}' if scn.setup else ''))
         for i, st in enumerate(scn.steps, 1):
-            t = normalise(st)
+            m = re.match(r'^\s*(\w+)\s*:\s*(.+)$', st)
+            t = normalise(m.group(2) if m and m.group(1).lower() in scn.players else st)
             kind = 'AGENT'
             for rx, fn in STEPS:
                 if rx.match(t):

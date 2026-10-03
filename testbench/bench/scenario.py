@@ -23,14 +23,17 @@ drives the game until the step is done ("Open the Borg campaign and start missio
 So a scenario can be written entirely in prose, and gets cheaper and more repeatable
 as its steps are rewritten into the measurable forms.
 """
+import concurrent.futures
 import json
 import re
+import subprocess
 import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import config, judge, vision
+from .log import Log
 from .session import GameError, Session
 
 UI_MAP = config.BENCH / 'ui.json'
@@ -49,6 +52,8 @@ class Scenario:
     timeout: int = 900
     stock_shell: str = ''          # 'embed': stock cases keep Menus.asi for Embed only
     assets: str = ''               # 'none': install this checkout with an empty A2_DATA
+    players: list = field(default_factory=list)   # ['host', 'joiner']: one game each
+    setup: str = ''                # a script run on each clone before launch
     description: str = ''
     steps: list = field(default_factory=list)
 
@@ -87,7 +92,8 @@ def case_dirname(res, mod, scn_mod):
     return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
 
 
-HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?)\s*:\s*(.+)$', re.I)
+HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup)'
+                    r'\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
 
 
@@ -143,7 +149,9 @@ def parse(path):
                     reference=hdr.get('reference', config.REFERENCE_ASPECT),
                     timeout=timeout, description=' '.join(desc), steps=steps,
                     stock_shell=hdr.get('stock shell', '').strip().lower(),
-                    assets=hdr.get('asset', '').strip().lower())
+                    assets=hdr.get('asset', '').strip().lower(),
+                    players=[w.lower() for w in re.split(r'[,\s]+', hdr.get('player', '')) if w],
+                    setup=hdr.get('setup', '').strip('` '))
 
 
 # ---------------------------------------------------------------------- step table
@@ -347,6 +355,55 @@ def s_press(c, m):
 def s_type(c, m):
     c.sess.type(m.group('text'))
     return None
+
+
+@step(r"^type (?:this machine's|the host's|the local) (?:ip )?address$")
+def s_type_address(c, m):
+    """The address every player's game is on: the machine's own, since a case runs all
+    of them here. It is the one the game shows as "Local IP Address" -- the source
+    address of the default route, found without sending anything (a UDP connect)."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as so:
+        try:
+            so.connect(('192.0.2.1', 9))
+            addr = so.getsockname()[0]
+        except OSError:
+            addr = '127.0.0.1'
+    c.sess.type(addr)
+    return f'typed {addr}'
+
+
+@step(r'^type what follows ' + Q.format('text') + r' in ' + Q.format('log') +
+      r'(?: of (?:the )?(?P<player>\w+))?$')
+def s_type_from_log(c, m):
+    """The word after TEXT in a log, from its last line that has it: how one player's
+    game types what another's was given (a join code). Waits up to 30 s for it."""
+    sess = c.sess
+    if m.group('player'):
+        sess = c.sessions.get(m.group('player').lower())
+        if not sess:
+            raise StepFailed(f'no player called {m.group("player")}')
+    text, name = m.group('text'), m.group('log')
+    found = {}
+
+    def look():
+        body = sess.game_log(name) or ''
+        for line in reversed(body.splitlines()):
+            i = line.lower().find(text.lower())
+            if i >= 0:
+                rest = line[i + len(text):].split()
+                if rest:
+                    found['word'] = rest[0].rstrip(',.;:')
+                    return True
+        return False
+
+    deadline = time.time() + 30
+    while not look():
+        if time.time() > deadline:
+            raise StepFailed(f'"{text}" not in {name} after 30 s')
+        time.sleep(0.5)
+    c.sess.type(found['word'])
+    return f'typed {found["word"]}'
 
 
 # -- evidence
@@ -603,6 +660,7 @@ class Case:
         self.n = 0
         self.results = []
         self.sess = None
+        self.sessions = {}                        # player -> Session (`Players:`), else empty
         self.ui = json.loads(UI_MAP.read_text()) if UI_MAP.exists() else {}
 
     @property
@@ -617,21 +675,64 @@ class Case:
 
     # -- running
 
+    def _new_session(self, artifacts, label):
+        return Session.create(artifacts, self.res, mod=self.mod, stock_shell=self.scn.stock_shell,
+                              assets=self.scn.assets or None, vnc=self.opts.get('vnc'),
+                              record=self.opts.get('record'), audio=self.opts.get('audio'),
+                              keep=self.opts.get('keep'), label=label,
+                              installs=self.opts.get('installs') if self.mod == 'refit' else None)
+
+    def _bring_up(self, sess, player=None):
+        sess.clone()
+        sess.prepare()
+        sess.start_display()
+        if self.scn.setup:
+            self.run_setup(sess)
+        if sess.s.get('vnc_port'):
+            self.say(f'    VNC{f" ({player})" if player else ""}: vncviewer localhost:{sess.s["vnc_port"]}')
+
+    def run_setup(self, sess):
+        """`Setup: online/reference-dplay.sh`: a script of this repository, run with the
+        session's state file once its clone and display are up, before any launch."""
+        words = self.scn.setup.split()
+        cmd = [str(config.REPO / words[0]), str(sess.statefile), *words[1:]]
+        plog = sess.dir / 'logs' / 'prepare.log'
+        with open(plog, 'a') as f:
+            f.write(f'$ {" ".join(cmd)}\n')
+            f.flush()
+            r = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, cwd=str(config.REPO))
+            f.write(f'[exit {r.returncode}]\n\n')
+        if r.returncode:
+            sess.log.action(f'setup: {self.scn.setup} failed (exit {r.returncode})', status='fail',
+                            detail='see logs/prepare.log')
+            raise GameError(f'setup {self.scn.setup} failed; see {plog}')
+        sess.log.action(f'setup: {self.scn.setup}', detail='logs/prepare.log')
+
     def run(self):
         t0 = time.time()
-        self.sess = Session.create(self.dir, self.res, mod=self.mod, stock_shell=self.scn.stock_shell,
-                                   assets=self.scn.assets or None, vnc=self.opts.get('vnc'),
-                                   record=self.opts.get('record'), audio=self.opts.get('audio'),
-                                   keep=self.opts.get('keep'), label=self.name,
-                                   installs=self.opts.get('installs') if self.mod == 'refit' else None)
-        self.log.meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps))
         status = 'pass'
+        if self.scn.players:
+            # One game per player, each with its own clone, prefix, display and input,
+            # under <case>/<player>/; one step log for the case, each line tagged.
+            self.dir.mkdir(parents=True, exist_ok=True)
+            Log(self.dir).meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps),
+                               players=', '.join(self.scn.players))
+            for p in self.scn.players:
+                sess = self._new_session(self.dir / p, f'{self.name}/{p}')
+                sess.log = _PlayerLog(self.dir, p)
+                self.sessions[p] = sess
+            self.sess = self.sessions[self.scn.players[0]]
+        else:
+            self.sess = self._new_session(self.dir, self.name)
+            self.log.meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps))
         try:
-            self.sess.clone()
-            self.sess.prepare()
-            self.sess.start_display()
-            if self.sess.s.get('vnc_port'):
-                self.say(f'    VNC: vncviewer localhost:{self.sess.s["vnc_port"]}')
+            if self.sessions:
+                # set-up is mostly waiting on Wine (Setup: runs regsvr32 through umu): in parallel
+                with concurrent.futures.ThreadPoolExecutor(len(self.sessions)) as pool:
+                    for f in [pool.submit(self._bring_up, s, p) for p, s in self.sessions.items()]:
+                        f.result()
+            else:
+                self._bring_up(self.sess)
             aborted = None
             for i, text in enumerate(self.scn.steps, 1):
                 self.n = i
@@ -664,12 +765,16 @@ class Case:
             self.results.append(dict(n=0, text='set-up', status='error', detail=f'{e}'))
             self.say(f'    ERROR        set-up: {e}')
         finally:
-            if self.sess:
-                crashed = self.sess.crashed()
-                self.sess.teardown()
+            for p, sess in (self.sessions.items() if self.sessions else [(None, self.sess)]):
+                if not sess:
+                    continue
+                crashed = sess.crashed()
+                sess.teardown()
                 if crashed:
-                    self.results.append(dict(n=None, text='the game did not crash (exception.txt)', status='fail',
-                                             detail='exception.txt was written during the run; see logs/'))
+                    who = f"{p}'s game" if p else 'the game'
+                    self.results.append(dict(n=None, text=f'{who} did not crash (exception.txt)', status='fail',
+                                             detail='exception.txt was written during the run; see '
+                                                    f'{p + "/" if p else ""}logs/'))
         statuses = [r['status'] for r in self.results]
         if any(s in ('fail', 'error') for s in statuses):
             status = 'fail'
@@ -684,8 +789,26 @@ class Case:
         return status
 
     def run_step(self, text):
+        """One step. With `Players:`, a step that starts with a player's name ("Host:
+        Click ...") runs on that player's game, and any other runs on each game in turn,
+        stopping at the first that does not pass."""
         self.log.step(self.n, text)
-        t = normalise(text)
+        if not self.sessions:
+            return self._run_step(text, normalise(text))
+        m = re.match(r'^\s*(\w+)\s*:\s*(.+)$', text)
+        if m and m.group(1).lower() in self.sessions:
+            self.sess = self.sessions[m.group(1).lower()]
+            return self._run_step(text, normalise(m.group(2)))
+        r = None
+        for p, sess in self.sessions.items():
+            self.sess = sess
+            r = self._run_step(text, normalise(text))
+            if r['status'] not in ('ok', 'pass'):
+                r['detail'] = f'{p}: {r.get("detail") or ""}'
+                return r
+        return r
+
+    def _run_step(self, text, t):
         self._check_result = None
         try:
             for rx, fn in STEPS:
@@ -947,6 +1070,20 @@ class Case:
         return {'resolution': f'{config.res_name(self.res)} ({config.aspect_name(self.res)})',
                 'mod state': self.mod, 'scenario': self.scn.title,
                 'step': f'{self.n} of {len(self.scn.steps)}'}
+
+
+class _PlayerLog(Log):
+    """A player's session writing into its case's step log, each line tagged with the
+    player, so one log reads as the whole exchange in order."""
+
+    def __init__(self, d, player):
+        super().__init__(d)
+        self.player = player
+
+    def _write(self, rec):
+        if rec.get('kind') != 'step':
+            rec['text'] = f'[{self.player}] {rec.get("text", "")}'
+        super()._write(rec)
 
 
 def _safe(name):
