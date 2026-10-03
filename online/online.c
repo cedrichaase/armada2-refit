@@ -1,12 +1,14 @@
 /*
  * Online.asi -- online multiplayer for Star Trek: Armada II.
  *
- * THIS VERSION ONLY WATCHES.  It is the first step of the plan in README.md:
- * it puts a pass-through in front of the game's DirectPlay 8 peer and logs
- * every call the game makes, every message DirectPlay hands back, and the
- * addresses that cross the interface.  That log is the specification of the
- * DirectPlay subset our own transport has to implement.  Nothing the game
- * sends or receives is changed.
+ * THIS VERSION WATCHES, AND ADDS THE MENU ENTRY.  It puts a pass-through in
+ * front of the game's DirectPlay 8 peer and logs every call the game makes,
+ * every message DirectPlay hands back, and the addresses that cross the
+ * interface.  That log is the specification of the DirectPlay subset our own
+ * transport has to implement.  Nothing the game sends or receives is
+ * changed.  And it turns the Multiplayer Connection screen's IPX button into
+ * Internet - Online ("the menu entry", below), which for now connects as
+ * Manual IP does.
  *
  * WHERE
  * -----
@@ -59,6 +61,7 @@ typedef char               *LPSTR;
 #define FILE_ATTRIBUTE_NORMAL  0x80
 #define INVALID_HANDLE_VALUE   ((HANDLE)(LONG)-1)
 #define PAGE_READWRITE         0x04
+#define PAGE_EXECUTE_READWRITE 0x40
 #define HEAP_ZERO_MEMORY       0x08
 
 typedef struct { BYTE opaque[24]; } CRITICAL_SECTION;
@@ -771,6 +774,167 @@ static void *patch_iat(HMODULE mod, const char *dll, const char *name, void *rep
     return 0;
 }
 
+/* ---- the menu entry: Internet - Online -------------------------------- */
+/*
+ * The Multiplayer Connection screen (do_multiplayerConnection's dialog) has
+ * five ShellButtons: GameSpy, Manual IP, LAN (TCP/IP), LAN (IPX) and Previous
+ * Menu, labelled by read_text_label("multiplayer_connection", key) from the
+ * game's label.map.  IPX has not existed on Windows since Vista, and neither
+ * Wine's DirectPlay nor Microsoft's can use it there, so its button becomes
+ * Internet - Online.  Four patches, each checked against the bytes it
+ * replaces, and all or none:
+ *
+ *   0x4d9a30  read_text_label's entry jumps here (label_hook): lan_ipx reads
+ *             "Internet - Online"; while that entry is the one chosen, the
+ *             Manual IP dialog's prompt and the connect/host texts read as
+ *             online ones.  Every replacement is no longer than the stock
+ *             text, so it fits whatever buffer the stock text fits.
+ *   0x5bfd01  the screen's WM_LBUTTONUP case: every click first clears the
+ *             online flag (stub_click), so no other button inherits it.
+ *   0x5bff9b  the IPX button has just been drawn pressed; instead of its LAN
+ *             connection, stub_ipx sets the flag and continues at 0x5c00b6,
+ *             the Manual IP branch after its own button: do_manual_ip, then
+ *             GenericConnection as an internet connection to the address
+ *             typed (manual_ip_address).  Both branches are in the same
+ *             frame with the same stack depth there, and the Manual IP path
+ *             sets every register it reads after that point.
+ *
+ * Until our transport exists the entry connects exactly as Manual IP does,
+ * through whatever DirectPlay is installed; g_online is what the transport
+ * will go by.
+ */
+#define A_READ_LABEL     0x4d9a30
+#define A_CLICK          0x5bfd01
+#define A_CLICK_BACK     0x5bfd0a
+#define A_IPX_PRESSED    0x5bff9b
+#define A_MANUAL_DIALOG  0x5c00b6
+
+__attribute__((used)) volatile int g_online;   /* Internet - Online is the entry chosen */
+static int  g_entry = 1;
+static BYTE g_label_tramp[16];
+typedef int (__cdecl *ReadLabel_t)(const char *section, const char *key, char *out);
+
+static int s_eq(const char *a, const char *b)
+{
+    while (*a && *a == *b) { a++; b++; }
+    return *a == *b;
+}
+
+static void s_copy(char *d, const char *s) { while ((*d++ = *s++)) {} }
+
+static int __cdecl label_hook(const char *section, const char *key, char *out)
+{
+    static const char *const online[][3] = {
+        { "multiplayer_manual_ip",  "manual_ip_address",      "Join code or host address (blank to host):" },
+        { "multiplayer_connection", "connect_try_manual_ip",  "Trying to connect online" },
+        { "multiplayer_connection", "cant_connect_manual_ip", "Cannot connect online" },
+        { "commandline_net",        "title_manual_ip_join",   "JOINING AN ONLINE GAME" },
+        { "commandline_net",        "title_manual_ip_host",   "HOSTING AN ONLINE GAME" },
+    };
+    int r = ((ReadLabel_t)(void *)g_label_tramp)(section, key, out);
+    int i;
+
+    if (!section || !key || !out) return r;
+    if (s_eq(section, "multiplayer_connection") && s_eq(key, "lan_ipx")) {
+        s_copy(out, "Internet - Online");
+        return 1;
+    }
+    if (g_online)
+        for (i = 0; i < (int)(sizeof online / sizeof online[0]); i++)
+            if (s_eq(section, online[i][0]) && s_eq(key, online[i][1])) {
+                s_copy(out, online[i][2]);
+                return 1;
+            }
+    return r;
+}
+
+__attribute__((used)) void __cdecl on_online_chosen(void)
+{
+    g_online = 1;
+    logline("menu: Internet - Online chosen");
+}
+
+/* every click on the connection screen: clear the flag, then the two
+ * instructions the jump replaced */
+__attribute__((naked)) static void stub_click(void)
+{
+    __asm__ volatile(
+        "movl $0, _g_online\n\t"
+        "movl 0x14(%ebp), %ebx\n\t"
+        "movl 0x7a30a0, %ecx\n\t"
+        "pushl $0x5bfd0a\n\t"
+        "ret");
+}
+
+/* the IPX button pressed: eax, ecx and edx are free here (the Manual IP
+ * branch loads each before use) */
+__attribute__((naked)) static void stub_ipx(void)
+{
+    __asm__ volatile(
+        "call _on_online_chosen\n\t"
+        "pushl $0x5c00b6\n\t"
+        "ret");
+}
+
+static int code_is(DWORD addr, const BYTE *bytes, int n)
+{
+    int i;
+    for (i = 0; i < n; i++) if (((const BYTE *)addr)[i] != bytes[i]) return 0;
+    return 1;
+}
+
+static int write_code(DWORD addr, const BYTE *bytes, int n)
+{
+    DWORD prot;
+    int   i;
+    if (!VirtualProtect((void *)addr, (UINT)n, PAGE_EXECUTE_READWRITE, &prot)) return 0;
+    for (i = 0; i < n; i++) ((BYTE *)addr)[i] = bytes[i];
+    VirtualProtect((void *)addr, (UINT)n, prot, &prot);
+    return 1;
+}
+
+/* a 5-byte jmp to `to` at `at`, NOP-padded to n bytes */
+static int write_jmp(DWORD at, void *to, int n)
+{
+    BYTE b[16];
+    DWORD rel = (DWORD)to - (at + 5);
+    int   i;
+    b[0] = 0xe9;
+    for (i = 0; i < 4; i++) b[1 + i] = (BYTE)(rel >> (8 * i));
+    for (i = 5; i < n; i++) b[i] = 0x90;
+    return write_code(at, b, n);
+}
+
+static void install_entry(char *b)
+{
+    static const BYTE sig_label[8] = { 0x55, 0x8b, 0xec, 0xa0, 0x68, 0x13, 0x76, 0x00 };
+    static const BYTE sig_click[9] = { 0x8b, 0x5d, 0x14, 0x8b, 0x0d, 0xa0, 0x30, 0x7a, 0x00 };
+    static const BYTE sig_ipx[8]   = { 0xa1, 0x00, 0x2d, 0x7a, 0x00, 0x8b, 0x4d, 0x08 };
+    static const BYTE sig_dlg[9]   = { 0x8b, 0x4d, 0x08, 0x51, 0xe8, 0x21, 0x6b, 0xff, 0xff };
+    DWORD prot, rel;
+    int   i;
+
+    if (!g_entry) { s_cat(b, "  menu entry off (Entry=0)"); return; }
+    if (!code_is(A_READ_LABEL, sig_label, 8) || !code_is(A_CLICK, sig_click, 9)
+        || !code_is(A_IPX_PRESSED, sig_ipx, 8) || !code_is(A_MANUAL_DIALOG, sig_dlg, 9)) {
+        s_cat(b, "  menu entry NOT installed: Armada2.exe is not the 1.1 this was made for");
+        return;
+    }
+    /* trampoline: read_text_label's first 8 bytes, then back to the rest */
+    for (i = 0; i < 8; i++) g_label_tramp[i] = sig_label[i];
+    rel = (A_READ_LABEL + 8) - ((DWORD)g_label_tramp + 8 + 5);
+    g_label_tramp[8] = 0xe9;
+    for (i = 0; i < 4; i++) g_label_tramp[9 + i] = (BYTE)(rel >> (8 * i));
+    VirtualProtect(g_label_tramp, sizeof g_label_tramp, PAGE_EXECUTE_READWRITE, &prot);
+
+    if (write_jmp(A_READ_LABEL, (void *)label_hook, 8)
+        && write_jmp(A_CLICK, (void *)stub_click, 9)
+        && write_jmp(A_IPX_PRESSED, (void *)stub_ipx, 5))
+        s_cat(b, "  menu entry: LAN (IPX) is Internet - Online");
+    else
+        s_cat(b, "  menu entry: VirtualProtect failed");
+}
+
 /* ---- startup ---------------------------------------------------------- */
 
 static void build_paths(char *ini)
@@ -799,12 +963,13 @@ static void startup(void)
     g_logging = (int)GetPrivateProfileIntA("Online", "Log",     1,  ini);
     g_payload = (int)GetPrivateProfileIntA("Online", "Payload", 16, ini);
     if (g_payload > 64) g_payload = 64;
+    g_entry   = (int)GetPrivateProfileIntA("Online", "Entry",   1,  ini);
     if (g_logging && g_logpath[0])
         g_log = CreateFileA(g_logpath, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
 
     b[0] = 0;
-    s_cat(b, "--- Online (trace) payload=");
+    s_cat(b, "--- Online payload=");
     s_num(b, g_payload);
     nm = GetModuleHandleA("NetworkManager.dll");
     if (!nm) {
@@ -815,6 +980,7 @@ static void startup(void)
         s_cat(b, g_real_cci ? "  NetworkManager.dll CoCreateInstance hooked"
                             : "  NetworkManager.dll imports no CoCreateInstance: nothing hooked");
     }
+    install_entry(b);
     logline(b);
 }
 

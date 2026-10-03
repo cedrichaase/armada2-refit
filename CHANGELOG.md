@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.5.0 — 2026-10-03
+
+Layers: online 0.2.0, testbench 2.4.0.
+
+### Added
+- *Internet – Online* on the Multiplayer Connection screen, in place of the IPX button
+  that cannot work today; it connects as Manual IP until the transport exists (online
+  0.2.0), with a bench scenario (testbench 2.4.0). `Online.asi` is still not part of
+  `./install`.
+
+Installed, not yet seen in game.
+
 ## 8.4.0 — 2026-10-03
 
 Layers: testbench 2.3.0.

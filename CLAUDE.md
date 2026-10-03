@@ -40,7 +40,7 @@ it bundles.
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
-| `online/` | `Online.asi` — online multiplayer, in progress: so far a trace of the game's DirectPlay 8. Not in `./install` or `a2mod` yet | `online/README.md` |
+| `online/` | `Online.asi` — online multiplayer, in progress: a trace of the game's DirectPlay 8 and the *Internet – Online* menu entry. Not in `./install` or `a2mod` yet | `online/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
@@ -637,6 +637,10 @@ both; **never ship one without the other.**
   *Internet – Online* menu entry, join codes first) and the traced DirectPlay surface
   are in `online/README.md`. Read it before designing anything here.
 - **No code from DirectPlay Lite**: it is GPL-2.0 and this repo is MIT.
+- ***Internet – Online* takes the IPX button's place** (IPX cannot work anywhere this
+  runs); don't add a fifth button. Its hooks and why are in `online/README.md`, "The
+  menu entry". `./a2test run multiplayer-online-entry multiplayer-two-players` checks the
+  entry and the stock Manual IP path, two games each.
 
 ### cutscenes
 

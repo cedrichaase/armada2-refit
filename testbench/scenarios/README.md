@@ -60,7 +60,9 @@ each game in turn and stops at the first that does not pass (`Launch the game`,
 screen is how the scenario waits for something the other one did. The case keeps one
 step log, each line tagged with its player. Such a case is still one job for
 `--jobs`, but runs as many games as it has players. `multiplayer-two-players.md` is
-the example.
+the example. The one time two such cases started together (four games), one game's
+audio reached the real output before the bench's guard stopped it (run
+20261003-165008). The other case passed, and that one passed when run again alone.
 
 ## Checks (measured)
 

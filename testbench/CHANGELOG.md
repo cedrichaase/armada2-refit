@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.4.0 — 2026-10-03
+
+### Added
+- `scenarios/multiplayer-online-entry.md`: both players host and join through
+  *Internet – Online* (online 0.2.0), then chat both ways.
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.3.0 — 2026-10-03
 
 ### Added

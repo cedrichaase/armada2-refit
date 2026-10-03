@@ -4,6 +4,16 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.2.0 — 2026-10-03
+
+### Added
+- *Internet – Online* on the Multiplayer Connection screen, in the IPX button's place:
+  its dialog asks for a join code or the host's address (blank hosts), and for now it
+  connects as Manual IP does. Key `Entry=` in `Online.ini` (1 by default; 0 leaves the
+  screen stock).
+
+Installed, not yet seen in game.
+
 ## 0.1.0 — 2026-10-03
 
 ### Added

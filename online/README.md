@@ -6,8 +6,9 @@ does not work at all. This layer replaces DirectPlay with a transport of our own
 find each other through a small rendezvous server, connect directly where their routers
 allow it, and fall back to a relay where they do not.
 
-**State:** step 2 of the plan below. `Online.asi` is a pass-through that only logs. It
-changes nothing the game sends or receives, and `./install` does not install it yet.
+**State:** step 4 of the plan below. `Online.asi` puts *Internet – Online* on the
+Multiplayer Connection screen, which for now connects as Manual IP does, and logs the
+game's DirectPlay traffic without changing it. `./install` does not install it yet.
 
 ## The goal
 
@@ -112,6 +113,36 @@ The trace stops with both instances still in the match, so leaving is not in it.
 - DirectPlay Voice.
 - Whether a refit install and a stock install can share a game (the game compares CRCs).
 
+## The menu entry
+
+The Multiplayer Connection screen is a dialog of five `ShellButton`s: *Internet -
+GameSpy*, *Internet - Manual IP*, *Local Area Network (IPX)*, *Local Area Network
+(TCP/IP)* and *Previous Menu*. Each is labelled by `read_text_label("multiplayer_connection",
+key)` from the game's `label.map`, and its click runs a branch of the dialog's
+`WM_LBUTTONUP` case that ends in `GenericConnection(hwnd, lan, ipx, try_key, fail_key,
+address)`. The Manual IP branch first runs `do_manual_ip` (the dialog with the address
+field) and passes `manual_ip_address` with `lan` and `ipx` both 0, which is how the
+Internet Game screen with *Create Game* comes up.
+
+**The entry takes the IPX button's place.** IPX has not existed on Windows since Vista,
+and neither Wine's DirectPlay nor Microsoft's can use it on any system this runs on, so
+that button can only ever fail. Taking its slot keeps the screen's layout and art as they
+are, where a fifth button would mean painting, hovering and hit-testing a control of our
+own on top of the game's. LAN (TCP/IP) and Manual IP stay as they were.
+
+| Address | Stock | Hook | Why |
+|---|---|---|---|
+| `0x4d9a30` | `read_text_label` | jump to `label_hook`, trampoline for the first 8 bytes | `lan_ipx` reads *Internet - Online*; while that entry is chosen, the Manual IP prompt (`multiplayer_manual_ip`), the connect/fail texts and the `commandline_net` titles read as online ones. None is longer than the stock text it replaces |
+| `0x5bfd01` | the screen's `WM_LBUTTONUP` case | `stub_click` | clears the online flag on every click, so no other button inherits it |
+| `0x5bff9b` | the IPX branch, its button just drawn pressed | `stub_ipx` | sets the flag and continues at `0x5c00b6`, the Manual IP branch after its own button: same frame, same stack depth, and that path sets every register it reads |
+
+Each site is checked against the bytes it replaces, and if any differs none is patched
+(`Online.log` says so). `Entry=0` in `Online.ini` leaves the screen stock.
+
+Until the transport exists, the entry connects exactly as Manual IP does, through
+whatever DirectPlay is installed: an address joins, a blank field hosts, and a code does
+not work yet. The flag is what the transport will go by.
+
 ## The plan
 
 1. ~~Does multiplayer work under Proton?~~ No (above).
@@ -122,7 +153,8 @@ The trace stops with both instances still in the match, so leaving is not in it.
    `./a2test run multiplayer-two-players` hosts, joins, chats both ways and plays a
    match, unattended, and checks both traces (below). Milestone 1 swaps its `Setup:`
    for our own transport and runs the same steps.
-4. **The menu entry:** *Internet – Online* on the Multiplayer Connection screen.
+4. ~~The menu entry.~~ *Internet – Online* in the IPX button's place (below);
+   `./a2test run multiplayer-online-entry` hosts and joins through it.
 5. **Milestone 1:** our `IDirectPlay8Peer` over plain UDP on a LAN, with a whole 2-player
    match on the bench.
 6. **Milestone 2:** the server, hole punching, relay fallback and join codes.
