@@ -1,10 +1,20 @@
 # Changelog — models
 
-`SOD` geometry: the widened mission loading screen (`logo-sod.py`, `loading-panel.sh`).
-It ships in lockstep with `textures/targets/LOADING`, and `a2tex install`/`revert` move
-the two together. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
-versions". Newest first. The reasoning is in `textures/README.md`, in the
-loading-screen section.
+The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
+`loading-panel.sh`), which ships in lockstep with `textures/targets/LOADING`, and
+`Planets.asi`, the planets' tessellation. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
+"Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
+
+## 3.0.0 — 2026-10-03
+
+### Added
+- `Planets.asi` (`planets.c`, `build.sh`, `Planets.ini`): the engine tessellates planets,
+  ground and cloud shell, finely enough for a modern resolution. `Detail=` divides its
+  facet tolerance (default 8; 1 = stock). Installed by `install.sh`, which `./install`
+  now runs. MAJOR: the layer now needs the ASI loader from `platform/`.
+- `a2mod` switches `Planets.asi`/`.ini` as part of this layer.
+
+Installed, not yet seen in game.
 
 ## 2.0.0 — 2026-09-27
 

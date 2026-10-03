@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.0.0 — 2026-10-03
+
+Layers: models 3.0.0, testbench 2.8.1.
+
+### Added
+- Planets are drawn round: `Planets.asi` makes the engine tessellate them for the
+  resolution in use instead of for 640x480 (models 3.0.0). `./install` runs
+  `models/install.sh`, and `a2mod` switches the plugin with the `models` layer.
+- `scenarios/no-assets.md` checks the plugin patched both sites (testbench 2.8.1).
+
+Installed, not yet seen in game.
+
 ## 8.10.0 — 2026-10-03
 
 Layers: testbench 2.8.0.
