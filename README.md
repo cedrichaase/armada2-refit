@@ -174,6 +174,9 @@ nothing:
 | [`testbench/`](testbench/README.md) | `./a2test`: the game headless at any resolution, scenarios, reports |
 | [`publish/`](publish/README.md) | what this repository may contain, and the check that enforces it |
 
+Gameplay changes not yet built (hotkeys, control groups, production queues, pan speed)
+are collected in [`IDEAS.md`](IDEAS.md).
+
 ## Entry points
 
     ./install                               install every layer
