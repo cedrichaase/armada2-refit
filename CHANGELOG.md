@@ -11,7 +11,7 @@ Layers: online 0.5.0.
 
 ### Changed
 - The online server runs publicly at `c20e.de:2399`, and `Online.asi` uses it by
-  default (`Server=c20e.de`) for join codes and the relay (online 0.5.0).
+  default (`Server=c20e.de`) for join codes and the relay (online 0.5.0, f8012c9).
 
 Installed, not yet seen in game.
 

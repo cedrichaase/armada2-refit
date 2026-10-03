@@ -10,7 +10,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
 - `Server=` defaults to `c20e.de`, the project's public server, in `Online.ini` and when
   the key is missing; `Server=` (empty) still means join by address only.
 - `bench-asi.sh` empties `Server=` unless given `--server`: the bench never talks to the
-  public server.
+  public server (f8012c9).
 
 Installed, not yet seen in game.
 
