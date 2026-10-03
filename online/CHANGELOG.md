@@ -4,6 +4,16 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.5.0 — 2026-10-03
+
+### Changed
+- `Server=` defaults to `c20e.de`, the project's public server, in `Online.ini` and when
+  the key is missing; `Server=` (empty) still means join by address only.
+- `bench-asi.sh` empties `Server=` unless given `--server`: the bench never talks to the
+  public server.
+
+Installed, not yet seen in game.
+
 ## 0.4.0 — 2026-10-03
 
 ### Added

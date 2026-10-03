@@ -12,7 +12,8 @@
 #   --server   Server= a local a2online-server on 127.0.0.1:23990, started here
 #              if none is listening yet.  It exits by itself after 90 s without
 #              a datagram, and logs to OnlineServer.log in the clone that
-#              started it.
+#              started it.  Without it Server= is empty: a bench game never
+#              talks to the public server.
 #   --relay    Direct=0: the games never try each other directly, everything
 #              goes through the server's relay (implies --server).
 set -euo pipefail
@@ -57,6 +58,9 @@ if [ -n "$server" ]; then
     fi
     flock -u 9
     set_key Server "127.0.0.1:$port"
+else
+    # never the public server from the bench
+    set_key Server ""
 fi
 [ -n "$loss" ] && set_key Loss "$loss"
 [ -n "$relay" ] && set_key Direct 0

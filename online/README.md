@@ -8,11 +8,11 @@ allow it, and fall back to a relay where they do not.
 
 **State:** milestone 2 of the plan below. *Internet – Online* on the Multiplayer
 Connection screen runs the game on `Online.asi`'s own transport, over UDP, under Proton
-without Microsoft's DirectPlay. With a server named in `Online.ini`, the host gets a join
-code and players type it to join: directly where the routers allow it, through the
-server's relay where not. Without one, players join by address as on a LAN. The server
-is `server/a2online-server.py`; no public instance runs yet, and nothing has crossed a
-real router. Every other connection type keeps the game's DirectPlay, traced but
+without Microsoft's DirectPlay. Through the server named in `Online.ini` (the public one
+at `c20e.de` unless changed), the host gets a join code and players type it to join:
+directly where the routers allow it, through the server's relay where not. With
+`Server=` empty, players join by address as on a LAN. The server is
+`server/a2online-server.py`; nothing has crossed a real router yet. Every other connection type keeps the game's DirectPlay, traced but
 unchanged. `./install` does not install it yet.
 
 ## The goal
@@ -266,14 +266,17 @@ within 10 s and get a new code. Limits per source address: 8 hosted games, 64 so
 128 KB/s of relay per socket. `selftest.py` beside it runs it on a free port and plays a
 host and a joiner against it.
 
+**The public instance** is `c20e.de:2399`, the default `Server=`. It runs there as a
+systemd service under a dynamic user, sandboxed, with its memory capped at 128 MB, and
+logs to the journal. The bench never uses it: `bench-asi.sh` empties `Server=` unless
+told `--server`.
+
 ### Not yet established
 
 - **Real routers.** On the bench every game is on one machine, so the probes always
   get through and the relay is only reached with `Direct=0`. Which routers the direct
   path beats, and how often the relay is needed, can only be learnt from players on
   two real networks.
-- **The public instance.** `Server=` is empty by default: no server is run by the
-  project yet.
 
 ## The plan
 
@@ -292,8 +295,8 @@ host and a joiner against it.
    Proton, and `multiplayer-online-loss` the same with 10% of datagrams dropped.
 6. ~~Milestone 2:~~ the server, hole punching, relay fallback and join codes (above).
    `./a2test run multiplayer-online-code` joins by code over the direct path,
-   `multiplayer-online-relay` through the relay with 5% loss. Still to do: a public
-   instance, and the first games across real routers.
+   `multiplayer-online-relay` through the relay with 5% loss. The public instance runs
+   at `c20e.de`. Still to do: the first games across real routers.
 7. **Milestone 3:** the server-backed game list. **Milestone 4:** voice, if anyone wants it.
 
 ## Running the trace

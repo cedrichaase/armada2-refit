@@ -1110,7 +1110,7 @@ static void startup(void)
     g_loss    = (int)GetPrivateProfileIntA("Online", "Loss",    0,  ini);
     if (g_loss > 50) g_loss = 50;
     g_direct  = (int)GetPrivateProfileIntA("Online", "Direct",  1,  ini);
-    GetPrivateProfileStringA("Online", "Server", "", g_server, sizeof g_server, ini);
+    GetPrivateProfileStringA("Online", "Server", "c20e.de", g_server, sizeof g_server, ini);
     if (g_logging && g_logpath[0])
         g_log = CreateFileA(g_logpath, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);

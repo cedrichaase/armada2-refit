@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.9.0 — 2026-10-03
+
+Layers: online 0.5.0.
+
+### Changed
+- The online server runs publicly at `c20e.de:2399`, and `Online.asi` uses it by
+  default (`Server=c20e.de`) for join codes and the relay (online 0.5.0).
+
+Installed, not yet seen in game.
+
 ## 8.8.0 — 2026-10-03
 
 Layers: online 0.4.0, testbench 2.7.0.

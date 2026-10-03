@@ -40,7 +40,7 @@ it bundles.
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
-| `online/` | `Online.asi` — online multiplayer, in progress: the *Internet – Online* menu entry, our own `IDirectPlay8Peer` over UDP (`peer.c`), and `server/a2online-server.py` for join codes, hole punching and the relay; no public instance yet. Not in `./install` or `a2mod` yet | `online/README.md` |
+| `online/` | `Online.asi` — online multiplayer, in progress: the *Internet – Online* menu entry, our own `IDirectPlay8Peer` over UDP (`peer.c`), and `server/a2online-server.py` for join codes, hole punching and the relay, public at `c20e.de:2399` (the default `Server=`; the bench blanks it). Not in `./install` or `a2mod` yet | `online/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
