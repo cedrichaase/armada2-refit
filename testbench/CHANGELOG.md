@@ -9,7 +9,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 ### Added
 - `scenarios/multiplayer-online-entry.md`: both players host and join through
-  *Internet – Online* (online 0.2.0), then chat both ways.
+  *Internet – Online* (online 0.2.0), then chat both ways (fd40da4).
 
 Installs nothing; no game-side change to confirm.
 

@@ -10,7 +10,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
 - *Internet – Online* on the Multiplayer Connection screen, in the IPX button's place:
   its dialog asks for a join code or the host's address (blank hosts), and for now it
   connects as Manual IP does. Key `Entry=` in `Online.ini` (1 by default; 0 leaves the
-  screen stock).
+  screen stock) (fd40da4).
 
 Installed, not yet seen in game.
 

@@ -13,7 +13,7 @@ Layers: online 0.2.0, testbench 2.4.0.
 - *Internet – Online* on the Multiplayer Connection screen, in place of the IPX button
   that cannot work today; it connects as Manual IP until the transport exists (online
   0.2.0), with a bench scenario (testbench 2.4.0). `Online.asi` is still not part of
-  `./install`.
+  `./install` (fd40da4).
 
 Installed, not yet seen in game.
 

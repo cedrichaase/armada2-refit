@@ -781,8 +781,8 @@ static void *patch_iat(HMODULE mod, const char *dll, const char *name, void *rep
  * Menu, labelled by read_text_label("multiplayer_connection", key) from the
  * game's label.map.  IPX has not existed on Windows since Vista, and neither
  * Wine's DirectPlay nor Microsoft's can use it there, so its button becomes
- * Internet - Online.  Four patches, each checked against the bytes it
- * replaces, and all or none:
+ * Internet - Online.  Three patches, each checked against the bytes it
+ * replaces (and 0x5c00b6, where stub_ipx goes, checked too), all or none:
  *
  *   0x4d9a30  read_text_label's entry jumps here (label_hook): lan_ipx reads
  *             "Internet - Online"; while that entry is the one chosen, the
