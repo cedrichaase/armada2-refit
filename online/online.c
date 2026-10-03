@@ -1,14 +1,13 @@
 /*
  * Online.asi -- online multiplayer for Star Trek: Armada II.
  *
- * THIS VERSION WATCHES, AND ADDS THE MENU ENTRY.  It puts a pass-through in
- * front of the game's DirectPlay 8 peer and logs every call the game makes,
- * every message DirectPlay hands back, and the addresses that cross the
- * interface.  That log is the specification of the DirectPlay subset our own
- * transport has to implement.  Nothing the game sends or receives is
- * changed.  And it turns the Multiplayer Connection screen's IPX button into
- * Internet - Online ("the menu entry", below), which for now connects as
- * Manual IP does.
+ * It turns the Multiplayer Connection screen's IPX button into Internet -
+ * Online ("the menu entry", below).  A game started there gets our own
+ * IDirectPlay8Peer over UDP (peer.c) instead of DirectPlay's.  Every peer,
+ * ours or DirectPlay's, is wrapped in a pass-through that logs every call the
+ * game makes, every message handed back, and the addresses that cross the
+ * interface; for DirectPlay's that log was the specification of what ours had
+ * to do.  The pass-through changes nothing.
  *
  * WHERE
  * -----
@@ -700,17 +699,32 @@ static void *g_vtbl[S_COUNT] = {
 /* ---- the CoCreateInstance hook ---------------------------------------- */
 
 static CoCreateInstance_t g_real_cci;
+extern volatile int g_online;
 
+#include "peer.c"
+
+/* With Internet - Online chosen, the peer is ours (peer.c) and DirectPlay's is
+ * never made; otherwise the game gets DirectPlay's.  Either way it is wrapped
+ * in the tracing proxy, so the log reads the same for both. */
 static HRESULT __stdcall hook_cci(const GUID *clsid, void *outer, DWORD ctx,
                                   const GUID *iid, void **out)
 {
-    HRESULT hr = g_real_cci(clsid, outer, ctx, iid, out);
+    HRESULT hr;
     char    m[200];
+    int     ours = g_online && out && guid_eq(clsid, &CLSID_DirectPlay8Peer)
+                   && guid_eq(iid, &IID_IDirectPlay8Peer);
+
+    if (ours) {
+        *out = peer_new();
+        hr = *out ? S_OK : DPNERR_OUTOFMEMORY;
+    } else
+        hr = g_real_cci(clsid, outer, ctx, iid, out);
 
     m[0] = 0;
     s_cat(m, "CoCreateInstance ");  s_guid(m, clsid);
     s_cat(m, " iid ");              s_guid(m, iid);
     s_cat(m, " -> ");               s_hex(m, (DWORD)hr);
+    if (ours) s_cat(m, "  OUR TRANSPORT (Internet - Online)");
 
     if (hr >= 0 && out && *out && guid_eq(clsid, &CLSID_DirectPlay8Peer)
         && guid_eq(iid, &IID_IDirectPlay8Peer)) {
@@ -964,6 +978,9 @@ static void startup(void)
     g_payload = (int)GetPrivateProfileIntA("Online", "Payload", 16, ini);
     if (g_payload > 64) g_payload = 64;
     g_entry   = (int)GetPrivateProfileIntA("Online", "Entry",   1,  ini);
+    g_port    = (WORD)GetPrivateProfileIntA("Online", "Port",   2302, ini);
+    g_loss    = (int)GetPrivateProfileIntA("Online", "Loss",    0,  ini);
+    if (g_loss > 50) g_loss = 50;
     if (g_logging && g_logpath[0])
         g_log = CreateFileA(g_logpath, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);

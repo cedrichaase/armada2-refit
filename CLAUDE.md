@@ -40,7 +40,7 @@ it bundles.
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
-| `online/` | `Online.asi` — online multiplayer, in progress: a trace of the game's DirectPlay 8 and the *Internet – Online* menu entry. Not in `./install` or `a2mod` yet | `online/README.md` |
+| `online/` | `Online.asi` — online multiplayer, in progress: the *Internet – Online* menu entry and our own `IDirectPlay8Peer` over UDP (`peer.c`); no server yet. Not in `./install` or `a2mod` yet | `online/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
@@ -641,6 +641,13 @@ both; **never ship one without the other.**
   runs); don't add a fifth button. Its hooks and why are in `online/README.md`, "The
   menu entry". `./a2test run multiplayer-online-entry multiplayer-two-players` checks the
   entry and the stock Manual IP path, two games each.
+- **`peer.c` is our DirectPlay**, used only when *Internet – Online* is chosen; it must
+  keep delivering the messages the trace shows, in that order. Two things the game
+  depends on that are easy to break: `Close` completes a pending search with
+  `ASYNC_OP_COMPLETE (USERCANCEL)` (without it quitting crashes), and `GetSPCaps` keeps
+  reporting DirectPlay's 1.5 s enum interval (the game ages its game list by it). Every
+  vtable slot needs its exact argument count (`__stdcall`). After any change run
+  `./a2test run multiplayer-online-match` and `multiplayer-online-loss` (10% loss).
 
 ### cutscenes
 

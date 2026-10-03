@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.6.0 — 2026-10-03
+
+Layers: online 0.3.0, testbench 2.5.0.
+
+### Added
+- Online multiplayer, milestone 1: *Internet – Online* runs the game on `Online.asi`'s
+  own UDP transport instead of DirectPlay, so hosting and joining work under Proton
+  without Microsoft's DLLs (online 0.3.0). No server yet: the host must be reachable as
+  on a LAN. Bench scenarios for a whole match, with and without packet loss (testbench
+  2.5.0). `Online.asi` is still not part of `./install`.
+
+Installed, not yet seen in game.
+
 ## 8.5.0 — 2026-10-03
 
 Layers: online 0.2.0, testbench 2.4.0.

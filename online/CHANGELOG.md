@@ -4,6 +4,17 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.3.0 — 2026-10-03
+
+### Added
+- Our own `IDirectPlay8Peer` over UDP (`peer.c`): a game started from *Internet –
+  Online* runs on it instead of DirectPlay's, which under Proton cannot host. A star
+  through the host, one reliable ordered stream per connection. Keys `Port=` (2302) and
+  `Loss=` (testing: drop that percentage of datagrams) in `Online.ini`.
+- `bench-asi.sh`: `Online.asi` alone into a test-bench clone, with `--loss N`.
+
+Installed, not yet seen in game.
+
 ## 0.2.0 — 2026-10-03
 
 ### Added

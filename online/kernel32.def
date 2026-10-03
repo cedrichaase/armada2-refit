@@ -13,3 +13,7 @@ EnterCriticalSection@4
 LeaveCriticalSection@4
 GetProcessHeap@0
 HeapAlloc@12
+CreateThread@24
+WaitForSingleObject@8
+CloseHandle@4
+HeapFree@12

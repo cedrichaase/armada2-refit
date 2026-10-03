@@ -15,8 +15,9 @@ Stock shell: embed                        (stock cases only: keep Menus.asi, Emb
 Assets: none                              (install this checkout with an empty A2_DATA:
                                            the game as without a texture pack)
 Players: host, joiner                     (one game per player; see "Several players")
-Setup: online/reference-dplay.sh          (a script of this repo, run on each clone
-                                           with its session state file, before launch)
+Setup: online/bench-asi.sh --loss 10      (a script of this repo, run on each clone
+                                           before launch, with its session state file
+                                           and then any words after the script's name)
 Timeout: 12 min
 
 Any prose is description.

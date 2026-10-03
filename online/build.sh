@@ -9,17 +9,19 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 out="$here/build"
 mkdir -p "$out"
 
-llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
+for lib in kernel32 ws2_32 ole32; do
+    llvm-dlltool -m i386 --kill-at -d "$here/$lib.def" -l "$out/$lib.lib"
+done
 
 clang --target=i386-pc-windows-msvc \
       -O2 -Wall -Wextra \
       -ffreestanding -fno-builtin \
       -fno-stack-protector -mno-stack-arg-probe \
-      -c "$here/online.c" -o "$out/online.obj"
+      -c "$here/online.c" -o "$out/online.obj"     # includes peer.c
 
 lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/Online.asi" \
-         "$out/online.obj" "$out/kernel32.lib"
+         "$out/online.obj" "$out/kernel32.lib" "$out/ws2_32.lib" "$out/ole32.lib"
 
 echo "built $out/Online.asi"
 objdump -f "$out/Online.asi" | sed -n '2,4p'

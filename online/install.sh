@@ -8,9 +8,8 @@
 # NetworkManager.dll is patched in memory only.  Removing the three files is a
 # complete uninstall, so there is no backup to keep.
 #
-# Not run by ./install: this version logs the game's DirectPlay traffic and
-# adds the Internet - Online entry, which connects as Manual IP does
-# (README.md).  On a stock Proton prefix that traffic is Wine's builtin
+# Not run by ./install yet: Internet - Online runs on our own transport, but
+# without the server a host must still be reachable as on a LAN (README.md).  On a stock Proton prefix that traffic is Wine's builtin
 # dpnet.dll, which cannot host; online/reference-dplay.sh sets up a bench clone
 # with Microsoft's instead.
 set -euo pipefail

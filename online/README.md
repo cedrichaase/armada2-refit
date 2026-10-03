@@ -6,9 +6,11 @@ does not work at all. This layer replaces DirectPlay with a transport of our own
 find each other through a small rendezvous server, connect directly where their routers
 allow it, and fall back to a relay where they do not.
 
-**State:** step 4 of the plan below. `Online.asi` puts *Internet – Online* on the
-Multiplayer Connection screen, which for now connects as Manual IP does, and logs the
-game's DirectPlay traffic without changing it. `./install` does not install it yet.
+**State:** milestone 1 of the plan below. *Internet – Online* on the Multiplayer
+Connection screen runs the game on `Online.asi`'s own transport, over UDP: host, join by
+address, and play, under Proton without Microsoft's DirectPlay. There is no server yet,
+so the host has to be reachable as on a LAN. Every other connection type keeps the
+game's DirectPlay, traced but unchanged. `./install` does not install it yet.
 
 ## The goal
 
@@ -139,9 +141,54 @@ own on top of the game's. LAN (TCP/IP) and Manual IP stay as they were.
 Each site is checked against the bytes it replaces, and if any differs none is patched
 (`Online.log` says so). `Entry=0` in `Online.ini` leaves the screen stock.
 
-Until the transport exists, the entry connects exactly as Manual IP does, through
-whatever DirectPlay is installed: an address joins, a blank field hosts, and a code does
-not work yet. The flag is what the transport will go by.
+The entry then runs the Manual IP flow (a blank field hosts, an address joins), and the
+flag makes `NetworkManager.dll` get our transport instead of DirectPlay (next section). A
+join code does not work yet: that is the server's, milestone 2.
+
+## Our transport (milestone 1)
+
+`peer.c` is an `IDirectPlay8Peer` of our own. When *Internet – Online* is the entry
+chosen, `NetworkManager.dll`'s `CoCreateInstance` gets it instead of DirectPlay's, which
+is never created, and the tracing proxy wraps it as before, so `Online.log` reads the same
+for both and the two can be compared line by line. It implements the calls and messages
+of the trace above, in the order DirectPlay delivered them. Addresses stay DirectPlay
+address objects, which Wine does implement: we read `hostname` and `port` out of the
+game's, and build the ones we hand it.
+
+- **A star through the host.** A joiner talks to the host only, and the host forwards
+  between joiners. Only the host then has to be reachable, which is the shape the
+  server's hole punching and relay need next. The DPNIDs are ours.
+- **One reliable, ordered stream per connection** over UDP: sequence numbers, a
+  cumulative acknowledgement with a 32-packet selective bitmask, retransmission on a
+  timer from the measured round trip, fragments of 1100 bytes. Every send is reliable
+  and ordered whatever its flags; the game only ever asks for that. A connection that
+  hears nothing for 15 s is lost, and a ping keeps quiet ones alive.
+- **One network thread per peer** receives, retransmits and delivers every message to
+  the game, in order. The game's calls only queue, and the game's handler is never
+  called with our lock held, because the game calls back in from it.
+- **Port 2302** (`Port=`), the port Armada II players already know to forward.
+
+What the bench showed on the way, each now built in:
+
+- **`Close` has to complete what is pending.** On quitting a match the game closes its
+  session, creates a fresh peer, starts a search, and closes that one too. DirectPlay's
+  `Close` ends the open search with `ASYNC_OP_COMPLETE (DPNERR_USERCANCEL)`, and the game
+  cleans up on that message. Without it the game's main thread crashed on the way out
+  (`Exception frame is not in stack limits`).
+- **The game ages its game list by the provider's enum interval.** It passes 0 for the
+  retry interval, takes the provider's default from `GetSPCaps`, and drops a listed game
+  it has not heard from for a few multiples of it. With one datagram in ten lost, two
+  missed round trips at DirectPlay's 1.5 s were enough for "The host of this game has
+  been lost". Reporting 500 ms made it worse: the list then dropped games within a
+  second and a half. So `GetSPCaps` reports DirectPlay's 1.5 s and the search actually
+  queries every 500 ms.
+- **`__stdcall` pops what it was declared with.** Every slot has its own exact argument
+  count; one shared "return S_OK" for slots of different arity would unbalance the
+  game's stack on the first call.
+
+`Loss=N` in `Online.ini` drops N% of the datagrams a game sends, on purpose, for testing
+on one machine, where nothing is ever lost. With `Loss=10` on both sides a match sent
+about 960 datagrams each way, dropped about 100, resent 65 and 92, and played on.
 
 ## The plan
 
@@ -155,8 +202,9 @@ not work yet. The flag is what the transport will go by.
    for our own transport and runs the same steps.
 4. ~~The menu entry.~~ *Internet – Online* in the IPX button's place (below);
    `./a2test run multiplayer-online-entry` hosts and joins through it.
-5. **Milestone 1:** our `IDirectPlay8Peer` over plain UDP on a LAN, with a whole 2-player
-   match on the bench.
+5. ~~Milestone 1:~~ our `IDirectPlay8Peer` over plain UDP (above).
+   `./a2test run multiplayer-online-match` plays a whole 2-player match on it under plain
+   Proton, and `multiplayer-online-loss` the same with 10% of datagrams dropped.
 6. **Milestone 2:** the server, hole punching, relay fallback and join codes.
 7. **Milestone 3:** the server-backed game list. **Milestone 4:** voice, if anyone wants it.
 
@@ -167,8 +215,12 @@ not redistributable. `reference-dplay.sh` downloads the DirectX redistributable 
 `winetricks directplay` uses into `$A2_DATA/reference/directx/` (checked against its
 sha256) and installs the DLLs into a **clone's** prefix, never the real one.
 
-Unattended, as a scenario (`testbench/scenarios/multiplayer-two-players.md`, whose
-`Setup:` runs `reference-dplay.sh` on each clone):
+Our own transport needs none of this: `online/bench-asi.sh` (a scenario's `Setup:`)
+puts only `Online.asi` into a clone, and `multiplayer-online-match` and
+`multiplayer-online-loss` run on it.
+
+The reference, unattended, as a scenario (`testbench/scenarios/multiplayer-two-players.md`,
+whose `Setup:` runs `reference-dplay.sh` on each clone):
 
     ./a2test run multiplayer-two-players --no-claude
     # each game's trace: <results>/multiplayer-two-players/1920x1080/<player>/logs/Online.log
