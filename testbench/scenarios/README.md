@@ -110,7 +110,10 @@ judge with nothing to compare against.
   REVIEW, and a person decides from the screenshots in the report.
 - **Anything else** is handed to an *agent*: `claude -p` driving the game through
   `a2test drive` until the step is done, or it reports failure. Every action it takes
-  lands in the case's log.
+  lands in the case's log. Its prompt includes [`../GAMEPLAY.md`](../GAMEPLAY.md), what
+  earlier agents learnt about playing a match, and it reports its own `lessons`: they go
+  into the case's log and are appended to `agent-lessons.md` in the results directory,
+  to be folded into `GAMEPLAY.md` once they hold up.
 
 Prose is fine for a first draft. Rewriting steps into the measured forms makes a
 scenario cheaper, faster and repeatable.

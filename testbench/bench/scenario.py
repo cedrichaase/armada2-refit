@@ -1060,6 +1060,9 @@ class Case:
         self.log.note(f'handing to an agent: {text}')
         result, meta = judge.agent(text, self.sess, self.context(), self.dir)
         self.log.note('agent', detail=json.dumps(meta, indent=1))
+        if result and result.get('lessons'):
+            self.log.note('agent lessons', detail='\n'.join(f'- {l}' for l in result['lessons']))
+            _keep_lessons(text, result['lessons'], self.dir)
         if not result:
             raise StepFailed(f'the agent did not finish: {meta}')
         if result['outcome'] != 'done':
@@ -1084,6 +1087,18 @@ class _PlayerLog(Log):
         if rec.get('kind') != 'step':
             rec['text'] = f'[{self.player}] {rec.get("text", "")}'
         super()._write(rec)
+
+
+def _keep_lessons(step, lessons, case_dir):
+    """Append an agent's lessons to one file across runs, to be folded into
+    testbench/GAMEPLAY.md by hand: that file goes into every agent's prompt, so what is
+    in it should have held up more than once."""
+    try:
+        with open(config.RESULTS / 'agent-lessons.md', 'a') as f:
+            f.write(f'\n## {time.strftime("%Y-%m-%d %H:%M")}: {step}\n({case_dir})\n\n')
+            f.writelines(f'- {l}\n' for l in lessons)
+    except OSError:
+        pass
 
 
 def _safe(name):

@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.8.0 — 2026-10-03
+
+### Added
+- `GAMEPLAY.md`: how to play a match through the bench (selecting, the build menu,
+  placing a structure, mining, the traps), from the first agent that mined resources.
+  Every agent step's prompt includes it.
+- Agent steps report `lessons`, written into the case's log and appended to
+  `agent-lessons.md` in the results directory (af3c97c).
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.7.1 — 2026-10-03
 
 ### Fixed

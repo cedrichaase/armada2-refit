@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.10.0 — 2026-10-03
+
+Layers: testbench 2.8.0.
+
+### Added
+- Bench agents get `testbench/GAMEPLAY.md`, notes on playing a match, and report their
+  own lessons for it (testbench 2.8.0, af3c97c).
+
+Installs nothing; no game-side change to confirm.
+
 ## 8.9.1 — 2026-10-03
 
 Layers: testbench 2.7.1.
