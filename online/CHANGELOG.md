@@ -11,7 +11,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
   rendezvous and relay server, Python standard library only, with `selftest.py`). A host
   gets a code, shown in GAME SETUP's chat; a joiner types it where an address went. Key
   `Server=host:port` in `Online.ini` (empty by default: join by address as before), and
-  `Direct=0` (testing: relay everything).
+  `Direct=0` (testing: relay everything) (2f2255a).
 - Lines in the game's chat boxes for the join code and for a code or server not found:
   two more checked call sites, the `Chat::Init` calls of the Internet Game screen and
   GAME SETUP.

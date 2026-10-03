@@ -14,7 +14,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   `multiplayer-online-relay.md` (the same through the server's relay, 5% loss); the
   match fragment is now `_online-setup.md` + `_online-play.md`, with the joiner's typing
   step between them.
-- `OnlineServer.log` is collected with the other logs.
+- `OnlineServer.log` is collected with the other logs (2f2255a).
 
 Installs nothing; no game-side change to confirm.
 

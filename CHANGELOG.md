@@ -14,7 +14,7 @@ Layers: online 0.4.0, testbench 2.6.0.
   self-hostable server, `online/server/a2online-server.py` (online 0.4.0). No public
   instance yet: `Server=` in `Online.ini` is empty by default. Bench scenarios for
   joining by code, directly and through the relay (testbench 2.6.0). `Online.asi` is
-  still not part of `./install`.
+  still not part of `./install` (2f2255a).
 
 Installed, not yet seen in game.
 
