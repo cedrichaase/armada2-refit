@@ -10,7 +10,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: qol 1.0.0 (new), testbench 2.9.0.
 
 ### Added
-- The `qol` layer: `QOL.asi` doubles the right-click-drag pan speed (`PanSpeed=` in
+- The `qol` layer: `QOL.asi` makes right-click-drag panning 2.5x as fast (`PanSpeed=` in
   `QOL.ini`), scaled in memory so `RTS_CFG.h` stays stock and network games still
   accept the player (qol 1.0.0, 8a8248b). `./install` runs `qol/install.sh`, `a2mod`
   switches it, and the release package and both installers carry it.

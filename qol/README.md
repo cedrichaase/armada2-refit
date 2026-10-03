@@ -119,7 +119,7 @@ in a real game, the user doesn't have to look down.
 
 ## QOL-2: Configurable right-drag pan speed
 
-*`QOL.asi`, stock-compatible. Built: `PanSpeed=` in `QOL.ini`, default 2.*
+*`QOL.asi`, stock-compatible. Built: `PanSpeed=` in `QOL.ini`, default 2.5.*
 
 **Problem.** Right-click-drag panning is slow on a large map at high resolution.
 
@@ -158,7 +158,7 @@ the compiled default, unscaled. The site's bytes are checked first, so another
 `Armada2.exe` leaves the plugin inert and says so in `QOL.log`.
 
 `ASI` plugins load before the game reads `RTS_CFG.h`, so the patch is always in place
-for the parse. Seen on the bench (2026-10-03): `QOL.log` reads
+for the parse. Seen on the bench (2026-10-03, at `PanSpeed=2`): `QOL.log` reads
 `RTS_CFG.h parsed: right-drag FASTSCROLL_COEFFICIENT now 0.0100 (file value x 2.00)`
 with the clone's file still at the stock 0.005, and a 200 px right-drag in the first
 Federation mission moved the view about 160 px.
