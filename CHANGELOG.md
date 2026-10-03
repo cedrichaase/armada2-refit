@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.1.0 — 2026-10-03
+
+Layers: testbench 2.9.0.
+
+### Added
+- `testbench/d3dtrace/`: a bench-only Direct3D 8 tracer, which showed how the engine
+  lights a frame (testbench 2.9.0).
+
+Installs nothing; no game-side change to confirm.
+
 ## 9.0.0 — 2026-10-03
 
 Layers: models 3.0.0, testbench 2.8.1.
