@@ -250,9 +250,20 @@ items can still stall at the third.
   charge has to stop for items we have already paid for. The same goes for the game's
   start-of-build cost check and its voice-over: an item that was paid on enqueue can't
   fail it.
-- **Refund on cancel.** Cancelling an item that hasn't started refunds its whole cost.
-  For the item in progress, the refund has to agree with the stock rules, whatever
-  those are (measure them), so that we never refund twice.
+- **Refund on cancel: always 100%.** Cancelling refunds the item's whole cost, whether
+  it is still waiting or already in progress. Whatever partial refund stock gives for
+  an item in progress is replaced, not added to, so nothing is refunded twice.
+- **Refund on destruction.** When a building is destroyed, everything in its queue is
+  refunded in full, the item in progress included. The same applies when a
+  construction ship with queued structures is destroyed. A building that is
+  *captured* or *assimilated* should refund its old owner too. That is not decided
+  yet, but it is the consistent reading.
+- **Officers and crew are part of the check.** An order is refused if the player is
+  short of officers or crew, counted the same way as the resources: what's free, minus
+  what's already queued. Crew is a quantity in the bank, so it is charged on enqueue and
+  refunded like the rest. Officers are a cap, not a stock, so each queued item takes its
+  share of the cap when it is queued and gives it back on cancel or destruction.
+  (This is the reading of "checked before". Confirm it when it is built.)
 - **Spreading orders (QOL-6) needs no extra rule.** Each order is charged when it is
   placed, whichever building it goes to.
 
@@ -273,18 +284,31 @@ every peer runs the plugin. Exempting it would mean telling its orders apart fro
 player's. Measure whether the AI's build planning breaks when the bank drops early.
 It may hold back a queue it would otherwise build in time.
 
+**Saves change (decided).** Every queued item carries an "already paid" mark, and the
+save has to hold it. Without it, a load either charges again when the item starts, or
+builds it for free. The new save layout must be designed so that:
+
+- a refit save loaded under `./a2mod stock` is refused cleanly, or loads with the
+  queues emptied and refunded. It must never load into a wrong bank;
+- a stock save loaded in refit treats its queues as unpaid, under stock rules, and is
+  charged as each item starts, as it would have been;
+- the mark goes in a place the stock loader ignores or rejects predictably. Measure
+  how the stock loader reacts to extra data before choosing.
+
+This makes the layer's eventual changelog a MAJOR version on the day it ships, because
+saves made with it need it to load.
+
 **Open questions.**
 
-- Does stock refund an in-progress item on cancel, and how much?
-- What happens to a paid queue when its building is destroyed: is it refunded or lost?
-  Today nothing is lost, because nothing in the queue was paid. Under this rule
-  something must be decided. Ask.
-- Officers and crew are not quite resources: crew regenerates, and officers are a cap.
-  Are they charged on enqueue too, or left to the start-of-build check?
-- Saves have to keep the "already paid" mark on every queued item. Otherwise a load
-  either charges twice or builds for free.
+- What does stock refund today when an in-progress item is cancelled? Measure it, so
+  the 100% rule replaces it exactly.
+- Captured or assimilated buildings: refund the old owner, and the new owner inherits
+  an empty queue?
 
 **Done when.** With 500 dilithium and an item costing 300, the first order drops the
 bank to 200 and the second is refused. Cancelling the first restores 500. The
 voice-over never plays during a normal build-up on the bench. A two-player bench game
 with nine orders and three cancels ends with both peers showing the same bank.
+Destroying a yard with three paid items returns all three costs. An order with too few
+officers is refused. A save made mid-queue loads with the same bank and queues, and
+nothing is charged a second time.
