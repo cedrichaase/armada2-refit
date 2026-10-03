@@ -173,7 +173,7 @@ nothing:
 | [`platform/`](platform/README.md) | Heroic and Proton, the DXVK d3d8 chain, the ASI loader, the widescreen patch |
 | [`testbench/`](testbench/README.md) | `./a2test`: the game headless at any resolution, scenarios, reports |
 | [`publish/`](publish/README.md) | what this repository may contain, and the check that enforces it |
-| [`online/`](online/README.md) | online multiplayer without port forwarding, in progress: `Online.asi` adds *Internet – Online*, which runs the game on its own UDP transport (no server yet, so the host must be reachable); not part of `./install` |
+| [`online/`](online/README.md) | online multiplayer without port forwarding, in progress: `Online.asi` adds *Internet – Online*, which runs the game on its own UDP transport, with join codes, hole punching and a relay through a self-hostable server (`online/server/`; no public instance yet); not part of `./install` |
 
 ## Entry points
 

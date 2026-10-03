@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.7.0 — 2026-10-03
+
+Layers: online 0.4.0, testbench 2.6.0.
+
+### Added
+- Online multiplayer, milestone 2: join codes, hole punching and a relay through a
+  self-hostable server, `online/server/a2online-server.py` (online 0.4.0). No public
+  instance yet: `Server=` in `Online.ini` is empty by default. Bench scenarios for
+  joining by code, directly and through the relay (testbench 2.6.0). `Online.asi` is
+  still not part of `./install`.
+
+Installed, not yet seen in game.
+
 ## 8.6.0 — 2026-10-03
 
 Layers: online 0.3.0, testbench 2.5.0.

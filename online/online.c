@@ -71,6 +71,8 @@ __declspec(dllimport) BOOL    __stdcall VirtualProtect(void *, UINT, DWORD, DWOR
 __declspec(dllimport) HANDLE  __stdcall CreateFileA(LPCSTR, DWORD, DWORD, void *, DWORD, DWORD, HANDLE);
 __declspec(dllimport) BOOL    __stdcall WriteFile(HANDLE, const void *, DWORD, DWORD *, void *);
 __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
+__declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
+__declspec(dllimport) BOOL    __stdcall IsWindow(HANDLE);
 __declspec(dllimport) DWORD   __stdcall GetTickCount(void);
 __declspec(dllimport) DWORD   __stdcall GetCurrentThreadId(void);
 __declspec(dllimport) void    __stdcall InitializeCriticalSection(CRITICAL_SECTION *);
@@ -822,6 +824,13 @@ static void *patch_iat(HMODULE mod, const char *dll, const char *name, void *rep
 #define A_CLICK_BACK     0x5bfd0a
 #define A_IPX_PRESSED    0x5bff9b
 #define A_MANUAL_DIALOG  0x5c00b6
+#define A_ROOM_INIT      0x5b2ff2   /* InternetGameDlgProc: chatRoom.Init(...) */
+#define A_GAME_INIT      0x5c5395   /* MultiplayerSetupDlgProc: chatGame.Init(...) */
+#define A_CHAT_INIT      0x5a9890   /* Chat::Init, thiscall, one argument */
+#define A_CHAT_APPEND    0x5a98b0   /* Chat::Append(this, format, ...), cdecl */
+#define CHAT_ROOM_OBJ    0x79df50   /* chatRoom: the Internet Game screen's chat box */
+#define CHAT_GAME_OBJ    0x79b838   /* chatGame: GAME SETUP's */
+#define CHAT_HWND        0x2714     /* Chat: the edit control Init was given */
 
 __attribute__((used)) volatile int g_online;   /* Internet - Online is the entry chosen */
 static int  g_entry = 1;
@@ -868,6 +877,105 @@ __attribute__((used)) void __cdecl on_online_chosen(void)
     logline("menu: Internet - Online chosen");
 }
 
+/* ---- notices in the game's chat boxes ---------------------------------- *
+ *
+ * The join code, and what goes wrong finding a game, are shown where the game
+ * shows its own "Local IP Address": as lines in a screen's chat box, through the
+ * game's Chat::Append.  Chat::Init empties the box, and each screen calls it as it
+ * opens, so a line for a screen that is not open waits for that call, and the
+ * host's code is posted again whenever GAME SETUP opens anew (after a match).
+ * The two Init calls are hooked at their call sites (install_entry). */
+
+typedef void (__cdecl *ChatAppend_t)(void *chat, const char *format, ...);
+static CRITICAL_SECTION g_ncs;
+static int  g_chat_hooked;
+static char g_pending[2][200];
+static char g_sticky[200];
+
+static void s_copyn(char *d, const char *s, int max)
+{
+    int i = 0;
+    if (s) for (; s[i] && i < max - 1; i++) d[i] = s[i];
+    d[i] = 0;
+}
+
+static void *chat_obj(int chat) { return (void *)(chat == CHAT_GAME ? CHAT_GAME_OBJ : CHAT_ROOM_OBJ); }
+
+static int chat_open(int chat)
+{
+    HANDLE h = *(HANDLE *)((BYTE *)chat_obj(chat) + CHAT_HWND);
+    return h && IsWindow(h);
+}
+
+static void chat_put(int chat, const char *text)
+{
+    ((ChatAppend_t)A_CHAT_APPEND)(chat_obj(chat), "%s", text);
+}
+
+static void notice(int chat, const char *text, int sticky)
+{
+    char t[200];
+    int  open;
+    if (!g_chat_hooked || !text || !text[0]) return;
+    s_copyn(t, text, sizeof t);
+    EnterCriticalSection(&g_ncs);
+    if (sticky) s_copyn(g_sticky, t, sizeof g_sticky);
+    open = chat_open(chat);
+    if (!open && !sticky) s_copyn(g_pending[chat], t, sizeof g_pending[chat]);
+    LeaveCriticalSection(&g_ncs);
+    if (open) chat_put(chat, t);
+}
+
+static void notice_unstick(void)
+{
+    EnterCriticalSection(&g_ncs);
+    g_sticky[0] = 0;
+    LeaveCriticalSection(&g_ncs);
+}
+
+/* after a screen's Chat::Init: what was waiting for it */
+__attribute__((used)) void __cdecl on_chat_init(void *obj)
+{
+    int  chat = obj == (void *)CHAT_GAME_OBJ ? CHAT_GAME : CHAT_ROOM;
+    char t[200], s[200];
+    EnterCriticalSection(&g_ncs);
+    s_copyn(t, g_pending[chat], sizeof t);
+    g_pending[chat][0] = 0;
+    s_copyn(s, chat == CHAT_GAME ? g_sticky : "", sizeof s);
+    LeaveCriticalSection(&g_ncs);
+    if (t[0]) chat_put(chat, t);
+    if (s[0]) chat_put(chat, s);
+}
+
+/* in place of `mov ecx, chat; call Chat::Init` (10 bytes): the same, then
+ * on_chat_init(chat).  On entry ecx is free (it is loaded here), the argument is
+ * on the stack, and Init pops it. */
+__attribute__((naked)) static void stub_room_init(void)
+{
+    __asm__ volatile(
+        "movl $0x79df50, %ecx\n\t"
+        "pushl %ecx\n\t"
+        "pushl 8(%esp)\n\t"
+        "movl $0x5a9890, %eax\n\t"
+        "call *%eax\n\t"
+        "call _on_chat_init\n\t"
+        "addl $4, %esp\n\t"
+        "ret $4");
+}
+
+__attribute__((naked)) static void stub_game_init(void)
+{
+    __asm__ volatile(
+        "movl $0x79b838, %ecx\n\t"
+        "pushl %ecx\n\t"
+        "pushl 8(%esp)\n\t"
+        "movl $0x5a9890, %eax\n\t"
+        "call *%eax\n\t"
+        "call _on_chat_init\n\t"
+        "addl $4, %esp\n\t"
+        "ret $4");
+}
+
 /* every click on the connection screen: clear the flag, then the two
  * instructions the jump replaced */
 __attribute__((naked)) static void stub_click(void)
@@ -907,6 +1015,18 @@ static int write_code(DWORD addr, const BYTE *bytes, int n)
     return 1;
 }
 
+/* a 5-byte call to `to` at `at`, NOP-padded to n bytes */
+static int write_call(DWORD at, void *to, int n)
+{
+    BYTE b[16];
+    DWORD rel = (DWORD)to - (at + 5);
+    int   i;
+    b[0] = 0xe8;
+    for (i = 0; i < 4; i++) b[1 + i] = (BYTE)(rel >> (8 * i));
+    for (i = 5; i < n; i++) b[i] = 0x90;
+    return write_code(at, b, n);
+}
+
 /* a 5-byte jmp to `to` at `at`, NOP-padded to n bytes */
 static int write_jmp(DWORD at, void *to, int n)
 {
@@ -925,12 +1045,15 @@ static void install_entry(char *b)
     static const BYTE sig_click[9] = { 0x8b, 0x5d, 0x14, 0x8b, 0x0d, 0xa0, 0x30, 0x7a, 0x00 };
     static const BYTE sig_ipx[8]   = { 0xa1, 0x00, 0x2d, 0x7a, 0x00, 0x8b, 0x4d, 0x08 };
     static const BYTE sig_dlg[9]   = { 0x8b, 0x4d, 0x08, 0x51, 0xe8, 0x21, 0x6b, 0xff, 0xff };
+    static const BYTE sig_room[10] = { 0xb9, 0x50, 0xdf, 0x79, 0x00, 0xe8, 0x94, 0x68, 0xff, 0xff };
+    static const BYTE sig_game[10] = { 0xb9, 0x38, 0xb8, 0x79, 0x00, 0xe8, 0xf1, 0x44, 0xfe, 0xff };
     DWORD prot, rel;
     int   i;
 
     if (!g_entry) { s_cat(b, "  menu entry off (Entry=0)"); return; }
     if (!code_is(A_READ_LABEL, sig_label, 8) || !code_is(A_CLICK, sig_click, 9)
-        || !code_is(A_IPX_PRESSED, sig_ipx, 8) || !code_is(A_MANUAL_DIALOG, sig_dlg, 9)) {
+        || !code_is(A_IPX_PRESSED, sig_ipx, 8) || !code_is(A_MANUAL_DIALOG, sig_dlg, 9)
+        || !code_is(A_ROOM_INIT, sig_room, 10) || !code_is(A_GAME_INIT, sig_game, 10)) {
         s_cat(b, "  menu entry NOT installed: Armada2.exe is not the 1.1 this was made for");
         return;
     }
@@ -943,8 +1066,12 @@ static void install_entry(char *b)
 
     if (write_jmp(A_READ_LABEL, (void *)label_hook, 8)
         && write_jmp(A_CLICK, (void *)stub_click, 9)
-        && write_jmp(A_IPX_PRESSED, (void *)stub_ipx, 5))
+        && write_jmp(A_IPX_PRESSED, (void *)stub_ipx, 5)
+        && write_call(A_ROOM_INIT, (void *)stub_room_init, 10)
+        && write_call(A_GAME_INIT, (void *)stub_game_init, 10)) {
+        g_chat_hooked = 1;
         s_cat(b, "  menu entry: LAN (IPX) is Internet - Online");
+    }
     else
         s_cat(b, "  menu entry: VirtualProtect failed");
 }
@@ -968,10 +1095,11 @@ static void build_paths(char *ini)
 static void startup(void)
 {
     char    ini[320];
-    char    b[200];
+    char    b[400];
     HMODULE nm;
 
     InitializeCriticalSection(&g_cs);
+    InitializeCriticalSection(&g_ncs);
     g_t0 = GetTickCount();
     build_paths(ini);
     g_logging = (int)GetPrivateProfileIntA("Online", "Log",     1,  ini);
@@ -981,6 +1109,8 @@ static void startup(void)
     g_port    = (WORD)GetPrivateProfileIntA("Online", "Port",   2302, ini);
     g_loss    = (int)GetPrivateProfileIntA("Online", "Loss",    0,  ini);
     if (g_loss > 50) g_loss = 50;
+    g_direct  = (int)GetPrivateProfileIntA("Online", "Direct",  1,  ini);
+    GetPrivateProfileStringA("Online", "Server", "", g_server, sizeof g_server, ini);
     if (g_logging && g_logpath[0])
         g_log = CreateFileA(g_logpath, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
@@ -988,6 +1118,9 @@ static void startup(void)
     b[0] = 0;
     s_cat(b, "--- Online payload=");
     s_num(b, g_payload);
+    s_cat(b, "  server=");
+    s_cat(b, g_server[0] ? g_server : "(none)");
+    if (!g_direct) s_cat(b, "  Direct=0: relay only");
     nm = GetModuleHandleA("NetworkManager.dll");
     if (!nm) {
         s_cat(b, "  NetworkManager.dll not loaded: nothing hooked");

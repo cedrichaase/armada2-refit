@@ -47,6 +47,7 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Press Escape` / `Press ctrl+s` / `Press Return 3 times` | virtual keyboard; xkb key names |
 | `Type "TEXT"` | |
 | `Type this machine's address` | the source address of the default route: what the game shows as "Local IP Address", and where every player of a case is |
+| `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
 | `Note "TEXT"` | a line in the log |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |

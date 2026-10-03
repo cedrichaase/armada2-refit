@@ -69,6 +69,7 @@ __declspec(dllimport) int     __stdcall select(int, FD_SET *, FD_SET *, FD_SET *
 __declspec(dllimport) int     __stdcall ioctlsocket(SOCKET, LONG, DWORD *);
 __declspec(dllimport) int     __stdcall setsockopt(SOCKET, int, int, const char *, int);
 __declspec(dllimport) int     __stdcall getsockname(SOCKET, void *, int *);
+__declspec(dllimport) int     __stdcall connect(SOCKET, const void *, int);
 __declspec(dllimport) HOSTENT *__stdcall gethostbyname(const char *);
 __declspec(dllimport) int     __stdcall WSAGetLastError(void);
 
@@ -183,12 +184,22 @@ typedef HRESULT (__stdcall *AddrAdd_t)(void *, const WCHAR *, const void *, DWOR
 #define LOST_MS      15000
 #define PING_MS      1000
 #define CONNECT_MS   10000
+#define PUNCH_MS     2500            /* how long both sides try to reach each other directly */
+#define PUNCH_EVERY  200
+#define ANSWER_MS    30000           /* the host answers a joiner's probes for this long */
+#define LOOKUP_MS    8000            /* a join code's lookup, before "the server does not answer" */
+#define REGISTER_MS  10000           /* a registered host refreshes its code this often */
+#define VPORT        0x0100          /* port 1, network order: the port of a relayed address */
 
 enum { ROLE_NONE, ROLE_HOST, ROLE_JOINER };
-enum { P_ENUM_Q = 1, P_ENUM_R, P_CONN, P_REJECT, P_DATA, P_ACK, P_PING, P_PONG, P_BYE };
+enum { P_ENUM_Q = 1, P_ENUM_R, P_CONN, P_REJECT, P_DATA, P_ACK, P_PING, P_PONG, P_BYE, P_PUNCH };
+/* to and from the server (server/a2online-server.py) */
+enum { SV_HOST = 0x40, SV_HOSTED, SV_JOIN, SV_PEER, SV_INTRO, SV_NOTFOUND, SV_RELAY, SV_RELAYED,
+       SV_BYE, SV_ERROR };
+enum { CHAT_ROOM, CHAT_GAME };       /* where a notice goes: the Internet Game screen, GAME SETUP */
 enum { R_ACCEPT = 1, R_APP, R_PLAYER_ADD, R_PLAYER_DEL, R_INFO, R_APPDESC, R_TERMINATE };
 enum { EV_RECEIVE = 1, EV_SEND_DONE, EV_CREATE, EV_DESTROY, EV_CONNECT_DONE, EV_ENUM_RESPONSE,
-       EV_ENUM_QUERY, EV_INDICATE, EV_TERMINATE, EV_PEER_INFO, EV_APPDESC, EV_ASYNC_DONE };
+       EV_ENUM_QUERY, EV_INDICATE, EV_TERMINATE, EV_PEER_INFO, EV_APPDESC, EV_ASYNC_DONE, EV_NOTICE };
 
 typedef struct Pkt { struct Pkt *next; DWORD seq, sent, first; int tries, len; BYTE data[FRAG + 16]; } Pkt;
 
@@ -250,6 +261,17 @@ typedef struct {
     BYTE            cn_pkt[600]; int cn_len;
     /* host: connection requests waiting for the game's INDICATE_CONNECT answer */
     DWORD           pend_ip[MAX_CONNS]; WORD pend_port[MAX_CONNS];
+    /* the server: our LAN address as we would give it out */
+    DWORD           lan_ip; WORD lan_port;
+    /* host: the join code (sv_state 1 = asking for one, 2 = have it) */
+    int             sv_state, sv_warned; DWORD sv_token, sv_start, sv_next;
+    char            code[8];
+    /* host: joiners the server introduced: probed for PUNCH_MS, answered for ANSWER_MS */
+    struct { DWORD pair, start, next; DWORD ip[2]; WORD port[2]; } punch[MAX_CONNS];
+    /* joiner: a join code (jn_state 1 = asking the server, 2 = probing the host, 3 = path chosen) */
+    int             jn_state; char jn_code[8];
+    DWORD           jn_nonce, jn_start, jn_next, jn_pair, jn_host_id;
+    DWORD           jn_ip[4]; WORD jn_port[4]; int jn_n;
     Ev             *in_head, *in_tail;
     DWORD           next_handle;
     DWORD           stat_sent, stat_recv, stat_resent, stat_dropped;
@@ -257,6 +279,14 @@ typedef struct {
 
 static WORD  g_port = 2302;
 static int   g_loss;                 /* Loss=: percent of datagrams dropped on purpose (tests) */
+static int   g_direct = 1;           /* Direct=0: never try a direct path, always relay (tests) */
+static char  g_server[128];          /* Server=host:port; empty = none */
+static DWORD g_srv_ip; static WORD g_srv_port;   /* resolved, network order */
+
+/* posts a line in one of the game's chat boxes (online.c); sticky = again
+ * whenever that screen is set up anew, until notice_unstick() */
+static void notice(int chat, const char *text, int sticky);
+static void notice_unstick(void);
 static DWORD g_rand = 0x2a2a2a2a;
 static void *g_peer_vtbl[37];
 
@@ -315,11 +345,53 @@ static void plog(Peer *p, const char *what)
     logline(b);
 }
 
-static void s_ip(char *d, DWORD ip, WORD port)
+/* A peer reached through the server's relay has the address 0.x.y.z, port 1:
+ * x.y.z is the id the server gave it.  No real datagram comes from 0.0.0.0/8, and
+ * DirectPlay's address objects carry it like any other, so the game hands it back
+ * to Connect and every connection is keyed by it as by a real address. */
+static int   is_relayed(DWORD ip) { return ip && (ip & 0xff) == 0; }
+static DWORD relayed_ip(DWORD id) { return ((id >> 16) & 0xff) << 8 | ((id >> 8) & 0xff) << 16 | (id & 0xff) << 24; }
+static DWORD relay_id(DWORD ip)   { return ((ip >> 8) & 0xff) << 16 | ((ip >> 16) & 0xff) << 8 | (ip >> 24); }
+
+static void s_dotted(char *d, DWORD ip)
 {
     const BYTE *b = (const BYTE *)&ip;
     s_num(d, b[0]); s_cat(d, "."); s_num(d, b[1]); s_cat(d, ".");
-    s_num(d, b[2]); s_cat(d, "."); s_num(d, b[3]); s_cat(d, ":"); s_num(d, hton16(port));
+    s_num(d, b[2]); s_cat(d, "."); s_num(d, b[3]);
+}
+
+static void s_ip(char *d, DWORD ip, WORD port)
+{
+    if (is_relayed(ip)) { s_cat(d, "relay #"); s_num(d, (long)relay_id(ip)); return; }
+    s_dotted(d, ip); s_cat(d, ":"); s_num(d, hton16(port));
+}
+
+/* "K7M-Q2X" */
+static void s_code(char *d, const char *code)
+{
+    char t[8];
+    int  i;
+    for (i = 0; i < 3; i++) { t[i] = code[i]; t[i + 4] = code[i + 3]; }
+    t[3] = '-'; t[7] = 0;
+    s_cat(d, t);
+}
+
+/* a join code as typed: six of the server's characters (no I, L, O, 0 or 1), any
+ * case, dashes and spaces ignored.  1 and `code` set to the six, upper case */
+static int read_code(const char *s, char *code)
+{
+    static const char alphabet[] = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    int n = 0, k;
+    for (; *s; s++) {
+        char ch = *s;
+        if (ch == '-' || ch == ' ') continue;
+        if (ch >= 'a' && ch <= 'z') ch = (char)(ch - 32);
+        for (k = 0; alphabet[k] && alphabet[k] != ch; k++) {}
+        if (!alphabet[k] || n == 6) return 0;
+        code[n++] = ch;
+    }
+    code[n] = 0;
+    return n == 6;
 }
 
 /* ---- addresses ------------------------------------------------------------ */
@@ -337,8 +409,8 @@ static void *make_addr(DWORD ip, WORD port)
     ((AddrSetSP_t)(*(void ***)a)[A_SETSP])(a, &CLSID_DP8SP_TCPIP);
     if (!ip && !port) return a;                     /* a device: the provider is all */
     t[0] = 0;
-    s_ip(t, ip, port);
-    for (i = 0; t[i] && t[i] != ':'; i++) host[i] = (WCHAR)t[i];
+    s_dotted(t, ip);
+    for (i = 0; t[i]; i++) host[i] = (WCHAR)t[i];
     host[i] = 0;
     ((AddrAdd_t)(*(void ***)a)[A_ADDCOMPONENT])(a, (const WCHAR *)L"hostname", host,
                                                  (DWORD)(2 * (i + 1)), DPNA_DATATYPE_STRING);
@@ -365,8 +437,9 @@ static int parse_ip(const char *s, DWORD *ip)
     return 1;
 }
 
-/* hostname and port out of the game's address; 0 = no hostname in it */
-static int addr_target(void *a, DWORD *ip, WORD *port)
+/* hostname and port out of the game's address: 1 = an address, 2 = a join code
+ * (in `code`), 0 = no hostname in it, -1 = a name that does not resolve */
+static int addr_target(void *a, DWORD *ip, WORD *port, char *code)
 {
     WCHAR w[128];
     char  s[128];
@@ -390,11 +463,54 @@ static int addr_target(void *a, DWORD *ip, WORD *port)
         *port = hton16((WORD)dport);
     if (!s[0]) return 0;
     if (parse_ip(s, ip)) return 1;
+    if (code && read_code(s, code)) return 2;
     {
         HOSTENT *h = gethostbyname(s);
         if (h && h->addrs && h->addrs[0]) { mcpy(ip, h->addrs[0], 4); return 1; }
     }
     return -1;
+}
+
+/* the server named by Server=, resolved once; 0 = none set or not found */
+static int server_addr(void)
+{
+    char host[128];
+    int  i, port = 2399;
+    if (g_srv_ip) return 1;
+    if (!g_server[0]) return 0;
+    for (i = 0; g_server[i] && g_server[i] != ':' && i < 127; i++) host[i] = g_server[i];
+    host[i] = 0;
+    if (g_server[i] == ':') {
+        port = 0;
+        for (i++; g_server[i] >= '0' && g_server[i] <= '9'; i++) port = port * 10 + (g_server[i] - '0');
+    }
+    if (!parse_ip(host, &g_srv_ip)) {
+        HOSTENT *h = gethostbyname(host);
+        if (!h || !h->addrs || !h->addrs[0]) { g_srv_ip = 0; return 0; }
+        mcpy(&g_srv_ip, h->addrs[0], 4);
+    }
+    g_srv_port = hton16((WORD)port);
+    return 1;
+}
+
+/* the address this machine reaches the server from, and the port we are bound to:
+ * what a player on the same network would use to reach us */
+static void find_lan(Peer *p)
+{
+    SOCKADDR_IN a;
+    int    al = sizeof a;
+    SOCKET s;
+    p->lan_ip = 0;
+    mzero(&a, sizeof a);
+    if (getsockname(p->sock, &a, &al) == 0) p->lan_port = a.port;
+    if (!g_srv_ip) return;
+    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (s == INVALID_SOCKET) return;
+    mzero(&a, sizeof a);
+    a.family = AF_INET; a.port = g_srv_port; a.addr = g_srv_ip;
+    al = sizeof a;
+    if (connect(s, &a, sizeof a) == 0 && getsockname(s, &a, &al) == 0) p->lan_ip = a.addr;
+    closesocket(s);
 }
 
 /* ---- the event queue (delivered by the network thread, in order) --------- */
@@ -475,6 +591,8 @@ static void conn_free(Conn *c)
     mzero(c, sizeof *c);
 }
 
+static int hdr(BYTE *b, int type) { b[0] = 'A'; b[1] = '2'; b[2] = 'O'; b[3] = 1; b[4] = (BYTE)type; return 5; }
+
 static void raw_send(Peer *p, DWORD ip, WORD port, const BYTE *d, int n)
 {
     SOCKADDR_IN to;
@@ -485,10 +603,20 @@ static void raw_send(Peer *p, DWORD ip, WORD port, const BYTE *d, int n)
         g_rand = g_rand * 1103515245u + 12345u;
         if ((int)((g_rand >> 16) % 100) < g_loss) { p->stat_dropped++; return; }
     }
+    if (is_relayed(ip)) {
+        BYTE w[1400];                      /* the server takes datagrams up to 1400 bytes */
+        int  k;
+        if (!g_srv_ip || n + 9 > (int)sizeof w) return;
+        k = hdr(w, SV_RELAY);
+        put32(w + k, relay_id(ip));
+        mcpy(w + k + 4, d, n);
+        to.port = g_srv_port; to.addr = g_srv_ip;
+        sendto(p->sock, (const char *)w, k + 4 + n, 0, &to, sizeof to);
+        return;
+    }
     sendto(p->sock, (const char *)d, n, 0, &to, sizeof to);
 }
 
-static int hdr(BYTE *b, int type) { b[0] = 'A'; b[1] = '2'; b[2] = 'O'; b[3] = 1; b[4] = (BYTE)type; return 5; }
 
 /* one reliable message on a connection, fragmented */
 static void rel_send(Peer *p, Conn *c, const BYTE *d, int n)
@@ -586,7 +714,7 @@ static void end_session(Peer *p, HRESULT hr, DWORD reason)
 static void conn_lost(Peer *p, Conn *c, DWORD reason)
 {
     char b[80];
-    b[0] = 0; s_cat(b, "lost "); s_ip(b, c->ip, c->port);
+    b[0] = 0; s_cat(b, reason == DPNDESTROYPLAYERREASON_NORMAL ? "left: " : "lost: "); s_ip(b, c->ip, c->port);
     plog(p, b);
     if (p->role == ROLE_HOST) {
         BYTE m[16];
@@ -709,6 +837,131 @@ static void on_message(Peer *p, Conn *c, const BYTE *m, int n)
         end_session(p, DPNERR_HOSTTERMINATEDSESSION, DPNDESTROYPLAYERREASON_SESSIONTERMINATED);
         break;
     }
+}
+
+/* ---- the server and the direct path (caller holds p->cs) ----------------- */
+
+static void say(Peer *p, int chat, const char *text, int sticky)
+{
+    Ev *e = ev_new(EV_NOTICE, text, s_len(text) + 1);
+    if (e) { e->a = (DWORD)chat; e->b = (DWORD)sticky; ev_push(p, e); }
+}
+
+static void to_server(Peer *p, const BYTE *d, int n) { raw_send(p, g_srv_ip, g_srv_port, d, n); }
+
+/* [pair][0 = probe, 1 = answer] */
+static void send_punch(Peer *p, DWORD ip, WORD port, DWORD pair, int answer)
+{
+    BYTE b[16];
+    int  k = hdr(b, P_PUNCH);
+    put32(b + k, pair); b[k + 4] = (BYTE)answer;
+    raw_send(p, ip, port, b, k + 5);
+}
+
+/* the joiner has a way to the host: the search starts there */
+static void use_path(Peer *p, DWORD ip, WORD port, const char *how)
+{
+    char b[120];
+    p->jn_state = 3;
+    p->en_ip = ip; p->en_port = port; p->en_next = GetTickCount();
+    b[0] = 0; s_cat(b, "join code "); s_code(b, p->jn_code); s_cat(b, ": "); s_cat(b, how);
+    s_cat(b, " "); s_ip(b, ip, port);
+    plog(p, b);
+}
+
+static void add_candidate(Peer *p, DWORD ip, WORD port)
+{
+    int i;
+    if (!ip || ip == 0xffffffff) return;
+    for (i = 0; i < p->jn_n; i++) if (p->jn_ip[i] == ip && p->jn_port[i] == port) return;
+    if (p->jn_n < 4) { p->jn_ip[p->jn_n] = ip; p->jn_port[p->jn_n] = port; p->jn_n++; }
+}
+
+static void on_server(Peer *p, const BYTE *b, int n, int type)
+{
+    char t[200];
+    int  i;
+    t[0] = 0;
+    switch (type) {
+    case SV_HOSTED:                          /* [token][code 6][public ip 4, port 2][our id] */
+        if (p->role != ROLE_HOST || !p->sv_state || n < 20 || get32(b) != p->sv_token) break;
+        if (p->sv_state != 2 || !(p->code[0] == b[4] && p->code[5] == b[9])) {
+            DWORD ip; WORD port;
+            for (i = 0; i < 6; i++) p->code[i] = (char)b[4 + i];
+            p->code[6] = 0;
+            mcpy(&ip, b + 10, 4); mcpy(&port, b + 14, 2);
+            s_cat(t, "join code "); s_code(t, p->code); s_cat(t, ", seen by the server as ");
+            s_ip(t, ip, port);
+            plog(p, t);
+            t[0] = 0; s_cat(t, "Join code: "); s_code(t, p->code);
+            say(p, CHAT_GAME, t, 1);
+        }
+        p->sv_state = 2; p->sv_warned = 0;
+        p->sv_next = GetTickCount() + REGISTER_MS;
+        break;
+    case SV_PEER:                            /* [nonce][host public 6][host lan 6][host id][our id][pair] */
+        if (p->jn_state != 1 || n < 28 || get32(b) != p->jn_nonce) break;
+        {
+            DWORD ip; WORD port;
+            p->jn_n = 0;
+            mcpy(&ip, b + 4, 4);  mcpy(&port, b + 8, 2);  add_candidate(p, ip, port);
+            mcpy(&ip, b + 10, 4); mcpy(&port, b + 14, 2); add_candidate(p, ip, port);
+            p->jn_host_id = get32(b + 16); p->jn_pair = get32(b + 24);
+            s_cat(t, "join code "); s_code(t, p->jn_code); s_cat(t, ": host at ");
+            s_ip(t, p->jn_ip[0], p->jn_port[0]);
+            if (p->jn_n > 1) { s_cat(t, ", on its network "); s_ip(t, p->jn_ip[1], p->jn_port[1]); }
+            plog(p, t);
+        }
+        if (!g_direct) { use_path(p, relayed_ip(p->jn_host_id), VPORT, "Direct=0, through the relay to"); break; }
+        p->jn_state = 2; p->jn_start = p->jn_next = GetTickCount();
+        break;
+    case SV_INTRO:                           /* [joiner public 6][joiner lan 6][joiner id][pair] */
+        if (p->role != ROLE_HOST || n < 20) break;
+        for (i = 0; i < MAX_CONNS; i++)
+            if (!p->punch[i].pair || GetTickCount() - p->punch[i].start > ANSWER_MS) break;
+        if (i == MAX_CONNS) break;
+        p->punch[i].pair = get32(b + 16);
+        mcpy(&p->punch[i].ip[0], b, 4);     mcpy(&p->punch[i].port[0], b + 4, 2);
+        mcpy(&p->punch[i].ip[1], b + 6, 4); mcpy(&p->punch[i].port[1], b + 10, 2);
+        p->punch[i].start = p->punch[i].next = GetTickCount();
+        s_cat(t, "a joiner is coming: "); s_ip(t, p->punch[i].ip[0], p->punch[i].port[0]);
+        s_cat(t, ", on its network "); s_ip(t, p->punch[i].ip[1], p->punch[i].port[1]);
+        s_cat(t, ", or relay #"); s_num(t, (long)get32(b + 12));
+        plog(p, t);
+        break;
+    case SV_NOTFOUND:
+        if (p->jn_state != 1 || n < 4 || get32(b) != p->jn_nonce) break;
+        p->jn_state = 0;
+        s_cat(t, "No game with the join code "); s_code(t, p->jn_code);
+        plog(p, t);
+        say(p, CHAT_ROOM, t, 0);
+        break;
+    case SV_ERROR:
+        s_cat(t, "Online server: ");
+        if (n > 4) { int k = s_len(t); for (i = 4; i < n && k < 190; i++) t[k++] = (char)b[i]; t[k] = 0; }
+        plog(p, t);
+        say(p, p->role == ROLE_HOST ? CHAT_GAME : CHAT_ROOM, t, 0);
+        break;
+    }
+}
+
+static void on_punch(Peer *p, DWORD ip, WORD port, const BYTE *b, int n)
+{
+    DWORD pair;
+    int   i;
+    if (n < 5 || !g_direct) return;
+    pair = get32(b);
+    if (p->jn_state == 2 && pair == p->jn_pair) {
+        if (b[4]) { use_path(p, ip, port, "direct to the host at"); return; }
+        send_punch(p, ip, port, pair, 1);
+        add_candidate(p, ip, port);          /* the host as its NAT shows it to us: probe it too */
+        return;
+    }
+    for (i = 0; i < MAX_CONNS; i++)
+        if (p->punch[i].pair == pair && GetTickCount() - p->punch[i].start < ANSWER_MS) {
+            if (!b[4]) send_punch(p, ip, port, pair, 1);
+            return;
+        }
 }
 
 /* ---- one datagram in (caller holds p->cs) ---------------------------------- */
@@ -834,6 +1087,12 @@ static void on_packet(Peer *p, DWORD ip, WORD port, const BYTE *b, int n)
     Conn *c;
     Ev   *e;
     if (n < 5 || b[0] != 'A' || b[1] != '2' || b[2] != 'O' || b[3] != 1) return;
+    if (b[4] >= SV_HOST && ip == g_srv_ip && port == g_srv_port) {
+        if (b[4] == SV_RELAYED) {
+            if (n >= 9 + 5) on_packet(p, relayed_ip(get32(b + 5)), VPORT, b + 9, n - 9);
+        } else on_server(p, b + 5, n - 5, b[4]);
+        return;
+    }
     p->stat_recv++;
     c = conn_find(p, ip, port);
     if (c) c->last_rx = GetTickCount();
@@ -878,15 +1137,74 @@ static void on_packet(Peer *p, DWORD ip, WORD port, const BYTE *b, int n)
     case P_BYE:
         if (c) conn_lost(p, c, DPNDESTROYPLAYERREASON_NORMAL);
         break;
+    case P_PUNCH:
+        on_punch(p, ip, port, b, n);
+        break;
     }
 }
 
 /* ---- timers (caller holds p->cs) ----------------------------------------- */
 
+static void tick_server(Peer *p, DWORD now)
+{
+    BYTE b[64];
+    int  i, k, j;
+
+    if (p->sv_state && (int)(now - p->sv_next) >= 0) {     /* host: get, then keep, the code */
+        k = hdr(b, SV_HOST);
+        put32(b + k, p->sv_token); mcpy(b + k + 4, &p->lan_ip, 4); mcpy(b + k + 8, &p->lan_port, 2);
+        to_server(p, b, k + 10);
+        p->sv_next = now + (p->sv_state == 2 ? REGISTER_MS : 1000);
+        if (p->sv_state == 1 && now - p->sv_start > LOOKUP_MS) {
+            p->sv_next = now + 5000;
+            if (!p->sv_warned) {
+                char t[200];
+                t[0] = 0; s_cat(t, "The online server "); s_cat(t, g_server);
+                s_cat(t, " does not answer: no join code. Players can still join by address.");
+                plog(p, t);
+                say(p, CHAT_GAME, t, 0);
+                p->sv_warned = 1;
+            }
+        }
+    }
+    for (i = 0; i < MAX_CONNS; i++)                         /* host: probe the joiners coming */
+        if (p->punch[i].pair && g_direct && (int)(now - p->punch[i].next) >= 0
+            && now - p->punch[i].start < PUNCH_MS) {
+            for (j = 0; j < 2; j++)
+                if (p->punch[i].ip[j]) send_punch(p, p->punch[i].ip[j], p->punch[i].port[j], p->punch[i].pair, 0);
+            p->punch[i].next = now + PUNCH_EVERY;
+        }
+    if (p->jn_state == 1 && (int)(now - p->jn_next) >= 0) {    /* joiner: look the code up */
+        if (now - p->jn_start > LOOKUP_MS) {
+            char t[200];
+            t[0] = 0; s_cat(t, "The online server "); s_cat(t, g_server); s_cat(t, " does not answer");
+            plog(p, t);
+            say(p, CHAT_ROOM, t, 0);
+            p->jn_state = 0;
+        } else {
+            k = hdr(b, SV_JOIN);
+            put32(b + k, p->jn_nonce); mcpy(b + k + 4, p->jn_code, 6);
+            mcpy(b + k + 10, &p->lan_ip, 4); mcpy(b + k + 14, &p->lan_port, 2);
+            to_server(p, b, k + 16);
+            p->jn_next = now + 500;
+        }
+    }
+    if (p->jn_state == 2 && (int)(now - p->jn_next) >= 0) {    /* joiner: probe the host */
+        if (now - p->jn_start > PUNCH_MS)
+            use_path(p, relayed_ip(p->jn_host_id), VPORT, "no direct path, through the relay to");
+        else {
+            for (j = 0; j < p->jn_n; j++) send_punch(p, p->jn_ip[j], p->jn_port[j], p->jn_pair, 0);
+            p->jn_next = now + PUNCH_EVERY;
+        }
+    }
+}
+
 static void tick(Peer *p)
 {
     DWORD now = GetTickCount();
     int   i;
+
+    tick_server(p, now);
 
     if (p->en_on && p->en_ip && (int)(now - p->en_next) >= 0) {
         if (p->en_left == 0 || (p->en_end && (int)(now - p->en_end) >= 0)) {
@@ -1152,6 +1470,9 @@ static void deliver_event(Peer *p, Ev *e)
     case EV_APPDESC:
         deliver(p, DPN_MSGID_APPLICATION_DESC, 0);
         break;
+    case EV_NOTICE:
+        notice((int)e->a, (const char *)e->data, (int)e->b);
+        break;
     }
     unmem(e);
 }
@@ -1291,17 +1612,33 @@ static HRESULT __stdcall n_EnumHosts(void *self, AppDesc *desc, void *host, void
     PEER(self);
     DWORD ip = 0; WORD port = 0;
     int   t;
-    char  b[120];
+    char  b[160], code[8];
     HRESULT hr;
     (void)device; (void)flags;
 
     if (!p->handler) return DPNERR_UNINITIALIZED;
     if ((hr = net_open(p, 0)) < 0) return hr;
-    t = addr_target(host, &ip, &port);
+    t = addr_target(host, &ip, &port, code);
     if (t < 0) return DPNERR_ADDRESSING;
+    if (t == 2 && !server_addr()) {
+        b[0] = 0;
+        s_cat(b, g_server[0] ? "The online server cannot be found: " : "No online server is set (Server= in Online.ini)");
+        s_cat(b, g_server);
+        plog(p, b);
+        notice(CHAT_ROOM, b, 0);
+        t = 0;                                         /* searches nothing, as with no host typed */
+    }
+    if (t == 2) find_lan(p);
     EnterCriticalSection(&p->cs);
     p->en_on = 1; p->en_h = ++p->next_handle; p->en_ctx = ctx;
-    p->en_ip = t ? ip : 0; p->en_port = port;
+    p->en_ip = t == 1 ? ip : 0; p->en_port = port;
+    p->jn_state = 0;
+    if (t == 2) {
+        mcpy(p->jn_code, code, 7);
+        g_rand = g_rand * 1103515245u + 12345u;
+        p->jn_nonce = g_rand ^ GetTickCount();
+        p->jn_state = 1; p->jn_start = p->jn_next = GetTickCount();
+    }
     p->en_left = count ? count : 0xffffffff;
     /* the game passes 0, "the provider's default", and drops a listed game it has not
      * heard from for a few seconds ("The host of this game has been lost"): at
@@ -1316,7 +1653,8 @@ static HRESULT __stdcall n_EnumHosts(void *self, AppDesc *desc, void *host, void
     if (h) *h = p->en_h;
     LeaveCriticalSection(&p->cs);
     b[0] = 0;
-    if (t) { s_cat(b, "looking for a game at "); s_ip(b, ip, port); }
+    if (t == 2) { s_cat(b, "looking up join code "); s_code(b, code); s_cat(b, " at "); s_cat(b, g_server); }
+    else if (t) { s_cat(b, "looking for a game at "); s_ip(b, ip, port); }
     else s_cat(b, "no host typed: not looking");
     plog(p, b);
     return DPNSUCCESS_PENDING;
@@ -1330,7 +1668,7 @@ static HRESULT __stdcall n_CancelAsyncOperation(void *self, DPNHANDLE h, DWORD f
     (void)flags;
     EnterCriticalSection(&p->cs);
     was = p->en_on && (h == 0 || h == p->en_h);
-    if (was) p->en_on = 0;
+    if (was) { p->en_on = 0; p->jn_state = 0; }
     LeaveCriticalSection(&p->cs);
     if (was) {
         m.size = sizeof m; m.op = p->en_h; m.ctx = p->en_ctx; m.hr = DPNERR_USERCANCEL;
@@ -1352,7 +1690,7 @@ static HRESULT __stdcall n_Connect(void *self, const AppDesc *desc, void *host, 
     (void)device; (void)sec; (void)cred; (void)flags;
 
     if (!p->handler) return DPNERR_UNINITIALIZED;
-    if (addr_target(host, &ip, &port) <= 0) return DPNERR_ADDRESSING;
+    if (addr_target(host, &ip, &port, 0) != 1) return DPNERR_ADDRESSING;
     if ((hr = net_open(p, 0)) < 0) return hr;
     EnterCriticalSection(&p->cs);
     p->role = ROLE_JOINER;
@@ -1453,6 +1791,24 @@ static HRESULT __stdcall n_Host(void *self, const AppDesc *desc, void **devs, DW
     LeaveCriticalSection(&p->cs);
     b[0] = 0; s_cat(b, "hosting \""); s_wide(b, p->sname, 60); s_cat(b, "\"");
     plog(p, b);
+    if (server_addr()) {
+        find_lan(p);
+        EnterCriticalSection(&p->cs);
+        g_rand = g_rand * 1103515245u + 12345u;
+        p->sv_token = g_rand ^ GetTickCount();
+        p->sv_state = 1; p->sv_warned = 0;
+        p->sv_start = p->sv_next = GetTickCount();
+        LeaveCriticalSection(&p->cs);
+        b[0] = 0; s_cat(b, "asking "); s_cat(b, g_server); s_cat(b, " for a join code");
+        plog(p, b);
+    } else {
+        b[0] = 0;
+        s_cat(b, g_server[0] ? "The online server cannot be found: " : "No online server is set (Server= in Online.ini)");
+        s_cat(b, g_server);
+        s_cat(b, ". Players can join by address.");
+        plog(p, b);
+        notice(CHAT_GAME, b, 0);
+    }
 
     m.size = sizeof m; m.id = p->self; m.ctx = pctx;
     deliver(p, DPN_MSGID_CREATE_PLAYER, &m);
@@ -1586,6 +1942,13 @@ static HRESULT __stdcall n_Close(void *self, DWORD flags)
         p->thread = 0;
     }
     EnterCriticalSection(&p->cs);
+    if (p->sv_state && p->sock != INVALID_SOCKET) {
+        BYTE r[16];
+        int  m = hdr(r, SV_BYE);
+        put32(r + m, p->sv_token);
+        to_server(p, r, m + 4);
+        to_server(p, r, m + 4);
+    }
     k = hdr(bye, P_BYE);
     for (i = 0; i < MAX_CONNS; i++)
         if (p->conns[i].used && p->sock != INVALID_SOCKET) {
@@ -1607,7 +1970,10 @@ static HRESULT __stdcall n_Close(void *self, DWORD flags)
         plog(p, b);
     }
     en = p->en_on; cn = p->cn_on;
+    if (p->sv_state) notice_unstick();
     p->role = ROLE_NONE; p->en_on = 0; p->cn_on = 0; p->bound = 0;
+    p->sv_state = 0; p->jn_state = 0;
+    mzero(p->punch, sizeof p->punch);
     LeaveCriticalSection(&p->cs);
     /* what is still pending completes as cancelled, before any DESTROY_PLAYER:
      * the game frees its search on this message (without it, quitting crashed) */

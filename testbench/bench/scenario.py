@@ -373,6 +373,39 @@ def s_type_address(c, m):
     return f'typed {addr}'
 
 
+@step(r'^type what follows ' + Q.format('text') + r' in ' + Q.format('log') +
+      r'(?: of (?:the )?(?P<player>\w+))?$')
+def s_type_from_log(c, m):
+    """The word after TEXT in a log, from its last line that has it: how one player's
+    game types what another's was given (a join code). Waits up to 30 s for it."""
+    sess = c.sess
+    if m.group('player'):
+        sess = c.sessions.get(m.group('player').lower())
+        if not sess:
+            raise StepFailed(f'no player called {m.group("player")}')
+    text, name = m.group('text'), m.group('log')
+    found = {}
+
+    def look():
+        body = sess.game_log(name) or ''
+        for line in reversed(body.splitlines()):
+            i = line.lower().find(text.lower())
+            if i >= 0:
+                rest = line[i + len(text):].split()
+                if rest:
+                    found['word'] = rest[0].rstrip(',.;:')
+                    return True
+        return False
+
+    deadline = time.time() + 30
+    while not look():
+        if time.time() > deadline:
+            raise StepFailed(f'"{text}" not in {name} after 30 s')
+        time.sleep(0.5)
+    c.sess.type(found['word'])
+    return f'typed {found["word"]}'
+
+
 # -- evidence
 
 @step(r'^(?:take a )?screenshot(?: (?:called|named|as))?(?: ' + Q.format('name') + r')?$|'

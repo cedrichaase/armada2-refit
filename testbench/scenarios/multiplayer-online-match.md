@@ -13,4 +13,6 @@ nothing but `Online.asi`. The joiner types this machine's address. The flow is
 `multiplayer-two-players.md`'s, and the logs checked at the end are the transport's
 own lines in `Online.log`.
 
-1. Include "_online-match".
+1. Include "_online-setup".
+2. Joiner: Type this machine's address.
+3. Include "_online-play".

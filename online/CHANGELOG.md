@@ -4,6 +4,21 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.4.0 — 2026-10-03
+
+### Added
+- Join codes, hole punching and a relay, through `server/a2online-server.py` (new: the
+  rendezvous and relay server, Python standard library only, with `selftest.py`). A host
+  gets a code, shown in GAME SETUP's chat; a joiner types it where an address went. Key
+  `Server=host:port` in `Online.ini` (empty by default: join by address as before), and
+  `Direct=0` (testing: relay everything).
+- Lines in the game's chat boxes for the join code and for a code or server not found:
+  two more checked call sites, the `Chat::Init` calls of the Internet Game screen and
+  GAME SETUP.
+- `bench-asi.sh --server` (a local server for the bench) and `--relay` (`Direct=0`).
+
+Installed, not yet seen in game.
+
 ## 0.3.0 — 2026-10-03
 
 ### Added

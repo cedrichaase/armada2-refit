@@ -40,7 +40,7 @@ it bundles.
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
-| `online/` | `Online.asi` — online multiplayer, in progress: the *Internet – Online* menu entry and our own `IDirectPlay8Peer` over UDP (`peer.c`); no server yet. Not in `./install` or `a2mod` yet | `online/README.md` |
+| `online/` | `Online.asi` — online multiplayer, in progress: the *Internet – Online* menu entry, our own `IDirectPlay8Peer` over UDP (`peer.c`), and `server/a2online-server.py` for join codes, hole punching and the relay; no public instance yet. Not in `./install` or `a2mod` yet | `online/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
@@ -648,6 +648,14 @@ both; **never ship one without the other.**
   reporting DirectPlay's 1.5 s enum interval (the game ages its game list by it). Every
   vtable slot needs its exact argument count (`__stdcall`). After any change run
   `./a2test run multiplayer-online-match` and `multiplayer-online-loss` (10% loss).
+- **The server's peers are addresses too.** A relayed peer is `0.x.y.z` port 1 (its
+  server id), so the game and the rest of `peer.c` treat it as any address; `raw_send`
+  is the one place that wraps it for the server. Server changes: run
+  `online/server/selftest.py`, then `./a2test run multiplayer-online-code
+  multiplayer-online-relay` (direct path; relay with 5% loss).
+- **Messages to the player go in the game's chat boxes** (`notice()` in `online.c`),
+  never in a window of our own; a line waits for its screen's `Chat::Init`, which empties
+  the box.
 
 ### cutscenes
 

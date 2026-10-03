@@ -12,5 +12,7 @@ clone's `Online.ini` drops one datagram in ten that each game sends, acknowledge
 and retransmissions included, and the match has to play on regardless. The last check
 reads the transport's closing line for its resend count.
 
-1. Include "_online-match".
-2. Expect "Online.log" contains "dropped on purpose".
+1. Include "_online-setup".
+2. Joiner: Type this machine's address.
+3. Include "_online-play".
+4. Expect "Online.log" contains "dropped on purpose".

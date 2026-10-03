@@ -6,11 +6,14 @@ does not work at all. This layer replaces DirectPlay with a transport of our own
 find each other through a small rendezvous server, connect directly where their routers
 allow it, and fall back to a relay where they do not.
 
-**State:** milestone 1 of the plan below. *Internet – Online* on the Multiplayer
-Connection screen runs the game on `Online.asi`'s own transport, over UDP: host, join by
-address, and play, under Proton without Microsoft's DirectPlay. There is no server yet,
-so the host has to be reachable as on a LAN. Every other connection type keeps the
-game's DirectPlay, traced but unchanged. `./install` does not install it yet.
+**State:** milestone 2 of the plan below. *Internet – Online* on the Multiplayer
+Connection screen runs the game on `Online.asi`'s own transport, over UDP, under Proton
+without Microsoft's DirectPlay. With a server named in `Online.ini`, the host gets a join
+code and players type it to join: directly where the routers allow it, through the
+server's relay where not. Without one, players join by address as on a LAN. The server
+is `server/a2online-server.py`; no public instance runs yet, and nothing has crossed a
+real router. Every other connection type keeps the game's DirectPlay, traced but
+unchanged. `./install` does not install it yet.
 
 ## The goal
 
@@ -141,9 +144,17 @@ own on top of the game's. LAN (TCP/IP) and Manual IP stay as they were.
 Each site is checked against the bytes it replaces, and if any differs none is patched
 (`Online.log` says so). `Entry=0` in `Online.ini` leaves the screen stock.
 
-The entry then runs the Manual IP flow (a blank field hosts, an address joins), and the
-flag makes `NetworkManager.dll` get our transport instead of DirectPlay (next section). A
-join code does not work yet: that is the server's, milestone 2.
+The entry then runs the Manual IP flow (a blank field hosts, a join code or an address
+joins), and the flag makes `NetworkManager.dll` get our transport instead of DirectPlay
+(next section).
+
+Two more call sites belong to the entry, for the server's messages to the player (below,
+"Showing the join code"). They are checked and patched with the rest:
+
+| Address | Stock | Hook | Why |
+|---|---|---|---|
+| `0x5b2ff2` | `InternetGameDlgProc`: `chatRoom.Init(GetDlgItem(...))` | `call stub_room_init` | the same call, then `on_chat_init`: a line waiting for the Internet Game screen ("No game with the join code …") goes in |
+| `0x5c5395` | `MultiplayerSetupDlgProc`: `chatGame.Init(...)` | `call stub_game_init` | the same for GAME SETUP, where the host's join code is posted again every time the screen opens |
 
 ## Our transport (milestone 1)
 
@@ -190,6 +201,80 @@ What the bench showed on the way, each now built in:
 on one machine, where nothing is ever lost. With `Loss=10` on both sides a match sent
 about 960 datagrams each way, dropped about 100, resent 65 and 92, and played on.
 
+## The server and join codes (milestone 2)
+
+`server/a2online-server.py` is the rendezvous and relay server: one UDP port (2399), Python
+3.8 and its standard library, nothing on disk. `Server=host:port` in `Online.ini` names
+it. The client speaks to it from the game's own socket, so the address the server sees
+for a player is that player's NAT mapping for the socket the game talks on, which is
+what the other player needs. The messages are `SV_*` in `peer.c` and the server, after
+the same `A2O` header as the rest of the protocol:
+
+- **Hosting.** `Host` sends `SV_HOST` with a random token and the host's LAN address,
+  and again every 10 s. The server answers `SV_HOSTED` with a join code, the public
+  address it sees, and an id for the relay. The token keeps the code if the host's
+  router gives it a new port. A code is six characters from 31 that cannot be misread
+  (no I, L, O, 0, 1), shown as `K7M-Q2X`; a host silent for 40 s, or its `SV_BYE` from
+  `Close`, frees it.
+- **Joining.** A join code typed into the address field reaches `EnumHosts` as the
+  address's `hostname`; six code characters (any case, dashes ignored) are taken as a
+  code, anything else as an address as before. `SV_JOIN` gets `SV_PEER` back with the
+  host's public and LAN address, and the host gets `SV_INTRO` with the joiner's, plus a
+  shared pair token. An unknown code gets `SV_NOTFOUND`.
+- **The direct path.** For 2.5 s both send `P_PUNCH` probes to every address they have
+  for the other, every 200 ms, and answer the probes that arrive. Each side's probes
+  open its own router to the other's, so where routers keep one public port per socket
+  (most home routers) the probes meet. The joiner takes the first address an *answer*
+  comes from, a round trip that proves both directions. It also probes back any address
+  a probe arrived from, which covers a host whose router picked a new port. Two players
+  behind the same router reach each other on their LAN addresses.
+- **The relay.** With no answer after 2.5 s, the joiner goes through the server.
+  `SV_RELAY [to id][datagram]` arrives at the other side as `SV_RELAYED [from id]
+  [datagram]`. The peer there is the address `0.x.y.z`, port 1, where `x.y.z` is its id.
+  No real datagram comes from `0.0.0.0/8`, and DirectPlay's address objects carry it
+  like any other address, so the game hands it back to `Connect`. Everything above the
+  socket, connections, retransmission and the game's messages, works on it unchanged.
+  The server relays only between a pair it introduced, at most 128 KB/s per player,
+  from the source address of the datagram, never from an address the sender claims.
+- **After that** the server is out of the game, except as the relay: the transport is
+  milestone 1's.
+
+`Direct=0` makes both sides skip the probes and relay everything: the bench's only way
+to exercise the relay, since on one machine every probe arrives.
+
+### Showing the join code
+
+The host needs to see the code to pass it on, and the game shows its own
+"Local IP Address" as a line in the Internet Game screen's chat box (`chatRoom`), via
+`Chat::Append(&chatRoom, "%s", …)`. So the plugin puts its messages in the same place:
+"Join code: K7M-Q2X" in GAME SETUP's chat (`chatGame`), where the host waits for
+players; "No game with the join code …" or "The online server … does not answer" in
+the Internet Game screen's. `Chat::Init` empties a chat box as its screen opens, so a
+line is added at once only while that box's window exists (`IsWindow` on the window
+`Init` was given), and otherwise waits for that screen's `Init` (the two call sites in
+the table above). The host's code is posted again on every `Init` of GAME SETUP until
+the session closes, so it is back after a match. A line from the network thread is
+added outside our lock, where the game adds its own players' chat lines.
+
+### Running a server
+
+    python3 online/server/a2online-server.py --port 2399     # UDP 2399 open to the internet
+
+It logs one line per game, join and relay to standard output. It keeps everything in
+memory, so a restart loses only the codes of games not yet joined. Hosts re-register
+within 10 s and get a new code. Limits per source address: 8 hosted games, 64 sockets,
+128 KB/s of relay per socket. `selftest.py` beside it runs it on a free port and plays a
+host and a joiner against it.
+
+### Not yet established
+
+- **Real routers.** On the bench every game is on one machine, so the probes always
+  get through and the relay is only reached with `Direct=0`. Which routers the direct
+  path beats, and how often the relay is needed, can only be learnt from players on
+  two real networks.
+- **The public instance.** `Server=` is empty by default: no server is run by the
+  project yet.
+
 ## The plan
 
 1. ~~Does multiplayer work under Proton?~~ No (above).
@@ -205,7 +290,10 @@ about 960 datagrams each way, dropped about 100, resent 65 and 92, and played on
 5. ~~Milestone 1:~~ our `IDirectPlay8Peer` over plain UDP (above).
    `./a2test run multiplayer-online-match` plays a whole 2-player match on it under plain
    Proton, and `multiplayer-online-loss` the same with 10% of datagrams dropped.
-6. **Milestone 2:** the server, hole punching, relay fallback and join codes.
+6. ~~Milestone 2:~~ the server, hole punching, relay fallback and join codes (above).
+   `./a2test run multiplayer-online-code` joins by code over the direct path,
+   `multiplayer-online-relay` through the relay with 5% loss. Still to do: a public
+   instance, and the first games across real routers.
 7. **Milestone 3:** the server-backed game list. **Milestone 4:** voice, if anyone wants it.
 
 ## Running the trace
@@ -217,7 +305,12 @@ sha256) and installs the DLLs into a **clone's** prefix, never the real one.
 
 Our own transport needs none of this: `online/bench-asi.sh` (a scenario's `Setup:`)
 puts only `Online.asi` into a clone, and `multiplayer-online-match` and
-`multiplayer-online-loss` run on it.
+`multiplayer-online-loss` run on it. With `--server` it also starts a server on
+127.0.0.1:23990 for every game on the machine (the first set-up starts it, and it exits
+90 s after the last datagram), and `--relay` sets `Direct=0` as well;
+`multiplayer-online-code` and `multiplayer-online-relay` use them. The joiner types the
+code it reads from the host's `Online.log` (the step `Type what follows "join code" in
+"Online.log" of host`).
 
 The reference, unattended, as a scenario (`testbench/scenarios/multiplayer-two-players.md`,
 whose `Setup:` runs `reference-dplay.sh` on each clone):

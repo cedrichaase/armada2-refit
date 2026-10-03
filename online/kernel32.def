@@ -17,3 +17,4 @@ CreateThread@24
 WaitForSingleObject@8
 CloseHandle@4
 HeapFree@12
+GetPrivateProfileStringA@24

@@ -12,3 +12,4 @@ setsockopt@20
 getsockname@12
 gethostbyname@4
 WSAGetLastError@0
+connect@12

@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.6.0 — 2026-10-03
+
+### Added
+- Step `Type what follows "TEXT" in "LOG" of PLAYER`: the word after TEXT in a log
+  of that player's game (a join code), typed into this one's.
+- `scenarios/multiplayer-online-code.md` (joining by join code, direct path) and
+  `multiplayer-online-relay.md` (the same through the server's relay, 5% loss); the
+  match fragment is now `_online-setup.md` + `_online-play.md`, with the joiner's typing
+  step between them.
+- `OnlineServer.log` is collected with the other logs.
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.5.0 — 2026-10-03
 
 ### Added
