@@ -175,6 +175,9 @@ nothing:
 | [`publish/`](publish/README.md) | what this repository may contain, and the check that enforces it |
 | [`online/`](online/README.md) | online multiplayer without port forwarding, in progress: `Online.asi` adds *Internet – Online*, which runs the game on its own UDP transport, with join codes, hole punching and a relay through a self-hostable server (`online/server/`; the public one is `c20e.de`); not part of `./install` |
 
+Gameplay changes not yet built (hotkeys, control groups, production queues, pan speed)
+are collected in [`IDEAS.md`](IDEAS.md).
+
 ## Entry points
 
     ./install                               install every layer
