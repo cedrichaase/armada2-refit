@@ -5,56 +5,56 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 8.7.0 — 2026-10-03
+## 8.8.0 — 2026-10-03
 
-Layers: online 0.4.0, testbench 2.6.0.
+Layers: online 0.4.0, testbench 2.7.0.
 
 ### Added
 - Online multiplayer, milestone 2: join codes, hole punching and a relay through a
   self-hostable server, `online/server/a2online-server.py` (online 0.4.0). No public
   instance yet: `Server=` in `Online.ini` is empty by default. Bench scenarios for
-  joining by code, directly and through the relay (testbench 2.6.0). `Online.asi` is
+  joining by code, directly and through the relay (testbench 2.7.0). `Online.asi` is
   still not part of `./install` (2f2255a).
 
 Installed, not yet seen in game.
 
-## 8.6.0 — 2026-10-03
+## 8.7.0 — 2026-10-03
 
-Layers: online 0.3.0, testbench 2.5.0.
+Layers: online 0.3.0, testbench 2.6.0.
 
 ### Added
 - Online multiplayer, milestone 1: *Internet – Online* runs the game on `Online.asi`'s
   own UDP transport instead of DirectPlay, so hosting and joining work under Proton
   without Microsoft's DLLs (online 0.3.0). No server yet: the host must be reachable as
   on a LAN. Bench scenarios for a whole match, with and without packet loss (testbench
-  2.5.0). `Online.asi` is still not part of `./install` (6cbeed9).
+  2.6.0). `Online.asi` is still not part of `./install` (6cbeed9).
+
+Installed, not yet seen in game.
+
+## 8.6.0 — 2026-10-03
+
+Layers: online 0.2.0, testbench 2.5.0.
+
+### Added
+- *Internet – Online* on the Multiplayer Connection screen, in place of the IPX button
+  that cannot work today; it connects as Manual IP until the transport exists (online
+  0.2.0), with a bench scenario (testbench 2.5.0). `Online.asi` is still not part of
+  `./install` (fd40da4).
 
 Installed, not yet seen in game.
 
 ## 8.5.0 — 2026-10-03
 
-Layers: online 0.2.0, testbench 2.4.0.
-
-### Added
-- *Internet – Online* on the Multiplayer Connection screen, in place of the IPX button
-  that cannot work today; it connects as Manual IP until the transport exists (online
-  0.2.0), with a bench scenario (testbench 2.4.0). `Online.asi` is still not part of
-  `./install` (fd40da4).
-
-Installed, not yet seen in game.
-
-## 8.4.0 — 2026-10-03
-
-Layers: testbench 2.3.0.
+Layers: testbench 2.4.0.
 
 ### Added
 - Bench scenarios with several games (`Players:`, `Setup:`), and
   `multiplayer-two-players.md`, which hosts, joins and plays a match unattended
-  (testbench 2.3.0, 245d1f6).
+  (testbench 2.4.0, 245d1f6).
 
 Installs nothing; no game-side change to confirm.
 
-## 8.3.0 — 2026-10-03
+## 8.4.0 — 2026-10-03
 
 Layers: online 0.1.0.
 
@@ -64,6 +64,14 @@ Layers: online 0.1.0.
   trace against (online 0.1.0, 14867b0). Not part of `./install` or `a2mod` yet.
 
 Installed, not yet seen in game.
+
+## 8.3.0 — 2026-10-03
+
+Layers: testbench 2.3.0.
+
+### Added
+- `./a2test watch`: every live bench session, view-only, tiled in one window
+  (testbench 2.3.0).
 
 ## 8.2.0 — 2026-10-02
 

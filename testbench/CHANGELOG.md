@@ -5,7 +5,7 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 2.6.0 — 2026-10-03
+## 2.7.0 — 2026-10-03
 
 ### Added
 - Step `Type what follows "TEXT" in "LOG" of PLAYER`: the word after TEXT in a log
@@ -18,7 +18,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 Installs nothing; no game-side change to confirm.
 
-## 2.5.0 — 2026-10-03
+## 2.6.0 — 2026-10-03
 
 ### Added
 - `scenarios/multiplayer-online-match.md`: host, join, chat and a match through
@@ -28,7 +28,7 @@ Installs nothing; no game-side change to confirm.
 
 Installs nothing; no game-side change to confirm.
 
-## 2.4.0 — 2026-10-03
+## 2.5.0 — 2026-10-03
 
 ### Added
 - `scenarios/multiplayer-online-entry.md`: both players host and join through
@@ -36,7 +36,7 @@ Installs nothing; no game-side change to confirm.
 
 Installs nothing; no game-side change to confirm.
 
-## 2.3.0 — 2026-10-03
+## 2.4.0 — 2026-10-03
 
 ### Added
 - Scenario headers `Players:` (one game per player, steps prefixed with the player's
@@ -45,6 +45,15 @@ Installs nothing; no game-side change to confirm.
 - `scenarios/multiplayer-two-players.md`: host, join, chat both ways and a 2-player
   match over TCP/IP, with Microsoft's DirectPlay and `Online.asi` in each clone.
 - The game's `Online.log` and `Online.ini` are gathered with the other logs.
+
+Installs nothing; no game-side change to confirm.
+
+## 2.3.0 — 2026-10-03
+
+### Added
+- `a2test watch`: every live session, view-only, tiled in one Chromium window. The watcher
+  starts its own `wayvnc` per session and bridges noVNC's WebSockets to them. Sessions
+  come and go on their own. Options `--no-open` and `--port`, and `A2TEST_WATCH_PORT`.
 
 Installs nothing; no game-side change to confirm.
 

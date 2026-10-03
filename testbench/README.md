@@ -7,6 +7,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test run main-menu hud font          # scenarios in testbench/scenarios/
     ./a2test run main-menu --res 16:9,21:9   # override the resolutions
     ./a2test run admirals-log --vnc          # ... and watch it (view-only VNC)
+    ./a2test watch                           # every live session, tiled in one window
     ./a2test run hud --jobs 1                # one game at a time (default: 5 at once)
     ./a2test check hud                       # how each step would run, no launch
     ./a2test list
@@ -209,18 +210,42 @@ war, the 21:9-tuned font). Add to it when it flags something known.
 
 ## Watching
 
+**`./a2test watch`** shows every live session at once, view-only, in one window, whoever
+started it and whether or not it was started with `--vnc`. For each session whose sway
+is up, it starts its own `wayvnc --disable-input --render-cursor` on a loopback port
+(so the virtual pointer is visible), and it serves a page on `127.0.0.1:5950` that tiles
+them with noVNC, choosing the column count that makes the tiles largest. It opens that
+page as a Chromium `--app` window with its own profile. Sessions that start later appear
+within two seconds, and ended ones drop out. Ctrl-C, or closing the window, stops the
+`wayvnc`s it started and nothing else: no session is touched, and input is disabled at
+the server. `--no-open` only serves the page, `--port` moves it (`A2TEST_WATCH_PORT`),
+and `?debug` on the URL turns on noVNC's console logging. Runtime files (control
+sockets, logs, the browser profile) are in `~/.cache/a2test/watch/`.
+
+Two things it works around, both measured:
+
+- **`wayvnc --websocket` segfaults on the first client** (wayvnc 0.10.1 with neatvnc
+  1.0.1: a call through a null pointer in `libneatvnc`). The watcher therefore bridges
+  each tile's WebSocket (`/ws/<session id>`) to the plain RFB port itself
+  (`bench/watch.py`, stdlib only). It answers as HTTP/1.1, because Chromium refuses an
+  upgrade answered as 1.0.
+- **noVNC's npm package is CommonJS**, and jsdelivr's `/+esm` fails to bundle it. The
+  page imports noVNC's own ES-module source (`core/rfb.js`) from jsdelivr's GitHub mirror,
+  pinned to v1.6.0. The page needs the network to load it.
+
 `--vnc` (per case) or `session start --vnc` starts a view-only `wayvnc` on the headless
 output: `vncviewer localhost:5910` (the port is printed; it counts up if busy). `--record`
-writes each case to `run.mp4` with `wf-recorder`. Both are optional and need `wayvnc`,
-`wf-recorder` and a viewer (`tigervnc`), none of which is installed here. Without them
-the bench warns and carries on.
+writes each case to `run.mp4` with `wf-recorder`. All are optional and need `wayvnc`
+(and `wf-recorder`, or a viewer such as `tigervnc`). Without them the bench warns and
+carries on, and `watch` refuses.
 
 ## Requirements
 
 `sway`, `grim`, `python-opencv` (numpy with it; its `dnn` module runs the OCR models),
 `wayland-scanner`
 and `cc` (for `a2input`), `pactl`, Heroic's Proton-CachyOS and umu, and `claude` for
-judged and agent steps. Optional: `wayvnc`, `wf-recorder`, `tigervnc`. The texture
+judged and agent steps. Optional: `wayvnc` (for `watch` and `--vnc`, with Chromium for
+`watch`), `wf-recorder`, `tigervnc`. The texture
 pipeline's "no numpy" rule is about what that pipeline may assume. The bench is
 separate and needs opencv.
 
