@@ -4,6 +4,16 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`README.md`](README.md).
 
+## 1.1.0 — 2026-10-03
+
+### Fixed
+- The one-pixel line along the top and the left of the 3D view under MSAA, which
+  collected the map grid's colour as the camera panned. After each `Present`, row 0 and
+  column 0 are refilled from their neighbours, sample for sample. New `MSAA.ini` key
+  `EdgeFill=` (default 1).
+
+Installed, not yet seen in game.
+
 ## 1.0.1 — 2026-09-27
 
 ### Changed

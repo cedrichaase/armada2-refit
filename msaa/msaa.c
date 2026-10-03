@@ -59,6 +59,31 @@
  * routes every render-target source through StretchRect first, which
  * resolves it.  If the minimap ever comes up black, this is why.
  *
+ * THE EDGE THE SCENE NEVER COVERS
+ * -------------------------------
+ * DXVK maps a D3D8/9 viewport to Vulkan shifted right and down by just under
+ * half a pixel (D3D9's pixel centres are on integers), and every primitive
+ * is clipped to it.  So the scene's coverage starts at x = y = 0.49: without
+ * MSAA the one sample of pixel 0 is at 0.5 and is covered; with it, the
+ * samples in the left half of column 0 and the top half of row 0 never are.
+ * The engine clears only depth in a mission (ClearDepthBuffer, 0x623bf0,
+ * flags 2) and lets the scene overwrite every colour pixel, so those samples
+ * keep whatever last reached them -- the map grid's lines, whose width runs
+ * past the viewport -- and the resolve shows it as a line along the top and
+ * the left that builds up as the camera pans.  No D3D8 viewport can start
+ * below 0, so the scene cannot be made to cover them.
+ *
+ * Instead, right after the frame's one Present (ST3D_DeviceDirectX8::
+ * RefreshDisplay, 0x624735) row 1 is copied onto row 0 and column 1 onto
+ * column 0, sample for sample (same sample count: DXVK's StretchRect copies
+ * rather than resolves).  Every sample the next frame covers is drawn over
+ * again; the ones it cannot cover now hold its neighbour from the frame
+ * before, which is what they would have shown.  DXVK refuses a copy within
+ * one surface, so each strip goes through a 1-pixel-thick render target,
+ * created and released within the call: nothing is held across frames, so
+ * re-creating or resetting the device is not affected.  EdgeFill=0 in
+ * MSAA.ini leaves the site alone.
+ *
  * Patched in memory only; the exe is not touched.  Each site's bytes are
  * checked against what they are in this build before anything is written,
  * so a different Armada2.exe leaves the plugin inert (and says so in the
@@ -127,12 +152,34 @@ typedef struct {
 typedef HRESULT (__stdcall *CheckMS_t)(void *self, UINT adapter, DWORD devType,
                                        DWORD fmt, BOOL windowed, DWORD msType);
 
+typedef struct { LONG left, top, right, bottom; } RECT;
+typedef struct { LONG x, y; } POINT;
+
+typedef struct {
+    DWORD Format, Type, Usage, Pool;
+    UINT  Size;
+    DWORD MultiSampleType;
+    UINT  Width, Height;
+} D3DSURFACE_DESC8;
+
+/* IDirect3DDevice8 slots 16, 25 and 28; IDirect3DSurface8 slot 8; slot 2
+ * of either is Release. */
+typedef HRESULT (__stdcall *GetBackBuffer_t)(void *dev, UINT n, DWORD type, void **out);
+typedef HRESULT (__stdcall *CreateRT_t)(void *dev, UINT w, UINT h, DWORD fmt,
+                                        DWORD ms, BOOL lockable, void **out);
+typedef HRESULT (__stdcall *CopyRects_t)(void *dev, void *src, const RECT *rects,
+                                         UINT n, void *dst, const POINT *pts);
+typedef HRESULT (__stdcall *GetDesc_t)(void *surf, D3DSURFACE_DESC8 *d);
+typedef DWORD   (__stdcall *Release_t)(void *self);
+
+#define VT(obj, slot) ((*(void ***)(obj))[slot])
+
 /* ---- addresses in this build (Armada2.exe, GOG patch 1.1) */
 
 #define ADDR_SM_PD3D        0x7ab870    /* ST3D_DeviceDirectX8::sm_pD3D */
 #define ADDR_GETWINDOW      0x62bc70    /* ST3D_GraphicsEngine::GetWindowHandle */
 
-typedef struct { DWORD at; int len; BYTE sig[16]; } Site;
+typedef struct { DWORD at; int len; BYTE sig[24]; } Site;
 
 /* The call is the last 5 bytes of each signature; the bytes before it pin
  * down that edi really is the present-parameters pointer at that point. */
@@ -144,6 +191,15 @@ static const Site k_sites[2] = {
     { 0x6237f7, 13, { 0x8B, 0x0D, 0x08, 0xD5, 0x7A, 0x00, 0x57, 0x52,
                       0xE8, 0x6C, 0x84, 0x00, 0x00 } },
 };
+
+/* RefreshDisplay's Present: mov edx,[eax]; push 0 x4; push eax;
+ * call [edx+0x3c]; inc dword [esi+0xa4].  The last 9 bytes (the call and the
+ * frame counter) become a jmp to present_stub and four NOPs. */
+static const Site k_present = {
+    0x62472a, 20, { 0x8B, 0x10, 0x6A, 0x00, 0x6A, 0x00, 0x6A, 0x00, 0x6A, 0x00,
+                    0x50, 0xFF, 0x52, 0x3C, 0xFF, 0x86, 0xA4, 0x00, 0x00, 0x00 } };
+#define PRESENT_PATCH_LEN 9
+DWORD g_presentBack = 0x62473e;     /* after the inc: pop esi; ...; ret */
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -269,6 +325,113 @@ __attribute__((naked)) void msaa_stub(void)
         "jmp *_g_getWindow\n\t");
 }
 
+/* ---- the edge fill, after Present -------------------------------------- */
+
+static int g_edgeFill = 1;
+
+/* Copy one strip of the back buffer onto its neighbour through a temporary
+ * render target of the strip's size.  Returns the failing HRESULT, or 0. */
+static HRESULT copy_strip(void *dev, void *bb, const D3DSURFACE_DESC8 *d,
+                          UINT w, UINT h, LONG fromX, LONG fromY)
+{
+    void   *tmp = NULLPTR;
+    RECT    r;
+    POINT   p = { 0, 0 };
+    HRESULT hr;
+
+    hr = ((CreateRT_t)VT(dev, 25))(dev, w, h, d->Format, d->MultiSampleType, FALSE, &tmp);
+    if (hr < 0 || !tmp) return hr < 0 ? hr : -1;
+
+    r.left = fromX; r.top = fromY; r.right = fromX + (LONG)w; r.bottom = fromY + (LONG)h;
+    hr = ((CopyRects_t)VT(dev, 28))(dev, bb, &r, 1, tmp, &p);
+    if (hr >= 0) {
+        r.left = 0; r.top = 0; r.right = (LONG)w; r.bottom = (LONG)h;
+        hr = ((CopyRects_t)VT(dev, 28))(dev, tmp, &r, 1, bb, &p);
+    }
+    ((Release_t)VT(tmp, 2))(tmp);
+    return hr;
+}
+
+/* Called from present_stub with the engine (ST3D_DeviceDirectX8) after its
+ * Present.  Anything unexpected does nothing, and is logged once. */
+void __cdecl edge_fill(void *engine)
+{
+    static int said_ok, said_fail;
+    void            *dev, *bb = NULLPTR;
+    D3DSURFACE_DESC8 d;
+    HRESULT          hr;
+    char             m[160];
+
+    dev = engine ? *(void **)((BYTE *)engine + 0x90) : NULLPTR;
+    if (!dev) return;
+    if (((GetBackBuffer_t)VT(dev, 16))(dev, 0, 0, &bb) < 0 || !bb) return;
+
+    hr = ((GetDesc_t)VT(bb, 8))(bb, &d);
+    if (hr >= 0 && d.MultiSampleType >= 2 && d.Width > 1 && d.Height > 1) {
+        hr = copy_strip(dev, bb, &d, d.Width, 1, 0, 1);          /* row 1 -> row 0 */
+        if (hr >= 0)
+            hr = copy_strip(dev, bb, &d, 1, d.Height, 1, 0);     /* col 1 -> col 0 */
+
+        m[0] = 0;
+        if (hr >= 0 && !said_ok) {
+            said_ok = 1;
+            s_cat(m, "edge fill: row 0 and column 0 of ");
+            s_num(m, (long)d.Width); s_cat(m, "x"); s_num(m, (long)d.Height);
+            s_cat(m, " at "); s_num(m, (long)d.MultiSampleType);
+            s_cat(m, "x, after each Present");
+        } else if (hr < 0 && !said_fail) {
+            said_fail = 1;
+            s_cat(m, "edge fill FAILED, hr "); s_hex(m, (DWORD)hr);
+        }
+        if (m[0]) logline(m);
+    }
+    ((Release_t)VT(bb, 2))(bb);
+}
+
+/* Stands in for RefreshDisplay's `call [edx+0x3c]; inc dword [esi+0xa4]`,
+ * reached by jmp with Present's five arguments already pushed.  Present is
+ * __stdcall and pops them; the engine reads nothing it leaves in a register
+ * before its own `ret`, but every register is kept anyway. */
+__attribute__((naked)) void present_stub(void)
+{
+    __asm__ __volatile__(
+        "call *0x3c(%edx)\n\t"
+        "pushal\n\t"
+        "pushfl\n\t"
+        "pushl %esi\n\t"            /* the engine */
+        "call _edge_fill\n\t"
+        "addl $4, %esp\n\t"
+        "popfl\n\t"
+        "popal\n\t"
+        "incl 0xa4(%esi)\n\t"
+        "jmp *_g_presentBack\n\t");
+}
+
+static int patch_present(void)
+{
+    const BYTE *p = (const BYTE *)k_present.at;
+    BYTE  *at = (BYTE *)k_present.at + k_present.len - PRESENT_PATCH_LEN;
+    DWORD  old;
+    int    k;
+
+    for (k = 0; k < k_present.len; k++)
+        if (p[k] != k_present.sig[k]) {
+            char m[128];
+            m[0] = 0;
+            s_cat(m, "Present site holds");
+            for (k = 0; k < k_present.len; k += 4) { s_cat(m, " "); s_hex(m, *(const DWORD *)(p + k)); }
+            logline(m);
+            return 0;
+        }
+    if (!VirtualProtect(at, PRESENT_PATCH_LEN, PAGE_EXECUTE_READWRITE, &old)) return 0;
+    at[0] = 0xE9;
+    *(DWORD *)(at + 1) = (DWORD)present_stub - (DWORD)(at + 5);
+    for (k = 5; k < PRESENT_PATCH_LEN; k++) at[k] = 0x90;
+    VirtualProtect(at, PRESENT_PATCH_LEN, old, &old);
+    FlushInstructionCache(GetCurrentProcess(), at, PRESENT_PATCH_LEN);
+    return 1;
+}
+
 static int patch_sites(void)
 {
     int i, k, ok = 0;
@@ -317,6 +480,7 @@ static void startup(void)
     build_paths(ini);
     g_samples = (int)GetPrivateProfileIntA("MSAA", "Samples", 8, ini);
     g_logging = (int)GetPrivateProfileIntA("MSAA", "Log",     1, ini);
+    g_edgeFill = (int)GetPrivateProfileIntA("MSAA", "EdgeFill", 1, ini);
 
     b[0] = 0;
     s_cat(b, "--- MSAA samples=");
@@ -335,6 +499,10 @@ static void startup(void)
         s_cat(b, "  sites patched ");
         s_num(b, r);
         s_cat(b, "/2");
+        if (r > 0)
+            s_cat(b, !g_edgeFill ? ", edge fill off"
+                     : patch_present() ? ", edge fill on"
+                     : ", edge fill NOT PATCHED: Present site bytes differ");
     }
     logline(b);
 }

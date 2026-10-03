@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 8.11.0 — 2026-10-03
+
+Layers: msaa 1.1.0.
+
+### Fixed
+- Under MSAA, the top row and left column of the 3D view no longer collect grid lines
+  as the camera pans; new `MSAA.ini` key `EdgeFill=` (msaa 1.1.0).
+
+Installed, not yet seen in game.
+
 ## 8.10.0 — 2026-10-03
 
 Layers: testbench 2.8.0.
