@@ -904,6 +904,16 @@ base, leaving a stock base under upscaled mips. That is the same invalid chain, 
 base would leave 512px mips over a 128px base — reached by the command meant to make
 things safe.
 
+**What the guard costs.** It walks every installed texture's stock chain level by level,
+and each step needs a width. Asked of ImageMagick (~8 ms a start), the ~11,800 widths of
+a full install took about 100 s, and `basename`/`dirname`/`ls | head` for the paths
+another 30: `a2tex install` ran about 175 s, every bench session included. Widths now
+come from the TGA header (the uint16 at byte 12), all read once by one process before
+the guard runs (`preload_widths`, `img_width` in `lib/common.sh`; an overwritten file's
+entry is updated), and paths by parameter expansion. Measured on a clone, against the
+previous version from stock: 171 s → 36 s, the same output line for line and all 3,795
+files in `Textures/` byte-identical.
+
 **Use a Box filter, and no peak lift.** At exact powers of two a box filter is a pure
 area average, so it preserves the mean — and with additive blending the mean *is* the
 light contributed, so a filter that dims the small levels makes the nebula fade as the

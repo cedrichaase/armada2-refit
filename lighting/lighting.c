@@ -63,6 +63,8 @@ typedef char               *LPSTR;
 #define TRUE  1
 
 #define GENERIC_WRITE          0x40000000
+#define GENERIC_READ           0x80000000
+#define OPEN_EXISTING          3
 #define FILE_SHARE_READ        0x00000001
 #define OPEN_ALWAYS            4
 #define FILE_ATTRIBUTE_NORMAL  0x80
@@ -76,6 +78,7 @@ __declspec(dllimport) BOOL    __stdcall FlushInstructionCache(HANDLE, const void
 __declspec(dllimport) HANDLE  __stdcall GetCurrentProcess(void);
 __declspec(dllimport) HANDLE  __stdcall CreateFileA(LPCSTR, DWORD, DWORD, void *, DWORD, DWORD, HANDLE);
 __declspec(dllimport) BOOL    __stdcall WriteFile(HANDLE, const void *, DWORD, DWORD *, void *);
+__declspec(dllimport) BOOL    __stdcall ReadFile(HANDLE, void *, DWORD, DWORD *, void *);
 __declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWORD);
 __declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
@@ -92,17 +95,28 @@ int _fltused = 0;   /* floats without the CRT */
 #define FN_ENABLE_STATIC   0x6207a0   /* ST3D_Database::EnableStaticVertexBuffers(bool) */
 #define VT_DATABASE        0x6bc56c   /* ST3D_Database vtable */
 #define VT_DIRECTIONAL     0x6bc8fc   /* ST3D_Directional_Light vtable */
+#define VT_POINT           0x6bc8ac   /* ST3D_Point_Light vtable */
+#define FN_NEBULA_LIGHTS   0x4a5160   /* Nebula::Simulate_Nebula_Lights(float), thiscall */
+#define FN_OBJECT_MATRIX   0x4cfd50   /* the GameObject's Matrix34, as Simulate_Nebula_Lights gets it */
+#define FN_NEW             0x652710   /* operator new, cdecl */
+#define FN_POINT_LIGHT     0x62f240   /* ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall */
+#define VT_PLANET          0x6b2b3c   /* Planet vtable */
+#define OBJECT_LIST        0x761084   /* the game objects GameObject_PreRenderAll walks */
+#define VT_FIREBALL        0x6afbd4   /* FireballExplosion vtable */
+#define FN_FIREBALL_SIM    0x465510   /* FireballExplosion::Simulate(float), slot 14 */
+#define FN_FIREBALL_DEL    0x465910   /* its scalar deleting destructor, slot 0 */
 
 /* Each site is a `call rel32` (E8) to a known function. */
 typedef struct { DWORD at; DWORD target; } Site;
 
-enum { S_PRERENDER, S_REGISTER, S_LOGICAL, S_VISIBLE, S_COUNT };
+enum { S_PRERENDER, S_REGISTER, S_LOGICAL, S_VISIBLE, S_NEBULA, S_COUNT };
 
 static const Site k_sites[S_COUNT] = {
     { 0x598193, FN_PRERENDER_ALL },
     { 0x597f83, FN_REGISTER_LIGHT },
     { 0x4ccd66, FN_FIND_LOGICAL },
     { 0x4ccd7e, FN_FIND_VISIBLE },
+    { 0x4a4a7a, FN_NEBULA_LIGHTS },
 };
 
 typedef void  (__cdecl    *PreRenderAll_t)(void *camera);
@@ -114,10 +128,10 @@ typedef void  (__thiscall *EnableStatic_t)(void *db, BOOL on);
 
 static int   g_gpu = 1, g_lights = 1;
 static float g_key_col[3]  = { 1.00f, 0.96f, 0.90f };
-static float g_key_dir[3]  = { 0.35f, -0.80f, 0.50f };
-static float g_fill_col[3] = { 0.10f, 0.12f, 0.24f };
-static float g_fill_dir[3] = { -0.35f, 0.80f, -0.50f };
-static float g_ambient[3]  = { 0.10f, 0.10f, 0.12f };
+static float g_key_dir[3]  = { 0.50f, -0.50f, 0.71f };
+static float g_fill_col[3] = { 0.06f, 0.08f, 0.18f };
+static float g_fill_dir[3] = { -0.50f, 0.50f, -0.71f };
+static float g_ambient[3]  = { 0.05f, 0.05f, 0.07f };
 static float g_key_mat[12], g_fill_mat[12];
 
 static int g_frame_lights;      /* directional lights seen this frame */
@@ -192,11 +206,12 @@ static void logline(const char *s)
 }
 
 /* "x y z" -> three floats; leaves v alone on a malformed value */
-static void parse3(const char *s, float *v)
+/* n numbers into v; v is left alone unless all n are there */
+static void parsen(const char *s, float *v, int n)
 {
     float out[3];
     int   i = 0;
-    while (i < 3) {
+    while (i < n) {
         float sign = 1.0f, val = 0.0f, scale = 0.0f;
         int   digits = 0;
         while (*s == ' ' || *s == '\t' || *s == ',') s++;
@@ -213,14 +228,21 @@ static void parse3(const char *s, float *v)
         if (!digits) return;
         out[i++] = sign * val;
     }
-    v[0] = out[0]; v[1] = out[1]; v[2] = out[2];
+    for (i = 0; i < n; i++) v[i] = out[i];
 }
 
 static void ini3(const char *ini, const char *key, float *v)
 {
     char b[96];
     GetPrivateProfileStringA("Lighting", key, "", b, sizeof b, ini);
-    if (b[0]) parse3(b, v);
+    if (b[0]) parsen(b, v, 3);
+}
+
+static void ini1(const char *ini, const char *key, float *v)
+{
+    char b[96];
+    GetPrivateProfileStringA("Lighting", key, "", b, sizeof b, ini);
+    if (b[0]) parsen(b, v, 1);
 }
 
 /* ---- the light matrix -------------------------------------------------- */
@@ -256,10 +278,21 @@ static void light_matrix(const float *d, float *m)
 
 /* ---- the hooks --------------------------------------------------------- */
 
+static void planet_glows(void);
+
+static void sky_update(void);
+static int   g_sky_on;
+static float g_sky_col[3], g_sky_mat[12];
+
+static void explosion_lights(void);
+
 static void __cdecl hook_prerender_all(void *camera)
 {
     g_frame_lights = 0;
+    if (g_lights) sky_update();
     ((PreRenderAll_t)FN_PRERENDER_ALL)(camera);
+    planet_glows();
+    explosion_lights();
 }
 
 static void __fastcall hook_register_light(void *engine, void *edx, void *light,
@@ -284,6 +317,7 @@ static void __fastcall hook_register_light(void *engine, void *edx, void *light,
     if (g_frame_lights++ == 0) {
         reg(engine, light, g_key_col, g_key_mat);
         reg(engine, light, g_fill_col, g_fill_mat);
+        if (g_sky_on) reg(engine, light, g_sky_col, g_sky_mat);
     }
 }
 
@@ -329,16 +363,161 @@ static void reverse_lights(void *dev)
     }
 }
 
+/* Point lights. ST3D_Standard_MeshVB::PreRender (0x63e340) hands Direct3D only the
+ * directional lights in the engine's list (a light's type, at +0xf0 of its class
+ * data, must be 1), so on the vertex-buffer path a ship never saw a point light:
+ * a nebula's glow, a planet's, an explosion's. The CPU path lights with them all
+ * (ST3D_Point_Light::LightVerticesLambert): full colour out to the falloff start
+ * (+0x100 of the light), then linearly down to nothing at start + range (+0x104).
+ * For each draw the plugin takes the point lights that reach the object, weighs
+ * each by that same falloff at the object's position, and gives the strongest to
+ * Direct3D's free light slots, with the falloff folded into the colour: over a
+ * ship, small against a light's range, that is the engine's own falloff. The slots
+ * are switched off again after the draw. A mirrored draw gets none: its normals
+ * point the other way, and reversing a directional light has no point-light
+ * equivalent.
+ * That holds for a soft light, one that fades over a distance like its reach:
+ * a nebula's, a planet's, an explosion's. A torpedo's or a pulse's light is a hard
+ * sphere (Galaxy photon: full to 50, gone at 55), smaller than a ship; weighed at
+ * the ship's centre it lit a whole saucer from one end or missed it. A light whose
+ * fade is under a quarter of its start goes to Direct3D as it is instead: full
+ * colour, and Range = start + fade, so each vertex is lit by it or not, as on the
+ * CPU path; it is picked if it is within that reach plus HARD_REACH of the draw.
+ * The stock meshes' normals point inward; the engine hands Direct3D its directional
+ * lights reversed to match (the map's axis is negated in the device's light), so a
+ * point light given where it is lights the side of a hull turned away from it. A soft
+ * light is therefore given mirrored through the draw's origin, which reverses its
+ * direction there exactly and, over a ship small against its distance, nearly
+ * everywhere. A hard light cannot be mirrored (its sphere would land on the far end
+ * of the ship) and still lights the faces turned away from it.
+ * Lights of one colour count once, by the strongest: a nebula field is many nebula
+ * objects of one type, each with its own light, and summed they would paint a ship
+ * in its colour at full saturation wherever two or three reach it. */
+#define HARD_REACH 150.0f   /* how far a mesh reaches from its origin, at most */
+typedef long (__stdcall *LightEnable_t)(void *, DWORD, BOOL);
+
+static void *g_glow_vt[19];          /* a planet's light: see planet_glows */
+
+static int   g_points = 6;           /* PointLights=: at most this many per draw */
+
+typedef struct { float col[3]; float pos[3]; float src[3]; float score, range; } Pick;
+
+/* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
+ * distance d: 1 straight under the sun, 1/2 over the terminator, 0 over the night
+ * side. */
+static float glow_phase(float dx, float dy, float dz, float d)
+{
+    float n = sqrt_f(g_key_dir[0] * g_key_dir[0] + g_key_dir[1] * g_key_dir[1] + g_key_dir[2] * g_key_dir[2]);
+    if (d < 1e-3f || n < 1e-6f) return 1.0f;
+    return 0.5f - 0.5f * (dx * g_key_dir[0] + dy * g_key_dir[1] + dz * g_key_dir[2]) / (d * n);
+}
+
+static int pick_points(const float *at, Pick *out, int max)
+{
+    DWORD eng = *(DWORD *)0x7ad508, head, node;
+    int n = 0, i, j;
+    if (!eng || max <= 0) return 0;
+    head = *(DWORD *)(eng + 0x60);
+    for (node = *(DWORD *)head; node != head; node = *(DWORD *)node) {
+        BYTE *inst  = *(BYTE **)(node + 8);
+        BYTE *light = *(BYTE **)inst;
+        const float *col = (const float *)(inst + 4);
+        const float *pos = (const float *)(inst + 0x10) + 9;
+        float start, range, dx, dy, dz, d, f, peak, score;
+        int   hard;
+        DWORD vt;
+        if (!light) continue;
+        vt = *(DWORD *)light;
+        if (vt != VT_POINT && vt != (DWORD)g_glow_vt) continue;
+        start = *(float *)(light + 0x100);
+        range = *(float *)(light + 0x104);
+        dx = at[0] - pos[0]; dy = at[1] - pos[1]; dz = at[2] - pos[2];
+        d = sqrt_f(dx * dx + dy * dy + dz * dz);
+        peak = col[0] > col[1] ? col[0] : col[1];
+        if (col[2] > peak) peak = col[2];
+        hard = range < 0.25f * start;
+        if (hard) {
+            float reach = start + range + HARD_REACH;
+            if (d >= reach) continue;
+            f = 1.0f;
+            score = peak * (1.0f - d / reach);
+        } else {
+            if (d >= start + range) continue;
+            f = d <= start ? 1.0f : 1.0f - (d - start) / range;
+            if (vt == (DWORD)g_glow_vt) f *= glow_phase(dx, dy, dz, d);
+            score = f * peak;
+        }
+        if (score < 0.004f) continue;
+        /* one of a colour already picked: keep the stronger */
+        for (i = 0; i < n; i++)
+            if (out[i].src[0] == col[0] && out[i].src[1] == col[1] && out[i].src[2] == col[2])
+                break;
+        if (i < n) {
+            if (out[i].score >= score) continue;
+            for (n--; i < n; i++) out[i] = out[i + 1];
+        }
+        /* insertion into the strongest-first list */
+        for (i = 0; i < n && out[i].score >= score; i++) ;
+        if (i >= max) continue;
+        if (n < max) n++;
+        for (j = n - 1; j > i; j--) out[j] = out[j - 1];
+        out[i].col[0] = col[0] * f; out[i].col[1] = col[1] * f; out[i].col[2] = col[2] * f;
+        out[i].pos[0] = pos[0]; out[i].pos[1] = pos[1]; out[i].pos[2] = pos[2];
+        out[i].src[0] = col[0]; out[i].src[1] = col[1]; out[i].src[2] = col[2];
+        out[i].score = score;
+        out[i].range = hard ? start + range : 100000.0f;
+    }
+    return n;
+}
+
+static int add_points(void *dev, const float *at, DWORD *slots)
+{
+    void **vt = *(void ***)dev;
+    Pick   pk[8];
+    int    n = pick_points(at, pk, g_points > 6 ? 6 : g_points), k = 0, i;
+    DWORD  slot = 0;
+    for (i = 0; i < n; i++) {
+        LIGHT8 l;
+        BOOL   on = 1;
+        while (slot < 8 && ((GetLightEnable_t)vt[47])(dev, slot, &on) >= 0 && on) slot++;
+        if (slot >= 8) break;
+        {
+            BYTE *b = (BYTE *)&l; unsigned z;
+            for (z = 0; z < sizeof l; z++) b[z] = 0;
+        }
+        l.Type = 1;                                   /* D3DLIGHT_POINT */
+        l.Diffuse.r = pk[i].col[0]; l.Diffuse.g = pk[i].col[1]; l.Diffuse.b = pk[i].col[2];
+        l.Diffuse.a = 1.0f;
+        if (pk[i].range >= 100000.0f) {             /* soft: mirrored through the draw */
+            l.Position[0] = 2.0f * at[0] - pk[i].pos[0];
+            l.Position[1] = 2.0f * at[1] - pk[i].pos[1];
+            l.Position[2] = 2.0f * at[2] - pk[i].pos[2];
+        } else {
+            l.Position[0] = pk[i].pos[0]; l.Position[1] = pk[i].pos[1]; l.Position[2] = pk[i].pos[2];
+        }
+        l.Range = pk[i].range;
+        l.Att0  = 1.0f;
+        ((SetLight_t)vt[44])(dev, slot, &l);
+        ((LightEnable_t)vt[46])(dev, slot, TRUE);
+        slots[k++] = slot++;
+    }
+    return k;
+}
+
 static void __fastcall hook_vb_render(void *self, void *edx, int group, void *lm, void *tm, void *tex)
 {
     const float *m = (const float *)CURRENT_MATRIX;
     float det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) +
                 m[2] * (m[3] * m[7] - m[4] * m[6]);
     void *dev = g_dev;
+    DWORD slots[8];
+    int   k = 0, i;
     (void)edx;
-    if (det < 0 && dev) reverse_lights(dev);
+    if (det < 0 && dev && g_fix_mirrored) reverse_lights(dev);
+    else if (dev && g_points > 0) k = add_points(dev, m + 9, slots);
     g_vb_render(self, group, lm, tm, tex);
-    if (det < 0 && dev) reverse_lights(dev);
+    for (i = 0; i < k; i++) ((LightEnable_t)(*(void ***)dev)[46])(dev, slots[i], 0);
+    if (det < 0 && dev && g_fix_mirrored) reverse_lights(dev);
 }
 
 static int patch_vb_render(void)
@@ -437,6 +616,435 @@ static int patch_set_material(void)
     return 1;
 }
 
+/* Nebulae. Every nebula already carries a point light (Nebula::InitializeGeometry,
+ * at +0x1ac), which Nebula::Simulate registers each tick through
+ * Simulate_Nebula_Lights while the nebula is on screen. Stock gives it the class's
+ * glow colour (red_glow.. at +0x22c of the NebulaClass) swung by a noise term,
+ * and the class's falloff (glow_falloff_start/range, +0x244/+0x248: 60 and 60 on
+ * every stock nebula). On the bench its colour came out black frame after frame.
+ * The plugin registers it in place of that: the glow colour times
+ * NebulaBrightness, steady, with the falloff times NebulaRange. */
+static float g_neb_bright = 2.0f, g_neb_range = 8.0f;
+static int   g_nebulae = 1;
+
+static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
+{
+    typedef float *(__thiscall *Matrix_t)(void *);
+    BYTE  *light = *(BYTE **)(neb + 0x1ac);
+    BYTE  *cls   = *(BYTE **)(neb + 0x40);
+    float  col[3];
+    float *mat;
+    (void)edx; (void)dt;
+    if (!light || !cls) return;
+    col[0] = *(float *)(cls + 0x22c) * g_neb_bright;
+    col[1] = *(float *)(cls + 0x230) * g_neb_bright;
+    col[2] = *(float *)(cls + 0x234) * g_neb_bright;
+    *(float *)(light + 0x100) = *(float *)(cls + 0x244) * g_neb_range;
+    *(float *)(light + 0x104) = *(float *)(cls + 0x248) * g_neb_range;
+    mat = ((Matrix_t)FN_OBJECT_MATRIX)(neb);
+    ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, light, col, mat);
+}
+
+/* Planets. A planet in sunlight lights what is near its day side, in the colour
+ * of its ground. Each frame, after GameObject_PreRenderAll, the plugin walks the
+ * same object list (0x761084) for planets and registers a point light for each
+ * at its centre (its position from the Entity's transform, +0x44, and its radius
+ * from the bounding sphere, +0x34, whose centre is in object space), coloured by
+ * the Key light times the mean colour of the planet's ground texture times
+ * PlanetGlow, full at the surface and gone at PlanetGlowRange radii.
+ * pick_points scales it per draw by how much of the day side faces the draw
+ * (glow_phase): a ship over the night side gets none. At the point under the sun,
+ * as it once was, the light came from where the Key does and was lost in it.
+ * The ground texture is the class's groundTextureName (PlanetClass +0x4bc) with 1 and 2 appended, one per
+ * hemisphere, else the name alone, else atmosphereTextureName (+0x4ac); the
+ * mean counts only lit texels, because the class planets' gore unwrap leaves
+ * black between the lobes. It is read from Textures/RGB once per name, so it is
+ * whatever art is installed.
+ * The light is an ST3D_Point_Light built as Nebula::InitializeGeometry builds its
+ * own, with a copy of the class's vtable whose four LightVertices methods (slots
+ * 13 to 16, the CPU path's) do nothing: in the engine's list it reaches the
+ * vertex-buffer draws through pick_points, and not the CPU-lit planets and moons,
+ * the planet itself among them, which it would otherwise light from inside. */
+typedef struct { char name[16]; float col[3]; } GlowTex;
+typedef struct { void *planet; BYTE *light; DWORD seen; } GlowLight;
+
+static float     g_glow = 1.5f, g_glow_range = 6.0f;
+static int       g_planet_glow = 1;
+static char      g_texdir[320];
+static GlowTex   g_glow_tex[16];
+static int       g_glow_ntex;
+static GlowLight g_glow_light[32];
+static DWORD     g_glow_frame;       /* planet_glows calls; a light seen neither this frame nor the last is free */
+
+static void __fastcall glow_no_light(void *l, void *e, void *a, void *b, int c, void *d)
+{
+    (void)l; (void)e; (void)a; (void)b; (void)c; (void)d;
+}
+
+/* One pass over an uncompressed 24/32-bit TGA in Textures/RGB, adding to acc:
+ * [0..2] the colour of its lit texels (any channel sum of 24 or more, 0..255) and
+ * [3] their count; [4..6] every texel's colour weighted by its chroma (max - min)
+ * and [7] the weights. 0 if the file cannot be read. */
+static int tga_scan(const char *name, const char *suffix, double *acc)
+{
+    static BYTE buf[65536];
+    char   path[400];
+    HANDLE f;
+    BYTE   h[18];
+    DWORD  got;
+    int    bpp, k = 0, i;
+
+    path[0] = 0; s_cat(path, g_texdir); s_cat(path, name); s_cat(path, suffix); s_cat(path, ".tga");
+    f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULLPTR, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+    if (f == INVALID_HANDLE_VALUE) return 0;
+    if (!ReadFile(f, h, 18, &got, NULLPTR) || got != 18 || h[1] != 0 || h[2] != 2 ||
+        (h[16] != 24 && h[16] != 32)) {
+        CloseHandle(f);
+        return 0;
+    }
+    bpp = h[16] / 8;
+    if (h[0]) SetFilePointer(f, 18 + h[0], NULLPTR, 0);
+    while (ReadFile(f, buf + k, sizeof buf - (DWORD)k, &got, NULLPTR) && got) {
+        int n = k + (int)got;
+        for (i = 0; i + bpp <= n; i += bpp) {
+            int bl = buf[i], gr = buf[i + 1], rd = buf[i + 2];
+            int hi = rd > gr ? rd : gr, lo = rd < gr ? rd : gr, w;
+            if (bl > hi) hi = bl;
+            if (bl < lo) lo = bl;
+            w = hi - lo;
+            if (w) {
+                acc[4] += (double)(rd * w); acc[5] += (double)(gr * w); acc[6] += (double)(bl * w);
+                acc[7] += (double)w;
+            }
+            if (rd + gr + bl < 24) continue;
+            acc[0] += rd; acc[1] += gr; acc[2] += bl; acc[3] += 1.0;
+        }
+        for (k = 0; i < n; i++) buf[k++] = buf[i];
+    }
+    CloseHandle(f);
+    return 1;
+}
+
+/* mean colour of a TGA's lit texels, 0..1, or 0 if it cannot be read */
+static int tga_mean(const char *name, const char *suffix, float *out)
+{
+    double acc[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    int    i;
+    if (!tga_scan(name, suffix, acc) || acc[3] < 1.0) return 0;
+    for (i = 0; i < 3; i++) out[i] = (float)(acc[i] / acc[3] / 255.0);
+    return 1;
+}
+
+static const float *glow_colour(const BYTE *cls)
+{
+    static const float grey[3] = { 0.5f, 0.5f, 0.5f };
+    const char *ground = (const char *)cls + 0x4bc, *atmo = (const char *)cls + 0x4ac;
+    const char *name = ground[0] ? ground : atmo;
+    GlowTex    *t;
+    float       a[3], b[3];
+    int         i, n;
+    if (!name[0]) return grey;
+    for (i = 0; i < g_glow_ntex; i++) {
+        const char *x = g_glow_tex[i].name, *y = name;
+        while (*x && *x == *y) x++, y++;
+        if (!*x && !*y) return g_glow_tex[i].col;
+    }
+    if (g_glow_ntex >= 16) return grey;
+    t = &g_glow_tex[g_glow_ntex++];
+    for (i = 0; i < 15 && name[i]; i++) t->name[i] = name[i];
+    t->name[i] = 0;
+    n = tga_mean(name, "1", a);
+    if (n) n += tga_mean(name, "2", b);
+    if (n == 2)       for (i = 0; i < 3; i++) t->col[i] = 0.5f * (a[i] + b[i]);
+    else if (n == 1)  for (i = 0; i < 3; i++) t->col[i] = a[i];
+    else if (!tga_mean(name, "", t->col)) for (i = 0; i < 3; i++) t->col[i] = grey[i];
+    {
+        char m[200];
+        m[0] = 0;
+        s_cat(m, "planet glow: "); s_cat(m, t->name); s_cat(m, " ground ");
+        s_vec(m, t->col);
+        logline(m);
+    }
+    return t->col;
+}
+
+static BYTE *glow_light(void *planet)
+{
+    typedef void *(__cdecl *New_t)(unsigned);
+    typedef void *(__thiscall *Ctor_t)(void *, void *, void *, const char *);
+    int   i, free_at = -1;
+    BYTE *l;
+    for (i = 0; i < 32; i++) {
+        if (g_glow_light[i].planet == planet) {
+            g_glow_light[i].seen = g_glow_frame;
+            return g_glow_light[i].light;
+        }
+        if (free_at < 0 && (!g_glow_light[i].planet || g_glow_frame - g_glow_light[i].seen > 1)) free_at = i;
+    }
+    if (free_at < 0) return NULLPTR;
+    g_glow_light[free_at].planet = planet;
+    g_glow_light[free_at].seen   = g_glow_frame;
+    if (g_glow_light[free_at].light) return g_glow_light[free_at].light;
+    if (!g_glow_vt[0]) {
+        for (i = 0; i < 19; i++) g_glow_vt[i] = ((void **)VT_POINT)[i];
+        for (i = 13; i <= 16; i++) g_glow_vt[i] = (void *)glow_no_light;
+    }
+    l = (BYTE *)((New_t)FN_NEW)(0x138);
+    if (!l) return NULLPTR;
+    ((Ctor_t)FN_POINT_LIGHT)(l, NULLPTR, NULLPTR, "planet glow");
+    *(void ***)l = g_glow_vt;
+    g_glow_light[free_at].light = l;
+    return l;
+}
+
+static void planet_glows(void)
+{
+    DWORD list = *(DWORD *)OBJECT_LIST, head, node;
+    int   i;
+    if (!g_planet_glow || !list) return;
+    g_glow_frame++;
+    head = *(DWORD *)(list + 4);
+    for (node = *(DWORD *)head; node != head; node = *(DWORD *)node) {
+        BYTE *obj = *(BYTE **)(node + 8), *ent, *cls, *light;
+        const float *sph, *xf, *g;
+        float col[3], mat[12], r;
+        if (!obj || *(DWORD *)obj != VT_PLANET) continue;
+        ent = *(BYTE **)(obj + 4);
+        cls = *(BYTE **)(obj + 0x40);
+        if (!ent || !cls) continue;
+        sph = (const float *)(ent + 0x34);
+        xf  = (const float *)(ent + 0x44);
+        r = sph[3];
+        if (r <= 0.0f) continue;
+        light = glow_light(obj);
+        if (!light) continue;
+        g = glow_colour(cls);
+        for (i = 0; i < 3; i++) col[i] = g[i] * g_key_col[i] * g_glow;
+        *(float *)(light + 0x100) = r;
+        *(float *)(light + 0x104) = r * (g_glow_range > 1.0f ? g_glow_range - 1.0f : 0.01f);
+        for (i = 0; i < 9; i++) mat[i] = (i % 4 == 0) ? 1.0f : 0.0f;
+        for (i = 0; i < 3; i++) mat[9 + i] = xf[9 + i] + sph[i];
+        ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, light, col, mat);
+    }
+}
+
+/* The skybox. A third directional light, faint, in the colour the sky shows most
+ * of and from the side that shows it. Starfield_Load_Background_Geometry
+ * (0x590c30) keeps the map's background name, lower-cased, in a buffer at
+ * 0x738538 for as long as the map runs: either a prefix whose faces are
+ * Textures/RGB/<prefix>0..5.tga (CreateBackgroundFace, 0x590f10, builds face i of
+ * a cube at +-100 facing +z, +x, -z, -x, +y, -y for i = 0..5), or a cube SOD
+ * that names its textures. Each frame, before GameObject_PreRenderAll, the
+ * plugin compares that name with the last; on a change it reads the faces once.
+ * The colour is the faces' mean weighted by each texel's chroma (max - min),
+ * which is the hue of the sky's nebulae and not the black between them, scaled
+ * to a peak of SkyLight. The light comes from the sum of the face directions
+ * weighted the same way; for a SOD sky, whose faces carry no direction the
+ * plugin knows, and for a sky with no side to speak of, along the Fill axis. */
+#define SKY_NAME 0x738538
+
+static float g_sky = 0.35f;
+static char  g_sky_name[64] = { 1, 0 };
+
+static void sky_from(double *acc, const double *dir)
+{
+    float  c[3], d[3], peak, n;
+    double w = acc[7];
+    int    i;
+    char   m[240];
+    g_sky_on = 0;
+    if (w < 1.0) return;
+    for (i = 0; i < 3; i++) c[i] = (float)(acc[4 + i] / w);
+    peak = c[0] > c[1] ? c[0] : c[1];
+    if (c[2] > peak) peak = c[2];
+    if (peak <= 0.0f) return;
+    for (i = 0; i < 3; i++) g_sky_col[i] = c[i] / peak * g_sky;
+    n = 0.0f;
+    if (dir) {
+        for (i = 0; i < 3; i++) d[i] = -(float)(dir[i] / w);
+        n = sqrt_f(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    }
+    if (n < 0.05f) for (i = 0; i < 3; i++) d[i] = g_fill_dir[i];
+    light_matrix(d, g_sky_mat);
+    g_sky_on = 1;
+    m[0] = 0;
+    s_cat(m, "sky: "); s_cat(m, g_sky_name); s_cat(m, " colour "); s_vec(m, g_sky_col);
+    s_cat(m, " axis "); s_vec(m, g_sky_mat + 6);
+    s_cat(m, n < 0.05f ? " (the fill's)" : "");
+    logline(m);
+}
+
+/* the textures a SOD names: every length-prefixed string that opens as a TGA */
+static void sky_sod(const char *name, double *acc)
+{
+    static BYTE d[65536];
+    char   path[400], t[64];
+    HANDLE f;
+    DWORD  got;
+    int    i, n, len, j;
+    path[0] = 0;
+    s_cat(path, g_texdir);
+    path[s_len(path) - 13] = 0;                /* "Textures\RGB\" off the end */
+    s_cat(path, "SOD\\"); s_cat(path, name);
+    f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULLPTR, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+    if (f == INVALID_HANDLE_VALUE) return;
+    n = ReadFile(f, d, sizeof d, &got, NULLPTR) ? (int)got : 0;
+    CloseHandle(f);
+    for (i = 0; i + 2 < n; i++) {
+        len = d[i] | d[i + 1] << 8;
+        if (len < 3 || len > 40 || i + 2 + len > n) continue;
+        for (j = 0; j < len; j++) {
+            BYTE ch = d[i + 2 + j];
+            if (!((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+                  ch == '_' || ch == '.' || ch == '-'))
+                break;
+            t[j] = (char)ch;
+        }
+        if (j < len) continue;
+        t[j] = 0;
+        if (!tga_scan(t, "", acc)) continue;
+        {
+            char m[120];
+            m[0] = 0; s_cat(m, "sky texture "); s_cat(m, t); logline(m);
+        }
+        i += 1 + len;
+    }
+}
+
+static void sky_update(void)
+{
+    static const double k_face[6][3] = {
+        { 0, 0, 1 }, { 1, 0, 0 }, { 0, 0, -1 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 } };
+    const char *name = (const char *)SKY_NAME;
+    double acc[8] = { 0, 0, 0, 0, 0, 0, 0, 0 }, dir[3] = { 0, 0, 0 };
+    int    i, j, n = 0, len;
+    for (i = 0; i < 63 && name[i] == g_sky_name[i] && name[i]; i++) ;
+    if (name[i] == g_sky_name[i]) return;
+    for (i = 0; i < 63 && name[i]; i++) g_sky_name[i] = name[i];
+    g_sky_name[i] = 0;
+    len = i;
+    if (!len) { g_sky_on = 0; return; }
+    if (len > 4 && name[len - 4] == '.' && name[len - 3] == 's' && name[len - 2] == 'o' && name[len - 1] == 'd') {
+        sky_sod(g_sky_name, acc);
+        sky_from(acc, NULLPTR);
+        return;
+    }
+    for (i = 0; i < 6; i++) {
+        char  suf[2];
+        double before = acc[7];
+        suf[0] = (char)('0' + i); suf[1] = 0;
+        if (!tga_scan(g_sky_name, suf, acc)) continue;
+        n++;
+        for (j = 0; j < 3; j++) dir[j] += k_face[i][j] * (acc[7] - before);
+    }
+    sky_from(acc, n == 6 ? dir : NULLPTR);
+}
+
+/* Explosions. A ship or station that dies goes up in a FireballExplosion (the
+ * xfireb* ODFs, classLabel fireballexplode): a model played for `length` seconds
+ * (ExplosionClass +0x4c), its time left counted down at +0xa8 by
+ * FireballExplosion::Simulate, which deletes it at zero. Stock gives it no light.
+ * The plugin wraps Simulate and the deleting destructor (vtable slots 14 and 0)
+ * to keep a list of the live ones, and each frame, after GameObject_PreRenderAll,
+ * registers a point light at each: ExplosionColour times ExplosionBrightness,
+ * up to full in the first 0.15 s, then down with the square of the time left;
+ * full out to the explosion's bounding radius and gone at ExplosionRange radii
+ * (no less than 40 units each). An ordinary ST3D_Point_Light, so the CPU path
+ * (planets, cloaking ships) takes it too. Torpedoes and pulses need nothing of
+ * the plugin: their ODFs give them a light (lightColor), which
+ * Ordnance::PreRenderAll registers and pick_points hands the GPU. */
+typedef void (__thiscall *Simulate_t)(void *, float);
+typedef void *(__thiscall *Delete_t)(void *, unsigned);
+typedef struct { void *obj; BYTE *light; float pos[3], r, left, len; } Boom;
+
+static float g_boom_col[3] = { 1.00f, 0.62f, 0.28f };
+static float g_boom_bright = 4.0f, g_boom_range = 10.0f;
+static int   g_explosions = 1;
+static Boom  g_boom[24];
+static BYTE *g_boom_pool[24];
+
+static Boom *boom_find(void *obj, int make)
+{
+    int i, free_at = -1;
+    for (i = 0; i < 24; i++) {
+        if (g_boom[i].obj == obj) return &g_boom[i];
+        if (!g_boom[i].obj && free_at < 0) free_at = i;
+    }
+    if (!make || free_at < 0) return NULLPTR;
+    if (!g_boom_pool[free_at]) {
+        typedef void *(__cdecl *New_t)(unsigned);
+        typedef void *(__thiscall *Ctor_t)(void *, void *, void *, const char *);
+        BYTE *l = (BYTE *)((New_t)FN_NEW)(0x138);
+        if (!l) return NULLPTR;
+        ((Ctor_t)FN_POINT_LIGHT)(l, NULLPTR, NULLPTR, "explosion");
+        g_boom_pool[free_at] = l;
+    }
+    g_boom[free_at].obj   = obj;
+    g_boom[free_at].light = g_boom_pool[free_at];
+    return &g_boom[free_at];
+}
+
+static void __fastcall hook_fireball_sim(BYTE *obj, void *edx, float dt)
+{
+    Boom *b = boom_find(obj, 1);
+    (void)edx;
+    if (b) {
+        BYTE *ent = *(BYTE **)(obj + 4), *cls = *(BYTE **)(obj + 0x30);
+        if (ent && cls) {
+            const float *xf = (const float *)(ent + 0x44);
+            int i;
+            for (i = 0; i < 3; i++) b->pos[i] = xf[9 + i];
+            b->r    = *(float *)(ent + 0x34 + 12);
+            b->len  = *(float *)(cls + 0x4c);
+            b->left = *(float *)(obj + 0xa8) - dt;
+        } else b->obj = NULLPTR;
+    }
+    ((Simulate_t)FN_FIREBALL_SIM)(obj, dt);
+}
+
+static void *__fastcall hook_fireball_del(void *obj, void *edx, unsigned flags)
+{
+    Boom *b = boom_find(obj, 0);
+    (void)edx;
+    if (b) b->obj = NULLPTR;
+    return ((Delete_t)FN_FIREBALL_DEL)(obj, flags);
+}
+
+static void explosion_lights(void)
+{
+    int i, j;
+    if (!g_explosions) return;
+    for (i = 0; i < 24; i++) {
+        Boom *b = &g_boom[i];
+        float k, age, r, col[3], mat[12];
+        if (!b->obj || b->len <= 0.0f || b->left <= 0.0f) continue;
+        age = b->len - b->left;
+        if (age < 0.15f) k = age / 0.15f;
+        else {
+            k = b->left / (b->len - 0.15f);
+            k = k > 1.0f ? 1.0f : k * k;
+        }
+        r = b->r > 40.0f ? b->r : 40.0f;
+        *(float *)(b->light + 0x100) = r;
+        *(float *)(b->light + 0x104) = r * (g_boom_range > 1.0f ? g_boom_range - 1.0f : 0.01f);
+        for (j = 0; j < 3; j++) col[j] = g_boom_col[j] * g_boom_bright * k;
+        for (j = 0; j < 9; j++) mat[j] = (j % 4 == 0) ? 1.0f : 0.0f;
+        for (j = 0; j < 3; j++) mat[9 + j] = b->pos[j];
+        ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, b->light, col, mat);
+    }
+}
+
+static int patch_slot(DWORD vt, int idx, DWORD expect, const void *hook)
+{
+    void **slot = (void **)(vt + 4 * idx);
+    DWORD  old;
+    if (*(DWORD *)slot != expect) return 0;
+    if (!VirtualProtect(slot, 4, PAGE_EXECUTE_READWRITE, &old)) return 0;
+    *slot = (void *)hook;
+    VirtualProtect(slot, 4, old, &old);
+    return 1;
+}
+
 /* ---- patching ---------------------------------------------------------- */
 
 static int site_ok(int i)
@@ -456,6 +1064,56 @@ static int redirect(int i, const void *to)
     return 1;
 }
 
+
+/* Planets. A planet is a Planet_Database whose GroundMesh hemispheres and cloud
+ * shell the engine rebuilds as the camera moves, so they stay on the CPU path
+ * (LightVertices_Lambert), which does take the scene's lights. What kept them
+ * from showing a night side is their material: GroundMesh's constructor
+ * (0x595ba0) builds one per mesh from ST3D_Colour_White, a constant term of
+ * White x 0.5 that the CPU path adds to every vertex, and a diffuse of
+ * White x 0.75. Half white everywhere, plus the Key, clamps the day side and
+ * leaves the night side half lit. The six fmuls that scale White (one per
+ * channel) are pointed at the plugin's own floats: PlanetAmbient and
+ * PlanetDiffuse. */
+#define FMULS_HALF   0x6ae220   /* 0.5f  */
+#define FMULS_3QTR   0x6ae70c   /* 0.75f */
+
+static float g_planet_amb[3]  = { 0.05f, 0.05f, 0.07f };   /* Ambient, unless PlanetAmbient is set */
+static float g_planet_diff[3] = { 1.00f, 1.00f, 1.00f };
+static int   g_planets = 1;
+
+static const DWORD k_planet_diff_at[3] = { 0x595c22, 0x595c3d, 0x595c57 };
+static const DWORD k_planet_amb_at[3]  = { 0x595c70, 0x595c7f, 0x595c8e };
+
+static int fmuls_ok(DWORD at, DWORD operand)
+{
+    const BYTE *p = (const BYTE *)at;
+    return p[0] == 0xD8 && p[1] == 0x0D && *(const DWORD *)(p + 2) == operand;
+}
+
+static void fmuls_point(DWORD at, const float *to)
+{
+    BYTE *p = (BYTE *)at + 2;
+    DWORD old;
+    VirtualProtect(p, 4, PAGE_EXECUTE_READWRITE, &old);
+    *(DWORD *)p = (DWORD)to;
+    VirtualProtect(p, 4, old, &old);
+    FlushInstructionCache(GetCurrentProcess(), p, 4);
+}
+
+static int patch_planets(void)
+{
+    int i;
+    for (i = 0; i < 3; i++)
+        if (!fmuls_ok(k_planet_diff_at[i], FMULS_3QTR) || !fmuls_ok(k_planet_amb_at[i], FMULS_HALF))
+            return 0;
+    for (i = 0; i < 3; i++) {
+        fmuls_point(k_planet_diff_at[i], &g_planet_diff[i]);
+        fmuls_point(k_planet_amb_at[i],  &g_planet_amb[i]);
+    }
+    return 1;
+}
+
 /* ---- startup ---------------------------------------------------------- */
 
 static void build_paths(char *ini)
@@ -469,6 +1127,7 @@ static void build_paths(char *ini)
     path[cut] = 0;
 
     ini[0] = 0;       s_cat(ini, path);       s_cat(ini, "Lighting.ini");
+    g_texdir[0] = 0;  s_cat(g_texdir, path);  s_cat(g_texdir, "Textures\\RGB\\");
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "Lighting.log");
 }
 
@@ -488,6 +1147,22 @@ static void startup(void)
     ini3(ini, "FillColour", g_fill_col);
     ini3(ini, "FillAxis",   g_fill_dir);
     ini3(ini, "Ambient",    g_ambient);
+    g_planets = (int)GetPrivateProfileIntA("Lighting", "Planets", 1, ini);
+    g_points  = (int)GetPrivateProfileIntA("Lighting", "PointLights", 6, ini);
+    g_nebulae = (int)GetPrivateProfileIntA("Lighting", "Nebulae", 1, ini);
+    ini1(ini, "NebulaBrightness", &g_neb_bright);
+    ini1(ini, "NebulaRange",      &g_neb_range);
+    g_planet_glow = (int)GetPrivateProfileIntA("Lighting", "PlanetGlows", 1, ini);
+    ini1(ini, "PlanetGlow",       &g_glow);
+    ini1(ini, "PlanetGlowRange",  &g_glow_range);
+    ini1(ini, "SkyLight",         &g_sky);
+    g_explosions = (int)GetPrivateProfileIntA("Lighting", "Explosions", 1, ini);
+    ini3(ini, "ExplosionColour",      g_boom_col);
+    ini1(ini, "ExplosionBrightness", &g_boom_bright);
+    ini1(ini, "ExplosionRange",      &g_boom_range);
+    for (i = 0; i < 3; i++) g_planet_amb[i] = g_ambient[i];
+    ini3(ini, "PlanetAmbient", g_planet_amb);
+    ini3(ini, "PlanetDiffuse", g_planet_diff);
     light_matrix(g_key_dir, g_key_mat);
     light_matrix(g_fill_dir, g_fill_mat);
 
@@ -499,6 +1174,12 @@ static void startup(void)
     s_cat(b, "  fill ");           s_vec(b, g_fill_col);
     s_cat(b, " axis ");            s_vec(b, g_fill_mat + 6);
     logline(b);
+    if (g_planets) {
+        b[0] = 0;
+        s_cat(b, "planets: ambient "); s_vec(b, g_planet_amb);
+        s_cat(b, "  diffuse ");        s_vec(b, g_planet_diff);
+        logline(b);
+    }
 
     for (i = 0; i < S_COUNT; i++) {
         if (!site_ok(i)) {
@@ -510,18 +1191,28 @@ static void startup(void)
             return;
         }
     }
-    if (g_lights) {
+    if (g_lights || g_planet_glow || g_explosions)
         n += redirect(S_PRERENDER, (const void *)hook_prerender_all);
-        n += redirect(S_REGISTER,  (const void *)hook_register_light);
-    }
+    if (g_lights) n += redirect(S_REGISTER, (const void *)hook_register_light);
     if (g_gpu) {
         n += redirect(S_LOGICAL, (const void *)hook_find_logical);
         n += redirect(S_VISIBLE, (const void *)hook_find_visible);
-        if (g_fix_mirrored) {
+        if (g_fix_mirrored || g_points > 0) {
             if (!patch_vb_render()) logline("NOT PATCHED: Render slot differs");
             else n++;
         }
         if (!patch_set_material()) logline("NOT PATCHED: SetMaterial site differs");
+        else n++;
+    }
+    if (g_nebulae) n += redirect(S_NEBULA, (const void *)hook_nebula_lights);
+    if (g_explosions) {
+        if (patch_slot(VT_FIREBALL, 14, FN_FIREBALL_SIM, (const void *)hook_fireball_sim) &&
+            patch_slot(VT_FIREBALL, 0, FN_FIREBALL_DEL, (const void *)hook_fireball_del))
+            n += 2;
+        else logline("NOT PATCHED: FireballExplosion vtable differs");
+    }
+    if (g_planets) {
+        if (!patch_planets()) logline("NOT PATCHED: planet material sites differ");
         else n++;
     }
     b[0] = 0;

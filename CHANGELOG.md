@@ -5,6 +5,67 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.8.3 — 2026-10-04
+
+Layers: lighting 1.3.3.
+
+### Changed
+- Planet glow a quarter brighter and reaching further; nebula light reaching as far as
+  in 9.8.1 (lighting 1.3.3).
+
+## 9.8.2 — 2026-10-04
+
+Layers: lighting 1.3.2.
+
+### Fixed
+- Nebula, planet and explosion light lit the far side of a ship; a planet's glow now
+  comes from the planet and shows. `NebulaRange` back to 5 (lighting 1.3.2).
+
+## 9.8.1 — 2026-10-04
+
+Layers: lighting 1.3.1.
+
+### Changed
+- Nebula, planet, skybox and explosion light about twice as strong, and nebulae,
+  planets and explosions reach further (lighting 1.3.1).
+
+## 9.8.0 — 2026-10-04
+
+Layers: lighting 1.3.0.
+
+### Added
+- Light sources: nebulae glow in their colour, planets light what is near their day
+  side, the skybox adds a faint coloured light, explosions light their surroundings, and
+  torpedo lights reach GPU-drawn ships again (lighting 1.3.0).
+
+## 9.7.1 — 2026-10-04
+
+Layers: textures 2.1.1, testbench 2.12.1.
+
+### Fixed
+- `a2tex install` (and so `./install`) runs in about 36 s instead of about 175 s, with
+  identical results (textures 2.1.1).
+- A bench session whose start fails is torn down instead of left running without a game
+  (testbench 2.12.1).
+
+## 9.7.0 — 2026-10-04
+
+Layers: lighting 1.2.0.
+
+### Changed
+- The key light comes in at a lower angle, and the fill and ambient light are darker,
+  for more contrast on ships and between a planet's day and night sides (lighting
+  1.2.0).
+
+## 9.6.0 — 2026-10-04
+
+Layers: lighting 1.1.0.
+
+### Added
+- Planets get a night side: `Lighting.asi` lights them with the key and fill like the
+  ships, where stock gave their material a constant half-white term that lit them all
+  round (lighting 1.1.0). Seen on the bench.
+
 ## 9.5.0 — 2026-10-04
 
 Layers: testbench 2.12.0.

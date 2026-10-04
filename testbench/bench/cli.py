@@ -339,11 +339,20 @@ def cmd_session(argv):
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
         s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
                            label=a.label, installs=a.install, stock_shell=a.stock_shell)
-        s.clone()
-        s.prepare()
-        s.start_display()
-        if not a.no_launch:
-            s.launch(a.args)
+        # A start that fails part-way (an install, the display, a launch the audio
+        # guard stops) is torn down here like any session. Left alone it kept its sway,
+        # input and VNC running and stayed "active" in `session list` with no game.
+        try:
+            s.clone()
+            s.prepare()
+            s.start_display()
+            if not a.no_launch:
+                s.launch(a.args)
+        except BaseException as e:
+            s.log.action(f'session start failed: {e}', status='fail')
+            s.teardown()
+            _session_report(s)
+            raise
         print(f'session {s.s["id"]}\n  artifacts: {s.dir}\n  state:     {s.statefile}')
         if s.s.get('vnc_port'):
             print(f'  watch:     vncviewer localhost:{s.s["vnc_port"]}')

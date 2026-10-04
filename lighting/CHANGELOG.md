@@ -1,8 +1,84 @@
 # Changelog — lighting
 
-`Lighting.asi`: ships and stations on the engine's static vertex buffers, and two scene
-lights in place of each map's own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
+`Lighting.asi`: ships and stations on the engine's static vertex buffers, scene lights
+in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
+
+## 1.3.3 — 2026-10-04
+
+### Changed
+- `PlanetGlow=1.5` (was 1.2), `PlanetGlowRange=6.0` (was 5.0), `NebulaRange=8.0` (was
+  5.0, as in 1.3.1). The built-in defaults match.
+
+Confirmed in game 2026-10-04.
+
+## 1.3.2 — 2026-10-04
+
+### Fixed
+- Soft point lights (nebulae, planets, explosions) lit the side of a hull turned away
+  from them: the stock meshes' normals point inward. They now go to Direct3D mirrored
+  through the draw's origin. Torpedo and pulse lights are unchanged and still inverted
+  (8f0d60f).
+- A planet's glow comes from its centre, scaled per object by how much of its day side
+  faces it, instead of from the surface under the sun, where the Key light hid it.
+
+### Changed
+- `NebulaRange=5.0` (was 8.0 in 1.3.1): a nebula's full-strength reach outdid a nearby
+  planet's.
+
+Seen on the bench 2026-10-04 (`SCENE=planet`). Confirmed in game 2026-10-04.
+
+## 1.3.1 — 2026-10-04
+
+### Changed
+- Stronger, wider light sources (1.3.0 was too subtle in game): `NebulaBrightness=2.0`
+  (was 1.0), `NebulaRange=8.0` (was 5.0), `PlanetGlow=1.2` (was 0.6), `PlanetGlowRange=5.0`
+  (was 3.0), `SkyLight=0.35` (was 0.15), `ExplosionBrightness=4.0` (was 2.0),
+  `ExplosionRange=10.0` (was 5.0). The built-in defaults match.
+
+Not seen on the bench (it could not start from this session). Confirmed in game 2026-10-04.
+
+## 1.3.0 — 2026-10-04
+
+### Added
+- Point lights on the GPU path (`PointLights=`): torpedoes and pulses light the hulls
+  they pass again, as stock did on the CPU path, and the light sources below reach
+  ships. Hard-edged lights (torpedoes) are lit per vertex; one colour counts once
+  (a1cb893).
+- `Nebulae=`, `NebulaBrightness=`, `NebulaRange=`: nebulae light their surroundings in
+  their glow colour.
+- `PlanetGlows=`, `PlanetGlow=`, `PlanetGlowRange=`: a planet's day side lights what is
+  near it in the mean colour of its ground texture.
+- `SkyLight=`: a faint third directional light in the skybox's dominant colour, from the
+  side that shows it.
+- `Explosions=`, `ExplosionColour=`, `ExplosionBrightness=`, `ExplosionRange=`: ship and
+  station explosions light their surroundings. `Lighting.log` now reads `call sites
+  patched 10`.
+
+Seen on the bench 2026-10-04 (`SCENE=nebula`, `SCENE=planet`, a scratch battle scene).
+Confirmed in game 2026-10-04.
+
+## 1.2.0 — 2026-10-04
+
+### Changed
+- The key light comes in at about 60° off vertical instead of 37° (`KeyAxis=0.50 -0.50
+  0.71`, the fill opposite it), so it grazes what the top-down camera sees.
+- Darker base lighting, so that the light sources still to come stand out:
+  `FillColour=0.06 0.08 0.18` (was `0.10 0.12 0.24`), `Ambient=0.05 0.05 0.07` (was
+  `0.10 0.10 0.12`), and `PlanetAmbient=0.02 0.02 0.03` for more contrast between a
+  planet's day and night sides.
+
+Seen on the bench 2026-10-04 (`SCENE=planet`). Confirmed in game 2026-10-04.
+
+## 1.1.0 — 2026-10-04
+
+### Added
+- `Planets=`, `PlanetAmbient=`, `PlanetDiffuse=`: planets and their cloud shells lit by
+  Key and Fill with a night side. The planet material's constant half-white term becomes
+  `PlanetAmbient` (default `Ambient`) and its 0.75 diffuse `PlanetDiffuse` (default 1).
+  `Lighting.log` now reads `call sites patched 7`.
+
+Seen on the bench 2026-10-04 (`SCENE=planet`).
 
 ## 1.0.0 — 2026-10-04
 

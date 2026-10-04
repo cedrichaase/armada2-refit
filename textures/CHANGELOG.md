@@ -5,6 +5,13 @@ into `Textures/RGB/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 versions". Newest first. The reasoning behind each change is in [`README.md`](README.md),
 not here.
 
+## 2.1.1 — 2026-10-04
+
+### Fixed
+- `a2tex install` took about 175 s, nearly all of it the mip-chain guard starting
+  ImageMagick for each of ~11,800 widths. Widths now come from the TGA header, read once
+  for the whole install: 171 s → 36 s, with identical output and identical files.
+
 ## 2.1.0 — 2026-09-27
 
 ### Added

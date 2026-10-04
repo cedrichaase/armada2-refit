@@ -11,8 +11,59 @@ FLOOR=${FLOOR:-0.15}          # unused since channel synthesis went absolute; se
 die () { printf 'error: %s\n' "$*" >&2; exit 1; }
 note () { printf '  %s\n' "$*" >&2; }
 
-# first existing spelling of a texture name; TGA case is inconsistent across the set
-tex_path () { ls "$1.tga" "$1.TGA" 2>/dev/null | head -1 || true; }
+# first existing spelling of a texture name; TGA case is inconsistent across the set.
+# Tests, not `ls | head`: install's mip guard asks this thousands of times. (No stock
+# texture exists in both spellings, so which is tried first changes nothing.)
+tex_path () {
+  if [ -e "$1.tga" ]; then printf '%s\n' "$1.tga"
+  elif [ -e "$1.TGA" ]; then printf '%s\n' "$1.TGA"
+  fi
+  return 0
+}
+
+# Width of an image in pixels. A TGA's is the little-endian uint16 at byte 12 of its
+# header, read with one `od` instead of starting ImageMagick: `a2tex install`'s mip
+# guard asks for thousands of widths, and ImageMagick at ~8 ms a start made that guard
+# about 100 s of every install (and so of every bench session). Anything else, or a
+# header that cannot be read, goes to ImageMagick as before.
+declare -gA TEXW=()
+# preload_widths <dir>...: every TGA's width in those directories into TEXW, keyed by
+# "<dir>/<name>" exactly as given, read by one process. img_width answers from it, and
+# subshells inherit it, so the $(...) callers do too. Whoever overwrites a TGA after
+# this updates its entry.
+preload_widths () {
+  local p w
+  while IFS=$'\t' read -r p w; do TEXW[$p]=$w; done < <(python3 - "$@" <<'PY'
+import os, struct, sys
+for d in sys.argv[1:]:
+    try:
+        names = os.listdir(d)
+    except OSError:
+        continue
+    for n in names:
+        if n[-4:].lower() != '.tga':
+            continue
+        try:
+            with open(os.path.join(d, n), 'rb') as f:
+                h = f.read(14)
+        except OSError:
+            continue
+        if len(h) == 14:
+            print('%s/%s\t%d' % (d, n, struct.unpack_from('<H', h, 12)[0]))
+PY
+)
+}
+
+img_width () {
+  local w
+  [ -n "${TEXW[$1]:-}" ] && { printf '%s' "${TEXW[$1]}"; return 0; }
+  case "$1" in
+    *.tga|*.TGA)
+      w=$(od -An -tu2 -j12 -N2 "$1" 2>/dev/null) && w=${w//[[:space:]]/} && [ -n "$w" ] &&
+        { printf '%s' "$w"; return 0; } ;;
+  esac
+  magick identify -format '%w' "$1[0]" 2>/dev/null
+}
 
 # A single all-black channel plane the same size as $1, written to $2.
 blank_channel () { magick "$1" -colorspace Gray -evaluate multiply 0 "PNG24:$2"; }
@@ -238,12 +289,12 @@ attach_alpha () {
 mip_name () {
   local stock=$1 lvl=$2 mode=${3:-name}
   local d b bw want cand f w
-  d=$(dirname "$stock"); b=$(basename "$stock"); b=${b%.*}
-  bw=$(magick identify -format '%w' "$stock" 2>/dev/null) || return 0
+  d=${stock%/*}; b=${stock##*/}; b=${b%.*}
+  bw=$(img_width "$stock") || return 0
   want=$(( bw >> lvl ))
   for cand in "${b}_${lvl}" "${b}${lvl}"; do
     f=$(cd "$d" && tex_path "$cand"); [ -n "$f" ] || continue
-    w=$(magick identify -format '%w' "$d/$f" 2>/dev/null) || continue
+    w=$(img_width "$d/$f") || continue
     [ "$w" = "$want" ] || continue
     if [ "$mode" = path ]; then printf '%s' "$d/$f"; else printf '%s' "$cand"; fi
     return 0
@@ -265,7 +316,7 @@ mip_name () {
 mip_strays () {
   local stock=$1 levels=$2
   local d b claimed lvl f n
-  d=$(dirname "$stock"); b=$(basename "$stock"); b=${b%.*}
+  d=${stock%/*}; b=${stock##*/}; b=${b%.*}
   claimed=" "
   for ((lvl=1; lvl<=levels; lvl++)); do claimed+="$(mip_name "$stock" "$lvl") "; done
 

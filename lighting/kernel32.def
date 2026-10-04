@@ -8,5 +8,6 @@ CreateFileA@28
 WriteFile@20
 SetFilePointer@16
 CloseHandle@4
+ReadFile@20
 GetPrivateProfileIntA@16
 GetPrivateProfileStringA@24
