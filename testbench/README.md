@@ -19,7 +19,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test drive shot menu                 #   prints the PNG path
     ./a2test drive click-text "Single Player"
     ./a2test drive step 'Wait for the single player screen'
-    ./a2test session stop                    #   quits, gathers logs, writes the report
+    ./a2test session stop                    #   ends the game, gathers logs, writes the report
 
 Reports go to `~/.local/share/a2test/results/<run>/`, with `latest` pointing at the
 newest. Each holds `index.html` (look at it), `report.md` (read or paste it),
@@ -44,6 +44,13 @@ minutes; it counts as one job but runs two games.
 **The user's install is never written.** Every case runs on a reflink clone of the
 game directory and the prefix, so a run is free to re-tune, break or `a2mod stock` its
 copy, and can run while the game is being played.
+
+**Scenes on demand** (`scene/`): `Scene.asi` turns a directly launched, empty map into
+a test scene, so renderer work need not reach a model, an angle or a weapon through
+the menus. Fog, HUD, grid, cursor and notices are off, and the objects come from a
+scene file (`SCENE=planet|nebula|firing`). A free camera can be moved while the game
+runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`; see
+`scene/README.md`.
 
 ## How a case runs
 
@@ -111,7 +118,9 @@ anything new in the game's `Logs/`.
   red herring, not the cause.
 - **The game ignores WM_CLOSE.** It is still up 20 s after one. `Quit the game`
   therefore goes through its menus: in a mission Esc, "Exit to Windows", "Yes"; on the
-  main menu the Exit panel, then "Yes".
+  main menu the Exit panel, then "Yes". `session stop` does not bother: the clone is
+  thrown away and every log is already on disk, so it terminates the game (two
+  sessions in 3 s); `--graceful` quits through the menus.
 - **Menu buttons are the pictures.** The labels ("SINGLE PLAYER") are painted into the
   background and take no clicks; the emblem above them does. Named targets in
   `ui.json` are the pictures, in 800x600 design space. They are mapped to the screen

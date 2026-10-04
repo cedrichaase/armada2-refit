@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.5.0 — 2026-10-04
+
+Layers: testbench 2.12.0.
+
+### Added
+- `testbench/scene/`: `Scene.asi` builds test scenes inside a running mission (a ship
+  beside a planet, beside a nebula, or firing at an indestructible target), with fog,
+  HUD, grid, cursor and notices off. `a2test drive scene` moves a free camera and
+  changes the scene while it runs. This is for renderer work that end-to-end scenarios
+  reach only with difficulty (testbench 2.12.0).
+
+### Changed
+- `a2test session stop` terminates the game; `--graceful` quits through its menus
+  (testbench 2.12.0).
+
+Installs nothing into the game.
+
 ## 9.4.0 — 2026-10-04
 
 Layers: lighting 1.0.0 (new), models 3.2.0, testbench 2.11.0.

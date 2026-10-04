@@ -35,7 +35,7 @@ a2test -- run Armada II headless and test it end to end
                        [--vnc] [--no-launch]
       --install PATH                   start from stock, then run PATH/install into the
                                        clone; repeat to stack checkouts (public, private)
-  a2test session stop [--keep]         quit, gather logs, write the report
+  a2test session stop [--keep] [--graceful]  end the game (terminated; --graceful: through its menus), gather logs, write the report
   a2test session list
   a2test watch [--no-open]             every live session, view-only, tiled in one
                                        window (wayvnc + noVNC; needs wayvnc)
@@ -50,9 +50,45 @@ a2test -- run Armada II headless and test it end to end
   a2test drive wait-text "TEXT" [--timeout S]
   a2test drive step "any scenario step"   run one step of the scenario grammar
   a2test drive running | log NAME | note "TEXT" | launch [ARGS] | quit
+  a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
+                                       e.g. "orbit ship 30 15 900", "camera rts", "query"
 
 Results: {results}
 """.format(results=config.RESULTS)
+
+
+def _scene_command(s, log, args):
+    """Hand commands to Scene.asi through Scene.cmd in the clone, and print what it
+    logged in answer. The plugin reads the file on its next tick (or frame, while
+    paused), deletes it and ends its answer with '< done'."""
+    lines = [c.strip() for a in args for c in a.split(';') if c.strip()]
+    if not lines:
+        raise GameError('drive scene: no command')
+    cmd, slog = s.game_dir / 'Scene.cmd', s.game_dir / 'Scene.log'
+    if not (s.game_dir / 'Scene.asi').exists():
+        raise GameError('drive scene: Scene.asi is not installed in this session '
+                        '(--install testbench/scene)')
+    end = time.time() + 10
+    while cmd.exists():                      # a previous command not yet taken
+        if time.time() > end:
+            raise GameError('drive scene: Scene.cmd is not being read -- is the scene built?')
+        time.sleep(0.1)
+    start = slog.stat().st_size if slog.exists() else 0
+    tmp = cmd.with_suffix('.tmp')
+    tmp.write_text('\r\n'.join(lines) + '\r\n')
+    tmp.rename(cmd)                          # the plugin never sees half a file
+    end = time.time() + 15
+    while True:
+        out = slog.read_bytes()[start:].decode(errors='replace') if slog.exists() else ''
+        if '< done' in out or time.time() > end:
+            break
+        time.sleep(0.1)
+    print(out.replace('\r', '').rstrip() or 'no answer')
+    log.action(f'scene: {"; ".join(lines)}')
+    if '< done' not in out:
+        print('timeout: Scene.asi did not answer within 15 s')
+        return 1
+    return 1 if '\n  !' in out or 'FAILED' in out else 0
 
 
 def _terminate(signum, frame):
@@ -318,12 +354,15 @@ def cmd_session(argv):
         if keep:
             s.s['keep'] = True
         s.log.action('session stopped from the command line')
-        graceful = True
-        if s.running():
-            graceful = _adhoc_step(s, 'Quit the game')['status'] == 'ok'
+        # Terminated by default: the clone is thrown away and every log is already
+        # on disk, so quitting through the menus only costs time. --graceful
+        # quits as a player would, for when the quit itself is under test.
+        how = 'terminated'
+        if '--graceful' in rest and s.running():
+            how = 'closed' if _adhoc_step(s, 'Quit the game')['status'] == 'ok' else 'forced'
         s.teardown()
         _session_report(s)
-        print(f'stopped ({"closed" if graceful else "forced"}); report: {s.dir.parent.parent / "index.html"}')
+        print(f'stopped ({how}); report: {s.dir.parent.parent / "index.html"}')
         return 0
     if sub == 'list':
         for s in _active_sessions():
@@ -480,6 +519,8 @@ def cmd_drive(argv):
         st, reason = rest[0].lower(), ' '.join(rest[1:])
         log.check(reason, st if st in ('pass', 'fail', 'review') else 'inconclusive', how='recorded by the driver')
         print('ok')
+    elif sub == 'scene':
+        return _scene_command(s, log, rest)
     elif sub == 'launch':
         s.launch(' '.join(rest) or '-nointro')
         print(f'launched, pid {s.game_pid()}')
