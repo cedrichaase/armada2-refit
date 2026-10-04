@@ -60,6 +60,8 @@ typedef const char         *LPCSTR;
 typedef char               *LPSTR;
 
 #define NULLPTR ((void *)0)
+
+#include "../platform/d3d9/d3d9dev.h"   /* Shaders=1: see "Shaders" below */
 #define TRUE  1
 
 #define GENERIC_WRITE          0x40000000
@@ -399,9 +401,21 @@ typedef long (__stdcall *LightEnable_t)(void *, DWORD, BOOL);
 
 static void *g_glow_vt[19];          /* a planet's light: see planet_glows */
 
-static int   g_points = 6;           /* PointLights=: at most this many per draw */
+static int   g_points = 12;          /* PointLights=: at most this many per draw (6 in Direct3D's slots) */
 
-typedef struct { float col[3]; float pos[3]; float src[3]; float score, range; } Pick;
+/* col: the colour at the draw's origin (falloff folded in), for Direct3D's slots;
+ * raw: without the falloff, start/fade: the falloff itself, for the shaders, which
+ * apply it per pixel. */
+typedef struct { float col[3]; float pos[3]; float src[3]; float score, range;
+                 float raw[3]; float start, fade; } Pick;
+
+/* What the shaders take for the draw in hand (Shaders=1, see hook_device): the point
+ * lights at their real positions, and which way the mesh's normals point. */
+#define SH_POINTS 16
+static int   g_sh_on;                /* the DrawIndexedPrimitive hook is in */
+static Pick  g_sh_pick[SH_POINTS];
+static int   g_sh_npick;
+static float g_sh_sign = -1.0f;      /* -1: inward normals, as stock; +1: a mirrored draw */
 
 /* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
  * distance d: 1 straight under the sun, 1/2 over the terminator, 0 over the night
@@ -424,7 +438,7 @@ static int pick_points(const float *at, Pick *out, int max)
         BYTE *light = *(BYTE **)inst;
         const float *col = (const float *)(inst + 4);
         const float *pos = (const float *)(inst + 0x10) + 9;
-        float start, range, dx, dy, dz, d, f, peak, score;
+        float start, range, dx, dy, dz, d, f, ph = 1.0f, peak, score;
         int   hard;
         DWORD vt;
         if (!light) continue;
@@ -445,7 +459,7 @@ static int pick_points(const float *at, Pick *out, int max)
         } else {
             if (d >= start + range) continue;
             f = d <= start ? 1.0f : 1.0f - (d - start) / range;
-            if (vt == (DWORD)g_glow_vt) f *= glow_phase(dx, dy, dz, d);
+            if (vt == (DWORD)g_glow_vt) { ph = glow_phase(dx, dy, dz, d); f *= ph; }
             score = f * peak;
         }
         if (score < 0.004f) continue;
@@ -467,15 +481,16 @@ static int pick_points(const float *at, Pick *out, int max)
         out[i].src[0] = col[0]; out[i].src[1] = col[1]; out[i].src[2] = col[2];
         out[i].score = score;
         out[i].range = hard ? start + range : 100000.0f;
+        out[i].raw[0] = col[0] * ph; out[i].raw[1] = col[1] * ph; out[i].raw[2] = col[2] * ph;
+        out[i].start = start; out[i].fade = range;
     }
     return n;
 }
 
-static int add_points(void *dev, const float *at, DWORD *slots)
+static int add_points(void *dev, const float *at, DWORD *slots, const Pick *pk, int n)
 {
     void **vt = *(void ***)dev;
-    Pick   pk[8];
-    int    n = pick_points(at, pk, g_points > 6 ? 6 : g_points), k = 0, i;
+    int    k = 0, i;
     DWORD  slot = 0;
     for (i = 0; i < n; i++) {
         LIGHT8 l;
@@ -512,10 +527,32 @@ static void __fastcall hook_vb_render(void *self, void *edx, int group, void *lm
                 m[2] * (m[3] * m[7] - m[4] * m[6]);
     void *dev = g_dev;
     DWORD slots[8];
-    int   k = 0, i;
+    Pick  pk[SH_POINTS];
+    int   k = 0, i, n = 0, mirrored = det < 0 && dev && g_fix_mirrored;
+    int   sh = g_sh_on && dev && d9_device(dev);
     (void)edx;
-    if (det < 0 && dev && g_fix_mirrored) reverse_lights(dev);
-    else if (dev && g_points > 0) k = add_points(dev, m + 9, slots);
+    /* Direct3D's slots get at most 6, the strongest, mirrored as before (and none for a
+     * mirrored draw); the shaders take up to SH_POINTS where they are. */
+    if (dev && g_points > 0 && (sh || !mirrored))
+        n = pick_points(m + 9, pk, g_points > SH_POINTS ? SH_POINTS : g_points);
+    if (mirrored) reverse_lights(dev);
+    else if (n) k = add_points(dev, m + 9, slots, pk, n > 6 ? 6 : n);
+    g_sh_npick = sh ? n : 0;
+    if (sh && g_logging) {
+        static int said_hard, said_many;
+        int hard = 0;
+        for (i = 0; i < n; i++) if (pk[i].range < 100000.0f) hard++;
+        if ((hard && !said_hard) || (n > 6 && !said_many)) {
+            char b[160];
+            if (hard) said_hard = 1;
+            if (n > 6) said_many = 1;
+            b[0] = 0; s_cat(b, "shaders: a draw takes "); s_num(b, n);
+            s_cat(b, " point lights, "); s_num(b, hard); s_cat(b, " of them hard");
+            s_cat(b, mirrored ? " (mirrored draw)" : ""); logline(b);
+        }
+    }
+    for (i = 0; i < g_sh_npick; i++) g_sh_pick[i] = pk[i];
+    g_sh_sign = mirrored ? 1.0f : -1.0f;
     g_in_vb = 1;
     g_vb_render(self, group, lm, tm, tex);
     g_in_vb = 0;
@@ -637,7 +674,6 @@ static int patch_set_material(void)
  * the shaders reproduce (another vertex format, fog, specular, another texture
  * stage), and every draw when there is no d3d9 device, goes fixed-function as
  * before. */
-#include "../platform/d3d9/d3d9dev.h"
 #include "hull_shaders.h"
 
 typedef long (__stdcall *DIP8_t)(void *, DWORD, UINT, UINT, UINT, UINT);
@@ -699,7 +735,12 @@ static int sh_setup(void *d9)
     D9_FN(d9, D9_GETTEXTURESTAGESTATE, D9Get2_t)(d9, 1, 1, &op1);
     /* MODULATE(TEXTURE, DIFFUSE or CURRENT), alpha MODULATE, stage 1 DISABLE */
     if (op != 4 || a1 != 2 || (a2 != 0 && a2 != 1) || aop != 4 || op1 != 1) {
-        sh_note(4, "a texture stage other than texture x lit colour"); return 0;
+        char why[120];
+        why[0] = 0; s_cat(why, "a texture stage other than texture x lit colour (op ");
+        s_num(why, (long)op); s_cat(why, " "); s_num(why, (long)a1); s_cat(why, ",");
+        s_num(why, (long)a2); s_cat(why, " alpha "); s_num(why, (long)aop);
+        s_cat(why, ", stage 1 "); s_num(why, (long)op1); s_cat(why, ")");
+        sh_note(4, why); return 0;
     }
 
     D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 256, w);            /* WORLD */
@@ -723,34 +764,47 @@ static int sh_setup(void *d9)
     c[4] = mt.Diffuse.r; c[5] = mt.Diffuse.g; c[6] = mt.Diffuse.b; c[7] = mt.Diffuse.a;
     d9_psconst(d9, 0, c, 2);
 
-    {   /* lcol c2.., lvec c10.., latt c18.. (hull.hlsl) */
-        float lc[32], lv[32], la[32];
+    {   /* hull.hlsl: dcol c2..c5, dvec c6..c9, misc c10, pcol c11.., ppos c27.., pfall c43.. */
+        float dc[16], dv[16], misc[4], pc[SH_POINTS * 4], pp[SH_POINTS * 4], pf[SH_POINTS * 4];
+        int   nd = 0;
+        for (i = 0; i < 16; i++) dc[i] = dv[i] = 0.0f;
         for (i = 0; i < 8; i++) {
             BOOL   on = 0;
             LIGHT8 l;
-            float *C = lc + i * 4, *V = lv + i * 4, *A = la + i * 4;
-            C[0] = C[1] = C[2] = C[3] = 0.0f;
-            V[0] = V[1] = V[3] = 0.0f; V[2] = 1.0f;
-            A[0] = 1e30f; A[1] = 1.0f; A[2] = A[3] = 0.0f;
+            float  n;
             if (D9_FN(d9, D9_GETLIGHTENABLE, D9LightOn_t)(d9, (DWORD)i, &on) < 0 || !on) continue;
             if (D9_FN(d9, D9_GETLIGHT, D9Light_t)(d9, (DWORD)i, &l) < 0) continue;
-            if (l.Type == 3) {                                   /* DIRECTIONAL */
-                float n = sqrt_f(l.Direction[0] * l.Direction[0] + l.Direction[1] * l.Direction[1] +
-                                 l.Direction[2] * l.Direction[2]);
-                if (n < 1e-6f) continue;
-                V[0] = -l.Direction[0] / n; V[1] = -l.Direction[1] / n; V[2] = -l.Direction[2] / n;
-            } else if (l.Type == 1) {                            /* POINT */
-                V[0] = l.Position[0]; V[1] = l.Position[1]; V[2] = l.Position[2]; V[3] = 1.0f;
-                A[0] = l.Range; A[1] = l.Att0; A[2] = l.Att1; A[3] = l.Att2;
-                if (A[1] + A[2] + A[3] <= 0.0f) A[1] = 1.0f;
-            } else {
-                sh_note(5, "a spot light"); return 0;
-            }
-            C[0] = l.Diffuse.r; C[1] = l.Diffuse.g; C[2] = l.Diffuse.b;
+            if (l.Type == 1) continue;        /* the mirrored copies of the picks: see below */
+            if (l.Type != 3) { sh_note(5, "a spot light"); return 0; }
+            if (nd >= 4) { sh_note(8, "more than four directional lights"); return 0; }
+            n = sqrt_f(l.Direction[0] * l.Direction[0] + l.Direction[1] * l.Direction[1] +
+                       l.Direction[2] * l.Direction[2]);
+            if (n < 1e-6f) continue;
+            dc[nd * 4] = l.Diffuse.r; dc[nd * 4 + 1] = l.Diffuse.g; dc[nd * 4 + 2] = l.Diffuse.b;
+            dv[nd * 4] = -l.Direction[0] / n; dv[nd * 4 + 1] = -l.Direction[1] / n;
+            dv[nd * 4 + 2] = -l.Direction[2] / n;
+            nd++;
         }
-        d9_psconst(d9, 2, lc, 8);
-        d9_psconst(d9, 10, lv, 8);
-        d9_psconst(d9, 18, la, 8);
+        d9_psconst(d9, 2, dc, 4);
+        d9_psconst(d9, 6, dv, 4);
+        misc[0] = g_sh_sign; misc[1] = misc[2] = misc[3] = 0.0f;
+        d9_psconst(d9, 10, misc, 1);
+        /* The point lights where they are, with the engine's falloff (full to start,
+         * gone after fade) for the shader to apply per pixel. */
+        for (i = 0; i < SH_POINTS; i++) {
+            float *C = pc + i * 4, *P = pp + i * 4, *F = pf + i * 4;
+            C[0] = C[1] = C[2] = C[3] = 0.0f;
+            P[0] = P[1] = P[2] = P[3] = 0.0f;
+            F[0] = 1.0f; F[1] = 1.0f; F[2] = F[3] = 0.0f;
+            if (i >= g_sh_npick) continue;
+            C[0] = g_sh_pick[i].raw[0]; C[1] = g_sh_pick[i].raw[1]; C[2] = g_sh_pick[i].raw[2];
+            P[0] = g_sh_pick[i].pos[0]; P[1] = g_sh_pick[i].pos[1]; P[2] = g_sh_pick[i].pos[2];
+            F[0] = g_sh_pick[i].start;
+            F[1] = g_sh_pick[i].fade > 1e-3f ? 1.0f / g_sh_pick[i].fade : 1000.0f;
+        }
+        d9_psconst(d9, 11, pc, SH_POINTS);
+        d9_psconst(d9, 27, pp, SH_POINTS);
+        d9_psconst(d9, 43, pf, SH_POINTS);
     }
     return 1;
 }
@@ -799,6 +853,7 @@ static void hook_device(void *dev)
     g_dip = (DIP8_t)vt[71];
     vt[71] = (void *)hook_dip;
     VirtualProtect(&vt[71], 4, old, &old);
+    g_sh_on = 1;
     logline("shaders: on, through the Direct3D 9 device behind d3d8");
 }
 
@@ -1371,7 +1426,7 @@ static void startup(void)
     ini3(ini, "FillAxis",   g_fill_dir);
     ini3(ini, "Ambient",    g_ambient);
     g_planets = (int)GetPrivateProfileIntA("Lighting", "Planets", 1, ini);
-    g_points  = (int)GetPrivateProfileIntA("Lighting", "PointLights", 6, ini);
+    g_points  = (int)GetPrivateProfileIntA("Lighting", "PointLights", 12, ini);
     g_nebulae = (int)GetPrivateProfileIntA("Lighting", "Nebulae", 1, ini);
     ini1(ini, "NebulaBrightness", &g_neb_bright);
     ini1(ini, "NebulaRange",      &g_neb_range);

@@ -1,8 +1,9 @@
 // Lighting.asi's hull shaders (Shaders=1), built into hull_shaders.h by
 // platform/d3d9/hlsl.sh. They stand in for Direct3D's fixed-function lighting on
-// the ST3D_Standard_MeshVB draws and compute the same thing per pixel: the same
-// lights (read back from the device at the draw), the same material, the same
-// texture stage (texture x lit colour). lighting/README.md, "Shaders".
+// the ST3D_Standard_MeshVB draws: Direct3D's lighting per pixel, the directional
+// lights read back from the device at the draw, the point lights Lighting.asi picks
+// given where they are, the same material and texture stage (texture x lit colour).
+// lighting/README.md, "Shaders".
 
 // ---- vertex: the game's vertex buffer as it is (FVF XYZ | NORMAL | TEX1) ----
 
@@ -27,25 +28,35 @@ Lit hull_vs(float4 p : POSITION, float3 n : NORMAL, float2 uv : TEXCOORD0)
     return o;
 }
 
-// ---- pixel: Direct3D's lighting equation, per pixel ----
+// ---- pixel: Direct3D's lighting equation per pixel, the point lights where they are ----
 
-#define LIGHTS 8
-float4 base          : register(c0);   // material emissive + ambient x material ambient; a: material diffuse alpha
-float4 mat_diffuse   : register(c1);
-float4 lcol[LIGHTS]  : register(c2);   // light diffuse colour; 0 for a light that is off
-float4 lvec[LIGHTS]  : register(c10);  // xyz: towards a directional light, or a point light's position; w: 1 for a point light
-float4 latt[LIGHTS]  : register(c18);  // range, attenuation 0, 1, 2
+#define DIRS   4
+#define POINTS 16
+float4 base         : register(c0);   // material emissive + ambient x material ambient; a: material diffuse alpha
+float4 mat_diffuse  : register(c1);
+float4 dcol[DIRS]   : register(c2);   // directional lights as the device has them; 0 for none
+float4 dvec[DIRS]   : register(c6);   // towards each
+float4 misc         : register(c10);  // x: the normals' sign for point lights (-1 inward, +1 mirrored)
+float4 pcol[POINTS] : register(c11);  // point light colour; 0 for none
+float4 ppos[POINTS] : register(c27);  // world position
+float4 pfall[POINTS]: register(c43);  // x: full to this distance, y: 1 / the fade after it
 sampler2D tex0 : register(s0);
 
 float4 hull_ps(Lit i) : COLOR
 {
     float3 N = normalize(i.n);
     float3 sum = base.rgb;
-    for (int k = 0; k < LIGHTS; k++) {
-        float3 L = lvec[k].xyz - i.wp * lvec[k].w;
+    // The engine hands Direct3D its directional lights reversed to match the stock
+    // meshes' inward normals, so these take the normal as it is.
+    for (int k = 0; k < DIRS; k++)
+        sum += dcol[k].rgb * mat_diffuse.rgb * max(0.0, dot(N, dvec[k].xyz));
+    // A point light is where it is; the inward normal is turned round instead.
+    float3 Np = N * misc.x;
+    for (int j = 0; j < POINTS; j++) {
+        float3 L = ppos[j].xyz - i.wp;
         float  d = length(L);
-        float  att = (d <= latt[k].x) ? 1.0 / (latt[k].y + d * (latt[k].z + d * latt[k].w)) : 0.0;
-        sum += lcol[k].rgb * mat_diffuse.rgb * max(0.0, dot(N, L / max(d, 1e-6))) * att;
+        float  f = saturate(1.0 - max(0.0, d - pfall[j].x) * pfall[j].y);
+        sum += pcol[j].rgb * mat_diffuse.rgb * max(0.0, dot(Np, L / max(d, 1e-6))) * f;
     }
     float4 t = tex2D(tex0, i.uv);
     return float4(t.rgb * saturate(sum), t.a * base.a);

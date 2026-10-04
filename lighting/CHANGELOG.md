@@ -4,6 +4,19 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.6.0 — 2026-10-05
+
+### Changed
+- With `Shaders=1`, point lights reach the shaders at their real positions, against the
+  inward normal turned round, with the engine's falloff per pixel: torpedo and pulse
+  lights now light the side of a hull facing them, and mirrored meshes get point lights.
+  Direct3D's slots (any draw that falls back) are as before.
+- `PointLights=12` (was 6): up to 16 per draw in the shaders, still 6 in Direct3D's slots.
+- `Lighting.log` names the stage setup of a draw left fixed-function, and the first draw
+  that takes a hard point light or more than 6.
+
+Seen on the bench 2026-10-05 (`SCENE=firing`, `SCENE=planet`). Installed, not yet seen in game.
+
 ## 1.5.0 — 2026-10-05
 
 ### Added

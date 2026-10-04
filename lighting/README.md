@@ -40,7 +40,7 @@ planet's ground colour (`planet glow:`).
 | `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
-| `PointLights` | `6` | point lights per GPU draw, the strongest first; `0` gives the GPU path none, as stock |
+| `PointLights` | `12` | point lights per GPU draw, the strongest first: up to 16 with `Shaders`, 6 in Direct3D's slots; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
 | `NebulaBrightness`, `NebulaRange` | `2.0`, `8.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
 | `NebulaCull` | `3.0` | a nebula counts as on screen, drawn and lighting, while its bounding sphere times this is in view; `1` is stock |
@@ -242,8 +242,9 @@ Galaxy facing the planet: mean RGB 19/31/40 with `PlanetGlows=0`, 20/32/41 with 
 unmirrored, 25/39/47 mirrored; the side facing away stays dark against the planet.
 
 A hard light (torpedo, pulse) cannot be mirrored: its sphere would land on the far end
-of the ship. It still lights the faces turned away from it, which from above are mostly
-hidden. Open.
+of the ship. On the fixed-function path it still lights the faces turned away from it,
+which from above are mostly hidden. With `Shaders=1` it lights the right side: the
+shaders take every point light where it is and turn the normal round instead (below).
 
 ### Nebulae
 
@@ -395,12 +396,31 @@ and levels match; shading runs smoothly across large triangles (the nacelles, th
 engineering hull's flank) where per-vertex lighting interpolated it. Under DXVK's d3d8
 with `Shaders=1` the log reads `no Direct3D 9 device` and the ship renders as before.
 
-**Next, and each changes the look** (`platform/D3D9.md`, phase 2): negate the inward
-normals in the shader and give every light where it is, which lights the right side for
-the hard lights (torpedoes, pulses) that mirroring cannot fix; hand the picked point
-lights straight to pixel shader constants, beyond Direct3D's eight slots; and use the
-hull texture's alpha, the self-illumination map: in the traced frame no draw on this
-path used it (blend `ONE/ZERO`, and no second pass).
+**Point lights in the shaders (1.6.0).** The directional lights still come from the
+device: the engine reverses them to match the inward normals, which is right as it is.
+The point lights do not: `hook_vb_render` picks up to 16 (`PointLights`, default 12) and
+hands them to the pixel shader at their real positions, with the engine's own falloff
+(full to the light's start, linear to nothing over its fade) applied per pixel rather
+than once at the draw's origin, against the normal turned round (`misc.x`, -1). So a
+torpedo's or a pulse's hard sphere lights the side of the hull facing it, the open item
+above, and a large ship near a soft light falls off across its length. A mirrored draw
+(`FixMirrored`), whose normals end up pointing outward, takes them with the sign +1, so
+mirrored meshes get point lights for the first time. Direct3D's slots still get the
+strongest 6, mirrored as before, for any draw that falls back.
+
+On the bench (2026-10-05): in the `firing` scene a draw took the Galaxy's own torpedo as
+a hard light (`Lighting.log`: `a draw takes 1 point lights, 1 of them hard`); in the
+`planet` close-up the planet's glow at its real position lit the ship as the mirrored one
+had, as it should for a light far away against the ship. The pixel shader is about 716
+instructions as vkd3d emits it (unoptimised): over shader model 3.0's guaranteed 512,
+which DXVK does not enforce and current Windows hardware exceeds.
+
+**Draws left fixed-function on purpose.** In the `firing` scene some `VBRender` draws use
+stage 0 `SELECTARG1(TEXTURE)`: the texture as it is, unlit. Lighting has nothing to add to
+them; the log names it once.
+
+**Next, and it changes the look:** the hull texture's alpha, the self-illumination map:
+in the traced frame no draw on this path used it (blend `ONE/ZERO`, and no second pass).
 
 ## Not covered yet
 
@@ -417,7 +437,8 @@ path used it (blend `ONE/ZERO`, and no second pass).
   "Reading back a dynamic vertex buffer").
 - Seen on the first Federation campaign map only. Other races, combat effects and frame
   rate have not been measured.
-- A mirrored mesh (`FixMirrored`) gets no point lights: reversing a directional light
-  fixes its normals, and a point light has no such reversal.
+- A mirrored mesh (`FixMirrored`) gets no point lights on the fixed-function path:
+  reversing a directional light fixes its normals, and a point light has no such
+  reversal. With `Shaders=1` it gets them.
 - Weapon impacts flash no light (above). `ShockwaveExplosion` (the big special weapons'
   ring) has its own `AdjustLighting` and is left alone.
