@@ -103,6 +103,11 @@ there the prefix's is used:
 - **Wine's builtin** `d3d8.dll` (320548), in the prefix, talks to `wined3d` directly and
   never loads `d3d9.dll`, so a DXVK d3d9 in the prefix is not reached from it.
 
+A plugin can reach Direct3D 9, and with it shaders, only through a translator that
+answers `QueryInterface(IDirect3DDevice9)`. Measured on the bench, crosire's current
+d3d8to9 release does; neither DXVK's d3d8 nor GOG's build does. The spike and the plan
+built on it are in [`D3D9.md`](D3D9.md).
+
 The GOG release as shipped, which `--revert` returns to, is GOG's translator on the
 prefix's d3d9 — Heroic's DXVK while `autoInstallDxvk` is on, else Wine's:
 

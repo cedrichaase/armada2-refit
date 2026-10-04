@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.11.0 — 2026-10-05
+
+Layers: testbench 2.13.0.
+
+### Added
+- `testbench/d3d9probe/`, a bench tool that checks whether plugins can reach Direct3D 9
+  behind the game's d3d8 (testbench 2.13.0). The spike and the plan it supports are in
+  `platform/D3D9.md`.
+
 ## 9.10.1 — 2026-10-05
 
 Layers: qol 1.1.1.

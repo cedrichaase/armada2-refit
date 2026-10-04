@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Put D3D9Probe.asi into a test-bench clone:
+#   ./a2test session start --install . --install testbench/d3d9probe
+# With D3D9PROBE_D3D8=<file>, that d3d8.dll goes into the clone's d3d8 slot too
+# (a d3d8to9 to test, say); without it the clone keeps the chain it was cloned with.
+# Refuses any game directory that is not an a2test clone.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../../a2env.sh"
+GAME="$A2_GAME"
+
+case "$GAME" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "refusing: $GAME is not an a2test clone" >&2; exit 1 ;;
+esac
+
+if [ -n "${D3D9PROBE_D3D8:-}" ]; then
+    cp "$D3D9PROBE_D3D8" "$GAME/d3d8.dll"
+    echo "d3d8.dll <- $D3D9PROBE_D3D8 ($(sha256sum < "$D3D9PROBE_D3D8" | cut -c1-16))"
+fi
+bash "$here/build.sh"
+cp "$here/build/D3D9Probe.asi" "$GAME/"
+rm -f "$GAME/D3D9Probe.log" "$GAME/D3D9Probe.tint"
+echo "installed D3D9Probe into $GAME; touch $GAME/D3D9Probe.tint to tint the indexed draws"
