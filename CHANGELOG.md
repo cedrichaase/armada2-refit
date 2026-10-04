@@ -13,7 +13,7 @@ Layers: postfx 1.1.1.
 - Selecting many ships no longer drags the frame rate down: each selected ship's bubble
   is drawn on the CPU, and that path was reading back from GPU memory under DXVK. 30
   selected went from 72.6 ms a frame to the vsync cap of 16.7 ms on the bench
-  (postfx 1.1.1).
+  (postfx 1.1.1, b038b8e).
 
 ## 9.10.1 — 2026-10-05
 

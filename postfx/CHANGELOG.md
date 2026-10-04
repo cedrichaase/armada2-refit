@@ -13,7 +13,7 @@ the numbers are in [`README.md`](README.md).
   `d3d9.cachedWriteOnlyBuffers = True` at every stage, so the engine's CPU mesh path no
   longer reads back from GPU memory. On the bench, 30 selected ships' bubbles went from
   70.6 ms a frame to 0.6–0.8 ms. `renderer-config.sh` leaves the key out, with a
-  warning, on a DXVK that does not know it.
+  warning, on a DXVK that does not know it (b038b8e).
 
 Installed, not yet seen in game.
 
