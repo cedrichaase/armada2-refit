@@ -23,7 +23,9 @@ records a hash of every modded file, and `refit` checks each one on the way back
 WHAT COUNTS AS A CHANGE
 
     textures      Textures/RGB/*.a2neb-backup  -- a2tex
-    models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel)
+    models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel),
+                                                  hull-bump (Federation hulls)
+                  Shaders/*.a2neb-backup       -- hull-bump (the dot3 shader's normal)
                   Planets.asi/.ini             -- added files: planet tessellation
                   Textures/RGB/a2flatbump.tga  -- added: the hull-bump flat map
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
@@ -118,7 +120,7 @@ def layer_of(rel, suffix):
         return 'cutscenes'
     if top == 'misc':
         return 'hud'
-    if top == 'SOD':
+    if top in ('SOD', 'Shaders'):
         return 'models'
     return 'other'
 

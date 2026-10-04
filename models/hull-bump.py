@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Light the Federation hulls per pixel, through the engine's own dot3 bump path.
 
-    models/hull-bump.py --install     patch the Federation SODs, add the flat map
-    models/hull-bump.py --revert      put the stock SODs back, remove the flat map
+    models/hull-bump.py --install     patch the Federation SODs and the dot3 shader,
+                                      add the flat map
+    models/hull-bump.py --revert      put the stock SODs and shader back, remove the map
     models/hull-bump.py --status      what is installed
     models/hull-bump.py --manifest    (re)write hull-bump.sha256 from the stock SODs
 
@@ -20,6 +21,14 @@ Textures/RGB/a2flatbump.tga, 8x8 mid-grey: normals straight out, per-pixel light
 no relief. It is the one file this layer adds to Textures/RGB, under a name no stock
 texture has, so no load can collide with a real texture. `a2mod` switches it with the
 SODs. models/README.md, "Hull lighting", has the measurements.
+
+It also corrects the dot3 vertex shader, which the engine assembles at load from
+Shaders/dot3_directional.nvv. The shader takes the surface normal of the per-pixel
+lighting from S x T, the cross product of the two texture-mapping directions, and not
+from the vertex normal it is also given. Where a hull's art is mirrored, S x T points
+into the hull and the key light cannot reach that side: dark tops, a blue cast from the
+fill light, a seam where the halves meet. The one line that reads S x T reads the normal
+instead (v5 -> v1). Hash-checked against stock and backed up like the SODs.
 
 Always patches from the stock bytes (the .a2neb-backup once there is one), checked
 against hull-bump.sha256, so a re-install is a fresh patch and never a patch of a patch.
@@ -46,6 +55,10 @@ MANIFEST = os.path.join(HERE, 'hull-bump.sha256')
 SUFFIX = '.a2neb-backup'
 BUMP_WORD = 0x200
 OPAQUE = b'\x06\x00opaque'
+SHADER = os.path.join(GAME, 'Shaders', 'dot3_directional.nvv')
+SHADER_STOCK = '770fc697db9cfcd570e65891731d2ad1d1460327c57c336bd67c37e765cdb988'
+SHADER_FROM = b'dp3 r3.z, v5.xyz, c[6]'     # z of the light vector from S x T ...
+SHADER_TO = b'dp3 r3.z, v1.xyz, c[6]'       # ... from the vertex normal instead
 
 
 def sha(b):
@@ -120,6 +133,15 @@ def game_running():
     return False
 
 
+def shader_patched():
+    """The corrected shader from the stock bytes, or exit if they are not stock."""
+    src = SHADER + SUFFIX if os.path.exists(SHADER + SUFFIX) else SHADER
+    d = open(src, 'rb').read()
+    if sha(d) != SHADER_STOCK or d.count(SHADER_FROM) != 1:
+        sys.exit(f'{src}: not the stock dot3 shader (sha256 differs) -- refusing (nothing written)')
+    return d.replace(SHADER_FROM, SHADER_TO)
+
+
 def status():
     n_patched = n_stock = 0
     for name in manifest():
@@ -129,7 +151,8 @@ def status():
         else:
             n_stock += 1
     print(f'{GAME}\n  hull bump: {n_patched} SODs patched, {n_stock} stock; '
-          f'{FLAT_NAME}.tga {"present" if os.path.exists(FLAT) else "absent"}')
+          f'{FLAT_NAME}.tga {"present" if os.path.exists(FLAT) else "absent"}; shader '
+          f'{"corrected" if SHADER_TO in open(SHADER, "rb").read() else "stock"}')
 
 
 def install():
@@ -147,6 +170,7 @@ def install():
         if not n:
             sys.exit(f'{name}: no plain material found -- refusing (nothing written)')
         todo.append((p, new, n))
+    shader = shader_patched()
     # Every check passed before anything is written: all or nothing.
     with open(FLAT, 'wb') as fh:
         fh.write(flat_tga())
@@ -157,8 +181,12 @@ def install():
         with open(p, 'wb') as fh:
             fh.write(new)
         total += n
+    if not os.path.exists(SHADER + SUFFIX):
+        shutil.copy2(SHADER, SHADER + SUFFIX)
+    with open(SHADER, 'wb') as fh:
+        fh.write(shader)
     print(f'installed hull bump: {total} materials in {len(todo)} SODs, '
-          f'{os.path.relpath(FLAT, GAME)}')
+          f'{os.path.relpath(FLAT, GAME)}, {os.path.relpath(SHADER, GAME)} corrected')
 
 
 def revert():
@@ -170,7 +198,9 @@ def revert():
             n += 1
     if os.path.exists(FLAT):
         os.remove(FLAT)
-    print(f'reverted hull bump: {n} SODs restored, {FLAT_NAME}.tga removed')
+    if os.path.exists(SHADER + SUFFIX):
+        os.replace(SHADER + SUFFIX, SHADER)
+    print(f'reverted hull bump: {n} SODs restored, {FLAT_NAME}.tga removed, shader restored')
 
 
 def write_manifest():
