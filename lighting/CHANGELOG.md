@@ -15,7 +15,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `Lighting.log` names the stage setup of a draw left fixed-function, and the first draw
   that takes a hard point light or more than 6.
 
-Seen on the bench 2026-10-05 (`SCENE=firing`, `SCENE=planet`). Installed, not yet seen in game.
+Seen on the bench 2026-10-05 (`SCENE=firing`, `SCENE=planet`). Confirmed in game 2026-10-05.
 
 ## 1.5.0 — 2026-10-05
 
