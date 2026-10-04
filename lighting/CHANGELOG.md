@@ -12,7 +12,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   nacelle grilles, bussards) as the CPU path's second pass does; the GPU path had dropped
   that pass. `0` leaves them dark (5ca6262).
 
-Seen on the bench 2026-10-05 (`SCENE=planet`, against the CPU path). Installed, not yet seen in game.
+Seen on the bench 2026-10-05 (`SCENE=planet`, against the CPU path). Confirmed in game 2026-10-05.
 
 ## 1.6.0 — 2026-10-05
 
