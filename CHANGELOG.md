@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.8.2 — 2026-10-04
+
+Layers: lighting 1.3.2.
+
+### Fixed
+- Nebula, planet and explosion light lit the far side of a ship; a planet's glow now
+  comes from the planet and shows. `NebulaRange` back to 5 (lighting 1.3.2).
+
 ## 9.8.1 — 2026-10-04
 
 Layers: lighting 1.3.1.

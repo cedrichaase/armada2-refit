@@ -383,6 +383,13 @@ static void reverse_lights(void *dev)
  * fade is under a quarter of its start goes to Direct3D as it is instead: full
  * colour, and Range = start + fade, so each vertex is lit by it or not, as on the
  * CPU path; it is picked if it is within that reach plus HARD_REACH of the draw.
+ * The stock meshes' normals point inward; the engine hands Direct3D its directional
+ * lights reversed to match (the map's axis is negated in the device's light), so a
+ * point light given where it is lights the side of a hull turned away from it. A soft
+ * light is therefore given mirrored through the draw's origin, which reverses its
+ * direction there exactly and, over a ship small against its distance, nearly
+ * everywhere. A hard light cannot be mirrored (its sphere would land on the far end
+ * of the ship) and still lights the faces turned away from it.
  * Lights of one colour count once, by the strongest: a nebula field is many nebula
  * objects of one type, each with its own light, and summed they would paint a ship
  * in its colour at full saturation wherever two or three reach it. */
@@ -394,6 +401,16 @@ static void *g_glow_vt[19];          /* a planet's light: see planet_glows */
 static int   g_points = 6;           /* PointLights=: at most this many per draw */
 
 typedef struct { float col[3]; float pos[3]; float src[3]; float score, range; } Pick;
+
+/* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
+ * distance d: 1 straight under the sun, 1/2 over the terminator, 0 over the night
+ * side. */
+static float glow_phase(float dx, float dy, float dz, float d)
+{
+    float n = sqrt_f(g_key_dir[0] * g_key_dir[0] + g_key_dir[1] * g_key_dir[1] + g_key_dir[2] * g_key_dir[2]);
+    if (d < 1e-3f || n < 1e-6f) return 1.0f;
+    return 0.5f - 0.5f * (dx * g_key_dir[0] + dy * g_key_dir[1] + dz * g_key_dir[2]) / (d * n);
+}
 
 static int pick_points(const float *at, Pick *out, int max)
 {
@@ -408,7 +425,10 @@ static int pick_points(const float *at, Pick *out, int max)
         const float *pos = (const float *)(inst + 0x10) + 9;
         float start, range, dx, dy, dz, d, f, peak, score;
         int   hard;
-        if (!light || (*(DWORD *)light != VT_POINT && *(DWORD *)light != (DWORD)g_glow_vt)) continue;
+        DWORD vt;
+        if (!light) continue;
+        vt = *(DWORD *)light;
+        if (vt != VT_POINT && vt != (DWORD)g_glow_vt) continue;
         start = *(float *)(light + 0x100);
         range = *(float *)(light + 0x104);
         dx = at[0] - pos[0]; dy = at[1] - pos[1]; dz = at[2] - pos[2];
@@ -424,6 +444,7 @@ static int pick_points(const float *at, Pick *out, int max)
         } else {
             if (d >= start + range) continue;
             f = d <= start ? 1.0f : 1.0f - (d - start) / range;
+            if (vt == (DWORD)g_glow_vt) f *= glow_phase(dx, dy, dz, d);
             score = f * peak;
         }
         if (score < 0.004f) continue;
@@ -467,7 +488,13 @@ static int add_points(void *dev, const float *at, DWORD *slots)
         l.Type = 1;                                   /* D3DLIGHT_POINT */
         l.Diffuse.r = pk[i].col[0]; l.Diffuse.g = pk[i].col[1]; l.Diffuse.b = pk[i].col[2];
         l.Diffuse.a = 1.0f;
-        l.Position[0] = pk[i].pos[0]; l.Position[1] = pk[i].pos[1]; l.Position[2] = pk[i].pos[2];
+        if (pk[i].range >= 100000.0f) {             /* soft: mirrored through the draw */
+            l.Position[0] = 2.0f * at[0] - pk[i].pos[0];
+            l.Position[1] = 2.0f * at[1] - pk[i].pos[1];
+            l.Position[2] = 2.0f * at[2] - pk[i].pos[2];
+        } else {
+            l.Position[0] = pk[i].pos[0]; l.Position[1] = pk[i].pos[1]; l.Position[2] = pk[i].pos[2];
+        }
         l.Range = pk[i].range;
         l.Att0  = 1.0f;
         ((SetLight_t)vt[44])(dev, slot, &l);
@@ -597,7 +624,7 @@ static int patch_set_material(void)
  * every stock nebula). On the bench its colour came out black frame after frame.
  * The plugin registers it in place of that: the glow colour times
  * NebulaBrightness, steady, with the falloff times NebulaRange. */
-static float g_neb_bright = 2.0f, g_neb_range = 8.0f;
+static float g_neb_bright = 2.0f, g_neb_range = 5.0f;
 static int   g_nebulae = 1;
 
 static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
@@ -620,13 +647,15 @@ static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
 
 /* Planets. A planet in sunlight lights what is near its day side, in the colour
  * of its ground. Each frame, after GameObject_PreRenderAll, the plugin walks the
- * same object list (0x761084) for planets and registers a point light for each:
- * on its surface at the point facing the Key light (its position from the
- * Entity's transform, +0x44, and its radius from the bounding sphere, +0x34,
- * whose centre is in object space), coloured by the Key light times the mean
- * colour of the planet's ground texture times PlanetGlow, full over the
- * first radius and gone at PlanetGlowRange radii. The ground texture is the
- * class's groundTextureName (PlanetClass +0x4bc) with 1 and 2 appended, one per
+ * same object list (0x761084) for planets and registers a point light for each
+ * at its centre (its position from the Entity's transform, +0x44, and its radius
+ * from the bounding sphere, +0x34, whose centre is in object space), coloured by
+ * the Key light times the mean colour of the planet's ground texture times
+ * PlanetGlow, full at the surface and gone at PlanetGlowRange radii.
+ * pick_points scales it per draw by how much of the day side faces the draw
+ * (glow_phase): a ship over the night side gets none. At the point under the sun,
+ * as it once was, the light came from where the Key does and was lost in it.
+ * The ground texture is the class's groundTextureName (PlanetClass +0x4bc) with 1 and 2 appended, one per
  * hemisphere, else the name alone, else atmosphereTextureName (+0x4ac); the
  * mean counts only lit texels, because the class planets' gore unwrap leaves
  * black between the lobes. It is read from Textures/RGB once per name, so it is
@@ -771,13 +800,9 @@ static BYTE *glow_light(void *planet)
 static void planet_glows(void)
 {
     DWORD list = *(DWORD *)OBJECT_LIST, head, node;
-    float sun[3], n;
     int   i;
     if (!g_planet_glow || !list) return;
     g_glow_frame++;
-    n = sqrt_f(g_key_dir[0] * g_key_dir[0] + g_key_dir[1] * g_key_dir[1] + g_key_dir[2] * g_key_dir[2]);
-    if (n < 1e-6f) return;
-    for (i = 0; i < 3; i++) sun[i] = -g_key_dir[i] / n;
     head = *(DWORD *)(list + 4);
     for (node = *(DWORD *)head; node != head; node = *(DWORD *)node) {
         BYTE *obj = *(BYTE **)(node + 8), *ent, *cls, *light;
@@ -798,7 +823,7 @@ static void planet_glows(void)
         *(float *)(light + 0x100) = r;
         *(float *)(light + 0x104) = r * (g_glow_range > 1.0f ? g_glow_range - 1.0f : 0.01f);
         for (i = 0; i < 9; i++) mat[i] = (i % 4 == 0) ? 1.0f : 0.0f;
-        for (i = 0; i < 3; i++) mat[9 + i] = xf[9 + i] + sph[i] + sun[i] * r;
+        for (i = 0; i < 3; i++) mat[9 + i] = xf[9 + i] + sph[i];
         ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, light, col, mat);
     }
 }

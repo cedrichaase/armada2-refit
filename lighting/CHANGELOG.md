@@ -4,6 +4,21 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.3.2 — 2026-10-04
+
+### Fixed
+- Soft point lights (nebulae, planets, explosions) lit the side of a hull turned away
+  from them: the stock meshes' normals point inward. They now go to Direct3D mirrored
+  through the draw's origin. Torpedo and pulse lights are unchanged and still inverted.
+- A planet's glow comes from its centre, scaled per object by how much of its day side
+  faces it, instead of from the surface under the sun, where the Key light hid it.
+
+### Changed
+- `NebulaRange=5.0` (was 8.0 in 1.3.1): a nebula's full-strength reach outdid a nearby
+  planet's.
+
+Seen on the bench 2026-10-04 (`SCENE=planet`). Installed, not yet seen in game.
+
 ## 1.3.1 — 2026-10-04
 
 ### Changed

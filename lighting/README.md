@@ -41,9 +41,9 @@ planet's ground colour (`planet glow:`).
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `PointLights` | `6` | point lights per GPU draw, the strongest first; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
-| `NebulaBrightness`, `NebulaRange` | `2.0`, `8.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
+| `NebulaBrightness`, `NebulaRange` | `2.0`, `5.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
 | `PlanetGlows` | `1` | a planet's day side lights what is near it |
-| `PlanetGlow`, `PlanetGlowRange` | `1.2`, `5.0` | Key x ground colour x this; full over one radius from the sunward surface, gone at this many radii |
+| `PlanetGlow`, `PlanetGlowRange` | `1.2`, `5.0` | Key x ground colour x this, from the planet's centre; full at its surface, gone at this many radii; times the share of the day side facing the object |
 | `SkyLight` | `0.35` | the sky light's strongest channel; `0` leaves it dark |
 | `Explosions` | `1` | ship and station explosions light their surroundings |
 | `ExplosionColour`, `ExplosionBrightness`, `ExplosionRange` | `1.00 0.62 0.28`, `4.0`, `10.0` | the flash's colour and peak; full over the explosion's radius (at least 40 units), gone at this many radii |
@@ -188,9 +188,10 @@ user found nebulae, planets, the sky and explosions all too subtle. Part of that
 structural: Direct3D sums ambient and every light and clamps at 1 before the texture,
 and the Key already takes the side it lights most of the way there, so a source shows
 mostly on a hull's shadowed side and as a shift in hue on its lit one. 1.3.1 doubles
-each source's colour (`SkyLight` a little more, 0.35) and widens each reach: nebulae to
-8x their ODF falloff (full to 480 units, gone at 960), planets to 5 radii, explosions to
-10 radii (a frigate's gone at 400 units). A glow of 2 saturates its
+each source's colour (`SkyLight` a little more, 0.35) and widens each reach: planets to
+5 radii, explosions to 10 radii (a frigate's gone at 400 units). Nebulae went to 8x their
+ODF falloff (full to 480 units) and back to 5x in 1.3.2: at 8 a Radioactive nebula's
+full yellow outreached a planet right beside the ship. A glow of 2 saturates its
 channels on the side facing it; that is the intended look, and the keys take it back down.
 
 ### Point lights on the GPU path
@@ -218,6 +219,28 @@ Lights of one colour count once, by the strongest. A nebula field is many nebula
 objects of one type, each with its own light, and summed they would paint a hull in
 its colour at full saturation wherever two or three reached it.
 
+### Which side a point light lights
+
+The stock meshes' normals point inward. The engine compensates for its directional
+lights: in the device, the light in slot 0 had the direction (0.836, 0.487, 0.251) where
+the sky light's axis was (−0.836, −0.487, −0.251), and the world matrix of the draw was
+the engine's object matrix, so nothing else stands between the two. A point light has no
+direction to negate: Direct3D takes it from the light's position, and with inward
+normals it lit the side of a hull turned *away* from the source. In game a Bird of Prey
+beside a Metaphasic nebula glowed green on the far wing; on the bench (`SCENE=planet`)
+the planet's glow, picked at full strength, moved the ship's planet-facing side by one
+level in 255.
+
+A soft light now goes to Direct3D mirrored through the draw's origin (2 x origin −
+position). That reverses its direction exactly at the origin and, for a light far away
+against the size of a ship, nearly everywhere on it. On the bench, the side of the
+Galaxy facing the planet: mean RGB 19/31/40 with `PlanetGlows=0`, 20/32/41 with the glow
+unmirrored, 25/39/47 mirrored; the side facing away stays dark against the planet.
+
+A hard light (torpedo, pulse) cannot be mirrored: its sphere would land on the far end
+of the ship. It still lights the faces turned away from it, which from above are mostly
+hidden. Open.
+
 ### Nebulae
 
 Every nebula builds a point light in `Nebula::InitializeGeometry` (at +0x1ac, falloff
@@ -235,10 +258,15 @@ stayed grey on the far side.
 ### Planets: light from the day side
 
 Each frame, after `GameObject_PreRenderAll`, the plugin walks the same object list
-(0x761084) for planets (vtable 0x6b2b3c). For each it registers a point light on the
-surface facing the Key: position from the Entity's transform (+0x44), radius from its
-bounding sphere (+0x34), whose centre is in object space. The light starts at the
-`Planet_Database` radius the engine itself uses. Its colour is Key x `PlanetGlow` x the
+(0x761084) for planets (vtable 0x6b2b3c). For each it registers a point light at its
+centre: position from the Entity's transform (+0x44), radius from its bounding sphere
+(+0x34), whose centre is in object space. The light is full at the `Planet_Database`
+radius the engine itself uses (262 for class M) and gone at `PlanetGlowRange` radii.
+`pick_points` scales it per draw by the share of the day side that faces the draw,
+½ − ½ (direction from the centre · `KeyAxis`): 1 under the sun, ½ over the terminator,
+0 over the night side. Up to 1.3.1 the light sat on the surface under the sun; from
+there it came from where the Key does, onto faces the Key already lights to the clamp,
+and showed nowhere. Its colour is Key x `PlanetGlow` x the
 mean colour of the planet's ground texture, `groundTextureName` (PlanetClass +0x4bc)
 with `1` and `2` appended, one file per hemisphere, else the name alone, else
 `atmosphereTextureName` (+0x4ac). Only lit texels count, because the class planets'
