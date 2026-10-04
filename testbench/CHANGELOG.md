@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.12.2 — 2026-10-04
+
+### Fixed
+- The audio watchdog's `pactl subscribe` dies with the process that started it. A
+  session stopped by terminating its driver used to leave it running; 63 had piled up
+  by evening, until pipewire-pulse refused every new client and no session could start
+  ("could not create the silent sink").
+
 ## 2.12.1 — 2026-10-04
 
 ### Fixed

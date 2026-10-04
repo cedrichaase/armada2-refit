@@ -50,6 +50,13 @@ def pid_alive(pid):
         return False
 
 
+def _die_with_parent():
+    """preexec_fn: SIGTERM this child when the thread that started it exits (Linux
+    PR_SET_PDEATHSIG, option 1), so a killed driver cannot leave it running."""
+    import ctypes
+    ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGTERM, 0, 0, 0)
+
+
 def kill_group(pid, sig=signal.SIGTERM):
     """Everything here is started with setsid, so its pid is its process group -- but a
     pid out of session.json may be long gone and reused.  Only a group that pid still
@@ -613,9 +620,14 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def _audio_watchdog(self):
         """For the whole case. `pactl subscribe` reports each new stream as it is created,
         so a stray one is moved and muted within milliseconds; the game is then stopped
-        and the next step fails on it."""
+        and the next step fails on it.
+
+        `pactl subscribe` dies with the thread that started it (PR_SET_PDEATHSIG): a
+        session stopped by terminating its driver never reaches the `finally`, and each
+        orphaned subscriber kept a connection until pipewire-pulse refused every client
+        ("too many client application connections") and no session could start."""
         sub = subprocess.Popen(['pactl', 'subscribe'], stdout=subprocess.PIPE, text=True,
-                               stderr=subprocess.DEVNULL)
+                               stderr=subprocess.DEVNULL, preexec_fn=_die_with_parent)
         self._audio_sub = sub            # teardown kills it: readline() may wait on the next event
         try:
             leaks = self._silence()
