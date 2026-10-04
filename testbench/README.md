@@ -62,7 +62,7 @@ runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`;
 | input | `input/a2input`: a wlr virtual pointer and virtual keyboard on sway's seat, fed through a FIFO | see "Input" |
 | game | `umu_run.py` with Heroic's environment, the clone as `WINEPREFIX`/`STEAM_COMPAT_DATA_PATH`; silent: `winepulse.drv=d;winealsa.drv=d` | see "Traps" |
 | capture | `grim -o HEADLESS-1` | what the compositor actually shows, scaling included |
-| teardown | Proton's `wineserver -k` on the clone, the launcher's process group, sway; logs gathered; clone deleted | |
+| teardown | Proton's `wineserver -k` on the clone, the launcher's process group, sway; logs gathered; clone deleted | also when `session start` fails part-way (an install, the display, a launch the audio guard stops): before 2.12.1 such a session kept its sway, input and VNC running and stayed in `session list` with no game |
 
 The launch step also proves isolation: it scans `/proc/<pid>/maps` and `fd` for the
 real install's path, and fails the case if the game has it open.

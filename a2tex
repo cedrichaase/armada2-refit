@@ -168,6 +168,8 @@ install)
       compgen -G "$DATA/$t/out/*.tga" >/dev/null && echo "$t"; done)
   [ ${#list[@]} -eq 0 ] && { echo "nothing to install -- no target is built in $DATA"; exit 0; }
   need_stock "${list[@]}"
+  # Every width the guards below will ask for, read once (img_width, textures/lib).
+  preload_widths "$TEX" $(for t in "${list[@]}"; do printf '%s ' "$DATA/$t/out"; done)
   # Every texture the engine treats as an interface sprite, computed once. Above 256
   # these CRASH the game, and `maxsize=` in target.conf only protects a texture whose
   # target knows it is UI. borgUI3 is an interface sprite in Sprites/gui_borg.spr AND is
@@ -202,7 +204,7 @@ install)
     if [ "$ms" != 0 ]; then
       for f in "$DATA/$t/out"/*.tga; do
         [ -e "$f" ] || continue
-        w=$(magick "$f" -format '%w' info:)
+        w=$(img_width "$f")
         if [ "$w" -gt "$ms" ]; then
           echo "REFUSED $t -- $(basename "$f") is ${w}px and the target declares maxsize=$ms."
           echo "        Interface sprites above 256 crash the game; see README.md."
@@ -219,9 +221,9 @@ install)
     # a UI sprite.
     for f in "$DATA/$t/out"/*.tga; do
       [ -e "$f" ] || continue
-      a=$(basename "$f" .tga)
+      a=${f##*/}; a=${a%.tga}
       grep -qxF "$a" "$IFACE" 2>/dev/null || continue
-      w=$(magick "$f" -format '%w' info:)
+      w=$(img_width "$f")
       if [ "$w" -gt 256 ]; then
         echo "REFUSED $t -- $a is ${w}px and is an @tmaterial=interface sprite."
         echo "        Interface sprites above 256 crash the game at the cinematic-to-HUD"
@@ -235,7 +237,7 @@ install)
 
     for f in "$DATA/$t/out"/*.tga; do
       [ -e "$f" ] || continue
-      a=$(basename "$f" .tga); dst=$(cd "$TEX" && tex_path "$a"); [ -z "$dst" ] && continue
+      a=${f##*/}; a=${a%.tga}; dst=$(cd "$TEX" && tex_path "$a"); [ -z "$dst" ] && continue
       # Enumerate the stock chain by WALKING LEVELS and resolving each with mip_name,
       # which tries both spellings and validates by width. The glob this replaces --
       # ${a}_[0-9]* -- matched neither fcruise1_B1/_B2 nor fresearch1/2, both of which
@@ -248,7 +250,7 @@ install)
         mn=$(mip_name "$TEX/$dst" $((n+1))); [ -n "$mn" ] || break
         n=$((n+1)); mips+="$mn "
       done
-      bw=$(magick "$f" -format '%w' info:); sw=$(magick "$TEX/$dst" -format '%w' info:)
+      bw=$(img_width "$f"); sw=$(img_width "$TEX/$dst")
       [ "$bw" = "$sw" ] && continue
       # Siblings named like levels but not sized like them. Checked BEFORE the chain
       # itself, and whether or not a valid chain was found, because the danger is the
@@ -268,7 +270,7 @@ install)
       while [ "$lvl" -le "$n" ]; do
         want=$((want/2)); mn=$(mip_name "$TEX/$dst" "$lvl")
         m="$DATA/$t/out/${mn}.tga"
-        if [ ! -f "$m" ] || [ "$(magick "$m" -format '%w' info:)" != "$want" ]; then ok=0; break; fi
+        if [ ! -f "$m" ] || [ "$(img_width "$m")" != "$want" ]; then ok=0; break; fi
         lvl=$((lvl+1))
       done
       if [ "$ok" != 1 ]; then
@@ -283,7 +285,7 @@ install)
 
     for f in "$DATA/$t/out"/*.tga; do
       [ -e "$f" ] || continue
-      a=$(basename "$f" .tga); dst=$(cd "$TEX" && tex_path "$a")
+      a=${f##*/}; a=${a%.tga}; dst=$(cd "$TEX" && tex_path "$a")
       [ -z "$dst" ] && { echo "?? no stock $a"; continue; }
       dst="$TEX/$dst"
 
@@ -293,7 +295,8 @@ install)
       # Mnebula2 over its stock 64/32/16/8 mips crashed the Klingon campaign whenever
       # the ion nebula came on screen. Refuse rather than ship it.
       [ -f "$dst$BAK" ] || cp -p "$dst" "$dst$BAK"
-      cp "$f" "$dst"; echo "installed $(basename "$dst")  ($t)"
+      cp "$f" "$dst"; echo "installed ${dst##*/}  ($t)"
+      [ -n "${TEXW[$f]:-}" ] && TEXW[$dst]=${TEXW[$f]} || unset 'TEXW[$dst]'
     done
     # panel=N: the target's art is cut for a model widened to N units (LOADING and
     # SOD/logo.SOD). Art and geometry are one change -- the wide art on the stock quads

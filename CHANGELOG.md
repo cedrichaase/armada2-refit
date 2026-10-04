@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.7.1 — 2026-10-04
+
+Layers: textures 2.1.1, testbench 2.12.1.
+
+### Fixed
+- `a2tex install` (and so `./install`) runs in about 36 s instead of about 175 s, with
+  identical results (textures 2.1.1).
+- A bench session whose start fails is torn down instead of left running without a game
+  (testbench 2.12.1).
+
 ## 9.7.0 — 2026-10-04
 
 Layers: lighting 1.2.0.

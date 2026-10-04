@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.12.1 — 2026-10-04
+
+### Fixed
+- A `session start` that failed part-way (on 2026-10-04, the audio guard stopping a
+  launch whose stream reached a real output) left its sway, input and VNC running and
+  the session listed as active with no game. It is now torn down and reported like any
+  stopped session, and the error is raised as before.
+- Sessions start in about a minute instead of three and a half: `./install` spent ~175 s
+  in `a2tex install` (textures 2.1.1).
+
 ## 2.12.0 — 2026-10-04
 
 ### Added
