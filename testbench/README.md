@@ -68,7 +68,7 @@ The launch step also proves isolation: it scans `/proc/<pid>/maps` and `fd` for 
 real install's path, and fails the case if the game has it open.
 
 Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
-channels), `Menus.log`, `MSAA.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `Armada2_d3d9.log` and
+channels), `Menus.log`, `MSAA.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
 `xalia_dxgi.log` (DXVK), `vkBasalt.log`, `sway.log`, `input.log`, `prepare.log`,
 `launch-env.txt` (the exact environment and argv), the clone's `ARMADA.PRF`,
 `Menus.ini`, `MSAA.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and

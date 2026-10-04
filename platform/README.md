@@ -81,6 +81,7 @@ Four parts, all required together:
 
     platform/d3d8-chain.py --status      identify the live chain, every link by hash
     platform/d3d8-chain.py --use dxvk    DXVK d3d8 -> DXVK d3d9 -> Vulkan
+    platform/d3d8-chain.py --use d3d8to9 crosire's d3d8to9 (vendored) -> DXVK d3d9 -> Vulkan
     platform/d3d8-chain.py --use gog     GOG d3d8to9 -> DXVK d3d9 -> Vulkan
     platform/d3d8-chain.py --use wine    Wine's builtin d3d8 -> wined3d -> OpenGL
     platform/d3d8-chain.py --revert      the GOG release as shipped, Heroic managing DXVK again
@@ -102,6 +103,14 @@ there the prefix's is used:
 - **DXVK's** `d3d8.dll` (~1.66 MB) implements Direct3D 8 on Vulkan through its own d3d9.
 - **Wine's builtin** `d3d8.dll` (320548), in the prefix, talks to `wined3d` directly and
   never loads `d3d9.dll`, so a DXVK d3d9 in the prefix is not reached from it.
+
+A plugin can reach Direct3D 9, and with it shaders, only through a translator that
+answers `QueryInterface(IDirect3DDevice9)`. Measured on the bench, crosire's current
+d3d8to9 release does; neither DXVK's d3d8 nor GOG's build does. The spike and the plan
+built on it are in [`D3D9.md`](D3D9.md). That release is vendored in
+`vendor/d3d8to9-1.16.0/` and `--use d3d8to9` puts it in the slot; `d3d9/d3d9dev.h` is
+what a plugin includes to draw through the device behind it, and `d3d9/hlsl.sh` builds
+its shaders.
 
 The GOG release as shipped, which `--revert` returns to, is GOG's translator on the
 prefix's d3d9 — Heroic's DXVK while `autoInstallDxvk` is on, else Wine's:

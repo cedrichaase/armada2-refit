@@ -5,6 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.13.0 — 2026-10-05
+
+### Added
+- `testbench/d3d9probe/`: `D3D9Probe.asi`, for bench clones only. It asks the game's
+  device for Direct3D 9 and, when it gets one, draws through it: a shader model 3.0
+  pattern every frame, and a `ps_2_0` swapped into the indexed draws while
+  `D3D9Probe.tint` exists. `D3D9PROBE_D3D8=<dll>` puts a d3d8.dll into the clone's slot.
+  `D3D9Probe.log` is gathered with the other logs. Its findings are in `platform/D3D9.md`.
+  Its shaders are HLSL (`probe.hlsl`), built with `platform/d3d9/hlsl.sh` and used
+  through `platform/d3d9/d3d9dev.h`, so it checks that piece too. It logs the first
+  `CopyRects` of each pair of surfaces with the branch d3d8to9 takes, and
+  `D3D9PROBE_TIMING=1` turns vsync off in the clone and the overlay off, so frame
+  times compare across chains.
+
+Installs nothing into the game; seen working on the bench 2026-10-05.
+
 ## 2.12.2 — 2026-10-04
 
 ### Fixed

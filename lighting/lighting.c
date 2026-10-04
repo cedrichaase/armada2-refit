@@ -60,6 +60,8 @@ typedef const char         *LPCSTR;
 typedef char               *LPSTR;
 
 #define NULLPTR ((void *)0)
+
+#include "../platform/d3d9/d3d9dev.h"   /* Shaders=1: see "Shaders" below */
 #define TRUE  1
 
 #define GENERIC_WRITE          0x40000000
@@ -344,6 +346,7 @@ typedef long (__stdcall *GetLight_t)(void *, DWORD, LIGHT8 *);
 typedef long (__stdcall *GetLightEnable_t)(void *, DWORD, BOOL *);
 
 static int        g_fix_mirrored = 1;
+static int        g_in_vb;        /* inside ST3D_Standard_MeshVB::Render: its draws are hulls */
 static VBRender_t g_vb_render;
 static void      *g_dev;          /* the device, as last seen by the SetMaterial hook */
 
@@ -398,9 +401,32 @@ typedef long (__stdcall *LightEnable_t)(void *, DWORD, BOOL);
 
 static void *g_glow_vt[19];          /* a planet's light: see planet_glows */
 
-static int   g_points = 6;           /* PointLights=: at most this many per draw */
+static int   g_points = 12;          /* PointLights=: at most this many per draw (6 in Direct3D's slots) */
 
-typedef struct { float col[3]; float pos[3]; float src[3]; float score, range; } Pick;
+/* col: the colour at the draw's origin (falloff folded in), for Direct3D's slots;
+ * raw: without the falloff, start/fade: the falloff itself, for the shaders, which
+ * apply it per pixel. */
+typedef struct { float col[3]; float pos[3]; float src[3]; float score, range;
+                 float raw[3]; float start, fade; } Pick;
+
+/* What the shaders take for the draw in hand (Shaders=1, see hook_device): the point
+ * lights at their real positions, and which way the mesh's normals point. */
+#define SH_POINTS 16
+static int   g_sh_on;                /* the DrawIndexedPrimitive hook is in */
+static Pick  g_sh_pick[SH_POINTS];
+static int   g_sh_npick;
+static float g_sh_sign = -1.0f;      /* -1: inward normals, as stock; +1: a mirrored draw */
+
+/* Self-illumination. On the CPU path a hull whose material is an
+ * ST3D_SelfIlluminatingMaterial is drawn twice (its NumPasses, slot 3, is 2): texture x
+ * lit colour, then the texture alone blended SRCALPHA/INVSRCALPHA, so where the alpha
+ * (the night-lights map) is bright the texture shows at full strength whatever the
+ * light. ST3D_Standard_MeshVB::Render calls the material's SetPassRenderState (slot 4)
+ * for pass 0 only, so on the GPU path the night lights never drew. Render's third
+ * argument is that material; the shaders fold the second pass into the first. */
+#define VT_SELFILLUM_MATERIAL 0x6bc854   /* ST3D_SelfIlluminatingMaterial vtable */
+static float g_selfillum = 1.0f;     /* SelfIllumination=: 1 is stock's second pass, 0 none */
+static int   g_sh_lit_self;          /* the draw in hand has a self-illuminating material */
 
 /* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
  * distance d: 1 straight under the sun, 1/2 over the terminator, 0 over the night
@@ -423,7 +449,7 @@ static int pick_points(const float *at, Pick *out, int max)
         BYTE *light = *(BYTE **)inst;
         const float *col = (const float *)(inst + 4);
         const float *pos = (const float *)(inst + 0x10) + 9;
-        float start, range, dx, dy, dz, d, f, peak, score;
+        float start, range, dx, dy, dz, d, f, ph = 1.0f, peak, score;
         int   hard;
         DWORD vt;
         if (!light) continue;
@@ -444,7 +470,7 @@ static int pick_points(const float *at, Pick *out, int max)
         } else {
             if (d >= start + range) continue;
             f = d <= start ? 1.0f : 1.0f - (d - start) / range;
-            if (vt == (DWORD)g_glow_vt) f *= glow_phase(dx, dy, dz, d);
+            if (vt == (DWORD)g_glow_vt) { ph = glow_phase(dx, dy, dz, d); f *= ph; }
             score = f * peak;
         }
         if (score < 0.004f) continue;
@@ -466,15 +492,16 @@ static int pick_points(const float *at, Pick *out, int max)
         out[i].src[0] = col[0]; out[i].src[1] = col[1]; out[i].src[2] = col[2];
         out[i].score = score;
         out[i].range = hard ? start + range : 100000.0f;
+        out[i].raw[0] = col[0] * ph; out[i].raw[1] = col[1] * ph; out[i].raw[2] = col[2] * ph;
+        out[i].start = start; out[i].fade = range;
     }
     return n;
 }
 
-static int add_points(void *dev, const float *at, DWORD *slots)
+static int add_points(void *dev, const float *at, DWORD *slots, const Pick *pk, int n)
 {
     void **vt = *(void ***)dev;
-    Pick   pk[8];
-    int    n = pick_points(at, pk, g_points > 6 ? 6 : g_points), k = 0, i;
+    int    k = 0, i;
     DWORD  slot = 0;
     for (i = 0; i < n; i++) {
         LIGHT8 l;
@@ -511,11 +538,40 @@ static void __fastcall hook_vb_render(void *self, void *edx, int group, void *lm
                 m[2] * (m[3] * m[7] - m[4] * m[6]);
     void *dev = g_dev;
     DWORD slots[8];
-    int   k = 0, i;
+    Pick  pk[SH_POINTS];
+    int   k = 0, i, n = 0, mirrored = det < 0 && dev && g_fix_mirrored;
+    int   sh = g_sh_on && dev && d9_device(dev);
     (void)edx;
-    if (det < 0 && dev && g_fix_mirrored) reverse_lights(dev);
-    else if (dev && g_points > 0) k = add_points(dev, m + 9, slots);
+    /* Direct3D's slots get at most 6, the strongest, mirrored as before (and none for a
+     * mirrored draw); the shaders take up to SH_POINTS where they are. */
+    if (dev && g_points > 0 && (sh || !mirrored))
+        n = pick_points(m + 9, pk, g_points > SH_POINTS ? SH_POINTS : g_points);
+    if (mirrored) reverse_lights(dev);
+    else if (n) k = add_points(dev, m + 9, slots, pk, n > 6 ? 6 : n);
+    g_sh_npick = sh ? n : 0;
+    if (sh && g_logging) {
+        static int said_hard, said_many;
+        int hard = 0;
+        for (i = 0; i < n; i++) if (pk[i].range < 100000.0f) hard++;
+        if ((hard && !said_hard) || (n > 6 && !said_many)) {
+            char b[160];
+            if (hard) said_hard = 1;
+            if (n > 6) said_many = 1;
+            b[0] = 0; s_cat(b, "shaders: a draw takes "); s_num(b, n);
+            s_cat(b, " point lights, "); s_num(b, hard); s_cat(b, " of them hard");
+            s_cat(b, mirrored ? " (mirrored draw)" : ""); logline(b);
+        }
+    }
+    for (i = 0; i < g_sh_npick; i++) g_sh_pick[i] = pk[i];
+    g_sh_sign = mirrored ? 1.0f : -1.0f;
+    g_sh_lit_self = tm && *(DWORD *)tm == VT_SELFILLUM_MATERIAL;
+    if (sh && g_sh_lit_self && g_logging) {
+        static int said_self;
+        if (!said_self) { said_self = 1; logline("shaders: a self-illuminating material, its night lights folded in"); }
+    }
+    g_in_vb = 1;
     g_vb_render(self, group, lm, tm, tex);
+    g_in_vb = 0;
     for (i = 0; i < k; i++) ((LightEnable_t)(*(void ***)dev)[46])(dev, slots[i], 0);
     if (det < 0 && dev && g_fix_mirrored) reverse_lights(dev);
 }
@@ -586,10 +642,14 @@ typedef long (__stdcall *SetRenderState_t)(void *dev, DWORD state, DWORD value);
 
 static const BYTE k_setmaterial_sig[6] = { 0xFF, 0x92, 0xA8, 0x00, 0x00, 0x00 };
 
+static void hook_device(void *dev);
+static int  g_shaders = 1;          /* Shaders=: see hook_device */
+
 static long __stdcall hook_set_material(void *dev, const MATERIAL8 *in)
 {
     MATERIAL8   m = *in;
     g_dev = dev;
+    if (g_shaders) hook_device(dev);
     m.Diffuse.r = m.Diffuse.g = m.Diffuse.b = 1.0f;
     m.Emissive.r = g_ambient[0];
     m.Emissive.g = g_ambient[1];
@@ -614,6 +674,205 @@ static int patch_set_material(void)
     VirtualProtect(p, 6, old, &old);
     FlushInstructionCache(GetCurrentProcess(), p, 6);
     return 1;
+}
+
+/* Shaders (Shaders=1). With crosire's d3d8to9 in the d3d8 slot (platform/D3D9.md,
+ * d3d8-chain.py --use d3d8to9) the game's device answers for the Direct3D 9 device
+ * behind it, and the hull draws above run with a vs_3_0/ps_3_0 pair (hull.hlsl) in
+ * place of fixed-function lighting. The pair computes what Direct3D's fixed-function
+ * lighting does, per pixel instead of per vertex: the lights this plugin set (read
+ * back from the device at the draw, so the Key, the Fill, the sky light, the point
+ * lights and FixMirrored's reversal all carry over), the material SetMaterial gave
+ * it, texture x lit colour. The shaders are bound in a hook on the d3d8
+ * DrawIndexedPrimitive, inside VBRender only: the engine sets its vertex format
+ * through d3d8 SetVertexShader(FVF), which d3d8to9 turns into SetVertexShader(NULL),
+ * so a shader bound any earlier would be unbound by it. Any draw that is not what
+ * the shaders reproduce (another vertex format, fog, specular, another texture
+ * stage), and every draw when there is no d3d9 device, goes fixed-function as
+ * before. */
+#include "hull_shaders.h"
+
+typedef long (__stdcall *DIP8_t)(void *, DWORD, UINT, UINT, UINT, UINT);
+typedef long (__stdcall *D9Get_t)(void *, DWORD, DWORD *);
+typedef long (__stdcall *D9Get2_t)(void *, DWORD, DWORD, DWORD *);
+typedef long (__stdcall *D9Mat_t)(void *, DWORD, float *);
+typedef long (__stdcall *D9Light_t)(void *, DWORD, LIGHT8 *);
+typedef long (__stdcall *D9LightOn_t)(void *, DWORD, BOOL *);
+typedef long (__stdcall *D9Material_t)(void *, MATERIAL8 *);
+
+#define FVF_HULL 0x112                 /* XYZ | NORMAL | TEX1 */
+
+static DIP8_t   g_dip;
+static void   **g_dip_vt;              /* the d3d8 device vtable whose slot 71 is ours */
+static D9Shader g_hull_vs = D9_VERTEX_SHADER(k_hull_vs);
+static D9Shader g_hull_ps = D9_PIXEL_SHADER(k_hull_ps);
+static long     g_sh_draws, g_sh_ff;   /* hull draws in shaders / left fixed-function */
+static DWORD    g_sh_why;              /* reasons already logged, one bit each */
+
+static void sh_note(int bit, const char *why)
+{
+    char b[160];
+    if (g_sh_why & (1u << bit)) return;
+    g_sh_why |= 1u << bit;
+    b[0] = 0; s_cat(b, "shaders: fixed-function for "); s_cat(b, why); logline(b);
+}
+
+/* r = a x b, row-major 4x4 */
+static void mat_mul(const float *a, const float *b, float *r)
+{
+    int i, j;
+    for (i = 0; i < 4; i++)
+        for (j = 0; j < 4; j++)
+            r[i * 4 + j] = a[i * 4] * b[j] + a[i * 4 + 1] * b[4 + j] +
+                           a[i * 4 + 2] * b[8 + j] + a[i * 4 + 3] * b[12 + j];
+}
+
+/* Everything hull.hlsl needs, from the device as the fixed-function draw would use
+ * it; 0 when this draw is not one the shaders reproduce. */
+static int sh_setup(void *d9)
+{
+    DWORD fvf = 0, v = 0, op = 0, a1 = 0, a2 = 0, aop = 0, op1 = 0;
+    float w[16], vw[16], p[16], wv[16], wvp[16], c[8], col[16];
+    MATERIAL8 mt;
+    int   i, j;
+
+    D9_FN(d9, D9_GETFVF, D9_Ptr_t)(d9, &fvf);
+    if (fvf != FVF_HULL) { sh_note(0, "a vertex format other than XYZ|NORMAL|TEX1"); return 0; }
+    D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 137, &v);          /* LIGHTING */
+    if (!v) { sh_note(1, "an unlit draw"); return 0; }
+    D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 28, &v);           /* FOGENABLE */
+    if (v) { sh_note(2, "fog"); return 0; }
+    D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 29, &v);           /* SPECULARENABLE */
+    if (v) { sh_note(3, "specular"); return 0; }
+    D9_FN(d9, D9_GETTEXTURESTAGESTATE, D9Get2_t)(d9, 0, 1, &op);
+    D9_FN(d9, D9_GETTEXTURESTAGESTATE, D9Get2_t)(d9, 0, 2, &a1);
+    D9_FN(d9, D9_GETTEXTURESTAGESTATE, D9Get2_t)(d9, 0, 3, &a2);
+    D9_FN(d9, D9_GETTEXTURESTAGESTATE, D9Get2_t)(d9, 0, 4, &aop);
+    D9_FN(d9, D9_GETTEXTURESTAGESTATE, D9Get2_t)(d9, 1, 1, &op1);
+    /* MODULATE(TEXTURE, DIFFUSE or CURRENT), alpha MODULATE, stage 1 DISABLE */
+    if (op != 4 || a1 != 2 || (a2 != 0 && a2 != 1) || aop != 4 || op1 != 1) {
+        char why[120];
+        why[0] = 0; s_cat(why, "a texture stage other than texture x lit colour (op ");
+        s_num(why, (long)op); s_cat(why, " "); s_num(why, (long)a1); s_cat(why, ",");
+        s_num(why, (long)a2); s_cat(why, " alpha "); s_num(why, (long)aop);
+        s_cat(why, ", stage 1 "); s_num(why, (long)op1); s_cat(why, ")");
+        sh_note(4, why); return 0;
+    }
+
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 256, w);            /* WORLD */
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 2, vw);             /* VIEW */
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 3, p);              /* PROJECTION */
+    mat_mul(w, vw, wv);
+    mat_mul(wv, p, wvp);
+    for (j = 0; j < 4; j++)                                      /* columns */
+        for (i = 0; i < 4; i++) col[j * 4 + i] = wvp[i * 4 + j];
+    d9_vsconst(d9, 0, col, 4);
+    for (j = 0; j < 3; j++)
+        for (i = 0; i < 4; i++) col[j * 4 + i] = w[i * 4 + j];
+    d9_vsconst(d9, 4, col, 3);
+
+    D9_FN(d9, D9_GETMATERIAL, D9Material_t)(d9, &mt);
+    D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 139, &v);          /* AMBIENT, a D3DCOLOR */
+    c[0] = mt.Emissive.r + mt.Ambient.r * (float)((v >> 16) & 255) / 255.0f;
+    c[1] = mt.Emissive.g + mt.Ambient.g * (float)((v >> 8) & 255) / 255.0f;
+    c[2] = mt.Emissive.b + mt.Ambient.b * (float)(v & 255) / 255.0f;
+    c[3] = mt.Diffuse.a;
+    c[4] = mt.Diffuse.r; c[5] = mt.Diffuse.g; c[6] = mt.Diffuse.b; c[7] = mt.Diffuse.a;
+    d9_psconst(d9, 0, c, 2);
+
+    {   /* hull.hlsl: dcol c2..c5, dvec c6..c9, misc c10, pcol c11.., ppos c27.., pfall c43.. */
+        float dc[16], dv[16], misc[4], pc[SH_POINTS * 4], pp[SH_POINTS * 4], pf[SH_POINTS * 4];
+        int   nd = 0;
+        for (i = 0; i < 16; i++) dc[i] = dv[i] = 0.0f;
+        for (i = 0; i < 8; i++) {
+            BOOL   on = 0;
+            LIGHT8 l;
+            float  n;
+            if (D9_FN(d9, D9_GETLIGHTENABLE, D9LightOn_t)(d9, (DWORD)i, &on) < 0 || !on) continue;
+            if (D9_FN(d9, D9_GETLIGHT, D9Light_t)(d9, (DWORD)i, &l) < 0) continue;
+            if (l.Type == 1) continue;        /* the mirrored copies of the picks: see below */
+            if (l.Type != 3) { sh_note(5, "a spot light"); return 0; }
+            if (nd >= 4) { sh_note(8, "more than four directional lights"); return 0; }
+            n = sqrt_f(l.Direction[0] * l.Direction[0] + l.Direction[1] * l.Direction[1] +
+                       l.Direction[2] * l.Direction[2]);
+            if (n < 1e-6f) continue;
+            dc[nd * 4] = l.Diffuse.r; dc[nd * 4 + 1] = l.Diffuse.g; dc[nd * 4 + 2] = l.Diffuse.b;
+            dv[nd * 4] = -l.Direction[0] / n; dv[nd * 4 + 1] = -l.Direction[1] / n;
+            dv[nd * 4 + 2] = -l.Direction[2] / n;
+            nd++;
+        }
+        d9_psconst(d9, 2, dc, 4);
+        d9_psconst(d9, 6, dv, 4);
+        misc[0] = g_sh_sign;
+        misc[1] = g_sh_lit_self ? g_selfillum : 0.0f;
+        misc[2] = misc[3] = 0.0f;
+        d9_psconst(d9, 10, misc, 1);
+        /* The point lights where they are, with the engine's falloff (full to start,
+         * gone after fade) for the shader to apply per pixel. */
+        for (i = 0; i < SH_POINTS; i++) {
+            float *C = pc + i * 4, *P = pp + i * 4, *F = pf + i * 4;
+            C[0] = C[1] = C[2] = C[3] = 0.0f;
+            P[0] = P[1] = P[2] = P[3] = 0.0f;
+            F[0] = 1.0f; F[1] = 1.0f; F[2] = F[3] = 0.0f;
+            if (i >= g_sh_npick) continue;
+            C[0] = g_sh_pick[i].raw[0]; C[1] = g_sh_pick[i].raw[1]; C[2] = g_sh_pick[i].raw[2];
+            P[0] = g_sh_pick[i].pos[0]; P[1] = g_sh_pick[i].pos[1]; P[2] = g_sh_pick[i].pos[2];
+            F[0] = g_sh_pick[i].start;
+            F[1] = g_sh_pick[i].fade > 1e-3f ? 1.0f / g_sh_pick[i].fade : 1000.0f;
+        }
+        d9_psconst(d9, 11, pc, SH_POINTS);
+        d9_psconst(d9, 27, pp, SH_POINTS);
+        d9_psconst(d9, 43, pf, SH_POINTS);
+    }
+    return 1;
+}
+
+static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc)
+{
+    void   *d9, *vs, *ps;
+    D9Saved sv;
+    long    r;
+    if (!g_in_vb) return g_dip(dev, pt, mi, nv, si, pc);
+    d9 = d9_device(dev);
+    vs = d9_shader(d9, &g_hull_vs);
+    ps = d9_shader(d9, &g_hull_ps);
+    if (!vs || !ps) {
+        if (d9) sh_note(6, "every draw: the shaders could not be created");
+        g_sh_ff++;
+        return g_dip(dev, pt, mi, nv, si, pc);
+    }
+    d9_save(d9, &sv);
+    if (!sh_setup(d9)) { d9_restore(d9, &sv); g_sh_ff++; return g_dip(dev, pt, mi, nv, si, pc); }
+    d9_bind(d9, vs, ps);
+    r = g_dip(dev, pt, mi, nv, si, pc);
+    d9_restore(d9, &sv);
+    if (++g_sh_draws == 1 || g_sh_draws == 100000) {
+        char b[120];
+        b[0] = 0; s_cat(b, "shaders: hull draws in shaders "); s_num(b, g_sh_draws);
+        s_cat(b, ", fixed-function "); s_num(b, g_sh_ff); logline(b);
+    }
+    return r;
+}
+
+/* The d3d8 device's DrawIndexedPrimitive (slot 71), patched once per vtable, and only
+ * when a Direct3D 9 device is behind it; it passes every draw outside VBRender
+ * straight on. */
+static void hook_device(void *dev)
+{
+    void **vt = *(void ***)dev;
+    DWORD  old;
+    if (vt == g_dip_vt || vt[71] == (void *)hook_dip) return;
+    g_dip_vt = vt;
+    if (!d9_device(dev)) {
+        logline("shaders: no Direct3D 9 device behind this d3d8 (not d3d8to9): fixed-function");
+        return;
+    }
+    if (!VirtualProtect(&vt[71], 4, PAGE_EXECUTE_READWRITE, &old)) return;
+    g_dip = (DIP8_t)vt[71];
+    vt[71] = (void *)hook_dip;
+    VirtualProtect(&vt[71], 4, old, &old);
+    g_sh_on = 1;
+    logline("shaders: on, through the Direct3D 9 device behind d3d8");
 }
 
 /* Nebulae. Every nebula already carries a point light (Nebula::InitializeGeometry,
@@ -1178,13 +1437,15 @@ static void startup(void)
     g_lights  = (int)GetPrivateProfileIntA("Lighting", "Lights", 1, ini);
     g_logging = (int)GetPrivateProfileIntA("Lighting", "Log",    1, ini);
     g_fix_mirrored = (int)GetPrivateProfileIntA("Lighting", "FixMirrored", 1, ini);
+    g_shaders = (int)GetPrivateProfileIntA("Lighting", "Shaders", 1, ini);
+    ini1(ini, "SelfIllumination", &g_selfillum);
     ini3(ini, "KeyColour",  g_key_col);
     ini3(ini, "KeyAxis",    g_key_dir);
     ini3(ini, "FillColour", g_fill_col);
     ini3(ini, "FillAxis",   g_fill_dir);
     ini3(ini, "Ambient",    g_ambient);
     g_planets = (int)GetPrivateProfileIntA("Lighting", "Planets", 1, ini);
-    g_points  = (int)GetPrivateProfileIntA("Lighting", "PointLights", 6, ini);
+    g_points  = (int)GetPrivateProfileIntA("Lighting", "PointLights", 12, ini);
     g_nebulae = (int)GetPrivateProfileIntA("Lighting", "Nebulae", 1, ini);
     ini1(ini, "NebulaBrightness", &g_neb_bright);
     ini1(ini, "NebulaRange",      &g_neb_range);
@@ -1206,6 +1467,7 @@ static void startup(void)
     b[0] = 0;
     s_cat(b, "--- Lighting GPU="); s_num(b, g_gpu);
     s_cat(b, " Lights=");          s_num(b, g_lights);
+    s_cat(b, " Shaders=");         s_num(b, g_shaders);
     s_cat(b, "  key ");            s_vec(b, g_key_col);
     s_cat(b, " axis ");            s_vec(b, g_key_mat + 6);
     s_cat(b, "  fill ");           s_vec(b, g_fill_col);
@@ -1234,7 +1496,7 @@ static void startup(void)
     if (g_gpu) {
         n += redirect(S_LOGICAL, (const void *)hook_find_logical);
         n += redirect(S_VISIBLE, (const void *)hook_find_visible);
-        if (g_fix_mirrored || g_points > 0) {
+        if (g_fix_mirrored || g_points > 0 || g_shaders) {
             if (!patch_vb_render()) logline("NOT PATCHED: Render slot differs");
             else n++;
         }

@@ -1,0 +1,13 @@
+d3d8to9 1.16.0 -- by Patrick Mours (crosire), BSD-2-Clause (LICENSE.md)
+    https://github.com/crosire/d3d8to9/releases/tag/v1.16.0
+    d3d8.dll is the release asset of that name, x86
+    LICENSE.md from the repository at the v1.16.0 tag, commit 255338f698c8270b537f0a91a13f795f4f988250
+
+It implements Direct3D 8 on Direct3D 9 and, unlike DXVK's d3d8, hands a plugin the
+Direct3D 9 device behind the game's (platform/D3D9.md). At run time it needs
+msvcp140.dll, vcruntime140.dll and d3dx9_43.dll; Proton has all three as builtins.
+
+Unmodified. publish/check.sh allows a binary in the repository only here, under
+platform/vendor/, and only with its sha256 listed below:
+
+122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8  d3d8.dll

@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.11.0 — 2026-10-05
+
+Layers: platform 3.1.0, testbench 2.13.0, lighting 1.7.0.
+
+### Added
+- `testbench/d3d9probe/`, a bench tool that checks whether plugins can reach Direct3D 9
+  behind the game's d3d8 (testbench 2.13.0). The spike and the plan it supports are in
+  `platform/D3D9.md`.
+- Phase 0 and 1 of that plan (platform 3.1.0): crosire's d3d8to9 vendored,
+  `d3d8-chain.py --use d3d8to9`, and `platform/d3d9/`, the shared header and HLSL build
+  for plugins that draw through Direct3D 9.
+- The first step of phase 2 (lighting 1.5.0): `Shaders=1` lights the GPU-drawn hulls
+  per pixel through that device, reproducing the fixed-function lighting; then the point
+  lights at their real positions, so torpedo lights land on the right side (lighting 1.6.0);
+  then the hulls' night lights, which the GPU path had dropped (lighting 1.7.0).
+
 ## 9.10.2 — 2026-10-05
 
 Layers: postfx 1.1.1.

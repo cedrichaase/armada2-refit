@@ -4,6 +4,40 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.7.0 — 2026-10-05
+
+### Added
+- `SelfIllumination=1.0`: with `Shaders=1`, a hull whose material is an
+  `ST3D_SelfIlluminatingMaterial` shows its night lights (the texture's alpha: windows,
+  nacelle grilles, bussards) as the CPU path's second pass does; the GPU path had dropped
+  that pass. `0` leaves them dark (5ca6262).
+
+Seen on the bench 2026-10-05 (`SCENE=planet`, against the CPU path). Confirmed in game 2026-10-05.
+
+## 1.6.0 — 2026-10-05
+
+### Changed
+- With `Shaders=1`, point lights reach the shaders at their real positions, against the
+  inward normal turned round, with the engine's falloff per pixel: torpedo and pulse
+  lights now light the side of a hull facing them, and mirrored meshes get point lights.
+  Direct3D's slots (any draw that falls back) are as before (18e2677).
+- `PointLights=12` (was 6): up to 16 per draw in the shaders, still 6 in Direct3D's slots.
+- `Lighting.log` names the stage setup of a draw left fixed-function, and the first draw
+  that takes a hard point light or more than 6.
+
+Seen on the bench 2026-10-05 (`SCENE=firing`, `SCENE=planet`). Confirmed in game 2026-10-05.
+
+## 1.5.0 — 2026-10-05
+
+### Added
+- `Shaders=1`: under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), the
+  GPU-drawn hulls are lit per pixel by a `vs_3_0`/`ps_3_0` pair (`hull.hlsl`, built
+  into the committed `hull_shaders.h`) that reproduces the fixed-function lighting with
+  the same lights and material. With any other d3d8, or `0`, nothing changes;
+  `Lighting.log` says which. Built with `platform/d3d9/` (98c75a1).
+
+Seen on the bench 2026-10-05 (`SCENE=planet`, both chains). Confirmed in game 2026-10-05.
+
 ## 1.4.0 — 2026-10-04
 
 ### Added
