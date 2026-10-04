@@ -38,7 +38,7 @@ it bundles.
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
-| `models/` | 3D geometry — the widened loading screen (`SOD`) and `Planets.asi`, the planets' tessellation | `models/README.md` |
+| `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
@@ -660,6 +660,10 @@ both; **never ship one without the other.**
 re-tessellates it per frame against a facet tolerance set for 640x480; a 5120-triangle
 `PB_CLSS*.sod` drew pixel for pixel like stock. `Planets.asi` lowers that tolerance
 (`Detail=`). Don't re-try new planet meshes: `models/README.md`.
+
+**The dilithium moons are ordinary SODs**, smoothed by `models/moon-sod.py` (PN patches,
+lumpy shape kept). **Leave their glow shell stock**: it is blended, so the engine
+transforms and sorts it on the CPU every frame, and smoothing it cost visible frame rate.
 
 ### online
 

@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # The models layer's own part of ./install: Planets.asi, which makes the engine
-# tessellate planets finely enough for a modern resolution (models/planets.c).
+# tessellate planets finely enough for a modern resolution (models/planets.c), and
+# the dilithium moons smoothed in their SOD files (models/moon-sod.py).
 #
 #   install.sh                build, then install
 #   install.sh --detail N     install and set Detail=N (1 = stock)
 #   install.sh --remove       take it out again
 #
-# Adds Planets.asi, Planets.ini and (at run time) Planets.log, and nothing else;
-# the exe is patched in memory only, so removing the three files is a complete
-# uninstall. Needs nothing from A2_DATA. The loading-screen model is not here: it
+# Adds Planets.asi, Planets.ini and (at run time) Planets.log; the exe is patched in
+# memory only. Rewrites the four moon SODs, keeping .a2neb-backup copies that
+# --remove restores. Needs nothing from A2_DATA: the moons are derived from the
+# player's own stock files. The loading-screen model is not here: it
 # ships with its art, the LOADING texture target, and ./a2tex install moves both.
 set -euo pipefail
 
@@ -32,6 +34,7 @@ done
 if [ "$remove" = 1 ]; then
     rm -f "$GAME/Planets.asi" "$GAME/Planets.ini" "$GAME/Planets.log"
     echo "removed Planets from $GAME"
+    "$here/moon-sod.py" --revert
     exit 0
 fi
 
@@ -44,3 +47,4 @@ if [ -n "$detail" ]; then
 fi
 rm -f "$GAME/Planets.log"
 echo "installed Planets.asi into $GAME ($(grep '^Detail=' "$GAME/Planets.ini"))"
+"$here/moon-sod.py" --install
