@@ -11,7 +11,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `testbench/d3dtrace/`: `D3DTrace.asi`, a Direct3D 8 call tracer that goes into bench
   clones only (`--install testbench/d3dtrace`), and `summarize.py`, which groups a
   traced frame's draws by lighting path. A session's `D3DTrace.log` is gathered with the
-  other logs.
+  other logs. While tracing it also logs every `SetTransform` as a `T` line.
 
 ## 2.8.1 — 2026-10-03
 

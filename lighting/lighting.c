@@ -287,6 +287,72 @@ static void __fastcall hook_register_light(void *engine, void *edx, void *light,
     }
 }
 
+/* Mirrored meshes. Some models carry a mesh that was built mirrored and is
+ * mirrored back by its node's matrix: the Akira's distant mesh (Fcruise1.sod,
+ * the 258-face one) is drawn with the near mesh's matrix with its X axis negated,
+ * determinant -1. On the vertex-buffer path such a mesh lights as if its normals
+ * pointed the other way: the Akira went dark and blue from above, bright from
+ * below, past the zoom at which the engine switches to it. Negating that mesh's
+ * normals was confirmed on the bench to put it right; the plugin does the
+ * equivalent without touching the mesh: for a draw whose object matrix (the
+ * engine's current one, 0x7ad640, which RenderInternalVB hands the device just
+ * before) has a negative determinant, the enabled lights' directions are
+ * reversed for that draw and restored after it. N . -L = -(N . L).
+ * The hook is ST3D_Standard_MeshVB::Render, slot 3 of its vtable (0x63e450). */
+#define VT_STANDARD_MESHVB 0x6bcbdc
+#define CURRENT_MATRIX     0x7ad640
+typedef struct { float r, g, b, a; } LCOLOR4;
+typedef struct { DWORD Type; LCOLOR4 Diffuse, Specular, Ambient; float Position[3], Direction[3];
+                 float Range, Falloff, Att0, Att1, Att2, Theta, Phi; } LIGHT8;
+typedef void (__thiscall *VBRender_t)(void *, int, void *, void *, void *);
+typedef long (__stdcall *SetLight_t)(void *, DWORD, const LIGHT8 *);
+typedef long (__stdcall *GetLight_t)(void *, DWORD, LIGHT8 *);
+typedef long (__stdcall *GetLightEnable_t)(void *, DWORD, BOOL *);
+
+static int        g_fix_mirrored = 1;
+static VBRender_t g_vb_render;
+static void      *g_dev;          /* the device, as last seen by the SetMaterial hook */
+
+static void reverse_lights(void *dev)
+{
+    void **vt = *(void ***)dev;
+    DWORD  i;
+    for (i = 0; i < 8; i++) {
+        BOOL   on = 0;
+        LIGHT8 l;
+        if (((GetLightEnable_t)vt[47])(dev, i, &on) < 0 || !on) continue;
+        if (((GetLight_t)vt[45])(dev, i, &l) < 0) continue;
+        l.Direction[0] = -l.Direction[0];
+        l.Direction[1] = -l.Direction[1];
+        l.Direction[2] = -l.Direction[2];
+        ((SetLight_t)vt[44])(dev, i, &l);
+    }
+}
+
+static void __fastcall hook_vb_render(void *self, void *edx, int group, void *lm, void *tm, void *tex)
+{
+    const float *m = (const float *)CURRENT_MATRIX;
+    float det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) +
+                m[2] * (m[3] * m[7] - m[4] * m[6]);
+    void *dev = g_dev;
+    (void)edx;
+    if (det < 0 && dev) reverse_lights(dev);
+    g_vb_render(self, group, lm, tm, tex);
+    if (det < 0 && dev) reverse_lights(dev);
+}
+
+static int patch_vb_render(void)
+{
+    void **slot = (void **)(VT_STANDARD_MESHVB + 3 * 4);
+    DWORD  old;
+    if (*(DWORD *)slot != 0x63e450) return 0;
+    g_vb_render = (VBRender_t)*slot;
+    if (!VirtualProtect(slot, 4, PAGE_EXECUTE_READWRITE, &old)) return 0;
+    *slot = (void *)hook_vb_render;
+    VirtualProtect(slot, 4, old, &old);
+    return 1;
+}
+
 static void enable_static(void *db, const char *name, const char *which)
 {
     char b[200];
@@ -335,6 +401,7 @@ static void *__fastcall hook_find_visible(void *engine, void *edx, const char *n
 typedef struct { float r, g, b, a; } COLOR4;
 typedef struct { COLOR4 Diffuse, Ambient, Specular, Emissive; float Power; } MATERIAL8;
 typedef long (__stdcall *SetMaterial_t)(void *dev, const MATERIAL8 *m);
+typedef long (__stdcall *SetRenderState_t)(void *dev, DWORD state, DWORD value);
 
 #define SITE_SETMATERIAL 0x63e4e4
 
@@ -343,11 +410,15 @@ static const BYTE k_setmaterial_sig[6] = { 0xFF, 0x92, 0xA8, 0x00, 0x00, 0x00 };
 static long __stdcall hook_set_material(void *dev, const MATERIAL8 *in)
 {
     MATERIAL8   m = *in;
+    g_dev = dev;
     m.Diffuse.r = m.Diffuse.g = m.Diffuse.b = 1.0f;
     m.Emissive.r = g_ambient[0];
     m.Emissive.g = g_ambient[1];
     m.Emissive.b = g_ambient[2];
     m.Ambient.r = m.Ambient.g = m.Ambient.b = 0.0f;
+    /* D3DRS_NORMALIZENORMALS: stock leaves it off, and a model the ODF scales
+     * (ScaleSOD, the Akira's 1.92) then lights with normals of the wrong length. */
+    ((SetRenderState_t)(*(void ***)dev)[50])(dev, 143, TRUE);
     return ((SetMaterial_t)(*(void ***)dev)[42])(dev, &m);
 }
 
@@ -411,6 +482,7 @@ static void startup(void)
     g_gpu     = (int)GetPrivateProfileIntA("Lighting", "GPU",    1, ini);
     g_lights  = (int)GetPrivateProfileIntA("Lighting", "Lights", 1, ini);
     g_logging = (int)GetPrivateProfileIntA("Lighting", "Log",    1, ini);
+    g_fix_mirrored = (int)GetPrivateProfileIntA("Lighting", "FixMirrored", 1, ini);
     ini3(ini, "KeyColour",  g_key_col);
     ini3(ini, "KeyAxis",    g_key_dir);
     ini3(ini, "FillColour", g_fill_col);
@@ -445,6 +517,10 @@ static void startup(void)
     if (g_gpu) {
         n += redirect(S_LOGICAL, (const void *)hook_find_logical);
         n += redirect(S_VISIBLE, (const void *)hook_find_visible);
+        if (g_fix_mirrored) {
+            if (!patch_vb_render()) logline("NOT PATCHED: Render slot differs");
+            else n++;
+        }
         if (!patch_set_material()) logline("NOT PATCHED: SetMaterial site differs");
         else n++;
     }

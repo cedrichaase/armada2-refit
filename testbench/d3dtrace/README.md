@@ -28,8 +28,9 @@ touched, so it composes with `MSAA.asi`.
   counts (`draws`, `prog` = draws with a programmable vertex shader, `setlight`).
 - **On demand:** while `D3DTrace.go` exists beside the exe (checked every 30 frames,
   deleted when seen) the next `Frames=` frames (`D3DTrace.ini`, default 2) are traced in
-  full: the light table, every `SetLight`, `LightEnable`, `SetMaterial` and
-  `SetVertexShaderConstant`, and one `D` line per draw with the state that decides how
+  full: the light table, every `SetLight`, `LightEnable`, `SetMaterial`,
+  `SetVertexShaderConstant` and `SetTransform` (a `T` line: the state, then the 16
+  floats row-major; 256 is WORLD), and one `D` line per draw with the state that decides how
   it is lit. `summarize.py` names the enums and groups the draws by lighting path.
 
 ## What it showed: how Armada II lights a frame

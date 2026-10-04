@@ -81,6 +81,7 @@ int _fltused = 0;
 #define SLOT_CREATEDEVICE        15
 /* IDirect3DDevice8 */
 #define SLOT_PRESENT             15
+#define SLOT_SETTRANSFORM        37
 #define SLOT_SETMATERIAL         42
 #define SLOT_SETLIGHT            44
 #define SLOT_LIGHTENABLE         46
@@ -252,6 +253,7 @@ typedef void   *(__stdcall *Create8_t)(UINT);
 typedef HRESULT (__stdcall *CreateDevice_t)(void *, UINT, DWORD, void *, DWORD, void *, void **);
 typedef HRESULT (__stdcall *Present_t)(void *, const void *, const void *, void *, const void *);
 typedef HRESULT (__stdcall *SetMaterial_t)(void *, const MATERIAL8 *);
+typedef HRESULT (__stdcall *SetTransform_t)(void *, DWORD, const float *);
 typedef HRESULT (__stdcall *SetLight_t)(void *, DWORD, const LIGHT8 *);
 typedef HRESULT (__stdcall *LightEnable_t)(void *, DWORD, BOOL);
 typedef HRESULT (__stdcall *SetRS_t)(void *, DWORD, DWORD);
@@ -273,6 +275,7 @@ static Create8_t      o_Create8;
 static CreateDevice_t o_CreateDevice;
 static Present_t      o_Present;
 static SetMaterial_t  o_SetMaterial;
+static SetTransform_t o_SetTransform;
 static SetLight_t     o_SetLight;
 static LightEnable_t  o_LightEnable;
 static SetRS_t        o_SetRS;
@@ -388,6 +391,21 @@ static void count_draw(const char *kind, DWORD pt, UINT prims)
 }
 
 /* ---- device wrappers ------------------------------------------------------ */
+
+/* SetTransform: the matrix (row-major, 16 floats) while tracing. 2 = VIEW,
+ * 3 = PROJECTION, 256 = WORLD. */
+static HRESULT __stdcall w_SetTransform(void *d, DWORD st, const float *mx)
+{
+    if (g_capture && mx) {
+        char m[400];
+        int  i;
+        m[0] = 0;
+        s_cat(m, "T "); s_num(m, (long)st);
+        for (i = 0; i < 16; i++) { s_cat(m, i ? "," : " "); s_flt(m, mx[i]); }
+        out(m);
+    }
+    return o_SetTransform(d, st, mx);
+}
 
 static HRESULT __stdcall w_SetMaterial(void *d, const MATERIAL8 *mt)
 {
@@ -610,6 +628,7 @@ static void hook_device(void *dev)
 {
     void **vt = VT(dev);
     HOOK(vt, SLOT_PRESENT,           w_Present,     o_Present);
+    HOOK(vt, SLOT_SETTRANSFORM,      w_SetTransform, o_SetTransform);
     HOOK(vt, SLOT_SETMATERIAL,       w_SetMaterial, o_SetMaterial);
     HOOK(vt, SLOT_SETLIGHT,          w_SetLight,    o_SetLight);
     HOOK(vt, SLOT_LIGHTENABLE,       w_LightEnable, o_LightEnable);
