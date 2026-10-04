@@ -9,7 +9,8 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 ### Added
 - Point lights on the GPU path (`PointLights=`): torpedoes and pulses light the hulls
   they pass again, as stock did on the CPU path, and the light sources below reach
-  ships. Hard-edged lights (torpedoes) are lit per vertex; one colour counts once.
+  ships. Hard-edged lights (torpedoes) are lit per vertex; one colour counts once
+  (a1cb893).
 - `Nebulae=`, `NebulaBrightness=`, `NebulaRange=`: nebulae light their surroundings in
   their glow colour.
 - `PlanetGlows=`, `PlanetGlow=`, `PlanetGlowRange=`: a planet's day side lights what is
