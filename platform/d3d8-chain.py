@@ -3,6 +3,8 @@
 
     d3d8-chain.py --status        identify every link by CONTENT, not by size folklore
     d3d8-chain.py --use dxvk      DXVK's d3d8 -> DXVK's d3d9 -> Vulkan
+    d3d8-chain.py --use d3d8to9   crosire's d3d8to9 (vendored) -> DXVK's d3d9 -> Vulkan;
+                                  plugins can reach Direct3D 9 (platform/D3D9.md)
     d3d8-chain.py --use gog       GOG's d3d8to9 -> DXVK's d3d9 -> Vulkan
     d3d8-chain.py --use wine      Wine's builtin d3d8 -> wined3d -> OpenGL
     d3d8-chain.py --revert        the GOG release as shipped: its d3d8to9 in the game
@@ -49,6 +51,11 @@ BACKUP_SUFFIX = '.a2chain-backup'
 # that it is recognised, and backed up, before anything has ever replaced it.
 GOG_D3D8TO9 = '735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719'
 GOG_BACKUP = os.path.join(GAME, 'd3d8.dll.gog-backup')
+# crosire's d3d8to9, vendored unmodified (vendor/d3d8to9-1.16.0/SOURCE.txt). Unlike
+# DXVK's d3d8 and GOG's build, it answers QueryInterface(IDirect3DDevice9).
+D3D8TO9 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       'vendor/d3d8to9-1.16.0/d3d8.dll')
+D3D8TO9_SHA = '122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8'
 
 
 def sha(path):
@@ -84,6 +91,8 @@ def identify(path):
         return '(missing)'
     if h == GOG_D3D8TO9:
         return 'GOG d3d8to9'
+    if h == D3D8TO9_SHA:
+        return 'd3d8to9 1.16.0 (vendored)'
     for name, cand in candidates().items():
         if sha(cand) == h:
             return name
@@ -205,6 +214,10 @@ def status():
         print('   can have any effect, and the DXVK HUD will never appear.')
     elif live.startswith('DXVK'):
         print('=> DXVK implements Direct3D 8 directly. dxvk.conf d3d9.* keys apply.')
+    elif live.startswith('d3d8to9'):
+        print('=> crosire\'s d3d8to9 translates to Direct3D 9; dxvk.conf d3d9.* keys apply')
+        print('   if the d3d9 above is DXVK (d3d8.* keys do not), and plugins can reach')
+        print('   the Direct3D 9 device (platform/D3D9.md).')
     elif live.startswith('GOG'):
         print('=> GOG\'s d3d8to9 translates to Direct3D 9; dxvk.conf applies if the')
         print('   d3d9 above is DXVK. dxcfg.ini\'s own knobs become live too.')
@@ -226,7 +239,7 @@ def _place(src, dst):
 
 
 def install(which):
-    """which: dxvk, gog, wine, or stock (--revert)."""
+    """which: dxvk, d3d8to9, gog, wine, or stock (--revert)."""
     gamed8 = os.path.join(GAME, 'd3d8.dll')
     gamed9 = os.path.join(GAME, 'd3d9.dll')
 
@@ -234,7 +247,8 @@ def install(which):
     # anything else in that slot is someone's own choice, and there is no way back to it.
     have = identify(gamed8)
     if have.startswith('UNKNOWN'):
-        raise SystemExit('game-directory d3d8.dll is %s -- not DXVK, Wine\'s or GOG\'s. '
+        raise SystemExit('game-directory d3d8.dll is %s -- not DXVK, d3d8to9, Wine\'s or '
+                         'GOG\'s. '
                          'Move it aside yourself first.' % have)
     gog_there = have == 'GOG d3d8to9' or os.path.exists(GOG_BACKUP)
     if which in ('stock', 'gog') and not gog_there:
@@ -242,9 +256,12 @@ def install(which):
                          % os.path.basename(GOG_BACKUP))
     dxvk8 = os.path.join(PROTON, 'dxvk/i386-windows/d3d8.dll')
     dxvk9 = os.path.join(PROTON, 'dxvk/i386-windows/d3d9.dll')
-    for src in {'dxvk': (dxvk8, dxvk9), 'gog': (dxvk9,)}.get(which, ()):
+    for src in {'dxvk': (dxvk8, dxvk9), 'gog': (dxvk9,),
+                'd3d8to9': (D3D8TO9, dxvk9)}.get(which, ()):
         if not os.path.exists(src):
             raise SystemExit('source not present: %s' % src)
+    if which == 'd3d8to9' and sha(D3D8TO9) != D3D8TO9_SHA:
+        raise SystemExit('%s does not match its SOURCE.txt hash' % D3D8TO9)
 
     # Fail before ANY side effect if the flag needs changing and Heroic is up: doing
     # half a chain switch is worse than doing none.  An earlier version checked inside
@@ -281,7 +298,7 @@ def install(which):
         print('backed up GOG\'s d3d8.dll -> %s' % os.path.basename(GOG_BACKUP))
 
     # The d3d9 override is part of the DXVK chain, not of the diagnostics.
-    set_d3d9_override(which in ('dxvk', 'gog'))
+    set_d3d9_override(which in ('dxvk', 'd3d8to9', 'gog'))
 
     def remove(path):
         if os.path.exists(path):
@@ -303,6 +320,11 @@ def install(which):
         _place(dxvk8, gamed8)
         _place(dxvk9, gamed9)
         # Both DXVK DLLs now sit beside the exe, so the prefix can do what it likes.
+    elif which == 'd3d8to9':
+        # The translator imports d3d9.dll by name, as DXVK's d3d8 does: DXVK's d3d9
+        # beside it, and the d3d9 override, keep the chain on Vulkan.
+        _place(D3D8TO9, gamed8)
+        _place(dxvk9, gamed9)
     elif which == 'gog':
         if have != 'GOG d3d8to9':
             _place(GOG_BACKUP, gamed8)
@@ -320,8 +342,8 @@ def main():
     if args[0] == '--status':
         status()
     elif args[0] == '--use' and len(args) > 1:
-        if args[1] not in ('dxvk', 'gog', 'wine'):
-            raise SystemExit('--use takes dxvk, gog or wine')
+        if args[1] not in ('dxvk', 'd3d8to9', 'gog', 'wine'):
+            raise SystemExit('--use takes dxvk, d3d8to9, gog or wine')
         install(args[1])
     elif args[0] == '--revert':
         install('stock')

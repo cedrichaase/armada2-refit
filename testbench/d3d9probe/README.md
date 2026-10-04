@@ -12,6 +12,8 @@ clone, and `a2mod` does not know about it.
     D3D9PROBE_D3D8=<path>/d3d8.dll ./a2test session start --install . --install testbench/d3d9probe
     # mid-scene shader swap, while the file exists:
     touch ~/.cache/a2test/sessions/<id>/game/D3D9Probe.tint
+    # frame times with vsync off and no overlay, to compare chains
+    D3D9PROBE_TIMING=1 ./a2test session start --install . --install testbench/d3d9probe
 
 `D3D9Probe.log` is gathered into the case's `logs/` with the others.
 
@@ -34,11 +36,19 @@ touched and `MSAA.asi` composes with it.
   the game's scene, with its textures and its vertex lighting still feeding it — the
   first thing a shader-based `Lighting.asi` has to be able to do. The previous pixel
   shader is restored after each draw.
+- **Every `CopyRects`** whose pair of surfaces (size, sample count, pool) has not been
+  seen yet, and every failing one (up to 20), with the branch crosire's d3d8to9 takes
+  for it: `StretchRect` or D3DX. That is how the minimap's read-back would show.
 - **Every 600 frames:** the mean frame time. On the bench it is pinned at 16.7 ms by
-  vsync, so it shows a chain that drops frames, not throughput.
+  vsync, so it shows a chain that drops frames, not throughput. `D3D9PROBE_TIMING=1`
+  appends `d3d9.presentInterval = 0` to the clone's `dxvk.conf` and leaves a
+  `D3D9Probe.timing` that turns the overlay off, so the chains do the same work.
 
-The shaders are hand-assembled token streams (no shader compiler is installed here);
-`platform/D3D9.md` says how real ones would be built.
+The shaders are HLSL (`probe.hlsl`), compiled by `platform/d3d9/hlsl.sh` into the
+committed `probe_shaders.h`, and created and bound through `platform/d3d9/d3d9dev.h`,
+so the probe also checks the piece the plugins use. It must not be installed with
+`testbench/d3dtrace`: both hook the same `Direct3DCreate8` import, and the second to
+load finds it taken and stands down.
 
 ## Reading the log
 

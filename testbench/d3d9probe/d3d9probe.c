@@ -56,7 +56,8 @@ int _fltused = 0;
 /* ---- log ---------------------------------------------------------------- */
 
 static char g_dir[260];
-static char g_log[280], g_tint[280];
+static char g_log[280], g_tint[280], g_timing[280];
+static int  g_no_overlay;     /* D3D9Probe.timing beside the exe: no overlay, so chains compare */
 
 static void s_cat(char *d, const char *s) { while (*d) d++; while ((*d++ = *s++)) ; }
 static void s_hex(char *d, DWORD v)
@@ -111,60 +112,34 @@ typedef HRESULT (__stdcall *Const_t)(void *, DWORD, const float *, DWORD);
 typedef HRESULT (__stdcall *DPUP_t)(void *, DWORD, DWORD, const void *, DWORD);
 typedef HRESULT (__stdcall *BB_t)(void *, DWORD, DWORD, DWORD, void **);
 
-enum { D9_QI = 0, D9_RELEASE = 2, D9_CAPS = 7, D9_GETBB = 18, D9_SETRT = 37, D9_GETRT = 38,
+enum { D9_QI = 0, D9_CAPS = 7, D9_GETBB = 18, D9_SETRT = 37, D9_GETRT = 38,
        D9_BEGIN = 41, D9_END = 42, D9_VIEWPORT = 47, D9_RS = 57, D9_SB = 59, D9_GETPS = 108,
        D9_DPUP = 83, D9_MKDECL = 86, D9_DECL = 87, D9_MKVS = 91, D9_VS = 92,
        D9_MKPS = 106, D9_PS = 107, D9_PSC = 109 };
 
-/* vs_3_0: dcl_position v0; dcl_position o0; mov o0, v0 */
-static const DWORD k_vs30[] = {
-    0xfffe0300,
-    0x0200001f, 0x80000000, 0x900f0000,
-    0x0200001f, 0x80000000, 0xe00f0000,
-    0x02000001, 0xe00f0000, 0x90e40000,
-    0x0000ffff };
-/* ps_3_0: dcl vPos.xy; mul r0.xy, vPos, c0; frc r0.xy, r0; mov r0.zw, c0; mov oC0, r0 */
-static const DWORD k_ps30[] = {
-    0xffff0300,
-    0x0200001f, 0x80000000, 0x90031000,
-    0x03000005, 0x80030000, 0x90e41000, 0xa0e40000,
-    0x02000013, 0x80030000, 0x80e40000,
-    0x02000001, 0x800c0000, 0xa0e40000,
-    0x02000001, 0x800f0800, 0x80e40000,
-    0x0000ffff };
-/* ps_2_0: dcl t0; dcl v0; dcl_2d s0; texld r0, t0, s0; mul r0, r0, v0; mul r0, r0, c0; mov oC0, r0 */
-static const DWORD k_ps20[] = {
-    0xffff0200,
-    0x0200001f, 0x80000000, 0xb00f0000,
-    0x0200001f, 0x80000000, 0x900f0000,
-    0x0200001f, 0x90000000, 0xa00f0800,
-    0x03000042, 0x800f0000, 0xb0e40000, 0xa0e40800,
-    0x03000005, 0x800f0000, 0x80e40000, 0x90e40000,
-    0x03000005, 0x800f0000, 0x80e40000, 0xa0e40000,
-    0x02000001, 0x800f0800, 0x80e40000,
-    0x0000ffff };
+/* The shaders, from probe.hlsl (build.sh compiles it with platform/d3d9/hlsl.sh). */
+#include "probe_shaders.h"
+#include "../../platform/d3d9/d3d9dev.h"
+
+static D9Shader g_vs_overlay = D9_VERTEX_SHADER(k_vs30);
+static D9Shader g_ps_overlay = D9_PIXEL_SHADER(k_ps30);
+static D9Shader g_ps_tint    = D9_PIXEL_SHADER(k_ps20);
 static const BYTE k_decl[16] = { 0,0, 0,0, 3, 0, 0, 0,   0xff,0, 0,0, 17, 0, 0, 0 };
 
-static void *g_dev9, *g_vs, *g_ps, *g_tps, *g_decl, *g_sb;
+static void *g_dev9, *g_vs, *g_ps, *g_tps, *g_decl, *g_sb;   /* shaders: d3d9dev.h's */
 static long  g_frames, g_tinted, g_tint_on;
 static void *g_tex0;
 
-static void *dev9_of(void *dev8)
-{
-    void *d9 = NULLPTR;
-    if (CALL(dev8, 0, QI_t)(dev8, &IID_IDirect3DDevice9, &d9) < 0 || !d9) return NULLPTR;
-    CALL(d9, D9_RELEASE, Rel_t)(d9);        /* lives as long as the d3d8 device */
-    return d9;
-}
+static void *dev9_of(void *dev8) { return d9_device(dev8); }
 
 static void setup9(void *d9)
 {
     char m[256]; HRESULT a, b, c, d, e;
     if (d9 == g_dev9) return;
-    g_dev9 = d9; g_vs = g_ps = g_tps = g_decl = g_sb = NULLPTR;   /* the old device's objects leak: a bench tool */
-    a = CALL(d9, D9_MKVS, PP_t)(d9, k_vs30, &g_vs);
-    b = CALL(d9, D9_MKPS, PP_t)(d9, k_ps30, &g_ps);
-    c = CALL(d9, D9_MKPS, PP_t)(d9, k_ps20, &g_tps);
+    g_dev9 = d9; g_decl = g_sb = NULLPTR;   /* the old device's decl and state block leak: a bench tool */
+    g_vs = d9_shader(d9, &g_vs_overlay); a = g_vs ? 0 : -1;
+    g_ps = d9_shader(d9, &g_ps_overlay); b = g_ps ? 0 : -1;
+    g_tps = d9_shader(d9, &g_ps_tint);   c = g_tps ? 0 : -1;
     d = CALL(d9, D9_MKDECL, PP_t)(d9, k_decl, &g_decl);
     e = CALL(d9, D9_SB, UPP_t)(d9, 1 /* D3DSBT_ALL */, &g_sb);
     m[0] = 0; s_cat(m, "  create: vs_3_0 "); s_hex(m, a); s_cat(m, "  ps_3_0 "); s_hex(m, b);
@@ -182,6 +157,8 @@ typedef void *  (__stdcall *Create8_t)(UINT);
 
 static Present_t      o_Present;
 static DIP_t          o_DIP;
+typedef HRESULT (__stdcall *CopyRects_t)(void *, void *, const void *, UINT, void *, const void *);
+static CopyRects_t    o_CopyRects;
 static SetTex_t       o_SetTex;
 static CreateDevice_t o_CreateDevice;
 static Create8_t      o_Create8;
@@ -231,7 +208,7 @@ static HRESULT __stdcall w_Present(void *dev, const void *a, const void *b, void
 {
     static long long t0, freq; static long n0; long long t;
     void *d9 = dev9_of(dev);
-    if (d9) { setup9(d9); overlay(d9); }
+    if (d9) { setup9(d9); if (!g_no_overlay) overlay(d9); }
     QueryPerformanceCounter(&t);
     if (!freq) { QueryPerformanceFrequency(&freq); t0 = t; n0 = g_frames; }
     if (g_frames - n0 >= 600) {
@@ -258,16 +235,52 @@ static HRESULT __stdcall w_SetTex(void *dev, DWORD stage, void *tex)
 
 static HRESULT __stdcall w_DIP(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc)
 {
-    void *d9, *prev = NULLPTR; HRESULT r; float c0[4] = { 1.0f, 0.35f, 0.35f, 1.0f };
+    void *d9; D9Saved sv; HRESULT r; float c0[4] = { 1.0f, 0.35f, 0.35f, 1.0f };
     if (!g_tint_on || !g_tex0 || !(d9 = dev9_of(dev)) || d9 != g_dev9 || !g_tps)
         return o_DIP(dev, pt, mi, nv, si, pc);
-    CALL(d9, D9_GETPS, P1_t)(d9, &prev);
-    CALL(d9, D9_PS, P1_t)(d9, g_tps);
-    CALL(d9, D9_PSC, Const_t)(d9, 0, c0, 1);
+    d9_save(d9, &sv);
+    d9_bind(d9, sv.vs, g_tps);              /* the FVF's fixed-function vertex stage stays */
+    d9_psconst(d9, 0, c0, 1);
     r = o_DIP(dev, pt, mi, nv, si, pc);
-    CALL(d9, D9_PS, P1_t)(d9, prev);
-    if (prev) CALL(prev, 2, Rel_t)(prev);
+    d9_restore(d9, &sv);
     g_tinted++;
+    return r;
+}
+
+/* d3d8 D3DSURFACE_DESC: Format, Type, Usage, Pool, Size, MultiSampleType, Width, Height */
+static void s_surf(char *m, const DWORD *d)
+{
+    s_cat(m, "["); s_num(m, (long)d[6]); s_cat(m, "x"); s_num(m, (long)d[7]);
+    s_cat(m, " fmt "); s_num(m, (long)d[0]); s_cat(m, " ms "); s_num(m, (long)d[5]);
+    s_cat(m, " pool "); s_num(m, (long)d[3]); s_cat(m, "]");
+}
+
+/* Which way d3d8to9 1.16.0 copies (its CopyRects, read in its source): through D3DX
+ * when the source is MANAGED or the destination is not DEFAULT, else StretchRect from
+ * a DEFAULT source. MSAA.asi's edge fill copies four strips a frame; the minimap
+ * read-back (msaa/README.md) is rarer, so the first call of each distinct pair of
+ * surfaces is logged, and every failure (up to 20). */
+static HRESULT __stdcall w_CopyRects(void *dev, void *src, const void *rects, UINT n, void *dst, const void *pts)
+{
+    static DWORD seen[24][4]; static int nseen, nfail; static long calls;
+    HRESULT r = o_CopyRects(dev, src, rects, n, dst, pts);
+    DWORD sd[8] = { 0 }, dd[8] = { 0 }, key[4]; int i;
+    if (src) CALL(src, 8, P1_t)(src, sd);
+    if (dst) CALL(dst, 8, P1_t)(dst, dd);
+    key[0] = sd[6] << 16 | sd[7]; key[1] = sd[3] << 8 | sd[5];
+    key[2] = dd[6] << 16 | dd[7]; key[3] = dd[3] << 8 | dd[5];
+    for (i = 0; i < nseen; i++)
+        if (seen[i][0] == key[0] && seen[i][1] == key[1] && seen[i][2] == key[2] && seen[i][3] == key[3]) break;
+    if (i == nseen || (r < 0 && nfail < 20)) {
+        char m[256]; m[0] = 0;
+        if (i == nseen && nseen < 24) { for (i = 0; i < 4; i++) seen[nseen][i] = key[i]; nseen++; }
+        if (r < 0) nfail++;
+        s_cat(m, "CopyRects #"); s_num(m, calls); s_cat(m, " frame "); s_num(m, g_frames); s_cat(m, " ");
+        s_surf(m, sd); s_cat(m, " -> "); s_surf(m, dd);
+        s_cat(m, (sd[3] == 1 || dd[3] != 0) ? "  via D3DX" : sd[3] == 0 ? "  via StretchRect" : "  via other");
+        s_cat(m, "  -> "); s_hex(m, (DWORD)r); logl(m);
+    }
+    calls++;
     return r;
 }
 
@@ -280,6 +293,7 @@ static HRESULT __stdcall w_CreateDevice(void *d3d, UINT ad, DWORD type, void *hw
         hook(VT(dev), 15, w_Present, (void **)&o_Present);
         hook(VT(dev), 61, w_SetTex, (void **)&o_SetTex);
         hook(VT(dev), 71, w_DIP, (void **)&o_DIP);
+        hook(VT(dev), 28, w_CopyRects, (void **)&o_CopyRects);
         q = CALL(dev, 0, QI_t)(dev, &IID_IDirect3DDevice9, &d9);
         m[0] = 0; s_cat(m, "  QueryInterface(IDirect3DDevice9) "); s_hex(m, q); s_cat(m, " -> "); s_hex(m, (DWORD)d9);
         s_cat(m, "  (d3d8 device "); s_hex(m, (DWORD)dev); s_cat(m, ")"); logl(m);
@@ -316,6 +330,8 @@ BOOL __stdcall DllMain(HANDLE inst, DWORD reason, void *res)
         g_dir[cut] = 0;
         g_log[0] = 0; s_cat(g_log, g_dir); s_cat(g_log, "D3D9Probe.log");
         g_tint[0] = 0; s_cat(g_tint, g_dir); s_cat(g_tint, "D3D9Probe.tint");
+        g_timing[0] = 0; s_cat(g_timing, g_dir); s_cat(g_timing, "D3D9Probe.timing");
+        g_no_overlay = GetFileAttributesA(g_timing) != INVALID_FILE_ATTRIBUTES;
         o_Create8 = (Create8_t)*iat;
         VirtualProtect(iat, 4, PAGE_READWRITE, &old);
         *iat = (void *)w_Create8;

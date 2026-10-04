@@ -6,6 +6,21 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.1.0 — 2026-10-05
+
+### Added
+- `vendor/d3d8to9-1.16.0/`: crosire's d3d8to9 release `d3d8.dll` (BSD-2-Clause),
+  unmodified, with its licence and a `SOURCE.txt` of hashes.
+- `d3d8-chain.py --use d3d8to9`: that translator on DXVK's d3d9, with the `d3d9`
+  override and `autoInstallDxvk` off as for `--use dxvk`. `--status` names it, and
+  `--use` refuses a vendored file that does not match its hash. Under it, plugins can
+  reach the Direct3D 9 device (`D3D9.md`). The default stays DXVK's d3d8.
+- `d3d9/d3d9dev.h` and `d3d9/hlsl.sh`: the shared piece for plugins that draw through
+  that device. The header gets the device and manages shader objects and the state
+  around a draw; the script compiles HLSL with vkd3d into an embedded header.
+
+Installs nothing by itself; `--use d3d8to9` installed, not yet seen in game.
+
 ## 3.0.0 — 2026-09-28
 
 ### Added
