@@ -652,6 +652,10 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   normals point inward, and a light given where it is lights the far side of a hull.
 - **A nebula lights only while it counts as on screen**, by its bounding sphere, which
   is smaller than its light's reach. `NebulaCull` widens the test, nothing else.
+- **`Shaders=1` binds its shaders in a d3d8 `DrawIndexedPrimitive` hook, inside
+  `VBRender` only**: the engine's `SetVertexShader(FVF)` becomes d3d9
+  `SetVertexShader(NULL)` under d3d8to9, so anything bound earlier is lost. Every d3d9
+  path must fall back when `d9_device()` is NULL (DXVK's d3d8). `platform/D3D9.md`.
 - **`models/hull-bump.py` and `Lighting.asi` do not combine**: a bump-mapped hull goes
   the dot3 way, which takes precedence over the vertex buffers.
 

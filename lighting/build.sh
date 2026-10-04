@@ -10,6 +10,10 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 out="$here/build"
 mkdir -p "$out"
 
+# The hull shaders (hull.hlsl -> hull_shaders.h, committed; Shaders=1).
+"$here/../platform/d3d9/hlsl.sh" "$here/hull_shaders.h" "$here/hull.hlsl" \
+    hull_vs:vs_3_0:k_hull_vs hull_ps:ps_3_0:k_hull_ps
+
 llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
 
 clang --target=i386-pc-windows-msvc \

@@ -9,7 +9,7 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 ## 3.1.0 — 2026-10-05
 
 ### Added
-- `vendor/d3d8to9-1.16.0/`: crosire's d3d8to9 release `d3d8.dll` (BSD-2-Clause),
+- `vendor/d3d8to9-1.16.0/`: crosire's d3d8to9 release `d3d8.dll` (BSD-2-Clause, 7d35a9f),
   unmodified, with its licence and a `SOURCE.txt` of hashes.
 - `d3d8-chain.py --use d3d8to9`: that translator on DXVK's d3d9, with the `d3d9`
   override and `autoInstallDxvk` off as for `--use dxvk`. `--status` names it, and

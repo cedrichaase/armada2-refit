@@ -38,6 +38,7 @@ planet's ground colour (`planet glow:`).
 | `Planets` | `1` | planets lit by Key and Fill with a night side (below) |
 | `PlanetAmbient` | `0.02 0.02 0.03` (left out: `Ambient`) | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
 | `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
+| `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `PointLights` | `6` | point lights per GPU draw, the strongest first; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
@@ -54,7 +55,7 @@ The key comes in about 60° off vertical (1.0.0 had about 37°), so from the usu
 camera, which looks down from above, the light grazes the hulls and planets instead of
 falling straight onto them. The fill, `Ambient` and `PlanetAmbient` are kept low so
 that light sources added later stand out against the base lighting. The lighting is
-per vertex and casts no shadows: a flat face such as a saucer's top takes one tone
+per vertex (per pixel with `Shaders=1` under d3d8to9) and casts no shadows: a flat face such as a saucer's top takes one tone
 whatever the angle. On the bench (`SCENE=planet`, the view 65° down) the Galaxy's saucer
 went from a mean grey of 155 to 111.
 
@@ -357,6 +358,49 @@ Torpedoes and pulses need nothing more: `Ordnance::PreRenderAll` (call at 0x58e5
 registers each one's ODF light while the engine's detail level is above 2, and the
 point-light path hands it to the GPU draws. A weapon's impact has no explosion object
 (it is a sprite effect), so it has no light of its own.
+
+## Shaders
+
+Phase 2 of `platform/D3D9.md`, first step. With crosire's d3d8to9 in the d3d8 slot the
+game's device answers `QueryInterface(IDirect3DDevice9)` with the Direct3D 9 device behind
+it (`platform/d3d9/d3d9dev.h`), and the hull draws of `ST3D_Standard_MeshVB::Render`
+run with `hull.hlsl`'s `vs_3_0`/`ps_3_0` pair in place of fixed-function lighting.
+
+**What the pair reproduces.** A `testbench/d3dtrace` frame of the planet scene with this
+plugin (2026-10-05): the hull draws are `XYZ|NORMAL|TEX1` indexed triangle lists, lit by
+Direct3D (`LIGHTING` at its default, on), stage 0 `MODULATE(TEXTURE, DIFFUSE)` for colour
+and alpha, stage 1 off, blend `ONE/ZERO` (opaque, so the texture's alpha goes nowhere),
+no fog, no specular; lights 0–2 are the sky light, Fill and Key as directionals and slot
+3 a point light (the planet's glow, mirrored). The shaders compute Direct3D's lighting
+equation for exactly that, per pixel: the material's emissive plus ambient, plus each
+enabled light's diffuse x material diffuse x max(0, N·L) x its attenuation within its
+range, clamped, times the texture. The lights, material and transforms are read back from
+the device at the draw, so everything above carries over unchanged: the Key, Fill and sky
+light, the picked point lights with their mirroring, `FixMirrored`'s reversal. A draw that
+is anything else (another vertex format, fog, specular, another stage setup, a spot
+light) goes fixed-function, and `Lighting.log` names the first of each reason.
+
+**Where the shaders are bound.** In a hook on the d3d8 device's `DrawIndexedPrimitive`
+(slot 71), and only while `VBRender` is running. The engine sets its vertex format with
+d3d8 `SetVertexShader(FVF)`, which d3d8to9 turns into d3d9 `SetFVF` +
+`SetVertexShader(NULL)`, so shaders bound before the engine's own setup would be unbound
+by it. The FVF stays the input layout. The previous shaders are put back right after the
+draw. The hook is patched in only when the device has a Direct3D 9 device behind it:
+under DXVK's d3d8 the log says so and nothing is patched.
+
+**Measured on the bench** (`SCENE=planet`, `orbit ship 200 20 150`, 1920x1080, d3d8to9):
+`Shaders=1` against `Shaders=0`, the Galaxy's box has mean 0.323 against 0.320 and RMSE
+0.035 (part of it the planet behind, which moves between runs). Light direction, colours
+and levels match; shading runs smoothly across large triangles (the nacelles, the
+engineering hull's flank) where per-vertex lighting interpolated it. Under DXVK's d3d8
+with `Shaders=1` the log reads `no Direct3D 9 device` and the ship renders as before.
+
+**Next, and each changes the look** (`platform/D3D9.md`, phase 2): negate the inward
+normals in the shader and give every light where it is, which lights the right side for
+the hard lights (torpedoes, pulses) that mirroring cannot fix; hand the picked point
+lights straight to pixel shader constants, beyond Direct3D's eight slots; and use the
+hull texture's alpha, the self-illumination map: in the traced frame no draw on this
+path used it (blend `ONE/ZERO`, and no second pass).
 
 ## Not covered yet
 
