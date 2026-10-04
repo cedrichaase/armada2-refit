@@ -21,7 +21,8 @@ network game simulates, and the two cannot ship in one plugin:
 
 - **`QOL.asi` — stock-compatible.** The camera, the keys, which ordinary command a key
   press turns into. A player with it can join a player without it, and nothing they
-  simulate differs. Installed by default. QOL-1, 2, 4, 5 and 6 belong here.
+  simulate differs. Installed by default. QOL-2, 4, 5 and 6 belong here. QOL-1 became
+  a plugin of its own, `GridLayout.asi` (`grid/`), so it can be switched separately.
 - **A rules plugin (`QOLRules.asi`, not built yet) — every player needs it.** Changes to
   what the game *does* with a command: when the bank is charged, what a group can
   hold if that travels over the network. Every node must run it with the same settings,
@@ -42,7 +43,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 
 | ID | Idea | Surface | First step | Status |
 |---|---|---|---|---|
-| [QOL-1](#qol-1-grid-hotkeys-for-the-button-bar) | Grid hotkeys for the button bar | `Input.map`, then maybe HUD layout | Remap the build slots, try on the bench | idea |
+| [QOL-1](#qol-1-grid-hotkeys-for-the-button-bar) | Grid hotkeys for the button bar | `GridLayout.asi` (`grid/`) | — | **done** ([`grid/`](../grid/README.md)) |
 | [QOL-2](#qol-2-configurable-right-drag-pan-speed) | Configurable right-drag pan speed | `QOL.asi`, `PanSpeed=` | A slider in the options screen | **done** (`QOL.asi`); slider open |
 | [QOL-3](#qol-3-larger-control-groups) | Larger control groups | code | Measure the cap | idea |
 | [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | code, `Input.map` | Check what Shift+number does today | idea |
@@ -77,7 +78,9 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 
 ## QOL-1: Grid hotkeys for the button bar
 
-*`QOL.asi`, stock-compatible (a key remap needs no plugin at all).*
+*Done, as a plugin of its own: [`grid/`](../grid/README.md), `GridLayout.asi`, so it can be
+switched on and off by itself. Stock-compatible. What follows is the plan as it was
+written; the README there has what was built and why.*
 
 **Problem.** The button bar's hotkeys are hard to use without looking. Each building's
 build menu binds its items to `F1`–`F12` by slot. The menus themselves sit on letters

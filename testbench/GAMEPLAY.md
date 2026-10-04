@@ -10,6 +10,27 @@ Agents report what they learnt in their result (`lessons`); the bench writes tho
 the case log and appends them to `agent-lessons.md` in the results directory. Fold the
 ones that hold up into this file.
 
+## Getting a match with units
+
+Use `Include "_enter-instant-action"` (in `scenarios/`): Instant Action on Warzone, as
+the Borg, against one easy AI. Each of these cost a bench round on 2026-10-04:
+
+- **A direct map launch has no units.** `Launch: -nointro a2_borg01` (or `--args` on
+  `session start`) opens the map with an empty fog-grey view and an empty bar. It is
+  fine for HUD looks, useless for anything that needs a unit.
+- **Instant Action will not start alone.** LAUNCH with every other slot empty answers
+  "Launch Failed: The game cannot be launched with only one player." Slot 2's name
+  dropdown (design 124,115) offers Empty Slot, Computer AI:Easy (design 124,143),
+  Medium and Hard.
+- **Pick the side.** Side defaults to Random, which deals any race, and the units and
+  panels differ per race. The Side dropdown (design 246,95) opens over the rows below
+  it; Borg is design 246,123.
+- **The match is up about 5 seconds after LAUNCH.** Waiting 50 wastes most of a minute
+  per relaunch; the fragment waits 8.
+- **Where things are** (1920x1080, Borg, Warzone, the same every time): the Nexus at
+  1130,470, an Assembler at 960,388, another just right of it, a Resource Collector
+  below at about 1062,713. Tooltips confirm ("G204-… - Assembler").
+
 ## The screen in a match
 
 - The view opens top-down on your own start: the starbase and a few ships.
@@ -38,7 +59,15 @@ Class names differ per faction; read them off the tooltip. Seen for the **Borg**
 ## Commands and building
 
 - **Selecting** a unit (left click on it) shows its **action bar**: square icons in a row
-  just above the info panel (y≈778, from x≈600, about 75 px apart).
+  just above the info panel (y≈778, from x≈600, about 75 px apart). With
+  `GridLayout.asi` installed (grid layer, on in refit) the bar is instead a 5x3 grid of
+  labelled buttons, and at 16:9 and wider it sits at the bottom between the minimap and
+  the info panel, which moves right. Its keys are by position (QWERT / ASDFG / ZXCVB;
+  T cancel, G back); `GridLayout.log` lists what each menu put on which key, which is
+  quicker than reading icons.
+- **Stock bar keys work without the menu open**: with only an Assembler's top level
+  showing, F5 starts placing a Processing Node. B opens the build menu, C orders, N AI,
+  F formations. With `GridLayout.asi` these are all off, and Q opens the build menu.
 - For the Assembler the **4th** icon (x≈823) opens the **build menu**. It replaces the bar
   with structure icons; dark ones are not available yet. The arrow in the row above goes
   back.
@@ -70,6 +99,16 @@ Class names differ per faction; read them off the tooltip. Seen for the **Borg**
 
 - **Escape opens OPTIONS**; it does not cancel anything. In multiplayer the match keeps
   running behind it. Leave with **Return to Game**, bottom left (≈403,1042).
-- How to cancel a placement was not established. Don't guess with Escape.
+- **Right-click cancels a placement** (the footprint goes, the bar comes back).
+- **A hung game looks like a black screen with a frozen game cursor.** The game draws
+  its own cursor, so if `drive move` moves the host pointer and the game's cursor stays
+  put, the game is not running frames any more, even though `Expect the game is still
+  running` passes. Don't keep clicking: `Stop the game`, then read the plugins' logs
+  (the one time this happened, a plugin under test had crashed the update loop).
 - A screenshot after every hover is what made the first mining run take 108 turns. Batch
   move, wait and ocr, and take a shot only to decide something.
+- **Driving a session from tool calls**: each command starts a fresh shell, so an
+  `export A2TEST_SESSION=…` does not carry over. Put the session path and a list of
+  steps in a small script in the scratchpad and run that.
+- **In a scenario file, every numbered or bulleted line is a step**, including the ones
+  in a fragment's description. Write notes as prose.

@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.2.0 — 2026-10-04
+
+Layers: grid 1.0.0 (new), testbench 2.10.0.
+
+### Added
+- The `grid` layer: `GridLayout.asi` turns the button bar into a 5×3 grid with one key
+  per cell by keyboard position (QWERT / ASDFG / ZXCVB; T cancel, G back), labelled on
+  the buttons, replacing the bar's stock keys. At 16:9 and wider it sits between the
+  minimap and the info panel, which moves right (grid 1.0.0). QOL-1 in
+  `qol/README.md`. `./install` runs `grid/install.sh` and `a2mod` switches it; the
+  release package and installers do not carry it yet.
+- Scenario `grid-layout` and the fragment `_enter-instant-action` (an Instant Action
+  match as the Borg against one easy AI); `GAMEPLAY.md` notes on getting a match with
+  units (testbench 2.10.0).
+
+Installed, not yet seen in game.
+
 ## 9.1.0 — 2026-10-03
 
 Layers: qol 1.0.0 (new), testbench 2.9.0.

@@ -5,6 +5,20 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.10.0 — 2026-10-04
+
+### Added
+- `scenarios/_enter-instant-action.md`: from launch into an Instant Action match on
+  Warzone as the Borg against one easy AI, in design coordinates. The way into any
+  match with units; a direct map launch has none.
+- `scenarios/grid-layout.md`: `GridLayout.asi`'s grid, keys, placement beside the info
+  panel, the stock keys switched off, and chat left alone.
+- `GridLayout.log` and `GridLayout.ini` are collected with the other plugins' logs.
+- `GAMEPLAY.md`: getting a match with units, where the Borg start is on Warzone, the
+  stock bar keys and the grid, cancelling a placement, and how a hung game looks.
+
+Installs nothing; no game-side change to confirm.
+
 ## 2.9.0 — 2026-10-03
 
 ### Added
