@@ -11,7 +11,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   GPU-drawn hulls are lit per pixel by a `vs_3_0`/`ps_3_0` pair (`hull.hlsl`, built
   into the committed `hull_shaders.h`) that reproduces the fixed-function lighting with
   the same lights and material. With any other d3d8, or `0`, nothing changes;
-  `Lighting.log` says which. Built with `platform/d3d9/`.
+  `Lighting.log` says which. Built with `platform/d3d9/` (98c75a1).
 
 Seen on the bench 2026-10-05 (`SCENE=planet`, both chains). Installed, not yet seen in game.
 
