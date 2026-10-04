@@ -135,9 +135,10 @@ At 16:9 the bottom of the screen has, in `HUD.asi`'s 2133-wide canvas, the minim
 (350 wide) on the left, the unit view (350) on the right and the info panel (880)
 centred between them, leaving about 276 on either side of the panel. The grid is five
 buttons of 80 and their gaps, about 410: it fits beside the panel only if the panel
-moves over. So the panel goes right, up to a small margin from the unit view, and the
-grid is centred in the room that opens between it and the minimap, its bottom row a
-margin above the bottom of the screen. At 16:10 (1920) the three panels and the grid
+moves over. So the panel goes right just as far as the grid and a small margin either
+side need, and the grid sits in the room that opens between it and the minimap, its
+bottom row a margin above the bottom of the screen. At 21:9 (2800) the room beside the
+centred panel is already about 610, and nothing moves. At 16:10 (1920) the three panels and the grid
 need about 2000 and do not fit, and at 4:3 even less; there, and with stock's
 1600-wide canvas (no `HUD.asi`), the grid stays above the info panel.
 

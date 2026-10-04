@@ -19,7 +19,7 @@ Newest first. How and why: [`README.md`](README.md).
   (chat), with Ctrl or Alt held, or without focus.
 - The key in each button's corner, `Labels=` and `LabelSize=` (percent, default 87).
 - `Place=beside` (default): at 16:9 and wider the grid sits between the minimap and the
-  info panel, which moves right towards the unit view; where there is no room it stays
+  info panel, which moves right only as far as needed; where there is no room it stays
   above the info panel. `Place=above` keeps it there always.
 - `[Cells] name=key` moves single buttons. `Enabled=0` leaves the bar stock.
 - `install.sh` (`--remove`); `./install` runs it, `a2mod` switches it as layer `grid`.

@@ -430,7 +430,7 @@ static void assign(Item *it, int n, int menu, int *cell)
 /* ---- where the grid goes ---------------------------------------------- */
 
 /* Beside the info panel, when there is room: the grid between the minimap and the
- * info panel, which moves right towards the unit view to make that room.  Decided
+ * info panel, which moves right -- only as far as it must -- to make that room.  Decided
  * where ShipDisplay::PostLoad reads its rects (the call at 0x4f0097, once for each
  * of infoPanelArea_0/_1/_2), which is also where HUD.asi's re-layout after a mode
  * change runs again.  Everything is in the 1600 x 1200 space LoadRectangle returns
@@ -468,7 +468,10 @@ static void plan_beside(void)
     gw = COLS * (bw + gap) - gap;
     iw = ip.r - ip.l + 1;
     if (mm.r + 1 + m + gw + m + iw + m > cv.l) return;  /* no room: above the info panel */
-    infoL = cv.l - m - iw;                               /* the info panel against the unit view */
+    /* The info panel moves right only as far as the grid needs, and not at all
+     * where the room beside it is already enough (21:9). */
+    infoL = mm.r + 1 + m + gw + m;
+    if (infoL < ip.l) infoL = ip.l;
     g_infoDx = infoL - ip.l;
     g_gridX = mm.r + 1 + ((infoL - (mm.r + 1)) - gw) / 2;
     g_gridY = 1200 - m - bh;
