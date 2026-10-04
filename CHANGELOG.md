@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.3.0 — 2026-10-04
+
+Layers: models 3.1.0.
+
+### Added
+- The dilithium moons lose their facets but keep their lumpy shape: `models/moon-sod.py`
+  smooths the rock in each moon model, leaving the glow shell stock for the frame rate
+  (models 3.1.0, 59e503a). `./install` runs it through `models/install.sh`.
+
+Confirmed in game 2026-10-04.
+
 ## 9.2.0 — 2026-10-04
 
 Layers: grid 1.0.0 (new), testbench 2.10.0.
