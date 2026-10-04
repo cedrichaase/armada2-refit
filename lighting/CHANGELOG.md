@@ -9,7 +9,8 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 ### Fixed
 - Soft point lights (nebulae, planets, explosions) lit the side of a hull turned away
   from them: the stock meshes' normals point inward. They now go to Direct3D mirrored
-  through the draw's origin. Torpedo and pulse lights are unchanged and still inverted.
+  through the draw's origin. Torpedo and pulse lights are unchanged and still inverted
+  (8f0d60f).
 - A planet's glow comes from its centre, scaled per object by how much of its day side
   faces it, instead of from the surface under the sun, where the Key light hid it.
 
