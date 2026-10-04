@@ -10,7 +10,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `PlanetGlow=1.5` (was 1.2), `PlanetGlowRange=6.0` (was 5.0), `NebulaRange=8.0` (was
   5.0, as in 1.3.1). The built-in defaults match.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-04.
 
 ## 1.3.2 — 2026-10-04
 
@@ -26,7 +26,7 @@ Installed, not yet seen in game.
 - `NebulaRange=5.0` (was 8.0 in 1.3.1): a nebula's full-strength reach outdid a nearby
   planet's.
 
-Seen on the bench 2026-10-04 (`SCENE=planet`). Installed, not yet seen in game.
+Seen on the bench 2026-10-04 (`SCENE=planet`). Confirmed in game 2026-10-04.
 
 ## 1.3.1 — 2026-10-04
 
@@ -36,7 +36,7 @@ Seen on the bench 2026-10-04 (`SCENE=planet`). Installed, not yet seen in game.
   (was 3.0), `SkyLight=0.35` (was 0.15), `ExplosionBrightness=4.0` (was 2.0),
   `ExplosionRange=10.0` (was 5.0). The built-in defaults match.
 
-Not seen on the bench (it could not start from this session). Installed, not yet seen in game.
+Not seen on the bench (it could not start from this session). Confirmed in game 2026-10-04.
 
 ## 1.3.0 — 2026-10-04
 
@@ -56,7 +56,7 @@ Not seen on the bench (it could not start from this session). Installed, not yet
   patched 10`.
 
 Seen on the bench 2026-10-04 (`SCENE=nebula`, `SCENE=planet`, a scratch battle scene).
-Installed, not yet seen in game.
+Confirmed in game 2026-10-04.
 
 ## 1.2.0 — 2026-10-04
 
