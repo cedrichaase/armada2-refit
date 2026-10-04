@@ -10,7 +10,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `NebulaCull=3.0`: a nebula counts as on screen while its bounding sphere times this is
   in view (stock: the sphere alone), so zooming in on a ship beside a nebula no longer
   makes the nebula and its light vanish. `Lighting.log` now reads `call sites patched
-  11`.
+  11` (c1d3708).
 
 Seen on the bench 2026-10-04 (`SCENE=nebula`, at 2). Installed, not yet seen in game.
 
