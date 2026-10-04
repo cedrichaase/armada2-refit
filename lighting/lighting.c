@@ -645,6 +645,42 @@ static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
     ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, light, col, mat);
 }
 
+/* Nebula culling. Whether a nebula is on screen is ST3D_Instance::FrustumTest
+ * (0x62e990), slot 3 of the NebulaInstance vtable (0x6b1448): its bounding sphere
+ * (the node's at +0x1c when the instance has one at +0x80, else its own at +0x34,
+ * radius at +0xc) against the camera's frustum. Nebula::sCullOccludedNebula asks
+ * it every frame before it draws a nebula, and the nebula's light is registered
+ * only while it is on screen. The sphere is smaller than the cloud as drawn, so a
+ * nebula beside a ship the camera is zoomed in on went, and its light with it,
+ * while its cloud still reached into the view. The plugin's slot 3 tests the
+ * sphere with its radius times NebulaCull and puts it back. The Big Mutara's
+ * sphere is 312; its light, at NebulaRange 8, reaches 960, hence 3. */
+#define VT_NEBULA_INSTANCE 0x6b1448
+#define FN_FRUSTUM_TEST    0x62e990
+typedef BOOL (__thiscall *Frustum_t)(void *, void *);
+static float g_neb_cull = 3.0f;
+
+static BOOL __fastcall hook_nebula_frustum(BYTE *inst, void *edx, void *camera)
+{
+    BYTE  *node = *(BYTE **)(inst + 0x80);
+    float *r    = (float *)((node ? node + 0x1c : inst + 0x34) + 0xc);
+    float  keep = *r;
+    BOOL   in;
+    static int logged;
+    (void)edx;
+    if (!logged) {
+        char b[120];
+        float v[3];
+        v[0] = keep; v[1] = g_neb_cull; v[2] = keep * g_neb_cull;
+        b[0] = 0; s_cat(b, "nebula cull: radius, factor, tested "); s_vec(b, v); logline(b);
+        logged = 1;
+    }
+    *r = keep * g_neb_cull;
+    in = ((Frustum_t)FN_FRUSTUM_TEST)(inst, camera);
+    *r = keep;
+    return in;
+}
+
 /* Planets. A planet in sunlight lights what is near its day side, in the colour
  * of its ground. Each frame, after GameObject_PreRenderAll, the plugin walks the
  * same object list (0x761084) for planets and registers a point light for each
@@ -1152,6 +1188,7 @@ static void startup(void)
     g_nebulae = (int)GetPrivateProfileIntA("Lighting", "Nebulae", 1, ini);
     ini1(ini, "NebulaBrightness", &g_neb_bright);
     ini1(ini, "NebulaRange",      &g_neb_range);
+    ini1(ini, "NebulaCull",       &g_neb_cull);
     g_planet_glow = (int)GetPrivateProfileIntA("Lighting", "PlanetGlows", 1, ini);
     ini1(ini, "PlanetGlow",       &g_glow);
     ini1(ini, "PlanetGlowRange",  &g_glow_range);
@@ -1205,6 +1242,10 @@ static void startup(void)
         else n++;
     }
     if (g_nebulae) n += redirect(S_NEBULA, (const void *)hook_nebula_lights);
+    if (g_neb_cull > 1.0f) {
+        if (patch_slot(VT_NEBULA_INSTANCE, 3, FN_FRUSTUM_TEST, (const void *)hook_nebula_frustum)) n++;
+        else logline("NOT PATCHED: NebulaInstance vtable differs");
+    }
     if (g_explosions) {
         if (patch_slot(VT_FIREBALL, 14, FN_FIREBALL_SIM, (const void *)hook_fireball_sim) &&
             patch_slot(VT_FIREBALL, 0, FN_FIREBALL_DEL, (const void *)hook_fireball_del))
