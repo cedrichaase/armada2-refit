@@ -10,10 +10,22 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - `testbench/scene/`: `Scene.asi`, a scene builder that goes into bench clones only
   (`--install testbench/scene`). Once a directly launched mission is running it turns
-  fog and shroud off for good, hides the HUD and the map grid, builds the object
-  `Scene.ini` names (`Odf=`, `X`/`Y`/`Z`, `Anchor=`, `Heading=`) and centres the
-  camera on it. Keys `Fog=`, `Hud=`, `Grid=`, `Immortal=`, `Center=`, `Delay=`; another
-  scene with `SCENE_INI=`. The bench gathers `Scene.log` and `Scene.ini`.
+  fog and shroud off for good, hides the HUD, grid, cursor and event notices
+  (`Fog=`, `Hud=`, `Grid=`, `Cursor=`, `Notices=`), and builds the objects of the scene
+  file's `[Object.<name>]` sections (`Odf=`, `Team=`, `X`/`Y`/`Z`, `Heading=`,
+  `Immortal=`, `Heal=`, `Engines=`, `Weapons=`, `Attack=`). `Anchor=`, `Center=`,
+  `Camera=`, `Delay=` in `[Scene]`.
+- Three scenes in `scene/scenes/`, chosen with `SCENE=`: `planet` (a Galaxy class beside
+  a class M planet), `nebula` (beside the Mutara nebula) and `firing` (a Galaxy class
+  firing at an indestructible Borg cube without moving). `SCENE_INI=` takes any file.
+- `a2test drive scene "CMD" ...`: commands to a running scene through `Scene.cmd`. They
+  include a free camera (`orbit`, `camera`, `camera rts`), `spawn`, `attack`, `heal`,
+  `engines`, `weapons`, `immortal`, `center`, `pause`/`resume`, `hud`/`grid`/`cursor`/
+  `notices`, and `query`. The bench gathers `Scene.log` and `Scene.ini`.
+
+### Changed
+- `a2test session stop` terminates the game instead of quitting through its menus;
+  `--graceful` quits through the menus as before.
 
 Installs nothing into the game; seen working on the bench 2026-10-04.
 

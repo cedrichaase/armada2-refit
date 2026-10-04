@@ -10,3 +10,6 @@ SetFilePointer@16
 CloseHandle@4
 GetPrivateProfileIntA@16
 GetPrivateProfileStringA@24
+ReadFile@20
+DeleteFileA@4
+GetPrivateProfileSectionNamesA@12

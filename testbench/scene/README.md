@@ -1,42 +1,96 @@
-# Scene builder — a test scene inside a running mission
+# Scene builder — test scenes inside a running mission
 
 End-to-end scenarios reach a scene the way a player does, which makes renderer work
 hard to reproduce: one model at one angle, one weapon firing, one ship beside one
-nebula. `Scene.asi` builds the scene instead. The bench launches straight into a map
-(`-nointro a2_borg01`, about 30 s to the first tick, with no units on it), and once the
-mission has run `Delay=` ticks the plugin turns that empty stage into what `Scene.ini`
-describes.
+planet. `Scene.asi` builds the scene instead. The bench launches straight into a map
+(`-nointro a2_borg01`, about 30 s to the first tick, with no units on it). Once the
+mission has run `Delay=` ticks, the plugin turns that empty stage into what a scene
+file describes. A free camera and other commands then change the scene while it runs.
 
-    ./a2test session start --install . --install testbench/scene --args '-nointro a2_borg01'
-    SCENE_INI=my-scene.ini ./a2test session start ...   # a scene of your own
+    SCENE=firing ./a2test session start --install . --install testbench/scene --args '-nointro a2_borg01'
+    ./a2test drive scene "orbit shooter 120 20 250"      # look from another side
+    ./a2test drive scene pause "orbit shooter 240 -30 250"
+    ./a2test drive shot underside
+    ./a2test session stop
 
-`install` refuses any game directory that is not an a2test clone: this is a test tool
-and never goes into the player's install. The bench gathers `Scene.log` and `Scene.ini`
-with the other logs.
+`SCENE=<name>` picks `scenes/<name>.ini`, `SCENE_INI=<file>` any file, and with neither
+set `Scene.ini` is used (one Galaxy class). `install` refuses any game directory that is
+not an a2test clone: this is a test tool and never goes into the player's install. The
+bench gathers `Scene.log` and `Scene.ini` with the other logs.
 
-**Status: a spike.** One object from `Scene.ini`, fog, HUD and grid off, and the camera
-centred on it, seen on the bench 2026-10-04 at 1920x1080. "Where this is going" below
-lists the rest.
+## The scenes
 
-## Scene.ini
+| `SCENE=` | What | Seen on the bench |
+|---|---|---|
+| `planet` | a Galaxy class beside a class M planet (`pb_clssm`) | 2026-10-04 |
+| `nebula` | a Galaxy class at the edge of the Mutara nebula (`mnebula8`) | 2026-10-04 |
+| `firing` | a Galaxy class firing at a Borg cube (`bbattle1`) without moving, for as long as the session runs: its engines are off; the cube cannot die, is healed every tick and has its weapons off | 2026-10-04, still firing after a minute |
+
+## Scene files
+
+`[Scene]`:
 
 | Key | Default | |
 |---|---|---|
 | `Enable` | 1 | 0 patches nothing |
 | `Delay` | 30 | mission ticks before the scene is built |
 | `Fog` | 0 | 0: fog and shroud off for good, the map fully explored; 1: as the map has them |
-| `Hud` | 0 | 0: no HUD at all; 1: the HUD as usual |
-| `Grid` | 0 | 0: no map grid; 1: as usual |
-| `Odf` | `fgalaxy` | the object, by its ODF name under `odf/` (`fgalaxy` is the Galaxy class) |
-| `Team` | 1 | |
-| `Anchor` | `camera` | `camera`: `X`/`Y`/`Z` are an offset from the RTS camera's interest point; `world`: absolute |
-| `X`, `Y`, `Z` | 0 | position |
-| `Heading` | 0 | degrees about the up axis; 0 faces +z |
-| `Immortal` | 1 | the object cannot die |
-| `Center` | 1 | centre the RTS camera on the object afterwards |
+| `Hud`, `Grid`, `Cursor`, `Notices` | 0 | 0 hides them; 1 leaves them as the game has them. Notices are the game's events: "Enemy engaged." and the like, their voice and minimap marker |
+| `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
+| `Center` | | centre the RTS camera on this object |
+| `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |
 
-On `a2_borg01` the camera's interest point starts at 0,0,0, which is the map's corner:
-half the view is off the map, and with `Fog=1` that half is flat grey.
+`[Object.<name>]`, one per object, built in file order:
+
+| Key | Default | |
+|---|---|---|
+| `Odf` | | the ODF name under `odf/` (`fgalaxy`, `bbattle1`, `pb_clssm`, `mnebula8`, ...) |
+| `Team` | 1 | planets and nebulae take 0 (the editor forces them neutral) |
+| `X`, `Y`, `Z` | 0 | position. Y is up |
+| `Heading` | 0 | degrees about the up axis; 0 faces +z |
+| `Immortal` | 1 | the object cannot die (craft only) |
+| `Heal` | 0 | 1: health topped up to full every tick, so it never shows damage |
+| `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving |
+| `Attack` | | the name of an object to attack, ordered once everything is built |
+
+**Where to put things.** On `a2_borg01` the map is the quadrant x > 0, z > 0, and the
+RTS camera starts looking at its corner, 0,0,0. **A planet outside the map is built
+but never drawn** (bench: one at x = −900 was invisible from any distance, one at
+1500,0,1500 drew). The scenes therefore use `Anchor=world` around 2000,0,2000.
+Scale: a Galaxy class is roughly 100 units long, and fills a 1920x1080 frame from
+about 100 units away. A class M planet is roughly 450 units across.
+
+**An ODF without a model draws as a placeholder.** A ship or station draws
+`SOD/<odf>.sod`. Some ODFs are templates other ODFs include (`bbattle` is the base of
+`bbattle1`..`4`) and have no SOD. They are still built, and drawn as the engine's
+placeholder: a small cube with a red bug on every face. `spawn` logs a note when
+there is no SOD.
+
+## Commands
+
+`./a2test drive scene "CMD" ["CMD" ...]` (or `;` between commands) writes them to
+`Scene.cmd` in the clone. The plugin reads it on its next tick, or its next frame
+while paused, and logs each command (`> ...`) and its answer. `drive scene` prints that
+answer and fails if a command did.
+
+| Command | |
+|---|---|
+| `orbit <object \| x y z> <yaw> <pitch> <distance>` | free camera on a sphere about a point or an object, which it follows. Yaw 0 looks from +z, 90 from +x; pitch is up from the horizon (±89) |
+| `camera <ex> <ey> <ez> <object \| tx ty tz>` | free camera at an eye, looking at a point or an object |
+| `camera rts` | back to the game's own camera |
+| `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
+| `attack <name> <target>` | order an attack |
+| `heal`, `engines`, `weapons`, `immortal` `<name> on\|off` | as the keys above |
+| `center <name>` | centre the RTS camera on an object |
+| `pause`, `resume` | the game's own pause (`PauseSimulation`) |
+| `hud`, `grid`, `cursor`, `notices` `on\|off` | as the keys above |
+| `query` | every object's handle and position, and the camera's eye, front and up |
+
+**Moving the camera while paused runs the simulation for 3 ticks, then pauses again.**
+While the simulation is paused, a moved camera draws the skybox from the new eye and
+every object as from the last simulated frame's camera: the ship lands off-centre,
+seen from the wrong side (seen on the bench, and gone after one resumed frame). The
+cost: a beam or torpedo advances by 3 ticks with each camera move.
 
 ## How it works, and what it relies on in `Armada2.exe`
 
@@ -44,65 +98,80 @@ Addresses are from `armada2.map` (GOG patch 1.1). Every entry point is checked a
 its first bytes before anything is patched or called. A different exe leaves the plugin
 inert, and `Scene.log` says so.
 
-- **The hook: one call site in the game tick.** `Simulate` (0x483290) calls
-  `GameObject_UpdateRange()` at 0x483351 on every tick, *also while the simulation is
-  paused*, unlike the object simulation beside it, which a flag at `[0x76b5ac]+0x84`
-  skips. That call is pointed at the plugin, which calls the original first. A live
-  scene (pause, then move the camera) needs a hook that keeps running, which is why
-  this one was chosen.
+- **The tick: one call site.** `Simulate` (0x483290) calls `GameObject_UpdateRange()`
+  at 0x483351 on every tick. The plugin wraps that call to build the scene, heal, and
+  read `Scene.cmd`.
 - **Building an object: `BuildObject(char *odf, int team, const Matrix34 &)`**
   (0x451990, cdecl), a free function. The mission scripts' own
   `ScriptInterfaceImp::BuildObject` cannot start an empty scene: its third argument is
   an existing object's handle, the position is taken relative to that object, and it
   returns 0 without one. The free function takes a whole transform, so position and
-  orientation are both free. A `Matrix34` is three axis rows (right, up, front) and
-  then the position. The new object's handle is the int at +0x28.
+  heading are both free. A `Matrix34` is three axis rows (right, up, front) and then the
+  position. The new object's handle is the int at +0x28.
 - **The script interface needs no mission DLL.** The mission scripts (`missions/*.dsl`,
-  `*.drl`, ordinary Win32 DLLs) reach the engine through the global
-  `g_pScriptInterface` (0x735c70). A static initialiser points it at a static
-  `ScriptInterfaceImp` (0x735c40) at start-up, so its methods can be called on a map
-  with no script. `CenterCamera(int handle)` (0x455190) and `CraftCannotDie(int, bool)`
-  (0x457590) are called that way. Neither reads `this`.
+  `*.drl`, ordinary Win32 DLLs) reach the engine through `g_pScriptInterface`
+  (0x735c70). A static initialiser points it at a static `ScriptInterfaceImp`
+  (0x735c40) at start-up, so its methods work on a map with no script. None of those
+  used reads `this`:
+  - `Attack(int, int, int)` 0x452be0: the attacker must be a craft with weapons; the
+    target is any object.
+  - `GetLocation(int)` 0x453140
+  - `PauseSimulation()` 0x454cc0 / `UnpauseSimulation()` 0x454cf0
+  - `CenterCamera(int)` 0x455190
+  - `DisableEngines(int, bool)` 0x456960 / `DisableWeapons(int, bool)` 0x456a60
+  - `SetCurrentHealth(int, float)` 0x456d20 / `GetMaxHealth(int)` 0x456da0
+  - `CraftCannotDie(int, bool)` 0x457590
+
   `ScriptInterfaceImp::GridVisible(bool)` is an empty stub, so it cannot hide the grid.
 - **Fog of war: `Scanner::ForceFogAndShroud(bool)`** (0x4935d0) writes the game setup's
   fog and shroud flags. `Scanner::IsFogged` / `IsShrouded` read them on every query, so
   `false` is the map as with fog and shroud off in the setup screen: explored, and never
   re-fogged. `Scanner::ForceUpdate()` (0x493600) makes the scanner recompute.
   `ScriptInterfaceImp::ClearFog` alone would not last, because fog grows back wherever
-  no unit can see. The control on the bench: `Fog=1` leaves the off-map half of the view
-  and the minimap flat grey, and `Fog=0` clears both.
+  no unit can see. Control on the bench: with `Fog=1` the shroud covers the map flat
+  grey, and with `Fog=0` it is gone.
 - **HUD: `DisplayInterface::SetInterfaceState(mode)`** (0x51a460, cdecl). The
-  `toggle_interface` binding (Ctrl+I in `Input.map`) steps a mode kept at
-  `[0x76b5ac]+0x78` through 0..3 and applies it with this function. 0 is the full HUD,
-  1 drops the tactical camera view (the 3D portrait of the selection), and 3 shows no
-  HUD at all (seen on the bench, one Ctrl+I at a time). The plugin writes 3 and applies
-  it. The cursor stays.
+  `toggle_interface` binding (Ctrl+I) steps a mode kept at `[0x76b5ac]+0x78` through
+  0..3. 0 is the full HUD, 1 drops the tactical camera view (the 3D portrait of the
+  selection), and 3 shows no HUD at all (seen on the bench, one Ctrl+I at a time).
 - **Grid: `GridRenderState`**, three ints per view at 0x768e18, `{mode, ?, visible}`.
-  The `grid_toggle` binding (Alt+G) cycles `mode` and `GridRenderState::Update`
+  The `grid_toggle` binding (Alt+G) cycles `mode`, and `GridRenderState::Update`
   (0x528080) derives the other two from it: mode 2 sets both to 0. `GridVisible()`
   (0x51e180), which the grid renderer asks, returns `visible`. The plugin writes
-  `{2, 0, 0}` for views 0 and 1, the two the toggle serves. Alt+G sent through the
-  bench's virtual keyboard did nothing visible, so the toggle is set, not pressed.
+  `{2, 0, 0}` for views 0 and 1. Alt+G sent through the bench's virtual keyboard did
+  nothing visible, so the toggle is set, not pressed.
+- **The free camera: the one call in `s_UpdateMainCamera`.** `s_UpdateMainCamera`
+  (0x53ed90) updates the main `ST3D_Camera` through a single virtual call,
+  `call *0x88(%eax)` at 0x53edac, on the view object. That is
+  `cOverViewImp::UpdateCamera`, which passes it on to `gCameraManager`'s current camera,
+  whatever its class. The call becomes `call camera_update; nop`. The wrapper makes the
+  same virtual call, then, when the free camera is on, calls the `ST3D_Camera`'s
+  virtual `SetTransform` (slot 5) with its own camera-to-world matrix. `SetTransform`
+  derives the rest itself (world-to-camera matrix, frustum). The camera-to-world matrix
+  is at `ST3D_Camera`+0xc0 (`GetCameraToWorldTransform`), which `query` reads.
+  A dead end that shaped this: patching `TacticalCamera::UpdateCamera`'s slot in
+  `TacticalCamera`'s vtable did nothing, because the camera in use is not that class.
+- **Cursor: the one `ST3D_Sprite::DrawScaled2D` call in `RefreshDisplay`** (0x6246fa),
+  which draws the cursor under DXVK. `HUD.asi` wraps the same call ("Cursors" in
+  `hud/README.md`). So `Scene.asi` patches it only once the scene is built, by when
+  `HUD.asi` has long since loaded, and chains to whatever the call went to. With the
+  cursor off, the draw is skipped. Clicks still land where the pointer is.
+- **Notices: `GameEvent::TriggerEvent`.** "Enemy engaged." is the event
+  `EVENTS_ENEMY_ENGAGED` from `events.dat` (text, voice, minimap marker). Events are
+  fired through three entry points: `TriggerEvent()` 0x479880,
+  `TriggerEvent(const Vector3 &, int, const Race *)` 0x4799a0, which the `GameObject`
+  overload calls, and `TriggerEvent(const Race *)` 0x479bb0. With notices off, each
+  entry returns false at once (`xor eax,eax; ret N`). The original bytes are kept and
+  put back by `notices on`.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`).
 
 ## Where this is going
 
-The plan (agreed 2026-10-04): scenes described in a scenario and built on demand, with
-live control for agents.
-
-1. **Several objects and a scene format**: named objects, a position and orientation
-   each, an ODF, and later timed or triggered steps (`at 5s: ship attacks target`).
-   It is interpreted, not compiled to a mission DLL, but designed so that it could be.
-2. **A free camera**: `CameraManager::SetCamera(GameCamera *)` takes any camera, and a
-   camera writes its view in its virtual `UpdateCamera(ST3D_Camera *)`. One of our
-   own (eye, target, up, fov) keeps the engine's culling consistent with what is drawn,
-   unlike a view matrix overridden at the Direct3D level.
-3. **A live channel**: a loopback port per session and `a2test drive spawn` / `camera` /
-   `attack` / `pause` / `tick N` / `query`. `query` returns each object's screen-space
-   box, so a step can measure or judge a crop of one object.
-4. **A `Scene:` block in scenarios**, and a first lighting regression scenario.
-
-Open: whether `BuildObject` places nebulae, which may be map-grid features rather than
-objects, and hiding the cursor (moving it off the view would do).
+- **A `Scene:` block in scenarios**, so a scenario names its scene and the bench
+  installs it, and a first lighting regression scenario.
+- **Screen-space boxes in `query`** (`ST3D_Camera::ProjectPoint`), so a step can
+  measure or judge a crop of one object.
+- **A second map**, once a scene needs more room than `a2_borg01`'s, with its bounds
+  read rather than assumed.
