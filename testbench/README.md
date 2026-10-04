@@ -45,6 +45,11 @@ minutes; it counts as one job but runs two games.
 game directory and the prefix, so a run is free to re-tune, break or `a2mod stock` its
 copy, and can run while the game is being played.
 
+**Scenes on demand** (`scene/`, in progress): `Scene.asi` turns a directly launched,
+empty map into a test scene, with fog, HUD and grid off and the objects `Scene.ini`
+names, so renderer work need not reach a model, an angle or a weapon through the
+menus. `--install testbench/scene`; see `scene/README.md`.
+
 ## How a case runs
 
 | Stage | What | Why this way |

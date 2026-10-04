@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.5.0 — 2026-10-04
+
+Layers: testbench 2.12.0.
+
+### Added
+- `testbench/scene/`: `Scene.asi` builds a test scene inside a running mission (one
+  object, fog, HUD and grid off), for renderer work that end-to-end scenarios reach only
+  with difficulty (testbench 2.12.0).
+
+Installs nothing into the game.
+
 ## 9.4.0 — 2026-10-04
 
 Layers: lighting 1.0.0 (new), models 3.2.0, testbench 2.11.0.

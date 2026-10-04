@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.12.0 — 2026-10-04
+
+### Added
+- `testbench/scene/`: `Scene.asi`, a scene builder that goes into bench clones only
+  (`--install testbench/scene`). Once a directly launched mission is running it turns
+  fog and shroud off for good, hides the HUD and the map grid, builds the object
+  `Scene.ini` names (`Odf=`, `X`/`Y`/`Z`, `Anchor=`, `Heading=`) and centres the
+  camera on it. Keys `Fog=`, `Hud=`, `Grid=`, `Immortal=`, `Center=`, `Delay=`; another
+  scene with `SCENE_INI=`. The bench gathers `Scene.log` and `Scene.ini`.
+
+Installs nothing into the game; seen working on the bench 2026-10-04.
+
 ## 2.11.0 — 2026-10-04
 
 ### Added

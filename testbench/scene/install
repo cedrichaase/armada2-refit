@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Put Scene.asi into a test-bench clone:
+#   ./a2test session start --install . --install testbench/scene
+# Refuses any game directory that is not an a2test clone: the scene builder is a
+# test tool and never goes into the player's install.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../../a2env.sh"
+GAME="$A2_GAME"
+
+case "$GAME" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "refusing: $GAME is not an a2test clone" >&2; exit 1 ;;
+esac
+
+bash "$here/build.sh"
+cp "$here/build/Scene.asi" "$GAME/"
+# A scene of the caller's own: SCENE_INI=<file> ./a2test session start ...
+cp "${SCENE_INI:-$here/Scene.ini}" "$GAME/Scene.ini"
+rm -f "$GAME/Scene.log"
+echo "installed Scene.asi into $GAME"
