@@ -36,6 +36,7 @@ it bundles.
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed so far), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
+| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, and two scene lights (warm key, dim blue fill) in place of each map's own | `lighting/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -303,7 +304,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -614,6 +615,24 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 - **Stock's bar keys are global per selection**, not per open menu (F5 builds from the
   top level). The grid empties the bar's hotkey tables around the stock handler and
   points the menu toggles at a zero; nothing outside the bar reads those controls.
+
+### lighting
+
+- **`Lighting.asi` is the engine's own GPU path, switched on.** Stock draws only asteroid
+  fields through `ST3D_Standard_MeshVB`; the plugin enables it for every object type's
+  model, as the asteroid field does. Don't write a renderer of our own before reading
+  `lighting/README.md`.
+- **On that path the SOD material lies.** Its diffuse colour (red, brick, purple
+  leftovers) and ambient were never shown by the CPU path; the plugin replaces them. The
+  engine's colour at +0x28 is not an ambient term (it turned every hull pink).
+- **A mesh under a mirrored node matrix lights inside out** on the GPU path (the Akira's
+  distant mesh). `FixMirrored` reverses the lights for such a draw. Measuring normals
+  against a mesh's centre does not find these meshes: most stock meshes read as
+  "inward", and flipping them darkened the near hulls.
+- **The map's `dlight` objects are the scene lights**, one to three per map; the plugin
+  replaces them every frame. The axis convention is the engine's (`KeyAxis`).
+- **`models/hull-bump.py` and `Lighting.asi` do not combine**: a bump-mapped hull goes
+  the dot3 way, which takes precedence over the vertex buffers.
 
 ### textures
 

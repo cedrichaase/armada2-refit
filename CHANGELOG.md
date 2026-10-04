@@ -13,7 +13,8 @@ Layers: lighting 1.0.0 (new), models 3.2.0, testbench 2.11.0.
 - The `lighting` layer: `Lighting.asi` draws ships and stations through the engine's own
   static vertex buffers (the GPU path stock uses only for asteroids) and replaces each
   map's lights with a warm key and a dim blue fill from `Lighting.ini` (lighting 1.0.0).
-  `./install` runs `lighting/install.sh` and `a2mod` switches it.
+  `./install` runs `lighting/install.sh` and `a2mod` switches it; the release package and
+  installers do not carry it yet.
 - `models/hull-bump.py`: Federation hulls lit per pixel through the engine's dot3 bump
   path, with one flat height map, `a2flatbump.tga`, and a corrected dot3 shader
   (models 3.2.0). Not run by `./install`. `textures/tools/inventory.py` does not count
