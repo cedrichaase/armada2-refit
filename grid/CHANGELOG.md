@@ -24,4 +24,4 @@ Newest first. How and why: [`README.md`](README.md).
 - `[Cells] name=key` moves single buttons. `Enabled=0` leaves the bar stock.
 - `install.sh` (`--remove`); `./install` runs it, `a2mod` switches it as layer `grid`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-04.

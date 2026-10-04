@@ -20,7 +20,7 @@ Layers: grid 1.0.0 (new), testbench 2.10.0.
   match as the Borg against one easy AI); `GAMEPLAY.md` notes on getting a match with
   units (testbench 2.10.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-04.
 
 ## 9.1.0 — 2026-10-03
 
