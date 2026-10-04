@@ -5,6 +5,25 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.4.0 — 2026-10-04
+
+Layers: lighting 1.0.0 (new), models 3.2.0, testbench 2.11.0.
+
+### Added
+- The `lighting` layer: `Lighting.asi` draws ships and stations through the engine's own
+  static vertex buffers (the GPU path stock uses only for asteroids) and replaces each
+  map's lights with a warm key and a dim blue fill from `Lighting.ini` (lighting 1.0.0).
+  `./install` runs `lighting/install.sh` and `a2mod` switches it; the release package and
+  installers do not carry it yet.
+- `models/hull-bump.py`: Federation hulls lit per pixel through the engine's dot3 bump
+  path, with one flat height map, `a2flatbump.tga`, and a corrected dot3 shader
+  (models 3.2.0). Not run by `./install`. `textures/tools/inventory.py` does not count
+  the map as stock art.
+- `testbench/d3dtrace/`: a bench-only Direct3D 8 tracer, which showed how the engine
+  lights a frame (testbench 2.11.0).
+
+Confirmed in game 2026-10-04.
+
 ## 9.3.0 — 2026-10-04
 
 Layers: models 3.1.0.

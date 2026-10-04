@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Put D3DTrace.asi into a test-bench clone:
+#   ./a2test session start --install . --install testbench/d3dtrace
+# Refuses any game directory that is not an a2test clone: the tracer is a
+# diagnostic and never goes into the player's install.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../../a2env.sh"
+GAME="$A2_GAME"
+
+case "$GAME" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "refusing: $GAME is not an a2test clone" >&2; exit 1 ;;
+esac
+
+bash "$here/build.sh"
+cp "$here/build/D3DTrace.asi" "$here/D3DTrace.ini" "$GAME/"
+rm -f "$GAME/D3DTrace.log" "$GAME/D3DTrace.go"
+echo "installed D3DTrace into $GAME; touch $GAME/D3DTrace.go to trace"

@@ -5,6 +5,19 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 `Planets.asi`, the planets' tessellation, and the dilithium moons (`moon-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 3.2.0 — 2026-10-04
+
+### Added
+- `hull-bump.py` (`--install`, `--revert`, `--status`, `--manifest`): the 36 Federation
+  SODs in `hull-bump.sha256` get the Borg's bump-mapped material spelling, so the engine
+  lights those hulls per pixel through its dot3 path. All of them name one flat height map,
+  `Textures/RGB/a2flatbump.tga`, which this layer adds and `a2mod` switches with it. It
+  also corrects the dot3 shader, `Shaders/dot3_directional.nvv`, to take the normal from
+  the vertex normal rather than S x T (backed up, filed under `models` by `a2mod`).
+  Not run by `./install`; a hull it patches leaves the `lighting` layer's GPU path.
+
+Confirmed in game 2026-10-04.
+
 ## 3.1.0 — 2026-10-04
 
 ### Added

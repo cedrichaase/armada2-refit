@@ -467,7 +467,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         if self.game_pid():
             raise GameError('the game is already running in this session')
         g = self.game_dir
-        for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'QOL.log', 'GridLayout.log', 'BinkProxy.log', 'Armada2_d3d9.log'):
+        for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'QOL.log', 'GridLayout.log', 'Lighting.log',
+                     'BinkProxy.log', 'D3DTrace.log', 'Armada2_d3d9.log'):
             try:
                 (g / name).unlink()
             except FileNotFoundError:
@@ -761,8 +762,10 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.game_dir
-        for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'BinkProxy.log', 'ARMADA.PRF', 'Menus.ini',
-                     'MSAA.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'GridLayout.log', 'GridLayout.ini', 'dxvk.conf', 'Online.log', 'Online.ini', 'OnlineServer.log'):
+        for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'ARMADA.PRF',
+                     'Menus.ini', 'MSAA.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'GridLayout.log',
+                     'GridLayout.ini', 'Lighting.log', 'Lighting.ini', 'dxvk.conf', 'Online.log',
+                     'Online.ini', 'OnlineServer.log'):
             if (g / name).exists():
                 shutil.copy2(g / name, dst / name)
         if self.crashed():
