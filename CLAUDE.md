@@ -35,6 +35,7 @@ it bundles.
 | `menus/` | `Menus.asi` — the shell menus — and `backdrop.sh`, which builds the widescreen plates it composites | `menus/README.md`, `menus/BACKDROPS.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed so far), and the plan for the rest, split by whether other players need it | `qol/README.md` |
+| `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`) and `Planets.asi`, the planets' tessellation | `models/README.md` |
@@ -298,7 +299,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -595,6 +596,20 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   out of games with stock players. Scale the value in memory after the parse, as
   `QOL.asi` does for `FASTSCROLL_COEFFICIENT` (right-drag only). `ARMADA.PRF` carries no
   such check.
+
+### grid
+
+- **A separate plugin on purpose**, so the grid can be switched on and off on its own:
+  without `GridLayout.asi` the bar and all its keys are stock. It changes how orders are
+  given, never what they are, so it is stock-compatible.
+- **Never patch the bar's vtable.** `HUD.asi` recognises the bar (`PopupPaletteImp`) by
+  the `PostLoad` in its vtable when it re-lays the HUD out; the grid wraps call sites
+  inside `Update` and `ShipDisplay::PostLoad` and detours `Render`'s first instruction.
+- **Don't touch the floating palette's width (+0x7c).** It is also the slot plan's width
+  (`row * [+0x7c] + col`); changing it made buttons vanish from the bar.
+- **Stock's bar keys are global per selection**, not per open menu (F5 builds from the
+  top level). The grid empties the bar's hotkey tables around the stock handler and
+  points the menu toggles at a zero; nothing outside the bar reads those controls.
 
 ### textures
 

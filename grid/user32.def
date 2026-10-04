@@ -1,0 +1,6 @@
+LIBRARY USER32.dll
+EXPORTS
+GetAsyncKeyState@4
+MapVirtualKeyA@8
+GetForegroundWindow@0
+GetWindowThreadProcessId@8
