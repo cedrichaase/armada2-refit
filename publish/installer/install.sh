@@ -53,7 +53,7 @@ is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
 # ------------------------------------------------------------------ uninstall
 
 if [ "$action" = uninstall ]; then
-    for n in HUD Menus MSAA; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
+    for n in HUD Menus MSAA QOL; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
     if is_proxy "$game/binkw32.dll"; then
         if [ -f "$game/binkw32.dll.a2neb-backup" ]; then
             mv -f "$game/binkw32.dll.a2neb-backup" "$game/binkw32.dll"
@@ -129,6 +129,7 @@ put() {   # file -- copy from the package into the game directory
 put HUD.asi; put HUD.ini
 rm -f "$game/MenuScale.asi" "$game/MenuScale.ini"   # Menus.asi's old name; never both
 put Menus.asi; put Menus.ini
+put QOL.asi; put QOL.ini
 
 if is_dxvk "$game/d3d8.dll"; then
     put MSAA.asi; put MSAA.ini

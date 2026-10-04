@@ -5,19 +5,67 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 9.1.0 — 2026-10-03
+## 9.4.0 — 2026-10-04
 
-Layers: models 3.1.0, testbench 2.9.0.
+Layers: lighting 1.0.0 (new), models 3.2.0, testbench 2.11.0.
 
 ### Added
-- `models/hull-bump.py`: Federation hulls lit per pixel through the engine's own dot3
-  bump path, with one flat height map, `a2flatbump.tga` (models 3.1.0). `a2mod` switches
-  that file with the `models` layer, and `textures/tools/inventory.py` does not count it
-  as stock art.
+- The `lighting` layer: `Lighting.asi` draws ships and stations through the engine's own
+  static vertex buffers (the GPU path stock uses only for asteroids) and replaces each
+  map's lights with a warm key and a dim blue fill from `Lighting.ini` (lighting 1.0.0).
+  `./install` runs `lighting/install.sh` and `a2mod` switches it.
+- `models/hull-bump.py`: Federation hulls lit per pixel through the engine's dot3 bump
+  path, with one flat height map, `a2flatbump.tga`, and a corrected dot3 shader
+  (models 3.2.0). Not run by `./install`. `textures/tools/inventory.py` does not count
+  the map as stock art.
 - `testbench/d3dtrace/`: a bench-only Direct3D 8 tracer, which showed how the engine
-  lights a frame (testbench 2.9.0).
+  lights a frame (testbench 2.11.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-04.
+
+## 9.3.0 — 2026-10-04
+
+Layers: models 3.1.0.
+
+### Added
+- The dilithium moons lose their facets but keep their lumpy shape: `models/moon-sod.py`
+  smooths the rock in each moon model, leaving the glow shell stock for the frame rate
+  (models 3.1.0, 59e503a). `./install` runs it through `models/install.sh`.
+
+Confirmed in game 2026-10-04.
+
+## 9.2.0 — 2026-10-04
+
+Layers: grid 1.0.0 (new), testbench 2.10.0.
+
+### Added
+- The `grid` layer: `GridLayout.asi` turns the button bar into a 5×3 grid with one key
+  per cell by keyboard position (QWERT / ASDFG / ZXCVB; T cancel, G back), labelled on
+  the buttons, replacing the bar's stock keys. At 16:9 and wider it sits between the
+  minimap and the info panel, which moves right (grid 1.0.0). QOL-1 in
+  `qol/README.md`. `./install` runs `grid/install.sh` and `a2mod` switches it; the
+  release package and installers do not carry it yet.
+- Scenario `grid-layout` and the fragment `_enter-instant-action` (an Instant Action
+  match as the Borg against one easy AI); `GAMEPLAY.md` notes on getting a match with
+  units (testbench 2.10.0).
+
+Confirmed in game 2026-10-04.
+
+## 9.1.0 — 2026-10-03
+
+Layers: qol 1.0.0 (new), testbench 2.9.0.
+
+### Added
+- The `qol` layer: `QOL.asi` makes right-click-drag panning 2.5x as fast (`PanSpeed=` in
+  `QOL.ini`), scaled in memory so `RTS_CFG.h` stays stock and network games still
+  accept the player (qol 1.0.0, 8a8248b). `./install` runs `qol/install.sh`, `a2mod`
+  switches it, and the release package and both installers carry it.
+- The gameplay ideas move from the root `IDEAS.md` to `qol/README.md`, split into
+  changes that stay compatible with stock players (`QOL.asi`) and rule changes every
+  player needs (a future rules plugin).
+- Scenario step `Right-drag from X,Y to X,Y` (testbench 2.9.0).
+
+Confirmed in game 2026-10-03.
 
 ## 9.0.0 — 2026-10-03
 

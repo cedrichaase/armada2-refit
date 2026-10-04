@@ -35,7 +35,11 @@ WHAT COUNTS AS A CHANGE
     menus         Menus.asi/.ini, Menus/*.bmp  -- added files, stock has none
                   (MenuScale.* before menus 2.0.0 -- still recognised, see LEGACY_MENUS)
     msaa          MSAA.asi/.ini                -- added files
-    cutscenes     binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
+    qol           QOL.asi/.ini                 -- added files; not a look but a feel
+                  (right-drag pan speed), switched so stock really is stock
+    grid          GridLayout.asi/.ini          -- added files: the bar as a 5x3 grid with
+                  position keys; switched so stock has stock's bar and keys
+    cutscenes    binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
                   animations/<Name>.mp4/.wav beside a <Name>.bik  -- cutscenes/binkproxy
     renderer      dxvk.conf                    -- AF, LOD bias, seamless cubes
     bloom         vkBasalt.conf enableOnLaunch -- see below
@@ -89,9 +93,12 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
          ('Planets.asi', 'models'), ('Planets.ini', 'models'),
          ('Textures/RGB/a2flatbump.tga', 'models'),
+         ('QOL.asi', 'qol'), ('QOL.ini', 'qol'),
+         ('GridLayout.asi', 'grid'), ('GridLayout.ini', 'grid'),
+         ('Lighting.asi', 'lighting'), ('Lighting.ini', 'lighting'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'hud', 'menus', 'msaa', 'cutscenes',
+LAYERS = ['textures', 'models', 'lighting', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.

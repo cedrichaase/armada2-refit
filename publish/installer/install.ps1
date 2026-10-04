@@ -64,7 +64,7 @@ function Test-OurDxvkConf {
 # ------------------------------------------------------------------ uninstall
 
 if ($Uninstall) {
-    foreach ($n in "HUD", "Menus", "MSAA") {
+    foreach ($n in "HUD", "Menus", "MSAA", "QOL") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
     }
     if (Test-Proxy (G "binkw32.dll")) {
@@ -157,6 +157,7 @@ function Put([string]$f) {
 Put "HUD.asi"; Put "HUD.ini"
 foreach ($n in "MenuScale.asi", "MenuScale.ini") { Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue }   # Menus.asi's old name
 Put "Menus.asi"; Put "Menus.ini"
+Put "QOL.asi"; Put "QOL.ini"
 
 if (Test-Dxvk (G "d3d8.dll")) {
     Put "MSAA.asi"; Put "MSAA.ini"
