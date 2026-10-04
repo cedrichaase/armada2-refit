@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Put Lighting.asi into a test-bench clone:
+#   ./a2test session start --install . --install lighting
+# Bench only while it is an experiment: refuses any game directory that is not
+# an a2test clone.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../a2env.sh"
+GAME="$A2_GAME"
+
+case "$GAME" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "refusing: $GAME is not an a2test clone" >&2; exit 1 ;;
+esac
+
+bash "$here/build.sh"
+cp "$here/build/Lighting.asi" "$here/Lighting.ini" "$GAME/"
+rm -f "$GAME/Lighting.log"
+echo "installed Lighting.asi into $GAME"
