@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.10.0 — 2026-10-04
+
+Layers: qol 1.1.0, testbench 2.12.2.
+
+### Added
+- Control groups: `Shift+number` adds to a group (`Alt+number` takes stock's select and
+  centre), and selections and groups hold up to `MaxSelection=` (default 40) instead of
+  16 (qol 1.1.0).
+
+### Fixed
+- The bench no longer leaks a `pactl subscribe` per stopped session (testbench 2.12.2).
+
 ## 9.9.0 — 2026-10-04
 
 Layers: lighting 1.4.0.

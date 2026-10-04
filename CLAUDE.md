@@ -34,7 +34,7 @@ it bundles.
 | `hud/` | `HUD.asi` — the in-game HUD layout, font and cursors at any aspect | `hud/README.md` |
 | `menus/` | `Menus.asi` — the shell menus — and `backdrop.sh`, which builds the widescreen plates it composites | `menus/README.md`, `menus/BACKDROPS.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
-| `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed so far), and the plan for the rest, split by whether other players need it | `qol/README.md` |
+| `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes | `lighting/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
@@ -593,9 +593,14 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 - **Two plugins, by what other players need.** `QOL.asi` holds only changes that stay
   on this player's machine (camera, keys, which ordinary command a key sends): a player
   with it can play a player without it. Anything that changes what every node simulates
-  (QOL-7's pay-on-enqueue; bigger groups if they travel over the network) goes in a
-  separate rules plugin that every player must run, checked when a network game is set
-  up. Never put a rules change into `QOL.asi`. Which idea is which: `qol/README.md`.
+  (QOL-7's pay-on-enqueue) goes in a separate rules plugin that every player must run,
+  checked when a network game is set up. Never put a rules change into `QOL.asi`. Which
+  idea is which: `qol/README.md`.
+- **The selection lives in `QOL.asi`, not in `cOverViewImp`, when `MaxSelection` > 16.**
+  Its 31 `this+0xbc` sites are re-pointed at the plugin's array; anything new that
+  reads the selection must go through `GetSelectList` (vtable +0x98), never +0xbc. An
+  order for more than 16 ships is still an ordinary `NetOrderObjects`, which stock
+  peers accept (`qol/README.md`, QOL-3).
 - **Never edit `RTS_CFG.h` for a QOL change.** Network games compare a CRC of its bytes
   ("EXE / RTS_CFG.h files do not match node %d"), so an edited file locks the player
   out of games with stock players. Scale the value in memory after the parse, as

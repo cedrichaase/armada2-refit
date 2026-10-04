@@ -1,9 +1,10 @@
 # qol — gameplay quality of life
 
 Changes to how Armada II *plays*, as opposed to how it looks: the controls, the camera,
-control groups, production. One of them is built (QOL-2, the right-drag pan speed, in
-`QOL.asi`); the rest are planned here, each with what is wrong today, what we want, what
-is already known and what still has to be measured. What is installed, at which
+control groups, production. Three of them are built in `QOL.asi`: the right-drag pan
+speed (QOL-2), selections and control groups of up to 120 (QOL-3), and Shift+number
+adding to a group (QOL-4). The rest are planned here, each with what is wrong today, what
+we want, what is already known and what still has to be measured. What is installed, at which
 version, and whether it has been seen in game is in [`CHANGELOG.md`](CHANGELOG.md).
 
     qol/install.sh                  build QOL.asi and install it with QOL.ini
@@ -21,14 +22,14 @@ network game simulates, and the two cannot ship in one plugin:
 
 - **`QOL.asi` — stock-compatible.** The camera, the keys, which ordinary command a key
   press turns into. A player with it can join a player without it, and nothing they
-  simulate differs. Installed by default. QOL-2, 4, 5 and 6 belong here. QOL-1 became
+  simulate differs. Installed by default. QOL-2 to 6 belong here. QOL-1 became
   a plugin of its own, `GridLayout.asi` (`grid/`), so it can be switched separately.
 - **A rules plugin (`QOLRules.asi`, not built yet) — every player needs it.** Changes to
   what the game *does* with a command: when the bank is charged, what a group can
   hold if that travels over the network. Every node must run it with the same settings,
   so it needs a check when a network game is set up (the `online/` layer is the place)
-  and it must refuse or stand down rather than desync. QOL-7 belongs here, and QOL-3 if
-  bigger groups change what is sent.
+  and it must refuse or stand down rather than desync. QOL-7 belongs here. (QOL-3 was
+  the other candidate; bigger groups turned out not to change what is sent.)
 
 The test for which side an idea falls on is the network game: would a stock player and
 a player with the plugin, given the same orders, end up in the same game? If yes,
@@ -45,8 +46,8 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 |---|---|---|---|---|
 | [QOL-1](#qol-1-grid-hotkeys-for-the-button-bar) | Grid hotkeys for the button bar | `GridLayout.asi` (`grid/`) | — | **done** ([`grid/`](../grid/README.md)) |
 | [QOL-2](#qol-2-configurable-right-drag-pan-speed) | Configurable right-drag pan speed | `QOL.asi`, `PanSpeed=` | A slider in the options screen | **done** (`QOL.asi`); slider open |
-| [QOL-3](#qol-3-larger-control-groups) | Larger control groups | code | Measure the cap | idea |
-| [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | code, `Input.map` | Check what Shift+number does today | idea |
+| [QOL-3](#qol-3-larger-control-groups) | Larger control groups | `QOL.asi`, `MaxSelection=` | A count on the selection panel; a stock peer in a network game | **done** (`QOL.asi`), bench |
+| [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | `QOL.asi`, `ShiftAddsToGroup=` | — | **done** (`QOL.asi`), bench |
 | [QOL-5](#qol-5-buildings-in-control-groups) | Buildings in control groups | code | Check what Ctrl+number does on a building | idea |
 | [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | code | Check what a build order does with several yards selected | idea |
 | [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | code, every peer | Measure stock's charge and refund rules | scoped |
@@ -189,53 +190,90 @@ and the setting survives a restart.
 
 ## QOL-3: Larger control groups
 
-*Rules plugin if bigger groups change what is sent; `QOL.asi` if not. Measure first.*
+*`QOL.asi`, stock-compatible. Built: `MaxSelection=` (default 40, 17 to 120; 16 or less
+leaves it stock).*
 
-**Problem.** A control group (`Ctrl+number` to store, `number` to recall) holds only a
-few units. A fleet has to be split across several groups.
+**Problem.** A control group (`Ctrl+number` to store, `number` to recall) holds only 16
+units. A fleet has to be split across several groups.
 
 **Wanted.** A much higher limit, or none.
 
-**Today.** The cap's value and where it applies are not yet measured. Two limits may be
-involved, and they must be told apart: the size of a *selection*, and the size of a
-*stored group*. The selection panel in the HUD also shows a fixed number of unit icons.
-A larger group must still display sensibly there, for example as a count or pages,
-even if it shows only the first N icons.
+**What limits it.** The *selection*, not the group. A stored group is a `list_array` of
+entity ids with no limit of its own (`cOverViewImp::mBindGroup`, 0x520c40, replaces it
+from the selection with no cap). But a group is built from the selection and recalled
+into it, and the selection is 16: `cOverViewImp` (one static object at 0x768e40,
+`g_pOverView` at 0x768e3c points to it) keeps a count at +0xb8 and an array of 16 entity
+ids at +0xbc, with live fields from +0xfc on, and `cOverViewImp::Select` (0x51f600)
+refuses a 17th object. Two more caps of 16: `mBindGroup`'s add path (`Ctrl+Shift+N`,
+0x520e97) and `mEditModeSelect` (0x5232e3).
 
-**Approach.** Measure first on the bench: select 10, 20, 30, 50 ships and store each
-selection as a group. Raising a fixed array size means a plugin that moves the group
-storage to a larger buffer, everywhere it is read: recall, the HUD, saves and the
-network. That is the expensive part.
+**How `QOL.asi` lifts it.** The array moves into the plugin. All 31 places that address
+it are `cOverViewImp` methods that reach it as `this+0xbc` with a 32-bit displacement or
+immediate, so each is rewritten in place to point at the plugin's array, without
+changing an instruction's length; the count stays at +0xb8. The three `cmp ...,0x10`
+become `MaxSelection` (an 8-bit immediate, hence 120 at most). Every site is checked
+byte for byte before any is written, so a different exe leaves the selection where it
+was, in one piece.
 
-**Open questions.** What is the cap, and is it per selection, per group, or both? Does a
-group or selection command go over the network with a fixed number of units? (See
-"Multiplayer" above.)
+**Who else reads the selection.** Everything outside `cOverViewImp` goes through its
+`GetSelectNum` / `GetSelectList` / `GetSelectedEntityIds` (vtable +0x94/+0x98/+0x9c),
+about 40 call sites, and copies into growable arrays: the button bar
+(`PopupPaletteImp`), `ActionMode::GetAction` (its two stack arrays are vote counters per
+action type, not per ship), the radar, `CommDisplay`'s give-units button. The selection
+panel (`ShipDisplay`) has 16 icon slots and fills them from the first 16 ids; its
+loops that would run to the selection count (`SimulateMultiObject`,
+`DisplayMultiObject`) are never called. So a bigger selection shows its first 16 icons.
 
-**Done when.** A group of 50 ships stores, recalls, saves, loads, and moves as one in a
-two-player bench game.
+**The network.** An order goes out as `NetOrderObjects`: two bytes, a 32-bit count, then
+that many handles. The receiving end hands count and handles to
+`GameObject::DeQueueCommand`, which walks however many arrive. A stock player therefore
+carries out an order for 40 ships like any other, and nothing about the groups
+themselves is sent. This is why QOL-3 is in `QOL.asi` and not the rules plugin; a
+network game against a stock player is the check still to make.
+
+**Seen on the bench (2026-10-04).** 30 scouts: `Ctrl+A` selected 30, `Ctrl+1` stored 30,
+`1` recalled 30 (each read from the game's memory, not the panel), and a move order took
+all 30 across the map. The panel shows 16 of them.
+
+**Open.** A count, or pages, on the selection panel for more than 16. Not checked yet:
+saving and loading a game with a group over 16, and a two-player game against stock.
 
 ---
 
 ## QOL-4: Shift+number adds to a group
 
-*`QOL.asi`, stock-compatible.*
+*`QOL.asi`, stock-compatible. Built: `ShiftAddsToGroup=` (default 1).*
 
 **Wanted.** As in StarCraft II, `Shift+number` adds the current selection to that group
 and keeps what is already in it. (`Ctrl+number` keeps its meaning: replace the group.)
 
-**Today.** `Input.map` binds `group_select_N` to the bare number key. Groups are
-created by holding `Ctrl`, which the engine handles. Nothing yet says what `Shift+N`
-does in stock.
+**Stock.** `Input.map` binds `group_select_N` to the bare number key, with any
+modifier; `cOverViewImp::mCheckGroupSelect` (0x521110) reads the modifiers itself from
+`g_pCommandControl` (0x76133c) and `g_pCommandShift` (0x761340):
 
-**Approach.** Bind `Shift+N` to a new action in the plugin: read group N, append the
-units not already in it up to the cap (QOL-3), and store it again. Do nothing on an
-empty selection.
+| Keys | Stock |
+|---|---|
+| `N` | select group N; a second `N` within 750 ms centres the camera on it |
+| `Shift+N` | select group N and centre the camera at once |
+| `Ctrl+N` | `mBindGroup(N, true)`: the group becomes the selection |
+| `Ctrl+Shift+N` | `mBindGroup(N, false)`: the selection is added, the group kept |
 
-**Open questions.** Does `Shift+N` already mean something, such as adding the group to
-the current selection? If it does, that meaning moves to another key. Ask before taking
-it.
+A unit is in one group at a time: binding takes it out of every other group first. A
+building goes into a second set of ten groups (`+0x1c4`, chosen by a flag at +0x20d of
+the first selected object's class), which recall falls back to when the first set's
+group is empty.
 
-**Done when.** Select A, `Ctrl+1`, select B, `Shift+1`, `1` recalls A and B.
+**With `QOL.asi`.** At 0x52129a, where the function tests Control to choose between
+binding and selecting, a jump to the plugin sends `Shift+N` without Control to
+`mBindGroup(N, false)`, the call stock makes for `Ctrl+Shift+N`; every other combination
+goes back to stock. `Shift+N`'s old meaning moves to `Alt+N`: the one read of
+`g_pCommandShift` that decides "centre now" (0x521350) reads `g_pCommandAlt` (0x761344)
+instead. Nothing in `Input.map` uses `Alt` with a number key. With nothing selected,
+`Shift+N` does nothing and the group is kept.
+
+**Seen on the bench (2026-10-04).** Select A, `Ctrl+1`; select B, `Shift+1`; deselect;
+`1` selects A and B. `Alt+1` after panning away selects both and centres the camera;
+`1` selects without moving it. `Ctrl+1` on B alone replaces the group.
 
 ---
 
