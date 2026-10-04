@@ -19,6 +19,16 @@ Layers: platform 3.1.0, testbench 2.13.0, lighting 1.5.0.
 - The first step of phase 2 (lighting 1.5.0): `Shaders=1` lights the GPU-drawn hulls
   per pixel through that device, reproducing the fixed-function lighting.
 
+## 9.10.2 — 2026-10-05
+
+Layers: postfx 1.1.1.
+
+### Fixed
+- Selecting many ships no longer drags the frame rate down: each selected ship's bubble
+  is drawn on the CPU, and that path was reading back from GPU memory under DXVK. 30
+  selected went from 72.6 ms a frame to the vsync cap of 16.7 ms on the bench
+  (postfx 1.1.1, b038b8e).
+
 ## 9.10.1 — 2026-10-05
 
 Layers: qol 1.1.1.

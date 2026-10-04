@@ -54,6 +54,58 @@ because a key DXVK does not recognise is silently ignored:
 - **`d3d9.seamlessCubes = True`** (stage 3). Filters across cube-map face edges. Directly
   relevant to the finished skybox class: many maps bind a `.sod` cube model, and a
   face-edge seam gets *more* visible at 2048/face, not less.
+- **`d3d9.cachedWriteOnlyBuffers = True`** (every stage). Not an image setting: it
+  makes the engine's CPU mesh path cheap under DXVK. Without it, 30 selected ships
+  cost 70 ms a frame. The next section explains why. A DXVK build that does not
+  know the key gets the stages without it and a warning.
+
+### Reading back a dynamic vertex buffer
+
+Selecting many ships cost frame rate in proportion to the number selected, and the
+frame rate came back as soon as they were deselected. The cost is the **selection
+bubble**, the grey translucent ellipse around each selected ship. It is
+`SelectionEffect` (`SelectionEffect.obj` in `armada2.map`): an `ST3D_Instance` of
+`SOD/select.sod` (one GeoSphere, 162 vertices, 320 faces) that
+`SelectionDisplay::PreRender` adds per selected object (`AddSelectionEffect`,
+0x599800) and `RenderSelectionEffects` (0x599900, called at 0x5984c0 from
+`Armada_RenderAllOurStuff`) draws once or twice per ship. Its shared material,
+"selection", is set as the engine's override material for the draw, coloured by team
+relation, and scaled to the ship's shield ellipse. The draws run after the scene,
+with z-sorting off and a different z-compare. Because the material is translucent,
+`ST3D_Mesh::RenderInternal` sends it down the CPU path (`RenderInternalNonVB`), as
+`models/README.md` found for the moons' glow shells.
+
+The mesh is small. The cost is how the CPU path writes it. A test-only plugin timed
+the call at 0x5984c0 and sampled the main thread's instruction pointer (bench,
+1920x1080, 30 Galaxy class, `testbench/scene`). With 30 selected, the bubbles took
+67–71 ms of a 69–73 ms frame. 95% of the samples fell on the two compares in
+`ST3D_VertexLighting_Group::RenderFacesInsideImmediateNoSpecular` (0x645f40) that
+check a face corner's texture coordinate against the vertex already written for it.
+`perf stat` measured 0.07 instructions per cycle, with no kernel time or page faults
+to speak of. The vertex that is compared against lives in the workspace's output
+array, which is the locked Direct3D dynamic vertex buffer. In `/proc/<pid>/maps` that
+array is a mapping of `/dev/dri/renderD128`: DXVK puts a write-only dynamic buffer in
+GPU memory, where every CPU read is uncached and crosses the bus, at about 1.2 µs a
+compare.
+
+`d3d9.cachedWriteOnlyBuffers = True` keeps those buffers in cached host memory. The
+engine draws exactly as before (same triangles, states and order), so the bubble
+looks the same. Measured with the timer above (frame times at 60 Hz vsync):
+
+| Selected | Frame, before | Bubbles, before | Frame, after | Bubbles, after |
+|---|---|---|---|---|
+| 0 | 16.7 ms | 0 | 16.7 ms | 0 |
+| 15 | 37.3 ms | 35.4 ms | 16.7 ms | 0.24–0.37 ms |
+| 30 | 72.6 ms | 70.6 ms | 16.7 ms | 0.60–0.81 ms |
+
+Why a renderer key and not a hook in `Lighting.asi`, which moved the hulls onto
+vertex buffers: the slow part is not the CPU transform of 320 faces, it is reading
+uncached memory. A GPU path for the bubble would also have to reproduce a translucent,
+team-coloured, depth-unsorted draw through the fixed-function pipeline. The key fixes
+every other draw on the CPU path as well: planets, the moons' glow shells, cloaking
+ships, and every hull with `GPU=0`. How much those gain has not been measured. The
+key also costs the GPU a little: it now reads those vertices from system memory. With
+the frame at the vsync cap on the bench, that cost did not show.
 
 `DXVK_HUD=fps,frametimes` is the measuring aid; it is deliberately **not** written into
 `dxvk.conf`, so it cannot be left on by accident. Expect the GPU to be near-idle — a 2001
