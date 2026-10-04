@@ -12,7 +12,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   makes the nebula and its light vanish. `Lighting.log` now reads `call sites patched
   11` (c1d3708).
 
-Seen on the bench 2026-10-04 (`SCENE=nebula`, at 2). Installed, not yet seen in game.
+Seen on the bench 2026-10-04 (`SCENE=nebula`, at 2). Confirmed in game 2026-10-04.
 
 ## 1.3.3 — 2026-10-04
 
