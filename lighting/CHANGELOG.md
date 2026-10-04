@@ -10,7 +10,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `SelfIllumination=1.0`: with `Shaders=1`, a hull whose material is an
   `ST3D_SelfIlluminatingMaterial` shows its night lights (the texture's alpha: windows,
   nacelle grilles, bussards) as the CPU path's second pass does; the GPU path had dropped
-  that pass. `0` leaves them dark.
+  that pass. `0` leaves them dark (5ca6262).
 
 Seen on the bench 2026-10-05 (`SCENE=planet`, against the CPU path). Installed, not yet seen in game.
 
