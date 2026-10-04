@@ -114,10 +114,10 @@ typedef void  (__thiscall *EnableStatic_t)(void *db, BOOL on);
 
 static int   g_gpu = 1, g_lights = 1;
 static float g_key_col[3]  = { 1.00f, 0.96f, 0.90f };
-static float g_key_dir[3]  = { 0.35f, -0.80f, 0.50f };
-static float g_fill_col[3] = { 0.10f, 0.12f, 0.24f };
-static float g_fill_dir[3] = { -0.35f, 0.80f, -0.50f };
-static float g_ambient[3]  = { 0.10f, 0.10f, 0.12f };
+static float g_key_dir[3]  = { 0.50f, -0.50f, 0.71f };
+static float g_fill_col[3] = { 0.06f, 0.08f, 0.18f };
+static float g_fill_dir[3] = { -0.50f, 0.50f, -0.71f };
+static float g_ambient[3]  = { 0.05f, 0.05f, 0.07f };
 static float g_key_mat[12], g_fill_mat[12];
 
 static int g_frame_lights;      /* directional lights seen this frame */
@@ -470,7 +470,7 @@ static int redirect(int i, const void *to)
 #define FMULS_HALF   0x6ae220   /* 0.5f  */
 #define FMULS_3QTR   0x6ae70c   /* 0.75f */
 
-static float g_planet_amb[3]  = { 0.10f, 0.10f, 0.12f };
+static float g_planet_amb[3]  = { 0.05f, 0.05f, 0.07f };   /* Ambient, unless PlanetAmbient is set */
 static float g_planet_diff[3] = { 1.00f, 1.00f, 1.00f };
 static int   g_planets = 1;
 

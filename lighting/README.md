@@ -25,14 +25,22 @@ switched to vertex buffers and the map's own lights.
 |---|---|---|
 | `GPU` | `1` | static vertex buffers for every game object type's model |
 | `Lights` | `1` | replace the map's lights with Key and Fill |
-| `KeyColour`, `FillColour` | `1.00 0.96 0.90`, `0.10 0.12 0.24` | linear RGB, 1 = full |
-| `KeyAxis`, `FillAxis` | `0.35 -0.80 0.50`, the negation | the light matrix's third axis, in the engine's own convention: the stock key on the first Federation map is `0 -0.707 0.707` and lights the hulls from above |
-| `Ambient` | `0.10 0.10 0.12` | light every GPU-drawn surface gets, whatever its direction |
+| `KeyColour`, `FillColour` | `1.00 0.96 0.90`, `0.06 0.08 0.18` | linear RGB, 1 = full |
+| `KeyAxis`, `FillAxis` | `0.50 -0.50 0.71`, the negation | the light matrix's third axis, in the engine's own convention: the stock key on the first Federation map is `0 -0.707 0.707` and lights the hulls from above |
+| `Ambient` | `0.05 0.05 0.07` | light every GPU-drawn surface gets, whatever its direction |
 | `Planets` | `1` | planets lit by Key and Fill with a night side (below) |
-| `PlanetAmbient` | `Ambient` | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
+| `PlanetAmbient` | `0.02 0.02 0.03` (left out: `Ambient`) | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
 | `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `Log` | `1` | write `Lighting.log` |
+
+The key comes in about 60° off vertical (1.0.0 had about 37°), so from the usual
+camera, which looks down from above, the light grazes the hulls and planets instead of
+falling straight onto them. The fill, `Ambient` and `PlanetAmbient` are kept low so
+that light sources added later stand out against the base lighting. The lighting is
+per vertex and casts no shadows: a flat face such as a saucer's top takes one tone
+whatever the angle. On the bench (`SCENE=planet`, the view 65° down) the Galaxy's saucer
+went from a mean grey of 155 to 111.
 
 Requires *Hardware Vertex Processing* on (Graphics Options; the default). With it off
 the engine keeps every mesh on the CPU and only the lights part applies.
