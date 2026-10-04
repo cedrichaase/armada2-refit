@@ -19,7 +19,7 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
   that device. The header gets the device and manages shader objects and the state
   around a draw; the script compiles HLSL with vkd3d into an embedded header.
 
-Installs nothing by itself; `--use d3d8to9` installed, not yet seen in game.
+Installs nothing by itself; `--use d3d8to9` confirmed in game 2026-10-05.
 
 ## 3.0.0 — 2026-09-28
 

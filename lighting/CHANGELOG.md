@@ -13,7 +13,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   the same lights and material. With any other d3d8, or `0`, nothing changes;
   `Lighting.log` says which. Built with `platform/d3d9/` (98c75a1).
 
-Seen on the bench 2026-10-05 (`SCENE=planet`, both chains). Installed, not yet seen in game.
+Seen on the bench 2026-10-05 (`SCENE=planet`, both chains). Confirmed in game 2026-10-05.
 
 ## 1.4.0 — 2026-10-04
 
