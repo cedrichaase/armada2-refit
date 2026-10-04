@@ -39,6 +39,7 @@ planet's ground colour (`planet glow:`).
 | `PlanetAmbient` | `0.02 0.02 0.03` (left out: `Ambient`) | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
 | `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
+| `SelfIllumination` | `1.0` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none |
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `PointLights` | `12` | point lights per GPU draw, the strongest first: up to 16 with `Shaders`, 6 in Direct3D's slots; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
@@ -419,8 +420,29 @@ which DXVK does not enforce and current Windows hardware exceeds.
 stage 0 `SELECTARG1(TEXTURE)`: the texture as it is, unlit. Lighting has nothing to add to
 them; the log names it once.
 
-**Next, and it changes the look:** the hull texture's alpha, the self-illumination map:
-in the traced frame no draw on this path used it (blend `ONE/ZERO`, and no second pass).
+**Night lights (1.7.0).** A hull texture's alpha is a night-lights map: windows, the
+deflector, nacelle grilles, bussard collectors (`textures/README.md`). A `testbench/d3dtrace`
+frame of the CPU path (`GPU=0`, planet scene) draws the Galaxy twice: texture x lit colour,
+opaque, then stage 0 `SELECTARG1(TEXTURE)` with alpha `MODULATE`, blended
+`SRCALPHA/INVSRCALPHA`, so the result is the lit texture with the bare texture laid over
+it by its alpha. That second pass belongs to the material class: `armada2.map` names
+`ST3D_SelfIlluminatingMaterial` (vtable 0x6bc854) with its own `NumPasses` (slot 3) and
+`SetPassRenderState` (slot 4). `ST3D_Standard_MeshVB::Render` (0x63e450) calls the
+material's slot 4 for pass 0 only, so on the GPU path the night lights never drew; the
+vertex-buffer trace has one opaque draw per mesh. The material is `Render`'s third
+argument, which `hook_vb_render` already receives: when its vtable is that class's, the
+shader folds the second pass in, `lerp(texture x light, texture, alpha x SelfIllumination)`,
+exactly the CPU path's result at `1`. Other materials are untouched, so a texture whose
+alpha means something else, or has none (it samples as 1), is never lit up by it.
+
+On the bench (`SCENE=planet`, `orbit ship 200 20 150`): the CPU path, the shaders before
+and the shaders with the night lights side by side. The blue nacelle grilles, the red
+bussard collectors, the saucer windows and the running lights are back as the CPU path
+draws them, now over the per-pixel hull. `Lighting.log`: `a self-illuminating material,
+its night lights folded in`.
+
+Not reproduced: the CPU path's first pass also has `SPECULARENABLE` on, with the
+specular colour computed on the CPU; the GPU path has had none since 1.0.0.
 
 ## Not covered yet
 

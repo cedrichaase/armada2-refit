@@ -37,6 +37,7 @@ float4 mat_diffuse  : register(c1);
 float4 dcol[DIRS]   : register(c2);   // directional lights as the device has them; 0 for none
 float4 dvec[DIRS]   : register(c6);   // towards each
 float4 misc         : register(c10);  // x: the normals' sign for point lights (-1 inward, +1 mirrored)
+                                      // y: self-illumination: the texture's alpha shows it unlit (0: none)
 float4 pcol[POINTS] : register(c11);  // point light colour; 0 for none
 float4 ppos[POINTS] : register(c27);  // world position
 float4 pfall[POINTS]: register(c43);  // x: full to this distance, y: 1 / the fade after it
@@ -59,5 +60,8 @@ float4 hull_ps(Lit i) : COLOR
         sum += pcol[j].rgb * mat_diffuse.rgb * max(0.0, dot(Np, L / max(d, 1e-6))) * f;
     }
     float4 t = tex2D(tex0, i.uv);
-    return float4(t.rgb * saturate(sum), t.a * base.a);
+    // A self-illuminating material's second pass on the CPU path, folded in: the
+    // texture alone, blended over the lit one by its alpha (the night-lights map).
+    float3 c = lerp(t.rgb * saturate(sum), t.rgb, saturate(t.a * misc.y));
+    return float4(c, t.a * base.a);
 }

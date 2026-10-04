@@ -417,6 +417,17 @@ static Pick  g_sh_pick[SH_POINTS];
 static int   g_sh_npick;
 static float g_sh_sign = -1.0f;      /* -1: inward normals, as stock; +1: a mirrored draw */
 
+/* Self-illumination. On the CPU path a hull whose material is an
+ * ST3D_SelfIlluminatingMaterial is drawn twice (its NumPasses, slot 3, is 2): texture x
+ * lit colour, then the texture alone blended SRCALPHA/INVSRCALPHA, so where the alpha
+ * (the night-lights map) is bright the texture shows at full strength whatever the
+ * light. ST3D_Standard_MeshVB::Render calls the material's SetPassRenderState (slot 4)
+ * for pass 0 only, so on the GPU path the night lights never drew. Render's third
+ * argument is that material; the shaders fold the second pass into the first. */
+#define VT_SELFILLUM_MATERIAL 0x6bc854   /* ST3D_SelfIlluminatingMaterial vtable */
+static float g_selfillum = 1.0f;     /* SelfIllumination=: 1 is stock's second pass, 0 none */
+static int   g_sh_lit_self;          /* the draw in hand has a self-illuminating material */
+
 /* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
  * distance d: 1 straight under the sun, 1/2 over the terminator, 0 over the night
  * side. */
@@ -553,6 +564,11 @@ static void __fastcall hook_vb_render(void *self, void *edx, int group, void *lm
     }
     for (i = 0; i < g_sh_npick; i++) g_sh_pick[i] = pk[i];
     g_sh_sign = mirrored ? 1.0f : -1.0f;
+    g_sh_lit_self = tm && *(DWORD *)tm == VT_SELFILLUM_MATERIAL;
+    if (sh && g_sh_lit_self && g_logging) {
+        static int said_self;
+        if (!said_self) { said_self = 1; logline("shaders: a self-illuminating material, its night lights folded in"); }
+    }
     g_in_vb = 1;
     g_vb_render(self, group, lm, tm, tex);
     g_in_vb = 0;
@@ -787,7 +803,9 @@ static int sh_setup(void *d9)
         }
         d9_psconst(d9, 2, dc, 4);
         d9_psconst(d9, 6, dv, 4);
-        misc[0] = g_sh_sign; misc[1] = misc[2] = misc[3] = 0.0f;
+        misc[0] = g_sh_sign;
+        misc[1] = g_sh_lit_self ? g_selfillum : 0.0f;
+        misc[2] = misc[3] = 0.0f;
         d9_psconst(d9, 10, misc, 1);
         /* The point lights where they are, with the engine's falloff (full to start,
          * gone after fade) for the shader to apply per pixel. */
@@ -1420,6 +1438,7 @@ static void startup(void)
     g_logging = (int)GetPrivateProfileIntA("Lighting", "Log",    1, ini);
     g_fix_mirrored = (int)GetPrivateProfileIntA("Lighting", "FixMirrored", 1, ini);
     g_shaders = (int)GetPrivateProfileIntA("Lighting", "Shaders", 1, ini);
+    ini1(ini, "SelfIllumination", &g_selfillum);
     ini3(ini, "KeyColour",  g_key_col);
     ini3(ini, "KeyAxis",    g_key_dir);
     ini3(ini, "FillColour", g_fill_col);
