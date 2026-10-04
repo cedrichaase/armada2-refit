@@ -456,6 +456,56 @@ static int redirect(int i, const void *to)
     return 1;
 }
 
+
+/* Planets. A planet is a Planet_Database whose GroundMesh hemispheres and cloud
+ * shell the engine rebuilds as the camera moves, so they stay on the CPU path
+ * (LightVertices_Lambert), which does take the scene's lights. What kept them
+ * from showing a night side is their material: GroundMesh's constructor
+ * (0x595ba0) builds one per mesh from ST3D_Colour_White, a constant term of
+ * White x 0.5 that the CPU path adds to every vertex, and a diffuse of
+ * White x 0.75. Half white everywhere, plus the Key, clamps the day side and
+ * leaves the night side half lit. The six fmuls that scale White (one per
+ * channel) are pointed at the plugin's own floats: PlanetAmbient and
+ * PlanetDiffuse. */
+#define FMULS_HALF   0x6ae220   /* 0.5f  */
+#define FMULS_3QTR   0x6ae70c   /* 0.75f */
+
+static float g_planet_amb[3]  = { 0.10f, 0.10f, 0.12f };
+static float g_planet_diff[3] = { 1.00f, 1.00f, 1.00f };
+static int   g_planets = 1;
+
+static const DWORD k_planet_diff_at[3] = { 0x595c22, 0x595c3d, 0x595c57 };
+static const DWORD k_planet_amb_at[3]  = { 0x595c70, 0x595c7f, 0x595c8e };
+
+static int fmuls_ok(DWORD at, DWORD operand)
+{
+    const BYTE *p = (const BYTE *)at;
+    return p[0] == 0xD8 && p[1] == 0x0D && *(const DWORD *)(p + 2) == operand;
+}
+
+static void fmuls_point(DWORD at, const float *to)
+{
+    BYTE *p = (BYTE *)at + 2;
+    DWORD old;
+    VirtualProtect(p, 4, PAGE_EXECUTE_READWRITE, &old);
+    *(DWORD *)p = (DWORD)to;
+    VirtualProtect(p, 4, old, &old);
+    FlushInstructionCache(GetCurrentProcess(), p, 4);
+}
+
+static int patch_planets(void)
+{
+    int i;
+    for (i = 0; i < 3; i++)
+        if (!fmuls_ok(k_planet_diff_at[i], FMULS_3QTR) || !fmuls_ok(k_planet_amb_at[i], FMULS_HALF))
+            return 0;
+    for (i = 0; i < 3; i++) {
+        fmuls_point(k_planet_diff_at[i], &g_planet_diff[i]);
+        fmuls_point(k_planet_amb_at[i],  &g_planet_amb[i]);
+    }
+    return 1;
+}
+
 /* ---- startup ---------------------------------------------------------- */
 
 static void build_paths(char *ini)
@@ -488,6 +538,10 @@ static void startup(void)
     ini3(ini, "FillColour", g_fill_col);
     ini3(ini, "FillAxis",   g_fill_dir);
     ini3(ini, "Ambient",    g_ambient);
+    g_planets = (int)GetPrivateProfileIntA("Lighting", "Planets", 1, ini);
+    for (i = 0; i < 3; i++) g_planet_amb[i] = g_ambient[i];
+    ini3(ini, "PlanetAmbient", g_planet_amb);
+    ini3(ini, "PlanetDiffuse", g_planet_diff);
     light_matrix(g_key_dir, g_key_mat);
     light_matrix(g_fill_dir, g_fill_mat);
 
@@ -499,6 +553,12 @@ static void startup(void)
     s_cat(b, "  fill ");           s_vec(b, g_fill_col);
     s_cat(b, " axis ");            s_vec(b, g_fill_mat + 6);
     logline(b);
+    if (g_planets) {
+        b[0] = 0;
+        s_cat(b, "planets: ambient "); s_vec(b, g_planet_amb);
+        s_cat(b, "  diffuse ");        s_vec(b, g_planet_diff);
+        logline(b);
+    }
 
     for (i = 0; i < S_COUNT; i++) {
         if (!site_ok(i)) {
@@ -522,6 +582,10 @@ static void startup(void)
             else n++;
         }
         if (!patch_set_material()) logline("NOT PATCHED: SetMaterial site differs");
+        else n++;
+    }
+    if (g_planets) {
+        if (!patch_planets()) logline("NOT PATCHED: planet material sites differ");
         else n++;
     }
     b[0] = 0;

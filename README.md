@@ -125,7 +125,7 @@ loads and nothing reports an error. On Windows no override is needed.
 | HUD | `hud/build/HUD.asi`, `hud/HUD.ini` | Don't also run `hud/ui-widescreen.py`, `ui-font-condense.py` or `cursor-aspect.py`; they are its file-based predecessors. Handles both cursor paths: D3D8's hardware cursor and the sprite path DXVK takes |
 | Quality of life | `qol/build/QOL.asi`, `qol/QOL.ini` | Right-drag pan speed (`PanSpeed=`, default 2.5x). Leave `RTS_CFG.h` stock: network games compare it, and the plugin scales the value in memory ([`qol/README.md`](qol/README.md)) |
 | Grid hotkeys | `grid/build/GridLayout.asi`, `grid/GridLayout.ini` | The button bar as a 5x3 grid, one key per cell by position (`QWERT`/`ASDFG`/`ZXCVB`; T cancel, G back). Replaces the bar's stock keys; delete the `.asi` to get them back ([`grid/README.md`](grid/README.md)) |
-| Lighting | `lighting/build/Lighting.asi`, `lighting/Lighting.ini` | Ships and stations lit on the GPU, and a warm key and a dim blue fill light in place of each map's own (`Lights=`, `GPU=`). Needs *Hardware Vertex Processing* on, the default ([`lighting/README.md`](lighting/README.md)) |
+| Lighting | `lighting/build/Lighting.asi`, `lighting/Lighting.ini` | Ships and stations lit on the GPU, a warm key and a dim blue fill light in place of each map's own, and planets with a night side (`Lights=`, `GPU=`, `Planets=`). Needs *Hardware Vertex Processing* on, the default ([`lighting/README.md`](lighting/README.md)) |
 | Menus | `menus/build/Menus.asi`, `menus/Menus.ini` | GDI only, so the renderer doesn't matter. Delete any old `MenuScale.asi`. Without backdrop plates it draws black sides |
 | Cutscenes (launch reels) | `cutscenes/binkproxy/build/binkw32.dll`, `BinkProxy.ini` | First rename the stock `binkw32.dll` to `binkw32_orig.dll`, because the proxy forwards to it. With no `.mp4` beside a `.bik` it only scales the launch reels to full screen. Replacement movies are AV1 through Media Foundation: under Proton that works (GStreamer + dav1d), and on Windows it presumably needs the AV1 Video Extension |
 
@@ -165,7 +165,7 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
 | [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (so far the right-drag pan speed), and the plan for hotkeys, control groups and production queues |
 | [`grid/`](grid/README.md) | grid | `GridLayout.asi`: the button bar as a fixed 5x3 grid with one key per cell, by keyboard position, labelled on the buttons |
-| [`lighting/`](lighting/README.md) | lighting | `Lighting.asi`: ships and stations on the engine's own GPU path, and two scene lights in place of each map's own |
+| [`lighting/`](lighting/README.md) | lighting | `Lighting.asi`: ships and stations on the engine's own GPU path, two scene lights in place of each map's own, and planets with a night side |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
 | [`models/`](models/CHANGELOG.md) | models | the loading-screen model, widened with its `LOADING` art |

@@ -1,7 +1,7 @@
-# Lighting — ships on the GPU, two scene lights
+# Lighting — ships on the GPU, two scene lights, planets with a night side
 
-`Lighting.asi` changes how Armada II lights its ships and stations, in two parts that
-`Lighting.ini` switches separately:
+`Lighting.asi` changes how Armada II lights its ships, stations and planets, in three
+parts that `Lighting.ini` switches separately:
 
 - **`GPU=1`**: ships and stations are drawn through the engine's own static vertex
   buffers. That is fixed-function Direct3D: the GPU transforms and lights them, where stock
@@ -10,11 +10,13 @@
   (`KeyColour`, `KeyAxis`) and a dim blue fill from the opposite side (`FillColour`,
   `FillAxis`). Every renderer lights from that one list, so the CPU, GPU and bump-mapped
   paths agree.
+- **`Planets=1`**: planets and their cloud shells get a night side. Stock gives their
+  material a constant half-white term that lights them all round (below).
 
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
 `a2mod` switches the plugin as the `lighting` layer. Each launch writes `Lighting.log`:
-`call sites patched 6` means every hook took, and the lines after it name every model
+`call sites patched 7` means every hook took, and the lines after it name every model
 switched to vertex buffers and the map's own lights.
 
 ## Settings
@@ -26,6 +28,9 @@ switched to vertex buffers and the map's own lights.
 | `KeyColour`, `FillColour` | `1.00 0.96 0.90`, `0.10 0.12 0.24` | linear RGB, 1 = full |
 | `KeyAxis`, `FillAxis` | `0.35 -0.80 0.50`, the negation | the light matrix's third axis, in the engine's own convention: the stock key on the first Federation map is `0 -0.707 0.707` and lights the hulls from above |
 | `Ambient` | `0.10 0.10 0.12` | light every GPU-drawn surface gets, whatever its direction |
+| `Planets` | `1` | planets lit by Key and Fill with a night side (below) |
+| `PlanetAmbient` | `Ambient` | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
+| `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `Log` | `1` | write `Lighting.log` |
 
@@ -57,6 +62,7 @@ per-render effect is attached (cloak, warp-in), as stock does for asteroids.
 | slot 3 of the `ST3D_Standard_MeshVB` vtable (0x6bcbdc), `Render` | reverses the enabled lights for a draw whose object matrix (0x7ad640) is mirrored | below |
 | call at 0x597f83, `GameObject_PreRenderAll` | wraps `ST3D_GraphicsEngine::RegisterLight`: the frame's first directional light is replaced by Key and Fill, the map's others are dropped | below |
 | call at 0x598193 | wraps `GameObject_PreRenderAll` | counts the frame for the hook above |
+| six `fmuls` in the `GroundMesh` constructor (0x595c22, 0x595c3d, 0x595c57; 0x595c70, 0x595c7f, 0x595c8e) | their operand, the stock 0.75 and 0.5, now points at `PlanetDiffuse` and `PlanetAmbient`, one channel each | "Planets", below |
 
 Each call site is checked (an `E8` to the expected function, the `SetMaterial` call's
 bytes, the vtable slot's address) before any is written. A different `Armada2.exe`
@@ -106,9 +112,46 @@ the matrix's third axis (`ST3D_Standard_MeshVB::PreRender`, 0x63e340, reads floa
 6–8). The plugin builds a symmetric matrix (a reflection taking z to the wanted axis),
 so the third row and column agree however a reader indexes it.
 
+## Planets
+
+A planet is not an ordinary model. Its visible database is a `Planet_Database`
+(`models/README.md`, "Planets.asi"), whose two `GroundMesh` hemispheres and `Atmosphere`
+cloud shell the engine re-tessellates as the camera moves. They stay on the CPU path,
+and `GPU=` leaves them there. The CPU path does take the scene's lights. On the bench,
+a wrapper around the device's per-light-model table (`ST3D_DeviceDirectX8`+0x50, filled
+at 0x62314a, called from `ST3D_Mesh::RenderInternal` at 0x632524 with the material's
+model at +0x40) logged all three planet meshes lit by `LightVertices_Lambert` (0x646bd0),
+with Key and Fill in the engine's list and no override material.
+
+What kept stock planets from showing a night side is their material. The `GroundMesh`
+constructor (0x595ba0) builds one per mesh, `ShroudLightingMaterial`, light model 1
+(Lambert), from `ST3D_Colour_White`: White x 0.5 as the first colour and White x 0.75 as
+the diffuse. Lambert starts every vertex from the engine's ambient (0 on the bench map)
+plus that first colour (the workspace's +0x58 once `SetLightingMaterial` has run, logged
+as 0.5), adds each light, and clamps to 1. So half white reaches every vertex whatever
+its direction: the day side clamps and the night side stays half lit. The Key comes
+from behind the usual camera, which hid this further: from the default view a planet
+is seen almost straight down its lit hemisphere and shows no terminator at all.
+
+Each channel of both colours is one `fmuls` with the stock constant (0.75 at 0x6ae70c,
+0.5 at 0x6ae220) as its operand. The plugin checks the six instructions (`D8 0D` and the
+constant's address) and points them at `PlanetDiffuse` and `PlanetAmbient`. White is
+1, so the products are those values. The material is built once per planet mesh, so
+nothing runs per frame.
+
+On the bench (`testbench/scene`, `SCENE=planet`, 1920x1080, mean grey over the disc,
+stock material -> `Planets=1`): from above, on the lit hemisphere, 181 -> 164 and no
+longer clamped; from below, the night side, 107 -> 72, blue from the Fill; side on, the
+lit and dark halves 154/93 -> 111/64. With Key and Fill both set to black the stock
+planet kept a mean of 93, the constant term alone. The user judged the bench result
+"more like it".
+
 ## Not covered yet
 
-- Planets keep their own renderer (`Planet_Database`), and the Borg and any hull
+- Planets stay on the CPU path (their meshes are rebuilt as the camera moves). The
+  clouds at a planet's poles pinch into a bright starburst where the cloud texture's
+  UVs converge; that is stock.
+- The Borg and any hull
   `models/hull-bump.py` patched keep the dot3 path, which takes precedence over the
   vertex buffers.
 - Translucent materials still go through the CPU path for sorting (see the moons in
