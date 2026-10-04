@@ -4,6 +4,16 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.3.1 — 2026-10-04
+
+### Changed
+- Stronger, wider light sources (1.3.0 was too subtle in game): `NebulaBrightness=2.0`
+  (was 1.0), `NebulaRange=8.0` (was 5.0), `PlanetGlow=1.2` (was 0.6), `PlanetGlowRange=5.0`
+  (was 3.0), `SkyLight=0.35` (was 0.15), `ExplosionBrightness=4.0` (was 2.0),
+  `ExplosionRange=10.0` (was 5.0). The built-in defaults match.
+
+Not seen on the bench (it could not start from this session). Installed, not yet seen in game.
+
 ## 1.3.0 — 2026-10-04
 
 ### Added

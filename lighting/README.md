@@ -41,12 +41,12 @@ planet's ground colour (`planet glow:`).
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `PointLights` | `6` | point lights per GPU draw, the strongest first; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
-| `NebulaBrightness`, `NebulaRange` | `1.0`, `5.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
+| `NebulaBrightness`, `NebulaRange` | `2.0`, `8.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
 | `PlanetGlows` | `1` | a planet's day side lights what is near it |
-| `PlanetGlow`, `PlanetGlowRange` | `0.6`, `3.0` | Key x ground colour x this; full over one radius from the sunward surface, gone at this many radii |
-| `SkyLight` | `0.15` | the sky light's strongest channel; `0` leaves it dark |
+| `PlanetGlow`, `PlanetGlowRange` | `1.2`, `5.0` | Key x ground colour x this; full over one radius from the sunward surface, gone at this many radii |
+| `SkyLight` | `0.35` | the sky light's strongest channel; `0` leaves it dark |
 | `Explosions` | `1` | ship and station explosions light their surroundings |
-| `ExplosionColour`, `ExplosionBrightness`, `ExplosionRange` | `1.00 0.62 0.28`, `2.0`, `5.0` | the flash's colour and peak; full over the explosion's radius (at least 40 units), gone at this many radii |
+| `ExplosionColour`, `ExplosionBrightness`, `ExplosionRange` | `1.00 0.62 0.28`, `4.0`, `10.0` | the flash's colour and peak; full over the explosion's radius (at least 40 units), gone at this many radii |
 | `Log` | `1` | write `Lighting.log` |
 
 The key comes in about 60° off vertical (1.0.0 had about 37°), so from the usual
@@ -180,6 +180,19 @@ falloff start (+0x100 of the light), then linearly down to nothing at start + ra
 of the class data is 1. So with `GPU=1` the ships had lost the torpedo lights stock
 showed, and nothing a plugin added as a point light would reach them.
 
+### Strength
+
+1.3.0 set every source low: nebula glows at their ODF colour (a half-strength primary),
+`PlanetGlow=0.6`, `SkyLight=0.15`, `ExplosionBrightness=2` over 5 radii. In game the
+user found nebulae, planets, the sky and explosions all too subtle. Part of that is
+structural: Direct3D sums ambient and every light and clamps at 1 before the texture,
+and the Key already takes the side it lights most of the way there, so a source shows
+mostly on a hull's shadowed side and as a shift in hue on its lit one. 1.3.1 doubles
+each source's colour (`SkyLight` a little more, 0.35) and widens each reach: nebulae to
+8x their ODF falloff (full to 480 units, gone at 960), planets to 5 radii, explosions to
+10 radii (a frigate's gone at 400 units). A glow of 2 saturates its
+channels on the side facing it; that is the intended look, and the keys take it back down.
+
 ### Point lights on the GPU path
 
 The plugin already wraps `ST3D_Standard_MeshVB::Render` (vtable slot 3) for mirrored
@@ -263,8 +276,8 @@ A SOD sky's faces carry no direction the plugin knows, and a sky can have no sid
 speak of; either way the light falls along `FillAxis`. It is a third directional light,
 registered with Key and Fill. On the bench map (`mbgaqu`, a prefix sky) it came out
 teal `(0.31, 1, 0.98)` x `SkyLight`, from the upper +x side. At `SkyLight=1` the top of
-the Galaxy went from 40/45/47 to 81/104/101; the default 0.15 is a seventh of that, of
-the order of the fill. The skybox itself does not take scene lights.
+the Galaxy went from 40/45/47 to 81/104/101. 1.3.0 shipped 0.15, of the order of the
+fill; 1.3.1 raised it to 0.35 ("Strength", above). The skybox itself does not take scene lights.
 
 ### Explosions
 

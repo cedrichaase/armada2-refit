@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.8.1 — 2026-10-04
+
+Layers: lighting 1.3.1.
+
+### Changed
+- Nebula, planet, skybox and explosion light about twice as strong, and nebulae,
+  planets and explosions reach further (lighting 1.3.1).
+
 ## 9.8.0 — 2026-10-04
 
 Layers: lighting 1.3.0.

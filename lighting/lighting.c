@@ -597,7 +597,7 @@ static int patch_set_material(void)
  * every stock nebula). On the bench its colour came out black frame after frame.
  * The plugin registers it in place of that: the glow colour times
  * NebulaBrightness, steady, with the falloff times NebulaRange. */
-static float g_neb_bright = 1.0f, g_neb_range = 5.0f;
+static float g_neb_bright = 2.0f, g_neb_range = 8.0f;
 static int   g_nebulae = 1;
 
 static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
@@ -639,7 +639,7 @@ static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
 typedef struct { char name[16]; float col[3]; } GlowTex;
 typedef struct { void *planet; BYTE *light; DWORD seen; } GlowLight;
 
-static float     g_glow = 0.6f, g_glow_range = 3.0f;
+static float     g_glow = 1.2f, g_glow_range = 5.0f;
 static int       g_planet_glow = 1;
 static char      g_texdir[320];
 static GlowTex   g_glow_tex[16];
@@ -818,7 +818,7 @@ static void planet_glows(void)
  * plugin knows, and for a sky with no side to speak of, along the Fill axis. */
 #define SKY_NAME 0x738538
 
-static float g_sky = 0.15f;
+static float g_sky = 0.35f;
 static char  g_sky_name[64] = { 1, 0 };
 
 static void sky_from(double *acc, const double *dir)
@@ -933,7 +933,7 @@ typedef void *(__thiscall *Delete_t)(void *, unsigned);
 typedef struct { void *obj; BYTE *light; float pos[3], r, left, len; } Boom;
 
 static float g_boom_col[3] = { 1.00f, 0.62f, 0.28f };
-static float g_boom_bright = 2.0f, g_boom_range = 5.0f;
+static float g_boom_bright = 4.0f, g_boom_range = 10.0f;
 static int   g_explosions = 1;
 static Boom  g_boom[24];
 static BYTE *g_boom_pool[24];
