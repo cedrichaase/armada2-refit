@@ -1,8 +1,27 @@
 # Changelog — lighting
 
-`Lighting.asi`: ships and stations on the engine's static vertex buffers, and two scene
-lights in place of each map's own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
+`Lighting.asi`: ships and stations on the engine's static vertex buffers, scene lights
+in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
+
+## 1.3.0 — 2026-10-04
+
+### Added
+- Point lights on the GPU path (`PointLights=`): torpedoes and pulses light the hulls
+  they pass again, as stock did on the CPU path, and the light sources below reach
+  ships. Hard-edged lights (torpedoes) are lit per vertex; one colour counts once.
+- `Nebulae=`, `NebulaBrightness=`, `NebulaRange=`: nebulae light their surroundings in
+  their glow colour.
+- `PlanetGlows=`, `PlanetGlow=`, `PlanetGlowRange=`: a planet's day side lights what is
+  near it in the mean colour of its ground texture.
+- `SkyLight=`: a faint third directional light in the skybox's dominant colour, from the
+  side that shows it.
+- `Explosions=`, `ExplosionColour=`, `ExplosionBrightness=`, `ExplosionRange=`: ship and
+  station explosions light their surroundings. `Lighting.log` now reads `call sites
+  patched 10`.
+
+Seen on the bench 2026-10-04 (`SCENE=nebula`, `SCENE=planet`, a scratch battle scene).
+Installed, not yet seen in game.
 
 ## 1.2.0 — 2026-10-04
 

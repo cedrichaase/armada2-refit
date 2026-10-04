@@ -1,7 +1,7 @@
-# Lighting — ships on the GPU, two scene lights, planets with a night side
+# Lighting — ships on the GPU, scene lights, planets with a night side, light sources
 
-`Lighting.asi` changes how Armada II lights its ships, stations and planets, in three
-parts that `Lighting.ini` switches separately:
+`Lighting.asi` changes how Armada II lights its ships, stations and planets, in parts
+that `Lighting.ini` switches separately:
 
 - **`GPU=1`**: ships and stations are drawn through the engine's own static vertex
   buffers. That is fixed-function Direct3D: the GPU transforms and lights them, where stock
@@ -12,12 +12,19 @@ parts that `Lighting.ini` switches separately:
   paths agree.
 - **`Planets=1`**: planets and their cloud shells get a night side. Stock gives their
   material a constant half-white term that lights them all round (below).
+- **Light sources** ("Light sources", below): point lights reach the GPU-drawn ships
+  (`PointLights`), so torpedoes and pulses light the hulls they pass as they always did
+  on the CPU path; nebulae glow in their colour (`Nebulae`); a planet's day side lights
+  what is near it in the colour of its ground (`PlanetGlows`); the skybox adds a faint
+  third light in its own colour (`SkyLight`); and a ship's or station's explosion
+  lights its surroundings (`Explosions`).
 
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
 `a2mod` switches the plugin as the `lighting` layer. Each launch writes `Lighting.log`:
-`call sites patched 7` means every hook took, and the lines after it name every model
-switched to vertex buffers and the map's own lights.
+`call sites patched 10` means every hook took, and the lines after it name every model
+switched to vertex buffers, the map's own lights, the sky light (`sky:`) and each
+planet's ground colour (`planet glow:`).
 
 ## Settings
 
@@ -32,6 +39,14 @@ switched to vertex buffers and the map's own lights.
 | `PlanetAmbient` | `0.02 0.02 0.03` (left out: `Ambient`) | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
 | `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
+| `PointLights` | `6` | point lights per GPU draw, the strongest first; `0` gives the GPU path none, as stock |
+| `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
+| `NebulaBrightness`, `NebulaRange` | `1.0`, `5.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
+| `PlanetGlows` | `1` | a planet's day side lights what is near it |
+| `PlanetGlow`, `PlanetGlowRange` | `0.6`, `3.0` | Key x ground colour x this; full over one radius from the sunward surface, gone at this many radii |
+| `SkyLight` | `0.15` | the sky light's strongest channel; `0` leaves it dark |
+| `Explosions` | `1` | ship and station explosions light their surroundings |
+| `ExplosionColour`, `ExplosionBrightness`, `ExplosionRange` | `1.00 0.62 0.28`, `2.0`, `5.0` | the flash's colour and peak; full over the explosion's radius (at least 40 units), gone at this many radii |
 | `Log` | `1` | write `Lighting.log` |
 
 The key comes in about 60° off vertical (1.0.0 had about 37°), so from the usual
@@ -154,6 +169,125 @@ lit and dark halves 154/93 -> 111/64. With Key and Fill both set to black the st
 planet kept a mean of 93, the constant term alone. The user judged the bench result
 "more like it".
 
+## Light sources
+
+The engine has point lights. A nebula carries one, a torpedo or pulse whose ODF sets
+`lightColor` carries one, and the CPU path lights a mesh with every point light in the
+list (`ST3D_Point_Light::LightVerticesLambert`, 0x62f640): full colour out to the
+falloff start (+0x100 of the light), then linearly down to nothing at start + range
+(+0x104). The vertex-buffer path never sees them. `ST3D_Standard_MeshVB::PreRender`
+(0x63e340) copies only the directional lights into Direct3D, those whose type at +0xf0
+of the class data is 1. So with `GPU=1` the ships had lost the torpedo lights stock
+showed, and nothing a plugin added as a point light would reach them.
+
+### Point lights on the GPU path
+
+The plugin already wraps `ST3D_Standard_MeshVB::Render` (vtable slot 3) for mirrored
+meshes. For every other draw it walks the engine's light list (engine 0x7ad508 +0x60, a
+`std::list` whose node holds the light at +0, its colour at +4 and its `Matrix34` at
++0x10), keeps the point lights (vtable 0x6bc8ac) that reach the draw's position (the
+translation of the current matrix, 0x7ad640), and sets the strongest `PointLights` of
+them as Direct3D point lights in the slots `PreRender` left free, switched off again
+after the draw. Two kinds are handled differently:
+
+- **A soft light** fades over a distance like its reach (nebula, planet, explosion).
+  It is weighed by the engine's falloff at the object's position, which is folded into
+  its colour, and given an unlimited range. Across a ship, which is small against such
+  a light, that matches the per-vertex falloff.
+- **A hard light** fades over less than a quarter of its start: the torpedoes and
+  pulses (the Galaxy's photon: full to 50, gone at 55). Weighed at the centre, one lit
+  a whole saucer green from its rim, or missed a ship it was touching (bench, Borg
+  torpedoes on the Galaxy). It goes to Direct3D at full colour with `Range` = start +
+  range, so each vertex is in it or not, as on the CPU path. It is picked when it is
+  within that reach plus 150 units (`HARD_REACH`) of the draw.
+
+Lights of one colour count once, by the strongest. A nebula field is many nebula
+objects of one type, each with its own light, and summed they would paint a hull in
+its colour at full saturation wherever two or three reached it.
+
+### Nebulae
+
+Every nebula builds a point light in `Nebula::InitializeGeometry` (at +0x1ac, falloff
+300 + 300), and `Nebula::Simulate` registers it through `Simulate_Nebula_Lights`
+(0x4a5160, called at 0x4a4a7a) while the nebula is on screen. Stock sets the light to
+the class's glow colour (`red_glow` .. at NebulaClass +0x22c) swung by noise, with the
+class's falloff (`glow_falloff_start`/`_range`, +0x244/+0x248: 60 and 60 on every stock
+nebula). On the bench it came out black frame after frame. The plugin replaces that
+call: the glow colour times `NebulaBrightness`, steady, and the falloff times
+`NebulaRange`. The glows are a half-strength primary or two: Mutara `(0.5, 0, 0.5)`,
+Metreon `(0.5, 0, 0)`, Metaphasic `(0, 1, 0)`, Cerulean `(0, 0, 0.5)`. On the bench
+(`SCENE=nebula`) the Galaxy at the Mutara's edge turned violet on the side facing it and
+stayed grey on the far side.
+
+### Planets: light from the day side
+
+Each frame, after `GameObject_PreRenderAll`, the plugin walks the same object list
+(0x761084) for planets (vtable 0x6b2b3c). For each it registers a point light on the
+surface facing the Key: position from the Entity's transform (+0x44), radius from its
+bounding sphere (+0x34), whose centre is in object space. The light starts at the
+`Planet_Database` radius the engine itself uses. Its colour is Key x `PlanetGlow` x the
+mean colour of the planet's ground texture, `groundTextureName` (PlanetClass +0x4bc)
+with `1` and `2` appended, one file per hemisphere, else the name alone, else
+`atmosphereTextureName` (+0x4ac). Only lit texels count, because the class planets'
+gore unwrap is black between the lobes. The texture is read from `Textures/RGB` once
+per name, so the colour follows whatever art is installed (Class M: `0.38 0.59 0.61`).
+
+The light is built as the nebula builds its own (operator new 0x652710, then
+`ST3D_Point_Light`'s constructor 0x62f240), but with a copy of the class's vtable whose
+four `LightVertices` slots (13 to 16, the CPU path's) do nothing. It stays in the
+engine's list, so `pick_points` hands it to the GPU draws, but the CPU-lit planets and
+moons ignore it. The planet itself is among them, and would otherwise be lit from just
+above its own surface.
+
+On the bench (`SCENE=planet`, the view from below the saucer, which faces the planet
+and is turned away from the Key): mean RGB over the ship 11/15/22 without the glow,
+18/27/34 with it.
+
+### The skybox
+
+`Starfield_Load_Background_Geometry` (0x590c30) copies the map's background name,
+lower-cased, into a buffer at 0x738538 that holds it for as long as the map runs. Each
+frame, before `GameObject_PreRenderAll`, the plugin compares that buffer with the name
+it last saw, and on a change reads the faces once. The name is one of two forms
+(`textures/README.md`):
+
+- **A prefix**: the faces are `<prefix>0..5.tga`, and `CreateBackgroundFace` (0x590f10)
+  builds face *i* of a ±100 cube facing +z, +x, −z, −x, +y, −y for *i* = 0..5.
+- **A cube SOD** (`<name>.sod`) that names its textures. The plugin reads every
+  length-prefixed string in the file that opens as a TGA.
+
+The colour is the faces' mean with each texel weighted by its chroma (max − min). That
+is the hue of the sky's clouds and not the black between them, scaled to a peak of
+`SkyLight`. The light comes from the sum of the face directions, weighted the same way.
+A SOD sky's faces carry no direction the plugin knows, and a sky can have no side to
+speak of; either way the light falls along `FillAxis`. It is a third directional light,
+registered with Key and Fill. On the bench map (`mbgaqu`, a prefix sky) it came out
+teal `(0.31, 1, 0.98)` x `SkyLight`, from the upper +x side. At `SkyLight=1` the top of
+the Galaxy went from 40/45/47 to 81/104/101; the default 0.15 is a seventh of that, of
+the order of the fill. The skybox itself does not take scene lights.
+
+### Explosions
+
+A ship or station that dies goes up in a `FireballExplosion` (the `xfireb*` ODFs,
+`classLabel = "fireballexplode"`): a model played for `length` seconds (ExplosionClass
++0x4c, 2.5 for all of them), its time left counted down at +0xa8 by
+`FireballExplosion::Simulate` (0x465510), which deletes it at zero. Stock gives it no
+light. The plugin wraps `Simulate` and the scalar deleting destructor (0x465910),
+slots 14 and 0 of the vtable (0x6afbd4), to keep a list of the live ones. Each frame,
+after `GameObject_PreRenderAll`, it registers a point light at each: `ExplosionColour`
+x `ExplosionBrightness`, up to full in the first 0.15 s, then down with the square of
+the time left. The light is full out to the explosion's bounding radius (34 for a
+frigate) and gone at `ExplosionRange` radii, no less than 40 units each. It is an
+ordinary point light, so the CPU path (planets, cloaking ships) takes it too.
+
+On the bench (a frigate dying 110 units from the Galaxy, paused at 0.3 s): the hull
+under it went from 20/32/38 to 30/39/41 mean RGB, orange-brown where it was dark blue.
+
+Torpedoes and pulses need nothing more: `Ordnance::PreRenderAll` (call at 0x58e55c)
+registers each one's ODF light while the engine's detail level is above 2, and the
+point-light path hands it to the GPU draws. A weapon's impact has no explosion object
+(it is a sprite effect), so it has no light of its own.
+
 ## Not covered yet
 
 - Planets stay on the CPU path (their meshes are rebuilt as the camera moves). The
@@ -166,5 +300,7 @@ planet kept a mean of 93, the constant term alone. The user judged the bench res
   `models/README.md`).
 - Seen on the first Federation campaign map only. Other races, combat effects and frame
   rate have not been measured.
-- The nebulae as light sources: the engine already has `Nebula::Simulate_Nebula_Lights`
-  (0x4a5160).
+- A mirrored mesh (`FixMirrored`) gets no point lights: reversing a directional light
+  fixes its normals, and a point light has no such reversal.
+- Weapon impacts flash no light (above). `ShockwaveExplosion` (the big special weapons'
+  ring) has its own `AdjustLighting` and is left alone.

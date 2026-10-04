@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.8.0 — 2026-10-04
+
+Layers: lighting 1.3.0.
+
+### Added
+- Light sources: nebulae glow in their colour, planets light what is near their day
+  side, the skybox adds a faint coloured light, explosions light their surroundings, and
+  torpedo lights reach GPU-drawn ships again (lighting 1.3.0).
+
 ## 9.7.1 — 2026-10-04
 
 Layers: textures 2.1.1, testbench 2.12.1.

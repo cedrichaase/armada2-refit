@@ -36,7 +36,7 @@ it bundles.
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed so far), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
-| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, two scene lights (warm key, dim blue fill) in place of each map's own, and planets with a night side | `lighting/README.md` |
+| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes | `lighting/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -634,6 +634,10 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   "inward", and flipping them darkened the near hulls.
 - **The map's `dlight` objects are the scene lights**, one to three per map; the plugin
   replaces them every frame. The axis convention is the engine's (`KeyAxis`).
+- **Point lights never reach the vertex-buffer path on their own**: `PreRender` copies
+  only directional lights. The plugin hands them over per draw (`pick_points`); any new
+  light source is a point light in the engine's list, and nothing more. A light the
+  CPU-lit planets must not take gets the plugin's no-op vtable, as the planet glow does.
 - **`models/hull-bump.py` and `Lighting.asi` do not combine**: a bump-mapped hull goes
   the dot3 way, which takes precedence over the vertex buffers.
 
