@@ -12,7 +12,7 @@ versions". Newest first. Details, and the planned changes, are in
   group and keeps what is in it, as `Ctrl+Shift+number` does in stock. Stock's
   `Shift+number` (select the group and centre the camera on it) moves to `Alt+number`.
 - `MaxSelection=` (default 40, 17–120; 16 or less leaves it stock): selections, and so
-  control groups, hold more than stock's 16. The selection panel shows the first 16.
+  control groups, hold more than stock's 16. The selection panel shows the first 16. (03003e7)
 
 Installed, not yet seen in game.
 
