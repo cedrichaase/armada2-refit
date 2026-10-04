@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.10.1 — 2026-10-05
+
+Layers: qol 1.1.1.
+
+### Fixed
+- Selecting more than 16 Galaxy or Vor'cha class ships no longer crashes the game
+  (qol 1.1.1).
+
 ## 9.10.0 — 2026-10-04
 
 Layers: qol 1.1.0, testbench 2.12.2.

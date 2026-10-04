@@ -224,6 +224,26 @@ panel (`ShipDisplay`) has 16 icon slots and fills them from the first 16 ids; it
 loops that would run to the selection count (`SimulateMultiObject`,
 `DisplayMultiObject`) are never called. So a bigger selection shows its first 16 icons.
 
+**Except the special weapons, which crashed 1.1.0.** For each special weapon of the
+selection, `PopupPaletteImp::mSetupSpecialWeapons` (every frame, to set the button) and
+`mQueueSpecialWeaponCommand` (to fire it) collect the selected ships that can use it
+into a 16-entry array on their own stack, unbounded: `ebp-0x78` with a container right
+after it at `ebp-0x38`, and `ebp-0x80` below that function's other locals. Seventeen
+Galaxy or Vor'cha class ships overran the first: the frame loop never finished (a black
+screen, the game at full CPU) or the heap was damaged and a ship's `CraftProcess::Attack`
+later called through a destroyed weapon system (`R6025`, pure virtual call). Ships
+without a special weapon never enter the array, which is why 40 Defiants and Intrepids
+were fine. `QOL.asi` moves both arrays to buffers of 120; they are addressed in five
+places (0x4fd32e, 0x4fd3af, 0x4fd40d, 0x4fd8f1, 0x4fd95d), each rewritten in place or
+as a jump to a stub, and all five are checked before the selection is touched: if they
+do not match, the cap stays at 16. The audit above missed them because it looked for
+the selection being copied; these copy a per-weapon subset of it.
+
+A bigger selection is also sent somewhere the audit above did not list: `GameObject::Select`
+reports each selected handle to the transport (`MySelectedAdd`), which keeps a
+`std::set` of them and, in a network game, sends it to allied co-players
+(`TransportNetwork::MySelectedTransmit`). It has no fixed size.
+
 **The network.** An order goes out as `NetOrderObjects`: two bytes, a 32-bit count, then
 that many handles. The receiving end hands count and handles to
 `GameObject::DeQueueCommand`, which walks however many arrive. A stock player therefore
@@ -235,8 +255,16 @@ network game against a stock player is the check still to make.
 `1` recalled 30 (each read from the game's memory, not the panel), and a move order took
 all 30 across the map. The panel shows 16 of them.
 
-**Open.** A count, or pages, on the selection panel for more than 16. Not checked yet:
-saving and loading a game with a group over 16, and a two-player game against stock.
+**Seen on the bench (2026-10-05).** 30 Galaxy class ships against Borg cubes: `Ctrl+A`
+selected 30 with the frame loop running, and the special weapon (saucer separation) for
+all 30 filled 30 entries of the moved array; then 40 selected of the 60 separated ships.
+The Executioner save that crashed 1.1.0 with 18 Vor'chas selected was the original
+report.
+
+**Open.** A count, or pages, on the selection panel for more than 16. The frame rate
+with 40 ships selected (seen in game with Defiants and Intrepids, gone on deselecting)
+is not measured yet. Not checked yet: saving and loading a game with a group over 16,
+and a two-player game against stock.
 
 ---
 

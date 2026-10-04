@@ -68,7 +68,9 @@
  * it into growable arrays: the button bar (PopupPaletteImp), ActionMode,
  * the radar, CommDisplay's give-units button.  The selection panel
  * (ShipDisplay) has 16 icon slots and fills them from the first 16 ids, so a
- * bigger selection shows its first 16.  Orders go to other players as
+ * bigger selection shows its first 16.  The exception is the special-weapon
+ * button, whose two functions gather the ships that can use a weapon into a
+ * 16-entry stack array; those move too (see patch_specials).  Orders go to other players as
  * NetOrderObjects, which carry a 32-bit count and that many handles, and the
  * receiving GameObject::DeQueueCommand walks however many arrive: a stock
  * player receives an order for 40 ships like any other.
@@ -393,6 +395,96 @@ static int patch_groups(void)
 
 /* ---- bigger selections and groups ------------------------------------- */
 
+/* The button bar's special weapons.  For each special weapon of the selection,
+ * PopupPaletteImp::mSetupSpecialWeapons (every frame, to set the button) and
+ * mQueueSpecialWeaponCommand (to fire it) gather the selected ships that can
+ * use it into a 16-entry array on their own stack, with no bound: stock never
+ * selected more.  17 Galaxy or Vor'cha class ships overrun it -- into the
+ * container beside it in mSetupSpecialWeapons (the frame never finishes, or
+ * the heap is damaged and a CraftProcess later calls a destroyed weapon system:
+ * R6025), and into the locals and return address of
+ * mQueueSpecialWeaponCommand.  Each array moves to a buffer of SEL_MAX here;
+ * it is addressed in five places, each a short sequence that becomes a jump to
+ * a stub doing the same with the buffer, or the same with an absolute push. */
+DWORD g_spec_ships[SEL_MAX];     /* mSetupSpecialWeapons' ships */
+DWORD g_queue_ships[SEL_MAX];   /* mQueueSpecialWeaponCommand's ships */
+
+/* 0x4fd3af: lea esi,[ebp-0x78]; mov [ebp-0x28],eax -- the read-back loop */
+__attribute__((naked)) void spec_read_stub(void)
+{
+    __asm__ __volatile__(
+        "movl $_g_spec_ships, %esi\n\t"
+        "movl %eax, -0x28(%ebp)\n\t"
+        "pushl $0x4fd3b5\n\t"
+        "ret\n\t");
+}
+
+/* 0x4fd8f1: lea ecx,[ebp-0x80]; mov [ebp+0xc],ecx -- the gathering loop's cursor */
+__attribute__((naked)) void queue_fill_stub(void)
+{
+    __asm__ __volatile__(
+        "movl $_g_queue_ships, %ecx\n\t"
+        "movl %ecx, 0xc(%ebp)\n\t"
+        "pushl $0x4fd8f7\n\t"
+        "ret\n\t");
+}
+
+/* 0x4fd95d: lea esi,[ebp-0x80]; mov edi,ecx -- the loop that turns them into handles */
+__attribute__((naked)) void queue_read_stub(void)
+{
+    __asm__ __volatile__(
+        "movl $_g_queue_ships, %esi\n\t"
+        "movl %ecx, %edi\n\t"
+        "pushl $0x4fd962\n\t"
+        "ret\n\t");
+}
+
+typedef struct { DWORD at; int len; BYTE sig[8]; } Seq;
+static const Seq k_spec[5] = {
+    /* lea ecx,[ebp-0x78]; mov [ebp-0x18],ecx; jmp +3 (over mov esi,[ebp+8], which
+     * esi already holds here) -> mov dword [ebp-0x18],g_spec_ships; nop */
+    { 0x4fd32e, 8, { 0x8D, 0x4D, 0x88, 0x89, 0x4D, 0xE8, 0xEB, 0x03 } },
+    { 0x4fd3af, 6, { 0x8D, 0x75, 0x88, 0x89, 0x45, 0xD8 } },
+    /* mov edx,[ebp-0x10]; lea eax,[ebp-0x78]; push edx; push eax
+     * -> push dword [ebp-0x10]; push g_spec_ships (edx, eax die in the call) */
+    { 0x4fd40d, 8, { 0x8B, 0x55, 0xF0, 0x8D, 0x45, 0x88, 0x52, 0x50 } },
+    { 0x4fd8f1, 6, { 0x8D, 0x4D, 0x80, 0x89, 0x4D, 0x0C } },
+    { 0x4fd95d, 5, { 0x8D, 0x75, 0x80, 0x8B, 0xF9 } },
+};
+
+static void jmp_to(BYTE *code, DWORD at, int len, void (*stub)(void))
+{
+    int k;
+    code[0] = 0xE9;
+    *(LONG *)(code + 1) = (LONG)((DWORD)stub - (at + 5));
+    for (k = 5; k < len; k++) code[k] = 0x90;
+}
+
+/* All five are checked before any is written.  1 if patched. */
+static int patch_specials(void)
+{
+    BYTE c[8];
+    int  i, k;
+    for (i = 0; i < 5; i++)
+        for (k = 0; k < k_spec[i].len; k++)
+            if (((const BYTE *)k_spec[i].at)[k] != k_spec[i].sig[k]) return 0;
+
+    c[0] = 0xC7; c[1] = 0x45; c[2] = 0xE8;                  /* mov dword [ebp-0x18],imm32 */
+    *(DWORD *)(c + 3) = (DWORD)g_spec_ships; c[7] = 0x90;
+    poke((BYTE *)k_spec[0].at, c, 8);
+    jmp_to(c, k_spec[1].at, 6, spec_read_stub);
+    poke((BYTE *)k_spec[1].at, c, 6);
+    c[0] = 0xFF; c[1] = 0x75; c[2] = 0xF0;                  /* push dword [ebp-0x10] */
+    c[3] = 0x68; *(DWORD *)(c + 4) = (DWORD)g_spec_ships;   /* push imm32 */
+    poke((BYTE *)k_spec[2].at, c, 8);
+    jmp_to(c, k_spec[3].at, 6, queue_fill_stub);
+    poke((BYTE *)k_spec[3].at, c, 6);
+    jmp_to(c, k_spec[4].at, 5, queue_read_stub);
+    poke((BYTE *)k_spec[4].at, c, 5);
+    return 1;
+}
+
+
 /* All 34 sites are checked before any is written: a partial move would leave
  * the selection in two places.  Returns the number of sites patched, or 0. */
 static int patch_selection(int max)
@@ -480,12 +572,13 @@ static void startup(void)
         s_cat(b, "  (16 or less: selection and groups left at stock's 16)");
     } else {
         if (k > SEL_MAX) k = SEL_MAX;
-        n = patch_selection(k);
+        /* the special-weapon arrays first: a bigger selection without them overruns the stack */
+        n = patch_specials() ? patch_selection(k) : 0;
         if (n) {
             s_cat(b, "  -> selections and groups up to ");
             s_num(b, k);
             s_cat(b, ", ");
-            s_num(b, n);
+            s_num(b, n + 5);
             s_cat(b, " sites patched");
         } else {
             s_cat(b, "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");

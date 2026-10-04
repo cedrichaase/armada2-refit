@@ -601,6 +601,11 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   reads the selection must go through `GetSelectList` (vtable +0x98), never +0xbc. An
   order for more than 16 ships is still an ordinary `NetOrderObjects`, which stock
   peers accept (`qol/README.md`, QOL-3).
+- **Stock code assumes 16 selected in places that never read the selection directly.**
+  The special-weapon button gathered capable ships into 16-entry stack arrays and
+  crashed 1.1.0 with 17 Galaxies selected. Auditing who *reads* the selection was not
+  enough; test any cap change with big selections of ships that have special weapons,
+  in combat.
 - **Never edit `RTS_CFG.h` for a QOL change.** Network games compare a CRC of its bytes
   ("EXE / RTS_CFG.h files do not match node %d"), so an edited file locks the player
   out of games with stock players. Scale the value in memory after the parse, as

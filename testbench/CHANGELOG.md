@@ -11,7 +11,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - The audio watchdog's `pactl subscribe` dies with the process that started it. A
   session stopped by terminating its driver used to leave it running; 63 had piled up
   by evening, until pipewire-pulse refused every new client and no session could start
-  ("could not create the silent sink"). (4e92c71)
+  ("could not create the silent sink"). (7360cb0)
 
 ## 2.12.1 — 2026-10-04
 
