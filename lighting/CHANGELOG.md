@@ -14,7 +14,7 @@ lights in place of each map's own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md)
   `0.10 0.10 0.12`), and `PlanetAmbient=0.02 0.02 0.03` for more contrast between a
   planet's day and night sides.
 
-Seen on the bench 2026-10-04 (`SCENE=planet`).
+Seen on the bench 2026-10-04 (`SCENE=planet`). Confirmed in game 2026-10-04.
 
 ## 1.1.0 — 2026-10-04
 
