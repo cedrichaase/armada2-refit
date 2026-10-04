@@ -4,6 +4,16 @@
 lights in place of each map's own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.0 — 2026-10-04
+
+### Added
+- `Planets=`, `PlanetAmbient=`, `PlanetDiffuse=`: planets and their cloud shells lit by
+  Key and Fill with a night side. The planet material's constant half-white term becomes
+  `PlanetAmbient` (default `Ambient`) and its 0.75 diffuse `PlanetDiffuse` (default 1).
+  `Lighting.log` now reads `call sites patched 7`.
+
+Seen on the bench 2026-10-04 (`SCENE=planet`).
+
 ## 1.0.0 — 2026-10-04
 
 ### Added

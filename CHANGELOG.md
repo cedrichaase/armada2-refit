@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.6.0 — 2026-10-04
+
+Layers: lighting 1.1.0.
+
+### Added
+- Planets get a night side: `Lighting.asi` lights them with the key and fill like the
+  ships, where stock gave their material a constant half-white term that lit them all
+  round (lighting 1.1.0). Seen on the bench.
+
 ## 9.5.0 — 2026-10-04
 
 Layers: testbench 2.12.0.

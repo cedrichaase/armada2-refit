@@ -36,7 +36,7 @@ it bundles.
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed so far), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
-| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, and two scene lights (warm key, dim blue fill) in place of each map's own | `lighting/README.md` |
+| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, two scene lights (warm key, dim blue fill) in place of each map's own, and planets with a night side | `lighting/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -625,6 +625,9 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 - **On that path the SOD material lies.** Its diffuse colour (red, brick, purple
   leftovers) and ambient were never shown by the CPU path; the plugin replaces them. The
   engine's colour at +0x28 is not an ambient term (it turned every hull pink).
+- **Planets already take the scene lights** (CPU path, `LightVertices_Lambert`). What
+  flattened them is their material's constant half-white term, which `Planets=` replaces;
+  judge a planet side on, since the Key comes from behind the usual camera.
 - **A mesh under a mirrored node matrix lights inside out** on the GPU path (the Akira's
   distant mesh). `FixMirrored` reverses the lights for such a draw. Measuring normals
   against a mesh's centre does not find these meshes: most stock meshes read as
