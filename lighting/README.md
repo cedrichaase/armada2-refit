@@ -367,7 +367,10 @@ point-light path hands it to the GPU draws. A weapon's impact has no explosion o
   `models/hull-bump.py` patched keep the dot3 path, which takes precedence over the
   vertex buffers.
 - Translucent materials still go through the CPU path for sorting (see the moons in
-  `models/README.md`).
+  `models/README.md`). Under DXVK that path was slow for another reason: it reads back
+  a dynamic vertex buffer kept in GPU memory. The selection bubbles cost 70 ms a frame
+  with 30 ships selected. `dxvk.conf` fixes that, not this plugin (`postfx/README.md`,
+  "Reading back a dynamic vertex buffer").
 - Seen on the first Federation campaign map only. Other races, combat effects and frame
   rate have not been measured.
 - A mirrored mesh (`FixMirrored`) gets no point lights: reversing a directional light

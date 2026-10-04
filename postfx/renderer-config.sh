@@ -16,6 +16,11 @@
 # Judge each stage in game before raising it.  See postfx/README.md, "Renderer-side
 # enhancements", for why each key is here and what it is expected to do.
 #
+# Every stage also carries d3d9.cachedWriteOnlyBuffers, which is not an image setting:
+# it makes the engine's CPU mesh path cheap again under DXVK (the selection bubbles cost
+# 70 ms a frame with 30 ships selected).  It is left out, with a warning, on a DXVK build
+# that does not know it.  postfx/README.md, "Reading back a dynamic vertex buffer".
+#
 # Nothing else in the game directory is touched.  dxvk.conf does not exist in a stock
 # install, so there is no backup to keep: removing the file restores stock exactly.
 #
@@ -156,11 +161,18 @@ keys_for_stage() {
     return 0
 }
 
+# Not tied to a stage, and not worth refusing the stages over: an older DXVK spelled it
+# differently (d3d9.cachedDynamicBuffers), and without it the game only runs slower.
+PERF_KEY=d3d9.cachedWriteOnlyBuffers
+perf_key=1
+
 if [ "$action" = verify ]; then
     echo "verifying stage $stage keys:"
     mapfile -t ks < <(keys_for_stage "$stage")
-    verify_keys "${ks[@]}"
-    exit $?
+    rc=0
+    verify_keys "${ks[@]}" || rc=$?
+    verify_keys "$PERF_KEY" | tail -n +2 || echo "    (optional: left out of dxvk.conf on this build)"
+    exit $rc
 fi
 
 # ---------------------------------------------------------------- the file
@@ -200,6 +212,15 @@ conf_text() {
         echo "# more visible at 2048/face, not less."
         echo "d3d9.seamlessCubes = True"
     fi
+
+    if [ "$perf_key" = 1 ]; then
+        echo
+        echo "# Every stage -- keep write-only dynamic buffers in cached memory."
+        echo "# The engine's CPU mesh path reads back the vertices it has just written into"
+        echo "# a locked dynamic vertex buffer.  DXVK maps that buffer in GPU memory, where"
+        echo "# each read is uncached: 30 selected ships' bubbles took 70 ms a frame."
+        echo "$PERF_KEY = True"
+    fi
 }
 
 if [ "$action" = print ]; then
@@ -218,6 +239,10 @@ fi
 echo "verifying stage $stage keys:"
 mapfile -t ks < <(keys_for_stage "$stage")
 verify_keys "${ks[@]}" || { echo "aborting: DXVK does not know one of these keys" >&2; exit 1; }
+if ! verify_keys "$PERF_KEY" | tail -n +2; then
+    echo "  warning: this DXVK does not know $PERF_KEY; leaving it out (large selections stay slow)" >&2
+    perf_key=0
+fi
 
 conf_text > "$CONF"
 

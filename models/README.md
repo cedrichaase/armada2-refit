@@ -124,6 +124,11 @@ blended, and draws from a vertex buffer. So by default only the rock is smoothed
 `--split 2` (1,152 triangles, the shell's 288 unchanged), which the user judged a good
 trade in game. `--glow` smooths the shell too.
 
+That was judged without `d3d9.cachedWriteOnlyBuffers`. Before postfx 1.1.1, the CPU
+path read back every vertex it wrote from a buffer DXVK keeps in GPU memory, which made
+it far slower than its triangle count suggests (`postfx/README.md`, "Reading back a
+dynamic vertex buffer"). The shell's cost with that key set has not been measured.
+
 ## Hull lighting
 
 ### What the engine does

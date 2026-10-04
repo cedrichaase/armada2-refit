@@ -6,6 +6,17 @@ configured by `postfx.py`). They are versioned together as one folder. Versionin
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The tables behind
 the numbers are in [`README.md`](README.md).
 
+## 1.1.1 — 2026-10-05
+
+### Fixed
+- Large selections no longer cost frame rate: `dxvk.conf` now sets
+  `d3d9.cachedWriteOnlyBuffers = True` at every stage, so the engine's CPU mesh path no
+  longer reads back from GPU memory. On the bench, 30 selected ships' bubbles went from
+  70.6 ms a frame to 0.6–0.8 ms. `renderer-config.sh` leaves the key out, with a
+  warning, on a DXVK that does not know it.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-09-28
 
 ### Added
