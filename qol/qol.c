@@ -1,7 +1,8 @@
 /*
  * QOL.asi -- gameplay quality of life for Star Trek: Armada II.  See qol/README.md.
  *
- * One change so far: the right-drag pan speed, scaled by PanSpeed= in QOL.ini.
+ * Two changes: the right-drag pan speed, scaled by PanSpeed= in QOL.ini, and
+ * Shift+number adding the selection to a control group (ShiftAddsToGroup=).
  *
  * WHY NOT JUST EDIT RTS_CFG.h
  * ---------------------------
@@ -25,9 +26,58 @@
  * nothing else in the game is affected.  Each parse scales its own fresh
  * value, so a second parse cannot compound it.
  *
- * Patched in memory only; the exe and RTS_CFG.h are not touched.  The site's
+ * SHIFT+NUMBER ADDS TO A GROUP (QOL-4)
+ * ------------------------------------
+ * cOverViewImp::mCheckGroupSelect (0x521110) handles the ten group_select_N
+ * actions, which Input.map binds to the bare number keys; it reads the
+ * modifiers from g_pCommandControl (0x76133c) and g_pCommandShift (0x761340).
+ * Stock: Ctrl+N is mBindGroup(N, true), replacing the group; Ctrl+Shift+N is
+ * mBindGroup(N, false), adding the selection to it (up to 16); N selects the
+ * group, a second N within 750 ms centres the camera on it, and Shift+N
+ * selects and centres at once.
+ *
+ * At 0x52129a, where the function tests Control to choose between binding and
+ * selecting, a jump to group_stub sends Shift+N without Control to
+ * mBindGroup(N, false), the call Ctrl+Shift+N makes; every other combination
+ * goes back to stock.  Shift+N's old meaning moves to Alt+N: the one read of
+ * g_pCommandShift that decides "centre now" (0x521350) reads g_pCommandAlt
+ * (0x761344) instead, a one-byte change of the address.  Groups live in this
+ * player's cOverViewImp and nothing about them is sent to other players, so
+ * this stays stock-compatible.
+ *
+ * BIGGER SELECTIONS AND GROUPS (QOL-3)
+ * ------------------------------------
+ * A control group is a list_array of entity ids with no limit of its own, but
+ * a group is built from the selection and recalled into it, and the
+ * selection holds 16: cOverViewImp keeps it as a count at +0xb8 and a fixed
+ * array of 16 ids at +0xbc, with live fields from +0xfc on, and
+ * cOverViewImp::Select refuses a 17th object (`cmp [this+0xb8],0x10` at
+ * 0x51f66e).  mBindGroup's add path (Ctrl+Shift+N) caps a group at 16 too
+ * (0x520e97), and so does mEditModeSelect (0x5232e3).
+ *
+ * The array moves to g_sel, MaxSelection= ids long.  cOverViewImp is a single
+ * static object at 0x768e40 (g_pOverView points to it), and every one of the
+ * 31 places that address the array -- all inside cOverViewImp's methods, from
+ * Select to GetSelectList -- does it as this+0xbc with a 32-bit displacement
+ * or immediate, so each is rewritten in place to g_sel - 0x768e40 without
+ * changing an instruction's length.  The count stays at +0xb8.  The three caps
+ * become MaxSelection (an 8-bit immediate, hence at most 120).
+ *
+ * Everything outside cOverViewImp reads the selection through GetSelectNum /
+ * GetSelectList / GetSelectedEntityIds (vtable +0x94/+0x98/+0x9c) and copies
+ * it into growable arrays: the button bar (PopupPaletteImp), ActionMode,
+ * the radar, CommDisplay's give-units button.  The selection panel
+ * (ShipDisplay) has 16 icon slots and fills them from the first 16 ids, so a
+ * bigger selection shows its first 16.  The exception is the special-weapon
+ * button, whose two functions gather the ships that can use a weapon into a
+ * 16-entry stack array; those move too (see patch_specials).  Orders go to other players as
+ * NetOrderObjects, which carry a 32-bit count and that many handles, and the
+ * receiving GameObject::DeQueueCommand walks however many arrive: a stock
+ * player receives an order for 40 ships like any other.
+ *
+ * Patched in memory only; the exe and RTS_CFG.h are not touched.  Each site's
  * bytes are checked against this build first, so a different Armada2.exe
- * leaves the plugin inert and says so in the log.
+ * leaves that change out and says so in the log.
  */
 
 typedef unsigned char       BYTE;
@@ -81,6 +131,68 @@ static const Site k_pan = {
     0x491766, 25, 17, { 0x68, 0xCC, 0xD7, 0x6F, 0x00, 0xE8, 0x00, 0x6C, 0x1C, 0x00,
                         0x8B, 0x45, 0xF0, 0x85, 0xC0, 0x75, 0x08,
                         0xD9, 0x1D, 0xB4, 0xFB, 0x70, 0x00, 0xEB, 0x02 } };
+
+/* mov edx,[g_pCommandControl]; cmp dword [edx],0; je <select>;
+ * mov eax,[g_pCommandShift].  The first six bytes become `jmp group_stub; nop`. */
+static const Site k_group_bind = {
+    0x52129a, 16, 0, { 0x8B, 0x15, 0x3C, 0x13, 0x76, 0x00, 0x83, 0x3A, 0x00,
+                       0x74, 0x1C, 0xA1, 0x40, 0x13, 0x76, 0x00 } };
+
+/* mov ecx,[g_pCommandShift] before "centre the camera now": the address's
+ * low byte (0x40, at offset 2) becomes 0x44, g_pCommandAlt. */
+static const Site k_group_focus = {
+    0x521350, 6, 2, { 0x8B, 0x0D, 0x40, 0x13, 0x76, 0x00 } };
+
+/* The selection array's 31 sites in cOverViewImp: the instruction's bytes up
+ * to its displacement (or immediate), which is 0xbc and becomes
+ * g_sel - OVERVIEW. */
+#define OVERVIEW     0x768e40   /* the one cOverViewImp; g_pOverView (0x768e3c) points here */
+#define SEL_MAX      120
+typedef struct { DWORD at; int off; BYTE pre[3]; } SelSite;
+static const SelSite k_sel[] = {
+    { 0x51efcc, 2, { 0x8B, 0xB6 } },        /* Simulate */
+    { 0x51f687, 2, { 0x8B, 0x83 } },        /* Select */
+    { 0x51f7bb, 2, { 0x8D, 0xB3 } },
+    { 0x51f856, 3, { 0x89, 0xB4, 0x83 } },
+    { 0x51f8a1, 2, { 0x8D, 0xBB } },
+    { 0x51fd55, 2, { 0x8D, 0x9F } },        /* GetSelectedEntityIds */
+    { 0x51fe8e, 2, { 0x8D, 0xB7 } },        /* FlushLists */
+    { 0x520071, 2, { 0x8D, 0x8F } },        /* SwapLists */
+    { 0x52009c, 3, { 0x89, 0x8C, 0xB7 } },
+    { 0x5204ea, 2, { 0x81, 0xC7 } },        /* mSetFormationOrientationToCurrentView */
+    { 0x520ab1, 2, { 0x8D, 0x9F } },        /* mFocusNextSelected */
+    { 0x520b02, 3, { 0x8B, 0xB4, 0xB7 } },
+    { 0x520b8d, 2, { 0x8D, 0xB3 } },        /* mSelectMeanY */
+    { 0x520c4e, 2, { 0x8B, 0x87 } },        /* mBindGroup */
+    { 0x520d2c, 2, { 0x8D, 0x87 } },
+    { 0x520e37, 2, { 0x81, 0xC7 } },
+    { 0x52115b, 2, { 0x8D, 0x97 } },        /* mCheckGroupSelect */
+    { 0x521207, 2, { 0x8D, 0x97 } },
+    { 0x5213df, 2, { 0x8D, 0x81 } },        /* mClearFromGroup */
+    { 0x521f41, 2, { 0x8D, 0xBE } },        /* mMainInput */
+    { 0x5230ec, 2, { 0x8D, 0xBE } },        /* mEditModeInput */
+    { 0x52326f, 2, { 0x8D, 0xBB } },        /* mDeselectAll */
+    { 0x5232f8, 3, { 0x89, 0x84, 0x8E } },  /* mEditModeSelect */
+    { 0x523347, 2, { 0x8D, 0x8E } },
+    { 0x5233cd, 2, { 0x8D, 0x9E } },        /* mEditModeDragAll */
+    { 0x52355e, 2, { 0x8D, 0xB9 } },        /* mEditModeDeleteAll */
+    { 0x52367f, 2, { 0x8D, 0xBB } },        /* mEditModeCopy */
+    { 0x523f70, 2, { 0x8D, 0xB3 } },        /* mEditModeDrag */
+    { 0x525a1e, 2, { 0x8D, 0xBB } },        /* mProcessKeyboardInput */
+    { 0x525a68, 3, { 0x8B, 0xB4, 0xB3 } },
+    { 0x527ab0, 2, { 0x8D, 0x81 } },        /* GetSelectList */
+};
+
+/* The three caps of 16, each an 8-bit immediate at `patch`:
+ * cmp dword [ebx+0xb8],0x10 (Select); cmp dword [ecx],0x10 (mBindGroup, add);
+ * cmp ecx,0x10 (mEditModeSelect). */
+static const Site k_cap[] = {
+    { 0x51f66e, 7, 6, { 0x83, 0xBB, 0xB8, 0x00, 0x00, 0x00, 0x10 } },
+    { 0x520e97, 3, 2, { 0x83, 0x39, 0x10 } },
+    { 0x5232e3, 3, 2, { 0x83, 0xF9, 0x10 } },
+};
+
+static DWORD g_sel[SEL_MAX];
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -219,6 +331,186 @@ static int patch_pan(void)
     return 1;
 }
 
+/* ---- Shift+number adds to a group ------------------------------------- */
+
+/* Reached by jmp from 0x52129a inside mCheckGroupSelect: edi = cOverViewImp,
+ * [ebp-4] = the group number.  Control held, or neither modifier: back to
+ * stock, at the next instruction or at the select path.  Shift alone:
+ * mBindGroup(N, false), then on to the end of this key's iteration as stock
+ * does after a bind.  Every path it returns to reloads eax and edx. */
+__attribute__((naked)) void group_stub(void)
+{
+    __asm__ __volatile__(
+        "movl 0x76133c, %edx\n\t"
+        "cmpl $0, (%edx)\n\t"
+        "jne 1f\n\t"
+        "movl 0x761340, %eax\n\t"
+        "cmpl $0, (%eax)\n\t"
+        "je 2f\n\t"
+        "pushl $0\n\t"
+        "pushl -4(%ebp)\n\t"
+        "movl %edi, %ecx\n\t"
+        "movl $0x520c40, %eax\n\t"
+        "call *%eax\n\t"
+        "movl $0x52138a, %eax\n\t"
+        "jmp *%eax\n"
+        "1:\n\t"
+        "movl $0x5212a5, %eax\n\t"
+        "jmp *%eax\n"
+        "2:\n\t"
+        "movl $0x5212c1, %eax\n\t"
+        "jmp *%eax\n\t");
+}
+
+static int site_ok(const Site *s)
+{
+    const BYTE *p = (const BYTE *)s->at;
+    int k;
+    for (k = 0; k < s->len; k++)
+        if (p[k] != s->sig[k]) return 0;
+    return 1;
+}
+
+static void poke(BYTE *at, const BYTE *bytes, int n)
+{
+    DWORD old;
+    int   k;
+    if (!VirtualProtect(at, (UINT)n, PAGE_EXECUTE_READWRITE, &old)) return;
+    for (k = 0; k < n; k++) at[k] = bytes[k];
+    VirtualProtect(at, (UINT)n, old, &old);
+    FlushInstructionCache(GetCurrentProcess(), at, (UINT)n);
+}
+
+static int patch_groups(void)
+{
+    BYTE jmp[6], alt = 0x44;
+    if (!site_ok(&k_group_bind) || !site_ok(&k_group_focus)) return 0;
+    jmp[0] = 0xE9;                                          /* jmp group_stub */
+    *(LONG *)(jmp + 1) = (LONG)((DWORD)group_stub - (k_group_bind.at + 5));
+    jmp[5] = 0x90;                                          /* nop */
+    poke((BYTE *)k_group_bind.at, jmp, 6);
+    poke((BYTE *)k_group_focus.at + k_group_focus.patch, &alt, 1);
+    return 1;
+}
+
+/* ---- bigger selections and groups ------------------------------------- */
+
+/* The button bar's special weapons.  For each special weapon of the selection,
+ * PopupPaletteImp::mSetupSpecialWeapons (every frame, to set the button) and
+ * mQueueSpecialWeaponCommand (to fire it) gather the selected ships that can
+ * use it into a 16-entry array on their own stack, with no bound: stock never
+ * selected more.  17 Galaxy or Vor'cha class ships overrun it -- into the
+ * container beside it in mSetupSpecialWeapons (the frame never finishes, or
+ * the heap is damaged and a CraftProcess later calls a destroyed weapon system:
+ * R6025), and into the locals and return address of
+ * mQueueSpecialWeaponCommand.  Each array moves to a buffer of SEL_MAX here;
+ * it is addressed in five places, each a short sequence that becomes a jump to
+ * a stub doing the same with the buffer, or the same with an absolute push. */
+DWORD g_spec_ships[SEL_MAX];     /* mSetupSpecialWeapons' ships */
+DWORD g_queue_ships[SEL_MAX];   /* mQueueSpecialWeaponCommand's ships */
+
+/* 0x4fd3af: lea esi,[ebp-0x78]; mov [ebp-0x28],eax -- the read-back loop */
+__attribute__((naked)) void spec_read_stub(void)
+{
+    __asm__ __volatile__(
+        "movl $_g_spec_ships, %esi\n\t"
+        "movl %eax, -0x28(%ebp)\n\t"
+        "pushl $0x4fd3b5\n\t"
+        "ret\n\t");
+}
+
+/* 0x4fd8f1: lea ecx,[ebp-0x80]; mov [ebp+0xc],ecx -- the gathering loop's cursor */
+__attribute__((naked)) void queue_fill_stub(void)
+{
+    __asm__ __volatile__(
+        "movl $_g_queue_ships, %ecx\n\t"
+        "movl %ecx, 0xc(%ebp)\n\t"
+        "pushl $0x4fd8f7\n\t"
+        "ret\n\t");
+}
+
+/* 0x4fd95d: lea esi,[ebp-0x80]; mov edi,ecx -- the loop that turns them into handles */
+__attribute__((naked)) void queue_read_stub(void)
+{
+    __asm__ __volatile__(
+        "movl $_g_queue_ships, %esi\n\t"
+        "movl %ecx, %edi\n\t"
+        "pushl $0x4fd962\n\t"
+        "ret\n\t");
+}
+
+typedef struct { DWORD at; int len; BYTE sig[8]; } Seq;
+static const Seq k_spec[5] = {
+    /* lea ecx,[ebp-0x78]; mov [ebp-0x18],ecx; jmp +3 (over mov esi,[ebp+8], which
+     * esi already holds here) -> mov dword [ebp-0x18],g_spec_ships; nop */
+    { 0x4fd32e, 8, { 0x8D, 0x4D, 0x88, 0x89, 0x4D, 0xE8, 0xEB, 0x03 } },
+    { 0x4fd3af, 6, { 0x8D, 0x75, 0x88, 0x89, 0x45, 0xD8 } },
+    /* mov edx,[ebp-0x10]; lea eax,[ebp-0x78]; push edx; push eax
+     * -> push dword [ebp-0x10]; push g_spec_ships (edx, eax die in the call) */
+    { 0x4fd40d, 8, { 0x8B, 0x55, 0xF0, 0x8D, 0x45, 0x88, 0x52, 0x50 } },
+    { 0x4fd8f1, 6, { 0x8D, 0x4D, 0x80, 0x89, 0x4D, 0x0C } },
+    { 0x4fd95d, 5, { 0x8D, 0x75, 0x80, 0x8B, 0xF9 } },
+};
+
+static void jmp_to(BYTE *code, DWORD at, int len, void (*stub)(void))
+{
+    int k;
+    code[0] = 0xE9;
+    *(LONG *)(code + 1) = (LONG)((DWORD)stub - (at + 5));
+    for (k = 5; k < len; k++) code[k] = 0x90;
+}
+
+/* All five are checked before any is written.  1 if patched. */
+static int patch_specials(void)
+{
+    BYTE c[8];
+    int  i, k;
+    for (i = 0; i < 5; i++)
+        for (k = 0; k < k_spec[i].len; k++)
+            if (((const BYTE *)k_spec[i].at)[k] != k_spec[i].sig[k]) return 0;
+
+    c[0] = 0xC7; c[1] = 0x45; c[2] = 0xE8;                  /* mov dword [ebp-0x18],imm32 */
+    *(DWORD *)(c + 3) = (DWORD)g_spec_ships; c[7] = 0x90;
+    poke((BYTE *)k_spec[0].at, c, 8);
+    jmp_to(c, k_spec[1].at, 6, spec_read_stub);
+    poke((BYTE *)k_spec[1].at, c, 6);
+    c[0] = 0xFF; c[1] = 0x75; c[2] = 0xF0;                  /* push dword [ebp-0x10] */
+    c[3] = 0x68; *(DWORD *)(c + 4) = (DWORD)g_spec_ships;   /* push imm32 */
+    poke((BYTE *)k_spec[2].at, c, 8);
+    jmp_to(c, k_spec[3].at, 6, queue_fill_stub);
+    poke((BYTE *)k_spec[3].at, c, 6);
+    jmp_to(c, k_spec[4].at, 5, queue_read_stub);
+    poke((BYTE *)k_spec[4].at, c, 5);
+    return 1;
+}
+
+
+/* All 34 sites are checked before any is written: a partial move would leave
+ * the selection in two places.  Returns the number of sites patched, or 0. */
+static int patch_selection(int max)
+{
+    BYTE  cap = (BYTE)max;
+    DWORD disp = (DWORD)g_sel - OVERVIEW;
+    int   i, k, n = (int)(sizeof k_sel / sizeof k_sel[0]);
+
+    for (i = 0; i < n; i++) {
+        const BYTE *p = (const BYTE *)k_sel[i].at;
+        for (k = 0; k < k_sel[i].off; k++)
+            if (p[k] != k_sel[i].pre[k]) return 0;
+        if (*(const DWORD *)(p + k_sel[i].off) != 0xbc) return 0;
+    }
+    for (i = 0; i < 3; i++)
+        if (!site_ok(&k_cap[i])) return 0;
+
+    /* whatever is selected already comes along (nothing is, this early) */
+    for (k = 0; k < 16; k++) g_sel[k] = *(volatile DWORD *)(OVERVIEW + 0xbc + 4 * k);
+    for (i = 0; i < n; i++)
+        poke((BYTE *)k_sel[i].at + k_sel[i].off, (const BYTE *)&disp, 4);
+    for (i = 0; i < 3; i++)
+        poke((BYTE *)k_cap[i].at + k_cap[i].patch, &cap, 1);
+    return n + 3;
+}
+
 /* ---- startup ---------------------------------------------------------- */
 
 static void build_paths(char *ini)
@@ -236,6 +528,7 @@ static void startup(void)
 {
     char  ini[320], val[32], b[200];
     float f;
+    int   k, n;
 
     build_paths(ini);
     g_logging = (int)GetPrivateProfileIntA("QOL", "Log", 1, ini);
@@ -257,6 +550,39 @@ static void startup(void)
         s_fixed(b, f, 2);
         s_cat(b, patch_pan() ? ", patched"
                              : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+    }
+    logline(b);
+
+    b[0] = 0;
+    s_cat(b, "--- QOL ShiftAddsToGroup=");
+    if (GetPrivateProfileIntA("QOL", "ShiftAddsToGroup", 1, ini)) {
+        s_cat(b, "1");
+        s_cat(b, patch_groups() ? "  -> Shift+N adds to group N, Alt+N selects and centres, patched"
+                                : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+    } else {
+        s_cat(b, "0  (number keys left alone)");
+    }
+    logline(b);
+
+    k = (int)GetPrivateProfileIntA("QOL", "MaxSelection", 40, ini);
+    b[0] = 0;
+    s_cat(b, "--- QOL MaxSelection=");
+    s_num(b, k);
+    if (k <= 16) {
+        s_cat(b, "  (16 or less: selection and groups left at stock's 16)");
+    } else {
+        if (k > SEL_MAX) k = SEL_MAX;
+        /* the special-weapon arrays first: a bigger selection without them overruns the stack */
+        n = patch_specials() ? patch_selection(k) : 0;
+        if (n) {
+            s_cat(b, "  -> selections and groups up to ");
+            s_num(b, k);
+            s_cat(b, ", ");
+            s_num(b, n + 5);
+            s_cat(b, " sites patched");
+        } else {
+            s_cat(b, "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+        }
     }
     logline(b);
 }
