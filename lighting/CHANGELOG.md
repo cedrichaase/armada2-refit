@@ -4,6 +4,14 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.3.3 — 2026-10-04
+
+### Changed
+- `PlanetGlow=1.5` (was 1.2), `PlanetGlowRange=6.0` (was 5.0), `NebulaRange=8.0` (was
+  5.0, as in 1.3.1). The built-in defaults match.
+
+Installed, not yet seen in game.
+
 ## 1.3.2 — 2026-10-04
 
 ### Fixed

@@ -41,9 +41,9 @@ planet's ground colour (`planet glow:`).
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `PointLights` | `6` | point lights per GPU draw, the strongest first; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
-| `NebulaBrightness`, `NebulaRange` | `2.0`, `5.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
+| `NebulaBrightness`, `NebulaRange` | `2.0`, `8.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
 | `PlanetGlows` | `1` | a planet's day side lights what is near it |
-| `PlanetGlow`, `PlanetGlowRange` | `1.2`, `5.0` | Key x ground colour x this, from the planet's centre; full at its surface, gone at this many radii; times the share of the day side facing the object |
+| `PlanetGlow`, `PlanetGlowRange` | `1.5`, `6.0` | Key x ground colour x this, from the planet's centre; full at its surface, gone at this many radii; times the share of the day side facing the object |
 | `SkyLight` | `0.35` | the sky light's strongest channel; `0` leaves it dark |
 | `Explosions` | `1` | ship and station explosions light their surroundings |
 | `ExplosionColour`, `ExplosionBrightness`, `ExplosionRange` | `1.00 0.62 0.28`, `4.0`, `10.0` | the flash's colour and peak; full over the explosion's radius (at least 40 units), gone at this many radii |
@@ -190,8 +190,10 @@ and the Key already takes the side it lights most of the way there, so a source 
 mostly on a hull's shadowed side and as a shift in hue on its lit one. 1.3.1 doubles
 each source's colour (`SkyLight` a little more, 0.35) and widens each reach: planets to
 5 radii, explosions to 10 radii (a frigate's gone at 400 units). Nebulae went to 8x their
-ODF falloff (full to 480 units) and back to 5x in 1.3.2: at 8 a Radioactive nebula's
-full yellow outreached a planet right beside the ship. A glow of 2 saturates its
+ODF falloff (full to 480 units), back to 5x in 1.3.2, when a Radioactive nebula's full
+yellow outreached a planet right beside the ship, and to 8x again in 1.3.3 once the planet
+glow showed. 1.3.3 also raised the planet glow by a quarter (`PlanetGlow=1.5`) and its
+reach to 6 radii. A glow of 2 saturates its
 channels on the side facing it; that is the intended look, and the keys take it back down.
 
 ### Point lights on the GPU path

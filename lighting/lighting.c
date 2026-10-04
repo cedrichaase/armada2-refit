@@ -624,7 +624,7 @@ static int patch_set_material(void)
  * every stock nebula). On the bench its colour came out black frame after frame.
  * The plugin registers it in place of that: the glow colour times
  * NebulaBrightness, steady, with the falloff times NebulaRange. */
-static float g_neb_bright = 2.0f, g_neb_range = 5.0f;
+static float g_neb_bright = 2.0f, g_neb_range = 8.0f;
 static int   g_nebulae = 1;
 
 static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
@@ -668,7 +668,7 @@ static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
 typedef struct { char name[16]; float col[3]; } GlowTex;
 typedef struct { void *planet; BYTE *light; DWORD seen; } GlowLight;
 
-static float     g_glow = 1.2f, g_glow_range = 5.0f;
+static float     g_glow = 1.5f, g_glow_range = 6.0f;
 static int       g_planet_glow = 1;
 static char      g_texdir[320];
 static GlowTex   g_glow_tex[16];
