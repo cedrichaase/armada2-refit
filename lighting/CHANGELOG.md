@@ -4,6 +4,18 @@
 lights in place of each map's own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-04
+
+### Changed
+- The key light comes in at about 60° off vertical instead of 37° (`KeyAxis=0.50 -0.50
+  0.71`, the fill opposite it), so it grazes what the top-down camera sees.
+- Darker base lighting, so that the light sources still to come stand out:
+  `FillColour=0.06 0.08 0.18` (was `0.10 0.12 0.24`), `Ambient=0.05 0.05 0.07` (was
+  `0.10 0.10 0.12`), and `PlanetAmbient=0.02 0.02 0.03` for more contrast between a
+  planet's day and night sides.
+
+Seen on the bench 2026-10-04 (`SCENE=planet`). Confirmed in game 2026-10-04.
+
 ## 1.1.0 — 2026-10-04
 
 ### Added
