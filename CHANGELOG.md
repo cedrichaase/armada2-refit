@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.9.0 — 2026-10-04
+
+Layers: lighting 1.4.0.
+
+### Added
+- Nebulae stay drawn, and keep lighting nearby ships, when the camera zooms in close
+  beside them (`NebulaCull=`, lighting 1.4.0).
+
 ## 9.8.3 — 2026-10-04
 
 Layers: lighting 1.3.3.

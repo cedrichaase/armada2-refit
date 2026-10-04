@@ -638,6 +638,10 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   only directional lights. The plugin hands them over per draw (`pick_points`); any new
   light source is a point light in the engine's list, and nothing more. A light the
   CPU-lit planets must not take gets the plugin's no-op vtable, as the planet glow does.
+- **A soft point light goes to Direct3D mirrored through the draw's origin**: stock
+  normals point inward, and a light given where it is lights the far side of a hull.
+- **A nebula lights only while it counts as on screen**, by its bounding sphere, which
+  is smaller than its light's reach. `NebulaCull` widens the test, nothing else.
 - **`models/hull-bump.py` and `Lighting.asi` do not combine**: a bump-mapped hull goes
   the dot3 way, which takes precedence over the vertex buffers.
 

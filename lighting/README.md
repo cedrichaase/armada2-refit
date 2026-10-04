@@ -22,7 +22,7 @@ that `Lighting.ini` switches separately:
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
 `a2mod` switches the plugin as the `lighting` layer. Each launch writes `Lighting.log`:
-`call sites patched 10` means every hook took, and the lines after it name every model
+`call sites patched 11` means every hook took, and the lines after it name every model
 switched to vertex buffers, the map's own lights, the sky light (`sky:`) and each
 planet's ground colour (`planet glow:`).
 
@@ -42,6 +42,7 @@ planet's ground colour (`planet glow:`).
 | `PointLights` | `6` | point lights per GPU draw, the strongest first; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
 | `NebulaBrightness`, `NebulaRange` | `2.0`, `8.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
+| `NebulaCull` | `3.0` | a nebula counts as on screen, drawn and lighting, while its bounding sphere times this is in view; `1` is stock |
 | `PlanetGlows` | `1` | a planet's day side lights what is near it |
 | `PlanetGlow`, `PlanetGlowRange` | `1.5`, `6.0` | Key x ground colour x this, from the planet's centre; full at its surface, gone at this many radii; times the share of the day side facing the object |
 | `SkyLight` | `0.35` | the sky light's strongest channel; `0` leaves it dark |
@@ -256,6 +257,32 @@ call: the glow colour times `NebulaBrightness`, steady, and the falloff times
 Metreon `(0.5, 0, 0)`, Metaphasic `(0, 1, 0)`, Cerulean `(0, 0, 0.5)`. On the bench
 (`SCENE=nebula`) the Galaxy at the Mutara's edge turned violet on the side facing it and
 stayed grey on the far side.
+
+### Nebula culling
+
+A nebula is drawn, and registers its light, only while the engine counts it as on
+screen. `Nebula::Simulate` calls `Simulate_Nebula_Lights` only while the object's
+on-screen flag (+0x25) is set, and `Nebula::Render` draws nothing while the nebula's
+own culled flag (+0x1b0) is set. `Nebula::sCullOccludedNebula` (0x4a52c0) sets that
+flag on every nebula each frame, then clears it for those that pass the fog check
+(`GameObject::CanUserSee`) and the camera test, slot 3 of the `NebulaInstance` vtable
+(0x6b1448). That slot is the generic `ST3D_Instance::FrustumTest` (0x62e990): the
+instance's bounding sphere (the node's at +0x1c when there is one at +0x80, else its
+own at +0x34, radius at +0xc) against the camera frustum. The survivors are then sorted
+by distance and thinned where one hides another.
+
+The sphere is smaller than what the nebula does. The Big Mutara's is 312 units, and its
+light reaches 960 at `NebulaRange=8`. Zoomed in on a ship 566 units from the Mutara's
+centre (bench, `SCENE=nebula`, a second Galaxy spawned at 1800,0,1800), the nebula's
+light went from registered to not between a camera distance of 600 and 120, and the
+ship turned from violet-edged to plain grey. Its cloud goes the same way.
+
+The plugin puts its own function in that slot. It multiplies the sphere's radius by
+`NebulaCull`, calls `FrustumTest`, and puts the radius back. Every caller that goes
+through the nebula's vtable gets the margin, and nothing else is touched. At 2 the
+light stayed registered at 600, 120 and 70, and the hull kept its violet edge. The
+default 3 (935 for the Mutara) covers the light's whole reach. A nebula just outside
+the view costs a few draws, which the GPU clips.
 
 ### Planets: light from the day side
 
