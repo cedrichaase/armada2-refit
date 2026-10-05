@@ -46,7 +46,7 @@ planet's ground colour (`planet glow:`).
 | `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
-| `SelfIllumination` | `2.5` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none, above 1 brighter than their texture ("Dynamic range") |
+| `SelfIllumination` | `1.8` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none, above 1 brighter than their texture ("Dynamic range") |
 | `HullSun` | `1.1` | with `Shaders`, the Key on GPU-drawn hulls times this, the light no longer clamped at 1 ("Dynamic range") |
 | `HighlightKnee` | `0.8` | with `Shaders` or `PlanetShaders`, colour above this rolls off towards white instead of clipping; `1` clips as before ("Dynamic range") |
 | `Specular`, `SpecularPower` | `0.7`, `24` | with `Shaders`, a highlight from every light, times the texture's brightness; strength (`0`: none) and exponent (below) |
@@ -516,7 +516,8 @@ B (and 2.2, worse) brightens the whole lit side: the plating rises to the window
 level and they vanish into it, so the hull loses contrast while bloom rises. E keeps the
 plating where it was and puts the near-white pixels where the eye expects light:
 windows, nacelle grilles, bussards, the glint on the saucer. The defaults sit between D
-and E (`HullSun=1.1`, `SelfIllumination=2.5`, `Specular=0.7`). A knee of 0.6 was tried
+and E (`HullSun=1.1`, `Specular=0.7`); `SelfIllumination` shipped at 2.5 on the bench and
+came down to 1.8 after a look in game. A knee of 0.6 was tried
 first and flattened planets: their ground is bright art, and compressing everything over
 0.6 hazed it. In the `firing` scene the Galaxy's own torpedo now lights its engineering
 hull orange as it leaves (the Borg cube is on the dot3 path and takes none of this).

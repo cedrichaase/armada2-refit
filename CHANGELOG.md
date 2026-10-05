@@ -12,7 +12,7 @@ Layers: lighting 1.10.0, postfx 1.2.0.
 ### Added
 - More dynamic range on lit hulls and planets (lighting 1.10.0): the light is no longer
   clamped at 1, highlights roll off towards white (`HighlightKnee`), and night lights and
-  specular are brighter (`SelfIllumination=2.5`, `Specular=0.7`, `HullSun=1.1`), so
+  specular are brighter (`SelfIllumination=1.8`, `Specular=0.7`, `HullSun=1.1`), so
   bloom has something to take.
 
 ### Changed

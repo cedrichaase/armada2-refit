@@ -425,7 +425,7 @@ static float g_sh_sign = -1.0f;      /* -1: inward normals, as stock; +1: a mirr
  * for pass 0 only, so on the GPU path the night lights never drew. Render's third
  * argument is that material; the shaders fold the second pass into the first. */
 #define VT_SELFILLUM_MATERIAL 0x6bc854   /* ST3D_SelfIlluminatingMaterial vtable */
-static float g_selfillum = 2.5f;     /* SelfIllumination=: 1 is stock's second pass, 0 none, above 1 brighter */
+static float g_selfillum = 1.8f;     /* SelfIllumination=: 1 is stock's second pass, 0 none, above 1 brighter */
 
 /* Specular and rim (Shaders=1 only; hull.hlsl). A Blinn-Phong highlight from every
  * light, times the texture's brightness as a gloss mask; and a rim light on the faces

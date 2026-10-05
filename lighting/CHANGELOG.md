@@ -15,7 +15,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `SelfIllumination` above 1 draws the night lights brighter than their texture.
 
 ### Changed
-- `SelfIllumination=2.5` (was 1.0), `Specular=0.7` (was 0.35); the built-in defaults
+- `SelfIllumination=1.8` (was 1.0), `Specular=0.7` (was 0.35); the built-in defaults
   match.
 
 Seen on the bench 2026-10-05 (`SCENE=planet`, `SCENE=firing`). Installed, not yet seen in game.
