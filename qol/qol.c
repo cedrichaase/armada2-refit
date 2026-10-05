@@ -95,6 +95,8 @@
  *     second class of station;
  *   - mFocusCameraOnShipGroup (0x520fcf) falls back to the stations' group
  *     as recall does;
+ *   - Producer::FinishBuild (0x4b9127) gives a station's builds no group:
+ *     stock gave them the station's, into the ships' set, which recall prefers;
  *   - the button bar's build button (mUpdateButtonsAndPosition, 0x4fc72c),
  *     enabled for one producer, is enabled for several stations of one kind;
  *     a build order (CheckCanExecute(ModeInfo), 0x4fc486), which stock queues
@@ -445,6 +447,7 @@ typedef void  (__thiscall *RemoveShipFn)(BYTE *group, int index);
 #define GO_DYING       0x113     /* byte; group recall skips it */
 #define GO_TEAM        0xec
 #define GO_ID          0x28      /* the entity id the selection and groups hold */
+#define GO_LABEL       0x120     /* its group number, drawn beside it; -1 for none */
 #define CC_STATION     0x20d     /* CraftClass: a station */
 
 static void jmp_to(BYTE *code, DWORD at, int len, void (*stub)(void));
@@ -627,6 +630,31 @@ __attribute__((naked)) void focus_stub(void)
         "ret\n\t");
 }
 
+/* Producer::FinishBuild gives the unit it has built to the producer's group
+ * (AddCraftToGroup, cOverViewImp's vtable +0xd4, with the producer's +0x120).
+ * From a station in group N that puts each new ship into the ships' group N,
+ * which recall then prefers: the key selects the new ships, not the stations.
+ * A station's builds join no group (-1, which AddCraftToGroup ignores). */
+int __cdecl producer_group(BYTE *producer)
+{
+    return files_as_station(producer) ? -1 : *(int *)(producer + GO_LABEL);
+}
+
+/* Replaces `mov eax,[esi+0x120]` (6 bytes at 0x4b9127, with a nop): esi = the
+ * producer; ecx (g_pOverView, just loaded) and edx are kept. */
+__attribute__((naked)) void built_stub(void)
+{
+    __asm__ __volatile__(
+        "pushl %ecx\n\t"
+        "pushl %edx\n\t"
+        "pushl %esi\n\t"
+        "call _producer_group\n\t"
+        "addl $4, %esp\n\t"
+        "popl %edx\n\t"
+        "popl %ecx\n\t"
+        "ret\n\t");
+}
+
 /* ---- the build menu for several stations (QOL-6) ---- */
 
 typedef void  (__thiscall *QueueCmdFn)(BYTE *obj, int cmd, void *cls);
@@ -799,6 +827,9 @@ static const Site k_stn_enable = { 0x4fc72c, 17, 0, { 0x8B, 0x4F, 0x44, 0x33, 0x
 static const Site k_stn_route  = { 0x4fc486, 9, 0, { 0x8B, 0x45, 0xE8, 0x33, 0xF6, 0x85, 0xC0, 0x7E, 0x75 } };
 static const Site k_stn_cancel = { 0x4fc0a6, 18, 0, { 0x8B, 0x45, 0xE0, 0x85, 0xC0, 0xC7, 0x45, 0xEC, 0x00,
                                                       0x00, 0x00, 0x00, 0x0F, 0x8E, 0x1C, 0x01, 0x00, 0x00 } };
+/* mov ecx,[g_pOverView]; mov eax,[esi+0x120]; push eax; push edi -- the load (at 6) becomes a call */
+static const Site k_stn_built  = { 0x4b9121, 14, 6, { 0x8B, 0x0D, 0x3C, 0x8E, 0x76, 0x00, 0x8B, 0x86,
+                                                      0x20, 0x01, 0x00, 0x00, 0x50, 0x57 } };
 /* test ah,2; je +0x13; call Producer::BuildQueueSize -- the call (at 5) is redirected */
 static const Site k_stn_qsize  = { 0x4fbf7e, 10, 5, { 0xF6, 0xC4, 0x02, 0x74, 0x13, 0xE8, 0xE8, 0xBB, 0xFB, 0xFF } };
 
@@ -807,13 +838,17 @@ static const Site k_stn_sel   ={ 0x51f67b, 12, 0, { 0x39, 0xBB, 0xB8, 0x00, 0x00
 static const Site k_stn_bind  = { 0x520c40, 6, 0, { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10 } };
 static const Site k_stn_focus = { 0x520fcf, 7, 0, { 0x8D, 0x9C, 0x81, 0x4C, 0x01, 0x00, 0x00 } };
 
-/* All seven are checked before any is written. */
+/* All eight are checked before any is written. */
 static int patch_stations(void)
 {
     BYTE c[18];
     if (!site_ok(&k_stn_sel) || !site_ok(&k_stn_bind) || !site_ok(&k_stn_focus) ||
         !site_ok(&k_stn_enable) || !site_ok(&k_stn_route) || !site_ok(&k_stn_cancel) ||
-        !site_ok(&k_stn_qsize)) return 0;
+        !site_ok(&k_stn_qsize) || !site_ok(&k_stn_built)) return 0;
+    c[0] = 0xE8;                                            /* call built_stub; nop */
+    *(LONG *)(c + 1) = (LONG)((DWORD)built_stub - (k_stn_built.at + k_stn_built.patch + 5));
+    c[5] = 0x90;
+    poke((BYTE *)k_stn_built.at + k_stn_built.patch, c, 6);
     c[0] = 0xE8;                                            /* call qsize_stub */
     *(LONG *)(c + 1) = (LONG)((DWORD)qsize_stub - (k_stn_qsize.at + k_stn_qsize.patch + 5));
     poke((BYTE *)k_stn_qsize.at + k_stn_qsize.patch, c, 5);

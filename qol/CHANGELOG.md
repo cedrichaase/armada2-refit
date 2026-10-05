@@ -20,6 +20,9 @@ versions". Newest first. Details, and the planned changes, are in
 - `Ctrl+number` now replaces a group that held stations: before, the stations stayed
   in it with their group number drawn, and `Ctrl+number` on a station added to the
   group. (5a5f2d0)
+- A ship built at a station in a control group no longer joins that group (stock gives
+  a producer's builds its group); it put the ship in the ships' group, which recall
+  prefers, so the key selected the new ships instead of the stations.
 
 Installed, not yet seen in game.
 

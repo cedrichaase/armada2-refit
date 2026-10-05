@@ -17,7 +17,8 @@ Layers: qol 1.2.0, testbench 2.14.0.
   2.14.0).
 
 ### Fixed
-- `Ctrl+number` replaces a group that held stations, label included (qol 1.2.0).
+- `Ctrl+number` replaces a group that held stations, label included, and ships built at
+  a station in a group no longer join it (qol 1.2.0).
 
 ## 9.13.1 — 2026-10-05
 

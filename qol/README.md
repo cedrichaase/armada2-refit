@@ -358,13 +358,21 @@ through `cOverViewImp::Select`. Three things then go wrong:
 - `mFocusCameraOnShipGroup`, where it picks the group (0x520fcf): the stations' group
   N when the ships' is empty, the choice recall makes. The double tap and `Alt+N`
   (QOL-4) centre on the station nearest the group's middle.
+- `Producer::FinishBuild` (0x4b8f50), where it hands the unit it has built to
+  `AddCraftToGroup` (`cOverViewImp`'s vtable +0xd4) with the producer's group number
+  (0x4b9127): a station's builds get -1, no group. Stock gives a yard's ships the
+  yard's group, so they landed in the ships' group N, which recall prefers, and the
+  key selected the new ships instead of the yards (seen in game, 2026-10-05). A unit
+  that changes into another (`Evolver`, `s_GiveSameStatsAndGroupAndSelection`) keeps
+  its own group as in stock.
 
 Groups are this player's alone and saved as stock saves them (a station group could
 already hold several), so nothing about this reaches other players or the save.
 
 **Seen on the bench (2026-10-05)**, `testbench/scenarios/qol-station-groups.md`, on the
 `stations` scene (three yards, an advanced yard, a research station, two ships):
-three yards select together; an advanced yard or a ship replaces them; `Ctrl+1` on
+three yards select together; an advanced yard or a ship replaces them; a scout built at
+a yard of group 2 joins no group, and `2` still selects the yards; `Ctrl+1` on
 three yards, then `1` from a ship, selects all three labelled 1; `Ctrl+1` on a ship
 empties the yards' group and clears their labels; `Shift+2` refuses a ship and the
 advanced yard and takes a third yard; `2 2` and `Alt+2` move the camera to the middle

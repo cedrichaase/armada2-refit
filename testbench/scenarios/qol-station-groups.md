@@ -50,16 +50,26 @@ real key presses. `selection` answers with what is selected, each one's group la
 34. Press 2 2 times.
 35. Wait 1 second.
 36. Expect scene "query" answers "camera rts eye 1700.0".
-37. Note "five orders with three yards selected go 2 + 2 + 1; a cancel goes to the longest queue".
+37. Note "a ship built at a yard of group 2 joins no group, and 2 still selects the yards".
 38. Scene "select yard1 yard2 yard3".
 39. Press q.
-40. Press x 5 times.
-41. Expect scene "selection" answers "yard1[g2 q2".
-42. Expect scene "selection" answers "yard2[g2 q2".
-43. Expect scene "selection" answers "yard3[g2 q1".
-44. Press t.
-45. Expect scene "selection" answers "yard1[g2 q1".
-46. Expect scene "selection" answers "yard2[g2 q2".
-47. Expect the game is still running.
-48. Quit the game.
-49. Expect no crash.
+40. Press q.
+41. Expect scene "selection" answers "yard1[g2 q1".
+42. Wait 45 seconds.
+43. Expect scene "selection" answers "yard1[g2 q0".
+44. Expect scene "selection" not answer "ship group 2".
+45. Scene "select ship1".
+46. Press 2.
+47. Expect scene "selection" answers "selected 3: yard1".
+48. Note "five orders with three yards selected go 2 + 2 + 1, starting after yard1, which built last; a cancel goes to the longest queue".
+49. Press q.
+50. Press x 5 times.
+51. Expect scene "selection" answers "yard1[g2 q1".
+52. Expect scene "selection" answers "yard2[g2 q2".
+53. Expect scene "selection" answers "yard3[g2 q2".
+54. Press t.
+55. Expect scene "selection" answers "yard2[g2 q1".
+56. Expect scene "selection" answers "yard3[g2 q2".
+57. Expect the game is still running.
+58. Quit the game.
+59. Expect no crash.
