@@ -13,7 +13,7 @@ versions". Newest first. Details, and the planned changes, are in
   `MaxSelection` over 16 now also moves that array, in setting up and in firing the
   special weapon, and is refused if it cannot.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 1.1.0 — 2026-10-04
 
@@ -24,7 +24,7 @@ Installed, not yet seen in game.
 - `MaxSelection=` (default 40, 17–120; 16 or less leaves it stock): selections, and so
   control groups, hold more than stock's 16. The selection panel shows the first 16. (691256a)
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 1.0.0 — 2026-10-03
 
