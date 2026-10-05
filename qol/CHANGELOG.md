@@ -24,7 +24,7 @@ versions". Newest first. Details, and the planned changes, are in
   a producer's builds its group); it put the ship in the ships' group, which recall
   prefers, so the key selected the new ships instead of the stations. (403dfad)
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 1.1.1 — 2026-10-05
 
