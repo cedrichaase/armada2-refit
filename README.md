@@ -30,10 +30,15 @@ a time, and every fix can be undone.
 | **Stretch-free HUD** | `HUD.asi` lays out the in-game HUD, font and cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets |
 | **Full-screen menus** | `Menus.asi` scales the 800x600 shell menus to fill the screen and draws them inside the game window, with optional widescreen backdrops (black sides without them) |
 | **Anti-aliasing** | `MSAA.asi` turns on up to 8x multisample anti-aliasing, which the game has no option for |
-| **Bloom and renderer tuning** | vkBasalt bloom, plus anisotropic filtering and LOD bias through `dxvk.conf` |
+| **Lighting** | `Lighting.asi` draws ships and stations on the engine's own GPU path under new scene lights (a warm key, a dim blue fill and a faint sky light), gives planets a night side, and makes nebulae, planets' day sides, explosions and torpedoes light the hulls around them. Under crosire's d3d8to9 (which `./install` sets up) hulls and planets are lit per pixel in shaders, with specular, a rim light, hull night lights, and city lights and water glint on planets |
+| **Bloom and renderer tuning** | vkBasalt bloom, on from launch, plus anisotropic filtering, LOD bias and seamless cube maps through `dxvk.conf` |
+| **Quality of life, stock-compatible** | `QOL.asi`: faster right-drag panning, `Shift+number` adds to a control group, selections and groups beyond 16 ships (40 by default), and stations in control groups with one build menu for several. Everything stays on your machine, so you can still play against unmodded players |
+| **Grid hotkeys** | `GridLayout.asi` lays the button bar out as a 5x3 grid with one key per cell by keyboard position (`QWERT`/`ASDFG`/`ZXCVB`), labelled on the buttons and placed between the minimap and the info panel on wide screens |
+| **Smoother geometry** | `Planets.asi` tessellates planets finely enough for a modern resolution, the dilithium moons are smoothed, and the selection bubble is round instead of a visible polygon |
 | **Texture replacement** | `./a2tex`, a pipeline for replacement textures, whether upscaled, generated or drawn by hand. It checks each one against the engine's format rules (bit depth, mip chains, size limits), installs it with a backup, and packs a set so others can install it. There are 84 recipes so far: skyboxes, nebulae, planets, UI and ship hulls |
 | **Video replacement** | a replacement `binkw32.dll` that plays the launch reels full screen and plays AV1 replacements in place of the original Bink movies, plus a pipeline to build them |
 | **Widened loading screen** | the 3D loading-screen model, rebuilt for widescreen |
+| **Online multiplayer** *(in progress)* | multiplayer under Proton is broken (Wine stubs DirectPlay). `Online.asi` adds *Internet – Online*, which runs on its own UDP transport with join codes, hole punching and a relay through a self-hostable server. Not part of `./install` yet ([`online/README.md`](online/README.md)) |
 | **One switch** | `./a2mod stock` / `refit` flips every layer at once for before/after comparisons |
 | **Headless test bench** | `./a2test` runs the game on a copy of the install on a virtual display at any resolution, and takes screenshots and runs regression scenarios |
 
@@ -47,7 +52,8 @@ checked against, then build and install. Builds live in `A2_DATA`, outside the
 repository.
 
 Every layer works without assets. With nothing built, the asset layers install nothing
-and the game keeps its own art, while the HUD, menus, MSAA and bloom still apply.
+and the game keeps its own art, while the HUD, menus, MSAA, lighting, quality of life,
+grid, planets and bloom still apply.
 [`textures/PACKS.md`](textures/PACKS.md) is the short path to building your own
 texture pack.
 
@@ -105,8 +111,10 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 **Building.** The plugins are 32-bit Windows DLLs, built with `clang` + `lld-link` +
 `llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`.
 **Prebuilt**, the zip on each
-[release](https://github.com/cedrichaase/armada2-refit/releases) has all four with their
-`.ini` files, `dxvk.conf` and the bloom config. It also has installers that do this
+[release](https://github.com/cedrichaase/armada2-refit/releases) has `HUD.asi`,
+`Menus.asi`, `MSAA.asi`, `QOL.asi`, `Lighting.asi` and the Bink proxy with their `.ini`
+files, `dxvk.conf` and the bloom config (`GridLayout.asi` and `Planets.asi` are built from
+the repository). It also has installers that do this
 section for you: `install.sh` on Linux, `install.bat` on Windows (`README.txt` in the
 zip). `publish/package.sh` builds the same zip locally.
 
@@ -123,9 +131,10 @@ loads and nothing reports an error. On Windows no override is needed.
 | Layer | Copy | Notes |
 |---|---|---|
 | HUD | `hud/build/HUD.asi`, `hud/HUD.ini` | Don't also run `hud/ui-widescreen.py`, `ui-font-condense.py` or `cursor-aspect.py`; they are its file-based predecessors. Handles both cursor paths: D3D8's hardware cursor and the sprite path DXVK takes |
-| Quality of life | `qol/build/QOL.asi`, `qol/QOL.ini` | Right-drag pan speed (`PanSpeed=`, default 2.5x). Leave `RTS_CFG.h` stock: network games compare it, and the plugin scales the value in memory ([`qol/README.md`](qol/README.md)) |
+| Quality of life | `qol/build/QOL.asi`, `qol/QOL.ini` | Right-drag pan speed (`PanSpeed=`, default 2.5x), `Shift+number` adds to a group (`ShiftAddsToGroup=`), selections beyond 16 (`MaxSelection=`, default 40), stations in control groups (`StationGroups=`). Leave `RTS_CFG.h` stock: network games compare it, and the plugin scales the value in memory ([`qol/README.md`](qol/README.md)) |
 | Grid hotkeys | `grid/build/GridLayout.asi`, `grid/GridLayout.ini` | The button bar as a 5x3 grid, one key per cell by position (`QWERT`/`ASDFG`/`ZXCVB`; T cancel, G back). Replaces the bar's stock keys; delete the `.asi` to get them back ([`grid/README.md`](grid/README.md)) |
-| Lighting | `lighting/build/Lighting.asi`, `lighting/Lighting.ini` | Ships and stations lit on the GPU, a warm key and a dim blue fill light in place of each map's own, and planets with a night side (`Lights=`, `GPU=`, `Planets=`). Needs *Hardware Vertex Processing* on, the default. Lit per pixel in shaders, with specular, a rim and the hulls' night lights, when the `d3d8.dll` is crosire's d3d8to9 (below); per vertex otherwise ([`lighting/README.md`](lighting/README.md)) |
+| Planets | `models/build/Planets.asi`, `models/Planets.ini` | Planets tessellated for a modern resolution (`Detail=`, default 8; 1 is stock). The moon and selection-bubble SODs are file edits from your own stock files: `models/install.sh` does those |
+| Lighting | `lighting/build/Lighting.asi`, `lighting/Lighting.ini` | Ships and stations lit on the GPU, a warm key, a dim blue fill and a faint sky light in place of each map's own, planets with a night side, and light from nebulae, planets, explosions and torpedoes (`Lights=`, `GPU=`, `Planets=`, `PointLights=`). Needs *Hardware Vertex Processing* on, the default. Lit per pixel in shaders, with specular, a rim and the hulls' night lights, when the `d3d8.dll` is crosire's d3d8to9 (below); per vertex otherwise ([`lighting/README.md`](lighting/README.md)) |
 | Menus | `menus/build/Menus.asi`, `menus/Menus.ini` | GDI only, so the renderer doesn't matter. Delete any old `MenuScale.asi`. Without backdrop plates it draws black sides |
 | Cutscenes (launch reels) | `cutscenes/binkproxy/build/binkw32.dll`, `BinkProxy.ini` | First rename the stock `binkw32.dll` to `binkw32_orig.dll`, because the proxy forwards to it. With no `.mp4` beside a `.bik` it only scales the launch reels to full screen. Replacement movies are AV1 through Media Foundation: under Proton that works (GStreamer + dav1d), and on Windows it presumably needs the AV1 Video Extension |
 
@@ -165,12 +174,12 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 | [`hud/`](hud/README.md) | hud | `HUD.asi`: the in-game HUD layout, font and cursors undistorted at any aspect, at run time |
 | [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops ([`BACKDROPS.md`](menus/BACKDROPS.md) builds them) |
 | [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
-| [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (so far the right-drag pan speed), and the plan for hotkeys, control groups and production queues |
+| [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (right-drag pan speed, `Shift+number` adds to a group, selections and groups beyond 16, stations in groups with one build menu), and the plan for the rest |
 | [`grid/`](grid/README.md) | grid | `GridLayout.asi`: the button bar as a fixed 5x3 grid with one key per cell, by keyboard position, labelled on the buttons |
-| [`lighting/`](lighting/README.md) | lighting | `Lighting.asi`: ships and stations on the engine's own GPU path, two scene lights in place of each map's own, and planets with a night side |
-| [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias) and vkBasalt bloom |
+| [`lighting/`](lighting/README.md) | lighting | `Lighting.asi`: ships and stations on the engine's own GPU path, three scene lights in place of each map's own, planets with a night side, light from nebulae, planets, explosions and torpedoes, and per-pixel shaders for hulls and planets under d3d8to9 |
+| [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias, seamless cube maps) and vkBasalt bloom, on from launch |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
-| [`models/`](models/CHANGELOG.md) | models | the loading-screen model, widened with its `LOADING` art |
+| [`models/`](models/README.md) | models | `Planets.asi` (planet tessellation), the smoothed dilithium moons, the round selection bubble, and the loading-screen model, widened with its `LOADING` art |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | `binkproxy`, a `binkw32.dll` that plays launch reels full screen and AV1 replacements in place of `.bik` movies, and the movie pipeline |
 
 `a2mod` does not switch these, because the layers above depend on them or they install
@@ -192,7 +201,7 @@ nothing:
     ./a2env.sh                              print where the game, prefix, Proton and assets are
 
 Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
-`menus/`, `msaa/`, `qol/`, `grid/`, `lighting/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
+`menus/`, `msaa/`, `qol/`, `grid/`, `models/`, `lighting/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
 a `--revert` flag on the Python tools. The layer's README has the details.
 
 ## Versions
