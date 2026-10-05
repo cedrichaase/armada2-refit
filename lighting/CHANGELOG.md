@@ -17,7 +17,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   the Key and `PlanetSun` for the Key.
 - Shipped `Lighting.ini`: `PlanetAmbient=0.018 0.018 0.027` (was 0.02 0.02 0.03). `Lighting.log` reads `call sites patched 12`.
 
-Seen on the bench 2026-10-05 (`SCENE=planet`). Installed, not yet seen in game.
+Seen on the bench 2026-10-05 (`SCENE=planet`). Confirmed in game 2026-10-05.
 
 ## 1.8.0 — 2026-10-05
 

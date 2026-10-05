@@ -14,7 +14,7 @@ Layers: lighting 1.9.0.
   shells in shaders under d3d8to9, lit per pixel, with a terminator, the atmosphere at
   the limb, water glint and city lights at night. Phase 3 of `platform/D3D9.md`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 9.13.1 — 2026-10-05
 
