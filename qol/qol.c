@@ -1,8 +1,10 @@
 /*
  * QOL.asi -- gameplay quality of life for Star Trek: Armada II.  See qol/README.md.
  *
- * Two changes: the right-drag pan speed, scaled by PanSpeed= in QOL.ini, and
- * Shift+number adding the selection to a control group (ShiftAddsToGroup=).
+ * The right-drag pan speed, scaled by PanSpeed= in QOL.ini; Shift+number adding
+ * the selection to a control group (ShiftAddsToGroup=); selections and groups
+ * beyond 16 (MaxSelection=); and stations in control groups, with one build
+ * menu for several (StationGroups=).
  *
  * WHY NOT JUST EDIT RTS_CFG.h
  * ---------------------------
@@ -74,6 +76,33 @@
  * NetOrderObjects, which carry a 32-bit count and that many handles, and the
  * receiving GameObject::DeQueueCommand walks however many arrive: a stock
  * player receives an order for 40 ships like any other.
+ *
+ * STATIONS IN CONTROL GROUPS (QOL-5), AND THEIR BUILD MENU (QOL-6)
+ * ------------------------------------------------------------------
+ * cOverViewImp keeps two sets of ten groups: ships at +0x14c and stations at
+ * +0x1c4 (a CraftClass with its station flag at +0x20d), and recall takes the
+ * ships' group N, or the stations' when that is empty.  Stock never let two
+ * stations be selected at once: Select deselects a lone station before taking
+ * anything else, and refuses anything but this player's ships once something is
+ * selected.  So a station group recalled as its last member, Ctrl+N never
+ * emptied the stations' group N (a stale member and label), and the double tap
+ * (mFocusCameraOnShipGroup) looked at the ships' group only.  StationGroups=1:
+ *   - Select (0x51f67b) takes another station of the same GameObjectClass as
+ *     the selected ones; anything else selected over several stations starts a
+ *     new selection, as stock does over one;
+ *   - mBindGroup (entry): Ctrl+N empties both sets' group N first; Shift+N
+ *     refuses ships into a station group, stations into a ship group, and a
+ *     second class of station;
+ *   - mFocusCameraOnShipGroup (0x520fcf) falls back to the stations' group
+ *     as recall does;
+ *   - the button bar's build button (mUpdateButtonsAndPosition, 0x4fc72c),
+ *     enabled for one producer, is enabled for several stations of one kind;
+ *     a build order (CheckCanExecute(ModeInfo), 0x4fc486), which stock queues
+ *     at every selected producer, goes to one of them: the shortest queue,
+ *     ties in turn; a cancel (command 0x13, CheckCanExecute(CommandInfoClass),
+ *     0x4fc0a6) to the longest queue, which also decides the cancel button
+ *     (0x4fbf83).  Each is the ordinary single-station order a stock player
+ *     receives.
  *
  * Patched in memory only; the exe and RTS_CFG.h are not touched.  Each site's
  * bytes are checked against this build first, so a different Armada2.exe
@@ -393,6 +422,416 @@ static int patch_groups(void)
     return 1;
 }
 
+/* ---- stations in control groups --------------------------------------- */
+
+/* Engine functions, objects and fields used below (Armada2.exe, patch 1.1). */
+typedef BYTE *(__cdecl    *EntityGetFn)(int id);
+typedef int   (__cdecl    *UserTeamFn)(void);
+typedef BYTE *(__cdecl    *DynCastFn)(void *p, LONG off, void *from, void *to, int ref);
+typedef void  (__thiscall *SetSelectedFn)(BYTE *obj, int on);
+typedef void  (__thiscall *RemoveShipFn)(BYTE *group, int index);
+#define ENTITY_GET     ((EntityGetFn)0x4cfff0)     /* Entity::Get */
+#define USER_TEAM      ((UserTeamFn)0x4d0060)      /* Entity::GetUserTeam */
+#define DYN_CAST       ((DynCastFn)0x6731a0)       /* __RTDynamicCast */
+#define SET_SELECTED   ((SetSelectedFn)0x4d3c00)   /* GameObject::SetSelected */
+#define REMOVE_SHIP    ((RemoveShipFn)0x527d20)    /* cGroup::RemoveShip(index): also clears the label */
+#define RTTI_GOCLASS   ((void *)0x6eee98)          /* GameObjectClass */
+#define RTTI_CRAFTCLS  ((void *)0x6eee08)          /* CraftClass */
+#define OV_COUNT       0xb8      /* cOverViewImp: how many are selected */
+#define OV_SHIPGRP     0x14c     /* ten cGroup of 12 bytes: list_array *, -, label */
+#define OV_STNGRP      0x1c4     /* the stations' ten */
+#define GO_FLAGS       0x14      /* byte; 4: a GameObject */
+#define GO_CLASS       0x40      /* GameObjectClass *, one per ODF */
+#define GO_DYING       0x113     /* byte; group recall skips it */
+#define GO_TEAM        0xec
+#define GO_ID          0x28      /* the entity id the selection and groups hold */
+#define CC_STATION     0x20d     /* CraftClass: a station */
+
+static void jmp_to(BYTE *code, DWORD at, int len, void (*stub)(void));
+
+static BYTE *ov_sel0(BYTE *ov)
+{
+    /* the first selected id; QOL-3 may have moved the array, GetSelectList knows where */
+    typedef const int *(__thiscall *ListFn)(BYTE *);
+    const int *ids = ((ListFn)(*(BYTE ***)ov)[0x98 / 4])(ov);
+    return ENTITY_GET(ids[0]);
+}
+
+static int is_obj(BYTE *o) { return o && (o[GO_FLAGS] & 4); }
+
+/* Which of the two sets of groups mBindGroup files `o` under: the stations'
+ * when its class is not a CraftClass or says it is a station. */
+static int files_as_station(BYTE *o)
+{
+    BYTE *cc = DYN_CAST(*(void **)(o + GO_CLASS), 0, RTTI_GOCLASS, RTTI_CRAFTCLS, 0);
+    return !cc || cc[CC_STATION];
+}
+
+/* One of this player's own stations: a CraftClass that says so. */
+static int my_station(BYTE *o)
+{
+    BYTE *cc;
+    if (!is_obj(o) || *(int *)(o + GO_TEAM) != USER_TEAM()) return 0;
+    cc = DYN_CAST(*(void **)(o + GO_CLASS), 0, RTTI_GOCLASS, RTTI_CRAFTCLS, 0);
+    return cc && cc[CC_STATION];
+}
+
+static int *grp_list(BYTE *grp) { return *(int **)grp; }   /* [0] count, [6] the ids */
+
+/* Live members of a group, and the class of the first; dead ids are dropped
+ * from a group only when it is rebound or emptied. */
+static int grp_live(BYTE *grp, void **cls)
+{
+    int *la = grp_list(grp), i, n = 0;
+    *cls = NULLPTR;
+    if (!la) return 0;
+    for (i = 0; i < la[0]; i++) {
+        BYTE *o = ENTITY_GET(((int *)la[6])[i]);
+        if (!is_obj(o) || o[GO_DYING]) continue;
+        if (!n++) *cls = *(void **)(o + GO_CLASS);
+    }
+    return n;
+}
+
+static void grp_clear(BYTE *grp)
+{
+    int *la = grp_list(grp);
+    while (la && la[0] > 0) REMOVE_SHIP(grp, la[0] - 1);
+}
+
+/* cOverViewImp::Select, before its "a station is selected alone" rules, for
+ * a select (type 0) or deselect (1) of `obj`.  1: take `obj` as stock takes a
+ * second ship (skip to the select/deselect itself); 0: go on as stock does. */
+int __cdecl sel_pre(BYTE *ov, BYTE *obj, int type)
+{
+    BYTE *cur;
+    int   n = *(int *)(ov + OV_COUNT), i;
+    typedef const int *(__thiscall *ListFn)(BYTE *);
+
+    if (n <= 0) return 0;
+    cur = ov_sel0(ov);
+    if (!my_station(cur)) return 0;           /* ships, or someone else's: stock */
+    if (my_station(obj) && *(void **)(obj + GO_CLASS) == *(void **)(cur + GO_CLASS))
+        return 1;                             /* another of the same kind */
+    if (type == 0 && n > 1) {
+        /* stations of one kind are selected and something else is clicked: a new
+         * selection, as stock makes when one station is selected */
+        const int *ids = ((ListFn)(*(BYTE ***)ov)[0x98 / 4])(ov);
+        for (i = 0; i < n; i++) {
+            BYTE *o = ENTITY_GET(ids[i]);
+            if (is_obj(o)) SET_SELECTED(o, 0);
+        }
+        *(int *)(ov + OV_COUNT) = 0;
+    }
+    return 0;
+}
+
+/* cOverViewImp::mBindGroup(N, replace), before it runs.  0 refuses the bind. */
+int __cdecl bind_pre(BYTE *ov, int g, int replace)
+{
+    BYTE *cur, *ship, *stn;
+    void *cls;
+    int   station;
+
+    if (g < 0 || g > 9 || *(int *)(ov + OV_COUNT) <= 0) return 1;
+    cur = ov_sel0(ov);
+    if (!is_obj(cur) || *(int *)(cur + GO_TEAM) != USER_TEAM()) return 1;   /* stock binds nothing */
+    ship = ov + OV_SHIPGRP + 12 * g;
+    stn  = ov + OV_STNGRP + 12 * g;
+    station = files_as_station(cur);
+
+    if (replace) {
+        /* the group becomes the selection: both sets' group N empty first,
+         * labels cleared.  Stock emptied only the ships' one, and never for stations */
+        grp_clear(ship);
+        grp_clear(stn);
+        return 1;
+    }
+    /* add: one kind to a group, and stations of one class */
+    if (station) {
+        if (grp_live(ship, &cls)) return 0;
+        grp_clear(ship);
+        if (grp_live(stn, &cls) && cls != *(void **)(cur + GO_CLASS)) return 0;
+    } else {
+        if (grp_live(stn, &cls)) return 0;
+        grp_clear(stn);
+    }
+    return 1;
+}
+
+/* Replaces `cmp [ebx+0xb8],edi; jne 0x51f717` (12 bytes at 0x51f67b) in
+ * Select: ebx = cOverViewImp, esi = the object, [ebp+0xc] = the type, edi = 1.
+ * Every place it goes on to reloads eax first. */
+__attribute__((naked)) void sel_stub(void)
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl 0xc(%ebp)\n\t"
+        "pushl %esi\n\t"
+        "pushl %ebx\n\t"
+        "call _sel_pre\n\t"
+        "addl $12, %esp\n\t"
+        "movl %eax, 28(%esp)\n\t"
+        "popal\n\t"
+        "testl %eax, %eax\n\t"
+        "jnz 1f\n\t"
+        "cmpl %edi, 0xb8(%ebx)\n\t"
+        "jne 2f\n\t"
+        "pushl $0x51f687\n\t"
+        "ret\n"
+        "1:\n\t"
+        "pushl $0x51f78a\n\t"
+        "ret\n"
+        "2:\n\t"
+        "pushl $0x51f717\n\t"
+        "ret\n\t");
+}
+
+/* mBindGroup's first six bytes (push ebp; mov ebp,esp; sub esp,0x10): ecx =
+ * cOverViewImp, [esp+4] = N, [esp+8] = replace (a bool, low byte). */
+__attribute__((naked)) void bind_stub(void)
+{
+    __asm__ __volatile__(
+        "pushl %ecx\n\t"
+        "movzbl 12(%esp), %eax\n\t"
+        "pushl %eax\n\t"
+        "pushl 12(%esp)\n\t"
+        "pushl %ecx\n\t"
+        "call _bind_pre\n\t"
+        "addl $12, %esp\n\t"
+        "popl %ecx\n\t"
+        "testl %eax, %eax\n\t"
+        "jz 1f\n\t"
+        "pushl %ebp\n\t"
+        "movl %esp, %ebp\n\t"
+        "subl $0x10, %esp\n\t"
+        "pushl $0x520c46\n\t"
+        "ret\n"
+        "1:\n\t"
+        "ret $8\n\t");
+}
+
+/* mFocusCameraOnShipGroup's `lea ebx,[ecx+eax*4+0x14c]` (7 bytes at 0x520fcf),
+ * eax = 3N: the ships' group N, or the stations' when that is empty -- the
+ * choice group recall makes. */
+__attribute__((naked)) void focus_stub(void)
+{
+    __asm__ __volatile__(
+        "leal 0x14c(%ecx,%eax,4), %ebx\n\t"
+        "movl (%ebx), %edx\n\t"
+        "cmpl $0, (%edx)\n\t"
+        "jne 1f\n\t"
+        "addl $0x78, %ebx\n"
+        "1:\n\t"
+        "pushl $0x520fd6\n\t"
+        "ret\n\t");
+}
+
+/* ---- the build menu for several stations (QOL-6) ---- */
+
+typedef void  (__thiscall *QueueCmdFn)(BYTE *obj, int cmd, void *cls);
+typedef int   (__thiscall *QueueSizeFn)(BYTE *producer);
+#define QUEUE_COMMAND  ((QueueCmdFn)0x4d4280)     /* GameObject::QueueCommand(AiCommand, const GameObjectClass *) */
+#define QUEUE_SIZE     ((QueueSizeFn)0x4b7b70)    /* Producer::BuildQueueSize, the one in progress included */
+#define CMD_BUILD      0x19
+
+/* Stations of this player's, all of one class: what Select lets be selected
+ * together, and what the build menu then serves as one. */
+static int one_kind(BYTE **o, int n)
+{
+    int i;
+    if (n < 2 || !my_station(o[0])) return 0;
+    for (i = 1; i < n; i++)
+        if (!my_station(o[i]) || *(void **)(o[i] + GO_CLASS) != *(void **)(o[0] + GO_CLASS))
+            return 0;
+    return 1;
+}
+
+/* mUpdateButtonsAndPosition: the build button (+0xf0) is enabled for one
+ * producer; and for several stations of one kind.  `arr` is the bar's
+ * CraftArray of the selection: [0] the objects, [2] how many. */
+int __cdecl build_enable(int *arr)
+{
+    return arr[2] == 1 || one_kind((BYTE **)arr[0], arr[2]);
+}
+
+static int g_lastBuilt;   /* the id the last spread order went to */
+
+/* PopupPaletteImp::CheckCanExecute(ModeInfo), a build: stock queues it at
+ * every selected producer.  Several stations of one kind get it once, at the
+ * one with the shortest queue; on a tie, the next after the one that got the
+ * last order, in selection order. */
+void __cdecl build_route(BYTE **o, int n, void *cls)
+{
+    int i, best = -1, bestq = 0, after = -1, k;
+
+    if (!one_kind(o, n)) {
+        for (i = 0; i < n; i++) QUEUE_COMMAND(o[i], CMD_BUILD, cls);
+        return;
+    }
+    for (i = 0; i < n; i++)
+        if (*(int *)(o[i] + GO_ID) == g_lastBuilt) after = i;
+    for (k = 1; k <= n; k++) {
+        int q;
+        i = (after + k) % n;
+        q = QUEUE_SIZE(o[i]);
+        if (best < 0 || q < bestq) { best = i; bestq = q; }
+    }
+    g_lastBuilt = *(int *)(o[best] + GO_ID);
+    QUEUE_COMMAND(o[best], CMD_BUILD, cls);
+}
+
+#define CMD_CANCEL     0x13      /* cancel the last build: the command whose button needs a queue */
+#define CI_COMMAND     0x1a0     /* CommandInfoClass: the command it sends */
+
+/* PopupPaletteImp::CheckCanExecute(CommandInfoClass), before it sends the
+ * command to every selected object in `arr` (a CraftArray).  A cancel, with
+ * several stations of one kind selected, goes to the one with the longest
+ * queue only; stock sent it to each. */
+void __cdecl cancel_filter(BYTE *ci, int *arr)
+{
+    BYTE **o = (BYTE **)arr[0];
+    int    i, best = 0, bestq = -1;
+    if (*(int *)(ci + CI_COMMAND) != CMD_CANCEL || !one_kind(o, arr[2])) return;
+    for (i = 0; i < arr[2]; i++) {
+        int q = QUEUE_SIZE(o[i]);
+        if (q > bestq) { best = i; bestq = q; }
+    }
+    o[0] = o[best];
+    arr[2] = 1;
+}
+
+/* The cancel button is enabled when the first selected producer has more in
+ * its queue than the one in progress; with several stations of one kind, the
+ * longest queue among them is what counts, since that is where it goes.
+ * -1: not such a selection, the first one's queue as stock. */
+int __cdecl longest_queue(int *arr)
+{
+    BYTE **o = (BYTE **)arr[0];
+    int    i, best = 0;
+    if (!one_kind(o, arr[2])) return -1;
+    for (i = 0; i < arr[2]; i++) {
+        int q = QUEUE_SIZE(o[i]);
+        if (q > best) best = q;
+    }
+    return best;
+}
+
+/* Called in place of Producer::BuildQueueSize at 0x4fbf83, in the
+ * CheckCanExecute that owns the CraftArray at [ebp-0x28]; ecx = the first. */
+__attribute__((naked)) void qsize_stub(void)
+{
+    __asm__ __volatile__(
+        "pushl %ecx\n\t"
+        "leal -0x28(%ebp), %eax\n\t"
+        "pushl %eax\n\t"
+        "call _longest_queue\n\t"
+        "addl $4, %esp\n\t"
+        "popl %ecx\n\t"
+        "cmpl $-1, %eax\n\t"
+        "jne 1f\n\t"
+        "movl $0x4b7b70, %eax\n\t"
+        "jmp *%eax\n"
+        "1:\n\t"
+        "ret\n\t");
+}
+
+/* Replaces the command loop's head `mov eax,[ebp-0x20]; test eax,eax;
+ * mov dword [ebp-0x14],0; jle 0x4fc1d4` (18 bytes at 0x4fc0a6): esi = the
+ * CommandInfoClass, [ebp-0x28] the CraftArray, a local the function frees. */
+__attribute__((naked)) void cancel_stub(void)
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "leal -0x28(%ebp), %eax\n\t"
+        "pushl %eax\n\t"
+        "pushl %esi\n\t"
+        "call _cancel_filter\n\t"
+        "addl $8, %esp\n\t"
+        "popal\n\t"
+        "movl -0x20(%ebp), %eax\n\t"
+        "movl $0, -0x14(%ebp)\n\t"
+        "testl %eax, %eax\n\t"
+        "jle 1f\n\t"
+        "pushl $0x4fc0b8\n\t"
+        "ret\n"
+        "1:\n\t"
+        "pushl $0x4fc1d4\n\t"
+        "ret\n\t");
+}
+
+/* Replaces `mov ecx,[edi+0x44]; xor edx,edx; cmp eax,1; mov eax,[edi+0xf0];
+ * sete dl` (17 bytes at 0x4fc72c): ebx = the CraftArray, edi = the bar. */
+__attribute__((naked)) void enable_stub(void)
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl %ebx\n\t"
+        "call _build_enable\n\t"
+        "addl $4, %esp\n\t"
+        "movl %eax, 20(%esp)\n\t"
+        "popal\n\t"
+        "movl 0x44(%edi), %ecx\n\t"
+        "movl 0xf0(%edi), %eax\n\t"
+        "pushl $0x4fc73d\n\t"
+        "ret\n\t");
+}
+
+/* Replaces the loop's head `mov eax,[ebp-0x18]; xor esi,esi; test eax,eax;
+ * jle` (9 bytes at 0x4fc486), and with it the loop: [ebp-0x20] the objects,
+ * [ebp-0x18] how many, edi = the ModeInfo, whose +0xc is the class to build. */
+__attribute__((naked)) void route_stub(void)
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl 0xc(%edi)\n\t"
+        "pushl -0x18(%ebp)\n\t"
+        "pushl -0x20(%ebp)\n\t"
+        "call _build_route\n\t"
+        "addl $12, %esp\n\t"
+        "popal\n\t"
+        "pushl $0x4fc504\n\t"
+        "ret\n\t");
+}
+
+static const Site k_stn_enable = { 0x4fc72c, 17, 0, { 0x8B, 0x4F, 0x44, 0x33, 0xD2, 0x83, 0xF8, 0x01,
+                                                      0x8B, 0x87, 0xF0, 0x00, 0x00, 0x00, 0x0F, 0x94, 0xC2 } };
+static const Site k_stn_route  = { 0x4fc486, 9, 0, { 0x8B, 0x45, 0xE8, 0x33, 0xF6, 0x85, 0xC0, 0x7E, 0x75 } };
+static const Site k_stn_cancel = { 0x4fc0a6, 18, 0, { 0x8B, 0x45, 0xE0, 0x85, 0xC0, 0xC7, 0x45, 0xEC, 0x00,
+                                                      0x00, 0x00, 0x00, 0x0F, 0x8E, 0x1C, 0x01, 0x00, 0x00 } };
+/* test ah,2; je +0x13; call Producer::BuildQueueSize -- the call (at 5) is redirected */
+static const Site k_stn_qsize  = { 0x4fbf7e, 10, 5, { 0xF6, 0xC4, 0x02, 0x74, 0x13, 0xE8, 0xE8, 0xBB, 0xFB, 0xFF } };
+
+static const Site k_stn_sel   ={ 0x51f67b, 12, 0, { 0x39, 0xBB, 0xB8, 0x00, 0x00, 0x00,
+                                                     0x0F, 0x85, 0x90, 0x00, 0x00, 0x00 } };
+static const Site k_stn_bind  = { 0x520c40, 6, 0, { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10 } };
+static const Site k_stn_focus = { 0x520fcf, 7, 0, { 0x8D, 0x9C, 0x81, 0x4C, 0x01, 0x00, 0x00 } };
+
+/* All seven are checked before any is written. */
+static int patch_stations(void)
+{
+    BYTE c[18];
+    if (!site_ok(&k_stn_sel) || !site_ok(&k_stn_bind) || !site_ok(&k_stn_focus) ||
+        !site_ok(&k_stn_enable) || !site_ok(&k_stn_route) || !site_ok(&k_stn_cancel) ||
+        !site_ok(&k_stn_qsize)) return 0;
+    c[0] = 0xE8;                                            /* call qsize_stub */
+    *(LONG *)(c + 1) = (LONG)((DWORD)qsize_stub - (k_stn_qsize.at + k_stn_qsize.patch + 5));
+    poke((BYTE *)k_stn_qsize.at + k_stn_qsize.patch, c, 5);
+    jmp_to(c, k_stn_cancel.at, 18, cancel_stub);
+    poke((BYTE *)k_stn_cancel.at, c, 18);
+    jmp_to(c, k_stn_enable.at, 17, enable_stub);
+    poke((BYTE *)k_stn_enable.at, c, 17);
+    jmp_to(c, k_stn_route.at, 9, route_stub);
+    poke((BYTE *)k_stn_route.at, c, 9);
+    jmp_to(c, k_stn_sel.at, 12, sel_stub);
+    poke((BYTE *)k_stn_sel.at, c, 12);
+    jmp_to(c, k_stn_bind.at, 6, bind_stub);
+    poke((BYTE *)k_stn_bind.at, c, 6);
+    jmp_to(c, k_stn_focus.at, 7, focus_stub);
+    poke((BYTE *)k_stn_focus.at, c, 7);
+    return 1;
+}
+
 /* ---- bigger selections and groups ------------------------------------- */
 
 /* The button bar's special weapons.  For each special weapon of the selection,
@@ -561,6 +1000,17 @@ static void startup(void)
                                 : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
     } else {
         s_cat(b, "0  (number keys left alone)");
+    }
+    logline(b);
+
+    b[0] = 0;
+    s_cat(b, "--- QOL StationGroups=");
+    if (GetPrivateProfileIntA("QOL", "StationGroups", 1, ini)) {
+        s_cat(b, "1");
+        s_cat(b, patch_stations() ? "  -> stations of one kind select and group together, patched"
+                                  : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+    } else {
+        s_cat(b, "0  (stations select and group as in stock)");
     }
     logline(b);
 

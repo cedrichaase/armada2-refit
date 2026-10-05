@@ -13,6 +13,10 @@ file describes. A free camera and other commands then change the scene while it 
     ./a2test drive shot underside
     ./a2test session stop
 
+A scenario puts the plugin in with `Setup: testbench/scene/bench-setup.sh <name>` and
+drives it with `Scene "CMD"` and `Expect scene "CMD" answers "TEXT"` steps
+(`scenarios/README.md`).
+
 `SCENE=<name>` picks `scenes/<name>.ini`, `SCENE_INI=<file>` any file, and with neither
 set `Scene.ini` is used (one Galaxy class). `install` refuses any game directory that is
 not an a2test clone: this is a test tool and never goes into the player's install. The
@@ -25,6 +29,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `planet` | a Galaxy class beside a class M planet (`pb_clssm`) | 2026-10-04 |
 | `nebula` | a Galaxy class at the edge of the Mutara nebula (`mnebula8`) | 2026-10-04 |
 | `firing` | a Galaxy class firing at a Borg cube (`bbattle1`) without moving, for as long as the session runs: its engines are off; the cube cannot die, is healed every tick and has its weapons off | 2026-10-04, still firing after a minute |
+| `stations` | the player's own: three shipyards (`yard1..3`), an advanced shipyard (`adv`), a research station (`lab`) and two ships, with the HUD on, for the control-group keys and the build menu (`scenarios/qol-station-groups.md`) | 2026-10-05 |
 
 ## Scene files
 
@@ -84,7 +89,9 @@ answer and fails if a command did.
 | `center <name>` | centre the RTS camera on an object |
 | `pause`, `resume` | the game's own pause (`PauseSimulation`) |
 | `hud`, `grid`, `cursor`, `notices` `on\|off` | as the keys above |
-| `query` | every object's handle and position, and the camera's eye, front and up |
+| `query` | every object's handle and position (and a producer's build queue), and the camera's eye, front and up |
+| `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`); answers as `selection` |
+| `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
 
 **Moving the camera while paused runs the simulation for 3 ticks, then pauses again.**
 While the simulation is paused, a moved camera draws the skybox from the new eye and

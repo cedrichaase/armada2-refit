@@ -129,6 +129,18 @@ int _fltused = 0;   /* floats without the CRT */
 #define IFACE_MODE       0x78u
 #define GRID_RECORDS     0x768e18u   /* GridRenderState, 3 ints per view */
 #define OBJECT_HANDLE    0x28u
+#define ENTITY_GET       0x4cfff0u   /* Entity::Get(handle), cdecl */
+#define OVERVIEW         ((void *)0x768e40u)   /* the one cOverViewImp */
+#define OV_SELECT        0x90u       /* vtable: Select(obj, type, clear first, ...) */
+#define OV_SELECT_NUM    0x94u       /* vtable: GetSelectNum() */
+#define OV_SELECT_LIST   0x98u       /* vtable: GetSelectList(), the ids */
+#define OV_SHIP_GROUPS   0x14cu      /* ten cGroup, 12 bytes each: list_array *, -, label */
+#define OV_STATION_GROUPS 0x1c4u     /* the stations' ten */
+#define OBJECT_CLASS     0x40u       /* GameObjectClass *, one per ODF */
+#define OBJECT_GROUP     0x120u      /* the group number drawn beside it, -1 for none */
+#define OBJECT_FLAGS     0x14u
+#define FLAG_PRODUCER    0x200u      /* a Producer: it has a build queue */
+#define QUEUE_SIZE       0x4b7b70u   /* Producer::BuildQueueSize, the one in progress included */
 #define CURSOR_DRAW_CALL 0x6246fau   /* RefreshDisplay: call ST3D_Sprite::DrawScaled2D */
 #define EVENT_TRIGGER_0  0x479880u   /* GameEvent::TriggerEvent() */
 #define EVENT_TRIGGER_3  0x4799a0u   /* GameEvent::TriggerEvent(const Vector3 &, int, const Race *) */
@@ -176,6 +188,11 @@ typedef void   (__thiscall *SiAttackFn)(void *si, int h, int target, int unused)
 typedef const float *(__thiscall *SiLocationFn)(void *si, int h);
 typedef void   (__thiscall *SiSetHealthFn)(void *si, int h, float v);
 typedef float  (__thiscall *SiMaxHealthFn)(void *si, int h);
+typedef void  *(__cdecl    *EntityGetFn)(int h);
+typedef void   (__thiscall *OvSelectFn)(void *ov, void *obj, int type, int clear, int sound);
+typedef int    (__thiscall *OvIntFn)(void *ov);
+typedef const int *(__thiscall *OvListFn)(void *ov);
+typedef int    (__thiscall *QueueSizeFn)(void *producer);
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -654,6 +671,13 @@ static void query(void)
         cat_vec(b, obj_pos(&g_obj[i]));
         if (g_obj[i].attack[0]) { s_cat(b, " attacking "); s_cat(b, g_obj[i].attack); }
         if (g_obj[i].heal) s_cat(b, " healed");
+        {
+            BYTE *o = (BYTE *)((EntityGetFn)ENTITY_GET)(g_obj[i].handle);
+            if (o && (*(DWORD *)(o + OBJECT_FLAGS) & FLAG_PRODUCER)) {
+                s_cat(b, " queue ");
+                s_num(b, ((QueueSizeFn)QUEUE_SIZE)(o));
+            }
+        }
         logline(b);
     }
     {
@@ -669,6 +693,83 @@ static void query(void)
         logline(b);
     }
     log_vec("  rts interest", (const float *)(TACTICAL_CAMERA + CAMERA_INTEREST));
+}
+
+/* An object's scene name, or its handle in hex. */
+static void cat_handle(char *b, int h)
+{
+    int i;
+    for (i = 0; i < g_nobj; i++)
+        if (g_obj[i].handle == h) { s_cat(b, g_obj[i].name); return; }
+    s_hex(b, (DWORD)h);
+}
+
+static void *ov_method(DWORD slot)
+{
+    return *(void **)(*(BYTE **)OVERVIEW + slot);
+}
+
+/* What is selected, each one's group label and class, and every control group
+ * that is not empty: what a test of the group keys reads back. */
+static void selection(void)
+{
+    char b[400];
+    int  n = ((OvIntFn)ov_method(OV_SELECT_NUM))(OVERVIEW);
+    const int *ids = ((OvListFn)ov_method(OV_SELECT_LIST))(OVERVIEW);
+    int  i, g, k;
+
+    b[0] = 0;
+    s_cat(b, "  selected ");
+    s_num(b, n);
+    s_cat(b, ":");
+    for (i = 0; i < n && s_len(b) < 340; i++) {
+        BYTE *o = (BYTE *)((EntityGetFn)ENTITY_GET)(ids[i]);
+        s_cat(b, " ");
+        cat_handle(b, ids[i]);
+        if (o) {
+            s_cat(b, "[g");
+            s_num(b, *(int *)(o + OBJECT_GROUP));
+            if (*(DWORD *)(o + OBJECT_FLAGS) & FLAG_PRODUCER) {
+                s_cat(b, " q");
+                s_num(b, ((QueueSizeFn)QUEUE_SIZE)(o));
+            }
+            s_cat(b, " c");
+            s_hex(b, *(DWORD *)(o + OBJECT_CLASS));
+            s_cat(b, "]");
+        }
+    }
+    logline(b);
+    for (k = 0; k < 2; k++)
+        for (g = 0; g < 10; g++) {
+            BYTE *grp = (BYTE *)OVERVIEW + (k ? OV_STATION_GROUPS : OV_SHIP_GROUPS) + 12 * g;
+            int  *la = *(int **)grp;
+            if (!la || la[0] <= 0) continue;
+            b[0] = 0;
+            s_cat(b, k ? "  station group " : "  ship group ");
+            s_num(b, g);
+            s_cat(b, " (");
+            s_num(b, la[0]);
+            s_cat(b, "):");
+            for (i = 0; i < la[0] && s_len(b) < 340; i++) {
+                s_cat(b, " ");
+                cat_handle(b, ((int *)la[6])[i]);
+            }
+            logline(b);
+        }
+}
+
+/* select <name> [<name> ...]: as clicking the first and Shift-clicking the
+ * rest, through cOverViewImp::Select, which every click goes through. */
+static void select_objs(char **t, int n)
+{
+    int i;
+    for (i = 0; i < n; i++) {
+        Obj  *o = find_obj(t[i]);
+        void *go = o ? ((EntityGetFn)ENTITY_GET)(o->handle) : NULLPTR;
+        if (!go) { logline("  ! no such object"); return; }
+        ((OvSelectFn)ov_method(OV_SELECT))(OVERVIEW, go, 0, i == 0, 1);
+    }
+    selection();
 }
 
 static int on_arg(const char *s) { return s_eq(s, "on") || s_eq(s, "1"); }
@@ -756,8 +857,11 @@ static void run_command(char *line)
     if (s_eq(t[0], "cursor") && n >= 2) { g_cursor_on = on_arg(t[1]); logline("  ok"); return; }
     if (s_eq(t[0], "notices") && n >= 2) { set_notices(on_arg(t[1])); logline("  ok"); return; }
     if (s_eq(t[0], "query")) { query(); return; }
+    if (s_eq(t[0], "selection")) { selection(); return; }
+    if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, spawn, attack, heal, engines, weapons, "
-            "immortal, center, pause, resume, hud, grid, cursor, notices, query)");
+            "immortal, center, pause, resume, hud, grid, cursor, notices, query, "
+            "select, selection)");
 }
 
 static int g_ready;   /* the scene has been built; commands may run */

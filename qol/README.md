@@ -1,9 +1,11 @@
 # qol — gameplay quality of life
 
 Changes to how Armada II *plays*, as opposed to how it looks: the controls, the camera,
-control groups, production. Three of them are built in `QOL.asi`: the right-drag pan
-speed (QOL-2), selections and control groups of up to 120 (QOL-3), and Shift+number
-adding to a group (QOL-4). The rest are planned here, each with what is wrong today, what
+control groups, production. Five of them are built in `QOL.asi`: the right-drag pan
+speed (QOL-2), selections and control groups of up to 120 (QOL-3), Shift+number
+adding to a group (QOL-4), stations in control groups (QOL-5) and one build menu for
+several stations, each order going to one of them (QOL-6). The rest are planned here,
+each with what is wrong today, what
 we want, what is already known and what still has to be measured. What is installed, at which
 version, and whether it has been seen in game is in [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -48,8 +50,8 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-2](#qol-2-configurable-right-drag-pan-speed) | Configurable right-drag pan speed | `QOL.asi`, `PanSpeed=` | A slider in the options screen | **done** (`QOL.asi`); slider open |
 | [QOL-3](#qol-3-larger-control-groups) | Larger control groups | `QOL.asi`, `MaxSelection=` | A count on the selection panel; a stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | `QOL.asi`, `ShiftAddsToGroup=` | — | **done** (`QOL.asi`), bench |
-| [QOL-5](#qol-5-buildings-in-control-groups) | Buildings in control groups | code | Check what Ctrl+number does on a building | idea |
-| [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | code | Check what a build order does with several yards selected | idea |
+| [QOL-5](#qol-5-buildings-in-control-groups) | Buildings in control groups | `QOL.asi`, `StationGroups=` | — | **done** (`QOL.asi`), bench |
+| [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | `QOL.asi`, `StationGroups=` | Construction ships | **done** for stations (`QOL.asi`), bench |
 | [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | code, every peer | Measure stock's charge and refund rules | scoped |
 
 ## Things that apply to all of them
@@ -307,27 +309,73 @@ instead. Nothing in `Input.map` uses `Alt` with a number key. With nothing selec
 
 ## QOL-5: Buildings in control groups
 
-*`QOL.asi`, stock-compatible, if a group stays local; measure.*
+*`QOL.asi`, stock-compatible. Built: `StationGroups=` (default 1).*
 
-**Wanted.** `Ctrl+number` stores a building (a shipyard, a research station) like a
-ship, and `number` selects it again, so its build menu is one key away.
+**Wanted.** `Ctrl+number` stores stations (shipyards, research stations) like ships,
+`number` selects them again, so their build menu is one key away, and a second
+`number` centres the camera on them, as it does for ships. One kind of station to a
+group is enough (decided 2026-10-05).
 
-**Today.** Not checked: does the game refuse to group buildings, or drop them on
-recall? Stations do have a selection and a build menu, so the HUD side exists.
+**Stock (seen in game, 2026-10-05).** One station can be stored, and `Shift+number`
+adds a second; but recalling the group selects only the one added last. Binding a ship
+to a group that held a station leaves the station's group number drawn beside it. A
+second press of the number does not move the camera to a station group.
 
-**Approach.** Allow buildings into a stored group. Decide what happens with a mixed
-group (ships and buildings): recall selects all of them, but a move order should only
-reach the ships. Recall should not move the camera to a building unless the key is
-double-tapped, if the game does that for ships.
+**Why.** `cOverViewImp` keeps two sets of ten groups (`cGroup`, 12 bytes: the list, and
+the group number at +8 that is copied to the object's label, `GameObject` +0x120):
+ships at +0x14c and stations at +0x1c4. Which set an object goes to is its class's:
+`mBindGroup` (0x520c40) casts the object's `GameObjectClass` (+0x40) to `CraftClass`,
+whose byte at +0x20d marks a station. Recall (`mCheckGroupSelect`, 0x521110) takes
+the ships' group N, or the stations' when that is empty, and selects each member
+through `cOverViewImp::Select`. Three things then go wrong:
 
-**Done when.** `Ctrl+4` on a shipyard, pan away, `4`, `B`: the build menu of that
-shipyard is open.
+- **`Select` (0x51f600) never holds two stations.** With one object selected that is
+  not this player's ship, it deselects that object before taking the new one; with
+  anything selected, it refuses anything but this player's ships. Recall therefore ends
+  on the last station it selected.
+- **`mBindGroup`'s replace (`Ctrl+N`) empties only the ships' group N**, and only when
+  the selection is ships: stations always take the add path, so `Ctrl+N` on a station
+  adds to the group, and a ship bound over a station group leaves the station in the
+  stations' group N with its label (`cGroup::RemoveShip` and `RemoveThisShip` are what
+  reset a label to -1).
+- **The double tap (`mFocusCameraOnShipGroup`, 0x520fb0) reads the ships' group only.**
+  It averages the living members' positions and points the camera at the member
+  nearest that mean (camera manager's vtable +0x58), the "centre of the bulk".
+
+**With `QOL.asi`.**
+
+- `Select`, where it tests "one is selected" (0x51f67b): when the selection is this
+  player's stations, another station of the same `GameObjectClass` is taken as stock
+  takes a second ship. Anything else selected over several stations deselects them
+  all first, as stock does over one. Mixing ships and stations stays impossible. This
+  is the one gate, so a click with Shift and the double click (everything of that
+  type on screen) select several stations too: double-clicking a yard selects every
+  such yard in view.
+- `mBindGroup`, at its entry: `Ctrl+N` empties both sets' group N first, labels
+  included, so the group becomes exactly the selection. `Shift+N` (and `Ctrl+Shift+N`)
+  refuses ships into a group that holds stations, stations into one that holds ships,
+  and a second class of station; a group whose members are all gone counts as empty.
+- `mFocusCameraOnShipGroup`, where it picks the group (0x520fcf): the stations' group
+  N when the ships' is empty, the choice recall makes. The double tap and `Alt+N`
+  (QOL-4) centre on the station nearest the group's middle.
+
+Groups are this player's alone and saved as stock saves them (a station group could
+already hold several), so nothing about this reaches other players or the save.
+
+**Seen on the bench (2026-10-05)**, `testbench/scenarios/qol-station-groups.md`, on the
+`stations` scene (three yards, an advanced yard, a research station, two ships):
+three yards select together; an advanced yard or a ship replaces them; `Ctrl+1` on
+three yards, then `1` from a ship, selects all three labelled 1; `Ctrl+1` on a ship
+empties the yards' group and clears their labels; `Shift+2` refuses a ship and the
+advanced yard and takes a third yard; `2 2` and `Alt+2` move the camera to the middle
+yard, and a ship group's double tap still centres on the ship.
 
 ---
 
 ## QOL-6: Production spread across a group of buildings
 
-*`QOL.asi`, stock-compatible: one ordinary order to the chosen building.*
+*`QOL.asi`, stock-compatible: one ordinary order to the chosen building. Built for
+stations, with QOL-5 (`StationGroups=`).*
 
 **Wanted.** Several buildings of the same kind in one group, for example three
 Federation shipyards on `4`. A build order given to the group goes to *one* of them,
@@ -340,22 +388,38 @@ chosen by:
 `4`, then `B`, then the Akira key pressed five times should give 2 + 2 + 1, not 5 on
 one yard and nothing on the others.
 
-**Today.** Not checked: what does a build order do with several producers selected?
-It may go to all of them, or to the first one, or not be offered at all.
+**Stock.** The button bar enables its build button for exactly one producer
+(`PopupPaletteImp::mUpdateButtonsAndPosition`: the first object's class can build, and
+the count is 1), so with QOL-5's several yards selected the build menu would be out of
+reach. Past that gate, stock already handles several: `CheckCanExecute(ModeInfo)`
+queues a build (`GameObject::QueueCommand`, command 0x19, the class to build) at
+**every** selected producer, and `CheckCanExecute(CommandInfoClass)` sends a cancel
+(command 0x13) to every one as well. Its button is enabled when the *first* producer
+has more queued than the one in progress (`Producer::BuildQueueSize` > 1).
 
-**Approach.** When a build order is issued with more than one producer selected, the
-plugin picks one producer by the rule above and issues an ordinary single-building
-order to it (see "Multiplayer"). Only producers that can build that item take part,
-so a group with a shipyard and an advanced shipyard still routes each unit to a yard
-that has it. A cancel goes to the yard with the longest queue of that item.
+**With `QOL.asi`**, for a selection of this player's stations of one class:
 
-**Open questions.** Should the rule weigh *time remaining* rather than item count? A
-yard with one long build may be busier than one with two short builds. Item count is
-what was asked for, and it is predictable. Should a Construction Ship group work the
-same way, with each structure placed by a different ship?
+- the build button is enabled (0x4fc72c);
+- a build order goes to one station: the shortest `BuildQueueSize`, and on a tie the
+  next after the one that got the last order, in selection order (0x4fc486, in place
+  of stock's loop);
+- a cancel goes to the station with the longest queue (0x4fc0a6), and the longest
+  queue is what enables its button (0x4fbf83). Stock's cancel takes the last item that
+  is waiting, not the one in progress.
 
-**Done when.** On the bench, three yards on one group, nine identical orders: each yard
-gets three, and the units come out in the expected order.
+Each is the single-station order a stock player's game receives. One producer, or
+anything that is not stations of one class, goes the stock way. The AI never uses the
+button bar.
+
+**Seen on the bench (2026-10-05).** Three yards, five orders for a slow ship: 2 + 2 + 1,
+and the first three are charged as they start, the other two when they do (stock).
+Five more from empty queues continued the turn: 2 + 1 + 2. A cancel with queues 2, 2, 1
+took yard1 to 1, the next yard2 to 1; with yard1 at 1 (only the one in progress) and
+yard3 at 3, the button stayed enabled and the cancel took yard3 to 2.
+
+**Open.** Construction ships: should a group of them place each structure with a
+different ship? They are ships, so QOL-5 and this leave them stock. Weighing *time
+remaining* rather than item count was not asked for; count is predictable.
 
 ---
 

@@ -5,6 +5,24 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-05
+
+### Added
+- `StationGroups=` (default 1): this player's stations of one kind can be selected
+  together (click, Shift-click, double click) and kept in one control group; recall
+  selects them all, and its second press (or `Alt+number`) centres the camera on them.
+  A group holds ships or one kind of station: `Shift+number` refuses anything else.
+  With several stations selected the build menu is available, and each build order
+  goes to the one with the shortest queue (in turn on a tie), each cancel to the
+  longest (QOL-5, QOL-6).
+
+### Fixed
+- `Ctrl+number` now replaces a group that held stations: before, the stations stayed
+  in it with their group number drawn, and `Ctrl+number` on a station added to the
+  group.
+
+Installed, not yet seen in game.
+
 ## 1.1.1 — 2026-10-05
 
 ### Fixed

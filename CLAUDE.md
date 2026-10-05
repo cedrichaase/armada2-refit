@@ -34,7 +34,7 @@ it bundles.
 | `hud/` | `HUD.asi` — the in-game HUD layout, font and cursors at any aspect | `hud/README.md` |
 | `menus/` | `Menus.asi` — the shell menus — and `backdrop.sh`, which builds the widescreen plates it composites | `menus/README.md`, `menus/BACKDROPS.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
-| `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16), and the plan for the rest, split by whether other players need it | `qol/README.md` |
+| `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes | `lighting/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
@@ -607,6 +607,12 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   crashed 1.1.0 with 17 Galaxies selected. Auditing who *reads* the selection was not
   enough; test any cap change with big selections of ships that have special weapons,
   in combat.
+- **Stations have their own ten groups** (`cOverViewImp+0x1c4`; ships' at +0x14c), and
+  `cOverViewImp::Select` is the one gate that kept two stations from being selected.
+  `StationGroups=` opens it for one class at a time; the button bar then needs the
+  build button and each build/cancel routed to one station (QOL-6), because stock sends
+  a build to *every* selected producer. Construction ships are ships and stay stock.
+  `./a2test run qol-station-groups --install .` checks it.
 - **Never edit `RTS_CFG.h` for a QOL change.** Network games compare a CRC of its bytes
   ("EXE / RTS_CFG.h files do not match node %d"), so an edited file locks the player
   out of games with stock players. Scale the value in memory after the parse, as

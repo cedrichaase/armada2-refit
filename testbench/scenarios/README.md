@@ -51,6 +51,8 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
 | `Note "TEXT"` | a line in the log |
+| `Scene "select yard1 yard2"` | commands to `Scene.asi` (`../scene/README.md`), `;` between several; a refused command fails the step. Needs `Setup: testbench/scene/bench-setup.sh <scene>` |
+| `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |
 
 ## Several players

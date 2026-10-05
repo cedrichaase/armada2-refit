@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.14.0 — 2026-10-05
+
+Layers: qol 1.2.0, testbench 2.14.0.
+
+### Added
+- Stations in control groups: several of one kind select and group together, recall
+  and centre like ships, and share one build menu that sends each order to one of
+  them (`StationGroups=`, qol 1.2.0).
+- Scene.asi selects and reads the selection, and scenarios can drive it (testbench
+  2.14.0).
+
+### Fixed
+- `Ctrl+number` replaces a group that held stations, label included (qol 1.2.0).
+
 ## 9.13.1 — 2026-10-05
 
 ### Changed
