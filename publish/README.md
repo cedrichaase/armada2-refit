@@ -100,12 +100,16 @@ without its history, which is full of stock art. So not every cited hash resolve
 
 ## Release packages
 
-Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the four
-plugins and writes `armada2-refit-<version>.zip`:
+Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the plugins
+and writes `armada2-refit-<version>.zip`:
 
-- `game/`: what goes beside `Armada2.exe`, which is `HUD.asi`, `Menus.asi`, `MSAA.asi`
-  and `binkw32.dll`, each with its `.ini`, and `dxvk.conf` at stage 3
-  (`postfx/renderer-config.sh --print`);
+- `game/`: what goes beside `Armada2.exe`, which is `HUD.asi`, `Menus.asi`, `QOL.asi`,
+  `Lighting.asi`, `MSAA.asi` and `binkw32.dll`, each with its `.ini`, and `dxvk.conf`
+  at stage 3 (`postfx/renderer-config.sh --print`). The installers put `MSAA.asi` in
+  only when DXVK is in the game directory: its `d3d8.dll`, or crosire's d3d8to9 (known
+  by hash) in front of its `d3d9.dll`. `Lighting.asi` goes in everywhere and lights per
+  pixel only behind d3d8to9; the zip does not install d3d8to9 itself (the repository's
+  `./install` does, `platform/README.md`);
 - `bloom/`: `postfx/postfx.py --export`, which is the same bloom for vkBasalt and as a
   ReShade preset, and `shaders.txt`;
 - `install.sh` (Linux) and `install.ps1` + `install.bat` (Windows), from

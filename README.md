@@ -125,7 +125,7 @@ loads and nothing reports an error. On Windows no override is needed.
 | HUD | `hud/build/HUD.asi`, `hud/HUD.ini` | Don't also run `hud/ui-widescreen.py`, `ui-font-condense.py` or `cursor-aspect.py`; they are its file-based predecessors. Handles both cursor paths: D3D8's hardware cursor and the sprite path DXVK takes |
 | Quality of life | `qol/build/QOL.asi`, `qol/QOL.ini` | Right-drag pan speed (`PanSpeed=`, default 2.5x). Leave `RTS_CFG.h` stock: network games compare it, and the plugin scales the value in memory ([`qol/README.md`](qol/README.md)) |
 | Grid hotkeys | `grid/build/GridLayout.asi`, `grid/GridLayout.ini` | The button bar as a 5x3 grid, one key per cell by position (`QWERT`/`ASDFG`/`ZXCVB`; T cancel, G back). Replaces the bar's stock keys; delete the `.asi` to get them back ([`grid/README.md`](grid/README.md)) |
-| Lighting | `lighting/build/Lighting.asi`, `lighting/Lighting.ini` | Ships and stations lit on the GPU, a warm key and a dim blue fill light in place of each map's own, and planets with a night side (`Lights=`, `GPU=`, `Planets=`). Needs *Hardware Vertex Processing* on, the default ([`lighting/README.md`](lighting/README.md)) |
+| Lighting | `lighting/build/Lighting.asi`, `lighting/Lighting.ini` | Ships and stations lit on the GPU, a warm key and a dim blue fill light in place of each map's own, and planets with a night side (`Lights=`, `GPU=`, `Planets=`). Needs *Hardware Vertex Processing* on, the default. Lit per pixel in shaders, with specular, a rim and the hulls' night lights, when the `d3d8.dll` is crosire's d3d8to9 (below); per vertex otherwise ([`lighting/README.md`](lighting/README.md)) |
 | Menus | `menus/build/Menus.asi`, `menus/Menus.ini` | GDI only, so the renderer doesn't matter. Delete any old `MenuScale.asi`. Without backdrop plates it draws black sides |
 | Cutscenes (launch reels) | `cutscenes/binkproxy/build/binkw32.dll`, `BinkProxy.ini` | First rename the stock `binkw32.dll` to `binkw32_orig.dll`, because the proxy forwards to it. With no `.mp4` beside a `.bik` it only scales the launch reels to full screen. Replacement movies are AV1 through Media Foundation: under Proton that works (GStreamer + dav1d), and on Windows it presumably needs the AV1 Video Extension |
 
@@ -134,9 +134,11 @@ the Bink proxy by renaming `binkw32_orig.dll` back.
 
 ### 2. Needs DXVK as the game's renderer
 
-DXVK's `d3d8.dll` and `d3d9.dll` go in the game directory, with `d3d8=n,b;d3d9=n,b`
-under Wine/Proton (`platform/d3d8-chain.py --use dxvk`). The same two DLLs also work on
-Windows.
+DXVK's `d3d9.dll` goes in the game directory, with a `d3d8.dll` in front of it: crosire's
+d3d8to9 (`platform/vendor/d3d8to9-1.16.0/`, which lets `Lighting.asi` use shaders) or
+DXVK's own d3d8. Under Wine/Proton add `d3d8=n,b;d3d9=n,b` (`platform/d3d8-chain.py
+--use d3d8to9`, or `--use dxvk`; `./install` moves the DXVK chain to d3d8to9). On Windows
+d3d8to9 also needs the Visual C++ 2015–2022 (x86) and DirectX end-user runtimes.
 
 | Layer | Install | Why DXVK |
 |---|---|---|

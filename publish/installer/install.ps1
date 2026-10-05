@@ -6,8 +6,9 @@ Armada II Refit -- install the release package into the game, on Windows.
 
 No choices to make: what can work here is installed, the rest is skipped and says why.
 First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled in
-vendor\, each file only if it is missing. MSAA.asi goes in when DXVK's d3d8.dll is in the
-game directory -- without DXVK the minimap goes black. The bloom preset goes in when ReShade is installed for the game;
+vendor\, each file only if it is missing. MSAA.asi goes in when DXVK is in the game
+directory -- its d3d8.dll, or crosire's d3d8to9 on its d3d9.dll; without DXVK the
+minimap goes black. The bloom preset goes in when ReShade is installed for the game;
 installing ReShade is optional and by hand (README.txt), then run this again.
 
 The game directory is the one holding Armada2.exe: the argument, else this folder's
@@ -53,6 +54,14 @@ function Test-Dxvk([string]$f) {
     (Test-Path -LiteralPath $f) -and
         ([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($f)) -match "(?i)dxvk")
 }
+# crosire's d3d8to9 1.16.0, as the repository's ./install places it (platform/vendor/), by hash.
+function Test-D3d8to9([string]$f) {
+    (Test-Path -LiteralPath $f) -and ((Get-Sha $f) -eq "122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8")
+}
+# DXVK in the chain: its own d3d8, or d3d8to9 in front of its d3d9.
+function Test-DxvkChain {
+    (Test-Dxvk (G "d3d8.dll")) -or ((Test-D3d8to9 (G "d3d8.dll")) -and (Test-Dxvk (G "d3d9.dll")))
+}
 function Test-Proxy([string]$f) {
     (Test-Path -LiteralPath $f) -and (Select-String -LiteralPath $f -Pattern "BinkProxy" -SimpleMatch -Quiet)
 }
@@ -64,7 +73,7 @@ function Test-OurDxvkConf {
 # ------------------------------------------------------------------ uninstall
 
 if ($Uninstall) {
-    foreach ($n in "HUD", "Menus", "MSAA", "QOL") {
+    foreach ($n in "HUD", "Menus", "MSAA", "QOL", "Lighting") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
     }
     if (Test-Proxy (G "binkw32.dll")) {
@@ -158,12 +167,17 @@ Put "HUD.asi"; Put "HUD.ini"
 foreach ($n in "MenuScale.asi", "MenuScale.ini") { Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue }   # Menus.asi's old name
 Put "Menus.asi"; Put "Menus.ini"
 Put "QOL.asi"; Put "QOL.ini"
+# Lit per pixel in shaders only behind crosire's d3d8to9; per vertex on any other d3d8.
+Put "Lighting.asi"; Put "Lighting.ini"
+if (-not (Test-D3d8to9 (G "d3d8.dll"))) {
+    Write-Host "  (Lighting: per vertex here -- its shaders need crosire's d3d8to9 as d3d8.dll)"
+}
 
-if (Test-Dxvk (G "d3d8.dll")) {
+if (Test-DxvkChain) {
     Put "MSAA.asi"; Put "MSAA.ini"
 } else {
     Remove-Item -LiteralPath (G "MSAA.asi") -ErrorAction SilentlyContinue
-    Write-Host "  MSAA.asi skipped: DXVK's d3d8.dll is not in the game directory"
+    Write-Host "  MSAA.asi skipped: DXVK is not in the game directory"
 }
 
 # The proxy forwards every call to the stock DLL as binkw32_orig.dll.
