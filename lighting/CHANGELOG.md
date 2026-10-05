@@ -12,7 +12,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `RimLight=0.12 0.14 0.20`, `RimPower=3.0`: with `Shaders=1`, light on the faces turned
   edge-on to the camera, so a hull's dark side keeps its outline (871c985).
 
-Seen on the bench 2026-10-05 (`SCENE=planet`, `SCENE=firing`). Installed, not yet seen in game.
+Seen on the bench 2026-10-05 (`SCENE=planet`, `SCENE=firing`). Confirmed in game 2026-10-05.
 
 ## 1.7.0 — 2026-10-05
 
