@@ -5,6 +5,13 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.12.0 — 2026-10-05
+
+Layers: lighting 1.8.0.
+
+### Added
+- Specular highlights and a rim light on the shader-lit hulls (lighting 1.8.0).
+
 ## 9.11.0 — 2026-10-05
 
 Layers: platform 3.1.0, testbench 2.13.0, lighting 1.7.0.

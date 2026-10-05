@@ -426,6 +426,13 @@ static float g_sh_sign = -1.0f;      /* -1: inward normals, as stock; +1: a mirr
  * argument is that material; the shaders fold the second pass into the first. */
 #define VT_SELFILLUM_MATERIAL 0x6bc854   /* ST3D_SelfIlluminatingMaterial vtable */
 static float g_selfillum = 1.0f;     /* SelfIllumination=: 1 is stock's second pass, 0 none */
+
+/* Specular and rim (Shaders=1 only; hull.hlsl). A Blinn-Phong highlight from every
+ * light, times the texture's brightness as a gloss mask; and a rim light on the faces
+ * turned edge-on to the camera. */
+static float g_spec = 0.35f, g_spec_pow = 24.0f;    /* Specular=, SpecularPower= */
+static float g_rim[3] = { 0.12f, 0.14f, 0.20f };    /* RimLight= */
+static float g_rim_pow = 3.0f;                      /* RimPower= */
 static int   g_sh_lit_self;          /* the draw in hand has a self-illuminating material */
 
 /* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
@@ -823,6 +830,16 @@ static int sh_setup(void *d9)
         d9_psconst(d9, 11, pc, SH_POINTS);
         d9_psconst(d9, 27, pp, SH_POINTS);
         d9_psconst(d9, 43, pf, SH_POINTS);
+    }
+    {   /* shine c59, rim_col c60, eye c61. The camera sits where the view matrix
+         * takes to the origin: with VIEW = [R 0; t 1], eye = -t R^T. */
+        float k[12];
+        k[0] = g_spec; k[1] = g_spec_pow; k[2] = g_rim_pow; k[3] = 0.0f;
+        k[4] = g_rim[0]; k[5] = g_rim[1]; k[6] = g_rim[2]; k[7] = 0.0f;
+        for (i = 0; i < 3; i++)
+            k[8 + i] = -(vw[12] * vw[i * 4] + vw[13] * vw[i * 4 + 1] + vw[14] * vw[i * 4 + 2]);
+        k[11] = 1.0f;
+        d9_psconst(d9, 59, k, 3);
     }
     return 1;
 }
@@ -1439,6 +1456,10 @@ static void startup(void)
     g_fix_mirrored = (int)GetPrivateProfileIntA("Lighting", "FixMirrored", 1, ini);
     g_shaders = (int)GetPrivateProfileIntA("Lighting", "Shaders", 1, ini);
     ini1(ini, "SelfIllumination", &g_selfillum);
+    ini1(ini, "Specular",         &g_spec);
+    ini1(ini, "SpecularPower",    &g_spec_pow);
+    ini3(ini, "RimLight",         g_rim);
+    ini1(ini, "RimPower",         &g_rim_pow);
     ini3(ini, "KeyColour",  g_key_col);
     ini3(ini, "KeyAxis",    g_key_dir);
     ini3(ini, "FillColour", g_fill_col);

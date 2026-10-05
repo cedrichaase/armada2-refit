@@ -40,6 +40,8 @@ planet's ground colour (`planet glow:`).
 | `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
 | `SelfIllumination` | `1.0` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none |
+| `Specular`, `SpecularPower` | `0.35`, `24` | with `Shaders`, a highlight from every light, times the texture's brightness; strength (`0`: none) and exponent (below) |
+| `RimLight`, `RimPower` | `0.12 0.14 0.20`, `3.0` | with `Shaders`, light on the faces turned edge-on to the camera; colour (`0 0 0`: none) and how closely it hugs the edge |
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `PointLights` | `12` | point lights per GPU draw, the strongest first: up to 16 with `Shaders`, 6 in Direct3D's slots; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
@@ -442,7 +444,34 @@ draws them, now over the per-pixel hull. `Lighting.log`: `a self-illuminating ma
 its night lights folded in`.
 
 Not reproduced: the CPU path's first pass also has `SPECULARENABLE` on, with the
-specular colour computed on the CPU; the GPU path has had none since 1.0.0.
+specular colour computed on the CPU; the GPU path has had none since 1.0.0. 1.8.0 adds a
+highlight of its own instead (next).
+
+**Specular and rim (1.8.0).** Two terms the fixed-function path could not give a hull
+reading as metal against black space:
+
+- A Blinn-Phong highlight from every light, directional and point, times `Specular` and
+  a gloss mask: the texture's luminance, so pale plating shines and dark seams and
+  panel lines do not. It is added after the texture (white light on metal) and before
+  the night lights are laid over, so a lit window is not glossed. The outward normal
+  and each light's true direction are the inward normal and the device's direction both
+  turned round (`misc.x`), as for the point lights. The camera is where the view matrix
+  takes to the origin, `-t R^T`.
+- A rim: `RimLight` x (1 − N·V)^`RimPower`, added to the light before the texture, so it
+  takes the hull's own colour, on the faces turned edge-on to the camera. A hull's dark
+  side keeps its outline.
+
+Measured on the bench (`SCENE=planet`, 2026-10-05). From the usual angle (`orbit ship
+200 20 150`), the Galaxy's box: mean 0.321 without, 0.338 with; the saucer and the
+nacelle tops take a broad sheen. Side on (`orbit ship 20 10 150`), 0.194 → 0.228: the
+saucer's edge and underside lift and keep a cool outline. `SpecularPower=64` with
+`Specular=0.6` read as nothing at all from the usual angle (mean 0.320, as without): the
+hulls are low-poly, and a large flat face such as the saucer's top has one normal, so a
+tight highlight lands only at the one angle that reflects the key into the camera and
+then lights the whole face at once. The broad default is the one that reads; how it reads
+as ships turn is for the game to show. The pixel shader is about 1370 instructions as
+vkd3d emits it; with vsync off in the `firing` scene the frame stayed on its 1.0 ms
+floor, as before.
 
 ## Not covered yet
 
