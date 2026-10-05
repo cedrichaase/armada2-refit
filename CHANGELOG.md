@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.13.0 — 2026-10-05
+
+Layers: models 3.3.0.
+
+### Added
+- The selection bubble around a selected ship is round instead of a visible polygon
+  (`models/select-sod.py`, models 3.3.0).
+
+Installed, not yet seen in game.
+
 ## 9.12.0 — 2026-10-05
 
 Layers: lighting 1.8.0.

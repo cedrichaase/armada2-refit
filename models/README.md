@@ -10,13 +10,14 @@ The game's 3D geometry, where the refit changes it:
   for a modern resolution. Below.
 - **Dilithium moons**, `SOD/Mdmoon*.SOD` and `Mmooninf.SOD`, smoothed by `moon-sod.py`.
   Below.
+- **The selection bubble**, `SOD/select.sod`, rounded by `select-sod.py`. Below.
 - **Hull lighting**, `hull-bump.py`: the Federation hulls are lit per pixel through the
   engine's own dot3 bump path. Below. Not part of `./install`: run
   `models/hull-bump.py --install` (`--revert`, `--status`). A hull it patches goes the
   dot3 way and so leaves `Lighting.asi`'s GPU path (`lighting/README.md`).
 
 `./install` runs `install.sh`, which builds and installs `Planets.asi` and `Planets.ini`
-and smooths the moons (`.a2neb-backup` copies; `install.sh --remove` restores them).
+smooths the moons and rounds the selection bubble (`.a2neb-backup` copies; `install.sh --remove` restores them).
 `a2mod` switches both, and the `SOD` backups, as the `models` layer.
 
 ## Planets.asi
@@ -128,6 +129,41 @@ That was judged without `d3d9.cachedWriteOnlyBuffers`. Before postfx 1.1.1, the 
 path read back every vertex it wrote from a buffer DXVK keeps in GPU memory, which made
 it far slower than its triangle count suggests (`postfx/README.md`, "Reading back a
 dynamic vertex buffer"). The shell's cost with that key set has not been measured.
+
+## The selection bubble
+
+### What was wrong
+
+The translucent ellipse around each selected ship shows its polygon: a run of straight
+segments around the rim, with corners, and flat facets in its shading. It is
+`SelectionEffect`, an instance of `SOD/select.sod` scaled to the ship's shield ellipse
+(`postfx/README.md`, "Reading back a dynamic vertex buffer"). The model is a 3ds Max
+GeoSphere at frequency 4: 162 vertices, 320 triangles, about 20 segments around a great
+circle, every vertex at radius 89.943 about the origin. Like the moons, and unlike the
+planets, the engine draws the mesh the SOD stores.
+
+### A finer sphere
+
+`select-sod.py` cuts each triangle into `--split N` x N and pushes every new vertex out
+onto the sphere. A true sphere allows that, and the moons' PN patches exist only to keep
+a shape that is not round. Stock vertices keep their place and index, the winding is the
+stock one, and the mesh's one dummy texcoord stays the only one. The file is SOD v1.92,
+which `moon-sod.py`'s parser does not read. The script finds the mesh by requiring it to
+end at the file's closing seven bytes, the stock file is pinned by hash, and `--split 1`
+reproduces it byte for byte.
+
+Seen on the bench (3440x1440, four selected Galaxy class, close and at play distance):
+`--split 2` (1,280 triangles, about 40 segments around) is round, with no corners on the
+rim, and `--split 4` (5,120) cannot be told from it at either distance. So the default
+is 2.
+
+### What it costs
+
+The bubble is blended, so it goes down the CPU path (`RenderInternalNonVB`), as the
+moons' glow shell does, and its cost grows with the face count. With
+`d3d9.cachedWriteOnlyBuffers`, 30 selected stock bubbles took 0.60–0.81 ms
+(`postfx/README.md`). Four times the faces suggests about 3 ms at 30 selected. That is
+an estimate from that measurement, not a measurement of its own.
 
 ## Hull lighting
 
