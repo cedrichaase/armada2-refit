@@ -10,7 +10,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `Specular=0.35`, `SpecularPower=24`: with `Shaders=1`, a highlight from every light,
   times the texture's brightness as a gloss mask.
 - `RimLight=0.12 0.14 0.20`, `RimPower=3.0`: with `Shaders=1`, light on the faces turned
-  edge-on to the camera, so a hull's dark side keeps its outline.
+  edge-on to the camera, so a hull's dark side keeps its outline (871c985).
 
 Seen on the bench 2026-10-05 (`SCENE=planet`, `SCENE=firing`). Installed, not yet seen in game.
 
