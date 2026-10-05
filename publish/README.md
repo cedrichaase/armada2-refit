@@ -168,6 +168,8 @@ bloom shaders for real, so CI also notices when a pinned one moves.
   GitHub Release with the zip, the changelog entry as its notes. An entry that still
   says "not yet seen in game" goes out as a pre-release. So **bumping the root version
   and pushing `main` is what releases**; a push that does not bump it releases nothing.
+- after that, on every push to `main`: delete all but the newest three releases. Their
+  tags stay, so a version named anywhere still resolves to its commit.
 
 ### Next
 

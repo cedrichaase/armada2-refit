@@ -112,3 +112,13 @@ jobs:
           grep -qi 'not yet seen in game' notes.md && pre=(--prerelease)
           gh release create "$tag" dist/*.zip --target "$GITHUB_SHA" \
             --title "Armada II Refit $VERSION" --notes-file notes.md "${pre[@]}"
+      - name: Keep only the newest three releases
+        run: |
+          # Older releases are deleted; their tags stay, so changelogs and links that
+          # name a version still resolve. publish/README.md, "Release packages".
+          gh release list --limit 1000 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[3:][] | .tagName' |
+          while read -r tag; do
+            echo "deleting release $tag (tag kept)"
+            gh release delete "$tag" --yes
+          done
