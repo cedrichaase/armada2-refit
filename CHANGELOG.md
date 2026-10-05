@@ -20,6 +20,9 @@ Layers: platform 3.2.0.
 - The release installers put `MSAA.asi` in on the d3d8to9 chain too (crosire's d3d8to9,
   known by hash, in front of DXVK's `d3d9.dll`); they had skipped it whenever the
   `d3d8.dll` was not DXVK's.
+- CI checks a new branch's commits from where it leaves `main`, not all of history,
+  which failed every new branch on 24cbcd0 (build output, taken out in da4a4a6). The
+  installer tests cover `Lighting.asi` and the d3d8to9 chain.
 
 ## 9.12.0 — 2026-10-05
 

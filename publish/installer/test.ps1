@@ -8,6 +8,8 @@ $ErrorActionPreference = "Stop"
 $T = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid())
 Expand-Archive -LiteralPath $Zip -DestinationPath $T
 $P = (Get-ChildItem -LiteralPath $T -Directory -Filter "armada2-refit-*").FullName
+# crosire's d3d8to9 as the repository vendors it: the installers know it by hash.
+$D3d8to9 = Join-Path $PSScriptRoot "..\..\platform\vendor\d3d8to9-1.16.0\d3d8.dll"
 function Check([string]$what, $ok) {   # $ok untyped: a [bool] parameter refuses strings
     if ($ok) { Write-Host "ok    $what" } else { throw "FAIL  $what" }
 }
@@ -29,11 +31,13 @@ $G = Join-Path $T "Star Trek Armada II"; Mock $G
 function G([string]$n) { Join-Path $G $n }
 
 Write-Host "== install on a GOG game: prerequisites, no DXVK, no ReShade"
-Install @($G) | Out-Null
+$out = Install @($G)
 Check "winmm.dll" ((Sha (G "winmm.dll")) -eq "baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5")
 Check "STA2WidescreenPatch.asi" ((Sha (G "STA2WidescreenPatch.asi")) -eq "193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5")
 Check "GOG's d3d8.dll untouched" (((Text (G "d3d8.dll")) -eq "gogd3d8to9") -and -not (Test-Path (G "d3d8.dll.gog-backup")))
 Check "no MSAA.asi" (-not (Test-Path (G "MSAA.asi")))
+Check "Lighting, per vertex here" ((Test-Path (G "Lighting.asi")) -and (Test-Path (G "Lighting.ini")) -and
+                                  ($out | Where-Object { $_ -like "*Lighting: per vertex*" }))
 Check "no bloom" (-not (Test-Path (G "A2Bloom.ini")))
 Check "binkw32.dll is the proxy" ((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy")
 Check "binkw32_orig.dll is stock" ((Text (G "binkw32_orig.dll")) -eq "stockbink")
@@ -54,6 +58,19 @@ foreach ($f in "MagicBloom.fx", "ReShade.fxh", "ReShadeUI.fxh") {
 Check "A2Bloom.ini" (Test-Path (G "A2Bloom.ini"))
 Check "and as ReShadePreset.ini" ((Sha (G "ReShadePreset.ini")) -eq (Sha (G "A2Bloom.ini")))
 
+Write-Host "== d3d8to9 in front of DXVK's d3d9: MSAA, and Lighting's shaders (no note)"
+Copy-Item (G "d3d8.dll") (Join-Path $T "dxvk8")
+Copy-Item $D3d8to9 (G "d3d8.dll")
+Set-Content (G "d3d9.dll") "dxvk"
+Remove-Item (G "MSAA.asi")
+$out = Install @($G)
+Check "MSAA.asi on the d3d8to9 chain" ((Test-Path (G "MSAA.asi")) -and -not ($out | Where-Object { $_ -like "*Lighting: per vertex*" }))
+Set-Content (G "d3d9.dll") "gogd3d8to9"
+$out = Install @($G)
+Check "no MSAA.asi without DXVK's d3d9" ((-not (Test-Path (G "MSAA.asi"))) -and ($out | Where-Object { $_ -like "*MSAA.asi skipped*" }))
+Copy-Item (Join-Path $T "dxvk8") (G "d3d8.dll")
+Remove-Item (G "d3d9.dll")
+
 Write-Host "== unzipped into the game directory, run with no argument"
 Copy-Item -Recurse $P (G "pkg")
 $out = & powershell -NoProfile -ExecutionPolicy Bypass -File (G "pkg\install.ps1")
@@ -65,7 +82,7 @@ Set-Content (G "UltimateASILoader-license.txt") "mine"
 $out = Install @("-Uninstall", $G)
 Check "binkw32.dll is stock again" ((Text (G "binkw32.dll")) -eq "stockbink")
 Check "no binkw32 copies" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")))
-foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "QOL.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "QOL.ini", "BinkProxy.ini", "dxvk.conf",
+foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "QOL.asi", "Lighting.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "QOL.ini", "Lighting.ini", "BinkProxy.ini", "dxvk.conf",
                "A2Bloom.ini", "ReShadePreset.ini", "winmm.dll", "STA2WidescreenPatch.asi", "armada2-refit-prereqs.txt") {
     Check "$f removed" (-not (Test-Path (G $f)))
 }
