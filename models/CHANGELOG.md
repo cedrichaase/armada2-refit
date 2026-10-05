@@ -14,7 +14,7 @@ selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md
   with the new vertices on the sphere. `install.sh` runs it and `install.sh --remove`
   reverts it; the backup is `.a2neb-backup` (433d846).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 3.2.0 — 2026-10-04
 

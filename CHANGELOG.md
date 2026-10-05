@@ -13,7 +13,7 @@ Layers: models 3.3.0.
 - The selection bubble around a selected ship is round instead of a visible polygon
   (`models/select-sod.py`, models 3.3.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 9.12.0 — 2026-10-05
 
