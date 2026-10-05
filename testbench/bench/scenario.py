@@ -516,6 +516,26 @@ def s_log(c, m):
                      how=f'substring search in {name}')
 
 
+@step(r'^scene ' + Q.format('cmd') + r'$')
+def s_scene(c, m):
+    """`Scene "select yard1 yard2"`: commands to Scene.asi (testbench/scene), ';'
+    between several. A command it refuses fails the step."""
+    out = c.sess.scene(m.group('cmd'))
+    if '\n  !' in '\n' + out or 'FAILED' in out:
+        raise StepFailed('Scene.asi refused: ' + out)
+    return out
+
+
+@step(r'^expect scene ' + Q.format('cmd') + r' (?:to )?(?P<neg>not )?(?:answers?|says?) ' + Q.format('text') + r'$')
+def s_scene_answer(c, m):
+    """`Expect scene "selection" answers "selected 3:"`: the command's own answer, not
+    the whole Scene.log, so an earlier answer cannot pass it."""
+    out = c.sess.scene(m.group('cmd'))
+    hit = m.group('text').lower() in out.lower()
+    ok = not hit if m.group('neg') else hit
+    return c.checked(ok, out, how=f'Scene.asi\'s answer to "{m.group("cmd")}"')
+
+
 @step(r'^expect (?:to be on )?the (?P<screen>[\w\' -]+?) (?:screen|menu)(?: to be shown| is shown)?$')
 def s_expect_screen(c, m):
     scr = c.screen_def(m.group('screen').lower())

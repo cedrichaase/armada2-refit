@@ -5,6 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 2.14.0 — 2026-10-05
+
+### Added
+- Scene.asi: `select <name>...` (as a click and Shift-clicks) and `selection` (what is
+  selected, each one's group, queue and class, and every control group); `query` gives
+  each producer's queue. The `stations` scene: three shipyards, an advanced one, a
+  research station and two ships.
+- Scenario steps `Scene "CMD"` and `Expect scene "CMD" answers "TEXT"`, and
+  `testbench/scene/bench-setup.sh <scene>` for a scenario's `Setup:` line.
+  `drive scene` and the steps share `Session.scene`.
+- `scenarios/qol-station-groups.md`: stations in control groups and the build menu
+  for several (qol 1.2.0).
+
+Installs nothing into the game; seen working on the bench 2026-10-05.
+
 ## 2.13.0 — 2026-10-05
 
 ### Added

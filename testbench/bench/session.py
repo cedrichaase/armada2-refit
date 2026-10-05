@@ -771,6 +771,40 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 return p.read_text(errors='replace')
         return None
 
+    def scene(self, commands):
+        """Hand commands (a list, or one string with ';' between them) to Scene.asi
+        through Scene.cmd in the clone, and return what it logged in answer. The plugin
+        reads the file on its next tick (or frame, while paused), deletes it and ends
+        its answer with '< done'; a failed command's answer has a '  !' line."""
+        if isinstance(commands, str):
+            commands = [commands]
+        lines = [c.strip() for a in commands for c in a.split(';') if c.strip()]
+        if not lines:
+            raise GameError('scene: no command')
+        cmd, slog = self.game_dir / 'Scene.cmd', self.game_dir / 'Scene.log'
+        if not (self.game_dir / 'Scene.asi').exists():
+            raise GameError('scene: Scene.asi is not installed in this game '
+                            '(--install testbench/scene, or Setup: testbench/scene/bench-setup.sh)')
+        end = time.time() + 10
+        while cmd.exists():                      # a previous command not yet taken
+            if time.time() > end:
+                raise GameError('scene: Scene.cmd is not being read -- is the scene built?')
+            time.sleep(0.1)
+        start = slog.stat().st_size if slog.exists() else 0
+        tmp = cmd.with_suffix('.tmp')
+        tmp.write_text('\r\n'.join(lines) + '\r\n')
+        tmp.rename(cmd)                          # the plugin never sees half a file
+        end = time.time() + 15
+        while True:
+            out = slog.read_bytes()[start:].decode(errors='replace') if slog.exists() else ''
+            if '< done' in out or time.time() > end:
+                break
+            time.sleep(0.1)
+        self.log.action(f'scene: {"; ".join(lines)}')
+        if '< done' not in out:
+            raise GameError('scene: Scene.asi did not answer within 15 s')
+        return out.replace('\r', '').rstrip()
+
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.game_dir

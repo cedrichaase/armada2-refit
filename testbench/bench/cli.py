@@ -57,37 +57,10 @@ Results: {results}
 """.format(results=config.RESULTS)
 
 
-def _scene_command(s, log, args):
-    """Hand commands to Scene.asi through Scene.cmd in the clone, and print what it
-    logged in answer. The plugin reads the file on its next tick (or frame, while
-    paused), deletes it and ends its answer with '< done'."""
-    lines = [c.strip() for a in args for c in a.split(';') if c.strip()]
-    if not lines:
-        raise GameError('drive scene: no command')
-    cmd, slog = s.game_dir / 'Scene.cmd', s.game_dir / 'Scene.log'
-    if not (s.game_dir / 'Scene.asi').exists():
-        raise GameError('drive scene: Scene.asi is not installed in this session '
-                        '(--install testbench/scene)')
-    end = time.time() + 10
-    while cmd.exists():                      # a previous command not yet taken
-        if time.time() > end:
-            raise GameError('drive scene: Scene.cmd is not being read -- is the scene built?')
-        time.sleep(0.1)
-    start = slog.stat().st_size if slog.exists() else 0
-    tmp = cmd.with_suffix('.tmp')
-    tmp.write_text('\r\n'.join(lines) + '\r\n')
-    tmp.rename(cmd)                          # the plugin never sees half a file
-    end = time.time() + 15
-    while True:
-        out = slog.read_bytes()[start:].decode(errors='replace') if slog.exists() else ''
-        if '< done' in out or time.time() > end:
-            break
-        time.sleep(0.1)
-    print(out.replace('\r', '').rstrip() or 'no answer')
-    log.action(f'scene: {"; ".join(lines)}')
-    if '< done' not in out:
-        print('timeout: Scene.asi did not answer within 15 s')
-        return 1
+def _scene_command(s, args):
+    """Hand commands to Scene.asi (Session.scene) and print its answer."""
+    out = s.scene(args)
+    print(out or 'no answer')
     return 1 if '\n  !' in out or 'FAILED' in out else 0
 
 
@@ -529,7 +502,7 @@ def cmd_drive(argv):
         log.check(reason, st if st in ('pass', 'fail', 'review') else 'inconclusive', how='recorded by the driver')
         print('ok')
     elif sub == 'scene':
-        return _scene_command(s, log, rest)
+        return _scene_command(s, rest)
     elif sub == 'launch':
         s.launch(' '.join(rest) or '-nointro')
         print(f'launched, pid {s.game_pid()}')

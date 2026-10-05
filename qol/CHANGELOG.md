@@ -5,6 +5,27 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-05
+
+### Added
+- `StationGroups=` (default 1): this player's stations of one kind can be selected
+  together (click, Shift-click, double click) and kept in one control group; recall
+  selects them all, and its second press (or `Alt+number`) centres the camera on them.
+  A group holds ships or one kind of station: `Shift+number` refuses anything else.
+  With several stations selected the build menu is available, and each build order
+  goes to the one with the shortest queue (in turn on a tie), each cancel to the
+  longest (QOL-5, QOL-6). (5a5f2d0)
+
+### Fixed
+- `Ctrl+number` now replaces a group that held stations: before, the stations stayed
+  in it with their group number drawn, and `Ctrl+number` on a station added to the
+  group. (5a5f2d0)
+- A ship built at a station in a control group no longer joins that group (stock gives
+  a producer's builds its group); it put the ship in the ships' group, which recall
+  prefers, so the key selected the new ships instead of the stations. (403dfad)
+
+Confirmed in game 2026-10-05.
+
 ## 1.1.1 — 2026-10-05
 
 ### Fixed
@@ -13,7 +34,7 @@ versions". Newest first. Details, and the planned changes, are in
   `MaxSelection` over 16 now also moves that array, in setting up and in firing the
   special weapon, and is refused if it cannot.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 1.1.0 — 2026-10-04
 
@@ -24,7 +45,7 @@ Installed, not yet seen in game.
 - `MaxSelection=` (default 40, 17–120; 16 or less leaves it stock): selections, and so
   control groups, hold more than stock's 16. The selection panel shows the first 16. (691256a)
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 1.0.0 — 2026-10-03
 
