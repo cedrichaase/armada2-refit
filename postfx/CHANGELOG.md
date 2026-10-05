@@ -13,7 +13,7 @@ the numbers are in [`README.md`](README.md).
   and `toggleKey = F35`, a keysym no keyboard map has, in place of `Home`. The release
   zip's `vkBasalt.conf.in` likewise. `./a2mod stock` still launches without it.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-05.
 
 ## 1.1.1 — 2026-10-05
 

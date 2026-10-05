@@ -18,7 +18,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `SelfIllumination=1.8` (was 1.0), `Specular=0.7` (was 0.35); the built-in defaults
   match.
 
-Seen on the bench 2026-10-05 (`SCENE=planet`, `SCENE=firing`). Installed, not yet seen in game.
+Seen on the bench 2026-10-05 (`SCENE=planet`, `SCENE=firing`). Confirmed in game 2026-10-05.
 
 ## 1.9.0 — 2026-10-05
 
