@@ -12,7 +12,7 @@ selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md
 - `select-sod.py` (`--install`, `--revert`, `--status`, `--split`, `--out`) rounds the
   selection bubble, `SOD/select.sod`: each of its 320 triangles becomes 4 (`--split 2`)
   with the new vertices on the sphere. `install.sh` runs it and `install.sh --remove`
-  reverts it; the backup is `.a2neb-backup`.
+  reverts it; the backup is `.a2neb-backup` (433d846).
 
 Installed, not yet seen in game.
 
