@@ -212,7 +212,7 @@ echo "In the launcher (Heroic: Game settings -> Advanced -> Environment variable
 echo "launch options, then %command%), set:"
 echo "    WINEDLLOVERRIDES=$overrides"
 if [ "$bloom" = 1 ]; then
-    echo "and for bloom (Home toggles it in game):"
+    echo "and for bloom:"
     echo "    ENABLE_VKBASALT=1"
     echo "    VKBASALT_CONFIG_FILE=$BLOOM/vkBasalt.conf"
 fi

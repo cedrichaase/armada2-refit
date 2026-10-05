@@ -11,9 +11,11 @@
     postfx.py --export DIR          write the files the release package carries, for
                                     vkBasalt and for ReShade (Windows); needs no layer
 
-In game, **Home toggles the effect on and off** -- the only A/B this project has had
-that needs no relaunch.  vkBasalt reads its config when the swapchain is created, so
-a --set takes effect on the next launch, not live.
+Bloom is on from launch, with no key to toggle it: vkBasalt's toggleKey is set to F35,
+a keysym no keyboard map gives a key, which vkBasalt then never sees pressed (left out,
+it would default to Home).  `a2mod stock` launches without it.  vkBasalt reads its
+config when the swapchain is created, so a --set takes effect on the next launch, not
+live.
 
 Needs the layer: postfx/vkbasalt/build.sh.  --on and --off edit Heroic's GamesConfig,
 which Heroic rewrites from memory on exit, so they refuse while Heroic is running --
@@ -104,7 +106,7 @@ def conf_text(intensity, threshold, share=None, header=None):
         share + '/A2Bloom.fx', share + '/Shaders', share + '/Textures')
     return '\n'.join((header or [
         MARKER,
-        '# Re-run postfx/postfx.py --set to change; --off to disable.  Home toggles in game.',
+        '# Re-run postfx/postfx.py --set to change; --off to disable.',
     ]) + [
         '',
         'effects = bloom',
@@ -112,7 +114,9 @@ def conf_text(intensity, threshold, share=None, header=None):
         'reshadeIncludePath = "%s"' % shaders,
         'reshadeTexturePath = "%s"' % textures,
         'depthCapture = off',
-        'toggleKey = Home',
+        '# On from launch, and no key toggles it: F35 has no key in any keyboard map, so',
+        '# vkBasalt never sees it pressed.  Left out, the toggle would be Home.',
+        'toggleKey = F35',
         'enableOnLaunch = True',
         '',
         '# pow(colour, threshold) * intensity feeds the blur -- see postfx.py.',
@@ -171,7 +175,7 @@ def export(out):
         # The zip's install.sh replaces @BLOOM@ with where it put the shaders.
         'vkBasalt.conf.in': conf_text(INTENSITY, THRESHOLD, share='@BLOOM@', header=[
             '# Armada II Refit bloom through vkBasalt (postfx/postfx.py --export).',
-            '# Home toggles it in game.']),
+            '# On from launch; no key toggles it.']),
         # ReShade on Windows sets the two MagicBloom switches in the preset, so it needs
         # no wrapper.  Home is ReShade's own overlay key; its effect toggle is set in
         # the overlay.
@@ -285,7 +289,7 @@ def main():
     write_config(a.intensity, a.threshold)
     if a.on:
         set_env(True)
-        print('\nLaunch the game.  Home toggles bloom.  Afterwards: postfx/postfx.py --check')
+        print('\nLaunch the game; bloom is on.  Afterwards: postfx/postfx.py --check')
 
 
 if __name__ == '__main__':

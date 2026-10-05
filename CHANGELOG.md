@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.15.0 — 2026-10-05
+
+Layers: lighting 1.10.0, postfx 1.2.0.
+
+### Added
+- More dynamic range on lit hulls and planets (lighting 1.10.0): the light is no longer
+  clamped at 1, highlights roll off towards white (`HighlightKnee`), and night lights and
+  specular are brighter (`SelfIllumination=2.5`, `Specular=0.7`, `HullSun=1.1`), so
+  bloom has something to take.
+
+### Changed
+- Bloom is on from launch with no toggle key (postfx 1.2.0); `a2mod status` no longer
+  mentions Home, and the release package's notes and installer say so.
+
+Installed, not yet seen in game.
+
 ## 9.14.0 — 2026-10-05
 
 Layers: lighting 1.9.0.
