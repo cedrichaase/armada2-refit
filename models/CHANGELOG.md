@@ -2,8 +2,19 @@
 
 The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 `loading-panel.sh`), which ships in lockstep with `textures/targets/LOADING`, and
-`Planets.asi`, the planets' tessellation, and the dilithium moons (`moon-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
+`Planets.asi`, the planets' tessellation, the dilithium moons (`moon-sod.py`) and the
+selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
+
+## 3.3.0 — 2026-10-05
+
+### Added
+- `select-sod.py` (`--install`, `--revert`, `--status`, `--split`, `--out`) rounds the
+  selection bubble, `SOD/select.sod`: each of its 320 triangles becomes 4 (`--split 2`)
+  with the new vertices on the sphere. `install.sh` runs it and `install.sh --remove`
+  reverts it; the backup is `.a2neb-backup` (433d846).
+
+Confirmed in game 2026-10-05.
 
 ## 3.2.0 — 2026-10-04
 
