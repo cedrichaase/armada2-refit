@@ -6,6 +6,15 @@ configured by `postfx.py`). They are versioned together as one folder. Versionin
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The tables behind
 the numbers are in [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-05
+
+### Changed
+- Bloom is on from launch with no toggle key: `postfx.py` writes `enableOnLaunch = True`
+  and `toggleKey = F35`, a keysym no keyboard map has, in place of `Home`. The release
+  zip's `vkBasalt.conf.in` likewise. `./a2mod stock` still launches without it.
+
+Confirmed in game 2026-10-05.
+
 ## 1.1.1 — 2026-10-05
 
 ### Fixed

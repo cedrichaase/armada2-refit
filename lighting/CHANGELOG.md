@@ -4,6 +4,22 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.10.0 — 2026-10-05
+
+### Added
+- `HullSun=1.1`: with `Shaders=1`, the Key on GPU-drawn hulls times this; `hull.hlsl` no
+  longer clamps the summed light at 1, so explosions and torpedoes beside a hull can
+  drive it past its texture.
+- `HighlightKnee=0.8`: in the hull and planet shaders, colour above it rolls off towards
+  white instead of clipping; `1` clips as before.
+- `SelfIllumination` above 1 draws the night lights brighter than their texture.
+
+### Changed
+- `SelfIllumination=1.8` (was 1.0), `Specular=0.7` (was 0.35); the built-in defaults
+  match.
+
+Seen on the bench 2026-10-05 (`SCENE=planet`, `SCENE=firing`). Confirmed in game 2026-10-05.
+
 ## 1.9.0 — 2026-10-05
 
 ### Added

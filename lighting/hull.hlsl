@@ -37,7 +37,9 @@ float4 mat_diffuse  : register(c1);
 float4 dcol[DIRS]   : register(c2);   // directional lights as the device has them; 0 for none
 float4 dvec[DIRS]   : register(c6);   // towards each
 float4 misc         : register(c10);  // x: the normals' sign (-1 inward, as stock; +1 a mirrored draw)
-                                      // y: self-illumination: the texture's alpha shows it unlit (0: none)
+                                      // y: self-illumination: the texture's alpha shows it unlit (0: none;
+                                      //    above 1 the night lights glow brighter than the texture)
+                                      // z: the highlight knee: above it, colour rolls off towards white (1: clip)
 float4 pcol[POINTS] : register(c11);  // point light colour; 0 for none
 float4 ppos[POINTS] : register(c27);  // world position
 float4 pfall[POINTS]: register(c43);  // x: full to this distance, y: 1 / the fade after it
@@ -45,6 +47,16 @@ float4 shine        : register(c59);  // x: specular strength, y: its exponent, 
 float4 rim_col      : register(c60);  // the rim light's colour; 0 for none
 float4 eye          : register(c61);  // the camera's world position
 sampler2D tex0 : register(s0);
+
+// The highlight shoulder: the colour as it is up to the knee k, then rolling off
+// towards 1 instead of clipping there, with the same slope at the knee. Per channel,
+// so light far past 1 turns white, as a bright light does. k >= 1 is the plain clip.
+float3 shoulder(float3 x, float k)
+{
+    float  r = max(1.0 - k, 1e-4);
+    float3 y = k + r * (1.0 - exp(-(x - k) / r));
+    return k >= 1.0 ? saturate(x) : lerp(max(x, 0.0), y, step(k, x));
+}
 
 // Blinn-Phong: the highlight of a light from direction L (unit, towards it), seen
 // from V, on a surface with the outward normal Nt.
@@ -82,9 +94,13 @@ float4 hull_ps(Lit i) : COLOR
     float4 t = tex2D(tex0, i.uv);
     // Gloss from the texture's brightness: pale plating shines, dark seams do not.
     float gloss = dot(t.rgb, float3(0.299, 0.587, 0.114));
-    float3 lit  = t.rgb * saturate(sum) + spec * shine.x * gloss;
+    // The light is not clamped at 1: a Key above 1 (HullSun), an explosion or a
+    // torpedo beside the hull drive the plating past its texture, and the shoulder
+    // below takes it towards white.
+    float3 lit  = t.rgb * max(sum, 0.0) + spec * shine.x * gloss;
     // A self-illuminating material's second pass on the CPU path, folded in: the
-    // texture alone, blended over the lit one by its alpha (the night-lights map).
-    float3 c = lerp(lit, t.rgb, saturate(t.a * misc.y));
-    return float4(saturate(c), t.a * base.a);
+    // texture alone, blended over the lit one by its alpha (the night-lights map);
+    // above 1, the night lights brighter than the texture.
+    float3 c = lerp(lit, t.rgb * max(misc.y, 1.0), saturate(t.a * min(misc.y, 1.0)));
+    return float4(shoulder(c, misc.z), t.a * base.a);
 }

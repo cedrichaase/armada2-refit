@@ -158,8 +158,7 @@ numerically, so the answer is a number rather than an impression:
 For a before/after of the project as a whole rather than one setting, `./a2mod stock`
 and `./a2mod refit` flip every visual layer at once in about 4 s, with DXVK kept
 in both states, so the two grabs differ only in what this project changed. Quit the game
-between them; Heroic can stay open. Bloom is bypassed at launch in stock, and Home
-still toggles it.
+between them; Heroic can stay open. Bloom is bypassed at launch in stock.
 
 Aim at a region, not the whole frame: a whole-frame diff of this game is dominated by
 ships drifting and sprites animating between the two grabs, which will swamp the effect
@@ -244,9 +243,15 @@ screen.
 On the stock chain, Direct3D 8 lands on wined3d/**OpenGL**, so vkBasalt has nothing to
 attach to — it does nothing, with no error to explain why.
 
-**Bloom** is MagicBloom through vkBasalt, threshold 6, intensity 0.08. **Home toggles
-it live**, which makes it the one renderer setting in this project with a same-frame
-A/B. CAS sharpening and FXAA/SMAA are untried.
+**Bloom** is MagicBloom through vkBasalt, threshold 6, intensity 0.08, **on from
+launch with no toggle key** (since postfx 1.2.0). Home used to toggle it, and
+`enableOnLaunch` had been left at `False` by hand, so the game launched without bloom
+and it looked as if bloom had stopped doing anything. vkBasalt's `toggleKey` defaults to
+Home when left out and logs an error for a name X does not know, so the config names
+`F35`: a real keysym that no keyboard map gives a key, so it resolves to keycode 0,
+which the keymap vkBasalt polls never reports pressed. For an A/B, `./a2mod stock`
+launches without it; on the bench, set `enableOnLaunch` in the session's copy of the
+config. CAS sharpening and FXAA/SMAA are untried.
 
     postfx/vkbasalt/build.sh          # build + install the layer (per-user, pinned)
     postfx/postfx.py --on             # write config, prove it compiles, enable in Heroic

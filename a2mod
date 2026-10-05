@@ -56,8 +56,7 @@ DELIBERATELY NOT SWITCHED, in both states:
 
 BLOOM is switched with vkBasalt's own `enableOnLaunch`, not with `postfx.py --off`:
 that edits Heroic's GamesConfig, which Heroic rewrites on exit, so it refuses while
-Heroic is open.  enableOnLaunch=False launches with the effect bypassed -- and Home
-still toggles it, which is the one live A/B this game has.
+Heroic is open.  enableOnLaunch=False launches with the effect bypassed.
 
 The game must not be running.  Anything that writes the game directory while in stock
 (`a2tex install`, a tool's installer) is caught on the way back: `refit` refuses
@@ -421,7 +420,7 @@ def status():
                 print(f'  {layer:<11} {parts}')
     b = bloom_get()
     print(f'  {"bloom":<11} ' + ('vkBasalt not configured' if b is None else
-                                 f'{"on" if b == "True" else "off"} at launch (Home toggles)'))
+                                 f'{"on" if b == "True" else "off"} at launch'))
     print(f'  {"dxvk":<11} unchanged in both states')
 
 

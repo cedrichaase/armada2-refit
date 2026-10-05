@@ -425,14 +425,19 @@ static float g_sh_sign = -1.0f;      /* -1: inward normals, as stock; +1: a mirr
  * for pass 0 only, so on the GPU path the night lights never drew. Render's third
  * argument is that material; the shaders fold the second pass into the first. */
 #define VT_SELFILLUM_MATERIAL 0x6bc854   /* ST3D_SelfIlluminatingMaterial vtable */
-static float g_selfillum = 1.0f;     /* SelfIllumination=: 1 is stock's second pass, 0 none */
+static float g_selfillum = 1.8f;     /* SelfIllumination=: 1 is stock's second pass, 0 none, above 1 brighter */
 
 /* Specular and rim (Shaders=1 only; hull.hlsl). A Blinn-Phong highlight from every
  * light, times the texture's brightness as a gloss mask; and a rim light on the faces
  * turned edge-on to the camera. */
-static float g_spec = 0.35f, g_spec_pow = 24.0f;    /* Specular=, SpecularPower= */
+static float g_spec = 0.7f, g_spec_pow = 24.0f;     /* Specular=, SpecularPower= */
 static float g_rim[3] = { 0.12f, 0.14f, 0.20f };    /* RimLight= */
 static float g_rim_pow = 3.0f;                      /* RimPower= */
+/* Dynamic range (Shaders=1; hull.hlsl, planet.hlsl). The Key on GPU-drawn hulls times
+ * HullSun, the light no longer clamped at 1, and colour above HighlightKnee rolled off
+ * towards white rather than clipped. lighting/README.md, "Dynamic range". */
+static float g_hull_sun = 1.1f;                     /* HullSun= */
+static float g_knee = 0.8f;                         /* HighlightKnee=; 1: clip, as before */
 static int   g_sh_lit_self;          /* the draw in hand has a self-illuminating material */
 
 /* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
@@ -808,11 +813,21 @@ static int sh_setup(void *d9)
             dv[nd * 4 + 2] = -l.Direction[2] / n;
             nd++;
         }
+        {   /* the Key, the brightest, times HullSun */
+            int   key = -1;
+            float best = 0.0f;
+            for (i = 0; i < nd; i++) {
+                float lum = dc[i * 4] + dc[i * 4 + 1] + dc[i * 4 + 2];
+                if (lum > best) { best = lum; key = i; }
+            }
+            if (key >= 0) for (i = 0; i < 3; i++) dc[key * 4 + i] *= g_hull_sun;
+        }
         d9_psconst(d9, 2, dc, 4);
         d9_psconst(d9, 6, dv, 4);
         misc[0] = g_sh_sign;
         misc[1] = g_sh_lit_self ? g_selfillum : 0.0f;
-        misc[2] = misc[3] = 0.0f;
+        misc[2] = g_knee;
+        misc[3] = 0.0f;
         d9_psconst(d9, 10, misc, 1);
         /* The point lights where they are, with the engine's falloff (full to start,
          * gone after fade) for the shader to apply per pixel. */
@@ -1623,7 +1638,7 @@ static void pl_consts(void *d9, const BYTE *mesh, const BYTE *lm, int atmo, cons
     }
     for (i = 0; i < 3; i++) k[52 + i] = g[i] * g_haze;
     k[55] = g_haze_pow;
-    k[56] = g_glint; k[57] = g_glint_pow; k[58] = g_city;
+    k[56] = g_glint; k[57] = g_glint_pow; k[58] = g_city; k[59] = g_knee;
     for (i = 0; i < 3; i++) k[60 + i] = g_city_col[i];
     /* c16..c39: point lights, measured from the surface */
     {
@@ -1809,6 +1824,8 @@ static void startup(void)
     ini1(ini, "SpecularPower",    &g_spec_pow);
     ini3(ini, "RimLight",         g_rim);
     ini1(ini, "RimPower",         &g_rim_pow);
+    ini1(ini, "HullSun",          &g_hull_sun);
+    ini1(ini, "HighlightKnee",    &g_knee);
     ini3(ini, "KeyColour",  g_key_col);
     ini3(ini, "KeyAxis",    g_key_dir);
     ini3(ini, "FillColour", g_fill_col);

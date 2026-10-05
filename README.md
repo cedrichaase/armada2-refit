@@ -149,7 +149,7 @@ d3d8to9 also needs the Visual C++ 2015–2022 (x86) and DirectX end-user runtime
 
 | Layer | Install | Needs |
 |---|---|---|
-| Bloom | `postfx/vkbasalt/build.sh`, then `postfx/postfx.py --on` | DXVK (vkBasalt is a Vulkan layer), a per-user vkBasalt build, and Heroic: `--on` sets `ENABLE_VKBASALT=1` in the game's Heroic config, so quit Heroic first. Home toggles it in game |
+| Bloom | `postfx/vkbasalt/build.sh`, then `postfx/postfx.py --on` | DXVK (vkBasalt is a Vulkan layer), a per-user vkBasalt build, and Heroic: `--on` sets `ENABLE_VKBASALT=1` in the game's Heroic config, so quit Heroic first. On from launch; `./a2mod stock` launches without it |
 
 The helper scripts (`./install`, `./a2mod`, the per-layer `install.sh`) are bash and
 assume Linux. They find the game through `a2env.sh`, which defaults to Heroic's paths.

@@ -130,7 +130,7 @@ OPTIONAL, BY HAND -- only if you want what the installer skipped
     Windows:  install ReShade (reshade.me) for Armada2.exe -- for Vulkan when DXVK's DLLs
               are in the game directory. No effect packages are needed. If you already
               had a ReShade preset, pick A2Bloom.ini in ReShade's overlay.
-  Home toggles bloom in game. Not yet seen in game through this package.
+  Bloom is on from launch. Not yet seen in game through this package.
   MSAA: if DXVK comes from somewhere other than the game directory (Proton's own, say),
   the installer cannot see it; copy game/MSAA.asi and game/MSAA.ini across yourself.
 

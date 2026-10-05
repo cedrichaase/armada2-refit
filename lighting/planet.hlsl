@@ -23,7 +23,8 @@ float4 centre       : register(c10);  // the sphere's centre, world space
 float4 eye          : register(c11);  // the camera's world position
 float4 dusk         : register(c12);  // rgb: the light's colour where it grazes; a: how far round it wraps
 float4 haze         : register(c13);  // rgb: the atmosphere's colour at the limb; a: its exponent
-float4 shine        : register(c14);  // x: ocean glint strength, y: its exponent, z: city lights at night
+float4 shine        : register(c14);  // x: ocean glint strength, y: its exponent, z: city lights at night,
+                                      // w: the highlight knee (hull.hlsl's shoulder; 1: clip)
 float4 city_col     : register(c15);  // the city lights' colour
 float4 pcol[POINTS] : register(c16);  // point light colour; 0 for none
 float4 ppos[POINTS] : register(c24);  // world position
@@ -68,6 +69,15 @@ Sky shade(float3 wp)
     return s;
 }
 
+// hull.hlsl's highlight shoulder: as it is up to the knee k, then rolling off towards
+// white instead of clipping.
+float3 shoulder(float3 x, float k)
+{
+    float  r = max(1.0 - k, 1e-4);
+    float3 y = k + r * (1.0 - exp(-(x - k) / r));
+    return k >= 1.0 ? saturate(x) : lerp(max(x, 0.0), y, step(k, x));
+}
+
 // The light on the texture: clamped, as Direct3D and the CPU path clamp it, but at the
 // Key's own strength rather than 1, so PlanetSun can lift the lit side above stock.
 float3 lit(Sky s) { return clamp(s.light, 0.0, max(1.0, dcol[0].a)); }
@@ -81,7 +91,7 @@ float4 ground_ps(Lit i) : COLOR
     float4 t = tex2D(tex0, i.uv);
     float  wet = saturate((t.b - max(t.r, t.g)) * 8.0 + 0.15) * saturate(1.2 - dot(t.rgb, 0.333) * 1.5);
     float3 c = t.rgb * lit(s) + s.glow + s.spec * shine.x * wet;
-    return float4(saturate(c), 1.0);
+    return float4(shoulder(c, shine.w), 1.0);
 }
 
 // The cities (pass 1, blended by alpha over the ground): the development texture
@@ -93,7 +103,7 @@ float4 city_ps(Lit i) : COLOR
     float4 t = tex2D(tex0, i.uv) * tex2D(tex1, i.uv);
     float  night = (1.0 - s.day) * shine.z;
     float3 c = t.rgb * lit(s) + city_col.rgb * night;
-    return float4(saturate(c), saturate(t.a * (1.0 + night * 2.0)));
+    return float4(shoulder(c, shine.w), saturate(t.a * (1.0 + night * 2.0)));
 }
 
 // The cloud shell (blended by its texture's alpha): the clouds lit with a night side,
@@ -104,5 +114,5 @@ float4 cloud_ps(Lit i) : COLOR
     float4 t = tex2D(tex0, i.uv);
     float  g = dot(s.glow, float3(0.3, 0.5, 0.2));
     float3 c = t.rgb * lit(s) + s.glow;
-    return float4(saturate(c), saturate(t.a + g));
+    return float4(shoulder(c, shine.w), saturate(t.a + g));
 }

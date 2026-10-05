@@ -46,8 +46,10 @@ planet's ground colour (`planet glow:`).
 | `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
-| `SelfIllumination` | `1.0` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none |
-| `Specular`, `SpecularPower` | `0.35`, `24` | with `Shaders`, a highlight from every light, times the texture's brightness; strength (`0`: none) and exponent (below) |
+| `SelfIllumination` | `1.8` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none, above 1 brighter than their texture ("Dynamic range") |
+| `HullSun` | `1.1` | with `Shaders`, the Key on GPU-drawn hulls times this, the light no longer clamped at 1 ("Dynamic range") |
+| `HighlightKnee` | `0.8` | with `Shaders` or `PlanetShaders`, colour above this rolls off towards white instead of clipping; `1` clips as before ("Dynamic range") |
+| `Specular`, `SpecularPower` | `0.7`, `24` | with `Shaders`, a highlight from every light, times the texture's brightness; strength (`0`: none) and exponent (below) |
 | `RimLight`, `RimPower` | `0.12 0.14 0.20`, `3.0` | with `Shaders`, light on the faces turned edge-on to the camera; colour (`0 0 0`: none) and how closely it hugs the edge |
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `PointLights` | `12` | point lights per GPU draw, the strongest first: up to 16 with `Shaders`, 6 in Direct3D's slots; `0` gives the GPU path none, as stock |
@@ -479,6 +481,46 @@ then lights the whole face at once. The broad default is the one that reads; how
 as ships turn is for the game to show. The pixel shader is about 1370 instructions as
 vkd3d emits it; with vsync off in the `firing` scene the frame stayed on its 1.0 ms
 floor, as before.
+
+## Dynamic range
+
+The frame is 8-bit and bloom (`postfx/`) works on it afterwards, as `pow(colour, 6)`, so
+only what reaches nearly white blooms. Before 1.10.0 nothing lit on a hull could reach
+it: `hull.hlsl` clamped the summed light at 1 *before* the texture, so a fully lit plate
+was at most its texture's own grey, and an explosion beside a hull
+(`ExplosionBrightness=4`) lit it no brighter than the Key alone. The night lights were
+the texture's own colour, and ended up no brighter than the plating around them. With
+the darker scene lights since 1.2.0, the frame had almost nothing for bloom to take.
+
+- **The light is no longer clamped.** `t × light + specular` can pass 1: under an
+  explosion, a torpedo, or the Key times `HullSun`.
+- **A shoulder instead of a clip** (`HighlightKnee`): each channel as it is up to the
+  knee, then `k + (1−k)(1 − e^(−(x−k)/(1−k)))`, which meets it with the same slope and
+  approaches 1. Per channel, so what is hotter than white turns white, as a bright light
+  does, rather than staying a flat saturated colour. The planet shaders end in the same
+  shoulder (their light was already allowed past 1 by `PlanetSun`, and was clipped).
+- **The highlights are what is pushed, not the hull.** `SelfIllumination` above 1 draws
+  the night lights at the texture times that, and `Specular` is doubled.
+
+Measured on the bench (`SCENE=planet`, `orbit ship 200 20 150`, a 720x330 box round the
+Galaxy, one session relaunched per variant, before bloom):
+
+| | `HullSun` | knee | `SelfIllumination` | `Specular` | mean | share > 0.85 | mean of c⁶ |
+|---|---|---|---|---|---|---|---|
+| A (as 1.9.0) | 1 | 1 | 1 | 0.35 | 0.380 | 0.4% | 0.037 |
+| B | 1.6 | 0.8 | 1 | 0.35 | 0.426 | 9.6% | 0.098 |
+| D | 1.25 | 0.8 | 2 | 0.6 | 0.419 | 3.2% | 0.073 |
+| E | 1 | 0.8 | 3 | 0.8 | 0.369 | 3.7% | 0.053 |
+
+B (and 2.2, worse) brightens the whole lit side: the plating rises to the windows'
+level and they vanish into it, so the hull loses contrast while bloom rises. E keeps the
+plating where it was and puts the near-white pixels where the eye expects light:
+windows, nacelle grilles, bussards, the glint on the saucer. The defaults sit between D
+and E (`HullSun=1.1`, `Specular=0.7`); `SelfIllumination` shipped at 2.5 on the bench and
+came down to 1.8 after a look in game. A knee of 0.6 was tried
+first and flattened planets: their ground is bright art, and compressing everything over
+0.6 hazed it. In the `firing` scene the Galaxy's own torpedo now lights its engineering
+hull orange as it leaves (the Borg cube is on the dot3 path and takes none of this).
 
 ## Planets on the GPU
 
