@@ -14,12 +14,12 @@ versions". Newest first. Details, and the planned changes, are in
   A group holds ships or one kind of station: `Shift+number` refuses anything else.
   With several stations selected the build menu is available, and each build order
   goes to the one with the shortest queue (in turn on a tie), each cancel to the
-  longest (QOL-5, QOL-6).
+  longest (QOL-5, QOL-6). (5a5f2d0)
 
 ### Fixed
 - `Ctrl+number` now replaces a group that held stations: before, the stations stayed
   in it with their group number drawn, and `Ctrl+number` on a station added to the
-  group.
+  group. (5a5f2d0)
 
 Installed, not yet seen in game.
 
