@@ -5,6 +5,25 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.13.0 — 2026-10-05
+
+Layers: platform 3.2.0.
+
+### Changed
+- `./install` sets up the d3d8to9 chain for a game on the DXVK chain, so the shader
+  lighting is on after a plain install (platform 3.2.0).
+- The release zip ships `Lighting.asi` and `Lighting.ini`, installed everywhere and taken
+  out by `--uninstall`; it lights per pixel only behind d3d8to9, which the zip does not
+  install, and per vertex otherwise.
+
+### Fixed
+- The release installers put `MSAA.asi` in on the d3d8to9 chain too (crosire's d3d8to9,
+  known by hash, in front of DXVK's `d3d9.dll`); they had skipped it whenever the
+  `d3d8.dll` was not DXVK's.
+- CI checks a new branch's commits from where it leaves `main`, not all of history,
+  which failed every new branch on 24cbcd0 (build output, taken out in da4a4a6). The
+  installer tests cover `Lighting.asi` and the d3d8to9 chain.
+
 ## 9.12.0 — 2026-10-05
 
 Layers: lighting 1.8.0.

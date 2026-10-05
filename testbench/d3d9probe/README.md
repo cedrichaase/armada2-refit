@@ -6,7 +6,7 @@ It is the spike behind `platform/D3D9.md`, kept so the chain can be re-checked a
 change to it. A bench tool: `install` refuses any game directory that is not an `a2test`
 clone, and `a2mod` does not know about it.
 
-    # the clone's own chain (DXVK's d3d8: QueryInterface fails, the probe only logs)
+    # the clone's own chain: since platform 3.2.0, ./install leaves it on d3d8to9
     ./a2test session start --install . --install testbench/d3d9probe
     # a d3d8to9 in the clone's d3d8 slot
     D3D9PROBE_D3D8=<path>/d3d8.dll ./a2test session start --install . --install testbench/d3d9probe

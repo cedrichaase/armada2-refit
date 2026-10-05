@@ -3,7 +3,7 @@
 #
 # Writes <out-dir>/armada2-refit-<version>.zip (default out-dir: dist/ under a fresh
 # mktemp -d, printed at the end):
-#   game/     what goes beside Armada2.exe: the four plugins and their .ini, dxvk.conf
+#   game/     what goes beside Armada2.exe: the five plugins and their .ini, dxvk.conf
 #   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
 #   install.sh  install.ps1  install.bat     publish/installer/, for Linux and Windows
 #   vendor/   third-party files whose licence allows bundling (platform/vendor/)
@@ -30,6 +30,7 @@ bash "$root/hud/build.sh"              >/dev/null
 bash "$root/menus/build.sh"            >/dev/null
 bash "$root/msaa/build.sh"             >/dev/null
 bash "$root/qol/build.sh"              >/dev/null
+bash "$root/lighting/build.sh"         >/dev/null
 bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
 
 name="armada2-refit-$ver"
@@ -41,6 +42,7 @@ cp "$root/hud/build/HUD.asi"                "$root/hud/HUD.ini"                 
 cp "$root/menus/build/Menus.asi"            "$root/menus/Menus.ini"             "$d/game/"
 cp "$root/msaa/build/MSAA.asi"              "$root/msaa/MSAA.ini"               "$d/game/"
 cp "$root/qol/build/QOL.asi"                "$root/qol/QOL.ini"                 "$d/game/"
+cp "$root/lighting/build/Lighting.asi"      "$root/lighting/Lighting.ini"       "$d/game/"
 cp "$root/cutscenes/binkproxy/build/binkw32.dll" "$root/cutscenes/binkproxy/BinkProxy.ini" "$d/game/"
 # dxvk.conf as ./install writes it (stage 3); only DXVK reads it.
 bash "$root/postfx/renderer-config.sh" --print --stage 3 > "$d/game/dxvk.conf"
@@ -85,8 +87,19 @@ the game directory. Undo everything with --uninstall (install.bat -Uninstall).
 WHAT GOES IN (game/, copied beside Armada2.exe)
   HUD.asi      + HUD.ini        hud $(version "$root/hud/CHANGELOG.md")        in-game HUD, font and cursors at any aspect
   Menus.asi    + Menus.ini      menus $(version "$root/menus/CHANGELOG.md")      the shell menus scaled to fill the screen
+  QOL.asi      + QOL.ini        qol $(version "$root/qol/CHANGELOG.md")        quality of life that stock players can play
+                                               against: right-drag pan speed, control groups
+  Lighting.asi + Lighting.ini   lighting $(version "$root/lighting/CHANGELOG.md")   ships and stations lit on the GPU, new scene
+                                               lights, planets with a night side, light
+                                               from nebulae, planets, explosions, torpedoes.
+                                               Lit per pixel in shaders, with specular, a
+                                               rim and the hulls' night lights, when the
+                                               d3d8.dll is crosire's d3d8to9 (the
+                                               repository's ./install sets that up); per
+                                               vertex otherwise. Lighting.log says which
   MSAA.asi     + MSAA.ini       msaa $(version "$root/msaa/CHANGELOG.md")       multisample anti-aliasing -- installed only
-                                               when DXVK's d3d8.dll is in the game directory
+                                               when DXVK is in the game directory: its
+                                               d3d8.dll, or d3d8to9 on its d3d9.dll
   binkw32.dll  + BinkProxy.ini  cutscenes $(version "$root/cutscenes/CHANGELOG.md")  launch reels full screen, AV1 movie replacements
   dxvk.conf                     postfx $(version "$root/postfx/CHANGELOG.md")     16x anisotropic filtering, LOD bias, seamless
                                                cube maps; only DXVK reads it

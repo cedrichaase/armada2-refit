@@ -26,9 +26,15 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           # New commits only: those since the push's old tip or the PR's base. A new
-          # branch has no old tip, so everything on it is checked.
+          # branch has no old tip; it is checked from where it leaves main, as a PR
+          # would be, since what main holds is published already. (Checking
+          # all of history failed every new branch on 24cbcd0, which committed build
+          # output that da4a4a6 took out again.) With no main to compare against,
+          # everything is checked.
           if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             range="$BASE..HEAD"
+          elif mb=$(git merge-base origin/main HEAD 2>/dev/null); then
+            range="$mb..HEAD"
           else
             range=HEAD
           fi

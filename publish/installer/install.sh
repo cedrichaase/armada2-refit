@@ -6,7 +6,7 @@
 #
 # No choices to make: what can work here is installed, the rest is skipped and says why.
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
-# in vendor/, each file only if missing. MSAA.asi goes in when DXVK's d3d8.dll is in the game directory (without DXVK the minimap goes
+# in vendor/, each file only if missing. MSAA.asi goes in when DXVK is in the game directory -- its d3d8.dll, or crosire's d3d8to9 on its d3d9.dll (without DXVK the minimap goes
 # black); bloom is set up when a vkBasalt layer is installed.
 #
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
@@ -49,11 +49,16 @@ MANIFEST="$game/armada2-refit-prereqs.txt"   # what the prerequisites step added
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
 # DXVK by content, never by name: GOG puts a d3d8.dll there too.
 is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
+# crosire's d3d8to9 1.16.0, as the repository's ./install places it (platform/vendor/), by hash.
+D3D8TO9_SHA=122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8
+is_d3d8to9() { [ -f "$1" ] && [ "$(sha256sum "$1" | cut -d' ' -f1)" = "$D3D8TO9_SHA" ]; }
+# DXVK in the chain: its own d3d8, or d3d8to9 in front of its d3d9.
+dxvk_chain() { is_dxvk "$game/d3d8.dll" || { is_d3d8to9 "$game/d3d8.dll" && is_dxvk "$game/d3d9.dll"; }; }
 
 # ------------------------------------------------------------------ uninstall
 
 if [ "$action" = uninstall ]; then
-    for n in HUD Menus MSAA QOL; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
+    for n in HUD Menus MSAA QOL Lighting; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
     if is_proxy "$game/binkw32.dll"; then
         if [ -f "$game/binkw32.dll.a2neb-backup" ]; then
             mv -f "$game/binkw32.dll.a2neb-backup" "$game/binkw32.dll"
@@ -130,12 +135,15 @@ put HUD.asi; put HUD.ini
 rm -f "$game/MenuScale.asi" "$game/MenuScale.ini"   # Menus.asi's old name; never both
 put Menus.asi; put Menus.ini
 put QOL.asi; put QOL.ini
+# Lit per pixel in shaders only behind crosire's d3d8to9; per vertex on any other d3d8.
+put Lighting.asi; put Lighting.ini
+is_d3d8to9 "$game/d3d8.dll" || echo "  (Lighting: per vertex here -- its shaders need crosire's d3d8to9 as d3d8.dll)"
 
-if is_dxvk "$game/d3d8.dll"; then
+if dxvk_chain; then
     put MSAA.asi; put MSAA.ini
 else
     rm -f "$game/MSAA.asi"
-    echo "  MSAA.asi skipped: DXVK's d3d8.dll is not in the game directory"
+    echo "  MSAA.asi skipped: DXVK is not in the game directory"
 fi
 
 # The proxy forwards every call to the stock DLL as binkw32_orig.dll.

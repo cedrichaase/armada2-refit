@@ -9,6 +9,9 @@
     d3d8-chain.py --use wine      Wine's builtin d3d8 -> wined3d -> OpenGL
     d3d8-chain.py --revert        the GOG release as shipped: its d3d8to9 in the game
                                   directory, the prefix's d3d9, Heroic's DXVK re-enabled
+    d3d8-chain.py --upgrade       what ./install runs: the DXVK chain becomes the d3d8to9
+                                  one, by swapping the game directory's d3d8.dll alone;
+                                  any other chain is left as it is
 
 --use keeps GOG's d3d8.dll as d3d8.dll.gog-backup the first time it replaces it, and
 refuses to replace a d3d8.dll it cannot identify.
@@ -334,6 +337,35 @@ def install(which):
     status()
 
 
+def upgrade():
+    """The DXVK chain -> the d3d8to9 chain, touching nothing but the game directory's
+    d3d8.dll.
+
+    The two chains differ only there: both keep DXVK's d3d9 beside the exe, and both
+    need the d3d9 override and autoInstallDxvk off, which the DXVK chain already has.
+    So this never reads or writes Heroic's config, and runs fine with Heroic open and
+    in a test-bench clone. Any chain but exactly DXVK's d3d8 on DXVK's d3d9 (GOG's,
+    Wine's, one of the player's own) is left alone and named; `--use dxvk` goes back.
+    """
+    gamed8 = os.path.join(GAME, 'd3d8.dll')
+    gamed9 = os.path.join(GAME, 'd3d9.dll')
+    have8 = identify(gamed8)
+    have9 = identify(gamed9) if os.path.exists(gamed9) else '(absent)'
+    if have8.startswith('d3d8to9'):
+        print('d3d8 chain: d3d8to9 already (plugins can reach Direct3D 9)')
+        return 0
+    if not (have8.startswith('DXVK d3d8') and have9.startswith('DXVK d3d9')):
+        print('d3d8 chain: left as it is (d3d8.dll: %s, d3d9.dll: %s); shaders need '
+              'd3d8to9 -- platform/d3d8-chain.py --use d3d8to9' % (have8, have9))
+        return 0
+    if sha(D3D8TO9) != D3D8TO9_SHA:
+        raise SystemExit('%s does not match its SOURCE.txt hash' % D3D8TO9)
+    _place(D3D8TO9, gamed8)
+    print('d3d8 chain: DXVK d3d8 -> d3d8to9 1.16.0 on %s (back: platform/d3d8-chain.py '
+          '--use dxvk)' % have9)
+    return 0
+
+
 def main():
     args = sys.argv[1:]
     if not args or args[0] in ('-h', '--help'):
@@ -347,6 +379,8 @@ def main():
         install(args[1])
     elif args[0] == '--revert':
         install('stock')
+    elif args[0] == '--upgrade':
+        upgrade()
     else:
         raise SystemExit('unknown arguments: %s' % ' '.join(args))
     return 0
