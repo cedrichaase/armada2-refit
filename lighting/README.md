@@ -36,11 +36,12 @@ planet's ground colour (`planet glow:`).
 | `KeyAxis`, `FillAxis` | `0.50 -0.50 0.71`, the negation | the light matrix's third axis, in the engine's own convention: the stock key on the first Federation map is `0 -0.707 0.707` and lights the hulls from above |
 | `Ambient` | `0.05 0.05 0.07` | light every GPU-drawn surface gets, whatever its direction |
 | `Planets` | `1` | planets lit by Key and Fill with a night side (below) |
-| `PlanetAmbient` | `0.02 0.02 0.03` (left out: `Ambient`) | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
+| `PlanetAmbient` | `0.018 0.018 0.027` (left out: `Ambient`) | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
 | `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
 | `PlanetShaders` | `1` | under d3d8to9, draw planets and their cloud shells in shaders, lit per pixel ("Planets on the GPU", below); with any other d3d8, or `0`, the CPU path as before |
-| `PlanetFill` | `0.35` | with `PlanetShaders`, every directional light but the Key, times this, on planets |
-| `PlanetWrap`, `PlanetDusk` | `0.12`, `1.00 0.55 0.35` | how far past the terminator the light wraps, and its colour where it grazes |
+| `PlanetFill` | `0.315` | with `PlanetShaders`, every directional light but the Key, times this, on planets |
+| `PlanetSun` | `1.2` | with `PlanetShaders`, the Key on planets times this; the light on the texture is clamped at this rather than 1, so the lit side can be brighter than the CPU path's |
+| `PlanetWrap`, `PlanetDusk` | `0.25`, `1.00 0.55 0.35` | how far past the terminator the light wraps, and its colour where it grazes |
 | `PlanetHaze`, `PlanetHazeColour`, `PlanetHazePower` | `0.45`, from the ground, `3.0` | the atmosphere seen edge-on at the limb: strength, colour (left out: half the ground's hue, half a sky blue), how closely it hugs the edge |
 | `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |

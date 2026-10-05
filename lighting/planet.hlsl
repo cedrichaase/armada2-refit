@@ -17,7 +17,7 @@ struct Lit
 #define POINTS 8
 float4 base         : register(c0);   // the material's constant term (rgb)
 float4 mat_diffuse  : register(c1);   // the material's diffuse colour (rgb)
-float4 dcol[DIRS]   : register(c2);   // directional lights' colour; 0 for none
+float4 dcol[DIRS]   : register(c2);   // directional lights' colour; 0 for none; dcol[0].a: the cap on the light
 float4 dvec[DIRS]   : register(c6);   // towards each, world space, unit
 float4 centre       : register(c10);  // the sphere's centre, world space
 float4 eye          : register(c11);  // the camera's world position
@@ -51,7 +51,7 @@ Sky shade(float3 wp)
         // Wrapped a little past the terminator, as an atmosphere scatters it, and
         // reddened where it grazes: sunset along the terminator.
         float lam = saturate((ndl + dusk.a) / (1.0 + dusk.a));
-        float3 c  = dcol[k].rgb * lerp(dusk.rgb, 1.0, saturate(ndl * 6.0));
+        float3 c  = dcol[k].rgb * lerp(dusk.rgb, 1.0, saturate(ndl * 4.0));
         s.light += c * mat_diffuse.rgb * lam;
         s.glow  += c * saturate(ndl + 0.35) * rim;
         float3 H = normalize(dvec[k].xyz + V);
@@ -68,6 +68,10 @@ Sky shade(float3 wp)
     return s;
 }
 
+// The light on the texture: clamped, as Direct3D and the CPU path clamp it, but at the
+// Key's own strength rather than 1, so PlanetSun can lift the lit side above stock.
+float3 lit(Sky s) { return clamp(s.light, 0.0, max(1.0, dcol[0].a)); }
+
 // The ground (ST3D_PlanetaryMaterial pass 0, opaque): the ground texture lit, the
 // atmosphere seen edge-on at the limb, and a glint off water, which is taken to be
 // where the ground is bluer than it is red or green.
@@ -76,7 +80,7 @@ float4 ground_ps(Lit i) : COLOR
     Sky    s = shade(i.wp);
     float4 t = tex2D(tex0, i.uv);
     float  wet = saturate((t.b - max(t.r, t.g)) * 8.0 + 0.15) * saturate(1.2 - dot(t.rgb, 0.333) * 1.5);
-    float3 c = t.rgb * saturate(s.light) + s.glow + s.spec * shine.x * wet;
+    float3 c = t.rgb * lit(s) + s.glow + s.spec * shine.x * wet;
     return float4(saturate(c), 1.0);
 }
 
@@ -88,7 +92,7 @@ float4 city_ps(Lit i) : COLOR
     Sky    s = shade(i.wp);
     float4 t = tex2D(tex0, i.uv) * tex2D(tex1, i.uv);
     float  night = (1.0 - s.day) * shine.z;
-    float3 c = t.rgb * saturate(s.light) + city_col.rgb * night;
+    float3 c = t.rgb * lit(s) + city_col.rgb * night;
     return float4(saturate(c), saturate(t.a * (1.0 + night * 2.0)));
 }
 
@@ -99,6 +103,6 @@ float4 cloud_ps(Lit i) : COLOR
     Sky    s = shade(i.wp);
     float4 t = tex2D(tex0, i.uv);
     float  g = dot(s.glow, float3(0.3, 0.5, 0.2));
-    float3 c = t.rgb * saturate(s.light) + s.glow;
+    float3 c = t.rgb * lit(s) + s.glow;
     return float4(saturate(c), saturate(t.a + g));
 }

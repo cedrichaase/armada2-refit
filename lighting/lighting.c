@@ -1474,8 +1474,9 @@ typedef long (__stdcall *D9Obj_t)(void *, void *);
 
 static int   g_planet_sh = 1;                                /* PlanetShaders= */
 static float g_dusk[3]   = { 1.00f, 0.55f, 0.35f };          /* PlanetDusk= */
-static float g_wrap      = 0.12f;                            /* PlanetWrap= */
-static float g_pl_fill   = 0.35f;                            /* PlanetFill= */
+static float g_wrap      = 0.25f;                            /* PlanetWrap= */
+static float g_pl_fill   = 0.315f;                           /* PlanetFill= */
+static float g_pl_sun    = 1.2f;                             /* PlanetSun= */
 static float g_haze      = 0.45f;                            /* PlanetHaze= */
 static float g_haze_col[3] = { -1.0f, 0.0f, 0.0f };          /* PlanetHazeColour=; < 0: from the ground */
 static float g_haze_pow  = 3.0f;                             /* PlanetHazePower= */
@@ -1601,6 +1602,8 @@ static void pl_consts(void *d9, const BYTE *mesh, const BYTE *lm, int atmo, cons
             t = k[24 + i]; k[24 + i] = k[24 + key * 4 + i]; k[24 + key * 4 + i] = t;
         }
     for (i = 4; i < 16; i++) k[8 + i] *= g_pl_fill;
+    for (i = 0; i < 3; i++) k[8 + i] *= g_pl_sun;
+    k[11] = g_pl_sun;
     /* c10: the sphere's centre, the world matrix's translation; c11: the camera */
     for (i = 0; i < 3; i++) k[40 + i] = w[12 + i];
     for (i = 0; i < 3; i++)
@@ -1832,6 +1835,7 @@ static void startup(void)
     ini3(ini, "PlanetDusk",        g_dusk);
     ini1(ini, "PlanetWrap",        &g_wrap);
     ini1(ini, "PlanetFill",        &g_pl_fill);
+    ini1(ini, "PlanetSun",         &g_pl_sun);
     ini1(ini, "PlanetHaze",        &g_haze);
     ini3(ini, "PlanetHazeColour",  g_haze_col);
     ini1(ini, "PlanetHazePower",   &g_haze_pow);

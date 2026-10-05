@@ -13,8 +13,9 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   normal, a night side for the clouds too, a warm terminator (`PlanetWrap`,
   `PlanetDusk`), the atmosphere at the limb (`PlanetHaze`, `PlanetHazeColour`,
   `PlanetHazePower`), a glint off water (`PlanetGlint`, `PlanetGlintPower`), city lights
-  at night (`CityLights`, `CityLightColour`) and `PlanetFill` for the lights other than
-  the Key. `Lighting.log` reads `call sites patched 12`.
+  at night (`CityLights`, `CityLightColour`), `PlanetFill` for the lights other than
+  the Key and `PlanetSun` for the Key.
+- Shipped `Lighting.ini`: `PlanetAmbient=0.018 0.018 0.027` (was 0.02 0.02 0.03). `Lighting.log` reads `call sites patched 12`.
 
 Seen on the bench 2026-10-05 (`SCENE=planet`). Installed, not yet seen in game.
 
