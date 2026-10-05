@@ -22,7 +22,7 @@ that `Lighting.ini` switches separately:
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
 `a2mod` switches the plugin as the `lighting` layer. Each launch writes `Lighting.log`:
-`call sites patched 11` means every hook took, and the lines after it name every model
+`call sites patched 12` means every hook took, and the lines after it name every model
 switched to vertex buffers, the map's own lights, the sky light (`sky:`) and each
 planet's ground colour (`planet glow:`).
 
@@ -36,8 +36,15 @@ planet's ground colour (`planet glow:`).
 | `KeyAxis`, `FillAxis` | `0.50 -0.50 0.71`, the negation | the light matrix's third axis, in the engine's own convention: the stock key on the first Federation map is `0 -0.707 0.707` and lights the hulls from above |
 | `Ambient` | `0.05 0.05 0.07` | light every GPU-drawn surface gets, whatever its direction |
 | `Planets` | `1` | planets lit by Key and Fill with a night side (below) |
-| `PlanetAmbient` | `0.02 0.02 0.03` (left out: `Ambient`) | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
+| `PlanetAmbient` | `0.018 0.018 0.027` (left out: `Ambient`) | the planet material's constant term, added whatever the direction; stock is `0.5 0.5 0.5` |
 | `PlanetDiffuse` | `1.00 1.00 1.00` | the planet material's diffuse colour; stock is `0.75 0.75 0.75` |
+| `PlanetShaders` | `1` | under d3d8to9, draw planets and their cloud shells in shaders, lit per pixel ("Planets on the GPU", below); with any other d3d8, or `0`, the CPU path as before |
+| `PlanetFill` | `0.315` | with `PlanetShaders`, every directional light but the Key, times this, on planets |
+| `PlanetSun` | `1.2` | with `PlanetShaders`, the Key on planets times this; the light on the texture is clamped at this rather than 1, so the lit side can be brighter than the CPU path's |
+| `PlanetWrap`, `PlanetDusk` | `0.25`, `1.00 0.55 0.35` | how far past the terminator the light wraps, and its colour where it grazes |
+| `PlanetHaze`, `PlanetHazeColour`, `PlanetHazePower` | `0.45`, from the ground, `3.0` | the atmosphere seen edge-on at the limb: strength, colour (left out: half the ground's hue, half a sky blue), how closely it hugs the edge |
+| `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
+| `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
 | `SelfIllumination` | `1.0` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none |
 | `Specular`, `SpecularPower` | `0.35`, `24` | with `Shaders`, a highlight from every light, times the texture's brightness; strength (`0`: none) and exponent (below) |
@@ -473,11 +480,76 @@ as ships turn is for the game to show. The pixel shader is about 1370 instructio
 vkd3d emits it; with vsync off in the `firing` scene the frame stayed on its 1.0 ms
 floor, as before.
 
+## Planets on the GPU
+
+`PlanetShaders=1`, phase 3 of `platform/D3D9.md`. A planet is two `GroundMesh`
+hemispheres and a cloud shell (`Planet_Database` +0xa8, +0xac, +0xb0), which
+`GroundMesh::Recompute` (0x596200) rebuilds whenever the camera's distance changes the
+facet size, and re-UVs every frame for a shell with turbulence. That is why they never
+had a static vertex buffer, and why turning on the engine's own vertex-buffer path for
+them would not do: `ST3D_Mesh::Update` builds that buffer once, and `Recompute` does not
+call it. On the CPU path they reached Direct3D as screen-space triangles with a lit
+colour (`testbench/d3dtrace`), with nothing for a shader to light.
+
+`Recompute` does leave the object-space arrays every `ST3D_Mesh` has: positions at
++0xc0 (count +0xc8), normals at +0xc4, UVs at +0x124, and groups at +0x104 (count
++0x100, 0x1c bytes each) whose faces (+0x8, count +0xc, 0x28 bytes each) hold three
+position indices and three UV indices. It is the layout `ST3D_MeshVB_Imp::CreateBuffers`
+(0x637e40) reads to build a hull's buffer.
+
+| Where | What |
+|---|---|
+| slot 11 of the `GroundMesh` vtable (0x6bab88), `ST3D_Mesh::RenderInternal` (0x6325d0) | the plugin's own: the camera's sphere test (`CheckSphereVisibility`), the texture material's `SetRenderState`, `SetTextureWrap`, `SetCulling` and `SetWorldTransform` as the vertex-buffer path sets them; then per group, for each of the material's passes (`NumPasses`, `SetPassRenderState`, `PassCleanup`, slots 3–5), the group's triangles from those arrays through `DrawPrimitiveUP` with `hull_vs` and a pixel shader of `planet.hlsl` |
+
+The engine still sets every texture, blend and stage state, so only the colour is the
+plugin's. The ground's material (`ST3D_PlanetaryMaterial`) has one pass, or two when
+the planet has a development texture (`PD_<class><hemisphere>`): its cities, alpha
+blended, times the planet's own population map in stage 1 (`cityAllocTexture`, painted
+from `CityAllocArray`). The cloud shell is the class's `atmosphereTextureName`, blended
+by its alpha. The pixel shaders are `ground_ps`, `city_ps` and `cloud_ps`:
+
+- **The normal is the sphere's**, the direction from the world matrix's translation, per
+  pixel. The terminator is round whatever the tessellation.
+- **The lights** are read from the engine's list: the directional lights (the brightest
+  is the Key; the others times `PlanetFill`, since on a sphere each lights a whole
+  hemisphere: at 1 the sky light lit the night side teal) and up to 8 point lights that
+  reach the surface, without the planet glows, which the CPU path never lit a planet
+  with either. The material's constant term and diffuse are the ones `Planets=` sets.
+  The cloud shell's are not: `PlanetInstance::mSetupAtmosphere` calls
+  `SetAtmosphereTint` every frame, which writes 0.5 and 0.75 x the tint over them, so
+  stock clouds stayed half lit on the night side even with `Planets=1`. The shader takes
+  the tint back out and uses `PlanetAmbient` x tint.
+- **Dusk:** the light wraps `PlanetWrap` past the terminator and takes `PlanetDusk`'s
+  colour where it grazes.
+- **The limb:** `PlanetHaze` x (1 − N·V)^`PlanetHazePower`, lit where the light
+  reaches, added to the ground and the clouds; the cloud shell is larger than the ground,
+  so at the edge it shows as a thin halo.
+- **Water:** a Blinn-Phong glint where the ground is bluer than it is red or green and
+  not bright.
+- **Cities:** by day lit as the ground; on the night side `CityLightColour` x
+  `CityLights`, with the alpha raised so they show over the dark ground.
+
+**One trap, met on the bench:** `ST3D_DeviceDirectX8::PolygonSortRequired` (0x625510)
+is not a property of the device. It reads the material last set on it, so asked before
+the planet's own material it answered for whatever was drawn before, and the cloud shell
+went to the stock path on some frames and the plugin's on others: it flickered. The
+plugin does not ask. A blended shell is drawn at once over its own ground instead of
+being deferred to the engine's sort; nothing else sits between the two.
+
+On the bench (`SCENE=planet`, 1920x1080, d3d8to9): five frames of a paused view were
+byte-identical, and every planet mesh went through the shaders (`Lighting.log`:
+`planet shaders: meshes drawn`, `left to stock 0`). Side on (`orbit planet 305 15
+1000`) the terminator is a clean curve with a narrow warm band; from the night side
+(`orbit planet 35 10 1000`) the planet is dark with its clouds faintly visible, where
+the CPU path lit both its ground and its clouds evenly.
+
 ## Not covered yet
 
-- Planets stay on the CPU path (their meshes are rebuilt as the camera moves). The
-  clouds at a planet's poles pinch into a bright starburst where the cloud texture's
-  UVs converge; that is stock.
+- With `PlanetShaders=0` or without d3d8to9, planets stay on the CPU path. Either way
+  the clouds at a planet's poles pinch into a bright starburst where the cloud
+  texture's UVs converge; that is stock.
+- The city pass (`CityLights`) has not been seen yet: the bench planet has no
+  development texture.
 - The Borg and any hull
   `models/hull-bump.py` patched keep the dot3 path, which takes precedence over the
   vertex buffers.

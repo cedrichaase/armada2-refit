@@ -1426,6 +1426,355 @@ static int patch_planets(void)
     return 1;
 }
 
+/* Planets on the GPU (PlanetShaders=1). A planet's two GroundMesh hemispheres and its
+ * cloud shell (Planet_Database +0xa8, +0xac, +0xb0) are rebuilt by GroundMesh::Recompute
+ * whenever the camera's distance changes the facet size, and the cloud shell's UVs
+ * every frame its turbulence is on, so they never had a static vertex buffer: the CPU
+ * path lit and projected them, and Direct3D got screen-space triangles with a colour.
+ * Recompute leaves object-space arrays behind for that path, as every ST3D_Mesh has
+ * them: positions at +0xc0 (count +0xc8), normals at +0xc4, UVs at +0x124; groups at
+ * +0x104 (count +0x100, 0x1c each), each with its faces at +0x8
+ * (count +0xc, 0x28 each: three position indices, then three UV indices). This is the
+ * layout ST3D_MeshVB_Imp::CreateBuffers (0x637e40) reads when it builds a hull's buffer.
+ *
+ * GroundMesh has its own vtable (0x6bab88), whose slot 11 is ST3D_Mesh::RenderInternal
+ * (0x6325d0). The plugin's slot 11 does what that function and RenderInternalNonVB
+ * (0x631fd0) do around the draw -- the camera's sphere test, the texture material's
+ * render state, then per group NumPasses x SetPassRenderState and PassCleanup -- so
+ * the engine still sets every texture, blend and stage state, and only the draw is its
+ * own: the triangles from those arrays, in object space, with SetWorldTransform's
+ * matrix, through hull_vs and planet.hlsl's pixel shaders. The normal is not the
+ * mesh's: it is the direction from the sphere's centre, per pixel, so the terminator is
+ * round whatever the tessellation. With no Direct3D 9 device, or a per-render effect,
+ * slot 11 calls the stock function. */
+#include "planet_shaders.h"
+
+#define VT_GROUND_MESH  0x6bab88   /* GroundMesh vtable */
+#define FN_MESH_RENDER  0x6325d0   /* ST3D_Mesh::RenderInternal(), slot 11 */
+#define FN_TM_SETSTATE  0x644700   /* ST3D_TextureMaterial::SetRenderState() const */
+#define FN_SPHERE_VIS   0x619300   /* ST3D_Camera::CheckSphereVisibility(const Vector3 &, float): 1 = outside */
+#define NODE_TO_CAMERA  0x7ad610   /* ST3D_Node::m_node_to_camera */
+#define PL_POINTS       8
+#define PL_MAXV         (3 * 65536)
+
+typedef void (__thiscall *MeshRender_t)(void *);
+typedef void (__thiscall *TmState_t)(void *);
+typedef int  (__thiscall *TmPasses_t)(void *, void *, DWORD);
+typedef void (__thiscall *TmPass_t)(void *, int, void *);
+typedef void (__thiscall *TmCleanup_t)(void *);
+typedef int  (__thiscall *SphereVis_t)(void *, const float *, float);
+typedef void (__thiscall *DevArg_t)(void *, DWORD);
+typedef int  (__thiscall *DevGet_t)(void *, int, void *);
+typedef long (__stdcall *D8VS_t)(void *, DWORD);
+typedef long (__stdcall *D8GetVS_t)(void *, DWORD *);
+typedef long (__stdcall *D8DPUP_t)(void *, DWORD, UINT, const void *, UINT);
+typedef long (__stdcall *D9GetSS_t)(void *, UINT, void **, UINT *, UINT *);
+typedef long (__stdcall *D9SetSS_t)(void *, UINT, void *, UINT, UINT);
+typedef long (__stdcall *D9Obj_t)(void *, void *);
+
+static int   g_planet_sh = 1;                                /* PlanetShaders= */
+static float g_dusk[3]   = { 1.00f, 0.55f, 0.35f };          /* PlanetDusk= */
+static float g_wrap      = 0.25f;                            /* PlanetWrap= */
+static float g_pl_fill   = 0.315f;                           /* PlanetFill= */
+static float g_pl_sun    = 1.2f;                             /* PlanetSun= */
+static float g_haze      = 0.45f;                            /* PlanetHaze= */
+static float g_haze_col[3] = { -1.0f, 0.0f, 0.0f };          /* PlanetHazeColour=; < 0: from the ground */
+static float g_haze_pow  = 3.0f;                             /* PlanetHazePower= */
+static float g_glint     = 0.30f, g_glint_pow = 40.0f;       /* PlanetGlint=, PlanetGlintPower= */
+static float g_city      = 0.8f;                             /* CityLights= */
+static float g_city_col[3] = { 1.00f, 0.72f, 0.38f };        /* CityLightColour= */
+
+static D9Shader g_ground_ps = D9_PIXEL_SHADER(k_ground_ps);
+static D9Shader g_city_ps   = D9_PIXEL_SHADER(k_city_ps);
+static D9Shader g_cloud_ps  = D9_PIXEL_SHADER(k_cloud_ps);
+static float    g_pl_v[PL_MAXV * 8];                         /* XYZ | NORMAL | TEX1 */
+static long     g_pl_draws, g_pl_stock;
+static DWORD    g_pl_said;                                   /* first of each kind of draw, logged */
+
+static void pl_note(int bit, const char *what)
+{
+    char b[160];
+    if (g_pl_said & (1u << bit)) return;
+    g_pl_said |= 1u << bit;
+    b[0] = 0; s_cat(b, "planet shaders: "); s_cat(b, what); logline(b);
+}
+
+/* The planet whose visible database db is (Entity +0x80, as GetVisibleDatabase reads
+ * it), for its class's ground colour. */
+static const BYTE *pl_class(const BYTE *db)
+{
+    DWORD list = *(DWORD *)OBJECT_LIST, head, node;
+    if (!list || !db) return NULLPTR;
+    head = *(DWORD *)(list + 4);
+    for (node = *(DWORD *)head; node != head; node = *(DWORD *)node) {
+        BYTE *obj = *(BYTE **)(node + 8), *ent;
+        if (!obj || *(DWORD *)obj != VT_PLANET) continue;
+        ent = *(BYTE **)(obj + 4);
+        if (ent && *(BYTE **)(ent + 0x80) == db) return *(BYTE **)(obj + 0x40);
+    }
+    return NULLPTR;
+}
+
+/* The point lights that reach a sphere at c of radius r, strongest first: as
+ * pick_points, measured from its surface, and without the planet glows, which the CPU
+ * path never lit a planet with either. */
+static int pl_points(const float *c, float r, Pick *out, int max)
+{
+    DWORD eng = *(DWORD *)0x7ad508, head, node;
+    int   n = 0, i, j;
+    if (!eng) return 0;
+    head = *(DWORD *)(eng + 0x60);
+    for (node = *(DWORD *)head; node != head && max > 0; node = *(DWORD *)node) {
+        BYTE *inst  = *(BYTE **)(node + 8);
+        BYTE *light = *(BYTE **)inst;
+        const float *col = (const float *)(inst + 4);
+        const float *pos = (const float *)(inst + 0x10) + 9;
+        float start, range, dx, dy, dz, d, f, peak, score;
+        if (!light || *(DWORD *)light != VT_POINT) continue;
+        start = *(float *)(light + 0x100);
+        range = *(float *)(light + 0x104);
+        dx = c[0] - pos[0]; dy = c[1] - pos[1]; dz = c[2] - pos[2];
+        d = sqrt_f(dx * dx + dy * dy + dz * dz) - r;
+        if (d < 0.0f) d = 0.0f;
+        if (d >= start + range) continue;
+        f = d <= start ? 1.0f : 1.0f - (d - start) / (range > 1e-3f ? range : 1e-3f);
+        peak = col[0] > col[1] ? col[0] : col[1];
+        if (col[2] > peak) peak = col[2];
+        score = f * peak;
+        if (score < 0.004f) continue;
+        for (i = 0; i < n && out[i].score >= score; i++) ;
+        if (i >= max) continue;
+        if (n < max) n++;
+        for (j = n - 1; j > i; j--) out[j] = out[j - 1];
+        for (j = 0; j < 3; j++) { out[i].raw[j] = col[j]; out[i].pos[j] = pos[j]; }
+        out[i].score = score; out[i].start = start; out[i].fade = range;
+    }
+    return n;
+}
+
+/* The pixel shader's constants for one group of one planet mesh. */
+static void pl_consts(void *d9, const BYTE *mesh, const BYTE *lm, int atmo, const float *w, const float *vw)
+{
+    float k[40 * 4];
+    DWORD eng = *(DWORD *)0x7ad508, head, node;
+    const float *mbase = (const float *)(lm + 0x18), *mdiff = (const float *)(lm + 0x24);
+    const BYTE  *cls;
+    float  peak, g[3];
+    int    i, nd = 0, np, key = 0;
+    float  key_lum = -1.0f;
+    Pick   pk[PL_POINTS];
+
+    for (i = 0; i < 40 * 4; i++) k[i] = 0.0f;
+    if (atmo) {
+        /* SetAtmosphereTint gives the shell 0.5 x tint and 0.75 x tint, every frame, past
+         * the material Planets= patches: the night side keeps PlanetAmbient here too. */
+        for (i = 0; i < 3; i++) {
+            float tint = mdiff[i] / 0.75f;
+            k[4 + i] = tint;
+            k[i] = g_planets ? g_planet_amb[i] * tint : mbase[i];
+        }
+    } else {
+        for (i = 0; i < 3; i++) { k[i] = mbase[i]; k[4 + i] = mdiff[i]; }
+    }
+    /* c2..c9: the engine's directional lights, Key first: a light shines along its
+     * matrix's third axis, so towards it is the axis turned round. */
+    head = eng ? *(DWORD *)(eng + 0x60) : 0;
+    if (head)
+        for (node = *(DWORD *)head; node != head && nd < 4; node = *(DWORD *)node) {
+            BYTE *inst = *(BYTE **)(node + 8);
+            BYTE *light = *(BYTE **)inst;
+            const float *col = (const float *)(inst + 4), *ax = (const float *)(inst + 0x10) + 6;
+            float n;
+            float lum;
+            if (!light || *(DWORD *)light != VT_DIRECTIONAL) continue;
+            n = sqrt_f(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+            if (n < 1e-6f) continue;
+            for (i = 0; i < 3; i++) { k[8 + nd * 4 + i] = col[i]; k[24 + nd * 4 + i] = -ax[i] / n; }
+            lum = col[0] + col[1] + col[2];
+            if (lum > key_lum) { key_lum = lum; key = nd; }
+            nd++;
+        }
+    /* The Key (the brightest) into slot 0, which the shaders take for the sun; the others,
+     * which on a sphere light a whole hemisphere, times PlanetFill. */
+    if (key > 0)
+        for (i = 0; i < 4; i++) {
+            float t = k[8 + i]; k[8 + i] = k[8 + key * 4 + i]; k[8 + key * 4 + i] = t;
+            t = k[24 + i]; k[24 + i] = k[24 + key * 4 + i]; k[24 + key * 4 + i] = t;
+        }
+    for (i = 4; i < 16; i++) k[8 + i] *= g_pl_fill;
+    for (i = 0; i < 3; i++) k[8 + i] *= g_pl_sun;
+    k[11] = g_pl_sun;
+    /* c10: the sphere's centre, the world matrix's translation; c11: the camera */
+    for (i = 0; i < 3; i++) k[40 + i] = w[12 + i];
+    for (i = 0; i < 3; i++)
+        k[44 + i] = -(vw[12] * vw[i * 4] + vw[13] * vw[i * 4 + 1] + vw[14] * vw[i * 4 + 2]);
+    for (i = 0; i < 3; i++) k[48 + i] = g_dusk[i];
+    k[51] = g_wrap;
+    /* c13: the haze, PlanetHazeColour or half the ground's own hue, half a sky blue */
+    if (g_haze_col[0] >= 0.0f) for (i = 0; i < 3; i++) g[i] = g_haze_col[i];
+    else {
+        static const float sky[3] = { 0.40f, 0.62f, 1.00f };
+        const float *gc;
+        cls = pl_class(*(const BYTE **)(mesh + 0x140));
+        gc = cls ? glow_colour(cls) : sky;
+        peak = gc[0] > gc[1] ? gc[0] : gc[1];
+        if (gc[2] > peak) peak = gc[2];
+        for (i = 0; i < 3; i++) g[i] = 0.5f * (peak > 1e-3f ? gc[i] / peak : 1.0f) + 0.5f * sky[i];
+    }
+    for (i = 0; i < 3; i++) k[52 + i] = g[i] * g_haze;
+    k[55] = g_haze_pow;
+    k[56] = g_glint; k[57] = g_glint_pow; k[58] = g_city;
+    for (i = 0; i < 3; i++) k[60 + i] = g_city_col[i];
+    /* c16..c39: point lights, measured from the surface */
+    {
+        float r = *(const float *)(mesh + 0x150);
+        float s = sqrt_f(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
+        np = g_points > 0 ? pl_points(k + 40, r * s, pk, g_points < PL_POINTS ? g_points : PL_POINTS) : 0;
+    }
+    for (i = 0; i < PL_POINTS; i++) {
+        float *C = k + (16 + i) * 4, *P = k + (24 + i) * 4, *F = k + (32 + i) * 4;
+        F[0] = 1.0f; F[1] = 1.0f;
+        if (i >= np) continue;
+        C[0] = pk[i].raw[0]; C[1] = pk[i].raw[1]; C[2] = pk[i].raw[2];
+        P[0] = pk[i].pos[0]; P[1] = pk[i].pos[1]; P[2] = pk[i].pos[2];
+        F[0] = pk[i].start;
+        F[1] = pk[i].fade > 1e-3f ? 1.0f / pk[i].fade : 1000.0f;
+    }
+    d9_psconst(d9, 0, k, 40);
+}
+
+/* One group's triangles, three vertices each, from the mesh's arrays; 0 if too many. */
+static int pl_build(const BYTE *mesh, const BYTE *grp)
+{
+    const float *pos = *(const float **)(mesh + 0xc0), *nrm = *(const float **)(mesh + 0xc4);
+    const float *uv  = *(const float **)(mesh + 0x124);
+    const BYTE  *f   = *(const BYTE **)(grp + 8);
+    int   nf = *(const int *)(grp + 0xc), nv = *(const int *)(mesh + 0xc8), i, c;
+    float *o = g_pl_v;
+    if (!pos || !nrm || !uv || !f || nf <= 0 || nf * 3 > PL_MAXV) return 0;
+    for (i = 0; i < nf; i++, f += 0x28)
+        for (c = 0; c < 3; c++) {
+            int v = ((const unsigned short *)f)[c], t = ((const unsigned short *)f)[3 + c];
+            if (v >= nv) return 0;
+            o[0] = pos[v * 3]; o[1] = pos[v * 3 + 1]; o[2] = pos[v * 3 + 2];
+            o[3] = nrm[v * 3]; o[4] = nrm[v * 3 + 1]; o[5] = nrm[v * 3 + 2];
+            o[6] = uv[t * 2];  o[7] = uv[t * 2 + 1];
+            o += 8;
+        }
+    return nf;
+}
+
+/* 1 when the mesh is drawn (or culled) here, 0 to leave it to the stock function. */
+static int pl_draw(BYTE *mesh)
+{
+    BYTE  *eng = *(BYTE **)0x7ad508, *db, *tmp, *grp;
+    void  *dev, *d8 = NULLPTR, *d9, *vs, *ps[3], *tm, *texs;
+    void **dvt;
+    float  cc[3], r, w[16], vw[16], p[16], wv[16], wvp[16], col[16];
+    const float *m = (const float *)NODE_TO_CAMERA, *lc = (const float *)(mesh + 0xd4);
+    DWORD  cull, fvf = 0;
+    int    atmo, g, ng, i, j;
+
+    if (!eng) return 0;
+    dev = *(void **)(eng + 0xcc + 4 * *(DWORD *)(eng + 0xc0));
+    if (!dev) return 0;
+    dvt = *(void ***)dev;
+    if (*(void **)(eng + 0xf8)) { pl_note(0, "stock for a mesh with a per-render effect"); return 0; }
+    /* No PolygonSortRequired test: it reads the material last set on the device, so asked
+     * here its answer depended on what was drawn before, and the cloud shell flickered
+     * between this path and the stock one frame to frame. A blended shell is drawn here
+     * at once, over its own ground, rather than deferred to the engine's sort. */
+    ((DevGet_t)dvt[48])(dev, 3, &d8);                /* GetPlatformSpecific: the d3d8 device */
+    d9 = d8 ? d9_device(d8) : NULLPTR;
+    if (!d9) { pl_note(2, "stock: no Direct3D 9 device behind d3d8 (not d3d8to9)"); return 0; }
+    vs = d9_shader(d9, &g_hull_vs);
+    ps[0] = d9_shader(d9, &g_ground_ps);
+    ps[1] = d9_shader(d9, &g_city_ps);
+    ps[2] = d9_shader(d9, &g_cloud_ps);
+    if (!vs || !ps[0] || !ps[1] || !ps[2]) { pl_note(3, "stock: the shaders could not be created"); return 0; }
+
+    /* the camera's sphere test, as RenderInternal makes it */
+    for (i = 0; i < 3; i++) cc[i] = m[i] * lc[0] + m[3 + i] * lc[1] + m[6 + i] * lc[2] + m[9 + i];
+    r = *(float *)(mesh + 0xe0);
+    if (*(BYTE *)(eng + 0xb0)) {
+        float *s = (float *)(eng + 0xb4), big = s[0] > s[1] ? s[0] : s[1];
+        r *= big > s[2] ? big : s[2];
+    }
+    if (((SphereVis_t)FN_SPHERE_VIS)(*(void **)(eng + 0xfc), cc, r) == 1) return 1;
+
+    tmp = *(BYTE **)(eng + 0x100);
+    tm  = tmp ? *(void **)(tmp + 4) : NULLPTR;
+    if (!tm) tm = *(void **)(mesh + 0x120);
+    if (!tm) tm = *(void **)(eng + 0x10);
+    if (!tm) return 0;
+    ((TmState_t)FN_TM_SETSTATE)(tm);
+    ((DevArg_t)dvt[44])(dev, *(DWORD *)(mesh + 0x138));          /* SetTextureWrap */
+    cull = *(DWORD *)(eng + 0x94);
+    if (cull == 3) cull = *(DWORD *)(mesh + 0x108);
+    ((DevArg_t)dvt[46])(dev, cull);                               /* SetCulling */
+    ((DevArg_t)dvt[47])(dev, (DWORD)CURRENT_MATRIX);              /* SetWorldTransform */
+
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 256, w);
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 2, vw);
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 3, p);
+    mat_mul(w, vw, wv);
+    mat_mul(wv, p, wvp);
+
+    db   = *(BYTE **)(mesh + 0x140);
+    atmo = db && *(BYTE **)(db + 0xb0) == mesh;
+    texs = mesh + 0x114;
+    grp  = *(BYTE **)(mesh + 0x104);
+    ng   = *(int *)(mesh + 0x100);
+    for (g = 0; g < ng; g++, grp += 0x1c) {
+        BYTE *lm = *(BYTE **)(eng + 0xa8) ? *(BYTE **)(eng + 0xa8) : *(BYTE **)(grp + 0x14);
+        int   nf = lm ? pl_build(mesh, grp) : 0, np, pass;
+        if (!nf) { pl_note(4, "a group left undrawn (no material, or too many faces)"); continue; }
+        np = ((TmPasses_t)(*(void ***)tm)[3])(tm, texs, *(DWORD *)(mesh + 0x12c));
+        for (pass = 0; pass < np; pass++) {
+            D9Saved sv;
+            void   *vb = NULLPTR, *ib = NULLPTR;
+            UINT    off = 0, stride = 0;
+            int     kind = atmo ? 2 : pass == 1 ? 1 : 0;
+            ((TmPass_t)(*(void ***)tm)[4])(tm, pass, texs);
+            d9_save(d9, &sv);
+            D9_FN(d9, 101, D9GetSS_t)(d9, 0, &vb, &off, &stride);  /* GetStreamSource */
+            D9_FN(d9, 105, D9Obj_t)(d9, &ib);                       /* GetIndices */
+            ((D8GetVS_t)(*(void ***)d8)[77])(d8, &fvf);
+            ((D8VS_t)(*(void ***)d8)[76])(d8, FVF_HULL);
+            d9_bind(d9, vs, ps[kind]);
+            for (j = 0; j < 4; j++) for (i = 0; i < 4; i++) col[j * 4 + i] = wvp[i * 4 + j];
+            d9_vsconst(d9, 0, col, 4);
+            for (j = 0; j < 3; j++) for (i = 0; i < 4; i++) col[j * 4 + i] = w[i * 4 + j];
+            d9_vsconst(d9, 4, col, 3);
+            pl_consts(d9, mesh, lm, atmo, w, vw);
+            ((D8DPUP_t)(*(void ***)d8)[72])(d8, 4, (UINT)nf, g_pl_v, 32);   /* DrawPrimitiveUP */
+            ((D8VS_t)(*(void ***)d8)[76])(d8, fvf);
+            D9_FN(d9, 100, D9SetSS_t)(d9, 0, vb, off, stride);
+            D9_FN(d9, 104, D9Obj_t)(d9, ib);
+            if (vb) D9_FN(vb, D9_RELEASE, D9_Ref_t)(vb);
+            if (ib) D9_FN(ib, D9_RELEASE, D9_Ref_t)(ib);
+            d9_restore(d9, &sv);
+            pl_note(8 + kind, kind == 2 ? "a cloud shell in shaders" : kind == 1 ? "a city pass in shaders"
+                                                                     : "a ground hemisphere in shaders");
+        }
+        ((TmCleanup_t)(*(void ***)tm)[5])(tm);
+    }
+    if (++g_pl_draws == 1 || g_pl_draws == 100000) {
+        char b[120];
+        b[0] = 0; s_cat(b, "planet shaders: meshes drawn "); s_num(b, g_pl_draws);
+        s_cat(b, ", left to stock "); s_num(b, g_pl_stock); logline(b);
+    }
+    return 1;
+}
+
+static void __fastcall hook_ground_render(BYTE *mesh, void *edx)
+{
+    (void)edx;
+    if (pl_draw(mesh)) return;
+    g_pl_stock++;
+    ((MeshRender_t)FN_MESH_RENDER)(mesh);
+}
+
 /* ---- startup ---------------------------------------------------------- */
 
 static void build_paths(char *ini)
@@ -1482,6 +1831,18 @@ static void startup(void)
     for (i = 0; i < 3; i++) g_planet_amb[i] = g_ambient[i];
     ini3(ini, "PlanetAmbient", g_planet_amb);
     ini3(ini, "PlanetDiffuse", g_planet_diff);
+    g_planet_sh = (int)GetPrivateProfileIntA("Lighting", "PlanetShaders", 1, ini);
+    ini3(ini, "PlanetDusk",        g_dusk);
+    ini1(ini, "PlanetWrap",        &g_wrap);
+    ini1(ini, "PlanetFill",        &g_pl_fill);
+    ini1(ini, "PlanetSun",         &g_pl_sun);
+    ini1(ini, "PlanetHaze",        &g_haze);
+    ini3(ini, "PlanetHazeColour",  g_haze_col);
+    ini1(ini, "PlanetHazePower",   &g_haze_pow);
+    ini1(ini, "PlanetGlint",       &g_glint);
+    ini1(ini, "PlanetGlintPower",  &g_glint_pow);
+    ini1(ini, "CityLights",        &g_city);
+    ini3(ini, "CityLightColour",   g_city_col);
     light_matrix(g_key_dir, g_key_mat);
     light_matrix(g_fill_dir, g_fill_mat);
 
@@ -1489,6 +1850,7 @@ static void startup(void)
     s_cat(b, "--- Lighting GPU="); s_num(b, g_gpu);
     s_cat(b, " Lights=");          s_num(b, g_lights);
     s_cat(b, " Shaders=");         s_num(b, g_shaders);
+    s_cat(b, " PlanetShaders=");   s_num(b, g_planet_sh);
     s_cat(b, "  key ");            s_vec(b, g_key_col);
     s_cat(b, " axis ");            s_vec(b, g_key_mat + 6);
     s_cat(b, "  fill ");           s_vec(b, g_fill_col);
@@ -1538,6 +1900,10 @@ static void startup(void)
     if (g_planets) {
         if (!patch_planets()) logline("NOT PATCHED: planet material sites differ");
         else n++;
+    }
+    if (g_planet_sh) {
+        if (patch_slot(VT_GROUND_MESH, 11, FN_MESH_RENDER, (const void *)hook_ground_render)) n++;
+        else logline("NOT PATCHED: GroundMesh vtable differs");
     }
     b[0] = 0;
     s_cat(b, "call sites patched ");

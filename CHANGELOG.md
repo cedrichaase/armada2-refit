@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.14.0 — 2026-10-05
+
+Layers: lighting 1.9.0.
+
+### Added
+- Planets on the GPU (lighting 1.9.0): `PlanetShaders=1` draws planets and their cloud
+  shells in shaders under d3d8to9, lit per pixel, with a terminator, the atmosphere at
+  the limb, water glint and city lights at night. Phase 3 of `platform/D3D9.md`.
+
+Confirmed in game 2026-10-05.
+
 ## 9.13.1 — 2026-10-05
 
 ### Changed
