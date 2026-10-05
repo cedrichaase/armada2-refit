@@ -573,8 +573,9 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 
 ### msaa, postfx, platform
 
-- **The game renders through DXVK/Vulkan.** The chain keeps DXVK's `d3d8.dll` **and**
-  `d3d9.dll` in the **game directory** (the prefix is not durable — Proton restores it
+- **The game renders through DXVK/Vulkan.** The chain keeps a `d3d8.dll` (crosire's
+  d3d8to9 since platform 3.2.0, which `./install` puts there so plugins can reach
+  Direct3D 9; DXVK's own d3d8 before) **and** DXVK's `d3d9.dll` in the **game directory** (the prefix is not durable — Proton restores it
   from symlinks), `d3d9=n,b` in the overrides, and the Wine virtual desktop **off**.
   The stock `syswow64/d3d8.dll` is *Wine's builtin*, and was once taken for DXVK's on
   the strength of its byte count. The virtual desktop also puts the menus in one window,

@@ -6,6 +6,18 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.2.0 — 2026-10-05
+
+### Added
+- `d3d8-chain.py --upgrade`, which `./install` now runs first: a game on the DXVK chain
+  (DXVK's d3d8 on DXVK's d3d9) moves to the d3d8to9 chain by swapping the game
+  directory's `d3d8.dll` alone, so `Lighting.asi`'s `Shaders` work after a plain
+  install. Heroic's config is never touched; any other chain is left as it is and named.
+  `--use dxvk` goes back.
+
+Exercised on a scratch game directory (DXVK chain, again, GOG's chain); `./a2test run
+no-assets` passes. Installed, not yet seen in game.
+
 ## 3.1.0 — 2026-10-05
 
 ### Added

@@ -85,6 +85,7 @@ Four parts, all required together:
     platform/d3d8-chain.py --use gog     GOG d3d8to9 -> DXVK d3d9 -> Vulkan
     platform/d3d8-chain.py --use wine    Wine's builtin d3d8 -> wined3d -> OpenGL
     platform/d3d8-chain.py --revert      the GOG release as shipped, Heroic managing DXVK again
+    platform/d3d8-chain.py --upgrade     what ./install runs: DXVK's chain -> the d3d8to9 one
 
 `--use` keeps GOG's `d3d8.dll` as `d3d8.dll.gog-backup` the first time it replaces it
 (it knows GOG's file by hash), sets the `d3d9=n,b` override for DXVK and GOG and
@@ -111,6 +112,14 @@ built on it are in [`D3D9.md`](D3D9.md). That release is vendored in
 `vendor/d3d8to9-1.16.0/` and `--use d3d8to9` puts it in the slot; `d3d9/d3d9dev.h` is
 what a plugin includes to draw through the device behind it, and `d3d9/hlsl.sh` builds
 its shaders.
+
+**`./install` puts the translator in place** (`--upgrade`, since platform 3.2.0) when the
+game directory holds exactly the DXVK chain: DXVK's d3d8 on DXVK's d3d9. The two chains
+differ only in the game directory's `d3d8.dll`; both need the `d3d9` override and
+`autoInstallDxvk` off, which the DXVK chain already has. So the step swaps that one file
+and never touches Heroic's config: it runs with Heroic open, and in a test-bench clone.
+Any other chain (GOG's, Wine's, a `d3d8.dll` of the player's own) is left as it is and
+named. `--use dxvk` goes back. The release zip's installer does not do this yet.
 
 The GOG release as shipped, which `--revert` returns to, is GOG's translator on the
 prefix's d3d9 — Heroic's DXVK while `autoInstallDxvk` is on, else Wine's:

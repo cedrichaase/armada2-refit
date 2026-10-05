@@ -5,6 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.13.0 — 2026-10-05
+
+Layers: platform 3.2.0.
+
+### Changed
+- `./install` sets up the d3d8to9 chain for a game on the DXVK chain, so the shader
+  lighting is on after a plain install (platform 3.2.0). The release zip is unchanged.
+
 ## 9.12.0 — 2026-10-05
 
 Layers: lighting 1.8.0.

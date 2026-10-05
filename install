@@ -2,6 +2,10 @@
 # Install every layer into the game directory ($A2_GAME, resolved by a2env.sh), each
 # through its own installer:
 #
+#   platform   platform/d3d8-chain.py --upgrade   the DXVK chain becomes the d3d8to9 one
+#                                            (DXVK's d3d9 behind crosire's d3d8to9), which
+#                                            lets Lighting.asi's Shaders reach Direct3D 9;
+#                                            any other chain is left as it is
 #   hud        hud/install.sh
 #   menus      menus/install.sh              Menus.asi
 #              menus/install-plates.sh       the backdrop plates built in $A2_DATA
@@ -29,6 +33,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 . "$here/a2env.sh"
 [ -d "$A2_GAME" ] || { echo "no game directory at $A2_GAME (see a2env.sh)" >&2; exit 1; }
 echo "== $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> $A2_GAME (assets: $A2_DATA)"
+python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/hud/install.sh"
 "$here/menus/install.sh"
 "$here/menus/install-plates.sh"
