@@ -3,8 +3,9 @@
  *
  * The right-drag pan speed, scaled by PanSpeed= in QOL.ini; Shift+number adding
  * the selection to a control group (ShiftAddsToGroup=); selections and groups
- * beyond 16 (MaxSelection=); and stations in control groups, with one build
- * menu for several (StationGroups=).
+ * beyond 16 (MaxSelection=); stations in control groups, with one build
+ * menu for several (StationGroups=); and long moves on the map going to warp
+ * (WarpDistance=).
  *
  * WHY NOT JUST EDIT RTS_CFG.h
  * ---------------------------
@@ -867,6 +868,125 @@ static int patch_stations(void)
     return 1;
 }
 
+/* ---- warp on long moves (QOL-8) --------------------------------------- */
+
+/* cOverViewImp::mNormalModeInput works out, every frame, the action a click on
+ * the map would give (+0x3c: the AiCommand in the low 12 bits) at the map point
+ * under the cursor (+0xa4); every click and the cursor read it from there.
+ * Stock turns a GO into GO_WARP there when Alt is held (0x522cb8), the command
+ * the minimap sends without Alt.  WarpDistance= adds: when this player's
+ * selected ships that can warp are on average farther than that from the
+ * point, and warp is allowed in this game.  GO_WARP
+ * moves as GO does, and each ship then warps only if warp is allowed and it is
+ * farther than cfgTOO_CLOSE_TO_WARP from where it is going -- the engine's
+ * own test, on every machine. */
+#define OV_ACTION      0x3c      /* cOverViewImp: what a click would do */
+#define OV_POINT       0xa4      /* the map point under the cursor, a Vector3 */
+#define GO_POS         0xac      /* GameObject: position, a Vector3 */
+#define ACT_COMMAND    0xfff
+#define ACT_KEEP       0x4000    /* the bit stock carries over into GO_WARP */
+#define CMD_GO         0x04
+#define CMD_GO_WARP    0x2b
+#define COMMAND_ALT    0x761344  /* g_pCommandAlt: int *, held or not */
+
+#define WARP_DEFAULT   "1100"    /* WarpDistance= when QOL.ini has none */
+
+float g_warpDistance;            /* 0: stock */
+
+static float f_sqrt(float f)
+{
+    __asm__ __volatile__("fsqrt" : "+t"(f));
+    return f;
+}
+
+/* What cCraftControl::TryWarp asks before it arms warp, but the order: warp
+ * allowed by the mission (g_allowWarp) and the setup screen
+ * (GameSetup::isAllowWarpSpeed), and, per ship, a control whose warp speed is
+ * above its speed.  A ship without warp has none above it. */
+typedef BYTE *(__thiscall *GetSetupFn)(BYTE *transport);
+typedef BYTE  (__thiscall *AllowWarpFn)(BYTE *setup);
+#define G_ALLOW_WARP   0x6f4de0                  /* int */
+#define G_TRANSPORT    0x76b8d4                  /* Transport * */
+#define GET_SETUP      ((GetSetupFn)0x557940)    /* Transport::getGameSetup */
+#define ALLOW_WARP     ((AllowWarpFn)0x546280)   /* GameSetup::isAllowWarpSpeed */
+#define CRAFT_CONTROL  0x1b0     /* Craft: its cCraftControl */
+#define CTL_SPEED      0x08      /* cCraftControl: impulse speed, a float */
+#define CTL_WARP       0x0c      /* and warp speed (SetWarpSpeed) */
+
+static int warp_allowed(void)
+{
+    return *(int *)G_ALLOW_WARP && ALLOW_WARP(GET_SETUP(*(BYTE **)G_TRANSPORT));
+}
+
+static int can_warp(BYTE *o)
+{
+    BYTE *ctl;
+    if (!DYN_CAST(*(void **)(o + GO_CLASS), 0, RTTI_GOCLASS, RTTI_CRAFTCLS, 0)) return 0;
+    ctl = *(BYTE **)(o + CRAFT_CONTROL);
+    return ctl && *(float *)(ctl + CTL_WARP) > *(float *)(ctl + CTL_SPEED);
+}
+
+/* This player's selected ships that can warp are on average farther than
+ * WarpDistance from the point; 0 when none of them can warp. */
+static int far_enough(BYTE *ov)
+{
+    typedef const int *(__thiscall *ListFn)(BYTE *);
+    const int   *ids = ((ListFn)(*(BYTE ***)ov)[0x98 / 4])(ov);
+    const float *p = (const float *)(ov + OV_POINT);
+    int   n = *(int *)(ov + OV_COUNT), i, k = 0, team = USER_TEAM();
+    float sum = 0.0f;
+
+    if (!warp_allowed()) return 0;
+    for (i = 0; i < n; i++) {
+        BYTE  *o = ENTITY_GET(ids[i]);
+        float *q, dx, dy, dz;
+        if (!is_obj(o) || *(int *)(o + GO_TEAM) != team || !can_warp(o)) continue;
+        q = (float *)(o + GO_POS);
+        dx = q[0] - p[0]; dy = q[1] - p[1]; dz = q[2] - p[2];
+        sum += f_sqrt(dx * dx + dy * dy + dz * dz);
+        k++;
+    }
+    return k && sum > g_warpDistance * (float)k;
+}
+
+void __cdecl warp_pre(BYTE *ov)
+{
+    int a = *(int *)(ov + OV_ACTION);
+    if ((a & ACT_COMMAND) != CMD_GO) return;
+    if (!**(int **)COMMAND_ALT && !(g_warpDistance > 0.0f && far_enough(ov))) return;
+    *(int *)(ov + OV_ACTION) = (a & ACT_KEEP) | CMD_GO_WARP;
+}
+
+/* Replaces stock's Alt block (0x522cb8 to 0x522cdf) from its first
+ * instruction: esi = cOverViewImp.  Every register is kept. */
+__attribute__((naked)) void warp_stub(void)
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushl %esi\n\t"
+        "call _warp_pre\n\t"
+        "addl $4, %esp\n\t"
+        "popal\n\t"
+        "pushl $0x522cdf\n\t"
+        "ret\n\t");
+}
+
+/* mov eax,[g_pCommandAlt]; cmp dword [eax],0; je 0x522cdf (the block's end);
+ * mov ecx,[esi+0x3c]; and ecx,0xfff; cmp ecx,4; jne -- the head of the block
+ * the stub does in its place, up to the `or edx,0x2b` it then makes. */
+static const Site k_warp = { 0x522cb8, 24, 0, {
+    0xA1, 0x44, 0x13, 0x76, 0x00, 0x83, 0x38, 0x00, 0x74, 0x1D,
+    0x8B, 0x4E, 0x3C, 0x81, 0xE1, 0xFF, 0x0F, 0x00, 0x00, 0x83, 0xF9, 0x04, 0x75, 0x0F } };
+
+static int patch_warp(void)
+{
+    BYTE c[10];
+    if (!site_ok(&k_warp)) return 0;
+    jmp_to(c, k_warp.at, 10, warp_stub);
+    poke((BYTE *)k_warp.at, c, 10);
+    return 1;
+}
+
 /* ---- bigger selections and groups ------------------------------------- */
 
 /* The button bar's special weapons.  For each special weapon of the selection,
@@ -1046,6 +1166,20 @@ static void startup(void)
                                   : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
     } else {
         s_cat(b, "0  (stations select and group as in stock)");
+    }
+    logline(b);
+
+    GetPrivateProfileStringA("QOL", "WarpDistance", WARP_DEFAULT, val, sizeof val, ini);
+    f = s_parse(val);
+    b[0] = 0;
+    s_cat(b, "--- QOL WarpDistance=");
+    s_cat(b, val);
+    if (f <= 0.0f) {
+        s_cat(b, f < 0.0f ? "  (not a number: moves left alone)" : "  (0: moves left alone)");
+    } else {
+        g_warpDistance = f;
+        s_cat(b, patch_warp() ? "  -> a move farther than that goes to warp, patched"
+                              : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
     }
     logline(b);
 
