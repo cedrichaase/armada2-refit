@@ -4,6 +4,17 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.13.0 — 2026-10-07
+
+### Changed
+- `CityLights`: a developed planet's night side draws its towns as a web of light, in
+  place of one flat colour over each town: streets and finer lanes beaded with lights,
+  highways reaching out between towns, single lights past their edges, a glow and
+  brighter downtowns, all generated in `planet.hlsl`'s `city_ps` from the development
+  texture and the population map. Fades to an even glow where a line is under a pixel.
+
+Seen on the bench 2026-10-07 (a class M planet settled by a colony ship). Confirmed in game 2026-10-07.
+
 ## 1.12.0 — 2026-10-07
 
 ### Added

@@ -691,8 +691,31 @@ by its alpha. The pixel shaders are `ground_ps`, `city_ps` and `cloud_ps`:
   so at the edge it shows as a thin halo.
 - **Water:** a Blinn-Phong glint where the ground is bluer than it is red or green and
   not bright.
-- **Cities:** by day lit as the ground; on the night side `CityLightColour` x
-  `CityLights`, with the alpha raised so they show over the dark ground.
+- **Cities:** by day lit as the ground, as stock. On the night side they are lit from
+  within, `CityLightColour` x `CityLights`, by a pattern the shader makes
+  (`city_night`). Up to 1.12.0 it lit the whole development texture one colour, which
+  showed each town as a flat cream blotch: the texture's alpha is one solid blob per
+  town, with nothing inside it (`PD_ECNA`, `PD_ECFR`, `PD_BORG`, measured), and its
+  colour is day-side ground. So the blobs say only *where* people live:
+  - **Density:** the alpha, times the population map in stage 1 (alpha times its
+    brightest channel, whichever the engine paints), averaged over 8 taps at 5 texels
+    and 8 at 14. Explicit taps rather than a mip bias, since nothing says these textures
+    have mips. A noise breaks each town into districts.
+  - **Streets:** the borders of a Voronoi net, 120 cells across the texture, inside
+    towns, beaded with lights along them, each border its own brightness; **lanes:** a
+    finer net of 300 in the denser parts; **highways:** a net of 20 cells, half its
+    borders dropped, reaching out between neighbouring towns. All are warped by a slow
+    noise so the roads curve. One net of 120 alone read as cracked glass close up.
+  - **Lights:** single points, thick in towns and thinning out past them; **glow:** a
+    faint warmth over each town; **downtown:** brighter in a few hot spots where a town
+    is densest. Light past 0.9 whitens.
+  - **No shimmer:** a line or point narrower than a pixel (`fwidth`) spreads the same
+    light over the pixel instead, so a distant planet shows an even glow.
+  The pattern was tuned on an offline preview over the real textures, then on the bench
+  with a colony ship ordered onto a class M planet (select it, D, click the planet; the
+  script call `ScriptInterfaceImp::Colonize` did nothing from the scene plugin). The
+  shader is about 1800 instructions, past ps_3_0's guaranteed 512; DXVK runs it, as it
+  runs `bump_ps` at 775.
 
 **One trap, met on the bench:** `ST3D_DeviceDirectX8::PolygonSortRequired` (0x625510)
 is not a property of the device. It reads the material last set on it, so asked before
@@ -713,8 +736,8 @@ the CPU path lit both its ground and its clouds evenly.
 - With `PlanetShaders=0` or without d3d8to9, planets stay on the CPU path. Either way
   the clouds at a planet's poles pinch into a bright starburst where the cloud
   texture's UVs converge; that is stock.
-- The city pass (`CityLights`) has not been seen yet: the bench planet has no
-  development texture.
+- The city pattern is cut in texture space, so it stretches where a hemisphere's UVs
+  do, at the limb of each hemisphere: a highway there can draw as a long straight streak.
 - Without d3d8to9, the Borg and any hull `models/hull-bump.py` patched keep the dot3
   passes ("Bump-mapped hulls"). The fallback under DXVK's d3d8 has not been run on the
   bench since 1.11.0; it is the stock function, called whenever there is no Direct3D 9
