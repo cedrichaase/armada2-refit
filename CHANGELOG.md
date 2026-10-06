@@ -14,7 +14,7 @@ Layers: lighting 1.12.0, testbench 3.1.0.
   the ODF's cyan or green (`OrdnanceColours=`, lighting 1.12.0); the bench's
   `factions` scene shows one weapon of each playable faction (testbench 3.1.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 10.1.0 — 2026-10-07
 

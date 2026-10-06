@@ -13,7 +13,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   other weapon). Federation orange, Klingon red, Borg cyan, Cardassian yellow, Romulan
   green, Species 8472 yellow-green. `0` keeps the ODF colours.
 
-Seen on the bench 2026-10-07 (`SCENE=factions`). Installed, not yet seen in game.
+Seen on the bench 2026-10-07 (`SCENE=factions`). Confirmed in game 2026-10-07.
 
 ## 1.11.0 — 2026-10-07
 
