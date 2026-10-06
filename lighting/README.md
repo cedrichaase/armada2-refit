@@ -65,6 +65,7 @@ planet's ground colour (`planet glow:`).
 | `SkyLight` | `0.35` | the sky light's strongest channel; `0` leaves it dark |
 | `Explosions` | `1` | ship and station explosions light their surroundings |
 | `ExplosionColour`, `ExplosionBrightness`, `ExplosionRange` | `1.00 0.62 0.28`, `4.0`, `10.0` | the flash's colour and peak; full over the explosion's radius (at least 40 units), gone at this many radii |
+| `OrdnanceColours` | `1` | a torpedo's or pulse's light takes the colour of its own sprite, at the ODF's brightness ("Torpedoes and pulses", below); `0` keeps the ODF's `lightColor` |
 | `Log` | `1` | write `Lighting.log` |
 
 The key comes in about 60° off vertical (1.0.0 had about 37°), so from the usual
@@ -102,7 +103,7 @@ per-render effect is attached (cloak, warp-in), as stock does for asteroids.
 | call at 0x63e4e4, `ST3D_Standard_MeshVB::Render` | replaces `SetMaterial`: diffuse white, ambient zero, emissive `Ambient=`; and turns `NORMALIZENORMALS` on | below |
 | slot 3 of the `ST3D_Standard_MeshVB` vtable (0x6bcbdc), `Render` | reverses the enabled lights for a draw whose object matrix (0x7ad640) is mirrored | below |
 | call at 0x597f83, `GameObject_PreRenderAll` | wraps `ST3D_GraphicsEngine::RegisterLight`: the frame's first directional light is replaced by Key and Fill, the map's others are dropped | below |
-| call at 0x598193 | wraps `GameObject_PreRenderAll` | counts the frame for the hook above |
+| call at 0x598193 | wraps `GameObject_PreRenderAll` | counts the frame for the hook above; afterwards adds the planet and explosion lights and recolours the torpedoes' (`Ordnance::PreRenderAll` is the next call, at 0x598199) |
 | slot 3 of the `ST3D_Dot3_MeshVB` vtable (0x6bc7d4), `Render` | draws a bump-mapped group once, in shaders | "Bump-mapped hulls", below |
 | six `fmuls` in the `GroundMesh` constructor (0x595c22, 0x595c3d, 0x595c57; 0x595c70, 0x595c7f, 0x595c8e) | their operand, the stock 0.75 and 0.5, now points at `PlanetDiffuse` and `PlanetAmbient`, one channel each | "Planets", below |
 
@@ -372,10 +373,60 @@ ordinary point light, so the CPU path (planets, cloaking ships) takes it too.
 On the bench (a frigate dying 110 units from the Galaxy, paused at 0.3 s): the hull
 under it went from 20/32/38 to 30/39/41 mean RGB, orange-brown where it was dark blue.
 
-Torpedoes and pulses need nothing more: `Ordnance::PreRenderAll` (call at 0x58e55c)
-registers each one's ODF light while the engine's detail level is above 2, and the
-point-light path hands it to the GPU draws. A weapon's impact has no explosion object
-(it is a sprite effect), so it has no light of its own.
+### Torpedoes and pulses
+
+`Ordnance::PreRenderAll` (call at 0x58e55c) registers each live torpedo's or pulse's
+light while the engine's detail level is above 2, and the point-light path hands it to
+the GPU draws. A weapon's impact has no explosion object (it is a sprite effect), so
+it has no light of its own.
+
+**The ODF colours ignore the projectile.** Every ODF that sets `lightColor` gives its
+`OrdnanceClass` one `ST3D_Point_Light` (class +0x10, built in the class constructor
+as `ord_light`), colour at +0xf4, and every ordnance of the class registers that one
+light where it is. The colours stock gives them: every Federation photon `0 1 1`
+(cyan) though its sprite is orange, nearly every other torpedo and pulse `0 1 0`
+(green), the Klingons' red torpedoes and the Cardassians' yellow plasma included.
+Measured from the stock art, the mean colour of each sprite's first frame, scaled to
+a peak of 1:
+
+| Faction | Sprite texture | ODF `lightColor` | Sprite |
+|---|---|---|---|
+| Federation (photon) | `Wftorp` | `0 1 1` | `1.00 0.69 0.10` |
+| Federation (quantum, `fbattlephotono`) | `Wfbluetorp` | `0 1 1` | `0.14 0.56 1.00` |
+| Klingon | `Wktorp` | `0 1 0` | `1.00 0.17 0.17` |
+| Borg | `Wbtorp` | `0 1 0` | `0.08 1.00 0.92` |
+| Cardassian (plasma) | `Wctorp` | `0 1 0` | `1.00 0.97 0.08` |
+| Romulan | `Wrtorp` | `0 1 0` | `0.11 1.00 0.42` |
+| Species 8472 (pulse, `spmpulseo`) | `Wpulse`, second strip | `0 1 0` | `0.78 1.00 0.43` |
+
+**The fix takes the colour from the sprite.** The class keeps its sprite at +0x12c
+(the ODF's `Sprite`, looked up in the sprite table by name); an `ST3D_Sprite` holds its
+first frame as fractions of its texture, U V at +0x38 and W H at +0x40, and its texture
+at +0x58, an `ST3D_DatabaseElement` whose name (+0x8) is the file name. The plugin
+reads that rectangle of the installed TGA (`Textures/RGB`, so a remastered sprite is
+measured as installed) and takes its mean colour: the sprites draw additively, so the
+mean is what they add. That hue, scaled to the ODF colour's peak, replaces the light's
+colour, so a weapon keeps its brightness. Why the first frame: a flipbook keeps one hue
+across its frames (every stock torpedo's first frame is within 0.03 of its whole sheet),
+while the pulses share one sheet, `Wpulse`, a colour per strip, and only the sprite's
+own rectangle tells them apart (the whole sheet reads `1.00 0.93 0.78` for all of them).
+
+`Ordnance::PreRenderAll` is called straight after `GameObject_PreRenderAll`, so the
+plugin's wrapper of the latter walks the live ordnance (the list at 0x771fac, the class
+at +0x34) and recolours each class's light before it is registered. Each class is
+measured once and logged (`ordnance light: Wftorp odf (0, 1, 1) sprite mean ... ->`):
+a light counts as done while it holds the colour written to it for that sprite, so a
+class rebuilt for the next mission, with its ODF colour back, is measured again. The
+ODFs stay stock: only the light's colour in memory changes, which is drawing alone,
+so nothing another player sees or simulates differs.
+
+On the bench (2026-10-07, `SCENE=factions`: one torpedo or pulse ship of each playable
+faction firing at a Borg cube), `Lighting.log` recoloured all six (the table above, to
+the second decimal). Under Federation fire the cube's plating took a warm orange pool
+where a torpedo arrived; the same burst on `main` washed whole faces cyan. The mean
+(G+B)/2 − R of the cube's centre over the burst: worst frame 29.5 before, 8.3 after
+(the cube's own blue shield flashes count in both). The Klingon torpedo lit it red.
+The Federation quantum torpedo (`fbattle`) was not in the scene.
 
 ## Shaders
 
@@ -678,5 +729,10 @@ the CPU path lit both its ground and its clouds evenly.
 - A mirrored mesh (`FixMirrored`) gets no point lights on the fixed-function path:
   reversing a directional light fixes its normals, and a point light has no such
   reversal. With `Shaders=1` it gets them.
+- A hard light can tint a whole face of a large flat hull (a Borg cube) when the draw
+  goes the fixed-function way: per vertex, one vertex inside the torpedo's sphere
+  colours its triangle. Seen on the bench with Borg torpedoes on a Borg cube before
+  `BumpShaders` (1.11.0) drew the Borg in shaders; not re-checked since. Not caused by
+  `OrdnanceColours`, which changes only the colour.
 - Weapon impacts flash no light (above). `ShockwaveExplosion` (the big special weapons'
   ring) has its own `AdjustLighting` and is left alone.

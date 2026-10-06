@@ -5,13 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 3.1.0 — 2026-10-07
+## 3.2.0 — 2026-10-07
 
 ### Added
 - The `warp` scene (three Federation destroyers in open space) and
   `scenarios/qol-warp.md`: a long move on the map goes to warp (qol 1.3.0).
 
-Installs nothing; seen working on the bench 2026-10-07.
+Installs nothing; the scene seen working on the bench 2026-10-07.
+
+## 3.1.0 — 2026-10-07
+
+### Added
+- The `factions` scene: one torpedo or pulse ship of each playable faction, each firing
+  at its own Borg cube (lighting 1.12.0, `OrdnanceColours`).
+
+Installs nothing into the game; seen working on the bench 2026-10-07.
 
 ## 3.0.0 — 2026-10-06
 
