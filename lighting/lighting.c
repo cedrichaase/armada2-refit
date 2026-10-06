@@ -739,14 +739,10 @@ static void mat_mul(const float *a, const float *b, float *r)
                            a[i * 4 + 2] * b[8 + j] + a[i * 4 + 3] * b[12 + j];
 }
 
-/* Everything hull.hlsl needs, from the device as the fixed-function draw would use
- * it; 0 when this draw is not one the shaders reproduce. */
-static int sh_setup(void *d9)
+/* 1 when the fixed-function draw in hand is one hull.hlsl reproduces. */
+static int sh_check(void *d9)
 {
     DWORD fvf = 0, v = 0, op = 0, a1 = 0, a2 = 0, aop = 0, op1 = 0;
-    float w[16], vw[16], p[16], wv[16], wvp[16], c[8], col[16];
-    MATERIAL8 mt;
-    int   i, j;
 
     D9_FN(d9, D9_GETFVF, D9_Ptr_t)(d9, &fvf);
     if (fvf != FVF_HULL) { sh_note(0, "a vertex format other than XYZ|NORMAL|TEX1"); return 0; }
@@ -770,6 +766,21 @@ static int sh_setup(void *d9)
         s_cat(why, ", stage 1 "); s_num(why, (long)op1); s_cat(why, ")");
         sh_note(4, why); return 0;
     }
+    return 1;
+}
+
+/* Everything hull.hlsl needs. For a hull draw (bump 0) the material and the directional
+ * lights are the device's, as the fixed-function draw would use them; for a bump-mapped
+ * one (bump 1) the dot3 path has set neither, so the material is hook_set_material's
+ * and the directional lights come from the engine's list, as
+ * ST3D_Standard_MeshVB::PreRender hands them to Direct3D. 0 when the lights are not
+ * ones the shaders take. */
+static int sh_consts(void *d9, int bump)
+{
+    DWORD v = 0;
+    float w[16], vw[16], p[16], wv[16], wvp[16], c[8], col[16];
+    MATERIAL8 mt;
+    int   i, j;
 
     D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 256, w);            /* WORLD */
     D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 2, vw);             /* VIEW */
@@ -783,20 +794,40 @@ static int sh_setup(void *d9)
         for (i = 0; i < 4; i++) col[j * 4 + i] = w[i * 4 + j];
     d9_vsconst(d9, 4, col, 3);
 
-    D9_FN(d9, D9_GETMATERIAL, D9Material_t)(d9, &mt);
-    D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 139, &v);          /* AMBIENT, a D3DCOLOR */
-    c[0] = mt.Emissive.r + mt.Ambient.r * (float)((v >> 16) & 255) / 255.0f;
-    c[1] = mt.Emissive.g + mt.Ambient.g * (float)((v >> 8) & 255) / 255.0f;
-    c[2] = mt.Emissive.b + mt.Ambient.b * (float)(v & 255) / 255.0f;
-    c[3] = mt.Diffuse.a;
-    c[4] = mt.Diffuse.r; c[5] = mt.Diffuse.g; c[6] = mt.Diffuse.b; c[7] = mt.Diffuse.a;
+    if (bump) {
+        for (i = 0; i < 3; i++) { c[i] = g_ambient[i]; c[4 + i] = 1.0f; }
+        c[3] = c[7] = 1.0f;
+    } else {
+        D9_FN(d9, D9_GETMATERIAL, D9Material_t)(d9, &mt);
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 139, &v);      /* AMBIENT, a D3DCOLOR */
+        c[0] = mt.Emissive.r + mt.Ambient.r * (float)((v >> 16) & 255) / 255.0f;
+        c[1] = mt.Emissive.g + mt.Ambient.g * (float)((v >> 8) & 255) / 255.0f;
+        c[2] = mt.Emissive.b + mt.Ambient.b * (float)(v & 255) / 255.0f;
+        c[3] = mt.Diffuse.a;
+        c[4] = mt.Diffuse.r; c[5] = mt.Diffuse.g; c[6] = mt.Diffuse.b; c[7] = mt.Diffuse.a;
+    }
     d9_psconst(d9, 0, c, 2);
 
     {   /* hull.hlsl: dcol c2..c5, dvec c6..c9, misc c10, pcol c11.., ppos c27.., pfall c43.. */
         float dc[16], dv[16], misc[4], pc[SH_POINTS * 4], pp[SH_POINTS * 4], pf[SH_POINTS * 4];
         int   nd = 0;
         for (i = 0; i < 16; i++) dc[i] = dv[i] = 0.0f;
-        for (i = 0; i < 8; i++) {
+        if (bump) {     /* the engine's list: a light shines along its matrix's third axis */
+            DWORD eng = *(DWORD *)0x7ad508, head = eng ? *(DWORD *)(eng + 0x60) : 0, node;
+            if (head)
+                for (node = *(DWORD *)head; node != head && nd < 4; node = *(DWORD *)node) {
+                    BYTE *inst = *(BYTE **)(node + 8);
+                    BYTE *light = *(BYTE **)inst;
+                    const float *lc = (const float *)(inst + 4), *ax = (const float *)(inst + 0x10) + 6;
+                    float n;
+                    if (!light || *(DWORD *)light != VT_DIRECTIONAL) continue;
+                    n = sqrt_f(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+                    if (n < 1e-6f) continue;
+                    for (j = 0; j < 3; j++) { dc[nd * 4 + j] = lc[j]; dv[nd * 4 + j] = ax[j] / n; }
+                    nd++;
+                }
+        }
+        for (i = 0; i < 8 && !bump; i++) {
             BOOL   on = 0;
             LIGHT8 l;
             float  n;
@@ -874,7 +905,9 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
         return g_dip(dev, pt, mi, nv, si, pc);
     }
     d9_save(d9, &sv);
-    if (!sh_setup(d9)) { d9_restore(d9, &sv); g_sh_ff++; return g_dip(dev, pt, mi, nv, si, pc); }
+    if (!sh_check(d9) || !sh_consts(d9, 0)) {
+        d9_restore(d9, &sv); g_sh_ff++; return g_dip(dev, pt, mi, nv, si, pc);
+    }
     d9_bind(d9, vs, ps);
     r = g_dip(dev, pt, mi, nv, si, pc);
     d9_restore(d9, &sv);
@@ -905,6 +938,151 @@ static void hook_device(void *dev)
     VirtualProtect(&vt[71], 4, old, &old);
     g_sh_on = 1;
     logline("shaders: on, through the Direct3D 9 device behind d3d8");
+}
+
+/* Bump-mapped hulls (BumpShaders=1, with Shaders=1). A mesh whose material names a bump
+ * map (the Borg; any hull models/hull-bump.py patched) goes through ST3D_Dot3_MeshVB,
+ * which ST3D_Mesh::Update picks before the plain vertex buffers. Its Render (0x6275a0,
+ * slot 3 of the vtable at 0x6bc7d4) draws each group once per light, added up: the
+ * normal map in stage 0 against the light taken into each vertex's tangent basis by
+ * the engine's dot3 shader (Shaders\dot3_directional.nvv), the light's colour in the
+ * texture factor; then once more multiplying the frame by the texture; then, for a
+ * self-illuminating mesh (the mesh's +0x12c, bit 4), the night lights. No ambient, no
+ * point light but at the mesh's centre, nothing of hull.hlsl. Under d3d8to9 the
+ * plugin draws the group itself instead, once, from the same vertex buffer, with
+ * bump_vs/bump_ps: everything a hull gets, with the normal from the normal map.
+ * lighting/README.md, "Bump-mapped hulls". */
+#define VT_DOT3_MESHVB  0x6bc7d4
+#define FN_DOT3_RENDER  0x6275a0
+#define FN_ENGINE_VB    0x62c1b0   /* ST3D_GraphicsEngine: a vertex buffer handle's IDirect3DVertexBuffer8 */
+#define FN_ENGINE_IB    0x62c210   /* and an index buffer's */
+#define DOT3_LIMIT      0x72c3f4   /* a debug cap on triangles drawn; -1 when off */
+#define DOT3_STRIDE     68         /* position, normal, UV, S, T, S x T */
+typedef void *(__thiscall *EngineBuf_t)(void *, DWORD);
+typedef int   (__thiscall *DevGet3_t)(void *, int, void *);
+typedef void  (__thiscall *DevTex_t)(void *, void *, int);
+typedef void  (__thiscall *TmPass3_t)(void *, int, void *);
+typedef long  (__stdcall *D8Stream_t)(void *, UINT, void *, UINT);
+typedef long  (__stdcall *D8Indices_t)(void *, void *, UINT);
+typedef long  (__stdcall *D8GetVS3_t)(void *, DWORD *);
+typedef long  (__stdcall *D8VS3_t)(void *, DWORD);
+typedef long  (__stdcall *D9Decl_t)(void *, const void *, void **);
+typedef long  (__stdcall *D9GetSamp_t)(void *, DWORD, DWORD, DWORD *);
+typedef long  (__stdcall *D9SetSamp_t)(void *, DWORD, DWORD, DWORD);
+#define D9_CREATEVERTEXDECLARATION 86
+#define D9_SETVERTEXDECLARATION    87
+#define D9_GETSAMPLERSTATE         68
+
+typedef struct { unsigned short stream, offset; BYTE type, method, usage, index; } VERTEXELEMENT9;
+static const VERTEXELEMENT9 k_dot3_decl[] = {
+    { 0,  0, 2, 0, 0, 0 },          /* FLOAT3 POSITION */
+    { 0, 12, 2, 0, 3, 0 },          /* FLOAT3 NORMAL */
+    { 0, 24, 1, 0, 5, 0 },          /* FLOAT2 TEXCOORD0 */
+    { 0, 32, 2, 0, 5, 1 },          /* FLOAT3 TEXCOORD1: S */
+    { 0, 44, 2, 0, 5, 2 },          /* FLOAT3 TEXCOORD2: T */
+    { 0, 56, 2, 0, 5, 3 },          /* FLOAT3 TEXCOORD3: S x T */
+    { 0xff, 0, 17, 0, 0, 0 }        /* D3DDECL_END */
+};
+
+static int        g_bump = 1;                /* BumpShaders= */
+static VBRender_t g_dot3_render;
+static D9Shader   g_bump_vs = D9_VERTEX_SHADER(k_bump_vs);
+static D9Shader   g_bump_ps = D9_PIXEL_SHADER(k_bump_ps);
+static void      *g_dot3_decl, *g_dot3_decl_dev;
+static long       g_bump_draws, g_bump_stock;
+
+/* 1 when the group is drawn here, 0 to leave it to the stock Render. */
+static int bump_draw(BYTE *self, int group, void *tm, void *tex)
+{
+    BYTE  *eng = *(BYTE **)0x7ad508, *grp, *mesh;
+    void  *dev, *d8 = NULLPTR, *d9, *vs, *ps, *vb, *ib, **texs;
+    void **dvt;
+    DWORD  prev_vs = 0, samp[3], fog = 0;
+    UINT   nv, pc;
+    D9Saved sv;
+    Pick   pk[SH_POINTS];
+    const float *m = (const float *)CURRENT_MATRIX;
+    int    i, n = 0;
+
+    if (!eng || !tm || !tex || *(int *)DOT3_LIMIT != -1) return 0;
+    dev = *(void **)(eng + 0xcc + 4 * *(DWORD *)(eng + 0xc0));
+    if (!dev) return 0;
+    dvt = *(void ***)dev;
+    ((DevGet3_t)dvt[48])(dev, 3, &d8);               /* GetPlatformSpecific: the d3d8 device */
+    d9 = d8 ? d9_device(d8) : NULLPTR;
+    if (!d9) return 0;
+    if (!g_dot3_decl || g_dot3_decl_dev != d9) {     /* made once per device */
+        g_dot3_decl = NULLPTR; g_dot3_decl_dev = d9;
+        if (D9_FN(d9, D9_CREATEVERTEXDECLARATION, D9Decl_t)(d9, k_dot3_decl, &g_dot3_decl) < 0)
+            g_dot3_decl = NULLPTR;
+    }
+    vs = d9_shader(d9, &g_bump_vs);
+    ps = d9_shader(d9, &g_bump_ps);
+    if (!vs || !ps || !g_dot3_decl) { sh_note(9, "bump-mapped hulls: the shaders could not be created"); return 0; }
+    D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 28, &fog);         /* FOGENABLE */
+    if (fog) { sh_note(10, "a bump-mapped hull under fog (stock dot3)"); return 0; }
+    texs = *(void ***)tex;                           /* DynArray<ST3D_Texture *>: diffuse, normal map */
+    if (!texs || !texs[0] || !texs[1]) return 0;
+
+    grp = *(BYTE **)(self + 8) + group * 24;
+    nv  = *(UINT *)(grp + 0x10);
+    pc  = *(UINT *)(grp + 0x14);
+    if (!pc) return 1;
+    vb = ((EngineBuf_t)FN_ENGINE_VB)(eng, *(DWORD *)grp);
+    ib = ((EngineBuf_t)FN_ENGINE_IB)(eng, *(DWORD *)(grp + 8));
+    if (!vb || !ib) return 0;
+
+    /* What the lights and the night lights need, as hook_vb_render gathers it. The
+     * normal from the basis faces the light whatever the matrix, so a mirrored draw
+     * needs no reversal: misc.x is always that of a stock (inward) hull. */
+    if (g_points > 0) n = pick_points(m + 9, pk, g_points > SH_POINTS ? SH_POINTS : g_points);
+    for (i = 0; i < n; i++) g_sh_pick[i] = pk[i];
+    g_sh_npick = n;
+    g_sh_sign = -1.0f;
+    mesh = *(BYTE **)(self + 0xc);
+    g_sh_lit_self = *(DWORD *)tm == VT_SELFILLUM_MATERIAL || (mesh && (*(DWORD *)(mesh + 0x12c) & 4));
+
+    /* The texture material's first pass (the diffuse in stage 0, opaque), as
+     * ST3D_Standard_MeshVB::Render sets it; the normal map in stage 1 through the
+     * engine's SetTexture, which keeps its cache of what each stage holds. */
+    ((TmPass3_t)(*(void ***)tm)[4])(tm, 0, tex);
+    ((DevTex_t)dvt[25])(dev, texs[0], 0);
+    ((DevTex_t)dvt[25])(dev, texs[1], 1);
+    ((D8Stream_t)(*(void ***)d8)[83])(d8, 0, vb, DOT3_STRIDE);     /* SetStreamSource */
+    ((D8Indices_t)(*(void ***)d8)[85])(d8, ib, 0);                 /* SetIndices */
+
+    d9_save(d9, &sv);
+    ((D8GetVS3_t)(*(void ***)d8)[77])(d8, &prev_vs);
+    for (i = 0; i < 3; i++) D9_FN(d9, D9_GETSAMPLERSTATE, D9GetSamp_t)(d9, 1, 5 + i, &samp[i]);
+    for (i = 0; i < 3; i++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 1, 5 + i, 2);  /* LINEAR */
+    D9_FN(d9, D9_SETVERTEXDECLARATION, D9_Ptr_t)(d9, g_dot3_decl);
+    d9_bind(d9, vs, ps);
+    sh_consts(d9, 1);
+    ((DIP8_t)(*(void ***)d8)[71])(d8, 4, 0, nv, 0, pc);           /* TRIANGLELIST, as stock */
+    ((D8VS3_t)(*(void ***)d8)[76])(d8, prev_vs);                   /* d3d8to9's own state again */
+    for (i = 0; i < 3; i++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 1, 5 + i, samp[i]);
+    d9_restore(d9, &sv);
+
+    if (++g_bump_draws == 1 || g_bump_draws == 100000) {
+        char b[160];
+        b[0] = 0; s_cat(b, "shaders: bump-mapped hull draws in shaders "); s_num(b, g_bump_draws);
+        s_cat(b, ", stock dot3 "); s_num(b, g_bump_stock);
+        logline(b);
+    }
+    if (g_sh_lit_self && g_logging) {
+        static int said_self;
+        if (!said_self) { said_self = 1; logline("shaders: a self-illuminating bump-mapped hull, its night lights folded in"); }
+    }
+    return 1;
+}
+
+static void __fastcall hook_dot3_render(void *self, void *edx, int group, void *lm, void *tm, void *tex)
+{
+    (void)edx;
+    if (!bump_draw((BYTE *)self, group, tm, tex)) {
+        g_bump_stock++;
+        g_dot3_render(self, group, lm, tm, tex);
+    }
 }
 
 /* Nebulae. Every nebula already carries a point light (Nebula::InitializeGeometry,
@@ -1819,6 +1997,7 @@ static void startup(void)
     g_logging = (int)GetPrivateProfileIntA("Lighting", "Log",    1, ini);
     g_fix_mirrored = (int)GetPrivateProfileIntA("Lighting", "FixMirrored", 1, ini);
     g_shaders = (int)GetPrivateProfileIntA("Lighting", "Shaders", 1, ini);
+    g_bump    = (int)GetPrivateProfileIntA("Lighting", "BumpShaders", 1, ini);
     ini1(ini, "SelfIllumination", &g_selfillum);
     ini1(ini, "Specular",         &g_spec);
     ini1(ini, "SpecularPower",    &g_spec_pow);
@@ -1867,6 +2046,7 @@ static void startup(void)
     s_cat(b, "--- Lighting GPU="); s_num(b, g_gpu);
     s_cat(b, " Lights=");          s_num(b, g_lights);
     s_cat(b, " Shaders=");         s_num(b, g_shaders);
+    s_cat(b, " BumpShaders=");     s_num(b, g_bump);
     s_cat(b, " PlanetShaders=");   s_num(b, g_planet_sh);
     s_cat(b, "  key ");            s_vec(b, g_key_col);
     s_cat(b, " axis ");            s_vec(b, g_key_mat + 6);
@@ -1902,6 +2082,11 @@ static void startup(void)
         }
         if (!patch_set_material()) logline("NOT PATCHED: SetMaterial site differs");
         else n++;
+    }
+    if (g_shaders && g_bump) {
+        g_dot3_render = (VBRender_t)FN_DOT3_RENDER;
+        if (patch_slot(VT_DOT3_MESHVB, 3, FN_DOT3_RENDER, (const void *)hook_dot3_render)) n++;
+        else logline("NOT PATCHED: Dot3_MeshVB vtable differs");
     }
     if (g_nebulae) n += redirect(S_NEBULA, (const void *)hook_nebula_lights);
     if (g_neb_cull > 1.0f) {

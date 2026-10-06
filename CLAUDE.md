@@ -667,8 +667,12 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `VBRender` only**: the engine's `SetVertexShader(FVF)` becomes d3d9
   `SetVertexShader(NULL)` under d3d8to9, so anything bound earlier is lost. Every d3d9
   path must fall back when `d9_device()` is NULL (DXVK's d3d8). `platform/D3D9.md`.
-- **`models/hull-bump.py` and `Lighting.asi` do not combine**: a bump-mapped hull goes
-  the dot3 way, which takes precedence over the vertex buffers.
+- **Bump-mapped hulls (the Borg, `models/hull-bump.py`'s) go the dot3 way**, which
+  takes precedence over the vertex buffers. `BumpShaders=1` wraps
+  `ST3D_Dot3_MeshVB::Render` and draws them in the hull shaders under d3d8to9. Their
+  normal is the SOD's vertex normal tilted by the map along S and T. Never use the
+  engine's S x T as the normal: it is summed from UV slopes and drew dark streaks where
+  UVs are mirrored.
 
 ### textures
 
@@ -718,7 +722,7 @@ both; **never ship one without the other.**
 **Federation hulls can be lit per pixel by the engine itself**: a SOD material spelled
 the Borg way (type 6, a second texture with word `0x200`) goes through the dot3 path.
 `models/hull-bump.py` does it with a *flat* height map; one derived from the hull art
-was rejected in game. It is 18–21% darker, because the dot3 passes have no ambient term
+was rejected in game. On the dot3 passes it is 18–21% darker, because they have no ambient term
 (`models/README.md`, "Hull lighting").
 
 **The planets' shape is not in their SOD.** `Planet_Database` builds its own sphere and
