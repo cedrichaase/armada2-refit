@@ -5,6 +5,17 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.3.0 — 2026-10-07
+
+### Added
+- `WarpDistance=` (default 1100; 0 leaves moves stock): a move ordered on the map goes
+  to warp, as the minimap's does, when the selected ships are on average farther than
+  that from the point; the cursor shows the warp ring there. Alt+click still warps at
+  any distance. The order is the minimap's `GO_WARP`, so stock players need nothing
+  (QOL-8).
+
+Installed, not yet seen in game.
+
 ## 1.2.0 — 2026-10-05
 
 ### Added
