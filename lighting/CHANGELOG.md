@@ -4,6 +4,17 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.12.0 — 2026-10-07
+
+### Added
+- `OrdnanceColours=1`: a torpedo's or pulse's light takes the hue of its own sprite
+  (the mean of its first frame in the installed texture) at the ODF's brightness, in
+  place of the ODF's `lightColor` (cyan on every Federation photon, green on nearly every
+  other weapon). Federation orange, Klingon red, Borg cyan, Cardassian yellow, Romulan
+  green, Species 8472 yellow-green. `0` keeps the ODF colours.
+
+Seen on the bench 2026-10-07 (`SCENE=factions`). Confirmed in game 2026-10-07.
+
 ## 1.11.0 — 2026-10-07
 
 ### Added

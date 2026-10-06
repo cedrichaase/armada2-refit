@@ -287,6 +287,7 @@ static int   g_sky_on;
 static float g_sky_col[3], g_sky_mat[12];
 
 static void explosion_lights(void);
+static void ordnance_colours(void);
 
 static void __cdecl hook_prerender_all(void *camera)
 {
@@ -295,6 +296,7 @@ static void __cdecl hook_prerender_all(void *camera)
     ((PreRenderAll_t)FN_PRERENDER_ALL)(camera);
     planet_glows();
     explosion_lights();
+    ordnance_colours();     /* Ordnance::PreRenderAll is next, at 0x598199 */
 }
 
 static void __fastcall hook_register_light(void *engine, void *edx, void *light,
@@ -1455,9 +1457,9 @@ static void sky_update(void)
  * up to full in the first 0.15 s, then down with the square of the time left;
  * full out to the explosion's bounding radius and gone at ExplosionRange radii
  * (no less than 40 units each). An ordinary ST3D_Point_Light, so the CPU path
- * (planets, cloaking ships) takes it too. Torpedoes and pulses need nothing of
- * the plugin: their ODFs give them a light (lightColor), which
- * Ordnance::PreRenderAll registers and pick_points hands the GPU. */
+ * (planets, cloaking ships) takes it too. Torpedoes and pulses have a light of
+ * their own (lightColor), which Ordnance::PreRenderAll registers and pick_points
+ * hands the GPU; ordnance_colours gives it the projectile's colour. */
 typedef void (__thiscall *Simulate_t)(void *, float);
 typedef void *(__thiscall *Delete_t)(void *, unsigned);
 typedef struct { void *obj; BYTE *light; float pos[3], r, left, len; } Boom;
@@ -1536,6 +1538,139 @@ static void explosion_lights(void)
         for (j = 0; j < 9; j++) mat[j] = (j % 4 == 0) ? 1.0f : 0.0f;
         for (j = 0; j < 3; j++) mat[9 + j] = b->pos[j];
         ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, b->light, col, mat);
+    }
+}
+
+/* Torpedoes and pulses. An ODF that sets lightColor gives its OrdnanceClass one
+ * ST3D_Point_Light (class +0x10), colour at +0xf4, which Ordnance::PreRenderAll
+ * registers for every live ordnance (the list at 0x771fac; an ordnance's class at
+ * +0x34). Stock's colours ignore the projectile: every Federation photon is cyan
+ * (0 1 1) though its sprite is orange, nearly every other torpedo and pulse green
+ * (0 1 0), Klingon red ones included. The class keeps its sprite at +0x12c (the
+ * ODF's Sprite, looked up in the sprite table); the sprite its first frame as
+ * fractions of its texture, U V at +0x38 and W H at +0x40, and its texture at
+ * +0x58, whose file name is the database element's name (+0x8). The first frame is
+ * the measure: a flipbook keeps one hue across its frames (stock: within 0.03 of
+ * the whole sheet on every torpedo), and the pulses share one sheet, a strip each.
+ * The colour is the mean over that rectangle of the installed TGA -- the sprites
+ * draw additively, so the mean is the light they add -- scaled to the ODF's peak,
+ * so a weapon keeps its brightness and takes the sprite's hue.
+ * Ordnance::PreRenderAll is called straight after GameObject_PreRenderAll
+ * (0x598199), so hook_prerender_all recolours the classes in play just before it.
+ * Each class is measured once: a light is done while it holds the colour written
+ * to it for that sprite; a class built anew (the next mission) has its ODF colour
+ * back and is measured again. */
+#define ORDNANCE_LIST 0x771fac   /* Ordnance::PreRenderAll's list */
+
+typedef struct { BYTE *light; void *sprite; float col[3]; } OrdLight;
+
+static int      g_ord_colours = 1;   /* OrdnanceColours= */
+static OrdLight g_ord[96];
+static int      g_ord_n;
+
+/* mean colour of the rectangle (u, v, w, h: fractions, from the top left) of a TGA
+ * in Textures/RGB, 0..1; 0 if the file cannot be read */
+static int tga_rect_mean(const char *name, const float *uv, float *out)
+{
+    static BYTE row[16384];
+    char   path[400];
+    HANDLE f;
+    BYTE   h[18];
+    DWORD  got;
+    int    w, ht, bpp, x0, x1, y0, y1, r, x, i, n = 0;
+    double acc[3] = { 0, 0, 0 };
+
+    path[0] = 0; s_cat(path, g_texdir); s_cat(path, name); s_cat(path, ".tga");
+    f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULLPTR, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+    if (f == INVALID_HANDLE_VALUE) return 0;
+    if (!ReadFile(f, h, 18, &got, NULLPTR) || got != 18 || h[1] != 0 || h[2] != 2 ||
+        (h[16] != 24 && h[16] != 32)) {
+        CloseHandle(f);
+        return 0;
+    }
+    bpp = h[16] / 8;
+    w   = h[12] | h[13] << 8;
+    ht  = h[14] | h[15] << 8;
+    if (w <= 0 || ht <= 0 || w * bpp > (int)sizeof row) { CloseHandle(f); return 0; }
+    x0 = (int)(uv[0] * w + 0.5f);          x1 = (int)((uv[0] + uv[2]) * w + 0.5f);
+    y0 = (int)(uv[1] * ht + 0.5f);         y1 = (int)((uv[1] + uv[3]) * ht + 0.5f);
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > w) x1 = w;
+    if (y1 > ht) y1 = ht;
+    if (x1 <= x0 || y1 <= y0) { CloseHandle(f); return 0; }
+    SetFilePointer(f, 18 + h[0], NULLPTR, 0);
+    for (r = 0; r < ht; r++) {
+        int y = (h[17] & 0x20) ? r : ht - 1 - r;     /* bit 5: rows stored top down */
+        if (!ReadFile(f, row, (DWORD)(w * bpp), &got, NULLPTR) || got != (DWORD)(w * bpp)) break;
+        if (y < y0 || y >= y1) continue;
+        for (x = x0; x < x1; x++) {
+            const BYTE *p = row + x * bpp;
+            acc[0] += p[2]; acc[1] += p[1]; acc[2] += p[0];
+            n++;
+        }
+    }
+    CloseHandle(f);
+    if (!n) return 0;
+    for (i = 0; i < 3; i++) out[i] = (float)(acc[i] / n / 255.0);
+    return 1;
+}
+
+static void ordnance_colour(BYTE *light, BYTE *sprite)
+{
+    float      *col = (float *)(light + 0xf4), c[3], peak, cp;
+    const char *tex;
+    BYTE       *t;
+    OrdLight   *o = NULLPTR;
+    int         i;
+    char        m[240];
+
+    for (i = 0; i < g_ord_n; i++)
+        if (g_ord[i].light == light) {
+            o = &g_ord[i];
+            if (o->sprite == sprite && col[0] == o->col[0] && col[1] == o->col[1] && col[2] == o->col[2])
+                return;
+            break;
+        }
+    if (!o) {
+        if (g_ord_n >= 96) { for (i = 0; i < 95; i++) g_ord[i] = g_ord[i + 1]; g_ord_n = 95; }
+        o = &g_ord[g_ord_n++];
+    }
+    o->light  = light;
+    o->sprite = sprite;
+    for (i = 0; i < 3; i++) o->col[i] = col[i];       /* left as it is unless measured */
+
+    t   = sprite ? *(BYTE **)(sprite + 0x58) : NULLPTR;
+    tex = t ? *(const char **)(t + 8) : NULLPTR;
+    m[0] = 0; s_cat(m, "ordnance light: ");
+    s_cat(m, tex ? tex : "(no sprite)"); s_cat(m, " odf "); s_vec(m, col);
+    peak = col[0] > col[1] ? col[0] : col[1];
+    if (col[2] > peak) peak = col[2];
+    if (!tex || peak <= 0.0f || !tga_rect_mean(tex, (const float *)(sprite + 0x38), c)) {
+        s_cat(m, " kept (texture not read)");
+        logline(m);
+        return;
+    }
+    cp = c[0] > c[1] ? c[0] : c[1];
+    if (c[2] > cp) cp = c[2];
+    if (cp <= 0.0f) { s_cat(m, " kept (black sprite)"); logline(m); return; }
+    for (i = 0; i < 3; i++) col[i] = o->col[i] = c[i] / cp * peak;
+    s_cat(m, " sprite mean "); s_vec(m, c);
+    s_cat(m, " -> "); s_vec(m, col);
+    logline(m);
+}
+
+static void ordnance_colours(void)
+{
+    DWORD head = *(DWORD *)ORDNANCE_LIST, node;
+    if (!g_ord_colours || !head) return;
+    for (node = *(DWORD *)head; node != head; node = *(DWORD *)node) {
+        BYTE *ord = *(BYTE **)(node + 8), *cls, *light;
+        if (!ord) continue;
+        cls = *(BYTE **)(ord + 0x34);
+        light = cls ? *(BYTE **)(cls + 0x10) : NULLPTR;
+        if (!light || *(DWORD *)light != VT_POINT) continue;
+        ordnance_colour(light, *(BYTE **)(cls + 0x12c));
     }
 }
 
@@ -2024,6 +2159,7 @@ static void startup(void)
     ini3(ini, "ExplosionColour",      g_boom_col);
     ini1(ini, "ExplosionBrightness", &g_boom_bright);
     ini1(ini, "ExplosionRange",      &g_boom_range);
+    g_ord_colours = (int)GetPrivateProfileIntA("Lighting", "OrdnanceColours", 1, ini);
     for (i = 0; i < 3; i++) g_planet_amb[i] = g_ambient[i];
     ini3(ini, "PlanetAmbient", g_planet_amb);
     ini3(ini, "PlanetDiffuse", g_planet_diff);
@@ -2070,7 +2206,7 @@ static void startup(void)
             return;
         }
     }
-    if (g_lights || g_planet_glow || g_explosions)
+    if (g_lights || g_planet_glow || g_explosions || g_ord_colours)
         n += redirect(S_PRERENDER, (const void *)hook_prerender_all);
     if (g_lights) n += redirect(S_REGISTER, (const void *)hook_register_light);
     if (g_gpu) {
