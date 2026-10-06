@@ -10,6 +10,9 @@ that `Lighting.ini` switches separately:
   (`KeyColour`, `KeyAxis`) and a dim blue fill from the opposite side (`FillColour`,
   `FillAxis`). Every renderer lights from that one list, so the CPU, GPU and bump-mapped
   paths agree.
+- **`BumpShaders=1`** (with `Shaders=1`): bump-mapped hulls, the Borg and any hull
+  `models/hull-bump.py` patched, go through the same shaders, lit by the engine's own
+  normal map ("Bump-mapped hulls", below).
 - **`Planets=1`**: planets and their cloud shells get a night side. Stock gives their
   material a constant half-white term that lights them all round (below).
 - **Light sources** ("Light sources", below): point lights reach the GPU-drawn ships
@@ -22,7 +25,7 @@ that `Lighting.ini` switches separately:
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
 `a2mod` switches the plugin as the `lighting` layer. Each launch writes `Lighting.log`:
-`call sites patched 12` means every hook took, and the lines after it name every model
+`call sites patched 13` means every hook took, and the lines after it name every model
 switched to vertex buffers, the map's own lights, the sky light (`sky:`) and each
 planet's ground colour (`planet glow:`).
 
@@ -46,6 +49,7 @@ planet's ground colour (`planet glow:`).
 | `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
+| `BumpShaders` | `1` | with `Shaders`, draw bump-mapped hulls (the Borg; `hull-bump.py`'s) in the hull shaders, their normal from the normal map, instead of the engine's dot3 passes ("Bump-mapped hulls", below); `0` leaves them to the dot3 passes |
 | `SelfIllumination` | `1.8` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none, above 1 brighter than their texture ("Dynamic range") |
 | `HullSun` | `1.1` | with `Shaders`, the Key on GPU-drawn hulls times this, the light no longer clamped at 1 ("Dynamic range") |
 | `HighlightKnee` | `0.8` | with `Shaders` or `PlanetShaders`, colour above this rolls off towards white instead of clipping; `1` clips as before ("Dynamic range") |
@@ -99,6 +103,7 @@ per-render effect is attached (cloak, warp-in), as stock does for asteroids.
 | slot 3 of the `ST3D_Standard_MeshVB` vtable (0x6bcbdc), `Render` | reverses the enabled lights for a draw whose object matrix (0x7ad640) is mirrored | below |
 | call at 0x597f83, `GameObject_PreRenderAll` | wraps `ST3D_GraphicsEngine::RegisterLight`: the frame's first directional light is replaced by Key and Fill, the map's others are dropped | below |
 | call at 0x598193 | wraps `GameObject_PreRenderAll` | counts the frame for the hook above |
+| slot 3 of the `ST3D_Dot3_MeshVB` vtable (0x6bc7d4), `Render` | draws a bump-mapped group once, in shaders | "Bump-mapped hulls", below |
 | six `fmuls` in the `GroundMesh` constructor (0x595c22, 0x595c3d, 0x595c57; 0x595c70, 0x595c7f, 0x595c8e) | their operand, the stock 0.75 and 0.5, now points at `PlanetDiffuse` and `PlanetAmbient`, one channel each | "Planets", below |
 
 Each call site is checked (an `E8` to the expected function, the `SetMaterial` call's
@@ -520,7 +525,74 @@ and E (`HullSun=1.1`, `Specular=0.7`); `SelfIllumination` shipped at 2.5 on the 
 came down to 1.8 after a look in game. A knee of 0.6 was tried
 first and flattened planets: their ground is bright art, and compressing everything over
 0.6 hazed it. In the `firing` scene the Galaxy's own torpedo now lights its engineering
-hull orange as it leaves (the Borg cube is on the dot3 path and takes none of this).
+hull orange as it leaves (the Borg cube was on the dot3 path and took none of this until
+1.11.0: "Bump-mapped hulls").
+
+## Bump-mapped hulls
+
+`BumpShaders=1`. A mesh whose material names a bump map (`models/README.md`, "How a SOD
+asks for it": the Borg in stock, and every hull `hull-bump.py` patches) does not take the
+vertex-buffer path above: `ST3D_Mesh::Update` gives it `ST3D_Dot3_MeshVB` first. Before
+1.11.0 none of this layer's shading reached such a hull: no `Ambient`, no point lights at
+their positions, no specular, rim or shoulder, and its night lights as the dot3 path drew
+them.
+
+**What the dot3 path does.** Read from `ST3D_Dot3_MeshVB::Render` (0x6275a0),
+`DrawLight` (0x627370) and `CreateShader` (0x627200). The vertex buffer has a 68-byte
+vertex: position, normal, UV, then three object-space vectors S, T and S x T, which
+`ST3D_CreateBasisVectors` (0x627aa0) sums per vertex from each triangle's UV slopes. The
+bump map is turned into a normal map at load (`ST3D_CreateNormalMap`) and is the
+group's second texture. `Render` draws every group once per light in the engine's list,
+added together. Stage 0 is `DOTPRODUCT3` of the normal map against the light vector, which
+the game's own vertex shader (`Shaders\dot3_directional.nvv`) takes into each vertex's S,
+T, S x T basis. The light's colour times the material's diffuse goes in `TEXTUREFACTOR`; a
+point light is reduced to a direction and a falloff at the mesh's centre. One more draw
+multiplies the frame by the diffuse texture, and for a self-illuminating mesh (the mesh's
++0x12c, bit 4) a third draws the night lights over it. There is no ambient term
+(`models/README.md`, "Measured": 18–21% darker than the CPU path).
+
+**What the plugin does instead.** It takes slot 3 of the vtable and, under d3d8to9, draws
+the group once itself, from the same vertex and index buffers (the engine's handles at
++0 and +8 of the group's 24-byte record, its vertex and triangle counts at +0x10 and
++0x14). The texture material's first pass sets stage 0 and the blend as for a plain hull.
+The normal map goes to stage 1 through the engine's own `SetTexture`, which caches what
+each stage holds. A Direct3D 9 vertex declaration of the 68-byte layout replaces the
+engine's shader for the draw, and the d3d8 vertex shader is set back after it. `bump_vs`
+and `bump_ps` (`hull.hlsl`) then give the hull everything `hull_ps` gives: the same
+`shade()`, constants and point lights. The material is `hook_set_material`'s: diffuse
+white, `Ambient` as emissive. The dot3 path sets no Direct3D lights, so the directional
+lights come from the engine's list, as `ST3D_Standard_MeshVB::PreRender` would set them.
+
+**The normal.** The dot3 shader projects the light onto S, T and S x T and dots that with
+the map, so the normal it lights with is S·n.x + T·n.y + (S x T)·n.z. It is outward and
+faces the light, where a stock mesh's normal points inward. The first build used it as it
+stands. On a Galaxy that `hull-bump.py` had patched, whose map is flat (n = (0, 0, 1)), it
+drew dark streaks down the saucer and the neck that the hull shaders do not have. S x T
+is summed from UV slopes, and it turns away from the surface wherever the UVs are
+mirrored or meet at a seam. The stock dot3 path lights with that same vector. So
+`bump_ps` takes the surface from the SOD's own vertex normal (inward, turned round) and
+uses S and T only for the map's slope, each made square to it. A flat map then gives
+exactly a plain hull's shading. A draw under a mirrored matrix needs no `FixMirrored`
+reversal: normal and light go to world space through the same matrix.
+
+**Left to the dot3 passes:** any draw with no Direct3D 9 device behind d3d8 (DXVK's
+d3d8, or `Shaders=0`), with fog on, while the engine's debug triangle cap (0x72c3f4) is
+set, or for a group without both textures. `Lighting.log` names the first
+(`shaders: bump-mapped hull draws in shaders N, stock dot3 M`).
+
+Measured on the bench (1920x1080, d3d8to9, 2026-10-06):
+
+| | stock dot3 | `BumpShaders=1` |
+|---|---|---|
+| Borg cube (`SCENE=firing`, `orbit target 60 25 260`), mean grey over the cube | 24.0 | 28.6 |
+
+The same faces are lit on both, and the relief from the Borg's height maps is kept; the
+lift is `Ambient`, the specular and the rim, and the night lights show as on the plain
+hulls. A Galaxy that `hull-bump.py` had patched, against the same Galaxy on the hull
+shaders (`SCENE=planet`, the 720x330 box): side on (`orbit ship 20 10 150`) mean 0.1414
+both, RMSE 0.023; from above (`orbit ship 200 20 150`) 0.393 against 0.396, RMSE 0.049,
+part of it the planet's clouds, which move between runs. With S x T as the normal, the
+first build measured 0.392 and RMSE 0.080 from above, the streaks.
 
 ## Planets on the GPU
 
@@ -592,9 +664,12 @@ the CPU path lit both its ground and its clouds evenly.
   texture's UVs converge; that is stock.
 - The city pass (`CityLights`) has not been seen yet: the bench planet has no
   development texture.
-- The Borg and any hull
-  `models/hull-bump.py` patched keep the dot3 path, which takes precedence over the
-  vertex buffers.
+- Without d3d8to9, the Borg and any hull `models/hull-bump.py` patched keep the dot3
+  passes ("Bump-mapped hulls"). The fallback under DXVK's d3d8 has not been run on the
+  bench since 1.11.0; it is the stock function, called whenever there is no Direct3D 9
+  device.
+- A bump-mapped hull has not yet been seen in game, in a Borg mission or with
+  `hull-bump.py` installed.
 - Translucent materials still go through the CPU path for sorting (see the moons in
   `models/README.md`). Under DXVK that path was slow for another reason: it reads back
   a dynamic vertex buffer kept in GPU memory. The selection bubbles cost 70 ms a frame

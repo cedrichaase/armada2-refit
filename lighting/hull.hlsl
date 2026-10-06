@@ -3,7 +3,9 @@
 // the ST3D_Standard_MeshVB draws: Direct3D's lighting per pixel, the directional
 // lights read back from the device at the draw, the point lights Lighting.asi picks
 // given where they are, the same material and texture stage (texture x lit colour).
-// lighting/README.md, "Shaders".
+// lighting/README.md, "Shaders". bump_vs and bump_ps light the ST3D_Dot3_MeshVB draws
+// (bump-mapped hulls: the Borg, and any hull models/hull-bump.py patched) the same way,
+// with the normal from the engine's own normal map; "Bump-mapped hulls".
 
 // ---- vertex: the game's vertex buffer as it is (FVF XYZ | NORMAL | TEX1) ----
 
@@ -66,11 +68,13 @@ float glint(float3 Nt, float3 L, float3 V)
     return dot(Nt, L) > 0.0 ? pow(max(0.0, dot(Nt, H)), shine.y) : 0.0;
 }
 
-float4 hull_ps(Lit i) : COLOR
+// Everything after the normal: the lights, the texture, the night lights, the shoulder.
+// N is the normal as the stock meshes have it (inward), the one the device's directional
+// lights pair with; misc.x turns it round.
+float4 shade(float3 N, float3 wp, float2 uv)
 {
-    float3 N  = normalize(i.n);
     float3 Nt = N * misc.x;                  // the outward normal: stock's are inward
-    float3 V  = normalize(eye.xyz - i.wp);
+    float3 V  = normalize(eye.xyz - wp);
     float3 sum = base.rgb, spec = 0.0;
     // The engine hands Direct3D its directional lights reversed to match the stock
     // meshes' inward normals, so the diffuse term takes the normal as it is; turned
@@ -81,7 +85,7 @@ float4 hull_ps(Lit i) : COLOR
     }
     // A point light is where it is; the outward normal faces it.
     for (int j = 0; j < POINTS; j++) {
-        float3 L = ppos[j].xyz - i.wp;
+        float3 L = ppos[j].xyz - wp;
         float  d = length(L);
         float  f = saturate(1.0 - max(0.0, d - pfall[j].x) * pfall[j].y);
         L /= max(d, 1e-6);
@@ -91,7 +95,7 @@ float4 hull_ps(Lit i) : COLOR
     // The rim: light on the faces turned edge-on to the camera, so a dark hull keeps
     // its outline against space.
     sum += rim_col.rgb * pow(1.0 - saturate(dot(Nt, V)), shine.z);
-    float4 t = tex2D(tex0, i.uv);
+    float4 t = tex2D(tex0, uv);
     // Gloss from the texture's brightness: pale plating shines, dark seams do not.
     float gloss = dot(t.rgb, float3(0.299, 0.587, 0.114));
     // The light is not clamped at 1: a Key above 1 (HullSun), an explosion or a
@@ -103,4 +107,70 @@ float4 hull_ps(Lit i) : COLOR
     // above 1, the night lights brighter than the texture.
     float3 c = lerp(lit, t.rgb * max(misc.y, 1.0), saturate(t.a * min(misc.y, 1.0)));
     return float4(shoulder(c, misc.z), t.a * base.a);
+}
+
+float4 hull_ps(Lit i) : COLOR
+{
+    return shade(normalize(i.n), i.wp, i.uv);
+}
+
+// ---- bump-mapped hulls: ST3D_Dot3_MeshVB's vertex buffer ----
+// Its 68-byte vertex: position, normal, UV, then the tangent basis the engine builds at
+// load (ST3D_CreateBasisVectors): S, T and S x T, in object space. The engine's own dot3
+// shader takes the light into that basis and dots it with the normal map, so the normal
+// it lights with is S n.x + T n.y + (S x T) n.z: outward, and facing the light itself,
+// not reversed as the device's lights are.
+
+struct Bumped
+{
+    float4 pos : POSITION;
+    float2 uv  : TEXCOORD0;
+    float3 n   : TEXCOORD1;       // the vertex normal, world space: for a degenerate basis
+    float3 wp  : TEXCOORD2;
+    float3 s   : TEXCOORD3;       // the basis, world space
+    float3 t   : TEXCOORD4;
+    float3 st  : TEXCOORD5;
+};
+
+float3 to_world(float3 v)
+{
+    return float3(dot(v, world[0].xyz), dot(v, world[1].xyz), dot(v, world[2].xyz));
+}
+
+Bumped bump_vs(float4 p : POSITION, float3 n : NORMAL, float2 uv : TEXCOORD0,
+               float3 s : TEXCOORD1, float3 t : TEXCOORD2, float3 st : TEXCOORD3)
+{
+    Bumped o;
+    o.pos = float4(dot(p, wvp[0]), dot(p, wvp[1]), dot(p, wvp[2]), dot(p, wvp[3]));
+    o.wp  = float3(dot(p, world[0]), dot(p, world[1]), dot(p, world[2]));
+    o.n   = to_world(n);
+    o.s   = to_world(s);
+    o.t   = to_world(t);
+    o.st  = to_world(st);
+    o.uv  = uv;
+    return o;
+}
+
+sampler2D nmap : register(s1);    // the engine's normal map, built from the SOD's height map
+
+// S or T made square to the outward normal Nt; none where it is degenerate.
+float3 across(float3 v, float3 Nt)
+{
+    float3 a = v - Nt * dot(Nt, v);
+    float  l = length(a);
+    return l > 1e-5 ? a / l : 0.0;
+}
+
+float4 bump_ps(Bumped i) : COLOR
+{
+    float3 m = tex2D(nmap, i.uv).rgb * 2.0 - 1.0;
+    // The surface is the SOD's own normal (inward, as stock), not S x T: that is summed
+    // from each triangle's UV slopes and turns away from the surface wherever the UVs
+    // are mirrored or seamed, and drew dark streaks down a Galaxy hull-bump.py had
+    // patched. S and T give the map's slope across it.
+    float3 Nt = -normalize(i.n);
+    float3 b  = across(i.s, Nt) * m.x + across(i.t, Nt) * m.y + Nt * m.z;
+    float  l  = length(b);
+    // shade() takes the inward normal and misc.x = -1, as for a stock hull
+    return shade(l > 1e-5 ? -b / l : -Nt, i.wp, i.uv);
 }

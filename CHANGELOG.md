@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 10.1.0 — 2026-10-07
+
+Layers: lighting 1.11.0.
+
+### Added
+- Borg ships, and hulls `models/hull-bump.py` patched, are lit in `Lighting.asi`'s hull
+  shaders under d3d8to9 (`BumpShaders=1`, lighting 1.11.0): their bump maps kept, with
+  the ambient, light sources, specular, rim and night lights other hulls get.
+
+Installed, not yet seen in game.
+
 ## 10.0.0 — 2026-10-06
 
 Layers: testbench 3.0.0.

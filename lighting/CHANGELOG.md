@@ -4,6 +4,19 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.11.0 — 2026-10-07
+
+### Added
+- `BumpShaders=1`: with `Shaders=1` under d3d8to9, bump-mapped hulls (the Borg, and any
+  hull `models/hull-bump.py` patched) are drawn once in `hull.hlsl`'s new
+  `bump_vs`/`bump_ps` instead of the engine's dot3 passes, taking `Ambient`, point lights
+  at their positions, specular, rim, the night lights and the highlight shoulder. The
+  normal is the SOD's vertex normal tilted by the engine's normal map. Slot 3 of the
+  `ST3D_Dot3_MeshVB` vtable; `Lighting.log` reads `call sites patched 13`.
+
+Seen on the bench 2026-10-06 (`SCENE=firing`, the Borg cube; `SCENE=planet`, a Galaxy with
+`hull-bump.py`). Installed, not yet seen in game.
+
 ## 1.10.0 — 2026-10-05
 
 ### Added
