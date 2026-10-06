@@ -5,7 +5,7 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 10.3.0 — 2026-10-07
+## 10.4.0 — 2026-10-07
 
 Layers: lighting 1.13.0.
 
@@ -13,7 +13,18 @@ Layers: lighting 1.13.0.
 - City lights on a planet's night side are webs of streets, roads and single lights
   instead of flat cream blotches (`CityLights`, lighting 1.13.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
+
+## 10.3.0 — 2026-10-07
+
+Layers: qol 1.3.0, testbench 3.2.0.
+
+### Added
+- A move ordered on the map past `WarpDistance=` (default 1100) goes to warp, as one on
+  the minimap does (qol 1.3.0); the `warp` scene and `qol-warp` scenario check it
+  (testbench 3.2.0).
+
+Confirmed in game 2026-10-07.
 
 ## 10.2.0 — 2026-10-07
 

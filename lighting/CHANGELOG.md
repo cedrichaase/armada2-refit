@@ -13,7 +13,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   brighter downtowns, all generated in `planet.hlsl`'s `city_ps` from the development
   texture and the population map. Fades to an even glow where a line is under a pixel.
 
-Seen on the bench 2026-10-07 (a class M planet settled by a colony ship). Installed, not yet seen in game.
+Seen on the bench 2026-10-07 (a class M planet settled by a colony ship). Confirmed in game 2026-10-07.
 
 ## 1.12.0 — 2026-10-07
 
