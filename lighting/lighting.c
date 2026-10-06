@@ -1376,10 +1376,11 @@ static void explosion_lights(void)
  * at zero it folds the beam up. Stock gives a phaser no light. Each frame, after
  * GameObject_PreRenderAll, the plugin walks the live ordnance (a std::list at
  * [0x771fac], the object at node +8; +0x27 set once it has expired) and registers a
- * point light at the start of every phaser that is visible (+0x24, which
- * Ordnance::PreRenderAll asks before it registers a torpedo's light), lifted
- * PhaserLift units along the beam so that it is off the hull it sits on, where it
- * would only graze it. One light object serves them all: RegisterLight keeps its
+ * point light at the start and one at the end of every phaser that is visible
+ * (+0x24, which Ordnance::PreRenderAll asks before it registers a torpedo's light),
+ * each lifted PhaserLift units along the beam towards the other end so that it is
+ * off the hull or shield it sits on, where it would only graze it. The end's is
+ * times PhaserImpact. One light object serves them all: RegisterLight keeps its
  * own copy of each colour and matrix.
  *
  * The colour is the beam's own art: the class's sprite (+0x12c, an ST3D_Sprite) holds
@@ -1397,6 +1398,7 @@ typedef struct { const void *tex; float col[3]; } BeamTex;
 
 static int     g_phasers = 1;
 static float   g_beam_bright = 2.0f, g_beam_start = 6.0f, g_beam_range = 70.0f, g_beam_lift = 8.0f;
+static float   g_beam_impact = 1.0f;   /* PhaserImpact=: the light at the beam's end, times this; 0 none */
 static BeamTex g_beam_tex[24];
 static int     g_beam_ntex;
 
@@ -1479,6 +1481,13 @@ static void phaser_lights(void)
         for (j = 0; j < 9; j++) mat[j] = (j % 4 == 0) ? 1.0f : 0.0f;
         for (j = 0; j < 3; j++) mat[9 + j] = a[j] + d[j] * n;
         ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, g_beam_light, c, mat);
+        /* the impact: at the end, lifted back towards the shooter, off the target's
+         * hull or shield */
+        if (g_beam_impact > 0.0f && n > 0.0f) {
+            for (j = 0; j < 3; j++) c[j] *= g_beam_impact;
+            for (j = 0; j < 3; j++) mat[9 + j] = b[j] - d[j] * n;
+            ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, g_beam_light, c, mat);
+        }
     }
 }
 
@@ -1971,6 +1980,7 @@ static void startup(void)
     ini1(ini, "PhaserStart",      &g_beam_start);
     ini1(ini, "PhaserRange",      &g_beam_range);
     ini1(ini, "PhaserLift",       &g_beam_lift);
+    ini1(ini, "PhaserImpact",     &g_beam_impact);
     for (i = 0; i < 3; i++) g_planet_amb[i] = g_ambient[i];
     ini3(ini, "PlanetAmbient", g_planet_amb);
     ini3(ini, "PlanetDiffuse", g_planet_diff);

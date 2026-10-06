@@ -18,7 +18,7 @@ that `Lighting.ini` switches separately:
   what is near it in the colour of its ground (`PlanetGlows`); the skybox adds a faint
   third light in its own colour (`SkyLight`); and a ship's or station's explosion
   lights its surroundings (`Explosions`); a phaser lights the firing ship around
-  its emitter (`Phasers`).
+  its emitter and the target where it strikes (`Phasers`).
 
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
@@ -62,8 +62,9 @@ planet's ground colour (`planet glow:`).
 | `SkyLight` | `0.35` | the sky light's strongest channel; `0` leaves it dark |
 | `Explosions` | `1` | ship and station explosions light their surroundings |
 | `ExplosionColour`, `ExplosionBrightness`, `ExplosionRange` | `1.00 0.62 0.28`, `4.0`, `10.0` | the flash's colour and peak; full over the explosion's radius (at least 40 units), gone at this many radii |
-| `Phasers` | `1` | a phaser lights the firing ship around its emitter while the beam is drawn ("Phasers", below) |
+| `Phasers` | `1` | a phaser lights the firing ship around its emitter, and the target where it strikes, while the beam is drawn ("Phasers", below) |
 | `PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift` | `2.0`, `6`, `70`, `8` | the beam's colour times this; full to `PhaserStart` units from the light, gone at `PhaserRange`; the light sits `PhaserLift` units out along the beam |
+| `PhaserImpact` | `1.0` | the light at the beam's end, times this; `0` none |
 | `Log` | `1` | write `Lighting.log` |
 
 The key comes in about 60° off vertical (1.0.0 had about 37°), so from the usual
@@ -386,16 +387,20 @@ folds the beam up. Stock gives a phaser no light: no phaser ODF sets `lightColor
 Each frame, after `GameObject_PreRenderAll`, the plugin walks the live ordnance, the
 list at [0x771fac] that `Ordnance::PreRenderAll` (0x58e4f0) walks, with the object at
 node +8 and +0x27 set once it has expired. For each live phaser that is visible (+0x24,
-which `PreRenderAll` asks before it registers a torpedo's light) it registers a point
-light at the beam's start, up over 0.06 s and down over the last 0.25 s. No hook is
+which `PreRenderAll` asks before it registers a torpedo's light) it registers two point
+lights, at the beam's start and at its end, up over 0.06 s and down over the last 0.25 s.
+The end is where `Beam::Simulate` lands the beam: on the target's shield sphere while
+its shields hold, else on the hardpoint it aims at. The light there is times
+`PhaserImpact`. No hook is
 patched for this; before it reads any ordnance the plugin checks that slot 0 of the
 `Phaser` vtable is its deleting destructor (0x57ee70), and logs `NOT PATCHED` if not.
 A list read each frame never holds a pointer to an object that has gone, which tracking
 lifetimes through `Simulate` and the destructor, as the explosions do, would.
 
-- **Where.** The start is on the hull, and a light on a surface only grazes it: N·L is
-  near 0 for the faces around it. The light sits `PhaserLift` units out along the beam,
-  which leaves the hull by construction.
+- **Where.** Both ends are on a surface, and a light on a surface only grazes it: N·L
+  is near 0 for the faces around it. Each light sits `PhaserLift` units along the beam
+  from its end, towards the other: off the shooter's hull, which the beam leaves by
+  construction, and off the target's hull or shield on the side the shot came from.
 - **Colour.** The beam's own art. The class's sprite (OrdnanceClass +0x12c, an
   `ST3D_Sprite`) holds its texture at +0x58, whose name, as for every
   `ST3D_DatabaseElement`, is at +0x8. The lit texels' mean, scaled to a peak of 1 and
@@ -414,6 +419,13 @@ On the bench (`SCENE=firing`, `orbit shooter 200 25 220`, 1920x1080, a 200x70 bo
 the saucer's deck beside the dorsal emitter, mean RGB): no beam 129/153/155; beam with
 `Phasers=0` 132.5/154.6/156.4, the flare sprite alone; beam with `Phasers=1`
 135.8/157.1/158.3, warm on the deck around the emitter.
+
+The impact, on the bench (a Galaxy firing at a second Galaxy with its shields up,
+`orbit target 215 25 130`, a 100x30 box of the target's engineering hull below the
+hit, mean RGB): no beam 146.7/166.7/166.9; with a beam and `PhaserImpact=0` the same in
+all five such frames; with `PhaserImpact=1` about 201/214/209 in four, a warm cream
+wash over the hull and neck around the hit. The shield's own flashes (cyan) come and go
+in both.
 
 ## Shaders
 
@@ -648,6 +660,5 @@ the CPU path lit both its ground and its clouds evenly.
 - A mirrored mesh (`FixMirrored`) gets no point lights on the fixed-function path:
   reversing a directional light fixes its normals, and a point light has no such
   reversal. With `Shaders=1` it gets them.
-- Weapon impacts flash no light (above), phasers' included: only the emitter end of
-  a beam has one. `ShockwaveExplosion` (the big special weapons'
+- Weapon impacts other than a phaser's flash no light (above). `ShockwaveExplosion` (the big special weapons'
   ring) has its own `AdjustLighting` and is left alone.

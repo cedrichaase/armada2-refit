@@ -11,6 +11,8 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   drawn, in the beam's own colour (read from its sprite texture) times
   `PhaserBrightness=2.0`, full to `PhaserStart=6`, gone at `PhaserRange=70`, lifted
   `PhaserLift=8` units out along the beam.
+- `PhaserImpact=1.0`: the beam's end lights the target the same way, times this; `0`
+  none.
 
 Seen on the bench 2026-10-06 (`SCENE=firing`). Installed, not yet seen in game.
 

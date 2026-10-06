@@ -10,8 +10,8 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: lighting 1.11.0.
 
 ### Added
-- Phaser fire lights the firing ship around the emitter, in the beam's colour
-  (`Phasers`, lighting 1.11.0).
+- Phaser fire lights the firing ship around the emitter and the target where it
+  strikes, in the beam's colour (`Phasers`, `PhaserImpact`, lighting 1.11.0).
 
 Installed, not yet seen in game.
 
