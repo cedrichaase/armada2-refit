@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 10.2.0 — 2026-10-07
+
+Layers: lighting 1.12.0, testbench 3.1.0.
+
+### Added
+- Torpedo and pulse lights take the colour of the projectile's own sprite instead of
+  the ODF's cyan or green (`OrdnanceColours=`, lighting 1.12.0); the bench's
+  `factions` scene shows one weapon of each playable faction (testbench 3.1.0).
+
+Installed, not yet seen in game.
+
 ## 10.1.0 — 2026-10-07
 
 Layers: lighting 1.11.0.
