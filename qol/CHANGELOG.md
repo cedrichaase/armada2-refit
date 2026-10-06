@@ -15,7 +15,7 @@ versions". Newest first. Details, and the planned changes, are in
   any distance. The order is the minimap's `GO_WARP`, so stock players need nothing
   (QOL-8).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 1.2.0 — 2026-10-05
 

@@ -14,7 +14,7 @@ Layers: qol 1.3.0, testbench 3.1.0.
   the minimap does (qol 1.3.0); the `warp` scene and `qol-warp` scenario check it
   (testbench 3.1.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 10.1.0 — 2026-10-07
 
