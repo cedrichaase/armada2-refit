@@ -12,14 +12,43 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test check hud                       # how each step would run, no launch
     ./a2test list
 
-    ./a2test session start --res 16:10       # a live session to drive by hand
+    ./a2test session start --res 16:10       # a live session to drive by hand; prints its ID
     ./a2test session start --install .       # this checkout's ./install, from stock
     ./a2test session start --res 800x600 --mod stock --stock-shell embed   # the stock baseline, menus clickable
     A2_DATA=$(mktemp -d) ./a2test session start --install .   # ... as without any assets
-    ./a2test drive shot menu                 #   prints the PNG path
-    ./a2test drive click-text "Single Player"
-    ./a2test drive step 'Wait for the single player screen'
-    ./a2test session stop                    #   ends the game, gathers logs, writes the report
+    ./a2test drive --session ID shot menu    #   prints the PNG path
+    ./a2test drive --session ID click-text "Single Player"
+    ./a2test drive --session ID step 'Wait for the single player screen'
+    ./a2test session stop ID                 #   ends the game, gathers logs, writes the report
+    ./a2test session list                    # the active sessions and their IDs
+
+### Which session a command acts on
+
+Several jobs share the bench, and every case of an `a2test run` is a session too. So
+a session is named, not guessed:
+
+- **`session start` prints the session's ID** (`session 20261006-142501-48213`,
+  date, time and the starting process) together with the exact `drive` and `stop`
+  commands for it. The ID is the name of its state directory,
+  `~/.cache/a2test/sessions/<ID>/`.
+- **`session stop` requires the ID** (`session stop ID`, `--session ID`, or
+  `A2TEST_SESSION`). There is no default, so a stop can only end a session someone
+  named.
+- **`drive` takes `--session ID`** anywhere on its line, or `A2TEST_SESSION`. Without
+  either, it drives the one active session if there is exactly one, and refuses, listing
+  them, if there are several.
+- `A2TEST_SESSION` takes the ID or the `state:` path `session start` prints; agent steps
+  get it set for them. An ID that has ended or does not exist is an error, never a
+  fall-back to another session.
+
+**An agent that starts a session keeps track of its ID and passes it on every
+command** -- `drive --session ID ...` and `session stop ID` -- and stops only the
+sessions it started itself. It never stops a session it did not start: one in `session
+list` that it does not recognise belongs to another job, however stale it looks. Each
+tool call is a fresh shell, so an `export A2TEST_SESSION=...` does not carry over; write
+the ID into the command, or into the script that runs the steps. With two sessions of
+its own (a host and a joiner, red and green), it keeps both IDs and names the right one
+each time.
 
 Reports go to `~/.local/share/a2test/results/<run>/`, with `latest` pointing at the
 newest. Each holds `index.html` (look at it), `report.md` (read or paste it),
@@ -170,11 +199,12 @@ anything new in the game's `Logs/`.
 - **Fog of war is flat grey.** A map opens scrolled to its top-left corner, so its
   unexplored area fills part of the 3D view with flat grey, and so does the minimap.
   The flat-area check will flag it. Don't use that check on a map.
-- **`a2test drive` drives the newest active session on the machine**, and every case
-  of an `a2test run` counts as one. With another job running scenarios, a `drive` after
-  your own `session start` went to *that* job's game (2026-09-27: an Escape and two
-  clicks landed in a `hud-mode-switch` case). When anything else may be using the bench,
-  set `A2TEST_SESSION` to the `state:` path `session start` prints.
+- **`a2test drive` used to drive the newest active session on the machine**, and every
+  case of an `a2test run` counts as one. With another job running scenarios, a `drive`
+  after your own `session start` went to *that* job's game (2026-09-27: an Escape and two
+  clicks landed in a `hud-mode-switch` case), and a bare `session stop` terminated a
+  parallel job's session (2026-10-05). That is why `session stop` now requires an ID and
+  `drive` refuses to choose among several ("Which session a command acts on").
 - **The briefing's OK button did not take a click** in one session, though Esc did.
   Not investigated.
 - **A clone starts with the player's own shell settings.** The game keeps the

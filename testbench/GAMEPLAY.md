@@ -108,7 +108,9 @@ Class names differ per faction; read them off the tooltip. Seen for the **Borg**
 - A screenshot after every hover is what made the first mining run take 108 turns. Batch
   move, wait and ocr, and take a shot only to decide something.
 - **Driving a session from tool calls**: each command starts a fresh shell, so an
-  `export A2TEST_SESSION=…` does not carry over. Put the session path and a list of
-  steps in a small script in the scratchpad and run that.
+  `export A2TEST_SESSION=…` does not carry over. Pass `--session ID` on every `drive`
+  and `session stop ID` at the end, with the ID `session start` printed, or put the ID
+  and a list of steps in a small script in the scratchpad and run that. Stop only the
+  sessions you started (`README.md`, "Which session a command acts on").
 - **In a scenario file, every numbered or bulleted line is a step**, including the ones
   in a fragment's description. Write notes as prose.

@@ -35,10 +35,16 @@ a2test -- run Armada II headless and test it end to end
                        [--vnc] [--no-launch]
       --install PATH                   start from stock, then run PATH/install into the
                                        clone; repeat to stack checkouts (public, private)
-  a2test session stop [--keep] [--graceful]  end the game (terminated; --graceful: through its menus), gather logs, write the report
-  a2test session list
+  a2test session stop ID [--keep] [--graceful]
+                                       end session ID (terminated; --graceful: through its
+                                       menus), gather logs, write the report. The id is
+                                       required: nothing stops a session by default
+  a2test session list                  active sessions: id, size, mod, game, artifacts
   a2test watch [--no-open]             every live session, view-only, tiled in one
                                        window (wayvnc + noVNC; needs wayvnc)
+  a2test drive [--session ID] ...      every drive command takes --session ID (or
+                                       A2TEST_SESSION=ID); without one, drive refuses
+                                       when more than one session is active
   a2test drive shot [NAME]             print the screenshot's path
   a2test drive click X Y [--design] [--button 3] [--double]
   a2test drive click-text "TEXT"
@@ -275,14 +281,59 @@ def _active_sessions():
     return out
 
 
-def _current():
-    f = os.environ.get('A2TEST_SESSION')
-    if f:
-        return Session.load(f)
+def _take_session(argv):
+    """Strip `--session ID` (or `--session=ID`) from anywhere in argv: (ID or None, the rest)."""
+    sid, rest, it = None, [], iter(argv)
+    for a in it:
+        if a == '--session':
+            sid = next(it, None)
+            if not sid:
+                raise GameError('--session needs a session id (a2test session list)')
+        elif a.startswith('--session='):
+            sid = a.split('=', 1)[1]
+        else:
+            rest.append(a)
+    return sid, rest
+
+
+def _session_by(ref):
+    """A session by its id, or by a path: its state file, or the artifacts' session.json."""
+    p = Path(ref).expanduser()
+    if not p.is_file():
+        p = config.CACHE / 'sessions' / ref / 'session.json'
+    if not p.is_file():
+        raise GameError(f'no session {ref!r} (a2test session list)')
+    st = json.loads(p.read_text())
+    if 'statefile' in st and 'id' not in st:
+        p = Path(st['statefile'])
+    s = Session.load(p)
+    if s.s.get('ended'):
+        raise GameError(f'session {s.s["id"]} has already ended')
+    return s
+
+
+def _active_list():
+    return '\n'.join(f'  {s.s["id"]}  {s.s.get("label", "")}  {s.dir}' for s in _active_sessions()) or '  (none)'
+
+
+def _current(sid=None, required=False):
+    """The session a command acts on. An explicit one (--session, else A2TEST_SESSION)
+    always wins. Without one, `required` refuses; otherwise the one active session is
+    used, and several are refused rather than guessed at: the newest may be another
+    job's."""
+    ref = sid or os.environ.get('A2TEST_SESSION')
+    if ref:
+        return _session_by(ref)
+    if required:
+        raise GameError('name the session: a2test session stop ID (or --session ID, or A2TEST_SESSION).\n'
+                        f'Active sessions:\n{_active_list()}')
     act = _active_sessions()
     if not act:
         raise GameError('no active session (a2test session start)')
-    return act[-1]
+    if len(act) > 1:
+        raise GameError(f'{len(act)} sessions are active; name yours with --session ID '
+                        f'(or A2TEST_SESSION):\n{_active_list()}')
+    return act[0]
 
 
 def cmd_session(argv):
@@ -326,13 +377,20 @@ def cmd_session(argv):
             s.teardown()
             _session_report(s)
             raise
-        print(f'session {s.s["id"]}\n  artifacts: {s.dir}\n  state:     {s.statefile}')
+        print(f'session {s.s["id"]}\n  artifacts: {s.dir}\n  state:     {s.statefile}\n'
+              f'  drive it:  a2test drive --session {s.s["id"]} ...\n'
+              f'  stop it:   a2test session stop {s.s["id"]}')
         if s.s.get('vnc_port'):
             print(f'  watch:     vncviewer localhost:{s.s["vnc_port"]}')
         return 0
     if sub == 'stop':
+        sid, rest = _take_session(rest)
+        ids = [a for a in rest if not a.startswith('-')]
+        if len(ids) > 1 or (ids and sid and ids[0] != sid):
+            raise GameError('session stop takes one session id')
         keep = '--keep' in rest
-        s = _current()
+        # Never the newest by default: that may be another job's session.
+        s = _current(sid or (ids[0] if ids else None), required=True)
         if keep:
             s.s['keep'] = True
         s.log.action('session stopped from the command line')
@@ -390,8 +448,11 @@ def _adhoc_step(s, text):
 def cmd_drive(argv):
     if not argv:
         raise GameError('drive what? (a2test help)')
+    sid, argv = _take_session(argv)
+    if not argv:
+        raise GameError('drive what? (a2test help)')
     sub, rest = argv[0], argv[1:]
-    s = _current()
+    s = _current(sid)
     log = s.log
 
     def xy(args, design):

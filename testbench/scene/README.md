@@ -8,10 +8,10 @@ mission has run `Delay=` ticks, the plugin turns that empty stage into what a sc
 file describes. A free camera and other commands then change the scene while it runs.
 
     SCENE=firing ./a2test session start --install . --install testbench/scene --args '-nointro a2_borg01'
-    ./a2test drive scene "orbit shooter 120 20 250"      # look from another side
-    ./a2test drive scene pause "orbit shooter 240 -30 250"
-    ./a2test drive shot underside
-    ./a2test session stop
+    ./a2test drive --session ID scene "orbit shooter 120 20 250"   # look from another side
+    ./a2test drive --session ID scene pause "orbit shooter 240 -30 250"
+    ./a2test drive --session ID shot underside
+    ./a2test session stop ID
 
 A scenario puts the plugin in with `Setup: testbench/scene/bench-setup.sh <name>` and
 drives it with `Scene "CMD"` and `Expect scene "CMD" answers "TEXT"` steps
