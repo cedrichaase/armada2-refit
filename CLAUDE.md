@@ -59,9 +59,13 @@ or `import a2env` (Python, with the repository root on `sys.path`): they resolve
 `~/.config/armada2-refit.conf`, then the default location.
 
 **To see a change working in the game without taking over the user's screen, use the
-test bench**: `./a2test session start --res 21:9`, then `./a2test drive shot` / `click` /
-`key` / `step "…"`, and read the screenshots. It runs on a reflink clone of the install
-and a headless display. Write regression scenarios in `testbench/scenarios/` for fixes
+test bench**: `./a2test session start --res 21:9`, then `./a2test drive --session ID shot`
+/ `click` / `key` / `step "…"`, and read the screenshots. It runs on a reflink clone of
+the install and a headless display. **Keep the ID `session start` prints, pass
+`--session ID` on every `drive`, and end with `./a2test session stop ID`** (the ID is
+required). Other jobs run sessions on the same bench: stop only the sessions you
+started, never one from `session list` you don't recognise (`testbench/README.md`,
+"Which session a command acts on"). Write regression scenarios in `testbench/scenarios/` for fixes
 worth keeping fixed. A bench pass is evidence for the user, not their sign-off
 ("Finishing work" still applies).
 **To test a checkout as installed**, `./a2test session start --install <checkout>` (or

@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 10.0.0 — 2026-10-06
+
+Layers: testbench 3.0.0.
+
+### Changed
+- `a2test session stop` requires a session ID, and `a2test drive` takes `--session ID`
+  and refuses to pick among several active sessions (testbench 3.0.0). `CLAUDE.md`: an
+  agent keeps the IDs of the sessions it starts and stops only those.
+
+Installs nothing; no game-side change to confirm.
+
 ## 9.17.0 — 2026-10-05
 
 Layers: models 3.3.0.

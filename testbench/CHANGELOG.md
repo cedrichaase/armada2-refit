@@ -5,6 +5,20 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.0.0 — 2026-10-06
+
+### Changed
+- `a2test session stop` requires the session's ID (`session stop ID`, `--session ID` or
+  `A2TEST_SESSION`); it no longer stops the newest session by default.
+- `a2test drive` takes `--session ID` anywhere on its line. Without one (or
+  `A2TEST_SESSION`) it drives the only active session and refuses when several are
+  active, instead of driving the newest.
+- `A2TEST_SESSION` takes a session ID as well as a state path; an unknown or ended
+  session is an error rather than a fall-back.
+- `session start` prints the `drive --session` and `session stop` commands for its ID.
+
+Installs nothing; seen working on the bench 2026-10-06.
+
 ## 2.14.0 — 2026-10-05
 
 ### Added
