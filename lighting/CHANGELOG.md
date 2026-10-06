@@ -4,6 +4,16 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.11.0 — 2026-10-06
+
+### Added
+- `Phasers=1`: a phaser lights the firing ship around its emitter while the beam is
+  drawn, in the beam's own colour (read from its sprite texture) times
+  `PhaserBrightness=2.0`, full to `PhaserStart=6`, gone at `PhaserRange=70`, lifted
+  `PhaserLift=8` units out along the beam.
+
+Seen on the bench 2026-10-06 (`SCENE=firing`). Installed, not yet seen in game.
+
 ## 1.10.0 — 2026-10-05
 
 ### Added

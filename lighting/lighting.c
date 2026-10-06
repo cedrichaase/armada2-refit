@@ -287,6 +287,7 @@ static int   g_sky_on;
 static float g_sky_col[3], g_sky_mat[12];
 
 static void explosion_lights(void);
+static void phaser_lights(void);
 
 static void __cdecl hook_prerender_all(void *camera)
 {
@@ -295,6 +296,7 @@ static void __cdecl hook_prerender_all(void *camera)
     ((PreRenderAll_t)FN_PRERENDER_ALL)(camera);
     planet_glows();
     explosion_lights();
+    phaser_lights();
 }
 
 static void __fastcall hook_register_light(void *engine, void *edx, void *light,
@@ -400,6 +402,7 @@ static void reverse_lights(void *dev)
 typedef long (__stdcall *LightEnable_t)(void *, DWORD, BOOL);
 
 static void *g_glow_vt[19];          /* a planet's light: see planet_glows */
+static BYTE *g_beam_light;           /* the phasers' one light: see phaser_lights */
 
 static int   g_points = 12;          /* PointLights=: at most this many per draw (6 in Direct3D's slots) */
 
@@ -462,7 +465,7 @@ static int pick_points(const float *at, Pick *out, int max)
         const float *col = (const float *)(inst + 4);
         const float *pos = (const float *)(inst + 0x10) + 9;
         float start, range, dx, dy, dz, d, f, ph = 1.0f, peak, score;
-        int   hard;
+        int   hard, beam;
         DWORD vt;
         if (!light) continue;
         vt = *(DWORD *)light;
@@ -473,7 +476,10 @@ static int pick_points(const float *at, Pick *out, int max)
         d = sqrt_f(dx * dx + dy * dy + dz * dz);
         peak = col[0] > col[1] ? col[0] : col[1];
         if (col[2] > peak) peak = col[2];
-        hard = range < 0.25f * start;
+        /* a phaser's light sits on a hull: picked and placed as a hard light, faded
+         * as a soft one (see phaser_lights) */
+        beam = light == g_beam_light;
+        hard = beam || range < 0.25f * start;
         if (hard) {
             float reach = start + range + HARD_REACH;
             if (d >= reach) continue;
@@ -486,10 +492,12 @@ static int pick_points(const float *at, Pick *out, int max)
             score = f * peak;
         }
         if (score < 0.004f) continue;
-        /* one of a colour already picked: keep the stronger */
-        for (i = 0; i < n; i++)
+        /* one of a colour already picked: keep the stronger (not phasers, which
+         * fire from several banks of a ship at once) */
+        for (i = 0; !beam && i < n; i++)
             if (out[i].src[0] == col[0] && out[i].src[1] == col[1] && out[i].src[2] == col[2])
                 break;
+        if (beam) i = n;
         if (i < n) {
             if (out[i].score >= score) continue;
             for (n--; i < n; i++) out[i] = out[i + 1];
@@ -1361,6 +1369,119 @@ static void explosion_lights(void)
     }
 }
 
+/* Phasers. A phaser shot is an ordnance object (class Phaser, vtable 0x6b8ee4) that
+ * lives for as long as its beam is drawn: Beam::Simulate puts the beam's start (+0xbc)
+ * on the firing ship's hardpoint every frame and its end (+0xc8) on the target, and
+ * counts its time left (+0xac) down from the class's lifeSpan (OrdnanceClass +0x1c);
+ * at zero it folds the beam up. Stock gives a phaser no light. Each frame, after
+ * GameObject_PreRenderAll, the plugin walks the live ordnance (a std::list at
+ * [0x771fac], the object at node +8; +0x27 set once it has expired) and registers a
+ * point light at the start of every phaser that is visible (+0x24, which
+ * Ordnance::PreRenderAll asks before it registers a torpedo's light), lifted
+ * PhaserLift units along the beam so that it is off the hull it sits on, where it
+ * would only graze it. One light object serves them all: RegisterLight keeps its
+ * own copy of each colour and matrix.
+ *
+ * The colour is the beam's own art: the class's sprite (+0x12c, an ST3D_Sprite) holds
+ * its texture at +0x58, whose name, like every ST3D_DatabaseElement's, is at +0x8.
+ * The lit texels' mean, scaled to a peak of 1, times the beam's tint (+0xf0: white, or
+ * the owner's team colour with NORMAL_WEAPON_TEAM_COLOR), times PhaserBrightness.
+ * Full to PhaserStart, gone at PhaserRange. pick_points takes it where it is, as it
+ * takes a torpedo's, but as a soft light in the shaders and never merged with another
+ * of its colour: a Galaxy's banks fire together. */
+#define VT_PHASER     0x6b8ee4   /* Phaser vtable */
+#define FN_PHASER_DEL 0x57ee70   /* its scalar deleting destructor, slot 0 */
+#define ORDNANCE_LIST 0x771fac   /* the live ordnance, as Ordnance::PreRenderAll walks it */
+
+typedef struct { const void *tex; float col[3]; } BeamTex;
+
+static int     g_phasers = 1;
+static float   g_beam_bright = 2.0f, g_beam_start = 6.0f, g_beam_range = 70.0f, g_beam_lift = 8.0f;
+static BeamTex g_beam_tex[24];
+static int     g_beam_ntex;
+
+static const float *beam_colour(const BYTE *cls)
+{
+    static const float white[3] = { 1.0f, 1.0f, 1.0f };
+    const BYTE *spr = *(const BYTE * const *)(cls + 0x12c), *tex;
+    const char *name;
+    BeamTex    *t;
+    char        stem[64], m[200];
+    float       peak;
+    int         i;
+    if (!spr || !(tex = *(const BYTE * const *)(spr + 0x58))) return white;
+    for (i = 0; i < g_beam_ntex; i++)
+        if (g_beam_tex[i].tex == tex) return g_beam_tex[i].col;
+    if (g_beam_ntex >= 24) return white;
+    t = &g_beam_tex[g_beam_ntex++];
+    t->tex = tex;
+    name = *(const char * const *)(tex + 8);
+    stem[0] = 0;
+    if (name) {   /* the name, without a path or an extension */
+        const char *s = name, *p;
+        for (p = name; *p; p++) if (*p == '\\' || *p == '/') s = p + 1;
+        for (i = 0; i < 63 && s[i] && s[i] != '.'; i++) stem[i] = s[i];
+        stem[i] = 0;
+    }
+    if (!stem[0] || !tga_mean(stem, "", t->col))
+        for (i = 0; i < 3; i++) t->col[i] = 1.0f;
+    peak = t->col[0] > t->col[1] ? t->col[0] : t->col[1];
+    if (t->col[2] > peak) peak = t->col[2];
+    for (i = 0; i < 3; i++) t->col[i] = peak > 1e-3f ? t->col[i] / peak : 1.0f;
+    m[0] = 0;
+    s_cat(m, "phaser: "); s_cat(m, stem[0] ? stem : "(no texture)"); s_cat(m, " ");
+    s_vec(m, t->col);
+    logline(m);
+    return t->col;
+}
+
+static void phaser_lights(void)
+{
+    DWORD head, node;
+    if (!g_phasers || !*(DWORD *)ORDNANCE_LIST) return;
+    if (!g_beam_light) {
+        typedef void *(__cdecl *New_t)(unsigned);
+        typedef void *(__thiscall *Ctor_t)(void *, void *, void *, const char *);
+        BYTE *l = (BYTE *)((New_t)FN_NEW)(0x138);
+        if (!l) return;
+        ((Ctor_t)FN_POINT_LIGHT)(l, NULLPTR, NULLPTR, "phaser");
+        g_beam_light = l;
+    }
+    *(float *)(g_beam_light + 0x100) = g_beam_start;
+    *(float *)(g_beam_light + 0x104) = g_beam_range > g_beam_start ? g_beam_range - g_beam_start : 0.01f;
+    head = *(DWORD *)ORDNANCE_LIST;
+    for (node = *(DWORD *)head; node != head; node = *(DWORD *)node) {
+        BYTE *o = *(BYTE **)(node + 8), *cls;
+        const float *a, *b, *col, *tint;
+        float left, len, age, k, d[3], n, c[3], mat[12];
+        int   j;
+        if (!o || *(DWORD *)o != VT_PHASER || o[0x27] || !o[0x24]) continue;
+        if (!(cls = *(BYTE **)(o + 0x34))) continue;
+        left = *(float *)(o + 0xac);
+        len  = *(float *)(cls + 0x1c);
+        if (left <= 0.0f || len <= 0.0f) continue;
+        /* up in 0.06 s, down over the last 0.25 */
+        age = len - left;
+        k = age < 0.06f ? age / 0.06f : 1.0f;
+        if (left < 0.25f) k *= left / 0.25f;
+        if (k <= 0.0f) continue;
+        a = (const float *)(o + 0xbc);
+        b = (const float *)(o + 0xc8);
+        for (j = 0; j < 3; j++) d[j] = b[j] - a[j];
+        n = sqrt_f(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        n = n > 1e-3f ? (n < g_beam_lift ? n : g_beam_lift) / n : 0.0f;
+        col  = beam_colour(cls);
+        tint = (const float *)(o + 0xf0);
+        for (j = 0; j < 3; j++) {
+            float t = tint[j] < 0.0f ? 0.0f : tint[j] > 1.0f ? 1.0f : tint[j];
+            c[j] = col[j] * t * g_beam_bright * k;
+        }
+        for (j = 0; j < 9; j++) mat[j] = (j % 4 == 0) ? 1.0f : 0.0f;
+        for (j = 0; j < 3; j++) mat[9 + j] = a[j] + d[j] * n;
+        ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, g_beam_light, c, mat);
+    }
+}
+
 static int patch_slot(DWORD vt, int idx, DWORD expect, const void *hook)
 {
     void **slot = (void **)(vt + 4 * idx);
@@ -1845,6 +1966,11 @@ static void startup(void)
     ini3(ini, "ExplosionColour",      g_boom_col);
     ini1(ini, "ExplosionBrightness", &g_boom_bright);
     ini1(ini, "ExplosionRange",      &g_boom_range);
+    g_phasers = (int)GetPrivateProfileIntA("Lighting", "Phasers", 1, ini);
+    ini1(ini, "PhaserBrightness", &g_beam_bright);
+    ini1(ini, "PhaserStart",      &g_beam_start);
+    ini1(ini, "PhaserRange",      &g_beam_range);
+    ini1(ini, "PhaserLift",       &g_beam_lift);
     for (i = 0; i < 3; i++) g_planet_amb[i] = g_ambient[i];
     ini3(ini, "PlanetAmbient", g_planet_amb);
     ini3(ini, "PlanetDiffuse", g_planet_diff);
@@ -1890,7 +2016,11 @@ static void startup(void)
             return;
         }
     }
-    if (g_lights || g_planet_glow || g_explosions)
+    if (g_phasers && *(DWORD *)VT_PHASER != FN_PHASER_DEL) {
+        logline("NOT PATCHED: Phaser vtable differs, no phaser lights");
+        g_phasers = 0;
+    }
+    if (g_lights || g_planet_glow || g_explosions || g_phasers)
         n += redirect(S_PRERENDER, (const void *)hook_prerender_all);
     if (g_lights) n += redirect(S_REGISTER, (const void *)hook_register_light);
     if (g_gpu) {

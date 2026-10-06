@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 9.18.0 — 2026-10-06
+
+Layers: lighting 1.11.0.
+
+### Added
+- Phaser fire lights the firing ship around the emitter, in the beam's colour
+  (`Phasers`, lighting 1.11.0).
+
+Installed, not yet seen in game.
+
 ## 9.17.0 — 2026-10-05
 
 Layers: models 3.3.0.
