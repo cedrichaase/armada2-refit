@@ -668,8 +668,6 @@ the CPU path lit both its ground and its clouds evenly.
   passes ("Bump-mapped hulls"). The fallback under DXVK's d3d8 has not been run on the
   bench since 1.11.0; it is the stock function, called whenever there is no Direct3D 9
   device.
-- A bump-mapped hull has not yet been seen in game, in a Borg mission or with
-  `hull-bump.py` installed.
 - Translucent materials still go through the CPU path for sorting (see the moons in
   `models/README.md`). Under DXVK that path was slow for another reason: it reads back
   a dynamic vertex buffer kept in GPU memory. The selection bubbles cost 70 ms a frame

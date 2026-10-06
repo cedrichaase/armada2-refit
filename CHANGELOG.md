@@ -14,7 +14,7 @@ Layers: lighting 1.11.0.
   shaders under d3d8to9 (`BumpShaders=1`, lighting 1.11.0): their bump maps kept, with
   the ambient, light sources, specular, rim and night lights other hulls get.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 10.0.0 — 2026-10-06
 

@@ -15,7 +15,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   `ST3D_Dot3_MeshVB` vtable; `Lighting.log` reads `call sites patched 13`.
 
 Seen on the bench 2026-10-06 (`SCENE=firing`, the Borg cube; `SCENE=planet`, a Galaxy with
-`hull-bump.py`). Installed, not yet seen in game.
+`hull-bump.py`). Confirmed in game 2026-10-07.
 
 ## 1.10.0 — 2026-10-05
 
