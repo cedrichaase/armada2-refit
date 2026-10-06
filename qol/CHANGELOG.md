@@ -10,7 +10,8 @@ versions". Newest first. Details, and the planned changes, are in
 ### Added
 - `WarpDistance=` (default 1100; 0 leaves moves stock): a move ordered on the map goes
   to warp, as the minimap's does, when the selected ships are on average farther than
-  that from the point; the cursor shows the warp ring there. Alt+click still warps at
+  that from the point; the cursor shows the warp ring there. Only ships that can warp
+  count, and nothing changes in a game with warp turned off. Alt+click still warps at
   any distance. The order is the minimap's `GO_WARP`, so stock players need nothing
   (QOL-8).
 

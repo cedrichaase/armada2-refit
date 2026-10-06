@@ -557,8 +557,13 @@ close to its destination moves at impulse while the rest of the selection warps.
 **With `QOL.asi`.** Stock's Alt block (0x522cb8 to 0x522cdf) becomes a jump to the
 plugin. Alt held still turns a `GO` into `GO_WARP` as in stock. Without Alt, so does a
 `GO` whose selection is on average farther than `WarpDistance` from the point under
-the cursor: this player's selected objects, by the straight-line distance from each
-one's position (+0xac) to the point, averaged. One order goes to the whole selection,
+the cursor: this player's selected ships that can warp, by the straight-line distance
+from each one's position (+0xac) to the point, averaged. A ship can warp when its
+control (`Craft+0x1b0`) has a warp speed (+0xc, `cCraftControl::SetWarpSpeed`) above
+its speed (+0x8), `TryWarp`'s own test; a selection with none such, or a game with warp
+turned off (`g_allowWarp`, `GameSetup::isAllowWarpSpeed`, as `TryWarp` reads them),
+stays an ordinary move. Counting every ship turned the cursor blue for ships that
+cannot warp (seen in game, 2026-10-07). One order goes to the whole selection,
 so the choice is one per order. The average is what a scattered selection sent to its
 own middle needs: it stays an ordinary move. The flag bit 0x4000 is kept as stock
 keeps it. The order sent is the ordinary `GO_WARP`, the one a stock player's minimap

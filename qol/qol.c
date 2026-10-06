@@ -875,7 +875,8 @@ static int patch_stations(void)
  * under the cursor (+0xa4); every click and the cursor read it from there.
  * Stock turns a GO into GO_WARP there when Alt is held (0x522cb8), the command
  * the minimap sends without Alt.  WarpDistance= adds: when this player's
- * selected objects are on average farther than that from the point.  GO_WARP
+ * selected ships that can warp are on average farther than that from the
+ * point, and warp is allowed in this game.  GO_WARP
  * moves as GO does, and each ship then warps only if warp is allowed and it is
  * farther than cfgTOO_CLOSE_TO_WARP from where it is going -- the engine's
  * own test, on every machine. */
@@ -898,6 +899,35 @@ static float f_sqrt(float f)
     return f;
 }
 
+/* What cCraftControl::TryWarp asks before it arms warp, but the order: warp
+ * allowed by the mission (g_allowWarp) and the setup screen
+ * (GameSetup::isAllowWarpSpeed), and, per ship, a control whose warp speed is
+ * above its speed.  A ship without warp has none above it. */
+typedef BYTE *(__thiscall *GetSetupFn)(BYTE *transport);
+typedef BYTE  (__thiscall *AllowWarpFn)(BYTE *setup);
+#define G_ALLOW_WARP   0x6f4de0                  /* int */
+#define G_TRANSPORT    0x76b8d4                  /* Transport * */
+#define GET_SETUP      ((GetSetupFn)0x557940)    /* Transport::getGameSetup */
+#define ALLOW_WARP     ((AllowWarpFn)0x546280)   /* GameSetup::isAllowWarpSpeed */
+#define CRAFT_CONTROL  0x1b0     /* Craft: its cCraftControl */
+#define CTL_SPEED      0x08      /* cCraftControl: impulse speed, a float */
+#define CTL_WARP       0x0c      /* and warp speed (SetWarpSpeed) */
+
+static int warp_allowed(void)
+{
+    return *(int *)G_ALLOW_WARP && ALLOW_WARP(GET_SETUP(*(BYTE **)G_TRANSPORT));
+}
+
+static int can_warp(BYTE *o)
+{
+    BYTE *ctl;
+    if (!DYN_CAST(*(void **)(o + GO_CLASS), 0, RTTI_GOCLASS, RTTI_CRAFTCLS, 0)) return 0;
+    ctl = *(BYTE **)(o + CRAFT_CONTROL);
+    return ctl && *(float *)(ctl + CTL_WARP) > *(float *)(ctl + CTL_SPEED);
+}
+
+/* This player's selected ships that can warp are on average farther than
+ * WarpDistance from the point; 0 when none of them can warp. */
 static int far_enough(BYTE *ov)
 {
     typedef const int *(__thiscall *ListFn)(BYTE *);
@@ -906,10 +936,11 @@ static int far_enough(BYTE *ov)
     int   n = *(int *)(ov + OV_COUNT), i, k = 0, team = USER_TEAM();
     float sum = 0.0f;
 
+    if (!warp_allowed()) return 0;
     for (i = 0; i < n; i++) {
         BYTE  *o = ENTITY_GET(ids[i]);
         float *q, dx, dy, dz;
-        if (!is_obj(o) || *(int *)(o + GO_TEAM) != team) continue;
+        if (!is_obj(o) || *(int *)(o + GO_TEAM) != team || !can_warp(o)) continue;
         q = (float *)(o + GO_POS);
         dx = q[0] - p[0]; dy = q[1] - p[1]; dz = q[2] - p[2];
         sum += f_sqrt(dx * dx + dy * dy + dz * dz);
