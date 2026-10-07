@@ -902,7 +902,11 @@ static void on_message(Peer *p, Conn *c, const BYTE *m, int n)
     }
     case R_RULES:
         if (n < 2) return;
-        if (p->role == ROLE_HOST) { c->rules = m[1] != 0; rules_recompute(p, c); }
+        if (p->role == ROLE_HOST) {
+            c->rules = m[1] != 0;
+            plog(p, c->rules ? "rules: a joiner has QOLRules" : "rules: a joiner has no QOLRules");
+            rules_recompute(p, c);
+        }
         else if (p->role == ROLE_JOINER) rules_apply(p, m[1] != 0);
         break;
     case R_TERMINATE:
