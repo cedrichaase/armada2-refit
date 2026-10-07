@@ -4,7 +4,7 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
-## 1.16.0 — 2026-10-07
+## 1.17.0 — 2026-10-07
 
 ### Fixed
 - A ship or station filling more than half the view (the engine's near fade) went to
@@ -12,6 +12,19 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   it in the shaders, its fade drawn as a screen door (`hull.hlsl`, `misc.w`).
 
 Installed, not yet seen in game.
+
+## 1.16.0 — 2026-10-07
+
+### Added
+- The Borg profile: with `BumpShaders=1`, bump-mapped hulls (the Borg) take
+  `BorgAmbient=0.015 0.018 0.015`, `BorgSpecular=0.15`, `BorgSpecularPower=64`,
+  `BorgRimLight=0.06 0.13 0.03` (a sickly green), `BorgSun=0.8` and
+  `BorgSelfIllumination` (left out: `SelfIllumination`) in place of `Ambient`,
+  `Specular`, `SpecularPower`, `RimLight`, `HullSun` and `SelfIllumination`. Darker
+  plating, the night lights carrying the look.
+
+Seen on the bench 2026-10-07 (`SCENE=firing`, weapons off; the cube beside `mnebula8`).
+Confirmed in game 2026-10-07.
 
 ## 1.15.0 — 2026-10-07
 

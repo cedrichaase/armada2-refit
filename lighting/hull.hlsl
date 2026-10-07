@@ -4,7 +4,7 @@
 // lights read back from the device at the draw, the point lights Lighting.asi picks
 // given where they are, the same material and texture stage (texture x lit colour).
 // lighting/README.md, "Shaders". bump_vs and bump_ps light the ST3D_Dot3_MeshVB draws
-// (bump-mapped hulls: the Borg, and any hull models/hull-bump.py patched) the same way,
+// (bump-mapped hulls: in stock, the Borg alone) the same way,
 // with the normal from the engine's own normal map; "Bump-mapped hulls". depth_vs and
 // depth_ps draw the shadow map, and every hull looks it up for the Key; "Shadows".
 
@@ -279,8 +279,8 @@ float4 bump_ps(Bumped i, float2 vp : VPOS) : COLOR
     float3 m = tex2D(nmap, i.uv).rgb * 2.0 - 1.0;
     // The surface is the SOD's own normal (inward, as stock), not S x T: that is summed
     // from each triangle's UV slopes and turns away from the surface wherever the UVs
-    // are mirrored or seamed, and drew dark streaks down a Galaxy hull-bump.py had
-    // patched. S and T give the map's slope across it.
+    // are mirrored or seamed, and drew dark streaks down a Galaxy patched to a
+    // flat bump map. S and T give the map's slope across it.
     float3 Nt = -normalize(i.n);
     float3 b  = across(i.s, Nt) * m.x + across(i.t, Nt) * m.y + Nt * m.z;
     float  l  = length(b);

@@ -24,10 +24,8 @@ WHAT COUNTS AS A CHANGE
 
     textures      Textures/RGB/*.a2neb-backup  -- a2tex
     models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel),
-                                                  hull-bump (Federation hulls)
-                  Shaders/*.a2neb-backup       -- hull-bump (the dot3 shader's normal)
+                                                  moon-sod, select-sod
                   Planets.asi/.ini             -- added files: planet tessellation
-                  Textures/RGB/a2flatbump.tga  -- added: the hull-bump flat map
     lighting      Lighting.asi/.ini            -- added files: ships on the GPU, scene lights
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
                   (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
@@ -92,7 +90,6 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('HUD.asi', 'hud'), ('HUD.ini', 'hud'),
          ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
          ('Planets.asi', 'models'), ('Planets.ini', 'models'),
-         ('Textures/RGB/a2flatbump.tga', 'models'),
          ('QOL.asi', 'qol'), ('QOL.ini', 'qol'),
          ('GridLayout.asi', 'grid'), ('GridLayout.ini', 'grid'),
          ('Lighting.asi', 'lighting'), ('Lighting.ini', 'lighting'),
@@ -127,7 +124,7 @@ def layer_of(rel, suffix):
         return 'cutscenes'
     if top == 'misc':
         return 'hud'
-    if top in ('SOD', 'Shaders'):
+    if top == 'SOD':
         return 'models'
     return 'other'
 

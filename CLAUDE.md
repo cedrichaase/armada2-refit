@@ -186,10 +186,6 @@ Until the sign-off, the work stays on its branch and in its worktree.
    all` cannot restore a stock atlas under condensed metrics and garble every glyph.
    The UI configs in `misc/` also have `.a2neb-backup`s, but are reverted by
    `hud/ui-widescreen.py --revert`, not by `a2tex`.
-   **The one file added rather than replaced is `a2flatbump.tga`**, from
-   `models/hull-bump.py`: a flat height map no stock texture shares a name with, which
-   the hull SODs it patches all name. It replaces nothing, so it has no backup;
-   `--revert` deletes it and `a2mod` lists it as an added `models` file.
 2. **Match the stock TGA format exactly**: image type 2, uncompressed, no ID field, no
    colour map — and **the same bit depth as the file you are replacing.** The nebula
    textures are 24-bit; **1113 of the 2115 textures in the game are 32-bit with a live
@@ -667,12 +663,16 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `VBRender` only**: the engine's `SetVertexShader(FVF)` becomes d3d9
   `SetVertexShader(NULL)` under d3d8to9, so anything bound earlier is lost. Every d3d9
   path must fall back when `d9_device()` is NULL (DXVK's d3d8). `platform/D3D9.md`.
-- **Bump-mapped hulls (the Borg, `models/hull-bump.py`'s) go the dot3 way**, which
+- **Bump-mapped hulls (in stock, the Borg alone) go the dot3 way**, which
   takes precedence over the vertex buffers. `BumpShaders=1` wraps
   `ST3D_Dot3_MeshVB::Render` and draws them in the hull shaders under d3d8to9. Their
   normal is the SOD's vertex normal tilted by the map along S and T. Never use the
   engine's S x T as the normal: it is summed from UV slopes and drew dark streaks where
   UVs are mirrored.
+- **The bump path is the Borg's, and has its own profile** (`BorgAmbient`,
+  `BorgSpecular`, `BorgRimLight`, `BorgSun`, ...): dark plating, so the night lights
+  carry the look. The Federation tuning made them too bright in game. Any other hull
+  given a bump map would take the Borg profile; give it one of its own first.
 - **The shadow map is last frame's hulls** (`Shadows=1`): drawn at the first hull draw
   of a frame from the list the previous frame recorded, and each draw looks itself up
   with its *previous* `WORLD` (matched by buffers and position), which is what keeps a
@@ -726,11 +726,11 @@ The loading screen is a 3D model, not a sprite: six quads in `SOD/logo.SOD` carr
 `models/logo-sod.py` (quads, `panel=`) ship together — `a2tex install`/`revert` move
 both; **never ship one without the other.**
 
-**Federation hulls can be lit per pixel by the engine itself**: a SOD material spelled
-the Borg way (type 6, a second texture with word `0x200`) goes through the dot3 path.
-`models/hull-bump.py` does it with a *flat* height map; one derived from the hull art
-was rejected in game. On the dot3 passes it is 18–21% darker, because they have no ambient term
-(`models/README.md`, "Hull lighting").
+**A SOD asks for a bump map** with a material spelled the Borg way (type 6, a second
+texture with word `0x200`). `hull-bump.py` gave the Federation hulls a flat one for
+per-pixel light and was removed in models 4.0.0, since `Lighting.asi` lights every hull
+per pixel; a height map derived from the hull art was rejected in game
+(`models/README.md`, "Bump maps on Federation hulls").
 
 **The planets' shape is not in their SOD.** `Planet_Database` builds its own sphere and
 re-tessellates it per frame against a facet tolerance set for 640x480; a 5120-triangle
