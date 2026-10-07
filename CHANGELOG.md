@@ -18,7 +18,7 @@ Layers: lighting 1.17.0.
   while the engine fades them; a faded ship is drawn blended, as stock draws it
   (lighting 1.17.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 11.0.0 — 2026-10-07
 

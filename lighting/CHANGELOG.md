@@ -16,7 +16,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   the shaders until the camera drew back. With `Shaders=1` it stays in the shaders and is
   drawn blended at the device's `Flush`, farthest first, front surface only (`misc.w`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 1.16.0 — 2026-10-07
 
