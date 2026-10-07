@@ -37,6 +37,7 @@ if [ "$remove" = 1 ]; then
     echo "removed Planets from $GAME"
     "$here/moon-sod.py" --revert
     "$here/select-sod.py" --revert
+    "$here/hull-sod.py" --revert
     exit 0
 fi
 
@@ -51,3 +52,4 @@ rm -f "$GAME/Planets.log"
 echo "installed Planets.asi into $GAME ($(grep '^Detail=' "$GAME/Planets.ini"))"
 "$here/moon-sod.py" --install
 "$here/select-sod.py" --install
+"$here/hull-sod.py" --install

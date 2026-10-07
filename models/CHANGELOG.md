@@ -6,6 +6,18 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 4.1.0 — 2026-10-07
+
+### Added
+- `hull-sod.py` (`--install`, `--revert`, `--status`, `--manifest`, `--split`, `--crease`,
+  `--only`, `--out`) rounds the curved parts of ship models: curved patches through the
+  stock vertices where faces meet gently, hard edges kept hard, and a ring of hard edges
+  (a saucer's rim) curved along itself. Four Federation models, pinned in
+  `hull-sod.sha256`: `Fgalaxy`, `Fente`, `Fcruise1`, `fsaucer`; `--split 4` by default.
+  `install.sh` runs it and `--remove` reverts it; the backup is `.a2neb-backup`.
+
+Installed, not yet seen in game (bench shots only, Galaxy class).
+
 ## 4.0.0 — 2026-10-07
 
 ### Removed
