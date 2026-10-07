@@ -17,7 +17,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   colour times this (`0` none), full to `PhaserImpactStart=6`, gone at
   `PhaserImpactRange=70`, lifted `PhaserImpactLift=8` units back along the beam.
 
-Seen on the bench 2026-10-07 (`SCENE=firing`, dorsal and ventral emitters). Installed, not yet seen in game.
+Seen on the bench 2026-10-07 (`SCENE=firing`, dorsal and ventral emitters). Confirmed in game 2026-10-07.
 
 ## 1.13.0 — 2026-10-07
 

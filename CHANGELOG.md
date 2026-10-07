@@ -14,7 +14,7 @@ Layers: lighting 1.14.0.
   and the target where it strikes, in the beam's colour (`Phasers`, `PhaserImpact`,
   lighting 1.14.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 10.4.0 — 2026-10-07
 
