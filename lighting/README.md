@@ -53,6 +53,7 @@ planet's ground colour (`planet glow:`).
 | `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
+| `NearFade` | `1` | with `Shaders`, keep a ship the engine fades for filling more than half the view in the shaders, the fade drawn as a screen door ("The near fade", below); `0` leaves it to the CPU path, in stock's lighting |
 | `BumpShaders` | `1` | with `Shaders`, draw bump-mapped hulls (the Borg; `hull-bump.py`'s) in the hull shaders, their normal from the normal map, instead of the engine's dot3 passes ("Bump-mapped hulls", below); `0` leaves them to the dot3 passes |
 | `SelfIllumination` | `1.8` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none, above 1 brighter than their texture ("Dynamic range") |
 | `HullSun` | `1.1` | with `Shaders`, the Key on GPU-drawn hulls times this, the light no longer clamped at 1 ("Dynamic range") |
@@ -891,6 +892,37 @@ ships. A hull outside the view casts none into it: the map holds only what the e
 drew, and it culls what is off screen. The map is one, not cascaded: on a wide view
 reaching far towards the horizon, its texels grow with everything it must cover. Up to
 2048 hull draws a frame cast; the rest are logged once and cast none.
+
+## The near fade
+
+A ship or station that fills more than half the view fades out as it fills more:
+`CraftInstance::ComputeFadeOut` (0x4caff0) takes the share of the view it fills,
+from `cfgFADE_OUT_MIN_FOV` (0.5) to `cfgFADE_OUT_MAX_FOV` (2.0), down to
+`1 - cfgFADE_OUT_MAX` (0.125). `ST3D_Instance::RenderInternal` (0x62e780) keeps the
+fade at the instance's +0x78, sets +0x77 when it is below exactly 1, and makes the
+instance the engine's +0x100 while its meshes draw. `PolygonSortRequired` (0x625510,
+slot 29 of `ST3D_DeviceDirectX8`) then answers "sort", and `ST3D_Mesh::RenderInternal`
+(0x6325d0) sends every mesh to the CPU path, the one that sorts. So a close ship was
+drawn in stock's lighting, and switched to the shaders the moment the camera drew far
+enough back for its fade to reach 1. A fade of 0.95 cannot be seen against space; the
+switch of lighting can (seen in a showcase take: the Martok at orbit distance 150,
+lit from 5.7 s as the camera glided to 200).
+
+Measured on the bench with the Martok framed at 150: at the call that picks the path,
+every "sort" answer, 760 of 760, came from a faded `CraftInstance`; at ordinary
+distance none.
+
+The plugin wraps that slot and answers "no sort" when the fade is the only reason (an
+opaque material, the instance's fade slot is `CraftInstance`'s, no cloak callback at
+the engine's +0x110, no per-render effect at +0xf8), asked from the mesh's
+`RenderInternal` (the two calls returning to 0x63275b and 0x6327ea) or from
+`ST3D_TextureMaterial::SetRenderState` (returning to 0x64472a), which leaves the
+material's blend states unset when the answer is "sort". Every other caller, a cloak
+and a translucent material keep stock's answer. `hull.hlsl` draws the fade as a
+screen door: a pixel is kept where the fade is above interleaved gradient noise over
+the screen. It stays opaque and writes depth, so it needs no sorting and whatever is
+behind shows through the gaps in any draw order; blending in place would hide a ship
+drawn later behind it.
 
 ## Not covered yet
 

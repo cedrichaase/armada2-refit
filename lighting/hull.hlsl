@@ -95,6 +95,7 @@ float4 misc         : register(c10);  // x: the normals' sign (-1 inward, as sto
                                       // y: self-illumination: the texture's alpha shows it unlit (0: none;
                                       //    above 1 the night lights glow brighter than the texture)
                                       // z: the highlight knee: above it, colour rolls off towards white (1: clip)
+                                      // w: how much of the hull is drawn: below 1 the engine's near fade (NearFade)
 float4 pcol[POINTS] : register(c11);  // point light colour; 0 for none
 float4 ppos[POINTS] : register(c27);  // world position
 float4 pfall[POINTS]: register(c43);  // x: full to this distance, y: 1 / the fade after it, z: wrap, w: power
@@ -165,6 +166,15 @@ float planet_shadow(float3 wp)
     return lerp(1.0, s, sun.w);
 }
 
+// The engine's near fade (CraftInstance::ComputeFadeOut), as a screen door: a pixel is
+// drawn or not against a fixed noise over the screen (interleaved gradient noise), so
+// misc.w of the hull's pixels are kept. Opaque and depth-written, so it needs no sorting
+// and what is behind shows through the gaps whatever order it is drawn in.
+void near_fade(float2 vp)
+{
+    clip(misc.w - frac(52.9829189 * frac(dot(vp, float2(0.06711056, 0.00583715)))));
+}
+
 // Everything after the normal: the lights, the texture, the night lights, the shoulder.
 // N is the normal as the stock meshes have it (inward), the one the device's directional
 // lights pair with; misc.x turns it round. sc: the point in the shadow map.
@@ -213,8 +223,9 @@ float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
     return float4(shoulder(c, misc.z), t.a * base.a);
 }
 
-float4 hull_ps(Lit i) : COLOR
+float4 hull_ps(Lit i, float2 vp : VPOS) : COLOR
 {
+    near_fade(vp);
     return shade(normalize(i.n), i.wp, i.uv, i.sc);
 }
 
@@ -262,8 +273,9 @@ float3 across(float3 v, float3 Nt)
     return l > 1e-5 ? a / l : 0.0;
 }
 
-float4 bump_ps(Bumped i) : COLOR
+float4 bump_ps(Bumped i, float2 vp : VPOS) : COLOR
 {
+    near_fade(vp);
     float3 m = tex2D(nmap, i.uv).rgb * 2.0 - 1.0;
     // The surface is the SOD's own normal (inward, as stock), not S x T: that is summed
     // from each triangle's UV slopes and turns away from the surface wherever the UVs

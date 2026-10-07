@@ -4,6 +4,15 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.16.0 — 2026-10-07
+
+### Fixed
+- A ship or station filling more than half the view (the engine's near fade) went to
+  the CPU path and lost the shaders until the camera drew back. `NearFade=1` (new) keeps
+  it in the shaders, its fade drawn as a screen door (`hull.hlsl`, `misc.w`).
+
+Installed, not yet seen in game.
+
 ## 1.15.0 — 2026-10-07
 
 ### Added

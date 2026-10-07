@@ -355,6 +355,7 @@ typedef long (__stdcall *GetLightEnable_t)(void *, DWORD, BOOL *);
 
 static int        g_fix_mirrored = 1;
 static int        g_in_vb;        /* inside ST3D_Standard_MeshVB::Render: its draws are hulls */
+static int        g_vb_seen;      /* a mesh has been drawn on the vertex-buffer path */
 static BYTE      *g_vb_mesh;      /* that draw's ST3D_Mesh, for the shadows */
 static VBRender_t g_vb_render;
 static void      *g_dev;          /* the device, as last seen by the SetMaterial hook */
@@ -600,7 +601,7 @@ static void __fastcall hook_vb_render(void *self, void *edx, int group, void *lm
         static int said_self;
         if (!said_self) { said_self = 1; logline("shaders: a self-illuminating material, its night lights folded in"); }
     }
-    g_in_vb = 1;
+    g_in_vb = g_vb_seen = 1;
     g_vb_mesh = *(BYTE **)((BYTE *)self + 0xc);   /* ST3D_MeshVB_Imp::Init keeps the mesh there */
     g_vb_render(self, group, lm, tm, tex);
     g_in_vb = 0;
@@ -767,6 +768,52 @@ typedef long (__stdcall *Reset8_t)(void *, void *);
 static Reset8_t g_reset;
 static int      g_shadows = 1, g_planet_shadows = 1;   /* Shadows=, PlanetShadows= */
 
+/* The near fade (NearFade=1, with Shaders=1). A ship or station that fills more than half
+ * the view fades out as it fills more (CraftInstance::ComputeFadeOut, 0x4caff0:
+ * cfgFADE_OUT_MIN_FOV 0.5 to cfgFADE_OUT_MAX_FOV 2.0, down to 1 - cfgFADE_OUT_MAX).
+ * ST3D_Instance::RenderInternal (0x62e780) keeps the fade at the instance's +0x78, marks
+ * it translucent at +0x77 below 1, and makes the instance the engine's +0x100 for its
+ * meshes. ST3D_DeviceDirectX8::PolygonSortRequired (0x625510) then says sort, for a
+ * fade of 0.99 as for 0.1, and ST3D_Mesh::RenderInternal (0x6325d0) sends every mesh to
+ * the CPU path, which sorts, and away from the shaders: a close ship drew in stock's
+ * lighting and turned lit as the camera drew back. The plugin answers "no sort" where
+ * the fade is the only reason, asked from the mesh's RenderInternal or from
+ * ST3D_TextureMaterial::SetRenderState (0x644700, which leaves the material's blend
+ * states unset when the answer is sort); hull.hlsl draws the fade as a screen door. A
+ * cloak (its vertex-alpha callback at the engine's +0x110), a per-render effect (+0xf8)
+ * and a translucent material stay stock. lighting/README.md, "The near fade". */
+#define VT_DEVICE_DX8       0x6bc6ac   /* ST3D_DeviceDirectX8 vtable */
+#define FN_SORT_REQUIRED    0x625510   /* its PolygonSortRequired, slot 29 */
+#define FN_CRAFT_FADE       0x4caff0   /* CraftInstance::ComputeFadeOut, an instance's slot 4 */
+typedef BYTE (__fastcall *SortRequired_t)(void *dev, void *edx);
+static int  g_near_fade = 1;           /* NearFade= */
+static long g_fade_draws;
+
+/* The fade of the instance being drawn: 1 for none. */
+static float near_fade(void)
+{
+    BYTE *eng = *(BYTE **)0x7ad508, *inst = eng ? *(BYTE **)(eng + 0x100) : NULLPTR;
+    float a;
+    if (!g_near_fade || !inst || !inst[0x77]) return 1.0f;
+    a = *(float *)(inst + 0x78);
+    return a < 0.0f ? 0.0f : a > 1.0f ? 1.0f : a;
+}
+
+static BYTE __fastcall hook_sort_required(void *dev, void *edx)
+{
+    DWORD ra = (DWORD)__builtin_return_address(0);
+    BYTE *eng = *(BYTE **)0x7ad508, *inst, *mat = *(BYTE **)((BYTE *)dev + 0x44);
+    BYTE  r = ((SortRequired_t)FN_SORT_REQUIRED)(dev, edx);
+    if (!r || !g_sh_on || !g_vb_seen || !eng || !mat) return r;
+    /* the mesh's RenderInternal, twice, and the material's SetRenderState */
+    if (ra != 0x63275b && ra != 0x6327ea && ra != 0x64472a) return r;
+    inst = *(BYTE **)(eng + 0x100);
+    if (!inst || !inst[0x77] || (*(DWORD **)inst)[4] != FN_CRAFT_FADE) return r;
+    if (*(DWORD *)(mat + 0x20) != 1 || *(DWORD *)(eng + 0x110) || *(DWORD *)(eng + 0xf8)) return r;
+    if (ra == 0x6327ea && ++g_fade_draws == 1) logline("near fade: a fading hull drawn in the shaders");
+    return 0;
+}
+
 static void sh_note(int bit, const char *why)
 {
     char b[160];
@@ -908,7 +955,7 @@ static int sh_consts(void *d9, int bump)
         misc[0] = g_sh_sign;
         misc[1] = g_sh_lit_self ? g_selfillum : 0.0f;
         misc[2] = g_knee;
-        misc[3] = 0.0f;
+        misc[3] = near_fade();
         d9_psconst(d9, 10, misc, 1);
         /* The point lights where they are, with the engine's falloff (full to start,
          * gone after fade) for the shader to apply per pixel. */
@@ -2794,6 +2841,7 @@ static void startup(void)
     g_fix_mirrored = (int)GetPrivateProfileIntA("Lighting", "FixMirrored", 1, ini);
     g_shaders = (int)GetPrivateProfileIntA("Lighting", "Shaders", 1, ini);
     g_bump    = (int)GetPrivateProfileIntA("Lighting", "BumpShaders", 1, ini);
+    g_near_fade = (int)GetPrivateProfileIntA("Lighting", "NearFade", 1, ini);
     ini1(ini, "SelfIllumination", &g_selfillum);
     ini1(ini, "Specular",         &g_spec);
     ini1(ini, "SpecularPower",    &g_spec_pow);
@@ -2861,6 +2909,7 @@ static void startup(void)
     s_cat(b, " Lights=");          s_num(b, g_lights);
     s_cat(b, " Shaders=");         s_num(b, g_shaders);
     s_cat(b, " BumpShaders=");     s_num(b, g_bump);
+    s_cat(b, " NearFade=");        s_num(b, g_near_fade);
     s_cat(b, " PlanetShaders=");   s_num(b, g_planet_sh);
     s_cat(b, " Shadows=");         s_num(b, g_shadows);
     s_cat(b, " PlanetShadows=");   s_num(b, g_planet_shadows);
@@ -2908,6 +2957,10 @@ static void startup(void)
         g_dot3_render = (VBRender_t)FN_DOT3_RENDER;
         if (patch_slot(VT_DOT3_MESHVB, 3, FN_DOT3_RENDER, (const void *)hook_dot3_render)) n++;
         else logline("NOT PATCHED: Dot3_MeshVB vtable differs");
+    }
+    if (g_gpu && g_shaders && g_near_fade) {
+        if (patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required)) n++;
+        else logline("NOT PATCHED: DeviceDirectX8 vtable differs, no near fade in the shaders");
     }
     if (g_nebulae) n += redirect(S_NEBULA, (const void *)hook_nebula_lights);
     if (g_neb_cull > 1.0f) {
