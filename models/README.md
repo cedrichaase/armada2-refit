@@ -161,6 +161,27 @@ moons' glow shell does, and its cost grows with the face count. With
 (`postfx/README.md`). Four times the faces suggests about 3 ms at 30 selected. That is
 an estimate from that measurement, not a measurement of its own.
 
+## Rounder hulls
+
+A saucer is a ring of flat facets, about 16 degrees of arc each (the Galaxy's: 22 around
+its outline), and a new vertex on a flat face stays flat, so splitting triangles does
+nothing. `hull-sod.py` uses the moons' curved patches (above) with one change, because a
+hull has real corners the moons do not. An edge is *smooth* when its two faces meet at
+under `--crease` degrees (40); a corner's normal averages only the faces reachable through
+smooth edges, and a *hard* edge is drawn on its own curve on both sides, so patches still
+meet exactly. Two things came out of the bench: a saucer's rim is itself a hard edge (top
+against bottom), so with hard edges straight the outline did not change at all; a vertex
+where exactly two hard edges meet at a gentle turn now gives the edge the chain's tangent.
+Measured on the Galaxy saucer's outline: turn per facet 16.4 to 8.8 degrees at `--split 2`,
+which still read as facets at 3440x1440; `--split 4` reads as an ellipse. Box edges,
+pylons and nacelle ends stay crisp. Cost: 4x the triangles per `--split 2`, 16x at 4 (the
+Galaxy goes 759 to 12,144); an opaque hull is drawn from a vertex buffer, but this has not
+been measured with a full fleet. Only opaque meshes with something round in them are rounded, at the largest split up
+to 4 that keeps a mesh within 12,500 triangles: a blended mesh (shields, glows) would be
+drawn on the CPU every frame, and a box gains nothing. 176 of 225 hull models change; the
+largest, a station, gains 32k triangles. Only v1.93 models, found by the eight zero bytes ahead of a
+mesh and read back after writing; other versions are skipped.
+
 ## Bump maps on Federation hulls
 
 `hull-bump.py` (models 3.2.0) gave the 36 Federation SODs the Borg's bump-mapped
