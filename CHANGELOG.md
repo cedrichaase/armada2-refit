@@ -18,7 +18,7 @@ Layers: testbench 3.4.0.
 - `Scene.asi`'s `Heal=` keeps shields and crew full; the `showcase` cubes hold fire
   (testbench 3.4.0).
 
-Installed, not yet seen in game.
+Installs nothing; seen working on the bench 2026-10-07.
 
 ## 10.7.0 — 2026-10-07
 

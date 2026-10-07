@@ -26,7 +26,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - The `showcase` scene: the cubes hold fire, so no Borg transporter effect in footage
   (cf4d277).
 
-Installed, not yet seen in game.
+Installs nothing; seen working on the bench 2026-10-07.
 
 ## 3.3.0 — 2026-10-07
 
