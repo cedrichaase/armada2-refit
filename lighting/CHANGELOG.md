@@ -15,7 +15,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   plating, the night lights carrying the look.
 
 Seen on the bench 2026-10-07 (`SCENE=firing`, weapons off; the cube beside `mnebula8`).
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 1.15.0 — 2026-10-07
 

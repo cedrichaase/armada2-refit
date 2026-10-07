@@ -18,7 +18,7 @@ Layers: lighting 1.16.0, models 4.0.0.
 - `models/hull-bump.py` and its flat map `a2flatbump.tga` (models 4.0.0); `a2mod` and
   `textures/tools/inventory.py` no longer list the map.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 10.6.0 — 2026-10-07
 
