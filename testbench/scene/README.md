@@ -29,6 +29,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `planet` | a Galaxy class beside a class M planet (`pb_clssm`) | 2026-10-04 |
 | `nebula` | a Galaxy class at the edge of the Mutara nebula (`mnebula8`) | 2026-10-04 |
 | `firing` | a Galaxy class firing at a Borg cube (`bbattle1`) without moving, for as long as the session runs: its engines are off; the cube cannot die, is healed every tick and has its weapons off | 2026-10-04, still firing after a minute |
+| `colony` | a fully developed class M planet (`Population=full`), its night side lit by cities, with four Federation ships (`fente`, `fbattle`, `fgalaxy`, `fcruise1`) parked off that side, engines on and no orders; the camera looks from the night side (`orbit planet 45 8 1100`). For the city lights (`lighting/README.md`, "Planets on the GPU") | 2026-10-07 |
 | `factions` | one torpedo or pulse ship of each playable faction, each firing at its own Borg cube as in `firing`: Federation `fed` (`fgalaxy`), Klingon `kli` (`kbattle`), Borg `borg` (`bbattle1`), Cardassian `card` (`cbattle`), Romulan `rom` (`rbattle`), Species 8472 `sp` (`8472_mothership`); each target is `<name>_t`. For the weapons' light colours (`lighting/README.md`, "Torpedoes and pulses") | 2026-10-07 |
 | `stations` | the player's own: three shipyards (`yard1..3`), an advanced shipyard (`adv`), a research station (`lab`) and two ships, with the HUD on, for the control-group keys and the build menu (`scenarios/qol-station-groups.md`) | 2026-10-05 |
 | `showcase` | a fleet action for footage: the Enterprise-E (`fente`), a Sovereign (`fbattle`), a Galaxy and two Klingon flagships (`kmartok`, `kbattle`) firing at two Borg cubes that fire back, in front of a class M planet; everyone immortal and healed, engines off | 2026-10-07 |
@@ -60,6 +61,8 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Heal` | 0 | 1: health topped up to full every tick, so it never shows damage |
 | `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving |
 | `Attack` | | the name of an object to attack, ordered once everything is built |
+| `Population` | | planets: colonised at once, as `colonize` (below) does: a number, `full`, or nothing for none |
+| `Colonist` | 1 | the team that holds a planet with `Population=`, and so whose race's cities it shows |
 
 **Where to put things.** On `a2_borg01` the map is the quadrant x > 0, z > 0, and the
 RTS camera starts looking at its corner, 0,0,0. **A planet outside the map is built
@@ -91,10 +94,11 @@ answer and fails if a command did.
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
 | `attack <name> <target>` | order an attack |
 | `heal`, `engines`, `weapons`, `immortal` `<name> on\|off` | as the keys above |
+| `colonize <planet> [<population> \| full \| off] [team]` | make a planet a grown colony of a team (default `full` and team 1), without a colony ship: it changes hands, gets a full garrison, and its cities show at once at that population, clamped to the class's maximum. The cities are the team's race's (`cityTextureName`: `ECFR` for the Federation and Romulans, `ECNA`, `BORG`); team 1 on `a2_borg01` is the Federation. `off` makes it neutral again with no population. The planet stays colonised (seen on the bench for several minutes); a population set below the maximum grows as any colony's does |
 | `center <name>` | centre the RTS camera on an object |
 | `pause`, `resume` | the game's own pause (`PauseSimulation`) |
 | `hud`, `grid`, `cursor`, `notices` `on\|off` | as the keys above |
-| `query` | every object's handle and position (and a producer's build queue), and the camera's eye, front and up |
+| `query` | every object's handle and position (and a producer's build queue, a planet's team, population and the population its cities are drawn at), and the camera's eye, front and up |
 | `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`); answers as `selection` |
 | `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
 
@@ -179,6 +183,30 @@ inert, and `Scene.log` says so.
   overload calls, and `TriggerEvent(const Race *)` 0x479bb0. With notices off, each
   entry returns false at once (`xor eax,eax; ret N`). The original bytes are kept and
   put back by `notices on`.
+- **A colony without a colony ship: `Planet::StartWithColony(int team)`** (0x4b5660,
+  thiscall), what a map that starts with a colony uses. It sets the population to the
+  medium level, a garrison of 100 and the team (`SetTeam`, virtual), so the planet is
+  the team's. `colonize` then sets the population asked for with
+  `Planet::SetPopulation(float)` (0x4b5970), which also sets the population level and
+  the maximum garrison; `Planet::GetMaxPopulation()` (0x4b5550) is the class's
+  `maxPopulation` level, read from `RTS_CFG.h`'s `cfgPOP_*` (heavy, a class M planet's,
+  is 5000), and is what `full` means. `Craft::SetCrew(float)` (0x4c83e0) fills the
+  garrison, clamped to that maximum: `Planet::Simulate` neutralises a colonised planet
+  whose garrison is 0. `off` is `Planet::NeutralizePlanet()` (0x4b5150) and a
+  population of 0. A `Planet` is told from other objects by its vtable (0x6b2b3c);
+  the team (+0xec) and population (+0x2ac) are what `query` reads.
+  **What is drawn is a second, eased population.** `PlanetInstance::Update` copies the
+  planet's +0x2c4 (the race whose cities are drawn) and +0x2c8 (the population they are
+  drawn at), and `mSetupHemisphere` paints the population map from
+  `pop / cfgPOP_HEAVY` against each race's `CityAllocArray` and binds the race's
+  development texture (`PD_<cityTextureName><hemisphere>`). `Planet::Simulate` sets
+  +0x2c4 to the team's race (`Team::GetTeam(int)` 0x496340, +0x244) and moves +0x2c8
+  toward the population at 200 a second, so a planet colonised from nothing would take
+  25 s to show a heavy planet's cities. `colonize` writes both itself.
+  **`ScriptInterfaceImp::Colonize(int, int)` (0x452ca0) is not this**: it orders a
+  colony ship (its first argument, a craft able to colonise) to colonise the planet
+  (its second), and does nothing for any other first argument. That is why it did
+  nothing when tried from this plugin with the planet alone.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`).

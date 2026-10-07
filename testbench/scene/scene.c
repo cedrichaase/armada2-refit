@@ -54,6 +54,10 @@
  *     (0x6246fa), which HUD.asi also wraps; see cursor_draw().
  *   GameEvent::TriggerEvent (0x479880, 0x4799a0, 0x479bb0) fires the events of
  *     events.dat -- "Enemy engaged." and the rest; see set_notices().
+ *   Planet::StartWithColony(int) 0x4b5660, SetPopulation(float) 0x4b5970,
+ *     GetMaxPopulation() 0x4b5550, NeutralizePlanet() 0x4b5150, Craft::SetCrew
+ *     (float) 0x4c83e0 and Team::GetTeam(int) 0x496340 colonise a planet
+ *     without a colony ship; see colonize().
  *
  * Matrix34 is three axis rows -- right, up, front -- then the position: a local
  * point (x, y, z) lands at x*right + y*up + z*front + position.
@@ -146,6 +150,20 @@ int _fltused = 0;   /* floats without the CRT */
 #define EVENT_TRIGGER_0  0x479880u   /* GameEvent::TriggerEvent() */
 #define EVENT_TRIGGER_3  0x4799a0u   /* GameEvent::TriggerEvent(const Vector3 &, int, const Race *) */
 #define EVENT_TRIGGER_1  0x479bb0u   /* GameEvent::TriggerEvent(const Race *) */
+#define PLANET_VTABLE    0x6b2b3cu   /* what Planet's constructor stores at +0 */
+#define PL_START_COLONY  0x4b5660u   /* Planet::StartWithColony(int team) */
+#define PL_SET_POP       0x4b5970u   /* Planet::SetPopulation(float) */
+#define PL_MAX_POP       0x4b5550u   /* Planet::GetMaxPopulation(), from the class's maxPopulation */
+#define PL_NEUTRALIZE    0x4b5150u   /* Planet::NeutralizePlanet() */
+#define CRAFT_SET_CREW   0x4c83e0u   /* Craft::SetCrew(float), clamped to the maximum crew */
+#define TEAM_GET         0x496340u   /* Team::GetTeam(int), static: Team &, unchecked */
+#define MAX_TEAM         12          /* Team::s_pTeamList (0x738db0) holds teams 0..12 */
+#define TEAM_RACE        0x244u      /* Team: its Race * */
+#define RACE_CITY_NAME   0x452u      /* Race: cityTextureName, inline (ECFR, ECNA, BORG) */
+#define PL_TEAM          0xecu       /* GameObject: its team */
+#define PL_POPULATION    0x2acu      /* Planet: population, float */
+#define PL_SHOWN_RACE    0x2c4u      /* Planet: the Race whose cities are drawn */
+#define PL_SHOWN_POP     0x2c8u      /* Planet: the population drawn, eased toward +0x2ac */
 
 #define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
 #define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
@@ -173,6 +191,12 @@ static const Sig k_sigs[] = {
     { SI_SET_HEALTH,    8, P_SI_HANDLE },
     { SI_MAX_HEALTH,    8, P_SI_HANDLE },
     { SI_CANNOT_DIE,    8, P_SI_HANDLE },
+    { PL_START_COLONY,  8, { 0x55, 0x8B, 0xEC, 0xA1, 0x84, 0x10, 0x76, 0x00 } },
+    { PL_SET_POP,       8, { 0x55, 0x8B, 0xEC, 0xD9, 0x45, 0x08, 0xD8, 0x1D } },
+    { PL_MAX_POP,       8, { 0x8B, 0x41, 0x40, 0x8B, 0x80, 0x90, 0x04, 0x00 } },
+    { PL_NEUTRALIZE,    8, { 0x53, 0x8B, 0xD9, 0x56, 0x33, 0xF6, 0x39, 0xB3 } },
+    { CRAFT_SET_CREW,   8, { 0x55, 0x8B, 0xEC, 0xD9, 0x81, 0xC4, 0x01, 0x00 } },
+    { TEAM_GET,         8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x8B, 0x04 } },
 };
 
 typedef void   (__cdecl    *UpdateRangeFn)(void);
@@ -194,6 +218,11 @@ typedef void   (__thiscall *OvSelectFn)(void *ov, void *obj, int type, int clear
 typedef int    (__thiscall *OvIntFn)(void *ov);
 typedef const int *(__thiscall *OvListFn)(void *ov);
 typedef int    (__thiscall *QueueSizeFn)(void *producer);
+typedef void   (__thiscall *PlIntFn)(void *planet, int v);
+typedef void   (__thiscall *PlFloatFn)(void *planet, float v);
+typedef float  (__thiscall *PlGetFloatFn)(void *planet);
+typedef void   (__thiscall *PlVoidFn)(void *planet);
+typedef BYTE  *(__cdecl    *TeamGetFn)(int team);
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -464,6 +493,61 @@ static void heal_all(void)
     }
 }
 
+/* A colonised planet, without a colony ship: what a map that starts with a
+ * colony does, through Planet::StartWithColony(team) -- population 10000, a
+ * garrison of 100, the planet on that team -- and then the population asked
+ * for (Planet::SetPopulation, clamped to the class's maxPopulation; "full" is
+ * that maximum) and a full garrison (Craft::SetCrew, clamped to the maximum
+ * SetPopulation sets), so that Planet::Simulate does not neutralise it for want
+ * of crew. The cities drawn are the team's Race's (cityTextureName: ECFR for the
+ * Federation, ECNA, BORG) at the population at +0x2c8, which Simulate eases
+ * toward the real one at 200 a second: from nothing to a heavy planet's 5000
+ * (RTS_CFG.h's cfgPOP_HEAVY) would take 25 s, so it is set at once too.
+ * ScriptInterfaceImp::Colonize is no use here: it is an order to a colony ship
+ * (a craft able to colonise) to fly to the planet, its first argument the ship. */
+static void colonize(Obj *o, const char *amount, int team)
+{
+    char  b[200];
+    BYTE *pl = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
+    BYTE *tm, *race;
+    float max, pop;
+
+    if (!pl || *(DWORD *)pl != PLANET_VTABLE) { logline("  ! not a planet"); return; }
+    if (s_eq(amount, "off") || s_eq(amount, "none")) {
+        ((PlVoidFn)PL_NEUTRALIZE)(pl);          /* back to team 0, no garrison */
+        ((PlFloatFn)PL_SET_POP)(pl, 0);
+        *(float *)(pl + PL_SHOWN_POP) = 0;
+        logline("  neutral, population 0");
+        return;
+    }
+    max = ((PlGetFloatFn)PL_MAX_POP)(pl);
+    if (max <= 0) { logline("  ! this class of planet holds no population"); return; }
+    pop = s_eq(amount, "full") ? max : s_atof(amount);
+    if (pop > max) pop = max;
+    if (pop < 0)   pop = 0;
+    tm = team >= 1 && team <= MAX_TEAM ? ((TeamGetFn)TEAM_GET)(team) : NULLPTR;
+    race = tm ? *(BYTE **)(tm + TEAM_RACE) : NULLPTR;
+    if (!race) { logline("  ! no such team, or it has no race"); return; }
+
+    ((PlIntFn)PL_START_COLONY)(pl, team);
+    ((PlFloatFn)PL_SET_POP)(pl, pop);
+    ((PlFloatFn)CRAFT_SET_CREW)(pl, 1e9f);
+    *(BYTE **)(pl + PL_SHOWN_RACE) = race;
+    *(float *)(pl + PL_SHOWN_POP)  = pop;
+
+    b[0] = 0;
+    s_cat(b, "  team ");
+    s_num(b, *(int *)(pl + PL_TEAM));
+    s_cat(b, ", cities ");
+    s_cpy(b + s_len(b), (const char *)(race + RACE_CITY_NAME), 16);
+    if (!race[RACE_CITY_NAME]) s_cat(b, "(none: this race has no city texture)");
+    s_cat(b, ", population ");
+    s_num(b, (long)*(float *)(pl + PL_POPULATION));
+    s_cat(b, " of ");
+    s_num(b, (long)max);
+    logline(b);
+}
+
 /* ---- the view: HUD, grid, camera -------------------------------------- */
 
 static void set_hud(int on)
@@ -710,6 +794,14 @@ static void query(void)
                 s_cat(b, " queue ");
                 s_num(b, ((QueueSizeFn)QUEUE_SIZE)(o));
             }
+            if (o && *(DWORD *)o == PLANET_VTABLE) {
+                s_cat(b, " team ");
+                s_num(b, *(int *)(o + PL_TEAM));
+                s_cat(b, " population ");
+                s_num(b, (long)*(float *)(o + PL_POPULATION));
+                s_cat(b, " shown ");
+                s_num(b, (long)*(float *)(o + PL_SHOWN_POP));
+            }
         }
         logline(b);
     }
@@ -900,6 +992,11 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_eq(t[0], "colonize") && n >= 2) {
+        if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
+        colonize(o, n >= 3 ? t[2] : "full", n >= 4 ? (int)s_atof(t[3]) : 1);
+        return;
+    }
     if (s_eq(t[0], "center") && n >= 2) {
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         ((SiHandleFn)SI_CENTER_CAMERA)(SI_INSTANCE, o->handle);
@@ -916,7 +1013,7 @@ static void run_command(char *line)
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
-            "immortal, center, pause, resume, hud, grid, cursor, notices, query, "
+            "immortal, colonize, center, pause, resume, hud, grid, cursor, notices, query, "
             "select, selection)");
 }
 
@@ -1010,6 +1107,11 @@ static void build_scene(void)
         if (!ini_int(sect, "Weapons", 1))
             ((SiHandleBoolFn)SI_NO_WEAPONS)(SI_INSTANCE, o->handle, 1);
         GetPrivateProfileStringA(sect, "Attack", "", o->attack, sizeof o->attack, g_ini);
+        GetPrivateProfileStringA(sect, "Population", "", b, 32, g_ini);
+        if (b[0]) {
+            logline("colonize");
+            colonize(o, b, ini_int(sect, "Colonist", 1));
+        }
     }
     for (i = 0; i < g_nobj; i++)
         if (g_obj[i].attack[0]) order_attack(&g_obj[i], g_obj[i].attack);
