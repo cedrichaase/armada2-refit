@@ -882,6 +882,13 @@ first hull draw of the next frame (`sm_frame`; a frame is a call of
 `GameObject_PreRenderAll`, which the plugin already wraps) it draws that list again into
 a depth map from the Key, and every hull draw of the frame looks itself up in it.
 
+**Two views a frame.** The engine calls `GameObject_PreRenderAll` twice per displayed frame,
+with two cameras: the main view and the selection's 3D portrait, each with its own few hull
+draws (bench: 86 and 4, alternating strictly). The plugin therefore keeps the hull lists
+and their frame counts per camera (`g_view`, set in `hook_prerender_all`); with one list
+for both, each view's map was made from the other's hulls and a ship in the main view
+sampled a map of the portrait's one, going dark at random.
+
 **The map.** R32F, `ShadowSize` square, with its own D24X8 depth surface, orthographic
 along the Key (the brightest directional light in the engine's list). It is fitted round
 the spheres of the hulls drawn, so it covers what is on screen: zoomed in on one Galaxy
@@ -933,6 +940,12 @@ shadows on, then the game relaunched with `Shadows=0 PlanetShadows=0`):
   its flanks with no offset bands or streaks.
 - The `firing` scene after merging the phasers: combat draws as before;
   `Lighting.log` reads `shadows: map 1000 of 5 hull draws`.
+
+**Blended draws cast nothing.** The depth pass has no texture or alpha test, so a draw that
+the engine blends or alpha-tests (`ALPHABLENDENABLE`, `ALPHATESTENABLE` read at `sm_take`)
+would be an opaque sheet in the map: on the bench a Steamrunner was dark whole, from every
+side and at `ShadowSize=8192`, until these were left out of the list (`g_sm_trans`). They
+still look the map up. `ShadowSize` was not the cause, and a bigger map did not help.
 
 Not shadowed: anything not drawn through the hull shaders (the CPU path's cloaking or
 warping ships, translucent meshes) casts and takes no shadow, and planets take none from

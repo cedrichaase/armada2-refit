@@ -5,6 +5,26 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.6.2 — 2026-10-07
+
+Layers: lighting 1.17.2.
+
+### Fixed
+- Hulls shadowed whole by a blended or alpha-tested draw above them under `Shadows=1`
+  (lighting 1.17.2).
+
+Installed, not yet seen in game.
+
+## 11.6.1 — 2026-10-07
+
+Layers: lighting 1.17.1.
+
+### Fixed
+- Hulls going dark from frame to frame under `Shadows=1`: the shadow map is made per
+  camera, not from whichever view rendered last (lighting 1.17.1).
+
+Installed, not yet seen in game.
+
 ## 11.6.0 — 2026-10-07
 
 Layers: qol 1.6.0, online 0.6.0.
