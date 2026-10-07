@@ -13,7 +13,7 @@ Layers: lighting 1.17.2.
 - Hulls shadowed whole by a blended or alpha-tested draw above them under `Shadows=1`
   (lighting 1.17.2).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 11.6.1 — 2026-10-07
 
@@ -23,7 +23,7 @@ Layers: lighting 1.17.1.
 - Hulls going dark from frame to frame under `Shadows=1`: the shadow map is made per
   camera, not from whichever view rendered last (lighting 1.17.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 11.6.0 — 2026-10-07
 
