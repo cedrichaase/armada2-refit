@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.1.0 — 2026-10-07
+
+Layers: lighting 1.17.0.
+
+### Changed
+- A ship close to the camera fades only once the camera's near plane cuts into it, not
+  once it fills half the view (`NearFade`, `NearFadeDepth`, `NearFadeMin`, lighting 1.17.0).
+
+### Fixed
+- Ships close to the camera keep the new lighting instead of falling back to stock's
+  while the engine fades them; a faded ship is drawn blended, as stock draws it
+  (lighting 1.17.0).
+
+Confirmed in game 2026-10-07.
+
 ## 11.0.0 — 2026-10-07
 
 Layers: lighting 1.16.0, models 4.0.0.

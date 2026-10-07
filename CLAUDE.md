@@ -673,6 +673,11 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `BorgSpecular`, `BorgRimLight`, `BorgSun`, ...): dark plating, so the night lights
   carry the look. The Federation tuning made them too bright in game. Any other hull
   given a bump map would take the Borg profile; give it one of its own first.
+- **Any fade below 1 sends a hull to the CPU path**, out of the shaders: the engine sorts
+  every translucent instance there. `NearFade=1` keeps a faded craft on the vertex
+  buffers and draws it blended at the device's `Flush`, after everything else, as stock
+  draws sorted triangles; a new hull draw in shaders must hand a fading draw to
+  `fd_take` like `hook_dip`. A screen-door fade was tried and its pattern showed.
 - **The shadow map is last frame's hulls** (`Shadows=1`): drawn at the first hull draw
   of a frame from the list the previous frame recorded, and each draw looks itself up
   with its *previous* `WORLD` (matched by buffers and position), which is what keeps a

@@ -95,6 +95,8 @@ float4 misc         : register(c10);  // x: the normals' sign (-1 inward, as sto
                                       // y: self-illumination: the texture's alpha shows it unlit (0: none;
                                       //    above 1 the night lights glow brighter than the texture)
                                       // z: the highlight knee: above it, colour rolls off towards white (1: clip)
+                                      // w: the engine's near fade (NearFade): below 1 the pixel's alpha, for the
+                                      //    blended pass at Flush; 1 for every other draw
 float4 pcol[POINTS] : register(c11);  // point light colour; 0 for none
 float4 ppos[POINTS] : register(c27);  // world position
 float4 pfall[POINTS]: register(c43);  // x: full to this distance, y: 1 / the fade after it, z: wrap, w: power
@@ -210,7 +212,7 @@ float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
     // texture alone, blended over the lit one by its alpha (the night-lights map);
     // above 1, the night lights brighter than the texture.
     float3 c = lerp(lit, t.rgb * max(misc.y, 1.0), saturate(t.a * min(misc.y, 1.0)));
-    return float4(shoulder(c, misc.z), t.a * base.a);
+    return float4(shoulder(c, misc.z), misc.w < 1.0 ? misc.w : t.a * base.a);
 }
 
 float4 hull_ps(Lit i) : COLOR
