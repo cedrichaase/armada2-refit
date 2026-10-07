@@ -1,6 +1,7 @@
 LIBRARY KERNEL32.dll
 EXPORTS
 GetModuleHandleA@4
+GetProcAddress@8
 GetModuleFileNameA@12
 VirtualProtect@16
 CreateFileA@28

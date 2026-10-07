@@ -5,6 +5,28 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.6.0 — 2026-10-07
+
+### Added
+- `QOLRules.asi` exports `QOLRules_Wanted`, `QOLRules_Network` and `QOLRules_Reset`; in a
+  network game it applies its rules when `Online.asi` reports that every player runs it
+  (latched at first use in a game), instead of standing down always.
+
+Installed, not yet seen in game.
+
+## 1.5.0 — 2026-10-07
+
+### Added
+- `QOLRules.asi` / `QOLRules.ini` (`PayOnQueue=`, default 1; `Log=`): QOL-7. An item is
+  paid when queued, not when it starts; an order the bank cannot cover (resources, crew,
+  officers) is dropped; cancelling or deleting a queued item, and losing the building
+  (destroyed, captured, assimilated), gives its cost back in full, crew included. Saves keep
+  which items are paid. Applies in single player and skirmish only and stands down in
+  network games (a rules change every peer must share). `a2mod` switches it with `qol`.
+
+Installed, not yet seen in game. On the bench: pay, start, refusal and cancel
+(`qol-pay-on-queue`); destruction, capture and save/load not yet run.
+
 ## 1.4.0 — 2026-10-07
 
 ### Added

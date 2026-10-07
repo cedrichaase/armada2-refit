@@ -14,6 +14,8 @@
 #              a datagram, and logs to OnlineServer.log in the clone that
 #              started it.  Without it Server= is empty: a bench game never
 #              talks to the public server.
+#   --no-rules P  the player named P (the scenario's Players: name) has no QOLRules.asi,
+#              for the mixed case of the rules handshake (online/README.md).
 #   --relay    Direct=0: the games never try each other directly, everything
 #              goes through the server's relay (implies --server).
 set -euo pipefail
@@ -21,12 +23,13 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 state="${1:?usage: bench-asi.sh <session state.json> [--loss N] [--server] [--relay]}"
 shift
-loss="" server="" relay=""
+loss="" server="" relay="" norules=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --loss)   loss="${2:?--loss needs a percentage}"; shift 2 ;;
         --server) server=1; shift ;;
         --relay)  server=1; relay=1; shift ;;
+        --no-rules) norules="${2:?--no-rules needs a player name}"; shift 2 ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
 done
@@ -62,6 +65,8 @@ else
     # never the public server from the bench
     set_key Server ""
 fi
+who="$(python3 -c 'import json,os,sys; d=json.load(open(sys.argv[1])); print((d.get("label") or "").split("/")[-1])' "$state")"
+[ "$who" = "$norules" ] && rm -f "$work/game/QOLRules.asi" "$work/game/QOLRules.ini"
 [ -n "$loss" ] && set_key Loss "$loss"
 [ -n "$relay" ] && set_key Direct 0
 echo "Online.asi installed in $work/game (log: Online.log)${loss:+, Loss=$loss}${server:+, Server=127.0.0.1:$port}${relay:+, Direct=0}"

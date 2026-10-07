@@ -53,7 +53,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-4](#qol-4-shiftnumber-adds-to-a-group) | Shift+number adds to a group | `QOL.asi`, `ShiftAddsToGroup=` | — | **done** (`QOL.asi`), bench |
 | [QOL-5](#qol-5-buildings-in-control-groups) | Buildings in control groups | `QOL.asi`, `StationGroups=` | — | **done** (`QOL.asi`), bench |
 | [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | `QOL.asi`, `StationGroups=` | Construction ships | **done** for stations (`QOL.asi`), bench |
-| [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | code, every peer | Measure stock's charge and refund rules | scoped |
+| [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | `QOLRules.asi`, `PayOnQueue=` | — | **in progress** (`QOLRules.asi`): bench for pay, refusal, cancel; single player only |
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
 | [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `QOL.asi`, `ViewDistance=` | — | **done** (`QOL.asi`) |
 
@@ -522,6 +522,27 @@ nothing is charged a second time.
 
 ---
 
+## QOL-7: built (qol 1.5.0)
+
+Where it stands. `QOLRules.asi` (`qol/rules.c`; its header comment holds the derivation)
+charges at the build order's `PushBuildQueueItem` call and marks the item paid in bit 30
+of its id; `StartBuild` gives a paid head back and lets stock charge it again (net zero,
+no advisor); Pop, CancelBuild, ActDelete, ClearBuildQueue, ClearTeam and DestroyShip give
+paid items back; Save/Load carry the marks in the producer's id counter. Measured on the
+bench: stock's crew refund is clamped to a cap (`AddCrew`), so crew is put back directly;
+a start's give-back needs the same.
+
+Network games: `online/peer.c` agrees the rules (`R_RULES`: joiners report, the host
+answers with whether everyone has the plugin; `QOLRules_Network`), and the plugin latches
+the answer. Only *Internet – Online* has it; other transports stand down.
+
+Not done: a refusal only reaches `QOLRules.log`, no on-screen
+feedback; destruction, capture and save/load paths are built but not bench-tested; a
+refit save with paid items loaded in stock loses what was paid; construction ships and
+the AI's own orders (if it bypasses the command) are untested.
+
+---
+
 ## QOL-8: Long moves on the map go to warp
 
 *`QOL.asi`, stock-compatible: the minimap's own order. Built: `WarpDistance=` (default
@@ -625,4 +646,3 @@ and are left alone.
 buffer's precision at a given distance hardly changes with the far plane. `Lighting.asi`'s
 shadow map is fitted around every hull it draws, so far-off ships on a wide view make
 its texels coarser, as a big battle already does.
-

@@ -4,6 +4,16 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.6.0 — 2026-10-07
+
+### Added
+- Rules handshake (`R_RULES`): a joiner tells the host whether `QOLRules.asi` is loaded with
+  `PayOnQueue=1`; the host answers every joiner, on every change, with whether every player
+  has it, and calls `QOLRules_Network` / `QOLRules_Reset` in the plugin. Without it
+  (or with a stock peer's missing plugin) the game plays by stock rules.
+
+Installed, not yet seen in game. Bench: `multiplayer-online-rules` (both have it).
+
 ## 0.5.0 — 2026-10-03
 
 ### Changed
