@@ -1355,6 +1355,7 @@ static float  g_sm_key[3];                 /* towards the Key */
 static int    g_sm_have_key;
 static float  g_sm_texel, g_sm_bias;       /* a texel in world units; the depth bias, 0..1 */
 static float  g_planet_sph[SM_PLANETS][4];
+static int    g_sm_trans;                  /* the draw sm_take saw is blended or alpha-tested */
 static int    g_sm_saved_ok;               /* sm_bind's saved sampler states, for sm_unbind */
 static DWORD  g_sm_saved[6];
 static void  *g_sm_saved_tex;
@@ -1619,6 +1620,12 @@ static int sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UIN
     ((SmIdx8_t)(*(void ***)d8)[86])(d8, &ib8, &base);                     /* GetIndices */
     sm_unref(ib8);
     if (!r->vb || !r->ib) { sm_drop(r); return 0; }
+    {   /* a draw blended or alpha-tested casts no shadow: the depth pass has no texture */
+        DWORD ab = 0, at = 0;
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 27, &ab);       /* ALPHABLENDENABLE */
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 15, &at);       /* ALPHATESTENABLE */
+        g_sm_trans = ab || at;
+    }
     r->base = (int)base; r->dot3 = dot3;
     r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
     return 1;
@@ -1699,6 +1706,16 @@ static void sm_keep(SmRec *r, const BYTE *mesh)
     if (g_sm_n[g_sm_cur] >= SM_MAX || !mesh) {
         static int said;
         if (!said && mesh) { said = 1; logline("shadows: more hull draws in a frame than the list holds; the rest cast none"); }
+        sm_drop(r);
+        return;
+    }
+    if (g_sm_trans) {
+        static long skipped;
+        if (++skipped == 1 || skipped == 20000) {
+            char b[120];
+            b[0] = 0; s_cat(b, "shadows: blended or alpha-tested draws left out of the map: "); s_num(b, skipped);
+            logline(b);
+        }
         sm_drop(r);
         return;
     }

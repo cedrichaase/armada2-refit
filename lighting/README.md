@@ -941,6 +941,12 @@ shadows on, then the game relaunched with `Shadows=0 PlanetShadows=0`):
 - The `firing` scene after merging the phasers: combat draws as before;
   `Lighting.log` reads `shadows: map 1000 of 5 hull draws`.
 
+**Blended draws cast nothing.** The depth pass has no texture or alpha test, so a draw that
+the engine blends or alpha-tests (`ALPHABLENDENABLE`, `ALPHATESTENABLE` read at `sm_take`)
+would be an opaque sheet in the map: on the bench a Steamrunner was dark whole, from every
+side and at `ShadowSize=8192`, until these were left out of the list (`g_sm_trans`). They
+still look the map up. `ShadowSize` was not the cause, and a bigger map did not help.
+
 Not shadowed: anything not drawn through the hull shaders (the CPU path's cloaking or
 warping ships, translucent meshes) casts and takes no shadow, and planets take none from
 ships. A hull outside the view casts none into it: the map holds only what the engine

@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.2.2 — 2026-10-07
+
+Layers: lighting 1.17.2.
+
+### Fixed
+- Hulls shadowed whole by a blended or alpha-tested draw above them under `Shadows=1`
+  (lighting 1.17.2).
+
+Installed, not yet seen in game.
+
 ## 11.2.1 — 2026-10-07
 
 Layers: lighting 1.17.1.
