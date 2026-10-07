@@ -4,6 +4,26 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.17.2 — 2026-10-07
+
+### Fixed
+- Whole hulls (a Steamrunner on the bench, an Akira's top in the first mission) went dark
+  under `Shadows=1`. A draw with alpha blending or alpha testing on (an overlay shell, a
+  decal) was drawn into the shadow map as an opaque hull; such draws now cast nothing,
+  and still take the shadow.
+
+Installed, not yet seen in game.
+
+## 1.17.1 — 2026-10-07
+
+### Fixed
+- Ships and stations went dark, one at a time and from frame to frame, with `Shadows=1`.
+  The engine renders the world twice a frame (the main view and the selection's 3D
+  portrait), and the shadow map of each was made from the other's hulls. The hull
+  lists, and the "previous frame" they stand for, are now kept per camera.
+
+Installed, not yet seen in game.
+
 ## 1.17.0 — 2026-10-07
 
 ### Added

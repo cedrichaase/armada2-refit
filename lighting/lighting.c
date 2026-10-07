@@ -291,11 +291,21 @@ static void phaser_lights(void);
 static void ordnance_colours(void);
 static void sm_planets(void);
 static DWORD g_frame;
+/* The engine renders the world twice a frame: the main view, and another camera with
+ * its own few hulls (the selection's 3D portrait). Each view keeps its own hull lists
+ * for the shadow map, which is made from the view's own last frame (sm_frame). */
+#define SM_VIEWS 4
+static void *g_view_cam[SM_VIEWS];
+static DWORD g_view_frames[SM_VIEWS];      /* the frames each view has had */
+static int   g_view;                       /* the view being rendered */
 
 static void __cdecl hook_prerender_all(void *camera)
 {
     g_frame_lights = 0;
     g_frame++;              /* the shadows' frame: see sm_frame */
+    for (g_view = 0; g_view < SM_VIEWS - 1 && g_view_cam[g_view] && g_view_cam[g_view] != camera; g_view++) ;
+    g_view_cam[g_view] = camera;
+    g_view_frames[g_view]++;
     if (g_lights) sky_update();
     ((PreRenderAll_t)FN_PRERENDER_ALL)(camera);
     sm_planets();
@@ -1326,11 +1336,16 @@ static float  g_sm_strength = 1.0f;        /* ShadowStrength= */
 static D9Shader g_depth_vs = D9_VERTEX_SHADER(k_depth_vs);
 static D9Shader g_depth_ps = D9_PIXEL_SHADER(k_depth_ps);
 
-static SmRec  g_sm_rec[2][SM_MAX];
-static int    g_sm_n[2], g_sm_cur;         /* g_sm_rec[g_sm_cur] fills this frame; the other is in the map */
-static int    g_sm_head[SM_HASH];          /* the map's list by sm_hash, -1 for none */
+static SmRec  g_smv_rec[SM_VIEWS][2][SM_MAX];
+static int    g_smv_n[SM_VIEWS][2], g_smv_cur[SM_VIEWS];   /* g_sm_rec[g_sm_cur] fills this frame; the other is in the map */
+static int    g_smv_head[SM_VIEWS][SM_HASH];               /* the map's list by sm_hash, -1 for none */
+static DWORD  g_smv_rec_frame[SM_VIEWS];                   /* the view frame the current list is of */
+#define g_sm_rec       (g_smv_rec[g_view])                 /* the lists of the view being rendered */
+#define g_sm_n         (g_smv_n[g_view])
+#define g_sm_cur       (g_smv_cur[g_view])
+#define g_sm_head      (g_smv_head[g_view])
+#define g_sm_rec_frame (g_smv_rec_frame[g_view])
 static DWORD  g_sm_frame = 0xffffffff;     /* the frame sm_frame last ran for */
-static DWORD  g_sm_rec_frame;              /* the frame the current list is of */
 static void  *g_sm_dev;                    /* the device what follows belongs to */
 static void  *g_sm_tex, *g_sm_surf, *g_sm_ds, *g_sm_sb;
 static int    g_sm_ok;                     /* the map holds last frame's hulls */
@@ -1340,6 +1355,7 @@ static float  g_sm_key[3];                 /* towards the Key */
 static int    g_sm_have_key;
 static float  g_sm_texel, g_sm_bias;       /* a texel in world units; the depth bias, 0..1 */
 static float  g_planet_sph[SM_PLANETS][4];
+static int    g_sm_trans;                  /* the draw sm_take saw is blended or alpha-tested */
 static int    g_sm_saved_ok;               /* sm_bind's saved sampler states, for sm_unbind */
 static DWORD  g_sm_saved[6];
 static void  *g_sm_saved_tex;
@@ -1368,9 +1384,14 @@ static void sm_drop_list(int l)
 /* Everything the shadows hold on the device: before a Reset, and for another device. */
 static void sm_release(void)
 {
-    int i;
-    sm_drop_list(0); sm_drop_list(1);
-    for (i = 0; i < SM_HASH; i++) g_sm_head[i] = -1;
+    int i, v, keep = g_view;
+    for (v = 0; v < SM_VIEWS; v++) {
+        g_view = v;
+        sm_drop_list(0); sm_drop_list(1);
+        for (i = 0; i < SM_HASH; i++) g_sm_head[i] = -1;
+        g_sm_rec_frame = 0;
+    }
+    g_view = keep;
     sm_unref(g_sm_surf); sm_unref(g_sm_tex); sm_unref(g_sm_ds); sm_unref(g_sm_sb);
     g_sm_surf = g_sm_tex = g_sm_ds = g_sm_sb = NULLPTR;
     g_sm_ok = 0;
@@ -1572,10 +1593,10 @@ static void sm_frame(void *d9)
         if (g_sm_dev != d9) { sm_release(); g_sm_dev = d9; g_sm_broken = 0; }
         /* the list just made becomes the map's; one from an older frame is stale */
         l = g_sm_cur;
-        if (g_sm_rec_frame + 1 != g_frame) sm_drop_list(l);
+        if (g_sm_rec_frame + 1 != g_view_frames[g_view]) sm_drop_list(l);
         g_sm_cur = l ^ 1;
         sm_drop_list(g_sm_cur);
-        g_sm_rec_frame = g_frame;
+        g_sm_rec_frame = g_view_frames[g_view];
         for (i = 0; i < SM_HASH; i++) g_sm_head[i] = -1;
         for (i = 0; i < g_sm_n[l]; i++) {
             int h = sm_hash(&g_sm_rec[l][i]);
@@ -1599,6 +1620,12 @@ static int sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UIN
     ((SmIdx8_t)(*(void ***)d8)[86])(d8, &ib8, &base);                     /* GetIndices */
     sm_unref(ib8);
     if (!r->vb || !r->ib) { sm_drop(r); return 0; }
+    {   /* a draw blended or alpha-tested casts no shadow: the depth pass has no texture */
+        DWORD ab = 0, at = 0;
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 27, &ab);       /* ALPHABLENDENABLE */
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 15, &at);       /* ALPHATESTENABLE */
+        g_sm_trans = ab || at;
+    }
     r->base = (int)base; r->dot3 = dot3;
     r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
     return 1;
@@ -1679,6 +1706,16 @@ static void sm_keep(SmRec *r, const BYTE *mesh)
     if (g_sm_n[g_sm_cur] >= SM_MAX || !mesh) {
         static int said;
         if (!said && mesh) { said = 1; logline("shadows: more hull draws in a frame than the list holds; the rest cast none"); }
+        sm_drop(r);
+        return;
+    }
+    if (g_sm_trans) {
+        static long skipped;
+        if (++skipped == 1 || skipped == 20000) {
+            char b[120];
+            b[0] = 0; s_cat(b, "shadows: blended or alpha-tested draws left out of the map: "); s_num(b, skipped);
+            logline(b);
+        }
         sm_drop(r);
         return;
     }
