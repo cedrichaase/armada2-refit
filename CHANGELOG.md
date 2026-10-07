@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.0.0 — 2026-10-07
+
+Layers: lighting 1.16.0, models 4.0.0.
+
+### Added
+- The Borg have a lighting profile of their own: dark plating with a faint, tight
+  highlight, a sickly green rim and their night lights carrying the look (`BorgAmbient`,
+  `BorgSpecular`, `BorgRimLight`, `BorgSun`, ..., lighting 1.16.0).
+
+### Removed
+- `models/hull-bump.py` and its flat map `a2flatbump.tga` (models 4.0.0); `a2mod` and
+  `textures/tools/inventory.py` no longer list the map.
+
+Installed, not yet seen in game.
+
 ## 10.6.0 — 2026-10-07
 
 Layers: lighting 1.15.0.

@@ -6,6 +6,17 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 4.0.0 — 2026-10-07
+
+### Removed
+- `hull-bump.py` and `hull-bump.sha256` (`--install`, `--revert`, `--status`,
+  `--manifest`), and with them `Textures/RGB/a2flatbump.tga`. A flat bump map gives a
+  hull exactly a plain hull's shading in `Lighting.asi`'s shaders, which light every
+  hull per pixel. It was never part of `./install`; an install that ran it is reverted
+  by the script as of commit 062eb7e (`models/hull-bump.py --revert`).
+
+Installs nothing; no game-side change to confirm.
+
 ## 3.3.0 — 2026-10-05
 
 ### Added

@@ -450,6 +450,15 @@ static float g_rim_pow = 3.0f;                      /* RimPower= */
  * towards white rather than clipped. lighting/README.md, "Dynamic range". */
 static float g_hull_sun = 1.1f;                     /* HullSun= */
 static float g_knee = 0.8f;                         /* HighlightKnee=; 1: clip, as before */
+/* The Borg profile (Shaders=1, BumpShaders=1): the values above, for the bump-mapped
+ * hulls, which in stock are the Borg's alone. Before BumpShaders they were drawn dark
+ * with glowing lights (the dot3 passes have no ambient, specular or rim), and the
+ * Federation's tuning lifted them. lighting/README.md, "The Borg profile". */
+static float g_borg_amb[3] = { 0.015f, 0.018f, 0.015f };   /* BorgAmbient= */
+static float g_borg_spec = 0.15f, g_borg_spec_pow = 64.0f; /* BorgSpecular=, BorgSpecularPower= */
+static float g_borg_rim[3] = { 0.06f, 0.13f, 0.03f };      /* BorgRimLight=: a sickly green */
+static float g_borg_sun = 0.8f;                            /* BorgSun=: HullSun's counterpart */
+static float g_borg_self = -1.0f;                          /* BorgSelfIllumination=; < 0: SelfIllumination */
 static int   g_sh_lit_self;          /* the draw in hand has a self-illuminating material */
 
 /* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
@@ -842,7 +851,7 @@ static int sh_consts(void *d9, int bump)
     d9_vsconst(d9, 4, col, 3);
 
     if (bump) {
-        for (i = 0; i < 3; i++) { c[i] = g_ambient[i]; c[4 + i] = 1.0f; }
+        for (i = 0; i < 3; i++) { c[i] = g_borg_amb[i]; c[4 + i] = 1.0f; }
         c[3] = c[7] = 1.0f;
     } else {
         D9_FN(d9, D9_GETMATERIAL, D9Material_t)(d9, &mt);
@@ -891,7 +900,7 @@ static int sh_consts(void *d9, int bump)
             dv[nd * 4 + 2] = -l.Direction[2] / n;
             nd++;
         }
-        {   /* the Key, the brightest, times HullSun */
+        {   /* the Key, the brightest, times HullSun (BorgSun) */
             int   key = -1;
             float best = 0.0f;
             for (i = 0; i < nd; i++) {
@@ -899,14 +908,14 @@ static int sh_consts(void *d9, int bump)
                 if (lum > best) { best = lum; key = i; }
             }
             if (key >= 0) {
-                for (i = 0; i < 3; i++) dc[key * 4 + i] *= g_hull_sun;
+                for (i = 0; i < 3; i++) dc[key * 4 + i] *= bump ? g_borg_sun : g_hull_sun;
                 dc[key * 4 + 3] = 1.0f;     /* the light the shadows take away */
             }
         }
         d9_psconst(d9, 2, dc, 4);
         d9_psconst(d9, 6, dv, 4);
         misc[0] = g_sh_sign;
-        misc[1] = g_sh_lit_self ? g_selfillum : 0.0f;
+        misc[1] = g_sh_lit_self ? (bump ? g_borg_self : g_selfillum) : 0.0f;
         misc[2] = g_knee;
         misc[3] = 0.0f;
         d9_psconst(d9, 10, misc, 1);
@@ -932,8 +941,10 @@ static int sh_consts(void *d9, int bump)
     {   /* shine c59, rim_col c60, eye c61. The camera sits where the view matrix
          * takes to the origin: with VIEW = [R 0; t 1], eye = -t R^T. */
         float k[12];
-        k[0] = g_spec; k[1] = g_spec_pow; k[2] = g_rim_pow; k[3] = 0.0f;
-        k[4] = g_rim[0]; k[5] = g_rim[1]; k[6] = g_rim[2]; k[7] = 0.0f;
+        const float *rim = bump ? g_borg_rim : g_rim;
+        k[0] = bump ? g_borg_spec : g_spec; k[1] = bump ? g_borg_spec_pow : g_spec_pow;
+        k[2] = g_rim_pow; k[3] = 0.0f;
+        k[4] = rim[0]; k[5] = rim[1]; k[6] = rim[2]; k[7] = 0.0f;
         for (i = 0; i < 3; i++)
             k[8 + i] = -(vw[12] * vw[i * 4] + vw[13] * vw[i * 4 + 1] + vw[14] * vw[i * 4 + 2]);
         k[11] = 1.0f;
@@ -1008,8 +1019,8 @@ static void hook_device(void *dev)
 }
 
 /* Bump-mapped hulls (BumpShaders=1, with Shaders=1). A mesh whose material names a bump
- * map (the Borg; any hull models/hull-bump.py patched) goes through ST3D_Dot3_MeshVB,
- * which ST3D_Mesh::Update picks before the plain vertex buffers. Its Render (0x6275a0,
+ * map (in stock, the Borg alone) goes through ST3D_Dot3_MeshVB, which ST3D_Mesh::Update
+ * picks before the plain vertex buffers. Its Render (0x6275a0,
  * slot 3 of the vtable at 0x6bc7d4) draws each group once per light, added up: the
  * normal map in stage 0 against the light taken into each vertex's tangent basis by
  * the engine's dot3 shader (Shaders\dot3_directional.nvv), the light's colour in the
@@ -2807,6 +2818,13 @@ static void startup(void)
     if (g_sm_size > 8192) g_sm_size = 8192;
     ini1(ini, "ShadowStrength",   &g_sm_strength);
     g_planet_shadows = (int)GetPrivateProfileIntA("Lighting", "PlanetShadows", 1, ini);
+    ini3(ini, "BorgAmbient",       g_borg_amb);
+    ini1(ini, "BorgSpecular",      &g_borg_spec);
+    ini1(ini, "BorgSpecularPower", &g_borg_spec_pow);
+    ini3(ini, "BorgRimLight",      g_borg_rim);
+    ini1(ini, "BorgSun",           &g_borg_sun);
+    ini1(ini, "BorgSelfIllumination", &g_borg_self);
+    if (g_borg_self < 0.0f) g_borg_self = g_selfillum;
     ini3(ini, "KeyColour",  g_key_col);
     ini3(ini, "KeyAxis",    g_key_dir);
     ini3(ini, "FillColour", g_fill_col);
