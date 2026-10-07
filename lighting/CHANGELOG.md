@@ -4,6 +4,21 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.15.0 — 2026-10-07
+
+### Added
+- `Shadows=1`, `ShadowSize=2048`, `ShadowStrength=1.0`: with `Shaders=1`, ships and
+  stations cast the Key's shadow on themselves and each other. Every hull draw in the
+  shaders is drawn again next frame into an R32F depth map from the Key (`hull.hlsl`'s
+  `depth_vs`/`depth_ps`), fitted round the hulls on screen; each hull looks itself up at
+  the pose it had then, so its shadow on itself does not lag. 3x3 soft lookup, normal
+  offset. The d3d8 device's `Reset` is wrapped to let the map go first.
+- `PlanetShadows=1`: a planet between a hull and the Key shadows it, tested as a sphere
+  in the hull shaders.
+
+Seen on the bench 2026-10-07 (a shadow scene: Galaxy, a destroyer behind the planet,
+a shipyard, a Borg cube, a destroyer under way; `SCENE=firing`). Confirmed in game 2026-10-07.
+
 ## 1.14.0 — 2026-10-07
 
 ### Added

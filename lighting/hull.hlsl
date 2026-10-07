@@ -5,12 +5,18 @@
 // given where they are, the same material and texture stage (texture x lit colour).
 // lighting/README.md, "Shaders". bump_vs and bump_ps light the ST3D_Dot3_MeshVB draws
 // (bump-mapped hulls: the Borg, and any hull models/hull-bump.py patched) the same way,
-// with the normal from the engine's own normal map; "Bump-mapped hulls".
+// with the normal from the engine's own normal map; "Bump-mapped hulls". depth_vs and
+// depth_ps draw the shadow map, and every hull looks it up for the Key; "Shadows".
 
 // ---- vertex: the game's vertex buffer as it is (FVF XYZ | NORMAL | TEX1) ----
 
 float4 wvp[4]   : register(c0);   // columns of WORLD x VIEW x PROJECTION
 float4 world[3] : register(c4);   // columns of WORLD (x, y, z)
+float4 smat[3]  : register(c7);   // columns of object -> shadow map (u, v, depth 0..1), at the
+                                  // pose the draw had when the map was drawn (last frame)
+float4 soff     : register(c10);  // x: the normal offset, world units (a texel's worth);
+                                  // y: the normals' sign (-1 inward, as stock; +1 a mirrored draw)
+float4 skey     : register(c11);  // towards the Key, world space, unit
 
 struct Lit
 {
@@ -18,16 +24,63 @@ struct Lit
     float2 uv  : TEXCOORD0;
     float3 n   : TEXCOORD1;       // world space, as the vertex has it
     float3 wp  : TEXCOORD2;       // world position
+    float3 sc  : TEXCOORD3;       // where it falls in the shadow map: u, v, depth
 };
+
+float3 to_world(float3 v)
+{
+    return float3(dot(v, world[0].xyz), dot(v, world[1].xyz), dot(v, world[2].xyz));
+}
+
+// The vertex in the shadow map, moved out along its normal first: by more where the Key
+// grazes the surface, which is where a depth map's texels lie across it and a surface
+// would shadow itself.
+float3 shadow_coord(float4 p, float3 n)
+{
+    float3 no  = n * soff.y;                          // outward, object space
+    float3 nw  = to_world(no);
+    float  l   = max(length(nw), 1e-6);
+    float  ndl = dot(nw / l, skey.xyz);
+    float  off = soff.x * (0.5 + 1.5 * sqrt(saturate(1.0 - ndl * ndl)));
+    float4 q   = float4(p.xyz + no * (off / l), 1.0);
+    return float3(dot(q, smat[0]), dot(q, smat[1]), dot(q, smat[2]));
+}
 
 Lit hull_vs(float4 p : POSITION, float3 n : NORMAL, float2 uv : TEXCOORD0)
 {
     Lit o;
     o.pos = float4(dot(p, wvp[0]), dot(p, wvp[1]), dot(p, wvp[2]), dot(p, wvp[3]));
     o.wp  = float3(dot(p, world[0]), dot(p, world[1]), dot(p, world[2]));
-    o.n   = float3(dot(n, world[0].xyz), dot(n, world[1].xyz), dot(n, world[2].xyz));
+    o.n   = to_world(n);
     o.uv  = uv;
+    o.sc  = shadow_coord(p, n);
     return o;
+}
+
+// ---- the shadow map: depth from the Key, of every hull drawn last frame ----
+
+float4 spass : register(c12);     // x: one texel, 1 / the map's size
+
+struct Depth
+{
+    float4 pos : POSITION;
+    float  d   : TEXCOORD0;
+};
+
+Depth depth_vs(float4 p : POSITION)
+{
+    Depth  o;
+    float3 s = float3(dot(p, smat[0]), dot(p, smat[1]), dot(p, smat[2]));
+    // u, v to clip space, half a texel back: Direct3D 9 puts a pixel's centre at the
+    // integer, a texel's at the half.
+    o.pos = float4(s.x * 2.0 - 1.0 - spass.x, 1.0 - s.y * 2.0 + spass.x, s.z, 1.0);
+    o.d   = s.z;
+    return o;
+}
+
+float4 depth_ps(Depth i) : COLOR
+{
+    return float4(i.d, 0.0, 0.0, 1.0);
 }
 
 // ---- pixel: Direct3D's lighting equation per pixel, the point lights where they are ----
@@ -48,7 +101,13 @@ float4 pfall[POINTS]: register(c43);  // x: full to this distance, y: 1 / the fa
 float4 shine        : register(c59);  // x: specular strength, y: its exponent, z: the rim's exponent
 float4 rim_col      : register(c60);  // the rim light's colour; 0 for none
 float4 eye          : register(c61);  // the camera's world position
+float4 shadow       : register(c62);  // x: 1 when there is a shadow map, y: one texel (uv), z: the depth
+                                      // bias, w: how much of the Key a shadow takes (ShadowStrength)
+float4 sun          : register(c63);  // towards the Key, world space, unit; w: the planets' strength
+#define PLANETS 8
+float4 planet[PLANETS] : register(c64); // a planet's centre, and its radius (0: none)
 sampler2D tex0 : register(s0);
+sampler2D smap : register(s3);    // the shadow map: depth 0..1 from the Key, 1 where nothing is
 
 // The highlight shoulder: the colour as it is up to the knee k, then rolling off
 // towards 1 instead of clipping there, with the same slope at the knee. Per channel,
@@ -68,20 +127,62 @@ float glint(float3 Nt, float3 L, float3 V)
     return dot(Nt, L) > 0.0 ? pow(max(0.0, dot(Nt, H)), shine.y) : 0.0;
 }
 
+// How much of the Key reaches a point: the shadow map, 3x3 texels weighted by where the
+// point falls between them (16 taps), so an edge is soft and does not step.
+float map_shadow(float3 sc)
+{
+    if (shadow.x <= 0.0 || sc.x <= 0.0 || sc.x >= 1.0 || sc.y <= 0.0 || sc.y >= 1.0) return 1.0;
+    float2 t   = sc.xy / shadow.y - 0.5;
+    float2 f   = frac(t);
+    float2 b   = (t - f + 0.5) * shadow.y;
+    float  d   = sc.z - shadow.z;
+    float  lit = 0.0;
+    for (int y = -1; y <= 2; y++) {
+        float wy = y == -1 ? 1.0 - f.y : (y == 2 ? f.y : 1.0);
+        for (int x = -1; x <= 2; x++) {
+            float wx = x == -1 ? 1.0 - f.x : (x == 2 ? f.x : 1.0);
+            float z  = tex2Dlod(smap, float4(b + float2(x, y) * shadow.y, 0.0, 0.0)).r;
+            lit += (d <= z ? 1.0 : 0.0) * wx * wy;
+        }
+    }
+    return lit / 9.0;
+}
+
+// How much of the Key the planets leave: a planet between the point and the Key shadows
+// it, softly over an edge that widens with the distance behind the planet, as the
+// sun's own size makes it.
+float planet_shadow(float3 wp)
+{
+    float s = 1.0;
+    for (int j = 0; j < PLANETS; j++) {
+        float  r = planet[j].w;
+        float3 c = planet[j].xyz - wp;
+        float  t = dot(c, sun.xyz);
+        float  d = length(c - sun.xyz * t);
+        float  w = r * 0.02 + max(t, 0.0) * 0.01;
+        s *= r > 0.0 && t > 0.0 ? smoothstep(r - w, r + w, d) : 1.0;
+    }
+    return lerp(1.0, s, sun.w);
+}
+
 // Everything after the normal: the lights, the texture, the night lights, the shoulder.
 // N is the normal as the stock meshes have it (inward), the one the device's directional
-// lights pair with; misc.x turns it round.
-float4 shade(float3 N, float3 wp, float2 uv)
+// lights pair with; misc.x turns it round. sc: the point in the shadow map.
+float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
 {
     float3 Nt = N * misc.x;                  // the outward normal: stock's are inward
     float3 V  = normalize(eye.xyz - wp);
     float3 sum = base.rgb, spec = 0.0;
+    // The Key's share: what the shadow map and the planets let through. dcol[k].a is 1
+    // for the Key and 0 for the other lights.
+    float  key = lerp(1.0, map_shadow(sc), shadow.w) * planet_shadow(wp);
     // The engine hands Direct3D its directional lights reversed to match the stock
     // meshes' inward normals, so the diffuse term takes the normal as it is; turned
     // round together, the same pair gives the highlight.
     for (int k = 0; k < DIRS; k++) {
-        sum  += dcol[k].rgb * mat_diffuse.rgb * max(0.0, dot(N, dvec[k].xyz));
-        spec += dcol[k].rgb * glint(Nt, dvec[k].xyz * misc.x, V);
+        float3 c = dcol[k].rgb * lerp(1.0, key, dcol[k].a);
+        sum  += c * mat_diffuse.rgb * max(0.0, dot(N, dvec[k].xyz));
+        spec += c * glint(Nt, dvec[k].xyz * misc.x, V);
     }
     // A point light is where it is; the outward normal faces it. pfall.z wraps the
     // diffuse term round, so a light sitting on the hull (a phaser's emitter) lights the
@@ -114,7 +215,7 @@ float4 shade(float3 N, float3 wp, float2 uv)
 
 float4 hull_ps(Lit i) : COLOR
 {
-    return shade(normalize(i.n), i.wp, i.uv);
+    return shade(normalize(i.n), i.wp, i.uv, i.sc);
 }
 
 // ---- bump-mapped hulls: ST3D_Dot3_MeshVB's vertex buffer ----
@@ -133,12 +234,8 @@ struct Bumped
     float3 s   : TEXCOORD3;       // the basis, world space
     float3 t   : TEXCOORD4;
     float3 st  : TEXCOORD5;
+    float3 sc  : TEXCOORD6;       // where it falls in the shadow map
 };
-
-float3 to_world(float3 v)
-{
-    return float3(dot(v, world[0].xyz), dot(v, world[1].xyz), dot(v, world[2].xyz));
-}
 
 Bumped bump_vs(float4 p : POSITION, float3 n : NORMAL, float2 uv : TEXCOORD0,
                float3 s : TEXCOORD1, float3 t : TEXCOORD2, float3 st : TEXCOORD3)
@@ -151,6 +248,7 @@ Bumped bump_vs(float4 p : POSITION, float3 n : NORMAL, float2 uv : TEXCOORD0,
     o.t   = to_world(t);
     o.st  = to_world(st);
     o.uv  = uv;
+    o.sc  = shadow_coord(p, n);
     return o;
 }
 
@@ -175,5 +273,5 @@ float4 bump_ps(Bumped i) : COLOR
     float3 b  = across(i.s, Nt) * m.x + across(i.t, Nt) * m.y + Nt * m.z;
     float  l  = length(b);
     // shade() takes the inward normal and misc.x = -1, as for a stock hull
-    return shade(l > 1e-5 ? -b / l : -Nt, i.wp, i.uv);
+    return shade(l > 1e-5 ? -b / l : -Nt, i.wp, i.uv, i.sc);
 }
