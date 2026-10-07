@@ -5,6 +5,27 @@ into `Textures/RGB/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 versions". Newest first. The reasoning behind each change is in [`README.md`](README.md),
 not here.
 
+## 2.2.0 — 2026-10-07
+
+### Added
+- `tools/hd-sky.sh BASE...`: each face of an already-upscaled `sky-faces` set, edited by an
+  image model (`belt`, `openai/gpt-image-2-5-sunburst`, 2048px, high) into a finer rendering
+  of the same picture. The only script here besides `upscale-stock.sh` that spends. It makes
+  the target `<BASE>HD` (`ai/` = the edits, `src/` = `ai/` at `blend=` over `BASE`'s `src/`,
+  default 100, so the edit as it is), reruns faces whose upload failed, and `--reblend`
+  is free.
+- Targets `MbgBorgHD`, `mbgpurHD`, `MbgKlingHD`, `mbgredHD`, `mbgrgHD`, `mbgaquHD`,
+  `MbgDom1HD`, `mbgdkHD`, `mbgklHD`, `mbggbHD`: ten sets, covering 53 of the 72 stock maps
+  (`MBG02`, the other 16, is an atlas and is not done this way). They write the same files
+  as their bases; `blend=100`.
+- `base=` in `target.conf` names the set an HD target stands in for. With no target named,
+  `a2tex install` and `a2tex pack` take the HD build where one is built and leave its base
+  out; **`a2tex install --no-hd`** takes the bases instead. Naming a target always installs
+  exactly that one, so `install MbgBorg` and `install MbgBorgHD` switch between the AI
+  upscale and HD; `revert` and `a2mod stock` return to stock as before.
+
+Installed, not yet seen in game. `borg-mission-1` passes on the bench with them installed.
+
 ## 2.1.1 — 2026-10-04
 
 ### Fixed

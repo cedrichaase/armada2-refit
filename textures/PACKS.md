@@ -66,6 +66,8 @@ density and fill right.
     ./a2tex verify MbgBorg          # header, size, means, mip chain -- from the raw bytes
     ./a2tex install MbgBorg         # into the game, backing up each file first
     ./a2tex revert all              # every texture back to stock
+    textures/tools/hd-sky.sh MbgBorg   # spends: HD faces for a set -> target MbgBorgHD
+    ./a2tex install MbgBorg         # the AI upscale again, where an HD build exists
 
 `install` refuses a target outright rather than install part of it when a build would
 crash the game: an interface sprite over 256px, or a base texture resized without its

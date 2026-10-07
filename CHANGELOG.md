@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.7.0 — 2026-10-07
+
+Layers: textures 2.2.0.
+
+### Added
+- HD skyboxes: `tools/hd-sky.sh` and twelve `<Set>HD` targets, installed by default over the
+  AI upscale; `a2tex install --no-hd` or `install <Set>` goes back to the upscale, `revert
+  all` or `a2mod stock` to stock. Installed, not yet seen in game.
+
 ## 11.6.0 — 2026-10-07
 
 Layers: qol 1.6.0, online 0.6.0.

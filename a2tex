@@ -81,6 +81,16 @@ fill_stock () { # fill_stock <quiet 0|1> <target>...
   done
   return $rc
 }
+# <Set>HD (`base=<Set>` in its target.conf) is a finer build of the same files as <Set>.
+# With no target named, install and pack take the HD build where one is built and leave
+# its base out; `install --no-hd` takes the bases. Naming a target always means that one.
+NOHD=0
+superseded () { # superseded <target>: true if a built HD build stands in for it
+  [ "$NOHD" = 1 ] && { [ "$(conf "$1" base "")" != "" ]; return; }
+  local h; for h in $(targets); do
+    [ "$(conf "$h" base "")" = "$1" ] && compgen -G "$DATA/$h/out/*.tga" >/dev/null && return 0
+  done; return 1
+}
 need_stock () { # every target named, or every target
   local -a l=("$@"); [ ${#l[@]} -gt 0 ] || mapfile -t l < <(targets)
   fill_stock 1 "${l[@]}" || die "stock/ is incomplete -- see MISSING above. The game install must be the GOG release (textures/README.md)."
@@ -165,6 +175,7 @@ install)
   # the GOG release.
   shift; list=("$@")
   [ ${#list[@]} -eq 0 ] && mapfile -t list < <(for t in $(targets); do
+      superseded "$t" && continue
       compgen -G "$DATA/$t/out/*.tga" >/dev/null && echo "$t"; done)
   [ ${#list[@]} -eq 0 ] && { echo "nothing to install -- no target is built in $DATA"; exit 0; }
   need_stock "${list[@]}"
@@ -357,6 +368,7 @@ pack)
   # finding reproducible, not to ship.
   [ ${#list[@]} -eq 0 ] && mapfile -t list < <(for t in $(targets); do
       [ "$(conf "$t" install yes)" = no ] && continue
+      superseded "$t" && continue
       compgen -G "$DATA/$t/out/*.tga" >/dev/null && echo "$t"; done)
   [ ${#list[@]} -gt 0 ] || die "nothing to pack -- no target is built in $DATA"
   mkdir -p "$A2_DATA/packs"

@@ -825,6 +825,37 @@ pairing by index is not a pairing rule: glibc collation ignores punctuation, so
 tiebreak. Two names differing only in punctuation would silently swap two faces of a
 cube — a failure that looks like bad art rather than a bug.
 
+## HD skyboxes: the faces edited by an image model
+
+`tools/hd-sky.sh BASE` sends each face of `BASE`'s `src/` (its AI upscale, 2048px) to
+`openai/gpt-image-2-5-sunburst` as a reference image, high quality at 2048x2048 (about
+$0.115 a face), with a prompt that asks for the same picture, sharper: same shapes in the
+same places, same colours and brightness, corners left black, detail only inside the
+existing structures, nothing new. The edits are `<BASE>HD/ai/`; at `blend=100` they are
+`src/`, and `build` fits their colour to stock's channel means like any other face.
+
+- **Sunburst, because it is the edit model that keeps composition.** The pilot (one Borg
+  face, $0.23) put two prompts side by side; both kept every cloud shape and the black
+  corner notches exactly. What changes is the grain: the edit turns soft gas into fine
+  filaments, which reads more electric than the stock painting. At blend 50 and 70
+  against the upscale the structure stayed soft; the user preferred the unblended edit.
+- **The edit is what the stock plate would be at 8x the detail, not 8x the pixels**, so it
+  invents far more than the Lanczos-anchored upscale: `measure-invention.sh` ranks
+  textures against stock and will report it. It is accepted on looks, in game.
+- **An upload sometimes 404s** before the model sees it (`belt` does not retry that);
+  the script reruns what is missing, so re-running is safe and bills only missing faces.
+- **Left out on purpose:** `mbgflu` (stock is a flat soft haze; the edit came back as
+  marbled water with white streaks, a different style) and `MbgBaku` (its stock blue is so
+  faint that `fit()` has to synthesise it, and the means then miss stock's by 2-3, which
+  `verify` rejects). Their `ai/` faces are kept in `$A2_DATA/textures/<Set>HD/ai/`.
+- **Switching:** `a2tex install <Set>HD` and `a2tex install <Set>` swap between the edit and
+  the plain upscale (same files; the backup stays stock); with no target named,
+  `install` takes the HD build and `install --no-hd` the bases; `revert` and `a2mod stock`
+  restore stock.
+- `MBG02` is not done this way: it is a 2x2 atlas of four 128px tiles whose cube-face
+  seams were made seamless on purpose (see above), and edits of the four tiles would
+  not join.
+
 ## Upscaling the puffs from their own quadrants
 
 Same idea as the skyboxes, three differences that matter.
