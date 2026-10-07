@@ -176,7 +176,10 @@ Measured on the Galaxy saucer's outline: turn per facet 16.4 to 8.8 degrees at `
 which still read as facets at 3440x1440; `--split 4` reads as an ellipse. Box edges,
 pylons and nacelle ends stay crisp. Cost: 4x the triangles per `--split 2`, 16x at 4 (the
 Galaxy goes 759 to 12,144); an opaque hull is drawn from a vertex buffer, but this has not
-been measured with a full fleet. Only v1.93 models, found by the eight zero bytes ahead of a
+been measured with a full fleet. Only opaque meshes with something round in them are rounded, at the largest split up
+to 4 that keeps a mesh within 12,500 triangles: a blended mesh (shields, glows) would be
+drawn on the CPU every frame, and a box gains nothing. 176 of 225 hull models change; the
+largest, a station, gains 32k triangles. Only v1.93 models, found by the eight zero bytes ahead of a
 mesh and read back after writing; other versions are skipped.
 
 ## Bump maps on Federation hulls

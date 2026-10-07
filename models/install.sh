@@ -2,7 +2,8 @@
 # The models layer's own part of ./install: Planets.asi, which makes the engine
 # tessellate planets finely enough for a modern resolution (models/planets.c), and
 # the dilithium moons smoothed in their SOD files (models/moon-sod.py), and the
-# selection bubble rounded (models/select-sod.py).
+# selection bubble rounded (models/select-sod.py), and the ships and stations drawn round
+# where they are round (models/hull-sod.py).
 #
 #   install.sh                build, then install
 #   install.sh --detail N     install and set Detail=N (1 = stock)

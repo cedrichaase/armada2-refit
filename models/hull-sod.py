@@ -3,7 +3,7 @@
 through their own vertices, and leave every hard edge hard.
 
     models/hull-sod.py --status          what each hull model is
-    models/hull-sod.py --install         round them (default --split 2, --crease 40)
+    models/hull-sod.py --install         round them (default --split 4, --crease 40)
     models/hull-sod.py --revert          put stock back
     models/hull-sod.py --install --only Fgalaxy      just the named models
 
@@ -25,8 +25,10 @@ UV interpolated inside the stock triangle it was cut from, so the texture keeps 
 mapping it was painted for; stock vertices stay where they are.
 
 Everything else in the file -- materials, nodes, transforms, hardpoints -- is copied
-through. Only version 1.93 models, whose mesh is found by the eight zero bytes in front
-of it and checked by reading the finished file back, are touched; the stock files are
+through. Only opaque meshes with something round in them are rounded, at the largest split that
+keeps a mesh within 12,500 triangles: a blended mesh (shields, glows) would be drawn on
+the CPU every frame, and a box gains nothing. Only version 1.93 models, whose mesh is
+found by the eight zero bytes in front of it and checked by reading the finished file back, are touched; the stock files are
 pinned by hash in hull-sod.sha256, and --split 1 reproduces each byte for byte.
 """
 import argparse
@@ -34,6 +36,7 @@ import glob
 import hashlib
 import math
 import os
+import re
 import shutil
 import struct
 import sys
@@ -44,6 +47,9 @@ import a2env  # noqa: E402  (the repository root, for where the game is)
 SODDIR = os.path.join(a2env.GAME, 'SOD')
 SUFFIX = '.a2neb-backup'
 MANIFEST = os.path.join(HERE, 'hull-sod.sha256')
+# Not hulls: skybox cubes, beams, portal and singularity effects, map features, the logo.
+NOT_HULLS = re.compile(r'^(mbg|master\d|logo$|borg_portal|weclair|wklincom|worbitalbeam|wrebeam|'
+                       r'wrepairother|wtechassimbm|quantumsing|microorg|fluidicrift|zflag)', re.I)
 
 
 def sha(b):
@@ -102,7 +108,7 @@ def read_mesh(d, p):
 def parse(d):
     """Every mesh in a v1.93 model, in file order."""
     if d[:10] != b'Storm3D_SW':
-        sys.exit('not a Storm3D SOD')
+        return None
     if round(struct.unpack_from('<f', d, 10)[0], 2) != 1.93:
         return None
     out, p = [], 14
@@ -203,6 +209,59 @@ def topology(V, faces, crease):
         if not fu[i] or any(n is None for n in corner[i]):
             corner[i] = None
     return corner, hard, wid
+
+
+def material(d, p):
+    """The lighting material a mesh asks for ('opaque', 'additive', 'default'), read from
+    the node header just before it: the name, eight bytes, the texture name, eight zeros."""
+    q = p - 8
+    for ln in range(80):
+        s = q - ln - 2
+        if s >= 10 and struct.unpack_from('<H', d, s)[0] == ln:
+            m = s - 8
+            for l2 in range(1, 24):
+                s2 = m - l2 - 2
+                if s2 >= 10 and struct.unpack_from('<H', d, s2)[0] == l2 and d[s2 + 2:m].isalpha():
+                    return d[s2 + 2:m].decode()
+            return None
+    return None
+
+
+def is_curved(V, G, crease):
+    """Whether rounding would change this mesh at all: some corner's normal leans more than
+    3 degrees off its own face's, or a hard chain bends. A box is neither."""
+    faces = [f for _, F in G for f in F]
+    corner, hard, wid = topology(V, faces, crease)
+    lean = math.cos(math.radians(3))
+    for f, nn in zip(faces, corner):
+        if nn is None:
+            continue
+        a, b, c = (V[k] for k in f[0::2])
+        fu = unit(cross(sub(b, a), sub(c, a)))
+        if any(dot(fu, n) < lean for n in nn):
+            return True
+    wpos, chain = {}, {}
+    for k, w in enumerate(wid):
+        wpos.setdefault(w, V[k])
+    for a, b in hard:
+        chain.setdefault(a, []).append(b); chain.setdefault(b, []).append(a)
+    for w, nb in chain.items():
+        if len(nb) == 2:
+            d1, d2 = unit(sub(wpos[nb[0]], wpos[w])), unit(sub(wpos[nb[1]], wpos[w]))
+            if d1 and d2 and dot(d1, tuple(-x for x in d2)) >= lean \
+                    and dot(d1, tuple(-x for x in d2)) < 0.9999:
+                return True
+    return False
+
+
+BUDGET = 12500                                    # triangles one rounded mesh may have
+
+
+def split_for(tris, n):
+    """The largest split up to n that keeps a mesh within BUDGET (0: leave it stock)."""
+    while n > 1 and tris * n * n > BUDGET:
+        n -= 1
+    return n
 
 
 def subdivide(V, T, G, n, crease):
@@ -322,8 +381,12 @@ def build(stock, n, crease):
     b, last, stats = bytearray(), 0, []
     for head, end, V, T, G in meshes:
         b += stock[last:head]
-        r = subdivide(V, T, G, n, crease) if n > 1 else (V, T, G)
-        if r is None:                              # would overflow the format's 16-bit counts
+        tris = sum(len(F) for _, F in G)
+        k = split_for(tris, n)
+        r = None
+        if k > 1 and material(stock, head) == 'opaque' and is_curved(V, G, crease):
+            r = subdivide(V, T, G, k, crease)
+        if r is None:                              # not opaque, flat, or too big for the format
             r = (V, T, G)
         b += mesh_bytes(*r)
         stats.append((sum(len(F) for _, F in G), sum(len(F) for _, F in r[2])))
@@ -355,7 +418,7 @@ def main():
     g.add_argument('--status', action='store_true')
     g.add_argument('--manifest', action='store_true',
                    help='write hull-sod.sha256 from the installed stock files')
-    ap.add_argument('--split', type=int, default=4, help='cut each edge into N (default 2)')
+    ap.add_argument('--split', type=int, default=4, help='cut each edge into N, at most (default 4)')
     ap.add_argument('--crease', type=float, default=40.0,
                     help='faces meeting at more than this many degrees stay a corner')
     ap.add_argument('--only', nargs='+', metavar='NAME', help='just these models')
@@ -371,7 +434,7 @@ def main():
             fh.write('# stock sha256 of each hull model hull-sod.py rounds (GOG patch 1.1)\n')
             for nme in names:
                 d = stock_bytes(nme, None)
-                if parse(d):
+                if parse(d) and not NOT_HULLS.match(nme):
                     fh.write(f'{sha(d)}  {nme}\n')
         return
     if a.status:

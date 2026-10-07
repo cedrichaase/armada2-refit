@@ -6,6 +6,19 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 4.2.0 — 2026-10-07
+
+### Added
+- `hull-sod.py` rounds every compatible model, not four: 225 hull models are pinned in
+  `hull-sod.sha256` (skybox cubes, beams, portal and singularity effects, map features and
+  the logo are not), and 176 of them change. Per mesh: only `opaque` materials (a blended
+  mesh would take the CPU path), only meshes with something round in them (boxes stay
+  stock), and the largest split up to `--split` that keeps a mesh within 12,500 triangles.
+  The first four hulls build byte for byte as in 4.1.0.
+
+Installed, not yet seen in game beyond the four hulls of 4.1.0 (bench: all four other
+factions' battleships).
+
 ## 4.1.0 — 2026-10-07
 
 ### Added
@@ -16,7 +29,7 @@ selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md
   `hull-sod.sha256`: `Fgalaxy`, `Fente`, `Fcruise1`, `fsaucer`; `--split 4` by default.
   `install.sh` runs it and `--remove` reverts it; the backup is `.a2neb-backup`.
 
-Installed, not yet seen in game (bench shots only, Galaxy class).
+Confirmed in game 2026-10-07.
 
 ## 4.0.0 — 2026-10-07
 
