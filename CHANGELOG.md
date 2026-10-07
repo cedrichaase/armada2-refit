@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.2.0 — 2026-10-07
+
+Layers: qol 1.4.0.
+
+### Added
+- The view reaches across the whole map: the far plane and the distance past which
+  ships, stations, planets, asteroids and nebulae fade out are raised in memory
+  (`ViewDistance=`, qol 1.4.0).
+
+Confirmed in game 2026-10-07.
+
 ## 11.1.0 — 2026-10-07
 
 Layers: lighting 1.17.0.
