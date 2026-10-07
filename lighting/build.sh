@@ -13,7 +13,8 @@ mkdir -p "$out"
 # The hull shaders (hull.hlsl -> hull_shaders.h, committed; Shaders=1).
 "$here/../platform/d3d9/hlsl.sh" "$here/hull_shaders.h" "$here/hull.hlsl" \
     hull_vs:vs_3_0:k_hull_vs hull_ps:ps_3_0:k_hull_ps \
-    bump_vs:vs_3_0:k_bump_vs bump_ps:ps_3_0:k_bump_ps
+    bump_vs:vs_3_0:k_bump_vs bump_ps:ps_3_0:k_bump_ps \
+    depth_vs:vs_3_0:k_depth_vs depth_ps:ps_3_0:k_depth_ps
 # The planet shaders (planet.hlsl -> planet_shaders.h, committed; PlanetShaders=1).
 "$here/../platform/d3d9/hlsl.sh" "$here/planet_shaders.h" "$here/planet.hlsl" \
     ground_ps:ps_3_0:k_ground_ps city_ps:ps_3_0:k_city_ps cloud_ps:ps_3_0:k_cloud_ps

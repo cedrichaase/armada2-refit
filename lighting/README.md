@@ -22,6 +22,9 @@ that `Lighting.ini` switches separately:
   third light in its own colour (`SkyLight`); and a ship's or station's explosion
   lights its surroundings (`Explosions`); a phaser lights the firing ship around
   its emitter and the target where it strikes (`Phasers`).
+- **`Shadows=1`** (with `Shaders=1`): ships and stations cast the Key's shadow on
+  themselves and on each other, from a depth map of the hulls drawn; **`PlanetShadows=1`**:
+  a planet shadows what is behind it from the Key ("Shadows", below).
 
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
@@ -71,13 +74,18 @@ planet's ground colour (`planet glow:`).
 | `PhaserWrap`, `PhaserFalloff` | `0.6`, `2` | the emitter's light in the hull shaders: how far its diffuse term wraps round past the faces turned to it (`0`: Lambert), and the power its falloff is raised to (a hot spot) |
 | `PhaserImpact`, `PhaserImpactStart`, `PhaserImpactRange`, `PhaserImpactLift` | `2.0`, `6`, `70`, `8` | the light at the beam's end: the beam's colour times this (`0` none), and its falloff and lift as for the emitter |
 | `OrdnanceColours` | `1` | a torpedo's or pulse's light takes the colour of its own sprite, at the ODF's brightness ("Torpedoes and pulses", below); `0` keeps the ODF's `lightColor` |
+| `Shadows` | `1` | with `Shaders`, the hulls in the shaders cast the Key's shadow on themselves and each other ("Shadows", below); `0` none |
+| `ShadowSize` | `2048` | the shadow map's width and height in texels (512 to 8192); it is fitted round the hulls on screen, so zoomed in a texel is a fraction of a unit |
+| `ShadowStrength` | `1.0` | how much of the Key a shadow takes away, from the map and from planets; `1` all of it, so a shadowed face keeps the fill, sky light, ambient and point lights |
+| `PlanetShadows` | `1` | with `Shaders`, a planet between a hull and the Key shadows it; `0` none |
 | `Log` | `1` | write `Lighting.log` |
 
 The key comes in about 60° off vertical (1.0.0 had about 37°), so from the usual
 camera, which looks down from above, the light grazes the hulls and planets instead of
 falling straight onto them. The fill, `Ambient` and `PlanetAmbient` are kept low so
 that light sources added later stand out against the base lighting. The lighting is
-per vertex (per pixel with `Shaders=1` under d3d8to9) and casts no shadows: a flat face such as a saucer's top takes one tone
+per vertex (per pixel with `Shaders=1` under d3d8to9); only the Key casts shadows
+(`Shadows=1`, shaders only). A flat face such as a saucer's top takes one tone
 whatever the angle. On the bench (`SCENE=planet`, the view 65° down) the Galaxy's saucer
 went from a mean grey of 155 to 111.
 
@@ -805,6 +813,84 @@ byte-identical, and every planet mesh went through the shaders (`Lighting.log`:
 1000`) the terminator is a clean curve with a narrow warm band; from the night side
 (`orbit planet 35 10 1000`) the planet is dark with its clouds faintly visible, where
 the CPU path lit both its ground and its clouds evenly.
+
+## Shadows
+
+`Shadows=1` and `PlanetShadows=1`, with `Shaders=1` under d3d8to9; phase 3 of
+`platform/D3D9.md`. Only the Key casts a shadow: it is the one light strong and
+directional enough for one to read, and the fill, sky light, ambient and point lights
+still reach a shadowed face, so it stays dark blue rather than black.
+
+**The engine has no pass for a shadow to come from.** It draws one object at a time,
+each straight into the frame. So the plugin keeps a list of every hull draw it puts
+through the shaders, the plain ones (`hook_dip`) and the bump-mapped ones
+(`bump_draw`): the Direct3D 9 vertex and index buffers (a reference to each), the
+draw's arguments, the base vertex index (asked of the d3d8 device, since d3d8to9 keeps
+it), `WORLD`, and the mesh's bounding sphere. `ST3D_MeshVB_Imp::Init` (0x637d20) keeps
+the `ST3D_Mesh` at +0xc of the vertex-buffer object, and the sphere is the mesh's own
+centre (+0xd4) and radius (+0xe0), the pair `RenderInternal`'s camera test reads. At the
+first hull draw of the next frame (`sm_frame`; a frame is a call of
+`GameObject_PreRenderAll`, which the plugin already wraps) it draws that list again into
+a depth map from the Key, and every hull draw of the frame looks itself up in it.
+
+**The map.** R32F, `ShadowSize` square, with its own D24X8 depth surface, orthographic
+along the Key (the brightest directional light in the engine's list). It is fitted round
+the spheres of the hulls drawn, so it covers what is on screen: zoomed in on one Galaxy
+a texel is 0.18 units, over a battle a few units. Its width goes in steps of 2^¼ and
+its centre is snapped to whole texels, so from one frame to the next its texels stay
+where they were and a shadow's edge does not crawl as the camera moves. `depth_vs`/
+`depth_ps` (`hull.hlsl`) write depth 0..1 across the hulls' range; both faces cast.
+Everything the pass changes is captured beforehand in a `D3DSBT_ALL` state block and
+applied again after it, with the render target and depth surface, so the engine's next
+draw finds the device as it left it. The target and depth surface are in the default
+pool, so the plugin wraps the d3d8 device's `Reset` (slot 14) and lets them go first,
+with every buffer reference it holds.
+
+**The lag, taken out.** The map is a frame old. A hull that moved since would find its
+own shadow a frame behind it, and its lit faces would cross their own shadow. So a draw
+looks itself up where it was when the map was drawn: the record in the map's list with
+the same buffers and arguments nearest to it (within 300 units) gives its `WORLD` then,
+and the vertex shader takes the shadow coordinate with that matrix. A hull's shadow on
+itself is then exact however it moves and turns; only one hull's shadow on another is a
+frame late. A draw with no record (new on screen, or switched to another level of detail)
+uses its own matrix. Two ships of one class share buffers, and are told apart by where
+they are.
+
+**Lookup.** Each vertex is moved out along its normal before the lookup, by half a texel
+where the Key falls straight on, up to two where it grazes, with a depth bias of half a
+texel more: the low-poly hulls' smooth normals otherwise shadowed their own faces near
+the terminator. The pixel shader takes 3x3 texels, weighted by where the point falls
+between them (16 taps), and scales the Key's diffuse and highlight by what passes
+(`dcol[k].a` marks the Key among the directional lights).
+
+**Planets** cast no shadow into the map. A planet is a sphere, and the plugin knows each
+one's centre and radius (as for its glow, `sm_planets`: 262 for class M, the engine's own
+`Planet_Database` radius), so the pixel shader tests up to 8 directly: a point the Key
+reaches only through a planet is in its shadow, softly over an edge that widens with the
+distance behind the planet.
+
+Measured on the bench (2026-10-07, 1920x1080, a scene of a Galaxy, a destroyer behind
+the planet, a shipyard with a Galaxy above it and a Borg cube; each view taken with
+shadows on, then the game relaunched with `Shadows=0 PlanetShadows=0`):
+
+- The Galaxy from below and behind (`orbit ship 225 45 160`): the engineering hull throws
+  a hard shadow across the right nacelle's pylon and inner face; the difference is black
+  everywhere else on the hull, so no acne on the saucer or the flat faces.
+- The destroyer behind the planet's night side: fully sunlit before, dark in the
+  planet's shadow after.
+- The shipyard: the docked ships and the two towers shade the lower rail.
+- The Borg cube (bump-mapped, convex): only its pipes' hairline shadows.
+- A destroyer ordered across the map, at about 100 units a second: its nacelles shade
+  its flanks with no offset bands or streaks.
+- The `firing` scene after merging the phasers: combat draws as before;
+  `Lighting.log` reads `shadows: map 1000 of 5 hull draws`.
+
+Not shadowed: anything not drawn through the hull shaders (the CPU path's cloaking or
+warping ships, translucent meshes) casts and takes no shadow, and planets take none from
+ships. A hull outside the view casts none into it: the map holds only what the engine
+drew, and it culls what is off screen. The map is one, not cascaded: on a wide view
+reaching far towards the horizon, its texels grow with everything it must cover. Up to
+2048 hull draws a frame cast; the rest are logged once and cast none.
 
 ## Not covered yet
 
