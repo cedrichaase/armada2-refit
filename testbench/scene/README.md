@@ -47,6 +47,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Hud`, `Grid`, `Cursor`, `Notices`, `Tooltips` | 0 | 0 hides them; 1 leaves them as the game has them. Notices are the game's events: "Enemy engaged." and the like, their voice and minimap marker. Tooltips are the rollover boxes, an object's name and description, that the pointer brings up over the 3D view even when the cursor is not drawn |
 | `Hover` | 1 | 0 removes what the object under the pointer gets drawn over it: its hull, shield and special-energy gauges, its system icons and the hover ring, which come up even with the HUD and the cursor hidden. 1 is stock. Selection circles and group numbers stay |
 | `ShieldFx` | 1 | 0 removes the flash on a craft's shields when a weapon hits them (green on most). The shields still take the damage. 1 is stock. The shields-down effect (a blue electric ring when they run out) is separate and stays; `Heal=1` prevents it |
+| `Music` | 1 | 0 stops the game starting any music track (`StartMusic` and the jukebox's `mStartNewTrack` return at once); sound effects and voices stay. `SCENE_MUSIC=0` at install puts it into the installed copy of any scene file, so footage can be laid over its own soundtrack |
 | `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
 | `Center` | | centre the RTS camera on this object |
 | `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |

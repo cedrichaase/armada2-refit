@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.9.0 — 2026-10-07
+
+Layers: testbench 3.5.0.
+
+### Added
+- `Scene.asi`'s `Music=` key and `SCENE_MUSIC=0` at install: a bench session without the
+  game's music, for footage (testbench 3.5.0).
+
+Installs nothing; seen working on the bench 2026-10-07.
+
 ## 11.8.0 — 2026-10-07
 
 Layers: testbench 3.4.0.

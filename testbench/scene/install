@@ -24,5 +24,7 @@ if [ ! -f "$ini" ]; then echo "no scene file $ini" >&2; exit 1; fi
 bash "$here/build.sh"
 cp "$here/build/Scene.asi" "$GAME/"
 cp "$ini" "$GAME/Scene.ini"
+# SCENE_MUSIC=0 puts Music=0 into the installed copy (the scene file itself stays as it is)
+if [ "${SCENE_MUSIC:-1}" = 0 ]; then sed -i 's/^\[Scene\]\r\?$/&\nMusic=0/' "$GAME/Scene.ini"; fi
 rm -f "$GAME/Scene.log" "$GAME/Scene.cmd"
 echo "installed Scene.asi into $GAME, scene $ini"

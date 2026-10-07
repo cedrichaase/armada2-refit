@@ -183,6 +183,8 @@ int _fltused = 0;   /* floats without the CRT */
 #define PL_POPULATION    0x2acu      /* Planet: population, float */
 #define PL_SHOWN_RACE    0x2c4u      /* Planet: the Race whose cities are drawn */
 #define PL_SHOWN_POP     0x2c8u      /* Planet: the population drawn, eased toward +0x2ac */
+#define START_MUSIC      0x4586c0u   /* StartMusic(long, int): cdecl, starts a music track */
+#define NEW_TRACK        0x463680u   /* JukeBox::mStartNewTrack: thiscall, no arguments, the in-mission music */
 #define TOOLTIP_ON_CALL  0x508070u   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::TooltipOn */
 #define HOVER_SIM_CALL   0x5080fcu   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::MouseOn -> +0x7c */
 #define HOVER_PRE_CALL   0x508e72u   /* SelectionDisplay::PreRender: call DisplayInterface::MouseOn -> hover effect */
@@ -230,6 +232,8 @@ static const Sig k_sigs[] = {
     { EVENT_TRIGGER_0,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_3,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_1,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
+    { START_MUSIC,      4, { 0x55, 0x8B, 0xEC, 0xA1 } },
+    { NEW_TRACK,        4, { 0x55, 0x8B, 0xEC, 0x6A } },
     { TOOLTIP_ON_CALL,  5, { 0xE8, 0x9B, 0x35, 0x01, 0x00 } },
     { HOVER_SIM_CALL,   5, { 0xE8, 0xDF, 0x34, 0x01, 0x00 } },
     { HOVER_PRE_CALL,   5, { 0xE8, 0x69, 0x27, 0x01, 0x00 } },
@@ -1506,6 +1510,24 @@ static void build_paths(void)
     g_sodpath[0] = 0; s_cat(g_sodpath, path); s_cat(g_sodpath, "SOD\\");
 }
 
+/* Music off: StartMusic (cdecl) and JukeBox::mStartNewTrack (thiscall, no stack
+ * arguments) take nothing off the stack that the caller does not, so a `ret` over each
+ * first byte makes every call a no-op. Sound effects and voices go another way and stay. */
+static void music_off(void)
+{
+    static const DWORD sites[2] = { START_MUSIC, NEW_TRACK };
+    int i;
+    for (i = 0; i < 2; i++) {
+        DWORD old;
+        BYTE *p = (BYTE *)sites[i];
+        if (!VirtualProtect(p, 1, PAGE_EXECUTE_READWRITE, &old)) continue;
+        p[0] = 0xC3;
+        VirtualProtect(p, 1, old, &old);
+        FlushInstructionCache(GetCurrentProcess(), p, 1);
+    }
+    logline("music off");
+}
+
 static void startup(void)
 {
     char b[200];
@@ -1535,6 +1557,7 @@ static void startup(void)
         return;
     }
     logline("tick, camera and craft instances hooked");
+    if (!ini_int("Scene", "Music", 1)) music_off();
 }
 
 BOOL __stdcall DllMain(HMODULE mod, DWORD reason, void *reserved)

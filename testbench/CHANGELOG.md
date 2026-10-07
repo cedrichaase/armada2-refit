@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.5.0 — 2026-10-07
+
+### Added
+- `Scene.asi`: `Music=` (default 1, as stock): 0 stops the game starting any music track
+  (`StartMusic` and `JukeBox::mStartNewTrack` return at once), leaving effects and voices;
+  `SCENE_MUSIC=0` at `testbench/scene/install` puts it into the installed `Scene.ini`.
+  Footage is recorded without the game's music and laid over its own soundtrack.
+
+Installs nothing; seen working on the bench 2026-10-07 (planet scene: -44 dB with music,
+-60 dB without).
+
 ## 3.4.0 — 2026-10-07
 
 ### Added
