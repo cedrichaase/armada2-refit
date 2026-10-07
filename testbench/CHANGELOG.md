@@ -11,6 +11,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `Scene.asi`: `Music=` (default 1, as stock): 0 stops the game starting any music track
   (`StartMusic` and `JukeBox::mStartNewTrack` return at once), leaving effects and voices;
   `SCENE_MUSIC=0` at `testbench/scene/install` puts it into the installed `Scene.ini`.
+  It works with `Enable=0`, so a campaign take has no music and no scene.
   Footage is recorded without the game's music and laid over its own soundtrack.
 
 Installs nothing; seen working on the bench 2026-10-07 (planet scene: -44 dB with music,

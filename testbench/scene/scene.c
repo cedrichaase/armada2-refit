@@ -232,8 +232,6 @@ static const Sig k_sigs[] = {
     { EVENT_TRIGGER_0,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_3,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_1,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
-    { START_MUSIC,      4, { 0x55, 0x8B, 0xEC, 0xA1 } },
-    { NEW_TRACK,        4, { 0x55, 0x8B, 0xEC, 0x6A } },
     { TOOLTIP_ON_CALL,  5, { 0xE8, 0x9B, 0x35, 0x01, 0x00 } },
     { HOVER_SIM_CALL,   5, { 0xE8, 0xDF, 0x34, 0x01, 0x00 } },
     { HOVER_PRE_CALL,   5, { 0xE8, 0x69, 0x27, 0x01, 0x00 } },
@@ -1513,6 +1511,15 @@ static void build_paths(void)
 /* Music off: StartMusic (cdecl) and JukeBox::mStartNewTrack (thiscall, no stack
  * arguments) take nothing off the stack that the caller does not, so a `ret` over each
  * first byte makes every call a no-op. Sound effects and voices go another way and stay. */
+static int music_sigs_ok(void)
+{
+    static const BYTE a[4] = { 0x55, 0x8B, 0xEC, 0xA1 }, b[4] = { 0x55, 0x8B, 0xEC, 0x6A };
+    int i;
+    for (i = 0; i < 4; i++)
+        if (((const BYTE *)START_MUSIC)[i] != a[i] || ((const BYTE *)NEW_TRACK)[i] != b[i]) return 0;
+    return 1;
+}
+
 static void music_off(void)
 {
     static const DWORD sites[2] = { START_MUSIC, NEW_TRACK };
@@ -1534,8 +1541,11 @@ static void startup(void)
     int  bad;
 
     build_paths();
+    /* Music has its own switch, outside Enable: a campaign take wants the music off and
+     * no scene. */
+    if (!ini_int("Scene", "Music", 1) && music_sigs_ok()) music_off();
     if (!ini_int("Scene", "Enable", 1)) {
-        logline("--- Scene: Enable=0, nothing patched");
+        logline("--- Scene: Enable=0, nothing else patched");
         return;
     }
     logline("--- Scene");
@@ -1557,7 +1567,6 @@ static void startup(void)
         return;
     }
     logline("tick, camera and craft instances hooked");
-    if (!ini_int("Scene", "Music", 1)) music_off();
 }
 
 BOOL __stdcall DllMain(HMODULE mod, DWORD reason, void *reserved)

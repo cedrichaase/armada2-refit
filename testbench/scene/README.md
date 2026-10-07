@@ -41,7 +41,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 
 | Key | Default | |
 |---|---|---|
-| `Enable` | 1 | 0 patches nothing |
+| `Enable` | 1 | 0 patches nothing but the music switch below (`Enable=0` with `Music=0`: a plain game with no music, for footage of the real campaign) |
 | `Delay` | 30 | mission ticks before the scene is built |
 | `Fog` | 0 | 0: fog and shroud off for good, the map fully explored; 1: as the map has them |
 | `Hud`, `Grid`, `Cursor`, `Notices`, `Tooltips` | 0 | 0 hides them; 1 leaves them as the game has them. Notices are the game's events: "Enemy engaged." and the like, their voice and minimap marker. Tooltips are the rollover boxes, an object's name and description, that the pointer brings up over the 3D view even when the cursor is not drawn |
