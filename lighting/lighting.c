@@ -288,12 +288,16 @@ static float g_sky_col[3], g_sky_mat[12];
 
 static void explosion_lights(void);
 static void ordnance_colours(void);
+static void sm_planets(void);
+static DWORD g_frame;
 
 static void __cdecl hook_prerender_all(void *camera)
 {
     g_frame_lights = 0;
+    g_frame++;              /* the shadows' frame: see sm_frame */
     if (g_lights) sky_update();
     ((PreRenderAll_t)FN_PRERENDER_ALL)(camera);
+    sm_planets();
     planet_glows();
     explosion_lights();
     ordnance_colours();     /* Ordnance::PreRenderAll is next, at 0x598199 */
@@ -349,6 +353,7 @@ typedef long (__stdcall *GetLightEnable_t)(void *, DWORD, BOOL *);
 
 static int        g_fix_mirrored = 1;
 static int        g_in_vb;        /* inside ST3D_Standard_MeshVB::Render: its draws are hulls */
+static BYTE      *g_vb_mesh;      /* that draw's ST3D_Mesh, for the shadows */
 static VBRender_t g_vb_render;
 static void      *g_dev;          /* the device, as last seen by the SetMaterial hook */
 
@@ -584,6 +589,7 @@ static void __fastcall hook_vb_render(void *self, void *edx, int group, void *lm
         if (!said_self) { said_self = 1; logline("shaders: a self-illuminating material, its night lights folded in"); }
     }
     g_in_vb = 1;
+    g_vb_mesh = *(BYTE **)((BYTE *)self + 0xc);   /* ST3D_MeshVB_Imp::Init keeps the mesh there */
     g_vb_render(self, group, lm, tm, tex);
     g_in_vb = 0;
     for (i = 0; i < k; i++) ((LightEnable_t)(*(void ***)dev)[46])(dev, slots[i], 0);
@@ -722,6 +728,32 @@ static D9Shader g_hull_vs = D9_VERTEX_SHADER(k_hull_vs);
 static D9Shader g_hull_ps = D9_PIXEL_SHADER(k_hull_ps);
 static long     g_sh_draws, g_sh_ff;   /* hull draws in shaders / left fixed-function */
 static DWORD    g_sh_why;              /* reasons already logged, one bit each */
+static float    g_sh_w[16];            /* the draw's WORLD, as sh_consts read it */
+
+/* Shadows (Shadows=1, PlanetShadows=1): see "Shadows" below. A hull draw in the shaders
+ * calls sm_frame first (a new frame draws the shadow map), then sm_take for the draw's
+ * buffers, sm_consts for its constants, sm_bind/sm_unbind around the draw, and sm_keep
+ * to cast a shadow next frame. */
+typedef struct {
+    void  *vb, *ib;          /* the Direct3D 9 buffers, one reference each */
+    UINT   off, stride, mi, nv, si, pc;
+    int    base, dot3;       /* the base vertex index; the dot3 vertex layout */
+    DWORD  pt;
+    float  w[16];            /* WORLD */
+    float  c[3], r;          /* the mesh's bounding sphere, world space */
+    int    next;             /* the next of its hash bucket */
+} SmRec;
+
+static void sm_frame(void *d9);
+static int  sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3);
+static void sm_consts(void *d9, const SmRec *r, float sign);
+static void sm_bind(void *d9);
+static void sm_unbind(void *d9);
+static void sm_keep(SmRec *r, const BYTE *mesh);
+static long __stdcall hook_reset(void *dev, void *params);
+typedef long (__stdcall *Reset8_t)(void *, void *);
+static Reset8_t g_reset;
+static int      g_shadows = 1, g_planet_shadows = 1;   /* Shadows=, PlanetShadows= */
 
 static void sh_note(int bit, const char *why)
 {
@@ -787,6 +819,7 @@ static int sh_consts(void *d9, int bump)
     D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 256, w);            /* WORLD */
     D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 2, vw);             /* VIEW */
     D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 3, p);              /* PROJECTION */
+    for (i = 0; i < 16; i++) g_sh_w[i] = w[i];
     mat_mul(w, vw, wv);
     mat_mul(wv, p, wvp);
     for (j = 0; j < 4; j++)                                      /* columns */
@@ -853,7 +886,10 @@ static int sh_consts(void *d9, int bump)
                 float lum = dc[i * 4] + dc[i * 4 + 1] + dc[i * 4 + 2];
                 if (lum > best) { best = lum; key = i; }
             }
-            if (key >= 0) for (i = 0; i < 3; i++) dc[key * 4 + i] *= g_hull_sun;
+            if (key >= 0) {
+                for (i = 0; i < 3; i++) dc[key * 4 + i] *= g_hull_sun;
+                dc[key * 4 + 3] = 1.0f;     /* the light the shadows take away */
+            }
         }
         d9_psconst(d9, 2, dc, 4);
         d9_psconst(d9, 6, dv, 4);
@@ -896,6 +932,8 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
 {
     void   *d9, *vs, *ps;
     D9Saved sv;
+    SmRec   rc;
+    int     rec;
     long    r;
     if (!g_in_vb) return g_dip(dev, pt, mi, nv, si, pc);
     d9 = d9_device(dev);
@@ -906,13 +944,19 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
         g_sh_ff++;
         return g_dip(dev, pt, mi, nv, si, pc);
     }
+    sm_frame(d9);
     d9_save(d9, &sv);
     if (!sh_check(d9) || !sh_consts(d9, 0)) {
         d9_restore(d9, &sv); g_sh_ff++; return g_dip(dev, pt, mi, nv, si, pc);
     }
+    rec = sm_take(dev, d9, &rc, pt, mi, nv, si, pc, 0);
+    sm_consts(d9, rec ? &rc : NULLPTR, g_sh_sign);
     d9_bind(d9, vs, ps);
+    sm_bind(d9);
     r = g_dip(dev, pt, mi, nv, si, pc);
+    sm_unbind(d9);
     d9_restore(d9, &sv);
+    if (rec) sm_keep(&rc, g_vb_mesh);
     if (++g_sh_draws == 1 || g_sh_draws == 100000) {
         char b[120];
         b[0] = 0; s_cat(b, "shaders: hull draws in shaders "); s_num(b, g_sh_draws);
@@ -940,6 +984,13 @@ static void hook_device(void *dev)
     VirtualProtect(&vt[71], 4, old, &old);
     g_sh_on = 1;
     logline("shaders: on, through the Direct3D 9 device behind d3d8");
+    /* Reset (slot 14): the shadow map is a D3DPOOL_DEFAULT target, which must be gone
+     * before the device resets, and the shadow casters hold the engine's buffers. */
+    if (g_shadows && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
+        g_reset = (Reset8_t)vt[14];
+        vt[14] = (void *)hook_reset;
+        VirtualProtect(&vt[14], 4, old, &old);
+    }
 }
 
 /* Bump-mapped hulls (BumpShaders=1, with Shaders=1). A mesh whose material names a bump
@@ -1003,8 +1054,9 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     UINT   nv, pc;
     D9Saved sv;
     Pick   pk[SH_POINTS];
+    SmRec  rc;
     const float *m = (const float *)CURRENT_MATRIX;
-    int    i, n = 0;
+    int    i, n = 0, rec;
 
     if (!eng || !tm || !tex || *(int *)DOT3_LIMIT != -1) return 0;
     dev = *(void **)(eng + 0xcc + 4 * *(DWORD *)(eng + 0xc0));
@@ -1025,6 +1077,7 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     if (fog) { sh_note(10, "a bump-mapped hull under fog (stock dot3)"); return 0; }
     texs = *(void ***)tex;                           /* DynArray<ST3D_Texture *>: diffuse, normal map */
     if (!texs || !texs[0] || !texs[1]) return 0;
+    sm_frame(d9);
 
     grp = *(BYTE **)(self + 8) + group * 24;
     nv  = *(UINT *)(grp + 0x10);
@@ -1060,7 +1113,12 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     D9_FN(d9, D9_SETVERTEXDECLARATION, D9_Ptr_t)(d9, g_dot3_decl);
     d9_bind(d9, vs, ps);
     sh_consts(d9, 1);
+    rec = sm_take(d8, d9, &rc, 4, 0, nv, 0, pc, 1);
+    sm_consts(d9, rec ? &rc : NULLPTR, -1.0f);
+    sm_bind(d9);
     ((DIP8_t)(*(void ***)d8)[71])(d8, 4, 0, nv, 0, pc);           /* TRIANGLELIST, as stock */
+    sm_unbind(d9);
+    if (rec) sm_keep(&rc, mesh);
     ((D8VS3_t)(*(void ***)d8)[76])(d8, prev_vs);                   /* d3d8to9's own state again */
     for (i = 0; i < 3; i++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 1, 5 + i, samp[i]);
     d9_restore(d9, &sv);
@@ -1084,6 +1142,459 @@ static void __fastcall hook_dot3_render(void *self, void *edx, int group, void *
     if (!bump_draw((BYTE *)self, group, tm, tex)) {
         g_bump_stock++;
         g_dot3_render(self, group, lm, tm, tex);
+    }
+}
+
+/* Shadows from the Key (Shadows=1, with Shaders=1). The engine draws one object at a
+ * time and has no pass of its own for a shadow to come from, so the plugin keeps a list
+ * of every hull draw it puts through the shaders (hook_dip and bump_draw: the buffers,
+ * the draw's arguments, WORLD and the mesh's bounding sphere), and at the first hull
+ * draw of the next frame draws them all again into a depth map from the Key: R32F,
+ * orthographic, fitted round their spheres, its size stepped and its centre snapped to
+ * whole texels so that its edges keep still while the camera moves. Every device state
+ * it touches is captured in a state block and applied again after it, with the render
+ * target and depth surface, so the engine's next draw finds the device as it left it.
+ *
+ * The map is a frame old, so a hull looks itself up where it was when the map was
+ * drawn: the previous frame's record of the same buffers and draw nearest to it gives
+ * its old WORLD, and the shadow coordinate is taken with that (sm_consts). A hull's
+ * shadow on itself is then exact however it moves, and only one hull's shadow on
+ * another lags by a frame. A draw with no record (new on screen, or switched to another
+ * level of detail) uses its own WORLD.
+ *
+ * Planets cast no shadow into the map: a sphere is tested exactly in the shader instead
+ * (PlanetShadows=1), from the list sm_planets makes each frame. lighting/README.md,
+ * "Shadows". */
+#define SM_MAX   2048          /* hull draws kept per frame */
+#define SM_HASH   1024
+#define SM_MATCH  300.0f        /* how far a hull moves in a frame and is still itself */
+#define SM_PLANETS 8
+
+typedef long (__stdcall *SmMakeTex_t)(void *, UINT, UINT, UINT, DWORD, DWORD, DWORD, void **, void *);
+typedef long (__stdcall *SmMakeDS_t)(void *, UINT, UINT, DWORD, DWORD, DWORD, BOOL, void **, void *);
+typedef long (__stdcall *SmLevel_t)(void *, UINT, void **);
+typedef long (__stdcall *SmSetRT_t)(void *, DWORD, void *);
+typedef long (__stdcall *SmGetRT_t)(void *, DWORD, void **);
+typedef long (__stdcall *SmClear_t)(void *, DWORD, const void *, DWORD, DWORD, float, DWORD);
+typedef long (__stdcall *SmState_t)(void *, DWORD, DWORD);
+typedef long (__stdcall *SmFVF_t)(void *, DWORD);
+typedef long (__stdcall *SmMakeSB_t)(void *, DWORD, void **);
+typedef long (__stdcall *SmSB_t)(void *);
+typedef long (__stdcall *SmGetTex_t)(void *, DWORD, void **);
+typedef long (__stdcall *SmSetTex_t)(void *, DWORD, void *);
+typedef long (__stdcall *SmDIP9_t)(void *, DWORD, int, UINT, UINT, UINT, UINT);
+typedef long (__stdcall *SmGetSS_t)(void *, UINT, void **, UINT *, UINT *);
+typedef long (__stdcall *SmSetSS_t)(void *, UINT, void *, UINT, UINT);
+typedef long (__stdcall *SmObj_t)(void *, void *);
+typedef long (__stdcall *SmIdx8_t)(void *, void **, UINT *);
+enum { SM_CREATETEXTURE = 23, SM_CREATEDEPTHSTENCIL = 29, SM_SETRENDERTARGET = 37,
+       SM_GETRENDERTARGET = 38, SM_SETDEPTHSTENCIL = 39, SM_GETDEPTHSTENCIL = 40, SM_CLEAR = 43,
+       SM_CREATESTATEBLOCK = 59, SM_DIP = 82, SM_SETSTREAMSOURCE = 100, SM_GETSTREAMSOURCE = 101,
+       SM_SETINDICES = 104, SM_GETINDICES = 105 };
+
+static int    g_sm_size = 2048;            /* ShadowSize= */
+static float  g_sm_strength = 1.0f;        /* ShadowStrength= */
+static D9Shader g_depth_vs = D9_VERTEX_SHADER(k_depth_vs);
+static D9Shader g_depth_ps = D9_PIXEL_SHADER(k_depth_ps);
+
+static SmRec  g_sm_rec[2][SM_MAX];
+static int    g_sm_n[2], g_sm_cur;         /* g_sm_rec[g_sm_cur] fills this frame; the other is in the map */
+static int    g_sm_head[SM_HASH];          /* the map's list by sm_hash, -1 for none */
+static DWORD  g_sm_frame = 0xffffffff;     /* the frame sm_frame last ran for */
+static DWORD  g_sm_rec_frame;              /* the frame the current list is of */
+static void  *g_sm_dev;                    /* the device what follows belongs to */
+static void  *g_sm_tex, *g_sm_surf, *g_sm_ds, *g_sm_sb;
+static int    g_sm_ok;                     /* the map holds last frame's hulls */
+static int    g_sm_broken;                 /* the map could not be made: no shadows */
+static float  g_sm_ls[12];                 /* world -> u, v, depth: three columns of four */
+static float  g_sm_key[3];                 /* towards the Key */
+static int    g_sm_have_key;
+static float  g_sm_texel, g_sm_bias;       /* a texel in world units; the depth bias, 0..1 */
+static float  g_planet_sph[SM_PLANETS][4];
+static int    g_sm_saved_ok;               /* sm_bind's saved sampler states, for sm_unbind */
+static DWORD  g_sm_saved[6];
+static void  *g_sm_saved_tex;
+static long   g_sm_maps;
+static const DWORD k_sm_samp[6] = { 1, 2, 5, 6, 7, 11 };   /* ADDRESSU, V, MAG, MIN, MIP, SRGBTEXTURE */
+static const DWORD k_sm_samp_val[6] = { 3, 3, 1, 1, 0, 0 };   /* CLAMP, CLAMP, POINT, POINT, NONE, off */
+
+static void sm_unref(void *o)
+{
+    if (o) D9_FN(o, D9_RELEASE, D9_Ref_t)(o);
+}
+
+static void sm_drop(SmRec *r)
+{
+    sm_unref(r->vb); sm_unref(r->ib);
+    r->vb = r->ib = NULLPTR;
+}
+
+static void sm_drop_list(int l)
+{
+    int i;
+    for (i = 0; i < g_sm_n[l]; i++) sm_drop(&g_sm_rec[l][i]);
+    g_sm_n[l] = 0;
+}
+
+/* Everything the shadows hold on the device: before a Reset, and for another device. */
+static void sm_release(void)
+{
+    int i;
+    sm_drop_list(0); sm_drop_list(1);
+    for (i = 0; i < SM_HASH; i++) g_sm_head[i] = -1;
+    sm_unref(g_sm_surf); sm_unref(g_sm_tex); sm_unref(g_sm_ds); sm_unref(g_sm_sb);
+    g_sm_surf = g_sm_tex = g_sm_ds = g_sm_sb = NULLPTR;
+    g_sm_ok = 0;
+}
+
+static long __stdcall hook_reset(void *dev, void *params)
+{
+    sm_release();
+    logline("shadows: the device resets, the shadow map is let go");
+    return g_reset(dev, params);
+}
+
+static int sm_hash(const SmRec *r)
+{
+    return (int)(((DWORD)r->vb >> 4) ^ r->si * 0x9e37u ^ r->pc * 31u ^ (DWORD)r->base * 7u) & (SM_HASH - 1);
+}
+
+/* The map's own objects, made once per device; 0 if they cannot be. */
+static int sm_make(void *d9)
+{
+    char b[120];
+    if (g_sm_tex && g_sm_surf && g_sm_ds && g_sm_sb) return 1;
+    sm_unref(g_sm_surf); sm_unref(g_sm_tex); sm_unref(g_sm_ds); sm_unref(g_sm_sb);
+    g_sm_surf = g_sm_tex = g_sm_ds = g_sm_sb = NULLPTR;
+    /* R32F (114) render target, DEFAULT pool; D24X8 (77) depth, not multisampled */
+    if (D9_FN(d9, SM_CREATETEXTURE, SmMakeTex_t)(d9, (UINT)g_sm_size, (UINT)g_sm_size, 1, 1, 114, 0,
+                                                  &g_sm_tex, NULLPTR) < 0 ||
+        D9_FN(g_sm_tex, 18, SmLevel_t)(g_sm_tex, 0, &g_sm_surf) < 0 ||
+        D9_FN(d9, SM_CREATEDEPTHSTENCIL, SmMakeDS_t)(d9, (UINT)g_sm_size, (UINT)g_sm_size, 77, 0, 0, TRUE,
+                                                      &g_sm_ds, NULLPTR) < 0 ||
+        D9_FN(d9, SM_CREATESTATEBLOCK, SmMakeSB_t)(d9, 1, &g_sm_sb) < 0) {   /* D3DSBT_ALL */
+        sm_unref(g_sm_surf); sm_unref(g_sm_tex); sm_unref(g_sm_ds); sm_unref(g_sm_sb);
+        g_sm_surf = g_sm_tex = g_sm_ds = g_sm_sb = NULLPTR;
+        g_sm_broken = 1;
+        logline("shadows: the shadow map could not be made: none");
+        return 0;
+    }
+    b[0] = 0; s_cat(b, "shadows: a shadow map of "); s_num(b, g_sm_size); s_cat(b, " x "); s_num(b, g_sm_size);
+    logline(b);
+    return 1;
+}
+
+/* The direction the Key's light travels: the brightest directional light in the
+ * engine's list, along its matrix's third axis. */
+static int sm_key_axis(float *fwd)
+{
+    DWORD eng = *(DWORD *)0x7ad508, head = eng ? *(DWORD *)(eng + 0x60) : 0, node;
+    float best = -1.0f;
+    if (!head) return 0;
+    for (node = *(DWORD *)head; node != head; node = *(DWORD *)node) {
+        BYTE *inst = *(BYTE **)(node + 8);
+        BYTE *light = *(BYTE **)inst;
+        const float *lc = (const float *)(inst + 4), *ax = (const float *)(inst + 0x10) + 6;
+        float lum, n;
+        if (!light || *(DWORD *)light != VT_DIRECTIONAL) continue;
+        lum = lc[0] + lc[1] + lc[2];
+        n = sqrt_f(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+        if (lum <= best || n < 1e-6f) continue;
+        best = lum;
+        fwd[0] = ax[0] / n; fwd[1] = ax[1] / n; fwd[2] = ax[2] / n;
+    }
+    return best > 0.0f;
+}
+
+/* c = a x W for the column a (four values) under a row-major WORLD: one column of
+ * object -> (u, v, depth). */
+static void sm_col(const float *w, const float *a, float *c)
+{
+    int i;
+    for (i = 0; i < 4; i++)
+        c[i] = w[i * 4] * a[0] + w[i * 4 + 1] * a[1] + w[i * 4 + 2] * a[2] + w[i * 4 + 3] * a[3];
+}
+
+/* The map, from the list g_sm_rec[l]. */
+static void sm_render(void *d9, int l, const float *fwd)
+{
+    SmRec *R = g_sm_rec[l];
+    int    n = g_sm_n[l], i, j;
+    float  right[3], up[3], lo[3] = { 0, 0, 0 }, hi[3] = { 0, 0, 0 }, e, eq, texel, ca, cb, zmin, zr, nrm;
+    void  *vs, *ps, *rt = NULLPTR, *ds = NULLPTR;
+
+    g_sm_ok = 0;
+    if (!n || g_sm_broken) return;
+    vs = d9_shader(d9, &g_depth_vs);
+    ps = d9_shader(d9, &g_depth_ps);
+    if (!vs || !ps || !sm_make(d9)) return;
+
+    /* the light's basis: right and up across the beam, fwd along it */
+    if (fwd[1] < 0.9f && fwd[1] > -0.9f) { right[0] = fwd[2]; right[1] = 0.0f; right[2] = -fwd[0]; }
+    else                                 { right[0] = 0.0f; right[1] = -fwd[2]; right[2] = fwd[1]; }
+    nrm = sqrt_f(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
+    for (i = 0; i < 3; i++) right[i] /= nrm;
+    up[0] = fwd[1] * right[2] - fwd[2] * right[1];
+    up[1] = fwd[2] * right[0] - fwd[0] * right[2];
+    up[2] = fwd[0] * right[1] - fwd[1] * right[0];
+
+    for (i = 0; i < n; i++) {
+        const float *c = R[i].c;
+        float p[3];
+        p[0] = c[0] * right[0] + c[1] * right[1] + c[2] * right[2];
+        p[1] = c[0] * up[0] + c[1] * up[1] + c[2] * up[2];
+        p[2] = c[0] * fwd[0] + c[1] * fwd[1] + c[2] * fwd[2];
+        for (j = 0; j < 3; j++) {
+            if (!i || p[j] - R[i].r < lo[j]) lo[j] = p[j] - R[i].r;
+            if (!i || p[j] + R[i].r > hi[j]) hi[j] = p[j] + R[i].r;
+        }
+    }
+    /* The extent in steps of 2^(1/4) and the centre on whole texels, so that the texels
+     * stay where they are from frame to frame and a shadow's edge does not crawl. */
+    e = hi[0] - lo[0] > hi[1] - lo[1] ? hi[0] - lo[0] : hi[1] - lo[1];
+    for (eq = 32.0f; eq < e * 1.02f; eq *= 1.18920712f) ;
+    texel = eq / (float)g_sm_size;
+    ca = (float)(long)((lo[0] + hi[0]) * 0.5f / texel) * texel;
+    cb = (float)(long)((lo[1] + hi[1]) * 0.5f / texel) * texel;
+    zmin = lo[2] - 20.0f;
+    zr   = hi[2] - lo[2] + 40.0f;
+    for (i = 0; i < 3; i++) {
+        g_sm_ls[i]     =  right[i] / eq;
+        g_sm_ls[4 + i] = -up[i] / eq;
+        g_sm_ls[8 + i] =  fwd[i] / zr;
+    }
+    g_sm_ls[3]  = 0.5f - ca / eq;
+    g_sm_ls[7]  = 0.5f + cb / eq;
+    g_sm_ls[11] = -zmin / zr;
+    g_sm_texel = texel;
+    /* half a texel plus a little: the normal offset does the rest */
+    g_sm_bias = (0.5f * texel + 0.2f) / zr;
+
+    if (++g_sm_maps == 1 || g_sm_maps == 1000) {
+        char b[200];
+        b[0] = 0; s_cat(b, "shadows: map "); s_num(b, g_sm_maps); s_cat(b, " of ");
+        s_num(b, n); s_cat(b, " hull draws, ");
+        s_flt(b, eq); s_cat(b, " units across, a texel "); s_flt(b, texel);
+        s_cat(b, ", depth "); s_flt(b, zr); s_cat(b, ", key travels "); s_vec(b, fwd);
+        logline(b);
+    }
+
+    /* Everything the pass changes comes back from the state block; the target and depth
+     * surface are not in it. */
+    D9_FN(g_sm_sb, 4, SmSB_t)(g_sm_sb);                                       /* Capture */
+    D9_FN(d9, SM_GETRENDERTARGET, SmGetRT_t)(d9, 0, &rt);
+    D9_FN(d9, SM_GETDEPTHSTENCIL, D9_Ptr_t)(d9, &ds);
+    D9_FN(d9, SM_SETRENDERTARGET, SmSetRT_t)(d9, 0, g_sm_surf);
+    D9_FN(d9, SM_SETDEPTHSTENCIL, D9_Ptr_t)(d9, g_sm_ds);
+    D9_FN(d9, SM_CLEAR, SmClear_t)(d9, 0, NULLPTR, 3, 0xffffffffu, 1.0f, 0);    /* TARGET | ZBUFFER: depth 1 */
+    {
+        static const DWORD rs[][2] = {
+            { 7, 1 }, { 14, 1 }, { 23, 4 },          /* ZENABLE, ZWRITEENABLE, ZFUNC LESSEQUAL */
+            { 22, 1 }, { 8, 3 },                     /* CULLMODE NONE: both faces cast; FILLMODE SOLID */
+            { 27, 0 }, { 15, 0 }, { 52, 0 },         /* no blend, no alpha test, no stencil */
+            { 174, 0 }, { 152, 0 }, { 194, 0 },      /* no scissor, no clip planes, no sRGB write */
+            { 168, 15 }, { 195, 0 }, { 175, 0 }      /* COLORWRITEENABLE; no depth bias */
+        };
+        for (i = 0; i < (int)(sizeof rs / sizeof rs[0]); i++)
+            D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, rs[i][0], rs[i][1]);
+    }
+    d9_bind(d9, vs, ps);
+    {
+        float k[4];
+        k[0] = 1.0f / (float)g_sm_size; k[1] = k[2] = k[3] = 0.0f;
+        d9_vsconst(d9, 12, k, 1);
+    }
+    for (i = 0; i < n; i++) {
+        float s[12];
+        sm_col(R[i].w, g_sm_ls, s);
+        sm_col(R[i].w, g_sm_ls + 4, s + 4);
+        sm_col(R[i].w, g_sm_ls + 8, s + 8);
+        d9_vsconst(d9, 7, s, 3);
+        if (R[i].dot3) D9_FN(d9, D9_SETVERTEXDECLARATION, D9_Ptr_t)(d9, g_dot3_decl);
+        else           D9_FN(d9, D9_SETFVF, SmFVF_t)(d9, FVF_HULL);
+        D9_FN(d9, SM_SETSTREAMSOURCE, SmSetSS_t)(d9, 0, R[i].vb, R[i].off, R[i].stride);
+        D9_FN(d9, SM_SETINDICES, SmObj_t)(d9, R[i].ib);
+        D9_FN(d9, SM_DIP, SmDIP9_t)(d9, R[i].pt, R[i].base, R[i].mi, R[i].nv, R[i].si, R[i].pc);
+    }
+    D9_FN(d9, SM_SETRENDERTARGET, SmSetRT_t)(d9, 0, rt);
+    D9_FN(d9, SM_SETDEPTHSTENCIL, D9_Ptr_t)(d9, ds);
+    D9_FN(g_sm_sb, 5, SmSB_t)(g_sm_sb);                                       /* Apply */
+    sm_unref(rt); sm_unref(ds);
+    g_sm_ok = 1;
+}
+
+/* Once per frame, at its first hull draw: the Key's direction, and the map from the
+ * hulls the frame before drew. */
+static void sm_frame(void *d9)
+{
+    int l, i;
+    if (g_sm_frame == g_frame) return;
+    g_sm_frame = g_frame;
+    g_sm_have_key = 0;
+    if (!g_shadows && !g_planet_shadows) return;
+    {
+        float fwd[3];
+        if (!sm_key_axis(fwd)) { g_sm_ok = 0; return; }
+        for (i = 0; i < 3; i++) g_sm_key[i] = -fwd[i];
+        g_sm_have_key = 1;
+        if (!g_shadows) return;
+        if (g_sm_dev != d9) { sm_release(); g_sm_dev = d9; g_sm_broken = 0; }
+        /* the list just made becomes the map's; one from an older frame is stale */
+        l = g_sm_cur;
+        if (g_sm_rec_frame + 1 != g_frame) sm_drop_list(l);
+        g_sm_cur = l ^ 1;
+        sm_drop_list(g_sm_cur);
+        g_sm_rec_frame = g_frame;
+        for (i = 0; i < SM_HASH; i++) g_sm_head[i] = -1;
+        for (i = 0; i < g_sm_n[l]; i++) {
+            int h = sm_hash(&g_sm_rec[l][i]);
+            g_sm_rec[l][i].next = g_sm_head[h];
+            g_sm_head[h] = i;
+        }
+        sm_render(d9, l, fwd);
+    }
+}
+
+/* The draw's buffers and arguments, as Direct3D 9 has them; 0 when no shadow map is
+ * made. The base vertex index is d3d8to9's, so it is asked of the d3d8 device. */
+static int sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3)
+{
+    void *ib8 = NULLPTR;
+    UINT  base = 0;
+    if (!g_shadows || g_sm_broken || g_sm_dev != d9) return 0;
+    r->vb = r->ib = NULLPTR;
+    D9_FN(d9, SM_GETSTREAMSOURCE, SmGetSS_t)(d9, 0, &r->vb, &r->off, &r->stride);
+    D9_FN(d9, SM_GETINDICES, SmObj_t)(d9, &r->ib);
+    ((SmIdx8_t)(*(void ***)d8)[86])(d8, &ib8, &base);                     /* GetIndices */
+    sm_unref(ib8);
+    if (!r->vb || !r->ib) { sm_drop(r); return 0; }
+    r->base = (int)base; r->dot3 = dot3;
+    r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
+    return 1;
+}
+
+/* The draw's shadow constants: the vertex shader's object -> map at the pose it had when
+ * the map was drawn, and the pixel shader's map, Key and planets. */
+static void sm_consts(void *d9, const SmRec *r, float sign)
+{
+    float v[20], k[(2 + SM_PLANETS) * 4];
+    const float *w0 = g_sh_w;
+    int   i;
+
+    if (r && g_sm_ok) {     /* the nearest record of the same draw in the map */
+        const SmRec *M = g_sm_rec[g_sm_cur ^ 1];
+        float best = SM_MATCH * SM_MATCH;
+        for (i = g_sm_head[sm_hash(r)]; i >= 0; i = M[i].next) {
+            float dx, dy, dz, d;
+            if (M[i].vb != r->vb || M[i].si != r->si || M[i].pc != r->pc || M[i].base != r->base) continue;
+            dx = M[i].w[12] - g_sh_w[12]; dy = M[i].w[13] - g_sh_w[13]; dz = M[i].w[14] - g_sh_w[14];
+            d = dx * dx + dy * dy + dz * dz;
+            if (d < best) { best = d; w0 = M[i].w; }
+        }
+    }
+    sm_col(w0, g_sm_ls, v);
+    sm_col(w0, g_sm_ls + 4, v + 4);
+    sm_col(w0, g_sm_ls + 8, v + 8);
+    v[12] = g_sm_texel; v[13] = sign; v[14] = v[15] = 0.0f;
+    for (i = 0; i < 3; i++) v[16 + i] = g_sm_have_key ? g_sm_key[i] : 0.0f;
+    v[19] = 0.0f;
+    d9_vsconst(d9, 7, v, 5);
+
+    k[0] = g_sm_ok && g_sm_have_key ? 1.0f : 0.0f;
+    k[1] = 1.0f / (float)g_sm_size;
+    k[2] = g_sm_bias;
+    k[3] = g_sm_strength;
+    for (i = 0; i < 3; i++) k[4 + i] = g_sm_have_key ? g_sm_key[i] : 0.0f;
+    k[7] = g_planet_shadows && g_sm_have_key ? g_sm_strength : 0.0f;
+    for (i = 0; i < SM_PLANETS * 4; i++) k[8 + i] = g_planet_sph[i / 4][i % 4];
+    d9_psconst(d9, 62, k, 2 + SM_PLANETS);
+}
+
+/* The map in sampler 3, point-sampled and clamped, around one draw. */
+static void sm_bind(void *d9)
+{
+    int i;
+    g_sm_saved_ok = 0;
+    if (!g_sm_ok || !g_sm_tex || g_sm_dev != d9) return;
+    D9_FN(d9, D9_GETTEXTURE, SmGetTex_t)(d9, 3, &g_sm_saved_tex);
+    for (i = 0; i < 6; i++) {
+        D9_FN(d9, D9_GETSAMPLERSTATE, D9GetSamp_t)(d9, 3, k_sm_samp[i], &g_sm_saved[i]);
+        D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 3, k_sm_samp[i], k_sm_samp_val[i]);
+    }
+    D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, 3, g_sm_tex);
+    g_sm_saved_ok = 1;
+}
+
+static void sm_unbind(void *d9)
+{
+    int i;
+    if (!g_sm_saved_ok) return;
+    g_sm_saved_ok = 0;
+    D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, 3, g_sm_saved_tex);
+    sm_unref(g_sm_saved_tex);
+    g_sm_saved_tex = NULLPTR;
+    for (i = 0; i < 6; i++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 3, k_sm_samp[i], g_sm_saved[i]);
+}
+
+/* The draw into this frame's list, to cast next frame, with WORLD and the mesh's bounding
+ * sphere (ST3D_Mesh +0xd4 centre, +0xe0 radius, as RenderInternal tests it) in world
+ * space; its references go with it, or are let go when the list is full. */
+static void sm_keep(SmRec *r, const BYTE *mesh)
+{
+    SmRec *d;
+    const float *w = g_sh_w, *lc;
+    float  s = 0.0f, rad = 200.0f;
+    int    i;
+    if (g_sm_n[g_sm_cur] >= SM_MAX || !mesh) {
+        static int said;
+        if (!said && mesh) { said = 1; logline("shadows: more hull draws in a frame than the list holds; the rest cast none"); }
+        sm_drop(r);
+        return;
+    }
+    d = &g_sm_rec[g_sm_cur][g_sm_n[g_sm_cur]++];
+    *d = *r;
+    for (i = 0; i < 16; i++) d->w[i] = w[i];
+    lc = (const float *)(mesh + 0xd4);
+    rad = *(const float *)(mesh + 0xe0);
+    for (i = 0; i < 3; i++) {
+        float l = w[i * 4] * w[i * 4] + w[i * 4 + 1] * w[i * 4 + 1] + w[i * 4 + 2] * w[i * 4 + 2];
+        if (l > s) s = l;
+        d->c[i] = lc[0] * w[i] + lc[1] * w[4 + i] + lc[2] * w[8 + i] + w[12 + i];
+    }
+    d->r = rad > 0.0f ? rad * sqrt_f(s) : 200.0f;
+}
+
+/* Each frame: the planets, for PlanetShadows. A planet's centre and radius as
+ * planet_glows takes them: the Entity's transform (+0x44) plus its bounding sphere
+ * (+0x34). */
+static void sm_planets(void)
+{
+    DWORD list = *(DWORD *)OBJECT_LIST, head, node;
+    int   n = 0, i;
+    static int   said;
+    static void *seen[8];
+    for (i = 0; i < SM_PLANETS * 4; i++) g_planet_sph[i / 4][i % 4] = 0.0f;
+    if (!g_planet_shadows || !list) return;
+    head = *(DWORD *)(list + 4);
+    for (node = *(DWORD *)head; node != head && n < SM_PLANETS; node = *(DWORD *)node) {
+        BYTE *obj = *(BYTE **)(node + 8), *ent;
+        const float *sph, *xf;
+        if (!obj || *(DWORD *)obj != VT_PLANET) continue;
+        ent = *(BYTE **)(obj + 4);
+        if (!ent) continue;
+        sph = (const float *)(ent + 0x34);
+        xf  = (const float *)(ent + 0x44);
+        if (sph[3] <= 0.0f) continue;
+        for (i = 0; i < 3; i++) g_planet_sph[n][i] = xf[9 + i] + sph[i];
+        g_planet_sph[n][3] = sph[3];
+        for (i = 0; i < said && seen[i] != obj; i++) ;
+        if (i == said && said < 8) {     /* once per planet */
+            char b[160];
+            seen[said++] = obj;
+            b[0] = 0; s_cat(b, "shadows: planet at "); s_vec(b, g_planet_sph[n]);
+            s_cat(b, " radius "); s_flt(b, sph[3]); logline(b);
+        }
+        n++;
     }
 }
 
@@ -2140,6 +2651,12 @@ static void startup(void)
     ini1(ini, "RimPower",         &g_rim_pow);
     ini1(ini, "HullSun",          &g_hull_sun);
     ini1(ini, "HighlightKnee",    &g_knee);
+    g_shadows = (int)GetPrivateProfileIntA("Lighting", "Shadows", 1, ini);
+    g_sm_size = (int)GetPrivateProfileIntA("Lighting", "ShadowSize", 2048, ini);
+    if (g_sm_size < 512) g_sm_size = 512;
+    if (g_sm_size > 8192) g_sm_size = 8192;
+    ini1(ini, "ShadowStrength",   &g_sm_strength);
+    g_planet_shadows = (int)GetPrivateProfileIntA("Lighting", "PlanetShadows", 1, ini);
     ini3(ini, "KeyColour",  g_key_col);
     ini3(ini, "KeyAxis",    g_key_dir);
     ini3(ini, "FillColour", g_fill_col);
@@ -2184,6 +2701,8 @@ static void startup(void)
     s_cat(b, " Shaders=");         s_num(b, g_shaders);
     s_cat(b, " BumpShaders=");     s_num(b, g_bump);
     s_cat(b, " PlanetShaders=");   s_num(b, g_planet_sh);
+    s_cat(b, " Shadows=");         s_num(b, g_shadows);
+    s_cat(b, " PlanetShadows=");   s_num(b, g_planet_shadows);
     s_cat(b, "  key ");            s_vec(b, g_key_col);
     s_cat(b, " axis ");            s_vec(b, g_key_mat + 6);
     s_cat(b, "  fill ");           s_vec(b, g_fill_col);
@@ -2206,7 +2725,7 @@ static void startup(void)
             return;
         }
     }
-    if (g_lights || g_planet_glow || g_explosions || g_ord_colours)
+    if (g_lights || g_planet_glow || g_explosions || g_ord_colours || (g_shaders && (g_shadows || g_planet_shadows)))
         n += redirect(S_PRERENDER, (const void *)hook_prerender_all);
     if (g_lights) n += redirect(S_REGISTER, (const void *)hook_register_light);
     if (g_gpu) {
