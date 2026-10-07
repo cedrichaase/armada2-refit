@@ -4,6 +4,21 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.14.0 — 2026-10-07
+
+### Added
+- `Phasers=1`: a phaser lights the firing ship where its beam leaves the hull, while
+  the beam is drawn: a hot spot in the beam's own colour (read from its sprite texture)
+  times `PhaserBrightness=4.5`, full to `PhaserStart=0`, gone at `PhaserRange=24`,
+  lifted `PhaserLift=3` units out along the beam. In the hull shaders its diffuse term
+  wraps round by `PhaserWrap=0.6`, so the plating it grazes takes it, and its falloff
+  is raised to `PhaserFalloff=2` (`hull.hlsl`, `pfall.z`/`.w`).
+- `PhaserImpact=2.0`: the beam's end lights the target where it strikes, in the beam's
+  colour times this (`0` none), full to `PhaserImpactStart=6`, gone at
+  `PhaserImpactRange=70`, lifted `PhaserImpactLift=8` units back along the beam.
+
+Seen on the bench 2026-10-07 (`SCENE=firing`, dorsal and ventral emitters). Installed, not yet seen in game.
+
 ## 1.13.0 — 2026-10-07
 
 ### Changed

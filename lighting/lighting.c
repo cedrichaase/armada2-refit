@@ -404,7 +404,9 @@ static void reverse_lights(void *dev)
 typedef long (__stdcall *LightEnable_t)(void *, DWORD, BOOL);
 
 static void *g_glow_vt[19];          /* a planet's light: see planet_glows */
-static BYTE *g_beam_light;           /* the phasers' one light: see phaser_lights */
+static BYTE *g_beam_light;           /* the phasers' impact light: see phaser_lights */
+static BYTE *g_emit_light;           /* the phasers' emitter light */
+static float g_emit_wrap = 0.6f, g_emit_power = 2.0f;   /* PhaserWrap=, PhaserFalloff= */
 
 static int   g_points = 12;          /* PointLights=: at most this many per draw (6 in Direct3D's slots) */
 
@@ -412,7 +414,7 @@ static int   g_points = 12;          /* PointLights=: at most this many per draw
  * raw: without the falloff, start/fade: the falloff itself, for the shaders, which
  * apply it per pixel. */
 typedef struct { float col[3]; float pos[3]; float src[3]; float score, range;
-                 float raw[3]; float start, fade; } Pick;
+                 float raw[3]; float start, fade; float wrap, power; } Pick;
 
 /* What the shaders take for the draw in hand (Shaders=1, see hook_device): the point
  * lights at their real positions, and which way the mesh's normals point. */
@@ -480,7 +482,7 @@ static int pick_points(const float *at, Pick *out, int max)
         if (col[2] > peak) peak = col[2];
         /* a phaser's light sits on a hull: picked and placed as a hard light, faded
          * as a soft one (see phaser_lights) */
-        beam = light == g_beam_light;
+        beam = light && (light == g_beam_light || light == g_emit_light);
         hard = beam || range < 0.25f * start;
         if (hard) {
             float reach = start + range + HARD_REACH;
@@ -516,6 +518,8 @@ static int pick_points(const float *at, Pick *out, int max)
         out[i].range = hard ? start + range : 100000.0f;
         out[i].raw[0] = col[0] * ph; out[i].raw[1] = col[1] * ph; out[i].raw[2] = col[2] * ph;
         out[i].start = start; out[i].fade = range;
+        out[i].wrap  = light == g_emit_light ? g_emit_wrap : 0.0f;
+        out[i].power = light == g_emit_light ? g_emit_power : 1.0f;
     }
     return n;
 }
@@ -876,12 +880,14 @@ static int sh_consts(void *d9, int bump)
             float *C = pc + i * 4, *P = pp + i * 4, *F = pf + i * 4;
             C[0] = C[1] = C[2] = C[3] = 0.0f;
             P[0] = P[1] = P[2] = P[3] = 0.0f;
-            F[0] = 1.0f; F[1] = 1.0f; F[2] = F[3] = 0.0f;
+            F[0] = 1.0f; F[1] = 1.0f; F[2] = 0.0f; F[3] = 1.0f;
             if (i >= g_sh_npick) continue;
             C[0] = g_sh_pick[i].raw[0]; C[1] = g_sh_pick[i].raw[1]; C[2] = g_sh_pick[i].raw[2];
             P[0] = g_sh_pick[i].pos[0]; P[1] = g_sh_pick[i].pos[1]; P[2] = g_sh_pick[i].pos[2];
             F[0] = g_sh_pick[i].start;
             F[1] = g_sh_pick[i].fade > 1e-3f ? 1.0f / g_sh_pick[i].fade : 1000.0f;
+            F[2] = g_sh_pick[i].wrap;
+            F[3] = g_sh_pick[i].power;
         }
         d9_psconst(d9, 11, pc, SH_POINTS);
         d9_psconst(d9, 27, pp, SH_POINTS);
@@ -1577,8 +1583,10 @@ static void explosion_lights(void)
 typedef struct { const void *tex; float col[3]; } BeamTex;
 
 static int     g_phasers = 1;
-static float   g_beam_bright = 2.0f, g_beam_start = 6.0f, g_beam_range = 70.0f, g_beam_lift = 8.0f;
-static float   g_beam_impact = 1.0f;   /* PhaserImpact=: the light at the beam's end, times this; 0 none */
+/* the emitter: PhaserBrightness=, PhaserStart=, PhaserRange=, PhaserLift= */
+static float   g_beam_bright = 4.5f, g_beam_start = 0.0f, g_beam_range = 24.0f, g_beam_lift = 3.0f;
+/* the impact: PhaserImpact= (its brightness; 0 none), PhaserImpactStart=, ...Range=, ...Lift= */
+static float   g_beam_impact = 2.0f, g_imp_start = 6.0f, g_imp_range = 70.0f, g_imp_lift = 8.0f;
 static BeamTex g_beam_tex[24];
 static int     g_beam_ntex;
 
@@ -1617,25 +1625,34 @@ static const float *beam_colour(const BYTE *cls)
     return t->col;
 }
 
+static BYTE *beam_light_new(const char *name)
+{
+    typedef void *(__cdecl *New_t)(unsigned);
+    typedef void *(__thiscall *Ctor_t)(void *, void *, void *, const char *);
+    BYTE *l = (BYTE *)((New_t)FN_NEW)(0x138);
+    if (l) ((Ctor_t)FN_POINT_LIGHT)(l, NULLPTR, NULLPTR, name);
+    return l;
+}
+
+static void beam_falloff(BYTE *l, float start, float range)
+{
+    *(float *)(l + 0x100) = start;
+    *(float *)(l + 0x104) = range > start ? range - start : 0.01f;
+}
+
 static void phaser_lights(void)
 {
     DWORD head, node;
     if (!g_phasers || !*(DWORD *)ORDNANCE_LIST) return;
-    if (!g_beam_light) {
-        typedef void *(__cdecl *New_t)(unsigned);
-        typedef void *(__thiscall *Ctor_t)(void *, void *, void *, const char *);
-        BYTE *l = (BYTE *)((New_t)FN_NEW)(0x138);
-        if (!l) return;
-        ((Ctor_t)FN_POINT_LIGHT)(l, NULLPTR, NULLPTR, "phaser");
-        g_beam_light = l;
-    }
-    *(float *)(g_beam_light + 0x100) = g_beam_start;
-    *(float *)(g_beam_light + 0x104) = g_beam_range > g_beam_start ? g_beam_range - g_beam_start : 0.01f;
+    if (!g_emit_light && !(g_emit_light = beam_light_new("phaser"))) return;
+    if (!g_beam_light && !(g_beam_light = beam_light_new("phaser impact"))) return;
+    beam_falloff(g_emit_light, g_beam_start, g_beam_range);
+    beam_falloff(g_beam_light, g_imp_start, g_imp_range);
     head = *(DWORD *)ORDNANCE_LIST;
     for (node = *(DWORD *)head; node != head; node = *(DWORD *)node) {
         BYTE *o = *(BYTE **)(node + 8), *cls;
         const float *a, *b, *col, *tint;
-        float left, len, age, k, d[3], n, c[3], mat[12];
+        float left, len, age, k, d[3], n, ne, ni, c[3], ci[3], mat[12];
         int   j;
         if (!o || *(DWORD *)o != VT_PHASER || o[0x27] || !o[0x24]) continue;
         if (!(cls = *(BYTE **)(o + 0x34))) continue;
@@ -1650,23 +1667,27 @@ static void phaser_lights(void)
         a = (const float *)(o + 0xbc);
         b = (const float *)(o + 0xc8);
         for (j = 0; j < 3; j++) d[j] = b[j] - a[j];
-        n = sqrt_f(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        n = n > 1e-3f ? (n < g_beam_lift ? n : g_beam_lift) / n : 0.0f;
+        n  = sqrt_f(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        ne = n > 1e-3f ? (n < g_beam_lift ? n : g_beam_lift) / n : 0.0f;
+        ni = n > 1e-3f ? (n < g_imp_lift ? n : g_imp_lift) / n : 0.0f;
         col  = beam_colour(cls);
         tint = (const float *)(o + 0xf0);
         for (j = 0; j < 3; j++) {
             float t = tint[j] < 0.0f ? 0.0f : tint[j] > 1.0f ? 1.0f : tint[j];
-            c[j] = col[j] * t * g_beam_bright * k;
+            c[j]  = col[j] * t * k * g_beam_bright;
+            ci[j] = col[j] * t * k * g_beam_impact;
         }
         for (j = 0; j < 9; j++) mat[j] = (j % 4 == 0) ? 1.0f : 0.0f;
-        for (j = 0; j < 3; j++) mat[9 + j] = a[j] + d[j] * n;
-        ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, g_beam_light, c, mat);
+        /* the emitter: a hot spot on the shooter's hull, just off the hardpoint */
+        if (g_beam_bright > 0.0f) {
+            for (j = 0; j < 3; j++) mat[9 + j] = a[j] + d[j] * ne;
+            ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, g_emit_light, c, mat);
+        }
         /* the impact: at the end, lifted back towards the shooter, off the target's
          * hull or shield */
-        if (g_beam_impact > 0.0f && n > 0.0f) {
-            for (j = 0; j < 3; j++) c[j] *= g_beam_impact;
-            for (j = 0; j < 3; j++) mat[9 + j] = b[j] - d[j] * n;
-            ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, g_beam_light, c, mat);
+        if (g_beam_impact > 0.0f && ni > 0.0f) {
+            for (j = 0; j < 3; j++) mat[9 + j] = b[j] - d[j] * ni;
+            ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, g_beam_light, ci, mat);
         }
     }
 }
@@ -2294,6 +2315,11 @@ static void startup(void)
     ini1(ini, "PhaserRange",      &g_beam_range);
     ini1(ini, "PhaserLift",       &g_beam_lift);
     ini1(ini, "PhaserImpact",     &g_beam_impact);
+    ini1(ini, "PhaserImpactStart", &g_imp_start);
+    ini1(ini, "PhaserImpactRange", &g_imp_range);
+    ini1(ini, "PhaserImpactLift",  &g_imp_lift);
+    ini1(ini, "PhaserWrap",       &g_emit_wrap);
+    ini1(ini, "PhaserFalloff",    &g_emit_power);
     g_ord_colours = (int)GetPrivateProfileIntA("Lighting", "OrdnanceColours", 1, ini);
     for (i = 0; i < 3; i++) g_planet_amb[i] = g_ambient[i];
     ini3(ini, "PlanetAmbient", g_planet_amb);
