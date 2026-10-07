@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 10.7.0 — 2026-10-07
+
+Layers: testbench 3.3.0.
+
+### Added
+- Camera moves in bench scenes: `glide` and `spin` (`Scene.asi`), and the `showcase`
+  scene, a fleet action for footage (testbench 3.3.0).
+
+Installs nothing; seen working on the bench 2026-10-07.
+
 ## 10.6.0 — 2026-10-07
 
 Layers: lighting 1.15.0.

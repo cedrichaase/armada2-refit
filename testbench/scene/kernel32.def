@@ -13,3 +13,4 @@ GetPrivateProfileStringA@24
 ReadFile@20
 DeleteFileA@4
 GetPrivateProfileSectionNamesA@12
+GetTickCount@0

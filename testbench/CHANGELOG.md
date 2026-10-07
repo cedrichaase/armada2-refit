@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.3.0 — 2026-10-07
+
+### Added
+- `Scene.asi`: `glide <seconds> <yaw> <pitch> <distance>` eases the orbit camera to a new
+  position, and `spin <degrees per second>` turns it steadily, both on wall-clock time
+  per frame, for camera moves that record smoothly.
+- The `showcase` scene: a Federation and Klingon fleet against two Borg cubes in front of
+  a class M planet, for footage.
+
+Installs nothing; seen working on the bench 2026-10-07.
+
 ## 3.2.0 — 2026-10-07
 
 ### Added

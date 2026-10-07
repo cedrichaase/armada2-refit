@@ -96,6 +96,7 @@ __declspec(dllimport) BOOL    __stdcall WriteFile(HANDLE, const void *, DWORD, D
 __declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWORD);
 __declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) BOOL    __stdcall DeleteFileA(LPCSTR);
+__declspec(dllimport) DWORD   __stdcall GetTickCount(void);
 __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileSectionNamesA(LPSTR, DWORD, LPCSTR);
@@ -552,6 +553,37 @@ static struct {
     float yaw, pitch, dist;
 } g_cam;
 
+/* A camera move in progress: `glide` eases the orbit's yaw, pitch and distance
+ * from where they are to new values over a time; `spin` turns the yaw at a steady
+ * rate. Both run on wall-clock time, per frame, so a recording plays them smoothly
+ * whatever the tick rate. */
+static struct {
+    DWORD t0, ms;            /* glide: start and length; ms 0 = none */
+    float from[3], to[3];    /* yaw, pitch, distance */
+    float spin;              /* degrees per second; 0 = none */
+    DWORD spin_t;            /* the last frame the spin advanced */
+} g_move;
+
+static void move_step(void)
+{
+    DWORD now = GetTickCount();
+    if (g_cam.mode != CAM_ORBIT) return;
+    if (g_move.ms) {
+        float u = (float)(now - g_move.t0) / (float)g_move.ms;
+        float *v[3] = { &g_cam.yaw, &g_cam.pitch, &g_cam.dist };
+        int   i;
+        if (u >= 1) { u = 1; g_move.ms = 0; }
+        u = u * u * (3 - 2 * u);          /* smoothstep: ease in and out */
+        for (i = 0; i < 3; i++) *v[i] = g_move.from[i] + (g_move.to[i] - g_move.from[i]) * u;
+    }
+    if (g_move.spin != 0) {
+        g_cam.yaw += g_move.spin * (float)(now - g_move.spin_t) / 1000.0f;
+        if (g_cam.yaw >  3600) g_cam.yaw -= 3600;
+        if (g_cam.yaw < -3600) g_cam.yaw += 3600;
+    }
+    g_move.spin_t = now;
+}
+
 static float          g_cam_m[12];   /* the last free-camera matrix, for query */
 static void          *g_st3dcam;     /* the main ST3D_Camera, once seen */
 
@@ -623,6 +655,7 @@ static void __thiscall camera_update(void *view, void *st3dcam)
     ((UpdateCameraFn)vt[0x88 / 4])(view, st3dcam);
     g_st3dcam = st3dcam;
     if (g_paused) process_commands();   /* the tick may not run while paused */
+    move_step();
     if (g_cam.mode != CAM_RTS && cam_matrix(g_cam_m)) {
         void **cvt = *(void ***)st3dcam;
         ((SetTransformFn)cvt[5])(st3dcam, g_cam_m);
@@ -816,10 +849,33 @@ static void run_command(char *line)
             if (g_cam.pitch >  89) g_cam.pitch =  89;
             if (g_cam.pitch < -89) g_cam.pitch = -89;
             g_cam.mode = CAM_ORBIT; camera_changed();
+            g_move.ms = 0;
             logline("  camera: orbit");
             return;
         }
         logline("  ! usage: orbit <object | x y z> <yaw> <pitch> <distance>");
+        return;
+    }
+    if (s_eq(t[0], "glide") && n == 5 && g_cam.mode == CAM_ORBIT) {
+        int i;
+        g_move.from[0] = g_cam.yaw; g_move.from[1] = g_cam.pitch; g_move.from[2] = g_cam.dist;
+        for (i = 0; i < 3; i++) g_move.to[i] = s_atof(t[2 + i]);
+        if (g_move.to[1] >  89) g_move.to[1] =  89;
+        if (g_move.to[1] < -89) g_move.to[1] = -89;
+        g_move.t0 = GetTickCount();
+        g_move.ms = (DWORD)(s_atof(t[1]) * 1000);
+        if (!g_move.ms) g_move.ms = 1;
+        logline("  camera: glide");
+        return;
+    }
+    if (s_eq(t[0], "glide")) {
+        logline("  ! usage: glide <seconds> <yaw> <pitch> <distance>, after an orbit");
+        return;
+    }
+    if (s_eq(t[0], "spin") && n == 2) {
+        g_move.spin = s_atof(t[1]);
+        g_move.spin_t = GetTickCount();
+        logline(g_move.spin != 0 ? "  camera: spin" : "  camera: spin off");
         return;
     }
     if (s_eq(t[0], "spawn") && n >= 6) {
@@ -859,7 +915,7 @@ static void run_command(char *line)
     if (s_eq(t[0], "query")) { query(); return; }
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
-    logline("  ! unknown command (camera, orbit, spawn, attack, heal, engines, weapons, "
+    logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
             "immortal, center, pause, resume, hud, grid, cursor, notices, query, "
             "select, selection)");
 }

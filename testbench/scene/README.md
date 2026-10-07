@@ -31,6 +31,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `firing` | a Galaxy class firing at a Borg cube (`bbattle1`) without moving, for as long as the session runs: its engines are off; the cube cannot die, is healed every tick and has its weapons off | 2026-10-04, still firing after a minute |
 | `factions` | one torpedo or pulse ship of each playable faction, each firing at its own Borg cube as in `firing`: Federation `fed` (`fgalaxy`), Klingon `kli` (`kbattle`), Borg `borg` (`bbattle1`), Cardassian `card` (`cbattle`), Romulan `rom` (`rbattle`), Species 8472 `sp` (`8472_mothership`); each target is `<name>_t`. For the weapons' light colours (`lighting/README.md`, "Torpedoes and pulses") | 2026-10-07 |
 | `stations` | the player's own: three shipyards (`yard1..3`), an advanced shipyard (`adv`), a research station (`lab`) and two ships, with the HUD on, for the control-group keys and the build menu (`scenarios/qol-station-groups.md`) | 2026-10-05 |
+| `showcase` | a fleet action for footage: the Enterprise-E (`fente`), a Sovereign (`fbattle`), a Galaxy and two Klingon flagships (`kmartok`, `kbattle`) firing at two Borg cubes that fire back, in front of a class M planet; everyone immortal and healed, engines off | 2026-10-07 |
 | `warp` | three of the player's Federation destroyers in open space at 3000,0,3000, with the HUD and cursor on, for long moves on the map going to warp (`scenarios/qol-warp.md`) | 2026-10-07 |
 
 ## Scene files
@@ -83,6 +84,8 @@ answer and fails if a command did.
 | Command | |
 |---|---|
 | `orbit <object \| x y z> <yaw> <pitch> <distance>` | free camera on a sphere about a point or an object, which it follows. Yaw 0 looks from +z, 90 from +x; pitch is up from the horizon (±89) |
+| `glide <seconds> <yaw> <pitch> <distance>` | after an `orbit`: move the camera to a new yaw, pitch and distance about the same point, eased in and out over that time. Yaw may pass 360 for a longer sweep |
+| `spin <degrees per second>` | after an `orbit`: turn the yaw steadily; `spin 0` stops. A new `orbit` ends a glide but not a spin |
 | `camera <ex> <ey> <ez> <object \| tx ty tz>` | free camera at an eye, looking at a point or an object |
 | `camera rts` | back to the game's own camera |
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
@@ -94,6 +97,10 @@ answer and fails if a command did.
 | `query` | every object's handle and position (and a producer's build queue), and the camera's eye, front and up |
 | `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`); answers as `selection` |
 | `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
+
+**`glide` and `spin` run on wall-clock time, per frame** (`GetTickCount`, in the camera
+hook), not per tick, so a recording plays them smoothly whatever the tick rate. Don't
+use them while paused: the objects stay where the last simulated frame drew them.
 
 **Moving the camera while paused runs the simulation for 3 ticks, then pauses again.**
 While the simulation is paused, a moved camera draws the skybox from the new eye and
