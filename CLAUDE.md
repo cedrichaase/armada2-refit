@@ -36,7 +36,7 @@ it bundles.
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several, long moves on the map at warp), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
-| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes | `lighting/README.md` |
+| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key | `lighting/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -673,6 +673,13 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   normal is the SOD's vertex normal tilted by the map along S and T. Never use the
   engine's S x T as the normal: it is summed from UV slopes and drew dark streaks where
   UVs are mirrored.
+- **The shadow map is last frame's hulls** (`Shadows=1`): drawn at the first hull draw
+  of a frame from the list the previous frame recorded, and each draw looks itself up
+  with its *previous* `WORLD` (matched by buffers and position), which is what keeps a
+  moving hull's shadow on itself from lagging. Any new hull draw in shaders must
+  `sm_take`/`sm_consts`/`sm_keep` like `hook_dip`, or it neither casts nor takes. The
+  pass restores the device through a state block; the map is default-pool, so `Reset`
+  is wrapped.
 
 ### textures
 

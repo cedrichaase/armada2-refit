@@ -97,7 +97,7 @@ float4 misc         : register(c10);  // x: the normals' sign (-1 inward, as sto
                                       // z: the highlight knee: above it, colour rolls off towards white (1: clip)
 float4 pcol[POINTS] : register(c11);  // point light colour; 0 for none
 float4 ppos[POINTS] : register(c27);  // world position
-float4 pfall[POINTS]: register(c43);  // x: full to this distance, y: 1 / the fade after it
+float4 pfall[POINTS]: register(c43);  // x: full to this distance, y: 1 / the fade after it, z: wrap, w: power
 float4 shine        : register(c59);  // x: specular strength, y: its exponent, z: the rim's exponent
 float4 rim_col      : register(c60);  // the rim light's colour; 0 for none
 float4 eye          : register(c61);  // the camera's world position
@@ -184,13 +184,16 @@ float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
         sum  += c * mat_diffuse.rgb * max(0.0, dot(N, dvec[k].xyz));
         spec += c * glint(Nt, dvec[k].xyz * misc.x, V);
     }
-    // A point light is where it is; the outward normal faces it.
+    // A point light is where it is; the outward normal faces it. pfall.z wraps the
+    // diffuse term round, so a light sitting on the hull (a phaser's emitter) lights the
+    // plating it grazes; pfall.w raises the falloff to a power, a hot spot. 0 and 1 for
+    // every other light.
     for (int j = 0; j < POINTS; j++) {
         float3 L = ppos[j].xyz - wp;
         float  d = length(L);
-        float  f = saturate(1.0 - max(0.0, d - pfall[j].x) * pfall[j].y);
+        float  f = pow(saturate(1.0 - max(0.0, d - pfall[j].x) * pfall[j].y), pfall[j].w);
         L /= max(d, 1e-6);
-        sum  += pcol[j].rgb * mat_diffuse.rgb * max(0.0, dot(Nt, L)) * f;
+        sum  += pcol[j].rgb * mat_diffuse.rgb * saturate((dot(Nt, L) + pfall[j].z) / (1.0 + pfall[j].z)) * f;
         spec += pcol[j].rgb * glint(Nt, L, V) * f;
     }
     // The rim: light on the faces turned edge-on to the camera, so a dark hull keeps

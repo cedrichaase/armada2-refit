@@ -5,6 +5,27 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 10.6.0 — 2026-10-07
+
+Layers: lighting 1.15.0.
+
+### Added
+- Shadows from the Key: ships and stations shade themselves and each other, and planets
+  shadow what is behind them (`Shadows`, `PlanetShadows`, lighting 1.15.0).
+
+Installed, not yet seen in game.
+
+## 10.5.0 — 2026-10-07
+
+Layers: lighting 1.14.0.
+
+### Added
+- Phaser fire lights the firing ship with a hot spot where the beam leaves its hull,
+  and the target where it strikes, in the beam's colour (`Phasers`, `PhaserImpact`,
+  lighting 1.14.0).
+
+Confirmed in game 2026-10-07.
+
 ## 10.4.0 — 2026-10-07
 
 Layers: lighting 1.13.0.

@@ -4,6 +4,36 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.15.0 — 2026-10-07
+
+### Added
+- `Shadows=1`, `ShadowSize=2048`, `ShadowStrength=1.0`: with `Shaders=1`, ships and
+  stations cast the Key's shadow on themselves and each other. Every hull draw in the
+  shaders is drawn again next frame into an R32F depth map from the Key (`hull.hlsl`'s
+  `depth_vs`/`depth_ps`), fitted round the hulls on screen; each hull looks itself up at
+  the pose it had then, so its shadow on itself does not lag. 3x3 soft lookup, normal
+  offset. The d3d8 device's `Reset` is wrapped to let the map go first.
+- `PlanetShadows=1`: a planet between a hull and the Key shadows it, tested as a sphere
+  in the hull shaders.
+
+Seen on the bench 2026-10-07 (a shadow scene: Galaxy, a destroyer behind the planet,
+a shipyard, a Borg cube, a destroyer under way; `SCENE=firing`). Installed, not yet seen in game.
+
+## 1.14.0 — 2026-10-07
+
+### Added
+- `Phasers=1`: a phaser lights the firing ship where its beam leaves the hull, while
+  the beam is drawn: a hot spot in the beam's own colour (read from its sprite texture)
+  times `PhaserBrightness=4.5`, full to `PhaserStart=0`, gone at `PhaserRange=24`,
+  lifted `PhaserLift=3` units out along the beam. In the hull shaders its diffuse term
+  wraps round by `PhaserWrap=0.6`, so the plating it grazes takes it, and its falloff
+  is raised to `PhaserFalloff=2` (`hull.hlsl`, `pfall.z`/`.w`).
+- `PhaserImpact=2.0`: the beam's end lights the target where it strikes, in the beam's
+  colour times this (`0` none), full to `PhaserImpactStart=6`, gone at
+  `PhaserImpactRange=70`, lifted `PhaserImpactLift=8` units back along the beam.
+
+Seen on the bench 2026-10-07 (`SCENE=firing`, dorsal and ventral emitters). Confirmed in game 2026-10-07.
+
 ## 1.13.0 — 2026-10-07
 
 ### Changed
