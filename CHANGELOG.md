@@ -9,9 +9,14 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 Layers: lighting 1.17.0.
 
+### Changed
+- A ship close to the camera fades only once the camera's near plane cuts into it, not
+  once it fills half the view (`NearFade`, `NearFadeDepth`, `NearFadeMin`, lighting 1.17.0).
+
 ### Fixed
 - Ships close to the camera keep the new lighting instead of falling back to stock's
-  while the engine fades them (`NearFade`, lighting 1.17.0).
+  while the engine fades them; a faded ship is drawn blended, as stock draws it
+  (lighting 1.17.0).
 
 Installed, not yet seen in game.
 

@@ -53,7 +53,7 @@ planet's ground colour (`planet glow:`).
 | `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
-| `NearFade` | `1` | with `Shaders`, keep a ship the engine fades for filling more than half the view in the shaders, the fade drawn as a screen door ("The near fade", below); `0` leaves it to the CPU path, in stock's lighting |
+| `NearFade`, `NearFadeDepth`, `NearFadeMin` | `1`, `0.3`, `0.125` | a ship fades only once the near clipping plane cuts into its bounding box, down to `NearFadeMin` when the plane has cut `NearFadeDepth` of the box's depth; with `Shaders` it stays in the shaders, drawn blended after everything else ("The near fade", below); `0`: stock's fade, on the CPU path in stock's lighting |
 | `BumpShaders` | `1` | with `Shaders`, draw bump-mapped hulls (the Borg) in the hull shaders, their normal from the normal map, instead of the engine's dot3 passes ("Bump-mapped hulls", below); `0` leaves them to the dot3 passes |
 | `SelfIllumination` | `1.8` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none, above 1 brighter than their texture ("Dynamic range") |
 | `HullSun` | `1.1` | with `Shaders`, the Key on GPU-drawn hulls times this, the light no longer clamped at 1 ("Dynamic range") |
@@ -943,34 +943,60 @@ reaching far towards the horizon, its texels grow with everything it must cover.
 
 ## The near fade
 
-A ship or station that fills more than half the view fades out as it fills more:
-`CraftInstance::ComputeFadeOut` (0x4caff0) takes the share of the view it fills,
-from `cfgFADE_OUT_MIN_FOV` (0.5) to `cfgFADE_OUT_MAX_FOV` (2.0), down to
-`1 - cfgFADE_OUT_MAX` (0.125). `ST3D_Instance::RenderInternal` (0x62e780) keeps the
-fade at the instance's +0x78, sets +0x77 when it is below exactly 1, and makes the
+Stock fades a ship or station out as it nears the camera: `CraftInstance::ComputeFadeOut`
+(0x4caff0, slot 4 of the `CraftInstance` vtable) takes its bounding sphere's radius
+over its distance (`inst+0x40` / `inst+0x8c`), from `cfgFADE_OUT_MIN_FOV` (0.5) to
+`cfgFADE_OUT_MAX_FOV` (2.0), down to `1 - cfgFADE_OUT_MAX` (0.125). The sphere is loose:
+the Martok's radius is 84, so it began to fade at a distance of 167, filling the
+screen but nowhere near the camera.
+
+**Why it switched off the shaders.** `ST3D_Instance::RenderInternal` (0x62e780) keeps
+the fade at the instance's +0x78, sets +0x77 when it is below exactly 1, and makes the
 instance the engine's +0x100 while its meshes draw. `PolygonSortRequired` (0x625510,
 slot 29 of `ST3D_DeviceDirectX8`) then answers "sort", and `ST3D_Mesh::RenderInternal`
 (0x6325d0) sends every mesh to the CPU path, the one that sorts. So a close ship was
-drawn in stock's lighting, and switched to the shaders the moment the camera drew far
-enough back for its fade to reach 1. A fade of 0.95 cannot be seen against space; the
-switch of lighting can (seen in a showcase take: the Martok at orbit distance 150,
-lit from 5.7 s as the camera glided to 200).
+drawn in stock's lighting, and switched to the shaders the moment the camera drew back
+far enough for its fade to reach 1. A fade of 0.95 cannot be seen against space; the
+switch of lighting can (a showcase take: the Martok at orbit distance 150, lit from
+5.7 s as the camera glided to 200). Measured on the bench with the Martok framed at
+150: at the call that picks the path, every "sort" answer, 760 of 760, came from a
+faded `CraftInstance`; at ordinary distance none.
 
-Measured on the bench with the Martok framed at 150: at the call that picks the path,
-every "sort" answer, 760 of 760, came from a faded `CraftInstance`; at ordinary
-distance none.
+**When it fades.** The plugin's `ComputeFadeOut` keeps stock's fade with distance
+(`GameObjectInstance::ComputeFadeOut`, 0x4d5a20, which stock's calls first) and stock's
+two cases of no near fade (`View_Record` 2, the byte at 0x7637b5). In place of the
+sphere it takes the instance's bounding box (`ST3D_Instance::GetBoundingBox`, 0x62ed90:
+the model's, scaled), placed by the instance's `Matrix34` (+0x44) and taken into view
+space with the device's VIEW; the near plane comes from PROJECTION. While the box's
+nearest corner is in front of the plane there is no fade; past it, the fade falls
+smoothly to `NearFadeMin` by the time the plane has cut `NearFadeDepth` of the box's
+depth. On the bench (near plane 20): at 150 and 70 the Martok is solid, at 50 its box
+is 51 units through the plane and it is at its floor. A box is still looser than a
+hull, so a ship turned corner-on fades a little before the plane touches it.
 
-The plugin wraps that slot and answers "no sort" when the fade is the only reason (an
-opaque material, the instance's fade slot is `CraftInstance`'s, no cloak callback at
+**How it is drawn.** The plugin wraps `PolygonSortRequired` and answers "no sort" when
+the fade is the only reason (an opaque material, a `CraftInstance`, no cloak callback at
 the engine's +0x110, no per-render effect at +0xf8), asked from the mesh's
-`RenderInternal` (the two calls returning to 0x63275b and 0x6327ea) or from
+`RenderInternal` (the calls returning to 0x63275b and 0x6327ea) or from
 `ST3D_TextureMaterial::SetRenderState` (returning to 0x64472a), which leaves the
-material's blend states unset when the answer is "sort". Every other caller, a cloak
-and a translucent material keep stock's answer. `hull.hlsl` draws the fade as a
-screen door: a pixel is kept where the fade is above interleaved gradient noise over
-the screen. It stays opaque and writes depth, so it needs no sorting and whatever is
-behind shows through the gaps in any draw order; blending in place would hide a ship
-drawn later behind it.
+material's blend states unset when the answer is "sort". Every other caller, a cloak and
+a translucent material keep stock's answer.
+
+The hull then reaches `hook_dip` (or `bump_draw`), but is not drawn there. Stock's CPU
+path hands a faded hull's triangles to `ST3D_ZSort_Manager`, which draws them, sorted,
+at the device's `Flush` (`ST3D_DeviceDirectX8::Flush`, slot 14, called from
+`Armada_RenderAllOurStuff` after every object has drawn), so whatever is behind the
+hull is on screen first. Blended at its own turn instead, a ship behind it and drawn
+later would either vanish behind it (it wrote depth) or be painted over it (it did
+not). So `fd_take` records each draw (buffers, the base vertex index from the d3d8
+device, textures and samplers, the cull mode, and every shader constant read back from
+the device), and the plugin's `Flush` draws them before stock's: hull by hull from the
+farthest, each into depth alone and then in colour where it is nearest, blended by the
+fade (`misc.w` is the pixel's alpha). A hull shows its front surface, not its insides.
+The state is captured and applied again with a state block, like the shadow map's.
+
+A screen door (a pixel drawn or not against noise, no sorting needed) was built first
+and rejected on the bench: at the fades a close camera gives, the pattern showed.
 
 ## Not covered yet
 

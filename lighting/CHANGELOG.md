@@ -6,10 +6,15 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 
 ## 1.17.0 — 2026-10-07
 
+### Added
+- `NearFade=1`, `NearFadeDepth=0.3`, `NearFadeMin=0.125`: a ship or station fades only
+  once the near clipping plane cuts into its bounding box, not once it fills half the
+  view, down to `NearFadeMin` when the plane has cut `NearFadeDepth` of the box's depth.
+
 ### Fixed
-- A ship or station filling more than half the view (the engine's near fade) went to
-  the CPU path and lost the shaders until the camera drew back. `NearFade=1` (new) keeps
-  it in the shaders, its fade drawn as a screen door (`hull.hlsl`, `misc.w`).
+- A faded ship or station (any fade below 1, however faint) went to the CPU path and lost
+  the shaders until the camera drew back. With `Shaders=1` it stays in the shaders and is
+  drawn blended at the device's `Flush`, farthest first, front surface only (`misc.w`).
 
 Installed, not yet seen in game.
 
