@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.4.0 — 2026-10-07
+
+Layers: qol 1.6.0, online 0.6.0.
+
+### Added
+- The online handshake for QOLRules: pay-on-queue runs in an *Internet – Online* game when
+  every player has it, and stands down otherwise.
+
+Installed, not yet seen in game.
+
 ## 11.3.0 — 2026-10-07
 
 Layers: qol 1.5.0.

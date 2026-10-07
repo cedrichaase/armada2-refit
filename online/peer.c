@@ -197,7 +197,7 @@ enum { P_ENUM_Q = 1, P_ENUM_R, P_CONN, P_REJECT, P_DATA, P_ACK, P_PING, P_PONG, 
 enum { SV_HOST = 0x40, SV_HOSTED, SV_JOIN, SV_PEER, SV_INTRO, SV_NOTFOUND, SV_RELAY, SV_RELAYED,
        SV_BYE, SV_ERROR };
 enum { CHAT_ROOM, CHAT_GAME };       /* where a notice goes: the Internet Game screen, GAME SETUP */
-enum { R_ACCEPT = 1, R_APP, R_PLAYER_ADD, R_PLAYER_DEL, R_INFO, R_APPDESC, R_TERMINATE };
+enum { R_ACCEPT = 1, R_APP, R_PLAYER_ADD, R_PLAYER_DEL, R_INFO, R_APPDESC, R_TERMINATE, R_RULES };
 enum { EV_RECEIVE = 1, EV_SEND_DONE, EV_CREATE, EV_DESTROY, EV_CONNECT_DONE, EV_ENUM_RESPONSE,
        EV_ENUM_QUERY, EV_INDICATE, EV_TERMINATE, EV_PEER_INFO, EV_APPDESC, EV_ASYNC_DONE, EV_NOTICE };
 
@@ -213,6 +213,7 @@ typedef struct {
     BYTE  *ooo[WINDOW]; int ooo_len[WINDOW];
     BYTE  *msg; int msg_len, msg_cap;
     DWORD  last_rx, last_tx, rtt, rto;
+    int    rules;                    /* host: this joiner runs QOLRules with PayOnQueue */
 } Conn;
 
 typedef struct {
@@ -246,6 +247,7 @@ typedef struct {
     volatile int    stop, closed;
     int             role;
     DPNID           self, host, next_id;
+    int             rules_all;       /* every player runs QOLRules: what the game plays by */
     WCHAR           myname[NAME_CHARS];
     /* the session, as the host keeps it (a joiner's copy comes with R_ACCEPT) */
     DWORD           sflags, smax, scur;
@@ -701,6 +703,9 @@ static void destroy_player(Peer *p, DPNID id, DWORD reason)
     /* the context goes with the event; the slot is freed once it is delivered */
 }
 
+static void rules_recompute(Peer *p, Conn *only);
+static void rules_reset(Peer *p);
+
 static void end_session(Peer *p, HRESULT hr, DWORD reason)
 {
     int i;
@@ -709,6 +714,7 @@ static void end_session(Peer *p, HRESULT hr, DWORD reason)
     for (i = 0; i < MAX_PLAYERS; i++)
         if (p->players[i].used) destroy_player(p, p->players[i].id, reason);
     for (i = 0; i < MAX_CONNS; i++) if (p->conns[i].used) conn_free(&p->conns[i]);
+    rules_reset(p);
 }
 
 static void conn_lost(Peer *p, Conn *c, DWORD reason)
@@ -727,6 +733,7 @@ static void conn_lost(Peer *p, Conn *c, DWORD reason)
             destroy_player(p, id, reason);
             m[0] = R_PLAYER_DEL; put32(m + 1, id); put32(m + 5, reason);
             to_joiners(p, m, 9, 0);
+            rules_recompute(p, 0);
         }
     } else if (p->role == ROLE_JOINER) {
         end_session(p, reason == DPNDESTROYPLAYERREASON_NORMAL ? DPNERR_HOSTTERMINATEDSESSION
@@ -734,6 +741,63 @@ static void conn_lost(Peer *p, Conn *c, DWORD reason)
                     reason == DPNDESTROYPLAYERREASON_NORMAL ? DPNDESTROYPLAYERREASON_SESSIONTERMINATED
                                                             : DPNDESTROYPLAYERREASON_CONNECTIONLOST);
     }
+}
+
+static void say(Peer *p, int chat, const char *text, int sticky);
+
+/* ---- QOLRules: agreeing on the rules (caller holds p->cs) -------------------
+ * QOLRules.asi (qol/) changes when the bank is charged, which every node of a
+ * network game simulates, so it may run only if every player runs it.  Each joiner
+ * tells the host whether it does (R_RULES, right after it is accepted); the host
+ * answers every joiner, and again on every change, with whether all of them
+ * do, itself included.  The stream is ordered, so the answer reaches a joiner
+ * before the host's launch of the game.  QOLRules latches it at its first use in
+ * a game; the session ending clears it. */
+typedef int  (*RulesWantedFn)(void);
+typedef void (*RulesSetFn)(int);
+
+static void *rules_proc(const char *name)
+{
+    HMODULE m = GetModuleHandleA("QOLRules.asi");
+    return m ? (void *)GetProcAddress(m, name) : 0;
+}
+
+static int rules_wanted(void)
+{
+    RulesWantedFn f = (RulesWantedFn)rules_proc("QOLRules_Wanted");
+    return f ? f() : 0;
+}
+
+static void rules_apply(Peer *p, int all)
+{
+    RulesSetFn f = (RulesSetFn)rules_proc("QOLRules_Network");
+    if (f) f(all);
+    if (all != p->rules_all && (all || rules_wanted()))
+        say(p, CHAT_GAME, all ? "Orders are paid when queued in this game."
+                              : "Orders are paid as they start: not everyone has QOLRules.", 0);
+    if (all != p->rules_all)
+        plog(p, all ? "rules: QOLRules on for every player" : "rules: stock (not every player has QOLRules)");
+    p->rules_all = all;
+}
+
+static void rules_reset(Peer *p)
+{
+    void (*f)(void) = (void (*)(void))rules_proc("QOLRules_Reset");
+    if (f) f();
+    p->rules_all = 0;
+}
+
+/* host: the answer, to every joiner when it changed, and to `only` in any case */
+static void rules_recompute(Peer *p, Conn *only)
+{
+    BYTE m[2];
+    int  i, all = rules_wanted(), was = p->rules_all;
+    for (i = 0; i < MAX_CONNS; i++)
+        if (p->conns[i].used && p->conns[i].open && !p->conns[i].rules) all = 0;
+    rules_apply(p, all);
+    m[0] = R_RULES; m[1] = (BYTE)all;
+    if (all != was) to_joiners(p, m, 2, 0);
+    else if (only) rel_send(p, only, m, 2);
 }
 
 /* ---- one reliable message in (caller holds p->cs) ------------------------- */
@@ -775,6 +839,11 @@ static void on_message(Peer *p, Conn *c, const BYTE *m, int n)
         ev_push(p, e);
         p->cn_on = 0;
         plog(p, "connected");
+        {
+            BYTE r[2];
+            r[0] = R_RULES; r[1] = (BYTE)rules_wanted();
+            rel_send(p, c, r, 2);
+        }
         break;
     }
     case R_APP: {
@@ -831,6 +900,11 @@ static void on_message(Peer *p, Conn *c, const BYTE *m, int n)
         ev_push(p, ev_new(EV_APPDESC, 0, 0));
         break;
     }
+    case R_RULES:
+        if (n < 2) return;
+        if (p->role == ROLE_HOST) { c->rules = m[1] != 0; rules_recompute(p, c); }
+        else if (p->role == ROLE_JOINER) rules_apply(p, m[1] != 0);
+        break;
     case R_TERMINATE:
         if (p->role != ROLE_JOINER) return;
         plog(p, "the host ended the session");
@@ -1303,6 +1377,7 @@ static void accept_joiner(Peer *p, Ev *e, void *pctx, const void *reply, DWORD r
     m[0] = R_PLAYER_ADD;
     n = 1 + put_player(m + 1, pl);
     to_joiners(p, m, n, id);
+    rules_recompute(p, c);               /* until it reports, it counts as without */
     LeaveCriticalSection(&p->cs);
 
     {
@@ -1972,6 +2047,7 @@ static HRESULT __stdcall n_Close(void *self, DWORD flags)
     en = p->en_on; cn = p->cn_on;
     if (p->sv_state) notice_unstick();
     p->role = ROLE_NONE; p->en_on = 0; p->cn_on = 0; p->bound = 0;
+    rules_reset(p);
     p->sv_state = 0; p->jn_state = 0;
     mzero(p->punch, sizeof p->punch);
     LeaveCriticalSection(&p->cs);
@@ -2017,6 +2093,7 @@ static HRESULT __stdcall n_DestroyPeer(void *self, DPNID id, const void *data, D
         destroy_player(p, id, DPNDESTROYPLAYERREASON_HOSTDESTROYEDPLAYER);
         m[0] = R_PLAYER_DEL; put32(m + 1, id); put32(m + 5, DPNDESTROYPLAYERREASON_HOSTDESTROYEDPLAYER);
         to_joiners(p, m, 9, id);
+        rules_recompute(p, 0);
     }
     LeaveCriticalSection(&p->cs);
     return S_OK;

@@ -5,6 +5,15 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.6.0 — 2026-10-07
+
+### Added
+- `QOLRules.asi` exports `QOLRules_Wanted`, `QOLRules_Network` and `QOLRules_Reset`; in a
+  network game it applies its rules when `Online.asi` reports that every player runs it
+  (latched at first use in a game), instead of standing down always.
+
+Installed, not yet seen in game.
+
 ## 1.5.0 — 2026-10-07
 
 ### Added

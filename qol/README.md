@@ -532,8 +532,11 @@ paid items back; Save/Load carry the marks in the producer's id counter. Measure
 bench: stock's crew refund is clamped to a cap (`AddCrew`), so crew is put back directly;
 a start's give-back needs the same.
 
-Not done: the network handshake (the plugin stands down outside single player and
-skirmish, so it never desyncs); a refusal only reaches `QOLRules.log`, no on-screen
+Network games: `online/peer.c` agrees the rules (`R_RULES`: joiners report, the host
+answers with whether everyone has the plugin; `QOLRules_Network`), and the plugin latches
+the answer. Only *Internet – Online* has it; other transports stand down.
+
+Not done: a refusal only reaches `QOLRules.log`, no on-screen
 feedback; destruction, capture and save/load paths are built but not bench-tested; a
 refit save with paid items loaded in stock loses what was paid; construction ships and
 the AI's own orders (if it bypasses the command) are untested.

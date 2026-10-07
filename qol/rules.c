@@ -8,9 +8,10 @@
  *
  * THIS IS NOT QOL.asi.  Charging earlier changes the bank, and every node of a
  * network game simulates the bank, so a player with this plugin and one without
- * would desync.  Until the online layer can agree on it when a game is set up,
- * the plugin applies its rules only in a game against the computer (single player
- * and skirmish) and stands down in any network game.
+ * would desync.  The plugin applies its rules in a game against the computer, and
+ * in a network game only when the online layer reports that every player runs it
+ * (QOLRules_Wanted / _Network / _Reset, called by Online.asi); otherwise it stands
+ * down.
  *
  * HOW STOCK QUEUES (Producer; the class has no name for this in the log, so)
  * ---------------------------------------------------------------------------
@@ -198,15 +199,27 @@ static void trace(const char *what, const BYTE *p)
     logline(m);
 }
 
-/* Only a game against the computer: both transports of the local kind. */
+/* A game against the computer: both transports of the local kind.  A network game
+ * plays by the rules only if every player runs them: the online layer
+ * (online/peer.c, R_RULES) says so through QOLRules_Network, and the answer is
+ * latched at the first use in a game, so a late change cannot split the peers. */
+static int g_net, g_latched, g_latch;
+
 static int rules_on(void)
 {
     BYTE *t = *(BYTE **)G_TRANSPORT;
     DWORD vt;
     if (!g_pay || !t) return 0;
     vt = *(DWORD *)t;
-    return vt == VT_LOCAL || vt == VT_LOCAL_INSTANT;
+    if (vt == VT_LOCAL || vt == VT_LOCAL_INSTANT) return 1;
+    if (!g_latched) { g_latched = 1; g_latch = g_net; }
+    return g_latch;
 }
+
+/* for the online layer (Online.asi finds them by name) */
+__declspec(dllexport) int  __cdecl QOLRules_Wanted(void)    { return g_pay; }
+__declspec(dllexport) void __cdecl QOLRules_Network(int on) { g_net = on != 0; }
+__declspec(dllexport) void __cdecl QOLRules_Reset(void)     { g_net = 0; g_latched = 0; g_latch = 0; }
 
 static void cost_of(const BYTE *p, void *cls, Cost *c)
 {
