@@ -13,7 +13,7 @@ Layers: lighting 1.15.0.
 - Shadows from the Key: ships and stations shade themselves and each other, and planets
   shadow what is behind them (`Shadows`, `PlanetShadows`, lighting 1.15.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 10.5.0 — 2026-10-07
 

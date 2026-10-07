@@ -17,7 +17,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   in the hull shaders.
 
 Seen on the bench 2026-10-07 (a shadow scene: Galaxy, a destroyer behind the planet,
-a shipyard, a Borg cube, a destroyer under way; `SCENE=firing`). Installed, not yet seen in game.
+a shipyard, a Borg cube, a destroyer under way; `SCENE=firing`). Confirmed in game 2026-10-07.
 
 ## 1.14.0 — 2026-10-07
 
