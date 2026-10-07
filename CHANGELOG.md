@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.3.0 — 2026-10-07
+
+Layers: qol 1.5.0.
+
+### Added
+- `QOLRules.asi`: pay when queuing, refund on cancel (QOL-7), single player and skirmish
+  only. `a2mod` and the bench's log collection know the new files.
+
+Installed, not yet seen in game.
+
 ## 11.2.0 — 2026-10-07
 
 Layers: qol 1.4.0.

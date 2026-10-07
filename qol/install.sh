@@ -5,8 +5,8 @@
 #   install.sh --pan-speed X    install and set PanSpeed=X (1 = leave right-drag alone)
 #   install.sh --remove         take it out again
 #
-# Adds QOL.asi, QOL.ini and (at run time) QOL.log, and nothing else; the exe is
-# patched in memory only, so removing the three files is a complete uninstall.
+# Adds QOL.asi, QOL.ini, QOLRules.asi, QOLRules.ini and (at run time) their logs, and nothing else; the exe is
+# patched in memory only, so removing those files is a complete uninstall.
 #
 # RTS_CFG.h must stay stock: network games compare its CRC (qol/README.md). If its
 # FASTSCROLL_COEFFICIENT differs from the stock .a2neb-backup beside it -- a hand edit,
@@ -32,7 +32,8 @@ done
 [ -d "$GAME" ] || { echo "game directory not found: $GAME" >&2; exit 1; }
 
 if [ "$remove" = 1 ]; then
-    rm -f "$GAME/QOL.asi" "$GAME/QOL.ini" "$GAME/QOL.log"
+    rm -f "$GAME/QOL.asi" "$GAME/QOL.ini" "$GAME/QOL.log" \
+          "$GAME/QOLRules.asi" "$GAME/QOLRules.ini" "$GAME/QOLRules.log"
     echo "removed QOL from $GAME"
     exit 0
 fi
@@ -43,12 +44,14 @@ bash "$here/build.sh" >/dev/null
 
 cp "$here/build/QOL.asi" "$GAME/QOL.asi"
 cp "$here/QOL.ini"       "$GAME/QOL.ini"
+cp "$here/build/QOLRules.asi" "$GAME/QOLRules.asi"
+cp "$here/QOLRules.ini"       "$GAME/QOLRules.ini"
 if [ -n "$pan" ]; then
     sed -i "s/^PanSpeed=.*/PanSpeed=$pan/" "$GAME/QOL.ini"
 fi
 
-rm -f "$GAME/QOL.log"
+rm -f "$GAME/QOL.log" "$GAME/QOLRules.log"
 echo "installed into $GAME:"
-ls -l "$GAME/QOL.asi" "$GAME/QOL.ini"
+ls -l "$GAME/QOL.asi" "$GAME/QOL.ini" "$GAME/QOLRules.asi" "$GAME/QOLRules.ini"
 grep '^PanSpeed=' "$GAME/QOL.ini"
 echo "after a launch:  cat \"$GAME/QOL.log\""
