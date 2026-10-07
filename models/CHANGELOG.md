@@ -16,8 +16,7 @@ selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md
   stock), and the largest split up to `--split` that keeps a mesh within 12,500 triangles.
   The first four hulls build byte for byte as in 4.1.0.
 
-Installed, not yet seen in game beyond the four hulls of 4.1.0 (bench: all four other
-factions' battleships).
+Confirmed in game 2026-10-07.
 
 ## 4.1.0 — 2026-10-07
 

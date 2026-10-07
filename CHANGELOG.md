@@ -13,7 +13,7 @@ Layers: models 4.2.0.
 - Every faction's ships and stations drawn round where they are round: 176 hull models
   (`hull-sod.py`, models 4.2.0).
 
-Installed, not yet seen in game beyond the four hulls of 11.3.0.
+Confirmed in game 2026-10-07.
 
 ## 11.3.0 — 2026-10-07
 
