@@ -20,7 +20,8 @@ that `Lighting.ini` switches separately:
   on the CPU path; nebulae glow in their colour (`Nebulae`); a planet's day side lights
   what is near it in the colour of its ground (`PlanetGlows`); the skybox adds a faint
   third light in its own colour (`SkyLight`); and a ship's or station's explosion
-  lights its surroundings (`Explosions`).
+  lights its surroundings (`Explosions`); a phaser lights the firing ship around
+  its emitter and the target where it strikes (`Phasers`).
 
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
@@ -65,6 +66,10 @@ planet's ground colour (`planet glow:`).
 | `SkyLight` | `0.35` | the sky light's strongest channel; `0` leaves it dark |
 | `Explosions` | `1` | ship and station explosions light their surroundings |
 | `ExplosionColour`, `ExplosionBrightness`, `ExplosionRange` | `1.00 0.62 0.28`, `4.0`, `10.0` | the flash's colour and peak; full over the explosion's radius (at least 40 units), gone at this many radii |
+| `Phasers` | `1` | a phaser lights the firing ship around its emitter, and the target where it strikes, while the beam is drawn ("Phasers", below) |
+| `PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift` | `4.5`, `0`, `24`, `3` | the emitter's light: the beam's colour times this (`0` none); full to `PhaserStart` units from the light, gone at `PhaserRange`; it sits `PhaserLift` units out along the beam |
+| `PhaserWrap`, `PhaserFalloff` | `0.6`, `2` | the emitter's light in the hull shaders: how far its diffuse term wraps round past the faces turned to it (`0`: Lambert), and the power its falloff is raised to (a hot spot) |
+| `PhaserImpact`, `PhaserImpactStart`, `PhaserImpactRange`, `PhaserImpactLift` | `2.0`, `6`, `70`, `8` | the light at the beam's end: the beam's colour times this (`0` none), and its falloff and lift as for the emitter |
 | `OrdnanceColours` | `1` | a torpedo's or pulse's light takes the colour of its own sprite, at the ODF's brightness ("Torpedoes and pulses", below); `0` keeps the ODF's `lightColor` |
 | `Log` | `1` | write `Lighting.log` |
 
@@ -428,6 +433,76 @@ where a torpedo arrived; the same burst on `main` washed whole faces cyan. The m
 (the cube's own blue shield flashes count in both). The Klingon torpedo lit it red.
 The Federation quantum torpedo (`fbattle`) was not in the scene.
 
+### Phasers
+
+A phaser shot is an ordnance object of class `Phaser` (vtable 0x6b8ee4) that lives as long
+as its beam is drawn. `Beam::Simulate` (0x58b850) puts the beam's start (+0xbc) on the
+firing ship's hardpoint every frame and its end (+0xc8) on the target, and counts its
+time left (+0xac) down from the class's `lifeSpan` (OrdnanceClass +0x1c); at zero it
+folds the beam up. Stock gives a phaser no light: no phaser ODF sets `lightColor`.
+
+Each frame, after `GameObject_PreRenderAll`, the plugin walks the live ordnance, the
+list at [0x771fac] that `Ordnance::PreRenderAll` (0x58e4f0) walks, with the object at
+node +8 and +0x27 set once it has expired. For each live phaser that is visible (+0x24,
+which `PreRenderAll` asks before it registers a torpedo's light) it registers two point
+lights, at the beam's start (the emitter) and at its end (the impact), up over 0.06 s
+and down over the last 0.25 s. The end is where `Beam::Simulate` lands the beam: on the
+target's shield sphere while its shields hold, else on the hardpoint it aims at. Each
+end has its own brightness, falloff and lift (`PhaserBrightness`…, `PhaserImpact`…).
+No hook is
+patched for this; before it reads any ordnance the plugin checks that slot 0 of the
+`Phaser` vtable is its deleting destructor (0x57ee70), and logs `NOT PATCHED` if not.
+A list read each frame never holds a pointer to an object that has gone, which tracking
+lifetimes through `Simulate` and the destructor, as the explosions do, would.
+
+- **Where.** Both ends are on a surface, and a light on a surface only grazes it: N·L
+  is near 0 for the faces around it. Each light sits a few units along the beam from
+  its end, towards the other: off the shooter's hull, which the beam leaves by
+  construction, and off the target's hull or shield on the side the shot came from.
+  That is enough at the impact, where the struck hull faces the shooter. It is not at
+  the emitter: a beam mostly leaves sideways, so the lifted light is still level with
+  the deck around the hardpoint. The first version (one light for both ends, the
+  impact's falloff, lifted 8 units) moved that deck by +3/255 and was not noticeable in
+  play.
+- **The emitter's hot spot.** So the emitter's light gets its own light object, a tight
+  falloff (gone at 24 units, squared: `PhaserFalloff`) and a wrapped diffuse term in
+  `hull.hlsl`, `(N·L + w) / (1 + w)` with `w = PhaserWrap`: plating the light grazes
+  takes about a third of it, and faces turned away from it (the far side of the saucer)
+  still none. The wrap and power go to the shader in `pfall.z`/`.w`, 0 and 1 for every
+  other light, which therefore draws as before. The fixed-function path (no d3d8to9)
+  has neither, and lights the emitter as Direct3D's own point light does.
+- **Colour.** The beam's own art. The class's sprite (OrdnanceClass +0x12c, an
+  `ST3D_Sprite`) holds its texture at +0x58, whose name, as for every
+  `ST3D_DatabaseElement`, is at +0x8. The lit texels' mean, scaled to a peak of 1 and
+  read once per texture, is logged as `phaser:` (Federation `Wfedphaser`:
+  `1.000 0.655 0.403`). It is times the beam's tint (+0xf0: white, or the owner's
+  colour with `NORMAL_WEAPON_TEAM_COLOR`) and `PhaserBrightness`. `rdphaser`,
+  `blphaser` and `mphaser` are rows of the one `Wphaser` sheet and all take its mean.
+- **Two light objects**, one for every emitter and one for every impact:
+  `RegisterLight` keeps its own copy of each colour and matrix, and the falloff is the
+  light object's.
+- **Picking.** `pick_points` takes it as it takes a torpedo's light: by its reach plus
+  `HARD_REACH`, at its real position, never mirrored. The shaders still fade it per
+  pixel, so it reads as a glow rather than a sphere. It is never merged with another
+  light of its colour, because a Galaxy's banks fire together.
+
+On the bench (`SCENE=firing`, `orbit shooter 200 25 220`, 1920x1080, a 200x70 box of
+the saucer's deck beside the dorsal emitter, mean RGB): the first version, no beam
+129/153/155; beam with `Phasers=0` 132.5/154.6/156.4, the flare sprite alone; beam with
+`Phasers=1` 135.8/157.1/158.3. The hot spot (2026-10-07, the box at 800,420): no beam
+93.6/114.2/116.9; beam 124.3/134.9/129.4, a warm patch on the deck centred on the
+hardpoint, the rest of the saucer unchanged. At `PhaserBrightness=6`, `PhaserRange=35` it
+was 148/152/142 and spread over a third of the saucer, clipping white at the core. From
+below (`orbit shooter 200 -30 220`) a ventral emitter lights the saucer's underside
+round its hardpoint and the neck beside it; nothing shows through on the far side.
+
+The impact, on the bench (a Galaxy firing at a second Galaxy with its shields up,
+`orbit target 215 25 130`, a 100x30 box of the target's engineering hull below the
+hit, mean RGB): no beam 146.7/166.7/166.9; with a beam and `PhaserImpact=0` the same in
+all five such frames; with `PhaserImpact=1` about 201/214/209 in four, a warm cream
+wash over the hull and neck around the hit. The shield's own flashes (cyan) come and go
+in both.
+
 ## Shaders
 
 Phase 2 of `platform/D3D9.md`, first step. With crosire's d3d8to9 in the d3d8 slot the
@@ -757,5 +832,5 @@ the CPU path lit both its ground and its clouds evenly.
   colours its triangle. Seen on the bench with Borg torpedoes on a Borg cube before
   `BumpShaders` (1.11.0) drew the Borg in shaders; not re-checked since. Not caused by
   `OrdnanceColours`, which changes only the colour.
-- Weapon impacts flash no light (above). `ShockwaveExplosion` (the big special weapons'
+- Weapon impacts other than a phaser's flash no light (above). `ShockwaveExplosion` (the big special weapons'
   ring) has its own `AdjustLighting` and is left alone.
