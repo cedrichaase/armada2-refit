@@ -45,6 +45,8 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Delay` | 30 | mission ticks before the scene is built |
 | `Fog` | 0 | 0: fog and shroud off for good, the map fully explored; 1: as the map has them |
 | `Hud`, `Grid`, `Cursor`, `Notices`, `Tooltips` | 0 | 0 hides them; 1 leaves them as the game has them. Notices are the game's events: "Enemy engaged." and the like, their voice and minimap marker. Tooltips are the rollover boxes, an object's name and description, that the pointer brings up over the 3D view even when the cursor is not drawn |
+| `Hover` | 1 | 0 removes what the object under the pointer gets drawn over it: its hull, shield and special-energy gauges, its system icons and the hover ring, which come up even with the HUD and the cursor hidden. 1 is stock. Selection circles and group numbers stay |
+| `ShieldFx` | 1 | 0 removes the flash on a craft's shields when a weapon hits them (green on most). The shields still take the damage. 1 is stock. The shields-down effect (a blue electric ring when they run out) is separate and stays; `Heal=1` prevents it |
 | `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
 | `Center` | | centre the RTS camera on this object |
 | `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |
@@ -99,7 +101,7 @@ answer and fails if a command did.
 | `colonize <planet> [<population> \| full \| off] [team]` | make a planet a grown colony of a team (default `full` and team 1), without a colony ship: it changes hands, gets a full garrison, and its cities show at once at that population, clamped to the class's maximum. The cities are the team's race's (`cityTextureName`: `ECFR` for the Federation and Romulans, `ECNA`, `BORG`); team 1 on `a2_borg01` is the Federation. `off` makes it neutral again with no population. The planet stays colonised (seen on the bench for several minutes); a population set below the maximum grows as any colony's does |
 | `center <name>` | centre the RTS camera on an object |
 | `pause`, `resume` | the game's own pause (`PauseSimulation`) |
-| `hud`, `grid`, `cursor`, `notices`, `tooltips` `on\|off` | as the keys above. `tooltips off` also clears a box already showing |
+| `hud`, `grid`, `cursor`, `notices`, `tooltips`, `hover`, `shieldfx` `on\|off` | as the keys above. `tooltips off` also clears a box already showing; `shieldfx off` lets flashes already showing run out |
 | `query` | every object's handle and position (and a producer's build queue, a planet's team, population and the population its cities are drawn at), and the camera's eye, front and up |
 | `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`); answers as `selection` |
 | `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
@@ -197,10 +199,50 @@ inert, and `Scene.log` says so.
   shape go by `DisplayInterface::MouseOn()` (0x51b5e0, `s_mouseOverObjectHandle`),
   which this leaves alone, so the pointer still hovers and clicks as before. The
   `stations` scene, which films the HUD with the cursor on, gets tooltips off too
-  unless it sets `Tooltips=1`. **The thin gauge drawn above an object
-  the pointer rests on stays**: it does not come from `TooltipOn()`. Blanking the one
-  `MouseOn()` call in `SelectionDisplay::PreRender` (0x508e72, which adds the hover
-  selection effect) did not remove it on the bench, so that patch was dropped.
+  unless it sets `Tooltips=1`. The gauges drawn over an object the pointer rests on
+  do not come from `TooltipOn()`; `hover` (below) removes them.
+- **Hover: the two `DisplayInterface::MouseOn()` calls in `SelectionDisplay`.**
+  `SelectionDisplay::Render` (0x509540) walks every object and draws its gauges
+  (`mDrawHullGauge`, `mDrawShieldGauge`, `mDrawSpecialEnergyGauge`) and system icons
+  when it is the *hover object*, `SelectionDisplay`+0x7c, or when it is selected and
+  on the hover object's team, +0x88; an unselected object other than the hover object
+  is skipped. Both fields are written in `SelectionDisplay::AlwaysSimulate` from the
+  one `MouseOn()` call at 0x5080fc (+0x88 is the hover object's team, +0x8c a fade-in
+  time). The hover ring is separate: `SelectionDisplay::PreRender` asks `MouseOn()`
+  itself, at 0x508e72, and moves selection effect 4 (`AddSelectionEffect` /
+  `RemoveSelectionEffect`) to that object. With hover off both calls become
+  `xor eax,eax` plus three `nop`s, so both functions see what they see with the
+  pointer over empty space: no hover gauges, no ring, and a selected object's gauges
+  as they are then. Selection circles and group numbers come from elsewhere in
+  `Render` and `PreRender` and stay. Clicks and orders ask `MouseOn()` themselves and
+  still work. Bench, `showcase`, the pointer over a cube: with hover on, a gauge above
+  it and a row of system icons below; with hover off, neither.
+  **Dead end:** blanking only the `PreRender` call (an earlier try) removes the ring
+  but not the gauges, because `Render` reads +0x7c, which only `AlwaysSimulate`
+  writes.
+- **Shield hits: the four weapon calls of `ShieldEffect::CreateShieldHit`.** The flash
+  on a craft's shields where a weapon strikes them is a `ShieldHit`, a model instance
+  that the static, cdecl `ShieldEffect::CreateShieldHit(GameObject *, const Matrix34 &,
+  ShieldType, float, int)` (0x4743b0) builds and lists in `m_shieldList`; it returns
+  the hit's id, or -1 when the shield type has no model. The weapons call it after
+  dealing their damage (a virtual call on the target just before): `Beam::Simulate`
+  at 0x58bb95 (which keeps the id at +0xe8 to move the effect along the beam),
+  `Bullet::Simulate` at 0x58cad8, `Mine::mMoveTowardsTarget` at 0x58d502 and
+  `Missile::Simulate` at 0x58dd65, each with the type and duration from the weapon's
+  class. With shield effects off each of those calls becomes `or eax,-1` plus two
+  `nop`s, the "no effect" answer the weapons already handle: `ShieldEffect::ShieldUpdate`
+  (0x4747d0) and `ShieldStop` (0x474770) find nothing under -1. Bench, `showcase`:
+  with shield effects on the struck cube sits in a green shell; with them off, none,
+  and the beams still end at the shield; with `heal cube1 off` its shields ran out
+  within 40 s (the shields-down ring came up and the beams reached the hull), so the
+  damage still lands.
+  Left alone: **the shields-down ring**, the blue electric effect, is a lasting
+  `ShieldHit` of type 1 (duration -1) that `Craft::ShieldsDown` (0x4c74f0),
+  `ShieldCollapse`, `CheckDerelict`, `DamageAlloc`, `mInitShipsSystems` and `Init`
+  create through the same function and keep at `Craft`+0x208; `Heal=1` keeps shields
+  from running out, so it never comes up. The special weapons that make shield
+  effects of their own (`ShieldInversion`, `EnergyShieldConverter`, `ReflectWeapon`,
+  `ClairvoyantLink`, `TimedInvincible`, ...) call it from elsewhere and are untouched.
 - **Heal: hull, shields and crew.** Hull through `ScriptInterfaceImp::SetCurrentHealth`
   as before; shields through `ScriptInterfaceImp::SetShieldPercent(int, float)`
   (0x455eb0), whose float is a fraction (0..1) of the maximum: it stores
@@ -212,7 +254,7 @@ inert, and `Scene.log` says so.
   written when below the maximum, because `Craft::SetCrew` also recomputes the craft's
   state. Bench, `showcase`, 30 s of fire: with only the hull healed both cubes wore
   the blue electric shields-down ring; with shields healed, none (the green flash of
-  shields taking hits remains, as it should).
+  shields taking hits remains; `shieldfx off` removes it).
 - **Move orders: `GameObject::SetCommand`.** The script interface's own orders end in
   `GameObject::SetCommand` overloads: `(AiCommand, const GameObject *, long, bool)`
   (0x4d1af0), `(AiCommand, const Vector3 &, long, bool)` (0x4d1b50) and

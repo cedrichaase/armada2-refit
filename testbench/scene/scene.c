@@ -61,7 +61,12 @@
  *     without a colony ship; see colonize().
  *   SelectionDisplay::AlwaysSimulate asks DisplayInterface::TooltipOn() for the
  *     object to show a rollover tooltip for, in one call at 0x508070; see
- *     set_tooltips().
+ *     set_tooltips(). Its DisplayInterface::MouseOn call at 0x5080fc, and
+ *     SelectionDisplay::PreRender's at 0x508e72, find the hover object; see
+ *     set_hover().
+ *   ShieldEffect::CreateShieldHit (0x4743b0), called by Beam, Bullet, Mine and
+ *     Missile at 0x58bb95, 0x58cad8, 0x58d502 and 0x58dd65, makes the flash of a
+ *     hit on shields; see set_shieldfx().
  *   Heal: ScriptInterfaceImp::SetShieldPercent(int, float) 0x455eb0 and
  *     SetCrew(int, float) 0x456060; see heal_all().
  *   Move orders: the GameObject::SetCommand overloads the script interface's
@@ -176,6 +181,12 @@ int _fltused = 0;   /* floats without the CRT */
 #define PL_SHOWN_RACE    0x2c4u      /* Planet: the Race whose cities are drawn */
 #define PL_SHOWN_POP     0x2c8u      /* Planet: the population drawn, eased toward +0x2ac */
 #define TOOLTIP_ON_CALL  0x508070u   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::TooltipOn */
+#define HOVER_SIM_CALL   0x5080fcu   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::MouseOn -> +0x7c */
+#define HOVER_PRE_CALL   0x508e72u   /* SelectionDisplay::PreRender: call DisplayInterface::MouseOn -> hover effect */
+#define SHIELD_HIT_BEAM  0x58bb95u   /* Beam::Simulate: call ShieldEffect::CreateShieldHit */
+#define SHIELD_HIT_SHOT  0x58cad8u   /* Bullet::Simulate: the same */
+#define SHIELD_HIT_MINE  0x58d502u   /* Mine::mMoveTowardsTarget: the same */
+#define SHIELD_HIT_MSL   0x58dd65u   /* Missile::Simulate: the same */
 #define SI_SET_SHIELDS   0x455eb0u   /* ScriptInterfaceImp::SetShieldPercent(int, float), 0..1 */
 #define SI_SET_CREW      0x456060u   /* ScriptInterfaceImp::SetCrew(int, float) -> Craft::SetCrew, clamped to the maximum */
 #define CRAFT_MAX_CREW   0x1c4u      /* Craft: maximum crew (float) */
@@ -207,6 +218,12 @@ static const Sig k_sigs[] = {
     { EVENT_TRIGGER_3,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_1,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { TOOLTIP_ON_CALL,  5, { 0xE8, 0x9B, 0x35, 0x01, 0x00 } },
+    { HOVER_SIM_CALL,   5, { 0xE8, 0xDF, 0x34, 0x01, 0x00 } },
+    { HOVER_PRE_CALL,   5, { 0xE8, 0x69, 0x27, 0x01, 0x00 } },
+    { SHIELD_HIT_BEAM,  5, { 0xE8, 0x16, 0x88, 0xEE, 0xFF } },
+    { SHIELD_HIT_SHOT,  5, { 0xE8, 0xD3, 0x78, 0xEE, 0xFF } },
+    { SHIELD_HIT_MINE,  5, { 0xE8, 0xA9, 0x6E, 0xEE, 0xFF } },
+    { SHIELD_HIT_MSL,   5, { 0xE8, 0x46, 0x66, 0xEE, 0xFF } },
     { SI_SET_SHIELDS,   8, P_SI_HANDLE },
     { SI_SET_CREW,      8, P_SI_HANDLE },
     { SET_COMMAND_AT,   8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x14, 0x8B, 0x55 } },
@@ -679,28 +696,75 @@ static void set_notices(int on)
  * With tooltips off that one call becomes `xor eax,eax` (no object): the box is
  * cleared and never shown. Nothing else changes: clicks, orders and the cursor's
  * shape go by DisplayInterface::MouseOn(), a separate query, and still see what
- * is under the pointer -- and so does the thin hover gauge drawn above an object
- * the pointer rests on, which stays (bench). The original bytes are kept and put
+ * is under the pointer -- and so does the hover gauge drawn above an object the
+ * pointer rests on, which `hover off` removes (below). The original bytes are kept and put
  * back by `tooltips on`. */
 static const BYTE k_no_object[5] = { 0x31, 0xC0, 0x90, 0x90, 0x90 };   /* xor eax,eax; nop x3 */
-static BYTE g_tooltip_orig[5];
-static int  g_tooltips_off;
+static const BYTE k_no_effect[5] = { 0x83, 0xC8, 0xFF, 0x90, 0x90 };   /* or eax,-1; nop x2 */
 
-static void set_tooltips(int on)
+/* A switch over 5-byte call sites: off writes the stub over each and keeps the
+ * original bytes, on puts them back. */
+typedef struct {
+    const DWORD *sites;
+    int          n;
+    const BYTE  *stub;
+    BYTE         orig[4][5];
+    int          off;
+} CallSwitch;
+
+static void set_switch(CallSwitch *w, int on)
 {
-    BYTE *p = (BYTE *)TOOLTIP_ON_CALL;
-    DWORD old;
-    int   k;
-    if (on == !g_tooltips_off) return;
-    if (!VirtualProtect(p, 5, PAGE_EXECUTE_READWRITE, &old)) return;
-    for (k = 0; k < 5; k++) {
-        if (!on) { g_tooltip_orig[k] = p[k]; p[k] = k_no_object[k]; }
-        else       p[k] = g_tooltip_orig[k];
+    int i, k;
+    if (on == !w->off) return;
+    for (i = 0; i < w->n; i++) {
+        BYTE *p = (BYTE *)w->sites[i];
+        DWORD old;
+        if (!VirtualProtect(p, 5, PAGE_EXECUTE_READWRITE, &old)) continue;
+        for (k = 0; k < 5; k++) {
+            if (!on) { w->orig[i][k] = p[k]; p[k] = w->stub[k]; }
+            else       p[k] = w->orig[i][k];
+        }
+        VirtualProtect(p, 5, old, &old);
+        FlushInstructionCache(GetCurrentProcess(), p, 5);
     }
-    VirtualProtect(p, 5, old, &old);
-    FlushInstructionCache(GetCurrentProcess(), p, 5);
-    g_tooltips_off = !on;
+    w->off = !on;
 }
+
+static const DWORD k_tooltip_sites[1] = { TOOLTIP_ON_CALL };
+static CallSwitch  g_tooltips = { k_tooltip_sites, 1, k_no_object, {{0}}, 0 };
+
+static void set_tooltips(int on) { set_switch(&g_tooltips, on); }
+
+/* Hover: the object under the pointer gets its gauges -- hull, shields, special
+ * energy, the system icons -- and a hover ring, even with the HUD and the cursor
+ * off. SelectionDisplay::Render draws an object's gauges when it is the hover
+ * object (SelectionDisplay+0x7c), or is selected and on the hover object's team
+ * (+0x88); both fields are set in AlwaysSimulate from the one DisplayInterface::MouseOn() call at 0x5080fc. The
+ * ring is SelectionDisplay::PreRender's: its own MouseOn() call (0x508e72) moves
+ * selection effect 4 to the object under the pointer. With hover off both calls
+ * become `xor eax,eax` (no object), which is what either sees with the pointer over
+ * empty space: no hover gauges, no ring, and a selected object's gauges as they
+ * are then. Selection circles and group numbers are untouched, and so are clicks
+ * and orders, which ask MouseOn() themselves. */
+static const DWORD k_hover_sites[2] = { HOVER_SIM_CALL, HOVER_PRE_CALL };
+static CallSwitch  g_hover = { k_hover_sites, 2, k_no_object, {{0}}, 0 };
+
+static void set_hover(int on) { set_switch(&g_hover, on); }
+
+/* Shield hits: the flash on a shielded craft that a weapon strikes is a ShieldHit,
+ * made by the static ShieldEffect::CreateShieldHit (0x4743b0), which returns its id,
+ * or -1 when that shield type has no model. Weapons call it from four sites, after
+ * the damage is dealt: Beam::Simulate, Bullet::Simulate, Mine::mMoveTowardsTarget
+ * and Missile::Simulate. With shield effects off each call becomes `or eax,-1`, the
+ * "no effect" answer, which the weapons already handle (a beam keeps the id to move
+ * the effect with, and ShieldEffect::ShieldUpdate / ShieldStop find nothing under
+ * -1). Damage is untouched. The shields-down effect (Craft::ShieldsDown and others,
+ * a lasting type-1 ShieldHit kept at Craft+0x208) and the special weapons' shield
+ * effects call it from elsewhere and are left alone. */
+static const DWORD k_shield_sites[4] = { SHIELD_HIT_BEAM, SHIELD_HIT_SHOT, SHIELD_HIT_MINE, SHIELD_HIT_MSL };
+static CallSwitch  g_shieldfx = { k_shield_sites, 4, k_no_effect, {{0}}, 0 };
+
+static void set_shieldfx(int on) { set_switch(&g_shieldfx, on); }
 
 /* The free camera: off, a fixed eye and target, or an orbit about a point or an
  * object. Recomputed every frame, so it follows a moving object. */
@@ -1182,11 +1246,14 @@ static void run_command(char *line)
     if (s_eq(t[0], "cursor") && n >= 2) { g_cursor_on = on_arg(t[1]); logline("  ok"); return; }
     if (s_eq(t[0], "notices") && n >= 2) { set_notices(on_arg(t[1])); logline("  ok"); return; }
     if (s_eq(t[0], "tooltips") && n >= 2) { set_tooltips(on_arg(t[1])); logline("  ok"); return; }
+    if (s_eq(t[0], "hover") && n >= 2) { set_hover(on_arg(t[1])); logline("  ok"); return; }
+    if (s_eq(t[0], "shieldfx") && n >= 2) { set_shieldfx(on_arg(t[1])); logline("  ok"); return; }
     if (s_eq(t[0], "query")) { query(); return; }
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
-            "immortal, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, query, "
+            "immortal, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
+            "shieldfx, query, "
             "select, selection)");
 }
 
@@ -1258,6 +1325,8 @@ static void build_scene(void)
     if (!g_cursor_on) logline(g_cursor_draw ? "cursor off" : "cursor: could not hook");
     if (!ini_int("Scene", "Notices", 0)) { set_notices(0); logline("notices off"); }
     if (!ini_int("Scene", "Tooltips", 0)) { set_tooltips(0); logline("tooltips off"); }
+    if (!ini_int("Scene", "Hover", 1))    { set_hover(0);    logline("hover gauges off"); }
+    if (!ini_int("Scene", "ShieldFx", 1)) { set_shieldfx(0); logline("shield hit effects off"); }
 
     /* [Object.<name>] sections, in file order */
     GetPrivateProfileSectionNamesA(names, sizeof names, g_ini);

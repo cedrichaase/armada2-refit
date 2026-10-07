@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 10.8.0 — 2026-10-07
+
+Layers: testbench 3.4.0.
+
+### Added
+- Bench scenes for footage: `colonize`/`Population=`, `goto`/`stop`, and switches for
+  tooltips, the hover gauges (`hover`/`Hover=`) and shield-hit flashes
+  (`shieldfx`/`ShieldFx=`) in `Scene.asi` (testbench 3.4.0).
+
+### Changed
+- `Scene.asi`'s `Heal=` keeps shields and crew full; the `showcase` cubes hold fire
+  (testbench 3.4.0).
+
+Installed, not yet seen in game.
+
 ## 10.7.0 — 2026-10-07
 
 Layers: testbench 3.3.0.
