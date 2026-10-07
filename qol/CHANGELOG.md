@@ -13,7 +13,7 @@ versions". Newest first. Details, and the planned changes, are in
   that after the parse, so nothing fades out with distance; fog and shroud still hide
   what they hid (QOL-9).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 1.3.0 — 2026-10-07
 

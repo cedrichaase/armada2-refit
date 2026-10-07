@@ -14,7 +14,7 @@ Layers: qol 1.4.0.
   ships, stations, planets, asteroids and nebulae fade out are raised in memory
   (`ViewDistance=`, qol 1.4.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 11.1.0 — 2026-10-07
 
