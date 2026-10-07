@@ -355,6 +355,7 @@ typedef long (__stdcall *GetLightEnable_t)(void *, DWORD, BOOL *);
 
 static int        g_fix_mirrored = 1;
 static int        g_in_vb;        /* inside ST3D_Standard_MeshVB::Render: its draws are hulls */
+static int        g_vb_seen;      /* a mesh has been drawn on the vertex-buffer path */
 static BYTE      *g_vb_mesh;      /* that draw's ST3D_Mesh, for the shadows */
 static VBRender_t g_vb_render;
 static void      *g_dev;          /* the device, as last seen by the SetMaterial hook */
@@ -450,6 +451,15 @@ static float g_rim_pow = 3.0f;                      /* RimPower= */
  * towards white rather than clipped. lighting/README.md, "Dynamic range". */
 static float g_hull_sun = 1.1f;                     /* HullSun= */
 static float g_knee = 0.8f;                         /* HighlightKnee=; 1: clip, as before */
+/* The Borg profile (Shaders=1, BumpShaders=1): the values above, for the bump-mapped
+ * hulls, which in stock are the Borg's alone. Before BumpShaders they were drawn dark
+ * with glowing lights (the dot3 passes have no ambient, specular or rim), and the
+ * Federation's tuning lifted them. lighting/README.md, "The Borg profile". */
+static float g_borg_amb[3] = { 0.015f, 0.018f, 0.015f };   /* BorgAmbient= */
+static float g_borg_spec = 0.15f, g_borg_spec_pow = 64.0f; /* BorgSpecular=, BorgSpecularPower= */
+static float g_borg_rim[3] = { 0.06f, 0.13f, 0.03f };      /* BorgRimLight=: a sickly green */
+static float g_borg_sun = 0.8f;                            /* BorgSun=: HullSun's counterpart */
+static float g_borg_self = -1.0f;                          /* BorgSelfIllumination=; < 0: SelfIllumination */
 static int   g_sh_lit_self;          /* the draw in hand has a self-illuminating material */
 
 /* How much of a planet's day side faces a point at (dx, dy, dz) from its centre, at
@@ -600,7 +610,7 @@ static void __fastcall hook_vb_render(void *self, void *edx, int group, void *lm
         static int said_self;
         if (!said_self) { said_self = 1; logline("shaders: a self-illuminating material, its night lights folded in"); }
     }
-    g_in_vb = 1;
+    g_in_vb = g_vb_seen = 1;
     g_vb_mesh = *(BYTE **)((BYTE *)self + 0xc);   /* ST3D_MeshVB_Imp::Init keeps the mesh there */
     g_vb_render(self, group, lm, tm, tex);
     g_in_vb = 0;
@@ -767,6 +777,100 @@ typedef long (__stdcall *Reset8_t)(void *, void *);
 static Reset8_t g_reset;
 static int      g_shadows = 1, g_planet_shadows = 1;   /* Shadows=, PlanetShadows= */
 
+/* The near fade (NearFade=1). A ship or station close to the camera fades out
+ * (CraftInstance::ComputeFadeOut, 0x4caff0, slot 4 of an instance's vtable): in stock from
+ * when its bounding sphere's radius is half its distance, cfgFADE_OUT_MIN_FOV 0.5 to
+ * cfgFADE_OUT_MAX_FOV 2.0, down to 1 - cfgFADE_OUT_MAX = 0.125. The plugin's own
+ * ComputeFadeOut keeps stock's fade with distance (GameObjectInstance's, which it calls
+ * first) and fades a hull only once the near clipping plane cuts into its bounding box:
+ * from 1 where the box's nearest corner reaches the plane, smoothly down to NearFadeMin
+ * when the plane has cut NearFadeDepth of the box's depth.
+ *
+ * ST3D_Instance::RenderInternal (0x62e780) keeps the fade at the instance's +0x78, marks
+ * it translucent at +0x77 below 1, and makes the instance the engine's +0x100 while its
+ * meshes draw. ST3D_DeviceDirectX8::PolygonSortRequired (0x625510) then says sort, and
+ * ST3D_Mesh::RenderInternal (0x6325d0) sends every mesh to the CPU path, which sorts,
+ * and away from the shaders. With Shaders=1 the plugin answers "no sort" where the fade
+ * is the only reason, asked from the mesh's RenderInternal or from
+ * ST3D_TextureMaterial::SetRenderState (0x644700, which leaves the material's blend
+ * states unset when the answer is sort). The hull's draws are then recorded instead of
+ * drawn (fd_take) and drawn blended at the device's Flush, before the triangles stock
+ * sorted (fd_replay). A cloak (its vertex-alpha callback at the engine's +0x110), a
+ * per-render effect (+0xf8) and a translucent material stay stock. lighting/README.md,
+ * "The near fade". */
+#define VT_DEVICE_DX8       0x6bc6ac   /* ST3D_DeviceDirectX8 vtable */
+#define FN_SORT_REQUIRED    0x625510   /* its PolygonSortRequired, slot 29 */
+#define FN_CRAFT_FADE       0x4caff0   /* CraftInstance::ComputeFadeOut, an instance's slot 4 */
+#define VT_CRAFT_INSTANCE   0x6b3e2c   /* CraftInstance vtable */
+#define FN_OBJECT_FADE      0x4d5a20   /* GameObjectInstance::ComputeFadeOut: the fade with distance */
+#define FN_INSTANCE_BOX     0x62ed90   /* ST3D_Instance::GetBoundingBox: the model's, scaled */
+#define FADE_VIEW_RECORD    0x76b610   /* View_Record; 2: no near fade, as in stock */
+#define FADE_OFF            0x7637b5   /* a byte that turns stock's near fade off */
+typedef BYTE (__fastcall *SortRequired_t)(void *dev, void *edx);
+typedef BYTE (__fastcall *Fade_t)(void *inst, void *edx, float *out);
+typedef void *(__fastcall *Box_t)(void *inst, void *edx, float *out);
+typedef long (__stdcall *D8Transform_t)(void *, DWORD, float *);
+static int   g_near_fade = 1;          /* NearFade= */
+static float g_nf_depth = 0.3f;        /* NearFadeDepth= */
+static float g_nf_min = 0.125f;        /* NearFadeMin= */
+static long  g_fade_draws;
+
+/* The instance's fade, CraftInstance::ComputeFadeOut's contract: 1 and *out when it fades. */
+static BYTE __fastcall hook_craft_fade(BYTE *inst, void *edx, float *out)
+{
+    const float *m = (const float *)(inst + 0x44);      /* its Matrix34: three axes, then where */
+    float box[6], v[16], pr[16], zn, lo = 1e30f, hi = -1e30f, t;
+    int   i, k;
+    if (((Fade_t)FN_OBJECT_FADE)(inst, edx, out)) return 1;
+    if (*(int *)FADE_VIEW_RECORD == 2 || *(BYTE *)FADE_OFF) return 0;
+    if (!g_dev ||
+        ((D8Transform_t)(*(void ***)g_dev)[38])(g_dev, 2, v) < 0 ||      /* GetTransform VIEW */
+        ((D8Transform_t)(*(void ***)g_dev)[38])(g_dev, 3, pr) < 0 ||     /* PROJECTION */
+        pr[10] == 0.0f)
+        return ((Fade_t)FN_CRAFT_FADE)(inst, edx, out);
+    zn = -pr[14] / pr[10];                               /* the near plane, view space */
+    ((Box_t)FN_INSTANCE_BOX)(inst, edx, box);
+    for (i = 0; i < 8; i++) {
+        float x = box[i & 1 ? 3 : 0], y = box[i & 2 ? 4 : 1], z = box[i & 4 ? 5 : 2], w[3], d;
+        for (k = 0; k < 3; k++) w[k] = x * m[k] + y * m[3 + k] + z * m[6 + k] + m[9 + k];
+        d = w[0] * v[2] + w[1] * v[6] + w[2] * v[10] + v[14];
+        if (d < lo) lo = d;
+        if (d > hi) hi = d;
+    }
+    if (lo >= zn || hi <= lo) return 0;
+    t = (zn - lo) / ((hi - lo) * (g_nf_depth > 0.01f ? g_nf_depth : 0.01f));
+    if (t > 1.0f) t = 1.0f;
+    t = t * t * (3.0f - 2.0f * t);
+    *out = 1.0f - (1.0f - g_nf_min) * t;
+    return *out < 1.0f;
+}
+
+/* The fade of the instance being drawn: 1 for none. */
+static float near_fade(void)
+{
+    BYTE *eng = *(BYTE **)0x7ad508, *inst = eng ? *(BYTE **)(eng + 0x100) : NULLPTR;
+    float a;
+    if (!g_near_fade || !inst || !inst[0x77]) return 1.0f;
+    a = *(float *)(inst + 0x78);
+    return a < 0.0f ? 0.0f : a > 1.0f ? 1.0f : a;
+}
+
+static BYTE __fastcall hook_sort_required(void *dev, void *edx)
+{
+    DWORD ra = (DWORD)__builtin_return_address(0);
+    BYTE *eng = *(BYTE **)0x7ad508, *inst, *mat = *(BYTE **)((BYTE *)dev + 0x44);
+    BYTE  r = ((SortRequired_t)FN_SORT_REQUIRED)(dev, edx);
+    if (!r || !g_sh_on || !g_vb_seen || !eng || !mat) return r;
+    /* the mesh's RenderInternal, twice, and the material's SetRenderState */
+    if (ra != 0x63275b && ra != 0x6327ea && ra != 0x64472a) return r;
+    inst = *(BYTE **)(eng + 0x100);
+    if (!inst || !inst[0x77] || ((*(DWORD **)inst)[4] != FN_CRAFT_FADE &&
+                                 (*(DWORD **)inst)[4] != (DWORD)hook_craft_fade)) return r;
+    if (*(DWORD *)(mat + 0x20) != 1 || *(DWORD *)(eng + 0x110) || *(DWORD *)(eng + 0xf8)) return r;
+    if (ra == 0x6327ea && ++g_fade_draws == 1) logline("near fade: a fading hull drawn in the shaders");
+    return 0;
+}
+
 static void sh_note(int bit, const char *why)
 {
     char b[160];
@@ -842,7 +946,7 @@ static int sh_consts(void *d9, int bump)
     d9_vsconst(d9, 4, col, 3);
 
     if (bump) {
-        for (i = 0; i < 3; i++) { c[i] = g_ambient[i]; c[4 + i] = 1.0f; }
+        for (i = 0; i < 3; i++) { c[i] = g_borg_amb[i]; c[4 + i] = 1.0f; }
         c[3] = c[7] = 1.0f;
     } else {
         D9_FN(d9, D9_GETMATERIAL, D9Material_t)(d9, &mt);
@@ -891,7 +995,7 @@ static int sh_consts(void *d9, int bump)
             dv[nd * 4 + 2] = -l.Direction[2] / n;
             nd++;
         }
-        {   /* the Key, the brightest, times HullSun */
+        {   /* the Key, the brightest, times HullSun (BorgSun) */
             int   key = -1;
             float best = 0.0f;
             for (i = 0; i < nd; i++) {
@@ -899,16 +1003,16 @@ static int sh_consts(void *d9, int bump)
                 if (lum > best) { best = lum; key = i; }
             }
             if (key >= 0) {
-                for (i = 0; i < 3; i++) dc[key * 4 + i] *= g_hull_sun;
+                for (i = 0; i < 3; i++) dc[key * 4 + i] *= bump ? g_borg_sun : g_hull_sun;
                 dc[key * 4 + 3] = 1.0f;     /* the light the shadows take away */
             }
         }
         d9_psconst(d9, 2, dc, 4);
         d9_psconst(d9, 6, dv, 4);
         misc[0] = g_sh_sign;
-        misc[1] = g_sh_lit_self ? g_selfillum : 0.0f;
+        misc[1] = g_sh_lit_self ? (bump ? g_borg_self : g_selfillum) : 0.0f;
         misc[2] = g_knee;
-        misc[3] = 0.0f;
+        misc[3] = near_fade();
         d9_psconst(d9, 10, misc, 1);
         /* The point lights where they are, with the engine's falloff (full to start,
          * gone after fade) for the shader to apply per pixel. */
@@ -932,8 +1036,10 @@ static int sh_consts(void *d9, int bump)
     {   /* shine c59, rim_col c60, eye c61. The camera sits where the view matrix
          * takes to the origin: with VIEW = [R 0; t 1], eye = -t R^T. */
         float k[12];
-        k[0] = g_spec; k[1] = g_spec_pow; k[2] = g_rim_pow; k[3] = 0.0f;
-        k[4] = g_rim[0]; k[5] = g_rim[1]; k[6] = g_rim[2]; k[7] = 0.0f;
+        const float *rim = bump ? g_borg_rim : g_rim;
+        k[0] = bump ? g_borg_spec : g_spec; k[1] = bump ? g_borg_spec_pow : g_spec_pow;
+        k[2] = g_rim_pow; k[3] = 0.0f;
+        k[4] = rim[0]; k[5] = rim[1]; k[6] = rim[2]; k[7] = 0.0f;
         for (i = 0; i < 3; i++)
             k[8 + i] = -(vw[12] * vw[i * 4] + vw[13] * vw[i * 4 + 1] + vw[14] * vw[i * 4 + 2]);
         k[11] = 1.0f;
@@ -941,6 +1047,8 @@ static int sh_consts(void *d9, int bump)
     }
     return 1;
 }
+
+static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3);
 
 static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc)
 {
@@ -965,6 +1073,11 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     }
     rec = sm_take(dev, d9, &rc, pt, mi, nv, si, pc, 0);
     sm_consts(d9, rec ? &rc : NULLPTR, g_sh_sign);
+    if (near_fade() < 1.0f && fd_take(dev, d9, pt, mi, nv, si, pc, 0)) {   /* drawn at Flush */
+        d9_restore(d9, &sv);
+        if (rec) sm_keep(&rc, g_vb_mesh);
+        return 0;
+    }
     d9_bind(d9, vs, ps);
     sm_bind(d9);
     r = g_dip(dev, pt, mi, nv, si, pc);
@@ -1008,8 +1121,8 @@ static void hook_device(void *dev)
 }
 
 /* Bump-mapped hulls (BumpShaders=1, with Shaders=1). A mesh whose material names a bump
- * map (the Borg; any hull models/hull-bump.py patched) goes through ST3D_Dot3_MeshVB,
- * which ST3D_Mesh::Update picks before the plain vertex buffers. Its Render (0x6275a0,
+ * map (in stock, the Borg alone) goes through ST3D_Dot3_MeshVB, which ST3D_Mesh::Update
+ * picks before the plain vertex buffers. Its Render (0x6275a0,
  * slot 3 of the vtable at 0x6bc7d4) draws each group once per light, added up: the
  * normal map in stage 0 against the light taken into each vertex's tangent basis by
  * the engine's dot3 shader (Shaders\dot3_directional.nvv), the light's colour in the
@@ -1129,9 +1242,11 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     sh_consts(d9, 1);
     rec = sm_take(d8, d9, &rc, 4, 0, nv, 0, pc, 1);
     sm_consts(d9, rec ? &rc : NULLPTR, -1.0f);
-    sm_bind(d9);
-    ((DIP8_t)(*(void ***)d8)[71])(d8, 4, 0, nv, 0, pc);           /* TRIANGLELIST, as stock */
-    sm_unbind(d9);
+    if (near_fade() >= 1.0f || !fd_take(d8, d9, 4, 0, nv, 0, pc, 1)) {   /* else drawn at Flush */
+        sm_bind(d9);
+        ((DIP8_t)(*(void ***)d8)[71])(d8, 4, 0, nv, 0, pc);       /* TRIANGLELIST, as stock */
+        sm_unbind(d9);
+    }
     if (rec) sm_keep(&rc, mesh);
     ((D8VS3_t)(*(void ***)d8)[76])(d8, prev_vs);                   /* d3d8to9's own state again */
     for (i = 0; i < 3; i++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 1, 5 + i, samp[i]);
@@ -1261,8 +1376,10 @@ static void sm_release(void)
     g_sm_ok = 0;
 }
 
+static void fd_release(void);
 static long __stdcall hook_reset(void *dev, void *params)
 {
+    fd_release();
     sm_release();
     logline("shadows: the device resets, the shadow map is let go");
     return g_reset(dev, params);
@@ -1576,6 +1693,172 @@ static void sm_keep(SmRec *r, const BYTE *mesh)
         d->c[i] = lc[0] * w[i] + lc[1] * w[4 + i] + lc[2] * w[8 + i] + w[12 + i];
     }
     d->r = rad > 0.0f ? rad * sqrt_f(s) : 200.0f;
+}
+
+/* A fading hull, drawn last and blended (NearFade=1 with Shaders=1). Stock's CPU path
+ * hands a faded hull's triangles to ST3D_ZSort_Manager, which draws them, sorted, at the
+ * device's Flush (ST3D_DeviceDirectX8::Flush, slot 14 of its vtable, after every object
+ * has drawn): whatever is behind it is on screen by then. Drawn blended at its turn
+ * instead, a ship behind it drawn later would vanish behind it (it wrote depth) or be
+ * painted over it (it did not). So each of a fading hull's draws is recorded, with the
+ * buffers, textures, samplers, cull mode and every shader constant hook_dip or bump_draw
+ * set for it, and drawn at Flush, before stock's sorted triangles: hull by hull from the
+ * farthest, each first into depth alone and then in colour where it is nearest, blended
+ * by its fade, so a hull shows its front surface and not its insides. lighting/README.md,
+ * "The near fade". */
+#define FD_MAX 512
+#define FD_VS  12               /* vertex shader constants hull_vs and bump_vs read */
+#define FD_PS  72               /* and the pixel shaders */
+#define FN_DEVICE_FLUSH 0x626440
+typedef void (__fastcall *Flush_t)(void *dev, void *edx);
+typedef long (__stdcall *FdConst_t)(void *, UINT, float *, UINT);
+enum { FD_GETVSCONST = 95, FD_GETPSCONST = 110 };
+typedef struct {
+    void  *vb, *ib, *tex[2], *inst;
+    UINT   off, stride, mi, nv, si, pc;
+    int    base, dot3;
+    DWORD  pt, cull, samp[2][13];
+    float  z;                   /* the hull's depth: its first draw's origin, view space */
+    float  vc[FD_VS * 4], pc4[FD_PS * 4];
+} FdRec;
+static FdRec  g_fd[FD_MAX];
+static int    g_fd_n, g_fd_ix[FD_MAX];
+static DWORD  g_fd_frame;
+static void  *g_fd_dev, *g_fd_sb;
+static long   g_fd_replays;
+
+static void fd_drop(void)
+{
+    int i, j;
+    for (i = 0; i < g_fd_n; i++) {
+        sm_unref(g_fd[i].vb); sm_unref(g_fd[i].ib);
+        for (j = 0; j < 2; j++) sm_unref(g_fd[i].tex[j]);
+    }
+    g_fd_n = 0;
+}
+
+/* The draw in hand into the list, 1; 0 to draw it now (the list is full, or no buffers). */
+static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3)
+{
+    BYTE  *eng = *(BYTE **)0x7ad508;
+    FdRec *r;
+    void  *ib8 = NULLPTR;
+    UINT   base = 0;
+    float  v[16];
+    int    i, j;
+    if (g_fd_n && (g_fd_frame != g_frame || g_fd_dev != d9)) fd_drop();   /* never flushed */
+    if (g_fd_n >= FD_MAX) {
+        static int said;
+        if (!said) { said = 1; logline("near fade: more fading hull draws in a frame than the list holds; the rest opaque"); }
+        return 0;
+    }
+    g_fd_frame = g_frame; g_fd_dev = d9;
+    r = &g_fd[g_fd_n];
+    r->vb = r->ib = r->tex[0] = r->tex[1] = NULLPTR;
+    D9_FN(d9, SM_GETSTREAMSOURCE, SmGetSS_t)(d9, 0, &r->vb, &r->off, &r->stride);
+    D9_FN(d9, SM_GETINDICES, SmObj_t)(d9, &r->ib);
+    ((SmIdx8_t)(*(void ***)d8)[86])(d8, &ib8, &base);                     /* d3d8to9's base vertex */
+    sm_unref(ib8);
+    if (!r->vb || !r->ib) { sm_unref(r->vb); sm_unref(r->ib); return 0; }
+    r->base = (int)base; r->dot3 = dot3;
+    r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
+    for (i = 0; i < 2; i++) {
+        if (i == 0 || dot3) D9_FN(d9, D9_GETTEXTURE, SmGetTex_t)(d9, (DWORD)i, &r->tex[i]);
+        for (j = 0; j < 13; j++) D9_FN(d9, D9_GETSAMPLERSTATE, D9GetSamp_t)(d9, (DWORD)i, (DWORD)j + 1, &r->samp[i][j]);
+    }
+    D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &r->cull);                /* CULLMODE */
+    D9_FN(d9, FD_GETVSCONST, FdConst_t)(d9, 0, r->vc, FD_VS);
+    D9_FN(d9, FD_GETPSCONST, FdConst_t)(d9, 0, r->pc4, FD_PS);
+    r->inst = eng ? *(void **)(eng + 0x100) : NULLPTR;
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 2, v);                           /* VIEW */
+    r->z = g_sh_w[12] * v[2] + g_sh_w[13] * v[6] + g_sh_w[14] * v[10] + v[14];
+    for (i = 0; i < g_fd_n; i++) if (g_fd[i].inst == r->inst) { r->z = g_fd[i].z; break; }
+    g_fd_n++;
+    return 1;
+}
+
+static void fd_draw(void *d9, const FdRec *r, void *hvs, void *hps, void *bvs, void *bps)
+{
+    int i, j;
+    if (r->dot3) D9_FN(d9, D9_SETVERTEXDECLARATION, D9_Ptr_t)(d9, g_dot3_decl);
+    else         D9_FN(d9, D9_SETFVF, SmFVF_t)(d9, FVF_HULL);
+    D9_FN(d9, SM_SETSTREAMSOURCE, SmSetSS_t)(d9, 0, r->vb, r->off, r->stride);
+    D9_FN(d9, SM_SETINDICES, SmObj_t)(d9, r->ib);
+    for (i = 0; i < (r->dot3 ? 2 : 1); i++) {
+        D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, (DWORD)i, r->tex[i]);
+        for (j = 0; j < 13; j++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, (DWORD)i, (DWORD)j + 1, r->samp[i][j]);
+    }
+    D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 22, r->cull);
+    d9_bind(d9, r->dot3 ? bvs : hvs, r->dot3 ? bps : hps);
+    d9_vsconst(d9, 0, r->vc, FD_VS);
+    d9_psconst(d9, 0, r->pc4, FD_PS);
+    D9_FN(d9, SM_DIP, SmDIP9_t)(d9, r->pt, r->base, r->mi, r->nv, r->si, r->pc);
+}
+
+static void fd_replay(void)
+{
+    void *d9 = g_fd_dev, *hvs, *hps, *bvs = NULLPTR, *bps = NULLPTR;
+    int   n = g_fd_n, i, j, a, b, pass;
+    if (!n) return;
+    if (g_fd_frame != g_frame || !d9 || d9 != d9_device(g_dev)) { fd_drop(); return; }
+    hvs = d9_shader(d9, &g_hull_vs); hps = d9_shader(d9, &g_hull_ps);
+    for (i = 0; i < n; i++) if (g_fd[i].dot3) { bvs = d9_shader(d9, &g_bump_vs); bps = d9_shader(d9, &g_bump_ps); break; }
+    if (!hvs || !hps || (i < n && (!bvs || !bps || !g_dot3_decl))) { fd_drop(); return; }
+    if (!g_fd_sb && D9_FN(d9, SM_CREATESTATEBLOCK, SmMakeSB_t)(d9, 1, &g_fd_sb) < 0) {   /* D3DSBT_ALL */
+        g_fd_sb = NULLPTR; fd_drop(); return;
+    }
+    /* farthest hull first, a hull's draws together and in their order */
+    for (i = 0; i < n; i++) g_fd_ix[i] = i;
+    for (i = 1; i < n; i++) {
+        int k = g_fd_ix[i];
+        for (j = i; j > 0; j--) {
+            const FdRec *p = &g_fd[g_fd_ix[j - 1]], *q = &g_fd[k];
+            if (p->z > q->z || (p->z == q->z && (p->inst != q->inst ? (DWORD)p->inst <= (DWORD)q->inst : g_fd_ix[j - 1] < k))) break;
+            g_fd_ix[j] = g_fd_ix[j - 1];
+        }
+        g_fd_ix[j] = k;
+    }
+    D9_FN(g_fd_sb, 4, SmSB_t)(g_fd_sb);                                          /* Capture */
+    {
+        static const DWORD rs[][2] = {
+            { 7, 1 }, { 28, 0 }, { 15, 0 }, { 52, 0 },      /* ZENABLE; no fog, no alpha test, no stencil */
+            { 171, 1 }, { 19, 5 }, { 20, 6 }                 /* BLENDOP ADD: SRCALPHA, INVSRCALPHA */
+        };
+        for (i = 0; i < (int)(sizeof rs / sizeof rs[0]); i++)
+            D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, rs[i][0], rs[i][1]);
+    }
+    sm_bind(d9);
+    for (a = 0; a < n; a = b) {
+        for (b = a + 1; b < n && g_fd[g_fd_ix[b]].inst == g_fd[g_fd_ix[a]].inst; b++) ;
+        for (pass = 0; pass < 2; pass++) {
+            D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 14, pass ? 0 : 1);      /* ZWRITEENABLE */
+            D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 23, 4);                 /* ZFUNC LESSEQUAL */
+            D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 168, pass ? 15 : 0);    /* COLORWRITEENABLE */
+            D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 27, pass ? 1 : 0);      /* ALPHABLENDENABLE */
+            for (i = a; i < b; i++) fd_draw(d9, &g_fd[g_fd_ix[i]], hvs, hps, bvs, bps);
+        }
+    }
+    sm_unbind(d9);
+    D9_FN(g_fd_sb, 5, SmSB_t)(g_fd_sb);                                          /* Apply */
+    if (++g_fd_replays == 1 || g_fd_replays == 10000) {
+        char m[120];
+        m[0] = 0; s_cat(m, "near fade: fading hulls drawn at Flush "); s_num(m, g_fd_replays);
+        s_cat(m, " times, "); s_num(m, n); s_cat(m, " draws this time"); logline(m);
+    }
+    fd_drop();
+}
+
+static void fd_release(void)
+{
+    fd_drop();
+    sm_unref(g_fd_sb);
+    g_fd_sb = NULLPTR;
+}
+
+static void __fastcall hook_flush(void *dev, void *edx)
+{
+    fd_replay();
+    ((Flush_t)FN_DEVICE_FLUSH)(dev, edx);
 }
 
 /* Each frame: the planets, for PlanetShadows. A planet's centre and radius as
@@ -2794,6 +3077,9 @@ static void startup(void)
     g_fix_mirrored = (int)GetPrivateProfileIntA("Lighting", "FixMirrored", 1, ini);
     g_shaders = (int)GetPrivateProfileIntA("Lighting", "Shaders", 1, ini);
     g_bump    = (int)GetPrivateProfileIntA("Lighting", "BumpShaders", 1, ini);
+    g_near_fade = (int)GetPrivateProfileIntA("Lighting", "NearFade", 1, ini);
+    ini1(ini, "NearFadeDepth", &g_nf_depth);
+    ini1(ini, "NearFadeMin",   &g_nf_min);
     ini1(ini, "SelfIllumination", &g_selfillum);
     ini1(ini, "Specular",         &g_spec);
     ini1(ini, "SpecularPower",    &g_spec_pow);
@@ -2807,6 +3093,13 @@ static void startup(void)
     if (g_sm_size > 8192) g_sm_size = 8192;
     ini1(ini, "ShadowStrength",   &g_sm_strength);
     g_planet_shadows = (int)GetPrivateProfileIntA("Lighting", "PlanetShadows", 1, ini);
+    ini3(ini, "BorgAmbient",       g_borg_amb);
+    ini1(ini, "BorgSpecular",      &g_borg_spec);
+    ini1(ini, "BorgSpecularPower", &g_borg_spec_pow);
+    ini3(ini, "BorgRimLight",      g_borg_rim);
+    ini1(ini, "BorgSun",           &g_borg_sun);
+    ini1(ini, "BorgSelfIllumination", &g_borg_self);
+    if (g_borg_self < 0.0f) g_borg_self = g_selfillum;
     ini3(ini, "KeyColour",  g_key_col);
     ini3(ini, "KeyAxis",    g_key_dir);
     ini3(ini, "FillColour", g_fill_col);
@@ -2861,6 +3154,7 @@ static void startup(void)
     s_cat(b, " Lights=");          s_num(b, g_lights);
     s_cat(b, " Shaders=");         s_num(b, g_shaders);
     s_cat(b, " BumpShaders=");     s_num(b, g_bump);
+    s_cat(b, " NearFade=");        s_num(b, g_near_fade);
     s_cat(b, " PlanetShaders=");   s_num(b, g_planet_sh);
     s_cat(b, " Shadows=");         s_num(b, g_shadows);
     s_cat(b, " PlanetShadows=");   s_num(b, g_planet_shadows);
@@ -2908,6 +3202,16 @@ static void startup(void)
         g_dot3_render = (VBRender_t)FN_DOT3_RENDER;
         if (patch_slot(VT_DOT3_MESHVB, 3, FN_DOT3_RENDER, (const void *)hook_dot3_render)) n++;
         else logline("NOT PATCHED: Dot3_MeshVB vtable differs");
+    }
+    if (g_gpu && g_near_fade) {
+        if (patch_slot(VT_CRAFT_INSTANCE, 4, FN_CRAFT_FADE, (const void *)hook_craft_fade)) n++;
+        else logline("NOT PATCHED: CraftInstance vtable differs, stock's near fade");
+    }
+    if (g_gpu && g_shaders && g_near_fade) {
+        if (patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required) &&
+            patch_slot(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH, (const void *)hook_flush))
+            n += 2;
+        else logline("NOT PATCHED: DeviceDirectX8 vtable differs, no near fade in the shaders");
     }
     if (g_nebulae) n += redirect(S_NEBULA, (const void *)hook_nebula_lights);
     if (g_neb_cull > 1.0f) {

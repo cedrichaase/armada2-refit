@@ -6,6 +6,41 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 4.2.0 — 2026-10-07
+
+### Added
+- `hull-sod.py` rounds every compatible model, not four: 225 hull models are pinned in
+  `hull-sod.sha256` (skybox cubes, beams, portal and singularity effects, map features and
+  the logo are not), and 176 of them change. Per mesh: only `opaque` materials (a blended
+  mesh would take the CPU path), only meshes with something round in them (boxes stay
+  stock), and the largest split up to `--split` that keeps a mesh within 12,500 triangles.
+  The first four hulls build byte for byte as in 4.1.0.
+
+Confirmed in game 2026-10-07.
+
+## 4.1.0 — 2026-10-07
+
+### Added
+- `hull-sod.py` (`--install`, `--revert`, `--status`, `--manifest`, `--split`, `--crease`,
+  `--only`, `--out`) rounds the curved parts of ship models: curved patches through the
+  stock vertices where faces meet gently, hard edges kept hard, and a ring of hard edges
+  (a saucer's rim) curved along itself. Four Federation models, pinned in
+  `hull-sod.sha256`: `Fgalaxy`, `Fente`, `Fcruise1`, `fsaucer`; `--split 4` by default.
+  `install.sh` runs it and `--remove` reverts it; the backup is `.a2neb-backup`.
+
+Confirmed in game 2026-10-07.
+
+## 4.0.0 — 2026-10-07
+
+### Removed
+- `hull-bump.py` and `hull-bump.sha256` (`--install`, `--revert`, `--status`,
+  `--manifest`), and with them `Textures/RGB/a2flatbump.tga`. A flat bump map gives a
+  hull exactly a plain hull's shading in `Lighting.asi`'s shaders, which light every
+  hull per pixel. It was never part of `./install`; an install that ran it is reverted
+  by the script as of commit 062eb7e (`models/hull-bump.py --revert`).
+
+Installs nothing; no game-side change to confirm.
+
 ## 3.3.0 — 2026-10-05
 
 ### Added

@@ -11,11 +11,6 @@ The game's 3D geometry, where the refit changes it:
 - **Dilithium moons**, `SOD/Mdmoon*.SOD` and `Mmooninf.SOD`, smoothed by `moon-sod.py`.
   Below.
 - **The selection bubble**, `SOD/select.sod`, rounded by `select-sod.py`. Below.
-- **Hull lighting**, `hull-bump.py`: the Federation hulls are lit per pixel through the
-  engine's own dot3 bump path. Below. Not part of `./install`: run
-  `models/hull-bump.py --install` (`--revert`, `--status`). A hull it patches goes the
-  dot3 way; with `Lighting.asi`'s `BumpShaders=1` under d3d8to9 that draw is taken into
-  the hull shaders (`lighting/README.md`, "Bump-mapped hulls").
 
 `./install` runs `install.sh`, which builds and installs `Planets.asi` and `Planets.ini`
 smooths the moons and rounds the selection bubble (`.a2neb-backup` copies; `install.sh --remove` restores them).
@@ -166,60 +161,42 @@ moons' glow shell does, and its cost grows with the face count. With
 (`postfx/README.md`). Four times the faces suggests about 3 ms at 30 selected. That is
 an estimate from that measurement, not a measurement of its own.
 
-## Hull lighting
+## Rounder hulls
 
-### What the engine does
+A saucer is a ring of flat facets, about 16 degrees of arc each (the Galaxy's: 22 around
+its outline), and a new vertex on a flat face stays flat, so splitting triangles does
+nothing. `hull-sod.py` uses the moons' curved patches (above) with one change, because a
+hull has real corners the moons do not. An edge is *smooth* when its two faces meet at
+under `--crease` degrees (40); a corner's normal averages only the faces reachable through
+smooth edges, and a *hard* edge is drawn on its own curve on both sides, so patches still
+meet exactly. Two things came out of the bench: a saucer's rim is itself a hard edge (top
+against bottom), so with hard edges straight the outline did not change at all; a vertex
+where exactly two hard edges meet at a gentle turn now gives the edge the chain's tangent.
+Measured on the Galaxy saucer's outline: turn per facet 16.4 to 8.8 degrees at `--split 2`,
+which still read as facets at 3440x1440; `--split 4` reads as an ellipse. Box edges,
+pylons and nacelle ends stay crisp. Cost: 4x the triangles per `--split 2`, 16x at 4 (the
+Galaxy goes 759 to 12,144); an opaque hull is drawn from a vertex buffer, but this has not
+been measured with a full fleet. Only opaque meshes with something round in them are rounded, at the largest split up
+to 4 that keeps a mesh within 12,500 triangles: a blended mesh (shields, glows) would be
+drawn on the CPU every frame, and a box gains nothing. 176 of 225 hull models change; the
+largest, a station, gains 32k triangles. Only v1.93 models, found by the eight zero bytes ahead of a
+mesh and read back after writing; other versions are skipped.
 
-Traced with `testbench/d3dtrace` (its README has the frame breakdown). Every hull is
-lit **per vertex on the CPU** and reaches Direct3D pre-transformed, with no normals.
-The exception is a mesh whose material names a bump map. With *Graphics Settings →
-Bump Mapping* on (the default), such a mesh is drawn through a dot3 vertex shader in
-four passes: per-pixel N·L for each of the two directional lights, then the texture,
-then the night-lights. In stock only the Borg have bump maps.
+## Bump maps on Federation hulls
 
-### How a SOD asks for it
+`hull-bump.py` (models 3.2.0) gave the 36 Federation SODs the Borg's bump-mapped
+material with one flat height map, `a2flatbump.tga`, to get per-pixel lighting out of
+the engine's dot3 path. Since lighting 1.11.0 `Lighting.asi` lights every hull per
+pixel in its own shaders (`lighting/README.md`, "Shaders"), and a flat map gives a
+patched hull exactly a plain hull's shading there. So it was removed in models 4.0.0.
 
-Read from the 167 bump-mapped materials in the 25 Borg SODs, all spelled alike: the
-lighting material `opaque` is **type 6** with **two** textures, the diffuse with word
-`0` and then the bump map with word `0x200`. A plain material is type 4 with one
-texture. The bump map is a 24-bit greyscale height map. The engine takes the normals
-from its slope at load.
-
-`hull-bump.py` rewrites the 59 plain `opaque` materials of the 36 Federation SODs in
-`hull-bump.sha256` that way, from the stock bytes, with a `.a2neb-backup` of each.
-
-### Why the height map is flat
-
-A height map derived from the hull art was tried first: a high-pass of each texture's
-luminance. It turns every painted speck into relief. In game the user called it
-"ugly as hell": "it adds a lot of detail where there should be none". The lighting
-itself read as better. A **flat** map keeps the per-pixel lighting and adds no relief,
-because a constant height has zero slope everywhere. So every material names one
-8x8 mid-grey map, `Textures/RGB/a2flatbump.tga`.
-
-It is the one file this layer adds to `Textures/RGB`, and it gets its own name on
-purpose. A stock texture that happens to be one colour (`Gshroud`, `Mdmoonglo`) would
-also be flat. But it is a real texture, and whether the engine caches a texture loaded
-as a bump map under the same name as the colour texture is not known. A clash would
-draw the fog of war as a normal map, or light a hull from a wrong direction. A
-unique name rules that out. `a2mod` switches the file with the SODs, and the texture
-inventory skips it.
-
-### Measured
-
-First Federation mission, 1920x1080, refit, one camera. Grey mean / standard deviation
-over each ship:
-
-| | Bump Mapping off (stock path) | `hull-bump` |
-|---|---|---|
-| Enterprise-E | 52.3 / 70.3 | 43.0 / 60.7 |
-| Akira | 69.2 / 71.9 | 54.5 / 55.5 |
-
-Smooth light and shade across saucers and nacelles, painted detail unchanged, and
-**18–21% darker**. The dot3 passes add no ambient or emissive term. The CPU path adds
-the material's (0.18, 0.065, 0.065), the warm lift stock hulls have. Restoring it means
-replacing the dot3 passes' colour maths in a plugin, and since lighting 1.11.0
-`Lighting.asi` does that (`BumpShaders=1`, under d3d8to9): one draw in its hull shaders,
-with `Ambient` and the rest, from the same vertex buffer and normal map. *Bump Mapping:
-Off* in game returns the hulls to the stock path at any time.
-
+What a SOD needs to ask for a bump map, read from the 167 bump-mapped materials in the
+25 Borg SODs (in stock only the Borg have them): the lighting material `opaque` is
+**type 6** with **two** textures, the diffuse with word `0` and then the bump map with
+word `0x200`. A plain material is type 4 with one texture. The bump map is a 24-bit
+greyscale height map, which the engine turns into a normal map at load. Such a hull goes
+through `Lighting.asi`'s bump path, which lights it with the Borg profile
+(`lighting/README.md`, "The Borg profile"). Federation hulls with real relief would take
+that spelling, a height map of their own, and a profile of their own. A map derived from
+the hull art (a high-pass of each texture's luminance) was tried and rejected in game: it
+turns every painted speck into relief.

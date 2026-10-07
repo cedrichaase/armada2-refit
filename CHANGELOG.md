@@ -5,7 +5,7 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 10.8.0 — 2026-10-07
+## 11.8.0 — 2026-10-07
 
 Layers: testbench 3.4.0.
 
@@ -21,7 +21,7 @@ Layers: testbench 3.4.0.
 
 Installs nothing; seen working on the bench 2026-10-07.
 
-## 10.7.0 — 2026-10-07
+## 11.7.0 — 2026-10-07
 
 Layers: testbench 3.3.0.
 
@@ -30,6 +30,87 @@ Layers: testbench 3.3.0.
   scene, a fleet action for footage (testbench 3.3.0).
 
 Installs nothing; seen working on the bench 2026-10-07.
+
+## 11.6.0 — 2026-10-07
+
+Layers: qol 1.6.0, online 0.6.0.
+
+### Added
+- The online handshake for QOLRules: pay-on-queue runs in an *Internet – Online* game when
+  every player has it, and stands down otherwise.
+
+Installed, not yet seen in game.
+
+## 11.5.0 — 2026-10-07
+
+Layers: qol 1.5.0.
+
+### Added
+- `QOLRules.asi`: pay when queuing, refund on cancel (QOL-7), single player and skirmish
+  only. `a2mod` and the bench's log collection know the new files.
+
+Installed, not yet seen in game.
+
+## 11.4.0 — 2026-10-07
+
+Layers: models 4.2.0.
+
+### Added
+- Every faction's ships and stations drawn round where they are round: 176 hull models
+  (`hull-sod.py`, models 4.2.0).
+
+Confirmed in game 2026-10-07.
+
+## 11.3.0 — 2026-10-07
+
+Layers: models 4.1.0.
+
+### Added
+- Federation saucers, bridge modules and aeroshells drawn round rather than as rings of
+  flat facets (`hull-sod.py`, models 4.1.0): four hulls so far.
+
+Confirmed in game 2026-10-07.
+
+## 11.2.0 — 2026-10-07
+
+Layers: qol 1.4.0.
+
+### Added
+- The view reaches across the whole map: the far plane and the distance past which
+  ships, stations, planets, asteroids and nebulae fade out are raised in memory
+  (`ViewDistance=`, qol 1.4.0).
+
+Confirmed in game 2026-10-07.
+
+## 11.1.0 — 2026-10-07
+
+Layers: lighting 1.17.0.
+
+### Changed
+- A ship close to the camera fades only once the camera's near plane cuts into it, not
+  once it fills half the view (`NearFade`, `NearFadeDepth`, `NearFadeMin`, lighting 1.17.0).
+
+### Fixed
+- Ships close to the camera keep the new lighting instead of falling back to stock's
+  while the engine fades them; a faded ship is drawn blended, as stock draws it
+  (lighting 1.17.0).
+
+Confirmed in game 2026-10-07.
+
+## 11.0.0 — 2026-10-07
+
+Layers: lighting 1.16.0, models 4.0.0.
+
+### Added
+- The Borg have a lighting profile of their own: dark plating with a faint, tight
+  highlight, a sickly green rim and their night lights carrying the look (`BorgAmbient`,
+  `BorgSpecular`, `BorgRimLight`, `BorgSun`, ..., lighting 1.16.0).
+
+### Removed
+- `models/hull-bump.py` and its flat map `a2flatbump.tga` (models 4.0.0); `a2mod` and
+  `textures/tools/inventory.py` no longer list the map.
+
+Confirmed in game 2026-10-07.
 
 ## 10.6.0 — 2026-10-07
 

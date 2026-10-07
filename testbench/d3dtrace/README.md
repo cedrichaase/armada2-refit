@@ -73,7 +73,6 @@ Observed on 2026-10-03, first Borg mission, 1920x1080, refit, with MSAA (session
 
 ## Experiment A: Federation hulls on the bump path
 
-Became `models/hull-bump.py`. What a SOD needs, why the height map is flat, and the
-measurements are in `models/README.md`, "Hull lighting". To try a variant on the
-bench, run it against a clone: `A2_GAME=~/.cache/a2test/sessions/<id>/game
-models/hull-bump.py --install`, after `session start --no-launch`.
+Became `models/hull-bump.py` (models 3.2.0), removed in models 4.0.0 once `Lighting.asi`
+lit every hull per pixel. What a SOD needs to ask for a bump map is in
+`models/README.md`, "Bump maps on Federation hulls".

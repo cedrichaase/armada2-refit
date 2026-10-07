@@ -17,6 +17,17 @@ clang --target=i386-pc-windows-msvc \
       -fno-stack-protector -mno-stack-arg-probe \
       -c "$here/qol.c" -o "$out/qol.obj"
 
+clang --target=i386-pc-windows-msvc \
+      -O2 -Wall -Wextra \
+      -ffreestanding -fno-builtin \
+      -fno-stack-protector -mno-stack-arg-probe \
+      -c "$here/rules.c" -o "$out/rules.obj"
+
+lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
+         /out:"$out/QOLRules.asi" \
+         "$out/rules.obj" "$out/kernel32.lib"
+echo "built $out/QOLRules.asi"
+
 lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/QOL.asi" \
          "$out/qol.obj" "$out/kernel32.lib"

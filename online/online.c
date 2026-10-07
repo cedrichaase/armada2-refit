@@ -66,6 +66,7 @@ typedef char               *LPSTR;
 typedef struct { BYTE opaque[24]; } CRITICAL_SECTION;
 
 __declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
+__declspec(dllimport) void *  __stdcall GetProcAddress(HMODULE, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetModuleFileNameA(HMODULE, LPSTR, DWORD);
 __declspec(dllimport) BOOL    __stdcall VirtualProtect(void *, UINT, DWORD, DWORD *);
 __declspec(dllimport) HANDLE  __stdcall CreateFileA(LPCSTR, DWORD, DWORD, void *, DWORD, DWORD, HANDLE);
