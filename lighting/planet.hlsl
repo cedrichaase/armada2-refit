@@ -94,16 +94,114 @@ float4 ground_ps(Lit i) : COLOR
     return float4(shoulder(c, shine.w), 1.0);
 }
 
+// The night lights are made here, not read: the development texture's alpha is a solid
+// blob per town, so it says only where people live. Hashes and noise, the usual
+// sin-fract kind; the cell nets are Voronoi.
+float  hash1(float2 p) { return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
+float2 hash2(float2 p)
+{
+    return frac(sin(float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)))) * 43758.5453);
+}
+float vnoise(float2 p)
+{
+    float2 ip = floor(p), f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return lerp(lerp(hash1(ip), hash1(ip + float2(1, 0)), f.x),
+                lerp(hash1(ip + float2(0, 1)), hash1(ip + float2(1, 1)), f.x), f.y);
+}
+float fbm(float2 p)
+{
+    return vnoise(p) * 0.55 + vnoise(p * 2.03 + float2(5.2, 1.3)) * 0.3
+         + vnoise(p * 4.1 + float2(9.1, 3.7)) * 0.15;
+}
+
+// The Voronoi net at p: x the distance to the nearest seed, y F2 - F1 (0 on a border
+// between two cells), z the nearest cell's hash, w one hash per pair of cells, the
+// same on both sides of their border.
+float4 cells(float2 p)
+{
+    float2 ip = floor(p), fp = frac(p);
+    float  d1 = 8.0, d2 = 8.0, i1 = 0.0, i2 = 0.0;
+    for (int y = -1; y <= 1; y++)
+        for (int x = -1; x <= 1; x++) {
+            float2 g = float2(x, y);
+            float2 r = g + hash2(ip + g) - fp;
+            float  d = dot(r, r);
+            float  id = hash1(ip + g + float2(17.0, 31.0));
+            if (d < d1) { d2 = d1; i2 = i1; d1 = d; i1 = id; }
+            else if (d < d2) { d2 = d; i2 = id; }
+        }
+    d1 = sqrt(d1);
+    return float4(d1, sqrt(d2) - d1, i1, frac(i1 + i2));
+}
+
+// Lit lines along the borders of the net at p (cells per UV), `width` cells wide, on
+// the share `keep` of the borders. fw is a pixel in cells: a line narrower than a
+// pixel spreads the same light over the pixel instead of shimmering.
+float roads(float2 p, float fw, float width, float keep, out float id)
+{
+    float4 c = cells(p);
+    float  w = max(width, fw);
+    id = c.z;
+    return (1.0 - smoothstep(0.0, w, c.y)) * (width / w) * step(c.w, keep) * (0.4 + 0.6 * frac(c.w * 7.31));
+}
+
+// Where people live at uv: the development texture's alpha times the planet's own
+// population map, as stock multiplies them, whichever channel the engine paints.
+float town_at(float2 uv)
+{
+    float4 p = tex2D(tex1, uv);
+    return tex2D(tex0, uv).a * p.a * max(p.r, max(p.g, p.b));
+}
+
+// How bright the cities are at night at uv: a faint glow over each town, downtown
+// brighter in hot spots, a street net beaded with lights and a finer net of lanes in
+// the denser parts fill each town, a coarse net of highways runs out between
+// neighbouring towns, and single lights scatter past their edges.
+float city_night(float2 uv)
+{
+    const float2 ring[8] = { float2(1, 0), float2(0.7071, 0.7071), float2(0, 1), float2(-0.7071, 0.7071),
+                             float2(-1, 0), float2(-0.7071, -0.7071), float2(0, -1), float2(0.7071, -0.7071) };
+    float m = town_at(uv), near = m, wide = 0.0;
+    for (int k = 0; k < 8; k++) {
+        near += town_at(uv + ring[k] * (5.0 / 256.0));
+        wide += town_at(uv + ring[k] * (14.0 / 256.0));
+    }
+    near /= 9.0; wide /= 8.0;
+    float  fw = max(fwidth(uv.x), fwidth(uv.y));          // UV per pixel
+    float  town = saturate((near * 0.7 + m * 0.3) * (0.7 + 1.6 * fbm(uv * 28.0)));
+    float2 wuv = uv + (float2(vnoise(uv * 9.0 + float2(2, 0)), vnoise(uv * 9.0 + float2(0, 7))) - 0.5) * 0.035;
+    float  sid, hid;
+    float  st = roads(wuv * 120.0, fw * 180.0, 0.055, 0.85, sid);
+    float  bead = lerp(0.775, 0.55 + 0.45 * vnoise(wuv * 900.0), saturate(2.0 - fw * 1400.0));
+    st *= smoothstep(0.05, 0.5, town) * (0.45 + 0.55 * sid) * bead;
+    float  lid;
+    float  lane = roads(wuv * 300.0 + 3.1, fw * 450.0, 0.09, 0.7, lid) * smoothstep(0.1, 0.6, town);
+    float  hw = roads(wuv * 20.0, fw * 30.0, 0.03, 0.5, hid);
+    hw *= smoothstep(0.02, 0.35, max(wide, near)) * (1.0 - 0.7 * smoothstep(0.4, 0.9, town));
+    float  d1 = cells(uv * 320.0).x;
+    float  pr = max(0.065, fw * 224.0);
+    float  pts = exp(-(d1 / pr) * (d1 / pr)) * (0.065 / pr) * (0.065 / pr)
+               * step(hash1(floor(uv * 320.0) + float2(3.0, 7.0)), (0.08 + 0.9 * saturate(town + wide * 0.3))
+                                                                  * smoothstep(0.01, 0.12, max(wide, near)));
+    float  core = pow(smoothstep(0.3, 0.9, town), 2.0) * (0.4 + 0.6 * vnoise(uv * 60.0 + float2(1.7, 4.4)));
+    float  glow = smoothstep(0.0, 0.6, town) * 0.12 + saturate(wide) * 0.04;
+    return 1.5 * (glow + core * 0.9 + st + lane * 0.8 + hw * 0.6 + pts * (0.8 + town));
+}
+
 // The cities (pass 1, blended by alpha over the ground): the development texture
 // times the planet's own city map in stage 1, as stock; by day lit like the ground,
-// at night lit from within.
+// at night lit from within by city_night, warm, whitening where it is brightest.
 float4 city_ps(Lit i) : COLOR
 {
     Sky    s = shade(i.wp);
     float4 t = tex2D(tex0, i.uv) * tex2D(tex1, i.uv);
     float  night = (1.0 - s.day) * shine.z;
-    float3 c = t.rgb * lit(s) + city_col.rgb * night;
-    return float4(shoulder(c, shine.w), saturate(t.a * (1.0 + night * 2.0)));
+    float  L = city_night(i.uv) * night;
+    float3 e = city_col.rgb * L + saturate(L - 0.9) * 0.4;
+    float  a = saturate(t.a + max(e.r, max(e.g, e.b)));
+    float3 c = (t.rgb * lit(s) * t.a + e) / max(a, 1e-3);
+    return float4(shoulder(c, shine.w), a);
 }
 
 // The cloud shell (blended by its texture's alpha): the clouds lit with a night side,

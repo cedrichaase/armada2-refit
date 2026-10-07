@@ -1,10 +1,11 @@
 # qol — gameplay quality of life
 
 Changes to how Armada II *plays*, as opposed to how it looks: the controls, the camera,
-control groups, production. Five of them are built in `QOL.asi`: the right-drag pan
+control groups, production. Six of them are built in `QOL.asi`: the right-drag pan
 speed (QOL-2), selections and control groups of up to 120 (QOL-3), Shift+number
-adding to a group (QOL-4), stations in control groups (QOL-5) and one build menu for
-several stations, each order going to one of them (QOL-6). The rest are planned here,
+adding to a group (QOL-4), stations in control groups (QOL-5), one build menu for
+several stations, each order going to one of them (QOL-6), and long moves on the map
+going to warp (QOL-8). The rest are planned here,
 each with what is wrong today, what
 we want, what is already known and what still has to be measured. What is installed, at which
 version, and whether it has been seen in game is in [`CHANGELOG.md`](CHANGELOG.md).
@@ -24,7 +25,7 @@ network game simulates, and the two cannot ship in one plugin:
 
 - **`QOL.asi` — stock-compatible.** The camera, the keys, which ordinary command a key
   press turns into. A player with it can join a player without it, and nothing they
-  simulate differs. Installed by default. QOL-2 to 6 belong here. QOL-1 became
+  simulate differs. Installed by default. QOL-2 to 6 and QOL-8 belong here. QOL-1 became
   a plugin of its own, `GridLayout.asi` (`grid/`), so it can be switched separately.
 - **A rules plugin (`QOLRules.asi`, not built yet) — every player needs it.** Changes to
   what the game *does* with a command: when the bank is charged, what a group can
@@ -53,6 +54,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-5](#qol-5-buildings-in-control-groups) | Buildings in control groups | `QOL.asi`, `StationGroups=` | — | **done** (`QOL.asi`), bench |
 | [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | `QOL.asi`, `StationGroups=` | Construction ships | **done** for stations (`QOL.asi`), bench |
 | [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | code, every peer | Measure stock's charge and refund rules | scoped |
+| [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
 
 ## Things that apply to all of them
 
@@ -516,3 +518,74 @@ Destroying a yard with three paid items returns all three costs, and so does los
 to capture or assimilation, which leaves the new owner an empty queue. An order with too few
 officers is refused. A save made mid-queue loads with the same bank and queues, and
 nothing is charged a second time.
+
+---
+
+## QOL-8: Long moves on the map go to warp
+
+*`QOL.asi`, stock-compatible: the minimap's own order. Built: `WarpDistance=` (default
+1100; 0 leaves moves stock).*
+
+**Problem.** A move ordered on the minimap goes to warp; the same move ordered on the
+map does not, unless Alt is held, which nothing in the game tells the player. Zoomed out,
+a ship sent from the middle of the screen to its edge crawls there at impulse.
+
+**Wanted.** A move on the map past some distance goes to warp, as if it had been
+ordered on the minimap.
+
+**Stock.** A move is one of two commands: `GO` (4) or `GO_WARP` (0x2b), each with a
+`_SINGLE` form for a lone ship (`AiCommandToName`'s table). Every frame,
+`cOverViewImp::mNormalModeInput` (0x522c40) works out what a click on the map would do
+(`ActionMode::GetAction`) and keeps it at `cOverViewImp+0x3c`, with the map point under
+the cursor at +0xa4. The click handlers (`mNormalModeLeftClick`,
+`mNormalModeRightClick`, `mBroadcastAction`) send whatever is there, and the cursor is
+drawn from it too. At 0x522cb8 that function turns a `GO` into `GO_WARP` when Alt
+(`g_pCommandAlt`, 0x761344) is held. The minimap's `RadarComponent::Simulate` does the
+opposite: `GO_WARP` unless Alt is held (0x4e8bfa).
+
+What a ship does with `GO_WARP` is decided where it is carried out, on every machine
+alike. `CraftProcess::Handle_New_Command` sets the move up as a `GO`, and then calls
+`cCraftControl::TryWarp(true)` only if that ship is farther than
+`cfgTOO_CLOSE_TO_WARP` (800 in `RTS_CFG.h`) from where it is going. `TryWarp` arms warp
+only if the ship's warp speed is above its speed and warp is allowed (`g_allowWarp`, the
+mission scripts' `AllowWarp`; `GameSetup::isAllowWarpSpeed`, the setup screen). On the
+way, `cHoverCraftControlBase::mWarpCheck` drops warp near planets and black holes
+(`mPreWarpCheck`) and when the destination is closer than the ship can stop from warp.
+So a `GO_WARP` cannot make a ship warp where the rules say it may not, and a ship
+close to its destination moves at impulse while the rest of the selection warps.
+
+**With `QOL.asi`.** Stock's Alt block (0x522cb8 to 0x522cdf) becomes a jump to the
+plugin. Alt held still turns a `GO` into `GO_WARP` as in stock. Without Alt, so does a
+`GO` whose selection is on average farther than `WarpDistance` from the point under
+the cursor: this player's selected ships that can warp, by the straight-line distance
+from each one's position (+0xac) to the point, averaged. A ship can warp when its
+control (`Craft+0x1b0`) has a warp speed (+0xc, `cCraftControl::SetWarpSpeed`) above
+its speed (+0x8), `TryWarp`'s own test; a selection with none such, or a game with warp
+turned off (`g_allowWarp`, `GameSetup::isAllowWarpSpeed`, as `TryWarp` reads them),
+stays an ordinary move. Counting every ship turned the cursor blue for ships that
+cannot warp (seen in game, 2026-10-07). One order goes to the whole selection,
+so the choice is one per order. The average is what a scattered selection sent to its
+own middle needs: it stays an ordinary move. The flag bit 0x4000 is kept as stock
+keeps it. The order sent is the ordinary `GO_WARP`, the one a stock player's minimap
+sends, so a stock player in the same game carries it out like any other.
+
+Since the cursor is drawn from the same field, it shows the choice before the click:
+stock's green move ring near, the game's blue warp ring past the distance.
+
+**Why 1100.** It is `cfg_MIN_MOVE_WARP_DISTANCE` in `RTS_CFG.h` ("At what range will
+the AI try to warp?"), so the player warps where the computer players do. Measured on
+the bench at 1920x1080 (2026-10-07): at the default zoom a pixel is about 1.15 units,
+so the side of the screen is about 1100 from its middle; zoomed all the way out it is
+about 1.75 units, about 1700. Ordering from the middle to the side therefore warps when
+zoomed out, and is on the edge of it at the default zoom.
+
+**Seen on the bench (2026-10-07)**, `testbench/scenarios/qol-warp.md` on the `warp`
+scene (three destroyers): zoomed out, a right-click near the right edge (about 1600
+away) showed the warp ring, and the ships went from 3000 to 4567 at up to about 700
+units a second (sampled by hand, about a second apart). A right-click about 1000 away
+showed the green ring and ran at about 240 a second. The scripted run showed the same
+two rings; the time warp takes to spin up was not measured.
+
+**Open.** A network game against a stock player (the order is the minimap's, so it
+should simply be carried out). Whether the threshold should follow the zoom: at the
+closest zooms, a move across the screen stays an ordinary one.

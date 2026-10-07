@@ -34,7 +34,7 @@ it bundles.
 | `hud/` | `HUD.asi` — the in-game HUD layout, font and cursors at any aspect | `hud/README.md` |
 | `menus/` | `Menus.asi` — the shell menus — and `backdrop.sh`, which builds the widescreen plates it composites | `menus/README.md`, `menus/BACKDROPS.md` |
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
-| `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several), and the plan for the rest, split by whether other players need it | `qol/README.md` |
+| `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several, long moves on the map at warp), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers | `lighting/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
@@ -59,9 +59,13 @@ or `import a2env` (Python, with the repository root on `sys.path`): they resolve
 `~/.config/armada2-refit.conf`, then the default location.
 
 **To see a change working in the game without taking over the user's screen, use the
-test bench**: `./a2test session start --res 21:9`, then `./a2test drive shot` / `click` /
-`key` / `step "…"`, and read the screenshots. It runs on a reflink clone of the install
-and a headless display. Write regression scenarios in `testbench/scenarios/` for fixes
+test bench**: `./a2test session start --res 21:9`, then `./a2test drive --session ID shot`
+/ `click` / `key` / `step "…"`, and read the screenshots. It runs on a reflink clone of
+the install and a headless display. **Keep the ID `session start` prints, pass
+`--session ID` on every `drive`, and end with `./a2test session stop ID`** (the ID is
+required). Other jobs run sessions on the same bench: stop only the sessions you
+started, never one from `session list` you don't recognise (`testbench/README.md`,
+"Which session a command acts on"). Write regression scenarios in `testbench/scenarios/` for fixes
 worth keeping fixed. A bench pass is evidence for the user, not their sign-off
 ("Finishing work" still applies).
 **To test a checkout as installed**, `./a2test session start --install <checkout>` (or
@@ -663,8 +667,12 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `VBRender` only**: the engine's `SetVertexShader(FVF)` becomes d3d9
   `SetVertexShader(NULL)` under d3d8to9, so anything bound earlier is lost. Every d3d9
   path must fall back when `d9_device()` is NULL (DXVK's d3d8). `platform/D3D9.md`.
-- **`models/hull-bump.py` and `Lighting.asi` do not combine**: a bump-mapped hull goes
-  the dot3 way, which takes precedence over the vertex buffers.
+- **Bump-mapped hulls (the Borg, `models/hull-bump.py`'s) go the dot3 way**, which
+  takes precedence over the vertex buffers. `BumpShaders=1` wraps
+  `ST3D_Dot3_MeshVB::Render` and draws them in the hull shaders under d3d8to9. Their
+  normal is the SOD's vertex normal tilted by the map along S and T. Never use the
+  engine's S x T as the normal: it is summed from UV slopes and drew dark streaks where
+  UVs are mirrored.
 
 ### textures
 
@@ -714,7 +722,7 @@ both; **never ship one without the other.**
 **Federation hulls can be lit per pixel by the engine itself**: a SOD material spelled
 the Borg way (type 6, a second texture with word `0x200`) goes through the dot3 path.
 `models/hull-bump.py` does it with a *flat* height map; one derived from the hull art
-was rejected in game. It is 18–21% darker, because the dot3 passes have no ambient term
+was rejected in game. On the dot3 passes it is 18–21% darker, because they have no ambient term
 (`models/README.md`, "Hull lighting").
 
 **The planets' shape is not in their SOD.** `Planet_Database` builds its own sphere and

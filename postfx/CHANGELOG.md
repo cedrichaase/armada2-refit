@@ -24,7 +24,7 @@ Confirmed in game 2026-10-05.
   70.6 ms a frame to 0.6–0.8 ms. `renderer-config.sh` leaves the key out, with a
   warning, on a DXVK that does not know it (b038b8e).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-06.
 
 ## 1.1.0 — 2026-09-28
 

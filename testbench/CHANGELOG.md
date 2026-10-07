@@ -5,6 +5,36 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.2.0 — 2026-10-07
+
+### Added
+- The `warp` scene (three Federation destroyers in open space) and
+  `scenarios/qol-warp.md`: a long move on the map goes to warp (qol 1.3.0).
+
+Installs nothing; the scene seen working on the bench 2026-10-07.
+
+## 3.1.0 — 2026-10-07
+
+### Added
+- The `factions` scene: one torpedo or pulse ship of each playable faction, each firing
+  at its own Borg cube (lighting 1.12.0, `OrdnanceColours`).
+
+Installs nothing into the game; seen working on the bench 2026-10-07.
+
+## 3.0.0 — 2026-10-06
+
+### Changed
+- `a2test session stop` requires the session's ID (`session stop ID`, `--session ID` or
+  `A2TEST_SESSION`); it no longer stops the newest session by default.
+- `a2test drive` takes `--session ID` anywhere on its line. Without one (or
+  `A2TEST_SESSION`) it drives the only active session and refuses when several are
+  active, instead of driving the newest.
+- `A2TEST_SESSION` takes a session ID as well as a state path; an unknown or ended
+  session is an error rather than a fall-back.
+- `session start` prints the `drive --session` and `session stop` commands for its ID.
+
+Installs nothing; seen working on the bench 2026-10-06.
+
 ## 2.14.0 — 2026-10-05
 
 ### Added

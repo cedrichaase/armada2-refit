@@ -388,9 +388,9 @@ whose `Setup:` runs `reference-dplay.sh` on each clone):
 
 By hand, to look around in between:
 
-    ./a2test session start --res 16:9 --no-launch      # twice: host and joiner
+    ./a2test session start --res 16:9 --no-launch      # twice: host and joiner; note both IDs
     online/reference-dplay.sh <state.json of each>     # Microsoft DirectPlay + Online.asi
-    A2TEST_SESSION=<host state.json> ./a2test drive launch
+    ./a2test drive --session <host ID> launch
     # host: Multiplayer emblem > Internet - Manual IP > O.K. with the field empty >
     #       Create Game > O.K.
     # joiner: rename at design 400,187 > Internet - Manual IP > design 400,292,
@@ -400,8 +400,9 @@ By hand, to look around in between:
 
 Traps found on the way:
 
-- **`a2test drive` drives the newest session** unless `A2TEST_SESSION` names one, so set
-  it on every command when two are running.
+- **Name the session on every command**: with two running, `a2test drive` refuses
+  without `--session ID`, and `session stop` always needs the ID. Stop both by ID at the
+  end.
 - **The Multiplayer button is the emblem, not the word.** `click-text "Multiplayer"`
   misses; the scenario step "Click the multiplayer emblem." hits.
 - **A clone can start with no Wine desktop.** The log shows `failed to start explorer`

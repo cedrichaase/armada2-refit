@@ -5,15 +5,59 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 9.18.0 — 2026-10-06
+## 10.4.0 — 2026-10-07
+
+Layers: lighting 1.13.0.
+
+### Changed
+- City lights on a planet's night side are webs of streets, roads and single lights
+  instead of flat cream blotches (`CityLights`, lighting 1.13.0).
+
+Confirmed in game 2026-10-07.
+
+## 10.3.0 — 2026-10-07
+
+Layers: qol 1.3.0, testbench 3.2.0.
+
+### Added
+- A move ordered on the map past `WarpDistance=` (default 1100) goes to warp, as one on
+  the minimap does (qol 1.3.0); the `warp` scene and `qol-warp` scenario check it
+  (testbench 3.2.0).
+
+Confirmed in game 2026-10-07.
+
+## 10.2.0 — 2026-10-07
+
+Layers: lighting 1.12.0, testbench 3.1.0.
+
+### Added
+- Torpedo and pulse lights take the colour of the projectile's own sprite instead of
+  the ODF's cyan or green (`OrdnanceColours=`, lighting 1.12.0); the bench's
+  `factions` scene shows one weapon of each playable faction (testbench 3.1.0).
+
+Confirmed in game 2026-10-07.
+
+## 10.1.0 — 2026-10-07
 
 Layers: lighting 1.11.0.
 
 ### Added
-- Phaser fire lights the firing ship around the emitter and the target where it
-  strikes, in the beam's colour (`Phasers`, `PhaserImpact`, lighting 1.11.0).
+- Borg ships, and hulls `models/hull-bump.py` patched, are lit in `Lighting.asi`'s hull
+  shaders under d3d8to9 (`BumpShaders=1`, lighting 1.11.0): their bump maps kept, with
+  the ambient, light sources, specular, rim and night lights other hulls get.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
+
+## 10.0.0 — 2026-10-06
+
+Layers: testbench 3.0.0.
+
+### Changed
+- `a2test session stop` requires a session ID, and `a2test drive` takes `--session ID`
+  and refuses to pick among several active sessions (testbench 3.0.0). `CLAUDE.md`: an
+  agent keeps the IDs of the sessions it starts and stops only those.
+
+Installs nothing; no game-side change to confirm.
 
 ## 9.17.0 — 2026-10-05
 

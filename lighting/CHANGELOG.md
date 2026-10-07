@@ -4,17 +4,40 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
-## 1.11.0 — 2026-10-06
+## 1.13.0 — 2026-10-07
+
+### Changed
+- `CityLights`: a developed planet's night side draws its towns as a web of light, in
+  place of one flat colour over each town: streets and finer lanes beaded with lights,
+  highways reaching out between towns, single lights past their edges, a glow and
+  brighter downtowns, all generated in `planet.hlsl`'s `city_ps` from the development
+  texture and the population map. Fades to an even glow where a line is under a pixel.
+
+Seen on the bench 2026-10-07 (a class M planet settled by a colony ship). Confirmed in game 2026-10-07.
+
+## 1.12.0 — 2026-10-07
 
 ### Added
-- `Phasers=1`: a phaser lights the firing ship around its emitter while the beam is
-  drawn, in the beam's own colour (read from its sprite texture) times
-  `PhaserBrightness=2.0`, full to `PhaserStart=6`, gone at `PhaserRange=70`, lifted
-  `PhaserLift=8` units out along the beam.
-- `PhaserImpact=1.0`: the beam's end lights the target the same way, times this; `0`
-  none.
+- `OrdnanceColours=1`: a torpedo's or pulse's light takes the hue of its own sprite
+  (the mean of its first frame in the installed texture) at the ODF's brightness, in
+  place of the ODF's `lightColor` (cyan on every Federation photon, green on nearly every
+  other weapon). Federation orange, Klingon red, Borg cyan, Cardassian yellow, Romulan
+  green, Species 8472 yellow-green. `0` keeps the ODF colours.
 
-Seen on the bench 2026-10-06 (`SCENE=firing`). Installed, not yet seen in game.
+Seen on the bench 2026-10-07 (`SCENE=factions`). Confirmed in game 2026-10-07.
+
+## 1.11.0 — 2026-10-07
+
+### Added
+- `BumpShaders=1`: with `Shaders=1` under d3d8to9, bump-mapped hulls (the Borg, and any
+  hull `models/hull-bump.py` patched) are drawn once in `hull.hlsl`'s new
+  `bump_vs`/`bump_ps` instead of the engine's dot3 passes, taking `Ambient`, point lights
+  at their positions, specular, rim, the night lights and the highlight shoulder. The
+  normal is the SOD's vertex normal tilted by the engine's normal map. Slot 3 of the
+  `ST3D_Dot3_MeshVB` vtable; `Lighting.log` reads `call sites patched 13`.
+
+Seen on the bench 2026-10-06 (`SCENE=firing`, the Borg cube; `SCENE=planet`, a Galaxy with
+`hull-bump.py`). Confirmed in game 2026-10-07.
 
 ## 1.10.0 — 2026-10-05
 

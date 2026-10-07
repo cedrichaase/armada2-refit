@@ -10,6 +10,9 @@ that `Lighting.ini` switches separately:
   (`KeyColour`, `KeyAxis`) and a dim blue fill from the opposite side (`FillColour`,
   `FillAxis`). Every renderer lights from that one list, so the CPU, GPU and bump-mapped
   paths agree.
+- **`BumpShaders=1`** (with `Shaders=1`): bump-mapped hulls, the Borg and any hull
+  `models/hull-bump.py` patched, go through the same shaders, lit by the engine's own
+  normal map ("Bump-mapped hulls", below).
 - **`Planets=1`**: planets and their cloud shells get a night side. Stock gives their
   material a constant half-white term that lights them all round (below).
 - **Light sources** ("Light sources", below): point lights reach the GPU-drawn ships
@@ -23,7 +26,7 @@ that `Lighting.ini` switches separately:
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
 `a2mod` switches the plugin as the `lighting` layer. Each launch writes `Lighting.log`:
-`call sites patched 12` means every hook took, and the lines after it name every model
+`call sites patched 13` means every hook took, and the lines after it name every model
 switched to vertex buffers, the map's own lights, the sky light (`sky:`) and each
 planet's ground colour (`planet glow:`).
 
@@ -47,6 +50,7 @@ planet's ground colour (`planet glow:`).
 | `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
+| `BumpShaders` | `1` | with `Shaders`, draw bump-mapped hulls (the Borg; `hull-bump.py`'s) in the hull shaders, their normal from the normal map, instead of the engine's dot3 passes ("Bump-mapped hulls", below); `0` leaves them to the dot3 passes |
 | `SelfIllumination` | `1.8` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none, above 1 brighter than their texture ("Dynamic range") |
 | `HullSun` | `1.1` | with `Shaders`, the Key on GPU-drawn hulls times this, the light no longer clamped at 1 ("Dynamic range") |
 | `HighlightKnee` | `0.8` | with `Shaders` or `PlanetShaders`, colour above this rolls off towards white instead of clipping; `1` clips as before ("Dynamic range") |
@@ -65,6 +69,7 @@ planet's ground colour (`planet glow:`).
 | `Phasers` | `1` | a phaser lights the firing ship around its emitter, and the target where it strikes, while the beam is drawn ("Phasers", below) |
 | `PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift` | `2.0`, `6`, `70`, `8` | the beam's colour times this; full to `PhaserStart` units from the light, gone at `PhaserRange`; the light sits `PhaserLift` units out along the beam |
 | `PhaserImpact` | `1.0` | the light at the beam's end, times this; `0` none |
+| `OrdnanceColours` | `1` | a torpedo's or pulse's light takes the colour of its own sprite, at the ODF's brightness ("Torpedoes and pulses", below); `0` keeps the ODF's `lightColor` |
 | `Log` | `1` | write `Lighting.log` |
 
 The key comes in about 60° off vertical (1.0.0 had about 37°), so from the usual
@@ -102,7 +107,8 @@ per-render effect is attached (cloak, warp-in), as stock does for asteroids.
 | call at 0x63e4e4, `ST3D_Standard_MeshVB::Render` | replaces `SetMaterial`: diffuse white, ambient zero, emissive `Ambient=`; and turns `NORMALIZENORMALS` on | below |
 | slot 3 of the `ST3D_Standard_MeshVB` vtable (0x6bcbdc), `Render` | reverses the enabled lights for a draw whose object matrix (0x7ad640) is mirrored | below |
 | call at 0x597f83, `GameObject_PreRenderAll` | wraps `ST3D_GraphicsEngine::RegisterLight`: the frame's first directional light is replaced by Key and Fill, the map's others are dropped | below |
-| call at 0x598193 | wraps `GameObject_PreRenderAll` | counts the frame for the hook above |
+| call at 0x598193 | wraps `GameObject_PreRenderAll` | counts the frame for the hook above; afterwards adds the planet and explosion lights and recolours the torpedoes' (`Ordnance::PreRenderAll` is the next call, at 0x598199) |
+| slot 3 of the `ST3D_Dot3_MeshVB` vtable (0x6bc7d4), `Render` | draws a bump-mapped group once, in shaders | "Bump-mapped hulls", below |
 | six `fmuls` in the `GroundMesh` constructor (0x595c22, 0x595c3d, 0x595c57; 0x595c70, 0x595c7f, 0x595c8e) | their operand, the stock 0.75 and 0.5, now points at `PlanetDiffuse` and `PlanetAmbient`, one channel each | "Planets", below |
 
 Each call site is checked (an `E8` to the expected function, the `SetMaterial` call's
@@ -371,10 +377,60 @@ ordinary point light, so the CPU path (planets, cloaking ships) takes it too.
 On the bench (a frigate dying 110 units from the Galaxy, paused at 0.3 s): the hull
 under it went from 20/32/38 to 30/39/41 mean RGB, orange-brown where it was dark blue.
 
-Torpedoes and pulses need nothing more: `Ordnance::PreRenderAll` (call at 0x58e55c)
-registers each one's ODF light while the engine's detail level is above 2, and the
-point-light path hands it to the GPU draws. A weapon's impact has no explosion object
-(it is a sprite effect), so it has no light of its own.
+### Torpedoes and pulses
+
+`Ordnance::PreRenderAll` (call at 0x58e55c) registers each live torpedo's or pulse's
+light while the engine's detail level is above 2, and the point-light path hands it to
+the GPU draws. A weapon's impact has no explosion object (it is a sprite effect), so
+it has no light of its own.
+
+**The ODF colours ignore the projectile.** Every ODF that sets `lightColor` gives its
+`OrdnanceClass` one `ST3D_Point_Light` (class +0x10, built in the class constructor
+as `ord_light`), colour at +0xf4, and every ordnance of the class registers that one
+light where it is. The colours stock gives them: every Federation photon `0 1 1`
+(cyan) though its sprite is orange, nearly every other torpedo and pulse `0 1 0`
+(green), the Klingons' red torpedoes and the Cardassians' yellow plasma included.
+Measured from the stock art, the mean colour of each sprite's first frame, scaled to
+a peak of 1:
+
+| Faction | Sprite texture | ODF `lightColor` | Sprite |
+|---|---|---|---|
+| Federation (photon) | `Wftorp` | `0 1 1` | `1.00 0.69 0.10` |
+| Federation (quantum, `fbattlephotono`) | `Wfbluetorp` | `0 1 1` | `0.14 0.56 1.00` |
+| Klingon | `Wktorp` | `0 1 0` | `1.00 0.17 0.17` |
+| Borg | `Wbtorp` | `0 1 0` | `0.08 1.00 0.92` |
+| Cardassian (plasma) | `Wctorp` | `0 1 0` | `1.00 0.97 0.08` |
+| Romulan | `Wrtorp` | `0 1 0` | `0.11 1.00 0.42` |
+| Species 8472 (pulse, `spmpulseo`) | `Wpulse`, second strip | `0 1 0` | `0.78 1.00 0.43` |
+
+**The fix takes the colour from the sprite.** The class keeps its sprite at +0x12c
+(the ODF's `Sprite`, looked up in the sprite table by name); an `ST3D_Sprite` holds its
+first frame as fractions of its texture, U V at +0x38 and W H at +0x40, and its texture
+at +0x58, an `ST3D_DatabaseElement` whose name (+0x8) is the file name. The plugin
+reads that rectangle of the installed TGA (`Textures/RGB`, so a remastered sprite is
+measured as installed) and takes its mean colour: the sprites draw additively, so the
+mean is what they add. That hue, scaled to the ODF colour's peak, replaces the light's
+colour, so a weapon keeps its brightness. Why the first frame: a flipbook keeps one hue
+across its frames (every stock torpedo's first frame is within 0.03 of its whole sheet),
+while the pulses share one sheet, `Wpulse`, a colour per strip, and only the sprite's
+own rectangle tells them apart (the whole sheet reads `1.00 0.93 0.78` for all of them).
+
+`Ordnance::PreRenderAll` is called straight after `GameObject_PreRenderAll`, so the
+plugin's wrapper of the latter walks the live ordnance (the list at 0x771fac, the class
+at +0x34) and recolours each class's light before it is registered. Each class is
+measured once and logged (`ordnance light: Wftorp odf (0, 1, 1) sprite mean ... ->`):
+a light counts as done while it holds the colour written to it for that sprite, so a
+class rebuilt for the next mission, with its ODF colour back, is measured again. The
+ODFs stay stock: only the light's colour in memory changes, which is drawing alone,
+so nothing another player sees or simulates differs.
+
+On the bench (2026-10-07, `SCENE=factions`: one torpedo or pulse ship of each playable
+faction firing at a Borg cube), `Lighting.log` recoloured all six (the table above, to
+the second decimal). Under Federation fire the cube's plating took a warm orange pool
+where a torpedo arrived; the same burst on `main` washed whole faces cyan. The mean
+(G+B)/2 − R of the cube's centre over the burst: worst frame 29.5 before, 8.3 after
+(the cube's own blue shield flashes count in both). The Klingon torpedo lit it red.
+The Federation quantum torpedo (`fbattle`) was not in the scene.
 
 ### Phasers
 
@@ -575,7 +631,74 @@ and E (`HullSun=1.1`, `Specular=0.7`); `SelfIllumination` shipped at 2.5 on the 
 came down to 1.8 after a look in game. A knee of 0.6 was tried
 first and flattened planets: their ground is bright art, and compressing everything over
 0.6 hazed it. In the `firing` scene the Galaxy's own torpedo now lights its engineering
-hull orange as it leaves (the Borg cube is on the dot3 path and takes none of this).
+hull orange as it leaves (the Borg cube was on the dot3 path and took none of this until
+1.11.0: "Bump-mapped hulls").
+
+## Bump-mapped hulls
+
+`BumpShaders=1`. A mesh whose material names a bump map (`models/README.md`, "How a SOD
+asks for it": the Borg in stock, and every hull `hull-bump.py` patches) does not take the
+vertex-buffer path above: `ST3D_Mesh::Update` gives it `ST3D_Dot3_MeshVB` first. Before
+1.11.0 none of this layer's shading reached such a hull: no `Ambient`, no point lights at
+their positions, no specular, rim or shoulder, and its night lights as the dot3 path drew
+them.
+
+**What the dot3 path does.** Read from `ST3D_Dot3_MeshVB::Render` (0x6275a0),
+`DrawLight` (0x627370) and `CreateShader` (0x627200). The vertex buffer has a 68-byte
+vertex: position, normal, UV, then three object-space vectors S, T and S x T, which
+`ST3D_CreateBasisVectors` (0x627aa0) sums per vertex from each triangle's UV slopes. The
+bump map is turned into a normal map at load (`ST3D_CreateNormalMap`) and is the
+group's second texture. `Render` draws every group once per light in the engine's list,
+added together. Stage 0 is `DOTPRODUCT3` of the normal map against the light vector, which
+the game's own vertex shader (`Shaders\dot3_directional.nvv`) takes into each vertex's S,
+T, S x T basis. The light's colour times the material's diffuse goes in `TEXTUREFACTOR`; a
+point light is reduced to a direction and a falloff at the mesh's centre. One more draw
+multiplies the frame by the diffuse texture, and for a self-illuminating mesh (the mesh's
++0x12c, bit 4) a third draws the night lights over it. There is no ambient term
+(`models/README.md`, "Measured": 18–21% darker than the CPU path).
+
+**What the plugin does instead.** It takes slot 3 of the vtable and, under d3d8to9, draws
+the group once itself, from the same vertex and index buffers (the engine's handles at
++0 and +8 of the group's 24-byte record, its vertex and triangle counts at +0x10 and
++0x14). The texture material's first pass sets stage 0 and the blend as for a plain hull.
+The normal map goes to stage 1 through the engine's own `SetTexture`, which caches what
+each stage holds. A Direct3D 9 vertex declaration of the 68-byte layout replaces the
+engine's shader for the draw, and the d3d8 vertex shader is set back after it. `bump_vs`
+and `bump_ps` (`hull.hlsl`) then give the hull everything `hull_ps` gives: the same
+`shade()`, constants and point lights. The material is `hook_set_material`'s: diffuse
+white, `Ambient` as emissive. The dot3 path sets no Direct3D lights, so the directional
+lights come from the engine's list, as `ST3D_Standard_MeshVB::PreRender` would set them.
+
+**The normal.** The dot3 shader projects the light onto S, T and S x T and dots that with
+the map, so the normal it lights with is S·n.x + T·n.y + (S x T)·n.z. It is outward and
+faces the light, where a stock mesh's normal points inward. The first build used it as it
+stands. On a Galaxy that `hull-bump.py` had patched, whose map is flat (n = (0, 0, 1)), it
+drew dark streaks down the saucer and the neck that the hull shaders do not have. S x T
+is summed from UV slopes, and it turns away from the surface wherever the UVs are
+mirrored or meet at a seam. The stock dot3 path lights with that same vector. So
+`bump_ps` takes the surface from the SOD's own vertex normal (inward, turned round) and
+uses S and T only for the map's slope, each made square to it. A flat map then gives
+exactly a plain hull's shading. A draw under a mirrored matrix needs no `FixMirrored`
+reversal: normal and light go to world space through the same matrix.
+
+**Left to the dot3 passes:** any draw with no Direct3D 9 device behind d3d8 (DXVK's
+d3d8, or `Shaders=0`), with fog on, while the engine's debug triangle cap (0x72c3f4) is
+set, or for a group without both textures. `Lighting.log` names the first
+(`shaders: bump-mapped hull draws in shaders N, stock dot3 M`).
+
+Measured on the bench (1920x1080, d3d8to9, 2026-10-06):
+
+| | stock dot3 | `BumpShaders=1` |
+|---|---|---|
+| Borg cube (`SCENE=firing`, `orbit target 60 25 260`), mean grey over the cube | 24.0 | 28.6 |
+
+The same faces are lit on both, and the relief from the Borg's height maps is kept; the
+lift is `Ambient`, the specular and the rim, and the night lights show as on the plain
+hulls. A Galaxy that `hull-bump.py` had patched, against the same Galaxy on the hull
+shaders (`SCENE=planet`, the 720x330 box): side on (`orbit ship 20 10 150`) mean 0.1414
+both, RMSE 0.023; from above (`orbit ship 200 20 150`) 0.393 against 0.396, RMSE 0.049,
+part of it the planet's clouds, which move between runs. With S x T as the normal, the
+first build measured 0.392 and RMSE 0.080 from above, the streaks.
 
 ## Planets on the GPU
 
@@ -623,8 +746,31 @@ by its alpha. The pixel shaders are `ground_ps`, `city_ps` and `cloud_ps`:
   so at the edge it shows as a thin halo.
 - **Water:** a Blinn-Phong glint where the ground is bluer than it is red or green and
   not bright.
-- **Cities:** by day lit as the ground; on the night side `CityLightColour` x
-  `CityLights`, with the alpha raised so they show over the dark ground.
+- **Cities:** by day lit as the ground, as stock. On the night side they are lit from
+  within, `CityLightColour` x `CityLights`, by a pattern the shader makes
+  (`city_night`). Up to 1.12.0 it lit the whole development texture one colour, which
+  showed each town as a flat cream blotch: the texture's alpha is one solid blob per
+  town, with nothing inside it (`PD_ECNA`, `PD_ECFR`, `PD_BORG`, measured), and its
+  colour is day-side ground. So the blobs say only *where* people live:
+  - **Density:** the alpha, times the population map in stage 1 (alpha times its
+    brightest channel, whichever the engine paints), averaged over 8 taps at 5 texels
+    and 8 at 14. Explicit taps rather than a mip bias, since nothing says these textures
+    have mips. A noise breaks each town into districts.
+  - **Streets:** the borders of a Voronoi net, 120 cells across the texture, inside
+    towns, beaded with lights along them, each border its own brightness; **lanes:** a
+    finer net of 300 in the denser parts; **highways:** a net of 20 cells, half its
+    borders dropped, reaching out between neighbouring towns. All are warped by a slow
+    noise so the roads curve. One net of 120 alone read as cracked glass close up.
+  - **Lights:** single points, thick in towns and thinning out past them; **glow:** a
+    faint warmth over each town; **downtown:** brighter in a few hot spots where a town
+    is densest. Light past 0.9 whitens.
+  - **No shimmer:** a line or point narrower than a pixel (`fwidth`) spreads the same
+    light over the pixel instead, so a distant planet shows an even glow.
+  The pattern was tuned on an offline preview over the real textures, then on the bench
+  with a colony ship ordered onto a class M planet (select it, D, click the planet; the
+  script call `ScriptInterfaceImp::Colonize` did nothing from the scene plugin). The
+  shader is about 1800 instructions, past ps_3_0's guaranteed 512; DXVK runs it, as it
+  runs `bump_ps` at 775.
 
 **One trap, met on the bench:** `ST3D_DeviceDirectX8::PolygonSortRequired` (0x625510)
 is not a property of the device. It reads the material last set on it, so asked before
@@ -645,11 +791,12 @@ the CPU path lit both its ground and its clouds evenly.
 - With `PlanetShaders=0` or without d3d8to9, planets stay on the CPU path. Either way
   the clouds at a planet's poles pinch into a bright starburst where the cloud
   texture's UVs converge; that is stock.
-- The city pass (`CityLights`) has not been seen yet: the bench planet has no
-  development texture.
-- The Borg and any hull
-  `models/hull-bump.py` patched keep the dot3 path, which takes precedence over the
-  vertex buffers.
+- The city pattern is cut in texture space, so it stretches where a hemisphere's UVs
+  do, at the limb of each hemisphere: a highway there can draw as a long straight streak.
+- Without d3d8to9, the Borg and any hull `models/hull-bump.py` patched keep the dot3
+  passes ("Bump-mapped hulls"). The fallback under DXVK's d3d8 has not been run on the
+  bench since 1.11.0; it is the stock function, called whenever there is no Direct3D 9
+  device.
 - Translucent materials still go through the CPU path for sorting (see the moons in
   `models/README.md`). Under DXVK that path was slow for another reason: it reads back
   a dynamic vertex buffer kept in GPU memory. The selection bubbles cost 70 ms a frame
@@ -660,5 +807,10 @@ the CPU path lit both its ground and its clouds evenly.
 - A mirrored mesh (`FixMirrored`) gets no point lights on the fixed-function path:
   reversing a directional light fixes its normals, and a point light has no such
   reversal. With `Shaders=1` it gets them.
+- A hard light can tint a whole face of a large flat hull (a Borg cube) when the draw
+  goes the fixed-function way: per vertex, one vertex inside the torpedo's sphere
+  colours its triangle. Seen on the bench with Borg torpedoes on a Borg cube before
+  `BumpShaders` (1.11.0) drew the Borg in shaders; not re-checked since. Not caused by
+  `OrdnanceColours`, which changes only the colour.
 - Weapon impacts other than a phaser's flash no light (above). `ShockwaveExplosion` (the big special weapons'
   ring) has its own `AdjustLighting` and is left alone.

@@ -14,7 +14,8 @@ The game's 3D geometry, where the refit changes it:
 - **Hull lighting**, `hull-bump.py`: the Federation hulls are lit per pixel through the
   engine's own dot3 bump path. Below. Not part of `./install`: run
   `models/hull-bump.py --install` (`--revert`, `--status`). A hull it patches goes the
-  dot3 way and so leaves `Lighting.asi`'s GPU path (`lighting/README.md`).
+  dot3 way; with `Lighting.asi`'s `BumpShaders=1` under d3d8to9 that draw is taken into
+  the hull shaders (`lighting/README.md`, "Bump-mapped hulls").
 
 `./install` runs `install.sh`, which builds and installs `Planets.asi` and `Planets.ini`
 smooths the moons and rounds the selection bubble (`.a2neb-backup` copies; `install.sh --remove` restores them).
@@ -217,6 +218,8 @@ over each ship:
 Smooth light and shade across saucers and nacelles, painted detail unchanged, and
 **18–21% darker**. The dot3 passes add no ambient or emissive term. The CPU path adds
 the material's (0.18, 0.065, 0.065), the warm lift stock hulls have. Restoring it means
-replacing the dot3 passes' colour maths in a plugin. *Bump Mapping: Off* in game
-returns the hulls to the stock path at any time.
+replacing the dot3 passes' colour maths in a plugin, and since lighting 1.11.0
+`Lighting.asi` does that (`BumpShaders=1`, under d3d8to9): one draw in its hull shaders,
+with `Ambient` and the rest, from the same vertex buffer and normal map. *Bump Mapping:
+Off* in game returns the hulls to the stock path at any time.
 

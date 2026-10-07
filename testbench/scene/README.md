@@ -8,10 +8,10 @@ mission has run `Delay=` ticks, the plugin turns that empty stage into what a sc
 file describes. A free camera and other commands then change the scene while it runs.
 
     SCENE=firing ./a2test session start --install . --install testbench/scene --args '-nointro a2_borg01'
-    ./a2test drive scene "orbit shooter 120 20 250"      # look from another side
-    ./a2test drive scene pause "orbit shooter 240 -30 250"
-    ./a2test drive shot underside
-    ./a2test session stop
+    ./a2test drive --session ID scene "orbit shooter 120 20 250"   # look from another side
+    ./a2test drive --session ID scene pause "orbit shooter 240 -30 250"
+    ./a2test drive --session ID shot underside
+    ./a2test session stop ID
 
 A scenario puts the plugin in with `Setup: testbench/scene/bench-setup.sh <name>` and
 drives it with `Scene "CMD"` and `Expect scene "CMD" answers "TEXT"` steps
@@ -29,7 +29,9 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `planet` | a Galaxy class beside a class M planet (`pb_clssm`) | 2026-10-04 |
 | `nebula` | a Galaxy class at the edge of the Mutara nebula (`mnebula8`) | 2026-10-04 |
 | `firing` | a Galaxy class firing at a Borg cube (`bbattle1`) without moving, for as long as the session runs: its engines are off; the cube cannot die, is healed every tick and has its weapons off | 2026-10-04, still firing after a minute |
+| `factions` | one torpedo or pulse ship of each playable faction, each firing at its own Borg cube as in `firing`: Federation `fed` (`fgalaxy`), Klingon `kli` (`kbattle`), Borg `borg` (`bbattle1`), Cardassian `card` (`cbattle`), Romulan `rom` (`rbattle`), Species 8472 `sp` (`8472_mothership`); each target is `<name>_t`. For the weapons' light colours (`lighting/README.md`, "Torpedoes and pulses") | 2026-10-07 |
 | `stations` | the player's own: three shipyards (`yard1..3`), an advanced shipyard (`adv`), a research station (`lab`) and two ships, with the HUD on, for the control-group keys and the build menu (`scenarios/qol-station-groups.md`) | 2026-10-05 |
+| `warp` | three of the player's Federation destroyers in open space at 3000,0,3000, with the HUD and cursor on, for long moves on the map going to warp (`scenarios/qol-warp.md`) | 2026-10-07 |
 
 ## Scene files
 
