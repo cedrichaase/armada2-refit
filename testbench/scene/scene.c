@@ -68,7 +68,10 @@
  *     Missile at 0x58bb95, 0x58cad8, 0x58d502 and 0x58dd65, makes the flash of a
  *     hit on shields; see set_shieldfx().
  *   Heal: ScriptInterfaceImp::SetShieldPercent(int, float) 0x455eb0 and
- *     SetCrew(int, float) 0x456060; see heal_all().
+ *     SetCrew(int, float) 0x456060, and Craft::RepairAllSystemsComplete()
+ *     0x4c8be0; see heal_all().
+ *   CraftInstance::Update (0x4cb390), slot 0x6b3e64 of CraftInstance's vtable,
+ *     decides which of a model's damage nodes show; see inst_update().
  *   Move orders: the GameObject::SetCommand overloads the script interface's
  *     own Goto and Stop end in -- (AiCommand, const GameObject *, long, bool)
  *     0x4d1af0, (AiCommand, const Vector3 &, long, bool) 0x4d1b50 and
@@ -192,6 +195,16 @@ int _fltused = 0;   /* floats without the CRT */
 #define CRAFT_MAX_CREW   0x1c4u      /* Craft: maximum crew (float) */
 #define CRAFT_SHIELDS    0x1c8u      /* Craft: shields, then the maximum at +0x1cc (floats) */
 #define CRAFT_CREW       0x1dcu      /* Craft: crew (float) */
+#define CRAFT_SYSTEMS    0x1e0u      /* Craft: its five CraftSystems, 0x30 bytes each */
+#define SYS_SIZE         0x30u
+#define SYS_ONLINE       0x0u        /* CraftSystem: byte, the system works */
+#define SYS_HELD_OFF     0x1u        /* CraftSystem: byte, switched off for good (PermanentDisable*) */
+#define SYS_MAX_HP       0x4u        /* CraftSystem: int, its hit points when whole */
+#define SYS_HP           0x18u       /* CraftSystem: double, its hit points now */
+#define REPAIR_ALL       0x4c8be0u   /* Craft::RepairAllSystemsComplete(), skips systems held off */
+#define INST_VT_UPDATE   0x6b3e64u   /* CraftInstance's vtable: Update(const GameObject *) */
+#define INST_UPDATE      0x4cb390u   /* CraftInstance::Update */
+#define INST_SYS_OK      0x9cu       /* CraftInstance: five bytes, a system's damage node hidden */
 #define SET_COMMAND_OBJ  0x4d1af0u   /* GameObject::SetCommand(AiCommand, const GameObject *, long, bool) */
 #define SET_COMMAND      0x4d1a40u   /* GameObject::SetCommand(AiCommand, long, bool, bool) */
 #define CMD_STOP         3           /* AiCommand: STOP */
@@ -226,6 +239,9 @@ static const Sig k_sigs[] = {
     { SHIELD_HIT_MSL,   5, { 0xE8, 0x46, 0x66, 0xEE, 0xFF } },
     { SI_SET_SHIELDS,   8, P_SI_HANDLE },
     { SI_SET_CREW,      8, P_SI_HANDLE },
+    { REPAIR_ALL,       8, { 0x53, 0x56, 0x8B, 0xF1, 0x33, 0xDB, 0x8B, 0x86 } },
+    { INST_UPDATE,      8, { 0x55, 0x8B, 0xEC, 0xA1, 0xAC, 0x0B, 0x74, 0x00 } },
+    { INST_VT_UPDATE,   4, { 0x90, 0xB3, 0x4C, 0x00 } },
     { SET_COMMAND_AT,   8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x14, 0x8B, 0x55 } },
     { SET_COMMAND_OBJ,  8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x14, 0x8B, 0x55 } },
     { SET_COMMAND,      8, { 0x55, 0x8B, 0xEC, 0x64, 0xA1, 0x00, 0x00, 0x00 } },
@@ -539,6 +555,8 @@ static void order_attack(Obj *o, const char *target)
  * Shields go through ScriptInterfaceImp::SetShieldPercent (a fraction of the
  * maximum), crew through SetCrew (Craft::SetCrew clamps it to the maximum), and
  * only when below it, since SetCrew also recomputes the craft's state. */
+static int systems_hurt(const BYTE *craft);
+
 static void heal_all(void)
 {
     int i;
@@ -554,7 +572,50 @@ static void heal_all(void)
             ((SiSetHealthFn)SI_SET_SHIELDS)(SI_INSTANCE, g_obj[i].handle, 1.0f);
         if (*(float *)(go + CRAFT_CREW) < *(float *)(go + CRAFT_MAX_CREW))
             ((SiSetHealthFn)SI_SET_CREW)(SI_INSTANCE, g_obj[i].handle, *(float *)(go + CRAFT_MAX_CREW));
+        if (systems_hurt(go))
+            ((SiVoidFn)REPAIR_ALL)(go);
     }
+}
+
+/* A system that is down or short of hit points, and not one held off on
+ * purpose (Engines=0, Weapons=0): what Craft::RepairAllSystemsComplete mends. */
+static int systems_hurt(const BYTE *craft)
+{
+    const BYTE *sys = *(BYTE *const *)(craft + CRAFT_SYSTEMS);
+    int k;
+    if (!sys) return 0;
+    for (k = 0; k < 5; k++, sys += SYS_SIZE) {
+        if (sys[SYS_HELD_OFF]) continue;
+        if (!sys[SYS_ONLINE] || *(const double *)(sys + SYS_HP) < (double)*(const int *)(sys + SYS_MAX_HP))
+            return 1;
+    }
+    return 0;
+}
+
+/* The damage effects: a craft's model carries a node per system (Shield, Engines,
+ * Target, Sensors, Life Damage; CraftClass::InitializeDamageNodes finds them),
+ * and a node shows its emitter -- the Galaxy's Engines node vents plasmalrg,
+ * the orange plume -- whenever that system is not online. CraftInstance::Update
+ * reads the systems into five bytes at +0x9c, which CraftInstance::RenderInternal
+ * turns into the nodes' hidden bit. A system Scene.asi switched off (Engines=0,
+ * the engines command, Weapons=0) is held off, not damaged, so its node stays
+ * hidden; a healed craft shows none at all. */
+static const BYTE k_inst_sys[5] = { 0x00, 0x30, 0x60, 0xc0, 0x90 };   /* for +0x9c..+0xa0 */
+
+static void __thiscall inst_update(void *inst, const void *go)
+{
+    const BYTE *sys;
+    int i, k;
+    ((void (__thiscall *)(void *, const void *))INST_UPDATE)(inst, go);
+    if (!go || !(*(const DWORD *)((const BYTE *)go + OBJECT_FLAGS) & FLAG_CRAFT)) return;
+    for (i = 0; i < g_nobj; i++)
+        if (g_obj[i].handle == *(const int *)((const BYTE *)go + OBJECT_HANDLE)) break;
+    if (i == g_nobj) return;
+    sys = *(BYTE *const *)((const BYTE *)go + CRAFT_SYSTEMS);
+    if (!sys) return;
+    for (k = 0; k < 5; k++)
+        if (g_obj[i].heal || sys[k_inst_sys[k] + SYS_HELD_OFF])
+            ((BYTE *)inst)[INST_SYS_OK + k] = 1;
 }
 
 /* A colonised planet, without a colony ship: what a map that starts with a
@@ -1468,11 +1529,12 @@ static void startup(void)
         return;
     }
     if (!patch_dword(HOOK_SITE + 1, (DWORD)&scene_tick - (HOOK_SITE + 5)) ||
-        !patch_call6(MAIN_CAM_CALL, (DWORD)&camera_update)) {
+        !patch_call6(MAIN_CAM_CALL, (DWORD)&camera_update) ||
+        !patch_dword(INST_VT_UPDATE, (DWORD)&inst_update)) {
         logline("NOT PATCHED: VirtualProtect failed");
         return;
     }
-    logline("tick and camera hooked");
+    logline("tick, camera and craft instances hooked");
 }
 
 BOOL __stdcall DllMain(HMODULE mod, DWORD reason, void *reserved)

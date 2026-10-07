@@ -15,7 +15,8 @@ Layers: testbench 3.4.0.
   (`shieldfx`/`ShieldFx=`) in `Scene.asi` (testbench 3.4.0).
 
 ### Changed
-- `Scene.asi`'s `Heal=` keeps shields and crew full; the `showcase` cubes hold fire
+- `Scene.asi`'s `Heal=` keeps shields, crew and systems full, and ships with their
+  engines switched off no longer stream a damage plume; the `showcase` cubes hold fire
   (testbench 3.4.0).
 
 Installs nothing; seen working on the bench 2026-10-07.

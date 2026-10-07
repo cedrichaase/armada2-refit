@@ -60,8 +60,8 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `X`, `Y`, `Z` | 0 | position. Y is up |
 | `Heading` | 0 | degrees about the up axis; 0 faces +z |
 | `Immortal` | 1 | the object cannot die (craft only) |
-| `Heal` | 0 | 1: hull, shields and crew topped up to full every tick, so it never shows damage, and a craft's shields never run out (no shields-down effect, the electric ring) |
-| `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving |
+| `Heal` | 0 | 1: hull, shields, crew and every system topped up to full every tick, so it never shows damage: its shields never run out (no shields-down effect, the electric ring) and no damaged-system effect (the plasma plume, venting gas) ever shows |
+| `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving. A system switched off here is not drawn as damaged (no plume) |
 | `Attack` | | the name of an object to attack, ordered once everything is built |
 | `Population` | | planets: colonised at once, as `colonize` (below) does: a number, `full`, or nothing for none |
 | `Colonist` | 1 | the team that holds a planet with `Population=`, and so whose race's cities it shows |
@@ -124,7 +124,8 @@ inert, and `Scene.log` says so.
 
 - **The tick: one call site.** `Simulate` (0x483290) calls `GameObject_UpdateRange()`
   at 0x483351 on every tick. The plugin wraps that call to build the scene, heal, and
-  read `Scene.cmd`.
+  read `Scene.cmd`. One more hook, in a vtable, hides the damage effects of systems the
+  scene switched off ("Damaged-system effects" below).
 - **Building an object: `BuildObject(char *odf, int team, const Matrix34 &)`**
   (0x451990, cdecl), a free function. The mission scripts' own
   `ScriptInterfaceImp::BuildObject` cannot start an empty scene: its third argument is
@@ -255,6 +256,29 @@ inert, and `Scene.log` says so.
   state. Bench, `showcase`, 30 s of fire: with only the hull healed both cubes wore
   the blue electric shields-down ring; with shields healed, none (the green flash of
   shields taking hits remains; `shieldfx off` removes it).
+- **Damaged-system effects: the model's damage nodes.** The orange plume a Galaxy
+  streamed from a nacelle with nothing shooting it was the engines' damage effect,
+  shown because `Engines=0` had switched the engines off. A craft's model carries a
+  node per system (`Shield`, `Engines`, `Target`, `Sensors` and `Life` `Damage`;
+  `CraftClass::InitializeDamageNodes` 0x4bfc70 finds them), each with an emitter from
+  `Sprites/emitter.spr` -- the Galaxy's `Engines` node vents `plasmalrg`, its `Life`
+  node `steamsml`. `CraftInstance::Update` (0x4cb390) reads each of the craft's five
+  systems (`Craft`+0x1e0, 0x30 bytes each: shields, engines, weapons, life support,
+  sensors) into a byte at +0x9c..+0xa0 of the render instance, set while the system is
+  online, and `CraftInstance::RenderInternal` (0x4cb0e0) turns each into its node's
+  hidden bit. A system off for any reason is drawn as damaged, and
+  `ScriptInterfaceImp::DisableEngines` ends in `Craft::PermanentDisableEngines`
+  (0x4ca1a0), which takes the engines offline and marks them held off (byte +1 of the
+  system). The plugin replaces `Update` in `CraftInstance`'s vtable (slot at
+  0x6b3e64) with a wrapper that calls it and then, for the scene's own objects, sets
+  the byte of every system held off -- and of all five on a healed craft -- so its
+  node stays hidden. `Heal=1` also mends real damage: whenever a system that is not held
+  off is offline or short of hit points (+0x18, a double, against +0x4), it calls
+  `Craft::RepairAllSystemsComplete` (0x4c8be0), which restores every such system and
+  leaves held-off ones alone, so `Engines=0` survives healing. The crew node (`crew1`..
+  `crew5` fire sprites) follows the crew fraction, which `Heal=1` already keeps full.
+  Bench, `nebula-close` (one Galaxy, `Engines=0`) and `showcase`: the plume on every
+  Federation and Klingon ship before, none after, and the Galaxy still in place.
 - **Move orders: `GameObject::SetCommand`.** The script interface's own orders end in
   `GameObject::SetCommand` overloads: `(AiCommand, const GameObject *, long, bool)`
   (0x4d1af0), `(AiCommand, const Vector3 &, long, bool)` (0x4d1b50) and

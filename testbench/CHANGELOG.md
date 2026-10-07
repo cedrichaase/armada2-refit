@@ -23,6 +23,10 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Changed
 - `Scene.asi`: `Heal=1` keeps shields and crew full as well as the hull, so a healed
   craft never shows the shields-down ring (634d3a9).
+- `Scene.asi`: `Heal=1` also repairs every system (`Craft::RepairAllSystemsComplete`),
+  and no scene craft shows a damaged-system effect for a system the scene switched off
+  (`Engines=0`, `Weapons=0`, `engines`), or for any system once healed: the plasma
+  plume every `Engines=0` ship streamed is gone.
 - The `showcase` scene: the cubes hold fire, so no Borg transporter effect in footage
   (cf4d277).
 
