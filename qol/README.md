@@ -55,6 +55,7 @@ Status values: **idea** (not investigated), **scoped** (approach known, nothing 
 | [QOL-6](#qol-6-production-spread-across-a-group-of-buildings) | Production spread across a group of buildings | `QOL.asi`, `StationGroups=` | Construction ships | **done** for stations (`QOL.asi`), bench |
 | [QOL-7](#qol-7-pay-when-queuing-refund-on-cancel) | Pay when queuing, refund on cancel | code, every peer | Measure stock's charge and refund rules | scoped |
 | [QOL-8](#qol-8-long-moves-on-the-map-go-to-warp) | Long moves on the map go to warp | `QOL.asi`, `WarpDistance=` | A stock peer in a network game | **done** (`QOL.asi`), bench |
+| [QOL-9](#qol-9-the-view-reaches-across-the-map) | The view reaches across the map | `QOL.asi`, `ViewDistance=` | — | **in progress** (`QOL.asi`) |
 
 ## Things that apply to all of them
 
@@ -589,3 +590,39 @@ two rings; the time warp takes to spin up was not measured.
 **Open.** A network game against a stock player (the order is the minimap's, so it
 should simply be carried out). Whether the threshold should follow the zoom: at the
 closest zooms, a move across the screen stays an ordinary one.
+
+## QOL-9: The view reaches across the map
+
+**Today.** Zoomed out, or with the camera tilted towards the horizon, everything past
+about 2500 units fades to nothing: ships, stations, planets, asteroids, nebulae. The
+map is still there, explored and in sight; the engine just stops drawing it.
+
+**Why.** Two values in `ART_CFG.h` end the view. `cfgOBJECT_CULLING_DISTANCE` (2800,
+at 0x6fcac0) is the one that shows: `GameObjectInstance::ComputeFadeOut` (0x4d5a20)
+fades an object from 0.9 of it to all of it, by its distance from the camera with the
+vertical scaled by a quarter, and for some classes scaled by the object's radius, and
+every instance type's own `ComputeFadeOut` goes through it: `CraftInstance`,
+`PlanetInstance`, `AsteroidInstance`, `CocoonInstance`, `PlaceHolderInstance` and
+`NebulaInstance` (0x4a5680, which darkens its additive glow by the fade rather than
+fading the instance). `DistanceCull` (0x4d5bb0) culls asteroid fields, Evolvers and
+building effects with the same distance, and `Ordnance::RenderAll` reads it too.
+`FAR_CLIPPING_PLANE` (20000, at 0x6fcab0) is the far plane `PresetView::Init` gives
+the game camera; `ST3D_Camera::CheckSphereVisibility` (0x619300) rejects a sphere past
+it, and the projection clips there.
+
+**What `QOL.asi` does.** `RTS_Configure` parses both keys (a missing key keeps the
+compiled default) and then, at 0x491bef, loads the culling distance to copy it to
+0x6fcac4, the value a mission script's `RestoreObjectCullingDistance` puts back after
+its own `SetObjectCullingDistance`. That load becomes `call view_stub; nop`: the stub
+raises both values to at least `ViewDistance` and loads `ecx` as the `mov` did, so the
+copy carries the raised value too. Both values are only ever read to draw, so a stock
+player can play a player with it. Fog and shroud are decided elsewhere
+(`GameObject::CanUserSee`), so what they hide stays hidden. The cineractive sequences
+swap in their own far plane (`CINERACTIVE_FAR_CLIPPING_PLANE`) and restore this one,
+and are left alone.
+
+**Cost.** More is drawn on a wide view. The near plane stays at 20, so the depth
+buffer's precision at a given distance hardly changes with the far plane. `Lighting.asi`'s
+shadow map is fitted around every hull it draws, so far-off ships on a wide view make
+its texels coarser, as a big battle already does.
+

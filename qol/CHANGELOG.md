@@ -5,6 +5,16 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.4.0 — 2026-10-07
+
+### Added
+- `ViewDistance=` (default 1000000; 0 leaves the view stock): `FAR_CLIPPING_PLANE` and
+  `cfgOBJECT_CULLING_DISTANCE` (`ART_CFG.h`, stock 20000 and 2800) are raised to at least
+  that after the parse, so nothing fades out with distance; fog and shroud still hide
+  what they hid (QOL-9).
+
+Installed, not yet seen in game.
+
 ## 1.3.0 — 2026-10-07
 
 ### Added

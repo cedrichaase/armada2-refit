@@ -4,8 +4,8 @@
  * The right-drag pan speed, scaled by PanSpeed= in QOL.ini; Shift+number adding
  * the selection to a control group (ShiftAddsToGroup=); selections and groups
  * beyond 16 (MaxSelection=); stations in control groups, with one build
- * menu for several (StationGroups=); and long moves on the map going to warp
- * (WarpDistance=).
+ * menu for several (StationGroups=); long moves on the map going to warp
+ * (WarpDistance=); and the view reaching across the whole map (ViewDistance=).
  *
  * WHY NOT JUST EDIT RTS_CFG.h
  * ---------------------------
@@ -363,6 +363,61 @@ static int patch_pan(void)
     return 1;
 }
 
+/* ---- view distance (QOL-9) -------------------------------------------- */
+
+/* Two values in ART_CFG.h end the view: FAR_CLIPPING_PLANE (20000, at
+ * 0x6fcab0), the far plane PresetView::Init gives the game camera, and
+ * cfgOBJECT_CULLING_DISTANCE (2800, at 0x6fcac0), past whose 0.9 every
+ * object's ComputeFadeOut (ships, stations, planets, asteroids, nebulae) fades
+ * it out.  RTS_Configure parses both and then, at 0x491bef, loads the culling
+ * distance to copy it to 0x6fcac4, from which a mission script's
+ * RestoreObjectCullingDistance puts it back.  That load becomes
+ * `call view_stub; nop`: the stub raises both values to ViewDistance, then
+ * loads ecx as the mov did.  Both are only ever read to draw, so this stays
+ * stock-compatible; the fog and the shroud still decide what is drawn. */
+#define VIEW_DEFAULT    "1000000"
+#define ADDR_FAR_PLANE  0x6fcab0
+#define ADDR_CULL_DIST  0x6fcac0
+
+/* mov ecx,[0x6fcac0]; mov [0x773cfc],edx; lea edx,[ebp-0x10];
+ * mov [0x6fcac4],ecx -- the first six bytes are replaced. */
+static const Site k_view = {
+    0x491bef, 21, 0, { 0x8B, 0x0D, 0xC0, 0xCA, 0x6F, 0x00, 0x89, 0x15, 0xFC, 0x3C,
+                       0x77, 0x00, 0x8D, 0x55, 0xF0, 0x89, 0x0D, 0xC4, 0xCA, 0x6F,
+                       0x00 } };
+
+float g_viewDistance = 0.0f;
+
+void __cdecl view_parsed(void)
+{
+    volatile float *far_plane = (volatile float *)ADDR_FAR_PLANE;
+    volatile float *cull      = (volatile float *)ADDR_CULL_DIST;
+    char m[160];
+
+    if (*far_plane < g_viewDistance) *far_plane = g_viewDistance;
+    if (*cull < g_viewDistance)      *cull = g_viewDistance;
+    m[0] = 0;
+    s_cat(m, "ART_CFG.h parsed: FAR_CLIPPING_PLANE now ");
+    s_num(m, f_round(*far_plane));
+    s_cat(m, ", cfgOBJECT_CULLING_DISTANCE now ");
+    s_num(m, f_round(*cull));
+    logline(m);
+}
+
+/* Stands in for `mov ecx,[0x6fcac0]`, reached by call; keeps every register
+ * but ecx, which it loads as the mov did. */
+__attribute__((naked)) void view_stub(void)
+{
+    __asm__ __volatile__(
+        "pushal\n\t"
+        "pushfl\n\t"
+        "call _view_parsed\n\t"
+        "popfl\n\t"
+        "popal\n\t"
+        "movl 0x6fcac0, %ecx\n\t"
+        "ret\n\t");
+}
+
 /* ---- Shift+number adds to a group ------------------------------------- */
 
 /* Reached by jmp from 0x52129a inside mCheckGroupSelect: edi = cOverViewImp,
@@ -411,6 +466,17 @@ static void poke(BYTE *at, const BYTE *bytes, int n)
     for (k = 0; k < n; k++) at[k] = bytes[k];
     VirtualProtect(at, (UINT)n, old, &old);
     FlushInstructionCache(GetCurrentProcess(), at, (UINT)n);
+}
+
+static int patch_view(void)
+{
+    BYTE call[6];
+    if (!site_ok(&k_view)) return 0;
+    call[0] = 0xE8;                                         /* call view_stub */
+    *(LONG *)(call + 1) = (LONG)((DWORD)view_stub - (k_view.at + 5));
+    call[5] = 0x90;                                         /* nop */
+    poke((BYTE *)k_view.at, call, 6);
+    return 1;
 }
 
 static int patch_groups(void)
@@ -1179,6 +1245,20 @@ static void startup(void)
     } else {
         g_warpDistance = f;
         s_cat(b, patch_warp() ? "  -> a move farther than that goes to warp, patched"
+                              : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
+    }
+    logline(b);
+
+    GetPrivateProfileStringA("QOL", "ViewDistance", VIEW_DEFAULT, val, sizeof val, ini);
+    f = s_parse(val);
+    b[0] = 0;
+    s_cat(b, "--- QOL ViewDistance=");
+    s_cat(b, val);
+    if (f <= 0.0f) {
+        s_cat(b, f < 0.0f ? "  (not a number: view left alone)" : "  (0: view left alone)");
+    } else {
+        g_viewDistance = f;
+        s_cat(b, patch_view() ? "  -> far plane and object culling raised to it, patched"
                               : "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
     }
     logline(b);
