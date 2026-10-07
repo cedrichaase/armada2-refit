@@ -44,7 +44,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Enable` | 1 | 0 patches nothing |
 | `Delay` | 30 | mission ticks before the scene is built |
 | `Fog` | 0 | 0: fog and shroud off for good, the map fully explored; 1: as the map has them |
-| `Hud`, `Grid`, `Cursor`, `Notices` | 0 | 0 hides them; 1 leaves them as the game has them. Notices are the game's events: "Enemy engaged." and the like, their voice and minimap marker |
+| `Hud`, `Grid`, `Cursor`, `Notices`, `Tooltips` | 0 | 0 hides them; 1 leaves them as the game has them. Notices are the game's events: "Enemy engaged." and the like, their voice and minimap marker. Tooltips are the rollover boxes, an object's name and description, that the pointer brings up over the 3D view even when the cursor is not drawn |
 | `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
 | `Center` | | centre the RTS camera on this object |
 | `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |
@@ -58,7 +58,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `X`, `Y`, `Z` | 0 | position. Y is up |
 | `Heading` | 0 | degrees about the up axis; 0 faces +z |
 | `Immortal` | 1 | the object cannot die (craft only) |
-| `Heal` | 0 | 1: health topped up to full every tick, so it never shows damage |
+| `Heal` | 0 | 1: hull, shields and crew topped up to full every tick, so it never shows damage, and a craft's shields never run out (no shields-down effect, the electric ring) |
 | `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving |
 | `Attack` | | the name of an object to attack, ordered once everything is built |
 | `Population` | | planets: colonised at once, as `colonize` (below) does: a number, `full`, or nothing for none |
@@ -93,11 +93,13 @@ answer and fails if a command did.
 | `camera rts` | back to the game's own camera |
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
 | `attack <name> <target>` | order an attack |
+| `goto <name>[,<name>...] <object \| x y z> [warp]` | order a move, as a player's right-click does (AiCommand `GO`; `warp`: `GO_WARP`), and switch the engines on. To a craft, the ship follows it; to any other object (a nebula, a planet), it goes to where the object is. A point is anchored like the scene file's positions. Several names, comma-separated, keep their places: each goes to the point plus its own offset from the group's centre. It ends an `attack`, though a ship still fires at what comes in range |
+| `stop <name>` | order a stop (AiCommand `STOP`, as `ScriptInterfaceImp::Stop` gives) |
 | `heal`, `engines`, `weapons`, `immortal` `<name> on\|off` | as the keys above |
 | `colonize <planet> [<population> \| full \| off] [team]` | make a planet a grown colony of a team (default `full` and team 1), without a colony ship: it changes hands, gets a full garrison, and its cities show at once at that population, clamped to the class's maximum. The cities are the team's race's (`cityTextureName`: `ECFR` for the Federation and Romulans, `ECNA`, `BORG`); team 1 on `a2_borg01` is the Federation. `off` makes it neutral again with no population. The planet stays colonised (seen on the bench for several minutes); a population set below the maximum grows as any colony's does |
 | `center <name>` | centre the RTS camera on an object |
 | `pause`, `resume` | the game's own pause (`PauseSimulation`) |
-| `hud`, `grid`, `cursor`, `notices` `on\|off` | as the keys above |
+| `hud`, `grid`, `cursor`, `notices`, `tooltips` `on\|off` | as the keys above. `tooltips off` also clears a box already showing |
 | `query` | every object's handle and position (and a producer's build queue, a planet's team, population and the population its cities are drawn at), and the camera's eye, front and up |
 | `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`); answers as `selection` |
 | `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
@@ -183,6 +185,49 @@ inert, and `Scene.log` says so.
   overload calls, and `TriggerEvent(const Race *)` 0x479bb0. With notices off, each
   entry returns false at once (`xor eax,eax; ret N`). The original bytes are kept and
   put back by `notices on`.
+- **Tooltips: the one `DisplayInterface::TooltipOn()` call in
+  `SelectionDisplay::AlwaysSimulate`** (0x508070). Each tick that function asks
+  `TooltipOn()` (0x51b610, the object `s_PrecomputeMouseOver` found under the
+  pointer) and, with an object, hands it to the cursor's
+  `CursorInterface::DoTooltip` (0x505a80), which shows the box once the pointer has
+  rested for `s_tooltipDelay`; with none it calls `ClearTooltips` (0x505d40). With
+  tooltips off the call becomes `xor eax,eax` plus three `nop`s, "no object", so the
+  box is cleared and never comes up. The original five bytes are kept and put back by
+  `tooltips on`. Nothing else asks `TooltipOn()`. Clicks, orders and the cursor's
+  shape go by `DisplayInterface::MouseOn()` (0x51b5e0, `s_mouseOverObjectHandle`),
+  which this leaves alone, so the pointer still hovers and clicks as before. The
+  `stations` scene, which films the HUD with the cursor on, gets tooltips off too
+  unless it sets `Tooltips=1`. **The thin gauge drawn above an object
+  the pointer rests on stays**: it does not come from `TooltipOn()`. Blanking the one
+  `MouseOn()` call in `SelectionDisplay::PreRender` (0x508e72, which adds the hover
+  selection effect) did not remove it on the bench, so that patch was dropped.
+- **Heal: hull, shields and crew.** Hull through `ScriptInterfaceImp::SetCurrentHealth`
+  as before; shields through `ScriptInterfaceImp::SetShieldPercent(int, float)`
+  (0x455eb0), whose float is a fraction (0..1) of the maximum: it stores
+  `max * f` into the craft's shields (+0x1c8, the maximum at +0x1cc, as
+  `GetShieldPercent` 0x455e70 reads them); crew through `ScriptInterfaceImp::SetCrew
+  (int, float)` (0x456060), which calls `Craft::SetCrew` (0x4c83e0), clamped to the
+  maximum crew at +0x1c4 (the crew is at +0x1dc). `ScriptInterfaceImp::GetMaxCrew` is
+  a stub that returns a global, so the maximum is read from the craft. Both are only
+  written when below the maximum, because `Craft::SetCrew` also recomputes the craft's
+  state. Bench, `showcase`, 30 s of fire: with only the hull healed both cubes wore
+  the blue electric shields-down ring; with shields healed, none (the green flash of
+  shields taking hits remains, as it should).
+- **Move orders: `GameObject::SetCommand`.** The script interface's own orders end in
+  `GameObject::SetCommand` overloads: `(AiCommand, const GameObject *, long, bool)`
+  (0x4d1af0), `(AiCommand, const Vector3 &, long, bool)` (0x4d1b50) and
+  `(AiCommand, long, bool, bool)` (0x4d1a40), all thiscall on the object. `goto` calls
+  the first or second with `GO` (4) or `GO_WARP` (0x2b), and `stop` the third with
+  `STOP` (3), as `ScriptInterfaceImp::Stop` (0x453590) does. The names come from
+  `AiCommandToName` (0x44e1c0) and its table. A craft is flag 8 of the flags at +0x14,
+  and +0x113 marks one that is dying; both are checked first, as the script interface
+  does. `ScriptInterfaceImp::Goto(int, int, bool, int)` (0x453520) was tried first and
+  did nothing for a Galaxy ordered to the nebula; it also checks a byte at +0x1bc of
+  the ship. `GO` with the nebula as its object did nothing either, which is why only a
+  craft is gone to as an object. Bench: a Galaxy ordered 590 units away arrived in
+  under 15 s, turning and accelerating as a player's ship does; three ships ordered as
+  a group kept their spacing; a Klingon flagship ordered to a Borg cube flew to it and
+  stopped beside it.
 - **A colony without a colony ship: `Planet::StartWithColony(int team)`** (0x4b5660,
   thiscall), what a map that starts with a colony uses. It sets the population to the
   medium level, a garrison of 100 and the team (`SetTeam`, virtual), so the planet is

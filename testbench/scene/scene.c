@@ -4,7 +4,8 @@
  * The bench reaches a map by launching straight into it, which gives an empty
  * stage with fog of war. This plugin turns that stage into a scene: after the
  * mission has simulated Delay= ticks it clears fog and shroud for good, hides
- * the HUD, the grid, the cursor and the event notices, and builds the named
+ * the HUD, the grid, the cursor, the event notices and the rollover tooltips,
+ * and builds the named
  * objects of Scene.ini's
  * [Object.<name>] sections. Commands written to Scene.cmd in the game directory
  * then change the scene while it runs: a free camera (`camera`, `orbit`),
@@ -58,6 +59,16 @@
  *     GetMaxPopulation() 0x4b5550, NeutralizePlanet() 0x4b5150, Craft::SetCrew
  *     (float) 0x4c83e0 and Team::GetTeam(int) 0x496340 colonise a planet
  *     without a colony ship; see colonize().
+ *   SelectionDisplay::AlwaysSimulate asks DisplayInterface::TooltipOn() for the
+ *     object to show a rollover tooltip for, in one call at 0x508070; see
+ *     set_tooltips().
+ *   Heal: ScriptInterfaceImp::SetShieldPercent(int, float) 0x455eb0 and
+ *     SetCrew(int, float) 0x456060; see heal_all().
+ *   Move orders: the GameObject::SetCommand overloads the script interface's
+ *     own Goto and Stop end in -- (AiCommand, const GameObject *, long, bool)
+ *     0x4d1af0, (AiCommand, const Vector3 &, long, bool) 0x4d1b50 and
+ *     (AiCommand, long, bool, bool) 0x4d1a40 -- with GO (4), GO_WARP (0x2b)
+ *     or STOP (3); see order_goto().
  *
  * Matrix34 is three axis rows -- right, up, front -- then the position: a local
  * point (x, y, z) lands at x*right + y*up + z*front + position.
@@ -164,6 +175,20 @@ int _fltused = 0;   /* floats without the CRT */
 #define PL_POPULATION    0x2acu      /* Planet: population, float */
 #define PL_SHOWN_RACE    0x2c4u      /* Planet: the Race whose cities are drawn */
 #define PL_SHOWN_POP     0x2c8u      /* Planet: the population drawn, eased toward +0x2ac */
+#define TOOLTIP_ON_CALL  0x508070u   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::TooltipOn */
+#define SI_SET_SHIELDS   0x455eb0u   /* ScriptInterfaceImp::SetShieldPercent(int, float), 0..1 */
+#define SI_SET_CREW      0x456060u   /* ScriptInterfaceImp::SetCrew(int, float) -> Craft::SetCrew, clamped to the maximum */
+#define CRAFT_MAX_CREW   0x1c4u      /* Craft: maximum crew (float) */
+#define CRAFT_SHIELDS    0x1c8u      /* Craft: shields, then the maximum at +0x1cc (floats) */
+#define CRAFT_CREW       0x1dcu      /* Craft: crew (float) */
+#define SET_COMMAND_OBJ  0x4d1af0u   /* GameObject::SetCommand(AiCommand, const GameObject *, long, bool) */
+#define SET_COMMAND      0x4d1a40u   /* GameObject::SetCommand(AiCommand, long, bool, bool) */
+#define CMD_STOP         3           /* AiCommand: STOP */
+#define SET_COMMAND_AT   0x4d1b50u   /* GameObject::SetCommand(AiCommand, const Vector3 &, long, bool) */
+#define FLAG_CRAFT       0x8u        /* GameObject flags (+0x14): a craft, what Goto and Stop accept */
+#define OBJECT_DEAD      0x113u      /* a byte Goto and Stop refuse an object on */
+#define CMD_GO           4           /* AiCommand: GO, a player's move */
+#define CMD_GO_WARP      0x2b        /* AiCommand: GO_WARP */
 
 #define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
 #define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
@@ -181,6 +206,12 @@ static const Sig k_sigs[] = {
     { EVENT_TRIGGER_0,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_3,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_1,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
+    { TOOLTIP_ON_CALL,  5, { 0xE8, 0x9B, 0x35, 0x01, 0x00 } },
+    { SI_SET_SHIELDS,   8, P_SI_HANDLE },
+    { SI_SET_CREW,      8, P_SI_HANDLE },
+    { SET_COMMAND_AT,   8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x14, 0x8B, 0x55 } },
+    { SET_COMMAND_OBJ,  8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x14, 0x8B, 0x55 } },
+    { SET_COMMAND,      8, { 0x55, 0x8B, 0xEC, 0x64, 0xA1, 0x00, 0x00, 0x00 } },
     { SI_ATTACK,        8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x56, 0x50 } },
     { SI_GET_LOCATION,  8, P_SI_HANDLE },
     { SI_PAUSE,         8, P_SI_PAUSE },
@@ -210,6 +241,9 @@ typedef void   (__thiscall *SiVoidFn)(void *si);
 typedef void   (__thiscall *SiHandleFn)(void *si, int h);
 typedef void   (__thiscall *SiHandleBoolFn)(void *si, int h, int yes);
 typedef void   (__thiscall *SiAttackFn)(void *si, int h, int target, int unused);
+typedef void   (__thiscall *SetCommandObjFn)(void *go, int cmd, const void *target, long param, int flag);
+typedef void   (__thiscall *SetCommandFn)(void *go, int cmd, long param, int a, int b);
+typedef void   (__thiscall *SetCommandAtFn)(void *go, int cmd, const float *pos, long param, int flag);
 typedef const float *(__thiscall *SiLocationFn)(void *si, int h);
 typedef void   (__thiscall *SiSetHealthFn)(void *si, int h, float v);
 typedef float  (__thiscall *SiMaxHealthFn)(void *si, int h);
@@ -482,14 +516,27 @@ static void order_attack(Obj *o, const char *target)
     logline(b);
 }
 
+/* Heal: hull, shields and crew back to full every tick. Shields too, because a
+ * craft whose shields run out shows the shields-down effect (an electric ring
+ * about it) however full its hull is; crew, because crew loss is damage too.
+ * Shields go through ScriptInterfaceImp::SetShieldPercent (a fraction of the
+ * maximum), crew through SetCrew (Craft::SetCrew clamps it to the maximum), and
+ * only when below it, since SetCrew also recomputes the craft's state. */
 static void heal_all(void)
 {
     int i;
     for (i = 0; i < g_nobj; i++) {
         float max;
+        BYTE *go;
         if (!g_obj[i].heal) continue;
         max = ((SiMaxHealthFn)SI_MAX_HEALTH)(SI_INSTANCE, g_obj[i].handle);
         ((SiSetHealthFn)SI_SET_HEALTH)(SI_INSTANCE, g_obj[i].handle, max);
+        go = (BYTE *)((EntityGetFn)ENTITY_GET)(g_obj[i].handle);
+        if (!go || !(*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT)) continue;
+        if (*(float *)(go + CRAFT_SHIELDS) < *(float *)(go + CRAFT_SHIELDS + 4))
+            ((SiSetHealthFn)SI_SET_SHIELDS)(SI_INSTANCE, g_obj[i].handle, 1.0f);
+        if (*(float *)(go + CRAFT_CREW) < *(float *)(go + CRAFT_MAX_CREW))
+            ((SiSetHealthFn)SI_SET_CREW)(SI_INSTANCE, g_obj[i].handle, *(float *)(go + CRAFT_MAX_CREW));
     }
 }
 
@@ -623,6 +670,36 @@ static void set_notices(int on)
         FlushInstructionCache(GetCurrentProcess(), p, 5);
     }
     g_notices_off = !on;
+}
+
+/* Tooltips: the rollover box over the 3D view (an object's name and its
+ * description) comes from SelectionDisplay::AlwaysSimulate, which asks
+ * DisplayInterface::TooltipOn() for the object under the pointer and hands it to
+ * CursorInterface::DoTooltip; with no object it calls ClearTooltips instead.
+ * With tooltips off that one call becomes `xor eax,eax` (no object): the box is
+ * cleared and never shown. Nothing else changes: clicks, orders and the cursor's
+ * shape go by DisplayInterface::MouseOn(), a separate query, and still see what
+ * is under the pointer -- and so does the thin hover gauge drawn above an object
+ * the pointer rests on, which stays (bench). The original bytes are kept and put
+ * back by `tooltips on`. */
+static const BYTE k_no_object[5] = { 0x31, 0xC0, 0x90, 0x90, 0x90 };   /* xor eax,eax; nop x3 */
+static BYTE g_tooltip_orig[5];
+static int  g_tooltips_off;
+
+static void set_tooltips(int on)
+{
+    BYTE *p = (BYTE *)TOOLTIP_ON_CALL;
+    DWORD old;
+    int   k;
+    if (on == !g_tooltips_off) return;
+    if (!VirtualProtect(p, 5, PAGE_EXECUTE_READWRITE, &old)) return;
+    for (k = 0; k < 5; k++) {
+        if (!on) { g_tooltip_orig[k] = p[k]; p[k] = k_no_object[k]; }
+        else       p[k] = g_tooltip_orig[k];
+    }
+    VirtualProtect(p, 5, old, &old);
+    FlushInstructionCache(GetCurrentProcess(), p, 5);
+    g_tooltips_off = !on;
 }
 
 /* The free camera: off, a fixed eye and target, or an orbit about a point or an
@@ -899,6 +976,93 @@ static void select_objs(char **t, int n)
 
 static int on_arg(const char *s) { return s_eq(s, "on") || s_eq(s, "1"); }
 
+/* A craft the move orders accept: a craft (flag 8) that is not dead, as
+ * ScriptInterfaceImp's orders check. */
+static void *craft_of(Obj *o)
+{
+    BYTE *go = o ? (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle) : NULLPTR;
+    if (!go || !(*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT) || go[OBJECT_DEAD]) return NULLPTR;
+    return go;
+}
+
+/* goto <name>[,<name>...] <object | x y z> [warp]: the move a player's
+ * right-click gives (AiCommand GO, or GO_WARP), through the GameObject::SetCommand
+ * overloads ScriptInterfaceImp's own orders end in: to an object or to a point.
+ * ScriptInterfaceImp::Goto itself is not used: it also checks a byte at +0x1bc
+ * of the ship, and ordered a scene's Galaxy to the nebula it did nothing (bench).
+ * Neither did GO with the nebula as its object, so only a craft is gone to as an
+ * object (and followed); anything else is gone to as the point where it is. Several names keep their places
+ * about their centre: each goes to the point plus its own offset from it. The
+ * engines are switched on first, since a scene may have them off. */
+static void order_goto(char **t, int n)
+{
+    char  *names = t[1], *p, *list[MAX_OBJECTS], b[200], target_name[32];
+    Obj   *grp[MAX_OBJECTS], *tgt = NULLPTR;
+    float  dest[3], mid[3] = { 0, 0, 0 };
+    int    k = 0, i, used, warp = 0;
+
+    for (p = names; ; ) {          /* split the comma list in place */
+        list[k++] = p;
+        while (*p && *p != ',') p++;
+        if (!*p || k >= MAX_OBJECTS) break;
+        *p++ = 0;
+    }
+    used = point_arg(t + 2, n - 2, dest, target_name);
+    if (!used) { logline("  ! usage: goto <name>[,<name>...] <object | x y z> [warp]"); return; }
+    if (n > 2 + used && s_eq(t[2 + used], "warp")) warp = 1;
+    /* GO to an object works for a craft (the ship follows it); ordered to a
+     * nebula it did nothing (bench), so any other object is gone to as a point */
+    if (target_name[0]) tgt = find_obj(target_name);
+    if (tgt && !craft_of(tgt)) {
+        const float *tp = obj_pos(tgt);
+        dest[0] = tp[0]; dest[1] = tp[1]; dest[2] = tp[2];
+        tgt = NULLPTR;
+    }
+    else if (!tgt && !target_name[0]) { dest[0] += g_anchor[0]; dest[1] += g_anchor[1]; dest[2] += g_anchor[2]; }
+
+    for (i = 0; i < k; i++) {
+        const float *q;
+        grp[i] = find_obj(list[i]);
+        if (!grp[i] || !craft_of(grp[i])) {
+            b[0] = 0; s_cat(b, "  ! not a craft in the scene: "); s_cat(b, list[i]);
+            logline(b);
+            return;
+        }
+        q = obj_pos(grp[i]);
+        mid[0] += q[0] / k; mid[1] += q[1] / k; mid[2] += q[2] / k;
+    }
+    for (i = 0; i < k; i++) {
+        Obj *o = grp[i];
+        ((SiHandleBoolFn)SI_NO_ENGINES)(SI_INSTANCE, o->handle, 0);
+        o->attack[0] = 0;
+        b[0] = 0;
+        s_cat(b, "  ");
+        s_cat(b, o->name);
+        if (tgt && k == 1) {
+            void *tg = ((EntityGetFn)ENTITY_GET)(tgt->handle);
+            if (!tg) { logline("  ! the target is gone"); return; }
+            ((SetCommandObjFn)SET_COMMAND_OBJ)(craft_of(o), warp ? CMD_GO_WARP : CMD_GO, tg, 0, 0);
+            s_cat(b, " -> ");
+            s_cat(b, tgt->name);
+        } else {
+            const float *q = obj_pos(o);
+            float at[3];
+            if (tgt) {   /* a group to an object: about where the object is now */
+                const float *tp = obj_pos(tgt);
+                dest[0] = tp[0]; dest[1] = tp[1]; dest[2] = tp[2];
+            }
+            at[0] = dest[0] + (k > 1 ? q[0] - mid[0] : 0);
+            at[1] = dest[1] + (k > 1 ? q[1] - mid[1] : 0);
+            at[2] = dest[2] + (k > 1 ? q[2] - mid[2] : 0);
+            ((SetCommandAtFn)SET_COMMAND_AT)(craft_of(o), warp ? CMD_GO_WARP : CMD_GO, at, 0, 0);
+            s_cat(b, " -> ");
+            cat_vec(b, at);
+        }
+        if (warp) s_cat(b, " (warp)");
+        logline(b);
+    }
+}
+
 static void run_command(char *line)
 {
     char *t[MAXTOK];
@@ -997,6 +1161,14 @@ static void run_command(char *line)
         colonize(o, n >= 3 ? t[2] : "full", n >= 4 ? (int)s_atof(t[3]) : 1);
         return;
     }
+    if (s_eq(t[0], "goto") && n >= 3) { order_goto(t, n); return; }
+    if (s_eq(t[0], "stop") && n >= 2) {
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+        ((SetCommandFn)SET_COMMAND)(craft_of(o), CMD_STOP, 0, 1, 0);   /* as ScriptInterfaceImp::Stop */
+        o->attack[0] = 0;
+        logline("  ok");
+        return;
+    }
     if (s_eq(t[0], "center") && n >= 2) {
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         ((SiHandleFn)SI_CENTER_CAMERA)(SI_INSTANCE, o->handle);
@@ -1009,11 +1181,12 @@ static void run_command(char *line)
     if (s_eq(t[0], "grid") && n >= 2) { set_grid(on_arg(t[1])); logline("  ok"); return; }
     if (s_eq(t[0], "cursor") && n >= 2) { g_cursor_on = on_arg(t[1]); logline("  ok"); return; }
     if (s_eq(t[0], "notices") && n >= 2) { set_notices(on_arg(t[1])); logline("  ok"); return; }
+    if (s_eq(t[0], "tooltips") && n >= 2) { set_tooltips(on_arg(t[1])); logline("  ok"); return; }
     if (s_eq(t[0], "query")) { query(); return; }
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
-            "immortal, colonize, center, pause, resume, hud, grid, cursor, notices, query, "
+            "immortal, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, query, "
             "select, selection)");
 }
 
@@ -1084,6 +1257,7 @@ static void build_scene(void)
     g_cursor_on = ini_int("Scene", "Cursor", 0);
     if (!g_cursor_on) logline(g_cursor_draw ? "cursor off" : "cursor: could not hook");
     if (!ini_int("Scene", "Notices", 0)) { set_notices(0); logline("notices off"); }
+    if (!ini_int("Scene", "Tooltips", 0)) { set_tooltips(0); logline("tooltips off"); }
 
     /* [Object.<name>] sections, in file order */
     GetPrivateProfileSectionNamesA(names, sizeof names, g_ini);
