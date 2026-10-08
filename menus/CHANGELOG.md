@@ -5,6 +5,20 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 4.3.2 — 2026-10-08
+
+### Fixed
+- An embedded full-screen menu (the main menu, the in-mission menu) is pinned to the game
+  window's client origin instead of the screen position the game computes for it, and
+  put back there if it is ever found elsewhere. A player on NixOS / GE-Proton10-32 had
+  the main menu at x=21000 (Menus.log: `embedded dialog #1 as child, 1920x1080
+  @21000,0`) and a black screen after the intro.
+- Menus.log: `where` lines give the window's and its parent's screen positions when a
+  full-screen menu is placed and embedded, and each time the game window moves while a
+  menu is up; `full-screen dialog` lines give the position the game asked for.
+
+Installed, not yet seen in game.
+
 ## 4.3.1 — 2026-10-02
 
 ### Fixed
