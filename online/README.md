@@ -17,9 +17,12 @@ traced but unchanged. `./install` does not install it yet.
 
 **Seen in game (2026-10-03):** a player's own install joined a bench game on the same
 machine by join code, through the public server at `c20e.de`, and played the match. That confirms the menu entry, the transport, the join code and the default
-server. It does **not** cover two networks: on one machine the direct path always wins,
-so neither hole punching through a real router nor the relay has been seen outside the
-bench ("Not yet established" under milestone 2).
+server. On one machine the direct path always wins, so that game could not show hole
+punching or the relay.
+
+**Seen across the internet (2026-10-09):** a real multiplayer game between players on
+two networks, each with the v11.8.0 release, through the public server. Whether it went
+over the direct path or the relay was not recorded (each side's `Online.log` says).
 
 ## The goal
 
@@ -282,9 +285,9 @@ told `--server`.
 ### Not yet established
 
 - **Real routers.** On the bench every game is on one machine, so the probes always
-  get through and the relay is only reached with `Direct=0`. Which routers the direct
-  path beats, and how often the relay is needed, can only be learnt from players on
-  two real networks.
+  get through and the relay is only reached with `Direct=0`. One game across two real
+  networks has worked (2026-10-09); which routers the direct path beats, and how often
+  the relay is needed, takes more of them, read from `Online.log`.
 
 ## The plan
 
@@ -304,8 +307,8 @@ told `--server`.
 6. ~~Milestone 2:~~ the server, hole punching, relay fallback and join codes (above).
    `./a2test run multiplayer-online-code` joins by code over the direct path,
    `multiplayer-online-relay` through the relay with 5% loss. The public instance runs
-   at `c20e.de`. Confirmed in game on one machine, 2026-10-03. Still to do: the first
-   games across real routers.
+   at `c20e.de`. Confirmed in game on one machine, 2026-10-03, and across the internet
+   between two networks, 2026-10-09.
 7. **Milestone 3:** the server-backed game list (next section).
 
 **Not planned: voice chat.** DirectPlay Voice is not going to be reimplemented. Players
