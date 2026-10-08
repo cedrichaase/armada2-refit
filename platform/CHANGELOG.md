@@ -12,7 +12,7 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 - `vendor/dxvk-3.1.1/`: DXVK's x32 `d3d9.dll` from the upstream release (zlib/libpng),
   which the release zip puts behind d3d8to9; `./install` still takes Proton's own.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 3.2.0 — 2026-10-05
 
