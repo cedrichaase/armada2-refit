@@ -12,7 +12,7 @@ versions". Newest first. Details, and the planned changes, are in
   network game it applies its rules when `Online.asi` reports that every player runs it
   (latched at first use in a game), instead of standing down always.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 1.5.0 — 2026-10-07
 

@@ -80,7 +80,7 @@ Layers: qol 1.6.0, online 0.6.0.
 - The online handshake for QOLRules: pay-on-queue runs in an *Internet – Online* game when
   every player has it, and stands down otherwise.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 11.5.0 — 2026-10-07
 
