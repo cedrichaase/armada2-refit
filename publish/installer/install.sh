@@ -221,6 +221,10 @@ fetch_shaders() {
 
 if [ "$bloom" = 0 ]; then
     echo "  bloom skipped: no vkBasalt layer installed (optional -- README.txt)"
+    # How to get one on this distribution: the GUI installer in the package holds the
+    # instructions, so there is one copy of them.
+    python3 "$here/armada2-refit-installer.py" --vkbasalt-howto 2>/dev/null | sed 's/^/    /' \
+        || echo "    install your distribution's 32-bit vkBasalt, then run this again"
 else
     case "$BLOOM" in *' '*|*'#'*) bloom=0; echo "  bloom skipped: vkBasalt cannot read the path $BLOOM" ;; esac
 fi

@@ -60,6 +60,31 @@ Keys: F5 refresh, Ctrl+Enter install, Alt+1..4 the pages.
    first, since Heroic may write its own copy back. Uninstall restores only values that
    are still as it left them. Any other launcher gets the text to copy.
 
+## When there is no vkBasalt
+
+Bloom needs a **32-bit** vkBasalt layer (the game is a 32-bit process), which no
+installer here ships. When none is found, the overview shows a panel with how to get one
+on this distribution, detected from `/etc/os-release`: `ID` first, then `ID_LIKE` in
+order, so Mint and Pop!_OS count as Ubuntu and CachyOS, EndeavourOS and Manjaro as
+Arch. `VKBASALT_HOWTO` in the script holds the instructions, and is their only copy:
+`install.sh` prints them through `--vkbasalt-howto` when it skips bloom, and
+`package.sh` writes all of them into `README.txt`.
+
+| Family | Command | Why |
+|---|---|---|
+| Arch | `yay -S lib32-vkbasalt` | AUR only, and it pulls the AUR `vkbasalt`; needs `[multilib]` |
+| Fedora | `sudo dnf install vkBasalt.i686` | in Fedora's own repositories |
+| Fedora Atomic | `sudo rpm-ostree install vkBasalt.i686`, then restart | the same package, layered |
+| Debian | `dpkg --add-architecture i386`, then `apt install vkbasalt:i386` | Debian builds it for i386 (bullseye on) |
+| Ubuntu | build prerequisites, then `postfx/vkbasalt/build.sh` from a clone | Ubuntu builds `vkbasalt` for every architecture but i386 |
+| other | the distribution's 32-bit package, or the same build | |
+
+These were checked against each distribution's archive on 2026-10-08, and CI runs them
+as written on every push (`vkbasalt-howto`, `vkbasalt-howto-ubuntu`), checking that a
+32-bit library and a layer manifest are there afterwards. **Flatpak Heroic** cannot see
+a host layer, nor read the bloom folder in `~/.local/share` (it has no home access), so
+the panel says bloom is not supported there yet.
+
 ## The package schema
 
 The release zip's layout, as far as this program relies on it, is versioned on its own:

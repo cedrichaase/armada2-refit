@@ -7,7 +7,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 11.7.0 — 2026-10-08
 
-Layers: gui-installer 1.0.0 (new; reads package schemas 0 and 1).
+Layers: gui-installer 1.0.0 (new; reads package schemas 0 and 1), postfx 1.2.1.
 
 ### Added
 - `gui-installer/armada2-refit-installer.py`, the graphical installer for Linux: finds the
@@ -19,6 +19,11 @@ Layers: gui-installer 1.0.0 (new; reads package schemas 0 and 1).
   replaced.
 - The release zip carries `Online.asi` + `Online.ini` (online 0.6.0), installed and
   uninstalled by `install.sh` and `install.ps1`.
+- Without a vkBasalt layer, `install.sh`, `README.txt` and the GUI say how to get one,
+  per distribution (Arch, Fedora, Debian, Ubuntu); CI runs those commands on each.
+
+### Fixed
+- `postfx/vkbasalt/build.sh` builds on Debian and Ubuntu (postfx 1.2.1).
 
 Installed, not yet seen in game.
 

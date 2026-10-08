@@ -18,6 +18,10 @@ Reads package schemas 0 and 1.
   as `.a2refit-backup`), and takes them out again on uninstall.
 - Leaves out textures and the cutscene player (`A2_SKIP=cutscenes`); for schema-0
   packages it takes the cutscene player out after their `install.sh`.
+- When no vkBasalt layer is found, how to get one on this distribution, detected from
+  `/etc/os-release` (Arch, Fedora, Fedora Atomic, Debian, Ubuntu, others), with Copy;
+  `--vkbasalt-howto [FAMILY|all] [--command N]` prints the same. CI runs each command
+  (`vkbasalt-howto` jobs).
 - Command line: `--list`, `--install [VERSION]`, `--package ZIP`, `--uninstall`,
   `--selftest`, `--check-version`.
 

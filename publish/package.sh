@@ -26,6 +26,8 @@ out="$(cd "$out" && pwd)"
 # version FILE -- the X.Y.Z of the newest "## X.Y.Z — date" heading.
 version () { sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' "$1" | head -1; }
 ver="$(version "$root/CHANGELOG.md")"
+gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer; also the
+                                                        # source of the vkBasalt how-to
 [ -n "$ver" ] || { echo "no version in CHANGELOG.md" >&2; exit 1; }
 commit="$(git -C "$root" rev-parse --short HEAD)"
 
@@ -133,8 +135,10 @@ OPTIONAL, BY HAND -- only if you want what the installer skipped
   Bloom needs a post-processing layer the installer cannot install for you. Set it up,
   then run the installer again; it finds it and does the rest (downloading MagicBloom
   and ReShade's headers from GitHub, pinned by hash).
-    Linux:    install a 32-bit vkBasalt (lib32-vkbasalt on Arch). The installer then
-              prints two variables to add to the launcher.
+    Linux:    install a 32-bit vkBasalt, then run the installer again; it prints two
+              variables to add to the launcher (the GUI installer writes them into
+              Heroic). By distribution:
+$(python3 "$gui" --vkbasalt-howto all | sed 's/^/              /')
     Windows:  install ReShade (reshade.me) for Armada2.exe -- for Vulkan when DXVK's DLLs
               are in the game directory. No effect packages are needed. If you already
               had a ReShade preset, pick A2Bloom.ini in ReShade's overlay.
@@ -176,7 +180,6 @@ EOF
 # layer, and the ::step ids install.sh prints under A2_PROGRESS=1, in order. Its layout
 # is the package schema, versioned on its own (gui-installer/README.md, "The package
 # schema"): bump "schema" only together with the installer's SCHEMAS.
-gui="$root/gui-installer/armada2-refit-installer.py"
 python3 "$gui" --check-version "$(version "$root/gui-installer/CHANGELOG.md")" >/dev/null \
     || { echo "gui-installer: INSTALLER_VERSION differs from its CHANGELOG.md" >&2; exit 1; }
 cp "$gui" "$d/"

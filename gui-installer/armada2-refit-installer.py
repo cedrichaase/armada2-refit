@@ -403,6 +403,84 @@ def unproxy(game, log=print):
             os.unlink(p(n))
 
 
+# ------------------------------------------------------------------ vkBasalt, per distro
+
+REPO_GIT = f'https://github.com/{REPO}.git'
+# Ubuntu builds vkbasalt for every architecture but i386, so it is built from source
+# with the project's own script, into the home folder. The same build is the fallback
+# anywhere else.
+BUILD_VKBASALT = (f'git clone --depth 1 {REPO_GIT} ~/armada2-refit && '
+                  '~/armada2-refit/postfx/vkbasalt/build.sh')
+# What to install where, by distribution family. Each command is run as it stands in CI
+# (.github/workflows/ci.yml, "vkbasalt-howto"), so keep them runnable as written.
+VKBASALT_HOWTO = {
+    'arch': ('Arch Linux', [
+        ('vkBasalt is in the AUR. With the [multilib] repository enabled and an AUR helper:',
+         'yay -S lib32-vkbasalt')]),
+    'fedora': ('Fedora', [
+        ("The 32-bit package is in Fedora's own repositories:",
+         'sudo dnf install vkBasalt.i686')]),
+    'fedora-ostree': ('Fedora Atomic (Silverblue, Kinoite, ...)', [
+        ('Layer the 32-bit package, then restart:',
+         'sudo rpm-ostree install vkBasalt.i686')]),
+    'debian': ('Debian', [
+        ('Debian packages the 32-bit layer; enable i386 packages and install it:',
+         'sudo dpkg --add-architecture i386 && sudo apt update && sudo apt install vkbasalt:i386')]),
+    'ubuntu': ('Ubuntu', [
+        ('Ubuntu has no 32-bit vkBasalt package, so build it into your home folder. '
+         'First what the build needs:',
+         'sudo dpkg --add-architecture i386 && sudo apt update && sudo apt install git file '
+         'gcc-multilib g++-multilib glslang-tools pkg-config python3-venv libx11-dev:i386'),
+        ('then the build (about a minute; installs into ~/.local only):', BUILD_VKBASALT)]),
+    'other': ('Other distributions', [
+        ("Install your distribution's 32-bit vkBasalt (named like vkbasalt:i386, "
+         'vkBasalt.i686 or lib32-vkbasalt), or build it into your home folder — it needs '
+         'gcc with 32-bit support, glslang, pkg-config, python3-venv and 32-bit libX11 '
+         'headers:', BUILD_VKBASALT)]),
+}
+
+
+def os_release():
+    out = {}
+    for path in ('/etc/os-release', '/usr/lib/os-release'):
+        try:
+            for line in open(path):
+                k, sep, v = line.strip().partition('=')
+                if sep:
+                    out[k] = v.strip().strip('"\'')
+            return out
+        except OSError:
+            continue
+    return out
+
+
+def distro_family(osr=None):
+    """'arch', 'fedora', 'fedora-ostree', 'debian', 'ubuntu' or 'other': the ID first,
+    then ID_LIKE in order, so Mint and Pop!_OS are Ubuntu, CachyOS and Manjaro Arch."""
+    osr = os_release() if osr is None else osr
+    for t in [osr.get('ID', '')] + osr.get('ID_LIKE', '').split():
+        if t in ('arch', 'archlinux'):
+            return 'arch'
+        if t == 'fedora':
+            ostree = osr.get('VARIANT_ID') in ('silverblue', 'kinoite', 'sericea', 'onyx',
+                                               'cosmic-atomic') or \
+                os.path.exists('/run/ostree-booted')
+            return 'fedora-ostree' if ostree else 'fedora'
+        if t in ('ubuntu', 'debian'):
+            return t
+    return 'other'
+
+
+def vkbasalt_howto(family=None):
+    """(what we detected, [(text, command)])."""
+    osr = os_release()
+    explicit = bool(family)
+    family = family or distro_family(osr)
+    name, steps = VKBASALT_HOWTO.get(family, VKBASALT_HOWTO['other'])
+    pretty = osr.get('PRETTY_NAME') if not explicit else None
+    return (pretty or name), steps
+
+
 # ------------------------------------------------------------------ Heroic's settings
 
 def split_overrides(v):
@@ -835,12 +913,33 @@ def cli(argv):
     ap.add_argument('--no-launcher', action='store_true')
     ap.add_argument('--check-version')
     ap.add_argument('--selftest', action='store_true')
+    ap.add_argument('--vkbasalt-howto', nargs='?', const='', metavar='FAMILY',
+                    help='how to install vkBasalt here (or for FAMILY: arch, fedora, '
+                         'fedora-ostree, debian, ubuntu, other, all)')
+    ap.add_argument('--command', type=int, metavar='N',
+                    help='with --vkbasalt-howto: print only its Nth command')
     a = ap.parse_args(argv)
     if a.check_version is not None:
         print(INSTALLER_VERSION)
         return 0 if a.check_version == INSTALLER_VERSION else 1
     if a.selftest:
         return selftest()
+    if a.vkbasalt_howto is not None:
+        fams = list(VKBASALT_HOWTO) if a.vkbasalt_howto == 'all' else [a.vkbasalt_howto or None]
+        for fam in fams:
+            if fam and fam not in VKBASALT_HOWTO:
+                print(f'unknown family {fam}', file=sys.stderr)
+                return 2
+            name, steps = vkbasalt_howto(fam)
+            if a.command:
+                if not 1 <= a.command <= len(steps):
+                    return 2
+                print(steps[a.command - 1][1])
+                continue
+            print(f'{name}:' if len(fams) > 1 else f'Bloom needs a 32-bit vkBasalt. On {name}:')
+            for text, cmd in steps:
+                print(f'  {text}\n      {cmd}')
+        return 0
 
     def releases():
         try:
@@ -945,6 +1044,15 @@ def selftest():
               'legacy zip: layers from README')
         check(split_overrides('a=n,b; b=n') == {'a': 'n,b', 'b': 'n'}, 'overrides parse')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
+        for osr, fam in [({'ID': 'arch'}, 'arch'), ({'ID': 'cachyos', 'ID_LIKE': 'arch'}, 'arch'),
+                         ({'ID': 'fedora'}, 'fedora'),
+                         ({'ID': 'fedora', 'VARIANT_ID': 'silverblue'}, 'fedora-ostree'),
+                         ({'ID': 'linuxmint', 'ID_LIKE': 'ubuntu debian'}, 'ubuntu'),
+                         ({'ID': 'pop', 'ID_LIKE': 'ubuntu debian'}, 'ubuntu'),
+                         ({'ID': 'debian'}, 'debian'), ({'ID': 'nixos'}, 'other')]:
+            if fam == 'fedora' and os.path.exists('/run/ostree-booted'):
+                continue
+            check(distro_family(osr) == fam, f'distro: {osr} is {fam}')
     return 0 if ok else 1
 
 
@@ -1385,6 +1493,11 @@ def run_gui():
             cols.append(p)
             box.append(cols)
 
+            self.bloom_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            self.bloom_panel.add_css_class('panel')
+            self.bloom_panel.set_visible(False)
+            box.append(self.bloom_panel)
+
             box.append(self.section('What it installs', 'lilac'))
             self.layers_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             box.append(self.layers_box)
@@ -1575,7 +1688,7 @@ def run_gui():
                                        else 'Proton’s own · no MSAA, lighting per vertex'),
                       'good' if f['dxvk'] else 'warn')
             self.fact(gg, 'Bloom', 'vkBasalt found' if f['vkbasalt']
-                      else 'no vkBasalt layer — bloom skipped (optional)',
+                      else 'no vkBasalt layer — bloom skipped (how to get it below)',
                       'good' if f['vkbasalt'] else 'warn')
             self.fact(gg, 'Launcher', f'{g.heroic.label()}, GOG app {g.heroic.app}' if g.heroic
                       else 'not Heroic — set the variables by hand', '' if g.heroic else 'warn')
@@ -1703,7 +1816,45 @@ def run_gui():
                     buf.insert(buf.get_end_iter(), '\n')
 
         # ---------------------------------------------------------- what it installs
+        def update_bloom(self):
+            p = self.bloom_panel
+            while (c := p.get_first_child()):
+                p.remove(c)
+            f, g = getattr(self, 'facts', None), self.game()
+            if not f or f['vkbasalt']:
+                p.set_visible(False)
+                return
+            name, steps = vkbasalt_howto()
+            p.append(self.section('Bloom needs vkBasalt', 'gold'))
+            p.append(lab(f'Optional. Everything else installs without it. Detected: {name}.',
+                         ('prose',), wrap=True))
+            if g and g.heroic and g.heroic.flatpak:
+                p.append(lab('This game runs in Heroic’s Flatpak, which cannot see a vkBasalt '
+                             'installed this way. Bloom under Flatpak Heroic is not supported '
+                             'yet.', ('val', 'warn'), wrap=True))
+            for text, cmd in steps:
+                p.append(lab(text, ('prose',), wrap=True))
+                row = Gtk.Box(spacing=10)
+                tv = Gtk.TextView(editable=False, monospace=True, hexpand=True,
+                                  wrap_mode=Gtk.WrapMode.CHAR)
+                tv.add_css_class('mono')
+                tv.set_left_margin(10)
+                tv.set_top_margin(6)
+                tv.set_bottom_margin(6)
+                tv.get_buffer().set_text(cmd)
+                row.append(tv)
+                cp = pill('Copy', 'gold', small=True)
+                cp.set_valign(Gtk.Align.CENTER)
+                cp.connect('clicked', lambda _b, c=cmd: (self.get_clipboard().set(c),
+                                                         self.set_status('Copied to the clipboard', 'ok')))
+                row.append(cp)
+                p.append(row)
+            p.append(lab('Then press Refresh, and install again to set bloom up.',
+                         ('dimtext',), wrap=True))
+            p.set_visible(True)
+
         def update_all(self):
+            self.update_bloom()
             self.update_layers()
             self.update_launcher()
             self.update_banner()
