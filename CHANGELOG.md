@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.8.0 — 2026-10-08
+
+Layers: platform 3.3.0.
+
+### Added
+- The release zip's `install.sh` sets up the game as the repository's `./install` does,
+  textures, menu backdrops and movies apart: the Direct3D chain (crosire's d3d8to9 on
+  DXVK 3.1.1's d3d9, in `chain/`; a replaced GOG or DXVK DLL is kept and put back by
+  `--uninstall`), `QOLRules.asi`, `GridLayout.asi`, `Planets.asi`, and the moon,
+  selection-bubble and hull SODs rewritten from the player's own files (`models/`,
+  needs python3). New `::step` ids `chain`, `grid`, `models` and manifest layers to match.
+  The Windows installer is unchanged.
+
+Installed, not yet seen in game.
+
 ## 11.7.1 — 2026-10-08
 
 Layers: menus 4.3.2.
