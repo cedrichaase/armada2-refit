@@ -90,7 +90,8 @@ Layers: qol 1.5.0.
 - `QOLRules.asi`: pay when queuing, refund on cancel (QOL-7), single player and skirmish
   only. `a2mod` and the bench's log collection know the new files.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09: pay on queue and the refund on cancel; the refund on
+losing the building and save/load not yet seen.
 
 ## 11.4.0 — 2026-10-07
 
