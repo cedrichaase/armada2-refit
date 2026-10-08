@@ -964,7 +964,8 @@ CSS = """
 window, .lcars-root { background: #000; color: @lc_peach; }
 .lcars, .lcars label { font-family: "Antonio", "Oswald", "Bebas Neue", "League Gothic",
     "Liberation Sans Narrow", "DejaVu Sans Condensed", sans-serif; }
-.title { font-size: 40px; font-weight: 600; color: @lc_orange; letter-spacing: 2px; }
+.title { font-size: 40px; font-weight: 600; color: @lc_orange; letter-spacing: 2px;
+    line-height: 0.95; }
 .subtitle { font-size: 15px; color: #000; font-weight: 600; letter-spacing: 1px; }
 .bar { min-height: 10px; }
 .c-orange { background: @lc_orange; } .c-peach { background: @lc_peach; }
@@ -1183,26 +1184,33 @@ def run_gui():
             grid.set_margin_end(14)
             self.set_content(grid)
 
-            # Top: the elbow, and the title bar.
-            grid.attach(Elbow('orange', 46, True), 0, 0, 1, 1)
+            # Top: the elbow, and the title bar. Every piece of a bar is exactly the
+            # elbow's arm high and pinned to its edge, so nothing taller in the row (the
+            # title) can stretch a piece and leave a step where it meets the elbow.
+            TOP_H, BOT_H = 46, 22
+
+            def pin(w, h, edge):
+                w.set_size_request(w.get_size_request()[0], h)
+                w.set_valign(edge)
+                return w
+            grid.attach(Elbow('orange', TOP_H, True), 0, 0, 1, 1)
             top = Gtk.Box(spacing=6, valign=Gtk.Align.START)
-            top.set_size_request(-1, 46)
-            top.append(seg('orange', hexpand=True))
+            top.append(pin(seg('orange', hexpand=True), TOP_H, Gtk.Align.START))
             title = lab('ARMADA II REFIT', ('title',))
             title.set_margin_start(10)
             title.set_margin_end(10)
-            title.set_valign(Gtk.Align.CENTER)
-            top.append(title)
+            top.append(pin(title, TOP_H, Gtk.Align.START))
             tag = Gtk.Box()
             tag.add_css_class('c-lilac')
             tag.set_size_request(150, -1)
+            pin(tag, TOP_H, Gtk.Align.START)
             tl = lab(f'INSTALLER {INSTALLER_VERSION}', ('subtitle',), xalign=1)
             tl.set_hexpand(True)
             tl.set_margin_end(10)
             tl.set_valign(Gtk.Align.END)
             tag.append(tl)
             top.append(tag)
-            top.append(seg('blue', width=46, extra=('cap-r',)))
+            top.append(pin(seg('blue', width=46, extra=('cap-r',)), TOP_H, Gtk.Align.START))
             grid.attach(top, 1, 0, 1, 1)
 
             # Left: the navigation.
@@ -1244,17 +1252,16 @@ def run_gui():
             grid.attach(side, 0, 1, 1, 1)
 
             # Bottom: the elbow and its bar.
-            grid.attach(Elbow('tan', 22, False), 0, 2, 1, 1)
+            grid.attach(Elbow('tan', BOT_H, False), 0, 2, 1, 1)
             bot = Gtk.Box(spacing=6, valign=Gtk.Align.END)
-            bot.set_size_request(-1, 22)
-            bot.append(seg('tan', width=220))
-            bot.append(seg('lilac', width=60))
+            bot.append(pin(seg('tan', width=220), BOT_H, Gtk.Align.END))
+            bot.append(pin(seg('lilac', width=60), BOT_H, Gtk.Align.END))
             self.footer = lab('', ('dimtext',), xalign=1)
             self.footer.set_hexpand(True)
             self.footer.set_margin_end(6)
             bot.append(self.footer)
-            bot.append(seg('peach', width=90))
-            bot.append(seg('blue', width=30, extra=('cap-r',)))
+            bot.append(pin(seg('peach', width=90), BOT_H, Gtk.Align.END))
+            bot.append(pin(seg('blue', width=30, extra=('cap-r',)), BOT_H, Gtk.Align.END))
             grid.attach(bot, 1, 2, 1, 1)
 
             # The content, and below it the status line, progress and the buttons.
