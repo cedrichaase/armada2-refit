@@ -18,7 +18,7 @@ Layers: platform 3.3.0.
   needs python3). New `::step` ids `chain`, `grid`, `models` and manifest layers to match.
   The Windows installer is unchanged.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 11.7.1 — 2026-10-08
 
