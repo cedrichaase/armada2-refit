@@ -45,6 +45,7 @@ it bundles.
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
 | `online/` | `Online.asi` — online multiplayer, in progress: the *Internet – Online* menu entry, our own `IDirectPlay8Peer` over UDP (`peer.c`), and `server/a2online-server.py` for join codes, hole punching and the relay, public at `c20e.de:2399` (the default `Server=`; the bench blanks it). Not in `./install` or `a2mod` yet | `online/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
+| `gui-installer/` | `armada2-refit-installer.py`, the graphical installer for Linux (GTK 4, LCARS style): installs GitHub release zips, cached, and writes Heroic's launch variables. Versioned on its own, with the release-package schema it reads (`manifest.json`, `install.sh`'s `::step` lines). Leaves out textures and cutscenes for now | `gui-installer/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
 testing, `./a2tex` for textures, `./install`, which installs every layer, and

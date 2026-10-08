@@ -104,7 +104,7 @@ Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the pl
 and writes `armada2-refit-<version>.zip`:
 
 - `game/`: what goes beside `Armada2.exe`, which is `HUD.asi`, `Menus.asi`, `QOL.asi`,
-  `Lighting.asi`, `MSAA.asi` and `binkw32.dll`, each with its `.ini`, and `dxvk.conf`
+  `Lighting.asi`, `Online.asi`, `MSAA.asi` and `binkw32.dll`, each with its `.ini`, and `dxvk.conf`
   at stage 3 (`postfx/renderer-config.sh --print`). The installers put `MSAA.asi` in
   only when DXVK is in the game directory: its `d3d8.dll`, or crosire's d3d8to9 (known
   by hash) in front of its `d3d9.dll`. `Lighting.asi` goes in everywhere and lights per
@@ -116,7 +116,14 @@ and writes `armada2-refit-<version>.zip`:
   `publish/installer/`;
 - `prereqs.txt`, what the installers download first, and `CREDITS.txt`, generated from
   it and from `shaders.txt`;
-- `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`.
+- `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`;
+- `manifest.json`, the same for the GUI installer (package schema 1), and
+  `armada2-refit-installer.py` itself, which CI also attaches to the release on its own
+  (`gui-installer/README.md`).
+
+`install.sh` reads two variables the GUI sets: `A2_PROGRESS=1` prints `::step <id>` as
+each stage starts, and `A2_SKIP=cutscenes` leaves the Bink proxy out (and puts back a
+stock `binkw32.dll` an earlier install replaced). Run by hand, it does as before.
 
 It is our code only, compiled, and our configuration. It holds nothing of the game,
 none of the test tools, and **no third-party shader**. `ReShadeUI.fxh` carries no

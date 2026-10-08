@@ -31,6 +31,7 @@ check '[ "$(sum "$G/STA2WidescreenPatch.asi")" = 193828b15b8cdba84617dd9a359b555
 check '[ "$(cat "$G/d3d8.dll")" = gogd3d8to9 ] && [ ! -e "$G/d3d8.dll.gog-backup" ]'
 check '[ ! -e "$G/MSAA.asi" ]'
 check '[ -e "$G/QOL.asi" ] && [ -e "$G/QOL.ini" ]'
+check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
 check '[ -e "$G/Lighting.asi" ] && [ -e "$G/Lighting.ini" ] && grep -q "Lighting: per vertex" "$T/out"'
 [ -n "$syslayer" ] || check '[ ! -e "$B" ]'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
@@ -68,7 +69,7 @@ echo mine > "$G/UltimateASILoader-license.txt"
 "$P/install.sh" --uninstall "$G" > "$T/out"
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check '[ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/binkw32.dll.a2neb-backup" ]'
-check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|MSAA|QOL|Lighting)\.ini$")" ]'
+check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|MSAA|QOL|Lighting|Online)\.ini$")" ]'
 check '[ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-prereqs.txt" ]'
 check '[ "$(cat "$G/UltimateASILoader-license.txt")" = mine ] && grep -q "left UltimateASILoader-license.txt" "$T/out"'
 check '[ "$(cat "$G/d3d8.dll")" = dxvk ]'

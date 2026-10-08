@@ -73,7 +73,7 @@ function Test-OurDxvkConf {
 # ------------------------------------------------------------------ uninstall
 
 if ($Uninstall) {
-    foreach ($n in "HUD", "Menus", "MSAA", "QOL", "Lighting") {
+    foreach ($n in "HUD", "Menus", "MSAA", "QOL", "Lighting", "Online") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
     }
     if (Test-Proxy (G "binkw32.dll")) {
@@ -167,6 +167,7 @@ Put "HUD.asi"; Put "HUD.ini"
 foreach ($n in "MenuScale.asi", "MenuScale.ini") { Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue }   # Menus.asi's old name
 Put "Menus.asi"; Put "Menus.ini"
 Put "QOL.asi"; Put "QOL.ini"
+Put "Online.asi"; Put "Online.ini"
 # Lit per pixel in shaders only behind crosire's d3d8to9; per vertex on any other d3d8.
 Put "Lighting.asi"; Put "Lighting.ini"
 if (-not (Test-D3d8to9 (G "d3d8.dll"))) {
