@@ -38,7 +38,7 @@ a time, and every fix can be undone.
 | **Texture replacement** | `./a2tex`, a pipeline for replacement textures, whether upscaled, generated or drawn by hand. It checks each one against the engine's format rules (bit depth, mip chains, size limits), installs it with a backup, and packs a set so others can install it. There are 84 recipes so far: skyboxes, nebulae, planets, UI and ship hulls |
 | **Video replacement** | a replacement `binkw32.dll` that plays the launch reels full screen and plays AV1 replacements in place of the original Bink movies, plus a pipeline to build them |
 | **Widened loading screen** | the 3D loading-screen model, rebuilt for widescreen |
-| **Online multiplayer** *(in progress)* | multiplayer under Proton is broken (Wine stubs DirectPlay). `Online.asi` adds *Internet – Online*, which runs on its own UDP transport with join codes, hole punching and a relay through a self-hostable server. Not part of `./install` yet ([`online/README.md`](online/README.md)) |
+| **Online multiplayer** *(in progress)* | multiplayer under Proton is broken (Wine stubs DirectPlay). `Online.asi` adds *Internet – Online*, which runs on its own UDP transport with join codes, hole punching and a relay through a self-hostable server. In the release zip; not part of `./install` yet ([`online/README.md`](online/README.md)) |
 | **One switch** | `./a2mod stock` / `refit` flips every layer at once for before/after comparisons |
 | **Headless test bench** | `./a2test` runs the game on a copy of the install on a virtual display at any resolution, and takes screenshots and runs regression scenarios |
 
@@ -86,6 +86,14 @@ overrides, the d3d8 chain, setting the resolution, and window management under H
 
 ## Quick start
 
+**Just playing, on Linux:** download `armada2-refit-installer.py` from the newest
+[release](https://github.com/cedrichaase/armada2-refit/releases) and run it
+(`python3 armada2-refit-installer.py`; it needs PyGObject with GTK 4 and libadwaita). It
+finds the game, shows what it will install, installs the newest release and can set
+Heroic's launch options for you ([`gui-installer/README.md`](gui-installer/README.md)).
+
+**From the repository:**
+
     ./a2env.sh                    # check where it thinks the game, prefix and Proton are
     ./install                     # build and install every layer
     ./a2mod status                # what is installed, layer by layer
@@ -112,11 +120,12 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 `llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`.
 **Prebuilt**, the zip on each
 [release](https://github.com/cedrichaase/armada2-refit/releases) has `HUD.asi`,
-`Menus.asi`, `MSAA.asi`, `QOL.asi`, `Lighting.asi` and the Bink proxy with their `.ini`
-files, `dxvk.conf` and the bloom config (`GridLayout.asi` and `Planets.asi` are built from
-the repository). It also has installers that do this
+`Menus.asi`, `MSAA.asi`, `QOL.asi`, `Lighting.asi`, `Online.asi` and the Bink proxy with
+their `.ini` files, `dxvk.conf` and the bloom config (`GridLayout.asi` and `Planets.asi`
+are built from the repository). It also has installers that do this
 section for you: `install.sh` on Linux, `install.bat` on Windows (`README.txt` in the
-zip). `publish/package.sh` builds the same zip locally.
+zip), and the graphical `armada2-refit-installer.py` for Linux, which leaves the Bink
+proxy out for now. `publish/package.sh` builds the same zip locally.
 
 **Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1,
 plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game

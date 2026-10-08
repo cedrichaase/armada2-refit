@@ -1,6 +1,7 @@
 # Every push and pull request: check that the new commits are publishable, build the
 # release zip (publish/package.sh) kept as a workflow artifact, and run its installers
-# against a mock game on Linux and Windows (publish/installer/test.sh, test.ps1).
+# against a mock game on Linux and Windows (publish/installer/test.sh, test.ps1), and the
+# GUI installer's (gui-installer/test.sh).
 # A push to main whose root CHANGELOG.md version has no release yet also tags vX.Y.Z and
 # publishes a GitHub Release with that zip. publish/README.md, "Release packages".
 name: CI
@@ -63,10 +64,14 @@ jobs:
           unzip -l "$zip"
       - name: install.sh against a mock game
         run: publish/installer/test.sh dist/*.zip
+      - name: the GUI installer's logic against a mock game and a mock Heroic
+        run: gui-installer/test.sh dist/*.zip
       - uses: actions/upload-artifact@v7
         with:
           name: armada2-refit-${{ github.sha }}
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/armada2-refit-installer.py
           if-no-files-found: error
 
   windows-installer:
@@ -105,12 +110,12 @@ jobs:
           fi
           # Notes: the root changelog's newest entry, without its heading.
           awk '/^## /{if (f) exit; f=1; next} f' CHANGELOG.md > notes.md
-          printf '\n---\nInstalling: README.txt in the zip, and [Installing by hand](%s/%s/blob/%s/README.md#installing-by-hand-layer-by-layer).\n' \
+          printf '\n---\nInstalling: on Linux, download armada2-refit-installer.py and run it (python3 armada2-refit-installer.py); otherwise README.txt in the zip, and [Installing by hand](%s/%s/blob/%s/README.md#installing-by-hand-layer-by-layer).\n' \
             "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> notes.md
           # An entry nobody has seen working in game yet ships as a pre-release.
           pre=()
           grep -qi 'not yet seen in game' notes.md && pre=(--prerelease)
-          gh release create "$tag" dist/*.zip --target "$GITHUB_SHA" \
+          gh release create "$tag" dist/*.zip dist/armada2-refit-installer.py --target "$GITHUB_SHA" \
             --title "Armada II Refit $VERSION" --notes-file notes.md "${pre[@]}"
       - name: Keep only the newest three releases
         run: |

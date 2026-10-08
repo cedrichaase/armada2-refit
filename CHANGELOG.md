@@ -5,6 +5,28 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.7.0 — 2026-10-08
+
+Layers: gui-installer 1.0.0 (new; reads package schemas 0 and 1), postfx 1.2.1.
+
+### Added
+- `gui-installer/armada2-refit-installer.py`, the graphical installer for Linux: finds the
+  game, installs any GitHub release (cached locally, newest full release by default),
+  writes Heroic's launch variables. In every release zip and as a release asset of its own.
+- Package schema 1: `manifest.json` in the release zip (layers, versions, `::step` ids).
+- `install.sh`: `A2_PROGRESS=1` prints `::step <id>` per stage; `A2_SKIP=cutscenes`
+  leaves the cutscene player out and puts back a stock `binkw32.dll` an earlier install
+  replaced.
+- The release zip carries `Online.asi` + `Online.ini` (online 0.6.0), installed and
+  uninstalled by `install.sh` and `install.ps1`.
+- Without a vkBasalt layer, `install.sh`, `README.txt` and the GUI say how to get one,
+  per distribution (Arch, Fedora, Debian, Ubuntu).
+
+### Fixed
+- `postfx/vkbasalt/build.sh` builds on Debian and Ubuntu (postfx 1.2.1).
+
+Installed, not yet seen in game.
+
 ## 11.6.2 — 2026-10-07
 
 Layers: lighting 1.17.2.

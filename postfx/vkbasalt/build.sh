@@ -97,7 +97,13 @@ export PATH="$WORK/venv/bin:$PATH"
 for need in gcc g++ glslangValidator pkg-config; do
     command -v "$need" >/dev/null || { echo "missing: $need" >&2; exit 1; }
 done
-[ -f /usr/lib32/pkgconfig/x11.pc ] || { echo "missing: lib32-libx11 (/usr/lib32/pkgconfig/x11.pc)" >&2; exit 1; }
+# The 32-bit .pc files: Arch's lib32, or Debian/Ubuntu's multiarch directory.
+PC32=""
+for d in /usr/lib32/pkgconfig /usr/lib/i386-linux-gnu/pkgconfig; do
+    [ -f "$d/x11.pc" ] && { PC32="$d"; break; }
+done
+[ -n "$PC32" ] || { echo "missing: 32-bit libX11 headers (Arch: lib32-libx11;" \
+    "Debian/Ubuntu: libx11-dev:i386)" >&2; exit 1; }
 
 # ---------------------------------------------------------------- build
 
@@ -124,7 +130,7 @@ echo "building (i386)..."
 # and would happily hand a 32-bit link the 64-bit libX11.  /usr/share/pkgconfig is the
 # arch-independent one: x11.pc requires xproto/kbproto, which are headers-only and live
 # there, not under lib32.
-PKG_CONFIG_LIBDIR=/usr/lib32/pkgconfig:/usr/share/pkgconfig \
+PKG_CONFIG_LIBDIR="$PC32":/usr/share/pkgconfig \
     meson setup "$WORK/build32" "$WORK/vkBasalt" \
         --cross-file "$WORK/cross-i386.ini" --buildtype=release \
         -Dcpp_args="$inc" -Dc_args="$inc" > "$WORK/meson-setup.log" 2>&1 \

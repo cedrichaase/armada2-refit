@@ -3,12 +3,15 @@
 #
 # Writes <out-dir>/armada2-refit-<version>.zip (default out-dir: dist/ under a fresh
 # mktemp -d, printed at the end):
-#   game/     what goes beside Armada2.exe: the five plugins and their .ini, dxvk.conf
+#   game/     what goes beside Armada2.exe: the six plugins and their .ini, dxvk.conf
 #   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
 #   install.sh  install.ps1  install.bat     publish/installer/, for Linux and Windows
 #   vendor/   third-party files whose licence allows bundling (platform/vendor/)
 #   prereqs.txt  CREDITS.txt  what they install first, and who made it
 #   README.txt  LICENSE  SHA256SUMS
+#   manifest.json               what is in it, for the GUI installer (package schema 1)
+#   armada2-refit-installer.py  the GUI installer (gui-installer/), also written beside
+#                               the zip, so a release carries it as an asset of its own
 # <version> is the root CHANGELOG.md's newest entry. Only our own code goes in: no asset,
 # nothing from the game, no third-party shader, none of the test tools (probe.exe,
 # binktest.exe). CI runs this
@@ -23,6 +26,8 @@ out="$(cd "$out" && pwd)"
 # version FILE -- the X.Y.Z of the newest "## X.Y.Z — date" heading.
 version () { sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' "$1" | head -1; }
 ver="$(version "$root/CHANGELOG.md")"
+gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer; also the
+                                                        # source of the vkBasalt how-to
 [ -n "$ver" ] || { echo "no version in CHANGELOG.md" >&2; exit 1; }
 commit="$(git -C "$root" rev-parse --short HEAD)"
 
@@ -31,6 +36,7 @@ bash "$root/menus/build.sh"            >/dev/null
 bash "$root/msaa/build.sh"             >/dev/null
 bash "$root/qol/build.sh"              >/dev/null
 bash "$root/lighting/build.sh"         >/dev/null
+bash "$root/online/build.sh"           >/dev/null
 bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
 
 name="armada2-refit-$ver"
@@ -43,6 +49,7 @@ cp "$root/menus/build/Menus.asi"            "$root/menus/Menus.ini"             
 cp "$root/msaa/build/MSAA.asi"              "$root/msaa/MSAA.ini"               "$d/game/"
 cp "$root/qol/build/QOL.asi"                "$root/qol/QOL.ini"                 "$d/game/"
 cp "$root/lighting/build/Lighting.asi"      "$root/lighting/Lighting.ini"       "$d/game/"
+cp "$root/online/build/Online.asi"          "$root/online/Online.ini"           "$d/game/"
 cp "$root/cutscenes/binkproxy/build/binkw32.dll" "$root/cutscenes/binkproxy/BinkProxy.ini" "$d/game/"
 # dxvk.conf as ./install writes it (stage 3); only DXVK reads it.
 bash "$root/postfx/renderer-config.sh" --print --stage 3 > "$d/game/dxvk.conf"
@@ -97,6 +104,9 @@ WHAT GOES IN (game/, copied beside Armada2.exe)
                                                d3d8.dll is crosire's d3d8to9 (the
                                                repository's ./install sets that up); per
                                                vertex otherwise. Lighting.log says which
+  Online.asi   + Online.ini     online $(version "$root/online/CHANGELOG.md")     online multiplayer under Wine/Proton too: the
+                                               Internet - Online entry, join codes, no port
+                                               forwarding (the project's server, c20e.de)
   MSAA.asi     + MSAA.ini       msaa $(version "$root/msaa/CHANGELOG.md")       multisample anti-aliasing -- installed only
                                                when DXVK is in the game directory: its
                                                d3d8.dll, or d3d8to9 on its d3d9.dll
@@ -125,8 +135,10 @@ OPTIONAL, BY HAND -- only if you want what the installer skipped
   Bloom needs a post-processing layer the installer cannot install for you. Set it up,
   then run the installer again; it finds it and does the rest (downloading MagicBloom
   and ReShade's headers from GitHub, pinned by hash).
-    Linux:    install a 32-bit vkBasalt (lib32-vkbasalt on Arch). The installer then
-              prints two variables to add to the launcher.
+    Linux:    install a 32-bit vkBasalt, then run the installer again; it prints two
+              variables to add to the launcher (the GUI installer writes them into
+              Heroic). By distribution:
+$(python3 "$gui" --vkbasalt-howto all | sed 's/^/              /')
     Windows:  install ReShade (reshade.me) for Armada2.exe -- for Vulkan when DXVK's DLLs
               are in the game directory. No effect packages are needed. If you already
               had a ReShade preset, pick A2Bloom.ini in ReShade's overlay.
@@ -164,7 +176,64 @@ EOF
     echo "    from     https://github.com/crosire/reshade-shaders"
 } > "$d/CREDITS.txt"
 
-(cd "$d" && sha256sum -- game/* bloom/* vendor/*/* prereqs.txt > SHA256SUMS)
+# The GUI installer, and the manifest it reads: what the package installs, layer by
+# layer, and the ::step ids install.sh prints under A2_PROGRESS=1, in order. Its layout
+# is the package schema, versioned on its own (gui-installer/README.md, "The package
+# schema"): bump "schema" only together with the installer's SCHEMAS.
+python3 "$gui" --check-version "$(version "$root/gui-installer/CHANGELOG.md")" >/dev/null \
+    || { echo "gui-installer: INSTALLER_VERSION differs from its CHANGELOG.md" >&2; exit 1; }
+cp "$gui" "$d/"
+python3 - "$d/manifest.json" <<EOF
+import json, sys
+layer = lambda id, name, version, files, summary, when='always': dict(
+    id=id, name=name, version=version, files=files, summary=summary, when=when)
+json.dump({
+    'schema': 1,
+    'name': 'armada2-refit',
+    'version': '$ver',
+    'commit': '$commit',
+    'installer': {'file': 'armada2-refit-installer.py',
+                  'version': '$(version "$root/gui-installer/CHANGELOG.md")'},
+    'linux': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
+    'steps': ['verify', 'prereqs', 'hud', 'menus', 'qol', 'lighting', 'online', 'msaa',
+              'cutscenes', 'renderer', 'bloom', 'done'],
+    'layers': [
+        layer('prereqs', 'Widescreen patch', '1.0', ['vendor/STA2WidescreenPatch/*'],
+              'STA2WidescreenPatch and the Ultimate ASI Loader that loads every plugin',
+              'missing'),
+        layer('hud', 'HUD', '$(version "$root/hud/CHANGELOG.md")', ['game/HUD.asi', 'game/HUD.ini'],
+              'the in-game HUD, font and cursors at any aspect ratio'),
+        layer('menus', 'Menus', '$(version "$root/menus/CHANGELOG.md")', ['game/Menus.asi', 'game/Menus.ini'],
+              'the shell menus scaled to fill the screen'),
+        layer('qol', 'Quality of life', '$(version "$root/qol/CHANGELOG.md")', ['game/QOL.asi', 'game/QOL.ini'],
+              'right-drag pan speed, bigger selections and control groups; plays against stock players'),
+        layer('lighting', 'Lighting', '$(version "$root/lighting/CHANGELOG.md")', ['game/Lighting.asi', 'game/Lighting.ini'],
+              'ships and stations lit on the GPU, new scene lights, planets with a night side; '
+              'per pixel behind d3d8to9, per vertex otherwise'),
+        layer('online', 'Online', '$(version "$root/online/CHANGELOG.md")', ['game/Online.asi', 'game/Online.ini'],
+              'online multiplayer that works under Wine/Proton: the Internet – Online entry, '
+              'join codes, no port forwarding'),
+        layer('msaa', 'Anti-aliasing', '$(version "$root/msaa/CHANGELOG.md")', ['game/MSAA.asi', 'game/MSAA.ini'],
+              'multisample anti-aliasing', 'dxvk'),
+        layer('cutscenes', 'Cutscene player', '$(version "$root/cutscenes/CHANGELOG.md")',
+              ['game/binkw32.dll', 'game/BinkProxy.ini'],
+              'launch reels full screen; the stock binkw32.dll is kept'),
+        layer('renderer', 'Renderer', '$(version "$root/postfx/CHANGELOG.md")', ['game/dxvk.conf'],
+              '16x anisotropic filtering, LOD bias, seamless cube maps (read by DXVK)', 'dxvk.conf'),
+        layer('bloom', 'Bloom', '$(version "$root/postfx/CHANGELOG.md")', ['bloom/*'],
+              'MagicBloom through vkBasalt; its shaders are downloaded, pinned by hash', 'vkbasalt'),
+    ],
+    'not_included': [
+        dict(id='textures', name='Textures',
+             summary='remastered textures are built from your own game files with ./a2tex; '
+                     'a release cannot carry them'),
+    ],
+}, open(sys.argv[1], 'w'), indent=1)
+EOF
+
+(cd "$d" && sha256sum -- game/* bloom/* vendor/*/* prereqs.txt manifest.json \
+    armada2-refit-installer.py > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")
+cp "$gui" "$out/armada2-refit-installer.py"
 echo "$out/$name.zip"
