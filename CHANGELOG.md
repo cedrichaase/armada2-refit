@@ -20,7 +20,7 @@ Layers: gui-installer 1.0.0 (new; reads package schemas 0 and 1), postfx 1.2.1.
 - The release zip carries `Online.asi` + `Online.ini` (online 0.6.0), installed and
   uninstalled by `install.sh` and `install.ps1`.
 - Without a vkBasalt layer, `install.sh`, `README.txt` and the GUI say how to get one,
-  per distribution (Arch, Fedora, Debian, Ubuntu); CI runs those commands on each.
+  per distribution (Arch, Fedora, Debian, Ubuntu).
 
 ### Fixed
 - `postfx/vkbasalt/build.sh` builds on Debian and Ubuntu (postfx 1.2.1).

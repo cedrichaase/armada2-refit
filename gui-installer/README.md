@@ -79,9 +79,7 @@ Arch. `VKBASALT_HOWTO` in the script holds the instructions, and is their only c
 | Ubuntu | build prerequisites, then `postfx/vkbasalt/build.sh` from a clone | Ubuntu builds `vkbasalt` for every architecture but i386 |
 | other | the distribution's 32-bit package, or the same build | |
 
-These were checked against each distribution's archive on 2026-10-08, and CI runs them
-as written on every push (`vkbasalt-howto`, `vkbasalt-howto-ubuntu`), checking that a
-32-bit library and a layer manifest are there afterwards. **Flatpak Heroic** cannot see
+These were checked against each distribution's archive on 2026-10-08. **Flatpak Heroic** cannot see
 a host layer, nor read the bloom folder in `~/.local/share` (it has no home access), so
 the panel says bloom is not supported there yet.
 

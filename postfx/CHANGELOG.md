@@ -13,7 +13,7 @@ the numbers are in [`README.md`](README.md).
   `/usr/lib/i386-linux-gnu/pkgconfig` as well as Arch's `/usr/lib32/pkgconfig`. Ubuntu
   packages no 32-bit vkBasalt, so the installers point Ubuntu players at this script.
 
-On Arch the same directory is picked as before. CI builds it on Ubuntu 24.04.
+On Arch the same directory is picked as before.
 
 Installed, not yet seen in game.
 

@@ -411,8 +411,8 @@ REPO_GIT = f'https://github.com/{REPO}.git'
 # anywhere else.
 BUILD_VKBASALT = (f'git clone --depth 1 {REPO_GIT} ~/armada2-refit && '
                   '~/armada2-refit/postfx/vkbasalt/build.sh')
-# What to install where, by distribution family. Each command is run as it stands in CI
-# (.github/workflows/ci.yml, "vkbasalt-howto"), so keep them runnable as written.
+# What to install where, by distribution family. Players paste these as they stand, so
+# keep them runnable as written.
 VKBASALT_HOWTO = {
     'arch': ('Arch Linux', [
         ('vkBasalt is in the AUR. With the [multilib] repository enabled and an AUR helper:',
