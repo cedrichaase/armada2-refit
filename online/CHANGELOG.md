@@ -12,7 +12,7 @@ and versions". Newest first. Details are in [`README.md`](README.md).
   has it, and calls `QOLRules_Network` / `QOLRules_Reset` in the plugin. Without it
   (or with a stock peer's missing plugin) the game plays by stock rules.
 
-Installed, not yet seen in game. Bench: `multiplayer-online-rules` (both have it).
+Confirmed in game 2026-10-09.
 
 ## 0.5.0 — 2026-10-03
 
