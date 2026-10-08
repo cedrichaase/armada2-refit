@@ -113,7 +113,11 @@ jobs:
             echo 'assumeyes=True' >> /etc/dnf/dnf.conf
             dnf install -q -y python3 file sudo
           else
+            # [multilib], which the instructions ask for: uncommented, or added.
             sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+            grep -q '^\[multilib\]' /etc/pacman.conf ||
+              printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
+            grep -A1 '^\[multilib\]' /etc/pacman.conf
             pacman -Syu --noconfirm --needed python file sudo base-devel git
           fi
       - name: The instructions, as written
