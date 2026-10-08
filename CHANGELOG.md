@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.7.1 — 2026-10-08
+
+Layers: menus 4.3.2.
+
+### Fixed
+- The main menu could open off-screen, leaving a black screen after the intro (seen on
+  NixOS with GE-Proton10-32): an embedded full-screen menu is pinned to the game window.
+
+Installed, not yet seen in game.
+
 ## 11.7.0 — 2026-10-08
 
 Layers: gui-installer 1.0.0 (new; reads package schemas 0 and 1), postfx 1.2.1.
