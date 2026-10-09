@@ -42,7 +42,9 @@
  *     a marked item that leaves the queue is given back.
  *   - ClearTeam (capture, assimilation) and DestroyShip on a producer: every
  *     marked item is given back, and the item in progress too -- in the old
- *     owner's bank, since ClearTeam runs before the team changes.
+ *     owner's bank, since ClearTeam runs before the team changes.  A destroyed
+ *     producer's team is cleared after, and that ClearTeam gives nothing back a
+ *     second time.
  *   - Save / Load: the marks are written into the producer's id counter (a field
  *     the stock file already holds) as a tag and a bitmask by position, and read
  *     back after Load.  A stock save has no tag and loads as unpaid queues, which
@@ -445,10 +447,14 @@ static void __thiscall h_clearq(BYTE *p)
     t_clearq(p);
 }
 
+/* A producer DestroyShip has taken down has given back the item in progress
+ * already, and its team is cleared after (on a later tick), so ClearTeam must not
+ * give it back a second time: seen on the bench, one ship's cost too many. +0x113
+ * is the object's destroyed flag, set by then; a capture leaves it clear. */
 static void __thiscall h_clearteam(BYTE *p)
 {
     trace("ClearTeam", p);
-    drain(p, rules_on(), "lost");
+    drain(p, !*(p + 0x113) && rules_on(), "lost");
     t_clearteam(p);
 }
 

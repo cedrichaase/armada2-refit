@@ -536,10 +536,20 @@ Network games: `online/peer.c` agrees the rules (`R_RULES`: joiners report, the 
 answers with whether everyone has the plugin; `QOLRules_Network`), and the plugin latches
 the answer. Only *Internet – Online* has it; other transports stand down.
 
-Not done: a refusal only reaches `QOLRules.log`, no on-screen
-feedback; destruction, capture and save/load paths are built but not bench-tested; a
-refit save with paid items loaded in stock loses what was paid; construction ships and
-the AI's own orders (if it bypasses the command) are untested.
+Losing the building and saving are on the bench: `qol-pay-on-queue-loss` destroys a yard
+with three ships queued (a hull hit through `DamageHull`), hands one to another team (the
+end of a capture or an assimilation; the boarding itself is not staged), and saves and
+loads one through the in-mission menu, each time checking the bank back at its start,
+once. The first run found a double refund: `DestroyShip` gives back the item in progress,
+and the dead producer's team is cleared after (on a later tick), so `ClearTeam` gave it
+back again. `ClearTeam` now gives the item in progress back only while the object's
+destroyed flag (+0x113) is clear, which a capture leaves it. Loading a save aborts the
+running mission, whose producers give their queues back into a bank the loaded game then
+replaces: harmless, and seen in the log as `lost` lines.
+
+Not done: a refusal only reaches `QOLRules.log`, no on-screen feedback; a refit save with
+paid items loaded in stock loses what was paid; construction ships and the AI's own
+orders (if it bypasses the command) are untested.
 
 ---
 

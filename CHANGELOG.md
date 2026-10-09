@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.9.0 — 2026-10-09
+
+Layers: qol 1.6.1, testbench 3.3.0.
+
+### Fixed
+- Pay on queue gave the item in progress back twice when its building was destroyed.
+
+### Added
+- The bench destroys, re-teams, saves and loads a building with paid items
+  (`qol-pay-on-queue-loss`), with new Scene commands `health`, `damage` and `team`.
+
+Installed, not yet seen in game.
+
 ## 11.8.0 — 2026-10-08
 
 Layers: platform 3.3.0.

@@ -88,6 +88,9 @@ answer and fails if a command did.
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
 | `attack <name> <target>` | order an attack |
 | `heal`, `engines`, `weapons`, `immortal` `<name> on\|off` | as the keys above |
+| `health <name> [<fraction>]` | set its health to that fraction of its maximum, and answer `health <now> of <max>`. Through the object's own `SetCurHealth` (vtable +0x68): the script interface's `SetCurrentHealth` acts on craft only and leaves a station as it is. With an attacker, the engine then destroys it itself |
+| `damage <name> <amount> [<attacker>]` | a hit on its hull, through `Craft::DamageHull` (0x4c8a80) as a weapon's: at zero the engine destroys it its own way (`DestroyShip`). Any craft, stations included; not while `immortal` |
+| `team <name> <team>` | hand it to another team, as mission scripts do (`SetRealTeam`, which calls the object's own `SetTeam`): what a capture or an assimilation does to it once the boarding has won |
 | `center <name>` | centre the RTS camera on an object |
 | `pause`, `resume` | the game's own pause (`PauseSimulation`) |
 | `hud`, `grid`, `cursor`, `notices` `on\|off` | as the keys above |
@@ -130,6 +133,8 @@ inert, and `Scene.log` says so.
   - `DisableEngines(int, bool)` 0x456960 / `DisableWeapons(int, bool)` 0x456a60
   - `SetCurrentHealth(int, float)` 0x456d20 / `GetMaxHealth(int)` 0x456da0
   - `CraftCannotDie(int, bool)` 0x457590
+  - `SetRealTeam(int, int)` 0x455cc0: the object's own virtual `SetTeam` (vtable
+    +0x7c), so the team change runs the overrides a producer has (`ClearTeam`)
 
   `ScriptInterfaceImp::GridVisible(bool)` is an empty stub, so it cannot hide the grid.
 - **Fog of war: `Scanner::ForceFogAndShroud(bool)`** (0x4935d0) writes the game setup's

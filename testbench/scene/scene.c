@@ -122,6 +122,8 @@ int _fltused = 0;   /* floats without the CRT */
 #define SI_SET_HEALTH    0x456d20u
 #define SI_MAX_HEALTH    0x456da0u
 #define SI_CANNOT_DIE    0x457590u
+#define SI_SET_REAL_TEAM 0x455cc0u   /* calls the object's own virtual SetTeam */
+#define DAMAGE_HULL      0x4c8a80u   /* Craft::DamageHull(float, int attacker): a weapon's hit */
 #define SI_INSTANCE      ((void *)0x735c40u)
 #define TACTICAL_CAMERA  0x763650u
 #define CAMERA_INTEREST  0x98u
@@ -129,6 +131,8 @@ int _fltused = 0;   /* floats without the CRT */
 #define IFACE_MODE       0x78u
 #define GRID_RECORDS     0x768e18u   /* GridRenderState, 3 ints per view */
 #define OBJECT_HANDLE    0x28u
+#define OBJECT_HEALTH    0x15cu      /* float; the maximum follows at +0x160 */
+#define VT_SET_CUR_HEALTH 0x68u      /* GameObject::SetCurHealth(float), any object */
 #define ENTITY_GET       0x4cfff0u   /* Entity::Get(handle), cdecl */
 #define OVERVIEW         ((void *)0x768e40u)   /* the one cOverViewImp */
 #define OV_SELECT        0x90u       /* vtable: Select(obj, type, clear first, ...) */
@@ -172,6 +176,8 @@ static const Sig k_sigs[] = {
     { SI_SET_HEALTH,    8, P_SI_HANDLE },
     { SI_MAX_HEALTH,    8, P_SI_HANDLE },
     { SI_CANNOT_DIE,    8, P_SI_HANDLE },
+    { SI_SET_REAL_TEAM, 8, P_SI_HANDLE },
+    { DAMAGE_HULL,      8, { 0x55, 0x8B, 0xEC, 0xD9, 0x45, 0x08, 0x56, 0x8B } },
 };
 
 typedef void   (__cdecl    *UpdateRangeFn)(void);
@@ -188,6 +194,9 @@ typedef void   (__thiscall *SiAttackFn)(void *si, int h, int target, int unused)
 typedef const float *(__thiscall *SiLocationFn)(void *si, int h);
 typedef void   (__thiscall *SiSetHealthFn)(void *si, int h, float v);
 typedef float  (__thiscall *SiMaxHealthFn)(void *si, int h);
+typedef void   (__thiscall *SiSetTeamFn)(void *si, int h, int team);
+typedef void   (__thiscall *SetCurHealthFn)(void *obj, float v);
+typedef BYTE   (__thiscall *DamageHullFn)(void *craft, float amount, int attacker);
 typedef void  *(__cdecl    *EntityGetFn)(int h);
 typedef void   (__thiscall *OvSelectFn)(void *ov, void *obj, int type, int clear, int sound);
 typedef int    (__thiscall *OvIntFn)(void *ov);
@@ -844,6 +853,45 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_eq(t[0], "health") && n >= 2) {
+        /* Through the object's own SetCurHealth: the script interface's
+         * SetCurrentHealth acts on craft only, and leaves a station alone. */
+        BYTE *go;
+        char  b[80];
+        if (!(o = find_obj(t[1])) || !(go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle))) {
+            logline("  ! no such object"); return;
+        }
+        if (n >= 3) {
+            float max = *(float *)(go + OBJECT_HEALTH + 4);
+            ((SetCurHealthFn)(*(void ***)go)[VT_SET_CUR_HEALTH / 4])(go, max * s_atof(t[2]));
+        }
+        b[0] = 0;
+        s_cat(b, "  health ");
+        s_flt(b, *(float *)(go + OBJECT_HEALTH));
+        s_cat(b, " of ");
+        s_flt(b, *(float *)(go + OBJECT_HEALTH + 4));
+        logline(b);
+        return;
+    }
+    if (s_eq(t[0], "damage") && n >= 3) {
+        /* As a weapon's hit: the hull loses AMOUNT, and at zero the engine
+         * destroys the object its own way. Stations are craft too. */
+        BYTE *go;
+        Obj  *by = n >= 4 ? find_obj(t[3]) : NULLPTR;
+        if (!(o = find_obj(t[1])) || !(go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle)) ||
+            !(*(DWORD *)(go + OBJECT_FLAGS) & 0x8u)) {
+            logline("  ! no such craft"); return;
+        }
+        ((DamageHullFn)DAMAGE_HULL)(go, s_atof(t[2]), by ? by->handle : 0);
+        logline("  ok");
+        return;
+    }
+    if (s_eq(t[0], "team") && n >= 3) {
+        if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
+        ((SiSetTeamFn)SI_SET_REAL_TEAM)(SI_INSTANCE, o->handle, (int)s_atof(t[2]));
+        logline("  ok");
+        return;
+    }
     if (s_eq(t[0], "center") && n >= 2) {
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         ((SiHandleFn)SI_CENTER_CAMERA)(SI_INSTANCE, o->handle);
@@ -860,7 +908,7 @@ static void run_command(char *line)
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, spawn, attack, heal, engines, weapons, "
-            "immortal, center, pause, resume, hud, grid, cursor, notices, query, "
+            "immortal, health, damage, team, center, pause, resume, hud, grid, cursor, notices, query, "
             "select, selection)");
 }
 

@@ -5,6 +5,17 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.6.1 — 2026-10-09
+
+### Fixed
+- `QOLRules.asi`: a destroyed building with a paid item in progress gave that item back
+  twice, once at `DestroyShip` and again when its team was cleared after. Found by
+  `testbench/scenarios/qol-pay-on-queue-loss.md`, which passes with the fix and fails
+  without it; destruction, the team change of a capture or assimilation, and save/load
+  each return the bank to its start, once.
+
+Installed, not yet seen in game.
+
 ## 1.6.0 — 2026-10-07
 
 ### Added

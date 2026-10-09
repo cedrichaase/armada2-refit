@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.3.0 — 2026-10-09
+
+### Added
+- Scene commands `health <name> [<fraction>]` (any object, through its own
+  `SetCurHealth`), `damage <name> <amount> [<attacker>]` (a hull hit through
+  `Craft::DamageHull`) and `team <name> <team>` (`SetRealTeam`).
+- `scenarios/qol-pay-on-queue-loss.md`: refunds when a yard is destroyed or changes team,
+  and paid queues across a save and load through the in-mission menu (qol 1.6.1).
+
+Installs nothing; seen working on the bench 2026-10-09.
+
 ## 3.2.0 — 2026-10-07
 
 ### Added
