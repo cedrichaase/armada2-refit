@@ -13,7 +13,7 @@ Layers: gui-installer 1.4.1.
 - The installer AppImage no longer prints fontconfig warnings at start: it uses the
   host's fontconfig and freetype (gui-installer 1.4.1).
 
-Installs nothing into the game; not yet seen from a release.
+Installs nothing into the game. Confirmed in game 2026-10-09.
 
 ## 11.17.0 — 2026-10-09
 

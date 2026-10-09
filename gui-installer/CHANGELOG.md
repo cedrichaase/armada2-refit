@@ -13,7 +13,7 @@ Reads package schemas 0 and 1.
   `appimage/build.py`): the bundled, older fontconfig printed about ninety warnings
   about the host's font configuration at every start.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 1.4.0 — 2026-10-09
 
