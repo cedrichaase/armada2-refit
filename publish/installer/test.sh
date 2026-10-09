@@ -33,6 +33,8 @@ check '[ ! -e "$G/MSAA.asi" ]'
 check '[ -e "$G/QOL.asi" ] && [ -e "$G/QOL.ini" ]'
 check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
 check '[ -e "$G/Lighting.asi" ] && [ -e "$G/Lighting.ini" ] && grep -q "Lighting: per vertex" "$T/out"'
+check '[ -e "$G/Sky.asi" ] && [ -e "$G/Sky.ini" ] && [ -e "$G/Sky/mbgaqu.ini" ] && grep -q "Sky: the stock sky here" "$T/out"'
+check '[ "$(ls "$G/Sky" | wc -l)" = "$(ls "$P/sky" | wc -l)" ]'
 [ -n "$syslayer" ] || check '[ ! -e "$B" ]'
 [ -n "$syslayer" ] || check 'grep -q "Bloom needs a 32-bit vkBasalt" "$T/out"'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
@@ -53,7 +55,7 @@ check 'grep -q "^bloom = \"$B/A2Bloom.fx\"" "$B/vkBasalt.conf"'
 echo "== d3d8to9 in front of DXVK's d3d9: MSAA, and Lighting's shaders (no note)"
 cp "$G/d3d8.dll" "$T/dxvk8"; cp "$D3D8TO9" "$G/d3d8.dll"; echo dxvk > "$G/d3d9.dll"; rm -f "$G/MSAA.asi"
 "$P/install.sh" "$G" > "$T/out"
-check '[ -e "$G/MSAA.asi" ] && ! grep -q "Lighting: per vertex" "$T/out"'
+check '[ -e "$G/MSAA.asi" ] && ! grep -q "Lighting: per vertex" "$T/out" && ! grep -q "Sky: the stock sky" "$T/out"'
 echo gogd3d8to9 > "$G/d3d9.dll"
 "$P/install.sh" "$G" > "$T/out"
 check '[ ! -e "$G/MSAA.asi" ] && grep -q "MSAA.asi skipped" "$T/out"'
@@ -67,10 +69,13 @@ rm -rf "$G/pkg"
 
 echo "== uninstall: what it added goes, what changed since stays"
 echo mine > "$G/UltimateASILoader-license.txt"
+echo "[Sky]" > "$G/Sky/myown.ini"   # a recipe of the player's own stays
 "$P/install.sh" --uninstall "$G" > "$T/out"
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check '[ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/binkw32.dll.a2neb-backup" ]'
-check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|MSAA|QOL|Lighting|Online)\.ini$")" ]'
+check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|MSAA|QOL|Lighting|Sky|Online)\.ini$")" ]'
+check '[ "$(ls "$G/Sky")" = myown.ini ]'
+rm -rf "$G/Sky"
 check '[ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-prereqs.txt" ]'
 check '[ "$(cat "$G/UltimateASILoader-license.txt")" = mine ] && grep -q "left UltimateASILoader-license.txt" "$T/out"'
 check '[ "$(cat "$G/d3d8.dll")" = dxvk ]'

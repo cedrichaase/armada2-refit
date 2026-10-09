@@ -8,7 +8,7 @@
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
 # in vendor/, each file only if missing. Then the Direct3D chain the repository's ./install
 # sets up (chain/): crosire's d3d8to9 as d3d8.dll on DXVK's d3d9.dll, so Lighting.asi
-# draws in shaders and MSAA.asi and dxvk.conf have DXVK under them. MSAA.asi goes in when
+# and Sky.asi draw in shaders and MSAA.asi and dxvk.conf have DXVK under them. MSAA.asi goes in when
 # DXVK is in the game directory -- its d3d8.dll, or crosire's d3d8to9 on its d3d9.dll
 # (without DXVK the minimap goes black); the models are rewritten from the player's own
 # SOD files with python3; bloom is set up when a vkBasalt layer is installed. Textures,
@@ -101,9 +101,14 @@ sods() {   # --install | --revert
 
 if [ "$action" = uninstall ]; then
     step uninstall "taking the mod out"
-    for n in HUD Menus MSAA QOL QOLRules GridLayout Planets Lighting Online; do
+    for n in HUD Menus MSAA QOL QOLRules GridLayout Planets Lighting Sky Online; do
         rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"
     done
+    # The sky recipes this package put in Sky/; anything else there is the player's.
+    if [ -d "$game/Sky" ]; then
+        for f in "$here"/sky/*.ini; do rm -f "$game/Sky/$(basename "$f")"; done
+        rmdir "$game/Sky" 2>/dev/null || true
+    fi
     if command -v python3 >/dev/null 2>&1 && [ -d "$here/models" ]; then
         echo "  the models back to stock:"; sods --revert
     fi
@@ -240,6 +245,15 @@ step lighting "lighting"
 # Lit per pixel in shaders only behind crosire's d3d8to9; per vertex on any other d3d8.
 put Lighting.asi; put Lighting.ini
 is_d3d8to9 "$game/d3d8.dll" || echo "  (Lighting: per vertex here -- its shaders need crosire's d3d8to9 as d3d8.dll)"
+
+# The sky drawn from a recipe per map, in a shader; also only behind crosire's d3d8to9,
+# and the stock sky anywhere else. The recipes go in Sky/, one per sky name.
+step sky "sky"
+put Sky.asi; put Sky.ini
+mkdir -p "$game/Sky"
+for f in "$here"/sky/*.ini; do cp "$f" "$game/Sky/"; done
+echo "  Sky/: $(ls "$here"/sky/*.ini | wc -l) sky recipes"
+is_d3d8to9 "$game/d3d8.dll" || echo "  (Sky: the stock sky here -- the procedural one needs crosire's d3d8to9 as d3d8.dll)"
 
 # Internet - Online, on our own transport: Wine's dpnet.dll cannot host.
 step online "online multiplayer"

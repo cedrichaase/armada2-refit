@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.16.0 — 2026-10-09
+
+Layers: gui-installer 1.3.0.
+
+### Added
+- The release zip carries the sky layer: `game/Sky.asi`, `game/Sky.ini` and the recipes in
+  `sky/`, in `manifest.json` as the `sky` layer and step. `install.sh` and `install.ps1`
+  put the recipes in the game's `Sky` folder, say when the chain gives the stock sky,
+  and take out only their own recipes on `--uninstall`; `test.sh` and `test.ps1` check
+  it (gui-installer 1.3.0 shows its step).
+
+Installer tests pass on Linux (`publish/installer/test.sh`, `gui-installer/test.sh`);
+`test.ps1` runs in CI. Not yet installed from a release.
+
 ## 11.15.0 — 2026-10-09
 
 Layers: sky 1.1.0.
