@@ -1130,7 +1130,10 @@ window.a2 { background: #05070d; }
 .sky-card row { border-radius: 0; }
 .sky-card > list > row:first-child { border-radius: 18px 18px 0 0; }
 .sky-card > list > row:last-child { border-radius: 0 0 18px 18px; }
-.title-big { font-size: 30px; font-weight: 300; letter-spacing: 0.5px; }
+.title-main { font-size: 40px; font-weight: 900; letter-spacing: 3px;
+              text-shadow: 0 0 18px alpha(#8fb4ff, 0.35); }
+.title-tag { color: AMBER_LIGHT; font-size: 14px; font-weight: 800; letter-spacing: 0.9em;
+             margin-left: 0.9em; text-shadow: 0 0 10px alpha(AMBER, 0.55); }
 .status { color: alpha(@window_fg_color, 0.75); }
 .status.err { color: @error_color; }
 .status.ok { color: @success_color; }
@@ -1403,8 +1406,10 @@ def run_gui():
 
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER,
                           margin_top=8, margin_bottom=28, margin_start=16, margin_end=16)
-            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-            title.append(lab('Armada II Refit', 'title-big', xalign=0.5))
+            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            title.append(lab('ARMADA II', 'title-main', xalign=0.5))
+            # The tracking also follows the last letter: the margin puts it back in the middle.
+            title.append(lab('REFIT', 'title-tag', xalign=0.5))
             col.append(title)
 
             card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
