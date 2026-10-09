@@ -25,6 +25,11 @@
  * position (+0xac), its class (+0x40) and the class's effectRadius (+0x1e0), the ODF
  * name through GameObject::GetOdfName (0x4d5620), and the fog of war through
  * GameObject::CanUserSee (slot 2 of its vtable), as Nebula::sCullOccludedNebula asks it.
+ * A nebula the fog has covered since it was seen is drawn by the engine as a ghost:
+ * Ghost::Simulate keeps a Spirit of it in Ghost::ghostList (0x736c90), the object's
+ * handle at +0x8 and a copy of its instance at +0x10, and Ghost::Render draws each
+ * through slot 3 of its vtable (GameObjectSpirit::Render, 0x4d5f70; vtable 0x6b1ca4).
+ * The plugin keeps a ghosted nebula's gas as well, and skips its spirit's billboards.
  * The camera is the device's own VIEW and PROJECTION, as the hulls were drawn with.
  *
  * Patched in memory only; the exe is not touched. Every site is checked before it is
@@ -92,12 +97,18 @@ int _fltused = 0;   /* floats without the CRT */
 #define FN_ODF_NAME        0x4d5620   /* GameObject::GetOdfName() const, thiscall */
 #define SLOT_CAN_SEE       2          /* GameObject::CanUserSee() const */
 #define STORM3D            0x7ad508   /* ST3D_GraphicsEngine * */
+#define GHOST_LIST         0x736c90   /* Ghost::ghostList, std::list<Spirit *> */
+#define VT_SPIRIT          0x6b1ca4   /* GameObjectSpirit vtable */
+#define SLOT_SPIRIT_RENDER 3          /* Spirit::Render(ST3D_Camera *), as Ghost::Render calls it */
+#define FN_SPIRIT_RENDER   0x4d5f70   /* GameObjectSpirit::Render */
+#define FN_ENTITY_GET      0x4cfff0   /* Entity::Get(int handle), static, cdecl */
 #define VT_DEVICE_DX8      0x6bc6ac   /* ST3D_DeviceDirectX8 vtable */
 
 typedef void        (__thiscall *Render_t)(void *obj, void *cam);
 typedef void        (__thiscall *Particles_t)(void *eng, void *list);
 typedef const char *(__thiscall *OdfName_t)(void *obj);
 typedef BYTE        (__thiscall *CanSee_t)(void *obj);
+typedef BYTE       *(__cdecl *EntityGet_t)(int handle);
 
 /* ---- tiny string/log helpers (no CRT) ---------------------------------- */
 
@@ -263,7 +274,7 @@ static float g_min_step = 6;  /* MinStep=: never closer together than this, worl
 static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
-static int   g_vol_maxy = 96; /* VolumeHeight=: and up, texels */
+static int   g_vol_maxy = 128; /* VolumeHeight=: and up, texels */
 static float g_vol_texel = 3; /* VolumeTexel=: never finer than this, world units */
 static FILETIME g_ini_time;
 
@@ -280,7 +291,7 @@ static void read_settings(void)
     parsen(b, &g_min_step, 1);
     g_bake     = (int)GetPrivateProfileIntA("Nebulae", "Bake", 1, g_ini);
     g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
-    g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 96, g_ini);
+    g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 128, g_ini);
     GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
     parsen(b, &g_vol_texel, 1);
     if (g_vol_max < 16) g_vol_max = 16;
@@ -298,7 +309,7 @@ static void read_settings(void)
 
 /* The pixel shader's constants, c0..c8; their meaning is listed in nebulae.hlsl.
  * c0 (camera), c6 (envelope) and c7.x, y, w are filled in per draw. */
-#define NCONST 13
+#define NCONST 15
 #define MAX_CLASSES 16
 #define MAX_NEB 256
 #define ENV_MAX 512
@@ -312,6 +323,7 @@ typedef struct {
     int      gen;             /* counts the reads */
     float    k[NCONST][4];
     float    extent, height, radius;
+    float    flow_speed, edge_warp, fil_reach, edge_dim;
     /* this frame's nebulae of the class, the fog of war applied */
     int      n;
     float    pos[MAX_NEB][3];
@@ -322,7 +334,7 @@ typedef struct {
     int      env_gen;
     float    ex0, ez0, ex1, ez1, ey;
     /* the baked gas: a volume over the class's box */
-    void    *vol;
+    void    *vol, *occ;       /* occ: which columns of the volume hold gas, and between which heights */
     DWORD    vol_sig;
     int      vol_gen, vx, vy, vz;
     float    vlo[3], vsize[3];
@@ -377,8 +389,17 @@ static int recipe_read(Cls *c)
         c->k[10][3] = ini1(f, "Shading", 1.0f);
     }
     c->k[11][3] = ini1(f, "FineDetail", 0.35f);
+    c->flow_speed = ini1(f, "FlowSpeed", 0.03f);  /* noise tiles a second */
+    c->k[13][1] = ini1(f, "Flow", 60.0f);
+    c->k[13][2] = ini1(f, "FlowScale", 2.0f);
+    c->edge_warp = ini1(f, "EdgeWarp", 0.35f);
+    c->k[14][0] = ini1(f, "Filaments", 0.0f);
+    c->k[14][1] = ini1(f, "FilamentScale", 0.6f);
+    c->k[14][2] = ini1(f, "FilamentSharpness", 3.0f);
+    c->fil_reach = ini1(f, "FilamentReach", 1.8f);
+    c->edge_dim = ini1(f, "EdgeOnDim", 0.5f);
     c->extent  = ini1(f, "Extent", 1.3f);
-    c->height  = ini1(f, "Height", 0.8f);        /* the domes' height, times the reach */
+    c->height  = ini1(f, "Height", 1.4f);        /* the domes' height, times the reach */
     c->gen++;
 
     b[0] = 0; s_cat(b, "recipe "); s_cat(b, f); s_cat(b, " read");
@@ -493,6 +514,7 @@ static void drop_objects(void)
     for (i = 0; i < g_ncls; i++) {
         unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1;
         unref(g_cls[i].vol); g_cls[i].vol = NULLPTR; g_cls[i].vol_gen = -1;
+        unref(g_cls[i].occ); g_cls[i].occ = NULLPTR;
     }
     for (i = 0; i < NQ; i++) { unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR; g_qbusy[i] = 0; }
     unref(g_qfreq); g_qfreq = NULLPTR; g_freq = 0;
@@ -676,12 +698,16 @@ out:
  * 0.6 of its reach (Extent times the effect radius) and gone at the reach, summed and
  * capped at 1 (alpha), in a texture over the box of the class's nebulae. The gameplay
  * edge, the effect radius, falls inside the soft part. Red is how high the gas may
- * rise there, as a fraction of the reach: the highest of the nebulae's spheres over
- * that point, so a field is a row of domes and not a slab. */
+ * rise there, as a fraction of the domes' height: the highest of the nebulae's
+ * paraboloids, which taper to nothing at the reach, so a field is a row of domes
+ * with sloping sides and not a slab with walls. Green is the filaments' wider disc
+ * (FilamentReach times the reach). The box leaves room for the outline's warp. */
 static int bake_envelope(void *d9, Cls *c)
 {
     static int said;
     float  reach = c->radius * c->extent, cell, x0, z0, ys = 0.0f;
+    float  freach = reach * (c->k[14][0] > 0.0f && c->fil_reach > 1.0f ? c->fil_reach : 1.0f);
+    float  outer = freach + reach * c->edge_warp;       /* room for the warped outline */
     int    W, H, i, x, z;
     LOCKED lk;
     char   m[200];
@@ -689,10 +715,10 @@ static int bake_envelope(void *d9, Cls *c)
     c->ex0 = c->ez0 = 1e30f; c->ex1 = c->ez1 = -1e30f;
     for (i = 0; i < c->n; i++) {
         const float *p = c->pos[i];
-        if (p[0] - reach < c->ex0) c->ex0 = p[0] - reach;
-        if (p[0] + reach > c->ex1) c->ex1 = p[0] + reach;
-        if (p[2] - reach < c->ez0) c->ez0 = p[2] - reach;
-        if (p[2] + reach > c->ez1) c->ez1 = p[2] + reach;
+        if (p[0] - outer < c->ex0) c->ex0 = p[0] - outer;
+        if (p[0] + outer > c->ex1) c->ex1 = p[0] + outer;
+        if (p[2] - outer < c->ez0) c->ez0 = p[2] - outer;
+        if (p[2] + outer > c->ez1) c->ez1 = p[2] + outer;
         ys += p[1];
     }
     c->ey = ys / (float)c->n;
@@ -714,18 +740,22 @@ static int bake_envelope(void *d9, Cls *c)
         DWORD *row = (DWORD *)(lk.bits + z * lk.pitch);
         float  wz = z0 + ((float)z + 0.5f) * (c->ez1 - c->ez0) / (float)H;
         for (x = 0; x < W; x++) {
-            float wx = x0 + ((float)x + 0.5f) * (c->ex1 - c->ex0) / (float)W, s = 0.0f, h = 0.0f;
-            int   a, r;
+            float wx = x0 + ((float)x + 0.5f) * (c->ex1 - c->ex0) / (float)W, s = 0.0f, h = 0.0f, g = 0.0f;
+            int   a, r, gg;
             for (i = 0; i < c->n; i++) {
-                float dx = wx - c->pos[i][0], dz = wz - c->pos[i][2], d2 = dx * dx + dz * dz, q;
-                if (d2 >= reach * reach) continue;
-                s += smooth(1.0f, 0.6f, sqrt_f(d2) / reach);
-                q = sqrt_f(1.0f - d2 / (reach * reach));      /* a sphere's height over the disc */
+                float dx = wx - c->pos[i][0], dz = wz - c->pos[i][2], d2 = dx * dx + dz * dz, d, q;
+                if (d2 >= freach * freach) continue;
+                d = sqrt_f(d2);
+                g += smooth(1.0f, 0.3f, d / freach);
+                if (d >= reach) continue;
+                s += smooth(1.0f, 0.6f, d / reach);
+                q = 1.0f - d2 / (reach * reach);              /* tapers to the edge: no wall */
                 if (q > h) h = q;
             }
             a = (int)((s > 1.0f ? 1.0f : s) * 255.0f + 0.5f);
             r = (int)(h * 255.0f + 0.5f);
-            row[x] = (DWORD)a << 24 | (DWORD)r << 16;
+            gg = (int)((g > 1.0f ? 1.0f : g) * 255.0f + 0.5f);
+            row[x] = (DWORD)a << 24 | (DWORD)r << 16 | (DWORD)gg << 8;
         }
     }
     D9_FN(c->env, TEX_UNLOCK, Unlock_t)(c->env, 0);
@@ -754,6 +784,54 @@ static void class_consts(Cls *c)
     c->k[7][0] = c->ey; c->k[7][1] = c->radius * c->extent * c->height;   /* the domes' full height */
     c->k[7][3] = 1.0f / c->k[7][1];          /* a path through a dome's middle: Brightness */
     c->k[11][0] = c->vlo[0]; c->k[11][1] = c->vlo[1]; c->k[11][2] = c->vlo[2];
+    c->k[13][3] = c->edge_warp * c->radius * c->extent;
+    c->k[14][3] = c->k[7][1] * 0.8f;          /* the filaments reach most of the domes' height */
+}
+
+/* Per column of the volume being baked: the most gas, and the lowest and highest layer
+ * that has any. Then widened (occ_dilate) and uploaded as c->occ, which the draw reads
+ * first so a slice pixel over empty space costs one small read. */
+#define OCC_MAX (512 * 512)
+static BYTE g_occ_max[OCC_MAX], g_occ_lo[OCC_MAX], g_occ_hi[OCC_MAX];
+static BYTE g_occ_t[3][OCC_MAX];
+
+static void occ_note(int X, int Y, int Z, int j, int r, const DWORD *row)
+{
+    int  x, lay = (j * 255 + (Y - 1) / 2) / (Y > 1 ? Y - 1 : 1);
+    (void)Z;
+    for (x = 0; x < X; x++) {
+        int  i = r * X + x;
+        BYTE d = (BYTE)(row[x] >> 16);           /* red: the density */
+        if (d > 1) {
+            if (d > g_occ_max[i]) g_occ_max[i] = d;
+            if ((BYTE)lay < g_occ_lo[i]) g_occ_lo[i] = (BYTE)lay;
+            if ((BYTE)lay > g_occ_hi[i]) g_occ_hi[i] = (BYTE)lay;
+        }
+    }
+}
+
+/* Widens every column's record to its neighbours within R texels (max of the gas and
+ * the top, min of the bottom), so that the flow, which moves the read by up to Flow
+ * units, never reads gas the record says is not there. Two passes, x then z. */
+static void occ_dilate(int X, int Z, int R)
+{
+    int pass, x, z, k;
+    for (pass = 0; pass < 2; pass++) {
+        const BYTE *m = pass ? g_occ_t[0] : g_occ_max, *lo = pass ? g_occ_t[1] : g_occ_lo, *hi = pass ? g_occ_t[2] : g_occ_hi;
+        BYTE *om = pass ? g_occ_max : g_occ_t[0], *olo = pass ? g_occ_lo : g_occ_t[1], *ohi = pass ? g_occ_hi : g_occ_t[2];
+        for (z = 0; z < Z; z++) for (x = 0; x < X; x++) {
+            BYTE a = 0, l = 255, h = 0;
+            for (k = -R; k <= R; k++) {
+                int xx = pass ? x : x + k, zz = pass ? z + k : z, i;
+                if (xx < 0 || xx >= X || zz < 0 || zz >= Z) continue;
+                i = zz * X + xx;
+                if (m[i] > a) a = m[i];
+                if (lo[i] < l) l = lo[i];
+                if (hi[i] > h) h = hi[i];
+            }
+            om[z * X + x] = a; olo[z * X + x] = l; ohi[z * X + x] = h;
+        }
+    }
 }
 
 /* Bakes a class's gas into c->vol: each layer of the volume drawn with bake_ps into a
@@ -793,6 +871,7 @@ static int bake_volume(void *d9, Cls *c, float half)
         return 0;
     }
     c->vx = X; c->vy = Y; c->vz = Z;
+    for (j = 0; j < X * Z; j++) { g_occ_max[j] = 0; g_occ_lo[j] = 255; g_occ_hi[j] = 0; }
     if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, (UINT)X, (UINT)Z, 1, 1, 21, 0, &rt, NULLPTR) < 0 ||      /* RENDERTARGET, DEFAULT */
         D9_FN(rt, 18, Level_t)(rt, 0, &rts) < 0 ||
         D9_FN(d9, D9_CREATEOFFSCREEN, MakeOff_t)(d9, (UINT)X, (UINT)Z, 21, 2, &sys, NULLPTR) < 0) {      /* SYSTEMMEM */
@@ -830,11 +909,33 @@ static int bake_volume(void *d9, Cls *c, float half)
             const DWORD *s = (const DWORD *)(src.bits + r * src.pitch);
             DWORD       *d = (DWORD *)(dst.bits + r * dst.row);
             for (x = 0; x < X; x++) d[x] = s[x];
+            occ_note(X, Y, Z, j, r, s);
         }
         D9_FN(c->vol, TEX_UNLOCK, Unlock_t)(c->vol, 0);
         D9_FN(sys, 14, SurfUnlock_t)(sys);
     }
     ok = j == Y;
+    if (ok) {   /* the occupancy: widened by the flow and a texel, then uploaded */
+        LOCKED lk;
+        int    R = (int)(c->k[13][1] / (size[0] / (float)X)) + 2, r, x;
+        if (R > 16) R = 16;
+        occ_dilate(X, Z, R);
+        unref(c->occ); c->occ = NULLPTR;
+        if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, (UINT)X, (UINT)Z, 1, 0, 21, 1, &c->occ, NULLPTR) >= 0 &&
+            D9_FN(c->occ, TEX_LOCK, Lock_t)(c->occ, 0, &lk, NULLPTR, 0) >= 0) {
+            for (r = 0; r < Z; r++) {
+                DWORD *d = (DWORD *)(lk.bits + r * lk.pitch);
+                for (x = 0; x < X; x++) {
+                    int i = r * X + x;
+                    d[x] = (DWORD)g_occ_max[i] << 16 | (DWORD)g_occ_hi[i] << 8 | (DWORD)g_occ_lo[i];
+                }
+            }
+            D9_FN(c->occ, TEX_UNLOCK, Unlock_t)(c->occ, 0);
+        } else {
+            unref(c->occ); c->occ = NULLPTR;
+            ok = 0;
+        }
+    }
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, old_rt);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, old_ds);
     unref(old_rt); unref(old_ds);
@@ -923,7 +1024,33 @@ static void *engine_device8(void)
     return *(void **)(dev + 0x90);
 }
 
-/* This frame's nebulae, by class, with the fog of war applied. */
+/* The handles the engine keeps ghosts of this frame: the objects the fog has covered
+ * since the player saw them. */
+#define MAX_GHOSTS 1024
+static int g_ghost[MAX_GHOSTS], g_nghost;
+
+static void ghosts(void)
+{
+    BYTE *head = *(BYTE **)(GHOST_LIST + 4), *node;
+    int   guard = 0;
+    g_nghost = 0;
+    if (!head) return;
+    for (node = *(BYTE **)head; node && node != head && guard < 100000; node = *(BYTE **)node, guard++) {
+        BYTE *sp = *(BYTE **)(node + 8);
+        if (sp && g_nghost < MAX_GHOSTS) g_ghost[g_nghost++] = *(int *)(sp + 8);
+    }
+}
+
+static int ghosted(BYTE *obj)
+{
+    int h = *(int *)(obj + 0x28), i;
+    for (i = 0; i < g_nghost; i++) if (g_ghost[i] == h) return 1;
+    return 0;
+}
+
+/* This frame's nebulae, by class, with the fog of war applied: a nebula is in the gas
+ * while the player sees it, or while the engine keeps a ghost of it (as stock shows
+ * its billboards then). */
 static int gather(void)
 {
     BYTE **vec = *(BYTE ***)NEBULA_LIST;
@@ -933,6 +1060,7 @@ static int gather(void)
     if (!vec) return 0;
     it = *(BYTE ***)((BYTE *)vec + 4); end = *(BYTE ***)((BYTE *)vec + 8);
     if (!it) return 0;
+    ghosts();
     for (; it < end; it++) {
         BYTE  *obj = *it;
         Cls   *c;
@@ -940,7 +1068,7 @@ static int gather(void)
         if (!obj) continue;
         c = class_of(obj);
         if (!c || !c->have || c->n >= MAX_NEB) continue;
-        if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj)) continue;
+        if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj) && !ghosted(obj)) continue;
         p = (float *)(obj + 0xac);
         c->pos[c->n][0] = p[0]; c->pos[c->n][1] = p[1]; c->pos[c->n][2] = p[2];
         for (i = 0; i < 3; i++) { DWORD b = *(DWORD *)&p[i]; c->sig = (c->sig ^ (b >> 4)) * 16777619UL; }
@@ -986,6 +1114,7 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
     for (i = 0; i < (int)(sizeof ssc / sizeof ssc[0]); i++) {
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, ssc[i][0], ssc[i][1]);
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 2, ssc[i][0], ssc[i][1]);
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 3, ssc[i][0], ssc[i][0] >= 5 && ssc[i][0] <= 6 ? 1 : ssc[i][1]);   /* point */
     }
 }
 
@@ -1088,10 +1217,31 @@ static int draw_gas(void)
         if (!nv) continue;
         c->k[0][0] = eye[0]; c->k[0][1] = eye[1]; c->k[0][2] = eye[2];
         class_consts(c);
+        {   /* the drift, wrapped to the noise's tile so it never loses precision */
+            LARGE now;
+            float sec;
+            QueryPerformanceCounter(&now);
+            {
+                double s = g_qpf.q ? (double)now.q / (double)g_qpf.q : 0.0;
+                s -= (double)(long)(s / 100000.0) * 100000.0;
+                sec = (float)s;
+            }
+            c->k[13][0] = fmod_f(sec * c->flow_speed, 1.0f);
+        }
+        {   /* edge-on, the path through the field is long and the gas would clip:
+             * dim it by the path's length against the domes' height, to EdgeOnDim */
+            float fy = f[1] < 0.0f ? -f[1] : f[1], path, lim, s;
+            lim = (c->ex1 - c->ex0) + (c->ez1 - c->ez0);
+            path = fy > 1e-3f ? 2.0f * c->k[7][1] / fy : lim;
+            if (path > lim) path = lim;
+            s = path > 2.0f * c->k[7][1] ? pow_f(2.0f * c->k[7][1] / path, c->edge_dim) : 1.0f;
+            c->k[7][3] = s / c->k[7][1];
+        }
         if (g_bake && c->vol) {
             for (i = 0; i < 3; i++) c->k[12][i] = 1.0f / c->vsize[i];
             d9_bind(d9, vs, vps);
             D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 2, c->vol);
+            D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 3, c->occ);
         } else {
             d9_bind(d9, vs, ps);
         }
@@ -1151,6 +1301,16 @@ static void __fastcall hook_nebula_render(BYTE *obj, void *edx, void *cam)
     ((Render_t)FN_NEBULA_RENDER)(obj, cam);
 }
 
+static void __fastcall hook_spirit_render(BYTE *sp, void *edx, void *cam)
+{
+    BYTE *obj;
+    Cls  *c;
+    (void)edx;
+    if (g_drawing && sp && (obj = ((EntityGet_t)FN_ENTITY_GET)(*(int *)(sp + 8))) != NULLPTR &&
+        *(DWORD *)obj == VT_NEBULA && (c = class_of(obj)) != NULLPTR && c->have) return;
+    ((Render_t)FN_SPIRIT_RENDER)(sp, cam);
+}
+
 /* ---- startup ------------------------------------------------------------ */
 
 static int patch_call(DWORD site, DWORD expect, void *to)
@@ -1199,6 +1359,10 @@ static void startup(void)
         patch_slot(VT_NEBULA, SLOT_RENDER, FN_NEBULA_RENDER, (void *)hook_nebula_render);
         patch_call(SITE_PARTICLES, FN_PARTICLES, (void *)hook_particles);
         s_cat(b, "  Nebula::Render and RenderParticleList patched");
+        if (patch_slot(VT_SPIRIT, SLOT_SPIRIT_RENDER, FN_SPIRIT_RENDER, (void *)hook_spirit_render))
+            s_cat(b, ", ghosts too");
+        else
+            s_cat(b, "; NOT the ghosts' Render: fogged nebulae keep their billboards");
     }
     logline(b);
 }
