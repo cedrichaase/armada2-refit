@@ -5,19 +5,53 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 11.14.0 — 2026-10-09
+## 11.17.0 — 2026-10-09
 
-Layers: gui-installer 1.3.0.
+Layers: gui-installer 1.4.0.
 
 ### Changed
 - The graphical installer has a procedural nebula behind its stars that goes to warp
   while installing, an amber accent, a bolder title, a Launch game button and a
   progress bar with an engine at its tip, always writes Heroic's launch settings, says how
   to get Heroic when there is none, and drops the remastering subtitle and the textures
-  note (gui-installer 1.3.0).
+  note (gui-installer 1.4.0).
 
-Installs nothing into the game; the window checked on a headless sway, not yet seen on
-the desktop.
+Installs nothing into the game. Confirmed in game 2026-10-09.
+
+## 11.16.0 — 2026-10-09
+
+Layers: gui-installer 1.3.0.
+
+### Added
+- The release zip carries the sky layer: `game/Sky.asi`, `game/Sky.ini` and the recipes in
+  `sky/`, in `manifest.json` as the `sky` layer and step. `install.sh` and `install.ps1`
+  put the recipes in the game's `Sky` folder, say when the chain gives the stock sky,
+  and take out only their own recipes on `--uninstall`; `test.sh` and `test.ps1` check
+  it (gui-installer 1.3.0 shows its step).
+
+Installer tests pass on Linux (`publish/installer/test.sh`, `gui-installer/test.sh`);
+`test.ps1` runs in CI. Not yet installed from a release.
+
+## 11.15.0 — 2026-10-09
+
+Layers: sky 1.1.0.
+
+### Added
+- Procedural recipes for every sky a stock map uses, and the recipe key `Band=` (sky 1.1.0).
+
+Confirmed in game 2026-10-09.
+
+## 11.14.0 — 2026-10-09
+
+Layers: sky 1.0.0 (new).
+
+### Added
+- The `sky` layer: `Sky.asi` draws a map's sky from a recipe, in a shader, with no cube
+  faces and so no seams; recipes for `mbgaqu` and `mbgkling` (sky 1.0.0). `./install`
+  installs it and `a2mod` switches it.
+- `no-assets` checks that `Sky.asi` patched its site.
+
+Confirmed in game 2026-10-09.
 
 ## 11.13.0 — 2026-10-09
 

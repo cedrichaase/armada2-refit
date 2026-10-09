@@ -4,7 +4,7 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
-## 1.3.0 — 2026-10-09
+## 1.4.0 — 2026-10-09
 
 Reads package schemas 0 and 1.
 
@@ -31,7 +31,17 @@ Reads package schemas 0 and 1.
 - The "Remastering tools for Star Trek: Armada II" subtitle and the note that textures
   are not shipped.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
+
+## 1.3.0 — 2026-10-09
+
+Reads package schemas 0 and 1.
+
+### Added
+- The sky layer (`Sky.asi` and its recipes): its own progress line, and "stock sky without
+  d3d8to9" in the layer list when the chain cannot give it shaders.
+
+Not yet seen in a window; `gui-installer/test.sh` runs it against a package.
 
 ## 1.2.0 — 2026-10-09
 

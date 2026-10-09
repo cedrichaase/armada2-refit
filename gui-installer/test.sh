@@ -41,6 +41,7 @@ echo BinkProxy > "$G/binkw32.dll"; echo x > "$G/BinkProxy.ini"
 echo "== install from the package, with Heroic's launch variables"
 "${run[@]}" --package "$zip" --game "$G" > "$T/out" 2> "$T/err"
 check '[ -e "$G/HUD.asi" ] && [ -e "$G/Lighting.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
+check '[ -e "$G/Sky.asi" ] && [ -e "$G/Sky/mbgkling.ini" ] && grep -q "Installing the sky" "$T/err"'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/BinkProxy.ini" ]'
 check 'grep -q "Skipping the cutscene player" "$T/err" && grep -q "Installing the HUD" "$T/err"'
 check 'grep -q "\"version\": \"$ver\"" "$G/armada2-refit-installed.json"'
@@ -50,6 +51,7 @@ check '[ -e "$H/GamesConfig/1174788223.json.a2refit-backup" ]'
 echo "== uninstall: the game and Heroic as they were"
 "${run[@]}" --uninstall --game "$G" > "$T/out" 2> "$T/err"
 check '[ ! -e "$G/HUD.asi" ] && [ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-installed.json" ]'
+check '[ ! -e "$G/Sky.asi" ] && [ ! -e "$G/Sky" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check 'python3 -c "import json,sys; a,b=(json.load(open(f)) for f in sys.argv[1:]); sys.exit(a!=b)" "$H/GamesConfig/1174788223.json" "$T/heroic-before.json"'
 echo "all passed"

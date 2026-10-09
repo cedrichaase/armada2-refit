@@ -38,6 +38,8 @@ Check "GOG's d3d8.dll untouched" (((Text (G "d3d8.dll")) -eq "gogd3d8to9") -and 
 Check "no MSAA.asi" (-not (Test-Path (G "MSAA.asi")))
 Check "Lighting, per vertex here" ((Test-Path (G "Lighting.asi")) -and (Test-Path (G "Lighting.ini")) -and
                                   ($out | Where-Object { $_ -like "*Lighting: per vertex*" }))
+Check "Sky, the stock sky here" ((Test-Path (G "Sky.asi")) -and (Test-Path (G "Sky\mbgaqu.ini")) -and
+                                ($out | Where-Object { $_ -like "*Sky: the stock sky here*" }))
 Check "no bloom" (-not (Test-Path (G "A2Bloom.ini")))
 Check "binkw32.dll is the proxy" ((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy")
 Check "binkw32_orig.dll is stock" ((Text (G "binkw32_orig.dll")) -eq "stockbink")
@@ -79,10 +81,12 @@ Remove-Item -Recurse (G "pkg")
 
 Write-Host "== uninstall: what it added goes, what changed since stays"
 Set-Content (G "UltimateASILoader-license.txt") "mine"
+Set-Content (G "Sky\myown.ini") "[Sky]"   # a recipe of the player's own stays
 $out = Install @("-Uninstall", $G)
+Check "the player's own recipe left" ((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "myown.ini")
 Check "binkw32.dll is stock again" ((Text (G "binkw32.dll")) -eq "stockbink")
 Check "no binkw32 copies" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")))
-foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "QOL.asi", "Lighting.asi", "Online.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "QOL.ini", "Lighting.ini", "Online.ini", "BinkProxy.ini", "dxvk.conf",
+foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "QOL.asi", "Lighting.asi", "Sky.asi", "Online.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "QOL.ini", "Lighting.ini", "Sky.ini", "Online.ini", "BinkProxy.ini", "dxvk.conf",
                "A2Bloom.ini", "ReShadePreset.ini", "winmm.dll", "STA2WidescreenPatch.asi", "armada2-refit-prereqs.txt") {
     Check "$f removed" (-not (Test-Path (G $f)))
 }

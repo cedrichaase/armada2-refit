@@ -12,7 +12,8 @@ than fail; the code layers install as usual, the cutscene proxy included. With n
 (`binkw32_orig.dll`), which is what `bink ...` lines in its log mean. With no plate,
 `Menus.asi` draws black sides. `Planets.asi` needs no assets at all; its log line says
 both of its sites in `Armada2.exe` were found and patched, and `QOL.asi`'s that it scaled
-the right-drag pan speed 2.5x as the game read `RTS_CFG.h`.
+the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Sky.asi` needs none either:
+its recipes are code, and its log says it found and patched `Background_Render`.
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -22,7 +23,8 @@ the right-drag pan speed 2.5x as the game read `RTS_CFG.h`.
 6. Expect "BinkProxy.log" contains "bink bitmaps".
 7. Expect "Planets.log" contains "sites patched 2/2".
 8. Expect "QOL.log" contains "FASTSCROLL_COEFFICIENT now 0.0125".
-9. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
-10. Quit the game.
-11. Expect the game to have exited.
-12. Expect no crash.
+9. Expect "Sky.log" contains "Background_Render patched".
+10. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
+11. Quit the game.
+12. Expect the game to have exited.
+13. Expect no crash.

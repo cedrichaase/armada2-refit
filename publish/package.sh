@@ -6,6 +6,7 @@
 #   game/     what goes beside Armada2.exe: the plugins and their .ini, dxvk.conf
 #   chain/    the Direct3D chain ./install sets up: crosire's d3d8to9 as d3d8.dll on
 #             DXVK's d3d9.dll (both from platform/vendor/, with their licences)
+#   sky/      the sky recipes (sky/skies/*.ini), which the installers put in the game's Sky/
 #   models/   models/moon-sod.py, select-sod.py, hull-sod.py (+ hull-sod.sha256) and
 #   a2env.py  the a2env.py they import: they rewrite the player's own stock SODs
 #   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
@@ -42,6 +43,7 @@ bash "$root/qol/build.sh"              >/dev/null
 bash "$root/grid/build.sh"             >/dev/null
 bash "$root/models/build.sh"           >/dev/null
 bash "$root/lighting/build.sh"         >/dev/null
+bash "$root/sky/build.sh"              >/dev/null
 bash "$root/online/build.sh"           >/dev/null
 bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
 
@@ -49,7 +51,7 @@ name="armada2-refit-$ver"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 d="$stage/$name"
-mkdir -p "$d/game" "$d/bloom" "$d/chain" "$d/models"
+mkdir -p "$d/game" "$d/bloom" "$d/chain" "$d/models" "$d/sky"
 cp "$root/hud/build/HUD.asi"                "$root/hud/HUD.ini"                 "$d/game/"
 cp "$root/menus/build/Menus.asi"            "$root/menus/Menus.ini"             "$d/game/"
 cp "$root/msaa/build/MSAA.asi"              "$root/msaa/MSAA.ini"               "$d/game/"
@@ -58,6 +60,8 @@ cp "$root/qol/build/QOLRules.asi"           "$root/qol/QOLRules.ini"            
 cp "$root/grid/build/GridLayout.asi"        "$root/grid/GridLayout.ini"         "$d/game/"
 cp "$root/models/build/Planets.asi"         "$root/models/Planets.ini"          "$d/game/"
 cp "$root/lighting/build/Lighting.asi"      "$root/lighting/Lighting.ini"       "$d/game/"
+cp "$root/sky/build/Sky.asi"               "$root/sky/Sky.ini"                 "$d/game/"
+cp "$root/sky/skies/"*.ini "$d/sky/"
 cp "$root/online/build/Online.asi"          "$root/online/Online.ini"           "$d/game/"
 cp "$root/cutscenes/binkproxy/build/binkw32.dll" "$root/cutscenes/binkproxy/BinkProxy.ini" "$d/game/"
 # dxvk.conf as ./install writes it (stage 3); only DXVK reads it.
@@ -127,6 +131,11 @@ WHAT GOES IN (game/, copied beside Armada2.exe)
                                                d3d8.dll is crosire's d3d8to9 (chain/,
                                                below); per vertex otherwise.
                                                Lighting.log says which
+  Sky.asi      + Sky.ini        sky $(version "$root/sky/CHANGELOG.md")        the sky computed in a shader from a recipe
+                                               per map, so the cube's seams are gone; the
+                                               recipes (sky/) go in the game's Sky folder.
+                                               Needs crosire's d3d8to9 (chain/); the stock
+                                               sky otherwise. Sky.log says which
   Online.asi   + Online.ini     online $(version "$root/online/CHANGELOG.md")     online multiplayer under Wine/Proton too: the
                                                Internet - Online entry, join codes, no port
                                                forwarding (the project's server, c20e.de)
@@ -241,7 +250,7 @@ json.dump({
                   'version': '$(version "$root/gui-installer/CHANGELOG.md")'},
     'linux': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
     'steps': ['verify', 'prereqs', 'chain', 'hud', 'menus', 'qol', 'grid', 'models',
-              'lighting', 'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done'],
+              'lighting', 'sky', 'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done'],
     'layers': [
         layer('prereqs', 'Widescreen patch', '1.0', ['vendor/STA2WidescreenPatch/*'],
               'STA2WidescreenPatch and the Ultimate ASI Loader that loads every plugin',
@@ -265,6 +274,9 @@ json.dump({
         layer('lighting', 'Lighting', '$(version "$root/lighting/CHANGELOG.md")', ['game/Lighting.asi', 'game/Lighting.ini'],
               'ships and stations lit on the GPU, new scene lights, planets with a night side; '
               'per pixel behind d3d8to9, per vertex otherwise'),
+        layer('sky', 'Sky', '$(version "$root/sky/CHANGELOG.md")', ['game/Sky.asi', 'game/Sky.ini', 'sky/*'],
+              'the sky computed in a shader from a recipe per map, with no seams; '
+              'behind d3d8to9, the stock sky otherwise'),
         layer('online', 'Online', '$(version "$root/online/CHANGELOG.md")', ['game/Online.asi', 'game/Online.ini'],
               'online multiplayer that works under Wine/Proton: the Internet – Online entry, '
               'join codes, no port forwarding'),
@@ -286,7 +298,7 @@ json.dump({
 }, open(sys.argv[1], 'w'), indent=1)
 EOF
 
-(cd "$d" && sha256sum -- game/* bloom/* chain/* models/* a2env.py vendor/*/* prereqs.txt manifest.json \
+(cd "$d" && sha256sum -- game/* bloom/* chain/* models/* sky/* a2env.py vendor/*/* prereqs.txt manifest.json \
     armada2-refit-installer.py > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")

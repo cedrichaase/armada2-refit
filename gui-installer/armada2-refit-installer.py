@@ -39,7 +39,7 @@ import time
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.3.0'
+INSTALLER_VERSION = '1.4.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -59,7 +59,7 @@ CACHE = os.path.join(XDG_CACHE, 'armada2-refit', 'installer')
 SETTINGS = os.path.join(XDG_CONFIG, 'armada2-refit', 'installer.json')
 
 # The install.sh stages, in order, and what the window says during each.
-STEPS = ['verify', 'prereqs', 'hud', 'menus', 'qol', 'lighting', 'online', 'msaa', 'cutscenes',
+STEPS = ['verify', 'prereqs', 'hud', 'menus', 'qol', 'lighting', 'sky', 'online', 'msaa', 'cutscenes',
          'renderer', 'bloom', 'done']
 STATUS = {
     'fetch': 'Checking for releases',
@@ -71,6 +71,7 @@ STATUS = {
     'menus': 'Installing the menus',
     'qol': 'Installing quality of life',
     'lighting': 'Installing lighting',
+    'sky': 'Installing the sky',
     'online': 'Installing online play',
     'msaa': 'Installing anti-aliasing',
     'cutscenes': 'Skipping the cutscene player',
@@ -359,6 +360,8 @@ def layer_verdict(layer, facts):
         return False, 'skipped — no vkBasalt layer'
     if layer['id'] == 'lighting' and not facts['d3d8to9']:
         return True, 'will install · per vertex'
+    if layer['id'] == 'sky' and not facts['d3d8to9']:
+        return True, 'will install · stock sky without d3d8to9'
     return True, 'will install'
 
 
