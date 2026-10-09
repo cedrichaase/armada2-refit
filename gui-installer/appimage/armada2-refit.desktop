@@ -4,6 +4,6 @@ Name=Armada II Refit
 Comment=Install Armada II Refit into Star Trek: Armada II
 Exec=armada2-refit-installer
 Icon=armada2-refit
-Categories=Game;Utility;
+Categories=Utility;
 Terminal=false
 StartupWMClass=armada2-refit-installer

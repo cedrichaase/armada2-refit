@@ -7,7 +7,7 @@ schemas, the Adwaita icons and gdk-pixbuf's loaders into APPDIR/usr, then the
 installer itself and the files beside this one. build.sh packs the result.
 
 What is left to the host, on purpose: the C library and its companions, everything
-that talks to the graphics driver (GL, EGL, Vulkan, DRM, GBM), and the display
+that talks to the graphics driver (GL, EGL, DRM, GBM; the Vulkan loader is bundled), and the display
 protocol libraries (Wayland, X11, xcb) -- bundling those breaks the host's own Mesa.
 The result runs on any distribution with a C library at least as new as the one it
 was built on, so CI builds it on the oldest we want (Ubuntu 24.04).
@@ -29,10 +29,12 @@ SCRIPT = os.path.join(HERE, '..', 'armada2-refit-installer.py')
 EXCLUDE = re.compile(r'^(ld-linux.*|linux-vdso.*|libc\.so.*|libm\.so.*|libdl\.so.*|'
                      r'libpthread\.so.*|librt\.so.*|libutil\.so.*|libresolv\.so.*|libnsl\.so.*|'
                      r'libcrypt\.so.*|libstdc\+\+\.so.*|libgcc_s\.so.*|'
-                     r'libGL.*|libEGL.*|libOpenGL.*|libgbm.*|libdrm.*|libvulkan.*|'
-                     r'libwayland-.*|libX.*|libxcb.*|libxshmfence.*|libxkbcommon.*|'
-                     r'libsystemd.*|libudev.*|libselinux.*|libasound.*|libpulse.*|'
-                     r'libnvidia.*|libcuda.*)$')
+                     r'libGL.*|libEGL.*|libOpenGL.*|libgbm.*|libdrm.*|'
+                     r'libwayland-.*|libX.*|libxcb.*|libxshmfence.*|'
+                     r'libudev.*|libasound.*|libpulse.*|libnvidia.*|libcuda.*)$')
+# Everything else is bundled, deliberately including the small ones a distribution may or
+# may not have installed (libselinux, libsystemd, libxkbcommon): a library this leaves to
+# the host must be one every graphical Linux has. main() prints the list.
 # Libraries GTK reaches through dlopen or typelibs rather than as a dependency.
 SEED_NAMES = ['gtk-4', 'adwaita-1', 'pango-1.0', 'pangocairo-1.0', 'pangoft2-1.0',
               'gdk_pixbuf-2.0', 'graphene-1.0', 'gio-2.0', 'gobject-2.0', 'glib-2.0',
@@ -180,6 +182,18 @@ def main(appdir):
     copy(os.path.join(HERE, 'armada2-refit.svg'),
          os.path.join(usr, 'share', 'icons', 'hicolor', 'scalable', 'apps', 'armada2-refit.svg'))
     os.symlink('armada2-refit.svg', os.path.join(appdir, '.DirIcon'))
+
+    # What the host has to provide: needed by something in here, left out above.
+    hostlibs = set()
+    for root, _, files in os.walk(usr):
+        for f in files:
+            path = os.path.join(root, f)
+            if os.path.islink(path) or not ('.so' in f or root.endswith('/bin')):
+                continue
+            for so in needed(path):
+                if EXCLUDE.match(so):
+                    hostlibs.add(so)
+    print('left to the host:', ' '.join(sorted(hostlibs)))
 
     size = int(run('du', '-sk', appdir).split()[0]) // 1024
     print(f'AppDir {appdir}: {size} MB, {len(bundled)} libraries bundled')

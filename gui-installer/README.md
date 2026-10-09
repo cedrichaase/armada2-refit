@@ -142,9 +142,12 @@ on, so build it where you mean it to be portable.
   pycairo, GTK 4, libadwaita and every library they load (`ldd` over each, less what the
   host must provide), the typelibs, compiled GLib schemas, Adwaita icons and gdk-pixbuf's
   loaders into an AppDir. **Left to the host on purpose:** the C library and its
-  companions, libstdc++, everything that talks to the graphics driver (GL, EGL, Vulkan,
+  companions, libstdc++, everything that talks to the graphics driver (GL, EGL,
   DRM, GBM) and the display libraries (Wayland, X11, xcb): bundling those breaks the host's
-  Mesa. There is no dconf module, so GSettings uses its memory backend.
+  Mesa. Small libraries a host may lack (`libselinux`, `libsystemd`, `libxkbcommon`, the
+  Vulkan loader) are bundled: leaving `libselinux` out once broke Ubuntu's GLib on a host
+  without it. `build.py` prints "left to the host"; read that list after touching the
+  exclusions. There is no dconf module, so GSettings uses its memory backend.
 - `appimage/AppRun` points Python, GTK and the loader at the bundle, and **stores every
   variable it changes in `A2_ORIG_<NAME>`** (`:unset` for none). `host_env()` in the script
   puts them back for every program the installer starts: `install.sh` and the `bash` and
