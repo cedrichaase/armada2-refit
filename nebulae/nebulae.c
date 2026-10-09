@@ -389,7 +389,7 @@ static int recipe_read(Cls *c)
         c->k[10][3] = ini1(f, "Shading", 1.0f);
     }
     c->k[11][3] = ini1(f, "FineDetail", 0.35f);
-    c->flow_speed = ini1(f, "FlowSpeed", 0.03f);  /* noise tiles a second */
+    c->flow_speed = ini1(f, "FlowSpeed", 0.03f);  /* noise tiles a second: the drift of the flow field */
     c->k[13][1] = ini1(f, "Flow", 60.0f);
     c->k[13][2] = ini1(f, "FlowScale", 2.0f);
     c->edge_warp = ini1(f, "EdgeWarp", 0.35f);
