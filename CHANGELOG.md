@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.14.0 — 2026-10-09
+
+Layers: sky 1.0.0 (new).
+
+### Added
+- The `sky` layer: `Sky.asi` draws a map's sky from a recipe, in a shader, with no cube
+  faces and so no seams; recipes for `mbgaqu` and `mbgkling` (sky 1.0.0). `./install`
+  installs it and `a2mod` switches it.
+- `no-assets` checks that `Sky.asi` patched its site.
+
+Installed, not yet seen in game.
+
 ## 11.13.0 — 2026-10-09
 
 Layers: gui-installer 1.2.0.
