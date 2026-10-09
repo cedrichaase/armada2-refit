@@ -4,6 +4,17 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.4.1 — 2026-10-09
+
+Reads package schemas 0 and 1.
+
+### Fixed
+- The AppImage leaves fontconfig and freetype to the host (`EXCLUDE` in
+  `appimage/build.py`): the bundled, older fontconfig printed about ninety warnings
+  about the host's font configuration at every start.
+
+Installed, not yet seen in game.
+
 ## 1.4.0 — 2026-10-09
 
 Reads package schemas 0 and 1.

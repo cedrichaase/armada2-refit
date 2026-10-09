@@ -198,8 +198,10 @@ on, so build it where you mean it to be portable.
   puts them back for every program the installer starts: `install.sh` and the `bash` and
   `python3` it calls must see the host's `LD_LIBRARY_PATH`, `PYTHONHOME` and `PATH`, not
   the bundle's. This is the part most likely to break silently.
-- On a host with a newer fontconfig than the bundle's, the bundled one prints "invalid
-  constant" warnings about the host's config files at start. They are harmless.
+- fontconfig and freetype are the host's, as the AppImage project's own exclude list
+  has them. A bundled fontconfig reads the host's config files, and one older than the
+  host's (Ubuntu 24.04's 2.15 under Arch's newer one) printed about ninety "invalid
+  constant" and `xsi:nil` warnings at every start. Every graphical Linux has both.
 - A bundled Python's compiled-in certificate folder may not exist on the host, so
   `ssl_context()` falls back to the usual bundle files.
 - `appimagetool` and the type-2 runtime are fetched by `build.sh`, pinned by version and

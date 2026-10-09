@@ -39,7 +39,7 @@ import time
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.4.0'
+INSTALLER_VERSION = '1.4.1'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
