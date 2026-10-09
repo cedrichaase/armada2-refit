@@ -86,9 +86,9 @@ overrides, the d3d8 chain, setting the resolution, and window management under H
 
 ## Quick start
 
-**Just playing, on Linux:** download `armada2-refit-installer.py` from the newest
-[release](https://github.com/cedrichaase/armada2-refit/releases) and run it
-(`python3 armada2-refit-installer.py`; it needs PyGObject with GTK 4 and libadwaita). It
+**Just playing, on Linux:** download `armada2-refit-installer-x86_64.AppImage` from the newest
+[release](https://github.com/cedrichaase/armada2-refit/releases), make it executable and
+run it. It carries GTK 4 and libadwaita itself. It
 finds the game, shows what it will install, installs the newest release and can set
 Heroic's launch options for you ([`gui-installer/README.md`](gui-installer/README.md)).
 
@@ -124,7 +124,7 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 their `.ini` files, `dxvk.conf` and the bloom config (`GridLayout.asi` and `Planets.asi`
 are built from the repository). It also has installers that do this
 section for you: `install.sh` on Linux, `install.bat` on Windows (`README.txt` in the
-zip), and the graphical `armada2-refit-installer.py` for Linux, which leaves the Bink
+zip), and the graphical installer for Linux (an AppImage), which leaves the Bink
 proxy out for now. `publish/package.sh` builds the same zip locally.
 
 **Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1,

@@ -19,6 +19,10 @@ PyGObject with GTK 4 and libadwaita (Arch `python-gobject gtk4 libadwaita`;
 Debian/Ubuntu `python3-gi gir1.2-gtk-4.0 gir1.2-adw-1`; Fedora `python3-gobject gtk4
 libadwaita`). Without them it says so and points at the command line.
 
+Released as an **AppImage** (`armada2-refit-installer-x86_64.AppImage`, about 50 MB), which
+carries Python, GTK 4 and libadwaita; the script itself is attached beside it. See
+"The AppImage" below.
+
 Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
 
 ## What it does
@@ -127,6 +131,34 @@ when the desktop has animations off. Nothing is shipped or fetched for it, so th
 stays one file and `publish/check.sh` has nothing to refuse. The face is the desktop's
 own. The window uses libadwaita 1.5 at most (`AlertDialog`, `Dialog`, `SwitchRow`).
 
+## The AppImage
+
+`appimage/build.sh [OUT]` builds it; CI runs that on **ubuntu-24.04**, which sets the
+oldest C library it runs on (glibc 2.39: Ubuntu 24.04, Debian 13, Fedora 40, and newer).
+It is not a container image and needs no root, but it assembles from the system it runs
+on, so build it where you mean it to be portable.
+
+- `appimage/build.py` copies the running Python and its standard library, PyGObject and
+  pycairo, GTK 4, libadwaita and every library they load (`ldd` over each, less what the
+  host must provide), the typelibs, compiled GLib schemas, Adwaita icons and gdk-pixbuf's
+  loaders into an AppDir. **Left to the host on purpose:** the C library and its
+  companions, libstdc++, everything that talks to the graphics driver (GL, EGL, Vulkan,
+  DRM, GBM) and the display libraries (Wayland, X11, xcb): bundling those breaks the host's
+  Mesa. There is no dconf module, so GSettings uses its memory backend.
+- `appimage/AppRun` points Python, GTK and the loader at the bundle, and **stores every
+  variable it changes in `A2_ORIG_<NAME>`** (`:unset` for none). `host_env()` in the script
+  puts them back for every program the installer starts: `install.sh` and the `bash` and
+  `python3` it calls must see the host's `LD_LIBRARY_PATH`, `PYTHONHOME` and `PATH`, not
+  the bundle's. This is the part most likely to break silently.
+- A bundled Python's compiled-in certificate folder may not exist on the host, so
+  `ssl_context()` falls back to the usual bundle files.
+- `appimagetool` and the type-2 runtime are fetched by `build.sh`, pinned by version and
+  sha256, into `~/.cache/armada2-refit/appimage-tools`. Nothing from there is committed;
+  the AppImage itself is a release asset, never a file in the repository.
+- `A2_INSTALLER_APPIMAGE=<file> test.sh <zip>` runs the whole mock-game test through the
+  AppImage. Where FUSE is missing, `APPIMAGE_EXTRACT_AND_RUN=1` runs it without
+  mounting (the type-2 runtime is static, so no libfuse2 is needed to mount either).
+
 ## Versioning
 
 `INSTALLER_VERSION` in the script is this layer's version. `CHANGELOG.md` heads it, and
@@ -139,5 +171,6 @@ in the zip.
 - `test.sh <zip>`: the self-test, then detection, install (cutscene skip, state file,
   Heroic's variables) and uninstall (game and Heroic as before) against a mock game and
   a mock Heroic in a scratch `HOME`. CI runs it on every push.
+- `A2_INSTALLER_APPIMAGE=<file> test.sh <zip>`: the same through the AppImage. CI does it.
 - The window was checked on a headless sway (`WLR_BACKENDS=headless`, `grim`, `wtype`).
   None of this proves anything loads in game.

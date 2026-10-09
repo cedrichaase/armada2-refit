@@ -29,6 +29,7 @@ import os
 import re
 import shutil
 import sqlite3
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -37,12 +38,12 @@ import time
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.1.0'
+INSTALLER_VERSION = '1.2.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
 RELEASES_PAGE = f'https://github.com/{REPO}/releases'
-INSTALLER_ASSET = 'armada2-refit-installer.py'
+INSTALLER_ASSET = 'armada2-refit-installer-x86_64.AppImage'
 STATE_FILE = 'armada2-refit-installed.json'     # in the game directory: what we installed
 GOG_APP = '1174788223'                          # Star Trek: Armada II on GOG
 # Layers a package carries that this installer leaves out (install.sh's A2_SKIP): the
@@ -569,11 +570,43 @@ class Release:
                     installer_url=self.installer_url, page=self.page)
 
 
+def host_env():
+    """The environment the installer was started in, as the user had it. The AppImage's
+    AppRun points Python, GTK and the loader at its own copies and keeps each variable's
+    old value in A2_ORIG_<NAME> (":unset" for none); anything we start -- install.sh,
+    bash, the browser -- must not inherit those. Outside an AppImage this is os.environ."""
+    env = dict(os.environ)
+    if env.pop('A2_APPIMAGE', None):
+        for k in [k for k in env if k.startswith('A2_ORIG_')]:
+            v = env.pop(k)
+            if v == ':unset':
+                env.pop(k[8:], None)
+            else:
+                env[k[8:]] = v
+    return env
+
+
+CA_BUNDLES = ('/etc/ssl/certs/ca-certificates.crt', '/etc/pki/tls/certs/ca-bundle.crt',
+              '/etc/ssl/ca-bundle.pem', '/etc/pki/tls/cacert.pem', '/etc/ssl/cert.pem')
+
+
+def ssl_context():
+    """The default context; a bundled Python's compiled-in certificate folder may not
+    exist on this distribution, so fall back to the usual bundles."""
+    ctx = ssl.create_default_context()
+    if not ctx.cert_store_stats().get('x509_ca'):
+        for f in CA_BUNDLES:
+            if os.path.isfile(f):
+                ctx.load_verify_locations(f)
+                break
+    return ctx
+
+
 def http_get(url, timeout=15):
     req = urllib.request.Request(url, headers={
         'User-Agent': f'armada2-refit-installer/{INSTALLER_VERSION}',
         'Accept': 'application/vnd.github+json'})
-    return urllib.request.urlopen(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout, context=ssl_context())
 
 
 def fetch_releases():
@@ -736,7 +769,7 @@ class Job:
         self.report, self.log = report, log
 
     def _run_script(self, pkgdir, args, steps, lo, hi):
-        env = dict(os.environ, A2_PROGRESS='1', A2_SKIP=' '.join(EXCLUDED))
+        env = dict(host_env(), A2_PROGRESS='1', A2_SKIP=' '.join(EXCLUDED))
         cmd = ['bash', os.path.join(pkgdir, 'install.sh')] + args
         self.log('$ ' + ' '.join(cmd))
         proc = subprocess.Popen(cmd, cwd=pkgdir, env=env, stdout=subprocess.PIPE,
@@ -1010,6 +1043,22 @@ def selftest():
               'legacy zip: layers from README')
         check(split_overrides('a=n,b; b=n') == {'a': 'n,b', 'b': 'n'}, 'overrides parse')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
+        keep = {k: os.environ.get(k) for k in ('A2_APPIMAGE', 'PATH', 'PYTHONHOME', 'A2_ORIG_PATH',
+                                              'A2_ORIG_PYTHONHOME')}
+        os.environ.update(A2_APPIMAGE='1', PATH='/bundle/bin:/usr/bin', PYTHONHOME='/bundle',
+                          A2_ORIG_PATH='/usr/bin', A2_ORIG_PYTHONHOME=':unset')
+        he = host_env()
+        check(he['PATH'] == '/usr/bin' and 'PYTHONHOME' not in he and 'A2_APPIMAGE' not in he
+              and not any(k.startswith('A2_ORIG_') for k in he),
+              "host_env: the AppImage's variables are put back, and the markers removed")
+        for k, v in keep.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        if keep['A2_APPIMAGE'] is None:
+            check(host_env().get('PATH') == os.environ.get('PATH'),
+                  'host_env: unchanged outside an AppImage')
         for osr, fam in [({'ID': 'arch'}, 'arch'), ({'ID': 'cachyos', 'ID_LIKE': 'arch'}, 'arch'),
                          ({'ID': 'fedora'}, 'fedora'),
                          ({'ID': 'fedora', 'VARIANT_ID': 'silverblue'}, 'fedora-ostree'),

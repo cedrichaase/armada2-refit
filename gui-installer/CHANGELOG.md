@@ -4,6 +4,23 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.2.0 — 2026-10-09
+
+Reads package schemas 0 and 1.
+
+### Added
+- `appimage/`: `build.sh` and `build.py` build `armada2-refit-installer-x86_64.AppImage`,
+  with Python, GTK 4 and libadwaita inside; `AppRun` keeps the host's environment in
+  `A2_ORIG_*`. Built and tested in CI on ubuntu-24.04.
+- `host_env()`: the programs the installer starts get the host's environment, not the
+  AppImage's. `ssl_context()`: falls back to the usual CA bundles.
+- `test.sh` takes `A2_INSTALLER_APPIMAGE=<file>` to run its checks through the AppImage.
+
+### Changed
+- `INSTALLER_ASSET` is the AppImage, so the "newer installer" banner links to it.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-09
 
 Reads package schemas 0 and 1.
