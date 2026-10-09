@@ -1113,7 +1113,16 @@ def selftest():
 
 # ------------------------------------------------------------------ the window
 
+# Amber, the warm of the nebula's cores, in place of the desktop's accent: libadwaita's
+# named colours for everything that takes the accent, and the two that matter set
+# outright, so they hold on any libadwaita.
+AMBER, AMBER_LIGHT, AMBER_INK = '#e8922f', '#f5a849', '#1c1206'
 CSS = """
+@define-color accent_bg_color AMBER;
+@define-color accent_color AMBER_LIGHT;
+@define-color accent_fg_color AMBER_INK;
+button.suggested-action { background-color: AMBER; color: AMBER_INK; }
+progressbar progress { background-color: AMBER_LIGHT; }
 window.a2 { background: #05070d; }
 .sky-card { background: alpha(#10141f, 0.74); border: 1px solid alpha(white, 0.08);
             border-radius: 18px; }
@@ -1122,7 +1131,6 @@ window.a2 { background: #05070d; }
 .sky-card > list > row:first-child { border-radius: 18px 18px 0 0; }
 .sky-card > list > row:last-child { border-radius: 0 0 18px 18px; }
 .title-big { font-size: 30px; font-weight: 300; letter-spacing: 0.5px; }
-.title-sub { color: alpha(@window_fg_color, 0.6); }
 .status { color: alpha(@window_fg_color, 0.75); }
 .status.err { color: @error_color; }
 .status.ok { color: @success_color; }
@@ -1132,7 +1140,10 @@ progressbar.thin trough, progressbar.thin progress { min-height: 4px; }
 progressbar.thin trough { background: alpha(white, 0.10); }
 .mono { font-family: monospace; font-size: 0.9em; }
 .logview { background: alpha(black, 0.35); padding: 8px; }
-"""
+""".replace('AMBER_LIGHT', AMBER_LIGHT).replace('AMBER_INK', AMBER_INK).replace('AMBER', AMBER)
+# libadwaita 1.6 reads the accent from CSS variables, which GTK parses from 4.16 on.
+CSS_VARS = (f':root {{ --accent-bg-color: {AMBER}; --accent-color: {AMBER_LIGHT}; '
+            f'--accent-fg-color: {AMBER_INK}; }}\n')
 
 
 NEBULA_SIZE = (256, 160)
@@ -1219,11 +1230,15 @@ def run_gui():
     class Sky(Gtk.DrawingArea):
         """The window's background: a dark gradient, a nebula made up anew at every
         launch (nebula_pixels, faded in once it is ready) and three layers of stars, all
-        drifting at different speeds. Drawn in code, so there is nothing to ship; still
-        when the desktop has animations off."""
+        drifting at different speeds. While an install runs it goes to warp (set_warp):
+        everything speeds up and the stars draw as streaks, easing in and out. Drawn in
+        code, so there is nothing to ship; still when the desktop has animations off."""
         LAYERS = ((90, 0.55, 3.0), (60, 0.85, 7.0), (28, 1.35, 14.0))   # count, radius, px/s
         CLOUD_SPEED = 1.5       # px/s on screen: behind the slowest stars
         CLOUD_FADE = 1.5        # s
+        WARP_SPEED = 40.0       # times the drift at full warp
+        WARP_EASE = 1.2         # s, about, to reach warp or to drop out of it
+        WARP_HOLD = 3.0         # s at least: an install from the cache takes under one
 
         def __init__(self):
             super().__init__(hexpand=True, vexpand=True)
@@ -1239,6 +1254,10 @@ def run_gui():
             threading.Thread(target=lambda: GLib.idle_add(self.cloud_ready, nebula_pixels(seed)),
                              daemon=True).start()
             self.animate = Gtk.Settings.get_default().get_property('gtk-enable-animations')
+            # Distance travelled, in seconds of ordinary drift: positions follow it rather
+            # than the clock, so changing speed never makes anything jump.
+            self.travel, self.warp, self.warp_to, self.t_last = 0.0, 0.0, 0.0, None
+            self.warp_from, self.warp_off = 0.0, None
             self.set_draw_func(self.draw)
             if self.animate:
                 self.add_tick_callback(self.tick)
@@ -1246,10 +1265,35 @@ def run_gui():
 
         def tick(self, widget, clock):
             now = clock.get_frame_time()
-            if now - self._last >= 33000:       # about 30 frames a second is plenty
+            # About 30 frames a second is plenty for a drift; at warp, every frame.
+            if now - self._last >= 33000 or self.warp > 0.001 or self.warp_to:
                 self._last = now
                 self.queue_draw()
             return GLib.SOURCE_CONTINUE
+
+        def set_warp(self, on):
+            t = GLib.get_monotonic_time() / 1e6
+            if on and self.animate:
+                self.warp_to, self.warp_from, self.warp_off = 1.0, t, None
+            elif self.warp_to:
+                self.warp_off = max(t, self.warp_from + self.WARP_HOLD)
+
+        def advance(self):
+            """Move the clock on: ease the warp level, add to the distance travelled."""
+            t = GLib.get_monotonic_time() / 1e6
+            dt = 0.0 if self.t_last is None else min(0.1, t - self.t_last)
+            self.t_last = t
+            if self.warp_off is not None and t >= self.warp_off:
+                self.warp_to, self.warp_off = 0.0, None
+            self.warp += (self.warp_to - self.warp) * min(1.0, dt * 3.0 / self.WARP_EASE)
+            if abs(self.warp - self.warp_to) < 0.001:
+                self.warp = self.warp_to
+            self.travel += dt * self.speed()
+            return t, dt
+
+        def speed(self):
+            e = self.warp * self.warp * (3 - 2 * self.warp)          # smoothstep
+            return 1.0 + (self.WARP_SPEED - 1.0) * e
 
         def cloud_ready(self, buf):
             import cairo
@@ -1277,7 +1321,8 @@ def run_gui():
                 self.build_nebula(w, h)
             cr.set_source_surface(self.nebula[2], 0, 0)
             cr.paint()
-            now = (GLib.get_monotonic_time() / 1e6) if self.animate else 0.0
+            now, dt = self.advance() if self.animate else (0.0, 0.0)
+            travel, mult = self.travel, self.speed()
             if self.cloud:
                 # Scaled to the window's height once per height, then only moved, by whole
                 # pixels: filtering it every frame cost half again the sky's CPU time.
@@ -1296,17 +1341,32 @@ def run_gui():
                 pat = cairo.SurfacePattern(self.cloud_scaled[1])
                 pat.set_extend(cairo.EXTEND_REPEAT)
                 pat.set_filter(cairo.FILTER_FAST)
-                pat.set_matrix(cairo.Matrix(x0=-round(now * self.CLOUD_SPEED)))
+                pat.set_matrix(cairo.Matrix(x0=-round(travel * self.CLOUD_SPEED)))
                 cr.set_source(pat)
-                fade = min(1.0, (GLib.get_monotonic_time() / 1e6 - self.cloud_t) /
-                           self.CLOUD_FADE) if self.animate else 1.0
+                fade = min(1.0, (now - self.cloud_t) / self.CLOUD_FADE) if self.animate else 1.0
                 cr.paint_with_alpha(fade)
+            # At warp a star is a streak behind it: at least what it covers in a frame, so
+            # it reads as one motion and not a dotted line.
+            streak = 0.0 if mult < 1.05 else max(dt * 1.6, 0.12)
+            cr.set_line_cap(cairo.LINE_CAP_ROUND)
             for x, y, r, a, ph, speed, tint in self.stars:
-                px = (x * w + now * speed) % w
+                px = (x * w + travel * speed) % w
                 tw = 0.75 + 0.25 * math.sin(now * 0.9 + ph) if self.animate else 1.0
-                cr.set_source_rgba(*self.tints[tint], a * tw)
-                cr.arc(px, y * h, r, 0, 6.2832)
-                cr.fill()
+                length = speed * mult * streak
+                if length > 1.0:
+                    # Faint at the tail, the star's own brightness at the head.
+                    g = cairo.LinearGradient(px - length, 0, px, 0)
+                    g.add_color_stop_rgba(0, *self.tints[tint], 0)
+                    g.add_color_stop_rgba(1, *self.tints[tint], a * tw)
+                    cr.set_source(g)
+                    cr.set_line_width(2 * r)
+                    cr.move_to(px - length, y * h)
+                    cr.line_to(px, y * h)
+                    cr.stroke()
+                else:
+                    cr.set_source_rgba(*self.tints[tint], a * tw)
+                    cr.arc(px, y * h, r, 0, 6.2832)
+                    cr.fill()
 
     class Window(Adw.ApplicationWindow):
         def __init__(self, app):
@@ -1324,7 +1384,8 @@ def run_gui():
         # ---------------------------------------------------------- layout
         def build(self):
             overlay = Gtk.Overlay()
-            overlay.set_child(Sky())
+            self.sky = Sky()
+            overlay.set_child(self.sky)
 
             view = Adw.ToolbarView(extend_content_to_top_edge=True)
             view.set_top_bar_style(Adw.ToolbarStyle.FLAT)
@@ -1507,6 +1568,7 @@ def run_gui():
 
         def failed(self, e):
             self.set_busy(False)
+            self.sky.set_warp(False)
             self.set_status(f'Failed: {e}', 'err')
             self.log(f'error: {e}')
 
@@ -1846,11 +1908,13 @@ def run_gui():
 
         def start_install(self, g, r, write):
             self.set_busy(True)
+            self.sky.set_warp(True)
             self.bar.set_fraction(0)
             self.log(f'== install {r.version} into {g.path}')
 
             def done(res):
                 self.set_busy(False)
+                self.sky.set_warp(False)
                 msg = f'Refit {res["version"]} installed'
                 if write and res['heroic']:
                     msg += '. Heroic launch settings written.'
@@ -1884,10 +1948,11 @@ def run_gui():
             self.in_thread(lambda: self.job().uninstall(self.releases, g.path), done)
 
     provider = Gtk.CssProvider()
+    css = (CSS_VARS if (Gtk.get_major_version(), Gtk.get_minor_version()) >= (4, 16) else '') + CSS
     if hasattr(provider, 'load_from_string'):
-        provider.load_from_string(CSS)
+        provider.load_from_string(css)
     else:
-        provider.load_from_data(CSS.encode(), -1)
+        provider.load_from_data(css.encode(), -1)
 
     def activate(app):
         Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_DARK)

@@ -139,6 +139,19 @@ behind the cards. Nothing is shipped or fetched for it, so the script stays one 
 `publish/check.sh` has nothing to refuse. The face is the desktop's own. The window uses
 libadwaita 1.5 at most (`AlertDialog`, `Dialog`).
 
+While an install runs the sky goes to warp (`Sky.set_warp`): everything travels up to 40
+times faster and the stars draw as streaks, faint at the tail, each at least as long as
+it moves in a frame so it reads as one motion. It eases in and out over about a second
+and holds for at least three, since an install from the cache takes under one. Positions
+follow a distance integrated over time, not the clock, so a change of speed never makes
+anything jump; at rest it costs nothing, and at warp the sky draws every frame instead
+of thirty a second.
+
+The accent is amber (`AMBER`, the warm of the nebula's cores), not the desktop's:
+libadwaita's accent colours by their old names and, on GTK 4.16 and later, the CSS
+variables libadwaita 1.6 reads them from, plus the Install button and the progress bar
+set outright, so those two hold on any libadwaita.
+
 When there is no Heroic at all (no config folder, no `heroic` on the `PATH`, no Flatpak)
 and the game is not one Heroic knows, an open row says how to get it for this
 distribution (`HEROIC_HOWTO`): the AUR package on Arch, otherwise the site's `.deb`/`.rpm`
