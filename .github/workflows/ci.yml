@@ -1,7 +1,8 @@
 # Every push and pull request: check that the new commits are publishable, build the
 # release zip (publish/package.sh) kept as a workflow artifact, and run its installers
 # against a mock game on Linux and Windows (publish/installer/test.sh, test.ps1), and the
-# GUI installer's (gui-installer/test.sh).
+# GUI installer's (gui-installer/test.sh), which is also built as an AppImage on
+# ubuntu-24.04, the oldest system it is meant to run on, and tested the same way.
 # A push to main whose root CHANGELOG.md version has no release yet also tags vX.Y.Z and
 # publishes a GitHub Release with that zip. publish/README.md, "Release packages".
 name: CI
@@ -74,6 +75,33 @@ jobs:
             dist/armada2-refit-installer.py
           if-no-files-found: error
 
+  appimage:
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-${{ github.sha }}
+          path: dist
+      - name: What the AppImage bundles
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 \
+            libgtk-4-1 libadwaita-1-0 adwaita-icon-theme librsvg2-common libglib2.0-bin \
+            libgdk-pixbuf2.0-bin
+      - name: Build the AppImage
+        run: gui-installer/appimage/build.sh dist
+      - name: the GUI installer's logic, through the AppImage
+        env:
+          A2_INSTALLER_APPIMAGE: dist/armada2-refit-installer-x86_64.AppImage
+        run: gui-installer/test.sh dist/*.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: armada2-refit-installer-${{ github.sha }}
+          path: dist/armada2-refit-installer-x86_64.AppImage
+          if-no-files-found: error
+
   windows-installer:
     needs: package
     runs-on: windows-2025
@@ -88,7 +116,7 @@ jobs:
         run: publish/installer/test.ps1 (Get-Item dist/*.zip).FullName
 
   release:
-    needs: [publishable, package, windows-installer]
+    needs: [publishable, package, appimage, windows-installer]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
@@ -102,6 +130,10 @@ jobs:
         with:
           name: armada2-refit-${{ github.sha }}
           path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-installer-${{ github.sha }}
+          path: dist
       - name: Release vX.Y.Z if it does not exist yet
         run: |
           tag="v$VERSION"
@@ -110,12 +142,13 @@ jobs:
           fi
           # Notes: the root changelog's newest entry, without its heading.
           awk '/^## /{if (f) exit; f=1; next} f' CHANGELOG.md > notes.md
-          printf '\n---\nInstalling: on Linux, download armada2-refit-installer.py and run it (python3 armada2-refit-installer.py); otherwise README.txt in the zip, and [Installing by hand](%s/%s/blob/%s/README.md#installing-by-hand-layer-by-layer).\n' \
+          printf '\n---\nInstalling: on Linux, download armada2-refit-installer-x86_64.AppImage, make it executable (chmod +x) and run it; otherwise README.txt in the zip, and [Installing by hand](%s/%s/blob/%s/README.md#installing-by-hand-layer-by-layer).\n' \
             "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> notes.md
           # An entry nobody has seen working in game yet ships as a pre-release.
           pre=()
           grep -qi 'not yet seen in game' notes.md && pre=(--prerelease)
-          gh release create "$tag" dist/*.zip dist/armada2-refit-installer.py --target "$GITHUB_SHA" \
+          gh release create "$tag" dist/*.zip dist/armada2-refit-installer.py \
+            dist/armada2-refit-installer-x86_64.AppImage --target "$GITHUB_SHA" \
             --title "Armada II Refit $VERSION" --notes-file notes.md "${pre[@]}"
       - name: Keep only the newest three releases
         run: |

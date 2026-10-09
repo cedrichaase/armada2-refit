@@ -5,6 +5,28 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.13.0 — 2026-10-09
+
+Layers: gui-installer 1.2.0.
+
+### Added
+- The graphical installer is released as an AppImage built in CI on ubuntu-24.04 and
+  attached to each release beside the script (gui-installer 1.2.0).
+
+Installs nothing into the game; the AppImage's window and its mock-game test checked on
+the build machine, not yet seen on another distribution.
+
+## 11.12.0 — 2026-10-09
+
+Layers: gui-installer 1.1.0.
+
+### Changed
+- The graphical installer's window is rebuilt: one screen, neutral libadwaita over a
+  starfield drawn in code, no LCARS, no layer table (gui-installer 1.1.0).
+
+Installs nothing into the game; the window checked on a headless sway, not yet seen in
+game.
+
 ## 11.11.0 — 2026-10-07
 
 Layers: testbench 3.5.0.

@@ -10,15 +10,16 @@
 
 It finds the game (Heroic, Lutris, Bottles, Wine prefixes, the usual folders), lists the
 releases on GitHub -- checked on every launch and on Refresh, cached under
-~/.cache/armada2-refit/installer so it works offline -- shows what the chosen release
-installs, and installs it by running the release's own install.sh, following its
-progress. It can also write the launch settings into Heroic's config for the game.
-Textures and the cutscene player are not installed from here, for now.
+~/.cache/armada2-refit/installer so it works offline -- and installs the chosen one by
+running the release's own install.sh, following its progress. It can also write the
+launch settings into Heroic's config for the game. Textures and the cutscene player are
+not installed from here, for now.
 
 It reads release packages of the schemas in SCHEMAS. The schema is the layout of the
 release zip as this program relies on it (manifest.json, install.sh's ::step lines),
 versioned on its own: gui-installer/README.md, "The package schema". Standalone: Python 3
-and the standard library, plus PyGObject with GTK 4 and libadwaita for the window.
+and the standard library, plus PyGObject with GTK 4 and libadwaita for the window (the
+AppImage carries them).
 """
 import fnmatch
 import glob
@@ -28,6 +29,7 @@ import os
 import re
 import shutil
 import sqlite3
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -36,22 +38,17 @@ import time
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.0.0'
+INSTALLER_VERSION = '1.2.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
 RELEASES_PAGE = f'https://github.com/{REPO}/releases'
-INSTALLER_ASSET = 'armada2-refit-installer.py'
+INSTALLER_ASSET = 'armada2-refit-installer-x86_64.AppImage'
 STATE_FILE = 'armada2-refit-installed.json'     # in the game directory: what we installed
 GOG_APP = '1174788223'                          # Star Trek: Armada II on GOG
 # Layers a package carries that this installer leaves out (install.sh's A2_SKIP): the
 # cutscene player is not installed from here yet. Textures are not in a package at all.
 EXCLUDED = ('cutscenes',)
-# Antonio (SIL OFL 1.1, Vernon Adams), the condensed face of the interface; fetched once
-# from Google Fonts' repository, pinned by commit and hash. Without it: a fallback face.
-FONT_URL = ('https://raw.githubusercontent.com/google/fonts/'
-            '95f4904fc8bcf26d3420fe315560c96417c6dec7/ofl/antonio/Antonio%5Bwght%5D.ttf')
-FONT_SHA = '9e95a2258ecdf3e45c72c5bbea1c4cd350e8f7bebc87c9dba53b29b1890b8903'
 
 HOME = os.path.expanduser('~')
 XDG_CACHE = os.environ.get('XDG_CACHE_HOME') or os.path.join(HOME, '.cache')
@@ -64,23 +61,23 @@ SETTINGS = os.path.join(XDG_CONFIG, 'armada2-refit', 'installer.json')
 STEPS = ['verify', 'prereqs', 'hud', 'menus', 'qol', 'lighting', 'online', 'msaa', 'cutscenes',
          'renderer', 'bloom', 'done']
 STATUS = {
-    'fetch': 'Contacting Starfleet archives',
+    'fetch': 'Checking for releases',
     'download': 'Downloading release {version}',
     'unpack': 'Unpacking the package',
-    'verify': 'Verifying package integrity',
-    'prereqs': 'Fitting the widescreen patch and ASI loader',
-    'hud': 'Refitting the HUD',
-    'menus': 'Widening the menus',
-    'qol': 'Loading quality-of-life subroutines',
+    'verify': 'Verifying the package',
+    'prereqs': 'Installing the widescreen patch and plugin loader',
+    'hud': 'Installing the HUD',
+    'menus': 'Installing the menus',
+    'qol': 'Installing quality of life',
     'lighting': 'Installing lighting',
-    'online': 'Opening subspace channels for online play',
-    'msaa': 'Smoothing the edges',
-    'cutscenes': 'Leaving the cutscenes stock',
-    'renderer': 'Tuning the renderer',
-    'bloom': 'Charging the bloom emitters',
+    'online': 'Installing online play',
+    'msaa': 'Installing anti-aliasing',
+    'cutscenes': 'Skipping the cutscene player',
+    'renderer': 'Configuring the renderer',
+    'bloom': 'Setting up bloom',
     'done': 'Finishing up',
     'launcher': 'Writing Heroic launch settings',
-    'uninstall': 'Taking the mod out',
+    'uninstall': 'Removing the mod',
     'restore': 'Restoring Heroic launch settings',
 }
 # Zips of schema 0 print no ::step lines; their install.sh output marks the stages.
@@ -99,10 +96,6 @@ LEGACY_LAYERS = {
     'binkw32.dll': ('cutscenes', 'Cutscene player', 'always'),
     'dxvk.conf': ('renderer', 'Renderer', 'dxvk.conf'),
 }
-NOT_INCLUDED = [dict(id='textures', name='Textures',
-                     summary='remastered textures are built from your own game files with '
-                             './a2tex; a release cannot carry them')]
-
 
 def vtuple(v):
     return tuple(int(x) for x in re.findall(r'\d+', v)) or (0,)
@@ -554,7 +547,6 @@ class Release:
         self.version = version
         self.prerelease = kw.get('prerelease', False)
         self.date = kw.get('date', '')
-        self.notes = kw.get('notes', '')
         self.url = kw.get('url')            # the zip on GitHub; None when only cached
         self.size = kw.get('size', 0)
         self.digest = kw.get('digest')      # 'sha256:...' as GitHub reports it
@@ -574,15 +566,47 @@ class Release:
 
     def to_json(self):
         return dict(version=self.version, prerelease=self.prerelease, date=self.date,
-                    notes=self.notes, url=self.url, size=self.size, digest=self.digest,
+                    url=self.url, size=self.size, digest=self.digest,
                     installer_url=self.installer_url, page=self.page)
+
+
+def host_env():
+    """The environment the installer was started in, as the user had it. The AppImage's
+    AppRun points Python, GTK and the loader at its own copies and keeps each variable's
+    old value in A2_ORIG_<NAME> (":unset" for none); anything we start -- install.sh,
+    bash, the browser -- must not inherit those. Outside an AppImage this is os.environ."""
+    env = dict(os.environ)
+    if env.pop('A2_APPIMAGE', None):
+        for k in [k for k in env if k.startswith('A2_ORIG_')]:
+            v = env.pop(k)
+            if v == ':unset':
+                env.pop(k[8:], None)
+            else:
+                env[k[8:]] = v
+    return env
+
+
+CA_BUNDLES = ('/etc/ssl/certs/ca-certificates.crt', '/etc/pki/tls/certs/ca-bundle.crt',
+              '/etc/ssl/ca-bundle.pem', '/etc/pki/tls/cacert.pem', '/etc/ssl/cert.pem')
+
+
+def ssl_context():
+    """The default context; a bundled Python's compiled-in certificate folder may not
+    exist on this distribution, so fall back to the usual bundles."""
+    ctx = ssl.create_default_context()
+    if not ctx.cert_store_stats().get('x509_ca'):
+        for f in CA_BUNDLES:
+            if os.path.isfile(f):
+                ctx.load_verify_locations(f)
+                break
+    return ctx
 
 
 def http_get(url, timeout=15):
     req = urllib.request.Request(url, headers={
         'User-Agent': f'armada2-refit-installer/{INSTALLER_VERSION}',
         'Accept': 'application/vnd.github+json'})
-    return urllib.request.urlopen(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout, context=ssl_context())
 
 
 def fetch_releases():
@@ -599,7 +623,7 @@ def fetch_releases():
             continue
         inst = [a for a in rel.get('assets', []) if a['name'] == INSTALLER_ASSET]
         out.append(Release(version, prerelease=bool(rel.get('prerelease')),
-                           date=(rel.get('published_at') or '')[:10], notes=rel.get('body') or '',
+                           date=(rel.get('published_at') or '')[:10],
                            url=zips[0]['browser_download_url'], size=zips[0].get('size', 0),
                            digest=zips[0].get('digest'), page=rel.get('html_url', RELEASES_PAGE),
                            installer_url=inst[0]['browser_download_url'] if inst else None))
@@ -621,12 +645,7 @@ def merge_cached(rels):
     for z in glob.glob(os.path.join(CACHE, 'releases', 'armada2-refit-*.zip')):
         m = re.match(r'armada2-refit-([\d.]+)\.zip$', os.path.basename(z))
         if m and m.group(1) not in known:
-            notes = ''
-            try:
-                notes = Package(z).changelog()
-            except Exception:
-                pass
-            rels.append(Release(m.group(1), notes=notes, size=os.path.getsize(z)))
+            rels.append(Release(m.group(1), size=os.path.getsize(z)))
             known.add(m.group(1))
     return sorted(rels, key=lambda r: vtuple(r.version), reverse=True)
 
@@ -692,7 +711,6 @@ class Package:
         self.schema = int(m.get('schema', 0))
         self.version = m.get('version', '?')
         self.layers = m.get('layers', [])
-        self.not_included = m.get('not_included', NOT_INCLUDED)
         self.steps = m.get('steps', STEPS)
 
     def supported(self):
@@ -723,9 +741,6 @@ class Package:
         return dict(schema=0, version=m.group(1) if m else '?',
                     commit=m.group(2) if m else '', layers=layers, steps=STEPS)
 
-    def changelog(self):
-        return f'Release {self.version}, from the cache.'
-
     def unpack(self, dest):
         """Into dest/, refusing any member that would land outside it."""
         if os.path.isdir(dest):
@@ -754,7 +769,7 @@ class Job:
         self.report, self.log = report, log
 
     def _run_script(self, pkgdir, args, steps, lo, hi):
-        env = dict(os.environ, A2_PROGRESS='1', A2_SKIP=' '.join(EXCLUDED))
+        env = dict(host_env(), A2_PROGRESS='1', A2_SKIP=' '.join(EXCLUDED))
         cmd = ['bash', os.path.join(pkgdir, 'install.sh')] + args
         self.log('$ ' + ' '.join(cmd))
         proc = subprocess.Popen(cmd, cwd=pkgdir, env=env, stdout=subprocess.PIPE,
@@ -872,7 +887,7 @@ class Job:
         self.report(1.0, 'done', None)
 
 
-# ------------------------------------------------------------------ settings, font
+# ------------------------------------------------------------------ settings
 
 def settings():
     return load_json(SETTINGS, {}) or {}
@@ -882,22 +897,6 @@ def remember(**kw):
     s = settings()
     s.update(kw)
     save_json(SETTINGS, s)
-
-
-def font_path(fetch=False):
-    p = os.path.join(CACHE, 'fonts', 'Antonio.ttf')
-    if os.path.isfile(p) and sha256(p) == FONT_SHA:
-        return p
-    if not fetch:
-        return None
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    with http_get(FONT_URL) as r:
-        data = r.read()
-    if hashlib.sha256(data).hexdigest() != FONT_SHA:
-        return None
-    with open(p, 'wb') as f:
-        f.write(data)
-    return p
 
 
 # ------------------------------------------------------------------ command line
@@ -1044,6 +1043,22 @@ def selftest():
               'legacy zip: layers from README')
         check(split_overrides('a=n,b; b=n') == {'a': 'n,b', 'b': 'n'}, 'overrides parse')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
+        keep = {k: os.environ.get(k) for k in ('A2_APPIMAGE', 'PATH', 'PYTHONHOME', 'A2_ORIG_PATH',
+                                              'A2_ORIG_PYTHONHOME')}
+        os.environ.update(A2_APPIMAGE='1', PATH='/bundle/bin:/usr/bin', PYTHONHOME='/bundle',
+                          A2_ORIG_PATH='/usr/bin', A2_ORIG_PYTHONHOME=':unset')
+        he = host_env()
+        check(he['PATH'] == '/usr/bin' and 'PYTHONHOME' not in he and 'A2_APPIMAGE' not in he
+              and not any(k.startswith('A2_ORIG_') for k in he),
+              "host_env: the AppImage's variables are put back, and the markers removed")
+        for k, v in keep.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        if keep['A2_APPIMAGE'] is None:
+            check(host_env().get('PATH') == os.environ.get('PATH'),
+                  'host_env: unchanged outside an AppImage')
         for osr, fam in [({'ID': 'arch'}, 'arch'), ({'ID': 'cachyos', 'ID_LIKE': 'arch'}, 'arch'),
                          ({'ID': 'fedora'}, 'fedora'),
                          ({'ID': 'fedora', 'VARIANT_ID': 'silverblue'}, 'fedora-ostree'),
@@ -1056,79 +1071,28 @@ def selftest():
     return 0 if ok else 1
 
 
+
 # ------------------------------------------------------------------ the window
 
 CSS = """
-@define-color lc_orange #ff9900;
-@define-color lc_peach #ffcc99;
-@define-color lc_lilac #cc99cc;
-@define-color lc_blue #9999ff;
-@define-color lc_sky #99ccff;
-@define-color lc_red #dd5555;
-@define-color lc_gold #ffaa00;
-@define-color lc_tan #d6a77a;
-@define-color lc_dim #6b5a4a;
-
-window, .lcars-root { background: #000; color: @lc_peach; }
-.lcars, .lcars label { font-family: "Antonio", "Oswald", "Bebas Neue", "League Gothic",
-    "Liberation Sans Narrow", "DejaVu Sans Condensed", sans-serif; }
-.title { font-size: 40px; font-weight: 600; color: @lc_orange; letter-spacing: 2px;
-    line-height: 0.95; }
-.subtitle { font-size: 15px; color: #000; font-weight: 600; letter-spacing: 1px; }
-.bar { min-height: 10px; }
-.c-orange { background: @lc_orange; } .c-peach { background: @lc_peach; }
-.c-lilac { background: @lc_lilac; } .c-blue { background: @lc_blue; }
-.c-sky { background: @lc_sky; } .c-red { background: @lc_red; }
-.c-gold { background: @lc_gold; } .c-tan { background: @lc_tan; }
-.cap-r { border-radius: 0 999px 999px 0; }
-.cap-l { border-radius: 999px 0 0 999px; }
-
-button.side { border-radius: 0; border: none; box-shadow: none; background-image: none;
-    min-height: 58px; padding: 0 10px 4px 0; margin: 0; }
-button.side label { color: #000; font-size: 18px; font-weight: 600; letter-spacing: 1px; }
-button.side:hover { filter: brightness(1.15); }
-button.side:checked { background: @lc_peach; }
-.side-fill { background: @lc_lilac; }
-.side-code { color: #000; font-size: 13px; font-weight: 600; }
-
-button.pill { border-radius: 999px; border: none; box-shadow: none; background-image: none;
-    min-height: 40px; padding: 0 26px; }
-button.pill label { color: #000; font-size: 19px; font-weight: 600; letter-spacing: 1px; }
-button.pill:hover { filter: brightness(1.15); }
-button.pill:disabled { background: #3a3530; } button.pill:disabled label { color: #777; }
-button.pill.small { min-height: 30px; padding: 0 16px; }
-button.pill.small label { font-size: 15px; }
-
-.section { color: @lc_orange; font-size: 22px; font-weight: 600; letter-spacing: 2px; }
-.section-bar { min-width: 18px; min-height: 22px; border-radius: 999px 0 0 999px; }
-.key { color: @lc_lilac; font-size: 16px; letter-spacing: 1px; }
-.val { color: @lc_peach; font-size: 16px; }
-.val.good { color: @lc_sky; } .val.warn { color: @lc_gold; } .val.bad { color: @lc_red; }
-.lcars label.prose, .prose { color: #e8d8c8; font-family: sans-serif; font-size: 13px; }
-.lcars label.dimtext, .dimtext { color: #a08c78; font-family: sans-serif; font-size: 12px; }
-.panel { border: 2px solid #2b2420; border-radius: 18px; padding: 14px 16px; background: #080605; }
-
-.chip { border-radius: 999px; padding: 2px 14px; min-width: 150px; }
-.chip label { color: #000; font-size: 16px; font-weight: 600; letter-spacing: 1px; }
-.chip.off { background: #3a3530; } .chip.off label { color: #8a8076; }
-.lver { color: @lc_lilac; font-size: 16px; min-width: 56px; }
-.verdict { font-size: 15px; letter-spacing: 1px; }
-.verdict.yes { color: @lc_sky; } .verdict.no { color: @lc_gold; } .verdict.na { color: #8a8076; }
-.layer-row { padding: 6px 0; border-bottom: 1px solid #1c1714; }
-
-.status { color: @lc_orange; font-size: 22px; letter-spacing: 2px; font-weight: 600; }
-.status.err { color: @lc_red; } .status.ok { color: @lc_sky; }
-.banner { background: #1d1408; border-radius: 12px; padding: 8px 14px; }
-.banner label { color: @lc_gold; }
-
-dropdown > button { background: #15110e; border-radius: 999px; border: 2px solid @lc_dim;
-    box-shadow: none; background-image: none; min-height: 34px; }
-dropdown > button label { color: @lc_peach; font-family: "Antonio", sans-serif; font-size: 16px; }
-switch { background: #3a3530; } switch:checked { background: @lc_orange; }
-switch > slider { background: #000; }
-textview, textview text { background: #050403; color: #e8d8c8; }
-textview.mono text { font-family: monospace; font-size: 12px; color: @lc_peach; }
-scrollbar slider { background: @lc_dim; }
+window.a2 { background: #05070d; }
+.sky-card { background: alpha(#10141f, 0.74); border: 1px solid alpha(white, 0.08);
+            border-radius: 18px; }
+.sky-card list, .sky-card row { background: transparent; }
+.sky-card row { border-radius: 0; }
+.sky-card > list > row:first-child { border-radius: 18px 18px 0 0; }
+.sky-card > list > row:last-child { border-radius: 0 0 18px 18px; }
+.title-big { font-size: 30px; font-weight: 300; letter-spacing: 0.5px; }
+.title-sub { color: alpha(@window_fg_color, 0.6); }
+.status { color: alpha(@window_fg_color, 0.75); }
+.status.err { color: @error_color; }
+.status.ok { color: @success_color; }
+.heads-up { color: alpha(@window_fg_color, 0.7); font-size: 0.92em; }
+.heads-up.warn { color: @warning_color; }
+progressbar.thin trough, progressbar.thin progress { min-height: 4px; }
+progressbar.thin trough { background: alpha(white, 0.10); }
+.mono { font-family: monospace; font-size: 0.9em; }
+.logview { background: alpha(black, 0.35); padding: 8px; }
 """
 
 
@@ -1136,453 +1100,217 @@ def run_gui():
     import gi
     gi.require_version('Gtk', '4.0')
     gi.require_version('Adw', '1')
-    gi.require_version('PangoCairo', '1.0')
-    from gi.repository import Adw, Gdk, Gio, GLib, Gtk, PangoCairo
+    from gi.repository import Adw, Gdk, Gio, GLib, Gtk
     import math
-
-    def add_font(path):
-        try:
-            return PangoCairo.FontMap.get_default().add_font_file(path)
-        except Exception:
-            return False
-
-    fp = font_path()
-    if fp:
-        add_font(fp)
+    import random
 
     def lab(text='', cls=(), xalign=0.0, wrap=False, **kw):
-        w = Gtk.Label(label=text, xalign=xalign, **kw)
-        for c in cls:
+        w = Gtk.Label(label=text, xalign=xalign, wrap=wrap, **kw)
+        for c in ([cls] if isinstance(cls, str) else cls):
             w.add_css_class(c)
-        if wrap:
-            w.set_wrap(True)
-            w.set_natural_wrap_mode(Gtk.NaturalWrapMode.WORD)
         return w
 
-    def seg(color, width=-1, height=-1, hexpand=False, extra=()):
-        b = Gtk.Box()
-        b.add_css_class('bar')
-        b.add_css_class('c-' + color)
-        for c in extra:
-            b.add_css_class(c)
-        b.set_size_request(width, height)
-        b.set_hexpand(hexpand)
-        return b
-
-    def pill(text, color, small=False):
-        b = Gtk.Button()
-        b.set_child(lab(text.upper(), xalign=0.5))
-        for c in ('pill', 'c-' + color, 'lcars') + (('small',) if small else ()):
-            b.add_css_class(c)
-        return b
-
-    SIDE_W, RI, R = 168, 26, 54
-    RGB = {'orange': (1, .6, 0), 'lilac': (.8, .6, .8), 'blue': (.6, .6, 1),
-           'peach': (1, .8, .6), 'tan': (.84, .65, .48)}
-
-    class Elbow(Gtk.DrawingArea):
-        def __init__(self, color, bar_h, top):
-            super().__init__()
-            self.color, self.bar_h, self.top = RGB[color], bar_h, top
-            self.set_content_width(SIDE_W + RI + 12)
-            self.set_content_height(bar_h + RI + 10)
-            self.set_draw_func(self.draw)
-
-        def draw(self, area, cr, w, h):
-            if not self.top:
-                cr.translate(0, h)
-                cr.scale(1, -1)
-            H = self.bar_h
-            cr.move_to(0, h)
-            cr.line_to(0, R)
-            cr.arc(R, R, R, math.pi, 1.5 * math.pi)
-            cr.line_to(w, 0)
-            cr.line_to(w, H)
-            cr.line_to(SIDE_W + RI, H)
-            cr.arc_negative(SIDE_W + RI, H + RI, RI, 1.5 * math.pi, math.pi)
-            cr.line_to(SIDE_W, h)
-            cr.close_path()
-            cr.set_source_rgb(*self.color)
-            cr.fill()
-
-    class Segments(Gtk.DrawingArea):
-        """The progress bar: a row of LCARS blocks that fill, with a running light."""
-        N = 36
+    class Sky(Gtk.DrawingArea):
+        """The window's background: a dark gradient, a faint nebula and three layers of
+        stars drifting at different speeds. Drawn in code, so there is nothing to ship;
+        still when the desktop has animations off."""
+        LAYERS = ((90, 0.55, 3.0), (60, 0.85, 7.0), (28, 1.35, 14.0))   # count, radius, px/s
 
         def __init__(self):
-            super().__init__()
-            self.fraction, self.busy, self.err, self.phase = 0.0, False, False, 0
-            self.set_content_height(26)
-            self.set_hexpand(True)
+            super().__init__(hexpand=True, vexpand=True)
+            rnd = random.Random(2399)
+            self.stars = [[rnd.random(), rnd.random(), r, rnd.uniform(0.35, 1.0),
+                           rnd.uniform(0, 6.3), speed, rnd.choice((0, 0, 0, 1, 2))]
+                          for count, r, speed in self.LAYERS for _ in range(count)]
+            self.tints = ((1.0, 1.0, 1.0), (0.75, 0.85, 1.0), (1.0, 0.88, 0.75))
+            self.t0 = None
+            self.nebula = None
+            self.animate = Gtk.Settings.get_default().get_property('gtk-enable-animations')
             self.set_draw_func(self.draw)
-            GLib.timeout_add(70, self.tick)
+            if self.animate:
+                self.add_tick_callback(self.tick)
+            self._last = 0
 
-        def tick(self):
-            if self.busy:
-                self.phase = (self.phase + 1) % (self.N * 2)
+        def tick(self, widget, clock):
+            now = clock.get_frame_time()
+            if now - self._last >= 33000:       # about 30 frames a second is plenty
+                self._last = now
                 self.queue_draw()
-            return True
+            return GLib.SOURCE_CONTINUE
 
-        def set(self, fraction, busy=None, err=False):
-            self.fraction = max(0.0, min(1.0, fraction))
-            if busy is not None:
-                self.busy = busy
-            self.err = err
-            self.queue_draw()
+        def build_nebula(self, w, h):
+            import cairo
+            s = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+            cr = cairo.Context(s)
+            g = cairo.LinearGradient(0, 0, 0, h)
+            g.add_color_stop_rgb(0, 0.016, 0.022, 0.050)
+            g.add_color_stop_rgb(1, 0.030, 0.040, 0.085)
+            cr.set_source(g)
+            cr.paint()
+            for fx, fy, fr, col in ((0.18, 0.22, 0.75, (0.22, 0.30, 0.75, 0.16)),
+                                    (0.85, 0.70, 0.80, (0.45, 0.20, 0.65, 0.12)),
+                                    (0.55, 0.05, 0.55, (0.15, 0.45, 0.65, 0.07))):
+                rad = cairo.RadialGradient(fx * w, fy * h, 0, fx * w, fy * h, fr * max(w, h))
+                rad.add_color_stop_rgba(0, *col)
+                rad.add_color_stop_rgba(1, col[0], col[1], col[2], 0)
+                cr.set_source(rad)
+                cr.paint()
+            self.nebula = (w, h, s)
 
         def draw(self, area, cr, w, h):
-            gap = 4
-            bw = (w - gap * (self.N - 1)) / self.N
-            full = self.fraction * self.N
-            for i in range(self.N):
-                x = i * (bw + gap)
-                r = min(h / 2, 8) if i in (0, self.N - 1) else 2
-                self.rect(cr, x, 0, bw, h, r, left=(i == 0), right=(i == self.N - 1))
-                if self.err and i < max(full, 1):
-                    cr.set_source_rgb(.87, .33, .33)
-                elif i < int(full):
-                    t = i / self.N
-                    cr.set_source_rgb(1, .6 + .2 * t, .0 + .6 * t)
-                elif i == int(full) and self.busy:
-                    k = .5 + .5 * math.sin(self.phase / 2.0)
-                    cr.set_source_rgb(.4 + .6 * k, .3 + .3 * k, .1)
-                else:
-                    cr.set_source_rgb(.16, .13, .11)
+            if not self.nebula or self.nebula[:2] != (w, h):
+                self.build_nebula(w, h)
+            cr.set_source_surface(self.nebula[2], 0, 0)
+            cr.paint()
+            now = (GLib.get_monotonic_time() / 1e6) if self.animate else 0.0
+            for x, y, r, a, ph, speed, tint in self.stars:
+                px = (x * w + now * speed) % w
+                tw = 0.75 + 0.25 * math.sin(now * 0.9 + ph) if self.animate else 1.0
+                cr.set_source_rgba(*self.tints[tint], a * tw)
+                cr.arc(px, y * h, r, 0, 6.2832)
                 cr.fill()
-            if self.busy:   # a sweep, as on a sensor display
-                x = (self.phase / (self.N * 2)) * w
-                cr.set_source_rgba(.6, .8, 1, .18)
-                cr.rectangle(x - 30, 0, 60, h)
-                cr.fill()
-
-        @staticmethod
-        def rect(cr, x, y, w, h, r, left, right):
-            rl = r if left else 2
-            rr = r if right else 2
-            cr.new_sub_path()
-            cr.arc(x + w - rr, y + rr, rr, -math.pi / 2, 0)
-            cr.arc(x + w - rr, y + h - rr, rr, 0, math.pi / 2)
-            cr.arc(x + rl, y + h - rl, rl, math.pi / 2, math.pi)
-            cr.arc(x + rl, y + rl, rl, math.pi, 1.5 * math.pi)
-            cr.close_path()
 
     class Window(Adw.ApplicationWindow):
         def __init__(self, app):
-            super().__init__(application=app, title='Armada II Refit — Installer')
-            self.set_default_size(1280, 820)
-            self.games, self.releases, self.package = [], [], None
-            self.busy, self.checked, self.check_error = False, None, None
-            self.updating = False
+            super().__init__(application=app, title='Armada II Refit',
+                             default_width=480, default_height=700)
+            self.add_css_class('a2')
+            self.games, self.releases, self.package, self.facts = [], [], None, None
+            self.busy, self.updating, self.user_picked = False, False, False
+            self.checked, self.check_error = None, None
+            self.banner_uri = RELEASES_PAGE
             self.build()
             self.load_games()
-            rels, self.checked = cached_releases()
-            self.set_releases(rels, keep=False)
             self.refresh()
-            if not fp:
-                threading.Thread(target=self.fetch_font, daemon=True).start()
 
         # ---------------------------------------------------------- layout
         def build(self):
-            grid = Gtk.Grid()
-            grid.add_css_class('lcars-root')
-            grid.add_css_class('lcars')
-            grid.set_margin_top(14)
-            grid.set_margin_bottom(14)
-            grid.set_margin_start(14)
-            grid.set_margin_end(14)
-            self.set_content(grid)
+            overlay = Gtk.Overlay()
+            overlay.set_child(Sky())
 
-            # Top: the elbow, and the title bar. Every piece of a bar is exactly the
-            # elbow's arm high and pinned to its edge, so nothing taller in the row (the
-            # title) can stretch a piece and leave a step where it meets the elbow.
-            TOP_H, BOT_H = 46, 22
+            view = Adw.ToolbarView(extend_content_to_top_edge=True)
+            view.set_top_bar_style(Adw.ToolbarStyle.FLAT)
+            header = Adw.HeaderBar(show_title=False)
+            header.add_css_class('flat')
+            menu = Gio.Menu()
+            menu.append('Refresh releases', 'win.refresh')
+            menu.append('Installation log', 'win.log')
+            menu.append('Releases on GitHub', 'win.releases')
+            header.pack_end(Gtk.MenuButton(icon_name='open-menu-symbolic', menu_model=menu))
+            view.add_top_bar(header)
+            self.banner = Adw.Banner(button_label='Download', revealed=False)
+            self.banner.connect('button-clicked', lambda _b: self.open_uri(self.banner_uri))
+            view.add_top_bar(self.banner)
 
-            def pin(w, h, edge):
-                w.set_size_request(w.get_size_request()[0], h)
-                w.set_valign(edge)
-                return w
-            grid.attach(Elbow('orange', TOP_H, True), 0, 0, 1, 1)
-            top = Gtk.Box(spacing=6, valign=Gtk.Align.START)
-            top.append(pin(seg('orange', hexpand=True), TOP_H, Gtk.Align.START))
-            title = lab('ARMADA II REFIT', ('title',))
-            title.set_margin_start(10)
-            title.set_margin_end(10)
-            top.append(pin(title, TOP_H, Gtk.Align.START))
-            tag = Gtk.Box()
-            tag.add_css_class('c-lilac')
-            tag.set_size_request(150, -1)
-            pin(tag, TOP_H, Gtk.Align.START)
-            tl = lab(f'INSTALLER {INSTALLER_VERSION}', ('subtitle',), xalign=1)
-            tl.set_hexpand(True)
-            tl.set_margin_end(10)
-            tl.set_valign(Gtk.Align.END)
-            tag.append(tl)
-            top.append(tag)
-            top.append(pin(seg('blue', width=46, extra=('cap-r',)), TOP_H, Gtk.Align.START))
-            grid.attach(top, 1, 0, 1, 1)
+            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER,
+                          margin_top=8, margin_bottom=28, margin_start=16, margin_end=16)
+            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            title.append(lab('Armada II Refit', 'title-big', xalign=0.5))
+            title.append(lab('Remastering tools for Star Trek: Armada II', 'title-sub', xalign=0.5))
+            col.append(title)
 
-            # Left: the navigation.
-            side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5,
-                           halign=Gtk.Align.START)
-            side.set_size_request(SIDE_W, -1)
-            side.set_margin_top(5)
-            side.set_margin_bottom(5)
-            self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
-            self.nav = {}
-            first = None
-            for i, (name, color) in enumerate([('overview', 'orange'), ('notes', 'blue'),
-                                               ('launcher', 'tan'), ('log', 'lilac')]):
-                b = Gtk.ToggleButton()
-                lb = lab(f'{i + 1:02d}-{name.upper()}', xalign=1, yalign=1)
-                lb.set_valign(Gtk.Align.END)
-                b.set_child(lb)
-                b.add_css_class('side')
-                b.add_css_class('c-' + color)
-                if first:
-                    b.set_group(first)
-                else:
-                    first = b
-                b.connect('toggled', self.on_nav, name)
-                side.append(b)
-                self.nav[name] = b
-            fill = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, vexpand=True)
-            fill.add_css_class('side-fill')
-            code = lab(f'GOG {GOG_APP}', ('side-code',), xalign=1)
-            code.set_valign(Gtk.Align.END)
-            code.set_vexpand(True)
-            code.set_margin_end(10)
-            code.set_margin_bottom(6)
-            fill.append(code)
-            side.append(fill)
-            side.append(seg('orange', height=34))
-            self.sensor = seg('red', height=18)
-            side.append(self.sensor)
-            grid.attach(side, 0, 1, 1, 1)
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            card.add_css_class('sky-card')
+            rows = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+            card.append(rows)
 
-            # Bottom: the elbow and its bar.
-            grid.attach(Elbow('tan', BOT_H, False), 0, 2, 1, 1)
-            bot = Gtk.Box(spacing=6, valign=Gtk.Align.END)
-            bot.append(pin(seg('tan', width=220), BOT_H, Gtk.Align.END))
-            bot.append(pin(seg('lilac', width=60), BOT_H, Gtk.Align.END))
-            self.footer = lab('', ('dimtext',), xalign=1)
-            self.footer.set_hexpand(True)
-            self.footer.set_margin_end(6)
-            bot.append(self.footer)
-            bot.append(pin(seg('peach', width=90), BOT_H, Gtk.Align.END))
-            bot.append(pin(seg('blue', width=30, extra=('cap-r',)), BOT_H, Gtk.Align.END))
-            grid.attach(bot, 1, 2, 1, 1)
-
-            # The content, and below it the status line, progress and the buttons.
-            main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
-                           hexpand=True, vexpand=True)
-            main.set_margin_top(4)
-            main.set_margin_bottom(8)
-            main.set_margin_end(4)
-            self.stack.set_vexpand(True)
-            main.append(self.stack)
-            self.stack.add_named(self.page_overview(), 'overview')
-            self.stack.add_named(self.page_notes(), 'notes')
-            self.stack.add_named(self.page_launcher(), 'launcher')
-            self.stack.add_named(self.page_log(), 'log')
-
-            self.status = lab('STANDING BY', ('status',))
-            self.status.set_ellipsize(3)
-            main.append(self.status)
-            self.bar = Segments()
-            main.append(self.bar)
-            row = Gtk.Box(spacing=10)
-            self.detail = lab('', ('dimtext',), wrap=True)
-            self.detail.set_hexpand(True)
-            row.append(self.detail)
-            self.b_refresh = pill('Refresh', 'blue')
-            self.b_refresh.connect('clicked', lambda *_: self.refresh())
-            self.b_uninstall = pill('Uninstall', 'red')
-            self.b_uninstall.connect('clicked', lambda *_: self.on_uninstall())
-            self.b_install = pill('Engage', 'orange')
-            self.b_install.connect('clicked', lambda *_: self.on_install())
-            for b in (self.b_refresh, self.b_uninstall, self.b_install):
-                row.append(b)
-            main.append(row)
-            grid.attach(main, 1, 1, 1, 1)
-            first.set_active(True)
-
-            # F5 refreshes, Ctrl+Enter installs, Alt+1..4 switch pages.
-            keys = Gtk.ShortcutController()
-            keys.set_scope(Gtk.ShortcutScope.GLOBAL)
-
-            def key(trigger, fn):
-                keys.add_shortcut(Gtk.Shortcut.new(Gtk.ShortcutTrigger.parse_string(trigger),
-                                                   Gtk.CallbackAction.new(lambda *_: fn() or True)))
-            key('F5', self.refresh)
-            key('<Control>Return', lambda: self.b_install.get_sensitive() and self.on_install())
-            for i, name in enumerate(('overview', 'notes', 'launcher', 'log'), 1):
-                key(f'<Alt>{i}', lambda n=name: self.nav[n].set_active(True))
-            self.add_controller(keys)
-
-        def section(self, text, color='orange'):
-            b = Gtk.Box(spacing=10)
-            bar = seg(color, extra=('section-bar',))
-            bar.set_valign(Gtk.Align.CENTER)
-            b.append(bar)
-            b.append(lab(text.upper(), ('section',)))
-            return b
-
-        def facts_grid(self):
-            g = Gtk.Grid(column_spacing=18, row_spacing=4)
-            g.rows = {}
-            return g
-
-        def fact(self, g, key, value, kind=''):
-            if key not in g.rows:
-                k = lab(key.upper(), ('key',))
-                v = lab('', ('val',), wrap=True)
-                v.set_hexpand(True)
-                v.set_selectable(True)
-                n = len(g.rows)
-                g.attach(k, 0, n, 1, 1)
-                g.attach(v, 1, n, 1, 1)
-                g.rows[key] = v
-            v = g.rows[key]
-            v.set_label(value)
-            for c in ('good', 'warn', 'bad'):
-                v.remove_css_class(c)
-            if kind:
-                v.add_css_class(kind)
-
-        def page_overview(self):
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-            box.set_margin_end(12)
-            self.banner = Gtk.Box(spacing=12)
-            self.banner.add_css_class('banner')
-            self.banner_text = lab('', wrap=True)
-            self.banner_text.set_hexpand(True)
-            self.banner.append(self.banner_text)
-            self.banner_link = pill('Download', 'gold', small=True)
-            self.banner_link.connect('clicked', lambda *_: self.open_uri(self.banner_uri))
-            self.banner.append(self.banner_link)
-            self.banner.set_visible(False)
-            box.append(self.banner)
-
-            cols = Gtk.Box(spacing=14, homogeneous=True)
-            # The game.
-            p = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            p.add_css_class('panel')
-            p.append(self.section('Game'))
-            row = Gtk.Box(spacing=8)
-            self.dd_game = Gtk.DropDown.new_from_strings(['searching…'])
-            self.dd_game.set_hexpand(True)
+            self.row_game = Adw.ActionRow(title='Game', subtitle_lines=2)
+            self.dd_game = Gtk.DropDown(valign=Gtk.Align.CENTER)
             self.dd_game.connect('notify::selected', lambda *_: self.on_game())
-            row.append(self.dd_game)
-            browse = pill('Browse', 'lilac', small=True)
-            browse.connect('clicked', lambda *_: self.on_browse())
-            row.append(browse)
-            p.append(row)
-            self.g_game = self.facts_grid()
-            p.append(self.g_game)
-            cols.append(p)
-            # The release.
-            p = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            p.add_css_class('panel')
-            p.append(self.section('Release', 'blue'))
-            self.dd_rel = Gtk.DropDown.new_from_strings(['no releases yet'])
-            self.dd_rel.set_hexpand(True)
+            browse = Gtk.Button(icon_name='folder-open-symbolic', valign=Gtk.Align.CENTER,
+                                tooltip_text='Choose the folder holding Armada2.exe')
+            browse.add_css_class('flat')
+            browse.connect('clicked', lambda _b: self.on_browse())
+            self.row_game.add_suffix(self.dd_game)
+            self.row_game.add_suffix(browse)
+            rows.append(self.row_game)
+
+            self.row_rel = Adw.ActionRow(title='Version', subtitle_lines=2)
+            self.dd_rel = Gtk.DropDown(valign=Gtk.Align.CENTER)
             self.dd_rel.connect('notify::selected', lambda *_: self.on_release())
-            p.append(self.dd_rel)
-            self.g_rel = self.facts_grid()
-            p.append(self.g_rel)
-            cols.append(p)
-            box.append(cols)
+            self.row_rel.add_suffix(self.dd_rel)
+            rows.append(self.row_rel)
 
-            self.bloom_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-            self.bloom_panel.add_css_class('panel')
-            self.bloom_panel.set_visible(False)
-            box.append(self.bloom_panel)
+            self.row_heroic = Adw.SwitchRow(title='Heroic launch settings', active=True,
+                                            subtitle_lines=3)
+            self.row_heroic.connect('notify::active', lambda *_: self.update_launcher())
+            rows.append(self.row_heroic)
 
-            box.append(self.section('What it installs', 'lilac'))
-            self.layers_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-            box.append(self.layers_box)
-            sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
-            sw.set_child(box)
-            return sw
-
-        def page_notes(self):
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            self.notes_title = self.section('Release notes', 'blue')
-            box.append(self.notes_title)
-            self.notes = Gtk.TextView(editable=False, cursor_visible=False,
-                                      wrap_mode=Gtk.WrapMode.WORD)
-            self.notes.set_left_margin(14)
-            self.notes.set_right_margin(14)
-            self.notes.set_top_margin(10)
-            buf = self.notes.get_buffer()
-            buf.create_tag('h', foreground='#ff9900', scale=1.35, weight=700,
-                           family='Antonio', pixels_above_lines=10)
-            buf.create_tag('h3', foreground='#cc99cc', scale=1.15, weight=700,
-                           family='Antonio', pixels_above_lines=8)
-            buf.create_tag('code', foreground='#99ccff', family='monospace')
-            buf.create_tag('bullet', foreground='#ff9900')
-            sw = Gtk.ScrolledWindow(vexpand=True)
-            sw.set_child(self.notes)
-            box.append(sw)
-            return box
-
-        def page_launcher(self):
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-            box.set_margin_end(12)
-            box.append(self.section('Launch settings', 'tan'))
-            box.append(lab('Wine loads its own DLLs unless told otherwise, so the game needs '
-                           'these variables in its launcher. The installer can write them into '
-                           "Heroic's settings for Armada II (a DLL override already there is "
-                           'kept and the missing ones added; a variable already set to something '
-                           'else is left alone). Uninstalling takes out what it added.',
-                           ('prose',), wrap=True))
-            row = Gtk.Box(spacing=12)
-            self.sw_heroic = Gtk.Switch(valign=Gtk.Align.CENTER)
-            self.sw_heroic.set_active(settings().get('heroic', True))
-            self.sw_heroic.connect('notify::active', lambda *_: (
-                remember(heroic=self.sw_heroic.get_active()), self.update_launcher()))
-            row.append(self.sw_heroic)
-            self.heroic_label = lab('', ('val',), wrap=True)
-            self.heroic_label.set_hexpand(True)
-            row.append(self.heroic_label)
-            box.append(row)
-            self.g_env = Gtk.Grid(column_spacing=18, row_spacing=6)
-            box.append(self.g_env)
-            box.append(self.section('For any other launcher', 'lilac'))
-            self.env_text = Gtk.TextView(editable=False, monospace=True)
+            self.row_env = Adw.ExpanderRow(title='Launch variables',
+                                           subtitle='Set these in your launcher')
+            self.env_text = Gtk.Label(xalign=0, selectable=True, wrap=True, hexpand=True)
             self.env_text.add_css_class('mono')
-            self.env_text.set_top_margin(8)
-            self.env_text.set_left_margin(10)
-            self.env_text.set_bottom_margin(8)
+            erow = Adw.ActionRow()
+            box = Gtk.Box(spacing=8, margin_top=8, margin_bottom=8, hexpand=True)
             box.append(self.env_text)
-            cp = pill('Copy', 'lilac', small=True)
-            cp.set_halign(Gtk.Align.START)
-            cp.connect('clicked', lambda *_: self.copy_env())
+            cp = Gtk.Button(icon_name='edit-copy-symbolic', valign=Gtk.Align.START,
+                            tooltip_text='Copy')
+            cp.add_css_class('flat')
+            cp.connect('clicked', lambda _b: self.copy(self.env_text.get_label()))
             box.append(cp)
-            sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
-            sw.set_child(box)
-            return sw
+            erow.set_child(box)
+            self.row_env.add_row(erow)
+            rows.append(self.row_env)
 
-        def page_log(self):
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            box.append(self.section('Log', 'lilac'))
-            self.logview = Gtk.TextView(editable=False, cursor_visible=False, monospace=True)
-            self.logview.add_css_class('mono')
-            self.logview.set_left_margin(10)
-            self.logview.set_top_margin(8)
-            sw = Gtk.ScrolledWindow(vexpand=True)
-            sw.set_child(self.logview)
-            self.logscroll = sw
-            box.append(sw)
-            return box
+            self.row_bloom = Adw.ExpanderRow(title='Bloom needs vkBasalt',
+                                             subtitle='Optional. Everything else installs without it.')
+            rows.append(self.row_bloom)
+            self.bloom_rows = []
+            col.append(card)
 
-        # ---------------------------------------------------------- helpers
-        def on_nav(self, button, name):
-            if button.get_active():
-                self.stack.set_visible_child_name(name)
+            self.heads_up = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            col.append(self.heads_up)
 
+            act = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            self.b_install = Gtk.Button(label='Install', halign=Gtk.Align.CENTER)
+            self.b_install.add_css_class('suggested-action')
+            self.b_install.add_css_class('pill')
+            self.b_install.set_size_request(220, 48)
+            self.b_install.connect('clicked', lambda _b: self.on_install())
+            act.append(self.b_install)
+            self.b_uninstall = Gtk.Button(label='Uninstall', halign=Gtk.Align.CENTER)
+            self.b_uninstall.add_css_class('flat')
+            self.b_uninstall.connect('clicked', lambda _b: self.on_uninstall())
+            act.append(self.b_uninstall)
+            col.append(act)
+
+            prog = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            self.bar = Gtk.ProgressBar()
+            self.bar.add_css_class('thin')
+            prog.append(self.bar)
+            self.status = lab('', 'status', xalign=0.5, wrap=True, justify=Gtk.Justification.CENTER)
+            prog.append(self.status)
+            col.append(prog)
+
+            clamp = Adw.Clamp(maximum_size=480, tightening_threshold=400, child=col)
+            scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, child=clamp)
+            view.set_content(scroll)
+            overlay.add_overlay(view)
+            self.set_content(overlay)
+
+            self.logview = Gtk.TextView(editable=False, monospace=True, cursor_visible=False,
+                                        wrap_mode=Gtk.WrapMode.WORD_CHAR)
+            self.logview.add_css_class('logview')
+            self.logscroll = Gtk.ScrolledWindow(child=self.logview, vexpand=True)
+            self.logdialog = None
+
+            for name, fn, accel in (('refresh', self.refresh, 'F5'),
+                                    ('log', self.show_log, '<Control>l'),
+                                    ('install', self.on_install, '<Control>Return'),
+                                    ('releases', lambda: self.open_uri(RELEASES_PAGE), None)):
+                a = Gio.SimpleAction.new(name, None)
+                a.connect('activate', lambda _a, _p, f=fn: f())
+                self.add_action(a)
+                if accel:
+                    self.get_application().set_accels_for_action('win.' + name, [accel])
+
+        # ---------------------------------------------------------- small things
         def open_uri(self, uri):
             Gtk.UriLauncher.new(uri).launch(self, None, None, None)
+
+        def copy(self, text):
+            self.get_clipboard().set(text)
+            self.set_status('Copied to the clipboard', 'ok')
 
         def log(self, line):
             buf = self.logview.get_buffer()
@@ -1590,8 +1318,20 @@ def run_gui():
             adj = self.logscroll.get_vadjustment()
             GLib.idle_add(lambda: adj.set_value(adj.get_upper()))
 
+        def show_log(self):
+            if self.logdialog is None:
+                self.logdialog = Adw.Dialog(title='Installation log', content_width=640,
+                                            content_height=420)
+                tv = Adw.ToolbarView()
+                tv.add_top_bar(Adw.HeaderBar())
+                tv.set_content(self.logscroll)
+                self.logdialog.set_child(tv)
+                self.logdialog.connect('closed', lambda _d: setattr(self, 'logdialog', None) or
+                                       tv.set_content(None))
+            self.logdialog.present(self)
+
         def set_status(self, text, kind=''):
-            self.status.set_label(text.upper())
+            self.status.set_label(text)
             for c in ('err', 'ok'):
                 self.status.remove_css_class(c)
             if kind:
@@ -1599,9 +1339,8 @@ def run_gui():
 
         def set_busy(self, busy):
             self.busy = busy
-            self.bar.set(self.bar.fraction, busy=busy)
-            self.dd_game.set_sensitive(not busy)
-            self.dd_rel.set_sensitive(not busy)
+            for w in (self.dd_game, self.dd_rel, self.row_heroic):
+                w.set_sensitive(not busy)
             self.update_buttons()
 
         def game(self):
@@ -1625,10 +1364,8 @@ def run_gui():
 
         def failed(self, e):
             self.set_busy(False)
-            self.bar.set(self.bar.fraction, busy=False, err=True)
             self.set_status(f'Failed: {e}', 'err')
             self.log(f'error: {e}')
-            self.sensor.set_visible(True)
 
         # ---------------------------------------------------------- the game
         def load_games(self, select=None):
@@ -1638,11 +1375,12 @@ def run_gui():
                     os.path.realpath(g.path) == os.path.realpath(last) for g in self.games):
                 self.games.insert(0, Game(os.path.realpath(last), 'Chosen'))
             self.updating = True
-            labels = [g.label() for g in self.games] or ['no Armada II found — Browse']
-            self.dd_game.set_model(Gtk.StringList.new(labels))
-            idx = next((i for i, g in enumerate(self.games) if last and
-                        os.path.realpath(g.path) == os.path.realpath(last)), 0)
-            self.dd_game.set_selected(idx)
+            self.dd_game.set_model(Gtk.StringList.new(
+                [g.label() for g in self.games] or ['No Armada II found']))
+            self.dd_game.set_selected(next(
+                (i for i, g in enumerate(self.games)
+                 if last and os.path.realpath(g.path) == os.path.realpath(last)), 0))
+            self.dd_game.set_visible(len(self.games) > 1)
             self.updating = False
             self.on_game()
 
@@ -1659,7 +1397,7 @@ def run_gui():
                     return
                 path = f.get_path()
                 if not exe_in(path):
-                    self.set_status('No Armada2.exe in that folder', 'err')
+                    self.set_status('There is no Armada2.exe in that folder', 'err')
                     return
                 remember(game=path)
                 self.load_games(select=path)
@@ -1669,57 +1407,35 @@ def run_gui():
             if self.updating:
                 return
             g = self.game()
-            gg = self.g_game
             if not g:
-                self.fact(gg, 'Folder', 'not found — use Browse to point at the folder '
-                                        'holding Armada2.exe', 'bad')
                 self.facts = None
+                self.row_game.set_subtitle('Not found. Choose the folder holding Armada2.exe.')
                 self.update_all()
                 return
             remember(game=g.path)
             f = self.facts = inspect(g.path)
-            self.fact(gg, 'Folder', short(g.path))
-            self.fact(gg, 'Found by', g.source)
             inst = f['installed']
-            self.fact(gg, 'Installed', ('Refit ' + inst if inst != '?' else 'Refit, version unknown')
-                      if inst else 'stock game', 'good' if inst else '')
-            self.fact(gg, 'Direct3D', ('DXVK through d3d8to9 · per-pixel lighting' if f['d3d8to9'] and f['dxvk']
-                                       else 'DXVK' if f['dxvk']
-                                       else 'Proton’s own · no MSAA, lighting per vertex'),
-                      'good' if f['dxvk'] else 'warn')
-            self.fact(gg, 'Bloom', 'vkBasalt found' if f['vkbasalt']
-                      else 'no vkBasalt layer — bloom skipped (how to get it below)',
-                      'good' if f['vkbasalt'] else 'warn')
-            self.fact(gg, 'Launcher', f'{g.heroic.label()}, GOG app {g.heroic.app}' if g.heroic
-                      else 'not Heroic — set the variables by hand', '' if g.heroic else 'warn')
+            self.row_game.set_subtitle(GLib.markup_escape_text(
+                short(g.path) + '\n' + ('Refit ' + inst if inst and inst != '?'
+                                        else 'Refit, version unknown' if inst else 'Stock game')))
             self.update_all()
 
         # ---------------------------------------------------------- releases
-        def set_releases(self, rels, keep=True):
+        def set_releases(self, rels):
             cur = self.release()
-            cur_v = cur.version if cur and keep and getattr(self, 'user_picked', False) else None
+            cur_v = cur.version if cur and self.user_picked else None
             self.releases = rels
-            self.updating = True
-            labels = []
             newest = default_release(rels)
+            labels = []
             for r in rels:
-                tags = [r.date] if r.date else []
+                tags = ['newest'] if r is newest else []
                 if r.prerelease:
-                    tags.append('PRE-RELEASE')
-                if r is newest:
-                    tags.append('NEWEST')
-                if r.is_cached():
-                    tags.append('CACHED')
-                if not r.url:
-                    tags.append('NO LONGER ON GITHUB')
-                labels.append(f'{r.version}  ·  ' + ' · '.join(tags))
-            self.dd_rel.set_model(Gtk.StringList.new(labels or ['no releases yet — Refresh']))
-            idx = 0
+                    tags.append('pre-release')
+                labels.append(r.version + (f'  ({", ".join(tags)})' if tags else ''))
+            self.updating = True
+            self.dd_rel.set_model(Gtk.StringList.new(labels or ['No releases']))
             pick = cur_v or (newest.version if newest else None)
-            for i, r in enumerate(rels):
-                if r.version == pick:
-                    idx = i
-            self.dd_rel.set_selected(idx)
+            self.dd_rel.set_selected(next((i for i, r in enumerate(rels) if r.version == pick), 0))
             self.updating = False
             self.on_release(user=False)
 
@@ -1728,23 +1444,19 @@ def run_gui():
                 return
             self.set_busy(True)
             self.set_status(STATUS['fetch'] + '…')
-            self.bar.set(0.0, busy=True)
+            self.bar.set_fraction(0)
             self.load_games(select=self.game().path if self.game() else None)
 
             def done(rels):
                 self.checked, self.check_error = time.time(), None
                 self.set_busy(False)
-                self.bar.set(0.0, busy=False)
-                newest = default_release(rels)
-                self.set_status(f'{len(rels)} releases on record · newest {newest.version}'
-                                if newest else 'No releases found', 'ok' if newest else 'err')
+                self.set_status('')
                 self.set_releases(rels)
 
             def fail(e):
                 self.check_error = str(e)
                 self.set_busy(False)
-                self.bar.set(0.0, busy=False)
-                self.set_status('Offline — showing cached releases', 'err')
+                self.set_status('Offline. Showing the releases already downloaded.')
                 self.log(f'release check failed: {e}')
                 self.set_releases(cached_releases()[0])
             self.in_thread(lambda: merge_cached(fetch_releases()), done, fail)
@@ -1756,211 +1468,131 @@ def run_gui():
                 self.user_picked = True
             r = self.release()
             self.package = None
-            g = self.g_rel
             if not r:
-                self.fact(g, 'Status', 'nothing to install yet — check your connection, '
-                                       'then Refresh', 'bad')
+                self.row_rel.set_subtitle('Nothing to install yet. Check the connection and refresh.')
                 self.update_all()
                 return
-            self.fact(g, 'Version', r.version)
-            self.fact(g, 'Channel', 'pre-release — not yet seen in game' if r.prerelease
-                      else 'release', 'warn' if r.prerelease else 'good')
-            self.fact(g, 'Published', r.date or 'unknown')
-            when = time.strftime('%H:%M, %d %b', time.localtime(self.checked)) \
-                if self.checked else 'never'
-            self.fact(g, 'Last check', when + (f' · offline' if self.check_error else ''),
-                      'warn' if self.check_error else '')
-            self.show_notes(r)
+            sub = [r.date] if r.date else []
+            if r.prerelease:
+                sub.append('pre-release, not yet seen in game')
             if r.is_cached():
-                self.fact(g, 'Package', f'cached · {human(os.path.getsize(r.cached))}', 'good')
                 self.read_package(r)
             elif r.url and not self.busy:
-                # Small (about a megabyte): fetch it now, to show what it holds.
-                self.fact(g, 'Package', f'fetching · {human(r.size)}')
+                # About a megabyte: fetch it now, to know what it holds.
+                sub.append('downloading…')
                 self.in_thread(lambda: download(r), lambda _: self.on_release(user=False),
-                               lambda e: (self.fact(g, 'Package', f'not fetched: {e}', 'bad'),
+                               lambda e: (self.row_rel.set_subtitle(f'Could not download: {e}'),
                                           self.update_all()))
+            if self.check_error and not r.url:
+                sub.append('no longer on GitHub')
+            self.row_rel.set_subtitle(' · '.join(sub) or ' ')
             self.update_all()
 
         def read_package(self, r):
             try:
                 self.package = Package(r.cached)
             except Exception as e:
-                self.fact(self.g_rel, 'Package', f'unreadable: {e}', 'bad')
+                self.row_rel.set_subtitle(f'Unreadable package: {e}')
                 self.package = None
-                return
-            p = self.package
-            self.fact(self.g_rel, 'Schema', f'{p.schema}' + ('' if p.supported() else
-                      ' — needs a newer installer'), '' if p.supported() else 'bad')
 
-        def show_notes(self, r):
-            buf = self.notes.get_buffer()
-            buf.set_text('')
-            text = r.notes or 'No notes for this release.'
-            text = text.split('\n---\n')[0]
-            for line in text.splitlines():
-                end = buf.get_end_iter()
-                if line.startswith('### '):
-                    buf.insert_with_tags_by_name(end, line[4:].upper() + '\n', 'h3')
-                elif line.startswith('## ') or line.startswith('# '):
-                    buf.insert_with_tags_by_name(end, line.lstrip('# ').upper() + '\n', 'h')
-                else:
-                    if line.startswith('- '):
-                        buf.insert_with_tags_by_name(end, '▸ ', 'bullet')
-                        line = line[2:]
-                    for i, part in enumerate(line.split('`')):
-                        if i % 2:
-                            buf.insert_with_tags_by_name(buf.get_end_iter(), part, 'code')
-                        else:
-                            buf.insert(buf.get_end_iter(), part)
-                    buf.insert(buf.get_end_iter(), '\n')
-
-        # ---------------------------------------------------------- what it installs
-        def update_bloom(self):
-            p = self.bloom_panel
-            while (c := p.get_first_child()):
-                p.remove(c)
-            f, g = getattr(self, 'facts', None), self.game()
-            if not f or f['vkbasalt']:
-                p.set_visible(False)
-                return
-            name, steps = vkbasalt_howto()
-            p.append(self.section('Bloom needs vkBasalt', 'gold'))
-            p.append(lab(f'Optional. Everything else installs without it. Detected: {name}.',
-                         ('prose',), wrap=True))
-            if g and g.heroic and g.heroic.flatpak:
-                p.append(lab('This game runs in Heroic’s Flatpak, which cannot see a vkBasalt '
-                             'installed this way. Bloom under Flatpak Heroic is not supported '
-                             'yet.', ('val', 'warn'), wrap=True))
-            for text, cmd in steps:
-                p.append(lab(text, ('prose',), wrap=True))
-                row = Gtk.Box(spacing=10)
-                tv = Gtk.TextView(editable=False, monospace=True, hexpand=True,
-                                  wrap_mode=Gtk.WrapMode.CHAR)
-                tv.add_css_class('mono')
-                tv.set_left_margin(10)
-                tv.set_top_margin(6)
-                tv.set_bottom_margin(6)
-                tv.get_buffer().set_text(cmd)
-                row.append(tv)
-                cp = pill('Copy', 'gold', small=True)
-                cp.set_valign(Gtk.Align.CENTER)
-                cp.connect('clicked', lambda _b, c=cmd: (self.get_clipboard().set(c),
-                                                         self.set_status('Copied to the clipboard', 'ok')))
-                row.append(cp)
-                p.append(row)
-            p.append(lab('Then press Refresh, and install again to set bloom up.',
-                         ('dimtext',), wrap=True))
-            p.set_visible(True)
-
+        # ---------------------------------------------------------- what to show
         def update_all(self):
+            self.update_heads_up()
             self.update_bloom()
-            self.update_layers()
             self.update_launcher()
             self.update_banner()
             self.update_buttons()
-            r = self.release()
-            self.footer.set_label(f'PACKAGE SCHEMA {"/".join(map(str, SCHEMAS))}  ·  '
-                                  f'CACHE {short(CACHE)}' + (f'  ·  RELEASE {r.version}' if r else ''))
 
-        def update_layers(self):
-            box = self.layers_box
-            while (c := box.get_first_child()):
-                box.remove(c)
-            p, f = self.package, getattr(self, 'facts', None)
-            if not p:
-                box.append(lab('The release package is not here yet.', ('prose',)))
+        def update_heads_up(self):
+            while (c := self.heads_up.get_first_child()):
+                self.heads_up.remove(c)
+            f, p = self.facts, self.package
+            if not f:
                 return
-            colors = ['orange', 'peach', 'blue', 'lilac', 'tan', 'sky', 'gold']
-            later = []
-            for i, l in enumerate(p.layers):
-                if l['id'] in EXCLUDED:
-                    later.append(l)
-                    continue
-                yes, why = layer_verdict(l, f) if f else (True, 'will install')
-                box.append(self.layer_row(l['name'], l.get('version', ''), l.get('summary', ''),
-                                          why, 'yes' if yes else 'no', colors[i % len(colors)]))
-            # What this installer does not install, for now: shown, and switched off.
-            for l in later + p.not_included:
-                row = self.layer_row(l['name'], '', l['summary'], 'not available yet', 'na', None)
-                sw = Gtk.Switch(active=False, sensitive=False, valign=Gtk.Align.CENTER)
-                row.append(sw)
-                box.append(row)
+            notes = []
+            if p:
+                for l in p.layers:
+                    if l['id'] in EXCLUDED or l['id'] == 'bloom':
+                        continue
+                    yes, why = layer_verdict(l, f)
+                    if not yes:
+                        notes.append(f'{l["name"]}: {why[len("skipped — "):]}'
+                                     if why.startswith('skipped — ') else f'{l["name"]}: {why}')
+                    elif 'per vertex' in why:
+                        notes.append(f'{l["name"]}: per vertex; per pixel needs d3d8to9')
+            notes.append('Textures are built from your own files, not shipped in releases.')
+            for i, n in enumerate(notes):
+                self.heads_up.append(lab(n, ('heads-up', 'warn') if i < len(notes) - 1
+                                         else 'heads-up', xalign=0.5, wrap=True,
+                                         justify=Gtk.Justification.CENTER, margin_start=8,
+                                         margin_end=8))
 
-        def layer_row(self, name, version, summary, verdict, kind, color):
-            row = Gtk.Box(spacing=14)
-            row.add_css_class('layer-row')
-            chip = Gtk.Box()
-            chip.add_css_class('chip')
-            chip.add_css_class('c-' + color if color else 'off')
-            chip.set_valign(Gtk.Align.CENTER)
-            chip.set_hexpand(False)
-            chip.set_size_request(176, -1)
-            chip.append(lab(name.upper(), xalign=1, hexpand=True))
-            row.append(chip)
-            row.append(lab(version, ('lver',)))
-            s = lab(summary, ('prose',), wrap=True, width_chars=24, max_width_chars=70)
-            s.set_hexpand(True)
-            row.append(s)
-            v = lab(verdict.upper(), ('verdict', kind), xalign=1, wrap=True,
-                    width_chars=16, max_width_chars=26)
-            row.append(v)
-            return row
+        def update_bloom(self):
+            for r in self.bloom_rows:
+                self.row_bloom.remove(r)
+            self.bloom_rows = []
+            f, g = self.facts, self.game()
+            if not f or f['vkbasalt']:
+                self.row_bloom.set_visible(False)
+                return
+            name, steps = vkbasalt_howto()
+            self.row_bloom.set_visible(True)
+            if g and g.heroic and g.heroic.flatpak:
+                r = Adw.ActionRow(title='Heroic runs as a Flatpak',
+                                  subtitle='It cannot see a vkBasalt installed this way, so '
+                                           'bloom is not supported there yet.')
+                self.row_bloom.add_row(r)
+                self.bloom_rows.append(r)
+            for text, cmd in steps:
+                r = Adw.ActionRow(title=GLib.markup_escape_text(text), title_lines=0,
+                                  subtitle=GLib.markup_escape_text(cmd), subtitle_lines=0)
+                r.add_css_class('property')
+                cp = Gtk.Button(icon_name='edit-copy-symbolic', valign=Gtk.Align.CENTER,
+                                tooltip_text='Copy')
+                cp.add_css_class('flat')
+                cp.connect('clicked', lambda _b, c=cmd: self.copy(c))
+                r.add_suffix(cp)
+                self.row_bloom.add_row(r)
+                self.bloom_rows.append(r)
+            r = Adw.ActionRow(title=f'Detected: {name}. Refresh and install again afterwards '
+                                    'to set bloom up.', title_lines=0)
+            r.add_css_class('dim-label')
+            self.row_bloom.add_row(r)
+            self.bloom_rows.append(r)
 
         def wanted_env(self):
-            f = getattr(self, 'facts', None)
+            f = self.facts
             if not f:
                 return {}
             st = f.get('state') or {}
-            if st.get('launcher_env') and st.get('version') == (self.package.version if self.package else None):
+            if st.get('launcher_env') and st.get('version') == (self.package.version
+                                                                if self.package else None):
                 return st['launcher_env']
             return launch_env(f, self.package)
 
         def update_launcher(self):
-            g = self.game()
-            env = self.wanted_env()
-            text = '\n'.join(f'{k}={v}' for k, v in env.items())
-            self.env_text.get_buffer().set_text(text or '(choose the game first)')
-            grid = self.g_env
-            while (c := grid.get_first_child()):
-                grid.remove(c)
-            if not g or not g.heroic:
-                self.sw_heroic.set_sensitive(False)
-                self.heroic_label.set_label('No Heroic entry for this install: set the '
-                                            'variables below in your launcher.')
+            g, env = self.game(), self.wanted_env()
+            self.env_text.set_label('\n'.join(f'{k}={v}' for k, v in env.items()))
+            heroic = bool(g and g.heroic)
+            self.row_heroic.set_visible(heroic)
+            self.row_env.set_visible(bool(env) and not (heroic and self.row_heroic.get_active()))
+            if not heroic:
                 return
-            self.sw_heroic.set_sensitive(True)
             changes, conflicts = heroic_plan(g.heroic, env)
-            on = self.sw_heroic.get_active()
-            msg = f'Write them to {g.heroic.label()} (GOG app {g.heroic.app})'
             if changes is None:
-                msg += ' — ' + conflicts[0]
+                sub = conflicts[0]
             elif not changes:
-                msg += ' — already set'
-            if on and heroic_running():
-                msg += '. Heroic is running: restart it after installing'
-            self.heroic_label.set_label(msg)
-            for j, h in enumerate(('VARIABLE', 'NOW', 'AFTER INSTALL')):
-                grid.attach(lab(h, ('key',)), j, 0, 1, 1)
-            cur = {}
-            data = load_json(g.heroic.config) or {}
-            for e in (data.get(g.heroic.app) or {}).get('enviromentOptions', []):
-                if isinstance(e, dict):
-                    cur[e.get('key')] = e.get('value', '')
-            ch = {c['key']: c['new'] for c in (changes or [])}
-            for i, (k, v) in enumerate(env.items(), 1):
-                now = cur.get(k, '(unset)')
-                after = ch.get(k, now) if on else now
-                grid.attach(lab(k, ('val',)), 0, i, 1, 1)
-                grid.attach(lab(now, ('val',), wrap=True), 1, i, 1, 1)
-                grid.attach(lab(after, ('val', 'good') if k in ch and on else ('val',), wrap=True),
-                            2, i, 1, 1)
-            for i, c in enumerate(conflicts or [], len(env) + 1):
-                grid.attach(lab(c, ('val', 'warn'), wrap=True), 0, i, 3, 1)
+                sub = f'Already set in {g.heroic.label()}'
+            else:
+                sub = f'Adds {", ".join(c["key"] for c in changes)} to {g.heroic.label()}'
+            if conflicts and changes is not None:
+                sub += '. ' + '; '.join(conflicts)
+            if self.row_heroic.get_active() and heroic_running():
+                sub += '. Heroic is running: restart it afterwards'
+            self.row_heroic.set_subtitle(GLib.markup_escape_text(sub))
 
         def update_banner(self):
-            p = self.package
-            newer = None
+            p, newer = self.package, None
             for r in self.releases:
                 if r.is_cached():
                     try:
@@ -1971,52 +1603,40 @@ def run_gui():
                         newer = (iv, r)
                     break
             if p and not p.supported():
-                self.banner_text.set_label(f'Release {p.version} uses package schema '
-                                           f'{p.schema}, which this installer cannot read. '
-                                           'Download the newest installer.')
+                self.banner.set_title(f'Release {p.version} needs a newer installer.')
             elif newer:
-                self.banner_text.set_label(f'A newer installer ({newer[0]}) comes with '
-                                           f'release {newer[1].version}.')
+                self.banner.set_title(f'A newer installer ({newer[0]}) is available.')
             else:
-                self.banner.set_visible(False)
+                self.banner.set_revealed(False)
                 return
             r = newer[1] if newer else self.release()
             self.banner_uri = (r.installer_url if r and r.installer_url else
                                r.page if r else RELEASES_PAGE)
-            self.banner.set_visible(True)
+            self.banner.set_revealed(True)
 
         def update_buttons(self):
-            g, r, p = self.game(), self.release(), self.package
-            f = getattr(self, 'facts', None)
+            g, r, p, f = self.game(), self.release(), self.package, self.facts
             inst = f and f['installed']
             ok = bool(g and r and (p is None or p.supported()) and (p or r.url))
             self.b_install.set_sensitive(not self.busy and ok)
-            self.b_uninstall.set_sensitive(not self.busy and bool(g and inst))
-            self.b_refresh.set_sensitive(not self.busy)
-            label = 'Engage'
+            self.b_uninstall.set_visible(bool(g and inst))
+            self.b_uninstall.set_sensitive(not self.busy)
+            label = 'Install'
             if r and inst:
-                label = ('Reinstall ' if inst == r.version else 'Install ' if inst == '?' else
-                         'Upgrade to ' if vtuple(r.version) > vtuple(inst)
-                         else 'Switch to ') + r.version
-            elif r:
-                label = f'Install {r.version}'
-            self.b_install.get_child().set_label(label.upper())
-
-        def copy_env(self):
-            buf = self.env_text.get_buffer()
-            text = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
-            self.get_clipboard().set(text)
-            self.set_status('Copied to the clipboard', 'ok')
+                label = ('Reinstall' if inst == r.version else 'Install' if inst == '?' else
+                         'Upgrade to' if vtuple(r.version) > vtuple(inst) else 'Switch to')
+                if label != 'Reinstall' and label != 'Install':
+                    label += f' {r.version}'
+            self.b_install.set_label(label)
 
         # ---------------------------------------------------------- jobs
         def report(self, frac, step, info):
             def ui():
-                text = STATUS.get(step, step)
-                text = text.format(version=(info or {}).get('version', ''))
+                text = STATUS.get(step, step).format(version=(info or {}).get('version', ''))
                 if info and info.get('detail'):
                     text += f' · {info["detail"]}'
                 self.set_status(text + ('…' if frac < 1 else ''))
-                self.bar.set(frac)
+                self.bar.set_fraction(frac)
             GLib.idle_add(ui)
 
         def job(self):
@@ -2034,12 +1654,12 @@ def run_gui():
 
         def on_install(self):
             g, r = self.game(), self.release()
-            if not g or not r:
+            if not g or not r or self.busy or not self.b_install.get_sensitive():
                 return
             if game_running():
-                self.set_status('Armada II is running — quit the game first', 'err')
+                self.set_status('Armada II is running. Quit the game first.', 'err')
                 return
-            write = self.sw_heroic.get_active() and bool(g.heroic)
+            write = self.row_heroic.get_active() and bool(g.heroic)
             if write and heroic_running():
                 self.confirm('Heroic is running',
                              'Heroic may write its own copy of the game settings back over '
@@ -2051,26 +1671,25 @@ def run_gui():
 
         def start_install(self, g, r, write):
             self.set_busy(True)
-            self.bar.set(0.0, busy=True)
-            self.nav['log'].get_active() or None
+            self.bar.set_fraction(0)
             self.log(f'== install {r.version} into {g.path}')
 
             def done(res):
                 self.set_busy(False)
-                self.bar.set(1.0, busy=False)
                 msg = f'Refit {res["version"]} installed'
                 if write and res['heroic']:
-                    msg += ' · Heroic launch settings written'
+                    msg += '. Heroic launch settings written.'
                 elif res['env']:
-                    msg += ' · set the launch variables (03-Launcher)'
+                    msg += '. Set the launch variables in your launcher.'
+                if res['notes']:
+                    msg += '\n' + ' · '.join(res['notes'])
                 self.set_status(msg, 'ok')
-                self.detail.set_label(' · '.join(res['notes']))
                 self.on_game()
             self.in_thread(lambda: self.job().install(r, None, g.path, launcher=write), done)
 
         def on_uninstall(self):
             g = self.game()
-            if not g:
+            if not g or self.busy:
                 return
             self.confirm('Uninstall Armada II Refit?',
                          f'Everything the mod put into {short(g.path)} is taken out and the '
@@ -2080,49 +1699,23 @@ def run_gui():
 
         def start_uninstall(self, g):
             self.set_busy(True)
-            self.bar.set(0.0, busy=True)
+            self.bar.set_fraction(0)
             self.log(f'== uninstall from {g.path}')
 
             def done(_):
                 self.set_busy(False)
-                self.bar.set(1.0, busy=False)
-                self.set_status('Uninstalled · the game is stock again', 'ok')
+                self.set_status('Uninstalled. The game is stock again.', 'ok')
                 self.on_game()
             self.in_thread(lambda: self.job().uninstall(self.releases, g.path), done)
 
-        def fetch_font(self):
-            try:
-                p = font_path(fetch=True)
-            except Exception:
-                return
-            if p:
-                GLib.idle_add(lambda: (add_font(p), self.restyle()))
-
-        def restyle(self):
-            # Pango caches the face per widget; nudging every label's style re-resolves it.
-            def walk(w):
-                if isinstance(w, Gtk.Label):
-                    w.add_css_class('refont')
-                    w.remove_css_class('refont')
-                c = w.get_first_child()
-                while c:
-                    walk(c)
-                    c = c.get_next_sibling()
-            load_css()
-            walk(self)
-            self.update_all()
-
     provider = Gtk.CssProvider()
-
-    def load_css():
-        if hasattr(provider, 'load_from_string'):
-            provider.load_from_string(CSS)
-        else:
-            provider.load_from_data(CSS.encode(), -1)
+    if hasattr(provider, 'load_from_string'):
+        provider.load_from_string(CSS)
+    else:
+        provider.load_from_data(CSS.encode(), -1)
 
     def activate(app):
         Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_DARK)
-        load_css()
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
                                                   Gtk.STYLE_PROVIDER_PRIORITY_USER)
         win = app.get_active_window() or Window(app)
@@ -2141,7 +1734,6 @@ if __name__ == '__main__':
         sys.exit(run_gui())
     except (ImportError, ValueError) as e:
         print(f'The window needs PyGObject with GTK 4 and libadwaita ({e}).\n'
-              'Install them (Arch: python-gobject gtk4 libadwaita; Debian/Ubuntu: '
-              'python3-gi gir1.2-gtk-4.0 gir1.2-adw-1; Fedora: python3-gobject gtk4 '
-              'libadwaita), or use the command line: --help.', file=sys.stderr)
+              'Use the AppImage, which carries them, or the command line: --help.',
+              file=sys.stderr)
         sys.exit(1)

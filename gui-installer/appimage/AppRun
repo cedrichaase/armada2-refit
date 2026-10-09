@@ -1,0 +1,40 @@
+#!/bin/sh
+# The AppImage's entry point. Points GTK, Python and GLib at the bundled copies, and
+# remembers what every variable was, so that the programs the installer starts
+# (install.sh, bash, the browser) get the host's own environment back: the installer's
+# host_env() reads the A2_ORIG_* variables written here.
+HERE="$(dirname "$(readlink -f "$0")")"
+USR="$HERE/usr"
+PYVER="$(ls "$USR/lib" | sed -n 's/^python\(3\.[0-9]*\)$/\1/p' | head -1)"
+
+remember () {   # remember VAR: keep its host value in A2_ORIG_VAR, ":unset" when it had none
+    eval "if [ \"\${$1+x}\" ]; then export A2_ORIG_$1=\"\$$1\"; else export A2_ORIG_$1=:unset; fi"
+}
+for v in PATH LD_LIBRARY_PATH PYTHONHOME PYTHONPATH PYTHONNOUSERSITE XDG_DATA_DIRS \
+         GI_TYPELIB_PATH GSETTINGS_SCHEMA_DIR GSETTINGS_BACKEND GIO_MODULE_DIR \
+         GDK_PIXBUF_MODULE_FILE GTK_PATH GTK_EXE_PREFIX GTK_IM_MODULE_FILE; do
+    remember "$v"
+done
+export A2_APPIMAGE=1
+
+export PATH="$USR/bin:$PATH"
+export LD_LIBRARY_PATH="$USR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PYTHONHOME="$USR"
+export PYTHONPATH="$USR/lib/python$PYVER/site-packages"
+export PYTHONNOUSERSITE=1
+export GI_TYPELIB_PATH="$USR/lib/girepository-1.0"
+export XDG_DATA_DIRS="$USR/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+export GSETTINGS_SCHEMA_DIR="$USR/share/glib-2.0/schemas"
+export GSETTINGS_BACKEND=memory          # no dconf module in here
+export GIO_MODULE_DIR="$USR/lib/gio/modules"
+unset GTK_PATH GTK_EXE_PREFIX GTK_IM_MODULE_FILE
+
+# gdk-pixbuf's loader cache names absolute paths: write one for where we are mounted now.
+cache="${XDG_RUNTIME_DIR:-/tmp}/a2refit-pixbuf-$$.cache"
+if [ -f "$USR/lib/gdk-pixbuf-loaders.cache.in" ]; then
+    sed "s|@APPDIR@|$USR|g" "$USR/lib/gdk-pixbuf-loaders.cache.in" > "$cache"
+    export GDK_PIXBUF_MODULE_FILE="$cache"
+    trap 'rm -f "$cache"' EXIT
+fi
+
+python3 "$USR/share/armada2-refit/armada2-refit-installer.py" "$@"

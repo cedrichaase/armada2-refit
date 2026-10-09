@@ -1,7 +1,7 @@
 # gui-installer — the graphical installer for Linux
 
-`armada2-refit-installer.py` is one Python file: a GTK 4 / libadwaita window in an
-LCARS style that installs a **release** of Armada II Refit into the GOG game under
+`armada2-refit-installer.py` is one Python file: a GTK 4 / libadwaita window over a
+starfield that installs a **release** of Armada II Refit into the GOG game under
 Wine/Proton. It is for players, not for working on the project. The repository's own
 `./install` builds from source and installs the asset layers too; this installs what a
 release zip carries.
@@ -19,7 +19,11 @@ PyGObject with GTK 4 and libadwaita (Arch `python-gobject gtk4 libadwaita`;
 Debian/Ubuntu `python3-gi gir1.2-gtk-4.0 gir1.2-adw-1`; Fedora `python3-gobject gtk4
 libadwaita`). Without them it says so and points at the command line.
 
-Keys: F5 refresh, Ctrl+Enter install, Alt+1..4 the pages.
+Released as an **AppImage** (`armada2-refit-installer-x86_64.AppImage`, about 50 MB), which
+carries Python, GTK 4 and libadwaita; the script itself is attached beside it. See
+"The AppImage" below.
+
+Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
 
 ## What it does
 
@@ -36,12 +40,12 @@ Keys: F5 refresh, Ctrl+Enter install, Alt+1..4 the pages.
    seen in game", and is offered but not chosen for you. A zip is about a megabyte, so
    the chosen one is fetched straight away (checked against GitHub's sha256 digest) to
    show what it holds.
-3. **Shows what it installs**, layer by layer, on this machine: the same tests
-   `install.sh` makes (DXVK in the game directory for MSAA, d3d8to9 for per-pixel
-   lighting, a vkBasalt layer for bloom, a `dxvk.conf` of the player's own).
-   **Textures and the cutscene player are listed as not available**, switched off: a
-   release cannot carry textures (they are built from the player's own files), and the
-   cutscene player is held back for now (`EXCLUDED` in the script).
+3. **Says what will not go in**, on this machine, in a line each under the card: the same
+   tests `install.sh` makes (DXVK in the game directory for MSAA, d3d8to9 for per-pixel
+   lighting, a `dxvk.conf` of the player's own; `layer_verdict` in the script). There is
+   no layer table: what installs is the release's business. **Textures and the cutscene
+   player are not installed from here** (`EXCLUDED`): a release cannot carry textures,
+   and the cutscene player is held back for now.
 4. **Installs** by unpacking the zip into the cache and running its own `install.sh`
    with the game directory, `A2_PROGRESS=1` and `A2_SKIP=cutscenes`. A schema-0 zip
    ignores `A2_SKIP`, so the installer puts the stock `binkw32.dll` back afterwards, as
@@ -117,12 +121,48 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 segmented bar: download 0–30 %, unpack, the script's steps 35–92 %, Heroic, done. A
 schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).
 
-## The font
+## The window
 
-The interface face is **Antonio** (SIL OFL 1.1), fetched once from Google Fonts'
-repository, pinned by commit and sha256 (`FONT_URL`, `FONT_SHA`), into the cache and
-loaded for this process only (`PangoCairo.FontMap.add_font_file`). Nothing is installed
-system-wide. Without it, a condensed system face stands in.
+One screen: the game, the version, the Heroic switch, **Install** (and **Uninstall** when
+the game has a release in it), a thin progress bar and a status line. The log is a dialog
+(`Ctrl+L`). The sky behind it is drawn in code (`Sky`): a gradient, a faint nebula and
+three layers of stars drifting at different speeds, at about 30 frames a second, still
+when the desktop has animations off. Nothing is shipped or fetched for it, so the script
+stays one file and `publish/check.sh` has nothing to refuse. The face is the desktop's
+own. The window uses libadwaita 1.5 at most (`AlertDialog`, `Dialog`, `SwitchRow`).
+
+## The AppImage
+
+`appimage/build.sh [OUT]` builds it; CI runs that on **ubuntu-24.04**, which sets the
+oldest C library it runs on (glibc 2.39: Ubuntu 24.04, Debian 13, Fedora 40, and newer).
+It is not a container image and needs no root, but it assembles from the system it runs
+on, so build it where you mean it to be portable.
+
+- `appimage/build.py` copies the running Python and its standard library, PyGObject and
+  pycairo, GTK 4, libadwaita and every library they load (`ldd` over each, less what the
+  host must provide), the typelibs, compiled GLib schemas, Adwaita icons and gdk-pixbuf's
+  loaders into an AppDir. **Left to the host on purpose:** the C library and its
+  companions, libstdc++, everything that talks to the graphics driver (GL, EGL,
+  DRM, GBM) and the display libraries (Wayland, X11, xcb): bundling those breaks the host's
+  Mesa. Small libraries a host may lack (`libselinux`, `libsystemd`, `libxkbcommon`, the
+  Vulkan loader) are bundled: leaving `libselinux` out once broke Ubuntu's GLib on a host
+  without it. `build.py` prints "left to the host"; read that list after touching the
+  exclusions. There is no dconf module, so GSettings uses its memory backend.
+- `appimage/AppRun` points Python, GTK and the loader at the bundle, and **stores every
+  variable it changes in `A2_ORIG_<NAME>`** (`:unset` for none). `host_env()` in the script
+  puts them back for every program the installer starts: `install.sh` and the `bash` and
+  `python3` it calls must see the host's `LD_LIBRARY_PATH`, `PYTHONHOME` and `PATH`, not
+  the bundle's. This is the part most likely to break silently.
+- On a host with a newer fontconfig than the bundle's, the bundled one prints "invalid
+  constant" warnings about the host's config files at start. They are harmless.
+- A bundled Python's compiled-in certificate folder may not exist on the host, so
+  `ssl_context()` falls back to the usual bundle files.
+- `appimagetool` and the type-2 runtime are fetched by `build.sh`, pinned by version and
+  sha256, into `~/.cache/armada2-refit/appimage-tools`. Nothing from there is committed;
+  the AppImage itself is a release asset, never a file in the repository.
+- `A2_INSTALLER_APPIMAGE=<file> test.sh <zip>` runs the whole mock-game test through the
+  AppImage. Where FUSE is missing, `APPIMAGE_EXTRACT_AND_RUN=1` runs it without
+  mounting (the type-2 runtime is static, so no libfuse2 is needed to mount either).
 
 ## Versioning
 
@@ -136,5 +176,6 @@ in the zip.
 - `test.sh <zip>`: the self-test, then detection, install (cutscene skip, state file,
   Heroic's variables) and uninstall (game and Heroic as before) against a mock game and
   a mock Heroic in a scratch `HOME`. CI runs it on every push.
+- `A2_INSTALLER_APPIMAGE=<file> test.sh <zip>`: the same through the AppImage. CI does it.
 - The window was checked on a headless sway (`WLR_BACKENDS=headless`, `grim`, `wtype`).
   None of this proves anything loads in game.

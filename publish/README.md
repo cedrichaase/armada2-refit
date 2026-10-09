@@ -125,8 +125,8 @@ and writes `armada2-refit-<version>.zip`:
   it and from `shaders.txt`;
 - `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`;
 - `manifest.json`, the same for the GUI installer (package schema 1), and
-  `armada2-refit-installer.py` itself, which CI also attaches to the release on its own
-  (`gui-installer/README.md`).
+  `armada2-refit-installer.py` itself; CI attaches the script and the AppImage built
+  from it to the release on their own (`gui-installer/README.md`).
 
 `install.sh` reads two variables the GUI sets: `A2_PROGRESS=1` prints `::step <id>` as
 each stage starts, and `A2_SKIP=cutscenes` leaves the Bink proxy out (and puts back a
