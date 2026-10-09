@@ -104,12 +104,16 @@ Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the pl
 and writes `armada2-refit-<version>.zip`:
 
 - `game/`: what goes beside `Armada2.exe`, which is `HUD.asi`, `Menus.asi`, `QOL.asi`,
-  `QOLRules.asi`, `GridLayout.asi`, `Planets.asi`, `Lighting.asi`, `Online.asi`,
+  `QOLRules.asi`, `GridLayout.asi`, `Planets.asi`, `Lighting.asi`, `Sky.asi`, `Online.asi`,
   `MSAA.asi` and `binkw32.dll`, each with its `.ini`, and `dxvk.conf`
   at stage 3 (`postfx/renderer-config.sh --print`). The installers put `MSAA.asi` in
   only when DXVK is in the game directory: its `d3d8.dll`, or crosire's d3d8to9 (known
   by hash) in front of its `d3d9.dll`. `Lighting.asi` goes in everywhere and lights per
-  pixel only behind d3d8to9, which `install.sh` puts in from `chain/`;
+  pixel only behind d3d8to9, which `install.sh` puts in from `chain/`. `Sky.asi` too
+  goes in everywhere and draws the procedural sky only behind d3d8to9 (the stock sky
+  otherwise);
+- `sky/`: the sky recipes, `sky/skies/*.ini`, which the installers copy into the game's
+  `Sky` folder and `--uninstall` takes out again (a recipe of the player's own stays);
 - `chain/`: crosire's d3d8to9 (`d3d8.dll`) and DXVK 3.1.1's `d3d9.dll`, from
   `platform/vendor/`. `install.sh` puts them in unless a `d3d8.dll` or `d3d9.dll` there is
   none of GOG's, DXVK's or these; a DXVK `d3d9.dll` already there stays. What it

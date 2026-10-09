@@ -73,8 +73,15 @@ function Test-OurDxvkConf {
 # ------------------------------------------------------------------ uninstall
 
 if ($Uninstall) {
-    foreach ($n in "HUD", "Menus", "MSAA", "QOL", "Lighting", "Online") {
+    foreach ($n in "HUD", "Menus", "MSAA", "QOL", "Lighting", "Sky", "Online") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
+    }
+    # The sky recipes this package put in Sky\; anything else there is the player's.
+    if (Test-Path -LiteralPath (G "Sky")) {
+        foreach ($r in Get-ChildItem -LiteralPath (Join-Path $here "sky") -Filter *.ini) {
+            Remove-Item -LiteralPath (Join-Path (G "Sky") $r.Name) -ErrorAction SilentlyContinue
+        }
+        if (-not (Get-ChildItem -LiteralPath (G "Sky"))) { Remove-Item -LiteralPath (G "Sky") }
     }
     if (Test-Proxy (G "binkw32.dll")) {
         if (Test-Path -LiteralPath (G "binkw32.dll.a2neb-backup")) {
@@ -172,6 +179,16 @@ Put "Online.asi"; Put "Online.ini"
 Put "Lighting.asi"; Put "Lighting.ini"
 if (-not (Test-D3d8to9 (G "d3d8.dll"))) {
     Write-Host "  (Lighting: per vertex here -- its shaders need crosire's d3d8to9 as d3d8.dll)"
+}
+# The sky drawn from a recipe per map, in a shader; also only behind crosire's d3d8to9,
+# and the stock sky anywhere else. The recipes go in Sky\, one per sky name.
+Put "Sky.asi"; Put "Sky.ini"
+New-Item -ItemType Directory -Force -Path (G "Sky") | Out-Null
+$recipes = @(Get-ChildItem -LiteralPath (Join-Path $here "sky") -Filter *.ini)
+foreach ($r in $recipes) { Copy-Item -LiteralPath $r.FullName (Join-Path (G "Sky") $r.Name) -Force }
+Write-Host "  Sky\: $($recipes.Count) sky recipes"
+if (-not (Test-D3d8to9 (G "d3d8.dll"))) {
+    Write-Host "  (Sky: the stock sky here -- the procedural one needs crosire's d3d8to9 as d3d8.dll)"
 }
 
 if (Test-DxvkChain) {

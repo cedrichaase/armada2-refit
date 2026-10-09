@@ -37,6 +37,7 @@ it bundles.
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several, long moves on the map at warp), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key | `lighting/README.md` |
+| `sky/` | `Sky.asi` — the map's sky computed from view direction by a shader, baked once per map into a cube, in place of the six painted faces; recipes per sky name in `sky/skies/` | `sky/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -305,7 +306,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -686,6 +687,20 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `sm_take`/`sm_consts`/`sm_keep` like `hook_dip`, or it neither casts nor takes. The
   pass restores the device through a state block; the map is default-pool, so `Reset`
   is wrapped.
+
+### sky
+
+- **The cube is not drawn at all when a recipe applies**: the call to
+  `ST3D_Instance::Render` in `Background_Render` is the hook, and without a d3d9 device
+  or a recipe it calls through, so the stock sky stays. Don't install black faces for
+  it: they would turn the fallback black.
+- **The cube reaches Direct3D pre-transformed**, so the directions come from the
+  camera (`ProjectScreenPointToWorldRay` at the viewport's corners), not from the
+  cube's vertices.
+- **Per pixel cost 6 ms at 4K**; the sky is baked once per map into a managed cube
+  whose edge texels sit on the edges (no seam with or without seamless filtering).
+  Keep any new look inside `sky_colour()` so the bake and the reference agree.
+- **Aqua is meant to be dimmer and softer than stock**: the user preferred it so.
 
 ### textures
 
