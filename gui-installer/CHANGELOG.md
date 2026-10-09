@@ -4,6 +4,26 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.1.0 — 2026-10-09
+
+Reads package schemas 0 and 1.
+
+### Changed
+- The window is rebuilt: one screen in plain libadwaita on a starfield drawn in code
+  (nothing to ship; still when the desktop has animations off). It holds the game, the
+  version, the Heroic switch, a heads-up line per layer that will be skipped, one
+  Install button, and the progress. The LCARS styling, the four pages (`Alt+1..4`), the
+  layer table, the release notes and the Antonio font download are gone.
+- The log moved into a dialog (`Ctrl+L`); `F5` refreshes, `Ctrl+Enter` installs.
+- Bloom's "how to get vkBasalt" is a collapsed row with a Copy button per command.
+- Status lines are plain ("Installing the HUD"); the command line prints the same.
+
+### Removed
+- `FONT_URL`/`FONT_SHA` and the cached font; the window no longer fetches anything but
+  the release list and the zip.
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-10-08
 
 Reads package schemas 0 and 1.

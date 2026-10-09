@@ -40,7 +40,7 @@ echo "== install from the package, with Heroic's launch variables"
 python3 "$gui" --package "$zip" --game "$G" > "$T/out" 2> "$T/err"
 check '[ -e "$G/HUD.asi" ] && [ -e "$G/Lighting.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/BinkProxy.ini" ]'
-check 'grep -q "Leaving the cutscenes stock" "$T/err" && grep -q "Refitting the HUD" "$T/err"'
+check 'grep -q "Skipping the cutscene player" "$T/err" && grep -q "Installing the HUD" "$T/err"'
 check 'grep -q "\"version\": \"$ver\"" "$G/armada2-refit-installed.json"'
 check 'grep -q "winmm=n,b;d3d8=n,b" "$H/GamesConfig/1174788223.json"'
 check '[ -e "$H/GamesConfig/1174788223.json.a2refit-backup" ]'

@@ -1,7 +1,7 @@
 # gui-installer — the graphical installer for Linux
 
-`armada2-refit-installer.py` is one Python file: a GTK 4 / libadwaita window in an
-LCARS style that installs a **release** of Armada II Refit into the GOG game under
+`armada2-refit-installer.py` is one Python file: a GTK 4 / libadwaita window over a
+starfield that installs a **release** of Armada II Refit into the GOG game under
 Wine/Proton. It is for players, not for working on the project. The repository's own
 `./install` builds from source and installs the asset layers too; this installs what a
 release zip carries.
@@ -19,7 +19,7 @@ PyGObject with GTK 4 and libadwaita (Arch `python-gobject gtk4 libadwaita`;
 Debian/Ubuntu `python3-gi gir1.2-gtk-4.0 gir1.2-adw-1`; Fedora `python3-gobject gtk4
 libadwaita`). Without them it says so and points at the command line.
 
-Keys: F5 refresh, Ctrl+Enter install, Alt+1..4 the pages.
+Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
 
 ## What it does
 
@@ -36,12 +36,12 @@ Keys: F5 refresh, Ctrl+Enter install, Alt+1..4 the pages.
    seen in game", and is offered but not chosen for you. A zip is about a megabyte, so
    the chosen one is fetched straight away (checked against GitHub's sha256 digest) to
    show what it holds.
-3. **Shows what it installs**, layer by layer, on this machine: the same tests
-   `install.sh` makes (DXVK in the game directory for MSAA, d3d8to9 for per-pixel
-   lighting, a vkBasalt layer for bloom, a `dxvk.conf` of the player's own).
-   **Textures and the cutscene player are listed as not available**, switched off: a
-   release cannot carry textures (they are built from the player's own files), and the
-   cutscene player is held back for now (`EXCLUDED` in the script).
+3. **Says what will not go in**, on this machine, in a line each under the card: the same
+   tests `install.sh` makes (DXVK in the game directory for MSAA, d3d8to9 for per-pixel
+   lighting, a `dxvk.conf` of the player's own; `layer_verdict` in the script). There is
+   no layer table: what installs is the release's business. **Textures and the cutscene
+   player are not installed from here** (`EXCLUDED`): a release cannot carry textures,
+   and the cutscene player is held back for now.
 4. **Installs** by unpacking the zip into the cache and running its own `install.sh`
    with the game directory, `A2_PROGRESS=1` and `A2_SKIP=cutscenes`. A schema-0 zip
    ignores `A2_SKIP`, so the installer puts the stock `binkw32.dll` back afterwards, as
@@ -117,12 +117,15 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 segmented bar: download 0–30 %, unpack, the script's steps 35–92 %, Heroic, done. A
 schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).
 
-## The font
+## The window
 
-The interface face is **Antonio** (SIL OFL 1.1), fetched once from Google Fonts'
-repository, pinned by commit and sha256 (`FONT_URL`, `FONT_SHA`), into the cache and
-loaded for this process only (`PangoCairo.FontMap.add_font_file`). Nothing is installed
-system-wide. Without it, a condensed system face stands in.
+One screen: the game, the version, the Heroic switch, **Install** (and **Uninstall** when
+the game has a release in it), a thin progress bar and a status line. The log is a dialog
+(`Ctrl+L`). The sky behind it is drawn in code (`Sky`): a gradient, a faint nebula and
+three layers of stars drifting at different speeds, at about 30 frames a second, still
+when the desktop has animations off. Nothing is shipped or fetched for it, so the script
+stays one file and `publish/check.sh` has nothing to refuse. The face is the desktop's
+own. The window uses libadwaita 1.5 at most (`AlertDialog`, `Dialog`, `SwitchRow`).
 
 ## Versioning
 
