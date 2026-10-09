@@ -102,6 +102,13 @@ each handled, each measured:
   `GetWindow(hDlg, GW_OWNER)`. A child has no owner, so `GW_OWNER` is answered
   with the owner the game asked for, and positions are converted to
   parent-client coordinates just before the real `MoveWindow`/`SetWindowPos`.
+- **A full-screen menu is pinned to (0,0).** It covers the game window, so its place
+  in the parent is known without asking the game. Taking the game's screen position
+  and converting it back was exact here, but on one player's NixOS / GE-Proton10-32
+  install the main menu landed at x=21000 and the screen stayed black after the intro
+  (not reproduced: GE-Proton10-32 on the bench, and GNOME here, both place it at 0,0).
+  `follow_parent` puts it back if it is found anywhere else, and Menus.log's `where`
+  lines record the game window's position while a menu is up.
 - **Resizing.** A full-screen menu is sized once. When the game window is
   resized under it, as Hyprland does when the game drops fullscreen on focus
   loss, it would hang off the bottom (Return to Game unreachable). Embedded

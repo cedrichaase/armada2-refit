@@ -6,14 +6,24 @@
 #
 # No choices to make: what can work here is installed, the rest is skipped and says why.
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
-# in vendor/, each file only if missing. MSAA.asi goes in when DXVK is in the game directory -- its d3d8.dll, or crosire's d3d8to9 on its d3d9.dll (without DXVK the minimap goes
-# black); bloom is set up when a vkBasalt layer is installed.
+# in vendor/, each file only if missing. Then the Direct3D chain the repository's ./install
+# sets up (chain/): crosire's d3d8to9 as d3d8.dll on DXVK's d3d9.dll, so Lighting.asi
+# draws in shaders and MSAA.asi and dxvk.conf have DXVK under them. MSAA.asi goes in when
+# DXVK is in the game directory -- its d3d8.dll, or crosire's d3d8to9 on its d3d9.dll
+# (without DXVK the minimap goes black); the models are rewritten from the player's own
+# SOD files with python3; bloom is set up when a vkBasalt layer is installed. Textures,
+# the menu backdrops and the replacement movies are built from the game's own art, so a
+# release cannot carry them.
 #
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
 # parent if the package was unzipped into the game, else $A2_GAME, else Heroic's
 # default for the GOG release. This is the release zip's installer, and it
 # stands alone: it needs nothing from the repository. (The repository's own ./install
 # builds from source and installs the asset layers too.)
+#
+# With A2_PROGRESS=1 it also prints "::step <id> <what>" as each stage starts, for the
+# GUI installer (gui-installer/README.md, "Progress"). The package's manifest.json lists
+# the ids in order; keep the two in step (publish/package.sh writes it).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,7 +31,7 @@ action=install game=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --uninstall) action=uninstall ;;
-        -h|--help)   sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)   sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)          echo "unknown option: $1" >&2; exit 2 ;;
         *)           game="$1" ;;
     esac
@@ -46,19 +56,14 @@ BLOOM_MARKER="# written by armada2-refit install.sh"
 
 MANIFEST="$game/armada2-refit-prereqs.txt"   # what the prerequisites step added
 
+step() { [ "${A2_PROGRESS:-}" != 1 ] || echo "::step $*"; }
+
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
-# DXVK by content, never by name: GOG puts a d3d8.dll there too.
-is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
-# crosire's d3d8to9 1.16.0, as the repository's ./install places it (platform/vendor/), by hash.
-D3D8TO9_SHA=122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8
-is_d3d8to9() { [ -f "$1" ] && [ "$(sha256sum "$1" | cut -d' ' -f1)" = "$D3D8TO9_SHA" ]; }
-# DXVK in the chain: its own d3d8, or d3d8to9 in front of its d3d9.
-dxvk_chain() { is_dxvk "$game/d3d8.dll" || { is_d3d8to9 "$game/d3d8.dll" && is_dxvk "$game/d3d9.dll"; }; }
-
-# ------------------------------------------------------------------ uninstall
-
-if [ "$action" = uninstall ]; then
-    for n in HUD Menus MSAA QOL Lighting; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
+# A2_SKIP="cutscenes ..." leaves those parts out -- the GUI installer does not install the
+# cutscene player yet. Only cutscenes can be skipped so far.
+skipped() { case " ${A2_SKIP:-} " in *" $1 "*) return 0 ;; esac; return 1; }
+# The proxy out again, the stock binkw32.dll back.
+unproxy() {
     if is_proxy "$game/binkw32.dll"; then
         if [ -f "$game/binkw32.dll.a2neb-backup" ]; then
             mv -f "$game/binkw32.dll.a2neb-backup" "$game/binkw32.dll"
@@ -70,6 +75,39 @@ if [ "$action" = uninstall ]; then
         fi
     fi
     rm -f "$game/BinkProxy.ini" "$game/BinkProxy.log"
+}
+# DXVK by content, never by name: GOG puts a d3d8.dll there too.
+is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
+# crosire's d3d8to9 1.16.0, as the repository's ./install places it (platform/vendor/), by hash.
+D3D8TO9_SHA=122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8
+is_d3d8to9() { [ -f "$1" ] && [ "$(sha256sum "$1" | cut -d' ' -f1)" = "$D3D8TO9_SHA" ]; }
+# DXVK in the chain: its own d3d8, or d3d8to9 in front of its d3d9.
+dxvk_chain() { is_dxvk "$game/d3d8.dll" || { is_d3d8to9 "$game/d3d8.dll" && is_dxvk "$game/d3d9.dll"; }; }
+# GOG's own d3d8.dll (its d3d8to9 build), as the release ships it. Kept as
+# d3d8.dll.gog-backup, the name platform/d3d8-chain.py gives it, when replaced.
+GOG_D3D8_SHA=735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719
+is_gog_d3d8() { [ -f "$1" ] && [ "$(sha256sum "$1" | cut -d' ' -f1)" = "$GOG_D3D8_SHA" ]; }
+CHAIN_BACKUP=.a2chain-backup   # any other d3d8.dll / d3d9.dll the chain step replaced
+# The SOD rewrites (models/): python3, with the game they work on.
+sods() {   # --install | --revert
+    local s
+    for s in moon-sod select-sod hull-sod; do
+        A2_GAME="$game" python3 "$here/models/$s.py" "$1" 2>&1 | sed 's/^/    /' \
+            || echo "  $s.py $1 failed -- the rest goes on"
+    done
+}
+
+# ------------------------------------------------------------------ uninstall
+
+if [ "$action" = uninstall ]; then
+    step uninstall "taking the mod out"
+    for n in HUD Menus MSAA QOL QOLRules GridLayout Planets Lighting Online; do
+        rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"
+    done
+    if command -v python3 >/dev/null 2>&1 && [ -d "$here/models" ]; then
+        echo "  the models back to stock:"; sods --revert
+    fi
+    unproxy
     if [ -f "$game/dxvk.conf" ] && grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
         rm -f "$game/dxvk.conf"
     fi
@@ -84,6 +122,15 @@ if [ "$action" = uninstall ]; then
         done
         rm -f "$MANIFEST"
     fi
+    # What the chain step replaced, back where it took it out.
+    for f in d3d8.dll d3d9.dll; do
+        [ -e "$game/$f" ] && continue
+        if [ "$f" = d3d8.dll ] && [ -f "$game/d3d8.dll.gog-backup" ]; then
+            mv -f "$game/d3d8.dll.gog-backup" "$game/d3d8.dll"
+        elif [ -f "$game/$f$CHAIN_BACKUP" ]; then
+            mv -f "$game/$f$CHAIN_BACKUP" "$game/$f"
+        fi
+    done
     if [ -f "$BLOOM/vkBasalt.conf" ] && grep -qF "$BLOOM_MARKER" "$BLOOM/vkBasalt.conf"; then
         rm -rf "$BLOOM"
         echo "removed $BLOOM -- also take ENABLE_VKBASALT and VKBASALT_CONFIG_FILE out of the launcher"
@@ -92,6 +139,7 @@ if [ "$action" = uninstall ]; then
     exit 0
 fi
 
+step verify "checking the package"
 (cd "$here" && sha256sum --quiet -c SHA256SUMS) || { echo "the package is damaged (SHA256SUMS)" >&2; exit 1; }
 echo "installing into $game"
 
@@ -115,8 +163,44 @@ prereq() {   # name|version|author|licence|page|files
     echo "      from $page"
 }
 
+step prereqs "prerequisites"
 echo "prerequisites:"
 while IFS= read -r line; do [ -n "$line" ] && prereq "$line"; done < "$here/prereqs.txt"
+
+# ------------------------------------------------------------------ the Direct3D chain
+
+# As the repository's ./install has it (platform/README.md): crosire's d3d8to9 as d3d8.dll,
+# which hands Lighting.asi the Direct3D 9 device behind the game's, on DXVK's d3d9.dll. A
+# d3d9.dll that is DXVK already (Proton's, say) stays. GOG's d3d8.dll, or DXVK's, is
+# replaced and kept; a d3d8.dll or d3d9.dll that is anything else is someone's own
+# choice, and the chain is then left as it is. What goes in is recorded in $MANIFEST like
+# the prerequisites, so --uninstall takes it out, unchanged only, and puts the old back.
+chain_put() {   # d3d8.dll | d3d9.dll
+    local f="$game/$1"
+    if [ -e "$f" ]; then
+        if [ "$1" = d3d8.dll ] && is_gog_d3d8 "$f"; then
+            [ -e "$f.gog-backup" ] || cp -p "$f" "$f.gog-backup"
+        else
+            [ -e "$f$CHAIN_BACKUP" ] || cp -p "$f" "$f$CHAIN_BACKUP"
+        fi
+        rm -f "$f"
+    fi
+    cp "$here/chain/$1" "$f"; record "$1"
+}
+
+step chain "Direct3D chain"
+echo "Direct3D chain:"
+d8="$game/d3d8.dll" d9="$game/d3d9.dll"
+if [ -e "$d8" ] && ! is_d3d8to9 "$d8" && ! is_gog_d3d8 "$d8" && ! is_dxvk "$d8"; then
+    echo "  left as it is: d3d8.dll is none of GOG's, DXVK's or crosire's d3d8to9"
+elif [ -e "$d9" ] && ! is_dxvk "$d9"; then
+    echo "  left as it is: d3d9.dll is not DXVK's"
+else
+    if is_d3d8to9 "$d8"; then echo "  d3d8.dll: crosire's d3d8to9 already"
+    else chain_put d3d8.dll; echo "  d3d8.dll: crosire's d3d8to9 1.16.0 -- BSD-2-Clause"; fi
+    if [ -e "$d9" ]; then echo "  d3d9.dll: DXVK already"
+    else chain_put d3d9.dll; echo "  d3d9.dll: DXVK 3.1.1 -- zlib/libpng"; fi
+fi
 echo "the mod:"
 
 # ------------------------------------------------------------------ plugins
@@ -131,14 +215,37 @@ put() {   # file -- copy from the package into the game directory
     echo "  $f"
 }
 
+step hud "HUD"
 put HUD.asi; put HUD.ini
 rm -f "$game/MenuScale.asi" "$game/MenuScale.ini"   # Menus.asi's old name; never both
+step menus "menus"
 put Menus.asi; put Menus.ini
+step qol "quality of life"
 put QOL.asi; put QOL.ini
+# Pay on queue; against the computer only, it stands down in a network game.
+put QOLRules.asi; put QOLRules.ini
+step grid "grid keys"
+put GridLayout.asi
+# The player's [Cells] choices survive a reinstall; only a missing file is replaced.
+if [ -e "$game/GridLayout.ini" ]; then echo "  GridLayout.ini (yours, kept)"; else put GridLayout.ini; fi
+step models "models"
+put Planets.asi; put Planets.ini
+if command -v python3 >/dev/null 2>&1; then
+    echo "  the moons, the selection bubble and the hulls, from your own SOD files:"
+    sods --install
+else
+    echo "  moons, selection bubble and hulls skipped: needs python3"
+fi
+step lighting "lighting"
 # Lit per pixel in shaders only behind crosire's d3d8to9; per vertex on any other d3d8.
 put Lighting.asi; put Lighting.ini
 is_d3d8to9 "$game/d3d8.dll" || echo "  (Lighting: per vertex here -- its shaders need crosire's d3d8to9 as d3d8.dll)"
 
+# Internet - Online, on our own transport: Wine's dpnet.dll cannot host.
+step online "online multiplayer"
+put Online.asi; put Online.ini
+
+step msaa "anti-aliasing"
 if dxvk_chain; then
     put MSAA.asi; put MSAA.ini
 else
@@ -146,15 +253,22 @@ else
     echo "  MSAA.asi skipped: DXVK is not in the game directory"
 fi
 
-# The proxy forwards every call to the stock DLL as binkw32_orig.dll.
-if ! is_proxy "$game/binkw32.dll"; then
-    [ -f "$game/binkw32.dll" ] || { echo "no binkw32.dll in $game" >&2; exit 1; }
-    cp -p "$game/binkw32.dll" "$game/binkw32.dll.a2neb-backup"
-    cp -p "$game/binkw32.dll" "$game/binkw32_orig.dll"
+step cutscenes "cutscene player"
+if skipped cutscenes; then
+    unproxy   # one an earlier install put in goes too
+    echo "  cutscene player skipped (A2_SKIP)"
+else
+    # The proxy forwards every call to the stock DLL as binkw32_orig.dll.
+    if ! is_proxy "$game/binkw32.dll"; then
+        [ -f "$game/binkw32.dll" ] || { echo "no binkw32.dll in $game" >&2; exit 1; }
+        cp -p "$game/binkw32.dll" "$game/binkw32.dll.a2neb-backup"
+        cp -p "$game/binkw32.dll" "$game/binkw32_orig.dll"
+    fi
+    [ -f "$game/binkw32_orig.dll" ] || { echo "binkw32.dll is the proxy but binkw32_orig.dll is missing" >&2; exit 1; }
+    put binkw32.dll; put BinkProxy.ini
 fi
-[ -f "$game/binkw32_orig.dll" ] || { echo "binkw32.dll is the proxy but binkw32_orig.dll is missing" >&2; exit 1; }
-put binkw32.dll; put BinkProxy.ini
 
+step renderer "renderer settings"
 if [ -f "$game/dxvk.conf" ] && ! grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
     echo "  dxvk.conf skipped: there is one already that this package did not write"
 else
@@ -165,6 +279,7 @@ fi
 
 # Needs a 32-bit vkBasalt layer (lib32-vkbasalt on Arch; or postfx/vkbasalt/build.sh in
 # the repository) -- the game is a 32-bit process. Without one, bloom is skipped.
+step bloom "bloom"
 bloom=0
 for d in "${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d" \
          /etc/vulkan/implicit_layer.d /usr/share/vulkan/implicit_layer.d; do
@@ -188,6 +303,10 @@ fetch_shaders() {
 
 if [ "$bloom" = 0 ]; then
     echo "  bloom skipped: no vkBasalt layer installed (optional -- README.txt)"
+    # How to get one on this distribution: the GUI installer in the package holds the
+    # instructions, so there is one copy of them.
+    python3 "$here/armada2-refit-installer.py" --vkbasalt-howto 2>/dev/null | sed 's/^/    /' \
+        || echo "    install your distribution's 32-bit vkBasalt, then run this again"
 else
     case "$BLOOM" in *' '*|*'#'*) bloom=0; echo "  bloom skipped: vkBasalt cannot read the path $BLOOM" ;; esac
 fi
@@ -204,6 +323,7 @@ fi
 
 # ------------------------------------------------------------------ what is left
 
+step done "done"
 # Wine prefers its own builtin DLLs; these make it load the game directory's.
 overrides="winmm=n,b;d3d8=n,b"
 if [ -e "$game/d3d9.dll" ]; then overrides="$overrides;d3d9=n,b"; fi

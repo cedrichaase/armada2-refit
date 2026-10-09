@@ -12,7 +12,7 @@ versions". Newest first. Details, and the planned changes, are in
   network game it applies its rules when `Online.asi` reports that every player runs it
   (latched at first use in a game), instead of standing down always.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 1.5.0 — 2026-10-07
 
@@ -24,8 +24,9 @@ Installed, not yet seen in game.
   which items are paid. Applies in single player and skirmish only and stands down in
   network games (a rules change every peer must share). `a2mod` switches it with `qol`.
 
-Installed, not yet seen in game. On the bench: pay, start, refusal and cancel
-(`qol-pay-on-queue`); destruction, capture and save/load not yet run.
+Confirmed in game 2026-10-09: pay on queue and the refund on cancel, single player.
+Losing the building (destroyed, captured, assimilated) and save/load not yet seen in game
+or run on the bench.
 
 ## 1.4.0 — 2026-10-07
 

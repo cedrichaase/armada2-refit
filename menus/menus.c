@@ -185,6 +185,8 @@ __declspec(dllimport) HWND    __stdcall CreateWindowExA(DWORD, LPCSTR, LPCSTR, D
                                                         HWND, HANDLE, HINSTANCE, void *);
 __declspec(dllimport) BOOL    __stdcall EnableWindow(HWND, BOOL);
 __declspec(dllimport) BOOL    __stdcall IsWindowEnabled(HWND);
+__declspec(dllimport) BOOL    __stdcall IsIconic(HWND);
+__declspec(dllimport) BOOL    __stdcall IsWindowVisible(HWND);
 __declspec(dllimport) HWND    __stdcall GetParent(HWND);
 __declspec(dllimport) HWND    __stdcall GetFocus(void);
 __declspec(dllimport) HWND    __stdcall SetFocus(HWND);
@@ -1285,6 +1287,31 @@ static void to_parent(HWND h, int *x, int *y)
     *x = (int)p.x; *y = (int)p.y;
 }
 
+/* Menus.log: where a window and its parent are on screen.  The parent's
+ * client origin is what a child's parent-client coordinates are added to. */
+static void log_where(const char *what, HWND h)
+{
+    RECT  wr;
+    POINT o;
+    HWND  p;
+    char  b[256];
+
+    if (!g_logging || !h) return;
+    p = GetParent(h);
+    wr.left = wr.top = wr.right = wr.bottom = 0;
+    GetWindowRect(h, &wr);
+    o.x = o.y = 0;
+    if (p) ClientToScreen(p, &o);
+    b[0] = 0;
+    s_cat(b, "  where, "); s_cat(b, what);
+    s_cat(b, ": window ");  s_num(b, wr.left); s_cat(b, ","); s_num(b, wr.top);
+    s_cat(b, " ");          s_num(b, wr.right - wr.left);
+    s_cat(b, "x");          s_num(b, wr.bottom - wr.top);
+    s_cat(b, "  parent client origin "); s_num(b, o.x); s_cat(b, ","); s_num(b, o.y);
+    if (!p) s_cat(b, " (no parent)");
+    logline(b);
+}
+
 /* Innermost embedded modal dialog still alive -- the one that owns input. */
 static HWND top_modal(void)
 {
@@ -1423,6 +1450,7 @@ static LONG_PTR __stdcall embed_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             s_cat(b, " @");                s_num(b, wr.left);
             s_cat(b, ",");                 s_num(b, wr.top);
             logline(b);
+            log_where("at WM_INITDIALOG", h);
         }
     } else if (msg == WM_NCDESTROY) {
         e->hwnd = NULLPTR; e->proc = NULLPTR; e->owner = NULLPTR; e->modal = 0; e->modeless = 0;
@@ -2099,7 +2127,16 @@ static BOOL __stdcall my_MoveWindow(HWND h, INT x, INT y, INT w, INT ht, BOOL rp
             s_cat(b, "full-screen dialog "); s_num(b, w); s_cat(b, "x"); s_num(b, ht);
             s_cat(b, ", content fitted from "); s_num(b, g_designW);
             s_cat(b, "x"); s_num(b, g_designH);
+            s_cat(b, ", asked for @"); s_num(b, x); s_cat(b, ","); s_num(b, y);
             logline(b);
+        }
+        if (is_embedded(h)) {
+            /* Embedded, a full-screen menu belongs at its parent's client
+             * origin, whatever screen position the game worked out for it. */
+            r = o_MoveWindow(h, 0, 0, w, ht, rp);
+            log_where("full-screen menu pinned", h);
+            if (slot_get(h)) ctl_adopt(h);
+            return r;
         }
     } else if (g_mode != MODE_LOG && is_dialog(h)) {
         char b[256];
@@ -2147,11 +2184,13 @@ static BOOL __stdcall my_SetWindowPos(HWND h, HWND after, INT x, INT y, INT w, I
          * full-screen element: keep its geometry, fit its content. */
         if (haveSize && !is_design_sized(w, ht)) {
             if (g_mode == MODE_SCALE) claim_letterbox(h);
+            if (is_embedded(h)) { x = 0; y = 0; f &= ~(UINT)SWP_NOMOVE; havePos = 0; }
         } else if (havePos || haveSize) {
             reposition(h, &x, &y, &w, &ht, havePos, haveSize);
         }
     }
-    if (!(f & SWP_NOMOVE)) to_parent(h, &x, &y);
+    if (!(f & SWP_NOMOVE) && !(is_embedded(h) && !(f & SWP_NOSIZE) && !is_design_sized(w, ht)))
+        to_parent(h, &x, &y);
     r = o_SetWindowPos(h, after, x, y, w, ht, f);
     if ((~f & (SWP_NOMOVE | SWP_NOSIZE)) && slot_get(h)) ctl_adopt(h);
     return r;
@@ -2252,9 +2291,10 @@ static void present_now(Slot *s)
  */
 static void follow_parent(Slot *s)
 {
-    RECT pr, wr;
-    HWND parent;
-    int  pw, ph;
+    RECT  pr, wr;
+    POINT at;
+    HWND  parent;
+    int   pw, ph;
 
     if (!s->letterbox || !is_embedded(s->hwnd)) return;
     parent = GetParent(s->hwnd);
@@ -2262,10 +2302,43 @@ static void follow_parent(Slot *s)
     pw = (int)(pr.right - pr.left);
     ph = (int)(pr.bottom - pr.top);
     if (pw <= 0 || ph <= 0) return;
-    if (pw == (int)(wr.right - wr.left) && ph == (int)(wr.bottom - wr.top)) return;
+    at.x = wr.left; at.y = wr.top;
+    ScreenToClient(parent, &at);                 /* where it sits in the parent */
+    if (pw == (int)(wr.right - wr.left) && ph == (int)(wr.bottom - wr.top) &&
+        at.x == 0 && at.y == 0) return;
     o_MoveWindow(s->hwnd, 0, 0, pw, ph, TRUE);   /* parent-client coordinates */
+    if (at.x || at.y) log_where("full-screen menu moved back", s->hwnd);
     ctl_adopt(s->hwnd);
     s->dirty = 1;
+}
+
+/* Menus.log: the game window's screen position whenever it changes while a
+ * menu is up, a few dozen times at most. */
+static void watch_parent(void)
+{
+    static POINT last = { -1, -1 };
+    static int   told = 0;
+    HWND  h = top_modal(), p;
+    POINT o;
+    RECT  cr;
+    char  b[160];
+
+    if (!g_logging || told >= 40 || !h || !(p = GetParent(h))) return;
+    o.x = o.y = 0;
+    ClientToScreen(p, &o);
+    if (o.x == last.x && o.y == last.y) return;
+    last = o;
+    told++;
+    cr.left = cr.top = cr.right = cr.bottom = 0;
+    o_GetClientRect(p, &cr);
+    b[0] = 0;
+    s_cat(b, "  where, game window: client origin "); s_num(b, o.x);
+    s_cat(b, ",");  s_num(b, o.y);
+    s_cat(b, "  client "); s_num(b, cr.right - cr.left);
+    s_cat(b, "x"); s_num(b, cr.bottom - cr.top);
+    s_cat(b, IsIconic(p) ? "  minimised" : "");
+    s_cat(b, IsWindowVisible(p) ? "" : "  hidden");
+    logline(b);
 }
 
 /*
@@ -2305,6 +2378,7 @@ static void __stdcall flush_dirty(HWND h, UINT msg, UINT_PTR id, DWORD t)
             else g_slot[i].dirty = 0;
         }
     settle_surface();
+    watch_parent();
 }
 
 static HDC __stdcall my_GetDC(HWND h)

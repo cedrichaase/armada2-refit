@@ -82,7 +82,7 @@ Set-Content (G "UltimateASILoader-license.txt") "mine"
 $out = Install @("-Uninstall", $G)
 Check "binkw32.dll is stock again" ((Text (G "binkw32.dll")) -eq "stockbink")
 Check "no binkw32 copies" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")))
-foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "QOL.asi", "Lighting.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "QOL.ini", "Lighting.ini", "BinkProxy.ini", "dxvk.conf",
+foreach ($f in "HUD.asi", "Menus.asi", "MSAA.asi", "QOL.asi", "Lighting.asi", "Online.asi", "HUD.ini", "Menus.ini", "MSAA.ini", "QOL.ini", "Lighting.ini", "Online.ini", "BinkProxy.ini", "dxvk.conf",
                "A2Bloom.ini", "ReShadePreset.ini", "winmm.dll", "STA2WidescreenPatch.asi", "armada2-refit-prereqs.txt") {
     Check "$f removed" (-not (Test-Path (G $f)))
 }

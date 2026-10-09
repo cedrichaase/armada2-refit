@@ -12,7 +12,7 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
   decal) was drawn into the shadow map as an opaque hull; such draws now cast nothing,
   and still take the shadow.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 1.17.1 — 2026-10-07
 
@@ -22,7 +22,7 @@ Installed, not yet seen in game.
   portrait), and the shadow map of each was made from the other's hulls. The hull
   lists, and the "previous frame" they stand for, are now kept per camera.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 1.17.0 — 2026-10-07
 

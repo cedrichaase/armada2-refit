@@ -1,0 +1,15 @@
+DXVK 3.1.1 -- by Philip Rebohle and the DXVK contributors, zlib/libpng (LICENSE)
+    https://github.com/doitsujin/dxvk/releases/tag/v3.1.1
+    d3d9.dll is x32/d3d9.dll from dxvk-3.1.1.tar.gz, sha256
+    40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608; the same file
+    Heroic downloads as its dxvk-3.1.1
+    LICENSE from the repository at the v3.1.1 tag, commit b1a1c99ab52b687cf950d62c88bc2fa316b41663
+
+Direct3D 9 on Vulkan. The release package puts it in the game directory behind
+crosire's d3d8to9 (../d3d8to9-1.16.0/), the chain the repository's ./install sets up
+with Proton's own DXVK: d3d8to9 -> DXVK d3d9 -> Vulkan. Only d3d9.dll is taken.
+
+Unmodified. publish/check.sh allows a binary in the repository only here, under
+platform/vendor/, and only with its sha256 listed below:
+
+265888c31ca78dffa290c39cb7e50bfb02762590e41927906e46fb32f01497fa  d3d9.dll

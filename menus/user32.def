@@ -21,6 +21,7 @@ DefWindowProcA@16
 DialogBoxIndirectParamA@20
 EnableWindow@8
 IsWindowEnabled@4
+IsIconic@4
 GetParent@4
 GetAncestor@8
 IsChild@8

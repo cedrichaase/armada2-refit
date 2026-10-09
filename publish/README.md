@@ -104,19 +104,33 @@ Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the pl
 and writes `armada2-refit-<version>.zip`:
 
 - `game/`: what goes beside `Armada2.exe`, which is `HUD.asi`, `Menus.asi`, `QOL.asi`,
-  `Lighting.asi`, `MSAA.asi` and `binkw32.dll`, each with its `.ini`, and `dxvk.conf`
+  `QOLRules.asi`, `GridLayout.asi`, `Planets.asi`, `Lighting.asi`, `Online.asi`,
+  `MSAA.asi` and `binkw32.dll`, each with its `.ini`, and `dxvk.conf`
   at stage 3 (`postfx/renderer-config.sh --print`). The installers put `MSAA.asi` in
   only when DXVK is in the game directory: its `d3d8.dll`, or crosire's d3d8to9 (known
   by hash) in front of its `d3d9.dll`. `Lighting.asi` goes in everywhere and lights per
-  pixel only behind d3d8to9; the zip does not install d3d8to9 itself (the repository's
-  `./install` does, `platform/README.md`);
+  pixel only behind d3d8to9, which `install.sh` puts in from `chain/`;
+- `chain/`: crosire's d3d8to9 (`d3d8.dll`) and DXVK 3.1.1's `d3d9.dll`, from
+  `platform/vendor/`. `install.sh` puts them in unless a `d3d8.dll` or `d3d9.dll` there is
+  none of GOG's, DXVK's or these; a DXVK `d3d9.dll` already there stays. What it
+  replaces is kept (`d3d8.dll.gog-backup`, else `.a2chain-backup`), recorded with the
+  prerequisites, and put back by `--uninstall`. `install.ps1` does not do this yet;
+- `models/` and `a2env.py`: `moon-sod.py`, `select-sod.py`, `hull-sod.py`, run by
+  `install.sh` with python3 on the player's own SODs (`--revert` on `--uninstall`);
 - `bloom/`: `postfx/postfx.py --export`, which is the same bloom for vkBasalt and as a
   ReShade preset, and `shaders.txt`;
 - `install.sh` (Linux) and `install.ps1` + `install.bat` (Windows), from
   `publish/installer/`;
 - `prereqs.txt`, what the installers download first, and `CREDITS.txt`, generated from
   it and from `shaders.txt`;
-- `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`.
+- `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`;
+- `manifest.json`, the same for the GUI installer (package schema 1), and
+  `armada2-refit-installer.py` itself, which CI also attaches to the release on its own
+  (`gui-installer/README.md`).
+
+`install.sh` reads two variables the GUI sets: `A2_PROGRESS=1` prints `::step <id>` as
+each stage starts, and `A2_SKIP=cutscenes` leaves the Bink proxy out (and puts back a
+stock `binkw32.dll` an earlier install replaced). Run by hand, it does as before.
 
 It is our code only, compiled, and our configuration. It holds nothing of the game,
 none of the test tools, and **no third-party shader**. `ReShadeUI.fxh` carries no

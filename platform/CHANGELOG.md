@@ -6,6 +6,14 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.3.0 — 2026-10-08
+
+### Added
+- `vendor/dxvk-3.1.1/`: DXVK's x32 `d3d9.dll` from the upstream release (zlib/libpng),
+  which the release zip puts behind d3d8to9; `./install` still takes Proton's own.
+
+Confirmed in game 2026-10-09.
+
 ## 3.2.0 — 2026-10-05
 
 ### Added

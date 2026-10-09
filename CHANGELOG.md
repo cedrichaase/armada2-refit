@@ -5,7 +5,7 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 11.9.0 — 2026-10-07
+## 11.11.0 — 2026-10-07
 
 Layers: testbench 3.5.0.
 
@@ -15,7 +15,7 @@ Layers: testbench 3.5.0.
 
 Installs nothing; seen working on the bench 2026-10-07.
 
-## 11.8.0 — 2026-10-07
+## 11.10.0 — 2026-10-07
 
 Layers: testbench 3.4.0.
 
@@ -31,7 +31,7 @@ Layers: testbench 3.4.0.
 
 Installs nothing; seen working on the bench 2026-10-07.
 
-## 11.7.0 — 2026-10-07
+## 11.9.0 — 2026-10-07
 
 Layers: testbench 3.3.0.
 
@@ -41,6 +41,53 @@ Layers: testbench 3.3.0.
 
 Installs nothing; seen working on the bench 2026-10-07.
 
+## 11.8.0 — 2026-10-08
+
+Layers: platform 3.3.0.
+
+### Added
+- The release zip's `install.sh` sets up the game as the repository's `./install` does,
+  textures, menu backdrops and movies apart: the Direct3D chain (crosire's d3d8to9 on
+  DXVK 3.1.1's d3d9, in `chain/`; a replaced GOG or DXVK DLL is kept and put back by
+  `--uninstall`), `QOLRules.asi`, `GridLayout.asi`, `Planets.asi`, and the moon,
+  selection-bubble and hull SODs rewritten from the player's own files (`models/`,
+  needs python3). New `::step` ids `chain`, `grid`, `models` and manifest layers to match.
+  The Windows installer is unchanged.
+
+Confirmed in game 2026-10-09.
+
+## 11.7.1 — 2026-10-08
+
+Layers: menus 4.3.2.
+
+### Fixed
+- The main menu could open off-screen, leaving a black screen after the intro (seen on
+  NixOS with GE-Proton10-32): an embedded full-screen menu is pinned to the game window.
+
+Installed, not yet seen in game.
+
+## 11.7.0 — 2026-10-08
+
+Layers: gui-installer 1.0.0 (new; reads package schemas 0 and 1), postfx 1.2.1.
+
+### Added
+- `gui-installer/armada2-refit-installer.py`, the graphical installer for Linux: finds the
+  game, installs any GitHub release (cached locally, newest full release by default),
+  writes Heroic's launch variables. In every release zip and as a release asset of its own.
+- Package schema 1: `manifest.json` in the release zip (layers, versions, `::step` ids).
+- `install.sh`: `A2_PROGRESS=1` prints `::step <id>` per stage; `A2_SKIP=cutscenes`
+  leaves the cutscene player out and puts back a stock `binkw32.dll` an earlier install
+  replaced.
+- The release zip carries `Online.asi` + `Online.ini` (online 0.6.0), installed and
+  uninstalled by `install.sh` and `install.ps1`.
+- Without a vkBasalt layer, `install.sh`, `README.txt` and the GUI say how to get one,
+  per distribution (Arch, Fedora, Debian, Ubuntu).
+
+### Fixed
+- `postfx/vkbasalt/build.sh` builds on Debian and Ubuntu (postfx 1.2.1).
+
+Installed, not yet seen in game.
+
 ## 11.6.2 — 2026-10-07
 
 Layers: lighting 1.17.2.
@@ -49,7 +96,7 @@ Layers: lighting 1.17.2.
 - Hulls shadowed whole by a blended or alpha-tested draw above them under `Shadows=1`
   (lighting 1.17.2).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 11.6.1 — 2026-10-07
 
@@ -59,7 +106,7 @@ Layers: lighting 1.17.1.
 - Hulls going dark from frame to frame under `Shadows=1`: the shadow map is made per
   camera, not from whichever view rendered last (lighting 1.17.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-07.
 
 ## 11.6.0 — 2026-10-07
 
@@ -69,7 +116,7 @@ Layers: qol 1.6.0, online 0.6.0.
 - The online handshake for QOLRules: pay-on-queue runs in an *Internet – Online* game when
   every player has it, and stands down otherwise.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 11.5.0 — 2026-10-07
 
@@ -79,7 +126,8 @@ Layers: qol 1.5.0.
 - `QOLRules.asi`: pay when queuing, refund on cancel (QOL-7), single player and skirmish
   only. `a2mod` and the bench's log collection know the new files.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09: pay on queue and the refund on cancel; the refund on
+losing the building and save/load not yet seen.
 
 ## 11.4.0 — 2026-10-07
 

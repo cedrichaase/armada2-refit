@@ -6,6 +6,17 @@ configured by `postfx.py`). They are versioned together as one folder. Versionin
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The tables behind
 the numbers are in [`README.md`](README.md).
 
+## 1.2.1 — 2026-10-08
+
+### Fixed
+- `vkbasalt/build.sh` builds on Debian and Ubuntu too: it finds the 32-bit `.pc` files in
+  `/usr/lib/i386-linux-gnu/pkgconfig` as well as Arch's `/usr/lib32/pkgconfig`. Ubuntu
+  packages no 32-bit vkBasalt, so the installers point Ubuntu players at this script.
+
+On Arch the same directory is picked as before.
+
+Installed, not yet seen in game.
+
 ## 1.2.0 — 2026-10-05
 
 ### Changed
