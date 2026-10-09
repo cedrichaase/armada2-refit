@@ -5,6 +5,56 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.5.0 — 2026-10-07
+
+### Added
+- `Scene.asi`: `Music=` (default 1, as stock): 0 stops the game starting any music track
+  (`StartMusic` and `JukeBox::mStartNewTrack` return at once), leaving effects and voices;
+  `SCENE_MUSIC=0` at `testbench/scene/install` puts it into the installed `Scene.ini`.
+  It works with `Enable=0`, so a campaign take has no music and no scene.
+  Footage is recorded without the game's music and laid over its own soundtrack.
+
+Installs nothing; seen working on the bench 2026-10-07 (planet scene: -44 dB with music,
+-60 dB without).
+
+## 3.4.0 — 2026-10-07
+
+### Added
+- `Scene.asi`: `colonize <planet> [<population> | full | off] [team]` and the scene key
+  `Population=` (with `Colonist=`) make a planet a grown colony without a colony ship;
+  the `colony` scene (263e543).
+- `Scene.asi`: `tooltips on|off` and `Tooltips=` (default off) hide the rollover boxes
+  over the 3D view (634d3a9).
+- `Scene.asi`: `goto <name>[,<name>...] <object | x y z> [warp]` and `stop <name>`, a
+  player's move and stop orders (634d3a9).
+- `Scene.asi`: `hover on|off` and `Hover=` (default on, as stock) remove the gauges,
+  system icons and ring the object under the pointer gets.
+- `Scene.asi`: `shieldfx on|off` and `ShieldFx=` (default on, as stock) remove the flash
+  of weapon hits on shields; damage is unchanged.
+
+### Changed
+- `Scene.asi`: `Heal=1` keeps shields and crew full as well as the hull, so a healed
+  craft never shows the shields-down ring (634d3a9).
+- `Scene.asi`: `Heal=1` also repairs every system (`Craft::RepairAllSystemsComplete`),
+  and no scene craft shows a damaged-system effect for a system the scene switched off
+  (`Engines=0`, `Weapons=0`, `engines`), or for any system once healed: the plasma
+  plume every `Engines=0` ship streamed is gone.
+- The `showcase` scene: the cubes hold fire, so no Borg transporter effect in footage
+  (cf4d277).
+
+Installs nothing; seen working on the bench 2026-10-07.
+
+## 3.3.0 — 2026-10-07
+
+### Added
+- `Scene.asi`: `glide <seconds> <yaw> <pitch> <distance>` eases the orbit camera to a new
+  position, and `spin <degrees per second>` turns it steadily, both on wall-clock time
+  per frame, for camera moves that record smoothly.
+- The `showcase` scene: a Federation and Klingon fleet against two Borg cubes in front of
+  a class M planet, for footage.
+
+Installs nothing; seen working on the bench 2026-10-07.
+
 ## 3.2.0 — 2026-10-07
 
 ### Added

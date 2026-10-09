@@ -5,6 +5,42 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.11.0 — 2026-10-07
+
+Layers: testbench 3.5.0.
+
+### Added
+- `Scene.asi`'s `Music=` key and `SCENE_MUSIC=0` at install: a bench session without the
+  game's music, for footage (testbench 3.5.0).
+
+Installs nothing; seen working on the bench 2026-10-07.
+
+## 11.10.0 — 2026-10-07
+
+Layers: testbench 3.4.0.
+
+### Added
+- Bench scenes for footage: `colonize`/`Population=`, `goto`/`stop`, and switches for
+  tooltips, the hover gauges (`hover`/`Hover=`) and shield-hit flashes
+  (`shieldfx`/`ShieldFx=`) in `Scene.asi` (testbench 3.4.0).
+
+### Changed
+- `Scene.asi`'s `Heal=` keeps shields, crew and systems full, and ships with their
+  engines switched off no longer stream a damage plume; the `showcase` cubes hold fire
+  (testbench 3.4.0).
+
+Installs nothing; seen working on the bench 2026-10-07.
+
+## 11.9.0 — 2026-10-07
+
+Layers: testbench 3.3.0.
+
+### Added
+- Camera moves in bench scenes: `glide` and `spin` (`Scene.asi`), and the `showcase`
+  scene, a fleet action for footage (testbench 3.3.0).
+
+Installs nothing; seen working on the bench 2026-10-07.
+
 ## 11.8.0 — 2026-10-08
 
 Layers: platform 3.3.0.
