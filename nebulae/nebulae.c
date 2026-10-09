@@ -272,6 +272,7 @@ static int   g_reload = 1;    /* Reload= */
 static int   g_slices = 40;   /* Slices=: through the deepest field on screen */
 static float g_min_step = 6;  /* MinStep=: never closer together than this, world units */
 static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
+static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ), 1 at full size */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
@@ -292,6 +293,7 @@ static void read_settings(void)
     parsen(b, &g_min_step, 1);
     g_bake     = (int)GetPrivateProfileIntA("Nebulae", "Bake", 1, g_ini);
     g_samples  = (int)GetPrivateProfileIntA("Nebulae", "Samples", 2, g_ini) >= 2 ? 2 : 1;
+    g_res      = (int)GetPrivateProfileIntA("Nebulae", "Resolution", 2, g_ini) >= 2 ? 2 : 1;
     g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
     g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 160, g_ini);
     GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
@@ -343,6 +345,8 @@ typedef struct {
     DWORD    vol_sig;
     int      vol_gen, vx, vy, vz;
     float    vlo[3], vsize[3];
+    float    glo[3], ghi[3];      /* the box the baked gas actually fills: the slices go through this */
+    int      gbox;
 } Cls;
 
 static Cls g_cls[MAX_CLASSES];
@@ -502,11 +506,21 @@ static D9Shader g_ps = D9_PIXEL_SHADER(k_neb_ps);
 static D9Shader g_bake_vs = D9_VERTEX_SHADER(k_bake_vs);
 static D9Shader g_bake_ps = D9_PIXEL_SHADER(k_bake_ps);
 static D9Shader g_vol_ps = D9_PIXEL_SHADER(k_vol_ps);
+static D9Shader g_vol_lr_ps = D9_PIXEL_SHADER(k_vol_lr_ps);
+static D9Shader g_quad_vs = D9_VERTEX_SHADER(k_quad_vs);
+static D9Shader g_zdown_ps = D9_PIXEL_SHADER(k_zdown_ps);
+static D9Shader g_comp_ps = D9_PIXEL_SHADER(k_comp_ps);
+static D9Shader g_zclear_ps = D9_PIXEL_SHADER(k_zclear_ps);
 static void    *g_obj_dev;    /* the d3d9 device everything below belongs to */
 static void    *g_sb;
 static void    *g_vol;        /* the noise, MANAGED pool */
 static int      g_vol_size;
 static void    *g_bn_tex;    /* the blue noise, MANAGED pool */
+/* Resolution=2, all DEFAULT pool (released before a Reset): the scene's depth copied
+ * by RESZ (INTZ), and at half size its nearest depth (R32F) and the gas (A16B16G16R16F). */
+static void    *g_zt, *g_lz, *g_lr;
+static UINT     g_zt_w, g_zt_h, g_lr_w, g_lr_h;
+static int      g_lr_broken;  /* INTZ or a target could not be made: full size from now on */
 
 static void unref(void *o) { if (o) D9_FN(o, D9_RELEASE, D9_Ref_t)(o); }
 
@@ -526,6 +540,7 @@ static void drop_objects(void)
     unref(g_sb); g_sb = NULLPTR;
     unref(g_vol); g_vol = NULLPTR; g_vol_size = 0;
     unref(g_bn_tex); g_bn_tex = NULLPTR;
+    unref(g_zt); unref(g_lz); unref(g_lr); g_zt = g_lz = g_lr = NULLPTR; g_zt_w = g_lr_w = 0;
     for (i = 0; i < g_ncls; i++) {
         unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1;
         unref(g_cls[i].vol); g_cls[i].vol = NULLPTR; g_cls[i].vol_gen = -1;
@@ -1035,6 +1050,29 @@ static int bake_volume(void *d9, Cls *c, float half)
         int    R = (int)(c->k[13][1] / (size[0] / (float)X)) + 2, r, x;
         if (R > 16) R = 16;
         occ_dilate(X, Z, R);
+        {   /* the box the gas fills, from the widened record: the slices need go no further */
+            int x0 = X, x1 = -1, z0 = Z, z1 = -1, y0 = 255, y1 = 0;
+            for (r = 0; r < Z; r++) for (x = 0; x < X; x++) {
+                int i = r * X + x;
+                if (g_occ_max[i] < 2) continue;
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (r < z0) z0 = r;
+                if (r > z1) z1 = r;
+                if (g_occ_lo[i] < y0) y0 = g_occ_lo[i];
+                if (g_occ_hi[i] > y1) y1 = g_occ_hi[i];
+            }
+            c->gbox = x1 >= x0;
+            if (c->gbox) {
+                float m = c->k[13][1] + size[1] / (float)Y;          /* the flow's reach and a layer */
+                c->glo[0] = c->vlo[0] + (float)x0 * size[0] / (float)X;
+                c->ghi[0] = c->vlo[0] + (float)(x1 + 1) * size[0] / (float)X;
+                c->glo[2] = c->vlo[2] + (float)z0 * size[2] / (float)Z;
+                c->ghi[2] = c->vlo[2] + (float)(z1 + 1) * size[2] / (float)Z;
+                c->glo[1] = c->vlo[1] + (float)y0 / 255.0f * size[1] - m;
+                c->ghi[1] = c->vlo[1] + (float)y1 / 255.0f * size[1] + m;
+            }
+        }
         unref(c->occ); c->occ = NULLPTR;
         if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, (UINT)X, (UINT)Z, 1, 0, 21, 1, &c->occ, NULLPTR) >= 0 &&
             D9_FN(c->occ, TEX_LOCK, Lock_t)(c->occ, 0, &lk, NULLPTR, 0) >= 0) {
@@ -1061,7 +1099,11 @@ done:
     else { unref(c->vol); c->vol = NULLPTR; }
     m[0] = 0; s_cat(m, ok ? "bake \"" : "bake FAILED \""); s_cat(m, c->odf); s_cat(m, "\": ");
     s_num(m, X); s_cat(m, "x"); s_num(m, Y); s_cat(m, "x"); s_num(m, Z); s_cat(m, " texels of ");
-    s_flt(m, size[0] / (float)X); s_cat(m, " units, in ");
+    s_flt(m, size[0] / (float)X); s_cat(m, " units; gas in ");
+    if (ok && c->gbox) {
+        s_num(m, (long)((c->ghi[0] - c->glo[0]) * (c->ghi[1] - c->glo[1]) * (c->ghi[2] - c->glo[2]) * 100.0f / (size[0] * size[1] * size[2])));
+        s_cat(m, "% of the box; in ");
+    } else s_cat(m, "? of the box; in ");
     s_num(m, g_qpf.q ? (long)((double)(t1.q - t0.q) * 1000.0 / (double)g_qpf.q) : -1); s_cat(m, " ms");
     logline(m);
     return ok;
@@ -1298,6 +1340,220 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
     }
 }
 
+/* ---- Resolution=2: the gas at half size ----------------------------------------
+
+ * Slicing at full size costs most where it is least needed: 40 slices a class of every
+ * pixel the gas covers (bench, 3440x1440: 3.9 ms of bare slicing for two classes). At
+ * half size it is a quarter of that. The slices then need the scene's depth to stop at
+ * hulls, and the game's depth buffer is not a texture: the RESZ convention (a bound
+ * INTZ texture and a magic POINTSIZE, which DXVK honours) copies it into one, resolving
+ * it when the buffer is multisampled. The gas accumulates in floating point, so it
+ * needs none of the full-size path's rounding, and one pass adds it to the frame,
+ * taking from the four nearest half-size pixels by how near their depth is to the
+ * pixel's own, so a hull's edge stays sharp. */
+#define FOURCC_INTZ 0x5a544e49UL
+#define RESZ_CODE   0x7fa05000UL
+enum { D9_CLEAR = 43, D9_SETVIEWPORT = 47, SURF_GETDESC = 12, TEX_GETLEVEL = 18 };
+typedef struct { DWORD format, type, usage, pool, ms, msq; UINT w, h; } SURFDESC;
+typedef long (__stdcall *Desc9_t)(void *, SURFDESC *);
+typedef long (__stdcall *Clear_t)(void *, DWORD, const void *, DWORD, DWORD, float, DWORD);
+typedef long (__stdcall *SetVP_t)(void *, const DWORD *);
+typedef long (__stdcall *VP_t)(void *, DWORD *);
+typedef struct { DWORD x, y, w, h; float mn, mx; } VIEWPORT9;
+
+static int lr_targets(void *d9, UINT zw, UINT zh, UINT fw, UINT fh)
+{
+    static int said;
+    UINT lw = (fw + 1) / 2, lh = (fh + 1) / 2;
+    if (g_zt && (g_zt_w != zw || g_zt_h != zh)) { unref(g_zt); g_zt = NULLPTR; }
+    if (g_lr && (g_lr_w != lw || g_lr_h != lh)) { unref(g_lr); unref(g_lz); g_lr = g_lz = NULLPTR; }
+    if (!g_zt) {
+        if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, zw, zh, 1, 2, FOURCC_INTZ, 0, &g_zt, NULLPTR) < 0) {   /* DEPTHSTENCIL, DEFAULT */
+            g_zt = NULLPTR;
+            note_once(&said, "half size: no INTZ depth texture on this device: the gas at full size");
+            return 0;
+        }
+        g_zt_w = zw; g_zt_h = zh;
+    }
+    if (!g_lr) {
+        if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, lw, lh, 1, 1, 113, 0, &g_lr, NULLPTR) < 0 ||   /* A16B16G16R16F */
+            D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, lw, lh, 1, 1, 114, 0, &g_lz, NULLPTR) < 0) {   /* R32F */
+            unref(g_lr); unref(g_lz); g_lr = g_lz = NULLPTR;
+            note_once(&said, "half size: no floating-point target: the gas at full size");
+            return 0;
+        }
+        g_lr_w = lw; g_lr_h = lh;
+        {
+            char m[160];
+            m[0] = 0; s_cat(m, "half size: depth "); s_num(m, (long)zw); s_cat(m, "x"); s_num(m, (long)zh);
+            s_cat(m, ", gas "); s_num(m, (long)lw); s_cat(m, "x"); s_num(m, (long)lh);
+            logline(m);
+        }
+    }
+    return 1;
+}
+
+typedef struct {
+    void     *rt0, *ds0;      /* the frame's own target and depth, put back at the end */
+    VIEWPORT9 vp0, vpl;       /* the 3D view, and its half */
+    float     k[3][4];        /* c21..c23 */
+} LrFrame;
+
+static void lr_samplers(void *d9)
+{
+    static const DWORD ss[][2] = { { 1, 3 }, { 2, 3 }, { 3, 3 }, { 5, 1 }, { 6, 1 }, { 7, 0 }, { 11, 0 } };   /* clamp, point */
+    int i, s;
+    for (s = 5; s <= 7; s++)
+        for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, (DWORD)s, ss[i][0], ss[i][1]);
+}
+
+static void lr_quad(void *d9)
+{
+    Vert v[4];
+    int  j;
+    for (j = 0; j < 4; j++) {
+        v[j].x = (j & 1) ? 1.0f : -1.0f;
+        v[j].y = (j & 2) ? -1.0f : 1.0f;
+        v[j].z = v[j].thick = v[j].k = 0.0f;
+    }
+    D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
+}
+
+/* Copies the depth, makes the half-size depth, and leaves the half-size gas target
+ * bound and cleared, with draw_states' states and no depth test. 0: not possible now,
+ * the caller draws at full size. Inside the caller's state block. */
+static int lr_begin(void *d9, LrFrame *L, const float *P)
+{
+    void    *zsurf = NULLPTR, *lzs = NULLPTR, *lrs = NULLPTR;
+    void    *qvs = d9_shader(d9, &g_quad_vs), *zps = d9_shader(d9, &g_zdown_ps);
+    SURFDESC rd, dd;
+    float    pt[3] = { 0, 0, 0 };
+    (void)zsurf;
+    L->rt0 = L->ds0 = NULLPTR;
+    if (g_lr_broken || !qvs || !zps || !d9_shader(d9, &g_comp_ps) || !d9_shader(d9, &g_vol_lr_ps) || !d9_shader(d9, &g_zclear_ps)) return 0;
+    D9_FN(d9, D9_GETRENDERTARGET2, GetRT_t)(d9, 0, &L->rt0);
+    D9_FN(d9, D9_GETDEPTHSTENCIL, Obj_t)(d9, &L->ds0);
+    if (!L->rt0 || !L->ds0 ||
+        D9_FN(L->rt0, SURF_GETDESC, Desc9_t)(L->rt0, &rd) < 0 || D9_FN(L->ds0, SURF_GETDESC, Desc9_t)(L->ds0, &dd) < 0 ||
+        !lr_targets(d9, dd.w, dd.h, rd.w, rd.h)) {
+        if (!g_zt || !g_lr) g_lr_broken = 1;
+        unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR;
+        return 0;
+    }
+    D9_FN(d9, D9_GETVIEWPORT, VP_t)(d9, (DWORD *)&L->vp0);
+    L->vpl = L->vp0;
+    L->vpl.x = L->vp0.x / 2; L->vpl.y = L->vp0.y / 2;
+    L->vpl.w = (L->vp0.x + L->vp0.w + 1) / 2 - L->vpl.x; L->vpl.h = (L->vp0.y + L->vp0.h + 1) / 2 - L->vpl.y;
+    if (L->vpl.x + L->vpl.w > g_lr_w) L->vpl.w = g_lr_w - L->vpl.x;
+    if (L->vpl.y + L->vpl.h > g_lr_h) L->vpl.h = g_lr_h - L->vpl.y;
+    L->k[0][0] = L->k[0][1] = 0.0f; L->k[0][2] = 1.0f / (float)g_zt_w; L->k[0][3] = 1.0f / (float)g_zt_h;
+    L->k[1][0] = 1.0f / (float)g_lr_w; L->k[1][1] = 1.0f / (float)g_lr_h; L->k[1][2] = P[10]; L->k[1][3] = P[14];
+    L->k[2][0] = (float)L->vpl.x; L->k[2][1] = (float)L->vpl.y;
+    L->k[2][2] = (float)(L->vpl.x + L->vpl.w - 1); L->k[2][3] = (float)(L->vpl.y + L->vpl.h - 1);
+
+    /* RESZ: the depth buffer into the INTZ texture bound at stage 0 */
+    D9_FN(d9, D9_SETVERTEXSHADER, D9_Ptr_t)(d9, NULLPTR);
+    D9_FN(d9, D9_SETPIXELSHADER, D9_Ptr_t)(d9, NULLPTR);
+    D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 14, 0);      /* ZWRITEENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 0);     /* COLORWRITEENABLE: nothing */
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 0, g_zt);
+    D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 1, 1, pt, sizeof pt);      /* a dummy point, as the convention asks */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 154, RESZ_CODE);              /* POINTSIZE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 154, 0x3f800000UL);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 0, NULLPTR);
+
+    /* the half-size depth */
+    D9_FN(g_lz, TEX_GETLEVEL, Level_t)(g_lz, 0, &lzs);
+    D9_FN(g_lr, TEX_GETLEVEL, Level_t)(g_lr, 0, &lrs);
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, lzs);
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, NULLPTR);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 15);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 0);      /* ALPHABLENDENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 22, 1);      /* CULLMODE: none */
+    D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);
+    d9_bind(d9, qvs, zps);
+    d9_psconst(d9, 21, &L->k[0][0], 3);
+    lr_samplers(d9);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
+    lr_quad(d9);
+
+    /* the gas target, cleared to no gas, with the depth in alpha */
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, lrs);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
+    d9_bind(d9, qvs, d9_shader(d9, &g_zclear_ps));
+    lr_quad(d9);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
+    unref(lzs); unref(lrs);
+    return 1;
+}
+
+/* After a bake (which binds targets of its own) or draw_states: the half-size target,
+ * its viewport, and no depth test. */
+static void lr_rebind(void *d9, LrFrame *L)
+{
+    void *lrs = NULLPTR;
+    D9_FN(g_lr, TEX_GETLEVEL, Level_t)(g_lr, 0, &lrs);
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, lrs);
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, NULLPTR);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE: the shader tests depth */
+    lr_samplers(d9);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
+    d9_psconst(d9, 21, &L->k[0][0], 3);
+    unref(lrs);
+}
+
+/* The gas onto the frame; the frame's target and depth back. */
+static void lr_end(void *d9, LrFrame *L)
+{
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, L->rt0);
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, L->ds0);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 1);      /* ALPHABLENDENABLE: ONE, ONE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 19, 2);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 20, 2);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 7);
+    D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);
+    d9_bind(d9, d9_shader(d9, &g_quad_vs), d9_shader(d9, &g_comp_ps));
+    d9_psconst(d9, 21, &L->k[0][0], 3);
+    lr_samplers(d9);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 7, g_lr);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 4, g_bn_tex);
+    lr_quad(d9);
+    unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR;
+}
+
+/* Reset: every DEFAULT-pool object (and, simplest, every other) must be gone first. The
+ * d3d8 device's slot 14, patched once and chained, as Lighting.asi does for its shadow
+ * map: whichever plugin patches second calls the first. */
+typedef long (__stdcall *Reset8_t)(void *, void *);
+static Reset8_t g_reset;
+static long __stdcall hook_reset(void *dev, void *params)
+{
+    drop_objects();
+    g_obj_dev = NULLPTR;
+    logline("the device resets: everything on it let go");
+    return g_reset(dev, params);
+}
+
+static void hook_device_reset(void *d8)
+{
+    void **vt = *(void ***)d8;
+    DWORD  old;
+    if (vt[14] == (void *)hook_reset) return;
+    if (!VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) return;
+    g_reset = (Reset8_t)vt[14];
+    vt[14] = (void *)hook_reset;
+    VirtualProtect(&vt[14], 4, old, &old);
+}
+
 /* Draws every class's gas; 1 if the device could take it (whether or not any was on
  * screen), 0 to leave the stock billboards. */
 static int draw_gas(void)
@@ -1305,7 +1561,8 @@ static int draw_gas(void)
     static int said_d9, said_sh, said_sb, said_cam;
     void  *d8, *d9, *vs, *ps, *vps;
     float  V[16], P[16], VP[16], cols[4][4], eye[3], f[3], r[3], u[3], zn;
-    int    i, ci, slot = -1, captured = 0;
+    int    i, ci, slot = -1, captured = 0, half_size = 0;
+    LrFrame L;
 
     d8 = engine_device8();
     d9 = d8 ? d9_device(d8) : NULLPTR;
@@ -1314,7 +1571,8 @@ static int draw_gas(void)
     ps = d9_shader(d9, &g_ps);
     vps = d9_shader(d9, &g_vol_ps);
     if (!vs || !ps || !vps) { note_once(&said_sh, "the shaders could not be created: the stock billboards"); return 0; }
-    if (d9 != g_obj_dev) { drop_objects(); g_obj_dev = d9; }
+    if (d9 != g_obj_dev) { drop_objects(); g_obj_dev = d9; g_lr_broken = 0; }
+    hook_device_reset(d8);
     if (!g_sb && D9_FN(d9, D9_CREATESTATEBLOCK, MakeSB_t)(d9, 1, &g_sb) < 0) {   /* D3DSBT_ALL */
         g_sb = NULLPTR;
         note_once(&said_sb, "no state block: the stock billboards");
@@ -1351,12 +1609,14 @@ static int draw_gas(void)
         if (!captured) {
             D9_FN(g_sb, SB_CAPTURE, SB_t)(g_sb);
             captured = 1;
-            draw_states(d9, vs, cols);
             if (g_timing) {
                 timing_poll();
                 slot = timing_slot(d9);
                 if (slot >= 0) D9_FN(g_q[slot][0], Q_ISSUE, Issue_t)(g_q[slot][0], 1);
             }
+            half_size = g_res == 2 && g_bake && lr_begin(d9, &L, P);
+            draw_states(d9, vs, cols);
+            if (half_size) lr_rebind(d9, &L);
         }
         if (!c->env || c->env_sig != c->sig || c->env_gen != c->gen) {
             if (!bake_envelope(d9, c)) continue;
@@ -1366,9 +1626,13 @@ static int draw_gas(void)
             D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
             bake_volume(d9, c, half);         /* on failure, c->vol stays NULL: per pixel */
             draw_states(d9, vs, cols);
+            if (half_size) lr_rebind(d9, &L);
         }
+        if (half_size && !c->vol) continue;   /* the half-size pass draws only baked gas */
         lo[0] = c->ex0; lo[1] = c->ey - half; lo[2] = c->ez0;
         hi[0] = c->ex1; hi[1] = c->ey + half; hi[2] = c->ez1;
+        if (g_bake && c->vol && c->gbox)          /* only where the bake found gas */
+            for (i = 0; i < 3; i++) { lo[i] = c->glo[i]; hi[i] = c->ghi[i]; }
         for (i = 0; i < 8; i++) {
             float x = ((i & 1) ? hi[0] : lo[0]) - eye[0], y = ((i & 2) ? hi[1] : lo[1]) - eye[1], z = ((i & 4) ? hi[2] : lo[2]) - eye[2];
             float d = x * f[0] + y * f[1] + z * f[2];
@@ -1438,7 +1702,7 @@ static int draw_gas(void)
         }
         if (g_bake && c->vol) {
             for (i = 0; i < 3; i++) c->k[12][i] = 1.0f / c->vsize[i];
-            d9_bind(d9, vs, vps);
+            d9_bind(d9, vs, half_size ? d9_shader(d9, &g_vol_lr_ps) : vps);
             D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 2, c->vol);
             D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 3, c->occ);
         } else {
@@ -1450,6 +1714,7 @@ static int draw_gas(void)
         g_slices_drawn += N;
     }
     if (captured) {
+        if (half_size) lr_end(d9, &L);
         if (slot >= 0) { D9_FN(g_q[slot][1], Q_ISSUE, Issue_t)(g_q[slot][1], 1); g_qbusy[slot] = 1; }
         D9_FN(g_sb, SB_APPLY, SB_t)(g_sb);
         g_drawn_frames++;
@@ -1460,6 +1725,7 @@ static int draw_gas(void)
 static void __fastcall hook_particles(void *eng, void *edx, void *list)
 {
     LARGE now;
+    int   i;
     (void)edx;
     ((Particles_t)FN_PARTICLES)(eng, list);
 
@@ -1469,6 +1735,7 @@ static void __fastcall hook_particles(void *eng, void *edx, void *list)
         if (file_time(g_ini, &t) && (t.lo != g_ini_time.lo || t.hi != g_ini_time.hi)) {
             g_ini_time = t;
             read_settings();
+            for (i = 0; i < g_ncls; i++) g_cls[i].vol_gen = -1;   /* the volume's size may have changed: bake again */
             logline(g_enable ? "Nebulae.ini read: on" : "Nebulae.ini read: off, the stock billboards");
         }
         recipes_reload();

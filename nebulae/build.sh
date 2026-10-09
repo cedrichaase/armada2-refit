@@ -13,7 +13,8 @@ mkdir -p "$out"
 # The shaders (nebulae.hlsl -> nebulae_shaders.h, committed).
 "$here/../platform/d3d9/hlsl.sh" "$here/nebulae_shaders.h" "$here/nebulae.hlsl" \
     neb_vs:vs_3_0:k_neb_vs neb_ps:ps_3_0:k_neb_ps \
-    bake_vs:vs_3_0:k_bake_vs bake_ps:ps_3_0:k_bake_ps vol_ps:ps_3_0:k_vol_ps
+    bake_vs:vs_3_0:k_bake_vs bake_ps:ps_3_0:k_bake_ps vol_ps:ps_3_0:k_vol_ps \
+    vol_lr_ps:ps_3_0:k_vol_lr_ps quad_vs:vs_3_0:k_quad_vs zdown_ps:ps_3_0:k_zdown_ps comp_ps:ps_3_0:k_comp_ps zclear_ps:ps_3_0:k_zclear_ps
 
 llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
 

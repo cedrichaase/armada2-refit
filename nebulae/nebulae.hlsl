@@ -44,9 +44,16 @@ sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the fi
 sampler3D s_vol   : register(s2);  // the baked gas: density, shading, hue, emission
 sampler2D s_blue  : register(s4);  // a 64x64 blue-noise tile: r and g two independent thresholds
 sampler2D s_occ   : register(s3);  // per column of it: r the most gas, b and g the lowest and highest layer with any
+sampler2D s_zfull : register(s5);  // Resolution=2: the scene's depth (INTZ, through RESZ), full size
+sampler2D s_zlow  : register(s6);  //   the nearest depth of each 2x2 of it, at half size
+sampler2D s_gas   : register(s7);  //   the gas, at half size, in floating point
+
+float4 k_lr      : register(c21);  // Resolution=2: zw 1 / the full target's size
+float4 k_lrv     : register(c23);  //   the half-size viewport, its first and last pixel: x0, y0, x1, y1
+float4 k_lr2     : register(c22);  //   xy 1 / the half-size targets' size; z, w the projection's _33 and _43 (to view depth)
 
 struct VsIn  { float4 pos : POSITION; float2 t : TEXCOORD0; };
-struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; float2 t : TEXCOORD1; };
+struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; float2 t : TEXCOORD1; float2 zw : TEXCOORD2; };
 
 VsOut neb_vs(VsIn i)
 {
@@ -55,6 +62,7 @@ VsOut neb_vs(VsIn i)
     o.pos = float4(dot(p, k_vp0), dot(p, k_vp1), dot(p, k_vp2), dot(p, k_vp3));
     o.w = i.pos.xyz;
     o.t = i.t;                     // the slice's thickness (world units) and its index
+    o.zw = o.pos.zw;               // its depth, for the half-size pass's own depth test
     return o;
 }
 
@@ -201,22 +209,23 @@ float4 bake_ps(float2 vpos : VPOS) : COLOR
     return float4(g.x, g.y / 1.6, g.z, g.w / 4.0);
 }
 
-// The draw from the baked volume: one read, and the fine octave of the tiling noise
-// for detail finer than the volume's texels.
-float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
+// The draw from the baked volume: one read (two with Samples=2), and the fine octave of
+// the tiling noise for detail finer than the volume's texels. The colour this slice
+// adds at p; w is -1 where there is no gas.
+float4 vol_gas(VsOut i, float3 p, float dist)
 {
-    float  dist;
-    float2 u0;
-    float3 p = slice_point(i, vpos, dist, u0);
+
     // Over empty space, one small read and out: the column holds no gas, or none at
     // this height (the record is widened by the flow, so the flow cannot reach any).
     float3 uvw = (p - k_vlo.xyz) * k_vsz.xyz;
     float4 o = tex2D(s_occ, uvw.xz);
     float  m = k_flow.y * k_vsz.y + 0.02;
-    if (o.r < 0.006 || uvw.y < o.b - m || uvw.y > o.g + m) return float4(0, 0, 0, 0);
+    if (o.r < 0.006 || uvw.y < o.b - m || uvw.y > o.g + m) return float4(0, 0, 0, -1);
     // Flow: the volume read through a warp field that drifts with time, so the gas
     // and its outline churn slowly instead of standing still.
-    float3 fl = tex3D(s_noise, p * (k_noise.x * k_flow.z) + float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37)).gba * 2.0 - 1.0;
+    float3 fl = 0.0;
+    if (k_flow.y > 0.0)
+        fl = tex3D(s_noise, p * (k_noise.x * k_flow.z) + float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37)).gba * 2.0 - 1.0;
     // Samples=2: two reads a quarter of the gap either side of the jittered point, one
     // in each half of the gap, stratified, which halves the noise the jitter leaves.
     float3 dir = (i.w - k_eye.xyz) / dist * (i.t.x * 0.25);
@@ -227,8 +236,89 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
                    tex3D(s_vol, ((pa + dir - k_vlo.xyz) * k_vsz.xyz).xzy));
     else
         v = tex3D(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy);
-    if (v.x <= 0.002) return float4(0, 0, 0, 0);
-    float  det = tex3D(s_noise, pa * (k_noise.x * 6.1) + k_seed.zxy).r;
+    if (v.x <= 0.002) return float4(0, 0, 0, -1);
+    float  det = 0.5;
+    if (k_vlo.w > 0.0) det = tex3D(s_noise, pa * (k_noise.x * 6.1) + k_seed.zxy).r;
     float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);
-    return slice_out(gas_colour(g, i.t.x, dist, pa), u0, i.t.y);
+    return float4(gas_colour(g, i.t.x, dist, pa), 1);
+}
+
+float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
+{
+    float  dist;
+    float2 u0;
+    float3 p = slice_point(i, vpos, dist, u0);
+    float4 c = vol_gas(i, p, dist);
+    if (c.w < 0.0) return float4(0, 0, 0, 0);
+    return slice_out(c.rgb, u0, i.t.y);
+}
+
+// Resolution=2: the same at half size, into a floating-point target, so no rounding
+// trick is needed. The depth test is the shader's: against the nearest scene depth of
+// the 2x2 full pixels this pixel covers, so gas never shows through any part of a hull.
+float4 vol_lr_ps(VsOut i, float2 vpos : VPOS) : COLOR
+{
+    float  zs = tex2D(s_zlow, (vpos + 0.5) * k_lr2.xy).r;
+    if (i.zw.x / i.zw.y > zs) return float4(0, 0, 0, 0);
+    float  dist;
+    float2 u0;
+    float3 p = slice_point(i, vpos, dist, u0);
+    float4 c = vol_gas(i, p, dist);
+    return float4(c.w < 0.0 ? 0.0 : c.rgb, 0);
+}
+
+// Resolution=2: a full-screen quad, its corners in clip space.
+float4 quad_vs(float4 pos : POSITION) : POSITION
+{
+    return float4(pos.xy, 0.0, 1.0);
+}
+
+// Resolution=2: the half-size depth, the nearest of each 2x2 of the scene's (vpos is
+// the half-size pixel inside the viewport's half).
+float4 zdown_ps(float2 vpos : VPOS) : COLOR
+{
+    float2 f = (floor(vpos) * 2.0 + 0.5) * k_lr.zw;      // half pixel i covers full pixels 2i, 2i+1
+    float  a = tex2D(s_zfull, f).r, b = tex2D(s_zfull, f + float2(k_lr.z, 0)).r;
+    float  c = tex2D(s_zfull, f + float2(0, k_lr.w)).r, d = tex2D(s_zfull, f + k_lr.zw).r;
+    return float4(min(min(a, b), min(c, d)), 0, 0, 0);
+}
+
+float view_z(float z)                   // post-projection depth to view depth (z - _33 is below 0)
+{
+    return k_lr2.w / min(z - k_lr2.z, -1e-9);
+}
+
+// Resolution=2: the gas target's clear: no gas, and in alpha the view depth of the
+// nearest scene of its 2x2, which the gas pass leaves alone (it writes rgb only) and
+// the composite reads with the gas in one fetch.
+float4 zclear_ps(float2 vpos : VPOS) : COLOR
+{
+    return float4(0, 0, 0, view_z(zdown_ps(vpos).r));
+}
+
+// Resolution=2: the gas onto the frame. A tent over the 3x3 half-size pixels about
+// this pixel, which also smooths away what the jitter leaves, each weighted by how near its depth is to this pixel's: at a hull's
+// edge a background pixel takes the gas of the half-size pixels behind it, and the
+// hull keeps what is in front of it. Then one dither to the 8-bit target.
+float4 comp_ps(float2 vpos : VPOS) : COLOR
+{
+    float2 full = floor(vpos) + 0.5;
+    float  zf = view_z(tex2D(s_zfull, full * k_lr.zw).r);
+    float2 h = full * 0.5 - 0.5;            // in half pixels, a half pixel's centre on an integer
+    float2 b = floor(h + 0.5), fr = h - b;  // the nearest half pixel, and where this one lies from it
+    float3 sum = 0.0;
+    float  wsum = 0.0;
+    [unroll] for (int y = -1; y <= 1; y++) {
+        [unroll] for (int x = -1; x <= 1; x++) {
+            float2 tw = saturate(1.0 - abs(float2(x, y) - fr) * (2.0 / 3.0));   // a tent 3 pixels wide
+            float2 uv = (clamp(b + float2(x, y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;   // never outside the viewport
+            float4 g = tex2D(s_gas, uv);    // rgb the gas, a its depth
+            float  w = tw.x * tw.y / (1e-3 + abs(g.a - zf) / zf);
+            sum += g.rgb * w;
+            wsum += w;
+        }
+    }
+    float3 c = sum / max(wsum, 1e-6);
+    float  u = tex2D(s_blue, (vpos + 0.5) / 64.0).r;
+    return float4(floor(c * 255.0 + u) / 255.0, 0);
 }
