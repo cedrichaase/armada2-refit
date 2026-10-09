@@ -156,6 +156,8 @@ static void note_once(int *said, const char *s) { if (!*said) { *said = 1; logli
 
 static float sqrt_f(float x) { float r; __asm__("fsqrt" : "=t"(r) : "0"(x)); return r; }
 static float fmod_f(float x, float m) { return x - (float)(int)(x / m) * m; }   /* x >= 0 */
+static float sin_f(float x)  { float r; __asm__("fsin" : "=t"(r) : "0"(x)); return r; }
+static float cos_f(float x)  { float r; __asm__("fcos" : "=t"(r) : "0"(x)); return r; }
 static float abs_f(float x)  { return x < 0.0f ? -x : x; }
 
 /* 2^x and log2(x), for the slices' geometric spacing: series, plenty for spacing */
@@ -256,9 +258,13 @@ static int file_time(const char *path, FILETIME *t)
 static int   g_enable = 1;    /* Enable= */
 static int   g_timing = 0;    /* Timing= */
 static int   g_reload = 1;    /* Reload= */
-static int   g_slices = 48;   /* Slices=: through the deepest field on screen */
+static int   g_slices = 40;   /* Slices=: through the deepest field on screen */
 static float g_min_step = 6;  /* MinStep=: never closer together than this, world units */
 static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
+static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
+static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
+static int   g_vol_maxy = 96; /* VolumeHeight=: and up, texels */
+static float g_vol_texel = 3; /* VolumeTexel=: never finer than this, world units */
 static FILETIME g_ini_time;
 
 static void read_settings(void)
@@ -268,10 +274,20 @@ static void read_settings(void)
     g_logging = (int)GetPrivateProfileIntA("Nebulae", "Log",    1, g_ini);
     g_timing  = (int)GetPrivateProfileIntA("Nebulae", "Timing", 0, g_ini);
     g_reload  = (int)GetPrivateProfileIntA("Nebulae", "Reload", 1, g_ini);
-    g_slices  = (int)GetPrivateProfileIntA("Nebulae", "Slices", 48, g_ini);
+    g_slices  = (int)GetPrivateProfileIntA("Nebulae", "Slices", 40, g_ini);
     g_noise   = (int)GetPrivateProfileIntA("Nebulae", "NoiseSize", 128, g_ini);
     GetPrivateProfileStringA("Nebulae", "MinStep", "6", b, sizeof b, g_ini);
     parsen(b, &g_min_step, 1);
+    g_bake     = (int)GetPrivateProfileIntA("Nebulae", "Bake", 1, g_ini);
+    g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
+    g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 96, g_ini);
+    GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
+    parsen(b, &g_vol_texel, 1);
+    if (g_vol_max < 16) g_vol_max = 16;
+    if (g_vol_max > 512) g_vol_max = 512;
+    if (g_vol_maxy < 8) g_vol_maxy = 8;
+    if (g_vol_maxy > 256) g_vol_maxy = 256;
+    if (g_vol_texel < 0.5f) g_vol_texel = 0.5f;
     if (g_slices < 4) g_slices = 4;
     if (g_slices > 160) g_slices = 160;
     if (g_min_step < 1.0f) g_min_step = 1.0f;
@@ -281,8 +297,8 @@ static void read_settings(void)
 /* ---- classes and their recipes ------------------------------------------ */
 
 /* The pixel shader's constants, c0..c8; their meaning is listed in nebulae.hlsl.
- * c0 (camera), c6 (envelope) and c7.x (the field's y) are filled in per draw. */
-#define NCONST 9
+ * c0 (camera), c6 (envelope) and c7.x, y, w are filled in per draw. */
+#define NCONST 13
 #define MAX_CLASSES 16
 #define MAX_NEB 256
 #define ENV_MAX 512
@@ -305,6 +321,11 @@ typedef struct {
     DWORD    env_sig;
     int      env_gen;
     float    ex0, ez0, ex1, ez1, ey;
+    /* the baked gas: a volume over the class's box */
+    void    *vol;
+    DWORD    vol_sig;
+    int      vol_gen, vx, vy, vz;
+    float    vlo[3], vsize[3];
 } Cls;
 
 static Cls g_cls[MAX_CLASSES];
@@ -341,8 +362,23 @@ static int recipe_read(Cls *c)
     c->k[8][0] = ini1(f, "Ridge", 0.0f);
     c->k[8][1] = ini1(f, "HueMix", 0.4f);
     c->k[8][2] = ini1(f, "WarpScale", 0.45f);
+    c->k[8][3] = ini1(f, "Lumps", 0.35f);
+    c->k[9][0] = ini1(f, "Knots", 1.5f);
+    c->k[9][1] = ini1(f, "KnotScale", 0.35f);
+    c->k[9][2] = ini1(f, "Lanes", 0.5f);
+    c->k[9][3] = ini1(f, "LaneScale", 1.7f);
+    {   /* the light the gas shades itself by: a direction, a step, a strength */
+        float l[2] = { 30.0f, 60.0f }, y, pt, st = ini1(f, "ShadeStep", 60.0f);
+        inin(f, "Light", l, 2);
+        y = l[0] * 0.017453293f; pt = l[1] * 0.017453293f;
+        c->k[10][0] = cos_f(pt) * sin_f(y) * st;
+        c->k[10][1] = sin_f(pt) * st;
+        c->k[10][2] = cos_f(pt) * cos_f(y) * st;
+        c->k[10][3] = ini1(f, "Shading", 1.0f);
+    }
+    c->k[11][3] = ini1(f, "FineDetail", 0.35f);
     c->extent  = ini1(f, "Extent", 1.3f);
-    c->height  = ini1(f, "Height", 0.45f);       /* times the radius */
+    c->height  = ini1(f, "Height", 0.8f);        /* the domes' height, times the reach */
     c->gen++;
 
     b[0] = 0; s_cat(b, "recipe "); s_cat(b, f); s_cat(b, " read");
@@ -373,7 +409,7 @@ static Cls *class_of(BYTE *obj)
     c->radius = *(float *)(cls + 0x1e0);
     if (!(c->radius > 10.0f && c->radius < 5000.0f)) c->radius = 300.0f;
     c->have = recipe_read(c);
-    c->env_gen = -1;
+    c->env_gen = -1; c->vol_gen = -1;
     b[0] = 0; s_cat(b, "class \""); s_cat(b, c->odf); s_cat(b, "\", effect radius "); s_flt(b, c->radius);
     s_cat(b, ", type "); s_num(b, *(long *)(cls + 0x1e4));
     s_cat(b, c->have ? ": drawn as gas" : ": no recipe, the stock billboards");
@@ -395,6 +431,8 @@ static void recipes_reload(void)
 
 /* ---- Direct3D 9 --------------------------------------------------------- */
 
+enum { D9_GETRENDERTARGETDATA = 32, D9_CREATEOFFSCREEN = 36, D9_SETRENDERTARGET2 = 37,
+       D9_GETRENDERTARGET2 = 38, D9_SETDEPTHSTENCIL = 39, D9_GETDEPTHSTENCIL = 40 };
 enum { D9_CREATETEXTURE = 23, D9_CREATEVOLUMETEXTURE = 24, D9_GETVIEWPORT = 48,
        D9_CREATESTATEBLOCK = 59, D9_DRAWPRIMITIVEUP = 83, D9_CREATEQUERY = 118 };
 enum { SB_CAPTURE = 4, SB_APPLY = 5, Q_ISSUE = 6, Q_GETDATA = 7, TEX_LOCK = 19, TEX_UNLOCK = 20 };
@@ -414,11 +452,22 @@ typedef long (__stdcall *MakeVol_t)(void *, UINT, UINT, UINT, UINT, DWORD, DWORD
 typedef long (__stdcall *Lock_t)(void *, UINT, void *, const void *, DWORD);
 typedef long (__stdcall *Unlock_t)(void *, UINT);
 typedef long (__stdcall *SetTex_t)(void *, DWORD, void *);
+typedef long (__stdcall *MakeOff_t)(void *, UINT, UINT, DWORD, DWORD, void **, void *);
+typedef long (__stdcall *Level_t)(void *, UINT, void **);
+typedef long (__stdcall *GetRT_t)(void *, DWORD, void **);
+typedef long (__stdcall *SetRT_t)(void *, DWORD, void *);
+typedef long (__stdcall *Obj_t)(void *, void *);
+typedef long (__stdcall *RTData_t)(void *, void *, void *);
+typedef long (__stdcall *SurfLock_t)(void *, void *, const void *, DWORD);
+typedef long (__stdcall *SurfUnlock_t)(void *);
 typedef struct { INT pitch; BYTE *bits; } LOCKED;
 typedef struct { INT row, slice; BYTE *bits; } LOCKEDBOX;
 
 static D9Shader g_vs = D9_VERTEX_SHADER(k_neb_vs);
 static D9Shader g_ps = D9_PIXEL_SHADER(k_neb_ps);
+static D9Shader g_bake_vs = D9_VERTEX_SHADER(k_bake_vs);
+static D9Shader g_bake_ps = D9_PIXEL_SHADER(k_bake_ps);
+static D9Shader g_vol_ps = D9_PIXEL_SHADER(k_vol_ps);
 static void    *g_obj_dev;    /* the d3d9 device everything below belongs to */
 static void    *g_sb;
 static void    *g_vol;        /* the noise, MANAGED pool */
@@ -441,7 +490,10 @@ static void drop_objects(void)
     int i;
     unref(g_sb); g_sb = NULLPTR;
     unref(g_vol); g_vol = NULLPTR; g_vol_size = 0;
-    for (i = 0; i < g_ncls; i++) { unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1; }
+    for (i = 0; i < g_ncls; i++) {
+        unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1;
+        unref(g_cls[i].vol); g_cls[i].vol = NULLPTR; g_cls[i].vol_gen = -1;
+    }
     for (i = 0; i < NQ; i++) { unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR; g_qbusy[i] = 0; }
     unref(g_qfreq); g_qfreq = NULLPTR; g_freq = 0;
 }
@@ -622,8 +674,10 @@ out:
 
 /* Where a class's gas may be, seen from above: each nebula a soft disc, full out to
  * 0.6 of its reach (Extent times the effect radius) and gone at the reach, summed and
- * capped at 1, in a texture over the box of the class's nebulae. The gameplay edge, the
- * effect radius, falls inside the soft part. */
+ * capped at 1 (alpha), in a texture over the box of the class's nebulae. The gameplay
+ * edge, the effect radius, falls inside the soft part. Red is how high the gas may
+ * rise there, as a fraction of the reach: the highest of the nebulae's spheres over
+ * that point, so a field is a row of domes and not a slab. */
 static int bake_envelope(void *d9, Cls *c)
 {
     static int said;
@@ -660,15 +714,18 @@ static int bake_envelope(void *d9, Cls *c)
         DWORD *row = (DWORD *)(lk.bits + z * lk.pitch);
         float  wz = z0 + ((float)z + 0.5f) * (c->ez1 - c->ez0) / (float)H;
         for (x = 0; x < W; x++) {
-            float wx = x0 + ((float)x + 0.5f) * (c->ex1 - c->ex0) / (float)W, s = 0.0f;
-            int   a;
-            for (i = 0; i < c->n && s < 1.0f; i++) {
-                float dx = wx - c->pos[i][0], dz = wz - c->pos[i][2], d2 = dx * dx + dz * dz;
+            float wx = x0 + ((float)x + 0.5f) * (c->ex1 - c->ex0) / (float)W, s = 0.0f, h = 0.0f;
+            int   a, r;
+            for (i = 0; i < c->n; i++) {
+                float dx = wx - c->pos[i][0], dz = wz - c->pos[i][2], d2 = dx * dx + dz * dz, q;
                 if (d2 >= reach * reach) continue;
                 s += smooth(1.0f, 0.6f, sqrt_f(d2) / reach);
+                q = sqrt_f(1.0f - d2 / (reach * reach));      /* a sphere's height over the disc */
+                if (q > h) h = q;
             }
             a = (int)((s > 1.0f ? 1.0f : s) * 255.0f + 0.5f);
-            row[x] = (DWORD)a << 24;
+            r = (int)(h * 255.0f + 0.5f);
+            row[x] = (DWORD)a << 24 | (DWORD)r << 16;
         }
     }
     D9_FN(c->env, TEX_UNLOCK, Unlock_t)(c->env, 0);
@@ -686,6 +743,113 @@ static int bake_envelope(void *d9, Cls *c)
 typedef struct { float x, y, z, thick, k; } Vert;
 #define MAX_VERTS (160 * 4 * 3)
 static Vert g_v[MAX_VERTS];
+
+/* The constants that place a class's gas: the envelope (c6), the field's y and the
+ * domes' height (c7), the volume's corner (c11). The camera (c0) and c12 are the
+ * caller's. */
+static void class_consts(Cls *c)
+{
+    c->k[6][0] = c->ex0; c->k[6][1] = c->ez0;
+    c->k[6][2] = 1.0f / (c->ex1 - c->ex0); c->k[6][3] = 1.0f / (c->ez1 - c->ez0);
+    c->k[7][0] = c->ey; c->k[7][1] = c->radius * c->extent * c->height;   /* the domes' full height */
+    c->k[7][3] = 1.0f / c->k[7][1];          /* a path through a dome's middle: Brightness */
+    c->k[11][0] = c->vlo[0]; c->k[11][1] = c->vlo[1]; c->k[11][2] = c->vlo[2];
+}
+
+/* Bakes a class's gas into c->vol: each layer of the volume drawn with bake_ps into a
+ * render target (a texel per pixel), read back and copied into the managed volume.
+ * The caller has captured the device's state and re-sets its own afterwards. 1 when
+ * the volume holds the class's gas as it is now. */
+static int bake_volume(void *d9, Cls *c, float half)
+{
+    static int said;
+    void  *vs = d9_shader(d9, &g_bake_vs), *ps = d9_shader(d9, &g_bake_ps);
+    void  *rt = NULLPTR, *rts = NULLPTR, *sys = NULLPTR, *old_rt = NULLPTR, *old_ds = NULLPTR;
+    float  size[3], texel, along;
+    int    X, Y, Z, j, ok = 0;
+    LARGE  t0, t1;
+    Vert   v[4];
+    char   m[220];
+
+    if (!vs || !ps) return 0;
+    QueryPerformanceCounter(&t0);
+    c->vlo[0] = c->ex0; c->vlo[1] = c->ey - half; c->vlo[2] = c->ez0;
+    size[0] = c->ex1 - c->ex0; size[1] = 2.0f * half; size[2] = c->ez1 - c->ez0;
+    along = size[0] > size[2] ? size[0] : size[2];
+    texel = along / (float)g_vol_max;
+    if (texel < g_vol_texel) texel = g_vol_texel;
+    X = (int)(size[0] / texel) + 1; Z = (int)(size[2] / texel) + 1; Y = (int)(size[1] / texel) + 1;
+    if (X > g_vol_max) X = g_vol_max;
+    if (Z > g_vol_max) Z = g_vol_max;
+    if (Y > g_vol_maxy) Y = g_vol_maxy;
+    if (X < 8) X = 8;
+    if (Z < 8) Z = 8;
+    if (Y < 8) Y = 8;
+    for (j = 0; j < 3; j++) c->vsize[j] = size[j];
+    if (c->vol && (c->vx != X || c->vy != Y || c->vz != Z)) { unref(c->vol); c->vol = NULLPTR; }
+    if (!c->vol && D9_FN(d9, D9_CREATEVOLUMETEXTURE, MakeVol_t)(d9, (UINT)X, (UINT)Z, (UINT)Y, 1, 0, 21, 1, &c->vol, NULLPTR) < 0) {
+        c->vol = NULLPTR;
+        note_once(&said, "bake: no volume texture could be made: the gas computed per pixel");
+        return 0;
+    }
+    c->vx = X; c->vy = Y; c->vz = Z;
+    if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, (UINT)X, (UINT)Z, 1, 1, 21, 0, &rt, NULLPTR) < 0 ||      /* RENDERTARGET, DEFAULT */
+        D9_FN(rt, 18, Level_t)(rt, 0, &rts) < 0 ||
+        D9_FN(d9, D9_CREATEOFFSCREEN, MakeOff_t)(d9, (UINT)X, (UINT)Z, 21, 2, &sys, NULLPTR) < 0) {      /* SYSTEMMEM */
+        note_once(&said, "bake: no render target could be made: the gas computed per pixel");
+        goto done;
+    }
+    D9_FN(d9, D9_GETRENDERTARGET2, GetRT_t)(d9, 0, &old_rt);
+    D9_FN(d9, D9_GETDEPTHSTENCIL, Obj_t)(d9, &old_ds);
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, rts);     /* the viewport becomes the layer */
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, NULLPTR);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);             /* ZENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 0);            /* ALPHABLENDENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 15);          /* COLORWRITEENABLE */
+    d9_bind(d9, vs, ps);
+    class_consts(c);
+    for (j = 0; j < 4; j++) {
+        v[j].x = (j & 1) ? 1.0f : -1.0f;
+        v[j].y = (j & 2) ? -1.0f : 1.0f;
+        v[j].z = v[j].thick = v[j].k = 0.0f;
+    }
+    for (j = 0; j < Y; j++) {
+        LOCKED    src;
+        LOCKEDBOX dst;
+        int       r, x;
+        struct { UINT l, t, r, b, f, k; } box;
+        c->k[12][0] = size[0] / (float)X; c->k[12][1] = size[1] / (float)Y; c->k[12][2] = size[2] / (float)Z;
+        c->k[12][3] = c->vlo[1] + ((float)j + 0.5f) * size[1] / (float)Y;
+        d9_psconst(d9, 0, &c->k[0][0], NCONST);
+        D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
+        if (D9_FN(d9, D9_GETRENDERTARGETDATA, RTData_t)(d9, rts, sys) < 0) break;
+        if (D9_FN(sys, 13, SurfLock_t)(sys, &src, NULLPTR, 0x10) < 0) break;            /* READONLY */
+        box.l = 0; box.t = 0; box.r = (UINT)X; box.b = (UINT)Z; box.f = (UINT)j; box.k = (UINT)j + 1;
+        if (D9_FN(c->vol, TEX_LOCK, Lock_t)(c->vol, 0, &dst, &box, 0) < 0) { D9_FN(sys, 14, SurfUnlock_t)(sys); break; }
+        for (r = 0; r < Z; r++) {
+            const DWORD *s = (const DWORD *)(src.bits + r * src.pitch);
+            DWORD       *d = (DWORD *)(dst.bits + r * dst.row);
+            for (x = 0; x < X; x++) d[x] = s[x];
+        }
+        D9_FN(c->vol, TEX_UNLOCK, Unlock_t)(c->vol, 0);
+        D9_FN(sys, 14, SurfUnlock_t)(sys);
+    }
+    ok = j == Y;
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, old_rt);
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, old_ds);
+    unref(old_rt); unref(old_ds);
+done:
+    unref(sys); unref(rts); unref(rt);
+    QueryPerformanceCounter(&t1);
+    if (ok) { c->vol_sig = c->sig; c->vol_gen = c->gen; }
+    else { unref(c->vol); c->vol = NULLPTR; }
+    m[0] = 0; s_cat(m, ok ? "bake \"" : "bake FAILED \""); s_cat(m, c->odf); s_cat(m, "\": ");
+    s_num(m, X); s_cat(m, "x"); s_num(m, Y); s_cat(m, "x"); s_num(m, Z); s_cat(m, " texels of ");
+    s_flt(m, size[0] / (float)X); s_cat(m, " units, in ");
+    s_num(m, g_qpf.q ? (long)((double)(t1.q - t0.q) * 1000.0 / (double)g_qpf.q) : -1); s_cat(m, " ms");
+    logline(m);
+    return ok;
+}
 
 static void mat_mul(const float *a, const float *b, float *o)   /* row-major 4x4, o = a * b */
 {
@@ -786,11 +950,9 @@ static int gather(void)
     return any;
 }
 
-/* Draws every class's gas; 1 if the device could take it (whether or not any was on
- * screen), 0 to leave the stock billboards. */
-static int draw_gas(void)
+/* The states every slice draw sets; the state block puts the engine's back. */
+static void draw_states(void *d9, void *vs, float cols[4][4])
 {
-    static int said_d9, said_sh, said_sb, said_cam;
     static const DWORD rs[][2] = {
         { 7, 1 },      /* ZENABLE */
         { 14, 0 },     /* ZWRITEENABLE */
@@ -812,9 +974,27 @@ static int draw_gas(void)
     };
     static const DWORD ss0[][2] = { { 1, 1 }, { 2, 1 }, { 3, 1 },       /* wrap */
                                     { 5, 2 }, { 6, 2 }, { 7, 2 }, { 11, 0 } };
-    static const DWORD ss1[][2] = { { 1, 3 }, { 2, 3 }, { 3, 3 },       /* clamp */
+    static const DWORD ssc[][2] = { { 1, 3 }, { 2, 3 }, { 3, 3 },       /* clamp, no mips */
                                     { 5, 2 }, { 6, 2 }, { 7, 0 }, { 11, 0 } };
-    void  *d8, *d9, *vs, *ps;
+    int i;
+    for (i = 0; i < (int)(sizeof rs / sizeof rs[0]); i++) D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, rs[i][0], rs[i][1]);
+    D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);               /* XYZ | TEX1, a float2 */
+    D9_FN(d9, D9_SETVERTEXSHADER, D9_Ptr_t)(d9, vs);
+    d9_vsconst(d9, 0, &cols[0][0], 4);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 0, g_vol);
+    for (i = 0; i < (int)(sizeof ss0 / sizeof ss0[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 0, ss0[i][0], ss0[i][1]);
+    for (i = 0; i < (int)(sizeof ssc / sizeof ssc[0]); i++) {
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, ssc[i][0], ssc[i][1]);
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 2, ssc[i][0], ssc[i][1]);
+    }
+}
+
+/* Draws every class's gas; 1 if the device could take it (whether or not any was on
+ * screen), 0 to leave the stock billboards. */
+static int draw_gas(void)
+{
+    static int said_d9, said_sh, said_sb, said_cam;
+    void  *d8, *d9, *vs, *ps, *vps;
     float  V[16], P[16], VP[16], cols[4][4], eye[3], f[3], r[3], u[3], zn;
     int    i, ci, slot = -1, captured = 0;
 
@@ -823,7 +1003,8 @@ static int draw_gas(void)
     if (!d9) { note_once(&said_d9, "no Direct3D 9 device behind d3d8 (not d3d8to9): the stock billboards"); return 0; }
     vs = d9_shader(d9, &g_vs);
     ps = d9_shader(d9, &g_ps);
-    if (!vs || !ps) { note_once(&said_sh, "the shaders could not be created: the stock billboards"); return 0; }
+    vps = d9_shader(d9, &g_vol_ps);
+    if (!vs || !ps || !vps) { note_once(&said_sh, "the shaders could not be created: the stock billboards"); return 0; }
     if (d9 != g_obj_dev) { drop_objects(); g_obj_dev = d9; }
     if (!g_sb && D9_FN(d9, D9_CREATESTATEBLOCK, MakeSB_t)(d9, 1, &g_sb) < 0) {   /* D3DSBT_ALL */
         g_sb = NULLPTR;
@@ -860,13 +1041,7 @@ static int draw_gas(void)
         if (!captured) {
             D9_FN(g_sb, SB_CAPTURE, SB_t)(g_sb);
             captured = 1;
-            for (i = 0; i < (int)(sizeof rs / sizeof rs[0]); i++) D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, rs[i][0], rs[i][1]);
-            D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);               /* XYZ | TEX1, a float2 */
-            d9_bind(d9, vs, ps);
-            d9_vsconst(d9, 0, &cols[0][0], 4);
-            D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 0, g_vol);
-            for (i = 0; i < (int)(sizeof ss0 / sizeof ss0[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 0, ss0[i][0], ss0[i][1]);
-            for (i = 0; i < (int)(sizeof ss1 / sizeof ss1[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, ss1[i][0], ss1[i][1]);
+            draw_states(d9, vs, cols);
             if (g_timing) {
                 timing_poll();
                 slot = timing_slot(d9);
@@ -876,7 +1051,12 @@ static int draw_gas(void)
         if (!c->env || c->env_sig != c->sig || c->env_gen != c->gen) {
             if (!bake_envelope(d9, c)) continue;
         }
-        half = c->radius * c->height;
+        half = c->radius * c->extent * c->height * (1.0f + c->k[8][3]);
+        if (g_bake && (!c->vol || c->vol_sig != c->sig || c->vol_gen != c->gen)) {
+            D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
+            bake_volume(d9, c, half);         /* on failure, c->vol stays NULL: per pixel */
+            draw_states(d9, vs, cols);
+        }
         lo[0] = c->ex0; lo[1] = c->ey - half; lo[2] = c->ez0;
         hi[0] = c->ex1; hi[1] = c->ey + half; hi[2] = c->ez1;
         for (i = 0; i < 8; i++) {
@@ -907,10 +1087,14 @@ static int draw_gas(void)
         }
         if (!nv) continue;
         c->k[0][0] = eye[0]; c->k[0][1] = eye[1]; c->k[0][2] = eye[2];
-        c->k[6][0] = c->ex0; c->k[6][1] = c->ez0;
-        c->k[6][2] = 1.0f / (c->ex1 - c->ex0); c->k[6][3] = 1.0f / (c->ez1 - c->ez0);
-        c->k[7][0] = c->ey; c->k[7][1] = 1.0f / half;
-        c->k[7][3] = 1.0f / (2.0f * c->radius);
+        class_consts(c);
+        if (g_bake && c->vol) {
+            for (i = 0; i < 3; i++) c->k[12][i] = 1.0f / c->vsize[i];
+            d9_bind(d9, vs, vps);
+            D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 2, c->vol);
+        } else {
+            d9_bind(d9, vs, ps);
+        }
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */

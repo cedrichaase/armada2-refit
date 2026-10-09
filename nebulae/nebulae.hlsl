@@ -24,11 +24,16 @@ float4 k_glow    : register(c3);   // rgb: the densest gas; w: gamma on the dens
 float4 k_noise   : register(c4);   // 1/tile (world units), warp, coverage, softness
 float4 k_seed    : register(c5);   // xyz: offset of the noise domain; w: detail
 float4 k_env     : register(c6);   // xy: envelope origin (x, z); zw: 1/its size
-float4 k_vert    : register(c7);   // x: the field's y; y: 1/half-height; z: 1/255; w: 1/reference length
-float4 k_shape   : register(c8);   // x: ridge; y: hue mix; z: warp scale; w: --
+float4 k_vert    : register(c7);   // x: the field's y; y: the domes' full height; z: 1/255; w: 1/reference length
+float4 k_shape   : register(c8);   // x: ridge; y: hue mix; z: warp scale; w: lumps (of the height)
+float4 k_knots   : register(c9);   // x: knots; y: their scale; z: lanes; w: their scale
+float4 k_light   : register(c10);  // xyz: towards the light, times the step (world units); w: shading
+float4 k_vlo     : register(c11);  // the baked volume: xyz its low corner (world); w: fine detail
+float4 k_vsz     : register(c12);  // bake: xyz world units per texel, w the layer's y; draw: xyz 1/its size
 
 sampler3D s_noise : register(s0);  // r: fbm; gba: three soft warp fields, all tiling
-sampler2D s_env   : register(s1);  // rgb: hue mix (0..1) and two spare; a: envelope
+sampler2D s_env   : register(s1);  // r: the domes' height (fraction); a: envelope
+sampler3D s_vol   : register(s2);  // the baked gas: density, shading, hue, emission
 
 struct VsIn  { float4 pos : POSITION; float2 t : TEXCOORD0; };
 struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; float2 t : TEXCOORD1; };
@@ -50,47 +55,125 @@ float hash12(float2 p)
     return frac((q.x + q.y) * q.z);
 }
 
-float4 neb_ps(VsOut i, float2 vpos : VPOS) : COLOR
+// The gas's density at q (noise coordinates), from the warp w and the disc's cover.
+// `det` is the fine octave's value; the shading sample passes the point's own, since
+// a step of ShadeStep is far larger than that octave and it only adds noise there.
+float gas_density(float3 q, float3 w, float cover, float det)
 {
-    float3 ray = i.w - k_eye.xyz;
-    float  dist = length(ray);
-    // A threshold per pixel that walks a golden-ratio sequence from slice to slice:
-    // stratified across the slices a pixel sees, so their errors cancel.
-    float  u0 = hash12(vpos);
-    float  jit = frac(u0 + i.t.y * 0.6180340) - 0.5;
-    // Each pixel samples a different depth inside its slice: the step between slices
-    // becomes fine noise instead of a stack of sheets.
-    float3 p = i.w + ray / dist * (jit * i.t.x);
-
-    float4 env = tex2D(s_env, (p.xz - k_env.xy) * k_env.zw);
-    float  dy = (p.y - k_vert.x) * k_vert.y;
-    float  cover = env.a * saturate(1.0 - dy * dy);
-    cover *= cover;
-    if (cover <= 0.001) return float4(0, 0, 0, 0);
-
-    float3 q = p * k_noise.x + k_seed.xyz;
-    float3 w = tex3D(s_noise, q * k_shape.z).gba * 2.0 - 1.0;
     float  base = tex3D(s_noise, q + w * k_noise.y).r;
-    float  det  = tex3D(s_noise, q * 3.13 + w.yzx * (k_noise.y * 0.5)).r;
     float  f = lerp(base, det, k_seed.w);
     float  n = (f - 0.5) * 8.0;                       // about a z-score (nebulae.c normalises)
     n = lerp(n, 2.0 - abs(n) * 2.0, k_shape.x);       // ridge: towards soft bands
-    // The envelope gathers the gas: deep inside, the threshold falls.
-    float  dens = saturate((n + (cover - 1.0) * 3.0 - k_noise.z) / k_noise.w + 0.5) * cover;
-    dens = pow(dens, k_glow.w);
+    // The edge is where the noise gives out, not a circle: the disc only raises the
+    // threshold towards its rim, and fades the last of it.
+    float  dens = saturate((n + (cover - 1.0) * 4.0 - k_noise.z) / k_noise.w + 0.5) * smoothstep(0.0, 0.35, cover);
+    return pow(dens, k_glow.w);
+}
+
+// The gas at a world point: x density, y shading (0..1.6), z hue (0..1), w emission
+// (knots times lanes, 0..4). What the bake stores, and the reference draws directly.
+float4 gas_at(float3 p)
+{
+    float4 env = tex2D(s_env, (p.xz - k_env.xy) * k_env.zw);
+    if (env.a <= 0.002) return float4(0, 1, 0, 1);
+
+    float3 q = p * k_noise.x + k_seed.xyz;
+    float3 w = tex3D(s_noise, q * k_shape.z).gba * 2.0 - 1.0;
+
+    // A dome over each nebula, its top and bottom pushed in and out by the warp field
+    // so the field has lumps and not a flat lid.
+    float  hgt = env.r * k_vert.y * (1.0 + w.z * k_shape.w);
+    float  t = abs(p.y - k_vert.x + w.y * k_shape.w * k_vert.y * 0.5) / max(hgt, 1.0);
+    float  cover = env.a * saturate((1.0 - t) * 2.5);
+    if (cover <= 0.001) return float4(0, 1, 0, 1);
+
+    float  det  = tex3D(s_noise, q * 3.13 + w.yzx * (k_noise.y * 0.5)).r;
+    float  dens = gas_density(q, w, cover, det);
+    // Self-shading, cheaply: the density a step towards the light. Where there is
+    // more gas between the point and the light, the point is in its own shadow; where
+    // there is less, it is a lit edge. That is what makes billows look round.
+    float  ahead = gas_density(q + k_light.xyz * k_noise.x, w, cover, det);
+    float  shade = clamp(1.0 + (dens - ahead) * k_light.w * 2.0, 0.25, 1.6);
+
+    // Knots: a coarse field whose peaks are brighter pockets of gas. Lanes: a softer
+    // one whose ridges are darker channels through it.
+    float  kn = tex3D(s_noise, q * k_knots.y + float3(0.31, 0.17, 0.53)).r;
+    float  knot = 1.0 + k_knots.x * smoothstep(0.5, 0.8, kn);
+    float  ln = tex3D(s_noise, q * k_knots.w + float3(0.71, 0.43, 0.29)).g;
+    float  lane = 1.0 - k_knots.z * smoothstep(0.35, 0.05, abs(ln - 0.5) * 2.0);
 
     float  hue = saturate((w.x * k_gas_b.w) * 0.5 + 0.5);
-    hue = lerp(hue, dens, k_shape.y);
-    float3 gas = lerp(k_gas_a.rgb, k_gas_b.rgb, hue);
-    float3 c = gas * dens + k_glow.rgb * (dens * dens * dens);
+    return float4(dens, shade, hue, knot * lane);
+}
 
+// The colour a slice adds for gas g at distance dist, before the rounding.
+float3 gas_colour(float4 g, float thick, float dist)
+{
+    float  dens = g.x;
+    float  hue = lerp(g.z, dens, k_shape.y);
+    float3 gas = lerp(k_gas_a.rgb, k_gas_b.rgb, hue);
+    float3 c = (gas * dens + k_glow.rgb * (dens * dens) * g.w) * g.w * g.y;
     float  near = saturate((dist - k_eye.w * 0.25) / k_eye.w);
-    c *= k_gas_a.w * near * (i.t.x * k_vert.w);
-    // Each slice adds well under one step of the 8-bit back buffer, which blending
-    // would round away. So each slice rounds itself, to whole steps, against a
-    // threshold that walks the golden-ratio sequence (offset from the jitter's): over
-    // the slices a pixel sees, the rounding errors cancel to about one step in all.
-    float  u = frac(u0 * 7.31 + 0.5 + i.t.y * 0.7548777);
-    c = floor(max(c, 0.0) * 255.0 + u) * k_vert.z;
-    return float4(c, 0.0);
+    return c * (k_gas_a.w * near * thick * k_vert.w);
+}
+
+// The slice's point for this pixel, jittered in depth; u0 the pixel's threshold.
+float3 slice_point(VsOut i, float2 vpos, out float dist, out float u0)
+{
+    float3 ray = i.w - k_eye.xyz;
+    dist = length(ray);
+    // A threshold per pixel that walks a golden-ratio sequence from slice to slice:
+    // stratified across the slices a pixel sees, so their errors cancel.
+    u0 = hash12(vpos);
+    float  jit = (frac(u0 + i.t.y * 0.6180340) - 0.5) * 0.6;
+    // Each pixel samples a different depth inside its slice: the step between slices
+    // becomes fine noise instead of a stack of sheets.
+    return i.w + ray / dist * (jit * i.t.x);
+}
+
+// Each slice adds well under one step of the 8-bit back buffer, which blending would
+// round away. So each slice rounds itself, to whole steps, against a threshold that
+// walks the golden-ratio sequence (offset from the jitter's): over the slices a pixel
+// sees, the rounding errors cancel to about one step in all.
+float4 slice_out(float3 c, float u0, float k)
+{
+    float  u = frac(u0 * 7.31 + 0.5 + k * 0.7548777);
+    return float4(floor(max(c, 0.0) * 255.0 + u) * k_vert.z, 0.0);
+}
+
+// The reference: every slice pixel computes the gas itself (Bake=0). Costly.
+float4 neb_ps(VsOut i, float2 vpos : VPOS) : COLOR
+{
+    float  dist, u0;
+    float3 p = slice_point(i, vpos, dist, u0);
+    float4 g = gas_at(p);
+    if (g.x <= 0.0) return float4(0, 0, 0, 0);
+    return slice_out(gas_colour(g, i.t.x, dist), u0, i.t.y);
+}
+
+float4 bake_vs(float4 pos : POSITION) : POSITION
+{
+    return float4(pos.xy, 0.0, 1.0);
+}
+
+// The bake: one layer of the volume per draw, a texel per pixel. Stored as
+// density, shading / 1.6, hue, emission / 4.
+float4 bake_ps(float2 vpos : VPOS) : COLOR
+{
+    float3 p = float3(k_vlo.x + (vpos.x + 0.5) * k_vsz.x, k_vsz.w, k_vlo.z + (vpos.y + 0.5) * k_vsz.z);
+    float4 g = gas_at(p);
+    return float4(g.x, g.y / 1.6, g.z, g.w / 4.0);
+}
+
+// The draw from the baked volume: one read, and the fine octave of the tiling noise
+// for detail finer than the volume's texels.
+float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
+{
+    float  dist, u0;
+    float3 p = slice_point(i, vpos, dist, u0);
+    float4 v = tex3D(s_vol, ((p - k_vlo.xyz) * k_vsz.xyz).xzy);   // width x, height z, depth y
+    if (v.x <= 0.002) return float4(0, 0, 0, 0);
+    float  det = tex3D(s_noise, p * (k_noise.x * 6.1) + k_seed.zxy).r;
+    float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);
+    return slice_out(gas_colour(g, i.t.x, dist), u0, i.t.y);
 }
