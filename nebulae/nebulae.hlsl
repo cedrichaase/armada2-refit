@@ -24,7 +24,7 @@ float4 k_glow    : register(c3);   // rgb: the densest gas; w: gamma on the dens
 float4 k_noise   : register(c4);   // 1/tile (world units), warp, coverage, softness
 float4 k_seed    : register(c5);   // xyz: offset of the noise domain; w: detail
 float4 k_env     : register(c6);   // xy: envelope origin (x, z); zw: 1/its size
-float4 k_vert    : register(c7);   // x: the field's y; y: the domes' full height; z: 1/255; w: 1/reference length
+float4 k_vert    : register(c7);   // x: the field's y; y: the domes' full height; z: 1/255; w: 1/reach, times the edge-on dimming
 float4 k_shape   : register(c8);   // x: ridge; y: hue mix; z: warp scale; w: lumps (of the height)
 float4 k_knots   : register(c9);   // x: knots; y: their scale; z: lanes; w: their scale
 float4 k_light   : register(c10);  // xyz: towards the light, times the step (world units); w: shading
@@ -90,7 +90,7 @@ float4 gas_at(float3 p)
     float  y = p.y - k_vert.x + w.y * k_shape.w * k_vert.y * 0.5;
     float  hgt = env.r * k_vert.y * (1.0 + w.z * k_shape.w);
     float  t = abs(y) / max(hgt, 1.0);
-    float  cover = env.a * smoothstep(1.0, 0.35, t);
+    float  cover = env.a * smoothstep(1.0, 0.55, t);   // dense to over half the height
 
     float  det  = tex3D(s_noise, q * 3.13 + w.yzx * (k_noise.y * 0.5)).r;
     float  dens = cover > 0.001 ? gas_density(q, w, cover, det) : 0.0;

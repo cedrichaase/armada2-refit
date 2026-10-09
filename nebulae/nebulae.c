@@ -274,7 +274,7 @@ static float g_min_step = 6;  /* MinStep=: never closer together than this, worl
 static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
-static int   g_vol_maxy = 128; /* VolumeHeight=: and up, texels */
+static int   g_vol_maxy = 160; /* VolumeHeight=: and up, texels */
 static float g_vol_texel = 3; /* VolumeTexel=: never finer than this, world units */
 static FILETIME g_ini_time;
 
@@ -291,7 +291,7 @@ static void read_settings(void)
     parsen(b, &g_min_step, 1);
     g_bake     = (int)GetPrivateProfileIntA("Nebulae", "Bake", 1, g_ini);
     g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
-    g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 128, g_ini);
+    g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 160, g_ini);
     GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
     parsen(b, &g_vol_texel, 1);
     if (g_vol_max < 16) g_vol_max = 16;
@@ -399,7 +399,7 @@ static int recipe_read(Cls *c)
     c->fil_reach = ini1(f, "FilamentReach", 1.8f);
     c->edge_dim = ini1(f, "EdgeOnDim", 0.5f);
     c->extent  = ini1(f, "Extent", 1.3f);
-    c->height  = ini1(f, "Height", 1.4f);        /* the domes' height, times the reach */
+    c->height  = ini1(f, "Height", 3.0f);        /* the domes' height, times the reach */
     c->gen++;
 
     b[0] = 0; s_cat(b, "recipe "); s_cat(b, f); s_cat(b, " read");
@@ -699,8 +699,8 @@ out:
  * capped at 1 (alpha), in a texture over the box of the class's nebulae. The gameplay
  * edge, the effect radius, falls inside the soft part. Red is how high the gas may
  * rise there, as a fraction of the domes' height: the highest of the nebulae's
- * paraboloids, which taper to nothing at the reach, so a field is a row of domes
- * with sloping sides and not a slab with walls. Green is the filaments' wider disc
+ * 1 - (d / reach)^3, full height over most of the disc and tapering to nothing at the
+ * reach, so a field is a row of tall domes with sloping sides and not a slab with walls. Green is the filaments' wider disc
  * (FilamentReach times the reach). The box leaves room for the outline's warp. */
 static int bake_envelope(void *d9, Cls *c)
 {
@@ -749,7 +749,8 @@ static int bake_envelope(void *d9, Cls *c)
                 g += smooth(1.0f, 0.3f, d / freach);
                 if (d >= reach) continue;
                 s += smooth(1.0f, 0.6f, d / reach);
-                q = 1.0f - d2 / (reach * reach);              /* tapers to the edge: no wall */
+                q = d / reach;
+                q = 1.0f - q * q * q;                         /* flat-topped, tapering at the edge: no wall */
                 if (q > h) h = q;
             }
             a = (int)((s > 1.0f ? 1.0f : s) * 255.0f + 0.5f);
@@ -782,7 +783,7 @@ static void class_consts(Cls *c)
     c->k[6][0] = c->ex0; c->k[6][1] = c->ez0;
     c->k[6][2] = 1.0f / (c->ex1 - c->ex0); c->k[6][3] = 1.0f / (c->ez1 - c->ez0);
     c->k[7][0] = c->ey; c->k[7][1] = c->radius * c->extent * c->height;   /* the domes' full height */
-    c->k[7][3] = 1.0f / c->k[7][1];          /* a path through a dome's middle: Brightness */
+    c->k[7][3] = 1.0f / (c->radius * c->extent);   /* Brightness per reach; the draw adds the dimming */
     c->k[11][0] = c->vlo[0]; c->k[11][1] = c->vlo[1]; c->k[11][2] = c->vlo[2];
     c->k[13][3] = c->edge_warp * c->radius * c->extent;
     c->k[14][3] = c->k[7][1] * 0.8f;          /* the filaments reach most of the domes' height */
@@ -1230,12 +1231,13 @@ static int draw_gas(void)
         }
         {   /* edge-on, the path through the field is long and the gas would clip:
              * dim it by the path's length against the domes' height, to EdgeOnDim */
-            float fy = f[1] < 0.0f ? -f[1] : f[1], path, lim, s;
+            float fy = f[1] < 0.0f ? -f[1] : f[1], path, lim, s, reach = c->radius * c->extent;
+            float ref = 2.8f * reach;            /* Brightness is per this path */
             lim = (c->ex1 - c->ex0) + (c->ez1 - c->ez0);
             path = fy > 1e-3f ? 2.0f * c->k[7][1] / fy : lim;
             if (path > lim) path = lim;
-            s = path > 2.0f * c->k[7][1] ? pow_f(2.0f * c->k[7][1] / path, c->edge_dim) : 1.0f;
-            c->k[7][3] = s / c->k[7][1];
+            s = path > ref ? pow_f(ref / path, c->edge_dim) : 1.0f;
+            c->k[7][3] = s / reach;
         }
         if (g_bake && c->vol) {
             for (i = 0; i < 3; i++) c->k[12][i] = 1.0f / c->vsize[i];
