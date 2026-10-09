@@ -12,7 +12,7 @@ cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAU
   `Brightness` is calibrated to about 0.92 of the stock set's luminance.
 - Recipe key `Band=` (yaw, pitch, half-width, gather): gas gathered about a great circle.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 1.0.0 — 2026-10-09
 
@@ -28,4 +28,4 @@ Installed, not yet seen in game.
 - `install.sh` (`--timing`, `--remove`); `./install` runs it, `a2mod` switches `Sky.asi`,
   `Sky.ini` and `Sky/*.ini` as the `sky` layer.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.

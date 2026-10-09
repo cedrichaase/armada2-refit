@@ -26,7 +26,7 @@ Layers: sky 1.1.0.
 ### Added
 - Procedural recipes for every sky a stock map uses, and the recipe key `Band=` (sky 1.1.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 11.14.0 — 2026-10-09
 
@@ -38,7 +38,7 @@ Layers: sky 1.0.0 (new).
   installs it and `a2mod` switches it.
 - `no-assets` checks that `Sky.asi` patched its site.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-09.
 
 ## 11.13.0 — 2026-10-09
 
