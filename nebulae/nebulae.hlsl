@@ -31,6 +31,7 @@ float4 k_light   : register(c10);  // xyz: towards the light, times the step (wo
 float4 k_vlo     : register(c11);  // the baked volume: xyz its low corner (world); w: fine detail
 float4 k_vsz     : register(c12);  // bake: xyz world units per texel, w the layer's y; draw: xyz 1/its size, w the frame
 float4 k_flow    : register(c13);  // x: the drift (noise units, grows with time); y: flow (world units); z: its scale; w: edge warp (world units)
+float4 k_samp    : register(c15);  // x: reads per slice pixel (1 or 2); y: the jitter's span (1, or 0.5 with two reads)
 float4 k_fil     : register(c14);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
 
 sampler3D s_noise : register(s0);  // r: fbm; gba: three soft warp fields, all tiling
@@ -147,7 +148,7 @@ float3 slice_point(VsOut i, float2 vpos, out float dist, out float2 u)
     u = tex2D(s_blue, (vpos + 0.5) / 64.0).rg + k_vsz.w * float2(0.6180340, 0.7548777);
     // Over the whole gap to the next slice (with vol_ps's two reads): a part left
     // unsampled shows as bands where the slices turn through the gas.
-    float  jit = (frac(u.x + i.t.y * 0.6180340) - 0.5) * 0.5;   // vol_ps reads a quarter gap either side
+    float  jit = (frac(u.x + i.t.y * 0.6180340) - 0.5) * k_samp.y;   // with two reads, vol_ps covers the rest
     return i.w + ray / dist * (jit * i.t.x);
 }
 
@@ -202,12 +203,16 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
     // Flow: the volume read through a warp field that drifts with time, so the gas
     // and its outline churn slowly instead of standing still.
     float3 fl = tex3D(s_noise, p * (k_noise.x * k_flow.z) + float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37)).gba * 2.0 - 1.0;
-    // Two reads a quarter of the gap either side of the jittered point: one in each
-    // half of the gap, stratified, which halves the noise the jitter leaves.
+    // Samples=2: two reads a quarter of the gap either side of the jittered point, one
+    // in each half of the gap, stratified, which halves the noise the jitter leaves.
     float3 dir = (i.w - k_eye.xyz) / dist * (i.t.x * 0.25);
     float3 pa = p + fl * k_flow.y;
-    float4 v = 0.5 * (tex3D(s_vol, ((pa - dir - k_vlo.xyz) * k_vsz.xyz).xzy) +   // width x, height z, depth y
-                      tex3D(s_vol, ((pa + dir - k_vlo.xyz) * k_vsz.xyz).xzy));
+    float4 v;
+    if (k_samp.x > 1.5)
+        v = 0.5 * (tex3D(s_vol, ((pa - dir - k_vlo.xyz) * k_vsz.xyz).xzy) +   // width x, height z, depth y
+                   tex3D(s_vol, ((pa + dir - k_vlo.xyz) * k_vsz.xyz).xzy));
+    else
+        v = tex3D(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy);
     if (v.x <= 0.002) return float4(0, 0, 0, 0);
     float  det = tex3D(s_noise, pa * (k_noise.x * 6.1) + k_seed.zxy).r;
     float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);

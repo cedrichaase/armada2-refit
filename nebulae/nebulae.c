@@ -272,6 +272,7 @@ static int   g_reload = 1;    /* Reload= */
 static int   g_slices = 40;   /* Slices=: through the deepest field on screen */
 static float g_min_step = 6;  /* MinStep=: never closer together than this, world units */
 static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
+static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
 static int   g_vol_maxy = 160; /* VolumeHeight=: and up, texels */
@@ -290,6 +291,7 @@ static void read_settings(void)
     GetPrivateProfileStringA("Nebulae", "MinStep", "6", b, sizeof b, g_ini);
     parsen(b, &g_min_step, 1);
     g_bake     = (int)GetPrivateProfileIntA("Nebulae", "Bake", 1, g_ini);
+    g_samples  = (int)GetPrivateProfileIntA("Nebulae", "Samples", 2, g_ini) >= 2 ? 2 : 1;
     g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
     g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 160, g_ini);
     GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
@@ -309,7 +311,7 @@ static void read_settings(void)
 
 /* The pixel shader's constants, c0..c8; their meaning is listed in nebulae.hlsl.
  * c0 (camera), c6 (envelope) and c7.x, y, w are filled in per draw. */
-#define NCONST 15
+#define NCONST 16
 #define MAX_CLASSES 16
 #define MAX_NEB 256
 #define ENV_MAX 512
@@ -1346,6 +1348,8 @@ static int draw_gas(void)
             c->k[7][3] = s / reach;
         }
         c->k[12][3] = (float)(g_frame & 1023);    /* the draw's dither moves on each frame */
+        c->k[15][0] = (g_bake && c->vol) ? (float)g_samples : 1.0f;
+        c->k[15][1] = c->k[15][0] > 1.5f ? 0.5f : 1.0f;
         if (g_bake && c->vol) {
             for (i = 0; i < 3; i++) c->k[12][i] = 1.0f / c->vsize[i];
             d9_bind(d9, vs, vps);
