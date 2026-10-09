@@ -16,6 +16,9 @@ Reads package schemas 0 and 1.
 - An amber accent (`AMBER`): the Install button, the progress bar and libadwaita's accent.
 - A bolder title: "ARMADA II" at weight 900 over a tracked amber "REFIT"
   (`.title-main`, `.title-tag`; `.title-big` is gone), in the desktop's own font.
+- **Launch game** beside Install (`launch_game()`, `heroic_launch_uri()`): starts the
+  game through Heroic; it takes the amber once there is nothing new to install.
+- `EngineBar`: the progress bar glides, with a glowing engine and a trail at its tip.
 - When no Heroic is found, an open row with how to install it on this distribution
   (`HEROIC_HOWTO`, `heroic_installed()`), a link to its site and what to do next.
 

@@ -11,7 +11,8 @@ Layers: gui-installer 1.3.0.
 
 ### Changed
 - The graphical installer has a procedural nebula behind its stars that goes to warp
-  while installing, an amber accent and a bolder title, always writes Heroic's launch settings, says how
+  while installing, an amber accent, a bolder title, a Launch game button and a
+  progress bar with an engine at its tip, always writes Heroic's launch settings, says how
   to get Heroic when there is none, and drops the remastering subtitle and the textures
   note (gui-installer 1.3.0).
 

@@ -483,6 +483,23 @@ HEROIC_HOWTO['ubuntu'] = HEROIC_HOWTO['debian']
 HEROIC_HOWTO['fedora-ostree'] = [('Install Heroic from Flathub:', HEROIC_FLATPAK)]
 
 
+def heroic_launch_uri(heroic):
+    """What Heroic's own desktop shortcuts open (Heroic 2.x)."""
+    return f'heroic://launch?appName={heroic.app}&runner=gog'
+
+
+def launch_game(heroic):
+    """Start the game through Heroic. xdg-open with the host's environment, so Heroic
+    never inherits the AppImage's libraries; False when there is no xdg-open."""
+    try:
+        subprocess.Popen(['xdg-open', heroic_launch_uri(heroic)], env=host_env(),
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    except OSError:
+        return False
+    return True
+
+
 def heroic_installed():
     """Heroic on this machine: run once (its config folder), or installed and never run."""
     if any(os.path.isdir(root) for root, _ in HEROIC_ROOTS):
@@ -1080,6 +1097,8 @@ def selftest():
             return sum(abs(alpha[r * nw + a] - alpha[r * nw + b]) for r in range(nh)) / nh
         check(seam(nw - 1, 0) <= 3 * seam(nw // 2, nw // 2 + 1) + 2,
               'nebula: tiles across without a seam')
+        check(heroic_launch_uri(Heroic(t, GOG_APP, False)) ==
+              f'heroic://launch?appName={GOG_APP}&runner=gog', "launch: Heroic's own URI")
         check(split_overrides('a=n,b; b=n') == {'a': 'n,b', 'b': 'n'}, 'overrides parse')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
         keep = {k: os.environ.get(k) for k in ('A2_APPIMAGE', 'PATH', 'PYTHONHOME', 'A2_ORIG_PATH',
@@ -1371,6 +1390,75 @@ def run_gui():
                     cr.arc(px, y * h, r, 0, 6.2832)
                     cr.fill()
 
+    class EngineBar(Gtk.Overlay):
+        """The progress bar with an engine at its tip: an amber glow that flickers and a
+        short trail behind it. The bar glides to each new fraction instead of jumping,
+        and the glow fades out once it is full. A plain bar when animations are off."""
+        HEIGHT = 24             # room for the glow around a 4 px bar
+        GLIDE = 4.0             # 1/s: how fast the bar closes on a new fraction
+
+        def __init__(self):
+            super().__init__()
+            self.bar = Gtk.ProgressBar(valign=Gtk.Align.CENTER, hexpand=True)
+            self.bar.add_css_class('thin')
+            box = Gtk.Box(height_request=self.HEIGHT)
+            box.append(self.bar)
+            self.set_child(box)
+            self.glow = Gtk.DrawingArea(can_target=False)
+            self.glow.set_draw_func(self.draw)
+            self.add_overlay(self.glow)
+            self.shown = self.target = self.lit = 0.0
+            self.t_last = None
+            self.animate = Gtk.Settings.get_default().get_property('gtk-enable-animations')
+            if self.animate:
+                self.add_tick_callback(self.tick)
+
+        def set_fraction(self, f):
+            if f < self.shown or not self.animate:
+                self.shown = f          # a new job starts from nothing at once
+                self.bar.set_fraction(f)
+            self.target = f
+            self.glow.queue_draw()
+
+        def tick(self, widget, clock):
+            t = clock.get_frame_time() / 1e6
+            dt = 0.0 if self.t_last is None else min(0.1, t - self.t_last)
+            self.t_last = t
+            lit_to = 1.0 if 0.0 < self.target < 1.0 else 0.0
+            if abs(self.target - self.shown) > 1e-4 or self.lit != lit_to or self.lit > 0:
+                self.shown += (self.target - self.shown) * min(1.0, dt * self.GLIDE)
+                self.lit += (lit_to - self.lit) * min(1.0, dt * (5.0 if lit_to else 1.5))
+                if self.lit < 0.01 and not lit_to:
+                    self.lit = 0.0
+                self.bar.set_fraction(self.shown)
+                self.glow.queue_draw()
+            return GLib.SOURCE_CONTINUE
+
+        def draw(self, area, cr, w, h):
+            import cairo
+            if self.lit <= 0.0 or self.shown <= 0.0:
+                return
+            x, y = self.shown * w, h / 2
+            t = GLib.get_monotonic_time() / 1e6
+            flick = 0.85 + 0.1 * math.sin(t * 23) + 0.05 * math.sin(t * 61)
+            # The trail: the bar burning brighter toward the engine.
+            trail = min(x, 80.0)
+            g = cairo.LinearGradient(x - trail, 0, x, 0)
+            g.add_color_stop_rgba(0, 1.0, 0.75, 0.40, 0)
+            g.add_color_stop_rgba(1, 1.0, 0.85, 0.60, 0.8 * self.lit)
+            cr.set_source(g)
+            cr.rectangle(x - trail, y - 2, trail, 4)
+            cr.fill()
+            # The engine: white-hot at the core, amber around it.
+            r = 14 * flick
+            g = cairo.RadialGradient(x, y, 0, x, y, r)
+            g.add_color_stop_rgba(0, 1.0, 0.97, 0.88, self.lit)
+            g.add_color_stop_rgba(0.25, 1.0, 0.72, 0.32, 0.75 * self.lit * flick)
+            g.add_color_stop_rgba(1, 0.96, 0.57, 0.18, 0)
+            cr.set_source(g)
+            cr.arc(x, y, r, 0, 6.2832)
+            cr.fill()
+
     class Window(Adw.ApplicationWindow):
         def __init__(self, app):
             super().__init__(application=app, title='Armada II Refit',
@@ -1471,21 +1559,28 @@ def run_gui():
             col.append(self.heads_up)
 
             act = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            self.b_install = Gtk.Button(label='Install', halign=Gtk.Align.CENTER)
-            self.b_install.add_css_class('suggested-action')
+            pair = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER, homogeneous=True)
+            self.b_install = Gtk.Button(label='Install')
             self.b_install.add_css_class('pill')
-            self.b_install.set_size_request(220, 48)
+            self.b_install.set_size_request(190, 48)
             self.b_install.connect('clicked', lambda _b: self.on_install())
-            act.append(self.b_install)
+            pair.append(self.b_install)
+            self.b_launch = Gtk.Button(child=Adw.ButtonContent(
+                icon_name='media-playback-start-symbolic', label='Launch game'),
+                tooltip_text='Start Armada II through Heroic')
+            self.b_launch.add_css_class('pill')
+            self.b_launch.set_size_request(190, 48)
+            self.b_launch.connect('clicked', lambda _b: self.on_launch())
+            pair.append(self.b_launch)
+            act.append(pair)
             self.b_uninstall = Gtk.Button(label='Uninstall', halign=Gtk.Align.CENTER)
             self.b_uninstall.add_css_class('flat')
             self.b_uninstall.connect('clicked', lambda _b: self.on_uninstall())
             act.append(self.b_uninstall)
             col.append(act)
 
-            prog = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-            self.bar = Gtk.ProgressBar()
-            self.bar.add_css_class('thin')
+            prog = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            self.bar = EngineBar()
             prog.append(self.bar)
             self.status = lab('', 'status', xalign=0.5, wrap=True, justify=Gtk.Justification.CENTER)
             prog.append(self.status)
@@ -1863,6 +1958,8 @@ def run_gui():
             self.b_install.set_sensitive(not self.busy and ok)
             self.b_uninstall.set_visible(bool(g and inst))
             self.b_uninstall.set_sensitive(not self.busy)
+            self.b_launch.set_visible(bool(g and g.heroic and inst))
+            self.b_launch.set_sensitive(not self.busy)
             label = 'Install'
             if r and inst:
                 label = ('Reinstall' if inst == r.version else 'Install' if inst == '?' else
@@ -1870,6 +1967,10 @@ def run_gui():
                 if label != 'Reinstall' and label != 'Install':
                     label += f' {r.version}'
             self.b_install.set_label(label)
+            # The amber goes to what there is to do: Launch once nothing is new to install.
+            launch_first = label == 'Reinstall' and self.b_launch.get_visible()
+            for b, on in ((self.b_install, not launch_first), (self.b_launch, launch_first)):
+                (b.add_css_class if on else b.remove_css_class)('suggested-action')
 
         # ---------------------------------------------------------- jobs
         def report(self, frac, step, info):
@@ -1930,6 +2031,18 @@ def run_gui():
                 self.set_status(msg, 'ok')
                 self.on_game()
             self.in_thread(lambda: self.job().install(r, None, g.path, launcher=write), done)
+
+        def on_launch(self):
+            g = self.game()
+            if not g or not g.heroic or self.busy:
+                return
+            if game_running():
+                self.set_status('Armada II is already running.')
+                return
+            if launch_game(g.heroic):
+                self.set_status('Starting Armada II through Heroic…', 'ok')
+            else:
+                self.open_uri(heroic_launch_uri(g.heroic))
 
         def on_uninstall(self):
             g = self.game()

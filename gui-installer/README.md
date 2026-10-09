@@ -158,6 +158,17 @@ and every common desktop sans (Adwaita Sans, Cantarell, Noto Sans, Ubuntu) has t
 weight. The tag's margin makes up for the tracking GTK also puts after its last letter,
 which would otherwise push it off centre.
 
+**Launch game** sits beside Install once the game has a release in it and Heroic knows
+it. It opens `heroic://launch?appName=<app>&runner=gog`, the URI Heroic 2.x's own
+desktop shortcuts use, through `xdg-open` with `host_env()`, so Heroic never inherits
+the AppImage's libraries (GTK's URI launcher is only the fallback). The amber goes to
+whichever of the two there is to do: Install while something new is there, Launch once
+the button would only say Reinstall.
+
+The progress bar (`EngineBar`) has an engine at its tip: a flickering amber glow and a
+short trail, drawn on an overlay 24 px high around the 4 px bar. The bar glides to each
+new fraction instead of jumping step to step, and the glow fades out once it is full.
+
 When there is no Heroic at all (no config folder, no `heroic` on the `PATH`, no Flatpak)
 and the game is not one Heroic knows, an open row says how to get it for this
 distribution (`HEROIC_HOWTO`): the AUR package on Arch, otherwise the site's `.deb`/`.rpm`
