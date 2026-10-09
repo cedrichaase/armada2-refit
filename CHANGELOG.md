@@ -10,7 +10,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: gui-installer 1.3.0.
 
 ### Changed
-- The graphical installer has a logo, always writes Heroic's launch settings, says how
+- The graphical installer has a procedural nebula behind its stars, always writes Heroic's launch settings, says how
   to get Heroic when there is none, and drops the remastering subtitle and the textures
   note (gui-installer 1.3.0).
 

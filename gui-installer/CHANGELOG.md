@@ -9,8 +9,8 @@ package schemas it reads are listed in each entry. Newest first.
 Reads package schemas 0 and 1.
 
 ### Added
-- A logo (`LOGO_SVG`, a ship leaving a drydock ring) above the title; `--logo` prints it,
-  and the AppImage's icon is written from it (`appimage/armada2-refit.svg` is gone).
+- A procedural nebula behind the stars (`nebula_pixels`), new at every launch, faded in
+  and drifting slowly; it replaces the three fixed colour washes.
 - When no Heroic is found, an open row with how to install it on this distribution
   (`HEROIC_HOWTO`, `heroic_installed()`), a link to its site and what to do next.
 

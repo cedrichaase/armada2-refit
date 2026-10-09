@@ -7,7 +7,6 @@
     python3 armada2-refit-installer.py --package ZIP --game DIR [--no-launcher]
     python3 armada2-refit-installer.py --uninstall [--game DIR]
     python3 armada2-refit-installer.py --selftest
-    python3 armada2-refit-installer.py --logo           the logo, as SVG
 
 It finds the game (Heroic, Lutris, Bottles, Wine prefixes, the usual folders), lists the
 releases on GitHub -- checked on every launch and on Refresh, cached under
@@ -98,65 +97,6 @@ LEGACY_LAYERS = {
     'binkw32.dll': ('cutscenes', 'Cutscene player', 'always'),
     'dxvk.conf': ('renderer', 'Renderer', 'dxvk.conf'),
 }
-
-# The logo, a ship leaving a drydock ring: drawn by hand, the one copy. The window shows it
-# and the AppImage takes its icon from here (--logo prints it).
-LOGO_SVG = '''\
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <defs>
-    <radialGradient id="sky" cx="38%" cy="32%" r="75%">
-      <stop offset="0" stop-color="#22336e"/>
-      <stop offset="1" stop-color="#070a16"/>
-    </radialGradient>
-    <linearGradient id="hull" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#9fb3d9"/>
-      <stop offset=".55" stop-color="#5d74a8"/>
-      <stop offset="1" stop-color="#34466f"/>
-    </linearGradient>
-    <linearGradient id="ring" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffc35a"/>
-      <stop offset="1" stop-color="#e07a12"/>
-    </linearGradient>
-    <radialGradient id="glow">
-      <stop offset="0" stop-color="#ffe2a0"/>
-      <stop offset=".4" stop-color="#ffab36" stop-opacity=".85"/>
-      <stop offset="1" stop-color="#ff8a00" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <circle cx="64" cy="64" r="60" fill="url(#sky)"/>
-  <circle cx="64" cy="64" r="59.2" fill="none" stroke="#8ea4d6" stroke-opacity=".35" stroke-width="1.6"/>
-  <g fill="#fff">
-    <circle cx="30" cy="34" r="1.2"/><circle cx="94" cy="28" r="1"/><circle cx="104" cy="74" r="1.3"/>
-    <circle cx="26" cy="82" r=".9"/><circle cx="78" cy="104" r="1"/><circle cx="48" cy="20" r=".8"/>
-  </g>
-  <!-- the ring, tilted; its far half behind the ship -->
-  <g transform="rotate(-28 64 66)">
-    <path d="M18 66 A46 17 0 0 1 110 66" fill="none" stroke="url(#ring)" stroke-width="7" stroke-opacity=".55"/>
-    <path d="M18 66 A46 17 0 0 1 110 66" fill="none" stroke="#5a2c00" stroke-width="7" stroke-dasharray="1.4 6.2" stroke-opacity=".6"/>
-  </g>
-  <!-- the ship, nose to the upper right -->
-  <g transform="rotate(42 64 64)">
-    <ellipse cx="45" cy="97" rx="4.5" ry="10" fill="url(#glow)"/>
-    <ellipse cx="83" cy="97" rx="4.5" ry="10" fill="url(#glow)"/>
-    <path d="M58 66 L44 74 L44 79 L58 74 Z M70 66 L84 74 L84 79 L70 74 Z" fill="#41557f"/>
-    <rect x="40.5" y="60" width="9" height="32" rx="4.5" fill="url(#hull)"/>
-    <rect x="78.5" y="60" width="9" height="32" rx="4.5" fill="url(#hull)"/>
-    <rect x="42" y="82" width="6" height="9" rx="3" fill="#ffb347"/>
-    <rect x="80" y="82" width="6" height="9" rx="3" fill="#ffb347"/>
-    <path d="M64 18 L81 50 L80 56 L71 60 L70 88 L58 88 L57 60 L48 56 L47 50 Z" fill="url(#hull)"/>
-    <path d="M64 18 L47 50 L48 56 L57 60 L58 88 L61 88 L61 58 L58 52 Z" fill="#d3def3" fill-opacity=".6"/>
-    <path d="M64 30 L69 44 L64 48 L59 44 Z" fill="#bfe3ff"/>
-    <rect x="59" y="85" width="10" height="5" rx="2.5" fill="#ffb347"/>
-  </g>
-  <!-- the ring's near half, in front of the ship -->
-  <g transform="rotate(-28 64 66)">
-    <path d="M18 66 A46 17 0 0 0 110 66" fill="none" stroke="url(#ring)" stroke-width="7"/>
-    <path d="M18 66 A46 17 0 0 0 110 66" fill="none" stroke="#5a2c00" stroke-width="7" stroke-dasharray="1.4 6.2" stroke-opacity=".55"/>
-    <path d="M18 66 A46 17 0 0 0 110 66" fill="none" stroke="#fff1c9" stroke-width="1" stroke-opacity=".7" transform="translate(0 -2.6)"/>
-  </g>
-</svg>
-'''
-
 
 def vtuple(v):
     return tuple(int(x) for x in re.findall(r'\d+', v)) or (0,)
@@ -1001,7 +941,6 @@ def cli(argv):
     ap.add_argument('--no-launcher', action='store_true')
     ap.add_argument('--check-version')
     ap.add_argument('--selftest', action='store_true')
-    ap.add_argument('--logo', action='store_true', help='print the logo (SVG)')
     ap.add_argument('--vkbasalt-howto', nargs='?', const='', metavar='FAMILY',
                     help='how to install vkBasalt here (or for FAMILY: arch, fedora, '
                          'fedora-ostree, debian, ubuntu, other, all)')
@@ -1013,9 +952,6 @@ def cli(argv):
         return 0 if a.check_version == INSTALLER_VERSION else 1
     if a.selftest:
         return selftest()
-    if a.logo:
-        sys.stdout.write(LOGO_SVG)
-        return 0
     if a.vkbasalt_howto is not None:
         fams = list(VKBASALT_HOWTO) if a.vkbasalt_howto == 'all' else [a.vkbasalt_howto or None]
         for fam in fams:
@@ -1134,6 +1070,16 @@ def selftest():
         check(p.schema == 0 and p.version == '11.4.0', 'legacy zip: schema 0, version from README')
         check([l['id'] for l in p.layers] == ['prereqs', 'hud', 'msaa', 'renderer', 'bloom'],
               'legacy zip: layers from README')
+        nw, nh = NEBULA_SIZE
+        neb = nebula_pixels(7)
+        alpha = neb[3::4]
+        check(len(neb) == nw * nh * 4 and 0.2 < sum(1 for v in alpha if v) / len(alpha) < 0.8,
+              'nebula: the size asked for, and part of the sky clouded')
+
+        def seam(a, b):         # mean alpha step between columns a and b
+            return sum(abs(alpha[r * nw + a] - alpha[r * nw + b]) for r in range(nh)) / nh
+        check(seam(nw - 1, 0) <= 3 * seam(nw // 2, nw // 2 + 1) + 2,
+              'nebula: tiles across without a seam')
         check(split_overrides('a=n,b; b=n') == {'a': 'n,b', 'b': 'n'}, 'overrides parse')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
         keep = {k: os.environ.get(k) for k in ('A2_APPIMAGE', 'PATH', 'PYTHONHOME', 'A2_ORIG_PATH',
@@ -1189,19 +1135,71 @@ progressbar.thin trough { background: alpha(white, 0.10); }
 """
 
 
-def logo_picture(Gdk, GLib, Gtk, size):
-    """LOGO_SVG at `size` points, rasterised at twice that so it stays sharp on a scaled
-    display; None when gdk-pixbuf has no SVG loader."""
-    from gi.repository import GdkPixbuf
-    try:
-        loader = GdkPixbuf.PixbufLoader.new_with_type('svg')
-        loader.set_size(size * 2, size * 2)
-        loader.write(LOGO_SVG.encode())
-        loader.close()
-        tex = Gdk.Texture.new_for_pixbuf(loader.get_pixbuf())
-    except GLib.Error:
-        return None
-    return Gtk.Image(paintable=tex, pixel_size=size, halign=Gtk.Align.CENTER)
+NEBULA_SIZE = (256, 160)
+
+
+def nebula_pixels(seed, w=NEBULA_SIZE[0], h=NEBULA_SIZE[1]):
+    """A nebula for the window's sky, as premultiplied ARGB32 (cairo's byte order): value
+    noise, gently domain-warped into soft billows (no thin filaments: they read as
+    electric), a second field for dark dust lanes and a slow one that moves the hue between
+    violet and teal; warm where it is densest. The lattices are periodic, so it tiles and can drift without a seam.
+    Pure Python (no numpy in the AppImage): about half a second, so run it off the
+    main thread."""
+    import math
+    import random
+    rnd = random.Random(seed)
+    octs = []
+    for o in range(5):
+        cx = 4 << o
+        cy = max(2, cx * h // w)
+        octs.append((cx, cy, [[rnd.random() for _ in range(cx)] for _ in range(cy)]))
+
+    def noise(lat, x, y):
+        cx, cy, g = lat
+        x, y = x * cx, y * cy
+        xi, yi = math.floor(x), math.floor(y)
+        fx, fy = x - xi, y - yi
+        fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+        x0, x1 = xi % cx, (xi + 1) % cx
+        r0, r1 = g[yi % cy], g[(yi + 1) % cy]
+        a = r0[x0] + (r0[x1] - r0[x0]) * fx
+        b = r1[x0] + (r1[x1] - r1[x0]) * fx
+        return a + (b - a) * fy
+
+    def fbm(x, y, n=5, ofs=0.0):
+        v, amp, tot = 0.0, 1.0, 0.0
+        for o in range(n):
+            v += amp * noise(octs[o], x + ofs, y + ofs * 0.7)
+            tot += amp
+            amp *= 0.5
+        return v / tot
+
+    cells = []
+    for j in range(h):
+        y = j / h
+        for i in range(w):
+            x = i / w
+            qx, qy = fbm(x, y, 4, 0.31), fbm(x, y, 4, 0.67)
+            cells.append((fbm(x + 0.35 * qx, y + 0.35 * qy), qx,
+                          noise(octs[0], x + 0.5, y + 0.2)))
+    dens = sorted(c[0] for c in cells)
+    # The thinnest 40 % stays empty; the top is a percentile, not the brightest cell, so
+    # every launch comes out about as bright, and none of it clips behind the cards.
+    lo, hi = dens[len(dens) * 2 // 5], dens[len(dens) * 995 // 1000]
+    violet, teal = (0.30, 0.18, 0.75), (0.10, 0.45, 0.80)
+    buf = bytearray(w * h * 4)
+    for k, (d, dust, hue) in enumerate(cells):
+        t = min(1.0, max(0.0, (d - lo) / (hi - lo))) ** 1.6
+        t *= 1 - 0.7 * min(1.0, max(0.0, (dust - 0.5) * 5))
+        m = min(1.0, max(0.0, (hue - 0.3) * 2.5))
+        hot = max(0.0, t - 0.6) * 2.5
+        r = min(1.0, violet[0] + (teal[0] - violet[0]) * m + 0.45 * hot)
+        g = min(1.0, violet[1] + (teal[1] - violet[1]) * m + 0.30 * hot)
+        b = min(1.0, violet[2] + (teal[2] - violet[2]) * m + 0.05 * hot)
+        a = min(0.6, t * 0.9)
+        buf[4 * k:4 * k + 4] = bytes((int(255 * b * a), int(255 * g * a),
+                                      int(255 * r * a), int(255 * a)))
+    return buf
 
 
 def run_gui():
@@ -1219,10 +1217,13 @@ def run_gui():
         return w
 
     class Sky(Gtk.DrawingArea):
-        """The window's background: a dark gradient, a faint nebula and three layers of
-        stars drifting at different speeds. Drawn in code, so there is nothing to ship;
-        still when the desktop has animations off."""
+        """The window's background: a dark gradient, a nebula made up anew at every
+        launch (nebula_pixels, faded in once it is ready) and three layers of stars, all
+        drifting at different speeds. Drawn in code, so there is nothing to ship; still
+        when the desktop has animations off."""
         LAYERS = ((90, 0.55, 3.0), (60, 0.85, 7.0), (28, 1.35, 14.0))   # count, radius, px/s
+        CLOUD_SPEED = 1.5       # px/s on screen: behind the slowest stars
+        CLOUD_FADE = 1.5        # s
 
         def __init__(self):
             super().__init__(hexpand=True, vexpand=True)
@@ -1233,6 +1234,10 @@ def run_gui():
             self.tints = ((1.0, 1.0, 1.0), (0.75, 0.85, 1.0), (1.0, 0.88, 0.75))
             self.t0 = None
             self.nebula = None
+            self.cloud, self.cloud_t, self.cloud_scaled = None, None, None
+            seed = random.SystemRandom().randrange(1 << 30)
+            threading.Thread(target=lambda: GLib.idle_add(self.cloud_ready, nebula_pixels(seed)),
+                             daemon=True).start()
             self.animate = Gtk.Settings.get_default().get_property('gtk-enable-animations')
             self.set_draw_func(self.draw)
             if self.animate:
@@ -1246,6 +1251,15 @@ def run_gui():
                 self.queue_draw()
             return GLib.SOURCE_CONTINUE
 
+        def cloud_ready(self, buf):
+            import cairo
+            w, h = NEBULA_SIZE
+            self.cloud = cairo.ImageSurface.create_for_data(buf, cairo.FORMAT_ARGB32, w, h,
+                                                            w * 4)
+            self.cloud_t = GLib.get_monotonic_time() / 1e6
+            self.queue_draw()
+            return GLib.SOURCE_REMOVE
+
         def build_nebula(self, w, h):
             import cairo
             s = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
@@ -1255,22 +1269,38 @@ def run_gui():
             g.add_color_stop_rgb(1, 0.030, 0.040, 0.085)
             cr.set_source(g)
             cr.paint()
-            for fx, fy, fr, col in ((0.18, 0.22, 0.75, (0.22, 0.30, 0.75, 0.16)),
-                                    (0.85, 0.70, 0.80, (0.45, 0.20, 0.65, 0.12)),
-                                    (0.55, 0.05, 0.55, (0.15, 0.45, 0.65, 0.07))):
-                rad = cairo.RadialGradient(fx * w, fy * h, 0, fx * w, fy * h, fr * max(w, h))
-                rad.add_color_stop_rgba(0, *col)
-                rad.add_color_stop_rgba(1, col[0], col[1], col[2], 0)
-                cr.set_source(rad)
-                cr.paint()
             self.nebula = (w, h, s)
 
         def draw(self, area, cr, w, h):
+            import cairo
             if not self.nebula or self.nebula[:2] != (w, h):
                 self.build_nebula(w, h)
             cr.set_source_surface(self.nebula[2], 0, 0)
             cr.paint()
             now = (GLib.get_monotonic_time() / 1e6) if self.animate else 0.0
+            if self.cloud:
+                # Scaled to the window's height once per height, then only moved, by whole
+                # pixels: filtering it every frame cost half again the sky's CPU time.
+                if not self.cloud_scaled or self.cloud_scaled[0] != h:
+                    sc = h / NEBULA_SIZE[1]
+                    tw = max(1, round(NEBULA_SIZE[0] * sc))
+                    tile = cairo.ImageSurface(cairo.FORMAT_ARGB32, tw, h)
+                    tc = cairo.Context(tile)
+                    tc.scale(tw / NEBULA_SIZE[0], sc)
+                    src = cairo.SurfacePattern(self.cloud)
+                    src.set_extend(cairo.EXTEND_REPEAT)     # so the edges wrap, too
+                    src.set_filter(cairo.FILTER_GOOD)
+                    tc.set_source(src)
+                    tc.paint()
+                    self.cloud_scaled = (h, tile)
+                pat = cairo.SurfacePattern(self.cloud_scaled[1])
+                pat.set_extend(cairo.EXTEND_REPEAT)
+                pat.set_filter(cairo.FILTER_FAST)
+                pat.set_matrix(cairo.Matrix(x0=-round(now * self.CLOUD_SPEED)))
+                cr.set_source(pat)
+                fade = min(1.0, (GLib.get_monotonic_time() / 1e6 - self.cloud_t) /
+                           self.CLOUD_FADE) if self.animate else 1.0
+                cr.paint_with_alpha(fade)
             for x, y, r, a, ph, speed, tint in self.stars:
                 px = (x * w + now * speed) % w
                 tw = 0.75 + 0.25 * math.sin(now * 0.9 + ph) if self.animate else 1.0
@@ -1312,10 +1342,7 @@ def run_gui():
 
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER,
                           margin_top=8, margin_bottom=28, margin_start=16, margin_end=16)
-            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            logo = logo_picture(Gdk, GLib, Gtk, 96)
-            if logo:
-                title.append(logo)
+            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
             title.append(lab('Armada II Refit', 'title-big', xalign=0.5))
             col.append(title)
 

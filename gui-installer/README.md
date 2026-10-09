@@ -123,14 +123,21 @@ schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).
 
 ## The window
 
-One screen: the logo, the game, the version, a line saying what goes into Heroic,
-**Install** (and **Uninstall** when
-the game has a release in it), a thin progress bar and a status line. The log is a dialog
-(`Ctrl+L`). The sky behind it is drawn in code (`Sky`): a gradient, a faint nebula and
-three layers of stars drifting at different speeds, at about 30 frames a second, still
-when the desktop has animations off. Nothing is shipped or fetched for it, so the script
-stays one file and `publish/check.sh` has nothing to refuse. The face is the desktop's
-own. The window uses libadwaita 1.5 at most (`AlertDialog`, `Dialog`).
+One screen: the game, the version, a line saying what goes into Heroic, **Install** (and
+**Uninstall** when the game has a release in it), a thin progress bar and a status line.
+The log is a dialog (`Ctrl+L`). The sky behind it is drawn in code (`Sky`): a gradient,
+a nebula and three layers of stars drifting at different speeds, at about 30 frames a
+second, still when the desktop has animations off. The nebula is new at every launch
+(`nebula_pixels`): value noise, gently domain-warped into soft billows (thin filaments
+looked electric), with dust lanes and a hue moving between violet and teal. It is pure
+Python, since the AppImage carries no numpy, so a thread computes it at 256x160 (about
+half a second) and it fades in. It is scaled to the window once per height and then only
+moved by whole pixels, at 1.5 px/s behind the slowest stars: filtering it every frame
+cost half as much CPU again as the rest of the sky. Brightness is set by a percentile,
+not the brightest cell, so every launch comes out about as bright and nothing clips
+behind the cards. Nothing is shipped or fetched for it, so the script stays one file and
+`publish/check.sh` has nothing to refuse. The face is the desktop's own. The window uses
+libadwaita 1.5 at most (`AlertDialog`, `Dialog`).
 
 When there is no Heroic at all (no config folder, no `heroic` on the `PATH`, no Flatpak)
 and the game is not one Heroic knows, an open row says how to get it for this
@@ -138,12 +145,6 @@ distribution (`HEROIC_HOWTO`): the AUR package on Arch, otherwise the site's `.d
 or Flathub, with the warning that bloom does not work in the Flatpak. A game found
 elsewhere (Lutris, a Wine prefix) gets the launch variables as text to copy instead.
 
-### The logo
-
-A ship leaving a drydock ring, drawn by hand as SVG in the script (`LOGO_SVG`), so it
-stays one file and `publish/check.sh` has nothing to refuse. `--logo` prints it, and the
-AppImage's icon is written from it at build time. The concepts it came from were
-generated images and live in `$A2_DATA/gui-installer/logo/`, not here.
 
 ## The AppImage
 
