@@ -152,6 +152,12 @@ libadwaita's accent colours by their old names and, on GTK 4.16 and later, the C
 variables libadwaita 1.6 reads them from, plus the Install button and the progress bar
 set outright, so those two hold on any libadwaita.
 
+The title is "ARMADA II" at weight 900 over a small, widely tracked amber "REFIT"
+(`.title-main`, `.title-tag`), in the desktop's own face: no font is shipped or fetched,
+and every common desktop sans (Adwaita Sans, Cantarell, Noto Sans, Ubuntu) has the heavy
+weight. The tag's margin makes up for the tracking GTK also puts after its last letter,
+which would otherwise push it off centre.
+
 When there is no Heroic at all (no config folder, no `heroic` on the `PATH`, no Flatpak)
 and the game is not one Heroic knows, an open row says how to get it for this
 distribution (`HEROIC_HOWTO`): the AUR package on Arch, otherwise the site's `.deb`/`.rpm`

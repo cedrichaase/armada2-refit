@@ -14,6 +14,8 @@ Reads package schemas 0 and 1.
 - Warp while installing (`Sky.set_warp`): the stars streak and everything speeds up,
   easing in and out, held for at least 3 s.
 - An amber accent (`AMBER`): the Install button, the progress bar and libadwaita's accent.
+- A bolder title: "ARMADA II" at weight 900 over a tracked amber "REFIT"
+  (`.title-main`, `.title-tag`; `.title-big` is gone), in the desktop's own font.
 - When no Heroic is found, an open row with how to install it on this distribution
   (`HEROIC_HOWTO`, `heroic_installed()`), a link to its site and what to do next.
 
