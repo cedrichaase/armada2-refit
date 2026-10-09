@@ -54,8 +54,8 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    **Uninstall** runs the installed release's `install.sh --uninstall` (or the newest
    cached one) and takes Heroic's changes back out.
 5. **Launch settings.** `install.sh` prints the variables the launcher needs
-   (`WINEDLLOVERRIDES`, and bloom's two). With the switch on (default) and a Heroic entry
-   for the game, they go into `GamesConfig/<app>.json` → `enviromentOptions` (Heroic's
+   (`WINEDLLOVERRIDES`, and bloom's two). The game does not start right without
+   them, so there is no switch: with a Heroic entry for the game they always go into `GamesConfig/<app>.json` → `enviromentOptions` (Heroic's
    spelling), with the original kept once as `<file>.a2refit-backup`. A DLL override
    already there is kept and the missing ones are appended. A variable already set to
    something else is left alone and reported. A game Heroic has no settings file for yet
@@ -123,13 +123,27 @@ schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).
 
 ## The window
 
-One screen: the game, the version, the Heroic switch, **Install** (and **Uninstall** when
+One screen: the logo, the game, the version, a line saying what goes into Heroic,
+**Install** (and **Uninstall** when
 the game has a release in it), a thin progress bar and a status line. The log is a dialog
 (`Ctrl+L`). The sky behind it is drawn in code (`Sky`): a gradient, a faint nebula and
 three layers of stars drifting at different speeds, at about 30 frames a second, still
 when the desktop has animations off. Nothing is shipped or fetched for it, so the script
 stays one file and `publish/check.sh` has nothing to refuse. The face is the desktop's
-own. The window uses libadwaita 1.5 at most (`AlertDialog`, `Dialog`, `SwitchRow`).
+own. The window uses libadwaita 1.5 at most (`AlertDialog`, `Dialog`).
+
+When there is no Heroic at all (no config folder, no `heroic` on the `PATH`, no Flatpak)
+and the game is not one Heroic knows, an open row says how to get it for this
+distribution (`HEROIC_HOWTO`): the AUR package on Arch, otherwise the site's `.deb`/`.rpm`
+or Flathub, with the warning that bloom does not work in the Flatpak. A game found
+elsewhere (Lutris, a Wine prefix) gets the launch variables as text to copy instead.
+
+### The logo
+
+A ship leaving a drydock ring, drawn by hand as SVG in the script (`LOGO_SVG`), so it
+stays one file and `publish/check.sh` has nothing to refuse. `--logo` prints it, and the
+AppImage's icon is written from it at build time. The concepts it came from were
+generated images and live in `$A2_DATA/gui-installer/logo/`, not here.
 
 ## The AppImage
 

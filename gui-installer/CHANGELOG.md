@@ -4,6 +4,27 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.3.0 — 2026-10-09
+
+Reads package schemas 0 and 1.
+
+### Added
+- A logo (`LOGO_SVG`, a ship leaving a drydock ring) above the title; `--logo` prints it,
+  and the AppImage's icon is written from it (`appimage/armada2-refit.svg` is gone).
+- When no Heroic is found, an open row with how to install it on this distribution
+  (`HEROIC_HOWTO`, `heroic_installed()`), a link to its site and what to do next.
+
+### Changed
+- Heroic's launch settings are always written when Heroic has the game: the switch is
+  now a line saying what goes in. The launch variables to copy show only for a game
+  Heroic does not run. `--no-launcher` stays on the command line.
+
+### Removed
+- The "Remastering tools for Star Trek: Armada II" subtitle and the note that textures
+  are not shipped.
+
+Installed, not yet seen in game.
+
 ## 1.2.0 — 2026-10-09
 
 Reads package schemas 0 and 1.

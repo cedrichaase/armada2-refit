@@ -7,13 +7,15 @@
     python3 armada2-refit-installer.py --package ZIP --game DIR [--no-launcher]
     python3 armada2-refit-installer.py --uninstall [--game DIR]
     python3 armada2-refit-installer.py --selftest
+    python3 armada2-refit-installer.py --logo           the logo, as SVG
 
 It finds the game (Heroic, Lutris, Bottles, Wine prefixes, the usual folders), lists the
 releases on GitHub -- checked on every launch and on Refresh, cached under
 ~/.cache/armada2-refit/installer so it works offline -- and installs the chosen one by
-running the release's own install.sh, following its progress. It can also write the
-launch settings into Heroic's config for the game. Textures and the cutscene player are
-not installed from here, for now.
+running the release's own install.sh, following its progress. It writes the launch
+settings into Heroic's config for the game, which does not start right without them, and
+says how to get Heroic when there is none. Textures and the cutscene player are not
+installed from here, for now.
 
 It reads release packages of the schemas in SCHEMAS. The schema is the layout of the
 release zip as this program relies on it (manifest.json, install.sh's ::step lines),
@@ -38,7 +40,7 @@ import time
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.2.0'
+INSTALLER_VERSION = '1.3.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -96,6 +98,65 @@ LEGACY_LAYERS = {
     'binkw32.dll': ('cutscenes', 'Cutscene player', 'always'),
     'dxvk.conf': ('renderer', 'Renderer', 'dxvk.conf'),
 }
+
+# The logo, a ship leaving a drydock ring: drawn by hand, the one copy. The window shows it
+# and the AppImage takes its icon from here (--logo prints it).
+LOGO_SVG = '''\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="sky" cx="38%" cy="32%" r="75%">
+      <stop offset="0" stop-color="#22336e"/>
+      <stop offset="1" stop-color="#070a16"/>
+    </radialGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9fb3d9"/>
+      <stop offset=".55" stop-color="#5d74a8"/>
+      <stop offset="1" stop-color="#34466f"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc35a"/>
+      <stop offset="1" stop-color="#e07a12"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#ffe2a0"/>
+      <stop offset=".4" stop-color="#ffab36" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#ff8a00" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="60" fill="url(#sky)"/>
+  <circle cx="64" cy="64" r="59.2" fill="none" stroke="#8ea4d6" stroke-opacity=".35" stroke-width="1.6"/>
+  <g fill="#fff">
+    <circle cx="30" cy="34" r="1.2"/><circle cx="94" cy="28" r="1"/><circle cx="104" cy="74" r="1.3"/>
+    <circle cx="26" cy="82" r=".9"/><circle cx="78" cy="104" r="1"/><circle cx="48" cy="20" r=".8"/>
+  </g>
+  <!-- the ring, tilted; its far half behind the ship -->
+  <g transform="rotate(-28 64 66)">
+    <path d="M18 66 A46 17 0 0 1 110 66" fill="none" stroke="url(#ring)" stroke-width="7" stroke-opacity=".55"/>
+    <path d="M18 66 A46 17 0 0 1 110 66" fill="none" stroke="#5a2c00" stroke-width="7" stroke-dasharray="1.4 6.2" stroke-opacity=".6"/>
+  </g>
+  <!-- the ship, nose to the upper right -->
+  <g transform="rotate(42 64 64)">
+    <ellipse cx="45" cy="97" rx="4.5" ry="10" fill="url(#glow)"/>
+    <ellipse cx="83" cy="97" rx="4.5" ry="10" fill="url(#glow)"/>
+    <path d="M58 66 L44 74 L44 79 L58 74 Z M70 66 L84 74 L84 79 L70 74 Z" fill="#41557f"/>
+    <rect x="40.5" y="60" width="9" height="32" rx="4.5" fill="url(#hull)"/>
+    <rect x="78.5" y="60" width="9" height="32" rx="4.5" fill="url(#hull)"/>
+    <rect x="42" y="82" width="6" height="9" rx="3" fill="#ffb347"/>
+    <rect x="80" y="82" width="6" height="9" rx="3" fill="#ffb347"/>
+    <path d="M64 18 L81 50 L80 56 L71 60 L70 88 L58 88 L57 60 L48 56 L47 50 Z" fill="url(#hull)"/>
+    <path d="M64 18 L47 50 L48 56 L57 60 L58 88 L61 88 L61 58 L58 52 Z" fill="#d3def3" fill-opacity=".6"/>
+    <path d="M64 30 L69 44 L64 48 L59 44 Z" fill="#bfe3ff"/>
+    <rect x="59" y="85" width="10" height="5" rx="2.5" fill="#ffb347"/>
+  </g>
+  <!-- the ring's near half, in front of the ship -->
+  <g transform="rotate(-28 64 66)">
+    <path d="M18 66 A46 17 0 0 0 110 66" fill="none" stroke="url(#ring)" stroke-width="7"/>
+    <path d="M18 66 A46 17 0 0 0 110 66" fill="none" stroke="#5a2c00" stroke-width="7" stroke-dasharray="1.4 6.2" stroke-opacity=".55"/>
+    <path d="M18 66 A46 17 0 0 0 110 66" fill="none" stroke="#fff1c9" stroke-width="1" stroke-opacity=".7" transform="translate(0 -2.6)"/>
+  </g>
+</svg>
+'''
+
 
 def vtuple(v):
     return tuple(int(x) for x in re.findall(r'\d+', v)) or (0,)
@@ -462,6 +523,34 @@ def distro_family(osr=None):
         if t in ('ubuntu', 'debian'):
             return t
     return 'other'
+
+
+# ------------------------------------------------------------------ Heroic, when missing
+
+HEROIC_SITE = 'https://heroicgameslauncher.com/downloads'
+HEROIC_FLATPAK = 'flatpak install flathub com.heroicgameslauncher.hgl'
+# The native package first: a Flatpak Heroic cannot see a vkBasalt installed on the host.
+HEROIC_HOWTO = {
+    'arch': [('Heroic is in the AUR. With an AUR helper:', 'yay -S heroic-games-launcher-bin')],
+    'fedora': [('Download the .rpm from heroicgameslauncher.com and install it, or use '
+                'Flathub (bloom does not work in the Flatpak):', HEROIC_FLATPAK)],
+    'debian': [('Download the .deb from heroicgameslauncher.com and install it, or use '
+                'Flathub (bloom does not work in the Flatpak):', HEROIC_FLATPAK)],
+    'other': [('Download Heroic from heroicgameslauncher.com, or use Flathub (bloom does '
+               'not work in the Flatpak):', HEROIC_FLATPAK)],
+}
+HEROIC_HOWTO['ubuntu'] = HEROIC_HOWTO['debian']
+HEROIC_HOWTO['fedora-ostree'] = [('Install Heroic from Flathub:', HEROIC_FLATPAK)]
+
+
+def heroic_installed():
+    """Heroic on this machine: run once (its config folder), or installed and never run."""
+    if any(os.path.isdir(root) for root, _ in HEROIC_ROOTS):
+        return True
+    if shutil.which('heroic', path=host_env().get('PATH')):
+        return True
+    return any(os.path.isdir(os.path.join(d, 'app/com.heroicgameslauncher.hgl'))
+               for d in ('/var/lib/flatpak', os.path.join(XDG_DATA, 'flatpak')))
 
 
 def vkbasalt_howto(family=None):
@@ -912,6 +1001,7 @@ def cli(argv):
     ap.add_argument('--no-launcher', action='store_true')
     ap.add_argument('--check-version')
     ap.add_argument('--selftest', action='store_true')
+    ap.add_argument('--logo', action='store_true', help='print the logo (SVG)')
     ap.add_argument('--vkbasalt-howto', nargs='?', const='', metavar='FAMILY',
                     help='how to install vkBasalt here (or for FAMILY: arch, fedora, '
                          'fedora-ostree, debian, ubuntu, other, all)')
@@ -923,6 +1013,9 @@ def cli(argv):
         return 0 if a.check_version == INSTALLER_VERSION else 1
     if a.selftest:
         return selftest()
+    if a.logo:
+        sys.stdout.write(LOGO_SVG)
+        return 0
     if a.vkbasalt_howto is not None:
         fams = list(VKBASALT_HOWTO) if a.vkbasalt_howto == 'all' else [a.vkbasalt_howto or None]
         for fam in fams:
@@ -1096,6 +1189,21 @@ progressbar.thin trough { background: alpha(white, 0.10); }
 """
 
 
+def logo_picture(Gdk, GLib, Gtk, size):
+    """LOGO_SVG at `size` points, rasterised at twice that so it stays sharp on a scaled
+    display; None when gdk-pixbuf has no SVG loader."""
+    from gi.repository import GdkPixbuf
+    try:
+        loader = GdkPixbuf.PixbufLoader.new_with_type('svg')
+        loader.set_size(size * 2, size * 2)
+        loader.write(LOGO_SVG.encode())
+        loader.close()
+        tex = Gdk.Texture.new_for_pixbuf(loader.get_pixbuf())
+    except GLib.Error:
+        return None
+    return Gtk.Image(paintable=tex, pixel_size=size, halign=Gtk.Align.CENTER)
+
+
 def run_gui():
     import gi
     gi.require_version('Gtk', '4.0')
@@ -1204,9 +1312,11 @@ def run_gui():
 
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER,
                           margin_top=8, margin_bottom=28, margin_start=16, margin_end=16)
-            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            logo = logo_picture(Gdk, GLib, Gtk, 96)
+            if logo:
+                title.append(logo)
             title.append(lab('Armada II Refit', 'title-big', xalign=0.5))
-            title.append(lab('Remastering tools for Star Trek: Armada II', 'title-sub', xalign=0.5))
             col.append(title)
 
             card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -1231,10 +1341,16 @@ def run_gui():
             self.row_rel.add_suffix(self.dd_rel)
             rows.append(self.row_rel)
 
-            self.row_heroic = Adw.SwitchRow(title='Heroic launch settings', active=True,
-                                            subtitle_lines=3)
-            self.row_heroic.connect('notify::active', lambda *_: self.update_launcher())
+            # Always written: the game does not start right without them.
+            self.row_heroic = Adw.ActionRow(title='Heroic launch settings', subtitle_lines=3)
             rows.append(self.row_heroic)
+
+            self.row_get_heroic = Adw.ExpanderRow(
+                title='Install Heroic Games Launcher',
+                subtitle='The refit runs the GOG game through Heroic, which also gets its '
+                         'launch settings from here.', subtitle_lines=0)
+            rows.append(self.row_get_heroic)
+            self.get_heroic_rows = []
 
             self.row_env = Adw.ExpanderRow(title='Launch variables',
                                            subtitle='Set these in your launcher')
@@ -1339,7 +1455,7 @@ def run_gui():
 
         def set_busy(self, busy):
             self.busy = busy
-            for w in (self.dd_game, self.dd_rel, self.row_heroic):
+            for w in (self.dd_game, self.dd_rel):
                 w.set_sensitive(not busy)
             self.update_buttons()
 
@@ -1499,6 +1615,7 @@ def run_gui():
         def update_all(self):
             self.update_heads_up()
             self.update_bloom()
+            self.update_get_heroic()
             self.update_launcher()
             self.update_banner()
             self.update_buttons()
@@ -1520,10 +1637,8 @@ def run_gui():
                                      if why.startswith('skipped — ') else f'{l["name"]}: {why}')
                     elif 'per vertex' in why:
                         notes.append(f'{l["name"]}: per vertex; per pixel needs d3d8to9')
-            notes.append('Textures are built from your own files, not shipped in releases.')
-            for i, n in enumerate(notes):
-                self.heads_up.append(lab(n, ('heads-up', 'warn') if i < len(notes) - 1
-                                         else 'heads-up', xalign=0.5, wrap=True,
+            for n in notes:
+                self.heads_up.append(lab(n, ('heads-up', 'warn'), xalign=0.5, wrap=True,
                                          justify=Gtk.Justification.CENTER, margin_start=8,
                                          margin_end=8))
 
@@ -1575,7 +1690,8 @@ def run_gui():
             self.env_text.set_label('\n'.join(f'{k}={v}' for k, v in env.items()))
             heroic = bool(g and g.heroic)
             self.row_heroic.set_visible(heroic)
-            self.row_env.set_visible(bool(env) and not (heroic and self.row_heroic.get_active()))
+            # A game Heroic does not run (Lutris, a Wine prefix): the text to copy.
+            self.row_env.set_visible(bool(env) and bool(g) and not heroic)
             if not heroic:
                 return
             changes, conflicts = heroic_plan(g.heroic, env)
@@ -1584,12 +1700,44 @@ def run_gui():
             elif not changes:
                 sub = f'Already set in {g.heroic.label()}'
             else:
-                sub = f'Adds {", ".join(c["key"] for c in changes)} to {g.heroic.label()}'
+                sub = f'Written to {g.heroic.label()} on install: {", ".join(c["key"] for c in changes)}'
             if conflicts and changes is not None:
                 sub += '. ' + '; '.join(conflicts)
-            if self.row_heroic.get_active() and heroic_running():
+            if heroic_running():
                 sub += '. Heroic is running: restart it afterwards'
             self.row_heroic.set_subtitle(GLib.markup_escape_text(sub))
+
+        def update_get_heroic(self):
+            for r in self.get_heroic_rows:
+                self.row_get_heroic.remove(r)
+            self.get_heroic_rows = []
+            g = self.game()
+            if (g and g.heroic) or heroic_installed():
+                self.row_get_heroic.set_visible(False)
+                return
+            self.row_get_heroic.set_visible(True)
+            self.row_get_heroic.set_expanded(True)
+            for text, cmd in HEROIC_HOWTO.get(distro_family(), HEROIC_HOWTO['other']):
+                r = Adw.ActionRow(title=GLib.markup_escape_text(text), title_lines=0,
+                                  subtitle=GLib.markup_escape_text(cmd), subtitle_lines=0)
+                r.add_css_class('property')
+                cp = Gtk.Button(icon_name='edit-copy-symbolic', valign=Gtk.Align.CENTER,
+                                tooltip_text='Copy')
+                cp.add_css_class('flat')
+                cp.connect('clicked', lambda _b, c=cmd: self.copy(c))
+                r.add_suffix(cp)
+                self.row_get_heroic.add_row(r)
+                self.get_heroic_rows.append(r)
+            site = Adw.ActionRow(title='heroicgameslauncher.com', activatable=True)
+            site.add_suffix(Gtk.Image(icon_name='adw-external-link-symbolic'))
+            site.connect('activated', lambda _r: self.open_uri(HEROIC_SITE))
+            self.row_get_heroic.add_row(site)
+            self.get_heroic_rows.append(site)
+            r = Adw.ActionRow(title='Then sign in to GOG in Heroic, install Star Trek: Armada '
+                                    'II, and press F5 here.', title_lines=0)
+            r.add_css_class('dim-label')
+            self.row_get_heroic.add_row(r)
+            self.get_heroic_rows.append(r)
 
         def update_banner(self):
             p, newer = self.package, None
@@ -1659,7 +1807,7 @@ def run_gui():
             if game_running():
                 self.set_status('Armada II is running. Quit the game first.', 'err')
                 return
-            write = self.row_heroic.get_active() and bool(g.heroic)
+            write = bool(g.heroic)
             if write and heroic_running():
                 self.confirm('Heroic is running',
                              'Heroic may write its own copy of the game settings back over '

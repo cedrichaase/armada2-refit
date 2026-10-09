@@ -175,12 +175,16 @@ def main(appdir):
     copy(SCRIPT, os.path.join(usr, 'share', 'armada2-refit', 'armada2-refit-installer.py'))
     copy(os.path.join(HERE, 'AppRun'), os.path.join(appdir, 'AppRun'))
     os.chmod(os.path.join(appdir, 'AppRun'), 0o755)
-    for f in ('armada2-refit.desktop', 'armada2-refit.svg'):
-        copy(os.path.join(HERE, f), os.path.join(appdir, f))
+    copy(os.path.join(HERE, 'armada2-refit.desktop'), os.path.join(appdir, 'armada2-refit.desktop'))
     copy(os.path.join(HERE, 'armada2-refit.desktop'),
          os.path.join(usr, 'share', 'applications', 'armada2-refit.desktop'))
-    copy(os.path.join(HERE, 'armada2-refit.svg'),
-         os.path.join(usr, 'share', 'icons', 'hicolor', 'scalable', 'apps', 'armada2-refit.svg'))
+    # The icon is the logo the script carries (LOGO_SVG), so there is one copy of it.
+    logo = subprocess.run([sys.executable, SCRIPT, '--logo'], check=True,
+                          capture_output=True, text=True).stdout
+    for d in (appdir, os.path.join(usr, 'share', 'icons', 'hicolor', 'scalable', 'apps')):
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, 'armada2-refit.svg'), 'w') as f:
+            f.write(logo)
     os.symlink('armada2-refit.svg', os.path.join(appdir, '.DirIcon'))
 
     # What the host has to provide: needed by something in here, left out above.
