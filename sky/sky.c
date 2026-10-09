@@ -227,8 +227,8 @@ static void read_settings(void)
     if (g_face > 4096) g_face = 4096;
 }
 
-/* The pixel shader's constants, c0..c12; their meaning is listed in sky.hlsl. */
-#define NCONST 13
+/* The pixel shader's constants, c0..c13; their meaning is listed in sky.hlsl. */
+#define NCONST 14
 typedef struct {
     char     name[64];        /* the map's background name, as the engine holds it */
     char     path[360];       /* Sky\<name>.ini */
@@ -302,6 +302,11 @@ static int recipe_read(Recipe *r)
         rgb(f, col, r->k[7 + 2 * i]);
         r->k[7 + 2 * i][3] = core[3];
     }
+    core[0] = 0.0f; core[1] = 90.0f; core[2] = 20.0f; core[3] = 0.0f;   /* Band: off */
+    inin(f, "Band", core, 4);
+    yaw_pitch(core[0], core[1], r->k[13]);
+    r->k[13][3] = core[2] * DEG;
+    r->k[12][0] = core[3];
     st[0] = 0.0f; st[1] = 90.0f; st[2] = 1.0f;
     inin(f, "Stretch", st, 3);
     yaw_pitch(st[0], st[1], r->k[10]);
@@ -539,7 +544,7 @@ static int bake(void *d9, Recipe *r, void *vs)
         int    i;
         for (i = 0; i < 3; i++) { c[i][0] = k_faces[f][i][0]; c[i][1] = k_faces[f][i][1]; c[i][2] = k_faces[f][i][2]; c[i][3] = 0.0f; }
         c[3][0] = 2.0f / (float)(S - 1); c[3][1] = c[3][2] = c[3][3] = 0.0f;
-        d9_psconst(d9, 13, &c[0][0], 4);
+        d9_psconst(d9, 14, &c[0][0], 4);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
         if (D9_FN(d9, D9_GETRENDERTARGETDATA, RTData_t)(d9, rts, sys) < 0) break;
         if (D9_FN(sys, SURF_LOCK, SurfLock_t)(sys, &src, NULLPTR, 0x10) < 0) break;            /* READONLY */

@@ -12,8 +12,16 @@ redistributed and licensed like the rest of the repository.
 
 A map whose sky has no recipe keeps the stock sky, and so does a chain with no Direct3D
 9 device behind d3d8 (DXVK's own d3d8, GOG's): the plugin says so in `Sky.log` and
-calls the engine's draw as before. Recipes so far: `mbgaqu` (Aqua) and `mbgkling`
-(Klingon).
+calls the engine's draw as before.
+
+**Recipes: every sky a stock map uses.** `mbgaqu`, `mbgkling`, `mbgpur`, `mbgred`,
+`mbgrg`, `mbgdk`, `mbgkl`, `mbgflu`, `mbggb`, `mbg02` and `mbgblue` (the same model and
+art, so the same recipe), `mbgborg`, `mbgdom1` and `mbgbaku`. Left stock on purpose:
+`Mbgstars`, a sparse starfield. Also left stock: the eleven sets no map uses (`MbgCard`,
+`MbgDom2`, `MbgIkol`, `MbgKlin2`–`4`, `MbgOmega`, `MbgRom1`–`3`). Their faces are named
+`.1`–`.6` and no cube model names them, so no map can reach them. The same goes for
+`Mbg01.SOD` and `MbgX.SOD`, which carry a planet inside the sky model: a recipe would
+drop the planet with the cube.
 
 ## Why the faces had to go
 
@@ -114,6 +122,10 @@ corner, **2.4/255** (mean 0.08). Neither difference image shows a line.
   `Glow` added over the densest part. The gas hue mixes `GasA` and `GasB` by a warp
   channel (large soft regions of each) and, by `HueMix`, by the field itself.
 - **Cores**: up to two soft lobes about a direction, which gather gas and glow.
+  Small and strong (under ~20°, gather over ~1) they saturate into a flat disc; keep
+  them wide and gentle.
+- **Band**: gas gathered about a great circle, for the skies that run in a band
+  (Ba'ku's orange band along the horizon, Dominion's pink one).
 - **Stretch** along an axis, for aurora-like curtains, and **Ridge**, a wide bell about
   the field's middle that makes soft bands. Squared, not creased, so it stays gas.
 
@@ -141,6 +153,7 @@ corner, **2.4/255** (mean 0.08). Neither difference image shows a line.
 | `Deep`, `GasA`, `GasB`, `Glow` | 0 | r, g, b |
 | `Core1`, `Core2` | 0,0,10,0 | yaw, pitch, size (degrees), gather (field units) |
 | `Core1Colour`, `Core2Colour` | 0 | r, g, b of the core's own glow |
+| `Band` | 0,90,20,0 | yaw, pitch of the band's pole (0,90: the band is the horizon); half-width (degrees); gather (field units; 0 = no band) |
 | `Stretch` | 0,90,1 | yaw, pitch of the axis; how far structure is drawn out along it (1 = none) |
 
 `Sky.ini` (`[Sky]`): `Enable` (default 1), `Face` (1536, the cube's edge; 0 = per
@@ -150,7 +163,10 @@ and the sky's GPU time every 600 frames), `Log`.
 
 **Tuning a recipe.** Edit the installed `Sky\<name>.ini` with the game running; the
 sky re-bakes within half a second. The recipes aim at the stock set's channel means,
-written into each file's header as numbers. The previews behind the shipped recipes
+written into each file's header as numbers. Each `Brightness` was scaled so that the
+mean over six cube faces, in an offline mirror of `sky_colour()`, lands at about 0.92 of
+stock's luminance: a little under, never over. Where the gas saturates into flat
+plateaus (dense skies like Borg's), a wider `Softness` (3) restores the depth. The previews behind the shipped recipes
 measured Klingon 75/23/5 against stock's 66/17/5, and Aqua 3/14/15 against 4/12/12.
 Aqua reads dimmer and softer than the stock faces in game, and the user preferred it
 that way (2026-10-09), so don't lift it to match stock's contrast.
@@ -180,9 +196,9 @@ memory and no detail.
   (`Starfield_Load_New_Background_Geometry`), or the bench may not load the map named.
   Not looked into. The Klingon recipe was judged on the bench by loading it under
   `mbgaqu`'s name, so it has not been compared with stock Klingon on the same view.
-- **The other sets.** Only `mbgaqu` and `mbgkling` have recipes. `MBG02` (the atlas, 16
-  maps) and `Mbgstars` are left to the stock path on purpose for now. A recipe would
-  work for `mbg02.sod` as for any other name.
+- **Recipes seen only on the bench.** Every recipe was drawn on the bench under
+  `mbgaqu`'s name (2026-10-09), not on its own maps, and not compared with stock on the
+  same view.
 - **Parallax layers and 3D nebulae** under the map. If built, they stay render-only in
   this plugin, never map entities, so multiplayer cannot desync.
 - **A `Reset` mid-map** is covered by the managed cube in principle; not exercised on

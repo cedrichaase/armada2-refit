@@ -23,7 +23,8 @@ float4 k_core2   : register(c8);
 float4 k_core2c  : register(c9);
 float4 k_stretch : register(c10);  // xyz: axis; w: stretch (1 = none)
 float4 k_shape   : register(c11);  // brightness, ridge, patchiness, detail
-float4 k_misc    : register(c12);  // drift offset, dither (in 1/255), gas gamma, hue mix
+float4 k_misc    : register(c12);  // band gather, dither (in 1/255), gas gamma, hue mix
+float4 k_band    : register(c13);  // xyz: the band's pole; w: its half-width (radians)
 
 struct VsIn  { float4 pos : POSITION; float3 ray : TEXCOORD0; };
 struct VsOut { float4 pos : POSITION; float3 ray : TEXCOORD0; };
@@ -101,7 +102,7 @@ float3 sky_colour(float3 dir)
     // Stretch along an axis: frequency along it divided by the stretch, so structure
     // runs long that way (curtains).
     float3 sp = dir - k_stretch.xyz * dot(dir, k_stretch.xyz) * (1.0 - 1.0 / k_stretch.w);
-    float3 p = sp * scale + k_seed.xyz + float3(k_misc.x, 0.0, 0.0);
+    float3 p = sp * scale + k_seed.xyz;
 
     // Domain warp: three soft low-octave fields displace the lookup of the main one,
     // which is what turns blobs into billows.
@@ -128,7 +129,11 @@ float3 sky_colour(float3 dir)
     float c1 = exp((dot(dir, k_core1.xyz) - 1.0) / max(k_core1.w * k_core1.w, 1e-4));
     float c2 = exp((dot(dir, k_core2.xyz) - 1.0) / max(k_core2.w * k_core2.w, 1e-4));
 
-    float field = n + patch * m + k_core1c.w * c1 + k_core2c.w * c2;
+    // The band: gas gathered about the great circle whose pole is k_band.xyz.
+    float bd = dot(dir, k_band.xyz);
+    float band = exp(-bd * bd / max(k_band.w * k_band.w, 1e-4));
+
+    float field = n + patch * m + k_core1c.w * c1 + k_core2c.w * c2 + k_misc.x * band;
     float dens = smoothstep(cover - soft, cover + soft, field);
     dens = pow(max(dens, 0.0), k_misc.z);
 
@@ -162,7 +167,7 @@ float4 sky_ps(float3 ray : TEXCOORD0) : COLOR
 // texels hold the edge itself and match their neighbours' exactly: with or without
 // seamless cube filtering, nothing steps across an edge. k_face: the face's centre,
 // its right and its down axes (Direct3D's cube layout), and 2/(S-1).
-float4 k_face[4] : register(c13);
+float4 k_face[4] : register(c14);
 
 float4 bake_ps(float2 vpos : VPOS) : COLOR
 {

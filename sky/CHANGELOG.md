@@ -4,6 +4,16 @@
 cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.0 — 2026-10-09
+
+### Added
+- Recipes for every sky a stock map uses: `mbgpur`, `mbgred`, `mbgrg`, `mbgdk`, `mbgkl`,
+  `mbgflu`, `mbggb`, `mbg02`, `mbgblue`, `mbgborg`, `mbgdom1`, `mbgbaku`. Each
+  `Brightness` is calibrated to about 0.92 of the stock set's luminance.
+- Recipe key `Band=` (yaw, pitch, half-width, gather): gas gathered about a great circle.
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-10-09
 
 ### Added

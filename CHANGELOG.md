@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.15.0 — 2026-10-09
+
+Layers: sky 1.1.0.
+
+### Added
+- Procedural recipes for every sky a stock map uses, and the recipe key `Band=` (sky 1.1.0).
+
+Installed, not yet seen in game.
+
 ## 11.14.0 — 2026-10-09
 
 Layers: sky 1.0.0 (new).
