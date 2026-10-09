@@ -493,6 +493,7 @@ static void    *g_obj_dev;    /* the d3d9 device everything below belongs to */
 static void    *g_sb;
 static void    *g_vol;        /* the noise, MANAGED pool */
 static int      g_vol_size;
+static void    *g_bn_tex;    /* the blue noise, MANAGED pool */
 
 static void unref(void *o) { if (o) D9_FN(o, D9_RELEASE, D9_Ref_t)(o); }
 
@@ -511,6 +512,7 @@ static void drop_objects(void)
     int i;
     unref(g_sb); g_sb = NULLPTR;
     unref(g_vol); g_vol = NULLPTR; g_vol_size = 0;
+    unref(g_bn_tex); g_bn_tex = NULLPTR;
     for (i = 0; i < g_ncls; i++) {
         unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1;
         unref(g_cls[i].vol); g_cls[i].vol = NULLPTR; g_cls[i].vol_gen = -1;
@@ -690,6 +692,105 @@ out:
     if (a) VirtualFree(a, 0, 0x8000);                 /* MEM_RELEASE */
     if (b) VirtualFree(b, 0, 0x8000);
     return ok;
+}
+
+/* ---- the blue noise ------------------------------------------------------------ */
+
+/* A 64x64 blue-noise tile (void and cluster, Ulichney 1993): a threshold per pixel with
+ * no low frequencies and no direction. The slices round their light and jitter their
+ * depth against it. White noise there reads as sand; interleaved gradient noise read
+ * as a fine diagonal hatching, which beat against the gas in camera sweeps (moire).
+ * Energy is a Gaussian (sigma 1.5) over the torus, kept up to date as points move. */
+#define BN 64
+#define BN_N (BN * BN)
+static float g_bn_e[BN_N], g_bn_k[BN_N];
+static BYTE  g_bn_on[BN_N];
+static WORD  g_bn_rank[BN_N];
+
+static void bn_add(int i, float s)
+{
+    int x0 = i % BN, y0 = i / BN, x, y;
+    for (y = 0; y < BN; y++) for (x = 0; x < BN; x++)
+        g_bn_e[y * BN + x] += s * g_bn_k[((y - y0 + BN) % BN) * BN + (x - x0 + BN) % BN];
+}
+
+static int bn_find(int on, int most)           /* the tightest cluster (most) or largest void */
+{
+    int   i, best = -1;
+    float v = 0.0f;
+    for (i = 0; i < BN_N; i++) {
+        if (g_bn_on[i] != on) continue;
+        if (best < 0 || (most ? g_bn_e[i] > v : g_bn_e[i] < v)) { best = i; v = g_bn_e[i]; }
+    }
+    return best;
+}
+
+static void blue_noise(void)
+{
+    BYTE  init[BN_N];
+    int   i, x, y, n = 0, ones, r;
+    DWORD h = 0x2545f491UL;
+    for (y = 0; y < BN; y++) for (x = 0; x < BN; x++) {
+        int dx = x > BN / 2 ? BN - x : x, dy = y > BN / 2 ? BN - y : y;
+        float d2 = (float)(dx * dx + dy * dy);
+        g_bn_k[y * BN + x] = exp2_f(-d2 / (2.0f * 1.5f * 1.5f) * 1.4426950f);
+    }
+    for (i = 0; i < BN_N; i++) { g_bn_on[i] = 0; g_bn_e[i] = 0.0f; }
+    for (i = 0; i < BN_N / 10; i++) {           /* a random start, a tenth on */
+        h = hash32(h + (DWORD)i);
+        r = (int)(h % BN_N);
+        if (!g_bn_on[r]) { g_bn_on[r] = 1; bn_add(r, 1.0f); n++; }
+    }
+    for (;;) {                                  /* relax: tightest cluster into largest void */
+        int c = bn_find(1, 1), v;
+        g_bn_on[c] = 0; bn_add(c, -1.0f);
+        v = bn_find(0, 0);
+        g_bn_on[v] = 1; bn_add(v, 1.0f);
+        if (v == c) break;
+    }
+    for (i = 0; i < BN_N; i++) init[i] = g_bn_on[i];
+    ones = n;
+    for (r = ones - 1; r >= 0; r--) {          /* ranks below: take the tightest out */
+        int c = bn_find(1, 1);
+        g_bn_on[c] = 0; bn_add(c, -1.0f); g_bn_rank[c] = (WORD)r;
+    }
+    for (i = 0; i < BN_N; i++) g_bn_e[i] = 0.0f;
+    for (i = 0; i < BN_N; i++) { g_bn_on[i] = init[i]; if (init[i]) bn_add(i, 1.0f); }
+    for (r = ones; r < BN_N; r++) {            /* ranks above: fill the largest void */
+        int v = bn_find(0, 0);
+        g_bn_on[v] = 1; bn_add(v, 1.0f); g_bn_rank[v] = (WORD)r;
+    }
+}
+
+static int make_blue(void *d9)
+{
+    static int made;
+    LOCKED lk;
+    int    y, x;
+    LARGE  t0, t1;
+    char   m[120];
+    if (!made) {
+        QueryPerformanceCounter(&t0);
+        blue_noise();
+        made = 1;
+        QueryPerformanceCounter(&t1);
+        m[0] = 0; s_cat(m, "blue noise: 64x64 in ");
+        s_num(m, g_qpf.q ? (long)((double)(t1.q - t0.q) * 1000.0 / (double)g_qpf.q) : -1); s_cat(m, " ms");
+        logline(m);
+    }
+    if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, BN, BN, 1, 0, 21, 1, &g_bn_tex, NULLPTR) < 0) { g_bn_tex = NULLPTR; return 0; }
+    if (D9_FN(g_bn_tex, TEX_LOCK, Lock_t)(g_bn_tex, 0, &lk, NULLPTR, 0) < 0) { unref(g_bn_tex); g_bn_tex = NULLPTR; return 0; }
+    for (y = 0; y < BN; y++) {
+        DWORD *d = (DWORD *)(lk.bits + y * lk.pitch);
+        for (x = 0; x < BN; x++) {
+            /* red: the rank; green: the rank of the tile shifted by half (an independent second threshold) */
+            DWORD a = (DWORD)(g_bn_rank[y * BN + x] >> 4);
+            DWORD b = (DWORD)(g_bn_rank[((y + BN / 2) % BN) * BN + (x + 17) % BN] >> 4);
+            d[x] = 0xff000000UL | a << 16 | b << 8;
+        }
+    }
+    D9_FN(g_bn_tex, TEX_UNLOCK, Unlock_t)(g_bn_tex, 0);
+    return 1;
 }
 
 /* ---- the envelope ---------------------------------------------------------- */
@@ -1111,7 +1212,11 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
     D9_FN(d9, D9_SETVERTEXSHADER, D9_Ptr_t)(d9, vs);
     d9_vsconst(d9, 0, &cols[0][0], 4);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 0, g_vol);
-    for (i = 0; i < (int)(sizeof ss0 / sizeof ss0[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 0, ss0[i][0], ss0[i][1]);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 4, g_bn_tex);
+    for (i = 0; i < (int)(sizeof ss0 / sizeof ss0[0]); i++) {
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 0, ss0[i][0], ss0[i][1]);
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 4, ss0[i][0], ss0[i][0] >= 5 ? 1 : ss0[i][1]);   /* wrap, point, no mips */
+    }
     for (i = 0; i < (int)(sizeof ssc / sizeof ssc[0]); i++) {
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, ssc[i][0], ssc[i][1]);
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 2, ssc[i][0], ssc[i][1]);
@@ -1142,6 +1247,7 @@ static int draw_gas(void)
         return 0;
     }
     if (!g_vol && !make_volume(d9)) return 0;
+    if (!g_bn_tex && !make_blue(d9)) return 0;
     if (!gather()) return 1;
 
     D9_FN(d9, D9_GETTRANSFORM, Mat_t)(d9, 2, V);      /* VIEW */
@@ -1239,6 +1345,7 @@ static int draw_gas(void)
             s = path > ref ? pow_f(ref / path, c->edge_dim) : 1.0f;
             c->k[7][3] = s / reach;
         }
+        c->k[12][3] = (float)(g_frame & 1023);    /* the draw's dither moves on each frame */
         if (g_bake && c->vol) {
             for (i = 0; i < 3; i++) c->k[12][i] = 1.0f / c->vsize[i];
             d9_bind(d9, vs, vps);
@@ -1295,11 +1402,29 @@ static void __fastcall hook_particles(void *eng, void *edx, void *list)
     g_drawing = g_enable && draw_gas();
 }
 
+/* Skipping Nebula::Render also skips what marks the nebula as on screen: Entity::Render
+ * sets the entity's +0x25 when its instance passes the frustum test (slot 3 of the
+ * instance's vtable, which Lighting.asi's NebulaCull widens), and Entity::ResetVisibility
+ * clears it every frame. Nebula::Simulate registers the nebula's light only while it
+ * is set, so without it ships stop taking the nebula's colour. The hook marks it as
+ * GameObject::Render would: not hidden (+0x27), seen by the player, in the frustum.
+ * Nebula::sCullOccludedNebula's culled flag (+0x1b0) is left out on purpose: it thins
+ * billboards one hides behind another, which says nothing about gas. */
+typedef BYTE (__thiscall *Frustum_t)(void *inst, void *cam);
+
+static void mark_on_screen(BYTE *obj, void *cam)
+{
+    BYTE *inst = *(BYTE **)(obj + 4);
+    if (obj[0x27] || !inst || !cam) return;
+    if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj)) return;
+    if (((Frustum_t)(*(void ***)inst)[3])(inst, cam)) obj[0x25] = 1;
+}
+
 static void __fastcall hook_nebula_render(BYTE *obj, void *edx, void *cam)
 {
     Cls *c;
     (void)edx;
-    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have) return;
+    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have) { mark_on_screen(obj, cam); return; }
     ((Render_t)FN_NEBULA_RENDER)(obj, cam);
 }
 

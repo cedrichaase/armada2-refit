@@ -29,13 +29,14 @@ float4 k_shape   : register(c8);   // x: ridge; y: hue mix; z: warp scale; w: lu
 float4 k_knots   : register(c9);   // x: knots; y: their scale; z: lanes; w: their scale
 float4 k_light   : register(c10);  // xyz: towards the light, times the step (world units); w: shading
 float4 k_vlo     : register(c11);  // the baked volume: xyz its low corner (world); w: fine detail
-float4 k_vsz     : register(c12);  // bake: xyz world units per texel, w the layer's y; draw: xyz 1/its size
+float4 k_vsz     : register(c12);  // bake: xyz world units per texel, w the layer's y; draw: xyz 1/its size, w the frame
 float4 k_flow    : register(c13);  // x: the drift (noise units, grows with time); y: flow (world units); z: its scale; w: edge warp (world units)
 float4 k_fil     : register(c14);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
 
 sampler3D s_noise : register(s0);  // r: fbm; gba: three soft warp fields, all tiling
 sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; a: envelope
 sampler3D s_vol   : register(s2);  // the baked gas: density, shading, hue, emission
+sampler2D s_blue  : register(s4);  // a 64x64 blue-noise tile: r and g two independent thresholds
 sampler2D s_occ   : register(s3);  // per column of it: r the most gas, b and g the lowest and highest layer with any
 
 struct VsIn  { float4 pos : POSITION; float2 t : TEXCOORD0; };
@@ -133,36 +134,38 @@ float3 gas_colour(float4 g, float thick, float dist)
     return c * (k_gas_a.w * near * thick * k_vert.w);
 }
 
-// The slice's point for this pixel, jittered in depth; u0 the pixel's threshold.
-float3 slice_point(VsOut i, float2 vpos, out float dist, out float u0)
+// The slice's point for this pixel, jittered in depth; u the pixel's two thresholds.
+float3 slice_point(VsOut i, float2 vpos, out float dist, out float2 u)
 {
     float3 ray = i.w - k_eye.xyz;
     dist = length(ray);
-    // A threshold per pixel that walks a golden-ratio sequence from slice to slice:
-    // stratified across the slices a pixel sees, so their errors cancel.
-    // Interleaved gradient noise rather than a hash: its error is spread evenly over
-    // neighbouring pixels, so the rounding reads as a fine even texture, not sand.
-    u0 = frac(52.9829189 * frac(dot(vpos, float2(0.06711056, 0.00583715))));
-    float  jit = (frac(u0 + i.t.y * 0.6180340) - 0.5) * 0.6;
-    // Each pixel samples a different depth inside its slice: the step between slices
-    // becomes fine noise instead of a stack of sheets.
+    // Blue noise: a threshold per pixel with no low frequencies and no direction, so
+    // what is left of the slicing reads as neither sand nor hatching. Its values walk
+    // the golden ratio from slice to slice, so over the slices a pixel sees they are
+    // stratified and the errors cancel, and they move on each frame (k_vsz.w), so
+    // nothing stands still on the screen while the gas moves under it.
+    u = tex2D(s_blue, (vpos + 0.5) / 64.0).rg + k_vsz.w * float2(0.6180340, 0.7548777);
+    // Over the whole gap to the next slice (with vol_ps's two reads): a part left
+    // unsampled shows as bands where the slices turn through the gas.
+    float  jit = (frac(u.x + i.t.y * 0.6180340) - 0.5) * 0.5;   // vol_ps reads a quarter gap either side
     return i.w + ray / dist * (jit * i.t.x);
 }
 
 // Each slice adds well under one step of the 8-bit back buffer, which blending would
-// round away. So each slice rounds itself, to whole steps, against a threshold that
-// walks the golden-ratio sequence (offset from the jitter's): over the slices a pixel
-// sees, the rounding errors cancel to about one step in all.
-float4 slice_out(float3 c, float u0, float k)
+// round away. So each slice rounds itself, to whole steps, against the second
+// threshold, walking the golden ratio (in another step) from slice to slice: over the
+// slices a pixel sees, the rounding errors cancel to about one step in all.
+float4 slice_out(float3 c, float2 u, float k)
 {
-    float  u = frac(u0 * 7.31 + 0.5 + k * 0.7548777);
-    return float4(floor(max(c, 0.0) * 255.0 + u) * k_vert.z, 0.0);
+    float  r = frac(u.y + k * 0.7548777);
+    return float4(floor(max(c, 0.0) * 255.0 + r) * k_vert.z, 0.0);
 }
 
 // The reference: every slice pixel computes the gas itself (Bake=0). Costly.
 float4 neb_ps(VsOut i, float2 vpos : VPOS) : COLOR
 {
-    float  dist, u0;
+    float  dist;
+    float2 u0;
     float3 p = slice_point(i, vpos, dist, u0);
     float4 g = gas_at(p);
     if (g.x <= 0.0) return float4(0, 0, 0, 0);
@@ -187,7 +190,8 @@ float4 bake_ps(float2 vpos : VPOS) : COLOR
 // for detail finer than the volume's texels.
 float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
 {
-    float  dist, u0;
+    float  dist;
+    float2 u0;
     float3 p = slice_point(i, vpos, dist, u0);
     // Over empty space, one small read and out: the column holds no gas, or none at
     // this height (the record is widened by the flow, so the flow cannot reach any).
@@ -198,10 +202,14 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
     // Flow: the volume read through a warp field that drifts with time, so the gas
     // and its outline churn slowly instead of standing still.
     float3 fl = tex3D(s_noise, p * (k_noise.x * k_flow.z) + float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37)).gba * 2.0 - 1.0;
-    p += fl * k_flow.y;
-    float4 v = tex3D(s_vol, ((p - k_vlo.xyz) * k_vsz.xyz).xzy);   // width x, height z, depth y
+    // Two reads a quarter of the gap either side of the jittered point: one in each
+    // half of the gap, stratified, which halves the noise the jitter leaves.
+    float3 dir = (i.w - k_eye.xyz) / dist * (i.t.x * 0.25);
+    float3 pa = p + fl * k_flow.y;
+    float4 v = 0.5 * (tex3D(s_vol, ((pa - dir - k_vlo.xyz) * k_vsz.xyz).xzy) +   // width x, height z, depth y
+                      tex3D(s_vol, ((pa + dir - k_vlo.xyz) * k_vsz.xyz).xzy));
     if (v.x <= 0.002) return float4(0, 0, 0, 0);
-    float  det = tex3D(s_noise, p * (k_noise.x * 6.1) + k_seed.zxy).r;
+    float  det = tex3D(s_noise, pa * (k_noise.x * 6.1) + k_seed.zxy).r;
     float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);
     return slice_out(gas_colour(g, i.t.x, dist), u0, i.t.y);
 }
