@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.17.1 — 2026-10-09
+
+Layers: gui-installer 1.4.1.
+
+### Fixed
+- The installer AppImage no longer prints fontconfig warnings at start: it uses the
+  host's fontconfig and freetype (gui-installer 1.4.1).
+
+Installs nothing into the game. Confirmed in game 2026-10-09.
+
 ## 11.17.0 — 2026-10-09
 
 Layers: gui-installer 1.4.0.

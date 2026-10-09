@@ -8,7 +8,9 @@ installer itself and the files beside this one. build.sh packs the result.
 
 What is left to the host, on purpose: the C library and its companions, everything
 that talks to the graphics driver (GL, EGL, DRM, GBM; the Vulkan loader is bundled), and the display
-protocol libraries (Wayland, X11, xcb) -- bundling those breaks the host's own Mesa.
+protocol libraries (Wayland, X11, xcb) -- bundling those breaks the host's own Mesa --
+and fontconfig with freetype, which read the host's font configuration: a bundled
+fontconfig older than the host's printed ninety warnings about its files at start.
 The result runs on any distribution with a C library at least as new as the one it
 was built on, so CI builds it on the oldest we want (Ubuntu 24.04).
 
@@ -31,7 +33,8 @@ EXCLUDE = re.compile(r'^(ld-linux.*|linux-vdso.*|libc\.so.*|libm\.so.*|libdl\.so
                      r'libcrypt\.so.*|libstdc\+\+\.so.*|libgcc_s\.so.*|'
                      r'libGL.*|libEGL.*|libOpenGL.*|libgbm.*|libdrm.*|'
                      r'libwayland-.*|libX.*|libxcb.*|libxshmfence.*|'
-                     r'libudev.*|libasound.*|libpulse.*|libnvidia.*|libcuda.*)$')
+                     r'libudev.*|libasound.*|libpulse.*|libnvidia.*|libcuda.*|'
+                     r'libfontconfig\.so.*|libfreetype\.so.*)$')
 # Everything else is bundled, deliberately including the small ones a distribution may or
 # may not have installed (libselinux, libsystemd, libxkbcommon): a library this leaves to
 # the host must be one every graphical Linux has. main() prints the list.
