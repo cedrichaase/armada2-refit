@@ -4,6 +4,35 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.4.0 — 2026-10-09
+
+Reads package schemas 0 and 1.
+
+### Added
+- A procedural nebula behind the stars (`nebula_pixels`), new at every launch, faded in
+  and drifting slowly; it replaces the three fixed colour washes.
+- Warp while installing (`Sky.set_warp`): the stars streak and everything speeds up,
+  easing in and out, held for at least 3 s.
+- An amber accent (`AMBER`): the Install button, the progress bar and libadwaita's accent.
+- A bolder title: "ARMADA II" at weight 900 over a tracked amber "REFIT"
+  (`.title-main`, `.title-tag`; `.title-big` is gone), in the desktop's own font.
+- **Launch game** beside Install (`launch_game()`, `heroic_launch_uri()`): starts the
+  game through Heroic; it takes the amber once there is nothing new to install.
+- `EngineBar`: the progress bar glides, with a glowing engine and a trail at its tip.
+- When no Heroic is found, an open row with how to install it on this distribution
+  (`HEROIC_HOWTO`, `heroic_installed()`), a link to its site and what to do next.
+
+### Changed
+- Heroic's launch settings are always written when Heroic has the game: the switch is
+  now a line saying what goes in. The launch variables to copy show only for a game
+  Heroic does not run. `--no-launcher` stays on the command line.
+
+### Removed
+- The "Remastering tools for Star Trek: Armada II" subtitle and the note that textures
+  are not shipped.
+
+Confirmed in game 2026-10-09.
+
 ## 1.3.0 — 2026-10-09
 
 Reads package schemas 0 and 1.

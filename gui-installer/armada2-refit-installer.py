@@ -11,9 +11,10 @@
 It finds the game (Heroic, Lutris, Bottles, Wine prefixes, the usual folders), lists the
 releases on GitHub -- checked on every launch and on Refresh, cached under
 ~/.cache/armada2-refit/installer so it works offline -- and installs the chosen one by
-running the release's own install.sh, following its progress. It can also write the
-launch settings into Heroic's config for the game. Textures and the cutscene player are
-not installed from here, for now.
+running the release's own install.sh, following its progress. It writes the launch
+settings into Heroic's config for the game, which does not start right without them, and
+says how to get Heroic when there is none. Textures and the cutscene player are not
+installed from here, for now.
 
 It reads release packages of the schemas in SCHEMAS. The schema is the layout of the
 release zip as this program relies on it (manifest.json, install.sh's ::step lines),
@@ -38,7 +39,7 @@ import time
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.3.0'
+INSTALLER_VERSION = '1.4.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -465,6 +466,51 @@ def distro_family(osr=None):
         if t in ('ubuntu', 'debian'):
             return t
     return 'other'
+
+
+# ------------------------------------------------------------------ Heroic, when missing
+
+HEROIC_SITE = 'https://heroicgameslauncher.com/downloads'
+HEROIC_FLATPAK = 'flatpak install flathub com.heroicgameslauncher.hgl'
+# The native package first: a Flatpak Heroic cannot see a vkBasalt installed on the host.
+HEROIC_HOWTO = {
+    'arch': [('Heroic is in the AUR. With an AUR helper:', 'yay -S heroic-games-launcher-bin')],
+    'fedora': [('Download the .rpm from heroicgameslauncher.com and install it, or use '
+                'Flathub (bloom does not work in the Flatpak):', HEROIC_FLATPAK)],
+    'debian': [('Download the .deb from heroicgameslauncher.com and install it, or use '
+                'Flathub (bloom does not work in the Flatpak):', HEROIC_FLATPAK)],
+    'other': [('Download Heroic from heroicgameslauncher.com, or use Flathub (bloom does '
+               'not work in the Flatpak):', HEROIC_FLATPAK)],
+}
+HEROIC_HOWTO['ubuntu'] = HEROIC_HOWTO['debian']
+HEROIC_HOWTO['fedora-ostree'] = [('Install Heroic from Flathub:', HEROIC_FLATPAK)]
+
+
+def heroic_launch_uri(heroic):
+    """What Heroic's own desktop shortcuts open (Heroic 2.x)."""
+    return f'heroic://launch?appName={heroic.app}&runner=gog'
+
+
+def launch_game(heroic):
+    """Start the game through Heroic. xdg-open with the host's environment, so Heroic
+    never inherits the AppImage's libraries; False when there is no xdg-open."""
+    try:
+        subprocess.Popen(['xdg-open', heroic_launch_uri(heroic)], env=host_env(),
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    except OSError:
+        return False
+    return True
+
+
+def heroic_installed():
+    """Heroic on this machine: run once (its config folder), or installed and never run."""
+    if any(os.path.isdir(root) for root, _ in HEROIC_ROOTS):
+        return True
+    if shutil.which('heroic', path=host_env().get('PATH')):
+        return True
+    return any(os.path.isdir(os.path.join(d, 'app/com.heroicgameslauncher.hgl'))
+               for d in ('/var/lib/flatpak', os.path.join(XDG_DATA, 'flatpak')))
 
 
 def vkbasalt_howto(family=None):
@@ -1044,6 +1090,18 @@ def selftest():
         check(p.schema == 0 and p.version == '11.4.0', 'legacy zip: schema 0, version from README')
         check([l['id'] for l in p.layers] == ['prereqs', 'hud', 'msaa', 'renderer', 'bloom'],
               'legacy zip: layers from README')
+        nw, nh = NEBULA_SIZE
+        neb = nebula_pixels(7)
+        alpha = neb[3::4]
+        check(len(neb) == nw * nh * 4 and 0.2 < sum(1 for v in alpha if v) / len(alpha) < 0.8,
+              'nebula: the size asked for, and part of the sky clouded')
+
+        def seam(a, b):         # mean alpha step between columns a and b
+            return sum(abs(alpha[r * nw + a] - alpha[r * nw + b]) for r in range(nh)) / nh
+        check(seam(nw - 1, 0) <= 3 * seam(nw // 2, nw // 2 + 1) + 2,
+              'nebula: tiles across without a seam')
+        check(heroic_launch_uri(Heroic(t, GOG_APP, False)) ==
+              f'heroic://launch?appName={GOG_APP}&runner=gog', "launch: Heroic's own URI")
         check(split_overrides('a=n,b; b=n') == {'a': 'n,b', 'b': 'n'}, 'overrides parse')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
         keep = {k: os.environ.get(k) for k in ('A2_APPIMAGE', 'PATH', 'PYTHONHOME', 'A2_ORIG_PATH',
@@ -1077,7 +1135,16 @@ def selftest():
 
 # ------------------------------------------------------------------ the window
 
+# Amber, the warm of the nebula's cores, in place of the desktop's accent: libadwaita's
+# named colours for everything that takes the accent, and the two that matter set
+# outright, so they hold on any libadwaita.
+AMBER, AMBER_LIGHT, AMBER_INK = '#e8922f', '#f5a849', '#1c1206'
 CSS = """
+@define-color accent_bg_color AMBER;
+@define-color accent_color AMBER_LIGHT;
+@define-color accent_fg_color AMBER_INK;
+button.suggested-action { background-color: AMBER; color: AMBER_INK; }
+progressbar progress { background-color: AMBER_LIGHT; }
 window.a2 { background: #05070d; }
 .sky-card { background: alpha(#10141f, 0.74); border: 1px solid alpha(white, 0.08);
             border-radius: 18px; }
@@ -1085,8 +1152,10 @@ window.a2 { background: #05070d; }
 .sky-card row { border-radius: 0; }
 .sky-card > list > row:first-child { border-radius: 18px 18px 0 0; }
 .sky-card > list > row:last-child { border-radius: 0 0 18px 18px; }
-.title-big { font-size: 30px; font-weight: 300; letter-spacing: 0.5px; }
-.title-sub { color: alpha(@window_fg_color, 0.6); }
+.title-main { font-size: 40px; font-weight: 900; letter-spacing: 3px;
+              text-shadow: 0 0 18px alpha(#8fb4ff, 0.35); }
+.title-tag { color: AMBER_LIGHT; font-size: 14px; font-weight: 800; letter-spacing: 0.9em;
+             margin-left: 0.9em; text-shadow: 0 0 10px alpha(AMBER, 0.55); }
 .status { color: alpha(@window_fg_color, 0.75); }
 .status.err { color: @error_color; }
 .status.ok { color: @success_color; }
@@ -1096,7 +1165,77 @@ progressbar.thin trough, progressbar.thin progress { min-height: 4px; }
 progressbar.thin trough { background: alpha(white, 0.10); }
 .mono { font-family: monospace; font-size: 0.9em; }
 .logview { background: alpha(black, 0.35); padding: 8px; }
-"""
+""".replace('AMBER_LIGHT', AMBER_LIGHT).replace('AMBER_INK', AMBER_INK).replace('AMBER', AMBER)
+# libadwaita 1.6 reads the accent from CSS variables, which GTK parses from 4.16 on.
+CSS_VARS = (f':root {{ --accent-bg-color: {AMBER}; --accent-color: {AMBER_LIGHT}; '
+            f'--accent-fg-color: {AMBER_INK}; }}\n')
+
+
+NEBULA_SIZE = (256, 160)
+
+
+def nebula_pixels(seed, w=NEBULA_SIZE[0], h=NEBULA_SIZE[1]):
+    """A nebula for the window's sky, as premultiplied ARGB32 (cairo's byte order): value
+    noise, gently domain-warped into soft billows (no thin filaments: they read as
+    electric), a second field for dark dust lanes and a slow one that moves the hue between
+    violet and teal; warm where it is densest. The lattices are periodic, so it tiles and can drift without a seam.
+    Pure Python (no numpy in the AppImage): about half a second, so run it off the
+    main thread."""
+    import math
+    import random
+    rnd = random.Random(seed)
+    octs = []
+    for o in range(5):
+        cx = 4 << o
+        cy = max(2, cx * h // w)
+        octs.append((cx, cy, [[rnd.random() for _ in range(cx)] for _ in range(cy)]))
+
+    def noise(lat, x, y):
+        cx, cy, g = lat
+        x, y = x * cx, y * cy
+        xi, yi = math.floor(x), math.floor(y)
+        fx, fy = x - xi, y - yi
+        fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+        x0, x1 = xi % cx, (xi + 1) % cx
+        r0, r1 = g[yi % cy], g[(yi + 1) % cy]
+        a = r0[x0] + (r0[x1] - r0[x0]) * fx
+        b = r1[x0] + (r1[x1] - r1[x0]) * fx
+        return a + (b - a) * fy
+
+    def fbm(x, y, n=5, ofs=0.0):
+        v, amp, tot = 0.0, 1.0, 0.0
+        for o in range(n):
+            v += amp * noise(octs[o], x + ofs, y + ofs * 0.7)
+            tot += amp
+            amp *= 0.5
+        return v / tot
+
+    cells = []
+    for j in range(h):
+        y = j / h
+        for i in range(w):
+            x = i / w
+            qx, qy = fbm(x, y, 4, 0.31), fbm(x, y, 4, 0.67)
+            cells.append((fbm(x + 0.35 * qx, y + 0.35 * qy), qx,
+                          noise(octs[0], x + 0.5, y + 0.2)))
+    dens = sorted(c[0] for c in cells)
+    # The thinnest 40 % stays empty; the top is a percentile, not the brightest cell, so
+    # every launch comes out about as bright, and none of it clips behind the cards.
+    lo, hi = dens[len(dens) * 2 // 5], dens[len(dens) * 995 // 1000]
+    violet, teal = (0.30, 0.18, 0.75), (0.10, 0.45, 0.80)
+    buf = bytearray(w * h * 4)
+    for k, (d, dust, hue) in enumerate(cells):
+        t = min(1.0, max(0.0, (d - lo) / (hi - lo))) ** 1.6
+        t *= 1 - 0.7 * min(1.0, max(0.0, (dust - 0.5) * 5))
+        m = min(1.0, max(0.0, (hue - 0.3) * 2.5))
+        hot = max(0.0, t - 0.6) * 2.5
+        r = min(1.0, violet[0] + (teal[0] - violet[0]) * m + 0.45 * hot)
+        g = min(1.0, violet[1] + (teal[1] - violet[1]) * m + 0.30 * hot)
+        b = min(1.0, violet[2] + (teal[2] - violet[2]) * m + 0.05 * hot)
+        a = min(0.6, t * 0.9)
+        buf[4 * k:4 * k + 4] = bytes((int(255 * b * a), int(255 * g * a),
+                                      int(255 * r * a), int(255 * a)))
+    return buf
 
 
 def run_gui():
@@ -1114,10 +1253,17 @@ def run_gui():
         return w
 
     class Sky(Gtk.DrawingArea):
-        """The window's background: a dark gradient, a faint nebula and three layers of
-        stars drifting at different speeds. Drawn in code, so there is nothing to ship;
-        still when the desktop has animations off."""
+        """The window's background: a dark gradient, a nebula made up anew at every
+        launch (nebula_pixels, faded in once it is ready) and three layers of stars, all
+        drifting at different speeds. While an install runs it goes to warp (set_warp):
+        everything speeds up and the stars draw as streaks, easing in and out. Drawn in
+        code, so there is nothing to ship; still when the desktop has animations off."""
         LAYERS = ((90, 0.55, 3.0), (60, 0.85, 7.0), (28, 1.35, 14.0))   # count, radius, px/s
+        CLOUD_SPEED = 1.5       # px/s on screen: behind the slowest stars
+        CLOUD_FADE = 1.5        # s
+        WARP_SPEED = 40.0       # times the drift at full warp
+        WARP_EASE = 1.2         # s, about, to reach warp or to drop out of it
+        WARP_HOLD = 3.0         # s at least: an install from the cache takes under one
 
         def __init__(self):
             super().__init__(hexpand=True, vexpand=True)
@@ -1128,7 +1274,15 @@ def run_gui():
             self.tints = ((1.0, 1.0, 1.0), (0.75, 0.85, 1.0), (1.0, 0.88, 0.75))
             self.t0 = None
             self.nebula = None
+            self.cloud, self.cloud_t, self.cloud_scaled = None, None, None
+            seed = random.SystemRandom().randrange(1 << 30)
+            threading.Thread(target=lambda: GLib.idle_add(self.cloud_ready, nebula_pixels(seed)),
+                             daemon=True).start()
             self.animate = Gtk.Settings.get_default().get_property('gtk-enable-animations')
+            # Distance travelled, in seconds of ordinary drift: positions follow it rather
+            # than the clock, so changing speed never makes anything jump.
+            self.travel, self.warp, self.warp_to, self.t_last = 0.0, 0.0, 0.0, None
+            self.warp_from, self.warp_off = 0.0, None
             self.set_draw_func(self.draw)
             if self.animate:
                 self.add_tick_callback(self.tick)
@@ -1136,10 +1290,44 @@ def run_gui():
 
         def tick(self, widget, clock):
             now = clock.get_frame_time()
-            if now - self._last >= 33000:       # about 30 frames a second is plenty
+            # About 30 frames a second is plenty for a drift; at warp, every frame.
+            if now - self._last >= 33000 or self.warp > 0.001 or self.warp_to:
                 self._last = now
                 self.queue_draw()
             return GLib.SOURCE_CONTINUE
+
+        def set_warp(self, on):
+            t = GLib.get_monotonic_time() / 1e6
+            if on and self.animate:
+                self.warp_to, self.warp_from, self.warp_off = 1.0, t, None
+            elif self.warp_to:
+                self.warp_off = max(t, self.warp_from + self.WARP_HOLD)
+
+        def advance(self):
+            """Move the clock on: ease the warp level, add to the distance travelled."""
+            t = GLib.get_monotonic_time() / 1e6
+            dt = 0.0 if self.t_last is None else min(0.1, t - self.t_last)
+            self.t_last = t
+            if self.warp_off is not None and t >= self.warp_off:
+                self.warp_to, self.warp_off = 0.0, None
+            self.warp += (self.warp_to - self.warp) * min(1.0, dt * 3.0 / self.WARP_EASE)
+            if abs(self.warp - self.warp_to) < 0.001:
+                self.warp = self.warp_to
+            self.travel += dt * self.speed()
+            return t, dt
+
+        def speed(self):
+            e = self.warp * self.warp * (3 - 2 * self.warp)          # smoothstep
+            return 1.0 + (self.WARP_SPEED - 1.0) * e
+
+        def cloud_ready(self, buf):
+            import cairo
+            w, h = NEBULA_SIZE
+            self.cloud = cairo.ImageSurface.create_for_data(buf, cairo.FORMAT_ARGB32, w, h,
+                                                            w * 4)
+            self.cloud_t = GLib.get_monotonic_time() / 1e6
+            self.queue_draw()
+            return GLib.SOURCE_REMOVE
 
         def build_nebula(self, w, h):
             import cairo
@@ -1150,28 +1338,129 @@ def run_gui():
             g.add_color_stop_rgb(1, 0.030, 0.040, 0.085)
             cr.set_source(g)
             cr.paint()
-            for fx, fy, fr, col in ((0.18, 0.22, 0.75, (0.22, 0.30, 0.75, 0.16)),
-                                    (0.85, 0.70, 0.80, (0.45, 0.20, 0.65, 0.12)),
-                                    (0.55, 0.05, 0.55, (0.15, 0.45, 0.65, 0.07))):
-                rad = cairo.RadialGradient(fx * w, fy * h, 0, fx * w, fy * h, fr * max(w, h))
-                rad.add_color_stop_rgba(0, *col)
-                rad.add_color_stop_rgba(1, col[0], col[1], col[2], 0)
-                cr.set_source(rad)
-                cr.paint()
             self.nebula = (w, h, s)
 
         def draw(self, area, cr, w, h):
+            import cairo
             if not self.nebula or self.nebula[:2] != (w, h):
                 self.build_nebula(w, h)
             cr.set_source_surface(self.nebula[2], 0, 0)
             cr.paint()
-            now = (GLib.get_monotonic_time() / 1e6) if self.animate else 0.0
+            now, dt = self.advance() if self.animate else (0.0, 0.0)
+            travel, mult = self.travel, self.speed()
+            if self.cloud:
+                # Scaled to the window's height once per height, then only moved, by whole
+                # pixels: filtering it every frame cost half again the sky's CPU time.
+                if not self.cloud_scaled or self.cloud_scaled[0] != h:
+                    sc = h / NEBULA_SIZE[1]
+                    tw = max(1, round(NEBULA_SIZE[0] * sc))
+                    tile = cairo.ImageSurface(cairo.FORMAT_ARGB32, tw, h)
+                    tc = cairo.Context(tile)
+                    tc.scale(tw / NEBULA_SIZE[0], sc)
+                    src = cairo.SurfacePattern(self.cloud)
+                    src.set_extend(cairo.EXTEND_REPEAT)     # so the edges wrap, too
+                    src.set_filter(cairo.FILTER_GOOD)
+                    tc.set_source(src)
+                    tc.paint()
+                    self.cloud_scaled = (h, tile)
+                pat = cairo.SurfacePattern(self.cloud_scaled[1])
+                pat.set_extend(cairo.EXTEND_REPEAT)
+                pat.set_filter(cairo.FILTER_FAST)
+                pat.set_matrix(cairo.Matrix(x0=-round(travel * self.CLOUD_SPEED)))
+                cr.set_source(pat)
+                fade = min(1.0, (now - self.cloud_t) / self.CLOUD_FADE) if self.animate else 1.0
+                cr.paint_with_alpha(fade)
+            # At warp a star is a streak behind it: at least what it covers in a frame, so
+            # it reads as one motion and not a dotted line.
+            streak = 0.0 if mult < 1.05 else max(dt * 1.6, 0.12)
+            cr.set_line_cap(cairo.LINE_CAP_ROUND)
             for x, y, r, a, ph, speed, tint in self.stars:
-                px = (x * w + now * speed) % w
+                px = (x * w + travel * speed) % w
                 tw = 0.75 + 0.25 * math.sin(now * 0.9 + ph) if self.animate else 1.0
-                cr.set_source_rgba(*self.tints[tint], a * tw)
-                cr.arc(px, y * h, r, 0, 6.2832)
-                cr.fill()
+                length = speed * mult * streak
+                if length > 1.0:
+                    # Faint at the tail, the star's own brightness at the head.
+                    g = cairo.LinearGradient(px - length, 0, px, 0)
+                    g.add_color_stop_rgba(0, *self.tints[tint], 0)
+                    g.add_color_stop_rgba(1, *self.tints[tint], a * tw)
+                    cr.set_source(g)
+                    cr.set_line_width(2 * r)
+                    cr.move_to(px - length, y * h)
+                    cr.line_to(px, y * h)
+                    cr.stroke()
+                else:
+                    cr.set_source_rgba(*self.tints[tint], a * tw)
+                    cr.arc(px, y * h, r, 0, 6.2832)
+                    cr.fill()
+
+    class EngineBar(Gtk.Overlay):
+        """The progress bar with an engine at its tip: an amber glow that flickers and a
+        short trail behind it. The bar glides to each new fraction instead of jumping,
+        and the glow fades out once it is full. A plain bar when animations are off."""
+        HEIGHT = 24             # room for the glow around a 4 px bar
+        GLIDE = 4.0             # 1/s: how fast the bar closes on a new fraction
+
+        def __init__(self):
+            super().__init__()
+            self.bar = Gtk.ProgressBar(valign=Gtk.Align.CENTER, hexpand=True)
+            self.bar.add_css_class('thin')
+            box = Gtk.Box(height_request=self.HEIGHT)
+            box.append(self.bar)
+            self.set_child(box)
+            self.glow = Gtk.DrawingArea(can_target=False)
+            self.glow.set_draw_func(self.draw)
+            self.add_overlay(self.glow)
+            self.shown = self.target = self.lit = 0.0
+            self.t_last = None
+            self.animate = Gtk.Settings.get_default().get_property('gtk-enable-animations')
+            if self.animate:
+                self.add_tick_callback(self.tick)
+
+        def set_fraction(self, f):
+            if f < self.shown or not self.animate:
+                self.shown = f          # a new job starts from nothing at once
+                self.bar.set_fraction(f)
+            self.target = f
+            self.glow.queue_draw()
+
+        def tick(self, widget, clock):
+            t = clock.get_frame_time() / 1e6
+            dt = 0.0 if self.t_last is None else min(0.1, t - self.t_last)
+            self.t_last = t
+            lit_to = 1.0 if 0.0 < self.target < 1.0 else 0.0
+            if abs(self.target - self.shown) > 1e-4 or self.lit != lit_to or self.lit > 0:
+                self.shown += (self.target - self.shown) * min(1.0, dt * self.GLIDE)
+                self.lit += (lit_to - self.lit) * min(1.0, dt * (5.0 if lit_to else 1.5))
+                if self.lit < 0.01 and not lit_to:
+                    self.lit = 0.0
+                self.bar.set_fraction(self.shown)
+                self.glow.queue_draw()
+            return GLib.SOURCE_CONTINUE
+
+        def draw(self, area, cr, w, h):
+            import cairo
+            if self.lit <= 0.0 or self.shown <= 0.0:
+                return
+            x, y = self.shown * w, h / 2
+            t = GLib.get_monotonic_time() / 1e6
+            flick = 0.85 + 0.1 * math.sin(t * 23) + 0.05 * math.sin(t * 61)
+            # The trail: the bar burning brighter toward the engine.
+            trail = min(x, 80.0)
+            g = cairo.LinearGradient(x - trail, 0, x, 0)
+            g.add_color_stop_rgba(0, 1.0, 0.75, 0.40, 0)
+            g.add_color_stop_rgba(1, 1.0, 0.85, 0.60, 0.8 * self.lit)
+            cr.set_source(g)
+            cr.rectangle(x - trail, y - 2, trail, 4)
+            cr.fill()
+            # The engine: white-hot at the core, amber around it.
+            r = 14 * flick
+            g = cairo.RadialGradient(x, y, 0, x, y, r)
+            g.add_color_stop_rgba(0, 1.0, 0.97, 0.88, self.lit)
+            g.add_color_stop_rgba(0.25, 1.0, 0.72, 0.32, 0.75 * self.lit * flick)
+            g.add_color_stop_rgba(1, 0.96, 0.57, 0.18, 0)
+            cr.set_source(g)
+            cr.arc(x, y, r, 0, 6.2832)
+            cr.fill()
 
     class Window(Adw.ApplicationWindow):
         def __init__(self, app):
@@ -1189,7 +1478,8 @@ def run_gui():
         # ---------------------------------------------------------- layout
         def build(self):
             overlay = Gtk.Overlay()
-            overlay.set_child(Sky())
+            self.sky = Sky()
+            overlay.set_child(self.sky)
 
             view = Adw.ToolbarView(extend_content_to_top_edge=True)
             view.set_top_bar_style(Adw.ToolbarStyle.FLAT)
@@ -1207,9 +1497,10 @@ def run_gui():
 
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER,
                           margin_top=8, margin_bottom=28, margin_start=16, margin_end=16)
-            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-            title.append(lab('Armada II Refit', 'title-big', xalign=0.5))
-            title.append(lab('Remastering tools for Star Trek: Armada II', 'title-sub', xalign=0.5))
+            title = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            title.append(lab('ARMADA II', 'title-main', xalign=0.5))
+            # The tracking also follows the last letter: the margin puts it back in the middle.
+            title.append(lab('REFIT', 'title-tag', xalign=0.5))
             col.append(title)
 
             card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -1234,10 +1525,16 @@ def run_gui():
             self.row_rel.add_suffix(self.dd_rel)
             rows.append(self.row_rel)
 
-            self.row_heroic = Adw.SwitchRow(title='Heroic launch settings', active=True,
-                                            subtitle_lines=3)
-            self.row_heroic.connect('notify::active', lambda *_: self.update_launcher())
+            # Always written: the game does not start right without them.
+            self.row_heroic = Adw.ActionRow(title='Heroic launch settings', subtitle_lines=3)
             rows.append(self.row_heroic)
+
+            self.row_get_heroic = Adw.ExpanderRow(
+                title='Install Heroic Games Launcher',
+                subtitle='The refit runs the GOG game through Heroic, which also gets its '
+                         'launch settings from here.', subtitle_lines=0)
+            rows.append(self.row_get_heroic)
+            self.get_heroic_rows = []
 
             self.row_env = Adw.ExpanderRow(title='Launch variables',
                                            subtitle='Set these in your launcher')
@@ -1265,21 +1562,28 @@ def run_gui():
             col.append(self.heads_up)
 
             act = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            self.b_install = Gtk.Button(label='Install', halign=Gtk.Align.CENTER)
-            self.b_install.add_css_class('suggested-action')
+            pair = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER, homogeneous=True)
+            self.b_install = Gtk.Button(label='Install')
             self.b_install.add_css_class('pill')
-            self.b_install.set_size_request(220, 48)
+            self.b_install.set_size_request(190, 48)
             self.b_install.connect('clicked', lambda _b: self.on_install())
-            act.append(self.b_install)
+            pair.append(self.b_install)
+            self.b_launch = Gtk.Button(child=Adw.ButtonContent(
+                icon_name='media-playback-start-symbolic', label='Launch game'),
+                tooltip_text='Start Armada II through Heroic')
+            self.b_launch.add_css_class('pill')
+            self.b_launch.set_size_request(190, 48)
+            self.b_launch.connect('clicked', lambda _b: self.on_launch())
+            pair.append(self.b_launch)
+            act.append(pair)
             self.b_uninstall = Gtk.Button(label='Uninstall', halign=Gtk.Align.CENTER)
             self.b_uninstall.add_css_class('flat')
             self.b_uninstall.connect('clicked', lambda _b: self.on_uninstall())
             act.append(self.b_uninstall)
             col.append(act)
 
-            prog = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-            self.bar = Gtk.ProgressBar()
-            self.bar.add_css_class('thin')
+            prog = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            self.bar = EngineBar()
             prog.append(self.bar)
             self.status = lab('', 'status', xalign=0.5, wrap=True, justify=Gtk.Justification.CENTER)
             prog.append(self.status)
@@ -1342,7 +1646,7 @@ def run_gui():
 
         def set_busy(self, busy):
             self.busy = busy
-            for w in (self.dd_game, self.dd_rel, self.row_heroic):
+            for w in (self.dd_game, self.dd_rel):
                 w.set_sensitive(not busy)
             self.update_buttons()
 
@@ -1367,6 +1671,7 @@ def run_gui():
 
         def failed(self, e):
             self.set_busy(False)
+            self.sky.set_warp(False)
             self.set_status(f'Failed: {e}', 'err')
             self.log(f'error: {e}')
 
@@ -1502,6 +1807,7 @@ def run_gui():
         def update_all(self):
             self.update_heads_up()
             self.update_bloom()
+            self.update_get_heroic()
             self.update_launcher()
             self.update_banner()
             self.update_buttons()
@@ -1523,10 +1829,8 @@ def run_gui():
                                      if why.startswith('skipped — ') else f'{l["name"]}: {why}')
                     elif 'per vertex' in why:
                         notes.append(f'{l["name"]}: per vertex; per pixel needs d3d8to9')
-            notes.append('Textures are built from your own files, not shipped in releases.')
-            for i, n in enumerate(notes):
-                self.heads_up.append(lab(n, ('heads-up', 'warn') if i < len(notes) - 1
-                                         else 'heads-up', xalign=0.5, wrap=True,
+            for n in notes:
+                self.heads_up.append(lab(n, ('heads-up', 'warn'), xalign=0.5, wrap=True,
                                          justify=Gtk.Justification.CENTER, margin_start=8,
                                          margin_end=8))
 
@@ -1578,7 +1882,8 @@ def run_gui():
             self.env_text.set_label('\n'.join(f'{k}={v}' for k, v in env.items()))
             heroic = bool(g and g.heroic)
             self.row_heroic.set_visible(heroic)
-            self.row_env.set_visible(bool(env) and not (heroic and self.row_heroic.get_active()))
+            # A game Heroic does not run (Lutris, a Wine prefix): the text to copy.
+            self.row_env.set_visible(bool(env) and bool(g) and not heroic)
             if not heroic:
                 return
             changes, conflicts = heroic_plan(g.heroic, env)
@@ -1587,12 +1892,44 @@ def run_gui():
             elif not changes:
                 sub = f'Already set in {g.heroic.label()}'
             else:
-                sub = f'Adds {", ".join(c["key"] for c in changes)} to {g.heroic.label()}'
+                sub = f'Written to {g.heroic.label()} on install: {", ".join(c["key"] for c in changes)}'
             if conflicts and changes is not None:
                 sub += '. ' + '; '.join(conflicts)
-            if self.row_heroic.get_active() and heroic_running():
+            if heroic_running():
                 sub += '. Heroic is running: restart it afterwards'
             self.row_heroic.set_subtitle(GLib.markup_escape_text(sub))
+
+        def update_get_heroic(self):
+            for r in self.get_heroic_rows:
+                self.row_get_heroic.remove(r)
+            self.get_heroic_rows = []
+            g = self.game()
+            if (g and g.heroic) or heroic_installed():
+                self.row_get_heroic.set_visible(False)
+                return
+            self.row_get_heroic.set_visible(True)
+            self.row_get_heroic.set_expanded(True)
+            for text, cmd in HEROIC_HOWTO.get(distro_family(), HEROIC_HOWTO['other']):
+                r = Adw.ActionRow(title=GLib.markup_escape_text(text), title_lines=0,
+                                  subtitle=GLib.markup_escape_text(cmd), subtitle_lines=0)
+                r.add_css_class('property')
+                cp = Gtk.Button(icon_name='edit-copy-symbolic', valign=Gtk.Align.CENTER,
+                                tooltip_text='Copy')
+                cp.add_css_class('flat')
+                cp.connect('clicked', lambda _b, c=cmd: self.copy(c))
+                r.add_suffix(cp)
+                self.row_get_heroic.add_row(r)
+                self.get_heroic_rows.append(r)
+            site = Adw.ActionRow(title='heroicgameslauncher.com', activatable=True)
+            site.add_suffix(Gtk.Image(icon_name='adw-external-link-symbolic'))
+            site.connect('activated', lambda _r: self.open_uri(HEROIC_SITE))
+            self.row_get_heroic.add_row(site)
+            self.get_heroic_rows.append(site)
+            r = Adw.ActionRow(title='Then sign in to GOG in Heroic, install Star Trek: Armada '
+                                    'II, and press F5 here.', title_lines=0)
+            r.add_css_class('dim-label')
+            self.row_get_heroic.add_row(r)
+            self.get_heroic_rows.append(r)
 
         def update_banner(self):
             p, newer = self.package, None
@@ -1624,6 +1961,8 @@ def run_gui():
             self.b_install.set_sensitive(not self.busy and ok)
             self.b_uninstall.set_visible(bool(g and inst))
             self.b_uninstall.set_sensitive(not self.busy)
+            self.b_launch.set_visible(bool(g and g.heroic and inst))
+            self.b_launch.set_sensitive(not self.busy)
             label = 'Install'
             if r and inst:
                 label = ('Reinstall' if inst == r.version else 'Install' if inst == '?' else
@@ -1631,6 +1970,10 @@ def run_gui():
                 if label != 'Reinstall' and label != 'Install':
                     label += f' {r.version}'
             self.b_install.set_label(label)
+            # The amber goes to what there is to do: Launch once nothing is new to install.
+            launch_first = label == 'Reinstall' and self.b_launch.get_visible()
+            for b, on in ((self.b_install, not launch_first), (self.b_launch, launch_first)):
+                (b.add_css_class if on else b.remove_css_class)('suggested-action')
 
         # ---------------------------------------------------------- jobs
         def report(self, frac, step, info):
@@ -1662,7 +2005,7 @@ def run_gui():
             if game_running():
                 self.set_status('Armada II is running. Quit the game first.', 'err')
                 return
-            write = self.row_heroic.get_active() and bool(g.heroic)
+            write = bool(g.heroic)
             if write and heroic_running():
                 self.confirm('Heroic is running',
                              'Heroic may write its own copy of the game settings back over '
@@ -1674,11 +2017,13 @@ def run_gui():
 
         def start_install(self, g, r, write):
             self.set_busy(True)
+            self.sky.set_warp(True)
             self.bar.set_fraction(0)
             self.log(f'== install {r.version} into {g.path}')
 
             def done(res):
                 self.set_busy(False)
+                self.sky.set_warp(False)
                 msg = f'Refit {res["version"]} installed'
                 if write and res['heroic']:
                     msg += '. Heroic launch settings written.'
@@ -1689,6 +2034,18 @@ def run_gui():
                 self.set_status(msg, 'ok')
                 self.on_game()
             self.in_thread(lambda: self.job().install(r, None, g.path, launcher=write), done)
+
+        def on_launch(self):
+            g = self.game()
+            if not g or not g.heroic or self.busy:
+                return
+            if game_running():
+                self.set_status('Armada II is already running.')
+                return
+            if launch_game(g.heroic):
+                self.set_status('Starting Armada II through Heroic…', 'ok')
+            else:
+                self.open_uri(heroic_launch_uri(g.heroic))
 
         def on_uninstall(self):
             g = self.game()
@@ -1712,10 +2069,11 @@ def run_gui():
             self.in_thread(lambda: self.job().uninstall(self.releases, g.path), done)
 
     provider = Gtk.CssProvider()
+    css = (CSS_VARS if (Gtk.get_major_version(), Gtk.get_minor_version()) >= (4, 16) else '') + CSS
     if hasattr(provider, 'load_from_string'):
-        provider.load_from_string(CSS)
+        provider.load_from_string(css)
     else:
-        provider.load_from_data(CSS.encode(), -1)
+        provider.load_from_data(css.encode(), -1)
 
     def activate(app):
         Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_DARK)

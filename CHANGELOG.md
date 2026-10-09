@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.17.0 — 2026-10-09
+
+Layers: gui-installer 1.4.0.
+
+### Changed
+- The graphical installer has a procedural nebula behind its stars that goes to warp
+  while installing, an amber accent, a bolder title, a Launch game button and a
+  progress bar with an engine at its tip, always writes Heroic's launch settings, says how
+  to get Heroic when there is none, and drops the remastering subtitle and the textures
+  note (gui-installer 1.4.0).
+
+Installs nothing into the game. Confirmed in game 2026-10-09.
+
 ## 11.16.0 — 2026-10-09
 
 Layers: gui-installer 1.3.0.

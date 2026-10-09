@@ -54,8 +54,8 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    **Uninstall** runs the installed release's `install.sh --uninstall` (or the newest
    cached one) and takes Heroic's changes back out.
 5. **Launch settings.** `install.sh` prints the variables the launcher needs
-   (`WINEDLLOVERRIDES`, and bloom's two). With the switch on (default) and a Heroic entry
-   for the game, they go into `GamesConfig/<app>.json` → `enviromentOptions` (Heroic's
+   (`WINEDLLOVERRIDES`, and bloom's two). The game does not start right without
+   them, so there is no switch: with a Heroic entry for the game they always go into `GamesConfig/<app>.json` → `enviromentOptions` (Heroic's
    spelling), with the original kept once as `<file>.a2refit-backup`. A DLL override
    already there is kept and the missing ones are appended. A variable already set to
    something else is left alone and reported. A game Heroic has no settings file for yet
@@ -123,13 +123,58 @@ schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).
 
 ## The window
 
-One screen: the game, the version, the Heroic switch, **Install** (and **Uninstall** when
-the game has a release in it), a thin progress bar and a status line. The log is a dialog
-(`Ctrl+L`). The sky behind it is drawn in code (`Sky`): a gradient, a faint nebula and
-three layers of stars drifting at different speeds, at about 30 frames a second, still
-when the desktop has animations off. Nothing is shipped or fetched for it, so the script
-stays one file and `publish/check.sh` has nothing to refuse. The face is the desktop's
-own. The window uses libadwaita 1.5 at most (`AlertDialog`, `Dialog`, `SwitchRow`).
+One screen: the game, the version, a line saying what goes into Heroic, **Install** (and
+**Uninstall** when the game has a release in it), a thin progress bar and a status line.
+The log is a dialog (`Ctrl+L`). The sky behind it is drawn in code (`Sky`): a gradient,
+a nebula and three layers of stars drifting at different speeds, at about 30 frames a
+second, still when the desktop has animations off. The nebula is new at every launch
+(`nebula_pixels`): value noise, gently domain-warped into soft billows (thin filaments
+looked electric), with dust lanes and a hue moving between violet and teal. It is pure
+Python, since the AppImage carries no numpy, so a thread computes it at 256x160 (about
+half a second) and it fades in. It is scaled to the window once per height and then only
+moved by whole pixels, at 1.5 px/s behind the slowest stars: filtering it every frame
+cost half as much CPU again as the rest of the sky. Brightness is set by a percentile,
+not the brightest cell, so every launch comes out about as bright and nothing clips
+behind the cards. Nothing is shipped or fetched for it, so the script stays one file and
+`publish/check.sh` has nothing to refuse. The face is the desktop's own. The window uses
+libadwaita 1.5 at most (`AlertDialog`, `Dialog`).
+
+While an install runs the sky goes to warp (`Sky.set_warp`): everything travels up to 40
+times faster and the stars draw as streaks, faint at the tail, each at least as long as
+it moves in a frame so it reads as one motion. It eases in and out over about a second
+and holds for at least three, since an install from the cache takes under one. Positions
+follow a distance integrated over time, not the clock, so a change of speed never makes
+anything jump; at rest it costs nothing, and at warp the sky draws every frame instead
+of thirty a second.
+
+The accent is amber (`AMBER`, the warm of the nebula's cores), not the desktop's:
+libadwaita's accent colours by their old names and, on GTK 4.16 and later, the CSS
+variables libadwaita 1.6 reads them from, plus the Install button and the progress bar
+set outright, so those two hold on any libadwaita.
+
+The title is "ARMADA II" at weight 900 over a small, widely tracked amber "REFIT"
+(`.title-main`, `.title-tag`), in the desktop's own face: no font is shipped or fetched,
+and every common desktop sans (Adwaita Sans, Cantarell, Noto Sans, Ubuntu) has the heavy
+weight. The tag's margin makes up for the tracking GTK also puts after its last letter,
+which would otherwise push it off centre.
+
+**Launch game** sits beside Install once the game has a release in it and Heroic knows
+it. It opens `heroic://launch?appName=<app>&runner=gog`, the URI Heroic 2.x's own
+desktop shortcuts use, through `xdg-open` with `host_env()`, so Heroic never inherits
+the AppImage's libraries (GTK's URI launcher is only the fallback). The amber goes to
+whichever of the two there is to do: Install while something new is there, Launch once
+the button would only say Reinstall.
+
+The progress bar (`EngineBar`) has an engine at its tip: a flickering amber glow and a
+short trail, drawn on an overlay 24 px high around the 4 px bar. The bar glides to each
+new fraction instead of jumping step to step, and the glow fades out once it is full.
+
+When there is no Heroic at all (no config folder, no `heroic` on the `PATH`, no Flatpak)
+and the game is not one Heroic knows, an open row says how to get it for this
+distribution (`HEROIC_HOWTO`): the AUR package on Arch, otherwise the site's `.deb`/`.rpm`
+or Flathub, with the warning that bloom does not work in the Flatpak. A game found
+elsewhere (Lutris, a Wine prefix) gets the launch variables as text to copy instead.
+
 
 ## The AppImage
 
