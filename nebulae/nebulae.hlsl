@@ -31,7 +31,12 @@ float4 k_light   : register(c10);  // xyz: towards the light, times the step (wo
 float4 k_vlo     : register(c11);  // the baked volume: xyz its low corner (world); w: fine detail
 float4 k_vsz     : register(c12);  // bake: xyz world units per texel, w the layer's y; draw: xyz 1/its size, w the frame
 float4 k_flow    : register(c13);  // x: the drift (noise units, grows with time); y: flow (world units); z: its scale; w: edge warp (world units)
-float4 k_samp    : register(c15);  // x: reads per slice pixel (1 or 2); y: the jitter's span (1, or 0.5 with two reads)
+float4 k_samp    : register(c15);  // x: reads per slice pixel (1 or 2); y: the jitter's span (1, or 0.5 with two reads); z: hue swing now; w: lightning on (0/1)
+float4 k_flash0  : register(c16);  // lightning: xyz where (world), w how bright now (0: dark);
+float4 k_flash1  : register(c17);  //   four of them, as separate constants: vkd3d does not
+float4 k_flash2  : register(c18);  //   place an array at its register()
+float4 k_flash3  : register(c19);
+float4 k_flashc  : register(c20);  // rgb: the lightning's colour; w: 1 / its radius squared
 float4 k_fil     : register(c14);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
 
 sampler3D s_noise : register(s0);  // r: fbm; gba: three soft warp fields, all tiling
@@ -125,12 +130,21 @@ float4 gas_at(float3 p)
 }
 
 // The colour a slice adds for gas g at distance dist, before the rounding.
-float3 gas_colour(float4 g, float thick, float dist)
+float3 gas_colour(float4 g, float thick, float dist, float3 p)
 {
     float  dens = g.x;
-    float  hue = lerp(g.z, dens, k_shape.y);
+    float  hue = saturate(lerp(g.z, dens, k_shape.y) + k_samp.z);   // HueCycle swings it with time
     float3 gas = lerp(k_gas_a.rgb, k_gas_b.rgb, hue);
     float3 c = (gas * dens + k_glow.rgb * (dens * dens) * g.w) * g.w * g.y;
+    // Lightning (Lightning=): up to four flashes inside the field. The gas about each
+    // lights up in the lightning's colour, and a small core where it strikes burns
+    // hotter, so the cloud flickers from within like a thunderhead.
+    if (k_samp.w > 0.5) {
+        float3 d0 = p - k_flash0.xyz, d1 = p - k_flash1.xyz, d2 = p - k_flash2.xyz, d3 = p - k_flash3.xyz;
+        float  f = k_flash0.w * exp(-dot(d0, d0) * k_flashc.w) + k_flash1.w * exp(-dot(d1, d1) * k_flashc.w)
+                 + k_flash2.w * exp(-dot(d2, d2) * k_flashc.w) + k_flash3.w * exp(-dot(d3, d3) * k_flashc.w);
+        c += k_flashc.rgb * f * (dens + 0.15 * f * f);
+    }
     float  near = saturate((dist - k_eye.w * 0.25) / k_eye.w);
     return c * (k_gas_a.w * near * thick * k_vert.w);
 }
@@ -170,7 +184,7 @@ float4 neb_ps(VsOut i, float2 vpos : VPOS) : COLOR
     float3 p = slice_point(i, vpos, dist, u0);
     float4 g = gas_at(p);
     if (g.x <= 0.0) return float4(0, 0, 0, 0);
-    return slice_out(gas_colour(g, i.t.x, dist), u0, i.t.y);
+    return slice_out(gas_colour(g, i.t.x, dist, p), u0, i.t.y);
 }
 
 float4 bake_vs(float4 pos : POSITION) : POSITION
@@ -216,5 +230,5 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
     if (v.x <= 0.002) return float4(0, 0, 0, 0);
     float  det = tex3D(s_noise, pa * (k_noise.x * 6.1) + k_seed.zxy).r;
     float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);
-    return slice_out(gas_colour(g, i.t.x, dist), u0, i.t.y);
+    return slice_out(gas_colour(g, i.t.x, dist, pa), u0, i.t.y);
 }

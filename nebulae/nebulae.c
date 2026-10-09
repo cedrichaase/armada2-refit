@@ -311,7 +311,7 @@ static void read_settings(void)
 
 /* The pixel shader's constants, c0..c8; their meaning is listed in nebulae.hlsl.
  * c0 (camera), c6 (envelope) and c7.x, y, w are filled in per draw. */
-#define NCONST 16
+#define NCONST 21
 #define MAX_CLASSES 16
 #define MAX_NEB 256
 #define ENV_MAX 512
@@ -326,6 +326,9 @@ typedef struct {
     float    k[NCONST][4];
     float    extent, height, radius;
     float    flow_speed, edge_warp, fil_reach, edge_dim;
+    float    hue_cycle, hue_swing;               /* HueCycle= (seconds), HueSwing= */
+    float    bolt_rate, bolt_size, bolt_bright;  /* Lightning= (a minute, a nebula), LightningSize=, LightningBrightness= */
+    float    bolt_t0[4], bolt_pos[4][3], bolt_amp[4], bolt_last;
     /* this frame's nebulae of the class, the fog of war applied */
     int      n;
     float    pos[MAX_NEB][3];
@@ -400,6 +403,14 @@ static int recipe_read(Cls *c)
     c->k[14][2] = ini1(f, "FilamentSharpness", 3.0f);
     c->fil_reach = ini1(f, "FilamentReach", 1.8f);
     c->edge_dim = ini1(f, "EdgeOnDim", 0.5f);
+    c->hue_cycle = ini1(f, "HueCycle", 0.0f);
+    c->hue_swing = ini1(f, "HueSwing", 0.5f);
+    c->bolt_rate = ini1(f, "Lightning", 0.0f);
+    c->bolt_size = ini1(f, "LightningSize", 0.3f);
+    c->bolt_bright = ini1(f, "LightningBrightness", 1.0f);
+    rgb(f, "LightningColour", c->k[20]);
+    if (c->k[20][0] + c->k[20][1] + c->k[20][2] <= 0.0f) { c->k[20][0] = 1.0f; c->k[20][1] = 0.92f; c->k[20][2] = 0.8f; }
+    for (i = 0; i < 4; i++) c->bolt_amp[i] = 0.0f;
     c->extent  = ini1(f, "Extent", 1.3f);
     c->height  = ini1(f, "Height", 3.0f);        /* the domes' height, times the reach */
     c->gen++;
@@ -1182,6 +1193,67 @@ static int gather(void)
     return any;
 }
 
+/* Lightning: flashes scheduled per class on the CPU, Lightning= a minute for each of
+ * its nebulae on screen, each at a random point inside a random nebula's dome. A
+ * flash is three quick flickers over a third of a second, each fading with a 65 ms
+ * half-life; up to four at once. */
+static DWORD g_bolt_seed = 0x9e3779b9UL;
+static long  g_bolts;
+
+static float rnd01(void)
+{
+    g_bolt_seed = hash32(g_bolt_seed + 0x6d2b79f5UL);
+    return (float)(g_bolt_seed >> 8) * (1.0f / 16777216.0f);
+}
+
+static float flicker(float t)      /* a flash's brightness t seconds after it starts */
+{
+    static const float at[3] = { 0.0f, 0.12f, 0.3f }, amp[3] = { 1.0f, 0.6f, 0.85f };
+    float s = 0.0f;
+    int   i;
+    for (i = 0; i < 3; i++) {
+        float u = t - at[i];
+        if (u >= 0.0f && u < 0.5f) s += amp[i] * exp2_f(-u * 15.0f);      /* a 65 ms half-life */
+    }
+    return s;
+}
+
+static void lightning(Cls *c, float now, float dt)
+{
+    int   i;
+    float r = c->radius * c->extent;
+    for (i = 0; i < 4; i++) {
+        c->k[16 + i][3] = 0.0f;
+        if (c->bolt_amp[i] > 0.0f) {
+            float a = now - c->bolt_t0[i];
+            if (a > 0.8f || a < 0.0f) c->bolt_amp[i] = 0.0f;
+            else {
+                c->k[16 + i][0] = c->bolt_pos[i][0]; c->k[16 + i][1] = c->bolt_pos[i][1]; c->k[16 + i][2] = c->bolt_pos[i][2];
+                c->k[16 + i][3] = c->bolt_amp[i] * flicker(a);
+            }
+        }
+    }
+    if (c->bolt_rate <= 0.0f || c->n == 0 || dt <= 0.0f || dt > 0.5f) return;
+    if (rnd01() < c->bolt_rate / 60.0f * (float)c->n * dt) {
+        for (i = 0; i < 4 && c->bolt_amp[i] > 0.0f; i++) ;
+        if (i < 4) {
+            const float *p = c->pos[(int)(rnd01() * (float)c->n) % c->n];
+            float a = rnd01() * 6.2831853f, d = sqrt_f(rnd01()) * r * 0.6f;
+            c->bolt_pos[i][0] = p[0] + d * cos_f(a);
+            c->bolt_pos[i][2] = p[2] + d * sin_f(a);
+            c->bolt_pos[i][1] = c->ey + (rnd01() * 2.0f - 1.0f) * c->k[7][1] * 0.45f;
+            c->bolt_t0[i] = now;
+            c->bolt_amp[i] = c->bolt_bright * (0.6f + 0.4f * rnd01());
+            if (++g_bolts <= 3) {
+                char b[160];
+                b[0] = 0; s_cat(b, "lightning \""); s_cat(b, c->odf); s_cat(b, "\": a flash at ");
+                s_flt(b, c->bolt_pos[i][0]); s_cat(b, " "); s_flt(b, c->bolt_pos[i][1]); s_cat(b, " "); s_flt(b, c->bolt_pos[i][2]);
+                logline(b);
+            }
+        }
+    }
+}
+
 /* The states every slice draw sets; the state block puts the engine's back. */
 static void draw_states(void *d9, void *vs, float cols[4][4])
 {
@@ -1350,6 +1422,20 @@ static int draw_gas(void)
         c->k[12][3] = (float)(g_frame & 1023);    /* the draw's dither moves on each frame */
         c->k[15][0] = (g_bake && c->vol) ? (float)g_samples : 1.0f;
         c->k[15][1] = c->k[15][0] > 1.5f ? 0.5f : 1.0f;
+        {   /* time, for the hue swing and the lightning */
+            LARGE now;
+            float sec;
+            double s;
+            QueryPerformanceCounter(&now);
+            s = g_qpf.q ? (double)now.q / (double)g_qpf.q : 0.0;
+            s -= (double)(long)(s / 100000.0) * 100000.0;
+            sec = (float)s;
+            c->k[15][2] = c->hue_cycle > 0.0f ? c->hue_swing * sin_f(sec * 6.2831853f / c->hue_cycle) : 0.0f;
+            c->k[15][3] = c->bolt_rate > 0.0f ? 1.0f : 0.0f;
+            c->k[20][3] = 1.0f / (c->bolt_size * c->radius * c->extent * c->bolt_size * c->radius * c->extent);
+            lightning(c, sec, c->bolt_last > 0.0f ? sec - c->bolt_last : 0.0f);
+            c->bolt_last = sec;
+        }
         if (g_bake && c->vol) {
             for (i = 0; i < 3; i++) c->k[12][i] = 1.0f / c->vsize[i];
             d9_bind(d9, vs, vps);
