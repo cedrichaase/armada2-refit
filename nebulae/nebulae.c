@@ -347,6 +347,7 @@ typedef struct {
     float    vlo[3], vsize[3];
     float    glo[3], ghi[3];      /* the box the baked gas actually fills: the slices go through this */
     int      gbox;
+    float    rungs;               /* the slices' ladder: slices per doubling of distance (0: not yet chosen) */
 } Cls;
 
 static Cls g_cls[MAX_CLASSES];
@@ -1603,8 +1604,8 @@ static int draw_gas(void)
 
     for (ci = 0; ci < g_ncls; ci++) {
         Cls   *c = &g_cls[ci];
-        float  lo[3], hi[3], dmin = 1e30f, dmax = -1e30f, d0, ratio, half;
-        int    k, N, nv = 0;
+        float  lo[3], hi[3], dmin = 1e30f, dmax = -1e30f, d0, dnear, snear, sfar, m, half;
+        int    k, N, j0, j1, nv = 0;
         if (!c->have || !c->n) continue;
         if (!captured) {
             D9_FN(g_sb, SB_CAPTURE, SB_t)(g_sb);
@@ -1639,23 +1640,50 @@ static int draw_gas(void)
             if (d < dmin) dmin = d;
             if (d > dmax) dmax = d;
         }
-        d0 = zn * 1.05f + 1.0f;
-        if (dmin > d0) d0 = dmin;
+        dnear = zn * 1.05f + 1.0f;
+        d0 = dmin > dnear ? dmin : dnear;
         if (dmax <= d0 + 1.0f) continue;
-        /* Geometric spacing: as far apart on screen near as far. */
+        /* Geometric spacing, as far apart on screen near as far, on a ladder fixed in
+         * distance from the eye: slice j sits between 2^(j/m) and 2^((j+1)/m). The box
+         * only picks which rungs are drawn. Spread over the box instead, every slice
+         * slid through the gas whenever the camera turned (the box's corners change
+         * distance), and the gas's knots flickered in and out in camera glides. The
+         * rungs per doubling (m) are chosen by the depth of the box's bounding sphere,
+         * which does not change as the camera turns (the box's own depth does, steeply
+         * where the camera is near a face, and re-chose them mid-turn), and only when
+         * it needs a third more or fewer slices than Slices= asks for. */
+        {
+            float cx = (lo[0] + hi[0]) * 0.5f - eye[0], cy = (lo[1] + hi[1]) * 0.5f - eye[1], cz = (lo[2] + hi[2]) * 0.5f - eye[2];
+            float hx = (hi[0] - lo[0]) * 0.5f, hy = (hi[1] - lo[1]) * 0.5f, hz = (hi[2] - lo[2]) * 0.5f;
+            float dc = sqrt_f(cx * cx + cy * cy + cz * cz), rad = sqrt_f(hx * hx + hy * hy + hz * hz);
+            snear = dc - rad > dnear ? dc - rad : dnear;
+            sfar = dc + rad;
+        }
         N = g_slices;
-        if ((dmax - d0) / g_min_step < (float)N) N = (int)((dmax - d0) / g_min_step) + 1;
+        if ((sfar - snear) / g_min_step < (float)N) N = (int)((sfar - snear) / g_min_step) + 1;
         if (N < 2) N = 2;
-        ratio = exp2_f(log2_f(dmax / d0) / (float)N);
-        for (k = 0; k < N && nv + 12 <= MAX_VERTS; k++) {
-            float a = d0 * pow_f(ratio, (float)k), b = a * ratio, poly[6][3];
-            int   n = cut_box(lo, hi, eye, f, r, u, (a + b) * 0.5f, poly), t;
+        {
+            float span = log2_f(sfar / snear), want = (float)N / (span > 0.05f ? span : 0.05f);
+            if (c->rungs <= 0.0f || c->rungs > want * 1.3f || c->rungs < want / 1.3f) c->rungs = want;
+            m = c->rungs;
+            j0 = (int)(m * log2_f(d0));
+            j1 = (int)(m * log2_f(dmax)) + 1;
+        }
+        for (k = j0; k <= j1 && nv + 12 <= MAX_VERTS; k++) {
+            float a = exp2_f((float)k / m), b = exp2_f((float)(k + 1) / m), mid = (a + b) * 0.5f, poly[6][3];
+            int   n, t;
+            if (mid > dmax) break;
+            if (mid < d0) {
+                if (dmin > dnear) continue;    /* before the box */
+                mid = d0;                      /* cut by the near plane: the cut stays put */
+            }
+            n = cut_box(lo, hi, eye, f, r, u, mid, poly);
             for (t = 1; t + 1 < n; t++) {
                 int idx[3] = { 0, t, t + 1 }, q;
                 for (q = 0; q < 3; q++) {
                     Vert *v = &g_v[nv++];
                     v->x = poly[idx[q]][0]; v->y = poly[idx[q]][1]; v->z = poly[idx[q]][2];
-                    v->thick = b - a; v->k = (float)k;
+                    v->thick = b - a; v->k = (float)k;   /* the rung: its thresholds stay with it */
                 }
             }
         }
@@ -1671,7 +1699,11 @@ static int draw_gas(void)
                 s -= (double)(long)(s / 100000.0) * 100000.0;
                 sec = (float)s;
             }
-            c->k[13][0] = fmod_f(sec * c->flow_speed, 1.0f);
+            /* The shader drifts the noise by (x, 0.71 x, 0.37 x), so x wraps at 100,
+             * where all three are whole tiles of it. Wrapped at 1, the other two jumped
+             * by most of a tile every 1 / FlowSpeed seconds, and the whole cloud
+             * rearranged itself in one frame. */
+            c->k[13][0] = fmod_f(sec * c->flow_speed, 100.0f);
         }
         {   /* edge-on, the path through the field is long and the gas would clip:
              * dim it by the path's length against the domes' height, to EdgeOnDim */
