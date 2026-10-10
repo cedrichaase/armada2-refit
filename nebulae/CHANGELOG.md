@@ -32,4 +32,4 @@ billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CL
   `Nebulae.asi`, `Nebulae.ini` and `Nebulae/*.ini` as the `nebulae` layer. Not in the
   release package yet.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-10.

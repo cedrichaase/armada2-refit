@@ -16,7 +16,7 @@ Layers: nebulae 1.0.0.
   `Nebulae.asi`, `Nebulae.ini` and `Nebulae/*.ini` as the `nebulae` layer. Not in the
   release package yet.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-10.
 
 ## 11.18.0 — 2026-10-10
 
