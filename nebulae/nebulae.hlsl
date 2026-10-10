@@ -45,10 +45,10 @@ float4 k_ringa   : register(c27);  //   rgb: its four colours, in turn
 float4 k_ringb   : register(c28);
 float4 k_ringc   : register(c29);
 float4 k_ringd   : register(c30);
-float4 k_opac    : register(c31);  // x: Opacity= over the reach: optical depth a world unit of the densest gas (0: none)
+float4 k_opac    : register(c31);  // x: Opacity= over the reach: optical depth a world unit of the densest gas (0: none); y: the envelope's height range (s_env.b)
 
 sampler3D s_noise : register(s0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
-sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; a: envelope
+sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; b: the nebulae's height there (0.5: the field's); a: envelope
 sampler3D s_vol   : register(s2);  // the baked gas: density, shading, hue, emission
 sampler2D s_blue  : register(s4);  // a 64x64 blue-noise tile: r and g two independent thresholds
 sampler2D s_occ   : register(s3);  // per column of it: r the most gas, b and g the lowest and highest layer with any
@@ -132,9 +132,9 @@ float4 gas_at(float3 p)
     float4 env = tex2D(s_env, (p.xz + w.xz * k_flow.w - k_env.xy) * k_env.zw);
     if (env.a <= 0.002 && env.g <= 0.002) return float4(0, 1, 0, 1);
 
-    // A dome over each nebula, its top and bottom pushed in and out by the warp field
-    // so the field has lumps and not a flat lid.
-    float  y = p.y - k_vert.x + w.y * k_shape.w * k_vert.y * 0.5;
+    // A dome over each nebula, at its own height, its top and bottom pushed in and out by
+    // the warp field so the field has lumps and not a flat lid.
+    float  y = p.y - (k_vert.x + (env.b * 2.0 - 1.0) * k_opac.y) + w.y * k_shape.w * k_vert.y * 0.5;
     float  hgt = env.r * k_vert.y * (1.0 + w.z * k_shape.w);
     float  t = abs(y) / max(hgt, 1.0);
     float  cover = env.a * smoothstep(1.0, 0.55, t);   // dense to over half the height
@@ -184,7 +184,7 @@ float3 gas_colour(float4 g, float thick, float dist, float3 p)
     // core profile again, from the envelope (1 at a centre, 0 at the reach).
     if (k_core.z > 0.0 || k_ring.x > 0.0) {
         float4 e = tex2D(s_env, (p.xz - k_env.xy) * k_env.zw);
-        float  t = abs(p.y - k_vert.x) / max(e.r * k_vert.y, 1.0);
+        float  t = abs(p.y - k_vert.x - (e.b * 2.0 - 1.0) * k_opac.y) / max(e.r * k_vert.y, 1.0);
         float  cp = saturate(e.r) * saturate(1.0 - t);
         // Pulse: the core brightens and dims, out of step from one nebula to the next
         // (a very large noise offsets the phase).

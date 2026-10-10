@@ -348,13 +348,14 @@ typedef struct {
      * centre), y its sharpness, z Pulse= (how much it pulses), w the pulse's phase now; c25 the ring (Ring=, RingAt=, RingWidth=, its phase now);
      * c26 its patches (scale, how much of it, softness, colour spread); c27..c30 its
      * four colours; c31 x Opacity= over the reach (optical depth a world unit of the
-     * densest gas) */
+     * densest gas), y ydev (the envelope's blue is a height within it) */
     float    ex[8][4];
     float    ring_cycle;      /* RingCycle=: seconds for the colours to go round */
     float    pulse_speed, pulse_wander, pulse_phase;   /* PulseSpeed= (a second), PulseWander= (of it) */
     double   pulse_last;      /* when the phase was last advanced (seconds) */
     float    extent, height, radius, radius0;   /* radius0: the class's own (a nebula's effect radius), Radius= overrides */
     float    flow_speed, edge_warp, fil_reach, edge_dim, opacity;
+    float    ydev;            /* the farthest any of the class's nebulae is above or below its mean (world units, at least 1) */
     float    hue_cycle, hue_swing;               /* HueCycle= (seconds), HueSwing= */
     float    bolt_rate, bolt_size, bolt_bright;  /* Lightning= (a minute, a nebula), LightningSize=, LightningBrightness= */
     float    bolt_t0[4], bolt_pos[4][3], bolt_amp[4], bolt_last;
@@ -937,7 +938,10 @@ static int make_blue(void *d9)
  * rise there, as a fraction of the domes' height: the highest of the nebulae's
  * 1 - (d / reach)^3, full height over most of the disc and tapering to nothing at the
  * reach, so a field is a row of tall domes with sloping sides and not a slab with walls. Green is the filaments' wider disc
- * (FilamentReach times the reach). The box leaves room for the outline's warp. */
+ * (FilamentReach times the reach). Blue is the height of the nebulae there, against
+ * the class's mean, within ydev, each weighted by its disc: every dome stands at its own
+ * nebula's height (a latinum nebula raised above the plane, say), where one height for
+ * the class put all of them at the mean. The box leaves room for the outline's warp. */
 static int bake_envelope(void *d9, Cls *c)
 {
     static int said;
@@ -958,6 +962,12 @@ static int bake_envelope(void *d9, Cls *c)
         ys += p[1];
     }
     c->ey = ys / (float)c->n;
+    c->ydev = 1.0f;
+    for (i = 0; i < c->n; i++) {
+        float d = c->pos[i][1] - c->ey;
+        if (d < 0.0f) d = -d;
+        if (d > c->ydev) c->ydev = d;
+    }
     cell = c->radius / 16.0f;
     W = (int)((c->ex1 - c->ex0) / cell) + 2; H = (int)((c->ez1 - c->ez0) / cell) + 2;
     if (W > ENV_MAX) W = ENV_MAX;
@@ -977,12 +987,15 @@ static int bake_envelope(void *d9, Cls *c)
         float  wz = z0 + ((float)z + 0.5f) * (c->ez1 - c->ez0) / (float)H;
         for (x = 0; x < W; x++) {
             float wx = x0 + ((float)x + 0.5f) * (c->ex1 - c->ex0) / (float)W, s = 0.0f, h = 0.0f, g = 0.0f;
-            int   a, r, gg;
+            float wy = 0.0f, ww = 0.0f;
+            int   a, r, gg, bb;
             for (i = 0; i < c->n; i++) {
                 float dx = wx - c->pos[i][0], dz = wz - c->pos[i][2], d2 = dx * dx + dz * dz, d, q;
                 if (d2 >= freach * freach) continue;
                 d = sqrt_f(d2);
                 g += smooth(1.0f, 0.3f, d / freach);
+                q = smooth(1.0f, 0.0f, d / freach) + 1e-4f;    /* the height: nearer nebulae count more */
+                wy += q * (c->pos[i][1] - c->ey); ww += q;
                 if (d >= reach) continue;
                 s += smooth(1.0f, 0.6f, d / reach);
                 q = d / reach;
@@ -992,7 +1005,10 @@ static int bake_envelope(void *d9, Cls *c)
             a = (int)((s > 1.0f ? 1.0f : s) * 255.0f + 0.5f);
             r = (int)(h * 255.0f + 0.5f);
             gg = (int)((g > 1.0f ? 1.0f : g) * 255.0f + 0.5f);
-            row[x] = (DWORD)a << 24 | (DWORD)r << 16 | (DWORD)gg << 8;
+            bb = (int)((0.5f + 0.5f * (ww > 0.0f ? wy / ww : 0.0f) / c->ydev) * 255.0f + 0.5f);
+            if (bb < 0) bb = 0;
+            if (bb > 255) bb = 255;
+            row[x] = (DWORD)a << 24 | (DWORD)r << 16 | (DWORD)gg << 8 | (DWORD)bb;
         }
     }
     D9_FN(c->env, TEX_UNLOCK, Unlock_t)(c->env, 0);
@@ -1000,7 +1016,7 @@ static int bake_envelope(void *d9, Cls *c)
     m[0] = 0; s_cat(m, "envelope \""); s_cat(m, c->odf); s_cat(m, "\": "); s_num(m, c->n);
     s_cat(m, " nebulae, x "); s_num(m, (long)c->ex0); s_cat(m, ".."); s_num(m, (long)c->ex1);
     s_cat(m, ", z "); s_num(m, (long)c->ez0); s_cat(m, ".."); s_num(m, (long)c->ez1);
-    s_cat(m, ", y "); s_num(m, (long)c->ey); s_cat(m, ", "); s_num(m, W); s_cat(m, "x"); s_num(m, H);
+    s_cat(m, ", y "); s_num(m, (long)c->ey); s_cat(m, " +-"); s_num(m, (long)c->ydev); s_cat(m, ", "); s_num(m, W); s_cat(m, "x"); s_num(m, H);
     logline(m);
     return 1;
 }
@@ -1021,6 +1037,7 @@ static void class_consts(Cls *c)
     c->k[7][0] = c->ey; c->k[7][1] = c->radius * c->extent * c->height;   /* the domes' full height */
     c->k[7][3] = 1.0f / (c->radius * c->extent);   /* Brightness per reach; the draw adds the dimming */
     c->ex[7][0] = c->opacity / (c->radius * c->extent);
+    c->ex[7][1] = c->ydev;
     c->k[11][0] = c->vlo[0]; c->k[11][1] = c->vlo[1]; c->k[11][2] = c->vlo[2];
     c->k[13][3] = c->edge_warp * c->radius * c->extent;
     c->k[14][3] = c->k[7][1] * 0.8f;          /* the filaments reach most of the domes' height */
@@ -1406,7 +1423,7 @@ static void lightning(Cls *c, float now, float dt)
             float a = rnd01() * 6.2831853f, d = sqrt_f(rnd01()) * r * 0.6f;
             c->bolt_pos[i][0] = p[0] + d * cos_f(a);
             c->bolt_pos[i][2] = p[2] + d * sin_f(a);
-            c->bolt_pos[i][1] = c->ey + (rnd01() * 2.0f - 1.0f) * c->k[7][1] * 0.45f;
+            c->bolt_pos[i][1] = p[1] + (rnd01() * 2.0f - 1.0f) * c->k[7][1] * 0.45f;
             c->bolt_t0[i] = now;
             c->bolt_amp[i] = c->bolt_bright * (0.6f + 0.4f * rnd01());
             if (++g_bolts <= 3) {
@@ -1817,7 +1834,7 @@ static int draw_gas(void)
         if (!c->env || c->env_sig != c->sig || c->env_gen != c->gen) {
             if (!bake_envelope(d9, c)) continue;
         }
-        half = c->radius * c->extent * c->height * (1.0f + c->k[8][3]);
+        half = c->radius * c->extent * c->height * (1.0f + c->k[8][3]) + c->ydev;   /* the domes, lumps and how far apart in height */
         if (g_bake && (!c->vol || c->vol_sig != c->sig || c->vol_gen != c->gen)) {
             D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
             bake_volume(d9, c, half);         /* on failure, c->vol stays NULL: per pixel */
