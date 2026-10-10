@@ -318,6 +318,7 @@ static void read_settings(void)
 #define MAX_NEB 256
 #define ENV_MAX 512
 
+#define MAX_VIEWS 4           /* views the gas is drawn into in a frame: the map, the HUD's action camera */
 typedef struct {
     BYTE    *cls;             /* the engine's NebulaClass */
     char     odf[40];
@@ -347,7 +348,7 @@ typedef struct {
     float    vlo[3], vsize[3];
     float    glo[3], ghi[3];      /* the box the baked gas actually fills: the slices go through this */
     int      gbox;
-    float    rungs;               /* the slices' ladder: slices per doubling of distance (0: not yet chosen) */
+    float    rungs[MAX_VIEWS];    /* the slices' ladder per view: slices per doubling of distance (0: not yet chosen) */
 } Cls;
 
 static Cls g_cls[MAX_CLASSES];
@@ -1562,7 +1563,7 @@ static int draw_gas(void)
     static int said_d9, said_sh, said_sb, said_cam;
     void  *d8, *d9, *vs, *ps, *vps;
     float  V[16], P[16], VP[16], cols[4][4], eye[3], f[3], r[3], u[3], zn;
-    int    i, ci, slot = -1, captured = 0, half_size = 0;
+    int    i, ci, view, slot = -1, captured = 0, half_size = 0;
     LrFrame L;
 
     d8 = engine_device8();
@@ -1582,6 +1583,27 @@ static int draw_gas(void)
     if (!g_vol && !make_volume(d9)) return 0;
     if (!g_bn_tex && !make_blue(d9)) return 0;
     if (!gather()) return 1;
+
+    {   /* Which view this is, by its viewport: the HUD's action camera draws the scene
+         * (and so the gas) a second time each frame, from its own camera. What is kept
+         * from frame to frame is kept per view; shared, the two views re-chose each
+         * other's slices every frame, and the map's slid through the gas again. */
+        static DWORD keys[MAX_VIEWS][4];
+        static int   next;
+        DWORD vp[6];
+        D9_FN(d9, D9_GETVIEWPORT, VP_t)(d9, vp);
+        for (view = 0; view < MAX_VIEWS; view++)
+            if (keys[view][2] && keys[view][0] == vp[0] && keys[view][1] == vp[1] && keys[view][2] == vp[2] && keys[view][3] == vp[3]) break;
+        if (view == MAX_VIEWS) {
+            char b[120];
+            view = next; next = (next + 1) % MAX_VIEWS;
+            for (i = 0; i < 4; i++) keys[view][i] = vp[i];
+            for (i = 0; i < g_ncls; i++) g_cls[i].rungs[view] = 0.0f;
+            b[0] = 0; s_cat(b, "gas drawn into a viewport at "); s_num(b, (long)vp[0]); s_cat(b, ","); s_num(b, (long)vp[1]);
+            s_cat(b, ", "); s_num(b, (long)vp[2]); s_cat(b, "x"); s_num(b, (long)vp[3]); s_cat(b, ": view "); s_num(b, view);
+            logline(b);
+        }
+    }
 
     D9_FN(d9, D9_GETTRANSFORM, Mat_t)(d9, 2, V);      /* VIEW */
     D9_FN(d9, D9_GETTRANSFORM, Mat_t)(d9, 3, P);      /* PROJECTION */
@@ -1664,8 +1686,9 @@ static int draw_gas(void)
         if (N < 2) N = 2;
         {
             float span = log2_f(sfar / snear), want = (float)N / (span > 0.05f ? span : 0.05f);
-            if (c->rungs <= 0.0f || c->rungs > want * 1.3f || c->rungs < want / 1.3f) c->rungs = want;
-            m = c->rungs;
+            float *rg = &c->rungs[view];
+            if (*rg <= 0.0f || *rg > want * 1.3f || *rg < want / 1.3f) *rg = want;
+            m = *rg;
             j0 = (int)(m * log2_f(d0));
             j1 = (int)(m * log2_f(dmax)) + 1;
         }
