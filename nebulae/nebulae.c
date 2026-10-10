@@ -14,6 +14,11 @@
  * - Nebula::Render (0x4a4a00), slot 11 of the Nebula vtable (0x6b148c): for a class
  *   with a recipe, while the plugin draws, it returns at once, so the billboards are
  *   not drawn. Any other class, or no Direct3D 9 device, calls the engine's.
+ * - Slot 11 of the LatinumNebula vtable (0x6b132c), GameObject::Render (0x4d54e0): the
+ *   latinum resource is not a Nebula but a TerrainObject drawn as an ordinary model
+ *   (latinum.SOD, its Mlatinum sprites). With a recipe for it (Nebulae\latinum.ini),
+ *   the same as for a nebula: the model is skipped, the gas drawn. Only that vtable's
+ *   slot is patched, so no other object's Render changes.
  * - The call to ST3D_GraphicsEngine::RenderParticleList (0x62d420) at 0x598455 in
  *   Armada_RenderAllOurStuff: the last draw before the device's Flush (which draws the
  *   sorted translucent triangles). Every opaque hull is in the depth buffer by then.
@@ -30,6 +35,10 @@
  * handle at +0x8 and a copy of its instance at +0x10, and Ghost::Render draws each
  * through slot 3 of its vtable (GameObjectSpirit::Render, 0x4d5f70; vtable 0x6b1ca4).
  * The plugin keeps a ghosted nebula's gas as well, and skips its spirit's billboards.
+ * Latinum nebulae are in no list of their own: GameObject::objectList (0x761084, a
+ * std::list<GameObject *> *) holds every game object, and they are the ones with
+ * LatinumNebula's vtable. Their class has no effect radius; the recipe's Radius= sets
+ * the gas's size.
  * The camera is the device's own VIEW and PROJECTION, as the hulls were drawn with.
  *
  * Patched in memory only; the exe is not touched. Every site is checked before it is
@@ -103,6 +112,9 @@ int _fltused = 0;   /* floats without the CRT */
 #define FN_SPIRIT_RENDER   0x4d5f70   /* GameObjectSpirit::Render */
 #define FN_ENTITY_GET      0x4cfff0   /* Entity::Get(int handle), static, cdecl */
 #define VT_DEVICE_DX8      0x6bc6ac   /* ST3D_DeviceDirectX8 vtable */
+#define VT_LATINUM         0x6b132c   /* LatinumNebula vtable (a TerrainObject, not a Nebula) */
+#define FN_OBJECT_RENDER   0x4d54e0   /* GameObject::Render, slot 11 of LatinumNebula's vtable */
+#define OBJECT_LIST        0x761084   /* GameObject::objectList, std::list<GameObject *> * */
 
 typedef void        (__thiscall *Render_t)(void *obj, void *cam);
 typedef void        (__thiscall *Particles_t)(void *eng, void *list);
@@ -327,7 +339,15 @@ typedef struct {
     FILETIME time;
     int      gen;             /* counts the reads */
     float    k[NCONST][4];
-    float    extent, height, radius;
+    /* c24..c30, beyond the NCONST block: c24 x Core= (the gas brighter towards each
+     * centre), y its sharpness, z Pulse= (how much it pulses), w the pulse's phase now; c25 the ring (Ring=, RingAt=, RingWidth=, its phase now);
+     * c26 its patches (scale, how much of it, softness, colour spread); c27..c30 its
+     * four colours */
+    float    ex[7][4];
+    float    ring_cycle;      /* RingCycle=: seconds for the colours to go round */
+    float    pulse_speed, pulse_wander, pulse_phase;   /* PulseSpeed= (a second), PulseWander= (of it) */
+    double   pulse_last;      /* when the phase was last advanced (seconds) */
+    float    extent, height, radius, radius0;   /* radius0: the class's own (a nebula's effect radius), Radius= overrides */
     float    flow_speed, edge_warp, fil_reach, edge_dim;
     float    hue_cycle, hue_swing;               /* HueCycle= (seconds), HueSwing= */
     float    bolt_rate, bolt_size, bolt_bright;  /* Lightning= (a minute, a nebula), LightningSize=, LightningBrightness= */
@@ -364,7 +384,26 @@ static int recipe_read(Cls *c)
     for (i = 0; i < NCONST; i++) for (j = 0; j < 4; j++) c->k[i][j] = 0.0f;
     if (!file_time(f, &c->time)) return 0;
 
+    c->radius = ini1(f, "Radius", c->radius0);   /* the size the gas is drawn at; Extent= and Height= are per it */
+    if (!(c->radius > 10.0f && c->radius < 5000.0f)) c->radius = c->radius0;
     c->k[0][3] = ini1(f, "NearFade", 60.0f);
+    for (i = 0; i < 7; i++) for (j = 0; j < 4; j++) c->ex[i][j] = 0.0f;
+    c->ex[0][0] = ini1(f, "Core", 0.0f);
+    c->ex[0][1] = ini1(f, "CoreSharpness", 4.0f);
+    c->ex[1][0] = ini1(f, "Ring", 0.0f);
+    c->ex[1][1] = ini1(f, "RingAt", 0.4f);
+    c->ex[1][2] = ini1(f, "RingWidth", 0.3f);
+    if (c->ex[1][2] < 0.01f) c->ex[1][2] = 0.01f;
+    c->ex[2][0] = ini1(f, "RingScale", 0.35f);
+    c->ex[2][1] = ini1(f, "RingPatch", 0.5f);
+    c->ex[2][2] = ini1(f, "RingSoftness", 0.15f);
+    c->ex[2][3] = ini1(f, "RingSpread", 0.5f);
+    rgb(f, "RingA", c->ex[3]); rgb(f, "RingB", c->ex[4]); rgb(f, "RingC", c->ex[5]); rgb(f, "RingD", c->ex[6]);
+    c->ex[0][2] = ini1(f, "Pulse", 0.0f);
+    c->pulse_speed = ini1(f, "PulseSpeed", 0.5f);
+    c->pulse_wander = ini1(f, "PulseWander", 0.5f);
+    c->ring_cycle = ini1(f, "RingCycle", 6.0f);
+    if (c->ring_cycle < 0.1f) c->ring_cycle = 0.1f;
     rgb(f, "GasA", c->k[1]); rgb(f, "GasB", c->k[2]); rgb(f, "Glow", c->k[3]);
     c->k[1][3] = ini1(f, "Brightness", 1.0f);
     c->k[2][3] = ini1(f, "HueScale", 2.0f);
@@ -446,12 +485,17 @@ static Cls *class_of(BYTE *obj)
     }
     c->odf[i] = 0;
     c->path[0] = 0; s_cat(c->path, g_dir); s_cat(c->path, "Nebulae\\"); s_cat(c->path, c->odf); s_cat(c->path, ".ini");
-    c->radius = *(float *)(cls + 0x1e0);
-    if (!(c->radius > 10.0f && c->radius < 5000.0f)) c->radius = 300.0f;
+    if (*(DWORD *)obj == VT_LATINUM) c->radius0 = 100.0f;   /* a LatinumNebulaClass has no effect radius */
+    else {
+        c->radius0 = *(float *)(cls + 0x1e0);
+        if (!(c->radius0 > 10.0f && c->radius0 < 5000.0f)) c->radius0 = 300.0f;
+    }
+    c->radius = c->radius0;
     c->have = recipe_read(c);
     c->env_gen = -1; c->vol_gen = -1;
-    b[0] = 0; s_cat(b, "class \""); s_cat(b, c->odf); s_cat(b, "\", effect radius "); s_flt(b, c->radius);
-    s_cat(b, ", type "); s_num(b, *(long *)(cls + 0x1e4));
+    b[0] = 0; s_cat(b, "class \""); s_cat(b, c->odf); s_cat(b, "\", radius "); s_flt(b, c->radius);
+    if (*(DWORD *)obj == VT_LATINUM) s_cat(b, ", latinum");
+    else { s_cat(b, ", type "); s_num(b, *(long *)(cls + 0x1e4)); }
     s_cat(b, c->have ? ": drawn as gas" : ": no recipe, the stock billboards");
     logline(b);
     return c;
@@ -1032,6 +1076,7 @@ static int bake_volume(void *d9, Cls *c, float half)
         c->k[12][0] = size[0] / (float)X; c->k[12][1] = size[1] / (float)Y; c->k[12][2] = size[2] / (float)Z;
         c->k[12][3] = c->vlo[1] + ((float)j + 0.5f) * size[1] / (float)Y;
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
+        d9_psconst(d9, 24, &c->ex[0][0], 7);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
         if (D9_FN(d9, D9_GETRENDERTARGETDATA, RTData_t)(d9, rts, sys) < 0) break;
         if (D9_FN(sys, 13, SurfLock_t)(sys, &src, NULLPTR, 0x10) < 0) break;            /* READONLY */
@@ -1210,29 +1255,43 @@ static int ghosted(BYTE *obj)
 /* This frame's nebulae, by class, with the fog of war applied: a nebula is in the gas
  * while the player sees it, or while the engine keeps a ghost of it (as stock shows
  * its billboards then). */
+static int gather_one(BYTE *obj)
+{
+    Cls   *c;
+    float *p;
+    int    i;
+    if (!obj) return 0;
+    c = class_of(obj);
+    if (!c || !c->have || c->n >= MAX_NEB) return 0;
+    if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj) && !ghosted(obj)) return 0;
+    p = (float *)(obj + 0xac);
+    c->pos[c->n][0] = p[0]; c->pos[c->n][1] = p[1]; c->pos[c->n][2] = p[2];
+    for (i = 0; i < 3; i++) { DWORD b = *(DWORD *)&p[i]; c->sig = (c->sig ^ (b >> 4)) * 16777619UL; }
+    c->n++;
+    return 1;
+}
+
 static int gather(void)
 {
     BYTE **vec = *(BYTE ***)NEBULA_LIST;
     BYTE **it, **end;
     int    i, any = 0;
     for (i = 0; i < g_ncls; i++) { g_cls[i].n = 0; g_cls[i].sig = 2166136261UL; }
-    if (!vec) return 0;
-    it = *(BYTE ***)((BYTE *)vec + 4); end = *(BYTE ***)((BYTE *)vec + 8);
-    if (!it) return 0;
     ghosts();
-    for (; it < end; it++) {
-        BYTE  *obj = *it;
-        Cls   *c;
-        float *p;
-        if (!obj) continue;
-        c = class_of(obj);
-        if (!c || !c->have || c->n >= MAX_NEB) continue;
-        if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj) && !ghosted(obj)) continue;
-        p = (float *)(obj + 0xac);
-        c->pos[c->n][0] = p[0]; c->pos[c->n][1] = p[1]; c->pos[c->n][2] = p[2];
-        for (i = 0; i < 3; i++) { DWORD b = *(DWORD *)&p[i]; c->sig = (c->sig ^ (b >> 4)) * 16777619UL; }
-        c->n++;
-        any = 1;
+    if (vec) {   /* a map with no nebula may have no list, or an empty one */
+        it = *(BYTE ***)((BYTE *)vec + 4); end = *(BYTE ***)((BYTE *)vec + 8);
+        if (it) for (; it < end; it++) any |= gather_one(*it);
+    }
+    {   /* Latinum nebulae are TerrainObjects, in no list of their own: every game
+         * object's, picked out by their vtable. */
+        BYTE *list = *(BYTE **)OBJECT_LIST, *head, *node;
+        int   guard = 0;
+        head = list ? *(BYTE **)(list + 4) : (BYTE *)NULLPTR;
+        if (head)
+            for (node = *(BYTE **)head; node && node != head && guard < 200000; node = *(BYTE **)node, guard++) {
+                BYTE *obj = *(BYTE **)(node + 8);
+                if (obj && *(DWORD *)obj == VT_LATINUM) any |= gather_one(obj);
+            }
     }
     return any;
 }
@@ -1399,7 +1458,28 @@ typedef struct {
     void     *rt0, *ds0;      /* the frame's own target and depth, put back at the end */
     VIEWPORT9 vp0, vpl;       /* the 3D view, and its half */
     float     k[3][4];        /* c21..c23 */
+    float     nx0, ny0, nx1, ny1;   /* where on screen this frame's gas boxes are (NDC); the composite goes no further */
+    int       nfull;          /* a box reaches behind the camera: the whole view */
 } LrFrame;
+
+/* Resolution=2: widen the screen rectangle the composite covers by a gas box, its
+ * corners through VIEW x PROJECTION (cols: its columns). */
+static void lr_box(LrFrame *L, float cols[4][4], const float *lo, const float *hi)
+{
+    int i;
+    for (i = 0; i < 8; i++) {
+        float x = (i & 1) ? hi[0] : lo[0], y = (i & 2) ? hi[1] : lo[1], z = (i & 4) ? hi[2] : lo[2];
+        float cx = cols[0][0] * x + cols[0][1] * y + cols[0][2] * z + cols[0][3];
+        float cy = cols[1][0] * x + cols[1][1] * y + cols[1][2] * z + cols[1][3];
+        float cw = cols[3][0] * x + cols[3][1] * y + cols[3][2] * z + cols[3][3];
+        if (cw <= 1e-3f) { L->nfull = 1; return; }
+        cx /= cw; cy /= cw;
+        if (cx < L->nx0) L->nx0 = cx;
+        if (cx > L->nx1) L->nx1 = cx;
+        if (cy < L->ny0) L->ny0 = cy;
+        if (cy > L->ny1) L->ny1 = cy;
+    }
+}
 
 static void lr_samplers(void *d9)
 {
@@ -1510,8 +1590,12 @@ static void lr_rebind(void *d9, LrFrame *L)
 }
 
 /* The gas onto the frame; the frame's target and depth back. */
+typedef long (__stdcall *Scissor_t)(void *, const LONG *);
+#define D9_SETSCISSORRECT 75
+
 static void lr_end(void *d9, LrFrame *L)
 {
+    int scissor = 0;
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, L->rt0);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, L->ds0);
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
@@ -1528,7 +1612,26 @@ static void lr_end(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 7, g_lr);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 4, g_bn_tex);
+    /* Only where the gas boxes are, and the filter's reach about them: the composite's
+     * 25 taps a pixel cost as much over empty screen as over gas. */
+    if (!L->nfull && L->nx1 >= L->nx0) {
+        float w = (float)L->vp0.w, h = (float)L->vp0.h;
+        float l = (L->nx0 * 0.5f + 0.5f) * w - 8.0f, r = (L->nx1 * 0.5f + 0.5f) * w + 8.0f;
+        float tp = (0.5f - L->ny1 * 0.5f) * h - 8.0f, bt = (0.5f - L->ny0 * 0.5f) * h + 8.0f;
+        LONG rc[4];
+        if (l < 0.0f) l = 0.0f;
+        if (tp < 0.0f) tp = 0.0f;
+        if (r > w) r = w;
+        if (bt > h) bt = h;
+        if (r <= l || bt <= tp) { unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR; return; }   /* all off screen */
+        rc[0] = (LONG)L->vp0.x + (LONG)l; rc[1] = (LONG)L->vp0.y + (LONG)tp;
+        rc[2] = (LONG)L->vp0.x + (LONG)r + 1; rc[3] = (LONG)L->vp0.y + (LONG)bt + 1;
+        D9_FN(d9, D9_SETSCISSORRECT, Scissor_t)(d9, rc);
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 174, 1);    /* SCISSORTESTENABLE */
+        scissor = 1;
+    }
     lr_quad(d9);
+    if (scissor) D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 174, 0);
     unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR;
 }
 
@@ -1638,6 +1741,7 @@ static int draw_gas(void)
                 if (slot >= 0) D9_FN(g_q[slot][0], Q_ISSUE, Issue_t)(g_q[slot][0], 1);
             }
             half_size = g_res == 2 && g_bake && lr_begin(d9, &L, P);
+            L.nx0 = L.ny0 = 1e30f; L.nx1 = L.ny1 = -1e30f; L.nfull = 0;
             draw_states(d9, vs, cols);
             if (half_size) lr_rebind(d9, &L);
         }
@@ -1723,6 +1827,7 @@ static int draw_gas(void)
             }
         }
         if (!nv) continue;
+        if (half_size) lr_box(&L, cols, lo, hi);
         c->k[0][0] = eye[0]; c->k[0][1] = eye[1]; c->k[0][2] = eye[2];
         class_consts(c);
         {   /* the drift, wrapped to the noise's tile so it never loses precision */
@@ -1739,6 +1844,16 @@ static int draw_gas(void)
              * by most of a tile every 1 / FlowSpeed seconds, and the whole cloud
              * rearranged itself in one frame. */
             c->k[13][0] = fmod_f(sec * c->flow_speed, 100.0f);
+            c->ex[1][3] = fmod_f(sec / c->ring_cycle, 1.0f);   /* the colours are a cycle: seamless at 1 */
+            {   /* the pulse: its speed wanders, as stock's; advanced by the time that has
+                 * passed, so the action camera's second draw adds nothing */
+                double s = g_qpf.q ? (double)now.q / (double)g_qpf.q : 0.0, dt = s - c->pulse_last;
+                float  spd = c->pulse_speed * (1.0f + c->pulse_wander * sin_f(sec * 0.37f) * cos_f(sec * 0.13f));
+                if (dt < 0.0 || dt > 0.5) dt = 0.0;
+                c->pulse_last = s;
+                c->pulse_phase = fmod_f(c->pulse_phase + (float)dt * spd * 6.2831853f, 6.2831853f);
+                c->ex[0][3] = c->pulse_phase;
+            }
         }
         {   /* edge-on, the path through the field is long and the gas would clip:
              * dim it by the path's length against the domes' height, to EdgeOnDim */
@@ -1779,6 +1894,7 @@ static int draw_gas(void)
             d9_bind(d9, vs, ps);
         }
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
+        d9_psconst(d9, 24, &c->ex[0][0], 7);
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */
         g_slices_drawn += drawn;
@@ -1855,13 +1971,21 @@ static void __fastcall hook_nebula_render(BYTE *obj, void *edx, void *cam)
     ((Render_t)FN_NEBULA_RENDER)(obj, cam);
 }
 
+static void __fastcall hook_latinum_render(BYTE *obj, void *edx, void *cam)
+{
+    Cls *c;
+    (void)edx;
+    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have) { mark_on_screen(obj, cam); return; }
+    ((Render_t)FN_OBJECT_RENDER)(obj, cam);
+}
+
 static void __fastcall hook_spirit_render(BYTE *sp, void *edx, void *cam)
 {
     BYTE *obj;
     Cls  *c;
     (void)edx;
     if (g_drawing && sp && (obj = ((EntityGet_t)FN_ENTITY_GET)(*(int *)(sp + 8))) != NULLPTR &&
-        *(DWORD *)obj == VT_NEBULA && (c = class_of(obj)) != NULLPTR && c->have) return;
+        (*(DWORD *)obj == VT_NEBULA || *(DWORD *)obj == VT_LATINUM) && (c = class_of(obj)) != NULLPTR && c->have) return;
     ((Render_t)FN_SPIRIT_RENDER)(sp, cam);
 }
 
@@ -1917,6 +2041,10 @@ static void startup(void)
             s_cat(b, ", ghosts too");
         else
             s_cat(b, "; NOT the ghosts' Render: fogged nebulae keep their billboards");
+        if (patch_slot(VT_LATINUM, SLOT_RENDER, FN_OBJECT_RENDER, (void *)hook_latinum_render))
+            s_cat(b, ", latinum too");
+        else
+            s_cat(b, "; NOT LatinumNebula's Render: latinum keeps its model");
     }
     logline(b);
 }

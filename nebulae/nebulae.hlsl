@@ -37,7 +37,14 @@ float4 k_flash1  : register(c17);  //   four of them, as separate constants: vkd
 float4 k_flash2  : register(c18);  //   place an array at its register()
 float4 k_flash3  : register(c19);
 float4 k_flashc  : register(c20);  // rgb: the lightning's colour; w: 1 / its radius squared
-float4 k_fil     : register(c14);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
+float4 k_fil     : register(c14);
+float4 k_core    : register(c24);  // x: Core, the gas brighter towards each nebula's centre (0: off); y: how sharply; z: Pulse; w: its phase now (radians)
+float4 k_ring    : register(c25);  // the ring about the core: x how much it tints (0: off, 1: wholly), y where (core profile), z its width, w the colours' phase now
+float4 k_rpatch  : register(c26);  //   x its patches' scale (of the tile), y how much of the ring they cover, z their softness, w the colours' spread
+float4 k_ringa   : register(c27);  //   rgb: its four colours, in turn
+float4 k_ringb   : register(c28);
+float4 k_ringc   : register(c29);
+float4 k_ringd   : register(c30);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
 
 sampler3D s_noise : register(s0);  // r: fbm; gba: three soft warp fields, all tiling
 sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; a: envelope
@@ -133,8 +140,12 @@ float4 gas_at(float3 p)
     float  ln = tex3D(s_noise, q * k_knots.w + float3(0.71, 0.43, 0.29)).g;
     float  lane = 1.0 - k_knots.z * smoothstep(0.35, 0.05, abs(ln - 0.5) * 2.0);
 
+    // Core: brighter towards each nebula's centre, by the envelope's dome (1 at a centre,
+    // 0 at the reach) and the height within it -- a glowing heart, as latinum's.
+    float  core = 1.0 + k_core.x * pow(saturate(env.r) * saturate(1.0 - t), k_core.y);
+
     float  hue = saturate((w.x * k_gas_b.w) * 0.5 + 0.5);
-    return float4(dens, shade, hue, knot * lane);
+    return float4(dens, shade, hue, knot * lane * core);
 }
 
 // The colour a slice adds for gas g at distance dist, before the rounding.
@@ -144,6 +155,33 @@ float3 gas_colour(float4 g, float thick, float dist, float3 p)
     float  hue = saturate(lerp(g.z, dens, k_shape.y) + k_samp.z);   // HueCycle swings it with time
     float3 gas = lerp(k_gas_a.rgb, k_gas_b.rgb, hue);
     float3 c = (gas * dens + k_glow.rgb * (dens * dens) * g.w) * g.w * g.y;
+    // About the core (Pulse=, Ring=), drawn per frame as they change with time: the
+    // core profile again, from the envelope (1 at a centre, 0 at the reach).
+    if (k_core.z > 0.0 || k_ring.x > 0.0) {
+        float4 e = tex2D(s_env, (p.xz - k_env.xy) * k_env.zw);
+        float  t = abs(p.y - k_vert.x) / max(e.r * k_vert.y, 1.0);
+        float  cp = saturate(e.r) * saturate(1.0 - t);
+        // Pulse: the core brightens and dims, out of step from one nebula to the next
+        // (a very large noise offsets the phase).
+        if (k_core.z > 0.0) {
+            float off = tex3D(s_noise, p * (k_noise.x * 0.05)).g * 12.566;
+            c *= 1.0 + k_core.z * sin(k_core.w + off) * pow(cp, k_core.y * 0.5);
+        }
+        // Ring: about the core, in patches, the gas takes colours that go round in turn
+        // and drift across it -- latinum's, which at the core's edge cycles through
+        // teal, violet, pink and green.
+        float  ring = k_ring.x > 0.0 ? saturate(1.0 - abs(cp - k_ring.y) / k_ring.z) : 0.0;
+        if (ring > 0.0) {
+            float  n = tex3D(s_noise, p * (k_noise.x * k_rpatch.x) + float3(0.37, 0.11, 0.73)).g;
+            ring *= smoothstep(1.0 - k_rpatch.y - k_rpatch.z, 1.0 - k_rpatch.y + k_rpatch.z, n);
+            float  s = frac(k_ring.w + n * k_rpatch.w) * 4.0, f = frac(s);
+            float3 a = s < 1.0 ? k_ringa.rgb : s < 2.0 ? k_ringb.rgb : s < 3.0 ? k_ringc.rgb : k_ringd.rgb;
+            float3 b = s < 1.0 ? k_ringb.rgb : s < 2.0 ? k_ringc.rgb : s < 3.0 ? k_ringd.rgb : k_ringa.rgb;
+            // A tint, not more light: the gas there takes the colour at its own brightness.
+            float  lum = dot(c, float3(0.3, 0.5, 0.2));
+            c = lerp(c, lerp(a, b, smoothstep(0.0, 1.0, f)) * (lum * 1.4), saturate(ring * k_ring.x));
+        }
+    }
     // Lightning (Lightning=): up to four flashes inside the field. The gas about each
     // lights up in the lightning's colour, and a small core where it strikes burns
     // hotter, so the cloud flickers from within like a thunderhead.
