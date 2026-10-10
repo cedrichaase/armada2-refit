@@ -38,6 +38,7 @@ it bundles.
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key | `lighting/README.md` |
 | `sky/` | `Sky.asi` — the map's sky computed from view direction by a shader, baked once per map into a cube, in place of the six painted faces; recipes per sky name in `sky/skies/` | `sky/README.md` |
+| `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -306,7 +307,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -701,6 +702,24 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   whose edge texels sit on the edges (no seam with or without seamless filtering).
   Keep any new look inside `sky_colour()` so the bake and the reference agree.
 - **Aqua is meant to be dimmer and softer than stock**: the user preferred it so.
+
+### nebulae
+
+- **A class with a recipe skips its billboards, and only then**: `Nebula::Render` and
+  the LatinumNebula vtable's `GameObject::Render` return early for it. Without a recipe
+  or a Direct3D 9 device behind d3d8, the stock billboards. `Nebula::Render` still marks
+  the nebula on screen: `Lighting.asi`'s nebula lights depend on it.
+- **The HUD's action camera draws the scene a second time each frame.** Any per-frame
+  state (the slices' ladder) is kept per view, by viewport. Bench scenes with `Hud=0`
+  hide this.
+- **Slices sit on a ladder fixed in distance from the eye**, and the blue-noise
+  thresholds stay put from frame to frame. Moving either made the gas shimmer or
+  flicker in camera motion.
+- **The noise is spectral, not value noise**, and read turned off the world's axes,
+  twice: value noise's grid, through a threshold, drew walls through every field.
+- **`Opacity=` keeps the gas as bright from every angle** (half size only); the
+  composite is bound by its texture reads, so measure any new read there
+  (`Timing=1`).
 
 ### textures
 
