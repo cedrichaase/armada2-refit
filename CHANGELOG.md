@@ -7,13 +7,12 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 11.18.0 — 2026-10-10
 
-Layers: platform 3.4.0, gui-installer 1.5.0.
+Layers: platform 3.4.0.
 
 ### Added
 - `platform/heroic-umu.py --on` bounds umu's Steam-runtime check to 3 s, with no
-  retries, in the game's Heroic config (platform 3.4.0). The graphical installer writes
-  the same two variables (gui-installer 1.5.0), and the release `install.sh` lists them
-  among the launcher variables.
+  retries, in the game's Heroic config (platform 3.4.0). Run by hand; not in `./install`
+  or the release installers.
 
 Installed, not yet seen in game.
 

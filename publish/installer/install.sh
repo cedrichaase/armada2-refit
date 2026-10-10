@@ -345,9 +345,6 @@ echo
 echo "In the launcher (Heroic: Game settings -> Advanced -> Environment variables; Steam:"
 echo "launch options, then %command%), set:"
 echo "    WINEDLLOVERRIDES=$overrides"
-echo "and, for a quicker start when Steam's servers are slow (umu, as in Heroic):"
-echo "    UMU_HTTP_TIMEOUT=3"
-echo "    UMU_HTTP_RETRIES=0"
 if [ "$bloom" = 1 ]; then
     echo "and for bloom:"
     echo "    ENABLE_VKBASALT=1"

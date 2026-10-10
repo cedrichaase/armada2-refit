@@ -72,8 +72,9 @@ A failed request is caught (`log.exception`) and the launch goes on with the ins
 runtime; one that answers inside 3 s still updates it. 1 s was too tight: the request
 failed on a normal day. Heroic passes the game's `enviromentOptions` to all three runs
 (`runWineCommand` → `setupEnvVars`), so **`platform/heroic-umu.py --on`** sets the two
-there, and the graphical installer writes them with the other launch variables. They are
-not in `./install`: it never edits Heroic's config, and the bench runs it into clones.
+there. It is a tool for this machine, run by hand: neither `./install` (which never edits
+Heroic's config, and which the bench runs into clones) nor the release installers set
+them, since a player's umu, network and runner are not ours to tune.
 
 Proton-CachyOS's protonfixes also fetches an FSR4 upscaler manifest from github.io on
 every run (`upscalers.py`, enabled unconditionally): 0.3 s normally, 3 s when the

@@ -39,7 +39,7 @@ import time
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.5.0'
+INSTALLER_VERSION = '1.4.1'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -368,10 +368,6 @@ def layer_verdict(layer, facts):
 def launch_env(facts, package=None):
     """The launcher variables install.sh will print for this game."""
     env = {'WINEDLLOVERRIDES': 'winmm=n,b;d3d8=n,b' + (';d3d9=n,b' if facts['d3d9'] else '')}
-    # umu asks Steam's repo about its runtime before each of Heroic's three runs per
-    # launch; these bound a slow answer to 3 s instead of up to ~15 (platform/heroic-umu.py).
-    env['UMU_HTTP_TIMEOUT'] = '3'
-    env['UMU_HTTP_RETRIES'] = '0'
     has_bloom = package is None or any(l['id'] == 'bloom' for l in package.layers)
     if facts['vkbasalt'] and has_bloom:
         bloom = os.path.join(XDG_DATA, 'armada2-refit-bloom')
