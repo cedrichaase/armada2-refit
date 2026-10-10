@@ -309,9 +309,9 @@ float4 comp_ps(float2 vpos : VPOS) : COLOR
     float2 b = floor(h + 0.5), fr = h - b;  // the nearest half pixel, and where this one lies from it
     float3 sum = 0.0;
     float  wsum = 0.0;
-    [unroll] for (int y = -1; y <= 1; y++) {
-        [unroll] for (int x = -1; x <= 1; x++) {
-            float2 tw = saturate(1.0 - abs(float2(x, y) - fr) * (2.0 / 3.0));   // a tent 3 pixels wide
+    [unroll] for (int y = -2; y <= 2; y++) {
+        [unroll] for (int x = -2; x <= 2; x++) {
+            float2 tw = saturate(1.0 - abs(float2(x, y) - fr) * (2.0 / 5.0));   // a tent 5 pixels wide
             float2 uv = (clamp(b + float2(x, y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;   // never outside the viewport
             float4 g = tex2D(s_gas, uv);    // rgb the gas, a its depth
             float  w = tw.x * tw.y / (1e-3 + abs(g.a - zf) / zf);

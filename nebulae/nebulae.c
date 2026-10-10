@@ -1627,7 +1627,7 @@ static int draw_gas(void)
     for (ci = 0; ci < g_ncls; ci++) {
         Cls   *c = &g_cls[ci];
         float  lo[3], hi[3], dmin = 1e30f, dmax = -1e30f, d0, dnear, snear, sfar, m, half;
-        int    k, N, j0, j1, nv = 0;
+        int    k, N, j0, j1, nv = 0, drawn = 0;
         if (!c->have || !c->n) continue;
         if (!captured) {
             D9_FN(g_sb, SB_CAPTURE, SB_t)(g_sb);
@@ -1670,16 +1670,27 @@ static int draw_gas(void)
          * only picks which rungs are drawn. Spread over the box instead, every slice
          * slid through the gas whenever the camera turned (the box's corners change
          * distance), and the gas's knots flickered in and out in camera glides. The
-         * rungs per doubling (m) are chosen by the depth of the box's bounding sphere,
-         * which does not change as the camera turns (the box's own depth does, steeply
-         * where the camera is near a face, and re-chose them mid-turn), and only when
-         * it needs a third more or fewer slices than Slices= asks for. */
+         * rungs per doubling (m) are chosen by the box's distances from the eye, its
+         * nearest point and farthest corner, which do not change as the camera turns
+         * (its depth along the view does, steeply where the camera is near a face, and
+         * re-chose them mid-turn), and only when they need a third more or fewer slices
+         * than Slices= asks for. (The bounding sphere's distances, tried first, were so
+         * much deeper than a tall box that few slices fell in the gas: grain.) */
         {
-            float cx = (lo[0] + hi[0]) * 0.5f - eye[0], cy = (lo[1] + hi[1]) * 0.5f - eye[1], cz = (lo[2] + hi[2]) * 0.5f - eye[2];
-            float hx = (hi[0] - lo[0]) * 0.5f, hy = (hi[1] - lo[1]) * 0.5f, hz = (hi[2] - lo[2]) * 0.5f;
-            float dc = sqrt_f(cx * cx + cy * cy + cz * cz), rad = sqrt_f(hx * hx + hy * hy + hz * hz);
-            snear = dc - rad > dnear ? dc - rad : dnear;
-            sfar = dc + rad;
+            float n2 = 0.0f, f2 = 0.0f;
+            for (i = 0; i < 3; i++) {
+                float a = lo[i] - eye[i], b = eye[i] - hi[i], g = a > b ? a : b, fa = a < 0 ? -a : a, fb = b < 0 ? -b : b, w = fa > fb ? fa : fb;
+                if (g > 0.0f) n2 += g * g;     /* outside the box along this axis */
+                f2 += w * w;
+            }
+            /* On screen, a point lies at least its distance times the cosine of the
+             * view's half diagonal deep: no slice nearer than that can show any gas
+             * (beside a box, its near corners would have drawn three times Slices=). */
+            snear = sqrt_f(n2) / sqrt_f(1.0f + 1.0f / (P[0] * P[0]) + 1.0f / (P[5] * P[5]));
+            if (snear < dnear) snear = dnear;
+            sfar = sqrt_f(f2);
+            if (d0 < snear) d0 = snear;
+            if (dmax <= d0 + 1.0f) continue;
         }
         N = g_slices;
         if ((sfar - snear) / g_min_step < (float)N) N = (int)((sfar - snear) / g_min_step) + 1;
@@ -1697,10 +1708,11 @@ static int draw_gas(void)
             int   n, t;
             if (mid > dmax) break;
             if (mid < d0) {
-                if (dmin > dnear) continue;    /* before the box */
+                if (d0 > dnear) continue;      /* before the box, or off screen */
                 mid = d0;                      /* cut by the near plane: the cut stays put */
             }
             n = cut_box(lo, hi, eye, f, r, u, mid, poly);
+            if (n >= 3) drawn++;
             for (t = 1; t + 1 < n; t++) {
                 int idx[3] = { 0, t, t + 1 }, q;
                 for (q = 0; q < 3; q++) {
@@ -1769,7 +1781,7 @@ static int draw_gas(void)
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */
-        g_slices_drawn += N;
+        g_slices_drawn += drawn;
     }
     if (captured) {
         if (half_size) lr_end(d9, &L);
