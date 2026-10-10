@@ -285,6 +285,7 @@ static int   g_slices = 40;   /* Slices=: through the deepest field on screen */
 static float g_min_step = 6;  /* MinStep=: never closer together than this, world units */
 static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
 static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ), 1 at full size */
+static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, half size only) */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
@@ -310,6 +311,10 @@ static void read_settings(void)
     g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 160, g_ini);
     GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
     parsen(b, &g_vol_texel, 1);
+    GetPrivateProfileStringA("Nebulae", "Obscure", "0.5", b, sizeof b, g_ini);
+    parsen(b, &g_obscure, 1);
+    if (g_obscure < 0.0f) g_obscure = 0.0f;
+    if (g_obscure > 1.0f) g_obscure = 1.0f;
     if (g_vol_max < 16) g_vol_max = 16;
     if (g_vol_max > 512) g_vol_max = 512;
     if (g_vol_maxy < 8) g_vol_maxy = 8;
@@ -342,13 +347,14 @@ typedef struct {
     /* c24..c30, beyond the NCONST block: c24 x Core= (the gas brighter towards each
      * centre), y its sharpness, z Pulse= (how much it pulses), w the pulse's phase now; c25 the ring (Ring=, RingAt=, RingWidth=, its phase now);
      * c26 its patches (scale, how much of it, softness, colour spread); c27..c30 its
-     * four colours */
-    float    ex[7][4];
+     * four colours; c31 x Opacity= over the reach (optical depth a world unit of the
+     * densest gas) */
+    float    ex[8][4];
     float    ring_cycle;      /* RingCycle=: seconds for the colours to go round */
     float    pulse_speed, pulse_wander, pulse_phase;   /* PulseSpeed= (a second), PulseWander= (of it) */
     double   pulse_last;      /* when the phase was last advanced (seconds) */
     float    extent, height, radius, radius0;   /* radius0: the class's own (a nebula's effect radius), Radius= overrides */
-    float    flow_speed, edge_warp, fil_reach, edge_dim;
+    float    flow_speed, edge_warp, fil_reach, edge_dim, opacity;
     float    hue_cycle, hue_swing;               /* HueCycle= (seconds), HueSwing= */
     float    bolt_rate, bolt_size, bolt_bright;  /* Lightning= (a minute, a nebula), LightningSize=, LightningBrightness= */
     float    bolt_t0[4], bolt_pos[4][3], bolt_amp[4], bolt_last;
@@ -403,6 +409,8 @@ static int recipe_read(Cls *c)
     c->pulse_speed = ini1(f, "PulseSpeed", 0.5f);
     c->pulse_wander = ini1(f, "PulseWander", 0.5f);
     c->ring_cycle = ini1(f, "RingCycle", 6.0f);
+    c->opacity = ini1(f, "Opacity", 0.0f);         /* optical depth through one reach of the densest gas */
+    if (c->opacity < 0.0f) c->opacity = 0.0f;
     if (c->ring_cycle < 0.1f) c->ring_cycle = 0.1f;
     rgb(f, "GasA", c->k[1]); rgb(f, "GasB", c->k[2]); rgb(f, "Glow", c->k[3]);
     c->k[1][3] = ini1(f, "Brightness", 1.0f);
@@ -629,12 +637,12 @@ static int timing_slot(void *d9)
 
 /* ---- the noise volume ----------------------------------------------------- */
 
-/* Periodic value noise: a lattice of P^3 random values that wraps, interpolated with a
- * quintic fade (C2, no creases). Every octave's period divides the volume's edge, so
- * the volume tiles. */
-#define LAT_MAX (32 * 32 * 32)
-static float g_lat[LAT_MAX];
-
+/* Spectral noise: random phases over a chosen spectrum, through an inverse FFT. Every
+ * wave has a whole number of periods across the volume, so it tiles; and nothing in it
+ * has a lattice. Value noise (random values at the corners of a grid, interpolated)
+ * varies eight times as much at the corners as at a cell's centre, all its octaves
+ * share the coarsest grid's planes, and the coverage threshold turned those planes into
+ * walls: horizontal and vertical streaks through every field, a starburst from above. */
 static DWORD hash32(DWORD x)
 {
     x ^= x >> 16; x *= 0x7feb352dUL;
@@ -643,71 +651,124 @@ static DWORD hash32(DWORD x)
     return x;
 }
 
-static void lattice(int P, DWORD seed)
+#define FFT_MAX 128
+static float g_tw_c[FFT_MAX / 2], g_tw_s[FFT_MAX / 2];
+
+/* one line of n (a power of two), in place, radix 2 */
+static void fft1(float *re, float *im, int n)
 {
-    int i;
-    for (i = 0; i < P * P * P; i++) g_lat[i] = (float)(hash32((DWORD)i * 0x9e3779b9UL ^ seed) >> 8) * (1.0f / 16777216.0f);
-}
-
-static float fade(float t) { return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f); }
-
-/* one octave of period P (lattice cells across the volume) at texel (x, y, z) of S */
-static float octave(int P, int S, int x, int y, int z)
-{
-    float fx = (float)x * P / S, fy = (float)y * P / S, fz = (float)z * P / S;
-    int   ix = (int)fx, iy = (int)fy, iz = (int)fz;
-    float ux = fade(fx - ix), uy = fade(fy - iy), uz = fade(fz - iz);
-    int   x1 = (ix + 1) % P, y1 = (iy + 1) % P, z1 = (iz + 1) % P;
-    const float *L = g_lat;
-#define LV(a, b, c) L[((c) * P + (b)) * P + (a)]
-    float a0 = LV(ix, iy, iz) + (LV(x1, iy, iz) - LV(ix, iy, iz)) * ux;
-    float a1 = LV(ix, y1, iz) + (LV(x1, y1, iz) - LV(ix, y1, iz)) * ux;
-    float a2 = LV(ix, iy, z1) + (LV(x1, iy, z1) - LV(ix, iy, z1)) * ux;
-    float a3 = LV(ix, y1, z1) + (LV(x1, y1, z1) - LV(ix, y1, z1)) * ux;
-#undef LV
-    float b0 = a0 + (a1 - a0) * uy, b1 = a2 + (a3 - a2) * uy;
-    return b0 + (b1 - b0) * uz;
-}
-
-/* The four channels: r, a fractal sum of four octaves (periods 4..32 across the tile),
- * normalised to mean 0.5 and spread 0.125 so the shader's (f - 0.5) * 8 is about a
- * z-score; g, b, a, three soft fields of two octaves (periods 2, 4) for the warp,
- * normalised to mean 0.5, spread 0.2. Stored as A8R8G8B8 (bytes b, g, r, a). */
-static float *g_chan;   /* S^3 floats, one channel at a time */
-
-static int noise_fill(BYTE *dst, int S)
-{
-    static const int   per_r[4] = { 4, 8, 16, 32 };
-    static const float amp_r[4] = { 1.0f, 0.5f, 0.25f, 0.125f };
-    static const int   per_w[2] = { 2, 4 };
-    static const float amp_w[2] = { 1.0f, 0.5f };
-    static const int   byte_of[4] = { 2, 1, 0, 3 };    /* r g b a in A8R8G8B8 */
-    int   ch, o, x, y, z, N = S * S * S;
-    if (!g_chan) g_chan = (float *)VirtualAlloc(NULLPTR, (UINT)(128 * 128 * 128 * 4), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if (!g_chan) return 0;
-    for (ch = 0; ch < 4; ch++) {
-        int   no = ch ? 2 : 4, i;
-        double sum = 0.0, sq = 0.0;
-        float mean, sd, want = ch ? 0.2f : 0.125f;
-        for (i = 0; i < N; i++) g_chan[i] = 0.0f;
-        for (o = 0; o < no; o++) {
-            int   P = ch ? per_w[o] : per_r[o];
-            float a = ch ? amp_w[o] : amp_r[o];
-            if (P > S / 2) continue;
-            lattice(P, 0x51f15e5dUL * (DWORD)(ch * 8 + o + 1));
-            for (z = 0; z < S; z++) for (y = 0; y < S; y++) for (x = 0; x < S; x++)
-                g_chan[(z * S + y) * S + x] += a * octave(P, S, x, y, z);
-        }
-        for (i = 0; i < N; i++) { sum += g_chan[i]; sq += (double)g_chan[i] * g_chan[i]; }
-        mean = (float)(sum / N);
-        sd = sqrt_f((float)(sq / N - (sum / N) * (sum / N)));
-        if (sd < 1e-6f) sd = 1e-6f;
-        for (i = 0; i < N; i++) {
-            float v = 0.5f + (g_chan[i] - mean) / sd * want;
-            int   b = (int)(v * 255.0f + 0.5f);
-            dst[i * 4 + byte_of[ch]] = (BYTE)(b < 0 ? 0 : b > 255 ? 255 : b);
+    int i, j, len;
+    for (i = 1, j = 0; i < n; i++) {                 /* bit reversal */
+        int b = n >> 1;
+        for (; j & b; b >>= 1) j ^= b;
+        j ^= b;
+        if (i < j) { float t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    for (len = 2; len <= n; len <<= 1) {
+        int h = len / 2, step = n / len;
+        for (i = 0; i < n; i += len) for (j = 0; j < h; j++) {
+            float wr = g_tw_c[j * step], wi = g_tw_s[j * step];
+            float *ar = re + i + j, *ai = im + i + j, *br = ar + h, *bi = ai + h;
+            float vr = *br * wr - *bi * wi, vi = *br * wi + *bi * wr;
+            *br = *ar - vr; *bi = *ai - vi;
+            *ar += vr; *ai += vi;
         }
     }
+}
+
+/* The whole volume of S^3, along each axis in turn. Across y and z, sixteen neighbouring
+ * lines at a time: one line alone reads a word from each of S rows a power of two apart,
+ * which all fall in the same few cache sets, and the transform took two seconds. */
+#define FFT_B 16
+static float g_bl_r[FFT_B][FFT_MAX], g_bl_i[FFT_B][FFT_MAX];
+
+static void fft3(float *re, float *im, int S)
+{
+    int ax, a, b, k, t;
+    for (k = 0; k < S / 2; k++) {
+        g_tw_c[k] = cos_f(6.2831853f * (float)k / (float)S);
+        g_tw_s[k] = sin_f(6.2831853f * (float)k / (float)S);
+    }
+    for (a = 0; a < S * S; a++) fft1(re + a * S, im + a * S, S);          /* along x: lines are rows */
+    for (ax = 1; ax < 3; ax++) {
+        int stride = ax == 1 ? S : S * S;
+        for (a = 0; a < S; a++) for (b = 0; b < S; b += FFT_B) {
+            int base = ax == 1 ? a * S * S + b : a * S + b;                 /* z then x, or y then x */
+            for (k = 0; k < S; k++) for (t = 0; t < FFT_B; t++) {
+                g_bl_r[t][k] = re[base + k * stride + t]; g_bl_i[t][k] = im[base + k * stride + t];
+            }
+            for (t = 0; t < FFT_B; t++) fft1(g_bl_r[t], g_bl_i[t], S);
+            for (k = 0; k < S; k++) for (t = 0; t < FFT_B; t++) {
+                re[base + k * stride + t] = g_bl_r[t][k]; im[base + k * stride + t] = g_bl_i[t][k];
+            }
+        }
+    }
+}
+
+/* A spectrum of waves from k0 to k1 periods across the volume (soft at both ends), each
+ * of amplitude k^-2.5: a fractal sum whose octaves halve, as the value noise's did. Two
+ * independent fields come out, in the real and the imaginary part. The amplitude is a
+ * table by k squared and the phase one of 1024, or the fill alone took two seconds. */
+#define SPEC_K2 (3 * (FFT_MAX / 2) * (FFT_MAX / 2) + 1)
+static float g_amp[SPEC_K2], g_ph_c[1024], g_ph_s[1024];
+
+static void spectrum(float *re, float *im, int S, float k0, float k1, DWORD seed)
+{
+    int x, y, z, i;
+    for (i = 0; i < 3 * (S / 2) * (S / 2) + 1; i++) {
+        float k = sqrt_f((float)i);
+        g_amp[i] = k > 0.5f && k < k1 * 1.6f ? pow_f(k, -2.5f) * smooth(k0 * 0.6f, k0, k) * (1.0f - smooth(k1, k1 * 1.6f, k)) : 0.0f;
+    }
+    if (g_ph_s[1] == 0.0f)
+        for (i = 0; i < 1024; i++) { g_ph_c[i] = cos_f(6.2831853f * (float)i / 1024.0f); g_ph_s[i] = sin_f(6.2831853f * (float)i / 1024.0f); }
+    for (z = 0; z < S; z++) for (y = 0; y < S; y++) for (x = 0; x < S; x++) {
+        int   kx = x < S / 2 ? x : x - S, ky = y < S / 2 ? y : y - S, kz = z < S / 2 ? z : z - S;
+        float a = g_amp[kx * kx + ky * ky + kz * kz];
+        i = (z * S + y) * S + x;
+        if (a > 0.0f) {
+            DWORD ph = hash32((DWORD)i * 0x9e3779b9UL ^ seed) >> 22;
+            re[i] = a * g_ph_c[ph]; im[i] = a * g_ph_s[ph];
+        } else {
+            re[i] = im[i] = 0.0f;
+        }
+    }
+    fft3(re, im, S);
+}
+
+/* a field into one channel, normalised to mean 0.5 and the given spread */
+static void channel_out(BYTE *dst, const float *v, int N, int byte, float want)
+{
+    double sum = 0.0, sq = 0.0;
+    float  mean, sd;
+    int    i;
+    for (i = 0; i < N; i++) { sum += v[i]; sq += (double)v[i] * v[i]; }
+    mean = (float)(sum / N);
+    sd = sqrt_f((float)(sq / N - (sum / N) * (sum / N)));
+    if (sd < 1e-6f) sd = 1e-6f;
+    for (i = 0; i < N; i++) {
+        int b = (int)((0.5f + (v[i] - mean) / sd * want) * 255.0f + 0.5f);
+        dst[i * 4 + byte] = (BYTE)(b < 0 ? 0 : b > 255 ? 255 : b);
+    }
+}
+
+/* The four channels: r, the fractal field, waves of 2..S/4 periods across the tile,
+ * normalised to mean 0.5 and spread 0.125 so the shader's (f - 0.5) * 8 is about a
+ * z-score; g, b, a, three soft fields of 1..4 periods for the warp, mean 0.5, spread
+ * 0.2. Stored as A8R8G8B8 (bytes b, g, r, a). */
+static int noise_fill(BYTE *dst, int S)
+{
+    int    N = S * S * S;
+    float *re = (float *)VirtualAlloc(NULLPTR, (UINT)(N * 8), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE), *im;
+    if (!re || S > FFT_MAX) { if (re) VirtualFree(re, 0, 0x8000); return 0; }
+    im = re + N;
+    spectrum(re, im, S, 2.0f, (float)S / 4.0f, 0x51f15e5dUL);
+    channel_out(dst, re, N, 2, 0.125f);                /* r */
+    spectrum(re, im, S, 1.0f, 4.0f, 0x2545f491UL);
+    channel_out(dst, re, N, 1, 0.2f);                  /* g */
+    channel_out(dst, im, N, 0, 0.2f);                  /* b */
+    spectrum(re, im, S, 1.0f, 4.0f, 0x6a09e667UL);
+    channel_out(dst, re, N, 3, 0.2f);                  /* a */
+    VirtualFree(re, 0, 0x8000);                        /* MEM_RELEASE */
     return 1;
 }
 
@@ -959,6 +1020,7 @@ static void class_consts(Cls *c)
     c->k[6][2] = 1.0f / (c->ex1 - c->ex0); c->k[6][3] = 1.0f / (c->ez1 - c->ez0);
     c->k[7][0] = c->ey; c->k[7][1] = c->radius * c->extent * c->height;   /* the domes' full height */
     c->k[7][3] = 1.0f / (c->radius * c->extent);   /* Brightness per reach; the draw adds the dimming */
+    c->ex[7][0] = c->opacity / (c->radius * c->extent);
     c->k[11][0] = c->vlo[0]; c->k[11][1] = c->vlo[1]; c->k[11][2] = c->vlo[2];
     c->k[13][3] = c->edge_warp * c->radius * c->extent;
     c->k[14][3] = c->k[7][1] * 0.8f;          /* the filaments reach most of the domes' height */
@@ -1076,7 +1138,7 @@ static int bake_volume(void *d9, Cls *c, float half)
         c->k[12][0] = size[0] / (float)X; c->k[12][1] = size[1] / (float)Y; c->k[12][2] = size[2] / (float)Z;
         c->k[12][3] = c->vlo[1] + ((float)j + 0.5f) * size[1] / (float)Y;
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
-        d9_psconst(d9, 24, &c->ex[0][0], 7);
+        d9_psconst(d9, 24, &c->ex[0][0], 8);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
         if (D9_FN(d9, D9_GETRENDERTARGETDATA, RTData_t)(d9, rts, sys) < 0) break;
         if (D9_FN(sys, 13, SurfLock_t)(sys, &src, NULLPTR, 0x10) < 0) break;            /* READONLY */
@@ -1438,7 +1500,7 @@ static int lr_targets(void *d9, UINT zw, UINT zh, UINT fw, UINT fh)
     }
     if (!g_lr) {
         if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, lw, lh, 1, 1, 113, 0, &g_lr, NULLPTR) < 0 ||   /* A16B16G16R16F */
-            D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, lw, lh, 1, 1, 114, 0, &g_lz, NULLPTR) < 0) {   /* R32F */
+            D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, lw, lh, 1, 1, 111, 0, &g_lz, NULLPTR) < 0) {   /* R16F: view depth */
             unref(g_lr); unref(g_lz); g_lr = g_lz = NULLPTR;
             note_once(&said, "half size: no floating-point target: the gas at full size");
             return 0;
@@ -1528,7 +1590,7 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     L->vpl.w = (L->vp0.x + L->vp0.w + 1) / 2 - L->vpl.x; L->vpl.h = (L->vp0.y + L->vp0.h + 1) / 2 - L->vpl.y;
     if (L->vpl.x + L->vpl.w > g_lr_w) L->vpl.w = g_lr_w - L->vpl.x;
     if (L->vpl.y + L->vpl.h > g_lr_h) L->vpl.h = g_lr_h - L->vpl.y;
-    L->k[0][0] = L->k[0][1] = 0.0f; L->k[0][2] = 1.0f / (float)g_zt_w; L->k[0][3] = 1.0f / (float)g_zt_h;
+    L->k[0][0] = g_obscure; L->k[0][1] = 0.0f; L->k[0][2] = 1.0f / (float)g_zt_w; L->k[0][3] = 1.0f / (float)g_zt_h;
     L->k[1][0] = 1.0f / (float)g_lr_w; L->k[1][1] = 1.0f / (float)g_lr_h; L->k[1][2] = P[10]; L->k[1][3] = P[14];
     L->k[2][0] = (float)L->vpl.x; L->k[2][1] = (float)L->vpl.y;
     L->k[2][2] = (float)(L->vpl.x + L->vpl.w - 1); L->k[2][3] = (float)(L->vpl.y + L->vpl.h - 1);
@@ -1562,7 +1624,7 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
     lr_quad(d9);
 
-    /* the gas target, cleared to no gas, with the depth in alpha */
+    /* the gas target, cleared to no gas and no optical depth */
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, lrs);
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
     d9_bind(d9, qvs, d9_shader(d9, &g_zclear_ps));
@@ -1582,6 +1644,7 @@ static void lr_rebind(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, NULLPTR);
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE: the shader tests depth */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 15);    /* COLORWRITEENABLE: rgb the gas, alpha its optical depth */
     lr_samplers(d9);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
@@ -1600,9 +1663,9 @@ static void lr_end(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, L->ds0);
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE */
-    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 1);      /* ALPHABLENDENABLE: ONE, ONE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 1);      /* ALPHABLENDENABLE: ONE, INVSRCALPHA (alpha: what the gas hides) */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 19, 2);
-    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 20, 2);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 20, 6);
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 7);
     D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);
     d9_bind(d9, d9_shader(d9, &g_quad_vs), d9_shader(d9, &g_comp_ps));
@@ -1611,6 +1674,12 @@ static void lr_end(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 7, g_lr);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 9, g_lr);    /* the same, filtered: away from depth edges */
+    {
+        static const DWORD ss[][2] = { { 1, 3 }, { 2, 3 }, { 3, 3 }, { 5, 2 }, { 6, 2 }, { 7, 0 }, { 11, 0 } };   /* clamp, linear */
+        int i;
+        for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 9, ss[i][0], ss[i][1]);
+    }
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 4, g_bn_tex);
     /* Only where the gas boxes are, and the filter's reach about them: the composite's
      * 25 taps a pixel cost as much over empty screen as over gas. */
@@ -1863,6 +1932,7 @@ static int draw_gas(void)
             path = fy > 1e-3f ? 2.0f * c->k[7][1] / fy : lim;
             if (path > lim) path = lim;
             s = path > ref ? pow_f(ref / path, c->edge_dim) : 1.0f;
+            if (half_size && c->opacity > 0.0f) s = 1.0f;   /* the gas's own opacity levels it off instead */
             c->k[7][3] = s / reach;
         }
         /* The draw's thresholds do not move from frame to frame: a step shared by every
@@ -1894,7 +1964,7 @@ static int draw_gas(void)
             d9_bind(d9, vs, ps);
         }
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
-        d9_psconst(d9, 24, &c->ex[0][0], 7);
+        d9_psconst(d9, 24, &c->ex[0][0], 8);
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */
         g_slices_drawn += drawn;

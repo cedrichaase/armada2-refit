@@ -37,25 +37,27 @@ float4 k_flash1  : register(c17);  //   four of them, as separate constants: vkd
 float4 k_flash2  : register(c18);  //   place an array at its register()
 float4 k_flash3  : register(c19);
 float4 k_flashc  : register(c20);  // rgb: the lightning's colour; w: 1 / its radius squared
-float4 k_fil     : register(c14);
+float4 k_fil     : register(c14);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
 float4 k_core    : register(c24);  // x: Core, the gas brighter towards each nebula's centre (0: off); y: how sharply; z: Pulse; w: its phase now (radians)
 float4 k_ring    : register(c25);  // the ring about the core: x how much it tints (0: off, 1: wholly), y where (core profile), z its width, w the colours' phase now
 float4 k_rpatch  : register(c26);  //   x its patches' scale (of the tile), y how much of the ring they cover, z their softness, w the colours' spread
 float4 k_ringa   : register(c27);  //   rgb: its four colours, in turn
 float4 k_ringb   : register(c28);
 float4 k_ringc   : register(c29);
-float4 k_ringd   : register(c30);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
+float4 k_ringd   : register(c30);
+float4 k_opac    : register(c31);  // x: Opacity= over the reach: optical depth a world unit of the densest gas (0: none)
 
-sampler3D s_noise : register(s0);  // r: fbm; gba: three soft warp fields, all tiling
+sampler3D s_noise : register(s0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
 sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; a: envelope
 sampler3D s_vol   : register(s2);  // the baked gas: density, shading, hue, emission
 sampler2D s_blue  : register(s4);  // a 64x64 blue-noise tile: r and g two independent thresholds
 sampler2D s_occ   : register(s3);  // per column of it: r the most gas, b and g the lowest and highest layer with any
 sampler2D s_zfull : register(s5);  // Resolution=2: the scene's depth (INTZ, through RESZ), full size
-sampler2D s_zlow  : register(s6);  //   the nearest depth of each 2x2 of it, at half size
-sampler2D s_gas   : register(s7);  //   the gas, at half size, in floating point
+sampler2D s_zlow  : register(s6);  //   the nearest depth of each 2x2 of it, at half size, as view depth
+sampler2D s_gas   : register(s7);  //   the gas, at half size, in floating point; alpha its optical depth
+sampler2D s_gasl  : register(s9);  //   the same, filtered (the composite's reads away from depth edges)
 
-float4 k_lr      : register(c21);  // Resolution=2: zw 1 / the full target's size
+float4 k_lr      : register(c21);  // Resolution=2: x Obscure=; zw 1 / the full target's size
 float4 k_lrv     : register(c23);  //   the half-size viewport, its first and last pixel: x0, y0, x1, y1
 float4 k_lr2     : register(c22);  //   xy 1 / the half-size targets' size; z, w the projection's _33 and _43 (to view depth)
 
@@ -80,12 +82,34 @@ float hash12(float2 p)
     return frac((q.x + q.y) * q.z);
 }
 
+// The noise domain turned off the world's axes, two ways (an orthonormal matrix about
+// no axis of them, and its transpose).
+float3 rot(float3 p)
+{
+    return float3(dot(p, float3(0.00, 0.80, 0.60)), dot(p, float3(-0.80, 0.36, -0.48)), dot(p, float3(-0.60, -0.48, 0.64)));
+}
+float3 rot2(float3 p)
+{
+    return float3(dot(p, float3(0.00, -0.80, -0.60)), dot(p, float3(0.80, 0.36, -0.48)), dot(p, float3(0.60, -0.48, 0.64)));
+}
+
+// One field from two reads of the tile, turned two ways and at scales that do not divide
+// each other, summed and brought back to the tile's own spread. A single read repeats
+// with the tile, and through a long path of gas a repeat adds up along its lattice's
+// directions, as a crystal's rows line up: sheets and streaks through the field, along
+// x, y and z before the domain was turned. Two lattices never line up together.
+float noise2(float3 a, float3 b)
+{
+    return (tex3D(s_noise, a).r + tex3D(s_noise, b).r - 1.0) * 0.7071 + 0.5;
+}
+
 // The gas's density at q (noise coordinates), from the warp w and the disc's cover.
 // `det` is the fine octave's value; the shading sample passes the point's own, since
 // a step of ShadeStep is far larger than that octave and it only adds noise there.
-float gas_density(float3 q, float3 w, float cover, float det)
+float gas_density(float3 p, float3 w, float cover, float det)
 {
-    float  base = tex3D(s_noise, q + w * k_noise.y).r;
+    float3 q = rot(p) * k_noise.x + k_seed.xyz, q2 = rot2(p) * (k_noise.x * 0.786) + k_seed.yzx;
+    float  base = noise2(q + w * k_noise.y, q2 + w.zxy * k_noise.y);
     float  f = lerp(base, det, k_seed.w);
     float  n = (f - 0.5) * 8.0;                       // about a z-score (nebulae.c normalises)
     n = lerp(n, 2.0 - abs(n) * 2.0, k_shape.x);       // ridge: towards soft bands
@@ -95,11 +119,12 @@ float gas_density(float3 q, float3 w, float cover, float det)
     return pow(dens, k_glow.w);
 }
 
+
 // The gas at a world point: x density, y shading (0..1.6), z hue (0..1), w emission
 // (knots times lanes, 0..4). What the bake stores, and the reference draws directly.
 float4 gas_at(float3 p)
 {
-    float3 q = p * k_noise.x + k_seed.xyz;
+    float3 q = rot(p) * k_noise.x + k_seed.xyz;
     float3 w = tex3D(s_noise, q * k_shape.z).gba * 2.0 - 1.0;
 
     // The envelope read through the warp: the outline is pushed out and in by up to
@@ -114,12 +139,12 @@ float4 gas_at(float3 p)
     float  t = abs(y) / max(hgt, 1.0);
     float  cover = env.a * smoothstep(1.0, 0.55, t);   // dense to over half the height
 
-    float  det  = tex3D(s_noise, q * 3.13 + w.yzx * (k_noise.y * 0.5)).r;
-    float  dens = cover > 0.001 ? gas_density(q, w, cover, det) : 0.0;
+    float  det  = noise2(q * 3.13 + w.yzx * (k_noise.y * 0.5), rot2(p) * (k_noise.x * 2.71) + k_seed.zxy + w.xzy * (k_noise.y * 0.5));
+    float  dens = cover > 0.001 ? gas_density(p, w, cover, det) : 0.0;
     // Self-shading, cheaply: the density a step towards the light. Where there is
     // more gas between the point and the light, the point is in its own shadow; where
     // there is less, it is a lit edge. That is what makes billows look round.
-    float  ahead = cover > 0.001 ? gas_density(q + k_light.xyz * k_noise.x, w, cover, det) : 0.0;
+    float  ahead = cover > 0.001 ? gas_density(p + k_light.xyz, w, cover, det) : 0.0;
     float  shade = clamp(1.0 + (dens - ahead) * k_light.w * 2.0, 0.25, 1.6);
 
     // Filaments: the ridges of a large, warped field, sharpened into tendrils, out to
@@ -243,14 +268,20 @@ float4 bake_vs(float4 pos : POSITION) : POSITION
 // density, shading / 1.6, hue, emission / 4.
 float4 bake_ps(float2 vpos : VPOS) : COLOR
 {
-    float3 p = float3(k_vlo.x + (vpos.x + 0.5) * k_vsz.x, k_vsz.w, k_vlo.z + (vpos.y + 0.5) * k_vsz.z);
+    // Each texel's point jittered within it. The noise's mips are chosen to be about a
+    // texel wide, so their grid beat against the bake's like two fine screens laid over
+    // each other: parallel lines through the gas (the detail octave's most, its mips the
+    // coarsest). Jittered, the beat is a fine noise instead.
+    float3 j = float3(hash12(vpos + k_vsz.w * float2(0.731, 0.317)), hash12(vpos.yx + k_vsz.w * float2(0.513, 0.877) + 41.0),
+                      hash12(vpos + k_vsz.w * float2(0.191, 0.643) + 83.0)) - 0.5;
+    float3 p = float3(k_vlo.x + (vpos.x + 0.5 + j.x) * k_vsz.x, k_vsz.w + j.y * k_vsz.y, k_vlo.z + (vpos.y + 0.5 + j.z) * k_vsz.z);
     float4 g = gas_at(p);
     return float4(g.x, g.y / 1.6, g.z, g.w / 4.0);
 }
 
 // The draw from the baked volume: one read (two with Samples=2), and the fine octave of
 // the tiling noise for detail finer than the volume's texels. The colour this slice
-// adds at p; w is -1 where there is no gas.
+// adds at p; w its optical depth (Opacity=), or -1 where there is no gas.
 float4 vol_gas(VsOut i, float3 p, float dist)
 {
 
@@ -277,9 +308,10 @@ float4 vol_gas(VsOut i, float3 p, float dist)
         v = tex3D(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy);
     if (v.x <= 0.002) return float4(0, 0, 0, -1);
     float  det = 0.5;
-    if (k_vlo.w > 0.0) det = tex3D(s_noise, pa * (k_noise.x * 6.1) + k_seed.zxy).r;
+    if (k_vlo.w > 0.0) det = noise2(rot(pa) * (k_noise.x * 6.1) + k_seed.zxy, rot2(pa) * (k_noise.x * 5.3) + k_seed.yzx);
     float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);
-    return float4(gas_colour(g, i.t.x, dist, pa), 1);
+    float  near = saturate((dist - k_eye.w * 0.25) / k_eye.w);
+    return float4(gas_colour(g, i.t.x, dist, pa), g.x * near * i.t.x * k_opac.x);
 }
 
 float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
@@ -293,17 +325,17 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
 }
 
 // Resolution=2: the same at half size, into a floating-point target, so no rounding
-// trick is needed. The depth test is the shader's: against the nearest scene depth of
+// trick is needed. Alpha adds up the optical depth for the composite. The depth test is the shader's: against the nearest scene depth of
 // the 2x2 full pixels this pixel covers, so gas never shows through any part of a hull.
 float4 vol_lr_ps(VsOut i, float2 vpos : VPOS) : COLOR
 {
     float  zs = tex2D(s_zlow, (vpos + 0.5) * k_lr2.xy).r;
-    if (i.zw.x / i.zw.y > zs) return float4(0, 0, 0, 0);
+    if (i.zw.y > zs) return float4(0, 0, 0, 0);     // w: the view depth
     float  dist;
     float2 u0;
     float3 p = slice_point(i, vpos, dist, u0);
     float4 c = vol_gas(i, p, dist);
-    return float4(c.w < 0.0 ? 0.0 : c.rgb, 0);
+    return c.w < 0.0 ? 0.0 : c;
 }
 
 // Resolution=2: a full-screen quad, its corners in clip space.
@@ -312,52 +344,97 @@ float4 quad_vs(float4 pos : POSITION) : POSITION
     return float4(pos.xy, 0.0, 1.0);
 }
 
-// Resolution=2: the half-size depth, the nearest of each 2x2 of the scene's (vpos is
-// the half-size pixel inside the viewport's half).
-float4 zdown_ps(float2 vpos : VPOS) : COLOR
-{
-    float2 f = (floor(vpos) * 2.0 + 0.5) * k_lr.zw;      // half pixel i covers full pixels 2i, 2i+1
-    float  a = tex2D(s_zfull, f).r, b = tex2D(s_zfull, f + float2(k_lr.z, 0)).r;
-    float  c = tex2D(s_zfull, f + float2(0, k_lr.w)).r, d = tex2D(s_zfull, f + k_lr.zw).r;
-    return float4(min(min(a, b), min(c, d)), 0, 0, 0);
-}
-
 float view_z(float z)                   // post-projection depth to view depth (z - _33 is below 0)
 {
     return k_lr2.w / min(z - k_lr2.z, -1e-9);
 }
 
-// Resolution=2: the gas target's clear: no gas, and in alpha the view depth of the
-// nearest scene of its 2x2, which the gas pass leaves alone (it writes rgb only) and
-// the composite reads with the gas in one fetch.
-float4 zclear_ps(float2 vpos : VPOS) : COLOR
+// Resolution=2: the half-size depth, the nearest of each 2x2 of the scene's (vpos is
+// the half-size pixel inside the viewport's half), as view depth in half floats (0.05%:
+// a few units far off). Read by every slice pixel and 25 times by every composite pixel,
+// so it is small and needs no conversion.
+float4 zdown_ps(float2 vpos : VPOS) : COLOR
 {
-    return float4(0, 0, 0, view_z(zdown_ps(vpos).r));
+    float2 f = (floor(vpos) * 2.0 + 0.5) * k_lr.zw;      // half pixel i covers full pixels 2i, 2i+1
+    float  a = tex2D(s_zfull, f).r, b = tex2D(s_zfull, f + float2(k_lr.z, 0)).r;
+    float  c = tex2D(s_zfull, f + float2(0, k_lr.w)).r, d = tex2D(s_zfull, f + k_lr.zw).r;
+    return float4(min(view_z(min(min(a, b), min(c, d))), 60000.0), 0, 0, 0);
 }
 
-// Resolution=2: the gas onto the frame. A tent over the 3x3 half-size pixels about
-// this pixel, which also smooths away what the jitter leaves, each weighted by how near its depth is to this pixel's: at a hull's
-// edge a background pixel takes the gas of the half-size pixels behind it, and the
-// hull keeps what is in front of it. Then one dither to the 8-bit target.
+// Resolution=2: the gas target's clear: no gas, no optical depth.
+float4 zclear_ps(float2 vpos : VPOS) : COLOR
+{
+    return 0.0;
+}
+
+// Resolution=2: the gas onto the frame. A tent over the 5x5 half-size pixels about
+// this pixel, which also smooths away what the jitter leaves, each weighted by how near
+// its depth is to this pixel's: at a hull's edge a background pixel takes the gas of the
+// half-size pixels behind it, and the hull keeps what is in front of it.
+//
+// Away from depth edges (nearly everywhere) no depth tells the taps apart, and the
+// tent is taken in pairs, by bilinear reads: 9 reads and the inner 3x3's depths. A depth
+// read for each of the 25 taps cost 0.57 ms more at 3440x1440 (bench, six classes): the
+// composite is bound by its reads.
+//
+// Then the gas's opacity (Opacity=). Gas that only adds light is as bright as its path
+// through it is long, and a flat field seen edge-on is several times as bright as from
+// above. Gas that also absorbs levels off: through optical depth t, light of one colour
+// C (what was added up) comes out as C (1 - e^-t) / t, which is C where the gas is thin
+// and the gas's own colour where it is thick, at any angle. Exact for gas of one colour,
+// and order does not matter, so the slices still need no sorting. What is behind loses
+// e^-t of itself, times Obscure=. Then one dither to the 8-bit target.
 float4 comp_ps(float2 vpos : VPOS) : COLOR
 {
     float2 full = floor(vpos) + 0.5;
-    float  zf = view_z(tex2D(s_zfull, full * k_lr.zw).r);
+    float  zf = min(view_z(tex2D(s_zfull, full * k_lr.zw).r), 60000.0);   // as the half-size depth
     float2 h = full * 0.5 - 0.5;            // in half pixels, a half pixel's centre on an integer
     float2 b = floor(h + 0.5), fr = h - b;  // the nearest half pixel, and where this one lies from it
-    float3 sum = 0.0;
-    float  wsum = 0.0;
-    [unroll] for (int y = -2; y <= 2; y++) {
-        [unroll] for (int x = -2; x <= 2; x++) {
-            float2 tw = saturate(1.0 - abs(float2(x, y) - fr) * (2.0 / 5.0));   // a tent 5 pixels wide
-            float2 uv = (clamp(b + float2(x, y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;   // never outside the viewport
-            float4 g = tex2D(s_gas, uv);    // rgb the gas, a its depth
-            float  w = tw.x * tw.y / (1e-3 + abs(g.a - zf) / zf);
-            sum += g.rgb * w;
-            wsum += w;
+    float  zi[3][3], edge = 0.0;
+    [unroll] for (int j = -1; j <= 1; j++) {
+        [unroll] for (int i = -1; i <= 1; i++) {
+            zi[j + 1][i + 1] = tex2D(s_zlow, (clamp(b + float2(i, j), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy).r;
+            edge = max(edge, abs(zi[j + 1][i + 1] - zf) / zf);
         }
     }
-    float3 c = sum / max(wsum, 1e-6);
+    float4 c = 0.0;
+    [branch] if (edge > 0.03) {
+        // At a depth edge: the 25 taps one by one, each weighted by its depth (the outer
+        // ring by its nearest inner neighbour's, which is read already).
+        float  wsum = 0.0;
+        [unroll] for (int y = -2; y <= 2; y++) {
+            [unroll] for (int x = -2; x <= 2; x++) {
+                float2 tw = saturate(1.0 - abs(float2(x, y) - fr) * (2.0 / 5.0));   // a tent 5 pixels wide
+                float2 uv = (clamp(b + float2(x, y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;   // never outside the viewport
+                float  zl = zi[clamp(y, -1, 1) + 1][clamp(x, -1, 1) + 1];
+                float  w = tw.x * tw.y / (1e-3 + abs(zl - zf) / zf);
+                c += tex2D(s_gas, uv) * w;
+                wsum += w;
+            }
+        }
+        c /= max(wsum, 1e-6);
+    } else {
+        // Elsewhere (nearly everywhere) the same tent, with no depth to weigh by: its taps
+        // in pairs, each pair one bilinear read between them, 9 reads for 25.
+        float2 w0 = saturate(1.0 - abs(-2.0 - fr) * 0.4), w1 = saturate(1.0 - abs(-1.0 - fr) * 0.4);
+        float2 w2 = saturate(1.0 - abs(fr) * 0.4), w3 = saturate(1.0 - abs(1.0 - fr) * 0.4), w4 = saturate(1.0 - abs(2.0 - fr) * 0.4);
+        float2 pa = -2.0 + w1 / max(w0 + w1, 1e-6), pb = w3 / max(w2 + w3, 1e-6);
+        float2 wa = w0 + w1, wb = w2 + w3;
+        float2 o[3] = { pa, pb, float2(2.0, 2.0) };
+        float2 ow[3] = { wa, wb, w4 };
+        float  wsum = 0.0;
+        [unroll] for (int y = 0; y < 3; y++) {
+            [unroll] for (int x = 0; x < 3; x++) {
+                float  w = ow[x].x * ow[y].y;
+                float2 uv = (clamp(b + float2(o[x].x, o[y].y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;
+                c += tex2D(s_gasl, uv) * w;
+                wsum += w;
+            }
+        }
+        c /= max(wsum, 1e-6);
+    }
+    float  t = c.a, e = exp(-t);
+    float3 g = c.rgb * (t > 1e-4 ? (1.0 - e) / t : 1.0 - 0.5 * t);
     float  u = tex2D(s_blue, (vpos + 0.5) / 64.0).r;
-    return float4(floor(c * 255.0 + u) / 255.0, 0);
+    return float4(floor(g * 255.0 + u) / 255.0, k_lr.x * (1.0 - e));
 }
