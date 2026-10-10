@@ -165,8 +165,9 @@ float3 slice_point(VsOut i, float2 vpos, out float dist, out float2 u)
     // Blue noise: a threshold per pixel with no low frequencies and no direction, so
     // what is left of the slicing reads as neither sand nor hatching. Its values walk
     // the golden ratio from slice to slice, so over the slices a pixel sees they are
-    // stratified and the errors cancel, and they move on each frame (k_vsz.w), so
-    // nothing stands still on the screen while the gas moves under it.
+    // stratified and the errors cancel. They stay put from frame to frame (k_vsz.w is
+    // 0): moved on each frame, they shifted every slice's samples together, and the
+    // gas flickered.
     u = tex2D(s_blue, (vpos + 0.5) / 64.0).rg + k_vsz.w * float2(0.6180340, 0.7548777);
     // Over the whole gap to the next slice (with vol_ps's two reads): a part left
     // unsampled shows as bands where the slices turn through the gas.

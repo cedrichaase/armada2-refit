@@ -1683,7 +1683,10 @@ static int draw_gas(void)
             s = path > ref ? pow_f(ref / path, c->edge_dim) : 1.0f;
             c->k[7][3] = s / reach;
         }
-        c->k[12][3] = (float)(g_frame & 1023);    /* the draw's dither moves on each frame */
+        /* The draw's thresholds do not move from frame to frame: a step shared by every
+         * pixel moves every slice's samples through the gas at once, and the gas's
+         * structure flickered in blotches (radioactive most, its detail the finest). */
+        c->k[12][3] = 0.0f;
         c->k[15][0] = (g_bake && c->vol) ? (float)g_samples : 1.0f;
         c->k[15][1] = c->k[15][0] > 1.5f ? 0.5f : 1.0f;
         {   /* time, for the hue swing and the lightning */
