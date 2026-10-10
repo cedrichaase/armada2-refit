@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.18.0 — 2026-10-10
+
+Layers: platform 3.4.0, gui-installer 1.5.0.
+
+### Added
+- `platform/heroic-umu.py --on` bounds umu's Steam-runtime check to 3 s, with no
+  retries, in the game's Heroic config (platform 3.4.0). The graphical installer writes
+  the same two variables (gui-installer 1.5.0), and the release `install.sh` lists them
+  among the launcher variables.
+
+Installed, not yet seen in game.
+
 ## 11.17.1 — 2026-10-09
 
 Layers: gui-installer 1.4.1.

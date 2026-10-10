@@ -46,6 +46,7 @@ check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll"
 check 'grep -q "Skipping the cutscene player" "$T/err" && grep -q "Installing the HUD" "$T/err"'
 check 'grep -q "\"version\": \"$ver\"" "$G/armada2-refit-installed.json"'
 check 'grep -q "winmm=n,b;d3d8=n,b" "$H/GamesConfig/1174788223.json"'
+check 'grep -q "UMU_HTTP_TIMEOUT" "$H/GamesConfig/1174788223.json"'
 check '[ -e "$H/GamesConfig/1174788223.json.a2refit-backup" ]'
 
 echo "== uninstall: the game and Heroic as they were"

@@ -54,7 +54,9 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    **Uninstall** runs the installed release's `install.sh --uninstall` (or the newest
    cached one) and takes Heroic's changes back out.
 5. **Launch settings.** `install.sh` prints the variables the launcher needs
-   (`WINEDLLOVERRIDES`, and bloom's two). The game does not start right without
+   (`WINEDLLOVERRIDES`, bloom's two, and umu's `UMU_HTTP_TIMEOUT=3` /
+   `UMU_HTTP_RETRIES=0`, which keep a slow Steam server from holding up each launch:
+   `platform/README.md`, "Launch time"). The game does not start right without
    them, so there is no switch: with a Heroic entry for the game they always go into `GamesConfig/<app>.json` → `enviromentOptions` (Heroic's
    spelling), with the original kept once as `<file>.a2refit-backup`. A DLL override
    already there is kept and the missing ones are appended. A variable already set to

@@ -33,6 +33,52 @@ application directory before the system directory, so this is what makes Wine lo
 game-directory `winmm.dll` (the ASI loader), `d3d8.dll` and `d3d9.dll` (DXVK) instead of
 its own. `platform/d3d8-chain.py` owns the `d3d9` entry and `autoInstallDxvk` (below).
 
+## Launch time
+
+Measured 2026-10-10 on the bench (umu as Heroic runs it, warm caches) and in Heroic's
+own log (`~/.local/state/Heroic/logs/heroic.log`). Seconds from the launcher's start:
+
+| s | What |
+|---|---|
+| 0 → ~1 | `umu_run.py` starts; asks `repo.steampowered.com` about the Steam runtime |
+| ~1 → ~3 | pressure-vessel builds the container (`srt-bwrap`, the capsule libraries) |
+| ~3 → ~4.7 | Wine boots the prefix: `wineboot`, `services`, `explorer`, then `Armada2.exe` |
+| ~4.7 → ~4.8 | every ASI plugin loads (all of them in 60 ms) |
+| ~4.8 → ~5.9 | the game's own start until its first frame; the D3D device at ~6.9 |
+| ~8.3 | the loading screen (a direct map launch); with the intro, the Activision reel ~2.2 s after the exe |
+
+So the game and the plugins are about two seconds of it; the rest is umu, the Steam
+runtime and Wine. **Heroic adds more before any of that**, and that is most of the wait
+for the first splash: before it starts the game it runs umu twice more, each a whole
+container and Wine boot to itself:
+
+- `createprefix` (`verifyWinePrefix`), on every launch: 4–9 s measured on the bench.
+- `cmd /c winepath -u C:\ProgramData\GOG.com\Galaxy\redists\GalaxyCommunication.exe`,
+  to place GOG's Comet (Galaxy achievements and presence): ~4 s. Only while
+  `experimentalFeatures.cometSupport` is not false, a **global** Heroic setting
+  (Settings → Advanced → experimental features), so it is the player's choice and no
+  script here touches it. Armada II has no Galaxy achievements.
+
+Heroic's log put the two at 7–20 s per launch (2026-10-10: 8, 17 and 20 s from "Launching"
+to the game's own start).
+
+**Every umu run asks Steam's repo about the runtime, even with `UMU_RUNTIME_UPDATE=0`**
+(umu 1.4.4 fetches `latest-public-beta.txt` first and checks that variable only to
+decide whether to act on the answer). With umu's defaults, a 5 s timeout and 3 retries,
+a slow server costs up to ~15 s per run, and Heroic makes three runs. Measured: the request alone took
+10.4 s on a day the repo was answering 503; one `createprefix` with the server silent
+(a black-hole proxy) took 19.0 s, and 9.9 s with `UMU_HTTP_TIMEOUT=3 UMU_HTTP_RETRIES=0`.
+A failed request is caught (`log.exception`) and the launch goes on with the installed
+runtime; one that answers inside 3 s still updates it. 1 s was too tight: the request
+failed on a normal day. Heroic passes the game's `enviromentOptions` to all three runs
+(`runWineCommand` → `setupEnvVars`), so **`platform/heroic-umu.py --on`** sets the two
+there, and the graphical installer writes them with the other launch variables. They are
+not in `./install`: it never edits Heroic's config, and the bench runs it into clones.
+
+Proton-CachyOS's protonfixes also fetches an FSR4 upscaler manifest from github.io on
+every run (`upscalers.py`, enabled unconditionally): 0.3 s normally, 3 s when the
+network misbehaves. It has no switch; GE-Proton does not do it.
+
 ## Widescreen
 
 `STA2WidescreenPatch` v1.0 ships two files into the game directory:

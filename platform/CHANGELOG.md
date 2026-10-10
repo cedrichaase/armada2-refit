@@ -6,6 +6,16 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.4.0 — 2026-10-10
+
+### Added
+- `heroic-umu.py --on/--off/--status`: `UMU_HTTP_TIMEOUT=3` and `UMU_HTTP_RETRIES=0` in
+  the game's Heroic config, so a slow Steam server holds each of Heroic's three umu runs
+  per launch up for at most 3 s instead of up to ~15. Not run by `./install`.
+
+On the bench, a `createprefix` with the Steam server silent took 9.9 s instead of 19.0 s,
+and the game started and reached a map with both set. Installed, not yet seen in game.
+
 ## 3.3.0 — 2026-10-08
 
 ### Added

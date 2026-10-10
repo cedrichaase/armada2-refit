@@ -4,6 +4,16 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.5.0 — 2026-10-10
+
+Reads package schemas 0 and 1.
+
+### Added
+- The launch variables include `UMU_HTTP_TIMEOUT=3` and `UMU_HTTP_RETRIES=0`, written to
+  Heroic with the others and taken out on uninstall (`launch_env`).
+
+`gui-installer/test.sh` passes. Installed, not yet seen in game.
+
 ## 1.4.1 — 2026-10-09
 
 Reads package schemas 0 and 1.
