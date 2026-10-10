@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.19.0 — 2026-10-10
+
+Layers: nebulae 1.0.0.
+
+### Added
+- The `nebulae` layer: `Nebulae.asi` draws each nebula class with a recipe, latinum
+  included, as a volume of gas in place of its billboards, with recipes for every class
+  (nebulae 1.0.0). `./install` runs `nebulae/install.sh`; `a2mod` switches
+  `Nebulae.asi`, `Nebulae.ini` and `Nebulae/*.ini` as the `nebulae` layer. Not in the
+  release package yet.
+
+Installed, not yet seen in game.
+
 ## 11.18.0 — 2026-10-10
 
 Layers: platform 3.4.0.

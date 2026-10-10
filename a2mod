@@ -29,6 +29,8 @@ WHAT COUNTS AS A CHANGE
     lighting      Lighting.asi/.ini            -- added files: ships on the GPU, scene lights
     sky           Sky.asi/.ini, Sky/*.ini      -- added files: the procedural sky and its
                                                   recipes
+    nebulae       Nebulae.asi/.ini,            -- added files: nebulae as volumes of gas
+                  Nebulae/*.ini                   and their recipes
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
                   (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
                   *.a2font-backup from ui-font-condense and the Curs_* art from
@@ -97,9 +99,10 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('GridLayout.asi', 'grid'), ('GridLayout.ini', 'grid'),
          ('Lighting.asi', 'lighting'), ('Lighting.ini', 'lighting'),
          ('Sky.asi', 'sky'), ('Sky.ini', 'sky'),
+         ('Nebulae.asi', 'nebulae'), ('Nebulae.ini', 'nebulae'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'lighting', 'sky', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
+LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
@@ -180,6 +183,12 @@ def discover():
         for f in sorted(os.listdir(recipes)):
             if f.lower().endswith('.ini'):
                 found.append({'rel': f'Sky/{f}', 'kind': 'added', 'layer': 'sky'})
+    # The nebulae layer's recipes (nebulae/install.sh), one per nebula class drawn as gas.
+    recipes = os.path.join(GAME, 'Nebulae')
+    if os.path.isdir(recipes):
+        for f in sorted(os.listdir(recipes)):
+            if f.lower().endswith('.ini'):
+                found.append({'rel': f'Nebulae/{f}', 'kind': 'added', 'layer': 'nebulae'})
     return sorted(found, key=lambda e: e['rel'])
 
 
