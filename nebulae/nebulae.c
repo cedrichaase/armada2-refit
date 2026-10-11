@@ -75,6 +75,8 @@ typedef struct { long long q; } LARGE;
 #define MEM_RESERVE            0x2000
 
 __declspec(dllimport) DWORD   __stdcall GetModuleFileNameA(HMODULE, LPSTR, DWORD);
+__declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
+__declspec(dllimport) void   *__stdcall GetProcAddress(HMODULE, LPCSTR);
 __declspec(dllimport) BOOL    __stdcall VirtualProtect(void *, UINT, DWORD, DWORD *);
 __declspec(dllimport) void   *__stdcall VirtualAlloc(void *, UINT, DWORD, DWORD);
 __declspec(dllimport) BOOL    __stdcall VirtualFree(void *, UINT, DWORD);
@@ -287,6 +289,9 @@ static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
 static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ), 1 at full size */
 static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, half size only) */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
+static int   g_shadows = 1;            /* Shadows=: ships shadow the gas from the Key (Lighting.asi's map) */
+static float g_shadow_strength = 0.75f; /* ShadowStrength=: how much of the gas's light a shadow takes (a recipe's Shadow= scales it) */
+static float g_shadow_soft = 0.02f;     /* ShadowSoftness=: the penumbra's width per unit behind the caster */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
 static int   g_vol_maxy = 160; /* VolumeHeight=: and up, texels */
@@ -315,6 +320,15 @@ static void read_settings(void)
     parsen(b, &g_obscure, 1);
     if (g_obscure < 0.0f) g_obscure = 0.0f;
     if (g_obscure > 1.0f) g_obscure = 1.0f;
+    g_shadows = (int)GetPrivateProfileIntA("Nebulae", "Shadows", 1, g_ini);
+    GetPrivateProfileStringA("Nebulae", "ShadowStrength", "0.75", b, sizeof b, g_ini);
+    parsen(b, &g_shadow_strength, 1);
+    if (g_shadow_strength < 0.0f) g_shadow_strength = 0.0f;
+    if (g_shadow_strength > 1.0f) g_shadow_strength = 1.0f;
+    GetPrivateProfileStringA("Nebulae", "ShadowSoftness", "0.02", b, sizeof b, g_ini);
+    parsen(b, &g_shadow_soft, 1);
+    if (g_shadow_soft < 0.0f) g_shadow_soft = 0.0f;
+    if (g_shadow_soft > 0.5f) g_shadow_soft = 0.5f;
     if (g_vol_max < 16) g_vol_max = 16;
     if (g_vol_max > 512) g_vol_max = 512;
     if (g_vol_maxy < 8) g_vol_maxy = 8;
@@ -355,6 +369,7 @@ typedef struct {
     double   pulse_last;      /* when the phase was last advanced (seconds) */
     float    extent, height, radius, radius0;   /* radius0: the class's own (a nebula's effect radius), Radius= overrides */
     float    flow_speed, edge_warp, fil_reach, edge_dim, opacity;
+    float    shadow;          /* Shadow=: times ShadowStrength=, how much of its light a ship's shadow takes */
     float    ydev;            /* the farthest any of the class's nebulae is above or below its mean (world units, at least 1) */
     float    hue_cycle, hue_swing;               /* HueCycle= (seconds), HueSwing= */
     float    bolt_rate, bolt_size, bolt_bright;  /* Lightning= (a minute, a nebula), LightningSize=, LightningBrightness= */
@@ -410,6 +425,8 @@ static int recipe_read(Cls *c)
     c->pulse_speed = ini1(f, "PulseSpeed", 0.5f);
     c->pulse_wander = ini1(f, "PulseWander", 0.5f);
     c->ring_cycle = ini1(f, "RingCycle", 6.0f);
+    c->shadow = ini1(f, "Shadow", 1.0f);
+    if (c->shadow < 0.0f) c->shadow = 0.0f;
     c->opacity = ini1(f, "Opacity", 0.0f);         /* optical depth through one reach of the densest gas */
     if (c->opacity < 0.0f) c->opacity = 0.0f;
     if (c->ring_cycle < 0.1f) c->ring_cycle = 0.1f;
@@ -1436,6 +1453,41 @@ static void lightning(Cls *c, float now, float dt)
     }
 }
 
+/* Ships' shadows in the gas: Lighting.asi's shadow map of the Key, when it has one for
+ * this view and frame (LightingShadowMap). Asked once per draw_gas; g_sh_tex is
+ * borrowed, and bound only while the gas is drawn. c32..c34 world -> the map, c35 per
+ * class. */
+typedef int (__cdecl *ShadowMap_t)(void *, void **, float *, float *);
+static void *g_sh_tex;
+static float g_sh_k[4][4];
+
+static void shadow_query(void *d9)
+{
+    static int said_none, said_map, looked;
+    static ShadowMap_t get;
+    float info[4];
+    g_sh_tex = NULLPTR;
+    if (!g_shadows || g_shadow_strength <= 0.0f) return;
+    if (!looked) {
+        HMODULE m = GetModuleHandleA("Lighting.asi");
+        looked = 1;
+        get = m ? (ShadowMap_t)GetProcAddress(m, "LightingShadowMap") : (ShadowMap_t)NULLPTR;
+        if (!get) note_once(&said_none, "no shadow map from Lighting.asi (not loaded, or older than 1.18.0): the gas takes no ships' shadows");
+    }
+    if (!get || !get(d9, &g_sh_tex, &g_sh_k[0][0], info)) { g_sh_tex = NULLPTR; return; }
+    g_sh_k[3][0] = g_shadow_strength;                  /* times each class's Shadow= */
+    g_sh_k[3][1] = info[0] * 2.0f;                     /* twice the hulls' bias: the gas has no faces to fight it */
+    g_sh_k[3][2] = info[2] > 0.0f ? g_shadow_soft * info[3] / info[2] : 0.0f;   /* map depth -> world -> u, v */
+    g_sh_k[3][3] = info[1];
+    if (!said_map) {
+        char b[160];
+        said_map = 1;
+        b[0] = 0; s_cat(b, "ships' shadows in the gas: Lighting.asi's map, "); s_flt(b, info[2]);
+        s_cat(b, " units across, "); s_flt(b, info[3]); s_cat(b, " deep");
+        logline(b);
+    }
+}
+
 /* The states every slice draw sets; the state block puts the engine's back. */
 static void draw_states(void *d9, void *vs, float cols[4][4])
 {
@@ -1477,7 +1529,10 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, ssc[i][0], ssc[i][1]);
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 2, ssc[i][0], ssc[i][1]);
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 3, ssc[i][0], ssc[i][0] >= 5 && ssc[i][0] <= 6 ? 1 : ssc[i][1]);   /* point */
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 8, ssc[i][0], ssc[i][0] >= 5 && ssc[i][0] <= 6 ? 1 : ssc[i][1]);   /* the shadow map: point */
     }
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 8, g_sh_tex);
+    d9_psconst(d9, 32, &g_sh_k[0][0], 3);
 }
 
 /* ---- Resolution=2: the gas at half size ----------------------------------------
@@ -1826,6 +1881,7 @@ static int draw_gas(void)
                 slot = timing_slot(d9);
                 if (slot >= 0) D9_FN(g_q[slot][0], Q_ISSUE, Issue_t)(g_q[slot][0], 1);
             }
+            shadow_query(d9);
             half_size = g_res == 2 && g_bake && lr_begin(d9, &L, P);
             L.nx0 = L.ny0 = 1e30f; L.nx1 = L.ny1 = -1e30f; L.nfull = 0;
             draw_states(d9, vs, cols);
@@ -1982,6 +2038,13 @@ static int draw_gas(void)
         }
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
         d9_psconst(d9, 24, &c->ex[0][0], 8);
+        {   /* c35: the shadow, this class's share of it (0: none, and the shader reads no map) */
+            float k[4];
+            k[0] = g_sh_tex ? g_sh_k[3][0] * c->shadow : 0.0f;
+            if (k[0] > 1.0f) k[0] = 1.0f;
+            k[1] = g_sh_k[3][1]; k[2] = g_sh_k[3][2]; k[3] = g_sh_k[3][3];
+            d9_psconst(d9, 35, k, 1);
+        }
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */
         g_slices_drawn += drawn;

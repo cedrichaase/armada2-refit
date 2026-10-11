@@ -1467,6 +1467,7 @@ static void sm_col(const float *w, const float *a, float *c)
         c[i] = w[i * 4] * a[0] + w[i * 4 + 1] * a[1] + w[i * 4 + 2] * a[2] + w[i * 4 + 3] * a[3];
 }
 
+static int g_dbgskip;
 /* The map, from the list g_sm_rec[l]. */
 static void sm_render(void *d9, int l, const float *fwd)
 {
@@ -1522,6 +1523,15 @@ static void sm_render(void *d9, int l, const float *fwd)
     /* half a texel plus a little: the normal offset does the rest */
     g_sm_bias = (0.5f * texel + 0.2f) / zr;
 
+    if (g_sm_maps % 500 == 3) {
+        for (i = 0; i < n; i++) {
+            char b[240];
+            b[0] = 0; s_cat(b, "DBG rec "); s_num(b, i); s_cat(b, " c "); s_vec(b, R[i].c); s_cat(b, " r "); s_flt(b, R[i].r);
+            s_cat(b, " nv "); s_num(b, (long)R[i].nv); s_cat(b, " pc "); s_num(b, (long)R[i].pc); s_cat(b, " dot3 "); s_num(b, R[i].dot3);
+            s_cat(b, " pt "); s_num(b, (long)R[i].pt);
+            logline(b);
+        }
+    }
     if (++g_sm_maps == 1 || g_sm_maps == 1000) {
         char b[200];
         b[0] = 0; s_cat(b, "shadows: map "); s_num(b, g_sm_maps); s_cat(b, " of ");
@@ -1556,8 +1566,15 @@ static void sm_render(void *d9, int l, const float *fwd)
         k[0] = 1.0f / (float)g_sm_size; k[1] = k[2] = k[3] = 0.0f;
         d9_vsconst(d9, 12, k, 1);
     }
+    {   static char dbgini[320]; static int dbgt;
+        if (!dbgini[0]) { s_cat(dbgini, g_logpath); dbgini[s_len(dbgini) - 3] = 0; s_cat(dbgini, "ini"); }
+        if ((dbgt++ & 31) == 0) g_dbgskip = (int)GetPrivateProfileIntA("Lighting", "DbgSkip", 0, dbgini); }
     for (i = 0; i < n; i++) {
         float s[12];
+        if ((g_dbgskip & 1) && R[i].dot3) continue;
+        if ((g_dbgskip & 2) && R[i].nv <= 4) continue;
+        if ((g_dbgskip & 4) && R[i].nv < 300 && !R[i].dot3) continue;
+        if ((g_dbgskip & 8) && R[i].nv >= 300) continue;
         sm_col(R[i].w, g_sm_ls, s);
         sm_col(R[i].w, g_sm_ls + 4, s + 4);
         sm_col(R[i].w, g_sm_ls + 8, s + 8);
@@ -1620,11 +1637,34 @@ static int sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UIN
     ((SmIdx8_t)(*(void ***)d8)[86])(d8, &ib8, &base);                     /* GetIndices */
     sm_unref(ib8);
     if (!r->vb || !r->ib) { sm_drop(r); return 0; }
-    {   /* a draw blended or alpha-tested casts no shadow: the depth pass has no texture */
-        DWORD ab = 0, at = 0;
+    {   /* a draw blended or alpha-tested casts no shadow: the depth pass has no texture.
+         * Blending is judged by what it does, not by ALPHABLENDENABLE: the engine leaves
+         * it on for opaque hulls with SRCBLEND ONE, DESTBLEND ZERO, which is no blend,
+         * and taken as one, every hull drawn after anything blended cast nothing. */
+        DWORD ab = 0, at = 0, sb = 2, db = 1;
         D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 27, &ab);       /* ALPHABLENDENABLE */
         D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 15, &at);       /* ALPHATESTENABLE */
-        g_sm_trans = ab || at;
+        if (ab) {
+            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 19, &sb);   /* SRCBLEND */
+            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 20, &db);   /* DESTBLEND */
+        }
+        g_sm_trans = (ab && !(sb == 2 && db == 1)) || at;         /* ONE, ZERO: opaque */
+        {   static int cnt; DWORD zw = 9, ze = 9, cw = 9, cull = 9, op = 9, aop = 9, a1 = 9, c1 = 9;
+            void *t0 = NULLPTR, *t1 = NULLPTR;
+            if ((nv == 458 || nv == 3361 || nv == 254 || nv == 5011) && cnt++ < 16) {
+                char b[260];
+                D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 14, &zw); D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 7, &ze);
+                D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 168, &cw); D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &cull);
+                D9_FN(d9, D9_GETTEXTURE, SmGetTex_t)(d9, 0, &t0); D9_FN(d9, D9_GETTEXTURE, SmGetTex_t)(d9, 1, &t1);
+                sm_unref(t0); sm_unref(t1);
+                b[0] = 0; s_cat(b, "DBG draw nv "); s_num(b, (long)nv); s_cat(b, " zwrite "); s_num(b, (long)zw); s_cat(b, " zen "); s_num(b, (long)ze);
+                s_cat(b, " cwrite "); s_num(b, (long)cw); s_cat(b, " cull "); s_num(b, (long)cull); s_cat(b, " ab "); s_num(b, (long)ab);
+                s_cat(b, " src "); s_num(b, (long)sb); s_cat(b, " dst "); s_num(b, (long)db); s_cat(b, " tex0 "); s_num(b, (long)(DWORD)t0);
+                s_cat(b, " tex1 "); s_num(b, (long)(DWORD)t1); s_cat(b, " mi "); s_num(b, (long)mi); s_cat(b, " si "); s_num(b, (long)si);
+                s_cat(b, " pc "); s_num(b, (long)pc); s_cat(b, " base "); s_num(b, (long)base);
+                logline(b); (void)op; (void)aop; (void)a1; (void)c1;
+            }
+        }
     }
     r->base = (int)base; r->dot3 = dot3;
     r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
@@ -1694,6 +1734,25 @@ static void sm_unbind(void *d9)
     for (i = 0; i < 6; i++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 3, k_sm_samp[i], g_sm_saved[i]);
 }
 
+/* The Key's shadow map for another plugin: Nebulae.asi darkens the gas in it, so ships
+ * cast their shadows through the nebulae ("Shadows in the gas", README). It is handed
+ * over only while it is this view's and this frame's, on the caller's device. ls takes
+ * the three columns world -> u, v, depth (sm_render); info: x the depth bias, y a texel
+ * in u and v, z the map's width and w its depth range, both in world units. The texture
+ * is borrowed: no reference is added, and it lives until the device resets. */
+__declspec(dllexport) int __cdecl LightingShadowMap(void *d9, void **tex, float *ls, float *info)
+{
+    int i;
+    if (!g_shadows || !g_sm_ok || !g_sm_tex || !g_sm_have_key || g_sm_dev != d9 || g_sm_frame != g_frame) return 0;
+    *tex = g_sm_tex;
+    for (i = 0; i < 12; i++) ls[i] = g_sm_ls[i];
+    info[0] = g_sm_bias;
+    info[1] = 1.0f / (float)g_sm_size;
+    info[2] = g_sm_texel * (float)g_sm_size;
+    info[3] = 1.0f / sqrt_f(g_sm_ls[8] * g_sm_ls[8] + g_sm_ls[9] * g_sm_ls[9] + g_sm_ls[10] * g_sm_ls[10]);
+    return 1;
+}
+
 /* The draw into this frame's list, to cast next frame, with WORLD and the mesh's bounding
  * sphere (ST3D_Mesh +0xd4 centre, +0xe0 radius, as RenderInternal tests it) in world
  * space; its references go with it, or are let go when the list is full. */
@@ -1703,6 +1762,9 @@ static void sm_keep(SmRec *r, const BYTE *mesh)
     const float *w = g_sh_w, *lc;
     float  s = 0.0f, rad = 200.0f;
     int    i;
+    {   static long nk, nt, nm; nk++; if (g_sm_trans) nt++; if (!mesh) nm++;
+        if (nk % 3000 == 0) { char b[160]; b[0] = 0; s_cat(b, "DBG keep "); s_num(b, nk); s_cat(b, " trans "); s_num(b, nt);
+            s_cat(b, " nomesh "); s_num(b, nm); logline(b); } }
     if (g_sm_n[g_sm_cur] >= SM_MAX || !mesh) {
         static int said;
         if (!said && mesh) { said = 1; logline("shadows: more hull draws in a frame than the list holds; the rest cast none"); }

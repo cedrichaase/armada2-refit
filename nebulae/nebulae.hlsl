@@ -46,6 +46,10 @@ float4 k_ringb   : register(c28);
 float4 k_ringc   : register(c29);
 float4 k_ringd   : register(c30);
 float4 k_opac    : register(c31);  // x: Opacity= over the reach: optical depth a world unit of the densest gas (0: none); y: the envelope's height range (s_env.b)
+float4 k_sh0     : register(c32);  // the Key's shadow map (Lighting.asi): world -> u,
+float4 k_sh1     : register(c33);  //   v,
+float4 k_sh2     : register(c34);  //   and depth along the Key (0..1 over the hulls)
+float4 k_sh      : register(c35);  //   x how much of the gas's light a shadow takes (0: no map), y the depth bias, z the penumbra (u, v per depth behind the caster), w half a texel (u, v)
 
 sampler3D s_noise : register(s0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
 sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; b: the nebulae's height there (0.5: the field's); a: envelope
@@ -56,6 +60,7 @@ sampler2D s_zfull : register(s5);  // Resolution=2: the scene's depth (INTZ, thr
 sampler2D s_zlow  : register(s6);  //   the nearest depth of each 2x2 of it, at half size, as view depth
 sampler2D s_gas   : register(s7);  //   the gas, at half size, in floating point; alpha its optical depth
 sampler2D s_gasl  : register(s9);  //   the same, filtered (the composite's reads away from depth edges)
+sampler2D s_shadow : register(s8); // the Key's shadow map, R32F, point-sampled: the depth of the nearest hull
 
 float4 k_lr      : register(c21);  // Resolution=2: x Obscure=; zw 1 / the full target's size
 float4 k_lrv     : register(c23);  //   the half-size viewport, its first and last pixel: x0, y0, x1, y1
@@ -174,7 +179,7 @@ float4 gas_at(float3 p)
 }
 
 // The colour a slice adds for gas g at distance dist, before the rounding.
-float3 gas_colour(float4 g, float thick, float dist, float3 p)
+float3 gas_colour(float4 g, float thick, float dist, float3 p, float lit)
 {
     float  dens = g.x;
     float  hue = saturate(lerp(g.z, dens, k_shape.y) + k_samp.z);   // HueCycle swings it with time
@@ -207,6 +212,9 @@ float3 gas_colour(float4 g, float thick, float dist, float3 p)
             c = lerp(c, lerp(a, b, smoothstep(0.0, 1.0, f)) * (lum * 1.4), saturate(ring * k_ring.x));
         }
     }
+    // In a ship's shadow, the gas loses the Key's share of its light. The lightning
+    // after this is its own light, and is not shadowed.
+    c *= 1.0 - k_sh.x * (1.0 - lit);
     // Lightning (Lightning=): up to four flashes inside the field. The gas about each
     // lights up in the lightning's colour, and a small core where it strikes burns
     // hotter, so the cloud flickers from within like a thunderhead.
@@ -218,6 +226,35 @@ float3 gas_colour(float4 g, float thick, float dist, float3 p)
     }
     float  near = saturate((dist - k_eye.w * 0.25) / k_eye.w);
     return c * (k_gas_a.w * near * thick * k_vert.w);
+}
+
+// How much of the Key reaches p past the hulls (0..1), from Lighting.asi's shadow map:
+// a ship's shadow through the gas. The light is a disc, not a point (the sun is), so a
+// shadow is sharp next to the hull and widens into its penumbra the farther behind the
+// hull the gas is. Two reads, as PCSS does with many: the first, anywhere in the widest
+// penumbra possible at p's depth, finds a caster and how far in front of p it is; the
+// second, within the penumbra that distance gives, is the answer. Each read is a point
+// of a disc picked from the pixel's thresholds and the slice: one pixel's answer is 0 or
+// 1, and the slices and the composite's tent add them up into a soft edge. Outside the
+// map (it covers the hulls on screen), the Key is not blocked.
+float key_lit(float3 p, float2 u, float k)
+{
+    if (k_sh.x <= 0.0) return 1.0;
+    float4 q = float4(p, 1.0);
+    float3 s = float3(dot(q, k_sh0), dot(q, k_sh1), dot(q, k_sh2));
+    if (s.z <= k_sh.y || s.x < 0.0 || s.x > 1.0 || s.y < 0.0 || s.y > 1.0) return 1.0;
+    float2 a = frac(u + k * float2(0.3819660, 0.5698403) + float2(0.25, 0.75));   // decorrelated from the jitter and the rounding
+    float2 b = frac(a + float2(0.5, 0.5));
+    float2 da = float2(cos(a.x * 6.2831853), sin(a.x * 6.2831853)) * sqrt(a.y);
+    float2 db = float2(cos(b.x * 6.2831853), sin(b.x * 6.2831853)) * sqrt(b.y);
+    // The map is cleared to 1 and its hulls lie well inside 0..1, so a 1 is no hull, not
+    // a hull at the far end: gas beyond every hull along the Key (z > 1) would otherwise
+    // be in shadow wherever there is no hull at all.
+    float  z = s.z - k_sh.y;
+    float  d = tex2Dlod(s_shadow, float4(s.xy + da * (k_sh.w + z * k_sh.z), 0, 0)).r;
+    float  r = k_sh.w + (d < min(z, 0.999) ? z - d : 0.0) * k_sh.z;
+    d = tex2Dlod(s_shadow, float4(s.xy + db * r, 0, 0)).r;
+    return d < min(z, 0.999) ? 0.0 : 1.0;
 }
 
 // The slice's point for this pixel, jittered in depth; u the pixel's two thresholds.
@@ -256,7 +293,7 @@ float4 neb_ps(VsOut i, float2 vpos : VPOS) : COLOR
     float3 p = slice_point(i, vpos, dist, u0);
     float4 g = gas_at(p);
     if (g.x <= 0.0) return float4(0, 0, 0, 0);
-    return slice_out(gas_colour(g, i.t.x, dist, p), u0, i.t.y);
+    return slice_out(gas_colour(g, i.t.x, dist, p, key_lit(p, u0, i.t.y)), u0, i.t.y);
 }
 
 float4 bake_vs(float4 pos : POSITION) : POSITION
@@ -282,7 +319,7 @@ float4 bake_ps(float2 vpos : VPOS) : COLOR
 // The draw from the baked volume: one read (two with Samples=2), and the fine octave of
 // the tiling noise for detail finer than the volume's texels. The colour this slice
 // adds at p; w its optical depth (Opacity=), or -1 where there is no gas.
-float4 vol_gas(VsOut i, float3 p, float dist)
+float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
 {
 
     // Over empty space, one small read and out: the column holds no gas, or none at
@@ -311,7 +348,7 @@ float4 vol_gas(VsOut i, float3 p, float dist)
     if (k_vlo.w > 0.0) det = noise2(rot(pa) * (k_noise.x * 6.1) + k_seed.zxy, rot2(pa) * (k_noise.x * 5.3) + k_seed.yzx);
     float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);
     float  near = saturate((dist - k_eye.w * 0.25) / k_eye.w);
-    return float4(gas_colour(g, i.t.x, dist, pa), g.x * near * i.t.x * k_opac.x);
+    return float4(gas_colour(g, i.t.x, dist, pa, key_lit(p, u, i.t.y)), g.x * near * i.t.x * k_opac.x);
 }
 
 float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
@@ -319,7 +356,7 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
     float  dist;
     float2 u0;
     float3 p = slice_point(i, vpos, dist, u0);
-    float4 c = vol_gas(i, p, dist);
+    float4 c = vol_gas(i, p, dist, u0);
     if (c.w < 0.0) return float4(0, 0, 0, 0);
     return slice_out(c.rgb, u0, i.t.y);
 }
@@ -334,7 +371,7 @@ float4 vol_lr_ps(VsOut i, float2 vpos : VPOS) : COLOR
     float  dist;
     float2 u0;
     float3 p = slice_point(i, vpos, dist, u0);
-    float4 c = vol_gas(i, p, dist);
+    float4 c = vol_gas(i, p, dist, u0);
     return c.w < 0.0 ? 0.0 : c;
 }
 
