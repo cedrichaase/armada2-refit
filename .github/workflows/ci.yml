@@ -2,9 +2,13 @@
 # release zip (publish/package.sh) kept as a workflow artifact, and run its installers
 # against a mock game on Linux and Windows (publish/installer/test.sh, test.ps1), and the
 # GUI installer's (gui-installer/test.sh), which is also built as an AppImage on
-# ubuntu-24.04, the oldest system it is meant to run on, and tested the same way.
+# ubuntu-24.04, the oldest system it is meant to run on, and tested the same way. The GUI
+# installer is also frozen with PyInstaller (gui-installer/pyinstaller/build.py) into a
+# portable .exe on Windows and a universal2 .app on macOS, each tested against a mock game
+# (gui-installer/test-windows.ps1, test-macos.sh); install.sh is run on macOS too.
 # A push to main whose root CHANGELOG.md version has no release yet also tags vX.Y.Z and
-# publishes a GitHub Release with that zip. publish/README.md, "Release packages".
+# publishes a GitHub Release with that zip and the three installers. publish/README.md,
+# "Release packages".
 name: CI
 
 on:
@@ -115,8 +119,69 @@ jobs:
         shell: powershell
         run: publish/installer/test.ps1 (Get-Item dist/*.zip).FullName
 
+  # The GUI installer as one windowed .exe, which needs no Python on the machine: it also
+  # runs the package's Python scripts (A2_PYTHON). PyInstaller is pinned in
+  # gui-installer/pyinstaller/requirements.txt. 64-bit: the installer need not match the
+  # 32-bit game.
+  windows-gui:
+    needs: package
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-${{ github.sha }}
+          path: dist
+      - name: Build armada2-refit-installer-windows.exe
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check -r gui-installer/pyinstaller/requirements.txt
+          python gui-installer/pyinstaller/build.py --out dist
+      - name: the frozen installer against a mock game
+        shell: powershell
+        run: gui-installer/test-windows.ps1 (Get-Item dist/armada2-refit-[0-9]*.zip).FullName dist/armada2-refit-installer-windows.exe
+      - uses: actions/upload-artifact@v7
+        with:
+          name: armada2-refit-installer-windows-${{ github.sha }}
+          path: dist/armada2-refit-installer-windows.exe
+          if-no-files-found: error
+
+  # The GUI installer as an .app, universal2 (Apple Silicon and Intel): setup-python's
+  # macOS builds are python.org's universal2 framework, with Tk. Signed ad hoc, not
+  # notarised. The game runs in a Wine prefix (CrossOver and the like), so install.sh is
+  # what installs there: it is tested here on macOS's own bash 3.2 and BSD tools as well.
+  macos-gui:
+    needs: package
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-${{ github.sha }}
+          path: dist
+      - name: Build armada2-refit-installer-macos.zip
+        run: |
+          python -m pip install --disable-pip-version-check -r gui-installer/pyinstaller/requirements.txt
+          python gui-installer/pyinstaller/build.py --out dist --arch universal2
+      - name: install.sh against a mock game, on macOS
+        run: publish/installer/test.sh dist/armada2-refit-[0-9]*.zip
+      - name: the frozen installer against a mock game in a mock CrossOver bottle
+        run: gui-installer/test-macos.sh dist/armada2-refit-[0-9]*.zip dist/armada2-refit-installer-macos.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: armada2-refit-installer-macos-${{ github.sha }}
+          path: dist/armada2-refit-installer-macos.zip
+          if-no-files-found: error
+
   release:
-    needs: [publishable, package, appimage, windows-installer]
+    needs: [publishable, package, appimage, windows-installer, windows-gui, macos-gui]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
@@ -134,6 +199,14 @@ jobs:
         with:
           name: armada2-refit-installer-${{ github.sha }}
           path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-installer-windows-${{ github.sha }}
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: armada2-refit-installer-macos-${{ github.sha }}
+          path: dist
       - name: Release vX.Y.Z if it does not exist yet
         run: |
           tag="v$VERSION"
@@ -142,13 +215,20 @@ jobs:
           fi
           # Notes: the root changelog's newest entry, without its heading.
           awk '/^## /{if (f) exit; f=1; next} f' CHANGELOG.md > notes.md
-          printf '\n---\nInstalling: on Linux, download armada2-refit-installer-x86_64.AppImage, make it executable (chmod +x) and run it; otherwise README.txt in the zip, and [Installing by hand](%s/%s/blob/%s/README.md#installing-by-hand-layer-by-layer).\n' \
-            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag" >> notes.md
+          {
+            printf '\n---\n**Installing**, with the GOG release of the game:\n\n'
+            printf -- '- **Windows**: download `armada2-refit-installer-windows.exe` and run it. It is not signed, so SmartScreen may hold it the first time: *More info* → *Run anyway*.\n'
+            printf -- '- **macOS**: needs CrossOver (or another Wine) with the game installed in it. Download `armada2-refit-installer-macos.zip` and unzip it. The app is not notarised, so the first time macOS refuses to open it: on macOS 15 and later, go to System Settings → Privacy & Security and click *Open Anyway*; on older macOS, right-click the app → *Open*.\n'
+            printf -- '- **Linux**: download `armada2-refit-installer-x86_64.AppImage`, make it executable (`chmod +x`) and run it.\n'
+            printf -- '- **By hand**: README.txt in the zip, and [Installing by hand](%s/%s/blob/%s/README.md#installing-by-hand-layer-by-layer).\n' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag"
+          } >> notes.md
           # An entry nobody has seen working in game yet ships as a pre-release.
           pre=()
           grep -qi 'not yet seen in game' notes.md && pre=(--prerelease)
-          gh release create "$tag" dist/*.zip dist/armada2-refit-installer.py \
-            dist/armada2-refit-installer-x86_64.AppImage --target "$GITHUB_SHA" \
+          gh release create "$tag" "dist/armada2-refit-$VERSION.zip" dist/armada2-refit-installer.py \
+            dist/armada2-refit-installer-x86_64.AppImage dist/armada2-refit-installer-windows.exe \
+            dist/armada2-refit-installer-macos.zip --target "$GITHUB_SHA" \
             --title "Armada II Refit $VERSION" --notes-file notes.md "${pre[@]}"
       - name: Keep only the newest three releases
         run: |

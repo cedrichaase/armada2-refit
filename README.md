@@ -88,11 +88,23 @@ overrides, the d3d8 chain, setting the resolution, and window management under H
 
 ## Quick start
 
-**Just playing, on Linux:** download `armada2-refit-installer-x86_64.AppImage` from the newest
-[release](https://github.com/cedrichaase/armada2-refit/releases), make it executable and
-run it. It carries GTK 4 and libadwaita itself. It
-finds the game, shows what it will install, installs the newest release and can set
-Heroic's launch options for you ([`gui-installer/README.md`](gui-installer/README.md)).
+**Just playing:** download the installer for your system from the newest
+[release](https://github.com/cedrichaase/armada2-refit/releases) and run it. It finds the
+game, shows what it will install, installs the newest release and sets the launch
+options the game needs ([`gui-installer/README.md`](gui-installer/README.md)).
+
+- **Windows**, the GOG game as GOG installs it: `armada2-refit-installer-windows.exe`,
+  one portable file. It is not signed, so SmartScreen may ask first: *More info* →
+  *Run anyway*.
+- **macOS**: `armada2-refit-installer-macos.zip`, an app for Apple Silicon and Intel.
+  The game runs in Wine: **CrossOver 26** is the recommended way (paid; CodeWeavers rate
+  Armada II "Runs Great"). Create a bottle, run GOG's offline installer in it, then run
+  this app. Sikarugir or Gcenx's Wine builds are free alternatives. Leave CrossOver's
+  graphics backend on its default: Direct3D 8 and 9 run through Wine's own wined3d on a
+  Mac. MSAA and bloom are not available there. The app is not notarised, so the first
+  launch is refused: System Settings → Privacy & Security → *Open Anyway*.
+- **Linux**: `armada2-refit-installer-x86_64.AppImage`; make it executable and run it.
+  It carries GTK 4 and libadwaita itself, and writes Heroic's launch options for you.
 
 **From the repository:**
 
@@ -125,9 +137,9 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 `Menus.asi`, `MSAA.asi`, `QOL.asi`, `Lighting.asi`, `Sky.asi` (with its recipes in `sky/`),
 `Online.asi` and the Bink proxy with their `.ini` files, `dxvk.conf` and the bloom config (`GridLayout.asi`, `Planets.asi`
 and `Nebulae.asi` are built from the repository). It also has installers that do this
-section for you: `install.sh` on Linux, `install.bat` on Windows (`README.txt` in the
-zip), and the graphical installer for Linux (an AppImage), which leaves the Bink
-proxy out for now. `publish/package.sh` builds the same zip locally.
+section for you: `install.sh` on Linux and macOS, `install.bat` on Windows (`README.txt`
+in the zip), and the graphical installers for all three, which leave the Bink proxy out
+for now. `publish/package.sh` builds the same zip locally.
 
 **Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1,
 plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game
