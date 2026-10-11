@@ -5,6 +5,13 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.6.0 — 2026-10-12
+
+### Added
+- Scene `planets`: one planet of each class and a dilithium moon, for `Surfaces.asi`.
+
+Installed, not yet seen in game.
+
 ## 3.5.0 — 2026-10-07
 
 ### Added

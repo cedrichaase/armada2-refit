@@ -4,6 +4,16 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.18.0 — 2026-10-12
+
+### Added
+- Planets and hull models with a recipe in `Surfaces.asi` are drawn from its cubes:
+  `surface_ps` (ground, gas giant shell) and `moon_ps` (hull models, the dilithium moon);
+  `shade_n` lights the terrain's normal. Key `Surfaces=` (1). A stock cloud shell over a
+  recipe ground keeps only its halo (`c47`).
+
+Installed, not yet seen in game.
+
 ## 1.17.2 — 2026-10-07
 
 ### Fixed

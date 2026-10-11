@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.20.0 — 2026-10-12
+
+surfaces 1.0.0, lighting 1.18.0, testbench 3.6.0
+
+### Added
+- `surfaces/`: `Surfaces.asi`, planet surfaces (classes D, H, J, K, L, M) and the
+  dilithium moon made from recipes as height fields baked into cubes, with relief,
+  craters, fissures, oceans, ice and drifting clouds with shadows; drawn by
+  `Lighting.asi`. `./install` runs `surfaces/install.sh`. Not yet in `a2mod`.
+
+Installed, not yet seen in game.
+
 ## 11.19.0 — 2026-10-10
 
 Layers: nebulae 1.0.0.

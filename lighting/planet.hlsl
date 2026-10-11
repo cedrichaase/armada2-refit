@@ -37,7 +37,13 @@ sampler2D tex1 : register(s1);
 // point is in sunlight (the first directional light, the Key).
 struct Sky { float3 light; float3 glow; float3 spec; float day; };
 
-Sky shade(float3 wp)
+// The same with the terrain's own normal Ns (surface_ps; Surfaces.asi's relief), and the
+// Key times `key` (the clouds' shadow). The terminator, its wrap, dusk and the limb stay
+// the sphere's; the terrain scales the light by how much more or less it faces each
+// light than the sphere there does, (Ns.L + 0.3) / (N.L + 0.3), up to twice: a slope
+// facing the sun just past the terminator catches it, one facing away falls dark. With
+// Ns = N and key = 1 it is exactly the sphere's light, which shade() is.
+Sky shade_n(float3 wp, float3 Ns, float key)
 {
     Sky s;
     float3 N = normalize(wp - centre.xyz);
@@ -49,25 +55,29 @@ Sky shade(float3 wp)
     s.day   = 0.0;
     for (int k = 0; k < DIRS; k++) {
         float ndl = dot(N, dvec[k].xyz);
+        float ndn = dot(Ns, dvec[k].xyz);
         // Wrapped a little past the terminator, as an atmosphere scatters it, and
         // reddened where it grazes: sunset along the terminator.
         float lam = saturate((ndl + dusk.a) / (1.0 + dusk.a));
-        float3 c  = dcol[k].rgb * lerp(dusk.rgb, 1.0, saturate(ndl * 4.0));
-        s.light += c * mat_diffuse.rgb * lam;
+        float rel = clamp((ndn + 0.3) / max(ndl + 0.3, 0.05), 0.0, 2.0);
+        float3 c  = dcol[k].rgb * lerp(dusk.rgb, 1.0, saturate(ndl * 4.0)) * (k == 0 ? key : 1.0);
+        s.light += c * mat_diffuse.rgb * lam * rel;
         s.glow  += c * saturate(ndl + 0.35) * rim;
         float3 H = normalize(dvec[k].xyz + V);
-        s.spec  += dcol[k].rgb * (ndl > 0.0 ? pow(saturate(dot(N, H)), shine.y) : 0.0);
+        s.spec  += dcol[k].rgb * (ndl > 0.0 ? pow(saturate(dot(Ns, H)), shine.y) : 0.0) * (k == 0 ? key : 1.0);
         if (k == 0) s.day = saturate(ndl * 4.0 + 0.3);
     }
     for (int j = 0; j < POINTS; j++) {
         float3 L = ppos[j].xyz - wp;
         float  d = length(L);
         float  f = saturate(1.0 - max(0.0, d - pfall[j].x) * pfall[j].y);
-        s.light += pcol[j].rgb * mat_diffuse.rgb * saturate(dot(N, L / max(d, 1e-6))) * f;
+        s.light += pcol[j].rgb * mat_diffuse.rgb * saturate(dot(Ns, L / max(d, 1e-6))) * f;
     }
     s.glow *= haze.rgb;
     return s;
 }
+
+Sky shade(float3 wp) { return shade_n(wp, normalize(wp - centre.xyz), 1.0); }
 
 // hull.hlsl's highlight shoulder: as it is up to the knee k, then rolling off towards
 // white instead of clipping.
@@ -206,11 +216,51 @@ float4 city_ps(Lit i) : COLOR
 
 // The cloud shell (blended by its texture's alpha): the clouds lit with a night side,
 // and the atmosphere at the limb, which shows past the ground's edge as a halo.
+// x: how much of the shell's own texture shows: 0 over a ground made by Surfaces.asi,
+// which brings clouds of its own, so only the halo at the limb is left.
+float4 shell : register(c47);
+
 float4 cloud_ps(Lit i) : COLOR
 {
     Sky    s = shade(i.wp);
-    float4 t = tex2D(tex0, i.uv);
+    float4 t = tex2D(tex0, i.uv) * shell.x;
     float  g = dot(s.glow, float3(0.3, 0.5, 0.2));
     float3 c = t.rgb * lit(s) + s.glow;
     return float4(shoulder(c, shine.w), saturate(t.a + g));
+}
+
+// A planet made by Surfaces.asi (surfaces/README.md): the ground, or a gas giant's shell,
+// from three cubes sampled in the planet's own frame, so the surface turns with the
+// mesh and has no seams. The relief's normal takes the light (shade_n); the clouds drift
+// about the pole, cast their shadow onto the ground towards the sun, and are lit by the
+// sphere; fissures and the like glow, most on the night side.
+float4 surf_rows[3] : register(c40);  // the world matrix's three axes (object to world)
+float4 surf_glow    : register(c43);  // rgb: the glow's colour; a: how much shows by day
+float4 surf_cloud   : register(c44);  // rgb: the clouds' colour; a: their opacity
+float4 surf_drift   : register(c45);  // cos, sin of the drift; the shadow's strength; its reach
+float4 surf_misc    : register(c46);  // x: the relief's strength; y: 1 with clouds
+samplerCUBE s_albedo : register(s2);  // rgb: ground; a: wet
+samplerCUBE s_relief : register(s3);  // rgb: normal - direction + 0.5; a: glow
+samplerCUBE s_clouds : register(s4);
+
+float3 to_obj(float3 v)   { return float3(dot(v, surf_rows[0].xyz), dot(v, surf_rows[1].xyz), dot(v, surf_rows[2].xyz)); }
+float3 to_world(float3 o) { return o.x * surf_rows[0].xyz + o.y * surf_rows[1].xyz + o.z * surf_rows[2].xyz; }
+float3 drifted(float3 d)  { return float3(surf_drift.x * d.x + surf_drift.y * d.z, d.y, surf_drift.x * d.z - surf_drift.y * d.x); }
+
+float4 surface_ps(Lit i) : COLOR
+{
+    float3 d  = normalize(to_obj(i.wp - centre.xyz));
+    float4 A  = texCUBE(s_albedo, d);
+    float4 B  = texCUBE(s_relief, d);
+    float3 Ns = normalize(to_world(normalize(d + (B.rgb - 0.5) * surf_misc.x)));
+    float3 Lo = normalize(to_obj(dvec[0].xyz));
+    float  cl = texCUBE(s_clouds, drifted(d)).r * surf_cloud.a * surf_misc.y;
+    float  cs = texCUBE(s_clouds, drifted(normalize(d + (Lo - d * dot(Lo, d)) * surf_drift.w))).r;
+    float  key = 1.0 - surf_drift.z * cs * surf_cloud.a * surf_misc.y;
+    Sky    s = shade_n(i.wp, Ns, key);
+    float3 c = A.rgb * lit(s) + s.glow + s.spec * shine.x * A.a;
+    c += surf_glow.rgb * B.a * lerp(surf_glow.a, 1.0, 1.0 - s.day);
+    Sky    sc = shade(i.wp);
+    c = lerp(c, surf_cloud.rgb * lit(sc) + sc.glow, cl);
+    return float4(shoulder(c, shine.w), 1.0);
 }
