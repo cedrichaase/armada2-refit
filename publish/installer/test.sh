@@ -14,6 +14,7 @@ set -euo pipefail
 zip="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 T="$(mktemp -d "${TMPDIR:-/tmp}/a2test.XXXXXX")"; trap 'rm -rf "$T"' EXIT
+T="$(cd "$T" && pwd)"   # macOS: TMPDIR ends in "/", and the scripts print paths as pwd spells them
 unzip -q "$zip" -d "$T"
 P=$(ls -d "$T"/armada2-refit-*/)
 # crosire's d3d8to9 as the repository vendors it: the installers know it by hash.

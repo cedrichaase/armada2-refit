@@ -14,6 +14,7 @@ set -euo pipefail
 abs () { (cd "$(dirname "$1")" && echo "$(pwd)/$(basename "$1")"); }
 zip="$(abs "$1")"; app="$(abs "$2")"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+T="$(cd "$T" && pwd)"   # macOS: TMPDIR ends in "/", and the scripts print paths as pwd spells them
 case "$app" in
     *.zip) ditto -x -k "$app" "$T/app"; app="$(echo "$T"/app/*.app)" ;;
 esac
