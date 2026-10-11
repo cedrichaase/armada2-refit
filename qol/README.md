@@ -527,14 +527,19 @@ nothing is charged a second time.
 Where it stands. `QOLRules.asi` (`qol/rules.c`; its header comment holds the derivation)
 charges at the build order's `PushBuildQueueItem` call and marks the item paid in bit 30
 of its id; `StartBuild` gives a paid head back and lets stock charge it again (net zero,
-no advisor); Pop, CancelBuild, ActDelete, ClearBuildQueue, ClearTeam and DestroyShip give
-paid items back; Save/Load carry the marks in the producer's id counter. Measured on the
-bench: stock's crew refund is clamped to a cap (`AddCrew`), so crew is put back directly;
-a start's give-back needs the same.
+no advisor); Pop, CancelBuild, ActDelete, ClearBuildQueue and ClearTeam give paid items
+back; Save/Load carry the marks in the producer's id counter. A destroyed producer is
+refunded through ClearTeam, which `GameObject::Cleanup` always calls and which zeroes the
+item in progress, so it is refunded once; DestroyShip is not hooked (it would refund again,
+and a craft that cannot die passes through it on every fatal hit). The officers of the
+item in progress are stock's to return there when `mRemoveConstructionEffect` does
+(qol 1.6.1). Measured on the bench: stock's crew refund is clamped to a cap (`AddCrew`),
+so crew is put back directly; a start's give-back needs the same.
 
 Network games: `online/peer.c` agrees the rules (`R_RULES`: joiners report, the host
 answers with whether everyone has the plugin; `QOLRules_Network`), and the plugin latches
-the answer. Only *Internet – Online* has it; other transports stand down.
+the answer, until the next game opens (`Program::GameOpenPreLoad`). Only *Internet –
+Online* has it; other transports stand down.
 
 Not done: a refusal only reaches `QOLRules.log`, no on-screen
 feedback; destruction, capture and save/load paths are built but not bench-tested; a
