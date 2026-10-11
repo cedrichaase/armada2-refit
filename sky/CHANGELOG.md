@@ -12,7 +12,7 @@ cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAU
   lanes and specks), `Haze=` (amount, coverage: a soft glow behind the clumps),
   `Stars=` (count, brightness, size, in-gas weight) with `StarA=`/`StarB=` (bright
   coloured stars with halos in the gas). Each off unless a recipe sets it. The bake's
-  face constants move from c14 to c19.
+  face constants move from c14 to c19. `d1d15e2`
 
 ### Changed
 - Every recipe uses them: clumps on black for `mbgred`, `mbgrg`, `mbgdom1`, `mbgpur`,

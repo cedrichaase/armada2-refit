@@ -11,7 +11,7 @@ Layers: sky 1.2.0.
 
 ### Added
 - Detail in the procedural skies: grain, dust, haze and embedded stars as recipe keys,
-  used by every sky recipe; `mbgblue` calibrated like `mbg02` (sky 1.2.0).
+  used by every sky recipe; `mbgblue` calibrated like `mbg02` (sky 1.2.0). `d1d15e2`
 
 Installed, not yet seen in game.
 
