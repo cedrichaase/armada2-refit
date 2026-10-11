@@ -1,0 +1,3 @@
+# What build.py freezes the installer with. CI pip-installs this file; build.py refuses
+# any other PyInstaller version, so a new one comes in by changing this line alone.
+pyinstaller==6.22.3
