@@ -249,6 +249,9 @@ json.dump({
     'installer': {'file': 'armada2-refit-installer.py',
                   'version': '$(version "$root/gui-installer/CHANGELOG.md")'},
     'linux': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
+    # The systems below install only from a package that names them (Package.for_system).
+    'windows': {'script': 'install.ps1', 'uninstall': '-Uninstall', 'progress': 'A2_PROGRESS'},
+    'macos': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
     'steps': ['verify', 'prereqs', 'chain', 'hud', 'menus', 'qol', 'grid', 'models',
               'lighting', 'sky', 'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done'],
     'layers': [

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Armada II Refit -- the graphical installer, for Linux (Wine/Proton, GOG release).
+"""Armada II Refit -- the graphical installer, for Linux, Windows and macOS (GOG release).
 
     python3 armada2-refit-installer.py            the window
     python3 armada2-refit-installer.py --list     what it finds: games, releases
@@ -8,29 +8,37 @@
     python3 armada2-refit-installer.py --uninstall [--game DIR]
     python3 armada2-refit-installer.py --selftest
 
-It finds the game (Heroic, Lutris, Bottles, Wine prefixes, the usual folders), lists the
-releases on GitHub -- checked on every launch and on Refresh, cached under
-~/.cache/armada2-refit/installer so it works offline -- and installs the chosen one by
-running the release's own install.sh, following its progress. It writes the launch
-settings into Heroic's config for the game, which does not start right without them, and
-says how to get Heroic when there is none. Textures and the cutscene player are not
+It finds the game, lists the releases on GitHub -- checked on every launch and on
+Refresh, cached so it works offline -- and installs the chosen one by running the
+release's own installer script, following its progress: install.sh on Linux (Heroic,
+Lutris, Bottles, Wine prefixes) and macOS (a Wine prefix: CrossOver, Sikarugir, Whisky,
+plain Wine), install.ps1 on Windows (plain GOG). It writes the launch settings the game
+needs where its launcher reads them: Heroic's config for the game on Linux, the Wine
+prefix's registry on macOS; Windows needs none. Textures and the cutscene player are not
 installed from here, for now.
 
 It reads release packages of the schemas in SCHEMAS. The schema is the layout of the
-release zip as this program relies on it (manifest.json, install.sh's ::step lines),
+release zip as this program relies on it (manifest.json, the scripts' ::step lines),
 versioned on its own: gui-installer/README.md, "The package schema". Standalone: Python 3
-and the standard library, plus PyGObject with GTK 4 and libadwaita for the window (the
-AppImage carries them).
+and the standard library; the window is GTK 4 and libadwaita on Linux (the AppImage
+carries them) and Tk on Windows and macOS (the .exe and the .app carry it).
+
+Frozen into an .exe or an .app, the program also stands in for Python: given a .py file
+as its first argument it runs it, so the release scripts' Python steps (the SOD
+rewrites) need no Python on the player's machine (A2_PYTHON).
 """
+import argparse    # noqa: F401  argparse, math and struct: for the SOD scripts the frozen
 import fnmatch
 import glob
 import hashlib
 import json
+import math        # noqa: F401  program runs as Python (run_python), so they are bundled
 import os
 import re
 import shutil
 import sqlite3
 import ssl
+import struct      # noqa: F401
 import subprocess
 import sys
 import tempfile
@@ -44,7 +52,15 @@ SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, 
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
 RELEASES_PAGE = f'https://github.com/{REPO}/releases'
-INSTALLER_ASSET = 'armada2-refit-installer-x86_64.AppImage'
+SYSTEM = {'win32': 'windows', 'darwin': 'macos'}.get(sys.platform, 'linux')
+# The installer as each system downloads it from a release.
+INSTALLER_ASSETS = {'linux': 'armada2-refit-installer-x86_64.AppImage',
+                    'windows': 'armada2-refit-installer-windows.exe',
+                    'macos': 'armada2-refit-installer-macos.zip'}
+INSTALLER_ASSET = INSTALLER_ASSETS[SYSTEM]
+SYSTEM_NAME = {'linux': 'Linux', 'windows': 'Windows', 'macos': 'macOS'}[SYSTEM]
+FROZEN = bool(getattr(sys, 'frozen', False))    # a PyInstaller .exe or .app
+NO_WINDOW = 0x08000000 if SYSTEM == 'windows' else 0   # CREATE_NO_WINDOW: no console flashes
 STATE_FILE = 'armada2-refit-installed.json'     # in the game directory: what we installed
 GOG_APP = '1174788223'                          # Star Trek: Armada II on GOG
 # Layers a package carries that this installer leaves out (install.sh's A2_SKIP): the
@@ -55,12 +71,23 @@ HOME = os.path.expanduser('~')
 XDG_CACHE = os.environ.get('XDG_CACHE_HOME') or os.path.join(HOME, '.cache')
 XDG_CONFIG = os.environ.get('XDG_CONFIG_HOME') or os.path.join(HOME, '.config')
 XDG_DATA = os.environ.get('XDG_DATA_HOME') or os.path.join(HOME, '.local/share')
-CACHE = os.path.join(XDG_CACHE, 'armada2-refit', 'installer')
-SETTINGS = os.path.join(XDG_CONFIG, 'armada2-refit', 'installer.json')
+if SYSTEM == 'windows':
+    _local = os.environ.get('LOCALAPPDATA') or os.path.join(HOME, 'AppData', 'Local')
+    CACHE = os.path.join(_local, 'armada2-refit', 'installer', 'cache')
+    SETTINGS = os.path.join(os.environ.get('APPDATA') or os.path.join(HOME, 'AppData', 'Roaming'),
+                            'armada2-refit', 'installer.json')
+elif SYSTEM == 'macos':
+    CACHE = os.path.join(HOME, 'Library', 'Caches', 'armada2-refit', 'installer')
+    SETTINGS = os.path.join(HOME, 'Library', 'Application Support', 'armada2-refit',
+                            'installer.json')
+else:
+    CACHE = os.path.join(XDG_CACHE, 'armada2-refit', 'installer')
+    SETTINGS = os.path.join(XDG_CONFIG, 'armada2-refit', 'installer.json')
+
 
 # The install.sh stages, in order, and what the window says during each.
-STEPS = ['verify', 'prereqs', 'hud', 'menus', 'qol', 'lighting', 'sky', 'online', 'msaa', 'cutscenes',
-         'renderer', 'bloom', 'done']
+STEPS = ['verify', 'prereqs', 'chain', 'hud', 'menus', 'qol', 'grid', 'models', 'lighting', 'sky',
+         'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done']
 STATUS = {
     'fetch': 'Checking for releases',
     'download': 'Downloading release {version}',
@@ -78,9 +105,12 @@ STATUS = {
     'renderer': 'Configuring the renderer',
     'bloom': 'Setting up bloom',
     'done': 'Finishing up',
-    'launcher': 'Writing Heroic launch settings',
+    'launcher': 'Writing the launch settings',
+    'chain': 'Setting up the Direct3D chain',
+    'grid': 'Installing the grid keys',
+    'models': 'Rewriting the models',
     'uninstall': 'Removing the mod',
-    'restore': 'Restoring Heroic launch settings',
+    'restore': 'Restoring the launch settings',
 }
 # Zips of schema 0 print no ::step lines; their install.sh output marks the stages.
 LEGACY_MARKS = [('prerequisites:', 'prereqs'), ('  HUD.asi', 'hud'), ('  Menus.asi', 'menus'),
@@ -111,7 +141,7 @@ def human(n):
 
 
 def short(path):
-    return '~' + path[len(HOME):] if path.startswith(HOME + '/') else path
+    return '~' + path[len(HOME):] if path.startswith(HOME + os.sep) else path
 
 
 def sha256(path):
@@ -140,8 +170,30 @@ def save_json(path, data, indent=1):
 
 
 def processes():
-    """(comm, cmdline) of every process we can see."""
+    """(comm, cmdline) of every process we can see: /proc on Linux, tasklist on Windows
+    (image names only), ps on macOS."""
     out = []
+    if SYSTEM == 'windows':
+        try:
+            r = subprocess.run(['tasklist', '/fo', 'csv', '/nh'], capture_output=True, text=True,
+                               errors='replace', creationflags=NO_WINDOW, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return out
+        for line in r.stdout.splitlines():
+            name = line.split('","')[0].strip('"')
+            if name:
+                out.append((name, name))
+        return out
+    if SYSTEM == 'macos':
+        try:
+            r = subprocess.run(['ps', '-axo', 'comm=,args='], capture_output=True, text=True,
+                               errors='replace', timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return out
+        for line in r.stdout.splitlines():
+            comm, _, cmd = line.strip().partition(' ')
+            out.append((os.path.basename(comm), line.strip()))
+        return out
     for pid in os.listdir('/proc'):
         if not pid.isdigit():
             continue
@@ -177,8 +229,10 @@ class Heroic:
 
 
 class Game:
-    def __init__(self, path, source, heroic=None):
-        self.path, self.source, self.heroic = path, source, heroic
+    """An install of the game. `heroic` (Linux) or `prefix` (macOS) is what launches it
+    and where its launch settings go; on Windows neither is needed."""
+    def __init__(self, path, source, heroic=None, prefix=None):
+        self.path, self.source, self.heroic, self.prefix = path, source, heroic, prefix
 
     def label(self):
         return f'{self.source} — {os.path.basename(self.path)}'
@@ -257,9 +311,9 @@ def find_in(root, depth):
     """Folders holding Armada2.exe at most `depth` levels below root, whose path names
     Armada (the game's folder always does), so the walk stays small."""
     found = []
-    base = root.rstrip('/').count('/')
+    base = root.rstrip(os.sep).count(os.sep)
     for d, subs, _ in os.walk(root):
-        level = d.count('/') - base
+        level = d.count(os.sep) - base
         if exe_in(d):
             found.append(d)
             subs[:] = []
@@ -277,15 +331,32 @@ def find_games():
     """Every Armada II install found, best first, without duplicates."""
     found = []
 
-    def add(path, source, heroic=None):
+    def add(path, source, heroic=None, prefix=None):
         if not path or not exe_in(path):
             return
         real = os.path.realpath(path)
         for g in found:
             if os.path.realpath(g.path) == real:
                 g.heroic = g.heroic or heroic
+                g.prefix = g.prefix or prefix
                 return
-        found.append(Game(real, source, heroic))
+        found.append(Game(real, source, heroic, prefix or
+                          (prefix_of(real) if SYSTEM == 'macos' else None)))
+
+    if SYSTEM == 'windows':
+        for p in gog_registry_dirs():
+            add(p, 'GOG')
+        add(a2env_game(), 'A2_GAME')
+        for root in windows_roots():
+            for p in find_in(root, 3):
+                add(p, 'Folder')
+        return found
+    if SYSTEM == 'macos':
+        for pre in mac_prefixes():
+            for p in find_in(os.path.join(pre.root, 'drive_c'), 4):
+                add(p, pre.label(), prefix=pre)
+        add(a2env_game(), 'A2_GAME')
+        return found
 
     heroic = heroic_entries()
     for p, h in heroic:
@@ -311,6 +382,285 @@ def find_games():
     return found
 
 
+# ------------------------------------------------------------------ Windows: GOG
+
+def gog_registry_dirs():
+    """Where the registry says GOG put the game: GOG Galaxy and GOG's offline installer
+    both write HKLM\\SOFTWARE\\[WOW6432Node\\]GOG.com\\Games\\<id>, with its folder in `path`."""
+    if SYSTEM != 'windows':
+        return []
+    import winreg
+    out = []
+    for base in (r'SOFTWARE\WOW6432Node\GOG.com\Games', r'SOFTWARE\GOG.com\Games'):
+        try:
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base)
+        except OSError:
+            continue
+        with key:
+            i = 0
+            while True:
+                try:
+                    sub = winreg.EnumKey(key, i)
+                except OSError:
+                    break
+                i += 1
+                vals = {}
+                try:
+                    with winreg.OpenKey(key, sub) as g:
+                        for n in ('gameName', 'path'):
+                            try:
+                                vals[n] = str(winreg.QueryValueEx(g, n)[0])
+                            except OSError:
+                                vals[n] = ''
+                except OSError:
+                    continue
+                if vals['path'] and (sub == GOG_APP or 'armada' in vals['gameName'].lower()):
+                    out.append(vals['path'])
+    return out
+
+
+def windows_roots():
+    """The folders GOG installs into by default, on every fixed drive."""
+    out = []
+    for d in 'CDEFGHIJ':
+        drive = f'{d}:\\'
+        if not os.path.isdir(drive):
+            continue
+        for sub in ('GOG Games', 'Games', r'Program Files (x86)\GOG Galaxy\Games',
+                    r'Program Files (x86)\GOG.com', r'Program Files (x86)', 'Program Files'):
+            if os.path.isdir(os.path.join(drive, sub)):
+                out.append(os.path.join(drive, sub))
+    return out
+
+
+# ------------------------------------------------------------------ macOS: Wine prefixes
+
+class WinePrefix:
+    """A Wine prefix holding the game, on macOS: a CrossOver bottle, a Whisky bottle, a
+    Sikarugir / Kegworks / Wineskin wrapper (an .app with the prefix inside it), or a
+    plain one. The DLL overrides go into its registry (user.reg), and prefix_wine() is
+    how the game starts in it."""
+    def __init__(self, root, kind, name=None, bundle=None):
+        self.root, self.kind, self.bundle = root, kind, bundle
+        base = os.path.basename(bundle or root)
+        self.name = name or (base[:-4] if base.endswith('.app') else base)
+        self.userreg = os.path.join(root, 'user.reg')
+
+    def label(self):
+        return f'Wine · {short(self.root)}' if self.kind == 'Wine' else f'{self.kind} · {self.name}'
+
+
+CROSSOVER_BOTTLES = '~/Library/Application Support/CrossOver/Bottles'
+WHISKY_BOTTLES = '~/Library/Containers/com.isaacmarovitz.Whisky/Bottles'
+WRAPPER_DIRS = ('Sikarugir', 'Kegworks', 'Wineskin', 'Porting Kit', '')
+
+
+def mac_prefixes():
+    """Every Wine prefix worth a look, CrossOver's first."""
+    out = []
+    for kind, where in (('CrossOver', CROSSOVER_BOTTLES), ('Whisky', WHISKY_BOTTLES)):
+        for b in sorted(glob.glob(os.path.join(os.path.expanduser(where), '*'))):
+            if os.path.isdir(os.path.join(b, 'drive_c')):
+                out.append(WinePrefix(b, kind))
+    for apps in (os.path.expanduser('~/Applications'), '/Applications'):
+        for sub in WRAPPER_DIRS:
+            for app in sorted(glob.glob(os.path.join(apps, sub, '*.app'))):
+                pre = os.path.join(app, 'Contents', 'SharedSupport', 'prefix')
+                if os.path.isdir(os.path.join(pre, 'drive_c')):
+                    out.append(WinePrefix(pre, 'Wrapper', bundle=app))
+    for pat in ('~/.wine', '~/Wine/*', '~/Games/*', '~/.local/share/wineprefixes/*'):
+        for p in sorted(glob.glob(os.path.expanduser(pat))):
+            if os.path.isdir(os.path.join(p, 'drive_c')):
+                out.append(WinePrefix(p, 'Wine'))
+    return out
+
+
+def prefix_of(path):
+    """The WinePrefix a game folder is in: the folder above its drive_c."""
+    d = os.path.realpath(path)
+    while True:
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        if os.path.basename(d) == 'drive_c':
+            for pre in mac_prefixes():
+                if os.path.realpath(pre.root) == parent:
+                    return pre
+            return WinePrefix(parent, 'Wine')
+        d = parent
+
+
+CROSSOVER_APP = '/Applications/CrossOver.app'
+MAC_WINES = ('/opt/homebrew/bin/wine', '/usr/local/bin/wine',
+             '/Applications/Wine Stable.app/Contents/Resources/wine/bin/wine',
+             '/Applications/Wine Devel.app/Contents/Resources/wine/bin/wine',
+             '/Applications/Wine Staging.app/Contents/Resources/wine/bin/wine')
+
+
+def prefix_wine(pre):
+    """(argv before the exe, extra environment) to start a program in the prefix, or
+    None when no Wine for it is found."""
+    if pre.kind == 'CrossOver':
+        for app in (CROSSOVER_APP, os.path.expanduser('~' + CROSSOVER_APP)):
+            w = os.path.join(app, 'Contents/SharedSupport/CrossOver/bin/wine')
+            if os.path.isfile(w):
+                return [w, '--bottle', pre.name], {}
+        return None
+    if pre.bundle:
+        for w in ('Contents/SharedSupport/wine/bin/wine', 'Contents/SharedSupport/wine/bin/wine64',
+                  'Contents/Resources/wine/bin/wine'):
+            if os.path.isfile(os.path.join(pre.bundle, w)):
+                return [os.path.join(pre.bundle, w)], {'WINEPREFIX': pre.root}
+    if pre.kind == 'Whisky':
+        w = os.path.expanduser('~/Library/Application Support/com.isaacmarovitz.Whisky/'
+                               'Libraries/Wine/bin/wine64')
+        if os.path.isfile(w):
+            return [w], {'WINEPREFIX': pre.root}
+    for w in (shutil.which('wine'),) + MAC_WINES:
+        if w and os.path.isfile(w):
+            return [w], {'WINEPREFIX': pre.root}
+    return None
+
+
+# The overrides go under AppDefaults\Armada2.exe, so they apply to the game alone and
+# not to everything else in the bottle. user.reg spells a key with doubled backslashes.
+REG_KEY = r'Software\\Wine\\AppDefaults\\Armada2.exe\\DllOverrides'
+REG_MODES = {'n': 'native', 'b': 'builtin'}
+REG_VALUE = re.compile(r'^"\*?([^"]+)"="([^"]*)"\s*$')
+
+
+def reg_mode(m):
+    return ','.join(REG_MODES.get(x.strip(), x.strip()) for x in m.split(','))
+
+
+def reg_section(lines, key=REG_KEY):
+    """(header index, end index) of `key` among user.reg's lines, or None."""
+    want = '[' + key.lower() + ']'
+    for i, l in enumerate(lines):
+        if l.startswith('[') and l.lower().split(']')[0] + ']' == want:
+            j = i + 1
+            while j < len(lines) and not lines[j].startswith('['):
+                j += 1
+            while j > i + 1 and not lines[j - 1].strip():
+                j -= 1          # the blank line before the next section stays where it is
+            return i, j
+    return None
+
+
+def reg_values(lines, sec):
+    """{dll: value} in a DllOverrides section; Wine's '*' prefix is the same DLL."""
+    out = {}
+    for l in lines[sec[0] + 1:sec[1]]:
+        m = REG_VALUE.match(l)
+        if m:
+            out[m.group(1).lower()] = m.group(2)
+    return out
+
+
+def read_reg(path):
+    with open(path, encoding='utf-8', errors='surrogateescape', newline='') as f:
+        return f.read().split('\n')
+
+
+def wineserver_running():
+    return any(comm.lower().startswith('wineserver') for comm, _ in processes())
+
+
+def prefix_plan(pre, wanted):
+    """(changes, conflicts) to give the game `wanted` in the prefix's registry. Only DLL
+    overrides can go there; one the game has already is kept, as in Heroic's."""
+    if not os.path.isfile(pre.userreg):
+        return None, [f'{pre.label()} has no registry yet: start any program in it once, '
+                      'then install again']
+    lines = read_reg(pre.userreg)
+    sec = reg_section(lines)
+    have = reg_values(lines, sec) if sec else {}
+    changes, conflicts = [], []
+    for k, v in wanted.items():
+        if k != 'WINEDLLOVERRIDES':
+            conflicts.append(f'{k}={v} has to be set in the launcher by hand')
+            continue
+        for dll, mode in split_overrides(v).items():
+            if dll.lower() not in have:
+                changes.append(dict(key=dll, old=None, new=reg_mode(mode)))
+    return changes, conflicts
+
+
+def prefix_apply(pre, changes, undo=False):
+    """Write `changes` into the prefix's user.reg, or take them back out (only values
+    still as we left them). Wine must not be running in the prefix, since wineserver
+    writes its own copy back on exit: the caller checks. The first write keeps the
+    original as user.reg.a2refit-backup."""
+    if not changes or not os.path.isfile(pre.userreg):
+        return []
+    lines = read_reg(pre.userreg)
+    backup = pre.userreg + '.a2refit-backup'
+    if not undo and not os.path.exists(backup):
+        shutil.copy2(pre.userreg, backup)
+    sec = reg_section(lines)
+    done = []
+    if not undo:
+        if sec is None:
+            while lines and lines[-1] == '':
+                lines.pop()
+            lines += ['', f'[{REG_KEY}] {int(time.time())}']
+            sec = (len(lines) - 1, len(lines))
+        lines[sec[1]:sec[1]] = [f'"{c["key"]}"="{c["new"]}"' for c in changes]
+        done = list(changes)
+    elif sec is not None:
+        keep = []
+        for l in lines[sec[0] + 1:sec[1]]:
+            m = REG_VALUE.match(l)
+            c = next((c for c in changes if m and m.group(1).lower() == c['key'].lower()
+                      and m.group(2) == c['new']), None)
+            if c:
+                done.append(c)
+            else:
+                keep.append(l)
+        if any(REG_VALUE.match(l) for l in keep):
+            lines[sec[0] + 1:sec[1]] = keep
+        else:                   # the section held only ours: it goes, with its blank line
+            lo = sec[0] - 1 if sec[0] > 0 and not lines[sec[0] - 1].strip() else sec[0]
+            lines[lo:sec[1]] = []
+    while lines and lines[-1] == '':
+        lines.pop()
+    lines.append('')
+    tmp = pre.userreg + '.tmp'
+    with open(tmp, 'w', encoding='utf-8', errors='surrogateescape', newline='') as f:
+        f.write('\n'.join(lines))
+    shutil.copymode(pre.userreg, tmp)
+    os.replace(tmp, pre.userreg)
+    return done
+
+
+def launch_game_native(game, env_add=None):
+    """Start the game without Heroic: the exe itself on Windows, through the prefix's
+    Wine on macOS (with the launch variables in its environment too, should the
+    registry not have them). False when there is no way to."""
+    try:
+        exe = next((os.path.join(game.path, n) for n in os.listdir(game.path)
+                    if n.lower() == 'armada2.exe'), None)
+    except OSError:
+        exe = None
+    if not exe:
+        return False
+    try:
+        if SYSTEM == 'windows':
+            subprocess.Popen([exe], cwd=game.path, close_fds=True,
+                             creationflags=0x00000008 | 0x00000200)   # DETACHED, NEW_GROUP
+            return True
+        w = prefix_wine(game.prefix) if game.prefix else None
+        if not w:
+            return False
+        argv, extra = w
+        env = dict(host_env(), **extra, **(env_add or {}))
+        subprocess.Popen(argv + [exe], cwd=game.path, env=env, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
+        return False
+    return True
+
+
 # ------------------------------------------------------------------ the game's state
 
 def is_dxvk(path):
@@ -331,7 +681,8 @@ def inspect(game):
     dxvk = is_dxvk(p('d3d8.dll')) or (d3d8to9 and is_dxvk(p('d3d9.dll')))
     layers = [os.path.join(XDG_DATA, 'vulkan/implicit_layer.d'), '/etc/vulkan/implicit_layer.d',
               '/usr/share/vulkan/implicit_layer.d']
-    vkbasalt = any(glob.glob(os.path.join(d, '*[Bb]asalt*.json')) for d in layers)
+    vkbasalt = SYSTEM == 'linux' and \
+        any(glob.glob(os.path.join(d, '*[Bb]asalt*.json')) for d in layers)
     conf = p('dxvk.conf')
     foreign_conf = os.path.isfile(conf) and \
         'generated by tools/renderer-config.sh' not in open(conf, errors='replace').read()
@@ -341,6 +692,7 @@ def inspect(game):
         installed = '?'
     return dict(dxvk=dxvk, d3d8to9=d3d8to9, vkbasalt=vkbasalt, foreign_conf=foreign_conf,
                 prereqs=os.path.exists(p('STA2WidescreenPatch.asi')),
+                reshade=os.path.exists(p('ReShade.ini')),
                 d3d9=os.path.exists(p('d3d9.dll')), installed=installed,
                 state=state if isinstance(state, dict) else None)
 
@@ -356,8 +708,16 @@ def layer_verdict(layer, facts):
         return False, 'skipped — needs DXVK in the game folder'
     if when == 'dxvk.conf' and facts['foreign_conf']:
         return False, 'skipped — your own dxvk.conf stays'
+    if when == 'vkbasalt' and SYSTEM == 'windows' and not facts.get('reshade'):
+        return False, 'skipped — ReShade is not installed'
+    if when == 'vkbasalt' and SYSTEM == 'windows':
+        return True, 'will install · ReShade preset'
+    if when == 'vkbasalt' and SYSTEM == 'macos':
+        return False, 'not on macOS yet'
     if when == 'vkbasalt' and not facts['vkbasalt']:
         return False, 'skipped — no vkBasalt layer'
+    if layer['id'] == 'msaa' and SYSTEM == 'macos':
+        return False, 'not on macOS — needs DXVK, which Direct3D 9 on a Mac cannot use'
     if layer['id'] == 'lighting' and not facts['d3d8to9']:
         return True, 'will install · per vertex'
     if layer['id'] == 'sky' and not facts['d3d8to9']:
@@ -366,7 +726,10 @@ def layer_verdict(layer, facts):
 
 
 def launch_env(facts, package=None):
-    """The launcher variables install.sh will print for this game."""
+    """The launcher variables install.sh will print for this game; none on Windows,
+    where the game folder's DLLs load first anyway."""
+    if SYSTEM == 'windows':
+        return {}
     env = {'WINEDLLOVERRIDES': 'winmm=n,b;d3d8=n,b' + (';d3d9=n,b' if facts['d3d9'] else '')}
     has_bloom = package is None or any(l['id'] == 'bloom' for l in package.layers)
     if facts['vkbasalt'] and has_bloom:
@@ -752,6 +1115,7 @@ class Package:
             self.top = tops.pop()
             if not any(n == f'{self.top}/install.sh' for n in names):
                 raise RuntimeError('not a release package: no install.sh')
+            self.has = {n[len(self.top) + 1:] for n in names}
             try:
                 self.manifest = json.loads(z.read(f'{self.top}/manifest.json'))
             except KeyError:
@@ -763,7 +1127,34 @@ class Package:
         self.steps = m.get('steps', STEPS)
 
     def supported(self):
-        return self.schema in SCHEMAS
+        return self.schema in SCHEMAS and self.for_system()
+
+    def for_system(self):
+        """Whether the package installs on this system. Linux: any. Windows and macOS:
+        only a package whose manifest names the system (manifest `windows` / `macos`):
+        before them install.ps1 printed no progress and install.sh did not run on a Mac."""
+        return SYSTEM == 'linux' or isinstance(self.manifest.get(SYSTEM), dict)
+
+    def why_not(self):
+        if self.schema not in SCHEMAS:
+            return (f'release {self.version} uses package schema {self.schema}; this installer '
+                    f'reads {", ".join(map(str, SCHEMAS))} — download the newest installer')
+        if not self.for_system():
+            return f'release {self.version} cannot be installed on {SYSTEM_NAME} — pick a newer one'
+        return None
+
+    def command(self, pkgdir, args):
+        """The argv that runs the package's installer here; args is [game] or
+        ['--uninstall', game]."""
+        m = self.manifest.get(SYSTEM) if isinstance(self.manifest.get(SYSTEM), dict) else {}
+        if SYSTEM == 'windows':
+            script = os.path.join(pkgdir, m.get('script', 'install.ps1'))
+            args = [m.get('uninstall', '-Uninstall') if a == '--uninstall' else a for a in args]
+            return ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+                    '-File', script] + args
+        script = os.path.join(pkgdir, m.get('script', 'install.sh'))
+        args = [m.get('uninstall', '--uninstall') if a == '--uninstall' else a for a in args]
+        return ['/bin/bash' if SYSTEM == 'macos' else 'bash', script] + args
 
     def _legacy(self, readme):
         m = re.search(r'Armada II Refit (\S+)\s+built from commit (\S+)', readme)
@@ -817,12 +1208,16 @@ class Job:
     def __init__(self, report, log):
         self.report, self.log = report, log
 
-    def _run_script(self, pkgdir, args, steps, lo, hi):
+    def _run_script(self, pkg, pkgdir, args, steps, lo, hi):
         env = dict(host_env(), A2_PROGRESS='1', A2_SKIP=' '.join(EXCLUDED))
-        cmd = ['bash', os.path.join(pkgdir, 'install.sh')] + args
+        if FROZEN:
+            # This program runs the scripts' Python steps itself (run_python).
+            env['A2_PYTHON'] = sys.executable
+        cmd = pkg.command(pkgdir, args)
         self.log('$ ' + ' '.join(cmd))
         proc = subprocess.Popen(cmd, cwd=pkgdir, env=env, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True, bufsize=1)
+                                stderr=subprocess.STDOUT, text=True, bufsize=1,
+                                encoding='utf-8', errors='replace', creationflags=NO_WINDOW)
         out, seen = [], 0
         for line in proc.stdout:
             line = line.rstrip('\n')
@@ -841,7 +1236,7 @@ class Job:
                 seen = max(seen, i)
                 self.report(lo + (hi - lo) * min(seen, len(steps)) / len(steps), step, None)
         if proc.wait() != 0:
-            tail = [l for l in out if l.strip()][-1:] or ['install.sh failed']
+            tail = [l for l in out if l.strip()][-1:] or ['the install script failed']
             raise RuntimeError(tail[0])
         return out
 
@@ -861,12 +1256,10 @@ class Job:
             zip_path = download(rel, dl)
         pkg = Package(zip_path)
         if not pkg.supported():
-            raise RuntimeError(f'release {pkg.version} uses package schema {pkg.schema}; '
-                               f'this installer reads {", ".join(map(str, SCHEMAS))} — '
-                               'download the newest installer')
+            raise RuntimeError(pkg.why_not())
         self.report(0.32, 'unpack', None)
         pkgdir = pkg.unpack(os.path.join(CACHE, 'unpacked', pkg.version))
-        out = self._run_script(pkgdir, [game], pkg.steps, 0.35, 0.92)
+        out = self._run_script(pkg, pkgdir, [game], pkg.steps, 0.35, 0.92)
         if pkg.schema == 0 and 'cutscenes' in EXCLUDED:
             # Its install.sh knows no A2_SKIP: take the cutscene player out again.
             unproxy(game, self.log)
@@ -880,7 +1273,7 @@ class Job:
         old = load_json(os.path.join(game, STATE_FILE), {}) or {}
         state = dict(version=pkg.version, schema=pkg.schema, installer=INSTALLER_VERSION,
                      installed=time.strftime('%Y-%m-%d %H:%M'), launcher_env=wanted,
-                     heroic=old.get('heroic'))
+                     heroic=old.get('heroic'), prefix=old.get('prefix'))
         notes = []
         g = next((x for x in find_games() if os.path.realpath(x.path) == os.path.realpath(game)),
                  None)
@@ -899,12 +1292,28 @@ class Job:
                                        changes=[c for c in prev if c['key'] not in keys] + done)
                 for c in done:
                     self.log(f'Heroic: {c["key"]}={c["new"]}')
+        elif launcher and g and g.prefix and wanted:
+            self.report(0.94, 'launcher', None)
+            changes, conflicts = prefix_plan(g.prefix, wanted)
+            notes += conflicts
+            if changes and wineserver_running():
+                notes.append('Wine is running: the DLL overrides were not written into '
+                             f'{g.prefix.label()} — quit every program in it and install again '
+                             '(Launch game sets them anyway)')
+            elif changes is not None:
+                done = prefix_apply(g.prefix, changes)
+                prev = (state['prefix'] or {}).get('changes', [])
+                keys = {c['key'] for c in done}
+                state['prefix'] = dict(userreg=g.prefix.userreg, label=g.prefix.label(),
+                                       changes=[c for c in prev if c['key'] not in keys] + done)
+                for c in done:
+                    self.log(f'{g.prefix.label()}: DllOverrides {c["key"]}={c["new"]}')
         for n in notes:
             self.log('note: ' + n)
         save_json(os.path.join(game, STATE_FILE), state)
         self.report(1.0, 'done', None)
         return dict(version=pkg.version, env=wanted, notes=notes,
-                    heroic=bool(state.get('heroic')))
+                    heroic=bool(state.get('heroic')), prefix=bool(state.get('prefix')))
 
     def uninstall(self, rels, game):
         if game_running():
@@ -921,7 +1330,7 @@ class Job:
                     dict(version=rel.version))
         pkg = Package(download(rel))
         pkgdir = pkg.unpack(os.path.join(CACHE, 'unpacked', pkg.version))
-        self._run_script(pkgdir, ['--uninstall', game], ['uninstall'], 0.1, 0.85)
+        self._run_script(pkg, pkgdir, ['--uninstall', game], ['uninstall'], 0.1, 0.85)
         h = state.get('heroic')
         if h and os.path.exists(h.get('config', '')):
             self.report(0.9, 'restore', None)
@@ -929,6 +1338,15 @@ class Job:
             her.config = h['config']
             for c in heroic_apply(her, h.get('changes', []), undo=True):
                 self.log(f'Heroic: {c["key"]} back to {c["old"] if c["old"] is not None else "(unset)"}')
+        pr = state.get('prefix')
+        if pr and os.path.isfile(pr.get('userreg', '')):
+            if wineserver_running():
+                self.log(f'note: Wine is running: the DLL overrides stay in {pr.get("label")}')
+            else:
+                self.report(0.92, 'restore', None)
+                pre = WinePrefix(os.path.dirname(pr['userreg']), 'Wine', name=pr.get('label'))
+                for c in prefix_apply(pre, pr.get('changes', []), undo=True):
+                    self.log(f'{pr.get("label")}: DllOverrides {c["key"]} removed')
         try:
             os.unlink(os.path.join(game, STATE_FILE))
         except OSError:
@@ -1103,6 +1521,35 @@ def selftest():
         check(heroic_launch_uri(Heroic(t, GOG_APP, False)) ==
               f'heroic://launch?appName={GOG_APP}&runner=gog', "launch: Heroic's own URI")
         check(split_overrides('a=n,b; b=n') == {'a': 'n,b', 'b': 'n'}, 'overrides parse')
+
+        # A Wine prefix's registry (macOS): written, kept, and taken back out byte for byte.
+        reg = os.path.join(t, 'user.reg')
+        stock = ('WINE REGISTRY Version 2\n;; All keys relative to \\User\n\n#arch=win64\n\n'
+                 '[Software\\\\Wine\\\\AppDefaults\\\\Armada2.exe\\\\X11 Driver] 1700000000\n'
+                 '"Decorated"="N"\n\n[Software\\\\Wine\\\\DllOverrides] 1700000000\n'
+                 '"*d3d8"="builtin"\n')
+        with open(reg, 'w', newline='') as f:
+            f.write(stock)
+        pre = WinePrefix(t, 'CrossOver', name='Armada')
+        want = {'WINEDLLOVERRIDES': 'winmm=n,b;d3d8=n,b'}
+        ch, conf = prefix_plan(pre, want)
+        check([c['key'] for c in ch] == ['winmm', 'd3d8'] and not conf,
+              'prefix: both overrides planned for the game (the bottle-wide one is not the game\'s)')
+        prefix_apply(pre, ch)
+        lines = read_reg(reg)
+        sec = reg_section(lines)
+        check(sec and reg_values(lines, sec) == {'winmm': 'native,builtin', 'd3d8': 'native,builtin'},
+              'prefix: AppDefaults\\Armada2.exe\\DllOverrides written')
+        check(prefix_plan(pre, want)[0] == [], 'prefix: nothing left to do after apply')
+        check(os.path.exists(reg + '.a2refit-backup'), 'prefix: backup kept')
+        prefix_apply(pre, ch, undo=True)
+        check(open(reg, newline='').read() == stock, 'prefix: undo leaves user.reg as it was')
+        check(prefix_plan(WinePrefix(os.path.join(t, 'none'), 'Wine'), want)[0] is None,
+              'prefix: no registry is reported, not created')
+        check(reg_mode('n,b') == 'native,builtin' and reg_mode('n') == 'native', 'prefix: modes')
+        check(prefix_of(os.path.join(t, 'drive_c', 'GOG Games', 'Armada')) is not None and
+              os.path.realpath(prefix_of(os.path.join(t, 'drive_c', 'x')).root) == os.path.realpath(t),
+              'prefix: found above drive_c')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
         keep = {k: os.environ.get(k) for k in ('A2_APPIMAGE', 'PATH', 'PYTHONHOME', 'A2_ORIG_PATH',
                                               'A2_ORIG_PYTHONHOME')}
@@ -2088,9 +2535,34 @@ def run_gui():
     return app.run([sys.argv[0]])
 
 
+def run_tk():
+    """The window on Windows and macOS (Tk)."""
+    print('The Windows and macOS window is not built yet; use the command line: --help.',
+          file=sys.stderr)
+    return 1
+
+
+def run_python(argv):
+    """Run argv[0], a .py file, with argv[1:] as python would: the frozen .exe and .app
+    stand in for Python for the release scripts (A2_PYTHON), so the SOD rewrites need
+    none on the player's machine. They use only the standard library."""
+    import runpy
+    sys.argv = list(argv)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(argv[0])))
+    try:
+        runpy.run_path(argv[0], run_name='__main__')
+    except SystemExit as e:
+        return e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+    return 0
+
+
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1 and sys.argv[1].endswith('.py') and os.path.isfile(sys.argv[1]):
+        sys.exit(run_python(sys.argv[1:]))
+    if len(sys.argv) > 1 and not (SYSTEM == 'macos' and sys.argv[1].startswith('-psn_')):
         sys.exit(cli(sys.argv[1:]))
+    if SYSTEM != 'linux':
+        sys.exit(run_tk())
     try:
         sys.exit(run_gui())
     except (ImportError, ValueError) as e:
