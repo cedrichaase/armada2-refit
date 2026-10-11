@@ -70,9 +70,9 @@ Check "::step lines in order with the rest" (($at["::step hud HUD"] -lt $at["  H
                                              ($at["::step done done"] -gt $at["  dxvk.conf"]))
 Check "winmm.dll" ((Sha (G "winmm.dll")) -eq "baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5")
 Check "STA2WidescreenPatch.asi" ((Sha (G "STA2WidescreenPatch.asi")) -eq "193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5")
-Check "a d3d8.dll that is none of GOG's, DXVK's or d3d8to9 left as it is" (((Text (G "d3d8.dll")) -eq "gogd3d8to9") -and
+Check "a d3d8.dll that is neither GOG's nor d3d8to9 left as it is" (((Text (G "d3d8.dll")) -eq "gogd3d8to9") -and
     -not (Test-Path (G "d3d8.dll.gog-backup")) -and -not (Test-Path (G "d3d8.dll.a2chain-backup")) -and
-    (Has $out "*left as it is: d3d8.dll is none of*") -and -not (Select-String -Quiet -SimpleMatch "d3d8.dll" (G "armada2-refit-prereqs.txt")))
+    (Has $out "*left as it is: d3d8.dll is neither GOG*") -and -not (Select-String -Quiet -SimpleMatch "d3d8.dll" (G "armada2-refit-prereqs.txt")))
 Check "no d3d9.dll" (-not (Test-Path (G "d3d9.dll")))
 Check "no MSAA.asi" (-not (Test-Path (G "MSAA.asi")))
 foreach ($n in "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Planets", "Online") {
