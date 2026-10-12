@@ -192,7 +192,13 @@ Borg cube in it; the recipe's `FlowSpeed=0` so that only the shadow differs): `S
 against `Shadows=1` differ only in shafts from the hulls down and away along the Key.
 The frame's mean difference is 2.5 of 255 looking towards the Key, where the shafts are
 plain at 1x; 0.36 side on and 0.2 from above, where they run across or away from the
-lines of sight. The GPU time it adds has not been measured (`Timing=1`).
+lines of sight.
+
+**Cost** (`Timing=1`, bench, 3440x1440, the same scene, the camera inside the field so
+the gas fills the screen; 6.1–6.3 ms of gas before): lit by the Key, +0.04–0.07 ms;
+the shadows, +1.25 ms looking towards the Key (+20%) and +0.6 ms from above. That is
+two dependent reads of the map per slice pixel with gas in it (none over empty space),
+at half size.
 
 ## Cost
 
