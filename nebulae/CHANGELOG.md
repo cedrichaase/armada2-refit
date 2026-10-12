@@ -4,6 +4,21 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.0 — 2026-10-12
+
+### Added
+- The gas lit by the Key (`LightingKey`, lighting 1.19.0): its light is its own glow and
+  a share of the Key's (`KeyShare=0.8`), scattered forward (`Scatter=0.2`,
+  Henyey-Greenstein), brighter looking towards the Key and dimmer with it behind; the
+  self-shading steps towards the Key instead of the recipe's `Light=`. Both keys in
+  `Nebulae.ini` and per recipe; `KeyShare=0` is the gas as before.
+- Ships' shadows in the gas: a hull takes the Key's share of the gas's light behind it,
+  from `Lighting.asi`'s shadow map (`LightingShadowMap`), sharp beside the hull and
+  widening down the shaft; lightning is not shadowed. `Nebulae.ini`: `Shadows=1`,
+  `ShadowSoftness=0.02`.
+
+Installed, not yet seen in game.
+
 ## 1.0.3 — 2026-10-12
 
 ### Fixed

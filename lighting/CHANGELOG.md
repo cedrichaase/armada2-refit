@@ -4,6 +4,16 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.19.0 — 2026-10-12
+
+### Added
+- `LightingShadowMap`, exported: the Key's shadow map for `Nebulae.asi`, handed over only
+  while it is the current view's and frame's.
+- `LightingKey`, exported: the direction towards the Key, from the engine's lights, for
+  `Nebulae.asi`'s gas.
+
+Installed, not yet seen in game.
+
 ## 1.18.2 — 2026-10-12
 
 ### Fixed

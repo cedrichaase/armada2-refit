@@ -15,3 +15,5 @@ QueryPerformanceCounter@4
 QueryPerformanceFrequency@4
 VirtualAlloc@16
 VirtualFree@12
+GetModuleHandleA@4
+GetProcAddress@8

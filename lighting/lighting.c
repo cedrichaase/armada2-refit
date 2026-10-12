@@ -1545,6 +1545,17 @@ static int sm_key_axis(float *fwd)
     return best > 0.0f;
 }
 
+/* The direction towards the Key, in world space, for another plugin: Nebulae.asi lights
+ * its gas by it ("Shadows in the gas", README). Read off the engine's lights at the
+ * call, so it is there with no hull on screen and with Shadows=0. */
+__declspec(dllexport) int __cdecl LightingKey(float *to_key)
+{
+    float fwd[3];
+    if (!sm_key_axis(fwd)) return 0;
+    to_key[0] = -fwd[0]; to_key[1] = -fwd[1]; to_key[2] = -fwd[2];
+    return 1;
+}
+
 /* c = a x W for the column a (four values) under a row-major WORLD: one column of
  * object -> (u, v, depth). */
 static void sm_col(const float *w, const float *a, float *c)
@@ -1797,6 +1808,25 @@ static void sm_unbind(void *d9)
     sm_unref(g_sm_saved_tex);
     g_sm_saved_tex = NULLPTR;
     for (i = 0; i < 6; i++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 3, k_sm_samp[i], g_sm_saved[i]);
+}
+
+/* The Key's shadow map for another plugin: Nebulae.asi darkens the gas in it, so ships
+ * cast their shadows through the nebulae ("Shadows in the gas", README). It is handed
+ * over only while it is this view's and this frame's, on the caller's device. ls takes
+ * the three columns world -> u, v, depth (sm_render); info: x the depth bias, y a texel
+ * in u and v, z the map's width and w its depth range, both in world units. The texture
+ * is borrowed: no reference is added, and it lives until the device resets. */
+__declspec(dllexport) int __cdecl LightingShadowMap(void *d9, void **tex, float *ls, float *info)
+{
+    int i;
+    if (!g_shadows || !g_sm_ok || !g_sm_tex || !g_sm_have_key || g_sm_dev != d9 || g_sm_frame != g_frame) return 0;
+    *tex = g_sm_tex;
+    for (i = 0; i < 12; i++) ls[i] = g_sm_ls[i];
+    info[0] = g_sm_bias;
+    info[1] = 1.0f / (float)g_sm_size;
+    info[2] = g_sm_texel * (float)g_sm_size;
+    info[3] = 1.0f / sqrt_f(g_sm_ls[8] * g_sm_ls[8] + g_sm_ls[9] * g_sm_ls[9] + g_sm_ls[10] * g_sm_ls[10]);
+    return 1;
 }
 
 /* The draw into this frame's list, to cast next frame, with WORLD and the mesh's bounding

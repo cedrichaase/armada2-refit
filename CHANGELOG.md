@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.23.0 — 2026-10-12
+
+Layers: nebulae 1.1.0, lighting 1.19.0.
+
+### Added
+- The nebula gas is lit by the Key, scattering it forward, and ships cast the Key's
+  shadow through it (nebulae 1.1.0, `KeyShare=`, `Scatter=`, `Shadows=`,
+  `ShadowSoftness=`), from `Lighting.asi`'s Key and shadow map, now exported as
+  `LightingKey` and `LightingShadowMap` (lighting 1.19.0).
+
+Installed, not yet seen in game.
+
 ## 11.22.9 — 2026-10-12
 
 Layers: lighting 1.18.2.
