@@ -4,6 +4,14 @@
 in place of the stock shell. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.1 — 2026-10-13
+
+### Changed
+- Shields down toned down: the collapse flash at half strength (`DownFlash` 1.2 → 0.6),
+  and the arcs a little sparser (`DownStrikes` 5 → 4, `DownCrackle` 0.2 → 0.15).
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-12
 
 ### Added
