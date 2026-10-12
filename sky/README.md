@@ -129,6 +129,40 @@ corner, **2.4/255** (mean 0.08). Neither difference image shows a line.
 - **Stretch** along an axis, for aurora-like curtains, and **Ridge**, a wide bell about
   the field's middle that makes soft bands. Squared, not creased, so it stays gas.
 
+## Detail
+
+The look above is billows a tenth of the screen across and nothing finer, and the
+recipes of 1.1.0 drew every sky that way. Side by side with the stock faces, that was
+what was missing: the stock skies are crisp clumps on black (red, Dominion, purple,
+red-green), mottled gas with dark specks and lanes (Borg, Klingon, fluidic), and bright
+coloured stars with halos inside the gas (Ba'ku; one knot in purple and dark Klingon).
+Four terms put that back, each off unless a recipe sets it:
+
+- **Grain**: a second five-octave field at `Grain`'s scale times `Scale`, in units of
+  its own spread, added to the field before the coverage threshold. It breaks the gas's
+  edges into clumps; with a high `Coverage` and a narrow `Softness` the sky becomes
+  clumps on black. It also varies the light inside dense gas, so saturated gas does not
+  go flat. **It takes the coarse warp unscaled**: carried by the warped lookup and
+  multiplied by its own scale, the warp grew with it and dragged swirled streaks, the
+  rejected look.
+- **Dust**: a field of its own; where it rises past its coverage, the gas is absorbed
+  towards `Deep` with the **square** of the excess, so lanes and specks are soft with no
+  floor. A capped absorption (a smoothstep to a fixed depth) drew flat olive patches
+  with hard rims. Empty space has nothing to absorb.
+- **Haze**: the field without the grain, as a soft glow in the gas colour, at a
+  coverage of its own: the glow behind the clumps where they gather.
+- **Stars**: a lattice of 5 cells to the unit (about 314 cells meet the sphere); a
+  cell holds a star with chance `count/314`, at a random point of it, kept within half
+  a cell of the sphere. A soft core whitening to its centre and a wide halo, coloured
+  between `StarA` and `StarB`, not scaled by `Brightness`. The in-gas weight takes the
+  gas **without its grain**: by the grainy density each star carried the grain's
+  texture across its disc (seen on the bench).
+
+Every recipe's `Brightness` was re-scaled after adding these, so the six-face mean
+luminance (the offline mirror) is the same as 1.1.0's, about 0.92 of stock. Grain
+widens the field's spread, so more of the sky crosses `Coverage`: the clumpy skies
+raised `Coverage` rather than dim the gas.
+
 ## Recipes
 
 `sky/skies/<name>.ini`, section `[Sky]`. Colours are 0–255, directions are yaw
@@ -155,6 +189,11 @@ corner, **2.4/255** (mean 0.08). Neither difference image shows a line.
 | `Core1Colour`, `Core2Colour` | 0 | r, g, b of the core's own glow |
 | `Band` | 0,90,20,0 | yaw, pitch of the band's pole (0,90: the band is the horizon); half-width (degrees); gather (field units; 0 = no band) |
 | `Stretch` | 0,90,1 | yaw, pitch of the axis; how far structure is drawn out along it (1 = none) |
+| `Grain` | 0,8,0.6 | amount (field units; 0 = off), scale (times `Scale`), gain between octaves |
+| `Dust` | 0,6,0.5 | amount (0 = off), scale (times `Scale`), coverage (in its own spread) |
+| `Haze` | 0,0 | amount (0 = off), coverage (field units, before grain) |
+| `Stars` | 0,1,0.5,0 | how many over the sphere, brightness, size (degrees), in-gas weight (0–1) |
+| `StarA`, `StarB` | 0 | r, g, b: the two ends of the stars' colours |
 
 `Sky.ini` (`[Sky]`): `Enable` (default 1), `Face` (1536, the cube's edge; 0 = per
 pixel), `Reload` (1: `Sky.ini` and the recipe on screen are re-read within half a
@@ -181,7 +220,10 @@ GPU time of the sky's draw, timestamp queries, Navi 10, `Timing=1`:
 | baked cube (`Face=1536`), vsync on (GPU clocks down) | 0.18 ms | 0.29 ms |
 | baked cube, vsync off | | 0.12 ms |
 
-The bake costs 35–280 ms once, when a map's sky first draws. **Frame time at 4K with
+The bake costs 35–280 ms once, when a map's sky first draws. With the detail terms
+(sky 1.2.0) the first bake of a session measured 1.26 s on the bench, re-bakes of
+another recipe 51–63 ms: the first includes making the much larger bake shader's
+pipeline, once per session, while the map loads. **Frame time at 4K with
 vsync off**, alternating procedural and stock in one session (600-frame means):
 1.31–1.34 ms with the procedural sky, 1.24–1.26 ms with the stock cube, so about
 +0.07 ms a frame. The cube holds 6 × 1536² texels at 4 bytes, 57 MB of video memory.
