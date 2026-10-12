@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install / remove Menus.asi in the game directory.
 #
-#   install.sh              build if needed, then install
+#   install.sh              build, then install
 #   install.sh --mode N     install and set Mode=N (0 log, 1 centre, 2 scale)
 #   install.sh --remove     take it out again
 #
@@ -26,7 +26,8 @@ remove=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --remove) remove=1 ;;
-        --mode)   mode="$2"; shift ;;
+        --mode)   [ $# -ge 2 ] || { echo "--mode needs a value (0 log, 1 centre, 2 scale)" >&2; exit 2; }
+                  mode="$2"; shift ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
     shift
@@ -55,7 +56,9 @@ if [ "$remove" = 1 ]; then
     exit 0
 fi
 
-[ -f "$here/build/Menus.asi" ] || bash "$here/build.sh"
+# Always rebuilt, as every other layer is: a build left over from before an edit or
+# a pull would otherwise be installed as it is.
+bash "$here/build.sh"
 legacy
 
 # put SRC DST -- copy beside the target, then rename over it. A game that is running
@@ -83,11 +86,17 @@ grep '^Mode=' "$GAME/Menus.ini"
 # The loader only runs because winmm is overridden to the game-directory copy.
 cfg="$HOME/.config/heroic/GamesConfig/1174788223.json"
 if [ -f "$cfg" ]; then
-    python3 - "$cfg" <<'PY'
+    # A check, not a step: whatever it finds, the install has happened, so it must
+    # never fail the script (./install runs every layer under set -e).
+    python3 - "$cfg" <<'PY' || true
 import json, sys
-env = json.load(open(sys.argv[1]))['1174788223'].get('enviromentOptions', [])
+try:
+    env = json.load(open(sys.argv[1])).get('1174788223', {}).get('enviromentOptions', []) or []
+except Exception as e:
+    print("could not read", sys.argv[1], "--", e)
+    sys.exit(0)
 ov = [e for e in env if e.get('key') == 'WINEDLLOVERRIDES']
-val = ov[0]['value'] if ov else ''
+val = (ov[0].get('value') or '') if ov else ''
 print("WINEDLLOVERRIDES =", val or "(unset)")
 if 'winmm=n' not in val:
     print("  WARNING: winmm is not overridden to native -- the ASI loader will")

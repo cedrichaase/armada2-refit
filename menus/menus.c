@@ -723,8 +723,11 @@ static void bd_taps(int n, int design, int *b, int *f)
 {
     int i;
     for (i = 0; i < n; i++) {
-        /* centre of screen pixel i in design pixels, x256, minus half a pixel */
-        int u = (int)(((2 * i + 1) * design * 256) / (2 * n)) - 128;
+        /* centre of screen pixel i in design pixels, x256, minus half a pixel;
+         * (q * 256) / (2n) in two parts, since q * 256 overflows an int at an
+         * 8K width and there is no 64-bit division without the CRT */
+        int q = (2 * i + 1) * design;
+        int u = q / (2 * n) * 256 + q % (2 * n) * 256 / (2 * n) - 128;
         if (u < 0) u = 0;
         b[i] = u >> 8;
         f[i] = u & 255;
@@ -1115,6 +1118,10 @@ static void present(Slot *s, HDC real, int full)
     }
 
     if (s->letterbox) {
+        /* The composite is no longer what the window shows: the next frame
+         * that does match a backdrop has to send the whole screen, sides
+         * included, not just its dirty rectangle. */
+        g_c.shown = NULLPTR;
         /* A full-screen dialog: the WINDOW is already the right size, so the
          * picture is fitted inside it, centred, and the surround painted --
          * otherwise the dialog's own white background shows through. */
@@ -1271,10 +1278,20 @@ static Emb *emb_get(HWND h)
 
 static int is_embedded(HWND h) { return emb_get(h) != NULLPTR; }
 
-/* The window the game thinks of as this dialog's owner. */
+/* The window the game thinks of as this dialog's owner.  An embedded modal
+ * dialog opened from a full-screen menu has the 3D window as its parent (see
+ * WM_INITDIALOG in embed_proc), but the game placed it against the menu it
+ * asked for, and that menu's letterboxed fit is the one to scale it by -- as
+ * for the same dialog as a popup, whose owner is the menu. */
 static HWND anchor_of(HWND h)
 {
-    return is_embedded(h) ? GetParent(h) : GetWindow(h, GW_OWNER);
+    Emb *e = emb_get(h);
+    if (!e) return GetWindow(h, GW_OWNER);
+    if (e->owner && e->owner != GetParent(h) && IsWindow(e->owner)) {
+        Slot *o = slot_get(e->owner);
+        if (o && o->letterbox) return e->owner;
+    }
+    return GetParent(h);
 }
 
 /* Screen coordinates, as the game computed them, -> what MoveWindow wants. */
@@ -2467,9 +2484,11 @@ static void slot_placement(Slot *s, int *ox, int *oy, int *dw, int *dh)
     if (rw * s->dh > rh * s->dw) { *dh = rh; *dw = s->dw * rh / s->dh; }
     else                         { *dw = rw; *dh = s->dh * rw / s->dw; }
     if (g_integer) {
+        /* A client area smaller than the design surface keeps the fractional
+         * fit: forcing 1x would place the surface outside the window, and the
+         * backdrop composite would read and write outside its DIB. */
         int f = *dh / s->dh;
-        if (f < 1) f = 1;
-        *dw = s->dw * f; *dh = s->dh * f;
+        if (f >= 1) { *dw = s->dw * f; *dh = s->dh * f; }
     }
     *ox = (rw - *dw) / 2;
     *oy = (rh - *dh) / 2;
@@ -2501,6 +2520,15 @@ static LONG_PTR __stdcall my_WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
      * dialog, so fall back to the default handler rather than guess. */
     if (!s || !s->oldProc) return DefWindowProcA(h, msg, wp, lp);
     prev = s->oldProc;
+
+    /* The window is going: release its surface now, rather than when the
+     * slot is next reclaimed -- by then the handle may name a new window. */
+    if (msg == WM_NCDESTROY) {
+        LONG_PTR r = CallWindowProcA(prev, h, msg, wp, lp);
+        if (g_c.shown == h) g_c.shown = NULLPTR;
+        slot_free(s);
+        return r;
+    }
 
     if (g_mode == MODE_SCALE && msg == WM_DRAWITEM && lp) {
         DRAWITEMSTRUCT *d = (DRAWITEMSTRUCT *)lp;
@@ -3064,13 +3092,22 @@ static void bd_list(const char *ini)
             int v[4], nv = 0, cur = -1;
             for (k = 0; ; k++) {
                 char c = val[k];
-                if (c >= '0' && c <= '9') { cur = (cur < 0 ? 0 : cur * 10) + (c - '0'); continue; }
+                if (c >= '0' && c <= '9') {
+                    cur = (cur < 0 ? 0 : cur * 10) + (c - '0');
+                    if (cur > 100000) cur = 100000;         /* no overflow */
+                    continue;
+                }
                 if (cur >= 0) {
                     v[nv++] = cur; cur = -1;
                     if (nv == 4) {
-                        if (b->nsoft < MAXSOFT && v[2] > 0 && v[3] > 0) {
+                        /* clipped to the design surface: bd_soften reads the
+                         * rectangle's edge rows from design-sized buffers */
+                        int x1 = v[0] + v[2], y1 = v[1] + v[3];
+                        if (x1 > g_designW) x1 = g_designW;
+                        if (y1 > g_designH) y1 = g_designH;
+                        if (b->nsoft < MAXSOFT && x1 > v[0] && y1 > v[1]) {
                             int *r = b->soft[b->nsoft++];
-                            r[0] = v[0]; r[1] = v[1]; r[2] = v[0] + v[2]; r[3] = v[1] + v[3];
+                            r[0] = v[0]; r[1] = v[1]; r[2] = x1; r[3] = y1;
                         }
                         nv = 0;
                     }
