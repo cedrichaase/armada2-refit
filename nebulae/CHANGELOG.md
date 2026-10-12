@@ -4,6 +4,13 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.5.1 — 2026-10-13
+
+### Changed
+- `mnebula10`: `Swirl=` 18 → 24, the Cerulean's specks wandering a little further.
+
+Installed, not yet seen in game.
+
 ## 1.5.0 — 2026-10-13
 
 ### Added
