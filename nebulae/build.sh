@@ -14,7 +14,8 @@ mkdir -p "$out"
 "$here/../platform/d3d9/hlsl.sh" "$here/nebulae_shaders.h" "$here/nebulae.hlsl" \
     neb_vs:vs_3_0:k_neb_vs neb_ps:ps_3_0:k_neb_ps \
     bake_vs:vs_3_0:k_bake_vs bake_ps:ps_3_0:k_bake_ps vol_ps:ps_3_0:k_vol_ps \
-    vol_lr_ps:ps_3_0:k_vol_lr_ps quad_vs:vs_3_0:k_quad_vs zdown_ps:ps_3_0:k_zdown_ps comp_ps:ps_3_0:k_comp_ps zclear_ps:ps_3_0:k_zclear_ps
+    vol_lr_ps:ps_3_0:k_vol_lr_ps quad_vs:vs_3_0:k_quad_vs zdown_ps:ps_3_0:k_zdown_ps comp_ps:ps_3_0:k_comp_ps zclear_ps:ps_3_0:k_zclear_ps \
+    vol_fr_ps:ps_3_0:k_vol_fr_ps edge_ps:ps_3_0:k_edge_ps qrow_ps:ps_3_0:k_qrow_ps qcol_ps:ps_3_0:k_qcol_ps etile_ps:ps_3_0:k_etile_ps tile_vs:vs_3_0:k_tile_vs
 
 llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
 

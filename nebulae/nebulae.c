@@ -293,6 +293,7 @@ static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
 static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ), 1 at full size */
 static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, half size only) */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
+static int   g_refine = 1;    /* EdgeRefine=: 1 the gas at full size at depth edges (half size only); 2 everywhere (a reference) */
 static int   g_shadows = 1;            /* Shadows=: ships shadow the gas from the Key (Lighting.asi's map) */
 static float g_key_share = 0.8f;        /* KeyShare=: the Key's share of the gas's light; the rest is its own glow (a recipe's KeyShare= overrides) */
 static float g_scatter = 0.2f;          /* Scatter=: how much the gas scatters the Key forward (0: alike every way; a recipe's Scatter= overrides) */
@@ -317,6 +318,8 @@ static void read_settings(void)
     g_bake     = (int)GetPrivateProfileIntA("Nebulae", "Bake", 1, g_ini);
     g_samples  = (int)GetPrivateProfileIntA("Nebulae", "Samples", 2, g_ini) >= 2 ? 2 : 1;
     g_res      = (int)GetPrivateProfileIntA("Nebulae", "Resolution", 2, g_ini) >= 2 ? 2 : 1;
+    g_refine   = (int)GetPrivateProfileIntA("Nebulae", "EdgeRefine", 1, g_ini);
+    if (g_refine < 0 || g_refine > 2) g_refine = 1;
     g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
     g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 160, g_ini);
     GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
@@ -561,7 +564,7 @@ static void recipes_reload(void)
 
 enum { D9_GETRENDERTARGETDATA = 32, D9_CREATEOFFSCREEN = 36, D9_SETRENDERTARGET2 = 37,
        D9_GETRENDERTARGET2 = 38, D9_SETDEPTHSTENCIL = 39, D9_GETDEPTHSTENCIL = 40 };
-enum { D9_CREATETEXTURE = 23, D9_CREATEVOLUMETEXTURE = 24, D9_SETVIEWPORT = 47, D9_GETVIEWPORT = 48,
+enum { D9_CREATETEXTURE = 23, D9_CREATEVOLUMETEXTURE = 24, D9_CREATEDEPTHSTENCIL = 29, D9_SETVIEWPORT = 47, D9_GETVIEWPORT = 48,
        D9_CREATESTATEBLOCK = 59, D9_DRAWPRIMITIVEUP = 83, D9_CREATEQUERY = 118 };
 enum { SB_CAPTURE = 4, SB_APPLY = 5, Q_ISSUE = 6, Q_GETDATA = 7, TEX_LOCK = 19, TEX_UNLOCK = 20 };
 
@@ -581,6 +584,7 @@ typedef long (__stdcall *Lock_t)(void *, UINT, void *, const void *, DWORD);
 typedef long (__stdcall *Unlock_t)(void *, UINT);
 typedef long (__stdcall *SetTex_t)(void *, DWORD, void *);
 typedef long (__stdcall *MakeOff_t)(void *, UINT, UINT, DWORD, DWORD, void **, void *);
+typedef long (__stdcall *MakeDS_t)(void *, UINT, UINT, DWORD, DWORD, DWORD, int, void **, void *);
 typedef long (__stdcall *Level_t)(void *, UINT, void **);
 typedef long (__stdcall *GetRT_t)(void *, DWORD, void **);
 typedef long (__stdcall *SetRT_t)(void *, DWORD, void *);
@@ -603,6 +607,12 @@ static D9Shader g_quad_vs = D9_VERTEX_SHADER(k_quad_vs);
 static D9Shader g_zdown_ps = D9_PIXEL_SHADER(k_zdown_ps);
 static D9Shader g_comp_ps = D9_PIXEL_SHADER(k_comp_ps);
 static D9Shader g_zclear_ps = D9_PIXEL_SHADER(k_zclear_ps);
+static D9Shader g_vol_fr_ps = D9_PIXEL_SHADER(k_vol_fr_ps);
+static D9Shader g_edge_ps = D9_PIXEL_SHADER(k_edge_ps);
+static D9Shader g_qcol_ps = D9_PIXEL_SHADER(k_qcol_ps);
+static D9Shader g_qrow_ps = D9_PIXEL_SHADER(k_qrow_ps);
+static D9Shader g_etile_ps = D9_PIXEL_SHADER(k_etile_ps);
+static D9Shader g_tile_vs = D9_VERTEX_SHADER(k_tile_vs);
 static void    *g_obj_dev;    /* the d3d9 device everything below belongs to */
 static void    *g_sb;
 static void    *g_vol;        /* the noise, MANAGED pool */
@@ -613,6 +623,14 @@ static void    *g_bn_tex;    /* the blue noise, MANAGED pool */
 static void    *g_zt, *g_lz, *g_lr;
 static UINT     g_zt_w, g_zt_h, g_lr_w, g_lr_h;
 static int      g_lr_broken;  /* INTZ or a target could not be made: full size from now on */
+static void    *g_lf;         /* EdgeRefine=1: the gas at full size (A16B16G16R16F), the INTZ's size */
+static void    *g_le;         /*   at quarter size, how far the depths the tents about each cell read spread (R16F), */
+static void    *g_leh;        /*   and in its row the nearest and farthest (G16R16F) */
+static UINT     g_lq_w, g_lq_h;
+static void    *g_lfz;        /*   its depth buffer (D24X8): 1 where refined, else 0 */
+static void    *g_lt, *g_tvb;  /*   which 16x16 tiles hold an edge (R32F), and the tiles' grid (MANAGED) */
+static UINT     g_lt_w, g_lt_h;
+static int      g_lf_broken;  /* they could not be made: no refining */
 static int      g_init_failed; /* the noise or the blue noise could not be made on this device: the stock
                                * billboards until the device or Nebulae.ini changes */
 
@@ -625,6 +643,10 @@ static void   *g_q[NQ][2], *g_qfreq;
 static int     g_qbusy[NQ];
 static unsigned long long g_freq;
 static double  g_gpu_sum;
+static void   *g_oq[NQ];      /* EdgeRefine=1: an occlusion query a view, the pixels refined */
+static int     g_oqbusy[NQ];
+static double  g_ref_sum;
+static long    g_ref_n;
 static LARGE   g_qpf;
 static long    g_gpu_n;
 
@@ -635,6 +657,9 @@ static void drop_objects(void)
     unref(g_vol); g_vol = NULLPTR; g_vol_size = 0;
     unref(g_bn_tex); g_bn_tex = NULLPTR;
     unref(g_zt); unref(g_lz); unref(g_lr); g_zt = g_lz = g_lr = NULLPTR; g_zt_w = g_lr_w = 0;
+    unref(g_lf); unref(g_le); unref(g_leh); unref(g_lfz); unref(g_lt); unref(g_tvb);
+    g_lf = g_le = g_leh = g_lfz = g_lt = g_tvb = NULLPTR;
+    for (i = 0; i < NQ; i++) { unref(g_oq[i]); g_oq[i] = NULLPTR; g_oqbusy[i] = 0; }
     for (i = 0; i < g_ncls; i++) {
         unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1;
         unref(g_cls[i].vol); g_cls[i].vol = NULLPTR; g_cls[i].vol_gen = -1;
@@ -658,6 +683,12 @@ static void timing_poll(void)
         if (D9_FN(g_q[i][0], Q_GETDATA, GetData_t)(g_q[i][0], &a, 8, 0) != 0) continue;
         g_qbusy[i] = 0;
         if (g_freq && b >= a) { g_gpu_sum += (double)(b - a) / (double)g_freq; g_gpu_n++; }
+    }
+    for (i = 0; i < NQ; i++) {
+        DWORD n;
+        if (!g_oqbusy[i] || D9_FN(g_oq[i], Q_GETDATA, GetData_t)(g_oq[i], &n, 4, 0) != 0) continue;
+        g_oqbusy[i] = 0;
+        g_ref_sum += (double)n; g_ref_n++;
     }
 }
 
@@ -1622,8 +1653,8 @@ static int lr_targets(void *d9, UINT zw, UINT zh, UINT fw, UINT fh)
 {
     static int said;
     UINT lw = (fw + 1) / 2, lh = (fh + 1) / 2;
-    if (g_zt && (g_zt_w != zw || g_zt_h != zh)) { unref(g_zt); g_zt = NULLPTR; }
-    if (g_lr && (g_lr_w != lw || g_lr_h != lh)) { unref(g_lr); unref(g_lz); g_lr = g_lz = NULLPTR; }
+    if (g_zt && (g_zt_w != zw || g_zt_h != zh)) { unref(g_zt); unref(g_lf); unref(g_lfz); g_zt = g_lf = g_lfz = NULLPTR; }
+    if (g_lr && (g_lr_w != lw || g_lr_h != lh)) { unref(g_lr); unref(g_lz); unref(g_le); unref(g_leh); g_lr = g_lz = g_le = g_leh = NULLPTR; }
     if (!g_zt) {
         if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, zw, zh, 1, 2, FOURCC_INTZ, 0, &g_zt, NULLPTR) < 0) {   /* DEPTHSTENCIL, DEFAULT */
             g_zt = NULLPTR;
@@ -1656,6 +1687,8 @@ typedef struct {
     float     k[3][4];        /* c21..c23 */
     float     nx0, ny0, nx1, ny1;   /* where on screen this frame's gas boxes are (NDC); the composite goes no further */
     int       nfull;          /* a box reaches behind the camera: the whole view */
+    void     *lfs;            /* EdgeRefine=1: the full-size gas's surface; NULL: not refining */
+    float     kt[4];          /*   c39 */
 } LrFrame;
 
 /* Resolution=2: widen the screen rectangle the composite covers by a gas box, its
@@ -1681,8 +1714,9 @@ static void lr_samplers(void *d9)
 {
     static const DWORD ss[][2] = { { 1, 3 }, { 2, 3 }, { 3, 3 }, { 5, 1 }, { 6, 1 }, { 7, 0 }, { 11, 0 } };   /* clamp, point */
     int i, s;
-    for (s = 5; s <= 7; s++)
-        for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, (DWORD)s, ss[i][0], ss[i][1]);
+    for (s = 5; s <= 12; s++)
+        if (s <= 7 || s >= 10)
+            for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, (DWORD)s, ss[i][0], ss[i][1]);
 }
 
 static void lr_quad(void *d9)
@@ -1697,6 +1731,190 @@ static void lr_quad(void *d9)
     D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
 }
 
+/* ---- EdgeRefine=1: the gas at full size at depth edges ------------------------
+
+ * At half size, a half pixel straddling a hull's silhouette has the hull's depth (the
+ * nearest of its 2x2) and so only the gas in front of the hull, and the composite's tent
+ * spreads it two half pixels out: along a silhouette the gas changes in two-pixel steps.
+ * Where a pixel's tent reaches half pixels of different depths, the slices are drawn
+ * again at full size, into a full-size floating-point target, and the composite takes
+ * that instead.
+ *
+ * Which pixels is a depth buffer of its own, cleared to 0 (no slice passes) and opened
+ * to 1 where refined; the test against the hulls is the shader's, against the INTZ copy.
+ * The second draw costs by the pixels refined only while the tiles with none stay as the
+ * clear left them: the hierarchical depth test then throws each slice out of them whole.
+ * Any draw over a tile spoils that, even one whose every pixel is discarded, and the
+ * slices are then tested pixel by pixel across the whole screen: about 0.2 ms at
+ * 1920x1080 with not one pixel refined, whether the mask was a stencil (the INTZ bound as
+ * the depth buffer), the scene's depth written from the shader, or a discard. So the
+ * mask is drawn only over the 16x16 tiles that hold an edge: a pass at one pixel a tile
+ * finds them, and a grid of tile quads, culled in the vertex shader by that (a vertex
+ * texture), draws the mask. */
+#define TILE 16
+typedef long (__stdcall *MakeVB_t)(void *, UINT, DWORD, DWORD, DWORD, void **, void *);
+typedef long (__stdcall *VBLock_t)(void *, UINT, UINT, void **, DWORD);
+typedef long (__stdcall *VBUnlock_t)(void *);
+typedef long (__stdcall *Stream_t)(void *, UINT, void *, UINT, UINT);
+typedef long (__stdcall *DP_t)(void *, DWORD, UINT, UINT);
+enum { D9_CREATEVERTEXBUFFER = 26, D9_DRAWPRIMITIVE = 81, D9_SETSTREAMSOURCE = 100, VB_LOCK = 11, VB_UNLOCK = 12 };
+#define VTX_SAMPLER0 257      /* D3DVERTEXTEXTURESAMPLER0 */
+
+static void lr_refine_off(LrFrame *L)
+{
+    unref(L->lfs); L->lfs = NULLPTR;
+    L->k[0][1] = 0.0f;
+}
+
+/* The tile grid: two triangles a tile, each corner (x, y) the tile and z which corner
+ * (0..3). MANAGED, so it outlives a Reset; made again when the INTZ's size changes. */
+static int lr_tile_grid(void *d9)
+{
+    float *v = NULLPTR;
+    UINT   x, y, n = g_lt_w * g_lt_h * 6, i = 0;
+    static const float corner[6] = { 0, 1, 2, 2, 1, 3 };
+    if (g_tvb) return 1;
+    if (D9_FN(d9, D9_CREATEVERTEXBUFFER, MakeVB_t)(d9, n * 12, 8, 0x2, 1, &g_tvb, NULLPTR) < 0) { g_tvb = NULLPTR; return 0; }   /* WRITEONLY, XYZ, MANAGED */
+    if (D9_FN(g_tvb, VB_LOCK, VBLock_t)(g_tvb, 0, 0, (void **)&v, 0) < 0 || !v) { unref(g_tvb); g_tvb = NULLPTR; return 0; }
+    for (y = 0; y < g_lt_h; y++)
+        for (x = 0; x < g_lt_w; x++) {
+            int c;
+            for (c = 0; c < 6; c++, i++) { v[i * 3] = (float)x; v[i * 3 + 1] = (float)y; v[i * 3 + 2] = corner[c]; }
+        }
+    D9_FN(g_tvb, VB_UNLOCK, VBUnlock_t)(g_tvb);
+    return 1;
+}
+
+static void lr_classify(void *d9, LrFrame *L)
+{
+    static int said;
+    void *eps = d9_shader(d9, &g_edge_ps), *rps = d9_shader(d9, &g_qcol_ps), *hps = d9_shader(d9, &g_qrow_ps);
+    void *tps = d9_shader(d9, &g_etile_ps), *tvs = d9_shader(d9, &g_tile_vs), *qvs = d9_shader(d9, &g_quad_vs);
+    void *les = NULLPTR, *lhs = NULLPTR, *lts = NULLPTR;
+    UINT  tw = (g_zt_w + TILE - 1) / TILE, th = (g_zt_h + TILE - 1) / TILE, qw = (g_lr_w + 1) / 2, qh = (g_lr_h + 1) / 2;
+    int   q = -1, i;
+    L->k[0][1] = 0.0f;
+    if (!g_refine || g_lf_broken || !eps || !rps || !hps || !tps || !tvs || !qvs || !d9_shader(d9, &g_vol_fr_ps)) return;
+    if (g_lt && (g_lt_w != tw || g_lt_h != th)) { unref(g_lt); unref(g_tvb); g_lt = g_tvb = NULLPTR; }
+    if (g_le && (g_lq_w != qw || g_lq_h != qh)) { unref(g_le); unref(g_leh); g_le = g_leh = NULLPTR; }
+    if ((!g_lf && D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, g_zt_w, g_zt_h, 1, 1, 113, 0, &g_lf, NULLPTR) < 0) ||   /* A16B16G16R16F */
+        (!g_le && D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, qw, qh, 1, 1, 111, 0, &g_le, NULLPTR) < 0) ||   /* R16F */
+        (!g_leh && D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, qw, g_lr_h, 1, 1, 112, 0, &g_leh, NULLPTR) < 0) ||   /* G16R16F, quarter wide, half high */
+        (!g_lfz && D9_FN(d9, D9_CREATEDEPTHSTENCIL, MakeDS_t)(d9, g_zt_w, g_zt_h, 77, 0, 0, 0, &g_lfz, NULLPTR) < 0) ||   /* D24X8 */
+        (!g_lt && D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, tw, th, 1, 1, 114, 0, &g_lt, NULLPTR) < 0)) {   /* R32F: a vertex texture */
+        unref(g_lf); unref(g_le); unref(g_leh); unref(g_lfz); unref(g_lt);
+        g_lf = g_le = g_leh = g_lfz = g_lt = NULLPTR; g_lf_broken = 1;
+        note_once(&said, "EdgeRefine: no full-size floating-point target or depth buffer: not refined");
+        return;
+    }
+    g_lt_w = tw; g_lt_h = th; g_lq_w = qw; g_lq_h = qh;
+    if (!lr_tile_grid(d9)) {
+        g_lf_broken = 1;
+        note_once(&said, "EdgeRefine: no vertex buffer for the tiles: not refined");
+        return;
+    }
+    D9_FN(g_lf, TEX_GETLEVEL, Level_t)(g_lf, 0, &L->lfs);
+    D9_FN(g_le, TEX_GETLEVEL, Level_t)(g_le, 0, &les);
+    D9_FN(g_leh, TEX_GETLEVEL, Level_t)(g_leh, 0, &lhs);
+    D9_FN(g_lt, TEX_GETLEVEL, Level_t)(g_lt, 0, &lts);
+    if (!L->lfs || !les || !lhs || !lts) { unref(les); unref(lhs); unref(lts); lr_refine_off(L); return; }
+    L->k[0][1] = (float)g_refine;
+    L->kt[0] = (float)L->vp0.x; L->kt[1] = (float)L->vp0.y; L->kt[2] = 1.0f / (float)qw; L->kt[3] = 1.0f / (float)qh;
+    d9_psconst(d9, 21, &L->k[0][0], 1);
+    d9_psconst(d9, 39, L->kt, 1);
+    /* the spread at quarter size, by rows and then columns (the half-size depth's states
+     * are bound) */
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 10, NULLPTR);   /* written here: not bound meanwhile */
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 11, NULLPTR);
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, lhs);
+    {
+        VIEWPORT9 vq = { 0, 0, 0, 0, 0.0f, 1.0f };
+        vq.w = qw; vq.h = g_lr_h;
+        D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&vq);
+        d9_bind(d9, qvs, hps);
+        D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
+        lr_quad(d9);
+        D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, les);
+        vq.h = qh;
+        D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&vq);
+    }
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 12, g_leh);
+    d9_bind(d9, qvs, rps);
+    lr_quad(d9);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 12, NULLPTR);
+    /* the tiles that hold a pixel to refine: one pixel a tile, over the whole target (the
+     * grid reads every tile; those beyond this view are drawn outside it) */
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 11, g_le);
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, lts);
+    {
+        VIEWPORT9 vt = { 0, 0, 0, 0, 0.0f, 1.0f };
+        vt.w = tw; vt.h = th;
+        D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&vt);
+    }
+    d9_bind(d9, qvs, tps);
+    lr_quad(d9);
+    unref(les); unref(lhs); unref(lts);
+    /* the full-size pixels to refine: the gas target cleared there, the depth opened */
+    D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, L->lfs);
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, g_lfz);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
+    D9_FN(d9, D9_CLEAR, Clear_t)(d9, 0, NULLPTR, 2, 0, 0.0f, 0);   /* ZBUFFER, to 0: nothing passes */
+    {   /* the quads' depth (0) mapped to 1: what they write opens a pixel to every slice */
+        VIEWPORT9 v1 = L->vp0;
+        v1.mn = v1.mx = 1.0f;
+        D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&v1);
+    }
+    {
+        static const DWORD rs[][2] = {
+            { 7, 1 }, { 23, 8 }, { 14, 1 }, { 52, 0 },       /* ZENABLE, ALWAYS, ZWRITEENABLE; no stencil */
+            { 168, 15 }, { 27, 0 },                          /* rgba, no blending: cleared to 0 */
+        };
+        static const DWORD ss[][2] = { { 1, 3 }, { 2, 3 }, { 5, 1 }, { 6, 1 }, { 7, 0 } };   /* clamp, point */
+        float k[4];
+        for (i = 0; i < (int)(sizeof rs / sizeof rs[0]); i++) D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, rs[i][0], rs[i][1]);
+        for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, VTX_SAMPLER0, ss[i][0], ss[i][1]);
+        k[0] = 2.0f * TILE / (float)L->vp0.w; k[1] = 2.0f * TILE / (float)L->vp0.h;
+        k[2] = 1.0f / (float)tw; k[3] = 1.0f / (float)th;
+        d9_vsconst(d9, 4, k, 1);
+    }
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, VTX_SAMPLER0, g_lt);
+    d9_bind(d9, tvs, eps);
+    D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2);
+    D9_FN(d9, D9_SETSTREAMSOURCE, Stream_t)(d9, 0, g_tvb, 0, 12);
+    if (g_timing) {
+        for (i = 0; i < NQ; i++) if (!g_oqbusy[i]) break;
+        if (i < NQ && (g_oq[i] || D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 9, &g_oq[i]) >= 0)) q = i;   /* OCCLUSION */
+        else if (i < NQ) g_oq[i] = NULLPTR;
+    }
+    if (q >= 0) D9_FN(g_oq[q], Q_ISSUE, Issue_t)(g_oq[q], 2);    /* BEGIN */
+    D9_FN(d9, D9_DRAWPRIMITIVE, DP_t)(d9, 4, 0, tw * th * 2);
+    if (q >= 0) { D9_FN(g_oq[q], Q_ISSUE, Issue_t)(g_oq[q], 1); g_oqbusy[q] = 1; }
+    D9_FN(d9, D9_SETSTREAMSOURCE, Stream_t)(d9, 0, NULLPTR, 0, 0);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, VTX_SAMPLER0, NULLPTR);
+    D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 14, 0);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 23, 4);      /* ZFUNC: LESSEQUAL again */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, NULLPTR);
+}
+
+/* The slices' second draw, at full size where edge_ps marked (on), and back to the
+ * half-size target after it (off). */
+static void lr_rebind(void *d9, LrFrame *L);
+static void lr_full(void *d9, LrFrame *L, void *vs, int on)
+{
+    if (on) {
+        D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, L->lfs);
+        D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, g_lfz);
+        D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 1);       /* ZENABLE: LESSEQUAL, no writes (draw_states) */
+        d9_bind(d9, vs, d9_shader(d9, &g_vol_fr_ps));
+    } else {
+        lr_rebind(d9, L);
+        d9_bind(d9, vs, d9_shader(d9, &g_vol_lr_ps));
+    }
+}
+
 /* Copies the depth, makes the half-size depth, and leaves the half-size gas target
  * bound and cleared, with draw_states' states and no depth test. 0: not possible now,
  * the caller draws at full size. Inside the caller's state block. */
@@ -1708,6 +1926,7 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     float    pt[3] = { 0, 0, 0 };
     (void)zsurf;
     L->rt0 = L->ds0 = NULLPTR;
+    L->lfs = NULLPTR;
     if (g_lr_broken || !qvs || !zps || !d9_shader(d9, &g_comp_ps) || !d9_shader(d9, &g_vol_lr_ps) || !d9_shader(d9, &g_zclear_ps)) return 0;
     D9_FN(d9, D9_GETRENDERTARGET2, GetRT_t)(d9, 0, &L->rt0);
     D9_FN(d9, D9_GETDEPTHSTENCIL, Obj_t)(d9, &L->ds0);
@@ -1758,6 +1977,7 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     lr_samplers(d9);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
     lr_quad(d9);
+    lr_classify(d9, L);
 
     /* the gas target, cleared to no gas and no optical depth */
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, lrs);
@@ -1797,7 +2017,7 @@ static void lr_end(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, L->rt0);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, L->ds0);
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
-    if (none) { unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR; return; }
+    if (none) { unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR; lr_refine_off(L); return; }
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 1);      /* ALPHABLENDENABLE: ONE, INVSRCALPHA (alpha: what the gas hides) */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 19, 2);
@@ -1811,6 +2031,9 @@ static void lr_end(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 7, g_lr);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 9, g_lr);    /* the same, filtered: away from depth edges */
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 10, L->lfs ? g_lf : NULLPTR);   /* EdgeRefine=1 */
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 11, L->lfs ? g_le : NULLPTR);
+    if (L->lfs) d9_psconst(d9, 39, L->kt, 1);
     {
         static const DWORD ss[][2] = { { 1, 3 }, { 2, 3 }, { 3, 3 }, { 5, 2 }, { 6, 2 }, { 7, 0 }, { 11, 0 } };   /* clamp, linear */
         int i;
@@ -1828,7 +2051,7 @@ static void lr_end(void *d9, LrFrame *L)
         if (tp < 0.0f) tp = 0.0f;
         if (r > w) r = w;
         if (bt > h) bt = h;
-        if (r <= l || bt <= tp) { unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR; return; }   /* all off screen */
+        if (r <= l || bt <= tp) { unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR; lr_refine_off(L); return; }   /* all off screen */
         rc[0] = (LONG)L->vp0.x + (LONG)l; rc[1] = (LONG)L->vp0.y + (LONG)tp;
         rc[2] = (LONG)L->vp0.x + (LONG)r + 1; rc[3] = (LONG)L->vp0.y + (LONG)bt + 1;
         D9_FN(d9, D9_SETSCISSORRECT, Scissor_t)(d9, rc);
@@ -1837,7 +2060,10 @@ static void lr_end(void *d9, LrFrame *L)
     }
     lr_quad(d9);
     if (scissor) D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 174, 0);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 10, NULLPTR);
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 11, NULLPTR);
     unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR;
+    lr_refine_off(L);
 }
 
 /* Reset: every DEFAULT-pool object (and, simplest, every other) must be gone first. The
@@ -1881,7 +2107,7 @@ static int draw_gas(void)
     ps = d9_shader(d9, &g_ps);
     vps = d9_shader(d9, &g_vol_ps);
     if (!vs || !ps || !vps) { note_once(&said_sh, "the shaders could not be created: the stock billboards"); return 0; }
-    if (d9 != g_obj_dev) { drop_objects(); g_obj_dev = d9; g_lr_broken = 0; }
+    if (d9 != g_obj_dev) { drop_objects(); g_obj_dev = d9; g_lr_broken = g_lf_broken = 0; }
     hook_device_reset(d8);
     if (!g_sb && D9_FN(d9, D9_CREATESTATEBLOCK, MakeSB_t)(d9, 1, &g_sb) < 0) {   /* D3DSBT_ALL */
         g_sb = NULLPTR;
@@ -2128,6 +2354,11 @@ static int draw_gas(void)
         }
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */
+        if (half_size && L.lfs) {   /* EdgeRefine=1: again at full size, at depth edges */
+            lr_full(d9, &L, vs, 1);
+            D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);
+            lr_full(d9, &L, vs, 0);
+        }
         g_slices_drawn += drawn;
     }
     if (captured) {
@@ -2170,7 +2401,9 @@ static void __fastcall hook_particles(void *eng, void *edx, void *list)
             s_cat(b, " us ("); s_num(b, g_gpu_n); s_cat(b, " frames timed, of "); s_num(b, g_drawn_frames);
             s_cat(b, " with gas); slices a frame ");
             s_num(b, g_drawn_frames ? g_slices_drawn / g_drawn_frames : 0);
+            if (g_ref_n) { s_cat(b, "; refined "); s_num(b, (long)(g_ref_sum / g_ref_n)); s_cat(b, " px a view"); }
             logline(b);
+            g_ref_sum = 0.0; g_ref_n = 0;
             g_frame_sum = 0.0; g_frame_n = 0; g_gpu_sum = 0.0; g_gpu_n = 0; g_drawn_frames = g_slices_drawn = 0;
         }
     }
