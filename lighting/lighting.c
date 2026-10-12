@@ -85,6 +85,8 @@ __declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWO
 __declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
+__declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
+__declspec(dllimport) void   *__stdcall GetProcAddress(HMODULE, LPCSTR);
 
 int _fltused = 0;   /* floats without the CRT */
 
@@ -151,6 +153,14 @@ static void s_cat(char *d, const char *s)
 {
     int n = s_len(d);
     while (*s) d[n++] = *s++;
+    d[n] = 0;
+}
+
+/* at most max characters of s: for names read out of the engine's objects */
+static void s_catn(char *d, const char *s, int max)
+{
+    int n = s_len(d);
+    while (*s && max-- > 0) d[n++] = *s++;
     d[n] = 0;
 }
 
@@ -298,14 +308,34 @@ static DWORD g_frame;
 #define SM_VIEWS 4
 static void *g_view_cam[SM_VIEWS];
 static DWORD g_view_frames[SM_VIEWS];      /* the frames each view has had */
+static DWORD g_view_used[SM_VIEWS];        /* the g_frame each view was last rendered at */
 static int   g_view;                       /* the view being rendered */
+static void  sm_view_clear(int v);
+
+/* The camera's view. A camera not seen before takes a free slot or, with none free,
+ * the one rendered longest ago, emptied: a camera that has gone (a closed portrait)
+ * never holds a slot that the main view and a live portrait would have to share. */
+static int view_of(void *camera)
+{
+    int v, old = 0;
+    for (v = 0; v < SM_VIEWS; v++) if (g_view_cam[v] == camera) return v;
+    for (v = 0; v < SM_VIEWS; v++) if (!g_view_cam[v]) break;
+    if (v == SM_VIEWS) {
+        for (v = 1; v < SM_VIEWS; v++) if (g_frame - g_view_used[v] > g_frame - g_view_used[old]) old = v;
+        v = old;
+        sm_view_clear(v);
+        g_view_frames[v] = 0;
+    }
+    g_view_cam[v] = camera;
+    return v;
+}
 
 static void __cdecl hook_prerender_all(void *camera)
 {
     g_frame_lights = 0;
     g_frame++;              /* the shadows' frame: see sm_frame */
-    for (g_view = 0; g_view < SM_VIEWS - 1 && g_view_cam[g_view] && g_view_cam[g_view] != camera; g_view++) ;
-    g_view_cam[g_view] = camera;
+    g_view = view_of(camera);
+    g_view_used[g_view] = g_frame;
     g_view_frames[g_view]++;
     if (g_lights) sky_update();
     ((PreRenderAll_t)FN_PRERENDER_ALL)(camera);
@@ -751,6 +781,15 @@ static int patch_set_material(void)
  * stage), and every draw when there is no d3d9 device, goes fixed-function as
  * before. */
 #include "hull_shaders.h"
+#include "../surfaces/surfaces.h"
+
+/* Surfaces.asi: defined with the planets, below ("Planets on the GPU"). */
+static A2SurfaceFn surface_fn(void);
+static void sf_bind(void *d9, const A2Surface *sf, int first, int n);
+static void sf_unbind(void *d9);
+static int  hull_surface(void *d8, const BYTE *mesh, A2Surface *out);
+static D9Shader g_moon_ps = D9_PIXEL_SHADER(k_moon_ps);
+static long     g_sh_surf;                 /* hull draws from Surfaces.asi */
 
 typedef long (__stdcall *DIP8_t)(void *, DWORD, UINT, UINT, UINT, UINT);
 typedef long (__stdcall *D9Get_t)(void *, DWORD, DWORD *);
@@ -1011,6 +1050,10 @@ static int sh_consts(void *d9, int bump)
             dc[nd * 4] = l.Diffuse.r; dc[nd * 4 + 1] = l.Diffuse.g; dc[nd * 4 + 2] = l.Diffuse.b;
             dv[nd * 4] = -l.Direction[0] / n; dv[nd * 4 + 1] = -l.Direction[1] / n;
             dv[nd * 4 + 2] = -l.Direction[2] / n;
+            /* a mirrored draw: hook_dip draws its front faces, so FixMirrored's reversal
+             * is taken back and the normals are a stock hull's (misc.x -1) */
+            if (g_sh_sign > 0.0f)
+                for (j = 0; j < 3; j++) dv[nd * 4 + j] = -dv[nd * 4 + j];
             nd++;
         }
         {   /* the Key, the brightest, times HullSun (BorgSun) */
@@ -1027,7 +1070,7 @@ static int sh_consts(void *d9, int bump)
         }
         d9_psconst(d9, 2, dc, 4);
         d9_psconst(d9, 6, dv, 4);
-        misc[0] = g_sh_sign;
+        misc[0] = bump ? g_sh_sign : -1.0f;
         misc[1] = g_sh_lit_self ? (bump ? g_borg_self : g_selfillum) : 0.0f;
         misc[2] = g_knee;
         misc[3] = near_fade();
@@ -1068,6 +1111,8 @@ static int sh_consts(void *d9, int bump)
 
 static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3);
 
+typedef long (__stdcall *D9Set_t)(void *, DWORD, DWORD);
+
 static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc)
 {
     void   *d9, *vs, *ps;
@@ -1075,6 +1120,7 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     SmRec   rc;
     int     rec;
     long    r;
+    DWORD   cull = 0;
     if (!g_in_vb) return g_dip(dev, pt, mi, nv, si, pc);
     d9 = d9_device(dev);
     vs = d9_shader(d9, &g_hull_vs);
@@ -1090,22 +1136,50 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
         d9_restore(d9, &sv); g_sh_ff++; return g_dip(dev, pt, mi, nv, si, pc);
     }
     rec = sm_take(dev, d9, &rc, pt, mi, nv, si, pc, 0);
-    sm_consts(d9, rec ? &rc : NULLPTR, g_sh_sign);
+    sm_consts(d9, rec ? &rc : NULLPTR, -1.0f);
+    /* A mirrored draw (FixMirrored's det < 0) has its winding reversed: under the
+     * engine's cull it shows its back faces, the far side of the hull seen through it,
+     * which the shadow map rightly finds behind the near side. The opposite cull draws
+     * the front faces; sh_consts lights them as a stock hull. */
+    if (g_sh_sign > 0.0f) {
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &cull);        /* CULLMODE CW, CCW */
+        if (cull == 2 || cull == 3) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, 5 - cull);
+        else cull = 0;
+    }
     if (near_fade() < 1.0f && fd_take(dev, d9, pt, mi, nv, si, pc, 0)) {   /* drawn at Flush */
+        if (cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
         d9_restore(d9, &sv);
         if (rec) sm_keep(&rc, g_vb_mesh);
         return 0;
+    }
+    {   /* a model whose texture has a recipe in Surfaces.asi (the dilithium moons) */
+        A2Surface msf;
+        void *mps = g_vb_mesh && surface_fn() ? d9_shader(d9, &g_moon_ps) : NULLPTR;
+        if (mps && hull_surface(dev, g_vb_mesh, &msf)) {
+            float k[8 * 4];
+            int   i, j;
+            for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) k[i * 4 + j] = i < 3 && j < 3 ? g_sh_w[i * 4 + j] : 0.0f;
+            for (j = 0; j < 3; j++) k[12 + j] = g_sh_w[12 + j];
+            for (i = 0; i < 16; i++) k[16 + i] = msf.k[i / 4][i % 4];
+            d9_psconst(d9, 72, k, 8);
+            sf_bind(d9, &msf, 4, 2);
+            ps = mps;
+            g_sh_surf++;
+        }
     }
     d9_bind(d9, vs, ps);
     sm_bind(d9);
     r = g_dip(dev, pt, mi, nv, si, pc);
     sm_unbind(d9);
+    if (ps == d9_shader(d9, &g_moon_ps)) sf_unbind(d9);
+    if (cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
     d9_restore(d9, &sv);
     if (rec) sm_keep(&rc, g_vb_mesh);
     if (++g_sh_draws == 1 || g_sh_draws == 100000) {
         char b[120];
         b[0] = 0; s_cat(b, "shaders: hull draws in shaders "); s_num(b, g_sh_draws);
-        s_cat(b, ", fixed-function "); s_num(b, g_sh_ff); logline(b);
+        s_cat(b, ", fixed-function "); s_num(b, g_sh_ff);
+        s_cat(b, ", from Surfaces.asi "); s_num(b, g_sh_surf); logline(b);
     }
     return r;
 }
@@ -1130,8 +1204,9 @@ static void hook_device(void *dev)
     g_sh_on = 1;
     logline("shaders: on, through the Direct3D 9 device behind d3d8");
     /* Reset (slot 14): the shadow map is a D3DPOOL_DEFAULT target, which must be gone
-     * before the device resets, and the shadow casters hold the engine's buffers. */
-    if (g_shadows && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
+     * before the device resets, and the shadow casters hold the engine's buffers; so
+     * does the near fade's list, and its state block must go too. */
+    if ((g_shadows || g_near_fade) && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
         g_reset = (Reset8_t)vt[14];
         vt[14] = (void *)hook_reset;
         VirtualProtect(&vt[14], 4, old, &old);
@@ -1211,6 +1286,7 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     d9 = d8 ? d9_device(d8) : NULLPTR;
     if (!d9) return 0;
     if (!g_dot3_decl || g_dot3_decl_dev != d9) {     /* made once per device */
+        if (g_dot3_decl) D9_FN(g_dot3_decl, D9_RELEASE, D9_Ref_t)(g_dot3_decl);   /* the previous device's */
         g_dot3_decl = NULLPTR; g_dot3_decl_dev = d9;
         if (D9_FN(d9, D9_CREATEVERTEXDECLARATION, D9Decl_t)(d9, k_dot3_decl, &g_dot3_decl) < 0)
             g_dot3_decl = NULLPTR;
@@ -1405,6 +1481,17 @@ static void sm_release(void)
     g_sm_ok = 0;
 }
 
+/* A view's lists emptied, for a slot given to another camera. */
+static void sm_view_clear(int v)
+{
+    int i, keep = g_view;
+    g_view = v;
+    sm_drop_list(0); sm_drop_list(1);
+    for (i = 0; i < SM_HASH; i++) g_sm_head[i] = -1;
+    g_sm_rec_frame = 0;
+    g_view = keep;
+}
+
 static void fd_release(void);
 static long __stdcall hook_reset(void *dev, void *params)
 {
@@ -1464,6 +1551,17 @@ static int sm_key_axis(float *fwd)
         fwd[0] = ax[0] / n; fwd[1] = ax[1] / n; fwd[2] = ax[2] / n;
     }
     return best > 0.0f;
+}
+
+/* The direction towards the Key, in world space, for another plugin: Nebulae.asi lights
+ * its gas by it ("Shadows in the gas", README). Read off the engine's lights at the
+ * call, so it is there with no hull on screen and with Shadows=0. */
+__declspec(dllexport) int __cdecl LightingKey(float *to_key)
+{
+    float fwd[3];
+    if (!sm_key_axis(fwd)) return 0;
+    to_key[0] = -fwd[0]; to_key[1] = -fwd[1]; to_key[2] = -fwd[2];
+    return 1;
 }
 
 /* c = a x W for the column a (four values) under a row-major WORLD: one column of
@@ -1594,7 +1692,16 @@ static void sm_frame(void *d9)
     if (!g_shadows && !g_planet_shadows) return;
     {
         float fwd[3];
-        if (!sm_key_axis(fwd)) { g_sm_ok = 0; return; }
+        if (!sm_key_axis(fwd)) {
+            /* no map this frame; the lists still turn over, or sm_keep would go on
+             * filling one (and holding its buffers) until the Key came back */
+            g_sm_ok = 0;
+            if (g_shadows && g_sm_dev == d9) {
+                sm_view_clear(g_view);
+                g_sm_rec_frame = g_view_frames[g_view];
+            }
+            return;
+        }
         for (i = 0; i < 3; i++) g_sm_key[i] = -fwd[i];
         g_sm_have_key = 1;
         if (!g_shadows) return;
@@ -1628,11 +1735,20 @@ static int sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UIN
     ((SmIdx8_t)(*(void ***)d8)[86])(d8, &ib8, &base);                     /* GetIndices */
     sm_unref(ib8);
     if (!r->vb || !r->ib) { sm_drop(r); return 0; }
-    {   /* a draw blended or alpha-tested casts no shadow: the depth pass has no texture */
-        DWORD ab = 0, at = 0;
+    {   /* A draw blended or alpha-tested casts no shadow: the depth pass has no texture.
+         * The engine leaves blending on for its opaque hulls, as ONE / ZERO, which
+         * blends nothing; only a blend that lets the frame through counts, and only an
+         * alpha test that can fail. */
+        DWORD ab = 0, at = 0, src = 2, dst = 1, af = 8;
         D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 27, &ab);       /* ALPHABLENDENABLE */
         D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 15, &at);       /* ALPHATESTENABLE */
-        g_sm_trans = ab || at;
+        if (ab) {
+            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 19, &src);  /* SRCBLEND */
+            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 20, &dst);  /* DESTBLEND */
+        }
+        if (at) D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 25, &af);   /* ALPHAFUNC */
+        g_sm_trans = (ab && !(src == 2 && dst == 1)) ||           /* ONE, ZERO */
+                     (at && af != 8);                             /* ALWAYS */
     }
     r->base = (int)base; r->dot3 = dot3;
     r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
@@ -1702,6 +1818,25 @@ static void sm_unbind(void *d9)
     for (i = 0; i < 6; i++) D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 3, k_sm_samp[i], g_sm_saved[i]);
 }
 
+/* The Key's shadow map for another plugin: Nebulae.asi darkens the gas in it, so ships
+ * cast their shadows through the nebulae ("Shadows in the gas", README). It is handed
+ * over only while it is this view's and this frame's, on the caller's device. ls takes
+ * the three columns world -> u, v, depth (sm_render); info: x the depth bias, y a texel
+ * in u and v, z the map's width and w its depth range, both in world units. The texture
+ * is borrowed: no reference is added, and it lives until the device resets. */
+__declspec(dllexport) int __cdecl LightingShadowMap(void *d9, void **tex, float *ls, float *info)
+{
+    int i;
+    if (!g_shadows || !g_sm_ok || !g_sm_tex || !g_sm_have_key || g_sm_dev != d9 || g_sm_frame != g_frame) return 0;
+    *tex = g_sm_tex;
+    for (i = 0; i < 12; i++) ls[i] = g_sm_ls[i];
+    info[0] = g_sm_bias;
+    info[1] = 1.0f / (float)g_sm_size;
+    info[2] = g_sm_texel * (float)g_sm_size;
+    info[3] = 1.0f / sqrt_f(g_sm_ls[8] * g_sm_ls[8] + g_sm_ls[9] * g_sm_ls[9] + g_sm_ls[10] * g_sm_ls[10]);
+    return 1;
+}
+
 /* The draw into this frame's list, to cast next frame, with WORLD and the mesh's bounding
  * sphere (ST3D_Mesh +0xd4 centre, +0xe0 radius, as RenderInternal tests it) in world
  * space; its references go with it, or are let go when the list is full. */
@@ -1769,7 +1904,7 @@ typedef struct {
 static FdRec  g_fd[FD_MAX];
 static int    g_fd_n, g_fd_ix[FD_MAX];
 static DWORD  g_fd_frame;
-static void  *g_fd_dev, *g_fd_sb;
+static void  *g_fd_dev, *g_fd_sb, *g_fd_sb_dev;   /* g_fd_sb belongs to g_fd_sb_dev */
 static long   g_fd_replays;
 
 static void fd_drop(void)
@@ -1849,9 +1984,11 @@ static void fd_replay(void)
     hvs = d9_shader(d9, &g_hull_vs); hps = d9_shader(d9, &g_hull_ps);
     for (i = 0; i < n; i++) if (g_fd[i].dot3) { bvs = d9_shader(d9, &g_bump_vs); bps = d9_shader(d9, &g_bump_ps); break; }
     if (!hvs || !hps || (i < n && (!bvs || !bps || !g_dot3_decl))) { fd_drop(); return; }
+    if (g_fd_sb && g_fd_sb_dev != d9) { sm_unref(g_fd_sb); g_fd_sb = NULLPTR; }   /* another device's */
     if (!g_fd_sb && D9_FN(d9, SM_CREATESTATEBLOCK, SmMakeSB_t)(d9, 1, &g_fd_sb) < 0) {   /* D3DSBT_ALL */
         g_fd_sb = NULLPTR; fd_drop(); return;
     }
+    g_fd_sb_dev = d9;
     /* farthest hull first, a hull's draws together and in their order */
     for (i = 0; i < n; i++) g_fd_ix[i] = i;
     for (i = 1; i < n; i++) {
@@ -2025,7 +2162,7 @@ static BOOL __fastcall hook_nebula_frustum(BYTE *inst, void *edx, void *camera)
  * 13 to 16, the CPU path's) do nothing: in the engine's list it reaches the
  * vertex-buffer draws through pick_points, and not the CPU-lit planets and moons,
  * the planet itself among them, which it would otherwise light from inside. */
-typedef struct { char name[16]; float col[3]; } GlowTex;
+typedef struct { char name[16]; float col[3]; DWORD used; } GlowTex;
 typedef struct { void *planet; BYTE *light; DWORD seen; } GlowLight;
 
 static float     g_glow = 1.5f, g_glow_range = 6.0f;
@@ -2107,10 +2244,14 @@ static const float *glow_colour(const BYTE *cls)
     for (i = 0; i < g_glow_ntex; i++) {
         const char *x = g_glow_tex[i].name, *y = name;
         while (*x && *x == *y) x++, y++;
-        if (!*x && !*y) return g_glow_tex[i].col;
+        if (!*x && !*y) { g_glow_tex[i].used = g_frame; return g_glow_tex[i].col; }
     }
-    if (g_glow_ntex >= 16) return grey;
-    t = &g_glow_tex[g_glow_ntex++];
+    if (g_glow_ntex < 16) t = &g_glow_tex[g_glow_ntex++];
+    else {   /* full: the one used longest ago makes way, unless all are in use (a few frames) */
+        for (t = g_glow_tex, i = 1; i < 16; i++) if (g_frame - g_glow_tex[i].used > g_frame - t->used) t = &g_glow_tex[i];
+        if (g_frame - t->used < 8) return grey;
+    }
+    t->used = g_frame;
     for (i = 0; i < 15 && name[i]; i++) t->name[i] = name[i];
     t->name[i] = 0;
     n = tga_mean(name, "1", a);
@@ -2419,7 +2560,7 @@ static void explosion_lights(void)
 #define FN_PHASER_DEL 0x57ee70   /* its scalar deleting destructor, slot 0 */
 #define ORDNANCE_LIST 0x771fac   /* the live ordnance, as Ordnance::PreRenderAll walks it */
 
-typedef struct { const void *tex; float col[3]; } BeamTex;
+typedef struct { const void *tex; char stem[64]; float col[3]; DWORD used; } BeamTex;
 
 static int     g_phasers = 1;
 /* the emitter: PhaserBrightness=, PhaserStart=, PhaserRange=, PhaserLift= */
@@ -2439,11 +2580,6 @@ static const float *beam_colour(const BYTE *cls)
     float       peak;
     int         i;
     if (!spr || !(tex = *(const BYTE * const *)(spr + 0x58))) return white;
-    for (i = 0; i < g_beam_ntex; i++)
-        if (g_beam_tex[i].tex == tex) return g_beam_tex[i].col;
-    if (g_beam_ntex >= 24) return white;
-    t = &g_beam_tex[g_beam_ntex++];
-    t->tex = tex;
     name = *(const char * const *)(tex + 8);
     stem[0] = 0;
     if (name) {   /* the name, without a path or an extension */
@@ -2452,6 +2588,22 @@ static const float *beam_colour(const BYTE *cls)
         for (i = 0; i < 63 && s[i] && s[i] != '.'; i++) stem[i] = s[i];
         stem[i] = 0;
     }
+    /* by address and name: a texture freed with its map and another made at the
+     * same address is another colour */
+    for (i = 0; i < g_beam_ntex; i++) {
+        const char *x = g_beam_tex[i].stem, *y = stem;
+        if (g_beam_tex[i].tex != tex) continue;
+        while (*x && *x == *y) x++, y++;
+        if (!*x && !*y) { g_beam_tex[i].used = g_frame; return g_beam_tex[i].col; }
+    }
+    if (g_beam_ntex < 24) t = &g_beam_tex[g_beam_ntex++];
+    else {   /* full: the one used longest ago makes way, unless all are in use (a few frames) */
+        for (t = g_beam_tex, i = 1; i < 24; i++) if (g_frame - g_beam_tex[i].used > g_frame - t->used) t = &g_beam_tex[i];
+        if (g_frame - t->used < 8) return white;
+    }
+    t->used = g_frame;
+    t->tex = tex;
+    for (i = 0; i < 64; i++) t->stem[i] = stem[i];
     if (!stem[0] || !tga_mean(stem, "", t->col))
         for (i = 0; i < 3; i++) t->col[i] = 1.0f;
     peak = t->col[0] > t->col[1] ? t->col[0] : t->col[1];
@@ -2892,6 +3044,12 @@ static int patch_impacts(void)
     return n;
 }
 
+/* the vtable slot holds what this build expects */
+static int slot_is(DWORD vt, int idx, DWORD expect)
+{
+    return *(DWORD *)(vt + 4 * idx) == expect;
+}
+
 static int patch_slot(DWORD vt, int idx, DWORD expect, const void *hook)
 {
     void **slot = (void **)(vt + 4 * idx);
@@ -3033,13 +3191,14 @@ static float g_city_col[3] = { 1.00f, 0.72f, 0.38f };        /* CityLightColour=
 static D9Shader g_ground_ps = D9_PIXEL_SHADER(k_ground_ps);
 static D9Shader g_city_ps   = D9_PIXEL_SHADER(k_city_ps);
 static D9Shader g_cloud_ps  = D9_PIXEL_SHADER(k_cloud_ps);
+static D9Shader g_surface_ps = D9_PIXEL_SHADER(k_surface_ps);
 static float    g_pl_v[PL_MAXV * 8];                         /* XYZ | NORMAL | TEX1 */
 static long     g_pl_draws, g_pl_stock;
 static DWORD    g_pl_said;                                   /* first of each kind of draw, logged */
 
 static void pl_note(int bit, const char *what)
 {
-    char b[160];
+    char b[320];
     if (g_pl_said & (1u << bit)) return;
     g_pl_said |= 1u << bit;
     b[0] = 0; s_cat(b, "planet shaders: "); s_cat(b, what); logline(b);
@@ -3189,6 +3348,114 @@ static void pl_consts(void *d9, const BYTE *mesh, const BYTE *lm, int atmo, cons
     d9_psconst(d9, 0, k, 40);
 }
 
+/* Surfaces.asi (surfaces/README.md): a planet's surface made from a recipe, as three
+ * cubes the ground (or a gas giant's shell) samples in surface_ps in place of the
+ * engine's texture. Asked for at the first planet draw, when every ASI is loaded
+ * (Surfaces.asi loads after this one); without it, or without a recipe for the class,
+ * the stock texture as before. */
+static int         g_surfaces = 1;                           /* Surfaces= */
+static A2SurfaceFn g_surface_fn;
+static int         g_surface_asked;
+
+static A2SurfaceFn surface_fn(void)
+{
+    if (!g_surface_asked) {
+        HMODULE m = g_surfaces ? GetModuleHandleA("Surfaces.asi") : NULLPTR;
+        g_surface_asked = 1;
+        g_surface_fn = m ? (A2SurfaceFn)GetProcAddress(m, "a2_surface") : (A2SurfaceFn)NULLPTR;
+        logline(g_surface_fn ? "planet shaders: Surfaces.asi found: planets with a recipe drawn from it"
+                             : g_surfaces ? "planet shaders: no Surfaces.asi: the stock planet textures"
+                                          : "planet shaders: Surfaces=0: the stock planet textures");
+    }
+    return g_surface_fn;
+}
+
+/* A model in the hull shaders, by the name of its first texture: mesh +0x114 points at
+ * the mesh's list of textures, whose first is what RenderInternal hands the device's
+ * SetTexture, and every ST3D_DatabaseElement keeps its name, a copy, at +0x8, as its
+ * constructor stores it. 1 with a surface in *out. A name Surfaces.asi has no recipe
+ * for is remembered, so the ships' textures are asked about once each. */
+#define HS_MISS 256
+static const char *g_hs_miss[HS_MISS];
+static int         g_hs_nmiss, g_hs_said;
+
+static int hull_surface(void *d8, const BYTE *mesh, A2Surface *out)
+{
+    const BYTE *const *list = *(const BYTE *const **)(mesh + 0x114);
+    const BYTE *tex = list ? list[0] : NULLPTR;
+    const char *name = tex ? *(const char **)(tex + 8) : NULLPTR;
+    int i, r;
+    if (!name || !name[0]) return 0;
+    for (i = 0; i < g_hs_nmiss; i++) if (g_hs_miss[i] == name) return 0;
+    out->size = (int)sizeof *out;
+    r = g_surface_fn(d8, name, out);
+    if (r == 0 && g_hs_nmiss < HS_MISS) g_hs_miss[g_hs_nmiss++] = name;
+    if (r != 0 || g_hs_said < 12) {
+        const char *mn = *(const char **)(mesh + 8);
+        char b[200];
+        if (r == 0) g_hs_said++;
+        if (r == 0 || !(g_pl_said & (1u << 20))) {
+            if (r != 0) g_pl_said |= 1u << 20;
+            b[0] = 0; s_cat(b, "hull shaders: mesh \""); s_catn(b, mn ? mn : "?", 40); s_cat(b, "\", texture \"");
+            s_catn(b, name, 40); s_cat(b, r == 1 ? "\": from Surfaces.asi" : r == 0 ? "\": no recipe" : "\": recipe, not drawn now");
+            logline(b);
+        }
+    }
+    return r == 1;
+}
+
+/* The cubes in samplers first..first+n-1 (albedo, relief, clouds), filtered and
+ * clamped, around one draw: 2..4 for a planet, 4..5 for a model in the hull shaders,
+ * whose sampler 3 is the shadow map. */
+static const DWORD k_sf_samp[7]     = { 1, 2, 3, 5, 6, 7, 11 };   /* ADDRESSU/V/W, MAG/MIN/MIP, SRGB */
+static const DWORD k_sf_samp_val[7] = { 3, 3, 3, 2, 2, 2, 0 };    /* clamp, linear, linear, linear, off */
+static void  *g_sf_saved_tex[3];
+static DWORD  g_sf_saved[3][7];
+static int    g_sf_first, g_sf_n;
+
+static void sf_bind(void *d9, const A2Surface *sf, int first, int n)
+{
+    void *t[3];
+    int   s, i;
+    t[0] = sf->albedo; t[1] = sf->relief; t[2] = sf->cloud ? sf->cloud : sf->relief;
+    g_sf_first = first; g_sf_n = n;
+    for (s = 0; s < n; s++) {
+        g_sf_saved_tex[s] = NULLPTR;
+        D9_FN(d9, D9_GETTEXTURE, SmGetTex_t)(d9, (DWORD)(first + s), &g_sf_saved_tex[s]);
+        for (i = 0; i < 7; i++) {
+            D9_FN(d9, D9_GETSAMPLERSTATE, D9GetSamp_t)(d9, (DWORD)(first + s), k_sf_samp[i], &g_sf_saved[s][i]);
+            D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, (DWORD)(first + s), k_sf_samp[i], k_sf_samp_val[i]);
+        }
+        D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, (DWORD)(first + s), t[s]);
+    }
+}
+
+static void sf_unbind(void *d9)
+{
+    int s, i;
+    for (s = 0; s < g_sf_n; s++) {
+        D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, (DWORD)(g_sf_first + s), g_sf_saved_tex[s]);
+        sm_unref(g_sf_saved_tex[s]);
+        g_sf_saved_tex[s] = NULLPTR;
+        for (i = 0; i < 7; i++)
+            D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, (DWORD)(g_sf_first + s), k_sf_samp[i], g_sf_saved[s][i]);
+    }
+    g_sf_n = 0;
+}
+
+/* c40..c46: the world matrix's axes, and what the recipe gives the draw. */
+static void sf_consts(void *d9, const A2Surface *sf, const float *w)
+{
+    float k[7 * 4];
+    int   i, j;
+    for (i = 0; i < 3; i++) {
+        for (j = 0; j < 3; j++) k[i * 4 + j] = w[i * 4 + j];
+        k[i * 4 + 3] = 0.0f;
+    }
+    for (i = 0; i < 16; i++) k[12 + i] = sf->k[i / 4][i % 4];
+    d9_psconst(d9, 40, k, 7);
+}
+
 /* One group's triangles, three vertices each, from the mesh's arrays; 0 if too many. */
 static int pl_build(const BYTE *mesh, const BYTE *grp)
 {
@@ -3214,7 +3481,10 @@ static int pl_build(const BYTE *mesh, const BYTE *grp)
 static int pl_draw(BYTE *mesh)
 {
     BYTE  *eng = *(BYTE **)0x7ad508, *db, *tmp, *grp;
-    void  *dev, *d8 = NULLPTR, *d9, *vs, *ps[3], *tm, *texs;
+    void  *dev, *d8 = NULLPTR, *d9, *vs, *ps[4], *tm, *texs;
+    A2Surface sf;
+    int    has_sf;
+    float  shell_tex = 1.0f, shell_k[4];
     void **dvt;
     float  cc[3], r, w[16], vw[16], p[16], wv[16], wvp[16], col[16];
     const float *m = (const float *)NODE_TO_CAMERA, *lc = (const float *)(mesh + 0xd4);
@@ -3248,6 +3518,26 @@ static int pl_draw(BYTE *mesh)
     }
     if (((SphereVis_t)FN_SPHERE_VIS)(*(void **)(eng + 0xfc), cc, r) == 1) return 1;
 
+    /* A surface from Surfaces.asi for the class's ground (or, for the shell, its
+     * atmosphere) texture name: asked before any state is set, since the first ask bakes. */
+    db   = *(BYTE **)(mesh + 0x140);
+    atmo = db && *(BYTE **)(db + 0xb0) == mesh;
+    has_sf = 0;
+    if (surface_fn() && (ps[3] = d9_shader(d9, &g_surface_ps)) != NULLPTR) {
+        const BYTE *cls = pl_class(db);
+        const char *name = cls ? (const char *)cls + (atmo ? 0x4ac : 0x4bc) : NULLPTR;
+        if (name && name[0]) {
+            sf.size = (int)sizeof sf;
+            has_sf = g_surface_fn(d8, name, &sf) == 1;
+        }
+        /* a stock shell over a ground made from a recipe keeps only its halo */
+        if (atmo && !has_sf && cls && ((const char *)cls)[0x4bc]) {
+            A2Surface g;
+            g.size = (int)sizeof g;
+            shell_tex = g_surface_fn(d8, (const char *)cls + 0x4bc, &g) == 1 ? 0.0f : 1.0f;
+        }
+    }
+
     tmp = *(BYTE **)(eng + 0x100);
     tm  = tmp ? *(void **)(tmp + 4) : NULLPTR;
     if (!tm) tm = *(void **)(mesh + 0x120);
@@ -3266,8 +3556,6 @@ static int pl_draw(BYTE *mesh)
     mat_mul(w, vw, wv);
     mat_mul(wv, p, wvp);
 
-    db   = *(BYTE **)(mesh + 0x140);
-    atmo = db && *(BYTE **)(db + 0xb0) == mesh;
     texs = mesh + 0x114;
     grp  = *(BYTE **)(mesh + 0x104);
     ng   = *(int *)(mesh + 0x100);
@@ -3281,19 +3569,37 @@ static int pl_draw(BYTE *mesh)
             void   *vb = NULLPTR, *ib = NULLPTR;
             UINT    off = 0, stride = 0;
             int     kind = atmo ? 2 : pass == 1 ? 1 : 0;
+            int     use_sf = has_sf && pass == 0;            /* the ground, or a gas giant's shell */
             ((TmPass_t)(*(void ***)tm)[4])(tm, pass, texs);
             d9_save(d9, &sv);
             D9_FN(d9, 101, D9GetSS_t)(d9, 0, &vb, &off, &stride);  /* GetStreamSource */
             D9_FN(d9, 105, D9Obj_t)(d9, &ib);                       /* GetIndices */
             ((D8GetVS_t)(*(void ***)d8)[77])(d8, &fvf);
             ((D8VS_t)(*(void ***)d8)[76])(d8, FVF_HULL);
-            d9_bind(d9, vs, ps[kind]);
+            d9_bind(d9, vs, use_sf ? ps[3] : ps[kind]);
             for (j = 0; j < 4; j++) for (i = 0; i < 4; i++) col[j * 4 + i] = wvp[i * 4 + j];
             d9_vsconst(d9, 0, col, 4);
             for (j = 0; j < 3; j++) for (i = 0; i < 4; i++) col[j * 4 + i] = w[i * 4 + j];
             d9_vsconst(d9, 4, col, 3);
             pl_consts(d9, mesh, lm, atmo, w, vw);
+            shell_k[0] = shell_tex; shell_k[1] = shell_k[2] = shell_k[3] = 0.0f;
+            d9_psconst(d9, 47, shell_k, 1);
+            if (use_sf) {
+                sf_consts(d9, &sf, w);
+                sf_bind(d9, &sf, 2, 3);
+                if (!(g_pl_said & (1u << (16 + kind)))) {    /* how each kind's frame stands */
+                    char  b[240];
+                    float det = w[0] * (w[5] * w[10] - w[6] * w[9]) - w[1] * (w[4] * w[10] - w[6] * w[8])
+                              + w[2] * (w[4] * w[9] - w[5] * w[8]);
+                    b[0] = 0; s_cat(b, kind == 2 ? "a shell" : "a ground hemisphere");
+                    s_cat(b, " from Surfaces.asi; its world axes "); s_vec(b, w); s_cat(b, " ");
+                    s_vec(b, w + 4); s_cat(b, " "); s_vec(b, w + 8); s_cat(b, ", determinant x1000 ");
+                    s_num(b, (long)(det * 1000.0f));
+                    pl_note(16 + kind, b);
+                }
+            }
             ((D8DPUP_t)(*(void ***)d8)[72])(d8, 4, (UINT)nf, g_pl_v, 32);   /* DrawPrimitiveUP */
+            if (use_sf) sf_unbind(d9);
             ((D8VS_t)(*(void ***)d8)[76])(d8, fvf);
             D9_FN(d9, 100, D9SetSS_t)(d9, 0, vb, off, stride);
             D9_FN(d9, 104, D9Obj_t)(d9, ib);
@@ -3416,6 +3722,7 @@ static void startup(void)
     ini3(ini, "PlanetAmbient", g_planet_amb);
     ini3(ini, "PlanetDiffuse", g_planet_diff);
     g_planet_sh = (int)GetPrivateProfileIntA("Lighting", "PlanetShaders", 1, ini);
+    g_surfaces  = (int)GetPrivateProfileIntA("Lighting", "Surfaces", 1, ini);
     ini3(ini, "PlanetDusk",        g_dusk);
     ini1(ini, "PlanetWrap",        &g_wrap);
     ini1(ini, "PlanetFill",        &g_pl_fill);
@@ -3494,8 +3801,10 @@ static void startup(void)
         else logline("NOT PATCHED: CraftInstance vtable differs, stock's near fade");
     }
     if (g_gpu && g_shaders && g_near_fade) {
-        if (patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required) &&
-            patch_slot(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH, (const void *)hook_flush))
+        /* both or neither: fading hulls recorded and never drawn would vanish */
+        if (slot_is(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED) && slot_is(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH) &&
+            patch_slot(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH, (const void *)hook_flush) &&
+            patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required))
             n += 2;
         else logline("NOT PATCHED: DeviceDirectX8 vtable differs, no near fade in the shaders");
     }
@@ -3505,8 +3814,10 @@ static void startup(void)
         else logline("NOT PATCHED: NebulaInstance vtable differs");
     }
     if (g_explosions) {
-        if (patch_slot(VT_FIREBALL, 14, FN_FIREBALL_SIM, (const void *)hook_fireball_sim) &&
-            patch_slot(VT_FIREBALL, 0, FN_FIREBALL_DEL, (const void *)hook_fireball_del))
+        /* both or neither: the explosion Simulate follows, the destructor forgets */
+        if (slot_is(VT_FIREBALL, 14, FN_FIREBALL_SIM) && slot_is(VT_FIREBALL, 0, FN_FIREBALL_DEL) &&
+            patch_slot(VT_FIREBALL, 0, FN_FIREBALL_DEL, (const void *)hook_fireball_del) &&
+            patch_slot(VT_FIREBALL, 14, FN_FIREBALL_SIM, (const void *)hook_fireball_sim))
             n += 2;
         else logline("NOT PATCHED: FireballExplosion vtable differs");
     }

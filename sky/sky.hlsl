@@ -7,7 +7,9 @@
 //
 // The look: domain-warped fractal value noise, shaped into soft gas by a coverage
 // threshold, coloured from the recipe's palette, plus up to two bright cores and an
-// optional stretch along an axis (aurora-like curtains). Constants come from the
+// optional stretch along an axis (aurora-like curtains); then the detail: a fine grain
+// through the gas, dust that darkens it, and bright stars with halos inside it.
+// Constants come from the
 // recipe (sky/skies/<name>.ini) through sky.c; their registers are listed below and
 // in sky.c's sky_consts(), which must agree.
 
@@ -25,6 +27,11 @@ float4 k_stretch : register(c10);  // xyz: axis; w: stretch (1 = none)
 float4 k_shape   : register(c11);  // brightness, ridge, patchiness, detail
 float4 k_misc    : register(c12);  // band gather, dither (in 1/255), gas gamma, hue mix
 float4 k_band    : register(c13);  // xyz: the band's pole; w: its half-width (radians)
+float4 k_grain   : register(c14);  // amount, scale (times Scale), gain; w: haze amount
+float4 k_dust    : register(c15);  // amount, scale (times Scale), coverage; w: haze coverage
+float4 k_stars   : register(c16);  // share of lattice cells with a star, brightness, size (radians), in-gas weight
+float4 k_star_a  : register(c17);  // rgb: one end of the stars' colours
+float4 k_star_b  : register(c18);  // rgb: the other
 
 struct VsIn  { float4 pos : POSITION; float3 ray : TEXCOORD0; };
 struct VsOut { float4 pos : POSITION; float3 ray : TEXCOORD0; };
@@ -83,6 +90,25 @@ float fbm3(float3 p, float gain)
     return s / n;
 }
 
+float fbm5(float3 p, float gain)
+{
+    float s = 0.0, a = 1.0, n = 0.0;
+    [unroll] for (int o = 0; o < 5; o++) {
+        s += a * vnoise(p); n += a; a *= gain;
+        p = mul(k_rot, p) * 2.03;
+    }
+    return s / n;
+}
+
+// fbm5's sum in units of its own spread, so an amount means the same at any gain:
+// one octave of value noise has a spread near 0.15, and octaves add in quadrature.
+float fbm5_z(float3 p, float gain)
+{
+    float a = 1.0, s1 = 0.0, s2 = 0.0;
+    [unroll] for (int o = 0; o < 5; o++) { s1 += a; s2 += a * a; a *= gain; }
+    return (fbm5(p, gain) - 0.5) * s1 / (0.15 * sqrt(s2));
+}
+
 float fbm6(float3 p, float gain)
 {
     float s = 0.0, a = 1.0, n = 0.0;
@@ -134,6 +160,14 @@ float3 sky_colour(float3 dir)
     float band = exp(-bd * bd / max(k_band.w * k_band.w, 1e-4));
 
     float field = n + patch * m + k_core1c.w * c1 + k_core2c.w * c2 + k_misc.x * band;
+
+    // Grain: a five-octave field at Grain's scale, displaced by the same coarse warp but
+    // not scaled with it (scaled, the warp drags streaks). It breaks the gas's edges into
+    // clumps, and further down it varies the light inside the dense gas.
+    float broad = field;
+    float3 wq = warp * (q - 0.5) * 2.0;
+    float g = fbm5_z(p * k_grain.y + wq + float3(31.4, 7.7, 12.9), k_grain.z);
+    field += k_grain.x * g;
     float dens = smoothstep(cover - soft, cover + soft, field);
     dens = pow(max(dens, 0.0), k_misc.z);
 
@@ -143,8 +177,48 @@ float3 sky_colour(float3 dir)
     float h = saturate((q.x - 0.5) * k_seed.w + 0.5);
     float3 gas = lerp(k_gas_a.rgb, k_gas_b.rgb, lerp(h, saturate(n * 0.3 + 0.5), k_misc.w));
     float3 col = lerp(k_deep.rgb, gas, saturate(dens / 0.6)) + k_glow.rgb * smoothstep(0.55, 1.0, dens);
+    // Haze: the field without the grain, as a soft glow behind the clumps, with a
+    // coverage of its own, so a sky of crisp clumps keeps a glow where they gather.
+    col += gas * k_grain.w * smoothstep(k_dust.w - soft, k_dust.w + soft, broad);
     col += k_core1c.rgb * c1 * (0.3 + 0.7 * dens) + k_core2c.rgb * c2 * (0.3 + 0.7 * dens);
+
+    // Dust: where a field of its own rises past its coverage, the gas is absorbed
+    // towards empty space, growing with the square of the excess: soft lanes and
+    // specks with no flat floor. Empty space has nothing to absorb.
+    float dz = fbm5_z(p * k_dust.y + wq + float3(5.3, 21.1, 2.6), 0.55);
+    float dt = max(dz - k_dust.z, 0.0);
+    col = lerp(k_deep.rgb, col, exp(-k_dust.x * dt * dt * saturate(dens / 0.3)));
+
+    // The grain in the light: dense gas never goes flat.
+    col = lerp(k_deep.rgb, col, exp(0.3 * k_grain.x * g * saturate(dens / 0.6)));
     col *= bright;
+
+    // Stars: on a lattice of 5 cells to the unit (about 314 cells meet the sphere), a
+    // cell holds a star with chance k_stars.x, at a random point of it, kept only within
+    // half a cell of the sphere. The star is a soft core whitening towards its centre and
+    // a wide halo, brighter where the gas is (in-gas weight). Not scaled by Brightness.
+    // The weight is the gas without its grain: by the grainy density, a star would carry
+    // the grain's texture across its disc.
+    float gathered = smoothstep(cover - soft, cover + soft, broad);
+    float3 cd = dir * 5.0;
+    float3 ci = floor(cd);
+    [unroll] for (int z = -1; z <= 1; z++)
+    [unroll] for (int y = -1; y <= 1; y++)
+    [unroll] for (int x = -1; x <= 1; x++) {
+        float3 c = ci + float3(x, y, z);
+        float3 k = c + k_seed.xyz + 0.5;
+        float3 pt = c + float3(hash13(k + float3(3.1, 0, 0)), hash13(k + float3(0, 5.7, 0)), hash13(k + float3(0, 0, 7.3)));
+        float len = length(pt);
+        float on = (hash13(k) < k_stars.x && abs(len - 5.0) < 0.5) ? 1.0 : 0.0;
+        float a2 = 2.0 * (1.0 - dot(dir, pt / len));
+        float b = hash13(k + float3(9.9, 1.1, 4.4));
+        float sz = k_stars.z * (0.6 + 0.8 * b);
+        float lum = on * k_stars.y * (0.25 + 0.75 * b * b * b) * lerp(1.0, gathered, k_stars.w);
+        float core = exp(-a2 / (sz * sz));
+        float halo = 0.18 / (1.0 + a2 / (9.0 * sz * sz)) * exp(-a2 / (64.0 * sz * sz));
+        float3 sc = lerp(k_star_a.rgb, k_star_b.rgb, hash13(k + float3(2.2, 8.8, 6.6)));
+        col += lerp(sc, 1.0, core * 0.35) * lum * (core + halo);
+    }
     return col;
 }
 
@@ -167,7 +241,7 @@ float4 sky_ps(float3 ray : TEXCOORD0) : COLOR
 // texels hold the edge itself and match their neighbours' exactly: with or without
 // seamless cube filtering, nothing steps across an edge. k_face: the face's centre,
 // its right and its down axes (Direct3D's cube layout), and 2/(S-1).
-float4 k_face[4] : register(c14);
+float4 k_face[4] : register(c19);
 
 float4 bake_ps(float2 vpos : VPOS) : COLOR
 {

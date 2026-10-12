@@ -14,10 +14,12 @@ mkdir -p "$out"
 "$here/../platform/d3d9/hlsl.sh" "$here/hull_shaders.h" "$here/hull.hlsl" \
     hull_vs:vs_3_0:k_hull_vs hull_ps:ps_3_0:k_hull_ps \
     bump_vs:vs_3_0:k_bump_vs bump_ps:ps_3_0:k_bump_ps \
-    depth_vs:vs_3_0:k_depth_vs depth_ps:ps_3_0:k_depth_ps
+    depth_vs:vs_3_0:k_depth_vs depth_ps:ps_3_0:k_depth_ps \
+    moon_ps:ps_3_0:k_moon_ps
 # The planet shaders (planet.hlsl -> planet_shaders.h, committed; PlanetShaders=1).
 "$here/../platform/d3d9/hlsl.sh" "$here/planet_shaders.h" "$here/planet.hlsl" \
-    ground_ps:ps_3_0:k_ground_ps city_ps:ps_3_0:k_city_ps cloud_ps:ps_3_0:k_cloud_ps
+    ground_ps:ps_3_0:k_ground_ps city_ps:ps_3_0:k_city_ps cloud_ps:ps_3_0:k_cloud_ps \
+    surface_ps:ps_3_0:k_surface_ps
 
 llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
 

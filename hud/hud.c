@@ -142,7 +142,8 @@
  * -------------
  * Applying a correction twice distorts as badly as not at all, so each part
  * checks that its file-based predecessor is gone and stands down otherwise:
- * font if any Sprites\FontFinal4_*.spr.a2font-backup exists, cursors if
+ * font if any Sprites\FontFinal4_*.spr.a2font-backup exists (the display mode
+ * is still read at its call, for the canvas), cursors if
  * Textures\RGB\Curs_Move.tga.a2neb-backup does, canvas if the GUI DB already
  * declares a screenWidth other than stock's 1600.  hud/install.sh reverts all
  * three first.  Every site's bytes are checked before anything is written; a
@@ -334,6 +335,7 @@ static int div_floor(int a, int b)
 
 static int g_W, g_H;            /* the display mode last set */
 static int g_doFont = 1, g_doCanvas = 1, g_doCursor = 1, g_doSeams = 1, g_doRelayout = 1;
+static int g_fontOn;            /* the font part patched: fix_fonts may run */
 
 /* ---- 1. font ---------------------------------------------------------- */
 
@@ -374,7 +376,7 @@ void __cdecl font_new_width_hook(int width)
         g_W = mode[0];
         g_H = mode[1];
     }
-    fix_fonts("display");
+    if (g_fontOn) fix_fonts("display");
 }
 
 __attribute__((naked)) void font_new_width_stub(void)
@@ -649,7 +651,9 @@ static void objectives_keep(void)
     b = *(BYTE **)(od + OBJ_DONE_BEGIN);
     e = *(BYTE **)(od + OBJ_DONE_END);
     g_objCount = (b && e > b) ? (int)(e - b) : 0;
-    if (g_objCount > (int)sizeof g_objDone) g_objCount = (int)sizeof g_objDone;
+    /* PostLoad reads the hand-over by its own count: more than fits is no hand-over,
+     * never a short one */
+    if (g_objCount > (int)sizeof g_objDone) { g_objCount = -1; return; }
     for (i = 0; i < g_objCount; i++) g_objDone[i] = b[i];
 }
 
@@ -946,20 +950,33 @@ static void startup(void)
     g_doRelayout = (int)GetPrivateProfileIntA("HUD", "Relayout", 1, ini);
     logline("--- HUD.asi");
 
-    /* font */
-    if (!g_doFont)
-        report("font", "off (Font=0)");
-    else if (exists_glob("Sprites\\FontFinal4_*.spr.a2font-backup"))
-        report("font", "STANDING DOWN: ui-font-condense.py's atlases are installed "
-                       "(Sprites\\*.a2font-backup) -- revert them first");
-    else if (!is_call(SITE_FONT_NEW_WIDTH, ADDR_FONT_NEW_WIDTH) ||
-             !is_call(SITE_FONT_INIT, ADDR_FONT_INIT))
-        report("font", "NOT PATCHED: call sites differ from this build");
-    else if (redirect_call(SITE_FONT_NEW_WIDTH, (void *)font_new_width_stub) &&
-             redirect_call(SITE_FONT_INIT, (void *)font_init_hook))
-        report("font", "patched");
-    else
-        report("font", "NOT PATCHED: VirtualProtect failed");
+    /* display mode -- the FontNewScreenWidth call is where every part learns the
+     * mode, so it is wrapped whenever the font or the canvas is on; only the font
+     * correction itself waits on the font part (g_fontOn) */
+    {
+        int mode_hooked = 0;
+        if (!g_doFont && !g_doCanvas)
+            ;
+        else if (!is_call(SITE_FONT_NEW_WIDTH, ADDR_FONT_NEW_WIDTH))
+            report("display mode", "NOT SEEN: call site differs from this build");
+        else if (redirect_call(SITE_FONT_NEW_WIDTH, (void *)font_new_width_stub))
+            mode_hooked = 1;
+        else
+            report("display mode", "NOT SEEN: VirtualProtect failed");
+
+        /* font */
+        if (!g_doFont)
+            report("font", "off (Font=0)");
+        else if (exists_glob("Sprites\\FontFinal4_*.spr.a2font-backup"))
+            report("font", "STANDING DOWN: ui-font-condense.py's atlases are installed "
+                           "(Sprites\\*.a2font-backup) -- revert them first");
+        else if (!mode_hooked || !is_call(SITE_FONT_INIT, ADDR_FONT_INIT))
+            report("font", "NOT PATCHED: call sites differ from this build");
+        else if (redirect_call(SITE_FONT_INIT, (void *)font_init_hook))
+            g_fontOn = 1, report("font", "patched");
+        else
+            report("font", "NOT PATCHED: VirtualProtect failed");
+    }
 
     /* canvas -- the stand-down check is per DB, at load time */
     if (!g_doCanvas)

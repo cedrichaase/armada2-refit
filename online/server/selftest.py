@@ -2,7 +2,8 @@
 """Runs a2online-server.py on a free local port and plays a host and a joiner
 against it with plain sockets: register, look the code up, the introduction,
 a relayed datagram each way, a relay to someone never introduced (dropped), an
-unknown code, and the code freed by BYE.  Exit 0 when all of it holds.
+unknown code, the code freed by BYE, a registration too short to read, and the
+rate limit on lookups.  Exit 0 when all of it holds.
 
     python3 online/server/selftest.py
 """
@@ -104,6 +105,21 @@ def main():
         time.sleep(0.2)
         stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 6) + code.encode() + LAN, S)
         check(recv(stranger, SV_NOTFOUND) is not None, 'BYE frees the code')
+
+        stranger.sendto(MAGIC + bytes([SV_HOST]) + struct.pack('<I', 9) + b'\x01', S)
+        stranger.settimeout(0.5)
+        check(recv(stranger, SV_HOSTED) is None, 'a registration with a short LAN address is ignored')
+        stranger.settimeout(2)
+
+        # every socket here is 127.0.0.1, so this goes last: it spends the address's lookups
+        time.sleep(1)
+        for n in range(30):
+            stranger.sendto(MAGIC + bytes([SV_JOIN]) + struct.pack('<I', 100 + n) + b'ZZZZZZ' + LAN, S)
+        stranger.settimeout(0.5)
+        answered = 0
+        while recv(stranger, SV_NOTFOUND) is not None:
+            answered += 1
+        check(5 <= answered <= 12, f'30 lookups at once from one address: {answered} answered (burst 10)')
     finally:
         srv.terminate()
         out = srv.communicate(timeout=5)[0]

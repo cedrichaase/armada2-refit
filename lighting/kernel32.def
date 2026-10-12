@@ -11,3 +11,5 @@ CloseHandle@4
 ReadFile@20
 GetPrivateProfileIntA@16
 GetPrivateProfileStringA@24
+GetModuleHandleA@4
+GetProcAddress@8

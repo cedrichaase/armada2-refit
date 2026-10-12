@@ -193,11 +193,12 @@ static int parsen(const char *s, float *v, int n)
     return 1;
 }
 
-static void inin(const char *file, const char *key, float *v, int n)
+/* 1 when the key holds n numbers (and v has them) */
+static int inin(const char *file, const char *key, float *v, int n)
 {
     char b[96];
     GetPrivateProfileStringA("Sky", key, "", b, sizeof b, file);
-    if (b[0]) parsen(b, v, n);
+    return b[0] ? parsen(b, v, n) : 0;
 }
 
 static int file_time(const char *path, FILETIME *t)
@@ -227,8 +228,9 @@ static void read_settings(void)
     if (g_face > 4096) g_face = 4096;
 }
 
-/* The pixel shader's constants, c0..c13; their meaning is listed in sky.hlsl. */
-#define NCONST 14
+/* The pixel shader's constants, c0..c18; their meaning is listed in sky.hlsl. The
+ * bake's face constants follow them, at c19. */
+#define NCONST 19
 typedef struct {
     char     name[64];        /* the map's background name, as the engine holds it */
     char     path[360];       /* Sky\<name>.ini */
@@ -319,6 +321,22 @@ static int recipe_read(Recipe *r)
     r->k[12][2] = ini1(f, "Gamma", 1.0f);
     r->k[12][3] = ini1(f, "HueMix", 0.5f);
     if (r->k[12][2] < 0.05f) r->k[12][2] = 0.05f;
+    st[0] = 0.0f; st[1] = 8.0f; st[2] = 0.6f;                           /* Grain: off */
+    inin(f, "Grain", st, 3);
+    r->k[14][0] = st[0]; r->k[14][1] = st[1]; r->k[14][2] = st[2];
+    st[0] = 0.0f; st[1] = 6.0f; st[2] = 0.5f;                           /* Dust: off */
+    inin(f, "Dust", st, 3);
+    r->k[15][0] = st[0]; r->k[15][1] = st[1]; r->k[15][2] = st[2];
+    core[0] = 0.0f; core[1] = 1.0f; core[2] = 0.5f; core[3] = 0.0f;   /* Stars: none */
+    if (!inin(f, "Stars", core, 4)) inin(f, "Stars", core, 3);
+    r->k[16][0] = core[0] / 314.0f;     /* stars over the sphere -> chance per lattice cell */
+    r->k[16][1] = core[1];
+    r->k[16][2] = core[2] * DEG;
+    r->k[16][3] = core[3];
+    rgb(f, "StarA", r->k[17]); rgb(f, "StarB", r->k[18]);
+    st[0] = 0.0f; st[1] = 0.0f;                                         /* Haze: off */
+    inin(f, "Haze", st, 2);
+    r->k[14][3] = st[0]; r->k[15][3] = st[1];
     r->gen++;
 
     b[0] = 0; s_cat(b, "recipe "); s_cat(b, f); s_cat(b, " read");
@@ -355,7 +373,7 @@ static Recipe *recipe_now(DWORD frame)
 
 enum { D9_CREATECUBETEXTURE = 25, D9_GETRENDERTARGETDATA = 32, D9_CREATEOFFSCREEN = 36,
        D9_SETRENDERTARGET2 = 37, D9_GETRENDERTARGET2 = 38, D9_SETDEPTHSTENCIL = 39,
-       D9_GETDEPTHSTENCIL = 40, D9_GETVIEWPORT = 48, D9_CREATESTATEBLOCK = 59,
+       D9_GETDEPTHSTENCIL = 40, D9_SETVIEWPORT = 47, D9_GETVIEWPORT = 48, D9_CREATESTATEBLOCK = 59,
        D9_DRAWPRIMITIVEUP = 83, D9_CREATEQUERY = 118 };
 enum { SB_CAPTURE = 4, SB_APPLY = 5, Q_ISSUE = 6, Q_GETDATA = 7,
        TEX_GETSURFACE = 18, CUBE_LOCK = 19, CUBE_UNLOCK = 20, SURF_LOCK = 13, SURF_UNLOCK = 14 };
@@ -367,6 +385,7 @@ typedef long (__stdcall *RS_t)(void *, DWORD, DWORD);
 typedef long (__stdcall *SS_t)(void *, DWORD, DWORD, DWORD);
 typedef long (__stdcall *FVF_t)(void *, DWORD);
 typedef long (__stdcall *VP_t)(void *, DWORD *);
+typedef long (__stdcall *SetVP_t)(void *, const DWORD *);
 typedef long (__stdcall *MakeQ_t)(void *, DWORD, void **);
 typedef long (__stdcall *Issue_t)(void *, DWORD);
 typedef long (__stdcall *GetData_t)(void *, void *, DWORD, DWORD);
@@ -442,7 +461,10 @@ static int timing_slot(void *d9)
     for (i = 0; i < NQ; i++) {
         if (g_qbusy[i]) continue;
         if (!g_q[i][0] && (D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][0]) < 0 ||     /* TIMESTAMP */
-                           D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][1]) < 0)) return -1;
+                           D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][1]) < 0)) {
+            unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR;   /* never half a pair */
+            return -1;
+        }
         return i;
     }
     return -1;
@@ -496,6 +518,7 @@ static int bake(void *d9, Recipe *r, void *vs)
     DWORD  fmt = 31;                   /* A2B10G10R10: dim gradients band at 8 bits */
     LARGE  t0, t1;
     Vert   v[4];
+    DWORD  old_vp[6];
     char   b[200];
 
     if (!ps) return 0;
@@ -526,6 +549,7 @@ static int bake(void *d9, Recipe *r, void *vs)
         if (!said) { said = 1; logline("bake: no render target could be made: the stock sky"); }
         goto done;
     }
+    D9_FN(d9, D9_GETVIEWPORT, VP_t)(d9, old_vp);
     D9_FN(d9, D9_GETRENDERTARGET2, GetRT_t)(d9, 0, &old_rt);
     D9_FN(d9, D9_GETDEPTHSTENCIL, Obj_t)(d9, &old_ds);
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, rts);     /* the viewport becomes the face */
@@ -544,7 +568,7 @@ static int bake(void *d9, Recipe *r, void *vs)
         int    i;
         for (i = 0; i < 3; i++) { c[i][0] = k_faces[f][i][0]; c[i][1] = k_faces[f][i][1]; c[i][2] = k_faces[f][i][2]; c[i][3] = 0.0f; }
         c[3][0] = 2.0f / (float)(S - 1); c[3][1] = c[3][2] = c[3][3] = 0.0f;
-        d9_psconst(d9, 14, &c[0][0], 4);
+        d9_psconst(d9, NCONST, &c[0][0], 4);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
         if (D9_FN(d9, D9_GETRENDERTARGETDATA, RTData_t)(d9, rts, sys) < 0) break;
         if (D9_FN(sys, SURF_LOCK, SurfLock_t)(sys, &src, NULLPTR, 0x10) < 0) break;            /* READONLY */
@@ -563,6 +587,7 @@ static int bake(void *d9, Recipe *r, void *vs)
     ok = f == 6;
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, old_rt);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, old_ds);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, old_vp);           /* setting the target reset it to the whole target */
     unref(old_rt); unref(old_ds);
 done:
     unref(sys); unref(rts); unref(rt);

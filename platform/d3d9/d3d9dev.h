@@ -8,7 +8,7 @@
  * translates to. Under DXVK's d3d8 or GOG's build it fails, d9_device() returns
  * NULL, and the plugin must do what it did before: every caller falls back.
  *
- *   void *d9 = d9_device(dev8);            once per draw is fine: cached per device
+ *   void *d9 = d9_device(dev8);            once per draw is fine: one QueryInterface
  *   void *vs = d9_shader(d9, &my_vs);      created on first use, from D9_SHADER(...)
  *   D9Saved sv; d9_save(d9, &sv);          the shaders bound now
  *   d9_bind(d9, vs, ps); d9_vsconst(...);  ours, for the game's next draw call
@@ -27,9 +27,17 @@
  * FVF draw. A plugin that also changes render or sampler states restores those
  * itself.
  *
- * Shader objects belong to one device. When the d3d8 device changes (a second
+ * Shader objects belong to one device. When the device changes (a second
  * CreateDevice), d9_device() releases every object created through d9_shader and
  * they are re-created on next use. Shaders survive Reset in Direct3D 9.
+ *
+ * The change is told by the d3d9 device, asked afresh on every call, not by the
+ * d3d8 device's address alone: a new d3d8 device can be allocated where the old one
+ * was. A d3d9 device cannot be while anything made on it is still held, since every
+ * d3d9 object holds a reference to its device; so whatever a plugin keeps for "the
+ * device d9" (shaders here, its own objects) stays right by comparing d9. A d3d8
+ * device with no d3d9 behind it is not asked again: the chain does not change while
+ * the game runs. platform/D3D9.md, "Which device".
  */
 #ifndef A2_D3D9DEV_H
 #define A2_D3D9DEV_H
@@ -85,15 +93,16 @@ D9_API void *d9_device(void *dev8)
     void *d9 = (void *)0;
     int   i;
     if (!dev8) return (void *)0;
-    if (dev8 == d9_dev8 && d9_asked) return d9_dev9;
+    if (dev8 == d9_dev8 && d9_asked && !d9_dev9) return (void *)0;
+    if (D9_FN(dev8, D9_QUERYINTERFACE, D9_QI_t)(dev8, &d9_iid_device9, &d9) < 0) d9 = (void *)0;
+    /* It lives exactly as long as the d3d8 device that owns it: hold no reference. */
+    if (d9) D9_FN(d9, D9_RELEASE, D9_Ref_t)(d9);
+    if (dev8 == d9_dev8 && d9 == d9_dev9 && d9_asked) return d9;
     for (i = 0; i < d9_nmade; i++) {             /* the previous device's objects */
         if (d9_made[i]->obj) D9_FN(d9_made[i]->obj, D9_RELEASE, D9_Ref_t)(d9_made[i]->obj);
         d9_made[i]->obj = (void *)0;
     }
     d9_nmade = 0;
-    if (D9_FN(dev8, D9_QUERYINTERFACE, D9_QI_t)(dev8, &d9_iid_device9, &d9) < 0) d9 = (void *)0;
-    /* It lives exactly as long as the d3d8 device that owns it: hold no reference. */
-    if (d9) D9_FN(d9, D9_RELEASE, D9_Ref_t)(d9);
     d9_dev8 = dev8; d9_dev9 = d9; d9_asked = 1;
     return d9;
 }

@@ -4,6 +4,49 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.5.0 — 2026-10-12
+
+Reads package schemas 0 and 1; on Windows and macOS, only packages whose manifest names
+the system (11.20.0 on).
+
+### Added
+- Windows and macOS. The core runs on all three (`SYSTEM`): per-system cache and settings
+  folders, processes, and the release script from the manifest's `windows` / `macos`
+  entry (`Package.command`, `Package.for_system`): `install.ps1` through PowerShell on
+  Windows, `install.sh` through `/bin/bash` on macOS.
+- Finding the game on Windows (GOG's registry entry, `gog_registry_dirs`; the usual
+  folders on every drive) and on macOS, in a Wine prefix (`mac_prefixes`): CrossOver
+  bottles, Whisky bottles, Sikarugir / Kegworks / Wineskin / Porting Kit wrappers, plain
+  prefixes.
+- On macOS the DLL overrides go into the prefix's registry, under
+  `AppDefaults\Armada2.exe\DllOverrides` in `user.reg` (`prefix_plan`, `prefix_apply`),
+  only while no Wine runs, with `user.reg.a2refit-backup`; uninstall takes out what is
+  still as it left it. Windows needs none.
+- **Launch game** without Heroic (`launch_game_native`): the exe on Windows, the
+  prefix's Wine on macOS (CrossOver's `wine --bottle`, a wrapper's own, Gcenx's).
+- The Tk window for Windows and macOS (`run_tk`), the GTK window's sky, nebula, warp and
+  engine bar drawn on one canvas, and how to get the game (`WINDOWS_HOWTO`) or a Wine
+  for it (`MAC_HOWTO`: CrossOver 26; Sikarugir or Gcenx's Wine) when there is none.
+  `A2_INSTALLER_TK=1` opens it on Linux.
+- The frozen program stands in for Python (`run_python`): the release scripts run the
+  SOD rewrites with it (`A2_PYTHON`), so Windows and macOS need no Python.
+- `pyinstaller/build.py` (PyInstaller 6.22.3, `pyinstaller/requirements.txt`) and
+  `pyinstaller/icon.py`: `armada2-refit-installer-windows.exe` (one portable windowed
+  file, icon, version resource) and `armada2-refit-installer-macos.zip` (a universal2
+  `.app`, ad-hoc signed). Both are attached to every release beside the AppImage.
+- `test-windows.ps1` and `test-macos.sh`: the frozen installers against a mock game (on
+  macOS in a mock CrossOver bottle); CI jobs `windows-gui` and `macos-gui`.
+
+### Changed
+- The layer lines say what the install will leave, not what is there now: the chain
+  step's d3d8to9 counts for lighting and the sky, DXVK's d3d9 for MSAA (`after_d3d8to9`,
+  `after_dxvk`). MSAA, `dxvk.conf` and bloom say why they are not on macOS; bloom on
+  Windows is ReShade's.
+- `STEPS` and the status lines know `chain`, `grid` and `models`; "Writing the launch
+  settings" in place of Heroic's alone.
+
+Installs nothing into the game itself. Installed, not yet seen in game.
+
 ## 1.4.1 — 2026-10-09
 
 Reads package schemas 0 and 1.

@@ -136,6 +136,7 @@ __declspec(dllimport) DWORD   __stdcall GetWindowThreadProcessId(HWND, DWORD *);
 
 /* PopupPaletteImp */
 #define PAL_BOUNDS     0x04     /* left, top, right, bottom */
+#define PAL_HIDDEN     0x16     /* BYTE: the bar is hidden; Update skips its buttons */
 #define PAL_SLOTS      0x28     /* ControlButton *[21] */
 #define N_SLOTS        21
 #define PAL_FLOAT_W    0x7c
@@ -758,8 +759,10 @@ void __attribute__((thiscall)) process_keys_hook(void *pal, void *crafts)
     *(LONG *)(p + PAL_BC_COUNT)  = saved[1];
     *(LONG *)(p + PAL_WC_COUNT)  = saved[2];
 
+    /* a hidden bar (+0x16, DisplayInterface::SetIsHidden) skips the update, so
+     * g_cellBtn is from an earlier selection: press nothing */
     c = key_pressed();
-    if (c >= 0 && g_cellBtn[c]) {
+    if (c >= 0 && g_cellBtn[c] && !*(p + PAL_HIDDEN)) {
         char m[96];
         m[0] = 0;
         s_cat(m, "key ");

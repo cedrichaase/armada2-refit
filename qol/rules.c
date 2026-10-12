@@ -39,10 +39,21 @@
  *     stock charges it as it always did -- it cannot fail, and the advisor stays
  *     quiet.  Should it fail anyway the item is taken again and keeps its mark.
  *   - Pop, CancelBuild (waiting head), ActDeleteBuildQueueItem, ClearBuildQueue:
- *     a marked item that leaves the queue is given back.
- *   - ClearTeam (capture, assimilation) and DestroyShip on a producer: every
- *     marked item is given back, and the item in progress too -- in the old
- *     owner's bank, since ClearTeam runs before the team changes.
+ *     a marked item that leaves the queue is given back.  A delete order matches
+ *     ids with the mark masked: one sent while the item waited still finds it
+ *     after StartBuild has cleared the mark.
+ *   - ClearTeam (capture, assimilation, and a destroyed producer: GameObject::
+ *     Cleanup always calls it when the dead object goes): every marked item is
+ *     given back, and the item in progress too -- in the old owner's bank, since
+ *     ClearTeam runs before the team changes.  Stock ClearTeam then zeroes the
+ *     item in progress, so this happens once.  Its officers are left out when
+ *     stock's own mRemoveConstructionEffect returns them (IsBusy, and for
+ *     Producer's version a live construction effect at +0x268; Evolver's
+ *     always), or they would be discharged twice.  DestroyShip is not hooked: it
+ *     would refund the same items again at Cleanup, and a craft that cannot die
+ *     (+0x182) passes through it on every fatal hit.
+ *   - Program::GameOpenPreLoad (every game, new or loaded): the network latch
+ *     below is cleared, so a second game in the same session asks again.
  *   - Save / Load: the marks are written into the producer's id counter (a field
  *     the stock file already holds) as a tag and a bitmask by position, and read
  *     back after Load.  A stock save has no tag and loads as unpaid queues, which
@@ -202,7 +213,8 @@ static void trace(const char *what, const BYTE *p)
 /* A game against the computer: both transports of the local kind.  A network game
  * plays by the rules only if every player runs them: the online layer
  * (online/peer.c, R_RULES) says so through QOLRules_Network, and the answer is
- * latched at the first use in a game, so a late change cannot split the peers. */
+ * latched at the first use in a game, so a late change cannot split the peers.
+ * Every game start clears the latch (h_open). */
 static int g_net, g_latched, g_latch;
 
 static int rules_on(void)
@@ -290,13 +302,14 @@ static void note(const char *what, const BYTE *team, const Cost *c)
     logline(m);
 }
 
-/* Give a class's cost back to the producer's owner. */
-static void give_back(BYTE *p, void *cls, const char *why)
+/* Give a class's cost back to the producer's owner; officers only with `off`. */
+static void give_back(BYTE *p, void *cls, const char *why, int off)
 {
     BYTE *team = *(BYTE **)(p + P_TEAM);
     Cost  c;
     if (!team || !cls) return;
     cost_of(p, cls, &c);
+    if (!off) c.off = 0;
     charge(team, &c, +1);
     note(why, team, &c);
 }
@@ -305,23 +318,29 @@ static void give_back(BYTE *p, void *cls, const char *why)
 
 static int is_paid(const BYTE *it) { return it && (IT_ID(it) & PAID); }
 
-/* Every marked item goes back, and the mark is cleared; with `cur`, the item in
- * progress too. */
-static void drain(BYTE *p, int cur, const char *why)
+/* Every marked item goes back, and the mark is cleared. */
+static void drain(BYTE *p, const char *why)
 {
     BYTE *it;
     for (it = *(BYTE **)(p + P_HEAD); it; it = IT_NEXT(it)) {
         if (!is_paid(it)) continue;
-        give_back(p, IT_CLS(it), why);
+        give_back(p, IT_CLS(it), why, 1);
         IT_ID(it) &= ~PAID;
     }
-    if (cur && *(void **)(p + P_CUR)) give_back(p, *(void **)(p + P_CUR), why);
 }
 
-static int is_producer(const BYTE *o)
+/* Does stock ClearTeam give the officers of the item in progress back itself?
+ * It calls mRemoveConstructionEffect (+0x170) when IsBusy (+0x138); Producer's
+ * discharges only while the construction effect (+0x268) is live, Evolver's
+ * always. */
+#define VT_REMOVE_EFFECT 0x4b7700     /* Producer::mRemoveConstructionEffect */
+#define P_EFFECT         0x268
+
+static int stock_returns_officers(BYTE *p)
 {
-    /* ClearBuildQueue is Producer's alone; another Craft's table is shorter */
-    return (*(const DWORD **)o)[0x13c / 4] == 0x4b78c0;
+    const DWORD *vt = *(const DWORD **)p;
+    if (!((BYTE (__thiscall *)(BYTE *))vt[0x138 / 4])(p)) return 0;
+    return vt[0x170 / 4] != VT_REMOVE_EFFECT || *(const int *)(p + P_EFFECT) != -1;
 }
 
 /* ---- hooks -------------------------------------------------------------- */
@@ -330,11 +349,13 @@ typedef BYTE (__thiscall *BoolFn)(BYTE *);
 typedef void (__thiscall *VoidFn)(BYTE *);
 typedef void (__thiscall *IntFn)(BYTE *, int);
 typedef BYTE (__thiscall *PtrFn)(BYTE *, void *);
+typedef void (__thiscall *OpenFn)(BYTE *, void *);
 
 static BoolFn t_start, t_cancel;
 static VoidFn t_pop, t_clearq, t_clearteam;
-static IntFn  t_actdel, t_destroy;
+static IntFn  t_actdel;
 static PtrFn  t_save, t_load;
+static OpenFn t_open;
 
 /* in place of `call Producer::PushBuildQueueItem` in Handle_New_Command */
 static void __thiscall h_push(BYTE *p, void *cls)
@@ -390,7 +411,7 @@ static void __thiscall h_pop(BYTE *p)
     int   paid = is_paid(head);
 
     t_pop(p);
-    if (paid && *(BYTE **)(p + P_HEAD) != head) give_back(p, cls, "popped");
+    if (paid && *(BYTE **)(p + P_HEAD) != head) give_back(p, cls, "popped", 1);
 }
 
 static BYTE __thiscall h_cancel(BYTE *p)
@@ -406,7 +427,7 @@ static BYTE __thiscall h_cancel(BYTE *p)
     trace("CancelBuild", p);
     r = t_cancel(p);
     if (paid && *(BYTE **)(p + P_HEAD) != head) {
-        give_back(p, cls, "cancelled");
+        give_back(p, cls, "cancelled", 1);
     } else if (cur && team && !*(void **)(p + P_CUR) && rules_on()) {
         /* the item in progress: stock gives it back in full except crew, which
          * AddCrew clamps to the cap -- what the cancel did not return is added */
@@ -419,43 +440,59 @@ static BYTE __thiscall h_cancel(BYTE *p)
     return r;
 }
 
+/* The order carries the id as it was when sent; StartBuild may have cleared the
+ * mark since.  Ids are matched with the mark masked and passed on as they are now. */
 static void __thiscall h_actdel(BYTE *p, int id)
 {
     trace("ActDeleteBuildQueueItem", p);
     BYTE *it;
     void *cls = NULLPTR;
-    int   paid = 0;
+    int   paid = 0, bare = id & ~PAID;
 
-    if (!(*(void **)(p + P_CUR) && id == *(int *)(p + P_CURID))) {
+    if (*(void **)(p + P_CUR) && bare == (*(int *)(p + P_CURID) & ~PAID)) {
+        id = *(int *)(p + P_CURID);
+    } else {
         for (it = *(BYTE **)(p + P_HEAD); it; it = IT_NEXT(it))
-            if (IT_ID(it) == id) { paid = is_paid(it); cls = IT_CLS(it); break; }
+            if ((IT_ID(it) & ~PAID) == bare) {
+                id = IT_ID(it); paid = is_paid(it); cls = IT_CLS(it); break;
+            }
     }
     t_actdel(p, id);
     if (paid) {
         for (it = *(BYTE **)(p + P_HEAD); it; it = IT_NEXT(it))
             if (IT_ID(it) == id) return;      /* still queued: nothing left */
-        give_back(p, cls, "deleted");
+        give_back(p, cls, "deleted", 1);
     }
 }
 
 static void __thiscall h_clearq(BYTE *p)
 {
     trace("ClearBuildQueue", p);
-    drain(p, 0, "cleared");
+    drain(p, "cleared");
     t_clearq(p);
 }
 
+/* Capture, assimilation, and every producer's removal (destroyed, or the game
+ * closing): stock zeroes the item in progress here, so it is given back once. */
 static void __thiscall h_clearteam(BYTE *p)
 {
+    void *cur = *(void **)(p + P_CUR);
+
     trace("ClearTeam", p);
-    drain(p, rules_on(), "lost");
+    drain(p, "lost");
+    if (cur && rules_on()) {
+        int off = !stock_returns_officers(p);
+        give_back(p, cur, off ? "lost in progress" : "lost in progress (officers by stock)", off);
+    }
     t_clearteam(p);
 }
 
-static void __thiscall h_destroy(BYTE *p, int a)
+/* every game, new or loaded: the network answer is asked again */
+static void __thiscall h_open(BYTE *prog, void *name)
 {
-    if (!*(p + 0x113) && is_producer(p)) drain(p, rules_on(), "destroyed");
-    t_destroy(p, a);
+    g_latched = 0;
+    g_latch = 0;
+    t_open(prog, name);
 }
 
 /* The marks ride in the id counter, which the stock file already holds. */
@@ -522,9 +559,9 @@ static const Entry k_actdel   = { 0x4b7a60, 5, { 0x55, 0x8B, 0xEC, 0x53, 0x56 } 
 static const Entry k_cancel   = { 0x4b84b0, 6, { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56 } };
 static const Entry k_clearq   = { 0x4b78c0, 6, { 0x53, 0x56, 0x8B, 0xF1, 0x33, 0xDB } };
 static const Entry k_clearteam= { 0x4b7790, 5, { 0x56, 0x8B, 0xF1, 0x8B, 0x06 } };
-static const Entry k_destroy  = { 0x4c96f0, 6, { 0x55, 0x8B, 0xEC, 0x56, 0x8B, 0xF1 } };
 static const Entry k_save     = { 0x4b8aa0, 6, { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x08 } };
 static const Entry k_load     = { 0x4b88d0, 6, { 0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10 } };
+static const Entry k_open     = { 0x4846a0, 5, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF } };  /* Program::GameOpenPreLoad */
 
 static void *hook(const Entry *e, void *fn)
 {
@@ -548,7 +585,7 @@ static int patch_rules(void)
     BYTE  call[5];
 
     if (!sig_ok(&k_start) || !sig_ok(&k_pop) || !sig_ok(&k_actdel) || !sig_ok(&k_cancel) ||
-        !sig_ok(&k_clearq) || !sig_ok(&k_clearteam) || !sig_ok(&k_destroy) ||
+        !sig_ok(&k_clearq) || !sig_ok(&k_clearteam) || !sig_ok(&k_open) ||
         !sig_ok(&k_save) || !sig_ok(&k_load)) return 0;
     /* the push call: its target is checked from its displacement */
     if (!(*(BYTE *)0x431532 == 0xE8 &&
@@ -561,9 +598,9 @@ static int patch_rules(void)
     t_cancel    = (BoolFn)hook(&k_cancel, (void *)h_cancel);
     t_clearq    = (VoidFn)hook(&k_clearq, (void *)h_clearq);
     t_clearteam = (VoidFn)hook(&k_clearteam, (void *)h_clearteam);
-    t_destroy   = (IntFn) hook(&k_destroy, (void *)h_destroy);
     t_save      = (PtrFn) hook(&k_save, (void *)h_save);
     t_load      = (PtrFn) hook(&k_load, (void *)h_load);
+    t_open      = (OpenFn)hook(&k_open, (void *)h_open);
 
     call[0] = 0xE8;
     *(LONG *)(call + 1) = (LONG)((DWORD)h_push - (0x431532 + 5));

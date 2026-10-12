@@ -167,10 +167,11 @@ float planet_shadow(float3 wp)
     return lerp(1.0, s, sun.w);
 }
 
-// Everything after the normal: the lights, the texture, the night lights, the shoulder.
+// Everything after the normal: the lights, the texture (t, sampled by the caller), the
+// night lights, the shoulder.
 // N is the normal as the stock meshes have it (inward), the one the device's directional
 // lights pair with; misc.x turns it round. sc: the point in the shadow map.
-float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
+float4 shade_t(float3 N, float3 wp, float4 t, float3 sc)
 {
     float3 Nt = N * misc.x;                  // the outward normal: stock's are inward
     float3 V  = normalize(eye.xyz - wp);
@@ -201,7 +202,6 @@ float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
     // The rim: light on the faces turned edge-on to the camera, so a dark hull keeps
     // its outline against space.
     sum += rim_col.rgb * pow(1.0 - saturate(dot(Nt, V)), shine.z);
-    float4 t = tex2D(tex0, uv);
     // Gloss from the texture's brightness: pale plating shines, dark seams do not.
     float gloss = dot(t.rgb, float3(0.299, 0.587, 0.114));
     // The light is not clamped at 1: a Key above 1 (HullSun), an explosion or a
@@ -213,6 +213,11 @@ float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
     // above 1, the night lights brighter than the texture.
     float3 c = lerp(lit, t.rgb * max(misc.y, 1.0), saturate(t.a * min(misc.y, 1.0)));
     return float4(shoulder(c, misc.z), misc.w < 1.0 ? misc.w : t.a * base.a);
+}
+
+float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
+{
+    return shade_t(N, wp, tex2D(tex0, uv), sc);
 }
 
 float4 hull_ps(Lit i) : COLOR
@@ -276,4 +281,32 @@ float4 bump_ps(Bumped i) : COLOR
     float  l  = length(b);
     // shade() takes the inward normal and misc.x = -1, as for a stock hull
     return shade(l > 1e-5 ? -b / l : -Nt, i.wp, i.uv, i.sc);
+}
+
+// A model whose texture has a recipe in Surfaces.asi (surfaces/README.md; in stock the
+// dilithium moons' Mdmoon): the colour, the relief and the cut-out from three cubes in
+// the direction from the model's origin, in its own frame, in place of the texture.
+// The relief tilts the mesh's own normal, so the rock keeps its lumpy shape; the
+// albedo's alpha is the cut-out the engine's alpha test makes holes of, through which
+// the glow shell shows; the relief's alpha glows along the holes' edges.
+float4 msurf_rows[3] : register(c72);  // WORLD's three axes (object to world)
+float4 msurf_ctr     : register(c75);  // WORLD's translation: the model's origin
+float4 msurf_glow    : register(c76);  // rgb: the glow's colour; a: how much shows by day (unused)
+float4 msurf_misc    : register(c79);  // x: the relief's strength; z: 1 when the albedo's alpha cuts
+samplerCUBE m_albedo : register(s4);
+samplerCUBE m_relief : register(s5);
+
+float4 moon_ps(Lit i) : COLOR
+{
+    float3 v  = i.wp - msurf_ctr.xyz;
+    float3 d  = normalize(float3(dot(v, msurf_rows[0].xyz), dot(v, msurf_rows[1].xyz), dot(v, msurf_rows[2].xyz)));
+    float4 A  = texCUBE(m_albedo, d);
+    float4 B  = texCUBE(m_relief, d);
+    A.a = lerp(1.0, A.a, msurf_misc.z);                     // opaque unless the recipe cuts
+    float3 p  = (B.rgb - 0.5) * msurf_misc.x;
+    float3 pw = p.x * msurf_rows[0].xyz + p.y * msurf_rows[1].xyz + p.z * msurf_rows[2].xyz;
+    float3 N  = normalize(normalize(i.n) + pw * misc.x);   // stock normals are inward
+    float4 c  = shade_t(N, i.wp, A, i.sc);
+    c.rgb += msurf_glow.rgb * B.a;
+    return c;
 }
