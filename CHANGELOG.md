@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.27.0 — 2026-10-12
+
+Layers: nebulae 1.2.0.
+
+### Added
+- Options against the stepped border hulls draw in front of the gas: `Upsample=`,
+  `ShadowFade=`, `ThinGas=`, and `Resolution=1` on the float path with `FullTent=` and
+  `Interleave=` (nebulae 1.2.0). Defaults keep today's look.
+
+Installed, not yet seen in game.
+
 ## 11.26.0 — 2026-10-12
 
 Layers: shields 1.0.0, testbench 3.9.0.

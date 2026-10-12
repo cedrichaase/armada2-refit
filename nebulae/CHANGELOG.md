@@ -4,6 +4,25 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-12
+
+### Added
+- `Upsample=` (0..4, default 0): the half-size composite at hulls' edges. 1 weighs every
+  tap by its own depth after a filtered-depth edge test; 2 adds a checkerboard of near and
+  far half-size depths; 3 a coverage ramp over a pixel at full-size silhouettes; 4 both.
+- `ShadowFade=` (world units, default 0): a ship's shadow in the gas fills in behind it,
+  which shortens the dark halo a long shaft draws about the hull seen down its length.
+- `ThinGas=` (default 0): below this baked density the slices skip the fine octave and
+  the ships' shadow.
+- `FullTent=` (9 or 5) and `Interleave=` (0/1), for `Resolution=1` only.
+
+### Changed
+- `Resolution=1` draws the gas on the float path at full size (optical depth,
+  `Opacity=`, `Obscure=`, the composite's tent) instead of the 8-bit additive path, which
+  stays only as the fallback without INTZ or a float target.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-12
 
 ### Added
