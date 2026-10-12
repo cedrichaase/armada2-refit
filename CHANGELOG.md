@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.32.1 — 2026-10-13
+
+Layers: nebulae 1.3.1.
+
+### Changed
+- The Metreon nebula's lightning flashes half as often (nebulae 1.3.1).
+
+Installed, not yet seen in game.
+
 ## 11.32.0 — 2026-10-13
 
 Layers: nebulae 1.3.0.
