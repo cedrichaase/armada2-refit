@@ -5,6 +5,18 @@ shockwave as a ring of light, in place of stock's sprite model and textured disc
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 The reasoning is in [`README.md`](README.md).
 
+## 1.0.1 — 2026-10-12
+
+### Changed
+- The shock ring is drawn to stock's disc, measured on the bench frame by frame: a band
+  of fire from about half the radius to its edge (at 0.955 of `GetCurrentRadius`), in
+  place of a thin rim at the radius; the class's colour overdriven to about 2.4 times
+  towards the edge, so its red clips and its hottest band goes yellow as stock's does,
+  redder inside; the inner edge broken into flame tongues, a faint red fringe outside.
+  `RingWidth=` is now the band's width, default 0.52 (was 0.03).
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-10-12
 
 ### Added

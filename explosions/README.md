@@ -6,7 +6,8 @@ A ship or station that dies goes up in a `FireballExplosion` (the `xfireb*` ODFs
 (`critical1..8` in `Sprites/explosion.spr`) each playing a 4x4 flipbook of an orange
 puff. The shockwave is a flat textured disc that grows to ten times the ship's radius.
 `Explosions.asi` draws each fireball instead as a volume of gas, ray-marched per pixel
-through a sphere, and each shockwave as a thin ring of light. It changes what is drawn
+through a sphere, and each shockwave as a band of fire in a shader, matched to stock's
+disc in size, light and colour. It changes what is drawn
 and nothing else: where an explosion is, how long it lasts and what it damages stay the
 engine's, so a game against players without it is unaffected.
 
@@ -128,6 +129,52 @@ picks it up) and a shot of the stock sprites in the same frame. Two dead ends sh
   the smoke later, letting it absorb less and keeping white for the hottest gas only
   made the fire orange through its first half.
 
+## The shock ring
+
+Stock's disc is `wselfdes.tga`, a 128x128 strip of purple flames (black at one end, a
+white-hot band near the other, a dark lip at the very end), laid radially over a fan
+of `rays = 16` and tinted by the class's `color` (1, 0.3, 0 for `xshock`). The ring was
+first drawn as a thin rim and read in game as far smaller and dimmer than stock. It is
+now drawn to stock's measured profile.
+
+**How it was measured.** The `explosion` scene seen from above (`orbit` at a pitch of
+65), a battleship spawned and killed, the game paused, then stepped: moving the camera
+while paused runs three ticks (`testbench/scene/README.md`). At each step one shot with
+`Rings=0` (stock) and one with `Rings=1`, the same frame. Each disc was unwrapped about
+its centre (the ellipse made round, then `-distort DePolar`) into the mean colour per
+radius. Give the reload 3 s before the shot: at 1.5 s on a busy machine the toggle
+sometimes missed it, and the pair came out identical.
+
+**What stock draws**, in fractions of the radius its outline shows, which is 0.955 of
+`GetCurrentRadius` (a sixteen-sided outline, not a circle):
+
+| r | 0.53 | 0.58 | 0.62 | 0.68 | 0.72 | 0.78 | 0.88 | 0.93 | 1.0 |
+|---|---|---|---|---|---|---|---|---|---|
+| red, green added (of 255) | 25, 8 | 90, 22 | 180, 50 | 240, 82 | 252, 102 | 253, 117 | 255, 135 | 255, 178 | edge |
+
+- **The same profile at every size**: it scales with the disc, so the shader reads its
+  noise in the disc's own radii.
+- **Driven well past the class's colour**: red clips over most of the band. Green, which
+  does not, says the light is about 1 times the colour at 0.7 of the radius and 2.4 at
+  0.93, and 2.4 times (1, 0.3, 0) clips to (1, 0.72, 0), the yellow of stock's hottest
+  band. So no whitening: the colour is the class's, overdriven, and the framebuffer
+  clips it. The old ring's light was about a tenth of this.
+- **Redder inside**: unclipped, green over red is about 0.24 in the inner band and 0.3 in
+  the white-hot band, from the texture's purple rows. The shader keeps the green and
+  raises the red there (`hg`). Clipping before the fade instead, which was tried first,
+  kept the red flat while the disc faded and left it far too bright late in its life.
+  Stock clips after its fade, and the hue is why its red outlasts its yellow.
+- **The fade overdriven too**: with the same linear fade, a disc at 2.4 times its colour
+  looks undimmed until well past the fade's start, as stock's does.
+- **Tongues and speckle**: the inner edge is broken into flame tongues by noise read off
+  the direction from the centre (broad lobes and finer spikes), and the band is speckled
+  a little along the radius. Speckle at 9 noise tiles to the radius showed the 64^3
+  tile as a pattern, and speckle drawn out far along the radius read as an iris. Two
+  scales whose ratio is not whole avoid both.
+
+`RingWidth=` is the band's width (0.52: the fire starts at about half the radius),
+`RingBreakup=` how much the noise breaks its inner edge and speckles it.
+
 ## Cost
 
 Bench, 1920x1080, `Timing=1`: 0.16 ms of GPU time a pass for a destroyer's fireball at
@@ -152,5 +199,6 @@ screen with its age, so a bench shot can be paired with the moment it shows.
   on the hull) and the hull's fragments stay stock.
 - Mine and latinum explosions are `FireballExplosion`s too, and get the same fire; the
   self-destruct (`xselfd`) shockwave gets the same ring in its class's white.
-- The ring lies in the dead craft's own plane; edge-on it is a line.
+- The ring lies in the dead craft's own plane; edge-on it is a line. Its outline is
+  round, where stock's has sixteen sides.
 - No light of its own: the light on the hulls around it is still `Lighting.asi`'s.

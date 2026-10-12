@@ -141,8 +141,10 @@ PsOut fire_ps(VsOut i, float2 vp : VPOS)
     return o;
 }
 
-// A shockwave: a thin ring of light in the plane of the explosion, expanding, broken up
-// by the noise along it, with a faint disc inside. The class's colour, whitened at the rim.
+// A shockwave: a broad band of fire in the plane of the explosion, as stock's disc draws
+// it -- dark inside, flame tongues reaching in from about half the radius, the light
+// rising towards a sharp outer edge. The class's colour, driven past 1 as stock's is, so
+// its red clips and the hottest part goes yellow (README, "The shock ring").
 PsOut ring_ps(VsOut i)
 {
     PsOut o;
@@ -150,18 +152,36 @@ PsOut ring_ps(VsOut i)
     float  dn = dot(d, k_ring.xyz);
     float  t = dot(k_ctr.xyz - k_eye.xyz, k_ring.xyz) / (abs(dn) > 1e-4 ? dn : 1e-4);
     float3 x = k_eye.xyz + d * t - k_ctr.xyz;
-    float  rr = length(x) / max(k_ring.w, 0.01);
-    float  e = (rr - 1.0) / k_ringb.x;
-    float  rim = exp2(-e * e * 2.5) * (rr < 1.0 ? 1.0 : exp2(-e * e * 4.0));
-    float  fb = (rr - 0.92) / 0.08;
-    float  fill = 0.12 * exp2(-fb * fb * 1.5) * (rr < 1.0 ? 1.0 : 0.0);   // a softer band just inside the rim
-    float3 xn = x / max(k_ringb.z, 0.01) * 6.0 + k_ringb.w;
-    float  n = tex3D(s_noise, xn).r * 0.6 + tex3D(s_noise, xn * 2.7 + 0.5).r * 0.4;
-    float  brk = saturate(1.0 + (n - 0.5) * 4.0 * k_ringc.w);
-    float  edge = 1.0 / (0.35 + 0.65 * abs(dn));       // seen edge on, a ring is a brighter line
-    float  v = (rim * brk + fill * (0.5 + 0.5 * brk)) * k_ringb.y * min(edge, 2.0);
-    float3 c = lerp(lerp(k_ringc.rgb, float3(1.0, 0.62, 0.3), 0.5), float3(1.0, 0.92, 0.8), saturate(rim * rim * 0.6)) * v;
-    clip(t > k_eye.w && v > 0.002 ? 1.0 : -1.0);
+    // In the radius stock's disc shows, its sixteen-sided outline's: 0.955 of its radius.
+    float  rr = length(x) / max(k_ring.w * 0.955, 0.01);
+    // The noise in the disc's own radii, so the pattern grows with it as stock's texture does.
+    // The tongues are read off the direction from the centre, moving only slowly along the
+    // plane's normal with the radius, so they are long spikes pointing in, as stock's are.
+    float3 dir = x / max(length(x), 1e-4);
+    float3 pt = dir * 3.2 + k_ring.xyz * rr * 0.9 + k_ringb.w;
+    float  zt = (tex3D(s_noise, pt).r - 0.5) * 3.5 + (tex3D(s_noise, pt * 2.37 + 0.5).r - 0.5) * 0.8
+                 + (tex3D(s_noise, pt * 0.43 + 0.71).r - 0.5) * 3.0;                                  // about a z-score; the last, broad lobes
+    // The speckle in blotches a little drawn out along the radius, as stock's flames are, at two scales
+    // whose ratio is not whole, so the noise volume's tile does not show as a pattern.
+    float3 ps = dir * 4.1 + k_ring.xyz * rr * 6.0 + k_ringb.w * 1.7;
+    float  zs = clamp((tex3D(s_noise, ps).r - 0.5) * 3.5 + (tex3D(s_noise, ps * 2.29 + 0.31).r - 0.5) * 2.0, -2.0, 2.0);
+    float  w = k_ringb.x;                                        // the band's width, of the radius
+    float  r0 = 1.0 - w + 0.06 + zt * w * 0.13 * k_ringc.w;      // where the fire starts, broken into tongues
+    float  u = saturate((rr - r0) / (w * 0.25));                 // 0 at the inner edge .. 1 a little past it
+    // Measured off stock's disc: the class's colour times 1 at 0.7 of the radius, about 1.8
+    // at 0.88 and 2.4 at 0.93, darker again just inside the edge, and a faint red fringe just outside it.
+    float  I = u * u * (3.0 - 2.0 * u) * (1.0 + 0.6 * smoothstep(0.68, 0.88, rr) + 0.75 * smoothstep(0.86, 0.93, rr));
+    I *= 1.0 + zs * 0.18 * k_ringc.w;
+    I *= lerp(1.0, 0.45, smoothstep(0.94, 0.99, rr));            // darker just inside the edge
+    I *= smoothstep(1.0, 0.985, rr);                             // the edge, sharp
+    float  fr = 0.3 * smoothstep(1.06, 1.0, rr) * smoothstep(0.97, 1.0, rr) * saturate(1.0 + zs * 0.4);
+    float  edge = 1.0 / (0.35 + 0.65 * abs(dn));                 // seen edge on, a disc is a brighter line
+    // Redder inside, as stock's texture is: its green, against the class's colour, is about
+    // three quarters of the white-hot band's. The light stays the same in green, so a fading
+    // disc keeps its red longest, as stock's does.
+    float  hg = lerp(0.75, 1.0, smoothstep(0.75, 0.93, rr));
+    float3 c = k_ringc.rgb * (float3(1.0, hg, 1.0) * I / hg + float3(1.0, 0.4, 0.4) * fr) * k_ringb.y * min(edge, 2.0);
+    clip(t > k_eye.w && max(c.r, max(c.g, c.b)) > 0.002 ? 1.0 : -1.0);
     o.d = depth_of(t * dot(d, k_look.xyz));
     o.c = float4(c * k_time.w, 0.0);
     return o;
