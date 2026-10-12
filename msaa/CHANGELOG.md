@@ -4,6 +4,15 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`README.md`](README.md).
 
+## 1.1.1 — 2026-10-12
+
+### Fixed
+- A `Samples=` that is not a power of two (6, 12) tried 6, 3 or 12, 6, 3 and never 4
+  or 2, so MSAA was left off. The search now starts at the highest power of two at or
+  below `Samples=`: 6 gives 4x.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-03
 
 ### Fixed

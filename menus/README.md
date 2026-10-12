@@ -473,7 +473,7 @@ revert.
 | key | meaning |
 |---|---|
 | `Mode` | `0` observe and log only, `1` centre at stock size, `2` centre and scale |
-| `IntegerScale` | `1` snaps to a whole factor (2x = 1600x1200) — crisper, leaves a band |
+| `IntegerScale` | `1` snaps to a whole factor (2x = 1600x1200) — crisper, leaves a band; a window under 800x600 keeps the fractional fit |
 | `Smooth` | `1` HALFTONE, `0` nearest neighbour |
 | `RaiseShellMode` | `0` leaves the engine's 800x600 front-end mode alone |
 | `Backdrops` | `0` black pillarboxes and a plain stretch, no plates |

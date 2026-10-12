@@ -4,6 +4,14 @@
 position. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions".
 Newest first. How and why: [`README.md`](README.md).
 
+## 1.0.1 — 2026-10-12
+
+### Fixed
+- A grid key pressed while the bar is hidden (`DisplayInterface::SetIsHidden`) pressed a
+  button left from an earlier selection; it now presses nothing.
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-10-04
 
 ### Added
