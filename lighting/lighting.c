@@ -3187,11 +3187,15 @@ static float g_haze_pow  = 3.0f;                             /* PlanetHazePower=
 static float g_glint     = 0.30f, g_glint_pow = 40.0f;       /* PlanetGlint=, PlanetGlintPower= */
 static float g_city      = 0.8f;                             /* CityLights= */
 static float g_city_col[3] = { 1.00f, 0.72f, 0.38f };        /* CityLightColour= */
+static float g_halo      = 1.0f;                             /* PlanetHalo=; 0: none */
+static float g_halo_h    = 0.04f;                            /* PlanetHaloHeight=, x the ground's radius */
+static float g_halo_fwd  = 2.0f;                             /* PlanetHaloForward= */
 
 static D9Shader g_ground_ps = D9_PIXEL_SHADER(k_ground_ps);
 static D9Shader g_city_ps   = D9_PIXEL_SHADER(k_city_ps);
 static D9Shader g_cloud_ps  = D9_PIXEL_SHADER(k_cloud_ps);
 static D9Shader g_surface_ps = D9_PIXEL_SHADER(k_surface_ps);
+static D9Shader g_halo_ps   = D9_PIXEL_SHADER(k_halo_ps);
 static float    g_pl_v[PL_MAXV * 8];                         /* XYZ | NORMAL | TEX1 */
 static long     g_pl_draws, g_pl_stock;
 static DWORD    g_pl_said;                                   /* first of each kind of draw, logged */
@@ -3477,6 +3481,40 @@ static int pl_build(const BYTE *mesh, const BYTE *grp)
     return nf;
 }
 
+/* The air past a planet's limb (halo_ps), added over the shell's group in g_pl_v (nf
+ * triangles), pushed out by s; no depth written, so it hides nothing. */
+static void pl_halo(void *d9, void *d8, void *vs, int nf, float s, const float *k)
+{
+    static const DWORD rs[5] = { 27, 19, 20, 14, 15 };  /* ALPHABLENDENABLE, SRC/DESTBLEND, ZWRITEENABLE, ALPHATESTENABLE */
+    static const DWORD to[5] = { 1, 2, 2, 0, 0 };       /* on, ONE, ONE, off, off */
+    DWORD    old[5], fvf = 0;
+    D9Saved  sv;
+    void    *vb = NULLPTR, *ps = d9_shader(d9, &g_halo_ps);
+    UINT     off = 0, stride = 0;
+    int      i;
+    if (!ps) return;
+    for (i = 0; i < nf * 3; i++) {
+        g_pl_v[i * 8] *= s; g_pl_v[i * 8 + 1] *= s; g_pl_v[i * 8 + 2] *= s;
+    }
+    d9_save(d9, &sv);
+    D9_FN(d9, 101, D9GetSS_t)(d9, 0, &vb, &off, &stride);      /* GetStreamSource */
+    ((D8GetVS_t)(*(void ***)d8)[77])(d8, &fvf);
+    ((D8VS_t)(*(void ***)d8)[76])(d8, FVF_HULL);
+    d9_bind(d9, vs, ps);
+    d9_psconst(d9, 48, k, 1);
+    for (i = 0; i < 5; i++) {
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, rs[i], &old[i]);
+        D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, rs[i], to[i]);
+    }
+    ((D8DPUP_t)(*(void ***)d8)[72])(d8, 4, (UINT)nf, g_pl_v, 32);   /* DrawPrimitiveUP */
+    for (i = 0; i < 5; i++) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, rs[i], old[i]);
+    ((D8VS_t)(*(void ***)d8)[76])(d8, fvf);
+    D9_FN(d9, 100, D9SetSS_t)(d9, 0, vb, off, stride);
+    if (vb) D9_FN(vb, D9_RELEASE, D9_Ref_t)(vb);
+    d9_restore(d9, &sv);
+    pl_note(11, "a planet's air past the limb in shaders");
+}
+
 /* 1 when the mesh is drawn (or culled) here, 0 to leave it to the stock function. */
 static int pl_draw(BYTE *mesh)
 {
@@ -3488,8 +3526,9 @@ static int pl_draw(BYTE *mesh)
     void **dvt;
     float  cc[3], r, w[16], vw[16], p[16], wv[16], wvp[16], col[16];
     const float *m = (const float *)NODE_TO_CAMERA, *lc = (const float *)(mesh + 0xd4);
-    DWORD  cull, fvf = 0;
+    DWORD  cull, fvf = 0, zw = 1;
     int    atmo, g, ng, i, j;
+    float  halo_k[4] = { 0.0f, 0.0f, 0.0f, 0.0f }, halo_s = 1.0f;
 
     if (!eng) return 0;
     dev = *(void **)(eng + 0xcc + 4 * *(DWORD *)(eng + 0xc0));
@@ -3556,6 +3595,28 @@ static int pl_draw(BYTE *mesh)
     mat_mul(w, vw, wv);
     mat_mul(wv, p, wvp);
 
+    /* The air past the limb: from the ground's radius (a hemisphere's first vertex; the
+     * meshes are spheres about the origin; a gas giant's, its shell's) to PlanetHaloHeight above it, drawn on the
+     * shell's triangles pushed out that far (halo_s), a little more for their chords. */
+    if (atmo && g_halo > 0.0f && *(BYTE **)(db + 0xa8)) {
+        const BYTE  *gm = *(BYTE **)(db + 0xa8);
+        const float *gp = *(const float **)(gm + 0xc0), *sp = *(const float **)(mesh + 0xc0);
+        float ws = sqrt_f(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]), rg, rs;
+        if (gp && sp && *(const int *)(gm + 0xc8) > 0 && *(const int *)(mesh + 0xc8) > 0) {
+            rg = sqrt_f(gp[0] * gp[0] + gp[1] * gp[1] + gp[2] * gp[2]) * ws;
+            rs = sqrt_f(sp[0] * sp[0] + sp[1] * sp[1] + sp[2] * sp[2]) * ws;
+            if (has_sf) rg = rs;                    /* a gas giant: its shell is its surface */
+            if (rg > 1e-3f && rs > 1e-3f) {
+                halo_k[0] = rg;
+                halo_k[1] = rg * (1.0f + (g_halo_h > 1e-3f ? g_halo_h : 1e-3f));
+                halo_k[2] = g_halo;
+                halo_k[3] = g_halo_fwd;
+                halo_s = halo_k[1] * 1.03f / rs;
+                if (halo_s < 1.0f) halo_s = 1.0f;
+            }
+        }
+    }
+
     texs = mesh + 0x114;
     grp  = *(BYTE **)(mesh + 0x104);
     ng   = *(int *)(mesh + 0x100);
@@ -3577,6 +3638,14 @@ static int pl_draw(BYTE *mesh)
             ((D8GetVS_t)(*(void ***)d8)[77])(d8, &fvf);
             ((D8VS_t)(*(void ***)d8)[76])(d8, FVF_HULL);
             d9_bind(d9, vs, use_sf ? ps[3] : ps[kind]);
+            /* A blended shell writes no depth: where it reaches past the ground, its
+             * depth hid whatever was drawn later behind it (the gas, nebulae's
+             * billboards), and the sky showed through as a dark ring round the planet.
+             * A gas giant's shell from Surfaces.asi is the planet itself, and opaque. */
+            if (kind == 2 && !use_sf) {
+                D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 14, &zw);
+                D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 14, 0);
+            }
             for (j = 0; j < 4; j++) for (i = 0; i < 4; i++) col[j * 4 + i] = wvp[i * 4 + j];
             d9_vsconst(d9, 0, col, 4);
             for (j = 0; j < 3; j++) for (i = 0; i < 4; i++) col[j * 4 + i] = w[i * 4 + j];
@@ -3600,6 +3669,7 @@ static int pl_draw(BYTE *mesh)
             }
             ((D8DPUP_t)(*(void ***)d8)[72])(d8, 4, (UINT)nf, g_pl_v, 32);   /* DrawPrimitiveUP */
             if (use_sf) sf_unbind(d9);
+            if (kind == 2 && !use_sf) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 14, zw);
             ((D8VS_t)(*(void ***)d8)[76])(d8, fvf);
             D9_FN(d9, 100, D9SetSS_t)(d9, 0, vb, off, stride);
             D9_FN(d9, 104, D9Obj_t)(d9, ib);
@@ -3609,6 +3679,7 @@ static int pl_draw(BYTE *mesh)
             pl_note(8 + kind, kind == 2 ? "a cloud shell in shaders" : kind == 1 ? "a city pass in shaders"
                                                                      : "a ground hemisphere in shaders");
         }
+        if (atmo && halo_k[2] > 0.0f) pl_halo(d9, d8, vs, nf, halo_s, halo_k);
         ((TmCleanup_t)(*(void ***)tm)[5])(tm);
     }
     if (++g_pl_draws == 1 || g_pl_draws == 100000) {
@@ -3734,6 +3805,9 @@ static void startup(void)
     ini1(ini, "PlanetGlintPower",  &g_glint_pow);
     ini1(ini, "CityLights",        &g_city);
     ini3(ini, "CityLightColour",   g_city_col);
+    ini1(ini, "PlanetHalo",        &g_halo);
+    ini1(ini, "PlanetHaloHeight",  &g_halo_h);
+    ini1(ini, "PlanetHaloForward", &g_halo_fwd);
     light_matrix(g_key_dir, g_key_mat);
     light_matrix(g_fill_dir, g_fill_mat);
 

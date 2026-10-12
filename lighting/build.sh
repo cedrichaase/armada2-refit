@@ -19,6 +19,7 @@ mkdir -p "$out"
 # The planet shaders (planet.hlsl -> planet_shaders.h, committed; PlanetShaders=1).
 "$here/../platform/d3d9/hlsl.sh" "$here/planet_shaders.h" "$here/planet.hlsl" \
     ground_ps:ps_3_0:k_ground_ps city_ps:ps_3_0:k_city_ps cloud_ps:ps_3_0:k_cloud_ps \
+    halo_ps:ps_3_0:k_halo_ps \
     surface_ps:ps_3_0:k_surface_ps
 
 llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
