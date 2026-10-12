@@ -4,6 +4,16 @@
 cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.3 — 2026-10-13
+
+### Changed
+- `mbgrg` (the green sky of `a2_kling01` and four other maps) toned down: `Softness`
+  1.4 → 2.6, `Coverage` 3.2 → 2.1, `Gamma` 1.3, `Grain=0.6,4,0.5`, `Haze=0.5,1.6`,
+  `Brightness` 0.307 → 0.25. Soft cloud in place of hard lime clumps; on the bench the
+  brightest gas fell from 202 to 98 (green, of 255) and the mean by a third.
+
+Installed, not yet seen in game.
+
 ## 1.2.2 — 2026-10-12
 
 ### Fixed

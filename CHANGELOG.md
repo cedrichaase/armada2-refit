@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.30.1 — 2026-10-13
+
+Layers: sky 1.2.3.
+
+### Changed
+- The green sky `mbgrg` (Klingon mission 1 and four other maps) is dimmer and its gas
+  soft-edged instead of hard clumps (sky 1.2.3).
+
+Installed, not yet seen in game.
+
 ## 11.30.0 — 2026-10-13
 
 Layers: fog 1.1.0.
