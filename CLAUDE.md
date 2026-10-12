@@ -39,6 +39,7 @@ it bundles.
 | `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key | `lighting/README.md` |
 | `sky/` | `Sky.asi` — the map's sky computed from view direction by a shader, baked once per map into a cube, in place of the six painted faces; recipes per sky name in `sky/skies/` | `sky/README.md` |
 | `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
+| `shields/` | `Shields.asi` — the ordinary shield hits drawn by a shader over the struck ship's shield ellipsoid (hot spot, ring, hex lattice and rim, by faction, weaker as the shields run out) in place of the stock `Xshldx01` shell. Not in the release package yet | `shields/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -720,6 +721,22 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 - **`Opacity=` keeps the gas as bright from every angle** (half size only); the
   composite is bound by its texture reads, so measure any new read there
   (`Timing=1`).
+
+### shields
+
+- **Only type 0 (`Xshldx01`, the ordinary hit) is the plugin's**: the call to
+  `ShieldHit::DrawShield` in `ShieldEffect::Render` skips it, every other shield type
+  (the shields-down ring, the special weapons' shells) calls through to stock. Without a
+  d3d9 device the stock shell stays.
+- **A hit's direction is recovered, not captured**: the instance transform is the hit's
+  frame times the shield-to-object 3x3 with its diagonal over the model's radius
+  (+0x40); row 2 times S'^-1 is the direction on the unit sphere. That follows a beam as
+  `ShieldUpdate` moves it. Don't re-derive it from the beam's end.
+- **Every hook is a chained call site** (DrawShield, RenderChunks, the four weapon
+  calls of `CreateShieldHit`): keep it so; `Scene.asi`'s `ShieldFx=0` and other plugins
+  write the same weapon sites.
+- **Render only**: nothing the simulation reads is written, so it stays
+  stock-compatible in multiplayer. The clock is wall time; `TimeScale=` is for looking.
 
 ### textures
 

@@ -31,6 +31,7 @@ WHAT COUNTS AS A CHANGE
                                                   recipes
     nebulae       Nebulae.asi/.ini,            -- added files: nebulae as volumes of gas
                   Nebulae/*.ini                   and their recipes
+    shields       Shields.asi/.ini             -- added files: shield hits drawn by a shader
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
                   (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
                   *.a2font-backup from ui-font-condense and the Curs_* art from
@@ -100,9 +101,10 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('Lighting.asi', 'lighting'), ('Lighting.ini', 'lighting'),
          ('Sky.asi', 'sky'), ('Sky.ini', 'sky'),
          ('Nebulae.asi', 'nebulae'), ('Nebulae.ini', 'nebulae'),
+         ('Shields.asi', 'shields'), ('Shields.ini', 'shields'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
+LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'shields', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.

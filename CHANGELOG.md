@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.22.0 — 2026-10-12
+
+Layers: shields 1.0.0, testbench 3.6.0.
+
+### Added
+- The `shields` layer: `Shields.asi` draws the ordinary shield hits in a shader over
+  the struck ship's shield ellipsoid (a hot spot, a ring, the hex lattice and rim lit
+  about each hit, by faction, weaker as the shields run out) in place of the stock
+  shell (shields 1.0.0). `./install` runs `shields/install.sh`; `a2mod` switches
+  `Shields.asi` and `Shields.ini` as the `shields` layer. Not in the release package
+  yet.
+- The `shields` scene and the `shields-hits` scenario; `no-assets` checks
+  `Shields.log` (testbench 3.6.0).
+
+Installed, not yet seen in game.
+
 ## 11.19.0 — 2026-10-10
 
 Layers: nebulae 1.0.0.
