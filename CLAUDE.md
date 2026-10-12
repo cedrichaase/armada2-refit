@@ -40,6 +40,7 @@ it bundles.
 | `sky/` | `Sky.asi` — the map's sky computed from view direction by a shader, baked once per map into a cube, in place of the six painted faces; recipes per sky name in `sky/skies/` | `sky/README.md` |
 | `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
 | `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M) and the dilithium moon's rock made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
+| `explosions/` | `Explosions.asi` — each ship's and station's fireball ray-marched as a volume of gas (white flash, burning billows cooling to smoke, spectral noise, seeded per explosion) and each shockwave drawn as a ring of light, in place of stock's flipbook sprites and textured disc. Render only. Not in the release package yet | `explosions/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -308,7 +309,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -748,6 +749,25 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   gone before any device `Reset`.
 - **The moon's cracks are holes, black as stock's are**: the rock is alpha-tested
   (`Cut=`), and the glow shell shows only where a crack opens at the silhouette.
+
+### explosions
+
+- **Only slot 15 (`Submit`) of the FireballExplosion and ShockwaveExplosion vtables is
+  ours.** `Lighting.asi` wraps slots 14 and 0 of FireballExplosion's and patches them
+  only while they still hold stock's pointers, and the ASI loader loads `Explosions.asi`
+  first: never touch those two. The draw wraps the call to `RenderChunks` at 0x598446,
+  because `Nebulae.asi` owns the next one (`RenderParticleList`).
+- **The draw writes its own depth** (`oDepth`, no depth writes): the hardware test then
+  applies where the fire's light comes from, so debris in front hides it and debris
+  inside it does not. A faded or cloaked hull is drawn at `Flush`, after us, so it
+  lies over the fire.
+- **vkd3d unrolls every loop and has no `tex3Dlod`**: the march is a fixed number of
+  steps, and the noise texture has one level so the implicit level inside the unrolled
+  branches cannot matter.
+- **The look was set on the bench against stock frozen at the same instant** (pause,
+  then `Enable=0`, which `Reload=1` picks up): judge a change that way, at RTS
+  distance as well as close up. Milky beige meant dim white light behind smoke, not
+  the colour ramp.
 
 ### textures
 

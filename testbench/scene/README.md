@@ -35,6 +35,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `stations` | the player's own: three shipyards (`yard1..3`), an advanced shipyard (`adv`), a research station (`lab`) and two ships, with the HUD on, for the control-group keys and the build menu (`scenarios/qol-station-groups.md`) | 2026-10-05 |
 | `showcase` | a fleet action for footage: the Enterprise-E (`fente`), a Sovereign (`fbattle`), a Galaxy and two Klingon flagships (`kmartok`, `kbattle`) firing at two Borg cubes that do not fire back (a Borg attack beams boarding parties over), in front of a class M planet; everyone immortal and healed, engines off | 2026-10-07 |
 | `warp` | three of the player's Federation destroyers in open space at 3000,0,3000, with the HUD and cursor on, for long moves on the map going to warp (`scenarios/qol-warp.md`) | 2026-10-07 |
+| `explosion` | a Galaxy class beside a destroyer (`small`), a cruiser (`mid`) and a battleship (`big`), none firing, to blow up with `kill`, for the explosions (`explosions/README.md`, `scenarios/explosions.md`) | 2026-10-12 |
 
 ## Scene files
 
@@ -97,6 +98,7 @@ answer and fails if a command did.
 | `camera rts` | back to the game's own camera |
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
 | `attack <name> <target>` | order an attack |
+| `kill <name>` | the craft dies at once, as a mission script blows one up (`ScriptInterfaceImp::ExplodeNow`, 0x456cf0); its healing and immortality are switched off first |
 | `goto <name>[,<name>...] <object \| x y z> [warp]` | order a move, as a player's right-click does (AiCommand `GO`; `warp`: `GO_WARP`), and switch the engines on. To a craft, the ship follows it; to any other object (a nebula, a planet), it goes to where the object is. A point is anchored like the scene file's positions. Several names, comma-separated, keep their places: each goes to the point plus its own offset from the group's centre. It ends an `attack`, though a ship still fires at what comes in range |
 | `stop <name>` | order a stop (AiCommand `STOP`, as `ScriptInterfaceImp::Stop` gives) |
 | `heal`, `engines`, `weapons`, `immortal` `<name> on\|off` | as the keys above |
