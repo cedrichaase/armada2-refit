@@ -85,6 +85,8 @@ __declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWO
 __declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
+__declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
+__declspec(dllimport) void   *__stdcall GetProcAddress(HMODULE, LPCSTR);
 
 int _fltused = 0;   /* floats without the CRT */
 
@@ -151,6 +153,14 @@ static void s_cat(char *d, const char *s)
 {
     int n = s_len(d);
     while (*s) d[n++] = *s++;
+    d[n] = 0;
+}
+
+/* at most max characters of s: for names read out of the engine's objects */
+static void s_catn(char *d, const char *s, int max)
+{
+    int n = s_len(d);
+    while (*s && max-- > 0) d[n++] = *s++;
     d[n] = 0;
 }
 
@@ -743,6 +753,15 @@ static int patch_set_material(void)
  * stage), and every draw when there is no d3d9 device, goes fixed-function as
  * before. */
 #include "hull_shaders.h"
+#include "../surfaces/surfaces.h"
+
+/* Surfaces.asi: defined with the planets, below ("Planets on the GPU"). */
+static A2SurfaceFn surface_fn(void);
+static void sf_bind(void *d9, const A2Surface *sf, int first, int n);
+static void sf_unbind(void *d9);
+static int  hull_surface(void *d8, const BYTE *mesh, A2Surface *out);
+static D9Shader g_moon_ps = D9_PIXEL_SHADER(k_moon_ps);
+static long     g_sh_surf;                 /* hull draws from Surfaces.asi */
 
 typedef long (__stdcall *DIP8_t)(void *, DWORD, UINT, UINT, UINT, UINT);
 typedef long (__stdcall *D9Get_t)(void *, DWORD, DWORD *);
@@ -1088,16 +1107,33 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
         if (rec) sm_keep(&rc, g_vb_mesh);
         return 0;
     }
+    {   /* a model whose texture has a recipe in Surfaces.asi (the dilithium moons) */
+        A2Surface msf;
+        void *mps = g_vb_mesh && surface_fn() ? d9_shader(d9, &g_moon_ps) : NULLPTR;
+        if (mps && hull_surface(dev, g_vb_mesh, &msf)) {
+            float k[8 * 4];
+            int   i, j;
+            for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) k[i * 4 + j] = i < 3 && j < 3 ? g_sh_w[i * 4 + j] : 0.0f;
+            for (j = 0; j < 3; j++) k[12 + j] = g_sh_w[12 + j];
+            for (i = 0; i < 16; i++) k[16 + i] = msf.k[i / 4][i % 4];
+            d9_psconst(d9, 72, k, 8);
+            sf_bind(d9, &msf, 4, 2);
+            ps = mps;
+            g_sh_surf++;
+        }
+    }
     d9_bind(d9, vs, ps);
     sm_bind(d9);
     r = g_dip(dev, pt, mi, nv, si, pc);
     sm_unbind(d9);
+    if (ps == d9_shader(d9, &g_moon_ps)) sf_unbind(d9);
     d9_restore(d9, &sv);
     if (rec) sm_keep(&rc, g_vb_mesh);
     if (++g_sh_draws == 1 || g_sh_draws == 100000) {
         char b[120];
         b[0] = 0; s_cat(b, "shaders: hull draws in shaders "); s_num(b, g_sh_draws);
-        s_cat(b, ", fixed-function "); s_num(b, g_sh_ff); logline(b);
+        s_cat(b, ", fixed-function "); s_num(b, g_sh_ff);
+        s_cat(b, ", from Surfaces.asi "); s_num(b, g_sh_surf); logline(b);
     }
     return r;
 }
@@ -2796,13 +2832,14 @@ static float g_city_col[3] = { 1.00f, 0.72f, 0.38f };        /* CityLightColour=
 static D9Shader g_ground_ps = D9_PIXEL_SHADER(k_ground_ps);
 static D9Shader g_city_ps   = D9_PIXEL_SHADER(k_city_ps);
 static D9Shader g_cloud_ps  = D9_PIXEL_SHADER(k_cloud_ps);
+static D9Shader g_surface_ps = D9_PIXEL_SHADER(k_surface_ps);
 static float    g_pl_v[PL_MAXV * 8];                         /* XYZ | NORMAL | TEX1 */
 static long     g_pl_draws, g_pl_stock;
 static DWORD    g_pl_said;                                   /* first of each kind of draw, logged */
 
 static void pl_note(int bit, const char *what)
 {
-    char b[160];
+    char b[320];
     if (g_pl_said & (1u << bit)) return;
     g_pl_said |= 1u << bit;
     b[0] = 0; s_cat(b, "planet shaders: "); s_cat(b, what); logline(b);
@@ -2952,6 +2989,114 @@ static void pl_consts(void *d9, const BYTE *mesh, const BYTE *lm, int atmo, cons
     d9_psconst(d9, 0, k, 40);
 }
 
+/* Surfaces.asi (surfaces/README.md): a planet's surface made from a recipe, as three
+ * cubes the ground (or a gas giant's shell) samples in surface_ps in place of the
+ * engine's texture. Asked for at the first planet draw, when every ASI is loaded
+ * (Surfaces.asi loads after this one); without it, or without a recipe for the class,
+ * the stock texture as before. */
+static int         g_surfaces = 1;                           /* Surfaces= */
+static A2SurfaceFn g_surface_fn;
+static int         g_surface_asked;
+
+static A2SurfaceFn surface_fn(void)
+{
+    if (!g_surface_asked) {
+        HMODULE m = g_surfaces ? GetModuleHandleA("Surfaces.asi") : NULLPTR;
+        g_surface_asked = 1;
+        g_surface_fn = m ? (A2SurfaceFn)GetProcAddress(m, "a2_surface") : (A2SurfaceFn)NULLPTR;
+        logline(g_surface_fn ? "planet shaders: Surfaces.asi found: planets with a recipe drawn from it"
+                             : g_surfaces ? "planet shaders: no Surfaces.asi: the stock planet textures"
+                                          : "planet shaders: Surfaces=0: the stock planet textures");
+    }
+    return g_surface_fn;
+}
+
+/* A model in the hull shaders, by the name of its first texture: mesh +0x114 points at
+ * the mesh's list of textures, whose first is what RenderInternal hands the device's
+ * SetTexture, and every ST3D_DatabaseElement keeps its name, a copy, at +0x8, as its
+ * constructor stores it. 1 with a surface in *out. A name Surfaces.asi has no recipe
+ * for is remembered, so the ships' textures are asked about once each. */
+#define HS_MISS 256
+static const char *g_hs_miss[HS_MISS];
+static int         g_hs_nmiss, g_hs_said;
+
+static int hull_surface(void *d8, const BYTE *mesh, A2Surface *out)
+{
+    const BYTE *const *list = *(const BYTE *const **)(mesh + 0x114);
+    const BYTE *tex = list ? list[0] : NULLPTR;
+    const char *name = tex ? *(const char **)(tex + 8) : NULLPTR;
+    int i, r;
+    if (!name || !name[0]) return 0;
+    for (i = 0; i < g_hs_nmiss; i++) if (g_hs_miss[i] == name) return 0;
+    out->size = (int)sizeof *out;
+    r = g_surface_fn(d8, name, out);
+    if (r == 0 && g_hs_nmiss < HS_MISS) g_hs_miss[g_hs_nmiss++] = name;
+    if (r != 0 || g_hs_said < 12) {
+        const char *mn = *(const char **)(mesh + 8);
+        char b[200];
+        if (r == 0) g_hs_said++;
+        if (r == 0 || !(g_pl_said & (1u << 20))) {
+            if (r != 0) g_pl_said |= 1u << 20;
+            b[0] = 0; s_cat(b, "hull shaders: mesh \""); s_catn(b, mn ? mn : "?", 40); s_cat(b, "\", texture \"");
+            s_catn(b, name, 40); s_cat(b, r == 1 ? "\": from Surfaces.asi" : r == 0 ? "\": no recipe" : "\": recipe, not drawn now");
+            logline(b);
+        }
+    }
+    return r == 1;
+}
+
+/* The cubes in samplers first..first+n-1 (albedo, relief, clouds), filtered and
+ * clamped, around one draw: 2..4 for a planet, 4..5 for a model in the hull shaders,
+ * whose sampler 3 is the shadow map. */
+static const DWORD k_sf_samp[7]     = { 1, 2, 3, 5, 6, 7, 11 };   /* ADDRESSU/V/W, MAG/MIN/MIP, SRGB */
+static const DWORD k_sf_samp_val[7] = { 3, 3, 3, 2, 2, 2, 0 };    /* clamp, linear, linear, linear, off */
+static void  *g_sf_saved_tex[3];
+static DWORD  g_sf_saved[3][7];
+static int    g_sf_first, g_sf_n;
+
+static void sf_bind(void *d9, const A2Surface *sf, int first, int n)
+{
+    void *t[3];
+    int   s, i;
+    t[0] = sf->albedo; t[1] = sf->relief; t[2] = sf->cloud ? sf->cloud : sf->relief;
+    g_sf_first = first; g_sf_n = n;
+    for (s = 0; s < n; s++) {
+        g_sf_saved_tex[s] = NULLPTR;
+        D9_FN(d9, D9_GETTEXTURE, SmGetTex_t)(d9, (DWORD)(first + s), &g_sf_saved_tex[s]);
+        for (i = 0; i < 7; i++) {
+            D9_FN(d9, D9_GETSAMPLERSTATE, D9GetSamp_t)(d9, (DWORD)(first + s), k_sf_samp[i], &g_sf_saved[s][i]);
+            D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, (DWORD)(first + s), k_sf_samp[i], k_sf_samp_val[i]);
+        }
+        D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, (DWORD)(first + s), t[s]);
+    }
+}
+
+static void sf_unbind(void *d9)
+{
+    int s, i;
+    for (s = 0; s < g_sf_n; s++) {
+        D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, (DWORD)(g_sf_first + s), g_sf_saved_tex[s]);
+        sm_unref(g_sf_saved_tex[s]);
+        g_sf_saved_tex[s] = NULLPTR;
+        for (i = 0; i < 7; i++)
+            D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, (DWORD)(g_sf_first + s), k_sf_samp[i], g_sf_saved[s][i]);
+    }
+    g_sf_n = 0;
+}
+
+/* c40..c46: the world matrix's axes, and what the recipe gives the draw. */
+static void sf_consts(void *d9, const A2Surface *sf, const float *w)
+{
+    float k[7 * 4];
+    int   i, j;
+    for (i = 0; i < 3; i++) {
+        for (j = 0; j < 3; j++) k[i * 4 + j] = w[i * 4 + j];
+        k[i * 4 + 3] = 0.0f;
+    }
+    for (i = 0; i < 16; i++) k[12 + i] = sf->k[i / 4][i % 4];
+    d9_psconst(d9, 40, k, 7);
+}
+
 /* One group's triangles, three vertices each, from the mesh's arrays; 0 if too many. */
 static int pl_build(const BYTE *mesh, const BYTE *grp)
 {
@@ -2977,7 +3122,10 @@ static int pl_build(const BYTE *mesh, const BYTE *grp)
 static int pl_draw(BYTE *mesh)
 {
     BYTE  *eng = *(BYTE **)0x7ad508, *db, *tmp, *grp;
-    void  *dev, *d8 = NULLPTR, *d9, *vs, *ps[3], *tm, *texs;
+    void  *dev, *d8 = NULLPTR, *d9, *vs, *ps[4], *tm, *texs;
+    A2Surface sf;
+    int    has_sf;
+    float  shell_tex = 1.0f, shell_k[4];
     void **dvt;
     float  cc[3], r, w[16], vw[16], p[16], wv[16], wvp[16], col[16];
     const float *m = (const float *)NODE_TO_CAMERA, *lc = (const float *)(mesh + 0xd4);
@@ -3011,6 +3159,26 @@ static int pl_draw(BYTE *mesh)
     }
     if (((SphereVis_t)FN_SPHERE_VIS)(*(void **)(eng + 0xfc), cc, r) == 1) return 1;
 
+    /* A surface from Surfaces.asi for the class's ground (or, for the shell, its
+     * atmosphere) texture name: asked before any state is set, since the first ask bakes. */
+    db   = *(BYTE **)(mesh + 0x140);
+    atmo = db && *(BYTE **)(db + 0xb0) == mesh;
+    has_sf = 0;
+    if (surface_fn() && (ps[3] = d9_shader(d9, &g_surface_ps)) != NULLPTR) {
+        const BYTE *cls = pl_class(db);
+        const char *name = cls ? (const char *)cls + (atmo ? 0x4ac : 0x4bc) : NULLPTR;
+        if (name && name[0]) {
+            sf.size = (int)sizeof sf;
+            has_sf = g_surface_fn(d8, name, &sf) == 1;
+        }
+        /* a stock shell over a ground made from a recipe keeps only its halo */
+        if (atmo && !has_sf && cls && ((const char *)cls)[0x4bc]) {
+            A2Surface g;
+            g.size = (int)sizeof g;
+            shell_tex = g_surface_fn(d8, (const char *)cls + 0x4bc, &g) == 1 ? 0.0f : 1.0f;
+        }
+    }
+
     tmp = *(BYTE **)(eng + 0x100);
     tm  = tmp ? *(void **)(tmp + 4) : NULLPTR;
     if (!tm) tm = *(void **)(mesh + 0x120);
@@ -3029,8 +3197,6 @@ static int pl_draw(BYTE *mesh)
     mat_mul(w, vw, wv);
     mat_mul(wv, p, wvp);
 
-    db   = *(BYTE **)(mesh + 0x140);
-    atmo = db && *(BYTE **)(db + 0xb0) == mesh;
     texs = mesh + 0x114;
     grp  = *(BYTE **)(mesh + 0x104);
     ng   = *(int *)(mesh + 0x100);
@@ -3044,19 +3210,37 @@ static int pl_draw(BYTE *mesh)
             void   *vb = NULLPTR, *ib = NULLPTR;
             UINT    off = 0, stride = 0;
             int     kind = atmo ? 2 : pass == 1 ? 1 : 0;
+            int     use_sf = has_sf && pass == 0;            /* the ground, or a gas giant's shell */
             ((TmPass_t)(*(void ***)tm)[4])(tm, pass, texs);
             d9_save(d9, &sv);
             D9_FN(d9, 101, D9GetSS_t)(d9, 0, &vb, &off, &stride);  /* GetStreamSource */
             D9_FN(d9, 105, D9Obj_t)(d9, &ib);                       /* GetIndices */
             ((D8GetVS_t)(*(void ***)d8)[77])(d8, &fvf);
             ((D8VS_t)(*(void ***)d8)[76])(d8, FVF_HULL);
-            d9_bind(d9, vs, ps[kind]);
+            d9_bind(d9, vs, use_sf ? ps[3] : ps[kind]);
             for (j = 0; j < 4; j++) for (i = 0; i < 4; i++) col[j * 4 + i] = wvp[i * 4 + j];
             d9_vsconst(d9, 0, col, 4);
             for (j = 0; j < 3; j++) for (i = 0; i < 4; i++) col[j * 4 + i] = w[i * 4 + j];
             d9_vsconst(d9, 4, col, 3);
             pl_consts(d9, mesh, lm, atmo, w, vw);
+            shell_k[0] = shell_tex; shell_k[1] = shell_k[2] = shell_k[3] = 0.0f;
+            d9_psconst(d9, 47, shell_k, 1);
+            if (use_sf) {
+                sf_consts(d9, &sf, w);
+                sf_bind(d9, &sf, 2, 3);
+                if (!(g_pl_said & (1u << (16 + kind)))) {    /* how each kind's frame stands */
+                    char  b[240];
+                    float det = w[0] * (w[5] * w[10] - w[6] * w[9]) - w[1] * (w[4] * w[10] - w[6] * w[8])
+                              + w[2] * (w[4] * w[9] - w[5] * w[8]);
+                    b[0] = 0; s_cat(b, kind == 2 ? "a shell" : "a ground hemisphere");
+                    s_cat(b, " from Surfaces.asi; its world axes "); s_vec(b, w); s_cat(b, " ");
+                    s_vec(b, w + 4); s_cat(b, " "); s_vec(b, w + 8); s_cat(b, ", determinant x1000 ");
+                    s_num(b, (long)(det * 1000.0f));
+                    pl_note(16 + kind, b);
+                }
+            }
             ((D8DPUP_t)(*(void ***)d8)[72])(d8, 4, (UINT)nf, g_pl_v, 32);   /* DrawPrimitiveUP */
+            if (use_sf) sf_unbind(d9);
             ((D8VS_t)(*(void ***)d8)[76])(d8, fvf);
             D9_FN(d9, 100, D9SetSS_t)(d9, 0, vb, off, stride);
             D9_FN(d9, 104, D9Obj_t)(d9, ib);
@@ -3172,6 +3356,7 @@ static void startup(void)
     ini3(ini, "PlanetAmbient", g_planet_amb);
     ini3(ini, "PlanetDiffuse", g_planet_diff);
     g_planet_sh = (int)GetPrivateProfileIntA("Lighting", "PlanetShaders", 1, ini);
+    g_surfaces  = (int)GetPrivateProfileIntA("Lighting", "Surfaces", 1, ini);
     ini3(ini, "PlanetDusk",        g_dusk);
     ini1(ini, "PlanetWrap",        &g_wrap);
     ini1(ini, "PlanetFill",        &g_pl_fill);
