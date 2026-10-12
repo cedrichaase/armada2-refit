@@ -5,6 +5,29 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 4.3.3 — 2026-10-12
+
+### Fixed
+- `IntegerScale=1` in a window smaller than 800x600 keeps the fractional fit instead of
+  forcing 1x, which placed the menu outside the window and had the backdrop composite
+  read and write outside its surface.
+- The backdrop's sides are drawn again after a frame that matched no backdrop: the
+  fallback's black pillarboxes now make the next composite send the whole screen, not
+  only its dirty rectangle.
+- An embedded modal dialog opened from a full-screen menu is fitted through that menu's
+  placement, as its popup form is, not through the screen's, which misplaced it when the
+  game window was not the screen.
+- The backdrop stretch's taps no longer overflow at widths of about 5200 px and up (8K).
+- `N.soften=` rectangles are clipped to the design surface; one reaching past 800x600 read
+  outside the frame buffers.
+- A scaled window's surface is released when the window is destroyed, not when its slot
+  is next reclaimed.
+- `install.sh` always rebuilds `Menus.asi` (a stale build was installed after an edit or a
+  pull); its closing Heroic-config check can no longer fail the script and stop
+  `./install`; `--mode` without a value gives a usage error.
+
+Installed, not yet seen in game.
+
 ## 4.3.2 — 2026-10-08
 
 ### Fixed

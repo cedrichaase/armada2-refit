@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.19.1 — 2026-10-12
+
+Layers: menus 4.3.3.
+
+### Fixed
+- Menus: `IntegerScale=1` in a window under 800x600, the backdrop's sides after an
+  unmatched frame, embedded nested dialogs' fit, 8K stretch taps, `N.soften=` bounds,
+  surfaces released on destroy; `menus/install.sh` always rebuilds and its closing check
+  no longer stops `./install` (menus 4.3.3).
+
+Installed, not yet seen in game.
+
 ## 11.19.0 — 2026-10-10
 
 Layers: nebulae 1.0.0.
