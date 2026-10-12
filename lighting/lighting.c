@@ -1042,6 +1042,10 @@ static int sh_consts(void *d9, int bump)
             dc[nd * 4] = l.Diffuse.r; dc[nd * 4 + 1] = l.Diffuse.g; dc[nd * 4 + 2] = l.Diffuse.b;
             dv[nd * 4] = -l.Direction[0] / n; dv[nd * 4 + 1] = -l.Direction[1] / n;
             dv[nd * 4 + 2] = -l.Direction[2] / n;
+            /* a mirrored draw: hook_dip draws its front faces, so FixMirrored's reversal
+             * is taken back and the normals are a stock hull's (misc.x -1) */
+            if (g_sh_sign > 0.0f)
+                for (j = 0; j < 3; j++) dv[nd * 4 + j] = -dv[nd * 4 + j];
             nd++;
         }
         {   /* the Key, the brightest, times HullSun (BorgSun) */
@@ -1058,7 +1062,7 @@ static int sh_consts(void *d9, int bump)
         }
         d9_psconst(d9, 2, dc, 4);
         d9_psconst(d9, 6, dv, 4);
-        misc[0] = g_sh_sign;
+        misc[0] = bump ? g_sh_sign : -1.0f;
         misc[1] = g_sh_lit_self ? (bump ? g_borg_self : g_selfillum) : 0.0f;
         misc[2] = g_knee;
         misc[3] = near_fade();
@@ -1099,6 +1103,8 @@ static int sh_consts(void *d9, int bump)
 
 static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3);
 
+typedef long (__stdcall *D9Set_t)(void *, DWORD, DWORD);
+
 static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc)
 {
     void   *d9, *vs, *ps;
@@ -1106,6 +1112,7 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     SmRec   rc;
     int     rec;
     long    r;
+    DWORD   cull = 0;
     if (!g_in_vb) return g_dip(dev, pt, mi, nv, si, pc);
     d9 = d9_device(dev);
     vs = d9_shader(d9, &g_hull_vs);
@@ -1121,8 +1128,18 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
         d9_restore(d9, &sv); g_sh_ff++; return g_dip(dev, pt, mi, nv, si, pc);
     }
     rec = sm_take(dev, d9, &rc, pt, mi, nv, si, pc, 0);
-    sm_consts(d9, rec ? &rc : NULLPTR, g_sh_sign);
+    sm_consts(d9, rec ? &rc : NULLPTR, -1.0f);
+    /* A mirrored draw (FixMirrored's det < 0) has its winding reversed: under the
+     * engine's cull it shows its back faces, the far side of the hull seen through it,
+     * which the shadow map rightly finds behind the near side. The opposite cull draws
+     * the front faces; sh_consts lights them as a stock hull. */
+    if (g_sh_sign > 0.0f) {
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &cull);        /* CULLMODE CW, CCW */
+        if (cull == 2 || cull == 3) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, 5 - cull);
+        else cull = 0;
+    }
     if (near_fade() < 1.0f && fd_take(dev, d9, pt, mi, nv, si, pc, 0)) {   /* drawn at Flush */
+        if (cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
         d9_restore(d9, &sv);
         if (rec) sm_keep(&rc, g_vb_mesh);
         return 0;
@@ -1147,6 +1164,7 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     r = g_dip(dev, pt, mi, nv, si, pc);
     sm_unbind(d9);
     if (ps == d9_shader(d9, &g_moon_ps)) sf_unbind(d9);
+    if (cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
     d9_restore(d9, &sv);
     if (rec) sm_keep(&rc, g_vb_mesh);
     if (++g_sh_draws == 1 || g_sh_draws == 100000) {
@@ -1698,11 +1716,20 @@ static int sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UIN
     ((SmIdx8_t)(*(void ***)d8)[86])(d8, &ib8, &base);                     /* GetIndices */
     sm_unref(ib8);
     if (!r->vb || !r->ib) { sm_drop(r); return 0; }
-    {   /* a draw blended or alpha-tested casts no shadow: the depth pass has no texture */
-        DWORD ab = 0, at = 0;
+    {   /* A draw blended or alpha-tested casts no shadow: the depth pass has no texture.
+         * The engine leaves blending on for its opaque hulls, as ONE / ZERO, which
+         * blends nothing; only a blend that lets the frame through counts, and only an
+         * alpha test that can fail. */
+        DWORD ab = 0, at = 0, src = 2, dst = 1, af = 8;
         D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 27, &ab);       /* ALPHABLENDENABLE */
         D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 15, &at);       /* ALPHATESTENABLE */
-        g_sm_trans = ab || at;
+        if (ab) {
+            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 19, &src);  /* SRCBLEND */
+            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 20, &dst);  /* DESTBLEND */
+        }
+        if (at) D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 25, &af);   /* ALPHAFUNC */
+        g_sm_trans = (ab && !(src == 2 && dst == 1)) ||           /* ONE, ZERO */
+                     (at && af != 8);                             /* ALWAYS */
     }
     r->base = (int)base; r->dot3 = dot3;
     r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
