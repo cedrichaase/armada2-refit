@@ -4,6 +4,15 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.0.2 — 2026-10-12
+
+### Fixed
+- The blue-noise sampler (stage 4) reads linear: `SRGBTEXTURE` was set to 1 with the
+  point filters, which biased the dither thresholds low (mean about 0.21, not 0.5).
+  Changes the look slightly: the gas was tuned with the bias in place.
+
+Installed, not yet seen in game.
+
 ## 1.0.1 — 2026-10-12
 
 ### Fixed

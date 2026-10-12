@@ -1490,7 +1490,8 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 4, g_bn_tex);
     for (i = 0; i < (int)(sizeof ss0 / sizeof ss0[0]); i++) {
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 0, ss0[i][0], ss0[i][1]);
-        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 4, ss0[i][0], ss0[i][0] >= 5 ? 1 : ss0[i][1]);   /* wrap, point, no mips */
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 4, ss0[i][0],                                     /* wrap, point, no mips, */
+              ss0[i][0] == 5 || ss0[i][0] == 6 ? 1 : ss0[i][0] == 7 ? 0 : ss0[i][1]);                /* linear: thresholds, not colour */
     }
     for (i = 0; i < (int)(sizeof ssc / sizeof ssc[0]); i++) {
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, ssc[i][0], ssc[i][1]);
