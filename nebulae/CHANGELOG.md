@@ -4,6 +4,17 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.0 — 2026-10-12
+
+### Added
+- Ships' shadows in the gas: a hull takes the Key's share of the gas's light behind it,
+  from `Lighting.asi`'s shadow map (`LightingShadowMap`, lighting 1.19.0), sharp beside
+  the hull and widening down the shaft; lightning is not shadowed.
+- `Nebulae.ini`: `Shadows=1`, `ShadowStrength=0.75`, `ShadowSoftness=0.02`; recipe key
+  `Shadow=` (scales the strength, default 1).
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-10-10
 
 ### Added

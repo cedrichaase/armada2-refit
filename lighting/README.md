@@ -153,6 +153,18 @@ from the mirror; negating that mesh's normals put it right on the bench. The plu
 does the equivalent without touching the mesh: for a draw under a mirrored matrix it
 reverses the enabled lights' directions and restores them after (N·−L = −(N·L)).
 
+**The mirror also reverses the winding, and the engine's cull mode does not follow it**
+on the vertex-buffer path: the outside of the mesh was culled and the inside of its far
+side drawn. The Steamrunner (`Fcruise2.sod`) is drawn whole under a mirrored matrix
+(scale 1.75, determinant < 0), so from above one saw the inside of its underside, with
+the nacelles showing through the hull from the front. The reversed lights made that pass
+for a lit hull; the shadows gave it away, since the far side's inside lies in the near
+side's shadow and the ship went dark from every side. `hook_dip` swaps `CULLMODE`
+between CW and CCW around a mirrored draw (`mirror_cull`), and a fading one keeps the
+swapped mode for its draw at `Flush`. Bench, 2026-10-12: the Steamrunner from six sides
+shows its bridge, windows and deflector, lit from above, with shadows on; the Akira is as
+before.
+
 Two approaches that failed: flipping every mesh whose normals point "inward" from its
 centre flipped the correct ones too (by that measure most stock meshes point inward),
 and turned the near hulls dark.
@@ -942,10 +954,26 @@ shadows on, then the game relaunched with `Shadows=0 PlanetShadows=0`):
   `Lighting.log` reads `shadows: map 1000 of 5 hull draws`.
 
 **Blended draws cast nothing.** The depth pass has no texture or alpha test, so a draw that
-the engine blends or alpha-tests (`ALPHABLENDENABLE`, `ALPHATESTENABLE` read at `sm_take`)
-would be an opaque sheet in the map: on the bench a Steamrunner was dark whole, from every
-side and at `ShadowSize=8192`, until these were left out of the list (`g_sm_trans`). They
-still look the map up. `ShadowSize` was not the cause, and a bigger map did not help.
+the engine blends or alpha-tests would be an opaque sheet in the map; these are left out
+of the list (`g_sm_trans`), and still look the map up. **Blending is judged by what it
+does**, not by `ALPHABLENDENABLE`: the engine leaves that on for opaque hulls, with
+`SRCBLEND` ONE and `DESTBLEND` ZERO, which is no blend at all. Taken as blending (1.17.2),
+it left every hull drawn after anything blended out of the map, which on the bench was
+every hull of every frame: no map was ever drawn, and in game shadows came and went with
+whatever the engine had drawn last. A draw counts as blended only when it keeps some of
+what is behind it (any pair but ONE, ZERO), or alpha-tests.
+
+1.17.2 left blended draws out because a Steamrunner went dark whole, from every side and
+at `ShadowSize=8192`. That was not a blended draw: it was the Steamrunner drawn inside out
+("Mirrored meshes", above), and the change only hid it by emptying the map.
+
+**The map is lent to `Nebulae.asi`**, which darkens the gas in a hull's shadow
+(`nebulae/README.md`, "Ships' shadows in the gas"): `LightingShadowMap(d9, &tex, ls,
+info)` is exported from `Lighting.asi`, and answers only while the map is this view's
+and this frame's (`g_sm_frame == g_frame`), on the device asked about. `ls` takes the
+three world -> u, v, depth columns of `sm_render`; `info` the depth bias, a texel in u
+and v, the map's width and its depth range in world units. No reference is added; the
+texture lives until the device resets.
 
 Not shadowed: anything not drawn through the hull shaders (the CPU path's cloaking or
 warping ships, translucent meshes) casts and takes no shadow, and planets take none from

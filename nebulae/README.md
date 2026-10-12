@@ -129,6 +129,43 @@ The composite is bound by its reads: a depth read for each of 25 taps cost 0.57 
 more at 3440x1440, more than all the opacity work. A 3x3 tent (the first) was grainy
 from outside the gas.
 
+## Ships' shadows in the gas
+
+A ship between the Key and the gas takes the Key's share of the gas's light away behind
+it: a dark shaft down through the field along the Key's direction (`Shadows=1`,
+`ShadowStrength=`, `ShadowSoftness=` in `Nebulae.ini`, and `Shadow=` per recipe, which
+scales the strength). Lightning is the gas's own light and is not shadowed.
+
+**The shadow map is `Lighting.asi`'s**, the one its hulls cast for the Key
+(`lighting/README.md`, "Shadows"). `Lighting.asi` exports `LightingShadowMap`, which
+hands over the texture, its world-to-map columns, its bias and its size only while the
+map belongs to the view being drawn and to this frame; `Nebulae.asi` finds it with
+`GetModuleHandleA("Lighting.asi")` and `GetProcAddress`, binds it to sampler 8 for the
+gas and nothing else, and keeps no reference. Without `Lighting.asi`, with its
+`Shadows=0`, or with no hull on screen, there is no map and the gas is unshadowed. The
+map covers the hulls on screen, so a hull off screen casts nothing into the gas.
+
+**Each sample of the gas reads the map twice**, as PCSS does with many reads: the first,
+anywhere in the widest penumbra possible at the sample's depth, finds a hull and how far
+in front of the sample it is; the second, within the penumbra that distance gives
+(`ShadowSoftness` per unit), is the answer, lit or not. The light is a disc, as the sun
+is, so a shadow is sharp beside the hull and softens down the shaft. Each pixel's answer
+is 0 or 1; the slices and the composite's tent add them up into a soft edge. The read
+points come from the pixel's blue-noise thresholds, walked from slice to slice, so they
+stay put from frame to frame like the slices' own.
+
+**The map is cleared to 1, and 1 means no hull**, not a hull at its far end: its hulls
+lie well inside 0..1 (it is fitted round them with a margin). Compared as a depth, gas
+beyond every hull along the Key was in shadow wherever there was no hull at all, a
+wedge with a straight edge through the field (bench, the first try).
+
+Measured on the bench (2026-10-12, 1920x1080, `mnebula8` with a Galaxy, a Sovereign and a
+Borg cube in it; the recipe's `FlowSpeed=0` so that only the shadow differs): `Shadow=0`
+against `Shadow=1` differ only in shafts from the hulls down and away along the Key
+(mean difference 0.76 of 255 seen side on, 0.12 from an RTS view, where the shafts
+mostly run away from the camera). The GPU time it adds has not been measured
+(`Timing=1`).
+
 ## Cost
 
 Bench, 3440x1440, the six-class scene at its default view: 1.52 ms of GPU
@@ -144,7 +181,7 @@ of an edit. Shape: `Extent`, `Height`, `Lumps`, `EdgeWarp`, `Radius`. Noise: `Se
 `Ridge`. Colour: `Brightness`, `GasA`, `GasB`, `Glow`, `HueScale`, `HueMix`,
 `HueCycle`, `HueSwing`. Light: `Light`, `ShadeStep`, `Shading`, `Knots`, `KnotScale`,
 `Lanes`, `LaneScale`. Motion: `Flow`, `FlowScale`, `FlowSpeed`. Filaments: `Filaments`,
-`FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`,
+`FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`, `Shadow`,
 `NearFade`. Lightning: `Lightning` (flashes a minute, a nebula), `LightningSize`,
 `LightningBrightness`, `LightningColour`. The core: `Core`, `CoreSharpness`, `Pulse`,
 `PulseSpeed`, `PulseWander`, and its ring of colours `Ring`, `RingAt`, `RingWidth`,

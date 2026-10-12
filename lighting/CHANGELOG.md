@@ -4,6 +4,23 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.19.0 — 2026-10-12
+
+### Added
+- `LightingShadowMap`, exported: the Key's shadow map for `Nebulae.asi`, handed over only
+  while it is the current view's and frame's.
+
+### Fixed
+- Hulls cast no shadow, or did only now and then. The engine leaves alpha blending on for
+  opaque hulls (SRCBLEND ONE, DESTBLEND ZERO), and 1.17.2 took that for a blended draw and
+  left the hull out of the shadow map; a draw is now left out only when its blend keeps
+  some of what is behind it, or it alpha-tests.
+- A mirrored mesh was drawn inside out: the cull mode now follows the mirror
+  (`mirror_cull`, also for a fading draw at `Flush`). The Steamrunner, mirrored whole,
+  showed the inside of its far side, and went dark whole once its shadows were cast.
+
+Installed, not yet seen in game.
+
 ## 1.18.0 — 2026-10-12
 
 ### Added

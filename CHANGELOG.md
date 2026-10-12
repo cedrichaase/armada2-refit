@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.23.0 — 2026-10-12
+
+Layers: nebulae 1.1.0, lighting 1.19.0.
+
+### Added
+- Ships cast the Key's shadow through the nebula gas (nebulae 1.1.0, `Shadows=`,
+  `ShadowStrength=`, `ShadowSoftness=`, recipe `Shadow=`), from `Lighting.asi`'s shadow
+  map, now exported as `LightingShadowMap` (lighting 1.19.0).
+
+### Fixed
+- Hulls' shadows came and went: opaque hulls were taken for blended draws and left out
+  of the shadow map; and mirrored meshes (the Steamrunner) were drawn inside out
+  (lighting 1.19.0).
+
+Installed, not yet seen in game.
+
 ## 11.22.0 — 2026-10-12
 
 surfaces 1.0.0, lighting 1.18.0, testbench 3.6.0
