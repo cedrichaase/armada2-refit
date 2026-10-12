@@ -5,7 +5,7 @@ where it lands: a flat, saturated green cup (red as the shields run out) that po
 and is gone. `Shields.asi` draws those hits itself, in a shader over the ship's whole
 shield ellipsoid, which stays invisible except about each hit: a hot spot where it
 struck with a white core and a flash at the blow, a ring running out across the shield
-from there, the shield's hex lattice and its rim (where the shell is seen edge on) lit
+from there, a soft glow over the shield and its rim (where the shell is seen edge on) lit
 around the hit and fading, all coloured by the struck ship's faction, weaker and
 flickering as its shields run out. Up to eight hits a ship at once.
 
@@ -122,12 +122,16 @@ ellipsoid's volume factor), so a scout and a station look alike:
   blow: a flash, then a fade over `Duration`. A beam holds it at `Sustain` while it plays
   on the shield, then fades over `FadeOut`. Its core goes white (`Core`).
 - **the ring**: runs out at `RingSpeed` from the blow, `RingWidth` wide, gone after
-  `RingTime`; a beam sends one every `RingPeriod` while it plays. It shows the lattice
-  (`RingLattice`).
-- **the field**: the lattice (`Pattern=hex`: hexes on the three planes of the unit
-  sphere, blended by how squarely each faces the point; `cells`: a random brightness per
-  cell) and the rim (`(1 − |N·V|)^RimPower`), lit within `GlowReach` of the hit and over
-  `GlowTime`.
+  `RingTime`; a beam sends one every `RingPeriod` while it plays. It can show the
+  lattice (`RingLattice`, 0 by default: a smooth ring).
+- **the field**: a smooth glow (`Pattern=none`, the default) or a lattice (`hex`: hexes
+  on the three planes of the unit sphere, blended by how squarely each faces the point;
+  `cells`: a random brightness per cell), and the rim (`(1 − |N·V|)^RimPower`), lit
+  within `GlowReach` of the hit and over `GlowTime`. The hex lattice was the first
+  default and was dropped before release (2026-10-12): the user did not want a pattern
+  on the shields. With `none` the glow is even where the hex fill averaged about 0.4,
+  so `Lattice` went from 0.6 to 0.25 to keep the shell about as bright, and
+  `RingLattice` from 0.6 to 0.
 - **strength**: `sqrt(damage / DamageRef)` within `StrengthMin..StrengthMax`, from the
   weapon's `damageBase` (a Galaxy's phasers 100–110, a Klingon battleship's torpedoes 55
   and 100 on the bench).
@@ -163,12 +167,13 @@ battleship (torpedoes) firing at a second Galaxy, healed so its shields hold. 19
   directions unit vectors in shield space; the first draw at 1,224 triangles.
 - Stock (`Enable=0`): a flat saturated green cup at each hit, the same on the Borg cube
   (`SCENE=firing`). With the plugin: blue spots with white cores where the beams and
-  torpedoes land, the hex lattice lit around them on the ellipsoid, the beams ending on
-  its surface; on the cube, green (Borg) on a sphere about it.
+  torpedoes land, the shield lit around them on the ellipsoid, the beams ending on
+  its surface; on the cube, green (Borg) on a sphere about it. (Seen with the hex
+  lattice; re-run with `Pattern=none`: smooth glows and rings, the shell no brighter.)
 - With `heal target off`, the shields ran out within 20 s; on the way the hits went
   dimmer and greyer, and once down the stock shields-down ring took over (type 1, left
   stock) and the beams reached the hull.
-- Under steady fire from two ships the lattice is lit over much of the shield's
+- Under steady fire from two ships the shield is lit over much of its
   underside; with `GlowReach=0.7` (the first default) the whole shell glowed faintly
   blue, so it is 0.35.
 

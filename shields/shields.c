@@ -346,7 +346,7 @@ static void read_settings(void)
     S.log_hits = (int)GetPrivateProfileIntA("Shields", "LogHits", 0, g_ini);
     GetPrivateProfileStringA("Shields", "ColourMode", "faction", b, sizeof b, g_ini);
     S.colour_mode = (b[0] | 0x20) == 's' ? COL_STOCK : (b[0] | 0x20) == 'f' && (b[1] | 0x20) == 'i' ? COL_FIXED : COL_FACTION;
-    GetPrivateProfileStringA("Shields", "Pattern", "hex", b, sizeof b, g_ini);
+    GetPrivateProfileStringA("Shields", "Pattern", "none", b, sizeof b, g_ini);
     S.pattern = (b[0] | 0x20) == 'c' ? 2 : (b[0] | 0x20) == 'n' || b[0] == '0' ? 0 : 1;   /* cells, none, hex */
 
     S.brightness   = inif("Brightness", 1.0f);
@@ -361,8 +361,8 @@ static void read_settings(void)
     S.ring_width   = inif("RingWidth", 0.09f);
     S.ring_time    = inif("RingTime", 0.55f);
     S.ring_period  = inif("RingPeriod", 0.4f);
-    S.ring_lattice = inif("RingLattice", 0.6f);
-    S.lattice      = inif("Lattice", 0.6f);
+    S.ring_lattice = inif("RingLattice", 0.0f);
+    S.lattice      = inif("Lattice", 0.25f);
     S.glow_reach   = inif("GlowReach", 0.35f);
     S.glow_time    = inif("GlowTime", 0.6f);
     S.glow_sustain = clamp_f(inif("GlowSustain", 0.3f), 0.0f, 1.0f);

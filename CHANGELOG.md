@@ -11,7 +11,7 @@ Layers: shields 1.0.0, testbench 3.6.0.
 
 ### Added
 - The `shields` layer: `Shields.asi` draws the ordinary shield hits in a shader over
-  the struck ship's shield ellipsoid (a hot spot, a ring, the hex lattice and rim lit
+  the struck ship's shield ellipsoid (a hot spot, a ring, a soft glow and the rim lit
   about each hit, by faction, weaker as the shields run out) in place of the stock
   shell (shields 1.0.0). `./install` runs `shields/install.sh`; `a2mod` switches
   `Shields.asi` and `Shields.ini` as the `shields` layer. Not in the release package

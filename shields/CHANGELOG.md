@@ -10,7 +10,7 @@ and versions". Newest first. The reasoning is in [`README.md`](README.md).
 - `Shields.asi`: the call to `ShieldHit::DrawShield` in `ShieldEffect::Render` skips
   the ordinary hits (type 0, `Xshldx01`); they are drawn after `RenderChunks` in
   `Armada_RenderAllOurStuff`, one pass per struck ship over its shield ellipsoid: a hot
-  spot, a ring running out, the hex lattice and rim lit about each hit, up to eight a
+  spot, a ring running out, a soft glow and the rim lit about each hit, up to eight a
   ship. Other shield types stay stock. Without a Direct3D 9 device behind d3d8, the
   stock shell.
 - The four weapon calls of `CreateShieldHit` are chained through thunks that note the

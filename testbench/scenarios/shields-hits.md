@@ -11,7 +11,7 @@ The scene (`testbench/scene/scenes/shields.ini`) is a Galaxy class (phasers) and
 Klingon battleship (torpedoes) firing at a second Galaxy, which is healed every tick so
 its shields hold. The log lines check that every hook was patched and that hits of both
 kinds (a beam and a shot) were picked up and drawn; the shots are for judging the look:
-blue hex-lit patches and rings on the target's shield ellipsoid where the weapons land,
+smooth blue glows and rings, no hex pattern, on the target's shield ellipsoid where the weapons land,
 no flat green shell.
 
 1. Launch the game.
