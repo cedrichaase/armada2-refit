@@ -26,7 +26,7 @@ must still be patched beside it.
 11. Take a screenshot called "fireball".
 12. Expect "Explosions.log" contains "first fireball".
 13. Expect "Explosions.log" contains "first ring".
-14. Expect a turbulent orange fireball of gas, not a cluster of flat sprites, where the cruiser was, and a thin ring of light around it.
+14. Expect a turbulent orange fireball of gas, not a cluster of flat sprites, where the cruiser was, and a broad orange band of fire around it, dark inside, as stock's shockwave disc.
 15. Scene "resume".
 16. Scene "kill small".
 17. Scene "kill big".

@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.26.1 — 2026-10-12
+
+Layers: explosions 1.0.1.
+
+### Changed
+- The shock ring matches stock's shockwave disc in size, brightness and colour: a broad,
+  overdriven orange band with a dark centre in place of a thin rim (explosions 1.0.1).
+
+Installed, not yet seen in game.
+
 ## 11.26.0 — 2026-10-12
 
 Layers: shields 1.0.0, testbench 3.9.0.

@@ -262,7 +262,7 @@ static float g_opacity = 0.3f;  /* Opacity=: how much the hot gas hides what is 
 static float g_flash = 1.0f;    /* Flash= */
 static float g_glow = 0.25f;    /* Glow=: the halo of the fireball's light */
 static float g_detail = 1.6f;   /* Detail=: noise tiles across the fireball */
-static float g_ring_bright = 1.0f, g_ring_width = 0.03f, g_ring_break = 1.0f;   /* RingBrightness=, RingWidth=, RingBreakup= */
+static float g_ring_bright = 1.0f, g_ring_width = 0.52f, g_ring_break = 1.0f;   /* RingBrightness=, RingWidth=, RingBreakup= */
 static float g_age = -1.0f;     /* Age=: draw every fireball at this fraction of its life (bench; -1: off) */
 static char  g_ini[320];
 static FILETIME g_ini_time;
@@ -297,12 +297,13 @@ static void read_settings(void)
     g_glow    = inif("Glow", 0.25f);
     g_detail  = inif("Detail", 1.6f);
     g_ring_bright = inif("RingBrightness", 1.0f);
-    g_ring_width  = inif("RingWidth", 0.03f);
+    g_ring_width  = inif("RingWidth", 0.52f);
     g_ring_break  = inif("RingBreakup", 1.0f);
     g_age     = inif("Age", -1.0f);
     if (g_size < 0.1f) g_size = 0.1f;
     if (g_grow < 0.02f) g_grow = 0.02f;
-    if (g_ring_width < 0.005f) g_ring_width = 0.005f;
+    if (g_ring_width < 0.02f) g_ring_width = 0.02f;
+    if (g_ring_width > 0.95f) g_ring_width = 0.95f;
 }
 
 /* ---- Direct3D 9 --------------------------------------------------------- */
@@ -846,7 +847,7 @@ static int draw(void)
             kc[9][0] = g_ring_width; kc[9][1] = g_ring_bright * v1; kc[9][2] = mx; kc[9][3] = frac_of(h) * 8.0f;
             kc[10][0] = *(float *)(cls + SWC_COLOUR); kc[10][1] = *(float *)(cls + SWC_COLOUR + 4); kc[10][2] = *(float *)(cls + SWC_COLOUR + 8);
             kc[10][3] = g_ring_break;
-            quad(&w, c, r * (1.0f + 3.0f * g_ring_width), v);
+            quad(&w, c, r * 1.03f, v);
             d9_bind(d9, vs, rps);
             g_drawn_ring++;
             if (!said_ring) {
