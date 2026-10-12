@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.33.0 — 2026-10-13
+
+Layers: lighting 1.22.0, nebulae 1.4.0.
+
+### Changed
+- Nebulae light ships in the colour of their gas (the Cerulean a light blue, not pure
+  blue), and less brightly: `NebulaRecipeColour=1`, `NebulaBrightness` 2.0 → 1.4,
+  through `Nebulae.asi`'s new export `NebulaLightColour`.
+
+Installed, not yet seen in game.
+
 ## 11.32.0 — 2026-10-13
 
 Layers: nebulae 1.3.0.

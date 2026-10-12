@@ -255,6 +255,11 @@ The Key's direction comes from `Lighting.asi`'s export `LightingKey`, read off t
 engine's lights at each draw, so it is there with no hull on screen and with its
 `Shadows=0`. Without `Lighting.asi`, the gas is its own light only.
 
+The other way round, the light a nebula casts on ships is `Lighting.asi`'s, and takes
+its hue from the recipe through this plugin's export `NebulaLightColour`: the mean of
+`GasA`, `GasB` and `Glow`, brightest channel 1, while the class is drawn as gas, and 0
+otherwise (`lighting/README.md`, "Nebulae").
+
 Measured on the bench (2026-10-12, 1920x1080, `mnebula8` with the ships below,
 `FlowSpeed=0`), the frame's mean against before: side on 54 → 58, towards the Key
 49 → 81, the Key behind the camera 55 → 50, from above 57 → 52.
