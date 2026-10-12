@@ -26,6 +26,8 @@
 #   explosions explosions/install.sh         Explosions.asi: fireballs drawn as gas, shockwaves
 #                                            as rings of light
 #   shields    shields/install.sh            Shields.asi: shield hits drawn by a shader
+#   fog        fog/install.sh                Fog.asi: the fog of war and the shroud with
+#                                            smooth edges
 #   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
 #                                            $A2_DATA/movies
 #
@@ -58,4 +60,5 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/nebulae/install.sh"
 "$here/explosions/install.sh"
 "$here/shields/install.sh"
+"$here/fog/install.sh"
 "$here/cutscenes/binkproxy/install.sh"

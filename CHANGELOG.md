@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.27.0 — 2026-10-12
+
+Layers: fog 1.0.0, testbench 3.10.0.
+
+### Added
+- The `fog` layer: `Fog.asi` draws the fog of war and the shroud in the 3D view with
+  smooth edges, through a pixel shader over the engine's own draw of each, in place of
+  the cell-by-cell staircase (fog 1.0.0). `./install` runs `fog/install.sh`; `a2mod`
+  switches `Fog.asi` and `Fog.ini` as the `fog` layer. Not in the release package yet.
+- The `fog` scene and the `fog-edges` scenario; `no-assets` checks `Fog.log`
+  (testbench 3.10.0).
+
+Installed, not yet seen in game.
+
 ## 11.26.0 — 2026-10-12
 
 Layers: shields 1.0.0, testbench 3.9.0.

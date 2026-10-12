@@ -476,7 +476,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         g = self.game_dir
         for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log', 'Lighting.log',
                      'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Armada2_d3d9.log', 'Explosions.log',
-                     'Shields.log'):
+                     'Shields.log', 'Fog.log'):
             try:
                 (g / name).unlink()
             except FileNotFoundError:
@@ -813,7 +813,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                      'Menus.ini', 'MSAA.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
                      'GridLayout.ini', 'Lighting.log', 'Lighting.ini', 'dxvk.conf', 'Online.log',
                      'Online.ini', 'OnlineServer.log', 'Explosions.log', 'Explosions.ini', 'Shields.log',
-                     'Shields.ini'):
+                     'Shields.ini', 'Fog.log', 'Fog.ini'):
             if (g / name).exists():
                 shutil.copy2(g / name, dst / name)
         if self.crashed():

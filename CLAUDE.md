@@ -42,6 +42,7 @@ it bundles.
 | `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M) and the dilithium moon's rock made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
 | `explosions/` | `Explosions.asi` — each ship's and station's fireball ray-marched as a volume of gas (white flash, burning billows cooling to smoke, spectral noise, seeded per explosion) and each shockwave drawn as a ring of light, in place of stock's flipbook sprites and textured disc. Render only. Not in the release package yet | `explosions/README.md` |
 | `shields/` | `Shields.asi` — the ordinary shield hits drawn by a shader over the struck ship's shield ellipsoid (hot spot, ring, soft glow and rim, by faction, weaker as the shields run out) in place of the stock `Xshldx01` shell. Not in the release package yet | `shields/README.md` |
+| `fog/` | `Fog.asi` — the fog of war and the shroud in the 3D view drawn with smooth edges: a pixel shader over the engine's own draw of each reconstructs the scan grid's mask with a cubic filter and draws an antialiased edge, in place of the cell-by-cell staircase. Not in the release package yet | `fog/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -310,7 +311,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Fog.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -785,6 +786,19 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   write the same weapon sites.
 - **Render only**: nothing the simulation reads is written, so it stays
   stock-compatible in multiplayer. The clock is wall time; `TimeScale=` is for looking.
+
+### fog
+
+- **The layers are the engine's draw; only the pixel stage is ours.** Each of
+  `Terrain_Geometry::Render`'s two `ST3D_Node::Render` calls (0x5933f5 fog, 0x593442
+  shroud) makes exactly one `DrawIndexedPrimitive`; the plugin binds a `ps_2_a` for it
+  and keeps the fixed-function vertex stage, so the diffuse colour (tint, opacity) is
+  stock's. Never `ps_3_0` there: it needs a `vs_3_0`.
+- **Don't make the fog textures bigger.** They hold one texel per scan-grid cell, so
+  there is nothing finer to put in them, and resizing them froze the game (`UImid`).
+- **The shroud is alpha-tested in stock**; the plugin blends it for the draw and puts
+  the four states back. Taps are held inside the grid's rectangle in the texture, or
+  the shroud thins along the map's border.
 
 ### textures
 
