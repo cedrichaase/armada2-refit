@@ -223,8 +223,10 @@ typedef struct {
     DWORD    checked;         /* QPC ticks / 2^20 of the last look at the file */
     float    k[NCONST][4];
     int      clouds;          /* the recipe has clouds */
+    int      face;            /* Face= in the recipe: its cubes' edge; 0: Surfaces.ini's */
     float    drift;           /* CloudDrift=, degrees per second */
     float    draw[4][4];      /* Lighting.asi's c43..c46, but for the drift angle */
+    float    model[4];        /* A2Surface's model[]: Mapping=, Gloss= */
     int      gen, baked_gen, failed_gen;
     void    *albedo, *relief, *cloud;   /* MANAGED cubes: they survive a Reset */
     void    *dev;             /* the d3d9 device they belong to */
@@ -352,6 +354,9 @@ static int recipe_read(Surf *s)
     v[0] = 2.5f; v[1] = 0.33f;                                        /* FissureShape */
     inin(f, "FissureShape", v, 2);
     s->k[28][0] = v[0]; s->k[28][1] = v[1];
+    s->face = (int)ini1(f, "Face", 0.0f);
+    if (s->face > 0 && s->face < 64) s->face = 64;
+    if (s->face > 4096) s->face = 4096;
 
     /* What Lighting.asi draws with (planet.hlsl, c43..c46). */
     rgb(f, "Glow", s->draw[0], 0, 0, 0);
@@ -365,6 +370,10 @@ static int recipe_read(Surf *s)
     s->draw[3][0] = ini1(f, "Depth", 1.0f);
     s->draw[3][1] = s->clouds ? 1.0f : 0.0f;
     s->draw[3][2] = s->k[27][3] > 0.0f ? 1.0f : 0.0f;               /* the albedo's alpha cuts */
+    GetPrivateProfileStringA("Surface", "Mapping", "radial", b, sizeof b, f);
+    s->model[0] = s_ieq(b, "triplanar") ? 1.0f : 0.0f;               /* a model's lookup */
+    s->model[1] = ini1(f, "Gloss", 1.0f);                             /* its highlight */
+    if (s->model[1] < 0.0f) s->model[1] = 0.0f;
     s->gen++;
 
     {
@@ -602,7 +611,7 @@ static int bake(void *d9, Surf *s)
     void *old_rt = NULLPTR, *old_ds = NULLPTR, *height;
     LARGE t0, t1;
     char  b[240];
-    int   S = g_face, ok;
+    int   S = s->face > 0 ? s->face : g_face, ok;
 
     if (!d9_shader(d9, &g_vs) || !d9_shader(d9, &g_height_ps) || !d9_shader(d9, &g_albedo_ps) ||
         !d9_shader(d9, &g_relief_ps) || !d9_shader(d9, &g_cloud_ps)) {
@@ -701,6 +710,7 @@ __declspec(dllexport) int __cdecl a2_surface(void *dev8, const char *name, A2Sur
     out->relief = s->relief;
     out->cloud  = s->cloud;
     for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) out->k[i][j] = s->draw[i][j];
+    for (i = 0; i < 4; i++) out->model[i] = s->model[i];
     QueryPerformanceCounter(&now);
     t = g_qpf.q ? (float)((double)(now.q - g_t0.q) / (double)g_qpf.q) : 0.0f;
     a = s->drift * t;

@@ -11,9 +11,13 @@ The game's 3D geometry, where the refit changes it:
 - **Dilithium moons**, `SOD/Mdmoon*.SOD` and `Mmooninf.SOD`, smoothed by `moon-sod.py`.
   Below.
 - **The selection bubble**, `SOD/select.sod`, rounded by `select-sod.py`. Below.
+- **The hulls**, rounded where they are round by `hull-sod.py`. Below.
+- **The asteroids**, `SOD/Master.SOD` and `Master1..8.SOD`, smoothed by
+  `asteroid-sod.py`. Below.
 
 `./install` runs `install.sh`, which builds and installs `Planets.asi` and `Planets.ini`
-smooths the moons and rounds the selection bubble (`.a2neb-backup` copies; `install.sh --remove` restores them).
+smooths the moons and the asteroids and rounds the selection bubble and the hulls
+(`.a2neb-backup` copies; `install.sh --remove` restores them).
 `a2mod` switches both, and the `SOD` backups, as the `models` layer.
 
 ## Planets.asi
@@ -181,6 +185,32 @@ to 4 that keeps a mesh within 12,500 triangles: a blended mesh (shields, glows) 
 drawn on the CPU every frame, and a box gains nothing. 176 of 225 hull models change; the
 largest, a station, gains 32k triangles. Only v1.93 models, found by the eight zero bytes ahead of a
 mesh and read back after writing; other versions are skipped.
+
+## The asteroids
+
+An asteroid field draws three to eight rocks out of the models the engine lists:
+`master.sod`, `master1` to `master5`, `master4` again and `master7` (`Master6` and
+`Master8` ship and are never drawn). Each is one mesh of 20 to 54 vertices (36 to 100
+triangles; `Master.SOD`, version 1.6, 32 and 60), drawn at 2 or 2.7 times its size, so a
+rock 40 units across has facets 10 units long and reads as a cut gem at any distance.
+They are drawn from the engine's static vertex buffers, as stock always drew asteroid
+fields. `hull-sod.py` leaves them alone: they are not hulls, and their material is
+`default`, not `opaque`.
+
+`asteroid-sod.py` uses `hull-sod.py`'s patches at `--split 4` (576 to 1,600 triangles a
+rock), every stock vertex in place and every UV interpolated. Smoothed through every edge
+(`--crease 180`) the rocks came out as eggs on the bench (`SCENE=asteroids`). Their faces
+meet at a median of 22 to 39 degrees with a tail of sharp edges up to 138, and at
+`--crease 55` the sharpest sixth stay edges: broken ridges with rounded faces between.
+No patch folds over (a triangle turned against the stock face it was cut from) at any
+crease up to 70; at 90 two do on `Master7`. The surface detail is not geometry: it is
+`Surfaces.asi`'s recipes `Master1` and `Master2`, lit per pixel by `Lighting.asi`
+(`surfaces/README.md`, "The asteroids").
+
+`Master6` is the one model whose node matrix is a mirror and whose triangles are wound
+the other way round, which cancel under the engine's cull. `Lighting.asi`'s hull shaders
+take any mirrored draw to need the opposite cull (the Steamrunner's case), so `Master6`
+would draw inside out there; since no field draws it, nothing was changed for it.
 
 ## Bump maps on Federation hulls
 

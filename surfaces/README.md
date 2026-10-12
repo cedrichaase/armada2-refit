@@ -13,16 +13,17 @@ repository.
 
 **It draws nothing itself.** `Lighting.asi` already draws every planet in shaders,
 per pixel, with the scene's lights (`lighting/README.md`, "Planets on the GPU"), and
-the dilithium moons' rock with its hull shaders. When `Surfaces.asi` is loaded and has
+the dilithium moons' and the asteroids' rock with its hull shaders. When `Surfaces.asi` is loaded and has
 a recipe for the texture, `Lighting.asi` samples the recipe's cubes instead of the
 texture and lights the terrain's own normal. Without `Surfaces.asi`, without a recipe,
-without `Lighting.asi`'s `PlanetShaders=1` (for planets) or `Shaders=1` (for the moon),
+without `Lighting.asi`'s `PlanetShaders=1` (for planets) or `Shaders=1` (for the models),
 or with no Direct3D 9 device behind d3d8, the stock texture draws as before.
 
-**Recipes: every class planet and the dilithium moon.** `PB_CLSSD`, `PB_CLSSH`,
-`PB_CLSSK`, `PB_CLSSL`, `PB_CLSSM` (the ground of classes D, H, K, L, M), `PB_CLSSJ`
-(class J, a gas giant drawn on its atmosphere shell) and `Mdmoon` (the dilithium moons'
-rock, in all four moon models). The named story planets (`Mearth`, `MQonos`, ...) are
+**Recipes: every class planet, the dilithium moon and the asteroids.** `PB_CLSSD`,
+`PB_CLSSH`, `PB_CLSSK`, `PB_CLSSL`, `PB_CLSSM` (the ground of classes D, H, K, L, M),
+`PB_CLSSJ` (class J, a gas giant drawn on its atmosphere shell), `Mdmoon` (the dilithium
+moons' rock, in all four moon models), and `Master1` and `Master2` (the asteroid fields'
+rocks, "The asteroids" below). The named story planets (`Mearth`, `MQonos`, ...) are
 ordinary models with their own art and are left alone.
 
 ## Why the gores had to go
@@ -70,7 +71,10 @@ would want slot 11 of the `GroundMesh` vtable.
   0x620f70, stores it there; `ST3D_Node` and `ST3D_Texture` call it). Taking +0x114
   for the texture itself, as a first try did, read a name from the list and crashed.
   Names without a recipe are remembered by pointer, so each ship texture is asked
-  about once.
+  about once. The cubes are looked up about the mesh's bounding-sphere centre
+  (`ST3D_Mesh` +0xd4, the one `RenderInternal`'s camera test reads), not the model's
+  origin, with the point scaled to the mesh's extents about that centre, read off its
+  positions (+0xc0, count +0xc8): "The asteroids", below.
 
 **The frame.** A planet's `GroundMesh` hemispheres and shell are drawn with the identity
 rotation (logged on the bench: axes (1,0,0) (0,1,0) (0,0,1), determinant 1, for ground
@@ -167,6 +171,43 @@ cut-out, and the engine's alpha test, which the rock's material already sets, ma
 holes of it through which the blended glow shell shows, as stock's alpha does. The glow
 lights the holes' edges.
 
+## The asteroids
+
+An asteroid field (`odf/other/mafield.odf`, `mafield2.odf`) is three to eight rocks, each
+one of the models the engine lists: `master.sod`, `master1` to `master5`, `master4` again
+and `master7` (`Master6` and `Master8` ship but are never drawn). All but `Master.SOD`
+are textured `Master1` or `Master2`; `Master.SOD` is `Master2` too. Stock paints them a
+256-texel cratered grey, smeared along the long faces of 20-vertex rocks.
+`models/asteroid-sod.py` smooths the meshes (`models/README.md`, "The asteroids"); the
+recipes give them their surface, drawn by `moon_ps` as the moon's is, with three changes
+the rocks needed on the bench (`SCENE=asteroids`):
+
+- **About the mesh's centre.** The moon is a sphere about its origin; an asteroid's
+  origin can sit near its surface (`Master7`'s is 3.8 units from it, 38 from its far
+  end), and the direction from there crushed one end's features and stretched the other's.
+  `Lighting.asi` looks up about the mesh's bounding-sphere centre, scaled to its extents
+  along each object axis, so a long rock is looked up as if it were round. The scale is
+  taken out of the relief, which otherwise tilted 2 to 2.7 times as far on rocks the
+  fields draw at that size (`scaleSOD`; the fields bake it into the vertices).
+- **Triplanar** (`Mapping=triplanar`). Even about the centre, the direction smeared the
+  rock into streaks and ripples wherever a face runs along it: the flat end of a rock, a
+  box-like side. Along each object axis the shader takes the cube face on that axis's
+  side at the point's other two coordinates (each -1..1 across the mesh), one continuous
+  picture per side, and blends the three by the surface's facing to the fourth power. A
+  side switches face where that projection's weight is nought, so no seam shows. The slope
+  baked at (±1, y, z) is the height's gradient across the y-z plane, which is the
+  normal's tilt for that projection; its component along the axis is dropped. Six cube
+  reads instead of two.
+- **Matte** (`Gloss=0.2`). The hulls' highlight takes the texture's brightness as its
+  gloss, which made pale rock read wet, as metal.
+
+The look: lumpy ground (low warp; at 0.6 the field drew marble and bark) under two sizes
+of crater bowls with raised rims, cavities darkened. A relief of 0.085 against the 0.06
+shipped added grain, not shape. `Master2` is paler, with smaller craters and more ridged
+ground, so the two read as two kinds of stone. `Face=1024` (both recipes: 67 MB each,
+126–173 ms to bake): at 512 a rock filling the screen showed its texels as soft waves in
+the relief.
+
 ## Recipes
 
 `surfaces/recipes/<texture>.ini`, section `[Surface]`. Colours are 0–255; heights are in
@@ -205,6 +246,9 @@ pitch (up from its equator).
 | `Depth` | 1 | the relief's strength in the light, at draw time (no re-bake) |
 | `Bands` | 8 1.5 0.3 4 | gas: bands; how far turbulence moves them; the warp's share; stretch along the longitude |
 | `Storm`, `StormColour` | 0 −20 8 0 | gas: yaw, pitch, size (degrees), strength |
+| `Face` | `Surfaces.ini`'s | this recipe's cube edge (64–4096) |
+| `Mapping` | `radial` | a model's lookup: `radial`, the direction from its centre; `triplanar`, each axis's cube faces across its extents ("The asteroids") |
+| `Gloss` | 1 | a model's highlight, times the hulls' |
 
 `Surfaces.ini` (`[Surfaces]`): `Enable` (1), `Face` (1024), `CloudFace` (512), `Reload`
 (1: the file and the recipes are looked at twice a second, and a changed recipe

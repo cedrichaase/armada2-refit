@@ -39,14 +39,14 @@ it bundles.
 | `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key | `lighting/README.md` |
 | `sky/` | `Sky.asi` — the map's sky computed from view direction by a shader, baked once per map into a cube, in place of the six painted faces; recipes per sky name in `sky/skies/` | `sky/README.md` |
 | `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
-| `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M) and the dilithium moon's rock made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
+| `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M), the dilithium moon's rock and the asteroids' made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
 | `explosions/` | `Explosions.asi` — each ship's and station's fireball ray-marched as a volume of gas (white flash, burning billows cooling to smoke, spectral noise, seeded per explosion) and each shockwave drawn as a band of fire matched to stock's disc, in place of stock's flipbook sprites and textured disc. Render only. Not in the release package yet | `explosions/README.md` |
 | `shields/` | `Shields.asi` — the ordinary shield hits drawn by a shader over the struck ship's shield ellipsoid (hot spot, ring, soft glow and rim, by faction, weaker as the shields run out) in place of the stock `Xshldx01` shell, and the shields-down ring as jagged arcs crackling over it (lighting the hull) in place of stock's turning `xshlddie` band. Not in the release package yet | `shields/README.md` |
 | `repair/` | `Repair.asi` — the welding on a ship under repair (stock's `xspark` sprites at the hardpoints of the system being repaired) drawn by shaders: a flickering arc with rays that lights the hull, a cooling hot spot, sparks streaking off. Not in the release package yet | `repair/README.md` |
 | `fog/` | `Fog.asi` — the fog of war and the shroud in the 3D view drawn with smooth edges: a pixel shader over the engine's own draw of each reconstructs the scan grid's mask with a cubic filter and draws an antialiased edge, in place of the cell-by-cell staircase. Not in the release package yet | `fog/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
-| `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
+| `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation), the smoothed dilithium moons (`moon-sod.py`) and asteroids (`asteroid-sod.py`) | `models/README.md` |
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
@@ -752,6 +752,10 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   gone before any device `Reset`.
 - **The moon's cracks are holes, black as stock's are**: the rock is alpha-tested
   (`Cut=`), and the glow shell shows only where a crack opens at the silhouette.
+- **A model is looked up about its mesh's centre, scaled to its extents** (`ST3D_Mesh`
+  +0xd4, positions +0xc0), never its origin: an asteroid's origin can sit on its surface.
+  The asteroids are `Mapping=triplanar`; the direction from the centre smeared their flat
+  faces into streaks. Fields draw `Master`, `Master1..5` and `Master7`, never 6 or 8.
 
 ### explosions
 

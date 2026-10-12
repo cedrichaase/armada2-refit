@@ -2,15 +2,17 @@
 # The models layer's own part of ./install: Planets.asi, which makes the engine
 # tessellate planets finely enough for a modern resolution (models/planets.c), and
 # the dilithium moons smoothed in their SOD files (models/moon-sod.py), and the
-# selection bubble rounded (models/select-sod.py), and the ships and stations drawn round
-# where they are round (models/hull-sod.py).
+# selection bubble rounded (models/select-sod.py), the ships and stations drawn round
+# where they are round (models/hull-sod.py), and the asteroids smoothed
+# (models/asteroid-sod.py).
 #
 #   install.sh                build, then install
 #   install.sh --detail N     install and set Detail=N (1 = stock)
 #   install.sh --remove       take it out again
 #
 # Adds Planets.asi, Planets.ini and (at run time) Planets.log; the exe is patched in
-# memory only. Rewrites the four moon SODs and select.sod, keeping .a2neb-backup copies that
+# memory only. Rewrites the four moon SODs, select.sod, the hulls and the eight
+# asteroids (Master1..8), keeping .a2neb-backup copies that
 # --remove restores. Needs nothing from A2_DATA: the moons are derived from the
 # player's own stock files. The loading-screen model is not here: it
 # ships with its art, the LOADING texture target, and ./a2tex install moves both.
@@ -39,6 +41,7 @@ if [ "$remove" = 1 ]; then
     "$here/moon-sod.py" --revert
     "$here/select-sod.py" --revert
     "$here/hull-sod.py" --revert
+    "$here/asteroid-sod.py" --revert
     exit 0
 fi
 
@@ -54,3 +57,4 @@ echo "installed Planets.asi into $GAME ($(grep '^Detail=' "$GAME/Planets.ini"))"
 "$here/moon-sod.py" --install
 "$here/select-sod.py" --install
 "$here/hull-sod.py" --install
+"$here/asteroid-sod.py" --install

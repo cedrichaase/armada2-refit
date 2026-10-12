@@ -4,6 +4,24 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.22.0 — 2026-10-13
+
+### Added
+- `moon_ps` (a model with a `Surfaces.asi` recipe) honours the recipe's
+  `Mapping=triplanar` (three projections along the model's axes, each side its own cube
+  face, blended by the normal) and `Gloss=` (the highlight's strength): the asteroids.
+
+### Changed
+- A model's cubes are looked up about its mesh's bounding-sphere centre (`ST3D_Mesh`
+  +0xd4) instead of its origin, with the point scaled to the mesh's extents about it:
+  Master7's origin is 3.8 units from its surface, and a long rock or the elongated
+  Mdmoon3 drew its features drawn out along it.
+
+### Fixed
+- The relief's tilt on a model no longer grows with the model's world scale.
+
+Installed, not yet seen in game.
+
 ## 1.21.0 — 2026-10-13
 
 ### Added
