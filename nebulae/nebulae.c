@@ -293,6 +293,7 @@ static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
 static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ), 1 at full size */
 static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, half size only) */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
+static int   g_upsample = 0;  /* Upsample=: the half-size gas onto the frame at depth edges, 0..4 (nebulae.hlsl, comp_up) */
 static int   g_shadows = 1;            /* Shadows=: ships shadow the gas from the Key (Lighting.asi's map) */
 static float g_key_share = 0.8f;        /* KeyShare=: the Key's share of the gas's light; the rest is its own glow (a recipe's KeyShare= overrides) */
 static float g_scatter = 0.2f;          /* Scatter=: how much the gas scatters the Key forward (0: alike every way; a recipe's Scatter= overrides) */
@@ -317,6 +318,8 @@ static void read_settings(void)
     g_bake     = (int)GetPrivateProfileIntA("Nebulae", "Bake", 1, g_ini);
     g_samples  = (int)GetPrivateProfileIntA("Nebulae", "Samples", 2, g_ini) >= 2 ? 2 : 1;
     g_res      = (int)GetPrivateProfileIntA("Nebulae", "Resolution", 2, g_ini) >= 2 ? 2 : 1;
+    g_upsample = (int)GetPrivateProfileIntA("Nebulae", "Upsample", 0, g_ini);
+    if (g_upsample < 0 || g_upsample > 4) g_upsample = 0;
     g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
     g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 160, g_ini);
     GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
@@ -1724,7 +1727,7 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     L->vpl.w = (L->vp0.x + L->vp0.w + 1) / 2 - L->vpl.x; L->vpl.h = (L->vp0.y + L->vp0.h + 1) / 2 - L->vpl.y;
     if (L->vpl.x + L->vpl.w > g_lr_w) L->vpl.w = g_lr_w - L->vpl.x;
     if (L->vpl.y + L->vpl.h > g_lr_h) L->vpl.h = g_lr_h - L->vpl.y;
-    L->k[0][0] = g_obscure; L->k[0][1] = 0.0f; L->k[0][2] = 1.0f / (float)g_zt_w; L->k[0][3] = 1.0f / (float)g_zt_h;
+    L->k[0][0] = g_obscure; L->k[0][1] = (float)g_upsample; L->k[0][2] = 1.0f / (float)g_zt_w; L->k[0][3] = 1.0f / (float)g_zt_h;
     L->k[1][0] = 1.0f / (float)g_lr_w; L->k[1][1] = 1.0f / (float)g_lr_h; L->k[1][2] = P[10]; L->k[1][3] = P[14];
     L->k[2][0] = (float)L->vpl.x; L->k[2][1] = (float)L->vpl.y;
     L->k[2][2] = (float)(L->vpl.x + L->vpl.w - 1); L->k[2][3] = (float)(L->vpl.y + L->vpl.h - 1);
@@ -1811,10 +1814,12 @@ static void lr_end(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 7, g_lr);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 9, g_lr);    /* the same, filtered: away from depth edges */
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 10, g_lz);   /* the half-size depth, filtered: Upsample='s edge test */
     {
         static const DWORD ss[][2] = { { 1, 3 }, { 2, 3 }, { 3, 3 }, { 5, 2 }, { 6, 2 }, { 7, 0 }, { 11, 0 } };   /* clamp, linear */
-        int i;
-        for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 9, ss[i][0], ss[i][1]);
+        int i, t;
+        for (t = 9; t <= 10; t++)
+            for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++) D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, (DWORD)t, ss[i][0], ss[i][1]);
     }
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 4, g_bn_tex);
     /* Only where the gas boxes are, and the filter's reach about them: the composite's
