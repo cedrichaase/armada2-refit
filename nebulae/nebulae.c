@@ -1392,6 +1392,28 @@ static int cut_box(const float *lo, const float *hi, const float *eye, const flo
 
 static DWORD g_frame;
 static int   g_drawing;       /* the last frame drew gas: Nebula::Render stands down for recipe classes */
+
+/* The hue of a nebula's light, for Lighting.asi ("The nebulae's light", README): the
+ * mean of its recipe's GasA=, GasB= and Glow=, the colours the gas is drawn in, with
+ * its brightest channel at 1. Lighting.asi keeps the ODF glow's strength. Only while
+ * the class is drawn as gas, on the same test that skips its billboards; otherwise 0,
+ * and the light keeps the ODF's colour, which the billboards are drawn in. */
+__declspec(dllexport) int __cdecl NebulaLightColour(void *neb, float *rgb)
+{
+    Cls  *c;
+    float m;
+    int   i;
+    if (!g_drawing || !neb || !rgb) return 0;
+    c = class_of((BYTE *)neb);
+    if (!c || !c->have || c->failed) return 0;
+    for (i = 0; i < 3; i++) rgb[i] = (c->k[1][i] + c->k[2][i] + c->k[3][i]) * (1.0f / 3.0f);
+    m = rgb[0] > rgb[1] ? rgb[0] : rgb[1];
+    if (rgb[2] > m) m = rgb[2];
+    if (m <= 0.0f) return 0;
+    for (i = 0; i < 3; i++) rgb[i] /= m;
+    return 1;
+}
+
 static long  g_drawn_frames, g_slices_drawn;
 static LARGE g_last;
 static double g_frame_sum;

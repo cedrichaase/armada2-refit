@@ -66,7 +66,8 @@ planet's ground colour (`planet glow:`).
 | `FixMirrored` | `1` | light meshes that a model mirrors back with its node matrix the right way round (below) |
 | `PointLights` | `12` | point lights per GPU draw, the strongest first: up to 16 with `Shaders`, 6 in Direct3D's slots; `0` gives the GPU path none, as stock |
 | `Nebulae` | `1` | nebulae light their surroundings in their glow colour |
-| `NebulaBrightness`, `NebulaRange` | `2.0`, `8.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
+| `NebulaBrightness`, `NebulaRange` | `1.4`, `8.0` | the glow colour's multiplier; the falloff's (stock 60 + 60 units) |
+| `NebulaRecipeColour` | `1` | a nebula drawn as gas lights in its recipe's hue at the glow's strength; `0`, the glow's pure primary |
 | `NebulaCull` | `3.0` | a nebula counts as on screen, drawn and lighting, while its bounding sphere times this is in view; `1` is stock |
 | `PlanetGlows` | `1` | a planet's day side lights what is near it |
 | `PlanetGlow`, `PlanetGlowRange` | `1.5`, `6.0` | Key x ground colour x this, from the planet's centre; full at its surface, gone at this many radii; times the share of the day side facing the object |
@@ -300,6 +301,17 @@ call: the glow colour times `NebulaBrightness`, steady, and the falloff times
 Metreon `(0.5, 0, 0)`, Metaphasic `(0, 1, 0)`, Cerulean `(0, 0, 0.5)`. On the bench
 (`SCENE=nebula`) the Galaxy at the Mutara's edge turned violet on the side facing it and
 stayed grey on the far side.
+
+Those primaries are the billboards' colours, not the gas's: beside the Cerulean's light
+blue gas (`GasA=60,110,255`, `GasB=40,190,240`) a hull went pure `0000ff`. While
+`Nebulae.asi` draws a class as gas, its export `NebulaLightColour` gives the hue of the
+recipe (the mean of `GasA`, `GasB` and `Glow`, its brightest channel 1), and the light
+takes that hue at the glow's own strength, its brightest channel, so the Metaphasic's
+1.0 stays twice the others' 0.5 (`NebulaRecipeColour=1`). It answers 0 on the same test
+that keeps a class's billboards, so stock billboards keep the stock colour. Looked up
+lazily, at the first nebula light: `Nebulae.asi` loads after this plugin. A light blue
+is far brighter to the eye than a pure blue at the same peak, so `NebulaBrightness`
+came down from 2.0 to 1.4 with it.
 
 ### Nebula culling
 

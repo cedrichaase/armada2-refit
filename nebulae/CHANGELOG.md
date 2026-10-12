@@ -4,6 +4,15 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.5.0 — 2026-10-13
+
+### Added
+- Export `NebulaLightColour`: the hue of a class's gas (the mean of `GasA=`, `GasB=`,
+  `Glow=`, brightest channel 1) while it is drawn as gas, which `Lighting.asi`'s nebula
+  lights take in place of the ODF glow colour.
+
+Installed, not yet seen in game.
+
 ## 1.4.0 — 2026-10-13
 
 ### Added

@@ -2084,22 +2084,43 @@ static void sm_planets(void)
  * and the class's falloff (glow_falloff_start/range, +0x244/+0x248: 60 and 60 on
  * every stock nebula). On the bench its colour came out black frame after frame.
  * The plugin registers it in place of that: the glow colour times
- * NebulaBrightness, steady, with the falloff times NebulaRange. */
-static float g_neb_bright = 2.0f, g_neb_range = 8.0f;
-static int   g_nebulae = 1;
+ * NebulaBrightness, steady, with the falloff times NebulaRange.
+ *
+ * The glows are half-strength primaries, the Cerulean's pure blue. While Nebulae.asi
+ * draws a class as gas, its export NebulaLightColour gives the hue of the recipe's gas
+ * (brightest channel 1), and the light takes that hue at the glow's strength, its
+ * brightest channel (NebulaRecipeColour). Nebulae.asi loads after this plugin, so it
+ * is looked up at the first nebula light. */
+typedef int (__cdecl *NebColour_t)(void *neb, float *rgb);
+static float       g_neb_bright = 1.4f, g_neb_range = 8.0f;
+static int         g_nebulae = 1, g_neb_recipe = 1;
+static NebColour_t g_neb_colour_fn;
+static int         g_neb_colour_asked;
 
 static void __fastcall hook_nebula_lights(BYTE *neb, void *edx, float dt)
 {
     typedef float *(__thiscall *Matrix_t)(void *);
     BYTE  *light = *(BYTE **)(neb + 0x1ac);
     BYTE  *cls   = *(BYTE **)(neb + 0x40);
-    float  col[3];
+    float  col[3], hue[3], s;
     float *mat;
+    int    i;
     (void)edx; (void)dt;
     if (!light || !cls) return;
-    col[0] = *(float *)(cls + 0x22c) * g_neb_bright;
-    col[1] = *(float *)(cls + 0x230) * g_neb_bright;
-    col[2] = *(float *)(cls + 0x234) * g_neb_bright;
+    for (i = 0; i < 3; i++) col[i] = *(float *)(cls + 0x22c + 4 * i);
+    if (!g_neb_colour_asked) {
+        HMODULE m = g_neb_recipe ? GetModuleHandleA("Nebulae.asi") : NULLPTR;
+        g_neb_colour_asked = 1;
+        g_neb_colour_fn = m ? (NebColour_t)GetProcAddress(m, "NebulaLightColour") : (NebColour_t)NULLPTR;
+        logline(g_neb_colour_fn ? "nebula lights: Nebulae.asi found: the recipes' hues"
+                                : "nebula lights: the ODF glow colours");
+    }
+    if (g_neb_colour_fn && g_neb_colour_fn(neb, hue)) {
+        s = col[0] > col[1] ? col[0] : col[1];
+        if (col[2] > s) s = col[2];
+        for (i = 0; i < 3; i++) col[i] = hue[i] * s;
+    }
+    for (i = 0; i < 3; i++) col[i] *= g_neb_bright;
     *(float *)(light + 0x100) = *(float *)(cls + 0x244) * g_neb_range;
     *(float *)(light + 0x104) = *(float *)(cls + 0x248) * g_neb_range;
     mat = ((Matrix_t)FN_OBJECT_MATRIX)(neb);
@@ -3759,6 +3780,7 @@ static void startup(void)
     g_planets = (int)GetPrivateProfileIntA("Lighting", "Planets", 1, ini);
     g_points  = (int)GetPrivateProfileIntA("Lighting", "PointLights", 12, ini);
     g_nebulae = (int)GetPrivateProfileIntA("Lighting", "Nebulae", 1, ini);
+    g_neb_recipe = (int)GetPrivateProfileIntA("Lighting", "NebulaRecipeColour", 1, ini);
     ini1(ini, "NebulaBrightness", &g_neb_bright);
     ini1(ini, "NebulaRange",      &g_neb_range);
     ini1(ini, "NebulaCull",       &g_neb_cull);

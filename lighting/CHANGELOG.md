@@ -4,6 +4,18 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.22.0 — 2026-10-13
+
+### Added
+- `NebulaRecipeColour=1`: a nebula `Nebulae.asi` draws as gas lights in its recipe's
+  hue (its export `NebulaLightColour`) at the ODF glow's strength, in place of the
+  glow's pure primary; the Cerulean's light goes from pure blue to its gas's light blue.
+
+### Changed
+- `NebulaBrightness` 2.0 → 1.4.
+
+Installed, not yet seen in game.
+
 ## 1.21.0 — 2026-10-13
 
 ### Added
