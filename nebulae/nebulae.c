@@ -297,6 +297,8 @@ static int   g_shadows = 1;            /* Shadows=: ships shadow the gas from th
 static float g_key_share = 0.8f;        /* KeyShare=: the Key's share of the gas's light; the rest is its own glow (a recipe's KeyShare= overrides) */
 static float g_scatter = 0.2f;          /* Scatter=: how much the gas scatters the Key forward (0: alike every way; a recipe's Scatter= overrides) */
 static float g_shadow_soft = 0.02f;     /* ShadowSoftness=: the penumbra's width per unit behind the caster */
+static float g_shadow_fade = 0.0f;      /* ShadowFade=: world units behind the caster over which a shadow fills in (0: never) */
+static float g_sh_depth;                /* the shadow map's depth in world units, this frame */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
 static int   g_vol_maxy = 160; /* VolumeHeight=: and up, texels */
@@ -338,6 +340,9 @@ static void read_settings(void)
     parsen(b, &g_shadow_soft, 1);
     if (g_shadow_soft < 0.0f) g_shadow_soft = 0.0f;
     if (g_shadow_soft > 0.5f) g_shadow_soft = 0.5f;
+    GetPrivateProfileStringA("Nebulae", "ShadowFade", "0", b, sizeof b, g_ini);
+    parsen(b, &g_shadow_fade, 1);
+    if (g_shadow_fade < 0.0f) g_shadow_fade = 0.0f;
     if (g_vol_max < 16) g_vol_max = 16;
     if (g_vol_max > 512) g_vol_max = 512;
     if (g_vol_maxy < 8) g_vol_maxy = 8;
@@ -1509,6 +1514,7 @@ static void shadow_query(void *d9)
     g_sh_k[3][1] = info[0] * 2.0f;                     /* twice the hulls' bias: the gas has no faces to fight it */
     g_sh_k[3][2] = info[2] > 0.0f ? g_shadow_soft * info[3] / info[2] : 0.0f;   /* map depth -> world -> u, v */
     g_sh_k[3][3] = info[1];
+    g_sh_depth = info[3];
     if (!said_map) {
         char b[160];
         said_map = 1;
@@ -2123,7 +2129,8 @@ static int draw_gas(void)
             k[0][0] = g_sh_tex && s > 0.0f ? 1.0f : 0.0f;
             k[0][1] = g_sh_k[3][1]; k[0][2] = g_sh_k[3][2]; k[0][3] = g_sh_k[3][3];
             k[1][0] = g_key[0]; k[1][1] = g_key[1]; k[1][2] = g_key[2]; k[1][3] = s;
-            k[2][0] = 1.0f + g * g; k[2][1] = 2.0f * g; k[2][2] = 0.0f; k[2][3] = 0.0f;
+            k[2][0] = 1.0f + g * g; k[2][1] = 2.0f * g; k[2][3] = 0.0f;
+            k[2][2] = g_shadow_fade > 0.0f ? g_sh_depth / g_shadow_fade : 0.0f;   /* map depth -> lengths of ShadowFade */
             d9_psconst(d9, 35, &k[0][0], 3);
         }
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);

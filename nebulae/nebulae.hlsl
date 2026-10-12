@@ -51,7 +51,7 @@ float4 k_sh1     : register(c33);  //   v,
 float4 k_sh2     : register(c34);  //   and depth along the Key (0..1 over the hulls)
 float4 k_sh      : register(c35);  //   x 1: there is a map (0: none), y the depth bias, z the penumbra (u, v per depth behind the caster), w half a texel (u, v)
 float4 k_key     : register(c36);  // xyz: towards the Key (Lighting.asi); w: the Key's share of the gas's light (0: none, all the gas's own)
-float4 k_scat    : register(c37);  // the Key scattered forward: x 1 + g*g, y 2g (Henyey-Greenstein's g, Scatter=)
+float4 k_scat    : register(c37);  // the Key scattered forward: x 1 + g*g, y 2g (Henyey-Greenstein's g, Scatter=); z: map depth to lengths of ShadowFade= (0: shadows never fill in)
 
 sampler3D s_noise : register(s0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
 sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; b: the nebulae's height there (0.5: the field's); a: envelope
@@ -263,7 +263,10 @@ float key_lit(float3 p, float2 u, float k)
     float  d = tex2Dlod(s_shadow, float4(s.xy + da * (k_sh.w + z * k_sh.z), 0, 0)).r;
     float  r = k_sh.w + (d < min(z, 0.999) ? z - d : 0.0) * k_sh.z;
     d = tex2Dlod(s_shadow, float4(s.xy + db * r, 0, 0)).r;
-    return d < min(z, 0.999) ? 0.0 : 1.0;
+    // ShadowFade=: the gas about a shaft scatters light into it, so a shadow fills in
+    // the farther behind its caster it is (k_scat.z: map depth to lengths of ShadowFade;
+    // 0, never). Seen straight down a shaft, that shortens the dark halo about the hull.
+    return d < min(z, 0.999) ? 1.0 - exp(-(z - d) * k_scat.z) : 1.0;
 }
 
 // The slice's point for this pixel, jittered in depth; u the pixel's two thresholds.
