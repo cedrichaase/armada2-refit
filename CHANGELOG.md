@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.22.2 — 2026-10-12
+
+Layers: hud 2.2.1, msaa 1.1.1.
+
+### Fixed
+- `HUD.asi` lays the HUD out with `Font=0` or the font standing down, and hands no
+  short objective list across a re-layout (hud 2.2.1).
+- `MSAA.asi` finds 4x for `Samples=6` and other counts that are not a power of two
+  (msaa 1.1.1).
+
+Installed, not yet seen in game.
+
 ## 11.22.1 — 2026-10-12
 
 Layers: cutscenes 2.0.2.
