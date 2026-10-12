@@ -147,6 +147,16 @@ int _fltused = 0;   /* floats without the CRT */
 #define SI_MAX_HEALTH    0x456da0u
 #define SI_CANNOT_DIE    0x457590u
 #define SI_EXPLODE_NOW   0x456cf0u   /* ScriptInterfaceImp::ExplodeNow(int): a craft dies now, as a mission script blows one up */
+#define SI_SPECIAL_AT    0x452d10u   /* ScriptInterfaceImp::Special_Attack(int, int target, const char *weapon) */
+#define SI_SPECIAL       0x452dc0u   /* ScriptInterfaceImp::Special_Attack(int, const char *weapon): no target */
+#define SI_SET_SPECIAL   0x456280u   /* ScriptInterfaceImp::SetSpecialEnergy(int, float) */
+#define CRAFT_SPECIAL_MAX 0x168u     /* a craft's special energy: its maximum, then what it has (+0x16c) */
+#define CRAFT_CARRIER    0x128u      /* a craft's Carrier: its weapons, a vector of Weapon * at +0xc..+0x10 */
+#define PRJ_SET_NAME     0x6593c0u   /* cPrjID::SetName(const char *), thiscall */
+#define WEAPON_FIND      0x664850u   /* WeaponClass::Find(const cPrjID &), cdecl */
+#define FIRE_AT_SPECIAL  0x4c3820u   /* Craft::FireAtSpecial(int slot, const GameObject *), thiscall */
+#define FIRE_SPECIAL     0x4c3b20u   /* Craft::FireAtSpecial(int slot): no target */
+#define WEAPON_CAN_FIRE  0x20u       /* Weapon vtable: can it fire at this target now */
 #define SI_INSTANCE      ((void *)0x735c40u)
 #define TACTICAL_CAMERA  0x763650u
 #define CAMERA_INTEREST  0x98u
@@ -259,6 +269,10 @@ static const Sig k_sigs[] = {
     { SI_MAX_HEALTH,    8, P_SI_HANDLE },
     { SI_CANNOT_DIE,    8, P_SI_HANDLE },
     { SI_EXPLODE_NOW,   8, P_SI_HANDLE },
+    { SI_SET_SPECIAL,   8, P_SI_HANDLE },
+    { SI_SPECIAL_AT,    8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 } },
+    { SI_SPECIAL,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 } },
+    { FIRE_AT_SPECIAL,  8, { 0x55, 0x8B, 0xEC, 0xA1, 0xC0, 0x0F, 0x7B, 0x00 } },
     { PL_START_COLONY,  8, { 0x55, 0x8B, 0xEC, 0xA1, 0x84, 0x10, 0x76, 0x00 } },
     { PL_SET_POP,       8, { 0x55, 0x8B, 0xEC, 0xD9, 0x45, 0x08, 0xD8, 0x1D } },
     { PL_MAX_POP,       8, { 0x8B, 0x41, 0x40, 0x8B, 0x80, 0x90, 0x04, 0x00 } },
@@ -278,6 +292,13 @@ typedef void   (__thiscall *SiVoidFn)(void *si);
 typedef void   (__thiscall *SiHandleFn)(void *si, int h);
 typedef void   (__thiscall *SiHandleBoolFn)(void *si, int h, int yes);
 typedef void   (__thiscall *SiAttackFn)(void *si, int h, int target, int unused);
+typedef void   (__thiscall *SiSpecialAtFn)(void *si, int h, int target, const char *weapon);
+typedef void   (__thiscall *SiSpecialFn)(void *si, int h, const char *weapon);
+typedef void   (__thiscall *PrjSetNameFn)(int *prj, const char *name);
+typedef void  *(__cdecl    *WeaponFindFn)(const int *prj);
+typedef BYTE   (__thiscall *FireAtSpecialFn)(void *craft, int slot, const void *target);
+typedef BYTE   (__thiscall *FireSpecialFn)(void *craft, int slot);
+typedef BYTE   (__thiscall *CanFireFn)(void *weapon, const void *target);
 typedef void   (__thiscall *SetCommandObjFn)(void *go, int cmd, const void *target, long param, int flag);
 typedef void   (__thiscall *SetCommandFn)(void *go, int cmd, long param, int a, int b);
 typedef void   (__thiscall *SetCommandAtFn)(void *go, int cmd, const float *pos, long param, int flag);
@@ -437,13 +458,14 @@ static void v_cross(float *r, const float *a, const float *b)
 
 /* ---- the scene's objects ---------------------------------------------- */
 
-#define MAX_OBJECTS 32
+#define MAX_OBJECTS 96
 
 typedef struct {
     char  name[32];
     char  attack[32];   /* the object this one is ordered to attack, if any */
     int   handle;
     int   heal;         /* topped up to full health every tick */
+    int   energy;       /* special energy topped up to full every tick */
 } Obj;
 
 static Obj   g_obj[MAX_OBJECTS];
@@ -526,6 +548,7 @@ static Obj *spawn(const char *name, const char *odf, int team,
     s_cpy(o->name, name, sizeof o->name);
     o->attack[0] = 0;
     o->heal = 0;
+    o->energy = 0;
     o->handle = *(int *)((BYTE *)go + OBJECT_HANDLE);
     s_cat(b, " team ");
     s_num(b, team);
@@ -561,12 +584,50 @@ static void order_attack(Obj *o, const char *target)
  * only when below it, since SetCrew also recomputes the craft's state. */
 static int systems_hurt(const BYTE *craft);
 
+static void *craft_of(Obj *o);
+
+/* Fire a craft's special weapon, by its weapon ODF's name, at a target or none: the
+ * weapon's slot in the craft's Carrier, then Craft::FireAtSpecial, as
+ * CraftProcess::FireCommandedSpecialWeapon calls it for a player's order. Logs the
+ * slot, whether the weapon says it can fire, and whether it fired. */
+static void fire_special(const Obj *o, const char *weapon, const Obj *tg)
+{
+    BYTE  *craft = (BYTE *)craft_of((Obj *)o), *carrier, **w, *cls;
+    void  *target = tg ? ((EntityGetFn)ENTITY_GET)(tg->handle) : NULLPTR;
+    int    prj = 0, n, i, slot = -1;
+    char   b[200];
+    BYTE   can, fired;
+    if (!craft || !(carrier = *(BYTE **)(craft + CRAFT_CARRIER))) { logline("  ! no weapons"); return; }
+    ((PrjSetNameFn)PRJ_SET_NAME)(&prj, weapon);
+    cls = (BYTE *)((WeaponFindFn)WEAPON_FIND)(&prj);
+    w = *(BYTE ***)(carrier + 0xc);
+    n = w ? (int)((*(BYTE ***)(carrier + 0x10)) - w) : 0;
+    for (i = 0; i < n; i++) if (w[i] && *(BYTE **)(w[i] + 4) == cls) { slot = i; break; }
+    if (!cls || slot < 0) { logline(cls ? "  ! the craft has no such weapon" : "  ! no such weapon class"); return; }
+    can = ((CanFireFn)(*(void ***)w[slot])[WEAPON_CAN_FIRE / 4])(w[slot], target);
+    fired = target ? ((FireAtSpecialFn)FIRE_AT_SPECIAL)(craft, slot, target) : ((FireSpecialFn)FIRE_SPECIAL)(craft, slot);
+    b[0] = 0;
+    s_cat(b, "  slot "); s_num(b, slot); s_cat(b, can ? ", can fire" : ", cannot fire now");
+    s_cat(b, fired ? ", fired" : ", NOT fired");
+    logline(b);
+}
+
+/* Special energy: a craft's to its maximum (ScriptInterfaceImp::SetSpecialEnergy). */
+static void fill_special(const Obj *o)
+{
+    BYTE *go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
+    if (!go || !(*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT)) return;
+    if (*(float *)(go + CRAFT_SPECIAL_MAX + 4) < *(float *)(go + CRAFT_SPECIAL_MAX))
+        ((SiSetHealthFn)SI_SET_SPECIAL)(SI_INSTANCE, o->handle, *(float *)(go + CRAFT_SPECIAL_MAX));
+}
+
 static void heal_all(void)
 {
     int i;
     for (i = 0; i < g_nobj; i++) {
         float max;
         BYTE *go;
+        if (g_obj[i].energy) fill_special(&g_obj[i]);
         if (!g_obj[i].heal) continue;
         max = ((SiMaxHealthFn)SI_MAX_HEALTH)(SI_INSTANCE, g_obj[i].handle);
         ((SiSetHealthFn)SI_SET_HEALTH)(SI_INSTANCE, g_obj[i].handle, max);
@@ -1285,6 +1346,21 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_eq(t[0], "special") && n >= 3) {
+        Obj *tg = NULLPTR;
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+        if (n >= 4 && !(tg = find_obj(t[3]))) { logline("  ! no such target"); return; }
+        fill_special(o);
+        fire_special(o, t[2], tg);
+        return;
+    }
+    if (s_eq(t[0], "energy") && n >= 3) {
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+        o->energy = on_arg(t[2]);
+        if (o->energy) fill_special(o);
+        logline("  ok");
+        return;
+    }
     if (s_eq(t[0], "kill") && n >= 2) {
         if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
         o->heal = 0;
@@ -1325,7 +1401,7 @@ static void run_command(char *line)
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
-            "immortal, kill, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
+            "immortal, special, energy, kill, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
             "shieldfx, query, "
             "select, selection)");
 }
@@ -1418,6 +1494,7 @@ static void build_scene(void)
         if (ini_int(sect, "Immortal", 1))
             ((SiHandleBoolFn)SI_CANNOT_DIE)(SI_INSTANCE, o->handle, 1);
         o->heal = ini_int(sect, "Heal", 0);
+        o->energy = ini_int(sect, "Energy", 0);
         if (!ini_int(sect, "Engines", 1))
             ((SiHandleBoolFn)SI_NO_ENGINES)(SI_INSTANCE, o->handle, 1);
         if (!ini_int(sect, "Weapons", 1))

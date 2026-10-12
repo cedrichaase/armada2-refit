@@ -88,9 +88,9 @@ it patched it, so another plugin's hook at the same site keeps working, and the 
 names a target that is not the engine's.
 
 - **The call to `ShieldHit::DrawShield` at 0x47492d in `ShieldEffect::Render`.** A hit
-  whose model is type 0's, or type 1's (the shields-down ring) with `Down=1`, is
-  skipped while the plugin draws; every other type (the special weapons' shells) calls
-  through and is drawn by stock.
+  whose model is type 0's, or type 1's (the shields-down ring) with `Down=1`, or a
+  special weapon's shell with a `[Shell.]` section, is skipped while the plugin draws;
+  every other calls through and is drawn by stock.
 - **The call to `ST3D_GraphicsEngine::RenderChunks` at 0x598446 in
   `Armada_RenderAllOurStuff`**: after the objects and `GameFeature_RenderAll`, before
   `RenderParticleList` (which `Nebulae.asi` hooks, a different site). The plugin calls
@@ -218,6 +218,33 @@ from below, a 900x420 box over its saucer's underside, mean RGB of five frames e
 underside under the discharges. From above, where the Key already lights the saucer near
 white, it was within frame-to-frame noise at 1.5 and at 4.
 
+## The special weapons' shells
+
+`ShieldEffect` makes six more types than the ordinary hit and the shields-down ring, for
+the special weapons; no ODF names them, the weapons' code passes them:
+`wshldadd` (2) and `wshldsub` (3) for shields added and drained, `wcorbrfr` (4) the
+corbomite reflector (`ReflectWeapon::mActivateReflect` makes it, untimed, with an
+identity frame, and `ReflectWeapon::Simulate` keeps it while the reflector is on),
+`wshldrmd` (5) shield remodulation, `wmanhiem` (6) the Gemini effect (`ManheimEffect`),
+`WEclairlink1` (7) the clairvoyant link. Their names are the engine's own: a
+null-terminated table at 0x6b00e0, in type order, which `ShieldEffect::GetShieldType`
+(0x474720) searches; the plugin reads a name there (checking that `GetShieldType` still
+loads that address) and looks for a section `[Shell.<name>]` in `Shields.ini`. (A first
+version read the name at +8 of each `m_logical_db` entry, as for a database element;
+those entries are databases, and the game crashed at the first shield hit.)
+
+A shell with `On=1` joins the ordinary hits: drawn by the same shader over the struck
+ship's ellipsoid, in its own colour, brightness, spot, ring and lattice, as a beam's
+hit is (held while the engine keeps it, a ring every `RingPeriod`), and in a pass of its
+own per ship and type. A shell with an identity frame has no point struck (`hit_dir`
+finds no direction): it is taken as covering the whole ship, with no hot spot and the
+glow reaching all over the ellipsoid, and the rings still sweep over it.
+
+On the bench (`SCENE=specials`, a Sovereign with its reflector on under a Klingon
+battleship's fire, 2026-10-13): the Klingon's phasers came back at it, and the
+Sovereign's shield ellipsoid glowed gold, brightest at its rim; `Shields.log`: `hit 16
+(wcorbrfr) on fbattle.odf ... untimed`.
+
 ## Shields.ini
 
 `Enable`, `Reload`, `LogHits`, `Log`; `Brightness`; `ColourMode`, `Federation`,
@@ -231,7 +258,8 @@ white, it was within frame-to-frame noise at 1.5 and at 4.
 `DownCore`, `DownGlowWidth`, `DownBranches`, `DownLit`, `DownRate`, `DownStrikes`,
 `DownStrikeSize`, `DownStrikeMin`, `DownStrikeMax`, `DownStrikeGap`, `DownCrackle`,
 `DownBand`, `DownFlash`, `DownFlashTime`, `DownFadeOut`, `DownFarSide`, `DownRimPower`,
-`DownLight`, `DownLightColour`, `DownLightReach`. Each is described in the file.
+`DownLight`, `DownLightColour`, `DownLightReach`; `Shells`, and per shell `[Shell.<name>]`
+`On`, `Colour`, `Brightness`, `Spot`, `Ring`, `Lattice`. Each is described in the file.
 
 ## On the bench
 
@@ -262,8 +290,9 @@ RTS distance; `no-assets` checks it installs and patches without assets.
 ## Not covered yet
 
 - The release package (`publish/`, the GUI installer) does not carry the layer.
-- Only types 0 and 1, the ordinary hit and the shields-down ring, are drawn by the
-  shaders; the special weapons' shells stay stock.
+- The shells of shield-type effects that `ShieldEffect` does not make (stasis, the
+  holograms) are `Specials.asi`'s concern or stay stock; only the six types it makes
+  are drawn here, and only the corbomite reflector's has been seen on the bench.
 - The shields-down arcs cost a second pixel shader over the ellipsoid of every ship whose
   shields are down (two fields of arcs, about twenty noise lookups a pixel); not yet
   measured in a fleet battle.

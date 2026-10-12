@@ -5,6 +5,24 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.13.0 — 2026-10-13
+
+### Added
+- `Scene.asi`: `special <ship> <weapon> [<target>]` fires a ship's special weapon (its
+  weapon ODF's name): the weapon's slot in the ship's carrier, then
+  `Craft::FireAtSpecial`, as a player's order does; it answers with the slot, whether the
+  weapon can fire and whether it fired. `energy <ship> on|off` and the scene key
+  `Energy=` keep a ship's special energy full every tick. Scenes may hold 96 objects
+  (was 32).
+- `SCENE=specials`: an enemy Sovereign that cannot die and does not fire, and a Galaxy
+  off to one side to warp, for `Specials.asi`.
+- Scenario `specials`: the holding beam, the tractor beam and the warp flash drawn by
+  `Specials.asi`, and psionic insanity's wave shot, with shots. `no-assets` also expects
+  `Specials.log`'s hooks line.
+- The bench clears `Specials.log` at launch and gathers it with `Specials.ini`.
+
+Installs nothing.
+
 ## 3.12.0 — 2026-10-13
 
 ### Added
