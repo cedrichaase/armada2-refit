@@ -7,14 +7,19 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 11.30.0 — 2026-10-13
 
-Layers: specials 1.0.0, testbench 3.12.0.
+Layers: specials 1.0.0, shields 1.2.0, testbench 3.12.0.
 
 ### Added
-- The `specials` layer: `Specials.asi` draws the warp flash by shader, in place of the
-  stock sprite: a white-hot core and blue glow with a lens streak, bursting as the craft
-  goes and leaving a ring, lighting the hulls about it (specials 1.0.0). `./install`
-  runs `specials/install.sh`; `a2mod` switches `Specials.asi` and `Specials.ini` as the
-  `specials` layer; the bench gathers `Specials.log`. Not in the release package yet.
+- The `specials` layer: `Specials.asi` draws the warp flash by shader (a white-hot core
+  and blue glow with a lens streak, bursting as the craft goes and leaving a ring), and
+  the special weapons' shots and waves from recipes in `Specials.ini`: beams, bolts and
+  bands of light running out, each lighting the hulls about it (specials 1.0.0).
+  `./install` runs `specials/install.sh`; `a2mod` switches `Specials.asi` and
+  `Specials.ini` as the `specials` layer. Not in the release package yet.
+- The special weapons' shield shells, the corbomite reflector's among them, drawn by
+  `Shields.asi` (shields 1.2.0).
+- `Scene.asi` fires special weapons (`special`, `energy`), `SCENE=specials`, scenario
+  `specials`; the bench gathers `Specials.log` (testbench 3.12.0).
 
 Installed, not yet seen in game.
 

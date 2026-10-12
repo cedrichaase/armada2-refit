@@ -156,7 +156,10 @@ float3 wave(float2 uv, float3 col, float3 edge_col, float seed, float4 p, float4
     float  band = exp(-d * d * 1.5) * turb;
     float  lead = exp(-pow(max(d + 0.3, 0.0) * 2.5, 2.0)) * step(-0.3, d) * turb;
     float  inside = saturate(r / max(p.x, 1e-3)) * (1.0 - step(p.x, r));
-    float  ray = pow(abs(cos(a * p.z * 0.5 + seed + 0.6 * sin(a * 3.0 + seed))), 24.0) * inside * inside * p.w;
+    float  spoke = floor((a + 3.14159265) * p.z * 0.159154943 + 0.5);    // which ray
+    float  vary = 0.25 + 0.75 * frac(sin(spoke * 12.9898 + seed * 78.233) * 43758.5453);
+    float  ray = pow(abs(cos(a * p.z * 0.5 + seed + 0.6 * sin(a * 3.0 + seed))), 24.0) * inside * inside * p.w * vary
+               * (0.6 + 0.4 * sin(r * 9.0 - t * 4.0 + spoke));
     return col * (band + q.x * inside + ray) + edge_col * lead * 0.8;
 }
 

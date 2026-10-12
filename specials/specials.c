@@ -822,7 +822,7 @@ static void __cdecl hook_ord_pre(void *camera)
  * ordnance: its class +0x34 (whose cPrjID * at +0x150 names its ODF), its owner's
  * handle +0x5c, its target's +0x60, its time left +0xac; a beam's (Beam's and
  * BeamToggle's) start +0xbc and end +0xc8. */
-#define SITE_ORD_SUBMIT    0x58e6df   /* in Ordnance::RenderAll: mov ecx,edi; call [eax+0x5c] */
+#define SITE_ORD_SUBMIT    0x58e6df   /* in Ordnance::RenderAll: the ordnance (edi) into ecx, then Submit through its vtable */
 #define FN_ORD_RENDERALL   0x58e580
 #define FN_PRJ_ODF         0x6593a0   /* cPrjID::GetOdfName() const, thiscall */
 #define FN_GET_TRANSFORM   0x4cfd50   /* Entity::GetTransform() const, thiscall: a Matrix34, position +0x24 */
@@ -1308,7 +1308,8 @@ void __fastcall ord_submit(BYTE *ord, void *edx, void *cam)
         g_shot[g_nshot].ord = ord;
         g_shot[g_nshot].rc = rc;
         g_nshot++;
-        if (g_shots_noted++ < 8 || S.survey) {
+        g_shots_noted++;
+        {   /* once per recipe */
             static const Recipe *said[MAX_RECIPES];
             int k, known = 0;
             for (k = 0; k < MAX_RECIPES && said[k]; k++) if (said[k] == rc) known = 1;
@@ -1423,7 +1424,7 @@ static void startup(void)
     s_cat(b, " and Ordnance::PreRenderAll");
     if ((DWORD)g_prev_ord_pre != FN_ORD_PRE) { s_cat(b, " (chained to "); s_hex(b, (DWORD)g_prev_ord_pre); s_cat(b, ")"); }
     s_cat(b, " patched");
-    {   /* the ordnance's Submit: 5 bytes, mov ecx,edi; call [eax+0x5c], become a call */
+    {   /* the ordnance's Submit: those 5 bytes become a call to the thunk */
         static const BYTE want[] = { 0x8b, 0xcf, 0xff, 0x50, 0x5c };
         BYTE *p = (BYTE *)SITE_ORD_SUBMIT;
         DWORD old;
