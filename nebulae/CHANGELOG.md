@@ -4,6 +4,13 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.3.1 — 2026-10-13
+
+### Changed
+- `mnebula7`: `Lightning=` 15 → 7.5, half as many flashes.
+
+Installed, not yet seen in game.
+
 ## 1.3.0 — 2026-10-13
 
 ### Added
