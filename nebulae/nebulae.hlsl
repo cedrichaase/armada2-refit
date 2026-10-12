@@ -49,7 +49,9 @@ float4 k_opac    : register(c31);  // x: Opacity= over the reach: optical depth 
 float4 k_sh0     : register(c32);  // the Key's shadow map (Lighting.asi): world -> u,
 float4 k_sh1     : register(c33);  //   v,
 float4 k_sh2     : register(c34);  //   and depth along the Key (0..1 over the hulls)
-float4 k_sh      : register(c35);  //   x how much of the gas's light a shadow takes (0: no map), y the depth bias, z the penumbra (u, v per depth behind the caster), w half a texel (u, v)
+float4 k_sh      : register(c35);  //   x 1: there is a map (0: none), y the depth bias, z the penumbra (u, v per depth behind the caster), w half a texel (u, v)
+float4 k_key     : register(c36);  // xyz: towards the Key (Lighting.asi); w: the Key's share of the gas's light (0: none, all the gas's own)
+float4 k_scat    : register(c37);  // the Key scattered forward: x 1 + g*g, y 2g (Henyey-Greenstein's g, Scatter=)
 
 sampler3D s_noise : register(s0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
 sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; b: the nebulae's height there (0.5: the field's); a: envelope
@@ -212,9 +214,16 @@ float3 gas_colour(float4 g, float thick, float dist, float3 p, float lit)
             c = lerp(c, lerp(a, b, smoothstep(0.0, 1.0, f)) * (lum * 1.4), saturate(ring * k_ring.x));
         }
     }
-    // In a ship's shadow, the gas loses the Key's share of its light. The lightning
-    // after this is its own light, and is not shadowed.
-    c *= 1.0 - k_sh.x * (1.0 - lit);
+    // The gas's light is its own glow and the Key's, which it scatters: KeyShare= of it
+    // the Key's, as seen side on to the Key. Scattered forward (Henyey-Greenstein, over
+    // its value side on), it is brighter looking towards the Key and dimmer with the Key
+    // behind the eye. In a ship's shadow, the gas has only its own glow; the lightning
+    // after this is its own light too, and is not shadowed.
+    if (k_key.w > 0.0) {
+        float cv = dot(-k_key.xyz, normalize(k_eye.xyz - p));   // 1: the Key's light carries straight on to the eye
+        float ph = pow(k_scat.x / max(k_scat.x - k_scat.y * cv, 1e-3), 1.5);
+        c *= 1.0 - k_key.w + k_key.w * ph * lit;
+    }
     // Lightning (Lightning=): up to four flashes inside the field. The gas about each
     // lights up in the lightning's colour, and a small core where it strikes burns
     // hotter, so the cloud flickers from within like a thunderhead.

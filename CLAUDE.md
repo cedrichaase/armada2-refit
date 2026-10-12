@@ -730,6 +730,10 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   export `LightingShadowMap` (sampler 8, c32..c35). In that map a texel of 1 means no
   hull, never a hull at the far end; compared as a depth, it shadowed all gas beyond the
   hulls.
+- **A shadow takes only the Key's share of the gas's light** (`KeyShare=`, the Key from
+  `LightingKey`, c36..c37), scattered forward (`Scatter=`). Dimming self-lit gas by a
+  fraction left shafts invisible except in a difference image; they show looking
+  towards the Key, where lines of sight run down them.
 
 ### surfaces
 

@@ -10,9 +10,10 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: nebulae 1.1.0, lighting 1.19.0.
 
 ### Added
-- Ships cast the Key's shadow through the nebula gas (nebulae 1.1.0, `Shadows=`,
-  `ShadowStrength=`, `ShadowSoftness=`, recipe `Shadow=`), from `Lighting.asi`'s shadow
-  map, now exported as `LightingShadowMap` (lighting 1.19.0).
+- The nebula gas is lit by the Key, scattering it forward, and ships cast the Key's
+  shadow through it (nebulae 1.1.0, `KeyShare=`, `Scatter=`, `Shadows=`,
+  `ShadowSoftness=`), from `Lighting.asi`'s Key and shadow map, now exported as
+  `LightingKey` and `LightingShadowMap` (lighting 1.19.0).
 
 ### Fixed
 - Hulls' shadows came and went: opaque hulls were taken for blended draws and left out

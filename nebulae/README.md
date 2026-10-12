@@ -129,12 +129,40 @@ The composite is bound by its reads: a depth read for each of 25 taps cost 0.57 
 more at 3440x1440, more than all the opacity work. A 3x3 tent (the first) was grainy
 from outside the gas.
 
+## Lit by the Key
+
+The gas's light is two parts: its own glow, and the Key's, which the gas scatters. The
+Key's share (`KeyShare=`, 0.8; 0 is the gas as before, all its own light) is what a
+ship's shadow takes away, and the reason there are shadows to see at all. While the gas
+was all its own light, a shadow could only dim it by a fixed fraction (the first try,
+`ShadowStrength=0.75`): seen side on, a pixel's line of sight crosses a shaft only for
+a ship's width out of hundreds of units of gas, and the shafts showed only in a
+difference image, amplified.
+
+**The Key's share is scattered forward** (Henyey-Greenstein, `Scatter=`, 0.2), taken
+over its value side on to the Key so that a side view keeps the recipe's brightness:
+looking towards the Key the gas is brighter (x1.9 at 0.2), with the Key behind the eye
+dimmer (x0.6). That is the silver lining a cloud has against the sun, and it is where
+shafts show: looking towards the Key, the lines of sight run down the shafts, not across
+them. At 0.3 the whole field was 2.3 times as bright looking towards the Key; that was
+too much. **The self-shading steps towards the Key** (the recipe's `Light=` is used only
+without one), so the billows' lit sides face the way the hulls' do; a new Key re-bakes
+the gas.
+
+The Key's direction comes from `Lighting.asi`'s export `LightingKey`, read off the
+engine's lights at each draw, so it is there with no hull on screen and with its
+`Shadows=0`. Without `Lighting.asi`, the gas is its own light only.
+
+Measured on the bench (2026-10-12, 1920x1080, `mnebula8` with the ships below,
+`FlowSpeed=0`), the frame's mean against before: side on 54 → 58, towards the Key
+49 → 81, the Key behind the camera 55 → 50, from above 57 → 52.
+
 ## Ships' shadows in the gas
 
 A ship between the Key and the gas takes the Key's share of the gas's light away behind
 it: a dark shaft down through the field along the Key's direction (`Shadows=1`,
-`ShadowStrength=`, `ShadowSoftness=` in `Nebulae.ini`, and `Shadow=` per recipe, which
-scales the strength). Lightning is the gas's own light and is not shadowed.
+`ShadowSoftness=` in `Nebulae.ini`). Lightning is the gas's own light and is not
+shadowed.
 
 **The shadow map is `Lighting.asi`'s**, the one its hulls cast for the Key
 (`lighting/README.md`, "Shadows"). `Lighting.asi` exports `LightingShadowMap`, which
@@ -160,11 +188,11 @@ beyond every hull along the Key was in shadow wherever there was no hull at all,
 wedge with a straight edge through the field (bench, the first try).
 
 Measured on the bench (2026-10-12, 1920x1080, `mnebula8` with a Galaxy, a Sovereign and a
-Borg cube in it; the recipe's `FlowSpeed=0` so that only the shadow differs): `Shadow=0`
-against `Shadow=1` differ only in shafts from the hulls down and away along the Key
-(mean difference 0.76 of 255 seen side on, 0.12 from an RTS view, where the shafts
-mostly run away from the camera). The GPU time it adds has not been measured
-(`Timing=1`).
+Borg cube in it; the recipe's `FlowSpeed=0` so that only the shadow differs): `Shadows=0`
+against `Shadows=1` differ only in shafts from the hulls down and away along the Key.
+The frame's mean difference is 2.5 of 255 looking towards the Key, where the shafts are
+plain at 1x; 0.36 side on and 0.2 from above, where they run across or away from the
+lines of sight. The GPU time it adds has not been measured (`Timing=1`).
 
 ## Cost
 
@@ -181,7 +209,7 @@ of an edit. Shape: `Extent`, `Height`, `Lumps`, `EdgeWarp`, `Radius`. Noise: `Se
 `Ridge`. Colour: `Brightness`, `GasA`, `GasB`, `Glow`, `HueScale`, `HueMix`,
 `HueCycle`, `HueSwing`. Light: `Light`, `ShadeStep`, `Shading`, `Knots`, `KnotScale`,
 `Lanes`, `LaneScale`. Motion: `Flow`, `FlowScale`, `FlowSpeed`. Filaments: `Filaments`,
-`FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`, `Shadow`,
+`FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`, `KeyShare`, `Scatter`,
 `NearFade`. Lightning: `Lightning` (flashes a minute, a nebula), `LightningSize`,
 `LightningBrightness`, `LightningColour`. The core: `Core`, `CoreSharpness`, `Pulse`,
 `PulseSpeed`, `PulseWander`, and its ring of colours `Ring`, `RingAt`, `RingWidth`,

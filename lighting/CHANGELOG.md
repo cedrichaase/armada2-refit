@@ -9,6 +9,8 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 ### Added
 - `LightingShadowMap`, exported: the Key's shadow map for `Nebulae.asi`, handed over only
   while it is the current view's and frame's.
+- `LightingKey`, exported: the direction towards the Key, from the engine's lights, for
+  `Nebulae.asi`'s gas.
 
 ### Fixed
 - Hulls cast no shadow, or did only now and then. The engine leaves alpha blending on for

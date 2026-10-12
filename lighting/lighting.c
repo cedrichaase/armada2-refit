@@ -1510,6 +1510,17 @@ static int sm_key_axis(float *fwd)
     return best > 0.0f;
 }
 
+/* The direction towards the Key, in world space, for another plugin: Nebulae.asi lights
+ * its gas by it ("Shadows in the gas", README). Read off the engine's lights at the
+ * call, so it is there with no hull on screen and with Shadows=0. */
+__declspec(dllexport) int __cdecl LightingKey(float *to_key)
+{
+    float fwd[3];
+    if (!sm_key_axis(fwd)) return 0;
+    to_key[0] = -fwd[0]; to_key[1] = -fwd[1]; to_key[2] = -fwd[2];
+    return 1;
+}
+
 /* c = a x W for the column a (four values) under a row-major WORLD: one column of
  * object -> (u, v, depth). */
 static void sm_col(const float *w, const float *a, float *c)

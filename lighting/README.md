@@ -973,7 +973,9 @@ info)` is exported from `Lighting.asi`, and answers only while the map is this v
 and this frame's (`g_sm_frame == g_frame`), on the device asked about. `ls` takes the
 three world -> u, v, depth columns of `sm_render`; `info` the depth bias, a texel in u
 and v, the map's width and its depth range in world units. No reference is added; the
-texture lives until the device resets.
+texture lives until the device resets. `LightingKey(to_key)` gives the gas the direction
+towards the Key at any time (`sm_key_axis`, read off the engine's lights), map or not:
+the gas takes a share of its light from the Key (`nebulae/README.md`, "Lit by the Key").
 
 Not shadowed: anything not drawn through the hull shaders (the CPU path's cloaking or
 warping ships, translucent meshes) casts and takes no shadow, and planets take none from

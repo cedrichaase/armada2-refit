@@ -290,7 +290,8 @@ static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ
 static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, half size only) */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
 static int   g_shadows = 1;            /* Shadows=: ships shadow the gas from the Key (Lighting.asi's map) */
-static float g_shadow_strength = 0.75f; /* ShadowStrength=: how much of the gas's light a shadow takes (a recipe's Shadow= scales it) */
+static float g_key_share = 0.8f;        /* KeyShare=: the Key's share of the gas's light; the rest is its own glow (a recipe's KeyShare= overrides) */
+static float g_scatter = 0.2f;          /* Scatter=: how much the gas scatters the Key forward (0: alike every way; a recipe's Scatter= overrides) */
 static float g_shadow_soft = 0.02f;     /* ShadowSoftness=: the penumbra's width per unit behind the caster */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
@@ -321,10 +322,14 @@ static void read_settings(void)
     if (g_obscure < 0.0f) g_obscure = 0.0f;
     if (g_obscure > 1.0f) g_obscure = 1.0f;
     g_shadows = (int)GetPrivateProfileIntA("Nebulae", "Shadows", 1, g_ini);
-    GetPrivateProfileStringA("Nebulae", "ShadowStrength", "0.75", b, sizeof b, g_ini);
-    parsen(b, &g_shadow_strength, 1);
-    if (g_shadow_strength < 0.0f) g_shadow_strength = 0.0f;
-    if (g_shadow_strength > 1.0f) g_shadow_strength = 1.0f;
+    GetPrivateProfileStringA("Nebulae", "KeyShare", "0.8", b, sizeof b, g_ini);
+    parsen(b, &g_key_share, 1);
+    if (g_key_share < 0.0f) g_key_share = 0.0f;
+    if (g_key_share > 1.0f) g_key_share = 1.0f;
+    GetPrivateProfileStringA("Nebulae", "Scatter", "0.2", b, sizeof b, g_ini);
+    parsen(b, &g_scatter, 1);
+    if (g_scatter < 0.0f) g_scatter = 0.0f;
+    if (g_scatter > 0.8f) g_scatter = 0.8f;
     GetPrivateProfileStringA("Nebulae", "ShadowSoftness", "0.02", b, sizeof b, g_ini);
     parsen(b, &g_shadow_soft, 1);
     if (g_shadow_soft < 0.0f) g_shadow_soft = 0.0f;
@@ -369,7 +374,9 @@ typedef struct {
     double   pulse_last;      /* when the phase was last advanced (seconds) */
     float    extent, height, radius, radius0;   /* radius0: the class's own (a nebula's effect radius), Radius= overrides */
     float    flow_speed, edge_warp, fil_reach, edge_dim, opacity;
-    float    shadow;          /* Shadow=: times ShadowStrength=, how much of its light a ship's shadow takes */
+    float    key_share, scatter;   /* KeyShare=, Scatter=: below 0, Nebulae.ini's */
+    float    shade_step;      /* ShadeStep=: the self-shading's step towards the light (world units) */
+    float    light0[3];       /* Light= and ShadeStep=: the self-shading's own step, when there is no Key */
     float    ydev;            /* the farthest any of the class's nebulae is above or below its mean (world units, at least 1) */
     float    hue_cycle, hue_swing;               /* HueCycle= (seconds), HueSwing= */
     float    bolt_rate, bolt_size, bolt_bright;  /* Lightning= (a minute, a nebula), LightningSize=, LightningBrightness= */
@@ -425,8 +432,10 @@ static int recipe_read(Cls *c)
     c->pulse_speed = ini1(f, "PulseSpeed", 0.5f);
     c->pulse_wander = ini1(f, "PulseWander", 0.5f);
     c->ring_cycle = ini1(f, "RingCycle", 6.0f);
-    c->shadow = ini1(f, "Shadow", 1.0f);
-    if (c->shadow < 0.0f) c->shadow = 0.0f;
+    c->key_share = ini1(f, "KeyShare", -1.0f);
+    if (c->key_share > 1.0f) c->key_share = 1.0f;
+    c->scatter = ini1(f, "Scatter", -1.0f);
+    if (c->scatter > 0.8f) c->scatter = 0.8f;
     c->opacity = ini1(f, "Opacity", 0.0f);         /* optical depth through one reach of the densest gas */
     if (c->opacity < 0.0f) c->opacity = 0.0f;
     if (c->ring_cycle < 0.1f) c->ring_cycle = 0.1f;
@@ -457,12 +466,14 @@ static int recipe_read(Cls *c)
     c->k[9][3] = ini1(f, "LaneScale", 1.7f);
     {   /* the light the gas shades itself by: a direction, a step, a strength */
         float l[2] = { 30.0f, 60.0f }, y, pt, st = ini1(f, "ShadeStep", 60.0f);
+        c->shade_step = st;
         inin(f, "Light", l, 2);
         y = l[0] * 0.017453293f; pt = l[1] * 0.017453293f;
         c->k[10][0] = cos_f(pt) * sin_f(y) * st;
         c->k[10][1] = sin_f(pt) * st;
         c->k[10][2] = cos_f(pt) * cos_f(y) * st;
         c->k[10][3] = ini1(f, "Shading", 1.0f);
+        c->light0[0] = c->k[10][0]; c->light0[1] = c->k[10][1]; c->light0[2] = c->k[10][2];
     }
     c->k[11][3] = ini1(f, "FineDetail", 0.35f);
     c->flow_speed = ini1(f, "FlowSpeed", 0.03f);  /* noise tiles a second: the drift of the flow field */
@@ -1467,7 +1478,7 @@ static void shadow_query(void *d9)
     static ShadowMap_t get;
     float info[4];
     g_sh_tex = NULLPTR;
-    if (!g_shadows || g_shadow_strength <= 0.0f) return;
+    if (!g_shadows) return;
     if (!looked) {
         HMODULE m = GetModuleHandleA("Lighting.asi");
         looked = 1;
@@ -1475,7 +1486,7 @@ static void shadow_query(void *d9)
         if (!get) note_once(&said_none, "no shadow map from Lighting.asi (not loaded, or older than 1.18.0): the gas takes no ships' shadows");
     }
     if (!get || !get(d9, &g_sh_tex, &g_sh_k[0][0], info)) { g_sh_tex = NULLPTR; return; }
-    g_sh_k[3][0] = g_shadow_strength;                  /* times each class's Shadow= */
+    g_sh_k[3][0] = 1.0f;                               /* there is a map */
     g_sh_k[3][1] = info[0] * 2.0f;                     /* twice the hulls' bias: the gas has no faces to fight it */
     g_sh_k[3][2] = info[2] > 0.0f ? g_shadow_soft * info[3] / info[2] : 0.0f;   /* map depth -> world -> u, v */
     g_sh_k[3][3] = info[1];
@@ -1486,6 +1497,39 @@ static void shadow_query(void *d9)
         s_cat(b, " units across, "); s_flt(b, info[3]); s_cat(b, " deep");
         logline(b);
     }
+}
+
+/* The Key's direction (LightingKey), asked once per draw_gas: the gas takes its share of
+ * the Key from it, and shades itself towards it. Without Lighting.asi, or with no Key in
+ * the engine's lights, none, and the gas is its own light as before. */
+typedef int (__cdecl *KeyDir_t)(float *);
+static float g_key[3];
+static int   g_have_key;
+
+static void key_query(void)
+{
+    static int looked, said_none, said_key;
+    static KeyDir_t get;
+    if (!looked) {
+        HMODULE m = GetModuleHandleA("Lighting.asi");
+        looked = 1;
+        get = m ? (KeyDir_t)GetProcAddress(m, "LightingKey") : (KeyDir_t)NULLPTR;
+        if (!get) note_once(&said_none, "no Key from Lighting.asi (not loaded, or older than 1.19.0): the gas is its own light only");
+    }
+    g_have_key = get && get(g_key);
+    if (g_have_key && !said_key) {
+        char b[160];
+        said_key = 1;
+        b[0] = 0; s_cat(b, "the gas takes the Key from Lighting.asi, towards ");
+        s_flt(b, g_key[0]); s_cat(b, ", "); s_flt(b, g_key[1]); s_cat(b, ", "); s_flt(b, g_key[2]);
+        logline(b);
+    }
+}
+
+/* This class's share of the Key (0: none, no Key). */
+static float key_share(const Cls *c)
+{
+    return g_have_key ? (c->key_share >= 0.0f ? c->key_share : g_key_share) : 0.0f;
 }
 
 /* The states every slice draw sets; the state block puts the engine's back. */
@@ -1882,10 +1926,21 @@ static int draw_gas(void)
                 if (slot >= 0) D9_FN(g_q[slot][0], Q_ISSUE, Issue_t)(g_q[slot][0], 1);
             }
             shadow_query(d9);
+            key_query();
             half_size = g_res == 2 && g_bake && lr_begin(d9, &L, P);
             L.nx0 = L.ny0 = 1e30f; L.nx1 = L.ny1 = -1e30f; L.nfull = 0;
             draw_states(d9, vs, cols);
             if (half_size) lr_rebind(d9, &L);
+        }
+        if (key_share(c) > 0.0f) {   /* the gas shades itself towards the Key; a new Key is a new bake */
+            for (k = 0; k < 3; k++) {
+                DWORD b;
+                c->k[10][k] = g_key[k] * c->shade_step;
+                b = *(DWORD *)&g_key[k];
+                c->sig = (c->sig ^ (b >> 8)) * 16777619UL;
+            }
+        } else {
+            for (k = 0; k < 3; k++) c->k[10][k] = c->light0[k];
         }
         if (!c->env || c->env_sig != c->sig || c->env_gen != c->gen) {
             if (!bake_envelope(d9, c)) continue;
@@ -2038,12 +2093,14 @@ static int draw_gas(void)
         }
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
         d9_psconst(d9, 24, &c->ex[0][0], 8);
-        {   /* c35: the shadow, this class's share of it (0: none, and the shader reads no map) */
-            float k[4];
-            k[0] = g_sh_tex ? g_sh_k[3][0] * c->shadow : 0.0f;
-            if (k[0] > 1.0f) k[0] = 1.0f;
-            k[1] = g_sh_k[3][1]; k[2] = g_sh_k[3][2]; k[3] = g_sh_k[3][3];
-            d9_psconst(d9, 35, k, 1);
+        {   /* c35: the shadow map (x 0: none, and the shader reads no map); c36: towards the
+             * Key, w this class's share of it; c37: its forward scattering */
+            float k[3][4], s = key_share(c), g = c->scatter >= 0.0f ? c->scatter : g_scatter;
+            k[0][0] = g_sh_tex && s > 0.0f ? 1.0f : 0.0f;
+            k[0][1] = g_sh_k[3][1]; k[0][2] = g_sh_k[3][2]; k[0][3] = g_sh_k[3][3];
+            k[1][0] = g_key[0]; k[1][1] = g_key[1]; k[1][2] = g_key[2]; k[1][3] = s;
+            k[2][0] = 1.0f + g * g; k[2][1] = 2.0f * g; k[2][2] = 0.0f; k[2][3] = 0.0f;
+            d9_psconst(d9, 35, &k[0][0], 3);
         }
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */
