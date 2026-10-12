@@ -361,7 +361,11 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     if (k_vlo.w > 0.0) det = noise2(rot(pa) * (k_noise.x * 6.1) + k_seed.zxy, rot2(pa) * (k_noise.x * 5.3) + k_seed.yzx);
     float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);
     float  near = saturate((dist - k_eye.w * 0.25) / k_eye.w);
-    return float4(gas_colour(g, i.t.x, dist, pa, key_lit(p, u, i.t.y)), g.x * near * i.t.x * k_opac.x);
+    // The ships' shadows at the same two points as the gas: the jittered point alone
+    // covers only half the gap (k_samp.y), so a shaft seen along its length came out
+    // as one copy of the hull's silhouette per slice, with gaps between them.
+    float  lit = k_samp.x > 1.5 ? 0.5 * (key_lit(p - dir, u, i.t.y) + key_lit(p + dir, u.yx, i.t.y)) : key_lit(p, u, i.t.y);
+    return float4(gas_colour(g, i.t.x, dist, pa, lit), g.x * near * i.t.x * k_opac.x);
 }
 
 float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR

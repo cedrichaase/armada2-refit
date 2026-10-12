@@ -4,6 +4,16 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.1 — 2026-10-13
+
+### Fixed
+- Ships' shadows are read at both points the gas is read at (`Samples=2`, the default),
+  which together cover the whole gap to the next slice; the jittered point alone covers
+  half of it, so a shaft seen along its length, looking towards the Key, drew as one
+  copy of the hull's silhouette per slice with gaps between them.
+
+Installed, not yet seen in game.
+
 ## 1.2.0 — 2026-10-12
 
 ### Added
