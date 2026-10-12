@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.30.2 — 2026-10-13
+
+Layers: nebulae 1.2.1.
+
+### Fixed
+- Ships' shadows in the gas read at both of the gas's two points per slice pixel, so a
+  shaft seen along its length is one streak, not a copy of the hull's silhouette per
+  slice (nebulae 1.2.1).
+
+Installed, not yet seen in game.
+
 ## 11.30.1 — 2026-10-13
 
 Layers: sky 1.2.3.

@@ -268,6 +268,16 @@ is 0 or 1; the slices and the composite's tent add them up into a soft edge. The
 points come from the pixel's blue-noise thresholds, walked from slice to slice, so they
 stay put from frame to frame like the slices' own.
 
+**The shadow is taken at both of the gas's points** (`Samples=2`): a quarter of the gap
+either side of the jittered point, which itself moves over only half the gap, so the
+two together cover all of it. Taken at the jittered point alone (1.1.0 to 1.2.0), half
+of every gap went unsampled, and a shaft seen along its length (looking towards the
+Key, a Borg assimilator in `mnebula8`) drew as one copy of the hull's silhouette per
+slice with gaps between them; in a `Shadows=0` difference image they stood as a stack.
+`Samples=1` joined them but was grainier. The cost was within the bench's run-to-run
+spread (gas 2.6–2.9 ms against 3.0–3.2 ms, 1920x1080, two sessions), since a read
+outside the map's square returns at once.
+
 **The map is cleared to 1, and 1 means no hull**, not a hull at its far end: its hulls
 lie well inside 0..1 (it is fitted round them with a margin). Compared as a depth, gas
 beyond every hull along the Key was in shadow wherever there was no hull at all, a
