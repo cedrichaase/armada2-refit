@@ -113,6 +113,19 @@ Per class, per field of its nebulae:
   and go. Bench, 1920x1080, the Radioactive at RTS distance: +0.1 ms of gas
   (1.36 → 1.47 ms); the frame changes by a mean of 8.6/255 in 30 s, the old flow 3.4 in
   20 s. `Bake=0` (the reference) has the fringe but not the fuzz.
+- **Swirl** (`Swirl=`, `SwirlScale=`, `SwirlPeriod=`). The flow slides and morphs the
+  gas but never moves it in loops. The swirl moves the read point round two circles,
+  the second turning the other way 1.618 times as fast (`SwirlPeriod` seconds for the
+  first), so the path never quite repeats. Their phases and size come from one read of
+  the soft warp noise at `SwirlScale` of the tile, fixed in the world: neighbouring
+  specks circle out of step, and since only time turns the phases, the displacement
+  field stays as smooth as it started and never tears the gas, as phases running at
+  different speeds would. One turn of phase across the noise. With more, at a reach of
+  12 the field folded on paper (reach times the phase gradient above 1). The reach is
+  at most `Swirl` on every axis, added to the flow's in the occupancy record and the
+  gas's box. Bench, 1920x1080, the Cerulean alone at 900 units: the frame changes by a
+  mean of 2.6/255 in 5 s and peaks at 4.0 near half a period (`Swirl=18`); the flow
+  alone, 1.0 and 2.0. Draw only: `Bake=0` has none.
 
 ### The noise has no lattice
 
@@ -340,7 +353,7 @@ of an edit. Shape: `Extent`, `Height`, `Lumps`, `EdgeWarp`, `Radius`. Noise: `Se
 `Tile`, `Warp`, `WarpScale`, `Detail`, `FineDetail`, `Coverage`, `Softness`, `Gamma`,
 `Ridge`. Colour: `Brightness`, `GasA`, `GasB`, `Glow`, `HueScale`, `HueMix`,
 `HueCycle`, `HueSwing`. Light: `Light`, `ShadeStep`, `Shading`, `Knots`, `KnotScale`,
-`Lanes`, `LaneScale`. Motion: `Flow`, `FlowScale`, `FlowSpeed`. Edges: `Fringe`, `FringeReach`, `FringeScale`, `Fuzz`, `FuzzSpeed`. Filaments: `Filaments`,
+`Lanes`, `LaneScale`. Motion: `Flow`, `FlowScale`, `FlowSpeed`, `Swirl`, `SwirlScale`, `SwirlPeriod`. Edges: `Fringe`, `FringeReach`, `FringeScale`, `Fuzz`, `FuzzSpeed`. Filaments: `Filaments`,
 `FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`, `KeyShare`, `Scatter`,
 `NearFade`. Lightning: `Lightning` (flashes a minute, a nebula), `LightningSize`,
 `LightningBrightness`, `LightningColour`. The core: `Core`, `CoreSharpness`, `Pulse`,

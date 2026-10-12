@@ -4,6 +4,17 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.4.0 — 2026-10-13
+
+### Added
+- `Swirl=` (with `SwirlScale=`, `SwirlPeriod=`): the gas read round two small circles,
+  the second the other way and 1.618 times as fast, at phases that vary from place to
+  place, so each speck wanders in slow loops out of step with its neighbours. The
+  occupancy record is widened by its reach as by the flow's. On in `mnebula10` (the
+  Cerulean: 18, scale 1, 30 s).
+
+Installed, not yet seen in game.
+
 ## 1.3.0 — 2026-10-13
 
 ### Added
