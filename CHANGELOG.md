@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.22.1 — 2026-10-12
+
+Layers: cutscenes 2.0.2.
+
+### Fixed
+- `binkw32.dll`: a replacement movie bigger than its destination outside the fit path
+  is scaled to fit instead of written past the buffer; a `binkw32_orig.dll` missing an
+  export no longer leaves null pointers behind; an over-long movie path and a `.wav`'s
+  inconsistent block align are handled (cutscenes 2.0.2).
+
+Installed, not yet seen in game.
+
 ## 11.22.0 — 2026-10-12
 
 surfaces 1.0.0, lighting 1.18.0, testbench 3.6.0

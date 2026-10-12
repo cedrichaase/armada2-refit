@@ -53,6 +53,7 @@ typedef struct { LONGLONG QuadPart; } LARGE_INTEGER;
 
 /* ---- kernel32 / user32 / winmm (static imports, see *.def) -------------- */
 __declspec(dllimport) HMODULE WINAPI LoadLibraryA(const char *);
+__declspec(dllimport) BOOL    WINAPI FreeLibrary(HMODULE);
 __declspec(dllimport) void *  WINAPI GetProcAddress(HMODULE, const char *);
 __declspec(dllimport) HMODULE WINAPI GetModuleHandleA(const char *);
 __declspec(dllimport) DWORD   WINAPI GetModuleFileNameA(HMODULE, char *, DWORD);
@@ -199,6 +200,10 @@ static int real_load(void)
     if (!R.Open || !R.DoFrame || !R.Wait || !R.NextFrame || !R.Close || !R.CopyToBuffer ||
         !R.Goto || !R.SetVolume || !R.SetSoundSystem || !R.OpenDirectSound) {
         logline("FATAL: binkw32_orig.dll is missing an export");
+        /* unloaded again, so the next call fails here too rather than
+         * returning 1 with null pointers */
+        FreeLibrary(R.dll);
+        memset(&R, 0, sizeof R);
         return 0;
     }
     return 1;
@@ -447,7 +452,11 @@ static void load_wav(Movie *mv, const char *path)
             memcpy(&mv->wf, c, 16);
             mv->wf.cbSize = 0;
             fmtOk = mv->wf.wFormatTag == 1 && mv->wf.wBitsPerSample == 16 && mv->wf.nChannels &&
-                    mv->wf.nChannels <= 2 && mv->wf.nSamplesPerSec;
+                    mv->wf.nChannels <= 2 && mv->wf.nSamplesPerSec &&
+                    mv->wf.nSamplesPerSec <= 384000;
+            /* derived, as load_audio does: the file's own may be 0 or disagree */
+            mv->wf.nBlockAlign = (WORD)(mv->wf.nChannels * 2);
+            mv->wf.nAvgBytesPerSec = mv->wf.nSamplesPerSec * mv->wf.nChannels * 2;
         } else if (id == 0x61746164 /*data*/ && fmtOk) {
             /* keep the whole file's allocation; play from the data chunk */
             memcpy(d, c, len);
@@ -485,7 +494,8 @@ static Movie *open_replacement(const char *bikname)
     s_cpy(mp4 + n - 4, ".mp4");
     a = GetFileAttributesA(mp4);
     if (a == INVALID_FILE_ATTRIBUTES || (a & FILE_ATTRIBUTE_DIRECTORY)) return NULLPTR;
-    if (!GetFullPathNameA(mp4, sizeof full, full, NULLPTR)) return NULLPTR;
+    a = GetFullPathNameA(mp4, sizeof full, full, NULLPTR);
+    if (!a || a >= sizeof full) return NULLPTR;   /* failed, or would not fit */
     if (!mf_init()) return NULLPTR;
 
     for (i = 0; i < MAX_MOVIES; i++) if (!g_mv[i].used) { mv = &g_mv[i]; break; }
@@ -803,13 +813,17 @@ static void fit_blit(const BYTE *src, int sw, int sh, BYTE *dst, int pitch, int 
     }
 }
 
-/* 1:1 copy at (x,y), clipped to the destination height the caller gave. */
+/* 1:1 copy at (x,y), clipped to the destination: the height the caller gave
+ * and the width the pitch holds. */
 static void plain_blit(const BYTE *src, int sw, int sh, BYTE *dst, int pitch, int dh, int dx, int dy, int type)
 {
-    int bpp = type_bpp(type), y;
-    if (!bpp) return;
+    int bpp = type_bpp(type), y, n;
+    if (!bpp || dx < 0 || dy < 0) return;
+    n = pitch / bpp - dx;
+    if (n > sw) n = sw;
+    if (n <= 0) return;
     for (y = 0; y < sh && dy + y < dh; y++)
-        put_row(dst + (dy + y) * pitch + dx * bpp, type, (const DWORD *)(src + y * sw * 4), sw);
+        put_row(dst + (dy + y) * pitch + dx * bpp, type, (const DWORD *)(src + y * sw * 4), n);
 }
 
 /* ---- the intro call site ------------------------------------------------------
@@ -961,6 +975,20 @@ EXPORT int WINAPI BinkCopyToBuffer(void *bink, void *dest, DWORD pitch, DWORD de
             fit_blit(g_scratch, (int)sw, (int)sh, dest, (int)pitch, bw, bh, type);
         }
         return 0;
+    }
+    {
+        /* A movie bigger than the room right of and below (x,y) -- a replacement
+         * larger than a 640x480 mode the intro was not raised out of -- is
+         * scaled to fit that room rather than cropped. */
+        DWORD bpp = (DWORD)type_bpp(type), roomW = pitch / bpp, roomH = destH;
+        if (x >= roomW || y >= roomH) return 0;
+        roomW -= x; roomH -= y;
+        if ((DWORD)mv->w > roomW || (DWORD)mv->h > roomH) {
+            if (roomW >= 2 && roomH >= 2 && roomW <= MAX_W)
+                fit_blit(mv->frame, mv->w, mv->h, (BYTE *)dest + y * pitch + x * bpp, (int)pitch,
+                         (int)roomW, (int)roomH, type);
+            return 0;
+        }
     }
     plain_blit(mv->frame, mv->w, mv->h, dest, (int)pitch, (int)destH, (int)x, (int)y, type);
     return 0;
