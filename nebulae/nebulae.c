@@ -290,8 +290,11 @@ static int   g_reload = 1;    /* Reload= */
 static int   g_slices = 40;   /* Slices=: through the deepest field on screen */
 static float g_min_step = 6;  /* MinStep=: never closer together than this, world units */
 static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
-static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ), 1 at full size */
-static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, half size only) */
+static int   g_res = 2;       /* Resolution=: the gas in floating point (needs INTZ) at half size (2) or full size (1) */
+static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, the float path only) */
+static int   g_full_tent = 9;  /* FullTent=: Resolution=1's composite tent, full pixels wide: 5, or 9 (as half size's) */
+static float g_thin = 0.0f;   /* ThinGas=: below this density the slices skip the fine octave and the shadow (0: never) */
+static int   g_ilv_on = 0;    /* Interleave=: 1 at full size, each 2x2 block of pixels takes every other slice */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
 static int   g_upsample = 0;  /* Upsample=: the half-size gas onto the frame at depth edges, 0..4 (nebulae.hlsl, comp_up) */
 static int   g_shadows = 1;            /* Shadows=: ships shadow the gas from the Key (Lighting.asi's map) */
@@ -322,10 +325,14 @@ static void read_settings(void)
     g_res      = (int)GetPrivateProfileIntA("Nebulae", "Resolution", 2, g_ini) >= 2 ? 2 : 1;
     g_upsample = (int)GetPrivateProfileIntA("Nebulae", "Upsample", 0, g_ini);
     if (g_upsample < 0 || g_upsample > 4) g_upsample = 0;
+    g_full_tent = (int)GetPrivateProfileIntA("Nebulae", "FullTent", 9, g_ini) >= 9 ? 9 : 5;
     g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
     g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 160, g_ini);
     GetPrivateProfileStringA("Nebulae", "VolumeTexel", "3", b, sizeof b, g_ini);
     parsen(b, &g_vol_texel, 1);
+    g_ilv_on   = (int)GetPrivateProfileIntA("Nebulae", "Interleave", 0, g_ini) ? 1 : 0;
+    GetPrivateProfileStringA("Nebulae", "ThinGas", "0", b, sizeof b, g_ini);
+    parsen(b, &g_thin, 1);
     GetPrivateProfileStringA("Nebulae", "Obscure", "0.5", b, sizeof b, g_ini);
     parsen(b, &g_obscure, 1);
     if (g_obscure < 0.0f) g_obscure = 0.0f;
@@ -611,6 +618,7 @@ static D9Shader g_quad_vs = D9_VERTEX_SHADER(k_quad_vs);
 static D9Shader g_zdown_ps = D9_PIXEL_SHADER(k_zdown_ps);
 static D9Shader g_comp_ps = D9_PIXEL_SHADER(k_comp_ps);
 static D9Shader g_zclear_ps = D9_PIXEL_SHADER(k_zclear_ps);
+static D9Shader g_ilv_ps = D9_PIXEL_SHADER(k_ilv_ps);
 static void    *g_obj_dev;    /* the d3d9 device everything below belongs to */
 static void    *g_sb;
 static void    *g_vol;        /* the noise, MANAGED pool */
@@ -619,6 +627,8 @@ static void    *g_bn_tex;    /* the blue noise, MANAGED pool */
 /* Resolution=2, all DEFAULT pool (released before a Reset): the scene's depth copied
  * by RESZ (INTZ), and at half size its nearest depth (R32F) and the gas (A16B16G16R16F). */
 static void    *g_zt, *g_lz, *g_lr;
+static void    *g_ilv;        /* Interleave=1 at full size: a D24S8 surface whose stencil is 1 in every other 2x2 block */
+static UINT     g_ilv_w, g_ilv_h;
 static UINT     g_zt_w, g_zt_h, g_lr_w, g_lr_h;
 static int      g_lr_broken;  /* INTZ or a target could not be made: full size from now on */
 static int      g_init_failed; /* the noise or the blue noise could not be made on this device: the stock
@@ -643,6 +653,7 @@ static void drop_objects(void)
     unref(g_vol); g_vol = NULLPTR; g_vol_size = 0;
     unref(g_bn_tex); g_bn_tex = NULLPTR;
     unref(g_zt); unref(g_lz); unref(g_lr); g_zt = g_lz = g_lr = NULLPTR; g_zt_w = g_lr_w = 0;
+    unref(g_ilv); g_ilv = NULLPTR; g_ilv_w = 0;
     for (i = 0; i < g_ncls; i++) {
         unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1;
         unref(g_cls[i].vol); g_cls[i].vol = NULLPTR; g_cls[i].vol_gen = -1;
@@ -1627,10 +1638,10 @@ typedef long (__stdcall *Desc9_t)(void *, SURFDESC *);
 typedef long (__stdcall *Clear_t)(void *, DWORD, const void *, DWORD, DWORD, float, DWORD);
 typedef struct { DWORD x, y, w, h; float mn, mx; } VIEWPORT9;
 
-static int lr_targets(void *d9, UINT zw, UINT zh, UINT fw, UINT fh)
+static int lr_targets(void *d9, UINT zw, UINT zh, UINT fw, UINT fh, UINT sc)
 {
     static int said;
-    UINT lw = (fw + 1) / 2, lh = (fh + 1) / 2;
+    UINT lw = (fw + sc - 1) / sc, lh = (fh + sc - 1) / sc;
     if (g_zt && (g_zt_w != zw || g_zt_h != zh)) { unref(g_zt); g_zt = NULLPTR; }
     if (g_lr && (g_lr_w != lw || g_lr_h != lh)) { unref(g_lr); unref(g_lz); g_lr = g_lz = NULLPTR; }
     if (!g_zt) {
@@ -1651,7 +1662,7 @@ static int lr_targets(void *d9, UINT zw, UINT zh, UINT fw, UINT fh)
         g_lr_w = lw; g_lr_h = lh;
         {
             char m[160];
-            m[0] = 0; s_cat(m, "half size: depth "); s_num(m, (long)zw); s_cat(m, "x"); s_num(m, (long)zh);
+            m[0] = 0; s_cat(m, sc > 1 ? "half size: depth " : "full size: depth "); s_num(m, (long)zw); s_cat(m, "x"); s_num(m, (long)zh);
             s_cat(m, ", gas "); s_num(m, (long)lw); s_cat(m, "x"); s_num(m, (long)lh);
             logline(m);
         }
@@ -1665,6 +1676,7 @@ typedef struct {
     float     k[3][4];        /* c21..c23 */
     float     nx0, ny0, nx1, ny1;   /* where on screen this frame's gas boxes are (NDC); the composite goes no further */
     int       nfull;          /* a box reaches behind the camera: the whole view */
+    int       ilv;            /* Interleave=1 this frame: the slices by rung parity, through g_ilv's stencil */
 } LrFrame;
 
 /* Resolution=2: widen the screen rectangle the composite covers by a gas box, its
@@ -1706,6 +1718,46 @@ static void lr_quad(void *d9)
     D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
 }
 
+/* Interleave=1: the stencil surface, its pattern drawn once when it is made (nothing
+ * else ever touches it). The gas target must be bound, full size, and the quad's states set. */
+typedef long (__stdcall *MakeDS_t)(void *, UINT, UINT, DWORD, DWORD, DWORD, int, void **, void *);
+#define D9_CREATEDEPTHSTENCILSURFACE 29
+static int ilv_surface(void *d9, UINT w, UINT h, void *qvs)
+{
+    static int said;
+    void *ps = d9_shader(d9, &g_ilv_ps);
+    if (g_ilv && (g_ilv_w != w || g_ilv_h != h)) { unref(g_ilv); g_ilv = NULLPTR; }
+    if (g_ilv) return 1;
+    if (!ps || D9_FN(d9, D9_CREATEDEPTHSTENCILSURFACE, MakeDS_t)(d9, w, h, 75, 0, 0, 0, &g_ilv, NULLPTR) < 0) {   /* D24S8, no MSAA */
+        g_ilv = NULLPTR;
+        note_once(&said, "interleave: no stencil surface: every slice in every pixel");
+        return 0;
+    }
+    g_ilv_w = w; g_ilv_h = h;
+    {   /* all of it, whichever view comes first: the pattern is by pixel, not by view */
+        VIEWPORT9 all = { 0, 0, w, h, 0.0f, 1.0f };
+        D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&all);
+    }
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, g_ilv);
+    D9_FN(d9, D9_CLEAR, Clear_t)(d9, 0, NULLPTR, 4, 0, 1.0f, 0);          /* STENCIL: 0 */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 0);     /* COLORWRITEENABLE: nothing */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 52, 1);      /* STENCILENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 56, 8);      /* STENCILFUNC: ALWAYS */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 55, 3);      /* STENCILPASS: REPLACE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 53, 1);      /* STENCILFAIL: KEEP */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 54, 1);      /* STENCILZFAIL: KEEP */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 57, 1);      /* STENCILREF */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 58, 0xff);   /* STENCILMASK */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 59, 0xff);   /* STENCILWRITEMASK */
+    d9_bind(d9, qvs, ps);
+    lr_quad(d9);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 52, 0);
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 15);
+    D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, NULLPTR);
+    return 1;
+}
+
 /* Copies the depth, makes the half-size depth, and leaves the half-size gas target
  * bound and cleared, with draw_states' states and no depth test. 0: not possible now,
  * the caller draws at full size. Inside the caller's state block. */
@@ -1722,18 +1774,21 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     D9_FN(d9, D9_GETDEPTHSTENCIL, Obj_t)(d9, &L->ds0);
     if (!L->rt0 || !L->ds0 ||
         D9_FN(L->rt0, SURF_GETDESC, Desc9_t)(L->rt0, &rd) < 0 || D9_FN(L->ds0, SURF_GETDESC, Desc9_t)(L->ds0, &dd) < 0 ||
-        !lr_targets(d9, dd.w, dd.h, rd.w, rd.h)) {
+        !lr_targets(d9, dd.w, dd.h, rd.w, rd.h, (UINT)g_res)) {
         if (!g_zt || !g_lr) g_lr_broken = 1;
         unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR;
         return 0;
     }
     D9_FN(d9, D9_GETVIEWPORT, VP_t)(d9, (DWORD *)&L->vp0);
     L->vpl = L->vp0;
-    L->vpl.x = L->vp0.x / 2; L->vpl.y = L->vp0.y / 2;
-    L->vpl.w = (L->vp0.x + L->vp0.w + 1) / 2 - L->vpl.x; L->vpl.h = (L->vp0.y + L->vp0.h + 1) / 2 - L->vpl.y;
+    {
+        DWORD sc = (DWORD)g_res;
+        L->vpl.x = L->vp0.x / sc; L->vpl.y = L->vp0.y / sc;
+        L->vpl.w = (L->vp0.x + L->vp0.w + sc - 1) / sc - L->vpl.x; L->vpl.h = (L->vp0.y + L->vp0.h + sc - 1) / sc - L->vpl.y;
+    }
     if (L->vpl.x + L->vpl.w > g_lr_w) L->vpl.w = g_lr_w - L->vpl.x;
     if (L->vpl.y + L->vpl.h > g_lr_h) L->vpl.h = g_lr_h - L->vpl.y;
-    L->k[0][0] = g_obscure; L->k[0][1] = (float)g_upsample; L->k[0][2] = 1.0f / (float)g_zt_w; L->k[0][3] = 1.0f / (float)g_zt_h;
+    L->k[0][0] = g_obscure; L->k[0][1] = 1.0f / (float)g_res; L->k[0][2] = 1.0f / (float)g_zt_w; L->k[0][3] = 1.0f / (float)g_zt_h;
     L->k[1][0] = 1.0f / (float)g_lr_w; L->k[1][1] = 1.0f / (float)g_lr_h; L->k[1][2] = P[10]; L->k[1][3] = P[14];
     L->k[2][0] = (float)L->vpl.x; L->k[2][1] = (float)L->vpl.y;
     L->k[2][2] = (float)(L->vpl.x + L->vpl.w - 1); L->k[2][3] = (float)(L->vpl.y + L->vpl.h - 1);
@@ -1764,6 +1819,10 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);
     d9_bind(d9, qvs, zps);
     d9_psconst(d9, 21, &L->k[0][0], 3);
+    {   /* c38 w: Upsample=, whose 2 and 4 make the half-size depth a checkerboard */
+        float t[4] = { 1.0f, 0.0f, 0.0f, g_res == 2 ? (float)g_upsample : 0.0f };
+        d9_psconst(d9, 38, t, 1);
+    }
     lr_samplers(d9);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
     lr_quad(d9);
@@ -1773,6 +1832,8 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
     d9_bind(d9, qvs, d9_shader(d9, &g_zclear_ps));
     lr_quad(d9);
+    L->ilv = g_res == 1 && g_ilv_on && ilv_surface(d9, g_lr_w, g_lr_h, qvs);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
     unref(lzs); unref(lrs);
     return 1;
@@ -1793,6 +1854,21 @@ static void lr_rebind(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
     d9_psconst(d9, 21, &L->k[0][0], 3);
+    {   /* c38 y: ThinGas= for the slices; z: Interleave; w Upsample= (the half-size depth's checkerboard) */
+        float t[4] = { 1.0f, g_thin, L->ilv ? 1.0f : 0.0f, g_res == 2 ? (float)g_upsample : 0.0f };
+        d9_psconst(d9, 38, t, 1);
+    }
+    if (L->ilv) {   /* the stencil picks each 2x2 block's slices: draw_gas sets STENCILREF per parity */
+        D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, g_ilv);
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 14, 0);      /* ZWRITEENABLE */
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 52, 1);      /* STENCILENABLE */
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 56, 3);      /* STENCILFUNC: EQUAL */
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 53, 1);      /* KEEP, KEEP, KEEP */
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 54, 1);
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 55, 1);
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 58, 0xff);
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 59, 0);
+    }
     unref(lrs);
 }
 
@@ -1806,6 +1882,7 @@ static void lr_end(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, L->rt0);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, L->ds0);
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
+    if (L->ilv) D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 52, 0);   /* STENCILENABLE */
     if (none) { unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR; return; }
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 1);      /* ALPHABLENDENABLE: ONE, INVSRCALPHA (alpha: what the gas hides) */
@@ -1815,6 +1892,10 @@ static void lr_end(void *d9, LrFrame *L)
     D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);
     d9_bind(d9, d9_shader(d9, &g_quad_vs), d9_shader(d9, &g_comp_ps));
     d9_psconst(d9, 21, &L->k[0][0], 3);
+    {   /* c38: the tent's tap stride, 2 only at full size with FullTent=9; w Upsample= (half size) */
+        float t[4] = { g_res == 1 && g_full_tent == 9 ? 2.0f : 1.0f, g_thin, 0.0f, g_res == 2 ? (float)g_upsample : 0.0f };
+        d9_psconst(d9, 38, t, 1);
+    }
     lr_samplers(d9);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 5, g_zt);
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 6, g_lz);
@@ -1961,7 +2042,8 @@ static int draw_gas(void)
             }
             shadow_query(d9);
             key_query();
-            half_size = g_res == 2 && g_bake && lr_begin(d9, &L, P);
+            L.ilv = 0;
+            half_size = g_bake && lr_begin(d9, &L, P);   /* the float path, at half or full size */
             L.nx0 = L.ny0 = 1e30f; L.nx1 = L.ny1 = -1e30f; L.nfull = 0;
             draw_states(d9, vs, cols);
             if (half_size) lr_rebind(d9, &L);
@@ -2139,6 +2221,28 @@ static int draw_gas(void)
             d9_psconst(d9, 35, &k[0][0], 3);
         }
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
+        if (half_size && L.ilv) {
+            /* Interleave=1: the even rungs into the blocks whose stencil is 0, the odd
+             * into the others; the triangles sorted by parity, in place (odd ones via g_v2) */
+            static Vert g_v2[MAX_VERTS];
+            int t, ne = 0, no = 0;
+            for (t = 0; t < nv; t += 3) {
+                Vert *src = &g_v[t], *dst;
+                int   odd = ((int)src->k) & 1, q;
+                dst = odd ? &g_v2[no] : &g_v[ne];
+                if (dst != src) for (q = 0; q < 3; q++) dst[q] = src[q];
+                if (odd) no += 3; else ne += 3;
+            }
+            for (t = 0; t < no; t++) g_v[ne + t] = g_v2[t];
+            if (ne) {
+                D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 57, 0);   /* STENCILREF */
+                D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(ne / 3), g_v, sizeof g_v[0]);
+            }
+            if (no) {
+                D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 57, 1);
+                D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(no / 3), g_v + ne, sizeof g_v[0]);
+            }
+        } else
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */
         g_slices_drawn += drawn;
     }
