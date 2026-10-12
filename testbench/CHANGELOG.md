@@ -5,15 +5,44 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 3.6.0 — 2026-10-12
+## 3.9.0 — 2026-10-12
 
 ### Added
 - `SCENE=shields`: a Galaxy (phasers) and a Klingon battleship (torpedoes) firing at a
   second, healed Galaxy, for `Shields.asi`.
 - Scenario `shields-hits`: the plugin's hooks, beam and missile hits drawn, three shots.
   `no-assets` also expects `Shields.log`'s hooks line.
+- The bench clears `Shields.log` at launch and gathers it with `Shields.ini`.
 
 Installs nothing; seen working on the bench 2026-10-12 (both scenarios pass).
+
+## 3.8.0 — 2026-10-12
+
+### Added
+- `Scene.asi`: `kill <name>` makes a scene craft die at once
+  (`ScriptInterfaceImp::ExplodeNow`), healing and immortality off first.
+- The `explosion` scene: a Galaxy class beside a destroyer, a cruiser and a battleship
+  to blow up; the `explosions` scenario (`explosions/README.md`), and an
+  `Explosions.log` check in `no-assets`.
+- The bench gathers `Explosions.log` and `Explosions.ini`.
+
+Installs nothing; seen working on the bench 2026-10-12 (`explosions` and `no-assets`
+pass).
+
+## 3.7.0 — 2026-10-12
+
+### Added
+- The `impacts` scene: Klingon torpedoes and Species 8472 pulses striking two Galaxy
+  class targets with no shield flash, for the lighting layer's `Impacts=`.
+
+Installs nothing; seen working on the bench 2026-10-12.
+
+## 3.6.0 — 2026-10-12
+
+### Added
+- Scene `planets`: one planet of each class and a dilithium moon, for `Surfaces.asi`.
+
+Installed, not yet seen in game.
 
 ## 3.5.0 — 2026-10-07
 

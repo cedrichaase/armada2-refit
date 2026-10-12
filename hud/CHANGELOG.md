@@ -5,6 +5,20 @@ before that `ui-widescreen.py`, `cursor-aspect.py` and (as the separate `font` l
 `ui-font-condense.py`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The derivations are in [`README.md`](README.md).
 
+## 2.2.1 — 2026-10-12
+
+### Fixed
+- The canvas and the re-layout no longer depend on the font part. The display mode was
+  read only in the font's `FontNewScreenWidth` hook, so with `Font=0`, the font
+  standing down for `.a2font-backup` atlases, or its call sites refused, no mode was
+  ever seen and the HUD stayed stretched. That call is now wrapped whenever `Font=` or
+  `Canvas=` is on; only the font correction waits on the font part.
+- The briefing's objective completion is not handed across a re-layout when a mission
+  has more than 256 objectives, where it was cut short and `ObjectivesDisplay::PostLoad`
+  read past it.
+
+Installed, not yet seen in game.
+
 ## 2.2.0 — 2026-09-27
 
 ### Added

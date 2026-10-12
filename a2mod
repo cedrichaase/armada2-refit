@@ -31,6 +31,9 @@ WHAT COUNTS AS A CHANGE
                                                   recipes
     nebulae       Nebulae.asi/.ini,            -- added files: nebulae as volumes of gas
                   Nebulae/*.ini                   and their recipes
+    surfaces      Surfaces.asi/.ini,           -- added files: planets' and the dilithium
+                  Surfaces/*.ini                  moon's surfaces and their recipes
+    explosions    Explosions.asi/.ini          -- added files: fireballs as gas, shock rings
     shields       Shields.asi/.ini             -- added files: shield hits drawn by a shader
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
                   (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
@@ -101,10 +104,12 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('Lighting.asi', 'lighting'), ('Lighting.ini', 'lighting'),
          ('Sky.asi', 'sky'), ('Sky.ini', 'sky'),
          ('Nebulae.asi', 'nebulae'), ('Nebulae.ini', 'nebulae'),
+         ('Surfaces.asi', 'surfaces'), ('Surfaces.ini', 'surfaces'),
+         ('Explosions.asi', 'explosions'), ('Explosions.ini', 'explosions'),
          ('Shields.asi', 'shields'), ('Shields.ini', 'shields'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'shields', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
+LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions', 'shields', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
@@ -191,6 +196,12 @@ def discover():
         for f in sorted(os.listdir(recipes)):
             if f.lower().endswith('.ini'):
                 found.append({'rel': f'Nebulae/{f}', 'kind': 'added', 'layer': 'nebulae'})
+    # The surfaces layer's recipes (surfaces/install.sh), one per planet class or model texture.
+    recipes = os.path.join(GAME, 'Surfaces')
+    if os.path.isdir(recipes):
+        for f in sorted(os.listdir(recipes)):
+            if f.lower().endswith('.ini'):
+                found.append({'rel': f'Surfaces/{f}', 'kind': 'added', 'layer': 'surfaces'})
     return sorted(found, key=lambda e: e['rel'])
 
 

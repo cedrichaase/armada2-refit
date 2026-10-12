@@ -6,6 +6,17 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.4.1 — 2026-10-12
+
+### Fixed
+- `d3d9/d3d9dev.h`: `d9_device()` told a new device by the d3d8 device's address alone,
+  so a d3d8 device made where the old one was got the old d3d9 device and its stale
+  shader objects back. It now asks `QueryInterface` on every call and compares the
+  d3d9 device (`D3D9.md`, "Which device"). `Lighting.asi`, `Sky.asi` and
+  `Nebulae.asi` are rebuilt with it.
+
+Installed, not yet seen in game.
+
 ## 3.4.0 — 2026-10-10
 
 ### Added

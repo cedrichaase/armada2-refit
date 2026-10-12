@@ -45,6 +45,8 @@ MAX_ENDPOINTS_PER_IP = 64
 RELAY_RATE = 128 * 1024  # bytes/s per endpoint, sustained (a full 8-player game is well under 50 KB/s)
 RELAY_BURST = 256 * 1024
 MAX_DATAGRAM = 1400
+LOOKUP_RATE = 2          # code lookups/s per IP address, sustained: a joiner asks every 0.5 s until answered
+LOOKUP_BURST = 10        # ... and at once; 31^6 codes cannot be tried at this pace
 
 
 def log(*a):
@@ -103,6 +105,9 @@ class Server(asyncio.DatagramProtocol):
         self.idle_exit = idle_exit
         self.last_packet = time.monotonic()
         self.transport = None
+        self.lookups = {}           # ip -> [tokens, last refill]: the lookup rate limit
+        self.misses = 0             # unknown codes looked up, logged in sum by sweep()
+        self.limited = 0            # lookups dropped by the rate limit, likewise
 
     # -- plumbing
 
@@ -154,12 +159,14 @@ class Server(asyncio.DatagramProtocol):
                 self.on_relay(ep, body, now)
             elif kind == SV_BYE:
                 self.on_bye(ep, body)
-        except (struct.error, IndexError, ValueError):
+        except (struct.error, IndexError, ValueError, OSError):
             pass
 
     def on_host(self, ep, b, now):
         """[token u32][lan addr 6]: register, or refresh, the game this endpoint hosts.
         The token keeps the code when the host's NAT gives it a new port."""
+        if len(b) < 10:
+            return
         token = struct.unpack_from('<I', b)[0]
         lan = b[4:10]
         game = next((g for g in self.games.values() if g.token == token and
@@ -182,6 +189,8 @@ class Server(asyncio.DatagramProtocol):
 
     def on_join(self, ep, b, now):
         """[nonce u32][code 6][lan addr 6]: introduce a joiner and the host."""
+        if len(b) < 16 or not self.may_look_up(ep.addr[0], now):
+            return
         nonce = struct.unpack_from('<I', b)[0]
         code = b[4:10].decode('ascii', 'replace').upper()
         lan = b[10:16]
@@ -189,7 +198,7 @@ class Server(asyncio.DatagramProtocol):
         if not game or game.host is ep:
             self.send(ep.addr, SV_NOTFOUND, struct.pack('<I', nonce))
             if not game:
-                log(f'join {show_code(code)} from {ep.addr}: no such game')
+                self.misses += 1
             return
         host = game.host
         pair = random.getrandbits(32) or 1
@@ -200,6 +209,18 @@ class Server(asyncio.DatagramProtocol):
                   struct.pack('<III', host.id, ep.id, pair))
         self.send(host.addr, SV_INTRO, pack_addr(ep.addr) + lan + struct.pack('<II', ep.id, pair))
         log(f'join {show_code(code)}: {ep.addr} (lan {unpack_addr(lan)}, id {ep.id}) -> host {host.addr}')
+
+    def may_look_up(self, ip, now):
+        """A token bucket per IP address for code lookups; False drops the lookup
+        unanswered (a real joiner just asks again 0.5 s later)."""
+        bucket = self.lookups.setdefault(ip, [LOOKUP_BURST, now])
+        bucket[0] = min(LOOKUP_BURST, bucket[0] + (now - bucket[1]) * LOOKUP_RATE)
+        bucket[1] = now
+        if bucket[0] < 1:
+            self.limited += 1
+            return False
+        bucket[0] -= 1
+        return True
 
     def on_relay(self, ep, b, now):
         """[to id u32][datagram]: forward to a peer this server introduced."""
@@ -241,6 +262,12 @@ class Server(asyncio.DatagramProtocol):
                         other.peers.discard(ep.id)
                 if ep.relayed:
                     log(f'relay: {addr} (id {ep.id}) gone after {ep.relayed} bytes')
+        for ip, (tokens, t) in list(self.lookups.items()):
+            if tokens + (now - t) * LOOKUP_RATE >= LOOKUP_BURST:
+                del self.lookups[ip]
+        if self.misses or self.limited:
+            log(f'lookups: {self.misses} of unknown codes, {self.limited} over the rate limit')
+            self.misses = self.limited = 0
         return self.idle_exit and now - self.last_packet > self.idle_exit
 
 

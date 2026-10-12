@@ -4,6 +4,34 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.6.1 — 2026-10-12
+
+### Fixed
+- `peer.c`: an `ENUM_HOSTS_RESPONSE` whose session name fills the datagram no longer
+  hands the game a data size of -1 (`get_desc` counted a password byte that was not
+  there), and responses are taken only from the address the search asks.
+- `peer.c`: a reliable message is capped at 256 KB (`MAX_MSG`); a peer streaming
+  fragments past it is dropped instead of growing the buffer without end. The buffer
+  now grows geometrically.
+- `peer.c`: a joiner ignores everything but `R_ACCEPT` before it is in, and fails the
+  connect cleanly when its own player has no slot, where a host could crash it.
+- `peer.c`: `DestroyPeer` closes the kicked joiner's connection to the game: nothing it
+  sends is relayed (it went out as from DPNID 0), it no longer counts for the rules
+  handshake, and the connection goes once the `R_TERMINATE` is acked or after 15 s.
+- `peer.c`: `Close` or a rebind from inside the game's handler stops the network thread
+  for good (a generation counter in place of `stop`), where the old thread kept running
+  beside a new one.
+- `peer.c`: every event allocation is checked; a joiner the game accepts but no slot is
+  left for gets a `P_REJECT` (`SESSIONFULL`) instead of no answer.
+- `online.c`: the menu entry is not patched if the trampoline cannot be made executable;
+  the DirectPlay call log's line buffers fit four 399-character addresses.
+- `server/a2online-server.py`: code lookups are rate-limited per IP address (2/s, burst
+  10), unknown codes are logged in sum, not one line each, and a short LAN address no
+  longer raises out of the handler. `selftest.py` checks both. The public server needs
+  redeploying for this.
+
+Installed, not yet seen in game.
+
 ## 0.6.0 — 2026-10-07
 
 ### Added

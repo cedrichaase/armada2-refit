@@ -146,6 +146,7 @@ int _fltused = 0;   /* floats without the CRT */
 #define SI_SET_HEALTH    0x456d20u
 #define SI_MAX_HEALTH    0x456da0u
 #define SI_CANNOT_DIE    0x457590u
+#define SI_EXPLODE_NOW   0x456cf0u   /* ScriptInterfaceImp::ExplodeNow(int): a craft dies now, as a mission script blows one up */
 #define SI_INSTANCE      ((void *)0x735c40u)
 #define TACTICAL_CAMERA  0x763650u
 #define CAMERA_INTEREST  0x98u
@@ -257,6 +258,7 @@ static const Sig k_sigs[] = {
     { SI_SET_HEALTH,    8, P_SI_HANDLE },
     { SI_MAX_HEALTH,    8, P_SI_HANDLE },
     { SI_CANNOT_DIE,    8, P_SI_HANDLE },
+    { SI_EXPLODE_NOW,   8, P_SI_HANDLE },
     { PL_START_COLONY,  8, { 0x55, 0x8B, 0xEC, 0xA1, 0x84, 0x10, 0x76, 0x00 } },
     { PL_SET_POP,       8, { 0x55, 0x8B, 0xEC, 0xD9, 0x45, 0x08, 0xD8, 0x1D } },
     { PL_MAX_POP,       8, { 0x8B, 0x41, 0x40, 0x8B, 0x80, 0x90, 0x04, 0x00 } },
@@ -1283,6 +1285,14 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_eq(t[0], "kill") && n >= 2) {
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+        o->heal = 0;
+        ((SiHandleBoolFn)SI_CANNOT_DIE)(SI_INSTANCE, o->handle, 0);
+        ((SiHandleFn)SI_EXPLODE_NOW)(SI_INSTANCE, o->handle);
+        logline("  ok");
+        return;
+    }
     if (s_eq(t[0], "colonize") && n >= 2) {
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         colonize(o, n >= 3 ? t[2] : "full", n >= 4 ? (int)s_atof(t[3]) : 1);
@@ -1315,7 +1325,7 @@ static void run_command(char *line)
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
-            "immortal, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
+            "immortal, kill, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
             "shieldfx, query, "
             "select, selection)");
 }

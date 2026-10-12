@@ -10,7 +10,7 @@
 #   models/   models/moon-sod.py, select-sod.py, hull-sod.py (+ hull-sod.sha256) and
 #   a2env.py  the a2env.py they import: they rewrite the player's own stock SODs
 #   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
-#   install.sh  install.ps1  install.bat     publish/installer/, for Linux and Windows
+#   install.sh  install.ps1  install.bat     publish/installer/: Linux and macOS; Windows
 #   vendor/   third-party files whose licence allows bundling (platform/vendor/)
 #   prereqs.txt  CREDITS.txt  what they install first, and who made it
 #   README.txt  LICENSE  SHA256SUMS
@@ -108,11 +108,16 @@ Armada II Refit $ver            built from commit $commit
 https://github.com/cedrichaase/armada2-refit
 
 INSTALL
+The easy way is the graphical installer, attached to every release on GitHub:
+armada2-refit-installer-windows.exe, armada2-refit-installer-macos.zip (an app) and the
+Linux AppImage. It downloads this package and runs the script below. By hand:
   Windows:          double-click install.bat (or: install.bat "C:\path\to\the game")
   Linux, Proton:    ./install.sh "/path/to/the game"
+  macOS, CrossOver or another Wine:
+                    /bin/bash install.sh "/path/to/the game" (in the bottle's drive_c)
 There is nothing to choose: each installs what can work on this machine and says what
-it skipped and why. Both find the game themselves when the package is unzipped into
-the game directory. Undo everything with --uninstall (install.bat -Uninstall).
+it skipped and why. Each finds the game itself when the package is unzipped into the
+game directory. Undo everything with --uninstall (install.bat -Uninstall).
 
 WHAT GOES IN (game/, copied beside Armada2.exe)
   HUD.asi      + HUD.ini        hud $(version "$root/hud/CHANGELOG.md")        in-game HUD, font and cursors at any aspect
@@ -145,14 +150,17 @@ WHAT GOES IN (game/, copied beside Armada2.exe)
   binkw32.dll  + BinkProxy.ini  cutscenes $(version "$root/cutscenes/CHANGELOG.md")  launch reels full screen, AV1 movie replacements
   dxvk.conf                     postfx $(version "$root/postfx/CHANGELOG.md")     16x anisotropic filtering, LOD bias, seamless
                                                cube maps; only DXVK reads it
-THE DIRECT3D CHAIN (chain/, Linux)    platform $(version "$root/platform/CHANGELOG.md")
+THE DIRECT3D CHAIN (chain/)    platform $(version "$root/platform/CHANGELOG.md")
   d3d8.dll  crosire's d3d8to9 1.16.0, which lets Lighting.asi draw in shaders, on
   d3d9.dll  DXVK 3.1.1's Direct3D 9 on Vulkan, which MSAA.asi and dxvk.conf need.
   Put in unless the game directory holds a d3d8.dll or d3d9.dll that is none of GOG's,
   DXVK's or these; a replaced one is kept as .a2chain-backup (GOG's d3d8.dll as
-  d3d8.dll.gog-backup) and put back by --uninstall.
+  d3d8.dll.gog-backup) and put back by --uninstall. That is Linux. On Windows only
+  d3d8.dll goes in, on Windows' own Direct3D 9, and a DXVK d3d8.dll is left as it is.
+  On macOS only d3d8.dll goes in, on Wine's own Direct3D 9 (wined3d): DXVK cannot run
+  Direct3D 9 on a Mac, so MSAA, dxvk.conf and bloom are skipped there.
 
-THE MODELS (models/, Linux, needs python3)
+THE MODELS (models/, needs Python 3; the graphical installer brings its own)
   The dilithium moons and the selection bubble smoothed, and the ships and stations
   drawn round where they are round: rewritten from your own stock SOD files, which
   are checked by hash and kept as .a2neb-backup.
@@ -170,7 +178,8 @@ FIRST, WHAT IT NEEDS -- in vendor/, installed if missing (CREDITS.txt)
 
 NEEDS FROM YOU
   Star Trek: Armada II, GOG release (patch 1.1). Under Wine/Proton, the DLL overrides
-  the installer prints, in the launcher. A plugin that does not recognise Armada2.exe
+  the installer prints, in the launcher (the graphical installer writes them into
+  Heroic's settings on Linux and into the Wine prefix's registry on macOS). A plugin that does not recognise Armada2.exe
   patches nothing and says so in its .log. Never install HUD.asi alongside the
   file-based fixes (hud/ui-widescreen.py and friends): every correction would apply
   twice.
@@ -249,6 +258,9 @@ json.dump({
     'installer': {'file': 'armada2-refit-installer.py',
                   'version': '$(version "$root/gui-installer/CHANGELOG.md")'},
     'linux': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
+    # The systems below install only from a package that names them (Package.for_system).
+    'windows': {'script': 'install.ps1', 'uninstall': '-Uninstall', 'progress': 'A2_PROGRESS'},
+    'macos': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
     'steps': ['verify', 'prereqs', 'chain', 'hud', 'menus', 'qol', 'grid', 'models',
               'lighting', 'sky', 'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done'],
     'layers': [

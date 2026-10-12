@@ -184,7 +184,8 @@ game's, and build the ones we hand it.
   cumulative acknowledgement with a 32-packet selective bitmask, retransmission on a
   timer from the measured round trip, fragments of 1100 bytes. Every send is reliable
   and ordered whatever its flags; the game only ever asks for that. A connection that
-  hears nothing for 15 s is lost, and a ping keeps quiet ones alive.
+  hears nothing for 15 s is lost, and a ping keeps quiet ones alive. A message is at most
+  256 KB reassembled (the game's are under 1 KB); a peer that sends more is dropped.
 - **One network thread per peer** receives, retransmits and delivers every message to
   the game, in order. The game's calls only queue, and the game's handler is never
   called with our lock held, because the game calls back in from it.
@@ -247,6 +248,8 @@ the same `A2O` header as the rest of the protocol:
   socket, connections, retransmission and the game's messages, works on it unchanged.
   The server relays only between a pair it introduced, at most 128 KB/s per player,
   from the source address of the datagram, never from an address the sender claims.
+  It answers at most 2 code lookups a second per IP address (a burst of 10), so the
+  31^6 codes cannot be tried one after another; a joiner asks again every 0.5 s anyway.
 - **After that** the server is out of the game, except as the relay: the transport is
   milestone 1's.
 

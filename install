@@ -19,8 +19,12 @@
 #   lighting   lighting/install.sh           Lighting.asi: ships on the GPU, two scene lights
 #   sky        sky/install.sh                Sky.asi and its recipes: the sky drawn from a
 #                                            recipe in a shader, where a map's sky has one
+#   surfaces   surfaces/install.sh           Surfaces.asi and its recipes: planets' surfaces
+#                                            made from a recipe, drawn by Lighting.asi
 #   nebulae    nebulae/install.sh            Nebulae.asi and its recipes: nebulae drawn as
 #                                            volumes of gas, for each class with a recipe
+#   explosions explosions/install.sh         Explosions.asi: fireballs drawn as gas, shockwaves
+#                                            as rings of light
 #   shields    shields/install.sh            Shields.asi: shield hits drawn by a shader
 #   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
 #                                            $A2_DATA/movies
@@ -50,6 +54,8 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/models/install.sh"
 "$here/lighting/install.sh"
 "$here/sky/install.sh"
+"$here/surfaces/install.sh"
 "$here/nebulae/install.sh"
+"$here/explosions/install.sh"
 "$here/shields/install.sh"
 "$here/cutscenes/binkproxy/install.sh"

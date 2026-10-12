@@ -279,9 +279,12 @@ static void s_fixed(char *d, float v, int places)
 static float s_parse(const char *s)
 {
     long whole = 0, frac = 0, scale = 1;
-    int  digits = 0;
+    int  digits = 0, wide = 0;
     while (*s == ' ' || *s == '\t') s++;
-    while (*s >= '0' && *s <= '9') { whole = whole * 10 + (*s++ - '0'); digits++; }
+    while (*s >= '0' && *s <= '9') {          /* nine digits fit a long; more is refused */
+        if (digits < 9) whole = whole * 10 + (*s - '0'); else wide = 1;
+        s++; digits++;
+    }
     if (*s == '.') {
         s++;
         while (*s >= '0' && *s <= '9' && scale < 1000000) {
@@ -290,7 +293,7 @@ static float s_parse(const char *s)
         while (*s >= '0' && *s <= '9') s++;
     }
     while (*s == ' ' || *s == '\t') s++;
-    if (!digits || (*s && *s != ';')) return -1.0f;
+    if (!digits || wide || (*s && *s != ';')) return -1.0f;
     return (float)whole + (float)frac / (float)scale;
 }
 

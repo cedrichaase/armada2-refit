@@ -75,6 +75,8 @@ typedef struct { long long q; } LARGE;
 #define MEM_RESERVE            0x2000
 
 __declspec(dllimport) DWORD   __stdcall GetModuleFileNameA(HMODULE, LPSTR, DWORD);
+__declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
+__declspec(dllimport) void   *__stdcall GetProcAddress(HMODULE, LPCSTR);
 __declspec(dllimport) BOOL    __stdcall VirtualProtect(void *, UINT, DWORD, DWORD *);
 __declspec(dllimport) void   *__stdcall VirtualAlloc(void *, UINT, DWORD, DWORD);
 __declspec(dllimport) BOOL    __stdcall VirtualFree(void *, UINT, DWORD);
@@ -115,12 +117,16 @@ int _fltused = 0;   /* floats without the CRT */
 #define VT_LATINUM         0x6b132c   /* LatinumNebula vtable (a TerrainObject, not a Nebula) */
 #define FN_OBJECT_RENDER   0x4d54e0   /* GameObject::Render, slot 11 of LatinumNebula's vtable */
 #define OBJECT_LIST        0x761084   /* GameObject::objectList, std::list<GameObject *> * */
+#define FN_CLASS_CLEAN     0x4cd4f0   /* GameObjectClass_Clean(), cdecl: frees every class */
+#define SITE_CLEAN_CLOSE   0x485c06   /* in Program::GameClosePostDebriefing: call GameObjectClass_Clean */
+#define SITE_CLEAN_GAME    0x4873ea   /* in Program::GameDoOne: call GameObjectClass_Clean */
 
 typedef void        (__thiscall *Render_t)(void *obj, void *cam);
 typedef void        (__thiscall *Particles_t)(void *eng, void *list);
 typedef const char *(__thiscall *OdfName_t)(void *obj);
 typedef BYTE        (__thiscall *CanSee_t)(void *obj);
 typedef BYTE       *(__cdecl *EntityGet_t)(int handle);
+typedef void        (__cdecl *Clean_t)(void);
 
 /* ---- tiny string/log helpers (no CRT) ---------------------------------- */
 
@@ -287,6 +293,10 @@ static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
 static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ), 1 at full size */
 static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, half size only) */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
+static int   g_shadows = 1;            /* Shadows=: ships shadow the gas from the Key (Lighting.asi's map) */
+static float g_key_share = 0.8f;        /* KeyShare=: the Key's share of the gas's light; the rest is its own glow (a recipe's KeyShare= overrides) */
+static float g_scatter = 0.2f;          /* Scatter=: how much the gas scatters the Key forward (0: alike every way; a recipe's Scatter= overrides) */
+static float g_shadow_soft = 0.02f;     /* ShadowSoftness=: the penumbra's width per unit behind the caster */
 static int   g_bake = 1;      /* Bake=: 1 the gas baked once per field; 0 computed per pixel (the reference) */
 static int   g_vol_max = 256; /* VolumeSize=: the baked volume's longest side across, texels */
 static int   g_vol_maxy = 160; /* VolumeHeight=: and up, texels */
@@ -315,6 +325,19 @@ static void read_settings(void)
     parsen(b, &g_obscure, 1);
     if (g_obscure < 0.0f) g_obscure = 0.0f;
     if (g_obscure > 1.0f) g_obscure = 1.0f;
+    g_shadows = (int)GetPrivateProfileIntA("Nebulae", "Shadows", 1, g_ini);
+    GetPrivateProfileStringA("Nebulae", "KeyShare", "0.8", b, sizeof b, g_ini);
+    parsen(b, &g_key_share, 1);
+    if (g_key_share < 0.0f) g_key_share = 0.0f;
+    if (g_key_share > 1.0f) g_key_share = 1.0f;
+    GetPrivateProfileStringA("Nebulae", "Scatter", "0.2", b, sizeof b, g_ini);
+    parsen(b, &g_scatter, 1);
+    if (g_scatter < 0.0f) g_scatter = 0.0f;
+    if (g_scatter > 0.8f) g_scatter = 0.8f;
+    GetPrivateProfileStringA("Nebulae", "ShadowSoftness", "0.02", b, sizeof b, g_ini);
+    parsen(b, &g_shadow_soft, 1);
+    if (g_shadow_soft < 0.0f) g_shadow_soft = 0.0f;
+    if (g_shadow_soft > 0.5f) g_shadow_soft = 0.5f;
     if (g_vol_max < 16) g_vol_max = 16;
     if (g_vol_max > 512) g_vol_max = 512;
     if (g_vol_maxy < 8) g_vol_maxy = 8;
@@ -341,6 +364,8 @@ typedef struct {
     char     odf[40];
     char     path[360];       /* Nebulae\<odf>.ini */
     int      have;            /* a recipe was read: this class is drawn as gas */
+    int      failed;          /* its envelope or bake could not be made: the stock billboards until the
+                               * recipe, Nebulae.ini or the device changes (not retried every frame) */
     FILETIME time;
     int      gen;             /* counts the reads */
     float    k[NCONST][4];
@@ -355,6 +380,9 @@ typedef struct {
     double   pulse_last;      /* when the phase was last advanced (seconds) */
     float    extent, height, radius, radius0;   /* radius0: the class's own (a nebula's effect radius), Radius= overrides */
     float    flow_speed, edge_warp, fil_reach, edge_dim, opacity;
+    float    key_share, scatter;   /* KeyShare=, Scatter=: below 0, Nebulae.ini's */
+    float    shade_step;      /* ShadeStep=: the self-shading's step towards the light (world units) */
+    float    light0[3];       /* Light= and ShadeStep=: the self-shading's own step, when there is no Key */
     float    ydev;            /* the farthest any of the class's nebulae is above or below its mean (world units, at least 1) */
     float    hue_cycle, hue_swing;               /* HueCycle= (seconds), HueSwing= */
     float    bolt_rate, bolt_size, bolt_bright;  /* Lightning= (a minute, a nebula), LightningSize=, LightningBrightness= */
@@ -386,7 +414,7 @@ static int recipe_read(Cls *c)
     const char *f = c->path;
     float  seed;
     int    i, j;
-    char   b[200];
+    char   b[400];        /* the path is up to 360 */
 
     for (i = 0; i < NCONST; i++) for (j = 0; j < 4; j++) c->k[i][j] = 0.0f;
     if (!file_time(f, &c->time)) return 0;
@@ -410,6 +438,10 @@ static int recipe_read(Cls *c)
     c->pulse_speed = ini1(f, "PulseSpeed", 0.5f);
     c->pulse_wander = ini1(f, "PulseWander", 0.5f);
     c->ring_cycle = ini1(f, "RingCycle", 6.0f);
+    c->key_share = ini1(f, "KeyShare", -1.0f);
+    if (c->key_share > 1.0f) c->key_share = 1.0f;
+    c->scatter = ini1(f, "Scatter", -1.0f);
+    if (c->scatter > 0.8f) c->scatter = 0.8f;
     c->opacity = ini1(f, "Opacity", 0.0f);         /* optical depth through one reach of the densest gas */
     if (c->opacity < 0.0f) c->opacity = 0.0f;
     if (c->ring_cycle < 0.1f) c->ring_cycle = 0.1f;
@@ -440,12 +472,14 @@ static int recipe_read(Cls *c)
     c->k[9][3] = ini1(f, "LaneScale", 1.7f);
     {   /* the light the gas shades itself by: a direction, a step, a strength */
         float l[2] = { 30.0f, 60.0f }, y, pt, st = ini1(f, "ShadeStep", 60.0f);
+        c->shade_step = st;
         inin(f, "Light", l, 2);
         y = l[0] * 0.017453293f; pt = l[1] * 0.017453293f;
         c->k[10][0] = cos_f(pt) * sin_f(y) * st;
         c->k[10][1] = sin_f(pt) * st;
         c->k[10][2] = cos_f(pt) * cos_f(y) * st;
         c->k[10][3] = ini1(f, "Shading", 1.0f);
+        c->light0[0] = c->k[10][0]; c->light0[1] = c->k[10][1]; c->light0[2] = c->k[10][2];
     }
     c->k[11][3] = ini1(f, "FineDetail", 0.35f);
     c->flow_speed = ini1(f, "FlowSpeed", 0.03f);  /* noise tiles a second: the drift of the flow field */
@@ -468,6 +502,7 @@ static int recipe_read(Cls *c)
     c->extent  = ini1(f, "Extent", 1.3f);
     c->height  = ini1(f, "Height", 3.0f);        /* the domes' height, times the reach */
     c->gen++;
+    c->failed = 0;
 
     b[0] = 0; s_cat(b, "recipe "); s_cat(b, f); s_cat(b, " read");
     logline(b);
@@ -479,7 +514,7 @@ static Cls *class_of(BYTE *obj)
     BYTE       *cls = *(BYTE **)(obj + 0x40);
     const char *name;
     Cls        *c;
-    char        b[200];
+    char        b[200];   /* the odf is up to 39 */
     int         i;
 
     for (i = 0; i < g_ncls; i++) if (g_cls[i].cls == cls) return &g_cls[i];
@@ -526,7 +561,7 @@ static void recipes_reload(void)
 
 enum { D9_GETRENDERTARGETDATA = 32, D9_CREATEOFFSCREEN = 36, D9_SETRENDERTARGET2 = 37,
        D9_GETRENDERTARGET2 = 38, D9_SETDEPTHSTENCIL = 39, D9_GETDEPTHSTENCIL = 40 };
-enum { D9_CREATETEXTURE = 23, D9_CREATEVOLUMETEXTURE = 24, D9_GETVIEWPORT = 48,
+enum { D9_CREATETEXTURE = 23, D9_CREATEVOLUMETEXTURE = 24, D9_SETVIEWPORT = 47, D9_GETVIEWPORT = 48,
        D9_CREATESTATEBLOCK = 59, D9_DRAWPRIMITIVEUP = 83, D9_CREATEQUERY = 118 };
 enum { SB_CAPTURE = 4, SB_APPLY = 5, Q_ISSUE = 6, Q_GETDATA = 7, TEX_LOCK = 19, TEX_UNLOCK = 20 };
 
@@ -553,6 +588,8 @@ typedef long (__stdcall *Obj_t)(void *, void *);
 typedef long (__stdcall *RTData_t)(void *, void *, void *);
 typedef long (__stdcall *SurfLock_t)(void *, void *, const void *, DWORD);
 typedef long (__stdcall *SurfUnlock_t)(void *);
+typedef long (__stdcall *SetVP_t)(void *, const DWORD *);
+typedef long (__stdcall *VP_t)(void *, DWORD *);
 typedef struct { INT pitch; BYTE *bits; } LOCKED;
 typedef struct { INT row, slice; BYTE *bits; } LOCKEDBOX;
 
@@ -576,6 +613,8 @@ static void    *g_bn_tex;    /* the blue noise, MANAGED pool */
 static void    *g_zt, *g_lz, *g_lr;
 static UINT     g_zt_w, g_zt_h, g_lr_w, g_lr_h;
 static int      g_lr_broken;  /* INTZ or a target could not be made: full size from now on */
+static int      g_init_failed; /* the noise or the blue noise could not be made on this device: the stock
+                               * billboards until the device or Nebulae.ini changes */
 
 static void unref(void *o) { if (o) D9_FN(o, D9_RELEASE, D9_Ref_t)(o); }
 
@@ -600,7 +639,9 @@ static void drop_objects(void)
         unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1;
         unref(g_cls[i].vol); g_cls[i].vol = NULLPTR; g_cls[i].vol_gen = -1;
         unref(g_cls[i].occ); g_cls[i].occ = NULLPTR;
+        g_cls[i].failed = 0;
     }
+    g_init_failed = 0;
     for (i = 0; i < NQ; i++) { unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR; g_qbusy[i] = 0; }
     unref(g_qfreq); g_qfreq = NULLPTR; g_freq = 0;
 }
@@ -630,7 +671,10 @@ static int timing_slot(void *d9)
     for (i = 0; i < NQ; i++) {
         if (g_qbusy[i]) continue;
         if (!g_q[i][0] && (D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][0]) < 0 ||     /* TIMESTAMP */
-                           D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][1]) < 0)) return -1;
+                           D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][1]) < 0)) {
+            unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR;   /* never half a pair */
+            return -1;
+        }
         return i;
     }
     return -1;
@@ -1102,6 +1146,7 @@ static int bake_volume(void *d9, Cls *c, float half)
     int    X, Y, Z, j, ok = 0;
     LARGE  t0, t1;
     Vert   v[4];
+    DWORD  old_vp[6];
     char   m[220];
 
     if (!vs || !ps) return 0;
@@ -1122,7 +1167,7 @@ static int bake_volume(void *d9, Cls *c, float half)
     if (c->vol && (c->vx != X || c->vy != Y || c->vz != Z)) { unref(c->vol); c->vol = NULLPTR; }
     if (!c->vol && D9_FN(d9, D9_CREATEVOLUMETEXTURE, MakeVol_t)(d9, (UINT)X, (UINT)Z, (UINT)Y, 1, 0, 21, 1, &c->vol, NULLPTR) < 0) {
         c->vol = NULLPTR;
-        note_once(&said, "bake: no volume texture could be made: the gas computed per pixel");
+        note_once(&said, "bake: no volume texture could be made: the stock billboards for the class");
         return 0;
     }
     c->vx = X; c->vy = Y; c->vz = Z;
@@ -1130,9 +1175,10 @@ static int bake_volume(void *d9, Cls *c, float half)
     if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, (UINT)X, (UINT)Z, 1, 1, 21, 0, &rt, NULLPTR) < 0 ||      /* RENDERTARGET, DEFAULT */
         D9_FN(rt, 18, Level_t)(rt, 0, &rts) < 0 ||
         D9_FN(d9, D9_CREATEOFFSCREEN, MakeOff_t)(d9, (UINT)X, (UINT)Z, 21, 2, &sys, NULLPTR) < 0) {      /* SYSTEMMEM */
-        note_once(&said, "bake: no render target could be made: the gas computed per pixel");
+        note_once(&said, "bake: no render target could be made: the stock billboards for the class");
         goto done;
     }
+    D9_FN(d9, D9_GETVIEWPORT, VP_t)(d9, old_vp);
     D9_FN(d9, D9_GETRENDERTARGET2, GetRT_t)(d9, 0, &old_rt);
     D9_FN(d9, D9_GETDEPTHSTENCIL, Obj_t)(d9, &old_ds);
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, rts);     /* the viewport becomes the layer */
@@ -1217,6 +1263,7 @@ static int bake_volume(void *d9, Cls *c, float half)
     }
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, old_rt);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, old_ds);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, old_vp);           /* setting the target reset it to the whole target */
     unref(old_rt); unref(old_ds);
 done:
     unref(sys); unref(rts); unref(rt);
@@ -1341,7 +1388,7 @@ static int gather_one(BYTE *obj)
     int    i;
     if (!obj) return 0;
     c = class_of(obj);
-    if (!c || !c->have || c->n >= MAX_NEB) return 0;
+    if (!c || !c->have || c->failed || c->n >= MAX_NEB) return 0;
     if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj) && !ghosted(obj)) return 0;
     p = (float *)(obj + 0xac);
     c->pos[c->n][0] = p[0]; c->pos[c->n][1] = p[1]; c->pos[c->n][2] = p[2];
@@ -1436,6 +1483,74 @@ static void lightning(Cls *c, float now, float dt)
     }
 }
 
+/* Ships' shadows in the gas: Lighting.asi's shadow map of the Key, when it has one for
+ * this view and frame (LightingShadowMap). Asked once per draw_gas; g_sh_tex is
+ * borrowed, and bound only while the gas is drawn. c32..c34 world -> the map, c35 per
+ * class. */
+typedef int (__cdecl *ShadowMap_t)(void *, void **, float *, float *);
+static void *g_sh_tex;
+static float g_sh_k[4][4];
+
+static void shadow_query(void *d9)
+{
+    static int said_none, said_map, looked;
+    static ShadowMap_t get;
+    float info[4];
+    g_sh_tex = NULLPTR;
+    if (!g_shadows) return;
+    if (!looked) {
+        HMODULE m = GetModuleHandleA("Lighting.asi");
+        looked = 1;
+        get = m ? (ShadowMap_t)GetProcAddress(m, "LightingShadowMap") : (ShadowMap_t)NULLPTR;
+        if (!get) note_once(&said_none, "no shadow map from Lighting.asi (not loaded, or older than 1.18.0): the gas takes no ships' shadows");
+    }
+    if (!get || !get(d9, &g_sh_tex, &g_sh_k[0][0], info)) { g_sh_tex = NULLPTR; return; }
+    g_sh_k[3][0] = 1.0f;                               /* there is a map */
+    g_sh_k[3][1] = info[0] * 2.0f;                     /* twice the hulls' bias: the gas has no faces to fight it */
+    g_sh_k[3][2] = info[2] > 0.0f ? g_shadow_soft * info[3] / info[2] : 0.0f;   /* map depth -> world -> u, v */
+    g_sh_k[3][3] = info[1];
+    if (!said_map) {
+        char b[160];
+        said_map = 1;
+        b[0] = 0; s_cat(b, "ships' shadows in the gas: Lighting.asi's map, "); s_flt(b, info[2]);
+        s_cat(b, " units across, "); s_flt(b, info[3]); s_cat(b, " deep");
+        logline(b);
+    }
+}
+
+/* The Key's direction (LightingKey), asked once per draw_gas: the gas takes its share of
+ * the Key from it, and shades itself towards it. Without Lighting.asi, or with no Key in
+ * the engine's lights, none, and the gas is its own light as before. */
+typedef int (__cdecl *KeyDir_t)(float *);
+static float g_key[3];
+static int   g_have_key;
+
+static void key_query(void)
+{
+    static int looked, said_none, said_key;
+    static KeyDir_t get;
+    if (!looked) {
+        HMODULE m = GetModuleHandleA("Lighting.asi");
+        looked = 1;
+        get = m ? (KeyDir_t)GetProcAddress(m, "LightingKey") : (KeyDir_t)NULLPTR;
+        if (!get) note_once(&said_none, "no Key from Lighting.asi (not loaded, or older than 1.19.0): the gas is its own light only");
+    }
+    g_have_key = get && get(g_key);
+    if (g_have_key && !said_key) {
+        char b[160];
+        said_key = 1;
+        b[0] = 0; s_cat(b, "the gas takes the Key from Lighting.asi, towards ");
+        s_flt(b, g_key[0]); s_cat(b, ", "); s_flt(b, g_key[1]); s_cat(b, ", "); s_flt(b, g_key[2]);
+        logline(b);
+    }
+}
+
+/* This class's share of the Key (0: none, no Key). */
+static float key_share(const Cls *c)
+{
+    return g_have_key ? (c->key_share >= 0.0f ? c->key_share : g_key_share) : 0.0f;
+}
+
 /* The states every slice draw sets; the state block puts the engine's back. */
 static void draw_states(void *d9, void *vs, float cols[4][4])
 {
@@ -1471,13 +1586,17 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 4, g_bn_tex);
     for (i = 0; i < (int)(sizeof ss0 / sizeof ss0[0]); i++) {
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 0, ss0[i][0], ss0[i][1]);
-        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 4, ss0[i][0], ss0[i][0] >= 5 ? 1 : ss0[i][1]);   /* wrap, point, no mips */
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 4, ss0[i][0],                                     /* wrap, point, no mips, */
+              ss0[i][0] == 5 || ss0[i][0] == 6 ? 1 : ss0[i][0] == 7 ? 0 : ss0[i][1]);                /* linear: thresholds, not colour */
     }
     for (i = 0; i < (int)(sizeof ssc / sizeof ssc[0]); i++) {
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, ssc[i][0], ssc[i][1]);
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 2, ssc[i][0], ssc[i][1]);
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 3, ssc[i][0], ssc[i][0] >= 5 && ssc[i][0] <= 6 ? 1 : ssc[i][1]);   /* point */
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 8, ssc[i][0], ssc[i][0] >= 5 && ssc[i][0] <= 6 ? 1 : ssc[i][1]);   /* the shadow map: point */
     }
+    D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 8, g_sh_tex);
+    d9_psconst(d9, 32, &g_sh_k[0][0], 3);
 }
 
 /* ---- Resolution=2: the gas at half size ----------------------------------------
@@ -1493,12 +1612,10 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
  * pixel's own, so a hull's edge stays sharp. */
 #define FOURCC_INTZ 0x5a544e49UL
 #define RESZ_CODE   0x7fa05000UL
-enum { D9_CLEAR = 43, D9_SETVIEWPORT = 47, SURF_GETDESC = 12, TEX_GETLEVEL = 18 };
+enum { D9_CLEAR = 43, SURF_GETDESC = 12, TEX_GETLEVEL = 18 };
 typedef struct { DWORD format, type, usage, pool, ms, msq; UINT w, h; } SURFDESC;
 typedef long (__stdcall *Desc9_t)(void *, SURFDESC *);
 typedef long (__stdcall *Clear_t)(void *, DWORD, const void *, DWORD, DWORD, float, DWORD);
-typedef long (__stdcall *SetVP_t)(void *, const DWORD *);
-typedef long (__stdcall *VP_t)(void *, DWORD *);
 typedef struct { DWORD x, y, w, h; float mn, mx; } VIEWPORT9;
 
 static int lr_targets(void *d9, UINT zw, UINT zh, UINT fw, UINT fh)
@@ -1633,6 +1750,7 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 15);
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 0);      /* ALPHABLENDENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 15, 0);      /* ALPHATESTENABLE: both passes write alpha 0 */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 22, 1);      /* CULLMODE: none */
     D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);
     d9_bind(d9, qvs, zps);
@@ -1675,10 +1793,11 @@ typedef long (__stdcall *Scissor_t)(void *, const LONG *);
 
 static void lr_end(void *d9, LrFrame *L)
 {
-    int scissor = 0;
+    int scissor = 0, none = !L->nfull && L->nx1 < L->nx0;   /* no gas box was drawn: nothing to add */
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, L->rt0);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, L->ds0);
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
+    if (none) { unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR; return; }
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 1);      /* ALPHABLENDENABLE: ONE, INVSRCALPHA (alpha: what the gas hides) */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 19, 2);
@@ -1769,8 +1888,11 @@ static int draw_gas(void)
         note_once(&said_sb, "no state block: the stock billboards");
         return 0;
     }
-    if (!g_vol && !make_volume(d9)) return 0;
-    if (!g_bn_tex && !make_blue(d9)) return 0;
+    if (g_init_failed) return 0;
+    if ((!g_vol && !make_volume(d9)) || (!g_bn_tex && !make_blue(d9))) {
+        g_init_failed = 1;    /* once a device: the noise alone takes a quarter of a second */
+        return 0;
+    }
     if (!gather()) return 1;
 
     {   /* Which view this is, by its viewport: the HUD's action camera draws the scene
@@ -1826,20 +1948,33 @@ static int draw_gas(void)
                 slot = timing_slot(d9);
                 if (slot >= 0) D9_FN(g_q[slot][0], Q_ISSUE, Issue_t)(g_q[slot][0], 1);
             }
+            shadow_query(d9);
+            key_query();
             half_size = g_res == 2 && g_bake && lr_begin(d9, &L, P);
             L.nx0 = L.ny0 = 1e30f; L.nx1 = L.ny1 = -1e30f; L.nfull = 0;
             draw_states(d9, vs, cols);
             if (half_size) lr_rebind(d9, &L);
         }
+        if (key_share(c) > 0.0f) {   /* the gas shades itself towards the Key; a new Key is a new bake */
+            for (k = 0; k < 3; k++) {
+                DWORD b;
+                c->k[10][k] = g_key[k] * c->shade_step;
+                b = *(DWORD *)&g_key[k];
+                c->sig = (c->sig ^ (b >> 8)) * 16777619UL;
+            }
+        } else {
+            for (k = 0; k < 3; k++) c->k[10][k] = c->light0[k];
+        }
         if (!c->env || c->env_sig != c->sig || c->env_gen != c->gen) {
-            if (!bake_envelope(d9, c)) continue;
+            if (!bake_envelope(d9, c)) { c->failed = 1; continue; }
         }
         half = c->radius * c->extent * c->height * (1.0f + c->k[8][3]) + c->ydev;   /* the domes, lumps and how far apart in height */
         if (g_bake && (!c->vol || c->vol_sig != c->sig || c->vol_gen != c->gen)) {
             D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
-            bake_volume(d9, c, half);         /* on failure, c->vol stays NULL: per pixel */
+            if (!bake_volume(d9, c, half)) c->failed = 1;   /* the class's billboards from the next frame */
             draw_states(d9, vs, cols);
             if (half_size) lr_rebind(d9, &L);
+            if (c->failed) continue;
         }
         if (half_size && !c->vol) continue;   /* the half-size pass draws only baked gas */
         lo[0] = c->ex0; lo[1] = c->ey - half; lo[2] = c->ez0;
@@ -1982,6 +2117,15 @@ static int draw_gas(void)
         }
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
         d9_psconst(d9, 24, &c->ex[0][0], 8);
+        {   /* c35: the shadow map (x 0: none, and the shader reads no map); c36: towards the
+             * Key, w this class's share of it; c37: its forward scattering */
+            float k[3][4], s = key_share(c), g = c->scatter >= 0.0f ? c->scatter : g_scatter;
+            k[0][0] = g_sh_tex && s > 0.0f ? 1.0f : 0.0f;
+            k[0][1] = g_sh_k[3][1]; k[0][2] = g_sh_k[3][2]; k[0][3] = g_sh_k[3][3];
+            k[1][0] = g_key[0]; k[1][1] = g_key[1]; k[1][2] = g_key[2]; k[1][3] = s;
+            k[2][0] = 1.0f + g * g; k[2][1] = 2.0f * g; k[2][2] = 0.0f; k[2][3] = 0.0f;
+            d9_psconst(d9, 35, &k[0][0], 3);
+        }
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(nv / 3), g_v, sizeof g_v[0]);   /* a triangle list */
         g_slices_drawn += drawn;
@@ -2008,7 +2152,8 @@ static void __fastcall hook_particles(void *eng, void *edx, void *list)
         if (file_time(g_ini, &t) && (t.lo != g_ini_time.lo || t.hi != g_ini_time.hi)) {
             g_ini_time = t;
             read_settings();
-            for (i = 0; i < g_ncls; i++) g_cls[i].vol_gen = -1;   /* the volume's size may have changed: bake again */
+            for (i = 0; i < g_ncls; i++) { g_cls[i].vol_gen = -1; g_cls[i].failed = 0; }   /* the volume's size may have changed: bake again */
+            g_init_failed = 0;
             logline(g_enable ? "Nebulae.ini read: on" : "Nebulae.ini read: off, the stock billboards");
         }
         recipes_reload();
@@ -2054,7 +2199,7 @@ static void __fastcall hook_nebula_render(BYTE *obj, void *edx, void *cam)
 {
     Cls *c;
     (void)edx;
-    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have) { mark_on_screen(obj, cam); return; }
+    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have && !c->failed) { mark_on_screen(obj, cam); return; }
     ((Render_t)FN_NEBULA_RENDER)(obj, cam);
 }
 
@@ -2062,7 +2207,7 @@ static void __fastcall hook_latinum_render(BYTE *obj, void *edx, void *cam)
 {
     Cls *c;
     (void)edx;
-    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have) { mark_on_screen(obj, cam); return; }
+    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have && !c->failed) { mark_on_screen(obj, cam); return; }
     ((Render_t)FN_OBJECT_RENDER)(obj, cam);
 }
 
@@ -2072,8 +2217,33 @@ static void __fastcall hook_spirit_render(BYTE *sp, void *edx, void *cam)
     Cls  *c;
     (void)edx;
     if (g_drawing && sp && (obj = ((EntityGet_t)FN_ENTITY_GET)(*(int *)(sp + 8))) != NULLPTR &&
-        (*(DWORD *)obj == VT_NEBULA || *(DWORD *)obj == VT_LATINUM) && (c = class_of(obj)) != NULLPTR && c->have) return;
+        (*(DWORD *)obj == VT_NEBULA || *(DWORD *)obj == VT_LATINUM) && (c = class_of(obj)) != NULLPTR && c->have && !c->failed) return;
     ((Render_t)FN_SPIRIT_RENDER)(sp, cam);
+}
+
+/* GameObjectClass_Clean frees every class when a game ends (Program::GameClosePostDebriefing)
+ * and before the next is set up (Program::GameDoOne). The classes here are keyed by the
+ * engine's class pointer, so they go with it: kept, the next game's classes landed at
+ * the same addresses and took the old entries, and the table filled after a few games. */
+static void classes_forget(void)
+{
+    int  i, n = g_ncls;
+    char b[80];
+    for (i = 0; i < g_ncls; i++) {
+        DWORD *w = (DWORD *)&g_cls[i];
+        UINT   k;
+        unref(g_cls[i].env); unref(g_cls[i].vol); unref(g_cls[i].occ);
+        for (k = 0; k < sizeof(Cls) / sizeof(DWORD); k++) w[k] = 0;
+    }
+    g_ncls = 0;
+    g_drawing = 0;
+    if (n) { b[0] = 0; s_cat(b, "the game's classes are freed: "); s_num(b, n); s_cat(b, " let go"); logline(b); }
+}
+
+static void __cdecl hook_class_clean(void)
+{
+    classes_forget();
+    ((Clean_t)FN_CLASS_CLEAN)();
 }
 
 /* ---- startup ------------------------------------------------------------ */
@@ -2102,7 +2272,7 @@ static int patch_slot(DWORD vt, int slot, DWORD expect, void *to)
 
 static void startup(void)
 {
-    char b[300];
+    char b[400];
     int  n, i, cut = 0;
 
     n = (int)GetModuleFileNameA(NULLPTR, g_dir, 280);
@@ -2132,6 +2302,11 @@ static void startup(void)
             s_cat(b, ", latinum too");
         else
             s_cat(b, "; NOT LatinumNebula's Render: latinum keeps its model");
+        if (patch_call(SITE_CLEAN_CLOSE, FN_CLASS_CLEAN, (void *)hook_class_clean) &
+            patch_call(SITE_CLEAN_GAME, FN_CLASS_CLEAN, (void *)hook_class_clean))
+            s_cat(b, ", classes forgotten with the game's");
+        else
+            s_cat(b, "; NOT GameObjectClass_Clean (both calls): classes are kept from game to game");
     }
     logline(b);
 }

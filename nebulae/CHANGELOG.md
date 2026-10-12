@@ -4,6 +4,57 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.0 — 2026-10-12
+
+### Added
+- The gas lit by the Key (`LightingKey`, lighting 1.19.0): its light is its own glow and
+  a share of the Key's (`KeyShare=0.8`), scattered forward (`Scatter=0.2`,
+  Henyey-Greenstein), brighter looking towards the Key and dimmer with it behind; the
+  self-shading steps towards the Key instead of the recipe's `Light=`. Both keys in
+  `Nebulae.ini` and per recipe; `KeyShare=0` is the gas as before.
+- Ships' shadows in the gas: a hull takes the Key's share of the gas's light behind it,
+  from `Lighting.asi`'s shadow map (`LightingShadowMap`), sharp beside the hull and
+  widening down the shaft; lightning is not shadowed. `Nebulae.ini`: `Shadows=1`,
+  `ShadowSoftness=0.02`.
+
+Installed, not yet seen in game.
+
+## 1.0.3 — 2026-10-12
+
+### Fixed
+- Rebuilt with platform 3.4.1's `d9_device()`, which tells a new Direct3D device by the
+  d3d9 device rather than the d3d8 device's address, so the gas's shaders are made
+  again on a device at a re-used address.
+
+Installed, not yet seen in game.
+
+## 1.0.2 — 2026-10-12
+
+### Fixed
+- The blue-noise sampler (stage 4) reads linear: `SRGBTEXTURE` was set to 1 with the
+  point filters, which biased the dither thresholds low (mean about 0.21, not 0.5).
+  Changes the look slightly: the gas was tuned with the bias in place.
+
+Installed, not yet seen in game.
+
+## 1.0.1 — 2026-10-12
+
+### Fixed
+- The classes are forgotten when the game frees its own: the two calls to
+  `GameObjectClass_Clean` (0x485c06, 0x4873ea) are wrapped. Kept by class pointer, a
+  later game's classes took over stale entries at recycled addresses, their textures
+  stayed held, and after 16 classes every nebula fell back to billboards.
+- A noise, envelope or bake that cannot be made is no longer retried every frame: the
+  noise once per device or `Nebulae.ini` read, a class's bake once per recipe read. A
+  class whose bake failed gets its stock billboards (it vanished at `Resolution=2`).
+- `Resolution=2`: no full-screen composite when no gas box was drawn; the half-size
+  depth and clear passes turn the alpha test off.
+- The viewport is put back after a bake (it covered the whole target in the HUD's
+  action camera); a timing query pair is never left half made; the recipe log line no
+  longer overflows its buffer on a long install path.
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-10-10
 
 ### Added

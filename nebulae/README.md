@@ -43,6 +43,14 @@ written; a different `Armada2.exe` leaves the plugin inert and says so in `Nebul
   gas and skips its billboards.
 - **Device `Reset`** (slot 14 of the d3d8 device, chained like `Lighting.asi`'s):
   everything in the default pool is released first.
+- **The two calls to `GameObjectClass_Clean` (0x4cd4f0)**, at 0x485c06 in
+  `Program::GameClosePostDebriefing` and at 0x4873ea in `Program::GameDoOne`. It frees
+  every object class, the nebula classes among them, when a game ends and before the
+  next is set up. The plugin keeps what it knows of a class (its recipe, envelope and
+  baked volume) by the engine's class pointer, so it lets all of it go there first, then
+  calls through. Kept, the next game's classes came back at recycled addresses and took
+  over the old entries (another class's recipe and radius), each stale entry held its
+  textures, and after sixteen classes every nebula fell back to billboards.
 
 What it reads: `Nebula::nebulaList` (0x73b1bc), a `std::vector<Nebula *>`; a nebula's
 position (+0xac), its class (+0x40) and the class's effect radius (+0x1e0); the ODF
@@ -75,6 +83,9 @@ Per class, per field of its nebulae:
   texel's point is jittered within it: the noise's mip level is about a texel wide, so
   its grid and the bake's beat against each other and drew parallel lines through the
   gas.
+  A bake (or an envelope) that cannot be made leaves that class on its stock billboards
+  until its recipe, `Nebulae.ini` or the device changes; so does the noise for every
+  class. Neither is retried every frame: the noise alone takes a quarter of a second.
 - **The draw**: slices on a geometric ladder fixed in distance from the eye (rung j
   between 2^(j/m) and 2^((j+1)/m)). Spread over the box instead, every slice slid
   through the gas as the camera turned, and the gas shimmered in camera glides. The
@@ -129,6 +140,77 @@ The composite is bound by its reads: a depth read for each of 25 taps cost 0.57 
 more at 3440x1440, more than all the opacity work. A 3x3 tent (the first) was grainy
 from outside the gas.
 
+## Lit by the Key
+
+The gas's light is two parts: its own glow, and the Key's, which the gas scatters. The
+Key's share (`KeyShare=`, 0.8; 0 is the gas as before, all its own light) is what a
+ship's shadow takes away, and the reason there are shadows to see at all. While the gas
+was all its own light, a shadow could only dim it by a fixed fraction (the first try,
+`ShadowStrength=0.75`): seen side on, a pixel's line of sight crosses a shaft only for
+a ship's width out of hundreds of units of gas, and the shafts showed only in a
+difference image, amplified.
+
+**The Key's share is scattered forward** (Henyey-Greenstein, `Scatter=`, 0.2), taken
+over its value side on to the Key so that a side view keeps the recipe's brightness:
+looking towards the Key the gas is brighter (x1.9 at 0.2), with the Key behind the eye
+dimmer (x0.6). That is the silver lining a cloud has against the sun, and it is where
+shafts show: looking towards the Key, the lines of sight run down the shafts, not across
+them. At 0.3 the whole field was 2.3 times as bright looking towards the Key; that was
+too much. **The self-shading steps towards the Key** (the recipe's `Light=` is used only
+without one), so the billows' lit sides face the way the hulls' do; a new Key re-bakes
+the gas.
+
+The Key's direction comes from `Lighting.asi`'s export `LightingKey`, read off the
+engine's lights at each draw, so it is there with no hull on screen and with its
+`Shadows=0`. Without `Lighting.asi`, the gas is its own light only.
+
+Measured on the bench (2026-10-12, 1920x1080, `mnebula8` with the ships below,
+`FlowSpeed=0`), the frame's mean against before: side on 54 → 58, towards the Key
+49 → 81, the Key behind the camera 55 → 50, from above 57 → 52.
+
+## Ships' shadows in the gas
+
+A ship between the Key and the gas takes the Key's share of the gas's light away behind
+it: a dark shaft down through the field along the Key's direction (`Shadows=1`,
+`ShadowSoftness=` in `Nebulae.ini`). Lightning is the gas's own light and is not
+shadowed.
+
+**The shadow map is `Lighting.asi`'s**, the one its hulls cast for the Key
+(`lighting/README.md`, "Shadows"). `Lighting.asi` exports `LightingShadowMap`, which
+hands over the texture, its world-to-map columns, its bias and its size only while the
+map belongs to the view being drawn and to this frame; `Nebulae.asi` finds it with
+`GetModuleHandleA("Lighting.asi")` and `GetProcAddress`, binds it to sampler 8 for the
+gas and nothing else, and keeps no reference. Without `Lighting.asi`, with its
+`Shadows=0`, or with no hull on screen, there is no map and the gas is unshadowed. The
+map covers the hulls on screen, so a hull off screen casts nothing into the gas.
+
+**Each sample of the gas reads the map twice**, as PCSS does with many reads: the first,
+anywhere in the widest penumbra possible at the sample's depth, finds a hull and how far
+in front of the sample it is; the second, within the penumbra that distance gives
+(`ShadowSoftness` per unit), is the answer, lit or not. The light is a disc, as the sun
+is, so a shadow is sharp beside the hull and softens down the shaft. Each pixel's answer
+is 0 or 1; the slices and the composite's tent add them up into a soft edge. The read
+points come from the pixel's blue-noise thresholds, walked from slice to slice, so they
+stay put from frame to frame like the slices' own.
+
+**The map is cleared to 1, and 1 means no hull**, not a hull at its far end: its hulls
+lie well inside 0..1 (it is fitted round them with a margin). Compared as a depth, gas
+beyond every hull along the Key was in shadow wherever there was no hull at all, a
+wedge with a straight edge through the field (bench, the first try).
+
+Measured on the bench (2026-10-12, 1920x1080, `mnebula8` with a Galaxy, a Sovereign and a
+Borg cube in it; the recipe's `FlowSpeed=0` so that only the shadow differs): `Shadows=0`
+against `Shadows=1` differ only in shafts from the hulls down and away along the Key.
+The frame's mean difference is 2.5 of 255 looking towards the Key, where the shafts are
+plain at 1x; 0.36 side on and 0.2 from above, where they run across or away from the
+lines of sight.
+
+**Cost** (`Timing=1`, bench, 3440x1440, the same scene, the camera inside the field so
+the gas fills the screen; 6.1–6.3 ms of gas before): lit by the Key, +0.04–0.07 ms;
+the shadows, +1.25 ms looking towards the Key (+20%) and +0.6 ms from above. That is
+two dependent reads of the map per slice pixel with gas in it (none over empty space),
+at half size.
+
 ## Cost
 
 Bench, 3440x1440, the six-class scene at its default view: 1.52 ms of GPU
@@ -144,7 +226,7 @@ of an edit. Shape: `Extent`, `Height`, `Lumps`, `EdgeWarp`, `Radius`. Noise: `Se
 `Ridge`. Colour: `Brightness`, `GasA`, `GasB`, `Glow`, `HueScale`, `HueMix`,
 `HueCycle`, `HueSwing`. Light: `Light`, `ShadeStep`, `Shading`, `Knots`, `KnotScale`,
 `Lanes`, `LaneScale`. Motion: `Flow`, `FlowScale`, `FlowSpeed`. Filaments: `Filaments`,
-`FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`,
+`FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`, `KeyShare`, `Scatter`,
 `NearFade`. Lightning: `Lightning` (flashes a minute, a nebula), `LightningSize`,
 `LightningBrightness`, `LightningColour`. The core: `Core`, `CoreSharpness`, `Pulse`,
 `PulseSpeed`, `PulseWander`, and its ring of colours `Ring`, `RingAt`, `RingWidth`,

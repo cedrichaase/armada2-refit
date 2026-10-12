@@ -5,6 +5,26 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.6.1 — 2026-10-12
+
+### Fixed
+- `QOLRules.asi`: a destroyed producer gave its item in progress back twice (DestroyShip,
+  then ClearTeam when the object is cleaned up), and a craft that cannot die refunded its
+  queue on every fatal hit. DestroyShip is no longer hooked; ClearTeam gives it all back,
+  once.
+- `QOLRules.asi`: losing a producer (destroyed, captured, assimilated) returned the
+  officers of the item in progress twice; they are left to stock's
+  `mRemoveConstructionEffect` when it returns them.
+- `QOLRules.asi`: the network game's answer (`QOLRules_Network`) was latched once per
+  session; it is now cleared at every game start (`Program::GameOpenPreLoad`), so a second
+  game in the same session cannot run on a stale answer.
+- `QOLRules.asi`: a delete order sent while an item waited was lost if the item started
+  before it arrived; ids are matched with the paid mark masked.
+- `QOL.ini`: a number with more than nine digits before the point overflowed and parsed
+  as garbage; it is now refused like any malformed value.
+
+Installed, not yet seen in game.
+
 ## 1.6.0 — 2026-10-07
 
 ### Added

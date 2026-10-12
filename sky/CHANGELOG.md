@@ -4,6 +4,46 @@
 cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.2 — 2026-10-12
+
+### Fixed
+- Rebuilt with platform 3.4.1's `d9_device()`, which tells a new Direct3D device by the
+  d3d9 device rather than the d3d8 device's address, so the sky's shaders and cube are
+  made again on a device at a re-used address.
+
+Installed, not yet seen in game.
+
+## 1.2.1 — 2026-10-12
+
+### Fixed
+- The viewport is put back after the bake: the frame's first sky draw covered the whole
+  back buffer when the bake happened in a smaller view (the HUD's action camera).
+- A timing query pair is never left half made (`Timing=1`).
+
+Installed, not yet seen in game.
+
+## 1.2.0 — 2026-10-12
+
+### Added
+- Recipe keys for the detail the stock faces had and the recipes lacked: `Grain=`
+  (amount, scale, gain: clumps and mottling), `Dust=` (amount, scale, coverage: dark
+  lanes and specks), `Haze=` (amount, coverage: a soft glow behind the clumps),
+  `Stars=` (count, brightness, size, in-gas weight) with `StarA=`/`StarB=` (bright
+  coloured stars with halos in the gas). Each off unless a recipe sets it. The bake's
+  face constants move from c14 to c19. `d1d15e2`
+
+### Changed
+- Every recipe uses them: clumps on black for `mbgred`, `mbgrg`, `mbgdom1`, `mbgpur`,
+  `mbggb`; dust and grain for `mbgborg`, `mbgkling`, `mbgdk`, `mbgflu`, `mbgaqu`,
+  `mbg02`; stars for `mbgbaku`, `mbgpur`, `mbgkl`. Each `Brightness` re-scaled to keep
+  1.1.0's mean luminance.
+
+### Fixed
+- `mbgblue` was never calibrated (`Brightness=1.0`, about 3.5 times `mbg02`'s); it is now
+  `mbg02`'s recipe, as its header says.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-09
 
 ### Added
