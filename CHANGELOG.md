@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.20.0 — 2026-10-12
+
+Layers: lighting 1.18.0, testbench 3.6.0.
+
+### Added
+- Torpedo and pulse impacts light the hull or shield they strike (`Impacts=` and the
+  `Impact*` keys in `Lighting.ini`; lighting 1.18.0).
+- The `impacts` bench scene (testbench 3.6.0).
+
+Installed, not yet seen in game.
+
 ## 11.19.0 — 2026-10-10
 
 Layers: nebulae 1.0.0.

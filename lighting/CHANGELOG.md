@@ -4,6 +4,19 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.18.0 — 2026-10-12
+
+### Added
+- `Impacts=1`, `ImpactBrightness=3.0`, `ImpactStart=10`, `ImpactRange=110`,
+  `ImpactLift=10`, `ImpactTime=0.4`: a torpedo or pulse that strikes a hull or a
+  shield lights it for a moment in its sprite's colour, from a point light at the hit
+  (wrapping slots 22 and 8 of the `PhotonTorpedo`, `PulsePhaser`,
+  `ShieldRemovingTorpedo` and `PoleronTorpedo` vtables, chained, and the two
+  `Ordnance::SimulateAll` calls for a clock of game time). A draw takes the strongest
+  impact only. Drawing only.
+
+Installed, not yet seen in game.
+
 ## 1.17.2 — 2026-10-07
 
 ### Fixed

@@ -21,7 +21,8 @@ that `Lighting.ini` switches separately:
   what is near it in the colour of its ground (`PlanetGlows`); the skybox adds a faint
   third light in its own colour (`SkyLight`); and a ship's or station's explosion
   lights its surroundings (`Explosions`); a phaser lights the firing ship around
-  its emitter and the target where it strikes (`Phasers`).
+  its emitter and the target where it strikes (`Phasers`); a torpedo or pulse lights
+  the hull or shield it strikes (`Impacts`).
 - **`Shadows=1`** (with `Shaders=1`): ships and stations cast the Key's shadow on
   themselves and on each other, from a depth map of the hulls drawn; **`PlanetShadows=1`**:
   a planet shadows what is behind it from the Key ("Shadows", below).
@@ -29,7 +30,7 @@ that `Lighting.ini` switches separately:
 `./install` runs `install.sh`; `install.sh --remove` takes the three files out again
 (`Lighting.asi`, `Lighting.ini`, `Lighting.log`). The exe is patched in memory only, and
 `a2mod` switches the plugin as the `lighting` layer. Each launch writes `Lighting.log`:
-`call sites patched 13` means every hook took, and the lines after it name every model
+`call sites patched 26` means every hook took, and the lines after it name every model
 switched to vertex buffers, the map's own lights, the sky light (`sky:`) and each
 planet's ground colour (`planet glow:`).
 
@@ -75,6 +76,8 @@ planet's ground colour (`planet glow:`).
 | `PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift` | `4.5`, `0`, `24`, `3` | the emitter's light: the beam's colour times this (`0` none); full to `PhaserStart` units from the light, gone at `PhaserRange`; it sits `PhaserLift` units out along the beam |
 | `PhaserWrap`, `PhaserFalloff` | `0.6`, `2` | the emitter's light in the hull shaders: how far its diffuse term wraps round past the faces turned to it (`0`: Lambert), and the power its falloff is raised to (a hot spot) |
 | `PhaserImpact`, `PhaserImpactStart`, `PhaserImpactRange`, `PhaserImpactLift` | `2.0`, `6`, `70`, `8` | the light at the beam's end: the beam's colour times this (`0` none), and its falloff and lift as for the emitter |
+| `Impacts` | `1` | a torpedo's or pulse's impact, on a hull or a shield, lights the target for a moment ("Impacts", below) |
+| `ImpactBrightness`, `ImpactStart`, `ImpactRange`, `ImpactLift`, `ImpactTime` | `3.0`, `10`, `110`, `10`, `0.4` | the flash: the sprite's colour times this (`0` none); full to `ImpactStart` units from the light, gone at `ImpactRange`; it sits `ImpactLift` units back along the shot's flight; gone `ImpactTime` seconds of game time after the hit |
 | `OrdnanceColours` | `1` | a torpedo's or pulse's light takes the colour of its own sprite, at the ODF's brightness ("Torpedoes and pulses", below); `0` keeps the ODF's `lightColor` |
 | `Shadows` | `1` | with `Shaders`, the hulls in the shaders cast the Key's shadow on themselves and each other ("Shadows", below); `0` none |
 | `ShadowSize` | `2048` | the shadow map's width and height in texels (512 to 8192); it is fitted round the hulls on screen, so zoomed in a texel is a fraction of a unit |
@@ -118,7 +121,8 @@ per-render effect is attached (cloak, warp-in), as stock does for asteroids.
 | call at 0x63e4e4, `ST3D_Standard_MeshVB::Render` | replaces `SetMaterial`: diffuse white, ambient zero, emissive `Ambient=`; and turns `NORMALIZENORMALS` on | below |
 | slot 3 of the `ST3D_Standard_MeshVB` vtable (0x6bcbdc), `Render` | reverses the enabled lights for a draw whose object matrix (0x7ad640) is mirrored | below |
 | call at 0x597f83, `GameObject_PreRenderAll` | wraps `ST3D_GraphicsEngine::RegisterLight`: the frame's first directional light is replaced by Key and Fill, the map's others are dropped | below |
-| call at 0x598193 | wraps `GameObject_PreRenderAll` | counts the frame for the hook above; afterwards adds the planet and explosion lights and recolours the torpedoes' (`Ordnance::PreRenderAll` is the next call, at 0x598199) |
+| call at 0x598193 | wraps `GameObject_PreRenderAll` | counts the frame for the hook above; afterwards adds the planet, explosion, phaser and impact lights and recolours the torpedoes' (`Ordnance::PreRenderAll` is the next call, at 0x598199) |
+| slots 22 and 8 (`Hit`, `SetOrigin`) of the `PhotonTorpedo`, `PulsePhaser`, `ShieldRemovingTorpedo` and `PoleronTorpedo` vtables; calls at 0x483279 and 0x4835b0 to `Ordnance::SimulateAll` | notes each impact and where it is; a clock of simulated time | "Impacts", below |
 | slot 3 of the `ST3D_Dot3_MeshVB` vtable (0x6bc7d4), `Render` | draws a bump-mapped group once, in shaders | "Bump-mapped hulls", below |
 | six `fmuls` in the `GroundMesh` constructor (0x595c22, 0x595c3d, 0x595c57; 0x595c70, 0x595c7f, 0x595c8e) | their operand, the stock 0.75 and 0.5, now points at `PlanetDiffuse` and `PlanetAmbient`, one channel each | "Planets", below |
 
@@ -393,7 +397,7 @@ under it went from 20/32/38 to 30/39/41 mean RGB, orange-brown where it was dark
 `Ordnance::PreRenderAll` (call at 0x58e55c) registers each live torpedo's or pulse's
 light while the engine's detail level is above 2, and the point-light path hands it to
 the GPU draws. A weapon's impact has no explosion object (it is a sprite effect), so
-it has no light of its own.
+stock gives it no light of its own; the plugin adds one ("Impacts", below).
 
 **The ODF colours ignore the projectile.** Every ODF that sets `lightColor` gives its
 `OrdnanceClass` one `ST3D_Point_Light` (class +0x10, built in the class constructor
@@ -512,6 +516,80 @@ hit, mean RGB): no beam 146.7/166.7/166.9; with a beam and `PhaserImpact=0` the 
 all five such frames; with `PhaserImpact=1` about 201/214/209 in four, a warm cream
 wash over the hull and neck around the hit. The shield's own flashes (cyan) come and go
 in both.
+
+### Impacts
+
+A torpedo or pulse that strikes a ship has no explosion object: what shows is sprite
+effects (the shield flash, `ShieldEffect::CreateShieldHit`; sparks on the hull), and in
+stock nothing lights. `Impacts=1` gives each hit a short flash of light.
+
+**Where a shot strikes.** Every torpedo and pulse goes off through its ordnance's `Hit`,
+slot 22 of its vtable (`Ordnance::Hit`, 0x58ef40; `PoleronTorpedo::Hit`, 0x580120, has
+its own), called from the class's `Simulate`, slot 20: `Missile::Simulate` (0x58d960)
+for the torpedoes (`classLabel` `photontorpedo`, `shieldremovingtorpedo`) and
+`Bullet::Simulate` (0x58c920) for the pulses (`pphaser`, class `PulsePhaser`). Each hits
+in one of two ways. While the target's shields hold, `Ordnance::Collision` (0x58f4f0)
+tests the shot's step against the shield sphere and writes the point where it crosses,
+in world space, to a `Vector3` it is handed; the shield flash then gets a matrix in the
+shield's own space, which is no use for placing a light. With the shields down, the shot
+hits once it is within a step of the hardpoint it aims at. `Hit` is given a point only
+for a torpedo's hull hit (the hardpoint's world position); a pulse's hits and every
+shield hit pass none. In all four cases, though, `Simulate` then puts the ordnance where
+it struck: `SetOrigin`, slot 8 (`Entity::SetOrigin`, 0x4cfe10), with the shield point or
+the hardpoint. `Hit` only marks the ordnance expired (`Entity::DoExpire` sets +0x27), so
+it is still there for that call.
+
+**The hooks.** The plugin wraps slots 22 and 8 of the four vtables those shots are
+built from: `PhotonTorpedo` (0x6b8f9c), `PulsePhaser` (0x6b96c4), `ShieldRemovingTorpedo`
+(0x6b9e14) and `PoleronTorpedo` (0x6b9284), each checked by its deleting destructor in
+slot 0. It keeps whatever pointer a slot holds and calls through it, so another plugin
+may wrap the same slots before or after. `Hit` notes an impact when the shot has a
+target and is visible (+0x24, as for its flight light), at the point it was given or the
+ordnance's own position (Entity +0x44, translation); the `SetOrigin` that follows from
+the same ordnance moves it to where the shot struck. Nothing is written to the ordnance
+or the target: what every node simulates is unchanged.
+
+**The light.** Each frame, after `GameObject_PreRenderAll`, every impact younger than
+`ImpactTime` registers a point light `ImpactLift` units back along the shot's flight
+(the third axis of its matrix, the one `Simulate` moves it along), off the hull or
+shield it hit, on the side the shot came from. Its colour is the shot's sprite, measured
+as for `OrdnanceColours` (the first frame's mean in the installed texture), scaled to a
+peak of 1, times `ImpactBrightness`; logged once per sprite as `impact light:`
+(`wktorp -> (1.000, 0.170, 0.166)`, `wpulse -> (0.779, 1.000, 0.435)`). It is full on the
+first frame and falls with the square of the time left. Time is the simulation's: the
+plugin redirects both calls of `Ordnance::SimulateAll` (0x483279, 0x4835b0) through a
+wrapper that adds their step to its own clock, so a paused game holds the flash.
+`pick_points` takes the light as a phaser's (by its reach plus `HARD_REACH`, at its real
+position, faded per pixel in the shaders). It is an ordinary `ST3D_Point_Light` in the
+engine's list, so the CPU path (planets, cloaking ships) takes it too.
+
+**One impact per draw.** Impacts are not merged by colour as other lights are (each
+fades at its own age, so no two have one colour), but a draw takes only the strongest
+of them. The first build let every one through, and a Species 8472 mothership's volley of
+pulses summed washed the Galaxy's whole stern out to a flat yellow-green.
+
+**Built on first use.** The light object is made at the first frame, as the phasers'
+are. Made while the plugin loaded (`operator new` from `DllMain`), it faulted, and the
+ASI loader reported `Unable to load Lighting.asi. Error: 998`.
+
+On the bench (2026-10-12, `SCENE=impacts`, 1920x1080, `Phasers=0` in both runs so the
+beams' own lights do not count; `orbit tgt 195 12 170`, a 360x100 box over the Galaxy's
+stern and engineering hull, mean RGB over 16 frames paused at random; one session with
+`Impacts=0`, one with `Impacts=1`, the same build):
+
+| | `Impacts=0` | `Impacts=1` |
+|---|---|---|
+| Klingon torpedoes on the shield (`tgt`), mean of 16 | 101.2/119.3/122.7 | 105.7/120.9/124.3 |
+| the same, brightest frame | 125.7/122.6/126.5 (a torpedo in flight, its own light) | 123.6/126.2/129.8 (a hit) |
+| 8472 pulses on the shield (`tgt2`), mean of 16 | 100.9/121.2/123.7 | 102.9/123.4/124.8 |
+| the same, brightest frame | 111.6/134.7/129.8 | 124.4/147.1/137.5 |
+
+Unhit, the box reads 97.7/117.5/121.0 in both. A Klingon hit turns the stern, the
+pylons and the lower nacelles pink, centred under the hit, with the spark sprite on it; a
+pulse hit, the faces turned to it yellow-green. Before one impact per draw, the pulses
+read 121.1/141.8/136.3 on average and 161.5/176.8/164.6 at worst. With `heal tgt2 off`
+the shields ran out and the pulses struck the hull: the neck and engineering hull took
+the same yellow-green round each hit.
 
 ## Shaders
 
@@ -1037,5 +1115,7 @@ and rejected on the bench: at the fades a close camera gives, the pattern showed
   colours its triangle. Seen on the bench with Borg torpedoes on a Borg cube before
   `BumpShaders` (1.11.0) drew the Borg in shaders; not re-checked since. Not caused by
   `OrdnanceColours`, which changes only the colour.
-- Weapon impacts other than a phaser's flash no light (above). `ShockwaveExplosion` (the big special weapons'
-  ring) has its own `AdjustLighting` and is left alone.
+- Impacts light only for torpedoes and pulses ("Impacts"). The special weapons'
+  ordnance (mines, cannons, the plasma and accelerator cannons, artillery) has none of its
+  own. `ShockwaveExplosion` (the big special weapons' ring) has its own `AdjustLighting`
+  and is left alone.
