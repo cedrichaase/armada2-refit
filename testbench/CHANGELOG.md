@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.7.0 — 2026-10-12
+
+### Added
+- The `impacts` scene: Klingon torpedoes and Species 8472 pulses striking two Galaxy
+  class targets with no shield flash, for the lighting layer's `Impacts=`.
+
+Installs nothing; seen working on the bench 2026-10-12.
+
 ## 3.6.0 — 2026-10-12
 
 ### Added

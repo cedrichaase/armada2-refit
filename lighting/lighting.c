@@ -298,6 +298,7 @@ static float g_sky_col[3], g_sky_mat[12];
 
 static void explosion_lights(void);
 static void phaser_lights(void);
+static void impact_lights(void);
 static void ordnance_colours(void);
 static void sm_planets(void);
 static DWORD g_frame;
@@ -342,6 +343,7 @@ static void __cdecl hook_prerender_all(void *camera)
     planet_glows();
     explosion_lights();
     phaser_lights();
+    impact_lights();
     ordnance_colours();     /* Ordnance::PreRenderAll is next, at 0x598199 */
 }
 
@@ -452,6 +454,7 @@ typedef long (__stdcall *LightEnable_t)(void *, DWORD, BOOL);
 static void *g_glow_vt[19];          /* a planet's light: see planet_glows */
 static BYTE *g_beam_light;           /* the phasers' impact light: see phaser_lights */
 static BYTE *g_emit_light;           /* the phasers' emitter light */
+static BYTE *g_hit_light;            /* the torpedoes' and pulses' impact light: see impact_lights */
 static float g_emit_wrap = 0.6f, g_emit_power = 2.0f;   /* PhaserWrap=, PhaserFalloff= */
 
 static int   g_points = 12;          /* PointLights=: at most this many per draw (6 in Direct3D's slots) */
@@ -460,7 +463,7 @@ static int   g_points = 12;          /* PointLights=: at most this many per draw
  * raw: without the falloff, start/fade: the falloff itself, for the shaders, which
  * apply it per pixel. */
 typedef struct { float col[3]; float pos[3]; float src[3]; float score, range;
-                 float raw[3]; float start, fade; float wrap, power; } Pick;
+                 float raw[3]; float start, fade; float wrap, power; int hit; } Pick;
 
 /* What the shaders take for the draw in hand (Shaders=1, see hook_device): the point
  * lights at their real positions, and which way the mesh's normals point. */
@@ -524,7 +527,7 @@ static int pick_points(const float *at, Pick *out, int max)
         const float *col = (const float *)(inst + 4);
         const float *pos = (const float *)(inst + 0x10) + 9;
         float start, range, dx, dy, dz, d, f, ph = 1.0f, peak, score;
-        int   hard, beam;
+        int   hard, beam, hit;
         DWORD vt;
         if (!light) continue;
         vt = *(DWORD *)light;
@@ -535,10 +538,11 @@ static int pick_points(const float *at, Pick *out, int max)
         d = sqrt_f(dx * dx + dy * dy + dz * dz);
         peak = col[0] > col[1] ? col[0] : col[1];
         if (col[2] > peak) peak = col[2];
-        /* a phaser's light sits on a hull: picked and placed as a hard light, faded
-         * as a soft one (see phaser_lights) */
+        /* a phaser's light, or an impact's, sits on a hull: picked and placed as a
+         * hard light, faded as a soft one (see phaser_lights, impact_lights) */
+        hit  = light == g_hit_light && g_hit_light;
         beam = light && (light == g_beam_light || light == g_emit_light);
-        hard = beam || range < 0.25f * start;
+        hard = beam || hit || range < 0.25f * start;
         if (hard) {
             float reach = start + range + HARD_REACH;
             if (d >= reach) continue;
@@ -552,9 +556,12 @@ static int pick_points(const float *at, Pick *out, int max)
         }
         if (score < 0.004f) continue;
         /* one of a colour already picked: keep the stronger (not phasers, which
-         * fire from several banks of a ship at once) */
+         * fire from several banks of a ship at once). Impacts count once whatever
+         * their colour, the strongest: each fades at its own age, so no two have one
+         * colour, and a volley of pulses summed washed a whole hull out */
         for (i = 0; !beam && i < n; i++)
-            if (out[i].src[0] == col[0] && out[i].src[1] == col[1] && out[i].src[2] == col[2])
+            if (hit ? out[i].hit :
+                (!out[i].hit && out[i].src[0] == col[0] && out[i].src[1] == col[1] && out[i].src[2] == col[2]))
                 break;
         if (beam) i = n;
         if (i < n) {
@@ -575,6 +582,7 @@ static int pick_points(const float *at, Pick *out, int max)
         out[i].start = start; out[i].fade = range;
         out[i].wrap  = light == g_emit_light ? g_emit_wrap : 0.0f;
         out[i].power = light == g_emit_light ? g_emit_power : 1.0f;
+        out[i].hit   = hit;
     }
     return n;
 }
@@ -2807,6 +2815,235 @@ static void ordnance_colours(void)
     }
 }
 
+/* Impacts. A torpedo or pulse that strikes a hull or a shield has no explosion object:
+ * what the player sees is sprite effects (the target's shield flash, its hull sparks),
+ * and nothing lights. Every torpedo and pulse detonates through the ordnance's Hit
+ * (vtable slot 22: Ordnance::Hit 0x58ef40, PoleronTorpedo's own 0x580120), called from
+ * its class's Simulate (slot 20: Missile::Simulate 0x58d960 for the torpedoes,
+ * Bullet::Simulate 0x58c920 for the pulses) once it reaches its target's shield sphere
+ * (Ordnance::Collision 0x58f4f0) or its hardpoint. Hit is given the hull point on a
+ * torpedo's hull hit and nothing otherwise, but in all four cases Simulate then puts
+ * the ordnance where it struck: SetOrigin (slot 8, Entity::SetOrigin 0x4cfe10) with the
+ * point on the shield sphere or the hardpoint's world position. Hit only marks the
+ * ordnance expired (Entity::DoExpire, +0x27); it is still there for that call.
+ *
+ * So the plugin wraps slots 22 and 8 of the four ordnance vtables that torpedoes and
+ * pulses are built from (classLabel photontorpedo, pphaser, shieldremovingtorpedo and
+ * the poleron torpedo), keeping each pointer it replaces and calling through it. Hit
+ * notes an impact (on a visible ordnance, +0x24, with a target), at the point it was
+ * given or the ordnance's own position; the SetOrigin that follows moves it to where
+ * Simulate puts the ordnance. Each frame, after GameObject_PreRenderAll, every impact
+ * younger than ImpactTime registers a point light ImpactLift units back along the
+ * ordnance's flight (the third axis of its matrix), in the colour of its sprite (the
+ * first frame's mean, as for its flight light, scaled to a peak of 1) times
+ * ImpactBrightness: full on the first frame, then down with the square of the time
+ * left. Time is the simulation's: the two calls of Ordnance::SimulateAll (0x483279,
+ * 0x4835b0) add their step to the plugin's clock, so a paused game holds the flash.
+ * Nothing is written to the ordnance or its target: drawing only. */
+#define FN_SIM_ALL    0x58e430   /* Ordnance::SimulateAll(float), cdecl */
+#define IMP_VTS       4
+#define IMP_MAX       48
+
+typedef void (__cdecl    *SimAll_t)(float);
+typedef void (__thiscall *OrdHit_t)(void *, void *, const float *);
+typedef void (__thiscall *SetOrigin_t)(void *, const float *);
+typedef struct { DWORD vt, dtor; const char *name; void *hit; void *origin; } ImpVt;
+typedef struct { const void *sprite; float col[3]; } ImpTex;
+typedef struct { void *ord; float pos[3], fwd[3], col[3], t0; } Impact;
+
+static const DWORD k_simall_at[2] = { 0x483279, 0x4835b0 };
+/* each class's vtable, and its scalar deleting destructor in slot 0 as a check */
+static ImpVt  g_imp_vt[IMP_VTS] = {
+    { 0x6b8f9c, 0x57f1b0, "PhotonTorpedo", 0, 0 },
+    { 0x6b96c4, 0x581e70, "PulsePhaser", 0, 0 },
+    { 0x6b9e14, 0x585460, "ShieldRemovingTorpedo", 0, 0 },
+    { 0x6b9284, 0x5803a0, "PoleronTorpedo", 0, 0 },
+};
+static int    g_impacts = 1;                                 /* Impacts= */
+static float  g_hit_bright = 3.0f, g_hit_start = 10.0f;      /* ImpactBrightness=, ImpactStart= */
+static float  g_hit_range = 110.0f, g_hit_time = 0.4f;       /* ImpactRange=, ImpactTime= */
+static float  g_hit_lift = 10.0f;                            /* ImpactLift= */
+static float  g_sim_clock;           /* simulated seconds, from Ordnance::SimulateAll */
+static Impact g_imp[IMP_MAX];
+static int    g_imp_last = -1;       /* the impact Hit noted last, until its SetOrigin */
+static ImpTex g_imp_tex[64];
+static int    g_imp_ntex;
+static long   g_imp_hits;
+
+static void __cdecl hook_sim_all(float dt)
+{
+    if (dt > 0.0f && dt < 10.0f) g_sim_clock += dt;
+    ((SimAll_t)FN_SIM_ALL)(dt);
+}
+
+static ImpVt *imp_vt(const void *o)
+{
+    DWORD vt = *(const DWORD *)o;
+    int   i;
+    for (i = 0; i < IMP_VTS; i++) if (g_imp_vt[i].vt == vt) return &g_imp_vt[i];
+    return &g_imp_vt[0];   /* not reached: only these vtables point here */
+}
+
+/* the sprite's first frame, its mean colour scaled to a peak of 1, once per sprite;
+ * else the class's flight light, else ExplosionColour */
+static const float *impact_colour(const BYTE *cls)
+{
+    BYTE       *spr = *(BYTE * const *)(cls + 0x12c), *t, *light;
+    const char *tex;
+    ImpTex     *it;
+    float       peak;
+    int         i;
+    char        m[240];
+    for (i = 0; i < g_imp_ntex; i++)
+        if (g_imp_tex[i].sprite == spr) return g_imp_tex[i].col;
+    it = &g_imp_tex[g_imp_ntex < 64 ? g_imp_ntex++ : 63];
+    it->sprite = spr;
+    t   = spr ? *(BYTE **)(spr + 0x58) : NULLPTR;
+    tex = t ? *(const char **)(t + 8) : NULLPTR;
+    m[0] = 0; s_cat(m, "impact light: "); s_cat(m, tex ? tex : "(no sprite)");
+    if (!tex || !tga_rect_mean(tex, (const float *)(spr + 0x38), it->col)) {
+        light = *(BYTE * const *)(cls + 0x10);
+        if (light && *(DWORD *)light == VT_POINT) {
+            for (i = 0; i < 3; i++) it->col[i] = ((float *)(light + 0xf4))[i];
+            s_cat(m, " (texture not read) flight light");
+        } else {
+            for (i = 0; i < 3; i++) it->col[i] = g_boom_col[i];
+            s_cat(m, " (texture not read) ExplosionColour");
+        }
+    }
+    peak = it->col[0] > it->col[1] ? it->col[0] : it->col[1];
+    if (it->col[2] > peak) peak = it->col[2];
+    for (i = 0; i < 3; i++) it->col[i] = peak > 1e-3f ? it->col[i] / peak : 1.0f;
+    s_cat(m, " -> "); s_vec(m, it->col);
+    logline(m);
+    return it->col;
+}
+
+static void __fastcall hook_ord_hit(BYTE *o, void *edx, void *target, const float *at)
+{
+    ImpVt *v = imp_vt(o);
+    BYTE  *cls = *(BYTE **)(o + 0x34), *ent = *(BYTE **)(o + 4);
+    (void)edx;
+    if (target && cls && ent && o[0x24] && !o[0x27]) {
+        const float *xf = (const float *)(ent + 0x44), *col = impact_colour(cls);
+        Impact *im = &g_imp[0];
+        float   n, oldest = 1e30f;
+        int     i, j;
+        for (i = 0; i < IMP_MAX; i++) {   /* a free slot, else the oldest */
+            float age = g_sim_clock - g_imp[i].t0;
+            if (g_imp[i].t0 <= 0.0f || age >= g_hit_time || age < 0.0f) { im = &g_imp[i]; break; }
+            if (g_imp[i].t0 < oldest) { oldest = g_imp[i].t0; im = &g_imp[i]; }
+        }
+        n = sqrt_f(xf[6] * xf[6] + xf[7] * xf[7] + xf[8] * xf[8]);
+        for (j = 0; j < 3; j++) {
+            im->pos[j] = at ? at[j] : xf[9 + j];
+            im->fwd[j] = n > 1e-6f ? xf[6 + j] / n : 0.0f;
+            im->col[j] = col[j];
+        }
+        im->t0  = g_sim_clock > 0.0f ? g_sim_clock : 1e-6f;
+        im->ord = o;
+        g_imp_last = (int)(im - g_imp);
+        g_imp_hits++;
+    }
+    ((OrdHit_t)v->hit)(o, target, at);
+}
+
+static void __fastcall hook_ord_origin(BYTE *o, void *edx, const float *p)
+{
+    ImpVt *v = imp_vt(o);
+    (void)edx;
+    if (g_imp_last >= 0 && g_imp[g_imp_last].ord == o && p) {
+        Impact *im = &g_imp[g_imp_last];
+        float   dx = p[0] - im->pos[0], dy = p[1] - im->pos[1], dz = p[2] - im->pos[2];
+        if (dx * dx + dy * dy + dz * dz < 300.0f * 300.0f) {
+            im->pos[0] = p[0]; im->pos[1] = p[1]; im->pos[2] = p[2];
+        }
+        im->ord = NULLPTR;
+        g_imp_last = -1;
+    }
+    ((SetOrigin_t)v->origin)(o, p);
+}
+
+static void impact_lights(void)
+{
+    int i, j;
+    if (g_imp_last >= 0) { g_imp[g_imp_last].ord = NULLPTR; g_imp_last = -1; }
+    if (!g_impacts) return;
+    /* built on first use, as the phasers' are: the engine's heap is not there yet
+     * while the plugin loads (operator new from DllMain faulted, error 998) */
+    if (!g_hit_light && !(g_hit_light = beam_light_new("impact"))) return;
+    *(float *)(g_hit_light + 0x100) = g_hit_start;
+    *(float *)(g_hit_light + 0x104) = g_hit_range > g_hit_start ? g_hit_range - g_hit_start : 0.01f;
+    for (i = 0; i < IMP_MAX; i++) {
+        Impact *im = &g_imp[i];
+        float   age = g_sim_clock - im->t0, k, c[3], mat[12];
+        if (im->t0 <= 0.0f || age < 0.0f || age >= g_hit_time) continue;
+        k = 1.0f - age / g_hit_time;
+        k *= k;
+        for (j = 0; j < 3; j++) c[j] = im->col[j] * g_hit_bright * k;
+        for (j = 0; j < 9; j++) mat[j] = (j % 4 == 0) ? 1.0f : 0.0f;
+        for (j = 0; j < 3; j++) mat[9 + j] = im->pos[j] - im->fwd[j] * g_hit_lift;
+        ((RegisterLight_t)FN_REGISTER_LIGHT)(*(void **)0x7ad508, g_hit_light, c, mat);
+    }
+}
+
+/* a vtable slot wrapped: whatever it holds now (stock, or another plugin's wrapper)
+ * is kept in *orig and called through */
+static int wrap_slot(DWORD vt, int idx, const void *hook, void **orig)
+{
+    void **slot = (void **)(vt + 4 * idx);
+    DWORD  old;
+    if (!*slot || *slot == hook) return 0;
+    if (!VirtualProtect(slot, 4, PAGE_EXECUTE_READWRITE, &old)) return 0;
+    *orig = *slot;
+    *slot = (void *)hook;
+    VirtualProtect(slot, 4, old, &old);
+    return 1;
+}
+
+static int patch_impacts(void)
+{
+    int i, n = 0;
+    for (i = 0; i < 2; i++) {
+        const BYTE *p = (const BYTE *)k_simall_at[i];
+        if (p[0] != 0xE8 || k_simall_at[i] + 5 + *(const LONG *)(p + 1) != FN_SIM_ALL) {
+            logline("NOT PATCHED: Ordnance::SimulateAll call sites differ, no impact lights");
+            return 0;
+        }
+    }
+    for (i = 0; i < IMP_VTS; i++)
+        if (*(DWORD *)g_imp_vt[i].vt != g_imp_vt[i].dtor) {
+            logline("NOT PATCHED: ordnance vtables differ, no impact lights");
+            return 0;
+        }
+    for (i = 0; i < 2; i++) {
+        BYTE *p = (BYTE *)k_simall_at[i] + 1;
+        DWORD old;
+        if (!VirtualProtect(p, 4, PAGE_EXECUTE_READWRITE, &old)) return n;
+        *(LONG *)p = (LONG)((DWORD)hook_sim_all - (k_simall_at[i] + 5));
+        VirtualProtect(p, 4, old, &old);
+        FlushInstructionCache(GetCurrentProcess(), p, 4);
+        n++;
+    }
+    for (i = 0; i < IMP_VTS; i++) {
+        if (wrap_slot(g_imp_vt[i].vt, 8, (const void *)hook_ord_origin, &g_imp_vt[i].origin)) {
+            if (wrap_slot(g_imp_vt[i].vt, 22, (const void *)hook_ord_hit, &g_imp_vt[i].hit)) {
+                n += 2;
+                continue;
+            }
+            /* put slot 8 back: a Hit we do not see needs no SetOrigin either */
+            wrap_slot(g_imp_vt[i].vt, 8, g_imp_vt[i].origin, &g_imp_vt[i].origin);
+        }
+        {
+            char b[160];
+            b[0] = 0; s_cat(b, "NOT PATCHED: "); s_cat(b, g_imp_vt[i].name);
+            s_cat(b, " vtable, its impacts give no light");
+            logline(b);
+        }
+    }
+    return n;
+}
+
 /* the vtable slot holds what this build expects */
 static int slot_is(DWORD vt, int idx, DWORD expect)
 {
@@ -3474,6 +3711,13 @@ static void startup(void)
     ini1(ini, "PhaserWrap",       &g_emit_wrap);
     ini1(ini, "PhaserFalloff",    &g_emit_power);
     g_ord_colours = (int)GetPrivateProfileIntA("Lighting", "OrdnanceColours", 1, ini);
+    g_impacts = (int)GetPrivateProfileIntA("Lighting", "Impacts", 1, ini);
+    ini1(ini, "ImpactBrightness", &g_hit_bright);
+    ini1(ini, "ImpactStart",      &g_hit_start);
+    ini1(ini, "ImpactRange",      &g_hit_range);
+    ini1(ini, "ImpactLift",       &g_hit_lift);
+    ini1(ini, "ImpactTime",       &g_hit_time);
+    if (g_hit_bright <= 0.0f || g_hit_time <= 0.0f) g_impacts = 0;
     for (i = 0; i < 3; i++) g_planet_amb[i] = g_ambient[i];
     ini3(ini, "PlanetAmbient", g_planet_amb);
     ini3(ini, "PlanetDiffuse", g_planet_diff);
@@ -3528,7 +3772,12 @@ static void startup(void)
         logline("NOT PATCHED: Phaser vtable differs, no phaser lights");
         g_phasers = 0;
     }
-    if (g_lights || g_planet_glow || g_explosions || g_phasers || g_ord_colours ||
+    if (g_impacts) {
+        int k = patch_impacts();
+        if (k) n += k;
+        else g_impacts = 0;
+    }
+    if (g_lights || g_planet_glow || g_explosions || g_phasers || g_ord_colours || g_impacts ||
         (g_shaders && (g_shadows || g_planet_shadows)))
         n += redirect(S_PRERENDER, (const void *)hook_prerender_all);
     if (g_lights) n += redirect(S_REGISTER, (const void *)hook_register_light);
