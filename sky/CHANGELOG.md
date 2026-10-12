@@ -4,6 +4,15 @@
 cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.1 — 2026-10-12
+
+### Fixed
+- The viewport is put back after the bake: the frame's first sky draw covered the whole
+  back buffer when the bake happened in a smaller view (the HUD's action camera).
+- A timing query pair is never left half made (`Timing=1`).
+
+Installed, not yet seen in game.
+
 ## 1.2.0 — 2026-10-12
 
 ### Added
