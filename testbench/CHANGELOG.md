@@ -5,6 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.10.0 — 2026-10-12
+
+### Added
+- Scenario `shields-down-repair` (`SCENE=shields`): the target's shields shot out, the
+  shields-down arcs and their light drawn by `Shields.asi`, then the attackers stopped
+  and the repair welding and its light drawn by `Repair.asi`; shots close, from below,
+  from RTS distance and of the welds. `no-assets` also expects `Repair.log`'s hooks line.
+- The bench clears `Repair.log` at launch and gathers it with `Repair.ini`.
+
+### Fixed
+- `no-assets` and `shields-hits` look for the Shields hooks line by its weapon sites:
+  with another plugin loaded first, `RenderChunks` is logged as chained and the old text
+  never matched.
+
+Installs nothing.
+
 ## 3.9.0 — 2026-10-12
 
 ### Added

@@ -110,6 +110,116 @@ float3 hit(float3 w, float4 h, float4 r)
     return float3(spot, ring, glow);
 }
 
+// ---- shields down ---------------------------------------------------------------
+//
+// The second pixel shader, for a ship whose shields are down (stock: shield type 1,
+// xshlddie, a band of lightning texture circling the ship). The same sphere and
+// vertex shader. Arcs are the zero lines of a warped 3D gradient noise on the unit
+// sphere: a core of constant pixel width, white-hot, in a blue glow. They show only
+// in the discharges shields.c places on the shell (up to six, each flashing and
+// dying where it struck, mostly about the equator) and, faintly, about the
+// equator; the noise is struck afresh several times a second (its seed jumps, two
+// fields half a step apart), so the arcs crackle in place and nothing turns. A flash over the whole shell when the
+// shields collapse.
+//
+// Constants from shields.c's draw_down(), which must agree with the registers.
+
+float4 d_eye   : register(c0);   // xyz the camera; w 1 / the shield's mean radius
+float4 d_arc   : register(c1);   // rgb the arcs' core; w overall brightness
+float4 d_glow  : register(c2);   // rgb the glow about them; w the shell's haze
+float4 d_shape : register(c3);   // x arc scale (cells over the sphere), y warp, z core width (pixels), w glow width
+float4 d_seed  : register(c4);   // xyz the noise's seed now; w the branches' share
+float4 d_band  : register(c5);   // x the band's half width (in u.y), y the crackle along it, z the collapse flash now, w fade (0..1)
+float4 d_misc  : register(c6);   // x the far side's share, y rim power, z the first field's share (the second's is 1 - it), w how much of each line is lit (-1..1)
+float4 d_seed2 : register(c7);   // xyz the second field's seed: it is struck afresh half a step after the first
+float4 d_s0 : register(c8);   float4 d_q0 : register(c16);
+float4 d_s1 : register(c9);   float4 d_q1 : register(c17);
+float4 d_s2 : register(c10);  float4 d_q2 : register(c18);
+float4 d_s3 : register(c11);  float4 d_q3 : register(c19);
+float4 d_s4 : register(c12);  float4 d_q4 : register(c20);
+float4 d_s5 : register(c13);  float4 d_q5 : register(c21);
+// sN.xyz a discharge's centre (world), sN.w its brightness now; qN.x 1 / its radius
+// (in shield radii), qN.yzw its seed offset
+
+float3 hash33(float3 p)
+{
+    p = frac(p * float3(0.1031, 0.1030, 0.0973));
+    p += dot(p, p.yxz + 33.33);
+    return frac((p.xxy + p.yxx) * p.zyx) * 2.0 - 1.0;
+}
+
+// gradient noise, -1..1 (about), quintic fade: no grid in its zero lines
+float gnoise(float3 p)
+{
+    float3 i = floor(p), f = frac(p);
+    float3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    float n000 = dot(hash33(i + float3(0, 0, 0)), f - float3(0, 0, 0));
+    float n100 = dot(hash33(i + float3(1, 0, 0)), f - float3(1, 0, 0));
+    float n010 = dot(hash33(i + float3(0, 1, 0)), f - float3(0, 1, 0));
+    float n110 = dot(hash33(i + float3(1, 1, 0)), f - float3(1, 1, 0));
+    float n001 = dot(hash33(i + float3(0, 0, 1)), f - float3(0, 0, 1));
+    float n101 = dot(hash33(i + float3(1, 0, 1)), f - float3(1, 0, 1));
+    float n011 = dot(hash33(i + float3(0, 1, 1)), f - float3(0, 1, 1));
+    float n111 = dot(hash33(i + float3(1, 1, 1)), f - float3(1, 1, 1));
+    float nx00 = lerp(n000, n100, u.x), nx10 = lerp(n010, n110, u.x);
+    float nx01 = lerp(n001, n101, u.x), nx11 = lerp(n011, n111, u.x);
+    return lerp(lerp(nx00, nx10, u.y), lerp(nx01, nx11, u.y), u.z) * 1.6;
+}
+
+// One field of arcs at p (on the unit sphere, scaled) for a seed: x the core (0..1, a
+// line of constant pixel width, with its forks), y the glow about it. The domain is
+// warped twice, coarse and fine, so the zero lines run jagged; only stretches of them
+// are lit, so they read as bolts rather than closed loops.
+float2 arcs(float3 p, float3 seed)
+{
+    float3 q = p + seed;
+    float3 w = q + d_shape.y * float3(gnoise(q * 1.9 + 11.3), gnoise(q * 1.9 + 37.1), gnoise(q * 1.9 + 71.7));
+    w += d_shape.y * 0.22 * float3(gnoise(w * 6.1 + 3.7), gnoise(w * 6.1 + 19.9), gnoise(w * 6.1 + 53.3));
+    float  n = gnoise(w);
+    float  an = abs(n);
+    float  fw = max(fwidth(n), 1e-4);
+    float  core = saturate(1.0 - an / (fw * d_shape.z));
+    float  halo = saturate(1.0 - an / (fw * d_shape.z * 4.0));
+    float  glow = d_shape.w / (an + d_shape.w);
+    float  seg = saturate(gnoise(w * 0.8 + 91.0) * 2.5 + d_misc.w);
+    // forks: a finer field's zero lines, only near a main arc
+    float  b = gnoise(w * 2.6 + 5.1);
+    float  fb = max(fwidth(b), 1e-4);
+    float  bcore = saturate(1.0 - abs(b) / (fb * d_shape.z * 0.7)) * exp(-an * 8.0) * d_seed.w;
+    return float2(max(core, bcore) * seg, (glow * glow + 0.6 * halo * halo) * seg);
+}
+
+float strike(float3 w, float4 s, float4 q)
+{
+    float d = length(w - s.xyz) * d_eye.w * q.x;
+    return s.w * exp(-d * d);
+}
+
+float4 down_ps(VsOut i) : COLOR
+{
+    float3 n = normalize(i.n);
+    float3 v = normalize(d_eye.xyz - i.w);
+    float  nv = dot(n, v);
+    float  rim = pow(1.0 - abs(nv), d_misc.y);
+    float3 u = normalize(i.u);
+    float  band = exp(-(u.y * u.y) / (d_band.x * d_band.x));
+    float  m = strike(i.w, d_s0, d_q0) + strike(i.w, d_s1, d_q1) + strike(i.w, d_s2, d_q2)
+             + strike(i.w, d_s3, d_q3) + strike(i.w, d_s4, d_q4) + strike(i.w, d_s5, d_q5);
+    m += d_band.y * band;
+    float  flash = d_band.z * (0.35 + 0.65 * rim);
+    if (m + flash + d_glow.w < 0.003) discard;
+    // two fields of arcs, each struck afresh (a new seed) as its share passes zero,
+    // half a step apart: the arcs jump from place to place without the whole shell
+    // popping at once
+    float2 a = arcs(u * d_shape.x, d_seed.xyz) * d_misc.z + arcs(u * d_shape.x, d_seed2.xyz) * (1.0 - d_misc.z);
+    float  side = nv < 0.0 ? d_misc.x : 1.0;        // the far side of the shell, seen through it
+    float  arc = a.x * m * 2.0;
+    float  glow = a.y * m;
+    float  haze = d_glow.w * rim * (0.3 + band);
+    float3 c = d_arc.rgb * arc + d_glow.rgb * (glow + haze + flash);
+    return float4(c * side * d_arc.w * d_band.w, 0.0);
+}
+
 float4 shield_ps(VsOut i) : COLOR
 {
     float3 n = normalize(i.n);

@@ -17,7 +17,7 @@ no flat green shell.
 1. Launch the game.
 2. Wait 50 seconds.
 3. Expect "Scene.log" contains "scene ready".
-4. Expect "Shields.log" contains "DrawShield and RenderChunks patched; the weapons' hits: beam shot mine missile".
+4. Expect "Shields.log" contains "the weapons' hits: beam shot mine missile".
 5. Scene "orbit target 160 20 170".
 6. Wait 6 seconds.
 7. Expect "Shields.log" contains "first shield hits drawn".

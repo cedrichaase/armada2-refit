@@ -12,7 +12,8 @@ mkdir -p "$out"
 
 # The shaders (shields.hlsl -> shields_shaders.h, committed).
 "$here/../platform/d3d9/hlsl.sh" "$here/shields_shaders.h" "$here/shields.hlsl" \
-    shield_vs:vs_3_0:k_shield_vs shield_ps:ps_3_0:k_shield_ps
+    shield_vs:vs_3_0:k_shield_vs shield_ps:ps_3_0:k_shield_ps \
+    down_ps:ps_3_0:k_down_ps
 
 llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
 

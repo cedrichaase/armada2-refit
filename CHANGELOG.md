@@ -5,6 +5,24 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.27.0 — 2026-10-12
+
+Layers: shields 1.1.0, repair 1.0.0, testbench 3.10.0.
+
+### Added
+- `Shields.asi` draws the shields-down ring too: jagged blue-white arcs crackling over
+  the ship's shield ellipsoid where stock turns a band of lightning texture, and the
+  brightest discharge lights the hull (shields 1.1.0).
+- The `repair` layer: `Repair.asi` draws the welding on a ship under repair in shaders
+  (a flickering arc with rays, a cooling hot spot, sparks streaking off the hull) in
+  place of the stock spark sprites, and each arc lights the hull about it (repair 1.0.0).
+  `./install` runs `repair/install.sh`; `a2mod` switches `Repair.asi` and `Repair.ini`
+  as the `repair` layer. Not in the release package yet.
+- The `shields-down-repair` scenario; `no-assets` checks `Repair.log`; the bench clears
+  and gathers `Repair.log` (testbench 3.10.0).
+
+Installed, not yet seen in game.
+
 ## 11.26.1 — 2026-10-12
 
 Layers: explosions 1.0.1.

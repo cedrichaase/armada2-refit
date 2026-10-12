@@ -41,7 +41,8 @@ it bundles.
 | `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
 | `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M) and the dilithium moon's rock made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
 | `explosions/` | `Explosions.asi` — each ship's and station's fireball ray-marched as a volume of gas (white flash, burning billows cooling to smoke, spectral noise, seeded per explosion) and each shockwave drawn as a band of fire matched to stock's disc, in place of stock's flipbook sprites and textured disc. Render only. Not in the release package yet | `explosions/README.md` |
-| `shields/` | `Shields.asi` — the ordinary shield hits drawn by a shader over the struck ship's shield ellipsoid (hot spot, ring, soft glow and rim, by faction, weaker as the shields run out) in place of the stock `Xshldx01` shell. Not in the release package yet | `shields/README.md` |
+| `shields/` | `Shields.asi` — the ordinary shield hits drawn by a shader over the struck ship's shield ellipsoid (hot spot, ring, soft glow and rim, by faction, weaker as the shields run out) in place of the stock `Xshldx01` shell, and the shields-down ring as jagged arcs crackling over it (lighting the hull) in place of stock's turning `xshlddie` band. Not in the release package yet | `shields/README.md` |
+| `repair/` | `Repair.asi` — the welding on a ship under repair (stock's `xspark` sprites at the hardpoints of the system being repaired) drawn by shaders: a flickering arc with rays that lights the hull, a cooling hot spot, sparks streaking off. Not in the release package yet | `repair/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -310,7 +311,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -772,19 +773,44 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 
 ### shields
 
-- **Only type 0 (`Xshldx01`, the ordinary hit) is the plugin's**: the call to
-  `ShieldHit::DrawShield` in `ShieldEffect::Render` skips it, every other shield type
-  (the shields-down ring, the special weapons' shells) calls through to stock. Without a
-  d3d9 device the stock shell stays.
+- **Types 0 and 1 are the plugin's** (`Xshldx01`, the ordinary hit; `xshlddie`, the
+  shields-down ring, untimed while the shields are down): the call to
+  `ShieldHit::DrawShield` in `ShieldEffect::Render` skips them, every other shield type
+  (the special weapons' shells) calls through to stock. Without a d3d9 device the stock
+  shells stay.
 - **A hit's direction is recovered, not captured**: the instance transform is the hit's
   frame times the shield-to-object 3x3 with its diagonal over the model's radius
   (+0x40); row 2 times S'^-1 is the direction on the unit sphere. That follows a beam as
   `ShieldUpdate` moves it. Don't re-derive it from the beam's end.
-- **Every hook is a chained call site** (DrawShield, RenderChunks, the four weapon
-  calls of `CreateShieldHit`): keep it so; `Scene.asi`'s `ShieldFx=0` and other plugins
+- **The shields-down arcs must not turn**: the user asked for a readable effect that
+  does not show as a rotating pattern. They are the zero lines of warped gradient noise,
+  re-seeded in two fields half a step apart; their core is a constant pixel width (from
+  `fwidth`), which keeps them readable from RTS distance.
+- **A light another plugin adds is an ordinary `ST3D_Point_Light` registered after
+  `GameObject_PreRenderAll`** (here through the chained call to `Ordnance::PreRenderAll`
+  at 0x598199, which `Repair.asi` chains too): `Lighting.asi` picks it up as any point
+  light, hard if its fade is under a quarter of its start. Size its reach by the ship's
+  bounding radius: the shield's mean radius on a flat ship reached almost none of the
+  hull.
+- **Every hook is a chained call site** (DrawShield, RenderChunks, Ordnance::PreRenderAll,
+  the four weapon calls of `CreateShieldHit`): keep it so; `Scene.asi`'s `ShieldFx=0` and other plugins
   write the same weapon sites.
 - **Render only**: nothing the simulation reads is written, so it stays
   stock-compatible in multiplayer. The clock is wall time; `TimeScale=` is for looking.
+
+### repair
+
+- **A weld is told by the call that made it, never by its sprite**: hull-hit sparks and
+  other effects share `NodeParticleEffect`'s list and may share the `xspark` art. The
+  call to `AddParticle` in `Craft::RepairSystem` notes the new tail node (with its
+  handle, hardpoint and sprite, against reuse); the call to `DrawScaled3D` in
+  `NodeParticleEffect::Render` goes through a thunk that reads the node from `esi`.
+- **Hardpoints sit a little inside the hull**: a flare or hot spot drawn at one is hidden
+  by the hull unless pulled towards the camera (`Pull=`); sparks fly out and show anyway.
+- **Not the construction welding**: `BuildingEffect` (welding edges) and the worker
+  bees are separate effects, and stay stock.
+- **Render only**, as the shields: nothing the simulation reads is written. The sparks
+  age by the particle's own simulation time; the flicker by wall time.
 
 ### textures
 
