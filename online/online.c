@@ -430,7 +430,7 @@ static HRESULT __stdcall msg_tap(void *ctx, DWORD type, void *msg)
     Proxy      *p = (Proxy *)ctx;
     const BYTE *b = (const BYTE *)msg;
     HRESULT     hr;
-    char        m[900];
+    char        m[1200];             /* two addresses (up to 400 each) and 32 bytes */
     DWORD       i, size;
 
     m[0] = 0;
@@ -513,7 +513,7 @@ static HRESULT __stdcall P_Connect(Proxy *p, DWORD desc, DWORD host, DWORD dev,
                                    DWORD pctx, DWORD actx, DWORD handle, DWORD flags)
 {
     HRESULT hr;
-    char    m[900];
+    char    m[1600];                 /* a desc (~340), two addresses (up to 400 each), 32 bytes */
     m[0] = 0;
     s_cat(m, "peer"); s_num(m, p->id);
     s_cat(m, " Connect desc ");  s_appdesc(m, (const BYTE *)desc);
@@ -557,7 +557,7 @@ static HRESULT __stdcall P_Host(Proxy *p, DWORD desc, DWORD devs, DWORD ndevs,
                                 DWORD sec, DWORD cred, DWORD pctx, DWORD flags)
 {
     HRESULT hr;
-    char    m[1000];
+    char    m[2400];                 /* a desc (~340) and up to four addresses (400 each) */
     DWORD   i;
     m[0] = 0;
     s_cat(m, "peer"); s_num(m, p->id);
@@ -622,7 +622,7 @@ static HRESULT __stdcall P_GetLocalHostAddresses(Proxy *p, DWORD out, DWORD coun
                                                  DWORD flags)
 {
     HRESULT hr = ((F3)p->rv[S_GetLocalHostAddresses])(p->real, out, count, flags);
-    char    m[900];
+    char    m[2000];                 /* up to four addresses (400 each) */
     DWORD   i, n = count ? *(DWORD *)count : 0;
     m[0] = 0;
     s_cat(m, "peer"); s_num(m, p->id);
@@ -641,7 +641,7 @@ static HRESULT __stdcall P_EnumHosts(Proxy *p, DWORD desc, DWORD host, DWORD dev
                                      DWORD handle, DWORD flags)
 {
     HRESULT hr;
-    char    m[900];
+    char    m[1600];                 /* a desc (~340) and two addresses (up to 400 each) */
     m[0] = 0;
     s_cat(m, "peer"); s_num(m, p->id);
     s_cat(m, " EnumHosts desc ");  s_appdesc(m, (const BYTE *)desc);
@@ -1063,7 +1063,10 @@ static void install_entry(char *b)
     rel = (A_READ_LABEL + 8) - ((DWORD)g_label_tramp + 8 + 5);
     g_label_tramp[8] = 0xe9;
     for (i = 0; i < 4; i++) g_label_tramp[9 + i] = (BYTE)(rel >> (8 * i));
-    VirtualProtect(g_label_tramp, sizeof g_label_tramp, PAGE_EXECUTE_READWRITE, &prot);
+    if (!VirtualProtect(g_label_tramp, sizeof g_label_tramp, PAGE_EXECUTE_READWRITE, &prot)) {
+        s_cat(b, "  menu entry NOT installed: VirtualProtect failed on the trampoline");
+        return;
+    }
 
     if (write_jmp(A_READ_LABEL, (void *)label_hook, 8)
         && write_jmp(A_CLICK, (void *)stub_click, 9)

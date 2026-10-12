@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.19.1 — 2026-10-12
+
+Layers: online 0.6.1.
+
+### Fixed
+- Online multiplayer hardening: malformed or hostile datagrams can no longer crash or
+  exhaust a game, a kicked joiner is cut off, the network thread stops for good on
+  `Close`, and the server rate-limits join-code lookups (online 0.6.1).
+
+Installed, not yet seen in game.
+
 ## 11.19.0 — 2026-10-10
 
 Layers: nebulae 1.0.0.
