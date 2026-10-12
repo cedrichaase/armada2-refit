@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.6.0 — 2026-10-12
+
+### Added
+- `Scene.asi`: `kill <name>` makes a scene craft die at once
+  (`ScriptInterfaceImp::ExplodeNow`), healing and immortality off first.
+- The `explosion` scene: a Galaxy class beside a destroyer, a cruiser and a battleship
+  to blow up; the `explosions` scenario (`explosions/README.md`), and an
+  `Explosions.log` check in `no-assets`.
+- The bench gathers `Explosions.log` and `Explosions.ini`.
+
+Installs nothing; seen working on the bench 2026-10-12 (`explosions` and `no-assets`
+pass).
+
 ## 3.5.0 — 2026-10-07
 
 ### Added

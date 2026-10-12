@@ -1,0 +1,168 @@
+// explosions.hlsl -- the fireballs and shock rings of Explosions.asi (explosions/README.md).
+//
+// Each is drawn on one quad that covers it on screen, in world space (explosions.c
+// builds it): a billboard through the explosion's centre, or the near plane when the
+// camera is close. The pixel shader finds its own ray from the camera through the
+// pixel, and writes its own depth, so the hardware's depth test against the hulls
+// already drawn applies at the depth where the light comes from, not at the quad's.
+//
+// Blending is ONE, INVSRCALPHA: rgb is light, premultiplied; alpha what the smoke hides
+// of what is behind. The ring writes no alpha, so it only adds.
+//
+// vkd3d does not know tex3Dlod and unrolls every loop, so the march is a fixed number of
+// steps, and the noise texture has one level (its implicit level then cannot matter
+// inside the unrolled branches).
+
+float4 k_vp0    : register(c0);   // vertex shader: the columns of VIEW x PROJECTION
+float4 k_vp1    : register(c1);
+float4 k_vp2    : register(c2);
+float4 k_vp3    : register(c3);
+
+float4 k_eye    : register(c0);   // xyz the camera; w the near plane's view depth
+float4 k_ctr    : register(c1);   // xyz the centre; w the fireball's full radius (world units)
+float4 k_time   : register(c2);   // x its radius now (world); y the age over the life (0..1); z the age in seconds; w Brightness
+float4 k_seed   : register(c3);   // xyz this explosion's offset into the noise; w the noise's scale (tiles across the fireball)
+float4 k_proj   : register(c4);   // x, y the projection's _33 and _43 (depth from view depth); z Flash; w Glow (the halo)
+float4 k_look   : register(c5);   // xyz the view's forward axis
+float4 k_shape  : register(c6);   // x Smoke; y Turbulence; z Cooling; w Opacity (of the hot gas)
+float4 k_ring   : register(c8);   // ring: xyz its plane's normal; w its radius now (world)
+float4 k_ringb  : register(c9);   //   x its width (of the radius); y how bright now; z its max radius; w seed
+float4 k_ringc  : register(c10);  //   rgb its colour (the class's); w Breakup
+
+sampler3D s_noise : register(s0); // r: a fractal field; gba: three soft warp fields; tiling, spectral (no lattice)
+
+struct VsIn  { float4 pos : POSITION; };
+struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; };
+
+VsOut quad_vs(VsIn i)
+{
+    VsOut o;
+    float4 p = float4(i.pos.xyz, 1.0);
+    o.pos = float4(dot(p, k_vp0), dot(p, k_vp1), dot(p, k_vp2), dot(p, k_vp3));
+    o.w = i.pos.xyz;
+    return o;
+}
+
+struct PsOut { float4 c : COLOR0; float d : DEPTH; };
+
+float hash12(float2 p)
+{
+    float3 q = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+    q += dot(q, q.yzx + 33.33);
+    return frac((q.x + q.y) * q.z);
+}
+
+// The colour of gas at temperature t (0 cold .. 1 white hot): deep red, orange, yellow,
+// white, roughly a black body's, with its light rising steeply with t.
+float3 heat_colour(float t)
+{
+    float3 c = lerp(float3(0.45, 0.04, 0.0), float3(1.0, 0.26, 0.02), saturate(t * 2.5));
+    c = lerp(c, float3(1.0, 0.6, 0.12), saturate((t - 0.45) * 2.5));
+    c = lerp(c, float3(1.0, 0.9, 0.7), saturate((t - 0.88) * 8.0));
+    return c * (t * t * 3.0);
+}
+
+float depth_of(float zv)
+{
+    zv = max(zv, k_eye.w * 1.001);
+    return k_proj.x + k_proj.y / zv;
+}
+
+#define STEPS 28
+
+PsOut fire_ps(VsOut i, float2 vp : VPOS)
+{
+    PsOut o;
+    float3 d = normalize(i.w - k_eye.xyz);
+    float3 oc = k_eye.xyz - k_ctr.xyz;
+    float  R = max(k_time.x, 0.01);
+    float  s = k_time.y;
+    float  b = dot(oc, d);
+    float  tc = max(-b, 0.0);                          // the ray's closest approach to the centre
+    float  dc = length(oc + d * tc);
+    float  cosv = max(dot(d, k_look.xyz), 0.05);
+
+    // The flash: a white point that blooms and is gone in a fifth of a second, and a
+    // halo of the fireball's light about it while it burns.
+    float  heat = saturate(1.15 - s * s * k_shape.z * 1.2);   // hot through the first half, then cooling to smoke
+    float  rf = k_ctr.w;
+    float  q = dc / (rf * 0.55);
+    float  flash = k_proj.z * exp2(-k_time.z * 9.0) * (exp2(-q * q * 4.0) * 3.0 + exp2(-q * q * 1.5) * 0.6);
+    float  q2 = dc / (R * 1.1);
+    float  halo = k_proj.w * heat * heat * exp2(-q2 * q2 * 3.0);
+    float3 glow = float3(1.0, 0.9, 0.75) * flash + float3(1.0, 0.45, 0.12) * halo;
+
+    float3 col = 0;
+    float  tr = 1.0, wsum = 0.0, tsum = 0.0;
+    float  Rm = R * 1.3;                             // the march: the noise pushes the gas out past R
+    float  h = b * b - (dot(oc, oc) - Rm * Rm);
+    if (h > 0.0) {
+        float sq = sqrt(h);
+        float t0 = max(-b - sq, k_eye.w / cosv), t1 = -b + sq;
+        if (t1 > t0) {
+            float  dt = (t1 - t0) / STEPS;
+            float  t = t0 + dt * hash12(vp);
+            float  turb = k_shape.y * (0.7 + 0.8 * s);
+            float  fade = 1.0 - smoothstep(0.55, 1.0, s);
+            float  smoke = k_shape.x * smoothstep(0.3, 0.8, s);   // the fire first, the smoke as it cools
+            float  dn = dt / R;                         // a step, in fireball radii
+            [unroll] for (int j = 0; j < STEPS; j++) {
+                float3 u = (k_eye.xyz + d * t - k_ctr.xyz) / R;   // in the fireball's radii
+                float  r = length(u);
+                // Noise in the gas's own coordinates, so its billows grow with it; the warp
+                // turns it over as it ages.
+                float3 w = tex3D(s_noise, u * 0.23 + k_seed.zxy).gba * 2.0 - 1.0;
+                float3 p = u * k_seed.w + k_seed.xyz + w * (0.06 + 0.08 * s) + float3(0.0, 0.0, s * 0.2);
+                float  n1 = tex3D(s_noise, p).r, n2 = tex3D(s_noise, p * 2.13 + 0.37).r;
+                float  f = (n1 - 0.5) * 5.0 + (n2 - 0.5) * 2.5;      // about a z-score
+                float  dens = saturate((0.85 - r) * 3.0 + f * turb * 0.3) * smoothstep(1.3, 1.0, r) * fade;
+                float  temp = saturate(heat * (1.05 - r * r * 0.7) + f * 0.2 - (1.0 - dens) * 0.3);
+                float3 e = heat_colour(temp) * dens;
+                float  sig = dens * (k_shape.w * heat + smoke * (1.0 - temp) * 3.0);
+                float  a = 1.0 - exp2(-sig * dn * 6.0);
+                float3 sm = float3(0.02, 0.015, 0.012) * (0.2 + 2.5 * temp) * smoke;  // smoke, lit by the fire inside
+                float3 add = tr * (e * dn * 1.6 * k_time.w + sm * a);
+                col += add;
+                float  wgt = dot(add, float3(0.3, 0.5, 0.2)) + tr * a;
+                wsum += wgt; tsum += wgt * t;
+                tr *= 1.0 - a;
+                t += dt;
+            }
+        }
+    }
+    // Saturate by the brightest channel, so a bright gas keeps its hue (orange stays
+    // orange) instead of clipping towards a milky white; only the hottest gas is white.
+    float  L = max(max(col.r, col.g), max(col.b, 1e-4));
+    col *= (1.0 - exp2(-L * 1.8)) / L;
+    col += glow * k_time.w * tr;
+    float tz = wsum > 1e-4 ? tsum / wsum : tc;
+    o.d = depth_of(tz * dot(d, k_look.xyz));
+    o.c = float4(col, 1.0 - tr);
+    return o;
+}
+
+// A shockwave: a thin ring of light in the plane of the explosion, expanding, broken up
+// by the noise along it, with a faint disc inside. The class's colour, whitened at the rim.
+PsOut ring_ps(VsOut i)
+{
+    PsOut o;
+    float3 d = normalize(i.w - k_eye.xyz);
+    float  dn = dot(d, k_ring.xyz);
+    float  t = dot(k_ctr.xyz - k_eye.xyz, k_ring.xyz) / (abs(dn) > 1e-4 ? dn : 1e-4);
+    float3 x = k_eye.xyz + d * t - k_ctr.xyz;
+    float  rr = length(x) / max(k_ring.w, 0.01);
+    float  e = (rr - 1.0) / k_ringb.x;
+    float  rim = exp2(-e * e * 2.5) * (rr < 1.0 ? 1.0 : exp2(-e * e * 4.0));
+    float  fb = (rr - 0.92) / 0.08;
+    float  fill = 0.12 * exp2(-fb * fb * 1.5) * (rr < 1.0 ? 1.0 : 0.0);   // a softer band just inside the rim
+    float3 xn = x / max(k_ringb.z, 0.01) * 6.0 + k_ringb.w;
+    float  n = tex3D(s_noise, xn).r * 0.6 + tex3D(s_noise, xn * 2.7 + 0.5).r * 0.4;
+    float  brk = saturate(1.0 + (n - 0.5) * 4.0 * k_ringc.w);
+    float  edge = 1.0 / (0.35 + 0.65 * abs(dn));       // seen edge on, a ring is a brighter line
+    float  v = (rim * brk + fill * (0.5 + 0.5 * brk)) * k_ringb.y * min(edge, 2.0);
+    float3 c = lerp(lerp(k_ringc.rgb, float3(1.0, 0.62, 0.3), 0.5), float3(1.0, 0.92, 0.8), saturate(rim * rim * 0.6)) * v;
+    clip(t > k_eye.w && v > 0.002 ? 1.0 : -1.0);
+    o.d = depth_of(t * dot(d, k_look.xyz));
+    o.c = float4(c * k_time.w, 0.0);
+    return o;
+}

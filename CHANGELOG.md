@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.21.0 — 2026-10-12
+
+Layers: explosions 1.0.0, testbench 3.6.0.
+
+### Added
+- The `explosions` layer: `Explosions.asi` draws each ship's and station's fireball as a
+  ray-marched volume of gas and each shockwave as a ring of light, in place of stock's
+  sprites and disc; render only (explosions 1.0.0). `./install` runs
+  `explosions/install.sh`; `a2mod` switches `Explosions.asi` and `Explosions.ini` as the
+  `explosions` layer. Not in the release package yet.
+- `Scene.asi` `kill`, the `explosion` scene and the `explosions` scenario
+  (testbench 3.6.0).
+
+Installed, not yet seen in game.
+
 ## 11.19.0 — 2026-10-10
 
 Layers: nebulae 1.0.0.

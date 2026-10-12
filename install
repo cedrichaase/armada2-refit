@@ -21,6 +21,8 @@
 #                                            recipe in a shader, where a map's sky has one
 #   nebulae    nebulae/install.sh            Nebulae.asi and its recipes: nebulae drawn as
 #                                            volumes of gas, for each class with a recipe
+#   explosions explosions/install.sh         Explosions.asi: fireballs drawn as gas, shockwaves
+#                                            as rings of light
 #   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
 #                                            $A2_DATA/movies
 #
@@ -50,4 +52,5 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/lighting/install.sh"
 "$here/sky/install.sh"
 "$here/nebulae/install.sh"
+"$here/explosions/install.sh"
 "$here/cutscenes/binkproxy/install.sh"
