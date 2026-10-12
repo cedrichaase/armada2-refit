@@ -187,8 +187,8 @@ static void note_once(int *said, const char *s) { if (!*said) { *said = 1; logli
 
 static float sqrt_f(float x) { float r; __asm__("fsqrt" : "=t"(r) : "0"(x)); return r; }
 static float abs_f(float x)  { return x < 0.0f ? -x : x; }
+static float sin_f(float x)  { float r; __asm__("fsin" : "=t"(r) : "0"(x)); return r; }
 static float clamp_f(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
-static float max_f(float a, float b) { return a > b ? a : b; }
 
 static float exp2_f(float x)
 {
@@ -291,7 +291,7 @@ static int file_time(const char *path, FILETIME *t)
 }
 
 static struct {
-    int   enable, reload;
+    int   enable, reload, survey, ordnance, waves;
     /* [Warp] */
     int   warp;
     float w_bright, w_size, w_min_px, w_core, w_glow, w_star, w_star_sharp, w_streak, w_streak_len, w_streak_sharp;
@@ -300,12 +300,16 @@ static struct {
     float w_light, w_light_reach;
 } S;
 static FILETIME g_ini_time;
+static void read_recipes(void);
 
 static void read_settings(void)
 {
     S.enable         = (int)GetPrivateProfileIntA("Specials", "Enable", 1, g_ini);
     g_logging        = (int)GetPrivateProfileIntA("Specials", "Log", 1, g_ini);
     S.reload         = (int)GetPrivateProfileIntA("Specials", "Reload", 1, g_ini);
+    S.survey         = (int)GetPrivateProfileIntA("Specials", "Survey", 0, g_ini);
+    S.ordnance       = (int)GetPrivateProfileIntA("Specials", "Ordnance", 1, g_ini);
+    S.waves          = (int)GetPrivateProfileIntA("Specials", "Waves", 1, g_ini);
 
     S.warp           = (int)GetPrivateProfileIntA("Warp", "Enable", 1, g_ini);
     S.w_bright       = inif("Warp", "Brightness", 1.3f);
@@ -336,6 +340,7 @@ static void read_settings(void)
     if (S.w_after < 0.02f) S.w_after = 0.02f;
     if (S.w_ring_time < 0.05f) S.w_ring_time = 0.05f;
     if (S.w_streak_len < 1.0f) S.w_streak_len = 1.0f;
+    read_recipes();
 }
 
 /* ---- time ------------------------------------------------------------------ */
@@ -467,31 +472,32 @@ static float flash_now(const Flash *f, double now)
 
 /* ---- the quads ------------------------------------------------------------ */
 
-/* Per vertex: where in the quad (t0.xy), which kind (t0.z), a parameter (t0.w); the
- * colour and brightness (t1); four more parameters (t2). The kinds are in
- * specials.hlsl. */
-typedef struct { float p[3]; float t0[4]; float t1[4]; float t2[4]; } Vert;
+/* Per vertex: where in the quad (t0.xy), which kind (t0.z), a length (t0.w); the
+ * colour and brightness (t1); a second colour and a seed (t2); the kind's parameters
+ * (t3, t4). The kinds and what their parameters mean are in specials.hlsl. */
+typedef struct { float p[3]; float t0[4]; float t1[4]; float t2[4]; float t3[4]; float t4[4]; } Vert;
 #define MAX_QUADS 4096
 static Vert g_v[MAX_QUADS * 6];
 static int  g_nq;
 
-enum { K_FLASH = 0, K_RING = 1 };
+enum { K_FLARE = 0, K_RING = 1, K_BEAM = 2, K_BOLT = 3, K_FIELD = 4, K_WAVE = 5 };
+
+/* What a quad draws: its kind, its length, its colours, brightness, seed and
+ * parameters, the same at its four corners. */
+typedef struct { float kind, len, col[3], bright, col2[3], seed, p3[4], p4[4]; } Look;
 
 static float g_eye[3], g_right[3], g_up[3], g_fwd[3], g_px;   /* the camera; g_px: a pixel's size at unit distance */
 
-static void quad(const float *a, const float *b, const float *c, const float *d,
-                 float kind, float w4, const float *col, float bright, const float *p2,
+static void quad(const float *a, const float *b, const float *c, const float *d, const Look *lk,
                  float ua, float va, float ub, float vb)
 {
     /* a b c d around the quad: (ua,va) at a, (ub,va) at b, (ub,vb) at c, (ua,vb) at d */
     static const int order[6] = { 0, 1, 2, 0, 2, 3 };
-    static const float zero[4] = { 0, 0, 0, 0 };
     const float *pts[4];
     float uv[4][2];
     int   k, j;
     Vert *v;
-    if (g_nq >= MAX_QUADS || bright <= 0.0f) return;
-    if (!p2) p2 = zero;
+    if (g_nq >= MAX_QUADS || lk->bright <= 0.0f) return;
     pts[0] = a; pts[1] = b; pts[2] = c; pts[3] = d;
     uv[0][0] = ua; uv[0][1] = va; uv[1][0] = ub; uv[1][1] = va;
     uv[2][0] = ub; uv[2][1] = vb; uv[3][0] = ua; uv[3][1] = vb;
@@ -499,17 +505,17 @@ static void quad(const float *a, const float *b, const float *c, const float *d,
     for (k = 0; k < 6; k++) {
         int o = order[k];
         for (j = 0; j < 3; j++) v[k].p[j] = pts[o][j];
-        v[k].t0[0] = uv[o][0]; v[k].t0[1] = uv[o][1]; v[k].t0[2] = kind; v[k].t0[3] = w4;
-        v[k].t1[0] = col[0]; v[k].t1[1] = col[1]; v[k].t1[2] = col[2]; v[k].t1[3] = bright;
-        for (j = 0; j < 4; j++) v[k].t2[j] = p2[j];
+        v[k].t0[0] = uv[o][0]; v[k].t0[1] = uv[o][1]; v[k].t0[2] = lk->kind; v[k].t0[3] = lk->len;
+        for (j = 0; j < 3; j++) { v[k].t1[j] = lk->col[j]; v[k].t2[j] = lk->col2[j]; }
+        v[k].t1[3] = lk->bright; v[k].t2[3] = lk->seed;
+        for (j = 0; j < 4; j++) { v[k].t3[j] = lk->p3[j]; v[k].t4[j] = lk->p4[j]; }
     }
     g_nq++;
 }
 
 /* A camera-facing rectangle about c, half size hx by hy (uv -ax..ax, -1..1 when
  * hx = ax hy), pulled towards the camera by pull. */
-static void billboard_xy(const float *c, float hx, float hy, float ax, float pull,
-                         float kind, float w4, const float *col, float bright, const float *p2)
+static void billboard_xy(const float *c, float hx, float hy, float ax, float pull, const Look *lk)
 {
     float to[3], m[3], a[3], b[3], cc[3], dd[3];
     int   j;
@@ -522,7 +528,24 @@ static void billboard_xy(const float *c, float hx, float hy, float ax, float pul
         cc[j] = m[j] + g_right[j] * hx + g_up[j] * hy;
         dd[j] = m[j] - g_right[j] * hx + g_up[j] * hy;
     }
-    quad(a, b, cc, dd, kind, w4, col, bright, p2, -ax, -1.0f, ax, 1.0f);
+    quad(a, b, cc, dd, lk, -ax, -1.0f, ax, 1.0f);
+}
+
+/* A quad along the segment from p0 to p1, half width hw, facing the camera as far as
+ * it can; u runs from u0 at p0 to u1 at p1, v -1..1 across. */
+static void ribbon(const float *p0, const float *p1, float hw, const Look *lk, float u0, float u1)
+{
+    float d[3], view[3], side[3], a[3], b[3], c[3], e[3];
+    int   j;
+    for (j = 0; j < 3; j++) { d[j] = p1[j] - p0[j]; view[j] = (p0[j] + p1[j]) * 0.5f - g_eye[j]; }
+    cross3(d, view, side);
+    if (len3(side) < 1e-8f) return;
+    norm3(side);
+    for (j = 0; j < 3; j++) {
+        a[j] = p0[j] - side[j] * hw; b[j] = p1[j] - side[j] * hw;
+        c[j] = p1[j] + side[j] * hw; e[j] = p0[j] + side[j] * hw;
+    }
+    quad(a, b, c, e, lk, u0, -1.0f, u1, 1.0f);
 }
 
 static float dist_to_eye(const float *p)
@@ -532,12 +555,24 @@ static float dist_to_eye(const float *p)
     return len3(d);
 }
 
+static void look_flare(Look *lk, const float *col, float bright, float core, float glow, float star,
+                       float star_sharp, float streak, float streak_sharp, const float *streak_col,
+                       float len, float angle)
+{
+    int j;
+    lk->kind = K_FLARE; lk->len = len; lk->bright = bright; lk->seed = 0.0f;
+    for (j = 0; j < 3; j++) { lk->col[j] = col[j]; lk->col2[j] = streak_col ? streak_col[j] : 0.0f; }
+    lk->p3[0] = core; lk->p3[1] = glow; lk->p3[2] = star; lk->p3[3] = star_sharp;
+    lk->p4[0] = streak; lk->p4[1] = streak_sharp; lk->p4[2] = angle; lk->p4[3] = 0.0f;
+}
+
 /* One flash's quads: the flash (core, glow, star and streak in one wide quad) and the
  * ring running out from it once the craft has gone. */
 static void flash_quads(const Flash *f, double now)
 {
-    float b = flash_now(f, now), dist = dist_to_eye(f->pos), px = g_px * dist, h, hmin, p2[4];
+    float b = flash_now(f, now), dist = dist_to_eye(f->pos), px = g_px * dist, h, hmin;
     float grow = 0.35f + 0.65f * f->k;
+    Look  lk;
     if (f->passed > 0.0) grow = 1.0f + 0.4f * clamp_f((float)(now - f->passed) / S.w_after, 0.0f, 1.0f);
     h = S.w_size * 2.5f * f->r * grow;
     hmin = S.w_min_px * px * 0.5f;
@@ -545,23 +580,34 @@ static void flash_quads(const Flash *f, double now)
     if (b < 0.004f) return;
     /* the streak runs StreakLength times the flash's size to either side, the quad
      * with it; the pull keeps the flash in front of the hull it sits in */
-    p2[0] = S.w_streak_col[0]; p2[1] = S.w_streak_col[1]; p2[2] = S.w_streak_col[2];
-    p2[3] = rnd(f->seed) * 6.2831853f;
-    billboard_xy(f->pos, h * S.w_streak_len, h, S.w_streak_len, h * 0.5f, K_FLASH, S.w_streak_len,
-                 S.w_col, S.w_bright * b, p2);
+    look_flare(&lk, S.w_col, S.w_bright * b, S.w_core, S.w_glow, S.w_star, S.w_star_sharp,
+               S.w_streak, S.w_streak_sharp, S.w_streak_col, S.w_streak_len, 0.0f);
+    billboard_xy(f->pos, h * S.w_streak_len, h, S.w_streak_len, h * 0.5f, &lk);
     if (S.w_ring > 0.0f && f->passed > 0.0) {
-        float t = (float)(now - f->passed), R, w;
+        float t = (float)(now - f->passed), R, w, k;
         if (t < S.w_ring_time) {
+            int j;
             R = S.w_ring_speed * f->r * t + h * 0.2f;
             w = S.w_ring_width;                                   /* of the ring's radius */
-            p2[0] = 1.0f / (1.0f + w);                           /* where the ring is, in the quad */
-            p2[1] = w / (1.0f + w);                              /*   its half width */
-            p2[2] = 0.0f; p2[3] = 0.0f;
-            billboard_xy(f->pos, R * (1.0f + w), R * (1.0f + w), 1.0f, 0.0f, K_RING, 0.0f, S.w_ring_col,
-                         S.w_ring * S.w_bright * (1.0f - t / S.w_ring_time) * (1.0f - t / S.w_ring_time), p2);
+            k = 1.0f - t / S.w_ring_time;
+            lk.kind = K_RING; lk.len = 0.0f; lk.bright = S.w_ring * S.w_bright * k * k;
+            for (j = 0; j < 3; j++) lk.col[j] = S.w_ring_col[j];
+            lk.p3[0] = 1.0f / (1.0f + w);                         /* where the ring is, in the quad */
+            lk.p3[1] = w / (1.0f + w);                            /*   its half width */
+            billboard_xy(f->pos, R * (1.0f + w), R * (1.0f + w), 1.0f, 0.0f, &lk);
         }
     }
 }
+
+static void ord_quads(double now);
+
+/* The lights of the last pass's special weapons, registered before the next frame's draw. */
+typedef struct { float pos[3], col[3], reach; } Lit;
+#define MAX_LIT 16
+static Lit g_lit[MAX_LIT];
+static int g_nlit, g_nlit_next;
+static int  g_nshot;      /* the special weapons' shots noted in this pass */
+static int  g_nwave;      /* and their waves */
 
 /* ---- Direct3D 9 --------------------------------------------------------- */
 
@@ -622,7 +668,7 @@ static int draw_all(void)
 {
     static int said_d9, said_sh, said_sb, said_cam, said_first;
     void    *d8, *d9, *vs, *ps;
-    float    V[16], P[16], VP[16], cols[4][4], pc[8];
+    float    V[16], P[16], VP[16], cols[4][4], pc[4];
     Viewport vp;
     double   now = now_s();
     int      i, k;
@@ -642,7 +688,7 @@ static int draw_all(void)
     }
 
     age_flashes(now);
-    if (!g_nflash) return 1;
+    if (!g_nflash && !g_nshot && !g_nwave) return 1;
 
     D9_FN(d9, D9_GETTRANSFORM, Mat_t)(d9, 2, V);      /* VIEW */
     D9_FN(d9, D9_GETTRANSFORM, Mat_t)(d9, 3, P);      /* PROJECTION */
@@ -666,6 +712,7 @@ static int draw_all(void)
             flash_quads(f, now);
         }
     for (i = 0; i < g_nflash; i++) g_flash[i].noted = 0;
+    ord_quads(now);
     if (!g_nq) return 1;
 
     {
@@ -690,13 +737,12 @@ static int draw_all(void)
         };
         D9_FN(g_sb, SB_CAPTURE, SB_t)(g_sb);
         for (k = 0; k < (int)(sizeof rs / sizeof rs[0]); k++) D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, rs[k][0], rs[k][1]);
-        /* XYZ, three sets of texture coordinates of four floats each */
-        D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x300 | (2UL << 16) | (2UL << 18) | (2UL << 20));
+        /* XYZ, five sets of texture coordinates of four floats each */
+        D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x500 | (2UL << 16) | (2UL << 18) | (2UL << 20) | (2UL << 22) | (2UL << 24));
         d9_bind(d9, vs, ps);
         d9_vsconst(d9, 0, &cols[0][0], 4);
-        pc[0] = S.w_core; pc[1] = S.w_glow; pc[2] = S.w_star; pc[3] = S.w_star_sharp;
-        pc[4] = S.w_streak; pc[5] = S.w_streak_sharp; pc[6] = (float)(now - (double)(long)(now / 1000.0) * 1000.0); pc[7] = 0.0f;
-        d9_psconst(d9, 0, pc, 2);
+        pc[0] = (float)(now - (double)(long)(now / 1000.0) * 1000.0); pc[1] = pc[2] = pc[3] = 0.0f;
+        d9_psconst(d9, 0, pc, 1);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(g_nq * 2), g_v, sizeof g_v[0]);
         D9_FN(g_sb, SB_APPLY, SB_t)(g_sb);
     }
@@ -704,7 +750,7 @@ static int draw_all(void)
     if (!said_first) {
         char b[160];
         said_first = 1;
-        b[0] = 0; s_cat(b, "first warp flash drawn: "); s_num(b, g_nq); s_cat(b, " quads");
+        b[0] = 0; s_cat(b, "first effects drawn: "); s_num(b, g_nq); s_cat(b, " quads");
         logline(b);
     }
     return 1;
@@ -760,12 +806,529 @@ static void fx_lights(void)
             for (j = 0; j < 3; j++) col[j] = S.w_light_col[j] * S.w_light * (b < 3.0f ? b : 3.0f);
             put_light(n++, f->pos, col, S.w_light_reach * f->r);
         }
+    for (i = 0; i < g_nlit && n < FX_LIGHTS; i++) put_light(n++, g_lit[i].pos, g_lit[i].col, g_lit[i].reach);
 }
 
 static void __cdecl hook_ord_pre(void *camera)
 {
     g_prev_ord_pre(camera);
     fx_lights();
+}
+
+/* ---- the special weapons' ordnance ------------------------------------------- */
+
+/* Ordnance::RenderAll submits every live ordnance the player can see through its
+ * vtable (slot 23, Submit(ST3D_Camera *)), the ordnance in edi at the call. An
+ * ordnance: its class +0x34 (whose cPrjID * at +0x150 names its ODF), its owner's
+ * handle +0x5c, its target's +0x60, its time left +0xac; a beam's (Beam's and
+ * BeamToggle's) start +0xbc and end +0xc8. */
+#define SITE_ORD_SUBMIT    0x58e6df   /* in Ordnance::RenderAll: mov ecx,edi; call [eax+0x5c] */
+#define FN_ORD_RENDERALL   0x58e580
+#define FN_PRJ_ODF         0x6593a0   /* cPrjID::GetOdfName() const, thiscall */
+#define FN_GET_TRANSFORM   0x4cfd50   /* Entity::GetTransform() const, thiscall: a Matrix34, position +0x24 */
+#define ORD_CLASS   0x34
+#define ORD_OWNER   0x5c
+#define ORD_TARGET  0x60
+#define ORD_LEFT    0xac
+#define ORD_START   0xbc
+#define ORD_END     0xc8
+#define OC_PRJ      0x150
+
+typedef const char *(__thiscall *PrjOdf_t)(void *prj);
+typedef const float *(__thiscall *GetTransform_t)(void *ent);
+typedef void (__thiscall *Submit_t)(void *ord, void *cam);
+
+static const char *ord_odf(const BYTE *ord)
+{
+    const BYTE *cls = *(BYTE * const *)(ord + ORD_CLASS);
+    void       *prj;
+    if (!cls || !(prj = *(void * const *)(cls + OC_PRJ))) return "";
+    return ((PrjOdf_t)FN_PRJ_ODF)(prj);
+}
+
+/* The C++ class of an object, from its vtable's RTTI: ".?AVTractorBeam@@" -> "TractorBeam" */
+static void rtti_name(const void *obj, char *out, int n)
+{
+    const BYTE *col = ((const BYTE * const *)*(void * const *)obj)[-1], *td;
+    const char *s;
+    int         i = 0;
+    out[0] = 0;
+    if (!col || !(td = *(const BYTE * const *)(col + 12))) return;
+    s = (const char *)(td + 8);
+    if (s[0] == '.' && s[1] == '?' && s[2] == 'A') s += 4;
+    while (s[i] && s[i] != '@' && i < n - 1) { out[i] = s[i]; i++; }
+    out[i] = 0;
+}
+
+static int s_ieq(const char *a, const char *b)
+{
+    for (; *a && *b; a++, b++) {
+        char x = *a, y = *b;
+        if (x >= 'A' && x <= 'Z') x += 32;
+        if (y >= 'A' && y <= 'Z') y += 32;
+        if (x != y) return 0;
+    }
+    return *a == *b;
+}
+
+/* Survey=1: log what each special ordnance is, the first few times it is drawn. */
+typedef struct { char odf[40]; int n; double first; } Seen;
+static Seen g_seen[96];
+static int  g_nseen;
+
+static void s_vec(char *b, const float *v)
+{
+    s_flt(b, v[0]); s_cat(b, " "); s_flt(b, v[1]); s_cat(b, " "); s_flt(b, v[2]);
+}
+
+static void survey(const BYTE *ord)
+{
+    const char *odf = ord_odf(ord);
+    Seen       *sn = NULLPTR;
+    double      now = now_s(), age;
+    char        b[480], cls[48];
+    int         i;
+    for (i = 0; i < g_nseen; i++) if (s_ieq(g_seen[i].odf, odf)) { sn = &g_seen[i]; break; }
+    if (!sn) {
+        if (g_nseen >= 96) return;
+        sn = &g_seen[g_nseen++];
+        for (i = 0; i < 39 && odf[i]; i++) sn->odf[i] = odf[i];
+        sn->odf[i] = 0;
+        sn->n = 0;
+        sn->first = now;
+    }
+    age = now - sn->first;
+    if (!(sn->n == 0 || (sn->n == 1 && age > 0.5) || (sn->n == 2 && age > 2.0))) return;
+    sn->n++;
+    rtti_name(ord, cls, sizeof cls);
+    b[0] = 0;
+    s_cat(b, "ordnance "); s_cat(b, odf); s_cat(b, " ("); s_cat(b, cls); s_cat(b, ") at "); s_flt(b, (float)age);
+    s_cat(b, "s: left "); s_flt(b, *(const float *)(ord + ORD_LEFT));
+    {
+        const float *T = ((GetTransform_t)FN_GET_TRANSFORM)((void *)ord);
+        BYTE *own = object_of(*(const int *)(ord + ORD_OWNER)), *tgt = object_of(*(const int *)(ord + ORD_TARGET));
+        s_cat(b, ", pos "); s_vec(b, T + 9);
+        s_cat(b, ", start "); s_vec(b, (const float *)(ord + ORD_START));
+        s_cat(b, ", end "); s_vec(b, (const float *)(ord + ORD_END));
+        s_cat(b, ", owner "); s_cat(b, own ? ((OdfName_t)FN_ODF_NAME)(own) : "-");
+        if (own) { s_cat(b, " at "); s_vec(b, (const float *)(own + GO_POS)); }
+        s_cat(b, ", target "); s_cat(b, tgt ? ((OdfName_t)FN_ODF_NAME)(tgt) : "-");
+        if (tgt) { s_cat(b, " at "); s_vec(b, (const float *)(tgt + GO_POS)); }
+    }
+    logline(b);
+}
+
+/* ---- the recipes --------------------------------------------------------------- */
+
+/* One per special weapon's ordnance, from a section [Ordnance.<odf>] of Specials.ini
+ * (the ordnance's ODF, without .odf; any case). Specials.ini says what each key does. */
+typedef struct {
+    char  name[40];
+    int   kind;                     /* K_BEAM, K_BOLT, K_FIELD, K_WAVE (a [Wave.] section) */
+    float col[3], core[3], bright, flicker, flicker_rate;
+    float width, min_px, core_w, flow[3], helix[3], crackle, emitter, impact, star, taper;   /* beam */
+    float size, tail, rays, spin, pulse, pulse_rate;                                  /* bolt */
+    int   on_owner;                                                                   /* field */
+    float radius, rim, swirl[3], fill;
+    float band, ray_count, ray_share, turb;                                          /* wave */
+    float light, light_col[3], light_reach, fade_in;
+} Recipe;
+#define MAX_RECIPES 96
+static Recipe g_rc[MAX_RECIPES];
+static int    g_nrc;
+
+__declspec(dllimport) DWORD __stdcall GetPrivateProfileSectionNamesA(LPSTR, DWORD, LPCSTR);
+
+static void ini3(const char *sect, const char *key, float *out, float a, float b, float c)
+{
+    char  s[64];
+    float v[3];
+    v[0] = a; v[1] = b; v[2] = c;
+    GetPrivateProfileStringA(sect, key, "", s, sizeof s, g_ini);
+    if (s[0]) parsen(s, v, 3);
+    out[0] = v[0]; out[1] = v[1]; out[2] = v[2];
+}
+
+static void read_recipes(void)
+{
+    static char names[8192];
+    const char *p;
+    char        kind[16], on[16];
+    g_nrc = 0;
+    if (!GetPrivateProfileSectionNamesA(names, sizeof names, g_ini)) return;
+    for (p = names; *p && g_nrc < MAX_RECIPES; p += s_len(p) + 1) {
+        Recipe *r = &g_rc[g_nrc];
+        int     i;
+        int     skip, is_wave = p[0] == 'W' && p[1] == 'a' && p[2] == 'v' && p[3] == 'e' && p[4] == '.';
+        if (is_wave) skip = 5;
+        else if (p[0] == 'O' && p[1] == 'r' && p[2] == 'd' && p[3] == 'n' && p[4] == 'a' && p[5] == 'n' &&
+                 p[6] == 'c' && p[7] == 'e' && p[8] == '.') skip = 9;
+        else continue;
+        for (i = 0; i < 39 && p[skip + i]; i++) r->name[i] = p[skip + i];
+        r->name[i] = 0;
+        GetPrivateProfileStringA(p, "Kind", "beam", kind, sizeof kind, g_ini);
+        r->kind = is_wave ? K_WAVE : kind[0] == 'b' && kind[1] == 'o' ? K_BOLT : kind[0] == 'f' ? K_FIELD : K_BEAM;
+        inirgb(p, "Colour", r->col, 120, 200, 255);
+        inirgb(p, "CoreColour", r->core, 235, 245, 255);
+        r->bright       = inif(p, "Brightness", 1.0f);
+        r->flicker      = clamp_f(inif(p, "Flicker", 0.0f), 0.0f, 1.0f);
+        r->flicker_rate = inif(p, "FlickerRate", 20.0f);
+        r->width        = inif(p, "Width", 6.0f);
+        r->min_px       = inif(p, "MinPixels", 3.0f);
+        r->core_w       = inif(p, "CoreWidth", 0.25f);
+        ini3(p, "Flow", r->flow, 0.0f, 0.15f, 8.0f);
+        ini3(p, "Helix", r->helix, 0.0f, 0.12f, 6.0f);
+        r->crackle      = inif(p, "Crackle", 0.0f);
+        r->emitter      = inif(p, "Emitter", 2.5f);
+        r->impact       = inif(p, "Impact", 4.0f);
+        r->star         = inif(p, "Star", 0.4f);
+        r->taper        = inif(p, "Taper", 1.0f);
+        r->size         = inif(p, "Size", 5.0f);
+        r->tail         = inif(p, "Tail", 4.0f);
+        r->rays         = inif(p, "Rays", 0.3f);
+        r->spin         = inif(p, "Spin", 3.0f);
+        r->pulse        = inif(p, "Pulse", 0.0f);
+        r->pulse_rate   = inif(p, "PulseRate", 8.0f);
+        GetPrivateProfileStringA(p, "On", "target", on, sizeof on, g_ini);
+        r->on_owner     = on[0] == 'o';
+        r->radius       = inif(p, "Radius", 1.3f);
+        r->rim          = inif(p, "Rim", 3.0f);
+        ini3(p, "Swirl", r->swirl, 0.4f, 5.0f, 1.5f);
+        r->fill         = inif(p, "Fill", 0.05f);
+        r->light        = inif(p, "Light", 1.5f);
+        inirgb(p, "LightColour", r->light_col, (int)(r->col[0] * 255.0f), (int)(r->col[1] * 255.0f), (int)(r->col[2] * 255.0f));
+        r->light_reach  = inif(p, "LightReach", 80.0f);
+        r->fade_in      = inif(p, "FadeIn", 0.15f);
+        r->band         = inif(p, "Band", 0.06f);
+        r->ray_count    = inif(p, "RayCount", 16.0f);
+        r->ray_share    = inif(p, "RayShare", 0.5f);
+        r->turb         = clamp_f(inif(p, "Turbulence", 0.4f), 0.0f, 1.0f);
+        if (r->width < 0.01f) r->width = 0.01f;
+        if (r->size < 0.01f) r->size = 0.01f;
+        if (r->core_w < 0.01f) r->core_w = 0.01f;
+        if (r->fade_in < 0.001f) r->fade_in = 0.001f;
+        g_nrc++;
+    }
+}
+
+/* The recipe for an ordnance's ODF ("tracbm.odf" or "tracbm"), or a wave's, or 0. */
+static const Recipe *recipe_of(const char *odf, int wave)
+{
+    char stem[40];
+    int  i;
+    for (i = 0; i < 39 && odf[i] && odf[i] != '.'; i++) stem[i] = odf[i];
+    stem[i] = 0;
+    for (i = 0; i < g_nrc; i++) if ((g_rc[i].kind == K_WAVE) == wave && s_ieq(g_rc[i].name, stem)) return &g_rc[i];
+    return NULLPTR;
+}
+
+/* ---- the shots ------------------------------------------------------------------- */
+
+/* Each ordnance with a recipe, as Submit gave it in this pass. A shot's age is kept
+ * by the ordnance's address (with its ODF's recipe, against reuse), and so is where a
+ * bolt was, for the way it is flying. */
+typedef struct { BYTE *ord; const Recipe *rc; } Shot;
+#define MAX_SHOTS 256
+static Shot g_shot[MAX_SHOTS];
+
+typedef struct { BYTE *ord; const Recipe *rc; double first; DWORD frame; float last[3], dir[3]; int has_last; } Age;
+static Age   g_age[MAX_SHOTS];
+static int   g_nage;
+static DWORD g_ord_frame;
+static long  g_shots_noted;
+
+static Age *age_of(BYTE *ord, const Recipe *rc, double now)
+{
+    int i, oldest = 0;
+    for (i = 0; i < g_nage; i++)
+        if (g_age[i].ord == ord && g_age[i].rc == rc) { g_age[i].frame = g_ord_frame; return &g_age[i]; }
+    for (i = 0; i < g_nage; i++)   /* one not seen for a while makes way */
+        if (g_ord_frame - g_age[i].frame > 30) break;
+    if (i == g_nage) {
+        if (g_nage < MAX_SHOTS) g_nage++;
+        else {
+            for (i = 1; i < g_nage; i++) if (g_age[i].frame < g_age[oldest].frame) oldest = i;
+            i = oldest;
+        }
+    }
+    g_age[i].ord = ord; g_age[i].rc = rc; g_age[i].first = now; g_age[i].frame = g_ord_frame; g_age[i].has_last = 0;
+    return &g_age[i];
+}
+
+/* The lights of the last pass's shots, registered before the next frame's draw. */
+
+static void add_light(const float *pos, const float *col, float k, float reach)
+{
+    int j;
+    if (g_nlit_next >= MAX_LIT || k <= 0.01f) return;
+    for (j = 0; j < 3; j++) { g_lit[g_nlit_next].pos[j] = pos[j]; g_lit[g_nlit_next].col[j] = col[j] * k; }
+    g_lit[g_nlit_next].reach = reach;
+    g_nlit_next++;
+}
+
+static float flicker_of(const Recipe *rc, DWORD seed, double now)
+{
+    DWORD tick;
+    if (rc->flicker <= 0.0f) return 1.0f;
+    tick = (DWORD)(long)(now * rc->flicker_rate);
+    return 1.0f - rc->flicker * rnd(seed + tick * 747796405UL);
+}
+
+static void beam_quads(const Shot *sh, const Age *ag, double now)
+{
+    const Recipe *rc = sh->rc;
+    const float  *a = (const float *)(sh->ord + ORD_START), *b = (const float *)(sh->ord + ORD_END);
+    float  d[3], mid[3], p0[3], p1[3], len, hw, px, bright, L, hmin;
+    DWORD  seed = hash32((DWORD)sh->ord);
+    Look   lk;
+    int    j;
+    for (j = 0; j < 3; j++) { d[j] = b[j] - a[j]; mid[j] = (a[j] + b[j]) * 0.5f; }
+    len = len3(d);
+    if (len < 1e-3f) return;
+    for (j = 0; j < 3; j++) d[j] /= len;
+    px = g_px * dist_to_eye(mid);
+    hw = rc->width * 0.5f;
+    hmin = rc->min_px * px * 0.5f;
+    bright = rc->bright * clamp_f((float)(now - ag->first) / rc->fade_in, 0.0f, 1.0f) * flicker_of(rc, seed, now);
+    if (hw < hmin) { bright *= sqrt_f(hw / hmin); hw = hmin; }
+    if (bright <= 0.004f) return;
+    L = len / hw;
+    for (j = 0; j < 3; j++) { p0[j] = a[j] - d[j] * hw; p1[j] = b[j] + d[j] * hw; }
+    lk.kind = K_BEAM; lk.len = L; lk.bright = bright; lk.seed = (float)(seed & 1023) * 0.01f;
+    for (j = 0; j < 3; j++) { lk.col[j] = rc->col[j]; lk.col2[j] = rc->core[j]; }
+    lk.p3[0] = rc->core_w; lk.p3[1] = rc->flow[0]; lk.p3[2] = rc->flow[1]; lk.p3[3] = rc->flow[2];
+    lk.p4[0] = rc->helix[0]; lk.p4[1] = rc->helix[1]; lk.p4[2] = rc->helix[2]; lk.p4[3] = rc->crackle;
+    if (rc->taper > 0.98f && rc->taper < 1.02f) ribbon(p0, p1, hw, &lk, -1.0f, L + 1.0f);
+    else {
+        /* a cone: segments whose width goes from hw to Taper hw; u stays in units of the
+         * start's half width, so the pattern does not stretch, and v is -1..1 across
+         * each, so the core and glow widen with the beam */
+        int   k, n = 12;
+        float q0[3], q1[3];
+        for (k = 0; k < n; k++) {
+            float f0 = (float)k / (float)n, f1 = (float)(k + 1) / (float)n, w;
+            Look  ls = lk;
+            for (j = 0; j < 3; j++) { q0[j] = p0[j] + (p1[j] - p0[j]) * f0; q1[j] = p0[j] + (p1[j] - p0[j]) * f1; }
+            w = hw * (1.0f + (rc->taper - 1.0f) * (f0 + f1) * 0.5f);
+            ribbon(q0, q1, w, &ls, -1.0f + (L + 2.0f) * f0, -1.0f + (L + 2.0f) * f1);
+        }
+    }
+    if (rc->emitter > 0.0f) {
+        float h = rc->emitter * hw;
+        look_flare(&lk, rc->col, bright * 0.6f, 30.0f, 3.5f, rc->star, 18.0f, 0.0f, 20.0f, NULLPTR, 1.0f,
+                   (float)now * 0.7f + lk.seed);
+        billboard_xy(a, h, h, 1.0f, h * 0.5f, &lk);
+    }
+    if (rc->impact > 0.0f) {
+        float h = rc->impact * hw * (rc->taper > 1.0f ? sqrt_f(rc->taper) : 1.0f);
+        look_flare(&lk, rc->col, bright * 0.6f, 30.0f, 3.0f, rc->star, 18.0f, 0.0f, 20.0f, NULLPTR, 1.0f,
+                   -(float)now * 0.9f + lk.seed);
+        billboard_xy(b, h, h, 1.0f, h * 0.5f, &lk);
+    }
+    if (rc->light > 0.0f) add_light(b, rc->light_col, rc->light * bright, rc->light_reach);
+}
+
+static void bolt_quads(const Shot *sh, Age *ag, double now)
+{
+    const Recipe *rc = sh->rc;
+    const float  *T = ((GetTransform_t)FN_GET_TRANSFORM)((void *)sh->ord);
+    float  pos[3], dir[3], p0[3], p1[3], R, px, bright, hmin, mv;
+    DWORD  seed = hash32((DWORD)sh->ord);
+    Look   lk;
+    int    j;
+    for (j = 0; j < 3; j++) pos[j] = T[9 + j];
+    /* the way it is flying: from where it was last; at first, toward its target */
+    if (ag->has_last) {
+        float m[3];
+        for (j = 0; j < 3; j++) m[j] = pos[j] - ag->last[j];
+        mv = len3(m);
+        if (mv > 1e-3f) { for (j = 0; j < 3; j++) ag->dir[j] = m[j] / mv; }
+    } else {
+        BYTE *tgt = object_of(*(const int *)(sh->ord + ORD_TARGET));
+        for (j = 0; j < 3; j++) ag->dir[j] = tgt ? ((const float *)(tgt + GO_POS))[j] - pos[j] : T[6 + j];
+        norm3(ag->dir);
+    }
+    for (j = 0; j < 3; j++) { ag->last[j] = pos[j]; dir[j] = ag->dir[j]; }
+    ag->has_last = 1;
+    px = g_px * dist_to_eye(pos);
+    R = rc->size;
+    hmin = rc->min_px * px * 0.5f;
+    bright = rc->bright * clamp_f((float)(now - ag->first) / rc->fade_in, 0.0f, 1.0f) * flicker_of(rc, seed, now);
+    if (rc->pulse > 0.0f) bright *= 1.0f + rc->pulse * sin_f((float)(now * rc->pulse_rate) + (float)(seed & 255));
+    if (R < hmin) { bright *= sqrt_f(R / hmin); R = hmin; }
+    if (bright <= 0.004f) return;
+    for (j = 0; j < 3; j++) { p0[j] = pos[j] - dir[j] * R * rc->tail; p1[j] = pos[j] + dir[j] * R; }
+    lk.kind = K_BOLT; lk.len = rc->tail; lk.bright = bright; lk.seed = (float)(seed & 1023) * 0.01f;
+    for (j = 0; j < 3; j++) { lk.col[j] = rc->col[j]; lk.col2[j] = rc->core[j]; }
+    lk.p3[0] = 18.0f; lk.p3[1] = 3.0f; lk.p3[2] = rc->rays; lk.p3[3] = (float)now * rc->spin + lk.seed;
+    lk.p4[0] = lk.p4[1] = lk.p4[2] = lk.p4[3] = 0.0f;
+    ribbon(p0, p1, R, &lk, -rc->tail, 1.0f);
+    /* seen head on, the ribbon is edge on: a flare holds the head */
+    look_flare(&lk, rc->col, bright * 0.6f, 25.0f, 3.5f, rc->rays, 14.0f, 0.0f, 20.0f, NULLPTR, 1.0f, lk.p3[3]);
+    billboard_xy(pos, R, R, 1.0f, 0.0f, &lk);
+    if (rc->light > 0.0f) add_light(pos, rc->light_col, rc->light * bright, rc->light_reach);
+}
+
+static void field_quads(const Shot *sh, const Age *ag, double now)
+{
+    const Recipe *rc = sh->rc;
+    BYTE  *obj = object_of(*(const int *)(sh->ord + (rc->on_owner ? ORD_OWNER : ORD_TARGET)));
+    float  c[3], R, bright;
+    DWORD  seed = hash32((DWORD)sh->ord);
+    Look   lk;
+    int    j;
+    if (obj) { for (j = 0; j < 3; j++) c[j] = ((const float *)(obj + GO_POS))[j]; R = rc->radius * radius_of(obj); }
+    else {
+        const float *T = ((GetTransform_t)FN_GET_TRANSFORM)((void *)sh->ord);
+        for (j = 0; j < 3; j++) c[j] = T[9 + j];
+        R = rc->radius * 50.0f;
+    }
+    bright = rc->bright * clamp_f((float)(now - ag->first) / rc->fade_in, 0.0f, 1.0f) * flicker_of(rc, seed, now);
+    if (bright <= 0.004f) return;
+    lk.kind = K_FIELD; lk.len = 0.0f; lk.bright = bright; lk.seed = (float)(seed & 1023) * 0.01f;
+    for (j = 0; j < 3; j++) { lk.col[j] = rc->col[j]; lk.col2[j] = rc->core[j]; }
+    lk.p3[0] = rc->rim; lk.p3[1] = rc->swirl[0]; lk.p3[2] = rc->swirl[1]; lk.p3[3] = rc->swirl[2];
+    lk.p4[0] = rc->fill; lk.p4[1] = lk.p4[2] = lk.p4[3] = 0.0f;
+    billboard_xy(c, R, R, 1.0f, 0.0f, &lk);
+    if (rc->light > 0.0f) add_light(c, rc->light_col, rc->light * bright, rc->light_reach);
+}
+
+/* A wave: the special weapons' shockwaves (ShockwaveExplosions of a class with a
+ * [Wave.] recipe). Its centre is its transform's position (+0x24), its plane is
+ * normal to its up axis (+0xc); ShockwaveExplosion::GetCurrentRadius gives how far it
+ * has run, +0x50 how far it will, and its class fades it after fadeFactor (+0xe0) of
+ * that, as stock fades its disc. */
+#define VT_SHOCKWAVE    0x6afdac   /* ShockwaveExplosion vtable */
+#define FN_SHOCK_INIT   0x466fd0   /* its slot 13, ShockwaveExplosion::Init */
+#define FN_SHOCK_RADIUS 0x467730   /* ShockwaveExplosion::GetCurrentRadius() const, thiscall */
+#define FN_SHOCK_SUBMIT 0x4676c0
+#define EX_CLASS        0x30
+#define EXC_PRJ         0x24
+#define SW_END          0x50
+#define SWC_FADE        0xe0
+typedef float (__thiscall *Radius_t)(void *);
+
+typedef struct { BYTE *ex; const Recipe *rc; } WaveShot;
+static WaveShot g_wavev[64];
+static Submit_t g_prev_wave;
+static long     g_waves_noted;
+
+static const char *wave_odf(const BYTE *ex)
+{
+    const BYTE *cls = *(BYTE * const *)(ex + EX_CLASS);
+    void       *prj;
+    if (!cls || !(prj = *(void * const *)(cls + EXC_PRJ))) return "";
+    return ((PrjOdf_t)FN_PRJ_ODF)(prj);
+}
+
+static void __fastcall hook_wave_submit(BYTE *ex, void *edx, void *cam)
+{
+    const Recipe *rc;
+    (void)edx;
+    if (S.enable && S.waves && g_drawing && g_nwave < 64 && (rc = recipe_of(wave_odf(ex), 1))) {
+        g_wavev[g_nwave].ex = ex;
+        g_wavev[g_nwave].rc = rc;
+        g_nwave++;
+        if (g_waves_noted++ < 8) {
+            char b[120];
+            b[0] = 0; s_cat(b, "drawing wave "); s_cat(b, rc->name);
+            logline(b);
+        }
+        return;
+    }
+    g_prev_wave(ex, cam);
+}
+
+static void wave_quads(const WaveShot *w)
+{
+    const Recipe *rc = w->rc;
+    const BYTE   *cls = *(BYTE * const *)(w->ex + EX_CLASS);
+    const float  *T = ((GetTransform_t)FN_GET_TRANSFORM)((void *)w->ex);
+    float  R = ((Radius_t)FN_SHOCK_RADIUS)((void *)w->ex), end = *(const float *)(w->ex + SW_END);
+    float  fade = cls ? *(const float *)(cls + SWC_FADE) : 0.5f, k = 1.0f, up[3], e1[3], e2[3], t[3];
+    float  c[3], a[3], b[3], cc[3], d[3], H, bright;
+    DWORD  seed = hash32((DWORD)w->ex);
+    Look   lk;
+    int    j;
+    if (!(R > 0.01f)) return;
+    if (end > 0.01f && R > fade * end) k = clamp_f((end - R) / ((1.0f - fade) * end + 1e-3f), 0.0f, 1.0f);
+    bright = rc->bright * k * flicker_of(rc, seed, now_s());
+    if (bright <= 0.004f) return;
+    for (j = 0; j < 3; j++) { c[j] = T[9 + j]; up[j] = T[3 + j]; }
+    norm3(up);
+    t[0] = 1.0f; t[1] = 0.0f; t[2] = 0.0f;
+    if (abs_f(up[0]) > 0.9f) { t[0] = 0.0f; t[1] = 1.0f; }
+    cross3(up, t, e1); norm3(e1);
+    cross3(up, e1, e2); norm3(e2);
+    H = R * (1.0f + rc->band * 3.0f);
+    for (j = 0; j < 3; j++) {
+        a[j]  = c[j] - e1[j] * H - e2[j] * H;
+        b[j]  = c[j] + e1[j] * H - e2[j] * H;
+        cc[j] = c[j] + e1[j] * H + e2[j] * H;
+        d[j]  = c[j] - e1[j] * H + e2[j] * H;
+    }
+    lk.kind = K_WAVE; lk.len = 0.0f; lk.bright = bright; lk.seed = (float)(seed & 1023) * 0.01f;
+    for (j = 0; j < 3; j++) { lk.col[j] = rc->col[j]; lk.col2[j] = rc->core[j]; }
+    lk.p3[0] = R / H; lk.p3[1] = rc->band * R / H; lk.p3[2] = rc->ray_count; lk.p3[3] = rc->ray_share;
+    lk.p4[0] = rc->fill; lk.p4[1] = rc->turb; lk.p4[2] = lk.p4[3] = 0.0f;
+    quad(a, b, cc, d, &lk, -1.0f, -1.0f, 1.0f, 1.0f);
+    if (rc->light > 0.0f) add_light(c, rc->light_col, rc->light * bright, R * 1.2f);
+}
+
+/* Every shot noted in this pass, then forgotten. */
+static void ord_quads(double now)
+{
+    int i;
+    g_ord_frame++;
+    g_nlit_next = 0;
+    for (i = 0; i < g_nshot; i++) {
+        Shot *sh = &g_shot[i];
+        Age  *ag = age_of(sh->ord, sh->rc, now);
+        if (sh->rc->kind == K_BOLT)       bolt_quads(sh, ag, now);
+        else if (sh->rc->kind == K_FIELD) field_quads(sh, ag, now);
+        else                              beam_quads(sh, ag, now);
+    }
+    g_nshot = 0;
+    for (i = 0; i < g_nwave; i++) wave_quads(&g_wavev[i]);
+    g_nwave = 0;
+    g_nlit = g_nlit_next;
+}
+
+static long g_ord_seen;
+
+/* Every ordnance Ordnance::RenderAll submits comes here: one with a recipe is noted
+ * and drawn after RenderChunks (while the plugin draws), any other calls through. */
+void __fastcall ord_submit(BYTE *ord, void *edx, void *cam)
+{
+    const Recipe *rc;
+    (void)edx;
+    g_ord_seen++;
+    if (S.enable && S.survey) survey(ord);
+    if (S.enable && S.ordnance && g_drawing && (rc = recipe_of(ord_odf(ord), 0)) && g_nshot < MAX_SHOTS) {
+        g_shot[g_nshot].ord = ord;
+        g_shot[g_nshot].rc = rc;
+        g_nshot++;
+        if (g_shots_noted++ < 8 || S.survey) {
+            static const Recipe *said[MAX_RECIPES];
+            int k, known = 0;
+            for (k = 0; k < MAX_RECIPES && said[k]; k++) if (said[k] == rc) known = 1;
+            if (!known && k < MAX_RECIPES) {
+                char b[160];
+                said[k] = rc;
+                b[0] = 0; s_cat(b, "drawing "); s_cat(b, rc->name);
+                s_cat(b, rc->kind == K_BOLT ? " (bolt)" : rc->kind == K_FIELD ? " (field)" : rc->kind == K_WAVE ? " (wave)" : " (beam)");
+                logline(b);
+            }
+        }
+        return;
+    }
+    ((Submit_t)(*(void ***)ord)[0x5c / 4])(ord, cam);
+}
+
+/* At the call: edi holds the ordnance, the camera is pushed; Submit is thiscall. */
+__attribute__((naked, used)) static void ord_thunk(void)
+{
+    __asm__("movl %edi, %ecx\n\tjmp @ord_submit@12");
 }
 
 /* ---- the hooks ------------------------------------------------------------ */
@@ -860,6 +1423,32 @@ static void startup(void)
     s_cat(b, " and Ordnance::PreRenderAll");
     if ((DWORD)g_prev_ord_pre != FN_ORD_PRE) { s_cat(b, " (chained to "); s_hex(b, (DWORD)g_prev_ord_pre); s_cat(b, ")"); }
     s_cat(b, " patched");
+    {   /* the ordnance's Submit: 5 bytes, mov ecx,edi; call [eax+0x5c], become a call */
+        static const BYTE want[] = { 0x8b, 0xcf, 0xff, 0x50, 0x5c };
+        BYTE *p = (BYTE *)SITE_ORD_SUBMIT;
+        DWORD old;
+        for (i = 0; i < 5 && p[i] == want[i]; i++) ;
+        if (i < 5) s_cat(b, "; NOT the ordnance's Submit (another plugin has it?): stock special weapons");
+        else if (VirtualProtect(p, 5, PAGE_EXECUTE_READWRITE, &old)) {
+            p[0] = 0xE8;
+            *(DWORD *)(p + 1) = (DWORD)ord_thunk - (SITE_ORD_SUBMIT + 5);
+            VirtualProtect(p, 5, old, &old);
+            FlushInstructionCache(GetCurrentProcess(), p, 5);
+            s_cat(b, ", and the ordnance's Submit");
+        }
+    }
+    {   /* the special weapons' waves: slot 15 of the ShockwaveExplosion vtable, whatever it
+         * holds (Explosions.asi's hook, or stock's), recognised by slot 13 */
+        DWORD *vt = (DWORD *)VT_SHOCKWAVE, old;
+        if (vt[13] != FN_SHOCK_INIT) s_cat(b, "; NOT ShockwaveExplosion::Submit: stock waves");
+        else if (VirtualProtect(&vt[15], 4, PAGE_EXECUTE_READWRITE, &old)) {
+            g_prev_wave = (Submit_t)vt[15];
+            vt[15] = (DWORD)hook_wave_submit;
+            VirtualProtect(&vt[15], 4, old, &old);
+            s_cat(b, ", ShockwaveExplosion::Submit");
+            if ((DWORD)g_prev_wave != FN_SHOCK_SUBMIT) { s_cat(b, " (chained to "); s_hex(b, (DWORD)g_prev_wave); s_cat(b, ")"); }
+        }
+    }
     logline(b);
     (void)cross3; (void)rnd;
 }

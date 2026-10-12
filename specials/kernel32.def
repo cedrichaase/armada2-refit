@@ -13,3 +13,4 @@ GetPrivateProfileStringA@24
 GetFileAttributesExA@12
 QueryPerformanceCounter@4
 QueryPerformanceFrequency@4
+GetPrivateProfileSectionNamesA@12
