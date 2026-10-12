@@ -203,7 +203,7 @@ enum { FILTER_BSPLINE = 0, FILTER_CATROM = 1 };
 
 static struct {
     int   enable, reload, filter, layer[3];
-    float threshold[3], softness[3], antialias;
+    float threshold[3], softness[3], rim[3], rim_width, antialias;
 } S;
 static FILETIME g_ini_time;
 
@@ -221,6 +221,9 @@ static void read_settings(void)
     S.softness[FOG]     = clamp_f(inif("FogSoftness", 0.2f), 0.0f, 0.5f);
     S.threshold[SHROUD] = clamp_f(inif("ShroudThreshold", 0.5f), 0.05f, 0.95f);
     S.softness[SHROUD]  = clamp_f(inif("ShroudSoftness", 0.1f), 0.0f, 0.5f);
+    S.rim[FOG]       = clamp_f(inif("FogRim", 1.0f), 0.0f, 1.0f);
+    S.rim[SHROUD]    = clamp_f(inif("ShroudRim", 1.0f), 0.0f, 1.0f);
+    S.rim_width      = clamp_f(inif("RimWidth", 0.25f), 0.1f, 4.0f);
     S.antialias = clamp_f(inif("Antialias", 1.0f), 0.0f, 8.0f);
 }
 
@@ -231,9 +234,10 @@ static void log_settings(const char *head)
     s_cat(b, " enable="); s_num(b, S.enable);
     s_cat(b, " filter="); s_cat(b, S.filter == FILTER_CATROM ? "catmull-rom" : "bspline");
     s_cat(b, " fog="); s_num(b, S.layer[FOG]);
-    s_cat(b, " ("); s_flt(b, S.threshold[FOG]); s_cat(b, "/"); s_flt(b, S.softness[FOG]); s_cat(b, ")");
+    s_cat(b, " ("); s_flt(b, S.threshold[FOG]); s_cat(b, "/"); s_flt(b, S.softness[FOG]); s_cat(b, "/"); s_flt(b, S.rim[FOG]); s_cat(b, ")");
     s_cat(b, " shroud="); s_num(b, S.layer[SHROUD]);
-    s_cat(b, " ("); s_flt(b, S.threshold[SHROUD]); s_cat(b, "/"); s_flt(b, S.softness[SHROUD]); s_cat(b, ")");
+    s_cat(b, " ("); s_flt(b, S.threshold[SHROUD]); s_cat(b, "/"); s_flt(b, S.softness[SHROUD]); s_cat(b, "/"); s_flt(b, S.rim[SHROUD]); s_cat(b, ")");
+    s_cat(b, " rimwidth="); s_flt(b, S.rim_width);
     s_cat(b, " antialias="); s_flt(b, S.antialias);
     logline(b);
 }
@@ -297,7 +301,7 @@ static int draw_layer(void *dev, int which, DWORD pt, UINT mi, UINT nv, UINT si,
     k[0][0] = n; k[0][1] = 1.0f / n; k[0][2] = S.threshold[which]; k[0][3] = S.softness[which];
     k[1][0] = (float)x0 + 0.5f; k[1][1] = (float)y0 + 0.5f;
     k[1][2] = (float)(x0 + gw) - 0.5f; k[1][3] = (float)(y0 + gh) - 0.5f;
-    k[2][0] = S.antialias; k[2][1] = k[2][2] = k[2][3] = 0.0f;
+    k[2][0] = S.antialias; k[2][1] = S.rim[which]; k[2][2] = 1.0f / S.rim_width; k[2][3] = 0.0f;
 
     d9_save(d9, &sv);
     d9_bind(d9, sv.vs, ps);           /* the vertex stage stays the engine's */

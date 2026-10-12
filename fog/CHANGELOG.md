@@ -4,6 +4,15 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 The reasoning is in [`README.md`](README.md).
 
+## 1.1.0 — 2026-10-13
+
+### Added
+- Stock's darker rim along the shroud's and the fog's edge, put back by shading the art
+  by the reconstructed mask: `FogRim=`, `ShroudRim=` (1, as stock; 0, flat as 1.0.0)
+  and `RimWidth=` (0.25, stock's width).
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-10-12
 
 ### Added

@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.30.0 — 2026-10-13
+
+Layers: fog 1.1.0.
+
+### Added
+- Stock's darker rim along the fog's and the shroud's edge, back over the smooth edge:
+  `FogRim=`, `ShroudRim=`, `RimWidth=` in `Fog.ini` (fog 1.1.0).
+
+Installed, not yet seen in game.
+
 ## 11.29.0 — 2026-10-12
 
 Layers: fog 1.0.0, testbench 3.11.0.
