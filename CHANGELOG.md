@@ -5,6 +5,15 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.30.3 — 2026-10-13
+
+Layers: shields 1.1.1.
+
+### Changed
+- The shields-down flash at half strength and the arcs a little sparser (shields 1.1.1).
+
+Installed, not yet seen in game.
+
 ## 11.30.2 — 2026-10-13
 
 Layers: nebulae 1.2.1.

@@ -407,7 +407,7 @@ static void read_settings(void)
     inirgb("LowColour", S.low, 255, 70, 40);
 
     S.down            = (int)GetPrivateProfileIntA("Shields", "Down", 1, g_ini);
-    S.down_strikes    = (int)GetPrivateProfileIntA("Shields", "DownStrikes", 5, g_ini);
+    S.down_strikes    = (int)GetPrivateProfileIntA("Shields", "DownStrikes", 4, g_ini);
     S.down_bright     = inif("DownBrightness", 2.5f);
     inirgb("DownArc", S.down_arc, 215, 230, 255);
     inirgb("DownGlow", S.down_glow, 140, 210, 510);
@@ -418,8 +418,8 @@ static void read_settings(void)
     S.down_glow_width = inif("DownGlowWidth", 0.08f);
     S.down_branches   = inif("DownBranches", 0.6f);
     S.down_band       = inif("DownBand", 0.35f);
-    S.down_crackle    = inif("DownCrackle", 0.2f);
-    S.down_flash      = inif("DownFlash", 1.2f);
+    S.down_crackle    = inif("DownCrackle", 0.15f);
+    S.down_flash      = inif("DownFlash", 0.6f);
     S.down_flash_time = inif("DownFlashTime", 0.35f);
     S.down_fade       = inif("DownFadeOut", 0.4f);
     S.down_size       = inif("DownStrikeSize", 0.7f);
