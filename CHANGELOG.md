@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.21.1 — 2026-10-12
+
+Layers: lighting 1.17.3.
+
+### Fixed
+- Hull shadows (`Shadows=1`) are made again: since lighting 1.17.2 every opaque hull
+  counted as blended (the engine's ONE / ZERO blend) and the shadow map was never drawn.
+  Hulls under a mirrored matrix (the Steamrunner, the Intrepid) are drawn front faces
+  out in the shaders, which was what had darkened them (lighting 1.17.3).
+
+Installed, not yet seen in game.
+
 ## 11.21.0 — 2026-10-12
 
 Layers: sky 1.2.0.

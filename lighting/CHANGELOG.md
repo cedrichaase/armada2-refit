@@ -4,6 +4,21 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.17.3 — 2026-10-12
+
+### Fixed
+- `Shadows=1` cast no shadow at all since 1.17.2: the engine draws every opaque hull with
+  blending on as ONE / ZERO, so every hull draw counted as blended and the map was never
+  made. A draw now counts as blended only with another blend, and as alpha-tested only
+  with an `ALPHAFUNC` other than ALWAYS.
+- The cause of 1.17.2's dark Steamrunner (and Intrepid): a draw under a mirrored matrix
+  (`FixMirrored`) has its winding reversed, so under the engine's cull the shaders drew
+  its back faces, the far side of the hull seen through it, which the map correctly put
+  behind the near side. With `Shaders=1` such a draw now takes the opposite cull and is lit
+  as a stock hull: mirrored hulls show their outside, and their own shadows.
+
+Installed, not yet seen in game.
+
 ## 1.17.2 — 2026-10-07
 
 ### Fixed
