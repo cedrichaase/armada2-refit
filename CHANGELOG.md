@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.30.0 — 2026-10-13
+
+Layers: specials 1.0.0, testbench 3.12.0.
+
+### Added
+- The `specials` layer: `Specials.asi` draws the warp flash by shader, in place of the
+  stock sprite: a white-hot core and blue glow with a lens streak, bursting as the craft
+  goes and leaving a ring, lighting the hulls about it (specials 1.0.0). `./install`
+  runs `specials/install.sh`; `a2mod` switches `Specials.asi` and `Specials.ini` as the
+  `specials` layer; the bench gathers `Specials.log`. Not in the release package yet.
+
+Installed, not yet seen in game.
+
 ## 11.29.0 — 2026-10-12
 
 Layers: fog 1.0.0, testbench 3.11.0.
