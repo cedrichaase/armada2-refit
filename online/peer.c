@@ -180,6 +180,7 @@ typedef HRESULT (__stdcall *AddrAdd_t)(void *, const WCHAR *, const void *, DWOR
 #define MAX_CONNS    16
 #define NAME_CHARS   64
 #define FRAG         1100            /* reliable payload per datagram */
+#define MAX_MSG      (256 * 1024)    /* one reliable message, reassembled; the game's are under 1 KB */
 #define WINDOW       64              /* out-of-order slots, and packets in flight */
 #define LOST_MS      15000
 #define PING_MS      1000
@@ -214,6 +215,7 @@ typedef struct {
     BYTE  *msg; int msg_len, msg_cap;
     DWORD  last_rx, last_tx, rtt, rto;
     int    rules;                    /* host: this joiner runs QOLRules with PayOnQueue */
+    DWORD  kicked;                   /* host: when DestroyPeer closed it (open = 0) */
 } Conn;
 
 typedef struct {
@@ -244,7 +246,8 @@ typedef struct {
     WORD            bound;           /* port, host order; 0 = ephemeral */
     HANDLE          thread;
     DWORD           thread_id;
-    volatile int    stop, closed;
+    volatile LONG   gen;             /* the network thread runs while this is the value it started with */
+    volatile int    closed;
     int             role;
     DPNID           self, host, next_id;
     int             rules_all;       /* every player runs QOLRules: what the game plays by */
@@ -671,7 +674,7 @@ static int get_desc(const BYTE *b, int avail, AppDesc *d, WCHAR *name)
     n += get_w(b + n, avail - n, name);
     d->name = name;
     if (n < avail && b[n]) d->flags |= DPNSESSION_REQUIREPASSWORD;
-    return n + 1;
+    return n < avail ? n + 1 : n;        /* the password byte, when it is there */
 }
 
 /* host: every joiner but `except` */
@@ -806,23 +809,37 @@ static void on_message(Peer *p, Conn *c, const BYTE *m, int n)
 {
     Ev *e;
     if (n < 1) return;
+    /* a joiner hears nothing but its acceptance before it is in; a host nothing from
+     * a connection it no longer has a player on (DestroyPeer) */
+    if (p->role == ROLE_JOINER && !c->open && m[0] != R_ACCEPT) return;
+    if (p->role == ROLE_HOST && (!c->open || !c->player)) return;
     switch (m[0]) {
     case R_ACCEPT: {                             /* joiner: we are in */
         AppDesc d; WCHAR name[NAME_CHARS];
         int off, k, count;
         DPNID me, host;
+        Player *pl;
         if (p->role != ROLE_JOINER || !p->cn_on || n < 13 || get32(m + 9) != p->cn_nonce) return;
         me = get32(m + 1); host = get32(m + 5);
         off = 13;
         k = get_desc(m + off, n - off, &d, name);
         if (k < 0) return;
         off += k;
+        if (!(pl = player_add(p, me, DPNPLAYER_LOCAL, p->myname, -1))) {
+            e = ev_new(EV_CONNECT_DONE, 0, 0);
+            if (e) { e->a = (DWORD)DPNERR_GENERIC; e->b = p->cn_h; e->ctx = p->cn_ctx; ev_push(p, e); }
+            p->cn_on = 0;
+            conn_free(c);
+            plog(p, "accepted, but no room for ourselves in the player table");
+            return;
+        }
+        pl->ctx = p->cn_pctx;
         p->sflags = d.flags; p->sinst = d.instance; p->sapp = d.application;
         p->smax = d.max; p->scur = d.cur; wcopy(p->sname, name, NAME_CHARS);
         p->self = me; p->host = host;
         c->open = 1; c->player = host;
-        player_add(p, me, DPNPLAYER_LOCAL, p->myname, -1)->ctx = p->cn_pctx;
-        e = ev_new(EV_CREATE, 0, 0); e->a = me; ev_push(p, e);
+        e = ev_new(EV_CREATE, 0, 0);
+        if (e) { e->a = me; ev_push(p, e); }
         count = off + 2 <= n ? (int)get16(m + off) : 0;
         off += 2;
         while (count-- > 0 && off + 10 <= n) {
@@ -830,13 +847,12 @@ static void on_message(Peer *p, Conn *c, const BYTE *m, int n)
             DWORD fl = get32(m + off + 4);
             off += 8;
             off += get_w(m + off, n - off, name);
-            if (id == me) continue;
-            player_add(p, id, fl, name, -1);
-            e = ev_new(EV_CREATE, 0, 0); e->a = id; ev_push(p, e);
+            if (id == me || !player_add(p, id, fl, name, -1)) continue;
+            e = ev_new(EV_CREATE, 0, 0);
+            if (e) { e->a = id; ev_push(p, e); }
         }
         e = ev_new(EV_CONNECT_DONE, off < n ? m + off : 0, off < n ? n - off : 0);
-        e->a = S_OK; e->b = p->cn_h; e->c = me; e->ctx = p->cn_ctx;
-        ev_push(p, e);
+        if (e) { e->a = S_OK; e->b = p->cn_h; e->c = me; e->ctx = p->cn_ctx; ev_push(p, e); }
         p->cn_on = 0;
         plog(p, "connected");
         {
@@ -869,7 +885,8 @@ static void on_message(Peer *p, Conn *c, const BYTE *m, int n)
         if (p->role != ROLE_JOINER || n < 11) return;
         get_w(m + 9, n - 9, name);
         if (!player_of(p, get32(m + 1)) && player_add(p, get32(m + 1), get32(m + 5), name, -1)) {
-            e = ev_new(EV_CREATE, 0, 0); e->a = get32(m + 1); ev_push(p, e);
+            e = ev_new(EV_CREATE, 0, 0);
+            if (e) { e->a = get32(m + 1); ev_push(p, e); }
             p->scur++;
         }
         break;
@@ -890,7 +907,8 @@ static void on_message(Peer *p, Conn *c, const BYTE *m, int n)
         if (!pl) return;
         wcopy(pl->name, name, NAME_CHARS);
         if (p->role == ROLE_HOST) { put32((BYTE *)m + 1, id); to_joiners(p, m, n, id); }
-        e = ev_new(EV_PEER_INFO, 0, 0); e->a = id; ev_push(p, e);
+        e = ev_new(EV_PEER_INFO, 0, 0);
+        if (e) { e->a = id; ev_push(p, e); }
         break;
     }
     case R_APPDESC: {
@@ -1059,10 +1077,16 @@ static void send_ack(Peer *p, Conn *c)
  * Returns 0 if the message ended the connection. */
 static int take(Peer *p, Conn *c, const BYTE *d, int n)
 {
+    if (c->msg_len + n - 5 > MAX_MSG) {             /* nothing the game sends: a peer gone wrong */
+        plog(p, "a message over the size limit: dropping the connection");
+        conn_lost(p, c, DPNDESTROYPLAYERREASON_CONNECTIONLOST);
+        return 0;
+    }
     if (c->msg_len + n - 5 > c->msg_cap) {
-        int   cap = c->msg_len + n + 2048;
-        BYTE *g = (BYTE *)mem(cap);
-        if (!g) return 1;
+        int   cap = c->msg_cap * 2 > c->msg_len + n + 2048 ? c->msg_cap * 2 : c->msg_len + n + 2048;
+        BYTE *g;
+        if (cap > MAX_MSG) cap = MAX_MSG;
+        if (!(g = (BYTE *)mem(cap))) return 1;
         mcpy(g, c->msg, c->msg_len);
         unmem(c->msg);
         c->msg = g; c->msg_cap = cap;
@@ -1182,8 +1206,8 @@ static void on_packet(Peer *p, DWORD ip, WORD port, const BYTE *b, int n)
             if (e) { e->a = ip; e->b = port; e->c = get32(b + 16); ev_push(p, e); }
         }
         break;
-    case P_ENUM_R:
-        if (p->en_on && n >= 4) {
+    case P_ENUM_R:                                  /* only from where the search asks */
+        if (p->en_on && n >= 4 && p->en_ip && ip == p->en_ip && port == p->en_port) {
             e = ev_new(EV_ENUM_RESPONSE, b + 4, n - 4);
             if (e) { e->a = ip; e->b = port; e->c = GetTickCount() - get32(b); ev_push(p, e); }
         }
@@ -1194,8 +1218,7 @@ static void on_packet(Peer *p, DWORD ip, WORD port, const BYTE *b, int n)
     case P_REJECT:
         if (p->cn_on && c && n >= 8 && get32(b) == p->cn_nonce) {
             e = ev_new(EV_CONNECT_DONE, 0, 0);
-            e->a = get32(b + 4); e->b = p->cn_h; e->ctx = p->cn_ctx;
-            ev_push(p, e);
+            if (e) { e->a = get32(b + 4); e->b = p->cn_h; e->ctx = p->cn_ctx; ev_push(p, e); }
             p->cn_on = 0;
             conn_free(c);
             plog(p, "refused by the host");
@@ -1287,8 +1310,7 @@ static void tick(Peer *p)
     if (p->en_on && p->en_ip && (int)(now - p->en_next) >= 0) {
         if (p->en_left == 0 || (p->en_end && (int)(now - p->en_end) >= 0)) {
             Ev *e = ev_new(EV_ASYNC_DONE, 0, 0);
-            e->a = p->en_h; e->b = S_OK; e->ctx = p->en_ctx;
-            ev_push(p, e);
+            if (e) { e->a = p->en_h; e->b = S_OK; e->ctx = p->en_ctx; ev_push(p, e); }
             p->en_on = 0;
         } else {
             put32(p->en_pkt + 5 + 16, now);
@@ -1301,8 +1323,7 @@ static void tick(Peer *p)
         Conn *c = &p->conns[0];
         if (now - p->cn_start > CONNECT_MS) {
             Ev *e = ev_new(EV_CONNECT_DONE, 0, 0);
-            e->a = DPNERR_NORESPONSE; e->b = p->cn_h; e->ctx = p->cn_ctx;
-            ev_push(p, e);
+            if (e) { e->a = DPNERR_NORESPONSE; e->b = p->cn_h; e->ctx = p->cn_ctx; ev_push(p, e); }
             p->cn_on = 0;
             if (c->used) conn_free(c);
             plog(p, "no answer from the host");
@@ -1316,6 +1337,10 @@ static void tick(Peer *p)
         Pkt  *k;
         if (!c->used || (!c->open && p->role != ROLE_HOST)) continue;
         if (now - c->last_rx > LOST_MS) { conn_lost(p, c, DPNDESTROYPLAYERREASON_CONNECTIONLOST); continue; }
+        if (p->role == ROLE_HOST && !c->open && (!c->unacked || now - c->kicked > LOST_MS)) {
+            conn_free(c);                /* kicked, and told so (or not answering): gone */
+            continue;
+        }
         for (k = c->unacked; k; k = k->next)
             if (now - k->sent > c->rto * (DWORD)(k->tries > 6 ? 6 : k->tries)) {
                 raw_send(p, c->ip, c->port, k->data, k->len);
@@ -1366,7 +1391,15 @@ static void accept_joiner(Peer *p, Ev *e, void *pctx, const void *reply, DWORD r
     c = conn_new(p, e->a, (WORD)e->b);
     id = p->next_id++;
     pl = c ? player_add(p, id, 0, name, (int)(c - p->conns)) : 0;
-    if (!pl) { LeaveCriticalSection(&p->cs); return; }
+    if (!pl) {                           /* no room after all: the joiner hears so */
+        int k = hdr(m, P_REJECT);
+        if (c) conn_free(c);
+        put32(m + k, get32(e->data)); put32(m + k + 4, (DWORD)DPNERR_SESSIONFULL);
+        raw_send(p, e->a, (WORD)e->b, m, k + 8);
+        LeaveCriticalSection(&p->cs);
+        plog(p, "no room for a joiner the game accepted");
+        return;
+    }
     pl->ctx = pctx;
     c->player = id; c->open = 1;
     p->scur++;
@@ -1463,7 +1496,7 @@ static void deliver_event(Peer *p, Ev *e)
         m.sender = make_addr(e->a, (WORD)e->b);
         m.device = make_addr(0, 0);
         m.desc = &d;
-        m.data = e->len > k ? e->data + k : 0; m.data_size = (DWORD)(e->len - k);
+        m.data = e->len > k ? e->data + k : 0; m.data_size = e->len > k ? (DWORD)(e->len - k) : 0;
         m.ctx = p->en_ctx; m.rtt = e->c;
         if (m.sender) deliver(p, DPN_MSGID_ENUM_HOSTS_RESPONSE, &m);
         drop_addr(m.sender); drop_addr(m.device);
@@ -1556,9 +1589,10 @@ static void deliver_event(Peer *p, Ev *e)
     unmem(e);
 }
 
-static void drain(Peer *p)
+/* stops as soon as the thread it runs on has been told to stop (gen changed) */
+static void drain(Peer *p, LONG gen)
 {
-    for (;;) {
+    while (p->gen == gen) {
         Ev *e;
         EnterCriticalSection(&p->cs);
         e = p->in_head;
@@ -1571,35 +1605,53 @@ static void drain(Peer *p)
 
 /* ---- the network thread ----------------------------------------------------- */
 
+/* The thread runs while p->gen is the value it was started with; stopping it is
+ * bumping p->gen.  A Close or a rebind from inside the game's handler (this very
+ * thread) cannot wait for it, so it notices on return, and exits however the peer
+ * is used afterwards: even if a new thread has been started meanwhile. */
+typedef struct { Peer *p; LONG gen; } NetArg;
+
 static DWORD __stdcall net_thread(void *arg)
 {
-    Peer *p = (Peer *)arg;
+    Peer *p = ((NetArg *)arg)->p;
+    LONG  gen = ((NetArg *)arg)->gen;
     BYTE  b[2048];
+    unmem(arg);
     CoInitializeEx(0, COINIT_MULTITHREADED);       /* the address objects are COM */
-    while (!p->stop) {
+    while (p->gen == gen) {
         FD_SET  r;
         TIMEVAL tv;
         r.count = 1; r.fd[0] = p->sock;
         tv.sec = 0; tv.usec = 10000;
         if (select(0, &r, 0, 0, &tv) > 0) {
-            for (;;) {
+            while (p->gen == gen) {
                 SOCKADDR_IN from;
                 int fl = sizeof from;
                 int n = recvfrom(p->sock, (char *)b, sizeof b, 0, &from, &fl);
                 if (n <= 0) break;
                 EnterCriticalSection(&p->cs);
-                on_packet(p, from.addr, from.port, b, n);
+                if (p->gen == gen) on_packet(p, from.addr, from.port, b, n);
                 LeaveCriticalSection(&p->cs);
-                drain(p);
+                drain(p, gen);
             }
         }
         EnterCriticalSection(&p->cs);
-        tick(p);
+        if (p->gen == gen) tick(p);
         LeaveCriticalSection(&p->cs);
-        drain(p);
+        drain(p, gen);
     }
     CoUninitialize();
     return 0;
+}
+
+/* tells the network thread to stop, and waits for it unless it is the caller */
+static void net_stop(Peer *p)
+{
+    if (!p->thread) return;
+    __sync_add_and_fetch(&p->gen, 1);
+    if (GetCurrentThreadId() != p->thread_id) WaitForSingleObject(p->thread, 5000);
+    CloseHandle(p->thread);
+    p->thread = 0;
 }
 
 /* (re)bind the socket to `port` (host order, 0 = any) and run the thread */
@@ -1611,13 +1663,7 @@ static HRESULT net_open(Peer *p, WORD port)
     char  b[80];
 
     if (p->sock != INVALID_SOCKET && (port == 0 || port == p->bound)) return S_OK;
-    if (p->thread) {
-        p->stop = 1;
-        if (GetCurrentThreadId() != p->thread_id) WaitForSingleObject(p->thread, 5000);
-        CloseHandle(p->thread);
-        p->thread = 0;
-        p->stop = 0;
-    }
+    net_stop(p);
     if (p->sock != INVALID_SOCKET) closesocket(p->sock);
     p->sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (p->sock == INVALID_SOCKET) return DPNERR_GENERIC;
@@ -1641,7 +1687,13 @@ static HRESULT net_open(Peer *p, WORD port)
     p->bound = port;
     s_cat(b, "UDP port "); s_num(b, hton16(a.port));
     plog(p, b);
-    p->thread = CreateThread(0, 0, net_thread, p, 0, &p->thread_id);
+    {
+        NetArg *na = (NetArg *)mem(sizeof(NetArg));
+        if (!na) return DPNERR_OUTOFMEMORY;
+        na->p = p; na->gen = p->gen;
+        p->thread = CreateThread(0, 0, net_thread, na, 0, &p->thread_id);
+        if (!p->thread) unmem(na);
+    }
     return p->thread ? S_OK : DPNERR_GENERIC;
 }
 
@@ -2014,12 +2066,7 @@ static HRESULT __stdcall n_Close(void *self, DWORD flags)
 
     if (p->closed) return S_OK;
     p->closed = 1;
-    if (p->thread) {
-        p->stop = 1;
-        if (GetCurrentThreadId() != p->thread_id) WaitForSingleObject(p->thread, 5000);
-        CloseHandle(p->thread);
-        p->thread = 0;
-    }
+    net_stop(p);
     EnterCriticalSection(&p->cs);
     if (p->sv_state && p->sock != INVALID_SOCKET) {
         BYTE r[16];
@@ -2074,7 +2121,6 @@ static HRESULT __stdcall n_Close(void *self, DWORD flags)
         deliver(p, DPN_MSGID_DESTROY_PLAYER, &m);
     }
     p->handler = 0;
-    p->stop = 0;
     return S_OK;
 }
 
@@ -2092,7 +2138,11 @@ static HRESULT __stdcall n_DestroyPeer(void *self, DPNID id, const void *data, D
         Conn *c = &p->conns[pl->conn];
         m[0] = R_TERMINATE; put32(m + 1, (DWORD)DPNERR_HOSTTERMINATEDSESSION);
         rel_send(p, c, m, 5);
-        c->player = 0;                   /* the BYE that follows is no second departure */
+        /* the connection only carries the R_TERMINATE now, until it is acked (tick):
+         * nothing it sends reaches the game, and the BYE that follows is no second
+         * departure */
+        c->player = 0; c->open = 0; c->kicked = GetTickCount();
+        pl->conn = -1;
         if (p->scur) p->scur--;
         destroy_player(p, id, DPNDESTROYPLAYERREASON_HOSTDESTROYEDPLAYER);
         m[0] = R_PLAYER_DEL; put32(m + 1, id); put32(m + 5, DPNDESTROYPLAYERREASON_HOSTDESTROYEDPLAYER);
