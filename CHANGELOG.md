@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.33.0 — 2026-10-13
+
+Layers: nebulae 1.4.0.
+
+### Added
+- The Cerulean nebula's specks wander in slow, roughly circular loops, each out of step
+  with its neighbours: `Swirl=` (nebulae 1.4.0).
+
+Installed, not yet seen in game.
+
 ## 11.32.1 — 2026-10-13
 
 Layers: nebulae 1.3.1.

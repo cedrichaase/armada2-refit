@@ -383,6 +383,11 @@ typedef struct {
      * the fine octave), w the fine octave's drift now (FuzzSpeed=, noise tiles a second) */
     float    fz[4];
     float    fuzz_speed, fringe_reach;
+    /* c40: x Swirl= (how far the gas wanders about its place, world units), y SwirlScale=
+     * (the noise that sets each place's phases, of the tile), z, w the two circles'
+     * phases now (radians; SwirlPeriod= seconds for the first to go round) */
+    float    sw[4];
+    float    swirl_period;
     float    ring_cycle;      /* RingCycle=: seconds for the colours to go round */
     float    pulse_speed, pulse_wander, pulse_phase;   /* PulseSpeed= (a second), PulseWander= (of it) */
     double   pulse_last;      /* when the phase was last advanced (seconds) */
@@ -504,6 +509,12 @@ static int recipe_read(Cls *c)
     c->fz[3] = 0.0f;
     c->fringe_reach = ini1(f, "FringeReach", 1.6f);
     c->fuzz_speed = ini1(f, "FuzzSpeed", 0.01f);
+    c->sw[0] = ini1(f, "Swirl", 0.0f);
+    c->sw[1] = ini1(f, "SwirlScale", 1.0f);
+    c->sw[2] = c->sw[3] = 0.0f;
+    c->swirl_period = ini1(f, "SwirlPeriod", 40.0f);
+    if (c->sw[0] < 0.0f) c->sw[0] = 0.0f;
+    if (c->swirl_period < 1.0f) c->swirl_period = 1.0f;
     c->edge_dim = ini1(f, "EdgeOnDim", 0.5f);
     c->hue_cycle = ini1(f, "HueCycle", 0.0f);
     c->hue_swing = ini1(f, "HueSwing", 0.5f);
@@ -1263,7 +1274,7 @@ static int bake_volume(void *d9, Cls *c, float half)
     ok = j == Y;
     if (ok) {   /* the occupancy: widened by the flow and a texel, then uploaded */
         LOCKED lk;
-        int    R = (int)(c->k[13][1] / (size[0] / (float)X)) + 2, r, x;
+        int    R = (int)((c->k[13][1] + c->sw[0]) / (size[0] / (float)X)) + 2, r, x;   /* the swirl's reach too */
         if (R > 16) R = 16;
         occ_dilate(X, Z, R);
         {   /* the box the gas fills, from the widened record: the slices need go no further */
@@ -1280,7 +1291,7 @@ static int bake_volume(void *d9, Cls *c, float half)
             }
             c->gbox = x1 >= x0;
             if (c->gbox) {
-                float m = c->k[13][1] + size[1] / (float)Y;          /* the flow's reach and a layer */
+                float m = c->k[13][1] + c->sw[0] + size[1] / (float)Y;   /* the flow's and swirl's reach and a layer */
                 c->glo[0] = c->vlo[0] + (float)x0 * size[0] / (float)X;
                 c->ghi[0] = c->vlo[0] + (float)(x1 + 1) * size[0] / (float)X;
                 c->glo[2] = c->vlo[2] + (float)z0 * size[2] / (float)Z;
@@ -2305,6 +2316,10 @@ static int draw_gas(void)
              * rearranged itself in one frame. */
             c->k[13][0] = fmod_f(sec * c->flow_speed, 100.0f);
             c->fz[3] = fmod_f(sec * c->fuzz_speed, 100.0f);   /* wraps as the flow's does */
+            /* the swirl's two circles: the second turns the other way, 1.618 times as
+             * fast, so the path never quite repeats; each wraps at its own full turn */
+            c->sw[2] = 6.2831853f * fmod_f(sec / c->swirl_period, 1.0f);
+            c->sw[3] = 6.2831853f * fmod_f(sec * 1.618034f / c->swirl_period, 1.0f);
             c->ex[1][3] = fmod_f(sec / c->ring_cycle, 1.0f);   /* the colours are a cycle: seamless at 1 */
             {   /* the pulse: its speed wanders, as stock's; advanced by the time that has
                  * passed, so the action camera's second draw adds nothing */
@@ -2358,6 +2373,7 @@ static int draw_gas(void)
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
         d9_psconst(d9, 24, &c->ex[0][0], 8);
         d9_psconst(d9, 38, c->fz, 1);
+        d9_psconst(d9, 40, c->sw, 1);
         {   /* c35: the shadow map (x 0: none, and the shader reads no map); c36: towards the
              * Key, w this class's share of it; c37: its forward scattering */
             float k[3][4], s = key_share(c), g = c->scatter >= 0.0f ? c->scatter : g_scatter;

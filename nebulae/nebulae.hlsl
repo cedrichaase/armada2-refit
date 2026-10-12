@@ -52,6 +52,7 @@ float4 k_sh2     : register(c34);  //   and depth along the Key (0..1 over the h
 float4 k_sh      : register(c35);  //   x 1: there is a map (0: none), y the depth bias, z the penumbra (u, v per depth behind the caster), w half a texel (u, v)
 float4 k_key     : register(c36);  // xyz: towards the Key (Lighting.asi); w: the Key's share of the gas's light (0: none, all the gas's own)
 float4 k_scat    : register(c37);
+float4 k_swirl   : register(c40);  // x: Swirl, how far the gas wanders about its place (world units); y: its phases' scale (of the tile); z, w: the two circles' phases now (radians)
 float4 k_fuzz    : register(c38);  // x: Fringe, a thin haze about the body; y: its noise's scale (of the tile); z: Fuzz, the outline feathered; w: the fine octave's drift now (noise tiles)  // the Key scattered forward: x 1 + g*g, y 2g (Henyey-Greenstein's g, Scatter=)
 
 sampler3D s_noise : register(s0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
@@ -350,7 +351,7 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     // this height (the record is widened by the flow, so the flow cannot reach any).
     float3 uvw = (p - k_vlo.xyz) * k_vsz.xyz;
     float4 o = tex2D(s_occ, uvw.xz);
-    float  m = k_flow.y * k_vsz.y + 0.02;
+    float  m = (k_flow.y + k_swirl.x) * k_vsz.y + 0.02;
     if (o.r < 0.006 || uvw.y < o.b - m || uvw.y > o.g + m) return float4(0, 0, 0, -1);
     // Flow: the volume read through a warp field that drifts with time, so the gas
     // and its outline churn slowly instead of standing still.
@@ -367,6 +368,18 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     // in each half of the gap, stratified, which halves the noise the jitter leaves.
     float3 dir = (i.w - k_eye.xyz) / dist * (i.t.x * 0.25);
     float3 pa = p + fl * k_flow.y;
+    // Swirl: the read goes round two circles, the second the other way and 1.618 times
+    // as fast, at phases and a size that vary smoothly from place to place, so each
+    // speck wanders in loops out of step with its neighbours. The phases are fixed in
+    // the world and only the time turns them: the field is never torn apart. Within
+    // Swirl= on every axis, the reach the occupancy record allows for.
+    if (k_swirl.x > 0.0) {
+        float3 sn = tex3D(s_noise, rot(p) * (k_noise.x * k_swirl.y) + k_seed.yzx + float3(0.29, 0.61, 0.17)).gba;
+        float  a1 = k_swirl.z + sn.x * 6.2832;
+        float  a2 = -k_swirl.w + sn.y * 6.2832;
+        float  r  = saturate(0.35 + sn.z * 0.9) * k_swirl.x;
+        pa += r * (0.62 * float3(cos(a1), 0.4 * sin(a2), sin(a1)) + 0.38 * float3(sin(a2), 0.6 * cos(a1), cos(a2)));
+    }
     float4 v;
     if (k_samp.x > 1.5)
         v = 0.5 * (tex3D(s_vol, ((pa - dir - k_vlo.xyz) * k_vsz.xyz).xzy) +   // width x, height z, depth y
