@@ -355,7 +355,7 @@ static Recipe *recipe_now(DWORD frame)
 
 enum { D9_CREATECUBETEXTURE = 25, D9_GETRENDERTARGETDATA = 32, D9_CREATEOFFSCREEN = 36,
        D9_SETRENDERTARGET2 = 37, D9_GETRENDERTARGET2 = 38, D9_SETDEPTHSTENCIL = 39,
-       D9_GETDEPTHSTENCIL = 40, D9_GETVIEWPORT = 48, D9_CREATESTATEBLOCK = 59,
+       D9_GETDEPTHSTENCIL = 40, D9_SETVIEWPORT = 47, D9_GETVIEWPORT = 48, D9_CREATESTATEBLOCK = 59,
        D9_DRAWPRIMITIVEUP = 83, D9_CREATEQUERY = 118 };
 enum { SB_CAPTURE = 4, SB_APPLY = 5, Q_ISSUE = 6, Q_GETDATA = 7,
        TEX_GETSURFACE = 18, CUBE_LOCK = 19, CUBE_UNLOCK = 20, SURF_LOCK = 13, SURF_UNLOCK = 14 };
@@ -367,6 +367,7 @@ typedef long (__stdcall *RS_t)(void *, DWORD, DWORD);
 typedef long (__stdcall *SS_t)(void *, DWORD, DWORD, DWORD);
 typedef long (__stdcall *FVF_t)(void *, DWORD);
 typedef long (__stdcall *VP_t)(void *, DWORD *);
+typedef long (__stdcall *SetVP_t)(void *, const DWORD *);
 typedef long (__stdcall *MakeQ_t)(void *, DWORD, void **);
 typedef long (__stdcall *Issue_t)(void *, DWORD);
 typedef long (__stdcall *GetData_t)(void *, void *, DWORD, DWORD);
@@ -442,7 +443,10 @@ static int timing_slot(void *d9)
     for (i = 0; i < NQ; i++) {
         if (g_qbusy[i]) continue;
         if (!g_q[i][0] && (D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][0]) < 0 ||     /* TIMESTAMP */
-                           D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][1]) < 0)) return -1;
+                           D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][1]) < 0)) {
+            unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR;   /* never half a pair */
+            return -1;
+        }
         return i;
     }
     return -1;
@@ -496,6 +500,7 @@ static int bake(void *d9, Recipe *r, void *vs)
     DWORD  fmt = 31;                   /* A2B10G10R10: dim gradients band at 8 bits */
     LARGE  t0, t1;
     Vert   v[4];
+    DWORD  old_vp[6];
     char   b[200];
 
     if (!ps) return 0;
@@ -526,6 +531,7 @@ static int bake(void *d9, Recipe *r, void *vs)
         if (!said) { said = 1; logline("bake: no render target could be made: the stock sky"); }
         goto done;
     }
+    D9_FN(d9, D9_GETVIEWPORT, VP_t)(d9, old_vp);
     D9_FN(d9, D9_GETRENDERTARGET2, GetRT_t)(d9, 0, &old_rt);
     D9_FN(d9, D9_GETDEPTHSTENCIL, Obj_t)(d9, &old_ds);
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, rts);     /* the viewport becomes the face */
@@ -563,6 +569,7 @@ static int bake(void *d9, Recipe *r, void *vs)
     ok = f == 6;
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, old_rt);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, old_ds);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, old_vp);           /* setting the target reset it to the whole target */
     unref(old_rt); unref(old_ds);
 done:
     unref(sys); unref(rts); unref(rt);

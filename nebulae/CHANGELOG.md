@@ -4,6 +4,24 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.0.1 — 2026-10-12
+
+### Fixed
+- The classes are forgotten when the game frees its own: the two calls to
+  `GameObjectClass_Clean` (0x485c06, 0x4873ea) are wrapped. Kept by class pointer, a
+  later game's classes took over stale entries at recycled addresses, their textures
+  stayed held, and after 16 classes every nebula fell back to billboards.
+- A noise, envelope or bake that cannot be made is no longer retried every frame: the
+  noise once per device or `Nebulae.ini` read, a class's bake once per recipe read. A
+  class whose bake failed gets its stock billboards (it vanished at `Resolution=2`).
+- `Resolution=2`: no full-screen composite when no gas box was drawn; the half-size
+  depth and clear passes turn the alpha test off.
+- The viewport is put back after a bake (it covered the whole target in the HUD's
+  action camera); a timing query pair is never left half made; the recipe log line no
+  longer overflows its buffer on a long install path.
+
+Installed, not yet seen in game.
+
 ## 1.0.0 — 2026-10-10
 
 ### Added

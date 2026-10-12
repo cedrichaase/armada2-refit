@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.19.1 — 2026-10-12
+
+Layers: nebulae 1.0.1, sky 1.1.1.
+
+### Fixed
+- Nebulae: classes forgotten when the game frees its own (wrapping
+  `GameObjectClass_Clean`); failed builds latched, falling back to the billboards; no
+  composite without gas; alpha test off in the half-size passes; viewport restored
+  after a bake; timing queries; a log buffer (nebulae 1.0.1).
+- Sky: viewport restored after the bake; timing queries (sky 1.1.1).
+
+Installed, not yet seen in game.
+
 ## 11.19.0 — 2026-10-10
 
 Layers: nebulae 1.0.0.
