@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.22.8 — 2026-10-12
+
+Layers: lighting 1.18.1, platform 3.4.1, sky 1.2.2, nebulae 1.0.3, surfaces 1.0.1.
+
+### Fixed
+- `Lighting.asi`: view slots for new cameras, the near fade's state block and the bump
+  declaration tied to their device, paired vtable patches all or nothing, the glow and
+  phaser colour caches no longer fill up, and the shadow lists turn over with no Key
+  light (lighting 1.18.1).
+- `d9_device()` tells a new device by the d3d9 device, not the d3d8 device's address
+  (platform 3.4.1); `Sky.asi`, `Nebulae.asi` and
+  `Surfaces.asi` rebuilt with it (sky 1.2.2, nebulae 1.0.3, surfaces 1.0.1).
+
+Installed, not yet seen in game.
+
 ## 11.22.7 — 2026-10-12
 
 Layers: nebulae 1.0.2.
