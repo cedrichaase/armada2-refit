@@ -117,12 +117,16 @@ int _fltused = 0;   /* floats without the CRT */
 #define VT_LATINUM         0x6b132c   /* LatinumNebula vtable (a TerrainObject, not a Nebula) */
 #define FN_OBJECT_RENDER   0x4d54e0   /* GameObject::Render, slot 11 of LatinumNebula's vtable */
 #define OBJECT_LIST        0x761084   /* GameObject::objectList, std::list<GameObject *> * */
+#define FN_CLASS_CLEAN     0x4cd4f0   /* GameObjectClass_Clean(), cdecl: frees every class */
+#define SITE_CLEAN_CLOSE   0x485c06   /* in Program::GameClosePostDebriefing: call GameObjectClass_Clean */
+#define SITE_CLEAN_GAME    0x4873ea   /* in Program::GameDoOne: call GameObjectClass_Clean */
 
 typedef void        (__thiscall *Render_t)(void *obj, void *cam);
 typedef void        (__thiscall *Particles_t)(void *eng, void *list);
 typedef const char *(__thiscall *OdfName_t)(void *obj);
 typedef BYTE        (__thiscall *CanSee_t)(void *obj);
 typedef BYTE       *(__cdecl *EntityGet_t)(int handle);
+typedef void        (__cdecl *Clean_t)(void);
 
 /* ---- tiny string/log helpers (no CRT) ---------------------------------- */
 
@@ -360,6 +364,8 @@ typedef struct {
     char     odf[40];
     char     path[360];       /* Nebulae\<odf>.ini */
     int      have;            /* a recipe was read: this class is drawn as gas */
+    int      failed;          /* its envelope or bake could not be made: the stock billboards until the
+                               * recipe, Nebulae.ini or the device changes (not retried every frame) */
     FILETIME time;
     int      gen;             /* counts the reads */
     float    k[NCONST][4];
@@ -408,7 +414,7 @@ static int recipe_read(Cls *c)
     const char *f = c->path;
     float  seed;
     int    i, j;
-    char   b[200];
+    char   b[400];        /* the path is up to 360 */
 
     for (i = 0; i < NCONST; i++) for (j = 0; j < 4; j++) c->k[i][j] = 0.0f;
     if (!file_time(f, &c->time)) return 0;
@@ -496,6 +502,7 @@ static int recipe_read(Cls *c)
     c->extent  = ini1(f, "Extent", 1.3f);
     c->height  = ini1(f, "Height", 3.0f);        /* the domes' height, times the reach */
     c->gen++;
+    c->failed = 0;
 
     b[0] = 0; s_cat(b, "recipe "); s_cat(b, f); s_cat(b, " read");
     logline(b);
@@ -507,7 +514,7 @@ static Cls *class_of(BYTE *obj)
     BYTE       *cls = *(BYTE **)(obj + 0x40);
     const char *name;
     Cls        *c;
-    char        b[200];
+    char        b[200];   /* the odf is up to 39 */
     int         i;
 
     for (i = 0; i < g_ncls; i++) if (g_cls[i].cls == cls) return &g_cls[i];
@@ -554,7 +561,7 @@ static void recipes_reload(void)
 
 enum { D9_GETRENDERTARGETDATA = 32, D9_CREATEOFFSCREEN = 36, D9_SETRENDERTARGET2 = 37,
        D9_GETRENDERTARGET2 = 38, D9_SETDEPTHSTENCIL = 39, D9_GETDEPTHSTENCIL = 40 };
-enum { D9_CREATETEXTURE = 23, D9_CREATEVOLUMETEXTURE = 24, D9_GETVIEWPORT = 48,
+enum { D9_CREATETEXTURE = 23, D9_CREATEVOLUMETEXTURE = 24, D9_SETVIEWPORT = 47, D9_GETVIEWPORT = 48,
        D9_CREATESTATEBLOCK = 59, D9_DRAWPRIMITIVEUP = 83, D9_CREATEQUERY = 118 };
 enum { SB_CAPTURE = 4, SB_APPLY = 5, Q_ISSUE = 6, Q_GETDATA = 7, TEX_LOCK = 19, TEX_UNLOCK = 20 };
 
@@ -581,6 +588,8 @@ typedef long (__stdcall *Obj_t)(void *, void *);
 typedef long (__stdcall *RTData_t)(void *, void *, void *);
 typedef long (__stdcall *SurfLock_t)(void *, void *, const void *, DWORD);
 typedef long (__stdcall *SurfUnlock_t)(void *);
+typedef long (__stdcall *SetVP_t)(void *, const DWORD *);
+typedef long (__stdcall *VP_t)(void *, DWORD *);
 typedef struct { INT pitch; BYTE *bits; } LOCKED;
 typedef struct { INT row, slice; BYTE *bits; } LOCKEDBOX;
 
@@ -604,6 +613,8 @@ static void    *g_bn_tex;    /* the blue noise, MANAGED pool */
 static void    *g_zt, *g_lz, *g_lr;
 static UINT     g_zt_w, g_zt_h, g_lr_w, g_lr_h;
 static int      g_lr_broken;  /* INTZ or a target could not be made: full size from now on */
+static int      g_init_failed; /* the noise or the blue noise could not be made on this device: the stock
+                               * billboards until the device or Nebulae.ini changes */
 
 static void unref(void *o) { if (o) D9_FN(o, D9_RELEASE, D9_Ref_t)(o); }
 
@@ -628,7 +639,9 @@ static void drop_objects(void)
         unref(g_cls[i].env); g_cls[i].env = NULLPTR; g_cls[i].env_gen = -1;
         unref(g_cls[i].vol); g_cls[i].vol = NULLPTR; g_cls[i].vol_gen = -1;
         unref(g_cls[i].occ); g_cls[i].occ = NULLPTR;
+        g_cls[i].failed = 0;
     }
+    g_init_failed = 0;
     for (i = 0; i < NQ; i++) { unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR; g_qbusy[i] = 0; }
     unref(g_qfreq); g_qfreq = NULLPTR; g_freq = 0;
 }
@@ -658,7 +671,10 @@ static int timing_slot(void *d9)
     for (i = 0; i < NQ; i++) {
         if (g_qbusy[i]) continue;
         if (!g_q[i][0] && (D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][0]) < 0 ||     /* TIMESTAMP */
-                           D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][1]) < 0)) return -1;
+                           D9_FN(d9, D9_CREATEQUERY, MakeQ_t)(d9, 10, &g_q[i][1]) < 0)) {
+            unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR;   /* never half a pair */
+            return -1;
+        }
         return i;
     }
     return -1;
@@ -1130,6 +1146,7 @@ static int bake_volume(void *d9, Cls *c, float half)
     int    X, Y, Z, j, ok = 0;
     LARGE  t0, t1;
     Vert   v[4];
+    DWORD  old_vp[6];
     char   m[220];
 
     if (!vs || !ps) return 0;
@@ -1150,7 +1167,7 @@ static int bake_volume(void *d9, Cls *c, float half)
     if (c->vol && (c->vx != X || c->vy != Y || c->vz != Z)) { unref(c->vol); c->vol = NULLPTR; }
     if (!c->vol && D9_FN(d9, D9_CREATEVOLUMETEXTURE, MakeVol_t)(d9, (UINT)X, (UINT)Z, (UINT)Y, 1, 0, 21, 1, &c->vol, NULLPTR) < 0) {
         c->vol = NULLPTR;
-        note_once(&said, "bake: no volume texture could be made: the gas computed per pixel");
+        note_once(&said, "bake: no volume texture could be made: the stock billboards for the class");
         return 0;
     }
     c->vx = X; c->vy = Y; c->vz = Z;
@@ -1158,9 +1175,10 @@ static int bake_volume(void *d9, Cls *c, float half)
     if (D9_FN(d9, D9_CREATETEXTURE, MakeTex_t)(d9, (UINT)X, (UINT)Z, 1, 1, 21, 0, &rt, NULLPTR) < 0 ||      /* RENDERTARGET, DEFAULT */
         D9_FN(rt, 18, Level_t)(rt, 0, &rts) < 0 ||
         D9_FN(d9, D9_CREATEOFFSCREEN, MakeOff_t)(d9, (UINT)X, (UINT)Z, 21, 2, &sys, NULLPTR) < 0) {      /* SYSTEMMEM */
-        note_once(&said, "bake: no render target could be made: the gas computed per pixel");
+        note_once(&said, "bake: no render target could be made: the stock billboards for the class");
         goto done;
     }
+    D9_FN(d9, D9_GETVIEWPORT, VP_t)(d9, old_vp);
     D9_FN(d9, D9_GETRENDERTARGET2, GetRT_t)(d9, 0, &old_rt);
     D9_FN(d9, D9_GETDEPTHSTENCIL, Obj_t)(d9, &old_ds);
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, rts);     /* the viewport becomes the layer */
@@ -1245,6 +1263,7 @@ static int bake_volume(void *d9, Cls *c, float half)
     }
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, old_rt);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, old_ds);
+    D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, old_vp);           /* setting the target reset it to the whole target */
     unref(old_rt); unref(old_ds);
 done:
     unref(sys); unref(rts); unref(rt);
@@ -1369,7 +1388,7 @@ static int gather_one(BYTE *obj)
     int    i;
     if (!obj) return 0;
     c = class_of(obj);
-    if (!c || !c->have || c->n >= MAX_NEB) return 0;
+    if (!c || !c->have || c->failed || c->n >= MAX_NEB) return 0;
     if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj) && !ghosted(obj)) return 0;
     p = (float *)(obj + 0xac);
     c->pos[c->n][0] = p[0]; c->pos[c->n][1] = p[1]; c->pos[c->n][2] = p[2];
@@ -1567,7 +1586,8 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
     D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 4, g_bn_tex);
     for (i = 0; i < (int)(sizeof ss0 / sizeof ss0[0]); i++) {
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 0, ss0[i][0], ss0[i][1]);
-        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 4, ss0[i][0], ss0[i][0] >= 5 ? 1 : ss0[i][1]);   /* wrap, point, no mips */
+        D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 4, ss0[i][0],                                     /* wrap, point, no mips, */
+              ss0[i][0] == 5 || ss0[i][0] == 6 ? 1 : ss0[i][0] == 7 ? 0 : ss0[i][1]);                /* linear: thresholds, not colour */
     }
     for (i = 0; i < (int)(sizeof ssc / sizeof ssc[0]); i++) {
         D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, ssc[i][0], ssc[i][1]);
@@ -1592,12 +1612,10 @@ static void draw_states(void *d9, void *vs, float cols[4][4])
  * pixel's own, so a hull's edge stays sharp. */
 #define FOURCC_INTZ 0x5a544e49UL
 #define RESZ_CODE   0x7fa05000UL
-enum { D9_CLEAR = 43, D9_SETVIEWPORT = 47, SURF_GETDESC = 12, TEX_GETLEVEL = 18 };
+enum { D9_CLEAR = 43, SURF_GETDESC = 12, TEX_GETLEVEL = 18 };
 typedef struct { DWORD format, type, usage, pool, ms, msq; UINT w, h; } SURFDESC;
 typedef long (__stdcall *Desc9_t)(void *, SURFDESC *);
 typedef long (__stdcall *Clear_t)(void *, DWORD, const void *, DWORD, DWORD, float, DWORD);
-typedef long (__stdcall *SetVP_t)(void *, const DWORD *);
-typedef long (__stdcall *VP_t)(void *, DWORD *);
 typedef struct { DWORD x, y, w, h; float mn, mx; } VIEWPORT9;
 
 static int lr_targets(void *d9, UINT zw, UINT zh, UINT fw, UINT fh)
@@ -1732,6 +1750,7 @@ static int lr_begin(void *d9, LrFrame *L, const float *P)
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vpl);
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 168, 15);
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 0);      /* ALPHABLENDENABLE */
+    D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 15, 0);      /* ALPHATESTENABLE: both passes write alpha 0 */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 22, 1);      /* CULLMODE: none */
     D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2 | 0x100);
     d9_bind(d9, qvs, zps);
@@ -1774,10 +1793,11 @@ typedef long (__stdcall *Scissor_t)(void *, const LONG *);
 
 static void lr_end(void *d9, LrFrame *L)
 {
-    int scissor = 0;
+    int scissor = 0, none = !L->nfull && L->nx1 < L->nx0;   /* no gas box was drawn: nothing to add */
     D9_FN(d9, D9_SETRENDERTARGET2, SetRT_t)(d9, 0, L->rt0);
     D9_FN(d9, D9_SETDEPTHSTENCIL, Obj_t)(d9, L->ds0);
     D9_FN(d9, D9_SETVIEWPORT, SetVP_t)(d9, (const DWORD *)&L->vp0);
+    if (none) { unref(L->rt0); unref(L->ds0); L->rt0 = L->ds0 = NULLPTR; return; }
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 7, 0);       /* ZENABLE */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 27, 1);      /* ALPHABLENDENABLE: ONE, INVSRCALPHA (alpha: what the gas hides) */
     D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, 19, 2);
@@ -1868,8 +1888,11 @@ static int draw_gas(void)
         note_once(&said_sb, "no state block: the stock billboards");
         return 0;
     }
-    if (!g_vol && !make_volume(d9)) return 0;
-    if (!g_bn_tex && !make_blue(d9)) return 0;
+    if (g_init_failed) return 0;
+    if ((!g_vol && !make_volume(d9)) || (!g_bn_tex && !make_blue(d9))) {
+        g_init_failed = 1;    /* once a device: the noise alone takes a quarter of a second */
+        return 0;
+    }
     if (!gather()) return 1;
 
     {   /* Which view this is, by its viewport: the HUD's action camera draws the scene
@@ -1943,14 +1966,15 @@ static int draw_gas(void)
             for (k = 0; k < 3; k++) c->k[10][k] = c->light0[k];
         }
         if (!c->env || c->env_sig != c->sig || c->env_gen != c->gen) {
-            if (!bake_envelope(d9, c)) continue;
+            if (!bake_envelope(d9, c)) { c->failed = 1; continue; }
         }
         half = c->radius * c->extent * c->height * (1.0f + c->k[8][3]) + c->ydev;   /* the domes, lumps and how far apart in height */
         if (g_bake && (!c->vol || c->vol_sig != c->sig || c->vol_gen != c->gen)) {
             D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, c->env);
-            bake_volume(d9, c, half);         /* on failure, c->vol stays NULL: per pixel */
+            if (!bake_volume(d9, c, half)) c->failed = 1;   /* the class's billboards from the next frame */
             draw_states(d9, vs, cols);
             if (half_size) lr_rebind(d9, &L);
+            if (c->failed) continue;
         }
         if (half_size && !c->vol) continue;   /* the half-size pass draws only baked gas */
         lo[0] = c->ex0; lo[1] = c->ey - half; lo[2] = c->ez0;
@@ -2128,7 +2152,8 @@ static void __fastcall hook_particles(void *eng, void *edx, void *list)
         if (file_time(g_ini, &t) && (t.lo != g_ini_time.lo || t.hi != g_ini_time.hi)) {
             g_ini_time = t;
             read_settings();
-            for (i = 0; i < g_ncls; i++) g_cls[i].vol_gen = -1;   /* the volume's size may have changed: bake again */
+            for (i = 0; i < g_ncls; i++) { g_cls[i].vol_gen = -1; g_cls[i].failed = 0; }   /* the volume's size may have changed: bake again */
+            g_init_failed = 0;
             logline(g_enable ? "Nebulae.ini read: on" : "Nebulae.ini read: off, the stock billboards");
         }
         recipes_reload();
@@ -2174,7 +2199,7 @@ static void __fastcall hook_nebula_render(BYTE *obj, void *edx, void *cam)
 {
     Cls *c;
     (void)edx;
-    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have) { mark_on_screen(obj, cam); return; }
+    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have && !c->failed) { mark_on_screen(obj, cam); return; }
     ((Render_t)FN_NEBULA_RENDER)(obj, cam);
 }
 
@@ -2182,7 +2207,7 @@ static void __fastcall hook_latinum_render(BYTE *obj, void *edx, void *cam)
 {
     Cls *c;
     (void)edx;
-    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have) { mark_on_screen(obj, cam); return; }
+    if (g_drawing && obj && (c = class_of(obj)) != NULLPTR && c->have && !c->failed) { mark_on_screen(obj, cam); return; }
     ((Render_t)FN_OBJECT_RENDER)(obj, cam);
 }
 
@@ -2192,8 +2217,33 @@ static void __fastcall hook_spirit_render(BYTE *sp, void *edx, void *cam)
     Cls  *c;
     (void)edx;
     if (g_drawing && sp && (obj = ((EntityGet_t)FN_ENTITY_GET)(*(int *)(sp + 8))) != NULLPTR &&
-        (*(DWORD *)obj == VT_NEBULA || *(DWORD *)obj == VT_LATINUM) && (c = class_of(obj)) != NULLPTR && c->have) return;
+        (*(DWORD *)obj == VT_NEBULA || *(DWORD *)obj == VT_LATINUM) && (c = class_of(obj)) != NULLPTR && c->have && !c->failed) return;
     ((Render_t)FN_SPIRIT_RENDER)(sp, cam);
+}
+
+/* GameObjectClass_Clean frees every class when a game ends (Program::GameClosePostDebriefing)
+ * and before the next is set up (Program::GameDoOne). The classes here are keyed by the
+ * engine's class pointer, so they go with it: kept, the next game's classes landed at
+ * the same addresses and took the old entries, and the table filled after a few games. */
+static void classes_forget(void)
+{
+    int  i, n = g_ncls;
+    char b[80];
+    for (i = 0; i < g_ncls; i++) {
+        DWORD *w = (DWORD *)&g_cls[i];
+        UINT   k;
+        unref(g_cls[i].env); unref(g_cls[i].vol); unref(g_cls[i].occ);
+        for (k = 0; k < sizeof(Cls) / sizeof(DWORD); k++) w[k] = 0;
+    }
+    g_ncls = 0;
+    g_drawing = 0;
+    if (n) { b[0] = 0; s_cat(b, "the game's classes are freed: "); s_num(b, n); s_cat(b, " let go"); logline(b); }
+}
+
+static void __cdecl hook_class_clean(void)
+{
+    classes_forget();
+    ((Clean_t)FN_CLASS_CLEAN)();
 }
 
 /* ---- startup ------------------------------------------------------------ */
@@ -2222,7 +2272,7 @@ static int patch_slot(DWORD vt, int slot, DWORD expect, void *to)
 
 static void startup(void)
 {
-    char b[300];
+    char b[400];
     int  n, i, cut = 0;
 
     n = (int)GetModuleFileNameA(NULLPTR, g_dir, 280);
@@ -2252,6 +2302,11 @@ static void startup(void)
             s_cat(b, ", latinum too");
         else
             s_cat(b, "; NOT LatinumNebula's Render: latinum keeps its model");
+        if (patch_call(SITE_CLEAN_CLOSE, FN_CLASS_CLEAN, (void *)hook_class_clean) &
+            patch_call(SITE_CLEAN_GAME, FN_CLASS_CLEAN, (void *)hook_class_clean))
+            s_cat(b, ", classes forgotten with the game's");
+        else
+            s_cat(b, "; NOT GameObjectClass_Clean (both calls): classes are kept from game to game");
     }
     logline(b);
 }

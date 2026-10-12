@@ -152,18 +152,9 @@ Its normals agree with its winding, and its world matrix is a clean rotation apa
 from the mirror; negating that mesh's normals put it right on the bench. The plugin
 does the equivalent without touching the mesh: for a draw under a mirrored matrix it
 reverses the enabled lights' directions and restores them after (N·−L = −(N·L)).
-
-**The mirror also reverses the winding, and the engine's cull mode does not follow it**
-on the vertex-buffer path: the outside of the mesh was culled and the inside of its far
-side drawn. The Steamrunner (`Fcruise2.sod`) is drawn whole under a mirrored matrix
-(scale 1.75, determinant < 0), so from above one saw the inside of its underside, with
-the nacelles showing through the hull from the front. The reversed lights made that pass
-for a lit hull; the shadows gave it away, since the far side's inside lies in the near
-side's shadow and the ship went dark from every side. `hook_dip` swaps `CULLMODE`
-between CW and CCW around a mirrored draw (`mirror_cull`), and a fading one keeps the
-swapped mode for its draw at `Flush`. Bench, 2026-10-12: the Steamrunner from six sides
-shows its bridge, windows and deflector, lit from above, with shadows on; the Akira is as
-before.
+The mirror also reverses the winding, so the engine's cull shows such a mesh's back
+faces: in the shaders (`Shaders=1`) the draw takes the opposite cull and is lit as a
+stock hull instead ("Shadows", "Mirrored draws draw their front faces").
 
 Two approaches that failed: flipping every mesh whose normals point "inward" from its
 centre flipped the correct ones too (by that measure most stock meshes point inward),
@@ -569,8 +560,9 @@ hands them to the pixel shader at their real positions, with the engine's own fa
 than once at the draw's origin, against the normal turned round (`misc.x`, -1). So a
 torpedo's or a pulse's hard sphere lights the side of the hull facing it, the open item
 above, and a large ship near a soft light falls off across its length. A mirrored draw
-(`FixMirrored`), whose normals end up pointing outward, takes them with the sign +1, so
-mirrored meshes get point lights for the first time. Direct3D's slots still get the
+(`FixMirrored`) takes them too, so mirrored meshes get point lights for the first time
+(since lighting 1.17.3 drawn front faces out and with the sign −1 as any hull; before,
+its back faces with +1). Direct3D's slots still get the
 strongest 6, mirrored as before, for any draw that falls back.
 
 On the bench (2026-10-05): in the `firing` scene a draw took the Galaxy's own torpedo as
@@ -899,7 +891,11 @@ with two cameras: the main view and the selection's 3D portrait, each with its o
 draws (bench: 86 and 4, alternating strictly). The plugin therefore keeps the hull lists
 and their frame counts per camera (`g_view`, set in `hook_prerender_all`); with one list
 for both, each view's map was made from the other's hulls and a ship in the main view
-sampled a map of the portrait's one, going dark at random.
+sampled a map of the portrait's one, going dark at random. There are four slots; a camera
+not seen before takes a free one or, with none free, the one rendered longest ago, emptied
+(`view_of`). Before 1.17.3 every camera past the third shared the last slot, so a game
+that made new cameras over time (a portrait re-created per selection, say) brought the
+bug back.
 
 **The map.** R32F, `ShadowSize` square, with its own D24X8 depth surface, orthographic
 along the Key (the brightest directional light in the engine's list). It is fitted round
@@ -954,18 +950,28 @@ shadows on, then the game relaunched with `Shadows=0 PlanetShadows=0`):
   `Lighting.log` reads `shadows: map 1000 of 5 hull draws`.
 
 **Blended draws cast nothing.** The depth pass has no texture or alpha test, so a draw that
-the engine blends or alpha-tests would be an opaque sheet in the map; these are left out
-of the list (`g_sm_trans`), and still look the map up. **Blending is judged by what it
-does**, not by `ALPHABLENDENABLE`: the engine leaves that on for opaque hulls, with
-`SRCBLEND` ONE and `DESTBLEND` ZERO, which is no blend at all. Taken as blending (1.17.2),
-it left every hull drawn after anything blended out of the map, which on the bench was
-every hull of every frame: no map was ever drawn, and in game shadows came and went with
-whatever the engine had drawn last. A draw counts as blended only when it keeps some of
-what is behind it (any pair but ONE, ZERO), or alpha-tests.
+the engine blends or alpha-tests would be an opaque sheet in the map. `sm_take` reads
+`ALPHABLENDENABLE` and `ALPHATESTENABLE`, but neither alone: the engine draws every opaque
+hull with blending on as `ONE` / `ZERO` (bench, 2026-10-12: the only state any hull draw
+had), so a blend counts only when it is not that, and an alpha test only when its
+`ALPHAFUNC` is not ALWAYS. Taking the enable alone (lighting 1.17.2) left every hull out
+and the map was never made. Such draws (`g_sm_trans`) still look the map up.
 
-1.17.2 left blended draws out because a Steamrunner went dark whole, from every side and
-at `ShadowSize=8192`. That was not a blended draw: it was the Steamrunner drawn inside out
-("Mirrored meshes", above), and the change only hid it by emptying the map.
+**Mirrored draws draw their front faces.** The Steamrunner and the Intrepid on the bench
+(`fcruise2`, `fcruise3`; 1.75 and 1.0 scale) are drawn under a mirrored matrix, and went
+dark whole with shadows on, from every side and at `ShadowSize=8192`. The map was right:
+their vertices, read back from the vertex buffer and taken into the map, landed inside
+it where the hulls are. The engine's cull (`CULLMODE` CW, for mirrored draws as for the
+rest) removes a mirrored draw's front faces, since the mirror reverses the winding, and
+what remains on screen is the far side of the hull seen through it. That side is behind
+the near side from the Key whichever way the Key comes, so the map shadowed it. It is also
+why these meshes once lit "inside out" ("Mirrored meshes" above): the faces shown were the
+far ones. `hook_dip` therefore gives a mirrored draw the opposite cull (CW and CCW
+swapped, restored after; the near fade records it with the draw), and `sh_consts` takes
+`FixMirrored`'s reversal back, lighting the front faces as a stock hull (`misc.x` −1).
+On screen the Steamrunner shows its bridge dome from above where its deflector showed
+through before. The fixed-function path, which draws a mirrored draw when the shaders
+cannot, still shows the back faces with the lights reversed.
 
 **The map is lent to `Nebulae.asi`**, which darkens the gas in a hull's shadow
 (`nebulae/README.md`, "Ships' shadows in the gas"): `LightingShadowMap(d9, &tex, ls,

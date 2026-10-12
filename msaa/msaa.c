@@ -35,7 +35,8 @@
  *
  * WHAT IS CHANGED, AND WHY EACH FIELD
  * -----------------------------------
- *   MultiSampleType   the highest of Samples, Samples/2, ... >= 2 that
+ *   MultiSampleType   the highest power of two <= Samples (16 at most), then
+ *                     half that, ... >= 2, that
  *                     IDirect3D8::CheckDeviceMultiSampleType accepts for BOTH
  *                     the back buffer format and the auto depth format (D16).
  *                     None accepted: nothing is changed at all.
@@ -270,7 +271,9 @@ void __cdecl msaa_fix(D3DPRESENT_PARAMETERS8 *pp, UINT adapter)
     if (!pp || !d3d || g_samples < 2) return;
     check = (CheckMS_t)((*(void ***)d3d)[11]);
 
-    for (n = g_samples > 16 ? 16 : g_samples; n >= 2; n /= 2) {
+    /* halving from a power of two: 6 would try 6, 3 and never 4 or 2 */
+    for (n = 16; n > g_samples; n /= 2) ;
+    for (; n >= 2; n /= 2) {
         if (check(d3d, adapter, D3DDEVTYPE_HAL, pp->BackBufferFormat,
                   pp->Windowed, (DWORD)n) < 0)
             continue;

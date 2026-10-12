@@ -15,10 +15,115 @@ Layers: nebulae 1.1.0, lighting 1.19.0.
   `ShadowSoftness=`), from `Lighting.asi`'s Key and shadow map, now exported as
   `LightingKey` and `LightingShadowMap` (lighting 1.19.0).
 
+Installed, not yet seen in game.
+
+## 11.22.9 — 2026-10-12
+
+Layers: lighting 1.18.2.
+
 ### Fixed
-- Hulls' shadows came and went: opaque hulls were taken for blended draws and left out
-  of the shadow map; and mirrored meshes (the Steamrunner) were drawn inside out
-  (lighting 1.19.0).
+- Hull shadows (`Shadows=1`) are made again: since lighting 1.17.2 every opaque hull
+  counted as blended (the engine's ONE / ZERO blend) and the shadow map was never drawn.
+  Hulls under a mirrored matrix (the Steamrunner, the Intrepid) are drawn front faces
+  out in the shaders, which was what had darkened them (lighting 1.18.2).
+
+Installed, not yet seen in game.
+
+## 11.22.8 — 2026-10-12
+
+Layers: lighting 1.18.1, platform 3.4.1, sky 1.2.2, nebulae 1.0.3, surfaces 1.0.1.
+
+### Fixed
+- `Lighting.asi`: view slots for new cameras, the near fade's state block and the bump
+  declaration tied to their device, paired vtable patches all or nothing, the glow and
+  phaser colour caches no longer fill up, and the shadow lists turn over with no Key
+  light (lighting 1.18.1).
+- `d9_device()` tells a new device by the d3d9 device, not the d3d8 device's address
+  (platform 3.4.1); `Sky.asi`, `Nebulae.asi` and
+  `Surfaces.asi` rebuilt with it (sky 1.2.2, nebulae 1.0.3, surfaces 1.0.1).
+
+Installed, not yet seen in game.
+
+## 11.22.7 — 2026-10-12
+
+Layers: nebulae 1.0.2.
+
+### Fixed
+- Nebulae: the blue-noise dither thresholds read linear, not as sRGB (nebulae 1.0.2).
+  Changes the look slightly.
+
+Installed, not yet seen in game.
+
+## 11.22.6 — 2026-10-12
+
+Layers: nebulae 1.0.1, sky 1.2.1.
+
+### Fixed
+- Nebulae: classes forgotten when the game frees its own (wrapping
+  `GameObjectClass_Clean`); failed builds latched, falling back to the billboards; no
+  composite without gas; alpha test off in the half-size passes; viewport restored
+  after a bake; timing queries; a log buffer (nebulae 1.0.1).
+- Sky: viewport restored after the bake; timing queries (sky 1.2.1).
+
+Installed, not yet seen in game.
+
+## 11.22.5 — 2026-10-12
+
+Layers: online 0.6.1.
+
+### Fixed
+- Online multiplayer hardening: malformed or hostile datagrams can no longer crash or
+  exhaust a game, a kicked joiner is cut off, the network thread stops for good on
+  `Close`, and the server rate-limits join-code lookups (online 0.6.1).
+
+Installed, not yet seen in game.
+
+## 11.22.4 — 2026-10-12
+
+Layers: qol 1.6.1, grid 1.0.1.
+
+### Fixed
+- `QOLRules.asi`: losing a producer refunds its item in progress once, officers included
+  once; the network rules latch is cleared at every game start; a delete order still
+  finds an item that started while it was on the way (qol 1.6.1).
+- `QOL.ini` refuses numbers too long to parse (qol 1.6.1).
+- `GridLayout.asi`: keys press nothing while the bar is hidden (grid 1.0.1).
+
+Installed, not yet seen in game.
+
+## 11.22.3 — 2026-10-12
+
+Layers: menus 4.3.3.
+
+### Fixed
+- Menus: `IntegerScale=1` in a window under 800x600, the backdrop's sides after an
+  unmatched frame, embedded nested dialogs' fit, 8K stretch taps, `N.soften=` bounds,
+  surfaces released on destroy; `menus/install.sh` always rebuilds and its closing check
+  no longer stops `./install` (menus 4.3.3).
+
+Installed, not yet seen in game.
+
+## 11.22.2 — 2026-10-12
+
+Layers: hud 2.2.1, msaa 1.1.1.
+
+### Fixed
+- `HUD.asi` lays the HUD out with `Font=0` or the font standing down, and hands no
+  short objective list across a re-layout (hud 2.2.1).
+- `MSAA.asi` finds 4x for `Samples=6` and other counts that are not a power of two
+  (msaa 1.1.1).
+
+Installed, not yet seen in game.
+
+## 11.22.1 — 2026-10-12
+
+Layers: cutscenes 2.0.2.
+
+### Fixed
+- `binkw32.dll`: a replacement movie bigger than its destination outside the fit path
+  is scaled to fit instead of written past the buffer; a `binkw32_orig.dll` missing an
+  export no longer leaves null pointers behind; an over-long movie path and a `.wav`'s
+  inconsistent block align are handled (cutscenes 2.0.2).
 
 Installed, not yet seen in game.
 

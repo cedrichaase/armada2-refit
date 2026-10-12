@@ -307,14 +307,34 @@ static DWORD g_frame;
 #define SM_VIEWS 4
 static void *g_view_cam[SM_VIEWS];
 static DWORD g_view_frames[SM_VIEWS];      /* the frames each view has had */
+static DWORD g_view_used[SM_VIEWS];        /* the g_frame each view was last rendered at */
 static int   g_view;                       /* the view being rendered */
+static void  sm_view_clear(int v);
+
+/* The camera's view. A camera not seen before takes a free slot or, with none free,
+ * the one rendered longest ago, emptied: a camera that has gone (a closed portrait)
+ * never holds a slot that the main view and a live portrait would have to share. */
+static int view_of(void *camera)
+{
+    int v, old = 0;
+    for (v = 0; v < SM_VIEWS; v++) if (g_view_cam[v] == camera) return v;
+    for (v = 0; v < SM_VIEWS; v++) if (!g_view_cam[v]) break;
+    if (v == SM_VIEWS) {
+        for (v = 1; v < SM_VIEWS; v++) if (g_frame - g_view_used[v] > g_frame - g_view_used[old]) old = v;
+        v = old;
+        sm_view_clear(v);
+        g_view_frames[v] = 0;
+    }
+    g_view_cam[v] = camera;
+    return v;
+}
 
 static void __cdecl hook_prerender_all(void *camera)
 {
     g_frame_lights = 0;
     g_frame++;              /* the shadows' frame: see sm_frame */
-    for (g_view = 0; g_view < SM_VIEWS - 1 && g_view_cam[g_view] && g_view_cam[g_view] != camera; g_view++) ;
-    g_view_cam[g_view] = camera;
+    g_view = view_of(camera);
+    g_view_used[g_view] = g_frame;
     g_view_frames[g_view]++;
     if (g_lights) sky_update();
     ((PreRenderAll_t)FN_PRERENDER_ALL)(camera);
@@ -449,16 +469,6 @@ static int   g_sh_on;                /* the DrawIndexedPrimitive hook is in */
 static Pick  g_sh_pick[SH_POINTS];
 static int   g_sh_npick;
 static float g_sh_sign = -1.0f;      /* -1: inward normals, as stock; +1: a mirrored draw */
-
-/* A mirrored draw's cull mode, turned round. The mirror reverses the winding of every
- * triangle, and the engine culls as for any other draw: the outside of the hull was
- * culled and the inside of its far side drawn (the Steamrunner whole, from every side).
- * Once shadows were cast it showed, as the far side's inside lies in the near side's
- * shadow. "Mirrored meshes", README. */
-static DWORD mirror_cull(DWORD c)
-{
-    return g_sh_sign > 0.0f && (c == 2 || c == 3) ? c ^ 1 : c;   /* CW <-> CCW */
-}
 
 /* Self-illumination. On the CPU path a hull whose material is an
  * ST3D_SelfIlluminatingMaterial is drawn twice (its NumPasses, slot 3, is 2): texture x
@@ -775,7 +785,6 @@ static long     g_sh_surf;                 /* hull draws from Surfaces.asi */
 
 typedef long (__stdcall *DIP8_t)(void *, DWORD, UINT, UINT, UINT, UINT);
 typedef long (__stdcall *D9Get_t)(void *, DWORD, DWORD *);
-typedef long (__stdcall *D9Set_t)(void *, DWORD, DWORD);
 typedef long (__stdcall *D9Get2_t)(void *, DWORD, DWORD, DWORD *);
 typedef long (__stdcall *D9Mat_t)(void *, DWORD, float *);
 typedef long (__stdcall *D9Light_t)(void *, DWORD, LIGHT8 *);
@@ -1033,6 +1042,10 @@ static int sh_consts(void *d9, int bump)
             dc[nd * 4] = l.Diffuse.r; dc[nd * 4 + 1] = l.Diffuse.g; dc[nd * 4 + 2] = l.Diffuse.b;
             dv[nd * 4] = -l.Direction[0] / n; dv[nd * 4 + 1] = -l.Direction[1] / n;
             dv[nd * 4 + 2] = -l.Direction[2] / n;
+            /* a mirrored draw: hook_dip draws its front faces, so FixMirrored's reversal
+             * is taken back and the normals are a stock hull's (misc.x -1) */
+            if (g_sh_sign > 0.0f)
+                for (j = 0; j < 3; j++) dv[nd * 4 + j] = -dv[nd * 4 + j];
             nd++;
         }
         {   /* the Key, the brightest, times HullSun (BorgSun) */
@@ -1049,7 +1062,7 @@ static int sh_consts(void *d9, int bump)
         }
         d9_psconst(d9, 2, dc, 4);
         d9_psconst(d9, 6, dv, 4);
-        misc[0] = g_sh_sign;
+        misc[0] = bump ? g_sh_sign : -1.0f;
         misc[1] = g_sh_lit_self ? (bump ? g_borg_self : g_selfillum) : 0.0f;
         misc[2] = g_knee;
         misc[3] = near_fade();
@@ -1090,6 +1103,8 @@ static int sh_consts(void *d9, int bump)
 
 static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3);
 
+typedef long (__stdcall *D9Set_t)(void *, DWORD, DWORD);
+
 static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc)
 {
     void   *d9, *vs, *ps;
@@ -1097,6 +1112,7 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     SmRec   rc;
     int     rec;
     long    r;
+    DWORD   cull = 0;
     if (!g_in_vb) return g_dip(dev, pt, mi, nv, si, pc);
     d9 = d9_device(dev);
     vs = d9_shader(d9, &g_hull_vs);
@@ -1112,8 +1128,18 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
         d9_restore(d9, &sv); g_sh_ff++; return g_dip(dev, pt, mi, nv, si, pc);
     }
     rec = sm_take(dev, d9, &rc, pt, mi, nv, si, pc, 0);
-    sm_consts(d9, rec ? &rc : NULLPTR, g_sh_sign);
+    sm_consts(d9, rec ? &rc : NULLPTR, -1.0f);
+    /* A mirrored draw (FixMirrored's det < 0) has its winding reversed: under the
+     * engine's cull it shows its back faces, the far side of the hull seen through it,
+     * which the shadow map rightly finds behind the near side. The opposite cull draws
+     * the front faces; sh_consts lights them as a stock hull. */
+    if (g_sh_sign > 0.0f) {
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &cull);        /* CULLMODE CW, CCW */
+        if (cull == 2 || cull == 3) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, 5 - cull);
+        else cull = 0;
+    }
     if (near_fade() < 1.0f && fd_take(dev, d9, pt, mi, nv, si, pc, 0)) {   /* drawn at Flush */
+        if (cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
         d9_restore(d9, &sv);
         if (rec) sm_keep(&rc, g_vb_mesh);
         return 0;
@@ -1135,14 +1161,10 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     }
     d9_bind(d9, vs, ps);
     sm_bind(d9);
-    {   DWORD cull = 0;
-        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &cull);                  /* CULLMODE */
-        if (mirror_cull(cull) != cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, mirror_cull(cull));
-        r = g_dip(dev, pt, mi, nv, si, pc);
-        if (mirror_cull(cull) != cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
-    }
+    r = g_dip(dev, pt, mi, nv, si, pc);
     sm_unbind(d9);
     if (ps == d9_shader(d9, &g_moon_ps)) sf_unbind(d9);
+    if (cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
     d9_restore(d9, &sv);
     if (rec) sm_keep(&rc, g_vb_mesh);
     if (++g_sh_draws == 1 || g_sh_draws == 100000) {
@@ -1174,8 +1196,9 @@ static void hook_device(void *dev)
     g_sh_on = 1;
     logline("shaders: on, through the Direct3D 9 device behind d3d8");
     /* Reset (slot 14): the shadow map is a D3DPOOL_DEFAULT target, which must be gone
-     * before the device resets, and the shadow casters hold the engine's buffers. */
-    if (g_shadows && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
+     * before the device resets, and the shadow casters hold the engine's buffers; so
+     * does the near fade's list, and its state block must go too. */
+    if ((g_shadows || g_near_fade) && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
         g_reset = (Reset8_t)vt[14];
         vt[14] = (void *)hook_reset;
         VirtualProtect(&vt[14], 4, old, &old);
@@ -1255,6 +1278,7 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     d9 = d8 ? d9_device(d8) : NULLPTR;
     if (!d9) return 0;
     if (!g_dot3_decl || g_dot3_decl_dev != d9) {     /* made once per device */
+        if (g_dot3_decl) D9_FN(g_dot3_decl, D9_RELEASE, D9_Ref_t)(g_dot3_decl);   /* the previous device's */
         g_dot3_decl = NULLPTR; g_dot3_decl_dev = d9;
         if (D9_FN(d9, D9_CREATEVERTEXDECLARATION, D9Decl_t)(d9, k_dot3_decl, &g_dot3_decl) < 0)
             g_dot3_decl = NULLPTR;
@@ -1447,6 +1471,17 @@ static void sm_release(void)
     sm_unref(g_sm_surf); sm_unref(g_sm_tex); sm_unref(g_sm_ds); sm_unref(g_sm_sb);
     g_sm_surf = g_sm_tex = g_sm_ds = g_sm_sb = NULLPTR;
     g_sm_ok = 0;
+}
+
+/* A view's lists emptied, for a slot given to another camera. */
+static void sm_view_clear(int v)
+{
+    int i, keep = g_view;
+    g_view = v;
+    sm_drop_list(0); sm_drop_list(1);
+    for (i = 0; i < SM_HASH; i++) g_sm_head[i] = -1;
+    g_sm_rec_frame = 0;
+    g_view = keep;
 }
 
 static void fd_release(void);
@@ -1649,7 +1684,16 @@ static void sm_frame(void *d9)
     if (!g_shadows && !g_planet_shadows) return;
     {
         float fwd[3];
-        if (!sm_key_axis(fwd)) { g_sm_ok = 0; return; }
+        if (!sm_key_axis(fwd)) {
+            /* no map this frame; the lists still turn over, or sm_keep would go on
+             * filling one (and holding its buffers) until the Key came back */
+            g_sm_ok = 0;
+            if (g_shadows && g_sm_dev == d9) {
+                sm_view_clear(g_view);
+                g_sm_rec_frame = g_view_frames[g_view];
+            }
+            return;
+        }
         for (i = 0; i < 3; i++) g_sm_key[i] = -fwd[i];
         g_sm_have_key = 1;
         if (!g_shadows) return;
@@ -1683,18 +1727,20 @@ static int sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UIN
     ((SmIdx8_t)(*(void ***)d8)[86])(d8, &ib8, &base);                     /* GetIndices */
     sm_unref(ib8);
     if (!r->vb || !r->ib) { sm_drop(r); return 0; }
-    {   /* a draw blended or alpha-tested casts no shadow: the depth pass has no texture.
-         * Blending is judged by what it does, not by ALPHABLENDENABLE: the engine leaves
-         * it on for opaque hulls with SRCBLEND ONE, DESTBLEND ZERO, which is no blend,
-         * and taken as one, every hull drawn after anything blended cast nothing. */
-        DWORD ab = 0, at = 0, sb = 2, db = 1;
+    {   /* A draw blended or alpha-tested casts no shadow: the depth pass has no texture.
+         * The engine leaves blending on for its opaque hulls, as ONE / ZERO, which
+         * blends nothing; only a blend that lets the frame through counts, and only an
+         * alpha test that can fail. */
+        DWORD ab = 0, at = 0, src = 2, dst = 1, af = 8;
         D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 27, &ab);       /* ALPHABLENDENABLE */
         D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 15, &at);       /* ALPHATESTENABLE */
         if (ab) {
-            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 19, &sb);   /* SRCBLEND */
-            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 20, &db);   /* DESTBLEND */
+            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 19, &src);  /* SRCBLEND */
+            D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 20, &dst);  /* DESTBLEND */
         }
-        g_sm_trans = (ab && !(sb == 2 && db == 1)) || at;         /* ONE, ZERO: opaque */
+        if (at) D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 25, &af);   /* ALPHAFUNC */
+        g_sm_trans = (ab && !(src == 2 && dst == 1)) ||           /* ONE, ZERO */
+                     (at && af != 8);                             /* ALWAYS */
     }
     r->base = (int)base; r->dot3 = dot3;
     r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
@@ -1850,7 +1896,7 @@ typedef struct {
 static FdRec  g_fd[FD_MAX];
 static int    g_fd_n, g_fd_ix[FD_MAX];
 static DWORD  g_fd_frame;
-static void  *g_fd_dev, *g_fd_sb;
+static void  *g_fd_dev, *g_fd_sb, *g_fd_sb_dev;   /* g_fd_sb belongs to g_fd_sb_dev */
 static long   g_fd_replays;
 
 static void fd_drop(void)
@@ -1893,7 +1939,6 @@ static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT
         for (j = 0; j < 13; j++) D9_FN(d9, D9_GETSAMPLERSTATE, D9GetSamp_t)(d9, (DWORD)i, (DWORD)j + 1, &r->samp[i][j]);
     }
     D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &r->cull);                /* CULLMODE */
-    r->cull = mirror_cull(r->cull);
     D9_FN(d9, FD_GETVSCONST, FdConst_t)(d9, 0, r->vc, FD_VS);
     D9_FN(d9, FD_GETPSCONST, FdConst_t)(d9, 0, r->pc4, FD_PS);
     r->inst = eng ? *(void **)(eng + 0x100) : NULLPTR;
@@ -1931,9 +1976,11 @@ static void fd_replay(void)
     hvs = d9_shader(d9, &g_hull_vs); hps = d9_shader(d9, &g_hull_ps);
     for (i = 0; i < n; i++) if (g_fd[i].dot3) { bvs = d9_shader(d9, &g_bump_vs); bps = d9_shader(d9, &g_bump_ps); break; }
     if (!hvs || !hps || (i < n && (!bvs || !bps || !g_dot3_decl))) { fd_drop(); return; }
+    if (g_fd_sb && g_fd_sb_dev != d9) { sm_unref(g_fd_sb); g_fd_sb = NULLPTR; }   /* another device's */
     if (!g_fd_sb && D9_FN(d9, SM_CREATESTATEBLOCK, SmMakeSB_t)(d9, 1, &g_fd_sb) < 0) {   /* D3DSBT_ALL */
         g_fd_sb = NULLPTR; fd_drop(); return;
     }
+    g_fd_sb_dev = d9;
     /* farthest hull first, a hull's draws together and in their order */
     for (i = 0; i < n; i++) g_fd_ix[i] = i;
     for (i = 1; i < n; i++) {
@@ -2107,7 +2154,7 @@ static BOOL __fastcall hook_nebula_frustum(BYTE *inst, void *edx, void *camera)
  * 13 to 16, the CPU path's) do nothing: in the engine's list it reaches the
  * vertex-buffer draws through pick_points, and not the CPU-lit planets and moons,
  * the planet itself among them, which it would otherwise light from inside. */
-typedef struct { char name[16]; float col[3]; } GlowTex;
+typedef struct { char name[16]; float col[3]; DWORD used; } GlowTex;
 typedef struct { void *planet; BYTE *light; DWORD seen; } GlowLight;
 
 static float     g_glow = 1.5f, g_glow_range = 6.0f;
@@ -2189,10 +2236,14 @@ static const float *glow_colour(const BYTE *cls)
     for (i = 0; i < g_glow_ntex; i++) {
         const char *x = g_glow_tex[i].name, *y = name;
         while (*x && *x == *y) x++, y++;
-        if (!*x && !*y) return g_glow_tex[i].col;
+        if (!*x && !*y) { g_glow_tex[i].used = g_frame; return g_glow_tex[i].col; }
     }
-    if (g_glow_ntex >= 16) return grey;
-    t = &g_glow_tex[g_glow_ntex++];
+    if (g_glow_ntex < 16) t = &g_glow_tex[g_glow_ntex++];
+    else {   /* full: the one used longest ago makes way, unless all are in use (a few frames) */
+        for (t = g_glow_tex, i = 1; i < 16; i++) if (g_frame - g_glow_tex[i].used > g_frame - t->used) t = &g_glow_tex[i];
+        if (g_frame - t->used < 8) return grey;
+    }
+    t->used = g_frame;
     for (i = 0; i < 15 && name[i]; i++) t->name[i] = name[i];
     t->name[i] = 0;
     n = tga_mean(name, "1", a);
@@ -2501,7 +2552,7 @@ static void explosion_lights(void)
 #define FN_PHASER_DEL 0x57ee70   /* its scalar deleting destructor, slot 0 */
 #define ORDNANCE_LIST 0x771fac   /* the live ordnance, as Ordnance::PreRenderAll walks it */
 
-typedef struct { const void *tex; float col[3]; } BeamTex;
+typedef struct { const void *tex; char stem[64]; float col[3]; DWORD used; } BeamTex;
 
 static int     g_phasers = 1;
 /* the emitter: PhaserBrightness=, PhaserStart=, PhaserRange=, PhaserLift= */
@@ -2521,11 +2572,6 @@ static const float *beam_colour(const BYTE *cls)
     float       peak;
     int         i;
     if (!spr || !(tex = *(const BYTE * const *)(spr + 0x58))) return white;
-    for (i = 0; i < g_beam_ntex; i++)
-        if (g_beam_tex[i].tex == tex) return g_beam_tex[i].col;
-    if (g_beam_ntex >= 24) return white;
-    t = &g_beam_tex[g_beam_ntex++];
-    t->tex = tex;
     name = *(const char * const *)(tex + 8);
     stem[0] = 0;
     if (name) {   /* the name, without a path or an extension */
@@ -2534,6 +2580,22 @@ static const float *beam_colour(const BYTE *cls)
         for (i = 0; i < 63 && s[i] && s[i] != '.'; i++) stem[i] = s[i];
         stem[i] = 0;
     }
+    /* by address and name: a texture freed with its map and another made at the
+     * same address is another colour */
+    for (i = 0; i < g_beam_ntex; i++) {
+        const char *x = g_beam_tex[i].stem, *y = stem;
+        if (g_beam_tex[i].tex != tex) continue;
+        while (*x && *x == *y) x++, y++;
+        if (!*x && !*y) { g_beam_tex[i].used = g_frame; return g_beam_tex[i].col; }
+    }
+    if (g_beam_ntex < 24) t = &g_beam_tex[g_beam_ntex++];
+    else {   /* full: the one used longest ago makes way, unless all are in use (a few frames) */
+        for (t = g_beam_tex, i = 1; i < 24; i++) if (g_frame - g_beam_tex[i].used > g_frame - t->used) t = &g_beam_tex[i];
+        if (g_frame - t->used < 8) return white;
+    }
+    t->used = g_frame;
+    t->tex = tex;
+    for (i = 0; i < 64; i++) t->stem[i] = stem[i];
     if (!stem[0] || !tga_mean(stem, "", t->col))
         for (i = 0; i < 3; i++) t->col[i] = 1.0f;
     peak = t->col[0] > t->col[1] ? t->col[0] : t->col[1];
@@ -2743,6 +2805,12 @@ static void ordnance_colours(void)
         if (!light || *(DWORD *)light != VT_POINT) continue;
         ordnance_colour(light, *(BYTE **)(cls + 0x12c));
     }
+}
+
+/* the vtable slot holds what this build expects */
+static int slot_is(DWORD vt, int idx, DWORD expect)
+{
+    return *(DWORD *)(vt + 4 * idx) == expect;
 }
 
 static int patch_slot(DWORD vt, int idx, DWORD expect, const void *hook)
@@ -3484,8 +3552,10 @@ static void startup(void)
         else logline("NOT PATCHED: CraftInstance vtable differs, stock's near fade");
     }
     if (g_gpu && g_shaders && g_near_fade) {
-        if (patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required) &&
-            patch_slot(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH, (const void *)hook_flush))
+        /* both or neither: fading hulls recorded and never drawn would vanish */
+        if (slot_is(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED) && slot_is(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH) &&
+            patch_slot(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH, (const void *)hook_flush) &&
+            patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required))
             n += 2;
         else logline("NOT PATCHED: DeviceDirectX8 vtable differs, no near fade in the shaders");
     }
@@ -3495,8 +3565,10 @@ static void startup(void)
         else logline("NOT PATCHED: NebulaInstance vtable differs");
     }
     if (g_explosions) {
-        if (patch_slot(VT_FIREBALL, 14, FN_FIREBALL_SIM, (const void *)hook_fireball_sim) &&
-            patch_slot(VT_FIREBALL, 0, FN_FIREBALL_DEL, (const void *)hook_fireball_del))
+        /* both or neither: the explosion Simulate follows, the destructor forgets */
+        if (slot_is(VT_FIREBALL, 14, FN_FIREBALL_SIM) && slot_is(VT_FIREBALL, 0, FN_FIREBALL_DEL) &&
+            patch_slot(VT_FIREBALL, 0, FN_FIREBALL_DEL, (const void *)hook_fireball_del) &&
+            patch_slot(VT_FIREBALL, 14, FN_FIREBALL_SIM, (const void *)hook_fireball_sim))
             n += 2;
         else logline("NOT PATCHED: FireballExplosion vtable differs");
     }

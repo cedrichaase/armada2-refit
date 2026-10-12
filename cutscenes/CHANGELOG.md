@@ -4,6 +4,23 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.0.2 — 2026-10-12
+
+### Fixed
+- `binkw32.dll`: a replacement movie larger than the buffer it is copied into outside
+  the fit path (`FitIntro=0`, or the intro left in a narrower mode) is scaled to fit
+  the room right of and below (x,y); the 1:1 copy is also clipped to the pitch's width.
+  It used to write past the locked back buffer.
+- `binkw32.dll`: a `binkw32_orig.dll` missing an export is unloaded again, so later
+  calls fail cleanly instead of calling through null pointers.
+- `binkw32.dll`: a movie path whose full name does not fit 300 characters is passed to
+  the real DLL; it used to read an unwritten buffer.
+- `binkw32.dll`: a `.wav`'s block align and byte rate are derived from its channels and
+  rate, not trusted from the file (a 0 divided in the log; odd values reached
+  `waveOutOpen`).
+
+Installed, not yet seen in game.
+
 ## 2.0.1 — 2026-09-27
 
 ### Fixed

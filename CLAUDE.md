@@ -691,8 +691,8 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   is wrapped.
 - **`ALPHABLENDENABLE` is on for opaque hulls** (ONE, ZERO). Judge a draw blended by its
   blend factors, never by that flag: 1.17.2 did, and left every hull out of the map.
-- **A mirrored draw needs its cull mode swapped** (`mirror_cull`): the mirror flips the
-  winding, and the Steamrunner, mirrored whole, drew inside out. A hull that goes dark
+- **A mirrored draw needs its cull mode swapped** (`hook_dip`, `g_sh_sign > 0`): the
+  mirror flips the winding, and the Steamrunner, mirrored whole, drew inside out. A hull that goes dark
   whole under shadows is drawn inside out, not acne: check the cull before the bias.
 
 ### sky

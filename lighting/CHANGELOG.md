@@ -12,14 +12,44 @@ in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](.
 - `LightingKey`, exported: the direction towards the Key, from the engine's lights, for
   `Nebulae.asi`'s gas.
 
+Installed, not yet seen in game.
+
+## 1.18.2 — 2026-10-12
+
 ### Fixed
-- Hulls cast no shadow, or did only now and then. The engine leaves alpha blending on for
-  opaque hulls (SRCBLEND ONE, DESTBLEND ZERO), and 1.17.2 took that for a blended draw and
-  left the hull out of the shadow map; a draw is now left out only when its blend keeps
-  some of what is behind it, or it alpha-tests.
-- A mirrored mesh was drawn inside out: the cull mode now follows the mirror
-  (`mirror_cull`, also for a fading draw at `Flush`). The Steamrunner, mirrored whole,
-  showed the inside of its far side, and went dark whole once its shadows were cast.
+- `Shadows=1` cast no shadow at all since 1.17.2: the engine draws every opaque hull with
+  blending on as ONE / ZERO, so every hull draw counted as blended and the map was never
+  made. A draw now counts as blended only with another blend, and as alpha-tested only
+  with an `ALPHAFUNC` other than ALWAYS.
+- The cause of 1.17.2's dark Steamrunner (and Intrepid): a draw under a mirrored matrix
+  (`FixMirrored`) has its winding reversed, so under the engine's cull the shaders drew
+  its back faces, the far side of the hull seen through it, which the map correctly put
+  behind the near side. With `Shaders=1` such a draw now takes the opposite cull and is lit
+  as a stock hull: mirrored hulls show their outside, and their own shadows.
+
+Installed, not yet seen in game.
+
+## 1.18.1 — 2026-10-12
+
+### Fixed
+- Cameras past the third shared one view slot, so the main view and the selection's
+  portrait could again share one hull list and shadow map. A new camera now takes the
+  slot rendered longest ago, emptied.
+- The near fade's state block was let go only on a `Reset` hooked under `Shadows=1`,
+  and was re-used on a new device; it now belongs to its device, and `Reset` is hooked
+  under `NearFade=1` too. The bump path's vertex declaration is released on a device
+  change instead of leaked.
+- Paired vtable patches (`PolygonSortRequired` with `Flush`, the fireball's `Simulate`
+  with its destructor) could leave the first patched when the second differed, so that
+  fading hulls were recorded and never drawn. Both slots are checked before either is
+  written.
+- The planet glow and phaser colour caches filled up for good (glows and haze grey, new
+  phasers white); they now let the entry used longest ago go. A phaser texture is
+  matched by name as well as address, so a texture made where a freed one was gets its
+  own colour.
+- With no Key light, the shadow lists stopped turning over while hull draws went on
+  filling one, holding the engine's buffers; they are emptied each frame instead.
+- Rebuilt with platform 3.4.1's `d9_device()`.
 
 Installed, not yet seen in game.
 

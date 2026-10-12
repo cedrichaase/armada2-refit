@@ -43,6 +43,14 @@ written; a different `Armada2.exe` leaves the plugin inert and says so in `Nebul
   gas and skips its billboards.
 - **Device `Reset`** (slot 14 of the d3d8 device, chained like `Lighting.asi`'s):
   everything in the default pool is released first.
+- **The two calls to `GameObjectClass_Clean` (0x4cd4f0)**, at 0x485c06 in
+  `Program::GameClosePostDebriefing` and at 0x4873ea in `Program::GameDoOne`. It frees
+  every object class, the nebula classes among them, when a game ends and before the
+  next is set up. The plugin keeps what it knows of a class (its recipe, envelope and
+  baked volume) by the engine's class pointer, so it lets all of it go there first, then
+  calls through. Kept, the next game's classes came back at recycled addresses and took
+  over the old entries (another class's recipe and radius), each stale entry held its
+  textures, and after sixteen classes every nebula fell back to billboards.
 
 What it reads: `Nebula::nebulaList` (0x73b1bc), a `std::vector<Nebula *>`; a nebula's
 position (+0xac), its class (+0x40) and the class's effect radius (+0x1e0); the ODF
@@ -75,6 +83,9 @@ Per class, per field of its nebulae:
   texel's point is jittered within it: the noise's mip level is about a texel wide, so
   its grid and the bake's beat against each other and drew parallel lines through the
   gas.
+  A bake (or an envelope) that cannot be made leaves that class on its stock billboards
+  until its recipe, `Nebulae.ini` or the device changes; so does the noise for every
+  class. Neither is retried every frame: the noise alone takes a quarter of a second.
 - **The draw**: slices on a geometric ladder fixed in distance from the eye (rung j
   between 2^(j/m) and 2^((j+1)/m)). Spread over the box instead, every slice slid
   through the gas as the camera turned, and the gas shimmered in camera glides. The
