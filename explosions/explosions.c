@@ -978,8 +978,9 @@ static void startup(void)
 
     b[0] = 0; s_cat(b, "--- Explosions enable="); s_num(b, g_enable);
     s_cat(b, " rings="); s_num(b, g_rings); s_cat(b, " timing="); s_num(b, g_timing);
-    if (((DWORD *)VT_FIREBALL)[13] != FN_FIREBALL_INIT || ((BYTE *)SITE_CHUNKS)[0] != 0xE8 ||
-        SITE_CHUNKS + 5 + *(DWORD *)(SITE_CHUNKS + 1) != FN_CHUNKS) {
+    /* The RenderChunks call is taken whatever it points at: Shields.asi chains the same
+       site, and either may load first. */
+    if (((DWORD *)VT_FIREBALL)[13] != FN_FIREBALL_INIT || ((BYTE *)SITE_CHUNKS)[0] != 0xE8) {
         s_cat(b, "  NOT PATCHED: FireballExplosion or the frame loop differs -- not the Armada2.exe this was built for");
     } else {
         g_prev_chunks = (Chunks_t)patch_call(SITE_CHUNKS, (void *)hook_chunks);

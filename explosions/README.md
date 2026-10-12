@@ -42,7 +42,8 @@ written; a different `Armada2.exe` leaves the plugin inert and says so in
   for the rings (`Rings=1`). `OmegaExplosion` has its own vtable and stays stock.
 - **The call to `ST3D_GraphicsEngine::RenderChunks` (0x62d470) at 0x598446 in
   `Armada_RenderAllOurStuff`.** Every opaque hull is in the depth buffer after it.
-  The plugin calls through to whatever the call went to, then draws what was noted in
+  The plugin calls through to whatever the call went to, and takes the call whatever it
+  points at: `Shields.asi` chains the same one and either may load first. It then draws what was noted in
   this pass and forgets it. The next call, `RenderParticleList` at 0x598455, is
   `Nebulae.asi`'s, and the device's `Flush` after it `Lighting.asi`'s, so the plugin
   takes neither. Drawing per pass is what makes the HUD's action camera, which draws the

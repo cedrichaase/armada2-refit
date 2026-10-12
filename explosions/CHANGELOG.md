@@ -10,7 +10,8 @@ The reasoning is in [`README.md`](README.md).
 ### Added
 - `Explosions.asi`: slot 15 (`Submit`) of the FireballExplosion and ShockwaveExplosion
   vtables notes each explosion the player sees, per view, in place of submitting stock's
-  model or disc; the call to `RenderChunks` at 0x598446 draws them after every hull.
+  model or disc; the call to `RenderChunks` at 0x598446, chained whatever it points at
+  (`Shields.asi` takes the same call), draws them after every hull.
   Slots 0 and 14 of FireballExplosion's vtable, which `Lighting.asi` wraps, are left
   alone. Without a Direct3D 9 device behind d3d8, or with `Enable=0`, stock.
 - The fireball: 28 steps through a sphere per pixel, a spectral noise volume made at
