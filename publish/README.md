@@ -118,23 +118,33 @@ and writes `armada2-refit-<version>.zip`:
   `platform/vendor/`. `install.sh` puts them in unless a `d3d8.dll` or `d3d9.dll` there is
   none of GOG's, DXVK's or these; a DXVK `d3d9.dll` already there stays. What it
   replaces is kept (`d3d8.dll.gog-backup`, else `.a2chain-backup`), recorded with the
-  prerequisites, and put back by `--uninstall`. `install.ps1` does not do this yet;
+  prerequisites, and put back by `--uninstall`. `install.ps1` puts only `d3d8.dll` in
+  (Windows' own Direct3D 9 is behind it) and leaves a DXVK `d3d8.dll` the player put
+  there; `install.sh` on macOS puts only `d3d8.dll` in too, on Wine's wined3d, since
+  DXVK cannot run Direct3D 9 on a Mac (D3DMetal, DXMT and CrossOver's DXVK cover
+  Direct3D 10 to 12), and skips MSAA, `dxvk.conf` and bloom there;
 - `models/` and `a2env.py`: `moon-sod.py`, `select-sod.py`, `hull-sod.py`, run by
   `install.sh` with python3 on the player's own SODs (`--revert` on `--uninstall`);
 - `bloom/`: `postfx/postfx.py --export`, which is the same bloom for vkBasalt and as a
   ReShade preset, and `shaders.txt`;
-- `install.sh` (Linux) and `install.ps1` + `install.bat` (Windows), from
-  `publish/installer/`;
+- `install.sh` (Linux and macOS) and `install.ps1` + `install.bat` (Windows), from
+  `publish/installer/`. `install.sh` keeps to `/bin/bash` 3.2 and BSD tools (no
+  `sha256sum`, `tac` or GNU `sed`); `test.sh` checks that on Linux by hiding those tools
+  and by faking `uname -s`;
 - `prereqs.txt`, what the installers download first, and `CREDITS.txt`, generated from
   it and from `shaders.txt`;
 - `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`;
 - `manifest.json`, the same for the GUI installer (package schema 1), and
-  `armada2-refit-installer.py` itself; CI attaches the script and the AppImage built
-  from it to the release on their own (`gui-installer/README.md`).
+  `armada2-refit-installer.py` itself; CI attaches the script, the AppImage, the
+  Windows `.exe` and the macOS app's zip built from it to the release on their own
+  (`gui-installer/README.md`). The manifest's `windows` and `macos` entries are what
+  lets those two install a package.
 
-`install.sh` reads two variables the GUI sets: `A2_PROGRESS=1` prints `::step <id>` as
-each stage starts, and `A2_SKIP=cutscenes` leaves the Bink proxy out (and puts back a
-stock `binkw32.dll` an earlier install replaced). Run by hand, it does as before.
+`install.sh` and `install.ps1` read three variables the GUI sets: `A2_PROGRESS=1` prints
+`::step <id>` as each stage starts, `A2_SKIP=cutscenes` leaves the Bink proxy out (and
+puts back a stock `binkw32.dll` an earlier install replaced), and `A2_PYTHON` names the
+program that runs the SOD scripts (the frozen installer itself on Windows and macOS).
+Run by hand, they do as before.
 
 It is our code only, compiled, and our configuration. It holds nothing of the game,
 none of the test tools, and **no third-party shader**. `ReShadeUI.fxh` carries no
@@ -182,8 +192,13 @@ bloom shaders for real, so CI also notices when a pinned one moves.
 - `package.sh`, with the zip kept as a workflow artifact, named by commit, and both
   installers run against a mock game: `test.sh` on Linux, `test.ps1` on a Windows
   runner;
+- the GUI installer built three ways, each tested against a mock game: the AppImage
+  (ubuntu-24.04), a portable `.exe` (windows-2025, `gui-installer/test-windows.ps1`) and
+  a universal2 `.app` (macos-15, `gui-installer/test-macos.sh`, after
+  `publish/installer/test.sh` on macOS);
 - on `main` only, when the root version has no release yet: tag `vX.Y.Z` and publish a
-  GitHub Release with the zip, the changelog entry as its notes. An entry that still
+  GitHub Release with the zip, the GUI installer as a script, an AppImage, a Windows
+  `.exe` and a macOS app's zip, the changelog entry as its notes. An entry that still
   says "not yet seen in game" goes out as a pre-release. So **bumping the root version
   and pushing `main` is what releases**; a push that does not bump it releases nothing.
 - after that, on every push to `main`: delete all but the newest three releases. Their

@@ -32,6 +32,7 @@ a time, and every fix can be undone.
 | **Anti-aliasing** | `MSAA.asi` turns on up to 8x multisample anti-aliasing, which the game has no option for |
 | **Lighting** | `Lighting.asi` draws ships and stations on the engine's own GPU path under new scene lights (a warm key, a dim blue fill and a faint sky light), gives planets a night side, and makes nebulae, planets' day sides, explosions and torpedoes light the hulls around them, and phaser fire light the firing ship at its emitter and the target where it strikes. Under crosire's d3d8to9 (which `./install` sets up) hulls and planets are lit per pixel in shaders, with specular, a rim light, hull night lights, and city lights and water glint on planets |
 | **Seamless skies** | `Sky.asi` draws each map's sky in a shader from a small recipe (seed, palette, density) in place of the six painted cube faces, so the cube's edges are gone; every sky a stock map uses has a recipe. Needs crosire's d3d8to9 (which `./install` sets up); the stock sky otherwise |
+| **Planet surfaces** | `Surfaces.asi` makes the class planets and the dilithium moons from recipes instead of their small painted textures: terrain with real relief (mountains, craters, canyons, glowing fissures) that the sun rakes along the terminator, oceans shading from shallow to deep, polar ice, drifting clouds with their shadows, banded gas giants, and moons split into plates by their cracks. No seams. Drawn by `Lighting.asi` under crosire's d3d8to9; the stock textures otherwise. Built from the repository; not in the release zip yet |
 | **Volumetric nebulae** | `Nebulae.asi` draws every nebula, latinum included, as a cloud of gas you can fly a camera through, in place of the flat billboards that turned with the camera: shaded billows, drifting flow, lightning in the metreon, a pulsing core in latinum, about as bright from every angle. Needs crosire's d3d8to9 (which `./install` sets up); the stock billboards otherwise. Built from the repository; not in the release zip yet |
 | **Bloom and renderer tuning** | vkBasalt bloom, on from launch, plus anisotropic filtering, LOD bias and seamless cube maps through `dxvk.conf` |
 | **Quality of life, stock-compatible** | `QOL.asi`: faster right-drag panning, `Shift+number` adds to a control group, selections and groups beyond 16 ships (40 by default), stations in control groups with one build menu for several, and long moves on the map going to warp as minimap moves do. Everything stays on your machine, so you can still play against unmodded players |
@@ -88,11 +89,23 @@ overrides, the d3d8 chain, setting the resolution, and window management under H
 
 ## Quick start
 
-**Just playing, on Linux:** download `armada2-refit-installer-x86_64.AppImage` from the newest
-[release](https://github.com/cedrichaase/armada2-refit/releases), make it executable and
-run it. It carries GTK 4 and libadwaita itself. It
-finds the game, shows what it will install, installs the newest release and can set
-Heroic's launch options for you ([`gui-installer/README.md`](gui-installer/README.md)).
+**Just playing:** download the installer for your system from the newest
+[release](https://github.com/cedrichaase/armada2-refit/releases) and run it. It finds the
+game, shows what it will install, installs the newest release and sets the launch
+options the game needs ([`gui-installer/README.md`](gui-installer/README.md)).
+
+- **Windows**, the GOG game as GOG installs it: `armada2-refit-installer-windows.exe`,
+  one portable file. It is not signed, so SmartScreen may ask first: *More info* →
+  *Run anyway*.
+- **macOS**: `armada2-refit-installer-macos.zip`, an app for Apple Silicon and Intel.
+  The game runs in Wine: **CrossOver 26** is the recommended way (paid; CodeWeavers rate
+  Armada II "Runs Great"). Create a bottle, run GOG's offline installer in it, then run
+  this app. Sikarugir or Gcenx's Wine builds are free alternatives. Leave CrossOver's
+  graphics backend on its default: Direct3D 8 and 9 run through Wine's own wined3d on a
+  Mac. MSAA and bloom are not available there. The app is not notarised, so the first
+  launch is refused: System Settings → Privacy & Security → *Open Anyway*.
+- **Linux**: `armada2-refit-installer-x86_64.AppImage`; make it executable and run it.
+  It carries GTK 4 and libadwaita itself, and writes Heroic's launch options for you.
 
 **From the repository:**
 
@@ -123,11 +136,11 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 **Prebuilt**, the zip on each
 [release](https://github.com/cedrichaase/armada2-refit/releases) has `HUD.asi`,
 `Menus.asi`, `MSAA.asi`, `QOL.asi`, `Lighting.asi`, `Sky.asi` (with its recipes in `sky/`),
-`Online.asi` and the Bink proxy with their `.ini` files, `dxvk.conf` and the bloom config (`GridLayout.asi`, `Planets.asi`
-and `Nebulae.asi` are built from the repository). It also has installers that do this
-section for you: `install.sh` on Linux, `install.bat` on Windows (`README.txt` in the
-zip), and the graphical installer for Linux (an AppImage), which leaves the Bink
-proxy out for now. `publish/package.sh` builds the same zip locally.
+`Online.asi` and the Bink proxy with their `.ini` files, `dxvk.conf` and the bloom config (`GridLayout.asi`, `Planets.asi`,
+`Nebulae.asi` and `Surfaces.asi` are built from the repository). It also has installers that do this
+section for you: `install.sh` on Linux and macOS, `install.bat` on Windows (`README.txt`
+in the zip), and the graphical installers for all three, which leave the Bink proxy out
+for now. `publish/package.sh` builds the same zip locally.
 
 **Every plugin needs** the game's `Armada2.exe` from GOG patch 1.1,
 plus the Ultimate ASI Loader (`winmm.dll`) that `STA2WidescreenPatch` puts in the game
@@ -191,6 +204,7 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 | [`lighting/`](lighting/README.md) | lighting | `Lighting.asi`: ships and stations on the engine's own GPU path, three scene lights in place of each map's own, planets with a night side, light from nebulae, planets, explosions, torpedoes and phasers, and per-pixel shaders for hulls and planets under d3d8to9 |
 | [`sky/`](sky/README.md) | sky | `Sky.asi`: the sky computed from view direction in a shader, from a recipe per sky, baked once per map; no cube seams |
 | [`nebulae/`](nebulae/README.md) | nebulae | `Nebulae.asi`: each nebula class, latinum included, drawn as a volume of gas from a recipe per class, in place of its billboards |
+| [`surfaces/`](surfaces/README.md) | surfaces | `Surfaces.asi`: the class planets' and the dilithium moon's surfaces made from recipes, with relief, craters, fissures, oceans and clouds, for `Lighting.asi` to draw in place of their textures |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias, seamless cube maps) and vkBasalt bloom, on from launch |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
 | [`models/`](models/README.md) | models | `Planets.asi` (planet tessellation), the smoothed dilithium moons, the round selection bubble, and the loading-screen model, widened with its `LOADING` art |

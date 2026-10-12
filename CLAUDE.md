@@ -39,6 +39,7 @@ it bundles.
 | `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key | `lighting/README.md` |
 | `sky/` | `Sky.asi` — the map's sky computed from view direction by a shader, baked once per map into a cube, in place of the six painted faces; recipes per sky name in `sky/skies/` | `sky/README.md` |
 | `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
+| `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M) and the dilithium moon's rock made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -47,7 +48,7 @@ it bundles.
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
 | `online/` | `Online.asi` — online multiplayer, in progress: the *Internet – Online* menu entry, our own `IDirectPlay8Peer` over UDP (`peer.c`), and `server/a2online-server.py` for join codes, hole punching and the relay, public at `c20e.de:2399` (the default `Server=`; the bench blanks it). Not in `./install` or `a2mod` yet | `online/README.md` |
 | `publish/` | what may be published and the check that enforces it. Installs nothing; versioned by the root | `publish/README.md` |
-| `gui-installer/` | `armada2-refit-installer.py`, the graphical installer for Linux (GTK 4 and libadwaita, over a starfield drawn in code): installs GitHub release zips, cached, and writes Heroic's launch variables. Versioned on its own, with the release-package schema it reads (`manifest.json`, `install.sh`'s `::step` lines). Leaves out textures and cutscenes for now | `gui-installer/README.md` |
+| `gui-installer/` | `armada2-refit-installer.py`, the graphical installer for Linux (GTK 4 and libadwaita, released as an AppImage), Windows and macOS (Tk, frozen by PyInstaller into a portable `.exe` and a universal2 `.app`), over a starfield drawn in code: installs GitHub release zips, cached, and writes the launch settings (Heroic's variables on Linux, the Wine prefix's registry on macOS; Windows needs none). Versioned on its own, with the release-package schema it reads (`manifest.json`, the scripts' `::step` lines). Leaves out textures and cutscenes for now | `gui-installer/README.md` |
 
 `./a2mod` is the entry point and stays at the root, with `./a2test` beside it for
 testing, `./a2tex` for textures, `./install`, which installs every layer, and
@@ -307,7 +308,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -720,6 +721,20 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
 - **`Opacity=` keeps the gas as bright from every angle** (half size only); the
   composite is bound by its texture reads, so measure any new read there
   (`Timing=1`).
+
+### surfaces
+
+- **`Surfaces.asi` draws nothing.** `Lighting.asi` owns the planets' draw (`GroundMesh`
+  slot 11) and the hulls' (`hook_dip`); it calls `a2_surface` (`surfaces/surfaces.h`) by
+  texture name and samples the cubes it gets. Change `surfaces.h` in both at once.
+- **A hull mesh's texture is `**(mesh + 0x114)`**, a list; reading `*(mesh + 0x114)` as
+  the texture crashed the game. Names sit at +0x8 of every database element.
+- **vkd3d unrolls every loop and chokes on a branch inside one**: write the Voronoi
+  searches branch-free (`step`/`lerp`); an `if` there took minutes to compile.
+- **The bake is one call**, because its height cube is in the default pool and must be
+  gone before any device `Reset`.
+- **The moon's cracks are holes, black as stock's are**: the rock is alpha-tested
+  (`Cut=`), and the glow shell shows only where a crack opens at the silhouette.
 
 ### textures
 

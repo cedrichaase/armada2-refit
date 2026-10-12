@@ -1,8 +1,9 @@
-# gui-installer — the graphical installer for Linux
+# gui-installer — the graphical installer, for Linux, Windows and macOS
 
-`armada2-refit-installer.py` is one Python file: a GTK 4 / libadwaita window over a
-starfield that installs a **release** of Armada II Refit into the GOG game under
-Wine/Proton. It is for players, not for working on the project. The repository's own
+`armada2-refit-installer.py` is one Python file: a window over a starfield that installs
+a **release** of Armada II Refit into the GOG game — under Wine/Proton on Linux (GTK 4 /
+libadwaita), as GOG installs it on Windows, and in a Wine prefix on macOS (both Tk). It
+is for players, not for working on the project. The repository's own
 `./install` builds from source and installs the asset layers too; this installs what a
 release zip carries.
 
@@ -19,9 +20,12 @@ PyGObject with GTK 4 and libadwaita (Arch `python-gobject gtk4 libadwaita`;
 Debian/Ubuntu `python3-gi gir1.2-gtk-4.0 gir1.2-adw-1`; Fedora `python3-gobject gtk4
 libadwaita`). Without them it says so and points at the command line.
 
-Released as an **AppImage** (`armada2-refit-installer-x86_64.AppImage`, about 50 MB), which
-carries Python, GTK 4 and libadwaita; the script itself is attached beside it. See
-"The AppImage" below.
+Released as an **AppImage** for Linux (`armada2-refit-installer-x86_64.AppImage`, about
+50 MB, carrying Python, GTK 4 and libadwaita), a portable **`.exe`** for Windows and a
+universal2 **`.app`** for macOS (`armada2-refit-installer-macos.zip`); the script itself
+is attached beside them. See "The AppImage", "Windows and macOS" and "The .exe and the
+.app" below. The sections up to there describe Linux; the other two systems differ only
+where "Windows and macOS" says.
 
 Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
 
@@ -108,15 +112,17 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 | `schema`, `name`, `version`, `commit` | the package |
 | `installer` | `file` and `version` of the GUI installer in the same release; a newer one than the running one shows a banner |
 | `linux` | `script` (`install.sh`), `uninstall` (its flag), `progress` (the variable) |
+| `windows`, `macos` | the same for those systems (`install.ps1`, `-Uninstall`; `install.sh`). The Windows and macOS installers install only a package that has its entry (`Package.for_system`): before 11.20.0, `install.ps1` printed no progress and `install.sh` did not run on a Mac. Adding them was not a new schema, since the Linux installer reads such a package as before |
 | `steps` | the `::step` ids `install.sh` prints, in order: the progress bar's denominator |
 | `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `vkbasalt` |
 | `not_included[]` | `id`, `name`, `summary`: shown as not available (textures) |
 
 ## Progress
 
-`install.sh` with `A2_PROGRESS=1` prints `::step <id> <what>` as each stage starts
-(`verify`, `prereqs`, `hud`, `menus`, `qol`, `lighting`, `online`, `msaa`, `cutscenes`,
-`renderer`, `bloom`, `done`; `uninstall`). The window maps the ids to its status line
+`install.sh` and `install.ps1` with `A2_PROGRESS=1` print `::step <id> <what>` as each
+stage starts (`verify`, `prereqs`, `chain`, `hud`, `menus`, `qol`, `grid`, `models`,
+`lighting`, `sky`, `online`, `msaa`, `cutscenes`, `renderer`, `bloom`, `done`;
+`uninstall`). The window maps the ids to its status line
 (`STATUS` in the script: "Refitting the HUD", "Installing lighting"…) and fills its
 segmented bar: download 0–30 %, unpack, the script's steps 35–92 %, Heroic, done. A
 schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).
@@ -211,6 +217,89 @@ on, so build it where you mean it to be portable.
   AppImage. Where FUSE is missing, `APPIMAGE_EXTRACT_AND_RUN=1` runs it without
   mounting (the type-2 runtime is static, so no libfuse2 is needed to mount either).
 
+## Windows and macOS
+
+The core is the same on all three systems (`SYSTEM`); what differs:
+
+| | Windows | macOS |
+|---|---|---|
+| The game | GOG's own install: the folder in GOG's registry entry (`HKLM\SOFTWARE\[WOW6432Node\]GOG.com\Games\1174788223`, `gog_registry_dirs`), else the usual folders on every drive | inside a Wine prefix (`mac_prefixes`): CrossOver bottles (`~/Library/Application Support/CrossOver/Bottles`), Whisky's, Sikarugir / Kegworks / Wineskin / Porting Kit wrappers (the prefix inside the `.app`), `~/.wine` and the like |
+| The script | `install.ps1` through `powershell.exe -ExecutionPolicy Bypass -File`, no console window | `install.sh` through `/bin/bash` (3.2, BSD tools) |
+| The chain | crosire's d3d8to9 on Windows' own Direct3D 9; a DXVK `d3d8.dll` the player put there stays | d3d8to9 on Wine's own wined3d: DXVK cannot run Direct3D 9 on a Mac, so no MSAA, `dxvk.conf` or bloom |
+| Launch settings | none: the game folder's DLLs load first | the DLL overrides, written into the prefix's `user.reg` under `AppDefaults\Armada2.exe\DllOverrides` (the game's alone, not the bottle's) |
+| Launch game | the exe | the prefix's Wine: CrossOver's `wine --bottle <name>`, a wrapper's own, Whisky's, else Gcenx's or Homebrew's |
+| Cache, settings | `%LOCALAPPDATA%\armada2-refit\installer\cache`, `%APPDATA%\armada2-refit\installer.json` | `~/Library/Caches/armada2-refit/installer`, `~/Library/Application Support/armada2-refit/installer.json` |
+
+**The registry, on macOS** (`prefix_plan`, `prefix_apply`). Only the overrides the game
+does not have yet go in, as Heroic's do on Linux; the first write keeps
+`user.reg.a2refit-backup`, and uninstall takes out only values still as it left them,
+with the section if it held nothing else, so the file comes back byte for byte. Wine
+must not be running in the prefix: wineserver writes its own copy back on exit, so with
+a `wineserver` running nothing is written and the player is told. **Launch game** passes
+the same overrides in the environment as well, so it works either way. A game outside
+any prefix gets the variables as text to copy.
+
+**Python.** The SOD rewrites are Python; Windows and macOS players have none (and
+macOS's `/usr/bin/python3` is a stub that offers to install the developer tools). The
+frozen program runs a `.py` given as its first argument (`run_python`), and the job sets
+`A2_PYTHON` to itself; both scripts use `A2_PYTHON` when it is set. An exception there
+goes to stderr, never to a dialog that would stall the script.
+
+**Which stack on a Mac.** Recommended: **CrossOver 26** (CodeWeavers, paid; Wine 11, rated
+"Runs Great" for Armada II). Free: **Sikarugir** (the former Kegworks) or **Gcenx's**
+macOS Wine builds. Whisky was discontinued in 2025, and Homebrew's `wine-stable` cask is
+disabled. Every Wine on Apple Silicon runs under Rosetta 2, which Apple keeps fully
+through macOS 27 and then only "for older unmaintained gaming titles"; whether Wine
+stays inside that is not announced. The window's own text for this is `MAC_HOWTO` in the
+script, its only copy (and `WINDOWS_HOWTO` for getting the game on Windows).
+
+### The window on Windows and macOS
+
+The `.exe` and the `.app` show the same one screen in Tk (8.6 or 9, from the standard
+library), in `run_tk()`. Everything is drawn on a single Canvas — the sky, the
+translucent card, the buttons and the pickers — since a Tk widget is opaque and would
+cut a box out of the sky. The card, buttons and fields are antialiased rounded
+rectangles with an alpha channel, built as PNGs in Python (`rounded_rows`, `tk_png`) and
+blended by Tk over the canvas; the pickers open a menu.
+
+The sky is `Sky` redone for a Canvas: the same `nebula_pixels`, composited over the
+gradient and scaled to the window height in a thread (`nebula_rgb`, a third of a second),
+faded in over five steps and then moved only by whole pixels; each star layer moves as
+one canvas tag, and only when it has travelled a whole pixel. At rest that is about 5 %
+of a core. While a job runs it goes to warp as on Linux, with tails stippled so the sky
+shows through (macOS draws them solid).
+
+Jobs run on a worker thread and reach Tk only through a queue polled every 40 ms. Errors
+in the window's own code go into the log (Ctrl/Cmd+L), since the frozen program has no
+console. On Windows it sets per-monitor DPI awareness and sizes everything by
+`tk scaling`; on macOS Tk's pixels are already points. Keys: F5 refresh, Ctrl+Enter
+(Cmd+Return) install, Ctrl+L (Cmd+L) the log. `A2_INSTALLER_TK=1` opens this window on
+Linux, to work on it; it was checked there on a headless sway with Xwayland, with Tk 8.6
+and 9, clicks synthesised with `event_generate`.
+
+## The .exe and the .app
+
+`pyinstaller/build.py [--out DIR] [--arch universal2]` freezes the script with
+PyInstaller for the system it runs on, pinned in `pyinstaller/requirements.txt` (build.py
+refuses another version). CI builds both:
+
+- **Windows**: `armada2-refit-installer-windows.exe`, one windowed file, portable
+  (nothing to install, no Python needed), with the icon and a version resource carrying
+  `INSTALLER_VERSION`. Unsigned: SmartScreen may hold it the first time (*More info* →
+  *Run anyway*). 64-bit; the game's 32 bits do not matter to it.
+- **macOS**: `Armada2 Refit Installer.app`, universal2 (Apple Silicon and Intel), built
+  on macos-15 with setup-python's universal2 framework Python (with Tk), signed ad hoc
+  and not notarised, zipped with `ditto` into `armada2-refit-installer-macos.zip`. The
+  first launch is refused: on macOS 15 and later, System Settings → Privacy & Security
+  → *Open Anyway*; on older ones, right-click → *Open*. Or
+  `xattr -dr com.apple.quarantine "Armada2 Refit Installer.app"`.
+
+Both run in Python's UTF-8 mode (`--python-option "X utf8"`). The modules the SOD scripts
+import are named as hidden imports in build.py. The icon is drawn from
+`appimage/armada2-refit.svg` by `pyinstaller/icon.py` in pure Python; it draws only the
+SVG features the icon uses and refuses anything else, so a richer icon fails the build
+rather than drawing wrong.
+
 ## Versioning
 
 `INSTALLER_VERSION` in the script is this layer's version. `CHANGELOG.md` heads it, and
@@ -224,5 +313,14 @@ in the zip.
   Heroic's variables) and uninstall (game and Heroic as before) against a mock game and
   a mock Heroic in a scratch `HOME`. CI runs it on every push.
 - `A2_INSTALLER_APPIMAGE=<file> test.sh <zip>`: the same through the AppImage. CI does it.
+- `test-windows.ps1 <zip> <exe>`: the shipping `.exe`, its standard handles redirected
+  (it is windowed), in scratch `LOCALAPPDATA`/`APPDATA`/`USERPROFILE`: version resource,
+  self-test, the exe as Python, install (cutscene skip, state file) and uninstall (the
+  game as before). CI runs it on windows-2025.
+- `test-macos.sh <zip> <app or its zip>`: the `.app` in a scratch `HOME` with a mock
+  CrossOver bottle: detection, the app as Python, install, the DLL overrides written into
+  the bottle's `user.reg` and taken out byte for byte, uninstall. CI runs it on
+  macos-15, after `publish/installer/test.sh`.
 - The window was checked on a headless sway (`WLR_BACKENDS=headless`, `grim`, `wtype`).
-  None of this proves anything loads in game.
+  None of this proves anything loads in game, and nothing here has been run on a real
+  Windows or Mac desktop by a person yet: only on CI's runners.

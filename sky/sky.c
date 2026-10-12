@@ -193,11 +193,12 @@ static int parsen(const char *s, float *v, int n)
     return 1;
 }
 
-static void inin(const char *file, const char *key, float *v, int n)
+/* 1 when the key holds n numbers (and v has them) */
+static int inin(const char *file, const char *key, float *v, int n)
 {
     char b[96];
     GetPrivateProfileStringA("Sky", key, "", b, sizeof b, file);
-    if (b[0]) parsen(b, v, n);
+    return b[0] ? parsen(b, v, n) : 0;
 }
 
 static int file_time(const char *path, FILETIME *t)
@@ -227,8 +228,9 @@ static void read_settings(void)
     if (g_face > 4096) g_face = 4096;
 }
 
-/* The pixel shader's constants, c0..c13; their meaning is listed in sky.hlsl. */
-#define NCONST 14
+/* The pixel shader's constants, c0..c18; their meaning is listed in sky.hlsl. The
+ * bake's face constants follow them, at c19. */
+#define NCONST 19
 typedef struct {
     char     name[64];        /* the map's background name, as the engine holds it */
     char     path[360];       /* Sky\<name>.ini */
@@ -319,6 +321,22 @@ static int recipe_read(Recipe *r)
     r->k[12][2] = ini1(f, "Gamma", 1.0f);
     r->k[12][3] = ini1(f, "HueMix", 0.5f);
     if (r->k[12][2] < 0.05f) r->k[12][2] = 0.05f;
+    st[0] = 0.0f; st[1] = 8.0f; st[2] = 0.6f;                           /* Grain: off */
+    inin(f, "Grain", st, 3);
+    r->k[14][0] = st[0]; r->k[14][1] = st[1]; r->k[14][2] = st[2];
+    st[0] = 0.0f; st[1] = 6.0f; st[2] = 0.5f;                           /* Dust: off */
+    inin(f, "Dust", st, 3);
+    r->k[15][0] = st[0]; r->k[15][1] = st[1]; r->k[15][2] = st[2];
+    core[0] = 0.0f; core[1] = 1.0f; core[2] = 0.5f; core[3] = 0.0f;   /* Stars: none */
+    if (!inin(f, "Stars", core, 4)) inin(f, "Stars", core, 3);
+    r->k[16][0] = core[0] / 314.0f;     /* stars over the sphere -> chance per lattice cell */
+    r->k[16][1] = core[1];
+    r->k[16][2] = core[2] * DEG;
+    r->k[16][3] = core[3];
+    rgb(f, "StarA", r->k[17]); rgb(f, "StarB", r->k[18]);
+    st[0] = 0.0f; st[1] = 0.0f;                                         /* Haze: off */
+    inin(f, "Haze", st, 2);
+    r->k[14][3] = st[0]; r->k[15][3] = st[1];
     r->gen++;
 
     b[0] = 0; s_cat(b, "recipe "); s_cat(b, f); s_cat(b, " read");
@@ -544,7 +562,7 @@ static int bake(void *d9, Recipe *r, void *vs)
         int    i;
         for (i = 0; i < 3; i++) { c[i][0] = k_faces[f][i][0]; c[i][1] = k_faces[f][i][1]; c[i][2] = k_faces[f][i][2]; c[i][3] = 0.0f; }
         c[3][0] = 2.0f / (float)(S - 1); c[3][1] = c[3][2] = c[3][3] = 0.0f;
-        d9_psconst(d9, 14, &c[0][0], 4);
+        d9_psconst(d9, NCONST, &c[0][0], 4);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
         if (D9_FN(d9, D9_GETRENDERTARGETDATA, RTData_t)(d9, rts, sys) < 0) break;
         if (D9_FN(sys, SURF_LOCK, SurfLock_t)(sys, &src, NULLPTR, 0x10) < 0) break;            /* READONLY */

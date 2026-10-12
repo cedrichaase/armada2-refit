@@ -5,6 +5,61 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.22.0 — 2026-10-12
+
+surfaces 1.0.0, lighting 1.18.0, testbench 3.6.0
+
+### Added
+- `surfaces/`: `Surfaces.asi`, planet surfaces (classes D, H, J, K, L, M) and the
+  dilithium moon made from recipes as height fields baked into cubes, with relief,
+  craters, fissures, oceans, ice and drifting clouds with shadows; drawn by
+  `Lighting.asi`. `./install` runs `surfaces/install.sh`; `a2mod` switches it as the
+  `surfaces` layer.
+
+Installed, not yet seen in game.
+
+## 11.21.0 — 2026-10-12
+
+Layers: sky 1.2.0.
+
+### Added
+- Detail in the procedural skies: grain, dust, haze and embedded stars as recipe keys,
+  used by every sky recipe; `mbgblue` calibrated like `mbg02` (sky 1.2.0). `d1d15e2`
+
+Installed, not yet seen in game.
+
+## 11.20.0 — 2026-10-12
+
+Layers: gui-installer 1.5.0.
+
+### Added
+- The graphical installer for Windows and macOS (gui-installer 1.5.0): a portable
+  `armada2-refit-installer-windows.exe` for the plain GOG install, and
+  `armada2-refit-installer-macos.zip`, a universal2 app for the game in CrossOver or
+  another Wine, writing the DLL overrides into the bottle's registry. Every release
+  carries both beside the AppImage.
+- The release zip's `install.sh` runs on macOS (`/bin/bash` 3.2, BSD tools) into a Wine
+  prefix: crosire's d3d8to9 on Wine's own Direct3D 9, never DXVK's (one an earlier
+  install put in comes out); MSAA, `dxvk.conf` and bloom skipped; the game found in a
+  CrossOver bottle. `A2_PYTHON` names the Python for the SOD rewrites on every system.
+- `manifest.json` names `windows` and `macos`; the Windows and macOS installers install
+  only packages that do.
+
+### Changed
+- `install.ps1` does what `install.sh` does: QOLRules, GridLayout (the player's
+  `GridLayout.ini` kept), Planets and the SOD rewrites (`A2_PYTHON`, `py -3` or a real
+  `python`); crosire's d3d8to9 in place of GOG's `d3d8.dll`, on Windows' own Direct3D 9
+  (a DXVK `d3d8.dll` is left as it is), recorded so `-Uninstall` restores GOG's;
+  `A2_PROGRESS` and `A2_SKIP`; every line in order on stdout, and a plain last-line
+  error with exit 1.
+- `install.sh` needs no `sha256sum`, `tac` or GNU `sed`; `publish/installer/test.sh`
+  runs on macOS too and, on Linux, again without those tools and again as Darwin.
+- CI builds and tests the `.exe` on windows-2025 and the `.app` on macos-15, and runs
+  `install.sh`'s test on macOS.
+- The zip's `README.txt` names the graphical installers and the macOS way.
+
+Installed, not yet seen in game.
+
 ## 11.19.0 — 2026-10-10
 
 Layers: nebulae 1.0.0.
