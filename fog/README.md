@@ -77,11 +77,19 @@ stage 0 did). The shader:
    the cubic B-spline in four taps (default), or Catmull-Rom in nine. The texture holds
    the art times the mask, and the mask in alpha, so one filtered sample gives both the
    smoothed mask *A* and the art weighted by it; their ratio is the art over hidden cells
-   only, so the edge does not darken towards black.
-2. **Draws the edge as a smoothstep of A** about `Threshold` (0.5 is where stock's edge
+   only, so the colour is not smeared by the filter.
+2. **Puts back stock's rim** (`Rim`, `RimWidth`): stock's seen texels are black, so its
+   bilinear filter darkens the art towards an edge, to half at the cut, and the shroud
+   looks bevelled. With the ratio above that was gone, and the user missed it. The
+   shader shades the art by the mask instead: half at the threshold, full where A has
+   risen `RimWidth` above it. On the bench, across a straight stretch of the shroud's
+   edge, stock ramps from 80 to 45 (grey levels) over 16 pixels before its cut;
+   `RimWidth=0.25` starts its ramp at the same pixel with the same slope, where 0.5
+   starts 40 pixels early, because the B-spline's mask rises more slowly than bilinear.
+3. **Draws the edge as a smoothstep of A** about `Threshold` (0.5 is where stock's edge
    is), `Softness` wide, and never narrower than `Antialias` pixels (`fwidth`), so it
    neither steps nor aliases when zoomed out.
-3. **Holds every tap inside the grid**, so the shroud does not thin along the map's own
+4. **Holds every tap inside the grid**, so the shroud does not thin along the map's own
    border: outside the grid the texture holds nothing the engine wrote.
 
 The shroud is drawn blended (`SRCALPHA`/`INVSRCALPHA`, alpha test off) instead of
@@ -106,6 +114,8 @@ waviness at cell scale, visible only magnified.
 | `Filter` | `bspline` | `bspline` or `catmull-rom` (above) |
 | `FogThreshold`, `ShroudThreshold` | 0.5 | where the edge sits, from seen (0) to hidden (1); lower grows the layer |
 | `FogSoftness`, `ShroudSoftness` | 0.2, 0.1 | how soft the edge is, in units of the mask: 0 as sharp as a pixel allows, 0.5 a gradient about two cells wide |
+| `FogRim`, `ShroudRim` | 1 | how much of stock's darker rim to keep: 1 as stock, 0 flat to the edge |
+| `RimWidth` | 0.25 | how far in the rim reaches, in units of the mask (0.25 is stock's width) |
 | `Antialias` | 1.0 | the least width of an edge, in multiples of the mask's change per pixel |
 
 ## Not covered

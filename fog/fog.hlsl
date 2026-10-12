@@ -16,6 +16,12 @@
 //   c0  texture size N, 1/N, threshold, softness (in units of the mask)
 //   c1  the scan grid in texel coordinates: first and last texel centres, x0 y0 x1 y1
 //   c2  x: the antialiasing width in multiples of the mask's change per pixel
+//       y: the rim's strength, z: 1 / its width (in units of the mask)
+//
+// The rim: stock's seen texels are black, so bilinear filtering darkens the art towards
+// an edge, to half at the cut, and the shroud looks bevelled. Dividing the art out (C/A)
+// loses that, so it is put back as a shade from the mask: half at the threshold, full
+// where the mask has risen by the width above it.
 
 sampler2D s_layer : register(s0);
 float4 k_tex  : register(c0);
@@ -36,6 +42,8 @@ float4 finish(float4 r, float4 diffuse)
     float3 c = saturate(r.rgb / max(a, 1.0 / 256.0));   // the art, from hidden cells only
     float w = max(k_tex.w, fwidth(a) * k_aa.x);
     float cov = smoothstep(k_tex.z - w, k_tex.z + w, a);
+    float shade = saturate(0.5 + 0.5 * (a - k_tex.z) * k_aa.z);
+    c *= lerp(1.0, shade, k_aa.y);
     return float4(c, cov) * diffuse;
 }
 
