@@ -63,8 +63,9 @@ sampler2D s_zlow  : register(s6);  //   the nearest depth of each 2x2 of it, at 
 sampler2D s_gas   : register(s7);  //   the gas, at half size, in floating point; alpha its optical depth
 sampler2D s_gasl  : register(s9);  //   the same, filtered (the composite's reads away from depth edges)
 sampler2D s_shadow : register(s8); // the Key's shadow map, R32F, point-sampled: the depth of the nearest hull
+sampler2D s_zlowl : register(s10); // Resolution=2, Upsample= 1..4: the half-size depth, filtered (the composite's edge test)
 
-float4 k_lr      : register(c21);  // Resolution=2: x Obscure=; zw 1 / the full target's size
+float4 k_lr      : register(c21);  // Resolution=2: x Obscure=; y Upsample=; zw 1 / the full target's size
 float4 k_lrv     : register(c23);  //   the half-size viewport, its first and last pixel: x0, y0, x1, y1
 float4 k_lr2     : register(c22);  //   xy 1 / the half-size targets' size; z, w the projection's _33 and _43 (to view depth)
 
@@ -407,7 +408,14 @@ float4 zdown_ps(float2 vpos : VPOS) : COLOR
     float2 f = (floor(vpos) * 2.0 + 0.5) * k_lr.zw;      // half pixel i covers full pixels 2i, 2i+1
     float  a = tex2D(s_zfull, f).r, b = tex2D(s_zfull, f + float2(k_lr.z, 0)).r;
     float  c = tex2D(s_zfull, f + float2(0, k_lr.w)).r, d = tex2D(s_zfull, f + k_lr.zw).r;
-    return float4(min(view_z(min(min(a, b), min(c, d))), 60000.0), 0, 0, 0);
+    float  z = min(min(a, b), min(c, d));
+    // Upsample=2 and 4: on one colour of a checkerboard the farthest of the 2x2 instead,
+    // so that a half pixel straddling a silhouette carries the gas behind the hull on
+    // one colour and the gas in front of it on the other (the composite weighs each tap
+    // by its own depth, so a hull pixel never takes a far one's gas).
+    float  m = k_lr.y, odd = frac(dot(floor(vpos), 0.5));
+    if ((abs(m - 2.0) < 0.5 || abs(m - 4.0) < 0.5) && odd > 0.25) z = max(max(a, b), max(c, d));
+    return float4(min(view_z(z), 60000.0), 0, 0, 0);
 }
 
 // Resolution=2: the gas target's clear: no gas, no optical depth.
@@ -433,7 +441,69 @@ float4 zclear_ps(float2 vpos : VPOS) : COLOR
 // and the gas's own colour where it is thick, at any angle. Exact for gas of one colour,
 // and order does not matter, so the slices still need no sorting. What is behind loses
 // e^-t of itself, times Obscure=. Then one dither to the 8-bit target.
-float4 comp_ps(float2 vpos : VPOS) : COLOR
+// Upsample= 1..4: the same tent, better at depth edges (nebulae/README.md, "Edges").
+// The edge test reads the half-size depth filtered at the 9 points the gas is read at,
+// so a depth change anywhere in the 5x5 shows (the point reads of the inner 3x3 missed
+// the outer ring, whose gas was then mixed in across a silhouette). At an edge every tap
+// is weighed by its own depth, not its inner neighbour's. With coverage (3 and 4), a
+// pixel on a full-size silhouette takes the gas for the nearest depth about it and the
+// gas for the farthest, mixed by how much of a cross of 5 full pixels is near: the gas's
+// edge is ramped over a pixel as the hull's own multisampled edge is, not stepped.
+float4 comp_up(float2 vpos)
+{
+    float2 full = floor(vpos) + 0.5;
+    float  zf = min(view_z(tex2D(s_zfull, full * k_lr.zw).r), 60000.0);
+    float2 h = full * 0.5 - 0.5;
+    float2 b = floor(h + 0.5), fr = h - b;
+    float2 w0 = saturate(1.0 - abs(-2.0 - fr) * 0.4), w1 = saturate(1.0 - abs(-1.0 - fr) * 0.4);
+    float2 w2 = saturate(1.0 - abs(fr) * 0.4), w3 = saturate(1.0 - abs(1.0 - fr) * 0.4), w4 = saturate(1.0 - abs(2.0 - fr) * 0.4);
+    float2 pa = -2.0 + w1 / max(w0 + w1, 1e-6), pb = w3 / max(w2 + w3, 1e-6);
+    float2 wa = w0 + w1, wb = w2 + w3;
+    float2 o[3] = { pa, pb, float2(2.0, 2.0) };
+    float2 ow[3] = { wa, wb, w4 };
+    float4 c = 0.0;
+    float  wsum = 0.0, edge = 0.0;
+    [unroll] for (int y = 0; y < 3; y++) {
+        [unroll] for (int x = 0; x < 3; x++) {
+            float  w = ow[x].x * ow[y].y;
+            float2 uv = (clamp(b + float2(o[x].x, o[y].y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;
+            edge = max(edge, abs(tex2Dlod(s_zlowl, float4(uv, 0, 0)).r - zf) / zf);
+            c += tex2Dlod(s_gasl, float4(uv, 0, 0)) * w;
+            wsum += w;
+        }
+    }
+    c /= max(wsum, 1e-6);
+    [branch] if (edge > 0.03) {
+        float  m = k_lr.y, zn = zf, zx = zf, cov = 1.0;
+        [branch] if (m > 2.5) {
+            float  zl = min(view_z(tex2D(s_zfull, (full + float2(-1, 0)) * k_lr.zw).r), 60000.0);
+            float  zr = min(view_z(tex2D(s_zfull, (full + float2( 1, 0)) * k_lr.zw).r), 60000.0);
+            float  zu = min(view_z(tex2D(s_zfull, (full + float2(0, -1)) * k_lr.zw).r), 60000.0);
+            float  zd = min(view_z(tex2D(s_zfull, (full + float2(0,  1)) * k_lr.zw).r), 60000.0);
+            float  n = min(min(min(zl, zr), min(zu, zd)), zf), x = max(max(max(zl, zr), max(zu, zd)), zf);
+            float  s = sqrt(n * x), on = (x - n) / n > 0.03 ? 1.0 : 0.0;
+            float  cv = 0.5 * step(zf, s) + 0.125 * (step(zl, s) + step(zr, s) + step(zu, s) + step(zd, s));
+            zn = lerp(zf, n, on); zx = lerp(zf, x, on); cov = lerp(1.0, cv, on);
+        }
+        float4 cn = 0.0, cx = 0.0;
+        float  sn = 0.0, sx = 0.0;
+        [unroll] for (int y = -2; y <= 2; y++) {
+            [unroll] for (int x = -2; x <= 2; x++) {
+                float2 tw = saturate(1.0 - abs(float2(x, y) - fr) * (2.0 / 5.0));
+                float2 uv = (clamp(b + float2(x, y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;
+                float  zt = tex2Dlod(s_zlow, float4(uv, 0, 0)).r;
+                float4 g = tex2Dlod(s_gas, float4(uv, 0, 0));
+                float  a = tw.x * tw.y / (1e-3 + abs(zt - zn) / zn), d = tw.x * tw.y / (1e-3 + abs(zt - zx) / zx);
+                cn += g * a; sn += a;
+                cx += g * d; sx += d;
+            }
+        }
+        c = lerp(cx / max(sx, 1e-6), cn / max(sn, 1e-6), cov);
+    }
+    return c;
+}
+
+float4 comp_stock(float2 vpos)
 {
     float2 full = floor(vpos) + 0.5;
     float  zf = min(view_z(tex2D(s_zfull, full * k_lr.zw).r), 60000.0);   // as the half-size depth
@@ -482,6 +552,14 @@ float4 comp_ps(float2 vpos : VPOS) : COLOR
         }
         c /= max(wsum, 1e-6);
     }
+    return c;
+}
+
+float4 comp_ps(float2 vpos : VPOS) : COLOR
+{
+    float4 c;
+    [branch] if (k_lr.y > 0.5) c = comp_up(vpos);
+    else c = comp_stock(vpos);
     float  t = c.a, e = exp(-t);
     float3 g = c.rgb * (t > 1e-4 ? (1.0 - e) / t : 1.0 - 0.5 * t);
     float  u = tex2D(s_blue, (vpos + 0.5) / 64.0).r;
