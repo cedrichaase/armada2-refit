@@ -51,6 +51,7 @@ planet's ground colour (`planet glow:`).
 | `PlanetSun` | `1.2` | with `PlanetShaders`, the Key on planets times this; the light on the texture is clamped at this rather than 1, so the lit side can be brighter than the CPU path's |
 | `PlanetWrap`, `PlanetDusk` | `0.25`, `1.00 0.55 0.35` | how far past the terminator the light wraps, and its colour where it grazes |
 | `PlanetHaze`, `PlanetHazeColour`, `PlanetHazePower` | `0.45`, from the ground, `3.0` | the atmosphere seen edge-on at the limb: strength, colour (left out: half the ground's hue, half a sky blue), how closely it hugs the edge |
+| `PlanetHalo`, `PlanetHaloHeight`, `PlanetHaloForward` | `1.0`, `0.04`, `2.0` | with `PlanetShaders`, the air past the limb, a glow added round the planet in the haze's colour: strength (`0` none), its height over the ground in planet radii, how much brighter looking towards the Key ("Planets on the GPU", below) |
 | `PlanetGlint`, `PlanetGlintPower` | `0.30`, `40` | a highlight off water (ground bluer than red or green); `0` none |
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
@@ -903,6 +904,27 @@ by its alpha. The pixel shaders are `ground_ps`, `city_ps` and `cloud_ps`:
 - **The limb:** `PlanetHaze` x (1 − N·V)^`PlanetHazePower`, lit where the light
   reaches, added to the ground and the clouds; the cloud shell is larger than the ground,
   so at the edge it shows as a thin halo.
+- **The shell writes no depth.** It reaches about 1% past the ground, 3–4 px at
+  ordinary zoom, and was drawn with the engine's depth writes on. Its halo there is
+  faint and nearly transparent, but its depth cut out whatever was drawn later behind
+  it in that ring (the volumetric gas, which `Nebulae.asi` adds after the scene, and the
+  stock nebula billboards), so the bare sky showed through as a dark outline round every
+  planet. On the bench it stayed a flat #071717 with `Nebulae.asi` on or off, over
+  purple gas. A gas giant's shell from `Surfaces.asi` is the planet's opaque surface,
+  and keeps writing depth.
+- **The air past the limb** (`PlanetHalo`): after each group of the shell, the plugin
+  draws the same triangles again, pushed out to `PlanetHaloHeight` over the ground (and
+  3% more for their chords), added (ONE, ONE) with no depth written, through
+  `halo_ps`. For each pixel it takes the line of sight's lowest point over the planet,
+  b, and the air there, `exp(-4h)(1-h)²` for `h` from 0 at the ground's edge to 1 at
+  the top, faded out over the ground's disc where the ground's own limb haze takes
+  over. It is lit by the sphere's normal at that point, wrapped and reddened at dusk as
+  the ground is, and brighter by `PlanetHaloForward` x (L·D)^6 looking towards the
+  Key. The ground's radius comes from a hemisphere's first vertex (the meshes are
+  spheres about their origin); for a gas giant drawn by `Surfaces.asi`, the shell's.
+  On the bench (`mnebula8` behind a class M, 1920x1080) the lit limb has a blue-white
+  rim fading out over about 10 px into the gas, the dusk limb meets it with none, and
+  the class J giant's limbs stay clean.
 - **Water:** a Blinn-Phong glint where the ground is bluer than it is red or green and
   not bright.
 - **Cities:** by day lit as the ground, as stock. On the night side they are lit from

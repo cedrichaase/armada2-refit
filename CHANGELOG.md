@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.30.0 — 2026-10-13
+
+Layers: lighting 1.21.0.
+
+### Added
+- Planets have an atmosphere past the limb, a glow lit by the Key (`PlanetHalo=`,
+  `PlanetHaloHeight=`, `PlanetHaloForward=`; lighting 1.21.0).
+
+### Fixed
+- The dark outline round planets, most visible against the volumetric nebulae: the
+  cloud shell no longer writes depth (lighting 1.21.0).
+
+Installed, not yet seen in game.
+
 ## 11.29.0 — 2026-10-12
 
 Layers: fog 1.0.0, testbench 3.11.0.

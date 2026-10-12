@@ -229,6 +229,36 @@ float4 cloud_ps(Lit i) : COLOR
     return float4(shoulder(c, shine.w), saturate(t.a + g));
 }
 
+// The atmosphere past the limb (PlanetHalo=; added, drawn on the cloud shell's triangles
+// pushed out to the top of the air): light scattered towards the eye along each line of
+// sight, which depends on how high above the ground the line passes, b. Thickest just
+// over the ground's edge and gone at the top, with air thinning exponentially; inside the
+// disc it fades out over the ground, whose own limb haze carries on from it. Lit by the
+// sphere at the line's lowest point, reddened at dusk, and brighter looking towards the
+// Key (forward scattering), so a planet against its sun shows a bright ring.
+float4 halo : register(c48);   // x: the ground's radius, y: the top of the air (world units),
+                               // z: strength, w: the brightening looking towards the Key
+
+float4 halo_ps(Lit i) : COLOR
+{
+    float3 D = normalize(i.wp - eye.xyz);
+    float3 P = eye.xyz + D * dot(centre.xyz - eye.xyz, D);   // the line's lowest point
+    float3 R = P - centre.xyz;
+    float  b = length(R);
+    float  h = (b - halo.x) / (halo.y - halo.x);              // 0 at the ground's edge, 1 at the top
+    float  a = saturate(1.0 - h);
+    float  dens = exp(-4.0 * max(h, 0.0)) * a * a * smoothstep(-0.5, 0.0, h);
+    float3 N = R / max(b, 1e-4);
+    float3 l = 0.0;
+    for (int k = 0; k < DIRS; k++) {
+        float ndl = dot(N, dvec[k].xyz);
+        float lam = saturate((ndl + 0.3) / 1.3);
+        l += dcol[k].rgb * lerp(dusk.rgb, 1.0, saturate(ndl * 3.0 + 0.3)) * lam
+           * (1.0 + halo.w * pow(saturate(dot(D, dvec[k].xyz)), 6.0));
+    }
+    return float4(haze.rgb * l * dens * halo.z, 1.0);
+}
+
 // A planet made by Surfaces.asi (surfaces/README.md): the ground, or a gas giant's shell,
 // from three cubes sampled in the planet's own frame, so the surface turns with the
 // mesh and has no seams. The relief's normal takes the light (shade_n); the clouds drift

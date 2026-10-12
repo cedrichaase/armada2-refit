@@ -4,6 +4,22 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.21.0 — 2026-10-13
+
+### Added
+- `PlanetHalo=1.0`, `PlanetHaloHeight=0.04`, `PlanetHaloForward=2.0`: the air past a
+  planet's limb, a glow added on the cloud shell's triangles pushed out to the top of the
+  air (`halo_ps`), thickest just over the ground's edge, lit by the Key, reddened at dusk
+  and brighter looking towards the Key.
+
+### Fixed
+- The dark outline round planets: the blended cloud shell wrote depth where it reaches
+  past the ground, so the gas and nebula billboards behind it were cut out in a ring
+  3–4 px wide and the bare sky showed through. The shell writes no depth now; a gas
+  giant's shell from `Surfaces.asi`, which is opaque, still does.
+
+Installed, not yet seen in game.
+
 ## 1.20.0 — 2026-10-12
 
 ### Added
