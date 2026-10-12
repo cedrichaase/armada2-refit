@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Armada II Refit -- install the release package into the game, on Linux (Wine/Proton).
+# Armada II Refit -- install the release package into the game, on Linux (Wine/Proton)
+# and on macOS (a Wine prefix: CrossOver, Whisky, a wrapper, plain Wine).
 #
 #   ./install.sh [<game dir>]               install
 #   ./install.sh --uninstall [<game dir>]   take all of it out again
@@ -15,9 +16,15 @@
 # the menu backdrops and the replacement movies are built from the game's own art, so a
 # release cannot carry them.
 #
+# On macOS Direct3D 9 can only be Wine's own (wined3d, on OpenGL): DXVK's d3d9.dll cannot
+# run there, so d3d8to9 goes in on Wine's d3d9, and MSAA.asi, dxvk.conf and bloom (no
+# vkBasalt) are skipped. The script keeps to the /bin/bash 3.2 and BSD tools a Mac ships.
+#
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
-# parent if the package was unzipped into the game, else $A2_GAME, else Heroic's
-# default for the GOG release. This is the release zip's installer, and it
+# parent if the package was unzipped into the game, else $A2_GAME, else (macOS) the GOG
+# game in a CrossOver bottle or in ~/.wine, else Heroic's default for the GOG release.
+# The model rewrites run with $A2_PYTHON if set (the GUI installer's own program), else
+# python3. This is the release zip's installer, and it
 # stands alone: it needs nothing from the repository. (The repository's own ./install
 # builds from source and installs the asset layers too.)
 #
@@ -28,10 +35,21 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 action=install game=""
+mac=0; [ "$(uname -s)" = Darwin ] && mac=1
+
+# Portable to a Mac: no sha256sum there (shasum -a 256), no tac, a BSD sed.
+if command -v sha256sum >/dev/null 2>&1; then SHA256="sha256sum"
+elif command -v shasum >/dev/null 2>&1; then SHA256="shasum -a 256"
+else echo "neither sha256sum nor shasum found" >&2; exit 1; fi
+sha256() { $SHA256 "$1" | cut -d' ' -f1; }
+# Check a sums file in the current directory; only the failures are printed, the same
+# with either tool.
+sha256_check() { $SHA256 -c "$1" 2>&1 | { grep -v ': OK$' || true; } >&2; }
+reverse_lines() { awk '{ l[NR] = $0 } END { for (i = NR; i > 0; i--) print l[i] }' "$1"; }
 while [ $# -gt 0 ]; do
     case "$1" in
         --uninstall) action=uninstall ;;
-        -h|--help)   sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)   sed -n '2,/^set -e/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)          echo "unknown option: $1" >&2; exit 2 ;;
         *)           game="$1" ;;
     esac
@@ -39,7 +57,15 @@ while [ $# -gt 0 ]; do
 done
 # Unzipped into the game directory itself: that is the one.
 if [ -z "$game" ] && [ -f "$here/../Armada2.exe" ]; then game="$here/.."; fi
-game="${game:-${A2_GAME:-$HOME/Games/Heroic/Star Trek Armada II}}"
+game="${game:-${A2_GAME:-}}"
+# On a Mac the game sits in a Wine prefix: a CrossOver bottle first, then ~/.wine.
+if [ -z "$game" ] && [ "$mac" = 1 ]; then
+    for g in "$HOME/Library/Application Support/CrossOver/Bottles/"*"/drive_c/GOG Games/"*Armada* \
+             "$HOME/.wine/drive_c/GOG Games/"*Armada*; do
+        if [ -d "$g" ]; then game="$g"; break; fi
+    done
+fi
+game="${game:-$HOME/Games/Heroic/Star Trek Armada II}"
 exe=$(ls "$game/Armada2.exe" "$game/armada2.exe" "$game/ARMADA2.EXE" 2>/dev/null | head -1 || true)
 [ -n "$exe" ] || { echo "no Armada2.exe in $game -- pass the game directory as an argument" >&2; exit 1; }
 game="$(cd "$game" && pwd)"
@@ -80,19 +106,29 @@ unproxy() {
 is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
 # crosire's d3d8to9 1.16.0, as the repository's ./install places it (platform/vendor/), by hash.
 D3D8TO9_SHA=122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8
-is_d3d8to9() { [ -f "$1" ] && [ "$(sha256sum "$1" | cut -d' ' -f1)" = "$D3D8TO9_SHA" ]; }
+is_d3d8to9() { [ -f "$1" ] && [ "$(sha256 "$1")" = "$D3D8TO9_SHA" ]; }
 # DXVK in the chain: its own d3d8, or d3d8to9 in front of its d3d9.
 dxvk_chain() { is_dxvk "$game/d3d8.dll" || { is_d3d8to9 "$game/d3d8.dll" && is_dxvk "$game/d3d9.dll"; }; }
 # GOG's own d3d8.dll (its d3d8to9 build), as the release ships it. Kept as
 # d3d8.dll.gog-backup, the name platform/d3d8-chain.py gives it, when replaced.
 GOG_D3D8_SHA=735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719
-is_gog_d3d8() { [ -f "$1" ] && [ "$(sha256sum "$1" | cut -d' ' -f1)" = "$GOG_D3D8_SHA" ]; }
+is_gog_d3d8() { [ -f "$1" ] && [ "$(sha256 "$1")" = "$GOG_D3D8_SHA" ]; }
 CHAIN_BACKUP=.a2chain-backup   # any other d3d8.dll / d3d9.dll the chain step replaced
-# The SOD rewrites (models/): python3, with the game they work on.
+# The SOD rewrites (models/): Python, with the game they work on. $A2_PYTHON (a path,
+# perhaps with spaces: the GUI installer's frozen program runs "<it> script.py args" as
+# python would), else python3. On a Mac without the Command Line Tools, /usr/bin/python3
+# is only a stub that asks to install them, so it does not count.
+PY="${A2_PYTHON:-}"
+if [ -z "$PY" ] && command -v python3 >/dev/null 2>&1; then
+    PY="$(command -v python3)"
+    if [ "$mac" = 1 ] && [ "$PY" = /usr/bin/python3 ] && ! xcode-select -p >/dev/null 2>&1; then
+        PY=""
+    fi
+fi
 sods() {   # --install | --revert
     local s
     for s in moon-sod select-sod hull-sod; do
-        A2_GAME="$game" python3 "$here/models/$s.py" "$1" 2>&1 | sed 's/^/    /' \
+        A2_GAME="$game" "$PY" "$here/models/$s.py" "$1" 2>&1 | sed 's/^/    /' \
             || echo "  $s.py $1 failed -- the rest goes on"
     done
 }
@@ -109,7 +145,7 @@ if [ "$action" = uninstall ]; then
         for f in "$here"/sky/*.ini; do rm -f "$game/Sky/$(basename "$f")"; done
         rmdir "$game/Sky" 2>/dev/null || true
     fi
-    if command -v python3 >/dev/null 2>&1 && [ -d "$here/models" ]; then
+    if [ -n "$PY" ] && [ -d "$here/models" ]; then
         echo "  the models back to stock:"; sods --revert
     fi
     unproxy
@@ -118,9 +154,9 @@ if [ "$action" = uninstall ]; then
     fi
     # The prerequisites, newest record first; a file changed since is left, and said so.
     if [ -f "$MANIFEST" ]; then
-        tac "$MANIFEST" | while read -r f sum; do
-            [ -e "$game/$f" ] || continue
-            if [ "$(sha256sum "$game/$f" | cut -d' ' -f1)" != "$sum" ]; then
+        reverse_lines "$MANIFEST" | while read -r f sum; do
+            [ -n "$f" ] && [ -e "$game/$f" ] || continue
+            if [ "$(sha256 "$game/$f")" != "$sum" ]; then
                 echo "  left $f: it changed since it was installed"; continue
             fi
             rm -f "$game/$f"
@@ -145,7 +181,7 @@ if [ "$action" = uninstall ]; then
 fi
 
 step verify "checking the package"
-(cd "$here" && sha256sum --quiet -c SHA256SUMS) || { echo "the package is damaged (SHA256SUMS)" >&2; exit 1; }
+(cd "$here" && sha256_check SHA256SUMS) || { echo "the package is damaged (SHA256SUMS)" >&2; exit 1; }
 echo "installing into $game"
 
 # ------------------------------------------------------------------ prerequisites
@@ -154,7 +190,7 @@ echo "installing into $game"
 # licence allows it. A file already in the game directory is never overwritten. What this
 # adds is recorded in $MANIFEST with its hash, so --uninstall takes out only that, and
 # only unchanged.
-record() { echo "$1 $(sha256sum "$game/$1" | cut -d' ' -f1)" >> "$MANIFEST"; }
+record() { echo "$1 $(sha256 "$game/$1")" >> "$MANIFEST"; }
 
 prereq() {   # name|version|author|licence|page|files
     local name ver author lic page files f
@@ -170,7 +206,9 @@ prereq() {   # name|version|author|licence|page|files
 
 step prereqs "prerequisites"
 echo "prerequisites:"
-while IFS= read -r line; do [ -n "$line" ] && prereq "$line"; done < "$here/prereqs.txt"
+while IFS= read -r line || [ -n "$line" ]; do
+    if [ -n "$line" ]; then prereq "$line"; fi
+done < "$here/prereqs.txt"
 
 # ------------------------------------------------------------------ the Direct3D chain
 
@@ -196,6 +234,16 @@ chain_put() {   # d3d8.dll | d3d9.dll
 step chain "Direct3D chain"
 echo "Direct3D chain:"
 d8="$game/d3d8.dll" d9="$game/d3d9.dll"
+# On a Mac, never DXVK's d3d9.dll: Wine's own is behind d3d8to9. One an earlier install
+# put in (recorded with chain/d3d9.dll's hash) comes out again, and out of $MANIFEST.
+if [ "$mac" = 1 ] && [ -f "$d9" ] && [ -f "$MANIFEST" ] \
+   && grep -qxF "d3d9.dll $(sha256 "$here/chain/d3d9.dll")" "$MANIFEST" \
+   && [ "$(sha256 "$d9")" = "$(sha256 "$here/chain/d3d9.dll")" ]; then
+    rm -f "$d9"
+    grep -v '^d3d9\.dll ' "$MANIFEST" > "$MANIFEST.tmp" || true
+    mv -f "$MANIFEST.tmp" "$MANIFEST"
+    echo "  d3d9.dll: took out the DXVK one an earlier install put in"
+fi
 if [ -e "$d8" ] && ! is_d3d8to9 "$d8" && ! is_gog_d3d8 "$d8" && ! is_dxvk "$d8"; then
     echo "  left as it is: d3d8.dll is none of GOG's, DXVK's or crosire's d3d8to9"
 elif [ -e "$d9" ] && ! is_dxvk "$d9"; then
@@ -203,7 +251,11 @@ elif [ -e "$d9" ] && ! is_dxvk "$d9"; then
 else
     if is_d3d8to9 "$d8"; then echo "  d3d8.dll: crosire's d3d8to9 already"
     else chain_put d3d8.dll; echo "  d3d8.dll: crosire's d3d8to9 1.16.0 -- BSD-2-Clause"; fi
-    if [ -e "$d9" ]; then echo "  d3d9.dll: DXVK already"
+    if [ -e "$d9" ] && [ "$mac" = 1 ]; then
+        echo "  d3d9.dll: DXVK's, not ours, left as it is -- it cannot run Direct3D 9 on a Mac;"
+        echo "  take it out to have Wine's own"
+    elif [ -e "$d9" ]; then echo "  d3d9.dll: DXVK already"
+    elif [ "$mac" = 1 ]; then echo "  d3d9.dll: Wine's own (wined3d) -- DXVK cannot run Direct3D 9 on a Mac"
     else chain_put d3d9.dll; echo "  d3d9.dll: DXVK 3.1.1 -- zlib/libpng"; fi
 fi
 echo "the mod:"
@@ -235,7 +287,7 @@ put GridLayout.asi
 if [ -e "$game/GridLayout.ini" ]; then echo "  GridLayout.ini (yours, kept)"; else put GridLayout.ini; fi
 step models "models"
 put Planets.asi; put Planets.ini
-if command -v python3 >/dev/null 2>&1; then
+if [ -n "$PY" ]; then
     echo "  the moons, the selection bubble and the hulls, from your own SOD files:"
     sods --install
 else
@@ -252,7 +304,7 @@ step sky "sky"
 put Sky.asi; put Sky.ini
 mkdir -p "$game/Sky"
 for f in "$here"/sky/*.ini; do cp "$f" "$game/Sky/"; done
-echo "  Sky/: $(ls "$here"/sky/*.ini | wc -l) sky recipes"
+echo "  Sky/: $(ls "$here"/sky/*.ini | wc -l | tr -d ' ') sky recipes"
 is_d3d8to9 "$game/d3d8.dll" || echo "  (Sky: the stock sky here -- the procedural one needs crosire's d3d8to9 as d3d8.dll)"
 
 # Internet - Online, on our own transport: Wine's dpnet.dll cannot host.
@@ -260,7 +312,10 @@ step online "online multiplayer"
 put Online.asi; put Online.ini
 
 step msaa "anti-aliasing"
-if dxvk_chain; then
+if [ "$mac" = 1 ]; then
+    rm -f "$game/MSAA.asi"
+    echo "  MSAA.asi skipped: needs DXVK, which a Mac cannot run Direct3D 9 on"
+elif dxvk_chain; then
     put MSAA.asi; put MSAA.ini
 else
     rm -f "$game/MSAA.asi"
@@ -283,7 +338,13 @@ else
 fi
 
 step renderer "renderer settings"
-if [ -f "$game/dxvk.conf" ] && ! grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
+if [ "$mac" = 1 ]; then
+    # Only DXVK reads it; one of ours from an earlier install goes.
+    if [ -f "$game/dxvk.conf" ] && grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
+        rm -f "$game/dxvk.conf"
+    fi
+    echo "  dxvk.conf skipped: only DXVK reads it, and a Mac has no DXVK for Direct3D 9"
+elif [ -f "$game/dxvk.conf" ] && ! grep -qF "$DXVK_MARKER" "$game/dxvk.conf"; then
     echo "  dxvk.conf skipped: there is one already that this package did not write"
 else
     put dxvk.conf
@@ -295,7 +356,7 @@ fi
 # the repository) -- the game is a 32-bit process. Without one, bloom is skipped.
 step bloom "bloom"
 bloom=0
-for d in "${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d" \
+[ "$mac" = 1 ] || for d in "${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d" \
          /etc/vulkan/implicit_layer.d /usr/share/vulkan/implicit_layer.d; do
     ls "$d"/*[Bb]asalt*.json >/dev/null 2>&1 && bloom=1
 done
@@ -304,22 +365,25 @@ done
 # and checked by hash (<sha256> <commit> <file>). Bloom is optional: a failure skips it.
 fetch_shaders() {
     local sum commit file dst url
-    while read -r sum commit file; do
+    while read -r sum commit file || [ -n "$sum" ]; do
         [ -n "$sum" ] || continue
         dst="$BLOOM/Shaders/$file"
-        echo "$sum  $dst" | sha256sum --quiet -c - >/dev/null 2>&1 && continue
+        if [ -f "$dst" ] && [ "$(sha256 "$dst")" = "$sum" ]; then continue; fi
         url="https://raw.githubusercontent.com/crosire/reshade-shaders/$commit/Shaders/$file"
         if command -v curl >/dev/null; then curl -fsSL -o "$dst" "$url" || return 1
         else wget -qO "$dst" "$url" || return 1; fi
-        echo "$sum  $dst" | sha256sum --quiet -c - >/dev/null 2>&1 || { rm -f "$dst"; return 1; }
+        [ "$(sha256 "$dst")" = "$sum" ] || { rm -f "$dst"; return 1; }
     done < "$here/bloom/shaders.txt"
 }
 
-if [ "$bloom" = 0 ]; then
+if [ "$mac" = 1 ]; then
+    echo "  bloom skipped: not available on macOS yet"
+elif [ "$bloom" = 0 ]; then
     echo "  bloom skipped: no vkBasalt layer installed (optional -- README.txt)"
     # How to get one on this distribution: the GUI installer in the package holds the
     # instructions, so there is one copy of them.
-    python3 "$here/armada2-refit-installer.py" --vkbasalt-howto 2>/dev/null | sed 's/^/    /' \
+    { [ -n "$PY" ] && "$PY" "$here/armada2-refit-installer.py" --vkbasalt-howto 2>/dev/null; } \
+        | sed 's/^/    /' \
         || echo "    install your distribution's 32-bit vkBasalt, then run this again"
 else
     case "$BLOOM" in *' '*|*'#'*) bloom=0; echo "  bloom skipped: vkBasalt cannot read the path $BLOOM" ;; esac
@@ -328,7 +392,8 @@ if [ "$bloom" = 1 ]; then
     mkdir -p "$BLOOM/Shaders" "$BLOOM/Textures"
     if fetch_shaders; then
         cp "$here/bloom/A2Bloom.fx" "$BLOOM/A2Bloom.fx"
-        sed -e "s|@BLOOM@|$BLOOM|g" -e "1i$BLOOM_MARKER" "$here/bloom/vkBasalt.conf.in" > "$BLOOM/vkBasalt.conf"
+        { echo "$BLOOM_MARKER"; sed -e "s|@BLOOM@|$BLOOM|g" "$here/bloom/vkBasalt.conf.in"; } \
+            > "$BLOOM/vkBasalt.conf"
         echo "  bloom, in $BLOOM"
     else
         bloom=0; echo "  bloom skipped: could not download its shaders from GitHub"
@@ -341,9 +406,15 @@ step done "done"
 # Wine prefers its own builtin DLLs; these make it load the game directory's.
 overrides="winmm=n,b;d3d8=n,b"
 if [ -e "$game/d3d9.dll" ]; then overrides="$overrides;d3d9=n,b"; fi
+# The GUI installer reads every line of the form "    NAME=value" as a launcher variable;
+# print no other line in that shape.
 echo
-echo "In the launcher (Heroic: Game settings -> Advanced -> Environment variables; Steam:"
-echo "launch options, then %command%), set:"
+if [ "$mac" = 1 ]; then
+    echo "In CrossOver: the bottle's Wine configuration -> Libraries, or set these for the game:"
+else
+    echo "In the launcher (Heroic: Game settings -> Advanced -> Environment variables; Steam:"
+    echo "launch options, then %command%), set:"
+fi
 echo "    WINEDLLOVERRIDES=$overrides"
 if [ "$bloom" = 1 ]; then
     echo "and for bloom:"

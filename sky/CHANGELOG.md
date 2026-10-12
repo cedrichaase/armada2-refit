@@ -4,6 +4,28 @@
 cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-12
+
+### Added
+- Recipe keys for the detail the stock faces had and the recipes lacked: `Grain=`
+  (amount, scale, gain: clumps and mottling), `Dust=` (amount, scale, coverage: dark
+  lanes and specks), `Haze=` (amount, coverage: a soft glow behind the clumps),
+  `Stars=` (count, brightness, size, in-gas weight) with `StarA=`/`StarB=` (bright
+  coloured stars with halos in the gas). Each off unless a recipe sets it. The bake's
+  face constants move from c14 to c19. `d1d15e2`
+
+### Changed
+- Every recipe uses them: clumps on black for `mbgred`, `mbgrg`, `mbgdom1`, `mbgpur`,
+  `mbggb`; dust and grain for `mbgborg`, `mbgkling`, `mbgdk`, `mbgflu`, `mbgaqu`,
+  `mbg02`; stars for `mbgbaku`, `mbgpur`, `mbgkl`. Each `Brightness` re-scaled to keep
+  1.1.0's mean luminance.
+
+### Fixed
+- `mbgblue` was never calibrated (`Brightness=1.0`, about 3.5 times `mbg02`'s); it is now
+  `mbg02`'s recipe, as its header says.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-09
 
 ### Added
