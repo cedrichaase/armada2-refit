@@ -378,6 +378,11 @@ typedef struct {
      * four colours; c31 x Opacity= over the reach (optical depth a world unit of the
      * densest gas), y ydev (the envelope's blue is a height within it) */
     float    ex[8][4];
+    /* c38: x Fringe= (a thin haze about the body, out to FringeReach= times the reach),
+     * y FringeScale= (its noise, of the tile), z Fuzz= (the outline's thin gas feathered by
+     * the fine octave), w the fine octave's drift now (FuzzSpeed=, noise tiles a second) */
+    float    fz[4];
+    float    fuzz_speed, fringe_reach;
     float    ring_cycle;      /* RingCycle=: seconds for the colours to go round */
     float    pulse_speed, pulse_wander, pulse_phase;   /* PulseSpeed= (a second), PulseWander= (of it) */
     double   pulse_last;      /* when the phase was last advanced (seconds) */
@@ -493,6 +498,12 @@ static int recipe_read(Cls *c)
     c->k[14][1] = ini1(f, "FilamentScale", 0.6f);
     c->k[14][2] = ini1(f, "FilamentSharpness", 3.0f);
     c->fil_reach = ini1(f, "FilamentReach", 1.8f);
+    c->fz[0] = ini1(f, "Fringe", 0.0f);
+    c->fz[1] = ini1(f, "FringeScale", 0.5f);
+    c->fz[2] = ini1(f, "Fuzz", 0.0f);
+    c->fz[3] = 0.0f;
+    c->fringe_reach = ini1(f, "FringeReach", 1.6f);
+    c->fuzz_speed = ini1(f, "FuzzSpeed", 0.01f);
     c->edge_dim = ini1(f, "EdgeOnDim", 0.5f);
     c->hue_cycle = ini1(f, "HueCycle", 0.0f);
     c->hue_swing = ini1(f, "HueSwing", 0.5f);
@@ -1013,7 +1024,7 @@ static int make_blue(void *d9)
  * rise there, as a fraction of the domes' height: the highest of the nebulae's
  * 1 - (d / reach)^3, full height over most of the disc and tapering to nothing at the
  * reach, so a field is a row of tall domes with sloping sides and not a slab with walls. Green is the filaments' wider disc
- * (FilamentReach times the reach). Blue is the height of the nebulae there, against
+ * (FilamentReach times the reach), or the fringe's (FringeReach), whichever is wider. Blue is the height of the nebulae there, against
  * the class's mean, within ydev, each weighted by its disc: every dome stands at its own
  * nebula's height (a latinum nebula raised above the plane, say), where one height for
  * the class put all of them at the mean. The box leaves room for the outline's warp. */
@@ -1022,6 +1033,7 @@ static int bake_envelope(void *d9, Cls *c)
     static int said;
     float  reach = c->radius * c->extent, cell, x0, z0, ys = 0.0f;
     float  freach = reach * (c->k[14][0] > 0.0f && c->fil_reach > 1.0f ? c->fil_reach : 1.0f);
+    if (c->fz[0] > 0.0f && reach * c->fringe_reach > freach) freach = reach * c->fringe_reach;   /* the fringe's disc */
     float  outer = freach + reach * c->edge_warp;       /* room for the warped outline */
     int    W, H, i, x, z;
     LOCKED lk;
@@ -1233,6 +1245,7 @@ static int bake_volume(void *d9, Cls *c, float half)
         c->k[12][3] = c->vlo[1] + ((float)j + 0.5f) * size[1] / (float)Y;
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
         d9_psconst(d9, 24, &c->ex[0][0], 8);
+        d9_psconst(d9, 38, c->fz, 1);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
         if (D9_FN(d9, D9_GETRENDERTARGETDATA, RTData_t)(d9, rts, sys) < 0) break;
         if (D9_FN(sys, 13, SurfLock_t)(sys, &src, NULLPTR, 0x10) < 0) break;            /* READONLY */
@@ -2291,6 +2304,7 @@ static int draw_gas(void)
              * by most of a tile every 1 / FlowSpeed seconds, and the whole cloud
              * rearranged itself in one frame. */
             c->k[13][0] = fmod_f(sec * c->flow_speed, 100.0f);
+            c->fz[3] = fmod_f(sec * c->fuzz_speed, 100.0f);   /* wraps as the flow's does */
             c->ex[1][3] = fmod_f(sec / c->ring_cycle, 1.0f);   /* the colours are a cycle: seamless at 1 */
             {   /* the pulse: its speed wanders, as stock's; advanced by the time that has
                  * passed, so the action camera's second draw adds nothing */
@@ -2343,6 +2357,7 @@ static int draw_gas(void)
         }
         d9_psconst(d9, 0, &c->k[0][0], NCONST);
         d9_psconst(d9, 24, &c->ex[0][0], 8);
+        d9_psconst(d9, 38, c->fz, 1);
         {   /* c35: the shadow map (x 0: none, and the shader reads no map); c36: towards the
              * Key, w this class's share of it; c37: its forward scattering */
             float k[3][4], s = key_share(c), g = c->scatter >= 0.0f ? c->scatter : g_scatter;
