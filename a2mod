@@ -34,7 +34,9 @@ WHAT COUNTS AS A CHANGE
     surfaces      Surfaces.asi/.ini,           -- added files: planets' and the dilithium
                   Surfaces/*.ini                  moon's surfaces and their recipes
     explosions    Explosions.asi/.ini          -- added files: fireballs as gas, shock rings
-    shields       Shields.asi/.ini             -- added files: shield hits drawn by a shader
+    shields       Shields.asi/.ini             -- added files: shield hits and the
+                                                  shields-down arcs drawn by shaders
+    repair        Repair.asi/.ini              -- added files: repair welding drawn by shaders
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
                   (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
                   *.a2font-backup from ui-font-condense and the Curs_* art from
@@ -107,9 +109,10 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('Surfaces.asi', 'surfaces'), ('Surfaces.ini', 'surfaces'),
          ('Explosions.asi', 'explosions'), ('Explosions.ini', 'explosions'),
          ('Shields.asi', 'shields'), ('Shields.ini', 'shields'),
+         ('Repair.asi', 'repair'), ('Repair.ini', 'repair'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions', 'shields', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
+LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions', 'shields', 'repair', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.

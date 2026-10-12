@@ -10,13 +10,16 @@
  * a hot spot flares, a ring runs out across the shield and the shield's lattice and rim
  * light up and fade (shields.hlsl). It changes what is drawn and nothing else: the hits
  * are the engine's, made and timed by its own weapons, so a player with it can play a
- * player without it.
+ * player without it. A ship whose shields are down (stock: a band of lightning texture
+ * circling it) gets arcs of lightning crackling over its shield ellipsoid instead
+ * (down_ps), and its brightest discharge lights its hull.
  *
  * THE HOOKS (addresses from armada2.map, GOG patch 1.1)
  * ---------
  * - The call to ShieldHit::DrawShield (0x474070) at 0x47492d in ShieldEffect::Render:
- *   a hit of the ordinary type (0, Xshldx01) is skipped while the plugin draws; every
- *   other type (the shields-down ring, the special weapons' shells) calls through.
+ *   a hit of the ordinary type (0, Xshldx01), or of the shields-down ring (1,
+ *   xshlddie) with Down=1, is skipped while the plugin draws; every other type (the
+ *   special weapons' shells) calls through.
  * - The call to ST3D_GraphicsEngine::RenderChunks (0x62d470) at 0x598446 in
  *   Armada_RenderAllOurStuff: after the objects and the game features, before the
  *   particles. The plugin calls it, then draws the hits, with the hulls in the depth
@@ -25,6 +28,8 @@
  *   0x58bb95, Bullet::Simulate 0x58cad8, Mine::mMoveTowardsTarget 0x58d502,
  *   Missile::Simulate 0x58dd65. Each goes through a thunk that notes the weapon (ebx at
  *   every one of them) and calls on; the hit's strength is the weapon class's damage.
+ * - The call to Ordnance::PreRenderAll (0x58e4f0) at 0x598199, after
+ *   GameObject_PreRenderAll: the plugin calls it, then registers the shields-down lights.
  * - The d3d8 device's Reset (slot 14), chained as Nebulae.asi and Lighting.asi chain it.
  * Every call site is chained: the plugin calls whatever the call went to when it
  * patched it, so another plugin's hook at the same site keeps working.
@@ -107,6 +112,11 @@ int _fltused = 0;   /* floats without the CRT */
 #define FN_ENTITY_GET      0x4cfff0   /* Entity::Get(int handle), static, cdecl */
 #define FN_ODF_NAME        0x4d5620   /* GameObject::GetOdfName() const, thiscall */
 #define SLOT_CAN_SEE       2          /* GameObject::CanUserSee() const */
+#define SITE_ORD_PRE       0x598199   /* in Armada_RenderAllOurStuff: call Ordnance::PreRenderAll */
+#define FN_ORD_PRE         0x58e4f0   /* Ordnance::PreRenderAll(ST3D_Camera *), cdecl */
+#define FN_NEW             0x652710   /* operator new, cdecl */
+#define FN_POINT_LIGHT     0x62f240   /* ST3D_Point_Light::ST3D_Point_Light(db, node, name), thiscall */
+#define FN_REGISTER_LIGHT  0x62d250   /* ST3D_GraphicsEngine::RegisterLight(light, colour *, Matrix34 *), thiscall */
 #define STORM3D            0x7ad508   /* ST3D_GraphicsEngine * */
 #define VT_DEVICE_DX8      0x6bc6ac   /* ST3D_DeviceDirectX8 vtable */
 
@@ -128,6 +138,8 @@ typedef int   (__cdecl *Create_t)(void *obj, const float *m, int type, float dur
 typedef const char *(__thiscall *OdfName_t)(void *obj);
 typedef BYTE  (__thiscall *CanSee_t)(void *obj);
 typedef BYTE *(__cdecl *EntityGet_t)(int handle);
+typedef void  (__cdecl *OrdPre_t)(void *camera);
+typedef void  (__thiscall *RegisterLight_t)(void *engine, void *light, const float *colour, const float *matrix);
 
 /* ---- tiny string/log helpers (no CRT) ---------------------------------- */
 
@@ -197,6 +209,8 @@ static void note_once(int *said, const char *s) { if (!*said) { *said = 1; logli
 
 static float sqrt_f(float x) { float r; __asm__("fsqrt" : "=t"(r) : "0"(x)); return r; }
 static float abs_f(float x)  { return x < 0.0f ? -x : x; }
+static float sin_f(float x) { float r; __asm__("fsin" : "=t"(r) : "0"(x)); return r; }
+static float cos_f(float x) { float r; __asm__("fcos" : "=t"(r) : "0"(x)); return r; }
 static float clamp_f(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
 
 static float log2_f(float x)
@@ -333,6 +347,12 @@ static struct {
     float damage_ref, strength_min, strength_max, fade_out;
     float weak_level, flicker, flicker_below, flicker_rate, low_shift;
     float fac[NFAC][3], fixed[3], low[3];
+    /* shields down (type 1) */
+    int   down, down_strikes;
+    float down_bright, down_arc[3], down_glow[3], down_haze, down_scale, down_warp, down_core;
+    float down_glow_width, down_branches, down_band, down_crackle, down_flash, down_flash_time;
+    float down_fade, down_size, down_time_min, down_time_max, down_gap, down_rate, down_far;
+    float down_rim_power, down_lit, down_light, down_light_col[3], down_light_reach;
 } S;
 static FILETIME g_ini_time;
 
@@ -385,6 +405,49 @@ static void read_settings(void)
     for (i = 0; i < NFAC; i++) inirgb(k_fac_key[i], S.fac[i], k_fac_def[i][0], k_fac_def[i][1], k_fac_def[i][2]);
     inirgb("Colour", S.fixed, 120, 190, 255);
     inirgb("LowColour", S.low, 255, 70, 40);
+
+    S.down            = (int)GetPrivateProfileIntA("Shields", "Down", 1, g_ini);
+    S.down_strikes    = (int)GetPrivateProfileIntA("Shields", "DownStrikes", 5, g_ini);
+    S.down_bright     = inif("DownBrightness", 2.5f);
+    inirgb("DownArc", S.down_arc, 215, 230, 255);
+    inirgb("DownGlow", S.down_glow, 140, 210, 510);
+    S.down_haze       = inif("DownHaze", 0.02f);
+    S.down_scale      = inif("DownScale", 2.6f);
+    S.down_warp       = inif("DownWarp", 0.55f);
+    S.down_core       = inif("DownCore", 2.0f);
+    S.down_glow_width = inif("DownGlowWidth", 0.08f);
+    S.down_branches   = inif("DownBranches", 0.6f);
+    S.down_band       = inif("DownBand", 0.35f);
+    S.down_crackle    = inif("DownCrackle", 0.2f);
+    S.down_flash      = inif("DownFlash", 1.2f);
+    S.down_flash_time = inif("DownFlashTime", 0.35f);
+    S.down_fade       = inif("DownFadeOut", 0.4f);
+    S.down_size       = inif("DownStrikeSize", 0.7f);
+    S.down_time_min   = inif("DownStrikeMin", 0.12f);
+    S.down_time_max   = inif("DownStrikeMax", 0.45f);
+    S.down_gap        = inif("DownStrikeGap", 0.15f);
+    S.down_rate       = inif("DownRate", 7.0f);
+    S.down_far        = inif("DownFarSide", 0.45f);
+    S.down_rim_power  = inif("DownRimPower", 2.5f);
+    S.down_lit        = clamp_f(inif("DownLit", -0.2f), -1.0f, 1.0f);
+    S.down_light      = inif("DownLight", 3.0f);
+    inirgb("DownLightColour", S.down_light_col, 150, 180, 255);
+    S.down_light_reach = inif("DownLightReach", 1.2f);
+    if (S.down_strikes < 0) S.down_strikes = 0;
+    if (S.down_strikes > 6) S.down_strikes = 6;
+    if (S.down_scale < 0.1f) S.down_scale = 0.1f;
+    if (S.down_core < 0.1f) S.down_core = 0.1f;
+    if (S.down_glow_width < 0.001f) S.down_glow_width = 0.001f;
+    if (S.down_band < 0.02f) S.down_band = 0.02f;
+    if (S.down_flash_time < 0.01f) S.down_flash_time = 0.01f;
+    if (S.down_fade < 0.01f) S.down_fade = 0.01f;
+    if (S.down_size < 0.02f) S.down_size = 0.02f;
+    if (S.down_time_min < 0.02f) S.down_time_min = 0.02f;
+    if (S.down_time_max < S.down_time_min) S.down_time_max = S.down_time_min;
+    if (S.down_gap < 0.0f) S.down_gap = 0.0f;
+    if (S.down_rate < 0.1f) S.down_rate = 0.1f;
+    if (S.down_rim_power < 0.25f) S.down_rim_power = 0.25f;
+    S.down_far = clamp_f(S.down_far, 0.0f, 1.0f);
 
     if (S.spot_size < 0.01f) S.spot_size = 0.01f;
     if (S.ring_width < 0.005f) S.ring_width = 0.005f;
@@ -492,6 +555,74 @@ static void *type0_model(void)
     return db ? db[0] : NULLPTR;
 }
 
+static void *type1_model(void)
+{
+    void **db = *(void ***)SHIELD_LOGICAL_DB;
+    return db ? db[1] : NULLPTR;
+}
+
+static void mem_copy(void *d, const void *s, unsigned n)
+{
+    volatile BYTE *o = (volatile BYTE *)d;      /* volatile: clang would make it a call to memcpy */
+    const BYTE    *i = (const BYTE *)s;
+    while (n--) *o++ = *i++;
+}
+
+static float rnd(DWORD seed) { return (float)(hash32(seed) & 0xffffffUL) / 16777216.0f; }
+
+/* ---- shields down -------------------------------------------------------- */
+
+/* A ship whose shields are down has a hit of type 1 (xshlddie), untimed, for as long
+ * as they stay down (Craft::ShieldsDown, and Craft's other paths that make one). The
+ * plugin keeps one record per ship, and on it up to six discharges: a place on the
+ * shell (shield space), mostly about the equator, where the arcs flare and die, then
+ * strike again elsewhere after a gap. */
+typedef struct { float dir[3]; double t0, dur; float peak; DWORD gen; } Strike;
+typedef struct { int handle, seen; double birth, death; Strike st[6]; } Down;
+#define MAX_DOWN 64
+static Down g_down[MAX_DOWN];
+static int  g_ndown;
+static long g_logged_downs;
+
+static void strike_new(Down *d, int k, double from)
+{
+    Strike *st = &d->st[k];
+    DWORD   seed = (DWORD)d->handle * 2654435761UL ^ (DWORD)k * 40503UL ^ ++st->gen * 2246822519UL;
+    float   y = rnd(seed) * 2.0f - 1.0f, a = rnd(seed + 1) * 6.2831853f, r, len;
+    y = y * y * y;                                   /* mostly about the equator */
+    r = sqrt_f(1.0f - y * y);
+    st->dir[0] = r * cos_f(a); st->dir[1] = y; st->dir[2] = r * sin_f(a);
+    len = sqrt_f(st->dir[0] * st->dir[0] + st->dir[1] * st->dir[1] + st->dir[2] * st->dir[2]);
+    if (len > 1e-6f) { st->dir[0] /= len; st->dir[1] /= len; st->dir[2] /= len; }
+    st->t0   = from + (double)(rnd(seed + 2) * 2.0f * S.down_gap);
+    st->dur  = (double)(S.down_time_min + (S.down_time_max - S.down_time_min) * rnd(seed + 3));
+    st->peak = 0.6f + 0.6f * rnd(seed + 4);
+}
+
+/* How bright discharge k is now, re-striking it once it is over. */
+static float strike_now(Down *d, int k, double now)
+{
+    Strike *st = &d->st[k];
+    double  age;
+    float   x, a, e;
+    if (st->gen == 0 || now - (st->t0 + st->dur) > 2.0) strike_new(d, k, now);
+    while (now >= st->t0 + st->dur) strike_new(d, k, st->t0 + st->dur);
+    age = now - st->t0;
+    if (age < 0.0) return 0.0f;
+    x = (float)(age / st->dur);
+    a = clamp_f((float)age / 0.03f, 0.0f, 1.0f);
+    e = (1.0f - x) * (1.0f - x);
+    /* it crackles: 30 times a second a new brightness */
+    return st->peak * a * e * (0.55f + 0.45f * rnd((DWORD)(long)(now * 30.0) * 747796405UL + (DWORD)k * 2891336453UL + (DWORD)d->handle));
+}
+
+/* The whole effect's level: in as the shields go, out over DownFadeOut once they are back */
+static float down_level(const Down *d, double now)
+{
+    if (d->death >= 0.0) return clamp_f(1.0f - (float)(now - d->death) / S.down_fade, 0.0f, 1.0f);
+    return clamp_f((float)(now - d->birth) / 0.08f, 0.0f, 1.0f);
+}
+
 static BYTE *object_of(int handle)
 {
     BYTE *obj = ((EntityGet_t)FN_ENTITY_GET)(handle);
@@ -525,16 +656,40 @@ static int hit_dir(BYTE *sh, BYTE *obj, float *dir)
 static void gather(double now)
 {
     BYTE *head = *(BYTE **)(SHIELD_LIST + 4), *nil = *(BYTE **)SHIELD_NIL, *node, *model = (BYTE *)type0_model();
+    BYTE *model1 = (BYTE *)type1_model();
     int   i, guard = 0;
     double keep = S.fade_out > S.ring_time ? S.fade_out : S.ring_time;
     if (keep < S.glow_time * 3.0) keep = S.glow_time * 3.0;
     if (keep < S.duration * 3.0) keep = S.duration * 3.0;
     for (i = 0; i < g_nhit; i++) g_hit[i].seen = 0;
+    for (i = 0; i < g_ndown; i++) g_down[i].seen = 0;
     if (head && nil && model) {
         node = *(BYTE **)head;                             /* the leftmost: begin() */
         while (node && node != head && guard++ < 4096) {
             BYTE *sh = *(BYTE **)(node + 0x14), *obj, *next;
             int   id = *(int *)(node + 0xc);
+            if (sh && model1 && *(BYTE **)(sh + HIT_SECOND) == model1 && object_of(*(int *)(sh + HIT_HANDLE))) {
+                int  hd = *(int *)(sh + HIT_HANDLE);
+                Down *d = NULLPTR;
+                for (i = 0; i < g_ndown; i++) if (g_down[i].handle == hd) { d = &g_down[i]; break; }
+                if (!d && g_ndown < MAX_DOWN) {
+                    d = &g_down[g_ndown++];
+                    for (i = 0; i < (int)sizeof *d; i++) ((volatile BYTE *)d)[i] = 0;
+                    d->handle = hd; d->birth = now; d->death = -1.0;
+                    if (S.log_hits || g_logged_downs < 6) {
+                        char b[200];
+                        const char *odf = ((OdfName_t)FN_ODF_NAME)(object_of(hd));
+                        g_logged_downs++;
+                        b[0] = 0; s_cat(b, "shields down on "); s_cat(b, odf ? odf : "?");
+                        s_cat(b, " (hit "); s_num(b, id); s_cat(b, *(sh + HIT_TIMED) ? ", timed)" : ", untimed)");
+                        logline(b);
+                    }
+                }
+                if (d) {
+                    if (d->death >= 0.0) { d->birth = now - 0.08; d->death = -1.0; }   /* down again before the fade was over */
+                    d->seen = 1;
+                }
+            }
             if (sh && *(BYTE **)(sh + HIT_SECOND) == model && (obj = object_of(*(int *)(sh + HIT_HANDLE))) != NULLPTR) {
                 float d[3];
                 if (hit_dir(sh, obj, d)) {
@@ -582,6 +737,15 @@ static void gather(double now)
             }
         }
     }
+    for (i = 0; i < g_ndown; ) {
+        Down *d = &g_down[i];
+        if (!d->seen && d->death < 0.0) d->death = now;
+        if ((d->death >= 0.0 && now - d->death > S.down_fade) || !object_of(d->handle)) {
+            mem_copy(&g_down[i], &g_down[--g_ndown], sizeof g_down[i]);
+            continue;
+        }
+        i++;
+    }
     for (i = 0; i < g_nhit; ) {
         Hit *h = &g_hit[i];
         if (!h->seen && h->death < 0.0) h->death = now;
@@ -606,6 +770,7 @@ typedef long (__stdcall *Mat_t)(void *, DWORD, float *);
 
 static D9Shader g_vs = D9_VERTEX_SHADER(k_shield_vs);
 static D9Shader g_ps = D9_PIXEL_SHADER(k_shield_ps);
+static D9Shader g_dps = D9_PIXEL_SHADER(k_down_ps);
 static void    *g_obj_dev;
 static void    *g_sb;
 
@@ -649,8 +814,6 @@ static void *engine_device8(void)
 static float g_sphere[SPH_VERTS][3];
 static int   g_sphere_n;
 
-static float sin_f(float x) { float r; __asm__("fsin" : "=t"(r) : "0"(x)); return r; }
-static float cos_f(float x) { float r; __asm__("fcos" : "=t"(r) : "0"(x)); return r; }
 
 static void make_sphere(void)
 {
@@ -734,15 +897,15 @@ static void hit_now(const Hit *h, double now, float *spot, float *ring_r, float 
 
 #define SHIP_HITS 8
 
-/* One struck ship: its shield ellipsoid, its hits. */
-static void draw_ship(void *d9, BYTE *obj, const int *idx, int n, double now, const float *eye)
+/* A ship's shield ellipsoid in the world: w = u A + t for u on the unit sphere, B the
+ * inverse of A, R its mean radius (the cube root of its volume factor). 0 if it has none. */
+static int ship_xform(BYTE *obj, float *A, float *B, float *t, float *R)
 {
     BYTE        *inst = *(BYTE **)(obj + 4);
     const float *S3 = (const float *)(*(BYTE **)(obj + 0x40) + 0x38);
     const float *T = (const float *)(inst + 0x44);
-    float A[9], B[9], t[3], sc[3] = { 1.0f, 1.0f, 1.0f }, M[9], det, R;
-    float vc[6][4], pc[24][4], col[3], lvl = 1.0f, bright;
-    int   i, j, k, fac;
+    float sc[3] = { 1.0f, 1.0f, 1.0f }, M[9], det;
+    int   i, j;
 
     if (inst[0x74]) { const float *s = (const float *)(inst + 0x28); sc[0] = s[0]; sc[1] = s[1]; sc[2] = s[2]; }
     /* unit sphere -> object: S3 rows, then the instance's scale; -> world: T */
@@ -751,16 +914,33 @@ static void draw_ship(void *d9, BYTE *obj, const int *idx, int n, double now, co
         A[i * 3 + j] = M[i * 3 + 0] * T[0 * 3 + j] + M[i * 3 + 1] * T[1 * 3 + j] + M[i * 3 + 2] * T[2 * 3 + j];
     for (j = 0; j < 3; j++)
         t[j] = S3[9] * sc[0] * T[0 * 3 + j] + S3[10] * sc[1] * T[1 * 3 + j] + S3[11] * sc[2] * T[2 * 3 + j] + T[9 + j];
-    if (!inv3(A, B)) return;
+    if (!inv3(A, B)) return 0;
     det = A[0] * (A[4] * A[8] - A[5] * A[7]) - A[1] * (A[3] * A[8] - A[5] * A[6]) + A[2] * (A[3] * A[7] - A[4] * A[6]);
-    R = pow_f(abs_f(det), 1.0f / 3.0f);
-    if (!(R > 0.01f)) return;
+    *R = pow_f(abs_f(det), 1.0f / 3.0f);
+    return *R > 0.01f;
+}
 
+/* The vertex shader's constants for one ship's ellipsoid (c4..c9). */
+static void ship_vsconst(void *d9, const float *A, const float *B, const float *t)
+{
+    float vc[6][4];
+    int   j, k;
     /* the columns: w.x = u . (A00, A10, A20) + t.x */
     for (j = 0; j < 3; j++) { vc[j][0] = A[0 * 3 + j]; vc[j][1] = A[1 * 3 + j]; vc[j][2] = A[2 * 3 + j]; vc[j][3] = t[j]; }
     /* the normal: the gradient of |u|^2 through w = u A + t, n = u (A^-1)^T: n.k = u . row k of A^-1 */
     for (k = 0; k < 3; k++) { vc[3 + k][0] = B[k * 3 + 0]; vc[3 + k][1] = B[k * 3 + 1]; vc[3 + k][2] = B[k * 3 + 2]; vc[3 + k][3] = 0.0f; }
     d9_vsconst(d9, 4, &vc[0][0], 6);
+}
+
+/* One struck ship: its shield ellipsoid, its hits. */
+static void draw_ship(void *d9, BYTE *obj, const int *idx, int n, double now, const float *eye)
+{
+    float A[9], B[9], t[3], R;
+    float pc[24][4], col[3], lvl = 1.0f, bright;
+    int   i, j, k, fac;
+
+    if (!ship_xform(obj, A, B, t, &R)) return;
+    ship_vsconst(d9, A, B, t);
 
     /* the shields left: weaker and flickering as they run out */
     if (obj[0x14] & 8) {
@@ -811,25 +991,105 @@ static float hit_weight(const Hit *h, double now)
     return spot + ring + glow;
 }
 
-static long g_ships_drawn, g_frames_drawn;
+/* One ship whose shields are down: arcs over its shield ellipsoid (down_ps). */
+static void draw_down(void *d9, BYTE *obj, Down *d, double now, const float *eye)
+{
+    float  A[9], B[9], t[3], R, pc[22][4], w;
+    double ta, tb;
+    DWORD  sa, sb;
+    int    i, j, k;
 
-/* Every struck ship's hits; 1 if the device could take them (the stock shells then
- * stand down), 0 to leave the stock shells. */
+    if (!ship_xform(obj, A, B, t, &R)) return;
+    ship_vsconst(d9, A, B, t);
+    for (i = 0; i < 22; i++) pc[i][0] = pc[i][1] = pc[i][2] = pc[i][3] = 0.0f;
+    pc[0][0] = eye[0]; pc[0][1] = eye[1]; pc[0][2] = eye[2]; pc[0][3] = 1.0f / R;
+    pc[1][0] = S.down_arc[0]; pc[1][1] = S.down_arc[1]; pc[1][2] = S.down_arc[2]; pc[1][3] = S.down_bright;
+    pc[2][0] = S.down_glow[0]; pc[2][1] = S.down_glow[1]; pc[2][2] = S.down_glow[2]; pc[2][3] = S.down_haze;
+    pc[3][0] = S.down_scale; pc[3][1] = S.down_warp; pc[3][2] = S.down_core; pc[3][3] = S.down_glow_width;
+    /* two fields of arcs, each struck afresh as its share passes zero, half a step apart */
+    ta = now * S.down_rate; tb = ta + 0.5;
+    sa = (DWORD)(long)ta * 2U; sb = (DWORD)(long)tb * 2U + 1U;
+    w = (float)(ta - (double)(long)ta);
+    w = 1.0f - abs_f(2.0f * w - 1.0f);
+    for (j = 0; j < 3; j++) {
+        pc[4][j] = 5.0f + 50.0f * rnd(sa * 2654435761UL + (DWORD)d->handle * 97UL + (DWORD)j);
+        pc[7][j] = 5.0f + 50.0f * rnd(sb * 2654435761UL + (DWORD)d->handle * 97UL + (DWORD)j);
+    }
+    pc[4][3] = S.down_branches;
+    pc[5][0] = S.down_band; pc[5][1] = S.down_crackle;
+    pc[5][2] = d->death < 0.0 ? S.down_flash * exp_f(-(float)(now - d->birth) / S.down_flash_time) : 0.0f;
+    pc[5][3] = down_level(d, now);
+    pc[6][0] = S.down_far; pc[6][1] = S.down_rim_power; pc[6][2] = w; pc[6][3] = S.down_lit;
+    for (k = 0; k < S.down_strikes; k++) {
+        float e = strike_now(d, k, now), p[3];
+        const float *u = d->st[k].dir;
+        for (j = 0; j < 3; j++) p[j] = u[0] * A[0 * 3 + j] + u[1] * A[1 * 3 + j] + u[2] * A[2 * 3 + j] + t[j];
+        pc[8 + k][0] = p[0]; pc[8 + k][1] = p[1]; pc[8 + k][2] = p[2]; pc[8 + k][3] = e;
+        pc[16 + k][0] = 1.0f / S.down_size;
+    }
+    d9_psconst(d9, 0, &pc[0][0], 22);
+    D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 4, (UINT)(g_sphere_n / 3), g_sphere, sizeof g_sphere[0]);
+}
+
+static long g_ships_drawn, g_frames_drawn, g_downs_drawn;
+
+static int g_down_ok;          /* the last frame could draw the shields-down arcs: stock's ring stands down */
+
+static const DWORD k_states[][2] = {
+    { 7, 1 },      /* ZENABLE */
+    { 14, 0 },     /* ZWRITEENABLE */
+    { 23, 4 },     /* ZFUNC: LESSEQUAL */
+    { 15, 0 },     /* ALPHATESTENABLE */
+    { 27, 1 },     /* ALPHABLENDENABLE */
+    { 19, 2 },     /* SRCBLEND: ONE */
+    { 20, 2 },     /* DESTBLEND: ONE */
+    { 171, 1 },    /* BLENDOP: ADD */
+    { 206, 0 },    /* SEPARATEALPHABLENDENABLE */
+    { 28, 0 },     /* FOGENABLE */
+    { 22, 1 },     /* CULLMODE: none -- the far side's hits show through the shell */
+    { 8, 3 },      /* FILLMODE: solid */
+    { 52, 0 },     /* STENCILENABLE */
+    { 152, 0 },    /* CLIPPLANEENABLE */
+    { 168, 7 },    /* COLORWRITEENABLE: rgb */
+    { 174, 0 },    /* SCISSORTESTENABLE */
+    { 194, 0 },    /* SRGBWRITEENABLE */
+};
+
+/* The device's state is captured once a frame, before the first draw, and the
+ * shells' state set; the first call does it. */
+static void capture(void *d9, int *captured, const float *cols)
+{
+    int k;
+    if (*captured) return;
+    D9_FN(g_sb, SB_CAPTURE, SB_t)(g_sb);
+    *captured = 1;
+    for (k = 0; k < (int)(sizeof k_states / sizeof k_states[0]); k++)
+        D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, k_states[k][0], k_states[k][1]);
+    D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2);          /* XYZ */
+    d9_vsconst(d9, 0, cols, 4);
+}
+
+/* Every struck ship's hits, then every ship whose shields are down; 1 if the device
+ * could take the hits (the stock shells then stand down), 0 to leave the stock shells.
+ * g_down_ok says the same for the shields-down ring. */
 static int draw_hits(void)
 {
-    static int said_d9, said_sh, said_sb, said_cam, said_first;
-    void  *d8, *d9, *vs, *ps;
+    static int said_d9, said_sh, said_sb, said_cam, said_first, said_down, said_dsh;
+    void  *d8, *d9, *vs, *ps, *dps;
     float  V[16], P[16], VP[16], cols[4][4], eye[3];
     double now = now_s();
-    int    i, j, captured = 0;
+    int    i, j, k, captured = 0;
     static int done[MAX_HITS];
 
+    g_down_ok = 0;
     d8 = engine_device8();
     d9 = d8 ? d9_device(d8) : NULLPTR;
     if (!d9) { note_once(&said_d9, "no Direct3D 9 device behind d3d8 (not d3d8to9): the stock shield hits"); return 0; }
     vs = d9_shader(d9, &g_vs);
     ps = d9_shader(d9, &g_ps);
     if (!vs || !ps) { note_once(&said_sh, "the shaders could not be created: the stock shield hits"); return 0; }
+    dps = S.down ? d9_shader(d9, &g_dps) : NULLPTR;
+    if (S.down && !dps) note_once(&said_dsh, "the shields-down shader could not be created: the stock ring");
     if (d9 != g_obj_dev) { unref(g_sb); g_sb = NULLPTR; g_obj_dev = d9; }
     hook_device_reset(d8);
     if (!g_sb && D9_FN(d9, D9_CREATESTATEBLOCK, MakeSB_t)(d9, 1, &g_sb) < 0) {   /* D3DSBT_ALL */
@@ -838,9 +1098,10 @@ static int draw_hits(void)
         return 0;
     }
     if (!g_sphere_n) make_sphere();
+    g_down_ok = dps != NULLPTR;
 
     gather(now);
-    if (!g_nhit) return 1;
+    if (!g_nhit && !(g_down_ok && g_ndown)) return 1;
 
     D9_FN(d9, D9_GETTRANSFORM, Mat_t)(d9, 2, V);      /* VIEW */
     D9_FN(d9, D9_GETTRANSFORM, Mat_t)(d9, 3, P);      /* PROJECTION */
@@ -852,7 +1113,7 @@ static int draw_hits(void)
     for (i = 0; i < g_nhit; i++) done[i] = 0;
     for (i = 0; i < g_nhit; i++) {
         BYTE *obj;
-        int   pick[SHIP_HITS], np = 0, k;
+        int   pick[SHIP_HITS], np = 0;
         float pw[SHIP_HITS];
         if (done[i]) continue;
         obj = object_of(g_hit[i].handle);
@@ -867,40 +1128,26 @@ static int draw_hits(void)
         }
         if (!obj || !np) continue;
         if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj)) continue;   /* as DrawShield asks */
-        if (!captured) {
-            static const DWORD rs[][2] = {
-                { 7, 1 },      /* ZENABLE */
-                { 14, 0 },     /* ZWRITEENABLE */
-                { 23, 4 },     /* ZFUNC: LESSEQUAL */
-                { 15, 0 },     /* ALPHATESTENABLE */
-                { 27, 1 },     /* ALPHABLENDENABLE */
-                { 19, 2 },     /* SRCBLEND: ONE */
-                { 20, 2 },     /* DESTBLEND: ONE */
-                { 171, 1 },    /* BLENDOP: ADD */
-                { 206, 0 },    /* SEPARATEALPHABLENDENABLE */
-                { 28, 0 },     /* FOGENABLE */
-                { 22, 1 },     /* CULLMODE: none -- the far side's hits show through the shell */
-                { 8, 3 },      /* FILLMODE: solid */
-                { 52, 0 },     /* STENCILENABLE */
-                { 152, 0 },    /* CLIPPLANEENABLE */
-                { 168, 7 },    /* COLORWRITEENABLE: rgb */
-                { 174, 0 },    /* SCISSORTESTENABLE */
-                { 194, 0 },    /* SRGBWRITEENABLE */
-            };
-            D9_FN(g_sb, SB_CAPTURE, SB_t)(g_sb);
-            captured = 1;
-            for (k = 0; k < (int)(sizeof rs / sizeof rs[0]); k++) D9_FN(d9, D9_SETRENDERSTATE, RS_t)(d9, rs[k][0], rs[k][1]);
-            D9_FN(d9, D9_SETFVF, FVF_t)(d9, 0x2);          /* XYZ */
-            d9_bind(d9, vs, ps);
-            d9_vsconst(d9, 0, &cols[0][0], 4);
-        }
+        if (!captured) { capture(d9, &captured, &cols[0][0]); d9_bind(d9, vs, ps); }
         draw_ship(d9, obj, pick, np, now, eye);
         g_ships_drawn++;
+    }
+    if (g_down_ok) {
+        int bound = 0;
+        for (i = 0; i < g_ndown; i++) {
+            BYTE *obj = object_of(g_down[i].handle);
+            if (!obj || !((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj)) continue;
+            capture(d9, &captured, &cols[0][0]);
+            if (!bound) { d9_bind(d9, vs, dps); bound = 1; }
+            draw_down(d9, obj, &g_down[i], now, eye);
+            g_downs_drawn++;
+            if (!said_down) { said_down = 1; logline("first shields-down arcs drawn"); }
+        }
     }
     if (captured) {
         D9_FN(g_sb, SB_APPLY, SB_t)(g_sb);
         g_frames_drawn++;
-        if (!said_first) {
+        if (!said_first && g_nhit) {
             char b[160];
             said_first = 1;
             b[0] = 0; s_cat(b, "first shield hits drawn: "); s_num(b, g_nhit); s_cat(b, " hit(s), sphere of ");
@@ -909,6 +1156,72 @@ static int draw_hits(void)
         }
     }
     return 1;
+}
+
+/* ---- the shields-down light ------------------------------------------------ */
+
+/* Each ship whose shields are down lights its own hull from its brightest discharge:
+ * an ordinary ST3D_Point_Light registered with the engine after
+ * GameObject_PreRenderAll (the call to Ordnance::PreRenderAll is chained), so
+ * Lighting.asi hands it to the GPU-drawn hulls as it does a torpedo's. Full to
+ * DownLightReach bounding radii, gone a fifth of that further on: a hard light, placed
+ * where it is. One light object per ship, made on first use. */
+#define DOWN_LIGHTS 8
+static BYTE    *g_down_light[DOWN_LIGHTS];
+static OrdPre_t g_prev_ord_pre;
+static long     g_down_lights;
+
+static void down_lights(void)
+{
+    double now = now_s();
+    int    i, j, n = 0;
+    void  *eng = *(void **)STORM3D;
+    if (!eng || !S.enable || !S.down || !g_down_ok || S.down_light <= 0.0f) return;
+    for (i = 0; i < g_ndown && n < DOWN_LIGHTS; i++) {
+        Down *d = &g_down[i];
+        BYTE *obj = object_of(d->handle);
+        float A[9], B[9], t[3], R, br, best = 0.0f, lv, col[3], mat[12];
+        int   k, kb = -1;
+        if (!obj || !((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj)) continue;
+        if (!ship_xform(obj, A, B, t, &R)) continue;
+        for (k = 0; k < S.down_strikes; k++) {
+            float e = strike_now(d, k, now);
+            if (e > best) { best = e; kb = k; }
+        }
+        lv = down_level(d, now);
+        if (d->death < 0.0) best += S.down_flash * exp_f(-(float)(now - d->birth) / S.down_flash_time);
+        if (kb < 0 || best * lv < 0.01f) continue;
+        if (!g_down_light[n]) {
+            typedef void *(__cdecl *New_t)(unsigned);
+            typedef void *(__thiscall *Ctor_t)(void *, void *, void *, const char *);
+            BYTE *l = (BYTE *)((New_t)FN_NEW)(0x138);
+            if (!l) return;
+            ((Ctor_t)FN_POINT_LIGHT)(l, NULLPTR, NULLPTR, "shieldsdown");
+            g_down_light[n] = l;
+        }
+        br = *(float *)(*(BYTE **)(obj + 4) + 0x34 + 12);   /* the bounding radius: the shield's mean one is small on a flat ship */
+        if (!(br > 0.01f)) br = R;
+        *(float *)(g_down_light[n] + 0x100) = S.down_light_reach * br;
+        *(float *)(g_down_light[n] + 0x104) = S.down_light_reach * br * 0.2f;
+        for (j = 0; j < 3; j++) col[j] = S.down_light_col[j] * S.down_light * best * lv;
+        for (j = 0; j < 9; j++) mat[j] = (j % 4 == 0) ? 1.0f : 0.0f;
+        for (j = 0; j < 3; j++)
+            mat[9 + j] = d->st[kb].dir[0] * A[0 * 3 + j] + d->st[kb].dir[1] * A[1 * 3 + j] + d->st[kb].dir[2] * A[2 * 3 + j] + t[j];
+        ((RegisterLight_t)FN_REGISTER_LIGHT)(eng, g_down_light[n], col, mat);
+        n++;
+        if (!g_down_lights++) {
+            char b[200];
+            b[0] = 0; s_cat(b, "first shields-down light: reach "); s_flt(b, S.down_light_reach * br);
+            s_cat(b, ", colour "); s_flt(b, col[0]); s_cat(b, " "); s_flt(b, col[1]); s_cat(b, " "); s_flt(b, col[2]);
+            logline(b);
+        }
+    }
+}
+
+static void __cdecl hook_ord_pre(void *camera)
+{
+    g_prev_ord_pre(camera);
+    down_lights();
 }
 
 /* ---- the hooks ------------------------------------------------------------ */
@@ -922,6 +1235,7 @@ static void __fastcall hook_drawshield(BYTE *hit, void *edx, void *cam, void *ma
 {
     (void)edx;
     if (g_drawing && S.enable && hit && *(BYTE **)(hit + HIT_SECOND) == type0_model() && type0_model()) return;
+    if (g_drawing && S.enable && S.down && g_down_ok && hit && *(BYTE **)(hit + HIT_SECOND) == type1_model() && type1_model()) return;
     g_prev_draw(hit, cam, mat);
 }
 
@@ -1001,12 +1315,21 @@ static void startup(void)
     if ((DWORD)g_prev_draw != FN_DRAWSHIELD) { s_cat(b, " (chained to "); s_hex(b, (DWORD)g_prev_draw); s_cat(b, ")"); }
     s_cat(b, " and RenderChunks");
     if ((DWORD)g_prev_chunks != FN_CHUNKS) { s_cat(b, " (chained to "); s_hex(b, (DWORD)g_prev_chunks); s_cat(b, ")"); }
+
     s_cat(b, " patched; the weapons' hits:");
     for (i = 0; i < 4; i++) {
         g_prev_create[i] = (Create_t)chain_call(k_hit_sites[i], (void *)k_thunk[i]);
         if (g_prev_create[i]) { sites++; s_cat(b, " "); s_cat(b, k_site_name[i]); }
     }
     if (sites < 4) s_cat(b, " (the others are not calls here: their hits take the reference strength)");
+    logline(b);
+    g_prev_ord_pre = (OrdPre_t)chain_call(SITE_ORD_PRE, (void *)hook_ord_pre);
+    b[0] = 0;
+    if (g_prev_ord_pre) {
+        s_cat(b, "Ordnance::PreRenderAll patched");
+        if ((DWORD)g_prev_ord_pre != FN_ORD_PRE) { s_cat(b, " (chained to "); s_hex(b, (DWORD)g_prev_ord_pre); s_cat(b, ")"); }
+        s_cat(b, ": the shields-down light");
+    } else s_cat(b, "Ordnance::PreRenderAll is not a call here: no shields-down light");
     logline(b);
 }
 
