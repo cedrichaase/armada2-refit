@@ -140,6 +140,81 @@ The composite is bound by its reads: a depth read for each of 25 taps cost 0.57 
 more at 3440x1440, more than all the opacity work. A 3x3 tent (the first) was grainy
 from outside the gas.
 
+## Hull edges (`EdgeRefine=1`)
+
+Half size drew every hull in or in front of the gas with a stepped border: background
+gas leaked one to three pixels onto the hull's edge in two-pixel steps, and any sharp
+change of the gas along a silhouette (a ship's shadow, "Ships' shadows in the gas") came
+out on the half-size grid. The half-size depth is the nearest of each 2x2, so a half
+pixel straddling a silhouette carries only the gas in front of the hull, and the
+composite's tent took the outer ring's depth from its inner neighbour.
+
+**`EdgeRefine=1` draws the gas a second time at full size, but only at depth edges.**
+Half size everywhere else, so the cost follows the length of the silhouettes, not the
+screen:
+
+- **Where:** two passes at quarter size take how far the half-size depths spread over the
+  7x7 half pixels about each 2x2 cell (the tent's 5x5 and one more). Above a spread of
+  0.06 (fully at 0.15) the composite takes the full-size gas, filtered over the 3x3 full
+  pixels at its own depth (within 1%), since a full-size pixel alone is grainier than the
+  tent. The window has the extra ring because the half pixel beside a straddling one can
+  be wrong too: along one cube's edge the raw half-size gas was about 40% too bright
+  (152 against 117) although its depth was right, and `Shadows` and `Obscure` made no
+  difference; why is not known. With the tent's 5x5 alone, a step was left at the band's
+  edge.
+- **The mask:** those pixels and their 3x3 neighbours are opened in a D24X8 buffer of
+  our own (depth from the viewport, MinZ = MaxZ, not from the shader), and the slices are
+  drawn again into a full-size A16B16G16R16F target, tested against the INTZ copy in the
+  shader as at half size.
+- **Only over the 16x16 tiles that hold an edge.** Any draw over a tile spoils its fast
+  clear, and then hierarchical Z no longer rejects whole slices there: a full-screen
+  mask that discarded every pixel cost 0.2 ms with nothing refined (binding the INTZ
+  texture as the depth-stencil and stenciling, or writing depth from the shader, the
+  same). One pass at a pixel per tile flags the tiles; a fixed grid of tile quads is
+  culled in the vertex shader by a vertex texture read (vs_3_0 `texldl`, which vkd3d
+  compiles).
+- `EdgeRefine=2` draws everything at full size this way: the reference the band was
+  measured against. `Timing=1` logs the pixels refined a view.
+
+Measured (bench, 3440x1440, vsync off, mnebula7, 8 and 9 loaded, two Borg cubes and two
+Klingon battleships in the middle one, the Key behind the camera; gas GPU time, `Timing=1`):
+
+| View | Half size | `EdgeRefine=1` | `EdgeRefine=2` |
+|---|---|---|---|
+| RTS distance | 3.92 ms (202 fps) | 4.41 ms (186 fps) | 17.9 ms (53 fps) |
+| Close-up, the gas fills the screen | 5.15 ms (154 fps) | 5.88 ms (140 fps) | 23.6 ms (40 fps) |
+| Wide, three classes | 2.91 ms (258 fps) | 3.22 ms (241 fps) | 13.0 ms (72 fps) |
+
+Against `EdgeRefine=2`, blurred by 1.5 px so grain does not count, the pixels about the
+hulls off by more than 4/255 fall from 0.5–0.8% to 0.04–0.11%. At 600% the refined band
+is a little more mottled than the tent beside it.
+
+### Other ways tried
+
+Each was built, behind its own key, and measured in the same scene and session. Their
+code is on the branch `worktree-nebula-hull-edges`.
+
+- **The whole gas at full size** (`Resolution=1` taking this float path at a scale of
+  1, a 9-pixel tent so the grain is as fine as half size's). Every artefact of half size
+  goes, but the gas costs 3.5 to 3.6 times as much: 14.2, 18.6 and 10.2 ms in the three
+  views, **50 fps** in the close-up. The reads of the baked gas and their maths are most of
+  it (with every slice pixel returning a constant after its depth test, 4.0 ms); skipping
+  the depth read saved nothing. Every other slice in alternate 2x2 blocks (by a stencil)
+  took 8.1–10.1 ms but brightened the gas and drew a dotted line along hulls.
+- **A better upsampling** (`Upsample=`): the edge test read through a filtered half-size
+  depth at the tent's 9 points (the inner 3x3 alone missed the outer ring, whose gas
+  leaked across silhouettes), every tap weighed by its own depth, and on a full-size
+  silhouette the gas for the nearest and the farthest depth about it mixed by coverage,
+  so the gas's edge ramps over a pixel as the multisampled hull's does. +0.01–0.03 ms. It
+  removes the leak but not the steps of a shadow's edge. A checkerboard of nearest and
+  farthest half-size depths, as half-size fog and SSAO use, added nothing once every tap
+  had its own depth.
+- **Skipping thin gas** (`ThinGas=0.05`): below that baked density no fine octave and no
+  shadow read. 0.3–0.5 ms less at half size, no visible change (blurred difference at
+  most 1.2/255).
+- **Shadows that fill in** (`ShadowFade=`): "Ships' shadows in the gas", "Seen down a
+  shaft".
+
 ## Lit by the Key
 
 The gas's light is two parts: its own glow, and the Key's, which the gas scatters. The
@@ -211,6 +286,20 @@ the shadows, +1.25 ms looking towards the Key (+20%) and +0.6 ms from above. Tha
 two dependent reads of the map per slice pixel with gas in it (none over empty space),
 at half size.
 
+**Seen down a shaft, a shadow is a dark ring about the hull.** With the Key behind the
+camera, as from the ordinary RTS view, each hull's shaft runs straight away behind it,
+and a line of sight just outside the silhouette meets the shaft some way behind the hull
+and runs inside it, through the penumbra that widens with depth (`ShadowSoftness`). The
+gas there loses the Key's share of its light, 80%: a dark outline hugging every ship. It
+is what the shadows should look like from there, and it was half the stepped border hulls
+drew in the gas; the other half, its edge on the half-size grid, is "Hull edges". A
+shadow that fills in behind its caster, as light the gas about it scatters would fill it
+(`ShadowFade=`, world units, built and measured; branch `worktree-nebula-hull-edges`),
+weakens the ring: about a Klingon battleship the shadow's mean darkening fell from 3.3
+to 1.2 of 255 at 150 and to 0.5 at 60, at no measurable cost. It also shortens the
+shafts looking towards the Key, where they are meant to show (at 60 little shadow is
+left), so it is not in.
+
 ## Cost
 
 Bench, 3440x1440, the six-class scene at its default view: 1.52 ms of GPU
@@ -237,4 +326,9 @@ Each recipe's header says what it is aiming for.
 
 - The release package (`publish/`, the GUI installer) does not carry the layer.
 - Lightning lights the gas, not ships.
-- Full size (`Resolution=1`) has no `Opacity=`; it keeps `EdgeOnDim`.
+- Full size (`Resolution=1`) has no `Opacity=`; it keeps `EdgeOnDim`. A full size on the
+  float path was built and measured ("Hull edges", "Other ways tried"), and is too slow
+  where the gas fills the screen.
+- `EdgeRefine=1`'s band is a little grainier than the tent beside it, and the half-size
+  gas beside a straddling half pixel can be too bright ("Hull edges"); neither is
+  understood yet.

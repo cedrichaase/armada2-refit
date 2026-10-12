@@ -293,7 +293,7 @@ static int   g_noise = 128;   /* NoiseSize=: the noise volume's edge, texels */
 static int   g_res = 2;       /* Resolution=: 2 the gas at half size (needs INTZ), 1 at full size */
 static float g_obscure = 0.5f; /* Obscure=: how much of what is behind the gas its opacity hides (0..1, half size only) */
 static int   g_samples = 2;   /* Samples=: reads of the baked gas per slice pixel, 1 or 2 */
-static int   g_refine = 0;    /* EdgeRefine=: 1 the gas at full size at depth edges (half size only); 2 everywhere (a reference) */
+static int   g_refine = 1;    /* EdgeRefine=: 1 the gas at full size at depth edges (half size only); 2 everywhere (a reference) */
 static int   g_shadows = 1;            /* Shadows=: ships shadow the gas from the Key (Lighting.asi's map) */
 static float g_key_share = 0.8f;        /* KeyShare=: the Key's share of the gas's light; the rest is its own glow (a recipe's KeyShare= overrides) */
 static float g_scatter = 0.2f;          /* Scatter=: how much the gas scatters the Key forward (0: alike every way; a recipe's Scatter= overrides) */
@@ -318,7 +318,7 @@ static void read_settings(void)
     g_bake     = (int)GetPrivateProfileIntA("Nebulae", "Bake", 1, g_ini);
     g_samples  = (int)GetPrivateProfileIntA("Nebulae", "Samples", 2, g_ini) >= 2 ? 2 : 1;
     g_res      = (int)GetPrivateProfileIntA("Nebulae", "Resolution", 2, g_ini) >= 2 ? 2 : 1;
-    g_refine   = (int)GetPrivateProfileIntA("Nebulae", "EdgeRefine", 0, g_ini);
+    g_refine   = (int)GetPrivateProfileIntA("Nebulae", "EdgeRefine", 1, g_ini);
     if (g_refine < 0 || g_refine > 2) g_refine = 1;
     g_vol_max  = (int)GetPrivateProfileIntA("Nebulae", "VolumeSize", 256, g_ini);
     g_vol_maxy = (int)GetPrivateProfileIntA("Nebulae", "VolumeHeight", 160, g_ini);

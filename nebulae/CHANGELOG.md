@@ -4,6 +4,16 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-12
+
+### Added
+- `EdgeRefine=` (default 1): at depth edges (hulls in or before the gas) the half-size
+  gas is drawn again at full size, so silhouettes are exact instead of in two-pixel steps;
+  half size elsewhere. 0 is half size everywhere, 2 full size everywhere (a reference).
+  `Timing=1` logs the pixels refined.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-12
 
 ### Added

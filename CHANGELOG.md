@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.27.0 — 2026-10-12
+
+Layers: nebulae 1.2.0.
+
+### Added
+- Hulls in or before the gas keep exact edges: `EdgeRefine=1` draws the gas at full size
+  along depth edges and at half size elsewhere (nebulae 1.2.0).
+
+Installed, not yet seen in game.
+
 ## 11.26.0 — 2026-10-12
 
 Layers: shields 1.0.0, testbench 3.9.0.
