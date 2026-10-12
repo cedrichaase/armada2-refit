@@ -4,6 +4,23 @@
 billboards, and the recipes in `recipes/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.3.0 — 2026-10-13
+
+### Added
+- `Fringe=` (with `FringeReach=`, `FringeScale=`): a thin, soft haze about a body of gas,
+  out past its edge and fading all the way, so a field thins out into space instead of
+  stopping at its outline. On in `mnebula6` (0.25) and `mnebula7` (0.3).
+- `Fuzz=` (with `FuzzSpeed=`): the thin gas at the outline feathered by the fine octave,
+  which now drifts slowly (two reads drifting opposite ways), so the edges are wispy and
+  their wisps come and go. On in `mnebula6`, `7`, `8`, `9`, `12`.
+
+### Changed
+- The flow is two reads drifting opposite ways instead of one: the gas changes shape
+  slowly rather than wobbling in place (every recipe with `Flow=`).
+- `mnebula7`: `Softness=` 0.7 → 1.0.
+
+Installed, not yet seen in game.
+
 ## 1.2.1 — 2026-10-13
 
 ### Fixed

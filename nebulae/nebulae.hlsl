@@ -51,7 +51,8 @@ float4 k_sh1     : register(c33);  //   v,
 float4 k_sh2     : register(c34);  //   and depth along the Key (0..1 over the hulls)
 float4 k_sh      : register(c35);  //   x 1: there is a map (0: none), y the depth bias, z the penumbra (u, v per depth behind the caster), w half a texel (u, v)
 float4 k_key     : register(c36);  // xyz: towards the Key (Lighting.asi); w: the Key's share of the gas's light (0: none, all the gas's own)
-float4 k_scat    : register(c37);  // the Key scattered forward: x 1 + g*g, y 2g (Henyey-Greenstein's g, Scatter=)
+float4 k_scat    : register(c37);
+float4 k_fuzz    : register(c38);  // x: Fringe, a thin haze about the body; y: its noise's scale (of the tile); z: Fuzz, the outline feathered; w: the fine octave's drift now (noise tiles)  // the Key scattered forward: x 1 + g*g, y 2g (Henyey-Greenstein's g, Scatter=)
 
 sampler3D s_noise : register(s0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
 sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; b: the nebulae's height there (0.5: the field's); a: envelope
@@ -167,6 +168,16 @@ float4 gas_at(float3 p)
         fil *= k_fil.x * saturate(det * 1.6);         // broken up along their length
         dens = dens + fil * (1.0 - dens);
         shade = lerp(shade, 1.2, fil);
+    }
+
+    // Fringe: a thin haze about the body, out to the wider disc and fading all the way
+    // there, so a field thins out into space instead of stopping at its outline. Its
+    // noise is soft, not thresholded as the body's is. Off unless the recipe asks.
+    if (k_fuzz.x > 0.0) {
+        float  fz = noise2(q * k_fuzz.y + w * (k_noise.y * 0.7) + float3(0.37, 0.11, 0.73),
+                           rot2(p) * (k_noise.x * k_fuzz.y * 0.786) + k_seed.zxy + float3(0.52, 0.23, 0.81));
+        float  haze = smoothstep(0.40, 0.72, fz) * env.g * smoothstep(1.0, 0.1, abs(y) / max(k_vert.y, 1.0));
+        dens = dens + k_fuzz.x * haze * (1.0 - dens);
     }
 
     // Knots: a coarse field whose peaks are brighter pockets of gas. Lanes: a softer
@@ -343,9 +354,15 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     if (o.r < 0.006 || uvw.y < o.b - m || uvw.y > o.g + m) return float4(0, 0, 0, -1);
     // Flow: the volume read through a warp field that drifts with time, so the gas
     // and its outline churn slowly instead of standing still.
+    // Two reads drifting opposite ways, turned apart: one drifting field only slides,
+    // and the gas wobbled in place; two change shape as they pass each other.
     float3 fl = 0.0;
-    if (k_flow.y > 0.0)
-        fl = tex3D(s_noise, p * (k_noise.x * k_flow.z) + float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37)).gba * 2.0 - 1.0;
+    if (k_flow.y > 0.0) {
+        float3 fd = float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37);
+        fl = (tex3D(s_noise, p * (k_noise.x * k_flow.z) + fd).gba +
+              tex3D(s_noise, rot2(p) * (k_noise.x * k_flow.z * 0.786) - fd.zxy + 0.5).gba - 1.0) * 1.4142;
+        fl = clamp(fl, -1.0, 1.0);                    // within the reach the occupancy record allows for
+    }
     // Samples=2: two reads a quarter of the gap either side of the jittered point, one
     // in each half of the gap, stratified, which halves the noise the jitter leaves.
     float3 dir = (i.w - k_eye.xyz) / dist * (i.t.x * 0.25);
@@ -357,9 +374,18 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     else
         v = tex3D(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy);
     if (v.x <= 0.002) return float4(0, 0, 0, -1);
+    // The fine octave, its two reads drifting opposite ways (FuzzSpeed=): the finest
+    // detail is never quite still, and with Fuzz= it feathers the outline: the thin gas
+    // there is raised or eaten by it, so the edge is wispy and its wisps come and go.
     float  det = 0.5;
-    if (k_vlo.w > 0.0) det = noise2(rot(pa) * (k_noise.x * 6.1) + k_seed.zxy, rot2(pa) * (k_noise.x * 5.3) + k_seed.yzx);
-    float4 g = float4(saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w)), v.y * 1.6, v.z, v.w * 4.0);
+    if (k_vlo.w > 0.0 || k_fuzz.z > 0.0) {
+        float3 dd = float3(k_fuzz.w, k_fuzz.w * 0.71, k_fuzz.w * 0.37);
+        det = noise2(rot(pa) * (k_noise.x * 6.1) + k_seed.zxy + dd, rot2(pa) * (k_noise.x * 5.3) + k_seed.yzx - dd.zxy);
+    }
+    float  dn = saturate(v.x * (1.0 + (det - 0.5) * 2.0 * k_vlo.w));
+    if (k_fuzz.z > 0.0)
+        dn = saturate(dn * (1.0 + k_fuzz.z * (1.0 - smoothstep(0.0, 0.45, dn)) * clamp((det - 0.5) * 8.0, -1.0, 1.0)));
+    float4 g = float4(dn, v.y * 1.6, v.z, v.w * 4.0);
     float  near = saturate((dist - k_eye.w * 0.25) / k_eye.w);
     // The ships' shadows at the same two points as the gas: the jittered point alone
     // covers only half the gap (k_samp.y), so a shaft seen along its length came out

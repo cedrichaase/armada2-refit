@@ -97,6 +97,22 @@ Per class, per field of its nebulae:
 - **Flow**: the volume read through a drifting warp; the drift wraps at 100, where its
   three axes are all whole tiles (at 1 the whole cloud rearranged itself every
   1 / `FlowSpeed` seconds).
+  Two reads of the warp, turned apart and drifting opposite ways, summed: with one, the
+  displacement field only slid past, and the gas wobbled in place while keeping its
+  shape; two change shape as they pass each other. The sum is clamped to one `Flow`, the
+  reach the occupancy record is widened by.
+- **Soft edges** (`Fringe=`, `Fuzz=`). Without them a field with no filaments stopped at
+  its outline: the Radioactive and the Metreon read as compact bodies with hard cutoffs
+  against space, where stock's billboards fade out ragged and the Mutara's filaments,
+  reaching 1.8 times past the body, gave it a halo. `Fringe=` bakes a thin haze about the
+  body, out to `FringeReach` times the reach (the envelope's green disc, the filaments'
+  when wider), from a soft noise that is not thresholded as the body's is, fading with the
+  disc and the height. `Fuzz=` acts at the draw: the fine octave's two reads drift
+  opposite ways (`FuzzSpeed=`, noise tiles a second), and where the gas is thin (below
+  0.45) it raises or eats it by up to `Fuzz`, so the outline is wispy and its wisps come
+  and go. Bench, 1920x1080, the Radioactive at RTS distance: +0.1 ms of gas
+  (1.36 → 1.47 ms); the frame changes by a mean of 8.6/255 in 30 s, the old flow 3.4 in
+  20 s. `Bake=0` (the reference) has the fringe but not the fuzz.
 
 ### The noise has no lattice
 
@@ -324,7 +340,7 @@ of an edit. Shape: `Extent`, `Height`, `Lumps`, `EdgeWarp`, `Radius`. Noise: `Se
 `Tile`, `Warp`, `WarpScale`, `Detail`, `FineDetail`, `Coverage`, `Softness`, `Gamma`,
 `Ridge`. Colour: `Brightness`, `GasA`, `GasB`, `Glow`, `HueScale`, `HueMix`,
 `HueCycle`, `HueSwing`. Light: `Light`, `ShadeStep`, `Shading`, `Knots`, `KnotScale`,
-`Lanes`, `LaneScale`. Motion: `Flow`, `FlowScale`, `FlowSpeed`. Filaments: `Filaments`,
+`Lanes`, `LaneScale`. Motion: `Flow`, `FlowScale`, `FlowSpeed`. Edges: `Fringe`, `FringeReach`, `FringeScale`, `Fuzz`, `FuzzSpeed`. Filaments: `Filaments`,
 `FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`, `KeyShare`, `Scatter`,
 `NearFade`. Lightning: `Lightning` (flashes a minute, a nebula), `LightningSize`,
 `LightningBrightness`, `LightningColour`. The core: `Core`, `CoreSharpness`, `Pulse`,

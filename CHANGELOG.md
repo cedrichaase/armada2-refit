@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.32.0 — 2026-10-13
+
+Layers: nebulae 1.3.0.
+
+### Added
+- Nebulae with softer, wispier outlines that shift slowly: `Fringe=` (a thin haze about
+  the body, on the Radioactive and Metreon nebulae) and `Fuzz=` (the outline feathered by
+  a drifting fine noise); the flow changes the gas's shape instead of wobbling it
+  (nebulae 1.3.0).
+
+Installed, not yet seen in game.
+
 ## 11.31.1 — 2026-10-13
 
 Layers: shields 1.1.1.
