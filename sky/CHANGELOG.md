@@ -4,6 +4,15 @@
 cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.1 — 2026-10-12
+
+### Fixed
+- Rebuilt with platform 3.4.1's `d9_device()`, which tells a new Direct3D device by the
+  d3d9 device rather than the d3d8 device's address, so the sky's shaders and cube are
+  made again on a device at a re-used address.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-09
 
 ### Added

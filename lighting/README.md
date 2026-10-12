@@ -887,7 +887,11 @@ with two cameras: the main view and the selection's 3D portrait, each with its o
 draws (bench: 86 and 4, alternating strictly). The plugin therefore keeps the hull lists
 and their frame counts per camera (`g_view`, set in `hook_prerender_all`); with one list
 for both, each view's map was made from the other's hulls and a ship in the main view
-sampled a map of the portrait's one, going dark at random.
+sampled a map of the portrait's one, going dark at random. There are four slots; a camera
+not seen before takes a free one or, with none free, the one rendered longest ago, emptied
+(`view_of`). Before 1.17.3 every camera past the third shared the last slot, so a game
+that made new cameras over time (a portrait re-created per selection, say) brought the
+bug back.
 
 **The map.** R32F, `ShadowSize` square, with its own D24X8 depth surface, orthographic
 along the Key (the brightest directional light in the engine's list). It is fitted round

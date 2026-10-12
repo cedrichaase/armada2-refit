@@ -297,14 +297,34 @@ static DWORD g_frame;
 #define SM_VIEWS 4
 static void *g_view_cam[SM_VIEWS];
 static DWORD g_view_frames[SM_VIEWS];      /* the frames each view has had */
+static DWORD g_view_used[SM_VIEWS];        /* the g_frame each view was last rendered at */
 static int   g_view;                       /* the view being rendered */
+static void  sm_view_clear(int v);
+
+/* The camera's view. A camera not seen before takes a free slot or, with none free,
+ * the one rendered longest ago, emptied: a camera that has gone (a closed portrait)
+ * never holds a slot that the main view and a live portrait would have to share. */
+static int view_of(void *camera)
+{
+    int v, old = 0;
+    for (v = 0; v < SM_VIEWS; v++) if (g_view_cam[v] == camera) return v;
+    for (v = 0; v < SM_VIEWS; v++) if (!g_view_cam[v]) break;
+    if (v == SM_VIEWS) {
+        for (v = 1; v < SM_VIEWS; v++) if (g_frame - g_view_used[v] > g_frame - g_view_used[old]) old = v;
+        v = old;
+        sm_view_clear(v);
+        g_view_frames[v] = 0;
+    }
+    g_view_cam[v] = camera;
+    return v;
+}
 
 static void __cdecl hook_prerender_all(void *camera)
 {
     g_frame_lights = 0;
     g_frame++;              /* the shadows' frame: see sm_frame */
-    for (g_view = 0; g_view < SM_VIEWS - 1 && g_view_cam[g_view] && g_view_cam[g_view] != camera; g_view++) ;
-    g_view_cam[g_view] = camera;
+    g_view = view_of(camera);
+    g_view_used[g_view] = g_frame;
     g_view_frames[g_view]++;
     if (g_lights) sky_update();
     ((PreRenderAll_t)FN_PRERENDER_ALL)(camera);
@@ -1122,8 +1142,9 @@ static void hook_device(void *dev)
     g_sh_on = 1;
     logline("shaders: on, through the Direct3D 9 device behind d3d8");
     /* Reset (slot 14): the shadow map is a D3DPOOL_DEFAULT target, which must be gone
-     * before the device resets, and the shadow casters hold the engine's buffers. */
-    if (g_shadows && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
+     * before the device resets, and the shadow casters hold the engine's buffers; so
+     * does the near fade's list, and its state block must go too. */
+    if ((g_shadows || g_near_fade) && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
         g_reset = (Reset8_t)vt[14];
         vt[14] = (void *)hook_reset;
         VirtualProtect(&vt[14], 4, old, &old);
@@ -1203,6 +1224,7 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     d9 = d8 ? d9_device(d8) : NULLPTR;
     if (!d9) return 0;
     if (!g_dot3_decl || g_dot3_decl_dev != d9) {     /* made once per device */
+        if (g_dot3_decl) D9_FN(g_dot3_decl, D9_RELEASE, D9_Ref_t)(g_dot3_decl);   /* the previous device's */
         g_dot3_decl = NULLPTR; g_dot3_decl_dev = d9;
         if (D9_FN(d9, D9_CREATEVERTEXDECLARATION, D9Decl_t)(d9, k_dot3_decl, &g_dot3_decl) < 0)
             g_dot3_decl = NULLPTR;
@@ -1397,6 +1419,17 @@ static void sm_release(void)
     g_sm_ok = 0;
 }
 
+/* A view's lists emptied, for a slot given to another camera. */
+static void sm_view_clear(int v)
+{
+    int i, keep = g_view;
+    g_view = v;
+    sm_drop_list(0); sm_drop_list(1);
+    for (i = 0; i < SM_HASH; i++) g_sm_head[i] = -1;
+    g_sm_rec_frame = 0;
+    g_view = keep;
+}
+
 static void fd_release(void);
 static long __stdcall hook_reset(void *dev, void *params)
 {
@@ -1586,7 +1619,16 @@ static void sm_frame(void *d9)
     if (!g_shadows && !g_planet_shadows) return;
     {
         float fwd[3];
-        if (!sm_key_axis(fwd)) { g_sm_ok = 0; return; }
+        if (!sm_key_axis(fwd)) {
+            /* no map this frame; the lists still turn over, or sm_keep would go on
+             * filling one (and holding its buffers) until the Key came back */
+            g_sm_ok = 0;
+            if (g_shadows && g_sm_dev == d9) {
+                sm_view_clear(g_view);
+                g_sm_rec_frame = g_view_frames[g_view];
+            }
+            return;
+        }
         for (i = 0; i < 3; i++) g_sm_key[i] = -fwd[i];
         g_sm_have_key = 1;
         if (!g_shadows) return;
@@ -1761,7 +1803,7 @@ typedef struct {
 static FdRec  g_fd[FD_MAX];
 static int    g_fd_n, g_fd_ix[FD_MAX];
 static DWORD  g_fd_frame;
-static void  *g_fd_dev, *g_fd_sb;
+static void  *g_fd_dev, *g_fd_sb, *g_fd_sb_dev;   /* g_fd_sb belongs to g_fd_sb_dev */
 static long   g_fd_replays;
 
 static void fd_drop(void)
@@ -1841,9 +1883,11 @@ static void fd_replay(void)
     hvs = d9_shader(d9, &g_hull_vs); hps = d9_shader(d9, &g_hull_ps);
     for (i = 0; i < n; i++) if (g_fd[i].dot3) { bvs = d9_shader(d9, &g_bump_vs); bps = d9_shader(d9, &g_bump_ps); break; }
     if (!hvs || !hps || (i < n && (!bvs || !bps || !g_dot3_decl))) { fd_drop(); return; }
+    if (g_fd_sb && g_fd_sb_dev != d9) { sm_unref(g_fd_sb); g_fd_sb = NULLPTR; }   /* another device's */
     if (!g_fd_sb && D9_FN(d9, SM_CREATESTATEBLOCK, SmMakeSB_t)(d9, 1, &g_fd_sb) < 0) {   /* D3DSBT_ALL */
         g_fd_sb = NULLPTR; fd_drop(); return;
     }
+    g_fd_sb_dev = d9;
     /* farthest hull first, a hull's draws together and in their order */
     for (i = 0; i < n; i++) g_fd_ix[i] = i;
     for (i = 1; i < n; i++) {
@@ -2017,7 +2061,7 @@ static BOOL __fastcall hook_nebula_frustum(BYTE *inst, void *edx, void *camera)
  * 13 to 16, the CPU path's) do nothing: in the engine's list it reaches the
  * vertex-buffer draws through pick_points, and not the CPU-lit planets and moons,
  * the planet itself among them, which it would otherwise light from inside. */
-typedef struct { char name[16]; float col[3]; } GlowTex;
+typedef struct { char name[16]; float col[3]; DWORD used; } GlowTex;
 typedef struct { void *planet; BYTE *light; DWORD seen; } GlowLight;
 
 static float     g_glow = 1.5f, g_glow_range = 6.0f;
@@ -2099,10 +2143,14 @@ static const float *glow_colour(const BYTE *cls)
     for (i = 0; i < g_glow_ntex; i++) {
         const char *x = g_glow_tex[i].name, *y = name;
         while (*x && *x == *y) x++, y++;
-        if (!*x && !*y) return g_glow_tex[i].col;
+        if (!*x && !*y) { g_glow_tex[i].used = g_frame; return g_glow_tex[i].col; }
     }
-    if (g_glow_ntex >= 16) return grey;
-    t = &g_glow_tex[g_glow_ntex++];
+    if (g_glow_ntex < 16) t = &g_glow_tex[g_glow_ntex++];
+    else {   /* full: the one used longest ago makes way, unless all are in use (a few frames) */
+        for (t = g_glow_tex, i = 1; i < 16; i++) if (g_frame - g_glow_tex[i].used > g_frame - t->used) t = &g_glow_tex[i];
+        if (g_frame - t->used < 8) return grey;
+    }
+    t->used = g_frame;
     for (i = 0; i < 15 && name[i]; i++) t->name[i] = name[i];
     t->name[i] = 0;
     n = tga_mean(name, "1", a);
@@ -2411,7 +2459,7 @@ static void explosion_lights(void)
 #define FN_PHASER_DEL 0x57ee70   /* its scalar deleting destructor, slot 0 */
 #define ORDNANCE_LIST 0x771fac   /* the live ordnance, as Ordnance::PreRenderAll walks it */
 
-typedef struct { const void *tex; float col[3]; } BeamTex;
+typedef struct { const void *tex; char stem[64]; float col[3]; DWORD used; } BeamTex;
 
 static int     g_phasers = 1;
 /* the emitter: PhaserBrightness=, PhaserStart=, PhaserRange=, PhaserLift= */
@@ -2431,11 +2479,6 @@ static const float *beam_colour(const BYTE *cls)
     float       peak;
     int         i;
     if (!spr || !(tex = *(const BYTE * const *)(spr + 0x58))) return white;
-    for (i = 0; i < g_beam_ntex; i++)
-        if (g_beam_tex[i].tex == tex) return g_beam_tex[i].col;
-    if (g_beam_ntex >= 24) return white;
-    t = &g_beam_tex[g_beam_ntex++];
-    t->tex = tex;
     name = *(const char * const *)(tex + 8);
     stem[0] = 0;
     if (name) {   /* the name, without a path or an extension */
@@ -2444,6 +2487,22 @@ static const float *beam_colour(const BYTE *cls)
         for (i = 0; i < 63 && s[i] && s[i] != '.'; i++) stem[i] = s[i];
         stem[i] = 0;
     }
+    /* by address and name: a texture freed with its map and another made at the
+     * same address is another colour */
+    for (i = 0; i < g_beam_ntex; i++) {
+        const char *x = g_beam_tex[i].stem, *y = stem;
+        if (g_beam_tex[i].tex != tex) continue;
+        while (*x && *x == *y) x++, y++;
+        if (!*x && !*y) { g_beam_tex[i].used = g_frame; return g_beam_tex[i].col; }
+    }
+    if (g_beam_ntex < 24) t = &g_beam_tex[g_beam_ntex++];
+    else {   /* full: the one used longest ago makes way, unless all are in use (a few frames) */
+        for (t = g_beam_tex, i = 1; i < 24; i++) if (g_frame - g_beam_tex[i].used > g_frame - t->used) t = &g_beam_tex[i];
+        if (g_frame - t->used < 8) return white;
+    }
+    t->used = g_frame;
+    t->tex = tex;
+    for (i = 0; i < 64; i++) t->stem[i] = stem[i];
     if (!stem[0] || !tga_mean(stem, "", t->col))
         for (i = 0; i < 3; i++) t->col[i] = 1.0f;
     peak = t->col[0] > t->col[1] ? t->col[0] : t->col[1];
@@ -2653,6 +2712,12 @@ static void ordnance_colours(void)
         if (!light || *(DWORD *)light != VT_POINT) continue;
         ordnance_colour(light, *(BYTE **)(cls + 0x12c));
     }
+}
+
+/* the vtable slot holds what this build expects */
+static int slot_is(DWORD vt, int idx, DWORD expect)
+{
+    return *(DWORD *)(vt + 4 * idx) == expect;
 }
 
 static int patch_slot(DWORD vt, int idx, DWORD expect, const void *hook)
@@ -3245,8 +3310,10 @@ static void startup(void)
         else logline("NOT PATCHED: CraftInstance vtable differs, stock's near fade");
     }
     if (g_gpu && g_shaders && g_near_fade) {
-        if (patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required) &&
-            patch_slot(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH, (const void *)hook_flush))
+        /* both or neither: fading hulls recorded and never drawn would vanish */
+        if (slot_is(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED) && slot_is(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH) &&
+            patch_slot(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH, (const void *)hook_flush) &&
+            patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required))
             n += 2;
         else logline("NOT PATCHED: DeviceDirectX8 vtable differs, no near fade in the shaders");
     }
@@ -3256,8 +3323,10 @@ static void startup(void)
         else logline("NOT PATCHED: NebulaInstance vtable differs");
     }
     if (g_explosions) {
-        if (patch_slot(VT_FIREBALL, 14, FN_FIREBALL_SIM, (const void *)hook_fireball_sim) &&
-            patch_slot(VT_FIREBALL, 0, FN_FIREBALL_DEL, (const void *)hook_fireball_del))
+        /* both or neither: the explosion Simulate follows, the destructor forgets */
+        if (slot_is(VT_FIREBALL, 14, FN_FIREBALL_SIM) && slot_is(VT_FIREBALL, 0, FN_FIREBALL_DEL) &&
+            patch_slot(VT_FIREBALL, 0, FN_FIREBALL_DEL, (const void *)hook_fireball_del) &&
+            patch_slot(VT_FIREBALL, 14, FN_FIREBALL_SIM, (const void *)hook_fireball_sim))
             n += 2;
         else logline("NOT PATCHED: FireballExplosion vtable differs");
     }
