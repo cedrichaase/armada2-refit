@@ -11,6 +11,9 @@ versions". Newest first. The reasoning is in [`README.md`](README.md).
   relief and cloud cubes on its first draw (106–480 ms; the session's first 2–3 s).
 - `Surfaces.ini`: `Enable`, `Face`, `CloudFace`, `Reload`, `Log`.
 - Recipes `PB_CLSSD`, `PB_CLSSH`, `PB_CLSSJ`, `PB_CLSSK`, `PB_CLSSL`, `PB_CLSSM`, `Mdmoon`.
-- `install.sh` (`--remove`).
+- `install.sh` (`--remove`); `./install` runs it, and `a2mod` switches `Surfaces.asi`,
+  `Surfaces.ini` and `Surfaces/*.ini` as the `surfaces` layer.
+- Recipe keys `FissureShape=` (warp, share of borders kept) and `Cut=`: the moon's rock
+  split into plates by straight cracks, cut through as stock's are.
 
 Installed, not yet seen in game.

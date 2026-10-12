@@ -133,10 +133,13 @@ every branch out of the cell loops.
 - **Craters**: two sizes, each a lattice of cells of which a share holds one at a
   jittered point: a bowl, a raised rim, a faint apron. Bigger ones are shallower for
   their size.
-- **Fissures**: the borders of a Voronoi net, a third of them kept, warped hard so they
+- **Fissures**: the borders of a Voronoi net, a share of them kept, warped so they
   meander; a second, finer net branches off the first (`Branches`). Each cuts a trench
-  (the width given) and glows along its core (a third as wide). A single net drew a
-  cracked eggshell; this was the second try.
+  (the width given) and glows along its core (a third as wide). A single unwarped net
+  with every border drew a cracked eggshell on class D. Warped hard (2.5) with a third
+  kept they meander, which suits D and L's canyons; on the moon, the same warp drew
+  blobby loops where stock has straight cracks, so it runs barely warped (0.3) with most
+  borders kept, which splits the rock into plates (`FissureShape`).
 - **Colour** by height from a six-stop ramp, mixed by large soft regions with a second
   ramp (`Alt`), times a fine colour noise; the sea by depth from `Shallow` to `Deep`; ice
   towards the poles, ragged at its edge; and **cavities**: the height's curvature over a
@@ -184,6 +187,7 @@ pitch (up from its equator).
 | `Relief` | 0.02 | the height's scale against the radius, per field unit: the normal's tilt |
 | `Craters` | 0 12 1 0.3 | share of cells with one; cells across; depth; rim |
 | `Fissures` | 0 0.05 1 1 | cells across (0: none); trench width; depth; glow |
+| `FissureShape` | 2.5 0.33 | the warp on the fissures (high: meanders; low: straight cracks) and the share of the net's borders kept (high: plates, as on the moon) |
 | `Branches` | 0.6 | the finer net of fissures, against the first |
 | `Cut` | 0 | the glow at which an alpha-tested model is cut through (the moon) |
 | `Ramp1`..`Ramp6` | | `height r g b` (a gas giant: `0..1 r g b`, across one band) |

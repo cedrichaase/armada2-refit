@@ -13,7 +13,8 @@ surfaces 1.0.0, lighting 1.18.0, testbench 3.6.0
 - `surfaces/`: `Surfaces.asi`, planet surfaces (classes D, H, J, K, L, M) and the
   dilithium moon made from recipes as height fields baked into cubes, with relief,
   craters, fissures, oceans, ice and drifting clouds with shadows; drawn by
-  `Lighting.asi`. `./install` runs `surfaces/install.sh`. Not yet in `a2mod`.
+  `Lighting.asi`. `./install` runs `surfaces/install.sh`; `a2mod` switches it as the
+  `surfaces` layer.
 
 Installed, not yet seen in game.
 
