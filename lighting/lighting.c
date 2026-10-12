@@ -440,6 +440,16 @@ static Pick  g_sh_pick[SH_POINTS];
 static int   g_sh_npick;
 static float g_sh_sign = -1.0f;      /* -1: inward normals, as stock; +1: a mirrored draw */
 
+/* A mirrored draw's cull mode, turned round. The mirror reverses the winding of every
+ * triangle, and the engine culls as for any other draw: the outside of the hull was
+ * culled and the inside of its far side drawn (the Steamrunner whole, from every side).
+ * Once shadows were cast it showed, as the far side's inside lies in the near side's
+ * shadow. "Mirrored meshes", README. */
+static DWORD mirror_cull(DWORD c)
+{
+    return g_sh_sign > 0.0f && (c == 2 || c == 3) ? c ^ 1 : c;   /* CW <-> CCW */
+}
+
 /* Self-illumination. On the CPU path a hull whose material is an
  * ST3D_SelfIlluminatingMaterial is drawn twice (its NumPasses, slot 3, is 2): texture x
  * lit colour, then the texture alone blended SRCALPHA/INVSRCALPHA, so where the alpha
@@ -746,6 +756,7 @@ static int patch_set_material(void)
 
 typedef long (__stdcall *DIP8_t)(void *, DWORD, UINT, UINT, UINT, UINT);
 typedef long (__stdcall *D9Get_t)(void *, DWORD, DWORD *);
+typedef long (__stdcall *D9Set_t)(void *, DWORD, DWORD);
 typedef long (__stdcall *D9Get2_t)(void *, DWORD, DWORD, DWORD *);
 typedef long (__stdcall *D9Mat_t)(void *, DWORD, float *);
 typedef long (__stdcall *D9Light_t)(void *, DWORD, LIGHT8 *);
@@ -1090,7 +1101,12 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     }
     d9_bind(d9, vs, ps);
     sm_bind(d9);
-    r = g_dip(dev, pt, mi, nv, si, pc);
+    {   DWORD cull = 0;
+        D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &cull);                  /* CULLMODE */
+        if (mirror_cull(cull) != cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, mirror_cull(cull));
+        r = g_dip(dev, pt, mi, nv, si, pc);
+        if (mirror_cull(cull) != cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
+    }
     sm_unbind(d9);
     d9_restore(d9, &sv);
     if (rec) sm_keep(&rc, g_vb_mesh);
@@ -1467,7 +1483,6 @@ static void sm_col(const float *w, const float *a, float *c)
         c[i] = w[i * 4] * a[0] + w[i * 4 + 1] * a[1] + w[i * 4 + 2] * a[2] + w[i * 4 + 3] * a[3];
 }
 
-static int g_dbgskip;
 /* The map, from the list g_sm_rec[l]. */
 static void sm_render(void *d9, int l, const float *fwd)
 {
@@ -1523,15 +1538,6 @@ static void sm_render(void *d9, int l, const float *fwd)
     /* half a texel plus a little: the normal offset does the rest */
     g_sm_bias = (0.5f * texel + 0.2f) / zr;
 
-    if (g_sm_maps % 500 == 3) {
-        for (i = 0; i < n; i++) {
-            char b[240];
-            b[0] = 0; s_cat(b, "DBG rec "); s_num(b, i); s_cat(b, " c "); s_vec(b, R[i].c); s_cat(b, " r "); s_flt(b, R[i].r);
-            s_cat(b, " nv "); s_num(b, (long)R[i].nv); s_cat(b, " pc "); s_num(b, (long)R[i].pc); s_cat(b, " dot3 "); s_num(b, R[i].dot3);
-            s_cat(b, " pt "); s_num(b, (long)R[i].pt);
-            logline(b);
-        }
-    }
     if (++g_sm_maps == 1 || g_sm_maps == 1000) {
         char b[200];
         b[0] = 0; s_cat(b, "shadows: map "); s_num(b, g_sm_maps); s_cat(b, " of ");
@@ -1566,15 +1572,8 @@ static void sm_render(void *d9, int l, const float *fwd)
         k[0] = 1.0f / (float)g_sm_size; k[1] = k[2] = k[3] = 0.0f;
         d9_vsconst(d9, 12, k, 1);
     }
-    {   static char dbgini[320]; static int dbgt;
-        if (!dbgini[0]) { s_cat(dbgini, g_logpath); dbgini[s_len(dbgini) - 3] = 0; s_cat(dbgini, "ini"); }
-        if ((dbgt++ & 31) == 0) g_dbgskip = (int)GetPrivateProfileIntA("Lighting", "DbgSkip", 0, dbgini); }
     for (i = 0; i < n; i++) {
         float s[12];
-        if ((g_dbgskip & 1) && R[i].dot3) continue;
-        if ((g_dbgskip & 2) && R[i].nv <= 4) continue;
-        if ((g_dbgskip & 4) && R[i].nv < 300 && !R[i].dot3) continue;
-        if ((g_dbgskip & 8) && R[i].nv >= 300) continue;
         sm_col(R[i].w, g_sm_ls, s);
         sm_col(R[i].w, g_sm_ls + 4, s + 4);
         sm_col(R[i].w, g_sm_ls + 8, s + 8);
@@ -1649,22 +1648,6 @@ static int sm_take(void *d8, void *d9, SmRec *r, DWORD pt, UINT mi, UINT nv, UIN
             D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 20, &db);   /* DESTBLEND */
         }
         g_sm_trans = (ab && !(sb == 2 && db == 1)) || at;         /* ONE, ZERO: opaque */
-        {   static int cnt; DWORD zw = 9, ze = 9, cw = 9, cull = 9, op = 9, aop = 9, a1 = 9, c1 = 9;
-            void *t0 = NULLPTR, *t1 = NULLPTR;
-            if ((nv == 458 || nv == 3361 || nv == 254 || nv == 5011) && cnt++ < 16) {
-                char b[260];
-                D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 14, &zw); D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 7, &ze);
-                D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 168, &cw); D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &cull);
-                D9_FN(d9, D9_GETTEXTURE, SmGetTex_t)(d9, 0, &t0); D9_FN(d9, D9_GETTEXTURE, SmGetTex_t)(d9, 1, &t1);
-                sm_unref(t0); sm_unref(t1);
-                b[0] = 0; s_cat(b, "DBG draw nv "); s_num(b, (long)nv); s_cat(b, " zwrite "); s_num(b, (long)zw); s_cat(b, " zen "); s_num(b, (long)ze);
-                s_cat(b, " cwrite "); s_num(b, (long)cw); s_cat(b, " cull "); s_num(b, (long)cull); s_cat(b, " ab "); s_num(b, (long)ab);
-                s_cat(b, " src "); s_num(b, (long)sb); s_cat(b, " dst "); s_num(b, (long)db); s_cat(b, " tex0 "); s_num(b, (long)(DWORD)t0);
-                s_cat(b, " tex1 "); s_num(b, (long)(DWORD)t1); s_cat(b, " mi "); s_num(b, (long)mi); s_cat(b, " si "); s_num(b, (long)si);
-                s_cat(b, " pc "); s_num(b, (long)pc); s_cat(b, " base "); s_num(b, (long)base);
-                logline(b); (void)op; (void)aop; (void)a1; (void)c1;
-            }
-        }
     }
     r->base = (int)base; r->dot3 = dot3;
     r->pt = pt; r->mi = mi; r->nv = nv; r->si = si; r->pc = pc;
@@ -1762,9 +1745,6 @@ static void sm_keep(SmRec *r, const BYTE *mesh)
     const float *w = g_sh_w, *lc;
     float  s = 0.0f, rad = 200.0f;
     int    i;
-    {   static long nk, nt, nm; nk++; if (g_sm_trans) nt++; if (!mesh) nm++;
-        if (nk % 3000 == 0) { char b[160]; b[0] = 0; s_cat(b, "DBG keep "); s_num(b, nk); s_cat(b, " trans "); s_num(b, nt);
-            s_cat(b, " nomesh "); s_num(b, nm); logline(b); } }
     if (g_sm_n[g_sm_cur] >= SM_MAX || !mesh) {
         static int said;
         if (!said && mesh) { said = 1; logline("shadows: more hull draws in a frame than the list holds; the rest cast none"); }
@@ -1866,6 +1846,7 @@ static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT
         for (j = 0; j < 13; j++) D9_FN(d9, D9_GETSAMPLERSTATE, D9GetSamp_t)(d9, (DWORD)i, (DWORD)j + 1, &r->samp[i][j]);
     }
     D9_FN(d9, D9_GETRENDERSTATE, D9Get_t)(d9, 22, &r->cull);                /* CULLMODE */
+    r->cull = mirror_cull(r->cull);
     D9_FN(d9, FD_GETVSCONST, FdConst_t)(d9, 0, r->vc, FD_VS);
     D9_FN(d9, FD_GETPSCONST, FdConst_t)(d9, 0, r->pc4, FD_PS);
     r->inst = eng ? *(void **)(eng + 0x100) : NULLPTR;
