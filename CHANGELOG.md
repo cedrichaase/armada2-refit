@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.22.4 — 2026-10-12
+
+Layers: qol 1.6.1, grid 1.0.1.
+
+### Fixed
+- `QOLRules.asi`: losing a producer refunds its item in progress once, officers included
+  once; the network rules latch is cleared at every game start; a delete order still
+  finds an item that started while it was on the way (qol 1.6.1).
+- `QOL.ini` refuses numbers too long to parse (qol 1.6.1).
+- `GridLayout.asi`: keys press nothing while the bar is hidden (grid 1.0.1).
+
+Installed, not yet seen in game.
+
 ## 11.22.3 — 2026-10-12
 
 Layers: menus 4.3.3.
