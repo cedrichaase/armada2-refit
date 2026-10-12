@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.12.0 — 2026-10-13
+
+### Added
+- `SCENE=asteroids`: an asteroid field (`mafield`) and a big one (`mafield2`) beside a
+  Galaxy class, for the asteroids' surfaces and smoothing.
+
+Installs nothing; seen working on the bench 2026-10-13.
+
 ## 3.11.0 — 2026-10-12
 
 ### Added

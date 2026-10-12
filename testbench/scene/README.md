@@ -38,6 +38,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `explosion` | a Galaxy class beside a destroyer (`small`), a cruiser (`mid`) and a battleship (`big`), none firing, to blow up with `kill`, for the explosions (`explosions/README.md`, `scenarios/explosions.md`) | 2026-10-12 |
 | `shields` | a Galaxy class (phasers) and a Klingon battleship (`kbattle`, torpedoes) firing at a second Galaxy (`target`) as in `firing`: the target healed, its shields holding. For the shield hits (`shields/README.md`, `scenarios/shields-hits.md`) | 2026-10-12 |
 | `fog` | three of the player's ships (`ship1`, `ship2`, `scout`) at 3000,0,3000 with the map's fog and shroud on (`Fog=1`) and the HUD on for the minimap; `goto scout ...` leaves fog of war behind. For the fog's and shroud's edges (`fog/README.md`, `scenarios/fog-edges.md`) | 2026-10-12 |
+| `asteroids` | an asteroid field (`field`, `mafield`: 4–8 rocks) and a big one (`big`, `mafield2`: 3–6 larger rocks), 500 apart, beside a Galaxy class with its engines off; the rocks are drawn at random from the field's models, so a session shows some of them, and `spawn` adds more fields. For the asteroids' surfaces and smoothing (`surfaces/README.md`, `models/README.md`, "The asteroids") | 2026-10-13 |
 
 ## Scene files
 

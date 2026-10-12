@@ -6,6 +6,17 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 4.3.0 — 2026-10-13
+
+### Added
+- `asteroid-sod.py` (`--install`, `--revert`, `--status`, `--split`, `--crease`, `--out`):
+  the nine asteroid models, `Master.SOD` and `Master1..8.SOD`, re-tessellated as PN
+  patches at `--split 4` (36–100 triangles a rock become 576–1,600), the sharpest edges
+  kept at `--crease 55`; stock pinned by hash, `--split 1` byte for byte. `install.sh`
+  runs it, `--remove` reverts it.
+
+Installed, not yet seen in game.
+
 ## 4.2.0 — 2026-10-07
 
 ### Added

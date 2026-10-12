@@ -31,6 +31,11 @@ typedef struct {
      *   k[3] x: the relief's strength in the light (1: as baked); y: 1 with clouds;
      *        z: 1 when the albedo's alpha is a cut-out (Cut=), else it is wetness */
     float  k[4][4];
+    /* A model in the hull shaders (planets ignore it):
+     *   model[0]: its lookup (Mapping=): 0 the direction from its centre, 1 triplanar,
+     *             each axis's cube faces across the model's extents
+     *   model[1]: its highlight, times the hulls' (Gloss=; 1 as a hull) */
+    float  model[4];
 } A2Surface;
 
 typedef int (__cdecl *A2SurfaceFn)(void *dev8, const char *name, A2Surface *out);

@@ -1152,16 +1152,36 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
         if (rec) sm_keep(&rc, g_vb_mesh);
         return 0;
     }
-    {   /* a model whose texture has a recipe in Surfaces.asi (the dilithium moons) */
+    {   /* a model whose texture has a recipe in Surfaces.asi (the dilithium moons, the
+         * asteroids). The cubes are looked up about the mesh's bounding-sphere centre
+         * (+0xd4, object space), taken to world space: an asteroid's origin can sit near
+         * its surface (Master7's is 3.8 units from it, 38 from its far end). The point
+         * is scaled to the mesh's extents about that centre, read off its positions
+         * (+0xc0, count +0xc8), so each axis runs -1..1 across the mesh: on a rock four
+         * times as long as it is wide, the plain direction drew every feature out along
+         * it, and the triplanar lookup (Mapping=triplanar) needs the range. */
         A2Surface msf;
         void *mps = g_vb_mesh && surface_fn() ? d9_shader(d9, &g_moon_ps) : NULLPTR;
         if (mps && hull_surface(dev, g_vb_mesh, &msf)) {
-            float k[8 * 4];
+            const float *lc = (const float *)(g_vb_mesh + 0xd4);
+            const float *pos = *(const float *const *)(g_vb_mesh + 0xc0);
+            int   npos = *(const int *)(g_vb_mesh + 0xc8);
+            float k[9 * 4], ex[3] = { 0.0f, 0.0f, 0.0f }, rad = *(const float *)(g_vb_mesh + 0xe0);
             int   i, j;
             for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) k[i * 4 + j] = i < 3 && j < 3 ? g_sh_w[i * 4 + j] : 0.0f;
-            for (j = 0; j < 3; j++) k[12 + j] = g_sh_w[12 + j];
+            for (j = 0; j < 3; j++) k[12 + j] = lc[0] * g_sh_w[j] + lc[1] * g_sh_w[4 + j] + lc[2] * g_sh_w[8 + j] + g_sh_w[12 + j];
             for (i = 0; i < 16; i++) k[16 + i] = msf.k[i / 4][i % 4];
-            d9_psconst(d9, 72, k, 8);
+            if (pos && npos > 0 && npos < 65536)
+                for (i = 0; i < npos; i++) for (j = 0; j < 3; j++) {
+                    float e = pos[i * 3 + j] - lc[j];
+                    if (e < 0.0f) e = -e;
+                    if (e > ex[j]) ex[j] = e;
+                }
+            if (!(rad > 0.0f)) rad = 1.0f;
+            for (j = 0; j < 3; j++) k[32 + j] = 1.0f / (ex[0] > 0.0f && ex[1] > 0.0f && ex[2] > 0.0f ? ex[j] : rad);
+            k[31] = msf.model[0];                   /* c79.w: Mapping=triplanar */
+            k[35] = msf.model[1];                   /* c80.w: Gloss= */
+            d9_psconst(d9, 72, k, 9);
             sf_bind(d9, &msf, 4, 2);
             ps = mps;
             g_sh_surf++;

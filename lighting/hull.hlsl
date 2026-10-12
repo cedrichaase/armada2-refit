@@ -170,8 +170,9 @@ float planet_shadow(float3 wp)
 // Everything after the normal: the lights, the texture (t, sampled by the caller), the
 // night lights, the shoulder.
 // N is the normal as the stock meshes have it (inward), the one the device's directional
-// lights pair with; misc.x turns it round. sc: the point in the shadow map.
-float4 shade_t(float3 N, float3 wp, float4 t, float3 sc)
+// lights pair with; misc.x turns it round. sc: the point in the shadow map. gk: the
+// highlight times this (a model's Gloss=; 1 for a hull).
+float4 shade_g(float3 N, float3 wp, float4 t, float3 sc, float gk)
 {
     float3 Nt = N * misc.x;                  // the outward normal: stock's are inward
     float3 V  = normalize(eye.xyz - wp);
@@ -203,7 +204,7 @@ float4 shade_t(float3 N, float3 wp, float4 t, float3 sc)
     // its outline against space.
     sum += rim_col.rgb * pow(1.0 - saturate(dot(Nt, V)), shine.z);
     // Gloss from the texture's brightness: pale plating shines, dark seams do not.
-    float gloss = dot(t.rgb, float3(0.299, 0.587, 0.114));
+    float gloss = dot(t.rgb, float3(0.299, 0.587, 0.114)) * gk;
     // The light is not clamped at 1: a Key above 1 (HullSun), an explosion or a
     // torpedo beside the hull drive the plating past its texture, and the shoulder
     // below takes it towards white.
@@ -213,6 +214,11 @@ float4 shade_t(float3 N, float3 wp, float4 t, float3 sc)
     // above 1, the night lights brighter than the texture.
     float3 c = lerp(lit, t.rgb * max(misc.y, 1.0), saturate(t.a * min(misc.y, 1.0)));
     return float4(shoulder(c, misc.z), misc.w < 1.0 ? misc.w : t.a * base.a);
+}
+
+float4 shade_t(float3 N, float3 wp, float4 t, float3 sc)
+{
+    return shade_g(N, wp, t, sc, 1.0);
 }
 
 float4 shade(float3 N, float3 wp, float2 uv, float3 sc)
@@ -283,30 +289,68 @@ float4 bump_ps(Bumped i) : COLOR
     return shade(l > 1e-5 ? -b / l : -Nt, i.wp, i.uv, i.sc);
 }
 
-// A model whose texture has a recipe in Surfaces.asi (surfaces/README.md; in stock the
-// dilithium moons' Mdmoon): the colour, the relief and the cut-out from three cubes in
-// the direction from the model's origin, in its own frame, in place of the texture.
+// A model whose texture has a recipe in Surfaces.asi (surfaces/README.md: the dilithium
+// moons' Mdmoon, the asteroids' Master1 and Master2): the colour, the relief and the
+// cut-out from three cubes in the direction from the mesh's centre, in its own frame, in
+// place of the texture.
 // The relief tilts the mesh's own normal, so the rock keeps its lumpy shape; the
 // albedo's alpha is the cut-out the engine's alpha test makes holes of, through which
 // the glow shell shows; the relief's alpha glows along the holes' edges.
 float4 msurf_rows[3] : register(c72);  // WORLD's three axes (object to world)
-float4 msurf_ctr     : register(c75);  // WORLD's translation: the model's origin
+float4 msurf_ctr     : register(c75);  // the mesh's bounding-sphere centre, world space
 float4 msurf_glow    : register(c76);  // rgb: the glow's colour; a: how much shows by day (unused)
-float4 msurf_misc    : register(c79);  // x: the relief's strength; z: 1 when the albedo's alpha cuts
+float4 msurf_misc    : register(c79);  // x: the relief's strength; z: 1 when the albedo's alpha cuts;
+                                       // w: 1 for Mapping=triplanar
+float4 msurf_ext     : register(c80);  // xyz: 1 / the mesh's extent about its centre, per object axis;
+                                       // w: the highlight's strength (Gloss=, 1 as a hull)
 samplerCUBE m_albedo : register(s4);
 samplerCUBE m_relief : register(s5);
 
 float4 moon_ps(Lit i) : COLOR
 {
     float3 v  = i.wp - msurf_ctr.xyz;
-    float3 d  = normalize(float3(dot(v, msurf_rows[0].xyz), dot(v, msurf_rows[1].xyz), dot(v, msurf_rows[2].xyz)));
-    float4 A  = texCUBE(m_albedo, d);
-    float4 B  = texCUBE(m_relief, d);
+    // object space (the axes carry WORLD's scale, squared in the dot products), over the
+    // extents: each axis -1..1 across the mesh, and a long rock looked up as if round
+    float3 q  = float3(dot(v, msurf_rows[0].xyz), dot(v, msurf_rows[1].xyz), dot(v, msurf_rows[2].xyz))
+              / max(dot(msurf_rows[0].xyz, msurf_rows[0].xyz), 1e-12) * msurf_ext.xyz;
+    float4 A, B;
+    float3 p;
+    if (msurf_misc.w > 0.5) {
+        // Triplanar (Mapping=triplanar: the asteroids): along each object axis, the cube
+        // face on that axis at the point's other two coordinates, one continuous picture
+        // per axis side, blended by how squarely the surface faces each. The direction from
+        // the centre smears wherever a face runs along it (the flat end of a rock, a
+        // box-like side). The slope baked at (±1, y, z) is the height's gradient across
+        // the y-z plane, which is the normal's tilt for that projection on either side.
+        float3 no = float3(dot(i.n, msurf_rows[0].xyz), dot(i.n, msurf_rows[1].xyz), dot(i.n, msurf_rows[2].xyz));
+        float3 w  = pow(abs(no) / max(length(no), 1e-6), 4.0);
+        // Each side takes its own face, +x or -x, by the way it faces: the switch falls
+        // where that projection's weight is nought.
+        float3 cq = clamp(q, -1.0, 1.0);
+        float3 sd = no >= 0.0 ? 1.0 : -1.0;
+        float4 Ax = texCUBE(m_albedo, float3(sd.x, cq.y, cq.z)), Bx = texCUBE(m_relief, float3(sd.x, cq.y, cq.z));
+        float4 Ay = texCUBE(m_albedo, float3(cq.x, sd.y, cq.z)), By = texCUBE(m_relief, float3(cq.x, sd.y, cq.z));
+        float4 Az = texCUBE(m_albedo, float3(cq.x, cq.y, sd.z)), Bz = texCUBE(m_relief, float3(cq.x, cq.y, sd.z));
+        w /= max(w.x + w.y + w.z, 1e-6);
+        A = Ax * w.x + Ay * w.y + Az * w.z;
+        B = Bx * w.x + By * w.y + Bz * w.z;
+        p = (Bx.rgb - 0.5) * float3(0.0, 1.0, 1.0) * w.x
+          + (By.rgb - 0.5) * float3(1.0, 0.0, 1.0) * w.y
+          + (Bz.rgb - 0.5) * float3(1.0, 1.0, 0.0) * w.z;
+    } else {
+        float3 d = normalize(q);
+        A = texCUBE(m_albedo, d);
+        B = texCUBE(m_relief, d);
+        p = B.rgb - 0.5;
+    }
     A.a = lerp(1.0, A.a, msurf_misc.z);                     // opaque unless the recipe cuts
-    float3 p  = (B.rgb - 0.5) * msurf_misc.x;
-    float3 pw = p.x * msurf_rows[0].xyz + p.y * msurf_rows[1].xyz + p.z * msurf_rows[2].xyz;
+    p *= msurf_misc.x;
+    // to world space without WORLD's scale: an asteroid is drawn at 2 to 2.7 times its
+    // model, which would tilt its normal by that much more
+    float3 pw = (p.x * msurf_rows[0].xyz + p.y * msurf_rows[1].xyz + p.z * msurf_rows[2].xyz)
+              * rsqrt(max(dot(msurf_rows[0].xyz, msurf_rows[0].xyz), 1e-12));
     float3 N  = normalize(normalize(i.n) + pw * misc.x);   // stock normals are inward
-    float4 c  = shade_t(N, i.wp, A, i.sc);
+    float4 c  = shade_g(N, i.wp, A, i.sc, msurf_ext.w);   // rock is not plating: Gloss=
     c.rgb += msurf_glow.rgb * B.a;
     return c;
 }

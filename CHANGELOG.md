@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.35.0 — 2026-10-13
+
+Layers: surfaces 1.1.0, lighting 1.23.0, models 4.3.0, testbench 3.12.0.
+
+### Added
+- The asteroids are smoothed (`models/asteroid-sod.py`; models 4.3.0) and drawn from
+  recipes, `Master1` and `Master2`: cratered rock baked into cubes, looked up triplanar,
+  lit per pixel with its own relief (surfaces 1.1.0, lighting 1.23.0).
+- Recipe keys `Face=`, `Mapping=` and `Gloss=` (surfaces 1.1.0).
+- `SCENE=asteroids` on the bench (testbench 3.12.0).
+
+### Changed
+- A model with a recipe is looked up about its mesh's centre, scaled to its extents,
+  and its relief no longer scales with its size (lighting 1.23.0).
+
+Installed, not yet seen in game.
+
 ## 11.34.1 — 2026-10-13
 
 Layers: nebulae 1.5.1.

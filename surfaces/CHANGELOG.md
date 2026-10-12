@@ -4,6 +4,21 @@
 `Lighting.asi`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.0 — 2026-10-13
+
+### Added
+- Recipes `Master1` and `Master2`: the asteroid fields' rock (`Master.SOD`,
+  `Master1..7.SOD`), matte grey stone with big and small crater bowls over lumpy ground,
+  at `Face=1024`; their bake takes 126–173 ms each.
+- Recipe keys `Face=` (the recipe's own cube edge, in place of `Surfaces.ini`'s),
+  `Mapping=triplanar` (a model's lookup: each axis's two cube faces across its extents,
+  blended by the surface's facing, instead of the direction from its centre) and
+  `Gloss=` (a model's highlight times the hulls'; 1 as before).
+- `A2Surface.model[4]` in `surfaces.h` (`Mapping=`, `Gloss=`); the struct's size changes,
+  so a `Lighting.asi` older than 1.23.0 draws the stock textures.
+
+Installed, not yet seen in game.
+
 ## 1.0.1 — 2026-10-12
 
 ### Fixed
