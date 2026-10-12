@@ -28,6 +28,8 @@
 #   shields    shields/install.sh            Shields.asi: shield hits and the shields-down
 #                                            arcs drawn by shaders
 #   repair     repair/install.sh             Repair.asi: the repair welding drawn by shaders
+#   fog        fog/install.sh                Fog.asi: the fog of war and the shroud with
+#                                            smooth edges
 #   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
 #                                            $A2_DATA/movies
 #
@@ -61,4 +63,5 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/explosions/install.sh"
 "$here/shields/install.sh"
 "$here/repair/install.sh"
+"$here/fog/install.sh"
 "$here/cutscenes/binkproxy/install.sh"

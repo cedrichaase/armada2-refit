@@ -37,6 +37,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `warp` | three of the player's Federation destroyers in open space at 3000,0,3000, with the HUD and cursor on, for long moves on the map going to warp (`scenarios/qol-warp.md`) | 2026-10-07 |
 | `explosion` | a Galaxy class beside a destroyer (`small`), a cruiser (`mid`) and a battleship (`big`), none firing, to blow up with `kill`, for the explosions (`explosions/README.md`, `scenarios/explosions.md`) | 2026-10-12 |
 | `shields` | a Galaxy class (phasers) and a Klingon battleship (`kbattle`, torpedoes) firing at a second Galaxy (`target`) as in `firing`: the target healed, its shields holding. For the shield hits (`shields/README.md`, `scenarios/shields-hits.md`) | 2026-10-12 |
+| `fog` | three of the player's ships (`ship1`, `ship2`, `scout`) at 3000,0,3000 with the map's fog and shroud on (`Fog=1`) and the HUD on for the minimap; `goto scout ...` leaves fog of war behind. For the fog's and shroud's edges (`fog/README.md`, `scenarios/fog-edges.md`) | 2026-10-12 |
 
 ## Scene files
 

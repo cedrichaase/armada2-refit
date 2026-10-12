@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.11.0 — 2026-10-12
+
+### Added
+- `SCENE=fog`: three of the player's ships with the map's fog and shroud on and the HUD
+  on, for `Fog.asi`.
+- Scenario `fog-edges`: the plugin's hooks, both layers drawn through the shader, a
+  near and a far shot. `no-assets` also expects `Fog.log`'s hooks line.
+- The bench clears `Fog.log` at launch and gathers it with `Fog.ini`.
+
+Installs nothing; seen working on the bench 2026-10-12 (`fog-edges` passes; `no-assets`
+passes its `Fog.log` step).
+
 ## 3.10.0 — 2026-10-12
 
 ### Added
