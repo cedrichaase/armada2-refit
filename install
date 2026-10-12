@@ -25,6 +25,7 @@
 #                                            volumes of gas, for each class with a recipe
 #   explosions explosions/install.sh         Explosions.asi: fireballs drawn as gas, shockwaves
 #                                            as rings of light
+#   shields    shields/install.sh            Shields.asi: shield hits drawn by a shader
 #   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
 #                                            $A2_DATA/movies
 #
@@ -56,4 +57,5 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/surfaces/install.sh"
 "$here/nebulae/install.sh"
 "$here/explosions/install.sh"
+"$here/shields/install.sh"
 "$here/cutscenes/binkproxy/install.sh"

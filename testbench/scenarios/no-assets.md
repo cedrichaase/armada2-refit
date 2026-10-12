@@ -15,6 +15,8 @@ both of its sites in `Armada2.exe` were found and patched, and `QOL.asi`'s that 
 the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Sky.asi` needs none either:
 its recipes are code, and its log says it found and patched `Background_Render`.
 `Explosions.asi` draws its fireballs from noise it makes itself, and says it patched them.
+Nor does `Shields.asi`: its shield hits are procedural, and its log says its hooks were
+patched.
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -26,7 +28,8 @@ its recipes are code, and its log says it found and patched `Background_Render`.
 8. Expect "QOL.log" contains "FASTSCROLL_COEFFICIENT now 0.0125".
 9. Expect "Sky.log" contains "Background_Render patched".
 10. Expect "Explosions.log" contains "FireballExplosion::Submit and RenderChunks patched".
-11. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
-12. Quit the game.
-13. Expect the game to have exited.
-14. Expect no crash.
+11. Expect "Shields.log" contains "DrawShield and RenderChunks patched".
+12. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
+13. Quit the game.
+14. Expect the game to have exited.
+15. Expect no crash.

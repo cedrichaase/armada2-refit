@@ -41,6 +41,7 @@ it bundles.
 | `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
 | `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M) and the dilithium moon's rock made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
 | `explosions/` | `Explosions.asi` — each ship's and station's fireball ray-marched as a volume of gas (white flash, burning billows cooling to smoke, spectral noise, seeded per explosion) and each shockwave drawn as a ring of light, in place of stock's flipbook sprites and textured disc. Render only. Not in the release package yet | `explosions/README.md` |
+| `shields/` | `Shields.asi` — the ordinary shield hits drawn by a shader over the struck ship's shield ellipsoid (hot spot, ring, soft glow and rim, by faction, weaker as the shields run out) in place of the stock `Xshldx01` shell. Not in the release package yet | `shields/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation) and the smoothed dilithium moons (`moon-sod.py`) | `models/README.md` |
@@ -768,6 +769,22 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   then `Enable=0`, which `Reload=1` picks up): judge a change that way, at RTS
   distance as well as close up. Milky beige meant dim white light behind smoke, not
   the colour ramp.
+
+### shields
+
+- **Only type 0 (`Xshldx01`, the ordinary hit) is the plugin's**: the call to
+  `ShieldHit::DrawShield` in `ShieldEffect::Render` skips it, every other shield type
+  (the shields-down ring, the special weapons' shells) calls through to stock. Without a
+  d3d9 device the stock shell stays.
+- **A hit's direction is recovered, not captured**: the instance transform is the hit's
+  frame times the shield-to-object 3x3 with its diagonal over the model's radius
+  (+0x40); row 2 times S'^-1 is the direction on the unit sphere. That follows a beam as
+  `ShieldUpdate` moves it. Don't re-derive it from the beam's end.
+- **Every hook is a chained call site** (DrawShield, RenderChunks, the four weapon
+  calls of `CreateShieldHit`): keep it so; `Scene.asi`'s `ShieldFx=0` and other plugins
+  write the same weapon sites.
+- **Render only**: nothing the simulation reads is written, so it stays
+  stock-compatible in multiplayer. The clock is wall time; `TimeScale=` is for looking.
 
 ### textures
 

@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.9.0 — 2026-10-12
+
+### Added
+- `SCENE=shields`: a Galaxy (phasers) and a Klingon battleship (torpedoes) firing at a
+  second, healed Galaxy, for `Shields.asi`.
+- Scenario `shields-hits`: the plugin's hooks, beam and missile hits drawn, three shots.
+  `no-assets` also expects `Shields.log`'s hooks line.
+- The bench clears `Shields.log` at launch and gathers it with `Shields.ini`.
+
+Installs nothing; seen working on the bench 2026-10-12 (both scenarios pass).
+
 ## 3.8.0 — 2026-10-12
 
 ### Added
