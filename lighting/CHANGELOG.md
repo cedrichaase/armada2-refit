@@ -4,6 +4,22 @@
 in place of each map's own, and light sources. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.24.0 — 2026-10-13
+
+### Added
+- `Cloak=1`: one's own cloaking and cloaked ships drawn as thick glass at `Flush`. What
+  is behind the hull is bent along its surface (a per-hull copy of the frame, `cloak_ps`),
+  each colour by a different amount, with a slow ripple, a rim and the Key's glint. While
+  cloaking, the hull goes patch by patch behind a glowing front. Keys `CloakBend`,
+  `CloakSplit`, `CloakRipple`, `CloakSpeed`, `CloakTint`, `CloakRim`, `CloakRimColour`,
+  `CloakGlint`, `CloakHull`, `CloakFront`, `CloakFrontColour`, `CloakReload`.
+
+### Changed
+- `hook_flush`, `PolygonSortRequired` and the `Reset` wrapper are patched for `NearFade=1`
+  or `Cloak=1`, not only the former.
+
+Installed, not yet seen in game.
+
 ## 1.23.0 — 2026-10-13
 
 ### Added

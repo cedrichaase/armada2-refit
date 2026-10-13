@@ -36,7 +36,7 @@ it bundles.
 | `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several, long moves on the map at warp), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
-| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key | `lighting/README.md` |
+| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key; cloaked ships as thick glass | `lighting/README.md` |
 | `sky/` | `Sky.asi` — the map's sky computed from view direction by a shader, baked once per map into a cube, in place of the six painted faces; recipes per sky name in `sky/skies/` | `sky/README.md` |
 | `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
 | `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M), the dilithium moon's rock and the asteroids' made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
@@ -695,6 +695,13 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   is wrapped.
 - **`ALPHABLENDENABLE` is on for opaque hulls** (ONE, ZERO). Judge a draw blended by its
   blend factors, never by that flag: 1.17.2 did, and left every hull out of the map.
+- **A cloak is two things, told apart by `cloak_state`**: while it comes on or goes off,
+  the vertex-alpha callback at the engine's +0x110; fully on, the engine's material
+  (+0x20) hung on the instance's +0x4, in place of every mesh's own. `Cloak=1` claims
+  both from `PolygonSortRequired` and draws the hull as glass at `Flush` over a copy of
+  the frame under it. A fully cloaked hull's texture is the cloak material's, so never
+  read the hull's look from it. On the bench, cloak with Scene.asi's `cloak` command:
+  `ScriptInterfaceImp::Cloak` wants the device researched and refuses.
 - **A mirrored draw needs its cull mode swapped** (`hook_dip`, `g_sh_sign > 0`): the
   mirror flips the winding, and the Steamrunner, mirrored whole, drew inside out. A hull that goes dark
   whole under shadows is drawn inside out, not acne: check the cull before the bias.

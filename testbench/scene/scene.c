@@ -147,6 +147,12 @@ int _fltused = 0;   /* floats without the CRT */
 #define SI_MAX_HEALTH    0x456da0u
 #define SI_CANNOT_DIE    0x457590u
 #define SI_EXPLODE_NOW   0x456cf0u   /* ScriptInterfaceImp::ExplodeNow(int): a craft dies now, as a mission script blows one up */
+#define GO_CLOAK_NOW     0x4d03e0u   /* GameObject::ImmediateCloak: thiscall, fully cloaked at once */
+#define SI_SET_ENERGY    0x456280u   /* SetSpecialEnergy(int, float): what cloaking draws on */
+#define CRAFT_ENERGY     0x16c       /* a craft's special energy, float */
+#define CRAFT_MAX_ENERGY 0x168       /* and its maximum */
+#define OBJECT_CLOAK     0x108       /* a GameObject's cloaking device, if any: its state at +0x3c
+                                      * (0 visible, 1 cloaking, 2 cloaked, 3 decloaking) */
 #define SI_INSTANCE      ((void *)0x735c40u)
 #define TACTICAL_CAMERA  0x763650u
 #define CAMERA_INTEREST  0x98u
@@ -259,6 +265,8 @@ static const Sig k_sigs[] = {
     { SI_MAX_HEALTH,    8, P_SI_HANDLE },
     { SI_CANNOT_DIE,    8, P_SI_HANDLE },
     { SI_EXPLODE_NOW,   8, P_SI_HANDLE },
+    { GO_CLOAK_NOW,     8, { 0x8B, 0x89, 0x08, 0x01, 0x00, 0x00, 0x85, 0xC9 } },
+    { SI_SET_ENERGY,    8, P_SI_HANDLE },
     { PL_START_COLONY,  8, { 0x55, 0x8B, 0xEC, 0xA1, 0x84, 0x10, 0x76, 0x00 } },
     { PL_SET_POP,       8, { 0x55, 0x8B, 0xEC, 0xD9, 0x45, 0x08, 0xD8, 0x1D } },
     { PL_MAX_POP,       8, { 0x8B, 0x41, 0x40, 0x8B, 0x80, 0x90, 0x04, 0x00 } },
@@ -444,6 +452,7 @@ typedef struct {
     char  attack[32];   /* the object this one is ordered to attack, if any */
     int   handle;
     int   heal;         /* topped up to full health every tick */
+    int   cloak;        /* `cloak` on: special energy kept full, so the cloak holds */
 } Obj;
 
 static Obj   g_obj[MAX_OBJECTS];
@@ -526,6 +535,7 @@ static Obj *spawn(const char *name, const char *odf, int team,
     s_cpy(o->name, name, sizeof o->name);
     o->attack[0] = 0;
     o->heal = 0;
+    o->cloak = 0;
     o->handle = *(int *)((BYTE *)go + OBJECT_HANDLE);
     s_cat(b, " team ");
     s_num(b, team);
@@ -567,6 +577,10 @@ static void heal_all(void)
     for (i = 0; i < g_nobj; i++) {
         float max;
         BYTE *go;
+        if (g_obj[i].cloak && (go = (BYTE *)((EntityGetFn)ENTITY_GET)(g_obj[i].handle)) &&
+            (*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT) &&
+            *(float *)(go + CRAFT_ENERGY) < *(float *)(go + CRAFT_MAX_ENERGY))
+            ((SiSetHealthFn)SI_SET_ENERGY)(SI_INSTANCE, g_obj[i].handle, *(float *)(go + CRAFT_MAX_ENERGY));
         if (!g_obj[i].heal) continue;
         max = ((SiMaxHealthFn)SI_MAX_HEALTH)(SI_INSTANCE, g_obj[i].handle);
         ((SiSetHealthFn)SI_SET_HEALTH)(SI_INSTANCE, g_obj[i].handle, max);
@@ -996,6 +1010,12 @@ static void query(void)
         if (g_obj[i].heal) s_cat(b, " healed");
         {
             BYTE *o = (BYTE *)((EntityGetFn)ENTITY_GET)(g_obj[i].handle);
+            if (o && (*(DWORD *)(o + OBJECT_FLAGS) & FLAG_CRAFT) && *(BYTE **)(o + OBJECT_CLOAK)) {
+                static const char *const st[4] = { "visible", "cloaking", "cloaked", "decloaking" };
+                DWORD c = *(DWORD *)(*(BYTE **)(o + OBJECT_CLOAK) + 0x3c);
+                s_cat(b, " cloak ");
+                s_cat(b, c < 4 ? st[c] : "?");
+            }
             if (o && (*(DWORD *)(o + OBJECT_FLAGS) & FLAG_PRODUCER)) {
                 s_cat(b, " queue ");
                 s_num(b, ((QueueSizeFn)QUEUE_SIZE)(o));
@@ -1293,6 +1313,24 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_eq(t[0], "cloak") && n >= 3) {
+        /* The device itself, not ScriptInterfaceImp::Cloak: that one asks AbleToCloak,
+         * which wants the team to have researched the device, and refuses the bench's
+         * ships besides. A set request byte (+0x2c) is what the player's button leaves
+         * for CloakingDevice::Simulate, which then cloaks (from visible, given the
+         * special energy) or decloaks (from cloaked). */
+        BYTE *go, *dev;
+        DWORD st;
+        if (!(o = find_obj(t[1])) || !(go = (BYTE *)craft_of(o))) { logline("  ! not a craft in the scene"); return; }
+        if (!(dev = *(BYTE **)(go + OBJECT_CLOAK))) { logline("  ! no cloaking device"); return; }
+        st = *(DWORD *)(dev + 0x3c);
+        o->cloak = s_eq(t[2], "now") || on_arg(t[2]);
+        if (o->cloak) ((SiSetHealthFn)SI_SET_ENERGY)(SI_INSTANCE, o->handle, *(float *)(go + CRAFT_MAX_ENERGY));
+        if (s_eq(t[2], "now")) ((SiVoidFn)GO_CLOAK_NOW)(go);
+        else if (o->cloak ? st == 0 : st == 2) dev[0x2c] = 1;
+        logline("  ok");
+        return;
+    }
     if (s_eq(t[0], "colonize") && n >= 2) {
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         colonize(o, n >= 3 ? t[2] : "full", n >= 4 ? (int)s_atof(t[3]) : 1);
@@ -1325,7 +1363,7 @@ static void run_command(char *line)
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
-            "immortal, kill, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
+            "immortal, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
             "shieldfx, query, "
             "select, selection)");
 }

@@ -56,6 +56,12 @@ planet's ground colour (`planet glow:`).
 | `CityLights`, `CityLightColour` | `0.8`, `1.00 0.72 0.38` | a developed planet's cities glowing on its night side; `0` none |
 | `Shaders` | `1` | under crosire's d3d8to9 (`platform/d3d8-chain.py --use d3d8to9`), light the GPU-drawn hulls per pixel in shaders (below); with any other d3d8, or `0`, per vertex as before |
 | `NearFade`, `NearFadeDepth`, `NearFadeMin` | `1`, `0.3`, `0.125` | a ship fades only once the near clipping plane cuts into its bounding box, down to `NearFadeMin` when the plane has cut `NearFadeDepth` of the box's depth; with `Shaders` it stays in the shaders, drawn blended after everything else ("The near fade", below); `0`: stock's fade, on the CPU path in stock's lighting |
+| `Cloak` | `1` | with `Shaders`, a cloaking or cloaked ship drawn as thick glass over what lies behind it ("Cloaked ships", below); `0`: stock's translucent hull on the CPU path |
+| `CloakBend`, `CloakSplit` | `0.035`, `0.18` | how far the glass bends what is behind it, a share of the hull's radius at its edges (half that face on); how much more or less red and blue are bent than green, as a share of the bend |
+| `CloakRipple`, `CloakSpeed` | `0.08`, `1` | slow waves moving the glass's surface, stronger halfway through a cloak; their speed |
+| `CloakTint`, `CloakRim`, `CloakRimColour`, `CloakGlint` | `0.93 0.97 1`, `0.35`, `0.45 0.75 1`, `0.5` | what the glass lets through; light on it where it turns away from the eye; the Key's highlight on it |
+| `CloakHull`, `CloakFront`, `CloakFrontColour` | `0`, `1`, `0.3 1 0.55` | how much of the lit hull stays once cloaked; the glow of the front behind which the hull goes, patch by patch, while it cloaks |
+| `CloakReload` | `0` | `1` reads the `Cloak*` look keys again every second, for tuning on the bench |
 | `BumpShaders` | `1` | with `Shaders`, draw bump-mapped hulls (the Borg) in the hull shaders, their normal from the normal map, instead of the engine's dot3 passes ("Bump-mapped hulls", below); `0` leaves them to the dot3 passes |
 | `SelfIllumination` | `1.8` | with `Shaders`, how strongly a self-illuminating hull's night lights show (below); `1` is stock's second pass, `0` none, above 1 brighter than their texture ("Dynamic range") |
 | `HullSun` | `1.1` | with `Shaders`, the Key on GPU-drawn hulls times this, the light no longer clamped at 1 ("Dynamic range") |
@@ -1158,6 +1164,58 @@ The state is captured and applied again with a state block, like the shadow map'
 
 A screen door (a pixel drawn or not against noise, no sorting needed) was built first
 and rejected on the bench: at the fades a close camera gives, the pattern showed.
+
+## Cloaked ships
+
+A cloaked ship of one's own (`Cloak=1`, with `Shaders`) is drawn as a block of thick
+glass: what lies behind it shows through, bent along its surface, with fringes of colour
+at its edges. Stock draws it as a translucent hull on the CPU path. An enemy's cloaked
+ship is not drawn at all, as in stock.
+
+**How stock draws a cloak.** A `CloakingDevice` (the craft's +0x108) has four states at
++0x3c: 0 visible, 1 cloaking, 2 cloaked, 3 decloaking (`GameObject::IsCloaked`,
+`IsFullyCloaked`, `IsDecloaking` read them). While cloaking or decloaking,
+`GameObject::RenderInternal` (0x4d52b0) copies the device's phase (+0x48) and level
+(+0x44) to 0x761088 and sets the engine's +0x110 to `CloakingEffect_VertexAlphaCallback`
+(0x668d30) and +0x114 to that pair. The callback gives each vertex an alpha of the level
+plus a sine wave across the model's box. The level runs from 1 down to 0.2 over the
+device's cloak time (`ApplyCloakingEffect` and `Simulate`), and back up when it
+decloaks. Fully cloaked, `CloakingDevice::Simulate` hangs the engine's material at +0x20
+(its alpha at +0x24 set to 0.2) on the instance's +0x4. `ST3D_Mesh::RenderInternal`
+(0x6325d0) draws every mesh with that material in place of its own, which is the cyan
+ghost stock shows. Either way `PolygonSortRequired` answers "sort", for +0x110 or for
+the material's type (+0x20 not 1), and the hull goes to the CPU path. Measured on the bench
+(`SCENE=cloak`): a warbird cloaks in about a second and a half and decloaks in under one.
+
+**What the plugin does.** `hook_sort_required` answers "no sort" while either is in
+place (`cloak_state`): the callback with an opaque material, or the engine's cloak
+material on the instance. A per-render effect (+0xf8, a warp) still gets stock's answer.
+The hull then reaches `hook_dip` (or `bump_draw`) and is recorded with the near fade's
+`fd_take`, whatever the fixed-function state (`sh_check` would refuse the cloak material).
+It is drawn at `Flush` in the same far-to-near order as the faded hulls. `ck_record`
+keeps what the shader needs: VIEW, the projection's scale over the render target's size,
+the instance's bounding sphere (radius +0x40, `Matrix34` +0x44), how much of the hull is
+left (`(level - 0.2) / 0.8`, 0 when fully cloaked) and the time. It also keeps the
+sphere's rectangle on screen, grown by the bend. At `Flush`, `ck_copy` copies that
+rectangle of the render target into a texture of its own size (`StretchRect`; under
+`MSAA.asi` this resolves the samples). The hull is drawn into depth, then opaque in
+`cloak_ps` (`hull.hlsl`) over the copy. A pixel samples the copy at itself plus the
+surface's normal in view space, scaled by `CloakBend` of the radius (more at the edges,
+where the glass runs thickest) and projected at the pixel's depth. Red, green and blue
+are each sampled at a different offset (three taps each, so a fringe is soft). Slow
+waves move the normal. A rim and the Key's glint light the glass, and the lit hull
+(`shade`, everything a hull gets) shows through as much as the cloak has left of it. It
+goes patch by patch against a smooth field over the hull, behind a glowing front.
+The texture is in the default pool and is let go before a `Reset`.
+
+A cloaked hull casts no shadow once less than half of it is left. With the hull drawn
+in full just after it decloaks, it would otherwise draw unshadowed for a moment. If the
+copy cannot be made, the hull is drawn faded as stock fades it (`misc.w`).
+
+Two cloaked hulls one behind the other: the farther is drawn first, so it is in the copy
+the nearer one bends. On the bench (`SCENE=cloak`, `./a2test run cloak --install .`): a
+warbird against a planet with a Galaxy behind it, cloaking, cloaked and decloaking; at
+RTS distance one's own cloaked ships stay findable as faint outlines.
 
 ## Not covered yet
 
