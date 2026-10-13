@@ -39,6 +39,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `shields` | a Galaxy class (phasers) and a Klingon battleship (`kbattle`, torpedoes) firing at a second Galaxy (`target`) as in `firing`: the target healed, its shields holding. For the shield hits (`shields/README.md`, `scenarios/shields-hits.md`) | 2026-10-12 |
 | `fog` | three of the player's ships (`ship1`, `ship2`, `scout`) at 3000,0,3000 with the map's fog and shroud on (`Fog=1`) and the HUD on for the minimap; `goto scout ...` leaves fog of war behind. For the fog's and shroud's edges (`fog/README.md`, `scenarios/fog-edges.md`) | 2026-10-12 |
 | `asteroids` | an asteroid field (`field`, `mafield`: 4–8 rocks) and a big one (`big`, `mafield2`: 3–6 larger rocks), 500 apart, beside a Galaxy class with its engines off; the rocks are drawn at random from the field's models, so a session shows some of them, and `spawn` adds more fields. For the asteroids' surfaces and smoothing (`surfaces/README.md`, `models/README.md`, "The asteroids") | 2026-10-13 |
+| `specials` | an enemy Sovereign (`tgt`) that cannot die, with its weapons and engines off and not healed, and a Galaxy class (`warper`) at 1500,0,1500 for the warp flash; shooters come with `spawn` and fire with `special`. For the special weapons and the warp flash (`specials/README.md`, `scenarios/specials.md`) | 2026-10-13 |
 | `cloak` | the player's own Romulan warbird (`warbird`, `rbattle`) and Klingon Bird of Prey (`bop`, `kdestroy`) in front of a class M planet and a Galaxy class, engines and weapons off; `cloak warbird on`. For cloaked ships drawn as glass (`lighting/README.md`, "Cloaked ships", `scenarios/cloak.md`) | 2026-10-13 |
 
 ## Scene files
@@ -68,6 +69,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Heading` | 0 | degrees about the up axis; 0 faces +z |
 | `Immortal` | 1 | the object cannot die (craft only) |
 | `Heal` | 0 | 1: hull, shields, crew and every system topped up to full every tick, so it never shows damage: its shields never run out (no shields-down effect, the electric ring) and no damaged-system effect (the plasma plume, venting gas) ever shows |
+| `Energy` | 0 | 1: the craft's special energy topped up to full every tick, so a special weapon that runs on it (a tractor beam, a holding beam) keeps running |
 | `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving. A system switched off here is not drawn as damaged (no plume) |
 | `Attack` | | the name of an object to attack, ordered once everything is built |
 | `Population` | | planets: colonised at once, as `colonize` (below) does: a number, `full`, or nothing for none |
@@ -103,6 +105,8 @@ answer and fails if a command did.
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
 | `attack <name> <target>` | order an attack |
 | `kill <name>` | the craft dies at once, as a mission script blows one up (`ScriptInterfaceImp::ExplodeNow`, 0x456cf0); its healing and immortality are switched off first |
+| `special <name> <weapon> [<target>]` | fire a craft's special weapon, by its weapon ODF's name (`gholdbm`, `gcorbom`), at a target or none: its special energy is filled first, the weapon's slot in the craft's carrier found (`WeaponClass::Find`), and `Craft::FireAtSpecial` (0x4c3820) called as a player's order does. Answers `slot N, can fire, fired` (or `cannot fire now`, `NOT fired`). The craft's weapons must be on (`Carrier::TriggerSelected` refuses while they are off) and the target within the weapon's range |
+| `energy <name> on\|off` | as `Energy=` |
 | `cloak <name> on\|off\|now` | `on`: the craft starts to cloak, `off`: to decloak, `now`: fully cloaked at once (`GameObject::ImmediateCloak`, 0x4d03e0). Its special energy is filled and kept full while it is on. It sets the request byte of the craft's cloaking device (+0x108, byte +0x2c) that the player's button leaves for `CloakingDevice::Simulate`, rather than calling `ScriptInterfaceImp::Cloak`: that asks `AbleToCloak`, which wants the team to have researched the device, and it refused the bench's ships. `query` shows each craft's state (`cloak visible`, `cloaking`, `cloaked`, `decloaking`) |
 | `goto <name>[,<name>...] <object \| x y z> [warp]` | order a move, as a player's right-click does (AiCommand `GO`; `warp`: `GO_WARP`), and switch the engines on. To a craft, the ship follows it; to any other object (a nebula, a planet), it goes to where the object is. A point is anchored like the scene file's positions. Several names, comma-separated, keep their places: each goes to the point plus its own offset from the group's centre. It ends an `attack`, though a ship still fires at what comes in range |
 | `stop <name>` | order a stop (AiCommand `STOP`, as `ScriptInterfaceImp::Stop` gives) |

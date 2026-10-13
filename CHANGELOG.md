@@ -5,15 +5,33 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 11.36.0 — 2026-10-13
+## 11.37.0 — 2026-10-13
 
-Layers: lighting 1.24.0, testbench 3.13.0.
+Layers: lighting 1.24.0, testbench 3.14.0.
 
 ### Added
 - Cloaked ships look like thick glass: what is behind them is bent along the hull, with
   colour fringes at the edges and a slow ripple, and while cloaking the hull goes patch by
   patch behind a glowing front (`Cloak=1` and the `Cloak*` keys; lighting 1.24.0).
-- `SCENE=cloak`, the scene command `cloak`, and the scenario `cloak` (testbench 3.13.0).
+- `SCENE=cloak`, the scene command `cloak`, and the scenario `cloak` (testbench 3.14.0).
+
+Installed, not yet seen in game.
+
+## 11.36.0 — 2026-10-13
+
+Layers: specials 1.0.0, shields 1.2.0, testbench 3.13.0.
+
+### Added
+- The `specials` layer: `Specials.asi` draws the warp flash by shader (a white-hot core
+  and blue glow with a lens streak, bursting as the craft goes and leaving a ring), and
+  the special weapons' shots and waves from recipes in `Specials.ini`: beams, bolts and
+  bands of light running out, each lighting the hulls about it (specials 1.0.0).
+  `./install` runs `specials/install.sh`; `a2mod` switches `Specials.asi` and
+  `Specials.ini` as the `specials` layer. Not in the release package yet.
+- The special weapons' shield shells, the corbomite reflector's among them, drawn by
+  `Shields.asi` (shields 1.2.0).
+- `Scene.asi` fires special weapons (`special`, `energy`), `SCENE=specials`, scenario
+  `specials`; the bench gathers `Specials.log` (testbench 3.13.0).
 
 Installed, not yet seen in game.
 
