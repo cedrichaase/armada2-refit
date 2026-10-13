@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.36.1 — 2026-10-13
+
+Layers: surfaces 1.1.1.
+
+### Changed
+- The class planets' recipes graded to stock's colours, measured on the bench in the
+  same light, with their detail unchanged: pastel J, turquoise M, even orange L, violet
+  patches on K, paler H; cloud on K, more on H and L, as stock's shell has (surfaces 1.1.1).
+
+Installed, not yet seen in game.
+
 ## 11.36.0 — 2026-10-13
 
 Layers: specials 1.0.0, shields 1.2.0, testbench 3.13.0.
