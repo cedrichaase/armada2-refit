@@ -16,7 +16,8 @@ the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Sky.asi` needs none
 its recipes are code, and its log says it found and patched `Background_Render`.
 `Explosions.asi` draws its fireballs from noise it makes itself, and says it patched them.
 Nor does `Shields.asi`: its shield hits are procedural, and its log says its hooks were
-patched; nor `Repair.asi`, whose welding is procedural too.
+patched; nor `Repair.asi`, whose welding is procedural too, nor `Venting.asi`, whose
+vents are.
 `Fog.asi` draws the engine's own fog texture, and says it patched both layers.
 `Specials.asi`'s warp flash, beams and waves are procedural, and its log names its hooks.
 
@@ -32,9 +33,10 @@ patched; nor `Repair.asi`, whose welding is procedural too.
 10. Expect "Explosions.log" contains "FireballExplosion::Submit and RenderChunks patched".
 11. Expect "Shields.log" contains "the weapons' hits: beam shot mine missile".
 12. Expect "Repair.log" contains "AddParticle, DrawScaled3D and RenderChunks".
-13. Expect "Fog.log" contains "the fog's and the shroud's ST3D_Node::Render patched".
-14. Expect "Specials.log" contains "and the ordnance's Submit, ShockwaveExplosion::Submit".
-15. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
-16. Quit the game.
-17. Expect the game to have exited.
-18. Expect no crash.
+13. Expect "Venting.log" contains "RenderParticle, the spray emitter's RenderInternal".
+14. Expect "Fog.log" contains "the fog's and the shroud's ST3D_Node::Render patched".
+15. Expect "Specials.log" contains "and the ordnance's Submit, ShockwaveExplosion::Submit".
+16. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
+17. Quit the game.
+18. Expect the game to have exited.
+19. Expect no crash.
