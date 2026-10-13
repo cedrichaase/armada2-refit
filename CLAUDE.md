@@ -720,6 +720,12 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   whose edge texels sit on the edges (no seam with or without seamless filtering).
   Keep any new look inside `sky_colour()` so the bake and the reference agree.
 - **Aqua is meant to be dimmer and softer than stock**: the user preferred it so.
+- **A recipe's level and colour balance are its grade**, fitted to the stock faces by
+  `sky/grade.py` from a bench bake (`Dump=1`): refit after changing a palette or
+  `Brightness`, don't hand-tune `GradeGain=`. Aqua is left ungraded and `mbgrg` at its
+  toned-down level on purpose (`POLICY`).
+- **The cube is magnified ~3.4x at 4K**; detail finer than it comes from `Fine=` at
+  draw time, not from a bigger cube.
 
 ### nebulae
 
