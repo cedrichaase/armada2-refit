@@ -171,6 +171,35 @@ cut-out, and the engine's alpha test, which the rock's material already sets, ma
 holes of it through which the blended glow shell shows, as stock's alpha does. The glow
 lights the holes' edges.
 
+## Matching stock's colour
+
+The class planets are graded against stock **on screen, in the same light**: the
+planets scene (`SCENE=planets`), each class framed to fill the view at two sides (yaw 300
+and 140, pitch 15), shot once with `Surfaces.ini`'s `Enable=0` and once with the
+recipes (`Reload=1` re-reads both, so one session does both), and compared by the mean of
+each channel and the saturation inside the disc. Recipe and stock go through the same
+lights, so the ratio is the albedo's. Since surfaces 1.1.1 every class is within 8% of
+stock per channel from both sides, but for D's red from one (+13%) and L's blue from the
+other (-13%): the recipe's ground is not stock's, so which features face the camera differs.
+
+Three things the first recipes got wrong, which a recipe's header numbers (the stock
+texture's mean) do not show:
+
+- **The ground lives in the low stops.** Heights are z-scores, so most of a planet lies
+  between `Ramp2` and `Ramp3`, and cavities darken it further. Stops picked to bracket
+  the stock palette rendered 10 to 40% darker than stock. Pick the middle stops from
+  the stock texture's dominant colours, not its extremes.
+- **Contrast across height shows as a difference between sides.** L's dark rust
+  lowlands and near-white highlands read dark from one side and washed out from the
+  other, where stock is an even orange. Keep the ramp within the stock palette's
+  luminance band.
+- **The stock shell's cloud is part of stock's colour.** H, K, L and M all have white
+  streaks from `PA_ECFR0`, which a recipe's ground suppresses ("Where Lighting.asi uses
+  it"), so those recipes bring cloud of their own.
+
+The engine adds no colour of its own (the ODFs have none): the warm Key is what turns
+stock J's pastels and M's teal brownish on the lit side, for recipes as for stock.
+
 ## The asteroids
 
 An asteroid field (`odf/other/mafield.odf`, `mafield2.odf`) is three to eight rocks, each

@@ -4,6 +4,21 @@
 `Lighting.asi`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.1.1 — 2026-10-13
+
+### Changed
+- The class planets' colours graded against stock on the bench, in the same light: each
+  class within 8% of stock's on-screen channel means from two sides (D's red and L's
+  blue within 13%), the detail unchanged. `Ramp*`/`Alt*` of `PB_CLSSD`, `PB_CLSSH`,
+  `PB_CLSSJ` (pale mint and cream bands, softer peach; `StormColour`), `PB_CLSSK`
+  (violet `Alt` regions, `Region` 0.55 → 0.65), `PB_CLSSL` (even orange, less contrast
+  across height) and `PB_CLSSM` (turquoise land and sea, `Deep`, `Shallow`, `Shore`
+  1.6 → 2.4).
+- Cloud as stock's shell has it: `PB_CLSSK` gains `Clouds=`; `PB_CLSSH` and `PB_CLSSL`
+  denser and whiter.
+
+Installed, not yet seen in game.
+
 ## 1.1.0 — 2026-10-13
 
 ### Added
