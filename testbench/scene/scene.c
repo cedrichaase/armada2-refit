@@ -147,6 +147,9 @@ int _fltused = 0;   /* floats without the CRT */
 #define SI_MAX_HEALTH    0x456da0u
 #define SI_CANNOT_DIE    0x457590u
 #define SI_EXPLODE_NOW   0x456cf0u   /* ScriptInterfaceImp::ExplodeNow(int): a craft dies now, as a mission script blows one up */
+#define GO_CLOAK_NOW     0x4d03e0u   /* GameObject::ImmediateCloak: thiscall, fully cloaked at once */
+#define OBJECT_CLOAK     0x108       /* a GameObject's cloaking device, if any: its state at +0x3c
+                                      * (0 visible, 1 cloaking, 2 cloaked, 3 decloaking) */
 #define SI_SPECIAL_AT    0x452d10u   /* ScriptInterfaceImp::Special_Attack(int, int target, const char *weapon) */
 #define SI_SPECIAL       0x452dc0u   /* ScriptInterfaceImp::Special_Attack(int, const char *weapon): no target */
 #define SI_SET_SPECIAL   0x456280u   /* ScriptInterfaceImp::SetSpecialEnergy(int, float) */
@@ -269,6 +272,7 @@ static const Sig k_sigs[] = {
     { SI_MAX_HEALTH,    8, P_SI_HANDLE },
     { SI_CANNOT_DIE,    8, P_SI_HANDLE },
     { SI_EXPLODE_NOW,   8, P_SI_HANDLE },
+    { GO_CLOAK_NOW,     8, { 0x8B, 0x89, 0x08, 0x01, 0x00, 0x00, 0x85, 0xC9 } },
     { SI_SET_SPECIAL,   8, P_SI_HANDLE },
     { SI_SPECIAL_AT,    8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 } },
     { SI_SPECIAL,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 } },
@@ -1057,6 +1061,12 @@ static void query(void)
         if (g_obj[i].heal) s_cat(b, " healed");
         {
             BYTE *o = (BYTE *)((EntityGetFn)ENTITY_GET)(g_obj[i].handle);
+            if (o && (*(DWORD *)(o + OBJECT_FLAGS) & FLAG_CRAFT) && *(BYTE **)(o + OBJECT_CLOAK)) {
+                static const char *const st[4] = { "visible", "cloaking", "cloaked", "decloaking" };
+                DWORD c = *(DWORD *)(*(BYTE **)(o + OBJECT_CLOAK) + 0x3c);
+                s_cat(b, " cloak ");
+                s_cat(b, c < 4 ? st[c] : "?");
+            }
             if (o && (*(DWORD *)(o + OBJECT_FLAGS) & FLAG_PRODUCER)) {
                 s_cat(b, " queue ");
                 s_num(b, ((QueueSizeFn)QUEUE_SIZE)(o));
@@ -1369,6 +1379,24 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_eq(t[0], "cloak") && n >= 3) {
+        /* The device itself, not ScriptInterfaceImp::Cloak: that one asks AbleToCloak,
+         * which wants the team to have researched the device, and refuses the bench's
+         * ships besides. A set request byte (+0x2c) is what the player's button leaves
+         * for CloakingDevice::Simulate, which then cloaks (from visible, given the
+         * special energy) or decloaks (from cloaked). */
+        BYTE *go, *dev;
+        DWORD st;
+        if (!(o = find_obj(t[1])) || !(go = (BYTE *)craft_of(o))) { logline("  ! not a craft in the scene"); return; }
+        if (!(dev = *(BYTE **)(go + OBJECT_CLOAK))) { logline("  ! no cloaking device"); return; }
+        st = *(DWORD *)(dev + 0x3c);
+        o->energy = s_eq(t[2], "now") || on_arg(t[2]);       /* the cloak draws on it */
+        if (o->energy) fill_special(o);
+        if (s_eq(t[2], "now")) ((SiVoidFn)GO_CLOAK_NOW)(go);
+        else if (o->energy ? st == 0 : st == 2) dev[0x2c] = 1;
+        logline("  ok");
+        return;
+    }
     if (s_eq(t[0], "colonize") && n >= 2) {
         if (!(o = find_obj(t[1]))) { logline("  ! no such object"); return; }
         colonize(o, n >= 3 ? t[2] : "full", n >= 4 ? (int)s_atof(t[3]) : 1);
@@ -1401,7 +1429,7 @@ static void run_command(char *line)
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
-            "immortal, special, energy, kill, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
+            "immortal, special, energy, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
             "shieldfx, query, "
             "select, selection)");
 }

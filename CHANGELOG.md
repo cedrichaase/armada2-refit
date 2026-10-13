@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.37.0 — 2026-10-13
+
+Layers: lighting 1.24.0, testbench 3.14.0.
+
+### Added
+- Cloaked ships look like thick glass: what is behind them is bent along the hull, with
+  colour fringes at the edges and a slow ripple, and while cloaking the hull goes patch by
+  patch behind a glowing front (`Cloak=1` and the `Cloak*` keys; lighting 1.24.0).
+- `SCENE=cloak`, the scene command `cloak`, and the scenario `cloak` (testbench 3.14.0).
+
+Installed, not yet seen in game.
+
 ## 11.36.0 — 2026-10-13
 
 Layers: specials 1.0.0, shields 1.2.0, testbench 3.13.0.

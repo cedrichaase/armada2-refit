@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.14.0 — 2026-10-13
+
+### Added
+- `SCENE=cloak`: the player's own warbird and Bird of Prey in front of a planet and a
+  Galaxy class, for cloaked ships drawn as glass.
+- Scene command `cloak <name> on|off|now`, and each craft's cloak state in `query`.
+- Scenario `cloak`: cloaks, holds and decloaks the warbird, checks the glass path in
+  `Lighting.log`, and shoots each stage.
+
+Installs nothing; seen working on the bench 2026-10-13.
+
 ## 3.13.0 — 2026-10-13
 
 ### Added
