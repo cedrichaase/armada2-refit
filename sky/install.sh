@@ -34,6 +34,7 @@ remove_recipes() {
     local f
     [ -d "$GAME/Sky" ] || return 0
     for f in "$here"/skies/*.ini; do rm -f "$GAME/Sky/$(basename "$f")"; done
+    rm -f "$GAME"/Sky/*.dump[0-5].tga          # Dump=1's faces (sky/README.md, "The grade")
     rmdir "$GAME/Sky" 2>/dev/null || true
 }
 

@@ -87,6 +87,7 @@ __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, IN
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
 __declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
 __declspec(dllimport) void   *__stdcall GetProcAddress(HMODULE, LPCSTR);
+__declspec(dllimport) DWORD   __stdcall GetTickCount(void);
 
 int _fltused = 0;   /* floats without the CRT */
 
@@ -912,6 +913,56 @@ static float near_fade(void)
     return a < 0.0f ? 0.0f : a > 1.0f ? 1.0f : a;
 }
 
+/* Cloaked ships (Cloak=1, with Shaders=1). Stock draws a cloaking ship on the CPU path:
+ * while it cloaks or decloaks (its CloakingDevice's state 1 or 3) GameObject::RenderInternal
+ * (0x4d52b0) puts CloakingEffect_VertexAlphaCallback at the engine's +0x110 and the
+ * device's phase and level ({+0x48, +0x44}, copied to 0x761088) at +0x114, and
+ * PolygonSortRequired says sort while +0x110 is set; the level runs from 1 to 0.2 over the
+ * cloak's time and back. Fully cloaked (state 2), CloakingDevice::Simulate hangs the
+ * engine's material at +0x20 (its alpha at +0x24 set to 0.2) on the instance's +0x4,
+ * which ST3D_Mesh::RenderInternal takes in place of each mesh's own, and its type says
+ * sort. The plugin answers "no sort" for both, records the hull's draws (fd_take) and
+ * draws them at Flush as glass: over a copy of the frame under the hull, cloak_ps in
+ * hull.hlsl. lighting/README.md, "Cloaked ships". */
+#define FN_CLOAK_ALPHA 0x668d30   /* CloakingEffect_VertexAlphaCallback */
+static int   g_cloak = 1;                                  /* Cloak= */
+static float g_ck_bend = 0.035f;                          /* CloakBend= */
+static float g_ck_split = 0.18f;                           /* CloakSplit= */
+static float g_ck_ripple = 0.08f;                          /* CloakRipple= */
+static float g_ck_rim = 0.35f;                             /* CloakRim= */
+static float g_ck_glint = 0.5f;                            /* CloakGlint= */
+static float g_ck_floor = 0.0f;                            /* CloakHull= */
+static float g_ck_glow = 1.0f;                             /* CloakFront= */
+static float g_ck_speed = 1.0f;                            /* CloakSpeed= */
+static float g_ck_tint[3] = { 0.93f, 0.97f, 1.0f };        /* CloakTint= */
+static float g_ck_rim_col[3] = { 0.45f, 0.75f, 1.0f };     /* CloakRimColour= */
+static float g_ck_edge[3] = { 0.3f, 1.0f, 0.55f };         /* CloakFrontColour= */
+static long  g_ck_draws;
+static int   g_ck_reload;                                  /* CloakReload= */
+static char  g_ini[320];                                   /* Lighting.ini's path */
+static void  ck_reload(void);
+
+/* 1 while a ship cloaks or decloaks (the vertex-alpha callback), 2 when it is fully
+ * cloaked (the engine's material on its instance), 0 otherwise; *vis: how much of the
+ * hull is left, 1 visible .. 0 cloaked. */
+static int cloak_state(float *vis)
+{
+    BYTE *eng = *(BYTE **)0x7ad508, *inst;
+    if (!g_cloak || !eng) return 0;
+    if (*(DWORD *)(eng + 0x110) == FN_CLOAK_ALPHA) {
+        const float *d = *(const float **)(eng + 0x114);
+        float l = d ? (d[1] - 0.2f) / 0.8f : 0.0f;          /* {phase, level} */
+        *vis = l < 0.0f ? 0.0f : l > 1.0f ? 1.0f : l;
+        return 1;
+    }
+    inst = *(BYTE **)(eng + 0x100);
+    if (inst && *(void **)(eng + 0x20) && *(void **)(inst + 4) == *(void **)(eng + 0x20)) {
+        *vis = 0.0f;
+        return 2;
+    }
+    return 0;
+}
+
 static BYTE __fastcall hook_sort_required(void *dev, void *edx)
 {
     DWORD ra = (DWORD)__builtin_return_address(0);
@@ -920,6 +971,13 @@ static BYTE __fastcall hook_sort_required(void *dev, void *edx)
     if (!r || !g_sh_on || !g_vb_seen || !eng || !mat) return r;
     /* the mesh's RenderInternal, twice, and the material's SetRenderState */
     if (ra != 0x63275b && ra != 0x6327ea && ra != 0x64472a) return r;
+    {   /* a cloak: an opaque material while it comes on or goes off, the engine's own
+         * material once it is fully on; never under a per-render effect (a warp) */
+        float v;
+        int   ck = cloak_state(&v);
+        if (ck && !*(DWORD *)(eng + 0xf8) && (ck == 2 || *(DWORD *)(mat + 0x20) == 1)) return 0;
+    }
+    if (!g_near_fade) return r;
     inst = *(BYTE **)(eng + 0x100);
     if (!inst || !inst[0x77] || ((*(DWORD **)inst)[4] != FN_CRAFT_FADE &&
                                  (*(DWORD **)inst)[4] != (DWORD)hook_craft_fade)) return r;
@@ -1109,7 +1167,7 @@ static int sh_consts(void *d9, int bump)
     return 1;
 }
 
-static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3);
+static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3, const float *ck);
 
 typedef long (__stdcall *D9Set_t)(void *, DWORD, DWORD);
 
@@ -1118,9 +1176,10 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     void   *d9, *vs, *ps;
     D9Saved sv;
     SmRec   rc;
-    int     rec;
+    int     rec, ck;
     long    r;
-    DWORD   cull = 0;
+    DWORD   cull = 0, fvf = 0;
+    float   cv = 1.0f;
     if (!g_in_vb) return g_dip(dev, pt, mi, nv, si, pc);
     d9 = d9_device(dev);
     vs = d9_shader(d9, &g_hull_vs);
@@ -1132,10 +1191,18 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
     }
     sm_frame(d9);
     d9_save(d9, &sv);
-    if (!sh_check(d9) || !sh_consts(d9, 0)) {
+    /* A cloaked hull is drawn as glass whatever the fixed-function state: fully cloaked,
+     * the engine's material is not one sh_check takes, and its texture is not shown. It
+     * casts a shadow only while more than half of the hull is left. */
+    ck = cloak_state(&cv);
+    if (ck) {
+        D9_FN(d9, D9_GETFVF, D9_Ptr_t)(d9, &fvf);
+        if (fvf != FVF_HULL) ck = 0;
+    }
+    if ((!ck && !sh_check(d9)) || !sh_consts(d9, 0)) {
         d9_restore(d9, &sv); g_sh_ff++; return g_dip(dev, pt, mi, nv, si, pc);
     }
-    rec = sm_take(dev, d9, &rc, pt, mi, nv, si, pc, 0);
+    rec = ck && cv < 0.5f ? 0 : sm_take(dev, d9, &rc, pt, mi, nv, si, pc, 0);
     sm_consts(d9, rec ? &rc : NULLPTR, -1.0f);
     /* A mirrored draw (FixMirrored's det < 0) has its winding reversed: under the
      * engine's cull it shows its back faces, the far side of the hull seen through it,
@@ -1146,7 +1213,7 @@ static long __stdcall hook_dip(void *dev, DWORD pt, UINT mi, UINT nv, UINT si, U
         if (cull == 2 || cull == 3) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, 5 - cull);
         else cull = 0;
     }
-    if (near_fade() < 1.0f && fd_take(dev, d9, pt, mi, nv, si, pc, 0)) {   /* drawn at Flush */
+    if ((ck || near_fade() < 1.0f) && fd_take(dev, d9, pt, mi, nv, si, pc, 0, ck ? &cv : NULLPTR)) {   /* drawn at Flush */
         if (cull) D9_FN(d9, D9_SETRENDERSTATE, D9Set_t)(d9, 22, cull);
         d9_restore(d9, &sv);
         if (rec) sm_keep(&rc, g_vb_mesh);
@@ -1226,7 +1293,7 @@ static void hook_device(void *dev)
     /* Reset (slot 14): the shadow map is a D3DPOOL_DEFAULT target, which must be gone
      * before the device resets, and the shadow casters hold the engine's buffers; so
      * does the near fade's list, and its state block must go too. */
-    if ((g_shadows || g_near_fade) && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
+    if ((g_shadows || g_near_fade || g_cloak) && vt[14] != (void *)hook_reset && VirtualProtect(&vt[14], 4, PAGE_EXECUTE_READWRITE, &old)) {
         g_reset = (Reset8_t)vt[14];
         vt[14] = (void *)hook_reset;
         VirtualProtect(&vt[14], 4, old, &old);
@@ -1296,7 +1363,8 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     Pick   pk[SH_POINTS];
     SmRec  rc;
     const float *m = (const float *)CURRENT_MATRIX;
-    int    i, n = 0, rec;
+    int    i, n = 0, rec, ck;
+    float  cv = 1.0f;
 
     if (!eng || !tm || !tex || *(int *)DOT3_LIMIT != -1) return 0;
     dev = *(void **)(eng + 0xcc + 4 * *(DWORD *)(eng + 0xc0));
@@ -1354,9 +1422,10 @@ static int bump_draw(BYTE *self, int group, void *tm, void *tex)
     D9_FN(d9, D9_SETVERTEXDECLARATION, D9_Ptr_t)(d9, g_dot3_decl);
     d9_bind(d9, vs, ps);
     sh_consts(d9, 1);
-    rec = sm_take(d8, d9, &rc, 4, 0, nv, 0, pc, 1);
+    ck = cloak_state(&cv);
+    rec = ck && cv < 0.5f ? 0 : sm_take(d8, d9, &rc, 4, 0, nv, 0, pc, 1);
     sm_consts(d9, rec ? &rc : NULLPTR, -1.0f);
-    if (near_fade() >= 1.0f || !fd_take(d8, d9, 4, 0, nv, 0, pc, 1)) {   /* else drawn at Flush */
+    if ((!ck && near_fade() >= 1.0f) || !fd_take(d8, d9, 4, 0, nv, 0, pc, 1, ck ? &cv : NULLPTR)) {   /* else drawn at Flush */
         sm_bind(d9);
         ((DIP8_t)(*(void ***)d8)[71])(d8, 4, 0, nv, 0, pc);       /* TRIANGLELIST, as stock */
         sm_unbind(d9);
@@ -1913,6 +1982,11 @@ static void sm_keep(SmRec *r, const BYTE *mesh)
 typedef void (__fastcall *Flush_t)(void *dev, void *edx);
 typedef long (__stdcall *FdConst_t)(void *, UINT, float *, UINT);
 enum { FD_GETVSCONST = 95, FD_GETPSCONST = 110 };
+#define CK_PS  10               /* cloak_ps's own constants, c84..c93 */
+enum { CK_STRETCHRECT = 34, CK_GETVIEWPORT = 48, CK_SURF_GETDESC = 12 };
+typedef long (__stdcall *CkVp_t)(void *, DWORD *);
+typedef long (__stdcall *CkDesc_t)(void *, DWORD *);
+typedef long (__stdcall *CkStretch_t)(void *, void *, const LONG *, void *, const LONG *, DWORD);
 typedef struct {
     void  *vb, *ib, *tex[2], *inst;
     UINT   off, stride, mi, nv, si, pc;
@@ -1920,12 +1994,132 @@ typedef struct {
     DWORD  pt, cull, samp[2][13];
     float  z;                   /* the hull's depth: its first draw's origin, view space */
     float  vc[FD_VS * 4], pc4[FD_PS * 4];
+    int    ck;                  /* a cloaked hull, drawn as glass: */
+    float  ckc[CK_PS * 4];      /* cloak_ps's constants, c84 on */
+    LONG   rc[4];               /* the frame under the hull, pixels: left, top, right, bottom */
 } FdRec;
 static FdRec  g_fd[FD_MAX];
 static int    g_fd_n, g_fd_ix[FD_MAX];
 static DWORD  g_fd_frame;
 static void  *g_fd_dev, *g_fd_sb, *g_fd_sb_dev;   /* g_fd_sb belongs to g_fd_sb_dev */
 static long   g_fd_replays;
+static D9Shader g_cloak_ps = D9_PIXEL_SHADER(k_cloak_ps);
+static D9Shader g_cloak_bump_ps = D9_PIXEL_SHADER(k_cloak_bump_ps);
+static void  *g_ck_tex, *g_ck_surf, *g_ck_dev;    /* the copy of the frame; g_ck_dev's */
+static DWORD  g_ck_desc[8];                       /* its D3DSURFACE_DESC */
+
+/* The constants cloak_ps reads for a cloaked hull, and the rectangle of the frame it can
+ * bend into view: its bounding sphere (the instance's radius at +0x40, its Matrix34 at
+ * +0x44) grown by the bend, on screen through VIEW, PROJECTION and the viewport. */
+static void ck_record(void *d9, FdRec *r, float vis)
+{
+    BYTE *inst = (BYTE *)r->inst;
+    float v[16], p[16], c[3], rad = 0.0f, k[CK_PS * 4], lo[2] = { 1e30f, 1e30f }, hi[2] = { -1e30f, -1e30f };
+    DWORD vp[6], desc[8];
+    void *rt = NULLPTR;
+    int   i, j, whole = 0;
+    for (i = 0; i < CK_PS * 4; i++) k[i] = 0.0f;
+    for (i = 0; i < 8; i++) desc[i] = 0;
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 2, v);               /* VIEW */
+    D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 3, p);               /* PROJECTION */
+    D9_FN(d9, CK_GETVIEWPORT, CkVp_t)(d9, vp);
+    if (D9_FN(d9, SM_GETRENDERTARGET, SmGetRT_t)(d9, 0, &rt) >= 0 && rt) {
+        D9_FN(rt, CK_SURF_GETDESC, CkDesc_t)(rt, desc);
+        sm_unref(rt);
+    }
+    if (inst) {
+        const float *m = (const float *)(inst + 0x44);
+        rad = *(const float *)(inst + 0x40);
+        for (i = 0; i < 3; i++) c[i] = m[9 + i];
+    }
+    if (!(rad > 0.0f && rad < 1e5f)) {          /* no instance: the draw's own origin */
+        rad = 100.0f;
+        for (i = 0; i < 3; i++) c[i] = g_sh_w[12 + i];
+    }
+    for (j = 0; j < 3; j++)                                       /* columns of VIEW */
+        for (i = 0; i < 3; i++) k[j * 4 + i] = v[i * 4 + j];
+    if (desc[6] && desc[7]) {
+        k[12] = 0.5f * p[0] * (float)vp[2] / (float)desc[6];
+        k[13] = 0.5f * p[5] * (float)vp[3] / (float)desc[7];
+        k[14] = 1.0f / (float)desc[6];
+        k[15] = 1.0f / (float)desc[7];
+    }
+    k[16] = c[0]; k[17] = c[1]; k[18] = c[2]; k[19] = rad;
+    k[20] = vis; k[21] = (float)(GetTickCount() % 3600000u) * 0.001f * g_ck_speed;
+    k[22] = g_ck_bend; k[23] = g_ck_split;
+    k[24] = g_ck_ripple; k[25] = g_ck_rim; k[26] = g_ck_glint; k[27] = g_ck_floor;
+    for (i = 0; i < 3; i++) {
+        k[28 + i] = g_ck_tint[i]; k[32 + i] = g_ck_rim_col[i]; k[36 + i] = g_ck_edge[i];
+    }
+    k[31] = g_ck_glow;
+    for (i = 0; i < CK_PS * 4; i++) r->ckc[i] = k[i];
+    r->ck = 1;
+
+    /* the sphere's view-space box, its corners on screen; all of it when it reaches the
+     * near plane. The bend moves a pixel by up to about twice CloakBend of the radius. */
+    {
+        float rr = rad * (1.2f + 3.0f * g_ck_bend), zn = p[10] != 0.0f ? -p[14] / p[10] : 1.0f, vc[3];
+        for (i = 0; i < 3; i++) vc[i] = c[0] * v[i] + c[1] * v[4 + i] + c[2] * v[8 + i] + v[12 + i];
+        if (vc[2] - rr <= zn) whole = 1;
+        for (i = 0; i < 8 && !whole; i++) {
+            float x = vc[0] + (i & 1 ? rr : -rr), y = vc[1] + (i & 2 ? rr : -rr), z = vc[2] + (i & 4 ? rr : -rr);
+            float cx = x * p[0] + y * p[4] + z * p[8] + p[12], cy = x * p[1] + y * p[5] + z * p[9] + p[13];
+            float cw = x * p[3] + y * p[7] + z * p[11] + p[15];
+            if (cw <= 1e-4f) { whole = 1; break; }
+            cx /= cw; cy /= cw;
+            if (cx < lo[0]) lo[0] = cx;
+            if (cx > hi[0]) hi[0] = cx;
+            if (cy < lo[1]) lo[1] = cy;
+            if (cy > hi[1]) hi[1] = cy;
+        }
+        if (whole) { lo[0] = lo[1] = -1.0f; hi[0] = hi[1] = 1.0f; }
+        if (lo[0] < -1.0f) lo[0] = -1.0f;
+        if (lo[1] < -1.0f) lo[1] = -1.0f;
+        if (hi[0] > 1.0f) hi[0] = 1.0f;
+        if (hi[1] > 1.0f) hi[1] = 1.0f;
+        r->rc[0] = (LONG)vp[0] + (LONG)((lo[0] * 0.5f + 0.5f) * (float)vp[2]) - 1;
+        r->rc[2] = (LONG)vp[0] + (LONG)((hi[0] * 0.5f + 0.5f) * (float)vp[2]) + 2;
+        r->rc[1] = (LONG)vp[1] + (LONG)((0.5f - hi[1] * 0.5f) * (float)vp[3]) - 1;
+        r->rc[3] = (LONG)vp[1] + (LONG)((0.5f - lo[1] * 0.5f) * (float)vp[3]) + 2;
+        if (r->rc[0] < (LONG)vp[0]) r->rc[0] = (LONG)vp[0];
+        if (r->rc[1] < (LONG)vp[1]) r->rc[1] = (LONG)vp[1];
+        if (r->rc[2] > (LONG)(vp[0] + vp[2])) r->rc[2] = (LONG)(vp[0] + vp[2]);
+        if (r->rc[3] > (LONG)(vp[1] + vp[3])) r->rc[3] = (LONG)(vp[1] + vp[3]);
+        if (desc[6] && r->rc[2] > (LONG)desc[6]) r->rc[2] = (LONG)desc[6];
+        if (desc[7] && r->rc[3] > (LONG)desc[7]) r->rc[3] = (LONG)desc[7];
+    }
+}
+
+/* The frame under a cloaked hull into g_ck_tex, as it is now: the hulls and the scene
+ * behind it are drawn. 0 if it cannot be copied. */
+static int ck_copy(void *d9, const FdRec *r)
+{
+    void *rt = NULLPTR;
+    DWORD desc[8];
+    int   i, same = 1;
+    if (r->rc[2] <= r->rc[0] || r->rc[3] <= r->rc[1]) return 0;
+    if (D9_FN(d9, SM_GETRENDERTARGET, SmGetRT_t)(d9, 0, &rt) < 0 || !rt) return 0;
+    D9_FN(rt, CK_SURF_GETDESC, CkDesc_t)(rt, desc);
+    for (i = 0; i < 8; i++) if (i != 2 && i != 4 && i != 5 && desc[i] != g_ck_desc[i]) same = 0;   /* not usage, samples */
+    if (!g_ck_tex || g_ck_dev != d9 || !same) {
+        sm_unref(g_ck_surf); sm_unref(g_ck_tex);
+        g_ck_surf = g_ck_tex = NULLPTR;
+        g_ck_dev = d9;
+        for (i = 0; i < 8; i++) g_ck_desc[i] = desc[i];
+        if (D9_FN(d9, SM_CREATETEXTURE, SmMakeTex_t)(d9, desc[6], desc[7], 1, 1, desc[0], 0, &g_ck_tex, NULLPTR) < 0 ||   /* RENDERTARGET, DEFAULT */
+            D9_FN(g_ck_tex, 18, SmLevel_t)(g_ck_tex, 0, &g_ck_surf) < 0) {
+            static int said;
+            if (!said) { said = 1; logline("cloak: no copy of the frame could be made; cloaked hulls drawn faded"); }
+            sm_unref(g_ck_surf); sm_unref(g_ck_tex);
+            g_ck_surf = g_ck_tex = NULLPTR;
+            sm_unref(rt);
+            return 0;
+        }
+    }
+    i = D9_FN(d9, CK_STRETCHRECT, CkStretch_t)(d9, rt, r->rc, g_ck_surf, r->rc, 0) >= 0;   /* D3DTEXF_NONE */
+    sm_unref(rt);
+    return i;
+}
 
 static void fd_drop(void)
 {
@@ -1938,7 +2132,7 @@ static void fd_drop(void)
 }
 
 /* The draw in hand into the list, 1; 0 to draw it now (the list is full, or no buffers). */
-static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3)
+static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT pc, int dot3, const float *ck)
 {
     BYTE  *eng = *(BYTE **)0x7ad508;
     FdRec *r;
@@ -1973,6 +2167,11 @@ static int fd_take(void *d8, void *d9, DWORD pt, UINT mi, UINT nv, UINT si, UINT
     D9_FN(d9, D9_GETTRANSFORM, D9Mat_t)(d9, 2, v);                           /* VIEW */
     r->z = g_sh_w[12] * v[2] + g_sh_w[13] * v[6] + g_sh_w[14] * v[10] + v[14];
     for (i = 0; i < g_fd_n; i++) if (g_fd[i].inst == r->inst) { r->z = g_fd[i].z; break; }
+    r->ck = 0;
+    if (ck) {
+        ck_record(d9, r, *ck);
+        if (++g_ck_draws == 1) logline("cloak: a cloaked hull drawn as glass at Flush");
+    }
     g_fd_n++;
     return 1;
 }
@@ -1992,6 +2191,7 @@ static void fd_draw(void *d9, const FdRec *r, void *hvs, void *hps, void *bvs, v
     d9_bind(d9, r->dot3 ? bvs : hvs, r->dot3 ? bps : hps);
     d9_vsconst(d9, 0, r->vc, FD_VS);
     d9_psconst(d9, 0, r->pc4, FD_PS);
+    if (r->ck) d9_psconst(d9, 84, r->ckc, CK_PS);
     D9_FN(d9, SM_DIP, SmDIP9_t)(d9, r->pt, r->base, r->mi, r->nv, r->si, r->pc);
 }
 
@@ -2031,14 +2231,35 @@ static void fd_replay(void)
     }
     sm_bind(d9);
     for (a = 0; a < n; a = b) {
+        /* A cloaked hull: the frame under it copied first, as it is with everything
+         * farther away drawn, then drawn opaque in cloak_ps over the copy. If the copy
+         * cannot be made, faded as stock fades it. */
+        void *cps = NULLPTR, *cbps = NULLPTR;
+        int   ck = 0;
         for (b = a + 1; b < n && g_fd[g_fd_ix[b]].inst == g_fd[g_fd_ix[a]].inst; b++) ;
+        if (g_fd[g_fd_ix[a]].ck) {
+            ck_reload();
+            cps = d9_shader(d9, &g_cloak_ps);
+            cbps = d9_shader(d9, &g_cloak_bump_ps);
+            ck = cps && cbps && ck_copy(d9, &g_fd[g_fd_ix[a]]);
+            for (i = a; i < b; i++)
+                if (!ck) g_fd[g_fd_ix[i]].pc4[43] = 0.2f + 0.8f * g_fd[g_fd_ix[i]].ckc[20];   /* misc.w: the alpha */
+            if (ck) {
+                static const DWORD ss[][2] = { { 1, 3 }, { 2, 3 }, { 5, 2 }, { 6, 2 }, { 7, 0 }, { 11, 0 } };
+                D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, 6, g_ck_tex);      /* CLAMP, LINEAR, no mips, no sRGB */
+                for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++)
+                    D9_FN(d9, D9_SETSAMPLERSTATE, D9SetSamp_t)(d9, 6, ss[i][0], ss[i][1]);
+            }
+        }
         for (pass = 0; pass < 2; pass++) {
             D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 14, pass ? 0 : 1);      /* ZWRITEENABLE */
             D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 23, 4);                 /* ZFUNC LESSEQUAL */
             D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 168, pass ? 15 : 0);    /* COLORWRITEENABLE */
-            D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 27, pass ? 1 : 0);      /* ALPHABLENDENABLE */
-            for (i = a; i < b; i++) fd_draw(d9, &g_fd[g_fd_ix[i]], hvs, hps, bvs, bps);
+            D9_FN(d9, D9_SETRENDERSTATE, SmState_t)(d9, 27, pass && !ck ? 1 : 0);   /* ALPHABLENDENABLE */
+            for (i = a; i < b; i++)
+                fd_draw(d9, &g_fd[g_fd_ix[i]], hvs, pass && ck ? cps : hps, bvs, pass && ck ? cbps : bps);
         }
+        if (ck) D9_FN(d9, D9_SETTEXTURE, SmSetTex_t)(d9, 6, NULLPTR);
     }
     sm_unbind(d9);
     D9_FN(g_fd_sb, 5, SmSB_t)(g_fd_sb);                                          /* Apply */
@@ -2055,6 +2276,8 @@ static void fd_release(void)
     fd_drop();
     sm_unref(g_fd_sb);
     g_fd_sb = NULLPTR;
+    sm_unref(g_ck_surf); sm_unref(g_ck_tex);      /* default pool: gone before a Reset */
+    g_ck_surf = g_ck_tex = g_ck_dev = NULLPTR;
 }
 
 static void __fastcall hook_flush(void *dev, void *edx)
@@ -3756,6 +3979,31 @@ static void build_paths(char *ini)
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "Lighting.log");
 }
 
+/* The look of a cloaked hull; again once a second with CloakReload=1, for tuning. */
+static void ck_keys(const char *ini)
+{
+    ini1(ini, "CloakBend",   &g_ck_bend);
+    ini1(ini, "CloakSplit",  &g_ck_split);
+    ini1(ini, "CloakRipple", &g_ck_ripple);
+    ini1(ini, "CloakSpeed",  &g_ck_speed);
+    ini3(ini, "CloakTint",   g_ck_tint);
+    ini1(ini, "CloakRim",    &g_ck_rim);
+    ini3(ini, "CloakRimColour", g_ck_rim_col);
+    ini1(ini, "CloakGlint",  &g_ck_glint);
+    ini1(ini, "CloakHull",   &g_ck_floor);
+    ini1(ini, "CloakFront",  &g_ck_glow);
+    ini3(ini, "CloakFrontColour", g_ck_edge);
+}
+
+static void ck_reload(void)
+{
+    static DWORD last;
+    DWORD now = GetTickCount();
+    if (!g_ck_reload || !g_ini[0] || now - last < 1000) return;
+    last = now;
+    ck_keys(g_ini);
+}
+
 static void startup(void)
 {
     char ini[320];
@@ -3770,6 +4018,10 @@ static void startup(void)
     g_shaders = (int)GetPrivateProfileIntA("Lighting", "Shaders", 1, ini);
     g_bump    = (int)GetPrivateProfileIntA("Lighting", "BumpShaders", 1, ini);
     g_near_fade = (int)GetPrivateProfileIntA("Lighting", "NearFade", 1, ini);
+    g_cloak   = (int)GetPrivateProfileIntA("Lighting", "Cloak", 1, ini);
+    g_ck_reload = (int)GetPrivateProfileIntA("Lighting", "CloakReload", 0, ini);
+    g_ini[0] = 0; s_cat(g_ini, ini);
+    ck_keys(ini);
     ini1(ini, "NearFadeDepth", &g_nf_depth);
     ini1(ini, "NearFadeMin",   &g_nf_min);
     ini1(ini, "SelfIllumination", &g_selfillum);
@@ -3859,6 +4111,7 @@ static void startup(void)
     s_cat(b, " Shaders=");         s_num(b, g_shaders);
     s_cat(b, " BumpShaders=");     s_num(b, g_bump);
     s_cat(b, " NearFade=");        s_num(b, g_near_fade);
+    s_cat(b, " Cloak=");           s_num(b, g_cloak);
     s_cat(b, " PlanetShaders=");   s_num(b, g_planet_sh);
     s_cat(b, " Shadows=");         s_num(b, g_shadows);
     s_cat(b, " PlanetShadows=");   s_num(b, g_planet_shadows);
@@ -3916,13 +4169,13 @@ static void startup(void)
         if (patch_slot(VT_CRAFT_INSTANCE, 4, FN_CRAFT_FADE, (const void *)hook_craft_fade)) n++;
         else logline("NOT PATCHED: CraftInstance vtable differs, stock's near fade");
     }
-    if (g_gpu && g_shaders && g_near_fade) {
+    if (g_gpu && g_shaders && (g_near_fade || g_cloak)) {
         /* both or neither: fading hulls recorded and never drawn would vanish */
         if (slot_is(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED) && slot_is(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH) &&
             patch_slot(VT_DEVICE_DX8, 14, FN_DEVICE_FLUSH, (const void *)hook_flush) &&
             patch_slot(VT_DEVICE_DX8, 29, FN_SORT_REQUIRED, (const void *)hook_sort_required))
             n += 2;
-        else logline("NOT PATCHED: DeviceDirectX8 vtable differs, no near fade in the shaders");
+        else { logline("NOT PATCHED: DeviceDirectX8 vtable differs, no near fade or cloak in the shaders"); g_cloak = 0; }
     }
     if (g_nebulae) n += redirect(S_NEBULA, (const void *)hook_nebula_lights);
     if (g_neb_cull > 1.0f) {

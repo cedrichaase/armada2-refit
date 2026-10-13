@@ -19,6 +19,7 @@ Nor does `Shields.asi`: its shield hits are procedural, and its log says its hoo
 patched; nor `Repair.asi`, whose welding is procedural too, nor `Venting.asi`, whose
 vents are.
 `Fog.asi` draws the engine's own fog texture, and says it patched both layers.
+`Specials.asi`'s warp flash, beams and waves are procedural, and its log names its hooks.
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -34,7 +35,8 @@ vents are.
 12. Expect "Repair.log" contains "AddParticle, DrawScaled3D and RenderChunks".
 13. Expect "Venting.log" contains "RenderParticle, the spray emitter's RenderInternal".
 14. Expect "Fog.log" contains "the fog's and the shroud's ST3D_Node::Render patched".
-15. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
-16. Quit the game.
-17. Expect the game to have exited.
-18. Expect no crash.
+15. Expect "Specials.log" contains "and the ordnance's Submit, ShockwaveExplosion::Submit".
+16. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
+17. Quit the game.
+18. Expect the game to have exited.
+19. Expect no crash.

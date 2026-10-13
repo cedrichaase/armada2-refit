@@ -30,6 +30,8 @@
 #   repair     repair/install.sh             Repair.asi: the repair welding drawn by shaders
 #   venting    venting/install.sh            Venting.asi: the plasma and gas a damaged ship
 #                                            vents, drawn by shaders
+#   specials   specials/install.sh           Specials.asi: the warp flash and the special
+#                                            weapons drawn by shaders
 #   fog        fog/install.sh                Fog.asi: the fog of war and the shroud with
 #                                            smooth edges
 #   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
@@ -66,5 +68,6 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/shields/install.sh"
 "$here/repair/install.sh"
 "$here/venting/install.sh"
+"$here/specials/install.sh"
 "$here/fog/install.sh"
 "$here/cutscenes/binkproxy/install.sh"

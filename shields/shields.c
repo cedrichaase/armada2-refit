@@ -342,6 +342,7 @@ static struct {
     int   enable, reload, log_hits, colour_mode, pattern;
     float brightness, spot, spot_size, flash, flash_time, duration, sustain;
     float ring, ring_speed, ring_width, ring_time, ring_period, ring_lattice;
+    int   shells;
     float lattice, glow_reach, glow_time, glow_sustain, time_scale, rim, rim_power, core;
     float hex_cells, hex_line, crackle;
     float damage_ref, strength_min, strength_max, fade_out;
@@ -355,6 +356,7 @@ static struct {
     float down_rim_power, down_lit, down_light, down_light_col[3], down_light_reach;
 } S;
 static FILETIME g_ini_time;
+static int   g_shells_read;      /* 0: read the [Shell.] sections again (the file, or the database, changed) */
 
 static void read_settings(void)
 {
@@ -383,6 +385,8 @@ static void read_settings(void)
     S.ring_period  = inif("RingPeriod", 0.4f);
     S.ring_lattice = inif("RingLattice", 0.0f);
     S.lattice      = inif("Lattice", 0.25f);
+    S.shells       = (int)GetPrivateProfileIntA("Shields", "Shells", 1, g_ini);
+    g_shells_read  = 0;
     S.glow_reach   = inif("GlowReach", 0.35f);
     S.glow_time    = inif("GlowTime", 0.6f);
     S.glow_sustain = clamp_f(inif("GlowSustain", 0.3f), 0.0f, 1.0f);
@@ -524,7 +528,8 @@ static const Made *made_of(int id)
 /* ---- the hits ------------------------------------------------------------ */
 
 typedef struct {
-    int    id, handle, site;
+    int    id, handle, site, type;   /* type: 0 the ordinary hit, 2..7 a special weapon's shell */
+    int    whole;                    /* a shell over the whole ship (an identity frame: no point struck) */
     float  dir[3];        /* where it struck, in shield space (the unit sphere) */
     float  strength;
     double birth, death;  /* seconds; death < 0 while the engine still has the hit */
@@ -559,6 +564,82 @@ static void *type1_model(void)
 {
     void **db = *(void ***)SHIELD_LOGICAL_DB;
     return db ? db[1] : NULLPTR;
+}
+
+/* ---- the special weapons' shells -------------------------------------------- */
+
+/* Types 2..7 (wshldadd, wshldsub, wcorbrfr, wshldrmd, wmanhiem, WEclairlink1: the
+ * special weapons' shells) are the plugin's when Shields.ini has a section
+ * [Shell.<the type's model name>] with On=1: drawn as hits of their own colour,
+ * brightness and lattice, held while the engine keeps them, as a beam's hit is. A
+ * type's name is the engine's own: ShieldEffect::GetShieldType looks a name up in a
+ * null-terminated table of them (SHIELD_TYPE_NAMES), in type order, so nothing here
+ * depends on the order of the types. */
+#define SHIELD_TYPE_NAMES  0x6b00e0   /* const char *[], the shield types' names, 0 at the end */
+#define FN_GET_SHIELD_TYPE 0x474720   /* ShieldEffect::GetShieldType(const char *), which reads it */
+
+/* GetShieldType reads the table where this exe has it: else the shells stay stock. */
+static int names_ok(void) { return *(const DWORD *)(FN_GET_SHIELD_TYPE + 4) == SHIELD_TYPE_NAMES; }
+typedef struct { const void *model; char name[32]; int on; float col[3], bright, lattice, spot, ring; } Shell;
+static Shell g_shell[8];
+
+static void shells_read(void)
+{
+    void **db = *(void ***)SHIELD_LOGICAL_DB;
+    int    k, i;
+    g_shells_read = 1;
+    for (k = 0; k < 8; k++) {
+        Shell      *sh = &g_shell[k];
+        const char *nm = NULLPTR;
+        char        sect[48], b[64];
+        float       v[3];
+        sh->model = db ? db[k] : NULLPTR;
+        sh->on = 0;
+        sh->name[0] = 0;
+        if (k < 2 || !sh->model || !names_ok()) continue;
+        for (i = 0; i <= k; i++) if (!((const char * const *)SHIELD_TYPE_NAMES)[i]) break;   /* the table may be shorter */
+        if (i <= k || !(nm = ((const char * const *)SHIELD_TYPE_NAMES)[k])) continue;
+        for (i = 0; i < 31 && nm[i]; i++) sh->name[i] = nm[i];
+        sh->name[i] = 0;
+        sect[0] = 0; s_cat(sect, "Shell."); s_cat(sect, sh->name);
+        sh->on = (int)GetPrivateProfileIntA(sect, "On", 0, g_ini) && S.shells;
+        v[0] = 255.0f; v[1] = 255.0f; v[2] = 255.0f;
+        GetPrivateProfileStringA(sect, "Colour", "", b, sizeof b, g_ini);
+        if (b[0]) parsen(b, v, 3);
+        for (i = 0; i < 3; i++) sh->col[i] = v[i] / 255.0f;
+#define SHELL_F(key, field, def) \
+        sh->field = def; GetPrivateProfileStringA(sect, key, "", b, sizeof b, g_ini); if (b[0]) parsen(b, &sh->field, 1);
+        SHELL_F("Brightness", bright, 1.0f)
+        SHELL_F("Lattice", lattice, S.lattice)
+        SHELL_F("Spot", spot, S.spot)
+        SHELL_F("Ring", ring, S.ring)
+#undef SHELL_F
+    }
+    {
+        static int said;
+        if (!said && db && g_shell[2].model) {
+            char b[300];
+            said = 1;
+            b[0] = 0; s_cat(b, "special weapons' shells:");
+            for (k = 2; k < 8; k++) {
+                s_cat(b, " "); s_cat(b, g_shell[k].name[0] ? g_shell[k].name : "-");
+                if (g_shell[k].on) s_cat(b, " (ours)");
+            }
+            logline(b);
+        }
+    }
+}
+
+/* The type of a hit's model: 0 the ordinary hit, a shell's index with a recipe, or -1. */
+static int hit_type(const void *model)
+{
+    void **db = *(void ***)SHIELD_LOGICAL_DB;
+    int    k;
+    if (!db || !model) return -1;
+    if (!g_shells_read || g_shell[2].model != db[2]) shells_read();
+    if (model == db[0]) return 0;
+    for (k = 2; k < 8; k++) if (g_shell[k].on && model == g_shell[k].model) return k;
+    return -1;
 }
 
 static void mem_copy(void *d, const void *s, unsigned n)
@@ -690,9 +771,12 @@ static void gather(double now)
                     d->seen = 1;
                 }
             }
-            if (sh && *(BYTE **)(sh + HIT_SECOND) == model && (obj = object_of(*(int *)(sh + HIT_HANDLE))) != NULLPTR) {
+            int ty = sh ? hit_type(*(void **)(sh + HIT_SECOND)) : -1;
+            if (sh && ty >= 0 && (obj = object_of(*(int *)(sh + HIT_HANDLE))) != NULLPTR) {
                 float d[3];
-                if (hit_dir(sh, obj, d)) {
+                int   whole = 0;
+                if (!hit_dir(sh, obj, d) && ty > 0) { d[0] = 0.0f; d[1] = 0.0f; d[2] = 1.0f; whole = 1; }
+                if (whole || hit_dir(sh, obj, d)) {
                     Hit *h = NULLPTR;
                     for (i = 0; i < g_nhit; i++) if (g_hit[i].id == id) { h = &g_hit[i]; break; }
                     if (!h && g_nhit < MAX_HITS) {
@@ -700,14 +784,18 @@ static void gather(double now)
                         float dmg;
                         h = &g_hit[g_nhit++];
                         h->id = id; h->birth = now; h->death = -1.0;
-                        h->site = m ? m->site : 1;
-                        dmg = m && m->damage >= 0.0f ? m->damage : S.damage_ref;
+                        h->type = ty;
+                        h->whole = whole;
+                        h->site = ty ? 0 : m ? m->site : 1;     /* a shell holds while the engine keeps it */
+                        dmg = !ty && m && m->damage >= 0.0f ? m->damage : S.damage_ref;
                         h->strength = clamp_f(sqrt_f(dmg / S.damage_ref), S.strength_min, S.strength_max);
                         if (S.log_hits || g_logged_hits < 12) {
                             char b[300];
                             const char *odf = ((OdfName_t)FN_ODF_NAME)(obj);
                             g_logged_hits++;
-                            b[0] = 0; s_cat(b, "hit "); s_num(b, id); s_cat(b, " on ");
+                            b[0] = 0; s_cat(b, "hit "); s_num(b, id);
+                            if (ty) { s_cat(b, " ("); s_cat(b, g_shell[ty].name); s_cat(b, ")"); }
+                            s_cat(b, " on ");
                             s_cat(b, odf ? odf : "?"); s_cat(b, " by a "); s_cat(b, k_site_name[h->site & 3]);
                             s_cat(b, ", damage "); s_flt(b, dmg); s_cat(b, " -> strength "); s_flt(b, h->strength);
                             s_cat(b, "; at "); s_flt(b, d[0]); s_cat(b, " "); s_flt(b, d[1]); s_cat(b, " "); s_flt(b, d[2]);
@@ -933,7 +1021,7 @@ static void ship_vsconst(void *d9, const float *A, const float *B, const float *
 }
 
 /* One struck ship: its shield ellipsoid, its hits. */
-static void draw_ship(void *d9, BYTE *obj, const int *idx, int n, double now, const float *eye)
+static void draw_ship(void *d9, BYTE *obj, const int *idx, int n, double now, const float *eye, int type, int whole)
 {
     float A[9], B[9], t[3], R;
     float pc[24][4], col[3], lvl = 1.0f, bright;
@@ -954,6 +1042,11 @@ static void draw_ship(void *d9, BYTE *obj, const int *idx, int n, double now, co
     if (S.colour_mode != COL_STOCK)
         for (i = 0; i < 3; i++) col[i] += (S.low[i] - col[i]) * S.low_shift * (1.0f - lvl);
     bright = S.brightness * (S.weak_level + (1.0f - S.weak_level) * lvl);
+    if (type > 0) {   /* a special weapon's shell: its own colour and brightness, whatever the shields' level */
+        for (i = 0; i < 3; i++) col[i] = g_shell[type].col[i];
+        bright = S.brightness * g_shell[type].bright;
+        lvl = 1.0f;
+    }
     if (lvl < S.flicker_below) {
         float weak = (S.flicker_below - lvl) / S.flicker_below;
         DWORD tick = (DWORD)(long)(now * S.flicker_rate);
@@ -966,6 +1059,11 @@ static void draw_ship(void *d9, BYTE *obj, const int *idx, int n, double now, co
     pc[1][0] = col[0]; pc[1][1] = col[1]; pc[1][2] = col[2]; pc[1][3] = bright;
     pc[2][0] = 1.0f / S.spot_size; pc[2][1] = 1.0f / S.ring_width; pc[2][2] = 1.0f / S.glow_reach; pc[2][3] = S.rim_power;
     pc[3][0] = S.spot; pc[3][1] = S.ring; pc[3][2] = S.lattice; pc[3][3] = S.rim;
+    if (type > 0) { pc[3][0] = g_shell[type].spot; pc[3][1] = g_shell[type].ring; pc[3][2] = g_shell[type].lattice; }
+    if (whole) {      /* over the whole ship: no spot, a glow all over it, rings sweeping over it */
+        pc[2][2] = 0.3f;
+        pc[3][0] = 0.0f;
+    }
     {
         double w = now - (double)(long)(now / 1000.0) * 1000.0;
         pc[4][0] = S.hex_cells; pc[4][1] = S.hex_line; pc[4][2] = (float)w;
@@ -1119,7 +1217,8 @@ static int draw_hits(void)
         obj = object_of(g_hit[i].handle);
         for (j = i; j < g_nhit; j++) {
             float w;
-            if (done[j] || g_hit[j].handle != g_hit[i].handle) continue;
+            if (done[j] || g_hit[j].handle != g_hit[i].handle || g_hit[j].type != g_hit[i].type ||
+                g_hit[j].whole != g_hit[i].whole) continue;
             done[j] = 1;
             w = hit_weight(&g_hit[j], now);
             if (w < 0.003f) continue;
@@ -1129,7 +1228,7 @@ static int draw_hits(void)
         if (!obj || !np) continue;
         if (!((CanSee_t)(*(void ***)obj)[SLOT_CAN_SEE])(obj)) continue;   /* as DrawShield asks */
         if (!captured) { capture(d9, &captured, &cols[0][0]); d9_bind(d9, vs, ps); }
-        draw_ship(d9, obj, pick, np, now, eye);
+        draw_ship(d9, obj, pick, np, now, eye, g_hit[i].type, g_hit[i].whole);
         g_ships_drawn++;
     }
     if (g_down_ok) {
@@ -1235,6 +1334,7 @@ static void __fastcall hook_drawshield(BYTE *hit, void *edx, void *cam, void *ma
 {
     (void)edx;
     if (g_drawing && S.enable && hit && *(BYTE **)(hit + HIT_SECOND) == type0_model() && type0_model()) return;
+    if (g_drawing && S.enable && hit && hit_type(*(void **)(hit + HIT_SECOND)) > 0) return;
     if (g_drawing && S.enable && S.down && g_down_ok && hit && *(BYTE **)(hit + HIT_SECOND) == type1_model() && type1_model()) return;
     g_prev_draw(hit, cam, mat);
 }

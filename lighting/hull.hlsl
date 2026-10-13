@@ -354,3 +354,87 @@ float4 moon_ps(Lit i) : COLOR
     c.rgb += msurf_glow.rgb * B.a;
     return c;
 }
+
+// ---- cloaked hulls: thick glass (Cloak=1) ----
+// A cloaking or cloaked ship, drawn at Flush after what lies behind it, over a copy of
+// the frame under it (s6). The hull bends what is behind it as a block of glass would,
+// along its normal seen from the eye, by more at the edges where the glass runs
+// thickest, and each colour by a different amount, so edges split into fringes. A slow
+// ripple moves the normal, stronger while the cloak comes on or goes off. The lit hull
+// shows through as much as the cloak has left of it, and goes from patch to patch,
+// with a glowing front where it is going. lighting/README.md, "Cloaked ships".
+float4 ck_view[3] : register(c84);  // columns of VIEW: world -> view x, y, z
+float4 ck_proj    : register(c87);  // x, y: half the projection's scale over the frame's size
+                                    // (world units at depth 1 -> uv); z, w: one pixel in uv
+float4 ck_ctr     : register(c88);  // the hull's bounding sphere: centre, world; w: radius
+float4 ck_a       : register(c89);  // x: how much of the hull is left (1 visible .. 0 cloaked);
+                                    // y: time, s; z: the bend, a share of the radius; w: the colour split
+float4 ck_b       : register(c90);  // x: the ripple; y: the rim; z: the glint; w: the hull's floor
+float4 ck_tint    : register(c91);  // rgb: what the glass passes; a: the front's glow
+float4 ck_rim     : register(c92);  // rgb: the rim's colour
+float4 ck_edge    : register(c93);  // rgb: the front's colour
+sampler2D ck_scene : register(s6);  // the frame behind the hull
+
+float3 ck_scene_at(float2 uv, float2 off, float split)
+{
+    // three taps per colour along the bend: the fringes are soft, not three ghosts
+    float3 c = 0.0;
+    for (int k = -1; k <= 1; k++) {
+        float s = 1.0 + split * 0.35 * k;
+        c.r += tex2Dlod(ck_scene, float4(uv + off * (s + split), 0.0, 0.0)).r;
+        c.g += tex2Dlod(ck_scene, float4(uv + off * s, 0.0, 0.0)).g;
+        c.b += tex2Dlod(ck_scene, float4(uv + off * (s - split), 0.0, 0.0)).b;
+    }
+    return c / 3.0;
+}
+
+float4 cloak_shade(float3 N, float3 wp, float4 hull, float2 vpos)
+{
+    float3 Nt  = N * misc.x;                          // outward
+    float3 V   = normalize(eye.xyz - wp);
+    float3 q   = (wp - ck_ctr.xyz) / max(ck_ctr.w, 1e-3);
+    float  vis = ck_a.x, t = ck_a.y;
+    // the ripple: three slow waves across the hull, as stock's alpha wave runs, on the normal
+    float  amp = ck_b.x * (0.4 + 2.4 * vis * (1.0 - vis));
+    float3 wob = float3(sin(q.y * 5.3 + t * 1.10),
+                        sin(q.z * 4.7 + t * 0.90 + 1.7),
+                        sin(q.x * 6.1 - t * 1.30 + 3.1));
+    float3 Ng  = normalize(Nt + wob * amp);
+    float3 nv  = float3(dot(Ng, ck_view[0].xyz), dot(Ng, ck_view[1].xyz), dot(Ng, ck_view[2].xyz));
+    float  z   = max(dot(wp - eye.xyz, ck_view[2].xyz), 1.0);
+    float  ndv = saturate(dot(Ng, V));
+    // the bend in world units, thicker towards the silhouette, then onto the screen
+    float  w   = ck_a.z * ck_ctr.w * (0.5 + 1.0 * sqrt(saturate(1.0 - ndv * ndv)));
+    float2 off = float2(nv.x, -nv.y) * w * ck_proj.xy / z;
+    float2 uv  = (vpos + 0.5) * ck_proj.zw;
+    float3 c   = ck_scene_at(uv, off, ck_a.w) * ck_tint.rgb;
+    // the glass's own light: a rim where it turns away, and the Key's glint
+    float  f   = pow(1.0 - ndv, 4.0);
+    c += ck_rim.rgb * f * ck_b.y;
+    c += pow(saturate(dot(Ng, normalize(sun.xyz + V))), 90.0) * ck_b.z;
+    // the hull, patch by patch: a smooth field over the hull, against how far the cloak has gone
+    float  m   = 0.5 + 0.30 * sin(q.x * 3.1 + q.y * 2.3 + 0.7) * sin(q.z * 2.7 - q.x * 1.3)
+                     + 0.15 * sin(q.y * 7.1 - q.z * 5.3 + 2.0);
+    float  e   = vis * 1.4 - 0.2;                     // the front, from beyond 0 to beyond 1
+    float  sh  = smoothstep(m - 0.12, m + 0.12, e);
+    float  edge = (1.0 - saturate(abs(e - m) / 0.12)) * step(0.001, vis) * step(vis, 0.999);
+    float  keep = lerp(ck_b.w, 1.0, sh);
+    c = lerp(c, hull.rgb, keep) + ck_edge.rgb * edge * ck_tint.a;
+    return float4(c, 1.0);
+}
+
+float4 cloak_ps(Lit i, float2 vpos : VPOS) : COLOR
+{
+    float3 N = normalize(i.n);
+    return cloak_shade(N, i.wp, shade(N, i.wp, i.uv, i.sc), vpos);
+}
+
+float4 cloak_bump_ps(Bumped i, float2 vpos : VPOS) : COLOR
+{
+    float3 m  = tex2D(nmap, i.uv).rgb * 2.0 - 1.0;
+    float3 Nt = -normalize(i.n);
+    float3 b  = across(i.s, Nt) * m.x + across(i.t, Nt) * m.y + Nt * m.z;
+    float  l  = length(b);
+    float3 N  = l > 1e-5 ? -b / l : -Nt;
+    return cloak_shade(N, i.wp, shade(N, i.wp, i.uv, i.sc), vpos);
+}
