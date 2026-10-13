@@ -4,6 +4,22 @@
 in place of the stock shell. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-13
+
+### Added
+- The special weapons' shells (types 2..7: `wshldadd`, `wshldsub`, `wcorbrfr`,
+  `wshldrmd`, `wmanhiem`, `WEclairlink1`) drawn as hits of their own colour,
+  brightness, spot, ring and lattice when `Shields.ini` has a `[Shell.<name>]` section
+  with `On=1`, the name being the engine's own (the table `ShieldEffect::GetShieldType`
+  reads); held while the engine keeps them, as a beam's hit. A shell over the whole
+  ship (the corbomite reflector's: an identity frame) has no hot spot and glows all
+  over the ellipsoid, rings sweeping over it. Recipes for all six; the corbomite
+  reflector is a gold mirror with its lattice standing out.
+- `Shields.ini`: `Shells`; `[Shell.<name>]` `On`, `Colour`, `Brightness`, `Spot`, `Ring`,
+  `Lattice`. `Shields.log` names the shell types once.
+
+Installed, not yet seen in game.
+
 ## 1.1.1 — 2026-10-13
 
 ### Changed

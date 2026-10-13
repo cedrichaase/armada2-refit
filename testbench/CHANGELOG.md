@@ -5,6 +5,35 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.14.0 — 2026-10-13
+
+### Added
+- `SCENE=cloak`: the player's own warbird and Bird of Prey in front of a planet and a
+  Galaxy class, for cloaked ships drawn as glass.
+- Scene command `cloak <name> on|off|now`, and each craft's cloak state in `query`.
+- Scenario `cloak`: cloaks, holds and decloaks the warbird, checks the glass path in
+  `Lighting.log`, and shoots each stage.
+
+Installs nothing; seen working on the bench 2026-10-13.
+
+## 3.13.0 — 2026-10-13
+
+### Added
+- `Scene.asi`: `special <ship> <weapon> [<target>]` fires a ship's special weapon (its
+  weapon ODF's name): the weapon's slot in the ship's carrier, then
+  `Craft::FireAtSpecial`, as a player's order does; it answers with the slot, whether the
+  weapon can fire and whether it fired. `energy <ship> on|off` and the scene key
+  `Energy=` keep a ship's special energy full every tick. Scenes may hold 96 objects
+  (was 32).
+- `SCENE=specials`: an enemy Sovereign that cannot die and does not fire, and a Galaxy
+  off to one side to warp, for `Specials.asi`.
+- Scenario `specials`: the holding beam, the tractor beam and the warp flash drawn by
+  `Specials.asi`, and psionic insanity's wave shot, with shots. `no-assets` also expects
+  `Specials.log`'s hooks line.
+- The bench clears `Specials.log` at launch and gathers it with `Specials.ini`.
+
+Installs nothing.
+
 ## 3.12.0 — 2026-10-13
 
 ### Added
