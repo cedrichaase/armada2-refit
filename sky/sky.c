@@ -61,6 +61,7 @@ typedef struct { long long q; } LARGE;
 
 #define GENERIC_WRITE          0x40000000
 #define FILE_SHARE_READ        0x00000001
+#define CREATE_ALWAYS          2
 #define OPEN_ALWAYS            4
 #define FILE_ATTRIBUTE_NORMAL  0x80
 #define FILE_END               2
@@ -155,6 +156,12 @@ static void logline(const char *s)
 static float sin_f(float x)  { float r; __asm__("fsin"  : "=t"(r) : "0"(x)); return r; }
 static float cos_f(float x)  { float r; __asm__("fcos"  : "=t"(r) : "0"(x)); return r; }
 static float fmod_f(float x, float m) { return x - (float)(int)(x / m) * m; }   /* x >= 0 */
+static float sqrt_f(float x) { float r; __asm__("fsqrt" : "=t"(r) : "0"(x)); return r; }
+
+/* The fine detail's noise volume (fine_volume): FINE_N texels a side, tiling. One
+ * feature of its noise spans about three texels, FINE_FEATURE of a tile. */
+#define FINE_N       64
+#define FINE_FEATURE (3.0f / FINE_N)
 
 #define DEG 0.017453293f
 
@@ -215,6 +222,7 @@ static int g_enable = 1;      /* Enable= */
 static int g_timing = 0;      /* Timing= */
 static int g_reload = 1;      /* Reload= */
 static int g_face = 1536;     /* Face=: the baked cube's edge; 0 computes every pixel, every frame */
+static int g_dump = 0;        /* Dump=: 1 writes each bake's faces to Sky\<name>.dump<f>.tga */
 static FILETIME g_ini_time;
 
 static void read_settings(void)
@@ -223,14 +231,15 @@ static void read_settings(void)
     g_logging = (int)GetPrivateProfileIntA("Sky", "Log",    1, g_ini);
     g_timing  = (int)GetPrivateProfileIntA("Sky", "Timing", 0, g_ini);
     g_reload  = (int)GetPrivateProfileIntA("Sky", "Reload", 1, g_ini);
+    g_dump    = (int)GetPrivateProfileIntA("Sky", "Dump", 0, g_ini);
     g_face    = (int)GetPrivateProfileIntA("Sky", "Face", 1536, g_ini);
     if (g_face && g_face < 64) g_face = 64;
     if (g_face > 4096) g_face = 4096;
 }
 
-/* The pixel shader's constants, c0..c18; their meaning is listed in sky.hlsl. The
- * bake's face constants follow them, at c19. */
-#define NCONST 19
+/* The pixel shader's constants, c0..c21; their meaning is listed in sky.hlsl. The
+ * bake's face constants follow them, at c22. */
+#define NCONST 22
 typedef struct {
     char     name[64];        /* the map's background name, as the engine holds it */
     char     path[360];       /* Sky\<name>.ini */
@@ -337,6 +346,19 @@ static int recipe_read(Recipe *r)
     st[0] = 0.0f; st[1] = 0.0f;                                         /* Haze: off */
     inin(f, "Haze", st, 2);
     r->k[14][3] = st[0]; r->k[15][3] = st[1];
+    st[0] = st[1] = st[2] = 1.0f;                                       /* the grade: none */
+    inin(f, "GradeGain", st, 3);
+    r->k[19][0] = st[0]; r->k[19][1] = st[1]; r->k[19][2] = st[2];
+    st[0] = st[1] = st[2] = 1.0f;
+    inin(f, "GradeCurve", st, 3);
+    for (i = 0; i < 3; i++) r->k[20][i] = st[i] < 0.2f ? 0.2f : st[i];
+    st[0] = 0.1f; st[1] = 0.3f; st[2] = 0.55f;                          /* Fine: amount, size (degrees), gain */
+    inin(f, "Fine", st, 3);
+    if (st[1] < 0.01f) st[1] = 0.01f;
+    r->k[21][0] = st[0];
+    r->k[21][1] = FINE_FEATURE / (st[1] * DEG);   /* volume tiles per radian */
+    r->k[21][2] = st[2];
+    r->k[21][3] = 0.5f * st[0] * st[0];
     r->gen++;
 
     b[0] = 0; s_cat(b, "recipe "); s_cat(b, f); s_cat(b, " read");
@@ -427,11 +449,14 @@ static double  g_gpu_sum;
 static LARGE   g_qpf;
 static long    g_gpu_n;
 
+static void *g_fine;          /* the fine detail's noise volume, MANAGED pool */
+
 static void drop_objects(void)
 {
     int i;
     unref(g_sb); g_sb = NULLPTR;
     unref(g_cube); g_cube = NULLPTR; g_cube_edge = 0; g_cube_gen = -1;
+    unref(g_fine); g_fine = NULLPTR;
     for (i = 0; i < NQ; i++) { unref(g_q[i][0]); unref(g_q[i][1]); g_q[i][0] = g_q[i][1] = NULLPTR; g_qbusy[i] = 0; }
     unref(g_qfreq); g_qfreq = NULLPTR; g_freq = 0;
 }
@@ -470,6 +495,89 @@ static int timing_slot(void *d9)
     return -1;
 }
 
+/* The fine detail's noise (sky.hlsl, fine_z): white noise blurred by a Gaussian of
+ * 1.2 texels with wrap-around, so it tiles and is smooth under trilinear filtering;
+ * stored as L8 at 0.5 + z/8 for z in units of its own spread (+-4 spreads fill the
+ * byte), with a box-filtered mip chain so an octave finer than a pixel fades to the
+ * mean. Made once per device, 300 KB. */
+#define FINE_N3 (FINE_N * FINE_N * FINE_N)
+static float g_fa[FINE_N3], g_fb[FINE_N3];
+
+static DWORD fine_hash(DWORD x)
+{
+    x *= 0x9e3779b1u; x ^= x >> 16; x *= 0x85ebca6bu; x ^= x >> 13; x *= 0xc2b2ae35u; x ^= x >> 16;
+    return x;
+}
+
+/* one axis of the blur, src to dst; stride 1, N or N*N picks the axis */
+static void fine_blur(const float *src, float *dst, int stride)
+{
+    static const float w[5] = { 1.0f, 0.7066f, 0.2494f, 0.04394f, 0.003866f };   /* exp(-k^2 / 2.88) */
+    int i, k;
+    for (i = 0; i < FINE_N3; i++) {
+        int   c = (i / stride) % FINE_N, base = i - c * stride;
+        float s = w[0] * src[i];
+        for (k = 1; k < 5; k++)
+            s += w[k] * (src[base + ((c + k) & (FINE_N - 1)) * stride] +
+                         src[base + ((c - k) & (FINE_N - 1)) * stride]);
+        dst[i] = s;
+    }
+}
+
+typedef long (__stdcall *MakeVol_t)(void *, UINT, UINT, UINT, UINT, DWORD, DWORD, DWORD, void **, void *);
+typedef long (__stdcall *VolLock_t)(void *, UINT, void *, const void *, DWORD);
+typedef long (__stdcall *VolUnlock_t)(void *, UINT);
+
+static int fine_volume(void *d9)
+{
+    static int said;
+    struct { INT row, slice; BYTE *bits; } box;
+    float *cur = g_fa, *nxt = g_fb, *t, sd = 0.0f;
+    int    i, n, lv, levels = 0;
+
+    if (g_fine) return 1;
+    for (n = FINE_N; n; n >>= 1) levels++;
+    if (D9_FN(d9, 24, MakeVol_t)(d9, FINE_N, FINE_N, FINE_N, (UINT)levels, 0, 50, 1, &g_fine, NULLPTR) < 0) {   /* L8, MANAGED */
+        g_fine = NULLPTR;
+        if (!said) { said = 1; logline("no noise volume for the fine detail: the baked sky alone"); }
+        return 0;
+    }
+    for (i = 0; i < FINE_N3; i++) g_fa[i] = (float)(fine_hash((DWORD)i + 0x51u) >> 8) / 16777216.0f - 0.5f;
+    fine_blur(g_fa, g_fb, 1);
+    fine_blur(g_fb, g_fa, FINE_N);
+    fine_blur(g_fa, g_fb, FINE_N * FINE_N);
+    for (i = 0; i < FINE_N3; i++) sd += g_fb[i] * g_fb[i];
+    sd = sqrt_f(sd / (float)FINE_N3);
+    for (i = 0; i < FINE_N3; i++) g_fa[i] = 127.5f + g_fb[i] / sd * 32.0f;   /* in byte units */
+    for (lv = 0, n = FINE_N; lv < levels; lv++, n >>= 1) {
+        int x, y, z;
+        if (D9_FN(g_fine, 19, VolLock_t)(g_fine, (UINT)lv, &box, NULLPTR, 0) < 0) break;   /* LockBox */
+        for (z = 0; z < n; z++) for (y = 0; y < n; y++) for (x = 0; x < n; x++) {
+            float v = cur[(z * n + y) * n + x];
+            box.bits[z * box.slice + y * box.row + x] = (BYTE)(v < 0.0f ? 0 : v > 255.0f ? 255 : (int)(v + 0.5f));
+        }
+        D9_FN(g_fine, 20, VolUnlock_t)(g_fine, (UINT)lv);
+        if (n > 1) {                     /* the next level: a 2x2x2 box */
+            int h = n / 2;
+            for (z = 0; z < h; z++) for (y = 0; y < h; y++) for (x = 0; x < h; x++) {
+                float s = 0.0f;
+                int   a, b, c;
+                for (c = 0; c < 2; c++) for (b = 0; b < 2; b++) for (a = 0; a < 2; a++)
+                    s += cur[((2 * z + c) * n + 2 * y + b) * n + 2 * x + a];
+                nxt[(z * h + y) * h + x] = s * 0.125f;
+            }
+            t = cur; cur = nxt; nxt = t;
+        }
+    }
+    if (lv < levels) {
+        unref(g_fine); g_fine = NULLPTR;
+        if (!said) { said = 1; logline("the noise volume could not be filled: the baked sky alone"); }
+        return 0;
+    }
+    logline("fine detail: noise volume made");
+    return 1;
+}
+
 /* The render states every sky draw sets; the state block puts the engine's back. */
 static void plain_states(void *d9)
 {
@@ -506,15 +614,75 @@ static const float k_faces[6][3][3] = {
     { { 0, 0, -1 }, { -1, 0, 0 }, { 0, -1, 0 } },
 };
 
+/* One baked texel from the render target: the average of its 2x2 samples when
+ * supersampled (ss = 2), in the target's format, 10-bit (31) or 8-bit (21). */
+static DWORD texel(const BYTE *row0, int pitch, int x, int ss, DWORD fmt)
+{
+    const DWORD *a = (const DWORD *)row0 + x * ss, *b = (const DWORD *)(row0 + pitch) + x * ss;
+    DWORD p[4], s0 = 0, s1 = 0, s2 = 0;
+    int   i;
+    if (ss == 1) return a[0];
+    p[0] = a[0]; p[1] = a[1]; p[2] = b[0]; p[3] = b[1];
+    if (fmt == 31) {
+        for (i = 0; i < 4; i++) { s0 += p[i] & 1023; s1 += (p[i] >> 10) & 1023; s2 += (p[i] >> 20) & 1023; }
+        return 0xc0000000u | (((s2 + 2) >> 2) << 20) | (((s1 + 2) >> 2) << 10) | ((s0 + 2) >> 2);
+    }
+    for (i = 0; i < 4; i++) { s0 += p[i] & 255; s1 += (p[i] >> 8) & 255; s2 += (p[i] >> 16) & 255; }
+    return 0xff000000u | (((s2 + 2) >> 2) << 16) | (((s1 + 2) >> 2) << 8) | ((s0 + 2) >> 2);
+}
+
+/* Dump=1: a baked face as a 24-bit TGA beside its recipe, Sky\<name>.dump<f>.tga, for
+ * measuring a recipe against the stock faces (sky/README.md, "The grade"). */
+static void dump_face(const Recipe *r, int f, const BYTE *bits, int pitch, int S, DWORD fmt)
+{
+    char   path[400];
+    BYTE   hdr[18], row[4096 * 3];
+    HANDLE h;
+    DWORD  wrote;
+    int    n, x, y;
+
+    path[0] = 0; s_cat(path, r->path);
+    n = s_len(path);
+    if (n < 4) return;
+    path[n - 4] = 0;
+    s_cat(path, ".dump"); s_num(path, f); s_cat(path, ".tga");
+    h = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
+    if (h == INVALID_HANDLE_VALUE) return;
+    for (x = 0; x < 18; x++) hdr[x] = 0;
+    hdr[2] = 2;                                      /* uncompressed true colour */
+    hdr[12] = (BYTE)S; hdr[13] = (BYTE)(S >> 8);
+    hdr[14] = (BYTE)S; hdr[15] = (BYTE)(S >> 8);
+    hdr[16] = 24; hdr[17] = 0x20;                    /* top-down */
+    WriteFile(h, hdr, 18, &wrote, NULLPTR);
+    for (y = 0; y < S; y++) {
+        const DWORD *s = (const DWORD *)(bits + y * pitch);
+        for (x = 0; x < S; x++) {
+            DWORD v = s[x];
+            if (fmt == 31) {
+                row[3 * x + 0] = (BYTE)((((v >> 20) & 1023) * 255 + 511) / 1023);
+                row[3 * x + 1] = (BYTE)((((v >> 10) & 1023) * 255 + 511) / 1023);
+                row[3 * x + 2] = (BYTE)(((v & 1023) * 255 + 511) / 1023);
+            } else {
+                row[3 * x + 0] = (BYTE)v; row[3 * x + 1] = (BYTE)(v >> 8); row[3 * x + 2] = (BYTE)(v >> 16);
+            }
+        }
+        WriteFile(h, row, (DWORD)(3 * S), &wrote, NULLPTR);
+    }
+    CloseHandle(h);
+}
+
 /* Bakes the recipe into g_cube: each face drawn into a render target with bake_ps, read
- * back and copied into the managed cube. Runs inside draw_sky's state block. Returns 1
- * when the cube holds this recipe. */
+ * back and copied into the managed cube. The target is twice the face's edge where
+ * that fits (up to 4096), and each texel the average of its four samples: the finest
+ * octaves of the grain lie only a few texels to a cycle, and one sample a texel
+ * aliased them into speckle. Runs inside draw_sky's state block. Returns 1 when the
+ * cube holds this recipe. */
 static int bake(void *d9, Recipe *r, void *vs)
 {
     static int said;
     void  *ps = d9_shader(d9, &g_bake_ps);
     void  *rt = NULLPTR, *rts = NULLPTR, *sys = NULLPTR, *old_rt = NULLPTR, *old_ds = NULLPTR;
-    int    S = g_face, f, y, ok = 0;
+    int    S = g_face, ss = 2 * g_face <= 4096 ? 2 : 1, R = S * ss, f, y, ok = 0;
     DWORD  fmt = 31;                   /* A2B10G10R10: dim gradients band at 8 bits */
     LARGE  t0, t1;
     Vert   v[4];
@@ -543,9 +711,9 @@ static int bake(void *d9, Recipe *r, void *vs)
         D9_FN(g_cube, 17, Desc_t)(g_cube, 0, &desc);          /* GetLevelDesc */
         fmt = desc.format;
     }
-    if (D9_FN(d9, 23, MakeTex_t)(d9, (UINT)S, (UINT)S, 1, 1, fmt, 0, &rt, NULLPTR) < 0 ||       /* RENDERTARGET, DEFAULT */
+    if (D9_FN(d9, 23, MakeTex_t)(d9, (UINT)R, (UINT)R, 1, 1, fmt, 0, &rt, NULLPTR) < 0 ||       /* RENDERTARGET, DEFAULT */
         D9_FN(rt, TEX_GETSURFACE, Level_t)(rt, 0, &rts) < 0 ||
-        D9_FN(d9, D9_CREATEOFFSCREEN, MakeOff_t)(d9, (UINT)S, (UINT)S, fmt, 2, &sys, NULLPTR) < 0) {   /* SYSTEMMEM */
+        D9_FN(d9, D9_CREATEOFFSCREEN, MakeOff_t)(d9, (UINT)R, (UINT)R, fmt, 2, &sys, NULLPTR) < 0) {   /* SYSTEMMEM */
         if (!said) { said = 1; logline("bake: no render target could be made: the stock sky"); }
         goto done;
     }
@@ -567,7 +735,10 @@ static int bake(void *d9, Recipe *r, void *vs)
         LOCKED src, dst;
         int    i;
         for (i = 0; i < 3; i++) { c[i][0] = k_faces[f][i][0]; c[i][1] = k_faces[f][i][1]; c[i][2] = k_faces[f][i][2]; c[i][3] = 0.0f; }
-        c[3][0] = 2.0f / (float)(S - 1); c[3][1] = c[3][2] = c[3][3] = 0.0f;
+        /* target pixel a -> face coordinate: a texel's samples at i -+ 1/4 (sky.hlsl) */
+        c[3][0] = 2.0f / (float)(ss * (S - 1));
+        c[3][1] = ss == 1 ? -1.0f : -1.0f - 0.5f / (float)(S - 1);
+        c[3][2] = c[3][3] = 0.0f;
         d9_psconst(d9, NCONST, &c[0][0], 4);
         D9_FN(d9, D9_DRAWPRIMITIVEUP, DPUP_t)(d9, 5, 2, v, sizeof v[0]);
         if (D9_FN(d9, D9_GETRENDERTARGETDATA, RTData_t)(d9, rts, sys) < 0) break;
@@ -577,10 +748,11 @@ static int bake(void *d9, Recipe *r, void *vs)
             break;
         }
         for (y = 0; y < S; y++) {
-            const DWORD *s = (const DWORD *)(src.bits + y * src.pitch);
-            DWORD       *d = (DWORD *)(dst.bits + y * dst.pitch);
-            for (i = 0; i < S; i++) d[i] = s[i];
+            const BYTE *s = src.bits + y * ss * src.pitch;
+            DWORD      *d = (DWORD *)(dst.bits + y * dst.pitch);
+            for (i = 0; i < S; i++) d[i] = texel(s, src.pitch, i, ss, fmt);
         }
+        if (g_dump) dump_face(r, f, dst.bits, dst.pitch, S, fmt);
         D9_FN(g_cube, CUBE_UNLOCK, CubeUnlock_t)(g_cube, (DWORD)f, 0);
         D9_FN(sys, SURF_UNLOCK, SurfUnlock_t)(sys);
     }
@@ -594,7 +766,8 @@ done:
     QueryPerformanceCounter(&t1);
     b[0] = 0;
     s_cat(b, ok ? "bake: \"" : "bake FAILED: \""); s_cat(b, r->name); s_cat(b, "\", six faces of ");
-    s_num(b, S); s_cat(b, fmt == 31 ? " at 10 bits, in " : " at 8 bits, in ");
+    s_num(b, S); s_cat(b, fmt == 31 ? " at 10 bits" : " at 8 bits");
+    s_cat(b, ss == 2 ? ", 4 samples a texel, in " : ", 1 sample a texel, in ");
     s_num(b, g_qpf.q ? (long)((double)(t1.q - t0.q) * 1000.0 / (double)g_qpf.q) : -1); s_cat(b, " ms");
     logline(b);
     if (ok) {
@@ -678,6 +851,17 @@ static int draw_sky(void *cam, Recipe *r)
         s_cat(b, ", device viewport "); s_num(b, (long)vp[2]); s_cat(b, "x"); s_num(b, (long)vp[3]);
         s_cat(b, " at "); s_num(b, (long)vp[0]); s_cat(b, ","); s_num(b, (long)vp[1]);
         logline(b);
+        {   /* how far the cube is magnified: the image plane's half-width is tan(hfov/2),
+             * and a cube texel at a face's centre spans 2/(S-1) of tangent */
+            float dx = v[1].rx - v[0].rx, dy = v[1].ry - v[0].ry, dz = v[1].rz - v[0].rz;
+            float th = 0.5f * sqrt_f(dx * dx + dy * dy + dz * dz);
+            b[0] = 0; s_cat(b, "first sky: tan(hfov/2) x1000 = "); s_num(b, (long)(th * 1000.0f));
+            if (g_face > 1 && th > 0.0f) {
+                s_cat(b, ", screen pixels per cube texel x100 = ");
+                s_num(b, (long)(rect[2] * 0.5f / th * 2.0f / (float)(g_face - 1) * 100.0f));
+            }
+            logline(b);
+        }
     }
 
     D9_FN(g_sb, SB_CAPTURE, SB_t)(g_sb);
@@ -696,9 +880,20 @@ static int draw_sky(void *cam, Recipe *r)
         static const DWORD ss[][2] = { { 1, 3 }, { 2, 3 }, { 3, 3 },       /* ADDRESSU/V/W: clamp */
                                        { 5, 2 }, { 6, 2 }, { 7, 0 },       /* MAG/MIN linear, no mips */
                                        { 11, 0 } };                        /* SRGBTEXTURE off */
+        static const DWORD sf[][2] = { { 1, 1 }, { 2, 1 }, { 3, 1 },       /* ADDRESSU/V/W: wrap */
+                                       { 5, 2 }, { 6, 2 }, { 7, 2 },       /* MAG/MIN/MIP linear */
+                                       { 11, 0 } };
+        static const float no_fine[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 0, g_cube);
         for (i = 0; i < (int)(sizeof ss / sizeof ss[0]); i++)
             D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 0, ss[i][0], ss[i][1]);
+        if (r->k[21][0] != 0.0f && fine_volume(d9)) {
+            D9_FN(d9, D9_SETTEXTURE, SetTex_t)(d9, 1, g_fine);
+            for (i = 0; i < (int)(sizeof sf / sizeof sf[0]); i++)
+                D9_FN(d9, D9_SETSAMPLERSTATE, SS_t)(d9, 1, sf[i][0], sf[i][1]);
+        } else {
+            d9_psconst(d9, 21, no_fine, 1);                               /* no detail: exp(0) */
+        }
     }
     if (g_timing) {
         timing_poll();

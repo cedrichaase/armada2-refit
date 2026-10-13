@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.36.0 — 2026-10-13
+
+Layers: sky 1.3.0.
+
+### Changed
+- The procedural skies colour-graded to their stock sets (`GradeGain=`/`GradeCurve=`,
+  fitted by `sky/grade.py`), with fine detail finer than the baked cube added at draw
+  time (`Fine=`), a supersampled bake, and a dither that no longer draws a grid
+  (sky 1.3.0).
+
+Installed, not yet seen in game.
+
 ## 11.35.0 — 2026-10-13
 
 Layers: surfaces 1.1.0, lighting 1.23.0, models 4.3.0, testbench 3.12.0.

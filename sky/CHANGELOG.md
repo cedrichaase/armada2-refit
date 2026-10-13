@@ -4,6 +4,31 @@
 cube faces, and the recipes in `skies/`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 1.3.0 — 2026-10-13
+
+### Added
+- Recipe keys `GradeGain=` / `GradeCurve=`: a per-channel grade (`gain * in^curve`) of
+  the gas, and `sky/grade.py`, which fits them to the stock set from a bake's faces.
+- Recipe key `Fine=` (amount, size, gain; default 0.1, 0.3°, 0.55): detail finer than
+  the cube's texels, three octaves of a tiling noise volume multiplied in at draw time.
+- `Sky.ini` key `Dump=` (0): writes each bake's faces to `Sky\<name>.dump0..5.tga`;
+  `install.sh --remove` removes them. The log names the field of view and the screen
+  pixels per cube texel.
+
+### Changed
+- Every recipe but `mbgaqu` graded to its stock set: luminance at 0.89–0.92 of stock
+  (was 0.79–1.18), channel balance matched; `mbgrg` balance only, at 0.57 of stock.
+- `mbgkling`: `Deep` 14,3,0 → 48,9,3 and `Glow` 110,70,22 → 110,86,20 (dark red gaps
+  and yellower highlights, as stock).
+- The bake takes four samples a texel (2x2, averaged), against aliasing in the
+  grain's finest octaves. Re-bakes 60 → 250 ms.
+
+### Fixed
+- The dither drew a faint square grid over dark sky: interleaved gradient noise on the
+  screen pixel in place of the lattice hash at continuous directions.
+
+Installed, not yet seen in game.
+
 ## 1.2.3 — 2026-10-13
 
 ### Changed

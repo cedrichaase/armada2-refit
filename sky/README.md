@@ -95,6 +95,14 @@ filtering is on. The bake reads its texel position from `VPOS`, so Direct3D 9's
 half-pixel convention cannot shift it. 10-bit faces (`A2B10G10R10`, falling back to
 8-bit) keep the dim gradients of a sky like Aqua's from banding.
 
+**Four samples a texel.** The finest octaves of the grain lie about three texels to a
+cycle at 1536 (`mbgflu`, `mbgdom1`: `Scale` times a grain scale of 6, five octaves),
+and one sample a texel aliased them into speckle. The bake renders into a target twice
+the face's edge (where that fits in 4096) and `sky.c` averages each 2x2 into a texel:
+the samples sit a quarter texel either side of the texel's direction, and past a face's
+edge they simply run on into the next face, so the edge rule above still holds. A
+re-bake costs about 250 ms instead of 60.
+
 Measured on the bench against the per-pixel reference, same camera: aimed at a cube
 edge, the largest difference anywhere was **2/255** (mean 0.07, the dither); aimed at a
 corner, **2.4/255** (mean 0.08). Neither difference image shows a line.
@@ -163,6 +171,68 @@ luminance (the offline mirror) is the same as 1.1.0's, about 0.92 of stock. Grai
 widens the field's spread, so more of the sky crosses `Coverage`: the clumpy skies
 raised `Coverage` rather than dim the gas.
 
+## Fine detail
+
+**The cube is magnified several times on screen.** The RTS camera's horizontal field
+of view is 73° (`tan` of half of it 0.736, logged as `first sky: ...`), so at 3840
+wide a texel at a face's centre covers **3.4 screen pixels** at `Face=1536`. Nothing
+finer than a few texels exists in the cube, and at 1:1 the gas read as soft square
+blobs, which is the "pixelation". A larger cube does not pay: 1:1 at 4K would need
+about 5200 texels a face, some 650 MB.
+
+So `draw_ps` adds detail finer than the cube each frame: three octaves of a tiling
+noise volume, 64³ texels of white noise blurred by a Gaussian of 1.2 texels with
+wrap-around (L8, a box-filtered mip chain, made once per device, 300 KB), each octave
+turned by the same rotation as the noise and offset so the tiles never line up. The
+sum, in units of its spread, multiplies the baked colour by `exp(a z - a²/2)`: empty
+space stays empty and the sky's mean light is unchanged. The volume's mips fade an
+octave finer than a pixel to the mean, so it cannot shimmer at lower resolutions.
+`Fine=` sets the amount, the largest octave's size in degrees and the gain between
+octaves. On the bench (Klingon, 4K) 0.25 read as a grain overlay; **0.1 at 0.3°**
+reads as finer gas and is the default. It costs about 0.17 ms a frame at 4K (vsync on).
+
+**The dither** is interleaved gradient noise on the screen pixel. Until 1.3.0 it was the
+noise's lattice hash taken at continuous directions (`hash13(dir * 4096)`), which beat
+into a faint square grid about 60 pixels across over the dark parts of the sky
+(bench: gone with `Dither=0`, gone with the new dither).
+
+## The grade
+
+`GradeGain=` and `GradeCurve=` grade the gas per channel, after `Brightness` and
+before the recipe's stars: `out = gain * in^curve` on 0..1. **`sky/grade.py` fits
+them** to the stock set the recipe replaces. Both are measured at stock's 256 texels a
+face, with a 40-texel square masked at each corner (the stock faces' notches, which
+the cube model never shows: pink on Ba'ku, black on Klingon and Borg, and they had
+pulled the stock means the recipe headers quote). Per channel the fit is the
+least-squares line through the log percentiles 50..99.5 of the bake against stock's,
+histogram matching in two numbers. Then every gain is scaled together so the sky
+lands at 0.92 of stock's luminance, as the `Brightness` calibration always aimed, and
+a recipe already graded is refitted through its grade, so a second pass refines the
+first (two passes land within 0.89–0.92 of stock).
+
+Measured before the grade (sky 1.2.3), against stock with the corners masked: the
+skies sat at 0.79–1.18 of stock's luminance, Klingon and Ba'ku over; `mbgrg` had red
+equal to green where stock's green is nearly double; `mbgdk` and `mbgkl` had half
+stock's chroma (grey where stock is teal or tinted); `mbgdom1` and `mbggb` were short
+of blue, Borg of green, Klingon's highlights too green and blue.
+
+Kept from stock on purpose (`POLICY` in `grade.py`): **Aqua is not graded** (the user
+preferred it dimmer and softer, 2026-10-09), and **`mbgrg` gets its channel balance
+only**, no curve, at 0.57 of stock's luminance, where 1.2.3 put it on purpose.
+
+The grade matches each channel's distribution, not how the hue moves with brightness.
+`grade.py --ramp` prints the mean colour in luminance bands (to 50/75/90/97/100% by
+rank) for the bake and for stock, for tuning a palette by hand: it showed Klingon's
+darkest half at R 20 against stock's 40 (black gaps where stock's are dark red), which
+`Deep` 14,3,0 → 48,9,3 put right before the refit. What no grade reaches is
+structure: stock Klingon's and Borg's radial streaks, the stock skies' painted shapes.
+
+To refit after changing a recipe, on the bench (`a2test session start --install .
+--install testbench/scene --args '-nointro a2_borg01'`, which draws `mbgaqu`): put
+`Dump=1` in the clone's `Sky.ini`, copy each recipe over the clone's `Sky\mbgaqu.ini`
+in turn (it re-bakes within half a second), move the six `Sky\mbgaqu.dump<f>.tga` to
+`<dir>/<recipe>/<f>.tga`, then `sky/grade.py <dir> --write [recipe...]`, and repeat once.
+
 ## Recipes
 
 `sky/skies/<name>.ini`, section `[Sky]`. Colours are 0–255, directions are yaw
@@ -194,11 +264,14 @@ raised `Coverage` rather than dim the gas.
 | `Haze` | 0,0 | amount (0 = off), coverage (field units, before grain) |
 | `Stars` | 0,1,0.5,0 | how many over the sphere, brightness, size (degrees), in-gas weight (0–1) |
 | `StarA`, `StarB` | 0 | r, g, b: the two ends of the stars' colours |
+| `GradeGain`, `GradeCurve` | 1,1,1 | the grade per channel, `gain * in^curve`; written by `grade.py` ("The grade") |
+| `Fine` | 0.1,0.3,0.55 | detail finer than the cube, at draw time: amount (0 = off), the largest octave's size (degrees), gain between octaves ("Fine detail") |
 
 `Sky.ini` (`[Sky]`): `Enable` (default 1), `Face` (1536, the cube's edge; 0 = per
 pixel), `Reload` (1: `Sky.ini` and the recipe on screen are re-read within half a
 second of an edit, and a changed recipe re-bakes), `Timing` (0; 1 logs the frame time
-and the sky's GPU time every 600 frames), `Log`.
+and the sky's GPU time every 600 frames), `Dump` (0; 1 writes each bake's faces to
+`Sky\<name>.dump0..5.tga` for `grade.py`), `Log`.
 
 **Tuning a recipe.** Edit the installed `Sky\<name>.ini` with the game running; the
 sky re-bakes within half a second. The recipes aim at the stock set's channel means,
@@ -208,7 +281,9 @@ stock's luminance: a little under, never over. Where the gas saturates into flat
 plateaus (dense skies like Borg's), a wider `Softness` (3) restores the depth. The previews behind the shipped recipes
 measured Klingon 75/23/5 against stock's 66/17/5, and Aqua 3/14/15 against 4/12/12.
 Aqua reads dimmer and softer than the stock faces in game, and the user preferred it
-that way (2026-10-09), so don't lift it to match stock's contrast.
+that way (2026-10-09), so don't lift it to match stock's contrast. Since 1.3.0 the
+level and colour balance are set by the grade, fitted by `grade.py` ("The grade"):
+after changing a recipe's palette or `Brightness`, refit it.
 
 ## Cost
 
@@ -227,8 +302,13 @@ pipeline, once per session, while the map loads. **Frame time at 4K with
 vsync off**, alternating procedural and stock in one session (600-frame means):
 1.31–1.34 ms with the procedural sky, 1.24–1.26 ms with the stock cube, so about
 +0.07 ms a frame. The cube holds 6 × 1536² texels at 4 bytes, 57 MB of video memory.
-The noise's finest octave spans about 9 texels a cycle at 1536, so a larger cube adds
-memory and no detail.
+The noise's finest octave spans about 9 texels a cycle at 1536 (the grain's, about 3),
+so a larger cube adds memory and little detail; the detail finer than the cube comes
+from `Fine=` instead.
+
+**Since 1.3.0** (four samples a texel, fine detail, bench at 3840x2160, vsync on): the
+first bake of a session 1.76 s, re-bakes 250 ms (400 ms with `Dump=1`); the sky's
+draw 0.50 ms of GPU time against 0.33 ms with `Fine=0`.
 
 ## Not covered yet
 
