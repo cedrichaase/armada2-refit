@@ -39,6 +39,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `shields` | a Galaxy class (phasers) and a Klingon battleship (`kbattle`, torpedoes) firing at a second Galaxy (`target`) as in `firing`: the target healed, its shields holding. For the shield hits (`shields/README.md`, `scenarios/shields-hits.md`) | 2026-10-12 |
 | `fog` | three of the player's ships (`ship1`, `ship2`, `scout`) at 3000,0,3000 with the map's fog and shroud on (`Fog=1`) and the HUD on for the minimap; `goto scout ...` leaves fog of war behind. For the fog's and shroud's edges (`fog/README.md`, `scenarios/fog-edges.md`) | 2026-10-12 |
 | `asteroids` | an asteroid field (`field`, `mafield`: 4–8 rocks) and a big one (`big`, `mafield2`: 3–6 larger rocks), 500 apart, beside a Galaxy class with its engines off; the rocks are drawn at random from the field's models, so a session shows some of them, and `spawn` adds more fields. For the asteroids' surfaces and smoothing (`surfaces/README.md`, `models/README.md`, "The asteroids") | 2026-10-13 |
+| `venting` | a Galaxy class (`galaxy`) and a Klingon battleship (`klingon`) parked 300 apart, healed and immortal, every system's damage node showing as if damaged (`Vent=all`): the Galaxy's nacelle vents plasma, its hull gas. Nothing fires. For the venting plasma and gas (`venting/README.md`) | 2026-10-13 |
 
 ## Scene files
 
@@ -68,6 +69,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Immortal` | 1 | the object cannot die (craft only) |
 | `Heal` | 0 | 1: hull, shields, crew and every system topped up to full every tick, so it never shows damage: its shields never run out (no shields-down effect, the electric ring) and no damaged-system effect (the plasma plume, venting gas) ever shows |
 | `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving. A system switched off here is not drawn as damaged (no plume) |
+| `Vent` | | `all`, `none` or one system (`shields`, `engines`, `weapons`, `sensors`, `life`): its damage node shows as a damaged system's does -- the plume, the venting gas -- healed or not, and the system keeps working |
 | `Attack` | | the name of an object to attack, ordered once everything is built |
 | `Population` | | planets: colonised at once, as `colonize` (below) does: a number, `full`, or nothing for none |
 | `Colonist` | 1 | the team that holds a planet with `Population=`, and so whose race's cities it shows |
@@ -105,6 +107,7 @@ answer and fails if a command did.
 | `goto <name>[,<name>...] <object \| x y z> [warp]` | order a move, as a player's right-click does (AiCommand `GO`; `warp`: `GO_WARP`), and switch the engines on. To a craft, the ship follows it; to any other object (a nebula, a planet), it goes to where the object is. A point is anchored like the scene file's positions. Several names, comma-separated, keep their places: each goes to the point plus its own offset from the group's centre. It ends an `attack`, though a ship still fires at what comes in range |
 | `stop <name>` | order a stop (AiCommand `STOP`, as `ScriptInterfaceImp::Stop` gives) |
 | `heal`, `engines`, `weapons`, `immortal` `<name> on\|off` | as the keys above |
+| `vent <name> <system \| all> on\|off` | as the `Vent` key, one system at a time (or all five) |
 | `colonize <planet> [<population> \| full \| off] [team]` | make a planet a grown colony of a team (default `full` and team 1), without a colony ship: it changes hands, gets a full garrison, and its cities show at once at that population, clamped to the class's maximum. The cities are the team's race's (`cityTextureName`: `ECFR` for the Federation and Romulans, `ECNA`, `BORG`); team 1 on `a2_borg01` is the Federation. `off` makes it neutral again with no population. The planet stays colonised (seen on the bench for several minutes); a population set below the maximum grows as any colony's does |
 | `center <name>` | centre the RTS camera on an object |
 | `pause`, `resume` | the game's own pause (`PauseSimulation`) |
@@ -286,6 +289,10 @@ inert, and `Scene.log` says so.
   `crew5` fire sprites) follows the crew fraction, which `Heal=1` already keeps full.
   Bench, `nebula-close` (one Galaxy, `Engines=0`) and `showcase`: the plume on every
   Federation and Klingon ship before, none after, and the Galaxy still in place.
+  `Vent=` and the `vent` command go the other way: the wrapper clears the byte of each
+  system named, so its node shows on a healed craft, and nothing else is touched. Bench,
+  `SCENE=venting`, 2026-10-13: the Galaxy's nacelle plume and its hull's gas, the
+  Klingon's two, for as long as the session runs.
 - **Move orders: `GameObject::SetCommand`.** The script interface's own orders end in
   `GameObject::SetCommand` overloads: `(AiCommand, const GameObject *, long, bool)`
   (0x4d1af0), `(AiCommand, const Vector3 &, long, bool)` (0x4d1b50) and

@@ -37,6 +37,8 @@ WHAT COUNTS AS A CHANGE
     shields       Shields.asi/.ini             -- added files: shield hits and the
                                                   shields-down arcs drawn by shaders
     repair        Repair.asi/.ini              -- added files: repair welding drawn by shaders
+    venting       Venting.asi/.ini             -- added files: venting plasma and gas drawn
+                                                  by shaders
     fog           Fog.asi/.ini                 -- added files: smooth fog-of-war and shroud edges
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
                   (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
@@ -111,10 +113,11 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('Explosions.asi', 'explosions'), ('Explosions.ini', 'explosions'),
          ('Shields.asi', 'shields'), ('Shields.ini', 'shields'),
          ('Repair.asi', 'repair'), ('Repair.ini', 'repair'),
+         ('Venting.asi', 'venting'), ('Venting.ini', 'venting'),
          ('Fog.asi', 'fog'), ('Fog.ini', 'fog'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions', 'shields', 'repair', 'fog', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
+LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions', 'shields', 'repair', 'venting', 'fog', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.

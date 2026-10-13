@@ -5,6 +5,20 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.13.0 — 2026-10-13
+
+### Added
+- `Vent=` (scene file) and the scene command `vent <name> <system|all> on|off`: a
+  system's damage node shows as if damaged (the plume, the venting gas) on a healed
+  craft, the system still working.
+- `SCENE=venting`: a Galaxy class and a Klingon battleship parked with every damage node
+  showing, for `Venting.asi`.
+- Scenario `venting`: the plugin's hooks, both kinds of vent recognised, drawn and lit,
+  shots parked, from below, moving and far. `no-assets` also expects `Venting.log`'s hooks
+  line. The bench clears `Venting.log` at launch and gathers it with `Venting.ini`.
+
+Installs nothing; the scene and the command seen working on the bench 2026-10-13.
+
 ## 3.12.0 — 2026-10-13
 
 ### Added

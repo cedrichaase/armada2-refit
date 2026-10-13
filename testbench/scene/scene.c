@@ -444,6 +444,7 @@ typedef struct {
     char  attack[32];   /* the object this one is ordered to attack, if any */
     int   handle;
     int   heal;         /* topped up to full health every tick */
+    int   vent;         /* systems whose damage node shows as if damaged (bit k: +0x9c+k) */
 } Obj;
 
 static Obj   g_obj[MAX_OBJECTS];
@@ -526,6 +527,7 @@ static Obj *spawn(const char *name, const char *odf, int team,
     s_cpy(o->name, name, sizeof o->name);
     o->attack[0] = 0;
     o->heal = 0;
+    o->vent = 0;
     o->handle = *(int *)((BYTE *)go + OBJECT_HANDLE);
     s_cat(b, " team ");
     s_num(b, team);
@@ -603,8 +605,21 @@ static int systems_hurt(const BYTE *craft)
  * reads the systems into five bytes at +0x9c, which CraftInstance::RenderInternal
  * turns into the nodes' hidden bit. A system Scene.asi switched off (Engines=0,
  * the engines command, Weapons=0) is held off, not damaged, so its node stays
- * hidden; a healed craft shows none at all. */
+ * hidden; a healed craft shows none at all. The vent command (Vent= in a scene
+ * file) shows a system's node as a damaged one shows it, healed or not, and
+ * changes nothing else: the system keeps working. */
 static const BYTE k_inst_sys[5] = { 0x00, 0x30, 0x60, 0xc0, 0x90 };   /* for +0x9c..+0xa0 */
+static const char *const k_sys_name[5] = { "shields", "engines", "weapons", "sensors", "life" };
+
+/* A Vent= value or the vent command's system: a name, "all", or "none". */
+static int vent_mask(const char *v)
+{
+    int k;
+    if (s_eq(v, "all"))  return 0x1f;
+    if (s_eq(v, "none") || !v[0]) return 0;
+    for (k = 0; k < 5; k++) if (s_eq(v, k_sys_name[k])) return 1 << k;
+    return -1;
+}
 
 static void __thiscall inst_update(void *inst, const void *go)
 {
@@ -618,7 +633,9 @@ static void __thiscall inst_update(void *inst, const void *go)
     sys = *(BYTE *const *)((const BYTE *)go + CRAFT_SYSTEMS);
     if (!sys) return;
     for (k = 0; k < 5; k++)
-        if (g_obj[i].heal || sys[k_inst_sys[k] + SYS_HELD_OFF])
+        if (g_obj[i].vent & (1 << k))
+            ((BYTE *)inst)[INST_SYS_OK + k] = 0;
+        else if (g_obj[i].heal || sys[k_inst_sys[k] + SYS_HELD_OFF])
             ((BYTE *)inst)[INST_SYS_OK + k] = 1;
 }
 
@@ -1285,6 +1302,14 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
+    if (s_eq(t[0], "vent") && n >= 4) {
+        int m = vent_mask(t[2]), on = on_arg(t[3]);
+        if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
+        if (m < 0) { logline("  ! system: shields, engines, weapons, sensors, life or all"); return; }
+        o->vent = on ? (o->vent | m) : (o->vent & ~m);
+        logline("  ok");
+        return;
+    }
     if (s_eq(t[0], "kill") && n >= 2) {
         if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
         o->heal = 0;
@@ -1418,6 +1443,11 @@ static void build_scene(void)
         if (ini_int(sect, "Immortal", 1))
             ((SiHandleBoolFn)SI_CANNOT_DIE)(SI_INSTANCE, o->handle, 1);
         o->heal = ini_int(sect, "Heal", 0);
+        {
+            char v[32];
+            GetPrivateProfileStringA(sect, "Vent", "", v, sizeof v, g_ini);
+            o->vent = vent_mask(v) < 0 ? 0 : vent_mask(v);
+        }
         if (!ini_int(sect, "Engines", 1))
             ((SiHandleBoolFn)SI_NO_ENGINES)(SI_INSTANCE, o->handle, 1);
         if (!ini_int(sect, "Weapons", 1))

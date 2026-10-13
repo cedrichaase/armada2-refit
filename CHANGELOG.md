@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.36.0 — 2026-10-13
+
+Layers: venting 1.0.0, testbench 3.13.0.
+
+### Added
+- `venting/`: `Venting.asi` draws the plasma and gas a damaged ship vents in shaders, in
+  place of the stock sprites: billowing puffs, plasma cooling from white-hot to red, gas
+  pale to blue, a glow and jet core at each vent, one unbroken trail behind a moving
+  ship, and a subtle flickering light on the hull about each vent (venting 1.0.0).
+  `./install` and `a2mod` carry it as the `venting` layer.
+- The bench's `Vent=` key and `vent` command show a system's damage node on a healed
+  craft; `SCENE=venting` and scenario `venting` (testbench 3.13.0).
+
+Installed, not yet seen in game.
+
 ## 11.35.0 — 2026-10-13
 
 Layers: surfaces 1.1.0, lighting 1.23.0, models 4.3.0, testbench 3.12.0.

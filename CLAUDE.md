@@ -43,6 +43,7 @@ it bundles.
 | `explosions/` | `Explosions.asi` — each ship's and station's fireball ray-marched as a volume of gas (white flash, burning billows cooling to smoke, spectral noise, seeded per explosion) and each shockwave drawn as a band of fire matched to stock's disc, in place of stock's flipbook sprites and textured disc. Render only. Not in the release package yet | `explosions/README.md` |
 | `shields/` | `Shields.asi` — the ordinary shield hits drawn by a shader over the struck ship's shield ellipsoid (hot spot, ring, soft glow and rim, by faction, weaker as the shields run out) in place of the stock `Xshldx01` shell, and the shields-down ring as jagged arcs crackling over it (lighting the hull) in place of stock's turning `xshlddie` band. Not in the release package yet | `shields/README.md` |
 | `repair/` | `Repair.asi` — the welding on a ship under repair (stock's `xspark` sprites at the hardpoints of the system being repaired) drawn by shaders: a flickering arc with rays that lights the hull, a cooling hot spot, sparks streaking off. Not in the release package yet | `repair/README.md` |
+| `venting/` | `Venting.asi` — the plasma and gas a damaged ship vents (stock's `ventplas` and `ventgas` sprites, from the damage nodes' emitters) drawn by shaders: billowing puffs that cool as they fly, a glow and jet core at each vent that light the hull, one unbroken trail behind a moving ship. Not in the release package yet | `venting/README.md` |
 | `fog/` | `Fog.asi` — the fog of war and the shroud in the 3D view drawn with smooth edges: a pixel shader over the engine's own draw of each reconstructs the scan grid's mask with a cubic filter and draws an antialiased edge, in place of the cell-by-cell staircase. Not in the release package yet | `fog/README.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
@@ -312,7 +313,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Fog.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Venting.asi`, `Fog.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -816,6 +817,24 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   bees are separate effects, and stay stock.
 - **Render only**, as the shields: nothing the simulation reads is written. The sparks
   age by the particle's own simulation time; the flicker by wall time.
+
+### venting
+
+- **A vent particle is told by its emitter's sprite node data, by name** (`ventplas`,
+  `ventgas`), looked up once per sprite: the damage emitters are ordinary spray emitters
+  in the SODs' `Damage` nodes, and the same particle lists carry every other emitter's.
+- **Copy a particle when the device is handed it; never keep the pointer**: it may be
+  freed before the next frame. The device can be handed one particle more than once a
+  frame (the instance's list, then each emitter's pass over it), so they are taken once.
+- **The vent's place comes from the emitter's `RenderInternal`** (slot 11 of the spray
+  vtable), where the engine's world matrix (0x7ad640) is the emitter node's; the youngest
+  particle trails a moving ship's nacelle by up to 0.15 s of flight.
+- **The plasma cools by its age to a steep power** (`PlasmaCooling=3`): a moving ship's
+  trail shows only its first second, and a gentle curve left it cream all along while
+  the parked plume looked right. Judge a colour change parked *and* moving
+  (`goto galaxy 2000 0 3500` in `SCENE=venting`).
+- **Render only**, as the shields and the repairs: nothing the simulation reads is
+  written.
 
 ### fog
 
