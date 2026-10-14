@@ -90,7 +90,7 @@ class Take:
                    '--label', label]
         else:
             # a shot with Prepare: starts without the game, prepares the clone, then launches
-            prep = ['--no-launch'] if s.get('Prepare') else ['--args', f.args(s)]
+            prep = ['--no-launch'] if s.get('Prepare') else [f'--args={f.args(s)}']   # '-nointro' alone reads as a flag
             cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier),
                    *f.variants[s.install_variant(self.variant)].split(), *prep, '--label', label]
         r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True)

@@ -566,6 +566,36 @@ scene glide 10 230 -3 420
 wait 10
 ```
 
+### s05b · The fleet in the Mutara nebula
+Shows: nebulae: shadows
+Scene: nebula-fleet.ini
+Variants: refit
+Layout: full refit
+Transition: dissolve 0.8
+In: 1.0
+Length: 12
+Status: draft
+
+The user's idea: a fleet inside the dense purple Mutara, flying towards the Key, the
+camera under and behind it looking up towards the light, so the hulls' shadows run back
+down through the gas. Refit only: stock has no shadows, and its billboards look punchier
+from here. The shafts are faint (only the Galaxy's reads clearly, lower left, early);
+stronger gas shadows are a question for `nebulae/`. A hull near the camera can make the
+shafts vanish (seen paused at `orbit sov 48 -24 220`), a bug report for `nebulae/`.
+Found by a 7-angle probe (2026-10-14, n05).
+
+```setup
+scene hover off; shieldfx off; tooltips off
+scene goto ente,sov,galaxy,akira,nebula,def1,def2 1700 0 1470
+scene orbit ente 28 -26 400
+wait 4
+```
+```action
+wait 0.5
+scene glide 13 40 -20 340
+wait 13.5
+```
+
 ### s06 · The sky
 Shows: sky
 Scene: planet
