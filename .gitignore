@@ -36,3 +36,6 @@ __pycache__/
 
 # a2test's input helper, built on first use from testbench/input/
 testbench/input/a2input
+
+# render3d: cargo's build output
+render3d/target/
