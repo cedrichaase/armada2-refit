@@ -99,4 +99,24 @@ Background and measurements live outside the repo, in
 
 ## Changes to the plan
 
-(none yet)
+- 2026-10-14: **Rust instead of C** (the user's request). Toolchain is rustup with
+  `i686-pc-windows-msvc` in `~/.rustup`, and `lld-link`; spike and skeleton build with
+  kernel32 as the only import. CI will need `rustup target add i686-pc-windows-msvc`.
+- 2026-10-14: the body is mapped (`body-map.md` in the notes). The signature is
+  `void __cdecl Armada_RenderAllOurStuff(Armada_Camera*, Render_Stuff&, bool isMain)`,
+  with 13 steps; every step but the inline stores, the object loop and credits can be
+  called on its own (the object loop's fallback is `GameObject_RenderAll` 0x597fb0).
+  `Background_Render` also draws BackgroundObjects and owns the only colour clear. The
+  particle list is drawn per view but pruned once a frame.
+- 2026-10-14: the sim reads nothing the render pass writes (`sim-render-coupling.md`,
+  two-player match with one side blind for 4 minutes). Rule: never draw from
+  `g_random` (0x7b0fac); render randomness is ours or `g_asyncRandom`.
+
+## Where it stands (2026-10-14, paused at a usage limit)
+
+- Done: milestone 1 (skeleton, commit 371a3be); `hlsl-rs.sh`.
+- Next: milestone 2. Hook the two call sites (0x59886e, 0x4e60f6) to a cdecl body
+  that runs the 13 steps as stock calls into our HDR target, then resolve, bloom and
+  tone map into the back buffer.
+- The asset subagent's worktree `.claude/worktrees/r3d-assets` (branch `r3d-assets`)
+  was stopped before it finished; check it for uncommitted work before reusing it.
