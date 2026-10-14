@@ -14,7 +14,7 @@ in [`README.md`](README.md).
 - `./a2film check`, `status`, `probe` (1280x720, `--jobs 4`), `take` (3840x2160,
   `--jobs 1`), `sheet`, `animatic` and `manifest` (`a2film-manifest/1`). A take is
   re-filmed only when its spec changes.
-- `films/selftest` and the first draft board, `films/whats-new`.
+- `films/selftest` and the draft boards `films/whats-new` and `films/promo` (with its review plan, `PLAN.md`).
 - The `film` skill (`.claude/skills/film/SKILL.md`).
 
 Tooling only; nothing to see in game.
