@@ -17,11 +17,11 @@ FILM_KEYS = {'Film', 'Final', 'Probe', 'Fps', 'Args', 'Music', 'Pointer'}
 SECTION_KEYS = {'Music'}
 SHOT_KEYS = {'Kind', 'Shows', 'Scene', 'Args', 'Variants', 'Layout', 'Crop', 'Transition', 'Title', 'Sub',
              'Caption', 'In', 'Length', 'Speed', 'Audio', 'Keys', 'File', 'From', 'Status', 'Background',
-             'Run', 'Wallpaper'}
+             'Run', 'Wallpaper', 'Players', 'Prepare'}
 KINDS = {'scene', 'card', 'footage', 'mission', 'desktop'}
 LAYOUTS = {'full', 'wipe', 'dissolve', 'split', 'pip'}
 STATUSES = {'draft', 'probed', 'approved', 'final'}
-OPS = {'scene', 'wait', 'key', 'click', 'step', 'shot', 'ptr', 'drag', 'lclick', 'press', 'run'}
+OPS = {'scene', 'wait', 'key', 'click', 'step', 'shot', 'ptr', 'drag', 'lclick', 'press', 'run', 'typelog'}
 
 DEFAULT_VARIANTS = {
     'refit': '--install . --install testbench/scene',
@@ -69,7 +69,29 @@ class Shot:
         v = self.get('Variants')
         if self.kind == 'desktop':
             return ['desktop']      # no game: one take, a bare desktop
+        if self.players:
+            return self.players     # one take per player, filmed together
         return [x.strip() for x in v.split(',') if x.strip()] if v else ['refit']
+
+    @property
+    def players(self):
+        """`Players: host, joiner`: several games in one shot, each a take named after its
+        player, all installed as the one variant `Variants:` names (refit by default)."""
+        v = self.get('Players')
+        return [x.strip() for x in v.split(',') if x.strip()] if v else []
+
+    def install_variant(self, variant):
+        """The film variant a take is installed as: its own, or for a player the shot's."""
+        if self.players:
+            return (self.get('Variants') or 'refit').split(',')[0].strip()
+        return variant
+
+    def split_line(self, text):
+        """`host: step ...` -> ('host', 'step ...'); a line with no player -> (None, text)."""
+        m = re.match(r'^([A-Za-z0-9_-]+):\s+(.*)$', text)
+        if m and m.group(1) in self.players:
+            return m.group(1), m.group(2)
+        return None, text
 
     @property
     def status(self):
@@ -194,7 +216,9 @@ class Film:
         only when this changes. Edit fields (Layout, Title, In, ...) are not in it."""
         ini = self.scene_ini(shot)
         ini_text = open(ini).read() if ini and os.path.exists(ini) else None
-        return dict(film=self.name, shot=shot.id, variant=variant, install=self.variants.get(variant),
+        return dict(film=self.name, shot=shot.id, variant=variant,
+                    install=self.variants.get(shot.install_variant(variant)),
+                    players=shot.get('Players'), prepare=shot.get('Prepare'),
                     tier=tier, res=self.res(tier), args=self.args(shot), scene=shot.get('Scene'),
                     scene_ini=ini_text, music=self.music, pointer=self.fields.get('Pointer'),
                     run=shot.get('Run'), wallpaper=shot.get('Wallpaper'),
@@ -355,9 +379,13 @@ def check(film):
                 elif len(w) > 1 and w[1] not in src.variants:
                     out.append((s, f'Wallpaper {w[0]} {w[1]}: {w[0]} films no {w[1]}'))
         if s.filmed:
-            for v in s.variants:
+            for v in {s.install_variant(v) for v in s.variants}:
                 if v not in film.variants and k != 'desktop':
                     out.append((s, f'variant {v} is not defined (Variant {v}: ...)'))
+            if s.players and len(s.players) < 2:
+                out.append((s, 'Players names fewer than two players'))
+            if s.get('Prepare') and not os.path.exists(os.path.join(REPO, s.get('Prepare').split()[0])):
+                out.append((s, f'Prepare: no script {s.get("Prepare").split()[0]} in the repository'))
             ini = film.scene_ini(s)
             if k == 'scene' and not ini:
                 out.append((s, 'a scene shot with no Scene'))
@@ -366,13 +394,13 @@ def check(film):
             if not s.action:
                 out.append((s, 'no ```action block'))
             for ln, t in s.setup + s.action:
-                op = t.split()[0]
+                op = s.split_line(t)[1].split()[0]
                 if op not in OPS:
                     out.append((s, f'line {ln}: unknown command {op}'))
             if lay in ('wipe', 'dissolve', 'split', 'pip') and len(s.variants) < 2:
                 out.append((s, f'Layout {lay} needs two variants'))
             if s.length is not None:
-                act = sum(float(t.split()[1]) for _, t in s.action if t.startswith('wait '))
+                act = sum(float(t.split()[1]) for _, t in s.action if t.startswith('wait '))   # shared waits
                 need = s.length * float(s.get('Speed', 1) or 1)    # seconds of take on screen
                 for v in s.variants:
                     if s.in_point(v) + need > act + 0.01:

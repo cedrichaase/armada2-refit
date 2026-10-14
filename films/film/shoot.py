@@ -89,8 +89,10 @@ class Take:
             cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier), '--mod', 'stock', '--no-launch',
                    '--label', label]
         else:
+            # a shot with Prepare: starts without the game, prepares the clone, then launches
+            prep = ['--no-launch'] if s.get('Prepare') else ['--args', f.args(s)]
             cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier),
-                   *f.variants[self.variant].split(), '--args', f.args(s), '--label', label]
+                   *f.variants[s.install_variant(self.variant)].split(), *prep, '--label', label]
         r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True)
         self.log.write(r.stdout + r.stderr)
         m = re.search(r'^session (\S+)', r.stdout, re.M)
@@ -98,6 +100,16 @@ class Take:
             raise RuntimeError('session did not start: ' + (r.stdout + r.stderr).strip()[-300:])
         self.sid = m.group(1)
         self.note(f'session {self.sid}')
+        if s.get('Prepare'):
+            words = s.get('Prepare').split()
+            state = os.path.join(SESSIONS, self.sid, 'session.json')
+            r = subprocess.run([os.path.join(REPO, words[0]), state, *words[1:]], cwd=REPO,
+                               capture_output=True, text=True)
+            self.log.write(f'$ Prepare: {s.get("Prepare")}\n{r.stdout}{r.stderr}')
+            if r.returncode:
+                raise RuntimeError(f'Prepare: {s.get("Prepare")} failed (exit {r.returncode})')
+            self.drive('launch', *f.args(s).split())
+            self.note('prepared and launched')
 
     def drive(self, *args):
         r = subprocess.run([A2TEST, 'drive', '--session', self.sid, *args], cwd=REPO,
@@ -288,6 +300,8 @@ class Take:
                     self.drive('click', str(round(x)), str(round(y)), *a[2:])
             elif op == 'run':
                 self.run_app()
+            elif op == 'typelog':
+                self.typelog(*arg.split(None, 2))
             elif op == 'ptr':
                 self.ptr(*[float(v) for v in arg.split()])
             elif op == 'drag':
@@ -309,6 +323,17 @@ class Take:
                 self.bench().input('up 1')
             elif op == 'press':
                 self.bench().key(arg)
+
+    def typelog(self, player, name, marker):
+        """Type the word that follows `marker` in a file of another player's game (the
+        host's join code, from its Online.log), as the bench's scenarios do."""
+        other = self.ensemble.takes[player]
+        path = os.path.join(other.bench().game_dir, name)
+        text = open(path, errors='replace').read() if os.path.exists(path) else ''
+        found = re.findall(re.escape(marker.strip('"')) + r'\W*([A-Za-z0-9-]+)', text, re.I)
+        if not found:
+            raise RuntimeError(f'typelog: no "{marker}" in {player}\'s {name}')
+        self.drive('type', found[-1])
 
     # ---------------------------------------------------------------- recording
     def record_start(self, raw):
@@ -443,6 +468,89 @@ class Take:
         return ok
 
 
+class Ensemble:
+    """A shot with Players: one Take per player, started together, set up and recorded
+    over one action, so their time lines agree and the layout can put them side by side.
+    A line `host: ...` goes to that player; any other line to each in turn, and a shared
+    `wait` is waited once."""
+
+    def __init__(self, film, shot, tier):
+        self.film, self.shot, self.tier = film, shot, tier
+        self.takes = {p: Take(film, shot, p, tier) for p in shot.players}
+        for t in self.takes.values():
+            t.ensemble = self
+        self.tag = f'{shot.id}/{",".join(shot.players)}'
+
+    def run(self, lines, events=None, t0=None):
+        for ln, text in lines:
+            who, line = self.shot.split_line(text)
+            if events is not None:
+                events.append(dict(t=round(time.time() - t0, 3), op=line.partition(' ')[0],
+                                   arg=line.partition(' ')[2], player=who))
+            if who:
+                self.takes[who].run([(ln, line)])
+            elif line.startswith('wait '):
+                time.sleep(float(line.split()[1]))
+            else:
+                for t in self.takes.values():
+                    t.run([(ln, line)])
+
+    def __call__(self):
+        takes = list(self.takes.values())
+        raws = {}
+        ok = False
+        for t in takes:
+            os.makedirs(os.path.dirname(t.stem), exist_ok=True)
+            t.log = open(t.stem + '.log', 'w')
+            raws[t] = tempfile.mkdtemp(prefix=f'{t.variant}-', dir=os.path.dirname(t.stem)) + '/raw'
+        try:
+            for i, t in enumerate(takes):
+                if i:
+                    time.sleep(8)       # never two starts in one second
+                t.start()
+            for t in takes:
+                t.wait_ready()
+            self.run(self.shot.setup)
+            for t in takes:
+                t.record_start(raws[t])
+            for t in takes:
+                t.wait_recording(raws[t])
+            t0 = time.time()
+            events = []
+            self.run(self.shot.action, events, t0)
+            time.sleep(TAIL)
+            duration = time.time() - t0
+            for t in takes:
+                t.record_stop()
+            for t in takes:
+                t.stop()
+                t.sid = None
+            for t in takes:
+                t.mux(raws[t], duration)
+                mine = [e for e in events if e.get('player') in (None, t.variant)]
+                json.dump(dict(start=t0, duration=round(duration, 3), events=mine),
+                          open(t.stem + '.events.json', 'w'), indent=1)
+                json.dump(dict(hash=self.film.spec_hash(self.shot, t.variant, self.tier),
+                               spec=self.film.spec(self.shot, t.variant, self.tier), commit=commit(),
+                               res=self.film.res(self.tier), tier=self.tier,
+                               filmed=time.strftime('%Y-%m-%d %H:%M:%S')),
+                          open(t.stem + '.spec.json', 'w'), indent=1)
+                t.contact_sheet(probe_duration(t.stem + '.mkv'))
+                t.note(f'done, {duration:.1f} s -> {t.stem}.mkv')
+            ok = True
+        except Exception as e:
+            for t in takes:
+                t.note(f'FAILED: {e}')
+        finally:
+            for t in takes:
+                if getattr(t, 'rec', None):
+                    t.record_stop()
+                t.stop()
+                shutil.rmtree(os.path.dirname(raws[t]), ignore_errors=True)
+                t.log.close()
+        return ok
+
+
 def film_takes(a, tier):
     film = load(a.board)
     probs = [(s, m) for s, m in sb.check(film) if s is None or not a.shots or s.id in a.shots]
@@ -453,6 +561,12 @@ def film_takes(a, tier):
     todo = []
     for s in select(film, a.shots):
         if not s.filmed:
+            continue
+        if s.players:       # all of a shot's players are filmed together, or none
+            if a.force or any(take_state(film, s, p, tier) != 'ok' for p in s.players):
+                todo.append(Ensemble(film, s, tier))
+            else:
+                say(f'{s.id}', 'current, skipped (--force to re-film)')
             continue
         for v in s.variants:
             if a.variant and v not in a.variant:
