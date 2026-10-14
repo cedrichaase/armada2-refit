@@ -278,6 +278,11 @@ def render_card(film, shot, tier, g, inputs, dur):
     style = dict(big=(150, 'white', True), heading=(72, 'white', True), accent=(40, ACCENT, True),
                  small=(34, '0xBBBBBB', False))
     lines = [(style.get(st, style['heading']), t) for st, t in shot.card]
+    # the whole card shrinks, keeping its proportions, until its widest line fits 88% of
+    # the width; drawtext cannot measure, so the width is estimated at 0.58 em a letter
+    widest = max((len(t) * px * 0.58 for (px, _, _), t in lines), default=0)
+    k = min(1.0, 1690 / widest) if widest else 1.0
+    lines = [((int(px * k), col, bold), t) for (px, col, bold), t in lines]
     total = sum(int(px * 1.45) for (px, _, _), _ in lines)
     y = (1080 - total) // 2
     chain = []
@@ -465,7 +470,9 @@ def assemble(film, tier, tl, segs, out, tmp):
     for p in segs:
         inputs += ['-i', p]
     for i in range(len(segs)):
-        g.add(f"[{i}:v]settb=AVTB,setpts=PTS-STARTPTS,fps={film.fps}[v{i}];[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
+        # xfade wants both its inputs on one timebase: every input, and every concat's
+        # output below, is put on 1/fps
+        g.add(f"[{i}:v]setpts=PTS-STARTPTS,fps={film.fps},settb=1/{film.fps}[v{i}];[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
     cv, ca = '[v0]', '[a0]'
     for i in range(1, len(segs)):
         shot, start, end, ov = tl[i]
@@ -473,7 +480,7 @@ def assemble(film, tier, tl, segs, out, tmp):
             g.add(f"{cv}[v{i}]xfade=transition=fade:duration={ov}:offset={start}[cv{i}];"
                   f"{ca}[a{i}]acrossfade=d={ov}[ca{i}]")
         else:
-            g.add(f"{cv}{ca}[v{i}][a{i}]concat=n=2:v=1:a=1[cv{i}][ca{i}]")
+            g.add(f"{cv}{ca}[v{i}][a{i}]concat=n=2:v=1:a=1[cc{i}][ca{i}];[cc{i}]settb=1/{film.fps}[cv{i}]")
         cv, ca = f'[cv{i}]', f'[ca{i}]'
     total = tl[-1][2]
     beds = music_beds(film, tl)
