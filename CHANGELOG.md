@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.40.0 — 2026-10-14
+
+Layers: films 1.0.0.
+
+### Added
+- `films/` and `./a2film`: films written as storyboards (shots, camera, layout,
+  transitions, titles, music), probed on the test bench at 1280x720 four games at once,
+  filmed at 4K, and cut into a rough cut and an edit manifest for an editor (films
+  1.0.0). The `film` skill holds the procedure. Installs nothing.
+
+Tooling only; nothing to see in game.
+
 ## 11.39.1 — 2026-10-13
 
 Layers: surfaces 1.1.1.

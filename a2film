@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# a2film -- storyboards filmed on the test bench (films/README.md)
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 -c 'import sys; sys.path.insert(0, sys.argv.pop(1)); from film.cli import main; sys.exit(main(sys.argv[1:]))' "$here/films" "$@"
