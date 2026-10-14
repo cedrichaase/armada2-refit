@@ -144,6 +144,9 @@ Close and low under the Enterprise-E's saucer, sliding along it. The eye lands o
 saucer's rim, where refit's key light falls off into shadow and stock is flat. The Borg
 in this scene beam boarding parties over: if a transporter effect drifts into frame,
 move `In:` rather than keep it. From the October showcase (`PFX-l5-ente-close`).
+The October stock take of this camera shows the hull dark and half transparent (stock
+fading hulls near the camera?): check the stock probe first; if it repeats, pull the
+camera back until stock draws the hull solid, or this wipe looks broken, not old.
 
 ```setup
 step Move the mouse to 1900,8

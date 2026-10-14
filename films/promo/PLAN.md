@@ -92,6 +92,19 @@ change before the cut.
 - **Alternative:** stock at the film's resolution. That is weaker: the stretch reads as a
   bug, not as "2001".
 
+**D8. The thumbnail.** Four mockups from existing footage are in
+`$A2_DATA/films/promo/thumbnail/` (`review.png` shows them full size and at 168x94;
+`notes.md` has the source frames and the camera for each final).
+- **Recommended: A**, one Enterprise-E split diagonally into "2001" and "NOW". It is the
+  film's argument in one picture, and it still reads small. Its final frame should be a
+  new 4K still, stock and refit (T6), from a camera where stock looks clearly older than
+  it does in the mockup.
+- **D**, the refit Borg cube with "25 YEARS LATER", also reads small, without its small
+  captions.
+- **B**, the hero Enterprise, loses its word at small size.
+- **C**, the explosion: refit's flat yellow shockwave band looks like stock's old disc.
+  That is worth a look as an explosions issue, not only a thumbnail one.
+
 ## Tooling before filming
 
 Each item is a change to `films/` (format, `shoot.py`, `edit.py`) with its README and
