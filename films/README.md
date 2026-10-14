@@ -92,6 +92,7 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
 | `Final` | `3840x2160` | the final takes' resolution |
 | `Probe` | `1280x720` | the probes' resolution. Keep the aspect of `Final`: positions in `Crop:` are fractions of the frame, so they carry over. Not 960x540: the game dies at start there (a Wine stack overflow) |
 | `Fps` | `30` | the cut's frame rate. Takes are variable-rate (real time); never fixed at capture |
+| `Pointer` | `1920x1080` | the space the pointer commands' coordinates are written in, scaled to each take, so a probe and a final take share one action block |
 | `Args` | `-nointro a2_borg01` | the game's arguments, for every shot that names no `Args` of its own |
 | `Variant <name>` | `refit`, `stock` | the bench `--install`s that make a variant; `refit`: `--install . --install testbench/scene`; `stock`: `--install testbench/scene`. Add your own (a branch's checkout, a setting) |
 | `Music` | | `Music=0` in every scene: `0` (the default) or `1` |
@@ -106,7 +107,7 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
 
 | Key | Default | |
 |---|---|---|
-| `Kind` | `scene` | `scene`: filmed on the bench with a `Scene.asi` scene. `card`: a title card from a ```` ```card ```` block, nothing filmed. `footage`: another shot's take (`From:`) or a file (`File:`), not filmed. `mission`: a mission played from its start (`Args:` names it, `Scene: none` or a scene file with `Enable=0`) |
+| `Kind` | `scene` | `scene`: filmed on the bench with a `Scene.asi` scene. `card`: a title card from a ```` ```card ```` block, nothing filmed. `footage`: another shot's take (`From:`) or a file (`File:`), not filmed. `mission`: a mission played from its start (`Args:` names it, `Scene: none` or a scene file with `Enable=0`). `desktop`: no game, a bare desktop running a program (`Run:`), for the GUI installer; see "Desktop shots" |
 | `Shows` | | the features or layers this shot is for, comma-separated (`explosions`, `lighting: shadows`). Prose for the reader, and what `check` counts |
 | `Scene` | | a scene in `testbench/scene/scenes/` by name, or a `.ini` path relative to the board |
 | `Args` | the film's | the game's arguments for this shot |
@@ -124,6 +125,8 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
 | `File` | | `footage` only: a file, a path relative to `$A2_DATA` |
 | `Background` | | `card` only: a shot id whose take is blurred behind the card |
 | `Status` | `draft` | `draft`, `probed`, `approved`, `final` |
+| `Run` | | `desktop` only: the program the `run` command starts. Leading `NAME=value` words are its environment; `{repo}` is this checkout |
+| `Wallpaper` | black | `desktop` only: `<shot> [variant] [t]`, a still at `t` s (1) from that shot's take at the same tier, or `#rrggbb` |
 
 ### Blocks
 
@@ -146,9 +149,38 @@ The setup and action blocks take one command per line (`#` comments):
 | `drag X0 Y0 X1 Y1 [S]` | press, drag over S seconds (1.0), release |
 | `lclick [X Y]` | a left click, after moving there |
 | `press COMBO` | a key press at human speed (`shift+1`); with `Keys: auto` it becomes a key hint |
+| `run` | `desktop` only: start the shot's `Run:` program |
 
-Pointer coordinates are in the take's pixels, so a shot that uses them should be filmed at
-one resolution; prefer Scene.asi's `select` and `goto`, which have none.
+Pointer coordinates (`ptr`, `drag`, `lclick`, `click`) are in the film's `Pointer` space,
+1920x1080 unless it says otherwise, and scaled to each take: a 1280x720 probe and a 4K
+take of one action block put the pointer on the same thing. In the game that holds for
+the HUD and the map, which scale with the screen at one aspect ratio. Where an order can
+go without the pointer, Scene.asi's `select` and `goto` are surer.
+
+### Desktop shots
+
+A `desktop` shot films a program, not the game: the GUI installer, in this repository.
+Its take is a stock bench session started with `--no-launch` (`a2test session start
+--mod stock --no-launch`): a headless desktop and a clone of the stock game, with no
+game running. The runner then
+
+- scales the output to 900 logical rows (a 1600x900 desktop at every tier), so a window
+  fills the same part of the frame in a probe and a 4K take, and the `Pointer` space
+  maps onto it;
+- floats every window in the middle, over the wallpaper, which is an `mpv` window tiled
+  underneath (there is no `swaybg` here);
+- makes a scratch `HOME` in which Heroic (`gog_store/installed.json`, `GamesConfig`)
+  knows the game at `~/Games/Heroic/Star Trek Armada II`, with the user's own vkBasalt
+  layer copied in, and the clone's record of an earlier release removed: the installer
+  finds a fresh stock game and really installs into it;
+- runs the program in user, mount and PID namespaces of its own: the clone is bind-mounted
+  at that path (the installer resolves links, and would show the bench's), and it sees
+  none of the bench's other games or the user's Heroic, which it would warn about. Its
+  environment has no D-Bus session, so nothing it does reaches the user's desktop;
+- records with `wf-recorder -D`: a still desktop sends no damage, so without it a take
+  has a handful of frames.
+
+There are no variants: one take, named `desktop`.
 
 ## What the board should say
 
@@ -190,6 +222,11 @@ House style for showcase footage (from the October showcase):
 - **Things drawn at random differ between variants** (an asteroid field's rocks are
   picked per session): a wipe across them shows two different fields. Prefer `dissolve`,
   or `full refit label`.
+- **A real install takes about 40 s** from the cache-less GUI installer, most of it on
+  "Rewriting the models…" (2026-10-14). Film it in one take and cut its start and its
+  end as two shots (`From:` the same take).
+- **Tk is not installed here** (`libtk8.6.so`), so the Windows/macOS window
+  (`A2_INSTALLER_TK=1`) cannot be filmed until `pacman -S tk`.
 - **Shots run in a fresh session each**, so one shot's orders never leak into the next.
   A session's start costs about a minute; that is what `--jobs` buys back.
 

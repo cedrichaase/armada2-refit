@@ -3,9 +3,11 @@
 Every take is a fresh bench session: started with the shot's scene and the variant's
 installs, the setup block run, the action block recorded, the session stopped. Takes run
 in parallel, `--jobs` at once."""
+import glob
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,6 +24,8 @@ A2TEST = os.path.join(REPO, 'a2test')
 SESSIONS = os.path.expanduser('~/.cache/a2test/sessions')
 READY_TIMEOUT = 300     # a session's game and scene, from start to built
 TAIL = 0.5              # seconds recorded after the action's last line
+GOG_APP = '1174788223'  # Armada II's GOG app id, as Heroic records it
+DESKTOP_ROWS = 900      # a desktop shot's logical height: a 1600x900 desktop, so a window fills it
 
 _print_lock = threading.Lock()
 
@@ -55,6 +59,15 @@ class Take:
         self.sid = None
         self.sess = None
         self.log = None
+        self.app = None         # a desktop shot's program, once `run` has started it
+        self.desktop = shot.kind == 'desktop'
+        # pointer coordinates are written in the film's Pointer space: a game take scales
+        # them to its pixels, a desktop take to its logical units (its output is scaled to
+        # DESKTOP_ROWS logical rows at every tier, so a window is the same size in each)
+        w, h = (int(v) for v in film.res(tier).split('x'))
+        pw, ph = film.pointer
+        self.scale = h / DESKTOP_ROWS
+        self.k = (w / self.scale / pw, DESKTOP_ROWS / ph) if self.desktop else (w / pw, h / ph)
 
     def note(self, msg):
         say(self.tag, msg)
@@ -71,9 +84,13 @@ class Take:
             env['SCENE_INI'] = ini
         if not f.music:
             env['SCENE_MUSIC'] = '0'
-        cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier),
-               *f.variants[self.variant].split(), '--args', f.args(s),
-               '--label', f'film-{f.name}-{s.id}-{self.variant}-{self.tier}']
+        label = f'film-{f.name}-{s.id}-{self.variant}-{self.tier}'
+        if self.desktop:      # no game: a stock clone to install into, and its display
+            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier), '--mod', 'stock', '--no-launch',
+                   '--label', label]
+        else:
+            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier),
+                   *f.variants[self.variant].split(), '--args', f.args(s), '--label', label]
         r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True)
         self.log.write(r.stdout + r.stderr)
         m = re.search(r'^session (\S+)', r.stdout, re.M)
@@ -91,6 +108,8 @@ class Take:
 
     def wait_ready(self):
         """Until the scene answers `query` with its objects (or, with no scene, the game runs)."""
+        if self.desktop:
+            return self.desktop_prepare()
         t0 = time.time()
         has_scene = self.film.scene_ini(self.shot) is not None
         seen = False     # `running` says "not running" until the game's process is up
@@ -108,9 +127,110 @@ class Take:
         raise RuntimeError(f'no scene after {READY_TIMEOUT} s')
 
     def stop(self):
+        if getattr(self, 'wall', None) and self.wall.poll() is None:
+            self.wall.terminate()
+        if self.app and self.app.poll() is None:
+            try:
+                os.killpg(self.app.pid, 15)
+                self.app.wait(10)
+            except (ProcessLookupError, subprocess.TimeoutExpired):
+                pass
         if self.sid:
             subprocess.run([A2TEST, 'session', 'stop', self.sid], cwd=REPO, capture_output=True, text=True)
             self.note('session stopped')
+
+    # ---------------------------------------------------------------- a desktop, no game
+    def swaymsg(self, *cmd):
+        r = subprocess.run(['swaymsg', *cmd], env=self.bench().wl_env(), capture_output=True, text=True)
+        self.log.write(f'  swaymsg {" ".join(cmd)} -> {(r.stdout + r.stderr).strip()[:300]}\n')
+
+    def wallpaper(self):
+        """`Wallpaper: <shot> [variant] [t]`, a still from that shot's take at this tier,
+        or `Wallpaper: #rrggbb`. Black without one."""
+        w = (self.shot.get('Wallpaper') or '#000000').split()
+        if w[0].startswith('#'):
+            png = self.stem + '.wallpaper.png'
+            subprocess.run(['magick', '-size', '16x9', f'xc:{w[0]}', png], check=True)
+            return png
+        src = self.film.shot(w[0])
+        v = w[1] if len(w) > 1 else src.variants[-1]
+        t = float(w[2]) if len(w) > 2 else 1.0
+        mkv = self.film.take(src, v, self.tier) + '.mkv'
+        if not os.path.exists(mkv):
+            raise RuntimeError(f'Wallpaper {w[0]} {v}: no take at this tier yet ({mkv})')
+        png = self.stem + '.wallpaper.png'
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{t:.2f}', '-i', mkv, '-frames:v', '1', png],
+                       check=True)
+        return png
+
+    def desktop_prepare(self):
+        """The bare desktop: scaled to 1080 logical rows, the wallpaper, every window
+        floating in the middle; and a scratch HOME in which Heroic knows the session's
+        stock clone, so an installer finds the game there and installs into it."""
+        self.swaymsg('output', 'HEADLESS-1', 'scale', f'{self.scale:.4f}')
+        self.swaymsg('for_window [app_id=".*"] floating enable, move position center')
+        self.swaymsg('for_window [class=".*"] floating enable, move position center')
+        # the wallpaper is a window, tiled under the floating ones: there is no swaybg here
+        self.swaymsg('for_window [app_id="a2film-wallpaper"] floating disable')
+        self.wall = subprocess.Popen(['mpv', '--wayland-app-id=a2film-wallpaper', '--no-audio', '--no-osc',
+                                      '--no-input-default-bindings', '--keep-open=yes', '--image-display-duration=inf',
+                                      '--cursor-autohide=no', '--no-border', '--panscan=1.0', self.wallpaper()],
+                                     env=self.bench().wl_env(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL, start_new_session=True)
+        home = os.path.join(self.bench().work, 'home')
+        heroic = os.path.join(home, '.config', 'heroic')
+        os.makedirs(os.path.join(heroic, 'gog_store'), exist_ok=True)
+        os.makedirs(os.path.join(heroic, 'GamesConfig'), exist_ok=True)
+        clone = str(self.bench().game_dir)
+        # the clone may carry the real install's record of a release: this is a fresh game
+        try:
+            os.remove(os.path.join(clone, 'armada2-refit-installed.json'))
+        except FileNotFoundError:
+            pass
+        # where Heroic puts it, so the window shows ~/Games/Heroic/Star Trek Armada II: the
+        # clone is bind-mounted there inside the program's namespace (run_app), since the
+        # installer resolves links and would show the bench's path
+        game = os.path.join(home, 'Games', 'Heroic', 'Star Trek Armada II')
+        os.makedirs(game, exist_ok=True)
+        self.clone, self.game = clone, game
+        # the user's own vkBasalt layer, which the installer looks for under XDG_DATA_HOME
+        layers = os.path.join(home, '.local', 'share', 'vulkan', 'implicit_layer.d')
+        os.makedirs(layers, exist_ok=True)
+        for src in glob.glob(os.path.expanduser('~/.local/share/vulkan/implicit_layer.d/vkBasalt*.json')):
+            shutil.copy(src, layers)
+        json.dump(dict(installed=[dict(appName=GOG_APP, install_path=game, platform='windows')]),
+                  open(os.path.join(heroic, 'gog_store', 'installed.json'), 'w'))
+        json.dump({GOG_APP: dict(enviromentOptions=[]), 'version': 'v0', 'explicit': True},
+                  open(os.path.join(heroic, 'GamesConfig', f'{GOG_APP}.json'), 'w'))
+        self.home = home
+        self.note(f'desktop at scale {self.scale:.3f}, HOME {home}, the game at {game}')
+        time.sleep(2.0)
+
+    def run_app(self):
+        """Start the shot's `Run:` program on the desktop: leading NAME=value words are its
+        environment, `{repo}` this checkout. It runs in its own PID and mount namespace: it
+        sees none of the bench's other games (nor the user's Heroic) among the processes,
+        and the session's clone of the game at ~/Games/Heroic."""
+        words = shlex.split(self.shot.get('Run').replace('{repo}', REPO))
+        env = dict(self.bench().wl_env(), HOME=self.home, XDG_CONFIG_HOME=os.path.join(self.home, '.config'),
+                   XDG_CACHE_HOME=os.path.join(self.home, '.cache'),
+                   XDG_DATA_HOME=os.path.join(self.home, '.local', 'share'), PATH=os.environ['PATH'],
+                   LANG=os.environ.get('LANG', 'C.UTF-8'), DISPLAY=self.bench().s['env']['DISPLAY'])
+        # nothing of the user's own desktop session: no bus to reach their Heroic or browser
+        for k in ('DBUS_SESSION_BUS_ADDRESS', 'XDG_SESSION_ID', 'XDG_CURRENT_DESKTOP', 'HYPRLAND_INSTANCE_SIGNATURE'):
+            env.pop(k, None)
+        while words and re.fullmatch(r'[A-Z_][A-Z0-9_]*=.*', words[0]):
+            k, _, v = words.pop(0).partition('=')
+            env[k] = v
+        # root in a namespace of its own to bind-mount, then the user again for the program
+        uid, gid = os.getuid(), os.getgid()
+        self.app = subprocess.Popen(['unshare', '--user', '--map-root-user', '--mount', '--pid', '--fork',
+                                     '--mount-proc', 'sh', '-c',
+                                     f'mount --bind "$0" "$1" && shift && exec unshare --user --map-user={uid} '
+                                     f'--map-group={gid} "$@"',
+                                     self.clone, self.game, *words], env=env, cwd=self.home, stdin=subprocess.DEVNULL,
+                                    stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
+        self.note(f'running {" ".join(words)}')
 
     # ---------------------------------------------------------------- input at human speed
     def bench(self):
@@ -120,8 +240,17 @@ class Take:
             self.sess = Session.load(os.path.join(SESSIONS, self.sid, 'session.json'))
         return self.sess
 
+    def xy(self, x, y):
+        return x * self.k[0], y * self.k[1]
+
     def ptr(self, x, y, secs=0.6):
         s = self.bench()
+        x, y = self.xy(x, y)
+        if self.desktop and s.s.get('cursor') is None:
+            # the first move is absolute, over the output's pixels; every later one is
+            # relative, in the compositor's logical units (Session.move)
+            s.input(f'move {int(x * self.scale)} {int(y * self.scale)}')
+            s.s['cursor'] = [int(x), int(y)]
         cx, cy = s.s.get('cursor') or [x, y]
         n = max(1, int(secs * 60))
         t0 = time.time()
@@ -147,7 +276,18 @@ class Take:
             elif op in ('key', 'shot', 'step'):
                 self.drive(op, arg)
             elif op == 'click':
-                self.drive('click', *arg.split())
+                a = arg.split()
+                x, y = self.xy(float(a[0]), float(a[1]))
+                button = int(a[a.index('--button') + 1]) if '--button' in a else 1
+                if self.desktop:
+                    self.ptr(float(a[0]), float(a[1]), 0.3)
+                    self.bench().input(f'down {button}')
+                    time.sleep(0.08)
+                    self.bench().input(f'up {button}')
+                else:
+                    self.drive('click', str(round(x)), str(round(y)), *a[2:])
+            elif op == 'run':
+                self.run_app()
             elif op == 'ptr':
                 self.ptr(*[float(v) for v in arg.split()])
             elif op == 'drag':
@@ -179,7 +319,9 @@ class Take:
         # when the game draws fewer (films/README.md, "Traps")
         x264 = ['-p', 'preset=ultrafast', '-p', 'crf=18'] if self.tier == 'probe' else \
                ['-p', 'preset=veryfast', '-p', 'crf=14']
-        self.rec = subprocess.Popen(['wf-recorder', '-o', 'HEADLESS-1', '-y', '-c', 'libx264', *x264,
+        # a still desktop sends no damage, so no frames: ask for every frame (-D)
+        nodamage = ['-D'] if self.desktop else []
+        self.rec = subprocess.Popen(['wf-recorder', '-o', 'HEADLESS-1', *nodamage, '-y', '-c', 'libx264', *x264,
                                      '-f', raw + '.mkv'], env=env, stdin=subprocess.DEVNULL,
                                     stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
         sink = (st.get('null_sink') or {}).get('name')

@@ -7,13 +7,15 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 11.40.0 — 2026-10-14
 
-Layers: films 1.0.0.
+Layers: films 1.0.0, testbench 3.16.0.
 
 ### Added
 - `films/` and `./a2film`: films written as storyboards (shots, camera, layout,
   transitions, titles, music), probed on the test bench at 1280x720 four games at once,
   filmed at 4K, and cut into a rough cut and an edit manifest for an editor (films
   1.0.0). The `film` skill holds the procedure. Installs nothing.
+- `a2test session start --assets none`, the game as a release installs it (testbench
+  3.16.0).
 
 Tooling only; nothing to see in game.
 

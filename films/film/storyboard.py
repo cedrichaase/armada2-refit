@@ -13,14 +13,15 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, REPO)
 import a2env  # noqa: E402
 
-FILM_KEYS = {'Film', 'Final', 'Probe', 'Fps', 'Args', 'Music'}
+FILM_KEYS = {'Film', 'Final', 'Probe', 'Fps', 'Args', 'Music', 'Pointer'}
 SECTION_KEYS = {'Music'}
 SHOT_KEYS = {'Kind', 'Shows', 'Scene', 'Args', 'Variants', 'Layout', 'Crop', 'Transition', 'Title', 'Sub',
-             'Caption', 'In', 'Length', 'Speed', 'Audio', 'Keys', 'File', 'From', 'Status', 'Background'}
-KINDS = {'scene', 'card', 'footage', 'mission'}
+             'Caption', 'In', 'Length', 'Speed', 'Audio', 'Keys', 'File', 'From', 'Status', 'Background',
+             'Run', 'Wallpaper'}
+KINDS = {'scene', 'card', 'footage', 'mission', 'desktop'}
 LAYOUTS = {'full', 'wipe', 'dissolve', 'split', 'pip'}
 STATUSES = {'draft', 'probed', 'approved', 'final'}
-OPS = {'scene', 'wait', 'key', 'click', 'step', 'shot', 'ptr', 'drag', 'lclick', 'press'}
+OPS = {'scene', 'wait', 'key', 'click', 'step', 'shot', 'ptr', 'drag', 'lclick', 'press', 'run'}
 
 DEFAULT_VARIANTS = {
     'refit': '--install . --install testbench/scene',
@@ -61,11 +62,13 @@ class Shot:
 
     @property
     def filmed(self):
-        return self.kind in ('scene', 'mission')
+        return self.kind in ('scene', 'mission', 'desktop')
 
     @property
     def variants(self):
         v = self.get('Variants')
+        if self.kind == 'desktop':
+            return ['desktop']      # no game: one take, a bare desktop
         return [x.strip() for x in v.split(',') if x.strip()] if v else ['refit']
 
     @property
@@ -160,6 +163,13 @@ class Film:
         return self.fields.get('Final', '3840x2160') if tier == 'final' else self.fields.get('Probe', '1280x720')
 
     @property
+    def pointer(self):
+        """The space pointer coordinates are written in (`Pointer: 1920x1080`), scaled to each
+        take's resolution, so a probe and a final take share one action block."""
+        w, h = self.fields.get('Pointer', '1920x1080').lower().split('x')
+        return int(w), int(h)
+
+    @property
     def fps(self):
         return float(self.fields.get('Fps', 30))
 
@@ -186,7 +196,8 @@ class Film:
         ini_text = open(ini).read() if ini and os.path.exists(ini) else None
         return dict(film=self.name, shot=shot.id, variant=variant, install=self.variants.get(variant),
                     tier=tier, res=self.res(tier), args=self.args(shot), scene=shot.get('Scene'),
-                    scene_ini=ini_text, music=self.music,
+                    scene_ini=ini_text, music=self.music, pointer=self.fields.get('Pointer'),
+                    run=shot.get('Run'), wallpaper=shot.get('Wallpaper'),
                     setup=[t for _, t in shot.setup], action=[t for _, t in shot.action])
 
     def spec_hash(self, shot, variant, tier):
@@ -331,9 +342,21 @@ def check(film):
                 out.append((s, f'From {a[0]}: no filmed shot of that id'))
             elif len(a) > 1 and a[1] not in src.variants:
                 out.append((s, f'From {a[0]} {a[1]}: {a[0]} films no {a[1]}'))
+        if k == 'desktop':
+            if any(t.split()[0] == 'run' for _, t in s.setup + s.action) and not s.get('Run'):
+                out.append((s, 'a run command with no Run: field'))
+            if s.get('Scene'):
+                out.append((s, 'a desktop shot has no Scene: there is no game'))
+            w = (s.get('Wallpaper') or '').split()
+            if w and not w[0].startswith('#'):
+                src = next((x for x in film.shots if x.id == w[0]), None)
+                if not src or not src.filmed or src.kind == 'desktop':
+                    out.append((s, f'Wallpaper {w[0]}: no filmed game shot of that id'))
+                elif len(w) > 1 and w[1] not in src.variants:
+                    out.append((s, f'Wallpaper {w[0]} {w[1]}: {w[0]} films no {w[1]}'))
         if s.filmed:
             for v in s.variants:
-                if v not in film.variants:
+                if v not in film.variants and k != 'desktop':
                     out.append((s, f'variant {v} is not defined (Variant {v}: ...)'))
             ini = film.scene_ini(s)
             if k == 'scene' and not ini:

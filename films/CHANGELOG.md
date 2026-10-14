@@ -11,6 +11,9 @@ in [`README.md`](README.md).
 - The storyboard format (`films/<name>/storyboard.md`): sections and shots with scene,
   variants, camera (```` ```setup ````, ```` ```action ````), layout, crop, transition,
   titles, key hints, audio, music beds per section, cards, `From:` footage and a status.
+- Desktop shots (`Kind: desktop`, `Run:`, `Wallpaper:`, the `run` command): a program,
+  the GUI installer, filmed on a bare bench desktop, installing into a stock clone of the
+  game. The film field `Pointer:` (1920x1080): pointer coordinates scaled to each take.
 - `./a2film check`, `status`, `probe` (1280x720, `--jobs 4`), `take` (3840x2160,
   `--jobs 1`), `sheet`, `animatic` and `manifest` (`a2film-manifest/1`). A take is
   re-filmed only when its spec changes.

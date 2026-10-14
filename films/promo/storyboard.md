@@ -1,7 +1,8 @@
 # Armada II Refit
 Film: promo
 Final: 3840x2160
-Variant stock-shell: --mod stock --stock-shell embed
+Pointer: 1920x1080
+Variant refit: --assets none --install . --install testbench/scene
 
 The promo: the one video that has to make someone who loved Armada II in 2001 install
 it again tonight. The two showcases before it argued *what changed* to people who already
@@ -19,9 +20,7 @@ The argument, in the order the film makes it:
 4. **It takes a minute to install.** A step-by-step guide through the graphical
    installer, ending on the game's own main menu, refitted.
 
-About 4:30 by the shot lengths, a little less once transitions overlap: cold open 0:15,
-hulls and light 0:38, battle 0:44, space 0:44, widescreen 0:13, gameplay 0:57,
-installing 0:55, end 0:06. Long for a promo; `PLAN.md` (D5) proposes where to cut to
+About 4:20 by the shot lengths, a little less once transitions overlap. Long for a promo; `PLAN.md` (D5) proposes where to cut to
 about 3:30, after the animatic shows what drags.
 `PLAN.md` beside this board holds the open decisions and the tooling the board needs
 before every shot can be filmed; read it first.
@@ -34,12 +33,17 @@ For the editor:
 - **Pace rises and falls by act**: quick cuts on the music in the cold open and in battle;
   long holds in space; the gameplay act is paced by the pointer, not the music; the
   install guide is calm and legible, every step on screen long enough to read twice.
+- **"Refit" is the game as a release installs it**, once the new effects are in the
+  installer: every code layer, and none of `$A2_DATA`'s assets — no remastered textures,
+  no menu backdrop plates, no movies (`--assets none`). The film is published when the
+  installer installs everything it shows. The thumbnail is the one exception: it uses
+  the remastered textures.
 - Lower-third titles name a feature once, the first time it is on screen. No act cards
   except where the film turns (gameplay, installing): the promo should not feel like a
   chaptered changelog.
-- **Shots marked `PLACEHOLDER` are cards standing in for footage the bench cannot film
-  yet** (the installer's window, two games online, see `PLAN.md`, "Tooling"). Their
-  prose says what the real shot is; their length is the real shot's.
+- **g06 is a `PLACEHOLDER` card** standing in for footage the bench cannot film yet (two
+  games online, `PLAN.md` T4). Its prose says what the real shot is; its length is the
+  real shot's.
 - Camera values copied from the October showcase (`$A2_DATA/promo/2026-10-showcase/
   tools/*.shots`) and from `films/whats-new` were checked on the bench; values marked
   *unprobed* in a shot's prose are first guesses.
@@ -47,37 +51,23 @@ For the editor:
 ## Cold open
 Music: Mbor300.wav from 0 gain -1 until h01 fade 1.2
 
-Seventeen seconds: the game as it shipped, then what it is now. Opens on the stock main
-menu, small and square in the middle of a black 16:9 frame, as a 2001 monitor showed it —
-holds just long enough to be recognised — then hard cuts to refit close-ups on the
-Borg bed's pulse, and the title. The teasers are cut from other shots' takes.
+Fifteen seconds: the game as it shipped, then what it is now. Opens on stock — the
+Enterprise-E from h01's camera, flat and dated — holds just long enough to be
+recognised, then hard cuts to the same moment in refit on the Borg bed's first hit, and
+the title. Every shot here is cut from other shots' takes.
 
 ### o01 · Stock, as it shipped
-Kind: mission
-Scene: menu.ini
-Args: -nointro
-Variants: stock-shell
-Layout: full stock-shell
+Kind: footage
+From: h01 stock
+In: 3.0
+Length: 3
 Transition: fade 1.0
 Audio: none
-In: 1.0
-Length: 3.5
 Caption: top
 Title: 2001
-Status: draft
 
-The stock main menu, untouched. Ideally pillarboxed at 800x600 in the middle of the
-frame, the size it was made for (needs a per-shot resolution, `PLAN.md` T3); until then
-the take is at the film's resolution and the stock shell fills what it fills. No title
-text beyond "2001": the viewer knows this screen.
-
-```setup
-step Wait up to 300 seconds for the main menu
-step Move the mouse to 1900,8
-```
-```action
-wait 5
-```
+Stock's Enterprise, the same frame o02 cuts to in refit. If h01's stock take shows the
+hull ghostly (see h01), take it from h03's stock instead and o02 from h03's refit.
 
 ### o02 · Teaser: the Enterprise
 Kind: footage
@@ -86,8 +76,8 @@ In: 3.0
 Length: 2.5
 Audio: none
 
-Hard cut on the bed's first hit: the Enterprise-E's hull filling the frame, lit from
-below. The change from o01 is the whole point; no transition.
+Hard cut on the bed's first hit: the same frame as o01, refit. The change is the whole
+point; no transition.
 
 ### o03 · Teaser: the fireball
 Kind: footage
@@ -452,7 +442,7 @@ wait 6.5
 ```
 
 ## Space
-Music: Mfedmp300.wav from 0 gain 1 until u01 fade 1.5
+Music: Mfedmp300.wav from 0 gain 1 until u02 fade 1.5
 
 The quiet act, slow cuts and long holds. The argument: planets, moons, rocks and the sky
 were textures on low-polygon shapes; now they are surfaces with relief, oceans, ice and
@@ -604,42 +594,20 @@ wait 7
 ## Widescreen
 Music: Mcarmp300.wav from 0 gain 0 until g00 fade 1.0
 
-Twenty seconds on the screen around the picture: the game was made for 800x600 and
-stretched everything to fit anything wider. Refit lays the menus and the HUD out for the
-screen they are on, at any aspect ratio. A dissolve each time: UI is spread over the
+A beat on the screen around the picture: the game was made for 800x600 and stretched
+everything to fit anything wider. Refit lays the HUD (and the menus) out for the screen
+they are on, at any aspect ratio. The menus are not shown: without the backdrop plates,
+which no release carries, they stand in black sides. A dissolve: UI is spread over the
 frame.
-
-### u01 · The main menu
-Kind: mission
-Scene: menu.ini
-Args: -nointro
-Variants: stock-shell, refit
-Layout: dissolve 2 1.2
-Transition: dissolve 0.8
-Title: Widescreen menus and HUD
-Sub: Laid out for your screen, at any aspect ratio
-Audio: none
-In: 1.0
-Length: 6
-Status: draft
-
-The main menu, stock then refit. Stock's shell at 16:9 is what a player sees today; the
-dissolve lands on refit's, the backdrop widened and the buttons where they belong.
-
-```setup
-step Wait up to 300 seconds for the main menu
-step Move the mouse to 1900,8
-```
-```action
-wait 8
-```
 
 ### u02 · The HUD in battle
 Shows: hud, grid
 Scene: showcase
 Variants: stock, refit
 Layout: dissolve 2.5 1.2
-Transition: dissolve 0.6
+Transition: dissolve 0.8
+Title: Widescreen HUD
+Sub: Laid out for your screen, at any aspect ratio
 Caption: top
 In: 1.0
 Length: 7
@@ -888,7 +856,7 @@ Online play that works under Wine and Proton
 Music: Mfed30.wav from 0 gain -4
 
 The guide: calm, legible, every step on screen long enough to read twice, each numbered
-the same way. The window is the GUI installer filmed on a bare desktop (`PLAN.md` T1),
+the same way. The window is the GUI installer filmed on a bare desktop (`Kind: desktop`),
 installing a real release into a stock copy of the game, so that the last shot — the
 game launched after it — is the honest result. Linux first, in full; Windows and macOS
 in one step each, since the window is the same. What the install leaves out (textures)
@@ -933,49 +901,110 @@ github.com/cedrichaase/armada2-refit/releases
 [small] macOS: armada2-refit-installer-macos.zip
 ```
 
-### i03 · Step 3: run it · PLACEHOLDER
-Length: 7
+### i03 · Step 3: run it
+Kind: desktop
+Run: python3 {repo}/gui-installer/armada2-refit-installer.py
+Wallpaper: h05 refit 9
+Layout: full
 Transition: dissolve 0.5
-
-The real shot: the desktop, the AppImage made executable and opened (a key hint for the
-double-click; the `chmod +x` line as a caption for terminal users). The window opens,
-the sky and the nebula fade in, the title settles. The eye lands on the game row: it
-found Armada II in Heroic by itself.
-
-```card
-[accent] 3 · RUN IT — PLACEHOLDER
-It finds the game on its own
-[small] chmod +x armada2-refit-installer-x86_64.AppImage
-```
-
-### i04 · Step 4: check what goes in · PLACEHOLDER
+Title: 3 · Run it
+Sub: It finds the game on its own
+Caption: top
+Audio: none
+In: 0.5
 Length: 7
-Transition: dissolve 0.4
+Status: draft
 
-The real shot: a slow push in (in the cut, `Crop:`) on the version picker and the lines
-under it, which say what this machine will get — the bloom line pointing at vkBasalt if
-it is missing. Pointer rests on the newest release.
+The desktop, the window opening on it: the sky and the nebula fade in, the title
+settles. The eye lands on the game row: it found Armada II in Heroic by itself. For
+terminal users, the caption could carry `chmod +x armada2-refit-installer-x86_64.AppImage`.
+The final take runs the release's AppImage, once the release carries the new effects;
+the probe runs the checkout's script, the same window.
 
-```card
-[accent] 4 · CHECK WHAT GOES IN — PLACEHOLDER
-The newest release is picked for you
-[small] Each line says what installs on this machine, and why if not
+```action
+wait 0.5
+run
+wait 7.5
 ```
 
-### i05 · Step 5: install · PLACEHOLDER
-Length: 9
+### i04 · Step 4: check what goes in
+Kind: desktop
+Run: python3 {repo}/gui-installer/armada2-refit-installer.py
+Wallpaper: h05 refit 9
+Layout: full
 Transition: dissolve 0.4
+Title: 4 · Check what goes in
+Sub: The newest release is picked for you; each line says what installs here
+Caption: top
+Audio: none
+In: 0.5
+Length: 7
+Status: draft
 
-The real shot, the installer's best moment: Install pressed (key hint), the sky going to
-warp, the engine glow riding the progress bar, the status line naming each layer
-("Refitting the HUD", "Installing lighting"…), and the bar full. Hold one beat on
-"done". Real speed: an install from the cache takes under a second and the warp holds
-for three, so nothing is sped up.
+The game row, the version picker and the line under them, which says what goes into
+Heroic. The pointer travels down them: the game it found, the newest release picked for
+you, the launch settings. Coordinates from the desktop test (2026-10-14): the window
+sits in the middle of a 1600x900 desktop, the game row at y 410, the picker at
+1044,489, the Heroic line at y 560, Install at 960,684 (Pointer space, 1920x1080).
 
-```card
-[accent] 5 · INSTALL — PLACEHOLDER
-One button. Launch settings are written into Heroic for you
+```setup
+run
+wait 6
+ptr 960 960 0.1
 ```
+```action
+wait 0.5
+ptr 700 410 1.2
+wait 1.5
+ptr 1044 489 1.0
+wait 1.5
+ptr 700 560 1.0
+wait 4.5
+```
+
+### i05 · Step 5: install
+Kind: desktop
+Run: python3 {repo}/gui-installer/armada2-refit-installer.py
+Wallpaper: h05 refit 9
+Layout: full
+Transition: dissolve 0.4
+Title: 5 · Install
+Sub: One button. The launch settings go into Heroic for you
+Caption: top
+Audio: none
+In: 0.5
+Length: 6
+Status: draft
+
+The installer's best moment: Install pressed, the sky going to warp, the engine glow
+riding the progress bar, the status line naming each layer ("Refitting the HUD",
+"Installing lighting"…), and the bar full. Hold one beat on "done". Real speed: the
+install is real, into the take's own stock copy of the game, and takes about 40 s,
+most of it on "Rewriting the models…": this shot is its start, i05b its end, one take.
+
+```setup
+run
+wait 8
+ptr 960 960 0.1
+```
+```action
+wait 0.5
+ptr 960 684 0.8
+lclick
+wait 52
+```
+
+### i05b · Step 5: done
+Kind: footage
+From: i05
+In: 46
+Length: 5
+Transition: dissolve 0.8
+Audio: none
+
+The end of the same take, about forty seconds on: the bar full, "Refit installed.
+Heroic launch settings written.", Launch game lit amber. Move `In:` to land a beat after
+the bar fills.
 
 ### i06 · Step 6: play
 Kind: mission
@@ -989,8 +1018,9 @@ In: 1.0
 Length: 6
 Status: draft
 
-The real shot opens on **Launch game** pressed in the window, then this: the game's
-main menu, refitted — the honest end of the guide. Until T1 exists, it is this alone.
+The game's main menu, refitted, as the installer leaves it: the honest end of the guide.
+With no backdrop plate the menu stands in black sides at 16:9; if that reads as broken,
+end the guide on i05's "done" and a cut to a refit game shot instead.
 
 ```setup
 step Wait up to 300 seconds for the main menu
@@ -1004,8 +1034,10 @@ wait 8
 Length: 6
 Transition: dissolve 0.5
 
-A card; with T1, a picture in picture of the Tk window (the same screen, filmed on
-Linux with `A2_INSTALLER_TK=1`) in the corner.
+A card until the Tk window can be filmed: it should be a desktop shot of the window the
+`.exe` and the `.app` show, run on Linux with `A2_INSTALLER_TK=1` (`Run:
+A2_INSTALLER_TK=1 python3 {repo}/gui-installer/armada2-refit-installer.py`), which needs
+Tk on the filming machine (`pacman -S tk`; this one has none, 2026-10-14).
 
 ```card
 [accent] WINDOWS AND MACOS
