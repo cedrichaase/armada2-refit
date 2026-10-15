@@ -114,8 +114,14 @@ pub fn pick_points(at: V3, max: usize) -> [f32; 48 * 4] {
     }
     let mut out: Vec<Pick> = Vec::new();
     let max = max.min(16);
-    for p in &scene::lights().points {
-        let (start, range, col) = (p.start, p.range, p.colour);
+    let lights = scene::lights();
+    for p in &lights.points {
+        // A planet's day side lights only what faces it (scene::lights::set_day_side).
+        let share = lights.share(p, at);
+        if share <= 0.0 {
+            continue;
+        }
+        let (start, range, col) = (p.start, p.range, p.colour * share);
         let d = (at - p.pos).len();
         let peak = col.x.max(col.y).max(col.z);
         let hard = p.style.hard || range < 0.25 * start;

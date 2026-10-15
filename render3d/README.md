@@ -610,3 +610,100 @@ takes `Scrap::Render`'s colour.
 
 **For other modules**: `posed(o)`, `shadow_map()`, `draws_plain_sod(o)`,
 `instance_scale(inst)`.
+
+### world
+
+`src/mods/world/`, `shaders/world_*.hlsl`, on by default, registered first (it takes
+the nebulae and the moons before `particles` and `hulls` see them). The objects whose
+class overrides `Render` and draws a world of its own: planets, the dilithium moons,
+asteroid fields, nebulae. It ports `Surfaces.asi` (the recipes, `Surfaces\<texture>.ini`),
+`Lighting.asi`'s planets and its nebula and planet lights, `Planets.asi` (moot: our own
+sphere) and `Nebulae.asi` (the recipes, `Nebulae\<odf>.ini`); their READMEs hold the
+looks settled with the user, kept here. Each part stands down while the plugin that
+draws it is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
+`Lighting.asi` or `Surfaces.asi`, the gas beside `Nebulae.asi`, the lights beside
+`Lighting.asi`. Settings in `[World]` (the parts: `Planets`, `Rocks`, `Nebulae`,
+`Surfaces`; the planet look under `Lighting.ini`'s names: `PlanetAmbient`, `PlanetDusk`,
+`PlanetWrap`, `PlanetFill`, `PlanetSun`, `PlanetHaze*`, `PlanetGlint*`, `CityLights`,
+`CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
+`RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`; the lights' `PlanetGlows`,
+`PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Nebulae.ini`'s keys), read again
+every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
+engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
+only) draws even with the plugins loaded, so `Enable` flips between theirs and ours.
+
+**Surfaces** (`surfaces.rs`, `world_surface.hlsl`): `Surfaces.asi`'s bake, unchanged,
+into three cubes per recipe (albedo, relief, clouds) that are render targets in the
+default pool with device-made levels; a `Reset` drops them and the next draw bakes
+again. Asked for by texture name; a name without a recipe keeps its stock texture.
+
+**Planets** (`planets.rs`, `world_planet.hlsl`), objects with the `Planet` vtable
+(0x6b2b3c) and a `Planet_Database` (vtable 0x6bab74, the instance's +0x80). Stock draws
+two `GroundMesh` hemispheres (database +0xa8, +0xac) and the atmosphere's cloud shell
+(+0xb0), radius at each mesh's +0x150, re-tessellated against the camera every frame;
+we draw one sphere of our own whose vertices carry the gore UVs `GroundMesh::mSetUVs`
+gives (the class textures are a four-lobe unwrap), so stock's art lands where it did.
+`PlanetInstance::RenderInternal` draws only while the planet's flags (+0x14) have bit 2
+and its byte +0x113 is clear. The ground is the class's `groundTextureName`
+(`PlanetClass+0x4bc`) with 1 and 2 appended, or its recipe; the shell the
+`atmosphereTextureName` (+0x4ac), turned about the axis by minus the instance's +0xb4
+times the database's +0xa4, its turbulence on the instance's +0xb8 while the class's
++0x4cc is positive, tinted (`mSetupAtmosphere`) from white towards the race's colour
+(race +0x464) as the population (+0x2c8) nears the class's maximum (its level at
++0x490 indexes the four `cfgPOP_*` at 0x702130). The look is `Lighting.asi`'s
+`planet.hlsl` (night side, dusk, the limb's haze, the air past the limb, the glint off
+water, cities at night), less its highlight shoulder, which the tone map does. The
+shell writes no depth. **Cities** (pass 1 of `ST3D_PlanetaryMaterial`): the race's
+(`Planet+0x2c4`) development texture `PD_<cityTextureName><1|2>` (race +0x452) times
+the planet's own map of where its people live, made again as `PlanetInstance::
+mSetupHemisphere` makes it from the race's `CityAllocArray` for that hemisphere
+(+0x514, +0x518: width, height, floats): each texel's alpha 0.4 x clamp((P - value) k),
+k the race's +0x470 and P the population over `cfgPOP_HEAVY` (0x70213c, set from
+`RTS_CFG.h` at load; the 25000 in the exe's data is not what runs) plus 1 / k. On the
+bench a full colony's map was 0x66 everywhere, the engine's and ours.
+
+**Rocks** (`rocks.rs`, `world_rock.hlsl`). An asteroid field (vtable 0x6b0cb4) holds
+its rocks as `ST3D_Instance`s (instance +0x98, count +0x9c, 0x98 bytes each: transform
++0x44, database +0x80), the class's databases at +0x1e0 named by the table at 0x6b07e8
+(`master`, `master1`..`master5`, `master4` again, `master7`); each is culled as
+`GameObjectInstance::DistanceCull` culls it (height counted a quarter, against
+`cfgOBJECT_CULLING_DISTANCE`, 0x6fcac0) and drawn at the field's `ScaleSOD`. A `Scrap`
+(vtable 0x6b15b4) is ours only when a mesh of it has a recipe (the dilithium moons'
+`Mdmoon`); any other is the hulls module's. A mesh with a recipe is drawn as
+`Lighting.asi`'s `moon_ps` drew it (relief, the recipe's cut-out as holes, triplanar
+for the asteroids), about its mesh's centre scaled to its extents. The moon's inner
+shell (`glowdmoon` material, whose colour `Scrap::Render` sets to (0, 0.5, 1) times the
+share of dilithium left, `ResourceInterface::GetTotalValue` over the class's
+`GetTotalMaxValue`, resource at +0x17c) is drawn dark and opaque as under `Lighting.asi`
+(`MoonShell=dark`): the settled look, black cracks with the glow showing only where a
+crack opens past the rock's edge; `MoonShell=glow` adds it in its colour, as stock
+did. The moon's `oreglow` sprite node (the nimbus) is drawn at `Step::Translucent`, its
+`moonpulse` animation on the instance's clock.
+
+**Nebulae** (`nebulae.rs`, `world_nebula.hlsl`): `Nebulae.asi`, its decisions kept
+(the envelope, the bake, the half-size slices on a ladder fixed in distance from the
+eye, per view, the blue-noise thresholds that stay put, the spectral noise). A class
+with a recipe draws as gas at `Step::Translucent`, its billboards skipped in the object
+loop; any other is left to the particles module. Every nebula the loop reaches is
+marked on screen (+0x25) as `Entity::Render` marks it when the instance's frustum test
+(slot 3) passes: `Nebula::Simulate` registers the nebula's light only while it is.
+The Key is the main view's (the action camera's view keeps the bake), the ships'
+shadows the hulls module's map (`hulls::shadow_map()`, sampler 8). A ghosted nebula of
+a gas class keeps its gas: slot 3 of the `GameObjectSpirit` vtable (0x6b1ca4) is
+wrapped. Everything is in the default pool; a `Reset` bakes again.
+
+**Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view
+(`Module::lights`), a point light at its centre (the instance's transform +0x44 plus
+its bounding sphere +0x34) in the Key's colour times its ground's mean colour times
+`PlanetGlow`, full at the surface and gone at `PlanetGlowRange` radii, marked a day
+side (`scene::lights::set_day_side`): a draw takes it times the share of the day side
+facing it (`Lights::share`), and the planets take none. *Nebula lights*: the call to
+`Simulate_Nebula_Lights` (0x4a5160) at 0x4a4a7a in `Nebula::Simulate` is re-pointed;
+stock's colour (the class's glow, +0x22c, swung by a noise term) came out black, so
+the light is the glow times `NebulaBrightness`, steady, in a gas class's recipe hue,
+its falloff (class +0x244, +0x248) times `NebulaRange` (written on the nebula's light
+object, +0x1ac). *Nebula cull*: slot 3 of the `NebulaInstance` vtable (0x6b1448,
+`ST3D_Instance::FrustumTest` 0x62e990) tests the bounding sphere (the node's at +0x1c
+when the instance has one at +0x80, else its own at +0x34; radius +0xc) with its radius
+times `NebulaCull`, and puts it back.

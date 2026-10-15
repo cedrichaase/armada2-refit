@@ -69,6 +69,21 @@ fn style_of(light: usize) -> Style {
     unsafe { STYLES.get(&light).copied().unwrap_or_default() }
 }
 
+static mut DAY_SIDE: alloc::collections::BTreeSet<usize> = alloc::collections::BTreeSet::new();
+
+/// Marks a light object as a planet's day side (`Lighting.asi`'s planet glow): it lights
+/// what is near it times the share of the day side facing it (`Lights::share`), and not
+/// the planet itself (`is_day_side`).
+#[allow(static_mut_refs)]
+pub fn set_day_side(light: usize) {
+    unsafe { DAY_SIDE.insert(light) };
+}
+
+#[allow(static_mut_refs)]
+pub fn is_day_side(light: usize) -> bool {
+    unsafe { DAY_SIDE.contains(&light) }
+}
+
 #[derive(Default)]
 pub struct Lights {
     pub dirs: Vec<Directional>,
@@ -140,7 +155,25 @@ impl Lights {
         }
     }
 
-    /// The point lights that reach a sphere, strongest first, at most `max`.
+    /// How much of a light reaches `at`: 1, or for a planet's day side (`set_day_side`)
+    /// the share of it facing `at`, 0 over the night side (`Lighting.asi`'s
+    /// `glow_phase`: half of one minus the cosine between the Key's direction and the
+    /// way from the light to `at`).
+    pub fn share(&self, p: &Point, at: V3) -> f32 {
+        if !is_day_side(p.light) {
+            return 1.0;
+        }
+        let Some(k) = self.key() else { return 1.0 };
+        let d = at - p.pos;
+        let (dl, kl) = (d.len(), k.dir.len());
+        if dl < 1e-3 || kl < 1e-6 {
+            return 1.0;
+        }
+        0.5 - 0.5 * d.dot(k.dir) / (dl * kl)
+    }
+
+    /// The point lights that reach a sphere, strongest first, at most `max`; a planet's
+    /// day side with its colour times its `share` at the centre.
     pub fn points_near(&self, centre: V3, radius: f32, max: usize) -> Vec<Point> {
         let mut v: Vec<(f32, Point)> = self
             .points
@@ -150,9 +183,15 @@ impl Lights {
                 if d >= p.start + p.range {
                     return None;
                 }
+                let mut p = *p;
+                let sh = self.share(&p, centre);
+                if sh <= 0.0 {
+                    return None;
+                }
+                p.colour = p.colour * sh;
                 let f = if d <= p.start { 1.0 } else { 1.0 - (d - p.start) / p.range.max(1e-3) };
                 let peak = p.colour.x.max(p.colour.y).max(p.colour.z);
-                Some((f * peak, *p))
+                Some((f * peak, p))
             })
             .collect();
         v.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(core::cmp::Ordering::Equal));

@@ -51,6 +51,13 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   lights, other particles, nebula puffs (classes without a volume recipe) and
   billboard effects in stock's; keys in `[Particles]`. `install.sh` also takes out
   `Venting.asi`.
+- Module `world` (on): planets on our own sphere in `Lighting.asi`'s planet look with
+  `Surfaces.asi`'s grounds (city lights by `cfgPOP_HEAVY`), asteroid fields and
+  dilithium moons with their recipe surfaces, nebulae as `Nebulae.asi`'s volumes with
+  ships' shadows from the hulls module, and the planet and nebula lights
+  `Lighting.asi` added; keys in `[World]`. `install.sh` takes out `Surfaces.asi` and
+  `Nebulae.asi` (and copies their recipes into the game), and `Lighting.asi` while
+  hulls and world are both on.
 
 Installed, not yet seen in game.
 

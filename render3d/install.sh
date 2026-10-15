@@ -28,7 +28,10 @@ ordnance  1  specials
 sky       1  sky
 overlays  1  fog
 particles 1  venting
+world     1  surfaces nebulae
+hulls     1
 "
+# Lighting.asi draws both hulls and planets: it goes only when hulls and world are on.
 
 remove=0
 while [ $# -gt 0 ]; do
@@ -100,6 +103,8 @@ fi
 
 # The plugins the modules that are on replace.
 removed=""
+world_on=0
+hulls_on=0
 while read -r module default layers; do
     [ -n "$module" ] || continue
     on=$(python3 - "$GAME/Render3D.ini" "$module" "$default" <<'EOF'
@@ -117,11 +122,26 @@ print(on)
 EOF
 )
     [ "$on" != 0 ] || continue
+    [ "$module" = world ] && world_on=1
+    [ "$module" = hulls ] && hulls_on=1
     for l in $layers; do
         "$here/../$l/install.sh" --remove >/dev/null
         removed="$removed $l"
     done
 done <<< "$MODULES"
+
+if [ "$hulls_on" = 1 ] && [ "$world_on" = 1 ]; then
+    "$here/../lighting/install.sh" --remove >/dev/null
+    removed="$removed lighting"
+fi
+
+# The world module reads the surfaces' and the nebulae's recipes from the game directory,
+# where their plugins' installers put them; with those plugins taken out, it puts them.
+if [ "${world_on:-0}" = 1 ]; then
+    mkdir -p "$GAME/Surfaces" "$GAME/Nebulae"
+    cp "$here"/../surfaces/recipes/*.ini "$GAME/Surfaces/"
+    cp "$here"/../nebulae/recipes/*.ini "$GAME/Nebulae/"
+fi
 
 rm -f "$GAME/Render3D.log"
 echo "installed into $GAME: Render3D.asi, Render3D.ini; superseded and removed: msaa$removed"

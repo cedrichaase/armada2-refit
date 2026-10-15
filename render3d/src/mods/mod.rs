@@ -15,6 +15,7 @@ pub mod ordnance;
 pub mod particles;
 pub mod overlays;
 pub mod sky;
+pub mod world;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
@@ -117,6 +118,9 @@ pub fn init() {
     // One line per module; the first that takes a step or an object draws it.
     // particles before hulls: it takes the latinum nebulae, which draw through the
     // plain GameObject::Render as hulls do.
+    // world first: it takes the nebulae (latinum included) and the rocks whose class has
+    // a recipe, and leaves every other one to particles and hulls.
+    add(Box::new(world::World::default()), true);
     add(Box::new(particles::Particles::default()), true);
     add(Box::new(hulls::Hulls::default()), true);
     add(Box::new(effects::Effects::new()), true);
