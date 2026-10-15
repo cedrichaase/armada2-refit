@@ -8,6 +8,7 @@
 //! keeps working. Without a Direct3D 9 device behind d3d8, or when our targets cannot
 //! be made, the stock body runs as it always did.
 pub mod post;
+pub mod steps;
 
 use crate::config::{self, Config};
 use crate::d3d::*;
@@ -66,7 +67,13 @@ unsafe extern "C" fn body(cam: usize, rs: usize, is_main: u32) {
     match begin(cfg) {
         None => unsafe { stock(cam, rs, is_main) },
         Some(saved) => {
-            unsafe { stock(cam, rs, is_main) };
+            let f = frame().as_mut();
+            match f.as_ref().and_then(|f| f.targets.as_ref().map(|t| (f.dev, t.w, t.h, f.frames))) {
+                Some((dev, w, h, n)) if cfg.steps && steps::usable() => {
+                    steps::run(dev, cam, rs, main, w, h, n);
+                }
+                _ => unsafe { stock(cam, rs, is_main) },
+            }
             end(cam, main, saved, cfg);
         }
     }
@@ -90,6 +97,7 @@ unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESU
         f.post = None;
         f.failed = None;
     }
+    crate::mods::reset();
     log!("frame: device Reset");
     match unsafe { RESET } {
         Some(r) => unsafe { r(dev8, params) },
@@ -122,6 +130,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
         if f.is_some() {
             log!("frame: a new device");
         } else {
+            crate::mods::settle();
             for name in crate::SUPERSEDED {
                 if crate::plugin_loaded(name) {
                     log!("{} is loaded: it keeps drawing its part inside the engine's steps", name);
@@ -130,6 +139,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
         }
         *f = Some(Frame { dev, post: None, targets: None, failed: None, frames: 0, logged: [None; 2] });
         hook_reset(dev8);
+        crate::mods::device(dev);
     }
     let f = f.as_mut()?;
     let rt = dev.get_render_target(0)?;
@@ -173,17 +183,6 @@ fn begin(cfg: &Config) -> Option<Saved> {
     Some(Saved { rt, ds })
 }
 
-/// The view's rectangle: the camera's (`+0x1b0`, floats x, y, w, h in back-buffer
-/// pixels), as `UpdateViewport` left it, inside the target.
-fn view_rect(cam: usize, w: u32, h: u32) -> PRect {
-    let f = |o: usize| engine::field_f32(cam, 0x1b0 + o);
-    let x = (f(0).max(0.0) as u32).min(w.saturating_sub(1));
-    let y = (f(4).max(0.0) as u32).min(h.saturating_sub(1));
-    let rw = (f(8).max(1.0) as u32).min(w - x);
-    let rh = (f(12).max(1.0) as u32).min(h - y);
-    PRect { x, y, w: rw, h: rh }
-}
-
 fn end(cam: usize, main: bool, saved: Saved, cfg: &Config) {
     let Some(f) = frame().as_mut() else { return };
     let (Some(t), Some(p)) = (f.targets.as_ref(), f.post.as_ref()) else {
@@ -191,7 +190,7 @@ fn end(cam: usize, main: bool, saved: Saved, cfg: &Config) {
         f.dev.set_depth_stencil(saved.ds.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
         return;
     };
-    let view = view_rect(cam, t.w, t.h);
+    let view = steps::cam_rect(cam, t.w, t.h);
     p.run(f.dev, t, view, &saved.rt, saved.ds.as_ref(), cfg);
     let which = if main { 0 } else { 1 };
     if f.logged[which] != Some(view) {

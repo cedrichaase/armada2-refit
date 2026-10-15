@@ -20,6 +20,9 @@ pub struct Config {
     pub shoulder: f32,
     /// Draw the inset (action camera) through us; 0 leaves it to the engine.
     pub inset: bool,
+    /// 1: the body runs as our sequence of steps (modules take some over); 0: the
+    /// engine's whole body runs, into our target.
+    pub steps: bool,
 }
 
 impl Default for Config {
@@ -35,6 +38,7 @@ impl Default for Config {
             exposure: 1.0,
             shoulder: 0.8,
             inset: true,
+            steps: true,
         }
     }
 }
@@ -57,6 +61,7 @@ pub fn load() -> Config {
         exposure: ini.float("Render3D", "Exposure", d.exposure),
         shoulder: ini.float("Render3D", "Shoulder", d.shoulder),
         inset: ini.int("Render3D", "Inset", d.inset as i32) != 0,
+        steps: ini.int("Render3D", "Steps", d.steps as i32) != 0,
     }
 }
 

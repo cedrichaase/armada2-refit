@@ -12,6 +12,7 @@ pub mod config;
 pub mod engine;
 pub mod frame;
 pub mod math;
+pub mod mods;
 #[rustfmt::skip]
 pub mod shaders;
 
@@ -53,6 +54,7 @@ fn startup() {
         return;
     }
     config::set(cfg);
+    mods::init();
     if frame::install() {
         log!("ready");
     }
