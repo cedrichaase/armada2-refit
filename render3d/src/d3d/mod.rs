@@ -124,6 +124,13 @@ pub struct LockedRect {
 }
 
 #[repr(C)]
+pub struct LockedBox {
+    pub row_pitch: i32,
+    pub slice_pitch: i32,
+    pub bits: *mut u8,
+}
+
+#[repr(C)]
 pub struct VertexElement {
     pub stream: u16,
     pub offset: u16,
@@ -214,6 +221,16 @@ impl Device {
     }
     pub fn update_texture(self, src: &Com, dst: &Com) -> HRESULT {
         vcall!(self.0, 31, fn(*mut c_void, *mut c_void) -> HRESULT, src.0, dst.0)
+    }
+    /// Copies a render target's contents into a system-memory surface of its size.
+    pub fn get_render_target_data(self, rt: &Com, sys: &Com) -> HRESULT {
+        vcall!(self.0, 32, fn(*mut c_void, *mut c_void) -> HRESULT, rt.0, sys.0)
+    }
+    pub fn create_offscreen_surface(self, w: u32, h: u32, fmt: u32, pool: u32) -> Option<Com> {
+        let mut o = null_mut();
+        let hr = vcall!(self.0, 36, fn(u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT,
+            w, h, fmt, pool, &mut o, null_mut());
+        if hr < 0 { None } else { Some(Com(o)) }
     }
     pub fn stretch_rect(self, src: &Com, sr: Option<&Rect>, dst: &Com, dr: Option<&Rect>, filter: u32) -> HRESULT {
         let s = sr.map_or(null_mut(), |r| r as *const Rect as *mut Rect);
@@ -383,6 +400,24 @@ impl Com {
     }
     pub fn cube_unlock(&self, face: u32, level: u32) -> HRESULT {
         vcall!(self.0, 20, fn(u32, u32) -> HRESULT, face, level)
+    }
+    /// Surface: `LockRect` of the whole surface.
+    pub fn surf_lock(&self, flags: u32) -> Option<LockedRect> {
+        let mut lr = LockedRect { pitch: 0, bits: null_mut() };
+        let hr = vcall!(self.0, 13, fn(*mut LockedRect, *const Rect, u32) -> HRESULT, &mut lr, core::ptr::null(), flags);
+        if hr < 0 { None } else { Some(lr) }
+    }
+    pub fn surf_unlock(&self) -> HRESULT {
+        vcall!(self.0, 14, fn() -> HRESULT,)
+    }
+    /// Volume texture: `LockBox` of a whole level.
+    pub fn vol_lock(&self, level: u32, flags: u32) -> Option<LockedBox> {
+        let mut lb = LockedBox { row_pitch: 0, slice_pitch: 0, bits: null_mut() };
+        let hr = vcall!(self.0, 19, fn(u32, *mut LockedBox, *const u8, u32) -> HRESULT, level, &mut lb, core::ptr::null(), flags);
+        if hr < 0 { None } else { Some(lb) }
+    }
+    pub fn vol_unlock(&self, level: u32) -> HRESULT {
+        vcall!(self.0, 20, fn(u32) -> HRESULT, level)
     }
     pub fn surf_desc(&self) -> SurfaceDesc {
         let mut d = SurfaceDesc::default();

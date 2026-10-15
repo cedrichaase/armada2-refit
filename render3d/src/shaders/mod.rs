@@ -4,4 +4,5 @@ pub mod effects_repair;
 pub mod effects_shields;
 pub mod ordnance;
 pub mod post;
+pub mod sky;
 pub mod sod;

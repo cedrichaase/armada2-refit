@@ -25,6 +25,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   of the same name override), torpedo lights recoloured and phaser lights as
   `Lighting.asi` makes them. Mining beams, mines and model-drawn specials without a
   recipe stay the engine's.
+- Module `sky` (on): all of `Background_Render`: `Sky.asi`'s recipe skies (built in
+  from `sky/skies/`; a `Sky\<name>.ini` in the game directory wins), baked on the GPU
+  into a half-float cube; stock faces where there is no recipe; the starfield from the
+  engine's octree, point stars lifted into HDR (`StarLift`); background planets and
+  suns (`SunLift`); keys in `[Sky]`.
 
 Installed, not yet seen in game.
 

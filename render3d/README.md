@@ -243,3 +243,87 @@ module's own keys, in `Render3D.ini` `[Ordnance]`:
 | `Recolour` | 1 | torpedo and pulse lights in their sprite's colour |
 | `PhaserLights` | 1 | the phasers' emitter and impact lights (`PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift`, `PhaserImpact`, `PhaserImpactStart`, `PhaserImpactRange`, `PhaserImpactLift`: `Lighting.ini`'s) |
 | `Survey` | 0 | log every ordnance ODF the first time it shows, with its vtable and `Submit` |
+
+### sky
+
+Takes over `Step::Background`, the whole of `Background_Render` (0x590d90), and
+supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's order:
+
+1. **The far plane.** `ST3D_Camera::SetFarPlane` (0x6198a0) to `STAR_FAR_CLIP_PLANE`
+   (0x6fcac8, 80000) for the step and back to `FAR_CLIPPING_PLANE` (0x6fcab0) after, as
+   stock does. That changes only the camera's CPU projection, so our draws use the
+   device's projection with its far plane moved out to the same distance: under the
+   scene's far plane the starfield (10000-20000 out) would be clipped.
+2. **The sky**, when the view shows one (`Render_Stuff` +4, and the detail
+   configuration `Storm3D+0x104` +0x2c not 2) and the map has a sky database
+   (`g_background_geometry_db`, 0x7720fc). The map's background name is the lower-cased
+   string `Starfield_Load_Background_Geometry` (0x590c30) keeps at 0x738538:
+   `<name>.sod` or a bare prefix.
+   - **With a recipe** (`sky/skies/<name>.ini`, built into the plugin; a
+     `Sky\<name>.ini` in the game directory takes precedence and is re-read when it
+     changes), the procedural sky of `Sky.asi` (sky/README.md, whose settled looks
+     it keeps: Aqua dimmer and softer, the grades, no filaments): one quad over the
+     viewport carrying each corner's world ray (from the inverse of view x projection,
+     far point minus near point, which is affine in screen position), sampling a cube
+     baked once per recipe. The bake is on the GPU only: each face is drawn by
+     `bake_ps` at twice its edge (Sky.asi's texel mapping, edge texels on the edges),
+     then `down_ps` averages each 2x2 with one bilinear tap into the face of a
+     half-float cube render target. The cube is in the default pool: dropped before a
+     `Reset`, baked again after. The gas is saturated as before; the recipe's stars are
+     added after that, so a star core may pass white (to 2) and bloom a little.
+     `fine_z`'s noise volume is `Sky.asi`'s, made the same way (managed pool).
+   - **Without one** (`Mbgstars`, or `Recipes=0`), the stock faces, unlit, at the
+     camera, depth off. A cube SOD's meshes through `scene::model`, culled as the
+     engine culls them (`mbg02.sod` holds two cubes, and only the one wound inwards
+     shows). A prefix sky as `CreateBackgroundFace` (0x590f10) builds it: face `i`
+     shows `<prefix><i>` on a quad at +-100 about the camera, texture coordinates
+     (0,0) (1,0) (1,1) (0,1) at its corners, clamped (`ClampTexturesRecursive`). A face
+     whose texture is missing draws white, as the engine's does.
+   - Otherwise a black clear of the view: stock's only colour clear.
+3. **The starfield** (`Render_Stuff` +8; off in the HUD's action camera), read every
+   frame from the engine's own: `g_starfield` (0x773d04) +4 is the root
+   `OctTree_Node`, whose objects (+0x30) and children (+0x3c) are VC6 `std::list`s of
+   `auto_ptr`s (the pointer at list node +0xc). A star (`Starfield::mCreateStarSprite`
+   builds them once, at random from `g_asyncRandom`, so every session differs) holds
+   its `ST3D_Sprite*` at +0 and its quad's four corners in world space at +0xc, which
+   `OctTree_Node::Render` hands to `ST3D_Sprite::DrawQuad` unchanged. The sprite's name
+   (database element +0x8) finds its texture and rectangle in the sprite table; its
+   colour is at +0x24. Added whole (the texture's alpha plays no part), as stock's
+   additive material. The point stars (`mstars`) are lifted past white near their
+   cores (`StarLift`); the blobs and clusters are not.
+4. **The background objects**: every object with flag `0x10000` (the
+   `BackgroundObject` constructor sets it; the object loop skips them), unless its
+   class is `hidden` (+0x19c; `dlight`) outside edit mode (`UserProfile` 0x76b5ac,
+   +0x84). Stock ones are `background_obj`s (`BackgroundObjectClass`: the suns
+   `Msun1-3`, `mwreck`, `mnebula`, `mgate`), drawn by `GameObject::Render`. Ours: the
+   SOD's meshes now, lit, all of them (nothing may wait for the flush: the depth is
+   cleared before the scene), and its sprite nodes as billboards. A sun is one
+   sprite node (`sun1..3` on `Mmoon`, half extent 200): `ST3D_SpriteNode::RenderInternal`
+   (0x63c300) colours it by the node data's colour times `s_diffuseColour` (white
+   outside the nebulae) and sizes it by `m_billboard_render_scaling_factor` (1). The
+   brightest texels go past white (`SunLift`). An object whose class overrides
+   `Render`, or whose SOD does not load (`mgate.sod` is version 1.2), is the engine's.
+5. The device's `Flush` (anything the engine queued), the far plane back, and
+   `ClearDepthBuffer` over the view for the scene.
+
+`Render3D.ini`, `[Sky]` (read again every 60 views):
+
+| Key | Default | |
+|---|---|---|
+| `Draw` | 1 | 0: the engine's `Background_Render` (for comparing on the bench) |
+| `Recipes` | 1 | 0: the stock faces where a recipe exists |
+| `Face` | 1536 | the baked cube's edge; 0 computes the sky at every pixel (the reference) |
+| `Reload` | 1 | re-read `Sky\<name>.ini` in the game directory every 30 views when it changes |
+| `Dump` | 0 | 1: each bake writes its faces to `Sky\<name>.dump0..5.tga` for `sky/grade.py` |
+| `StarLift`, `SunLift` | 0.5, 1 | how far past white the brightest texels of the point stars and of the suns go (0: stock's light) |
+| `Load` | | bench only: a background name to load in place of the map's (`Starfield_Load_Background_Geometry`), once per new value |
+
+Seen on the bench (2026-10-15, `a2_borg01`, 1920x1080), each against the engine's own
+draw in the same session and frame (`Draw=0`, paused): the stock faces of `mbgaqu`,
+`mbgkling.sod`, `mbgpur`, `mbgbaku.sod`, `mbgborg.sod` and `mbgstars` match (sky regions
+equal to 0.1/255; `mbgborg` means equal to 0.05), the starfield matches with
+`StarLift=0`, two spawned suns match to 0.2/255 with `SunLift=0`. `mbg02.sod` (and
+`mbgblue.sod`, the same model) is 2-5% brighter than the engine's: its material is lit
+(model 1), and the engine lights the sky with the scene lights; ours is unlit. The
+recipe skies match `Sky.asi`'s away from the (random) starfield blobs. The HUD's action
+camera draws the sky without stars, as stock.
