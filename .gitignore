@@ -41,3 +41,8 @@ testbench/input/a2input
 render3d/target/
 render3d/build/
 render3d/a2fmt/target/
+
+# ui: cargo's build output
+ui/target/
+ui/build/
+ui/fontbake/target/

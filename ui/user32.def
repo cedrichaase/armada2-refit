@@ -1,0 +1,15 @@
+LIBRARY USER32.dll
+EXPORTS
+GetCursorPos@4
+ScreenToClient@8
+GetClientRect@8
+GetForegroundWindow@0
+GetAsyncKeyState@4
+SetWindowLongA@12
+GetWindowLongA@8
+CallWindowProcA@20
+PeekMessageA@20
+TranslateMessage@4
+DispatchMessageA@4
+IsWindow@4
+ShowCursor@4
