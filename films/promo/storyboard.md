@@ -530,7 +530,7 @@ Probe review 2026-10-15: the Galaxy was out of frame; from the other side (30) a
 
 ```setup
 scene hover off; tooltips off
-scene orbit big 30 -8 500
+scene orbit big 30 -8 260
 ```
 ```action
 wait 0.5
