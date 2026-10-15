@@ -415,7 +415,7 @@ impl Construction {
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;
                 world.r[2] = world.r[2] * s.z;
-                let ours = !name.is_empty() && hulls::draw_instance(v, inst, inst, true, name, &world, Some(colour));
+                let ours = !name.is_empty() && hulls::draw_instance(v, inst, inst, true, &crate::assets::sod_of(name), &world, Some(colour));
                 if ours {
                     crate::mods::particles::feed(inst, name, &world, v);
                     self.said += 1;

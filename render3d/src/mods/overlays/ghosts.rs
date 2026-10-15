@@ -171,7 +171,7 @@ impl Ghosts {
         if name.is_empty() {
             return false;
         }
-        let Some(model) = scene::model(v.dev, name) else { return false };
+        let Some(model) = scene::model(v.dev, &crate::assets::sod_of(name)) else { return false };
         let pos: V3 = unsafe { rd(inst + 0x68) };
         // GameObjectSpirit::Render's cull (it writes only the spirit's own instance).
         let culled = unsafe {

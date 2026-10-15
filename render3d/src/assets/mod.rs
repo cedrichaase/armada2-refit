@@ -68,6 +68,7 @@ struct Store {
     odf_dir: DirIndex,
     sods: BTreeMap<String, Option<Rc<Sod>>>,
     odfs: BTreeMap<String, Option<Rc<Odf>>>,
+    bases: BTreeMap<String, String>,
     sprites: Option<Rc<SpriteTable>>,
     widths: BTreeMap<String, Option<u32>>,
     textures: BTreeMap<String, Option<Com>>,
@@ -91,6 +92,7 @@ fn store() -> &'static mut Store {
                 odf_dir: DirIndex::build("odf"),
                 sods: BTreeMap::new(),
                 odfs: BTreeMap::new(),
+                bases: BTreeMap::new(),
                 sprites: None,
                 widths: BTreeMap::new(),
                 textures: BTreeMap::new(),
@@ -147,6 +149,28 @@ pub fn odf(name: &str) -> Option<Rc<Odf>> {
     let dir = &s.odf_dir;
     let v = Odf::load(&key, |n| dir.read(n)).ok().map(Rc::new);
     s.odfs.insert(key, v.clone());
+    v
+}
+
+/// The SOD an ODF's objects draw, lower case and without extension: its `baseName`
+/// when it sets one (`kmartok` draws `kbattle`, `kprison` draws `kbase`), else its own
+/// name. Every SOD looked up for a game object goes through this; `ScaleSOD` and the
+/// rest stay the ODF's.
+pub fn sod_of(name: &str) -> String {
+    let key = rt::lower(name.strip_suffix(".odf").or(name.strip_suffix(".ODF")).unwrap_or(name));
+    if let Some(v) = store().bases.get(&key) {
+        return v.clone();
+    }
+    let base = odf(&key).and_then(|o| o.get_str("baseName").map(rt::lower)).filter(|b| !b.is_empty());
+    let v = match base {
+        Some(b) => {
+            let b = String::from(b.strip_suffix(".sod").unwrap_or(&b));
+            log!("assets: {} draws {}.sod (baseName)", key, b);
+            b
+        }
+        None => key.clone(),
+    };
+    store().bases.insert(key, v.clone());
     v
 }
 

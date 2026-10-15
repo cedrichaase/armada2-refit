@@ -416,7 +416,7 @@ impl Sky {
         if name.is_empty() {
             return false;
         }
-        let Some(model) = scene::model(v.dev, name) else { return false };
+        let Some(model) = scene::model(v.dev, &crate::assets::sod_of(name)) else { return false };
         if obj::expired(o) || !obj::can_user_see(o) {
             return true;
         }

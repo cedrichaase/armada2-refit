@@ -217,7 +217,7 @@ impl Rocks {
         if name.is_empty() {
             return false;
         }
-        let Some(model) = scene::model(v.dev, name) else { return false };
+        let Some(model) = scene::model(v.dev, &crate::assets::sod_of(name)) else { return false };
         // Only a scrap with a surface from a recipe (the dilithium moons): any other is
         // the hulls module's (or the engine's), drawn as any plain SOD.
         if !self.info(&model, surf).surface {

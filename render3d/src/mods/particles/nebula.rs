@@ -58,7 +58,7 @@ impl Nebulae {
             return s.clone();
         }
         let s = (|| {
-            let sod = assets::sod(&key)?;
+            let sod = assets::sod(&assets::sod_of(&key))?;
             let nodes: Vec<(usize, Rc<Look>)> = sod
                 .nodes
                 .iter()

@@ -51,7 +51,8 @@ const SITES_COCOON: [usize; 4] = [0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4];
 
 /// A dying craft waiting to be broken up (at the next `Step::Chunks`, with a device).
 struct Pending {
-    odf: String,
+    /// The SOD (the ODF's `baseName`, else its name).
+    sod: String,
     world: M34,
     clock: pose::Clock,
     team: V3,
@@ -86,14 +87,14 @@ unsafe extern "thiscall" fn hook_fragment(inst: usize, colour: *const f32, vel: 
         if ACTIVE && faces < 0 && pending().len() < 64 {
             let o = object_of_instance(inst);
             let name = if o != 0 { obj::odf_name(o) } else { "" };
-            if !name.is_empty() && super::super::hulls::draws_plain_sod(o) && crate::assets::sod(name).is_some() {
+            if !name.is_empty() && super::super::hulls::draws_plain_sod(o) && crate::assets::sod(&crate::assets::sod_of(name)).is_some() {
                 let s = super::super::hulls::instance_scale(inst) * scale_sod(name);
                 let mut world = obj::transform(o);
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;
                 world.r[2] = world.r[2] * s.z;
                 let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
-                pending().push(Pending { odf: String::from(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
+                pending().push(Pending { sod: crate::assets::sod_of(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
                 return;
             }
         }
@@ -121,7 +122,7 @@ unsafe extern "thiscall" fn hook_fragment_cocoon(inst: usize, colour: *const f32
             world.r[1] = world.r[1] * s.y;
             world.r[2] = world.r[2] * s.z;
             let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
-            pending().push(Pending { odf: String::from("8472_cocoon"), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
+            pending().push(Pending { sod: String::from("8472_cocoon"), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
             return;
         }
         let f: unsafe extern "thiscall" fn(usize, *const f32, usize, u32, i32, usize) = core::mem::transmute(FN_FRAGMENT);
@@ -147,14 +148,14 @@ unsafe extern "thiscall" fn hook_build_fragment(inst: usize, colour: *const f32,
             } else {
                 ""
             };
-            if !name.is_empty() && crate::assets::sod(name).is_some() {
+            if !name.is_empty() && crate::assets::sod(&crate::assets::sod_of(name)).is_some() {
                 let s = super::super::hulls::instance_scale(inst) * scale_sod(name);
                 let mut world = engine::field_m34(inst, 0x44);
                 world.r[0] = world.r[0] * s.x;
                 world.r[1] = world.r[1] * s.y;
                 world.r[2] = world.r[2] * s.z;
                 let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
-                pending().push(Pending { odf: String::from(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: Some(faces as usize) });
+                pending().push(Pending { sod: crate::assets::sod_of(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: Some(faces as usize) });
                 return;
             }
         }
@@ -271,7 +272,7 @@ impl Chunks {
     }
 
     fn spawn(&mut self, v: &View, p: Pending) {
-        let Some(model) = scene::model(v.dev, &p.odf) else { return };
+        let Some(model) = scene::model(v.dev, &p.sod) else { return };
         let eye = unsafe { LAST_EYE };
         let pz = pose::pose(&model.sod, &model.info, &p.world, p.clock, pose::auto(eye));
         let mut n = 0;
@@ -290,7 +291,7 @@ impl Chunks {
         }
         self.made += 1;
         if self.made <= 6 {
-            log!("effects: debris: {} broke into {} chunks ({} live)", p.odf, n, self.chunks.len());
+            log!("effects: debris: {} broke into {} chunks ({} live)", p.sod, n, self.chunks.len());
         }
     }
 

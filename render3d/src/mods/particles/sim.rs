@@ -365,7 +365,7 @@ impl System {
             let key = (o, field(o, 0x28) as u32);
             if !self.owners.contains_key(&key) {
                 let name = obj::odf_name(o);
-                let set = if name.is_empty() { None } else { self.set(name, true) };
+                let set = if name.is_empty() { None } else { self.set(&assets::sod_of(name), true) };
                 self.owners.insert(key, Owner::new(Kind::Object, set));
             }
             let Some(ow) = self.owners.get_mut(&key) else { continue };

@@ -28,6 +28,11 @@ Layers: render3d 0.2.0, testbench 3.17.0, models 4.4.0.
   plays a match with a battle on render3d, and `render3d-mode-switch` changes the
   display mode in one (testbench 3.17.0).
 
+### Fixed
+- render3d draws the ships and stations whose ODF names another SOD (`baseName`):
+  Martok's Negh'Var, Caddebostan's ship, the Ferengi scavenger, the 8472 hero mothership,
+  Martok's base and the prison had stock's light and cloak (render3d 0.2.0).
+
 Installed, not yet seen in game.
 
 ## 11.40.0 — 2026-10-15

@@ -92,6 +92,12 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   `Nebulae.asi` (and copies their recipes into the game), and `Lighting.asi` while
   hulls and world are both on.
 
+### Fixed
+- An object's SOD is its ODF's `baseName` when it sets one (`assets::sod_of`), as the
+  engine reads it: Martok's Negh'Var (`kbattle`), Caddebostan's ship, the Ferengi
+  scavenger, the 8472 hero mothership, Martok's base and the prison were left to the
+  engine (stock light and cloak), as were their emitters, debris, ghosts and holograms.
+
 Installed, not yet seen in game.
 
 ## 0.1.0 — 2026-10-15
