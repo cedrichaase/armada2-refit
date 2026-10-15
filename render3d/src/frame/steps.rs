@@ -153,6 +153,7 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         time: engine::sim_time(),
         frame,
     };
+    mods::lights(&v);
     crate::scene::begin_view(&v);
     mods::begin_view(&v);
     unsafe {

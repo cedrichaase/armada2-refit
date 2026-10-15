@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.41.0 — 2026-10-15
+
+Layers: render3d 0.2.0.
+
+### Added
+- render3d draws the 3D view as its own sequence of steps, with modules taking parts
+  over from the engine and the plugins: effects (explosions, shield hits, repair
+  welding, debris) (render3d 0.2.0).
+
+Installed, not yet seen in game.
+
 ## 11.40.0 — 2026-10-15
 
 Layers: render3d 0.1.0, testbench 3.16.0.

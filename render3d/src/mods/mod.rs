@@ -9,6 +9,7 @@ use crate::d3d::Device;
 use crate::frame::steps::View;
 use crate::log;
 
+pub mod effects;
 pub mod hulls;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -52,6 +53,11 @@ pub trait Module {
     fn device(&mut self, _dev: Device) {}
     /// Before a `Reset`: drop everything in the default pool.
     fn reset(&mut self) {}
+    /// Once per view, after `GameObject_PreRenderAll` and `Ordnance::PreRenderAll`
+    /// registered the engine's lights: register any light of one's own with the engine
+    /// (`ST3D_GraphicsEngine::RegisterLight`), so `scene::lights()` and the engine's own
+    /// draws both see it. The engine deletes the records at the end of the view.
+    fn lights(&mut self, _v: &View) {}
     /// Once per view, after the lights are registered and before any step.
     fn begin_view(&mut self, _v: &View) {}
     /// Draws a step in the engine's place; true if it did (the engine's is skipped).
@@ -96,6 +102,7 @@ pub fn init() {
     };
     // One line per module; the first that takes a step or an object draws it.
     add(Box::new(hulls::Hulls::default()), false);
+    add(Box::new(effects::Effects::new()), true);
 }
 
 /// At the first frame, when every plugin is loaded: drop the modules whose plugin is.
@@ -123,6 +130,12 @@ pub fn device(dev: Device) {
 pub fn reset() {
     for m in all().iter_mut() {
         m.reset();
+    }
+}
+
+pub fn lights(v: &View) {
+    for m in all().iter_mut() {
+        m.lights(v);
     }
 }
 

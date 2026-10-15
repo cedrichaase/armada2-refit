@@ -97,3 +97,60 @@ the next frame, at the new size.
 (`platform/D3D9.md`). Under DXVK's own d3d8, or when the targets cannot be made, the
 body runs as stock. An `A16B16G16R16F` target with MSAA falls back to one without, then
 to 8 bits, and the log says which.
+
+## Modules
+
+### effects
+
+`src/mods/effects/`, on by default. The game features that are effects, hull debris,
+and their lights; it ports `Explosions.asi`, `Shields.asi` and `Repair.asi`, whose
+looks were settled with the user (their READMEs hold the derivations; the settings
+keep the plugins' keys, in `Render3D.ini` sections `[Explosions]`, `[Shields]`,
+`[Repair]` and `[Debris]`, read once at start). Each part stands down while its plugin
+is loaded. Everything noted while the features run is drawn at `Step::Chunks`, after
+the debris and the engine's own `RenderChunks` (called through its call site, so
+construction's chunks and any plugin chained there still draw), when every opaque hull
+is in the depth buffer.
+
+- **Explosions** (`explosions.rs`). `ExplosionFeature::Render` (0x464ba0) walks
+  `Explosion::explosionList` (head node at 0x7367c4) and submits each explosion whose
+  slot 2 says it is visible (slot 15, `Submit(cam)`). The module does the same in its
+  place, noting `FireballExplosion`s (vtable 0x6afbd4) and `ShockwaveExplosion`s
+  (0x6afdac) and submitting any other class (`OmegaExplosion`) to the engine. The
+  fireball is ray-marched, the shockwave a band of fire, as in the plugin. New: the
+  scene is HDR, so the light above `HdrFrom=` (1.5) is kept in part (`Hdr=`, 0.5) and
+  the white-hot core and the flash bloom by their energy; below it the plugin's look is
+  unchanged. Each fireball also registers a point light (`lighting/README.md`,
+  "Explosions": `LightColour`, `LightBrightness=4`, `LightRange=10` radii, at least 40
+  units) unless `Lighting.asi` is loaded, which adds its own.
+- **Shield hits** (`shields.rs`). `ShieldEffect::Render` (0x474910) calls
+  `ShieldHit::DrawShield(cam, [0x736e2c])` (0x474070) for each hit of `m_shieldList`
+  (0x736de8) in order; the module does the same for every hit that is not its own
+  (types 0 and 1, and a special weapon's shell with a `[Shell.<name>]` recipe, named
+  from the engine's table at 0x6b00e0). The hits' strength comes from the four weapon
+  calls of `CreateShieldHit` (0x58bb95, 0x58cad8, 0x58d502, 0x58dd65), chained through
+  thunks that note the ordnance in `ebx`. The shields-down discharges register a point
+  light on the hull.
+- **Repair welding** (`repair.rs`). `NodeParticleEffect` stays the engine's (its
+  `Render` also prunes particles of dead objects): the call to `AddParticle` in
+  `Craft::RepairSystem` (0x4c90c0) is chained to note each weld, and the call to
+  `DrawScaled3D` in `NodeParticleEffect::Render` (0x473767) goes through a thunk that
+  reads the particle's node from `esi` and skips a weld. The welds are drawn as in the
+  plugin, and each burning arc registers a point light.
+- **Debris** (`chunks.rs`), `Step::Chunks`: our own chunks (`spec-chunks-anim-lod.md`
+  §1). The call to `ST3D_Instance::Fragment` (0x62eb20) in `Craft::Explode` (0x4c6bfc)
+  is chained: for a craft whose SOD we read, the module notes its ODF, transform,
+  animation clock and team colour and does not call the engine's (so the engine makes
+  no chunks of it); otherwise the engine's runs. At the next `Step::Chunks` each mesh
+  of the LOD shown breaks into patches as `CreateChunks` does (a random seed face, every
+  face with a corner within half the mesh's radius), flying and spinning on the sim
+  clock with stock's `ART_CFG.h` numbers (4 ± 2 s, 90 units/s, 4 rad/s, at most 1500),
+  drawn through the scene layer's hull shading, and gone without fading at the end of
+  their life. The other callers (a cancelled construction) stay the engine's.
+- **Lights.** `Module::lights()` runs once per view after `GameObject_PreRenderAll` and
+  `Ordnance::PreRenderAll`, before `scene::begin_view` reads the light list: the module
+  registers ordinary `ST3D_Point_Light`s (`operator new` 0x652710, the constructor
+  0x62f240, `RegisterLight` 0x62d250), which the engine deletes the records of at the
+  view's end, so both the engine's draws and the scene layer see them.
+- **Still the engine's**: construction (`BuildingEffect`, the bees and drones), nanites,
+  `Step::Specials` (the special-object effects), and every spark that is not a weld.
