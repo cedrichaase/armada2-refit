@@ -148,48 +148,6 @@ about the ship, and show as their wave.
 The waves' colours are the stock textures' own, measured as the luminance-weighted mean
 of each texture.
 
-### Art direction: tractor and assimilation beams
-
-The user's direction (2026-10-15), not yet in the recipes: the tractor beams
-(`tracbm`, `tracbmo`), the Borg holding beam (`holdbm`, the Borg tractor) and the
-assimilation beams should not be lasers. The current recipes draw them as ribbons with
-a hot core, flowing pulses and twisting strands. These beams should be **a fluctuating
-cone, like a laser projector shining through vapour**:
-
-- **A cone, not a line.** It starts at a point on the emitter and widens toward the
-  target. At the wide end it takes in **most of the target's area**, so the target sits
-  inside the beam rather than at its tip.
-- **Light in a medium, not a solid object.** The cone is translucent: stars and hull
-  show through it. It is brightest at the emitter and thins toward the target.
-  Brightness runs in streaks along its length, as a projector's beam does in haze.
-  There is no white-hot core.
-- **Fluctuating.** The streaks and the vapour drift and shimmer the whole time it is on.
-  The beam's outline stays steady while the light inside it moves. Nothing should twist
-  or pulse in a regular, readable way.
-- **It lights the target.** The hull inside the cone takes a faint wash of the beam's
-  colour, the same colour as the beam. The wash covers the part of the hull the cone
-  reaches. It is faint enough that the hull's own detail still reads.
-- **Colours stay stock's**: blue for the tractors, green for the Borg.
-
-Seen in the references (frames from DS9's tractor shots and TNG's Borg cube; kept out of
-the repository):
-
-- **The streaks.** A profile across a DS9 tractor beam has three or four broad
-  lengthwise bands (blue 140, 85, 135, 70, 125), not a smooth falloff. The edges are as
-  bright as the middle, and the beam drops to black within a few pixels of its edge.
-- **The colour.** Saturated blue near the emitter (about 1,56,162). Toward the target it
-  fades into the sky. Over a bright background it reads as pale, almost white cyan,
-  because it adds light.
-- **The hull wash.** The struck runabout is lit blue all over (74,129,186 against a grey
-  hull). The Enterprise's saucer under the Borg beam measures 55,69,64 where the beam
-  falls and 10,11,11 just outside it: a faint green-grey cast confined to the cone's
-  footprint.
-- **The Borg beam's source.** A small bright point on the cube (97,162,104) where the
-  cone starts. Its end is as wide as the saucer.
-
-Which ODFs "assimilation" covers is still to be settled when the recipes are written:
-at least `techassimbeam`, and possibly `borgbor` (the auto-assimilator).
-
 ## On the bench
 
 `SCENE=specials`: an enemy Sovereign (`tgt`, immortal, unarmed, engines off) and a
