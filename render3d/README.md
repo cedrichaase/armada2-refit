@@ -30,10 +30,9 @@ What it does today:
   cores), MSAA on render3d's own targets, and shadows from this frame's hulls (the
   plugin's were the last frame's).
 
-Still the engine's (falling back per object or per effect): mining beams, mines and
-model-drawn special weapons without a recipe, construction welding and worker bees,
-nanites, emitters on ordnance
-and effect instances, the Evolver, holograms and the build-placement ghost.
+Still the engine's (falling back per object or per effect): construction welding and
+worker bees, nanites, emitters on effect instances, the Evolver, holograms and the
+build-placement ghost.
 
 ## Building and installing
 
@@ -218,10 +217,52 @@ out would change the game. A submitted shot is then drawn by, in turn:
    their texture coordinates (u0 v0, u1 v0, u1 v1, u0 v1). The one change: texels near
    white are lifted past it (`Hot=`, `HotFrom=`), so beam cores and torpedo hearts
    bloom by their energy;
-3. **the engine's own `Submit`**, called through the vtable, for everything else:
-   mines, pods, the commando team, the mining beam (`wmbeam.sod`, an instance scaled
-   along the beam, `MiningBeam::Submit` 0x57d1e0) and the special weapons that draw a
-   model and have no recipe.
+3. **the engine's own `Submit`**, called through the vtable, for everything else,
+   with its draw of a model ours (below, "The models"): mines, colony pods, the
+   commando team, the myotron, the black hole, flux wave, stasis and transwarp
+   weapons. The chain pulsar's `Submit` (0x574f20) draws its class's sprite at its
+   position (as a torpedo's, in the sprite's own colour) and renders its emitter node
+   (+0xdc); while the particles module runs, which fires that emitter itself, the
+   sprite is drawn by `sprite.rs` and the `Submit` not called.
+
+The mining, orbital and repair beams (`MiningBeam`, ODF class `minebm`: stock stretches
+`wmbeam.sod` and its kin from the ship to its target, `MiningBeam::Submit` 0x57d1e0) are
+recipes (case 1): beams flowing back to the ship in stock's colours (dilithium blue,
+latinum green, the Borg metal and orbital beams violet, the repair beam orange,
+flowing into the hull). A beam ends inside the moon it mines (+0xc8), where a flare
+and a light show nothing: `ImpactAtSurface=k` puts its impact flare and its light where
+the beam enters the target's bounding sphere (+0x60's object, its instance's radius
+times k), so the light falls on the moon's face. The world module's moons take it as
+any point light.
+
+**The models.** Every model-drawing class's `Submit` ends by calling `Entity::Render`
+(0x4cfda0) through slot 11 of its vtable: the instance's frustum test (instance slot 3),
+the on-screen byte (+0x25), the instance's draw (instance slot 5). Before that, some set
+the instance's scale (`Entity::EnableScaling` 0x4cff50 writes instance +0x74,
+`SetScaleFactor` 0x4cff20 instance +0x28): the mining beam along its length
+(class +0x164 across, the length over class +0x160 along), the stasis field to its
+target's size (class +0x148 over instance +0x40), the black hole and flux wave by their
+growth (class +0x15c times +0xbc, drawn only from 0.01); the transwarp drive draws only
+while class +0x154 is set. So the module does not redo any of that: for a class it hands
+to the engine, slot 11 of the class's vtable is pointed at `models.rs`'s `ord_render`
+(only if it holds `Entity::Render`; checked and logged), and the engine's `Submit` runs
+as it always did. While the ordnance step has a shot in that `Submit`, `ord_render`
+draws it: the frustum test called as stock calls it, +0x25 set as stock sets it, then the
+SOD named by the ODF's `shotGeometry` (whose database must be the instance's plain
+`ST3D_Database`) at `Entity::GetTransform` times the instance's scale, posed on the
+instance's clock, through the scene layer (lit by the scene's lights; the `team*` groups, a
+mine's whole hull, in the owner's team colour (+0x5c): stock tints them with whatever team
+colour `GameObject::RenderInternal` last handed the engine (Storm3D +0x34), the last
+object drawn as far as the bench shows (a red player's mine showed green); additive meshes
+such as the rift's and the transwarp's queued for the flush). Its emitters (the commando
+team's and the pods' rockets, the myotron's contrails, the rift's clouds, the flux
+wave's plasma) go to the particles module (`particles::feed`, keyed by the shot and its
+class) and are drawn with every other particle; without the particles module a model
+with emitters is the engine's. A recipe bolt's SOD emitters (the micro-organisms'
+contrails) are fed the same way. Anything else (no SOD, another database) falls through
+to `Entity::Render`. On top, `[Model.<odf>]` in `ordnance.ini` gives a model a glow at
+its heart, an HDR flare pulsing on the sim clock with its own light on the hulls about
+it: the antimatter mine's white-gold, the gravity mine's violet, the myotron's green.
 
 **The warp flash.** `RenderWarpSpriteEffects` still runs: `WarpSpriteEffect::Render`
 moves each flash onto its craft's line of motion and removes it, which the game
@@ -262,6 +303,7 @@ module's own keys, in `Render3D.ini` `[Ordnance]`:
 | `Hot`, `HotFrom` | 0.6, 0.7 | how far past white a sprite's hottest texels go, from which level |
 | `Recolour` | 1 | torpedo and pulse lights in their sprite's colour |
 | `PhaserLights` | 1 | the phasers' emitter and impact lights (`PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift`, `PhaserImpact`, `PhaserImpactStart`, `PhaserImpactRange`, `PhaserImpactLift`: `Lighting.ini`'s) |
+| `Models` | 1 | 0: the shots that draw a model are drawn by the engine (no vtable slot is taken) |
 | `Survey` | 0 | log every ordnance ODF the first time it shows, with its vtable and `Submit` |
 
 ### specials

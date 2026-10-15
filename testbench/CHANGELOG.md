@@ -15,6 +15,9 @@ versions". Newest first. The why is in [`README.md`](README.md).
   the `showcase` battle; render3d must take the new device and draw the same scene.
 - Scenario `render3d-specialfx`: the special-object effects (Computer Override, Energy
   Dissipator, Psionic Disruption) through render3d's `specials` module.
+- Scenario `render3d-ordmodels`: mines, the commando team, the myotron, the flux wave,
+  transwarp and the chain pulsar fired in the `specials` scene, drawn by render3d.
+  Scenes `mining` (a freighter mining a dilithium moon) and `ordmodels`.
 - `testbench/operating/`: what agents learned about driving the game on the bench, one
   file per piece of work.
 

@@ -87,7 +87,8 @@ pub fn feed(key: usize, sod: &str, world: &M34, v: &View) {
     }
 }
 
-/// Whether the particles module draws this view (its emitters may be fed).
+/// Whether the module draws the particles in this view (`feed` does something): a
+/// module that would draw an instance with emitters leaves it to the engine otherwise.
 pub fn live() -> bool {
     unsafe { LIVE }
 }

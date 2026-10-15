@@ -74,6 +74,9 @@ pub struct Recipe {
     light_col: [f32; 3],
     light_reach: f32,
     fade_in: f32,
+    /// A beam's impact flare and light where it enters its target's bounding sphere
+    /// (times this; 0: at the beam's end, as for a hull's hardpoint).
+    surface: f32,
 }
 
 impl Recipe {
@@ -123,6 +126,7 @@ impl Recipe {
             light_col: s.rgb(sec, "LightColour", [col[0] * 255.0, col[1] * 255.0, col[2] * 255.0]),
             light_reach: s.f(sec, "LightReach", 80.0),
             fade_in: s.f(sec, "FadeIn", 0.15).max(0.001),
+            surface: s.f(sec, "ImpactAtSurface", 0.0),
         }
     }
 }
@@ -679,6 +683,26 @@ impl Fx {
             let fl = Self::flare(rgb(r.col), bright * 0.6, 30.0, 3.5, r.star, 18.0, 0.0, 20.0, V3::ZERO, 1.0, now * 0.7 + sd);
             self.billboard(cam, a, h, h, 1.0, h * 0.5, &fl);
         }
+        // The impact: the beam's end, or where it enters its target's bounding sphere
+        // (a mining beam ends inside the moon, where a flare and a light show nothing).
+        let mut b = b;
+        if r.surface > 0.0 {
+            let tgt = eng::object_of(unsafe { crate::engine::rd::<i32>(ord + 0x60) });
+            if tgt != 0 {
+                let (c, rad) = (eng::obj_pos(tgt), eng::radius_of(tgt) * r.surface);
+                // a + d t, |a + d t - c| = rad: the first root within the beam.
+                let m = a - c;
+                let bq = m.dot(d);
+                let cq = m.dot(m) - rad * rad;
+                let disc = bq * bq - cq;
+                if cq > 0.0 && disc > 0.0 {
+                    let t = -bq - sqrtf(disc);
+                    if t > 0.0 && t < len {
+                        b = a + d * t;
+                    }
+                }
+            }
+        }
         if r.impact > 0.0 {
             let h = r.impact * hw * if r.taper > 1.0 { sqrtf(r.taper) } else { 1.0 };
             let fl = Self::flare(rgb(r.col), bright * 0.6, 30.0, 3.0, r.star, 18.0, 0.0, 20.0, V3::ZERO, 1.0, -now * 0.9 + sd);
@@ -786,6 +810,29 @@ impl Fx {
         if !self.said.contains(&rc) && self.said.len() < 128 {
             self.said.push(rc);
             crate::log!("ordnance: drawing special {} ({:?})", self.recipes[rc].name, self.recipes[rc].kind);
+        }
+    }
+
+    /// A glowing core at `c` (a mine's heart, a pod's engines): a flare of half size
+    /// `h` (never under `min_px` across), `col` times `bright`, with a four-pointed star
+    /// of share `star` at `angle`, pulled towards the camera by `pull`; and its light,
+    /// `light` times `col`, full to `reach`. For `models.rs`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn glow(&mut self, v: &View, c: V3, h: f32, min_px: f32, col: V3, bright: f32, star: f32, angle: f32, pull: f32, light: f32, reach: f32) {
+        let cam = Self::cam(v);
+        let px = cam.px * (c - cam.eye).len();
+        let hmin = min_px * px * 0.5;
+        let (mut h, mut b) = (h, bright);
+        if h < hmin {
+            b *= sqrtf(h / hmin);
+            h = hmin;
+        }
+        if b > 0.004 {
+            let fl = Self::flare(col, b, 30.0, 3.0, star, 16.0, 0.0, 20.0, V3::ZERO, 1.0, angle);
+            self.billboard(&cam, c, h, h, 1.0, pull, &fl);
+        }
+        if light > 0.0 {
+            self.add_light(c, [col.x, col.y, col.z], light * bright, reach);
         }
     }
 

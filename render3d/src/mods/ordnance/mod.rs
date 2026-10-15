@@ -16,6 +16,7 @@ mod eng;
 mod fx;
 mod ini;
 mod lights;
+mod models;
 mod sprite;
 
 use super::{Module, Step};
@@ -39,6 +40,7 @@ const SUB_PLASMA: usize = 0x57f580;
 const SUB_POLERON: usize = 0x5800d0;
 const SUB_ARTILLERY: usize = 0x5730a0;
 const SUB_SRT: usize = 0x5853b0; // ShieldRemovingTorpedo
+const SUB_CHAIN: usize = 0x574f20; // ChainPulsar: its sprite, and its emitter node's Render
 
 
 // The warp flash: the call to ST3D_Sprite::DrawScaled3D in WarpSpriteEffect::Render.
@@ -52,12 +54,15 @@ const FN_WARP: usize = 0x59c560;
 enum Who {
     Recipe(usize),
     Stock,
+    /// The engine's `Submit`, with its call of `Entity::Render` ours (`models.rs`).
+    Model,
     Engine,
 }
 
 pub struct Ordnance {
     sprites: sprite::Sprites,
     fx: fx::Fx,
+    models: models::Models,
     lights: lights::Lights,
     /// Stock's sprites drawn by us (0: the engine's Submit draws them).
     stock: bool,
@@ -75,6 +80,17 @@ static mut VIEW: *const View = core::ptr::null();
 static mut PREV_WARP_SPRITE: usize = FN_DRAW_SCALED;
 /// Flashes noted by the warp hook in this view: (effect, position).
 static mut NOTED: Vec<(usize, V3)> = Vec::new();
+
+/// The module and the view being drawn, while one is (for the hooks).
+fn current() -> Option<(&'static mut Ordnance, &'static View)> {
+    unsafe {
+        if MODULE.is_null() || VIEW.is_null() {
+            None
+        } else {
+            Some((&mut *MODULE, &*VIEW))
+        }
+    }
+}
 
 impl Default for Ordnance {
     fn default() -> Ordnance {
@@ -104,6 +120,7 @@ impl Ordnance {
         Ordnance {
             sprites,
             fx: fx::Fx::new(&s),
+            models: models::Models::new(&s),
             lights,
             stock: s.i("Ordnance", "Stock", 1) != 0,
             survey: s.i("Ordnance", "Survey", 0) != 0,
@@ -142,7 +159,8 @@ impl Ordnance {
         let sub = field(engine::vtable(ord), SLOT_SUBMIT);
         let w = match self.fx.recipe_of(odf, false) {
             Some(rc) if self.fx.specials => Who::Recipe(rc),
-            _ if self.stock && matches!(sub, SUB_PHASER | SUB_PULSE | SUB_PHOTON | SUB_PLASMA | SUB_POLERON | SUB_ARTILLERY | SUB_SRT) => Who::Stock,
+            _ if self.stock && matches!(sub, SUB_PHASER | SUB_PULSE | SUB_PHOTON | SUB_PLASMA | SUB_POLERON | SUB_ARTILLERY | SUB_SRT | SUB_CHAIN) => Who::Stock,
+            _ if self.models.take_class(ord) => Who::Model,
             _ => Who::Engine,
         };
         if self.survey || !self.seen.iter().any(|s| s == odf) {
@@ -158,6 +176,12 @@ impl Ordnance {
     /// Our copy of stock's `Submit` for the classes `who` calls Stock.
     fn draw_stock(&mut self, v: &View, ord: usize) {
         let cls = field(ord, 0x34);
+        // The chain pulsar: its sprite is ours while the particles module fires its
+        // emitter (+0xdc) and draws the trail; otherwise the engine's Submit does both.
+        if field(engine::vtable(ord), SLOT_SUBMIT) == SUB_CHAIN && !crate::mods::particles::live() {
+            self.submit(v, ord);
+            return;
+        }
         let spr = field(cls, 0x12c);
         if spr == 0 {
             return;
@@ -185,6 +209,14 @@ impl Ordnance {
                 };
                 self.sprites.scaled(v, spr, eng::transform(ord).p, w, col);
             }
+        }
+    }
+
+    /// The engine's own `Submit` of a shot (vtable +0x5c).
+    fn submit(&mut self, v: &View, ord: usize) {
+        unsafe {
+            let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(ord), SLOT_SUBMIT));
+            f(ord, v.cam);
         }
     }
 
@@ -229,12 +261,19 @@ impl Ordnance {
                 continue;
             }
             match self.who(ord) {
-                Who::Recipe(rc) => self.fx.shot(v, ord, rc),
+                Who::Recipe(rc) => {
+                    self.fx.shot(v, ord, rc);
+                    if self.fx.recipes[rc].kind == fx::Kind::Bolt {
+                        self.models.feed_shot(v, ord);
+                    }
+                }
                 Who::Stock => self.draw_stock(v, ord),
-                Who::Engine => unsafe {
-                    let f: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(ord), SLOT_SUBMIT));
-                    f(ord, cam);
+                Who::Model => unsafe {
+                    models::IN_SUBMIT = true;
+                    self.submit(v, ord);
+                    models::IN_SUBMIT = false;
                 },
+                Who::Engine => self.submit(v, ord),
             }
         }
         self.sprites.draw(v);

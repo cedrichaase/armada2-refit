@@ -28,8 +28,12 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   `Hot`/`HotFrom`), the special weapons' beams, bolts, fields and waves and the warp
   flash from `Specials.asi`'s recipes (`ordnance.ini`, built in; Render3D.ini sections
   of the same name override), torpedo lights recoloured and phaser lights as
-  `Lighting.asi` makes them. Mining beams, mines and model-drawn specials without a
-  recipe stay the engine's.
+  `Lighting.asi` makes them. Shots drawn as models (mines, colony pods, the commando
+  team, the myotron, black hole, flux wave, stasis, transwarp) through the scene layer,
+  in their owner's team colour, with a pulsing glow and light by `[Model.<odf>]`, their
+  emitters as render3d's particles (`[Ordnance] Models=`); the mining, orbital and
+  repair beams as recipes flowing back to the ship, their impact where the beam enters
+  the target (`ImpactAtSurface=`).
 - Module `sky` (on): all of `Background_Render`: `Sky.asi`'s recipe skies (built in
   from `sky/skies/`; a `Sky\<name>.ini` in the game directory wins), baked on the GPU
   into a half-float cube; stock faces where there is no recipe; the starfield from the
