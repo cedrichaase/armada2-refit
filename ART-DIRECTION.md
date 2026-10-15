@@ -108,3 +108,68 @@ Missing from today's look:
 - the light on the struck hull.
 
 The next pass should settle whether the ring and the rim stay.
+
+## Cloaking (render3d's `hulls`, the `Cloak*` keys in `Render3D.ini`)
+
+The user's direction (2026-10-15), not yet in `ps_cloak` (`shaders/hulls.hlsl`). The
+cloak as it is now looks good and stays the base: the hull as glass over a copy of the
+frame, bending what lies behind it. Two things should change: the transition, and how
+much is left of a ship once it is cloaked.
+
+### The transition: the ship wavers out
+
+As in the TV series, a ship that cloaks should **look as though its whole geometry is
+bending in waves before it is gone**, and the same in reverse when it decloaks. Today a
+noise threshold eats the hull away patch by patch, with a glowing front where it is
+eating. The ship never changes shape; it is cut away.
+
+- **The shape moves, not just the shading.** Waves run across the whole hull and visibly
+  shift its outline: the silhouette ripples against the stars, nacelles and saucer edge
+  bend and swim. It should read as the ship's geometry bending, not as a pattern
+  painted on a ship that stays still.
+- **Waves, not noise.** Broad, regular-looking bands of distortion that travel across
+  the hull, a few bands across the ship's length, rather than random blotches. They
+  move steadily in one direction while the transition runs.
+- **The hull dissolves into the bending, not away from it.** While the waves run, the
+  hull fades into the refracting glass: first the shape starts to waver, then its
+  colour thins into the bent background, then the last of it ripples out. Decloaking
+  plays the same thing backwards: the waves bring the ship in, then settle, and the
+  ship holds still once it is solid.
+- **Strongest mid-transition.** The waves are weak at the start, largest around the
+  middle, and settle to the cloaked look at the end. The current `CloakRipple` already
+  peaks mid-transition (`vis·(1−vis)`). The new waves follow the same envelope, but much
+  larger: big enough to move the silhouette by a visible fraction of the hull's width.
+- **The glowing front is optional.** Whether the green edge (`CloakFront`) stays,
+  is replaced by the waves, or becomes a faint shimmer along the crests is open. In
+  the series there is no sharp front: the ship is simply gone at the end of the waver.
+
+### Cloaked: a little more there
+
+Fully cloaked, a ship today is nearly invisible (`CloakHull=0`; only a faint bend, rim
+and glint). It should be **a little more visible**: never a ship-shaped object, but a
+patch of space that is clearly not quite right.
+
+- **A slow, moving wave pattern in the refraction.** Faint waves keep drifting across
+  the cloaked hull, and they change *where the light behind it is bent*: the stars and
+  hulls seen through it slide and wobble a little as each wave passes. The pattern
+  should be in the bending, not in a brightness or colour overlay: what you see is the
+  background refracted differently from moment to moment.
+- **Slow and gentle.** Much slower and smaller than during the transition: a heat
+  shimmer, not a ripple of water. It should never turn or pulse in a readable rhythm.
+- **Visible against a busy background, nearly gone against black.** Since it shows only
+  as bent background, it should be easy to spot in front of a nebula, a planet or
+  another ship, and barely there against empty space. That is the right behaviour, not
+  something to correct with a glow.
+- **Fair in multiplayer.** This applies only to cloaked ships the engine already draws
+  (your own, and what your side can see). It must never draw a ship the engine hides
+  from the player: render only, as everything in render3d is.
+
+Measured against today's look: the glass, the colour split along the bend, the rim and
+glint fit. Missing:
+- waves large enough to move the silhouette during the transition;
+- the hull dissolving through the waves, in place of the noise threshold;
+- a slow drifting wave in the refraction while fully cloaked.
+
+The next pass should settle whether the green front stays, and how strong the cloaked
+shimmer may be before it reads as a ship rather than a disturbance (judge it in game,
+against a nebula and against empty space).
