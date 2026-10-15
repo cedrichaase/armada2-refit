@@ -12,6 +12,7 @@ use crate::log;
 pub mod effects;
 pub mod hulls;
 pub mod ordnance;
+pub mod overlays;
 pub mod sky;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -107,6 +108,7 @@ pub fn init() {
     add(Box::new(effects::Effects::new()), true);
     add(Box::new(ordnance::Ordnance::new()), true);
     add(Box::new(sky::Sky::default()), true);
+    add(Box::new(overlays::Overlays::default()), true);
 }
 
 /// At the first frame, when every plugin is loaded: drop the modules whose plugin is.

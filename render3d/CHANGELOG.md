@@ -30,6 +30,10 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   into a half-float cube; stock faces where there is no recipe; the starfield from the
   engine's octree, point stars lifted into HDR (`StarLift`); background planets and
   suns (`SunLift`); keys in `[Sky]`.
+- Module `overlays` (on): the fog of war and shroud with `Fog.asi`'s smooth edges over
+  the engine's own scan textures, the tactical grid, the selection bubbles and the
+  fog-of-war ghosts of stations; keys in `[Overlays]`. The build ghost and footprints
+  stay the engine's.
 
 Installed, not yet seen in game.
 

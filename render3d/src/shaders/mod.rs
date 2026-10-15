@@ -3,6 +3,7 @@ pub mod effects_explosions;
 pub mod effects_repair;
 pub mod effects_shields;
 pub mod ordnance;
+pub mod overlays;
 pub mod post;
 pub mod sky;
 pub mod sod;

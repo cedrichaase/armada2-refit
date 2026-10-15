@@ -12,7 +12,7 @@ Layers: render3d 0.2.0.
 ### Added
 - render3d draws the 3D view as its own sequence of steps, with modules taking parts
   over from the engine and the plugins: effects (explosions, shield hits, repair
-  welding, debris), ordnance (shots, special weapons, the warp flash), the sky (render3d 0.2.0).
+  welding, debris), ordnance (shots, special weapons, the warp flash), the sky, the fog of war, grid and selection (render3d 0.2.0).
 
 Installed, not yet seen in game.
 

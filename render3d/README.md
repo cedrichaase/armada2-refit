@@ -327,3 +327,98 @@ equal to 0.1/255; `mbgborg` means equal to 0.05), the starfield matches with
 (model 1), and the engine lights the sky with the scene lights; ours is unlit. The
 recipe skies match `Sky.asi`'s away from the (random) starfield blobs. The HUD's action
 camera draws the sky without stars, as stock.
+
+### overlays
+
+`src/mods/overlays/`, `shaders/overlays.hlsl`; on unless `[Modules] overlays=0`, and
+standing down while `Fog.asi` is loaded (it supersedes it). It draws what the engine
+draws over and about the map rather than as objects, and nothing it does is written
+where the simulation reads. Settings in `Render3D.ini`, `[Overlays]`.
+
+**`Step::Terrain`** (`Terrain_Geometry::Render`, 0x593200, on `g_terrain_geometry`
+0x772140) is run as stock runs it. Until the engine's first call has made its meshes
+(`Terrain_Geometry::m_initialized`, 0x772180) the step is the engine's, and so is the
+whole step in the tactical view (`View_Record` 1) when the profile's shroud option
+(`UserProfile+0x45`, 1 or 2) has the shroud drawn as a `TreeGrid` (`+0x28`), a path
+not seen on the bench. In order:
+
+1. the build footprints, the engine's own sprites
+   (`PlaceholderFeature::RenderFootprints` 0x473930 on `placeholderFeature` 0x736d50,
+   at the grid's height `+0x1c`);
+2. the tactical grid, when `GridVisible()` (0x51e180, the current `View_Record`'s
+   `GridRenderState`) says so: one line every `GRID_SIZE` (0x71a78c) across the map's
+   rectangle (`+0x4` x0, `+0xc` z0, `+0x10` x1, `+0x18` z1, `+0x1c` y; `+0x20` + 1
+   lines along z and `+0x24` + 1 along x, summed a step at a time as stock sums them),
+   in `ST3D_Colour_Dark_Orange` (0x7a8ee8), depth-tested and written as stock's
+   `ClipAndRenderLine` draws them. `Grid=0` calls the engine's `DrawGrid` (0x593480);
+3. the fog of war, unless the map editor is on (`UserProfile+0x84`), only in the RTS
+   view (`View_Record` 0) and when the game has fog (`GameSetup::isFog` 0x5462f0);
+4. the shroud over it, under the same conditions with `GameSetup::isShroud`
+   (0x546300).
+
+**The fog and the shroud** are `Fog.asi`'s look (`fog/README.md`: the cubic mask, the
+pixel-wide smoothstep edge, stock's rim, the taps held inside the grid; `Filter`,
+`FogThreshold`, `ShroudThreshold`, `FogSoftness`, `ShroudSoftness`, `FogRim`,
+`ShroudRim`, `RimWidth`, `Antialias` keep its keys and defaults), drawn on a quad of
+our own instead of through the engine's draw. The quad is the map's rectangle at the
+grid's height, with the UVs `Terrain_Geometry::SetVertexPositions` (0x592e10) gives the
+engine's mesh: the map centred in the texture's unit square with square texels, v
+running against z. The textures are the engine's: `fogTexture` (`+0x34`) and
+`shroudTexture` (`+0x38`), `ST3D_Texture`s whose per-device texture sits at `+0x40` +
+the device index (`Storm3D+0xc0`) times 4, and whose `+4` there is the
+`IDirect3DTexture8`, which d3d8to9 answers for its `IDirect3DTexture9`. They are never
+resized (one texel per scan cell; resizing them froze the game). The grid in them is
+`Scanner::m_fog` / `m_shroud` (0x738a54 / 0x738a58: width `+0xc`, height `+0x10`),
+centred. Stock's states: the depth test always passes and nothing is written; the fog
+blends with an opacity of 0.7 (its texture material `fog` is made 0.3 translucent:
+`ST3D_TextureMaterial+0x24` = 1 - 0.3, read into the device's material opacity), the
+shroud is opaque and alpha-tested, here blended so its edge can be soft. On the bench
+(`SCENE=fog`, 1920x1080, against `Fog.asi` at the same moment) both layers read the
+same grey levels to the unit, inside and at the edge.
+
+**`Step::Selection`** (`RenderSelectionEffects` 0x599900, main view only, not in a
+cineractive): the selection bubbles, from `SelectionEffect::sm_EffectHash` (0x773c88;
+16 buckets at 0x773c8c chained by `+0x9c`), read and never written. An entry is an
+instance of `select.sod` with `+0x84` its reasons (1 the player's selection, 2 a
+co-player's, 4 under the pointer), `+0x88` the object's handle (`Entity::Get`
+0x4cfff0), `+0x8c` the damage pulse's phase (which `SimulateSelectionEffects` advances)
+and `+0x90` its base scale (the shield ellipsoid, each semi-axis at least 15, times 1.2
+over the sphere's radius), times `Entity::GetScaleFactor` when `IsScaled`. The colours
+are `SelectionEffect::Render`'s (0x599e80): relation to the player's team on a craft,
+(0.7, 0, 1) enemy, (0, 0.7, 1) neutral, (0.6, 0.6, 0.6) ally
+(`GameObject::GetTeamRelation` 0x4d1080 against `Transport::getUserTeam` 0x5578b0),
+times `0.25 + 0.2 (1 - health) sin(phase)`; on anything else the team colour times
+0.25; a second shell at 1.1 times the scale in the team colour (full under the pointer,
+else times 0.25), all times `UserProfile+0x48`; a co-player's selection blinks on wall
+time. The material `selection` is constant: the colour is added as it is, depth-tested,
+not written, front faces only (on the bench stock's bubble adds one layer of its
+colour, not two). Seen on the bench: own ships grey with the team shell, an enemy
+Klingon violet with a red shell, the hover shell on a cube in its team colour, each
+matching stock. Stock stretches a warping craft's bubble with its hull
+(`WarpInstance`); not done here yet.
+
+**Ghosts** (the feature `Ghost`, vtable 0x6aff8c; `Ghost::Render` 0x472cc0):
+`Ghost::ghostList` (its node pointer at 0x736c94) holds a spirit per object the player
+has seen and no longer sees: `+4` its class (`GameObjectClass::GetOdfName` 0x4ce370
+names the SOD, as for a hull), `+0xc` its team (`Team::GetTeam` 0x496340, colour at
+`+8`), `+0x10` a copy of its instance (transform `+0x44`, position `+0x68`, scale
+`+0x28`, visible database `+0x80`). Stock draws each (not in a cineractive or the
+editor) with the lighting material `Ghost+0x24` in place of every mesh's own
+(`light.odf`: ambient and diffuse 0.1 at the material's `+0x18` and `+0x24`) and the
+team colour times `ghostTeamColorFactor` (`Ghost+0x28`) on team faces, culled by
+`GameObjectInstance::DistanceCull` (0x4d5bb0, which writes only the spirit's own
+instance), opaque: on the bench a ghost is near black and hides what is behind it.
+Here: texture times (the material's ambient + its diffuse times the directional
+lights), the team faces tinted, self-illuminated texels lit as on a hull (the windows
+show on stock's ghosts too). A spirit that does not show a plain SOD (a planet's, an
+asteroid field's, a nebula's) is left to its own `Render`, under stock's state
+(`Storm3D+0xa8` the material, `+0x4` 0.5, `+0x34` the tint).
+
+**The build ghost** (the feature `PlaceholderFeature`, vtable 0x6b005c;
+`PlaceholderFeature::Render` 0x4738a0, `sRenderInternal` 0x473aa0) is the engine's by
+default (`BuildGhost=0`): stock draws the station being placed (class `+0x34`, at
+`+0x38`, colour `+0x68`, ambient from 0x736d40 unless `+0x74`) as a faded hull through
+the engine's sorted translucent path, which comes out as a bright glow over the
+station's lit plating, and `BuildGhost=1`'s additive approximation does not match it
+yet; the faded-hull look belongs with the hulls module. `DrawHeightPost` (0x593840)
+stays the engine's either way.
