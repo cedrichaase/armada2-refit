@@ -2,11 +2,11 @@
 
 How the effects should look: the user's direction, filled in from reference frames
 (kept out of the repository, hard rule 8), with what was measured in them. Each section
-names the layer that will carry it out. A section describes the target, not what is
-installed: what a layer draws today is in its README, and what changed in its
-CHANGELOG. When a layer's recipes take a direction up, say so here.
+names the render3d module that will carry it out. A section describes the target, not what is
+installed: what a module draws today is in `render3d/README.md`, and what changed in
+`render3d/CHANGELOG.md`. When a module's recipes take a direction up, say so here.
 
-## Tractor and assimilation beams (`specials/`)
+## Tractor and assimilation beams (render3d's `ordnance`, `render3d/ordnance.ini`)
 
 The user's direction (2026-10-15), not yet in the recipes: the tractor beams
 (`tracbm`, `tracbmo`), the Borg holding beam (`holdbm`, the Borg tractor) and the
@@ -48,9 +48,9 @@ the repository):
 Which ODFs "assimilation" covers is still to be settled when the recipes are written:
 at least `techassimbeam`, and possibly `borgbor` (the auto-assimilator).
 
-## Shield hits (`shields/`)
+## Shield hits (render3d's `effects`)
 
-The user's direction (2026-10-15), not yet in `Shields.ini` or the shader. A shield hit
+The user's direction (2026-10-15), not yet in `[Shields]` or `shaders/effects_shields.hlsl`. A shield hit
 should read as **a misty, glowing dispersal of light over a curved ellipsoid that
 encloses the ship. Only the area around the impact is actually lit up.** Federation
 shields are a pale, light blue; Klingon shields are the same pattern in a strong,
@@ -68,7 +68,7 @@ shield; kept out of the repository):
   space and the hull show as if no shield were there.
 - **Mist, not a surface pattern.** Around the impact the light is soft, cloudy haze
   with uneven density, like lit vapour rather than a smooth glow. There is no hex
-  lattice and no grid (in line with the 2026-10-12 decision, `shields/README.md`, "The draw").
+  lattice and no grid (in line with the 2026-10-12 decision for `Shields.asi`, whose look render3d keeps).
 - **Rays are Klingon only.** The Bird-of-Prey's shield breaks into clear rays, a
   sunburst from the impact point about as long as the lit area's radius. The Federation
   shields (Intrepid, Prometheus) have none: just the mist. So rays are part of the
@@ -96,7 +96,7 @@ shield; kept out of the repository):
   - Species 8472: orange, in the Federation pattern.
   - Cardassian and any other faction: the Federation pattern; colour not yet given.
 
-Measured against today's look (`shields/README.md`, "The draw"): the hot spot, white core, faction colour
+Measured against today's look (`render3d/README.md`, "effects"): the hot spot, white core, faction colour
 and the glow that stays near the hit already fit. Not in the references:
 - the ring running out from the hit;
 - a rim that brightens where the shell is seen edge on, in place of an edge that just
