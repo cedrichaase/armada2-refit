@@ -285,7 +285,8 @@ shield; kept out of the repository):
 - **Rays are Klingon only.** The Bird-of-Prey's shield breaks into clear rays, a
   sunburst from the impact point about as long as the lit area's radius. The Federation
   shields (Intrepid, Prometheus) have none: just the mist. So rays are part of the
-  faction's look, not of every hit.
+  Klingon look, not of every hit. Every other faction uses the Federation pattern, mist
+  without rays, in its own colour.
 - **A bright point where the shot lands.** Where the beam or torpedo meets the shell
   there is a small, near-white flare (Bird-of-Prey about 205,200,187; Prometheus about
   254,230,211, warmed by the orange disruptor). The beam visibly stops there, at the
@@ -304,6 +305,9 @@ shield; kept out of the repository):
   - Federation: light blue to periwinkle. The haze over space reads lavender-grey where
     it is thin (82,78,91 on the Prometheus).
   - Klingon: pure green, with red and blue near zero in the falloff (3,80,1).
+  - Borg and Romulan: green, in the Federation pattern.
+  - Species 8472: orange, in the Federation pattern.
+  - Cardassian and any other faction: the Federation pattern; colour not yet given.
 
 Measured against today's look ("The draw"): the hot spot, white core, faction colour
 and the glow that stays near the hit already fit. Not in the references:
