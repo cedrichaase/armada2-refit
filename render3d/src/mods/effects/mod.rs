@@ -11,17 +11,27 @@
 //!   shields-down arcs and the special weapons' shells with a recipe are ours, every
 //!   other shell is the engine's `ShieldHit::DrawShield`.
 //! - `repair`: the welding sparks of `Craft::RepairSystem`; `NodeParticleEffect`'s
-//!   other sparks stay the engine's (its `Render` runs, with the welds skipped).
+//!   `Render` runs, with the welds (and, with `sparks`, every particle) skipped.
+//! - `sparks`: `NodeParticleEffect`'s other particles (systems blowing up, phaser
+//!   flares, beam hits): stock's sprites, with sparks streaking off and a flash.
+//! - `construction`: `BuildingEffect` through `feature()`: the station being built via
+//!   the hulls module, welding arcs and cooling seams along its new edges.
+//! - `bees`: `WorkerBee` and `DroneColony` through `feature()`: the bees as lit
+//!   models, their welding beams as arcs of light. (`weldfx`: their shared quads.)
 //! - `chunks`: `Step::Chunks`, hull debris of our own (`spec-chunks-anim-lod.md` §1).
 //!
 //! Everything noted while the features run is drawn at `Step::Chunks`, after the
 //! debris: every opaque hull and chunk is then in the depth buffer, as the plugins
-//! drew after `RenderChunks`. Construction (`BuildingEffect`, the bees and drones),
-//! nanites and `Step::Specials` stay the engine's.
+//! drew after `RenderChunks`. `Step::Specials` stays the engine's; `NaniteEffect` is
+//! never made by the game.
+pub mod bees;
 pub mod chunks;
+pub mod construction;
 pub mod explosions;
 pub mod repair;
 pub mod shields;
+pub mod sparks;
+pub mod weldfx;
 
 use super::{Module, Step};
 use crate::d3d::*;
@@ -195,7 +205,16 @@ pub struct Effects {
     sh: shields::Shields,
     rp: repair::Repair,
     ch: chunks::Chunks,
+    co: construction::Construction,
+    bees: bees::Bees,
+    sp: sparks::SparkFx,
+    fx: weldfx::Fx,
     hooked: bool,
+    /// Bench A/B (`[Construction] ABTest=1`): while `Render3D.construction-off` exists in
+    /// the game directory, construction, the bees and the sparks are the engine's.
+    ab: bool,
+    ab_off: bool,
+    ab_checked: f64,
 }
 
 impl Effects {
@@ -205,7 +224,14 @@ impl Effects {
             sh: shields::Shields::new(),
             rp: repair::Repair::new(),
             ch: chunks::Chunks::new(),
+            co: construction::Construction::new(),
+            bees: bees::Bees::new(),
+            sp: sparks::SparkFx::new(),
+            fx: weldfx::Fx::new(),
             hooked: false,
+            ab: crate::config::ini().int("Construction", "ABTest", 0) != 0,
+            ab_off: false,
+            ab_checked: 0.0,
         }
     }
 }
@@ -256,22 +282,56 @@ impl Module for Effects {
         if self.ch.on {
             self.ch.install();
         }
+        if self.sp.on {
+            self.sp.install();
+        }
         log!(
-            "effects: explosions {}, explosion light {}, shields {}, repair {}, debris {}",
-            self.ex.on, self.ex.light_on, self.sh.on, self.rp.on, self.ch.on
+            "effects: explosions {}, explosion light {}, shields {}, repair {}, debris {}, construction {}, bees {}, sparks {}",
+            self.ex.on, self.ex.light_on, self.sh.on, self.rp.on, self.ch.on, self.co.on, self.bees.on, self.sp.on
         );
     }
     fn reset(&mut self) {
         self.ex.reset();
         self.ch.reset();
+        self.sp.reset();
     }
     fn lights(&mut self, v: &View) {
         self.ex.lights(v);
         self.sh.lights(v);
         self.rp.lights(v);
+        if !self.ab_off {
+            if self.co.on {
+                self.co.lights(v);
+            }
+            if self.bees.on {
+                self.bees.lights(v);
+            }
+            if self.sp.on {
+                self.sp.lights(v);
+            }
+        }
     }
     fn begin_view(&mut self, _v: &View) {
         self.ex.notes.clear();
+        self.bees.begin_view();
+        if self.ab {
+            let now = crate::rt::now();
+            if now - self.ab_checked > 0.5 {
+                self.ab_checked = now;
+                let off = crate::rt::file_exists(&crate::rt::game_path("Render3D.construction-off"));
+                if off != self.ab_off {
+                    self.ab_off = off;
+                    log!("effects: construction, bees, sparks: {}", if off { "the engine's (A/B)" } else { "ours (A/B)" });
+                    sparks::set_taking(self.sp.on && !off);
+                }
+            }
+        }
+    }
+    /// The station under construction as an object (`ConstructionObject`, `mconstph`):
+    /// its `Render` (0x4a3790) draws nothing; the station is `BuildingEffect`'s, drawn in
+    /// `feature()`. Taken here so the object loop leaves nothing of it to the engine.
+    fn object(&mut self, o: usize, _v: &View) -> bool {
+        self.co.on && !self.ab_off && field(engine::vtable(o), 11 * 4) == construction::FN_CONSTRUCTION_OBJECT_RENDER
     }
     fn feature(&mut self, f: usize, v: &View) -> bool {
         match engine::vtable(f) {
@@ -280,6 +340,9 @@ impl Module for Effects {
             // The engine's Render draws every other spark; the welds are skipped there
             // (repair.rs) and drawn by us at Step::Chunks.
             VT_NODE_PARTICLE => false,
+            construction::VT_BUILDING if self.co.on && !self.ab_off => self.co.feature(v),
+            bees::VT_WORKER_BEE if self.bees.on && !self.ab_off => self.bees.feature(f, false, v),
+            bees::VT_DRONE_COLONY if self.bees.on && !self.ab_off => self.bees.feature(f, true, v),
             _ => false,
         }
     }
@@ -303,6 +366,16 @@ impl Module for Effects {
             if self.rp.on {
                 self.rp.draw(v, &c);
             }
+            if self.co.on && !self.ab_off {
+                self.co.draw(v, &c, &mut self.fx);
+            }
+            if self.bees.on && !self.ab_off {
+                self.bees.draw(v, &c, &mut self.fx);
+            }
+            if self.sp.on && !self.ab_off {
+                self.sp.draw(v, &c, &mut self.fx);
+            }
+            self.fx.draw(v, &c);
         }
         self.ex.notes.clear();
         true

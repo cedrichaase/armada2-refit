@@ -523,7 +523,12 @@ impl Drawer {
         // (None for a model that is not an instance's: inst 0.)
         let limit = if p.inst == 0 { -1 } else { engine::field(p.inst, 0x10) as i32 };
         let mut faces_left: i64 = if limit >= 0 { limit as i64 } else { i64::MAX };
-        for part in m.parts.iter() {
+        // With a face limit the faces are counted in the engine's walk of the node tree
+        // (children in its order, the reverse of the file's: `ST3D_Node::AddChild` puts
+        // each new child first), which is also the order `BuildingEffect` adds its
+        // welding edges in; without one, the order does not matter.
+        let order: Vec<usize> = if limit >= 0 { engine_order(m) } else { (0..m.parts.len()).collect() };
+        for part in order.iter().map(|&i| &m.parts[i]) {
             if !want(part.blend) || !p.pose.shown.get(part.node).copied().unwrap_or(false) {
                 continue;
             }
@@ -560,7 +565,9 @@ impl Drawer {
                 dev.ps_const(16, &pick_points(world.p, look.point_lights));
             }
             let mirrored = world.det3() < 0.0;
-            dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CCW } else { CULL_CW });
+            // A face-limited instance (a station being built) shows its inside through
+            // the faces not built yet: drawn two-sided, as stock shows it.
+            dev.set_rs(RS_CULLMODE, if part.two_sided || limit >= 0 { CULL_NONE } else if mirrored { CULL_CCW } else { CULL_CW });
             let tex_name = if p.assimilated { second_texture(m, part.node).or(part.texture.as_deref()) } else { part.texture.as_deref() };
             let tex = tex_name.and_then(|t| assets::texture(dev, t)).unwrap_or(core::ptr::null_mut());
             dev.set_texture(0, tex);
@@ -628,6 +635,29 @@ impl Drawer {
         }
         Some((tex.ptr(), v.rect.x, v.rect.y, w, h))
     }
+}
+
+/// The model's parts in the engine's walk of its node tree: depth first from each
+/// root, children in reverse file order.
+fn engine_order(m: &Model) -> Vec<usize> {
+    let nodes = &m.sod.nodes;
+    let mut rank = alloc::vec![usize::MAX; nodes.len()];
+    let mut next = 0;
+    let mut stack: Vec<usize> = (0..nodes.len()).filter(|&i| nodes[i].parent.is_none()).rev().collect();
+    let mut guard = 0;
+    while let Some(i) = stack.pop() {
+        guard += 1;
+        if guard > nodes.len() * 2 || rank[i] != usize::MAX {
+            continue;
+        }
+        rank[i] = next;
+        next += 1;
+        // Pushed in file order, so the last child (the engine's first) is popped first.
+        stack.extend(nodes[i].children.iter().copied());
+    }
+    let mut order: Vec<usize> = (0..m.parts.len()).collect();
+    order.sort_by_key(|&pi| rank.get(m.parts[pi].node).copied().unwrap_or(usize::MAX));
+    order
 }
 
 /// A mesh's second texture (the Borg's assimilated look, `CraftClass::

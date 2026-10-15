@@ -17,7 +17,7 @@ mod fx;
 mod ini;
 mod lights;
 mod models;
-mod sprite;
+pub mod sprite;
 
 use super::{Module, Step};
 use crate::d3d::Device;

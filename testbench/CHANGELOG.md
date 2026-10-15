@@ -21,6 +21,9 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - Scenario `render3d-hulls-extras`: the build ghost and height posts while placing a
   station, a hologram (a Romulan holo-emitter on a Klingon battleship) and the Evolver,
   drawn by render3d.
+- Scenario `render3d-construction` and scene `construction`: a construction ship
+  building a station, drawn by render3d. `Scene.asi` command `build <rig> <odf> <x y z
+  | object>` orders a construction ship to build there (resources topped up).
 - `testbench/operating/`: what agents learned about driving the game on the bench, one
   file per piece of work.
 

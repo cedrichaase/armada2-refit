@@ -49,6 +49,12 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   edge glow (`ps_holo`), and the build ghost as stock's pale layered hull
   (`[Hulls] BuildGhost=1`, `GhostDepth=`); `Reload=1` is read while the game runs. The
   log names, once per class, any object no module draws.
+- Module `effects` also draws construction (the station rising face by face in the
+  hull look, each edge welded with an arc, hot spot, sparks and a seam cooling from
+  white to red, lighting the hull; `[Construction]`), the worker bees and drones as
+  lit models with a crackling welding beam (`[Bees]`), every spark that is not a weld
+  (systems blowing up, phaser flares, beam hits) with stock's sprite and a burst of
+  streaking sparks and a flash (`[Sparks]`), and a cancelled construction's debris.
 - Module `specials` (on, after `particles`): `Step::Specials`, the timed special-object
   effects (Computer Override, Energy Dissipator, Psionic Disruption): their cloud
   emitters as render3d's particles, plus a shader layer over the struck hull (Borg

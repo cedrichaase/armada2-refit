@@ -98,10 +98,21 @@ unsafe extern "C" fn hook_add(name: *const u8, colour: *const f32, o: usize, hp:
     }
 }
 
+/// Whether the particle node is a weld of ours (for the sparks, which draw the rest).
+pub fn is_weld(node: usize) -> bool {
+    welds().iter().any(|w| w.matches(node))
+}
+
+/// Whether the engine's draw of `NodeParticleEffect`'s sprites goes through our thunk
+/// (the sparks can only take them over then).
+pub fn hooked() -> bool {
+    unsafe { DRAWING }
+}
+
 unsafe extern "thiscall" fn repair_sprite(sprite: usize, cam: usize, pos: *const f32, size: f32) {
     unsafe {
         let node = RP_NODE;
-        if DRAWING && node != 0 && welds().iter().any(|w| w.matches(node)) {
+        if DRAWING && node != 0 && (super::sparks::takes() || welds().iter().any(|w| w.matches(node))) {
             return;
         }
         let f: unsafe extern "thiscall" fn(usize, usize, *const f32, f32) = core::mem::transmute(PREV_SPRITE);

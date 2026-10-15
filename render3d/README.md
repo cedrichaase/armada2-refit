@@ -30,9 +30,12 @@ What it does today:
   cores), MSAA on render3d's own targets, and shadows from this frame's hulls (the
   plugin's were the last frame's).
 
-Still the engine's (falling back per object or per effect): construction welding and
-worker bees, nanites, the station under construction (`ConstructionObject`), emitters
-on effect instances, and a hologram whose class is not a plain SOD.
+Still the engine's: nothing in a whole match by default. A module hands an object or
+effect back to the engine only where it cannot draw it: a SOD that does not load or
+is not a plain database (a hologram's class among them), an effect class it does not
+know, or a module switched off (construction and the bees need the hulls module, the
+emitters the particles module). Nanites have no draw of their own: `NaniteEffect` is
+never made, and what shows is the ordnance and `Step::Specials`.
 
 ## Building and installing
 
@@ -154,8 +157,9 @@ is in the depth buffer.
   `Render` also prunes particles of dead objects): the call to `AddParticle` in
   `Craft::RepairSystem` (0x4c90c0) is chained to note each weld, and the call to
   `DrawScaled3D` in `NodeParticleEffect::Render` (0x473767) goes through a thunk that
-  reads the particle's node from `esi` and skips a weld. The welds are drawn as in the
-  plugin, and each burning arc registers a point light.
+  reads the particle's node from `esi` and skips a weld (and, while the sparks below
+  are on, every other particle too). The welds are drawn as in the plugin, and each
+  burning arc registers a point light.
 - **Debris** (`chunks.rs`), `Step::Chunks`: our own chunks (`spec-chunks-anim-lod.md`
   §1). The call to `ST3D_Instance::Fragment` (0x62eb20) in `Craft::Explode` (0x4c6bfc)
   is chained: for a craft whose SOD we read, the module notes its ODF, transform,
@@ -169,16 +173,102 @@ is in the depth buffer.
 `Fragment` (0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4, in `Evolver::mDoRemoveConstructionEffect`
 and the other construction-effect functions; each breaks the whole cocoon, faces -1),
 each re-pointed only while it calls `Fragment` itself; the cocoon (a `CocoonInstance`,
-vtable 0x6b2630, of the database at 0x73fccc) at its instance's transform and scale. The
-other caller (`BuildingEffect::SafeDestroyConstruction`, a cancelled construction) stays
-the engine's.
+vtable 0x6b2630, of the database at 0x73fccc) at its instance's transform and scale.
+  A construction cancelled or destroyed breaks up the same way: the call to `Fragment` in `BuildingEffect::SafeDestroyConstruction` (0x46a0f1) is chained too,
+  its instance the one embedded in the construction (class at its `Info`'s `+0xd0`,
+  named by `GameObjectClass::GetOdfName` 0x4ce370), only the faces built so far (the
+  call's face count) breaking, in the SOD's order.
+- **Construction** (`construction.rs`, `weldfx.rs`, `shaders/effects_construction.hlsl`).
+  `BuildingEffect` (vtable 0x6afe4c) taken through `feature()`, in place of
+  `BuildingEffect::Render` (0x469660). Stock: `BuildingEffect::m_list` (a `std::map`,
+  head node at 0x736bd4, `_Nil` at 0x736c1c, node `+0x14` the `Info`) holds a
+  construction per station being built. The `Info`: `+0` the builder's handle, `+4`
+  the teams that see it, `+8` its colour, `+0x20` the station's instance (a
+  `CraftInstance`, its class at `+0xb8`), `+0xb4` the handle `ApplyScaleEffects` is
+  asked for, `+0xc8` the station's faces, `+0xcc` those built so far, `+0xd0` the
+  class, `+0xe0` `weldingSpeed` (an edge's progress a second, default 1), `+0xe8`
+  `weldingRadius` (the spark's half size, default 1; `weldingSpriteName` is `xspark`),
+  `+0x100` the welding edges' list head. `BuildingEffect::Simulate` (0x469490) moves
+  the faces built with the build time and, for each new face
+  (`AddNewWeldingEdges`, from the faces' corners in the world), adds its edges (the
+  list node: start `+0x14`, end `+0x20`, progress `+0x2c` 0..1, erased at 1).
+  `Render` draws, while the builder is seen (or its team is one the player sees,
+  `Entity::GetTeamsVisibleToUser` 0x4d0070, or the editor is on, or `View_Record` is
+  2), when faces are built and `GameObjectInstance::DistanceCull` (0x4d5bb0) passes:
+  `ApplyScaleEffects` (0x599760), the frustum test (slot 3), the face limit
+  (`SetRenderFaceLimit` 0x62ea80: `+0x10`) and the instance in the builder's team
+  colour (`GameObject::GetTeamColor` 0x4d5000, into `Storm3D+0x34`); the construction
+  object's on-screen byte (`ConstructionRig::GetConstructionObject` 0x4afe80, `+0x25`;
+  `ConstructionObject::Render` 0x4a3790 draws nothing); and one `xspark` sprite per
+  edge sliding from its start to its end. Ours makes the same calls (each writes only
+  the effect's own instance) and draws the station with the hulls module's look
+  (`hulls::draw_instance`), faces limited as stock limits them, and two-sided: the
+  engine's limited draw shows the inside of the part-built hull, which culling hid
+  (seen on the bench). Each edge is welded as the repair welding welds (Repair.asi's
+  look): a flickering arc with turning rays at the weld (on a share of the edges at a
+  time, `ArcShare`), a hot spot, sparks streaking off and cooling, and behind it the
+  seam, white-hot at the weld and cooling along the edge through the black-body ramp
+  to dull red, which goes on cooling once the edge is done (`CoolTime`); a construction gone before
+  all its faces were built (cancelled, destroyed: its chunks fly off) takes its seams
+  with it. A few arcs per
+  construction light its hull (`Lights`). With the hulls module off, or its SOD
+  unread, the engine draws it. `[Construction]`: `Enable`, `Brightness`, `Flare`,
+  `FlareMinPixels`, `ArcShare`, `FlickerRate`, `Stutter`, `ArcColour`, `HotColour`,
+  `HotSpot`, `Seam`, `SeamWidth`, `SeamMinPixels`, `CoolTime`, `Sparks`, `SparkSpeed`
+  (times the station's radius), `SparkSpread`, `SparkLife`, `SparkDrag`, `SparkWidth`,
+  `SparkMinPixels`, `SparkBrightness`, `StreakTime`, `Lights`, `Light`, `LightColour`,
+  `LightReach` (times the station's radius); `ABTest=1` (bench): while
+  `Render3D.construction-off` exists in the game directory, construction, the bees and
+  the sparks are the engine's, for a comparison at the same moment.
+- **Worker bees and drones** (`bees.rs`). `WorkerBee` (vtable 0x6b017c) and
+  `DroneColony` (0x6afe98) taken through `feature()`, in place of `BeeColony::Render`
+  (0x4688a0). Stock: the colony's bees (its `GetBeeList`, vtable `+0x40`: a multimap,
+  `_Nil` at 0x736bc4, the bee at node `+0x10`) are `ST3D_Instance`s of the bee's SOD
+  (`workerBeeName` of the construction ship's ODF, `fbee` by default, its database at
+  `ConstructionRigClass+0x494`; the drones' from `gdrones`, `DronesClass+0x2f4`),
+  drawn by `ST3D_Instance::Render` while `BeeColony::ShouldDrawBee` says so (the owner,
+  `+0xbc`, is seen); a bee that welds (`+0x8c` = 4) draws `weldingBeamSprite` (`+0x84`)
+  as a ribbon (`RenderAsPolygon`) from itself (`+0x68`) to its spot (`+0xac`),
+  `weldingBeamWidth` (`+0x88`) wide. Ours: the bee through `hulls::draw_instance`, lit
+  as a hull, its strobes drawn as running lights, its emitters (the drones' steam) fed
+  to the particles module (`particles::feed`); the beam as a crackling arc of light
+  with the welding's flare, hot spot and sparks at the spot, and a light on the hull.
+  A bee is a plain `ST3D_Instance`: its vtable has no `IsCraftInstance` slot (slot 10
+  is RTTI data, and calling it hung the game), so `draw_instance` is told. `[Bees]`:
+  `Enable`, `Beam`, `BeamColour`, `BeamMinPixels`, `Flare`, `FlareMinPixels`,
+  `HotSpot`, `HotColour`, `Sparks`, `SparkEvery`, `SparkLife`, `SparkSpeed`,
+  `SparkSpread`, `SparkBrightness`, `SparkMinPixels`, `FlickerRate`, `Light`,
+  `LightColour`, `LightReach`, `Brightness`.
+- **Sparks** (`sparks.rs`): every particle of `NodeParticleEffect` that is not a weld.
+  Stock adds them with `NodeParticleEffect::AddParticle` (0x4733c0 at a hardpoint,
+  0x4734c0 at a point in the object's frame; at most 200, 4 per object): a system
+  blowing up (`Craft::DamageAlloc`, `Craft::DramaticDeathSequence`: `systemexpl1..7`,
+  half size the bounding radius times `SYSTEM_EXPLOSION_SIZE_FACTOR` 0.14, at least 4,
+  a second), a phaser's flare at its emitter (`Phaser::Init`, its class's sprite at
+  `+0x160` in its colour) and a beam's hit (`Beam::Simulate`, `beam explosion1`).
+  `Render` draws each with `ST3D_Sprite::DrawScaled3D` (colour `+0x20`, half size
+  `+0x2c`) at its hardpoint (`Entity::GetWorldPosition` 0x4cff70) or its point
+  (`+0x10`) in the object's frame; age `+0x34`, life `+0x38`. Ours, while repair.rs's
+  thunk is in place: stock's sprite and flipbook drawn as stock draws it (the ordnance
+  module's `sprite::Sprites`, its hottest texels past white), and new, a burst of sparks
+  streaking off it, cooling (a system's blast more than a weapon's), and a flash of
+  light on the hull. `[Sparks]`: `Enable`, `Hot`, `HotFrom`, `BlastSparks`, `HitSparks`,
+  `SparkSpeed` (times the sprite's size), `SparkSpread`, `SparkLife`,
+  `SparkBrightness`, `SparkMinPixels`, `BurstTime`, `BlastLight`, `Light`,
+  `LightReach`, `LightTime`.
+- **Nanites**: nothing to take. `NaniteEffect` (vtable 0x6affdc, `Render` 0x473280: one
+  sprite flying from an object towards the camera) is never made: nothing in
+  `Armada2.exe` calls its constructor (0x472fe0). What a player sees of nanites is the
+  `Nanites` ordnance (a `Bullet`, `Submit` through its instance) and the
+  `TimedScrambleInterface` it leaves on its target: the ordnance module's and
+  `Step::Specials`.
 - **Lights.** `Module::lights()` runs once per view after `GameObject_PreRenderAll` and
   `Ordnance::PreRenderAll`, before `scene::begin_view` reads the light list: the module
   registers ordinary `ST3D_Point_Light`s (`operator new` 0x652710, the constructor
   0x62f240, `RegisterLight` 0x62d250), which the engine deletes the records of at the
   view's end, so both the engine's draws and the scene layer see them.
-- **Still the engine's**: construction (`BuildingEffect`, the bees and drones), nanites,
-  and every spark that is not a weld. `Step::Specials` is the `specials` module's.
+- **Still the engine's**: construction and the bees while the hulls module does not
+  run. `Step::Specials` is the `specials` module's.
 
 ### ordnance
 
@@ -858,7 +948,15 @@ draws: `survey: left to the engine: vtable ... (Render ..., RenderInternal ...),
 database vtable ..., odf '...'`.
 
 **For other modules**: `posed(o)`, `shadow_map()`, `draws_plain_sod(o)`,
-`instance_scale(inst)`, `placeholder(v, class, place, colour, blocked)`.
+`instance_scale(inst)`, `placeholder(v, class, place, colour, blocked)`, and
+`draw_instance(v, key, inst, craft, sod, world, team)`: an
+`ST3D_Instance` that is no game object's (a station being built, a worker bee) drawn
+now with the hull look, its additive meshes and sprite nodes at `Step::Translucent`
+(the effects module's construction and bees). Under a face limit (`+0x10`) the faces
+are counted in the engine's walk of the node tree (children in reverse file order),
+groups and faces in file order (`fbase` on the bench: the engine's mesh groups and
+first faces matched the file's), and the hull is drawn two-sided, as the engine's
+limited draw shows the inside of a part-built station.
 
 ### world
 

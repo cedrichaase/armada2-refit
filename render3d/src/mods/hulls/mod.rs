@@ -663,6 +663,7 @@ impl Module for Hulls {
     fn begin_view(&mut self, v: &View) {
         unsafe { CUR = v.key() };
         unsafe { ME = self as *mut Hulls };
+        unsafe { THIS = self as *mut Hulls };
         let st = view_state(v.key());
         st.posed.clear();
         st.faded.clear();
@@ -873,6 +874,65 @@ impl Module for Hulls {
         // Never "taken": the engine's flush still runs.
         false
     }
+}
+
+/// The hulls module while it runs (set at its `begin_view`), for `draw_instance`.
+static mut THIS: *mut Hulls = core::ptr::null_mut();
+
+/// For other modules: draws an `ST3D_Instance` that is no game object's (a station
+/// being built, a worker bee) as a hull, now, with the hull look: `sod` placed by
+/// `world` (its ODF's `ScaleSOD` and the instance's scale folded in), the nodes the
+/// engine shows per instance, the instance's face limit (`+0x10`), its animation
+/// clock; its additive meshes and sprite nodes (running lights) follow at
+/// `Step::Translucent`. `key` names it in this view (its instance's address will do).
+/// `craft`: the instance is a `CraftInstance` (its damage and crew nodes apply); a
+/// plain `ST3D_Instance` has no `IsCraftInstance` slot to ask.
+/// False when the hulls module does not run, stands aside, or the SOD does not load:
+/// the caller lets the engine draw it.
+pub fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, world: &M34, team: Option<V3>) -> bool {
+    let h = unsafe { THIS };
+    if h.is_null() || inst == 0 {
+        return false;
+    }
+    let h = unsafe { &mut *h };
+    if h.off {
+        return false;
+    }
+    let Some(model) = scene::model(v.dev, sod) else { return false };
+    let clock = pose::Clock::of_instance(inst, v.time);
+    let mut p = pose::pose(&model.sod, &model.info, world, clock, pose::auto(v.eye));
+    visibility(0, inst, craft, &model, &mut p);
+    let (c, r) = draw::model_sphere(&model);
+    let centre = world.transform_point(c);
+    let radius = r * world.r[0].len().max(world.r[1].len()).max(world.r[2].len());
+    let look = h.look().clone();
+    let team = if look.team && game::team_colours_on() { team } else { None };
+    let posed = Posed {
+        obj: 0,
+        inst,
+        model,
+        pose: p,
+        world: *world,
+        scale: v3(1.0, 1.0, 1.0),
+        centre,
+        radius,
+        since_start: (v.time - engine::field_f32(inst, 0x18)).max(0.0),
+        flags: field(inst, 0xc) as u32,
+        clock,
+        team,
+        assimilated: false,
+        warp: None,
+        waves: None,
+        glow: None,
+        cloak: None,
+        drawn: true,
+    };
+    h.draw.draw(v, &look, &posed, draw::Mode::Opaque);
+    let st = view_state(v.key());
+    h.sprites.collect(v, &look, &posed, &mut st.sprites);
+    st.posed.insert(key, posed);
+    st.additive.push(key);
+    true
 }
 
 /// A unit vector, or `d` when `v` is too short.

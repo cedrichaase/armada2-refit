@@ -44,6 +44,8 @@ use alloc::vec::Vec;
 
 const SITE_EXPLODE_FRAGMENT: usize = 0x4c6bfc; // in Craft::Explode: call ST3D_Instance::Fragment
 const FN_FRAGMENT: usize = 0x62eb20;
+const SITE_BUILD_FRAGMENT: usize = 0x46a0f1; // in BuildingEffect::SafeDestroyConstruction: the same call
+const FN_CLASS_ODF: usize = 0x4ce370; // GameObjectClass::GetOdfName(), thiscall
 /// The Evolver's four calls of `Fragment` on its cocoon.
 const SITES_COCOON: [usize; 4] = [0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4];
 
@@ -53,11 +55,14 @@ struct Pending {
     world: M34,
     clock: pose::Clock,
     team: V3,
+    /// A construction's: only the faces built so far break (in the SOD's order).
+    faces: Option<usize>,
 }
 
 static mut PENDING: Vec<Pending> = Vec::new();
 static mut ACTIVE: bool = false;
 static mut PREV_FRAGMENT: usize = 0;
+static mut PREV_BUILD_FRAGMENT: usize = 0;
 static mut LAST_EYE: V3 = V3::ZERO;
 
 #[allow(static_mut_refs)]
@@ -88,7 +93,7 @@ unsafe extern "thiscall" fn hook_fragment(inst: usize, colour: *const f32, vel: 
                 world.r[1] = world.r[1] * s.y;
                 world.r[2] = world.r[2] * s.z;
                 let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
-                pending().push(Pending { odf: String::from(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team });
+                pending().push(Pending { odf: String::from(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
                 return;
             }
         }
@@ -116,10 +121,44 @@ unsafe extern "thiscall" fn hook_fragment_cocoon(inst: usize, colour: *const f32
             world.r[1] = world.r[1] * s.y;
             world.r[2] = world.r[2] * s.z;
             let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
-            pending().push(Pending { odf: String::from("8472_cocoon"), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team });
+            pending().push(Pending { odf: String::from("8472_cocoon"), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: None });
             return;
         }
         let f: unsafe extern "thiscall" fn(usize, *const f32, usize, u32, i32, usize) = core::mem::transmute(FN_FRAGMENT);
+        f(inst, colour, vel, smoking, faces, attractor);
+    }
+}
+
+/// A construction cancelled or destroyed (`BuildingEffect::SafeDestroyConstruction`):
+/// the instance is the one embedded in the construction's `Info` (`+0x20`), its class at
+/// the `Info`'s `+0xd0`, and `faces` the faces built so far, which are the ones that
+/// break.
+unsafe extern "thiscall" fn hook_build_fragment(inst: usize, colour: *const f32, vel: usize, smoking: u32, faces: i32, attractor: usize) {
+    unsafe {
+        if ACTIVE && faces > 0 && pending().len() < 64 && inst > 0x20 {
+            let class = engine::field(inst - 0x20, 0xd0);
+            let name = if class != 0 {
+                let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(FN_CLASS_ODF);
+                let s = crate::rt::cstr_at(f(class), 260);
+                match s.len().checked_sub(4) {
+                    Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(".odf") => &s[..n],
+                    _ => s,
+                }
+            } else {
+                ""
+            };
+            if !name.is_empty() && crate::assets::sod(name).is_some() {
+                let s = super::super::hulls::instance_scale(inst) * scale_sod(name);
+                let mut world = engine::field_m34(inst, 0x44);
+                world.r[0] = world.r[0] * s.x;
+                world.r[1] = world.r[1] * s.y;
+                world.r[2] = world.r[2] * s.z;
+                let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
+                pending().push(Pending { odf: String::from(name), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team, faces: Some(faces as usize) });
+                return;
+            }
+        }
+        let f: unsafe extern "thiscall" fn(usize, *const f32, usize, u32, i32, usize) = core::mem::transmute(PREV_BUILD_FRAGMENT);
         f(inst, colour, vel, smoking, faces, attractor);
     }
 }
@@ -195,6 +234,15 @@ impl Chunks {
             log!("effects: debris: {} of the Evolver's {} cocoon Fragment calls ours", n, SITES_COCOON.len());
         } else {
             self.on = false;
+            return;
+        }
+        if let Some(prev) = hook::call_target(SITE_BUILD_FRAGMENT) {
+            if hook::patch_call(SITE_BUILD_FRAGMENT, prev, hook_build_fragment as *const () as usize) {
+                unsafe { PREV_BUILD_FRAGMENT = prev };
+                log!("effects: debris: a cancelled construction's Fragment{} hooked: our own chunks", if prev != FN_FRAGMENT { " (chained)" } else { "" });
+            }
+        } else {
+            log!("effects: debris: SafeDestroyConstruction does not call Fragment here: the engine's chunks for it");
         }
     }
 
@@ -227,12 +275,18 @@ impl Chunks {
         let eye = unsafe { LAST_EYE };
         let pz = pose::pose(&model.sod, &model.info, &p.world, p.clock, pose::auto(eye));
         let mut n = 0;
+        let mut budget = p.faces.unwrap_or(usize::MAX);
         for (pi, part) in model.parts.iter().enumerate() {
             if !pz.shown.get(part.node).copied().unwrap_or(false) {
                 continue;
             }
+            if budget == 0 {
+                break;
+            }
             let Some(mesh) = model.sod.nodes[part.node].mesh() else { continue };
-            n += self.break_part(v.dev, &model, pi, mesh, &pz.world[part.node], p.team);
+            let (k, used) = self.break_part(v.dev, &model, pi, mesh, &pz.world[part.node], p.team, budget);
+            n += k;
+            budget = budget.saturating_sub(used);
         }
         self.made += 1;
         if self.made <= 6 {
@@ -240,14 +294,16 @@ impl Chunks {
         }
     }
 
-    /// Breaks one mesh into chunks; how many.
-    fn break_part(&mut self, dev: Device, model: &Rc<Model>, pi: usize, mesh: &a2fmt::sod::Mesh, w0: &M34, team: V3) -> usize {
+    /// Breaks one mesh into chunks, at most its first `limit` faces: how many chunks,
+    /// and how many faces it took.
+    #[allow(clippy::too_many_arguments)]
+    fn break_part(&mut self, dev: Device, model: &Rc<Model>, pi: usize, mesh: &a2fmt::sod::Mesh, w0: &M34, team: V3, limit: usize) -> (usize, usize) {
         let part = &model.parts[pi];
         let un = mesh.unindexed();
         let idx: Vec<u32> = un.groups.iter().flatten().copied().collect();
-        let ntri = idx.len() / 3;
+        let ntri = (idx.len() / 3).min(limit);
         if ntri == 0 {
-            return 0;
+            return (0, 0);
         }
         let pos = |vi: u32| -> V3 {
             let c = un.vertices[vi as usize];
@@ -331,7 +387,7 @@ impl Chunks {
             made.push((groups, centre, rc));
         }
         let bytes = unsafe { core::slice::from_raw_parts(all_idx.as_ptr() as *const u8, all_idx.len() * 2) };
-        let Some(ib) = upload_buffer(dev, bytes, true) else { return 0 };
+        let Some(ib) = upload_buffer(dev, bytes, true) else { return (0, ntri) };
         let parts: Vec<Part> = made
             .iter()
             .map(|(groups, centre, rc)| Part {
@@ -382,7 +438,7 @@ impl Chunks {
                 team,
             });
         }
-        n
+        (n, ntri)
     }
 
     pub fn draw(&mut self, v: &View) {
