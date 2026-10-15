@@ -9,8 +9,6 @@
 #   hud        hud/install.sh
 #   menus      menus/install.sh              Menus.asi
 #              menus/install-plates.sh       the backdrop plates built in $A2_DATA
-#   render3d   render3d/install.sh           Render3D.asi: the 3D view through render3d (HDR,
-#                                            MSAA, bloom); takes MSAA.asi out
 #   qol        qol/install.sh                QOL.asi: right-drag pan speed
 #   grid       grid/install.sh               GridLayout.asi: the bar as a grid of position keys
 #   renderer   postfx/renderer-config.sh     dxvk.conf at stage 3, as shipped
@@ -37,6 +35,10 @@
 #                                            smooth edges
 #   cutscenes  cutscenes/binkproxy/install.sh  the proxy DLL, and every movie built in
 #                                            $A2_DATA/movies
+#   render3d   render3d/install.sh           Render3D.asi: the 3D view through render3d (HDR,
+#                                            MSAA, bloom, its modules); last, because it
+#                                            takes out MSAA.asi and each plugin a module of
+#                                            its replaces
 #
 # The code layers need nothing but this checkout. The asset layers install what is
 # BUILT in A2_DATA (a2env.sh; default ~/.local/share/armada2-refit): with nothing
@@ -55,7 +57,6 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/hud/install.sh"
 "$here/menus/install.sh"
 "$here/menus/install-plates.sh"
-"$here/render3d/install.sh"
 "$here/qol/install.sh"
 "$here/grid/install.sh"
 "$here/postfx/renderer-config.sh" --stage 3
@@ -72,3 +73,4 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/specials/install.sh"
 "$here/fog/install.sh"
 "$here/cutscenes/binkproxy/install.sh"
+"$here/render3d/install.sh"   # last: it removes the plugins its modules replace

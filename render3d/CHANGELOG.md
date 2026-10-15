@@ -35,6 +35,12 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   fog-of-war ghosts of stations; keys in `[Overlays]`. The build ghost and footprints
   stay the engine's.
 
+### Changed
+- `install.sh` removes each plugin a module that is on replaces (effects: Explosions,
+  Shields, Repair; ordnance: Specials; sky: Sky; overlays: Fog), reading `[Modules]`
+  from the game's `Render3D.ini`; `./install` runs it last. Its ini merge keeps each
+  added key in its own section. The log names each module loaded at start.
+
 Installed, not yet seen in game.
 
 ## 0.1.0 — 2026-10-15

@@ -13,6 +13,10 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `Render3D.log` and `Render3D.ini` are cleared at launch and gathered with the other
   logs.
 
+### Changed
+- Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
+  Repair, Fog and Specials, it checks that `Render3D.asi` loaded each module.
+
 Installed, not yet seen in game.
 
 ## 3.15.0 — 2026-10-13

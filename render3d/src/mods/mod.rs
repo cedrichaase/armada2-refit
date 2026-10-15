@@ -98,6 +98,7 @@ pub fn init() {
     // not finished yet is off until asked for.
     let mut add = |m: Box<dyn Module>, on: bool| {
         if ini.int("Modules", m.name(), on as i32) != 0 {
+            log!("module {}: loaded", m.name());
             mods.push(m);
         } else {
             log!("module {}: off (Render3D.ini [Modules] {}=1 turns it on)", m.name(), m.name());
