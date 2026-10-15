@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.16.0 — 2026-10-15
+
+### Added
+- Scenario `render3d`: the `showcase` scene through `Render3D.asi`, the main view and,
+  with `hud on`, the action camera's inset, checked in `Render3D.log`.
+- `Render3D.log` and `Render3D.ini` are cleared at launch and gathered with the other
+  logs.
+
+Installed, not yet seen in game.
+
 ## 3.15.0 — 2026-10-13
 
 ### Added

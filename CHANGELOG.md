@@ -7,7 +7,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 11.40.0 — 2026-10-15
 
-Layers: render3d 0.1.0.
+Layers: render3d 0.1.0, testbench 3.16.0.
 
 ### Added
 - `render3d/`: `Render3D.asi`, the 3D view through a renderer of our own, in Rust. The
@@ -18,6 +18,7 @@ Layers: render3d 0.1.0.
 ### Changed
 - `./install` runs `render3d/install.sh` in place of `msaa/install.sh`, and removes
   `MSAA.asi`: render3d's scene target has samples of its own.
+- The bench gathers `Render3D.log`; scenario `render3d` (testbench 3.16.0).
 
 Installed, not yet seen in game.
 
