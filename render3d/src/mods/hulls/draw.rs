@@ -202,9 +202,11 @@ pub fn model_box(m: &Model) -> Option<(V3, V3)> {
 
 /// The cloak's waves for this draw, as `vs_hull`'s c17..c19 (`ART-DIRECTION.md`,
 /// "Cloaking"): bands along the hull's longest axis, `bands` of them over its length,
-/// travelling at `speed` bands a second; they sway it across the other two axes by
-/// `sway` world units (the wider axis fully, the thinner by half).
-fn cloak_waves(p: &Posed, look: &Look, time: f32, sway: f32) -> [f32; 12] {
+/// travelling at `speed` bands a second; they sway it by `sway` world units across the
+/// screen, at right angles to the bands and never towards the camera, so the ship
+/// ripples like an image rather than bending in depth (the user found a sway through
+/// the hull's own axes too three-dimensional from the RTS camera, 2026-10-16).
+fn cloak_waves(p: &Posed, look: &Look, time: f32, eye: V3, sway: f32) -> [f32; 12] {
     let Some((lo, hi)) = model_box(&p.model) else { return [0.0; 12] };
     let d = hi - lo;
     let ext = [d.x * p.world.r[0].len(), d.y * p.world.r[1].len(), d.z * p.world.r[2].len()];
@@ -213,9 +215,9 @@ fn cloak_waves(p: &Posed, look: &Look, time: f32, sway: f32) -> [f32; 12] {
     let along = p.world.r[ix[0]].norm();
     let k = 2.0 * core::f32::consts::PI * look.cloak_wave_bands / ext[ix[0]].max(1e-3);
     let ph = along.dot(p.centre) * k + time * look.cloak_wave_speed * 2.0 * core::f32::consts::PI;
-    let side = p.world.r[ix[1]].norm() * sway;
-    let up = p.world.r[ix[2]].norm() * (sway * 0.5);
-    [along.x * k, along.y * k, along.z * k, ph, side.x, side.y, side.z, 0.0, up.x, up.y, up.z, 0.0]
+    let across = along.cross(p.centre - eye);
+    let side = if across.len() < 1e-6 { p.world.r[ix[1]].norm() } else { across.norm() } * sway;
+    [along.x * k, along.y * k, along.z * k, ph, side.x, side.y, side.z, 0.0, 0.0, 0.0, 0.0, 0.0]
 }
 
 /// The fade a hull is drawn at: the engine's far fade, or (crafts) Lighting.asi's near
@@ -457,7 +459,7 @@ impl Drawer {
         let mut ck_wave = [0.0f32; 4];
         if let (Mode::Cloak, Some((st, vis, _))) = (mode, p.cloak) {
             let env = if st == 1 || st == 3 { 4.0 * vis * (1.0 - vis) } else { 0.0 };
-            let w = cloak_waves(p, look, v.time, look.cloak_wave * p.radius * env);
+            let w = cloak_waves(p, look, v.time, v.eye, look.cloak_wave * p.radius * env);
             vk[36..48].copy_from_slice(&w);
             ck_wave.copy_from_slice(&w[0..4]);
         }

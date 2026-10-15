@@ -1000,8 +1000,10 @@ are drawn at `Step::Translucent`, far to near, depth first. A cloaking device (+
 state +0x3c, alpha +0x44, phase +0x48) draws the hull as `Lighting.asi`'s glass over a
 copy of the frame, in the look of `ART-DIRECTION.md`, "Cloaking". While it cloaks or
 decloaks, bands travel along the hull's longest axis (`CloakWaveBands` over its
-length, `CloakWaveSpeed` a second) and `vs_hull` sways the geometry across the other two
-axes by up to `CloakWave` of the radius, on the envelope `4·vis·(1−vis)`; the sway is a
+length, `CloakWaveSpeed` a second) and `vs_hull` sways the geometry across the screen,
+at right angles to the bands and never in depth, by up to `CloakWave` of the radius
+(swayed through the hull's own axes it bent in 3D and looked comical from the RTS
+camera), on the envelope `4·vis·(1−vis)`; the sway is a
 function of the world position, so the parts stay joined. The hull thins into the
 glass band by band (crests first) in place of the old noise threshold, and the green
 front (`CloakFront`) is a thin line along each band. Fully cloaked, slow waves drift

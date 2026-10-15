@@ -139,10 +139,12 @@ bending in waves before it is gone**, and the same in reverse when it decloaks. 
 noise threshold eats the hull away patch by patch, with a glowing front where it is
 eating. The ship never changes shape; it is cut away.
 
-- **The shape moves, not just the shading.** Waves run across the whole hull and visibly
-  shift its outline: the silhouette ripples against the stars, nacelles and saucer edge
-  bend and swim. It should read as the ship's geometry bending, not as a pattern
-  painted on a ship that stays still.
+- **The shape moves, not just the shading, but flat, like an image.** Waves run across
+  the whole hull and shift its outline a little: the silhouette ripples against the
+  stars. The ripple is in the picture, across the screen: the hull must not bend or
+  wobble in depth. Swaying the geometry through its own axes (render3d 0.4.0 as first
+  built) read as too three-dimensional, almost comical from the RTS camera (the user,
+  2026-10-16).
 - **Waves, not noise.** Broad, regular-looking bands of distortion that travel across
   the hull, a few bands across the ship's length, rather than random blotches. They
   move steadily in one direction while the transition runs.
@@ -154,7 +156,7 @@ eating. The ship never changes shape; it is cut away.
 - **Strongest mid-transition.** The waves are weak at the start, largest around the
   middle, and settle to the cloaked look at the end. The current `CloakRipple` already
   peaks mid-transition (`vis·(1−vis)`). The new waves follow the same envelope, but much
-  larger: big enough to move the silhouette by a visible fraction of the hull's width.
+  larger: enough to ripple the silhouette, a small fraction of the hull's width.
 - **The glowing front is optional.** Whether the green edge (`CloakFront`) stays,
   is replaced by the waves, or becomes a faint shimmer along the crests is open. In
   the series there is no sharp front: the ship is simply gone at the end of the waver.

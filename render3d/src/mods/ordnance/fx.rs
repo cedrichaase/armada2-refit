@@ -90,6 +90,10 @@ pub struct Recipe {
     /// A cone's fans: how many (up to 4), the light between their edges (0..1), how
     /// often each comes and goes (a second); their edges' width in pixels.
     fans: [f32; 3],
+    /// A second colour of a cone's fans (`Sprinkle`), at this share of its brightness
+    /// (`SprinkleShare`, 0 for none): the auto-assimilator's green in its blue.
+    sprinkle: [f32; 3],
+    sprinkle_share: f32,
     edge_px: f32,
     /// A cone's vapour: depth, blobs per wide-end half width, speed along the beam
     /// (half widths a second); its brightness at the target against the emitter's.
@@ -161,6 +165,8 @@ impl Recipe {
             beyond: s.f(sec, "Beyond", 0.5).max(0.0),
             pull: s.f(sec, "Pull", 1.0).max(0.0),
             fans: s.n(sec, "Fans", [3.0, 0.3, 0.7]),
+            sprinkle: s.rgb(sec, "Sprinkle", [60.0, 255.0, 110.0]),
+            sprinkle_share: s.f(sec, "SprinkleShare", 0.0).max(0.0),
             edge_px: s.f(sec, "EdgePixels", 2.0).max(0.1),
             vapour: s.n(sec, "Vapour", [0.5, 1.2, 0.5]),
             fall: s.f(sec, "Fall", 0.25).max(0.0),
@@ -841,6 +847,26 @@ impl Fx {
             let uvw = [[prev.2, -w0, w0], [next.2, -w1, w1], [next.2, w1, w1], [prev.2, w0, w0]];
             self.quad_w(p, &lk, uvw);
             prev = next;
+        }
+        if r.sprinkle_share > 0.0 {
+            // The second colour: the same cone again, two fans of its own (its own
+            // seed, a little quicker), so now and then a fan of it comes and goes.
+            let lk2 = Look {
+                col: rgb(r.sprinkle),
+                bright: bright * r.sprinkle_share,
+                seed: sd + 37.3,
+                p3: [lk.p3[0].min(2.0), lk.p3[1], lk.p3[2] * 1.3, lk.p3[3]],
+                ..lk
+            };
+            let mut prev = node(0);
+            for k in 1..=N {
+                let next = node(k);
+                let (w0, w1) = (wid(prev.2), wid(next.2));
+                let p = [prev.0, next.0, next.1, prev.1];
+                let uvw = [[prev.2, -w0, w0], [next.2, -w1, w1], [next.2, w1, w1], [prev.2, w0, w0]];
+                self.quad_w(p, &lk2, uvw);
+                prev = next;
+            }
         }
         if r.emitter > 0.0 {
             // The small bright point on the emitter where the cone starts.

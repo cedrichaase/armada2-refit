@@ -16,9 +16,14 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 - Shield hits: an uneven mist about the impact, a soft curved edge at the shell's
   silhouette, rays on Klingon shields only, and a point light on the struck hull.
 - Shield colour defaults: Klingon green (was orange), Species 8472 orange (was purple).
+- The auto-assimilator (`borgbor`) is the cube's assimilation beam in its blue, with a
+  fan of green now and then (`Sprinkle`, `SprinkleShare`).
+- The cloak's waves sway the hull across the screen only, never in depth, smaller and
+  finer: `CloakWave` 0.03 (was 0.08), `CloakWaveBands` 3 (was 1.5).
 
 ### Added
-- `Kind=cone` in ordnance recipes, with `Spread`, `Beyond`, `Pull`, `Fans`,
+- `Kind=cone` in ordnance recipes, with `Spread`, `Beyond`, `Pull`, `Fans`, `Sprinkle`,
+  `SprinkleShare`,
   `EdgePixels`, `Vapour`, `Fall`, `WashBack`, `WashReach`.
 - `[Shields]` keys `Mist`, `MistReach`, `MistShare`, `MistContrast`, `MistScale`,
   `MistDrift`, `Edge`, `Rays`, `RayLength`, `RaySharpness`, `RayFactions`, `HitLight`,
