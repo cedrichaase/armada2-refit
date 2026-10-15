@@ -49,6 +49,8 @@ WHAT COUNTS AS A CHANGE
     menus         Menus.asi/.ini, Menus/*.bmp  -- added files, stock has none
                   (MenuScale.* before menus 2.0.0 -- still recognised, see LEGACY_MENUS)
     msaa          MSAA.asi/.ini                -- added files
+    render3d      Render3D.asi/.ini            -- added files: the 3D view drawn through
+                                                  render3d (HDR, MSAA, bloom)
     qol           QOL.asi/.ini                 -- added files; not a look but a feel
                   (right-drag pan speed), switched so stock really is stock
     grid          GridLayout.asi/.ini          -- added files: the bar as a 5x3 grid with
@@ -104,6 +106,7 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('MenuScale.asi', 'menus'), ('MenuScale.ini', 'menus'),
          ('HUD.asi', 'hud'), ('HUD.ini', 'hud'),
          ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
+         ('Render3D.asi', 'render3d'), ('Render3D.ini', 'render3d'),
          ('Planets.asi', 'models'), ('Planets.ini', 'models'),
          ('QOL.asi', 'qol'), ('QOL.ini', 'qol'),
          ('QOLRules.asi', 'qol'), ('QOLRules.ini', 'qol'),
@@ -120,7 +123,7 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('Fog.asi', 'fog'), ('Fog.ini', 'fog'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions', 'shields', 'repair', 'specials', 'venting', 'fog', 'hud', 'menus', 'msaa', 'qol', 'grid', 'cutscenes',
+LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions', 'shields', 'repair', 'specials', 'venting', 'fog', 'hud', 'menus', 'msaa', 'render3d', 'qol', 'grid', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.

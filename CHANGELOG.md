@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 11.40.0 — 2026-10-15
+
+Layers: render3d 0.1.0.
+
+### Added
+- `render3d/`: `Render3D.asi`, the 3D view through a renderer of our own, in Rust. The
+  engine's steps (and every plugin hooked into them) draw into a half-float target with
+  MSAA, which is bloomed by energy and tone-mapped into the back buffer (render3d 0.1.0).
+  `a2mod` switches it as the `render3d` layer.
+
+### Changed
+- `./install` runs `render3d/install.sh` in place of `msaa/install.sh`, and removes
+  `MSAA.asi`: render3d's scene target has samples of its own.
+
+Installed, not yet seen in game.
+
 ## 11.39.1 — 2026-10-13
 
 Layers: surfaces 1.1.1.

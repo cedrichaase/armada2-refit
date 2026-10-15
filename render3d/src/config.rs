@@ -13,6 +13,8 @@ pub struct Config {
     pub hdr: bool,
     pub bloom: f32,
     pub bloom_threshold: f32,
+    /// Width of the threshold's soft knee.
+    pub bloom_knee: f32,
     pub exposure: f32,
     /// Where the tone map's shoulder starts, in stock's white (1.0).
     pub shoulder: f32,
@@ -29,6 +31,7 @@ impl Default for Config {
             hdr: true,
             bloom: 0.12,
             bloom_threshold: 1.0,
+            bloom_knee: 0.5,
             exposure: 1.0,
             shoulder: 0.8,
             inset: true,
@@ -50,6 +53,7 @@ pub fn load() -> Config {
         hdr: ini.int("Render3D", "HDR", d.hdr as i32) != 0,
         bloom: ini.float("Render3D", "Bloom", d.bloom),
         bloom_threshold: ini.float("Render3D", "BloomThreshold", d.bloom_threshold),
+        bloom_knee: ini.float("Render3D", "BloomKnee", d.bloom_knee),
         exposure: ini.float("Render3D", "Exposure", d.exposure),
         shoulder: ini.float("Render3D", "Shoulder", d.shoulder),
         inset: ini.int("Render3D", "Inset", d.inset as i32) != 0,

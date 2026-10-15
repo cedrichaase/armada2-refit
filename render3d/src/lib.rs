@@ -10,18 +10,31 @@ pub mod rt;
 pub mod d3d;
 pub mod config;
 pub mod engine;
+pub mod frame;
 pub mod math;
+#[rustfmt::skip]
+pub mod shaders;
 
 use rt::win::*;
 
 #[global_allocator]
 static HEAP: rt::mem::Heap = rt::mem::Heap;
 
-/// The plugins this one replaces. Loaded together they would hook the same calls.
-const SUPERSEDED: &[&str] = &[
+/// The plugins whose work moves into render3d's modules. While the engine's own step
+/// draws a category, the plugin hooked into that step keeps working there; a module
+/// of ours that takes a category over stands down while its plugin is loaded.
+/// MSAA.asi only wastes work beside us: our scene target has samples of its own.
+pub const SUPERSEDED: &[&str] = &[
     "Lighting.asi", "Sky.asi", "Nebulae.asi", "Surfaces.asi", "Explosions.asi", "Shields.asi",
     "Repair.asi", "Venting.asi", "Specials.asi", "Fog.asi", "Planets.asi", "MSAA.asi",
 ];
+
+/// Whether a plugin is loaded, by file name. Asked at the first frame, not at load:
+/// the ASI loader may not have loaded the others yet when our DllMain runs.
+pub fn plugin_loaded(name: &str) -> bool {
+    let c = rt::cstr(name);
+    !unsafe { GetModuleHandleA(c.as_ptr()) }.is_null()
+}
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
@@ -39,15 +52,10 @@ fn startup() {
         log!("Enable=0: standing down, the engine draws the 3D view");
         return;
     }
-    for name in SUPERSEDED {
-        let c = rt::cstr(name);
-        if !unsafe { GetModuleHandleA(c.as_ptr()) }.is_null() {
-            log!("{} is loaded: standing down (render3d replaces it; render3d/install.sh removes it)", name);
-            return;
-        }
-    }
     config::set(cfg);
-    log!("ready");
+    if frame::install() {
+        log!("ready");
+    }
 }
 
 #[unsafe(no_mangle)]

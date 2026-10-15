@@ -12,7 +12,9 @@ set -euo pipefail
 out=$1 src=$2; shift 2
 inc=$(dirname "$src")
 # The stamp covers the file, every header it can include, and the entry list.
-stamp="source $(cat "$src" "$inc"/*.hlsli 2>/dev/null <(printf '%s\n' "$@") | sha256sum | cut -d' ' -f1)"
+shopt -s nullglob
+headers=("$inc"/*.hlsli)
+stamp="source $(cat "$src" "${headers[@]}" <(printf '%s\n' "$@") | sha256sum | cut -d' ' -f1)"
 if [ -f "$out" ] && grep -qF "$stamp" "$out"; then exit 0; fi
 command -v vkd3d-compiler >/dev/null ||
     { echo "hlsl-rs.sh: $out is stale and vkd3d-compiler is not installed (Arch: vkd3d)" >&2; exit 1; }
