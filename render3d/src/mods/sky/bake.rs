@@ -1,4 +1,4 @@
-//! The procedural sky baked into a cube once per map (sky/README.md, "The draw"), and
+//! The procedural sky baked into a cube once per map, and
 //! the fine detail's noise volume. Both on the GPU only: each face is drawn by
 //! `bake_ps` into a target twice its edge, then `down_ps` averages each 2x2 into the
 //! cube face, a render target itself. The cube is half floats, so the recipe's stars
@@ -297,7 +297,7 @@ fn half(h: u16) -> f32 {
 }
 
 /// `Dump=1`: a baked face as a 24-bit TGA, `Sky\<name>.dump<f>.tga` in the game
-/// directory, for `sky/grade.py` (sky/README.md, "The grade").
+/// directory, for `render3d/perf/sky-grade.py`.
 fn dump_face(dev: Device, r: &Recipe, f: usize, face: &Com, s: u32, fmt: u32) {
     let Some(sys) = dev.create_offscreen_surface(s, s, fmt, POOL_SYSTEMMEM) else { return };
     if dev.get_render_target_data(face, &sys) < 0 {

@@ -14,7 +14,7 @@
 // sits on the hull as it moves and runs on across the meshes of every node. Drawn additively over the hull (pushed out a little along the
 // normal), depth-tested, writing no depth. Colours above 1 bloom (the frame is HDR).
 //
-// Constants come from specials/look.rs, which must agree with the registers.
+// Constants come from src/mods/specials/look.rs, which must agree with the registers.
 
 float4x4 W  : register(c0);    // world (transposed)
 float4x4 VP : register(c4);    // view x projection (transposed)

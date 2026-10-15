@@ -1,6 +1,5 @@
 //! Planets: the class planets drawn on a sphere of our own, lit per pixel with
-//! `Lighting.asi`'s planet look (`lighting/README.md`, "Planets" and "Planets on the
-//! GPU": a night side, dusk, the limb's haze, the air past the limb, a glint off water,
+//! `Lighting.asi`'s planet look (a night side, dusk, the limb's haze, the air past the limb, a glint off water,
 //! city lights at night) and, where a class has a recipe, `Surfaces.asi`'s ground.
 //!
 //! The engine draws a planet as a `Planet_Database` of two `GroundMesh` hemispheres and
@@ -461,7 +460,7 @@ impl Planets {
                 }
             }
             // The shell's material: SetAtmosphereTint writes 0.5 and 0.75 x the tint; the
-            // ambient is PlanetAmbient x tint (lighting/README.md).
+            // ambient is PlanetAmbient x tint.
             let amb = [self.look.ambient[0] * tint[0], self.look.ambient[1] * tint[1], self.look.ambient[2] * tint[2]];
             set_material(&mut k, amb, tint);
             if sf_ok {
@@ -558,7 +557,7 @@ impl Planets {
             k[(32 + i) * 4 + 1] = 1.0;
         }
         // Without the planets' own glows, which the CPU path never lit a planet with
-        // either (lighting/README.md, "Planets on the GPU").
+        // either.
         let near: Vec<_> = ls.points_near(centre, radius, 16).into_iter().filter(|p| !scene::lights::is_day_side(p.light)).take(8).collect();
         for (i, p) in near.iter().enumerate() {
             k[(16 + i) * 4..(16 + i) * 4 + 3].copy_from_slice(&[p.colour.x, p.colour.y, p.colour.z]);

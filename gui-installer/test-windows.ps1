@@ -103,13 +103,12 @@ $r = Run @("--list")
 Check "--list sees release $pver in the cache" (($r.Code -eq 0) -and (Has $r.Out "  $pver *"))
 $r = Run @("--package", $Zip, "--game", $G)
 Check "--package exits 0" ($r.Code -eq 0)
-foreach ($n in "HUD.asi", "Menus.asi", "QOL.asi", "Lighting.asi", "Sky.asi", "Online.asi", "winmm.dll") {
+foreach ($n in "HUD.asi", "Menus.asi", "QOL.asi", "Online.asi", "winmm.dll") {
     Check $n (Test-Path -LiteralPath (G $n))
 }
-Check "Sky\ holds the recipes" (@(Get-ChildItem -LiteralPath (G "Sky") -Filter *.ini).Count -gt 0)
 Check "the cutscene player left out (A2_SKIP=cutscenes)" (((Text (G "binkw32.dll")) -eq "stockbink") -and
     -not (Test-Path -LiteralPath (G "binkw32_orig.dll")) -and -not (Test-Path -LiteralPath (G "BinkProxy.ini")))
-Check "progress from install.ps1's ::step lines" ((Has $r.Err "*Installing the HUD*") -and (Has $r.Err "*Installing the sky*"))
+Check "progress from install.ps1's ::step lines" ((Has $r.Err "*Installing the HUD*") -and (Has $r.Err "*Installing online play*"))
 Check "the SOD scripts ran under the exe without a traceback" (-not (Has ($r.Out + $r.Err) "*Traceback*") -and
     -not (Has ($r.Out + $r.Err) "*ModuleNotFoundError*"))
 $state = Get-Content -Raw -LiteralPath (G "armada2-refit-installed.json") | ConvertFrom-Json

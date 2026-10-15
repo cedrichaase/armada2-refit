@@ -1,8 +1,8 @@
 // entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL vol_lr_ps:ps_3_0:PS_VOL_LR quad_vs:vs_3_0:VS_QUAD zdown_ps:ps_3_0:PS_ZDOWN comp_ps:ps_3_0:PS_COMP zclear_ps:ps_3_0:PS_ZCLEAR vol_fr_ps:ps_3_0:PS_VOL_FR edge_ps:ps_3_0:PS_EDGE qrow_ps:ps_3_0:PS_QROW qcol_ps:ps_3_0:PS_QCOL etile_ps:ps_3_0:PS_ETILE tile_vs:vs_3_0:VS_TILE
 // The world module's nebulae (src/mods/world/nebulae.rs): Nebulae.asi's nebulae.hlsl,
-// ported unchanged but for this header; "nebulae.c" below is now nebulae.rs.
+// ported unchanged but for this header.
 //
-// nebulae.hlsl -- the gas of Nebulae.asi (nebulae/README.md).
+// nebulae.hlsl -- the gas of Nebulae.asi.
 //
 // A nebula class's gas is drawn as slices: polygons perpendicular to the view, one
 // behind the other through the box its nebulae fill, each depth-tested against the
@@ -11,9 +11,9 @@
 // behind it does not. Additive blending makes the order of the slices irrelevant.
 //
 // The density at a point is the class's envelope (where its nebulae are: a top-down
-// texture over the map, nebulae.c bakes it) times a vertical profile, shaped by a
-// domain-warped noise from a tiling 3D texture (also nebulae.c). Constants come from
-// the class's recipe (Nebulae\<odf>.ini) through nebulae.c's neb_consts(), which must
+// texture over the map, nebulae.rs bakes it) times a vertical profile, shaped by a
+// domain-warped noise from a tiling 3D texture (also nebulae.rs). Constants come from
+// the class's recipe (Nebulae\<odf>.ini) through nebulae.rs, which must
 // agree with the registers below.
 
 float4 k_vp0     : register(c0);   // the columns of VIEW x PROJECTION
@@ -128,7 +128,7 @@ float gas_density(float3 p, float3 w, float cover, float det)
     float3 q = rot(p) * k_noise.x + k_seed.xyz, q2 = rot2(p) * (k_noise.x * 0.786) + k_seed.yzx;
     float  base = noise2(q + w * k_noise.y, q2 + w.zxy * k_noise.y);
     float  f = lerp(base, det, k_seed.w);
-    float  n = (f - 0.5) * 8.0;                       // about a z-score (nebulae.c normalises)
+    float  n = (f - 0.5) * 8.0;                       // about a z-score (nebulae.rs normalises)
     n = lerp(n, 2.0 - abs(n) * 2.0, k_shape.x);       // ridge: towards soft bands
     // The edge is where the noise gives out, not a circle: the disc only raises the
     // threshold towards its rim, and fades the last of it.

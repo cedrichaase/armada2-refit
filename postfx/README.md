@@ -4,7 +4,7 @@ Two `a2mod` layers in one folder: **renderer** (`renderer-config.sh`, which writ
 `dxvk.conf`) and **bloom** (`postfx.py` plus the per-user vkBasalt build in
 `vkbasalt/`). Both apply to every frame at once and are independent of the texture
 pipeline. Anti-aliasing is covered here too, as Tier 2, because it was chosen
-among these routes; the hook itself lives in `msaa/`.
+among these routes; the multisampling itself is `Render3D.asi`'s (`render3d/`).
 
 Everything in this section is global — it applies to every texture and every model at
 once, costs nothing per-asset, and is reversible by deleting one file. All of it is
@@ -98,7 +98,7 @@ looks the same. Measured with the timer above (frame times at 60 Hz vsync):
 | 15 | 37.3 ms | 35.4 ms | 16.7 ms | 0.24–0.37 ms |
 | 30 | 72.6 ms | 70.6 ms | 16.7 ms | 0.60–0.81 ms |
 
-Why a renderer key and not a hook in `Lighting.asi`, which moved the hulls onto
+Why a renderer key and not a hook in the old `Lighting.asi`, which moved the hulls onto
 vertex buffers: the slow part is not the CPU transform of 320 faces, it is reading
 uncached memory. A GPU path for the bubble would also have to reproduce a translucent,
 team-coloured, depth-unsorted draw through the fixed-function pipeline. The key fixes
@@ -189,29 +189,18 @@ and precisely where the upscaled art lives. Expect stage 2 to do more for this g
 appearance than stage 1, which inverts the usual ordering. Stage 1 still goes first:
 AF is what keeps the sharper mips stage 2 selects from aliasing on the oblique surfaces.
 
-## Tier 2 — anti-aliasing: route 2, `msaa/`
+## Tier 2 — anti-aliasing: route 2, in the plugin
 
-**Route 2 is `MSAA.asi`, 8x.** `MSAA.log` shows 8x on every device creation (3440x1440,
-the launch reels' 640x480, 3440x1440 again) and DXVK logs no errors.
-
-    msaa/install.sh                 # build + install (Samples=8)
-    msaa/install.sh --samples 4     # or 2; 0 patches nothing
-    msaa/install.sh --remove        # three files out, stock behaviour back
-
-It redirects the two `call GetWindowHandle` that sit just before
-`IDirect3D8::CreateDevice` in `ST3D_DeviceDirectX8::CreateDevice` (`0x6235d0`). At
-that point `edi` is the present-parameters struct. The plugin then sets:
-- the highest sample count the device accepts for both the colour and D16 depth
-  formats
-- `SwapEffect=DISCARD`
-- a non-lockable back buffer
-
-`Reset` reuses the same struct, so a device loss keeps MSAA. `MSAA.log` records what
-each device creation actually got. The renderer was read end to end first: nothing
-renders off-screen, and the one back-buffer read-back is the minimap copy
-(`CopyOffscreenToTexture`). That copy works only because DXVK's D3D8 CopyRects
-resolves a multisampled source through `StretchRect`. So **check the minimap first**
-when judging it. Full reasoning in `msaa/README.md`.
+**Route 2 is `Render3D.asi`'s `MSAA=4`** (0, 2, 4 or 8; `render3d/README.md`): it draws
+the 3D view into a multisampled half-float target of its own and resolves it into the
+back buffer. It replaced `MSAA.asi`, which redirected the two `call GetWindowHandle`
+before `IDirect3D8::CreateDevice` in `ST3D_DeviceDirectX8::CreateDevice` (`0x6235d0`) to
+set `MultiSampleType` on the device's back buffer (8x, `SwapEffect=DISCARD`, a
+non-lockable back buffer). That plugin was removed; the reasoning below is why an
+ASI-side route was the one taken. Its minimap trap went with it: the minimap's
+back-buffer read-back (`CopyOffscreenToTexture`) worked only because DXVK's D3D8
+CopyRects resolves a multisampled source through `StretchRect`, and render3d's engine
+back buffer is not multisampled.
 
 Why that route, of the three:
 
@@ -225,8 +214,8 @@ AA cannot come from `dxvk.conf`, and the routes are:
    with `d3d8-chain.py --use gog` (GOG d3d8to9 → DXVK d3d9 → Vulkan), which would make
    both `anisotropic=` and `antialiasing=` live again. Untested, and its accepted values
    are unknown because `dxcfg.exe`'s strings are packed.
-2. **An ASI hook on `IDirect3D8::CreateDevice`**, setting `MultiSampleType` — the one
-   taken. Squarely inside the toolchain `menus/` proves — clang + lld-link + the
+2. **An ASI hook**, first on `IDirect3D8::CreateDevice` setting `MultiSampleType`, now a
+   target of render3d's own — the one taken. Squarely inside the toolchain `menus/` proves — clang + lld-link + the
    Ultimate ASI Loader — and `armada2.map` gives the call site. DXVK implements D3D8
    multisampling properly on Vulkan, which wined3d's D3D8 path did not reliably do.
 3. **Post-process AA via vkBasalt** — see Tier 3. FXAA/SMAA rather than MSAA, so it

@@ -1,9 +1,9 @@
-//! Sky recipes (sky/README.md, "Recipes"): a handful of numbers per stock sky, turned
+//! Sky recipes: a handful of numbers per stock sky, turned
 //! into the pixel shader's constants c0..c21 exactly as `Sky.asi`'s `recipe_read` does.
 //!
-//! The recipes are `sky/skies/<name>.ini`, built into the plugin, so the sky needs no
-//! file in the game directory. A file `Sky\<name>.ini` in the game directory (where
-//! `sky/install.sh` puts them) takes precedence, and is re-read while the game runs
+//! The recipes are `render3d/skies/<name>.ini`, built into the plugin, so the sky needs no
+//! file in the game directory. A file `Sky\<name>.ini` in the game directory (a copy
+//! is not installed by default) takes precedence, and is re-read while the game runs
 //! when it changes (`Reload=1`), so a recipe can still be tuned live.
 use crate::math::{cosf, fmodf, sinf};
 use crate::rt;
@@ -15,20 +15,20 @@ pub const NCONST: usize = 22;
 
 /// The recipes of every stock sky with one, by background name (no extension).
 static BUILT_IN: &[(&str, &str)] = &[
-    ("mbg02", include_str!("../../../../sky/skies/mbg02.ini")),
-    ("mbgaqu", include_str!("../../../../sky/skies/mbgaqu.ini")),
-    ("mbgbaku", include_str!("../../../../sky/skies/mbgbaku.ini")),
-    ("mbgblue", include_str!("../../../../sky/skies/mbgblue.ini")),
-    ("mbgborg", include_str!("../../../../sky/skies/mbgborg.ini")),
-    ("mbgdk", include_str!("../../../../sky/skies/mbgdk.ini")),
-    ("mbgdom1", include_str!("../../../../sky/skies/mbgdom1.ini")),
-    ("mbgflu", include_str!("../../../../sky/skies/mbgflu.ini")),
-    ("mbggb", include_str!("../../../../sky/skies/mbggb.ini")),
-    ("mbgkl", include_str!("../../../../sky/skies/mbgkl.ini")),
-    ("mbgkling", include_str!("../../../../sky/skies/mbgkling.ini")),
-    ("mbgpur", include_str!("../../../../sky/skies/mbgpur.ini")),
-    ("mbgred", include_str!("../../../../sky/skies/mbgred.ini")),
-    ("mbgrg", include_str!("../../../../sky/skies/mbgrg.ini")),
+    ("mbg02", include_str!("../../../skies/mbg02.ini")),
+    ("mbgaqu", include_str!("../../../skies/mbgaqu.ini")),
+    ("mbgbaku", include_str!("../../../skies/mbgbaku.ini")),
+    ("mbgblue", include_str!("../../../skies/mbgblue.ini")),
+    ("mbgborg", include_str!("../../../skies/mbgborg.ini")),
+    ("mbgdk", include_str!("../../../skies/mbgdk.ini")),
+    ("mbgdom1", include_str!("../../../skies/mbgdom1.ini")),
+    ("mbgflu", include_str!("../../../skies/mbgflu.ini")),
+    ("mbggb", include_str!("../../../skies/mbggb.ini")),
+    ("mbgkl", include_str!("../../../skies/mbgkl.ini")),
+    ("mbgkling", include_str!("../../../skies/mbgkling.ini")),
+    ("mbgpur", include_str!("../../../skies/mbgpur.ini")),
+    ("mbgred", include_str!("../../../skies/mbgred.ini")),
+    ("mbgrg", include_str!("../../../skies/mbgrg.ini")),
 ];
 
 /// The fine detail's noise volume: one feature of its noise spans about three texels

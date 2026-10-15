@@ -1,18 +1,18 @@
 // entries: shield_vs:vs_3_0:VS_SHIELD shield_ps:ps_3_0:PS_SHIELD down_ps:ps_3_0:PS_DOWN
 // The shield hits of render3d's effects module (src/mods/effects/shields.rs), ported
-// from Shields.asi (shields/README.md), whose look was settled with the user: the
-// constants below are filled by shields.rs as shields.c filled them.
+// from Shields.asi, whose look was settled with the user: the
+// constants below are filled by shields.rs as Shields.asi filled them.
 //
-// One draw per struck ship: a unit sphere, mapped by shields.c onto the ship's shield
+// One draw per struck ship: a unit sphere, mapped by shields.rs onto the ship's shield
 // ellipsoid (the engine's own shield-to-object transform, then the ship's), drawn
 // additively, depth-tested against the hulls and writing no depth. The shell itself is
 // invisible: every pixel's light comes from the hits on it, up to eight a ship, each a
 // hot spot where it struck, a ring running out from there, and the shield's lattice
-// and rim lit around it while it lasts. shields.c works out per hit, per frame, how
+// and rim lit around it while it lasts. shields.rs works out per hit, per frame, how
 // bright each part is now (its age, whether the hit is still live, its strength), so
 // the shader holds no time of its own beyond the lattice's crackle.
 //
-// Constants come from shields.c's draw_ship(), which must agree with the registers.
+// Constants come from shields.rs's draw_ship(), which must agree with the registers.
 
 float4 k_vp0   : register(c0);   // vertex shader: the columns of VIEW x PROJECTION
 float4 k_vp1   : register(c1);
@@ -119,13 +119,13 @@ float3 hit(float3 w, float4 h, float4 r)
 // xshlddie, a band of lightning texture circling the ship). The same sphere and
 // vertex shader. Arcs are the zero lines of a warped 3D gradient noise on the unit
 // sphere: a core of constant pixel width, white-hot, in a blue glow. They show only
-// in the discharges shields.c places on the shell (up to six, each flashing and
+// in the discharges shields.rs places on the shell (up to six, each flashing and
 // dying where it struck, mostly about the equator) and, faintly, about the
 // equator; the noise is struck afresh several times a second (its seed jumps, two
 // fields half a step apart), so the arcs crackle in place and nothing turns. A flash over the whole shell when the
 // shields collapse.
 //
-// Constants from shields.c's draw_down(), which must agree with the registers.
+// Constants from shields.rs's draw_down(), which must agree with the registers.
 
 float4 d_eye   : register(c0);   // xyz the camera; w 1 / the shield's mean radius
 float4 d_arc   : register(c1);   // rgb the arcs' core; w overall brightness

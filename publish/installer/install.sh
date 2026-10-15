@@ -8,16 +8,14 @@
 # No choices to make: what can work here is installed, the rest is skipped and says why.
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
 # in vendor/, each file only if missing. Then the Direct3D chain the repository's ./install
-# sets up (chain/): crosire's d3d8to9 as d3d8.dll on DXVK's d3d9.dll, so Lighting.asi
-# and Sky.asi draw in shaders and MSAA.asi and dxvk.conf have DXVK under them. MSAA.asi goes in when
-# DXVK is in the game directory -- its d3d8.dll, or crosire's d3d8to9 on its d3d9.dll
-# (without DXVK the minimap goes black); the models are rewritten from the player's own
+# sets up (chain/): crosire's d3d8to9 as d3d8.dll on DXVK's d3d9.dll, so dxvk.conf has
+# DXVK under it; the models are rewritten from the player's own
 # SOD files with python3; bloom is set up when a vkBasalt layer is installed. Textures,
 # the menu backdrops and the replacement movies are built from the game's own art, so a
 # release cannot carry them.
 #
 # On macOS Direct3D 9 can only be Wine's own (wined3d, on OpenGL): DXVK's d3d9.dll cannot
-# run there, so d3d8to9 goes in on Wine's d3d9, and MSAA.asi, dxvk.conf and bloom (no
+# run there, so d3d8to9 goes in on Wine's d3d9, and dxvk.conf and bloom (no
 # vkBasalt) are skipped. The script keeps to the /bin/bash 3.2 and BSD tools a Mac ships.
 #
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
@@ -83,6 +81,18 @@ BLOOM_MARKER="# written by armada2-refit install.sh"
 MANIFEST="$game/armada2-refit-prereqs.txt"   # what the prerequisites step added
 
 step() { [ "${A2_PROGRESS:-}" != 1 ] || echo "::step $*"; }
+# The per-part plugins earlier packages and installs put in, replaced by Render3D.asi
+# (not in this package yet): taken out, so those parts are the engine's own again.
+OLD_PLUGINS="MSAA Planets Lighting Sky Nebulae Surfaces Explosions Shields Repair Venting Specials Fog"
+old_plugins_out() {
+    local n
+    for n in $OLD_PLUGINS; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
+    # Sky.asi's recipes (one per sky name, mbg*.ini); anything else there is the player's.
+    if [ -d "$game/Sky" ]; then
+        rm -f "$game/Sky"/mbg*.ini
+        rmdir "$game/Sky" 2>/dev/null || true
+    fi
+}
 
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
 # A2_SKIP="cutscenes ..." leaves those parts out -- the GUI installer does not install the
@@ -108,7 +118,6 @@ is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
 D3D8TO9_SHA=122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8
 is_d3d8to9() { [ -f "$1" ] && [ "$(sha256 "$1")" = "$D3D8TO9_SHA" ]; }
 # DXVK in the chain: its own d3d8, or d3d8to9 in front of its d3d9.
-dxvk_chain() { is_dxvk "$game/d3d8.dll" || { is_d3d8to9 "$game/d3d8.dll" && is_dxvk "$game/d3d9.dll"; }; }
 # GOG's own d3d8.dll (its d3d8to9 build), as the release ships it. Kept as
 # d3d8.dll.gog-backup, the name platform/d3d8-chain.py gives it, when replaced.
 GOG_D3D8_SHA=735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719
@@ -137,14 +146,10 @@ sods() {   # --install | --revert
 
 if [ "$action" = uninstall ]; then
     step uninstall "taking the mod out"
-    for n in HUD Menus MSAA QOL QOLRules GridLayout Planets Lighting Sky Online; do
+    for n in HUD Menus QOL QOLRules GridLayout Online; do
         rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"
     done
-    # The sky recipes this package put in Sky/; anything else there is the player's.
-    if [ -d "$game/Sky" ]; then
-        for f in "$here"/sky/*.ini; do rm -f "$game/Sky/$(basename "$f")"; done
-        rmdir "$game/Sky" 2>/dev/null || true
-    fi
+    old_plugins_out
     if [ -n "$PY" ] && [ -d "$here/models" ]; then
         echo "  the models back to stock:"; sods --revert
     fi
@@ -213,7 +218,7 @@ done < "$here/prereqs.txt"
 # ------------------------------------------------------------------ the Direct3D chain
 
 # As the repository's ./install has it (platform/README.md): crosire's d3d8to9 as d3d8.dll,
-# which hands Lighting.asi the Direct3D 9 device behind the game's, on DXVK's d3d9.dll. A
+# on DXVK's d3d9.dll. A
 # d3d9.dll that is DXVK already (Proton's, say) stays. GOG's d3d8.dll, or DXVK's, is
 # replaced and kept; a d3d8.dll or d3d9.dll that is anything else is someone's own
 # choice, and the chain is then left as it is. What goes in is recorded in $MANIFEST like
@@ -275,6 +280,7 @@ put() {   # file -- copy from the package into the game directory
 step hud "HUD"
 put HUD.asi; put HUD.ini
 rm -f "$game/MenuScale.asi" "$game/MenuScale.ini"   # Menus.asi's old name; never both
+old_plugins_out   # earlier packages' per-part plugins: those parts are the engine's own again
 step menus "menus"
 put Menus.asi; put Menus.ini
 step qol "quality of life"
@@ -286,41 +292,15 @@ put GridLayout.asi
 # The player's [Cells] choices survive a reinstall; only a missing file is replaced.
 if [ -e "$game/GridLayout.ini" ]; then echo "  GridLayout.ini (yours, kept)"; else put GridLayout.ini; fi
 step models "models"
-put Planets.asi; put Planets.ini
 if [ -n "$PY" ]; then
     echo "  the moons, the selection bubble and the hulls, from your own SOD files:"
     sods --install
 else
     echo "  moons, selection bubble and hulls skipped: needs python3"
 fi
-step lighting "lighting"
-# Lit per pixel in shaders only behind crosire's d3d8to9; per vertex on any other d3d8.
-put Lighting.asi; put Lighting.ini
-is_d3d8to9 "$game/d3d8.dll" || echo "  (Lighting: per vertex here -- its shaders need crosire's d3d8to9 as d3d8.dll)"
-
-# The sky drawn from a recipe per map, in a shader; also only behind crosire's d3d8to9,
-# and the stock sky anywhere else. The recipes go in Sky/, one per sky name.
-step sky "sky"
-put Sky.asi; put Sky.ini
-mkdir -p "$game/Sky"
-for f in "$here"/sky/*.ini; do cp "$f" "$game/Sky/"; done
-echo "  Sky/: $(ls "$here"/sky/*.ini | wc -l | tr -d ' ') sky recipes"
-is_d3d8to9 "$game/d3d8.dll" || echo "  (Sky: the stock sky here -- the procedural one needs crosire's d3d8to9 as d3d8.dll)"
-
 # Internet - Online, on our own transport: Wine's dpnet.dll cannot host.
 step online "online multiplayer"
 put Online.asi; put Online.ini
-
-step msaa "anti-aliasing"
-if [ "$mac" = 1 ]; then
-    rm -f "$game/MSAA.asi"
-    echo "  MSAA.asi skipped: needs DXVK, which a Mac cannot run Direct3D 9 on"
-elif dxvk_chain; then
-    put MSAA.asi; put MSAA.ini
-else
-    rm -f "$game/MSAA.asi"
-    echo "  MSAA.asi skipped: DXVK is not in the game directory"
-fi
 
 step cutscenes "cutscene player"
 if skipped cutscenes; then

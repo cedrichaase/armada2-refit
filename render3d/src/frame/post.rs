@@ -242,8 +242,7 @@ impl Post {
         // 3. Tone map into the back buffer at the view's rectangle. The scene is read a
         // texel per pixel. With MSAA, the view's first column and row take their
         // neighbours': the scene starts half a pixel in (DXVK's viewport offset), so
-        // half their samples are never drawn (msaa/README.md, "The top row and left
-        // column").
+        // half their samples are never drawn.
         dev.set_render_target(0, out.ptr());
         let od = out.surf_desc();
         dev.set_texture(0, t.resolve.ptr());

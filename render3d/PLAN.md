@@ -90,7 +90,7 @@ Background and measurements live outside the repo, in
    - shields, selection, ghosts and the build ghost, fog and grid (Shields, Fog);
    - the long tail (special-object effects, nanites, construction): stock fallback
      first, then ours.
-5. **Integration.** `./install` installs render3d in place of the superseded layers;
+5. **Integration.** `./install` installs render3d, and the superseded layers are removed from the repository (their old files are taken out of an install);
    an `a2mod` layer; a test-bench scenario; `no-assets`; README, CHANGELOG and root
    changelog; `publish/check.sh`.
 6. **Done when** a whole match plays on the bench with every category ours, and
@@ -155,10 +155,11 @@ Rules for a module:
 1. **Off until it is right.** Register it `false` (off unless `[Modules] <name>=1`)
    until it matches stock (or the plugin it ports) on the bench, then `true`.
 2. **Stand down beside its plugin**: `superseded()` names the `.asi` whose work it
-   replaces, so an install that still has that plugin keeps its look.
+   replaces, so a stale copy of that plugin left in an install keeps its look.
 3. **Faithful to stock's look and quirks** (the user wants the early-2000s charm), and
-   to the ported plugin's look where there is one: the plugins' READMEs say what was
-   settled with the user and must not be re-opened.
+   to the ported plugin's look where there is one: what the plugins' READMEs recorded
+   (now in this crate's README, beside each module; the plugins' folders are in the
+   repository history) was settled with the user and must not be re-opened.
 4. **Cosmetic simulation is ours**, on the sim clock (`View::time`), following
    `spec-particles.md` and `spec-chunks-anim-lod.md` in the notes.
 5. **Write each engine finding into this crate's README** beside the code that needs

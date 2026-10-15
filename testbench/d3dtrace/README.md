@@ -19,7 +19,7 @@ Armada2.exe imports `Direct3DCreate8` by name; the plugin points that IAT entry
 `d3d8.dll!Direct3DCreate8`. Otherwise it logs `NOT HOOKED` and does nothing. The
 wrapper patches `IDirect3D8::CreateDevice` (slot 15), and that wrapper patches the
 device's vtable. Slot numbers are Wine's `include/d3d8.h`. No code in the exe is
-touched, so it composes with `MSAA.asi`.
+touched, so it composes with the other plugins (`Render3D.asi` included).
 
 ## What it writes
 
@@ -73,6 +73,6 @@ Observed on 2026-10-03, first Borg mission, 1920x1080, refit, with MSAA (session
 
 ## Experiment A: Federation hulls on the bump path
 
-Became `models/hull-bump.py` (models 3.2.0), removed in models 4.0.0 once `Lighting.asi`
-lit every hull per pixel. What a SOD needs to ask for a bump map is in
+Became `models/hull-bump.py` (models 3.2.0), removed in models 4.0.0 once the per-pixel hull lighting
+(`Lighting.asi`, now `Render3D.asi`) lit every hull. What a SOD needs to ask for a bump map is in
 `models/README.md`, "Bump maps on Federation hulls".

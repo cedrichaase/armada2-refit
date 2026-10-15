@@ -1,5 +1,4 @@
-//! The hulls' look, `[Hulls]` in Render3D.ini: Lighting.asi's settled values
-//! (lighting/README.md, "Settings"), carried over with their names.
+//! The hulls' look, `[Hulls]` in Render3D.ini: Lighting.asi's settled values, carried over with their names.
 use crate::config;
 use crate::math::{v3, V3};
 

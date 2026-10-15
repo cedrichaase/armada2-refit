@@ -1,4 +1,4 @@
-//! Explosions, ported from `Explosions.asi` (explosions/README.md): each
+//! Explosions, ported from `Explosions.asi`: each
 //! `FireballExplosion` drawn as a volume of gas, ray-marched per pixel through a
 //! sphere, and each `ShockwaveExplosion` as a band of fire matched to stock's disc. The
 //! look and its tuning are the plugin's, set with the user; what is new is HDR: the
@@ -18,8 +18,8 @@
 //! `ShockwaveExplosion::GetCurrentRadius` (0x467730) its radius now; its class holds
 //! `color` at +0xd0 and `fadeFactor` at +0xe0.
 //!
-//! Each fireball is also a light (as `Lighting.asi` gave it one, `lighting/README.md`,
-//! "Explosions"): an ordinary point light registered at the view's start, up to full in
+//! Each fireball is also a light (as `Lighting.asi` gave it one; render3d/README.md,
+//! "effects"): an ordinary point light registered at the view's start, up to full in
 //! its first 0.15 s, then down with the square of the time left; full out to its
 //! entity's bounding radius (the explosion's entity `+4`, its bounding sphere at
 //! `+0x34`, radius `+0x40`; at least 40 units), gone at `LightRange` radii.

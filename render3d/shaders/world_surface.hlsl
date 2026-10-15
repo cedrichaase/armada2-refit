@@ -2,7 +2,7 @@
 // The world module's surface bake (src/mods/world/surfaces.rs): Surfaces.asi's
 // surface.hlsl, ported unchanged but for this header.
 //
-// surface.hlsl -- the bake of Surfaces.asi (surfaces/README.md).
+// surface.hlsl -- the bake of Surfaces.asi.
 //
 // A planet's surface as a function of direction from its centre, in object space:
 // nothing here knows about the engine's gore unwrap, so there are no seams. Four
@@ -16,10 +16,10 @@
 //   cloud_ps   cloud density (all channels)
 //
 // Lighting.asi samples the last three per pixel when it draws the planet
-// (lighting/planet.hlsl, surface_ps). Heights are in units of the field's own spread,
+// (its planet shader's surface_ps). Heights are in units of the field's own spread,
 // as sky.hlsl's: the warped six-octave sum's standard deviation is near 0.125 about 0.5,
 // so (f - 0.5) * 8 is about a z-score, and Sea, the ramp's stops and Coverage are in
-// those units whatever the other settings. The registers are filled by surfaces.c,
+// those units whatever the other settings. The registers are filled by surfaces.rs,
 // recipe_read(), which must agree.
 
 float4 k_seed    : register(c0);   // xyz: offset of the noise domain; w: kind (0 rock, 1 gas)

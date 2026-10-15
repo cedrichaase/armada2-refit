@@ -1,6 +1,6 @@
 // entries: quad_vs:vs_3_0:VS_QUAD fire_ps:ps_3_0:PS_FIRE ring_ps:ps_3_0:PS_RING
 // The fireballs and shock rings of render3d's effects module (src/mods/effects/
-// explosions.rs), ported from Explosions.asi (explosions/README.md): the look is that
+// explosions.rs), ported from Explosions.asi: the look is that
 // plugin's, settled with the user. New here: the scene is HDR, so the fireball's
 // hottest gas and its flash go past white (k_hdr) and bloom by their energy.
 //

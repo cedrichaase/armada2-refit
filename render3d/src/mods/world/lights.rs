@@ -1,5 +1,4 @@
-//! The world's lights, as `Lighting.asi` gave them (lighting/README.md, "Nebulae",
-//! "Planets"), while `Lighting.asi` is not loaded (it adds its own):
+//! The world's lights, as `Lighting.asi` gave them, while `Lighting.asi` is not loaded (it adds its own):
 //!
 //! - **Planet glows.** A planet in sunlight lights what is near its day side in the
 //!   colour of its ground: once per view (`Module::lights`), a point light per planet at

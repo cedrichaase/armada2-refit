@@ -1,4 +1,4 @@
-//! Surfaces made from recipes (`surfaces/README.md`): a planet's ground, a gas giant, the
+//! Surfaces made from recipes: a planet's ground, a gas giant, the
 //! dilithium moons' rock and the asteroids', as functions of direction baked into three
 //! cubes. The port of `Surfaces.asi`: the same recipes (`Surfaces\<texture>.ini` in the
 //! game directory), the same bake (`shaders/world_surface.hlsl`, unchanged), asked for
@@ -217,7 +217,7 @@ fn yaw_pitch(yaw: f32, pitch: f32) -> [f32; 3] {
     [math::cosf(p) * math::sinf(y), math::sinf(p), math::cosf(p) * math::cosf(y)]
 }
 
-/// As surfaces.c's recipe_read: the keys of `surfaces/README.md`, "Recipes".
+/// As Surfaces.asi read a recipe: the keys of render3d/README.md, "Recipes".
 fn read_recipe(path: &str) -> Recipe {
     let f = Ini::open(path);
     let mut k = [[0.0f32; 4]; NCONST];

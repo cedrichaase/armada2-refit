@@ -1,5 +1,5 @@
-//! The venting plasma and gas, drawn as `Venting.asi` drew them (`venting/README.md`;
-//! the look the user settled there is kept as it was): each vent particle a puff of gas
+//! The venting plasma and gas, drawn as `Venting.asi` drew them (the look
+//! the user settled is kept as it was): each vent particle a puff of gas
 //! whose billows roll and cool as it flies, a moving ship's puffs linked into one
 //! unbroken trail, and at each vent that sprays a glow, a surging jet core and a light
 //! on the hull about it. The particles are ours now (`sim.rs`), not the engine's.

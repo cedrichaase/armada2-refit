@@ -1,6 +1,6 @@
 // entries: planet_vs:vs_3_0:VS_PLANET ground_ps:ps_3_0:PS_GROUND city_ps:ps_3_0:PS_CITY cloud_ps:ps_3_0:PS_CLOUD halo_ps:ps_3_0:PS_HALO surface_ps:ps_3_0:PS_SURFACE
 // The world module's planets (src/mods/world/planets.rs): Lighting.asi's planet shaders
-// (lighting/planet.hlsl; lighting/README.md, "Planets on the GPU") over a sphere of our
+// (its planet.hlsl) over a sphere of our
 // own instead of the engine's re-tessellated GroundMesh. The pixel shaders are the
 // plugin's, but for the highlight shoulder, which the frame's tone map now does.
 
@@ -278,7 +278,7 @@ float4 halo_ps(Lit i) : COLOR
     return float4(haze.rgb * l * dens * halo.z, 1.0);
 }
 
-// A planet made by Surfaces.asi (surfaces/README.md): the ground, or a gas giant's shell,
+// A planet made by Surfaces.asi: the ground, or a gas giant's shell,
 // from three cubes sampled in the planet's own frame, so the surface turns with the
 // mesh and has no seams. The relief's normal takes the light (shade_n); the clouds drift
 // about the pole, cast their shadow onto the ground towards the sun, and are lit by the

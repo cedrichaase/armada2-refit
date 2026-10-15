@@ -1,4 +1,4 @@
-# Ships blow up as fireballs of gas and shock rings (Explosions.asi)
+# Ships blow up as fireballs of gas and shock rings (Render3D.asi)
 
 Resolutions: 16:9
 Mod: refit
@@ -6,17 +6,16 @@ Launch: -nointro a2_borg01
 Setup: testbench/scene/bench-setup.sh explosion
 Timeout: 8 min
 
-`explosions/README.md`. Run it on a checkout: `./a2test run explosions --install .`
+`render3d/README.md`, "effects" (explosions). Run it on a checkout: `./a2test run explosions --install .`
 (the scene comes from `Setup:`). The scene (`testbench/scene/scenes/explosion.ini`) is a
 Galaxy class beside a destroyer (`small`), a cruiser (`mid`) and a battleship (`big`);
 `kill` makes one die at once. The cruiser's fireball and its shock ring are drawn by the
-plugin; `Lighting.asi`'s explosion light, which wraps two other slots of the same vtable,
-must still be patched beside it.
+effects module.
 
 1. Launch the game.
 2. Wait 50 seconds.
-3. Expect "Explosions.log" contains "FireballExplosion::Submit and RenderChunks patched, ShockwaveExplosion::Submit too".
-4. Expect "Lighting.log" not contain "NOT PATCHED: FireballExplosion".
+3. Expect "Render3D.log" contains "module effects: on".
+4. Expect "Render3D.log" not contain "FAILED: no fireballs".
 5. Expect "Scene.log" contains "scene ready".
 6. Scene "orbit 2045 0 2190 60 25 520".
 7. Wait 2 seconds.
@@ -24,13 +23,12 @@ must still be patched beside it.
 9. Wait 1 seconds.
 10. Scene "pause".
 11. Take a screenshot called "fireball".
-12. Expect "Explosions.log" contains "first fireball".
-13. Expect "Explosions.log" contains "first ring".
-14. Expect a turbulent orange fireball of gas, not a cluster of flat sprites, where the cruiser was, and a broad orange band of fire around it, dark inside, as stock's shockwave disc.
-15. Scene "resume".
-16. Scene "kill small".
-17. Scene "kill big".
-18. Wait 6 seconds.
-19. Take a screenshot called "after".
-20. Expect the game is still running.
-21. Expect no crash.
+12. Expect "Render3D.log" contains "effects: fireball at".
+13. Expect a turbulent orange fireball of gas, not a cluster of flat sprites, where the cruiser was, and a broad orange band of fire around it, dark inside, as stock's shockwave disc.
+14. Scene "resume".
+15. Scene "kill small".
+16. Scene "kill big".
+17. Wait 6 seconds.
+18. Take a screenshot called "after".
+19. Expect the game is still running.
+20. Expect no crash.

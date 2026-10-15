@@ -34,6 +34,11 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
   Repair, Fog, Specials and Venting, it checks that `Render3D.asi` loaded each module.
 
+### Changed
+- Scenarios `explosions`, `shields-hits`, `shields-down-repair`, `venting`, `specials`,
+  `fog-edges` and `cloak` check render3d's modules in `Render3D.log` in place of the
+  removed plugins; the session no longer clears or collects their `.ini` and `.log`.
+
 Installed, not yet seen in game.
 
 ## 3.16.0 — 2026-10-15

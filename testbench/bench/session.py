@@ -474,9 +474,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         if self.game_pid():
             raise GameError('the game is already running in this session')
         g = self.game_dir
-        for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log', 'Lighting.log',
-                     'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Armada2_d3d9.log', 'Explosions.log',
-                     'Shields.log', 'Repair.log', 'Venting.log', 'Fog.log', 'Specials.log', 'Render3D.log'):
+        for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
+                     'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Armada2_d3d9.log', 'Render3D.log'):
             try:
                 (g / name).unlink()
             except FileNotFoundError:
@@ -809,11 +808,10 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.game_dir
-        for name in ('Menus.log', 'MSAA.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.ini', 'ARMADA.PRF',
-                     'Menus.ini', 'MSAA.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
-                     'GridLayout.ini', 'Lighting.log', 'Lighting.ini', 'dxvk.conf', 'Online.log',
-                     'Online.ini', 'OnlineServer.log', 'Explosions.log', 'Explosions.ini', 'Shields.log',
-                     'Shields.ini', 'Repair.log', 'Repair.ini', 'Venting.log', 'Venting.ini', 'Fog.log', 'Fog.ini', 'Specials.log', 'Specials.ini', 'Render3D.log', 'Render3D.ini'):
+        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.ini', 'ARMADA.PRF',
+                     'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
+                     'GridLayout.ini', 'dxvk.conf', 'Online.log',
+                     'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini'):
             if (g / name).exists():
                 shutil.copy2(g / name, dst / name)
         if self.crashed():

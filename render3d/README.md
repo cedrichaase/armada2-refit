@@ -21,11 +21,12 @@ What it does today:
   (particles, debris, animation, LOD) is render3d's own, on the sim clock; the game's
   simulation is only read. A part no module draws yet is the engine's, called where
   stock calls it.
-- **It supersedes ten plugins**: `MSAA.asi` always, and `Lighting.asi`, `Sky.asi`,
-  `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`,
-  `Venting.asi`, `Specials.asi` and `Fog.asi` while the module that replaces each is on
-  (their looks are ported, and each module stands down while its plugin is loaded).
-  `install.sh` takes them out.
+- **It replaces the per-part plugins**, which are no longer in the repository: `MSAA.asi`,
+  `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`,
+  `Shields.asi`, `Repair.asi`, `Venting.asi`, `Specials.asi`, `Fog.asi` and
+  `Planets.asi`. Their looks are ported here, with the findings the code needs written
+  beside each hook below. A module stands down while a stale copy of its old plugin is
+  loaded (`SUPERSEDED` in `src/lib.rs`), and `install.sh` takes any such copy out.
 - **New, beyond the plugins:** bloom by energy (explosions' cores, weapon cores, star
   cores), MSAA on render3d's own targets, and shadows from this frame's hulls (the
   plugin's were the last frame's).
@@ -39,10 +40,10 @@ never made, and what shows is the ordnance and `Step::Specials`.
 
 ## Building and installing
 
-    render3d/install.sh            # build, install Render3D.asi + Render3D.ini, remove the superseded plugins
+    render3d/install.sh            # build, install Render3D.asi, Render3D.ini and the recipes; take out any old plugin
     render3d/install.sh --remove   # take it out again
 
-`./install` runs it in MSAA's place. Building needs rustup with the 32-bit Windows
+`./install` runs it. Building needs rustup with the 32-bit Windows
 target (`rustup target add i686-pc-windows-msvc`) and `lld-link` (LLVM); `build.sh`
 uses `~/.cargo/bin/cargo` first, since a distribution's cargo has no such target. The
 crate links with `/nodefaultlib`, `kernel32` its only import (an import library made by
@@ -67,6 +68,12 @@ is committed with a stamp so a machine without vkd3d builds as long as it is cur
 | `Inset` | 1 | 0: the HUD's action-camera view is left to the engine |
 | `Timing` | 0 | 1: CPU and GPU time per view and step in the log (below); with `Enable=0`, the engine's own view timed |
 | `TimingEvery` | 5 | seconds between timing reports |
+
+**`[Modules]`.** Each module has a key of its own, `<name>=1` (the names are in the
+sections below: `effects`, `ordnance`, `specials`, `sky`, `overlays`, `particles`,
+`hulls`, `world`). **`<name>=0` leaves that part to the engine: its stock look, drawn by
+`Armada2.exe` at the step as without the module.** There is no plugin to fall back to
+any more, so the old plugins' looks exist only as these modules.
 
 ## Timing
 
@@ -122,10 +129,8 @@ after, and the engine's own target and depth are bound again, so the engine (and
 d3d8to9, which keeps its own record of what is bound) sees what it left.
 
 **The first row and column.** DXVK offsets a Direct3D 9 viewport by half a pixel, so
-with MSAA half the samples of the view's first row and column are never drawn
-(`msaa/README.md`, "The top row and left column"). The final pass reads those pixels
-from their neighbours instead, which does what `MSAA.asi`'s edge fill did without the
-frame's delay.
+with MSAA half the samples of the view's first row and column are never drawn. The final pass reads those pixels from their neighbours instead, which does what
+`MSAA.asi`'s edge fill did without the frame's delay.
 
 **Reset.** Every target is in the default pool and must be gone before the device
 resets. Slot 14 of the d3d8 device's vtable (`Reset`) is chained, as `Lighting.asi`
@@ -148,10 +153,10 @@ to 8 bits, and the log says which.
 
 `src/mods/effects/`, on by default. The game features that are effects, hull debris,
 and their lights; it ports `Explosions.asi`, `Shields.asi` and `Repair.asi`, whose
-looks were settled with the user (their READMEs hold the derivations; the settings
-keep the plugins' keys, in `Render3D.ini` sections `[Explosions]`, `[Shields]`,
-`[Repair]` and `[Debris]`, read once at start). Each part stands down while its plugin
-is loaded. Everything noted while the features run is drawn at `Step::Chunks`, after
+looks were settled with the user (kept as they were; the settings keep the plugins'
+keys, in `Render3D.ini` sections `[Explosions]`, `[Shields]`, `[Repair]` and
+`[Debris]`, read once at start). Each part stands down while a stale copy of its old
+plugin is loaded. Everything noted while the features run is drawn at `Step::Chunks`, after
 the debris and the engine's own `RenderChunks` (called through its call site, so
 construction's chunks and any plugin chained there still draw), when every opaque hull
 is in the depth buffer.
@@ -164,9 +169,12 @@ is in the depth buffer.
   fireball is ray-marched, the shockwave a band of fire, as in the plugin. New: the
   scene is HDR, so the light above `HdrFrom=` (1.5) is kept in part (`Hdr=`, 0.5) and
   the white-hot core and the flash bloom by their energy; below it the plugin's look is
-  unchanged. Each fireball also registers a point light (`lighting/README.md`,
-  "Explosions": `LightColour`, `LightBrightness=4`, `LightRange=10` radii, at least 40
-  units) unless `Lighting.asi` is loaded, which adds its own.
+  unchanged. Each fireball also registers a point light (stock gives it none): up
+  to full in its first 0.15 s, then down with the square of the time left, full out to
+  the explosion's bounding radius and gone at `LightRange=10` radii (no less than 40
+  units), in `LightColour` times `LightBrightness=4`. It is an ordinary point light,
+  which the engine's own CPU lighting (planets, cloaking ships) takes too. Skipped
+  while a stale `Lighting.asi` is loaded, which adds its own.
 - **Shield hits** (`shields.rs`). `ShieldEffect::Render` (0x474910) calls
   `ShieldHit::DrawShield(cam, [0x736e2c])` (0x474070) for each hit of `m_shieldList`
   (0x736de8) in order; the module does the same for every hit that is not its own
@@ -515,10 +523,10 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
    (`g_background_geometry_db`, 0x7720fc). The map's background name is the lower-cased
    string `Starfield_Load_Background_Geometry` (0x590c30) keeps at 0x738538:
    `<name>.sod` or a bare prefix.
-   - **With a recipe** (`sky/skies/<name>.ini`, built into the plugin; a
+   - **With a recipe** (`render3d/skies/<name>.ini`, built into the plugin; a
      `Sky\<name>.ini` in the game directory takes precedence and is re-read when it
-     changes), the procedural sky of `Sky.asi` (sky/README.md, whose settled looks
-     it keeps: Aqua dimmer and softer, the grades, no filaments): one quad over the
+     changes), the procedural sky of `Sky.asi` (its settled looks kept: Aqua
+     dimmer and softer than stock, the grades, soft billows and no filaments; "Sky recipes" below): one quad over the
      viewport carrying each corner's world ray (from the inverse of view x projection,
      far point minus near point, which is affine in screen position), sampling a cube
      baked once per recipe. The bake is on the GPU only: each face is drawn by
@@ -570,7 +578,7 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
 | `Recipes` | 1 | 0: the stock faces where a recipe exists |
 | `Face` | 1536 | the baked cube's edge; 0 computes the sky at every pixel (the reference) |
 | `Reload` | 1 | re-read `Sky\<name>.ini` in the game directory every 30 views when it changes |
-| `Dump` | 0 | 1: each bake writes its faces to `Sky\<name>.dump0..5.tga` for `sky/grade.py` |
+| `Dump` | 0 | 1: each bake writes its faces to `Sky\<name>.dump0..5.tga` for `perf/sky-grade.py` |
 | `StarLift`, `SunLift` | 0.5, 1 | how far past white the brightest texels of the point stars and of the suns go (0: stock's light) |
 | `Load` | | bench only: a background name to load in place of the map's (`Starfield_Load_Background_Geometry`), once per new value |
 
@@ -583,6 +591,46 @@ equal to 0.1/255; `mbgborg` means equal to 0.05), the starfield matches with
 (model 1), and the engine lights the sky with the scene lights; ours is unlit. The
 recipe skies match `Sky.asi`'s away from the (random) starfield blobs. The HUD's action
 camera draws the sky without stars, as stock.
+
+**Sky recipes** (`render3d/skies/<name>.ini`, section `[Sky]`, one per stock sky name;
+built into the plugin with `include_str!`, so the sky needs no file in the game
+directory; a `Sky\<name>.ini` there takes precedence). Colours are 0-255; directions
+are yaw (degrees about +y; 0 looks along +z, 90 along +x) and pitch (up from the
+horizon). Each recipe's header says which maps use it and the stock channel means it
+aims at.
+
+| Key | Default | |
+|---|---|---|
+| `Seed` | 1 | moves the noise domain: a different sky with the same character |
+| `Scale` | 2 | the largest structure's frequency over the sphere; 2-3 gives a few billows per cube face |
+| `Warp` | 0.4 | domain warp; over ~0.5 it drags streaks |
+| `Detail` | 0.5 | amplitude ratio between octaves: lower is softer |
+| `Coverage` | 1.0 | where the gas begins, in units of the field's spread: higher is emptier |
+| `Softness` | 2.0 | the width of the gas's edge in the same units; 2-3 is cloud (a wider one restores depth where dense skies saturate into plateaus) |
+| `Patchiness` | 0.5 | a one-octave field at a third of `Scale` that gathers the gas in parts of the sky |
+| `Ridge` | 0 | 0-1: towards soft bands |
+| `Gamma` | 1 | on the density: above 1 thins the faint gas |
+| `HueScale`, `HueMix` | 2, 0.5 | how sharply the two gas hues separate; 0: hue by region, 1: hue by density |
+| `Brightness` | 1 | the whole sky |
+| `Dither` | 1 | the per-pixel dither, in steps of the 8-bit back buffer |
+| `Deep`, `GasA`, `GasB`, `Glow` | 0 | r, g, b |
+| `Core1`, `Core2` | 0,0,10,0 | yaw, pitch, size (degrees), gather (field units); `Core1Colour`, `Core2Colour`: the core's own glow |
+| `Band` | 0,90,20,0 | yaw, pitch of the band's pole (0,90: the horizon); half-width (degrees); gather (0: no band) |
+| `Stretch` | 0,90,1 | yaw, pitch of the axis; how far structure is drawn out along it (1: none) |
+| `Grain`, `Dust`, `Haze` | | detail: grain (amount, scale times `Scale`, gain between octaves), dust (amount, scale, coverage), haze (amount, coverage); amount 0 is off |
+| `Stars` | 0,1,0.5,0 | how many over the sphere, brightness, size (degrees), in-gas weight; `StarA`, `StarB`: the two ends of the colours |
+| `GradeGain`, `GradeCurve` | 1,1,1 | the grade per channel, `gain * in^curve`, after `Brightness` and before the stars |
+| `Fine` | 0.1,0.3,0.55 | detail finer than the cube, at draw time: amount (0: off), the largest octave's size (degrees), gain between octaves. The cube is magnified about 3.4x at 4K, so finer detail comes from here, not from a bigger cube |
+
+Edit a recipe in the game directory's `Sky\` with the game running and it re-bakes
+within half a second (`Reload=1`). **The grade** is fitted, not hand-tuned:
+`perf/sky-grade.py` fits `GradeGain`/`GradeCurve` per channel by least squares through
+the log percentiles 50..99.5 of the bake against the stock faces (the stock faces'
+40-texel corner notches masked), then scales every gain together so the sky lands at
+0.92 of stock's luminance, a little under and never over. Aqua is deliberately left
+ungraded (dimmer and softer than stock, as the user prefers) and `mbgrg` gets its
+channel balance only, at 0.57 of stock's luminance. Refit after changing a palette or
+`Brightness`; its docstring has the procedure (`Dump=1` writes the faces it reads).
 
 ### overlays
 
@@ -612,8 +660,9 @@ not seen on the bench. In order:
 4. the shroud over it, under the same conditions with `GameSetup::isShroud`
    (0x546300).
 
-**The fog and the shroud** are `Fog.asi`'s look (`fog/README.md`: the cubic mask, the
-pixel-wide smoothstep edge, stock's rim, the taps held inside the grid; `Filter`,
+**The fog and the shroud** are `Fog.asi`'s look (the cubic mask, the
+pixel-wide smoothstep edge, stock's rim, the taps held inside the grid, which keeps the
+shroud from thinning along the map's border; `Filter`,
 `FogThreshold`, `ShroudThreshold`, `FogSoftness`, `ShroudSoftness`, `FogRim`,
 `ShroudRim`, `RimWidth`, `Antialias` keep its keys and defaults), drawn on a quad of
 our own instead of through the engine's draw. The quad is the map's rectangle at the
@@ -709,8 +758,8 @@ written, blended. At most 4096 posts a view.
 `src/mods/particles/`, `shaders/particles*.hlsl`, on by default; stands down while
 `Venting.asi` is loaded. Our own particle simulation and drawing in place of the
 engine's, after `spec-particles.md` in the notes; ports `Venting.asi`'s look for the
-vents (its README holds what was settled with the user, and the settings keep its keys,
-in `Render3D.ini [Particles]`).
+vents (the look settled with the user, and the settings keep its keys, in
+`Render3D.ini [Particles]`).
 
 - **Who owns which emitters.** Every game object in `GameObject::objectList` whose SOD
   (named after its ODF) has emitter nodes: the damage vents, the drones' steam, a gate's
@@ -785,15 +834,16 @@ in `Render3D.ini [Particles]`).
 | `CloudFps` | 30 | the frame rate a cloud particle's per-frame drift is taken at |
 | `EngineLights` | 1 | 0: the vents' lights only for the hulls we draw |
 | `LogEvery` | 600 | frames between log lines |
-| `Plasma`, `Gas`, `PlasmaSprite`, ... | | `Venting.ini`'s keys and defaults (`venting/Venting.ini`); `Plasma=0` draws the plasma vents in the stock look |
+| `Plasma`, `Gas` | 1 | 0: that kind of vent is the engine's sprite, stock's look |
+| `Plasma<K>`, `Gas<K>` | | the vent look, one key per kind: `Brightness`, `Size`, `Stretch`, `MinPixels`, `Flicker`, `Cooling`, `Glow`, `GlowSize`, `GlowMinPixels`, `GlowColour`, `Jet`, `JetLength`, `JetWidth`, `Light`, `LightColour`, `LightReach`; also `PlasmaHot`/`Mid`/`Cool`, `GasBright`/`Cold`, `BillowScale`/`Flow`/`Contrast` and `EdgeSoftness`. Defaults in `Cfg::read` (`vent.rs`) |
 
 ### hulls
 
 #### hulls
 
 `src/mods/hulls/`, `shaders/hulls.hlsl`, on by default; supersedes `Lighting.asi`'s
-hull path (and stands down while `Lighting.asi` is loaded). Settings in `[Hulls]`
-(Lighting.ini's keys and settled values: `Ambient`, `Specular`, `SpecularPower`,
+hull path (and stands down while a stale `Lighting.asi` is loaded). Settings in `[Hulls]`
+(Lighting.asi's keys and settled values: `Ambient`, `Specular`, `SpecularPower`,
 `RimLight`, `RimPower`, `HullSun`, `HighlightKnee`, `SelfIllumination`, the `Borg*`
 profile, `PointLights`, `NearFade*`, `Cloak*`, plus `Shadows`, `ShadowSize`,
 `ShadowStrength`, `PlanetShadows`, `BumpStrength`, `SpriteNodes`, `AdditiveMeshes`,
@@ -860,6 +910,11 @@ falloff at the mesh's origin; of one colour only the strongest; at most `PointLi
 light may say how it is to be taken with `scene::lights::set_style` (hard, never merged
 by colour, wrap, falloff power): the ordnance module's phaser emitter (hard, distinct,
 wrap 0.6, power 2) and impact (hard, distinct) lights, as `Lighting.asi` took its own.
+The engine's stock meshes have inward normals, which is why a point light given where
+it is lit the far side of a hull in `Lighting.asi`'s fixed-function path (it handed a
+soft light to Direct3D mirrored through the draw's origin); the shaders here take every
+point light where it is and turn the normal round instead (`scene::NORMAL_SIGN`), so no
+mirroring is needed.
 
 **Scene lights.** `scene::Lights::gather` replaces the map's directional lights with
 `Lighting.asi`'s Key, Fill and sky light (the sky's mean colour weighted by chroma,
@@ -987,20 +1042,22 @@ the nebulae and the moons before `particles` and `hulls` see them). The objects 
 class overrides `Render` and draws a world of its own: planets, the dilithium moons,
 asteroid fields, nebulae. It ports `Surfaces.asi` (the recipes, `Surfaces\<texture>.ini`),
 `Lighting.asi`'s planets and its nebula and planet lights, `Planets.asi` (moot: our own
-sphere) and `Nebulae.asi` (the recipes, `Nebulae\<odf>.ini`); their READMEs hold the
-looks settled with the user, kept here. Each part stands down while the plugin that
-draws it is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
+sphere) and `Nebulae.asi` (the recipes, `Nebulae\<odf>.ini`); the looks settled with
+the user are kept. Each part stands down while a stale copy of the plugin that drew it
+is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `Lighting.asi` or `Surfaces.asi`, the gas beside `Nebulae.asi`, the lights beside
-`Lighting.asi`. Settings in `[World]` (the parts: `Planets`, `Rocks`, `Nebulae`,
+`Lighting.asi`. The recipes live in this folder: `skies/` (built into the plugin),
+`surfaces/` and `nebulae/` (copied by `install.sh` into the game's `Surfaces\` and
+`Nebulae\`, where an edited copy is re-read while the game runs); see "Recipes" below. Settings in `[World]` (the parts: `Planets`, `Rocks`, `Nebulae`,
 `Surfaces`; the planet look under `Lighting.ini`'s names: `PlanetAmbient`, `PlanetDusk`,
 `PlanetWrap`, `PlanetFill`, `PlanetSun`, `PlanetHaze*`, `PlanetGlint*`, `CityLights`,
 `CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Nebulae.ini`'s keys), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Resolution` 2 for half size, `Obscure` 0.5, `Samples` 2, `EdgeRefine` 1, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
-only) draws even with the plugins loaded, so `Enable` flips between theirs and ours.
+only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
 
 **Surfaces** (`surfaces.rs`, `world_surface.hlsl`): `Surfaces.asi`'s bake, unchanged,
 into three cubes per recipe (albedo, relief, clouds) that are render targets in the
@@ -1076,3 +1133,59 @@ object, +0x1ac). *Nebula cull*: slot 3 of the `NebulaInstance` vtable (0x6b1448,
 `ST3D_Instance::FrustumTest` 0x62e990) tests the bounding sphere (the node's at +0x1c
 when the instance has one at +0x80, else its own at +0x34; radius +0xc) with its radius
 times `NebulaCull`, and puts it back.
+
+**Recipes.** Three folders, one per kind, all plain `.ini` files you can edit.
+
+- `skies/<name>.ini`: the sky recipes, built into the plugin ("Sky recipes" above).
+- `surfaces/<texture>.ini`: planets (classes D, H, J, K, L, M), the dilithium moon
+  `Mdmoon` and the asteroids `Master1`/`Master2`. Installed by `install.sh` into the
+  game's `Surfaces\`; a name without a file keeps its stock texture. A recipe for a hull
+  texture is found at that texture's first draw only, so adding one needs a restart.
+- `nebulae/<odf>.ini`: the gas classes (`mnebula6`..`10`, `mnebula12`, `latinum`,
+  `fluidicnebula`, `generatednebula`). Installed into the game's `Nebulae\`; a class
+  without one keeps its billboards.
+
+Edited copies in the game directory are re-read within half a second with `Reload=1`,
+and a changed recipe bakes again. Each file's header gives what it aims at.
+
+*Surface recipes* (`[Surface]`; colours 0-255, heights in field units, about -4 to 5;
+directions are yaw about the planet's +y and pitch up from its equator):
+
+| Key | Default | |
+|---|---|---|
+| `Kind` | `rock` | `gas` for a gas giant |
+| `Seed`, `Scale`, `Warp`, `Detail` | 1, 2.5, 0.4, 0.5 | as for the sky; high `Warp` turns the ground wormy |
+| `Continents`, `Ridges` | 0 | the slow field that lifts and sinks regions; mountain chains on land |
+| `Sea`, `Shore` | none, 1 | the sea level (left out: a dry world); how deep the water must be to reach `Deep` |
+| `Relief` | 0.02 | the height's scale against the radius per field unit: the normal's tilt |
+| `Craters` | 0 12 1 0.3 | share of cells with one; cells across; depth; rim |
+| `Fissures` | 0 0.05 1 1 | cells across (0: none); trench width; depth; glow. `FissureShape` (2.5 0.33): the warp, and the share of the net's borders kept; `Branches` (0.6): the finer net |
+| `Cut` | 0 | the glow at which an alpha-tested model is cut through (the moon's cracks are holes) |
+| `Ramp1`..`Ramp6`, `Alt1`..`Alt6` | | `height r g b` (gas: `0..1 r g b` across one band); `Alt` is a second ramp mixed in by region (`Region`: scale, share, colour noise, its scale) |
+| `Deep`, `Shallow` | | the sea; a gas giant's poles are `Deep` |
+| `Ice`, `IceColour` | | latitude it starts at (0..1), softness, ragged edge, amount; colour |
+| `Cavity` | 0.25 0.15 | hollows darkened, crests lightened |
+| `Glow`, `GlowDay` | 0, 0.3 | the fissures' light, and how much of it shows by day |
+| `Clouds` | none | scale, coverage (higher is clearer), softness, warp; `CloudShape`, `CloudColour`, `CloudOpacity`, `CloudDrift` (degrees per second), `CloudShadow` (strength, reach in radians) |
+| `Depth` | 1 | the relief's strength in the light, at draw time (no re-bake) |
+| `Bands`, `Storm`, `StormColour` | | gas giants: bands, turbulence, warp share, stretch; the storm's yaw, pitch, size, strength |
+| `Face` | `[Surfaces]`'s | this recipe's cube edge (64-4096) |
+| `Mapping` | `radial` | a model's lookup: `radial`, the direction from its mesh's centre; `triplanar`, each axis's cube faces across its extents. The asteroids are `triplanar`: the direction from the centre smeared their flat faces into streaks |
+| `Gloss` | 1 | a model's highlight, times the hulls' |
+
+*Nebula recipes* (`[Nebula]`; `Cls::read` in `nebulae.rs` is the authority for defaults).
+Shape: `Extent`, `Height`, `Lumps`, `EdgeWarp`, `Radius`. Noise: `Seed`, `Tile`, `Warp`,
+`WarpScale`, `Detail`, `FineDetail`, `Coverage`, `Softness`, `Gamma`, `Ridge`. Colour:
+`Brightness`, `GasA`, `GasB`, `Glow`, `HueScale`, `HueMix`, `HueCycle`, `HueSwing`.
+Light: `Light`, `ShadeStep`, `Shading`, `Knots`, `KnotScale`, `Lanes`, `LaneScale`.
+Motion: `Flow`, `FlowScale`, `FlowSpeed`, `Swirl`, `SwirlScale`, `SwirlPeriod`. Edges:
+`Fringe`, `FringeReach`, `FringeScale`, `Fuzz`, `FuzzSpeed`. Filaments: `Filaments`,
+`FilamentScale`, `FilamentSharpness`, `FilamentReach`. Viewing: `Opacity`, `EdgeOnDim`,
+`KeyShare`, `Scatter`, `NearFade`. Lightning: `Lightning` (flashes a minute, a nebula),
+`LightningSize`, `LightningBrightness`, `LightningColour`. The core: `Core`,
+`CoreSharpness`, `Pulse`, `PulseSpeed`, `PulseWander`, and its ring of colours `Ring`,
+`RingAt`, `RingWidth`, `RingScale`, `RingPatch`, `RingSoftness`, `RingSpread`,
+`RingCycle`, `RingA`..`RingD`. A shadow takes only the Key's share of the gas's own
+light (`KeyShare`), scattered forward (`Scatter`); dimming self-lit gas by a fraction
+left the shafts invisible except in a difference image, and they show looking towards
+the Key.

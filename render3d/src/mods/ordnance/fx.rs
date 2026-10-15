@@ -1,6 +1,6 @@
 //! Specials.asi, ported: the warp flash and the special weapons drawn by shaders from
-//! recipes (`render3d/ordnance.ini`, overridable in Render3D.ini; specials/README.md
-//! holds the looks the user settled, which are kept). Every effect is built here as
+//! recipes (`render3d/ordnance.ini`, overridable in Render3D.ini; the looks
+//! the user settled in Specials.asi are kept). Every effect is built here as
 //! world-space quads for `fx_ps` in `shaders/ordnance.hlsl`, drawn additively, depth
 //! tested against the hulls, writing no depth.
 //!

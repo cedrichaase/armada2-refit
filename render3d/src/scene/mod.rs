@@ -393,8 +393,7 @@ pub fn draw_part(v: &View, m: &Model, pi: usize, world: &M34, p: &Params) {
 
 /// Which way `smooth_normals` points: a2fmt takes them from the file's winding, and
 /// the engine's front faces run anticlockwise on screen (it culls clockwise), so they
-/// point inward, as the engine's own do (lighting/README.md, "Which side a point light
-/// lights"); -1 turns them out. (With the opposite cull, every hull showed its back
+/// point inward, as the engine's own do; -1 turns them out. (With the opposite cull, every hull showed its back
 /// faces, which is why +1 once looked right.)
 pub const NORMAL_SIGN: f32 = -1.0;
 

@@ -1,6 +1,6 @@
 // entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY bake_ps:ps_3_0:PS_BAKE down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE
 // The background of the 3D view (src/mods/sky/): the procedural sky ported from
-// Sky.asi (sky/README.md, sky/sky.hlsl), the stock cube's faces, and the sprites of the
+// Sky.asi (its settled looks kept), the stock cube's faces, and the sprites of the
 // starfield and of the background objects (the suns).
 //
 // The procedural sky: one quad over the viewport. Each vertex carries the world-space

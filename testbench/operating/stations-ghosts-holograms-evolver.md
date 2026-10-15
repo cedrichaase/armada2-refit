@@ -12,8 +12,8 @@ Every command below was run from the real worktree (where `./a2test` lives), wit
   start with `--no-launch`, set `Enable=0` under `[Render3D]` in the clone's
   `~/.cache/a2test/sessions/<ID>/game/Render3D.ini` (line 4), then
   `./a2test drive --session <ID> launch -nointro a2_borg01`. The engine then draws the
-  whole 3D view as without the plugin (Lighting.asi and the other superseded plugins
-  are not installed, so this is the engine's own CPU path).
+  whole 3D view as without the plugin (none of the replaced per-part plugins is installed any more,
+  so this is the engine's own CPU path).
 - `drive launch` refuses while the game runs; there is no restart command short of
   `drive quit` (an agent step) or a new session.
 

@@ -1,5 +1,6 @@
-//! Shield hits, ported from `Shields.asi` (shields/README.md, which holds the look
-//! settled with the user and every engine fact below): each struck ship's shield
+//! Shield hits, ported from `Shields.asi` (the look
+//! settled with the user is kept, and the engine facts it needs are below and in
+//! render3d/README.md): each struck ship's shield
 //! ellipsoid drawn by a shader about its hits (hot spot, ring, glow and rim, by
 //! faction, weaker as the shields run out), the shields-down ring as jagged arcs that
 //! crackle without turning, the special weapons' shells that have a recipe, and the

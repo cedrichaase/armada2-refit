@@ -24,33 +24,18 @@ WHAT COUNTS AS A CHANGE
 
     textures      Textures/RGB/*.a2neb-backup  -- a2tex
     models        SOD/*.a2neb-backup           -- logo-sod (the widened loading panel),
-                                                  moon-sod, select-sod
-                  Planets.asi/.ini             -- added files: planet tessellation
-    lighting      Lighting.asi/.ini            -- added files: ships on the GPU, scene lights
-    sky           Sky.asi/.ini, Sky/*.ini      -- added files: the procedural sky and its
-                                                  recipes
-    nebulae       Nebulae.asi/.ini,            -- added files: nebulae as volumes of gas
-                  Nebulae/*.ini                   and their recipes
-    surfaces      Surfaces.asi/.ini,           -- added files: planets' and the dilithium
-                  Surfaces/*.ini                  moon's surfaces and their recipes
-    explosions    Explosions.asi/.ini          -- added files: fireballs as gas, shock rings
-    shields       Shields.asi/.ini             -- added files: shield hits and the
-                                                  shields-down arcs drawn by shaders
-    repair        Repair.asi/.ini              -- added files: repair welding drawn by shaders
-    venting       Venting.asi/.ini             -- added files: venting plasma and gas drawn
-                                                  by shaders
-    specials      Specials.asi/.ini            -- added files: the warp flash and the special
-                                                  weapons drawn by shaders
-    fog           Fog.asi/.ini                 -- added files: smooth fog-of-war and shroud edges
+                                                  moon-sod, select-sod, hull-sod, asteroid-sod
     hud           HUD.asi/.ini                 -- added files: layout, font, cursors
                   (before hud 2.0.0: misc/*.a2neb-backup from ui-widescreen,
                   *.a2font-backup from ui-font-condense and the Curs_* art from
                   cursor-aspect -- still recognised, filed under 'hud')
     menus         Menus.asi/.ini, Menus/*.bmp  -- added files, stock has none
                   (MenuScale.* before menus 2.0.0 -- still recognised, see LEGACY_MENUS)
-    msaa          MSAA.asi/.ini                -- added files
-    render3d      Render3D.asi/.ini            -- added files: the 3D view drawn through
-                                                  render3d (HDR, MSAA, bloom)
+    render3d      Render3D.asi/.ini,           -- added files: the 3D view drawn through
+                  Surfaces/*.ini, Nebulae/*.ini   render3d (HDR, MSAA, bloom) and its recipes
+                  (the plugins it replaced -- MSAA, Lighting, Sky, Nebulae, Surfaces,
+                  Explosions, Shields, Repair, Venting, Specials, Fog, Planets -- and
+                  Sky/*.ini: still recognised, see LEGACY_RENDER)
     qol           QOL.asi/.ini                 -- added files; not a look but a feel
                   (right-drag pan speed), switched so stock really is stock
     grid          GridLayout.asi/.ini          -- added files: the bar as a 5x3 grid with
@@ -65,7 +50,7 @@ DELIBERATELY NOT SWITCHED, in both states:
     DXVK itself (d3d8.dll/d3d9.dll in the game dir) -- plumbing, not a look; stock
         wined3d is a different renderer and would make the comparison two changes.
     The ASI loader (winmm.dll) and STA2WidescreenPatch.asi -- base setup; the menu
-        and MSAA hooks cannot load without the loader.
+        and renderer hooks cannot load without the loader.
     ARMADA.PRF, RTS_CFG.h -- the player's options, set in game.  Not visual.
     The Heroic side and the vkBasalt layer itself.
 
@@ -102,28 +87,22 @@ EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
 # restored from a snapshot taken before the rename -- is still a modded file, so it
 # is found and set aside like the new ones rather than left live in stock.
 LEGACY_MENUS = 'MenuScale'
+# The plugins render3d replaced, removed from the repository with render3d 0.2.0 (and
+# models 5.0.0 for Planets): render3d/install.sh takes them out, but a stale copy, or
+# one restored from an older snapshot, is still a modded file, filed under render3d.
+LEGACY_RENDER = ['MSAA', 'Lighting', 'Sky', 'Nebulae', 'Surfaces', 'Explosions', 'Shields',
+                 'Repair', 'Venting', 'Specials', 'Fog', 'Planets']
 ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('MenuScale.asi', 'menus'), ('MenuScale.ini', 'menus'),
          ('HUD.asi', 'hud'), ('HUD.ini', 'hud'),
-         ('MSAA.asi', 'msaa'), ('MSAA.ini', 'msaa'),
          ('Render3D.asi', 'render3d'), ('Render3D.ini', 'render3d'),
-         ('Planets.asi', 'models'), ('Planets.ini', 'models'),
          ('QOL.asi', 'qol'), ('QOL.ini', 'qol'),
          ('QOLRules.asi', 'qol'), ('QOLRules.ini', 'qol'),
          ('GridLayout.asi', 'grid'), ('GridLayout.ini', 'grid'),
-         ('Lighting.asi', 'lighting'), ('Lighting.ini', 'lighting'),
-         ('Sky.asi', 'sky'), ('Sky.ini', 'sky'),
-         ('Nebulae.asi', 'nebulae'), ('Nebulae.ini', 'nebulae'),
-         ('Surfaces.asi', 'surfaces'), ('Surfaces.ini', 'surfaces'),
-         ('Explosions.asi', 'explosions'), ('Explosions.ini', 'explosions'),
-         ('Shields.asi', 'shields'), ('Shields.ini', 'shields'),
-         ('Repair.asi', 'repair'), ('Repair.ini', 'repair'),
-         ('Venting.asi', 'venting'), ('Venting.ini', 'venting'),
-         ('Specials.asi', 'specials'), ('Specials.ini', 'specials'),
-         ('Fog.asi', 'fog'), ('Fog.ini', 'fog'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
-         ('dxvk.conf', 'renderer')]
-LAYERS = ['textures', 'models', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions', 'shields', 'repair', 'specials', 'venting', 'fog', 'hud', 'menus', 'msaa', 'render3d', 'qol', 'grid', 'cutscenes',
+         ('dxvk.conf', 'renderer')] + \
+        [(f'{n}.{x}', 'render3d') for n in LEGACY_RENDER for x in ('asi', 'ini')]
+LAYERS = ['textures', 'models', 'hud', 'menus', 'render3d', 'qol', 'grid', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
@@ -198,24 +177,13 @@ def discover():
             for f in sorted(os.listdir(plates)):
                 if f.lower().endswith('.bmp'):
                     found.append({'rel': f'{d}/{f}', 'kind': 'added', 'layer': 'menus'})
-    # The sky layer's recipes (sky/install.sh), one per sky with a procedural look.
-    recipes = os.path.join(GAME, 'Sky')
-    if os.path.isdir(recipes):
-        for f in sorted(os.listdir(recipes)):
-            if f.lower().endswith('.ini'):
-                found.append({'rel': f'Sky/{f}', 'kind': 'added', 'layer': 'sky'})
-    # The nebulae layer's recipes (nebulae/install.sh), one per nebula class drawn as gas.
-    recipes = os.path.join(GAME, 'Nebulae')
-    if os.path.isdir(recipes):
-        for f in sorted(os.listdir(recipes)):
-            if f.lower().endswith('.ini'):
-                found.append({'rel': f'Nebulae/{f}', 'kind': 'added', 'layer': 'nebulae'})
-    # The surfaces layer's recipes (surfaces/install.sh), one per planet class or model texture.
-    recipes = os.path.join(GAME, 'Surfaces')
-    if os.path.isdir(recipes):
-        for f in sorted(os.listdir(recipes)):
-            if f.lower().endswith('.ini'):
-                found.append({'rel': f'Surfaces/{f}', 'kind': 'added', 'layer': 'surfaces'})
+    # render3d's recipes (render3d/install.sh), and Sky.asi's, which it takes out.
+    for d in ('Surfaces', 'Nebulae', 'Sky'):
+        recipes = os.path.join(GAME, d)
+        if os.path.isdir(recipes):
+            for f in sorted(os.listdir(recipes)):
+                if f.lower().endswith('.ini'):
+                    found.append({'rel': f'{d}/{f}', 'kind': 'added', 'layer': 'render3d'})
     return sorted(found, key=lambda e: e['rel'])
 
 
@@ -262,6 +230,11 @@ def load_state():
         elif e.get('layer') == 'textures' and \
                 e.get('rel', '').lower().startswith('textures/rgb/curs_'):
             e['layer'] = 'hud'
+        # The plugins render3d replaced had layers of their own before render3d 0.2.0.
+        elif e.get('layer') in ('msaa', 'lighting', 'sky', 'nebulae', 'surfaces', 'explosions',
+                                'shields', 'repair', 'venting', 'specials', 'fog') or \
+                e.get('rel', '').lower() in ('planets.asi', 'planets.ini'):
+            e['layer'] = 'render3d'
     return st
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build D3DTrace.asi -- same toolchain as msaa/build.sh (no CRT, Win32
+# Build D3DTrace.asi -- same toolchain as menus/build.sh (no CRT, Win32
 # prototypes in the source, import library from kernel32.def, --kill-at).
 # -msse2 so float-to-int is cvttss2si, not a call to the CRT's _ftol2.
 set -euo pipefail

@@ -92,7 +92,7 @@ impl Waves {
 const HARD_REACH: f32 = 150.0;
 
 /// The point lights one mesh takes, as `Lighting.asi`'s `pick_points` chose them for
-/// its shaders (lighting/README.md, "Point lights on the GPU path"), at the mesh's
+/// its shaders, at the mesh's
 /// origin `at`:
 /// - a hard light (it fades over less than a quarter of its start: a torpedo's, a
 ///   discharge's, a weld's; or a module's light styled hard: a phaser's) is picked
@@ -197,8 +197,7 @@ pub fn model_sphere(m: &Model) -> (V3, f32) {
 }
 
 /// The fade a hull is drawn at: the engine's far fade, or (crafts) Lighting.asi's near
-/// fade, which waits for the near plane to cut into the hull's box
-/// (lighting/README.md, "The near fade").
+/// fade, which waits for the near plane to cut into the hull's box.
 pub fn fade(p: &Posed, v: &View, look: &Look) -> f32 {
     if engine::field(engine::storm3d(), 0xe8) == 0 {
         return 1.0;

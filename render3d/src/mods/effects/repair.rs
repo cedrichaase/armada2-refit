@@ -1,5 +1,5 @@
-//! The repair welding, ported from `Repair.asi` (repair/README.md, which holds the
-//! look settled with the user and the engine facts below): at each spark of a repair
+//! The repair welding, ported from `Repair.asi` (the
+//! look settled with the user is kept, and the engine facts it needs are below): at each spark of a repair
 //! an arc that flickers with turning rays and lights the hull, a hot spot cooling on
 //! the hull, sparks streaking off and cooling.
 //!

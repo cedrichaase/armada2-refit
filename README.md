@@ -29,21 +29,11 @@ a time, and every fix can be undone.
 |---|---|
 | **Stretch-free HUD** | `HUD.asi` lays out the in-game HUD, font and cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets |
 | **Full-screen menus** | `Menus.asi` scales the 800x600 shell menus to fill the screen and draws them inside the game window, with optional widescreen backdrops (black sides without them) |
-| **Anti-aliasing** | `MSAA.asi` turns on up to 8x multisample anti-aliasing, which the game has no option for |
-| **Lighting** | `Lighting.asi` draws ships and stations on the engine's own GPU path under new scene lights (a warm key, a dim blue fill and a faint sky light), gives planets a night side, and makes nebulae, planets' day sides, explosions and torpedoes light the hulls around them, and phaser fire light the firing ship at its emitter and the target where it strikes. Under crosire's d3d8to9 (which `./install` sets up) hulls and planets are lit per pixel in shaders, with specular, a rim light, hull night lights, and city lights and water glint on planets |
-| **Seamless skies** | `Sky.asi` draws each map's sky in a shader from a small recipe (seed, palette, density) in place of the six painted cube faces, so the cube's edges are gone; every sky a stock map uses has a recipe. Needs crosire's d3d8to9 (which `./install` sets up); the stock sky otherwise |
-| **Planet surfaces** | `Surfaces.asi` makes the class planets and the dilithium moons from recipes instead of their small painted textures: terrain with real relief (mountains, craters, canyons, glowing fissures) that the sun rakes along the terminator, oceans shading from shallow to deep, polar ice, drifting clouds with their shadows, banded gas giants, and moons split into plates by their cracks. No seams. Drawn by `Lighting.asi` under crosire's d3d8to9; the stock textures otherwise. Built from the repository; not in the release zip yet |
-| **Volumetric nebulae** | `Nebulae.asi` draws every nebula, latinum included, as a cloud of gas you can fly a camera through, in place of the flat billboards that turned with the camera: shaded billows, drifting flow, lightning in the metreon, a pulsing core in latinum, about as bright from every angle. Needs crosire's d3d8to9 (which `./install` sets up); the stock billboards otherwise. Built from the repository; not in the release zip yet |
-| **Volumetric explosions** | `Explosions.asi` draws a dying ship's or station's fireball as a turbulent ball of gas that flashes white, burns yellow and orange and cools to smoke, sized by the ship, and its shockwave as a thin ring of light, in place of the flat flipbook sprites and the textured disc. Draws only: the explosions stay the game's. Needs crosire's d3d8to9 (which `./install` sets up); the stock explosions otherwise. Built from the repository; not in the release zip yet |
-| **Shield hits** | `Shields.asi` draws the flash where a weapon strikes a ship's shields in a shader, in place of the stock flat green shell: a hot spot, a ring running out across the shield ellipsoid and a soft glow around the hit, coloured by faction, weaker and flickering as the shields run out. A ship whose shields are down gets jagged blue-white arcs crackling over its shield ellipsoid, lighting its hull, in place of the stock turning band of lightning. Needs crosire's d3d8to9 (which `./install` sets up); stock's otherwise. Built from the repository; not in the release zip yet |
-| **Repair welding** | `Repair.asi` draws the welding on a ship under repair in shaders, in place of the stock white star sprites: a flickering blue-white arc with rays that lights the hull about it, an orange hot spot cooling after it, and sparks streaking off the hull, cooling from white to red. Needs crosire's d3d8to9; the stock sparks otherwise. Built from the repository; not in the release zip yet |
-| **Venting plasma** | `Venting.asi` draws the plasma and gas a damaged ship vents in shaders, in place of the stock smoke sprites: billowing puffs, the plasma white-hot at the vent and cooling through orange to red, the gas pale turning blue, a flickering glow and jet core at each vent that light the hull about it, and one unbroken trail behind a moving ship. Needs crosire's d3d8to9; the stock sprites otherwise. Built from the repository; not in the release zip yet |
-| **Warp flash and special weapons** | `Specials.asi` draws the flash where a ship goes to warp as a white-hot core in a blue glow with a lens streak, bursting as the ship goes and leaving a ring of light; and the special weapons as shaders: tractor, holding and assimilation beams glowing with pulses, twisting strands or crackling lightning, torpedo-like specials as glowing bolts with tails, the shield and energy rechargers' and psionic insanity's waves as bands of light running out. `Shields.asi` draws their shield effects, the corbomite reflector's gold shell among them. Needs crosire's d3d8to9; stock's otherwise. Built from the repository; not in the release zip yet |
-| **Smooth fog of war** | `Fog.asi` draws the edges of the fog of war and the shroud as smooth curves instead of the staircase of square cells stock shows: a circle your sensors clear reads as a circle, clean at every zoom. The fog itself is the game's: what is hidden, its look and its colour. Needs crosire's d3d8to9 (which `./install` sets up); the stock edges otherwise. Built from the repository; not in the release zip yet |
+| **Our own 3D renderer** | `Render3D.asi` takes over the 3D view and draws it into a half-float, multisampled target, bloomed by energy and tone-mapped into the back buffer, with modules of its own for every category: ships and stations lit per pixel by a warm key, a dim blue fill and a faint sky light, with shadows and light from nebulae, planets, explosions and weapons; each map's sky computed in a shader from a recipe, with no cube seams; planets and the dilithium moon made from recipes (relief, craters, oceans, ice, clouds, a night side); every nebula as a cloud of gas you can fly through; fireballs and shockwaves, shield hits, repair welding, venting plasma, the warp flash and the special weapons drawn by shaders; and the fog of war and the shroud with smooth edges. It replaces the earlier per-part plugins (MSAA, lighting, sky, nebulae, surfaces, explosions, shields, repair, venting, specials, fog, planets). Needs crosire's d3d8to9 (which `./install` sets up); without it the engine draws the 3D view. Built from the repository; not in the release zip yet ([`render3d/README.md`](render3d/README.md)) |
 | **Bloom and renderer tuning** | vkBasalt bloom, on from launch, plus anisotropic filtering, LOD bias and seamless cube maps through `dxvk.conf` |
 | **Quality of life, stock-compatible** | `QOL.asi`: faster right-drag panning, `Shift+number` adds to a control group, selections and groups beyond 16 ships (40 by default), stations in control groups with one build menu for several, and long moves on the map going to warp as minimap moves do. Everything stays on your machine, so you can still play against unmodded players |
 | **Grid hotkeys** | `GridLayout.asi` lays the button bar out as a 5x3 grid with one key per cell by keyboard position (`QWERT`/`ASDFG`/`ZXCVB`), labelled on the buttons and placed between the minimap and the info panel on wide screens |
-| **Smoother geometry** | `Planets.asi` tessellates planets finely enough for a modern resolution, the dilithium moons are smoothed, and the selection bubble is round instead of a visible polygon |
+| **Smoother geometry** | the dilithium moons and the asteroids are smoothed, and the selection bubble is round instead of a visible polygon (SOD rewrites from your own stock files, `models/install.sh`) |
 | **Texture replacement** | `./a2tex`, a pipeline for replacement textures, whether upscaled, generated or drawn by hand. It checks each one against the engine's format rules (bit depth, mip chains, size limits), installs it with a backup, and packs a set so others can install it. There are 84 recipes so far: skyboxes, nebulae, planets, UI and ship hulls |
 | **Video replacement** | a replacement `binkw32.dll` that plays the launch reels full screen and plays AV1 replacements in place of the original Bink movies, plus a pipeline to build them |
 | **Widened loading screen** | the 3D loading-screen model, rebuilt for widescreen |
@@ -61,8 +51,8 @@ checked against, then build and install. Builds live in `A2_DATA`, outside the
 repository.
 
 Every layer works without assets. With nothing built, the asset layers install nothing
-and the game keeps its own art, while the HUD, menus, MSAA, lighting, quality of life,
-grid, planets and bloom still apply.
+and the game keeps its own art, while the HUD, menus, the renderer, quality of life,
+grid and bloom still apply.
 [`textures/PACKS.md`](textures/PACKS.md) is the short path to building your own
 texture pack.
 
@@ -81,7 +71,7 @@ are missing, and its `CREDITS.txt` says where they come from.
 through [Heroic](https://heroicgameslauncher.com/) and Proton:
 
 - [DXVK](https://github.com/doitsujin/dxvk)'s `d3d8.dll` and `d3d9.dll` in the game
-  directory, so the game renders through Vulkan. MSAA, bloom and the renderer settings
+  directory, so the game renders through Vulkan. Bloom and the renderer settings
   depend on it. `platform/d3d8-chain.py --use dxvk` sets it up.
 - [vkBasalt](https://github.com/DadSchoorse/vkBasalt) for bloom. It is Linux-only.
 - For building: `clang`, `lld-link` and `llvm-dlltool` for the plugins (no MSVC or
@@ -108,7 +98,7 @@ options the game needs ([`gui-installer/README.md`](gui-installer/README.md)).
   Armada II "Runs Great"). Create a bottle, run GOG's offline installer in it, then run
   this app. Sikarugir or Gcenx's Wine builds are free alternatives. Leave CrossOver's
   graphics backend on its default: Direct3D 8 and 9 run through Wine's own wined3d on a
-  Mac. MSAA and bloom are not available there. The app is not notarised, so the first
+  Mac. Bloom is not available there. The app is not notarised, so the first
   launch is refused: System Settings → Privacy & Security → *Open Anyway*.
 - **Linux**: `armada2-refit-installer-x86_64.AppImage`; make it executable and run it.
   It carries GTK 4 and libadwaita itself, and writes Heroic's launch options for you.
@@ -141,9 +131,7 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 `llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`.
 **Prebuilt**, the zip on each
 [release](https://github.com/cedrichaase/armada2-refit/releases) has `HUD.asi`,
-`Menus.asi`, `MSAA.asi`, `QOL.asi`, `Lighting.asi`, `Sky.asi` (with its recipes in `sky/`),
-`Online.asi` and the Bink proxy with their `.ini` files, `dxvk.conf` and the bloom config (`GridLayout.asi`, `Planets.asi`,
-`Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Venting.asi`, `Fog.asi` and `Specials.asi` are built from the repository). It also has installers that do this
+`Menus.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files, `dxvk.conf` and the bloom config (`GridLayout.asi` and `Render3D.asi` are built from the repository). It also has installers that do this
 section for you: `install.sh` on Linux and macOS, `install.bat` on Windows (`README.txt`
 in the zip), and the graphical installers for all three, which leave the Bink proxy out
 for now. `publish/package.sh` builds the same zip locally.
@@ -163,9 +151,6 @@ loads and nothing reports an error. On Windows no override is needed.
 | HUD | `hud/build/HUD.asi`, `hud/HUD.ini` | Don't also run `hud/ui-widescreen.py`, `ui-font-condense.py` or `cursor-aspect.py`; they are its file-based predecessors. Handles both cursor paths: D3D8's hardware cursor and the sprite path DXVK takes |
 | Quality of life | `qol/build/QOL.asi`, `qol/QOL.ini` | Right-drag pan speed (`PanSpeed=`, default 2.5x), `Shift+number` adds to a group (`ShiftAddsToGroup=`), selections beyond 16 (`MaxSelection=`, default 40), stations in control groups (`StationGroups=`), long map moves at warp (`WarpDistance=`, default 1100). Leave `RTS_CFG.h` stock: network games compare it, and the plugin scales the value in memory ([`qol/README.md`](qol/README.md)) |
 | Grid hotkeys | `grid/build/GridLayout.asi`, `grid/GridLayout.ini` | The button bar as a 5x3 grid, one key per cell by position (`QWERT`/`ASDFG`/`ZXCVB`; T cancel, G back). Replaces the bar's stock keys; delete the `.asi` to get them back ([`grid/README.md`](grid/README.md)) |
-| Planets | `models/build/Planets.asi`, `models/Planets.ini` | Planets tessellated for a modern resolution (`Detail=`, default 8; 1 is stock). The moon and selection-bubble SODs are file edits from your own stock files: `models/install.sh` does those |
-| Lighting | `lighting/build/Lighting.asi`, `lighting/Lighting.ini` | Ships and stations lit on the GPU, a warm key, a dim blue fill and a faint sky light in place of each map's own, planets with a night side, and light from nebulae, planets, explosions, torpedoes and phasers (`Lights=`, `GPU=`, `Planets=`, `PointLights=`). Needs *Hardware Vertex Processing* on, the default. Lit per pixel in shaders, with specular, a rim and the hulls' night lights, when the `d3d8.dll` is crosire's d3d8to9 (below); per vertex otherwise ([`lighting/README.md`](lighting/README.md)) |
-| Sky | `sky/build/Sky.asi`, `sky/Sky.ini`, and `sky/skies/*.ini` into a `Sky` folder beside them | Each map's sky computed in a shader from its recipe, with no cube seams. Only behind crosire's d3d8to9 (below); the stock sky otherwise, and for a sky with no recipe ([`sky/README.md`](sky/README.md)) |
 | Menus | `menus/build/Menus.asi`, `menus/Menus.ini` | GDI only, so the renderer doesn't matter. Delete any old `MenuScale.asi`. Without backdrop plates it draws black sides |
 | Cutscenes (launch reels) | `cutscenes/binkproxy/build/binkw32.dll`, `BinkProxy.ini` | First rename the stock `binkw32.dll` to `binkw32_orig.dll`, because the proxy forwards to it. With no `.mp4` beside a `.bik` it only scales the launch reels to full screen. Replacement movies are AV1 through Media Foundation: under Proton that works (GStreamer + dav1d), and on Windows it presumably needs the AV1 Video Extension |
 
@@ -175,14 +160,14 @@ the Bink proxy by renaming `binkw32_orig.dll` back.
 ### 2. Needs DXVK as the game's renderer
 
 DXVK's `d3d9.dll` goes in the game directory, with a `d3d8.dll` in front of it: crosire's
-d3d8to9 (`platform/vendor/d3d8to9-1.16.0/`, which lets `Lighting.asi` use shaders) or
+d3d8to9 (`platform/vendor/d3d8to9-1.16.0/`, which lets `Render3D.asi` use shaders) or
 DXVK's own d3d8. Under Wine/Proton add `d3d8=n,b;d3d9=n,b` (`platform/d3d8-chain.py
 --use d3d8to9`, or `--use dxvk`; `./install` moves the DXVK chain to d3d8to9). On Windows
 d3d8to9 also needs the Visual C++ 2015–2022 (x86) and DirectX end-user runtimes.
 
 | Layer | Install | Why DXVK |
 |---|---|---|
-| MSAA | `msaa/build/MSAA.asi`, `msaa/MSAA.ini` | The minimap copies from the back buffer. Native D3D8 does not allow that from a multisampled surface, and DXVK resolves it. Without DXVK expect a black minimap ([`msaa/README.md`](msaa/README.md)) |
+| 3D renderer | `render3d/build/Render3D.asi`, `render3d/Render3D.ini`, its recipes (`render3d/skies/` built in; `render3d/surfaces/` and `render3d/nebulae/` into `Surfaces` and `Nebulae` folders beside it) | Draws the 3D view through Direct3D 9 behind the game's d3d8, so it needs DXVK and crosire's d3d8to9 (below); under DXVK's own d3d8 the engine draws the view. Replaces the earlier `MSAA.asi`, `Lighting.asi`, `Sky.asi` and the other per-part plugins; `render3d/install.sh` takes any of them out ([`render3d/README.md`](render3d/README.md)) |
 | Renderer | `postfx/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. The release zip has it ready, in `game/` |
 
 ### 3. Linux only: vkBasalt, launched through Heroic
@@ -204,22 +189,12 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 |---|---|---|
 | [`hud/`](hud/README.md) | hud | `HUD.asi`: the in-game HUD layout, font and cursors undistorted at any aspect, at run time |
 | [`menus/`](menus/README.md) | menus | `Menus.asi`: the 800x600 shell menus scaled to fill the screen, embedded in the game window, with outpainted backdrops ([`BACKDROPS.md`](menus/BACKDROPS.md) builds them) |
-| [`msaa/`](msaa/README.md) | msaa | `MSAA.asi`: 8x multisample anti-aliasing |
 | [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (right-drag pan speed, `Shift+number` adds to a group, selections and groups beyond 16, stations in groups with one build menu, long moves at warp), and the plan for the rest |
 | [`grid/`](grid/README.md) | grid | `GridLayout.asi`: the button bar as a fixed 5x3 grid with one key per cell, by keyboard position, labelled on the buttons |
-| [`lighting/`](lighting/README.md) | lighting | `Lighting.asi`: ships and stations on the engine's own GPU path, three scene lights in place of each map's own, planets with a night side, light from nebulae, planets, explosions, torpedoes and phasers, and per-pixel shaders for hulls and planets under d3d8to9 |
-| [`sky/`](sky/README.md) | sky | `Sky.asi`: the sky computed from view direction in a shader, from a recipe per sky, baked once per map; no cube seams |
-| [`nebulae/`](nebulae/README.md) | nebulae | `Nebulae.asi`: each nebula class, latinum included, drawn as a volume of gas from a recipe per class, in place of its billboards |
-| [`surfaces/`](surfaces/README.md) | surfaces | `Surfaces.asi`: the class planets' and the dilithium moon's surfaces made from recipes, with relief, craters, fissures, oceans and clouds, for `Lighting.asi` to draw in place of their textures |
-| [`explosions/`](explosions/README.md) | explosions | `Explosions.asi`: fireballs drawn as gas, ray-marched through a spectral noise, and shockwaves as rings of light, in place of stock's sprites and disc |
-| [`shields/`](shields/README.md) | shields | `Shields.asi`: the hits on a ship's shields, and the shields-down arcs, drawn by shaders over its shield ellipsoid, in place of the stock shells |
-| [`repair/`](repair/README.md) | repair | `Repair.asi`: the welding on a ship under repair drawn by shaders, in place of the stock spark sprites |
-| [`venting/`](venting/README.md) | venting | `Venting.asi`: the plasma and gas a damaged ship vents, drawn by shaders and lighting the hull, in place of the stock sprites |
-| [`specials/`](specials/README.md) | specials | `Specials.asi`: the warp flash and the special weapons' beams, bolts and waves drawn by shaders from recipes, in place of stock's sprites and models |
-| [`fog/`](fog/README.md) | fog | `Fog.asi`: the fog of war and the shroud drawn with smooth edges by a shader over the engine's own draw, in place of the cell-by-cell staircase |
+| [`render3d/`](render3d/README.md) | render3d | `Render3D.asi`: the 3D view through a renderer of our own, in Rust. Half-float multisampled target with bloom by energy, and modules for hulls (scene lights, shadows), sky, particles, ordnance, effects (explosions, shields, repair, venting, warp), planets, moons, asteroids and nebulae, and fog and selection. Replaced the per-part plugins |
 | [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias, seamless cube maps) and vkBasalt bloom, on from launch |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
-| [`models/`](models/README.md) | models | `Planets.asi` (planet tessellation), the smoothed dilithium moons, the round selection bubble, and the loading-screen model, widened with its `LOADING` art |
+| [`models/`](models/README.md) | models | the smoothed dilithium moons and asteroids, the round selection bubble, and the loading-screen model, widened with its `LOADING` art. The planets' sphere is render3d's |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | `binkproxy`, a `binkw32.dll` that plays launch reels full screen and AV1 replacements in place of `.bik` movies, and the movie pipeline |
 
 `a2mod` does not switch these, because the layers above depend on them or they install
@@ -241,7 +216,7 @@ nothing:
     ./a2env.sh                              print where the game, prefix, Proton and assets are
 
 Each layer installs and removes itself with its own script: `install.sh` in `hud/`,
-`menus/`, `msaa/`, `qol/`, `grid/`, `models/`, `lighting/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
+`menus/`, `qol/`, `grid/`, `models/`, `render3d/` and `cutscenes/binkproxy/`, `a2tex install`/`revert` for textures, or
 a `--revert` flag on the Python tools. The layer's README has the details.
 
 ## Versions

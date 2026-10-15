@@ -7,9 +7,7 @@ Armada II Refit -- install the release package into the game, on Windows.
 No choices to make: what can work here is installed, the rest is skipped and says why.
 First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled in
 vendor\, each file only if it is missing. Then the Direct3D chain: crosire's d3d8to9 as
-d3d8.dll (chain\), in place of GOG's own d3d8to9 build, so Lighting.asi and Sky.asi draw in
-shaders on Windows' own Direct3D 9. MSAA.asi goes in when DXVK is in the game directory --
-its d3d8.dll, or crosire's d3d8to9 on its d3d9.dll; without DXVK the minimap goes black.
+d3d8.dll (chain\), in place of GOG's own d3d8to9 build, on Windows' own Direct3D 9.
 The models are rewritten from the player's own SOD files with Python 3 (py, python or
 A2_PYTHON), skipped without it. The bloom preset goes in when ReShade is installed for the
 game; installing ReShade is optional and by hand (README.txt), then run this again.
@@ -89,10 +87,6 @@ function Test-GogD3d8([string]$f) {
     (Test-Path -LiteralPath $f) -and ((Get-Sha $f) -eq "735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719")
 }
 $ChainBackup = ".a2chain-backup"   # any other d3d8.dll the chain step replaced
-# DXVK in the chain: its own d3d8, or d3d8to9 in front of its d3d9.
-function Test-DxvkChain {
-    (Test-Dxvk (G "d3d8.dll")) -or ((Test-D3d8to9 (G "d3d8.dll")) -and (Test-Dxvk (G "d3d9.dll")))
-}
 function Test-Proxy([string]$f) {
     (Test-Path -LiteralPath $f) -and (Select-String -LiteralPath $f -Pattern "BinkProxy" -SimpleMatch -Quiet)
 }
@@ -157,20 +151,27 @@ function Invoke-Sods([string]$mode) {   # --install | --revert
     }
 }
 
+# The per-part plugins earlier packages put in, replaced by Render3D.asi (not in this
+# package yet): taken out, so those parts are the engine's own again.
+function Remove-OldPlugins {
+    foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Nebulae", "Surfaces", "Explosions", "Shields", "Repair", "Venting", "Specials", "Fog") {
+        foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
+    }
+    # Sky.asi's recipes (one per sky name, mbg*.ini); anything else there is the player's.
+    if (Test-Path -LiteralPath (G "Sky")) {
+        Get-ChildItem -LiteralPath (G "Sky") -Filter "mbg*.ini" | Remove-Item -ErrorAction SilentlyContinue
+        if (-not (Get-ChildItem -Force -LiteralPath (G "Sky"))) { Remove-Item -LiteralPath (G "Sky") }
+    }
+}
+
 # ------------------------------------------------------------------ uninstall
 
 if ($Uninstall) {
     Step uninstall "taking the mod out"
-    foreach ($n in "HUD", "Menus", "MSAA", "QOL", "QOLRules", "GridLayout", "Planets", "Lighting", "Sky", "Online") {
+    foreach ($n in "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Online") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
     }
-    # The sky recipes this package put in Sky\; anything else there is the player's.
-    if (Test-Path -LiteralPath (G "Sky")) {
-        foreach ($r in Get-ChildItem -LiteralPath (Join-Path $here "sky") -Filter *.ini) {
-            Remove-Item -LiteralPath (Join-Path (G "Sky") $r.Name) -ErrorAction SilentlyContinue
-        }
-        if (-not (Get-ChildItem -Force -LiteralPath (G "Sky"))) { Remove-Item -LiteralPath (G "Sky") }
-    }
+    Remove-OldPlugins
     if (Test-Path -LiteralPath (Join-Path $here "models")) {
         $Py = @(Find-Python)
         if ($Py.Count) { Say "  the models back to stock:"; Invoke-Sods "--revert" }
@@ -257,13 +258,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $env:WINDIR "$sysdir\vcruntime140.dl
 
 # ------------------------------------------------------------------ the Direct3D chain
 
-# crosire's d3d8to9 as d3d8.dll, which hands Lighting.asi the Direct3D 9 device behind
-# the game's. On Windows that is Windows' own Direct3D 9, so DXVK's d3d9.dll is not put
-# in (a DXVK d3d9.dll already there stays, and MSAA then has DXVK under it). GOG's
+# crosire's d3d8to9 as d3d8.dll. On Windows that is Windows' own Direct3D 9, so DXVK's
+# d3d9.dll is not put in (a DXVK d3d9.dll already there stays). GOG's
 # d3d8.dll (its own d3d8to9 build) is replaced and kept as d3d8.dll.gog-backup. Any other
 # d3d8.dll is the player's own choice and is left as it is -- DXVK's too: on Windows
-# someone put it there by hand, for MSAA, which d3d8to9 on Windows' Direct3D 9 would
-# take away. What goes in is recorded in $Manifest like the prerequisites, so
+# someone put it there by hand, which d3d8to9 on Windows' Direct3D 9 would take away. What goes in is recorded in $Manifest like the prerequisites, so
 # -Uninstall takes it out, unchanged only, and puts the old one back.
 Step chain "Direct3D chain"
 Say "Direct3D chain:"
@@ -271,7 +270,7 @@ $d8 = G "d3d8.dll"
 if (Test-D3d8to9 $d8) {
     Say "  d3d8.dll: crosire's d3d8to9 already"
 } elseif ((Test-Path -LiteralPath $d8) -and (Test-Dxvk $d8)) {
-    Say "  left as it is: d3d8.dll is DXVK's (lighting per vertex, the stock sky)"
+    Say "  left as it is: d3d8.dll is DXVK's"
 } elseif ((Test-Path -LiteralPath $d8) -and -not (Test-GogD3d8 $d8)) {
     Say "  left as it is: d3d8.dll is neither GOG's nor crosire's d3d8to9"
 } else {
@@ -304,6 +303,7 @@ function Put([string]$f) {
 Step hud "HUD"
 Put "HUD.asi"; Put "HUD.ini"
 foreach ($n in "MenuScale.asi", "MenuScale.ini") { Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue }   # Menus.asi's old name; never both
+Remove-OldPlugins
 Step menus "menus"
 Put "Menus.asi"; Put "Menus.ini"
 Step qol "quality of life"
@@ -315,7 +315,6 @@ Put "GridLayout.asi"
 # The player's [Cells] choices survive a reinstall; only a missing file is replaced.
 if (Test-Path -LiteralPath (G "GridLayout.ini")) { Say "  GridLayout.ini (yours, kept)" } else { Put "GridLayout.ini" }
 Step models "models"
-Put "Planets.asi"; Put "Planets.ini"
 $Py = @(Find-Python)
 if ($Py.Count) {
     Say "  the moons, the selection bubble and the hulls, from your own SOD files:"
@@ -323,34 +322,8 @@ if ($Py.Count) {
 } else {
     Say "  moons, selection bubble and hulls skipped: needs Python 3 (py or python)"
 }
-Step lighting "lighting"
-# Lit per pixel in shaders only behind crosire's d3d8to9; per vertex on any other d3d8.
-Put "Lighting.asi"; Put "Lighting.ini"
-if (-not (Test-D3d8to9 (G "d3d8.dll"))) {
-    Say "  (Lighting: per vertex here -- its shaders need crosire's d3d8to9 as d3d8.dll)"
-}
-# The sky drawn from a recipe per map, in a shader; also only behind crosire's d3d8to9,
-# and the stock sky anywhere else. The recipes go in Sky\, one per sky name.
-Step sky "sky"
-Put "Sky.asi"; Put "Sky.ini"
-New-Item -ItemType Directory -Force -Path (G "Sky") | Out-Null
-$recipes = @(Get-ChildItem -LiteralPath (Join-Path $here "sky") -Filter *.ini)
-foreach ($r in $recipes) { Copy-Item -LiteralPath $r.FullName (Join-Path (G "Sky") $r.Name) -Force }
-Say "  Sky\: $($recipes.Count) sky recipes"
-if (-not (Test-D3d8to9 (G "d3d8.dll"))) {
-    Say "  (Sky: the stock sky here -- the procedural one needs crosire's d3d8to9 as d3d8.dll)"
-}
-
 Step online "online multiplayer"
 Put "Online.asi"; Put "Online.ini"
-
-Step msaa "anti-aliasing"
-if (Test-DxvkChain) {
-    Put "MSAA.asi"; Put "MSAA.ini"
-} else {
-    Remove-Item -LiteralPath (G "MSAA.asi") -ErrorAction SilentlyContinue
-    Say "  MSAA.asi skipped: DXVK is not in the game directory"
-}
 
 Step cutscenes "cutscene player"
 if (Test-Skipped "cutscenes") {

@@ -7,7 +7,7 @@
 // core, a torpedo's heart) are lifted past white so they bloom by their energy.
 //
 // fx_vs / fx_ps: the warp flash and the special weapons of Specials.asi, ported
-// unchanged (specials/specials.hlsl; specials/README.md for the looks). Every quad is
+// unchanged (the looks are Specials.asi's). Every quad is
 // built by fx.rs in the world, and every kind is drawn by one pixel shader chosen per
 // quad (branch-free), so quads of any recipe go in one draw call.
 //

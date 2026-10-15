@@ -1,10 +1,10 @@
 # render3d against the plugins it replaces
 
 What the 3D view costs with render3d, against the same view drawn by the engine with
-the eleven plugins render3d's `install.sh` takes out (`Lighting.asi`, `Sky.asi`,
+the eleven old plugins (an older checkout, "Method" below) that render3d's `install.sh` takes out (`Lighting.asi`, `Sky.asi`,
 `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`,
 `Venting.asi`, `Specials.asi`, `Fog.asi`, `MSAA.asi`), measured the same way on the
-bench. Every other layer (`Planets.asi`, the HUD, the menus, QOL) is installed in both. The instrument is `Timing=1` (README.md, "Timing").
+bench. Every other layer (the HUD, the menus, QOL) is installed in both. The instrument is `Timing=1` (README.md, "Timing").
 
 ## Method
 

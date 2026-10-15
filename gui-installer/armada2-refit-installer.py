@@ -85,7 +85,9 @@ else:
     SETTINGS = os.path.join(XDG_CONFIG, 'armada2-refit', 'installer.json')
 
 
-# The install.sh stages, in order, and what the window says during each.
+# The install.sh stages, in order, and what the window says during each. Packages before
+# the per-part plugins were removed also name 'lighting', 'sky' and 'msaa' (their manifest
+# lists them); the entries for those stay so such a package still installs.
 STEPS = ['verify', 'prereqs', 'chain', 'hud', 'menus', 'qol', 'grid', 'models', 'lighting', 'sky',
          'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done']
 STATUS = {
@@ -2577,7 +2579,7 @@ MAC_HOWTO = dict(
     notes=["Direct3D 8 and 9 run through Wine's own wined3d on a Mac, so leave CrossOver's "
            'graphics backend on its default for this game: D3DMetal, DXVK and DXMT only cover '
            'Direct3D 10 to 12.',
-           'Anti-aliasing (MSAA) and bloom are not available on macOS.'])
+           'Bloom is not available on macOS.'])
 
 SKY_TOP, SKY_BOTTOM = (4, 6, 13), (8, 10, 22)      # the gradient, as Sky.build_nebula's
 

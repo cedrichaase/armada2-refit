@@ -1,7 +1,7 @@
 // entries: vs_rock:vs_3_0:VS_ROCK ps_rock:ps_3_0:PS_ROCK ps_flat:ps_3_0:PS_FLAT vs_sprite:vs_3_0:VS_RSPRITE ps_sprite:ps_3_0:PS_RSPRITE
 // The world module's rocks (src/mods/world/rocks.rs): the dilithium moons' rock and the
-// asteroids', surfaces from recipes (surfaces/README.md), as Lighting.asi's moon_ps drew
-// them (lighting/hull.hlsl): the colour, the relief and the cut-out from three cubes in
+// asteroids', surfaces from recipes, as Lighting.asi's moon_ps drew
+// them (in its hull shader): the colour, the relief and the cut-out from three cubes in
 // the direction from the mesh's centre, or triplanar across its extents; lit as
 // Lighting.asi lit its hulls (diffuse, a highlight by the texture's brightness, a rim),
 // by the view's registered lights. No shadow map yet.
@@ -95,7 +95,7 @@ float4 ps_rock(VO i) : COLOR
     if (msurf_misc.w > 0.5) {
         // Triplanar (the asteroids): along each object axis, the cube face on that
         // axis's side at the point's other two coordinates, blended by how squarely the
-        // surface faces each axis (surfaces/README.md, "The asteroids").
+        // surface faces each axis.
         float3 no = float3(dot(i.n, msurf_rows[0].xyz), dot(i.n, msurf_rows[1].xyz), dot(i.n, msurf_rows[2].xyz));
         float3 w  = pow(abs(no) / max(length(no), 1e-6), 4.0);
         float3 cq = clamp(q, -1.0, 1.0);

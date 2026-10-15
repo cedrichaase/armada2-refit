@@ -1,6 +1,6 @@
 // entries: vs_plane:vs_3_0:VS_PLANE ps_fog_bspline:ps_3_0:PS_FOG_BSPLINE ps_fog_catrom:ps_3_0:PS_FOG_CATROM ps_colour:ps_3_0:PS_COLOUR ps_ghost:ps_3_0:PS_GHOST vs_line:vs_3_0:VS_LINE ps_line:ps_3_0:PS_LINE
 // The overlays module (src/mods/overlays/): the fog of war and the shroud with
-// smooth edges (ported from fog/fog.hlsl, Fog.asi), the tactical grid's lines, the
+// smooth edges (ported from Fog.asi), the tactical grid's lines, the
 // selection bubbles and the fog-of-war ghosts.
 
 float4x4 VP : register(c4);    // view x projection (transposed); world is identity

@@ -1,6 +1,6 @@
 // entries: vent_vs:vs_3_0:VS_VENT vent_ps:ps_3_0:PS_VENT
 // The vents of the particles module (src/mods/particles/vent.rs), ported from
-// Venting.asi (venting/venting.hlsl, venting/README.md): the look settled there.
+// Venting.asi: the look settled there.
 //
 // Every quad is built by vent.rs, in the world, facing the camera: each vent particle
 // as a puff of gas stretched along its flight, and at each vent that is spraying a

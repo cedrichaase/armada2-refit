@@ -3,7 +3,8 @@
 #
 #   render3d/perf/compare.sh OLD_CHECKOUT [OUT_DIR]
 #
-# OLD_CHECKOUT is a checkout (or a copy of one, e.g. `git archive main`) whose
+# OLD_CHECKOUT is a checkout from before the per-part plugins were removed from the
+# repository (or a copy of one, e.g. an archive of that commit) whose
 # ./install puts in the stock plugins; its install builds into it, so pass a copy you
 # do not mind being built in. For each scene (SCENES, default "showcase match nebula")
 # and each configuration (CFGS, default "old new"), one session at a time: start it,

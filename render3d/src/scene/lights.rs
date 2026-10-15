@@ -2,7 +2,7 @@
 //! from `GameObject_PreRenderAll` and `Ordnance::PreRenderAll`; `Storm3D+0x60`, a
 //! `std::list` of records: `+0` the light, `+4` its colour, `+0x10` its transform).
 //! Plugins add theirs the same way (shields, repairs, venting), so every light source
-//! in the game is in this one list. Layouts as `lighting/README.md` established them.
+//! in the game is in this one list. Layouts as `Lighting.asi` established them.
 use crate::engine::{field, rd, storm3d, vtable};
 use crate::math::{M34, V3};
 use alloc::vec::Vec;
@@ -31,7 +31,7 @@ pub struct Point {
 }
 
 /// How a light a module registers is to be taken by the lit draws (as `Lighting.asi`
-/// took its own phaser lights, lighting/README.md "Phasers"): placed as a hard light
+/// took its own phaser lights, a phaser's two lights): placed as a hard light
 /// whatever its falloff, never merged with others of its colour (several banks fire at
 /// once), its falloff raised to `power` and wrapped `wrap` round the plating it
 /// grazes. Default: none of it.
@@ -135,8 +135,7 @@ impl Lights {
         l
     }
 
-    /// `Lighting.asi`'s scene lights in place of the map's (lighting/README.md, "The
-    /// lights", "The skybox"): every directional light the map registered is dropped,
+    /// `Lighting.asi`'s scene lights in place of the map's: every directional light the map registered is dropped,
     /// and a warm Key, a dim blue Fill opposite it and a faint light in the sky's own
     /// colour, from its brightest side, take their place. `[Lights]` in Render3D.ini;
     /// nothing is changed while `Lighting.asi` is loaded (it has replaced them in the

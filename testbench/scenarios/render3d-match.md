@@ -7,7 +7,7 @@ Timeout: 15 min
 
 `render3d/README.md`. Run it on a checkout: `./a2test run render3d-match --install .`.
 An Instant Action match on Warzone as the Borg against an easy AI (`_enter-instant-action`),
-drawn by `Render3D.asi` with every module on (`./install` takes the plugins they replace
+drawn by `Render3D.asi` with every module on (`./install` takes the plugins they replaced
 out). The easy AI leaves the player alone, so `Scene.asi` (scene `match`: it builds and
 hides nothing) stages a battle beside the Borg start on Warzone (about 16900, 0, 9000): two Federation ships and two Klingon
 battleships attack each other, mortal, so ships die, burn and break up. The fog of war is off (it has its own scenario, `fog-edges`);

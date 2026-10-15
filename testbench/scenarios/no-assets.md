@@ -11,9 +11,9 @@ than fail; the code layers install as usual, the cutscene proxy included. With n
 `.mp4` beside any `.bik`, `binkw32.dll` passes every movie to the real DLL
 (`binkw32_orig.dll`), which is what `bink ...` lines in its log mean. With no plate,
 `Menus.asi` draws black sides. `QOL.asi`'s log says it scaled
-the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Render3D.asi` replaces `Venting.asi`,
+the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Render3D.asi` replaced `Venting.asi`,
 `Sky.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Fog.asi`, `Specials.asi` and
-`Planets.asi` (`./install` skips them) with modules that need no assets: the planets
+`Planets.asi` (`./install` takes any it finds out) with modules that need no assets: the planets
 are the world module's own sphere, the sky
 recipes are built in, the vents, fire, shields, welds and special weapons are procedural, and
 the fog is the engine's own texture. Its log names each module it loaded.

@@ -1,6 +1,6 @@
 //! The fog of war and the shroud, drawn from the engine's own textures with smooth
-//! edges: the port of `Fog.asi` (`fog/README.md` has the derivation and the decisions
-//! settled with the user, kept here).
+//! edges: the port of `Fog.asi` (the decisions
+//! settled with the user are kept here).
 //!
 //! Stock draws each layer as one mesh over the map (`Terrain_Geometry` `+0x2c`, or the
 //! subdivided `+0x30`), textured with `fogTexture` (`+0x34`, texture material `fog`:

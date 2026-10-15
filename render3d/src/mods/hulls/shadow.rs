@@ -3,8 +3,7 @@
 //! draws. `Lighting.asi` could only use the last frame's hulls (it saw them only as the
 //! engine drew them), and looked each draw up where it had been; here nothing lags.
 //! The map is fitted round those hulls, its width in steps of 2^(1/4) and its centre
-//! snapped to whole texels so a shadow's edge does not crawl as the camera moves
-//! (lighting/README.md, "Shadows").
+//! snapped to whole texels so a shadow's edge does not crawl as the camera moves.
 //!
 //! The planets cast no shadow into the map: the hull shader tests up to eight of them
 //! as spheres (`planets()`), as `Lighting.asi` did.

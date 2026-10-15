@@ -648,6 +648,6 @@ swap in their own far plane (`CINERACTIVE_FAR_CLIPPING_PLANE`) and restore this 
 and are left alone.
 
 **Cost.** More is drawn on a wide view. The near plane stays at 20, so the depth
-buffer's precision at a given distance hardly changes with the far plane. `Lighting.asi`'s
+buffer's precision at a given distance hardly changes with the far plane. render3d's
 shadow map is fitted around every hull it draws, so far-off ships on a wide view make
 its texels coarser, as a big battle already does.

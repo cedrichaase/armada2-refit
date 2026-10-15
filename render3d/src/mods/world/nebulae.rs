@@ -1,8 +1,8 @@
-//! Nebulae drawn as volumes of gas: the port of `Nebulae.asi` (`nebulae/README.md`, whose
+//! Nebulae drawn as volumes of gas: the port of `Nebulae.asi` (whose
 //! decisions hold here: the envelope, the bake, the slices on a ladder fixed in distance
 //! from the eye kept per view, the blue-noise thresholds that stay put, the spectral
 //! noise, half size with its composite, `EdgeRefine=1`). A class is drawn as gas when
-//! it has a recipe, `Nebulae\<odf>.ini` in the game directory (`nebulae/recipes/`);
+//! it has a recipe, `Nebulae\<odf>.ini` in the game directory (`render3d/nebulae/`);
 //! anything else keeps the stock billboards, drawn where they always were.
 //!
 //! What changed in the move:
@@ -220,7 +220,7 @@ impl Cls {
         c
     }
 
-    /// As nebulae.c's recipe_read.
+    /// As Nebulae.asi read a recipe.
     fn read(&mut self) -> bool {
         let f = Ini::open(&self.path);
         if !f.exists() {
@@ -502,8 +502,7 @@ fn smooth(e0: f32, e1: f32, x: f32) -> f32 {
 }
 
 /// Waves from k0 to k1 periods across the volume, amplitude k^-2.5, random phases: two
-/// independent tiling fields in the real and imaginary parts (nebulae/README.md, "The
-/// noise has no lattice").
+/// independent tiling fields in the real and imaginary parts.
 fn spectrum(fft: &Fft, re: &mut [f32], im: &mut [f32], s: usize, k0: f32, k1: f32, seed: u32) {
     let n2 = 3 * (s / 2) * (s / 2) + 1;
     let mut amp = vec![0.0f32; n2];
@@ -635,7 +634,7 @@ fn make_noise(dev: Device, s: u32) -> Option<Com> {
 
 // ---- the blue noise --------------------------------------------------------------------
 
-/// A 64x64 blue-noise tile by void and cluster (Ulichney 1993), as nebulae.c makes it:
+/// A 64x64 blue-noise tile by void and cluster (Ulichney 1993), as Nebulae.asi makes it:
 /// red the rank, green the rank of the tile shifted by half (a second threshold).
 fn blue_noise() -> Vec<u8> {
     let n = BN * BN;
@@ -1131,7 +1130,7 @@ impl Nebulae {
         (self.bolt_seed >> 8) as f32 * (1.0 / 16_777_216.0)
     }
 
-    /// Lightning: flashes scheduled per class (as nebulae.c's).
+    /// Lightning: flashes scheduled per class (as Nebulae.asi's).
     fn lightning(&mut self, key: &str, now: f32, dt: f32) {
         let r0 = self.rnd01();
         let (r1, r2, r3, r4, r5) = (self.rnd01(), self.rnd01(), self.rnd01(), self.rnd01(), self.rnd01());
@@ -1335,7 +1334,7 @@ impl Nebulae {
             if dmax <= d0 + 1.0 {
                 continue;
             }
-            // The ladder (nebulae/README.md, "The draw").
+            // The ladder.
             let (mut n2, mut f2) = (0.0f32, 0.0f32);
             for i in 0..3 {
                 let (a, b) = (lo[i] - eye[i], eye[i] - hi[i]);
@@ -1671,8 +1670,7 @@ impl Nebulae {
         dev.ps_const(21, flat(&l.k));
     }
 
-    /// EdgeRefine=1: where the half-size depths spread, the slices again at full size
-    /// (nebulae/README.md, "Hull edges").
+    /// EdgeRefine=1: where the half-size depths spread, the slices again at full size.
     fn lr_classify(&mut self, dev: Device, l: &mut Lr) {
         l.k[0][1] = 0.0;
         if self.cfg.refine == 0 || self.gpu.lf_broken {
@@ -1939,7 +1937,7 @@ fn mark_on_screen(o: usize, cam: usize) {
     }
 }
 
-/// Where a class's gas may be, from above (nebulae.c's bake_envelope): alpha each nebula
+/// Where a class's gas may be, from above (Nebulae.asi's bake_envelope): alpha each nebula
 /// a soft disc out to its reach, red the domes' height, green the filaments' (or the
 /// fringe's) wider disc, blue the nebulae's height there.
 fn bake_envelope(dev: Device, c: &mut Cls) -> bool {

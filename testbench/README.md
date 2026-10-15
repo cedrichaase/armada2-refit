@@ -97,10 +97,10 @@ The launch step also proves isolation: it scans `/proc/<pid>/maps` and `fd` for 
 real install's path, and fails the case if the game has it open.
 
 Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
-channels), `Menus.log`, `MSAA.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
+channels), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
 `xalia_dxgi.log` (DXVK), `vkBasalt.log`, `sway.log`, `input.log`, `prepare.log`,
 `launch-env.txt` (the exact environment and argv), the clone's `ARMADA.PRF`,
-`Menus.ini`, `MSAA.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
+`Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
 anything new in the game's `Logs/`.
 
 ## Traps, each measured here
@@ -249,7 +249,7 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   `session start --no-launch`, set `Enable=0` under `[Render3D]` in the clone's
   `Render3D.ini`, then `drive launch -nointro a2_borg01`.
 - **A/B at the same moment**: a module key with `Reload=1` is read again while the game
-  runs (`[Specials]` every ~2 s, `[Hulls]` every second); `scene pause`, shoot,
+  runs (read again every ~2 s); `scene pause`, shoot,
   switch the module off, wait for the log to say so, shoot again. Rendering continues
   while paused. Cloud particles drift while paused in stock, so that side moves.
 - **Scenario pacing**: `spawn X; select X` on one line selects nothing (spawn, wait a

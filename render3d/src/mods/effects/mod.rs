@@ -128,7 +128,7 @@ impl Cam {
 }
 
 /// Engine point lights of our own, made on first use and registered each view (the
-/// plugins' way: `lighting/README.md`, "A light another plugin adds").
+/// plugins' way: an ordinary `ST3D_Point_Light` registered after `GameObject_PreRenderAll`).
 pub struct LightPool {
     name: &'static [u8],
     objs: Vec<usize>,

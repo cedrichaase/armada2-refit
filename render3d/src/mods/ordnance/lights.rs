@@ -1,7 +1,7 @@
 //! The shots' light, at the start of each view (after `Ordnance::PreRenderAll` has
 //! registered every torpedo's and pulse's own light):
 //!
-//! - **Recolouring** (from `Lighting.asi`, lighting/README.md "Torpedoes and pulses"):
+//! - **Recolouring** (from `Lighting.asi`):
 //!   an ODF's `lightColor` ignores its projectile (every Federation photon is cyan,
 //!   nearly every other torpedo and pulse green). The class's light (class +0x10, an
 //!   `ST3D_Point_Light`, its colour +0xf4) takes the hue of its sprite instead: the mean

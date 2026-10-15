@@ -1,12 +1,12 @@
 // entries: weld_vs:vs_3_0:VS_WELD weld_ps:ps_3_0:PS_WELD
 // The repair welding of render3d's effects module (src/mods/effects/repair.rs), ported
-// from Repair.asi (repair/README.md), whose look was settled with the user; the quads
-// are built by repair.rs as repair.c built them.
+// from Repair.asi, whose look was settled with the user; the quads
+// are built by repair.rs as Repair.asi built them.
 //
-// Every quad is built by repair.c, in the world, facing the camera: the arc's flare at
+// Every quad is built by repair.rs, in the world, facing the camera: the arc's flare at
 // the weld, the hot spot it leaves on the hull, and each spark as a streak along its
 // flight. Drawn additively, depth-tested against the hulls, writing no depth. The
-// pixel shader draws all three, chosen per quad (branch-free): repair.c works out per
+// pixel shader draws all three, chosen per quad (branch-free): repair.rs works out per
 // frame how bright and what colour each one is, so the shader holds no time of its own.
 //
 // Per vertex: t0.xy where in the quad (-1..1 across; along a streak 0 at the tail end
@@ -14,7 +14,7 @@
 // streak's length in widths, or the flare's ray angle (radians); t1.rgb the colour,
 // t1.a the brightness.
 //
-// Constants come from repair.c's draw_welds(), which must agree with the registers.
+// Constants come from repair.rs, which must agree with the registers.
 
 float4 k_vp0 : register(c0);   // vertex shader: the columns of VIEW x PROJECTION
 float4 k_vp1 : register(c1);

@@ -1,17 +1,17 @@
 # Changelog — models
 
 The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
-`loading-panel.sh`), which ships in lockstep with `textures/targets/LOADING`, and
-`Planets.asi`, the planets' tessellation, the dilithium moons (`moon-sod.py`) and the
-selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
+`loading-panel.sh`), which ships in lockstep with `textures/targets/LOADING`, the
+dilithium moons (`moon-sod.py`), the selection bubble (`select-sod.py`), the hulls
+(`hull-sod.py`) and the asteroids (`asteroid-sod.py`); `Planets.asi` until 5.0.0. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
-## 4.4.0 — 2026-10-15
+## 5.0.0 — 2026-10-15
 
-### Added
-- `install.sh --no-planets` installs everything but `Planets.asi`, and
-  `--remove-planets` takes out `Planets.asi` alone; `./install` passes the first while
-  render3d's world module draws the planets. The SOD rewrites stay in both.
+### Removed
+- `Planets.asi` (`planets.c`, `Planets.ini`, `build.sh`) and `install.sh --detail`: the
+  planets are render3d's world module's own sphere. `install.sh` takes out a copy an
+  earlier install left.
 
 Installed, not yet seen in game.
 
