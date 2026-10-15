@@ -1,4 +1,4 @@
-// entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL vol_lr_ps:ps_3_0:PS_VOL_LR quad_vs:vs_3_0:VS_QUAD zdown_ps:ps_3_0:PS_ZDOWN comp_ps:ps_3_0:PS_COMP zclear_ps:ps_3_0:PS_ZCLEAR vol_fr_ps:ps_3_0:PS_VOL_FR edge_ps:ps_3_0:PS_EDGE qrow_ps:ps_3_0:PS_QROW qcol_ps:ps_3_0:PS_QCOL etile_ps:ps_3_0:PS_ETILE tile_vs:vs_3_0:VS_TILE
+// entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL vol_fb_ps:ps_3_0:PS_VOL_FB quad_vs:vs_3_0:VS_QUAD comp_ps:ps_3_0:PS_COMP
 // The world module's nebulae (src/mods/world/nebulae.rs): Nebulae.asi's nebulae.hlsl,
 // ported unchanged but for this header.
 //
@@ -64,19 +64,10 @@ sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the fi
 sampler3D s_vol   : register(s2);  // the baked gas: density, shading, hue, emission
 sampler2D s_blue  : register(s4);  // a 64x64 blue-noise tile: r and g two independent thresholds
 sampler2D s_occ   : register(s3);  // per column of it: r the most gas, b and g the lowest and highest layer with any
-sampler2D s_zfull : register(s5);  // Resolution=2: the scene's depth (INTZ, through RESZ), full size
-sampler2D s_zlow  : register(s6);  //   the nearest depth of each 2x2 of it, at half size, as view depth
-sampler2D s_gas   : register(s7);  //   the gas, at half size, in floating point; alpha its optical depth
-sampler2D s_gasl  : register(s9);  //   the same, filtered (the composite's reads away from depth edges)
+sampler2D s_gas   : register(s7);  // the gas at full size, in floating point; alpha its optical depth
 sampler2D s_shadow : register(s8); // the Key's shadow map, R32F, point-sampled: the depth of the nearest hull
-sampler2D s_gasf  : register(s10); // EdgeRefine=1: the gas at full size, at depth edges only (as s_gas)
-sampler2D s_edge  : register(s11); //   at quarter size, how far the depths the tents about it read spread
-sampler2D s_qrow  : register(s12); //   and the nearest and farthest in its row, on the way there
-sampler2D s_vtile : register(s0);  // tile_vs (a vertex texture): 1 where a 16x16 tile holds a pixel to refine
 
-float4 k_lr      : register(c21);  // Resolution=2: x Obscure=; y EdgeRefine= (1: the full-size gas at depth edges, 2: everywhere); zw 1 / the full target's size
-float4 k_lrv     : register(c23);  //   the half-size viewport, its first and last pixel: x0, y0, x1, y1
-float4 k_lr2     : register(c22);  //   xy 1 / the half-size targets' size; z, w the projection's _33 and _43 (to view depth)
+float4 k_lr      : register(c21);  // the composite: x Obscure=; zw 1 / the gas target's size
 
 struct VsIn  { float4 pos : POSITION; float2 t : TEXCOORD0; };
 struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; float2 t : TEXCOORD1; float2 zw : TEXCOORD2; };
@@ -421,13 +412,12 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
     return slice_out(c.rgb, u0, i.t.y);
 }
 
-// Resolution=2: the same at half size, into a floating-point target, so no rounding
-// trick is needed. Alpha adds up the optical depth for the composite. The depth test is the shader's: against the nearest scene depth of
-// the 2x2 full pixels this pixel covers, so gas never shows through any part of a hull.
-float4 vol_lr_ps(VsOut i, float2 vpos : VPOS) : COLOR
+// The same into a floating-point target at full size, so no rounding trick is needed.
+// Alpha adds up the optical depth for the composite. The target's depth buffer is a
+// copy of the scene's (INTZ, through RESZ), so the depth test against the hulls is the
+// hardware's, pixel for pixel, as in the frame itself.
+float4 vol_fb_ps(VsOut i, float2 vpos : VPOS) : COLOR
 {
-    float  zs = tex2D(s_zlow, (vpos + 0.5) * k_lr2.xy).r;
-    if (i.zw.y > zs) return float4(0, 0, 0, 0);     // w: the view depth
     float  dist;
     float2 u0;
     float3 p = slice_point(i, vpos, dist, u0);
@@ -435,219 +425,24 @@ float4 vol_lr_ps(VsOut i, float2 vpos : VPOS) : COLOR
     return c.w < 0.0 ? 0.0 : c;
 }
 
-// EdgeRefine=1: the same at full size, only at depth edges (where edge_ps marked the depth
-// buffer), into a full-size floating-point target. The depth test against the hulls is
-// the shader's, against the scene's depth at this very pixel, as the hardware's would be.
-float4 vol_fr_ps(VsOut i, float2 vpos : VPOS) : COLOR
-{
-    if (i.zw.x > tex2D(s_zfull, (vpos + 0.5) * k_lr.zw).r * i.zw.y) return 0.0;   // z/w: LESSEQUAL
-    float  dist;
-    float2 u0;
-    float3 p = slice_point(i, vpos, dist, u0);
-    float4 c = vol_gas(i, p, dist, u0);
-    return c.w < 0.0 ? 0.0 : c;
-}
-
-// EdgeRefine: how far the depths a pixel's tent reads spread, from the nearest: where
-// the composite takes the full-size gas (from EDGE_LO, wholly at EDGE_HI).
-#define EDGE_LO 0.06
-#define EDGE_HI 0.15
-float4 k_tile    : register(c39);  // EdgeRefine=1: xy the view's first pixel (full size, etile_ps); zw 1 / the quarter-size targets' size
-
-// A quarter-size cell's uv, inside the view.
-float2 quv(float2 q)
-{
-    return (clamp(q, floor(k_lrv.xy * 0.5), floor(k_lrv.zw * 0.5)) + 0.5) * k_tile.zw;
-}
-
-// EdgeRefine=1: how far the half-size depths spread about each 2x2 of half pixels, at
-// quarter size: over the 8x8 half pixels from 3 before it to 4 after, the 7x7 about
-// either half pixel of the cell. The composite's tent reads the 5x5 half pixels about its
-// own, and away from a depth edge weighs none by depth: a half pixel straddling a
-// silhouette two out (it holds only the gas in front of the hull) still spreads to it.
-// The half pixel next to a straddling one can be wrong too (bench: 40% too much gas along
-// one silhouette, not along the next), so a pixel is refined where either is in its
-// tent's reach. In two passes, the rows' nearest and farthest (quarter wide, half high)
-// and then the columns' spread. At half size (each half pixel's 7x7) the same cost 41 us
-// at 1920x1080; with a 10x10 a cell, the band was half as wide again.
-float4 qrow_ps(float2 vpos : VPOS) : COLOR
-{
-    float2 o = floor(vpos) * float2(2.0, 1.0) + float2(-3.0, 0.0);
-    float  mn = 60000.0, mx = 0.0;
-    [unroll] for (int i = 0; i < 8; i++) {
-        float z = tex2D(s_zlow, (clamp(o + float2(i, 0), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy).r;
-        mn = min(mn, z);
-        mx = max(mx, z);
-    }
-    return float4(mn, mx, 0, 0);
-}
-
-float4 qcol_ps(float2 vpos : VPOS) : COLOR
-{
-    float  x = (floor(vpos.x) + 0.5) * k_tile.z;
-    float  y0 = floor(vpos.y) * 2.0 - 3.0;
-    float  mn = 60000.0, mx = 0.0;
-    [unroll] for (int j = 0; j < 8; j++) {
-        float2 z = tex2D(s_qrow, float2(x, (clamp(y0 + j, k_lrv.y, k_lrv.w) + 0.5) * k_lr2.y)).rg;
-        mn = min(mn, z.x);
-        mx = max(mx, z.y);
-    }
-    return float4((mx - mn) / mn, 0, 0, 0);
-}
-
-// EdgeRefine=1: which 16x16 tiles of the view hold a pixel edge_ps opens, a pixel a tile:
-// the 6x6 quarter cells its pixels and their neighbours read.
-float4 etile_ps(float2 vpos : VPOS) : COLOR
-{
-    float2 o = floor((k_tile.xy + floor(vpos) * 16.0 - 1.0) * 0.25);
-    float  e = 0.0;
-    [unroll] for (int j = 0; j < 6; j++)
-        [unroll] for (int i = 0; i < 6; i++)
-            e = max(e, tex2D(s_edge, quv(o + float2(i, j))).r);
-    return k_lr.y > 1.5 || e > EDGE_LO ? 1.0 : 0.0;
-}
-
-// EdgeRefine=1: a tile's quad (x, y the tile, z which corner), where it holds an edge;
-// elsewhere all its corners on one point outside the view, and nothing is drawn.
-float4 k_tilev   : register(c4);   // tile_vs: xy a tile's size in clip space (2 x 16 / the view's); zw 1 / the tiles' target's size
-float4 tile_vs(float3 p : POSITION) : POSITION
-{
-    float  f = tex2Dlod(s_vtile, float4((p.xy + 0.5) * k_tilev.zw, 0.0, 0.0)).r;
-    float2 c = (p.xy + float2(fmod(p.z, 2.0), floor(p.z * 0.5))) * k_tilev.xy;
-    return f > 0.5 ? float4(c.x - 1.0, 1.0 - c.y, 0.0, 1.0) : float4(-2.0, -2.0, 0.0, 1.0);
-}
-
-// EdgeRefine=1: the full-size pixels whose gas the full-size pass draws are opened in that
-// pass's depth buffer (to 1: the rest keep 0, where nothing passes) and their gas cleared:
-// those the composite refines, and the 3x3 about each, which it filters over. Their
-// quarter cells are the 2x2 read here.
-float4 edge_ps(float2 vpos : VPOS) : COLOR
-{
-    float2 o = floor((floor(vpos) - 1.0) * 0.25);
-    float  e = 0.0;
-    [unroll] for (int j = 0; j < 2; j++)
-        [unroll] for (int i = 0; i < 2; i++)
-            e = max(e, tex2D(s_edge, quv(o + float2(i, j))).r);
-    clip(k_lr.y > 1.5 ? 1.0 : e - EDGE_LO);   // EdgeRefine=2: everywhere
-    return 0.0;
-}
-
-// Resolution=2: a full-screen quad, its corners in clip space.
+// The composite: a full-screen quad, its corners in clip space.
 float4 quad_vs(float4 pos : POSITION) : POSITION
 {
     return float4(pos.xy, 0.0, 1.0);
 }
 
-float view_z(float z)                   // post-projection depth to view depth (z - _33 is below 0)
-{
-    return k_lr2.w / min(z - k_lr2.z, -1e-9);
-}
-
-// Resolution=2: the half-size depth, the nearest of each 2x2 of the scene's (vpos is
-// the half-size pixel inside the viewport's half), as view depth in half floats (0.05%:
-// a few units far off). Read by every slice pixel and 25 times by every composite pixel,
-// so it is small and needs no conversion.
-float4 zdown_ps(float2 vpos : VPOS) : COLOR
-{
-    float2 f = (floor(vpos) * 2.0 + 0.5) * k_lr.zw;      // half pixel i covers full pixels 2i, 2i+1
-    float  a = tex2D(s_zfull, f).r, b = tex2D(s_zfull, f + float2(k_lr.z, 0)).r;
-    float  c = tex2D(s_zfull, f + float2(0, k_lr.w)).r, d = tex2D(s_zfull, f + k_lr.zw).r;
-    return float4(min(view_z(min(min(a, b), min(c, d))), 60000.0), 0, 0, 0);
-}
-
-// Resolution=2: the gas target's clear: no gas, no optical depth.
-float4 zclear_ps(float2 vpos : VPOS) : COLOR
-{
-    return 0.0;
-}
-
-// Resolution=2: the gas onto the frame. A tent over the 5x5 half-size pixels about
-// this pixel, which also smooths away what the jitter leaves, each weighted by how near
-// its depth is to this pixel's: at a hull's edge a background pixel takes the gas of the
-// half-size pixels behind it, and the hull keeps what is in front of it.
-//
-// Away from depth edges (nearly everywhere) no depth tells the taps apart, and the
-// tent is taken in pairs, by bilinear reads: 9 reads and the inner 3x3's depths. A depth
-// read for each of the 25 taps cost 0.57 ms more at 3440x1440 (bench, six classes): the
-// composite is bound by its reads.
-//
-// Then the gas's opacity (Opacity=). Gas that only adds light is as bright as its path
-// through it is long, and a flat field seen edge-on is several times as bright as from
-// above. Gas that also absorbs levels off: through optical depth t, light of one colour
-// C (what was added up) comes out as C (1 - e^-t) / t, which is C where the gas is thin
-// and the gas's own colour where it is thick, at any angle. Exact for gas of one colour,
-// and order does not matter, so the slices still need no sorting. What is behind loses
-// e^-t of itself, times Obscure=. Then one dither to the 8-bit target.
+// The gas onto the frame, a pixel for a pixel, with its opacity (Opacity=). Gas that
+// only adds light is as bright as its path through it is long, and a flat field seen
+// edge-on is several times as bright as from above. Gas that also absorbs levels off:
+// through optical depth t, light of one colour C (what was added up) comes out as
+// C (1 - e^-t) / t, which is C where the gas is thin and the gas's own colour where it
+// is thick, at any angle. Exact for gas of one colour, and order does not matter, so
+// the slices still need no sorting. What is behind loses e^-t of itself, times
+// Obscure=. The frame is in half floats, so no dither.
 float4 comp_ps(float2 vpos : VPOS) : COLOR
 {
-    float2 full = floor(vpos) + 0.5;
-    float  zf = min(view_z(tex2D(s_zfull, full * k_lr.zw).r), 60000.0);   // as the half-size depth
-    float2 h = full * 0.5 - 0.5;            // in half pixels, a half pixel's centre on an integer
-    float2 b = floor(h + 0.5), fr = h - b;  // the nearest half pixel, and where this one lies from it
-    float  zi[3][3], edge = 0.0;
-    [unroll] for (int j = -1; j <= 1; j++) {
-        [unroll] for (int i = -1; i <= 1; i++) {
-            zi[j + 1][i + 1] = tex2D(s_zlow, (clamp(b + float2(i, j), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy).r;
-            edge = max(edge, abs(zi[j + 1][i + 1] - zf) / zf);
-        }
-    }
-    float4 c = 0.0;
-    [branch] if (edge > 0.03) {
-        // At a depth edge: the 25 taps one by one, each weighted by its depth (the outer
-        // ring by its nearest inner neighbour's, which is read already).
-        float  wsum = 0.0;
-        [unroll] for (int y = -2; y <= 2; y++) {
-            [unroll] for (int x = -2; x <= 2; x++) {
-                float2 tw = saturate(1.0 - abs(float2(x, y) - fr) * (2.0 / 5.0));   // a tent 5 pixels wide
-                float2 uv = (clamp(b + float2(x, y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;   // never outside the viewport
-                float  zl = zi[clamp(y, -1, 1) + 1][clamp(x, -1, 1) + 1];
-                float  w = tw.x * tw.y / (1e-3 + abs(zl - zf) / zf);
-                c += tex2D(s_gas, uv) * w;
-                wsum += w;
-            }
-        }
-        c /= max(wsum, 1e-6);
-    } else {
-        // Elsewhere (nearly everywhere) the same tent, with no depth to weigh by: its taps
-        // in pairs, each pair one bilinear read between them, 9 reads for 25.
-        float2 w0 = saturate(1.0 - abs(-2.0 - fr) * 0.4), w1 = saturate(1.0 - abs(-1.0 - fr) * 0.4);
-        float2 w2 = saturate(1.0 - abs(fr) * 0.4), w3 = saturate(1.0 - abs(1.0 - fr) * 0.4), w4 = saturate(1.0 - abs(2.0 - fr) * 0.4);
-        float2 pa = -2.0 + w1 / max(w0 + w1, 1e-6), pb = w3 / max(w2 + w3, 1e-6);
-        float2 wa = w0 + w1, wb = w2 + w3;
-        float2 o[3] = { pa, pb, float2(2.0, 2.0) };
-        float2 ow[3] = { wa, wb, w4 };
-        float  wsum = 0.0;
-        [unroll] for (int y = 0; y < 3; y++) {
-            [unroll] for (int x = 0; x < 3; x++) {
-                float  w = ow[x].x * ow[y].y;
-                float2 uv = (clamp(b + float2(o[x].x, o[y].y), k_lrv.xy, k_lrv.zw) + 0.5) * k_lr2.xy;
-                c += tex2D(s_gasl, uv) * w;
-                wsum += w;
-            }
-        }
-        c /= max(wsum, 1e-6);
-    }
-    // EdgeRefine=1: at a depth edge, the gas drawn at full size (edge_ps marked where),
-    // filtered over the 3x3 full pixels about this one at its own depth, as the tent
-    // smooths the half-size gas's grain; faded in as the depths spread, so the change
-    // from one to the other draws no line.
-    float  wr = k_lr.y > 1.5 ? 1.0 : k_lr.y > 0.5 ? smoothstep(EDGE_LO, EDGE_HI, tex2D(s_edge, quv(floor(b * 0.5))).r) : 0.0;
-    [branch] if (wr > 0.0) {
-        float4 cf = 0.0;
-        float  wf = 0.0;
-        [unroll] for (int y = -1; y <= 1; y++) {
-            [unroll] for (int x = -1; x <= 1; x++) {
-                float2 uv = clamp(full + float2(x, y), k_lrv.xy * 2.0 + 0.5, k_lrv.zw * 2.0 + 1.5) * k_lr.zw;   // inside the view
-                float  zq = min(view_z(tex2D(s_zfull, uv).r), 60000.0);
-                float  w = (2.0 - abs(x)) * (2.0 - abs(y)) * step(abs(zq - zf), 0.01 * zf);
-                cf += tex2D(s_gasf, uv) * w;
-                wf += w;
-            }
-        }
-        c = lerp(c, cf / wf, wr);
-    }
+    float4 c = tex2D(s_gas, (floor(vpos) + 0.5) * k_lr.zw);
     float  t = c.a, e = exp(-t);
     float3 g = c.rgb * (t > 1e-4 ? (1.0 - e) / t : 1.0 - 0.5 * t);
-    float  u = tex2D(s_blue, (vpos + 0.5) / 64.0).r;
-    return float4(floor(g * 255.0 + u) / 255.0, k_lr.x * (1.0 - e));
+    return float4(g, k_lr.x * (1.0 - e));
 }

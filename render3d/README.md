@@ -1054,7 +1054,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Resolution` 2 for half size, `Obscure` 0.5, `Samples` 2, `EdgeRefine` 1, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1108,7 +1108,7 @@ did. The moon's `oreglow` sprite node (the nimbus) is drawn at `Step::Translucen
 `moonpulse` animation on the instance's clock.
 
 **Nebulae** (`nebulae.rs`, `world_nebula.hlsl`): `Nebulae.asi`, its decisions kept
-(the envelope, the bake, the half-size slices on a ladder fixed in distance from the
+(the envelope, the bake, the slices on a ladder fixed in distance from the
 eye, per view, the blue-noise thresholds that stay put, the spectral noise). A class
 with a recipe draws as gas at `Step::Translucent`, its billboards skipped in the object
 loop; any other is left to the particles module. Every nebula the loop reaches is
@@ -1118,6 +1118,15 @@ The Key is the main view's (the action camera's view keeps the bake), the ships'
 shadows the hulls module's map (`hulls::shadow_map()`, sampler 8). A ghosted nebula of
 a gas class keeps its gas: slot 3 of the `GameObjectSpirit` vtable (0x6b1ca4) is
 wrapped. Everything is in the default pool; a `Reset` bakes again.
+The gas is drawn at full size into a half-float target whose depth buffer is a RESZ copy
+of the scene's (so hulls hide it pixel for pixel, by the hardware's test) and composited
+a pixel for a pixel; `Nebulae.asi`'s half-size pass, its depth-weighted 5x5 tent and
+`EdgeRefine=` are gone. Measured on the bench (`nebula` scene, 1920x1080, RX 5700), the
+pass costs 8.2 ms against the half-size path's 3.4 ms, and about 0.14 ms a slice
+(`Slices=20` 5.3 ms, `80` 10.2 ms; `Samples=1` saves only 0.2 ms: the slices' blending,
+not their reads, is the cost). The tent had also hidden the slices' blue-noise jitter
+(about 10 screen pixels wide): at 40 slices the grain is about twice the half-size
+path's, and it takes 80 to match it.
 
 **Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view
 (`Module::lights`), a point light at its centre (the instance's transform +0x44 plus

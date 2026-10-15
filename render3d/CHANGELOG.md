@@ -4,6 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.3.0 — 2026-10-15
+
+### Changed
+- Nebulae: the gas is drawn at full size into a half-float target with the scene's
+  depth (RESZ into INTZ) as its depth buffer, and composited a pixel for a pixel, with
+  no dither. 8.2 ms against 3.4 ms on the bench at 1080p (README.md, "Nebulae").
+
+### Removed
+- Nebulae: the half-size pass, its depth-weighted composite and the edge refinement;
+  the `[Nebulae]` keys `Resolution=` and `EdgeRefine=`.
+
+Installed, not yet seen in game.
+
 ## 0.2.0 — 2026-10-15
 
 ### Added
