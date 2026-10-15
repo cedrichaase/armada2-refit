@@ -10,11 +10,11 @@ replacement movies, the menu plates — have nothing to install and must say so 
 than fail; the code layers install as usual, the cutscene proxy included. With no
 `.mp4` beside any `.bik`, `binkw32.dll` passes every movie to the real DLL
 (`binkw32_orig.dll`), which is what `bink ...` lines in its log mean. With no plate,
-`Menus.asi` draws black sides. `Planets.asi` needs no assets at all; its log line says
-both of its sites in `Armada2.exe` were found and patched, and `QOL.asi`'s that it scaled
+`Menus.asi` draws black sides. `QOL.asi`'s log says it scaled
 the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Render3D.asi` replaces `Venting.asi`,
-`Sky.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Fog.asi` and `Specials.asi`
-(`render3d/install.sh` takes them out) with modules that need no assets: the sky
+`Sky.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Fog.asi`, `Specials.asi` and
+`Planets.asi` (`./install` skips them) with modules that need no assets: the planets
+are the world module's own sphere, the sky
 recipes are built in, the vents, fire, shields, welds and special weapons are procedural, and
 the fog is the engine's own texture. Its log names each module it loaded.
 
@@ -24,7 +24,7 @@ the fog is the engine's own texture. Its log names each module it loaded.
 4. Expect "Menus.log" contains "hooks=7/7".
 5. Expect "BinkProxy.log" contains "BinkProxy loaded".
 6. Expect "BinkProxy.log" contains "bink bitmaps".
-7. Expect "Planets.log" contains "sites patched 2/2".
+7. Expect "Render3D.log" contains "module world: loaded".
 8. Expect "QOL.log" contains "FASTSCROLL_COEFFICIENT now 0.0125".
 9. Expect "Render3D.log" contains "module particles: loaded".
 10. Expect "Render3D.log" contains "frame: both views come through render3d".

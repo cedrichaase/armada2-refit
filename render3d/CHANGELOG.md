@@ -66,6 +66,9 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   does not know is the engine's; keys in `[Specials]`.
 
 ### Changed
+- `install.sh --superseded` names the layers whose plugins the modules that are on
+  replace; `./install` skips them instead of installing them for this to take out. With
+  the world module on, `Planets.asi` goes too (models 4.4.0).
 - The state saved around each draw is a recorded block of what our draws change, not
   the whole device state (`gfx::Guard`): render3d's CPU time in a battle 4.7 -> 1.3 ms
   a view, below the plugins' 1.8 ms (`PERF.md`).

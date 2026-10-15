@@ -7,7 +7,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 11.41.0 — 2026-10-15
 
-Layers: render3d 0.2.0, testbench 3.17.0.
+Layers: render3d 0.2.0, testbench 3.17.0, models 4.4.0.
 
 ### Added
 - render3d draws the 3D view as its own sequence of steps, its modules taking over
@@ -20,11 +20,13 @@ Layers: render3d 0.2.0, testbench 3.17.0.
   plugins it replaces; it now takes less CPU than they did (`render3d/PERF.md`).
 
 ### Changed
-- `./install` runs `render3d/install.sh` last; it takes out the plugins its modules
-  replace: Sky, Explosions, Shields, Repair, Fog, Specials, Venting, Surfaces, Nebulae
-  and Lighting. Scenario `no-assets` checks the modules instead; scenario `render3d-match` plays a
-  match with a battle on render3d, and `render3d-mode-switch` changes the display mode
-  in one (testbench 3.17.0).
+- `./install` no longer installs the plugins render3d's modules replace
+  (`render3d/install.sh --superseded`), `Planets.asi` among them (models 4.4.0), and
+  runs `render3d/install.sh` last, which takes out any an earlier install left: Sky,
+  Explosions, Shields, Repair, Fog, Specials, Venting, Surfaces, Nebulae, Lighting and
+  Planets. Scenario `no-assets` checks the modules instead; scenario `render3d-match`
+  plays a match with a battle on render3d, and `render3d-mode-switch` changes the
+  display mode in one (testbench 3.17.0).
 
 Installed, not yet seen in game.
 

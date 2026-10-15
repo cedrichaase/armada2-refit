@@ -6,6 +6,15 @@ The game's 3D geometry: the widened mission loading screen (`logo-sod.py`,
 selection bubble (`select-sod.py`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 4.4.0 — 2026-10-15
+
+### Added
+- `install.sh --no-planets` installs everything but `Planets.asi`, and
+  `--remove-planets` takes out `Planets.asi` alone; `./install` passes the first while
+  render3d's world module draws the planets. The SOD rewrites stay in both.
+
+Installed, not yet seen in game.
+
 ## 4.3.0 — 2026-10-13
 
 ### Added

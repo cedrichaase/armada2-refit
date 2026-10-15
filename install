@@ -38,7 +38,12 @@
 #   render3d   render3d/install.sh           Render3D.asi: the 3D view through render3d (HDR,
 #                                            MSAA, bloom, its modules); last, because it
 #                                            takes out MSAA.asi and each plugin a module of
-#                                            its replaces
+#                                            its replaces that an earlier install left
+#
+# The layers whose plugins render3d's modules replace (render3d/install.sh --superseded:
+# lighting, sky, surfaces, nebulae, explosions, shields, repair, venting, specials, fog,
+# and the models layer's Planets.asi) are skipped, not installed and taken out again. A
+# module set to 0 under [Modules] in the game's Render3D.ini brings its plugin back.
 #
 # The code layers need nothing but this checkout. The asset layers install what is
 # BUILT in A2_DATA (a2env.sh; default ~/.local/share/armada2-refit): with nothing
@@ -61,16 +66,21 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/grid/install.sh"
 "$here/postfx/renderer-config.sh" --stage 3
 "$here/a2tex" install
-"$here/models/install.sh"
-"$here/lighting/install.sh"
-"$here/sky/install.sh"
-"$here/surfaces/install.sh"
-"$here/nebulae/install.sh"
-"$here/explosions/install.sh"
-"$here/shields/install.sh"
-"$here/repair/install.sh"
-"$here/venting/install.sh"
-"$here/specials/install.sh"
-"$here/fog/install.sh"
+# The plugins render3d's modules replace are not installed at all (render3d/install.sh
+# --superseded names them, from [Modules] in the game's Render3D.ini).
+replaced=$("$here/render3d/install.sh" --superseded)
+is_replaced() { grep -qx "$1" <<< "$replaced"; }
+if is_replaced planets; then
+    "$here/models/install.sh" --no-planets
+else
+    "$here/models/install.sh"
+fi
+for layer in lighting sky surfaces nebulae explosions shields repair venting specials fog; do
+    if is_replaced "$layer"; then
+        echo "$layer: not installed, render3d draws it"
+    else
+        "$here/$layer/install.sh"
+    fi
+done
 "$here/cutscenes/binkproxy/install.sh"
 "$here/render3d/install.sh"   # last: it removes the plugins its modules replace

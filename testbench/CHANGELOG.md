@@ -29,6 +29,8 @@ versions". Newest first. The why is in [`README.md`](README.md).
   staging recipes per topic. `a2test run -j 1` named for one game at a time.
 
 ### Changed
+- Scenario `no-assets`: `Planets.asi` is no longer installed beside render3d; the world
+  module's load is checked in its place.
 - Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
   Repair, Fog, Specials and Venting, it checks that `Render3D.asi` loaded each module.
 
