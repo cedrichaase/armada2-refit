@@ -76,7 +76,11 @@ the install and a headless display. **Keep the ID `session start` prints, pass
 `--session ID` on every `drive`, and end with `./a2test session stop ID`** (the ID is
 required). Other jobs run sessions on the same bench: stop only the sessions you
 started, never one from `session list` you don't recognise (`testbench/README.md`,
-"Which session a command acts on"). Write regression scenarios in `testbench/scenarios/` for fixes
+"Which session a command acts on"). **The bench runs on the user's own GPU**: a GPU
+hang in a bench game crashed the user's desktop once, so run one game at a time
+(`a2test run -j 1`), at `--res 1280x720` unless fine detail is judged, and stop
+sessions promptly. Before driving the game, read `testbench/README.md`, "Operating the
+game: what agents learned", and the staging recipes in `testbench/operating/`. Write regression scenarios in `testbench/scenarios/` for fixes
 worth keeping fixed. A bench pass is evidence for the user, not their sign-off
 ("Finishing work" still applies).
 **To test a checkout as installed**, `./a2test session start --install <checkout>` (or

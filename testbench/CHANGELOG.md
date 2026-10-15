@@ -24,8 +24,9 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - Scenario `render3d-construction` and scene `construction`: a construction ship
   building a station, drawn by render3d. `Scene.asi` command `build <rig> <odf> <x y z
   | object>` orders a construction ship to build there (resources topped up).
-- `testbench/operating/`: what agents learned about driving the game on the bench, one
-  file per piece of work.
+- README "Operating the game: what agents learned" (one game at a time, 720p, timings,
+  A/B at the same moment, scenario pacing), and `testbench/operating/`, one file of
+  staging recipes per topic. `a2test run -j 1` named for one game at a time.
 
 ### Changed
 - Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
