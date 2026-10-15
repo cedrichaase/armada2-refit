@@ -261,6 +261,62 @@ Sovereign's shield ellipsoid glowed gold, brightest at its rim; `Shields.log`: `
 `DownLight`, `DownLightColour`, `DownLightReach`; `Shells`, and per shell `[Shell.<name>]`
 `On`, `Colour`, `Brightness`, `Spot`, `Ring`, `Lattice`. Each is described in the file.
 
+## Art direction: shield hits
+
+The user's direction (2026-10-15), not yet in `Shields.ini` or the shader. A shield hit
+should read as **a misty, glowing dispersal of light over a curved ellipsoid that
+encloses the ship. Only the area around the impact is actually lit up.** Federation
+shields are a pale, light blue; Klingon shields are the same pattern in a strong,
+bright green.
+
+What that means, filled in from the references (frames from *Voyager* and *DS9*: the
+Intrepid and Prometheus classes taking hits; *Star Trek VI*: a Klingon Bird-of-Prey's
+shield; kept out of the repository):
+
+- **The shell is implied, not drawn.** Nowhere is the ellipsoid visible as a surface
+  of its own. You read its curve from how the lit area bends: the glow wraps around the
+  ship as if painted on a curved surface. Where the lit area reaches the shell's
+  silhouette, it ends on a soft but definite curved edge against space (the
+  Bird-of-Prey's and the Prometheus's frames). Away from the hit there is nothing:
+  space and the hull show as if no shield were there.
+- **Mist, not a surface pattern.** Around the impact the light is soft, cloudy haze
+  with uneven density, like lit vapour rather than a smooth glow. Near the hit it breaks
+  into faint streaks fanning outwards along the shell. On the Bird-of-Prey these are
+  clear rays, a sunburst from the impact point, about as long as the lit area's radius.
+  There is no hex lattice and no grid (in line with the 2026-10-12 decision under
+  "The draw").
+- **A bright point where the shot lands.** Where the beam or torpedo meets the shell
+  there is a small, near-white flare (Bird-of-Prey about 205,200,187; Prometheus about
+  254,230,211, warmed by the orange disruptor). The beam visibly stops there, at the
+  shell, not at the hull.
+- **The falloff is wide and soft.** In the Intrepid long shot the glow is brightest
+  just beside the impact, at about 63,163,220, and fades to the sky over about a fifth
+  of the frame. On the Bird-of-Prey the green is still about 42,116,1 at 40% of the
+  lit radius and about 1,36,2 at 80%. The lit area is large, a good part of the ship's
+  length, but it never covers the whole shell.
+- **The hull under the hit is lit.** On the Intrepid close-up the saucer under the
+  impact is washed pale blue-white, about 179,202,247 at its brightest and 113,129,175
+  a little further off. The hull far from the hit stays dark (15,23,30). The shield
+  light falls on the hull as well as glowing in front of it: a light on the hull is
+  part of the look, not an extra.
+- **Colour by faction, saturated in the falloff and white at the core.**
+  - Federation: light blue to periwinkle. The haze over space reads lavender-grey where
+    it is thin (82,78,91 on the Prometheus).
+  - Klingon: pure green, with red and blue near zero in the falloff (3,80,1).
+
+Measured against today's look ("The draw"): the hot spot, white core, faction colour
+and the glow that stays near the hit already fit. Not in the references:
+- the ring running out from the hit;
+- a rim that brightens where the shell is seen edge on, in place of an edge that just
+  ends where the lit mist stops.
+
+Missing from today's look:
+- the misty, uneven texture;
+- the rays fanning out from the impact;
+- the light on the struck hull.
+
+The next pass should settle whether the ring and the rim stay.
+
 ## On the bench
 
 `SCENE=shields` (`testbench/scene/scenes/shields.ini`): a Galaxy (phasers) and a Klingon
