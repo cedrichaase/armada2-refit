@@ -14,7 +14,7 @@ Layers: render3d 0.2.0, testbench 3.17.0.
   every part from the engine and the plugins: hulls, effects (explosions, shield hits,
   repair welding, debris), ordnance (shots, special weapons, the warp flash), the sky,
   the fog of war, grid and selection, particles and vents, and planets, moons,
-  asteroids and nebulae (render3d 0.2.0).
+  asteroids and nebulae, and the special-object effects (render3d 0.2.0).
 
 ### Changed
 - `./install` runs `render3d/install.sh` last; it takes out the plugins its modules

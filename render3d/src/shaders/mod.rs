@@ -10,6 +10,7 @@ pub mod particles_vent;
 pub mod post;
 pub mod sky;
 pub mod sod;
+pub mod specials;
 pub mod world_nebula;
 pub mod world_planet;
 pub mod world_rock;

@@ -13,6 +13,10 @@ versions". Newest first. The why is in [`README.md`](README.md).
   hides nothing; fog off).
 - Scenario `render3d-mode-switch`: a display mode changed in Graphics Settings during
   the `showcase` battle; render3d must take the new device and draw the same scene.
+- Scenario `render3d-specialfx`: the special-object effects (Computer Override, Energy
+  Dissipator, Psionic Disruption) through render3d's `specials` module.
+- `testbench/operating/`: what agents learned about driving the game on the bench, one
+  file per piece of work.
 
 ### Changed
 - Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,

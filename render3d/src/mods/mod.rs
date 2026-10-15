@@ -15,6 +15,7 @@ pub mod ordnance;
 pub mod particles;
 pub mod overlays;
 pub mod sky;
+pub mod specials;
 pub mod world;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -125,6 +126,7 @@ pub fn init() {
     add(Box::new(hulls::Hulls::default()), true);
     add(Box::new(effects::Effects::new()), true);
     add(Box::new(ordnance::Ordnance::new()), true);
+    add(Box::new(specials::Specials::default()), true);
     add(Box::new(sky::Sky::default()), true);
     add(Box::new(overlays::Overlays::default()), true);
 }

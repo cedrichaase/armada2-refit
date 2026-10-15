@@ -39,6 +39,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   the engine's own scan textures, the tactical grid, the selection bubbles and the
   fog-of-war ghosts of stations; keys in `[Overlays]`. The build ghost and footprints
   stay the engine's.
+- Module `specials` (on, after `particles`): `Step::Specials`, the timed special-object
+  effects (Computer Override, Energy Dissipator, Psionic Disruption): their cloud
+  emitters as render3d's particles, plus a shader layer over the struck hull (Borg
+  circuitry, a film of veins, violet ripples) and a light at each cloud; an effect it
+  does not know is the engine's; keys in `[Specials]`.
 
 ### Changed
 - `install.sh` removes each plugin a module that is on replaces (effects: Explosions,

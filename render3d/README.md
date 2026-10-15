@@ -32,7 +32,7 @@ What it does today:
 
 Still the engine's (falling back per object or per effect): mining beams, mines and
 model-drawn special weapons without a recipe, construction welding and worker bees,
-nanites, special-object effects (assimilation, boarding parties), emitters on ordnance
+nanites, emitters on ordnance
 and effect instances, the Evolver, holograms and the build-placement ghost.
 
 ## Building and installing
@@ -173,7 +173,7 @@ is in the depth buffer.
   0x62f240, `RegisterLight` 0x62d250), which the engine deletes the records of at the
   view's end, so both the engine's draws and the scene layer see them.
 - **Still the engine's**: construction (`BuildingEffect`, the bees and drones), nanites,
-  `Step::Specials` (the special-object effects), and every spark that is not a weld.
+  and every spark that is not a weld. `Step::Specials` is the `specials` module's.
 
 ### ordnance
 
@@ -263,6 +263,82 @@ module's own keys, in `Render3D.ini` `[Ordnance]`:
 | `Recolour` | 1 | torpedo and pulse lights in their sprite's colour |
 | `PhaserLights` | 1 | the phasers' emitter and impact lights (`PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift`, `PhaserImpact`, `PhaserImpactStart`, `PhaserImpactRange`, `PhaserImpactLift`: `Lighting.ini`'s) |
 | `Survey` | 0 | log every ordnance ODF the first time it shows, with its vtable and `Submit` |
+
+### specials
+
+`src/mods/specials/`, `shaders/specials.hlsl`, on by default (`[Modules] specials=0`
+leaves it to the engine). `Step::Specials`: the special-object effects, which stock
+draws in `SpecialObjectEffect::RenderAll` (0x60be90, called at 0x598372).
+
+**What stock draws there.** `RenderAll` walks `SpecialObjectEffect::mAllEffects` (its
+head node pointer at 0x7a8c0c; each node's +8 is an effect) and calls each effect's
+`Render(cam)` (vtable slot 0). The base `SpecialObjectEffect::Render` (0x49ea70) draws
+nothing (`ConvertEffect`, `Disable`, `SlowEffect`, `VampireEffect`...).
+`TimedSpecialObjectEffect::Render` (0x60c460, every `Timed*` class, `BoardingParty`,
+`LineOfSightEffect`) draws the `ST3D_Instance` embedded at +0x2c only when the weapon
+gave it a database (+0xac, the instance's +0x80) and a visual target (+0xb0): the
+instance is put at the target's transform (`Entity::GetTransform`) and rendered.
+`TimedChangeTeam::Render` (0x60e090) also wants a node (+0xc8) and a target that is a
+craft (flags bit 8) and not expired (+0x27), and puts it at that node of the target
+(`Entity::GetWorldTransform`, 0x4cff90). Three weapons give an effect a database, each
+from its ordnance class: `ComputerOverride::Hit` (a `TimedChangeTeam`, class +0x190),
+`MicroOrganism::Hit` (a `TimedDrain`, class +0x188) and `PsionicDisruption::Simulate`
+(a `TimedCrewDisruption`, class +0x160): the ordnance ODF's `particleArt`, a SOD that
+is a single cloud emitter (`wovremit`: `override`, `wmicremit`: `microorg`,
+`psionicdisruption`: `psiondis`; Cardassian `microorgs` names `wmicremi2`, which no
+SOD is). Everything else in the list draws nothing in this step: the boarding parties
+(their transporter shimmer is the billboard effect, the particles module's), the
+hologram (`TimedHoloEffect` keeps its own instance at +0xb4, drawn from
+`GameObject::RenderInternal`) and the rest of the timed effects.
+
+**What the module does.** Once a frame (in `lights()`, after the particles module has
+simulated) it walks the same list. For each effect stock would draw it finds the SOD:
+the effect's weapon class (+0x4) holds its ordnance class at +0x18
+(`OrdnanceClass::Find` of the weapon's `ordName`, in `WeaponClass`'s constructor), whose
+cPrjID (+0x150, `cPrjID::GetOdfName` 0x6593a0) names the ordnance ODF; and hands the
+instance's emitters to the particles module at stock's placement (`particles::feed`),
+so the cloud is our particles, drawn at `Step::Translucent` in stock's look. The step
+then draws only what it cannot take: an effect of a class whose `Render` is not one of
+the three above, or whose SOD does not load, is rendered by the engine (its own
+`Render`), as stock. Without the particles module running the whole step is the
+engine's.
+
+**The looks** (`look.rs`, `specials.hlsl`), new, on top of stock's cloud, for as long as
+the effect is listed (effect +0x28: seconds left; +0xc: finished): a layer of light
+over the hull of the object the effect is on (+0x8, if it is still in the object list,
+not expired and seen by the player; posed by the hulls module, `hulls::posed`; a
+cloaked hull gets none), additive, depth-tested, pushed out a little along the normal,
+in the object's own frame so it stays on the hull; and a point light at the cloud. Up
+over `Rise` seconds, down over the kind's last `Fade` seconds; everything above 1 blooms.
+
+- **Computer Override** (`TimedChangeTeam`): green Borg circuitry (traces laid out per
+  face of the object's box, nodes, pulses running along them) creeping over the ship
+  from the side the Borg ship is on, with a bright front. Stock's cloud of coloured stars
+  sits on the Borg ship while the beam flies and on the victim after the hit.
+- **Energy Dissipator** (`TimedDrain`): a pink film of veins and breathing blobs, in the
+  spores' colour.
+- **Psionic Disruption** (`TimedCrewDisruption`): violet interference ripples. The
+  effect is renewed every half second while the beam holds, so it fades over its last
+  quarter second only.
+
+| Key (`[Specials]`) | Default | |
+|---|---|---|
+| `Enable` | 1 | 0: the engine draws the step (read again every 2 s with `Reload=1`, for comparing at the same moment) |
+| `Overlay`, `Lights` | 1 | 0: no layer over the hull / no light |
+| `Survey` | 1 | logs each effect class and name the first time it is seen |
+| `Rise` | 0.4 | seconds the looks take to come up |
+| `Push` | 0.004 | how far the layer sits off the hull, in radii |
+| `RimPower`, `CoreWhite` | 2.5, 0.35 | the layer's rim; how much its hot cores whiten |
+| `<Kind>` | 1 | `Override`, `Drain`, `Psionic`: 0 turns that kind's look off |
+| `<Kind>Colour`, `<Kind>Gain`, `<Kind>Strength` | | the layer's colour (0..255), times the gain (light), and strength |
+| `<Kind>Creep`, `<Kind>Scale`, `<Kind>Rim`, `<Kind>Fade` | | seconds to cover the hull, pattern cells per radius, rim, fade-out seconds |
+| `<Kind>LightColour`, `<Kind>LightBrightness`, `<Kind>LightRange` | | the light at the cloud (range in the ship's radii) |
+| `LogEvery` | 600 | frames between log lines |
+
+Seen on the bench (2026-10-15, `specials` scene, 1280x720), against stock at the same
+moment (`Enable=0` with `Reload=1`): the clouds sit where the engine puts them; the
+layers come up on the Sovereign as described, main view and with the HUD's inset.
+Scenario `render3d-specialfx`.
 
 ### sky
 
@@ -485,9 +561,9 @@ in `Render3D.ini [Particles]`).
   while its current instance (`Storm3D+0x100`) is an object we own, or none (the global
   list), is dropped. With the hulls module on the engine never renders those instances;
   with it off, it renders them and simulates their lists as before, and only their draw
-  is dropped. Every other instance's particles (the emitters on weapons' and special
-  effects' SODs: contrails, rockets, rifts, clouds) are still the engine's, drawn into
-  our target. A module that draws such an instance in the engine's place calls
+  is dropped. The special-object effects' clouds are fed by the `specials` module.
+  Every other instance's particles (the emitters on weapons' SODs: contrails, rockets,
+  rifts) are still the engine's, drawn into our target. A module that draws such an instance in the engine's place calls
   `particles::feed` with it every frame instead. (The freighter's `latinum_spray`,
   which `Freighter::RenderInternal`, 0x4b22c0, looks up by name, is in no stock SOD.)
 - **The look.** Drawn at `Step::Translucent` as one batch per texture and material

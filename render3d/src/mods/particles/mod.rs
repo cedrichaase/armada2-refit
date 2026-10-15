@@ -87,6 +87,11 @@ pub fn feed(key: usize, sod: &str, world: &M34, v: &View) {
     }
 }
 
+/// Whether the particles module draws this view (its emitters may be fed).
+pub fn live() -> bool {
+    unsafe { LIVE }
+}
+
 pub struct Particles {
     batch: Batch,
     vdraw: vent::Drawer,
