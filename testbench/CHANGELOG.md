@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.17.0 — 2026-10-15
+
+### Changed
+- Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
+  Repair, Fog and Specials, it checks that `Render3D.asi` loaded each module.
+
+Installed, not yet seen in game.
+
 ## 3.16.0 — 2026-10-15
 
 ### Added
@@ -13,9 +21,6 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `Render3D.log` and `Render3D.ini` are cleared at launch and gathered with the other
   logs.
 
-### Changed
-- Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
-  Repair, Fog and Specials, it checks that `Render3D.asi` loaded each module.
 
 Installed, not yet seen in game.
 

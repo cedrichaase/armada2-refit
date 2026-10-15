@@ -7,17 +7,18 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 11.41.0 — 2026-10-15
 
-Layers: render3d 0.2.0, testbench 3.16.0.
+Layers: render3d 0.2.0, testbench 3.17.0.
 
 ### Added
 - render3d draws the 3D view as its own sequence of steps, with modules taking parts
   over from the engine and the plugins: effects (explosions, shield hits, repair
-  welding, debris), ordnance (shots, special weapons, the warp flash), the sky, the fog of war, grid and selection (render3d 0.2.0).
+  welding, debris), ordnance (shots, special weapons, the warp flash), the sky, the fog of war, grid
+  and selection (render3d 0.2.0).
 
 ### Changed
 - `./install` runs `render3d/install.sh` last; it takes out the plugins its modules
   replace (Sky, Explosions, Shields, Repair, Fog, Specials). Scenario `no-assets` checks
-  the modules instead (testbench 3.16.0).
+  the modules instead (testbench 3.17.0).
 
 Installed, not yet seen in game.
 
