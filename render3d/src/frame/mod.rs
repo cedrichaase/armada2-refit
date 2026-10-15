@@ -98,6 +98,9 @@ unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESU
         f.failed = None;
     }
     crate::mods::reset();
+    crate::assets::reset();
+    crate::gfx::reset();
+    crate::scene::reset();
     log!("frame: device Reset");
     match unsafe { RESET } {
         Some(r) => unsafe { r(dev8, params) },

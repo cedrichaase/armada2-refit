@@ -159,6 +159,28 @@ pub fn list_files(pattern: &str) -> Vec<String> {
     out
 }
 
+/// Entries matching a pattern, files and directories, as (name, is_directory).
+pub fn list_entries(pattern: &str) -> Vec<(String, bool)> {
+    let p = cstr(pattern);
+    let mut out = Vec::new();
+    unsafe {
+        let mut fd: FindData = core::mem::zeroed();
+        let h = FindFirstFileA(p.as_ptr(), &mut fd);
+        if h == INVALID_HANDLE {
+            return out;
+        }
+        loop {
+            let n = fd.name.iter().position(|&c| c == 0).unwrap_or(260);
+            out.push((String::from_utf8_lossy(&fd.name[..n]).into_owned(), fd.attrs & FILE_ATTRIBUTE_DIRECTORY != 0));
+            if FindNextFileA(h, &mut fd) == 0 {
+                break;
+            }
+        }
+        FindClose(h);
+    }
+    out
+}
+
 /// Seconds from a monotonic counter.
 pub fn now() -> f64 {
     let mut f = 0i64;

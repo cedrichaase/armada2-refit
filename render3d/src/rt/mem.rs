@@ -126,6 +126,58 @@ pub unsafe extern "C" fn strlen(s: *const u8) -> usize {
     n
 }
 
+// 64-bit division and remainder, which LLVM leaves to the C runtime's helpers on this
+// target (float formatting needs them). Each takes two 64-bit values on the stack,
+// pops them itself and returns in edx:eax: `stdcall`, under the undecorated name
+// (`\x01` stops LLVM adding `@16`). Shift-and-subtract, so no 64-bit division
+// appears inside them to call back into themselves.
+fn udivmod(n: u64, d: u64) -> (u64, u64) {
+    if d == 0 {
+        return (u64::MAX, n);
+    }
+    let (mut q, mut r) = (0u64, 0u64);
+    let mut i = 64;
+    while i > 0 {
+        i -= 1;
+        r = (r << 1) | ((n >> i) & 1);
+        if r >= d {
+            r -= d;
+            q |= 1u64 << i;
+        }
+    }
+    (q, r)
+}
+
+
+extern "stdcall" fn aulldiv(n: u64, d: u64) -> u64 {
+    udivmod(n, d).0
+}
+
+
+extern "stdcall" fn aullrem(n: u64, d: u64) -> u64 {
+    udivmod(n, d).1
+}
+
+
+extern "stdcall" fn alldiv(n: i64, d: i64) -> i64 {
+    let q = udivmod(n.unsigned_abs(), d.unsigned_abs()).0 as i64;
+    if (n < 0) != (d < 0) { q.wrapping_neg() } else { q }
+}
+
+
+extern "stdcall" fn allrem(n: i64, d: i64) -> i64 {
+    let r = udivmod(n.unsigned_abs(), d.unsigned_abs()).1 as i64;
+    if n < 0 { r.wrapping_neg() } else { r }
+}
+
+core::arch::global_asm!(
+    ".globl __aulldiv", "__aulldiv:", "jmp {a}",
+    ".globl __aullrem", "__aullrem:", "jmp {b}",
+    ".globl __alldiv", "__alldiv:", "jmp {c}",
+    ".globl __allrem", "__allrem:", "jmp {d}",
+    a = sym aulldiv, b = sym aullrem, c = sym alldiv, d = sym allrem,
+);
+
 // The MSVC stack probe: eax = bytes wanted. Touches each page down to the new stack
 // top, then moves esp there, keeping the return address on top.
 core::arch::global_asm!(

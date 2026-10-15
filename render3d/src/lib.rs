@@ -6,13 +6,16 @@
 extern crate alloc;
 
 pub mod rt;
+pub mod assets;
 #[macro_use]
 pub mod d3d;
 pub mod config;
 pub mod engine;
 pub mod frame;
+pub mod gfx;
 pub mod math;
 pub mod mods;
+pub mod scene;
 #[rustfmt::skip]
 pub mod shaders;
 

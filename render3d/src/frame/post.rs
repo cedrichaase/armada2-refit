@@ -5,7 +5,7 @@
 //! view's rectangle (scaled down for each bloom level), and every tap is clamped to it.
 use crate::config::Config;
 use crate::d3d::*;
-use crate::shaders::*;
+use crate::shaders::post::*;
 use alloc::vec::Vec;
 use crate::log;
 use core::ffi::c_void;

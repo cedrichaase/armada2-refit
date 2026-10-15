@@ -153,6 +153,7 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         time: engine::sim_time(),
         frame,
     };
+    crate::scene::begin_view(&v);
     mods::begin_view(&v);
     unsafe {
         // 8: sky, stars, background objects; then the depth is cleared for the scene.
@@ -183,8 +184,21 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         if !mods::step(Step::Specials, &v) {
             cdecl1(via(SITE_SPECIAL, FN_SPECIAL), cam);
         }
+        // 15: game features. GameFeature_RenderAll draws each feature whose flags
+        // (`+0x20`) have bit 4 through its `Render(cam, isMain)` (vtable `+0x20`); a
+        // module may take any one of them.
         if !mods::step(Step::Features, &v) {
-            cdecl2(via(SITE_FEATURES, FN_FEATURES), cam, main as u32);
+            if hook::call_target(SITE_FEATURES) == Some(FN_FEATURES) {
+                engine::for_each_feature(|f| {
+                    if f != 0 && engine::field_u8(f, 0x20) & 4 != 0 && !mods::feature(f, &v) {
+                        let r: unsafe extern "thiscall" fn(usize, usize, u32) =
+                            core::mem::transmute(engine::field(engine::vtable(f), 0x20));
+                        r(f, cam, main as u32);
+                    }
+                });
+            } else {
+                cdecl2(via(SITE_FEATURES, FN_FEATURES), cam, main as u32);
+            }
         }
         if !mods::step(Step::Warp, &v) {
             cdecl1(via(SITE_WARP, FN_WARP), cam);
@@ -200,6 +214,7 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         if !mods::step(Step::Particles, &v) {
             this1(via(SITE_PARTICLES, FN_PARTICLES), s3d, s3d + 0x68);
         }
+        crate::scene::flush(&v);
         mods::step(Step::Translucent, &v);
         let dvt = engine::vtable(st3d);
         this0(engine::field(dvt, DEV_FLUSH), st3d);

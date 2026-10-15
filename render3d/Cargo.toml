@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 libm = "0.2"
+a2fmt = { path = "a2fmt" }
 
 [profile.release]
 panic = "abort"

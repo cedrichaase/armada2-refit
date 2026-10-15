@@ -1,3 +1,4 @@
+// entries: vs_quad:vs_3_0:VS_QUAD ps_prefilter:ps_3_0:PS_PREFILTER ps_down:ps_3_0:PS_DOWN ps_up:ps_3_0:PS_UP ps_final:ps_3_0:PS_FINAL
 // The frame's post passes: the scene is drawn into a half-float target, then bloomed
 // and tone-mapped into the engine's back buffer (render3d/README.md, "The frame").
 //

@@ -8,6 +8,8 @@
 use crate::d3d::Device;
 use crate::frame::steps::View;
 use crate::log;
+
+pub mod hulls;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
@@ -61,6 +63,12 @@ pub trait Module {
     fn object(&mut self, _obj: usize, _v: &View) -> bool {
         false
     }
+    /// Draws a game feature (`GameFeature_RenderAll`'s loop: explosions, shield hits,
+    /// sparks, construction, ghosts, the build ghost...) in the engine's place; true if
+    /// it did. Tell them apart by vtable.
+    fn feature(&mut self, _f: usize, _v: &View) -> bool {
+        false
+    }
     /// Once per view, after the last flush, before the lights are deleted.
     fn end_view(&mut self, _v: &View) {}
 }
@@ -77,14 +85,17 @@ fn all() -> &'static mut Vec<Box<dyn Module>> {
 pub fn init() {
     let ini = crate::config::ini();
     let mods = all();
-    let mut add = |m: Box<dyn Module>| {
-        if ini.int("Modules", m.name(), 1) != 0 {
+    // `on`: whether the module runs when Render3D.ini does not say; a module that is
+    // not finished yet is off until asked for.
+    let mut add = |m: Box<dyn Module>, on: bool| {
+        if ini.int("Modules", m.name(), on as i32) != 0 {
             mods.push(m);
         } else {
-            log!("module {}: off in Render3D.ini", m.name());
+            log!("module {}: off (Render3D.ini [Modules] {}=1 turns it on)", m.name(), m.name());
         }
     };
-    let _ = &mut add;
+    // One line per module; the first that takes a step or an object draws it.
+    add(Box::new(hulls::Hulls::default()), false);
 }
 
 /// At the first frame, when every plugin is loaded: drop the modules whose plugin is.
@@ -137,6 +148,15 @@ pub fn step(s: Step, v: &View) -> bool {
 pub fn object(o: usize, v: &View) -> bool {
     for m in all().iter_mut() {
         if m.object(o, v) {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn feature(f: usize, v: &View) -> bool {
+    for m in all().iter_mut() {
+        if m.feature(f, v) {
             return true;
         }
     }

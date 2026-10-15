@@ -2,6 +2,7 @@
 //! Where each was established: `$A2_DATA/notes/renderer-inventory/` and the plugin
 //! READMEs it cites. Names come from the game's own `armada2.map`.
 pub mod hook;
+pub mod obj;
 
 use crate::math::{M34, V3};
 use core::ffi::c_void;
@@ -103,6 +104,25 @@ pub fn for_each_in_list(list_ptr_addr: usize, mut f: impl FnMut(usize)) {
     while n != head && n != 0 && guard < 1_000_000 {
         f(field(n, 8));
         n = field(n, 0);
+        guard += 1;
+    }
+}
+
+/// `GameFeature` list (a `std::vector<GameFeature*>*` at 0x736c84: begin `+4`, end
+/// `+8`), what `GameFeature_RenderAll` walks.
+pub const FEATURE_LIST: usize = 0x736c84;
+
+/// Calls `f` with each game feature, in the vector's order.
+pub fn for_each_feature(mut f: impl FnMut(usize)) {
+    let v = unsafe { rd::<usize>(FEATURE_LIST) };
+    if v == 0 {
+        return;
+    }
+    let (mut p, end) = (field(v, 4), field(v, 8));
+    let mut guard = 0;
+    while p != 0 && p < end && guard < 100_000 {
+        f(field(p, 0));
+        p += 4;
         guard += 1;
     }
 }
