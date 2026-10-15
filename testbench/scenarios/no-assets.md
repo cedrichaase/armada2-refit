@@ -12,10 +12,10 @@ than fail; the code layers install as usual, the cutscene proxy included. With n
 (`binkw32_orig.dll`), which is what `bink ...` lines in its log mean. With no plate,
 `Menus.asi` draws black sides. `Planets.asi` needs no assets at all; its log line says
 both of its sites in `Armada2.exe` were found and patched, and `QOL.asi`'s that it scaled
-the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Venting.asi` needs none either: its vents are procedural. `Render3D.asi` replaces
+the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Render3D.asi` replaces `Venting.asi`,
 `Sky.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Fog.asi` and `Specials.asi`
 (`render3d/install.sh` takes them out) with modules that need no assets: the sky
-recipes are built in, the fire, shields, welds and special weapons are procedural, and
+recipes are built in, the vents, fire, shields, welds and special weapons are procedural, and
 the fog is the engine's own texture. Its log names each module it loaded.
 
 1. Launch the game.
@@ -26,7 +26,7 @@ the fog is the engine's own texture. Its log names each module it loaded.
 6. Expect "BinkProxy.log" contains "bink bitmaps".
 7. Expect "Planets.log" contains "sites patched 2/2".
 8. Expect "QOL.log" contains "FASTSCROLL_COEFFICIENT now 0.0125".
-9. Expect "Venting.log" contains "RenderParticle, the spray emitter's RenderInternal".
+9. Expect "Render3D.log" contains "module particles: loaded".
 10. Expect "Render3D.log" contains "frame: both views come through render3d".
 11. Expect "Render3D.log" contains "module sky: loaded".
 12. Expect "Render3D.log" contains "module effects: loaded".

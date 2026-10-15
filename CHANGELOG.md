@@ -17,7 +17,7 @@ Layers: render3d 0.2.0, testbench 3.17.0.
 
 ### Changed
 - `./install` runs `render3d/install.sh` last; it takes out the plugins its modules
-  replace (Sky, Explosions, Shields, Repair, Fog, Specials). Scenario `no-assets` checks
+  replace (Sky, Explosions, Shields, Repair, Fog, Specials, Venting). Scenario `no-assets` checks
   the modules instead (testbench 3.17.0).
 
 Installed, not yet seen in game.

@@ -9,7 +9,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 ### Changed
 - Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
-  Repair, Fog and Specials, it checks that `Render3D.asi` loaded each module.
+  Repair, Fog, Specials and Venting, it checks that `Render3D.asi` loaded each module.
 
 Installed, not yet seen in game.
 
