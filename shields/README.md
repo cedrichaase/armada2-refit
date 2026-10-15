@@ -280,11 +280,12 @@ shield; kept out of the repository):
   Bird-of-Prey's and the Prometheus's frames). Away from the hit there is nothing:
   space and the hull show as if no shield were there.
 - **Mist, not a surface pattern.** Around the impact the light is soft, cloudy haze
-  with uneven density, like lit vapour rather than a smooth glow. Near the hit it breaks
-  into faint streaks fanning outwards along the shell. On the Bird-of-Prey these are
-  clear rays, a sunburst from the impact point, about as long as the lit area's radius.
-  There is no hex lattice and no grid (in line with the 2026-10-12 decision under
-  "The draw").
+  with uneven density, like lit vapour rather than a smooth glow. There is no hex
+  lattice and no grid (in line with the 2026-10-12 decision under "The draw").
+- **Rays are Klingon only.** The Bird-of-Prey's shield breaks into clear rays, a
+  sunburst from the impact point about as long as the lit area's radius. The Federation
+  shields (Intrepid, Prometheus) have none: just the mist. So rays are part of the
+  faction's look, not of every hit.
 - **A bright point where the shot lands.** Where the beam or torpedo meets the shell
   there is a small, near-white flare (Bird-of-Prey about 205,200,187; Prometheus about
   254,230,211, warmed by the orange disruptor). The beam visibly stops there, at the
@@ -312,7 +313,7 @@ and the glow that stays near the hit already fit. Not in the references:
 
 Missing from today's look:
 - the misty, uneven texture;
-- the rays fanning out from the impact;
+- the rays fanning out from the impact, on Klingon shields;
 - the light on the struck hull.
 
 The next pass should settle whether the ring and the rim stay.
