@@ -265,7 +265,8 @@ float rays(float3 u, float3 w, float4 h, float4 r, float4 hu)
              + sin(a * 11.0 + s * 2.0) * (0.65 + 0.35 * sin(t * 1.7 + s * 5.0)) * 0.8
              + sin(a * 17.0 + s * 4.0) * (0.65 + 0.35 * sin(t * 2.3 + s * 7.0)) * 0.6
              + sin(a * 29.0 + s * 6.0) * 0.4;
-    float  spoke = pow(saturate(f * 0.4), k_ray.z);
+    // f peaks near 2.8 where the four line up; a spoke is its upper half, sharpened
+    float  spoke = pow(saturate(f * 0.5), k_ray.z);
     // a spoke's length varies with it: the strongest run out furthest
     float  x = saturate(d * k_ray.y / (0.6 + 0.4 * saturate(f * 0.5)));
     float  env = smoothstep(0.0, 0.05, d) * (1.0 - x) * (1.0 - x);

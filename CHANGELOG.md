@@ -7,7 +7,7 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 
 ## 12.2.0 — 2026-10-15
 
-Layers: render3d 0.4.0.
+Layers: render3d 0.4.0, testbench 3.17.1.
 
 ### Changed
 - Tractor and assimilation beams as a translucent cone; shield hits with mist, Klingon

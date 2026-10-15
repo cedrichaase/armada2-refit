@@ -36,7 +36,7 @@
 //     turbulence.
 //   kind 6, a cone (the tractor, holding and assimilation beams): t0.x the way along,
 //     0 at the emitter, 1 at the beam's end, t2.r where the cone ends past it; t0.y
-//     across (-1..1); t0.w the beam's length in the wide end's half widths; t3 = the
+//     across (-1..1) times t2.g, the half width there over the wide end's; t0.w the beam's length in the wide end's half widths; t3 = the
 //     streaks' count across, how dark between them, how fast they drift, the soft
 //     edge in pixels; t4 = vapour depth, blobs per wide-end half width, the vapour's
 //     speed along the beam (half widths a second), the brightness at the target
@@ -222,10 +222,12 @@ float vnoise(float2 p)
 // black within a few pixels of its outline. No core. The streaks run in the cone's own
 // across (-1..1), so they spread with it; their phases drift slowly by sums of sines
 // at unrelated rates, so nothing turns or pulses in a rhythm one can read.
-float3 cone(float2 uv, float lw, float3 col, float s_end, float seed, float4 p, float4 q)
+float3 cone(float2 uv, float lw, float3 col, float2 sw, float seed, float4 p, float4 q)
 {
     float  t = k_time.x;
-    float  s = uv.x, v = uv.y;
+    // v comes as v w and w (the half width there): see Fx::cone
+    float  s_end = sw.x;
+    float  s = uv.x, v = uv.y / max(sw.y, 1e-4);
     float  av = abs(v);
     float  fw = max(fwidth(v), 1e-4);
     float  e = saturate((1.0 - av) / max(fw * p.w, 1e-4));
@@ -242,7 +244,7 @@ float3 cone(float2 uv, float lw, float3 col, float s_end, float seed, float4 p, 
              + 0.3 * vnoise(float2(x * 2.3 - run * 1.9 + 5.2, y * 2.1 - t * 0.11 + 1.3))
              + 0.2 * vnoise(float2(x * 5.1 - run * 3.7 + 11.7, y * 4.7 + t * 0.23 + 7.9));
     float  vap = max(1.0 - q.x + q.x * 2.0 * n, 0.0);
-    float  along = lerp(1.0, q.w, pow(saturate(s), 0.7));
+    float  along = lerp(1.0, q.w, pow(saturate(s), 0.45));
     float  f = saturate((s_end - s) / max(s_end - 1.0 + 0.1, 0.05));
     float  far = f * f * (3.0 - 2.0 * f);
     float  near = saturate(s * 40.0);
@@ -266,6 +268,6 @@ float4 fx_ps(VsOut i) : COLOR
              + bolt(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t3) * k3
              + field(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k4
              + wave(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k5
-             + cone(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.r, i.t2.a, i.t3, i.t4) * k6;
+             + cone(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rg, i.t2.a, i.t3, i.t4) * k6;
     return float4(c * i.t1.a, 0.0);
 }

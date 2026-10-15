@@ -205,10 +205,10 @@ is in the depth buffer.
   `HitLightReach` times the ship's bounding radius and gone at that reach, its falloff
   raised to `HitLightPower` so the far hull stays dark; styled distinct, so several
   hits on one ship each light it. The ring and the rim are as they were; the next pass
-  settles whether they stay. `[Shields]` keys (defaults): `Mist` (0.6), `MistReach`
-  (0.5), `MistShare` (1), `MistContrast` (1.6), `MistScale` (3, cells across the unit
+  settles whether they stay. `[Shields]` keys (defaults): `Mist` (0.45), `MistReach`
+  (0.35), `MistShare` (1), `MistContrast` (1.6), `MistScale` (3, cells across the unit
   sphere), `MistDrift` (0.08 a second), `Edge` (0.15), `Rays` (1.2, 0 for none),
-  `RayLength` (0.55), `RaySharpness` (3), `RayFactions` (`Klingon`; any of
+  `RayLength` (0.55), `RaySharpness` (2), `RayFactions` (`Klingon`; any of
   `Federation, Klingon, Romulan, Borg, Cardassian, Species8472, Other`), `HitLight`
   (2, 0 for none), `HitLightWhite` (0.5), `HitLightReach` (0.8), `HitLightPower` (2),
   `HitLights` (6, at most 16).
@@ -394,10 +394,16 @@ any point light.
 `techassimbeam`, `borgbor`; since 0.4.0) are `Kind=cone` recipes, after
 `ART-DIRECTION.md`'s direction: not a laser but a cone of light through vapour. The
 cone runs from the beam's start (+0xbc), `Width` wide, to `Spread` of the target's
-bounding radius (+0x60's object; without one, an eighth of the beam's length) about
-its end (+0xc8), and on for `Beyond` of that radius as it fades, so the target sits
-inside the beam rather than at its tip. It is 16 camera-facing segments, each node
-with its own side vector so the segments meet. A flat quad through the target's
+half width across the beam (+0x60's object; without one, an eighth of the beam's
+length) about its end (+0xc8), and on for `Beyond` of its bounding radius as it fades,
+so the target sits inside the beam rather than at its tip. The half width is the
+target as the hulls module posed it this view: its shown meshes' boxes (`Part::lo`,
+`hi`) measured along the direction the cone opens on screen. The bounding sphere made
+a cone as wide as a Sovereign is long when the beam met it nose on (seen on the
+bench). It is 16 camera-facing segments, each node with its own side vector so the
+segments meet; each is a trapezoid, so the across coordinate goes to the shader as
+(v w, w) and is divided per pixel (interpolated straight, it bent at every quad's
+diagonal and the streaks zigzagged). A flat quad through the target's
 centre would be cut in half by the hull in the depth test, so the wide end is moved
 towards the eye along the line to it (`Pull` target radii, growing as the square of
 the way along): that leaves it where it was on screen and puts it in front of the hull

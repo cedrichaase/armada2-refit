@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.17.1 — 2026-10-16
+
+### Changed
+- `specials`: the holding, assimilation (`gTechAssimBeam`) and tractor beams are
+  checked as `Kind=cone` and shot close and from above; `shields-hits`: a Klingon
+  cruiser takes the same fire, for the rays.
+
+Installs nothing; both scenarios pass on the bench.
+
 ## 3.17.0 — 2026-10-15
 
 ### Added

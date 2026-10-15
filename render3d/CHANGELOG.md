@@ -9,8 +9,9 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 ### Changed
 - Tractor, holding and assimilation beams (`tracbm`, `tracbmo`, `holdbm`,
   `techassimbeam`, `borgbor`) are drawn as a translucent cone through vapour, after
-  `ART-DIRECTION.md`: lengthwise streaks, drifting vapour, no core, widening to take in
-  the target, with a soft light of the beam's colour on the target's hull.
+  `ART-DIRECTION.md`: lengthwise streaks, drifting vapour, no core, widening to the
+  target's width across the beam (its meshes' boxes, not its bounding sphere), with a
+  soft light of the beam's colour on the target's hull.
 - Shield hits: an uneven mist about the impact, a soft curved edge at the shell's
   silhouette, rays on Klingon shields only, and a point light on the struck hull.
 - Shield colour defaults: Klingon green (was orange), Species 8472 orange (was purple).

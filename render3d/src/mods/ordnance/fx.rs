@@ -425,6 +425,24 @@ impl Fx {
         }
     }
 
+    /// A quad whose vertices carry their own u, v times w, and w (`t2.y`): `cone`'s
+    /// projective v.
+    fn quad_w(&mut self, p: [V3; 4], lk: &Look, uvw: [[f32; 3]; 4]) {
+        if lk.bright <= 0.0 || self.verts.len() >= 6 * 8192 {
+            return;
+        }
+        for o in [0usize, 1, 2, 0, 2, 3] {
+            self.verts.push(FxVert {
+                p: [p[o].x, p[o].y, p[o].z],
+                t0: [uvw[o][0], uvw[o][1], lk.kind, lk.len],
+                t1: [lk.col.x, lk.col.y, lk.col.z, lk.bright],
+                t2: [lk.col2.x, uvw[o][2], lk.col2.z, lk.seed],
+                t3: lk.p3,
+                t4: lk.p4,
+            });
+        }
+    }
+
     /// A camera-facing rectangle about c, half size hx by hy (uv -ax..ax, -1..1),
     /// pulled towards the camera by `pull`.
     fn billboard(&mut self, cam: &Cam, c: V3, hx: f32, hy: f32, ax: f32, pull: f32, lk: &Look) {
@@ -780,7 +798,11 @@ impl Fx {
             return;
         }
         let hw0 = (r.width * 0.5).max(r.min_px * cam.px * (a - cam.eye).len() * 0.5);
-        let hw1 = (r.spread * tr).max(hw0);
+        // The wide end takes in Spread of the target as it lies across the beam, seen
+        // from here: its meshes' boxes measured along the cone's side at the end (a
+        // ship met nose on is narrow, broadside long), not its bounding sphere.
+        let across = if tgt != 0 { target_across(tgt, d, b - cam.eye) } else { None };
+        let hw1 = (r.spread * across.unwrap_or(tr)).max(hw0);
         let s_end = 1.0 + r.beyond * tr / len;
         let sd = (seed & 1023) as f32 * 0.01;
         let lk = Look {
@@ -807,10 +829,17 @@ impl Fx {
             };
             (towards(c - side), towards(c + side), f)
         };
+        // Each segment is a trapezoid, so v across it is sent as (v w, w), w the
+        // half width there, and divided out per pixel: interpolated straight, v bends
+        // at the seam of the quad's two triangles and the streaks zigzag.
+        let wid = |f: f32| (hw0 + (hw1 - hw0) * f) / hw1;
         let mut prev = node(0);
         for k in 1..=N {
             let next = node(k);
-            self.quad([prev.0, next.0, next.1, prev.1], &lk, prev.2, -1.0, next.2, 1.0);
+            let (w0, w1) = (wid(prev.2), wid(next.2));
+            let p = [prev.0, next.0, next.1, prev.1];
+            let uvw = [[prev.2, -w0, w0], [next.2, -w1, w1], [next.2, w1, w1], [prev.2, w0, w0]];
+            self.quad_w(p, &lk, uvw);
             prev = next;
         }
         if r.emitter > 0.0 {
@@ -1056,4 +1085,29 @@ impl Fx {
             }
         }
     }
+}
+
+/// Half the width of an object across a beam along `d`, in the direction the cone
+/// opens on screen (`d` x `view`): its shown meshes' boxes as the hulls module posed
+/// them this view. None if the object is not posed.
+fn target_across(o: usize, d: V3, view: V3) -> Option<f32> {
+    let p = crate::mods::hulls::posed(o)?;
+    let side = d.cross(view);
+    if side.len() < 1e-8 {
+        return None;
+    }
+    let side = side.norm();
+    let (mut lo, mut hi) = (f32::MAX, f32::MIN);
+    for part in &p.model.parts {
+        if !p.pose.shown.get(part.node).copied().unwrap_or(false) {
+            continue;
+        }
+        let Some(w) = p.pose.world.get(part.node) else { continue };
+        let c = w.transform_point((part.lo + part.hi) * 0.5).dot(side);
+        let h = (part.hi - part.lo) * 0.5;
+        let e = w.r[0].dot(side).abs() * h.x + w.r[1].dot(side).abs() * h.y + w.r[2].dot(side).abs() * h.z;
+        lo = lo.min(c - e);
+        hi = hi.max(c + e);
+    }
+    (hi > lo).then_some((hi - lo) * 0.5)
 }
