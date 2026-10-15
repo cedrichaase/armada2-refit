@@ -14,6 +14,8 @@ pub mod engine;
 pub mod gfx;
 pub mod input;
 pub mod math;
+#[rustfmt::skip]
+pub mod shaders;
 pub mod surface;
 pub mod text;
 pub mod widgets;

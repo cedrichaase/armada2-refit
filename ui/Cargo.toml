@@ -16,6 +16,14 @@ libm = "0.2"
 a2fmt = { path = "../render3d/a2fmt" }
 
 [build-dependencies]
+fontbake = { path = "fontbake" }
+
+# The font bake is brute force over every glyph texel; unoptimised it takes minutes.
+[profile.release.build-override]
+opt-level = 3
+
+[profile.dev.build-override]
+opt-level = 3
 
 [profile.release]
 panic = "abort"

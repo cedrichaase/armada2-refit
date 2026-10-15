@@ -1,0 +1,16 @@
+Noto Sans Condensed 2.015 -- Noto Sans by the Noto Project Authors
+(github.com/notofonts/latin-greek-cyrillic), SIL Open Font License 1.1.
+    Copied unmodified from Arch Linux's noto-fonts package 1:2026.09.01-1, which installs
+    upstream's release files: /usr/share/fonts/noto/NotoSans-CondensedMedium.ttf and
+    NotoSans-CondensedSemiBold.ttf. Both name tables say "Version 2.015" and carry the
+    OFL-1.1 licence notice.
+    LICENSE.txt is the OFL-1.1 text with the copyright line from the fonts' name tables.
+    (The package's own /usr/share/licenses/noto-fonts/LICENSE is Apache-2.0 text, which
+    does not match what the font files state, so it is not used.)
+
+UI.asi bakes these into a signed-distance atlas at build time (ui/fontbake); the atlas is
+derived and never committed. publish/check.sh allows a binary in the repository only here,
+under platform/vendor/, and only with its sha256 listed below:
+
+e367c9cff3acf134f7f12a6ae7ce876d6dbe3aaa2f70121bb1f9ab66457a7196  NotoSans-CondensedMedium.ttf
+55ebf2188d1b9ff6b09affe3783c7704f8bd627586bf0a097ea4f6a8842f8cce  NotoSans-CondensedSemiBold.ttf

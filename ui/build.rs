@@ -21,4 +21,6 @@ fn main() {
         println!("cargo:rustc-link-lib={lib}");
     }
     println!("cargo:rustc-link-search=native={}", out.display());
+    // The font atlases (ui/src/text includes font-regular.bin and font-bold.bin).
+    fontbake::bake_fonts(&here.join("../platform/vendor"), &out);
 }
