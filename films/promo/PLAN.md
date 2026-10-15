@@ -43,6 +43,24 @@ after; the install guide closes, as asked.
   the camera following it towards the Key light, at an angle where the hulls' shadows
   in the gas read clearly (`nebula-fleet.ini`); it replaces or joins s05.
 
+## Open after probe round 1 (2026-10-15)
+
+- **The HUD skin differs between takes** (purple, green, gold): the player's race is not
+  pinned on the bench, so u02's stock/refit dissolve compares two skins. Scene.asi has no
+  key for it yet. Until it has, u02 and the gameplay shots carry whatever skin a session
+  draws.
+- **g06 shows the machine's LAN address** in the lobby chat ("Local IP Address: ...").
+  Blur it in the cut, or film with the address hidden, before publishing.
+- **Bugs found while filming, for their layers** (not hidden by framing):
+  - lighting: a faded hull is drawn behind a planet that is behind it (stock too); in
+    refit a hull built with the camera close can stay faded until the camera goes far;
+    refit's fully cloaked glass is nearly invisible over a planet (b06).
+  - surfaces: vertical streaks on the class M surface at 4K.
+  - nebulae: the hulls' shadows in the gas are faint, and vanish when a hull is near the
+    camera (s05b); refit's Mutara reads dimmer than stock's billboards (s05).
+  - gui-installer: the version line truncates ("pre-release, not yet seen i…", i04).
+  - textures: the Enterprise's registry reads "NCC-1701E", no hyphen.
+
 ## Tooling
 
 | | What | State |
@@ -50,7 +68,7 @@ after; the install guide closes, as asked.
 | T1 | `Kind: desktop`: the GUI installer on a bare bench desktop, installing into a stock clone (`films/README.md`, "Desktop shots") | done |
 | T2 | pointer coordinates in the film's `Pointer` space (1920x1080), scaled to each take | done |
 | T3 | a per-shot resolution | dropped (D7) |
-| T4 | two games in one shot, for online play | to do |
+| T4 | two games in one shot (`Players:`, `Prepare:`, `typelog`) | done |
 | T5 | refit as a release installs it | done: `a2test session start --assets none` |
 | T6 | a still from a take, for the thumbnail | not needed: the thumbnail is shot as stills |
 
