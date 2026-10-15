@@ -160,6 +160,12 @@ patch of space that is clearly not quite right.
   as bent background, it should be easy to spot in front of a nebula, a planet or
   another ship, and barely there against empty space. That is the right behaviour, not
   something to correct with a glow.
+- **Your own ships keep a trace of their hull.** A cloaked ship of the player's own
+  shows its hull texture at about **10% opacity** under the glass and the shimmer:
+  enough to find and pick out your own ships at a glance, never enough to read as
+  uncloaked. Every other cloaked ship the engine draws keeps the bend and shimmer
+  alone, with no hull. Today `CloakHull` (the hull's floor while cloaked) is one value
+  for every ship; this needs it per owner, 0.1 for the player's own and 0 otherwise.
 - **Fair in multiplayer.** This applies only to cloaked ships the engine already draws
   (your own, and what your side can see). It must never draw a ship the engine hides
   from the player: render only, as everything in render3d is.
@@ -168,7 +174,8 @@ Measured against today's look: the glass, the colour split along the bend, the r
 glint fit. Missing:
 - waves large enough to move the silhouette during the transition;
 - the hull dissolving through the waves, in place of the noise threshold;
-- a slow drifting wave in the refraction while fully cloaked.
+- a slow drifting wave in the refraction while fully cloaked;
+- the player's own cloaked ships showing their hull at about 10%.
 
 The next pass should settle whether the green front stays, and how strong the cloaked
 shimmer may be before it reads as a ship rather than a disturbance (judge it in game,
