@@ -162,12 +162,14 @@ pub fn reset() {
 
 pub fn lights(v: &View) {
     for m in all().iter_mut() {
+        let _z = crate::timing::zone(m.name());
         m.lights(v);
     }
 }
 
 pub fn begin_view(v: &View) {
     for m in all().iter_mut() {
+        let _z = crate::timing::zone(m.name());
         m.begin_view(v);
     }
 }
@@ -175,6 +177,7 @@ pub fn begin_view(v: &View) {
 pub fn step(s: Step, v: &View) -> bool {
     let mut done = false;
     for m in all().iter_mut() {
+        let _z = crate::timing::zone(m.name());
         if m.step(s, v) {
             done = true;
             if s != Step::Translucent {
@@ -187,6 +190,7 @@ pub fn step(s: Step, v: &View) -> bool {
 
 pub fn object(o: usize, v: &View) -> bool {
     for m in all().iter_mut() {
+        let _z = crate::timing::zone(m.name());
         if m.object(o, v) {
             return true;
         }
@@ -217,6 +221,7 @@ fn survey(o: usize) {
 
 pub fn feature(f: usize, v: &View) -> bool {
     for m in all().iter_mut() {
+        let _z = crate::timing::zone(m.name());
         if m.feature(f, v) {
             return true;
         }
@@ -226,6 +231,7 @@ pub fn feature(f: usize, v: &View) -> bool {
 
 pub fn end_view(v: &View) {
     for m in all().iter_mut() {
+        let _z = crate::timing::zone(m.name());
         m.end_view(v);
     }
 }

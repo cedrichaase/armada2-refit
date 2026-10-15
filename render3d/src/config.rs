@@ -23,6 +23,11 @@ pub struct Config {
     /// 1: the body runs as our sequence of steps (modules take some over); 0: the
     /// engine's whole body runs, into our target.
     pub steps: bool,
+    /// Log CPU and GPU time per view and step (`timing.rs`); with `Enable=0` the
+    /// engine's own body is timed instead.
+    pub timing: bool,
+    /// Seconds between timing reports.
+    pub timing_every: f32,
 }
 
 impl Default for Config {
@@ -39,6 +44,8 @@ impl Default for Config {
             shoulder: 0.8,
             inset: true,
             steps: true,
+            timing: false,
+            timing_every: 5.0,
         }
     }
 }
@@ -62,6 +69,8 @@ pub fn load() -> Config {
         shoulder: ini.float("Render3D", "Shoulder", d.shoulder),
         inset: ini.int("Render3D", "Inset", d.inset as i32) != 0,
         steps: ini.int("Render3D", "Steps", d.steps as i32) != 0,
+        timing: ini.int("Render3D", "Timing", d.timing as i32) != 0,
+        timing_every: ini.float("Render3D", "TimingEvery", d.timing_every),
     }
 }
 

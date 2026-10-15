@@ -351,19 +351,26 @@ impl Module for Effects {
             return false;
         }
         if self.ch.on {
+            let _z = crate::timing::zone("effects: debris");
             self.ch.simulate(v.time);
             self.ch.draw(v);
         }
         // The engine's chunks (construction's, and a plugin's work chained there).
-        engine_chunks();
+        {
+            let _z = crate::timing::zone("effects: engine chunks");
+            engine_chunks();
+        }
         if let Some(c) = Cam::of(v) {
             if self.ex.on {
+                let _z = crate::timing::zone("effects: explosions");
                 self.ex.draw(v, &c);
             }
             if self.sh.on {
+                let _z = crate::timing::zone("effects: shields");
                 self.sh.draw(v, &c);
             }
             if self.rp.on {
+                let _z = crate::timing::zone("effects: repair");
                 self.rp.draw(v, &c);
             }
             if self.co.on && !self.ab_off {
@@ -373,8 +380,10 @@ impl Module for Effects {
                 self.bees.draw(v, &c, &mut self.fx);
             }
             if self.sp.on && !self.ab_off {
+                let _z = crate::timing::zone("effects: sparks");
                 self.sp.draw(v, &c, &mut self.fx);
             }
+            let _z = crate::timing::zone("effects: quads");
             self.fx.draw(v, &c);
         }
         self.ex.notes.clear();

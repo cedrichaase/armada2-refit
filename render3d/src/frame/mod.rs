@@ -14,6 +14,7 @@ use crate::config::{self, Config};
 use crate::d3d::*;
 use crate::engine::{self, hook};
 use crate::log;
+use crate::timing;
 use core::ffi::c_void;
 use post::{PRect, Post, Targets};
 
@@ -55,27 +56,85 @@ pub fn install() -> bool {
     true
 }
 
+/// Starts timing a view when `Timing=1`; true if it did (`timing::end` is then owed).
+fn time_view(main: bool) -> bool {
+    if !timing::on() {
+        return false;
+    }
+    match Device::from_d3d8(engine::d3d8_device()) {
+        Some(dev) => {
+            timing::begin(dev, main);
+            true
+        }
+        None => false,
+    }
+}
+
 unsafe extern "C" fn body(cam: usize, rs: usize, is_main: u32) {
+    let timed = time_view(is_main & 0xff != 0);
+    unsafe { body_inner(cam, rs, is_main) };
+    if timed {
+        timing::end();
+    }
+}
+
+unsafe fn body_inner(cam: usize, rs: usize, is_main: u32) {
     let stock: BodyFn = unsafe { core::mem::transmute(BODY) };
     let Some(cfg) = config::get() else {
-        return unsafe { stock(cam, rs, is_main) };
+        unsafe { stock(cam, rs, is_main) };
+        return timing::mark("stock");
     };
     let main = is_main & 0xff != 0;
     if !main && !cfg.inset {
-        return unsafe { stock(cam, rs, is_main) };
+        unsafe { stock(cam, rs, is_main) };
+        return timing::mark("stock");
     }
     match begin(cfg) {
-        None => unsafe { stock(cam, rs, is_main) },
+        None => {
+            unsafe { stock(cam, rs, is_main) };
+            timing::mark("stock");
+        }
         Some(saved) => {
+            timing::mark("targets");
             let f = frame().as_mut();
             match f.as_ref().and_then(|f| f.targets.as_ref().map(|t| (f.dev, t.w, t.h, f.frames))) {
                 Some((dev, w, h, n)) if cfg.steps && steps::usable() => {
                     steps::run(dev, cam, rs, main, w, h, n);
                 }
-                _ => unsafe { stock(cam, rs, is_main) },
+                _ => {
+                    unsafe { stock(cam, rs, is_main) };
+                    timing::mark("stock");
+                }
             }
             end(cam, main, saved, cfg);
+            timing::mark("post");
         }
+    }
+}
+
+/// `Enable=0` with `Timing=1`: both call sites go through a body that only times the
+/// engine's own, for comparing render3d with the plugins it replaces. False, with
+/// nothing written, under the same conditions as `install`.
+pub fn install_measure() -> bool {
+    for s in SITES {
+        if hook::call_target(s) != Some(BODY) {
+            log!("timing: the call at {:#x} is not to {:#x}: not timed", s, BODY);
+            return false;
+        }
+    }
+    for s in SITES {
+        hook::patch_call(s, BODY, measure_body as *const () as usize);
+    }
+    true
+}
+
+unsafe extern "C" fn measure_body(cam: usize, rs: usize, is_main: u32) {
+    let stock: BodyFn = unsafe { core::mem::transmute(BODY) };
+    let timed = time_view(is_main & 0xff != 0);
+    unsafe { stock(cam, rs, is_main) };
+    if timed {
+        timing::mark("engine");
+        timing::end();
     }
 }
 
@@ -101,6 +160,7 @@ unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESU
     crate::assets::reset();
     crate::gfx::reset();
     crate::scene::reset();
+    timing::reset();
     log!("frame: device Reset");
     match unsafe { RESET } {
         Some(r) => unsafe { r(dev8, params) },

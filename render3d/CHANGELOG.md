@@ -55,6 +55,10 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   lit models with a crackling welding beam (`[Bees]`), every spark that is not a weld
   (systems blowing up, phaser flares, beam hits) with stock's sprite and a burst of
   streaking sparks and a flash (`[Sparks]`), and a cancelled construction's debris.
+- `Timing=1` (`TimingEvery=`): CPU and GPU time per view and per step, CPU zones per
+  module, and any view over 8 ms with its steps, in `Render3D.log`; with `Enable=0` it
+  times the engine's own view, which `perf/compare.sh` uses to measure render3d against
+  the plugins it replaces (`PERF.md`).
 - Module `specials` (on, after `particles`): `Step::Specials`, the timed special-object
   effects (Computer Override, Energy Dissipator, Psionic Disruption): their cloud
   emitters as render3d's particles, plus a shader layer over the struck hull (Borg
@@ -62,6 +66,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   does not know is the engine's; keys in `[Specials]`.
 
 ### Changed
+- The state saved around each draw is a recorded block of what our draws change, not
+  the whole device state (`gfx::Guard`): render3d's CPU time in a battle 4.7 -> 1.3 ms
+  a view, below the plugins' 1.8 ms (`PERF.md`).
+- Ini files are kept parsed and read again only when they change: the sky's
+  once-a-second re-read cost a ~20 ms hitch under Wine.
 - `install.sh` removes each plugin a module that is on replaces (effects: Explosions,
   Shields, Repair; ordnance: Specials; sky: Sky; overlays: Fog), reading `[Modules]`
   from the game's `Render3D.ini`; `./install` runs it last. Its ini merge keeps each

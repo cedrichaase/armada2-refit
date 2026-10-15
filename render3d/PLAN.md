@@ -194,8 +194,13 @@ Each branch starts from the commit that added this section and is merged into
 - Milestone 6: a whole Instant Action match with a battle plays on the bench with every
   module on and no render plugin installed (`render3d-match`, run 20261015-160720). The
   user's in-game sign-off is next.
-- Open: the fallbacks listed in README.md ("Still the engine's"); the `kbase` fog-of-war
+- Every category of the 3D view is drawn by a module; the engine draws only what a
+  module hands back per object (README.md, "Still the engine's"). Timing and the
+  comparison with the plugins are in `PERF.md`: less CPU than the plugins, 0.4-0.7 ms
+  more GPU (the HDR post passes).
+- Open: the `kbase` fog-of-war
   ghost's centre differs from stock (not node visibility, not the bay node); moon
-  cracks a little thinner than `Surfaces.asi`'s; no GPU timing; alt-tab (a true
+  cracks a little thinner than `Surfaces.asi`'s; the starfield's quads built on the CPU
+  each frame (0.2 ms); alt-tab (a true
   `Reset`) not exercised on the bench, which has nothing to switch to. A display mode
   changed in a battle (a new device) is: `render3d-mode-switch`, run 20261015-172844.

@@ -16,6 +16,8 @@ Layers: render3d 0.2.0, testbench 3.17.0.
   special weapons, mines, pods, mining beams, the warp flash), the sky, the fog of war, grid, selection, height posts and
   the build ghost, particles and vents, the Evolver and holograms, planets, moons,
   asteroids and nebulae, and the special-object effects (render3d 0.2.0).
+- render3d's `Timing=1` and `render3d/perf/compare.sh`: render3d measured against the
+  plugins it replaces; it now takes less CPU than they did (`render3d/PERF.md`).
 
 ### Changed
 - `./install` runs `render3d/install.sh` last; it takes out the plugins its modules

@@ -65,6 +65,28 @@ is committed with a stamp so a machine without vkd3d builds as long as it is cur
 | `Exposure` | 1.0 | scales the scene before the tone map |
 | `Shoulder` | 0.8 | where the tone map starts to roll off towards white |
 | `Inset` | 1 | 0: the HUD's action-camera view is left to the engine |
+| `Timing` | 0 | 1: CPU and GPU time per view and step in the log (below); with `Enable=0`, the engine's own view timed |
+| `TimingEvery` | 5 | seconds between timing reports |
+
+## Timing
+
+`Timing=1` (`src/timing.rs`) times each view as a run of marks: the seam, our targets,
+each step of the body (`setup` is the lights, the distance cull, the modules' lights
+and the scene layer's shadow map; then `background`, `terrain`, `objects`, `ordnance`,
+`specials`, `features`, `warp`, `hud prep`, `chunks`, `particles`, `translucent`,
+`selection, end`) and `post` (resolve, bloom, tone map). Each mark notes the CPU clock
+and issues a Direct3D 9 timestamp query; a span is booked to the mark that ends it.
+The queries are read back from a ring four frames deep without waiting, so timing
+does not stall the GPU; a set not finished when its turn comes again is counted as
+late. Every `TimingEvery` seconds the log has the frame's period (from one main view
+to the next), each view's CPU and GPU time with their maxima, the time outside the 3D
+views (the HUD, the simulation, `Present`), and the split by step.
+
+With `Enable=0` and `Timing=1` nothing of render3d draws, but both call sites of
+`Armada_RenderAllOurStuff` go through a body that only marks around the engine's
+(`frame::install_measure`), with every plugin hooked into it at work. Installed beside
+the plugins render3d replaces, that measures them the same way: the comparison in
+`PERF.md`.
 
 ## How the frame works
 
@@ -112,8 +134,8 @@ the next frame, at the new size. A display mode chosen in Graphics Settings is n
 `Reset`: the engine releases its device and creates another. The first frame on a
 device render3d has not seen ("frame: a new device") drops the frame's state, hooks
 the new device's `Reset` and hands the device to every module, which makes its
-resources again; scenario `render3d-mode-switch` checks it, from 1080p to 1024x768
-in a running battle.
+resources again; scenario `render3d-mode-switch` checks it, switching to
+800x600 in a running battle.
 
 **Without Direct3D 9.** The d3d9 device is asked for behind the game's d3d8 one
 (`platform/D3D9.md`). Under DXVK's own d3d8, or when the targets cannot be made, the

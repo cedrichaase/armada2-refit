@@ -32,9 +32,9 @@ ship's side, a pink film of veins, and violet ripples; then the HUD's action cam
 14. Expect "Render3D.log" contains "of 'Computer Override' (ordnance overrid): wovremit".
 15. Expect "Render3D.log" contains "first layer drawn: Override over fbattle".
 16. Take a screenshot called "override".
-17. Check that the Sovereign carries thin glowing green lines (a circuit pattern) over its hull, with a few coloured star sprites near it, and that nothing is garbled.
-18. Wait 3 seconds.
-19. Take a screenshot called "override-later".
+17. Wait 3 seconds.
+18. Take a screenshot called "override-later".
+19. Check that the Sovereign carries thin glowing green lines (a circuit pattern) over its hull, with a few coloured star sprites near it, and that nothing is garbled.
 20. Scene "kill ovr".
 21. Wait 20 seconds.
 22. Scene "spawn mic kspecial 3000 0 3300 180 1".
@@ -65,6 +65,6 @@ ship's side, a pink film of veins, and violet ripples; then the HUD's action cam
 47. Wait 60 seconds.
 48. Expect the game is still running.
 49. Expect "Render3D.log" not contains "PANIC".
-50. Expect "Render3D.log" not contains "the engine draws it".
+50. Expect "Render3D.log" not contains "particleArt".
 51. Quit the game.
 52. Expect no crash.

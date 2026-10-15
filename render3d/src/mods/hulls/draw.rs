@@ -378,6 +378,7 @@ impl Drawer {
 
     /// Draws one hull in one mode.
     pub fn draw(&mut self, v: &View, look: &Look, p: &Posed, mode: Mode) {
+        let _z = crate::timing::zone("hulls: draw");
         let dev = v.dev;
         let m = &p.model;
         // Which parts this mode draws.

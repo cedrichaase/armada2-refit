@@ -221,6 +221,7 @@ impl Hulls {
     /// Poses an object for this view, or None when it is not ours to draw (another
     /// class, a database that is not its class's plain SOD, no SOD).
     fn prepare(&mut self, o: usize, v: &View) -> Option<Posed> {
+        let _z = crate::timing::zone("hulls: pose");
         let inst = obj::instance(o);
         if inst == 0 {
             return None;
@@ -713,6 +714,7 @@ impl Module for Hulls {
             }
         }
         if look.shadows {
+            let _z = crate::timing::zone("hulls: shadow map");
             let st = view_state(v.key());
             self.shadow.render(v, &look, &st.posed, &mut self.draw);
         } else {

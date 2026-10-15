@@ -205,20 +205,13 @@ impl Ini {
         file_exists(core::str::from_utf8(&self.path[..self.path.len() - 1]).unwrap_or(""))
     }
     pub fn string(&self, sec: &str, key: &str) -> Option<String> {
-        let (s, k) = (cstr(sec), cstr(key));
-        let mut buf = alloc::vec![0u8; 2048];
-        let n = unsafe {
-            GetPrivateProfileStringA(s.as_ptr(), k.as_ptr(), b"\x01\0".as_ptr(), buf.as_mut_ptr(), 2048, self.path.as_ptr())
-        } as usize;
-        if n == 1 && buf[0] == 1 {
-            return None;
-        }
+        let v = ini_cache::value(&self.path, sec, key)?;
         // Strip a trailing ; comment and whitespace.
-        let mut t = &buf[..n];
-        if let Some(c) = t.iter().position(|&c| c == b';') {
-            t = &t[..c];
-        }
-        Some(String::from(String::from_utf8_lossy(t).trim()))
+        let t = match v.find(';') {
+            Some(c) => &v[..c],
+            None => &v[..],
+        };
+        Some(String::from(t.trim()))
     }
     pub fn int(&self, sec: &str, key: &str, def: i32) -> i32 {
         self.string(sec, key).and_then(|s| parse_i32(&s)).unwrap_or(def)
@@ -241,10 +234,110 @@ impl Ini {
         }
     }
     pub fn sections(&self) -> Vec<String> {
-        let mut buf = alloc::vec![0u8; 32768];
-        let n = unsafe { GetPrivateProfileSectionNamesA(buf.as_mut_ptr(), 32768, self.path.as_ptr()) } as usize;
-        buf[..n].split(|&c| c == 0).filter(|s| !s.is_empty())
-            .map(|s| String::from_utf8_lossy(s).into_owned()).collect()
+        ini_cache::sections(&self.path)
+    }
+}
+
+/// Ini files read once and kept parsed, read again only when the file's write time or
+/// size changes (looked at no more than twice a second). Wine's `GetPrivateProfile*`
+/// opens and parses the whole file on every call, which made the modules' periodic
+/// re-reads of their settings cost tens of milliseconds a time (README.md, "Timing").
+/// The rules are `GetPrivateProfileString`'s: names without case, a section written twice
+/// read as one, the first of a repeated key winning, surrounding whitespace and one pair
+/// of quotes dropped.
+mod ini_cache {
+    use super::win::*;
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
+    struct File {
+        path: Vec<u8>,
+        stamp: Option<([u32; 2], u32)>,
+        checked: f64,
+        /// Section names in file order (as written), and (section, key, value) with the
+        /// names lower-cased.
+        sections: Vec<String>,
+        entries: Vec<(String, String, String)>,
+    }
+
+    static mut FILES: Vec<File> = Vec::new();
+
+    fn stamp(path: &[u8]) -> Option<([u32; 2], u32)> {
+        let mut d: FindData = unsafe { core::mem::zeroed() };
+        let h = unsafe { FindFirstFileA(path.as_ptr(), &mut d) };
+        if h == INVALID_HANDLE {
+            return None;
+        }
+        unsafe { FindClose(h) };
+        Some((d.written, d.size_low))
+    }
+
+    fn parse(f: &mut File) {
+        f.sections.clear();
+        f.entries.clear();
+        let name = core::str::from_utf8(&f.path[..f.path.len().saturating_sub(1)]).unwrap_or("");
+        let Some(bytes) = super::read_file(name) else { return };
+        let text = String::from_utf8_lossy(&bytes);
+        let mut sec = String::new();
+        for line in text.lines() {
+            let l = line.trim();
+            if l.is_empty() || l.starts_with(';') {
+                continue;
+            }
+            if let Some(rest) = l.strip_prefix('[') {
+                let s = rest.split(']').next().unwrap_or("").trim();
+                sec = s.to_ascii_lowercase();
+                if !f.sections.iter().any(|x| x.eq_ignore_ascii_case(s)) {
+                    f.sections.push(String::from(s));
+                }
+                continue;
+            }
+            let Some(eq) = l.find('=') else { continue };
+            let key = l[..eq].trim().to_ascii_lowercase();
+            if key.is_empty() || f.entries.iter().any(|e| e.0 == sec && e.1 == key) {
+                continue;
+            }
+            let mut v = l[eq + 1..].trim();
+            if v.len() >= 2 && ((v.starts_with('"') && v.ends_with('"')) || (v.starts_with('\'') && v.ends_with('\''))) {
+                v = &v[1..v.len() - 1];
+            }
+            f.entries.push((sec.clone(), key, String::from(v)));
+        }
+    }
+
+    #[allow(static_mut_refs)]
+    fn file(path: &[u8]) -> &'static File {
+        let files = unsafe { &mut FILES };
+        let now = super::now();
+        let i = match files.iter().position(|f| f.path == path) {
+            Some(i) => i,
+            None => {
+                files.push(File { path: path.to_vec(), stamp: None, checked: f64::NEG_INFINITY, sections: Vec::new(), entries: Vec::new() });
+                files.len() - 1
+            }
+        };
+        let f = &mut files[i];
+        if now - f.checked >= 0.5 {
+            f.checked = now;
+            let s = stamp(path);
+            if s != f.stamp || s.is_none() && !f.entries.is_empty() {
+                f.stamp = s;
+                parse(f);
+            }
+        }
+        &files[i]
+    }
+
+    pub fn value(path: &[u8], sec: &str, key: &str) -> Option<String> {
+        let f = file(path);
+        f.entries
+            .iter()
+            .find(|e| e.0.eq_ignore_ascii_case(sec) && e.1.eq_ignore_ascii_case(key))
+            .map(|e| e.2.clone())
+    }
+
+    pub fn sections(path: &[u8]) -> Vec<String> {
+        file(path).sections.clone()
     }
 }
 

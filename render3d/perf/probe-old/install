@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Bench only (render3d/PERF.md): put this checkout's Render3D.asi into the clone in
+# measure-only mode (Enable=0, Timing=1), so the engine's own 3D view, with the plugins
+# a stock-plugin checkout installed, is timed the way render3d's is.
+set -euo pipefail
+[ -n "${A2_GAME:-}" ] || { echo "no A2_GAME" >&2; exit 1; }
+case "$A2_GAME" in *a2test*) ;; *) echo "refusing: not a bench clone: $A2_GAME" >&2; exit 1;; esac
+asi="${R3D_PROBE_ASI:-$(cd "$(dirname "$0")/../.." && pwd)/build/Render3D.asi}"
+[ -f "$asi" ] || { echo "no $asi: run render3d/build.sh first" >&2; exit 1; }
+cp "$asi" "$A2_GAME/Render3D.asi"
+printf '[Render3D]\r\nEnable=0\r\nLog=1\r\nTiming=1\r\nTimingEvery=5\r\n' > "$A2_GAME/Render3D.ini"
+echo "probe-old: Render3D.asi in measure-only mode (Enable=0, Timing=1)"

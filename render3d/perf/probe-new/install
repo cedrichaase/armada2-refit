@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Bench only (render3d/PERF.md): Timing=1 in the clone's installed Render3D.ini.
+set -euo pipefail
+[ -n "${A2_GAME:-}" ] || { echo "no A2_GAME" >&2; exit 1; }
+case "$A2_GAME" in *a2test*) ;; *) echo "refusing: not a bench clone: $A2_GAME" >&2; exit 1;; esac
+ini="$A2_GAME/Render3D.ini"
+[ -f "$ini" ] || { echo "no Render3D.ini in the clone" >&2; exit 1; }
+python3 - "$ini" <<'EOF'
+import sys
+p = sys.argv[1]
+s = open(p, newline='').read()
+nl = '\r\n' if '\r\n' in s else '\n'
+lines = [l for l in s.split(nl) if not l.startswith(('Timing=', 'TimingEvery='))]
+i = lines.index('[Render3D]')
+lines[i + 1:i + 1] = ['Timing=1', 'TimingEvery=5']
+open(p, 'w', newline='').write(nl.join(lines))
+EOF
+echo "probe-new: Timing=1 in Render3D.ini"

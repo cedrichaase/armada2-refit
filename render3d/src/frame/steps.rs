@@ -9,6 +9,7 @@
 //! there before, so calling through the site runs their work as the stock body would.
 //! A plugin loaded after us patches its site before the first frame, and the site is
 //! read every frame.
+use crate::timing;
 use super::post::PRect;
 use crate::d3d::*;
 use crate::engine::{self, hook, rd, storm3d};
@@ -154,17 +155,23 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         frame,
     };
     mods::lights(&v);
-    crate::scene::begin_view(&v);
+    {
+        let _z = timing::zone("scene layer");
+        crate::scene::begin_view(&v);
+    }
     mods::begin_view(&v);
+    timing::mark("setup");
     unsafe {
         // 8: sky, stars, background objects; then the depth is cleared for the scene.
         if !mods::step(Step::Background, &v) {
             cdecl3(via(SITE_BACKGROUND, FN_BACKGROUND), cam, rsf(4) as u32, rsf(8) as u32);
         }
+        timing::mark("background");
         // 9: footprints, the tactical grid, fog and shroud.
         if rsf(0) && !mods::step(Step::Terrain, &v) {
             this1(via(SITE_TERRAIN, FN_TERRAIN), G_TERRAIN, cam);
         }
+        timing::mark("terrain");
         // 10-12: objects, with the near fade on.
         this1(FN_NEAR_FADE, s3d, rd::<i32>(CFG_FADE_OUT) as usize);
         if !mods::step(Step::Objects, &v) {
@@ -178,13 +185,16 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
                 }
             });
         }
+        timing::mark("objects");
         // 13-16
         if rsf(0xc) && !mods::step(Step::Ordnance, &v) {
             cdecl1(via(SITE_ORD_RENDER, FN_ORD_RENDER), cam);
         }
+        timing::mark("ordnance");
         if !mods::step(Step::Specials, &v) {
             cdecl1(via(SITE_SPECIAL, FN_SPECIAL), cam);
         }
+        timing::mark("specials");
         // 15: game features. GameFeature_RenderAll draws each feature whose flags
         // (`+0x20`) have bit 4 through its `Render(cam, isMain)` (vtable `+0x20`); a
         // module may take any one of them.
@@ -201,24 +211,33 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
                 cdecl2(via(SITE_FEATURES, FN_FEATURES), cam, main as u32);
             }
         }
+        timing::mark("features");
         if !mods::step(Step::Warp, &v) {
             cdecl1(via(SITE_WARP, FN_WARP), cam);
         }
+        timing::mark("warp");
         // 17: the HUD's per-frame preparation (main view only).
         if main {
             cdecl1(via(SITE_UI_PRE, FN_UI_PRE), rd::<usize>(VIEW_MODE));
         }
+        timing::mark("hud prep");
         // 18-20: debris, particles, then every sorted translucent triangle.
         if !mods::step(Step::Chunks, &v) {
             this0(via(SITE_CHUNKS, FN_CHUNKS), s3d);
         }
+        timing::mark("chunks");
         if !mods::step(Step::Particles, &v) {
             this1(via(SITE_PARTICLES, FN_PARTICLES), s3d, s3d + 0x68);
         }
-        crate::scene::flush(&v);
+        timing::mark("particles");
+        {
+            let _z = timing::zone("scene layer");
+            crate::scene::flush(&v);
+        }
         mods::step(Step::Translucent, &v);
         let dvt = engine::vtable(st3d);
         this0(engine::field(dvt, DEV_FLUSH), st3d);
+        timing::mark("translucent");
         // 21-22: selection circles and the like.
         if main && rd::<u32>(VIEW_MODE) != 2 && !mods::step(Step::Selection, &v) {
             cdecl1(via(SITE_SELECTION, FN_SELECTION), cam);
@@ -228,6 +247,7 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         // 24: the lights registered for this view.
         this0(via(SITE_DEL_LIGHTS, FN_DEL_LIGHTS), s3d);
     }
+    timing::mark("selection, end");
     // 25-26: stock's black line along the view's right column and bottom row.
     let r = v.rect;
     if r.w > 1 && r.h > 1 {

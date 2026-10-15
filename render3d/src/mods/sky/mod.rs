@@ -236,6 +236,7 @@ impl Sky {
     /// corner, sampling the baked cube (or computing every pixel, `Face=0`). False if
     /// it cannot draw (the stock faces are drawn instead).
     fn draw_recipe(&mut self, v: &View, vp: &M4) -> bool {
+        let _z = crate::timing::zone("sky: cube");
         let dev = v.dev;
         let Some(inv) = vp.inverse() else { return false };
         let corner = |x: f32, y: f32| -> [f32; 3] {
@@ -302,6 +303,7 @@ impl Sky {
     /// The stock sky: the cube SOD's meshes, or the six prefix faces, at the camera,
     /// unlit, depth off.
     fn draw_stock(&mut self, v: &View, vp: &M4, bg: &str) {
+        let _z = crate::timing::zone("sky: stock faces");
         let dev = v.dev;
         if !(self.vs_face.bind(dev) && self.ps_face.bind(dev) && self.face_decl.bind(dev)) {
             return;
@@ -401,6 +403,7 @@ impl Sky {
     /// when expired or unseen, else its SOD). Its meshes are drawn now, lit by the
     /// view's lights; its sprite nodes go into the batch. False: the engine's draw.
     fn object(&mut self, o: usize, v: &View) -> bool {
+        let _z = crate::timing::zone("sky: background objects");
         if field(engine::vtable(o), SLOT_RENDER * 4) != FN_GO_RENDER {
             return false;
         }
@@ -455,6 +458,7 @@ impl Sky {
     }
 
     fn draw_batch(&mut self, v: &View, vp: &M4) {
+        let _z = crate::timing::zone("sky: sprite batch");
         if self.batch.is_empty() {
             return;
         }
@@ -530,11 +534,13 @@ impl Module for Sky {
             }
             if stars_on && unsafe { rd::<usize>(G_STARFIELD) } != 0 {
                 let lift = self.cfg.star_lift;
+                let _z = crate::timing::zone("sky: stars");
                 self.stars.gather(&mut self.batch, lift);
                 self.draw_batch(&vf, &vp);
             }
         }
         // The background objects, with depth: each draws itself, or the engine does.
+        let _zo = crate::timing::zone("sky: object list");
         let edit = field_u8(unsafe { rd::<usize>(USER_PROFILE) }, 0x84) != 0;
         let mut list: Vec<usize> = Vec::new();
         engine::for_each_in_list(engine::OBJECT_LIST, |o| {

@@ -18,6 +18,7 @@ pub mod mods;
 pub mod scene;
 #[rustfmt::skip]
 pub mod shaders;
+pub mod timing;
 
 use rt::win::*;
 
@@ -52,8 +53,12 @@ fn startup() {
     let cfg = config::load();
     rt::log_open("Render3D.log", cfg.log);
     log!("Render3D {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
+    timing::configure(cfg.timing, cfg.timing_every);
     if !cfg.enable {
         log!("Enable=0: standing down, the engine draws the 3D view");
+        if cfg.timing && frame::install_measure() {
+            log!("timing: the engine's own body is timed (Enable=0)");
+        }
         return;
     }
     config::set(cfg);
