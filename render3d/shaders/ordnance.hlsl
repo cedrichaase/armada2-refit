@@ -36,9 +36,10 @@
 //     turbulence.
 //   kind 6, a cone (the tractor, holding and assimilation beams): t0.x the way along,
 //     0 at the emitter, 1 at the beam's end, t2.r where the cone ends past it; t0.y
-//     across (-1..1) times t2.g, the half width there over the wide end's; t0.w the beam's length in the wide end's half widths; t3 = the
-//     streaks' count across, how dark between them, how fast they drift, the soft
-//     edge in pixels; t4 = vapour depth, blobs per wide-end half width, the vapour's
+//     across (-1..1) times t2.g, the half width there over the wide end's; t0.w the
+//     beam's length in the wide end's half widths; t3 = the fans' count (up to 4),
+//     the light between their edges, how often each comes and goes (a second), the
+//     edges' width in pixels; t4 = vapour depth, blobs per wide-end half width, the vapour's
 //     speed along the beam (half widths a second), the brightness at the target
 //     against the emitter's.
 
@@ -222,6 +223,25 @@ float vnoise(float2 p)
 // black within a few pixels of its outline. No core. The streaks run in the cone's own
 // across (-1..1), so they spread with it; their phases drift slowly by sums of sines
 // at unrelated rates, so nothing turns or pulses in a rhythm one can read.
+// One fan of a cone: a wedge from the emitter (a band of v, which is the cone's own
+// width), hard edged and brightest along its edges, softer between them. It fades in,
+// holds and fades out, then comes back at another angle and width: the new ones are
+// drawn only while it is dark, so nothing jumps. i: which fan; fw: the edge's width in
+// v; interior: the light between the edges against theirs.
+float cone_fan(float v, float i, float seed, float t, float rate, float interior, float fw)
+{
+    float ph = t * rate * (0.75 + 0.5 * hash21(float2(i, seed))) + hash21(float2(seed, i * 7.1 + 0.3));
+    float n = floor(ph), x = frac(ph);
+    float a = sin(3.14159265 * x);
+    a *= a;
+    float c = (hash21(float2(n + i * 17.0, seed)) * 2.0 - 1.0) * 0.55;
+    float w = min(0.18 + 0.5 * hash21(float2(n * 1.3 + 3.7, i * 1.7 + seed)), 1.0 - abs(c));
+    float d = w - abs(v - c);
+    float inside = saturate(d / fw);
+    float edge = exp(-max(d, 0.0) / max(w * 0.1, 1e-4));
+    return a * inside * (interior + 1.6 * (1.0 - interior) * edge);
+}
+
 float3 cone(float2 uv, float lw, float3 col, float2 sw, float seed, float4 p, float4 q)
 {
     float  t = k_time.x;
@@ -232,11 +252,16 @@ float3 cone(float2 uv, float lw, float3 col, float2 sw, float seed, float4 p, fl
     float  fw = max(fwidth(v), 1e-4);
     float  e = saturate((1.0 - av) / max(fw * p.w, 1e-4));
     float  edge = e * e * (3.0 - 2.0 * e);
-    float  w = 3.14159265 * p.x;
-    float  ph1 = seed + t * p.z + s * 0.8 + 0.6 * sin(t * 0.21 + seed);
-    float  ph2 = seed * 1.7 - t * p.z * 0.73 + s * 0.5 + 0.5 * sin(t * 0.13 + seed * 2.3);
-    float  st = 0.5 + 0.3 * sin(v * w + ph1) + 0.2 * sin(v * w * 1.41 + ph2);
-    float  streak = 1.0 - p.y + p.y * st * st * (3.0 - 2.0 * st);
+    // Fans (p: how many, up to four; the light between their edges; how often each
+    // comes and goes, a second): the beams the series draws, appearing and fading
+    // each on its own.
+    float  efw = fw * max(p.w, 1.0);
+    float  streak = cone_fan(v, 0.0, seed, t, p.z, p.y, efw) * step(0.5, p.x)
+                  + cone_fan(v, 1.0, seed, t, p.z, p.y, efw) * step(1.5, p.x)
+                  + cone_fan(v, 2.0, seed, t, p.z, p.y, efw) * step(2.5, p.x)
+                  + cone_fan(v, 3.0, seed, t, p.z, p.y, efw) * step(3.5, p.x);
+    // a fine grain of lengthwise lines in the light, drifting slowly
+    streak *= 0.7 + 0.3 * vnoise(float2(v * 40.0 + seed, s * 0.6 + t * 0.35));
     float  x = s * lw * q.y;
     float  y = v * q.y * 0.5 + seed;
     float  run = t * q.z * q.y;
@@ -244,7 +269,8 @@ float3 cone(float2 uv, float lw, float3 col, float2 sw, float seed, float4 p, fl
              + 0.3 * vnoise(float2(x * 2.3 - run * 1.9 + 5.2, y * 2.1 - t * 0.11 + 1.3))
              + 0.2 * vnoise(float2(x * 5.1 - run * 3.7 + 11.7, y * 4.7 + t * 0.23 + 7.9));
     float  vap = max(1.0 - q.x + q.x * 2.0 * n, 0.0);
-    float  along = lerp(1.0, q.w, pow(saturate(s), 0.45));
+    // the fans converge on the emitter, so the light gathers there
+    float  along = lerp(1.0, q.w, pow(saturate(s), 0.45)) * (1.0 + 1.5 * pow(saturate(1.0 - s), 3.0));
     float  f = saturate((s_end - s) / max(s_end - 1.0 + 0.1, 0.05));
     float  far = f * f * (3.0 - 2.0 * f);
     float  near = saturate(s * 40.0);

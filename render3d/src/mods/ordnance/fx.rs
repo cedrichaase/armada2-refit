@@ -87,9 +87,9 @@ pub struct Recipe {
     spread: f32,
     beyond: f32,
     pull: f32,
-    /// A cone's lengthwise streaks: how many across, how dark between them, how fast
-    /// they drift (radians a second); its outline's soft edge in pixels.
-    streaks: [f32; 3],
+    /// A cone's fans: how many (up to 4), the light between their edges (0..1), how
+    /// often each comes and goes (a second); their edges' width in pixels.
+    fans: [f32; 3],
     edge_px: f32,
     /// A cone's vapour: depth, blobs per wide-end half width, speed along the beam
     /// (half widths a second); its brightness at the target against the emitter's.
@@ -160,7 +160,7 @@ impl Recipe {
             spread: s.f(sec, "Spread", 0.8).max(0.01),
             beyond: s.f(sec, "Beyond", 0.5).max(0.0),
             pull: s.f(sec, "Pull", 1.0).max(0.0),
-            streaks: s.n(sec, "Streaks", [3.5, 0.6, 0.35]),
+            fans: s.n(sec, "Fans", [3.0, 0.3, 0.7]),
             edge_px: s.f(sec, "EdgePixels", 2.0).max(0.1),
             vapour: s.n(sec, "Vapour", [0.5, 1.2, 0.5]),
             fall: s.f(sec, "Fall", 0.25).max(0.0),
@@ -776,8 +776,8 @@ impl Fx {
     /// `Beyond` of it. Built of camera-facing segments, each node's side its own (so
     /// the segments meet); the wide end is drawn towards the camera along the line to
     /// the eye (`Pull` target radii, growing as the square of the way along), which
-    /// leaves it where it was on screen but in front of the hull it holds. Streaks and
-    /// vapour are the shader's; the outline is the geometry's and holds still. Its
+    /// leaves it where it was on screen but in front of the hull it holds. The fans
+    /// (wedges inside it that come and go) and the vapour are the shader's. Its
     /// light is a wash on the side of the target the cone falls on.
     fn cone(&mut self, cam: &Cam, ord: usize, rc: usize, age: usize, now: f32) {
         let r = self.recipes[rc].clone();
@@ -812,7 +812,7 @@ impl Fx {
             bright,
             col2: v3(s_end, 0.0, 0.0),
             seed: sd,
-            p3: [r.streaks[0], clamp(r.streaks[1], 0.0, 1.0), r.streaks[2], r.edge_px],
+            p3: [clamp(r.fans[0], 0.0, 4.0), clamp(r.fans[1], 0.0, 1.0), r.fans[2], r.edge_px],
             p4: [clamp(r.vapour[0], 0.0, 1.0), r.vapour[1], r.vapour[2], r.fall],
         };
         const N: usize = 16;

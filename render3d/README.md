@@ -408,13 +408,16 @@ centre would be cut in half by the hull in the depth test, so the wide end is mo
 towards the eye along the line to it (`Pull` target radii, growing as the square of
 the way along): that leaves it where it was on screen and puts it in front of the hull
 it holds, while the narrow end stays behind the emitter's own plating. The shader
-(`cone` in `ordnance.hlsl`) has no core: broad streaks across the cone's own -1..1
-(so they spread with it, as a projector's do in haze), their edges lifted to the
-middle's brightness, their phases drifting by sums of sines at unrelated rates;
-three octaves of value noise for vapour, running along the beam (`Vapour`'s speed;
+(`cone` in `ordnance.hlsl`) has no core. Its light is up to four fans (`Fans=count,
+interior,rate`): wedges from the emitter, each a band of the cone's own -1..1 (so it
+spreads with it), hard edged (`EdgePixels`, by `fwidth`), brightest along its edges
+and `interior` of that between them, with a fine grain of lengthwise lines. Each
+fades in, holds and fades out `rate` times a second (each at its own rate) and takes a
+new angle and width from a hash of its cycle, which changes only while it is dark, so
+nothing jumps: the series' beams, which come and go while the beam stays on. The light
+gathers towards the emitter, where the fans converge. Then three octaves of value noise for vapour, running along the beam (`Vapour`'s speed;
 the tractors' run back towards the ship) and slowly across; brightest at the emitter,
-`Fall` of it at the target; black within `EdgePixels` of the outline (`fwidth`). The
-outline is the geometry's and holds still, so only the light inside it moves. A small
+`Fall` of it at the target; black within `EdgePixels` of the outline. A small
 flare (`Emitter`) marks the point on the ship; there is no impact flare. **The wash**
 on the target is a soft point light (`Light` times the beam's colour), placed
 `WashBack` target radii from its centre back towards the emitter and full out to

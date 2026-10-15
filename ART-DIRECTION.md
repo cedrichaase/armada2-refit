@@ -20,11 +20,19 @@ cone, like a laser projector shining through vapour**:
   inside the beam rather than at its tip.
 - **Light in a medium, not a solid object.** The cone is translucent: stars and hull
   show through it. It is brightest at the emitter and thins toward the target.
-  Brightness runs in streaks along its length, as a projector's beam does in haze.
   There is no white-hot core.
-- **Fluctuating.** The streaks and the vapour drift and shimmer the whole time it is on.
-  The beam's outline stays steady while the light inside it moves. Nothing should twist
-  or pulse in a regular, readable way.
+- **Made of fans that come and go** (the user's addition, 2026-10-16, from DS9's
+  Bird-of-Prey tractor on the *Defiant* and *Voyager* under a Borg cube; frames kept
+  out of the repository). The cone is not one even body of light: it is two to four
+  wedges of light from the emitter, each with hard edges brighter than the softer
+  light between them, with a fine grain of lengthwise lines in it. The wedges overlap,
+  and each fades in, holds and fades out on its own, coming back at another angle and
+  width, so the set changes visibly within a quarter of a second while the beam as a
+  whole stays on. The light is densest where the wedges converge at the emitter,
+  which is a small bright point (blue-white on the Borg cube). The tractor and the
+  Borg beams work the same way.
+- **Fluctuating.** The fans and the vapour move the whole time it is on. Nothing should
+  twist or pulse in a regular, readable way.
 - **It lights the target.** The hull inside the cone takes a faint wash of the beam's
   colour, the same colour as the beam. The wash covers the part of the hull the cone
   reaches. It is faint enough that the hull's own detail still reads.
