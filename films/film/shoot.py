@@ -102,7 +102,8 @@ class Take:
         self.note(f'session {self.sid}')
         if s.get('Prepare'):
             words = s.get('Prepare').split()
-            state = os.path.join(SESSIONS, self.sid, 'session.json')
+            m = re.search(r'^\s*state:\s*(\S+)', r.stdout, re.M)
+            state = m.group(1) if m else os.path.join(SESSIONS, self.sid, 'session.json')
             r = subprocess.run([os.path.join(REPO, words[0]), state, *words[1:]], cwd=REPO,
                                capture_output=True, text=True)
             self.log.write(f'$ Prepare: {s.get("Prepare")}\n{r.stdout}{r.stderr}')
@@ -123,7 +124,9 @@ class Take:
         if self.desktop:
             return self.desktop_prepare()
         t0 = time.time()
-        has_scene = self.film.scene_ini(self.shot) is not None
+        ini = self.film.scene_ini(self.shot)
+        # a scene file with Enable=0 (a mission, the menus) builds no scene to query
+        has_scene = ini is not None and not re.search(r'^\s*Enable\s*=\s*0', open(ini).read(), re.M)
         seen = False     # `running` says "not running" until the game's process is up
         while time.time() - t0 < READY_TIMEOUT:
             if 'not running' in self.drive('running'):
@@ -325,14 +328,23 @@ class Take:
                 self.bench().key(arg)
 
     def typelog(self, player, name, marker):
-        """Type the word that follows `marker` in a file of another player's game (the
-        host's join code, from its Online.log), as the bench's scenarios do."""
-        other = self.ensemble.takes[player]
-        path = os.path.join(other.bench().game_dir, name)
-        text = open(path, errors='replace').read() if os.path.exists(path) else ''
-        found = re.findall(re.escape(marker.strip('"')) + r'\W*([A-Za-z0-9-]+)', text, re.I)
-        if not found:
-            raise RuntimeError(f'typelog: no "{marker}" in {player}\'s {name}')
+        """Type the word that follows `marker` in a log of another player's game, from its
+        last line that has it (the host's join code, from its Online.log), as the bench's
+        `Type what follows ... in ... of <player>` does. Waits up to 30 s for it."""
+        ens = getattr(self, 'ensemble', None)
+        if not ens or player not in ens.takes:
+            raise RuntimeError(f'typelog: no player {player} in this shot')
+        other = ens.takes[player].bench()
+        rx = re.compile(re.escape(marker.strip('"\'')) + r'\W*([A-Za-z0-9-]+)', re.I)
+        t0 = time.time()
+        while True:
+            found = rx.findall(other.game_log(name) or '')
+            if found:
+                break
+            if time.time() - t0 > 30:
+                raise RuntimeError(f'typelog: no "{marker}" in {player}\'s {name} after 30 s')
+            time.sleep(0.5)
+        self.note(f'typelog: {found[-1]} from {player}\'s {name}')
         self.drive('type', found[-1])
 
     # ---------------------------------------------------------------- recording
@@ -504,12 +516,16 @@ class Ensemble:
             t.log = open(t.stem + '.log', 'w')
             raws[t] = tempfile.mkdtemp(prefix=f'{t.variant}-', dir=os.path.dirname(t.stem)) + '/raw'
         try:
-            for i, t in enumerate(takes):
-                if i:
-                    time.sleep(8)       # never two starts in one second
+            # the players' sessions start together (a start is mostly waiting on the clone
+            # and Wine), staggered: never two starts in one second
+            def bring_up(i_t):
+                i, t = i_t
+                time.sleep(8 * i)
                 t.start()
-            for t in takes:
                 t.wait_ready()
+            with ThreadPoolExecutor(len(takes)) as ex:
+                for f in [ex.submit(bring_up, it) for it in enumerate(takes)]:
+                    f.result()
             self.run(self.shot.setup)
             for t in takes:
                 t.record_start(raws[t])
