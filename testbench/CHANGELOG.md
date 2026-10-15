@@ -7,6 +7,11 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 ## 3.17.0 — 2026-10-15
 
+### Added
+- Scenario `render3d-match`: an Instant Action match on render3d with every module on,
+  a battle staged beside the Borg start by `Scene.asi`'s new `SCENE=match` (builds and
+  hides nothing; fog off).
+
 ### Changed
 - Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
   Repair, Fog, Specials and Venting, it checks that `Render3D.asi` loaded each module.
