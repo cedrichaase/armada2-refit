@@ -18,6 +18,13 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   blooming by energy in HDR), shield hits and the shields-down arcs (`Shields.asi`),
   repair welding (`Repair.asi`), and hull debris as render3d's own simulation; keys in
   `[Explosions]`, `[Shields]`, `[Repair]`, `[Debris]`.
+- Module `ordnance` (on): every shot and the warp flash: phasers, pulses, torpedoes,
+  plasma, polerons and artillery in stock's look (near-white texels lifted past white,
+  `Hot`/`HotFrom`), the special weapons' beams, bolts, fields and waves and the warp
+  flash from `Specials.asi`'s recipes (`ordnance.ini`, built in; Render3D.ini sections
+  of the same name override), torpedo lights recoloured and phaser lights as
+  `Lighting.asi` makes them. Mining beams, mines and model-drawn specials without a
+  recipe stay the engine's.
 
 Installed, not yet seen in game.
 

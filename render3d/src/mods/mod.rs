@@ -11,6 +11,7 @@ use crate::log;
 
 pub mod effects;
 pub mod hulls;
+pub mod ordnance;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
@@ -103,6 +104,7 @@ pub fn init() {
     // One line per module; the first that takes a step or an object draws it.
     add(Box::new(hulls::Hulls::default()), false);
     add(Box::new(effects::Effects::new()), true);
+    add(Box::new(ordnance::Ordnance::new()), true);
 }
 
 /// At the first frame, when every plugin is loaded: drop the modules whose plugin is.

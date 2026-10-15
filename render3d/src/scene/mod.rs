@@ -228,6 +228,12 @@ pub fn begin_view(_v: &View) {
     st().queue.clear();
 }
 
+/// Reads the engine's registered lights again, for a module that registered lights of
+/// its own in its `begin_view` (the ordnance module: shots, warp flashes).
+pub fn regather_lights() {
+    st().lights = Lights::gather();
+}
+
 /// The registered lights of the view being drawn.
 pub fn lights() -> &'static Lights {
     &st().lights

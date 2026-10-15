@@ -154,3 +154,92 @@ is in the depth buffer.
   view's end, so both the engine's draws and the scene layer see them.
 - **Still the engine's**: construction (`BuildingEffect`, the bees and drones), nanites,
   `Step::Specials` (the special-object effects), and every spark that is not a weld.
+
+### ordnance
+
+The `ordnance` module (on by default; `[Modules] ordnance=0` leaves it to the engine)
+draws every shot and the warp flash, in place of `Ordnance::RenderAll` (0x58e580,
+`Step::Ordnance`) and around `RenderWarpSpriteEffects` (0x59c560, `Step::Warp`). It
+supersedes `Specials.asi`, and stands down while that is loaded.
+
+**The loop.** `RenderAll` walks `Ordnance::ordnanceList` (the `std::list` at 0x771fa8,
+its head node's pointer at 0x771fac) and submits a shot when its owner (handle +0x5c,
+`Entity::Get`, a game object, not +0x113) is not culled for this view (+0x183) and the
+player can see it (`CanUserSee`, vtable slot 2), else the same of its target (+0x60),
+else when the shot itself is within `cfgOBJECT_CULLING_DISTANCE` (0x6fcac0) of the
+camera and visible. Ours makes the same tests in the same order, **and the one write
+stock makes there**: a shot whose target has +0x10f set, or whose target has +0x112
+while its owner (`GameObject::GetObjEvenIfDestroyed`) has not, forgets its target
+(+0x60 = 0). That write is the engine's own behaviour in its render pass; leaving it
+out would change the game. A submitted shot is then drawn by, in turn:
+
+1. a **recipe** by its ODF (the class +0x34 keeps its `cPrjID` at +0x150,
+   `cPrjID::GetOdfName` 0x6593a0): `Specials.asi`'s beams, bolts and fields, ported
+   unchanged (`fx.rs`, `fx_ps` in `shaders/ordnance.hlsl`), on the sim clock;
+2. **stock's own look, drawn by us** (`sprite.rs`), for the classes whose `Submit`
+   (vtable +0x5c) is `Phaser` 0x57edc0, `PulsePhaser` 0x581cb0, `PhotonTorpedo`
+   0x57f100, `PlasmaCannon` 0x57f580, `PoleronTorpedo` 0x5800d0, `Artillery` 0x5730a0
+   or `ShieldRemovingTorpedo` 0x5853b0. Those draw the class's sprite (+0x12c) as a
+   ribbon (`ST3D_Sprite::RenderAsPolygon` 0x63a810: from the beam's start +0xbc to its
+   end +0xc8, the class's width +0x148 wide, turned about its length by
+   (a − eye) × (b − eye); a pulse from its head +0xc8 back towards the start, at most
+   the class's length +0x144) or as a camera-facing square (`DrawScaled3D` 0x63aa60:
+   at the shot's position, `Entity::GetTransform` +0x24, half size +0x148), coloured
+   by the shot (phaser +0xf0, photon, poleron and shield-removing torpedo +0xd0,
+   pulse and artillery +0xd4; the plasma cannon sets none and keeps the sprite's own
+   +0x24). Both end in `ClipAndRender3D` (0x63b4b0); what we read of it: the sprite's
+   rectangle +0x38 (u, v, w, h, fractions of the texture), its flags +0x50 (0x10 not
+   animated, 0x20 tiled along the ribbon once per its width +0x40), its material +0x54
+   (blend factors +0x1c source, +0x20 destination, Direct3D's numbers), its texture
+   +0x58 (named at +0x8); the flipbook's frame is what `ST3D_Sprite::Animate`
+   (0x63a580) leaves in `m_texture_coordinate_offset` (0x7ad6d0), called where
+   `ClipAndRender3D` calls it, so every flipbook shows stock's frame; the colour is
+   times Storm3D +0x4, the alpha the device's +0x48. Corners in the order stock gives
+   their texture coordinates (u0 v0, u1 v0, u1 v1, u0 v1). The one change: texels near
+   white are lifted past it (`Hot=`, `HotFrom=`), so beam cores and torpedo hearts
+   bloom by their energy;
+3. **the engine's own `Submit`**, called through the vtable, for everything else:
+   mines, pods, the commando team, the mining beam (`wmbeam.sod`, an instance scaled
+   along the beam, `MiningBeam::Submit` 0x57d1e0) and the special weapons that draw a
+   model and have no recipe.
+
+**The warp flash.** `RenderWarpSpriteEffects` still runs: `WarpSpriteEffect::Render`
+moves each flash onto its craft's line of motion and removes it, which the game
+relies on. Its one draw, the call to `DrawScaled3D` at 0x59cc6b, is re-pointed at us
+(only if it still calls 0x63aa60): the effect (its handle +0, its point +4, its
+distance +0x10) is noted, and the flash drawn after the step as `Specials.asi` drew
+it (`[Warp]`), with its afterglow and ring once the engine has dropped the effect.
+
+**The special weapons' waves** are `ShockwaveExplosion`s, which the effects module
+draws: it asks `mods::ordnance::draw_wave(expl, view)` first. A wave whose class
+(+0x30) names, through its `cPrjID` (+0x24), an ODF with a `[Wave.]` recipe is drawn
+there (`ShockwaveExplosion::GetCurrentRadius` 0x467730, its end +0x50, the class's
+`fadeFactor` +0xe0, in the plane normal to its transform's second axis) and the call
+answers true; any other is left to the caller's ring.
+
+**Light.** At the start of each view, after `Ordnance::PreRenderAll` has registered
+every torpedo's and pulse's light: their records in the registry (Storm3D +0x60:
+record +0 the light, +4 its colour) take the hue of their sprite's first frame,
+scaled to the ODF colour's peak (the class's light +0x10, its colour +0xf4), which is
+`Lighting.asi`'s recolouring; every visible phaser (vtable 0x6b8ee4, not expired
++0x27, visible +0x24) gets an emitter and an impact light in its texture's colour
+times its tint, up over 0.06 s and down over its last 0.25 s (time left +0xac of the
+class's `lifeSpan` +0x1c); and the special weapons' and the warp flashes' lights of the
+last frame are registered. New lights are `ST3D_Point_Light`s made once with the
+engine's constructor (0x62f240) and registered with `RegisterLight` (0x62d250), so a
+hull the engine draws takes them too; the scene's list is then read again. With
+`Lighting.asi` loaded, it does the recolouring and the phaser lights itself.
+
+**Settings.** The recipes and `[Warp]` are `render3d/ordnance.ini`, built into the
+plugin; a section or key of the same name in `Render3D.ini` overrides it. The
+module's own keys, in `Render3D.ini` `[Ordnance]`:
+
+| Key | Default | |
+|---|---|---|
+| `Stock` | 1 | 0: stock's sprites are drawn by the engine's `Submit` |
+| `Specials` | 1 | 0: no recipes for shots; they fall to stock |
+| `Waves` | 1 | 0: `draw_wave` draws none; the special weapons' waves are drawn as any shockwave |
+| `Hot`, `HotFrom` | 0.6, 0.7 | how far past white a sprite's hottest texels go, from which level |
+| `Recolour` | 1 | torpedo and pulse lights in their sprite's colour |
+| `PhaserLights` | 1 | the phasers' emitter and impact lights (`PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift`, `PhaserImpact`, `PhaserImpactStart`, `PhaserImpactRange`, `PhaserImpactLift`: `Lighting.ini`'s) |
+| `Survey` | 0 | log every ordnance ODF the first time it shows, with its vtable and `Submit` |

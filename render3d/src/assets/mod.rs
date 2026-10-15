@@ -170,6 +170,13 @@ pub fn texture_exists(name: &str) -> bool {
     store().tex_index.find(name).is_some()
 }
 
+/// A texture's base level decoded (BGRA8, rows top-down), by name; not cached.
+pub fn image(name: &str) -> Option<tga::Image> {
+    let s = store();
+    let base = String::from(s.tex_index.find(name)?);
+    tga::decode(&s.tex_dir.read(&base)?).ok()
+}
+
 fn tex_width(s: &mut Store, file: &str) -> Option<u32> {
     let key = rt::lower(file);
     if let Some(w) = s.widths.get(&key) {
