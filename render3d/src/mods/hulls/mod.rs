@@ -268,6 +268,12 @@ impl Hulls {
     }
 }
 
+/// The nodes an instance shows as the engine would draw it, without its object: for a
+/// fog-of-war ghost (overlays), whose spirit keeps the instance as it was last seen.
+pub fn instance_visibility(inst: usize, model: &Model, p: &mut pose::Pose) {
+    visibility(0, inst, game::is_craft_instance(inst), model, p);
+}
+
 /// The nodes the engine shows or hides per instance, by writing flags into the shared
 /// database before it draws (`ST3D_Stream::ReadDatabase`, `GameObjectInstance::
 /// RenderInternal`, `CraftInstance::RenderInternal`, `Shipyard::Render`,

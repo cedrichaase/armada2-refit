@@ -193,7 +193,8 @@ impl Ghosts {
         world.r[0] = world.r[0] * s.x;
         world.r[1] = world.r[1] * s.y;
         world.r[2] = world.r[2] * s.z;
-        let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::of_instance(inst, v.time), pose::auto(v.eye));
+        let mut p = pose::pose(&model.sod, &model.info, &world, pose::Clock::of_instance(inst, v.time), pose::auto(v.eye));
+        crate::mods::hulls::instance_visibility(inst, &model, &mut p);
         if self.said < 4 {
             self.said += 1;
             log!("overlays: ghost of {} at {:.0},{:.0},{:.0}", name, world.p.x, world.p.y, world.p.z);
@@ -307,3 +308,4 @@ impl Ghosts {
         }
     }
 }
+
