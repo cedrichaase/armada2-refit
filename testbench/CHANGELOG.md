@@ -18,6 +18,9 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - Scenario `render3d-ordmodels`: mines, the commando team, the myotron, the flux wave,
   transwarp and the chain pulsar fired in the `specials` scene, drawn by render3d.
   Scenes `mining` (a freighter mining a dilithium moon) and `ordmodels`.
+- Scenario `render3d-hulls-extras`: the build ghost and height posts while placing a
+  station, a hologram (a Romulan holo-emitter on a Klingon battleship) and the Evolver,
+  drawn by render3d.
 - `testbench/operating/`: what agents learned about driving the game on the bench, one
   file per piece of work.
 

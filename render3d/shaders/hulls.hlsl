@@ -1,4 +1,4 @@
-// entries: vs_hull:vs_3_0:VS_HULL ps_hull:ps_3_0:PS_HULL ps_bump:ps_3_0:PS_BUMP ps_cloak:ps_3_0:PS_CLOAK vs_depth:vs_3_0:VS_DEPTH ps_depth:ps_3_0:PS_DEPTH vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE
+// entries: vs_hull:vs_3_0:VS_HULL ps_hull:ps_3_0:PS_HULL ps_bump:ps_3_0:PS_BUMP ps_cloak:ps_3_0:PS_CLOAK ps_ghost:ps_3_0:PS_GHOST ps_holo:ps_3_0:PS_HOLO vs_depth:vs_3_0:VS_DEPTH ps_depth:ps_3_0:PS_DEPTH vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE
 // Hulls: ships, stations and the like, drawn from their SODs by render3d's hulls module
 // (src/mods/hulls/). Lighting.asi's hull look ported (lighting/README.md, "Shaders",
 // "Specular and rim", "Dynamic range", "Bump-mapped hulls", "The Borg profile",
@@ -262,6 +262,74 @@ float4 ps_cloak(VO i, float2 vpos : VPOS) : COLOR
     float keep = lerp(ck_b.w, 1.0, sh);
     c = lerp(c, hull.rgb, keep) + ck_edge.rgb * edge * ck_tint.a;
     return float4(c, 1.0);
+}
+
+// ---- the build ghost: the station being placed, faded --------------------------------
+// Stock draws it as a faded hull through its sorted translucent path (half the fade),
+// which comes out pale and washed towards white with a hot sheen where it faces the
+// light. Here: the lit hull lifted towards its texture at full light, a broad highlight
+// towards each directional light past white (so it blooms), and a blocked placement's
+// red added as stock adds its red ambient. Premultiplied (ONE, INVSRCALPHA).
+float4 gh_a   : register(c80); // x: alpha; y: lift; z: sheen; w: the sheen's exponent
+float4 gh_add : register(c81); // rgb: light added on the texture (a blocked placement's red)
+
+float lum(float3 c)
+{
+    return dot(c, float3(0.299, 0.587, 0.114));
+}
+
+float4 ps_ghost(VO i) : COLOR
+{
+    float3 N = normalize(i.n);
+    float4 t = sample_tex(i.uv);
+    float3 c = shade(N, i.wp, t, i.sc, i.wv).rgb;
+    float3 V = normalize(k_eye.xyz - i.wp);
+    float sheen = 0.0;
+    for (int k = 0; k < DIRS; k++) {
+        float3 H = normalize(k_dvec[k].xyz + V);
+        sheen += lum(k_dcol[k].rgb) * pow(saturate(dot(N, H)), gh_a.w);
+    }
+    c = lerp(c, max(c, t.rgb * k_tint.rgb), gh_a.y) + t.rgb * gh_add.rgb;
+    c += sheen * gh_a.z * (0.5 + 0.5 * lum(t.rgb));
+    return float4(c * gh_a.x, gh_a.x);
+}
+
+// ---- holograms: a craft shown as another class (TimedHoloEffect) ---------------------
+// The lit hull of the class it shows, drawn as a hologram in the object's team colour:
+// scanlines rolling down the screen, a bright band sweeping along the hull, a stepped
+// flicker with rare dropouts, and a glow at the silhouette past white. Premultiplied.
+float4 ho_a    : register(c82); // x: alpha; y: scanline depth; z: scanline pitch (pixels); w: time (s)
+float4 ho_b    : register(c83); // x: flicker; y: edge glow; z: its exponent; w: this hologram's seed
+float4 ho_tint : register(c84); // rgb: the hologram's colour; w: the sweep's strength
+float4 ho_ax   : register(c85); // xyz: the hull's up axis (world, unit); w: 1 / its radius
+float4 ho_ctr  : register(c86); // xyz: its centre; w: how far the hull goes towards the colour
+float4 ho_c    : register(c87); // x: the scanlines' roll (pitches per second); y: the sweeps per second; z: dropout chance
+
+float hash1(float x)
+{
+    return frac(sin(x * 12.9898 + 78.233) * 43758.5453);
+}
+
+float4 ps_holo(VO i, float2 vpos : VPOS) : COLOR
+{
+    float3 N = normalize(i.n);
+    float4 t = sample_tex(i.uv);
+    float3 c = shade(N, i.wp, t, i.sc, i.wv).rgb;
+    float3 V = normalize(k_eye.xyz - i.wp);
+    float time = ho_a.w, seed = ho_b.w;
+    float s = 0.5 + 0.5 * cos(6.2831853 * (vpos.y / ho_a.z - time * ho_c.x));
+    float scan = 1.0 - ho_a.y * s;
+    float h = dot(i.wp - ho_ctr.xyz, ho_ax.xyz) * ho_ax.w;
+    float at = frac(time * ho_c.y + seed) * 3.0 - 1.5;
+    float band = exp(-(h - at) * (h - at) * 30.0) * ho_tint.w;
+    float flick = 1.0 - ho_b.x * hash1(floor(time * 15.0) + seed * 97.0);
+    flick *= 1.0 - 0.6 * step(1.0 - ho_c.z, hash1(floor(time * 6.0) + seed * 13.0));
+    float edge = pow(1.0 - saturate(dot(N, V)), ho_b.z);
+    float3 tint = ho_tint.rgb;
+    float3 base = lerp(c, lum(c) * tint * 1.6, ho_ctr.w);
+    float a = saturate(ho_a.x * scan * flick);
+    float3 glow = tint * (edge * ho_b.y + band) * flick;
+    return float4(base * a + glow, a);
 }
 
 // ---- the shadow map: depth from the Key ---------------------------------------------

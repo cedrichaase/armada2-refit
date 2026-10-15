@@ -90,10 +90,27 @@ struct ViewState {
     /// Additive meshes of opaque hulls, for the flush.
     additive: Vec<usize>,
     sprites: Vec<sprites::Quad>,
+    /// Models drawn for what is not an object of its own (holograms, the Evolver's
+    /// cocoon, build ghosts), for the flush.
+    extras: Vec<(Posed, Extra)>,
+}
+
+/// How an extra model is drawn at the flush.
+#[derive(Clone, Copy)]
+enum Extra {
+    /// The build ghost: alpha, and whether the placement is blocked.
+    Ghost(f32, bool),
+    /// A hologram in this colour, with this seed.
+    Holo(V3, f32),
+    /// A faded hull (the cocoon while it forms).
+    Faded(f32),
 }
 
 static mut VIEWS: [Option<ViewState>; 2] = [None, None];
 static mut CUR: usize = 0;
+/// The module, for the calls other modules make into it (`placeholder`); set at every
+/// `begin_view` (the box it lives in does not move).
+static mut ME: *mut Hulls = core::ptr::null_mut();
 
 #[allow(static_mut_refs)]
 fn view_state(key: usize) -> &'static mut ViewState {
@@ -139,6 +156,9 @@ pub struct Hulls {
     /// A/B on the bench: standing aside (`look.ab_test`).
     off: bool,
     ab_checked: f64,
+    /// `Reload=1`: when `[Hulls]` was last read.
+    loaded_at: f64,
+    said_extra: [u32; 3],
 }
 
 impl Default for Hulls {
@@ -152,6 +172,8 @@ impl Default for Hulls {
             sprites: sprites::Sprites::new(),
             off: false,
             ab_checked: 0.0,
+            loaded_at: 0.0,
+            said_extra: [0; 3],
         }
     }
 }
@@ -166,7 +188,17 @@ fn our_class(o: usize, look: &Look) -> bool {
         game::FN_SCRAP_RENDER => look.scrap,
         _ => false,
     };
-    ok && matches!(game::render_internal_fn(o), game::FN_GO_RI | game::FN_CRAFT_RI | game::FN_FREIGHTER_RI)
+    ok && match game::render_internal_fn(o) {
+        game::FN_GO_RI | game::FN_CRAFT_RI | game::FN_FREIGHTER_RI => true,
+        game::FN_EVOLVER_RI => look.evolver,
+        _ => false,
+    }
+}
+
+/// The `RenderInternal`s that are or end in `Craft::RenderInternal` (the warp stretch,
+/// the white wave light).
+fn craft_ri(o: usize) -> bool {
+    matches!(game::render_internal_fn(o), game::FN_CRAFT_RI | game::FN_FREIGHTER_RI | game::FN_EVOLVER_RI)
 }
 
 impl Hulls {
@@ -230,7 +262,7 @@ impl Hulls {
         } else {
             None
         };
-        let warp = if craft && matches!(game::render_internal_fn(o), game::FN_CRAFT_RI | game::FN_FREIGHTER_RI) {
+        let warp = if craft && craft_ri(o) {
             game::warp(o, &obj::transform(o)).map(|(b, sv, n)| {
                 static mut SAID: u32 = 0;
                 unsafe { SAID += 1 };
@@ -242,8 +274,7 @@ impl Hulls {
         } else {
             None
         };
-        let craft_ri = craft && matches!(game::render_internal_fn(o), game::FN_CRAFT_RI | game::FN_FREIGHTER_RI);
-        let waves = draw::Waves::of(o, craft_ri, v.time);
+        let waves = draw::Waves::of(o, craft && craft_ri(o), v.time);
         let glow = if game::render_fn(o) == game::FN_SCRAP_RENDER { game::scrap_glow(o) } else { None };
         Some(Posed {
             obj: o,
@@ -266,6 +297,246 @@ impl Hulls {
             drawn: false,
         })
     }
+}
+
+impl Hulls {
+    /// Poses a model that is not a game object's own (a hologram's class, the cocoon, a
+    /// build ghost): `place` as the engine places the instance, times the SOD's
+    /// `ScaleSOD` (looked up by `odf`, 1 without one) and `scale` (the instance's
+    /// scale effects). `clean`: the class's special nodes hidden as `DisableSpecialNodes`
+    /// and a fresh instance leave them (damage, crew fires, the Borg's), and `lights`
+    /// hidden too when `no_lights` (the build ghost's instance sets `+0x90`).
+    fn pose_extra(&mut self, v: &View, odf: &str, place: &M34, scale: V3, clock: pose::Clock, team: Option<V3>, class: usize, no_lights: bool) -> Option<Posed> {
+        let model = scene::model(v.dev, odf)?;
+        let s = scale * self.scale_sod(odf);
+        let mut world = *place;
+        world.r[0] = world.r[0] * s.x;
+        world.r[1] = world.r[1] * s.y;
+        world.r[2] = world.r[2] * s.z;
+        let mut p = pose::pose(&model.sod, &model.info, &world, clock, pose::auto(v.eye));
+        clean(&model, class, no_lights, &mut p);
+        let (c, r) = draw::model_sphere(&model);
+        let centre = world.transform_point(c);
+        let radius = r * world.r[0].len().max(world.r[1].len()).max(world.r[2].len());
+        Some(Posed {
+            obj: 0,
+            inst: 0,
+            model,
+            pose: p,
+            world,
+            scale,
+            centre,
+            radius,
+            since_start: clock.elapsed.max(0.0),
+            flags: clock.flags,
+            clock,
+            team,
+            assimilated: false,
+            warp: None,
+            waves: None,
+            glow: None,
+            cloak: None,
+            drawn: true,
+        })
+    }
+
+    /// `TimedHoloEffect::RenderHologram` (0x60f730) in the engine's place: the class it
+    /// shows, at its instance, as a hologram in the object's team colour, with the
+    /// class's running lights. Writes the on-screen byte with whether it is in view, as
+    /// `GameObject::RenderInternal` writes the call's answer. False to leave it to the
+    /// engine (not a plain SOD).
+    fn hologram(&mut self, o: usize, h: usize, v: &View, look: &Look) -> bool {
+        let Some((inst, class)) = game::hologram_parts(h) else { return false };
+        let db = field(inst, 0x80);
+        let name = game::class_odf(class);
+        if db == 0 || engine::vtable(db) != game::VT_DATABASE || name.is_empty() || scene::model(v.dev, name).is_none() {
+            if self.said_extra[0] < 8 {
+                self.said_extra[0] += 1;
+                log!("hulls: a hologram of '{}' (database vtable {:#x}) is left to the engine", name, engine::vtable(db));
+            }
+            return false;
+        }
+        let seen = game::frustum_test(inst, v.cam);
+        unsafe { core::ptr::write_volatile((o + 0x25) as *mut u8, seen as u8) };
+        if !seen {
+            return true;
+        }
+        let place = game::instance_matrix(inst);
+        let clock = pose::Clock::of_instance(inst, v.time);
+        let team = game::team_colour(o);
+        let Some(p) = self.pose_extra(v, name, &place, v3(1.0, 1.0, 1.0), clock, Some(team), class, false) else { return false };
+        if self.said_extra[0] < 8 {
+            self.said_extra[0] += 1;
+            log!("hulls: {} shows a hologram of {} (team colour {:.2},{:.2},{:.2})", obj::odf_name(o), name, team.x, team.y, team.z);
+        }
+        let st = view_state(v.key());
+        self.sprites.collect(v, look, &p, &mut st.sprites);
+        let seed = ((o >> 4) as u32).wrapping_mul(2654435761) as f32 / 4294967296.0;
+        st.extras.push((p, Extra::Holo(team, seed)));
+        true
+    }
+
+    /// The Evolver's cocoon, as `Evolver::RenderInternal` (0x4b1170) draws it: culled
+    /// by distance, its scale effects applied, faded while it forms. Whether it is in
+    /// view (stock's answer, the on-screen byte while only the cocoon shows).
+    fn cocoon(&mut self, c: usize, v: &View, look: &Look) -> bool {
+        let pos = engine::field_v3(c, 0x68);
+        if game::distance_culled(pos, v.eye) {
+            return false;
+        }
+        game::cocoon_scale_effects(c);
+        let db = field(c, 0x80);
+        let ours = engine::vtable(c) == game::VT_COCOON && db != 0 && engine::vtable(db) == game::VT_DATABASE && db == unsafe { engine::rd::<usize>(game::COCOON_DB) };
+        let place = game::instance_matrix(c);
+        let p = if ours {
+            self.pose_extra(v, "8472_cocoon", &place, game::instance_scale(c), pose::Clock::of_instance(c, v.time), None, 0, false)
+        } else {
+            None
+        };
+        let Some(p) = p else {
+            // Not the cocoon we know: the engine's own draw of the instance.
+            return game::instance_render(c, v.cam);
+        };
+        if !game::frustum_test(c, v.cam) {
+            return false;
+        }
+        // (`p.inst` stays 0: the cocoon's `+0x10` is not a face limit.)
+        // Stock's fade (`CocoonInstance::ComputeFadeOut`: the base far fade times the
+        // ramp `+0x98` over the first third) comes out 0 throughout on the bench, the
+        // base reading the cocoon's `+0x98` (an instance's class elsewhere) as a class;
+        // yet stock's draw shows the cocoon solid from the start. Drawn solid.
+        let fade = 1.0f32;
+        self.said_extra[1] += 1;
+        if self.said_extra[1] % 60 == 1 {
+            log!(
+                "hulls: an Evolver's cocoon at {:.0},{:.0},{:.0}, scale {:.2}, far fade {:.2}, stock's fade {:.2} (+0x98 {:.2})",
+                pos.x, pos.y, pos.z, game::instance_scale(c).x, fade, game::cocoon_fade(c), engine::field_f32(c, 0x98)
+            );
+        }
+        let st = view_state(v.key());
+        self.sprites.collect(v, look, &p, &mut st.sprites);
+        if fade < 0.999 {
+            st.extras.push((p, Extra::Faded(fade)));
+        } else {
+            self.draw.draw(v, look, &p, draw::Mode::Opaque);
+            st.extras.push((p, Extra::Faded(1.0)));
+        }
+        true
+    }
+}
+
+impl Hulls {
+    /// An extra model at the flush: depth first, then its look where it is nearest,
+    /// then its additive meshes.
+    fn draw_extra(&mut self, v: &View, look: &Look, p: &Posed, e: Extra, now: f32) {
+        let mut k = [0.0f32; 8 * 4];
+        let (mode, a) = match e {
+            Extra::Faded(f) if f >= 0.999 => {
+                self.draw.draw(v, look, p, draw::Mode::Additive(1.0));
+                return;
+            }
+            Extra::Faded(f) => (draw::Mode::Faded(f), f),
+            Extra::Ghost(alpha, blocked) => {
+                let g = &look.ghost;
+                let b = if blocked { g.blocked } else { V3::ZERO };
+                k[0..8].copy_from_slice(&[alpha, g.lift, g.sheen, g.sheen_power, b.x, b.y, b.z, 0.0]);
+                (draw::Mode::Ghost, alpha)
+            }
+            Extra::Holo(tint, seed) => {
+                let h = &look.holo;
+                let m = tint.x.max(tint.y).max(tint.z);
+                let t = if m > 0.05 { tint * (1.0 / m) } else { v3(0.4, 0.8, 1.0) };
+                let up = norm_or(p.world.r[1], UP);
+                let t_now = now;
+                k[8..32].copy_from_slice(&[
+                    h.alpha, h.scan, h.pitch, t_now,
+                    h.flicker, h.edge, h.edge_power, seed,
+                    t.x, t.y, t.z, h.sweep,
+                    up.x, up.y, up.z, 1.0 / p.radius.max(1.0),
+                    p.centre.x, p.centre.y, p.centre.z, h.tint,
+                    h.roll, h.sweep_rate, h.dropout, 0.0,
+                ]);
+                (draw::Mode::Holo, h.alpha)
+            }
+        };
+        self.draw.extra = k;
+        if !matches!(e, Extra::Ghost(..)) || look.ghost.depth {
+            self.draw.draw(v, look, p, draw::Mode::DepthOnly);
+        }
+        self.draw.draw(v, look, p, mode);
+        self.draw.draw(v, look, p, draw::Mode::Additive(a));
+    }
+}
+
+/// The build ghost (`PlaceholderFeature::sRenderInternal`, 0x473aa0) for other modules:
+/// the station of `class` where `place` puts it, in `colour`, drawn at the flush as
+/// stock fades it, its height post with it (`overlays::height_post`, or the engine's
+/// `DrawHeightPost` without the overlays module). False when the hulls module does not
+/// draw it (not running, `BuildGhost=0`, no SOD): the caller leaves it to the engine.
+pub fn placeholder(v: &View, class: usize, place: &M34, colour: V3, blocked: bool) -> bool {
+    let me = unsafe { ME };
+    if me.is_null() || class == 0 {
+        return false;
+    }
+    let me = unsafe { &mut *me };
+    if me.off {
+        return false;
+    }
+    let look = me.look().clone();
+    if !look.ghost.on {
+        return false;
+    }
+    let name = game::class_odf(class);
+    if name.is_empty() {
+        return false;
+    }
+    if game::distance_culled(place.p, v.eye) {
+        return true;
+    }
+    let Some(p) = me.pose_extra(v, name, place, v3(1.0, 1.0, 1.0), pose::Clock::FROZEN, Some(colour), class, true) else { return false };
+    if me.said_extra[2] < 8 {
+        me.said_extra[2] += 1;
+        log!(
+            "hulls: build ghost of {} at {:.0},{:.0},{:.0}, colour {:.2},{:.2},{:.2}{}",
+            name, place.p.x, place.p.y, place.p.z, colour.x, colour.y, colour.z, if blocked { ", blocked" } else { "" }
+        );
+    }
+    view_state(v.key()).extras.push((p, Extra::Ghost(look.ghost.alpha, blocked)));
+    super::overlays::height_post(v, place.p);
+    true
+}
+
+/// A model shown clean: the class's damage nodes' children, its crew fires and its
+/// Borg node hidden (a craft class), `lights` too when asked, `hardpoints` always.
+fn clean(model: &Model, class: usize, no_lights: bool, p: &mut pose::Pose) {
+    let sod = &model.sod;
+    if let Some(i) = sod.find("hardpoints") {
+        hide(sod, i, &mut p.shown, true);
+    }
+    if no_lights || game::detail_level() == 0 {
+        if let Some(i) = sod.find("lights").or_else(|| sod.find("light")) {
+            hide(sod, i, &mut p.shown, true);
+        }
+    }
+    if class == 0 || !is_craft_class(class) {
+        return;
+    }
+    for (cf, _) in game::DAMAGE_NODES.iter().copied().chain([(0x408usize, 0usize)]) {
+        if let Some(i) = game::element_name(field(class, cf)).and_then(|nm| sod.find(nm)) {
+            for &c in &sod.nodes[i].children {
+                hide(sod, c, &mut p.shown, true);
+            }
+        }
+    }
+    if let Some(i) = game::element_name(field(class, 0x420)).and_then(|nm| sod.find(nm)) {
+        hide(sod, i, &mut p.shown, true);
+    }
+}
+
+/// Whether a class is a `CraftClass` (its node fields are where `clean` reads them):
+/// `DisableSpecialNodes` (vtable slot 7) is `CraftClass`'s (0x4bfdf0).
+fn is_craft_class(class: usize) -> bool {
+    field(engine::vtable(class), 7 * 4) == 0x4bfdf0
 }
 
 /// The nodes an instance shows as the engine would draw it, without its object: for a
@@ -391,12 +662,26 @@ impl Module for Hulls {
     }
     fn begin_view(&mut self, v: &View) {
         unsafe { CUR = v.key() };
+        unsafe { ME = self as *mut Hulls };
         let st = view_state(v.key());
         st.posed.clear();
         st.faded.clear();
         st.cloaked.clear();
         st.additive.clear();
         st.sprites.clear();
+        st.extras.clear();
+        // `Reload=1` is itself read every second, so it can be set in a running game.
+        let now = crate::rt::now();
+        if now - self.loaded_at > 1.0 {
+            self.loaded_at = now;
+            if crate::config::ini().int("Hulls", "Reload", 0) != 0 {
+                let old = self.look.take().map(|l| (l.ghost.alpha, l.ghost.lift, l.holo.alpha));
+                let new = self.look().clone();
+                if old != Some((new.ghost.alpha, new.ghost.lift, new.holo.alpha)) {
+                    log!("hulls: [Hulls] read again: ghost alpha {:.2} lift {:.2}, hologram alpha {:.2}", new.ghost.alpha, new.ghost.lift, new.holo.alpha);
+                }
+            }
+        }
         let look = self.look().clone();
         if look.ab_test {
             let now = crate::rt::now();
@@ -417,7 +702,7 @@ impl Module for Hulls {
         // frame's hulls and the object loop finds them posed.
         let mut list = Vec::new();
         engine::for_each_in_list(engine::OBJECT_LIST, |o| {
-            if in_loop(o) && !obj::expired(o) && our_class(o, &look) && obj::can_user_see(o) {
+            if in_loop(o) && !obj::expired(o) && our_class(o, &look) && obj::can_user_see(o) && !(look.holo.on && game::hologram(o) != 0) {
                 list.push(o);
             }
         });
@@ -440,6 +725,27 @@ impl Module for Hulls {
             return false;
         }
         let key = v.key();
+        // Evolver::RenderInternal: the cocoon first; past a third of the evolution
+        // only the cocoon.
+        if game::render_internal_fn(o) == game::FN_EVOLVER_RI && !obj::expired(o) && obj::can_user_see(o) {
+            let c = game::cocoon(o);
+            if c != 0 {
+                game::instance_update(o);
+                let shown = self.cocoon(c, v, &look);
+                if game::evolution(o) > 1.0 / 3.0 {
+                    unsafe { core::ptr::write_volatile((o + 0x25) as *mut u8, shown as u8) };
+                    return true;
+                }
+            }
+        }
+        // A hologram: GameObject::RenderInternal draws it in place of the hull.
+        let h = game::hologram(o);
+        if h != 0 && look.holo.on && !obj::expired(o) && obj::can_user_see(o) {
+            game::instance_update(o);
+            if self.hologram(o, h, v, &look) {
+                return true;
+            }
+        }
         if !view_state(key).posed.contains_key(&o) {
             // Not posed in begin_view: expired or unseen (nothing to draw, as stock),
             // or not ours (another database, no SOD: the engine draws it).
@@ -466,7 +772,14 @@ impl Module for Hulls {
             return true;
         }
         if game::render_fn(o) == game::FN_RIG_RENDER {
-            game::rig_placeholder(o);
+            match game::rig_placeholder_of(o) {
+                Some((class, place, colour)) => {
+                    if !placeholder(v, class, &place, colour, false) {
+                        game::rig_placeholder(o);
+                    }
+                }
+                None => {}
+            }
         }
         let inst = obj::instance(o);
         if !game::frustum_test(inst, v.cam) {
@@ -534,8 +847,19 @@ impl Module for Hulls {
                 order.push((v.view.transform_point(p.centre).z, o, 1.0, true));
             }
         }
+        // Extras go in the same order, by index past usize::MAX / 2.
+        const EXTRA: usize = usize::MAX / 2;
+        for (i, (p, _)) in st.extras.iter().enumerate() {
+            order.push((v.view.transform_point(p.centre).z, EXTRA + i, 1.0, false));
+        }
         order.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(core::cmp::Ordering::Equal));
+        let now = { let n = crate::rt::now(); (n - 1000.0 * libm::floor(n / 1000.0)) as f32 };
         for (_, o, f, ck) in order {
+            if o >= EXTRA {
+                let Some((p, e)) = st.extras.get(o - EXTRA) else { continue };
+                self.draw_extra(v, &look, p, *e, now);
+                continue;
+            }
             let Some(p) = st.posed.get(&o) else { continue };
             if ck {
                 self.draw.draw(v, &look, p, draw::Mode::Cloak);

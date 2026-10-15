@@ -31,8 +31,8 @@ What it does today:
   plugin's were the last frame's).
 
 Still the engine's (falling back per object or per effect): construction welding and
-worker bees, nanites, emitters on effect instances, the Evolver, holograms and the
-build-placement ghost.
+worker bees, nanites, the station under construction (`ConstructionObject`), emitters
+on effect instances, and a hologram whose class is not a plain SOD.
 
 ## Building and installing
 
@@ -165,7 +165,13 @@ is in the depth buffer.
   face with a corner within half the mesh's radius), flying and spinning on the sim
   clock with stock's `ART_CFG.h` numbers (4 ± 2 s, 90 units/s, 4 rad/s, at most 1500),
   drawn through the scene layer's hull shading, and gone without fading at the end of
-  their life. The other callers (a cancelled construction) stay the engine's.
+  their life. The Evolver's cocoon bursting is taken the same way: its four calls of
+`Fragment` (0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4, in `Evolver::mDoRemoveConstructionEffect`
+and the other construction-effect functions; each breaks the whole cocoon, faces -1),
+each re-pointed only while it calls `Fragment` itself; the cocoon (a `CocoonInstance`,
+vtable 0x6b2630, of the database at 0x73fccc) at its instance's transform and scale. The
+other caller (`BuildingEffect::SafeDestroyConstruction`, a cancelled construction) stays
+the engine's.
 - **Lights.** `Module::lights()` runs once per view after `GameObject_PreRenderAll` and
   `Ordnance::PreRenderAll`, before `scene::begin_view` reads the light list: the module
   registers ordinary `ST3D_Point_Light`s (`operator new` 0x652710, the constructor
@@ -553,13 +559,36 @@ asteroid field's, a nebula's) is left to its own `Render`, under stock's state
 (`Storm3D+0xa8` the material, `+0x4` 0.5, `+0x34` the tint).
 
 **The build ghost** (the feature `PlaceholderFeature`, vtable 0x6b005c;
-`PlaceholderFeature::Render` 0x4738a0, `sRenderInternal` 0x473aa0) is the engine's by
-default (`BuildGhost=0`): stock draws the station being placed (class `+0x34`, at
-`+0x38`, colour `+0x68`, ambient from 0x736d40 unless `+0x74`) as a faded hull through
-the engine's sorted translucent path, which comes out as a bright glow over the
-station's lit plating, and `BuildGhost=1`'s additive approximation does not match it
-yet; the faded-hull look belongs with the hulls module. `DrawHeightPost` (0x593840)
-stays the engine's either way.
+`PlaceholderFeature::Render` 0x4738a0): taken here and handed to the hulls module
+(`hulls::placeholder`, "The build ghost" under hulls), in the main view only as stock
+draws it: the class `+0x34`, where it would stand `+0x38` (a `Matrix34`), its colour
+`+0x68`, and `+0x74` whether the placement is clear (set: the footprints' `valid_build`
+sprite; clear: `invalid_build`, and stock lights the ghost with the dark red ambient at
+0x736d40 in place of the scene's). With the hulls module off or `[Hulls] BuildGhost=0`
+the feature is the engine's.
+
+**Height posts** (`posts.rs`, `vs_line`/`ps_line` in `shaders/overlays.hlsl`).
+`DrawHeightPost(const Vector3&, ST3D_Camera*)` (0x593840, cdecl) draws a line from a
+point straight to the grid's plane (`Terrain_Geometry+0x1c`, 0x77215c), in
+`ST3D_Colour_Green` (0x7a8f68) when the point is above it and `ST3D_Colour_Red`
+(0x7a8f78) when not, through `ST3D_Camera::ClipAndRenderLine` (0x618590): a pixel wide,
+aliased. Its five calls are re-pointed (each only while it still calls 0x593840):
+`PlaceholderFeature::sRenderInternal` (0x473bbc; the hulls module's build ghost notes
+its post directly), and from `DisplayInterface::PreRenderAll`, inside the body, the
+overview's `mNormalModeRender` (0x522080, the object under the pointer), `mRenderWhere`
+(0x5222fd, the move target), `mDrawPosts` (0x524c02) and its one-point helper
+(0x524c2d). While one of our views runs a post is noted and drawn at the flush; outside
+one, the engine's runs. Ours: a quad about the segment in screen space, `HeightPostWidth`
+pixels wide at 1080 lines (scaled with the view's height), covered by the distance from
+its centre line with a soft edge `HeightPostSoft` pixels wide, so it is as crisp at any
+resolution; the segment is cut where it passes behind the eye; depth-tested, not
+written, blended. At most 4096 posts a view.
+
+| Key (`[Overlays]`) | Default | |
+|---|---|---|
+| `HeightPosts` | 1 | 0: the engine's `DrawHeightPost` |
+| `HeightPostWidth`, `HeightPostSoft` | 1.5, 1 | the line's width (pixels at 1080 lines) and its soft edge (pixels) |
+| `HeightPostBrightness` | 1 | the colour times this (above 1 it blooms) |
 
 ### particles
 
@@ -665,11 +694,13 @@ profile, `PointLights`, `NearFade*`, `Cloak*`, plus `Shadows`, `ShadowSize`,
 `Scrap::Render` (0x4a58e0), with a `RenderInternal` (slot 22) of `GameObject`
 (0x4d52b0), `Craft` (0x4c8630) or `Freighter` (0x4b22c0), whose instance (+0x80) draws
 a plain `ST3D_Database` (vtable 0x6bc56c) that is its class's visible database
-(`GameObjectClass+0x1dc`). Anything else (the Evolver, planets, other databases) is
+(`GameObjectClass+0x1dc`); and the Evolver (`RenderInternal` `Evolver` 0x4b1170, "The
+Evolver" below, `[Hulls] Evolver=1`). Anything else (planets, other databases) is
 left to the engine. In `object` the module does what `GameObject::Render` does around
-the draw: expired and unseen objects draw nothing; a hologram (+0x174) is the engine's
-(`TimedHoloEffect::RenderHologram`); +0x26 suppresses the draw; a rig's placeholder is
-drawn by `PlaceholderFeature::sRenderInternal` for the player's team; the instance's
+the draw: expired and unseen objects draw nothing; an Evolver's cocoon first ("The
+Evolver"); a hologram (+0x174) in place of the hull ("Holograms"); +0x26 suppresses the
+draw; a rig's next station as a build ghost for the player's team ("The build ghost");
+the instance's
 frustum test (instance slot 3, as `Entity::Render` makes it) is called, not redone,
 because for a craft it also applies the scale effects into the instance's scale
 (+0x28, valid while +0x74); a pass sets the on-screen byte (+0x25) the HUD reads. Those
@@ -746,8 +777,88 @@ Evaluate` plays them (quirks kept: unevenly judged keys played evenly, `linear`
 wrapping), at `Step::Translucent` after the hulls. A scrap object's `glowdmoon` node
 takes `Scrap::Render`'s colour.
 
+**Holograms** (`TimedHoloEffect`, the object's `+0x174`). `GameObject::RenderInternal`
+draws an object with a hologram as the class the hologram shows, in place of its hull:
+`TimedHoloEffect::RenderHologram` (0x60f730) calls that class's `DisableSpecialNodes`
+(class vtable slot 7) and renders the effect's `ST3D_Instance` (`+0xb4`), made by
+`TimedHoloEffect::init` of the class's (`+0xc4`) visible database `+0x1dc` and put at the
+object's transform every tick by `Simulate`; the call's answer becomes the on-screen
+byte. Two weapons make one: the Romulan holo-emitter (`gholoemt` on `rspecial`; the
+target shows as the firing ship's class, 0x57a8ff) and the holo-generator (`ghologen`,
+`HoloGenWeapon::Simulate` 0x66b711: the ship disguises itself as its target's class).
+Here (`Holograms=1`): the class's SOD (named by `GameObjectClass::GetOdfName` 0x4ce370,
+at its `ScaleSOD`) at the instance's transform, clean (`hardpoints`, the craft class's
+damage nodes' children, its crew fires and Borg node hidden), its running lights drawn,
+the instance's frustum test (slot 3) for the on-screen byte, and drawn at the flush by
+`ps_holo` in the object's team colour: the lit hull of the class it shows, drawn part
+of the way towards that colour (`HoloTint`), at `HoloAlpha`, scanlines `HoloScanPitch`
+pixels apart rolling down the screen (`HoloScan`, `HoloScanRoll`), a bright band
+sweeping along the hull's up axis (`HoloSweep`, `HoloSweepRate`), a stepped flicker
+(`HoloFlicker`) with rare dropouts (`HoloDropout`), and a glow at the silhouette past
+white (`HoloEdge`, `HoloEdgePower`) that blooms; premultiplied, after a depth pass. The
+disguise still reads as the ship it shows. The real hull is not posed for the shadow
+map while it wears a hologram. A hologram whose class is not a plain SOD is the
+engine's.
+
+**The Evolver** (8472's `8472_passive` and `8472_active`, class label `evolver`).
+`Evolver::RenderInternal` (0x4b1170): while it evolves it has a cocoon (`+0x2ac`, a
+`CocoonInstance`, vtable 0x6b2630, of `8472_cocoon.sod`, whose database the engine
+finds once and keeps at 0x73fccc), culled by distance (`GameObjectInstance::
+DistanceCull`), its strategic-view scale effect made (0x4d5eb0) and its scale effects
+applied (`ApplyScaleEffects` 0x599760, which `Evolver::mUpdateConstructionEffect`
+0x4b0a10 sets every tick to grow it from the Evolver's box to the new class's), then
+drawn; past a third of the evolution (`+0x2b0`) only the cocoon is drawn and its
+answer is the on-screen byte, before that the ship is drawn too (`Craft::
+RenderInternal`). Here the same, the cocoon posed at its instance's transform and scale
+and drawn as a hull, solid: stock's fade for it (`CocoonInstance::ComputeFadeOut`
+0x4b1320, the base far fade times a ramp `+0x98` over the first third) comes out 0 on
+the bench throughout (the base reads the cocoon's `+0x98`, an instance's class
+elsewhere, as a class), yet stock's draw shows the cocoon solid from its first frame.
+The burst is the effects module's debris ("Debris"). `Evolver=0` leaves the Evolver
+to the engine.
+
+**The build ghost** (`hulls::placeholder`, for the overlays module's
+`PlaceholderFeature` and for `ConstructionRig::Render`'s next item). Stock
+(`PlaceholderFeature::sRenderInternal`, 0x473aa0) makes a `PlaceHolderInstance` (a
+`CraftInstance`, vtable 0x6b0094) on the stack of the class's databases, culls it by
+distance, hides its `lights` (`+0x90`), takes the strategic view's scale, sets the team
+colour to the colour it is given and renders it; `PlaceHolderInstance::ComputeFadeOut`
+(0x473c30) halves the far fade, or gives a half. So it goes down the engine's sorted
+translucent path: every layer of the hull (the inside through the plating) blended at
+half, which reads pale and washed towards white with hot patches where layers pile up.
+Then `DrawHeightPost` from where it stands. Here: the class's SOD clean, `lights`
+hidden, culled by distance as `DistanceCull` decides (the height counted a quarter,
+against `cfgOBJECT_CULLING_DISTANCE`), at the flush with every layer (`GhostDepth=0`;
+1: only the nearest), by `ps_ghost`: the lit hull lifted towards its texture at full
+light (`GhostLift`), a broad highlight towards each directional light past white
+(`GhostSheen`, `GhostSheenPower`) that blooms, the blocked placement's red added on the
+texture (`GhostBlocked`, stock's ambient), at `GhostAlpha` (stock's half); then its
+additive meshes; its height post through the overlays module. A construction rig's
+next station (`ConstructionRig::Render`, 0x4af9b0, the player's own rig, through
+`PlaceholderFeature::sRenderInternal` at 0x4afa11) is drawn the same way.
+
+| Key (`[Hulls]`) | Default | |
+|---|---|---|
+| `Holograms` | 1 | 0: the engine draws holograms (the class plainly) |
+| `HoloAlpha`, `HoloTint` | 0.8, 0.35 | how opaque, and how far towards the team colour |
+| `HoloScan`, `HoloScanPitch`, `HoloScanRoll` | 0.35, 3, 0.5 | the scanlines' depth, pitch (pixels) and roll (pitches a second) |
+| `HoloSweep`, `HoloSweepRate` | 1.2, 0.35 | the sweeping band's strength and sweeps a second |
+| `HoloFlicker`, `HoloDropout` | 0.12, 0.03 | the flicker's depth and the chance of a dropout (6 a second) |
+| `HoloEdge`, `HoloEdgePower` | 2.5, 2.5 | the silhouette's glow and its exponent |
+| `Evolver` | 1 | 0: the Evolver and its cocoon are the engine's |
+| `BuildGhost` | 1 | 0: the build ghost (and a rig's) is the engine's |
+| `GhostAlpha`, `GhostLift` | 0.5, 0.5 | its opacity (stock's half) and how far the plating is lifted |
+| `GhostSheen`, `GhostSheenPower` | 1.5, 6 | the broad highlight past white and its exponent |
+| `GhostBlocked` | 0.5, 0, 0 | what a blocked placement adds |
+| `GhostDepth` | 0 | 1: only the ghost's nearest layer |
+| `Reload` | 0 | 1: `[Hulls]` read again every second (the bench; itself read every second) |
+
+**The survey.** `mods::object` logs, once per class (vtable), every object no module
+draws: `survey: left to the engine: vtable ... (Render ..., RenderInternal ...),
+database vtable ..., odf '...'`.
+
 **For other modules**: `posed(o)`, `shadow_map()`, `draws_plain_sod(o)`,
-`instance_scale(inst)`.
+`instance_scale(inst)`, `placeholder(v, class, place, colour, blocked)`.
 
 ### world
 

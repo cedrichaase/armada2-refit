@@ -191,7 +191,28 @@ pub fn object(o: usize, v: &View) -> bool {
             return true;
         }
     }
+    survey(o);
     false
+}
+
+/// The survey of what is left to the engine: each class of object no module draws,
+/// logged once (its vtable, `Render`, `RenderInternal`, its instance's database's
+/// vtable and its ODF).
+fn survey(o: usize) {
+    static mut SEEN: Vec<usize> = Vec::new();
+    let vt = crate::engine::vtable(o);
+    #[allow(static_mut_refs)]
+    let seen = unsafe { &mut SEEN };
+    if vt == 0 || seen.len() >= 256 || seen.contains(&vt) {
+        return;
+    }
+    seen.push(vt);
+    let f = crate::engine::field;
+    let db = f(f(o, 4), 0x80);
+    log!(
+        "survey: left to the engine: vtable {:#x} (Render {:#x}, RenderInternal {:#x}), database vtable {:#x}, odf '{}'",
+        vt, f(vt, 11 * 4), f(vt, 22 * 4), crate::engine::vtable(db), crate::engine::obj::odf_name(o)
+    );
 }
 
 pub fn feature(f: usize, v: &View) -> bool {

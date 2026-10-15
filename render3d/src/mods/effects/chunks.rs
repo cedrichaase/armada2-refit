@@ -8,8 +8,13 @@
 //! chained: when the craft's SOD is one we can read, we note the craft (its ODF, its
 //! transform, its animation clock, its team colour) and do not call the engine's, so
 //! the engine makes no chunks of its own for it; otherwise the engine's is called. The
-//! other callers (a construction cancelled, `BuildingEffect` and `Evolver`) stay the
-//! engine's: their chunks are drawn by `RenderChunks`, which still runs.
+//! Evolver's cocoon bursting (`Evolver::mDoRemoveConstructionEffect` and the other three
+//! construction-effect calls, 0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4, each breaking the
+//! whole cocoon: faces -1) is taken the same way, each call only while it still calls
+//! `Fragment` itself: the cocoon (`CocoonInstance`, of `8472_cocoon.sod`) at its
+//! instance's transform and scale. The other callers (a cancelled construction,
+//! `BuildingEffect::SafeDestroyConstruction`) stay the engine's: their chunks are drawn
+//! by `RenderChunks`, which still runs.
 //!
 //! **Breaking a mesh** (`CreateChunks` 0x61b7c0, as the spec gives it): every mesh of
 //! the LOD shown breaks into patches: a random unused face, its first corner the seed,
@@ -39,6 +44,8 @@ use alloc::vec::Vec;
 
 const SITE_EXPLODE_FRAGMENT: usize = 0x4c6bfc; // in Craft::Explode: call ST3D_Instance::Fragment
 const FN_FRAGMENT: usize = 0x62eb20;
+/// The Evolver's four calls of `Fragment` on its cocoon.
+const SITES_COCOON: [usize; 4] = [0x4b07b4, 0x4b0872, 0x4b0914, 0x4b09b4];
 
 /// A dying craft waiting to be broken up (at the next `Step::Chunks`, with a device).
 struct Pending {
@@ -86,6 +93,33 @@ unsafe extern "thiscall" fn hook_fragment(inst: usize, colour: *const f32, vel: 
             }
         }
         let f: unsafe extern "thiscall" fn(usize, *const f32, usize, u32, i32, usize) = core::mem::transmute(PREV_FRAGMENT);
+        f(inst, colour, vel, smoking, faces, attractor);
+    }
+}
+
+/// The Evolver's cocoon breaking up (faces -1, the whole of it).
+unsafe extern "thiscall" fn hook_fragment_cocoon(inst: usize, colour: *const f32, vel: usize, smoking: u32, faces: i32, attractor: usize) {
+    unsafe {
+        let hulls = super::super::hulls::game::VT_COCOON;
+        let db = engine::field(inst, 0x80);
+        if ACTIVE
+            && faces < 0
+            && pending().len() < 64
+            && engine::vtable(inst) == hulls
+            && db != 0
+            && db == engine::rd::<usize>(super::super::hulls::game::COCOON_DB)
+            && crate::assets::sod("8472_cocoon").is_some()
+        {
+            let s = super::super::hulls::instance_scale(inst);
+            let mut world = engine::field_m34(inst, 0x44);
+            world.r[0] = world.r[0] * s.x;
+            world.r[1] = world.r[1] * s.y;
+            world.r[2] = world.r[2] * s.z;
+            let team = if colour.is_null() { v3(1.0, 1.0, 1.0) } else { v3(*colour, *colour.add(1), *colour.add(2)) };
+            pending().push(Pending { odf: String::from("8472_cocoon"), world, clock: pose::Clock::of_instance(inst, engine::sim_time()), team });
+            return;
+        }
+        let f: unsafe extern "thiscall" fn(usize, *const f32, usize, u32, i32, usize) = core::mem::transmute(FN_FRAGMENT);
         f(inst, colour, vel, smoking, faces, attractor);
     }
 }
@@ -157,6 +191,8 @@ impl Chunks {
                 ACTIVE = true;
             }
             log!("effects: debris: Craft::Explode's Fragment{} hooked: our own chunks", if prev != FN_FRAGMENT { " (chained)" } else { "" });
+            let n = SITES_COCOON.iter().filter(|&&s| hook::patch_call(s, FN_FRAGMENT, hook_fragment_cocoon as *const () as usize)).count();
+            log!("effects: debris: {} of the Evolver's {} cocoon Fragment calls ours", n, SITES_COCOON.len());
         } else {
             self.on = false;
         }

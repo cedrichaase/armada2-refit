@@ -8,12 +8,15 @@
 //! - the features `Ghost` (fog-of-war ghosts) and `PlaceholderFeature` (the build
 //!   ghost) (`ghosts`).
 //!
-//! What it does not take stays the engine's: the shroud's `TreeGrid` path, the build
-//! footprints' sprites and the build ghost's height post are called through.
+//! - the height posts (`DrawHeightPost`, `posts`), as anti-aliased lines.
+//!
+//! What it does not take stays the engine's: the shroud's `TreeGrid` path and the build
+//! footprints' sprites are called through.
 //! Nothing the simulation reads is written.
 mod fog;
 mod ghosts;
 mod grid;
+mod posts;
 mod selection;
 
 use super::{Module, Step};
@@ -73,8 +76,6 @@ pub struct Settings {
     pub grid: bool,
     pub selection: bool,
     pub ghosts: bool,
-    /// The build ghost drawn here (approximate, see `ghosts`); 0 leaves it to the engine.
-    pub build_ghost: bool,
     pub fog_layers: fog::Settings,
 }
 
@@ -87,7 +88,6 @@ impl Settings {
             grid: on("Grid"),
             selection: on("Selection"),
             ghosts: on("Ghosts"),
-            build_ghost: ini.int("Overlays", "BuildGhost", 0) != 0,
             fog_layers: fog::Settings::read(&ini) }
     }
 }
@@ -98,21 +98,22 @@ pub struct Overlays {
     grid: grid::Grid,
     sel: selection::Selection,
     ghosts: ghosts::Ghosts,
+    posts: posts::Posts,
 }
 
 impl Default for Overlays {
     fn default() -> Overlays {
         let s = Settings::read();
         log!(
-            "overlays: fog {} (filter {}), grid {}, selection {}, ghosts {}, build ghost {}",
+            "overlays: fog {} (filter {}), grid {}, selection {}, ghosts {}",
             s.fog as u8,
             if s.fog_layers.catrom { "catmull-rom" } else { "bspline" },
             s.grid as u8,
             s.selection as u8,
-            s.ghosts as u8,
-            s.build_ghost as u8
+            s.ghosts as u8
         );
-        Overlays { s, fog: fog::Fog::new(), grid: grid::Grid::new(), sel: selection::Selection::new(), ghosts: ghosts::Ghosts::new() }
+        let posts = posts::Posts::new(&crate::config::ini());
+        Overlays { s, fog: fog::Fog::new(), grid: grid::Grid::new(), sel: selection::Selection::new(), ghosts: ghosts::Ghosts::new(), posts }
     }
 }
 
@@ -172,18 +173,29 @@ impl Module for Overlays {
     fn superseded(&self) -> Option<&'static str> {
         Some("Fog.asi")
     }
-    fn device(&mut self, _dev: Device) {}
+    fn device(&mut self, _dev: Device) {
+        self.posts.install();
+    }
     fn reset(&mut self) {
         self.grid.reset();
         self.fog.reset();
+        self.posts.reset();
     }
     fn begin_view(&mut self, _v: &View) {
         self.ghosts.begin_view();
+        self.posts.begin_view();
+    }
+    fn end_view(&mut self, _v: &View) {
+        self.posts.end_view();
     }
     fn step(&mut self, s: Step, v: &View) -> bool {
         match s {
             Step::Terrain if self.s.fog => self.terrain(v),
             Step::Selection if self.s.selection => self.sel.draw(v),
+            Step::Translucent => {
+                self.posts.draw(v);
+                false
+            }
             _ => false,
         }
     }
@@ -193,8 +205,19 @@ impl Module for Overlays {
         }
         match engine::vtable(f) {
             VT_GHOST => self.ghosts.ghosts(f, v),
-            VT_PLACEHOLDER if self.s.build_ghost => self.ghosts.placeholder(f, v),
+            VT_PLACEHOLDER => self.ghosts.placeholder(f, v),
             _ => false,
+        }
+    }
+}
+
+/// A height post from `top` to the grid's plane, drawn with this view's posts; the
+/// engine's `DrawHeightPost` when posts are not ours.
+pub fn height_post(v: &View, top: crate::math::V3) {
+    if !posts::note(top) {
+        unsafe {
+            let f: unsafe extern "C" fn(*const crate::math::V3, usize) = core::mem::transmute(0x593840usize);
+            f(&top, v.cam);
         }
     }
 }

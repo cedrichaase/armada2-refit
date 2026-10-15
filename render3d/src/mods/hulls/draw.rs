@@ -27,6 +27,11 @@ pub enum Mode {
     Additive(f32),
     /// As glass over a copy of the frame.
     Cloak,
+    /// The build ghost (`ps_ghost`, constants from `Drawer::extra`), premultiplied,
+    /// where it is nearest (after `DepthOnly`).
+    Ghost,
+    /// A hologram (`ps_holo`, constants from `Drawer::extra`), likewise.
+    Holo,
 }
 
 /// The warp stretch, in world space (`spec-chunks-anim-lod.md` section 5).
@@ -240,7 +245,11 @@ pub struct Drawer {
     ps: Shader,
     ps_bump: Shader,
     ps_cloak: Shader,
+    ps_ghost: Shader,
+    ps_holo: Shader,
     decl: Decl,
+    /// Pixel constants c80.. for `Mode::Ghost` and `Mode::Holo`, set by the caller.
+    pub extra: [f32; 8 * 4],
     /// Normal maps made from height maps, by name.
     nmaps: BTreeMap<String, Option<Com>>,
     /// The copy of the frame a cloaked hull bends.
@@ -255,7 +264,10 @@ impl Drawer {
             ps: Shader::pixel(&PS_HULL),
             ps_bump: Shader::pixel(&PS_BUMP),
             ps_cloak: Shader::pixel(&PS_CLOAK),
+            ps_ghost: Shader::pixel(&PS_GHOST),
+            ps_holo: Shader::pixel(&PS_HOLO),
             decl: Decl::new(&scene::VERTEX),
+            extra: [0.0; 8 * 4],
             nmaps: BTreeMap::new(),
             copy: None,
             said_bump: false,
@@ -379,8 +391,14 @@ impl Drawer {
         let _g = Guard::new(dev);
         let ps_ok = match mode {
             Mode::Cloak => self.ps_cloak.bind(dev),
+            Mode::Ghost => self.ps_ghost.bind(dev),
+            Mode::Holo => self.ps_holo.bind(dev),
             _ => self.ps.bind(dev),
         };
+        let own_ps = matches!(mode, Mode::Cloak | Mode::Ghost | Mode::Holo);
+        if matches!(mode, Mode::Ghost | Mode::Holo) {
+            dev.ps_const(80, &self.extra);
+        }
         if !(self.vs.bind(dev) && ps_ok && self.decl.bind(dev)) {
             return;
         }
@@ -445,6 +463,12 @@ impl Drawer {
                 dev.set_rs(RS_DESTBLEND, BLEND_ONE);
                 dev.set_rs(RS_ZWRITEENABLE, 0);
             }
+            Mode::Ghost | Mode::Holo => {
+                dev.set_rs(RS_ALPHABLENDENABLE, 1);
+                dev.set_rs(RS_SRCBLEND, BLEND_ONE);
+                dev.set_rs(RS_DESTBLEND, BLEND_INVSRCALPHA);
+                dev.set_rs(RS_ZWRITEENABLE, 0);
+            }
         }
         for s in [0u32, 1] {
             dev.set_ss(s, SAMP_ADDRESSU, TADDRESS_WRAP);
@@ -496,7 +520,8 @@ impl Drawer {
         }
         let mut shared: Option<(bool, [f32; 74 * 4])> = None;
         // The faces the instance draws (`sm_faces_remaining`, `+0x10`: construction).
-        let limit = engine::field(p.inst, 0x10) as i32;
+        // (None for a model that is not an instance's: inst 0.)
+        let limit = if p.inst == 0 { -1 } else { engine::field(p.inst, 0x10) as i32 };
         let mut faces_left: i64 = if limit >= 0 { limit as i64 } else { i64::MAX };
         for part in m.parts.iter() {
             if !want(part.blend) || !p.pose.shown.get(part.node).copied().unwrap_or(false) {
@@ -512,7 +537,7 @@ impl Drawer {
                 dev.ps_const(3, &shared.as_ref().unwrap().1[3 * 4..]);
             }
             // Bump-mapped meshes go through ps_bump with their normal map.
-            let nmap = if bump && mode != Mode::DepthOnly && mode != Mode::Cloak {
+            let nmap = if bump && mode != Mode::DepthOnly && !own_ps {
                 let n = self.normal_map(dev, part.bump.as_deref().unwrap_or(""));
                 if !self.said_bump {
                     self.said_bump = true;
@@ -525,7 +550,7 @@ impl Drawer {
             if !nmap.is_null() {
                 self.ps_bump.bind(dev);
                 dev.set_texture(1, nmap);
-            } else if mode != Mode::Cloak {
+            } else if !own_ps {
                 self.ps.bind(dev);
             }
             dev.ps_const(73, &[if nmap.is_null() { 0.0 } else { 1.0 }, look.bump, look.knee, 0.0]);

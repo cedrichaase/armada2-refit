@@ -41,8 +41,14 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   suns (`SunLift`); keys in `[Sky]`.
 - Module `overlays` (on): the fog of war and shroud with `Fog.asi`'s smooth edges over
   the engine's own scan textures, the tactical grid, the selection bubbles and the
-  fog-of-war ghosts of stations; keys in `[Overlays]`. The build ghost and footprints
-  stay the engine's.
+  fog-of-war ghosts of stations, and the height posts (`DrawHeightPost`) as
+  antialiased lines (`HeightPosts`, `HeightPostWidth`, `HeightPostSoft`,
+  `HeightPostBrightness`); keys in `[Overlays]`.
+- Module `hulls` also draws the Evolver and its cocoon (whose burst is render3d's
+  debris), holograms as the class they show in a shader of scanlines, flicker and an
+  edge glow (`ps_holo`), and the build ghost as stock's pale layered hull
+  (`[Hulls] BuildGhost=1`, `GhostDepth=`); `Reload=1` is read while the game runs. The
+  log names, once per class, any object no module draws.
 - Module `specials` (on, after `particles`): `Step::Specials`, the timed special-object
   effects (Computer Override, Energy Dissipator, Psionic Disruption): their cloud
   emitters as render3d's particles, plus a shader layer over the struck hull (Borg

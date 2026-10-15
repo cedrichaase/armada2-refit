@@ -55,6 +55,54 @@ pub struct Look {
     pub scrap: bool,
     /// The bench's A/B switch (`ABTest=1`): see `Hulls::superseded`.
     pub ab_test: bool,
+    /// Holograms (`TimedHoloEffect`) drawn here as a hologram of the class they show
+    /// (0: the engine's plain draw of that class).
+    pub holo: Holo,
+    /// The build ghost (`PlaceholderFeature`, a rig's next station).
+    pub ghost: Ghost,
+    /// The Evolver (its cocoon and the ship inside) drawn here.
+    pub evolver: bool,
+    /// Read `[Hulls]` again every second (the bench).
+    pub reload: bool,
+}
+
+#[derive(Clone, Copy)]
+pub struct Holo {
+    pub on: bool,
+    /// How opaque the hologram is at most.
+    pub alpha: f32,
+    /// How deep the scanlines cut, their pitch in pixels and how fast they roll.
+    pub scan: f32,
+    pub pitch: f32,
+    pub roll: f32,
+    /// The bright band sweeping along the hull, and how often (per second).
+    pub sweep: f32,
+    pub sweep_rate: f32,
+    /// How much the brightness flickers, and how often it drops out.
+    pub flicker: f32,
+    pub dropout: f32,
+    /// The edge glow (past white: it blooms) and how tight it hugs the silhouette.
+    pub edge: f32,
+    pub edge_power: f32,
+    /// How far the lit hull is drawn towards the hologram's colour.
+    pub tint: f32,
+}
+
+#[derive(Clone, Copy)]
+pub struct Ghost {
+    pub on: bool,
+    /// The fade stock gives it (`PlaceHolderInstance::ComputeFadeOut`: half).
+    pub alpha: f32,
+    /// How far the lit plating is lifted towards its texture at full light.
+    pub lift: f32,
+    /// The broad highlight towards the Key, past white, and its exponent.
+    pub sheen: f32,
+    pub sheen_power: f32,
+    /// What a blocked placement adds (stock's ambient 0x736d40: dark red).
+    pub blocked: V3,
+    /// 1: only the nearest layer (a depth pass first); 0: every layer, as stock's
+    /// sorted triangles show the hull's inside through its plating.
+    pub depth: bool,
 }
 
 fn v(a: [f32; 3]) -> V3 {
@@ -114,5 +162,30 @@ pub fn load() -> Look {
         team: ini.int(s, "TeamColours", 1) != 0,
         scrap: ini.int(s, "Scrap", 1) != 0,
         ab_test: ini.int(s, "ABTest", 0) != 0,
+        holo: Holo {
+            on: ini.int(s, "Holograms", 1) != 0,
+            alpha: f("HoloAlpha", 0.8),
+            scan: f("HoloScan", 0.35),
+            pitch: f("HoloScanPitch", 3.0).max(1.0),
+            roll: f("HoloScanRoll", 0.5),
+            sweep: f("HoloSweep", 1.2),
+            sweep_rate: f("HoloSweepRate", 0.35),
+            flicker: f("HoloFlicker", 0.12),
+            dropout: f("HoloDropout", 0.03),
+            edge: f("HoloEdge", 2.5),
+            edge_power: f("HoloEdgePower", 2.5),
+            tint: f("HoloTint", 0.35),
+        },
+        ghost: Ghost {
+            on: ini.int(s, "BuildGhost", 1) != 0,
+            alpha: f("GhostAlpha", 0.5),
+            lift: f("GhostLift", 0.5),
+            sheen: f("GhostSheen", 1.5),
+            sheen_power: f("GhostSheenPower", 6.0),
+            blocked: c("GhostBlocked", [0.5, 0.0, 0.0]),
+            depth: ini.int(s, "GhostDepth", 0) != 0,
+        },
+        evolver: ini.int(s, "Evolver", 1) != 0,
+        reload: ini.int(s, "Reload", 0) != 0,
     }
 }

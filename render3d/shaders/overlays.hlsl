@@ -1,4 +1,4 @@
-// entries: vs_plane:vs_3_0:VS_PLANE ps_fog_bspline:ps_3_0:PS_FOG_BSPLINE ps_fog_catrom:ps_3_0:PS_FOG_CATROM ps_colour:ps_3_0:PS_COLOUR ps_ghost:ps_3_0:PS_GHOST
+// entries: vs_plane:vs_3_0:VS_PLANE ps_fog_bspline:ps_3_0:PS_FOG_BSPLINE ps_fog_catrom:ps_3_0:PS_FOG_CATROM ps_colour:ps_3_0:PS_COLOUR ps_ghost:ps_3_0:PS_GHOST vs_line:vs_3_0:VS_LINE ps_line:ps_3_0:PS_LINE
 // The overlays module (src/mods/overlays/): the fog of war and the shroud with
 // smooth edges (ported from fog/fog.hlsl, Fog.asi), the tactical grid's lines, the
 // selection bubbles and the fog-of-war ghosts.
@@ -117,7 +117,7 @@ float4 ps_colour() : COLOR
     return k_colour;
 }
 
-// ---- the fog-of-war ghosts (and BuildGhost=1's build ghost) ------------------------
+// ---- the fog-of-war ghosts ----------------------------------------------------------
 //
 // Drawn with the scene layer's vertex shader (sod.hlsl's vs_sod: uv, normal, world
 // position). Stock lights a ghost with one material in place of every mesh's own
@@ -155,4 +155,63 @@ float4 ps_ghost(GI i) : COLOR
         l += g_dcol[d].rgb * saturate(dot(n, -g_ddir[d].xyz));
     float3 c = t.rgb * g_tint.rgb * (g_amb.rgb + g_diff.rgb * l) + t.rgb * t.a * g_si.x;
     return float4(c, g_amb.a);
+}
+
+// ---- height posts: crisp anti-aliased lines ------------------------------------------
+//
+// `DrawHeightPost`'s vertical line from a point down (or up) to the grid's plane, drawn
+// as a quad a few pixels wide about the segment in screen space; the pixel shader
+// covers it by the distance from the centre line, so the line is as wide at any
+// resolution and has a soft edge a pixel wide. The segment is cut where it passes
+// behind the eye. Each vertex carries both ends, which side of the line it is on and
+// which end it belongs to.
+//
+//   vertex c8: x, y the view's size in pixels; z half the line's width (pixels);
+//              w the soft edge (pixels)
+
+float4 l_vp : register(c8);
+
+struct LI {
+    float3 a   : POSITION;
+    float3 b   : TEXCOORD0;
+    float2 se  : TEXCOORD1;   // x: side (-1, 1); y: end (0 at a, 1 at b)
+    float4 col : TEXCOORD2;
+};
+
+struct LO {
+    float4 pos : POSITION;
+    float2 d   : TEXCOORD0;   // x: pixels from the centre line; y: half the width
+    float4 col : TEXCOORD1;
+};
+
+LO vs_line(LI i)
+{
+    LO o;
+    float4 pa = mul(float4(i.a, 1.0), VP);
+    float4 pb = mul(float4(i.b, 1.0), VP);
+    float e = 1e-3;
+    float4 qa = pa.w < e ? lerp(pa, pb, (e - pa.w) / (pb.w - pa.w)) : pa;
+    float4 qb = pb.w < e ? lerp(pb, pa, (e - pb.w) / (pa.w - pb.w)) : pb;
+    float2 sa = qa.xy / qa.w * l_vp.xy * 0.5;
+    float2 sb = qb.xy / qb.w * l_vp.xy * 0.5;
+    float2 dir = sb - sa;
+    float len = length(dir);
+    dir = len > 1e-4 ? dir / len : float2(1.0, 0.0);
+    float2 nrm = float2(-dir.y, dir.x);
+    float w = l_vp.z + l_vp.w;
+    float4 p = i.se.y > 0.5 ? qb : qa;
+    float2 off = (nrm * i.se.x + dir * (i.se.y * 2.0 - 1.0)) * w * 2.0 / l_vp.xy;
+    p.xy += off * p.w;
+    o.pos = p;
+    o.d = float2(i.se.x * w, l_vp.z);
+    o.col = i.col;
+    return o;
+}
+
+float4 l_ps : register(c0);   // x: the soft edge (pixels)
+
+float4 ps_line(LO i) : COLOR
+{
+    float cover = saturate((i.d.y + 0.5 * l_ps.x - abs(i.d.x)) / max(l_ps.x, 1e-3));
+    return float4(i.col.rgb, i.col.a * cover);
 }

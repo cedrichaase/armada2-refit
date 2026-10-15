@@ -17,15 +17,11 @@
 //! asteroid field's, a nebula's) is left to its own `Render` under stock's state.
 //!
 //! **The build ghost.** While the player places a station, `placeholderFeature`
-//! (0x736d50) holds its class (`+0x34`), where it would stand (`+0x38`, a
-//! `Matrix34`) and a colour (`+0x68`). Stock draws it in the main view only, as a
-//! `PlaceHolderInstance` of the class's SOD whose fade is half the far fade, the colour
-//! as its team colour, and the ambient light from 0x736d40 unless `+0x74` is set; then
-//! `DrawHeightPost` (0x593840), which stays the engine's. The faded instance goes
-//! through the engine's sorted translucent path, which on the bench comes out as a
-//! bright glow over faint plating. `BuildGhost=1` draws an additive approximation
-//! (half the lit colour, the self-illumination three times); it does not match yet,
-//! so the engine draws it by default.
+//! (0x736d50) holds its class (`+0x34`), where it would stand (`+0x38`, a `Matrix34`),
+//! a colour (`+0x68`) and whether the placement is clear (`+0x74`). Stock draws it in
+//! the main view only; here it is handed to the hulls module (`hulls::placeholder`),
+//! which draws it as stock fades it, with its height post (render3d/README.md, "The
+//! build ghost").
 use crate::d3d::*;
 use crate::engine::{self, field, field_f32, rd, storm3d};
 use crate::frame::steps::View;
@@ -44,10 +40,7 @@ const GHOST_NODES: usize = 0x736c94;
 const FN_TEAM_GET: usize = 0x496340; // Team::GetTeam(int), cdecl: Team&
 const FN_CLASS_ODF: usize = 0x4ce370; // GameObjectClass::GetOdfName, thiscall
 const FN_DISTANCE_CULL: usize = 0x4d5bb0; // GameObjectInstance::DistanceCull(eye, pos), thiscall
-const FN_HEIGHT_POST: usize = 0x593840; // DrawHeightPost(const Vector3&, ST3D_Camera*), cdecl
 const VT_DATABASE: usize = 0x6bc56c;
-const G_AMBIENT: usize = 0x773ba8;
-const PLACEHOLDER_AMBIENT: usize = 0x736d40;
 const SPIRIT_RENDER: usize = 0xc; // Spirit vtable: Render(ST3D_Camera*)
 const S3D_MATERIAL: usize = 0xa8; // Storm3D: the lighting material in place of every mesh's
 const S3D_ALPHA: usize = 0x4;
@@ -209,7 +202,9 @@ impl Ghosts {
         true
     }
 
-    /// `PlaceholderFeature::Render`: the station being placed.
+    /// `PlaceholderFeature::Render` (0x4738a0): the station being placed, in the main
+    /// view only, drawn by the hulls module as stock fades it (`hulls::placeholder`),
+    /// with its height post. False leaves the feature to the engine.
     pub fn placeholder(&mut self, f: usize, v: &View) -> bool {
         if !v.main {
             return true;
@@ -218,41 +213,16 @@ impl Ghosts {
         if class == 0 {
             return true;
         }
-        let name = class_odf(class);
-        if self.said_build == 0 {
-            log!("overlays: build ghost of class {:#x}: odf '{}'", class, name);
-        }
-        let Some(model) = (!name.is_empty()).then(|| scene::model(v.dev, name)).flatten() else { return false };
-        let mut world: M34 = unsafe { rd(f + 0x38) };
-        let pos = world.p;
-        let s = self.scale_sod(name);
-        world.r[0] = world.r[0] * s;
-        world.r[1] = world.r[1] * s;
-        world.r[2] = world.r[2] * s;
+        let place: M34 = unsafe { rd(f + 0x38) };
         let colour: V3 = unsafe { rd(f + 0x68) };
-        let ambient: V3 = if engine::field_u8(f, 0x74) == 0 { unsafe { rd(PLACEHOLDER_AMBIENT) } } else { unsafe { rd(G_AMBIENT) } };
-        let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::FROZEN, pose::auto(v.eye));
-        if self.said_build < 4 {
+        // `+0x74`: the placement is clear; while it is not, stock lights the ghost with
+        // the dark red ambient at 0x736d40 in place of the scene's.
+        let blocked = engine::field_u8(f, 0x74) == 0;
+        if self.said_build < 2 {
             self.said_build += 1;
-            log!(
-                "overlays: build ghost {} at {:.0},{:.0},{:.0}, colour {:.2},{:.2},{:.2}, ambient {:.2},{:.2},{:.2} (+0x74 {}), {} parts",
-                name, pos.x, pos.y, pos.z, colour.x, colour.y, colour.z, ambient.x, ambient.y, ambient.z, engine::field_u8(f, 0x74), model.parts.len()
-            );
+            log!("overlays: build ghost of class {:#x} ('{}'), blocked {}", class, class_odf(class), blocked);
         }
-        // Drawn half transparent: alpha is the fade alone (a hull texture's alpha is its
-        // self-illumination, not a mask).
-        for (pi, part) in model.parts.iter().enumerate() {
-            if p.shown.get(part.node).copied().unwrap_or(false) {
-                let w = p.world[part.node];
-                self.queue.push(Queued { model: model.clone(), part: pi, world: w, tint: colour, amb: ambient * 0.5, diff: v3(0.5, 0.5, 0.5), alpha: 0.5, self_illum: 3.0 });
-            }
-        }
-        self.draw_queue(v, true);
-        unsafe {
-            let hp: unsafe extern "C" fn(*const V3, usize) = core::mem::transmute(FN_HEIGHT_POST);
-            hp(&pos, v.cam);
-        }
-        true
+        crate::mods::hulls::placeholder(v, class, &place, colour, blocked)
     }
 
     /// The ghosts gathered: opaque, or blended without depth writes.

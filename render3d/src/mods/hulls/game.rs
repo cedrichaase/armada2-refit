@@ -346,3 +346,129 @@ pub fn scrap_glow(o: usize) -> Option<V3> {
         Some(v3(0.0, 0.5, 1.0) * f)
     }
 }
+
+// ---- What hulls draws besides game objects: holograms, the Evolver's cocoon, the
+// build ghost (render3d/README.md, "Hulls": "Holograms", "The Evolver", "The build
+// ghost"). ----
+
+/// `GameObjectClass::GetOdfName` (thiscall): the class's ODF name, which names its SOD,
+/// without the extension.
+pub fn class_odf(class: usize) -> &'static str {
+    if class == 0 {
+        return "";
+    }
+    unsafe {
+        let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(0x4ce370usize);
+        let p = f(class);
+        if p.is_null() {
+            return "";
+        }
+        let s = crate::rt::cstr_at(p, 260);
+        match s.len().checked_sub(4) {
+            Some(n) if s.is_char_boundary(n) && s[n..].eq_ignore_ascii_case(".odf") => &s[..n],
+            _ => s,
+        }
+    }
+}
+
+/// `GameObjectInstance::DistanceCull` as it decides (0x4d5bb0): the distance from the
+/// eye with the height counted a quarter, against `cfgOBJECT_CULLING_DISTANCE`
+/// (0x6fcac0). Computed, not called, where there is no instance to call it on.
+pub fn distance_culled(pos: V3, eye: V3) -> bool {
+    let limit = unsafe { rd::<f32>(0x6fcac0) };
+    let d = pos - eye;
+    d.x * d.x + d.y * d.y / 16.0 + d.z * d.z > limit * limit
+}
+
+/// A hologram (`TimedHoloEffect`, the object's `+0x174`): (its `ST3D_Instance` `+0xb4`,
+/// the class it shows `+0xc4`). `TimedHoloEffect::init` makes the instance of the
+/// class's visible database (`+0x1dc`), and `Simulate` puts it at the object's
+/// transform every tick.
+pub fn hologram_parts(h: usize) -> Option<(usize, usize)> {
+    let inst = field(h, 0xb4);
+    let class = field(h, 0xc4);
+    (inst != 0 && class != 0).then_some((inst, class))
+}
+
+/// The Evolver's cocoon (`Evolver+0x2ac`, a `CocoonInstance`, vtable 0x6b2630, of
+/// `8472_cocoon.sod`, whose database the engine keeps at 0x73fccc), while it evolves.
+pub const VT_COCOON: usize = 0x6b2630;
+pub const COCOON_DB: usize = 0x73fccc;
+pub fn cocoon(o: usize) -> usize {
+    field(o, 0x2ac)
+}
+
+/// How far the evolution has gone (`+0x2b0`, 0..1): past a third, only the cocoon is
+/// drawn (`Evolver::RenderInternal`, 0x4b1170).
+pub fn evolution(o: usize) -> f32 {
+    field_f32(o, 0x2b0)
+}
+
+/// What `Evolver::RenderInternal` does to the cocoon before it draws it: the strategic
+/// view's scale effect made (`GameObjectInstance::CreateStrategicViewScaleEffect`,
+/// 0x4d5eb0) and every scale effect of its handle (`+0x94`) applied into its scale
+/// (`ApplyScaleEffects`, 0x599760). The same writes stock makes every frame.
+pub fn cocoon_scale_effects(c: usize) {
+    unsafe {
+        let create: unsafe extern "thiscall" fn(usize) = core::mem::transmute(0x4d5eb0usize);
+        create(c);
+        let apply: unsafe extern "C" fn(usize, usize) = core::mem::transmute(0x599760usize);
+        apply(c, field(c, 0x94));
+    }
+}
+
+/// The cocoon's fade (`CocoonInstance::ComputeFadeOut`, 0x4b1320: the near fade, times
+/// its `+0x98` while that is under 1, which `Evolver::mUpdateConstructionEffect` ramps
+/// from 0 to 1 over the first third).
+pub fn cocoon_fade(c: usize) -> f32 {
+    let mut f = 1.0f32;
+    let r = unsafe {
+        let g: unsafe extern "thiscall" fn(usize, *mut f32) -> u8 = core::mem::transmute(0x4b1320usize);
+        g(c, &mut f)
+    };
+    if r != 0 && f.is_finite() { f.clamp(0.0, 1.0) } else { 1.0 }
+}
+
+/// The engine's own draw of an instance (`ST3D_Instance::Render`, slot 6): whether it
+/// drew.
+pub fn instance_render(inst: usize, cam: usize) -> bool {
+    unsafe {
+        let f: unsafe extern "thiscall" fn(usize, usize) -> u8 = core::mem::transmute(field(vtable(inst), 6 * 4));
+        f(inst, cam) != 0
+    }
+}
+
+/// The build ghost a construction rig shows for its next item (`ConstructionRig::
+/// Render`, 0x4af9b0, for the player's own team): (the item's class, where it would
+/// stand, the colour). None while there is none.
+pub fn rig_placeholder_of(o: usize) -> Option<(usize, M34, V3)> {
+    unsafe {
+        let user: unsafe extern "C" fn() -> i32 = core::mem::transmute(0x4d0060usize);
+        if field(o, 0xec) as i32 != user() {
+            return None;
+        }
+        let mut item = field(o, 0x254);
+        if item == 0 {
+            let f: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(0x4b7b40usize);
+            item = f(o);
+        }
+        let busy: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(o), 0x138));
+        if busy(o) != 0 || item == 0 {
+            return None;
+        }
+        let ok: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(field(vtable(item), 0x28));
+        if ok(item) == 0 {
+            return None;
+        }
+        let colour: unsafe extern "thiscall" fn(usize) -> *const V3 = core::mem::transmute(0x4d4fe0usize);
+        let c = colour(o);
+        let c = if c.is_null() { v3(1.0, 1.0, 1.0) } else { core::ptr::read_unaligned(c) };
+        let mut m = [0u8; 0x30];
+        let place: unsafe extern "thiscall" fn(usize, *mut u8) -> *const M34 = core::mem::transmute(field(vtable(o), 0x188));
+        let mp = place(o, m.as_mut_ptr());
+        if mp.is_null() {
+            return None;
+        }
+        Some((item, core::ptr::read_unaligned(mp), c))
+    }
+}
