@@ -111,12 +111,82 @@ Background and measurements live outside the repo, in
 - 2026-10-14: the sim reads nothing the render pass writes (`sim-render-coupling.md`,
   two-player match with one side blind for 4 minutes). Rule: never draw from
   `g_random` (0x7b0fac); render randomness is ours or `g_asyncRandom`.
+- 2026-10-15: **the plugins stay working while modules arrive.** The step body calls
+  each engine step through its call site, so every plugin hooked there still draws,
+  into our target; a module stands down while the plugin it replaces is loaded,
+  instead of the whole renderer standing down. Only `MSAA.asi` is removed at once.
+- 2026-10-15: a database does not keep its SOD's name (`+0x8` is not a string on
+  `ST3D_Database`); the SOD is named after the object's ODF, scaled by its `ScaleSOD`.
+- 2026-10-15: `GameFeature_RenderAll` is re-implemented as a loop (each feature with
+  flag bit 4 at `+0x20` gets `Render(cam, isMain)`, vtable `+0x20`), so modules take
+  features one by one.
 
-## Where it stands (2026-10-14, paused at a usage limit)
+## Milestone 4: how a module is built
 
-- Done: milestone 1 (skeleton, commit 371a3be); `hlsl-rs.sh`.
-- Next: milestone 2. Hook the two call sites (0x59886e, 0x4e60f6) to a cdecl body
-  that runs the 13 steps as stock calls into our HDR target, then resolve, bloom and
-  tone map into the back buffer.
-- The asset subagent's worktree `.claude/worktrees/r3d-assets` (branch `r3d-assets`)
-  was stopped before it finished; check it for uncommitted work before reusing it.
+The frame (`frame/`) runs the body as steps (`frame/steps.rs`); a module
+(`mods/<name>.rs`, registered with one `add(...)` line in `mods/mod.rs`) takes over
+whatever it draws through the `Module` trait:
+
+- `step(Step::X)`: a whole engine step (sky and background, terrain, ordnance,
+  specials, warp, chunks, particles, selection; `Translucent` runs just before the
+  device's `Flush`);
+- `object(o)`: one object of the object loop, in place of its `Render`;
+- `feature(f)`: one game feature of `GameFeature_RenderAll` (explosions, shield hits,
+  sparks, construction, ghosts, the build ghost...), in place of its `Render`;
+- `begin_view`/`end_view`, `device`, `reset` (drop the default pool before a `Reset`).
+
+What every module uses, rather than writing its own:
+
+- `assets`: SODs, textures (stock mip chains), the sprite table, ODFs, by name;
+- `scene`: SOD instances (`scene::model`, `pose::pose`, `scene::draw` or
+  `draw_part` with one's own shaders), the view's registered lights
+  (`scene::lights()`), the translucent queue;
+- `gfx`: `Guard` (put the engine's device state back), `Shader`/`Decl` made on first
+  use, `DynVb` for geometry rebuilt every frame, `PerView` for per-view state (the HUD's
+  action camera is a second view: `View::key`);
+- `engine`, `engine::obj`: addresses and reads of the engine's state. **Never write
+  anything the simulation reads**, never draw from `g_random` (0x7b0fac).
+- Shaders: `shaders/<name>.hlsl` with an `// entries:` first line; `build.sh` compiles
+  it into `src/shaders/<name>.rs`. vkd3d unrolls loops and has no `tex3Dlod`; keep
+  branches out of loops.
+
+Rules for a module:
+
+1. **Off until it is right.** Register it `false` (off unless `[Modules] <name>=1`)
+   until it matches stock (or the plugin it ports) on the bench, then `true`.
+2. **Stand down beside its plugin**: `superseded()` names the `.asi` whose work it
+   replaces, so an install that still has that plugin keeps its look.
+3. **Faithful to stock's look and quirks** (the user wants the early-2000s charm), and
+   to the ported plugin's look where there is one: the plugins' READMEs say what was
+   settled with the user and must not be re-opened.
+4. **Cosmetic simulation is ours**, on the sim clock (`View::time`), following
+   `spec-particles.md` and `spec-chunks-anim-lod.md` in the notes.
+5. **Write each engine finding into this crate's README** beside the code that needs
+   it, in words (hard rule 9): names, addresses, offsets, never listings.
+6. Bench evidence for every claim, against stock or the plugin at the same moment
+   (`scene pause`, then compare), main view and inset (`scene "hud on"`).
+
+### The modules, and who builds them (2026-10-15)
+
+| Module | Takes over | Ports | Branch |
+|---|---|---|---|
+| hulls | objects drawn by `GameObject::Render`: ships, stations, anomalies, scrap; their sprite nodes; fades, cloak, warp stretch, team colour, Borg bump, same-frame shadows | `Lighting.asi` (hulls) | `r3d-hulls` |
+| sky | `Step::Background`: sky cube or recipe, starfield, background planets and suns | `Sky.asi` | `r3d-sky` |
+| particles | `Step::Particles`, emitters on SOD nodes, nebula puffs, billboard effects: our own particle simulation | `Venting.asi` | `r3d-particles` |
+| ordnance | `Step::Ordnance`, `Step::Warp`: beams, projectiles, special weapons, the warp flash | `Specials.asi` | `r3d-ordnance` |
+| effects | features: explosions (fireball, shockwave, Omega), shield hits, hit sparks and repair, construction, bees; `Step::Chunks` (our own debris), `Step::Specials` | `Explosions.asi`, `Shields.asi`, `Repair.asi` | `r3d-effects` |
+| world | objects that override `Render`: planets, moons, asteroid fields, nebulae (volumes), black holes and the like | `Surfaces.asi`, `Planets.asi`, `Nebulae.asi`, `Lighting.asi` (planets) | `r3d-world` |
+| overlays | `Step::Terrain` (grid, fog, shroud, footprints), `Step::Selection`, ghosts, the build ghost | `Fog.asi` | `r3d-overlays` |
+
+Each branch starts from the commit that added this section and is merged into
+`worktree-renderer` by the integrator. A module touches `mods/<name>.rs` (or
+`mods/<name>/`), `shaders/<name>*.hlsl`, its line in `mods/mod.rs`, and its section of
+`README.md`; a change to the shared layers (`scene`, `gfx`, `assets`, `engine`,
+`frame`) is kept small and named in the commit message, since others build on it.
+
+## Where it stands (2026-10-15)
+
+- Milestones 1-3 done: the frame (HDR, MSAA, bloom, tone map), the step body, the
+  module interface, `a2fmt` and the shared layers; `hulls` draws ships and stations
+  from their SODs, off by default.
+- Milestone 4 in progress: the seven modules above, built in parallel.
