@@ -92,6 +92,14 @@ impl Lights {
         }
     }
 
+    /// How the lit draws take pool light `n` (render3d's hulls: as Lighting.asi took
+    /// its phaser lights).
+    fn style(&self, n: usize, s: crate::scene::lights::Style) {
+        if let Some(&l) = self.pool.get(n) {
+            crate::scene::lights::set_style(l, s);
+        }
+    }
+
     /// The mean colour (0..1) of a rectangle of a texture, from the TGA.
     fn mean(&mut self, tex: &str, r: [f32; 4]) -> Option<V3> {
         let key = (crate::rt::lower(tex), [(r[0] * 1000.0) as i32, (r[1] * 1000.0) as i32, (r[2] * 1000.0) as i32, (r[3] * 1000.0) as i32]);
@@ -226,11 +234,13 @@ impl Lights {
             if ph[0] > 0.0 {
                 let p = a + d * (len.min(ph[3]) / len);
                 self.register(n, p, c * ph[0], ph[1], ph[2] - ph[1]);
+                self.style(n, crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.6, power: 2.0 });
                 n += 1;
             }
             if ph[4] > 0.0 {
                 let p = b - d * (len.min(ph[7]) / len);
                 self.register(n, p, c * ph[4], ph[5], ph[6] - ph[5]);
+                self.style(n, crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.0, power: 1.0 });
                 n += 1;
             }
         }
@@ -255,6 +265,7 @@ impl Lights {
                 break;
             }
             self.register(n, l.pos, l.col, l.start, l.range);
+            self.style(n, crate::scene::lights::Style::default());
             n += 1;
         }
         changed || n > 0

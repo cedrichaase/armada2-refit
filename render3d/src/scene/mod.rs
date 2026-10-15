@@ -326,9 +326,9 @@ pub fn draw_part(v: &View, m: &Model, pi: usize, world: &M34, p: &Params) {
     let w = world.to_m4();
     dev.vs_const(0, w.transpose().as_floats());
     let mirrored = world.det3() < 0.0;
-    // Which side faces out: the winding stock's meshes are authored with, flipped
-    // under a mirrored node.
-    dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CW } else { CULL_CCW });
+    // Which side faces out: the engine culls clockwise (its front faces run
+    // anticlockwise on screen), and a mirrored node reverses the winding.
+    dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CCW } else { CULL_CW });
     let tex = part.texture.as_deref().and_then(|t| assets::texture(dev, t)).unwrap_or(core::ptr::null_mut());
     dev.set_texture(0, tex);
     let blended = p.alpha < 0.999 || matches!(part.blend, Blend::Additive | Blend::Alpha);
@@ -375,7 +375,9 @@ pub fn draw_part(v: &View, m: &Model, pi: usize, world: &M34, p: &Params) {
         set(&mut k, 20 + i, [pt.colour.x, pt.colour.y, pt.colour.z, pt.range]);
     }
     let additive = part.blend == Blend::Additive;
-    set(&mut k, 1, [if p.lit && !additive { 1.0 } else { 0.0 }, if blended && !additive { 1.0 } else { 0.0 }, NORMAL_SIGN * if mirrored { -1.0 } else { 1.0 }, p.alpha]);
+    // A normal taken through a mirrored node stays outward (a mirror is its own
+    // inverse transpose), so it needs no flip of its own.
+    set(&mut k, 1, [if p.lit && !additive { 1.0 } else { 0.0 }, if blended && !additive { 1.0 } else { 0.0 }, NORMAL_SIGN, p.alpha]);
     dev.set_stream(0, part.vb.ptr(), 0, 32);
     dev.set_indices(part.ib.ptr());
     for g in &part.groups {
@@ -389,9 +391,12 @@ pub fn draw_part(v: &View, m: &Model, pi: usize, world: &M34, p: &Params) {
     }
 }
 
-/// Which way `smooth_normals` points: outward as a2fmt computes them. Seen on the
-/// bench: with -1 every hull was lit from behind.
-pub const NORMAL_SIGN: f32 = 1.0;
+/// Which way `smooth_normals` points: a2fmt takes them from the file's winding, and
+/// the engine's front faces run anticlockwise on screen (it culls clockwise), so they
+/// point inward, as the engine's own do (lighting/README.md, "Which side a point light
+/// lights"); -1 turns them out. (With the opposite cull, every hull showed its back
+/// faces, which is why +1 once looked right.)
+pub const NORMAL_SIGN: f32 = -1.0;
 
 /// At `Step::Translucent`: every queued part, back to front.
 pub fn flush(v: &View) {

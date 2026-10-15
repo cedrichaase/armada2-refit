@@ -2,6 +2,7 @@
 pub mod effects_explosions;
 pub mod effects_repair;
 pub mod effects_shields;
+pub mod hulls;
 pub mod ordnance;
 pub mod overlays;
 pub mod particles;

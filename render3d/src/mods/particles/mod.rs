@@ -204,7 +204,7 @@ impl Particles {
             // `lights()` hook that runs before the scene reads the list, call this from
             // there and set SCENE_POINTS false, or the scene would see the light twice.
             if SCENE_POINTS {
-                scene::add_point(scene::lights::Point { pos, colour: col, start, range, light });
+                scene::add_point(scene::lights::Point { pos, colour: col, start, range, light, style: scene::lights::Style::default() });
             }
             n += 1;
         }

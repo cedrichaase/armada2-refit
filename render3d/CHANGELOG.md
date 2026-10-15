@@ -13,7 +13,12 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   plugin it replaces is loaded.
 - `a2fmt`: SOD, TGA (stock mip chains), `.spr` and ODF readers; the scene layer draws
   SOD instances lit by the engine's registered lights.
-- Module `hulls` (off by default): ships and stations from their SODs.
+- Module `hulls` (on; stands down while `Lighting.asi` is loaded, which still draws
+  the planets): ships, stations and other plain-SOD objects from their SODs in
+  `Lighting.asi`'s look (scene lights, team colours, the Borg bump profile, point lights
+  picked as its `pick_points`, the highlight shoulder), fades, cloak glass, warp
+  stretch, sprite nodes, billboard effects and flipbooks, and a shadow map of this
+  frame's hulls. The scene layer's culling and normals fixed (back faces showed).
 - Module `effects` (on): explosions (`Explosions.asi`'s fireball and ring, the core
   blooming by energy in HDR), shield hits and the shields-down arcs (`Shields.asi`),
   repair welding (`Repair.asi`), and hull debris as render3d's own simulation; keys in

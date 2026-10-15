@@ -26,6 +26,47 @@ pub struct Point {
     pub range: f32,
     /// The light object (to tell a plugin's own lights apart, if a module must).
     pub light: usize,
+    /// How the module that registered it wants it taken (`set_style`), else default.
+    pub style: Style,
+}
+
+/// How a light a module registers is to be taken by the lit draws (as `Lighting.asi`
+/// took its own phaser lights, lighting/README.md "Phasers"): placed as a hard light
+/// whatever its falloff, never merged with others of its colour (several banks fire at
+/// once), its falloff raised to `power` and wrapped `wrap` round the plating it
+/// grazes. Default: none of it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Style {
+    pub hard: bool,
+    pub distinct: bool,
+    pub wrap: f32,
+    pub power: f32,
+}
+
+impl Default for Style {
+    fn default() -> Style {
+        Style { hard: false, distinct: false, wrap: 0.0, power: 1.0 }
+    }
+}
+
+static mut STYLES: alloc::collections::BTreeMap<usize, Style> = alloc::collections::BTreeMap::new();
+
+/// Marks a light object (an `ST3D_Point_Light` a module made and registers) to be taken
+/// so; it stays so for as long as the object lives (a module's pool).
+#[allow(static_mut_refs)]
+pub fn set_style(light: usize, s: Style) {
+    unsafe {
+        if s == Style::default() {
+            STYLES.remove(&light);
+        } else {
+            STYLES.insert(light, s);
+        }
+    }
+}
+
+#[allow(static_mut_refs)]
+fn style_of(light: usize) -> Style {
+    unsafe { STYLES.get(&light).copied().unwrap_or_default() }
 }
 
 #[derive(Default)]
@@ -63,19 +104,40 @@ impl Lights {
                 }
                 VT_POINT => {
                     let (start, range) = unsafe { (rd::<f32>(light + 0x100), rd::<f32>(light + 0x104)) };
-                    l.points.push(Point { pos: m.p, colour, start, range, light });
+                    l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light) });
                 }
                 // Another kind (a plugin's own vtable for a light the CPU path must not
                 // take, as Lighting.asi's planet glow): read as a point light.
                 _ => {
                     let (start, range) = unsafe { (rd::<f32>(light + 0x100), rd::<f32>(light + 0x104)) };
                     if start.is_finite() && range.is_finite() && start >= 0.0 && range >= 0.0 && start + range < 1.0e6 {
-                        l.points.push(Point { pos: m.p, colour, start, range, light });
+                        l.points.push(Point { pos: m.p, colour, start, range, light, style: style_of(light) });
                     }
                 }
             }
         }
+        l.replace_scene_lights();
         l
+    }
+
+    /// `Lighting.asi`'s scene lights in place of the map's (lighting/README.md, "The
+    /// lights", "The skybox"): every directional light the map registered is dropped,
+    /// and a warm Key, a dim blue Fill opposite it and a faint light in the sky's own
+    /// colour, from its brightest side, take their place. `[Lights]` in Render3D.ini;
+    /// nothing is changed while `Lighting.asi` is loaded (it has replaced them in the
+    /// engine's list already) or with `Replace=0`. `gather` applies it, so every
+    /// reading of the list (a module's re-read after registering lights too) has them.
+    pub fn replace_scene_lights(&mut self) {
+        let c = scene_config();
+        if !c.replace || self.dirs.is_empty() {
+            return;
+        }
+        self.dirs.clear();
+        self.dirs.push(Directional { dir: c.key_axis, colour: c.key });
+        self.dirs.push(Directional { dir: c.fill_axis, colour: c.fill });
+        if let Some((col, dir)) = sky_light(c) {
+            self.dirs.push(Directional { dir, colour: col });
+        }
     }
 
     /// The point lights that reach a sphere, strongest first, at most `max`.
@@ -105,4 +167,120 @@ impl Lights {
             .copied()
             .max_by(|a, b| (a.colour.x + a.colour.y + a.colour.z).partial_cmp(&(b.colour.x + b.colour.y + b.colour.z)).unwrap_or(core::cmp::Ordering::Equal))
     }
+}
+
+/// `[Lights]` of Render3D.ini: the scene lights (`Lighting.asi`'s `Lights=1` and its
+/// settled values).
+pub struct SceneConfig {
+    pub replace: bool,
+    pub key: V3,
+    pub key_axis: V3,
+    pub fill: V3,
+    pub fill_axis: V3,
+    pub sky: f32,
+}
+
+static mut SCENE_CFG: Option<SceneConfig> = None;
+
+#[allow(static_mut_refs)]
+pub fn scene_config() -> &'static SceneConfig {
+    unsafe {
+        SCENE_CFG.get_or_insert_with(|| {
+            let ini = crate::config::ini();
+            let v = |k: &str, d: [f32; 3]| {
+                let a = ini.floats("Lights", k, d);
+                crate::math::v3(a[0], a[1], a[2])
+            };
+            let key_axis = v("KeyAxis", [0.50, -0.50, 0.71]).norm();
+            let replace = ini.int("Lights", "Replace", 1) != 0 && !crate::plugin_loaded("Lighting.asi");
+            let c = SceneConfig {
+                replace,
+                key: v("KeyColour", [1.00, 0.96, 0.90]),
+                key_axis,
+                fill: v("FillColour", [0.06, 0.08, 0.18]),
+                fill_axis: v("FillAxis", [-key_axis.x, -key_axis.y, -key_axis.z]).norm(),
+                sky: ini.float("Lights", "SkyLight", 0.35),
+            };
+            crate::log!(
+                "lights: scene lights {} (key {:?} along {:?})",
+                if c.replace { "replace the map's" } else { "are the map's" }, c.key, c.key_axis
+            );
+            c
+        })
+    }
+}
+
+/// The sky's own light: the map's background (the name `Starfield_Load_Background_
+/// Geometry` keeps at 0x738538: a prefix of six faces, or a cube SOD), its texels'
+/// mean weighted by their chroma, scaled to a peak of `SkyLight`, from the side where
+/// that colour is (the faces of a prefix sky face +z, +x, -z, -x, +y, -y); a SOD sky's
+/// faces carry no direction, so it falls along the Fill's axis. Read once per map.
+#[allow(static_mut_refs)]
+fn sky_light(c: &SceneConfig) -> Option<(V3, V3)> {
+    static mut SKY: Option<(alloc::string::String, Option<(V3, V3)>)> = None;
+    if !(c.sky > 0.0) {
+        return None;
+    }
+    let name = unsafe { crate::rt::cstr_at(0x738538 as *const u8, 63) };
+    unsafe {
+        if let Some((n, v)) = SKY.as_ref() {
+            if n == name {
+                return *v;
+            }
+        }
+    }
+    let lname = crate::rt::lower(name);
+    let mut acc = [0.0f64; 4];
+    let mut dir = [0.0f64; 3];
+    let mut faces = 0;
+    let scan = |tex: &str, acc: &mut [f64; 4]| -> Option<f64> {
+        let img = crate::assets::image(tex)?;
+        let before = acc[3];
+        for px in img.pixels.chunks_exact(4) {
+            let (b, g, r) = (px[0] as f64, px[1] as f64, px[2] as f64);
+            let w = r.max(g).max(b) - r.min(g).min(b);
+            acc[0] += r * w;
+            acc[1] += g * w;
+            acc[2] += b * w;
+            acc[3] += w;
+        }
+        Some(acc[3] - before)
+    };
+    if let Some(sod) = lname.strip_suffix(".sod") {
+        if let Some(s) = crate::assets::sod(sod) {
+            for n in &s.nodes {
+                if let Some(t) = n.mesh().and_then(|m| m.diffuse_texture()) {
+                    scan(t, &mut acc);
+                }
+            }
+        }
+    } else if !lname.is_empty() {
+        const FACE: [[f64; 3]; 6] =
+            [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0]];
+        for (i, f) in FACE.iter().enumerate() {
+            let mut t = lname.clone();
+            t.push((b'0' + i as u8) as char);
+            if let Some(w) = scan(&t, &mut acc) {
+                faces += 1;
+                for k in 0..3 {
+                    dir[k] += f[k] * w;
+                }
+            }
+        }
+    }
+    let mut out = None;
+    if acc[3] >= 1.0 {
+        let col = [acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3]];
+        let peak = col[0].max(col[1]).max(col[2]);
+        if peak > 0.0 {
+            let s = c.sky as f64 / peak;
+            let colour = crate::math::v3((col[0] * s) as f32, (col[1] * s) as f32, (col[2] * s) as f32);
+            let d = crate::math::v3((-dir[0] / acc[3]) as f32, (-dir[1] / acc[3]) as f32, (-dir[2] / acc[3]) as f32);
+            let axis = if faces == 6 && d.len() >= 0.05 { d.norm() } else { c.fill_axis };
+            crate::log!("lights: sky {} colour {:?} along {:?}", lname, colour, axis);
+            out = Some((colour, axis));
+        }
+    }
+    unsafe { SKY = Some((alloc::string::String::from(name), out)) };
+    out
 }

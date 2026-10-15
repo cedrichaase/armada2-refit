@@ -507,3 +507,106 @@ in `Render3D.ini [Particles]`).
 | `EngineLights` | 1 | 0: the vents' lights only for the hulls we draw |
 | `LogEvery` | 600 | frames between log lines |
 | `Plasma`, `Gas`, `PlasmaSprite`, ... | | `Venting.ini`'s keys and defaults (`venting/Venting.ini`); `Plasma=0` draws the plasma vents in the stock look |
+
+### hulls
+
+#### hulls
+
+`src/mods/hulls/`, `shaders/hulls.hlsl`, on by default; supersedes `Lighting.asi`'s
+hull path (and stands down while `Lighting.asi` is loaded). Settings in `[Hulls]`
+(Lighting.ini's keys and settled values: `Ambient`, `Specular`, `SpecularPower`,
+`RimLight`, `RimPower`, `HullSun`, `HighlightKnee`, `SelfIllumination`, the `Borg*`
+profile, `PointLights`, `NearFade*`, `Cloak*`, plus `Shadows`, `ShadowSize`,
+`ShadowStrength`, `PlanetShadows`, `BumpStrength`, `SpriteNodes`, `AdditiveMeshes`,
+`TeamColours`, `Scrap`) and the scene lights in `[Lights]` (`Replace`, `KeyColour`,
+`KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`).
+
+**What it claims.** An object whose class's `Render` (vtable slot 11) is
+`GameObject::Render` (0x4d54e0), `Shipyard::Render` (0x4bb900, Starbase too),
+`MiningStation::Render` (0x4b44a0), `ConstructionRig::Render` (0x4af9b0) or
+`Scrap::Render` (0x4a58e0), with a `RenderInternal` (slot 22) of `GameObject`
+(0x4d52b0), `Craft` (0x4c8630) or `Freighter` (0x4b22c0), whose instance (+0x80) draws
+a plain `ST3D_Database` (vtable 0x6bc56c) that is its class's visible database
+(`GameObjectClass+0x1dc`). Anything else (the Evolver, planets, other databases) is
+left to the engine. In `object` the module does what `GameObject::Render` does around
+the draw: expired and unseen objects draw nothing; a hologram (+0x174) is the engine's
+(`TimedHoloEffect::RenderHologram`); +0x26 suppresses the draw; a rig's placeholder is
+drawn by `PlaceholderFeature::sRenderInternal` for the player's team; the instance's
+frustum test (instance slot 3, as `Entity::Render` makes it) is called, not redone,
+because for a craft it also applies the scale effects into the instance's scale
+(+0x28, valid while +0x74); a pass sets the on-screen byte (+0x25) the HUD reads. Those
+are the only writes; the instance's `Update` (slot 14) is called as stock calls it
+before it reads the damage bytes.
+
+**Posing** (`begin_view`). Every object the object loop will reach is posed for the
+view (the scene layer's `pose`, on the instance's clock: start +0x18, flags +0xc), with
+the nodes the engine shows or hides per instance by writing into the shared database
+applied to this pose instead: `hardpoints` never; `lights`/`light` at detail level 0
+(`ST3D_GraphicsEngine_Configuration+0x40`) or while the instance's +0x90 says so; the
+damaged systems' nodes (`CraftClass::InitializeDamageNodes`: class +0x40c/+0x418/+0x410/
++0x414/+0x41c against the instance bytes +0x9c..+0xa0) hide their children; the crew
+fires (class +0x408) shown one more for each fifth of the crew lost (`+0xa4`, as
+`CrewDamageTraverse`, children in the engine's reversed order); `borg` (class +0x420)
+only while assimilated (+0xa1, which also swaps every mesh to its second texture as
+`CraftClass::SetBorgMeshTextures` does); the shipyard's build node (class +0x4a4, shown
+while +0x2b8 is not `NO_ENTITY`) and the mining station's dock node (class +0x4b0).
+`hulls::posed(o)` gives other modules this view's pose of an object (every node's
+world matrix and whether it is shown).
+
+**The look** (`hulls.hlsl`). `Lighting.asi`'s: ambient, the scene's directional lights
+with the Key times `HullSun` and taken away by shadows, Blinn-Phong specular weighted by
+the texture's brightness, the rim light, self-illuminating groups folded in by the
+texture's alpha, team colour on `team*` groups (the team's colour, `Team::GetTeam(+0xec)
++ 8`, or the player's own in a game of type 2, while `Storm3D+0x40` allows team colours),
+and its highlight shoulder: the lit hull rolls off towards white above
+`HighlightKnee` and stays within 1, as it did when `Lighting.asi` drew into the same
+target, so a hot spot whitens plating without blooming over the hull. Bump-mapped
+meshes (the Borg) take the Borg profile and a normal map built from the height map as
+`ST3D_CreateNormalMap` builds it, in a tangent frame worked out per pixel. Normals:
+the SOD's winding makes them inward, as the engine's are (`scene::NORMAL_SIGN` = -1
+turns them out); a mirrored node swaps the cull and needs no flip of its own. A mesh's
+texture flipbook (a SOD animation reference) and the engine's wave lights
+(`GameObject::RenderInternal`'s four special-weapon getters, `Craft::RenderInternal`'s
+white one while +0x240; colour +0xf4, wavelength +0x13c, speed +0x140, direction
++0x144) are reproduced; the construction face limit (+0x10) too.
+
+**Point lights**, per mesh, as `Lighting.asi`'s `pick_points` chose them for its
+shaders: a hard light (fading over under a quarter of its start: torpedoes, the
+shields-down discharges, the welds) is picked within its reach plus 150 and scored by
+its peak and nearness; a soft one (nebulae, explosions) within its reach, scored by its
+falloff at the mesh's origin; of one colour only the strongest; at most `PointLights`
+(12). The shader takes each where it is, falloff per pixel. A module that registers a
+light may say how it is to be taken with `scene::lights::set_style` (hard, never merged
+by colour, wrap, falloff power): the ordnance module's phaser emitter (hard, distinct,
+wrap 0.6, power 2) and impact (hard, distinct) lights, as `Lighting.asi` took its own.
+
+**Scene lights.** `scene::Lights::gather` replaces the map's directional lights with
+`Lighting.asi`'s Key, Fill and sky light (the sky's mean colour weighted by chroma,
+from its brightest side; the background name is read where
+`Starfield_Load_Background_Geometry` keeps it, 0x738538), unless `Lighting.asi` is
+loaded or `[Lights] Replace=0`.
+
+**Shadows** (`shadow.rs`). At the start of each view every posed hull that can throw a
+shadow into it is drawn into an R32F depth map from the Key, fitted round them
+(width in steps of 2^(1/4), centre snapped to texels): this frame's hulls, not the last
+frame's as `Lighting.asi` had to. Planets (vtable 0x6b2b3c) are tested as spheres.
+`hulls::shadow_map()` lends it to other modules as `LightingShadowMap` did.
+
+**Fades, cloak, warp.** The far fade is the engine's (`GameObjectInstance::
+ComputeFadeOut`, 0x4d5a20); crafts take `Lighting.asi`'s near fade (the near plane
+cutting into the hull's box) while `Storm3D+0xe8` says near fades are on. Faded hulls
+are drawn at `Step::Translucent`, far to near, depth first. A cloaking device (+0x108:
+state +0x3c, alpha +0x44, phase +0x48) draws the hull as `Lighting.asi`'s glass over a
+copy of the frame. The warp stretch is `Craft::RenderInternal`'s while +0x244 is above
+0 (`spec-chunks-anim-lod.md` §5).
+
+**Sprites** (`sprites.rs`, `anim.rs`). SOD sprite nodes (running lights, strobes, crew
+fires) and the billboard effect pinned to an object (`GameObject::SetBillboardEffect`,
++0x3c) are drawn as `ST3D_SpriteNode::RenderInternal` and `ST3D_Instance::
+RenderSpriteNodeEffect` draw them, their animations played as `ST3D_AnimationChannel::
+Evaluate` plays them (quirks kept: unevenly judged keys played evenly, `linear`
+wrapping), at `Step::Translucent` after the hulls. A scrap object's `glowdmoon` node
+takes `Scrap::Render`'s colour.
+
+**For other modules**: `posed(o)`, `shadow_map()`, `draws_plain_sod(o)`,
+`instance_scale(inst)`.

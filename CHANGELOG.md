@@ -11,7 +11,7 @@ Layers: render3d 0.2.0, testbench 3.17.0.
 
 ### Added
 - render3d draws the 3D view as its own sequence of steps, with modules taking parts
-  over from the engine and the plugins: effects (explosions, shield hits, repair
+  over from the engine and the plugins: hulls (while Lighting.asi is not loaded), effects (explosions, shield hits, repair
   welding, debris), ordnance (shots, special weapons, the warp flash), the sky, the fog of war, grid
   and selection, particles and vents (render3d 0.2.0).
 

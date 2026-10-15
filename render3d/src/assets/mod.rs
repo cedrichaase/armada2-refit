@@ -165,16 +165,17 @@ pub fn sprites() -> Rc<SpriteTable> {
     s.sprites.clone().unwrap()
 }
 
-/// Whether a texture of that name exists (`Textures/RGB/<name>.tga`).
-pub fn texture_exists(name: &str) -> bool {
-    store().tex_index.find(name).is_some()
-}
-
-/// A texture's base level decoded (BGRA8, rows top-down), by name; not cached.
+/// A texture's base image decoded (BGRA8, top-down), by name: for a module that makes
+/// something of its own from it (a normal map from a height map, a mean colour).
 pub fn image(name: &str) -> Option<tga::Image> {
     let s = store();
     let base = String::from(s.tex_index.find(name)?);
     tga::decode(&s.tex_dir.read(&base)?).ok()
+}
+
+/// Whether a texture of that name exists (`Textures/RGB/<name>.tga`).
+pub fn texture_exists(name: &str) -> bool {
+    store().tex_index.find(name).is_some()
 }
 
 fn tex_width(s: &mut Store, file: &str) -> Option<u32> {

@@ -118,7 +118,7 @@ pub fn init() {
     // particles before hulls: it takes the latinum nebulae, which draw through the
     // plain GameObject::Render as hulls do.
     add(Box::new(particles::Particles::default()), true);
-    add(Box::new(hulls::Hulls::default()), false);
+    add(Box::new(hulls::Hulls::default()), true);
     add(Box::new(effects::Effects::new()), true);
     add(Box::new(ordnance::Ordnance::new()), true);
     add(Box::new(sky::Sky::default()), true);
