@@ -4,6 +4,8 @@ pub mod effects_repair;
 pub mod effects_shields;
 pub mod ordnance;
 pub mod overlays;
+pub mod particles;
+pub mod particles_vent;
 pub mod post;
 pub mod sky;
 pub mod sod;

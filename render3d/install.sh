@@ -27,6 +27,7 @@ effects   1  explosions shields repair
 ordnance  1  specials
 sky       1  sky
 overlays  1  fog
+particles 1  venting
 "
 
 remove=0

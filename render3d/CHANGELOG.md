@@ -40,6 +40,12 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   Shields, Repair; ordnance: Specials; sky: Sky; overlays: Fog), reading `[Modules]`
   from the game's `Render3D.ini`; `./install` runs it last. Its ini merge keeps each
   added key in its own section. The log names each module loaded at start.
+- Module `particles` (on): render3d's own particle simulation (spray, cloud and the
+  global list, after the engine's rules and quirks, on the sim clock) for every
+  emitter node of every object; damage vents in `Venting.asi`'s look with their hull
+  lights, other particles, nebula puffs (classes without a volume recipe) and
+  billboard effects in stock's; keys in `[Particles]`. `install.sh` also takes out
+  `Venting.asi`.
 
 Installed, not yet seen in game.
 

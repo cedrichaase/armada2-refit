@@ -239,6 +239,13 @@ pub fn lights() -> &'static Lights {
     &st().lights
 }
 
+/// Adds a point light to the view being drawn, for the modules that draw after this
+/// (a module's own light source: the particles module's vents). Call from
+/// `begin_view`; the list is gathered again for the next view.
+pub fn add_point(p: lights::Point) {
+    st().lights.points.push(p);
+}
+
 /// How to draw an instance.
 #[derive(Clone, Copy)]
 pub struct Params {

@@ -12,6 +12,7 @@ use crate::log;
 pub mod effects;
 pub mod hulls;
 pub mod ordnance;
+pub mod particles;
 pub mod overlays;
 pub mod sky;
 use alloc::boxed::Box;
@@ -84,6 +85,15 @@ pub trait Module {
 
 static mut MODS: Vec<Box<dyn Module>> = Vec::new();
 static mut ACTIVE: bool = false;
+/// The names of the modules running, from the first frame on.
+static mut NAMES: Vec<&'static str> = Vec::new();
+
+/// Whether a module runs (asked by another module, e.g. whether a class of nebula is
+/// drawn as a volume). False before the first frame.
+#[allow(static_mut_refs)]
+pub fn running(name: &str) -> bool {
+    unsafe { NAMES.iter().any(|n| *n == name) }
+}
 
 #[allow(static_mut_refs)]
 fn all() -> &'static mut Vec<Box<dyn Module>> {
@@ -105,6 +115,9 @@ pub fn init() {
         }
     };
     // One line per module; the first that takes a step or an object draws it.
+    // particles before hulls: it takes the latinum nebulae, which draw through the
+    // plain GameObject::Render as hulls do.
+    add(Box::new(particles::Particles::default()), true);
     add(Box::new(hulls::Hulls::default()), false);
     add(Box::new(effects::Effects::new()), true);
     add(Box::new(ordnance::Ordnance::new()), true);
@@ -125,6 +138,7 @@ pub fn settle() {
     for m in mods.iter() {
         log!("module {}: on", m.name());
     }
+    unsafe { NAMES = mods.iter().map(|m| m.name()).collect() };
     unsafe { ACTIVE = true };
 }
 

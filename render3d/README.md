@@ -422,3 +422,88 @@ the engine's sorted translucent path, which comes out as a bright glow over the
 station's lit plating, and `BuildGhost=1`'s additive approximation does not match it
 yet; the faded-hull look belongs with the hulls module. `DrawHeightPost` (0x593840)
 stays the engine's either way.
+
+### particles
+
+#### particles
+
+`src/mods/particles/`, `shaders/particles*.hlsl`, on by default; stands down while
+`Venting.asi` is loaded. Our own particle simulation and drawing in place of the
+engine's, after `spec-particles.md` in the notes; ports `Venting.asi`'s look for the
+vents (its README holds what was settled with the user, and the settings keep its keys,
+in `Render3D.ini [Particles]`).
+
+- **Who owns which emitters.** Every game object in `GameObject::objectList` whose SOD
+  (named after its ODF) has emitter nodes: the damage vents, the drones' steam, a gate's
+  or a colony pod's emitters. Each frame the SOD is posed with `scene::pose` at the
+  object's transform scaled by its instance scale and the ODF's `ScaleSOD`, and each
+  emitter fires from its node's world matrix (spray: one particle per frame at most,
+  the node's +Z tilted by a random pitch and yaw within the spread; cloud: the whole
+  list topped up to its count, with stock's per-frame drift taken at `CloudFps=30`).
+  The flight axis is a unit one: the engine puts `ScaleSOD` into the model's positions,
+  not into its node matrices, so a plume is speed × life long whatever the ship.
+  Simulated once per displayed frame on the sim clock, for every object whether drawn
+  or not: stock's double ageing in the action camera and its freeze of an off-screen
+  object's particles are not reproduced. A destroyed object's particles go with it.
+- **Damage nodes.** A craft shows or hides its damage nodes per system from the bytes at
+  `+0x9c..+0xa1` of its `CraftInstance` (vtable 0x6b3e2c), which the instance's `Update`
+  (slot 14, 0x4cb390) writes from the craft's systems and `CraftInstance::RenderInternal`
+  (0x4cb0e0) applies: a node is hidden while its byte is set, except `borg`'s, shown
+  while it is. The node of a system is the first in the SOD whose name is the engine's
+  (`CraftClass::InitializeDamageNodes`, 0x4bfc70: `shields`, `engines`, `target`,
+  `sensors`, `life`, `borg`), so a node named otherwise is never hidden, as in stock. An
+  object a module draws in the engine's place never gets its `Update`, so the module
+  calls it through the vtable (it only reads the craft; the bench's `Scene.asi` wraps
+  it for `Vent=`). While the instance shows another database than its class's
+  (`+0x80` against the class's `+0x1dc`), none of its emitters fire.
+- **The global list.** The chain pulsar (vtable 0x6b7c74, its `crpulsar` emitter at
+  `+0xdc`) and the Manheim effect (0x6b89fc, `gemini` at `+0xd4`), found in
+  `Ordnance::ordnanceList` (0x771fa8): their emitters fire at the shot's transform and
+  their particles outlive the shot, as the engine's global list's do.
+- **No double draw.** `ST3D_DeviceDirectX8::RenderParticle` (vtable 0x6bc6ac slot 50,
+  0x6262f0) is chained: while one of our views runs, a particle the engine hands over
+  while its current instance (`Storm3D+0x100`) is an object we own, or none (the global
+  list), is dropped. With the hulls module on the engine never renders those instances;
+  with it off, it renders them and simulates their lists as before, and only their draw
+  is dropped. Every other instance's particles (the emitters on weapons' and special
+  effects' SODs: contrails, rockets, rifts, clouds) are still the engine's, drawn into
+  our target. A module that draws such an instance in the engine's place calls
+  `particles::feed` with it every frame instead. (The freighter's `latinum_spray`,
+  which `Freighter::RenderInternal`, 0x4b22c0, looks up by name, is in no stock SOD.)
+- **The look.** Drawn at `Step::Translucent` as one batch per texture and material
+  through a `DynVb`: quads parallel to the image plane, half extents = the sprite node's
+  size plus growth × age (times the instance's scale), the node data's colour animation
+  and the sprite's flipbook on the particle's age, additive. Each particle's colour is
+  multiplied by 1 + the emitters its owner showed this frame, which is what stock's
+  repeated hand-off of the whole list by every emitter node adds up to. The vents
+  (`ventplas`, `ventgas`) are drawn as `Venting.asi` drew them (`vent.rs`,
+  `particles_vent.hlsl`): billowing puffs that cool, linked into one trail behind a
+  moving ship, a glow and a jet core at each vent, and a light on the hull.
+- **Vent lights.** One `ST3D_Point_Light` per vent (up to 16; `operator new` 0x652710,
+  the constructor 0x62f240), registered for each view with
+  `ST3D_GraphicsEngine::RegisterLight` (0x62d250) so the hulls the engine draws take it,
+  and added to the scene layer's list for ours.
+- **Billboard effects** (the transporter shimmer and the scripts' `AddBillboardEffect`):
+  the node data at `GameObject+0x3c`, drawn at the object's bounding sphere
+  (`Entity::GetBoundingSphere`, 0x4cfd70) centre pulled towards the eye by its radius,
+  that radius in half size. The engine's call to `RenderSpriteNodeEffect` (0x62ebd0) in
+  `GameObject::RenderInternal` (0x4d544c) is re-pointed at a stub that skips it while
+  our view runs.
+- **Nebula puffs.** `object()` takes nebulae (vtable 0x6b148c) and latinum nebulae
+  (0x6b132c, drawn by the plain `GameObject::Render`, which is why the module is
+  registered before hulls) whose class has no volume recipe (`Nebulae\<odf>.ini` while
+  the world module or `Nebulae.asi` runs): their SODs' sprite nodes as additive
+  billboards (half extents) or, for `lightning#`, quads of the full size in the node's
+  XY plane, coloured by the class's animation on absolute sim time. `ScaleSOD` spreads
+  the nodes but does not grow the quads. `Nebula::sCullOccludedNebula` still runs in the
+  step body: its hidden flag at `+0x1b0` skips a nebula, its intensity at `+0x1d0`
+  dims it, times `GameObjectInstance::ComputeFadeOut` (0x4d5a20) when it reports a near
+  fade, as `NebulaInstance::ComputeFadeOut` (0x4a5680) does.
+
+| Key (`[Particles]`) | Default | |
+|---|---|---|
+| `Enable` | 1 | 0: the engine draws its particles, as without the module (read again every 2 s with `Reload=1`, for a comparison at the same moment) |
+| `CloudFps` | 30 | the frame rate a cloud particle's per-frame drift is taken at |
+| `EngineLights` | 1 | 0: the vents' lights only for the hulls we draw |
+| `LogEvery` | 600 | frames between log lines |
+| `Plasma`, `Gas`, `PlasmaSprite`, ... | | `Venting.ini`'s keys and defaults (`venting/Venting.ini`); `Plasma=0` draws the plasma vents in the stock look |
