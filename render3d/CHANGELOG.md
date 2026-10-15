@@ -4,6 +4,21 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.3.0 — 2026-10-15
+
+### Changed
+- Cloaking in `ART-DIRECTION.md`'s look: while a ship cloaks or decloaks, waves sway
+  its geometry so the silhouette bends, and the hull thins into the glass band by band
+  in place of the noise threshold; the green front is a thin line along the bands.
+- Fully cloaked, slow waves drift in the refraction.
+- `CloakHull` is the floor for the player's own ships, now 0.1 (was 0 for every ship).
+
+### Added
+- Keys `CloakHullOthers` (0), `CloakWave`, `CloakWaveBands`, `CloakWaveSpeed`,
+  `CloakWaveTilt`, `CloakShimmer` and `CloakShimmerSpeed` in `[Hulls]`.
+
+Installed, not yet seen in game.
+
 ## 0.2.0 — 2026-10-15
 
 ### Added

@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.1.0 — 2026-10-15
+
+Layers: render3d 0.3.0.
+
+### Changed
+- Cloaking: wave-swayed transition, a drifting shimmer while cloaked, and the player's
+  own cloaked ships at 10% hull (render3d 0.3.0).
+
+Installed, not yet seen in game.
+
 ## 12.0.0 — 2026-10-15
 
 Layers: render3d 0.2.0, models 5.0.0, testbench 3.17.0.

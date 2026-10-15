@@ -933,7 +933,19 @@ ComputeFadeOut`, 0x4d5a20); crafts take `Lighting.asi`'s near fade (the near pla
 cutting into the hull's box) while `Storm3D+0xe8` says near fades are on. Faded hulls
 are drawn at `Step::Translucent`, far to near, depth first. A cloaking device (+0x108:
 state +0x3c, alpha +0x44, phase +0x48) draws the hull as `Lighting.asi`'s glass over a
-copy of the frame. The warp stretch is `Craft::RenderInternal`'s while +0x244 is above
+copy of the frame, in the look of `ART-DIRECTION.md`, "Cloaking". While it cloaks or
+decloaks, bands travel along the hull's longest axis (`CloakWaveBands` over its
+length, `CloakWaveSpeed` a second) and `vs_hull` sways the geometry across the other two
+axes by up to `CloakWave` of the radius, on the envelope `4·vis·(1−vis)`; the sway is a
+function of the world position, so the parts stay joined. The hull thins into the
+glass band by band (crests first) in place of the old noise threshold, and the green
+front (`CloakFront`) is a thin line along each band. Fully cloaked, slow waves drift
+in the refraction offset (`CloakShimmer` of the radius, `CloakShimmerSpeed`): only the
+bent background moves, so it shows against a nebula and hardly against black. The
+hull's floor is per owner: `CloakHull` (0.1) for the player's own ships, by the
+object's team (+0xec) against `Entity::GetUserTeam` (0x4d0060, the call `QOL.asi`
+makes), and `CloakHullOthers` (0) for everyone else's. Only hulls the engine already
+draws are touched. The warp stretch is `Craft::RenderInternal`'s while +0x244 is above
 0 (`spec-chunks-anim-lod.md` §5).
 
 **Sprites** (`sprites.rs`, `anim.rs`). SOD sprite nodes (running lights, strobes, crew

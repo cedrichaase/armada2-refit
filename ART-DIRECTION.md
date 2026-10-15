@@ -111,7 +111,8 @@ The next pass should settle whether the ring and the rim stay.
 
 ## Cloaking (render3d's `hulls`, the `Cloak*` keys in `Render3D.ini`)
 
-The user's direction (2026-10-15), not yet in `ps_cloak` (`shaders/hulls.hlsl`). The
+The user's direction (2026-10-15). In `ps_cloak` and `vs_hull` (`shaders/hulls.hlsl`)
+since render3d 0.3.0, not yet seen in game; the keys are in `render3d/README.md`. The
 cloak as it is now looks good and stays the base: the hull as glass over a copy of the
 frame, bending what lies behind it. Two things should change: the transition, and how
 much is left of a ship once it is cloaked.
@@ -170,13 +171,14 @@ patch of space that is clearly not quite right.
   (your own, and what your side can see). It must never draw a ship the engine hides
   from the player: render only, as everything in render3d is.
 
-Measured against today's look: the glass, the colour split along the bend, the rim and
-glint fit. Missing:
+Measured against the look before render3d 0.3.0: the glass, the colour split along the
+bend, the rim and glint fit. Missing then, and drawn now:
 - waves large enough to move the silhouette during the transition;
 - the hull dissolving through the waves, in place of the noise threshold;
 - a slow drifting wave in the refraction while fully cloaked;
 - the player's own cloaked ships showing their hull at about 10%.
 
-The next pass should settle whether the green front stays, and how strong the cloaked
+The green front stays for now as a thin line along each band (`CloakFront=0` takes it
+out). The next pass should settle whether it stays, and how strong the cloaked
 shimmer may be before it reads as a ship rather than a disturbance (judge it in game,
 against a nebula and against empty space).

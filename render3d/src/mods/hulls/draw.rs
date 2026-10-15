@@ -177,6 +177,14 @@ pub fn pick_points(at: V3, max: usize) -> [f32; 48 * 4] {
 
 /// The model's bounding sphere in its own space (every mesh's, static pose).
 pub fn model_sphere(m: &Model) -> (V3, f32) {
+    match model_box(m) {
+        Some((lo, hi)) => ((lo + hi) * 0.5, (hi - lo).len() * 0.5),
+        None => (V3::ZERO, 1.0),
+    }
+}
+
+/// The model's box, model space: the parts' spheres, placed by their nodes.
+pub fn model_box(m: &Model) -> Option<(V3, V3)> {
     let mut lo = v3(f32::MAX, f32::MAX, f32::MAX);
     let mut hi = v3(f32::MIN, f32::MIN, f32::MIN);
     let mut any = false;
@@ -189,11 +197,25 @@ pub fn model_sphere(m: &Model) -> (V3, f32) {
         hi = v3(hi.x.max(c.x + r), hi.y.max(c.y + r), hi.z.max(c.z + r));
         any = true;
     }
-    if !any {
-        return (V3::ZERO, 1.0);
-    }
-    let c = (lo + hi) * 0.5;
-    (c, (hi - lo).len() * 0.5)
+    any.then_some((lo, hi))
+}
+
+/// The cloak's waves for this draw, as `vs_hull`'s c17..c19 (`ART-DIRECTION.md`,
+/// "Cloaking"): bands along the hull's longest axis, `bands` of them over its length,
+/// travelling at `speed` bands a second; they sway it across the other two axes by
+/// `sway` world units (the wider axis fully, the thinner by half).
+fn cloak_waves(p: &Posed, look: &Look, time: f32, sway: f32) -> [f32; 12] {
+    let Some((lo, hi)) = model_box(&p.model) else { return [0.0; 12] };
+    let d = hi - lo;
+    let ext = [d.x * p.world.r[0].len(), d.y * p.world.r[1].len(), d.z * p.world.r[2].len()];
+    let mut ix = [0usize, 1, 2];
+    ix.sort_by(|a, b| ext[*b].partial_cmp(&ext[*a]).unwrap_or(core::cmp::Ordering::Equal));
+    let along = p.world.r[ix[0]].norm();
+    let k = 2.0 * core::f32::consts::PI * look.cloak_wave_bands / ext[ix[0]].max(1e-3);
+    let ph = along.dot(p.centre) * k + time * look.cloak_wave_speed * 2.0 * core::f32::consts::PI;
+    let side = p.world.r[ix[1]].norm() * sway;
+    let up = p.world.r[ix[2]].norm() * (sway * 0.5);
+    [along.x * k, along.y * k, along.z * k, ph, side.x, side.y, side.z, 0.0, up.x, up.y, up.z, 0.0]
 }
 
 /// The fade a hull is drawn at: the engine's far fade, or (crafts) Lighting.asi's near
@@ -431,7 +453,15 @@ impl Drawer {
             vk[28..32].copy_from_slice(&[wv.dir.x, wv.dir.y, wv.dir.z, wv.k]);
             vk[32..36].copy_from_slice(&[wv.phase, 1.0, 0.0, 0.0]);
         }
-        dev.vs_const(8, &vk[..36]);
+        // The cloak's waves sway the geometry while it cloaks or decloaks (c17..c19).
+        let mut ck_wave = [0.0f32; 4];
+        if let (Mode::Cloak, Some((st, vis, _))) = (mode, p.cloak) {
+            let env = if st == 1 || st == 3 { 4.0 * vis * (1.0 - vis) } else { 0.0 };
+            let w = cloak_waves(p, look, v.time, look.cloak_wave * p.radius * env);
+            vk[36..48].copy_from_slice(&w);
+            ck_wave.copy_from_slice(&w[0..4]);
+        }
+        dev.vs_const(8, &vk[..48]);
         // States.
         for (s, val) in [
             (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
@@ -496,7 +526,7 @@ impl Drawer {
             let (st, vis, _) = p.cloak.unwrap_or((2, 0.0, 0.0));
             let _ = st;
             let vw = &v.view.0;
-            let mut ck = [0.0f32; 11 * 4];
+            let mut ck = [0.0f32; 13 * 4];
             for r in 0..3 {
                 ck[r * 4..r * 4 + 3].copy_from_slice(&[vw[0][r], vw[1][r], vw[2][r]]);
             }
@@ -508,7 +538,9 @@ impl Drawer {
             let (cc, cr) = if ir > 0.0 && ir < 1e5 { (engine::field_v3(p.inst, 0x68), ir) } else { (p.centre, p.radius) };
             ck[16..20].copy_from_slice(&[cc.x, cc.y, cc.z, cr]);
             ck[20..24].copy_from_slice(&[vis, v.time * look.cloak_speed, look.cloak_bend, look.cloak_split]);
-            ck[24..28].copy_from_slice(&[look.cloak_ripple, look.cloak_rim, look.cloak_glint, look.cloak_hull]);
+            // The player's own ships keep a trace of their hull; no one else's does.
+            let floor = if game::is_users(p.obj) { look.cloak_hull } else { look.cloak_hull_others };
+            ck[24..28].copy_from_slice(&[look.cloak_ripple, look.cloak_rim, look.cloak_glint, floor]);
             let t = look.cloak_tint;
             ck[28..32].copy_from_slice(&[t.x, t.y, t.z, look.cloak_front]);
             let r = look.cloak_rim_colour;
@@ -516,6 +548,8 @@ impl Drawer {
             let e = look.cloak_front_colour;
             ck[36..40].copy_from_slice(&[e.x, e.y, e.z, 0.0]);
             ck[40..44].copy_from_slice(&[ox as f32, oy as f32, 0.0, 0.0]);
+            ck[44..48].copy_from_slice(&ck_wave);
+            ck[48..52].copy_from_slice(&[look.cloak_shimmer, look.cloak_wave_tilt, v.time * look.cloak_shimmer_speed, 0.0]);
             dev.ps_const(80, &ck);
         }
         let mut shared: Option<(bool, [f32; 74 * 4])> = None;
