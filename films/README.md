@@ -112,7 +112,9 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
 | `Scene` | | a scene in `testbench/scene/scenes/` by name, or a `.ini` path relative to the board |
 | `Args` | the film's | the game's arguments for this shot |
 | `Variants` | `refit` | which variants to film, in the order the layout reads them: the first is the one a wipe or dissolve starts from |
-| `Layout` | `full` | how the variants fill the frame: `full [<variant>] [label]` (one variant, a corner label if `label`); `wipe [<mid> <end>]` (the first variant on the left; a divider comes in from the right, eases to rest at `mid` of the width, then on to `end`, revealing the second; default `0.5 1.0`, as the October showcase); `dissolve [hold fade]` (the first variant held, then dissolved into the second; for subjects spread over the frame); `split` (side by side, each cropped to its centre half); `pip <variant> <corner>` (that variant small in a corner, `tl`, `tr`, `bl` or `br`, over the other) |
+| `Players` | | several games in one shot, filmed together: `host, joiner`. Each player is a take named after it, installed as the shot's first `Variants:` (refit by default), and the layout reads the players as its variants; see "Two games in one shot" |
+| `Prepare` | | `<script> [args]`, a script of this repository run with each take's session state file after its clone is made and before the game starts (`online/bench-asi.sh --server`), as a scenario's `Setup:` |
+| `Layout` | `full` | how the variants fill the frame: `full [<variant>] [label]` (one variant, a corner label if `label`); `wipe [<mid> <end>]` (the first variant on the left; a divider comes in from the right, eases to rest at `mid` of the width, then on to `end`, revealing the second; default `0.5 1.0`, as the October showcase); `dissolve [hold fade]` (the first variant held, then dissolved into the second; for subjects spread over the frame); `split [w]` (side by side, each variant's centre `w` of its width, 0.5 by default, fitted into half the frame; `0.75` is a 4:3 menu whole, letterboxed); `pip <variant> <corner>` (that variant small in a corner, `tl`, `tr`, `bl` or `br`, over the other) |
 | `Crop` | | `x y w h`, fractions of the frame, applied to every variant before the layout (the HUD's grid: `0.15 0.64 0.43 0.36`) |
 | `Transition` | `cut` | how the shot comes in: `cut`, `dissolve S`, `fade S` (from black), `dip S` (through black) |
 | `Title`, `Sub` | | a lower-third title and its line below; `Caption: top` moves them to the top (HUD footage) |
@@ -150,6 +152,8 @@ The setup and action blocks take one command per line (`#` comments):
 | `lclick [X Y]` | a left click, after moving there |
 | `press COMBO` | a key press at human speed (`shift+1`); with `Keys: auto` it becomes a key hint |
 | `run` | `desktop` only: start the shot's `Run:` program |
+| `typelog PLAYER FILE MARKER` | `Players:` only: type the word after `MARKER` on the last line of `FILE` in that player's game directory that has it, waiting up to 30 s (`typelog host Online.log "join code"`) |
+| `PLAYER: CMD` | `Players:` only: the command goes to that player's game (`host: step Click "Create Game"`); a line without a player goes to each in turn, and a bare `wait` is waited once |
 
 Pointer coordinates (`ptr`, `drag`, `lclick`, `click`) are in the film's `Pointer` space,
 1920x1080 unless it says otherwise, and scaled to each take: a 1280x720 probe and a 4K
@@ -181,6 +185,29 @@ game running. The runner then
   has a handful of frames.
 
 There are no variants: one take, named `desktop`.
+
+### Two games in one shot
+
+A shot with `Players: host, joiner` films two games together, for online play: each
+player is a session of its own, both started together (eight seconds apart), set up and
+recorded over one action block, so their time lines agree and `Layout: split` can put
+them side by side (`split 0.75` for the menus, which fill the 4:3 middle). Every line
+runs in order, whichever player it is for, so a `host:` step that waits for text holds
+the joiner too: write the action as the story the two screens tell together.
+
+- `Prepare: online/bench-asi.sh --server` installs `Online.asi` in each clone and starts
+  a local `a2online-server`; with `Prepare:` a session starts without the game
+  (`--no-launch`), runs the script, then launches it with the shot's `Args:`.
+- The steps are the online scenarios' (`testbench/scenarios/_online-setup.md`,
+  `_online-play.md`), as `step` lines: they find buttons by OCR, which is surer than
+  pointer coordinates across tiers. The joiner types the host's join code with
+  `typelog host Online.log "join code"`.
+- A menu shot's scene file has `Enable=0` (no scene to wait for: the take starts once
+  the game runs) and `Music=0`.
+- `check` cannot time an action that waits for text on screen, so it does not warn
+  about `Length:` there; read the takes' length off the probe.
+- Two players are two games but one job of `--jobs`: probing it beside other shots,
+  lower `--jobs` so the bench is not running more games than it should.
 
 ## What the board should say
 

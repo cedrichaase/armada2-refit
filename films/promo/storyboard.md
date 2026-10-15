@@ -866,20 +866,69 @@ click 1850 540 --button 3
 wait 6
 ```
 
-### g06 · Online, under Wine and Proton · PLACEHOLDER
-Length: 8
+### g06 · Online, under Wine and Proton
+Kind: mission
+Players: host, joiner
+Scene: menu.ini
+Prepare: online/bench-asi.sh --server
+Args: -nointro
+Layout: split 0.75
+Caption: top
+Title: Online play that works under Wine and Proton
+Sub: Host a game, share a code, no port forwarding
 Transition: dissolve 0.5
+In: 1.0
+Length: 16
+Speed: 1.5
 
-The real shot is two games side by side (`split`): the host opens *Internet – Online*,
-its game setup shows a join code; the joiner types it and appears in the host's lobby.
-Needs two bench sessions in one shot (`PLAN.md` T4); the steps are
-`scenarios/multiplayer-online-code.md`'s. Title: "Online play that works under Wine and
-Proton", sub: "Host a game, share a code, no port forwarding".
+Two games side by side, the host on the left. The host is already in its game setup,
+its join code in the chat; the joiner opens *Internet – Online*, types the code, finds
+the host's game and joins, and each says hello. The steps are
+`testbench/scenarios/multiplayer-online-code.md`'s, through a local `a2online-server`
+(`Prepare:`). The eye should land on the code: shown on the left, typed on the right.
+The take runs about 26 s; `In: 1.0` at `Speed: 1.5` shows 24 s of it in 16, from the
+joiner's first click to both hellos. The editor may cut the game list's wait instead.
 
-```card
-[accent] PLACEHOLDER — TWO GAMES, SIDE BY SIDE
-Online play that works under Wine and Proton
-[small] Host a game, share a join code, no port forwarding
+```setup
+step Wait for the main menu
+step Click the multiplayer emblem
+step Wait for the multiplayer connection screen
+step Click at design 400,187
+step Press End
+step Press BackSpace 32 times
+host: step Type "host"
+joiner: step Type "joiner"
+host: step Click "Internet - Online"
+host: step Wait up to 10 seconds for "Join code or host address"
+host: step Click "O.K."
+host: step Wait up to 30 seconds for "Create Game"
+host: step Click "Create Game"
+host: wait 3
+host: step Click "O.K."
+host: step Wait up to 30 seconds for "GAME SETUP"
+host: step Wait up to 20 seconds for "Join code"
+```
+```action
+wait 1
+joiner: step Click "Internet - Online"
+joiner: step Wait up to 10 seconds for "Join code or host address"
+joiner: step Click at design 400,292
+joiner: typelog host Online.log "join code"
+wait 0.6
+joiner: step Click "O.K."
+joiner: step Wait up to 30 seconds for "host's Game"
+wait 0.8
+joiner: step Click "host's Game"
+joiner: step Click "Join Game"
+joiner: step Wait up to 30 seconds for "GAME SETUP"
+joiner: step Click at design 155,547
+joiner: step Type "hello from joiner"
+joiner: step Press Return
+host: step Wait up to 20 seconds for "hello from joiner"
+host: step Click at design 155,547
+host: step Type "hello from host"
+host: step Press Return
+wait 3
 ```
 
 ## Installing

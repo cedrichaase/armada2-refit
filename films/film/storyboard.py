@@ -399,8 +399,10 @@ def check(film):
                     out.append((s, f'line {ln}: unknown command {op}'))
             if lay in ('wipe', 'dissolve', 'split', 'pip') and len(s.variants) < 2:
                 out.append((s, f'Layout {lay} needs two variants'))
-            if s.length is not None:
-                act = sum(float(t.split()[1]) for _, t in s.action if t.startswith('wait '))   # shared waits
+            # a step that waits for text on screen takes as long as the game does: no telling
+            ocr_wait = any(re.match(r'step\s+wait\b.*\bfor\s+"', s.split_line(t)[1], re.I) for _, t in s.action)
+            if s.length is not None and not ocr_wait:
+                act = sum(float(t.split()[1]) for t in (s.split_line(x)[1] for _, x in s.action) if t.startswith('wait '))
                 need = s.length * float(s.get('Speed', 1) or 1)    # seconds of take on screen
                 for v in s.variants:
                     if s.in_point(v) + need > act + 0.01:

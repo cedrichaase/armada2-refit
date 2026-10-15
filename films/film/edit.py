@@ -384,7 +384,13 @@ def render_shot(film, shot, tier, g, inputs, dur):
               + g.text(variants[0].upper(), int(48 * g.k), lab_y, 54, label_color(variants[0]), ls) + ','
               + g.text(variants[1].upper(), int(48 * g.k), lab_y, 54, label_color(variants[1]), lr) + '[lay]')
     elif lay == 'split':
-        g.add(f"{L[0]}crop=iw/2:ih:iw/4:0[s0];{L[1]}crop=iw/2:ih:iw/4:0[s1];[s0][s1]hstack,"
+        # `split [w]`: each variant's centre w of its width (0.5), fitted into half the frame;
+        # 0.75 is a 4:3 menu whole, letterboxed
+        nums = [float(x) for x in args if _num(x)]
+        cw = min(1.0, max(0.1, nums[0])) if nums else 0.5
+        half = (f"crop=iw*{cw}:ih:iw*{(1 - cw) / 2}:0,scale={W // 2}:{H}:force_original_aspect_ratio=decrease,"
+                f"pad={W // 2}:{H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1")
+        g.add(f"{L[0]}{half}[s0];{L[1]}{half}[s1];[s0][s1]hstack,"
               f"drawbox=x={W // 2 - 1}:y=0:w=2:h={H}:color=white:t=fill,"
               + g.text(variants[0].upper(), int(48 * g.k), lab_y, 54, label_color(variants[0])) + ','
               + g.text(variants[1].upper(), 'w-tw-48', lab_y, 54, label_color(variants[1])) + '[lay]')

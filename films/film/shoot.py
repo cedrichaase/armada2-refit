@@ -109,7 +109,16 @@ class Take:
             self.log.write(f'$ Prepare: {s.get("Prepare")}\n{r.stdout}{r.stderr}')
             if r.returncode:
                 raise RuntimeError(f'Prepare: {s.get("Prepare")} failed (exit {r.returncode})')
-            self.drive('launch', *f.args(s).split())
+            # a launch the bench's audio guard stops (a stream that reached a real output
+            # before it was moved) has the game stopped: once more, then give up
+            for attempt in (1, 2):
+                out = self.drive('launch', *f.args(s).split())
+                if out.startswith('launched'):
+                    break
+                self.note(f'launch {attempt} failed: {out[:200]}')
+                if attempt == 2:
+                    raise RuntimeError(f'the game did not launch: {out[:200]}')
+                time.sleep(3)
             self.note('prepared and launched')
 
     def drive(self, *args):
