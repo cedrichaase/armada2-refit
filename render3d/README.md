@@ -5,7 +5,7 @@
 the back buffer by render3d. It is written in `no_std` Rust (`src/`), and the plan, its
 milestones and every change to it are in [`PLAN.md`](PLAN.md).
 
-What it does today (milestone 2, "wrap mode"):
+What it does today:
 
 - **The frame is ours.** The view is drawn into a half-float (`A16B16G16R16F`) target
   with 4x MSAA and a depth of its own, then resolved, bloomed and tone-mapped into the
@@ -13,16 +13,31 @@ What it does today (milestone 2, "wrap mode"):
   shield hits, glows) now sums past white instead of clipping, and what lies past
   white glows by how bright it is: bloom by energy, which an 8-bit back buffer cannot
   hold. Below the tone map's shoulder every colour is stock's.
-- **Every step inside the view is still the engine's**, so every plugin hooked into
-  those steps (`Lighting.asi`, `Sky.asi`, `Nebulae.asi` and the rest) keeps drawing
-  its part, into our target. Modules of our own replace the steps one category at a
-  time (PLAN.md, milestone 4).
-- **`MSAA.asi` is superseded**: the scene target has samples of its own, and the back
-  buffer stays 1x. `install.sh` removes it.
+- **The body is ours**: `Armada_RenderAllOurStuff`'s steps run in render3d's own
+  sequence (`frame/steps.rs`), and seven modules (`## Modules` below) draw every
+  category of the 3D view from the game's own assets, read by `a2fmt`: hulls, the sky
+  and background, particles, ordnance, effects, the world (planets, moons, asteroids,
+  nebulae) and the overlays (fog, grid, selection, ghosts). The cosmetic simulation
+  (particles, debris, animation, LOD) is render3d's own, on the sim clock; the game's
+  simulation is only read. A part no module draws yet is the engine's, called where
+  stock calls it.
+- **It supersedes ten plugins**: `MSAA.asi` always, and `Lighting.asi`, `Sky.asi`,
+  `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`,
+  `Venting.asi`, `Specials.asi` and `Fog.asi` while the module that replaces each is on
+  (their looks are ported, and each module stands down while its plugin is loaded).
+  `install.sh` takes them out.
+- **New, beyond the plugins:** bloom by energy (explosions' cores, weapon cores, star
+  cores), MSAA on render3d's own targets, and shadows from this frame's hulls (the
+  plugin's were the last frame's).
+
+Still the engine's (falling back per object or per effect): mining beams, mines and
+model-drawn special weapons without a recipe, construction welding and worker bees,
+nanites, special-object effects (assimilation, boarding parties), emitters on ordnance
+and effect instances, the Evolver, holograms and the build-placement ghost.
 
 ## Building and installing
 
-    render3d/install.sh            # build, install Render3D.asi + Render3D.ini, remove MSAA.asi
+    render3d/install.sh            # build, install Render3D.asi + Render3D.ini, remove the superseded plugins
     render3d/install.sh --remove   # take it out again
 
 `./install` runs it in MSAA's place. Building needs rustup with the 32-bit Windows

@@ -186,7 +186,15 @@ Each branch starts from the commit that added this section and is merged into
 
 ## Where it stands (2026-10-15)
 
-- Milestones 1-3 done: the frame (HDR, MSAA, bloom, tone map), the step body, the
-  module interface, `a2fmt` and the shared layers; `hulls` draws ships and stations
-  from their SODs, off by default.
-- Milestone 4 in progress: the seven modules above, built in parallel.
+- Milestones 1-5 done: the frame, the step body, `a2fmt`, the shared layers, all seven
+  modules (merged from the agents' copies, each A/B-tested against stock or its plugin
+  on the bench), `./install` putting it in place with one call and taking out the
+  plugins it supersedes, the `a2mod` layer, scenarios `render3d`, `render3d-match` and
+  `no-assets`, CI.
+- Milestone 6: a whole Instant Action match with a battle plays on the bench with every
+  module on and no render plugin installed (`render3d-match`, run 20261015-160720). The
+  user's in-game sign-off is next.
+- Open: the fallbacks listed in README.md ("Still the engine's"); the `kbase` fog-of-war
+  ghost's centre differs from stock (not node visibility, not the bay node); moon
+  cracks a little thinner than `Surfaces.asi`'s; no GPU timing; `Reset` (alt-tab, a
+  resolution change) not yet exercised on the bench.
