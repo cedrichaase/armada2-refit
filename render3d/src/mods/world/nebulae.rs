@@ -1577,8 +1577,9 @@ impl Nebulae {
         // f + r (ndc.x - _31) / _11 + u (ndc.y - _32) / _22, which is linear in x and y.
         let vp = dev.get_viewport();
         let (vx, vy, vw, vh) = (vp.x as f32, vp.y as f32, vp.w.max(1) as f32, vp.h.max(1) as f32);
-        let (ax, by) = (2.0 / vw / p[0][0], 2.0 / vh / p[1][1]);
-        let (cx, cy) = ((-2.0 * vx / vw - 1.0 - p[2][0]) / p[0][0], (-2.0 * vy / vh - 1.0 - p[2][1]) / p[1][1]);
+        // ndc.x = 2 (x - vx) / vw - 1, and ndc.y = 1 - 2 (y - vy) / vh: y runs down.
+        let (ax, by) = (2.0 / vw / p[0][0], -2.0 / vh / p[1][1]);
+        let (cx, cy) = ((-2.0 * vx / vw - 1.0 - p[2][0]) / p[0][0], (2.0 * vy / vh + 1.0 - p[2][1]) / p[1][1]);
         let (w, h) = self.gpu.zt_wh;
         let fs = self.gpu.fb.as_ref()?.tex_surface(0)?;
         // The gas target, cleared to no gas and no optical depth (in the viewport).

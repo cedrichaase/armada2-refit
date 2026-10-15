@@ -22,6 +22,10 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 - Nebulae: the half-size pass, its depth-weighted composite and the edge refinement;
   the `[Nebulae]` keys `Resolution=` and `EdgeRefine=`.
 
+### Fixed
+- Nebulae: the march's rays were mirrored top to bottom, so the gas was drawn
+  reflected about the view and slid as the RTS camera panned.
+
 Installed, not yet seen in game.
 
 ## 0.2.0 — 2026-10-15

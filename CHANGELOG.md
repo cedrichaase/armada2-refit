@@ -14,6 +14,9 @@ Layers: render3d 0.3.0.
   `Denoise=` and `Footprint=` added, `Resolution=` and `EdgeRefine=` removed
   (render3d 0.3.0).
 
+### Fixed
+- render3d's marched gas no longer slides as the RTS camera pans (render3d 0.3.0).
+
 Installed, not yet seen in game.
 
 ## 12.0.0 — 2026-10-15
