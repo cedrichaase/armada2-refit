@@ -5,13 +5,14 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 12.1.0 — 2026-10-15
+## 12.1.0 — 2026-10-16
 
 Layers: render3d 0.3.0.
 
 ### Changed
-- render3d draws the nebulae's gas at full size; `[Nebulae]` `Resolution=` and
-  `EdgeRefine=` removed (render3d 0.3.0).
+- render3d ray-marches the nebulae's gas at full size; `[Nebulae]` `Steps=`,
+  `Denoise=` and `Footprint=` added, `Resolution=` and `EdgeRefine=` removed
+  (render3d 0.3.0).
 
 Installed, not yet seen in game.
 

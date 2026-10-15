@@ -1054,7 +1054,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1118,15 +1118,47 @@ The Key is the main view's (the action camera's view keeps the bake), the ships'
 shadows the hulls module's map (`hulls::shadow_map()`, sampler 8). A ghosted nebula of
 a gas class keeps its gas: slot 3 of the `GameObjectSpirit` vtable (0x6b1ca4) is
 wrapped. Everything is in the default pool; a `Reset` bakes again.
-The gas is drawn at full size into a half-float target whose depth buffer is a RESZ copy
-of the scene's (so hulls hide it pixel for pixel, by the hardware's test) and composited
-a pixel for a pixel; `Nebulae.asi`'s half-size pass, its depth-weighted 5x5 tent and
-`EdgeRefine=` are gone. Measured on the bench (`nebula` scene, 1920x1080, RX 5700), the
-pass costs 8.2 ms against the half-size path's 3.4 ms, and about 0.14 ms a slice
-(`Slices=20` 5.3 ms, `80` 10.2 ms; `Samples=1` saves only 0.2 ms: the slices' blending,
-not their reads, is the cost). The tent had also hidden the slices' blue-noise jitter
-(about 10 screen pixels wide): at 40 slices the grain is about twice the half-size
-path's, and it takes 80 to match it.
+The gas is **marched** at full size, not sliced. Each class draws its gas box once
+(the faces facing the eye, or those facing away when the eye is in or near it), and each
+pixel finds its own ray (c41..c43: the ray at view depth 1 is linear in the pixel), cuts
+it to the box and to the scene's depth (a RESZ copy into INTZ, read as a texture; with
+this projection `z - _33` is below 0), and takes `Steps=` steps (8, 12, 16 or 24, an
+entry point each, since vkd3d unrolls the loop) spaced in proportion to the distance,
+each jittered in its span by the pixel's blue-noise threshold walked by the golden
+ratio. Its sums (light, optical depth) are added into a half-float target; `comp_ps`
+filters them with a 5x5 Gaussian of `Denoise=` pixels (sigma) that leaves out pixels
+whose scene depth differs by over 5%, so hull edges stay a pixel sharp, and applies
+`Opacity=`/`Obscure=` onto the frame. The slices (`vol_ps`) remain only without INTZ
+and for `Bake=0`. vkd3d has no `tex3Dlod`, and a read's level from the hardware's
+derivatives is undefined inside a branch that differs per pixel, so the march reads the
+noise with `tex3Dgrad` (the pixel's footprint at the step's distance, times
+`Footprint=`) and can then skip rays that miss the gas, columns the occupancy record
+says are empty at that height, and points the volume says are clear. The flow, a slow
+field, is read every fourth step and drawn straight in between.
+
+Measured on the bench (`nebula` scene, 1920x1080, RX 5700, the camera inside a cloud
+about 1700 x 1000 units, so every ray crosses a long path of gas), with the gas split
+out by `Timing=1`'s marks:
+
+| | march | filter, composite | total | grain |
+|---|---|---|---|---|
+| `Nebulae.asi`'s half-size slices, 40 x 2 reads | | | 3.39 ms | 0.65 |
+| full-size slices, 40 | | | 8.16 ms | 1.21 |
+| march, 8 steps | 4.79 ms | 0.81 ms | 5.6 ms | 0.68 |
+| march, 12 steps | 6.05 ms | 0.77 ms | 6.9 ms | 0.61 |
+| march, 16 steps | 7.12 ms | 0.72 ms | 7.9 ms | 0.59 |
+
+Grain is the mean |shot - its 1.5-pixel blur| over the middle of the frame, in 8-bit
+steps. Unfiltered, the march's grain goes as one over the root of the steps (24 steps
+3.1, 12 steps 4.6): a few samples of a long path, not a lattice. The half-size path's
+tent (about 10 screen pixels wide) had hidden the same noise; the 1.5-pixel filter takes
+it out while the gas's own structure stays, since the volume's texels (6.6 units here)
+are several pixels wide. Per sample the march costs about what the slices did; what it
+saves is the blending of every slice, and what it spends is four times the pixels.
+About 2.5 ms of the march does not depend on the step count (8 to 16 steps adds 0.29 ms
+a step): likely the unrolled shader's size (8,000 instructions at 16 steps), which real
+loops would shrink. Shadows cost 0.6 ms of 7.6 at 24 steps; the noise reads (flow, fine
+detail) were half of it before the flow was thinned. `Footprint=2` saved nothing.
 
 **Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view
 (`Module::lights`), a point light at its centre (the instance's transform +0x44 plus

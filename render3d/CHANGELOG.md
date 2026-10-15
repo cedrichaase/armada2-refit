@@ -4,12 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
-## 0.3.0 — 2026-10-15
+## 0.3.0 — 2026-10-16
+
+### Added
+- Nebulae: `[Nebulae]` `Steps=` (8, 12, 16 or 24; default 8), `Denoise=` (the
+  filter's sigma in pixels, default 1.5) and `Footprint=` (the noise reads' footprint,
+  default 1).
 
 ### Changed
-- Nebulae: the gas is drawn at full size into a half-float target with the scene's
-  depth (RESZ into INTZ) as its depth buffer, and composited a pixel for a pixel, with
-  no dither. 8.2 ms against 3.4 ms on the bench at 1080p (README.md, "Nebulae").
+- Nebulae: the gas is ray-marched at full size, a ray per pixel through the baked
+  volume up to the scene's depth (RESZ into INTZ), into a half-float target, and put
+  onto the frame through a depth-aware 5x5 filter with `Opacity=`/`Obscure=`. 5.6 ms
+  against 3.4 ms on the bench at 1080p, same grain (README.md, "Nebulae"). The slices
+  remain only without INTZ and for `Bake=0`.
 
 ### Removed
 - Nebulae: the half-size pass, its depth-weighted composite and the edge refinement;
