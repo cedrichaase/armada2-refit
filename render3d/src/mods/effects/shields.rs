@@ -2,9 +2,12 @@
 //! settled with the user is kept, and the engine facts it needs are below and in
 //! render3d/README.md): each struck ship's shield
 //! ellipsoid drawn by a shader about its hits (hot spot, ring, glow and rim, by
-//! faction, weaker as the shields run out), the shields-down ring as jagged arcs that
-//! crackle without turning, the special weapons' shells that have a recipe, and the
-//! light of the shields-down discharges on the hull.
+//! faction, weaker as the shields run out), with ART-DIRECTION.md's lit mist about
+//! each hit, rays on the factions that have them (`RayFactions`, the Klingons) and a
+//! soft edge at the shell's silhouette; the light of each hit on the hull under it;
+//! the shields-down ring as jagged arcs that crackle without turning, the special
+//! weapons' shells that have a recipe, and the light of the shields-down discharges
+//! on the hull.
 //!
 //! `ShieldEffect::Render` (0x474910) walks `m_shieldList` (0x736de8, a
 //! `std::map<int, auto_ptr<ShieldHit>>`: head node at +4 of the map, a node's key at
@@ -58,7 +61,7 @@ const HIT_SHIELDS: usize = 0xc0;
 const NFAC: usize = 7;
 const FAC_KEY: [&str; NFAC] = ["Federation", "Klingon", "Romulan", "Borg", "Cardassian", "Species8472", "Other"];
 const FAC_DEF: [[f32; 3]; NFAC] =
-    [[90.0, 170.0, 255.0], [255.0, 140.0, 60.0], [90.0, 255.0, 130.0], [110.0, 255.0, 120.0], [255.0, 200.0, 80.0], [210.0, 120.0, 255.0], [140.0, 200.0, 255.0]];
+    [[90.0, 170.0, 255.0], [12.0, 255.0, 6.0], [90.0, 255.0, 130.0], [110.0, 255.0, 120.0], [255.0, 200.0, 80.0], [255.0, 140.0, 40.0], [140.0, 200.0, 255.0]];
 
 #[derive(Clone, Copy, PartialEq)]
 enum ColMode {
@@ -103,6 +106,22 @@ struct Set {
     flicker_below: f32,
     flicker_rate: f32,
     low_shift: f32,
+    mist: f32,
+    mist_reach: f32,
+    mist_share: f32,
+    mist_contrast: f32,
+    mist_scale: f32,
+    mist_drift: f32,
+    edge: f32,
+    rays: f32,
+    ray_length: f32,
+    ray_sharp: f32,
+    ray_fac: [bool; NFAC],
+    hit_light: f32,
+    hit_light_white: f32,
+    hit_light_reach: f32,
+    hit_light_power: f32,
+    hit_lights: usize,
     fac: [V3; NFAC],
     fixed: V3,
     low: V3,
@@ -144,6 +163,11 @@ impl Set {
             fac[i] = c.rgb(FAC_KEY[i], FAC_DEF[i]);
         }
         let down_time_min = c.f("DownStrikeMin", 0.12).max(0.02);
+        let ray_list = c.s("RayFactions").unwrap_or_else(|| String::from("Klingon")).to_ascii_lowercase();
+        let mut ray_fac = [false; NFAC];
+        for (i, f) in ray_fac.iter_mut().enumerate() {
+            *f = ray_list.split([',', ' ']).any(|w| w.trim() == FAC_KEY[i].to_ascii_lowercase());
+        }
         Set {
             colour_mode: if mode.starts_with('s') { ColMode::Stock } else if mode.starts_with("fi") { ColMode::Fixed } else { ColMode::Faction },
             pattern: if pattern.starts_with('c') { 2.0 } else if pattern.starts_with('h') { 1.0 } else { 0.0 },
@@ -180,6 +204,22 @@ impl Set {
             flicker_below: c.f("FlickerBelow", 0.5).clamp(0.01, 1.0),
             flicker_rate: c.f("FlickerRate", 18.0),
             low_shift: c.f("LowShift", 0.6).clamp(0.0, 1.0),
+            mist: c.f("Mist", 0.6).max(0.0),
+            mist_reach: c.f("MistReach", 0.5).max(0.01),
+            mist_share: c.f("MistShare", 1.0).clamp(0.0, 1.0),
+            mist_contrast: c.f("MistContrast", 1.6).max(0.0),
+            mist_scale: c.f("MistScale", 3.0).max(0.1),
+            mist_drift: c.f("MistDrift", 0.08),
+            edge: c.f("Edge", 0.15).clamp(0.0, 1.0),
+            rays: c.f("Rays", 1.2).max(0.0),
+            ray_length: c.f("RayLength", 0.55).max(0.01),
+            ray_sharp: c.f("RaySharpness", 3.0).max(0.25),
+            ray_fac,
+            hit_light: c.f("HitLight", 2.0).max(0.0),
+            hit_light_white: c.f("HitLightWhite", 0.5).clamp(0.0, 1.0),
+            hit_light_reach: c.f("HitLightReach", 0.8).max(0.01),
+            hit_light_power: c.f("HitLightPower", 2.0).max(0.25),
+            hit_lights: c.i("HitLights", 6).clamp(0, 16) as usize,
             fac,
             fixed: c.rgb("Colour", [120.0, 190.0, 255.0]),
             low: c.rgb("LowColour", [255.0, 70.0, 40.0]),
@@ -338,6 +378,9 @@ pub struct Shields {
     ps: Shader,
     dps: Shader,
     lights: LightPool,
+    /// The hits' light on the hull, and how many of its lights are styled yet.
+    hit_lights: LightPool,
+    hit_styled: usize,
     /// The last frame could draw the shields-down arcs: stock's ring stands down.
     down_ok: bool,
     logged_hits: u32,
@@ -361,6 +404,8 @@ impl Shields {
             ps: Shader::pixel(&PS_SHIELD),
             dps: Shader::pixel(&PS_DOWN),
             lights: LightPool::new(b"shieldsdown\0"),
+            hit_lights: LightPool::new(b"shieldhit\0"),
+            hit_styled: 0,
             down_ok: true,
             logged_hits: 0,
             logged_downs: 0,
@@ -656,9 +701,67 @@ impl Shields {
         }
     }
 
-    /// The shields-down light: per ship, its brightest discharge.
+    /// The hits' light on the hull (ART-DIRECTION.md: the hull under a hit is washed
+    /// pale in the shield's colour): a point light where each hit struck the shell, as
+    /// bright as its glow is now, reaching `HitLightReach` of the ship's bounding radius
+    /// and falling steeply (`HitLightPower`) so the far hull stays dark; the brightest
+    /// `HitLights` of the hits gathered last.
+    fn hit_lights(&mut self, v: &View) {
+        let s = &self.s;
+        if s.hit_light <= 0.0 || s.hit_lights == 0 || self.hits.is_empty() {
+            return;
+        }
+        let now = v.time as f64;
+        let mut pick: Vec<(f32, usize)> = Vec::new();
+        for (i, h) in self.hits.iter().enumerate() {
+            if h.whole {
+                continue;
+            }
+            let (spot, _, _, glow) = self.hit_now(h, now);
+            let k = glow + 0.25 * spot;
+            if k > 0.02 {
+                pick.push((k, i));
+            }
+        }
+        pick.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(core::cmp::Ordering::Equal));
+        let mut n = 0;
+        for &(k, i) in &pick {
+            if n >= s.hit_lights {
+                break;
+            }
+            let h = self.hits[i];
+            let o = object_of(h.handle);
+            if o == 0 || !obj::can_user_see(o) {
+                continue;
+            }
+            let Some((a, t, r)) = ship_xform(o) else { continue };
+            let (col, bright) = self.look(o, h.ty, now);
+            let mut br = engine::field_f32(field(o, 4), 0x40);
+            if !(br > 0.01) {
+                br = r;
+            }
+            let pos = a[0] * h.dir.x + a[1] * h.dir.y + a[2] * h.dir.z + t;
+            let pale = col + (v3(1.0, 1.0, 1.0) - col) * s.hit_light_white;
+            let reach = s.hit_light_reach * br;
+            if self.hit_lights.register(n, pos, pale * (s.hit_light * bright * k), reach * 0.1, reach * 0.9) {
+                if n >= self.hit_styled {
+                    let st = crate::scene::lights::Style { hard: false, distinct: true, wrap: 0.2, power: s.hit_light_power };
+                    crate::scene::lights::set_style(self.hit_lights.light(n), st);
+                    self.hit_styled = n + 1;
+                }
+                n += 1;
+            }
+        }
+    }
+
+    /// The lights: the hits' on the hull, and the shields-down discharges' (per ship,
+    /// its brightest discharge).
     pub fn lights(&mut self, v: &View) {
-        if !self.on || !self.s.down || !self.down_ok || self.s.down_light <= 0.0 {
+        if !self.on {
+            return;
+        }
+        self.hit_lights(v);
+        if !self.s.down || !self.down_ok || self.s.down_light <= 0.0 {
             return;
         }
         let now = v.time as f64;
@@ -782,16 +885,12 @@ impl Shields {
         dev.draw_primitive_up(PT_TRIANGLELIST, (self.sphere.len() / 3) as u32, self.sphere.as_ptr() as *const u8, 12);
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn draw_ship(&self, v: &View, c: &Cam, o: usize, pick: &[(usize, f32)], now: f64, ty: usize, whole: bool) {
+    /// A ship's shield colour and brightness for hits of type `ty` now: by faction (or
+    /// stock's, or one colour), shifted towards `LowColour` and dimmer as the shields
+    /// run out, flickering when they are low; a shell's own.
+    fn look(&self, o: usize, ty: usize, now: f64) -> (V3, f32) {
         let s = &self.s;
-        let Some((a, t, r)) = ship_xform(o) else { return };
-        ship_vsconst(v.dev, &a, t);
-        let mut lvl = 1.0f32;
-        if field(o, 0x14) & 8 != 0 {
-            let (cur, max) = (engine::field_f32(o, 0x1c8), engine::field_f32(o, 0x1cc));
-            lvl = if max > 0.05 { (cur / max).clamp(0.0, 1.0) } else { 0.0 };
-        }
+        let mut lvl = Self::level(o, 0);
         let mut col = match s.colour_mode {
             ColMode::Stock => v3(1.0 - lvl, lvl, 0.0),
             ColMode::Fixed => s.fixed,
@@ -812,7 +911,27 @@ impl Shields {
             let r1 = (super::hash32(tick.wrapping_mul(2654435761).wrapping_add(field(o, 0x28) as u32)) & 0xffff) as f32 / 65535.0;
             bright *= 1.0 - s.flicker * weak * r1;
         }
-        let mut pc = [[0.0f32; 4]; 24];
+        (col, bright)
+    }
+
+    /// The shields' level (0..1) of a ship, 1 for a shell.
+    fn level(o: usize, ty: usize) -> f32 {
+        if ty == 0 && field(o, 0x14) & 8 != 0 {
+            let (cur, max) = (engine::field_f32(o, 0x1c8), engine::field_f32(o, 0x1cc));
+            if max > 0.05 { (cur / max).clamp(0.0, 1.0) } else { 0.0 }
+        } else {
+            1.0
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_ship(&self, v: &View, c: &Cam, o: usize, pick: &[(usize, f32)], now: f64, ty: usize, whole: bool) {
+        let s = &self.s;
+        let Some((a, t, r)) = ship_xform(o) else { return };
+        ship_vsconst(v.dev, &a, t);
+        let (col, bright) = self.look(o, ty, now);
+        let lvl = Self::level(o, ty);
+        let mut pc = [[0.0f32; 4]; 33];
         pc[0] = [c.eye.x, c.eye.y, c.eye.z, 1.0 / r];
         pc[1] = [col.x, col.y, col.z, bright];
         pc[2] = [1.0 / s.spot_size, 1.0 / s.ring_width, 1.0 / s.glow_reach, s.rim_power];
@@ -829,13 +948,20 @@ impl Shields {
         }
         let w = now - libm::floor(now / 1000.0) * 1000.0;
         pc[4] = [s.hex_cells, s.hex_line, w as f32, (s.crackle + (1.0 - lvl) * 0.5).clamp(0.0, 1.0)];
-        pc[5] = [s.core, s.pattern, s.ring_lattice, 0.0];
+        pc[5] = [s.core, s.pattern, s.ring_lattice, s.edge];
+        pc[6] = [s.mist, s.mist_share, s.mist_contrast, 1.0 / s.mist_reach];
+        let rays = if ty == 0 && !whole && s.ray_fac[fac_of(o)] { s.rays } else { 0.0 };
+        pc[7] = [rays, 1.0 / s.ray_length, s.ray_sharp, 0.0];
+        // the mist's drift: slow, along a fixed slant, wrapped every 2000 s
+        let dt = (now - libm::floor(now / 2000.0) * 2000.0) as f32 * s.mist_drift;
+        pc[24] = [dt * 0.6, dt * 0.35, -dt * 0.72, s.mist_scale];
         for (k, &(hi, _)) in pick.iter().enumerate().take(8) {
             let h = &self.hits[hi];
             let (spot, ring_r, ring, glow) = self.hit_now(h, now);
             let p = a[0] * h.dir.x + a[1] * h.dir.y + a[2] * h.dir.z + t;
             pc[8 + k] = [p.x, p.y, p.z, spot];
             pc[16 + k] = [ring_r, ring, glow, 0.0];
+            pc[25 + k] = [h.dir.x, h.dir.y, h.dir.z, rnd(h.id as u32 ^ 0x5bd1e995)];
         }
         v.dev.ps_const(0, pc.as_flattened());
         self.sphere_draw(v.dev);

@@ -8,7 +8,8 @@ installed: what a module draws today is in `render3d/README.md`, and what change
 
 ## Tractor and assimilation beams (render3d's `ordnance`, `render3d/ordnance.ini`)
 
-The user's direction (2026-10-15), not yet in the recipes: the tractor beams
+The user's direction (2026-10-15), drawn since render3d 0.4.0 (`Kind=cone` in
+`render3d/ordnance.ini`), not yet seen in game: the tractor beams
 (`tracbm`, `tracbmo`), the Borg holding beam (`holdbm`, the Borg tractor) and the
 assimilation beams should not be lasers. The current recipes draw them as ribbons with
 a hot core, flowing pulses and twisting strands. These beams should be **a fluctuating
@@ -45,12 +46,16 @@ the repository):
 - **The Borg beam's source.** A small bright point on the cube (97,162,104) where the
   cone starts. Its end is as wide as the saucer.
 
-Which ODFs "assimilation" covers is still to be settled when the recipes are written:
-at least `techassimbeam`, and possibly `borgbor` (the auto-assimilator).
+Which ODFs "assimilation" covers: `techassimbeam` (the technology assimilation beam)
+and `borgbor` (the auto-assimilator: an assimilator by name, and drawn in stock from
+the same `Wborgbore` art as the holding and tractor beams). `borgbor` keeps the blue
+its recipe had rather than the Borg green; that it is stock's blue is still to be
+checked against stock in game. `fusionholdbm` (a
+holding beam no ship carries in stock) has no recipe.
 
 ## Shield hits (render3d's `effects`)
 
-The user's direction (2026-10-15), not yet in `[Shields]` or `shaders/effects_shields.hlsl`. A shield hit
+The user's direction (2026-10-15), drawn since render3d 0.4.0 (`[Shields]`, `shaders/effects_shields.hlsl`), not yet seen in game. A shield hit
 should read as **a misty, glowing dispersal of light over a curved ellipsoid that
 encloses the ship. Only the area around the impact is actually lit up.** Federation
 shields are a pale, light blue; Klingon shields are the same pattern in a strong,
@@ -102,10 +107,12 @@ and the glow that stays near the hit already fit. Not in the references:
 - a rim that brightens where the shell is seen edge on, in place of an edge that just
   ends where the lit mist stops.
 
-Missing from today's look:
-- the misty, uneven texture;
+Missing from the look before render3d 0.4.0, and added there (`Mist*`, `Edge`, `Ray*`,
+`HitLight*`; not yet seen in game):
+- the misty, uneven texture, and the soft curved edge at the shell's silhouette;
 - the rays fanning out from the impact, on Klingon shields;
-- the light on the struck hull.
+- the light on the struck hull;
+- the faction colours above (Klingon green, Species 8472 orange).
 
 The next pass should settle whether the ring and the rim stay.
 

@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.2.0 — 2026-10-15
+
+Layers: render3d 0.4.0.
+
+### Changed
+- Tractor and assimilation beams as a translucent cone; shield hits with mist, Klingon
+  rays and light on the struck hull (render3d 0.4.0).
+
+Installed, not yet seen in game.
+
 ## 12.1.0 — 2026-10-15
 
 Layers: render3d 0.3.0.

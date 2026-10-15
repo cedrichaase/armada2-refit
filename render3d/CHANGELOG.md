@@ -4,6 +4,26 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.4.0 — 2026-10-15
+
+### Changed
+- Tractor, holding and assimilation beams (`tracbm`, `tracbmo`, `holdbm`,
+  `techassimbeam`, `borgbor`) are drawn as a translucent cone through vapour, after
+  `ART-DIRECTION.md`: lengthwise streaks, drifting vapour, no core, widening to take in
+  the target, with a soft light of the beam's colour on the target's hull.
+- Shield hits: an uneven mist about the impact, a soft curved edge at the shell's
+  silhouette, rays on Klingon shields only, and a point light on the struck hull.
+- Shield colour defaults: Klingon green (was orange), Species 8472 orange (was purple).
+
+### Added
+- `Kind=cone` in ordnance recipes, with `Spread`, `Beyond`, `Pull`, `Streaks`,
+  `EdgePixels`, `Vapour`, `Fall`, `WashBack`, `WashReach`.
+- `[Shields]` keys `Mist`, `MistReach`, `MistShare`, `MistContrast`, `MistScale`,
+  `MistDrift`, `Edge`, `Rays`, `RayLength`, `RaySharpness`, `RayFactions`, `HitLight`,
+  `HitLightWhite`, `HitLightReach`, `HitLightPower`, `HitLights`.
+
+Installed, not yet seen in game.
+
 ## 0.3.0 — 2026-10-15
 
 ### Changed

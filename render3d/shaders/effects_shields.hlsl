@@ -7,10 +7,14 @@
 // ellipsoid (the engine's own shield-to-object transform, then the ship's), drawn
 // additively, depth-tested against the hulls and writing no depth. The shell itself is
 // invisible: every pixel's light comes from the hits on it, up to eight a ship, each a
-// hot spot where it struck, a ring running out from there, and the shield's lattice
-// and rim lit around it while it lasts. shields.rs works out per hit, per frame, how
-// bright each part is now (its age, whether the hit is still live, its strength), so
-// the shader holds no time of its own beyond the lattice's crackle.
+// hot spot where it struck, a ring running out from there, the shield's lattice and
+// rim lit around it while it lasts, and a lit mist about it (ART-DIRECTION.md, "Shield
+// hits": uneven haze like lit vapour, of a 3D gradient noise fixed to the shell and
+// drifting slowly), with rays fanning out from it on the factions that have them (the
+// Klingons). Where the lit shell turns away to its silhouette, it ends on a soft
+// edge. shields.rs works out per hit, per frame, how bright each part is now (its
+// age, whether the hit is still live, its strength), so the shader holds no time of
+// its own beyond the lattice's crackle, the rays' slow beat and the mist's drift.
 //
 // Constants come from shields.rs's draw_ship(), which must agree with the registers.
 
@@ -30,11 +34,15 @@ float4 k_col   : register(c1);   // rgb: the shield's colour; w: overall brightn
 float4 k_shape : register(c2);   // x 1/spot size, y 1/ring width, z 1/glow reach, w rim power
 float4 k_mix   : register(c3);   // x spot, y ring, z lattice, w rim: how bright each part is
 float4 k_grid  : register(c4);   // x cells across the radius, y line width, z time (s, wrapped), w crackle (0..1)
-float4 k_core  : register(c5);   // x: how white the spot's core goes; y: lattice mode (0 none, 1 hex, 2 cells of noise); z: the ring's lattice share
+float4 k_core  : register(c5);   // x: how white the spot's core goes; y: lattice mode (0 none, 1 hex, 2 cells of noise); z: the ring's lattice share; w: the edge's width (in facing, 0..1)
+float4 k_mist  : register(c6);   // x the mist's brightness, y its share in the lattice and rim, z its contrast, w 1 / its reach (shield radii)
+float4 k_ray   : register(c7);   // x the rays' brightness (0: none), y 1 / their length (shield radii), z their sharpness, w -
+float4 k_drift : register(c24);  // xyz the mist's drift now (noise space), w its scale (cells across the unit sphere)
 // Per hit: hN.xyz where it struck (world), hN.w the spot's brightness now;
 // rN.x the ring's radius now (in shield radii), rN.y its brightness, rN.z the glow's
-// brightness about the hit (lattice and rim). Eight of them, as separate constants:
-// vkd3d does not place an array at its register().
+// brightness about the hit (lattice, rim, mist and rays); uN.xyz where it struck on
+// the unit sphere, uN.w a seed (0..1). Eight of them, as separate constants: vkd3d
+// does not place an array at its register().
 float4 k_h0 : register(c8);   float4 k_r0 : register(c16);
 float4 k_h1 : register(c9);   float4 k_r1 : register(c17);
 float4 k_h2 : register(c10);  float4 k_r2 : register(c18);
@@ -43,6 +51,8 @@ float4 k_h4 : register(c12);  float4 k_r4 : register(c20);
 float4 k_h5 : register(c13);  float4 k_r5 : register(c21);
 float4 k_h6 : register(c14);  float4 k_r6 : register(c22);
 float4 k_h7 : register(c15);  float4 k_r7 : register(c23);
+float4 k_u0 : register(c25);  float4 k_u1 : register(c26);  float4 k_u2 : register(c27);  float4 k_u3 : register(c28);
+float4 k_u4 : register(c29);  float4 k_u5 : register(c30);  float4 k_u6 : register(c31);  float4 k_u7 : register(c32);
 
 struct VsIn  { float4 pos : POSITION; };
 struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; float3 n : TEXCOORD1; float3 u : TEXCOORD2; };
@@ -101,8 +111,9 @@ float lattice(float3 u)
     return k_core.y < 0.5 ? 1.0 : (k_core.y < 1.5 ? hexv : cells);
 }
 
-// What one hit adds at this point: x the spot, y the ring, z the glow about it
-float3 hit(float3 w, float4 h, float4 r)
+// What one hit adds at this point: x the spot, y the ring, z the glow about it, w the
+// mist's light (wide and soft, but gone well before the far side of the shell)
+float4 hit(float3 w, float4 h, float4 r)
 {
     float d = length(w - h.xyz) * k_eye.w;         // in shield radii
     float s = d * k_shape.x;
@@ -110,7 +121,9 @@ float3 hit(float3 w, float4 h, float4 r)
     float q = (d - r.x) * k_shape.y;
     float ring = r.y * exp(-q * q) * saturate(d * 4.0);   // the ring is born out of the spot, not on it
     float glow = r.z * exp(-d * k_shape.z);
-    return float3(spot, ring, glow);
+    float m = d * k_mist.w;
+    float haze = r.z * exp(-m * m);
+    return float4(spot, ring, glow, haze);
 }
 
 // ---- shields down ---------------------------------------------------------------
@@ -223,21 +236,69 @@ float4 down_ps(VsOut i) : COLOR
     return float4(c * side * d_arc.w * d_band.w, 0.0);
 }
 
+// The mist at u (on the unit sphere): 0..2, about 1 on the whole, uneven like lit
+// vapour. Four octaves of the gradient noise above (no grid, unlike value noise), the
+// domain bent once by a coarser field so the denser parts run in wisps; fixed to the
+// shell and drifting slowly through it, never struck afresh, so it does not shimmer.
+float mist(float3 u)
+{
+    float3 p = u * k_drift.w + k_drift.xyz;
+    p += 0.45 * gnoise(p * 0.6 + 17.0) * float3(0.8, 0.5, -0.35);
+    float f = gnoise(p) + 0.5 * gnoise(p * 2.03 + 5.1) + 0.25 * gnoise(p * 4.07 + 9.7) + 0.125 * gnoise(p * 8.11 + 13.3);
+    return 2.0 * saturate(0.5 + f * k_mist.z * (0.5 / 1.875));
+}
+
+// One hit's rays at u (unit sphere) and w (world): a sunburst about where it struck,
+// clear spokes of uneven width and length out to the rays' length, from just outside
+// the spot. The angle about the hit comes from a frame on the sphere there; four
+// sines of whole numbers of turns (seeded per hit) make the spokes, each beating
+// slowly in strength, so the burst breathes in place and nothing turns.
+float rays(float3 u, float3 w, float4 h, float4 r, float4 hu)
+{
+    float  d = length(w - h.xyz) * k_eye.w;
+    float3 n = hu.xyz;
+    float3 t1 = normalize(cross(n, lerp(float3(0.0, 1.0, 0.0), float3(1.0, 0.0, 0.0), step(0.9, abs(n.y)))));
+    float3 t2 = cross(n, t1);
+    float  a = atan2(dot(u, t2), dot(u, t1) + 1e-5);
+    float  s = hu.w * 6.2831853, t = k_grid.z;
+    float  f = sin(a * 7.0 + s) * (0.65 + 0.35 * sin(t * 1.3 + s * 3.0))
+             + sin(a * 11.0 + s * 2.0) * (0.65 + 0.35 * sin(t * 1.7 + s * 5.0)) * 0.8
+             + sin(a * 17.0 + s * 4.0) * (0.65 + 0.35 * sin(t * 2.3 + s * 7.0)) * 0.6
+             + sin(a * 29.0 + s * 6.0) * 0.4;
+    float  spoke = pow(saturate(f * 0.4), k_ray.z);
+    // a spoke's length varies with it: the strongest run out furthest
+    float  x = saturate(d * k_ray.y / (0.6 + 0.4 * saturate(f * 0.5)));
+    float  env = smoothstep(0.0, 0.05, d) * (1.0 - x) * (1.0 - x);
+    return r.z * spoke * env;
+}
+
 float4 shield_ps(VsOut i) : COLOR
 {
     float3 n = normalize(i.n);
     float3 v = normalize(k_eye.xyz - i.w);
     float  facing = abs(dot(n, v));
     float  rim = pow(1.0 - facing, k_shape.w);
-    float3 a = hit(i.w, k_h0, k_r0) + hit(i.w, k_h1, k_r1) + hit(i.w, k_h2, k_r2) + hit(i.w, k_h3, k_r3)
+    float4 a = hit(i.w, k_h0, k_r0) + hit(i.w, k_h1, k_r1) + hit(i.w, k_h2, k_r2) + hit(i.w, k_h3, k_r3)
              + hit(i.w, k_h4, k_r4) + hit(i.w, k_h5, k_r5) + hit(i.w, k_h6, k_r6) + hit(i.w, k_h7, k_r7);
-    if (a.x + a.y + a.z < 0.002) discard;
-    float  lat = lattice(normalize(i.u));
+    if (a.x + a.y + a.z + a.w * k_mist.x < 0.002) discard;
+    float3 u = normalize(i.u);
+    float  lat = lattice(u);
+    float  m = mist(u);
     float  spot = a.x * k_mix.x;
     float  ring = a.y * k_mix.y * lerp(1.0, 0.35 + lat, k_core.z);
-    float  field = a.z * (lat * k_mix.z + rim * k_mix.w);
+    float  field = a.z * (lat * k_mix.z + rim * k_mix.w) * lerp(1.0, m, k_mist.y);
+    float  haze = a.w * k_mist.x * m;
+    float  ray = 0.0;
+    if (k_ray.x > 0.0) {
+        ray = rays(u, i.w, k_h0, k_r0, k_u0) + rays(u, i.w, k_h1, k_r1, k_u1) + rays(u, i.w, k_h2, k_r2, k_u2) + rays(u, i.w, k_h3, k_r3, k_u3)
+            + rays(u, i.w, k_h4, k_r4, k_u4) + rays(u, i.w, k_h5, k_r5, k_u5) + rays(u, i.w, k_h6, k_r6, k_u6) + rays(u, i.w, k_h7, k_r7, k_u7);
+        ray *= k_ray.x;
+    }
     // seen face on, a shell is thin and shows little; at its edge the light runs along it
-    float  e = (spot + ring + field) * (0.55 + 0.45 * rim + 0.25 * (1.0 - facing));
+    float  e = (spot + ring + field + haze) * (0.55 + 0.45 * rim + 0.25 * (1.0 - facing)) + ray;
+    // ...and stops at the silhouette on a soft but definite curve
+    float  x = saturate(facing / max(k_core.w, 1e-4));
+    e *= x * x * (3.0 - 2.0 * x);
     float3 c = k_col.rgb * e;
     float  hot = saturate(spot * spot * k_core.x);  // the core of a hit goes white
     c = lerp(c, float3(1.0, 1.0, 1.0) * e, hot);

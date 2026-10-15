@@ -183,6 +183,35 @@ is in the depth buffer.
   calls of `CreateShieldHit` (0x58bb95, 0x58cad8, 0x58d502, 0x58dd65), chained through
   thunks that note the ordnance in `ebx`. The shields-down discharges register a point
   light on the hull.
+  Since 0.4.0 the hits take `ART-DIRECTION.md`'s direction ("Shield hits"): the shell
+  is implied, lit only about the hit. A **mist** of uneven density lies over the glow
+  about each hit, like lit vapour: four octaves of 3D gradient noise on the unit
+  sphere (no grid; value noise drew walls in the nebulae), the domain bent once so the
+  dense parts run in wisps, fixed to the shell and drifting slowly through it, never
+  re-seeded, so it does not shimmer. Its light falls off as a Gaussian of the distance
+  from the hit (`MistReach`, in shield radii), wide but gone well before the far side.
+  It also modulates the glow's lattice and rim (`MistShare`). Where the lit shell
+  turns to its silhouette everything fades over the last `Edge` of facing, so the lit
+  area ends on a soft but definite curve rather than at its brightest. **Rays** only
+  on the factions in `RayFactions` (Klingon): a sunburst of clear spokes from just
+  outside the spot out to `RayLength`, four sines of whole numbers of turns about the
+  hit, seeded per hit, each beating slowly in strength, so the burst breathes in place
+  and does not turn. The faction is the ODF's first letter (`f`, `k`, `r`, `b`, `c`,
+  `8`), as for the colours, whose defaults now follow the direction: Klingon pure green
+  (`12,255,6`), Species 8472 orange (`255,140,40`). **The hull under a hit is lit**: each
+  hit (the brightest `HitLights`) registers a point light where it struck the shell,
+  in its shield colour taken `HitLightWhite` of the way to white, as bright as its
+  glow (plus a quarter of its spot) times `HitLight`, full out to a tenth of
+  `HitLightReach` times the ship's bounding radius and gone at that reach, its falloff
+  raised to `HitLightPower` so the far hull stays dark; styled distinct, so several
+  hits on one ship each light it. The ring and the rim are as they were; the next pass
+  settles whether they stay. `[Shields]` keys (defaults): `Mist` (0.6), `MistReach`
+  (0.5), `MistShare` (1), `MistContrast` (1.6), `MistScale` (3, cells across the unit
+  sphere), `MistDrift` (0.08 a second), `Edge` (0.15), `Rays` (1.2, 0 for none),
+  `RayLength` (0.55), `RaySharpness` (3), `RayFactions` (`Klingon`; any of
+  `Federation, Klingon, Romulan, Borg, Cardassian, Species8472, Other`), `HitLight`
+  (2, 0 for none), `HitLightWhite` (0.5), `HitLightReach` (0.8), `HitLightPower` (2),
+  `HitLights` (6, at most 16).
 - **Repair welding** (`repair.rs`). `NodeParticleEffect` stays the engine's (its
   `Render` also prunes particles of dead objects): the call to `AddParticle` in
   `Craft::RepairSystem` (0x4c90c0) is chained to note each weld, and the call to
@@ -360,6 +389,33 @@ and a light show nothing: `ImpactAtSurface=k` puts its impact flare and its ligh
 the beam enters the target's bounding sphere (+0x60's object, its instance's radius
 times k), so the light falls on the moon's face. The world module's moons take it as
 any point light.
+
+**The tractor, holding and assimilation beams** (`tracbm`, `tracbmo`, `holdbm`,
+`techassimbeam`, `borgbor`; since 0.4.0) are `Kind=cone` recipes, after
+`ART-DIRECTION.md`'s direction: not a laser but a cone of light through vapour. The
+cone runs from the beam's start (+0xbc), `Width` wide, to `Spread` of the target's
+bounding radius (+0x60's object; without one, an eighth of the beam's length) about
+its end (+0xc8), and on for `Beyond` of that radius as it fades, so the target sits
+inside the beam rather than at its tip. It is 16 camera-facing segments, each node
+with its own side vector so the segments meet. A flat quad through the target's
+centre would be cut in half by the hull in the depth test, so the wide end is moved
+towards the eye along the line to it (`Pull` target radii, growing as the square of
+the way along): that leaves it where it was on screen and puts it in front of the hull
+it holds, while the narrow end stays behind the emitter's own plating. The shader
+(`cone` in `ordnance.hlsl`) has no core: broad streaks across the cone's own -1..1
+(so they spread with it, as a projector's do in haze), their edges lifted to the
+middle's brightness, their phases drifting by sums of sines at unrelated rates;
+three octaves of value noise for vapour, running along the beam (`Vapour`'s speed;
+the tractors' run back towards the ship) and slowly across; brightest at the emitter,
+`Fall` of it at the target; black within `EdgePixels` of the outline (`fwidth`). The
+outline is the geometry's and holds still, so only the light inside it moves. A small
+flare (`Emitter`) marks the point on the ship; there is no impact flare. **The wash**
+on the target is a soft point light (`Light` times the beam's colour), placed
+`WashBack` target radii from its centre back towards the emitter and full out to
+`WashReach` radii: the hull facing the emitter, where the cone falls, takes it, and
+the far side, turned away, does not. A spot light limited to the cone's footprint
+would match better, but no lit draw takes one yet. Seen head on, the cone's quads
+close to a line (as every ribbon here does). Not yet seen in game.
 
 **The models.** Every model-drawing class's `Submit` ends by calling `Entity::Render`
 (0x4cfda0) through slot 11 of its vtable: the instance's frustum test (instance slot 3),
