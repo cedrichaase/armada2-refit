@@ -1,4 +1,4 @@
-# Cloaked ships drawn as glass by Lighting.asi
+# Cloaked ships drawn as glass by Render3D.asi
 
 Resolutions: 16:9
 Mod: refit
@@ -6,11 +6,11 @@ Launch: -nointro a2_borg01
 Setup: testbench/scene/bench-setup.sh cloak
 Timeout: 6 min
 
-`lighting/README.md`, "Cloaked ships". Run it on a checkout: `./a2test run cloak --install .`.
+`render3d/README.md`, "hulls" (cloaks). Run it on a checkout: `./a2test run cloak --install .`.
 The scene (`testbench/scene/scenes/cloak.ini`) is the player's own Romulan warbird and
 Klingon Bird of Prey in front of a class M planet and a Galaxy class. The warbird
 cloaks, holds, and decloaks; the Bird of Prey cloaks at once. The log line checks that
-a cloaked hull went through the glass path; the shots are for judging the look: halfway,
+the hulls module is on; the shots are for judging the look: halfway,
 the hull going patch by patch behind a green front; cloaked, clear glass with a thin
 bright edge, the planet and the Galaxy behind it a little bent and fringed in colour,
 no opaque or flat-tinted hull; decloaked, the warbird as before.
@@ -25,7 +25,7 @@ no opaque or flat-tinted hull; decloaked, the warbird as before.
 8. Wait 8 seconds.
 9. Expect scene "query" answers "warbird handle".
 10. Expect scene "query" answers "cloak cloaked".
-11. Expect "Lighting.log" contains "cloak: a cloaked hull drawn as glass at Flush".
+11. Expect "Render3D.log" contains "module hulls: on".
 12. Take a screenshot called "cloak-glass".
 13. Scene "cloak bop now".
 14. Scene "orbit warbird 300 10 230".

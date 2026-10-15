@@ -5,6 +5,72 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.0.0 — 2026-10-15
+
+Layers: render3d 0.2.0, models 5.0.0, testbench 3.17.0.
+
+### Removed
+- The per-part plugins render3d replaces, and their layers: `msaa`, `lighting`, `sky`,
+  `nebulae`, `surfaces`, `explosions`, `shields`, `repair`, `venting`, `specials` and
+  `fog`, and models' `Planets.asi` (models 5.0.0). `a2mod` no longer switches them as
+  layers; a stale copy is filed under render3d. Their recipes moved into `render3d/`
+  (render3d 0.2.0).
+- The release package no longer carries `MSAA.asi`, `Planets.asi`, `Lighting.asi`,
+  `Sky.asi` or the sky recipes, nor the `lighting`, `sky` and `msaa` steps; its
+  installers take out those plugins and the old `Sky\mbg*.ini` left by an earlier
+  release. render3d is not in the package yet, so a release draws the 3D view stock.
+
+### Changed
+- `./install` installs render3d and the models' SOD rewrites with no plugin to skip;
+  `render3d/install.sh` takes out any old plugin an earlier install left. Scenarios that
+  tested the plugins check render3d's modules (testbench 3.17.0).
+
+Installed, not yet seen in game.
+
+## 11.41.0 — 2026-10-15
+
+Layers: render3d 0.2.0, testbench 3.17.0.
+
+### Added
+- render3d draws the 3D view as its own sequence of steps, its modules taking over
+  every part from the engine and the plugins: hulls, effects (explosions, shield hits,
+  repair welding, debris, construction, worker bees, sparks), ordnance (shots,
+  special weapons, mines, pods, mining beams, the warp flash), the sky, the fog of war, grid, selection, height posts and
+  the build ghost, particles and vents, the Evolver and holograms, planets, moons,
+  asteroids and nebulae, and the special-object effects (render3d 0.2.0).
+- render3d's `Timing=1` and `render3d/perf/compare.sh`: render3d measured against the
+  plugins it replaces; it now takes less CPU than they did (`render3d/PERF.md`).
+
+### Changed
+- `./install` runs `render3d/install.sh` last, which takes out the plugins its modules
+  replace (removed from the repository in 12.0.0). Scenario `no-assets` checks the modules instead; scenario `render3d-match`
+  plays a match with a battle on render3d, and `render3d-mode-switch` changes the
+  display mode in one (testbench 3.17.0).
+
+### Fixed
+- render3d draws the ships and stations whose ODF names another SOD (`baseName`):
+  Martok's Negh'Var, Caddebostan's ship, the Ferengi scavenger, the 8472 hero mothership,
+  Martok's base and the prison had stock's light and cloak (render3d 0.2.0).
+
+Installed, not yet seen in game.
+
+## 11.40.0 — 2026-10-15
+
+Layers: render3d 0.1.0, testbench 3.16.0.
+
+### Added
+- `render3d/`: `Render3D.asi`, the 3D view through a renderer of our own, in Rust. The
+  engine's steps (and every plugin hooked into them) draw into a half-float target with
+  MSAA, which is bloomed by energy and tone-mapped into the back buffer (render3d 0.1.0).
+  `a2mod` switches it as the `render3d` layer.
+
+### Changed
+- `./install` runs `render3d/install.sh` in place of `msaa/install.sh`, and removes
+  `MSAA.asi`: render3d's scene target has samples of its own.
+- The bench gathers `Render3D.log`; scenario `render3d` (testbench 3.16.0).
+
+Installed, not yet seen in game.
+
 ## 11.39.1 — 2026-10-13
 
 Layers: surfaces 1.1.1.

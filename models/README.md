@@ -6,8 +6,9 @@ The game's 3D geometry, where the refit changes it:
   (`logo-sod.py`, with its art from `loading-panel.sh`). It ships with the `LOADING`
   texture target, and `a2tex install`/`revert` move the two together. The reasoning is
   in `textures/README.md`, in the loading-screen section.
-- **Planets**, `Planets.asi` (`planets.c`): the engine tessellates them finely enough
-  for a modern resolution. Below.
+- **Planets** are not here: their shape is not in their SOD, and they are drawn on a
+  sphere of render3d's own (`render3d/README.md`, world module). What was learned
+  before that is below, under "Planets".
 - **Dilithium moons**, `SOD/Mdmoon*.SOD` and `Mmooninf.SOD`, smoothed by `moon-sod.py`.
   Below.
 - **The selection bubble**, `SOD/select.sod`, rounded by `select-sod.py`. Below.
@@ -15,69 +16,30 @@ The game's 3D geometry, where the refit changes it:
 - **The asteroids**, `SOD/Master.SOD` and `Master1..8.SOD`, smoothed by
   `asteroid-sod.py`. Below.
 
-`./install` runs `install.sh`, which builds and installs `Planets.asi` and `Planets.ini`
-smooths the moons and the asteroids and rounds the selection bubble and the hulls
-(`.a2neb-backup` copies; `install.sh --remove` restores them).
-`a2mod` switches both, and the `SOD` backups, as the `models` layer.
+`./install` runs `install.sh`, which smooths the moons and the asteroids and rounds the
+selection bubble and the hulls (`.a2neb-backup` copies; `install.sh --remove` restores
+them). `a2mod` switches the `SOD` backups as the `models` layer.
 
-## Planets.asi
+## Planets
 
-### What was wrong
+The planets on the maps looked like polygons: at 3440x1440 the rim of a planet was a run
+of straight segments, and the facets showed in the terminator and in the cloud shell.
 
-The planets on the maps look like polygons: at 3440x1440 the rim of a planet is a run
-of straight segments, and the facets show in the terminator and in the cloud shell.
-
-### The dead end: a finer SOD does nothing
+### A finer SOD does nothing
 
 Every class planet has a model, `SOD/PB_CLSSD/H/J/K/L/M.sod`, picked by the ODF's name
 (`odf/stations/PB_CLSSH.odf` → `PB_CLSSH.sod`). Each is a 3ds Max `GeoSphere01` at
-frequency 4, 162 vertices and 320 triangles, which would explain a polygon outline of
-about 21 sides. A 5120-triangle re-tessellation of all six, keeping every UV, was built
-and installed on the bench. **The planet it drew matched stock pixel for pixel**: 93
-pixels of 102,000 differed by more than 3%, all of them the sun flare and the
-planet's rotation. The engine does not draw the shape of that mesh.
+frequency 4, 162 vertices and 320 triangles. A 5120-triangle re-tessellation of all six,
+keeping every UV, was built and installed on the bench. **The planet it drew matched
+stock pixel for pixel**: 93 pixels of 102,000 differed by more than 3%, all of them the
+sun flare and the planet's rotation. The engine does not draw the shape of that mesh.
 
-### What the engine does instead
-
-`Planet_Database` (constructor `0x595670`, from `armada2.map`) builds its own meshes:
-`GroundMesh` (constructor `0x595ba0`) for the ground, named `GeoSphere01`/`GeoSphere02`,
-and for the `Atmosphere` cloud shell, out of latitude/longitude angle tables
-(`GroundMesh::sInitAngleTables`, `0x595d60`). It re-tessellates them as the camera moves:
-`Planet_Database::RenderInternal` (`0x595910`) picks an angle step from the camera
-distance *d* and the planet radius *r*,
-
-    step = 2 · acos(1 − k · d / r),   clamped to [π/64, π/4]
-
-and passes it to `GroundMesh::Recompute` (`0x596200`).
-
-1 − cos(step/2) is how far the middle of a facet sags inside the true sphere, as a
-fraction of *r*, so this holds the sag at *k · d* in world units. Seen through the
-perspective camera, that is *k* times the focal length in pixels: a fixed number of
-pixels at a given resolution. The constant was set for 640x480: **k = 0.0015625**
-(1/640), and 0.00046875 in the preset view where `View_Record` is 2. At 1440 lines the
-same *k* leaves facets several pixels deep.
-
-### The hook
-
-The two `flds` instructions that load *k* (`0x595972` and `0x59597c`) are pointed at the
-plugin's own copies, divided by `Detail=` in `Planets.ini` (default 8). No other
-instruction in `.text` reads the two constants. The [π/64, π/4] clamp stays as it is,
-so the finest mesh the engine can be asked for is the one it always built for a camera
-close in, and its angle tables are sized for that. `Detail` only decides how far out in
-the zoom range that mesh is used.
-
-Both sites' bytes, and the constants they load, are checked against this build before
-either is written, as bit patterns: the exe's 0.00046875 is one unit in the last place
-away from the nearest float to that decimal, so a float literal does not match it. A
-different `Armada2.exe` leaves the plugin inert, and `Planets.log` says so. `Detail=1`
-(or 0) patches nothing. The exe is patched in memory only. Removing `Planets.asi`,
-`Planets.ini` and `Planets.log` uninstalls it completely.
-
-On the bench at 3440x1440, stock draws the rim of a class H planet as straight segments.
-With `Detail=8` it is a clean circle, the cloud shell included.
-`testbench/scenarios/no-assets.md` checks that both sites are patched.
-
-Built like the other plugins (`menus/build.sh`): clang, `lld-link`, no CRT.
+`Planet_Database` builds its own meshes (`GroundMesh` for the ground, and the
+`Atmosphere` cloud shell) out of latitude/longitude angle tables, and re-tessellates
+them as the camera moves against a facet tolerance set for 640x480. The earlier
+`Planets.asi` lowered that tolerance; `Render3D.asi` replaced it by drawing the planets
+on a finer sphere of its own that carries the same UV layout, so the stock gore textures
+land where they did. Don't try new planet meshes.
 
 ## The dilithium moons
 
@@ -204,11 +166,11 @@ meet at a median of 22 to 39 degrees with a tail of sharp edges up to 138, and a
 `--crease 55` the sharpest sixth stay edges: broken ridges with rounded faces between.
 No patch folds over (a triangle turned against the stock face it was cut from) at any
 crease up to 70; at 90 two do on `Master7`. The surface detail is not geometry: it is
-`Surfaces.asi`'s recipes `Master1` and `Master2`, lit per pixel by `Lighting.asi`
-(`surfaces/README.md`, "The asteroids").
+render3d's recipes `Master1` and `Master2` (`render3d/surfaces/`), lit per pixel by its
+hulls module (`render3d/README.md`, world module).
 
 `Master6` is the one model whose node matrix is a mirror and whose triangles are wound
-the other way round, which cancel under the engine's cull. `Lighting.asi`'s hull shaders
+the other way round, which cancel under the engine's cull. render3d's hull shaders
 take any mirrored draw to need the opposite cull (the Steamrunner's case), so `Master6`
 would draw inside out there; since no field draws it, nothing was changed for it.
 
@@ -216,8 +178,8 @@ would draw inside out there; since no field draws it, nothing was changed for it
 
 `hull-bump.py` (models 3.2.0) gave the 36 Federation SODs the Borg's bump-mapped
 material with one flat height map, `a2flatbump.tga`, to get per-pixel lighting out of
-the engine's dot3 path. Since lighting 1.11.0 `Lighting.asi` lights every hull per
-pixel in its own shaders (`lighting/README.md`, "Shaders"), and a flat map gives a
+the engine's dot3 path. Since lighting 1.11.0 `Lighting.asi`, and now render3d, lights every hull per
+pixel in its own shaders (`render3d/README.md`, hulls), and a flat map gives a
 patched hull exactly a plain hull's shading there. So it was removed in models 4.0.0.
 
 What a SOD needs to ask for a bump map, read from the 167 bump-mapped materials in the
@@ -225,8 +187,8 @@ What a SOD needs to ask for a bump map, read from the 167 bump-mapped materials 
 **type 6** with **two** textures, the diffuse with word `0` and then the bump map with
 word `0x200`. A plain material is type 4 with one texture. The bump map is a 24-bit
 greyscale height map, which the engine turns into a normal map at load. Such a hull goes
-through `Lighting.asi`'s bump path, which lights it with the Borg profile
-(`lighting/README.md`, "The Borg profile"). Federation hulls with real relief would take
+through render3d's bump path, which lights it with the Borg profile
+(`render3d/README.md`, hulls). Federation hulls with real relief would take
 that spelling, a height map of their own, and a profile of their own. A map derived from
 the hull art (a high-pass of each texture's luminance) was tried and rejected in game: it
 turns every painted speck into relief.

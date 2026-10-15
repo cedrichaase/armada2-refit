@@ -1564,7 +1564,7 @@ textures the target actually holds.
 ### "2.27 GB resident" was never a memory figure
 
 It is tempting to size textures against a figure like "the textures already hold
-2.27 GB" inside a 32-bit LAA process. **That is the size of `Textures/RGB` on disk.** Nothing
+2.27 GB" inside a 32-bit process (one that is not even large-address-aware: `Armada2.exe`'s header characteristics are 0x010e, without the flag, so it has 2 GB). **That is the size of `Textures/RGB` on disk.** Nothing
 established that Armada II holds all 2115 of them in memory at once, and there is good
 reason to think it does not: a Federation-versus-Klingon match has no cause to load
 Cardassian hulls.

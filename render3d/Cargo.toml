@@ -1,0 +1,27 @@
+[package]
+name = "render3d"
+version = "0.2.0"
+edition = "2024"
+publish = false
+description = "Render3D.asi: Star Trek: Armada II's 3D view drawn by our own renderer"
+license = "MIT"
+
+[lib]
+name = "render3d"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+libm = "0.2"
+a2fmt = { path = "a2fmt" }
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true
+codegen-units = 1
+debug = 1
+
+[profile.dev]
+panic = "abort"
+opt-level = 1

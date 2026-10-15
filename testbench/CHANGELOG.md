@@ -5,6 +5,53 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.17.0 — 2026-10-15
+
+### Added
+- Scenario `render3d-match`: an Instant Action match on render3d with every module on,
+  a battle staged beside the Borg start by `Scene.asi`'s new `SCENE=match` (builds and
+  hides nothing; fog off).
+- Scenario `render3d-mode-switch`: a display mode changed in Graphics Settings during
+  the `showcase` battle; render3d must take the new device and draw the same scene.
+- Scenario `render3d-specialfx`: the special-object effects (Computer Override, Energy
+  Dissipator, Psionic Disruption) through render3d's `specials` module.
+- Scenario `render3d-ordmodels`: mines, the commando team, the myotron, the flux wave,
+  transwarp and the chain pulsar fired in the `specials` scene, drawn by render3d.
+  Scenes `mining` (a freighter mining a dilithium moon) and `ordmodels`.
+- Scenario `render3d-hulls-extras`: the build ghost and height posts while placing a
+  station, a hologram (a Romulan holo-emitter on a Klingon battleship) and the Evolver,
+  drawn by render3d.
+- Scenario `render3d-construction` and scene `construction`: a construction ship
+  building a station, drawn by render3d. `Scene.asi` command `build <rig> <odf> <x y z
+  | object>` orders a construction ship to build there (resources topped up).
+- README "Operating the game: what agents learned" (one game at a time, 720p, timings,
+  A/B at the same moment, scenario pacing), and `testbench/operating/`, one file of
+  staging recipes per topic. `a2test run -j 1` named for one game at a time.
+
+### Changed
+- Scenario `no-assets`: `Planets.asi` is no longer installed beside render3d; the world
+  module's load is checked in its place.
+- Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,
+  Repair, Fog, Specials and Venting, it checks that `Render3D.asi` loaded each module.
+
+### Changed
+- Scenarios `explosions`, `shields-hits`, `shields-down-repair`, `venting`, `specials`,
+  `fog-edges` and `cloak` check render3d's modules in `Render3D.log` in place of the
+  removed plugins; the session no longer clears or collects their `.ini` and `.log`.
+
+Installed, not yet seen in game.
+
+## 3.16.0 — 2026-10-15
+
+### Added
+- Scenario `render3d`: the `showcase` scene through `Render3D.asi`, the main view and,
+  with `hud on`, the action camera's inset, checked in `Render3D.log`.
+- `Render3D.log` and `Render3D.ini` are cleared at launch and gathered with the other
+  logs.
+
+
+Installed, not yet seen in game.
+
 ## 3.15.0 — 2026-10-13
 
 ### Added

@@ -13,7 +13,7 @@
  *   4. while D3D9Probe.tint exists beside the exe, every IDirect3DDevice8::
  *      DrawIndexedPrimitive (71) with a stage-0 texture runs with a ps_2_0
  *      shader: texture * fixed-function diffuse * red tint -- a per-draw
- *      shader swapped in mid-scene, as a lighting plugin would.
+ *      shader swapped in mid-scene, as a renderer plugin would.
  */
 
 typedef unsigned char  BYTE;
@@ -257,8 +257,8 @@ static void s_surf(char *m, const DWORD *d)
 
 /* Which way d3d8to9 1.16.0 copies (its CopyRects, read in its source): through D3DX
  * when the source is MANAGED or the destination is not DEFAULT, else StretchRect from
- * a DEFAULT source. MSAA.asi's edge fill copies four strips a frame; the minimap
- * read-back (msaa/README.md) is rarer, so the first call of each distinct pair of
+ * a DEFAULT source. An edge fill copies four strips a frame; the minimap
+ * read-back is rarer, so the first call of each distinct pair of
  * surfaces is logged, and every failure (up to 20). */
 static HRESULT __stdcall w_CopyRects(void *dev, void *src, const void *rects, UINT n, void *dst, const void *pts)
 {

@@ -97,10 +97,10 @@ The launch step also proves isolation: it scans `/proc/<pid>/maps` and `fd` for 
 real install's path, and fails the case if the game has it open.
 
 Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
-channels), `Menus.log`, `MSAA.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
+channels), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
 `xalia_dxgi.log` (DXVK), `vkBasalt.log`, `sway.log`, `input.log`, `prepare.log`,
 `launch-env.txt` (the exact environment and argv), the clone's `ARMADA.PRF`,
-`Menus.ini`, `MSAA.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
+`Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
 anything new in the game's `Logs/`.
 
 ## Traps, each measured here
@@ -215,6 +215,51 @@ anything new in the game's `Logs/`.
   this looked like a name leaking from one session into a later clone, but it was never
   the bench's. A scenario must not expect the default name; `multiplayer-name.md` clears
   the field before it types.
+
+## Operating the game: what agents learned
+
+Lessons from agents driving the game on the bench, kept so the next one need not
+re-learn them. Recipes for staging particular things are in `operating/`, one file
+per topic: `construction.md` (a station built by a construction ship, sparks),
+`special-weapons-and-mining.md` (mines, model-drawn special weapons, mining beams),
+`special-object-effects.md` (Computer Override, Energy Dissipator, Psionic
+Disruption), `stations-ghosts-holograms-evolver.md` (the build ghost and height
+posts, a hologram, the Evolver, a survey of what no module draws).
+
+- **The bench's GPU is the user's.** A GPU hang in one bench game (2026-10-15) reset
+  the GPU, killed every bench game and crashed the user's desktop compositor. Run one
+  game at a time (`a2test run -j 1`; a scenario with a judged step also runs its 4:3
+  reference case), stop each session as soon as you have what you need, run at 720p
+  (`--res 1280x720`) unless fine detail is judged, and keep every new shader pass
+  fixed-cost. A session whose game died shows "game not running" in `session list`;
+  `session stop` still cleans it up (exit code 2 then).
+- **Starting takes two to three minutes** (clone, both installs, the first tick), so
+  `session start` can outlast a 120 s tool timeout: start it in the background and
+  wait for `stop it:` in its output. The scene is built 30-60 s after that: wait for
+  `scene ready` in the clone's `Scene.log`, not a fixed time.
+- **Without a scene the 3D view is grey**, in stock too: a bare `-nointro a2_borg01`
+  shows the HUD over nothing. Always stage with `SCENE=` (`scene/README.md`).
+- **`Setup:` runs from the checkout `a2test` runs from**, not from `--install`: a scene
+  or scene command that exists only in a copy is not found. Use an existing scene and
+  `Scene "spawn ..."` steps, or a temporary copy of the scenario with an absolute
+  `Setup:` path. `a2test run` takes a scenario by path.
+- **`--install` runs that tree's `./install`, which builds into it**: for a stock
+  comparison install a reflink copy of a pristine tree, never the tree itself.
+- **A stock reference in the same setup** (`--install` cannot go with `--mod stock`):
+  `session start --no-launch`, set `Enable=0` under `[Render3D]` in the clone's
+  `Render3D.ini`, then `drive launch -nointro a2_borg01`.
+- **A/B at the same moment**: a module key with `Reload=1` is read again while the game
+  runs (read again every ~2 s); `scene pause`, shoot,
+  switch the module off, wait for the log to say so, shoot again. Rendering continues
+  while paused. Cloud particles drift while paused in stock, so that side moves.
+- **Scenario pacing**: `spawn X; select X` on one line selects nothing (spawn, wait a
+  second, then select); a `special` fired in the second its shooter spawned answers
+  "fired" but does nothing (wait 2 s); button-bar clicks need a second between them.
+  `answers "fired"` also matches "NOT fired": check `", fired"`.
+- **Escape during placement opens the OPTIONS menu**, not a cancel, and `Scene.asi`
+  stops reading commands until "Return to Game" is clicked.
+- **Agent sandboxes** may refuse shell lines that mix variables with `sed`, loops of
+  `drive` commands or heredocs: put the sequence in a small script and run that.
 
 ## The stretch measurement
 

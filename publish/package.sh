@@ -6,7 +6,6 @@
 #   game/     what goes beside Armada2.exe: the plugins and their .ini, dxvk.conf
 #   chain/    the Direct3D chain ./install sets up: crosire's d3d8to9 as d3d8.dll on
 #             DXVK's d3d9.dll (both from platform/vendor/, with their licences)
-#   sky/      the sky recipes (sky/skies/*.ini), which the installers put in the game's Sky/
 #   models/   models/moon-sod.py, select-sod.py, hull-sod.py (+ hull-sod.sha256) and
 #   a2env.py  the a2env.py they import: they rewrite the player's own stock SODs
 #   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
@@ -38,12 +37,8 @@ commit="$(git -C "$root" rev-parse --short HEAD)"
 
 bash "$root/hud/build.sh"              >/dev/null
 bash "$root/menus/build.sh"            >/dev/null
-bash "$root/msaa/build.sh"             >/dev/null
 bash "$root/qol/build.sh"              >/dev/null
 bash "$root/grid/build.sh"             >/dev/null
-bash "$root/models/build.sh"           >/dev/null
-bash "$root/lighting/build.sh"         >/dev/null
-bash "$root/sky/build.sh"              >/dev/null
 bash "$root/online/build.sh"           >/dev/null
 bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
 
@@ -51,17 +46,12 @@ name="armada2-refit-$ver"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 d="$stage/$name"
-mkdir -p "$d/game" "$d/bloom" "$d/chain" "$d/models" "$d/sky"
+mkdir -p "$d/game" "$d/bloom" "$d/chain" "$d/models"
 cp "$root/hud/build/HUD.asi"                "$root/hud/HUD.ini"                 "$d/game/"
 cp "$root/menus/build/Menus.asi"            "$root/menus/Menus.ini"             "$d/game/"
-cp "$root/msaa/build/MSAA.asi"              "$root/msaa/MSAA.ini"               "$d/game/"
 cp "$root/qol/build/QOL.asi"                "$root/qol/QOL.ini"                 "$d/game/"
 cp "$root/qol/build/QOLRules.asi"           "$root/qol/QOLRules.ini"            "$d/game/"
 cp "$root/grid/build/GridLayout.asi"        "$root/grid/GridLayout.ini"         "$d/game/"
-cp "$root/models/build/Planets.asi"         "$root/models/Planets.ini"          "$d/game/"
-cp "$root/lighting/build/Lighting.asi"      "$root/lighting/Lighting.ini"       "$d/game/"
-cp "$root/sky/build/Sky.asi"               "$root/sky/Sky.ini"                 "$d/game/"
-cp "$root/sky/skies/"*.ini "$d/sky/"
 cp "$root/online/build/Online.asi"          "$root/online/Online.ini"           "$d/game/"
 cp "$root/cutscenes/binkproxy/build/binkw32.dll" "$root/cutscenes/binkproxy/BinkProxy.ini" "$d/game/"
 # dxvk.conf as ./install writes it (stage 3); only DXVK reads it.
@@ -127,38 +117,26 @@ WHAT GOES IN (game/, copied beside Armada2.exe)
   QOLRules.asi + QOLRules.ini   qol             pay for an item when it is queued; against
                                                the computer only, stands down online
   GridLayout.asi + .ini         grid $(version "$root/grid/CHANGELOG.md")       the button bar as a 5x3 grid of position keys
-  Planets.asi  + Planets.ini    models $(version "$root/models/CHANGELOG.md")     planets tessellated for a modern resolution
-  Lighting.asi + Lighting.ini   lighting $(version "$root/lighting/CHANGELOG.md")   ships and stations lit on the GPU, new scene
-                                               lights, planets with a night side, light
-                                               from nebulae, planets, explosions, torpedoes.
-                                               Lit per pixel in shaders, with specular, a
-                                               rim and the hulls' night lights, when the
-                                               d3d8.dll is crosire's d3d8to9 (chain/,
-                                               below); per vertex otherwise.
-                                               Lighting.log says which
-  Sky.asi      + Sky.ini        sky $(version "$root/sky/CHANGELOG.md")        the sky computed in a shader from a recipe
-                                               per map, so the cube's seams are gone; the
-                                               recipes (sky/) go in the game's Sky folder.
-                                               Needs crosire's d3d8to9 (chain/); the stock
-                                               sky otherwise. Sky.log says which
   Online.asi   + Online.ini     online $(version "$root/online/CHANGELOG.md")     online multiplayer under Wine/Proton too: the
                                                Internet - Online entry, join codes, no port
                                                forwarding (the project's server, c20e.de)
-  MSAA.asi     + MSAA.ini       msaa $(version "$root/msaa/CHANGELOG.md")       multisample anti-aliasing -- installed only
-                                               when DXVK is in the game directory: its
-                                               d3d8.dll, or d3d8to9 on its d3d9.dll
   binkw32.dll  + BinkProxy.ini  cutscenes $(version "$root/cutscenes/CHANGELOG.md")  launch reels full screen, AV1 movie replacements
   dxvk.conf                     postfx $(version "$root/postfx/CHANGELOG.md")     16x anisotropic filtering, LOD bias, seamless
                                                cube maps; only DXVK reads it
 THE DIRECT3D CHAIN (chain/)    platform $(version "$root/platform/CHANGELOG.md")
-  d3d8.dll  crosire's d3d8to9 1.16.0, which lets Lighting.asi draw in shaders, on
-  d3d9.dll  DXVK 3.1.1's Direct3D 9 on Vulkan, which MSAA.asi and dxvk.conf need.
+  d3d8.dll  crosire's d3d8to9 1.16.0, on
+  d3d9.dll  DXVK 3.1.1's Direct3D 9 on Vulkan, which dxvk.conf needs.
   Put in unless the game directory holds a d3d8.dll or d3d9.dll that is none of GOG's,
   DXVK's or these; a replaced one is kept as .a2chain-backup (GOG's d3d8.dll as
   d3d8.dll.gog-backup) and put back by --uninstall. That is Linux. On Windows only
   d3d8.dll goes in, on Windows' own Direct3D 9, and a DXVK d3d8.dll is left as it is.
   On macOS only d3d8.dll goes in, on Wine's own Direct3D 9 (wined3d): DXVK cannot run
-  Direct3D 9 on a Mac, so MSAA, dxvk.conf and bloom are skipped there.
+  Direct3D 9 on a Mac, so dxvk.conf and bloom are skipped there.
+
+THE 3D VIEW
+  This package leaves the 3D view to the engine: the per-part plugins of earlier
+  packages (lighting, sky, planets, anti-aliasing) are taken out on install, and
+  their replacement, Render3D.asi, is not in a release yet.
 
 THE MODELS (models/, needs Python 3; the graphical installer brings its own)
   The dilithium moons and the selection bubble smoothed, and the ships and stations
@@ -196,8 +174,6 @@ $(python3 "$gui" --vkbasalt-howto all | sed 's/^/              /')
               are in the game directory. No effect packages are needed. If you already
               had a ReShade preset, pick A2Bloom.ini in ReShade's overlay.
   Bloom is on from launch. Not yet seen in game through this package.
-  MSAA: if DXVK comes from somewhere other than the game directory (Proton's own, say),
-  the installer cannot see it; copy game/MSAA.asi and game/MSAA.ini across yourself.
 
 Full notes: README.md in the repository, "Installing by hand, layer by layer".
 MIT licence (LICENSE). An unofficial fan project; nothing of the game is included.
@@ -262,14 +238,14 @@ json.dump({
     'windows': {'script': 'install.ps1', 'uninstall': '-Uninstall', 'progress': 'A2_PROGRESS'},
     'macos': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
     'steps': ['verify', 'prereqs', 'chain', 'hud', 'menus', 'qol', 'grid', 'models',
-              'lighting', 'sky', 'online', 'msaa', 'cutscenes', 'renderer', 'bloom', 'done'],
+              'online', 'cutscenes', 'renderer', 'bloom', 'done'],
     'layers': [
         layer('prereqs', 'Widescreen patch', '1.0', ['vendor/STA2WidescreenPatch/*'],
               'STA2WidescreenPatch and the Ultimate ASI Loader that loads every plugin',
               'missing'),
         layer('chain', 'Direct3D chain', '$(version "$root/platform/CHANGELOG.md")',
               ['chain/d3d8.dll', 'chain/d3d9.dll'],
-              "crosire's d3d8to9 on DXVK's d3d9: shaders for the lighting, DXVK for MSAA"),
+              "crosire's d3d8to9 on DXVK's d3d9: DXVK underneath"),
         layer('hud', 'HUD', '$(version "$root/hud/CHANGELOG.md")', ['game/HUD.asi', 'game/HUD.ini'],
               'the in-game HUD, font and cursors at any aspect ratio'),
         layer('menus', 'Menus', '$(version "$root/menus/CHANGELOG.md")', ['game/Menus.asi', 'game/Menus.ini'],
@@ -280,20 +256,11 @@ json.dump({
               'Pay on queue against the computer'),
         layer('grid', 'Grid keys', '$(version "$root/grid/CHANGELOG.md")', ['game/GridLayout.asi', 'game/GridLayout.ini'],
               'the button bar as a 5×3 grid of position keys'),
-        layer('models', 'Models', '$(version "$root/models/CHANGELOG.md")',
-              ['game/Planets.asi', 'game/Planets.ini', 'models/*'],
-              'planets tessellated finely; moons, selection bubble and hulls smoothed from your own files'),
-        layer('lighting', 'Lighting', '$(version "$root/lighting/CHANGELOG.md")', ['game/Lighting.asi', 'game/Lighting.ini'],
-              'ships and stations lit on the GPU, new scene lights, planets with a night side; '
-              'per pixel behind d3d8to9, per vertex otherwise'),
-        layer('sky', 'Sky', '$(version "$root/sky/CHANGELOG.md")', ['game/Sky.asi', 'game/Sky.ini', 'sky/*'],
-              'the sky computed in a shader from a recipe per map, with no seams; '
-              'behind d3d8to9, the stock sky otherwise'),
+        layer('models', 'Models', '$(version "$root/models/CHANGELOG.md")', ['models/*'],
+              'moons, selection bubble and hulls smoothed from your own files'),
         layer('online', 'Online', '$(version "$root/online/CHANGELOG.md")', ['game/Online.asi', 'game/Online.ini'],
               'online multiplayer that works under Wine/Proton: the Internet – Online entry, '
               'join codes, no port forwarding'),
-        layer('msaa', 'Anti-aliasing', '$(version "$root/msaa/CHANGELOG.md")', ['game/MSAA.asi', 'game/MSAA.ini'],
-              'multisample anti-aliasing', 'dxvk'),
         layer('cutscenes', 'Cutscene player', '$(version "$root/cutscenes/CHANGELOG.md")',
               ['game/binkw32.dll', 'game/BinkProxy.ini'],
               'launch reels full screen; the stock binkw32.dll is kept'),
@@ -310,7 +277,7 @@ json.dump({
 }, open(sys.argv[1], 'w'), indent=1)
 EOF
 
-(cd "$d" && sha256sum -- game/* bloom/* chain/* models/* sky/* a2env.py vendor/*/* prereqs.txt manifest.json \
+(cd "$d" && sha256sum -- game/* bloom/* chain/* models/* a2env.py vendor/*/* prereqs.txt manifest.json \
     armada2-refit-installer.py > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")

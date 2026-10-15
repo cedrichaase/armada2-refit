@@ -81,9 +81,8 @@ check 'grep -q "^  $pver " "$T/out"'
 
 echo "== install from the package, with the bottle's DLL overrides"
 "$X" --package "$zip" --game "$G" > "$T/out" 2> "$T/err" || { tail -30 "$T/out" "$T/err"; exit 1; }
-check '[ -e "$G/HUD.asi" ] && [ -e "$G/Lighting.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
-check '[ -e "$G/Sky.asi" ] && ls "$G/Sky/"*.ini > /dev/null'
-check '[ ! -e "$G/d3d9.dll" ] && [ ! -e "$G/MSAA.asi" ]'
+check '[ -e "$G/HUD.asi" ] && [ -e "$G/QOL.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
+check '[ ! -e "$G/d3d9.dll" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/BinkProxy.ini" ]'
 check 'grep -q "Installing the HUD" "$T/err"'
 check '! grep -q -e Traceback -e ModuleNotFoundError "$T/out" "$T/err"'

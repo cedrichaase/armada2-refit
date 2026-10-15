@@ -159,7 +159,7 @@ row 96, where the briefing's first pixels are 990 and 97 — about 7 levels dark
 the fog. Not the art: the installed tiles' alpha is byte-identical to stock at every
 edge, and 0 in those columns. Not texture wrap at the quad edge either: tiles made
 transparent but for an opaque right column and bottom row put nothing on their left or
-top edges. It was MSAA: the same art with `MSAA.ini` `Samples=0` has no line, and with 8
+top edges. It was MSAA: the same art with `MSAA.ini` `Samples=0` (the plugin then drawing the 3D view's anti-aliasing, since replaced by `Render3D.asi`'s `MSAA=`) has no line, and with 8
 it does. A quad from `n + 0.25` covers a quarter of pixel `n`, so some of its samples
 count, and MSAA shades that pixel once, at its centre — outside the quad, where the
 texture coordinate has run past 0 and wrapped to the sprite's far edge. The snap puts

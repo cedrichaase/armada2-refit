@@ -121,8 +121,8 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 
 `install.sh` and `install.ps1` with `A2_PROGRESS=1` print `::step <id> <what>` as each
 stage starts (`verify`, `prereqs`, `chain`, `hud`, `menus`, `qol`, `grid`, `models`,
-`lighting`, `sky`, `online`, `msaa`, `cutscenes`, `renderer`, `bloom`, `done`;
-`uninstall`). The window maps the ids to its status line
+`online`, `cutscenes`, `renderer`, `bloom`, `done`; `uninstall`; before 12.0.0 also
+`lighting`, `sky` and `msaa`). The window maps the ids to its status line
 (`STATUS` in the script: "Refitting the HUD", "Installing lighting"…) and fills its
 segmented bar: download 0–30 %, unpack, the script's steps 35–92 %, Heroic, done. A
 schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).

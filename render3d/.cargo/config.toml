@@ -1,0 +1,13 @@
+# Render3D.asi is a 32-bit Windows DLL with no C runtime, linked like the C plugins
+# (menus/build.sh): lld-link, /nodefaultlib, kernel32 through an import library that
+# build.rs generates from kernel32.def with llvm-dlltool --kill-at.
+[build]
+target = "i686-pc-windows-msvc"
+
+[target.i686-pc-windows-msvc]
+linker = "lld-link"
+rustflags = [
+    "-C", "target-feature=+sse2",
+    "-C", "link-arg=/nodefaultlib",
+    "-C", "link-arg=/entry:DllMain",
+]

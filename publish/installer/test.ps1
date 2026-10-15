@@ -13,7 +13,7 @@ $P = (Get-ChildItem -LiteralPath $T -Directory -Filter "armada2-refit-*").FullNa
 $D3d8to9 = Join-Path $PSScriptRoot "..\..\platform\vendor\d3d8to9-1.16.0\d3d8.dll"
 $D3d8to9Sha = "122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8"
 # install.sh's ::step ids, in order (manifest.json's "steps").
-$Steps = "verify prereqs chain hud menus qol grid models lighting sky online msaa cutscenes renderer bloom done"
+$Steps = "verify prereqs chain hud menus qol grid models online cutscenes renderer bloom done"
 function Check([string]$what, $ok) {   # $ok untyped: a [bool] parameter refuses strings
     if ($ok) { Write-Host "ok    $what" } else { throw "FAIL  $what" }
 }
@@ -57,8 +57,14 @@ $env:A2_PYTHON = $FakePy
 
 $G = Join-Path $T "Star Trek Armada II"; Mock $G
 function G([string]$n) { Join-Path $G $n }
+# What earlier packages and installs left: the per-part plugins Render3D.asi replaced.
+foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Fog", "Specials") {
+    Set-Content (G "$n.asi") "old"; Set-Content (G "$n.ini") "old"
+}
+New-Item -ItemType Directory (G "Sky") | Out-Null
+Set-Content (G "Sky\mbgaqu.ini") "old"; Set-Content (G "Sky\myown.ini") "[Sky]"
 
-Write-Host "== install on a GOG game: prerequisites, no DXVK, no ReShade, with progress"
+Write-Host "== install on a GOG game: prerequisites, no DXVK, no ReShade, with progress, the old plugins out"
 $env:A2_PROGRESS = "1"
 $out = Install @($G)
 $env:A2_PROGRESS = $null
@@ -74,13 +80,13 @@ Check "a d3d8.dll that is neither GOG's nor d3d8to9 left as it is" (((Text (G "d
     -not (Test-Path (G "d3d8.dll.gog-backup")) -and -not (Test-Path (G "d3d8.dll.a2chain-backup")) -and
     (Has $out "*left as it is: d3d8.dll is neither GOG*") -and -not (Select-String -Quiet -SimpleMatch "d3d8.dll" (G "armada2-refit-prereqs.txt")))
 Check "no d3d9.dll" (-not (Test-Path (G "d3d9.dll")))
-Check "no MSAA.asi" (-not (Test-Path (G "MSAA.asi")))
-foreach ($n in "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Planets", "Online") {
+foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Fog", "Specials") {
+    Check "$n.asi + $n.ini out" (-not (Test-Path (G "$n.asi")) -and -not (Test-Path (G "$n.ini")))
+}
+Check "the player's own recipe left, Sky.asi's gone" ((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "myown.ini")
+foreach ($n in "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Online") {
     Check "$n.asi + $n.ini" ((Test-Path (G "$n.asi")) -and (Test-Path (G "$n.ini")))
 }
-Check "Lighting, per vertex here" ((Test-Path (G "Lighting.asi")) -and (Test-Path (G "Lighting.ini")) -and (Has $out "*Lighting: per vertex*"))
-Check "Sky, the stock sky here" ((Test-Path (G "Sky.asi")) -and (Test-Path (G "Sky\mbgaqu.ini")) -and (Has $out "*Sky: the stock sky here*"))
-Check "every sky recipe" (@(Get-ChildItem (G "Sky")).Count -eq @(Get-ChildItem (Join-Path $P "sky")).Count)
 $log = Get-Content -LiteralPath $PyLog
 Check "the SOD rewrites, in order, with the game" (
     ($log[0] -like "*models\moon-sod.py --install") -and ($log[1] -like "game *Star Trek Armada II") -and
@@ -114,7 +120,7 @@ Check "no proxy files" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-
 $out = Install @($G)
 Check "the proxy back without A2_SKIP" (((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy") -and ((Text (G "binkw32_orig.dll")) -eq "stockbink"))
 
-Write-Host "== DXVK's d3d8.dll: the player's own choice, left as it is; MSAA on it"
+Write-Host "== DXVK's d3d8.dll: the player's own choice, left as it is; left as it is"
 Set-Content (G "d3d8.dll") "dxvk"
 Set-Content (G "ReShade.ini") "[GENERAL]"
 Add-Content (G "HUD.ini") "; mine"
@@ -122,8 +128,6 @@ $out = Install @($G)
 Check "prerequisites already installed" (Has $out "*STA2WidescreenPatch: already installed")
 Check "DXVK's d3d8.dll left, nothing recorded" (((Text (G "d3d8.dll")) -eq "dxvk") -and
     -not (Test-Path (G "d3d8.dll.a2chain-backup")) -and (Has $out "*d3d8.dll is DXVK's*"))
-Check "Lighting per vertex there" (Has $out "*Lighting: per vertex*")
-Check "MSAA.asi on DXVK's d3d8" (Test-Path (G "MSAA.asi"))
 Check "HUD.ini.bak kept" ((Get-Content (G "HUD.ini.bak") -Raw) -match "; mine")
 foreach ($f in "MagicBloom.fx", "ReShade.fxh", "ReShadeUI.fxh") {
     Check "shader $f" ((Get-Item (G "reshade-shaders\Shaders\$f")).Length -gt 0)
@@ -131,19 +135,13 @@ foreach ($f in "MagicBloom.fx", "ReShade.fxh", "ReShadeUI.fxh") {
 Check "A2Bloom.ini" (Test-Path (G "A2Bloom.ini"))
 Check "and as ReShadePreset.ini" ((Sha (G "ReShadePreset.ini")) -eq (Sha (G "A2Bloom.ini")))
 
-Write-Host "== no d3d8.dll: d3d8to9 goes in; MSAA only with DXVK's d3d9 behind it"
+Write-Host "== no d3d8.dll: d3d8to9 goes in"
 Remove-Item -LiteralPath (G "d3d8.dll")
 $out = Install @($G)
 Check "d3d8.dll is d3d8to9" ((Sha (G "d3d8.dll")) -eq $D3d8to9Sha)
-Check "Lighting and Sky in shaders (no notes)" (-not (Has $out "*Lighting: per vertex*") -and -not (Has $out "*Sky: the stock sky*"))
-Check "no MSAA.asi on Windows' own d3d9" ((-not (Test-Path (G "MSAA.asi"))) -and (Has $out "*MSAA.asi skipped*"))
 Set-Content (G "d3d9.dll") "dxvk"
 $out = Install @($G)
 Check "d3d8to9 already" (Has $out "*d3d8.dll: crosire's d3d8to9 already")
-Check "MSAA.asi on the d3d8to9 chain" (Test-Path (G "MSAA.asi"))
-Set-Content (G "d3d9.dll") "gogd3d8to9"
-$out = Install @($G)
-Check "no MSAA.asi without DXVK's d3d9" ((-not (Test-Path (G "MSAA.asi"))) -and (Has $out "*MSAA.asi skipped*"))
 Set-Content (G "d3d9.dll") "dxvk"
 
 Write-Host "== unzipped into the game directory, run with no argument"
@@ -164,7 +162,7 @@ Remove-Item -LiteralPath $PyLog
 Check "the player's own recipe left" ((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "myown.ini")
 Check "binkw32.dll is stock again" ((Text (G "binkw32.dll")) -eq "stockbink")
 Check "no binkw32 copies" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")))
-foreach ($n in "HUD", "Menus", "MSAA", "QOL", "QOLRules", "GridLayout", "Planets", "Lighting", "Sky", "Online") {
+foreach ($n in "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Online") {
     foreach ($e in ".asi", ".ini", ".log") { Check "$n$e removed" (-not (Test-Path (G "$n$e"))) }
 }
 foreach ($f in "BinkProxy.ini", "dxvk.conf", "A2Bloom.ini", "ReShadePreset.ini", "winmm.dll", "STA2WidescreenPatch.asi",

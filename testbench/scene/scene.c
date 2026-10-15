@@ -229,6 +229,10 @@ int _fltused = 0;   /* floats without the CRT */
 #define OBJECT_DEAD      0x113u      /* a byte Goto and Stop refuse an object on */
 #define CMD_GO           4           /* AiCommand: GO, a player's move */
 #define CMD_GO_WARP      0x2b        /* AiCommand: GO_WARP */
+#define CMD_BUILD        0x19        /* AiCommand: BUILD */
+#define SET_COMMAND_BUILD 0x4d1cb0u  /* GameObject::SetCommand(AiCommand, const GameObjectClass *, const Vector3 &, bool) */
+#define CLASS_FIND       0x4cd370u   /* GameObjectClass::Find(const char *odf), static */
+#define TEAM_ADD_RES     0x4988d0u   /* Team::AddResource(float, eResource): clamped to the team's maximum */
 
 #define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
 #define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
@@ -283,6 +287,9 @@ static const Sig k_sigs[] = {
     { PL_NEUTRALIZE,    8, { 0x53, 0x8B, 0xD9, 0x56, 0x33, 0xF6, 0x39, 0xB3 } },
     { CRAFT_SET_CREW,   8, { 0x55, 0x8B, 0xEC, 0xD9, 0x81, 0xC4, 0x01, 0x00 } },
     { TEAM_GET,         8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x8B, 0x04 } },
+    { SET_COMMAND_BUILD, 8, { 0x55, 0x8B, 0xEC, 0x64, 0xA1, 0x00, 0x00, 0x00 } },
+    { CLASS_FIND,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x8D, 0x4D } },
+    { TEAM_ADD_RES,     8, { 0x55, 0x8B, 0xEC, 0x51, 0x8B, 0x45, 0x0C, 0x56 } },
 };
 
 typedef void   (__cdecl    *UpdateRangeFn)(void);
@@ -319,6 +326,9 @@ typedef void   (__thiscall *PlFloatFn)(void *planet, float v);
 typedef float  (__thiscall *PlGetFloatFn)(void *planet);
 typedef void   (__thiscall *PlVoidFn)(void *planet);
 typedef BYTE  *(__cdecl    *TeamGetFn)(int team);
+typedef void   (__thiscall *SetCommandBuildFn)(void *go, int cmd, const void *cls, const float *pos, int flag);
+typedef void  *(__cdecl    *ClassFindFn)(const char *odf);
+typedef float  (__thiscall *TeamAddResFn)(void *team, float amount, int resource);
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -1280,6 +1290,51 @@ static void order_goto(char **t, int n)
     }
 }
 
+/* build <rig> <odf> <x y z | object>: order a construction ship to build a
+ * station at a point, the order a player's build button and click give (AiCommand
+ * BUILD with the station's class and the point, through the GameObject::SetCommand
+ * overload that ScriptInterfaceImp::SetCommandWhatWhoWhereVO ends in). The rig's
+ * team gets every resource topped up first (Team::AddResource, clamped to the
+ * team's maximum) so it can pay, and its engines are switched on. The rig flies
+ * there, opens and sends its worker bees; the station rises face by face with
+ * welding along its new edges (BuildingEffect). */
+static void order_build(char **t, int n)
+{
+    Obj   *o;
+    BYTE  *go, *team;
+    void  *cls;
+    float  at[3];
+    char   objname[32], b[200];
+    int    used, r, tn;
+
+    o = find_obj(t[1]);
+    go = o ? (BYTE *)craft_of(o) : NULLPTR;
+    if (!go) { logline("  ! not a craft in the scene"); return; }
+    cls = ((ClassFindFn)CLASS_FIND)(t[2]);
+    if (!cls) { logline("  ! no such class (an ODF name, without .odf)"); return; }
+    used = point_arg(t + 3, n - 3, at, objname);
+    if (!used) { logline("  ! usage: build <rig> <odf> <x y z | object>"); return; }
+    if (objname[0]) {
+        const float *tp = obj_pos(find_obj(objname));
+        at[0] = tp[0]; at[1] = tp[1]; at[2] = tp[2];
+    } else { at[0] += g_anchor[0]; at[1] += g_anchor[1]; at[2] += g_anchor[2]; }
+    tn = *(int *)(go + PL_TEAM);
+    team = tn >= 1 && tn <= MAX_TEAM ? ((TeamGetFn)TEAM_GET)(tn) : NULLPTR;
+    if (team)
+        for (r = 0; r < 4; r++) ((TeamAddResFn)TEAM_ADD_RES)(team, 100000.0f, r);
+    ((SiHandleBoolFn)SI_NO_ENGINES)(SI_INSTANCE, o->handle, 0);
+    o->attack[0] = 0;
+    ((SetCommandBuildFn)SET_COMMAND_BUILD)(go, CMD_BUILD, cls, at, 0);
+    b[0] = 0;
+    s_cat(b, "  ");
+    s_cat(b, o->name);
+    s_cat(b, " builds ");
+    s_cat(b, t[2]);
+    s_cat(b, " at ");
+    cat_vec(b, at);
+    logline(b);
+}
+
 static void run_command(char *line)
 {
     char *t[MAXTOK];
@@ -1428,6 +1483,7 @@ static void run_command(char *line)
         return;
     }
     if (s_eq(t[0], "goto") && n >= 3) { order_goto(t, n); return; }
+    if (s_eq(t[0], "build") && n >= 4) { order_build(t, n); return; }
     if (s_eq(t[0], "stop") && n >= 2) {
         if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
         ((SetCommandFn)SET_COMMAND)(craft_of(o), CMD_STOP, 0, 1, 0);   /* as ScriptInterfaceImp::Stop */

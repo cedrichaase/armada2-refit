@@ -33,22 +33,12 @@ it bundles.
 |---|---|---|
 | `hud/` | `HUD.asi` — the in-game HUD layout, font and cursors at any aspect | `hud/README.md` |
 | `menus/` | `Menus.asi` — the shell menus — and `backdrop.sh`, which builds the widescreen plates it composites | `menus/README.md`, `menus/BACKDROPS.md` |
-| `msaa/` | `MSAA.asi` | `msaa/README.md` |
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several, long moves on the map at warp), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
-| `lighting/` | `Lighting.asi` — ships and stations on the engine's own GPU vertex-buffer path, scene lights (warm key, dim blue fill, a faint sky light) in place of each map's own, planets with a night side, and light sources: nebulae, planets' day sides, explosions, torpedoes, phasers; shadows from the key; cloaked ships as thick glass | `lighting/README.md` |
-| `sky/` | `Sky.asi` — the map's sky computed from view direction by a shader, baked once per map into a cube, in place of the six painted faces; recipes per sky name in `sky/skies/` | `sky/README.md` |
-| `nebulae/` | `Nebulae.asi` — each nebula class with a recipe (latinum included) drawn as a volume of gas in place of its billboards: view-aligned slices through a baked volume, at half size; recipes per class in `nebulae/recipes/`. Not in the release package yet | `nebulae/README.md` |
-| `surfaces/` | `Surfaces.asi` — planets' surfaces (classes D, H, J, K, L, M), the dilithium moon's rock and the asteroids' made from recipes: a height field coloured by height, with relief, craters, fissures, oceans, ice and clouds, baked once per recipe into cubes; drawn and lit by `Lighting.asi`, which asks for them through `surfaces.h`. Recipes in `surfaces/recipes/`. Not in the release package yet | `surfaces/README.md` |
-| `explosions/` | `Explosions.asi` — each ship's and station's fireball ray-marched as a volume of gas (white flash, burning billows cooling to smoke, spectral noise, seeded per explosion) and each shockwave drawn as a band of fire matched to stock's disc, in place of stock's flipbook sprites and textured disc. Render only. Not in the release package yet | `explosions/README.md` |
-| `shields/` | `Shields.asi` — the ordinary shield hits drawn by a shader over the struck ship's shield ellipsoid (hot spot, ring, soft glow and rim, by faction, weaker as the shields run out) in place of the stock `Xshldx01` shell, and the shields-down ring as jagged arcs crackling over it (lighting the hull) in place of stock's turning `xshlddie` band. Not in the release package yet | `shields/README.md` |
-| `repair/` | `Repair.asi` — the welding on a ship under repair (stock's `xspark` sprites at the hardpoints of the system being repaired) drawn by shaders: a flickering arc with rays that lights the hull, a cooling hot spot, sparks streaking off. Not in the release package yet | `repair/README.md` |
-| `venting/` | `Venting.asi` — the plasma and gas a damaged ship vents (stock's `ventplas` and `ventgas` sprites, from the damage nodes' emitters) drawn by shaders: billowing puffs that cool as they fly, a glow and jet core at each vent that light the hull, one unbroken trail behind a moving ship. Not in the release package yet | `venting/README.md` |
-| `specials/` | `Specials.asi` — the warp flash (stock's `warp_sprite`) and the special weapons' shots and waves drawn by shaders from recipes per ODF in `Specials.ini`: beams, bolts and bands of light running out, lighting the hulls. The special weapons' shield shells are `Shields.asi`'s. Not in the release package yet | `specials/README.md` |
-| `fog/` | `Fog.asi` — the fog of war and the shroud in the 3D view drawn with smooth edges: a pixel shader over the engine's own draw of each reconstructs the scan grid's mask with a cubic filter and draws an antialiased edge, in place of the cell-by-cell staircase. Not in the release package yet | `fog/README.md` |
+| `render3d/` | `Render3D.asi` — the 3D view through a renderer of our own, in `no_std` Rust: both views of `Armada_RenderAllOurStuff` drawn into a half-float MSAA target, bloomed by energy and tone-mapped into the back buffer; seven modules of its own draw every category (hulls with the scene lights and shadows, sky, particles, ordnance, effects, planets, moons, asteroids and nebulae, fog and selection) from the game's assets, with its own cosmetic simulation (`PLAN.md`). It replaced the per-part plugins (MSAA, Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog and Planets), which were removed from the repository; their recipes live in `render3d/skies/`, `render3d/surfaces/` and `render3d/nebulae/`, and `render3d/install.sh` takes out any of those plugins an earlier install left. Not in the release package yet | `render3d/README.md`, `render3d/PLAN.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
-| `models/` | 3D geometry — the widened loading screen (`SOD`), `Planets.asi` (the planets' tessellation), the smoothed dilithium moons (`moon-sod.py`) and asteroids (`asteroid-sod.py`) | `models/README.md` |
+| `models/` | 3D geometry — the widened loading screen (`SOD`), the smoothed dilithium moons (`moon-sod.py`) and asteroids (`asteroid-sod.py`), and the other SOD rewrites. The planets' sphere is render3d's | `models/README.md` |
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
 | `platform/` | what `a2mod` never switches: DXVK, the ASI loader, Heroic/Proton; `vendor/` holds the third-party binaries we may redistribute | `platform/README.md` |
 | `testbench/` | `./a2test`: the game headless at any resolution, scenarios, reports. Installs nothing | `testbench/README.md` |
@@ -75,7 +65,11 @@ the install and a headless display. **Keep the ID `session start` prints, pass
 `--session ID` on every `drive`, and end with `./a2test session stop ID`** (the ID is
 required). Other jobs run sessions on the same bench: stop only the sessions you
 started, never one from `session list` you don't recognise (`testbench/README.md`,
-"Which session a command acts on"). Write regression scenarios in `testbench/scenarios/` for fixes
+"Which session a command acts on"). **The bench runs on the user's own GPU**: a GPU
+hang in a bench game crashed the user's desktop once, so run one game at a time
+(`a2test run -j 1`), at `--res 1280x720` unless fine detail is judged, and stop
+sessions promptly. Before driving the game, read `testbench/README.md`, "Operating the
+game: what agents learned", and the staging recipes in `testbench/operating/`. Write regression scenarios in `testbench/scenarios/` for fixes
 worth keeping fixed. A bench pass is evidence for the user, not their sign-off
 ("Finishing work" still applies).
 **To test a checkout as installed**, `./a2test session start --install <checkout>` (or
@@ -316,7 +310,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 ## a2mod
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
-  before/after: textures, font, HUD layout, the menus (`Menus.asi`), MSAA, `QOL.asi`, `GridLayout.asi`, `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Venting.asi`, `Specials.asi`, `Fog.asi`, cutscenes, the loading-screen
+  before/after: textures, font, HUD layout, the menus (`Menus.asi`), `QOL.asi`, `GridLayout.asi`, `Render3D.asi`, cutscenes, the loading-screen
   model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
@@ -583,7 +577,7 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `menus/install.sh` leaves them be. With no plate, `Menus.asi` draws black sides.
   `N.soften=` is a `Menus.ini` key, documented in `menus/README.md`.
 
-### msaa, postfx, platform
+### postfx, platform
 
 - **The game renders through DXVK/Vulkan.** The chain keeps a `d3d8.dll` (crosire's
   d3d8to9 since platform 3.2.0, which `./install` puts there so plugins can reach
@@ -598,8 +592,8 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   by size.** "Heroic redeploys DXVK" is `autoInstallDxvk` working as designed.
 - **Bloom** is vkBasalt, possible only because the chain is Vulkan. `postfx/postfx.py`
   refuses any effect `fxcheck` cannot compile.
-- **MSAA is an ASI hook** because nothing in DXVK or `dxcfg.ini` can turn it on. The
-  minimap is the one thing that could break (`msaa/README.md`).
+- **MSAA is render3d's**, on its own scene target, because nothing in DXVK or
+  `dxcfg.ini` can turn it on for the engine's back buffer.
 
 ### qol
 
@@ -645,247 +639,81 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   top level). The grid empties the bar's hotkey tables around the stock handler and
   points the menu toggles at a zero; nothing outside the bar reads those controls.
 
-### lighting
+### render3d
 
-- **`Lighting.asi` is the engine's own GPU path, switched on.** Stock draws only asteroid
-  fields through `ST3D_Standard_MeshVB`; the plugin enables it for every object type's
-  model, as the asteroid field does. Don't write a renderer of our own before reading
-  `lighting/README.md`.
-- **On that path the SOD material lies.** Its diffuse colour (red, brick, purple
-  leftovers) and ambient were never shown by the CPU path; the plugin replaces them. The
-  engine's colour at +0x28 is not an ambient term (it turned every hull pink).
-- **Planets already take the scene lights** (CPU path, `LightVertices_Lambert`). What
-  flattened them is their material's constant half-white term, which `Planets=` replaces;
-  judge a planet side on, since the Key comes from behind the usual camera.
-- **A mesh under a mirrored node matrix lights inside out** on the GPU path (the Akira's
-  distant mesh). `FixMirrored` reverses the lights for such a draw. Measuring normals
-  against a mesh's centre does not find these meshes: most stock meshes read as
-  "inward", and flipping them darkened the near hulls.
-- **The map's `dlight` objects are the scene lights**, one to three per map; the plugin
-  replaces them every frame. The axis convention is the engine's (`KeyAxis`).
-- **Point lights never reach the vertex-buffer path on their own**: `PreRender` copies
-  only directional lights. The plugin hands them over per draw (`pick_points`); any new
-  light source is a point light in the engine's list, and nothing more. A light the
-  CPU-lit planets must not take gets the plugin's no-op vtable, as the planet glow does.
-- **A soft point light goes to Direct3D mirrored through the draw's origin**: stock
-  normals point inward, and a light given where it is lights the far side of a hull.
-- **A nebula lights only while it counts as on screen**, by its bounding sphere, which
-  is smaller than its light's reach. `NebulaCull` widens the test, nothing else.
-- **`Shaders=1` binds its shaders in a d3d8 `DrawIndexedPrimitive` hook, inside
-  `VBRender` only**: the engine's `SetVertexShader(FVF)` becomes d3d9
-  `SetVertexShader(NULL)` under d3d8to9, so anything bound earlier is lost. Every d3d9
-  path must fall back when `d9_device()` is NULL (DXVK's d3d8). `platform/D3D9.md`.
-- **Bump-mapped hulls (in stock, the Borg alone) go the dot3 way**, which
-  takes precedence over the vertex buffers. `BumpShaders=1` wraps
-  `ST3D_Dot3_MeshVB::Render` and draws them in the hull shaders under d3d8to9. Their
-  normal is the SOD's vertex normal tilted by the map along S and T. Never use the
-  engine's S x T as the normal: it is summed from UV slopes and drew dark streaks where
-  UVs are mirrored.
-- **The bump path is the Borg's, and has its own profile** (`BorgAmbient`,
-  `BorgSpecular`, `BorgRimLight`, `BorgSun`, ...): dark plating, so the night lights
-  carry the look. The Federation tuning made them too bright in game. Any other hull
-  given a bump map would take the Borg profile; give it one of its own first.
-- **Any fade below 1 sends a hull to the CPU path**, out of the shaders: the engine sorts
-  every translucent instance there. `NearFade=1` keeps a faded craft on the vertex
-  buffers and draws it blended at the device's `Flush`, after everything else, as stock
-  draws sorted triangles; a new hull draw in shaders must hand a fading draw to
-  `fd_take` like `hook_dip`. A screen-door fade was tried and its pattern showed.
-- **The shadow map is last frame's hulls** (`Shadows=1`): drawn at the first hull draw
-  of a frame from the list the previous frame recorded, and each draw looks itself up
-  with its *previous* `WORLD` (matched by buffers and position), which is what keeps a
-  moving hull's shadow on itself from lagging. Any new hull draw in shaders must
-  `sm_take`/`sm_consts`/`sm_keep` like `hook_dip`, or it neither casts nor takes. The
-  pass restores the device through a state block; the map is default-pool, so `Reset`
-  is wrapped.
-- **`ALPHABLENDENABLE` is on for opaque hulls** (ONE, ZERO). Judge a draw blended by its
-  blend factors, never by that flag: 1.17.2 did, and left every hull out of the map.
-- **A cloak is two things, told apart by `cloak_state`**: while it comes on or goes off,
-  the vertex-alpha callback at the engine's +0x110; fully on, the engine's material
-  (+0x20) hung on the instance's +0x4, in place of every mesh's own. `Cloak=1` claims
-  both from `PolygonSortRequired` and draws the hull as glass at `Flush` over a copy of
-  the frame under it. A fully cloaked hull's texture is the cloak material's, so never
-  read the hull's look from it. On the bench, cloak with Scene.asi's `cloak` command:
-  `ScriptInterfaceImp::Cloak` wants the device researched and refuses.
-- **A mirrored draw needs its cull mode swapped** (`hook_dip`, `g_sh_sign > 0`): the
-  mirror flips the winding, and the Steamrunner, mirrored whole, drew inside out. A hull that goes dark
-  whole under shadows is drawn inside out, not acne: check the cull before the bias.
-
-### sky
-
-- **The cube is not drawn at all when a recipe applies**: the call to
-  `ST3D_Instance::Render` in `Background_Render` is the hook, and without a d3d9 device
-  or a recipe it calls through, so the stock sky stays. Don't install black faces for
-  it: they would turn the fallback black.
-- **The cube reaches Direct3D pre-transformed**, so the directions come from the
-  camera (`ProjectScreenPointToWorldRay` at the viewport's corners), not from the
-  cube's vertices.
-- **Per pixel cost 6 ms at 4K**; the sky is baked once per map into a managed cube
-  whose edge texels sit on the edges (no seam with or without seamless filtering).
-  Keep any new look inside `sky_colour()` so the bake and the reference agree.
-- **Aqua is meant to be dimmer and softer than stock**: the user preferred it so.
-- **A recipe's level and colour balance are its grade**, fitted to the stock faces by
-  `sky/grade.py` from a bench bake (`Dump=1`): refit after changing a palette or
-  `Brightness`, don't hand-tune `GradeGain=`. Aqua is left ungraded and `mbgrg` at its
-  toned-down level on purpose (`POLICY`).
-- **The cube is magnified ~3.4x at 4K**; detail finer than it comes from `Fine=` at
-  draw time, not from a bigger cube.
-
-### nebulae
-
-- **A class with a recipe skips its billboards, and only then**: `Nebula::Render` and
-  the LatinumNebula vtable's `GameObject::Render` return early for it. Without a recipe
-  or a Direct3D 9 device behind d3d8, the stock billboards. `Nebula::Render` still marks
-  the nebula on screen: `Lighting.asi`'s nebula lights depend on it.
-- **The HUD's action camera draws the scene a second time each frame.** Any per-frame
-  state (the slices' ladder) is kept per view, by viewport. Bench scenes with `Hud=0`
-  hide this.
-- **Slices sit on a ladder fixed in distance from the eye**, and the blue-noise
-  thresholds stay put from frame to frame. Moving either made the gas shimmer or
-  flicker in camera motion.
-- **The noise is spectral, not value noise**, and read turned off the world's axes,
-  twice: value noise's grid, through a threshold, drew walls through every field.
-- **`Opacity=` keeps the gas as bright from every angle** (half size only); the
-  composite is bound by its texture reads, so measure any new read there
-  (`Timing=1`).
-- **Ships' shadows in the gas are `Lighting.asi`'s shadow map**, borrowed through its
-  export `LightingShadowMap` (sampler 8, c32..c35). In that map a texel of 1 means no
-  hull, never a hull at the far end; compared as a depth, it shadowed all gas beyond the
-  hulls.
-- **A shadow takes only the Key's share of the gas's light** (`KeyShare=`, the Key from
-  `LightingKey`, c36..c37), scattered forward (`Scatter=`). Dimming self-lit gas by a
-  fraction left shafts invisible except in a difference image; they show looking
-  towards the Key, where lines of sight run down them.
-
-### surfaces
-
-- **`Surfaces.asi` draws nothing.** `Lighting.asi` owns the planets' draw (`GroundMesh`
-  slot 11) and the hulls' (`hook_dip`); it calls `a2_surface` (`surfaces/surfaces.h`) by
-  texture name and samples the cubes it gets. Change `surfaces.h` in both at once.
-- **A hull mesh's texture is `**(mesh + 0x114)`**, a list; reading `*(mesh + 0x114)` as
-  the texture crashed the game. Names sit at +0x8 of every database element.
-- **vkd3d unrolls every loop and chokes on a branch inside one**: write the Voronoi
-  searches branch-free (`step`/`lerp`); an `if` there took minutes to compile.
-- **The bake is one call**, because its height cube is in the default pool and must be
-  gone before any device `Reset`.
-- **The moon's cracks are holes, black as stock's are**: the rock is alpha-tested
-  (`Cut=`), and the glow shell shows only where a crack opens at the silhouette.
-- **A model is looked up about its mesh's centre, scaled to its extents** (`ST3D_Mesh`
-  +0xd4, positions +0xc0), never its origin: an asteroid's origin can sit on its surface.
-  The asteroids are `Mapping=triplanar`; the direction from the centre smeared their flat
-  faces into streaks. Fields draw `Master`, `Master1..5` and `Master7`, never 6 or 8.
-
-### explosions
-
-- **Only slot 15 (`Submit`) of the FireballExplosion and ShockwaveExplosion vtables is
-  ours.** `Lighting.asi` wraps slots 14 and 0 of FireballExplosion's and patches them
-  only while they still hold stock's pointers, and the ASI loader loads `Explosions.asi`
-  first: never touch those two. The draw wraps the call to `RenderChunks` at 0x598446,
-  because `Nebulae.asi` owns the next one (`RenderParticleList`).
-- **The draw writes its own depth** (`oDepth`, no depth writes): the hardware test then
-  applies where the fire's light comes from, so debris in front hides it and debris
-  inside it does not. A faded or cloaked hull is drawn at `Flush`, after us, so it
-  lies over the fire.
-- **vkd3d unrolls every loop and has no `tex3Dlod`**: the march is a fixed number of
-  steps, and the noise texture has one level so the implicit level inside the unrolled
-  branches cannot matter.
-- **The look was set on the bench against stock frozen at the same instant** (pause,
-  then `Enable=0`, which `Reload=1` picks up): judge a change that way, at RTS
-  distance as well as close up. Milky beige meant dim white light behind smoke, not
-  the colour ramp.
-
-### shields
-
-- **Types 0 and 1 are the plugin's** (`Xshldx01`, the ordinary hit; `xshlddie`, the
-  shields-down ring, untimed while the shields are down), and **types 2..7** (the
-  special weapons' shells, the corbomite reflector's among them) when `Shields.ini` has
-  a `[Shell.<name>]` for them: the call to `ShieldHit::DrawShield` in
-  `ShieldEffect::Render` skips those, every other calls through to stock. Without a
-  d3d9 device the stock shells stay.
-- **A shell type's name comes from the engine's name table** (0x6b00e0, what
-  `ShieldEffect::GetShieldType` searches), never from `m_logical_db`: its entries are
-  databases, not elements, and reading a name at +8 of one crashed the game at the first
-  hit. A shell with an identity frame (the corbomite reflector's) has no point struck
-  and is drawn over the whole ellipsoid.
-- **A hit's direction is recovered, not captured**: the instance transform is the hit's
-  frame times the shield-to-object 3x3 with its diagonal over the model's radius
-  (+0x40); row 2 times S'^-1 is the direction on the unit sphere. That follows a beam as
-  `ShieldUpdate` moves it. Don't re-derive it from the beam's end.
-- **The shields-down arcs must not turn**: the user asked for a readable effect that
-  does not show as a rotating pattern. They are the zero lines of warped gradient noise,
-  re-seeded in two fields half a step apart; their core is a constant pixel width (from
-  `fwidth`), which keeps them readable from RTS distance.
-- **A light another plugin adds is an ordinary `ST3D_Point_Light` registered after
-  `GameObject_PreRenderAll`** (here through the chained call to `Ordnance::PreRenderAll`
-  at 0x598199, which `Repair.asi` chains too): `Lighting.asi` picks it up as any point
-  light, hard if its fade is under a quarter of its start. Size its reach by the ship's
-  bounding radius: the shield's mean radius on a flat ship reached almost none of the
-  hull.
-- **Every hook is a chained call site** (DrawShield, RenderChunks, Ordnance::PreRenderAll,
-  the four weapon calls of `CreateShieldHit`): keep it so; `Scene.asi`'s `ShieldFx=0` and other plugins
-  write the same weapon sites.
-- **Render only**: nothing the simulation reads is written, so it stays
-  stock-compatible in multiplayer. The clock is wall time; `TimeScale=` is for looking.
-
-### repair
-
-- **A weld is told by the call that made it, never by its sprite**: hull-hit sparks and
-  other effects share `NodeParticleEffect`'s list and may share the `xspark` art. The
-  call to `AddParticle` in `Craft::RepairSystem` notes the new tail node (with its
-  handle, hardpoint and sprite, against reuse); the call to `DrawScaled3D` in
-  `NodeParticleEffect::Render` goes through a thunk that reads the node from `esi`.
-- **Hardpoints sit a little inside the hull**: a flare or hot spot drawn at one is hidden
-  by the hull unless pulled towards the camera (`Pull=`); sparks fly out and show anyway.
-- **Not the construction welding**: `BuildingEffect` (welding edges) and the worker
-  bees are separate effects, and stay stock.
-- **Render only**, as the shields: nothing the simulation reads is written. The sparks
-  age by the particle's own simulation time; the flicker by wall time.
-
-### venting
-
-- **A vent particle is told by its emitter's sprite node data, by name** (`ventplas`,
-  `ventgas`), looked up once per sprite: the damage emitters are ordinary spray emitters
-  in the SODs' `Damage` nodes, and the same particle lists carry every other emitter's.
-- **Copy a particle when the device is handed it; never keep the pointer**: it may be
-  freed before the next frame. The device can be handed one particle more than once a
-  frame (the instance's list, then each emitter's pass over it), so they are taken once.
-- **The vent's place comes from the emitter's `RenderInternal`** (slot 11 of the spray
-  vtable), where the engine's world matrix (0x7ad640) is the emitter node's; the youngest
-  particle trails a moving ship's nacelle by up to 0.15 s of flight.
-- **The plasma cools by its age to a steep power** (`PlasmaCooling=3`): a moving ship's
-  trail shows only its first second, and a gentle curve left it cream all along while
-  the parked plume looked right. Judge a colour change parked *and* moving
-  (`goto galaxy 2000 0 3500` in `SCENE=venting`).
-- **Render only**, as the shields and the repairs: nothing the simulation reads is
-  written.
-
-### specials
-
+- **It replaced twelve plugins (MSAA, lighting, sky, nebulae, surfaces, explosions, shields, repair, venting, specials, fog, planets), and they are gone.** What
+  they found is in `render3d/README.md` under each module; the old plugin files are
+  only recognised (so `install.sh` and `a2mod` can take them out of an old install). A
+  module switched off (`[Modules] <name>=0`) leaves that part to the *engine*, the stock
+  look: there is no plugin to fall back to. A module stands down while a stale copy of
+  its old plugin is loaded (`src/lib.rs`).
+- **The seam is the two calls of `Armada_RenderAllOurStuff`.** If either site is not
+  the stock call, render3d stands down and the game draws as stock. Without a
+  Direct3D 9 device behind d3d8 (DXVK's own d3d8) the body runs as stock too; every
+  d3d9 path must fall back when `d9_device()` is NULL (`platform/D3D9.md`).
+- **The HUD's action camera draws the scene a second time each frame.** Any per-view
+  state (the nebula slice ladder, the shadow map's list) is kept per view, by
+  viewport. Bench scenes with `Hud=0` hide this.
+- **Render only.** Nothing the simulation reads is written and nothing draws from
+  `g_random`; the cosmetic simulation (particles, debris, animation) is render3d's own,
+  on the sim clock. That keeps it stock-compatible in multiplayer.
+- **vkd3d unrolls every loop, chokes on a branch inside one and has no `tex3Dlod`.**
+  Write shader loops with a fixed count and branch-free (`step`/`lerp`); the volume
+  march and the Voronoi searches do. Quads of different recipes go in one draw
+  call, chosen per quad in the shader.
 - **A special weapon is told by its ODF, never its C++ class.** `Phaser`, `Missile` and
   `Bullet` are shared with the ordinary weapons (the Borg ion beam is a `Phaser`); the
-  ordnance class's `cPrjID` (+0x150) names it, and a recipe `[Ordnance.<odf>]` makes it
-  the plugin's. Waves likewise by the explosion class's `cPrjID` (+0x24), `[Wave.<odf>]`.
-- **The ordnance hook is five bytes of `Ordnance::RenderAll`** (0x58e6df: the ordnance put into `ecx` and
-  `Submit` called through its vtable), not a call site: the plugin checks them and stands down if another
-  plugin has them. `ShockwaveExplosion::Submit` (vtable slot 15) is shared with
-  `Explosions.asi`'s rings: each wraps whatever the slot holds, so a wave without a
-  recipe still reaches the rings.
-- **Write a recipe from the survey, not from the screen.** `Survey=1` logs what each
-  ordnance is. On the bench, lines that looked like special weapons were often the
-  ships' own phasers; a carrier's weapons must be on for a special to fire
-  (`Carrier::TriggerSelected`), and switching them off again stops a toggled beam.
-
-### fog
-
-- **The layers are the engine's draw; only the pixel stage is ours.** Each of
-  `Terrain_Geometry::Render`'s two `ST3D_Node::Render` calls (0x5933f5 fog, 0x593442
-  shroud) makes exactly one `DrawIndexedPrimitive`; the plugin binds a `ps_2_a` for it
-  and keeps the fixed-function vertex stage, so the diffuse colour (tint, opacity) is
-  stock's. Never `ps_3_0` there: it needs a `vs_3_0`.
-- **Don't make the fog textures bigger.** They hold one texel per scan-grid cell, so
-  there is nothing finer to put in them, and resizing them froze the game (`UImid`).
-- **The shroud is alpha-tested in stock**; the plugin blends it for the draw and puts
-  the four states back. Taps are held inside the grid's rectangle in the texture, or
-  the shroud thins along the map's border.
+  ordnance class's `cPrjID` (+0x150) names the ODF, and a recipe `[Ordnance.<odf>]`
+  makes it a special. Waves likewise by the explosion class's `cPrjID` (+0x24). Write
+  a recipe from the `Survey` log, not from the screen: on the bench, lines that looked
+  like special weapons were often the ships' own phasers.
+- **The hull look has a Borg profile of its own.** Bump-mapped meshes (in stock the
+  Borg alone) take the `Borg*` keys: dark plating, so the night lights carry the look.
+  The Federation tuning made them too bright in game. Normals are the SOD's winding
+  (inward, as the engine's: `scene::NORMAL_SIGN`); a **mirrored node swaps the cull**,
+  and needs no flip of its own (the Steamrunner drew inside out without it, and a hull
+  that goes dark whole under shadows is inside out, not acne).
+- **A cloak is two things**: while it comes on or goes off, the vertex alpha of a fade;
+  fully on, the engine's cloak material in place of every mesh's own. A fully
+  cloaked hull's texture is that material's, so never read the hull's look from it.
+  Faded hulls are drawn at `Step::Translucent`, far to near, not in the opaque pass.
+- **Point lights are the engine's list.** Any new light source is an ordinary point
+  light registered by a module's `lights()` after `GameObject_PreRenderAll` and
+  `Ordnance::PreRenderAll`, before the view reads the list; size its reach by the
+  ship's bounding radius (the shield's mean radius on a flat ship reached almost none
+  of the hull). A soft point light is given mirrored through the draw's origin, since
+  stock normals point inward. A nebula lights only while it counts as on screen, so
+  render3d still marks every nebula it reaches.
+- **Nebulae slices sit on a ladder fixed in distance from the eye**, per view, and the
+  blue-noise thresholds stay put from frame to frame; moving either made the gas
+  shimmer. The noise is spectral, not value noise (value noise's grid drew walls). In
+  the shadow map a texel of 1 means no hull, never a hull at the far end.
+- **The sky's settled looks stay**: Aqua is meant to be dimmer and softer than stock
+  (the user preferred it), soft billows and no filaments; a recipe's level and colour
+  balance are its grade, fitted by `render3d/perf/sky-grade.py` from a bench bake,
+  not hand-tuned. The cube is magnified a few times at 4K, so finer detail comes from
+  the draw, not a bigger cube. A recipe in `render3d/skies/` is built in; a
+  `Sky\<name>.ini` in the game directory takes precedence.
+- **Surfaces are looked up about a mesh's centre, scaled to its extents**, never its
+  origin (an asteroid's origin can sit on its surface); the asteroids are triplanar.
+  Fields draw `Master`, `Master1..5` and `Master7`, never 6 or 8. A hull mesh's texture
+  is `**(mesh + 0x114)`, a list: reading `*(mesh + 0x114)` as the texture crashed.
+- **The shields-down arcs must not turn**: the user asked for a readable effect that
+  does not show as a rotating pattern. A shell type's name comes from the engine's name
+  table, never `m_logical_db` (reading a name at +8 of one of its entries crashed).
+- **Hardpoints sit a little inside the hull**: a weld's flare drawn at one is hidden
+  unless pulled towards the camera. A weld is told by the call that made it, never
+  by its sprite (hull-hit sparks share the `xspark` art). A vent particle is told
+  by its emitter's sprite by name; copy a particle when it is handed over, never keep
+  the pointer. The plasma cools steeply with age; judge a change parked *and* moving.
+- **Don't make the fog textures bigger**: one texel per scan-grid cell, and resizing
+  them froze the game (`UImid`). The shroud is alpha-tested in stock; render3d blends it
+  so its edge can be soft, and holds its taps inside the grid's rectangle or the
+  shroud thins along the map's border.
+- **The planets are a sphere of render3d's own** (the world module): `Planet_Database`
+  re-tessellates its own sphere against a tolerance set for 640x480, and a denser
+  `PB_CLSS*.sod` drew pixel for pixel like stock, so don't re-try new planet meshes.
+  The dilithium moons are ordinary SODs smoothed by `models/moon-sod.py`.
 
 ### textures
 
@@ -934,14 +762,12 @@ both; **never ship one without the other.**
 
 **A SOD asks for a bump map** with a material spelled the Borg way (type 6, a second
 texture with word `0x200`). `hull-bump.py` gave the Federation hulls a flat one for
-per-pixel light and was removed in models 4.0.0, since `Lighting.asi` lights every hull
+per-pixel light and was removed in models 4.0.0, since render3d lights every hull
 per pixel; a height map derived from the hull art was rejected in game
 (`models/README.md`, "Bump maps on Federation hulls").
 
-**The planets' shape is not in their SOD.** `Planet_Database` builds its own sphere and
-re-tessellates it per frame against a facet tolerance set for 640x480; a 5120-triangle
-`PB_CLSS*.sod` drew pixel for pixel like stock. `Planets.asi` lowers that tolerance
-(`Detail=`). Don't re-try new planet meshes: `models/README.md`.
+**The planets' shape is not in their SOD**: `Planet_Database` builds its own sphere, and the
+planets are render3d's own (see its section). Don't re-try new planet meshes.
 
 **The dilithium moons are ordinary SODs**, smoothed by `models/moon-sod.py` (PN patches,
 lumpy shape kept). **Leave their glow shell stock**: it is blended, so the engine
