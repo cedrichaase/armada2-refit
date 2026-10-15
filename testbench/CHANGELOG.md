@@ -11,6 +11,8 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - Scenario `render3d-match`: an Instant Action match on render3d with every module on,
   a battle staged beside the Borg start by `Scene.asi`'s new `SCENE=match` (builds and
   hides nothing; fog off).
+- Scenario `render3d-mode-switch`: a display mode changed in Graphics Settings during
+  the `showcase` battle; render3d must take the new device and draw the same scene.
 
 ### Changed
 - Scenario `no-assets`: with render3d's modules in place of Sky, Explosions, Shields,

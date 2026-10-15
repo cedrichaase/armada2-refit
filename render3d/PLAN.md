@@ -196,5 +196,6 @@ Each branch starts from the commit that added this section and is merged into
   user's in-game sign-off is next.
 - Open: the fallbacks listed in README.md ("Still the engine's"); the `kbase` fog-of-war
   ghost's centre differs from stock (not node visibility, not the bay node); moon
-  cracks a little thinner than `Surfaces.asi`'s; no GPU timing; `Reset` (alt-tab, a
-  resolution change) not yet exercised on the bench.
+  cracks a little thinner than `Surfaces.asi`'s; no GPU timing; alt-tab (a true
+  `Reset`) not exercised on the bench, which has nothing to switch to. A display mode
+  changed in a battle (a new device) is: `render3d-mode-switch`, run 20261015-172844.

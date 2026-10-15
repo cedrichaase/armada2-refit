@@ -20,7 +20,8 @@ Layers: render3d 0.2.0, testbench 3.17.0.
 - `./install` runs `render3d/install.sh` last; it takes out the plugins its modules
   replace: Sky, Explosions, Shields, Repair, Fog, Specials, Venting, Surfaces, Nebulae
   and Lighting. Scenario `no-assets` checks the modules instead; scenario `render3d-match` plays a
-  match with a battle on render3d (testbench 3.17.0).
+  match with a battle on render3d, and `render3d-mode-switch` changes the display mode
+  in one (testbench 3.17.0).
 
 Installed, not yet seen in game.
 

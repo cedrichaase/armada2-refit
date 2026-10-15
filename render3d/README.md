@@ -106,7 +106,12 @@ frame's delay.
 **Reset.** Every target is in the default pool and must be gone before the device
 resets. Slot 14 of the d3d8 device's vtable (`Reset`) is chained, as `Lighting.asi`
 chains it: render3d drops its targets and passes on the call, and makes new ones at
-the next frame, at the new size.
+the next frame, at the new size. A display mode chosen in Graphics Settings is not a
+`Reset`: the engine releases its device and creates another. The first frame on a
+device render3d has not seen ("frame: a new device") drops the frame's state, hooks
+the new device's `Reset` and hands the device to every module, which makes its
+resources again; scenario `render3d-mode-switch` checks it, from 1080p to 1024x768
+in a running battle.
 
 **Without Direct3D 9.** The d3d9 device is asked for behind the game's d3d8 one
 (`platform/D3D9.md`). Under DXVK's own d3d8, or when the targets cannot be made, the
