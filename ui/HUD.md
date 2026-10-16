@@ -370,6 +370,23 @@ backing, and below them, while a region is shown, a field with the prompt in the
 accent, the text and the caret. The keys are never ours: `TextInput_ProcessInput`
 reads them from the engine's input as before.
 
+### Seen on the bench
+
+2026-10-16, 1280x720, the shell's theme (the race's theme is another agent's work):
+Instant Action as the Borg showed Crew, Power Nodes ("16/600", the Borg's officers),
+Dilithium and Metal, counting; the Federation campaign and the tutorial Crew,
+Officers, Dilithium, Latinum and Metal. Every top-right button pressed its stock
+function: more (menu, help and palette appeared), help (drawn active), idle (an
+Assembler selected, the camera on it), view, palette (the bar hid and came back),
+menu (the in-mission OPTIONS menu, Return to Game back), objectives (the box). The
+game's tooltips showed, the verbose one after a rest. The pause key showed our box
+("GAME PAUSED", "CONTINUE"), CONTINUE and the pause key both unpaused. Typing in chat
+showed the line with the caret where the engine has it; the pause lines showed in
+the chat. The Federation briefing and the tutorial's lesson boxes showed in ours,
+closed on OK and on Return (by their own step), and the tutorial advanced on Return
+and zoomed on the wheel as with the stock box. The intro's centre lines showed as
+ours. `testbench/scenarios/ui-hud-panels.md` and `ui-hud-panels-objectives.md`.
+
 ### Not done here
 
 - **`CommDisplay` / `CommBar`, `DropPlayerBox`, `LoadPercentageBox`** (multiplayer).
