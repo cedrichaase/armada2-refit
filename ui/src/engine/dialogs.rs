@@ -1151,7 +1151,7 @@ fn run_modal(h: HWND) -> isize {
     let mut last_report = started;
     let depth = slot_of(h).map_or(0, |s| s.depth);
     if depth == 1 {
-        crate::menus::backdrop::begin();
+        crate::menus::backdrop::begin(slot_of(h).map_or("", |s| screen_name(s.proc_addr)));
     }
     let result;
     loop {

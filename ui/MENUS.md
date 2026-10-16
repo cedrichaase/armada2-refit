@@ -692,7 +692,11 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   `tutorials`, `federation`, `klingon`, `borg`), `federation` on each visit until one
   is (the mission list over the campaign selection keeps its view); never over a
   mission (`backdrop::over_mission`). render3d moves the camera from one view to the
-  next across the map.
+  next across the map. A dialog opened within 1.5 s of the last one closing keeps the
+  mission's picture (Options handing over to Load Game), and aborting a mission opens
+  Options, the admiral's log and the campaign selection in turn. So the main menu and
+  the campaign selection, which no mission opens, drop it (`backdrop::begin`); else the
+  scene stayed off after an abort (`ui-menus-scene-abort`).
 - **How it is asked for.** `Render3D_MenuScene(name, x, y, w, h)`, render3d's one
   export, looked up once with `GetModuleHandleA("Render3D.asi")` and
   `GetProcAddress`. It draws into the whole back buffer and returns 1, or 0 when it

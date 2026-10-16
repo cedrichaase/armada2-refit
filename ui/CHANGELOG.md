@@ -13,6 +13,11 @@ versions". Newest first. Details are in [`README.md`](README.md).
   Menu. Pointing at a campaign moves render3d's camera to its scene (needs render3d
   0.9.0). UI.log notes `menus: campaign emblems`.
 
+### Fixed
+- After a mission was aborted the campaign selection drew without the menu scene: the
+  mission's picture was handed on from Options to the admiral's log to it. The main
+  menu and the campaign selection now drop it (`backdrop::begin`).
+
 Installed, not yet seen in game.
 
 ## 0.7.0 — 2026-10-16

@@ -20,6 +20,8 @@ Layers: ui 0.8.0, render3d 0.9.0, testbench 3.26.0.
 ### Fixed
 - Ships in the menu scene cast shadows, and cut-out meshes (half a Borg fusion cube)
   cast theirs in missions too (render3d 0.9.0).
+- After an aborted mission the campaign selection is over the menu scene again, not
+  the stock look (ui 0.8.0).
 
 Installed, not yet seen in game.
 
