@@ -16,7 +16,7 @@
 //! calls, made in the panel's always-step.
 use crate::engine::radar::{self, Kind};
 use crate::engine::{hud, sprite};
-use crate::gfx::{fade, mix, rgba, Color, Corners, Tex, Weight, R};
+use crate::gfx::{fade, rgba, Color, Corners, Tex, Weight, R};
 use crate::widgets::{Align, Ui};
 use alloc::vec::Vec;
 
@@ -222,7 +222,7 @@ pub fn run(ui: &mut Ui) {
         if let Some(g) = radar::fog_grid() {
             update_layer(&mut s.fog, &g, teams);
             if let Some(tex) = s.fog.tex {
-                ui.draw.image(tex, grid_rect(sq, &g), fade(mix(t.panel, 0xff000000, 0.4), 0.55));
+                ui.draw.image(tex, grid_rect(sq, &g), fade(SHROUD, 0.6));
             }
         }
     }

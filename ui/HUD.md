@@ -285,8 +285,8 @@ sprite for every hidden cell, the grid centred in the sprite's texture (`+0x1c` 
 `+0x20` its size; 128x128 too). Ours builds one A8R8G8B8 texture per layer at the
 grid's own size, white and opaque where hidden, rebuilt only when the packed
 visibility bits (or the team mask) changed, and draws it tinted over the grid's
-rectangle in the square: the fog a translucent dark, the shroud the opaque slate of the
-3D view's shroud. Grid row 0 is the square's top (seen on the bench: the clearing
+rectangle in the square: the shroud opaque in the slate of the 3D view's shroud, the
+fog in the same slate at 60%. Grid row 0 is the square's top (seen on the bench: the clearing
 follows a ship sent north). The engine's textures are never resized or replaced
 (CLAUDE.md: `UImid` froze the game).
 
