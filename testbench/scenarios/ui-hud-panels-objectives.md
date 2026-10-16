@@ -10,7 +10,8 @@ Interface" opens its objectives box at the start and advances its lessons on Ent
 so it shows both that the box is ours and that the keys stay the engine's: Enter
 closes the box through the stock box's own key step. The first lesson is zooming
 ("Zoom your view in or out by scrolling the mouse wheel"); once the wheel has turned,
-Enter advances to the second lesson, whose box opens with "Select the Enterprise".
+Enter advances to the second lesson, whose box opens with "Select the Enterprise"
+a few seconds later.
 The intro's centre lines ("Retinal Authorization Status: ...") are the overlay
 messages. The Academy is the top-left panel of the single player
 screen; its first mission button is at 621,158 and O.K. at 555,580 (1280x720).
@@ -27,7 +28,7 @@ screen; its first mission button is at 621,158 and O.K. at 555,580 (1280x720).
 10. Wait up to 300 seconds for the mission to start.
 11. Wait 3 seconds.
 12. Expect "UI.log" contains "overlay: #".
-13. Expect "UI.log" contains "objectives: \"Tutorial: User Interface\"".
+13. Expect "UI.log" contains "3 objectives: [ ] Zoom your view".
 14. Take a screenshot called "objectives".
 15. Check that a window titled TUTORIAL: USER INTERFACE is in the middle of a dimmed screen, with a BRIEFING SUMMARY heading and text, an OBJECTIVES heading with three lines each beginning with an empty check box, and an OK button at the bottom right, drawn in the UI's flat style, not the stock grey metal panel.
 16. Move the mouse to 640,600.
@@ -38,7 +39,7 @@ screen; its first mission button is at 621,158 and O.K. at 555,580 (1280x720).
 21. Scroll the mouse wheel up 3 times.
 22. Wait 2 seconds.
 23. Press Return.
-24. Wait 3 seconds.
+24. Wait up to 30 seconds for "Select the Enterprise".
 25. Expect "UI.log" contains "Select the Enterprise".
 26. Take a screenshot called "lesson 2".
 27. Check that the objectives window is shown again, now with the objective "Select the Enterprise".
