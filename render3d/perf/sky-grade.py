@@ -191,6 +191,8 @@ def main():
         recipe = os.path.join(HERE, '..', 'skies', r + '.ini')
         if not os.path.exists(recipe) or (only and r not in only):
             continue
+        if r == 'mbgblue' and 'mbg02' in os.listdir(dump) and (not only or 'mbg02' in only):
+            continue  # the same model as mbg02, whose grade it is given
         hs = histograms([os.path.join(dump, r, f'{i}.tga') for i in range(6)], True)
         ht = histograms(stock_faces(r), r not in ('mbg02', 'mbgblue'))
         ms, mt = [mean(h) for h in hs], [mean(h) for h in ht]

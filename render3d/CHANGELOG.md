@@ -4,6 +4,21 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.2.1 — 2026-10-16
+
+### Changed
+- Sky: the recipes draw the broad gas only. `Grain=` and `Dust=` are gone from every
+  recipe in `skies/`, and `Fine=` (the draw-time detail) defaults to `0` (off); the keys
+  remain. `GradeGain=`/`GradeCurve=` refitted to the stock faces without them, three
+  passes of `perf/sky-grade.py` (0.89-0.92 of stock's luminance; `mbgrg` 0.55, Aqua
+  ungraded, as before).
+
+### Fixed
+- `perf/sky-grade.py`: `mbgblue` is no longer fitted again on top of the `mbg02` grade
+  it is given (it wrote gains of 18-19).
+
+Installed, not yet seen in game.
+
 ## 0.2.0 — 2026-10-15
 
 ### Added

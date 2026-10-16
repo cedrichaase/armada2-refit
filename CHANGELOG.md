@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.1.0 — 2026-10-16
+
+Layers: render3d 0.2.1, testbench 3.18.0.
+
+### Changed
+- The procedural skies lose their grain, dust and draw-time fine detail, and their
+  grades are refitted to stock without them (render3d 0.2.1).
+
+### Added
+- Bench scene `sky`: the sky alone (testbench 3.18.0).
+
+Installed, not yet seen in game.
+
 ## 12.0.0 — 2026-10-15
 
 Layers: render3d 0.2.0, models 5.0.0, testbench 3.17.0.

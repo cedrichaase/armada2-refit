@@ -580,7 +580,7 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
 | `Reload` | 1 | re-read `Sky\<name>.ini` in the game directory every 30 views when it changes |
 | `Dump` | 0 | 1: each bake writes its faces to `Sky\<name>.dump0..5.tga` for `perf/sky-grade.py` |
 | `StarLift`, `SunLift` | 0.5, 1 | how far past white the brightest texels of the point stars and of the suns go (0: stock's light) |
-| `Load` | | bench only: a background name to load in place of the map's (`Starfield_Load_Background_Geometry`), once per new value |
+| `Load` | | bench only: a background name to load in place of the map's (`Starfield_Load_Background_Geometry`), once per new value. With `Recipes=0`, a cube SOD loaded after another draws black (seen 2026-10-16 for `mbgbaku`, `mbgborg`, `mbgdom1` and `mbgkling` after `mbg02`); for a stock reference across several skies use `Draw=0`, the engine's own draw, which shows them all |
 
 Seen on the bench (2026-10-15, `a2_borg01`, 1920x1080), each against the engine's own
 draw in the same session and frame (`Draw=0`, paused): the stock faces of `mbgaqu`,
@@ -620,7 +620,7 @@ aims at.
 | `Grain`, `Dust`, `Haze` | | detail: grain (amount, scale times `Scale`, gain between octaves), dust (amount, scale, coverage), haze (amount, coverage); amount 0 is off |
 | `Stars` | 0,1,0.5,0 | how many over the sphere, brightness, size (degrees), in-gas weight; `StarA`, `StarB`: the two ends of the colours |
 | `GradeGain`, `GradeCurve` | 1,1,1 | the grade per channel, `gain * in^curve`, after `Brightness` and before the stars |
-| `Fine` | 0.1,0.3,0.55 | detail finer than the cube, at draw time: amount (0: off), the largest octave's size (degrees), gain between octaves. The cube is magnified about 3.4x at 4K, so finer detail comes from here, not from a bigger cube |
+| `Fine` | 0,0.3,0.55 | detail finer than the cube, at draw time: amount (0: off, the default: the skies keep to the broad gas, as stock), the largest octave's size (degrees), gain between octaves. The cube is magnified about 3.4x at 4K, so finer detail comes from here, not from a bigger cube |
 
 Edit a recipe in the game directory's `Sky\` with the game running and it re-bakes
 within half a second (`Reload=1`). **The grade** is fitted, not hand-tuned:

@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.18.0 — 2026-10-16
+
+### Added
+- Scene `sky` (`SCENE=sky`): no objects, the free camera at the middle of the map
+  looking out, for judging the skies on their own.
+
+Installed, not yet seen in game.
+
 ## 3.17.0 — 2026-10-15
 
 ### Added
