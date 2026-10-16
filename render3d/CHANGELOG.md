@@ -16,7 +16,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   `Widen`, `Flash`, `FlashTime`), `[Group] WarpColour`, `[View] WarpEye`/`WarpTarget`,
   `[Ship] Warp`; the map's starbase stays (`Warp=0`) and the Borg's tunnel is green.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.9.0 — 2026-10-16
 

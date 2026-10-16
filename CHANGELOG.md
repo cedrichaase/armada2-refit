@@ -18,7 +18,7 @@ Layers: ui 0.9.0, render3d 0.10.0, testbench 3.27.0.
 - The loading screen is redrawn inside long loading steps too, after each model and
   texture loads (ui 0.9.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.17.0 — 2026-10-16
 

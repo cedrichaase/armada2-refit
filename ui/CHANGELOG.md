@@ -17,7 +17,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
 - UI.log names each stretch of 100 ms or more with no loading frame presented, with
   its step and what loaded in it (`loading: still`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.8.0 — 2026-10-16
 

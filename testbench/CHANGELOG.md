@@ -18,7 +18,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `Wait for the briefing` presses Space at every look until the briefing shows, which
   skips a campaign mission's opening cinematic (`ui.json` screen key `skip`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.26.0 — 2026-10-16
 
