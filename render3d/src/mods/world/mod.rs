@@ -40,6 +40,23 @@ pub struct World {
     checked: f64,
 }
 
+/// The module, for the overlays' ghosts (set at every view).
+static mut ME: *mut World = core::ptr::null_mut();
+
+/// A planet's fog-of-war ghost (`overlays::ghosts`), drawn on our sphere like the
+/// planet itself; false if it is not a planet's or planets are the engine's.
+pub fn planet_ghost(sp: usize, v: &View) -> bool {
+    let me = unsafe { ME };
+    if me.is_null() {
+        return false;
+    }
+    let me = unsafe { &mut *me };
+    if !(me.enable && me.on_planets) {
+        return false;
+    }
+    me.planets.draw_ghost(sp, v, &mut me.surfaces)
+}
+
 impl Default for World {
     fn default() -> World {
         let ini = crate::config::ini();
@@ -133,6 +150,7 @@ impl Module for World {
         }
     }
     fn begin_view(&mut self, v: &View) {
+        unsafe { ME = self as *mut World };
         if v.main && self.reload {
             let now = crate::rt::now();
             if now - self.checked > 1.0 {

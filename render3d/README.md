@@ -949,7 +949,15 @@ team colour times `ghostTeamColorFactor` (`Ghost+0x28`) on team faces, culled by
 instance), opaque: on the bench a ghost is near black and hides what is behind it.
 Here: texture times (the material's ambient + its diffuse times the directional
 lights), the team faces tinted, self-illuminated texels lit as on a hull (the windows
-show on stock's ghosts too). A spirit that does not show a plain SOD (a planet's, an
+show on stock's ghosts too). A planet's spirit (its instance copy a `PlanetInstance`,
+vtable 0x6b2ce4, over a `Planet_Database`) goes to the world module, which draws it
+on its own sphere with the planet's ground and shell, culled as the spirit's `Render`
+culls (`DistanceCull`), without the race's tint or cities (they live on the object):
+left to its own `Render`, a fogged planet came back as the engine's low-polygon sphere
+and stock texture. Stock dims it: on the bench (`scenarios/render3d-planet-ghost.md`)
+stock's planet ghost is 0.20 of the seen planet's brightness, so every pass's colour
+is scaled by `[World] PlanetGhost` (0.2; `shine.w` in `world_planet.hlsl`, 1 for a planet
+seen), which measures 0.22 there. Any other spirit that does not show a plain SOD (an
 asteroid field's, a nebula's) is left to its own `Render`, under stock's state
 (`Storm3D+0xa8` the material, `+0x4` 0.5, `+0x34` the tint).
 
@@ -1299,7 +1307,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `Nebulae\`, where an edited copy is re-read while the game runs); see "Recipes" below. Settings in `[World]` (the parts: `Planets`, `Rocks`, `Nebulae`,
 `Surfaces`; the planet look under `Lighting.ini`'s names: `PlanetAmbient`, `PlanetDusk`,
 `PlanetWrap`, `PlanetFill`, `PlanetSun`, `PlanetHaze*`, `PlanetGlint*`, `CityLights`,
-`CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
+`CityLightColour`, `PlanetHalo*`, `PlanetGhost`; the rocks' `RockAmbient`, `RockSpecular*`,
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
 `MoonCrackCore`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,

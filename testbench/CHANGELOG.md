@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.29.0 — 2026-10-17
+
+### Added
+- Scene `fog-planet` and scenario `render3d-planet-ghost`: a class M planet left as a
+  fog-of-war ghost, which keeps render3d's sphere and surface.
+
+Installed, not yet seen in game.
+
 ## 3.28.0 — 2026-10-17
 
 ### Added
