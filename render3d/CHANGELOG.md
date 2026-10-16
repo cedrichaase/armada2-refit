@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.10.1 — 2026-10-17
+
+### Fixed
+- A departure's warp flashes drew as hard-edged boxes: the `warp_sprite` art's core is a
+  flat white diamond and its halo reaches its border, and at four times stock's light
+  both showed. The flash now fades round from near its centre (`flash_ps`) at 1.5 times
+  stock's light.
+
+Installed, not yet seen in game.
+
 ## 0.10.0 — 2026-10-17
 
 ### Added

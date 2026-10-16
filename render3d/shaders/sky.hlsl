@@ -1,4 +1,4 @@
-// entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY bake_ps:ps_3_0:PS_BAKE down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE tunnel_ps:ps_3_0:PS_TUNNEL
+// entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY bake_ps:ps_3_0:PS_BAKE down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE tunnel_ps:ps_3_0:PS_TUNNEL flash_ps:ps_3_0:PS_FLASH
 // The background of the 3D view (src/mods/sky/): the procedural sky ported from
 // Sky.asi (its settled looks kept), the stock cube's faces, and the sprites of the
 // starfield and of the background objects (the suns).
@@ -362,4 +362,23 @@ float4 tunnel_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
     // A bright point dead ahead, where the streaks come from.
     glow += lerp(k_tcol.rgb, 1.0, 0.5) * exp(-r * r / 0.0015) * 0.9;
     return float4((col + glow) * k, k * k_tun.z);
+}
+
+// A departure's warp flash (src/menu/, Pass::Warp): the stock warp_sprite, additive like
+// sprite_ps, faded to nothing well inside the sprite's edge. The art's halo has light at
+// its border (12/255 on the middle row) and its core is a flat white diamond: drawn
+// brighter than stock into the HDR frame, both showed as a hard-edged box.
+// c32: the sprite's rectangle in the texture (u, v, width, height).
+float4 k_frect : register(c32);
+
+float4 flash_ps(SprOut i) : COLOR
+{
+    float2 q = (i.uv - k_frect.xy) / k_frect.zw * 2.0 - 1.0;
+    // Round and soft from near the centre out: the art's core is a flat white diamond,
+    // which at more than stock's light reads as a hard-edged box.
+    float edge = 1.0 - smoothstep(0.12, 0.95, length(q));
+    float3 t = tex2D(s_tex, i.uv).rgb;
+    float peak = max(t.r, max(t.g, t.b));
+    float lift = 1.0 + i.col.a * smoothstep(0.75, 1.0, peak);
+    return float4(t * i.col.rgb * lift * edge * edge, 1.0);
 }

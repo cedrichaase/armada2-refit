@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.18.1 — 2026-10-17
+
+Layers: render3d 0.10.1, ui 0.9.1.
+
+### Fixed
+- The warp flashes of the menu scene's departure no longer show as boxes (render3d
+  0.10.1).
+- The campaign selection keeps its campaigns' names in order after an aborted mission
+  (ui 0.9.1).
+
+Installed, not yet seen in game.
+
 ## 12.18.0 — 2026-10-17
 
 Layers: ui 0.9.0, render3d 0.10.0, testbench 3.27.0.

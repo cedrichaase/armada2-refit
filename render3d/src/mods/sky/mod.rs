@@ -130,6 +130,7 @@ pub struct Sky {
     vs_spr: Shader,
     ps_spr: Shader,
     ps_tunnel: Shader,
+    ps_flash: Shader,
     quad_decl: Decl,
     face_decl: Decl,
     spr_decl: Decl,
@@ -159,6 +160,7 @@ impl Default for Sky {
             vs_spr: Shader::vertex(&VS_SPRITE),
             ps_spr: Shader::pixel(&PS_SPRITE),
             ps_tunnel: Shader::pixel(&PS_TUNNEL),
+            ps_flash: Shader::pixel(&PS_FLASH),
             quad_decl: Decl::new(&QUAD_DECL),
             face_decl: Decl::new(&scene::VERTEX),
             spr_decl: Decl::new(&SPRITE_DECL),
@@ -528,7 +530,16 @@ impl Sky {
             for (at, half, bright) in flashes {
                 self.batch.billboard(&info, at, right, up, half, half, [bright, bright, bright, 1.0]);
             }
-            self.draw_batch(v, &vp);
+            // The sprite shader with the fade to its edge (`flash_ps`): the art's halo
+            // reaches its border, which showed as a box at the menu's brightness.
+            if self.vs_spr.bind(dev) && self.ps_flash.bind(dev) && self.spr_decl.bind(dev) {
+                dev.ps_const(32, &info.uv);
+                for (st, val) in [(RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
+                    (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_SRGBWRITEENABLE, 0)] {
+                    dev.set_rs(st, val);
+                }
+                self.batch.draw(dev, &vp);
+            }
         }
         let Some(tn) = shot.tunnel else { return };
         let Some(inv) = vp.inverse() else { return };
