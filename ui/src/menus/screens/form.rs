@@ -66,7 +66,7 @@ pub fn build<'a>(s: &'a Screen, combos: &[(i32, usize)]) -> Form<'a> {
     let note = footnote(s).map(|c| c.key);
     let mut labels: Vec<&Control> =
         s.model.controls.iter().filter(|c| is_label(c) && c.visible && !c.text.is_empty() && Some(c.key) != title && Some(c.key) != note).collect();
-    let mut fields: Vec<&Control> = s.model.controls.iter().filter(|c| c.visible && ((is_button(c) && !is_footer(c) && c.rect[1] < 500) || is_scroll(c))).collect();
+    let mut fields: Vec<&Control> = s.model.controls.iter().filter(|c| c.visible && ((is_button(c) && !is_shell_combo(c) && !is_footer(c) && c.rect[1] < 500) || is_scroll(c))).collect();
     fields.sort_by_key(|c| (c.rect[1], c.rect[0]));
 
     // End captions: labels that share a rectangle.
@@ -251,4 +251,11 @@ fn field_row<'a>(ui: &mut Ui, s: &Screen, c: &'a Control, label: Option<&Control
             stock_button(ui, s, c, r, hot);
         }
     }
+}
+
+/// A shell `ComboBox` (`engine::shellcombo`): on the settings screens the hidden Win32
+/// combo box behind it is the field (a choice is its own selection), so the shell widget
+/// is not a field of its own; drawn as one, it took the combo's caption.
+fn is_shell_combo(c: &Control) -> bool {
+    matches!(c.what, What::Shell(crate::engine::shellui::Kind::Combo))
 }

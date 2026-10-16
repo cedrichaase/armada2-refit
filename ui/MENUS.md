@@ -597,10 +597,11 @@ its body.) `do_fail_mission` (0x6077c0) is never called. What follows a mission 
 it, that mission's name, and the game loads it at once, so the next thing on screen is
 its cinematic and then the loading screen (`LOADING.md`, ours with `[Loading]
 Enable=1`); after the last of the last campaign, the Credits; when the campaign is
-complete, the single-player screen; after a lost one, back to the shell. The Admiral's
-Log comes up between missions only when no next mission is queued (`GameDoOne`), and it
-is a dialog, hosted with its spec. So `[Menus] Enable=1` needs nothing for a mission's
-end, and its outcome is the stock one by construction. `testbench/scenarios/
+complete, the single-player screen; after a lost one, back to the shell. **On the
+bench the Admiral's Log came up after the first Federation mission was won** (2026-10-16,
+`Scene.asi`'s `succeed`), before the next mission, which the reading above did not
+predict; it is a dialog, hosted with its spec, so `[Menus] Enable=1` still needs nothing
+of its own for a mission's end, and its outcome is the stock one by construction. `testbench/scenarios/
 ui-menus-success.md` wins and loses the first Federation mission with `Scene.asi`'s
 `succeed` and `fail` and checks what comes next.
 
