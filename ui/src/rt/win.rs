@@ -61,6 +61,7 @@ unsafe extern "system" {
     pub fn OutputDebugStringA(s: *const u8);
     pub fn ExitProcess(code: u32) -> !;
     pub fn GetCurrentThreadId() -> u32;
+    pub fn GetCurrentProcessId() -> u32;
 }
 
 // ---- user32 -----------------------------------------------------------------------
@@ -113,6 +114,8 @@ unsafe extern "system" {
     pub fn IsWindow(w: HWND) -> i32;
     pub fn ShowCursor(show: i32) -> i32;
     pub fn GetKeyState(vk: i32) -> i16;
+    pub fn MapVirtualKeyA(code: u32, map: u32) -> u32;
+    pub fn GetWindowThreadProcessId(w: HWND, pid: *mut u32) -> u32;
 }
 
 // ---- the front end's own loop (engine/shell.rs) --------------------------------------

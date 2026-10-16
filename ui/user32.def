@@ -24,3 +24,5 @@ CloseClipboard@0
 EmptyClipboard@0
 GetClipboardData@4
 SetClipboardData@8
+MapVirtualKeyA@8
+GetWindowThreadProcessId@8

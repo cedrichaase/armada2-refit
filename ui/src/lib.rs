@@ -15,6 +15,7 @@ pub mod cursor;
 pub mod engine;
 pub mod gallery;
 pub mod gfx;
+pub mod hud;
 pub mod input;
 pub mod math;
 #[rustfmt::skip]
@@ -52,6 +53,7 @@ fn startup() {
     log!("mission: {}", if engine::ingame::install() { "hooked" } else { "standing down" });
     log!("shell: {}", if engine::shell::install() { "hooked" } else { "standing down" });
     log!("loading: {}", if engine::loading::install() { "hooked" } else { "standing down" });
+    log!("hud: {}", if hud::install() { "panels of ours" } else { "stock" });
 }
 
 #[unsafe(no_mangle)]

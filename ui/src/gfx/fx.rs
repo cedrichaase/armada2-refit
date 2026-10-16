@@ -221,25 +221,6 @@ impl Draw {
     }
 }
 
-impl Draw {
-    /// Text wrapped at `max_w` pixels (`text::layout_wrapped`), the first line's top
-    /// at `y`; returns its height.
-    #[allow(clippy::too_many_arguments)]
-    pub fn text_wrapped(&mut self, s: &str, size: f32, max_w: f32, x: f32, y: f32, c: Color, w: super::Weight) -> f32 {
-        let font = super::font_of(w);
-        let Some(tex) = self.font_tex(w) else { return 0.0 };
-        let scale = 2.0 * font.spread * size / font.em_texels;
-        let k = [super::KIND_SDF, scale.max(1.0), 0.0, 0.0];
-        let mut quads = alloc::vec::Vec::new();
-        let h = crate::text::layout_wrapped(font, s, size, max_w, x, y, &mut |q| quads.push(q));
-        for q in quads {
-            let [x0, y0, x1, y1] = q.rect;
-            self.aquad(Some(tex), R::new(x0, y0, x1 - x0, y1 - y0), [c; 4], q.uv, k);
-        }
-        h
-    }
-}
-
 // ---- images for the style --------------------------------------------------------------
 
 /// A BMP from the game's files (`Menus/mainbkgr.bmp`, the widescreen menu plates that

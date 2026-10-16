@@ -33,3 +33,4 @@ GlobalAlloc@8
 GlobalLock@4
 GlobalUnlock@4
 GlobalSize@4
+GetCurrentProcessId@0

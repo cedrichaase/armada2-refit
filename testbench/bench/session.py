@@ -811,7 +811,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.ini', 'ARMADA.PRF',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',
-                     'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini'):
+                     'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini', 'UI.log', 'UI.ini'):
             if (g / name).exists():
                 shutil.copy2(g / name, dst / name)
         if self.crashed():

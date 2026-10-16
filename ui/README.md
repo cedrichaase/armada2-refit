@@ -355,6 +355,7 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 | `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472` everywhere |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
+| `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 0, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)) |
 
 ## The renderer (`src/gfx/`)
 
@@ -463,11 +464,20 @@ Behind them, three pieces in `widgets/state.rs` and `focus.rs`:
   widget claims the keyboard from the engine, so focus is dropped by a click on nothing
   focusable and when the focused widget is not called. In a mission Tab only starts
   navigation when something is focused; a screen with no game keys calls
-  `keyboard_nav()`. `button`, `toggle` and `slider` are not focusable yet (they are
-  `ui-style`'s).
+  `keyboard_nav()`. A click focuses only a widget that takes typing or arrow keys
+  (text field, list, dropdown, spinner); buttons, toggles, sliders, check boxes and
+  tabs take the focus from Tab alone, so a click on one never keeps keys from the engine.
 
 `gallery.rs` is every widget on one screen: `[Demo] Shell=1` shows it beside the old
 demo panel, in four tabs (Text, Lists, Choice, Misc). The scenario `ui-widgets` drives it.
+
+## The HUD
+
+The in-mission HUD is taken over a panel at a time: each stock `DisplayInterface`
+component keeps simulating, and one switch stops it drawing and taking the mouse while a
+panel of ours reads its state and presses its buttons. The button bar is the first.
+[`HUD.md`](HUD.md) has the inventory of the HUD's components, the switch, the bar and
+the engine reads each panel uses.
 
 ## Testing
 

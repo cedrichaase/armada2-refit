@@ -30,5 +30,9 @@ pub fn frame(ctx: Context) {
         crate::cursor::draw(ctx, &mut ui);
         let (mouse, keys) = ui.end();
         crate::input::set_capture(mouse, keys);
+        if ctx == Context::Mission {
+            // No stock panel takes the mouse under one of ours.
+            crate::engine::hud::set_pointer_over_ui(mouse);
+        }
     });
 }
