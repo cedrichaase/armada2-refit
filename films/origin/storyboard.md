@@ -114,17 +114,12 @@ Length: 10
 Status: probed
 
 A Borg cube fires its technology assimilation beam (`gTechAssimBeam`) at the Sovereign:
-in refit a green beam with two strands twisting about it, drawing data back to the cube
-(`render3d/ordnance.ini`, `techassimbeam`). The cube large in frame, the camera on its
-side and a little below, so the eye goes from the cube along the beam to the target.
-The beam needs its target within 300 (`TechAssimBeam.odf`): the cube is spawned 220
-away, as in `films/promo` b05. `special` must answer `fired`.
-
-The user's direction for this beam (`ART-DIRECTION.md`, "Tractor and assimilation
-beams": a fluctuating cone of light in vapour, its wide end taking in most of the
-target, washing its hull in the beam's colour) is not on `main` yet: it is on the
-unmerged branch `worktree-cloak-art-direction`. Filmed from `main`, this shot shows the
-beam as `main` draws it, and must not be cut as the result of that direction.
+in refit a green cone of light in vapour from the cube onto the ship
+(`render3d/ordnance.ini`, `techassimbeam`, `Kind=cone`; `ART-DIRECTION.md`, "Tractor
+and assimilation beams"). The cube large in frame, the camera on its side and a little
+below, so the eye goes from the cube along the beam to the target. The beam needs its
+target within 300 (`TechAssimBeam.odf`): the cube is spawned 220 away, as in
+`films/promo` b05. `special` must answer `fired`.
 
 Probe review 2026-10-16: the beam fires at about 5 s of the take (the cube turns to
 it first) and stops by 12 s. Refit's beam is the same thin cyan line as stock's, pixel
@@ -132,6 +127,18 @@ for pixel at the same moment, although `Render3D.log` says `drawing special
 techassimbeam (Beam)`: the recipe's green beam with twisting strands does not show (a
 question for render3d's `ordnance`). So the wipe is `full refit` until it does, and
 this shot is weak: there is nothing in it render3d visibly draws.
+
+Answered 2026-10-16, after `worktree-cloak-art-direction` was merged: **the
+assimilation beam never forms in this scene**, in stock or refit
+(`testbench/scenarios/specials.md`). It only lives while the cube can take a special
+weapon the target's team has researched, and the bench's Sovereign has none, so it ends
+as soon as it is fired. The thin cyan line is the cube's own Borg phaser (`bbphaso`),
+firing at the enemy Sovereign, drawn as stock draws it. A research station and a
+`fedpod1` pod spawned for the Sovereign's team did not make the beam form. This shot
+cannot show the assimilation beam until the scene can give the target's team a
+researched special (a `Scene.asi` command that does not exist yet); `tr15` shows the
+same cone look in the tractor beam's blue. Do not cut this shot as the assimilation
+beam.
 
 ```setup
 scene hover off; tooltips off
@@ -144,4 +151,78 @@ scene orbit 3000 0 3120 75 -6 320
 wait 1
 scene special holder gTechAssimBeam tgt; glide 13 95 -4 290
 wait 13
+```
+
+### tr15 · The tractor beam
+Shows: specials
+Scene: specials
+Variants: refit
+Layout: full refit
+Transition: cut
+In: 2.5
+Length: 10
+Status: probed
+
+The prompt behind the beams' look (`ART-DIRECTION.md`, "Tractor and assimilation
+beams"): a beam as a cone of light through vapour, fans of light coming and going,
+its wide end taking in the target and washing its hull in the beam's colour. A
+Federation Assault ship (`fassault`) holds the Sovereign in its blue tractor beam; the
+camera close and a little below, between the two, so the cone and the lit hull both
+read. The tractor needs its target within 200 (`gtracbm.odf`); 220 between the centres
+fired in `testbench/scenarios/specials.md`. Refit alone: stock's tractor is a thin
+textured beam and answers a different question.
+
+First filmed on a scratch board from the unmerged branch (2026-10-16): the cone came in
+from the right edge, the Assault ship out of frame. Here the camera sits further back
+along the beam so both ships are in frame. Probe 2026-10-16 at pitch -12: both ships
+edge-on, the cone a thin blue line, since its wide end spans the target as seen across
+the beam. From below (pitch -32 to -28), about the point between the ships, both are in
+frame and the cone opens: at 3 s of the probe the fans show as streaks inside it, at 5 s
+the Sovereign's saucer is lit blue-grey, and the cone thins as the camera comes round
+towards the side (11-13 s). The cone is faint against the dark sky; a 4K take may want
+it seen a little longer from 40-55.
+
+```setup
+scene hover off; tooltips off
+scene spawn tractor fassault 3000 0 3220 180 1
+wait 3
+scene engines tractor off; energy tractor on
+scene orbit 3000 0 3115 40 -32 250
+```
+```action
+wait 1
+scene special tractor gtracbm tgt; glide 13 70 -28 230
+wait 13
+```
+
+### sh14 · Shield hits
+Shows: shields
+Scene: shields
+Variants: refit
+Layout: full refit
+Transition: cut
+In: 1.0
+Length: 10
+Status: probed
+
+The prompt behind the shield hits' look (`ART-DIRECTION.md`, "Shield hits"): an uneven
+mist about each impact, a soft edge where the shell curves away, and light on the
+struck hull. A Galaxy class takes phaser and torpedo fire from a Galaxy and a Klingon
+battleship; the camera close on its saucer and a little below, turning slowly, so
+several impacts land in frame. Refit alone: stock's hit is a smooth green shell over
+the whole ship.
+
+First filmed on a scratch board from the unmerged branch (2026-10-16): several hits
+read clearly, white-blue mist on the saucer's shell. Probe from `main` 2026-10-16: the
+same, a hit in frame every couple of seconds, the mist reaching across the saucer's
+rim at 10-13 s.
+
+```setup
+scene hover off; tooltips off
+scene orbit target 200 -6 140
+```
+```action
+wait 1
+scene glide 12 235 -4 125
+wait 12
 ```
