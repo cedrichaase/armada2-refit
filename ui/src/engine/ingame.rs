@@ -62,6 +62,7 @@ unsafe extern "thiscall" fn chat_render(chat: usize) {
     let flush: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(TRIFAN_FLUSH) };
     unsafe { flush(dev + DEV_TRIFAN) };
     count();
+    crate::widgets::theme::set_player_race(super::race::mission_race());
     surface::frame(Context::Mission);
 }
 

@@ -51,6 +51,8 @@ pub struct Hud {
     pub bar_keys: bool,
     /// The key in each button's corner.
     pub bar_labels: bool,
+    /// The info panel (`ShipDisplay`).
+    pub info: bool,
 }
 
 pub fn load() -> Config {
@@ -74,6 +76,7 @@ pub fn load() -> Config {
             bar: ini.int("HUD", "Bar", 0) != 0,
             bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
             bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
+            info: ini.int("HUD", "Info", 0) != 0,
         },
         menus: ini.int("Menus", "Enable", 0) != 0,
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",

@@ -21,9 +21,9 @@
 //! own keyboard step (the game's simulate), not in the UI's frame.
 use crate::engine::palette::{self, Kind};
 use crate::engine::{hud, sound, sprite};
-use crate::gfx::{fade, mix, Weight, R};
+use crate::gfx::{fade, Weight, R};
 use crate::rt::win::*;
-use crate::widgets::{Align, Ui};
+use crate::widgets::{theme, Align, Ui};
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -272,7 +272,9 @@ fn on_keys(p: usize) {
 /// panel when there is room, else above the info panel, aligned to its left edge.
 fn place(ui: &Ui, w: f32, h: f32) -> R {
     let m = ui.u(10.0);
-    let info = if hud::hidden(hud::SHIP_DISPLAY) { None } else { hud::panel_rect(hud::SHIP_DISPLAY, ui.w, ui.h) };
+    // Ours when it draws, else the stock panel's rectangle.
+    let ours = super::info::rect().map(|r| [r.x, r.y, r.right(), r.bottom()]);
+    let info = if hud::hidden(hud::SHIP_DISPLAY) { None } else if unsafe { super::INFO } { ours } else { hud::panel_rect(hud::SHIP_DISPLAY, ui.w, ui.h) };
     let mini = hud::panel_rect(hud::MAP_RADAR, ui.w, ui.h);
     match (info, mini) {
         (Some(i), Some(mm)) if i[0] - mm[2] >= w + 2.0 * m => {
@@ -325,9 +327,8 @@ pub fn run(ui: &mut Ui) {
         let (col, row) = (c % COLS, c / COLS);
         let r = R::new(outer.x + pad + col as f32 * (cs + gap), outer.y + pad + row as f32 * (cs + gap), cs, cs);
         let b = cells[c];
-        let rad = ui.u(5.0);
         if b == 0 {
-            ui.draw.rect_round(r, rad, fade(t.track, 0.55));
+            ui.draw.fill(r, theme::button_corners(ui, r), fade(t.track, 0.55));
             continue;
         }
         let enabled = palette::state(b) != 0;
@@ -342,36 +343,29 @@ pub fn run(ui: &mut Ui) {
             s.pending = b;
             s.pending_age = 0;
         }
-        let edge = if active { t.accent } else if hot && enabled { mix(t.accent, t.panel_edge, 0.35) } else { t.panel_edge };
-        let bg = if held && enabled { t.button_down } else if hot && enabled { t.button_hot } else { t.button };
-        ui.draw.rect_round(r, rad, edge);
-        let e = ui.u(if active { 2.5 } else { 1.5 }).max(1.0);
-        ui.draw.rect_round(r.inset(e), (rad - e).max(0.0), bg);
+        let mut st = theme::State::of(ui, id, hot && enabled, held && enabled);
+        st.on = active;
+        st.off = !enabled;
+        let content = theme::button_frame(ui, r, st);
         // The game's icon, inside the edge.
-        let icon = r.inset(e + ui.u(2.0));
+        let icon = r.inset(ui.u(5.0));
         match sprite::art(palette::sprite(b)) {
             Some((tex, uv)) => {
-                let tint = if enabled { 0xffffffff } else { 0xff6a6a6a };
+                let tint = if enabled { 0xffffffff } else { fade(0xffffffff, 0.4) };
                 ui.draw.image_uv(tex, icon, uv, tint);
             }
             None => {
                 // No art: the button's name.
                 let name = items.iter().find(|it| it.btn == b).map_or("", |it| it.desc.name.as_str());
-                let tc = if enabled { t.text } else { t.text_dim };
-                ui.text_in(icon, name, 13.0, Align::Centre, tc, Weight::Regular);
+                ui.text_in(icon, name, t.micro_size, Align::Centre, content, Weight::Regular);
             }
-        }
-        if !enabled {
-            ui.draw.rect_round(r.inset(e), (rad - e).max(0.0), 0x60000000);
         }
         if cfg.hud.bar_keys && cfg.hud.bar_labels {
             let k = [LABEL[c]];
             let label = core::str::from_utf8(&k).unwrap_or("?");
-            let sz = ui.u(15.0);
+            let sz = ui.u(t.micro_size + 1.0);
             let lr = R::new(r.x + ui.u(3.0), r.y + ui.u(2.0), sz * 1.1, sz * 1.15);
-            ui.draw.rect_round(lr, ui.u(3.0), 0xb0000000);
-            let col = if enabled { 0xffffe48f } else { 0xff8c8c8c };
-            ui.text_in(lr, label, 15.0, Align::Centre, col, Weight::Bold);
+            theme::badge(ui, lr, label, !enabled);
         }
     }
 
@@ -422,23 +416,15 @@ fn tooltip(ui: &mut Ui, at: R, bar: R, text: &str) {
         }
     }
     let clean = String::from(clean.replace(" :", ":").trim());
-    let t = ui.theme;
-    let size = ui.u(19.0);
     let maxw = ui.u(460.0);
-    let (tw, th) = crate::text::measure_wrapped(crate::text::font(), &clean, size, maxw);
-    let pad = ui.u(9.0);
-    let (w, h) = (tw + 2.0 * pad, th + 2.0 * pad);
+    let (w, h) = theme::tooltip_size(ui, &clean, maxw);
     let mut x = at.x.min(ui.w - w - ui.u(4.0)).max(ui.u(4.0));
     let mut y = bar.y - h - ui.u(6.0);
     if y < 0.0 {
         y = bar.bottom() + ui.u(6.0);
         x = x.max(0.0);
     }
-    let r = R::new(x, y, w, h);
-    let rad = ui.u(5.0);
-    ui.draw.rect_round(r, rad, t.panel_edge);
-    ui.draw.rect_round(r.inset(1.0), rad - 1.0, 0xf00a1220);
-    ui.draw.text_wrapped(&clean, size, maxw, r.x + pad, r.y + pad, t.text, Weight::Regular);
+    theme::tooltip(ui, R::new(x, y, w, h), &clean, 1.0);
 }
 
 /// `bar: menu=0 | Q=build W=order ...`, once per change, as GridLayout.log does.

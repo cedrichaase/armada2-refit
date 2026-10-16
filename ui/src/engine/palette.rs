@@ -120,7 +120,7 @@ static mut SPRITES_DB: usize = 0;
 
 /// A sprite of the HUD's sprite database by name, cached while the database is the same.
 #[allow(static_mut_refs)]
-fn find_sprite(name: &str) -> usize {
+pub fn find_sprite(name: &str) -> usize {
     unsafe {
         let db = rd::<usize>(SPRITE_DB);
         if db == 0 {

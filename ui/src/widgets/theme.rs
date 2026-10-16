@@ -804,6 +804,16 @@ pub fn separator(ui: &mut Ui, r: R) {
     ui.draw.rect_hgrad(R::new(r.x + half, y, half, h), c, fade(c, 0.0));
 }
 
+/// A key's letter in a button's corner (the HUD bar's grid keys): a dark plate with
+/// the letter in the title colour, dimmed when the button is off.
+pub fn badge(ui: &mut Ui, r: R, s: &str, off: bool) {
+    let t = ui.theme;
+    let c = if t.form == Form::Lcars { Corners::pill(r) } else { t.px(ui, t.small) };
+    ui.draw.fill(r, c, fade(0xff000000, 0.72));
+    let col = if off { t.text_off } else { t.title };
+    ui.text_in(r, s, t.micro_size, Align::Centre, col, Weight::Bold);
+}
+
 /// A heading inside a panel.
 pub fn heading(ui: &mut Ui, r: R, s: &str) {
     let t = ui.theme;
