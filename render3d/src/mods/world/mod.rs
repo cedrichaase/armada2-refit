@@ -159,13 +159,17 @@ impl Module for World {
         if !self.enable {
             return false;
         }
-        match engine::vtable(o) {
+        let ours = match engine::vtable(o) {
             planets::VT_PLANET if self.on_planets => self.planets.draw(o, v, &mut self.surfaces),
             rocks::VT_SCRAP if self.on_rocks => self.rocks.draw_scrap(o, v, &mut self.surfaces),
             rocks::VT_ASTEROID_FIELD if self.on_rocks => self.rocks.draw_field(o, v, &mut self.surfaces),
             nebulae::VT_NEBULA | nebulae::VT_LATINUM if self.on_nebulae => self.nebulae.object(o, v),
             _ => false,
+        };
+        if ours {
+            mark_on_screen(o, v);
         }
+        ours
     }
     fn step(&mut self, s: Step, v: &View) -> bool {
         if s == Step::Translucent && self.enable {
@@ -182,5 +186,23 @@ impl Module for World {
         if v.main {
             self.planets.end_frame(v.frame);
         }
+    }
+}
+
+/// What `Entity::Render` (0x4cfda0) writes as the engine draws an object: its on-screen
+/// byte (+0x25), set when the instance's frustum test (its vtable slot 3) passes, and
+/// cleared for every object each frame by `Entity::ResetVisibility`. The pointer's
+/// pick (`DisplayInterface::s_PrecomputeMouseOver`) passes over any object whose byte is
+/// clear, so an object drawn here in the engine's place must have it written, or it
+/// cannot be clicked: planets could be selected only by a drag box and not
+/// right-clicked to colonise. As `GameObject::Render`, nothing for an object that is
+/// going or that the player cannot see.
+fn mark_on_screen(o: usize, v: &View) {
+    use crate::engine::obj;
+    if obj::expired(o) || !obj::can_user_see(o) {
+        return;
+    }
+    if crate::mods::hulls::game::frustum_test(obj::instance(o), v.cam) {
+        crate::mods::hulls::game::set_on_screen(o);
     }
 }

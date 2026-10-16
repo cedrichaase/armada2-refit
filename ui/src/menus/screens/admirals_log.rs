@@ -1,5 +1,6 @@
 //! The Admiral's Log (`do_admiralsLog`), after a mission or from the in-mission menu: a
-//! tab strip, the players down the left, the page, and Save to text / Done.
+//! tab strip, the players down the left, the page, and Done. Stock's Save to text
+//! (2211, which writes the log to a text file) is left out: not offered.
 //!
 //! The stock dialog is a frame of art with owner-drawn buttons (the eight tabs, the
 //! players, Save and Done: windows, which the model reads by id and text) and eight panes
@@ -40,7 +41,6 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let mut players: Vec<&Control> = s.model.controls.iter().filter(|c| (2100..2300).contains(&c.id) && c.rect[0] < 100 && matches!(c.what, What::Window(Class::OwnerDrawn))).collect();
     players.sort_by_key(|c| c.id);
     let done = window_ctl(s, 2212);
-    let save_text = window_ctl(s, 2211);
     let panes: Vec<&Control> = s.model.controls.iter().filter(|c| matches!(c.what, What::Window(Class::Pane))).collect();
     if tabs.len() < 2 || done.is_none() {
         return false;
@@ -116,13 +116,10 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         kit::forward_part(ui, s, dst, src);
     }
 
-    // Save to text, Done.
+    // Done.
     let bw = ui.u(260.0);
     if let Some(c) = done {
         kit::button(ui, s, R::new(foot.right() - bw, foot.y, bw, foot.h), c, &c.text);
-    }
-    if let Some(c) = save_text {
-        kit::button(ui, s, R::new(foot.right() - 2.0 * bw - gap, foot.y, bw, foot.h), c, &c.text);
     }
     true
 }

@@ -79,11 +79,13 @@ pub fn place(ui: &Ui) -> (R, R, R) {
     let pad = ui.u(8.0);
     let side = ui.u(cfg.minimap_size).min(ui.h * 0.45).max(ui.u(120.0));
     let strip = ui.u(30.0);
-    let w = side + 2.0 * pad;
-    let h = side + 2.0 * pad + strip + ui.u(6.0);
+    // Inside the frame (an LCARS frame's elbows and bars), padded.
+    let (fl, ft, fr, fb) = crate::widgets::theme::frame_margins(ui);
+    let w = side + 2.0 * pad + fl + fr;
+    let h = side + 2.0 * pad + strip + ui.u(6.0) + ft + fb;
     let outer = R::new(m, ui.h - m - h, w, h);
-    let strip_r = R::new(outer.x + pad, outer.y + pad, side, strip);
-    let square = R::new(outer.x + pad, outer.bottom() - pad - side, side, side);
+    let strip_r = R::new(outer.x + fl + pad, outer.y + ft + pad, side, strip);
+    let square = R::new(outer.x + fl + pad, outer.bottom() - fb - pad - side, side, side);
     (outer, strip_r, square)
 }
 

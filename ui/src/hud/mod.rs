@@ -7,6 +7,7 @@ pub mod bar;
 pub mod info;
 pub mod minimap;
 pub mod overlay;
+mod tooltips;
 pub mod unitview;
 // hud-panels: the resources, the top-right buttons, the boxes, the overlay, the chat.
 mod buttons;
@@ -29,6 +30,7 @@ static mut INFO: bool = false;
 static mut MINIMAP: bool = false;
 static mut SELECTION: bool = false;
 static mut UNIT_VIEW: bool = false;
+static mut TOOLTIPS: bool = false;
 
 /// Patches what the panels switched on in UI.ini need; each stands down on its own.
 pub fn install() -> bool {
@@ -37,7 +39,7 @@ pub fn install() -> bool {
         crate::log!("hud: Enable=0, the HUD is stock");
         return false;
     }
-    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !panels::any(cfg) && !comm::any(cfg) {
+    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !cfg.tooltips && !panels::any(cfg) && !comm::any(cfg) {
         crate::log!("hud: no panel switched on, the HUD is stock");
         return false;
     }
@@ -72,6 +74,11 @@ pub fn install() -> bool {
     }
     panels::install(cfg);
     comm::install(cfg);
+    if cfg.tooltips {
+        hud::take_tooltips(true);
+        unsafe { TOOLTIPS = true };
+        crate::log!("tooltips: ours");
+    }
     true
 }
 
@@ -92,6 +99,10 @@ fn map_panels(cfg: &crate::config::Hud) {
             hud::set_taken(engine::overlay::SELECTION_DISPLAY, false, true);
             unsafe { SELECTION = true };
             crate::log!("selection: ours, gauges {}", if cfg.selection_gauges { "on the selection" } else { "as stock" });
+            if !cfg.selection_bubbles {
+                let off = engine::overlay::hide_bubbles();
+                crate::log!("selection: the 3D bubbles {}", if off { "off" } else { "left on: RenderSelectionEffects is not stock" });
+            }
         } else {
             crate::log!("selection: stays stock");
         }
@@ -146,5 +157,8 @@ pub fn run(ui: &mut Ui) {
         }
         panels::run(ui);
         comm::run(ui);
+        if TOOLTIPS {
+            tooltips::run(ui);
+        }
     }
 }

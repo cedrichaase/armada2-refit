@@ -70,6 +70,12 @@ impl<'a> Ui<'a> {
         persist().slots.entry(id.0).or_insert([0.0; 4])
     }
 
+    /// Draws the overlay layer now (the frame's last widgets), so what follows, the
+    /// cursor, is drawn over it.
+    pub fn flush_overlays(&mut self) {
+        run_overlays(self);
+    }
+
     /// Draws `f` after everything else this frame, over it: a popup list, a tooltip.
     /// `f` runs with the pointer visible through what is occluded, and may itself call
     /// `overlay`. It owns what it draws with (it cannot borrow the caller's frame).
@@ -130,8 +136,9 @@ impl<'a> Ui<'a> {
     }
 }
 
-/// `Ui::end`'s part: the overlay layer, focus navigation, and rolling the occluders.
-pub(super) fn end_frame(ui: &mut Ui) {
+/// Draws the overlay layer queued so far (and what it queues in turn). `Ui::end` does
+/// it too; the frame calls it first so that the cursor draws over the overlay layer.
+pub(super) fn run_overlays(ui: &mut Ui) {
     ui.x.in_overlay = true;
     ui.x.input_clip = None;
     loop {
@@ -144,6 +151,11 @@ pub(super) fn end_frame(ui: &mut Ui) {
         }
     }
     ui.x.in_overlay = false;
+}
+
+/// `Ui::end`'s part: the overlay layer, focus navigation, and rolling the occluders.
+pub(super) fn end_frame(ui: &mut Ui) {
+    run_overlays(ui);
     ui.focus_end();
     let p = persist();
     p.occ_prev = core::mem::take(&mut p.occ_now);

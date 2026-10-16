@@ -31,6 +31,7 @@ use crate::shaders::overlays::PS_COLOUR;
 use crate::shaders::sod::VS_SOD;
 
 const BUCKETS: usize = 0x773c8c;
+const FN_RENDER_SELECTION: usize = 0x599900; // RenderSelectionEffects, cdecl
 const FN_ENTITY_GET: usize = 0x4cfff0; // Entity::Get(handle), cdecl
 const FN_USER_TEAM: usize = 0x5578b0; // Transport::getUserTeam, thiscall
 const FN_RELATION: usize = 0x4d1080; // GameObject::GetTeamRelation(team), thiscall
@@ -60,6 +61,12 @@ impl Selection {
 
     /// Every bubble; true: the engine's step is skipped.
     pub fn draw(&mut self, v: &View) -> bool {
+        // UI.asi switches the bubbles off (`[HUD] SelectionBubbles=0`, its brackets mark
+        // the selection) by making `RenderSelectionEffects` return at once: drawn in
+        // its place, they are not drawn either.
+        if unsafe { rd::<u8>(FN_RENDER_SELECTION) } == 0xc3 {
+            return true;
+        }
         let Some(model) = scene::model(v.dev, "select") else { return false };
         let profile = field_f32(unsafe { rd::<usize>(super::USER_PROFILE) }, 0x48);
         let user_team = unsafe {

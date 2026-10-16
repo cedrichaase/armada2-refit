@@ -324,17 +324,20 @@ pub fn run(ui: &mut Ui) {
     let (cs, gap, pad) = (ui.u(62.0), ui.u(5.0), ui.u(8.0));
     let gw = COLS as f32 * cs + (COLS - 1) as f32 * gap;
     let gh = ROWS as f32 * cs + (ROWS - 1) as f32 * gap;
-    let outer = place(ui, gw + 2.0 * pad, gh + 2.0 * pad);
+    // The grid sits inside the frame (an LCARS frame's elbows and bars), padded.
+    let (fl, ft, fr, fb) = theme::frame_margins(ui);
+    let outer = place(ui, gw + 2.0 * pad + fl + fr, gh + 2.0 * pad + ft + fb);
     ui.panel(outer);
+    let (gx, gy) = (outer.x + fl + pad, outer.y + ft + pad);
     // The fifth column, cancel/back, set off from the grid proper.
-    let col4 = R::new(outer.x + pad + 4.0 * (cs + gap) - gap * 0.5 - ui.u(1.0), outer.y + pad, ui.u(1.0).max(1.0), gh);
+    let col4 = R::new(gx + 4.0 * (cs + gap) - gap * 0.5 - ui.u(1.0), gy, ui.u(1.0).max(1.0), gh);
     ui.draw.rect(col4, fade(t.panel_edge, 0.5));
 
     let mut hovered = 0usize;
     let mut hovered_rect = R::new(0.0, 0.0, 0.0, 0.0);
     for c in 0..CELLS {
         let (col, row) = (c % COLS, c / COLS);
-        let r = R::new(outer.x + pad + col as f32 * (cs + gap), outer.y + pad + row as f32 * (cs + gap), cs, cs);
+        let r = R::new(gx + col as f32 * (cs + gap), gy + row as f32 * (cs + gap), cs, cs);
         let b = cells[c];
         if b == 0 {
             ui.draw.fill(r, theme::button_corners(ui, r), fade(t.track, 0.55));

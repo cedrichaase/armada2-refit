@@ -159,9 +159,12 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
             if !crate::engine::cursor::installed() || !crate::engine::cursor::synchronous() {
                 return;
             }
-            // None: the engine shows no cursor (a right-drag); neither do we.
+            // None: the engine shows no cursor (a right-drag); neither do we, unless a
+            // box of ours wants the pointer (a mission's opening briefing: its stock box,
+            // whose `Render` names the cursor, is not drawn).
             match crate::engine::cursor::shape() {
                 Some(n) => n,
+                None if crate::hud::panels::box_shown() => "c_arrow",
                 None => return,
             }
         }

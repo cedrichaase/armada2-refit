@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.14.0 — 2026-10-16
+
+Layers: ui 0.5.0, render3d 0.6.2, testbench 3.24.0.
+
+### Fixed
+- Planets can be clicked and colonised again with render3d (render3d 0.6.2); a
+  cursor over a mission's opening briefing (ui 0.5.0).
+
+### Changed
+- The UI's HUD: the engine's tooltips themed, the selection ellipsoids off with
+  thinner brackets, the resources reordered, panels kept inside the LCARS frame, a
+  square unit view frame, no Save to text in the Admiral's Log (ui 0.5.0).
+
+Installed, not yet seen in game.
+
 ## 12.13.0 — 2026-10-16
 
 Layers: ui 0.4.0, hud 2.2.2, testbench 3.23.0.

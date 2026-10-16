@@ -30,6 +30,8 @@ pub fn frame(ctx: Context) {
         let mut ui = crate::widgets::Ui::begin(draw, w, h, crate::input::state());
         ui.theme = crate::widgets::Theme::for_context(ctx);
         crate::app::run(ctx, &mut ui);
+        // The overlay layer (boxes, dropdowns, tooltips) first: the cursor goes on top.
+        ui.flush_overlays();
         crate::cursor::draw(ctx, &mut ui);
         let (mouse, keys) = ui.end();
         crate::input::set_capture(mouse, keys);
