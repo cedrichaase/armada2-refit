@@ -28,7 +28,7 @@ settings screens; Exit.
 2. Wait 15 seconds.
 3. Take a screenshot called "intro".
 4. Press Escape.
-31. Expect "Invasion" is visible.
+5. Wait 3 seconds.
 6. Press Escape.
 7. Wait 3 seconds.
 8. Press Escape.
@@ -54,7 +54,7 @@ settings screens; Exit.
 28. Take a screenshot called "campaign selection".
 29. Click "Federation Campaign".
 30. Wait 3 seconds.
-31. Expect "Federation Campaign" is visible.
+31. Expect "Invasion" is visible.
 32. Click "Invasion".
 33. Wait 1 second.
 34. Click "O.K.".
