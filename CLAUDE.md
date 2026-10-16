@@ -36,7 +36,7 @@ it bundles.
 | `qol/` | `QOL.asi` — gameplay quality of life compatible with stock players (right-drag pan speed, Shift+number adds to a group, selections and groups beyond 16, stations in groups with one build menu for several, long moves on the map at warp), and the plan for the rest, split by whether other players need it | `qol/README.md` |
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `render3d/` | `Render3D.asi` — the 3D view through a renderer of our own, in `no_std` Rust: both views of `Armada_RenderAllOurStuff` drawn into a half-float MSAA target, bloomed by energy and tone-mapped into the back buffer; seven modules of its own draw every category (hulls with the scene lights and shadows, sky, particles, ordnance, effects, planets, moons, asteroids and nebulae, fog and selection) from the game's assets, with its own cosmetic simulation (`PLAN.md`). It replaced the per-part plugins (MSAA, Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog and Planets), which were removed from the repository; their recipes live in `render3d/skies/`, `render3d/surfaces/` and `render3d/nebulae/`, and `render3d/install.sh` takes out any of those plugins an earlier install left. Not in the release package yet | `render3d/README.md`, `render3d/PLAN.md` |
-| `ui/` | `UI.asi` — the runtime the HUD, menus and loading screen will be redrawn with, in `no_std` Rust like render3d: a 2D renderer on the d3d9 device (SDF text from a vendored OFL font, rounded panels, nine-slices), immediate-mode widgets, input with capture, and hooks into a mission's frame, a front-end screen of our own and the loading screen. Draws nothing unless a `[Demo]` key is on. Not in `./install` or `a2mod` yet; `ui/bench-asi.sh` puts it in a bench clone | `ui/README.md`, `ui/PLAN.md` |
+| `ui/` | `UI.asi` — the runtime the HUD, menus and loading screen will be redrawn with, in `no_std` Rust like render3d: a 2D renderer on the d3d9 device (SDF text from a vendored OFL font, rounded panels, nine-slices), immediate-mode widgets, input with capture, and hooks into a mission's frame, a front-end screen of our own and the loading screen. Its HUD panels (`[HUD]`, `HUD.md`) and the menus hosted and drawn by it (`[Menus]`, `MENUS.md`) supersede `HUD.asi`, `GridLayout.asi` and `Menus.asi` part by part; all off in the shipped `UI.ini`. `ui/install.sh` (in `./install`, the `ui` layer of `a2mod`); `ui/bench-asi.sh` puts a working copy's build in a bench clone | `ui/README.md`, `ui/PLAN.md`, `ui/STYLE.md` |
 | `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), the smoothed dilithium moons (`moon-sod.py`) and asteroids (`asteroid-sod.py`), and the other SOD rewrites. The planets' sphere is render3d's | `models/README.md` |
@@ -732,8 +732,21 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   on top of the UI. A screen of ours in the front end is modelled on `Show_Credits`, the
   one shell screen that draws through Direct3D; the device can be re-created at every
   switch between the shell's display and the game's.
-- Findings stay in `ui/README.md` beside the hook that uses them, and every address in
-  `src/engine/` (`ui/PLAN.md`, "What this exposes of Armada2.exe").
+- Findings stay in `ui/README.md` (or `HUD.md` / `MENUS.md`) beside the hook that uses
+  them, and every address in `src/engine/` (`ui/PLAN.md`, "What this exposes of
+  Armada2.exe").
+- **Every panel and screen is drawn through `widgets/theme.rs`** (`STYLE.md`): never
+  hard-code a colour. A click gives keyboard focus only to a widget that takes typing
+  or arrow keys; a focused button once kept every key from the engine.
+- **A HUD panel of ours never replaces the stock component's logic**: the stock panel
+  keeps simulating, the panel switch (`engine/hud.rs`, in `RenderAll` and
+  `CursorInterface::RefreshOwner`, never a vtable) skips its drawing and mouse, and ours
+  reads its state and presses its own functions (`HUD.md`). The bar stands down while
+  `GridLayout.asi` is loaded.
+- **A menu of ours never writes a setting**: the stock dialog runs hidden and a screen
+  spec acts only through its controls (`MENUS.md`, "Writing a screen spec"); specs are
+  keyed by dialog procedure, not template (one template is five screens). The menu
+  host stands down while `Menus.asi` is loaded.
 
 ### textures
 

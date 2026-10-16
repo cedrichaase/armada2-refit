@@ -1,15 +1,17 @@
 # UI — the runtime for a HUD, menus and loading screen of our own
 
-`UI.asi` is the runtime that the game's HUD, front-end menus and loading screen will
-be redrawn with, in our own code (`PLAN.md`). This first step is the runtime alone:
-a 2D renderer on the game's Direct3D 9 device, text, widgets, input with capture, and
-a hook into each of the three places the UI draws. **With the shipped `UI.ini` it
-draws nothing**; `[Demo]` turns on a demonstration panel per context.
+`UI.asi` redraws the game's HUD, front-end menus and loading screen in our own code
+(`PLAN.md`): a 2D renderer on the game's Direct3D 9 device, text, widgets, input with
+capture, and a hook into each of the three places the UI draws, with the HUD's panels
+(`HUD.md`) and the menus (`MENUS.md`) taken over on top of them. **With the shipped
+`UI.ini` every panel and the menus are off**: the hooks are in and nothing is drawn;
+`[HUD]` and `[Menus]` turn the parts on, `[Demo]` a demonstration per context.
 
 It is a `no_std` Rust DLL like render3d (`render3d/README.md`, "Building and
-installing"), and is **not in `./install` or `a2mod` yet**: nothing uses it until a
-panel or screen of ours replaces a stock one. The bench gets it with
-`ui/bench-asi.sh` (below).
+installing"). `ui/install.sh` (run by `./install`) puts `UI.asi` and `UI.ini` in the
+game directory and keeps the player's `UI.ini` values (`ini-merge.py` adds only the
+keys theirs lacks); `--remove` takes them out. `a2mod` switches it as the `ui` layer.
+The bench gets a working copy's build with `ui/bench-asi.sh` (below).
 
 **The menus** (`[Menus] Enable=1`, off by default): every stock shell dialog runs
 hidden and is drawn and driven by the UI, generically or by a screen spec of ours.

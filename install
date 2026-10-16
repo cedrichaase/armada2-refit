@@ -22,6 +22,9 @@
 #                                            MSAA, bloom, its modules drawing every part),
 #                                            and its recipes; takes out the plugins it
 #                                            replaced if an earlier install left them
+#   ui         ui/install.sh                 UI.asi: the UI runtime (ui/PLAN.md); its HUD
+#                                            panels and menus are off until UI.ini turns
+#                                            them on
 #
 # The code layers need nothing but this checkout. The asset layers install what is
 # BUILT in A2_DATA (a2env.sh; default ~/.local/share/armada2-refit): with nothing
@@ -47,3 +50,4 @@ python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/models/install.sh"
 "$here/cutscenes/binkproxy/install.sh"
 "$here/render3d/install.sh"
+"$here/ui/install.sh"
