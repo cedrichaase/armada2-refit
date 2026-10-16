@@ -14,8 +14,10 @@ loaded the UI's bar stands down. Run with `--install <checkout>` or without: the
 prepare step does not install the grid.
 
 The match is `_enter-instant-action.md`'s: Borg, Warzone. At 1280x720 the first
-Assembler sits at 640,262 and the second at 680,280, and the UI's bar sits above the
-info panel with its top-left cell (Q) at about 400,482: R at 535,482, S at 446,527.
+Assembler sits at 640,262 and the Nexus at 755,320 (the second Assembler drifts, so
+it is not used). The UI's bar sits above the info panel, which is taller for the
+Nexus: with the Assembler selected the top-left cell (Q) is at about 400,482, with the
+Nexus at 400,411 (E, the AI menu there, at 490,411).
 `UI.log` names each layout ("bar: menu=0 ... | Q=build ...") and each press ("bar:
 click build", "bar: key S=bmining"). A click on the bar is the UI's, so the Assembler
 stays selected through it (capture).
@@ -47,18 +49,18 @@ stays selected through it (capture).
 25. Check that a building footprint (a square of green or red brackets) follows the cursor.
 26. Click at 900,300.
 27. Wait 2 seconds.
-28. Click at 680,280.
+28. Click at 755,320.
 29. Wait 1 second.
-30. Press w.
-31. Wait 1 second.
-32. Expect "UI.log" contains "W=repair".
-33. Press g.
-34. Wait 1 second.
-35. Expect "UI.log" contains "bar: key G=back".
-36. Click at 535,482.
-37. Wait 1 second.
-38. Expect "UI.log" contains "bar: click aiMenu".
-39. Expect "Assembler" is visible.
+30. Expect "UI.log" contains "Q=build W=order E=aiMenu A=recrew S=transport D=rally".
+31. Press w.
+32. Wait 1 second.
+33. Expect "UI.log" contains "bar: key W=order".
+34. Press g.
+35. Wait 1 second.
+36. Expect "UI.log" contains "bar: key G=back".
+37. Click at 490,411.
+38. Wait 1 second.
+39. Expect "UI.log" contains "bar: click aiMenu".
 40. Press g.
 41. Wait 1 second.
 42. Press Return.
