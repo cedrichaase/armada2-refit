@@ -51,6 +51,16 @@ pub struct Hud {
     pub bar_keys: bool,
     /// The key in each button's corner.
     pub bar_labels: bool,
+    /// The panels of hud-panels (HUD.md): the resources, the top-right buttons, the
+    /// message and objectives boxes, the pause box, the replay controls, the overlay
+    /// messages, the chat lines and the text entry.
+    pub resources: bool,
+    pub buttons: bool,
+    pub messages: bool,
+    pub pause: bool,
+    pub replay: bool,
+    pub overlay: bool,
+    pub chat: bool,
 }
 
 pub fn load() -> Config {
@@ -74,6 +84,13 @@ pub fn load() -> Config {
             bar: ini.int("HUD", "Bar", 0) != 0,
             bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
             bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
+            resources: ini.int("HUD", "Resources", 0) != 0,
+            buttons: ini.int("HUD", "Buttons", 0) != 0,
+            messages: ini.int("HUD", "Messages", 0) != 0,
+            pause: ini.int("HUD", "Pause", 0) != 0,
+            replay: ini.int("HUD", "Replay", 0) != 0,
+            overlay: ini.int("HUD", "Overlay", 0) != 0,
+            chat: ini.int("HUD", "Chat", 0) != 0,
         },
         menus: ini.int("Menus", "Enable", 0) != 0,
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",

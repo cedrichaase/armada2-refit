@@ -4,6 +4,16 @@
 //! (`engine::hud`) stops it drawing and taking the mouse. Ours reads that state and
 //! acts through the component's own functions.
 pub mod bar;
+// hud-panels: the resources, the top-right buttons, the boxes, the overlay, the chat.
+mod buttons;
+mod chat;
+mod messages;
+mod objectives;
+mod overlay;
+pub mod panels;
+mod pause;
+mod replay;
+mod resources;
 
 use crate::engine::{self, hud};
 use crate::widgets::Ui;
@@ -17,7 +27,7 @@ pub fn install() -> bool {
         crate::log!("hud: Enable=0, the HUD is stock");
         return false;
     }
-    if !cfg.bar {
+    if !cfg.bar && !panels::any(cfg) {
         crate::log!("hud: no panel switched on, the HUD is stock");
         return false;
     }
@@ -40,6 +50,7 @@ pub fn install() -> bool {
             crate::log!("bar: stays stock");
         }
     }
+    panels::install(cfg);
     true
 }
 
@@ -60,5 +71,6 @@ pub fn run(ui: &mut Ui) {
         if BAR {
             bar::run(ui);
         }
+        panels::run(ui);
     }
 }
