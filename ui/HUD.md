@@ -766,6 +766,32 @@ player with a bar from the transport's `GetLoadPercentage` (`engine::setup::
 load_fractions`, the loading screen's read); the stock text, from its `GetInformation`,
 when the transport answers nothing.
 
+### Seen on the bench (comms, drop, load wait)
+
+2026-10-16, two games at 1280x720 with Microsoft's DirectPlay, by hand and in
+`testbench/scenarios/ui-hud-multiplayer.md`. A host alone with a computer player is a
+network game too, and showed the panel first: two bars, the computer's chat switch
+absent, the teams column ("Teams are locked"), four resource rows for the Borg. With a
+joiner (three bars, in the Federation, Klingon, Romulan and Cardassian themes): the
+chat switch flipped and stayed flipped (the toggle press); PRIVATE with the host
+selected left only the host's switch on, and the joiner's next line reached the host
+alone; with the joiner on the host's team and instant trade on (Advanced: "Trade Using
+Convoys"), minus and give sent 1000 dilithium, and the joiner read "host gave you 1000
+dilithium." (giving between players on different teams does nothing, in stock too:
+`GiveResourceCallback` refuses enemies; with convoys the give buttons are disabled).
+Allied victory flips and comes back in a game whose teams are locked, as in stock
+(`ToggleAlliedVictory` changes the team's flag only where alliances are free). With the
+joiner's game killed, the host showed our drop box ("Waiting for N seconds:", "joiner is
+unresponsive.", "host is waiting."), its buttons disabled for the first seconds, then
+Eliminate removed the joiner ("joiner was disconnected. The player was eliminated.").
+With the joiner's load held half-way (`[Loading] Hold=6`), the host showed our load
+wait, the host's bar full and the joiner's at 54%; the stock box and the drop box
+alternate while the other player does not answer.
+
+**Not seen**: the alliance column and its buttons (a game type with free alliances,
+not reached: every game on the bench had "Teams are locked."), give units, the high
+latency switch's effect, AI Takeover.
+
 ## Not done
 
 - Every panel after the info panel (the order above).
