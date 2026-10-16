@@ -15,8 +15,10 @@ For the agents after (`ui-hud-map`, `ui-hud-panels`, `ui-hud-panels-objectives`,
 - **The Academy's "User Interface" tutorial starts with zooming**, not selecting:
   lesson 1's objectives are "Zoom your view in or out by scrolling the mouse wheel",
   "Click the OK button or press the 'Enter' key ..." and "After you have completed
-  this lesson, press the 'Enter' key to advance". Enter does not advance until the
-  wheel has turned; lesson 2 is "Select the Enterprise".
+  this lesson, press the 'Enter' key to advance". After the box is closed, three wheel
+  notches and Enter bring lesson 2's box ("Select the Enterprise") a few seconds
+  later, so wait for its text rather than a fixed time (two Enters without the wheel,
+  3 s apart, did not bring it in time).
 - **The chat is themed by race in a mission**: with `HUD.Chat=1` our history box and
   our field wear the race theme (green for the Borg), so a judged step must not tell
   ours from stock's by "green".
