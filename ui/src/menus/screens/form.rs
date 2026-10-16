@@ -92,8 +92,9 @@ pub fn build<'a>(s: &'a Screen, combos: &[(i32, usize)]) -> Form<'a> {
             used.push(l.key);
         }
         let mut caps: [Option<&Control>; 2] = [None, None];
-        if is_scroll(f) {
-            let mine: Vec<&&Control> = ends.iter().filter(|e| e.rect[1] + e.rect[3] / 2 >= f.rect[1] - 40 && e.rect[1] <= f.rect[1] + f.rect[3] + 20 && overlap(e, f)).collect();
+        if let (true, Some(l)) = (is_scroll(f), best) {
+            // The end captions stand on the caption's own line, either side of it.
+            let mine: Vec<&&Control> = ends.iter().filter(|e| (e.rect[1] - l.rect[1]).abs() <= 14 && overlap(e, l)).collect();
             if let Some(a) = mine.first() {
                 caps[0] = Some(**a);
             }
