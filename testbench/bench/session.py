@@ -220,11 +220,13 @@ class Session:
             steps = [[str(config.REPO / 'a2mod'), 'stock']] + \
                     [[str(Path(i['path']) / 'install')] for i in installs]
         else:
-            # HUD.asi fixes the HUD, font and cursors at run time for whatever mode
-            # is set, so the install takes no resolution: the same install is what
-            # every case runs, which is the point.  install.sh first reverts the
-            # three file-based fixes it replaced, which the user's install may carry.
-            steps = [[str(config.REPO / 'hud/install.sh')]]
+            # The user's install with this checkout's UI.asi: the UI lays the HUD, menus
+            # and cursor out at run time for whatever mode is set, so the install takes
+            # no resolution and every case runs the same one.  ui/install.sh also takes
+            # out what the UI supersedes (HUD.asi, GridLayout.asi, Menus.asi) and puts
+            # back the file-based HUD fixes the user's install may carry, as ./install
+            # does (ui/README.md, "Installing").
+            steps = [[str(config.REPO / 'ui/install.sh')]]
         with open(plog, 'a') as f:
             for cmd in steps:
                 f.write(f'$ {" ".join(cmd)}\n')
@@ -251,7 +253,11 @@ class Session:
         (2026-09-26). Menus.asi goes back with nothing else on: no scaling, the stock
         800x600 shell mode, no backdrops, stock Esc. The HUD, font and cursors, which the
         stock baseline exists for, stay stock."""
-        shutil.copy2(config.GAME / 'Menus.asi', self.game_dir / 'Menus.asi')
+        # Built from this checkout: ./install no longer puts Menus.asi into the user's
+        # install (the UI hosts the menus), so it cannot be copied from there.
+        subprocess.run(['bash', str(config.REPO / 'menus/build.sh')], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        shutil.copy2(config.REPO / 'menus/build/Menus.asi', self.game_dir / 'Menus.asi')
         (self.game_dir / 'Menus.ini').write_text(
             '; written by the Armada II test bench: stock shell, embedded only\r\n'
             '[Menus]\r\nMode=1\r\nDesignWidth=800\r\nDesignHeight=600\r\nIntegerScale=1\r\n'

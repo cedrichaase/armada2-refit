@@ -33,6 +33,7 @@ pub mod comm;
 pub mod shellui;
 pub mod radar;
 pub mod shellcombo;
+pub mod unitview;
 
 use core::ffi::c_void;
 

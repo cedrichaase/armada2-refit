@@ -16,8 +16,10 @@ prepare step does not install the grid.
 The match is `_enter-instant-action.md`'s: Borg, Warzone. At 1280x720 the first
 Assembler sits at 640,262 and the Nexus at 755,320 (the second Assembler drifts, so
 it is not used). The UI's bar sits above the info panel, which is taller for the
-Nexus: with the Assembler selected the top-left cell (Q) is at about 400,482, with the
-Nexus at 400,411 (E, the AI menu there, at 490,411).
+Nexus. With every part of the UI on (the default since ui-switchon) and the Assembler
+selected, the top-left cell (Q) is at about 465,438 and S (Transport) at 510,483; with
+the Nexus the info panel is taller and the bar higher, so its AI menu is opened by its
+key, E.
 `UI.log` names each layout ("bar: menu=0 ... | Q=build ...") and each press ("bar:
 click build", "bar: key S=bmining"). A click on the bar is the UI's, so the Assembler
 stays selected through it (capture).
@@ -28,11 +30,11 @@ stays selected through it (capture).
 4. Click at 640,262.
 5. Wait 1 second.
 6. Expect "UI.log" contains "Q=build W=order E=form R=aiMenu A=stop S=transport Z=gtracbm".
-7. Move the mouse to 446,527.
+7. Move the mouse to 510,483.
 8. Wait 2 seconds.
 9. Take a screenshot called "top level".
 10. Check that above the info panel at the bottom there is one dark rounded panel holding a grid of square icon buttons, each with a small yellow letter in its top-left corner (Q W E R in the top row, A S in the middle, Z at the bottom), that a tooltip box reading "Transport" is shown above it, and that there is no other row of command buttons anywhere on the screen.
-11. Click at 400,482.
+11. Click at 465,438.
 12. Wait 1 second.
 13. Expect "UI.log" contains "bar: click build".
 14. Expect "UI.log" contains "T=cancel".
@@ -58,9 +60,9 @@ stays selected through it (capture).
 34. Press g.
 35. Wait 1 second.
 36. Expect "UI.log" contains "bar: key G=back".
-37. Click at 490,411.
+37. Press e.
 38. Wait 1 second.
-39. Expect "UI.log" contains "bar: click aiMenu".
+39. Expect "UI.log" contains "bar: key E=aiMenu".
 40. Press g.
 41. Wait 1 second.
 42. Press Return.

@@ -667,8 +667,13 @@ its cinematic and then the loading screen (`LOADING.md`, ours with `[Loading]
 Enable=1`); after the last of the last campaign, the Credits; when the campaign is
 complete, the single-player screen; after a lost one, back to the shell. **On the
 bench the Admiral's Log came up after the first Federation mission was won** (2026-10-16,
-`Scene.asi`'s `succeed`), before the next mission, which the reading above did not
-predict; it is a dialog, hosted with its spec, so `[Menus] Enable=1` still needs nothing
+`Scene.asi`'s `succeed`), and its Done led to the **single-player screen**, not to the
+next mission (2026-10-16, on the way through the whole game; after an aborted mission
+the Log's Done led to the single-player screen too (once, in a session where the save
+had been loaded before, to the campaign's mission list), after an Instant Action match to the
+main menu), which
+the reading above did not predict; so a won mission returns to the shell as a lost one
+does, and the campaign goes on from the mission list. It is a dialog, hosted with its spec, so `[Menus] Enable=1` still needs nothing
 of its own for a mission's end, and its outcome is the stock one by construction. `testbench/scenarios/
 ui-menus-success.md` wins and loses the first Federation mission with `Scene.asi`'s
 `succeed` and `fail` and checks what comes next.

@@ -9,19 +9,21 @@ anything is patched or called.
 
     [HUD]
     Enable=1      ; 0: the HUD is stock whatever the panel keys say
-    Bar=0         ; the button bar is ours (below)
+    Bar=1         ; the button bar is ours (below)
     BarKeys=1     ; with it, the grid's keys; 0 keeps stock's bar keys
     BarLabels=1   ; the key in each button's corner
-    Info=0        ; the info panel is ours (below)
-    Minimap=0     ; the minimap is ours (below); MinimapSize=300, its side in units
-    Selection=0   ; the selection overlay is ours; SelectionGauges=1 shows the
+    Info=1        ; the info panel is ours (below)
+    Minimap=1     ; the minimap is ours (below); MinimapSize=300, its side in units
+    Selection=1   ; the selection overlay is ours; SelectionGauges=1 shows the
                   ; selected units' gauges always (0: as stock, while pointed at)
-    UnitView=0    ; our frame around the unit view, which the engine still draws
-    Comm=0        ; the comm panel, DropPlayer=0 the dropped-player box, LoadWait=0
+    UnitView=1    ; the unit view placed by us, in our frame; UnitViewSize=260
+    Comm=1        ; the comm panel, DropPlayer=1 the dropped-player box, LoadWait=1
                   ; the wait for the others' loads (below, "Comms, ...")
 
-Every panel key defaults to 0: with the shipped `UI.ini` the HUD is stock and the
-panel switch is not even patched.
+Every panel key defaults to 1: with the shipped `UI.ini` the whole HUD is ours, and
+`ui/install.sh` takes `HUD.asi` and `GridLayout.asi` out (README.md, "Installing").
+A panel at 0 is the stock one, on the stock canvas (README.md, "A part switched back
+to stock").
 
 ## What the HUD is made of
 
@@ -68,7 +70,7 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 | `MapRadar` (`mapRadar`) — **the minimap, ours** | the map, fog, units, the camera's view outline; ship/station filter buttons | `RadarComponent` from the scanner grids (fog) and the object lists | click/drag moves the camera or orders a move; filter buttons | the radar's own textures (`Gminimap`, `Gfog`, ...) and sprites | done: `engine::radar` |
 | `ResourcePanel` (`g_resourcePanel`) | the resources (dilithium, metal, latinum, biomatter, crew, officers) at the top | `ResourceComponent`s asking `Team::GetResource` | tooltips only | `StandardBackground` and text | `engine::resources` (the amounts, done); which `eResource` is which |
 | `ButtonPanel` (`g_buttonPanel`) | the top-right buttons: menu, comm, idle unit, view toggle, objectives, help, palette, more | fixed | its `StandardButton`s (focus-step) | `StandardButton` sprites with tooltips | done: `engine::topbar`, `hud/buttons.rs` |
-| `CinematicView` (`g_cinematicView`) — the unit view (`cinematicPanelArea`) | a second 3D view of the action, or a video | its camera, the action camera's target | clicks on it | a second scene render inside `RenderAll` (render3d/README.md: the action camera is a second view) | keep the engine's render; ours draws the frame around it only (done, `UnitView`) |
+| `CinematicView` (`g_cinematicView`) — the unit view (`cinematicPanelArea`) | a second 3D view of the action, or a video | its camera, the action camera's target | clicks on it | a second scene render inside `RenderAll` (render3d/README.md: the action camera is a second view) | keep the engine's render; ours places it and draws the frame around it (done, `UnitView`: "The unit view") |
 | `MessageDisplay` (`g_messageDisplay`) | a mission message box (text and OK) | script calls (`SetText`) | its OK button; pauses the game | `StandardBackground`, `StandardText`, `StandardButton` | done: `engine::popups`, `hud/messages.rs` |
 | `ObjectivesDisplay` (`g_objectivesDisplay`) | the briefing and objectives, ticks for completed ones | the mission's objectives file, `SetObjectiveComplete` | OK; keys while it has the mouse (`GameKeysProcessInput`) | as `MessageDisplay` | done: `engine::popups`, `hud/objectives.rs` |
 | `CommDisplay` (`commDisplay`), with its `CommBar`s | multiplayer comms: players, teams, alliances, give resources/units, chat targets, allied victory, latency | the transport's `GameSetup` | many buttons, toggles and amount boxes | `StandardButton`/`ToggleButton`/text | done: `engine::comm`, `hud/comm.rs` |
@@ -130,6 +132,16 @@ owns it. With no owner, `CursorInterface::Render` gives the device no cursor at 
 (each owner's `Render` puts its cursor in `iCursor+0x2c` for that), so just before it
 renders, ours puts the bar's own cursor there (`g_pPopupPalette+0x24`, which the bar's
 `PostLoad` loads with `LoadCursor`): the same arrow a stock panel shows.
+
+**A panel of ours draws only where its stock component would.** `RenderAll` walks the
+render list of the view in use (`s_pRenderList[View_Record]`), and the cinematic view
+(view 2: a mission's opening, the scripts' cutscenes) has a list of its own with only
+`CinematicView`, `OverlayText`, `ScreenFade`, `DropPlayerBox`, `LoadPercentBox` and
+`PauseBox` (UI.log's component list during the first Federation mission's opening).
+So `engine::hud::hidden(c)` is true for a component that is not in that list, as well
+as for one whose own flag is set: before, the resources, the buttons and the minimap of
+ours were drawn over the opening cutscene. In view 2 `CinematicView::Render` draws only
+a video; the unit view's frame follows.
 
 **Taking a panel.** `engine::hud::set_taken(at, by_pointer, on)`: a component by its
 address, or (the bar) by the global that points to it, read when asked.
@@ -491,14 +503,46 @@ they cover it.
 
 ## The unit view
 
-`hud/unitview.rs`, with `[HUD] UnitView=1`. `CinematicView` (`g_cinematicView`,
-0x763758) is a second render of the scene with its own camera
-(`ST3D_GraphicsEngine::SetCurrentCamera` around `RenderView`, which calls
-`Armada_RenderAllOurStuff`: render3d/README.md, the action camera) or a Bink video:
-only the engine can draw it, so it is not taken over. Ours draws a frame of the theme
-just outside its rectangle (`+0x04`), with the form's accent at two corners, while it
-is shown. `DisplayInterface::SetInterfaceState` shows it in state 0 and hides it in the
-others.
+`hud/unitview.rs` over `engine/unitview.rs`, with `[HUD] UnitView=1`.
+`CinematicView` (`g_cinematicView`, 0x763758) is a second render of the scene with
+its own camera (`ST3D_GraphicsEngine::SetCurrentCamera` around `RenderView`, which
+calls `Armada_RenderAllOurStuff`: render3d/README.md, the action camera), a Bink
+video, or a still picture (`cinematic_background`) while it renders neither: only the
+engine can draw it, so it is not taken over. **It is placed by us**, a square of
+`UnitViewSize` units (260) at the bottom right, and ours draws a frame of the theme
+just outside it, with the form's accent at two corners, while it is shown.
+
+**Where the engine draws it** is read from the component's own fields every frame,
+all relative to the corner of its rectangle `+0x04` (in the 1600 x 1200 space):
+`RenderView` and the video take the corner plus `cinematicDisplayArea` (`+0x48`, as
+left, top, right, bottom offsets), convert it to the screen with
+`DisplayInterface::ConvertRectangle` and give it to the view's camera as its
+viewport (put back after); the still picture is drawn at the corner plus
+`cinematicBackgroundArea` (`+0x38`); `CursorOver` tests the pointer against `+0x04`.
+Stock reads them once, in `PostLoad` (`cinematicPanelArea` 350 x 384 at the bottom
+right, both areas 320 x 320 at 25, 19 inside it), so on the stock canvas at 16:9 the
+view is stretched and its camera's viewport with it. `engine::unitview::place` writes
+all three each frame from our place: `+0x04` the square in canvas units (whole units
+covering the pixels), both areas at offset 0 and the panel's size. The camera then
+gets a square viewport at any aspect, and the pointer's test agrees with what is
+drawn.
+
+**The stock frame** (`cinematicBackgroundPanel`, a `StandardBackground` at `+0x58`
+whose tiles are placed from the same corner and sized for the 350 x 384 panel) is
+drawn by `CinematicView::Render` after the view, on every path. While ours places the
+view, the panel switch calls `engine::unitview::render` for this component in place of
+its `Render` (`engine/hud.rs`): the frame's pointer is swapped for an inert object of
+ours, whose vtable's every slot is an empty function, for that one call (the frame's
+`Render`, vtable `+0x10`, is the only call made on it there), and put back. Checked
+first: the component's and the frame's vtables still hold `CinematicView::Render`
+and `StandardBackground::Render`; else ours only draws its frame around the stock
+place.
+
+**When it shows.** `DisplayInterface::SetInterfaceState` shows it in state 0 and hides
+it in the others. The state is the profile's interface mode (`[0x76b5ac]+0x78`, Game
+Settings' Interface Mode), which Ctrl+I steps through 0..3; the bench's profile has 1
+(no unit view). In state 0, with Graphics Settings' Cinematic Window on, it renders the
+action camera; else the still picture.
 
 ### Seen on the bench (minimap, overlay)
 
@@ -617,7 +661,12 @@ never gets its focus-step, so with the box ours `popups::objectives_keys` calls
 Measured on the bench: a first version that pressed OK on Enter itself and kept the
 key from the engine left the Starfleet Academy tutorial's lessons stuck and its
 zoom unanswered; closed by its own step, the tutorial runs as with the stock box. Its
-hidden-step, which opens it on the objectives key (Alt+O), still runs. Ours: windows
+hidden-step, which opens it on the objectives key (Alt+O), still runs. **The box stays the mouse's owner while it shows** (the panel switch's `CursorOver`
+says yes for it, taken or not): `GameKeysProcessInput`, which runs before
+`SimulateAll` every pass, opens the chat line on Return unless the owner is
+`ObjectivesDisplay`. Without it, Return closed our box and opened the chat line too,
+and the next Esc closed the chat instead of opening the in-mission menu (seen on the
+bench in `ui-whole-game.md`). Ours: windows
 over a dimmed screen (`panels::boxed`; not `Ui::modal`, which keeps the keyboard),
 the message's title as the window's, the text wrapped; the objectives with a check
 box per line, ticked when complete.

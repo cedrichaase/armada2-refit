@@ -40,23 +40,7 @@ fi
 
 bash "$here/build.sh" >/dev/null
 
-echo "reverting the file-based fixes HUD.asi replaces:"
-python3 "$here/ui-widescreen.py"    --revert | sed 's/^/  /'
-python3 "$here/ui-font-condense.py" --revert | sed 's/^/  /'
-python3 "$here/cursor-aspect.py"    --revert | sed 's/^/  /'
-
-# Those two --reverts restore from their .a2neb-backup and keep it.  A backup
-# left beside a file that is stock again reads as "still modified" to a2mod,
-# and as "squashed cursors installed" to HUD.asi, so drop each one -- but only
-# where the file now matches it byte for byte.
-dropped=0
-shopt -s nullglob nocaseglob
-for b in "$GAME"/misc/gui_*.cfg.a2neb-backup "$GAME"/Textures/RGB/curs_*.tga.a2neb-backup; do
-    f="${b%.a2neb-backup}"
-    if [ -f "$f" ] && cmp -s "$f" "$b"; then rm -f "$b"; dropped=$((dropped + 1)); fi
-done
-shopt -u nullglob nocaseglob
-echo "  $dropped backup(s) dropped beside files now identical to them"
+bash "$here/revert-files.sh"
 
 cp "$here/build/HUD.asi" "$GAME/HUD.asi"
 cp "$here/HUD.ini"       "$GAME/HUD.ini"

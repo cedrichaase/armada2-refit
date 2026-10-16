@@ -40,8 +40,10 @@ WHAT COUNTS AS A CHANGE
                   (right-drag pan speed), switched so stock really is stock
     grid          GridLayout.asi/.ini          -- added files: the bar as a 5x3 grid with
                   position keys; switched so stock has stock's bar and keys
-    ui            UI.asi/.ini                  -- added files: the UI runtime, its HUD panels
-                  and menus (each off until UI.ini turns it on)
+    ui            UI.asi/.ini                  -- added files: the HUD, the menus, the loading
+                  screen and the cursor drawn by the UI.  ./install no longer puts
+                  in HUD.asi, GridLayout.asi or Menus.asi (ui/supersede.sh takes them
+                  out); an older install that still has them is snapshot as it is
     cutscenes    binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
                   animations/<Name>.mp4/.wav beside a <Name>.bik  -- cutscenes/binkproxy
     renderer      dxvk.conf                    -- AF, LOD bias, seamless cubes

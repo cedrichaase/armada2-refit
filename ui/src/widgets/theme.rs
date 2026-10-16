@@ -1232,7 +1232,7 @@ static mut PLATE: Option<Option<crate::gfx::Tex>> = None;
 /// The menu plate (`Menus/mainbkgr.bmp`, installed by menus/install-plates.sh), loaded
 /// on first use; None when it is not installed.
 #[allow(static_mut_refs)]
-fn plate() -> Option<crate::gfx::Tex> {
+pub fn plate() -> Option<crate::gfx::Tex> {
     unsafe {
         if PLATE.is_none() {
             let t = crate::gfx::load_bmp("Menus/mainbkgr.bmp");
