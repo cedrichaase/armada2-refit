@@ -81,13 +81,28 @@ pub fn button(ui: &mut Ui, s: &Screen, c: &Control, r: R, label: Option<&str>) -
     }
     let id = ui.id(&key(c, "b"));
     let (hot, held, clicked) = ui.interact(id, r);
-    let mut st = State::of(ui, id, hot, held);
-    st.on = c.checked || (matches!(c.what, What::Shell(Kind::Toggle)) && c.checked);
+    let st = State::of(ui, id, hot, held);
     theme::button(ui, r, text, st);
     if clicked {
-        s.click_control(c);
+        press(s, c);
     }
     clicked
+}
+
+/// The stock click on `c`. A shell button whose label is justified (Game Setup's
+/// "Minimap Hidden", "Resources: Normal"; the Advanced panel's settings) is a small
+/// square picture with its label beside it, and takes the pointer on the square only (a
+/// click in the middle of "Minimap Hidden" did nothing). The square is at the end the
+/// label is justified to: the left, or the right for a right-justified label (the
+/// Advanced panel's left column). A button with a centred label is clicked in its
+/// middle.
+pub fn press(s: &Screen, c: &Control) {
+    let half = c.rect[3] / 2;
+    match (&c.what, c.align) {
+        (What::Shell(Kind::Toggle | Kind::Button | Kind::Cycle), -1) => s.click(c.rect[0] + half, c.rect[1] + half),
+        (What::Shell(Kind::Toggle | Kind::Button | Kind::Cycle), 1) => s.click(c.rect[0] + c.rect[2] - half, c.rect[1] + half),
+        _ => s.click_control(c),
+    }
 }
 
 /// A plain button of ours that clicks a design point of the dialog (a hit area the
@@ -107,24 +122,11 @@ pub fn point_button(ui: &mut Ui, s: &Screen, r: R, label: &str, x: i32, y: i32, 
     clicked
 }
 
-/// A cycle (or toggle) button as a button showing its current label, with a small
-/// heading over it when `heading` is given. A click steps it, through the stock click.
+/// A cycle (or toggle) button: a button labelled with the stock label, which says the
+/// current choice ("Resources: Lots", "Warp Disabled"). A click steps it, through the
+/// stock click. Not a drop-down: the stock button has no list, only a next choice.
 pub fn cycle(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> bool {
-    let live = s.top && c.enabled;
-    let id = ui.id(&key(c, "c"));
-    let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
-    let mut st = State::of(ui, id, hot, held);
-    st.off = !c.enabled;
-    let col = theme::button_frame(ui, r, st);
-    let t = ui.theme;
-    let pad = ui.u(t.pad);
-    ui.text_in(R::new(r.x + pad, r.y, r.w - 2.0 * pad - r.h * 0.5, r.h), &c.text, t.text_size, Align::Left, col, Weight::Regular);
-    // The mark that says a click steps it: a chevron at the right.
-    theme::dropdown_arrow(ui, r, State { on: false, ..st });
-    if clicked {
-        s.click_control(c);
-    }
-    clicked
+    button(ui, s, c, r, None)
 }
 
 /// A heading and a value line over a control, as the setup screens' groups have.
@@ -211,22 +213,11 @@ pub fn choose(s: &Screen, c: &Control, i: i32) -> bool {
     true
 }
 
-/// A shell toggle as our check box with the toggle's own label (which says its state).
+/// A shell toggle. Its label says its state ("Fixed Placement", "Warp Disabled"), and
+/// its on flag does not always mean the setting is on (Warp Enabled is a toggle that
+/// is off), so it is drawn as a button with that label, as `cycle`.
 pub fn check(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> bool {
-    let live = s.top && c.enabled;
-    let id = ui.id(&key(c, "t"));
-    let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
-    let mut st = State::of(ui, id, hot, held);
-    st.off = !c.enabled;
-    let bw = theme::check(ui, r, c.checked, st);
-    let t = ui.theme;
-    let gap = ui.u(t.pad * 0.7);
-    let col = theme::row_text(ui, State { on: false, ..st });
-    ui.text_in(R::new(r.x + bw + gap, r.y, r.w - bw - gap, r.h), &c.text, t.text_size, Align::Left, col, Weight::Regular);
-    if clicked {
-        s.click_control(c);
-    }
-    clicked
+    button(ui, s, c, r, None)
 }
 
 /// A piece of the stock dialog's picture (a colour swatch, a map preview) drawn in `r`,

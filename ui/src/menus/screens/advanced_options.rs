@@ -64,7 +64,16 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     // The two columns split at the stock panel's middle.
     let mid = s.model.rect[0] + s.model.rect[2] / 2;
     let w = ui.u(1100.0).min(screen.w - ui.u(32.0));
-    let h = ui.u(800.0).min(screen.h - ui.u(32.0));
+    // As tall as the fuller column needs.
+    let bh0 = ui.u(t.button_h);
+    let slider_h0 = ui.u(t.small_size + 34.0);
+    let col_h = |left: bool| {
+        let n_sl = sl.iter().filter(|sd| (sd.x + 100 < mid) == left).count() as f32;
+        let n_set = set.iter().filter(|c| (c.rect[0] + c.rect[2] / 2 < mid) == left).count() as f32;
+        n_sl * (slider_h0 + ui.u(t.gap)) + n_set * (bh0 + ui.u(t.gap))
+    };
+    let need = col_h(true).max(col_h(false)) + ui.u(t.title_size + 2.0 * t.pad + 8.0) + bh0 + ui.u(t.pad * 3.0);
+    let h = need.min(screen.h - ui.u(32.0));
     let r = Anchor::Centre.place(screen, w, h, 0.0);
     let inner = ui.window(r, "Advanced Options");
     let bh = ui.u(t.button_h);

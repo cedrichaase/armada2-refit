@@ -6,8 +6,9 @@
 //!   player, side and team as our drop-downs over the stock `ComboBox`es
 //!   (`engine::shellcombo`). A choice is the two clicks a player gives the stock one.
 //!   Under the rows, the colour palette (the stock swatches) and its Random button.
-//! - **Chat** in a multiplayer game: the stock chat log (a read-only edit) and the line
-//!   being typed (the stock edit, as our field).
+//! - **Messages and chat**, under the players: the stock message log (a read-only
+//!   edit, which also tells of each setting changed) and, in a multiplayer game, the
+//!   chat line being typed (the stock edit, as our field).
 //! - **The map**, a window on the right: its name and players and what the screen says
 //!   of it (the stock labels), the minimap preview (cropped from the mirror; a click on
 //!   it is a click on the stock preview, which picks a start location), and the
@@ -30,7 +31,7 @@ use alloc::vec::Vec;
 /// x 450 and above y 300; the minimap preview's frame; the bottom row of buttons.
 const TABLE_RIGHT: i32 = 450;
 const TABLE_BOTTOM: i32 = 260;
-const PREVIEW: [i32; 4] = [619, 125, 166, 166];
+const PREVIEW: [i32; 4] = [627, 129, 155, 155];
 const BOTTOM_ROW: i32 = 560;
 
 fn is_combo(c: &Control) -> bool {
@@ -100,7 +101,8 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
     let edits = kit::visible(s, kit::is_edit);
     let log = edits.iter().find(|c| c.style & 0x4 != 0).copied();
     let line = edits.iter().find(|c| c.style & 0x4 == 0).copied();
-    let chat = line.is_some();
+    // The log also says what the host changed ("Resources: Lots"), in Instant Action too.
+    let chat = line.is_some() || log.is_some();
     let row_h = ui.u(t.row_h + 6.0);
     let head_h = ui.u(t.small_size + 10.0);
     let palette_h = ui.u(t.button_h);
@@ -154,7 +156,7 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
     if chat {
         let cr = R::new(r.x, pr.bottom() + ui.u(t.gap * 2.0), r.w, r.bottom() - pr.bottom() - ui.u(t.gap * 2.0));
         let ci = kit::panel(ui, cr);
-        let fh = ui.u(t.row_h + 4.0);
+        let fh = if line.is_some() { ui.u(t.row_h + 4.0) } else { -ui.u(t.gap) };
         if let Some(lc) = log {
             chat_log(ui, &lc.text, R::new(ci.x, ci.y, ci.w, ci.h - fh - ui.u(t.gap)));
         }

@@ -19,6 +19,20 @@ use crate::menus::Screen;
 use crate::widgets::{theme, Align, Anchor, State, Ui};
 use alloc::vec::Vec;
 
+/// The map last clicked in this dialog, by its label. The stock rows do not say which
+/// map is chosen: a clicked row is drawn held (button state 2) and stays so when the
+/// list scrolls under it or another row is clicked, so the held rows are only a guess
+/// before the first click.
+static mut CHOSEN: (crate::rt::win::HWND, alloc::string::String) = (core::ptr::null_mut(), alloc::string::String::new());
+
+fn selected(s: &Screen, rows: &[&Control]) -> Option<usize> {
+    let chosen = unsafe { &*core::ptr::addr_of!(CHOSEN) };
+    if chosen.0 == s.slot.hwnd {
+        return rows.iter().position(|c| c.text == chosen.1);
+    }
+    rows.iter().position(|c| c.hover == 2)
+}
+
 pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     // The rows: wide labelled buttons, one under another.
     let mut rows: Vec<&Control> = kit::visible(s, |c| matches!(c.what, What::Shell(Kind::Button)) && c.rect[2] > 200 && c.rect[3] < 20);
@@ -64,14 +78,14 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         let live = s.top && c.enabled && !c.text.is_empty();
         let (hot, held, clicked) = if live { ui.interact(id, rr) } else { (false, false, false) };
         let mut st = State::of(ui, id, hot, held);
-        // The stock row stays drawn held while it is the selection.
-        st.on = c.hover == 2 || c.checked;
+        st.on = selected(s, &rows) == Some(i);
         theme::row(ui, rr, i, st);
         let col = theme::row_text(ui, st);
         ui.text_in(rr.inset(ui.u(8.0)), &c.text, t.text_size, Align::Left, col, Weight::Regular);
         if clicked {
             s.click_control(c);
             double = ui.input.double[0];
+            unsafe { CHOSEN = (s.slot.hwnd, c.text.clone()) };
         }
     }
     // The arrows, as our buttons beside the list; the wheel clicks them too.

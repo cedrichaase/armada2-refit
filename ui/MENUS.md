@@ -120,6 +120,12 @@ Each pass, about 60 a second:
    `Present`. A lost device skips the frame and keeps pumping.
 6. **Run the actions** the frame queued, and leave the loop if the dialog ended.
 
+**A nested dialog lets go of the mouse capture.** A dialog opened by a click on another
+(Game Setup's SELECT MAP opens Map Select) can start while the outer dialog still holds
+the capture its button press took; every press then went to that hidden window, which
+the pump drops, and Map Select's spec never saw a click. `run_modal` releases a capture
+held by a hosted window when it starts (`UI.log`: "opens with the capture held").
+
 `EndDialog` on a hosted modal dialog only records the result; the loop ends, the window
 is destroyed (`WM_DESTROY` reaches the game's procedure, as after a stock
 `DialogBox`), and the caller gets the result. A dialog opened from a hosted one runs a
@@ -210,7 +216,9 @@ model has no widget there.
 `ShellToggleButton` 0x6bb18c, `ShellButtonSelBox` 0x6bb0e4, and the screens' own
 `FileSelectButton`, `RoomSelectButton`, `PlayerListButton`, ...); one whose slot 1 is
 `TextLabel::Draw` (0x5a7590) is a label (`TextLabel`, `StdTextLabel` 0x6bbaa4).
-`ShellScrollBar` (0x6bb164) is left to the mirror.
+`ShellScrollBar` (0x6bb164) is left to the mirror. `ComboBox` (Game Setup's player
+rows, Map Select's filter) is a `ShellButton` with an `UpdateButton` of its own, so it
+is recognised by its vtable (`Kind::Combo`, below).
 
 **What is read**, each offset from the method that writes it:
 
@@ -226,6 +234,8 @@ model has no widget there.
 | label alignment | button +0x174 left, +0x175 right | `SetLeftJustifyText`, `SetRightJustifyText` |
 | toggle on | `ShellToggleButton` +0x188 | `SetButton` (0x5a69b0), which also copies the on or off label to +0x3c |
 | cycle choice | `CycleButton` +0x198 | `GetSelection` (0x5a5dd0) |
+| hidden combo box | `ComboBox` +0x198 (an `HWND`) | `ComboBox::Send`, which forwards every message to it |
+| pull-down: item count, item height, rectangle, opens downwards | `ComboBox` +0x178, +0x17c, +0x180 (left, top, right, bottom, the button's own row included), +0x1b4 | `Send` (counts `CB_ADDSTRING`/`CB_INSERTSTRING`, sizes the pull-down), `InDropDownArea` |
 | label text | `TextLabel` +0x8 (`char[1024]`); `StdTextLabel` the `std::string` at +0x468 | `SetLabelText` (0x5a7650, 0x5e8bd0) |
 | label rectangle, flags | `TextLabel` +0x408, +0x418 (`DrawText` flags) | constructor (0x5a73a0) |
 | label shown, colour | `TextLabel` +0x45c, +0x464 | `HideLabelText`/`ShowLabelText` (0x5a7690), the constructor |
@@ -298,8 +308,11 @@ to map a scenario's design coordinates to the screen (`testbench/bench/scenario.
 
 ## Writing a screen spec
 
-A spec lays a screen out our way; the stock dialog still runs under it. One exists, the
-main menu (`src/menus/screens/main_menu.rs`). To write another:
+A spec lays a screen out our way; the stock dialog still runs under it. The main menu
+(`src/menus/screens/main_menu.rs`) is the example; the setup and multiplayer screens
+below are built from `screens/kit.rs`, which draws each kind of stock control as our
+widget and acts on it the stock way (`kit::button`, `cycle`, `combo`, `edit`, `list`,
+`picture`, and `form` for a whole small dialog). To write another:
 
 1. **Find the screen's name** in `SCREENS` in `src/engine/dialogs.rs` (the table below
    has them all). A spec is chosen by the dialog procedure, never the template: 0x123 is
@@ -322,7 +335,10 @@ main menu (`src/menus/screens/main_menu.rs`). To write another:
    - keep the art where it carries information with `s.mirror_part(ui, design_rect,
      screen_rect, tint)`: a map preview, a portrait, the screen's own background
      (the main menu fades it behind its buttons);
-   - only `s.top` takes input: draw a lower dialog without acting.
+   - only `s.top` takes input: draw a lower dialog without acting;
+   - a shell button whose label is justified beside a small square (Game Setup's
+     "Fixed Placement", the Advanced panel's settings) takes the pointer on the square
+     only: `kit::press` clicks the square, at the end the label is justified to.
 4. **Hover**, if the stock screen plays a sound or an animation on it, is a
    `WM_MOUSEMOVE` to the stock button's point when your hover changes (the main menu
    does this).
@@ -331,6 +347,78 @@ main menu (`src/menus/screens/main_menu.rs`). To write another:
 
 `[Menus] Specs=0` draws every screen generically, for comparing a spec with the stock
 screen.
+
+## The setup and multiplayer specs
+
+Each finds its controls in the model by kind and place, not by label, so it works in
+every language and in each of the screen's states, and returns false (the generic
+screen draws it) when they are not there. All act only through the stock controls.
+
+### Game Setup (`game_setup.rs`)
+
+Instant Action's setup and every multiplayer game's (`do_multiplayerSetup`).
+
+- **The player rows are `ComboBox`es, not cycle buttons.** Each row is three (player or
+  computer, side, team; the player one doubled, one of the pair hidden), and each shows
+  the choice of a hidden Win32 combo box and draws a pull-down list of its own into the
+  dialog when clicked (`engine::shellcombo`). The model reads a `ComboBox` like a
+  button (its rectangle, shown, enabled) and its items and choice from the hidden combo
+  box (`CB_GETLBTEXT`, `CB_GETCURSEL`). Our drop-down shows them; a choice is the two
+  clicks a player would give: on the stock button, which opens the pull-down, and on
+  the item in it. The pull-down's rows are `h` (+0x17c) tall from the top of its
+  rectangle (+0x180); opening downwards, the first row is the button itself, so item
+  `i` is row `i + 1`; opening upwards, item `i` is row `i` and the last row is the
+  button (`InDropDownArea` tests the same bands). Sending the hidden combo box
+  `CB_SETCURSEL` instead would change what is shown without the screen's handler.
+- **Colours** are the stock swatches, cropped from the mirror, left of each row and in
+  the palette under the table, and clicked where they are: a click on a row's swatch
+  and then on a palette swatch recolours that player, as in stock.
+- **The map** window: the map's labels (name, players, "Teams are locked."), the
+  minimap preview cropped from the mirror (design 627,129, 155x155: the frame's inside,
+  clear of the "Shroud On, Fog On" label, which the stock screen draws across the
+  frame); a click on it is a click on the stock preview (start locations, with Fixed
+  Placement). The settings are buttons labelled as the game labels them, which say
+  their state ("Resources: Lots", "Fixed Placement"); a toggle's on flag does not
+  always mean on ("Warp Enabled" is a toggle that is off), so no check mark is drawn.
+- **Messages and chat**: the multi-line read-only edit under the table is the screen's
+  log (it says "Resources: Lots" when the host changes it, in Instant Action too); a
+  single-line edit is the chat line, our field, whose typing goes to the stock edit.
+- In stock the Instant Action "Minimap Hidden" toggle does nothing when clicked.
+
+### Advanced Options (`advanced_options.rs`)
+
+`LaunchAdvancedOptionsWindow`. Two columns as in stock. The sliders are
+`ShellScrollBar`s, which the model leaves to the mirror: each slider's three labels
+(the name centred, the two ends justified left and right) are read, and the bar is
+cropped from the mirror 16 design pixels under them, from the left end's label to the
+right end's. The pointer over a bar, and a drag that started on one, goes to the stock
+dialog at the bar's design place (`generic::forward_input` with the pointer mapped
+into it), so the stock bar moves itself.
+
+### Map Select (`map_select.rs`)
+
+`do_mapSelect`. The stock list is fourteen `FileSelectButton` rows whose labels are the
+maps at the scroll position, two arrow buttons beside them, a filter (`ComboBox`), and
+Select Map and Cancel. Our list shows the fourteen; the wheel and our arrows click the
+stock arrows; a click on a row is the stock click (which chooses it), a double click
+that and Select Map. The stock rows do not say which map is chosen: a clicked row is
+drawn held (button state 2) and stays so when another is clicked or the list scrolls
+under it, so the spec marks the row it last clicked, by label, and the held one before
+any click. The preview is Game Setup's (it shows the chosen map once Map Select
+closes).
+
+### Multiplayer Connection (`multiplayer.rs`) and the small dialogs (`forms.rs`)
+
+- **Multiplayer Connection**: the name (the stock edit, as our field), and the
+  connection buttons in their stock order, labelled as the game labels them. With
+  `Online.asi`, *Internet - Online* is the stock IPX button relabelled
+  (online/README.md, "The menu entry"), so it is in the model like the others and a
+  click on it is the stock click that `Online.asi` turns into the online flow.
+- **Manual IP, the game's name, create room, password, map transfer, room select and
+  the GameSpy account screens** are `kit::form`: one window with the dialog's labels
+  (the first, when it stands above everything, as the title), edits as fields, lists
+  as lists, and the buttons along the bottom. GameSpy is gone, so the account screens
+  and the room list are not reached; they are forms so that they work if they are.
 
 ## The screens
 
@@ -388,6 +476,13 @@ hidden surfaces).
   LAUNCH; the in-mission menu over the mission, closed by Esc; Save Game with a typed
   name; Load Game of that save (abort, Yes); quit.
 
+- `ui-menus-setup.md`: Instant Action's Game Setup through its spec: two computer
+  players set through the drop-downs, a side, Fixed Placement, Map Select (scrolled,
+  Four Sisters chosen), the Advanced panel (Warp off, a slider moved), LAUNCH.
+- `ui-menus-multiplayer.md`: two games, both with the UI's menus and Microsoft's
+  DirectPlay (`ui/bench-asi.sh --dplay`): Multiplayer Connection, Manual IP, the lobby,
+  Create Game, the joiner's game list, Game Setup with chat both ways, LAUNCH.
+
 ## Not done
 
 - **The generic `widgets` screen and the local text field, list and drop-down are not
@@ -398,8 +493,15 @@ hidden surfaces).
   composed by the code above, not seen), the Technology Tree, Multiplayer and its
   lobbies (no network on the bench), Credits (a screen of the engine's own, not a
   dialog: it runs as before), the licence, GameSpy and command-line screens.
-- **One spec**, the main menu, with English labels (the stock art carries the words,
-  so the spec names its buttons itself).
+- **Specs** for the main menu (English labels: the stock art carries the words), Game
+  Setup, Advanced Options, Map Select, Multiplayer Connection, the Internet lobby and
+  the small multiplayer dialogs. The other screens are generic.
+- **Map Select's list is the stock window of fourteen rows**, scrolled by the stock
+  arrows: the whole list of maps is not read (it is `KnownMaps`'), and the stock scroll
+  bar's thumb is not drawn.
+- **The `Shell::Screen::Show` screens** (voice options, command-line host and join)
+  are hosted with the generic screen: they are not reached on the bench, so their
+  model has not been read, and they have no spec.
 - **Keyboard navigation** of a spec (arrows, Enter) and of the generic screen beyond
   what the stock dialog does with Enter, Esc and Tab.
 - **The cursor** is the system arrow over the 3D window, as with the GDI menus; a cursor
