@@ -135,6 +135,32 @@ pub fn texture_dynamic(w: u32, h: u32) -> Tex {
     register(TexSrc { w, h, fmt: FMT_X8R8G8B8, pixels: Pixels::Owned(px), obj: None, dirty: true })
 }
 
+/// As `texture_dynamic`, with its alpha (`FMT_A8R8G8B8`): a mask whose pixels change
+/// (the minimap's fog, `hud::minimap`). Transparent until `tex_update`.
+pub fn texture_dynamic_argb(w: u32, h: u32) -> Tex {
+    let px = alloc::vec![0u8; (w * h * 4) as usize];
+    register(TexSrc { w, h, fmt: FMT_A8R8G8B8, pixels: Pixels::Owned(px), obj: None, dirty: true })
+}
+
+/// A texture that is the engine's (a Direct3D 9 texture it made, e.g. the minimap's
+/// picture): nothing of its own, drawn from what `tex_set_external` last gave it.
+pub fn texture_external() -> Tex {
+    register(TexSrc { w: 1, h: 1, fmt: 0, pixels: Pixels::Static(&[]), obj: None, dirty: false })
+}
+
+/// The engine texture an external `Tex` draws from (None: it draws nothing).
+#[allow(static_mut_refs)]
+pub fn tex_set_external(t: Tex, tex: Option<Com>, w: u32, h: u32) {
+    let v = unsafe { &mut TEXTURES };
+    let Some(s) = v.get_mut(t.0 as usize) else { return };
+    if s.fmt != 0 {
+        return;
+    }
+    s.w = w.max(1);
+    s.h = h.max(1);
+    s.obj = tex.map(|c| (Device(core::ptr::null_mut()), c));
+}
+
 /// New pixels for a `texture_dynamic`: `rows` rows of `w * 4` bytes from `src`, `pitch`
 /// bytes apart, written at the top-left; copied to the device when it next draws.
 #[allow(static_mut_refs)]
@@ -169,6 +195,10 @@ pub fn tex_size(t: Tex) -> (u32, u32) {
 fn tex_obj(dev: Device, t: Tex) -> *mut c_void {
     let v = unsafe { &mut TEXTURES };
     let Some(s) = v.get_mut(t.0 as usize) else { return core::ptr::null_mut() };
+    if s.fmt == 0 {
+        // The engine's own texture (`texture_external`), on the device in use.
+        return s.obj.as_ref().map_or(core::ptr::null_mut(), |(_, c)| c.ptr());
+    }
     if s.dirty && s.obj.as_ref().is_some_and(|(d, _)| *d == dev) {
         // Changed pixels on a texture already made here: copy them again.
         let (_, tex) = s.obj.as_ref().unwrap();

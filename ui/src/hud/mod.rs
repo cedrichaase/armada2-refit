@@ -5,12 +5,18 @@
 //! acts through the component's own functions.
 pub mod bar;
 pub mod info;
+pub mod minimap;
+pub mod overlay;
+pub mod unitview;
 
 use crate::engine::{self, hud};
 use crate::widgets::Ui;
 
 static mut BAR: bool = false;
 static mut INFO: bool = false;
+static mut MINIMAP: bool = false;
+static mut SELECTION: bool = false;
+static mut UNIT_VIEW: bool = false;
 
 /// Patches what the panels switched on in UI.ini need; each stands down on its own.
 pub fn install() -> bool {
@@ -19,7 +25,7 @@ pub fn install() -> bool {
         crate::log!("hud: Enable=0, the HUD is stock");
         return false;
     }
-    if !cfg.bar && !cfg.info {
+    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view {
         crate::log!("hud: no panel switched on, the HUD is stock");
         return false;
     }
@@ -30,6 +36,7 @@ pub fn install() -> bool {
     if !hud::install() {
         return false;
     }
+    map_panels(cfg);
     if cfg.bar {
         let grid = unsafe { crate::rt::win::GetModuleHandleA(c"GridLayout.asi".as_ptr() as *const u8) };
         if !grid.is_null() {
@@ -54,6 +61,33 @@ pub fn install() -> bool {
     true
 }
 
+/// The minimap, the selection overlay and the unit view's frame (minimap.rs,
+/// overlay.rs, unitview.rs).
+fn map_panels(cfg: &crate::config::Hud) {
+    if cfg.minimap {
+        if engine::radar::functions_stock() && minimap::install() {
+            hud::set_taken(engine::radar::MAP_RADAR, false, true);
+            unsafe { MINIMAP = true };
+            crate::log!("minimap: ours");
+        } else {
+            crate::log!("minimap: stays stock");
+        }
+    }
+    if cfg.selection {
+        if engine::overlay::functions_stock() && engine::radar::functions_stock() {
+            hud::set_taken(engine::overlay::SELECTION_DISPLAY, false, true);
+            unsafe { SELECTION = true };
+            crate::log!("selection: ours, gauges {}", if cfg.selection_gauges { "on the selection" } else { "as stock" });
+        } else {
+            crate::log!("selection: stays stock");
+        }
+    }
+    if cfg.unit_view {
+        unsafe { UNIT_VIEW = true };
+        crate::log!("unit view: our frame");
+    }
+}
+
 static mut LOGGED: f64 = -10.0;
 
 /// A mission's frame: every panel of ours.
@@ -68,6 +102,16 @@ pub fn run(ui: &mut Ui) {
             hud::log_components();
         }
         LOGGED = now;
+        if SELECTION {
+            let keep = if MINIMAP { let (o, _, _) = minimap::place(ui); alloc::vec![o] } else { alloc::vec::Vec::new() };
+            overlay::run(ui, &keep);
+        }
+        if UNIT_VIEW {
+            unitview::run(ui);
+        }
+        if MINIMAP {
+            minimap::run(ui);
+        }
         // The info panel first: the bar is placed against it.
         if INFO {
             info::run(ui);
