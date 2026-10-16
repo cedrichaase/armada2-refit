@@ -1,5 +1,12 @@
 # Menus — Armada II's front-end menus
 
+> **Superseded by the UI.** `./install` no longer installs `Menus.asi`: the UI hosts
+> the menus (`[Menus] Enable`, `ui/MENUS.md`), and `ui/install.sh` takes `Menus.asi`
+> out. The backdrop plates (`backdrop.sh`, `install-plates.sh`) are still built and
+> installed: the UI's menus draw them. This file stays as the description of the
+> shell the UI hosts, and for a player who sets `[Menus] Enable=0` and runs
+> `menus/install.sh` by hand.
+
 `Menus.asi` fixes the game's GDI menu shell: it raises the front-end display mode,
 scales the menus to fill the screen, embeds them in the game window (`Embed=1`),
 composites hi-res backdrops behind them and removes the menu-switch flash. It was

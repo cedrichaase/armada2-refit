@@ -1,5 +1,10 @@
 # grid — the button bar as a grid of keys
 
+> **Superseded by the UI.** `./install` no longer installs `GridLayout.asi`: the UI's
+> bar has the grid (`[HUD] Bar`, `ui/HUD.md`, "The button bar"), and `ui/install.sh`
+> takes `GridLayout.asi` out. This file stays as the behaviour the UI's bar matches,
+> and for a player who sets `[HUD] Bar=0` and runs `grid/install.sh` by hand.
+
 `GridLayout.asi` turns the button bar into a fixed 5×3 grid and gives every cell one
 key, by its position on the keyboard:
 
