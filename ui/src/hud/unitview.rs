@@ -30,6 +30,11 @@ pub fn run(ui: &mut Ui) {
     if hud::hidden(c) || crate::engine::ingame::hud_hidden() {
         return;
     }
+    // In the cinematic view (a cutscene) the engine draws the unit view only while it
+    // plays a video (`CinematicView::Render` returns at once otherwise): no frame then.
+    if crate::engine::radar::view() == 2 && !hud::video_playing() {
+        return;
+    }
     let p = if unitview::enabled() { unitview::view_rect(ui.w, ui.h) } else { hud::panel_rect(c, ui.w, ui.h) };
     let Some(p) = p else { return };
     let r = R::new(p[0], p[1], p[2] - p[0], p[3] - p[1]);

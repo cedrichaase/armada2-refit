@@ -82,9 +82,21 @@ pub fn panel_rect(c: usize, w: f32, h: f32) -> Option<[f32; 4]> {
     Some([r[0] as f32 * sx, r[1] as f32 * sy, (r[2] + 1) as f32 * sx, (r[3] + 1) as f32 * sy])
 }
 
-/// Whether the panel is hidden (`SetIsHidden`; a cinematic hides them all).
+/// Whether the panel is hidden: its own flag (`SetIsHidden`; the interface modes hide
+/// them), or it is not in the render list of the view in use. The cinematic view
+/// (`View_Record` 2, a mission's opening and the scripts' cutscenes) has a list of its
+/// own with only the unit view, the overlay messages, the fade and the multiplayer and
+/// pause boxes in it: seen on the bench, the first Federation mission's opening
+/// showed the resources, the buttons and the minimap of ours over it until this.
 pub fn hidden(c: usize) -> bool {
-    c == 0 || unsafe { rd::<u8>(c + DI_HIDDEN) } != 0
+    c == 0 || unsafe { rd::<u8>(c + DI_HIDDEN) } != 0 || !in_view(c)
+}
+
+/// Whether `RenderAll` walks this component in the view in use (true when the list
+/// cannot be read, so a misread hides nothing).
+pub fn in_view(c: usize) -> bool {
+    let list = components();
+    list.is_empty() || list.contains(&c)
 }
 
 /// The component's name (`GetName`), e.g. "PopupPalette".
