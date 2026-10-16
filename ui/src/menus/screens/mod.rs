@@ -10,7 +10,15 @@
 use super::Screen;
 use crate::widgets::Ui;
 
+pub mod common;
+pub mod form;
+pub mod game_settings;
+pub mod graphics_settings;
 pub mod main_menu;
+pub mod notice;
+pub mod options;
+pub mod sound_settings;
+pub mod text_window;
 
 pub struct Spec {
     /// The screen it lays out, as `engine::dialogs::screen_name` names it.
@@ -18,7 +26,18 @@ pub struct Spec {
     pub draw: fn(&mut Ui, &Screen) -> bool,
 }
 
-pub const SPECS: &[Spec] = &[Spec { screen: "main menu", draw: main_menu::draw }];
+pub const SPECS: &[Spec] = &[
+    Spec { screen: "main menu", draw: main_menu::draw },
+    Spec { screen: "options", draw: options::draw },
+    Spec { screen: "game settings", draw: game_settings::draw },
+    Spec { screen: "graphics settings", draw: graphics_settings::draw },
+    Spec { screen: "sound settings", draw: sound_settings::draw },
+    Spec { screen: "message", draw: notice::draw },
+    Spec { screen: "yes or no", draw: notice::draw },
+    Spec { screen: "net waiting", draw: notice::draw },
+    Spec { screen: "help", draw: text_window::draw },
+    Spec { screen: "licence agreement", draw: text_window::draw },
+];
 
 pub fn find(screen: &str) -> Option<&'static Spec> {
     if screen.is_empty() {

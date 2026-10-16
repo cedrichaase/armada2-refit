@@ -11,7 +11,6 @@
 pub mod actions;
 pub mod backdrop;
 pub mod generic;
-pub mod local;
 pub mod model;
 pub mod screens;
 
@@ -94,7 +93,7 @@ pub fn closed(h: HWND) {
 /// Whether a text field of ours has the keyboard (Enter and Esc are then its, not the
 /// dialog's).
 pub fn wants_keys() -> bool {
-    local::focused()
+    crate::input::keys_captured()
 }
 
 /// A frame of the menus: every hosted dialog, outermost first, each by its spec or the

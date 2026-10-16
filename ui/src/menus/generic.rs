@@ -11,12 +11,12 @@
 //!   owner-drawn control) is cropped from the mirror. Labels the screen paints into its
 //!   background art are not controls, so a screen that relies on them needs a spec.
 use super::model::{Class, Control, What};
-use super::{actions, local, Screen};
+use super::{actions, Screen};
 use crate::engine::dialogs;
 use crate::engine::shellui::Kind;
 use crate::gfx::{fade, Weight, R};
 use crate::rt::win::*;
-use crate::widgets::{Align, Ui};
+use crate::widgets::{Align, FieldEvent, ListEvent, Ui};
 use alloc::vec::Vec;
 
 /// What the pointer did last on a dialog: where it was (design coordinates) and which
@@ -167,6 +167,10 @@ pub fn widgets(ui: &mut Ui, s: &Screen) {
                 let al = match c.align { 0 => Align::Centre, 1 => Align::Right, _ => Align::Left };
                 ui.text_in(r, &c.text, size, al, argb(c.colour), Weight::Regular);
             }
+            What::Shell(Kind::Scroll) => {
+                let track = R::new(s.fit.x + c.track.0 as f32 * fs, r.y, c.track.1 as f32 * fs, r.h);
+                shell_slider(ui, s, c, track, &id);
+            }
             What::Shell(_) if c.text.is_empty() => {
                 // A picture button: its own art, as the game draws it now.
                 s.mirror_part(ui, c.rect, r, if c.enabled { 0xffffffff } else { 0x80ffffff });
@@ -185,28 +189,23 @@ pub fn widgets(ui: &mut Ui, s: &Screen) {
                 }
             }
             What::Window(Class::Edit) => {
-                if local::text_field(ui, &id, r, &c.text, s.top) {
-                    // Focused: what is typed goes to the stock edit.
-                    for &vk in ui.input.keys() {
-                        if matches!(vk, 0x25 | 0x27 | 0x24 | 0x23 | 0x2e) {
-                            actions::push(actions::Action::Key { h: c.hwnd, msg: WM_KEYDOWN, wp: vk as usize });
-                        }
-                    }
-                    for &ch in ui.input.chars() {
-                        if ch != '\r' && ch != '\u{1b}' && (ch as u32) < 256 {
-                            actions::push(actions::Action::Key { h: c.hwnd, msg: WM_CHAR, wp: ch as usize });
-                        }
-                    }
-                }
+                edit(ui, s, c, &id, r);
             }
             What::Window(Class::List) if !c.items.is_empty() || c.selected < 0 => {
-                if let Some((i, dbl)) = local::list(ui, &id, r, &c.items, c.selected, c.top, s.top) {
-                    actions::push(actions::Action::Select { h: c.hwnd, combo: false, index: i as i32, double: dbl });
+                let items: Vec<&str> = c.items.iter().map(|x| x.as_str()).collect();
+                let mut sel = if c.selected >= 0 { Some(c.selected as usize) } else { None };
+                let ev = ui.list_text(r, &id, &items, &mut sel);
+                if s.top && ev != ListEvent::None {
+                    if let Some(i) = sel {
+                        actions::push(actions::Action::Select { h: c.hwnd, combo: false, index: i as i32, double: ev == ListEvent::Activated });
+                    }
                 }
             }
             What::Window(Class::Combo) if !c.items.is_empty() => {
-                if let Some(i) = local::dropdown(ui, &id, r, &c.items, c.selected, s.top) {
-                    actions::push(actions::Action::Select { h: c.hwnd, combo: true, index: i as i32, double: false });
+                let items: Vec<&str> = c.items.iter().map(|x| x.as_str()).collect();
+                let mut sel = c.selected.max(0) as usize;
+                if ui.dropdown(r, &id, &items, &mut sel) && s.top {
+                    actions::push(actions::Action::Select { h: c.hwnd, combo: true, index: sel as i32, double: false });
                 }
             }
             What::Window(Class::Button) => {
@@ -237,6 +236,70 @@ pub fn widgets(ui: &mut Ui, s: &Screen) {
                 actions::push(actions::Action::Mouse { h, msg: WM_MOUSEMOVE, keys: 0, x, y });
             }
         }
+    }
+}
+
+/// What a slider is dragged to, between its press and its release: (the scroll bar,
+/// the value). The stock bar takes a click, so the click is sent when the player lets go.
+static mut DRAG: (usize, f32) = (0, 0.0);
+
+/// A stock `ShellScrollBar` as our slider over `track` (the screen rectangle of its
+/// track). The bar takes a click at a point of the track and sets itself from where it
+/// landed, so a drag is shown by the slider and the click is sent on release; a key
+/// step is one click at once.
+pub fn shell_slider(ui: &mut Ui, s: &Screen, c: &Control, track: R, id: &str) {
+    let (lo, hi) = (c.range.0 as f32, c.range.1 as f32);
+    if hi <= lo || c.track.1 <= 0 {
+        return;
+    }
+    let drag = unsafe { DRAG.0 == c.key };
+    let mut v = if drag { unsafe { DRAG.1 } } else { c.pos as f32 };
+    let changed = ui.slider(track, id, &mut v, lo, hi);
+    if !s.top {
+        return;
+    }
+    let to = |v: f32| libm::roundf(v) as i32;
+    if changed {
+        if ui.input.down[0] {
+            unsafe { DRAG = (c.key, v) };
+        } else if to(v) != c.pos {
+            click_scroll(s, c, to(v));
+        }
+    }
+    if drag && !ui.input.down[0] {
+        let v = unsafe { DRAG.1 };
+        unsafe { DRAG = (0, 0.0) };
+        if to(v) != c.pos {
+            click_scroll(s, c, to(v));
+        }
+    }
+}
+
+/// Sets a stock scroll bar to `v` with a click at the point of its track that maps to
+/// it (the bar maps the point's distance along the track, over the track's length plus
+/// one, onto its range).
+pub fn click_scroll(s: &Screen, c: &Control, v: i32) {
+    let (lo, hi) = c.range;
+    let n = (hi - lo).max(1);
+    let along = ((v - lo) * (c.track.1 + 1) * 2 + (c.track.1 + 1)) / (2 * n);
+    let (x, y) = if c.horizontal {
+        (c.track.0 + along, c.rect[1] + c.rect[3] / 2)
+    } else {
+        (c.rect[0] + c.rect[2] / 2, c.track.0 + along)
+    };
+    s.click(x, y);
+}
+
+/// A stock edit as our text field: it edits a copy of the edit's text, and what the
+/// player changes is sent on as the edit's new text (the edit notifies its parent
+/// itself, as for typing). The edit keeps its own limit.
+pub fn edit(ui: &mut Ui, s: &Screen, c: &Control, id: &str, r: R) {
+    let mut text = c.text.clone();
+    let limit = unsafe { SendMessageA(c.hwnd, 0xd5, 0, 0) }; // EM_GETLIMITTEXT
+    let max = if (1..0x7ffffff).contains(&limit) { limit as usize } else { 0 };
+    let ev = ui.text_field(r, id, &mut text, max);
+    if s.top && ev == FieldEvent::Changed {
+        actions::push(actions::Action::SetText { h: c.hwnd, text });
     }
 }
 

@@ -11,7 +11,7 @@ use crate::engine::dialogs;
 use crate::rt::win::*;
 use alloc::vec::Vec;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Action {
     /// A mouse message for `h` at `x`, `y` in its client coordinates.
     Mouse { h: HWND, msg: u32, keys: usize, x: i32, y: i32 },
@@ -24,6 +24,8 @@ pub enum Action {
     /// sends its parent (`LBN_SELCHANGE`/`LBN_DBLCLK`, `CBN_SELCHANGE` then
     /// `CBN_SELENDOK`).
     Select { h: HWND, combo: bool, index: i32, double: bool },
+    /// An edit's whole text, as the player edited it in our text field.
+    SetText { h: HWND, text: alloc::string::String },
 }
 
 static mut QUEUE: Vec<Action> = Vec::new();
@@ -74,6 +76,13 @@ pub fn run() {
             Action::Key { h, msg, wp } => {
                 if unsafe { IsWindow(h) } != 0 {
                     unsafe { SendMessageA(h, msg, wp, if msg == WM_KEYDOWN { 1 } else { 1 }) };
+                }
+            }
+            Action::SetText { h, text } => {
+                if unsafe { IsWindow(h) } != 0 {
+                    let mut b: Vec<u8> = text.chars().map(|c| if (c as u32) < 256 { c as u8 } else { b'?' }).collect();
+                    b.push(0);
+                    unsafe { SendMessageA(h, WM_SETTEXT, 0, b.as_ptr() as isize) };
                 }
             }
             Action::Select { h, combo, index, double } => {
