@@ -438,6 +438,12 @@ impl Draw {
         self.aquad(Some(t), r, [tint; 4], uv, [KIND_TEX, 0.0, 0.0, 0.0]);
     }
 
+    /// Part of a signed-distance atlas (`uv`) drawn into `r` in one colour, as text
+    /// is: `scale` is screen pixels per unit of the atlas's distance (`icons`).
+    pub fn sdf_image(&mut self, t: Tex, r: R, uv: [f32; 4], c: Color, scale: f32) {
+        self.aquad(Some(t), r, [c; 4], uv, [KIND_SDF, scale.max(1.0), 0.0, 0.0]);
+    }
+
     /// A whole texture drawn into `r`, tinted.
     pub fn image(&mut self, t: Tex, r: R, tint: Color) {
         self.image_uv(t, r, [0.0, 0.0, 1.0, 1.0], tint);

@@ -23,4 +23,7 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", out.display());
     // The font atlases (ui/src/text includes font-regular.bin and font-bold.bin).
     fontbake::bake_fonts(&here.join("../platform/vendor"), &out);
+    // The HUD's icons (ui/src/icons.rs includes icons.bin; drawn in fontbake/src/icons.rs).
+    fontbake::bake_icons(&out);
+    println!("cargo:rerun-if-changed={}", here.join("fontbake/src/icons.rs").display());
 }

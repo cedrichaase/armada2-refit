@@ -60,6 +60,9 @@ pub struct Hud {
     pub bar_keys: bool,
     /// The key in each button's corner.
     pub bar_labels: bool,
+    /// Our own icons (`icons`) on the bar's and the top-right buttons in place of the
+    /// game's button art; 0: the game's.
+    pub icons: bool,
     /// The info panel (`ShipDisplay`).
     pub info: bool,
     /// The info panel shows a single unit live, from a camera of its own, in the place
@@ -92,6 +95,9 @@ pub struct Hud {
     pub replay: bool,
     pub overlay: bool,
     pub chat: bool,
+    /// The mission scripts' team texts (`engine::trade`): the trade status ("Sent to
+    /// Team 2") and the team message.
+    pub team_texts: bool,
     /// The multiplayer boxes (HUD.md, "Comms, the drop box and the load wait"): the comm
     /// panel, the dropped-player box, the wait for the other players' loads.
     pub comm: bool,
@@ -123,6 +129,7 @@ pub fn load() -> Config {
             bar: ini.int("HUD", "Bar", 1) != 0,
             bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
             bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
+            icons: ini.int("HUD", "Icons", 1) != 0,
             info: ini.int("HUD", "Info", 1) != 0,
             info_camera: ini.int("HUD", "InfoCamera", 1) != 0,
             info_scale: ini.float("HUD", "InfoScale", 1.3).clamp(0.6, 2.5),
@@ -140,6 +147,7 @@ pub fn load() -> Config {
             replay: ini.int("HUD", "Replay", 1) != 0,
             overlay: ini.int("HUD", "Overlay", 1) != 0,
             chat: ini.int("HUD", "Chat", 1) != 0,
+            team_texts: ini.int("HUD", "TeamTexts", 1) != 0,
             comm: ini.int("HUD", "Comm", 1) != 0,
             drop_player: ini.int("HUD", "DropPlayer", 1) != 0,
             load_wait: ini.int("HUD", "LoadWait", 1) != 0,

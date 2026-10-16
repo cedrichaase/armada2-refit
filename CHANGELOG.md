@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.19.0 — 2026-10-17
+
+Layers: ui 0.10.0, testbench 3.28.0.
+
+### Added
+- The HUD's command and top-right buttons show flat icons of our own in the theme's
+  colours, keeping the game's metaphors; the mission scripts' trade status and team
+  message are drawn by the UI instead of stretched (ui 0.10.0, `[HUD] Icons`,
+  `[HUD] TeamTexts`).
+
+### Changed
+- The info panel no longer shows ten empty queue slots for an idle builder; the
+  minimap's filters are words and state dots (ui 0.10.0).
+
+Installed, not yet seen in game.
+
 ## 12.18.0 — 2026-10-17
 
 Layers: ui 0.9.0, render3d 0.10.0, testbench 3.27.0.

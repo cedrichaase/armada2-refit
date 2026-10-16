@@ -12,12 +12,14 @@ anything is patched or called.
     Bar=1         ; the button bar is ours (below)
     BarKeys=1     ; with it, the grid's keys; 0 keeps stock's bar keys
     BarLabels=1   ; the key in each button's corner
+    Icons=1       ; our flat icons on the bar's and top-right buttons (0: the game's)
     Info=1        ; the info panel is ours (below); InfoCamera=1 its close-up,
                   ; InfoScale=1.3 its size
     Minimap=1     ; the minimap is ours (below); MinimapSize=300, its side in units
     Selection=1   ; the selection overlay is ours; SelectionGauges=1 shows the
                   ; selected units' gauges always (0: as stock, while pointed at)
     UnitView=1    ; the unit view placed by us, in our frame; UnitViewSize=260
+    TeamTexts=1   ; the scripts' trade status and team message (below)
     Comm=1        ; the comm panel, DropPlayer=1 the dropped-player box, LoadWait=1
                   ; the wait for the others' loads (below, "Comms, ...")
 
@@ -172,7 +174,10 @@ under the new menu, and laid out by it they jump. The bar lays out by the menu i
 buttons were built for (recorded in the bar's keyboard step, which runs right after
 the buttons are built) whenever that step has run in the last quarter second.
 
-**Icons.** `ControlButton::Render` looks its sprite up every time it draws: the
+**Icons.** With `[HUD] Icons=1` (the default) a button shows our own flat icon for
+its sprite's name (`ui/src/icons.rs`, STYLE.md "Icons") and the game's art only for a
+name we have no icon for (special weapons, build items). The name is found as below.
+`ControlButton::Render` looks its sprite up every time it draws: the
 command's or mode's `ButtonName(std::string &)` names it (`CommandInfoClass` 0x519780,
 `ModeInfo` 0x4e7950), and `StandardButton::SetImages` finds it by that name in the HUD's
 sprite database (`DisplayInterface::m_spriteDatabase` 0x765030,
@@ -341,6 +346,9 @@ Seen on the bench 2026-10-16 at 1280x720 (`ui-hud-info` scene): the Galaxy and t
 starbase drawn live, lit, with the Galaxy's phaser fire crossing the picture.
 
 **The queue** is `Producer::GetBuildQueue` (0x4b8070): ten classes, 0 for a free slot.
+Only what is queued is drawn: an idle builder has no queue row, and its construction
+bar, standing at 0%, is not drawn either (a starbase's panel is a third shorter for
+it), so the panel grows a row when the first item is queued.
 A click on one is `Producer::RequestDeleteBuildQueueItem` (vtable +0x140) with the
 slot, as `BuildWireframe::Simulate` does; the click sound with it.
 
@@ -486,11 +494,16 @@ taken within half a second (the game paused) is dropped. `UI.log`: "minimap: ord
 
 **The filter buttons** press the stock buttons' functions, `MapRadar::NextShipFilter`
 (0x4eb7c0) and `NextStationFilter` (0x4eb930) (static; they cycle the state and post
-its name in the chat, "All ships visible" and so on), from the same step. Each shows
-the stock button's art (`StandardButton+0x2c`: `mapfilter_ship_button` in
-`uiFilterButtons`), a coloured mark and a word for the state, and as tooltip the game's
-own strings (`Localized_Strings::Localize` on `g_string`: `GUI_MM_SHIPS_TOOLTIP`,
-`GUI_MM_ALL_SHIPS_VISIBLE`, ...).
+its name in the chat, "All ships visible" and so on), from the same step. The stock
+buttons' pictures (`mapfilter_ship_button` in `uiFilterButtons`, 50 x 20: a squashed
+starship and a starbase that no longer reads as one) are not used: no picture reads at
+the size the strip above the minimap allows. Each filter is its **name** (the tooltip,
+`GUI_MM_SHIPS_TOOLTIP` "Filter Ships", without "Filter"; English if that fails) and
+the four states as **dots in the blips' colours**, all (a ring), allies, enemies,
+neutral, the one in force lit. A click on a dot picks that state: the stock button is
+pressed as many times as it takes, all at the next step (`radar::queue_filter(station,
+n)`), so the chat names only the last. A click on the name goes to the next state, as
+stock. The tooltips are the game's (`GUI_MM_ALL_SHIPS_VISIBLE`, ...).
 
 **HUD.asi** re-lays the stock `MapRadar` out after a display mode change
 (hud/README.md, "Re-layout"); ours reads no stock rectangle but the stock radar's
@@ -777,6 +790,35 @@ the panel's corner), justification `+0x68`, text `+0x84` (a `std::string`), colo
 `+0x94`, fade `+0xa0` (raised and lowered by the stock `AlwaysGameSimulate`, which also
 erases a faded one: it keeps running). Ours draws each in title type with a shadow,
 in its colour times its fade.
+
+### The trade status and the team message (not components)
+
+`engine/trade.rs`, `hud/trade.rs`, `[HUD] TeamTexts=1`. Two texts a mission's script
+asks for are printed by `Team::RenderUserTeamData` (0x497df0), which the mission
+frame calls right after `RenderAll` (at 0x5988d0), in the default font at fixed points
+on the 1600 x 1200 canvas, so they stretch on a wide screen (seen in the second
+Federation mission, *Lifelines*):
+
+- **the trade status**, while `Team::s_showTradesToTeam` (0x6fea10, set by the script's
+  `ShowTradesTo`, `ScriptInterfaceImp::ShowTradesTo`) is a team from 2 to 8:
+  `Team::RenderResourcesSentToTeam` on the team at `s_pTeamList[1]` (0x738db4) prints
+  `TRADE_SENT_TO_TEAM` ("Sent to Team %d:") in that team's colour (`Team+0x08`) and the
+  dilithium, latinum and metal sent to it (`TRADE_*_AMOUNT`), each in its resource's
+  colour (`ResourceComponent::s_ResourceColor`), from float arrays indexed by team on
+  the sender (`+0x2c`, `+0x78`, `+0xc4`, which `Team::Register*Trade` add to), rounded
+  half up;
+- **the team message**, while `Team::s_teamMessage` (0x738df8, copied in by
+  `Team::SetTeamMessage` from the script's `SetTeamText`) is not empty, localised,
+  in red at (50, 740).
+
+The call is re-pointed at ours (checked to be stock first), which does nothing while
+the texts are taken. Ours: the trade status in a small panel under the top-right
+buttons (the team's colour as a mark by its title, a row per resource with its mark,
+name and amount), the team message centred under the resource strip on a faint
+backing. `UI.log`: "trade: Sent to Team 2: Dilithium: 0 Latinum: 0 Metal: 0 | <message>"
+whenever either changes. Seen on the bench 2026-10-17 at 1680x720 in *Lifelines*, in
+the Federation and Klingon themes (`testbench/scenarios/ui-hud-polish.md`); the team
+message was not seen.
 
 ### Chat and the text entry (not components)
 

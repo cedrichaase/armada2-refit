@@ -16,6 +16,7 @@ pub mod engine;
 pub mod gallery;
 pub mod gfx;
 pub mod hud;
+pub mod icons;
 pub mod input;
 pub mod loading;
 pub mod math;

@@ -586,7 +586,7 @@ enum Pending {
 static mut PENDING: [Pending; 2] = [Pending::None, Pending::None];
 static mut PENDING_AT: f64 = 0.0;
 static mut HOOKED: bool = false;
-static mut FILTER_PRESS: (bool, bool) = (false, false);
+static mut FILTER_PRESS: (u8, u8) = (0, 0);
 
 /// The command button is the right one, unless the player swapped the buttons.
 pub fn buttons_swapped() -> bool {
@@ -617,12 +617,14 @@ pub fn queue_order(u: f32, v: f32) {
     }
 }
 
-pub fn queue_filter(station: bool) {
+/// Presses a filter button `n` times at the next always-step (each press is the
+/// next state: all, allies, enemies, neutral).
+pub fn queue_filter(station: bool, n: u8) {
     unsafe {
         if station {
-            FILTER_PRESS.1 = true
+            FILTER_PRESS.1 = n.min(3)
         } else {
-            FILTER_PRESS.0 = true
+            FILTER_PRESS.0 = n.min(3)
         }
     }
 }
@@ -659,11 +661,11 @@ extern "C" fn teams_visible_step() -> u32 {
             }
         }
         let (s, st) = core::mem::take(&mut FILTER_PRESS);
-        if s {
+        for _ in 0..s {
             let f: unsafe extern "C" fn(usize) = core::mem::transmute(NEXT_SHIP_FILTER);
             f(field(MAP_RADAR, MR_SHIP_BUTTON));
         }
-        if st {
+        for _ in 0..st {
             let f: unsafe extern "C" fn(usize) = core::mem::transmute(NEXT_STATION_FILTER);
             f(field(MAP_RADAR, MR_STATION_BUTTON));
         }
@@ -784,6 +786,18 @@ pub fn localize(key: &core::ffi::CStr) -> &'static str {
     }
     let f: unsafe extern "thiscall" fn(usize, *const u8) -> *const u8 = unsafe { core::mem::transmute(LOCALIZE) };
     unsafe { super::hud::cstr_static(f(s, key.as_ptr() as *const u8)) }
+}
+
+/// A filter's name: its tooltip ("Filter Ships") without the word "Filter", else
+/// English.
+pub fn filter_name(station: bool) -> &'static str {
+    let tip = localize(if station { c"GUI_MM_STATIONS_TOOLTIP" } else { c"GUI_MM_SHIPS_TOOLTIP" }).trim();
+    let rest = tip.strip_prefix("Filter ").map(str::trim);
+    match rest {
+        Some(r) if !r.is_empty() && r.len() <= 14 => r,
+        _ if station => "Stations",
+        _ => "Ships",
+    }
 }
 
 /// A filter button's tooltip, and what its state shows, in the game's words.

@@ -4,6 +4,28 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.10.0 — 2026-10-17
+
+### Added
+- `[HUD] TeamTexts` (default 1): the mission scripts' trade status ("Sent to Team 2"
+  and the resources sent, in *Lifelines*) and team message, printed stretched in the
+  default font by `Team::RenderUserTeamData`, are drawn by us: the trade status in a
+  panel under the top-right buttons, the message under the resource strip.
+- `[HUD] Icons` (default 1): our own flat icons, baked at build time into a
+  signed-distance atlas, on the button bar's commands and menus and the top-right
+  buttons, in the theme's colours, keeping the game's metaphors (chair, I-beam, brain,
+  ...); special weapons and build items keep the game's art. 0: the game's art.
+
+### Changed
+- The info panel draws a builder's queue only when something is queued, and no
+  construction bar at 0% for an idle builder: an idle starbase's panel is about a third
+  shorter. The systems row is a little lower (34 units).
+- The minimap's filters are words (SHIPS, STATIONS) and four state dots each (all,
+  allies, enemies, neutral, the one in force lit) in place of the stock buttons'
+  pictures; a click on a dot picks that state, a click on the word goes to the next.
+
+Installed, not yet seen in game.
+
 ## 0.9.0 — 2026-10-17
 
 ### Added

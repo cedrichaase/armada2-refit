@@ -23,7 +23,7 @@ aspect, any size, extensible by code. What the game's art is kept for is what ca
 | Kept from the game | Why |
 |---|---|
 | Unit portraits and wireframes (`*WIREFRAME0*`, the ship icons) | they identify the unit; the wireframe's damage colouring is the engine's |
-| Build, order and special-weapon icons (the square button art) | players read them at a glance; 64 px art, drawn inside our buttons, never stretched past 2x |
+| Build and special-weapon icons (the square button art) | they identify a unit or a weapon; 64 px art, drawn inside our buttons, never stretched past 2x. The **command** icons are ours (below, "Icons") |
 | Race emblems (the Federation delta, the Klingon trefoil, ...) | identity; drawn as images inside our frames |
 | Cursor shapes (`cursor.spr`) | the cursor's shape says which order a click gives (`README.md`, "The cursor"); `src/cursor.rs` draws the engine's art sharp |
 | The menu plates (`Menus/mainbkgr.bmp`, built by `menus/backdrop.sh`) | the front end's backdrop (below) |
@@ -191,6 +191,36 @@ Each is one function in `theme.rs`, given its rectangle and a `State` (hover eas
   stays, and `[Demo] Style=1` still shows the earlier band over it.
 - **The HUD** takes the player's race's theme. Its panels are anchored to the screen
   edges (`Anchor`) at any aspect, translucent, the 3D view showing through.
+
+## Icons
+
+**The commands' and the HUD buttons' icons are ours** (`[HUD] Icons=1`), drawn in
+code: the game's are bevelled metal tiles with the symbol in the middle, painted for
+64 px and a 4:3 HUD, and looked out of place in flat panels. Ours keep **the game's
+metaphor for each** (the captain's chair for orders, the steel I-beam for building, the
+flask for research, the brain for the AI menu, the hand for trade, binoculars for
+explore, the wrench for repair, darts in each formation's shape) and draw it flat:
+
+- one **ink** colour, the button's content colour (light on the dark buttons, dark on
+  LCARS's lit pills), with at most one part in a **role** colour where the colour is
+  the information: the status colours for alert levels and autonomy, stop and cancel;
+  the resource strip's colours for dilithium, latinum, metal and crew; the accent for
+  a secondary part (the flask's liquid, the transporter's sparkle); a dimmer ink for
+  depth (the beam's length). On a lit pill the role colours are taken most of the way
+  to the ink, so they still stand out from the fill;
+- **levels** are one glyph and a meter of three steps along the foot, lit one, two or
+  three in green, yellow or red (alerts, movement and special-weapon autonomy);
+- a 64-unit grid, strokes about 5 units, round caps, the symbol inside 6..58.
+
+They are built from a few primitives with exact distances (circles, rounded boxes,
+capsules, polygons, arcs; union, cut and intersection) in `ui/fontbake/src/icons.rs`,
+baked at build time into a signed-distance atlas like the font (1 MB, 64 texels per
+icon), and drawn by the text's shader kind (`src/icons.rs`), so they are sharp at any
+size. Each is named by the game sprite it stands in for (`b_stop`, `comm_button`):
+the bar and the top-right buttons look the sprite's name up and fall back to the
+game's art. `cargo run --example icons --target x86_64-unknown-linux-gnu -- out.ppm`
+in `ui/fontbake` renders every icon at the bar's size and twice that, for looking at
+a change. Not ours: special weapons and build items (unit and weapon art).
 
 ## The cursor
 

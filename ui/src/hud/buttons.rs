@@ -12,6 +12,14 @@ use alloc::vec::Vec;
 const ORDER: [Which; 8] = [Which::Menu, Which::Help, Which::Palette, Which::Comm, Which::Idle, Which::View, Which::Objectives, Which::More];
 
 static mut LOGGED: bool = false;
+/// The panel's foot in the last frame it drew (for the trade status under it).
+static mut BOTTOM: Option<(f32, f64)> = None;
+
+/// The foot of the buttons' panel, if it drew in the last half second.
+pub fn bottom() -> Option<f32> {
+    let now = crate::rt::now();
+    unsafe { BOTTOM }.filter(|&(_, at)| now - at < 0.5).map(|(y, _)| y)
+}
 
 pub fn run(ui: &mut Ui) {
     if crate::engine::hud::hidden(topbar::BUTTON_PANEL) {
@@ -41,6 +49,7 @@ pub fn run(ui: &mut Ui) {
     let w = list.len() as f32 * cs + (list.len() - 1) as f32 * gap;
     let (outer, inner) = super::panels::fit(ui, Anchor::TopRight, w, cs, ui.u(6.0));
     ui.panel(outer);
+    unsafe { BOTTOM = Some((outer.bottom(), crate::rt::now())) };
     for (i, &(which, b)) in list.iter().enumerate() {
         let r = crate::gfx::R::new(inner.x + i as f32 * (cs + gap), inner.y, cs, cs);
         let on = match which {

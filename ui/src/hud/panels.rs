@@ -6,7 +6,7 @@
 //!
 //! Shared by them: `game_button`, a button of ours that shows a stock
 //! `StandardButton`'s picture, its state and the game's tooltip, and presses it.
-use super::{buttons, chat, messages, objectives, overlay_text, pause, replay, resources};
+use super::{buttons, chat, messages, objectives, overlay_text, pause, replay, resources, trade};
 use crate::config::Hud;
 use crate::engine::{self, hud, popups, sound, sprite, topbar};
 use crate::gfx::R;
@@ -24,7 +24,7 @@ fn on() -> Option<&'static Hud> {
 
 /// Any of these panels switched on.
 pub fn any(c: &Hud) -> bool {
-    c.resources || c.buttons || c.messages || c.pause || c.replay || c.overlay || c.chat
+    c.resources || c.buttons || c.messages || c.pause || c.replay || c.overlay || c.chat || c.team_texts
 }
 
 /// Takes over each panel switched on (after the panel switch is installed).
@@ -61,6 +61,14 @@ pub fn install(c: &Hud) {
         } else {
             crate::log!("panels: chat stays stock");
             o.chat = false;
+        }
+    }
+    if c.team_texts {
+        if engine::trade::install() {
+            engine::trade::set_taken(true);
+            crate::log!("panels: team texts ours");
+        } else {
+            o.team_texts = false;
         }
     }
     unsafe { ON = Some(o) };
@@ -102,6 +110,9 @@ pub fn run(ui: &mut Ui) {
     if o.replay {
         ui.scope("hud.replay", replay::run);
     }
+    if o.team_texts {
+        ui.scope("hud.trade", trade::run);
+    }
     // Over the top bar, as stock's (OverlayText follows ResourcePanel in the list).
     if o.overlay {
         ui.scope("hud.overlay", overlay_text::run);
@@ -138,13 +149,20 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
     let col = theme::button_frame(ui, r, st);
     let e = ui.u(ui.theme.edge).max(1.0);
     let img = r.inset(e + ui.u(4.0));
-    match sprite::art(engine::buttons::sprite(b)) {
+    let sp = engine::buttons::sprite(b);
+    let t = ui.theme;
+    let ours = crate::config::get().hud.icons && sp != 0 && {
+        let ink = if !enabled { crate::gfx::fade(col, 0.45) } else { col };
+        let ir = img.inset(ui.u(1.0));
+        crate::icons::draw(&mut ui.draw, sprite::name(sp), ir, 1.0, crate::icons::theme_colour(&t, ink))
+    };
+    match if ours { None } else { sprite::art(sp) } {
+        _ if ours => {}
         Some((tex, uv)) => {
             let tint = if !enabled { 0xff5a5a5a } else if hot { 0xffffffff } else { 0xffd0d0d0 };
             ui.draw.image_uv(tex, img, uv, tint);
         }
         None => {
-            let t = ui.theme;
             ui.text_in(img, name, t.micro_size, Align::Centre, col, Weight::Bold);
         }
     }

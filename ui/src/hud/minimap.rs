@@ -290,53 +290,86 @@ pub fn run(ui: &mut Ui) {
     }
 }
 
-/// The two filter buttons: the stock buttons' art, their state as a coloured mark,
-/// the game's tooltip.
+/// The two filters, ships and stations: each its name (the word, not the stock
+/// buttons' 50 x 20 pictures, which do not read at this size) and the four states as
+/// dots in the blips' colours (all, allies, enemies, neutral), the one in force lit. A
+/// click on a dot picks that state (the stock button pressed as often as it takes); a
+/// click on the name goes to the next, as the stock button does. The game's tooltips.
 fn filters(ui: &mut Ui, strip: R) {
     let s = st();
     let t = ui.theme;
     let (ship_f, station_f) = radar::filters();
-    let (ship_spr, station_spr) = radar::filter_sprites();
-    let bw = (strip.w - ui.u(6.0)) * 0.5;
-    let mut hovered = 0u8;
+    let gap = ui.u(6.0);
+    let gw = (strip.w - gap) * 0.5;
+    // hovered: (filter 1 or 2, the state pointed at or 4 for the name)
+    let mut hovered = (0u8, 0u8);
     let mut tip_rect = strip;
-    for (i, (state, spr)) in [(ship_f, ship_spr), (station_f, station_spr)].into_iter().enumerate() {
-        let r = R::new(strip.x + i as f32 * (bw + ui.u(6.0)), strip.y, bw, strip.h);
-        let id = ui.id(if i == 0 { "minimap.ships" } else { "minimap.stations" });
-        let (hot, held, clicked) = ui.interact(id, r);
+    for (i, state) in [ship_f, station_f].into_iter().enumerate() {
+        let station = i == 1;
+        let g = R::new(strip.x + i as f32 * (gw + gap), strip.y, gw, strip.h);
+        crate::widgets::theme::field(ui, g, crate::widgets::theme::State::default());
+        let d = ui.u(13.0).min(g.h - ui.u(8.0));
+        let step = d + ui.u(4.0);
+        let dots_w = 4.0 * step + ui.u(4.0);
+        let name_r = R::new(g.x, g.y, g.w - dots_w, g.h);
+        let id = ui.id(if station { "minimap.stations" } else { "minimap.ships" });
+        let (hot, held, clicked) = ui.interact(id, name_r);
         let stt = crate::widgets::theme::State::of(ui, id, hot, held);
-        crate::widgets::theme::button_frame(ui, r, stt);
-        let icon = R::new(r.x + ui.u(4.0), r.y + ui.u(3.0), r.h - ui.u(6.0), r.h - ui.u(6.0));
-        if let Some((tex, uv)) = sprite::art(spr) {
-            ui.draw.image_uv(tex, icon, uv, 0xffffffff);
-        }
-        let (mark, word) = match state {
-            1 => (t.good, "ALLY"),
-            2 => (t.bad, "ENEMY"),
-            3 => (t.warn, "NEUTRAL"),
-            _ => (t.text, "ALL"),
-        };
-        let lr = R::new(icon.right() + ui.u(5.0), r.y, r.right() - icon.right() - ui.u(8.0), r.h);
-        ui.draw.fill(R::new(lr.x, r.y + r.h * 0.5 - ui.u(3.0), ui.u(6.0), ui.u(6.0)), Corners::round(ui.u(3.0)), mark);
-        let lr2 = R::new(lr.x + ui.u(10.0), lr.y, lr.w - ui.u(10.0), lr.h);
-        ui.text_in(lr2, word, t.micro_size, Align::Left, t.text, Weight::Bold);
+        let col = crate::gfx::mix(t.text_dim, t.text, stt.hot);
+        let label = crate::widgets::theme::caps(radar::filter_name(station));
+        ui.text_in(R::new(name_r.x + ui.u(7.0), name_r.y, name_r.w - ui.u(7.0), name_r.h), &label, t.micro_size, Align::Left, col, Weight::Bold);
         if clicked {
-            radar::queue_filter(i == 1);
+            radar::queue_filter(station, 1);
             crate::engine::sound::click();
         }
         if hot {
-            hovered = i as u8 + 1;
-            tip_rect = r;
+            hovered = (i as u8 + 1, 4);
+            tip_rect = g;
+        }
+        for k in 0..4u32 {
+            let cell = R::new(g.right() - ui.u(6.0) - (4 - k) as f32 * step + ui.u(4.0), g.y + (g.h - d) * 0.5, d, d);
+            let id = ui.id(&crate::sfmt!("minimap.f{}.{}", i, k));
+            let (hot, held, clicked) = ui.interact(id, cell);
+            let on = state == k;
+            let mark = match k {
+                1 => t.good,
+                2 => t.bad,
+                3 => t.warn,
+                _ => t.text,
+            };
+            if on {
+                ui.draw.fill(cell.inset(-ui.u(2.0)), Corners::round(cell.w * 0.5 + ui.u(2.0)), fade(mark, 0.28));
+            }
+            let dot = if on { cell.inset(ui.u(1.0)) } else { cell.inset(ui.u(2.5)) };
+            let a = if on { 1.0 } else if hot { 0.85 } else { 0.45 };
+            if k == 0 {
+                // all: a ring
+                ui.draw.stroke(dot, Corners::round(dot.w * 0.5), ui.u(2.0).max(1.0), fade(mark, a));
+            } else {
+                ui.draw.fill(dot, Corners::round(dot.w * 0.5), fade(mark, a));
+            }
+            if clicked && !on && !held {
+                radar::queue_filter(station, ((k + 4 - state) % 4) as u8);
+                crate::engine::sound::click();
+            }
+            if hot {
+                hovered = (i as u8 + 1, k as u8);
+                tip_rect = cell;
+            }
         }
     }
     let now = ui.time();
-    if hovered != s.tip_on {
-        s.tip_on = hovered;
+    let key = hovered.0 * 8 + hovered.1;
+    if key != s.tip_on {
+        s.tip_on = key;
         s.tip_since = now;
     }
-    if hovered != 0 && now - s.tip_since > 0.35 {
-        let (tip, state) = radar::filter_text(hovered == 2, if hovered == 1 { ship_f } else { station_f });
-        let text = crate::sfmt!("{}\n{}", tip.trim(), state.trim());
+    if hovered.0 != 0 && now - s.tip_since > 0.35 {
+        let station = hovered.0 == 2;
+        let current = if station { station_f } else { ship_f };
+        let shown = if hovered.1 == 4 { current } else { hovered.1 as u32 };
+        let (tip, state) = radar::filter_text(station, shown);
+        let text = if hovered.1 == 4 { crate::sfmt!("{}\n{}", tip.trim(), state.trim()) } else { alloc::string::String::from(state.trim()) };
         let (w, h) = crate::widgets::theme::tooltip_size(ui, &text, ui.u(360.0));
         let r = R::new(tip_rect.x, (tip_rect.y - h - ui.u(6.0)).max(0.0), w, h);
         crate::widgets::theme::tooltip(ui, r, &text, 1.0);

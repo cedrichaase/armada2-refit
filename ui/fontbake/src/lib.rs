@@ -5,6 +5,8 @@
 //! the nearest one (point-segment distance), signed by the nonzero winding. Only
 //! segments within the spread of a texel are looked at, which keeps a bake to seconds.
 
+pub mod icons;
+
 use skrifa::{
     FontRef, MetadataProvider,
     instance::{LocationRef, Size},
@@ -311,6 +313,11 @@ pub fn bake(ttf: &[u8]) -> Vec<u8> {
     }
     b.extend_from_slice(&atlas);
     b
+}
+
+/// Bakes the HUD's icons into `out` as `icons.bin` (`icons.rs`).
+pub fn bake_icons(out: &Path) {
+    std::fs::write(out.join("icons.bin"), icons::bake()).unwrap();
 }
 
 /// Bakes the two vendored weights into `out`: Medium as `font-regular.bin`, SemiBold as

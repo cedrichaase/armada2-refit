@@ -29,6 +29,7 @@ pub mod shell;
 pub mod sound;
 pub mod sprite;
 pub mod topbar;
+pub mod trade;
 // ui-multiplayer: the comm panel, the drop box, the load wait.
 pub mod comm;
 pub mod shellui;

@@ -278,8 +278,8 @@ const BAR_H: f32 = 20.0;
 const BAR_LABEL: f32 = 70.0;
 const BAR_VALUE: f32 = 78.0;
 const STAT_H: f32 = 24.0;
-const SYS_H: f32 = 40.0;
-const QUEUE_CELL: f32 = 52.0;
+const SYS_H: f32 = 34.0;
+const QUEUE_CELL: f32 = 44.0;
 
 fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let t = ui.theme;
@@ -287,14 +287,22 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let gap = ui.u(t.gap);
     // Heights, top to bottom, in pixels.
     let head = ui.u(t.heading_size + 4.0) + if s.class.is_some() { ui.u(t.small_size + 2.0) } else { 0.0 };
-    let n_bars = s.hull.is_some() as usize + (s.shields.is_some() || s.shield_text.is_some()) as usize + s.bars.len();
+    let queue = if builder { info::queue(s.obj) } else { [(0, 0); info::QUEUE_LEN] };
+    // Only what is queued is drawn: an idle builder has no queue row, and no
+    // construction bar standing at 0%.
+    let queued = queue.iter().filter(|q| q.0 != 0).count();
+    let bars: Vec<&(BarKind, info::Bar)> = s
+        .bars
+        .iter()
+        .filter(|(k, b)| !(builder && queued == 0 && matches!(k, BarKind::Construction) && b.fraction() <= 0.0))
+        .collect();
+    let n_bars = s.hull.is_some() as usize + (s.shields.is_some() || s.shield_text.is_some()) as usize + bars.len();
     let bars_h = n_bars as f32 * (ui.u(BAR_H) + ui.u(4.0));
     let stats_h = if s.stats.is_empty() { 0.0 } else { ui.u(STAT_H) + gap };
     let right_h = head + gap + bars_h + stats_h;
     let top_h = right_h.max(ui.u(WIRE * if s.craft { 1.0 } else { 0.8 }));
     let sys_h = if s.systems.is_empty() { 0.0 } else { ui.u(SYS_H) + gap };
-    let queue = if builder { info::queue(s.obj) } else { [(0, 0); info::QUEUE_LEN] };
-    let queue_h = if builder { ui.u(QUEUE_CELL) + gap + ui.u(t.micro_size + 4.0) } else { 0.0 };
+    let queue_h = if queued > 0 { ui.u(QUEUE_CELL) + gap + ui.u(t.micro_size + 4.0) } else { 0.0 };
     let w = ui.u(W_SINGLE).min(ui.w - ui.u(20.0));
     // The frame's own bars (an LCARS frame's top and bottom) come on top of the padding.
     let (_, ft, _, fb) = theme::frame_margins(ui);
@@ -398,7 +406,8 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
         }
         y += bh + ui.u(4.0);
     }
-    for (i, (kind, b)) in s.bars.iter().enumerate() {
+    for (i, kb) in bars.iter().enumerate() {
+        let (kind, b) = (&kb.0, &kb.1);
         let br = R::new(x, y, cw, bh);
         let f = b.fraction();
         let stock = info::colour(b.colour);
@@ -489,17 +498,17 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     }
 
     // The builder's queue.
-    if builder {
+    if queued > 0 {
         let cell = ui.u(QUEUE_CELL);
-        let n = info::QUEUE_LEN as f32;
-        let qgap = ((inner.w - cell * n) / (n - 1.0)).max(ui.u(2.0));
+        let qgap = ui.u(6.0);
         let progress = info::build_progress(s.obj).map(|b| b.fraction());
+        let mut k = 0.0;
         for (i, &(class, comp)) in queue.iter().enumerate() {
-            let r = R::new(inner.x + i as f32 * (cell + qgap), by, cell, cell);
             if class == 0 {
-                ui.draw.fill(r, theme::button_corners(ui, r), fade(t.track, 0.5));
                 continue;
             }
+            let r = R::new(inner.x + k * (cell + qgap), by, cell, cell);
+            k += 1.0;
             let id = ui.id(&crate::sfmt!("info.queue{}", i));
             let (hot, held, clicked) = ui.interact(id, r);
             let mut st = State::of(ui, id, hot, held);
