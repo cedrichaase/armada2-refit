@@ -51,6 +51,9 @@ float4 msurf_misc     : register(c33);  // x: the relief's strength; z: 1 when t
                                         // w: 1 for Mapping=triplanar
 float4 msurf_ext      : register(c34);  // xyz: 1 / the mesh's extent about its centre, per object axis;
                                         // w: the highlight's strength (Gloss=)
+float4 msurf_core     : register(c35);  // rgb: the light inside a dilithium moon (0: none, the
+                                        // cut is a hole); w: the cut's level (Cut=)
+float4 msurf_spill    : register(c36);  // x: the glow's scale (1); y: the white at a crack's core
 samplerCUBE m_albedo : register(s0);
 samplerCUBE m_relief : register(s1);
 
@@ -116,14 +119,21 @@ float4 ps_rock(VO i) : COLOR
         p = B.rgb - 0.5;
     }
     A.a = lerp(1.0, A.a, msurf_misc.z);                 // opaque unless the recipe cuts
-    clip(A.a - 0.5);                                    // the rock's alpha test: its cracks are holes
+    // The rock's alpha test, its cracks holes; with a light inside (the dilithium
+    // moons), the cracks are that light instead, so it shows through them and nowhere else.
+    float inside = msurf_core.w > 0.0 ? 1.0 : 0.0;
+    clip(max(A.a, inside) - 0.5);
     p *= msurf_misc.x;
     // to world space without WORLD's scale
     float3 pw = (p.x * msurf_rows[0].xyz + p.y * msurf_rows[1].xyz + p.z * msurf_rows[2].xyz)
               * rsqrt(max(dot(msurf_rows[0].xyz, msurf_rows[0].xyz), 1e-12));
     float3 N  = normalize(normalize(i.n) + pw);
     float4 c  = shade(N, i.wp, A, msurf_ext.w);
-    c.rgb += msurf_glow.rgb * B.a;
+    c.rgb += msurf_glow.rgb * B.a * msurf_spill.x;
+    // The crack: the moon's light, whiter towards the fissure's core (B.a past the cut).
+    float  hot  = saturate((B.a - msurf_core.w) / max(msurf_core.w, 1e-3));
+    float3 core = msurf_core.rgb * (1.0 + hot) + dot(msurf_core.rgb, 0.333) * hot * hot * msurf_spill.y;
+    c.rgb = lerp(c.rgb, core, (1.0 - A.a) * inside);
     return float4(c.rgb, 1.0);
 }
 

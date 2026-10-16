@@ -28,7 +28,7 @@ pub struct Surface {
     pub relief: Com,
     pub cloud: Option<Com>,
     /// planet.hlsl's c43..c46: glow (rgb, a: by day), clouds (rgb, a: opacity), drift
-    /// (cos, sin, shadow strength, shadow reach), misc (relief strength, clouds 1, cut 1).
+    /// (cos, sin, shadow strength, shadow reach), misc (relief strength, clouds 1, cut 1, the cut's level).
     pub draw: [[f32; 4]; 4],
     /// A model's lookup: x 1 for triplanar; y its gloss.
     pub model: [f32; 4],
@@ -263,7 +263,7 @@ fn read_recipe(path: &str) -> Recipe {
     draw[1][3] = if clouds { one(&f, "CloudOpacity", 0.9) } else { 0.0 };
     let shadow = vals(&f, "CloudShadow", 2).unwrap_or(alloc::vec![0.5, 0.012]);
     draw[2] = [1.0, 0.0, shadow[0], shadow[1]];
-    draw[3] = [one(&f, "Depth", 1.0), if clouds { 1.0 } else { 0.0 }, if k[27][3] > 0.0 { 1.0 } else { 0.0 }, 0.0];
+    draw[3] = [one(&f, "Depth", 1.0), if clouds { 1.0 } else { 0.0 }, if k[27][3] > 0.0 { 1.0 } else { 0.0 }, k[27][3]];
     let mapping = f.string("Surface", "Mapping").unwrap_or_default();
     let model = [if mapping.eq_ignore_ascii_case("triplanar") { 1.0 } else { 0.0 }, one(&f, "Gloss", 1.0).max(0.0), 0.0, 0.0];
     Recipe { k, clouds, face, drift: one(&f, "CloudDrift", 0.4), draw, model }

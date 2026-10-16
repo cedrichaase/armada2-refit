@@ -1300,7 +1300,8 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `Surfaces`; the planet look under `Lighting.ini`'s names: `PlanetAmbient`, `PlanetDusk`,
 `PlanetWrap`, `PlanetFill`, `PlanetSun`, `PlanetHaze*`, `PlanetGlint*`, `CityLights`,
 `CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
-`RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`; the lights' `PlanetGlows`,
+`RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
+`MoonCrackCore`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
 `NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
@@ -1360,8 +1361,17 @@ share of dilithium left, `ResourceInterface::GetTotalValue` over the class's
 `GetTotalMaxValue`, resource at +0x17c) is drawn dark and opaque as under `Lighting.asi`
 (`MoonShell=dark`): the settled look, black cracks with the glow showing only where a
 crack opens past the rock's edge; `MoonShell=glow` adds it in its colour, as stock
-did. The moon's `oreglow` sprite node (the nimbus) is drawn at `Step::Translucent`, its
-`moonpulse` animation on the instance's clock.
+did. That shell only shows with `MoonCracks=0`: by default the cracks are not holes but
+the moon's light (`ps_rock`, c35), so it glows from inside and through its cracks only.
+The light is the moon's sprite node's animated colour (`oreglow`'s `moonpulse`, (0, 0.5,
+1) down to 0.4 of it every 2 s; `dmooninf`'s `infpulse`, purple, on the infinite moons)
+at its brightest key, swung by `MoonPulse` of the pulse, times the share of dilithium
+left (the shell's colour over its full colour) and `MoonCracks`, past 1 so the bloom
+spreads it along the crack. It whitens towards the fissure's core (the relief cube's
+alpha past `Cut=`, times `MoonCrackCore`), and the recipe's `Glow=` beside the cracks
+takes its hue and pulse at the recipe's strength. The nimbus itself, a round billboard
+behind the moon that showed only past its edge as a halo, is drawn only with
+`MoonNimbus=1`, at `Step::Translucent`, its animation on the instance's clock.
 
 **Nebulae** (`nebulae.rs`, `world_nebula.hlsl`): `Nebulae.asi`, its decisions kept
 (the envelope, the bake, the slices on a ladder fixed in distance from the

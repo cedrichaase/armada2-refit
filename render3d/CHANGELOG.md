@@ -4,6 +4,21 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.11.0 — 2026-10-17
+
+### Added
+- `[World] MoonCracks` (4), `MoonPulse` (0.5), `MoonCrackCore` (1), `MoonNimbus` (0).
+
+### Changed
+- A dilithium moon's cracks are lit from inside (`ps_rock`, c35/c36) instead of cut
+  through to the dark shell: the nimbus's colour at its peak (purple on the infinite
+  moons), half of its pulse, times the share of dilithium left, whiter at a crack's
+  core and bright enough to bloom. The recipe's `Glow=` beside the cracks takes that
+  light's hue and pulse. The `oreglow` nimbus, the round halo behind the moon, is no
+  longer drawn (`MoonNimbus=1` brings it back).
+
+Installed, not yet seen in game.
+
 ## 0.10.1 — 2026-10-17
 
 ### Fixed

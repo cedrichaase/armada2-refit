@@ -120,6 +120,16 @@ struct Look {
     /// The moons' inner glow shell dark and opaque, as under Lighting.asi (`MoonShell=dark`,
     /// the settled look: black cracks); `glow`: stock's, added in the moon's colour.
     dark_shell: bool,
+    /// The light in a dilithium moon's cracks, times its nimbus's colour at the peak of
+    /// its pulse (`MoonCracks`; 0: the cracks are holes onto the shell, as before).
+    cracks: f32,
+    /// How much of the nimbus's pulse the cracks take (`MoonPulse`, 0..1).
+    pulse: f32,
+    /// The white at a crack's core, times the light's brightness (`MoonCrackCore`).
+    crack_core: f32,
+    /// The nimbus drawn (`MoonNimbus`): the round halo behind the moon. Off by default,
+    /// since the light shows through the cracks.
+    nimbus: bool,
 }
 
 impl Rocks {
@@ -147,6 +157,10 @@ impl Rocks {
                 rim_pow: ini.float(s, "RockRimPower", 3.0),
                 sun: ini.float(s, "RockSun", 1.1),
                 dark_shell: !ini.string(s, "MoonShell").is_some_and(|m| m.trim().eq_ignore_ascii_case("glow")),
+                cracks: ini.float(s, "MoonCracks", 4.0).max(0.0),
+                pulse: ini.float(s, "MoonPulse", 0.5).clamp(0.0, 1.0),
+                crack_core: ini.float(s, "MoonCrackCore", 1.0).max(0.0),
+                nimbus: ini.float(s, "MoonNimbus", 0.0) != 0.0,
             },
             said: 0,
         }
@@ -241,19 +255,39 @@ impl Rocks {
         let glow = glow_colour(o);
         let clock = pose::Clock::of_instance(inst, v.time);
         let p = pose::pose(&model.sod, &model.info, &world, clock, pose::auto(v.eye));
-        self.draw_model(v, &model, &p, glow, surf);
         // Its sprite nodes (the moon's `oreglow` nimbus), on the instance's clock as
-        // GameObject::RenderInternal plays them.
+        // GameObject::RenderInternal plays them; their colour is the light in the cracks.
         let (since, flags) = if inst != 0 { ((v.time - unsafe { rd::<f32>(inst + 0x18) }).max(0.0), field(inst, 0xc) as u32) } else { (v.time, 3) };
-        self.sprite_nodes(v, &model, &p, sc.x * s, since, flags);
+        let nimbus = self.sprite_nodes(v, &model, &p, sc.x * s, since, flags);
+        let core = self.crack_light(glow, nimbus);
+        self.draw_model(v, &model, &p, glow, core, surf);
         true
     }
 
-    /// The model's shown sprite nodes, queued for the translucent step (as the hulls
-    /// module draws a hull's: `@sprite_node` id, its sprite's rectangle, its animation's
-    /// colour; a billboard's size is a half extent, an oriented quad's the full one in
-    /// its node's x-y plane).
-    fn sprite_nodes(&mut self, v: &View, model: &Model, p: &pose::Pose, scale: f32, time: f32, flags: u32) {
+    /// The light inside a dilithium moon's cracks, or None to leave them holes: the
+    /// nimbus's colour at the peak of its pulse (stock's (0, 0.5, 1); purple on the
+    /// infinite moons), swung by `MoonPulse` of the pulse, times the share of dilithium
+    /// left (the glow shell's colour over its full colour) and `MoonCracks`.
+    fn crack_light(&self, glow: Option<V3>, nimbus: Option<([f32; 3], [f32; 3])>) -> Option<V3> {
+        if self.look.cracks <= 0.0 {
+            return None;
+        }
+        let full = v3(0.0, 0.5, 1.0);
+        let left = glow.map_or(1.0, |g| (g.len() / full.len()).min(1.0));
+        let (now, peak) = nimbus.unwrap_or(([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]));
+        let lum = |c: [f32; 3]| 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+        let swing = if lum(peak) > 1e-4 { (lum(now) / lum(peak)).clamp(0.0, 1.0) } else { 1.0 };
+        let k = self.look.cracks * left * (1.0 - self.look.pulse + self.look.pulse * swing);
+        Some(v3(peak[0], peak[1], peak[2]) * k)
+    }
+
+    /// The model's shown sprite nodes, queued for the translucent step when `MoonNimbus`
+    /// is on (as the hulls module draws a hull's: `@sprite_node` id, its sprite's
+    /// rectangle, its animation's colour; a billboard's size is a half extent, an
+    /// oriented quad's the full one in its node's x-y plane). Gives the first animated
+    /// node's colour now and at its brightest key.
+    fn sprite_nodes(&mut self, v: &View, model: &Model, p: &pose::Pose, scale: f32, time: f32, flags: u32) -> Option<([f32; 3], [f32; 3])> {
+        let mut light = None;
         let t = assets::sprites();
         for (i, n) in model.sod.nodes.iter().enumerate() {
             if !matches!(n.kind, a2fmt::sod::NodeKind::Sprite) || !p.shown.get(i).copied().unwrap_or(false) {
@@ -265,9 +299,25 @@ impl Rocks {
             if let Some(a) = nd.animation.as_deref().and_then(|a| t.animation(a)) {
                 match crate::mods::hulls::anim::value(a, time, flags) {
                     Some(crate::mods::hulls::anim::Value::Draw(false)) => continue,
-                    Some(crate::mods::hulls::anim::Value::Colour(c)) => colour = c,
+                    Some(crate::mods::hulls::anim::Value::Colour(c)) => {
+                        colour = c;
+                        if light.is_none() {
+                            let mut peak = c;
+                            for k in &a.keys {
+                                if let a2fmt::spr::KeyValue::Colour(kc) = k.value {
+                                    if kc[0] + kc[1] + kc[2] > peak[0] + peak[1] + peak[2] {
+                                        peak = kc;
+                                    }
+                                }
+                            }
+                            light = Some((c, peak));
+                        }
+                    }
                     _ => {}
                 }
+            }
+            if !self.look.nimbus {
+                continue;
             }
             let r = sp.uv_rect().unwrap_or_else(|| {
                 let rw = sp.reference[0].unwrap_or(256.0).max(1.0);
@@ -298,6 +348,7 @@ impl Rocks {
                 depth: v.view.transform_point(pos).z,
             });
         }
+        light
     }
 
     /// An asteroid field's rocks; false leaves the field to the engine.
@@ -333,13 +384,15 @@ impl Rocks {
             world.r[1] = world.r[1] * scale;
             world.r[2] = world.r[2] * scale;
             let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::FROZEN, pose::auto(v.eye));
-            self.draw_model(v, &model, &p, None, surf);
+            self.draw_model(v, &model, &p, None, None, surf);
         }
         self.note(0, "an asteroid field's rocks");
         true
     }
 
-    fn draw_model(&mut self, v: &View, model: &Rc<Model>, p: &pose::Pose, glow: Option<V3>, surf: &mut Surfaces) {
+    /// `core`: the light inside a dilithium moon's cracks (`crack_light`), None to leave
+    /// the recipe's cut as holes.
+    fn draw_model(&mut self, v: &View, model: &Rc<Model>, p: &pose::Pose, glow: Option<V3>, core: Option<V3>, surf: &mut Surfaces) {
         let any = self.info(model, surf).any;
         if !any {
             scene::draw(v, model, p, &scene::Params::default());
@@ -396,8 +449,10 @@ impl Rocks {
                     let w = &world;
                     let ctr = w.transform_point(part.centre);
                     // c28..c30 the axes, c31 the centre, c32 the glow, c33 the relief's
-                    // strength, the cut and the mapping, c34 the extents and the gloss.
-                    let mut k = [0.0f32; 7 * 4];
+                    // strength, the cut and the mapping, c34 the extents and the gloss,
+                    // c35 the light in the cracks and the cut's level, c36 the glow's scale
+                    // and the white at a crack's core.
+                    let mut k = [0.0f32; 9 * 4];
                     for i in 0..3 {
                         k[i * 4..i * 4 + 3].copy_from_slice(&[w.r[i].x, w.r[i].y, w.r[i].z]);
                     }
@@ -405,6 +460,19 @@ impl Rocks {
                     k[16..20].copy_from_slice(&s.draw[0]);
                     k[20..24].copy_from_slice(&[relief_strength(s), 0.0, s.draw[3][2], s.model[0]]);
                     k[24..28].copy_from_slice(&[ext.x, ext.y, ext.z, s.model[1]]);
+                    k[32] = 1.0;
+                    if let Some(c) = core.filter(|_| s.draw[3][2] > 0.0) {
+                        // The cracks lit from inside: no hole, so neither the shell nor the
+                        // space behind shows through; the recipe's glow beside them follows
+                        // the light (its pulse, the dilithium left).
+                        // The recipe's glow keeps its strength against the full light and
+                        // takes the light's hue (the infinite moons' is purple).
+                        k[28..32].copy_from_slice(&[c.x, c.y, c.z, s.draw[3][3].max(1e-3)]);
+                        let g = v3(s.draw[0][0], s.draw[0][1], s.draw[0][2]).len() / (v3(0.0, 0.5, 1.0) * self.look.cracks).len().max(1e-6);
+                        k[16..19].copy_from_slice(&[c.x * g, c.y * g, c.z * g]);
+                        k[33] = self.look.crack_core;
+                        self.note(4, "a moon's cracks lit from inside");
+                    }
                     dev.ps_const(28, &k);
                     begin_states(dev);
                     let mirrored = w.det3() < 0.0;
