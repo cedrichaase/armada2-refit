@@ -4,6 +4,33 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.9.0 — 2026-10-16
+
+### Added
+- The menu scene is one map, `menus/map.ini` (`Menu\map.ini` in the game directory
+  takes precedence), asked for by view: `main`, and for the campaign selection
+  `tutorials` (a starbase over the planet), `federation` (the fleet), `klingon` (Klingon
+  ships decloaking before a Metreon nebula), `borg` (a fusion cube casting its shadow
+  through a Mutara nebula). The camera moves across the map between views (`Blend`).
+  Keys `[Group.*]` (with `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`),
+  `[View.*]`, `[Ship.*]`, `[Nebula.*]` (its `KeyShare`, `Scatter`, `Opacity`,
+  `Brightness` over the recipe's, for the menu's own class).
+- The world module draws the menu's gas (`Nebulae::draw_menu`, menu pass `Gas`), and
+  the hulls module decloaks menu ships with the cloak's look.
+
+### Removed
+- The recipes `menus/main.ini` and `menus/single.ini` and their keys (`Base`,
+  `[Camera]`, `[Orbit]`, `[Ship<n>]`): the map's views take their place.
+
+### Fixed
+- Menu hulls cast no shadow: the shadow map read a model with no instance as having
+  no faces to draw.
+- The shadow map leaves no cut-out mesh out: it casts what the hull pass draws of it,
+  its texture's alpha cut at 0.5 (half of a Borg fusion cube cast nothing, in missions
+  too).
+
+Installed, not yet seen in game.
+
 ## 0.8.0 — 2026-10-16
 
 ### Added

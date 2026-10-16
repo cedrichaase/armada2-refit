@@ -681,32 +681,47 @@ ui-menus-success.md` wins and loses the first Federation mission with `Scene.asi
 ## The menu scene
 
 `[Menus] Scene=1` (the default): the main menu and the campaign selection stand over
-a 3D scene, a Federation fleet in orbit over a planet, drawn by render3d
-(`render3d/README.md`, "The menu scene"). Code: `src/menus/scene.rs`.
+render3d's map, a 3D scene with a place for each of them: a Federation fleet in orbit
+over a planet, a starbase, Klingon ships before a Metreon nebula, a Borg fusion cube in
+a Mutara nebula (`render3d/README.md`, "The menu scene"). Code: `src/menus/scene.rs`.
 
 - **Where it is drawn.** At the start of each frame of the dialog host's loop, after
   the clear and before `surface::frame(Context::Menus)`, so it is under everything of
-  ours. The scene is the one of the full-screen dialog at the bottom of what shows
-  (`main` for "main menu", `single` for "single player"; the mission list over the
-  campaign selection keeps `single`), never over a mission (`backdrop::over_mission`).
+  ours. The view is that of the full-screen dialog at the bottom of what shows: `main`
+  for "main menu"; for "single player" the campaign last pointed at (`scene::choose`:
+  `tutorials`, `federation`, `klingon`, `borg`), `federation` on each visit until one
+  is (the mission list over the campaign selection keeps its view); never over a
+  mission (`backdrop::over_mission`). render3d moves the camera from one view to the
+  next across the map.
 - **How it is asked for.** `Render3D_MenuScene(name, x, y, w, h)`, render3d's one
   export, looked up once with `GetModuleHandleA("Render3D.asi")` and
   `GetProcAddress`. It draws into the whole back buffer and returns 1, or 0 when it
-  cannot (no Render3D.asi, render3d stood down, no recipe, no Direct3D 9 device); the
-  frame then goes on as without it.
+  cannot (no Render3D.asi, render3d stood down, no such view, no Direct3D 9 device);
+  the frame then goes on as without it.
 - **The specs over it** ask `scene::shown()`. The main menu (`over_scene`) draws none
   of the stock screen's art and **passes no input to it**: off the column a click does
   nothing, where over the faded art it reached the stock screen's hidden targets
   (Instant Action, Exit) from empty space. The column keeps its places entry for entry
   (the bench clicks them by position); its entries are text that lights up with an
   accent bar and glow, the title rises above it, and the left of the screen is shaded
-  for the text. The campaign selection lays its four cards in a row along the foot,
-  as lighter glass, so the fleet and the planet fill the middle. Without the scene both
-  draw as before.
+  for the text. Without the scene it draws as before.
+- **The campaign selection over it** (`single_player.rs`, `over_scene`) is a column of
+  the same kind under SINGLE PLAYER: each campaign its faction's emblem and its name,
+  then Load Game and Previous Menu, quieter. Pointing at a campaign lights it and
+  chooses its view; the row whose view shows keeps its accent bar at half strength. A
+  click on a row is a click on the stock panel's point, as the cards' was, and the
+  stock screen still hears the hover (its sound). The emblems are the HUD's race icons,
+  white silhouettes with their alpha (`federation_icon`, `klingon_icon`, `borg_icon` in
+  `Sprites/gui_global.spr`: 84 px cells of `Textures/RGB/allrace.tga`, read from the
+  game's own files, so a texture pack's version shows), tinted as the text. The
+  tutorials have no race: their emblem is Starfleet Academy's patch, the triangle the
+  stock tutorial card shows, drawn as an outline round the Federation icon's delta.
+  Without `allrace.tga` the names stand alone (UI.log: `menus: campaign emblems`).
+  Without the scene the four cards draw in a 2x2 grid as before.
 - **For the bench**, UI.log says `menus: scene <name> on` and `menus: scene off` at
-  each change. `testbench/ui.json` gives the main menu's and the campaign selection's
-  targets a `label`, which `Click the <target>` clicks (by OCR) while the scene is on,
-  since their stock points are on nothing then.
+  each change of screen. `testbench/ui.json` gives the main menu's and the campaign
+  selection's targets a `label`, which `Click the <target>` clicks (by OCR) while the
+  scene is on, since their stock points are on nothing then.
 
 ## Testing
 
@@ -716,7 +731,8 @@ has where things are and how to look inside a hosted dialog (`Menus.Trace=1` dum
 hidden surfaces).
 
 - `ui-menus-scene.md` (run with `--install .`): the main menu and the campaign
-  selection over render3d's scene, a hover, the label clicks, back again.
+  selection over render3d's map, each campaign's view by hovering its row (the
+  Klingons decloaking, the cube's shadow in the gas), back again.
 - `ui-menus-options.md`: the main menu's spec; Options; Graphics Settings' Bump Mapping
   switched off, the display-mode list opened and a mode chosen, the screen left and
   opened again, and still off; Sound Settings' Music Volume slider and Unit Speech, the

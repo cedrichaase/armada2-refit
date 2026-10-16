@@ -25,7 +25,7 @@ Save Game's name field and its Save button.
 5. Wait 3 seconds.
 6. Expect "Federation Campaign" is visible.
 7. Take a screenshot called "campaign selection".
-8. Check that the screenshot shows four cards (Tutorials, Federation Campaign, Klingon Campaign, Borg Campaign), each with the faction's picture from the stock screen under its name, a Previous Menu button at the bottom left and a Load Game button at the bottom right, drawn in the dark blue and amber shell style (in a 2x2 grid over a dark backdrop, or in a row along the foot over a 3D scene of a fleet and a planet when render3d draws the menu scene).
+8. Check that the screenshot shows either four cards (Tutorials, Federation Campaign, Klingon Campaign, Borg Campaign), each with the faction's picture from the stock screen under its name, a Previous Menu button at the bottom left and a Load Game button at the bottom right, drawn in the dark blue and amber shell style (in a 2x2 grid over a dark backdrop); or, when render3d draws the menu scene, a column at the left of the four names each with a white emblem, then LOAD GAME and PREVIOUS MENU, over a 3D scene.
 9. Click "Federation Campaign".
 10. Wait 3 seconds.
 11. Expect "Invasion" is visible.

@@ -1,19 +1,19 @@
-//! The menu scene: a 3D scene of our own behind the front end's menus (a fleet in orbit
-//! over a planet), drawn on request by `UI.asi` through `Render3D_MenuScene`, with the
-//! modules' own looks (the sky's recipe, the world's planet, the hulls' lighting,
-//! shadows and running lights) and the frame's bloom and tone map. README.md, "The menu
-//! scene".
+//! The menu scene: a map of our own behind the front end's menus (a Federation fleet in
+//! orbit over a planet, a starbase beside it, Klingon ships before a Metreon nebula, a
+//! Borg fusion cube in a Mutara nebula), drawn on request by `UI.asi` through
+//! `Render3D_MenuScene` from one of its views, with the modules' own looks (the sky's
+//! recipe, the world's planet and gas, the hulls' lighting, shadows, running lights and
+//! cloak) and the frame's bloom and tone map. README.md, "The menu scene".
 //!
 //! Nothing of a mission is read: in the front end there is no game object, no camera
-//! and no registered light. The scene is a recipe (`render3d/menus/<name>.ini`, built
-//! in; a `Menu\<name>.ini` in the game directory takes precedence and is read again
-//! when it changes), posed on a clock of its own, and the view is ours. Every module
-//! that draws a part of it does so in `Module::menu`, given the posed `Shot`.
+//! and no registered light. The map is a recipe (`render3d/menus/map.ini`, built in; a
+//! `Menu\map.ini` in the game directory takes precedence and is read again when it
+//! changes), posed on a clock of its own, and the view is ours. Every module that draws
+//! a part of it does so in `Module::menu`, given the posed `Shot`.
 //!
-//! The scene lives in the fleet's frame: the fleet holds still with the camera and the
-//! sun, and the orbit shows as the planet turning under it and the sky turning about
-//! the orbit's axis (+x). Planet centre at the origin; the fleet travels along +z (the
-//! way the hulls' noses point), over the planet on +y or where `[Planet] At` says.
+//! Every scene is on the one map, under one sun: a view names the camera, and asking
+//! for another view moves the camera over to it (`Blend=`). The planet turns about its
+//! axis and the sky about +x (the fleet's orbit).
 use crate::d3d::Device;
 use crate::frame::post::PRect;
 use crate::frame::steps::View;
@@ -24,11 +24,8 @@ use crate::{assets, log, rt};
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// The recipes built into the plugin, by name.
-static BUILT_IN: &[(&str, &str)] = &[
-    ("main", include_str!("../../menus/main.ini")),
-    ("single", include_str!("../../menus/single.ini")),
-];
+/// The map built into the plugin.
+static BUILT_IN: &str = include_str!("../../menus/map.ini");
 
 /// The passes of a menu frame, in order; the depth is cleared before `Ships`, which
 /// draw on a projection of their own (the planet is far beyond them).
@@ -40,7 +37,10 @@ pub enum Pass {
     Planet,
     /// The hulls, opaque.
     Ships,
-    /// What blends over the hulls: additive meshes, running lights.
+    /// The gas, over the hulls by their depth (before the cloak, which bends what is
+    /// behind a hull).
+    Gas,
+    /// What blends over the hulls: additive meshes, decloaking hulls, running lights.
     Translucent,
 }
 
@@ -51,6 +51,8 @@ pub struct ShipAt {
     /// Its placement, the ODF's `ScaleSOD` and the recipe's scale folded in.
     pub world: M34,
     pub team: Option<V3>,
+    /// Decloaking: how much of the hull is back, 0 (not there) to 1; None when whole.
+    pub cloak: Option<f32>,
 }
 
 /// The planet, posed for this frame.
@@ -64,6 +66,21 @@ pub struct PlanetAt {
     pub cloud_yaw: f32,
 }
 
+/// A gas field of the map: nebulae of one class, and what the map sets of its recipe
+/// for the menu (the menu's classes are its own, so a mission's are untouched).
+#[derive(Clone)]
+pub struct Gas {
+    pub odf: String,
+    pub radius: f32,
+    /// The nebulae's centres (map).
+    pub centres: Vec<[f32; 3]>,
+    /// `KeyShare=`, `Scatter=`, `Opacity=`, `Brightness=` over the recipe's.
+    pub key_share: Option<f32>,
+    pub scatter: Option<f32>,
+    pub opacity: Option<f32>,
+    pub brightness: Option<f32>,
+}
+
 /// The scene at one moment: what the modules draw.
 pub struct Shot {
     pub sky: String,
@@ -75,6 +92,9 @@ pub struct Shot {
     pub sun: Option<(String, V3, f32)>,
     pub planet: Option<PlanetAt>,
     pub ships: Vec<ShipAt>,
+    pub gas: Vec<Gas>,
+    /// Towards the Key (the sun), which lights the gas.
+    pub key: Option<V3>,
 }
 
 /// One `key=value` text recipe, sections lower-cased.
@@ -98,23 +118,6 @@ impl Text {
             sec.1.push((rt::lower(k.trim()), String::from(v.trim().trim_matches('"'))));
         }
         Text { sections }
-    }
-    /// `other`'s keys over these (a recipe over its `Base`).
-    fn over(mut self, other: Text) -> Text {
-        for (name, keys) in other.sections {
-            match self.sections.iter_mut().find(|s| s.0 == name) {
-                Some(s) => {
-                    for (k, v) in keys {
-                        match s.1.iter_mut().find(|e| e.0 == k) {
-                            Some(e) => e.1 = v,
-                            None => s.1.push((k, v)),
-                        }
-                    }
-                }
-                None => self.sections.push((name, keys)),
-            }
-        }
-        self
     }
     fn get(&self, sec: &str, key: &str) -> Option<&str> {
         let s = self.sections.iter().find(|s| s.0 == sec)?;
@@ -164,20 +167,42 @@ fn parse_f(s: &str) -> Option<f32> {
     Some(if neg { -v as f32 } else { v as f32 })
 }
 
-/// The recipe's text: the game directory's `Menu\<name>.ini`, else the built-in one.
-fn text_of(name: &str) -> Option<(String, &'static str)> {
-    let mut path = String::from("Menu\\");
-    path.push_str(name);
-    path.push_str(".ini");
-    if let Some(d) = rt::read_file(&rt::game_path(&path)) {
-        return Some((String::from_utf8_lossy(&d).into_owned(), "Menu\\ in the game directory"));
+/// The map's text: the game directory's `Menu\map.ini`, else the built-in one.
+fn text_of() -> (String, &'static str) {
+    if let Some(d) = rt::read_file(&rt::game_path("Menu\\map.ini")) {
+        return (String::from_utf8_lossy(&d).into_owned(), "Menu\\map.ini in the game directory");
     }
-    BUILT_IN.iter().find(|(n, _)| *n == name).map(|(_, t)| (String::from(*t), "built in"))
+    (String::from(BUILT_IN), "built in")
+}
+
+/// A group of the map: a place the scenes' ships, gas and cameras are given from.
+#[derive(Clone)]
+struct Group {
+    name: String,
+    at: V3,
+    yaw: f32,
+    /// The view on whose arrival the group's ships decloak (`CloakView=`): cloaked
+    /// until then, after `delay` seconds, each ship `stagger` after the last, over `time`.
+    cloak_view: Option<String>,
+    cloak_delay: f32,
+    cloak_time: f32,
+    cloak_stagger: f32,
+}
+
+impl Group {
+    /// A point given in the group's frame, in the map's.
+    fn place(&self, p: V3) -> V3 {
+        let (s, c) = (math::sinf(self.yaw), math::cosf(self.yaw));
+        self.at + v3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c)
+    }
 }
 
 struct ShipDef {
     odf: String,
     sod: String,
+    group: usize,
+    /// Which of its group's ships it is, for the cloak's stagger.
+    nth: usize,
     scale: f32,
     at: V3,
     yaw: f32,
@@ -186,10 +211,19 @@ struct ShipDef {
     team: Option<V3>,
 }
 
-/// A recipe, read.
-struct Recipe {
+/// A view: a camera in its group's frame.
+struct ViewDef {
     name: String,
-    /// What it was read from (its own text and its base's), to notice an edit.
+    eye: V3,
+    target: V3,
+    fov: f32,
+    sway: V3,
+    sway_period: f32,
+}
+
+/// The map, read.
+struct Map {
+    /// What it was read from, to notice an edit.
     text: String,
     sky: String,
     sky_rate: f32,
@@ -197,19 +231,14 @@ struct Recipe {
     sun: Option<(String, V3, f32)>,
     key: Directional,
     fill: Directional,
-    planet: Option<(String, String, f32, f32, f32, V3)>,
-    altitude: f32,
-    /// The planet's centre from the fleet (`[Planet] At`), when the recipe moves it
-    /// from straight below.
-    planet_at: Option<V3>,
+    /// Ground, clouds, radius, spin, cloud turn, axis, centre.
+    planet: Option<(String, String, f32, f32, f32, V3, V3)>,
     orbit_rate: f32,
-    eye: V3,
-    target: V3,
-    fov: f32,
-    sway: V3,
-    sway_period: f32,
     blend: f32,
+    groups: Vec<Group>,
     ships: Vec<ShipDef>,
+    gas: Vec<Gas>,
+    views: Vec<ViewDef>,
 }
 
 /// Turns about the unit axis `a` by `t` radians, as an M34 of rows.
@@ -229,18 +258,15 @@ fn rotation(a: V3, t: f32) -> M34 {
 
 const DEG: f32 = 0.017_453_293;
 
-impl Recipe {
-    fn read(name: &str) -> Option<Recipe> {
-        let (own, src) = text_of(name)?;
-        let mut t = Text::parse(&own);
-        let mut text = own.clone();
-        // One level of `Base=`: another recipe under this one.
-        if let Some(base) = t.get("scene", "base").map(rt::lower).filter(|b| *b != name) {
-            if let Some((bt, _)) = text_of(&base) {
-                text.push_str(&bt);
-                t = Text::parse(&bt).over(t);
-            }
-        }
+/// The part of a section name after `<kind>.` (`[View.main]` -> `main`).
+fn named<'a>(sec: &'a str, kind: &str) -> Option<&'a str> {
+    sec.strip_prefix(kind)?.strip_prefix('.').filter(|n| !n.is_empty())
+}
+
+impl Map {
+    fn read() -> Map {
+        let (text, src) = text_of();
+        let t = Text::parse(&text);
         let s = "scene";
         let key_dir = t.v(s, "keyaxis", v3(-0.6, -0.35, 0.72)).norm();
         let fill_dir = t.v(s, "fillaxis", v3(0.5, 0.4, -0.6)).norm();
@@ -258,9 +284,7 @@ impl Recipe {
             let b = 0.25 + 0.75 * u * u * u;
             stars.push((d, size * (0.6 + 0.8 * b), b));
         }
-        let sun = t.get(s, "sun").filter(|x| !x.is_empty()).map(|o| {
-            (String::from(o), -key_dir, t.f(s, "sundistance", 30000.0))
-        });
+        let sun = t.get(s, "sun").filter(|x| !x.is_empty()).map(|o| (String::from(o), -key_dir, t.f(s, "sundistance", 30000.0)));
         let planet = t.get("planet", "class").map(|cls| {
             let odf = assets::odf(cls);
             let g = |k: &str, d: &str| -> String {
@@ -276,20 +300,52 @@ impl Recipe {
                 t.f("planet", "spin", 0.0),
                 t.f("planet", "clouds", 0.0),
                 t.v("planet", "axis", v3(1.0, 0.0, 0.0)).norm(),
+                t.v("planet", "at", V3::ZERO),
             )
         });
-        let mut ships = Vec::new();
+        let blend = t.f(s, "blend", 2.0).max(0.0);
+        // The groups; ships, gas and views name theirs (none: the map's origin).
+        let mut groups = alloc::vec![Group {
+            name: String::new(),
+            at: V3::ZERO,
+            yaw: 0.0,
+            cloak_view: None,
+            cloak_delay: 0.0,
+            cloak_time: 1.0,
+            cloak_stagger: 0.0,
+        }];
         for (sec, _) in &t.sections {
-            if !sec.starts_with("ship") {
+            let Some(name) = named(sec, "group") else { continue };
+            groups.push(Group {
+                name: String::from(name),
+                at: t.v(sec, "at", V3::ZERO),
+                yaw: t.f(sec, "yaw", 0.0) * DEG,
+                cloak_view: t.get(sec, "cloakview").map(rt::lower),
+                cloak_delay: t.f(sec, "cloakdelay", blend * 0.7).max(0.0),
+                cloak_time: t.f(sec, "cloaktime", 2.5).max(0.05),
+                cloak_stagger: t.f(sec, "cloakstagger", 0.5).max(0.0),
+            });
+        }
+        let group_of = |sec: &str| -> usize {
+            let g = t.get(sec, "group").map(rt::lower).unwrap_or_default();
+            groups.iter().position(|x| x.name == g).unwrap_or(0)
+        };
+        let mut ships: Vec<ShipDef> = Vec::new();
+        for (sec, _) in &t.sections {
+            if named(sec, "ship").is_none() {
                 continue;
             }
             let Some(odf) = t.get(sec, "odf") else { continue };
             let sod = assets::sod_of(odf);
             let scale_sod = assets::odf(odf).and_then(|o| o.get_f32("ScaleSOD")).filter(|x| *x > 0.0).unwrap_or(1.0);
             let team = t.get(sec, "team").map(|_| t.v(sec, "team", v3(1.0, 1.0, 1.0)));
+            let group = group_of(sec);
+            let nth = ships.iter().filter(|s| s.group == group).count();
             ships.push(ShipDef {
                 odf: String::from(odf),
                 sod,
+                group,
+                nth,
                 scale: scale_sod * t.f(sec, "scale", 1.0),
                 at: t.v(sec, "at", V3::ZERO),
                 yaw: t.f(sec, "yaw", 0.0) * DEG,
@@ -298,9 +354,61 @@ impl Recipe {
                 team,
             });
         }
-        let r = Recipe {
-            name: String::from(name),
-            text,
+        let mut gas = Vec::new();
+        for (sec, _) in &t.sections {
+            if named(sec, "nebula").is_none() {
+                continue;
+            }
+            let Some(odf) = t.get(sec, "odf") else { continue };
+            let g = &groups[group_of(sec)];
+            // The class's radius: the recipe's, else the ODF's `effectRadius`.
+            let radius = t.get(sec, "radius").and_then(parse_f).or_else(|| assets::odf(odf).and_then(|o| o.get_f32("effectRadius"))).filter(|r| *r > 10.0).unwrap_or(300.0);
+            // Centres on a jittered grid over an ellipse of half extents `Size` (x, z)
+            // in the group's frame, `Spacing` apart, as a map's nebula is laid out.
+            let at = t.v(sec, "at", V3::ZERO);
+            let size = t.v(sec, "size", v3(1500.0, 0.0, 1500.0));
+            let step = t.f(sec, "spacing", radius * 1.2).max(radius * 0.3);
+            let jitter = t.f(sec, "jitter", 0.35);
+            let mut rng = math::Lcg(t.f(sec, "seed", 11.0) as u32 | 1);
+            let mut centres = Vec::new();
+            let (nx, nz) = ((size.x / step) as i32, (size.z / step) as i32);
+            for iz in -nz..=nz {
+                for ix in -nx..=nx {
+                    let (x, z) = (ix as f32 * step + rng.signed() * step * jitter, iz as f32 * step + rng.signed() * step * jitter);
+                    let e = (x / size.x.max(1.0)) * (x / size.x.max(1.0)) + (z / size.z.max(1.0)) * (z / size.z.max(1.0));
+                    if e > 1.0 {
+                        continue;
+                    }
+                    let p = g.place(at + v3(x, 0.0, z));
+                    centres.push([p.x, p.y, p.z]);
+                }
+            }
+            let over = |k: &str| t.get(sec, k).and_then(parse_f);
+            gas.push(Gas {
+                odf: String::from(odf),
+                radius,
+                centres,
+                key_share: over("keyshare"),
+                scatter: over("scatter"),
+                opacity: over("opacity"),
+                brightness: over("brightness"),
+            });
+        }
+        let mut views = Vec::new();
+        for (sec, _) in &t.sections {
+            let Some(name) = named(sec, "view") else { continue };
+            let g = &groups[group_of(sec)];
+            views.push(ViewDef {
+                name: String::from(name),
+                eye: g.place(t.v(sec, "eye", v3(0.0, 50.0, 400.0))),
+                target: g.place(t.v(sec, "target", V3::ZERO)),
+                fov: t.f(sec, "fov", 40.0).clamp(5.0, 120.0),
+                sway: t.v(sec, "sway", v3(8.0, 4.0, 6.0)),
+                sway_period: t.f(sec, "swayperiod", 40.0).max(1.0),
+            });
+        }
+        let m = Map {
+            text: text.clone(),
             sky: t.str(s, "sky", "mbgblue"),
             sky_rate: t.f(s, "skyturn", 0.004),
             stars,
@@ -308,72 +416,76 @@ impl Recipe {
             key: Directional { dir: key_dir, colour: t.v(s, "keycolour", v3(1.0, 0.95, 0.86)) },
             fill: Directional { dir: fill_dir, colour: t.v(s, "fillcolour", v3(0.10, 0.12, 0.18)) },
             planet,
-            altitude: t.f("orbit", "altitude", 600.0),
-            planet_at: t.get("planet", "at").map(|_| t.v("planet", "at", V3::ZERO)),
-            orbit_rate: t.f("orbit", "rate", 0.004),
-            eye: t.v("camera", "eye", v3(-180.0, 60.0, -260.0)),
-            target: t.v("camera", "target", v3(40.0, -20.0, 0.0)),
-            fov: t.f("camera", "fov", 40.0).clamp(5.0, 120.0),
-            sway: t.v("camera", "sway", v3(8.0, 4.0, 6.0)),
-            sway_period: t.f("camera", "swayperiod", 40.0).max(1.0),
-            blend: t.f("camera", "blend", 1.5).max(0.0),
+            orbit_rate: t.f("planet", "orbit", 0.004),
+            blend,
+            groups,
             ships,
+            gas,
+            views,
         };
         log!(
-            "menu: scene \"{}\" ({}): sky {}, planet {}, {} ships, {} stars",
-            name,
+            "menu: map ({}): sky {}, planet {}, {} groups, {} ships, {} gas fields, {} views, {} stars",
             src,
-            r.sky,
-            r.planet.as_ref().map_or("none", |p| p.0.as_str()),
-            r.ships.len(),
-            r.stars.len()
+            m.sky,
+            m.planet.as_ref().map_or("none", |p| p.0.as_str()),
+            m.groups.len() - 1,
+            m.ships.len(),
+            m.gas.len(),
+            m.views.len(),
+            m.stars.len()
         );
-        for sh in &r.ships {
-            log!("menu:   ship {} ({}) at {:.0},{:.0},{:.0} scale {:.2}", sh.odf, sh.sod, sh.at.x, sh.at.y, sh.at.z, sh.scale);
+        for g in m.groups.iter().skip(1) {
+            log!("menu:   group {} at {:.0},{:.0},{:.0}{}", g.name, g.at.x, g.at.y, g.at.z, if g.cloak_view.is_some() { ", decloaks" } else { "" });
         }
-        Some(r)
+        for sh in &m.ships {
+            log!("menu:   ship {} ({}) in {} at {:.0},{:.0},{:.0} scale {:.2}", sh.odf, sh.sod, m.groups[sh.group].name, sh.at.x, sh.at.y, sh.at.z, sh.scale);
+        }
+        for g in &m.gas {
+            log!("menu:   gas {} radius {:.0}, {} nebulae", g.odf, g.radius, g.centres.len());
+        }
+        for v in &m.views {
+            log!("menu:   view {}", v.name);
+        }
+        m
     }
 
-    /// Where the fleet is: `Altitude` over the planet's surface on +y, or opposite
-    /// `[Planet] At` from its centre (the origin).
-    fn fleet(&self) -> V3 {
-        match self.planet_at {
-            Some(a) => -a,
-            None => v3(0.0, self.planet.as_ref().map_or(0.0, |p| p.2) + self.altitude, 0.0),
-        }
+    fn view(&self, name: &str) -> Option<&ViewDef> {
+        self.views.iter().find(|v| v.name == name)
     }
 
-    /// The camera's eye and target in the fleet's frame at `t`, with its sway.
-    fn camera(&self, t: f32) -> (V3, V3) {
-        let w = 6.283_185_5 / self.sway_period;
-        let s = self.sway;
+    /// A view's eye and target at `t`, with its sway.
+    fn camera(v: &ViewDef, t: f32) -> (V3, V3) {
+        let w = 6.283_185_5 / v.sway_period;
+        let s = v.sway;
         let d = v3(s.x * math::sinf(w * t), s.y * math::sinf(w * t * 0.73 + 1.1), s.z * math::sinf(w * t * 0.51 + 2.3));
-        (self.eye + d, self.target + d * 0.3)
+        (v.eye + d, v.target + d * 0.3)
     }
 
-    /// The scene posed at `t` seconds.
-    fn shot(&self, t: f32) -> Shot {
-        let fleet = self.fleet();
+    /// The scene posed at `t` seconds; `cloak(group, nth)` says how far a ship of a
+    /// decloaking group is back (None: whole).
+    fn shot(&self, t: f32, cloak: impl Fn(&Group, usize) -> Option<f32>) -> Shot {
         let mut ships = Vec::new();
         for s in &self.ships {
+            let g = &self.groups[s.group];
             // Each ship bobs and rolls a little on a period of its own.
             let ph = s.phase + t * 0.21;
             let bob = v3(0.0, math::sinf(ph) * 1.5, math::sinf(ph * 0.7) * 0.8) * s.bob;
             let roll = math::sinf(ph * 0.8 + 0.5) * 0.02 * s.bob;
             let pitch = math::sinf(ph * 0.6 + 1.3) * 0.012 * s.bob;
-            let (sy, cy) = (math::sinf(s.yaw), math::cosf(s.yaw));
+            let yw = s.yaw + g.yaw;
+            let (sy, cy) = (math::sinf(yw), math::cosf(yw));
             let yaw = M34 { r: [v3(cy, 0.0, -sy), v3(0.0, 1.0, 0.0), v3(sy, 0.0, cy)], p: V3::ZERO };
             let m = rotation(v3(0.0, 0.0, 1.0), roll).then(&rotation(v3(1.0, 0.0, 0.0), pitch)).then(&yaw);
             let mut w = m;
             w.r[0] = w.r[0] * s.scale;
             w.r[1] = w.r[1] * s.scale;
             w.r[2] = w.r[2] * s.scale;
-            w.p = fleet + s.at + bob;
-            ships.push(ShipAt { sod: s.sod.clone(), world: w, team: s.team });
+            w.p = g.place(s.at) + bob;
+            ships.push(ShipAt { sod: s.sod.clone(), world: w, team: s.team, cloak: cloak(g, s.nth) });
         }
-        // The orbit: the planet turns under the fleet about +x, and the sky with it.
+        // The orbit: the planet turns about its axis, and the sky with the fleet's orbit.
         let orbit = -self.orbit_rate * t;
-        let planet = self.planet.as_ref().map(|(g, a, radius, spin, clouds, axis)| {
+        let planet = self.planet.as_ref().map(|(g, a, radius, spin, clouds, axis, at)| {
             // The model's pole (+y) along the axis, then the ground's turn.
             let up = *axis;
             let side = if up.y.abs() < 0.9 { v3(0.0, 1.0, 0.0).cross(up).norm() } else { v3(1.0, 0.0, 0.0) };
@@ -381,7 +493,7 @@ impl Recipe {
             let frame = M34 { r: [side, up, fwd], p: V3::ZERO };
             let turn = rotation(v3(0.0, 1.0, 0.0), orbit * (1.0 + spin));
             let mut w = turn.then(&frame);
-            w.p = V3::ZERO;
+            w.p = *at;
             PlanetAt { ground: g.clone(), atmo: a.clone(), world: w, radius: *radius, cloud_yaw: clouds * t }
         });
         Shot {
@@ -391,25 +503,42 @@ impl Recipe {
             sun: self.sun.clone(),
             planet,
             ships,
+            gas: self.gas.clone(),
+            key: Some(-self.key.dir),
         }
     }
 }
 
 /// What persists between frames.
 struct State {
-    recipe: Option<Recipe>,
+    map: Option<Map>,
     /// When the clock started (`rt::now`), and the last frame's time.
     start: f64,
     last: f64,
-    /// When the recipe was last checked for an edit.
+    /// When the map was last checked for an edit.
     checked: f64,
-    /// The camera the last frame had, and the one blended from after a change of scene.
+    /// The view shown, the one before it, and when it changed.
+    view: String,
+    prev: String,
+    since: f64,
+    /// The camera the last frame had, and the one blended from after a change of view.
     cam: Option<(V3, V3, f32)>,
-    from: Option<(V3, V3, f32, f64)>,
+    from: Option<(V3, V3, f32)>,
     said: u32,
 }
 
-static mut STATE: State = State { recipe: None, start: 0.0, last: 0.0, checked: 0.0, cam: None, from: None, said: 0 };
+static mut STATE: State = State {
+    map: None,
+    start: 0.0,
+    last: 0.0,
+    checked: 0.0,
+    view: String::new(),
+    prev: String::new(),
+    since: 0.0,
+    cam: None,
+    from: None,
+    said: 0,
+};
 
 #[allow(static_mut_refs)]
 fn st() -> &'static mut State {
@@ -438,44 +567,61 @@ fn smooth(x: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-/// Draws the scene `name` over the back buffer's rectangle `rect`, inside the caller's
-/// scene. False, with nothing drawn, when it cannot be (no recipe, no device, no
-/// targets): the caller draws its own backdrop.
+/// How far the ship `nth` of a decloaking group is back, the view `view` shown since
+/// `since` (`now` the clock), the one before it `prev`; None when whole.
+fn cloak_of(g: &Group, nth: usize, view: &str, prev: &str, since: f64, now: f64, blend: f32) -> Option<f32> {
+    let cv = g.cloak_view.as_deref()?;
+    let gone = (now - since) as f32;
+    if cv == view {
+        let k = (gone - g.cloak_delay - nth as f32 * g.cloak_stagger) / g.cloak_time;
+        return if k >= 1.0 { None } else { Some(k.max(0.0)) };
+    }
+    // Leaving its view, the group stays as it was until the camera has gone; then it
+    // cloaks again, to decloak on the next arrival.
+    if cv == prev && gone < blend {
+        return None;
+    }
+    Some(0.0)
+}
+
+/// Draws the view `name` of the map over the back buffer's rectangle `rect`, inside
+/// the caller's scene; the camera moves over from the view drawn before. False, with
+/// nothing drawn, when it cannot be (no such view, no device, no targets): the caller
+/// draws its own backdrop.
 pub fn draw(name: &str, rect: PRect) -> bool {
     let s = st();
     let now = rt::now();
     if s.start == 0.0 || now - s.last > 600.0 {
         s.start = now;
+        s.cam = None;
     }
     s.last = now;
     let t = (now - s.start) as f32;
-    let changed = s.recipe.as_ref().is_none_or(|r| r.name != name);
-    if changed || now - s.checked > 1.0 {
+    if s.map.is_none() || now - s.checked > 1.0 {
         s.checked = now;
-        let same_text = !changed && text_of(name).is_some_and(|(own, _)| s.recipe.as_ref().is_some_and(|r| r.text.starts_with(own.as_str())));
-        if !same_text {
-            let old = s.recipe.take();
-            s.recipe = Recipe::read(name);
-            if s.recipe.is_none() {
-                if s.said & 1 == 0 {
-                    s.said |= 1;
-                    log!("menu: no scene \"{}\"", name);
-                }
-                s.recipe = old;
-                return false;
-            }
-            if changed {
-                if let Some((e, a, f)) = s.cam {
-                    s.from = Some((e, a, f, now));
-                }
-            }
+        if s.map.as_ref().is_none_or(|m| m.text != text_of().0) {
+            s.map = Some(Map::read());
         }
     }
-    let Some(r) = s.recipe.as_ref() else { return false };
-    let (mut eye, mut at) = r.camera(t);
-    let mut fov = r.fov;
-    if let Some((e0, a0, f0, t0)) = s.from {
-        let k = if r.blend > 0.0 { smooth(((now - t0) as f32) / r.blend) } else { 1.0 };
+    let Some(m) = s.map.as_ref() else { return false };
+    let Some(vd) = m.view(name) else {
+        if s.said & 1 == 0 {
+            s.said |= 1;
+            log!("menu: the map has no view \"{}\"", name);
+        }
+        return false;
+    };
+    if s.view != name {
+        s.prev = core::mem::replace(&mut s.view, String::from(name));
+        s.since = now;
+        s.from = s.cam;
+        log!("menu: view {}", name);
+    }
+    let (mut eye, mut at) = Map::camera(vd, t);
+    let mut fov = vd.fov;
+    let gone = (now - s.since) as f32;
+    if let Some((e0, a0, f0)) = s.from {
+        let k = if m.blend > 0.0 { smooth(gone / m.blend) } else { 1.0 };
         eye = e0.lerp(eye, k);
         at = a0.lerp(at, k);
         fov = f0 + (fov - f0) * k;
@@ -484,13 +630,12 @@ pub fn draw(name: &str, rect: PRect) -> bool {
         }
     }
     s.cam = Some((eye, at, fov));
-    let shot = r.shot(t);
-    let fleet = r.fleet();
-    let (eye_w, at_w) = (fleet + eye, fleet + at);
-    let lights = Lights { dirs: alloc::vec![r.key, r.fill], points: Vec::new() };
-    let planet_r = r.planet.as_ref().map_or(0.0, |p| p.2);
+    let (view, prev, since, blend) = (s.view.as_str(), s.prev.as_str(), s.since, m.blend);
+    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, now, blend));
+    let lights = Lights { dirs: alloc::vec![m.key, m.fill], points: Vec::new() };
+    let planet = m.planet.as_ref().map(|p| (p.6, p.2));
     crate::frame::menu_frame(rect, move |dev: Device, frame: u32| {
-        let view = look_at(eye_w, at_w);
+        let view = look_at(eye, at);
         let aspect = rect.w as f32 / rect.h.max(1) as f32;
         let fovr = fov * DEG;
         let mk = |near: f32, far: f32| View {
@@ -502,30 +647,37 @@ pub fn draw(name: &str, rect: PRect) -> bool {
             st3d: 0,
             view,
             proj: perspective(fovr, aspect, near, far),
-            eye: eye_w,
+            eye,
             time: t,
             frame,
         };
         crate::scene::set_lights(lights);
         // The sky and the planet on a projection that reaches past the planet; the
-        // ships on one of their own, after the depth is cleared.
-        let reach = (eye_w.len() + planet_r * 1.2).max(1000.0);
-        let far_v = mk((reach * 0.01).max(1.0), reach * 2.0);
+        // ships and the gas on one of their own, after the depth is cleared.
+        let (near_p, far_p) = match planet {
+            Some((c, r)) => {
+                let d = (c - eye).len();
+                (((d - r * 1.05) * 0.5).max(10.0), d + r * 1.2)
+            }
+            None => (10.0, 1.0e5),
+        };
+        let far_v = mk(near_p, far_p.max(near_p * 2.0));
         mods::menu(Pass::Sky, &shot, &far_v);
         mods::menu(Pass::Planet, &shot, &far_v);
         dev.clear(&[], crate::d3d::CLEAR_ZBUFFER, 0, 1.0, 0);
-        let near_v = mk(1.0, (eye_w.len() * 0.5).max(4000.0));
+        let near_v = mk(2.0, 16000.0);
         mods::menu_begin(&shot, &near_v);
         mods::menu(Pass::Ships, &shot, &near_v);
         crate::scene::flush(&near_v);
+        mods::menu(Pass::Gas, &shot, &near_v);
         mods::menu(Pass::Translucent, &shot, &near_v);
     })
 }
 
-/// `UI.asi`'s call: draws the scene `name` (a NUL-terminated name) over the rectangle
-/// `x, y, w, h` of the back buffer, between the caller's `BeginScene` and `EndScene`
-/// with the back buffer bound. 1 if it drew, 0 if the caller is to draw its own
-/// backdrop. The device's state is put back as it was, the back buffer bound again.
+/// `UI.asi`'s call: draws the view `name` (a NUL-terminated name) of the map over the
+/// rectangle `x, y, w, h` of the back buffer, between the caller's `BeginScene` and
+/// `EndScene` with the back buffer bound. 1 if it drew, 0 if the caller is to draw its
+/// own backdrop. The device's state is put back as it was, the back buffer bound again.
 #[unsafe(no_mangle)]
 pub extern "C" fn Render3D_MenuScene(name: *const u8, x: u32, y: u32, w: u32, h: u32) -> u32 {
     if name.is_null() || w == 0 || h == 0 || crate::config::get().is_none() {

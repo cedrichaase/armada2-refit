@@ -1,8 +1,9 @@
-//! The 3D scene behind the main menu and the campaign selection (`[Menus] Scene=1`): a
-//! fleet in orbit over a planet, drawn by render3d (`Render3D_MenuScene`, render3d's
-//! README, "The menu scene") into the back buffer at the start of the menus' frame,
-//! before anything of ours. The screen specs then draw over it (`shown`) in place of
-//! the stock screen's art.
+//! The 3D scene behind the main menu and the campaign selection (`[Menus] Scene=1`):
+//! render3d's map (`Render3D_MenuScene`, render3d's README, "The menu scene"), drawn
+//! into the back buffer at the start of the menus' frame, before anything of ours. The
+//! main menu shows its view `main`; the campaign selection the view of the campaign
+//! last pointed at (`choose`), the Federation's at first, and render3d moves the camera
+//! over. The screen specs then draw over it (`shown`) in place of the stock screen's art.
 //!
 //! Without Render3D.asi, or when it draws nothing (no Direct3D 9 device, its scene
 //! switched off), `shown` is false and the specs draw what they drew before.
@@ -14,6 +15,18 @@ type SceneFn = unsafe extern "C" fn(*const u8, u32, u32, u32, u32) -> u32;
 static mut FN: Option<Option<SceneFn>> = None;
 /// The scene drew under this frame.
 static mut SHOWN: bool = false;
+/// The campaign selection's view, while it shows (None: the first, the Federation's).
+static mut CHOICE: Option<&'static core::ffi::CStr> = None;
+
+/// The campaign selection's spec: the view to show for the campaign pointed at.
+pub fn choose(view: &'static core::ffi::CStr) {
+    unsafe { CHOICE = Some(view) };
+}
+
+/// The view the campaign selection last chose (None: none yet, the Federation's).
+pub fn chosen() -> Option<&'static core::ffi::CStr> {
+    unsafe { CHOICE }
+}
 
 fn scene_fn() -> Option<SceneFn> {
     unsafe {
@@ -33,7 +46,7 @@ fn scene_fn() -> Option<SceneFn> {
 fn scene_for(screen: &str) -> Option<&'static core::ffi::CStr> {
     match screen {
         "main menu" => Some(c"main"),
-        "single player" => Some(c"single"),
+        "single player" => Some(unsafe { CHOICE }.unwrap_or(c"federation")),
         _ => None,
     }
 }
@@ -45,7 +58,12 @@ fn wanted() -> Option<(&'static core::ffi::CStr, SceneFn)> {
     }
     let all = crate::engine::dialogs::stack();
     let full = all.iter().rposition(|s| s.w() >= crate::engine::dialogs::DESIGN_W && s.h() >= crate::engine::dialogs::DESIGN_H)?;
-    let name = scene_for(crate::engine::dialogs::screen_name(all[full].proc_addr))?;
+    let screen = crate::engine::dialogs::screen_name(all[full].proc_addr);
+    if screen != "single player" {
+        // Each visit to the campaign selection starts at the Federation's view.
+        unsafe { CHOICE = None };
+    }
+    let name = scene_for(screen)?;
     Some((name, scene_fn()?))
 }
 

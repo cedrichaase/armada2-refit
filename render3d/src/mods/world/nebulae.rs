@@ -1199,8 +1199,7 @@ impl Nebulae {
         if !self.cfg.enable {
             return;
         }
-        let dev = v.dev;
-        if !self.device_ready(dev) {
+        if !self.device_ready(v.dev) {
             return;
         }
         // The nebulae are gathered once a frame (the action camera's view draws the same).
@@ -1212,6 +1211,57 @@ impl Nebulae {
         } else if self.classes.values().all(|c| c.pos.is_empty()) {
             return;
         }
+        // The Key: the brightest of the view's directional lights; towards it.
+        if v.main {
+            self.key_main = scene::lights().key().map(|k| [-k.dir.x, -k.dir.y, -k.dir.z]);
+        }
+        self.draw_classes(v, false);
+    }
+
+    /// The menu scene's gas (`crate::menu`): each field that class's nebulae, lit by the
+    /// Key `key` (towards it), held still so the volume is baked once, with what the
+    /// map sets over its recipe. Its classes are its own (`<odf>@menu`), so a mission's
+    /// nebulae of the same class keep their own radius, recipe and bake.
+    pub fn draw_menu(&mut self, v: &View, gas: &[crate::menu::Gas], key: Option<[f32; 3]>) {
+        if !self.cfg.enable || gas.is_empty() || !self.device_ready(v.dev) {
+            return;
+        }
+        for c in self.classes.values_mut() {
+            c.pos.clear();
+            c.sig = 2_166_136_261;
+        }
+        for g in gas {
+            let mut name = rt::lower(&g.odf);
+            name.push_str("@menu");
+            let c = self.classes.entry(name).or_insert_with(|| Cls::new(&rt::lower(&g.odf), false, g.radius));
+            // Set again every frame: a reload of the recipe reads its own.
+            if let Some(x) = g.key_share {
+                c.key_share = x.min(1.0);
+            }
+            if let Some(x) = g.scatter {
+                c.scatter = x.clamp(0.0, 0.8);
+            }
+            if let Some(x) = g.opacity {
+                c.opacity = x.max(0.0);
+            }
+            if let Some(x) = g.brightness {
+                c.k[1][3] = x.max(0.0);
+            }
+            for p in g.centres.iter().take(MAX_NEB) {
+                c.pos.push(*p);
+                for x in p {
+                    c.sig = (c.sig ^ (x.to_bits() >> 4)).wrapping_mul(16_777_619);
+                }
+            }
+        }
+        self.key_main = key;
+        self.draw_classes(v, true);
+    }
+
+    /// Every class's gas with this frame's centres into the view, lit by `key_main`.
+    /// `menu`: the menu scene's view, whose clock runs the lightning too.
+    fn draw_classes(&mut self, v: &View, menu: bool) {
+        let dev = v.dev;
         let p = v.proj.0;
         if p[2][2] == 0.0 || p[2][3] == 0.0 {
             return;
@@ -1227,11 +1277,6 @@ impl Nebulae {
         let f = [vw[0][2], vw[1][2], vw[2][2]];
         let eye = [v.eye.x, v.eye.y, v.eye.z];
         let zn = -p[3][2] / p[2][2];
-
-        // The Key: the brightest of the view's directional lights; towards it.
-        if v.main {
-            self.key_main = scene::lights().key().map(|k| [-k.dir.x, -k.dir.y, -k.dir.z]);
-        }
         let key = self.key_main;
         let _g = gfx::Guard::new(dev);
         // Ships' shadows in the gas: the hulls' shadow map of the Key, this view's
@@ -1444,7 +1489,7 @@ impl Nebulae {
             c.k[20][3] = 1.0 / (bs * bs).max(1e-6);
             let last = c.bolt_last;
             c.bolt_last = sec;
-            let dt = if last > 0.0 && v.main { sec - last } else { 0.0 };
+            let dt = if last > 0.0 && (v.main || menu) { sec - last } else { 0.0 };
             self.lightning(&key_name, sec, dt);
             let c = self.classes.get_mut(&key_name).unwrap();
             let baked = self.cfg.bake && c.vol.is_some();

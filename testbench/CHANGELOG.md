@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.26.0 — 2026-10-16
+
+### Changed
+- Scenario `ui-menus-scene` visits each campaign's scene by hovering its row (ui 0.8.0,
+  render3d 0.9.0); `ui-menus-single`'s campaign check accepts the column of emblems.
+
+Installed, not yet seen in game.
+
 ## 3.25.0 — 2026-10-16
 
 ### Added

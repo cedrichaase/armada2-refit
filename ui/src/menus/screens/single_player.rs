@@ -9,7 +9,12 @@
 //! is a click on a point inside the stock panel (the same points `testbench/ui.json`
 //! names), and a hover is a `WM_MOUSEMOVE` to the point, so the stock screen plays the
 //! panel's animation and sound, which the cut of the art then shows.
-use crate::gfx::{fade, R};
+//!
+//! Over render3d's map (`menus::scene`) the screen is a column like the main menu's:
+//! each campaign its faction's emblem (the HUD's race icons, `allrace` in
+//! `gui_global.spr`; for the tutorials Starfleet Academy's patch, drawn) and its name,
+//! and pointing at one moves the camera to its scene (`scene::choose`).
+use crate::gfx::{fade, Tex, R};
 use crate::menus::screens::kit;
 use crate::menus::{actions, Screen};
 use crate::rt::win::{HWND, WM_MOUSEMOVE};
@@ -21,6 +26,25 @@ struct Card {
     art: [i32; 4],
     at: (i32, i32),
     name: &'static str,
+}
+
+/// Each card's view of render3d's map, and its emblem: a race icon's cell in
+/// `allrace` (`gui_global.spr`, 84 px cells of 256), or None for the Academy's patch.
+const VIEWS: [(&core::ffi::CStr, Option<(u32, u32)>); 4] =
+    [(c"tutorials", None), (c"federation", Some((0, 0))), (c"klingon", Some((84, 0))), (c"borg", Some((84, 84)))];
+
+/// The race icons, loaded once (None inside: not found, the names stand alone).
+static mut ICONS: Option<Option<Tex>> = None;
+
+fn icons() -> Option<Tex> {
+    unsafe {
+        if ICONS.is_none() {
+            let t = crate::gfx::load_tga("Textures\\RGB\\allrace.tga");
+            crate::log!("menus: campaign emblems {}", if t.is_some() { "from allrace.tga" } else { "not found (allrace.tga): names only" });
+            ICONS = Some(t);
+        }
+        ICONS.flatten()
+    }
 }
 
 const CARDS: [Card; 4] = [
@@ -45,37 +69,25 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     if foot.len() < 2 {
         return false;
     }
+    if crate::menus::scene::shown() {
+        return over_scene(ui, s, &names, &foot);
+    }
     let t = ui.theme;
     let sc = ui.screen();
-    let scene = crate::menus::scene::shown();
-    if scene {
-        // Over the 3D scene: shade at the top for the title and at the foot for the cards.
-        ui.draw.rect_vgrad(R::new(0.0, 0.0, sc.w, sc.h * 0.2), 0xb0010205, 0x00010205);
-        ui.draw.rect_vgrad(R::new(0.0, sc.h * 0.45, sc.w, sc.h * 0.55), 0x00010205, 0xd0010205);
-    } else {
-        kit::backdrop(ui);
-    }
+    kit::backdrop(ui);
 
-    // The screen: a title, the cards (2x2, or in a row along the foot over the scene,
-    // which then fills the middle), the foot.
+    // The screen: a title, the cards (2x2), the foot.
     let m = ui.u(40.0);
     let title_h = ui.u(74.0);
     let foot_h = ui.u(t.button_h);
     let gap = ui.u(24.0);
     ui.text_in(R::new(m, ui.u(18.0), sc.w - 2.0 * m, title_h), "SINGLE PLAYER", t.display_size, Align::Left, t.title, crate::gfx::Weight::Bold);
     let grid = R::new(m, ui.u(18.0) + title_h, sc.w - 2.0 * m, sc.h - ui.u(18.0) - title_h - foot_h - 2.0 * gap - ui.u(10.0));
-    let cols = if scene { 4usize } else { 2 };
-    let (card_w, card_h) = if scene {
-        let w = (grid.w - 3.0 * gap) / 4.0;
-        // The art is about 3:2 under the name bar.
-        let h = (w / 1.55 + ui.u(46.0)).min(grid.h * 0.6);
-        (w, h)
-    } else {
-        let h = (grid.h - gap) * 0.5;
-        (((grid.w - gap) * 0.5).min(h * 1.5 + ui.u(24.0)), h)
-    };
+    let cols = 2usize;
+    let card_h = (grid.h - gap) * 0.5;
+    let card_w = ((grid.w - gap) * 0.5).min(card_h * 1.5 + ui.u(24.0));
     let x0 = grid.x + (grid.w - cols as f32 * card_w - (cols - 1) as f32 * gap) * 0.5;
-    let y0 = if scene { grid.bottom() - card_h } else { grid.y };
+    let y0 = grid.y;
     let mut hover = -1i32;
     for (i, card) in CARDS.iter().enumerate() {
         let r = R::new(x0 + (i % cols) as f32 * (card_w + gap), y0 + (i / cols) as f32 * (card_h + gap), card_w, card_h);
@@ -83,13 +95,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         let live = s.top && s.model.button_at(card.at.0, card.at.1).is_none_or(|c| c.enabled);
         let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
         let st = theme::State::of(ui, id, hot, held);
-        if scene {
-            // Glass over the scene: the theme's panel, lighter.
-            ui.draw.rect_vgrad(r, fade(t.panel_top, 0.55), fade(t.panel, 0.7));
-            ui.draw.frame(r, 1.0, fade(t.panel_edge, 0.9));
-        } else {
-            theme::panel(ui, r);
-        }
+        theme::panel(ui, r);
         let (bar, rest) = r.take_top(ui.u(46.0));
         let name = names.get(i).map_or(card.name, |c| if c.text.is_empty() { card.name } else { c.text.as_str() });
         ui.text_in(bar.inset(ui.u(8.0)), name, t.heading_size, Align::Left, if hot { t.accent } else { t.title }, crate::gfx::Weight::Bold);
@@ -121,5 +127,126 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     kit::button(ui, s, R::new(m, fy, bw, foot_h), foot[0], &foot[0].text);
     let last = foot.len() - 1;
     kit::button(ui, s, R::new(sc.w - m - bw, fy, bw, foot_h), foot[last], &foot[last].text);
+    true
+}
+
+/// The emblem of card `i` in `r` (a square), tinted.
+fn emblem(ui: &mut Ui, i: usize, r: R, c: crate::gfx::Color) {
+    match VIEWS[i].1 {
+        Some((x, y)) => {
+            let Some(t) = icons() else { return };
+            let k = 1.0 / 256.0;
+            ui.draw.image_uv(t, r, [x as f32 * k, y as f32 * k, (x + 84) as f32 * k, (y + 84) as f32 * k], c);
+        }
+        None => academy(ui, r, c),
+    }
+}
+
+/// Starfleet Academy's patch, drawn: a triangle standing on its base, its corners
+/// rounded, round the Federation's delta.
+fn academy(ui: &mut Ui, r: R, c: crate::gfx::Color) {
+    let (cx, w) = (r.x + r.w * 0.5, r.w * 0.94);
+    let h = w * 0.88;
+    let top = r.y + (r.h - h) * 0.5;
+    let pts = [(cx, top), (cx + w * 0.5, top + h), (cx - w * 0.5, top + h)];
+    let lw = (r.w * 0.075).max(1.5);
+    for i in 0..3 {
+        ui.draw.line(pts[i], pts[(i + 1) % 3], lw, c);
+        ui.draw.rect_round(R::new(pts[i].0 - lw * 0.5, pts[i].1 - lw * 0.5, lw, lw), lw * 0.5, c);
+    }
+    if let Some(t) = icons() {
+        // The delta of the Federation's icon, without the bar behind it.
+        let k = 1.0 / 256.0;
+        let d = R::new(cx - w * 0.2, top + h * 0.36, w * 0.4, w * 0.48);
+        ui.draw.image_uv(t, d, [24.0 * k, 2.0 * k, 60.0 * k, 80.0 * k], c);
+    }
+}
+
+/// Over render3d's map: the column at the left, as the main menu's, under a title;
+/// each campaign its emblem and its name, lit as the pointer comes over it, which
+/// moves the camera to its scene; the row whose scene shows keeps its bar. Load Game
+/// and Previous Menu follow in the column.
+fn over_scene(ui: &mut Ui, s: &Screen, names: &[&crate::menus::model::Control], foot: &[&crate::menus::model::Control]) -> bool {
+    use crate::gfx::Weight;
+    let sc = ui.screen();
+    let t = ui.theme;
+    ui.draw.rect_hgrad(R::new(0.0, 0.0, sc.w * 0.22, sc.h), 0xd8010205, 0xa0010205);
+    ui.draw.rect_hgrad(R::new(sc.w * 0.22, 0.0, sc.w * 0.3, sc.h), 0xa0010205, 0x00010205);
+    ui.draw.rect_vgrad(R::new(0.0, 0.0, sc.w, sc.h * 0.12), 0x80000000, 0x00000000);
+    ui.draw.rect_vgrad(R::new(0.0, sc.h * 0.84, sc.w, sc.h * 0.16), 0x00000000, 0x90000000);
+
+    let (w, eh, gap) = (ui.u(420.0), ui.u(68.0), ui.u(10.0));
+    let (fh, title_h) = (ui.u(46.0), ui.u(90.0));
+    let total = title_h + 4.0 * eh + 3.0 * gap + ui.u(36.0) + 2.0 * fh;
+    let x = libm::roundf(sc.w * 0.08).max(ui.u(40.0));
+    let top = libm::roundf((sc.h - total) * 0.5);
+    ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), "STAR TREK ARMADA II", 24.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
+    ui.text_in(R::new(x - ui.u(2.0), top - ui.u(8.0), w * 1.5, ui.u(76.0)), "SINGLE PLAYER", 56.0, Align::Left, t.title, Weight::Bold);
+    ui.draw.rect_hgrad(R::new(x, top + ui.u(74.0), ui.u(260.0), ui.u(2.0).max(1.0)), t.accent, fade(t.accent, 0.0));
+    let shown = crate::menus::scene::chosen();
+    let mut y = top + title_h;
+    let mut hover = -1i32;
+    for (i, card) in CARDS.iter().enumerate() {
+        let r = R::new(x, y, w, eh);
+        y += eh + gap;
+        let id = ui.id(card.name);
+        let live = s.top && s.model.button_at(card.at.0, card.at.1).is_none_or(|c| c.enabled);
+        let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
+        let st = theme::State::of(ui, id, hot, held);
+        let here = shown.is_some_and(|v| v == VIEWS[i].0) || (shown.is_none() && i == 1);
+        let k = st.hot.max(if here { 0.45 } else { 0.0 });
+        if k > 0.01 {
+            ui.draw.rect_hgrad(r, fade(t.accent, 0.26 * st.hot), fade(t.accent, 0.0));
+            ui.draw.rect(R::new(r.x, r.y + ui.u(10.0), ui.u(4.0).max(2.0), r.h - ui.u(20.0)), fade(t.accent, k));
+        }
+        let c = if !live {
+            t.text_off
+        } else if held {
+            t.accent
+        } else {
+            crate::gfx::mix(t.text, 0xffffffff, k)
+        };
+        let nudge = ui.u(8.0) * st.hot;
+        let is = ui.u(46.0);
+        emblem(ui, i, R::new(r.x + ui.u(20.0) + nudge, r.y + (r.h - is) * 0.5, is, is), c);
+        let name = names.get(i).map_or(card.name, |c| if c.text.is_empty() { card.name } else { c.text.as_str() });
+        let tr = R::new(r.x + ui.u(20.0) + is + ui.u(18.0) + nudge, r.y, r.w - is - ui.u(44.0), r.h);
+        ui.text_in(tr, name, 24.0, Align::Left, c, Weight::Bold);
+        if hot {
+            hover = i as i32;
+            crate::menus::scene::choose(VIEWS[i].0);
+        }
+        if clicked {
+            s.click(card.at.0, card.at.1);
+        }
+    }
+    // The stock screen hears of the hover, so its own sound plays.
+    unsafe {
+        let h = s.slot.hwnd;
+        if s.top && HOVER != (h, hover) {
+            HOVER = (h, hover);
+            let (x, y) = if hover >= 0 { CARDS[hover as usize].at } else { (2, 2) };
+            actions::push(actions::Action::Mouse { h, msg: WM_MOUSEMOVE, keys: 0, x: x - s.model.rect[0], y: y - s.model.rect[1] });
+        }
+    }
+    // Load Game, then Previous Menu, quieter, below a gap.
+    y += ui.u(26.0);
+    let last = foot.len() - 1;
+    for c in [foot[last], foot[0]] {
+        let r = R::new(x, y, w, fh);
+        y += fh;
+        let id = ui.id(c.text.as_str());
+        let on = s.top && c.enabled;
+        let (hot, held, clicked) = if on { ui.interact(id, r) } else { (false, false, false) };
+        let st = theme::State::of(ui, id, hot, held);
+        if st.hot > 0.01 {
+            ui.draw.rect(R::new(r.x, r.y + ui.u(10.0), ui.u(3.0).max(2.0), r.h - ui.u(20.0)), fade(t.accent, st.hot));
+        }
+        let col = if !on { t.text_off } else if held { t.accent } else { crate::gfx::mix(fade(t.text, 0.8), 0xffffffff, st.hot) };
+        ui.text_in(R::new(r.x + ui.u(20.0) + ui.u(8.0) * st.hot, r.y, r.w, r.h), &c.text, 19.0, Align::Left, col, Weight::Bold);
+        if clicked {
+            s.click_control(c);
+        }
+    }
     true
 }

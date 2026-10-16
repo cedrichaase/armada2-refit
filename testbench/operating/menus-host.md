@@ -31,12 +31,17 @@ What an agent driving the front end with the UI's menus on needs to know (`ui/ME
   painted into the faded art behind it ("OPTIONS" at 764,484), and `Click "OPTIONS"`
   clicked the art; the art works too (it passes clicks to the stock screen), but the
   column is what a scenario should click, by position.
-- **Over the menu scene** (`[Menus] Scene=1` with render3d 0.8.0; UI.log `menus: scene
+- **Over the menu scene** (`[Menus] Scene=1` with render3d 0.8.0 or later; UI.log `menus: scene
   main on`) the main menu has no art behind it and takes no click off the column: a
   design point clicks nothing. `Click the single player emblem` and the other
   `ui.json` targets with a `label` click the UI's own entry by OCR then; the column's
-  positions above are unchanged. The campaign cards stand in a row along the foot.
-  `Menu\main.ini` in the clone retunes the scene live (`render3d/README.md`).
+  positions above are unchanged. The campaign selection is a column at the left too,
+  at 1280x720 its rows at y 270 (Tutorials), 322, 374, 426 (Borg), x 220: `Move the
+  mouse to` a row moves the camera to that campaign's scene (Render3D.log `menu: view
+  <name>`; wait ~4 s for the 2.5 s move, ~8 s for the Klingons to decloak).
+  `Menu\map.ini` in the clone retunes the map live (`render3d/README.md`); the
+  projector math there is plain look-at: a camera on +z looking down -z has screen
+  right along -x.
 - Game Setup's player rows: `Click at design 124,115` opens player 2's list,
   `124,143` picks "Computer AI:Easy"; `246,95` / `246,123` set player 1's side to Borg
   (as in `ui-runtime.md`).

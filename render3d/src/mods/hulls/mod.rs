@@ -861,6 +861,10 @@ impl Module for Hulls {
         // The finest level of detail at any distance: the scene is a close-up.
         let lod = pose::Lod::Auto { eye: v.eye, settings: pose::LodSettings { detail: 4, dist: [1.0e5, 1.0e5, 1.0e5, 1.0e5] } };
         for (i, s) in shot.ships.iter().enumerate() {
+            // Cloaked whole, a ship is not there at all (it waits to decloak).
+            if s.cloak.is_some_and(|k| k <= 0.0) {
+                continue;
+            }
             let Some(model) = scene::model(v.dev, &s.sod) else { continue };
             let clock = pose::Clock::looping(v.time);
             let mut p = pose::pose(&model.sod, &model.info, &s.world, clock, lod);
@@ -871,7 +875,11 @@ impl Module for Hulls {
             let radius = r * s.world.r[0].len().max(s.world.r[1].len()).max(s.world.r[2].len());
             if self.said_menu & (1 << i.min(31)) == 0 {
                 self.said_menu |= 1 << i.min(31);
-                log!("hulls: menu scene: {} ({} parts), radius {:.0}", model.name, model.parts.len(), radius);
+                // The parts the shadow map leaves out as cut-outs (`shadow::render`).
+                let cut = model.parts.iter().filter(|part| {
+                    model.sod.nodes[part.node].mesh().is_some_and(|ms| ms.texture_material.eq_ignore_ascii_case("default")) && part.groups.iter().any(|g| !g.self_illum)
+                }).count();
+                log!("hulls: menu scene: {} ({} parts, {} cut out of the shadow map), radius {:.0}", model.name, model.parts.len(), cut, radius);
             }
             let posed = Posed {
                 obj: 0,
@@ -890,9 +898,13 @@ impl Module for Hulls {
                 warp: None,
                 waves: None,
                 glow: None,
-                cloak: None,
+                // Decloaking: as the engine's state 3, this much of the hull back.
+                cloak: s.cloak.map(|k| (3, k.min(1.0), 0.0)),
                 drawn: true,
             };
+            if posed.cloak.is_some() && look.cloak {
+                st.cloaked.push(i + 1);
+            }
             st.posed.insert(i + 1, posed);
         }
         if look.shadows {
@@ -909,8 +921,22 @@ impl Module for Hulls {
                 let look = self.look().clone();
                 let st = view_state(v.key());
                 let keys: Vec<usize> = st.posed.keys().copied().collect();
+                // The map's other scenes are posed too: only what is in view is drawn.
+                let vp = v.view.mul(&v.proj);
                 for k in keys {
                     let Some(p) = st.posed.get(&k) else { continue };
+                    if !shadow::in_view(&vp, p.centre, p.radius) {
+                        st.cloaked.retain(|&c| c != k);
+                        continue;
+                    }
+                    if let Some((_, a, _)) = p.cloak {
+                        // Cloak=0: faded, as stock fades it.
+                        if !look.cloak {
+                            st.faded.push((k, 0.2 + 0.8 * a));
+                        }
+                        // No running lights until the hull is back.
+                        continue;
+                    }
                     self.draw.draw(v, &look, p, draw::Mode::Opaque);
                     self.sprites.collect(v, &look, p, &mut st.sprites);
                     st.additive.push(k);

@@ -64,13 +64,14 @@ pub struct Shadow {
     ps: Shader,
     decl: Decl,
     target: Option<(Com, Com, Com, u32)>,
-    said: bool,
+    /// The casters and meshes last logged.
+    said: (usize, usize),
     failed: bool,
 }
 
 impl Shadow {
     pub fn new() -> Shadow {
-        Shadow { vs: Shader::vertex(&VS_DEPTH), ps: Shader::pixel(&PS_DEPTH), decl: Decl::new(&scene::VERTEX), target: None, said: false, failed: false }
+        Shadow { vs: Shader::vertex(&VS_DEPTH), ps: Shader::pixel(&PS_DEPTH), decl: Decl::new(&scene::VERTEX), target: None, said: (0, 0), failed: false }
     }
 
     pub fn reset(&mut self) {
@@ -183,6 +184,12 @@ impl Shadow {
             dev.set_rs(s, val);
         }
         dev.set_stream_freq(0, 1);
+        // The cut-out meshes' textures (their alpha only).
+        dev.set_ss(0, SAMP_ADDRESSU, TADDRESS_WRAP);
+        dev.set_ss(0, SAMP_ADDRESSV, TADDRESS_WRAP);
+        dev.set_ss(0, SAMP_MAGFILTER, TEXF_LINEAR);
+        dev.set_ss(0, SAMP_MINFILTER, TEXF_LINEAR);
+        dev.set_ss(0, SAMP_MIPFILTER, TEXF_LINEAR);
         let mut vk = [0.0f32; 4 * 10];
         for r in 0..3 {
             vk[8 + r * 4..12 + r * 4].copy_from_slice(&rows[r]);
@@ -196,22 +203,26 @@ impl Shadow {
                 k[4..8].copy_from_slice(&[wp.s1, wp.o, 1.0, 0.0]);
             }
             dev.vs_const(8, &k[..20]);
-            let limit = engine::field(p.inst, 0x10) as i32;
+            // The faces the instance draws (construction); a model that is no
+            // instance's (the menu scene) draws them all.
+            let limit = if p.inst == 0 { -1 } else { engine::field(p.inst, 0x10) as i32 };
             let mut faces_left: i64 = if limit >= 0 { limit as i64 } else { i64::MAX };
             for part in &p.model.parts {
                 if part.blend != Blend::Opaque || !p.pose.shown.get(part.node).copied().unwrap_or(false) {
                     continue;
                 }
                 // Cut-out meshes (a `default` mesh with a group that is not
-                // self-illuminating) cast nothing: the depth pass has no texture, and
-                // would cast their holes (as Lighting.asi left alpha-tested draws out).
+                // self-illuminating) cast what the hull pass draws of them: their
+                // texture is bound and those groups cut out at alpha 0.5 as `ps_hull`
+                // does (left out entirely, as Lighting.asi left alpha-tested draws, half
+                // a Borg fusion cube cast nothing).
                 let default_mat = p.model.sod.nodes[part.node].mesh().is_some_and(|ms| ms.texture_material.eq_ignore_ascii_case("default"));
-                if default_mat && part.groups.iter().any(|g| !g.self_illum) {
-                    continue;
-                }
+                let cut = default_mat && part.groups.iter().any(|g| !g.self_illum);
                 if faces_left <= 0 {
                     break;
                 }
+                let tex = if cut { part.texture.as_deref().and_then(|t| crate::assets::texture(dev, t)).unwrap_or(core::ptr::null_mut()) } else { core::ptr::null_mut() };
+                dev.set_texture(0, tex);
                 let world = p.pose.world[part.node];
                 dev.vs_const(0, world.to_m4().transpose().as_floats());
                 dev.set_stream(0, part.vb.ptr(), 0, 32);
@@ -221,12 +232,14 @@ impl Shadow {
                     if tris == 0 {
                         break;
                     }
+                    dev.ps_const(0, &[if cut && !g.self_illum && !tex.is_null() { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0]);
                     faces_left -= tris as i64;
                     dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, tris);
                 }
                 parts += 1;
             }
         }
+        dev.set_texture(0, core::ptr::null_mut());
         dev.set_render_target(0, rt0.ptr());
         dev.set_depth_stencil(ds0.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
         dev.set_viewport(&vp0);
@@ -243,8 +256,10 @@ impl Shadow {
                 range,
             });
         }
-        if !self.said {
-            self.said = true;
+        // In a mission once; in the menu scene whenever it changes (a scene of another view).
+        let menu = planets.is_some();
+        if (menu && self.said != (casters.len(), parts)) || self.said == (0, 0) {
+            self.said = (casters.len(), parts);
             log!("hulls: shadow map of {} hulls ({} meshes), {:.0} units wide, {:.3} a texel", casters.len(), parts, width, texel_w);
         }
     }
@@ -272,7 +287,7 @@ impl Shadow {
 
 /// Whether a sphere is (nearly) in the view: its centre through view x projection
 /// against the clip volume, grown by its radius.
-fn in_view(vp: &crate::math::M4, c: V3, r: f32) -> bool {
+pub(super) fn in_view(vp: &crate::math::M4, c: V3, r: f32) -> bool {
     let q = vp.transform([c.x, c.y, c.z, 1.0]);
     let w = q[3];
     if w + r < 0.0 {
