@@ -5,6 +5,59 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.23.0 — 2026-10-16
+
+### Added
+- Scenarios `ui-whole-game` (16:9, 21:9 and 4:3: the whole game with `./install`'s
+  defaults), `ui-menus-multiplayer`, `ui-hud-multiplayer` (ui 0.4.0); operating notes
+  `ui-switchon.md`, `ui-multiplayer.md`, `ui-fixes.md`.
+
+### Changed
+- Scenarios of the superseded plugins (`grid-layout`, `hud`, `hud-mode-switch`,
+  `escape-menu`, `main-menu`, `game-setup-labels`) put their plugin back with
+  `ui/bench-legacy.sh`; `_enter-instant-action` goes through the UI's Game Setup;
+  `ui-hud-map`, `ui-hud-panels` and `ui-hud-panels-objectives` check what stock shows.
+- A run's report gathers more of the UI's logs.
+
+Installed, not yet seen in game.
+
+## 3.22.0 — 2026-10-16
+
+### Added
+- `Scene.asi` commands `succeed [s]` and `fail [s]`, which end the mission as its
+  script would; scenes `ending`, `ui-hud-info`.
+- Scenarios `ui-hud-info`, `ui-hud-map`, `ui-hud-overlay`, `ui-hud-panels`,
+  `ui-hud-panels-objectives`, `ui-menus-single`, `ui-menus-dialogs`, `ui-menus-widgets`,
+  `ui-menus-setup`, `ui-menus-success`, `ui-loading` (ui 0.3.0); operating notes for
+  each agent's area.
+
+### Changed
+- `ui-menus-options` and `ui-menus-match` follow the menus' own layouts.
+
+Installed, not yet seen in game.
+
+## 3.21.0 — 2026-10-16
+
+### Added
+- Scenario step `Scroll the wheel down|up [N times]` (481b796).
+- Scenarios `ui-widgets`, `ui-widgets-cursor` (scene `ui-cursor`), `ui-style`,
+  `ui-hud-bar`, `ui-menus-options` and `ui-menus-match` (ui 0.2.0).
+- A run's report gathers `UI.log` and `UI.ini`; `design_to_screen` also reads the
+  design-area line `UI.log` writes while the UI hosts the menus.
+- Operating notes `operating/ui-widgets.md`, `ui-style.md`, `hud-takeover.md`,
+  `menus-host.md`.
+
+Installed, not yet seen in game.
+
+## 3.20.0 — 2026-10-16
+
+### Added
+- Scenario `ui-runtime`: `UI.asi`'s demonstration panel in a screen of ours (the
+  Credits' place), on the loading screen and over the HUD, with a click on it that the
+  engine must not see (ui 0.1.0). Its setup is `ui/bench-asi.sh`.
+
+Installed, not yet seen in game.
+
 ## 3.19.1 — 2026-10-16
 
 ### Changed

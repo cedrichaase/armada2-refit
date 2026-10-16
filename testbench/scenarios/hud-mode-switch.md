@@ -2,8 +2,11 @@
 
 Resolutions: 4:3, 21:9
 Mod: refit
+Setup: ui/bench-legacy.sh hud
 Reference: 4:3
 Timeout: 14 min
+
+`HUD.asi` is no longer installed by `./install` (the HUD is the UI's); the setup puts it back with `[HUD] Enable=0`, as a player who sets the UI's HUD back to stock would (`ui/README.md`, "A part switched back to stock").
 
 Regression test for hud 2.2.0. Before it, `HUD.asi` fitted the layout canvas to the
 display mode once, when the GUI config loaded at the start of a mission. A mode chosen

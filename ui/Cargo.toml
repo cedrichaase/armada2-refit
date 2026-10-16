@@ -1,0 +1,37 @@
+[package]
+name = "ui"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "UI.asi: Star Trek: Armada II's HUD, menus and loading screen drawn by our own UI runtime"
+license = "MIT"
+
+[lib]
+name = "ui"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+libm = "0.2"
+a2fmt = { path = "../render3d/a2fmt" }
+
+[build-dependencies]
+fontbake = { path = "fontbake" }
+
+# The font bake is brute force over every glyph texel; unoptimised it takes minutes.
+[profile.release.build-override]
+opt-level = 3
+
+[profile.dev.build-override]
+opt-level = 3
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true
+codegen-units = 1
+debug = 1
+
+[profile.dev]
+panic = "abort"
+opt-level = 1

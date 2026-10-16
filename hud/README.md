@@ -1,5 +1,10 @@
 # HUD — the in-game UI, its font and its cursors at any aspect
 
+> **Superseded by the UI.** `./install` no longer installs `HUD.asi`: the HUD is
+> `UI.asi`'s (`ui/README.md`, "Installing"), and `ui/install.sh` takes `HUD.asi` out.
+> This layer stays as the description of the stock HUD the UI works on, and for a
+> player who sets `[HUD] Enable=0` in `UI.ini` and runs `hud/install.sh` by hand.
+
 The in-game HUD has three things that are drawn against a fixed 4:3 (or 5:4) reference
 and come out stretched on a wide screen: the **layout canvas** (1600x1200), the **font**
 (1280x1024) and the **cursors** (800x600). `HUD.asi` corrects all three inside the engine,

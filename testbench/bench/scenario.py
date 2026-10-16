@@ -354,6 +354,16 @@ def s_press(c, m):
     return None
 
 
+@step(r'^(?:scroll|turn|roll) the (?:mouse )?wheel (?P<dir>up|down)(?: (?P<n>\d+) (?:times|notches?))?$')
+def s_wheel(c, m):
+    # a2input counts notches positive = down
+    n = int(m.group('n') or 1)
+    for _ in range(n):
+        c.sess.wheel(n=1 if m.group('dir') == 'down' else -1)
+        time.sleep(0.15)
+    return None
+
+
 @step(r'^type ' + Q.format('text') + r'$')
 def s_type(c, m):
     c.sess.type(m.group('text'))
@@ -922,7 +932,8 @@ class Case:
 
     def design_to_screen(self, x, y):
         """The shell's 800x600 design space to screen pixels.  Menus.asi logs the mapping
-        it applied ('MoveWindow 800x600 @0,0 -> 1440x1080 @240,0'); without it (stock),
+        it applied ('MoveWindow 800x600 @0,0 -> 1440x1080 @240,0'), and so does UI.asi
+        when it draws the menus; without either (stock),
         the 800x600 display mode fills the output, stretched."""
         if self.mod == 'stock':
             # the stock 800x600 shell mode fills the output, stretched -- also with the
@@ -930,7 +941,8 @@ class Case:
             # 800x600 MODE, not onto the screen: clicking that 1:1 missed (2026-09-26)
             W, H = self.res
             return int(x * W / 800), int(y * H / 600)
-        body = self.sess.game_log('Menus.log') or ''
+        # UI.asi logs the same line when it draws the menus itself (ui/MENUS.md).
+        body = (self.sess.game_log('Menus.log') or '') + '\n' + (self.sess.game_log('UI.log') or '')
         found = re.findall(r'MoveWindow 800x600 @0,0\s+->\s+(\d+)x(\d+) @(-?\d+),(-?\d+)', body)
         if found:
             w, h, ox, oy = map(int, found[-1])

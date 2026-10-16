@@ -5,6 +5,62 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.13.0 — 2026-10-16
+
+Layers: ui 0.4.0, hud 2.2.2, testbench 3.23.0.
+
+### Changed
+- **The UI draws the whole HUD, every menu, the loading screen and the cursor by
+  default** (ui 0.4.0). `./install` no longer runs `hud/install.sh`,
+  `grid/install.sh` or `menus/install.sh`: `ui/install.sh` takes `HUD.asi`,
+  `GridLayout.asi` and `Menus.asi` out (`ui/supersede.sh`); the menu plates stay
+  installed, for the UI's main menu. Those layers stay in the repository; `a2mod`
+  still recognises their files in an older install.
+
+### Added
+- The multiplayer HUD panels and the Internet lobby; scenario `ui-whole-game` at three
+  aspects (ui 0.4.0, testbench 3.23.0).
+
+Installed, not yet seen in game.
+
+## 12.12.0 — 2026-10-16
+
+Layers: ui 0.3.0, testbench 3.22.0.
+
+### Added
+- `UI.asi` in `./install` and `a2mod` (the `ui` layer), with every HUD panel, most menu
+  screens and a loading screen of its own, each off by default in `UI.ini` (ui 0.3.0).
+- Scenarios for each, and `Scene.asi`'s `succeed`/`fail` (testbench 3.22.0).
+
+Installed, not yet seen in game.
+
+## 12.11.0 — 2026-10-16
+
+Layers: ui 0.2.0, testbench 3.21.0.
+
+### Added
+- The UI's widgets, its own cursor, its style (a theme per race), the first HUD panel
+  of its own (the button bar, superseding `GridLayout.asi` when on) and the menus
+  hosted and drawn by the UI (superseding `Menus.asi` when on); all off by default
+  (ui 0.2.0).
+- Scenarios for each (testbench 3.21.0).
+
+Installed, not yet seen in game.
+
+## 12.10.0 — 2026-10-16
+
+Layers: ui 0.1.0, testbench 3.20.0.
+
+### Added
+- A new layer, `ui/`: `UI.asi`, the runtime the HUD, menus and loading screen will be
+  redrawn with (`ui/PLAN.md`): a 2D renderer on the Direct3D 9 device, SDF text from a
+  vendored OFL font, immediate-mode widgets, input with capture, and hooks into a
+  mission's frame, a front-end screen of our own and the loading screen. Draws nothing
+  unless a `[Demo]` key is on; not in `./install` or `a2mod` yet (ui 0.1.0).
+- Scenario `ui-runtime` (testbench 3.20.0).
+
+Installed, not yet seen in game.
+
 ## 12.9.0 — 2026-10-16
 
 Layers: films 1.3.0.

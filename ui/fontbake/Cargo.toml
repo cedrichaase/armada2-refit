@@ -1,0 +1,22 @@
+[package]
+name = "fontbake"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Host-side: bakes a TTF into the signed-distance atlas blob UI.asi embeds"
+license = "MIT"
+
+[dependencies]
+skrifa = "0.44"
+
+# `preview` is for `cargo test --features preview --target x86_64-unknown-linux-gnu`:
+# the build script then bakes into this crate's own OUT_DIR, so the test can include the
+# runtime (ui/src/text) and render through it.
+[features]
+preview = []
+
+[build-dependencies]
+skrifa = "0.44"
+
+[dev-dependencies]
+libm = "0.2"

@@ -40,6 +40,10 @@ WHAT COUNTS AS A CHANGE
                   (right-drag pan speed), switched so stock really is stock
     grid          GridLayout.asi/.ini          -- added files: the bar as a 5x3 grid with
                   position keys; switched so stock has stock's bar and keys
+    ui            UI.asi/.ini                  -- added files: the HUD, the menus, the loading
+                  screen and the cursor drawn by the UI.  ./install no longer puts
+                  in HUD.asi, GridLayout.asi or Menus.asi (ui/supersede.sh takes them
+                  out); an older install that still has them is snapshot as it is
     cutscenes    binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
                   animations/<Name>.mp4/.wav beside a <Name>.bik  -- cutscenes/binkproxy
     renderer      dxvk.conf                    -- AF, LOD bias, seamless cubes
@@ -99,10 +103,11 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('QOL.asi', 'qol'), ('QOL.ini', 'qol'),
          ('QOLRules.asi', 'qol'), ('QOLRules.ini', 'qol'),
          ('GridLayout.asi', 'grid'), ('GridLayout.ini', 'grid'),
+         ('UI.asi', 'ui'), ('UI.ini', 'ui'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
          ('dxvk.conf', 'renderer')] + \
         [(f'{n}.{x}', 'render3d') for n in LEGACY_RENDER for x in ('asi', 'ini')]
-LAYERS = ['textures', 'models', 'hud', 'menus', 'render3d', 'qol', 'grid', 'cutscenes',
+LAYERS = ['textures', 'models', 'hud', 'menus', 'render3d', 'qol', 'grid', 'ui', 'cutscenes',
           'renderer', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.

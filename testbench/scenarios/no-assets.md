@@ -10,7 +10,7 @@ replacement movies, the menu plates — have nothing to install and must say so 
 than fail; the code layers install as usual, the cutscene proxy included. With no
 `.mp4` beside any `.bik`, `binkw32.dll` passes every movie to the real DLL
 (`binkw32_orig.dll`), which is what `bink ...` lines in its log mean. With no plate,
-`Menus.asi` draws black sides. `QOL.asi`'s log says it scaled
+the UI's main menu draws its column over the stock art with black beside it. `QOL.asi`'s log says it scaled
 the right-drag pan speed 2.5x as the game read `RTS_CFG.h`. `Render3D.asi` replaced `Venting.asi`,
 `Sky.asi`, `Explosions.asi`, `Shields.asi`, `Repair.asi`, `Fog.asi`, `Specials.asi` and
 `Planets.asi` (`./install` takes any it finds out) with modules that need no assets: the planets
@@ -21,7 +21,7 @@ the fog is the engine's own texture. Its log names each module it loaded.
 1. Launch the game.
 2. Wait for the main menu.
 3. Take a screenshot called "main menu".
-4. Expect "Menus.log" contains "hooks=7/7".
+4. Expect "UI.log" contains "menus: hosted by the UI".
 5. Expect "BinkProxy.log" contains "BinkProxy loaded".
 6. Expect "BinkProxy.log" contains "bink bitmaps".
 7. Expect "Render3D.log" contains "module world: loaded".
@@ -32,7 +32,7 @@ the fog is the engine's own texture. Its log names each module it loaded.
 12. Expect "Render3D.log" contains "module effects: loaded".
 13. Expect "Render3D.log" contains "module ordnance: loaded".
 14. Expect "Render3D.log" contains "module overlays: loaded".
-15. Check that the main menu shows the game's own stock art — the Armada II logo and the Single Player, Instant Action and Multiplayer buttons — centred at full screen height, with plain black to its left and right.
+15. Check that the main menu shows a column of labelled buttons at the left (SINGLE PLAYER, INSTANT ACTION, MULTIPLAYER, OPTIONS ...) over the game's own stock title art, faded, at full screen height, with dark plain areas to its left and right rather than a widened picture.
 16. Quit the game.
 17. Expect the game to have exited.
 18. Expect no crash.

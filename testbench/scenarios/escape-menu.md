@@ -2,7 +2,10 @@
 
 Resolutions: 16:9
 Mod: refit
+Setup: ui/bench-legacy.sh menus
 Launch: -nointro a2_borg01
+
+`Menus.asi` is no longer installed by `./install` (the UI hosts the menus); the setup puts it back with `[Menus] Enable=0`, as a player who sets the UI's menus back to stock would (`ui/README.md`, "A part switched back to stock").
 
 Regression tests for menus 2.1.0 (`EscapeReturns=1`: Esc in the in-mission menu acts as
 Return to Game) and menus 2.0.2 (Esc reopens the in-mission menu after it has been
