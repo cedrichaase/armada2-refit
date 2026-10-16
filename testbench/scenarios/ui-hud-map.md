@@ -35,7 +35,7 @@ clicks on the minimap are checked by `UI.log` and by the outline moving.
 11. Move the mouse to 1000,150.
 12. Wait 1 second.
 13. Take a screenshot called "selected".
-14. Check that the selected unit near the middle of the screen, a small white ship at about 640,262, has small corner brackets around it and thin green and blue bars just above it.
+14. Check that the selected unit near the middle of the screen, a small white ship at about 640,262, has small corner brackets around it and a thin green bar (the hull gauge; a thinner shield bar may sit beside it) just above it.
 15. Right-click at 150,600.
 16. Wait 2 seconds.
 17. Expect "UI.log" contains "minimap: order".
