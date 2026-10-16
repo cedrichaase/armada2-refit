@@ -17,6 +17,8 @@ anything is patched or called.
     Selection=0   ; the selection overlay is ours; SelectionGauges=1 shows the
                   ; selected units' gauges always (0: as stock, while pointed at)
     UnitView=0    ; our frame around the unit view, which the engine still draws
+    Comm=0        ; the comm panel, DropPlayer=0 the dropped-player box, LoadWait=0
+                  ; the wait for the others' loads (below, "Comms, ...")
 
 Every panel key defaults to 0: with the shipped `UI.ini` the HUD is stock and the
 panel switch is not even patched.
@@ -69,12 +71,12 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 | `CinematicView` (`g_cinematicView`) — the unit view (`cinematicPanelArea`) | a second 3D view of the action, or a video | its camera, the action camera's target | clicks on it | a second scene render inside `RenderAll` (render3d/README.md: the action camera is a second view) | keep the engine's render; ours draws the frame around it only (done, `UnitView`) |
 | `MessageDisplay` (`g_messageDisplay`) | a mission message box (text and OK) | script calls (`SetText`) | its OK button; pauses the game | `StandardBackground`, `StandardText`, `StandardButton` | done: `engine::popups`, `hud/messages.rs` |
 | `ObjectivesDisplay` (`g_objectivesDisplay`) | the briefing and objectives, ticks for completed ones | the mission's objectives file, `SetObjectiveComplete` | OK; keys while it has the mouse (`GameKeysProcessInput`) | as `MessageDisplay` | done: `engine::popups`, `hud/objectives.rs` |
-| `CommDisplay` (`commDisplay`), with its `CommBar`s | multiplayer comms: players, teams, alliances, give resources/units, chat targets, allied victory, latency | the transport's `GameSetup` | many buttons, toggles and amount boxes | `StandardButton`/`ToggleButton`/text | `GameSetup` reads and the comm actions (`ProcessAlliance`, `GiveResource`, ...): late, with the menus' multiplayer screens |
+| `CommDisplay` (`commDisplay`), with its `CommBar`s | multiplayer comms: players, teams, alliances, give resources/units, chat targets, allied victory, latency | the transport's `GameSetup` | many buttons, toggles and amount boxes | `StandardButton`/`ToggleButton`/text | done: `engine::comm`, `hud/comm.rs` |
 | `PauseBox` (`pauseBox`) | "paused" and an unpause button | the game's pause state | unpause; it locks the mouse to itself (`AlwaysSimulate` writes the owner) | box, text, button | done: `engine::popups`, `hud/pause.rs` |
-| `DropPlayerBox` (`dropPlayerBox`) | a dropped player: drop or AI takeover, with a timer | the transport | its two buttons | box, text, buttons | multiplayer: late |
+| `DropPlayerBox` (`dropPlayerBox`) | a dropped player: drop or AI takeover, with a timer | the transport | its two buttons | box, text, buttons | done: `engine::comm`, `hud/comm.rs` |
 | `ReplayPanel` (`g_replayPanel`) | replay controls: restart, pause, slow, normal, fast | the replay | its buttons | `StandardButton`s | done: `engine::popups`, `hud/replay.rs` (not seen: no replay on the bench) |
 | `OverlayText` (`overlayText`) | timed messages in the middle of the screen (`AddMessage`) | script and game events | none | the HUD font | done: `engine::overlay_text`, `hud/overlay_text.rs` |
-| `LoadPercentageBox` (`loadPercentageBox`) | multiplayer load progress of the other players | the transport | none | box and text | with the loading screen |
+| `LoadPercentageBox` (`loadPercentageBox`) | multiplayer load progress of the other players | the transport | none | box and text | done: `engine::comm`, `hud/comm.rs` (after the load; the loading screen covers the load itself) |
 | `EditMenu` (`g_editMenu`) | the map editor's menu; hidden in a game | — | — | — | not taken |
 | `cOverViewImp` (`g_pOverView`) — the 3D view itself | selection boxes, the order cursor | the selection, the pointer's target | everything not on a panel: the owner of last resort | — | not a panel: stays the engine's |
 | `CursorInterface` (`iCursor`) | the cursor shape and the tooltips (`DoTooltip`, `mDrawTooltip`) | the owner's cursor and `Tooltip` | owns the decision of who owns the mouse | the device's cursor; tooltip boxes in the HUD font | the cursor is PLAN.md's "not decided yet"; tooltips are ours per panel (the bar's are) |
@@ -535,6 +537,7 @@ named here beside the panel that uses it:
 | `popups.rs` | `MessageDisplay`, `ObjectivesDisplay`, `PauseBox`, `ReplayPanel`: shown, texts, objectives and their completion, their buttons | the boxes, the replay controls |
 | `overlay_text.rs` | `OverlayText`'s messages (point, justification, text, colour, fade) | the overlay messages |
 | `chat.rs` | the chat lines, the text-entry regions, the skip of both stock drawings | the chat |
+| `comm.rs` | `CommDisplay` and its `CommBar`s, `DropPlayerBox`, `LoadPercentageBox`: texts, players, relations, chat switches, resource amounts, their buttons | the multiplayer boxes |
 
 ## The resources, the buttons, the boxes, the overlay and the chat
 
@@ -678,20 +681,90 @@ closed on OK and on Return (by their own step), and the tutorial advanced on Ret
 and zoomed on the wheel as with the stock box. The intro's centre lines showed as
 ours. `testbench/scenarios/ui-hud-panels.md` and `ui-hud-panels-objectives.md`.
 
-### Not done here
+## Comms, the drop box and the load wait
 
-- **`CommDisplay` / `CommBar`, `DropPlayerBox`, `LoadPercentageBox`** (multiplayer).
-  `CommDisplay` is a panel of `CommBar`s, one per player slot, each made by
-  `CommBar::CreateButton`/`CreateToggle`/`CreateColorToggle`/`CreateAlliance` with
-  callbacks (`PlayerSelectCallback`, `MakeEnemyCallback`, `MakeNeutralCallback`,
-  `MakeAllyCallback`, ...) that a panel of ours would press as it presses a
-  `StandardButton` (toggles and colour buttons are subclasses: their press slot is
-  not `StandardButton`'s, so `engine::buttons::press` refuses them and they need
-  their own check), and it reads `GameSetup` through `g_transport` for the names,
-  teams and alliances. `DropPlayerBox` (`dropPlayerBox`, 0x764cd0) is a box with a
-  `DropPlayerText` and two buttons, shown by the transport when a player drops;
-  `LoadPercentageBox` (`loadPercentageBox`, 0x764de0) only text. Each needs a
-  network game on the bench (`online/`'s two-player scenarios) to verify.
+`hud/comm.rs` over `engine/comm.rs`, each behind its own `[HUD]` key, 0 by default:
+`Comm` (the comm panel), `DropPlayer` (the dropped-player box), `LoadWait` (the wait
+for the other players' loads). Each component is a global instance taken through the
+panel switch, and each is read only after its vtable is checked to be its class's
+(`CommDisplay` 0x6b5a5c, `CommBar` 0x6b5870, `DropPlayerBox` 0x6b5b68,
+`LoadPercentageBox` 0x6b5d94), and each button only after its press function (`+0x5c`)
+is checked to be the one its `PostLoad` gave it. Like the stock boxes, whose
+`CursorOver` answers true wherever the pointer is, ours keep the mouse from everything
+under them while they show (`comm::blocking`); the keyboard stays the engine's.
+
+**Toggles are pressed through their own press.** The comm panel's chat switches, colour
+buttons, allied victory and latency are `ToggleButton`s (or `ColorButton`s, built on
+it), whose press slot (vtable `+0x20`) is `ToggleButton::mButtonPressFunction`
+(0x510990): it flips the state between 1 and 2 and goes on to `StandardButton`'s, which
+calls the callback; the callbacks read the new state. `engine::buttons::press` accepts
+that slot as well as `StandardButton`'s, so a toggle is queued and pressed at the
+simulate pass like any button. The `AllianceButton`s have `StandardButton`'s press.
+
+### The comm panel (`CommDisplay`, `commDisplay` 0x764a60)
+
+Opened by the top-right comm button (`ButtonPanel::OpenComm`, disabled outside a network
+game) and closed by its OK (`OkayCallback`, `SetIsHidden(true)`). What `PostLoad` builds
+and ours reads:
+
+| What | Where | Notes |
+|---|---|---|
+| title, headings (player, message, team, alliance), group captions (message, give), allied-victory and latency captions | `StandardText *` at `+0x3c`..`+0x5c` | the text is the GUI config's label key at the text's `+0x54` (`GetLabel`), localised as `StandardText::Render` does |
+| message all, allies, enemies, the selected player | `StandardButton *` `+0x60`, `+0x64`, `+0x68`, `+0x6c` | each sets which bars' chat switches are on (`CommBar::ActivateChat`) and calls the transport's `UpdateChatTargets` (vtable `+0x94`): the chat line typed next goes to them |
+| give the selected units to the selected player | `+0x70` | `GiveUnitsCallback`: the overview's selection, sent as a transfer order |
+| OK | `+0x74` | hides the panel |
+| a resource row each: dilithium, metal, latinum, crew, biomatter | `+0x78`, `+0x7c`, `+0x80`, `+0x84`, `+0x88` | NULL for a resource the race has not (`Transfer*::UsedBy`); else 16 bytes: up, down, give, the amount's text. The buttons hold their `TransferDetails` at `+0x60`: the amount `+0x40`, least `+0x48`, most `+0x4c`, step `+0x50`. Up and down change the amount; give sends it (`ActionSend`). The resource's name is its `GUI_CP_*_RES` key (`Transfer*::GetName`) |
+| allied victory, high latency | `ToggleButton *` `+0x8c`, `+0x90` | NULL when the game has none; on at state 2 |
+| the bars | count `+0x94` (`commBarNumberOfPlayers`), `CommBar **` `+0x98` | one per slot, in slot order |
+| teams fixed, alliances free | bytes `+0x9c`, `+0x9d` | from `GameSetup::getRelationshipType`: which of the team and alliance columns shows |
+| the selected bar | `+0xa0` | `SetCurrentPlayer`; the player giving and the private message go to |
+
+A `CommBar`: `+0x28` it stands for a player (cleared for an empty slot), `+0x2c` its slot,
+`+0x38` its team shows, `+0x39` its alliance buttons work; the name button `+0x3c`
+(`PlayerSelectCallback`, selects the player), the name text `+0x40` (a `PlayerNameText`,
+the name inline at `+0x84`), the chat switch `+0x44` (`ChatToggleCallback`, which also
+calls `UpdateChatTargets`; disabled for a computer), the team's text `+0x48` (a
+`TeamNameText`: the team's number from 1 at `+0x84`, written after the localised
+`GUI_POP_COMM_TEAM_PREFIX`), the enemy, neutral and ally `AllianceButton`s `+0x4c`,
+`+0x50`, `+0x54` (`Make*Callback`: an alliance order; the relation in force has state 2,
+`UpdateAlliance` sets it as orders arrive, and one proposed but not yet answered has
+the byte `+0x7c` set, which the stock button draws as a second sprite), and the colour
+button `+0x58` (a `ColorButton`, `PlayerSelectCallback` too; the player's colour, three
+floats, at `+0x68`).
+
+Ours: a window over the dimmed screen with the players' table (colour, name, team when
+teams are fixed, the chat switch, enemy/neutral/ally when alliances are free, a proposed
+relation framed in the warning colour), the selected player's row marked (a click on a
+row presses its colour button), and beside it the message buttons, give units and the
+resource rows (minus, the amount, plus, give); allied victory, latency and OK along the
+bottom. Labels are the stock buttons' own or, for a picture button, its tooltip's first
+line; English words only where neither exists.
+
+### The dropped player (`DropPlayerBox`, `dropPlayerBox` 0x764cd0)
+
+`Program::DisplayInputProcess` shows it while the transport waits on a player who stopped
+answering and hides it when that is settled (`dropPlayerBox.SetIsHidden` in its log
+lines), and keeps its seconds up to date (`UpdateTime`). `+0x2c`: the text, a
+`DropPlayerText` whose `GetInformation` (vtable `+0x24`, returning the colour and the
+text) writes the whole message, the wait and its seconds, who dropped and why, and the
+votes cast; ours calls it and draws what it writes, the first line as the title.
+`+0x30`: drop the player (`DropCallback`), `+0x34`: let the computer take over
+(`AiTakeoverCallback`), each a vote through the network transport. Its
+`AlwaysGameSimulate` (which keeps running) disables a button once its vote is cast, and
+the computer's when the game type cannot have one.
+
+### The load wait (`LoadPercentageBox`, `loadPercentageBox` 0x764de0)
+
+Not part of the load: `Program::DisplayInputProcess` shows it once this player's load is
+done (the mission's frames have started) while the transport still has load percentages
+to show (`ShowLoadPercentages`, vtable `+0x40`), keeps the milliseconds waited in its
+text (`LoadPercentageText`, `+0x284`, through `UpdateTime`), and hides it when every
+player is in. So the loading screen of ours (`LOADING.md`), which shows the same
+percentages during this player's load, and this box do not overlap: the box is the time
+after. Ours: the stock title (`GUI_POP_LOAD_WAIT`), the seconds, and a row per network
+player with a bar from the transport's `GetLoadPercentage` (`engine::setup::
+load_fractions`, the loading screen's read); the stock text, from its `GetInformation`,
+when the transport answers nothing.
 
 ## Not done
 
