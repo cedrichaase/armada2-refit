@@ -16,7 +16,9 @@ UI where the engine's `ComputeContainerRect` puts them. `UnitView=1` frames the
 engine's unit view.
 
 The match is `_enter-instant-action.md`'s: Borg, Warzone. At 1280x720 the first
-Assembler sits at 640,262 and the Nexus at 755,320.
+Assembler sits at 640,262 and the Nexus at 755,320. The start position is dealt at
+random, so the base is at a different place on the minimap from run to run; the
+clicks on the minimap are checked by `UI.log` and by the outline moving.
 
 1. Include "_enter-instant-action".
 2. Expect "UI.log" contains "minimap: ours".
@@ -25,16 +27,17 @@ Assembler sits at 640,262 and the Nexus at 755,320.
 5. Wait 2 seconds.
 6. Expect "UI.log" contains "minimap: ours at".
 7. Take a screenshot called "minimap".
-8. Check that at the bottom left there is one dark square map panel with two small buttons above it, showing a mostly dark map where an area around the player's base is lighter (the fog lifted there), small coloured dots for units and a light outline of the camera's view, and that there is no second minimap anywhere on the screen.
+8. Check that at the bottom left there is one square map panel with two small buttons reading "ALL" above it, the map in it mostly a flat grey-blue (the shroud) except a small black cleared area around the player's base with a few small coloured dots and icons in it, a thin white outline (the camera's view) over that area, and that there is no second minimap anywhere on the screen.
 9. Click at 640,262.
-10. Wait 1 second.
-11. Take a screenshot called "selected".
-12. Check that the selected unit near the middle of the screen has four corner brackets around it with a thin coloured bar above it.
-13. Right-click at 150,600.
-14. Wait 2 seconds.
-15. Expect "UI.log" contains "minimap: order".
-16. Click at 60,560.
-17. Wait 2 seconds.
-18. Take a screenshot called "camera moved".
-19. Check that the 3D view now shows a different part of the map than in the screenshot "selected", and that the light camera outline on the minimap has moved towards its upper left.
-20. Expect the game is still running.
+10. Move the mouse to 1000,150.
+11. Wait 1 second.
+12. Take a screenshot called "selected".
+13. Check that the selected unit near the middle of the screen, a small white ship at about 640,262, has small corner brackets around it and thin green and blue bars just above it.
+14. Right-click at 150,600.
+15. Wait 2 seconds.
+16. Expect "UI.log" contains "minimap: order".
+17. Click at 110,560.
+18. Wait 2 seconds.
+19. Take a screenshot called "camera moved".
+20. Check that the 3D view now shows a different part of the map than in the screenshot "selected" (probably flat grey shroud), and that the thin white camera outline on the minimap is now near the point 110,560 on the screen, no longer over the player's base.
+21. Expect the game is still running.
