@@ -661,7 +661,12 @@ never gets its focus-step, so with the box ours `popups::objectives_keys` calls
 Measured on the bench: a first version that pressed OK on Enter itself and kept the
 key from the engine left the Starfleet Academy tutorial's lessons stuck and its
 zoom unanswered; closed by its own step, the tutorial runs as with the stock box. Its
-hidden-step, which opens it on the objectives key (Alt+O), still runs. Ours: windows
+hidden-step, which opens it on the objectives key (Alt+O), still runs. **The box stays the mouse's owner while it shows** (the panel switch's `CursorOver`
+says yes for it, taken or not): `GameKeysProcessInput`, which runs before
+`SimulateAll` every pass, opens the chat line on Return unless the owner is
+`ObjectivesDisplay`. Without it, Return closed our box and opened the chat line too,
+and the next Esc closed the chat instead of opening the in-mission menu (seen on the
+bench in `ui-whole-game.md`). Ours: windows
 over a dimmed screen (`panels::boxed`; not `Ui::modal`, which keeps the keyboard),
 the message's title as the window's, the text wrapped; the objectives with a check
 box per line, ticked when complete.

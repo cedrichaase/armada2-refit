@@ -225,6 +225,13 @@ unsafe extern "thiscall" fn render_component(c: usize) {
 
 unsafe extern "thiscall" fn cursor_over(c: usize) -> bool {
     unsafe {
+        // The objectives box stays the mouse's owner while it shows, ours or not, as
+        // stock's modal box is: `GameKeysProcessInput` opens the chat line on Return
+        // unless the owner is this box, and Return is also what closes it.
+        if c == super::popups::OBJECTIVES && rd::<u8>(c + DI_HIDDEN) == 0 && taken(c) {
+            let f: unsafe extern "thiscall" fn(usize) -> bool = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_CURSOR_OVER));
+            return f(c);
+        }
         if OVER_UI || taken(c) {
             return false;
         }
