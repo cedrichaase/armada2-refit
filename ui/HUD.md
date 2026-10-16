@@ -73,7 +73,7 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 | `PauseBox` (`pauseBox`) | "paused" and an unpause button | the game's pause state | unpause; it locks the mouse to itself (`AlwaysSimulate` writes the owner) | box, text, button | done: `engine::popups`, `hud/pause.rs` |
 | `DropPlayerBox` (`dropPlayerBox`) | a dropped player: drop or AI takeover, with a timer | the transport | its two buttons | box, text, buttons | multiplayer: late |
 | `ReplayPanel` (`g_replayPanel`) | replay controls: restart, pause, slow, normal, fast | the replay | its buttons | `StandardButton`s | done: `engine::popups`, `hud/replay.rs` (not seen: no replay on the bench) |
-| `OverlayText` (`overlayText`) | timed messages in the middle of the screen (`AddMessage`) | script and game events | none | the HUD font | done: `engine::overlay`, `hud/overlay.rs` |
+| `OverlayText` (`overlayText`) | timed messages in the middle of the screen (`AddMessage`) | script and game events | none | the HUD font | done: `engine::overlay_text`, `hud/overlay_text.rs` |
 | `LoadPercentageBox` (`loadPercentageBox`) | multiplayer load progress of the other players | the transport | none | box and text | with the loading screen |
 | `EditMenu` (`g_editMenu`) | the map editor's menu; hidden in a game | — | — | — | not taken |
 | `cOverViewImp` (`g_pOverView`) — the 3D view itself | selection boxes, the order cursor | the selection, the pointer's target | everything not on a panel: the owner of last resort | — | not a panel: stays the engine's |
@@ -533,7 +533,7 @@ named here beside the panel that uses it:
 | `buttons.rs` | a `StandardButton`'s picture, state, label, tooltips and press; presses queued for the simulate pass; an `ObjectivesText`'s string and colour; `Localize`; Latin-1 strings | the top-right buttons, the boxes, the replay controls |
 | `topbar.rs` | `ResourcePanel`'s components (which `eResource` the race shows), the amounts as stock writes them, the resources' colours and tooltips; `ButtonPanel`'s eight buttons and "show more" | the resources, the top-right buttons |
 | `popups.rs` | `MessageDisplay`, `ObjectivesDisplay`, `PauseBox`, `ReplayPanel`: shown, texts, objectives and their completion, their buttons | the boxes, the replay controls |
-| `overlay.rs` | `OverlayText`'s messages (point, justification, text, colour, fade) | the overlay messages |
+| `overlay_text.rs` | `OverlayText`'s messages (point, justification, text, colour, fade) | the overlay messages |
 | `chat.rs` | the chat lines, the text-entry regions, the skip of both stock drawings | the chat |
 
 ## The resources, the buttons, the boxes, the overlay and the chat
