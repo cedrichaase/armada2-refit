@@ -175,6 +175,11 @@ pub fn set_taken(at: usize, by_pointer: bool, on: bool) {
     }
 }
 
+/// Whether a component is one we have taken over.
+pub fn is_taken(c: usize) -> bool {
+    taken(c)
+}
+
 #[allow(static_mut_refs)]
 fn taken(c: usize) -> bool {
     c != 0 && unsafe { TAKEN.iter().any(|&(a, p)| a != 0 && if p { rd::<usize>(a) == c } else { a == c }) }

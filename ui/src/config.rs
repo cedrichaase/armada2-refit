@@ -51,6 +51,16 @@ pub struct Hud {
     pub bar_keys: bool,
     /// The key in each button's corner.
     pub bar_labels: bool,
+    /// The minimap (`MapRadar`), ours, and its size in units.
+    pub minimap: bool,
+    pub minimap_size: f32,
+    /// The selection overlay (`SelectionDisplay`) over the 3D view, ours; with
+    /// `SelectionGauges=1` the selected units always show their gauges (0: as stock,
+    /// while the pointer is on one of them).
+    pub selection: bool,
+    pub selection_gauges: bool,
+    /// Our frame around the unit view (`CinematicView`), which the engine still draws.
+    pub unit_view: bool,
 }
 
 pub fn load() -> Config {
@@ -74,6 +84,11 @@ pub fn load() -> Config {
             bar: ini.int("HUD", "Bar", 0) != 0,
             bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
             bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
+            minimap: ini.int("HUD", "Minimap", 0) != 0,
+            minimap_size: ini.float("HUD", "MinimapSize", 300.0).clamp(120.0, 900.0),
+            selection: ini.int("HUD", "Selection", 0) != 0,
+            selection_gauges: ini.int("HUD", "SelectionGauges", 1) != 0,
+            unit_view: ini.int("HUD", "UnitView", 0) != 0,
         },
         menus: ini.int("Menus", "Enable", 0) != 0,
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",
