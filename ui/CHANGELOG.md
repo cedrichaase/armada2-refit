@@ -4,6 +4,44 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.3.0 — 2026-10-16
+
+### Added
+- `ui/install.sh`, run by `./install`; `a2mod` switches `UI.asi`/`UI.ini` as the `ui`
+  layer. A reinstall keeps the player's `UI.ini` values (`ini-merge.py`) (04194ee).
+- The HUD's race: `[UI] Theme=auto` draws the player's race's theme in a mission
+  (`engine/race.rs`) (9bf63fe).
+- HUD panels of ours, each off by default: `[HUD] Info` (the info panel: one unit, a
+  builder and its queue, a group), `Minimap` and `MinimapSize`, `Selection` and
+  `SelectionGauges` (the selection overlay), `UnitView` (a frame around the unit view),
+  `Resources`, `Buttons` (the top-right buttons), `Messages` (the message and
+  objectives boxes), `Pause`, `Replay`, `Overlay` (the centre messages) and `Chat` (the
+  chat lines and the text entry) (9bf63fe, 9acbb51, a088117).
+- Menu screens of ours (`[Menus]`): Single Player, Mission Select, Load Game, Save Game,
+  the Admiral's Log, the Technology Tree; Options (from the main menu and in a mission),
+  Game, Graphics and Sound Settings, the message and yes-or-no boxes, net waiting, help,
+  the licence; Game Setup, Advanced Options, Map Select, Multiplayer Connection, Manual
+  IP and the other small multiplayer dialogs. The shell's scroll bars and combo boxes
+  are read into the control model (4573f6c, e9cc6b4, 4ca533d).
+- A loading screen of ours, `[Loading] Enable` (default 0): the map's sky, the
+  mission's title, briefing and objectives, the players and their multiplayer load,
+  frames between the engine's 5% steps; `[Loading] Hold` for the bench (2e9bb2b).
+- `bench-asi.sh --scene`, `--dplay`.
+
+### Changed
+- The button bar is drawn through the theme and placed against the UI's info panel
+  when that is on (9bf63fe).
+- The generic `widgets` menu screen uses the shared widgets; `menus/local.rs` is gone
+  (e9cc6b4).
+
+### Fixed
+- A dialog opened on a button down kept the mouse captured, and the next dialog took no
+  click (4573f6c, 4ca533d).
+- A screen under the top dialog took the pointer: "Save Successful!"'s O.K. could not be
+  clicked over the save list (defa59f).
+
+Installed, not yet seen in game.
+
 ## 0.2.0 — 2026-10-16
 
 ### Added

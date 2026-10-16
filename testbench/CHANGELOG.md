@@ -5,6 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.20.0 — 2026-10-16
+
+### Added
+- `Scene.asi` commands `succeed [s]` and `fail [s]`, which end the mission as its
+  script would; scenes `ending`, `ui-hud-info`.
+- Scenarios `ui-hud-info`, `ui-hud-map`, `ui-hud-overlay`, `ui-hud-panels`,
+  `ui-hud-panels-objectives`, `ui-menus-single`, `ui-menus-dialogs`, `ui-menus-widgets`,
+  `ui-menus-setup`, `ui-menus-success`, `ui-loading` (ui 0.3.0); operating notes for
+  each agent's area.
+
+### Changed
+- `ui-menus-options` and `ui-menus-match` follow the menus' own layouts.
+
+Installed, not yet seen in game.
+
 ## 3.19.0 — 2026-10-16
 
 ### Added

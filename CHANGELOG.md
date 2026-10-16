@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.3.0 — 2026-10-16
+
+Layers: ui 0.3.0, testbench 3.20.0.
+
+### Added
+- `UI.asi` in `./install` and `a2mod` (the `ui` layer), with every HUD panel, most menu
+  screens and a loading screen of its own, each off by default in `UI.ini` (ui 0.3.0).
+- Scenarios for each, and `Scene.asi`'s `succeed`/`fail` (testbench 3.20.0).
+
+Installed, not yet seen in game.
+
 ## 12.2.0 — 2026-10-16
 
 Layers: ui 0.2.0, testbench 3.19.0.
