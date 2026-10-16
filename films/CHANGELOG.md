@@ -14,16 +14,16 @@ in [`README.md`](README.md).
   once any of those paths changed since, committed or not. Docs, `films/` and other
   paths that cannot change a take are left out; the stock variant sees only the bench
   and its installs. A take of 1.0.0 from a dirty tree, or without a commit, is
-  `unknown`.
+  `unknown` (3937489).
 - `status`, `probe`, `take` and `manifest` say why a take is not current ("spec
   changed", "code changed since 139e18a (render3d)"); the manifest's takes carry `dirty`
-  and `stale` beside `current`.
+  and `stale` beside `current` (3937489).
 
 ### Added
 - `--ignore-code` on `status`, `probe`, `take` and `manifest`: only a changed spec makes
-  a take stale.
+  a take stale (3937489).
 - `films/film/selftest.py`, which pins when a take is current, on a throw-away
-  repository.
+  repository (3937489).
 
 Tooling only; nothing to see in game.
 

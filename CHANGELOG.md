@@ -12,7 +12,7 @@ Layers: films 1.1.0.
 ### Changed
 - `a2film` re-films a take once the code it shows has changed since its commit, not
   only when its spec changes, and says why a take is stale; `--ignore-code` keeps such
-  takes (films 1.1.0).
+  takes (films 1.1.0; 3937489).
 
 Tooling only; nothing to see in game.
 
