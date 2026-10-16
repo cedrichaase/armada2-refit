@@ -1,8 +1,8 @@
 //! The smaller HUD panels (HUD.md, steps 3 and 4 of "The order to take them over"):
 //! each behind its own `[HUD]` key, taken over through the panel switch, and drawn
-//! here in the order that keeps the boxes on top: the overlay messages and the chat
-//! under everything, then the resources, the top-right buttons and the replay
-//! controls, and last the boxes that pause the game (pause, message, objectives).
+//! here in the order that keeps the boxes on top: the chat under everything, then the
+//! resources, the top-right buttons and the replay controls, the overlay messages over
+//! them, and last the boxes that pause the game (pause, message, objectives).
 //!
 //! Shared by them: `game_button`, a button of ours that shows a stock
 //! `StandardButton`'s picture, its state and the game's tooltip, and presses it.
@@ -78,9 +78,6 @@ pub fn run(ui: &mut Ui) {
         ui.claim(screen);
         ui.occlude(screen);
     }
-    if o.overlay {
-        ui.scope("hud.overlay", overlay::run);
-    }
     if o.chat {
         ui.scope("hud.chat", chat::run);
     }
@@ -94,6 +91,10 @@ pub fn run(ui: &mut Ui) {
     }
     if o.replay {
         ui.scope("hud.replay", replay::run);
+    }
+    // Over the top bar, as stock's (OverlayText follows ResourcePanel in the list).
+    if o.overlay {
+        ui.scope("hud.overlay", overlay::run);
     }
     if o.pause {
         ui.scope("hud.pause", pause::run);
