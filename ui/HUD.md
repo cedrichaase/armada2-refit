@@ -133,6 +133,16 @@ owns it. With no owner, `CursorInterface::Render` gives the device no cursor at 
 renders, ours puts the bar's own cursor there (`g_pPopupPalette+0x24`, which the bar's
 `PostLoad` loads with `LoadCursor`): the same arrow a stock panel shows.
 
+**A panel of ours draws only where its stock component would.** `RenderAll` walks the
+render list of the view in use (`s_pRenderList[View_Record]`), and the cinematic view
+(view 2: a mission's opening, the scripts' cutscenes) has a list of its own with only
+`CinematicView`, `OverlayText`, `ScreenFade`, `DropPlayerBox`, `LoadPercentBox` and
+`PauseBox` (UI.log's component list during the first Federation mission's opening).
+So `engine::hud::hidden(c)` is true for a component that is not in that list, as well
+as for one whose own flag is set: before, the resources, the buttons and the minimap of
+ours were drawn over the opening cutscene. In view 2 `CinematicView::Render` draws only
+a video; the unit view's frame follows.
+
 **Taking a panel.** `engine::hud::set_taken(at, by_pointer, on)`: a component by its
 address, or (the bar) by the global that points to it, read when asked.
 

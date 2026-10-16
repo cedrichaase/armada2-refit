@@ -600,6 +600,8 @@ Assembler's place is in screen pixels): the demo screen in the Credits' place an
 click on it, the loading-screen panel, the panel over the HUD, and a click on it that
 the engine does not see (the selection stays).
 
+`ui-whole-game.md` (`--install .`, at `--res 1280x720`, `21:9` and `1024x768`): the game as `./install` gives it, from the intro through a campaign mission, a match won and the Admiral's Log to Options and Exit (`testbench/operating/ui-switchon.md`).
+
 `ui-menus-options.md` and `ui-menus-match.md` (`--menus`, 1280x720): the hosted menus,
 `MENUS.md`, "Testing".
 
