@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.28.0 — 2026-10-17
+
+### Added
+- Scenario `ui-hud-polish`: *Lifelines* through the campaign menu at 1680x720, the
+  UI's trade status, the starbase's shorter info panel, the bar's icons and the
+  minimap's filters, and the AI menu's level icons (ui 0.10.0).
+
+Installed, not yet seen in game.
+
 ## 3.27.0 — 2026-10-17
 
 ### Added

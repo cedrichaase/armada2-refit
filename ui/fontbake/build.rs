@@ -1,5 +1,6 @@
 // Only for the preview test (feature `preview`): bakes the vendored fonts into OUT_DIR so
 // the test can include ui/src/text and render through the runtime itself.
+#[allow(dead_code)]
 #[path = "src/lib.rs"]
 mod fontbake;
 

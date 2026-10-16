@@ -18,6 +18,7 @@ mod overlay_text;
 pub mod panels;
 mod pause;
 mod replay;
+mod trade;
 mod resources;
 // ui-multiplayer: the comm panel, the drop box, the load wait.
 mod comm;

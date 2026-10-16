@@ -361,7 +361,14 @@ pub fn run(ui: &mut Ui) {
         let content = theme::button_frame(ui, r, st);
         // The game's icon, inside the edge.
         let icon = r.inset(ui.u(5.0));
-        match sprite::art(palette::sprite(b)) {
+        let sp = palette::sprite(b);
+        let ours = cfg.hud.icons && sp != 0 && {
+            let ink = if enabled { content } else { fade(content, 0.45) };
+            let ir = icon.inset(ui.u(0.5));
+            crate::icons::draw(&mut ui.draw, sprite::name(sp), ir, 1.0, crate::icons::theme_colour(&t, ink))
+        };
+        match if ours { None } else { sprite::art(sp) } {
+            _ if ours => {}
             Some((tex, uv)) => {
                 let tint = if enabled { 0xffffffff } else { fade(0xffffffff, 0.4) };
                 ui.draw.image_uv(tex, icon, uv, tint);

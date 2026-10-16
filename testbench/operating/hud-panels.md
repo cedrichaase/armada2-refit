@@ -29,3 +29,11 @@ buttons, the boxes, the overlay and the chat"), for the agents after.
 - **Not found on the bench**: a `MessageDisplay` (no mission script reached in a few
   minutes showed one; the tutorial's `*_text_end.txt` is probably one, at the end of
   a tutorial), a replay (the `ReplayPanel`), multiplayer's comm panel and drop box.
+- **The trade status needs the campaign's script**: `-nointro a2_fed02` loads the map
+  without it (and deals a random faction), so nothing shows. Go through the menus:
+  at 1680x720 with the UI's menus, Single Player 198,258, the Federation campaign
+  260,322, `Click "Lifelines"`, `Click "O.K."`, `Wait up to 300 seconds for the
+  briefing`, `Click "OK"`. "Sent to Team 2" shows at once; Starbase 27 is at 890,172 and
+  the *USS Odyssey* at 655,387 (`scenarios/ui-hud-polish.md`). Every Federation
+  mission is unlocked on the bench's profile. The bar's grid keys there: Q orders,
+  W formations, E the AI menu, G back.
