@@ -20,6 +20,7 @@ pub mod shell;
 pub mod sound;
 pub mod sprite;
 pub mod shellui;
+pub mod shellcombo;
 
 use core::ffi::c_void;
 
