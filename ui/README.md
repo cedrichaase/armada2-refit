@@ -400,7 +400,9 @@ that the old plugins are not installed:
   the whole HUD is stock and `HUD.asi` corrects it as before. Not tested on the bench
   with a mix of panels of ours and `HUD.asi`'s canvas.
 - **`[HUD] Bar=0`** is the stock bar with stock's keys; `grid/install.sh` gives the
-  grid back through `GridLayout.asi`.
+  grid back through `GridLayout.asi`, which places it against the stock info panel and
+  minimap: beside ours (drawn elsewhere) it lands in the wrong place, so it belongs
+  with `[HUD] Enable=0` and `HUD.asi` (as `grid-layout.md` sets it up).
 - **`[HUD] UnitView=0`** leaves the unit view where the stock canvas puts it (the
   bottom right, 350 x 384 canvas units: wide on a wide screen), with its stock frame.
 - **`[Menus] Enable=0`** gives the stock GDI menus: the shell's 800 x 600 display mode,
