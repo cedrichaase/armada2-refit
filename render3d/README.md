@@ -183,6 +183,35 @@ is in the depth buffer.
   calls of `CreateShieldHit` (0x58bb95, 0x58cad8, 0x58d502, 0x58dd65), chained through
   thunks that note the ordnance in `ebx`. The shields-down discharges register a point
   light on the hull.
+  Since 0.6.0 the hits take `ART-DIRECTION.md`'s direction ("Shield hits"): the shell
+  is implied, lit only about the hit. A **mist** of uneven density lies over the glow
+  about each hit, like lit vapour: four octaves of 3D gradient noise on the unit
+  sphere (no grid; value noise drew walls in the nebulae), the domain bent once so the
+  dense parts run in wisps, fixed to the shell and drifting slowly through it, never
+  re-seeded, so it does not shimmer. Its light falls off as a Gaussian of the distance
+  from the hit (`MistReach`, in shield radii), wide but gone well before the far side.
+  It also modulates the glow's lattice and rim (`MistShare`). Where the lit shell
+  turns to its silhouette everything fades over the last `Edge` of facing, so the lit
+  area ends on a soft but definite curve rather than at its brightest. **Rays** only
+  on the factions in `RayFactions` (Klingon): a sunburst of clear spokes from just
+  outside the spot out to `RayLength`, four sines of whole numbers of turns about the
+  hit, seeded per hit, each beating slowly in strength, so the burst breathes in place
+  and does not turn. The faction is the ODF's first letter (`f`, `k`, `r`, `b`, `c`,
+  `8`), as for the colours, whose defaults now follow the direction: Klingon pure green
+  (`12,255,6`), Species 8472 orange (`255,140,40`). **The hull under a hit is lit**: each
+  hit (the brightest `HitLights`) registers a point light where it struck the shell,
+  in its shield colour taken `HitLightWhite` of the way to white, as bright as its
+  glow (plus a quarter of its spot) times `HitLight`, full out to a tenth of
+  `HitLightReach` times the ship's bounding radius and gone at that reach, its falloff
+  raised to `HitLightPower` so the far hull stays dark; styled distinct, so several
+  hits on one ship each light it. The ring and the rim are as they were; the next pass
+  settles whether they stay. `[Shields]` keys (defaults): `Mist` (0.45), `MistReach`
+  (0.35), `MistShare` (1), `MistContrast` (1.6), `MistScale` (3, cells across the unit
+  sphere), `MistDrift` (0.08 a second), `Edge` (0.15), `Rays` (1.2, 0 for none),
+  `RayLength` (0.55), `RaySharpness` (2), `RayFactions` (`Klingon`; any of
+  `Federation, Klingon, Romulan, Borg, Cardassian, Species8472, Other`), `HitLight`
+  (2, 0 for none), `HitLightWhite` (0.5), `HitLightReach` (0.8), `HitLightPower` (2),
+  `HitLights` (6, at most 16).
 - **Repair welding** (`repair.rs`). `NodeParticleEffect` stays the engine's (its
   `Render` also prunes particles of dead objects): the call to `AddParticle` in
   `Craft::RepairSystem` (0x4c90c0) is chained to note each weld, and the call to
@@ -360,6 +389,42 @@ and a light show nothing: `ImpactAtSurface=k` puts its impact flare and its ligh
 the beam enters the target's bounding sphere (+0x60's object, its instance's radius
 times k), so the light falls on the moon's face. The world module's moons take it as
 any point light.
+
+**The tractor, holding and assimilation beams** (`tracbm`, `tracbmo`, `holdbm`,
+`techassimbeam`, `borgbor`; since 0.6.0) are `Kind=cone` recipes, after
+`ART-DIRECTION.md`'s direction: not a laser but a cone of light through vapour. The
+cone runs from the beam's start (+0xbc), `Width` wide, to `Spread` of the target's
+half width across the beam (+0x60's object; without one, an eighth of the beam's
+length) about its end (+0xc8), and on for `Beyond` of its bounding radius as it fades,
+so the target sits inside the beam rather than at its tip. The half width is the
+target as the hulls module posed it this view: its shown meshes' boxes (`Part::lo`,
+`hi`) measured along the direction the cone opens on screen. The bounding sphere made
+a cone as wide as a Sovereign is long when the beam met it nose on (seen on the
+bench). It is 16 camera-facing segments, each node with its own side vector so the
+segments meet; each is a trapezoid, so the across coordinate goes to the shader as
+(v w, w) and is divided per pixel (interpolated straight, it bent at every quad's
+diagonal and the streaks zigzagged). A flat quad through the target's
+centre would be cut in half by the hull in the depth test, so the wide end is moved
+towards the eye along the line to it (`Pull` target radii, growing as the square of
+the way along): that leaves it where it was on screen and puts it in front of the hull
+it holds, while the narrow end stays behind the emitter's own plating. The shader
+(`cone` in `ordnance.hlsl`) has no core. Its light is up to four fans (`Fans=count,
+interior,rate`): wedges from the emitter, each a band of the cone's own -1..1 (so it
+spreads with it), hard edged (`EdgePixels`, by `fwidth`), brightest along its edges
+and `interior` of that between them, with a fine grain of lengthwise lines. Each
+fades in, holds and fades out `rate` times a second (each at its own rate) and takes a
+new angle and width from a hash of its cycle, which changes only while it is dark, so
+nothing jumps: the series' beams, which come and go while the beam stays on. The light
+gathers towards the emitter, where the fans converge. Then three octaves of value noise for vapour, running along the beam (`Vapour`'s speed;
+the tractors' run back towards the ship) and slowly across; brightest at the emitter,
+`Fall` of it at the target; black within `EdgePixels` of the outline. A small
+flare (`Emitter`) marks the point on the ship; there is no impact flare. **The wash**
+on the target is a soft point light (`Light` times the beam's colour), placed
+`WashBack` target radii from its centre back towards the emitter and full out to
+`WashReach` radii: the hull facing the emitter, where the cone falls, takes it, and
+the far side, turned away, does not. A spot light limited to the cone's footprint
+would match better, but no lit draw takes one yet. Seen head on, the cone's quads
+close to a line (as every ribbon here does). Not yet seen in game.
 
 **The models.** Every model-drawing class's `Submit` ends by calling `Entity::Render`
 (0x4cfda0) through slot 11 of its vtable: the instance's frustum test (instance slot 3),
@@ -954,7 +1019,21 @@ ComputeFadeOut`, 0x4d5a20); crafts take `Lighting.asi`'s near fade (the near pla
 cutting into the hull's box) while `Storm3D+0xe8` says near fades are on. Faded hulls
 are drawn at `Step::Translucent`, far to near, depth first. A cloaking device (+0x108:
 state +0x3c, alpha +0x44, phase +0x48) draws the hull as `Lighting.asi`'s glass over a
-copy of the frame. The warp stretch is `Craft::RenderInternal`'s while +0x244 is above
+copy of the frame, in the look of `ART-DIRECTION.md`, "Cloaking". While it cloaks or
+decloaks, bands travel along the hull's longest axis (`CloakWaveBands` over its
+length, `CloakWaveSpeed` a second) and `vs_hull` sways the geometry across the screen,
+at right angles to the bands and never in depth, by up to `CloakWave` of the radius
+(swayed through the hull's own axes it bent in 3D and looked comical from the RTS
+camera), on the envelope `4·vis·(1−vis)`; the sway is a
+function of the world position, so the parts stay joined. The hull thins into the
+glass band by band (crests first) in place of the old noise threshold, and the green
+front (`CloakFront`) is a thin line along each band. Fully cloaked, slow waves drift
+in the refraction offset (`CloakShimmer` of the radius, `CloakShimmerSpeed`): only the
+bent background moves, so it shows against a nebula and hardly against black. The
+hull's floor is per owner: `CloakHull` (0.1) for the player's own ships, by the
+object's team (+0xec) against `Entity::GetUserTeam` (0x4d0060, the call `QOL.asi`
+makes), and `CloakHullOthers` (0) for everyone else's. Only hulls the engine already
+draws are touched. The warp stretch is `Craft::RenderInternal`'s while +0x244 is above
 0 (`spec-chunks-anim-lod.md` §5).
 
 **Sprites** (`sprites.rs`, `anim.rs`). SOD sprite nodes (running lights, strobes, crew

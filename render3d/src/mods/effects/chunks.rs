@@ -403,6 +403,8 @@ impl Chunks {
                 two_sided: part.two_sided,
                 centre: *centre,
                 radius: *rc,
+                lo: *centre - v3(*rc, *rc, *rc),
+                hi: *centre + v3(*rc, *rc, *rc),
             })
             .collect();
         drop(ib);

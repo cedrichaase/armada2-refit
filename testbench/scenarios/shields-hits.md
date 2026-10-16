@@ -11,8 +11,11 @@ The scene (`testbench/scene/scenes/shields.ini`) is a Galaxy class (phasers) and
 Klingon battleship (torpedoes) firing at a second Galaxy, which is healed every tick so
 its shields hold. The log lines check that the hits were noted at the weapons' call sites and that hits of both
 kinds (a beam and a shot) were picked up and drawn; the shots are for judging the look:
-smooth blue glows and rings, no hex pattern, on the target's shield ellipsoid where the weapons land,
-no flat green shell.
+a pale blue mist about each hit, uneven like lit vapour, on the target's shield
+ellipsoid where the weapons land and ending on a soft curve at its silhouette, a
+near-white point where the shot lands, the hull under it lit, no hex pattern and no
+flat shell; then a Klingon cruiser taking the same fire, its hits in strong green with
+rays fanning out from each (`ART-DIRECTION.md`, "Shield hits").
 
 1. Launch the game.
 2. Wait 50 seconds.
@@ -29,6 +32,18 @@ no flat green shell.
 13. Scene "orbit target 200 25 260".
 14. Wait 2 seconds.
 15. Take a screenshot called "shields-wide".
-16. Expect the game is still running.
-17. Quit the game.
-18. Expect no crash.
+16. Scene "spawn ktgt kcruise1 2600 0 2350 180 2".
+17. Scene "immortal ktgt on".
+18. Scene "heal ktgt on".
+19. Scene "weapons ktgt off".
+20. Scene "engines ktgt off".
+21. Scene "attack shooter ktgt".
+22. Scene "attack klingon ktgt".
+23. Scene "orbit ktgt 160 20 140".
+24. Wait 6 seconds.
+25. Take a screenshot called "shields-klingon".
+26. Wait 2 seconds.
+27. Take a screenshot called "shields-klingon-2".
+28. Expect the game is still running.
+29. Quit the game.
+30. Expect no crash.

@@ -66,6 +66,9 @@ pub struct Part {
     /// Model-space bounding sphere of the mesh (in its node's space).
     pub centre: V3,
     pub radius: f32,
+    /// Its box, in the same space: how wide the mesh really is along each axis.
+    pub lo: V3,
+    pub hi: V3,
 }
 
 pub struct Model {
@@ -146,6 +149,11 @@ impl Model {
                 .or_else(|| sod.texture_for_ident(&mesh.texture_material).map(String::from))
                 .filter(|t| !t.is_empty());
             let (c, r) = mesh.bounds();
+            let (mut lo, mut hi) = (v3(f32::MAX, f32::MAX, f32::MAX), v3(f32::MIN, f32::MIN, f32::MIN));
+            for p in &mesh.positions {
+                lo = v3(lo.x.min(p[0]), lo.y.min(p[1]), lo.z.min(p[2]));
+                hi = v3(hi.x.max(p[0]), hi.y.max(p[1]), hi.z.max(p[2]));
+            }
             parts.push(Part {
                 node: i,
                 vb,
@@ -158,6 +166,8 @@ impl Model {
                 two_sided: mesh.cull == 0,
                 centre: v3(c[0], c[1], c[2]),
                 radius: r,
+                lo,
+                hi,
             });
         }
         Model { name: String::from(name), sod, info, parts }

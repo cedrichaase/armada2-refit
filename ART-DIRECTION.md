@@ -8,7 +8,8 @@ installed: what a module draws today is in `render3d/README.md`, and what change
 
 ## Tractor and assimilation beams (render3d's `ordnance`, `render3d/ordnance.ini`)
 
-The user's direction (2026-10-15), not yet in the recipes: the tractor beams
+The user's direction (2026-10-15), drawn since render3d 0.6.0 (`Kind=cone` in
+`render3d/ordnance.ini`), not yet seen in game: the tractor beams
 (`tracbm`, `tracbmo`), the Borg holding beam (`holdbm`, the Borg tractor) and the
 assimilation beams should not be lasers. The current recipes draw them as ribbons with
 a hot core, flowing pulses and twisting strands. These beams should be **a fluctuating
@@ -19,11 +20,19 @@ cone, like a laser projector shining through vapour**:
   inside the beam rather than at its tip.
 - **Light in a medium, not a solid object.** The cone is translucent: stars and hull
   show through it. It is brightest at the emitter and thins toward the target.
-  Brightness runs in streaks along its length, as a projector's beam does in haze.
   There is no white-hot core.
-- **Fluctuating.** The streaks and the vapour drift and shimmer the whole time it is on.
-  The beam's outline stays steady while the light inside it moves. Nothing should twist
-  or pulse in a regular, readable way.
+- **Made of fans that come and go** (the user's addition, 2026-10-16, from DS9's
+  Bird-of-Prey tractor on the *Defiant* and *Voyager* under a Borg cube; frames kept
+  out of the repository). The cone is not one even body of light: it is two to four
+  wedges of light from the emitter, each with hard edges brighter than the softer
+  light between them, with a fine grain of lengthwise lines in it. The wedges overlap,
+  and each fades in, holds and fades out on its own, coming back at another angle and
+  width, so the set changes visibly within a quarter of a second while the beam as a
+  whole stays on. The light is densest where the wedges converge at the emitter,
+  which is a small bright point (blue-white on the Borg cube). The tractor and the
+  Borg beams work the same way.
+- **Fluctuating.** The fans and the vapour move the whole time it is on. Nothing should
+  twist or pulse in a regular, readable way.
 - **It lights the target.** The hull inside the cone takes a faint wash of the beam's
   colour, the same colour as the beam. The wash covers the part of the hull the cone
   reaches. It is faint enough that the hull's own detail still reads.
@@ -45,12 +54,16 @@ the repository):
 - **The Borg beam's source.** A small bright point on the cube (97,162,104) where the
   cone starts. Its end is as wide as the saucer.
 
-Which ODFs "assimilation" covers is still to be settled when the recipes are written:
-at least `techassimbeam`, and possibly `borgbor` (the auto-assimilator).
+Which ODFs "assimilation" covers: `techassimbeam` (the technology assimilation beam)
+and `borgbor` (the auto-assimilator: an assimilator by name, and drawn in stock from
+the same `Wborgbore` art as the holding and tractor beams). `borgbor` keeps the blue
+its recipe had rather than the Borg green; that it is stock's blue is still to be
+checked against stock in game. `fusionholdbm` (a
+holding beam no ship carries in stock) has no recipe.
 
 ## Shield hits (render3d's `effects`)
 
-The user's direction (2026-10-15), not yet in `[Shields]` or `shaders/effects_shields.hlsl`. A shield hit
+The user's direction (2026-10-15), drawn since render3d 0.6.0 (`[Shields]`, `shaders/effects_shields.hlsl`), not yet seen in game. A shield hit
 should read as **a misty, glowing dispersal of light over a curved ellipsoid that
 encloses the ship. Only the area around the impact is actually lit up.** Federation
 shields are a pale, light blue; Klingon shields are the same pattern in a strong,
@@ -102,9 +115,87 @@ and the glow that stays near the hit already fit. Not in the references:
 - a rim that brightens where the shell is seen edge on, in place of an edge that just
   ends where the lit mist stops.
 
-Missing from today's look:
-- the misty, uneven texture;
+Missing from the look before render3d 0.6.0, and added there (`Mist*`, `Edge`, `Ray*`,
+`HitLight*`; not yet seen in game):
+- the misty, uneven texture, and the soft curved edge at the shell's silhouette;
 - the rays fanning out from the impact, on Klingon shields;
-- the light on the struck hull.
+- the light on the struck hull;
+- the faction colours above (Klingon green, Species 8472 orange).
 
 The next pass should settle whether the ring and the rim stay.
+
+## Cloaking (render3d's `hulls`, the `Cloak*` keys in `Render3D.ini`)
+
+The user's direction (2026-10-15). In `ps_cloak` and `vs_hull` (`shaders/hulls.hlsl`)
+since render3d 0.5.0, not yet seen in game; the keys are in `render3d/README.md`. The
+cloak as it is now looks good and stays the base: the hull as glass over a copy of the
+frame, bending what lies behind it. Two things should change: the transition, and how
+much is left of a ship once it is cloaked.
+
+### The transition: the ship wavers out
+
+As in the TV series, a ship that cloaks should **look as though its whole geometry is
+bending in waves before it is gone**, and the same in reverse when it decloaks. Today a
+noise threshold eats the hull away patch by patch, with a glowing front where it is
+eating. The ship never changes shape; it is cut away.
+
+- **The shape moves, not just the shading, but flat, like an image.** Waves run across
+  the whole hull and shift its outline a little: the silhouette ripples against the
+  stars. The ripple is in the picture, across the screen: the hull must not bend or
+  wobble in depth. Swaying the geometry through its own axes (render3d 0.5.0 as first
+  built) read as too three-dimensional, almost comical from the RTS camera (the user,
+  2026-10-16).
+- **Waves, not noise.** Broad, regular-looking bands of distortion that travel across
+  the hull, a few bands across the ship's length, rather than random blotches. They
+  move steadily in one direction while the transition runs.
+- **The hull dissolves into the bending, not away from it.** While the waves run, the
+  hull fades into the refracting glass: first the shape starts to waver, then its
+  colour thins into the bent background, then the last of it ripples out. Decloaking
+  plays the same thing backwards: the waves bring the ship in, then settle, and the
+  ship holds still once it is solid.
+- **Strongest mid-transition.** The waves are weak at the start, largest around the
+  middle, and settle to the cloaked look at the end. The current `CloakRipple` already
+  peaks mid-transition (`vis·(1−vis)`). The new waves follow the same envelope, but much
+  larger: enough to ripple the silhouette, a small fraction of the hull's width.
+- **The glowing front is optional.** Whether the green edge (`CloakFront`) stays,
+  is replaced by the waves, or becomes a faint shimmer along the crests is open. In
+  the series there is no sharp front: the ship is simply gone at the end of the waver.
+
+### Cloaked: a little more there
+
+Fully cloaked, a ship today is nearly invisible (`CloakHull=0`; only a faint bend, rim
+and glint). It should be **a little more visible**: never a ship-shaped object, but a
+patch of space that is clearly not quite right.
+
+- **A slow, moving wave pattern in the refraction.** Faint waves keep drifting across
+  the cloaked hull, and they change *where the light behind it is bent*: the stars and
+  hulls seen through it slide and wobble a little as each wave passes. The pattern
+  should be in the bending, not in a brightness or colour overlay: what you see is the
+  background refracted differently from moment to moment.
+- **Slow and gentle.** Much slower and smaller than during the transition: a heat
+  shimmer, not a ripple of water. It should never turn or pulse in a readable rhythm.
+- **Visible against a busy background, nearly gone against black.** Since it shows only
+  as bent background, it should be easy to spot in front of a nebula, a planet or
+  another ship, and barely there against empty space. That is the right behaviour, not
+  something to correct with a glow.
+- **Your own ships keep a trace of their hull.** A cloaked ship of the player's own
+  shows its hull texture at about **10% opacity** under the glass and the shimmer:
+  enough to find and pick out your own ships at a glance, never enough to read as
+  uncloaked. Every other cloaked ship the engine draws keeps the bend and shimmer
+  alone, with no hull. Today `CloakHull` (the hull's floor while cloaked) is one value
+  for every ship; this needs it per owner, 0.1 for the player's own and 0 otherwise.
+- **Fair in multiplayer.** This applies only to cloaked ships the engine already draws
+  (your own, and what your side can see). It must never draw a ship the engine hides
+  from the player: render only, as everything in render3d is.
+
+Measured against the look before render3d 0.5.0: the glass, the colour split along the
+bend, the rim and glint fit. Missing then, and drawn now:
+- waves large enough to move the silhouette during the transition;
+- the hull dissolving through the waves, in place of the noise threshold;
+- a slow drifting wave in the refraction while fully cloaked;
+- the player's own cloaked ships showing their hull at about 10%.
+
+The green front stays for now as a thin line along each band (`CloakFront=0` takes it
+out). The next pass should settle whether it stays, and how strong the cloaked
+shimmer may be before it reads as a ship rather than a disturbance (judge it in game,
+against a nebula and against empty space).

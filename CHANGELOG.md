@@ -5,6 +5,36 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.8.1 — 2026-10-16
+
+Layers: render3d 0.6.1.
+
+### Fixed
+- `render3d/build.sh` no longer shares a fixed temp file between installs running at
+  once (render3d 0.6.1).
+
+Tooling only; nothing to see in game.
+
+## 12.8.0 — 2026-10-16
+
+Layers: render3d 0.6.0, testbench 3.19.1.
+
+### Changed
+- Tractor and assimilation beams as a translucent cone; shield hits with mist, Klingon
+  rays and light on the struck hull (render3d 0.6.0; 85c80d1, 424abef, 7cb274a, 8336f62).
+
+Installed, not yet seen in game.
+
+## 12.7.0 — 2026-10-16
+
+Layers: render3d 0.5.0.
+
+### Changed
+- Cloaking: wave-swayed transition, a drifting shimmer while cloaked, and the player's
+  own cloaked ships at 10% hull (render3d 0.5.0; 7941b19).
+
+Installed, not yet seen in game.
+
 ## 12.6.0 — 2026-10-16
 
 Layers: films 1.2.0.

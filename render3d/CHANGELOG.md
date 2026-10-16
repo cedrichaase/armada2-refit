@@ -4,6 +4,57 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.6.1 — 2026-10-16
+
+### Fixed
+- `build.sh` writes `src/shaders/mod.rs` and `build/Render3D.asi` through temp files of
+  its own run (`mktemp`, then a rename), so installs of one checkout running at once
+  (`a2film --jobs`, `a2test -j`) no longer collide on `src/shaders/mod.rs.new`.
+
+Tooling only; nothing to see in game.
+
+## 0.6.0 — 2026-10-16
+
+### Changed
+- Tractor, holding and assimilation beams (`tracbm`, `tracbmo`, `holdbm`,
+  `techassimbeam`, `borgbor`) are drawn as a translucent cone through vapour, after
+  `ART-DIRECTION.md`: fans of light with hard bright edges that fade in and out each on
+  its own, drifting vapour, no core, widening to the
+  target's width across the beam (its meshes' boxes, not its bounding sphere), with a
+  soft light of the beam's colour on the target's hull.
+- Shield hits: an uneven mist about the impact, a soft curved edge at the shell's
+  silhouette, rays on Klingon shields only, and a point light on the struck hull.
+- Shield colour defaults: Klingon green (was orange), Species 8472 orange (was purple).
+- The auto-assimilator (`borgbor`) is the cube's assimilation beam in its blue, with a
+  fan of green now and then (`Sprinkle`, `SprinkleShare`).
+- The cloak's waves sway the hull across the screen only, never in depth, smaller and
+  finer: `CloakWave` 0.03 (was 0.08), `CloakWaveBands` 3 (was 1.5).
+
+### Added
+- `Kind=cone` in ordnance recipes, with `Spread`, `Beyond`, `Pull`, `Fans`, `Sprinkle`,
+  `SprinkleShare`,
+  `EdgePixels`, `Vapour`, `Fall`, `WashBack`, `WashReach`.
+- `[Shields]` keys `Mist`, `MistReach`, `MistShare`, `MistContrast`, `MistScale`,
+  `MistDrift`, `Edge`, `Rays`, `RayLength`, `RaySharpness`, `RayFactions`, `HitLight`,
+  `HitLightWhite`, `HitLightReach`, `HitLightPower`, `HitLights`.
+
+Installed, not yet seen in game.
+
+## 0.5.0 — 2026-10-16
+
+### Changed
+- Cloaking in `ART-DIRECTION.md`'s look: while a ship cloaks or decloaks, waves sway
+  its geometry so the silhouette bends, and the hull thins into the glass band by band
+  in place of the noise threshold; the green front is a thin line along the bands.
+- Fully cloaked, slow waves drift in the refraction.
+- `CloakHull` is the floor for the player's own ships, now 0.1 (was 0 for every ship).
+
+### Added
+- Keys `CloakHullOthers` (0), `CloakWave`, `CloakWaveBands`, `CloakWaveSpeed`,
+  `CloakWaveTilt`, `CloakShimmer` and `CloakShimmerSpeed` in `[Hulls]`.
+
+Installed, not yet seen in game.
+
 ## 0.4.0 — 2026-10-16
 
 ### Added

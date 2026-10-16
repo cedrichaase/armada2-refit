@@ -138,6 +138,11 @@ impl LightPool {
     pub const fn new(name: &'static [u8]) -> LightPool {
         LightPool { name, objs: Vec::new() }
     }
+    /// Light object `i` of the pool (made by `register`), 0 if none yet; for
+    /// `scene::lights::set_style`.
+    pub fn light(&self, i: usize) -> usize {
+        self.objs.get(i).copied().unwrap_or(0)
+    }
     /// Registers light `i` of the pool at `pos`: full colour to `start`, gone `range`
     /// further on. False if no light object could be made.
     pub fn register(&mut self, i: usize, pos: V3, colour: V3, start: f32, range: f32) -> bool {
