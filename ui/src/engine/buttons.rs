@@ -31,6 +31,9 @@ const VT_PRESS: usize = 0x20;
 /// `StandardButton::mButtonPressFunction`: what the vtable slot must be for `press` to
 /// call it (a subclass with its own press is not pressed this way).
 const STANDARD_BUTTON_PRESS: usize = 0x50bad0;
+/// `ToggleButton::mButtonPressFunction` (the comm panel's toggles and colour buttons):
+/// flips the state between 1 and 2, then goes on to `StandardButton`'s (HUD.md, "Comms").
+const TOGGLE_BUTTON_PRESS: usize = 0x510990;
 
 const TEXT_COLOUR: usize = 0x70;
 const TEXT_STRING: usize = 0x84;
@@ -98,7 +101,7 @@ pub fn press(b: usize) -> bool {
         return false;
     }
     let vt_press = unsafe { rd::<usize>(rd::<usize>(b) + VT_PRESS) };
-    if vt_press != STANDARD_BUTTON_PRESS {
+    if vt_press != STANDARD_BUTTON_PRESS && vt_press != TOGGLE_BUTTON_PRESS {
         crate::log!("buttons: {:#x} is not a StandardButton's press, not pressed", vt_press);
         return false;
     }
@@ -130,6 +133,10 @@ static mut HOOKED: bool = false;
 /// Patches the site. False (presses are then made at once, in the UI's frame) when it
 /// is not stock.
 pub fn install_presses() -> bool {
+    // Several groups of panels ask for it (hud-panels, the multiplayer boxes): once.
+    if unsafe { HOOKED } {
+        return true;
+    }
     let ok = super::hook::patch_call(SITE_PRESSES, RESET_VISIBILITY, presses as *const () as usize);
     if !ok {
         crate::log!("buttons: the call at {:#x} is not to Entity::ResetVisibility: presses are made in the UI's frame", SITE_PRESSES);
