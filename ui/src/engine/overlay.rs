@@ -41,7 +41,6 @@ const OBJECT_LIST: usize = 0x761084;
 const OBJ_FLAGS: usize = 0x14;
 const OBJ_DRAWN: usize = 0x25;
 const OBJ_CLASS: usize = 0x40;
-const OBJ_LABEL: usize = 0x48;
 const OBJ_TEAM: usize = 0xec;
 const OBJ_SELECTED: usize = 0x10e;
 const OBJ_REMOVED: usize = 0x113;
@@ -172,14 +171,11 @@ pub fn units(w: f32, h: f32) -> Vec<Unit> {
     out
 }
 
-/// The unit's name: its own label (`+0x48`) when it has one, else its class's
-/// display name (`GetClassDisplayName`, vtable `+0x70`).
+/// The unit's class as the game names it to the player (`GetClassDisplayName`,
+/// vtable `+0x70`, e.g. "Assembler"). (`+0x48`, which `mDrawLabel` prints, is the
+/// object's script label, e.g. "bconst1051": not for the player.)
 pub fn name(obj: usize) -> &'static str {
     unsafe {
-        let label = field(obj, OBJ_LABEL);
-        if label != 0 && rd::<u8>(label) != 0 {
-            return super::hud::cstr_static(label as *const u8);
-        }
         let f: unsafe extern "thiscall" fn(usize) -> *const u8 = core::mem::transmute(rd::<usize>(rd::<usize>(obj) + VT_CLASS_NAME));
         super::hud::cstr_static(f(obj))
     }

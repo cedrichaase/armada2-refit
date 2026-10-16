@@ -20,6 +20,9 @@ use crate::gfx::{fade, mix, rgba, Color, Corners, Tex, Weight, R};
 use crate::widgets::{Align, Ui};
 use alloc::vec::Vec;
 
+/// The shroud: the slate the 3D view's shroud is, so the two read as one.
+const SHROUD: Color = rgba(44, 49, 62, 255);
+
 struct Layer {
     tex: Option<Tex>,
     w: usize,
@@ -157,7 +160,7 @@ pub fn run(ui: &mut Ui) {
     ui.panel(outer);
 
     // The map: space, the engine's picture of the map's features, warp suppression.
-    ui.draw.fill(sq, Corners::SQUARE, rgba(2, 4, 8, 255));
+    ui.draw.fill(sq, Corners::SQUARE, rgba(4, 6, 12, 255));
     ui.draw.push_clip(sq);
     if let Some(m) = ext_texture(&mut s.map, radar::map_texture()) {
         ui.draw.image(m, sq, 0xffffffff);
@@ -181,17 +184,22 @@ pub fn run(ui: &mut Ui) {
             }
         }
         let a = if b.ghost { 0.45 } else { 1.0 };
-        let col = colour3(b.colour, a);
+        // A team with no map colour (a scripted map, the bench's scenes): its relation.
+        let col = if b.colour.iter().sum::<f32>() < 0.1 {
+            fade(match radar::relation(b.team) { 0 => t.good, 1 => t.accent2, 2 => t.bad, _ => t.warn }, a)
+        } else {
+            colour3(b.colour, a)
+        };
         let dark = fade(0xff000000, 0.8 * a);
         match b.kind {
             Kind::Station => {
-                let sz = (b.size * tx).max(ui.u(7.0));
+                let sz = (b.size * tx).max(ui.u(10.0));
                 let rr = R::new(x - sz * 0.5, y - sz * 0.5, sz, sz);
                 ui.draw.fill(rr.inset(-1.0), Corners::SQUARE, dark);
                 ui.draw.fill(rr, Corners::SQUARE, col);
             }
             Kind::Ship => {
-                let sz = (b.size * tx).max(ui.u(5.0));
+                let sz = (b.size * tx).max(ui.u(7.0));
                 let rr = R::new(x - sz * 0.5, y - sz * 0.5, sz, sz);
                 ui.draw.fill(rr.inset(-1.0), Corners::round(sz * 0.5), dark);
                 ui.draw.fill(rr, Corners::round(sz * 0.5), col);
@@ -202,7 +210,7 @@ pub fn run(ui: &mut Ui) {
             }
         }
         if b.selected {
-            let sz = (b.size * tx).max(ui.u(7.0)) + ui.u(5.0);
+            let sz = (b.size * tx).max(if b.kind == Kind::Station { ui.u(10.0) } else { ui.u(7.0) }) + ui.u(6.0);
             ui.draw.stroke(R::new(x - sz * 0.5, y - sz * 0.5, sz, sz), Corners::round(sz * 0.5), ui.u(1.2).max(1.0), 0xffffffff);
         }
     }
@@ -214,7 +222,7 @@ pub fn run(ui: &mut Ui) {
         if let Some(g) = radar::fog_grid() {
             update_layer(&mut s.fog, &g, teams);
             if let Some(tex) = s.fog.tex {
-                ui.draw.image(tex, grid_rect(sq, &g), fade(mix(t.panel, 0xff000000, 0.5), 0.6));
+                ui.draw.image(tex, grid_rect(sq, &g), fade(mix(t.panel, 0xff000000, 0.4), 0.55));
             }
         }
     }
@@ -222,7 +230,7 @@ pub fn run(ui: &mut Ui) {
         if let Some(g) = radar::shroud_grid() {
             update_layer(&mut s.shroud, &g, teams);
             if let Some(tex) = s.shroud.tex {
-                ui.draw.image(tex, grid_rect(sq, &g), rgba(4, 6, 10, 255));
+                ui.draw.image(tex, grid_rect(sq, &g), SHROUD);
             }
         }
     }
@@ -250,7 +258,7 @@ pub fn run(ui: &mut Ui) {
     filters(ui, strip);
     mouse(ui, sq);
 
-    if !s.logged {
+    if !s.logged && !blips.is_empty() {
         s.logged = true;
         let (tw, th) = radar::fog_texture_size();
         let g = radar::fog_grid();

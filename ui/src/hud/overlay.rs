@@ -83,7 +83,7 @@ pub fn run(ui: &mut Ui, keep_out: &[R]) {
             let d = [b'0' + g];
             let s = core::str::from_utf8(&d).unwrap_or("?");
             let sz = ui.u(16.0);
-            let br = R::new(r.x - sz * 0.35, r.y - sz * 0.35, sz, sz);
+            let br = R::new(r.x - sz - ui.u(3.0), r.y, sz, sz);
             ui.draw.fill(br, Corners::round(ui.u(3.0)), fade(0xff000000, 0.75));
             ui.draw.stroke(br, Corners::round(ui.u(3.0)), ui.u(1.0).max(1.0), col);
             ui.text_in(br, s, t.micro_size, Align::Centre, t.text, Weight::Bold);
