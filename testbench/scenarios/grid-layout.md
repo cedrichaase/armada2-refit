@@ -2,7 +2,10 @@
 
 Resolutions: 16:9
 Mod: refit
+Setup: ui/bench-legacy.sh grid
 Timeout: 10 min
+
+`GridLayout.asi` is no longer installed by `./install` (the UI's bar has the grid, `ui-hud-bar.md`); the setup puts it back with `[HUD] Bar=0`, as a player who sets the UI's bar back to stock would (`ui/README.md`, "A part switched back to stock").
 
 `grid/README.md`. With `GridLayout.asi` installed the bar is a 5x3 grid, a key per
 cell (QWERT / ASDFG / ZXCVB; T cancel, G back), and the bar's stock keys do nothing.

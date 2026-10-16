@@ -2,9 +2,12 @@
 
 Resolutions: 4:3, 16:10, 16:9, 21:9
 Mod: refit
+Setup: ui/bench-legacy.sh hud
 Reference: 800x600 stock
 Stock shell: embed
 Timeout: 12 min
+
+`HUD.asi` is no longer installed by `./install` (the HUD is the UI's); the setup puts it back with `[HUD] Enable=0`, as a player who sets the UI's HUD back to stock would (`ui/README.md`, "A part switched back to stock").
 
 Measured at the first Federation mission's briefing, where the faction (and so the HUD
 art) is always the same, reopened with the camera over unexplored space

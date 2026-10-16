@@ -2,6 +2,9 @@
 
 Resolutions: 4:3, 21:9
 Mod: refit
+Setup: ui/bench-legacy.sh menus
+
+`Menus.asi` is no longer installed by `./install` (the UI hosts the menus); the setup puts it back with `[Menus] Enable=0`, as a player who sets the UI's menus back to stock would (`ui/README.md`, "A part switched back to stock").
 
 Regression test for `[Labels]` in `Menus.ini` (menus 4.3.0). On Instant Action's Game
 Setup, stock draws "Shroud Off, Fog Off" and "Random Placement" on past their
