@@ -59,6 +59,11 @@ pub struct Hud {
     pub bar_labels: bool,
     /// The info panel (`ShipDisplay`).
     pub info: bool,
+    /// The info panel shows a single unit live, from a camera of its own, in the place
+    /// of its wireframe (`engine::closeup`; needs render3d).
+    pub info_camera: bool,
+    /// The info panel's size, a factor on the UI's scale.
+    pub info_scale: f32,
     /// The minimap (`MapRadar`), ours, and its size in units.
     pub minimap: bool,
     pub minimap_size: f32,
@@ -110,6 +115,8 @@ pub fn load() -> Config {
             bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
             bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
             info: ini.int("HUD", "Info", 1) != 0,
+            info_camera: ini.int("HUD", "InfoCamera", 1) != 0,
+            info_scale: ini.float("HUD", "InfoScale", 1.3).clamp(0.6, 2.5),
             minimap: ini.int("HUD", "Minimap", 1) != 0,
             minimap_size: ini.float("HUD", "MinimapSize", 300.0).clamp(120.0, 900.0),
             selection: ini.int("HUD", "Selection", 1) != 0,

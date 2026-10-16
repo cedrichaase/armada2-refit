@@ -19,7 +19,7 @@
 //! The craft under the pointer in the 3D view gets a small card above the panel, as
 //! stock's hover strip shows it. Every part has stock's tooltip.
 use crate::engine::info::{self, BarKind, Face, Single, Text};
-use crate::engine::{hud, sprite};
+use crate::engine::{closeup, hud, sprite};
 use crate::gfx::{fade, mix, Color, Corners, Weight, R};
 use crate::widgets::{theme, Align, State, Ui};
 use alloc::string::String;
@@ -65,6 +65,14 @@ enum Tip {
 }
 
 pub fn run(ui: &mut Ui) {
+    // The whole panel at `[HUD] InfoScale`: its close-up, words, bars and systems alike.
+    let scale = ui.scale;
+    ui.scale *= crate::config::get().hud.info_scale;
+    run_scaled(ui);
+    ui.scale = scale;
+}
+
+fn run_scaled(ui: &mut Ui) {
     let hover_craft = info::take_hover();
     if hud::hidden(hud::SHIP_DISPLAY) || crate::engine::ingame::hud_hidden() {
         unsafe { RECT = None };
@@ -207,6 +215,33 @@ fn wireframe(ui: &mut Ui, obj: usize, r: R) {
     }
 }
 
+/// A craft live, close up, in `r` (`engine::closeup`, `[HUD] InfoCamera`): the picture
+/// asked for this frame is drawn by the engine before the next, so the first frame of
+/// a unit (or with the close-up unavailable) shows its wireframe. False when nothing
+/// was drawn.
+fn closeup(ui: &mut Ui, s: &Single, r: R) -> bool {
+    if !closeup_on(s) {
+        return false;
+    }
+    let px = [libm::roundf(r.x) as i32, libm::roundf(r.y) as i32, libm::roundf(r.w) as i32, libm::roundf(r.h) as i32];
+    let Some(tex) = closeup::request(s.obj, px) else { return false };
+    let at = R::new(px[0] as f32, px[1] as f32, px[2] as f32, px[3] as f32);
+    let t = ui.theme;
+    ui.draw.image(tex, at, 0xffffffff);
+    // A soft vignette into the panel at the edges, and the panel's edge around it.
+    let v = ui.u(10.0);
+    let edge = fade(t.panel, 0.0);
+    ui.draw.rect_vgrad(R::new(at.x, at.y, at.w, v), fade(t.panel, 0.55), edge);
+    ui.draw.rect_vgrad(R::new(at.x, at.bottom() - v, at.w, v), edge, fade(t.panel, 0.55));
+    ui.draw.frame(at, ui.u(t.edge).max(1.0), t.panel_edge);
+    true
+}
+
+/// Whether `s` gets the close-up in place of its wireframe.
+fn closeup_on(s: &Single) -> bool {
+    crate::config::get().hud.info_camera && s.craft && !s.planet && closeup::available()
+}
+
 /// A bar in a row: its icon or name at the left, the bar, its value at the right.
 fn bar_with(ui: &mut Ui, r: R, f: f32, col: Color, left: &str, right: &str) {
     bar_icon(ui, r, f, col, 0, left, right)
@@ -269,7 +304,9 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     // The wireframe, at the left.
     let wire_side = ui.u(WIRE).min(top_h);
     let wr = R::new(inner.x, inner.y + (top_h - wire_side) * 0.5, wire_side, wire_side);
-    wireframe(ui, s.obj, wr.inset(ui.u(4.0)));
+    if !closeup(ui, s, wr) {
+        wireframe(ui, s.obj, wr.inset(ui.u(4.0)));
+    }
     let (slowed, spy) = info::effects(s.obj);
     if slowed || spy {
         let (gs, rs) = info::effect_sprites();

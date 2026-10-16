@@ -4,6 +4,16 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.5.0 — 2026-10-16
+
+### Added
+- The info panel's close-up, `[HUD] InfoCamera=1`: a single craft drawn live by the
+  engine's renderer from a camera of the UI's, in place of its wireframe (needs
+  render3d 0.7.0; without it the wireframe stays).
+- `[HUD] InfoScale` (1.3): the info panel's size.
+
+Installed, not yet seen in game.
+
 ## 0.4.0 — 2026-10-16
 
 ### Added

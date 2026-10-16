@@ -239,7 +239,7 @@ pub fn vp_constants(v: &View) -> [f32; 16] {
     *v.view.mul(&v.proj).transpose().as_floats()
 }
 
-/// Several things a module keeps per view (the main view and the inset), by
+/// Several things a module keeps per view (the main view, the inset, the UI's close-up), by
 /// `View::key`.
 pub struct PerView<T> {
     pub v: Vec<T>,

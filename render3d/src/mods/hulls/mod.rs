@@ -106,7 +106,7 @@ enum Extra {
     Faded(f32),
 }
 
-static mut VIEWS: [Option<ViewState>; 2] = [None, None];
+static mut VIEWS: [Option<ViewState>; 3] = [None, None, None];
 static mut CUR: usize = 0;
 /// The module, for the calls other modules make into it (`placeholder`); set at every
 /// `begin_view` (the box it lives in does not move).
@@ -114,7 +114,7 @@ static mut ME: *mut Hulls = core::ptr::null_mut();
 
 #[allow(static_mut_refs)]
 fn view_state(key: usize) -> &'static mut ViewState {
-    unsafe { VIEWS[key.min(1)].get_or_insert_with(ViewState::default) }
+    unsafe { VIEWS[key.min(2)].get_or_insert_with(ViewState::default) }
 }
 
 /// The posed model of an object in the view being drawn (or last drawn), if the hulls

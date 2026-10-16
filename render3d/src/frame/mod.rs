@@ -32,8 +32,8 @@ struct Frame {
     /// Targets could not be made at this size: stock until the size changes.
     failed: Option<(u32, u32)>,
     frames: u32,
-    /// The last rectangle logged for the main view and the inset.
-    logged: [Option<PRect>; 2],
+    /// The last rectangle logged for each view (`steps::view_key`).
+    logged: [Option<PRect>; 3],
 }
 
 static mut FRAME: Option<Frame> = None;
@@ -200,7 +200,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
                 }
             }
         }
-        *f = Some(Frame { dev, post: None, targets: None, failed: None, frames: 0, logged: [None; 2] });
+        *f = Some(Frame { dev, post: None, targets: None, failed: None, frames: 0, logged: [None; 3] });
         hook_reset(dev8);
         crate::mods::device(dev);
     }
@@ -255,10 +255,10 @@ fn end(cam: usize, main: bool, saved: Saved, cfg: &Config) {
     };
     let view = steps::cam_rect(cam, t.w, t.h);
     p.run(f.dev, t, view, &saved.rt, saved.ds.as_ref(), cfg);
-    let which = if main { 0 } else { 1 };
+    let which = steps::view_key(cam, main);
     if f.logged[which] != Some(view) {
         f.logged[which] = Some(view);
-        log!("frame {}: {} view {}x{} at {},{}", f.frames, if main { "main" } else { "inset" }, view.w, view.h, view.x, view.y);
+        log!("frame {}: {} view {}x{} at {},{}", f.frames, ["main", "inset", "other"][which], view.w, view.h, view.x, view.y);
     }
     if main {
         f.frames = f.frames.saturating_add(1);

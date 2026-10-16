@@ -101,9 +101,27 @@ pub struct View {
     pub frame: u32,
 }
 
+/// `g_cinematicView` (`CinematicView`), its camera at `+0x2c`: the HUD's action camera.
+const CINEMATIC_VIEW: usize = 0x763758;
+const CV_CAMERA: usize = 0x2c;
+
 impl View {
+    /// Which view this is, for what a module keeps per view: 0 the main view, 1 the
+    /// HUD's action camera, 2 any other camera (`UI.asi`'s close-up of the selected
+    /// unit, ui/HUD.md), so no two views share a nebula ladder or a hull list.
     pub fn key(&self) -> usize {
-        if self.main { 0 } else { 1 }
+        view_key(self.cam, self.main)
+    }
+}
+
+/// `View::key` for a camera, before there is a `View`.
+pub fn view_key(cam: usize, main: bool) -> usize {
+    if main {
+        0
+    } else if cam == engine::field(CINEMATIC_VIEW, CV_CAMERA) {
+        1
+    } else {
+        2
     }
 }
 

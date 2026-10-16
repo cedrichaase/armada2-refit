@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.14.0 — 2026-10-16
+
+Layers: ui 0.5.0, render3d 0.7.0.
+
+### Added
+- The info panel shows the selected unit live, close up, in place of its wireframe,
+  and is a third bigger (`[HUD] InfoCamera`, `InfoScale`; ui 0.5.0, render3d 0.7.0).
+
+Installed, not yet seen in game.
+
 ## 12.13.0 — 2026-10-16
 
 Layers: ui 0.4.0, hud 2.2.2, testbench 3.23.0.
