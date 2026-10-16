@@ -1116,6 +1116,14 @@ fn run_modal(h: HWND) -> isize {
         if GetFocus().is_null() && !game.is_null() {
             SetFocus(game);
         }
+        // A dialog opened by a click on another (Game Setup's SELECT MAP) opens while
+        // the outer one may still hold the mouse capture its button press took; every
+        // press would then go to that hidden window and never reach the UI.
+        let cap = GetCapture();
+        if !cap.is_null() && in_hosted(cap) {
+            crate::log!("menus: dialog {:p} opens with the capture held by {:p}: released", h, cap);
+            ReleaseCapture();
+        }
     }
     // A click that opened this dialog was a button down that a hosted window took the
     // mouse on (the campaign selection opens the mission list on the down); its up is

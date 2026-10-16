@@ -11,16 +11,22 @@ use super::Screen;
 use crate::widgets::Ui;
 
 pub mod admirals_log;
+pub mod advanced_options;
 pub mod common;
 pub mod form;
+pub mod forms;
 pub mod game_settings;
+pub mod game_setup;
 pub mod graphics_settings;
 pub mod kit;
 pub mod main_menu;
+pub mod map_select;
 pub mod mission_select;
+pub mod multiplayer;
 pub mod notice;
 pub mod options;
 pub mod saves;
+pub mod setup_kit;
 pub mod single_player;
 pub mod sound_settings;
 pub mod tech_tree;
@@ -49,6 +55,20 @@ pub const SPECS: &[Spec] = &[
     Spec { screen: "net waiting", draw: notice::draw },
     Spec { screen: "help", draw: text_window::draw },
     Spec { screen: "licence agreement", draw: text_window::draw },
+    // Instant Action's and the multiplayer screens (menus-setup).
+    Spec { screen: "game setup", draw: game_setup::draw },
+    Spec { screen: "advanced options", draw: advanced_options::draw },
+    Spec { screen: "map select", draw: map_select::draw },
+    Spec { screen: "multiplayer connection", draw: multiplayer::connection },
+    Spec { screen: "manual ip", draw: forms::manual_ip },
+    Spec { screen: "game name", draw: forms::game_name },
+    Spec { screen: "create room", draw: forms::game_name },
+    Spec { screen: "password", draw: forms::password },
+    Spec { screen: "map transfer", draw: forms::map_transfer },
+    Spec { screen: "room select", draw: forms::gamespy },
+    Spec { screen: "gamespy login", draw: forms::gamespy },
+    Spec { screen: "create account", draw: forms::gamespy },
+    Spec { screen: "change password", draw: forms::gamespy },
 ];
 
 pub fn find(screen: &str) -> Option<&'static Spec> {

@@ -34,6 +34,9 @@ const VT_TOGGLE_BUTTON: usize = 0x6bb18c;
 const VT_SELBOX: usize = 0x6bb0e4;
 const VT_STD_TEXT_LABEL: usize = 0x6bbaa4;
 const VT_SCROLLBAR: usize = 0x6bb164;
+/// `ComboBox` (a `ShellButton` that draws a hidden Win32 combo box's choice and its own
+/// pull-down list; Game Setup's player rows): `shellcombo.rs` reads the rest.
+const VT_COMBO_BOX: usize = 0x6bad2c;
 /// The address range of Armada2.exe's vtables (`.rdata`).
 const RDATA: (usize, usize) = (0x6b0000, 0x6d0000);
 
@@ -163,6 +166,8 @@ pub enum Kind {
     Label,
     /// A `ShellScrollBar`.
     Scroll,
+    /// A `ComboBox`: the choice of a hidden combo box, with a pull-down of its own.
+    Combo,
 }
 
 /// A shell widget as read this frame.
@@ -219,7 +224,7 @@ fn read(w: usize) -> Option<Widget> {
         return None;
     }
     let slot = |i: usize| rd::<usize>(vt + i * 4);
-    if slot(8) == FN_BUTTON_UPDATE_HDC || vt == VT_SCROLLBAR {
+    if slot(8) == FN_BUTTON_UPDATE_HDC || vt == VT_SCROLLBAR || vt == VT_COMBO_BOX {
         if vt == VT_SCROLLBAR {
             let horizontal = rd::<u8>(w + SB_HORIZONTAL) != 0;
             let r = [rd::<i32>(w + SB_RECT), rd::<i32>(w + SB_RECT + 4), rd::<i32>(w + SB_RECT + 8), rd::<i32>(w + SB_RECT + 12)];
@@ -247,6 +252,7 @@ fn read(w: usize) -> Option<Widget> {
             VT_CYCLE_BUTTON => Kind::Cycle,
             VT_TOGGLE_BUTTON => Kind::Toggle,
             VT_SELBOX => Kind::SelBox,
+            VT_COMBO_BOX => Kind::Combo,
             _ => Kind::Button,
         };
         let mut label = cstr_at(w + BTN_LABEL, BTN_LABEL_LEN);

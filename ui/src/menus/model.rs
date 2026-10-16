@@ -283,6 +283,13 @@ fn shell_controls(dlg: HWND, ox: i32, oy: i32, out: &mut Vec<Control>) {
         }
         c.colour = bgr_to_argb(w.colour);
         c.align = w.align;
+        if w.kind == Kind::Combo {
+            // Its choice is the hidden combo box's (engine::shellcombo).
+            (c.items, c.selected) = crate::engine::shellcombo::items(w.obj);
+            if let Some(t) = c.items.get(c.selected.max(0) as usize).filter(|_| c.selected >= 0) {
+                c.text = t.clone();
+            }
+        }
         out.push(c);
     }
 }
@@ -317,7 +324,7 @@ pub fn read(s: &Slot) -> Model {
 /// UI.log: a dialog's controls, once per screen, for writing specs.
 pub fn log(m: &Model) {
     crate::log!("menus: model of \"{}\" (template {}), {} controls:", m.screen, m.template, m.controls.len());
-    for c in m.controls.iter().take(80) {
+    for c in m.controls.iter().take(300) {
         crate::log!(
             "menus:   {:?} id {} @{},{} {}x{}{}{} \"{}\"{}",
             c.what,

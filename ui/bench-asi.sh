@@ -15,6 +15,9 @@
 #   --menus       the UI hosts the shell's menus ([Menus] Enable=1, ui/MENUS.md), and
 #                 Menus.asi is taken out of the clone: the two must not both host them
 #                 (UI.asi stands down while it is loaded)
+#   --dplay       first puts Microsoft's DirectPlay and Online.asi into the clone
+#                 (online/reference-dplay.sh), for a multiplayer scenario with the
+#                 UI's menus: a scenario's Setup: line runs one script
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +27,7 @@ sets=()
 nogrid=0
 scene=
 menus=0
+dplay=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --demo)
@@ -33,6 +37,7 @@ while [ $# -gt 0 ]; do
         --no-grid) nogrid=1; shift ;;
         --scene) scene="${2:?--scene needs a name}"; shift 2 ;;
         --menus) menus=1; sets+=("Menus.Enable=1"); shift ;;
+        --dplay) dplay=1; shift ;;
         *=*) sets+=("$1"); shift ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
@@ -40,6 +45,7 @@ done
 work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])' "$state")"
 [ -d "$work/game" ] || { echo "no clone at $work/game" >&2; exit 1; }
 
+[ "$dplay" = 1 ] && bash "$here/../online/reference-dplay.sh" "$state"
 bash "$here/build.sh" >/dev/null
 cp "$here/build/UI.asi" "$here/UI.ini" "$work/game/"
 if [ "$nogrid" = 1 ]; then

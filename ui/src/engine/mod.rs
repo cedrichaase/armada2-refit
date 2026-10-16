@@ -29,6 +29,7 @@ pub mod sprite;
 pub mod topbar;
 pub mod shellui;
 pub mod radar;
+pub mod shellcombo;
 
 use core::ffi::c_void;
 
