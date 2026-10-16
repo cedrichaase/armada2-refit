@@ -11,7 +11,7 @@ in [`README.md`](README.md).
 - The board `films/origin` for the origin video's game shots that `films/promo` lacks:
   an Akira class stock and refit (`ak13`, scene `films/origin/akira.ini`), the Metreon
   nebula (`mt14`, scene `films/origin/metreon.ini`) and the Borg cube's technology
-  assimilation beam (`as17`).
+  assimilation beam (`as17`) (522f9b7).
 
 Tooling only; nothing to see in game.
 

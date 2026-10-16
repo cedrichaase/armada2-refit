@@ -11,7 +11,7 @@ Layers: films 1.2.0.
 
 ### Added
 - The `films/origin` board: an Akira class, the Metreon nebula and the assimilation
-  beam, for the origin video (films 1.2.0).
+  beam, for the origin video (films 1.2.0; 522f9b7).
 
 Tooling only; nothing to see in game.
 
