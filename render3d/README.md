@@ -183,6 +183,35 @@ is in the depth buffer.
   calls of `CreateShieldHit` (0x58bb95, 0x58cad8, 0x58d502, 0x58dd65), chained through
   thunks that note the ordnance in `ebx`. The shields-down discharges register a point
   light on the hull.
+  Since 0.6.0 the hits take `ART-DIRECTION.md`'s direction ("Shield hits"): the shell
+  is implied, lit only about the hit. A **mist** of uneven density lies over the glow
+  about each hit, like lit vapour: four octaves of 3D gradient noise on the unit
+  sphere (no grid; value noise drew walls in the nebulae), the domain bent once so the
+  dense parts run in wisps, fixed to the shell and drifting slowly through it, never
+  re-seeded, so it does not shimmer. Its light falls off as a Gaussian of the distance
+  from the hit (`MistReach`, in shield radii), wide but gone well before the far side.
+  It also modulates the glow's lattice and rim (`MistShare`). Where the lit shell
+  turns to its silhouette everything fades over the last `Edge` of facing, so the lit
+  area ends on a soft but definite curve rather than at its brightest. **Rays** only
+  on the factions in `RayFactions` (Klingon): a sunburst of clear spokes from just
+  outside the spot out to `RayLength`, four sines of whole numbers of turns about the
+  hit, seeded per hit, each beating slowly in strength, so the burst breathes in place
+  and does not turn. The faction is the ODF's first letter (`f`, `k`, `r`, `b`, `c`,
+  `8`), as for the colours, whose defaults now follow the direction: Klingon pure green
+  (`12,255,6`), Species 8472 orange (`255,140,40`). **The hull under a hit is lit**: each
+  hit (the brightest `HitLights`) registers a point light where it struck the shell,
+  in its shield colour taken `HitLightWhite` of the way to white, as bright as its
+  glow (plus a quarter of its spot) times `HitLight`, full out to a tenth of
+  `HitLightReach` times the ship's bounding radius and gone at that reach, its falloff
+  raised to `HitLightPower` so the far hull stays dark; styled distinct, so several
+  hits on one ship each light it. The ring and the rim are as they were; the next pass
+  settles whether they stay. `[Shields]` keys (defaults): `Mist` (0.45), `MistReach`
+  (0.35), `MistShare` (1), `MistContrast` (1.6), `MistScale` (3, cells across the unit
+  sphere), `MistDrift` (0.08 a second), `Edge` (0.15), `Rays` (1.2, 0 for none),
+  `RayLength` (0.55), `RaySharpness` (2), `RayFactions` (`Klingon`; any of
+  `Federation, Klingon, Romulan, Borg, Cardassian, Species8472, Other`), `HitLight`
+  (2, 0 for none), `HitLightWhite` (0.5), `HitLightReach` (0.8), `HitLightPower` (2),
+  `HitLights` (6, at most 16).
 - **Repair welding** (`repair.rs`). `NodeParticleEffect` stays the engine's (its
   `Render` also prunes particles of dead objects): the call to `AddParticle` in
   `Craft::RepairSystem` (0x4c90c0) is chained to note each weld, and the call to
@@ -361,6 +390,42 @@ the beam enters the target's bounding sphere (+0x60's object, its instance's rad
 times k), so the light falls on the moon's face. The world module's moons take it as
 any point light.
 
+**The tractor, holding and assimilation beams** (`tracbm`, `tracbmo`, `holdbm`,
+`techassimbeam`, `borgbor`; since 0.6.0) are `Kind=cone` recipes, after
+`ART-DIRECTION.md`'s direction: not a laser but a cone of light through vapour. The
+cone runs from the beam's start (+0xbc), `Width` wide, to `Spread` of the target's
+half width across the beam (+0x60's object; without one, an eighth of the beam's
+length) about its end (+0xc8), and on for `Beyond` of its bounding radius as it fades,
+so the target sits inside the beam rather than at its tip. The half width is the
+target as the hulls module posed it this view: its shown meshes' boxes (`Part::lo`,
+`hi`) measured along the direction the cone opens on screen. The bounding sphere made
+a cone as wide as a Sovereign is long when the beam met it nose on (seen on the
+bench). It is 16 camera-facing segments, each node with its own side vector so the
+segments meet; each is a trapezoid, so the across coordinate goes to the shader as
+(v w, w) and is divided per pixel (interpolated straight, it bent at every quad's
+diagonal and the streaks zigzagged). A flat quad through the target's
+centre would be cut in half by the hull in the depth test, so the wide end is moved
+towards the eye along the line to it (`Pull` target radii, growing as the square of
+the way along): that leaves it where it was on screen and puts it in front of the hull
+it holds, while the narrow end stays behind the emitter's own plating. The shader
+(`cone` in `ordnance.hlsl`) has no core. Its light is up to four fans (`Fans=count,
+interior,rate`): wedges from the emitter, each a band of the cone's own -1..1 (so it
+spreads with it), hard edged (`EdgePixels`, by `fwidth`), brightest along its edges
+and `interior` of that between them, with a fine grain of lengthwise lines. Each
+fades in, holds and fades out `rate` times a second (each at its own rate) and takes a
+new angle and width from a hash of its cycle, which changes only while it is dark, so
+nothing jumps: the series' beams, which come and go while the beam stays on. The light
+gathers towards the emitter, where the fans converge. Then three octaves of value noise for vapour, running along the beam (`Vapour`'s speed;
+the tractors' run back towards the ship) and slowly across; brightest at the emitter,
+`Fall` of it at the target; black within `EdgePixels` of the outline. A small
+flare (`Emitter`) marks the point on the ship; there is no impact flare. **The wash**
+on the target is a soft point light (`Light` times the beam's colour), placed
+`WashBack` target radii from its centre back towards the emitter and full out to
+`WashReach` radii: the hull facing the emitter, where the cone falls, takes it, and
+the far side, turned away, does not. A spot light limited to the cone's footprint
+would match better, but no lit draw takes one yet. Seen head on, the cone's quads
+close to a line (as every ribbon here does). Not yet seen in game.
+
 **The models.** Every model-drawing class's `Submit` ends by calling `Entity::Render`
 (0x4cfda0) through slot 11 of its vtable: the instance's frustum test (instance slot 3),
 the on-screen byte (+0x25), the instance's draw (instance slot 5). Before that, some set
@@ -525,8 +590,8 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
    `<name>.sod` or a bare prefix.
    - **With a recipe** (`render3d/skies/<name>.ini`, built into the plugin; a
      `Sky\<name>.ini` in the game directory takes precedence and is re-read when it
-     changes), the procedural sky of `Sky.asi` (its settled looks kept: Aqua
-     dimmer and softer than stock, the grades, soft billows and no filaments; "Sky recipes" below): one quad over the
+     changes), the procedural sky of `Sky.asi`, each recipe's shape and grade fitted
+     to its stock sky, with soft billows and no filaments ("Sky recipes" below): one quad over the
      viewport carrying each corner's world ray (from the inverse of view x projection,
      far point minus near point, which is affine in screen position), sampling a cube
      baked once per recipe. The bake is on the GPU only: each face is drawn by
@@ -580,7 +645,7 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
 | `Reload` | 1 | re-read `Sky\<name>.ini` in the game directory every 30 views when it changes |
 | `Dump` | 0 | 1: each bake writes its faces to `Sky\<name>.dump0..5.tga` for `perf/sky-grade.py` |
 | `StarLift`, `SunLift` | 0.5, 1 | how far past white the brightest texels of the point stars and of the suns go (0: stock's light) |
-| `Load` | | bench only: a background name to load in place of the map's (`Starfield_Load_Background_Geometry`), once per new value |
+| `Load` | | bench only: a background name to load in place of the map's (`Starfield_Load_Background_Geometry`), once per new value. With `Recipes=0`, a cube SOD loaded after another draws black (seen 2026-10-16 for `mbgbaku`, `mbgborg`, `mbgdom1` and `mbgkling` after `mbg02`); for a stock reference across several skies use `Draw=0`, the engine's own draw, which shows them all |
 
 Seen on the bench (2026-10-15, `a2_borg01`, 1920x1080), each against the engine's own
 draw in the same session and frame (`Draw=0`, paused): the stock faces of `mbgaqu`,
@@ -605,6 +670,7 @@ aims at.
 | `Scale` | 2 | the largest structure's frequency over the sphere; 2-3 gives a few billows per cube face |
 | `Warp` | 0.4 | domain warp; over ~0.5 it drags streaks |
 | `Detail` | 0.5 | amplitude ratio between octaves: lower is softer |
+| `Octaves` | 6 | how many of the gas's six octaves count, 1-6; a fraction fades the finest out. Under 4 the value noise's lattice shows (blocky, axis-aligned clumps) |
 | `Coverage` | 1.0 | where the gas begins, in units of the field's spread: higher is emptier |
 | `Softness` | 2.0 | the width of the gas's edge in the same units; 2-3 is cloud (a wider one restores depth where dense skies saturate into plateaus) |
 | `Patchiness` | 0.5 | a one-octave field at a third of `Scale` that gathers the gas in parts of the sky |
@@ -620,17 +686,37 @@ aims at.
 | `Grain`, `Dust`, `Haze` | | detail: grain (amount, scale times `Scale`, gain between octaves), dust (amount, scale, coverage), haze (amount, coverage); amount 0 is off |
 | `Stars` | 0,1,0.5,0 | how many over the sphere, brightness, size (degrees), in-gas weight; `StarA`, `StarB`: the two ends of the colours |
 | `GradeGain`, `GradeCurve` | 1,1,1 | the grade per channel, `gain * in^curve`, after `Brightness` and before the stars |
-| `Fine` | 0.1,0.3,0.55 | detail finer than the cube, at draw time: amount (0: off), the largest octave's size (degrees), gain between octaves. The cube is magnified about 3.4x at 4K, so finer detail comes from here, not from a bigger cube |
+| `Fine` | 0,0.3,0.55 | detail finer than the cube, at draw time: amount (0: off, the default: the skies keep to the broad gas, as stock), the largest octave's size (degrees), gain between octaves. The cube is magnified about 3.4x at 4K, so finer detail comes from here, not from a bigger cube |
 
 Edit a recipe in the game directory's `Sky\` with the game running and it re-bakes
 within half a second (`Reload=1`). **The grade** is fitted, not hand-tuned:
 `perf/sky-grade.py` fits `GradeGain`/`GradeCurve` per channel by least squares through
 the log percentiles 50..99.5 of the bake against the stock faces (the stock faces'
 40-texel corner notches masked), then scales every gain together so the sky lands at
-0.92 of stock's luminance, a little under and never over. Aqua is deliberately left
-ungraded (dimmer and softer than stock, as the user prefers) and `mbgrg` gets its
-channel balance only, at 0.57 of stock's luminance. Refit after changing a palette or
+0.92 of stock's luminance, a little under and never over, every sky alike (Aqua was
+left ungraded and `mbgrg` at 0.57 of stock until render3d 0.3.0, when the skies were
+fitted to stock's shape). Refit after changing a palette or
 `Brightness`; its docstring has the procedure (`Dump=1` writes the faces it reads).
+
+**The shape** is fitted too, before the grade: `perf/sky-shape.py --fit` moves `Scale`,
+`Detail`, `Octaves`, `Coverage`, `Softness` and `Warp` on a running bench game
+(`SCENE=sky`) until the bake's structure matches the stock faces', in two measures the
+grade cannot change: how the log luminance's variance spreads over octave bands (clump
+size and edge hardness), and its standardised quantiles (mid-tones against plateaus on
+black). Both are taken at 512 texels a face, with stock magnified bilinearly as the
+engine shows it, so detail finer than a stock texel counts against a recipe as it would
+on screen; measured at stock's own 256 the fit put that detail into crisp, swirling
+edges. `Softness` may only widen and `Warp` only drop (soft, billowing gas, no streaks),
+and every recipe is fitted, Aqua and `mbgrg` included. Most stock skies are many
+mid-sized clumps, a few degrees across, and their fitted `Scale`s are two to five times
+the hand-set ones (`mbgborg` 2.4 to 12.1); `mbgbaku`, `mbgdom1` and `mbgpur` are large
+soft shapes and stayed near theirs. The grain, dust and draw-time detail the recipes had
+before render3d 0.2.1 stood in for that structure as speckle; with the shape fitted
+they stay off. The descent is greedy: started from the hand-set `Scale`, `mbg02`,
+`mbggb` and `mbgred` stopped in a local minimum (0.3-0.6) and were fitted again from a
+`Scale` of 7-9 (to 0.14-0.25). Read the bands before trusting a fit that stays far
+from stock, and look at it: the measure is blind to a value-noise lattice (hence the
+`Octaves` floor).
 
 ### overlays
 
@@ -933,7 +1019,21 @@ ComputeFadeOut`, 0x4d5a20); crafts take `Lighting.asi`'s near fade (the near pla
 cutting into the hull's box) while `Storm3D+0xe8` says near fades are on. Faded hulls
 are drawn at `Step::Translucent`, far to near, depth first. A cloaking device (+0x108:
 state +0x3c, alpha +0x44, phase +0x48) draws the hull as `Lighting.asi`'s glass over a
-copy of the frame. The warp stretch is `Craft::RenderInternal`'s while +0x244 is above
+copy of the frame, in the look of `ART-DIRECTION.md`, "Cloaking". While it cloaks or
+decloaks, bands travel along the hull's longest axis (`CloakWaveBands` over its
+length, `CloakWaveSpeed` a second) and `vs_hull` sways the geometry across the screen,
+at right angles to the bands and never in depth, by up to `CloakWave` of the radius
+(swayed through the hull's own axes it bent in 3D and looked comical from the RTS
+camera), on the envelope `4·vis·(1−vis)`; the sway is a
+function of the world position, so the parts stay joined. The hull thins into the
+glass band by band (crests first) in place of the old noise threshold, and the green
+front (`CloakFront`) is a thin line along each band. Fully cloaked, slow waves drift
+in the refraction offset (`CloakShimmer` of the radius, `CloakShimmerSpeed`): only the
+bent background moves, so it shows against a nebula and hardly against black. The
+hull's floor is per owner: `CloakHull` (0.1) for the player's own ships, by the
+object's team (+0xec) against `Entity::GetUserTeam` (0x4d0060, the call `QOL.asi`
+makes), and `CloakHullOthers` (0) for everyone else's. Only hulls the engine already
+draws are touched. The warp stretch is `Craft::RenderInternal`'s while +0x244 is above
 0 (`spec-chunks-anim-lod.md` §5).
 
 **Sprites** (`sprites.rs`, `anim.rs`). SOD sprite nodes (running lights, strobes, crew
@@ -1054,7 +1154,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Resolution` 2 for half size, `Obscure` 0.5, `Samples` 2, `EdgeRefine` 1, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1108,7 +1208,7 @@ did. The moon's `oreglow` sprite node (the nimbus) is drawn at `Step::Translucen
 `moonpulse` animation on the instance's clock.
 
 **Nebulae** (`nebulae.rs`, `world_nebula.hlsl`): `Nebulae.asi`, its decisions kept
-(the envelope, the bake, the half-size slices on a ladder fixed in distance from the
+(the envelope, the bake, the slices on a ladder fixed in distance from the
 eye, per view, the blue-noise thresholds that stay put, the spectral noise). A class
 with a recipe draws as gas at `Step::Translucent`, its billboards skipped in the object
 loop; any other is left to the particles module. Every nebula the loop reaches is
@@ -1118,6 +1218,85 @@ The Key is the main view's (the action camera's view keeps the bake), the ships'
 shadows the hulls module's map (`hulls::shadow_map()`, sampler 8). A ghosted nebula of
 a gas class keeps its gas: slot 3 of the `GameObjectSpirit` vtable (0x6b1ca4) is
 wrapped. Everything is in the default pool; a `Reset` bakes again.
+The gas is **marched** at full size, not sliced. Each class draws its gas box once
+(the faces facing the eye, or those facing away when the eye is in or near it), and each
+pixel finds its own ray (c41..c43: the ray at view depth 1 is linear in the pixel), cuts
+it to the box and to the scene's depth (a RESZ copy into INTZ, read as a texture; with
+this projection `z - _33` is below 0), and takes `Steps=` steps (8, 12, 16 or 24, an
+entry point each, since vkd3d unrolls the loop) spaced in proportion to the distance,
+each jittered in its span by the pixel's blue-noise threshold walked by the golden
+ratio. Its sums (light, optical depth) are added into a half-float target; `comp_ps`
+filters them with a 5x5 Gaussian of `Denoise=` pixels (sigma) that leaves out pixels
+whose scene depth differs by over 5%, so hull edges stay a pixel sharp, and applies
+`Opacity=`/`Obscure=` onto the frame. The slices (`vol_ps`) remain only without INTZ
+and for `Bake=0`. vkd3d has no `tex3Dlod`, and a read's level from the hardware's
+derivatives is undefined inside a branch that differs per pixel, so the march reads the
+noise with `tex3Dgrad` (the pixel's footprint at the step's distance, times
+`Footprint=`) and can then skip rays that miss the gas, columns the occupancy record
+says are empty at that height, and points the volume says are clear. The flow, a slow
+field, is read every fourth step and drawn straight in between.
+
+Measured on the bench (`nebula` scene, 1920x1080, RX 5700, the camera inside a cloud
+about 1700 x 1000 units, so every ray crosses a long path of gas), with the gas split
+out by `Timing=1`'s marks:
+
+| | march | filter, composite | total | grain |
+|---|---|---|---|---|
+| `Nebulae.asi`'s half-size slices, 40 x 2 reads | | | 3.39 ms | 0.65 |
+| full-size slices, 40 | | | 8.16 ms | 1.21 |
+| march, 8 steps | 4.79 ms | 0.81 ms | 5.6 ms | 0.68 |
+| march, 12 steps | 6.05 ms | 0.77 ms | 6.9 ms | 0.61 |
+| march, 16 steps | 7.12 ms | 0.72 ms | 7.9 ms | 0.59 |
+
+Grain is the mean |shot - its 1.5-pixel blur| over the middle of the frame, in 8-bit
+steps. Unfiltered, the march's grain goes as one over the root of the steps (24 steps
+3.1, 12 steps 4.6): a few samples of a long path, not a lattice. The half-size path's
+tent (about 10 screen pixels wide) had hidden the same noise; the 1.5-pixel filter takes
+it out while the gas's own structure stays, since the volume's texels (6.6 units here)
+are several pixels wide. Per sample the march costs about what the slices did; what it
+saves is the blending of every slice, and what it spends is four times the pixels.
+About 2.5 ms of the march does not depend on the step count (8 to 16 steps adds 0.29 ms
+a step). It is not the unrolled shader's size: Microsoft's compiler (`d3dcompiler_43`,
+run under Wine for the measurement only, never part of the build) makes the 8-step march
+a real `rep` loop of 2,200 dwords instead of vkd3d's 10,400, and on the bench (720p) the
+march took 2.53 ms either way against vkd3d's 2.52: DXVK's SPIR-V and the driver end
+up at the same code.
+
+**`Temporal=`** (default 0.1) adds the frames up, since in game 8 steps' stipple still
+showed through the filter. The thresholds then walk the golden ratio from frame to frame
+(`k_ray2.w`, the frame), so each frame's samples fall between the last's, and
+`temporal_ps` blends this frame's march into the view's history, a share `Temporal=` of
+it. A pixel's gas is found in the history where it was the frame before: the march
+writes a second target (MRT), the view depth of each step weighted by its optical depth,
+and that point goes through the last frame's VIEW x PROJECTION. History the present
+frame's 3x3 neighbourhood does not support (gas a hull now covers, gas that moved) is
+clipped to its mean +- `TemporalClip=` (1.25) spreads; a value the half floats cannot
+hold, or a NaN, is replaced by the mean so it cannot stay. The clip alone let a ship
+that moved over the gas trail its outline in game (eight steps' noise makes the
+neighbourhood's spread wide), so history is also dropped wherever the scene's view depth
+differs by over 5% from what it was there (the march stopped at another hull): beside
+the history a second target keeps that depth and how many frames the history holds,
+and a pixel takes each frame at 1 / (frames + 1) until that reaches `Temporal=`, so a
+dropped pixel is clean again within a few frames. In thin gas (the Big Cerulean
+Nebula's specks) a frame's eight steps find gas in few pixels, and a 3x3 that found
+none has a mean and a spread of zero, which wiped the history whatever
+`TemporalClip=` was (1.25, 2.5 and 4 measured the same) and left the stipple there:
+the clip's top also reaches the brightest pixel of the ring two pixels out, which
+smoothed those wisps on the bench. Zoomed out, a grain stayed in game that zooming in
+smoothed away: the volume's texels and the swirl's folds were then finer than a pixel,
+and a ray through the pixel's centre alone gave each pixel a value of its own that every
+frame repeated, so no number of frames averaged it out. So the ray also walks within its
+pixel from frame to frame (`Jitter=`, its span in pixels, default 1; an R2 sequence on
+the frame, `k_ray1.w`), as TAA's camera jitter does, and the frames add up the gas over
+the whole pixel. It costs nothing in the march. On the bench (720p, high above the Big
+Cerulean Nebula) the wisps came out finer and less blotchy than with `Jitter=0`, whose
+grain number was the same (0.94 / 0.95; `Footprint=2` 0.94): the metric mostly measures
+the gas's own structure there. The history is four targets
+per view (the action camera keeps its own), dropped with the device and whenever no gas
+was marched. `comp_ps` then filters and composites the history as it did the march.
+The pass costs 0.22 ms at 720p. With `Temporal=0` the thresholds stay put, as before:
+moved without adding the frames up, they made the gas shimmer. Shadows cost 0.6 ms of 7.6 at 24 steps; the noise reads (flow, fine
+detail) were half of it before the flow was thinned. `Footprint=2` saved nothing.
 
 **Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view
 (`Module::lights`), a point light at its centre (the instance's transform +0x44 plus

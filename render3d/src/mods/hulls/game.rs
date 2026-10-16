@@ -133,6 +133,16 @@ pub fn cloak(o: usize) -> (u32, f32, f32) {
     (field(d, 0x3c) as u32, field_f32(d, 0x44), field_f32(d, 0x48))
 }
 
+/// The player's team (`Entity::GetUserTeam`, 0x4d0060, cdecl), as QOL.asi asks it.
+pub fn user_team() -> i32 {
+    unsafe { core::mem::transmute::<usize, unsafe extern "C" fn() -> i32>(0x4d0060)() }
+}
+
+/// Whether the object is the player's own: its team (`+0xec`) is the player's.
+pub fn is_users(o: usize) -> bool {
+    o != 0 && field(o, 0xec) as i32 == user_team()
+}
+
 /// The warp stretch for this draw (`Craft::RenderInternal`): (b, S, the motion in
 /// object space) while the craft's `+0x244` is above 0.
 pub fn warp(o: usize, world: &M34) -> Option<(f32, f32, V3)> {

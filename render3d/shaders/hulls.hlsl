@@ -19,6 +19,9 @@ float4 soff    : register(c13); // x: the normal offset for the shadow lookup (w
 float4 skey    : register(c14); // towards the Key, world, unit
 float4 wave_d  : register(c15); // a wave light: x,y,z its direction (mesh space), w: 2 pi / wavelength
 float4 wave_t  : register(c16); // x: its phase now (time x speed x 2 pi), y: 1 when there is one
+float4 ck_vw   : register(c17); // the cloak's waves: xyz the travel axis (world) x the wave number, w: the phase now
+float4 ck_vu   : register(c18); // xyz: the first sway (world units, the hull's up axis); 0 unless cloaking
+float4 ck_vs   : register(c19); // xyz: the second sway (world units, its side axis)
 
 struct VI {
     float3 pos : POSITION;
@@ -34,6 +37,15 @@ struct VO {
     float3 sc  : TEXCOORD3;   // in the shadow map: u, v, depth
     float  wv  : TEXCOORD4;   // the wave light's share at this vertex (-0.5 .. 0.5)
 };
+
+// The cloak's waves (ART-DIRECTION.md, "Cloaking"): bands that travel along the hull's
+// long axis and sway its geometry across it, so the silhouette bends. A continuous
+// function of the world position, so the parts stay joined; zero for every other draw.
+float3 cloak_wave(float3 w)
+{
+    float ph = dot(w, ck_vw.xyz) - ck_vw.w;
+    return ck_vu.xyz * sin(ph) + ck_vs.xyz * sin(ph * 1.7 + 1.3);
+}
 
 // The warp stretch (spec-chunks-anim-lod.md, section 5): the front of the hull beyond a
 // plane across the motion is stretched by S along it, the whole shifted back by o.
@@ -56,6 +68,7 @@ VO vs_hull(VI i)
 {
     VO o;
     float3 w = warp(mul(float4(i.pos, 1.0), W).xyz);
+    w += cloak_wave(w);
     o.pos = mul(float4(w, 1.0), VP);
     o.wp = w;
     float3 n = mul(float4(i.nrm, 0.0), W).xyz * warp_k.w;
@@ -219,6 +232,8 @@ float4 ck_tint    : register(c87);  // rgb: what the glass passes; a: the front'
 float4 ck_rim     : register(c88);
 float4 ck_edge    : register(c89);
 float4 ck_org     : register(c90);  // xy: the copy's top left in the target, pixels
+float4 ck_wave    : register(c91);  // the transition's bands, as the vertex's ck_vw
+float4 ck_c       : register(c92);  // x: the cloaked shimmer (of the radius); y: how far the bands tilt the glass; z: the shimmer's clock
 sampler2D ck_scene : register(s6);
 
 float3 ck_scene_at(float2 uv, float2 off, float split)
@@ -240,23 +255,37 @@ float4 ps_cloak(VO i, float2 vpos : VPOS) : COLOR
     float3 V = normalize(k_eye.xyz - i.wp);
     float3 q = (i.wp - ck_ctr.xyz) / max(ck_ctr.w, 1e-3);
     float vis = ck_a.x, t = ck_a.y;
-    float amp = ck_b.x * (0.4 + 2.4 * vis * (1.0 - vis));
+    // The transition's envelope: nothing at either end, 1 halfway.
+    float env = 4.0 * vis * (1.0 - vis);
+    float amp = ck_b.x * (0.4 + 0.6 * env);
     float3 wob = float3(sin(q.y * 5.3 + t * 1.10), sin(q.z * 4.7 + t * 0.90 + 1.7), sin(q.x * 6.1 - t * 1.30 + 3.1));
-    float3 Ng = normalize(N + wob * amp);
+    // The bands that sway the geometry tilt the glass with them.
+    float ph = dot(i.wp, ck_wave.xyz) - ck_wave.w;
+    float3 ax = ck_wave.xyz / max(length(ck_wave.xyz), 1e-6);
+    float3 Ng = normalize(N + wob * amp + ax * cos(ph) * env * ck_c.y);
     float3 nv = float3(dot(Ng, ck_view[0].xyz), dot(Ng, ck_view[1].xyz), dot(Ng, ck_view[2].xyz));
     float z = max(dot(i.wp - k_eye.xyz, ck_view[2].xyz), 1.0);
     float ndv = saturate(dot(Ng, V));
     float w = ck_a.z * ck_ctr.w * (0.5 + 1.0 * sqrt(saturate(1.0 - ndv * ndv)));
     float2 off = float2(nv.x, -nv.y) * w * ck_proj.xy / z;
+    // The cloaked shimmer: slow waves drifting across the hull that move where the
+    // light behind it is bent, in the bending only. Incommensurate rates, so no rhythm.
+    float s = ck_c.z;
+    float2 sh2 = float2(sin(q.x * 2.3 + q.y * 1.1 - s * 0.53) + 0.6 * sin(q.z * 3.7 - q.x * 1.9 + s * 0.31 + 2.1),
+                        sin(q.y * 2.9 - q.z * 1.3 + s * 0.41 + 0.9) + 0.6 * sin(q.x * 3.3 + q.z * 2.3 - s * 0.67 + 4.0));
+    off += sh2 * (ck_c.x * ck_ctr.w * (1.0 - vis)) * ck_proj.xy / z;
     float2 uv = (vpos - ck_org.xy + 0.5) * ck_proj.zw;
     float3 c = ck_scene_at(uv, off, ck_a.w) * ck_tint.rgb;
     float f = pow(1.0 - ndv, 4.0);
     c += ck_rim.rgb * f * ck_b.y;
     c += pow(saturate(dot(Ng, normalize(k_sun.xyz + V))), 90.0) * ck_b.z;
-    float m = 0.5 + 0.30 * sin(q.x * 3.1 + q.y * 2.3 + 0.7) * sin(q.z * 2.7 - q.x * 1.3) + 0.15 * sin(q.y * 7.1 - q.z * 5.3 + 2.0);
-    float e = vis * 1.4 - 0.2;
-    float sh = smoothstep(m - 0.12, m + 0.12, e);
-    float edge = (1.0 - saturate(abs(e - m) / 0.12)) * step(0.001, vis) * step(vis, 0.999);
+    // The hull thins into the glass band by band: crests first, troughs last, the
+    // bands travelling with the sway.
+    float m = 0.2 + 0.6 * (0.5 + 0.5 * sin(ph)) + 0.06 * sin(q.x * 7.1 - q.z * 5.3 + 2.0);
+    float e = vis * 1.5 - 0.25;
+    float sh = smoothstep(m - 0.25, m + 0.25, e);
+    // The front: a thin line along each band where the hull is half gone.
+    float edge = (1.0 - saturate(abs(e - m) / 0.04)) * step(0.001, vis) * step(vis, 0.999);
     float keep = lerp(ck_b.w, 1.0, sh);
     c = lerp(c, hull.rgb, keep) + ck_edge.rgb * edge * ck_tint.a;
     return float4(c, 1.0);

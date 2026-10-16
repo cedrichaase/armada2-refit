@@ -11,9 +11,10 @@ The scene (`testbench/scene/scenes/cloak.ini`) is the player's own Romulan warbi
 Klingon Bird of Prey in front of a class M planet and a Galaxy class. The warbird
 cloaks, holds, and decloaks; the Bird of Prey cloaks at once. The log line checks that
 the hulls module is on; the shots are for judging the look: halfway,
-the hull going patch by patch behind a green front; cloaked, clear glass with a thin
-bright edge, the planet and the Galaxy behind it a little bent and fringed in colour,
-no opaque or flat-tinted hull; decloaked, the warbird as before.
+the hull swaying out of shape and thinning band by band behind thin green lines;
+cloaked, clear glass with a thin bright edge and a trace (about 10%) of the hull, both
+ships being the player's own, the planet and the Galaxy behind it a little bent and
+fringed in colour; decloaked, the warbird as before.
 
 1. Launch the game.
 2. Wait 50 seconds.

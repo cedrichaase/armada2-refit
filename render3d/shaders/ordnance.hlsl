@@ -7,7 +7,8 @@
 // core, a torpedo's heart) are lifted past white so they bloom by their energy.
 //
 // fx_vs / fx_ps: the warp flash and the special weapons of Specials.asi, ported
-// unchanged (the looks are Specials.asi's). Every quad is
+// unchanged (the looks are Specials.asi's), and the cone of the tractor, holding and
+// assimilation beams (ART-DIRECTION.md). Every quad is
 // built by fx.rs in the world, and every kind is drawn by one pixel shader chosen per
 // quad (branch-free), so quads of any recipe go in one draw call.
 //
@@ -33,6 +34,14 @@
 //     t2.rgb its leading edge's colour; t3 = its radius in the quad, its band's half
 //     width (of the quad), the rays' count, the rays' share; t4 = fill share,
 //     turbulence.
+//   kind 6, a cone (the tractor, holding and assimilation beams): t0.x the way along,
+//     0 at the emitter, 1 at the beam's end, t2.r where the cone ends past it; t0.y
+//     across (-1..1) times t2.g, the half width there over the wide end's; t0.w the
+//     beam's length in the wide end's half widths; t3 = the fans' count (up to 4),
+//     the light between their edges, how often each comes and goes (a second), the
+//     edges' width in pixels; t4 = vapour depth, blobs per wide-end half width, the vapour's
+//     speed along the beam (half widths a second), the brightness at the target
+//     against the emitter's.
 
 float4 k_vp0 : register(c0);   // vertex shaders: the columns of VIEW x PROJECTION
 float4 k_vp1 : register(c1);
@@ -193,6 +202,82 @@ float3 wave(float2 uv, float3 col, float3 edge_col, float seed, float4 p, float4
     return col * (band + q.x * inside + ray) + edge_col * lead * 0.8;
 }
 
+// Value noise, 0..1, for the cone's vapour.
+float hash21(float2 p)
+{
+    return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+}
+
+float vnoise(float2 p)
+{
+    float2 c = floor(p);
+    float2 f = frac(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return lerp(lerp(hash21(c), hash21(c + float2(1.0, 0.0)), u.x),
+                lerp(hash21(c + float2(0.0, 1.0)), hash21(c + float2(1.0, 1.0)), u.x), u.y);
+}
+
+// A cone of light through vapour, as a projector's beam in haze: broad lengthwise
+// streaks (their edges as bright as their middles), vapour drifting along it from the
+// emitter and shimmering, brightest at the emitter and thinning towards the target,
+// black within a few pixels of its outline. No core. The streaks run in the cone's own
+// across (-1..1), so they spread with it; their phases drift slowly by sums of sines
+// at unrelated rates, so nothing turns or pulses in a rhythm one can read.
+// One fan of a cone: a wedge from the emitter (a band of v, which is the cone's own
+// width), hard edged and brightest along its edges, softer between them. It fades in,
+// holds and fades out, then comes back at another angle and width: the new ones are
+// drawn only while it is dark, so nothing jumps. i: which fan; fw: the edge's width in
+// v; interior: the light between the edges against theirs.
+float cone_fan(float v, float i, float seed, float t, float rate, float interior, float fw)
+{
+    float ph = t * rate * (0.75 + 0.5 * hash21(float2(i, seed))) + hash21(float2(seed, i * 7.1 + 0.3));
+    float n = floor(ph), x = frac(ph);
+    float a = sin(3.14159265 * x);
+    a *= a;
+    float c = (hash21(float2(n + i * 17.0, seed)) * 2.0 - 1.0) * 0.55;
+    float w = min(0.18 + 0.5 * hash21(float2(n * 1.3 + 3.7, i * 1.7 + seed)), 1.0 - abs(c));
+    float d = w - abs(v - c);
+    float inside = saturate(d / fw);
+    float edge = exp(-max(d, 0.0) / max(w * 0.1, 1e-4));
+    return a * inside * (interior + 1.6 * (1.0 - interior) * edge);
+}
+
+float3 cone(float2 uv, float lw, float3 col, float2 sw, float seed, float4 p, float4 q)
+{
+    float  t = k_time.x;
+    // v comes as v w and w (the half width there): see Fx::cone
+    float  s_end = sw.x;
+    float  s = uv.x, v = uv.y / max(sw.y, 1e-4);
+    float  av = abs(v);
+    float  fw = max(fwidth(v), 1e-4);
+    float  e = saturate((1.0 - av) / max(fw * p.w, 1e-4));
+    float  edge = e * e * (3.0 - 2.0 * e);
+    // Fans (p: how many, up to four; the light between their edges; how often each
+    // comes and goes, a second): the beams the series draws, appearing and fading
+    // each on its own.
+    float  efw = fw * max(p.w, 1.0);
+    float  streak = cone_fan(v, 0.0, seed, t, p.z, p.y, efw) * step(0.5, p.x)
+                  + cone_fan(v, 1.0, seed, t, p.z, p.y, efw) * step(1.5, p.x)
+                  + cone_fan(v, 2.0, seed, t, p.z, p.y, efw) * step(2.5, p.x)
+                  + cone_fan(v, 3.0, seed, t, p.z, p.y, efw) * step(3.5, p.x);
+    // a fine grain of lengthwise lines in the light, drifting slowly
+    streak *= 0.7 + 0.3 * vnoise(float2(v * 40.0 + seed, s * 0.6 + t * 0.35));
+    float  x = s * lw * q.y;
+    float  y = v * q.y * 0.5 + seed;
+    float  run = t * q.z * q.y;
+    float  n = 0.5 * vnoise(float2(x - run, y + t * 0.05))
+             + 0.3 * vnoise(float2(x * 2.3 - run * 1.9 + 5.2, y * 2.1 - t * 0.11 + 1.3))
+             + 0.2 * vnoise(float2(x * 5.1 - run * 3.7 + 11.7, y * 4.7 + t * 0.23 + 7.9));
+    float  vap = max(1.0 - q.x + q.x * 2.0 * n, 0.0);
+    // the fans converge on the emitter, so the light gathers there
+    float  along = lerp(1.0, q.w, pow(saturate(s), 0.45)) * (1.0 + 1.5 * pow(saturate(1.0 - s), 3.0));
+    float  f = saturate((s_end - s) / max(s_end - 1.0 + 0.1, 0.05));
+    float  far = f * f * (3.0 - 2.0 * f);
+    float  near = saturate(s * 40.0);
+    float  rim = 1.0 + 0.25 * exp(-(1.0 - av) * 12.0);
+    return col * streak * vap * along * far * near * edge * rim;
+}
+
 float4 fx_ps(VsOut i) : COLOR
 {
     float  kind = i.t0.z;
@@ -201,12 +286,14 @@ float4 fx_ps(VsOut i) : COLOR
     float  k2 = step(1.5, kind) * (1.0 - step(2.5, kind));
     float  k3 = step(2.5, kind) * (1.0 - step(3.5, kind));
     float  k4 = step(3.5, kind) * (1.0 - step(4.5, kind));
-    float  k5 = step(4.5, kind);
+    float  k5 = step(4.5, kind) * (1.0 - step(5.5, kind));
+    float  k6 = step(5.5, kind);
     float3 c = flare(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t3, i.t4) * k0
              + ring(i.t0.xy, i.t3.x, i.t3.y, i.t1.rgb) * k1
              + beam(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k2
              + bolt(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t3) * k3
              + field(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k4
-             + wave(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k5;
+             + wave(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k5
+             + cone(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rg, i.t2.a, i.t3, i.t4) * k6;
     return float4(c * i.t1.a, 0.0);
 }

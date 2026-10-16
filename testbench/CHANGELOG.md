@@ -5,7 +5,7 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 3.21.0 — 2026-10-16
+## 3.23.0 — 2026-10-16
 
 ### Added
 - Scenarios `ui-whole-game` (16:9, 21:9 and 4:3: the whole game with `./install`'s
@@ -21,7 +21,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 Installed, not yet seen in game.
 
-## 3.20.0 — 2026-10-16
+## 3.22.0 — 2026-10-16
 
 ### Added
 - `Scene.asi` commands `succeed [s]` and `fail [s]`, which end the mission as its
@@ -36,7 +36,7 @@ Installed, not yet seen in game.
 
 Installed, not yet seen in game.
 
-## 3.19.0 — 2026-10-16
+## 3.21.0 — 2026-10-16
 
 ### Added
 - Scenario step `Scroll the wheel down|up [N times]` (481b796).
@@ -49,7 +49,7 @@ Installed, not yet seen in game.
 
 Installed, not yet seen in game.
 
-## 3.18.0 — 2026-10-16
+## 3.20.0 — 2026-10-16
 
 ### Added
 - Scenario `ui-runtime`: `UI.asi`'s demonstration panel in a screen of ours (the
@@ -57,6 +57,32 @@ Installed, not yet seen in game.
   engine must not see (ui 0.1.0). Its setup is `ui/bench-asi.sh`.
 
 Installed, not yet seen in game.
+
+## 3.19.1 — 2026-10-16
+
+### Changed
+- `specials`: the holding, assimilation (`gTechAssimBeam`) and tractor beams are
+  checked as `Kind=cone` and shot close and from above; `shields-hits`: a Klingon
+  cruiser takes the same fire, for the rays.
+
+Installs nothing; both scenarios pass on the bench.
+
+## 3.19.0 — 2026-10-16
+
+### Added
+- Scene `sky` (`SCENE=sky`): no objects, the free camera at the middle of the map
+  looking out, for judging the skies on their own (712a09a).
+
+Installed, not yet seen in game.
+
+## 3.18.0 — 2026-10-16
+
+### Added
+- `a2test session start --assets none`: the clone is installed from an empty `A2_DATA`
+  (no textures, menu plates or movies), as a scenario's `Assets: none` already could;
+  the game as a release installs it. Used by `films/promo`.
+
+Installs nothing into the game. Confirmed in game 2026-10-16.
 
 ## 3.17.0 — 2026-10-15
 
@@ -101,7 +127,6 @@ Installed, not yet seen in game.
   with `hud on`, the action camera's inset, checked in `Render3D.log`.
 - `Render3D.log` and `Render3D.ini` are cleared at launch and gathered with the other
   logs.
-
 
 Installed, not yet seen in game.
 

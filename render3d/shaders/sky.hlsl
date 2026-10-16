@@ -33,7 +33,7 @@ float4 k_dust    : register(c15);  // amount, scale (times Scale), coverage; w: 
 float4 k_stars   : register(c16);  // share of lattice cells with a star, brightness, size (radians), in-gas weight
 float4 k_star_a  : register(c17);  // rgb: one end of the stars' colours
 float4 k_star_b  : register(c18);  // rgb: the other
-float4 k_gain    : register(c19);  // rgb: the grade's gain per channel
+float4 k_gain    : register(c19);  // rgb: the grade's gain per channel; w: octaves of the gas (Octaves=)
 float4 k_curve   : register(c20);  // rgb: the grade's exponent per channel
 float4 k_fine    : register(c21);  // fine detail at draw time: amount, frequency (noise tiles per radian), gain, amount^2/2
 
@@ -106,11 +106,15 @@ float fbm5_z(float3 p, float gain)
     return (fbm5(p, gain) - 0.5) * s1 / (0.15 * sqrt(s2));
 }
 
-float fbm6(float3 p, float gain)
+// Up to six octaves: octave o is weighed by saturate(octaves - o), so a fractional
+// count fades the finest out (branch-free, for vkd3d) and the gas is as soft as stock's
+// magnified faces at the smallest scale without losing its clumps.
+float fbm6(float3 p, float gain, float octaves)
 {
     float s = 0.0, a = 1.0, n = 0.0;
     [unroll] for (int o = 0; o < 6; o++) {
-        s += a * vnoise(p); n += a; a *= gain;
+        float w = a * saturate(octaves - o);
+        s += w * vnoise(p); n += w; a *= gain;
         p = mul(k_rot, p) * 2.03;
     }
     return s / n;
@@ -130,7 +134,7 @@ float3 sky_colour(float3 dir)
                       fbm3(p + float3(8.3, 2.8, 5.1), 0.5),
                       fbm3(p + float3(4.6, 7.1, 0.9), 0.5));
     float3 pw = p + warp * (q - 0.5) * 2.0;
-    float f = fbm6(pw, detail);
+    float f = fbm6(pw, detail, k_gain.w);
     float n = (f - 0.5) * 8.0;
     n = lerp(n, 2.0 * exp(-n * n) - 0.6, ridge);
 
@@ -181,7 +185,11 @@ float3 sky_colour(float3 dir)
         float sz = k_stars.z * (0.6 + 0.8 * b);
         float lum = on * k_stars.y * (0.25 + 0.75 * b * b * b) * lerp(1.0, gathered, k_stars.w);
         float core = exp(-a2 / (sz * sz));
-        float halo = 0.18 / (1.0 + a2 / (9.0 * sz * sz)) * exp(-a2 / (64.0 * sz * sz));
+        // The search reaches about one lattice cell (0.2 rad, a2 0.04) past the pixel's
+        // own: a halo that went further was cut at the cells' borders, a faint square
+        // about a big star (mbgpur). It fades to nothing within that.
+        float reach = saturate(1.0 - a2 / 0.04);
+        float halo = 0.18 / (1.0 + a2 / (9.0 * sz * sz)) * exp(-a2 / (64.0 * sz * sz)) * reach * reach;
         float3 sc = lerp(k_star_a.rgb, k_star_b.rgb, hash13(k + float3(2.2, 8.8, 6.6)));
         stars += lerp(sc, 1.0, core * 0.35) * lum * (core + halo);
     }

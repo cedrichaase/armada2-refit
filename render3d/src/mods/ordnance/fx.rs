@@ -1,6 +1,7 @@
 //! Specials.asi, ported: the warp flash and the special weapons drawn by shaders from
 //! recipes (`render3d/ordnance.ini`, overridable in Render3D.ini; the looks
-//! the user settled in Specials.asi are kept). Every effect is built here as
+//! the user settled in Specials.asi are kept, but for the tractor, holding and
+//! assimilation beams, cones since 0.4.0: `Fx::cone`). Every effect is built here as
 //! world-space quads for `fx_ps` in `shaders/ordnance.hlsl`, drawn additively, depth
 //! tested against the hulls, writing no depth.
 //!
@@ -26,6 +27,8 @@ pub enum Kind {
     Bolt,
     Field,
     Wave,
+    /// A cone of light through vapour (the tractor, holding and assimilation beams).
+    Cone,
 }
 
 const K_FLARE: f32 = 0.0;
@@ -34,6 +37,7 @@ const K_BEAM: f32 = 2.0;
 const K_BOLT: f32 = 3.0;
 const K_FIELD: f32 = 4.0;
 const K_WAVE: f32 = 5.0;
+const K_CONE: f32 = 6.0;
 
 /// One recipe: `[Ordnance.<odf>]` or `[Wave.<odf>]`.
 #[derive(Clone, Debug)]
@@ -77,6 +81,28 @@ pub struct Recipe {
     /// A beam's impact flare and light where it enters its target's bounding sphere
     /// (times this; 0: at the beam's end, as for a hull's hardpoint).
     surface: f32,
+    /// A cone: its wide end's half width in its target's bounding radii; how far past
+    /// the beam's end it runs as it fades, and how far towards the camera its wide end
+    /// is drawn (so it lies over the hull), both in those radii.
+    spread: f32,
+    beyond: f32,
+    pull: f32,
+    /// A cone's fans: how many (up to 4), the light between their edges (0..1), how
+    /// often each comes and goes (a second); their edges' width in pixels.
+    fans: [f32; 3],
+    /// A second colour of a cone's fans (`Sprinkle`), at this share of its brightness
+    /// (`SprinkleShare`, 0 for none): the auto-assimilator's green in its blue.
+    sprinkle: [f32; 3],
+    sprinkle_share: f32,
+    edge_px: f32,
+    /// A cone's vapour: depth, blobs per wide-end half width, speed along the beam
+    /// (half widths a second); its brightness at the target against the emitter's.
+    vapour: [f32; 3],
+    fall: f32,
+    /// A cone's wash on its target: the light sits this many target radii back from
+    /// its centre towards the emitter, full out to `wash_reach` radii.
+    wash_back: f32,
+    wash_reach: f32,
 }
 
 impl Recipe {
@@ -85,7 +111,15 @@ impl Recipe {
             Kind::Wave
         } else {
             let k = crate::rt::lower(&s.s(sec, "Kind", "beam"));
-            if k.starts_with("bo") { Kind::Bolt } else if k.starts_with('f') { Kind::Field } else { Kind::Beam }
+            if k.starts_with("bo") {
+                Kind::Bolt
+            } else if k.starts_with('f') {
+                Kind::Field
+            } else if k.starts_with('c') {
+                Kind::Cone
+            } else {
+                Kind::Beam
+            }
         };
         let col = s.rgb(sec, "Colour", [120.0, 200.0, 255.0]);
         let on = crate::rt::lower(&s.s(sec, "On", "target"));
@@ -127,6 +161,17 @@ impl Recipe {
             light_reach: s.f(sec, "LightReach", 80.0),
             fade_in: s.f(sec, "FadeIn", 0.15).max(0.001),
             surface: s.f(sec, "ImpactAtSurface", 0.0),
+            spread: s.f(sec, "Spread", 0.8).max(0.01),
+            beyond: s.f(sec, "Beyond", 0.5).max(0.0),
+            pull: s.f(sec, "Pull", 1.0).max(0.0),
+            fans: s.n(sec, "Fans", [3.0, 0.3, 0.7]),
+            sprinkle: s.rgb(sec, "Sprinkle", [60.0, 255.0, 110.0]),
+            sprinkle_share: s.f(sec, "SprinkleShare", 0.0).max(0.0),
+            edge_px: s.f(sec, "EdgePixels", 2.0).max(0.1),
+            vapour: s.n(sec, "Vapour", [0.5, 1.2, 0.5]),
+            fall: s.f(sec, "Fall", 0.25).max(0.0),
+            wash_back: s.f(sec, "WashBack", 1.2),
+            wash_reach: s.f(sec, "WashReach", 1.4).max(0.05),
         }
     }
 }
@@ -380,6 +425,24 @@ impl Fx {
                 t0: [uv[o][0], uv[o][1], lk.kind, lk.len],
                 t1: [lk.col.x, lk.col.y, lk.col.z, lk.bright],
                 t2: [lk.col2.x, lk.col2.y, lk.col2.z, lk.seed],
+                t3: lk.p3,
+                t4: lk.p4,
+            });
+        }
+    }
+
+    /// A quad whose vertices carry their own u, v times w, and w (`t2.y`): `cone`'s
+    /// projective v.
+    fn quad_w(&mut self, p: [V3; 4], lk: &Look, uvw: [[f32; 3]; 4]) {
+        if lk.bright <= 0.0 || self.verts.len() >= 6 * 8192 {
+            return;
+        }
+        for o in [0usize, 1, 2, 0, 2, 3] {
+            self.verts.push(FxVert {
+                p: [p[o].x, p[o].y, p[o].z],
+                t0: [uvw[o][0], uvw[o][1], lk.kind, lk.len],
+                t1: [lk.col.x, lk.col.y, lk.col.z, lk.bright],
+                t2: [lk.col2.x, uvw[o][2], lk.col2.z, lk.seed],
                 t3: lk.p3,
                 t4: lk.p4,
             });
@@ -713,6 +776,116 @@ impl Fx {
         }
     }
 
+    /// A tractor, holding or assimilation beam (ART-DIRECTION.md): a translucent cone
+    /// from a point on the emitter (+0xbc) widening onto its target, `Spread` of the
+    /// target's bounding radius wide where the beam ends (+0xc8), and on, fading, for
+    /// `Beyond` of it. Built of camera-facing segments, each node's side its own (so
+    /// the segments meet); the wide end is drawn towards the camera along the line to
+    /// the eye (`Pull` target radii, growing as the square of the way along), which
+    /// leaves it where it was on screen but in front of the hull it holds. The fans
+    /// (wedges inside it that come and go) and the vapour are the shader's. Its
+    /// light is a wash on the side of the target the cone falls on.
+    fn cone(&mut self, cam: &Cam, ord: usize, rc: usize, age: usize, now: f32) {
+        let r = self.recipes[rc].clone();
+        let a: V3 = unsafe { crate::engine::rd(ord + 0xbc) };
+        let b: V3 = unsafe { crate::engine::rd(ord + 0xc8) };
+        let d = b - a;
+        let len = d.len();
+        if len < 1e-3 {
+            return;
+        }
+        let d = d * (1.0 / len);
+        let tgt = eng::object_of(unsafe { crate::engine::rd::<i32>(ord + 0x60) });
+        // The target's size, or without one a cone an eighth as wide as it is long.
+        let (tc, tr) = if tgt != 0 { (eng::obj_pos(tgt), eng::radius_of(tgt)) } else { (b, (len * 0.125).max(r.width)) };
+        let seed = hash32(ord as u32);
+        let bright = r.bright * clamp((now - self.ages[age].first) / r.fade_in, 0.0, 1.0) * Self::flicker(&r, seed, now);
+        if bright <= 0.004 {
+            return;
+        }
+        let hw0 = (r.width * 0.5).max(r.min_px * cam.px * (a - cam.eye).len() * 0.5);
+        // The wide end takes in Spread of the target as it lies across the beam, seen
+        // from here: its meshes' boxes measured along the cone's side at the end (a
+        // ship met nose on is narrow, broadside long), not its bounding sphere.
+        let across = if tgt != 0 { target_across(tgt, d, b - cam.eye) } else { None };
+        let hw1 = (r.spread * across.unwrap_or(tr)).max(hw0);
+        let s_end = 1.0 + r.beyond * tr / len;
+        let sd = (seed & 1023) as f32 * 0.01;
+        let lk = Look {
+            kind: K_CONE,
+            len: len / hw1,
+            col: rgb(r.col),
+            bright,
+            col2: v3(s_end, 0.0, 0.0),
+            seed: sd,
+            p3: [clamp(r.fans[0], 0.0, 4.0), clamp(r.fans[1], 0.0, 1.0), r.fans[2], r.edge_px],
+            p4: [clamp(r.vapour[0], 0.0, 1.0), r.vapour[1], r.vapour[2], r.fall],
+        };
+        const N: usize = 16;
+        let node = |k: usize| -> (V3, V3, f32) {
+            let f = s_end * k as f32 / N as f32;
+            let c = a + d * (len * f);
+            let side = d.cross(c - cam.eye);
+            let side = if side.len() < 1e-8 { V3::ZERO } else { side.norm() * (hw0 + (hw1 - hw0) * f) };
+            let pull = r.pull * tr * clamp(f, 0.0, 1.0) * clamp(f, 0.0, 1.0);
+            let towards = |p: V3| -> V3 {
+                let to = cam.eye - p;
+                let l = to.len();
+                if l < 1e-3 { p } else { p + to * (pull.min(l * 0.5) / l) }
+            };
+            (towards(c - side), towards(c + side), f)
+        };
+        // Each segment is a trapezoid, so v across it is sent as (v w, w), w the
+        // half width there, and divided out per pixel: interpolated straight, v bends
+        // at the seam of the quad's two triangles and the streaks zigzag.
+        let wid = |f: f32| (hw0 + (hw1 - hw0) * f) / hw1;
+        let mut prev = node(0);
+        for k in 1..=N {
+            let next = node(k);
+            let (w0, w1) = (wid(prev.2), wid(next.2));
+            let p = [prev.0, next.0, next.1, prev.1];
+            let uvw = [[prev.2, -w0, w0], [next.2, -w1, w1], [next.2, w1, w1], [prev.2, w0, w0]];
+            self.quad_w(p, &lk, uvw);
+            prev = next;
+        }
+        if r.sprinkle_share > 0.0 {
+            // The second colour: the same cone again, two fans of its own (its own
+            // seed, a little quicker), so now and then a fan of it comes and goes.
+            let lk2 = Look {
+                col: rgb(r.sprinkle),
+                bright: bright * r.sprinkle_share,
+                seed: sd + 37.3,
+                p3: [lk.p3[0].min(2.0), lk.p3[1], lk.p3[2] * 1.3, lk.p3[3]],
+                ..lk
+            };
+            let mut prev = node(0);
+            for k in 1..=N {
+                let next = node(k);
+                let (w0, w1) = (wid(prev.2), wid(next.2));
+                let p = [prev.0, next.0, next.1, prev.1];
+                let uvw = [[prev.2, -w0, w0], [next.2, -w1, w1], [next.2, w1, w1], [prev.2, w0, w0]];
+                self.quad_w(p, &lk2, uvw);
+                prev = next;
+            }
+        }
+        if r.emitter > 0.0 {
+            // The small bright point on the emitter where the cone starts.
+            let h = r.emitter * hw0;
+            let fl = Self::flare(rgb(r.col), bright * 0.6, 30.0, 3.5, r.star, 18.0, 0.0, 20.0, V3::ZERO, 1.0, sd);
+            self.billboard(cam, a, h, h, 1.0, h * 0.5, &fl);
+        }
+        if r.light > 0.0 && self.main && self.lights_next.len() < 24 {
+            // The wash: a soft light back from the target towards the emitter, so the
+            // side the cone falls on takes it and the far side, turned away, does not.
+            let pos = if tgt != 0 { tc - d * (tr * r.wash_back) } else { b };
+            let reach = tr * r.wash_reach;
+            let k = r.light * bright;
+            if k > 0.01 {
+                self.lights_next.push(Lit { pos, col: rgb(r.light_col) * k, start: reach, range: reach * 0.6 });
+            }
+        }
+    }
+
     fn bolt(&mut self, cam: &Cam, ord: usize, rc: usize, age: usize, now: f32) {
         let r = self.recipes[rc].clone();
         let t = eng::transform(ord);
@@ -805,6 +978,7 @@ impl Fx {
         match self.recipes[rc].kind {
             Kind::Bolt => self.bolt(&cam, ord, rc, age, now),
             Kind::Field => self.field_(&cam, ord, rc, age, now),
+            Kind::Cone => self.cone(&cam, ord, rc, age, now),
             _ => self.beam(&cam, ord, rc, age, now),
         }
         if !self.said.contains(&rc) && self.said.len() < 128 {
@@ -937,4 +1111,29 @@ impl Fx {
             }
         }
     }
+}
+
+/// Half the width of an object across a beam along `d`, in the direction the cone
+/// opens on screen (`d` x `view`): its shown meshes' boxes as the hulls module posed
+/// them this view. None if the object is not posed.
+fn target_across(o: usize, d: V3, view: V3) -> Option<f32> {
+    let p = crate::mods::hulls::posed(o)?;
+    let side = d.cross(view);
+    if side.len() < 1e-8 {
+        return None;
+    }
+    let side = side.norm();
+    let (mut lo, mut hi) = (f32::MAX, f32::MIN);
+    for part in &p.model.parts {
+        if !p.pose.shown.get(part.node).copied().unwrap_or(false) {
+            continue;
+        }
+        let Some(w) = p.pose.world.get(part.node) else { continue };
+        let c = w.transform_point((part.lo + part.hi) * 0.5).dot(side);
+        let h = (part.hi - part.lo) * 0.5;
+        let e = w.r[0].dot(side).abs() * h.x + w.r[1].dot(side).abs() * h.y + w.r[2].dot(side).abs() * h.z;
+        lo = lo.min(c - e);
+        hi = hi.max(c + e);
+    }
+    (hi > lo).then_some((hi - lo) * 0.5)
 }
