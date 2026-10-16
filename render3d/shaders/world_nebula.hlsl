@@ -646,6 +646,18 @@ TemporalOut temporal_ps(float2 vpos : VPOS)
             zs += tex2Dlod(s_gz, float4(uv, 0.0, 0.0)).r;
         }
     }
+    // The ring about them, two pixels out: only its brightest counts (below).
+    float4 mx = 0.0;
+    [unroll] for (int i = -2; i <= 2; i++) {
+        float2 ra = clamp(px + float2(i, -2), k_dnv.xy, k_dnv.zw) * k_lr.zw;
+        float2 rb = clamp(px + float2(i, 2), k_dnv.xy, k_dnv.zw) * k_lr.zw;
+        mx = max(mx, max(tex2Dlod(s_gas, float4(ra, 0.0, 0.0)), tex2Dlod(s_gas, float4(rb, 0.0, 0.0))));
+    }
+    [unroll] for (int j = -1; j <= 1; j++) {
+        float2 ra = clamp(px + float2(-2, j), k_dnv.xy, k_dnv.zw) * k_lr.zw;
+        float2 rb = clamp(px + float2(2, j), k_dnv.xy, k_dnv.zw) * k_lr.zw;
+        mx = max(mx, max(tex2Dlod(s_gas, float4(ra, 0.0, 0.0)), tex2Dlod(s_gas, float4(rb, 0.0, 0.0))));
+    }
     m1 /= 9.0;
     float4 sd = sqrt(max(m2 / 9.0 - m1 * m1, 0.0));
     // Where the gas is (its weighted view depth over the neighbourhood), or with none,
@@ -667,7 +679,10 @@ TemporalOut temporal_ps(float2 vpos : VPOS)
     float4 hist = tex2Dlod(s_hist, float4(pp * k_lr.zw, 0.0, 0.0));
     hist = hist >= 0.0 ? hist : m1;
     hist = hist <= 60000.0 ? hist : m1;
-    hist = clamp(hist, m1 - k_tm.z * sd, m1 + k_tm.z * sd);
+    // In thin gas a frame's eight steps find gas in few pixels, and a neighbourhood that
+    // found none has no spread to clip to: the history would be wiped and the stipple
+    // stay. So the clip's top reaches up to the brightest pixel two out as well.
+    hist = clamp(hist, m1 - k_tm.z * sd, max(m1 + k_tm.z * sd, mx));
     float4 r = lerp(hist, c, max(1.0 / (n + 1.0), k_tm.x));
     r = r >= 0.0 ? r : 0.0;
     TemporalOut o;

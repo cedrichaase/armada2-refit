@@ -1177,7 +1177,12 @@ neighbourhood's spread wide), so history is also dropped wherever the scene's vi
 differs by over 5% from what it was there (the march stopped at another hull): beside
 the history a second target keeps that depth and how many frames the history holds,
 and a pixel takes each frame at 1 / (frames + 1) until that reaches `Temporal=`, so a
-dropped pixel is clean again within a few frames. The history is four targets
+dropped pixel is clean again within a few frames. In thin gas (the Big Cerulean
+Nebula's specks) a frame's eight steps find gas in few pixels, and a 3x3 that found
+none has a mean and a spread of zero, which wiped the history whatever
+`TemporalClip=` was (1.25, 2.5 and 4 measured the same) and left the stipple there:
+the clip's top also reaches the brightest pixel of the ring two pixels out, which
+smoothed those wisps on the bench. The history is four targets
 per view (the action camera keeps its own), dropped with the device and whenever no gas
 was marched. `comp_ps` then filters and composites the history as it did the march.
 The pass costs 0.22 ms at 720p. With `Temporal=0` the thresholds stay put, as before:

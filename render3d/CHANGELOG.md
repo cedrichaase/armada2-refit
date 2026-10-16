@@ -13,7 +13,8 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 - Nebulae: the marched gas is added up over frames (`temporal_ps`): the thresholds walk
   on from frame to frame, and each frame is blended into a history per view, reprojected
   by the gas's depth, clipped to the neighbourhood and dropped where the scene's depth
-  changed (a ship moved over the gas). `[Nebulae]` `Temporal=` (this
+  changed (a ship moved over the gas); the clip's top reaches the brightest pixel two
+  out, so thin gas keeps its history. `[Nebulae]` `Temporal=` (this
   frame's share, default 0.1; 0 off) and `TemporalClip=` (default 1.25).
 
 ### Changed
