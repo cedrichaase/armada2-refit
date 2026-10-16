@@ -54,3 +54,8 @@ What an agent driving the game as `./install` now gives it (every part of the UI
   typed into the mission; not reproduced since. `testbench/scenarios/ui-whole-game.md`
   goes through the same path.
 - A gdb attached with SIGSEGV stopping catches Wine's own handled faults too.
+- **`QOLRules.asi` in the clone.** A bench clone is the user's install, and `a2mod stock`
+  does not switch the rules plugin: with `PayOnQueue=1` an order the team cannot pay
+  for when it is queued is refused (`QOLRules.log`: "refused ... crew"), so
+  `qol-station-groups.md`'s five orders came out 1 + 1 (yard2, yard3) on 2026-10-16,
+  with the UI's bar routing each to one yard as `GridLayout.asi` did.
