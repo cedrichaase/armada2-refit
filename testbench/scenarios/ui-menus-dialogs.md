@@ -50,7 +50,7 @@ by text. The screens are read through the model of the hidden dialogs (UI.log li
 34. Click "Save Game".
 35. Wait 3 seconds.
 36. Expect "SAVE GAME" is visible.
-37. Click at design 400,579.
+37. Click at 640,639.
 38. Wait 4 seconds.
 39. Expect "Save Successful" is visible.
 40. Take a screenshot called "save message".

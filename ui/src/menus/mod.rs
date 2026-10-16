@@ -126,7 +126,9 @@ pub fn frame(ui: &mut Ui) {
             model::log(&m);
         }
         let scr = Screen { slot: s, model: &m, fit, mirror: tex, top };
-        ui.scope(&crate::sfmt!("dlg{:p}", s.hwnd), |ui| {
+        // Only the top dialog takes input: a lower one is drawn inert, or a widget of
+        // its under the top one (a list under a message box) takes the press first.
+        ui.scope(&crate::sfmt!("dlg{:p}", s.hwnd), |ui| ui.inert_unless(top, |ui| {
             if cfg.menus_specs {
                 if let Some(spec) = screens::find(m.screen) {
                     if (spec.draw)(ui, &scr) {
@@ -135,7 +137,7 @@ pub fn frame(ui: &mut Ui) {
                 }
             }
             if cfg.menus_widgets { generic::widgets(ui, &scr) } else { generic::mirrored(ui, &scr) }
-        });
+        }));
     }
     // The whole screen is the menus': nothing of the engine's is under them.
     ui.claim(ui.screen());

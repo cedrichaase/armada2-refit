@@ -60,6 +60,8 @@ pub(super) struct Frame {
     pub nav: bool,
     /// A widget took focus this frame.
     pub focus_taken: bool,
+    /// Drawing something that takes no input (`Ui::inert_unless`).
+    pub inert: bool,
 }
 
 impl<'a> Ui<'a> {
@@ -101,9 +103,25 @@ impl<'a> Ui<'a> {
         !persist().occ_prev.iter().any(|o| o.contains(p))
     }
 
-    /// Whether keys reach widgets now (not while a modal is open, except to its own).
+    /// Whether keys reach widgets now (not while a modal is open, except to its own,
+    /// and never inside `inert_unless`).
     pub fn keys_free(&self) -> bool {
-        self.x.in_overlay || !persist().modal_prev
+        !self.x.inert && (self.x.in_overlay || !persist().modal_prev)
+    }
+
+    /// Runs `f` with its widgets drawn as usual but seeing neither the pointer nor the
+    /// keys, unless `live`: a screen under another one.
+    pub fn inert_unless<T>(&mut self, live: bool, f: impl FnOnce(&mut Self) -> T) -> T {
+        if live {
+            return f(self);
+        }
+        let (clip, inert) = (self.x.input_clip, self.x.inert);
+        self.x.input_clip = Some(R::new(0.0, 0.0, 0.0, 0.0));
+        self.x.inert = true;
+        let out = f(self);
+        self.x.input_clip = clip;
+        self.x.inert = inert;
+        out
     }
 
     /// Says a modal is open this frame (modal.rs).
