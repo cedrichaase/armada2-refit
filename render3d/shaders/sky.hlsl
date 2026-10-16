@@ -1,4 +1,4 @@
-// entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY bake_ps:ps_3_0:PS_BAKE down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE
+// entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY bake_ps:ps_3_0:PS_BAKE down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE tunnel_ps:ps_3_0:PS_TUNNEL
 // The background of the 3D view (src/mods/sky/): the procedural sky ported from
 // Sky.asi (its settled looks kept), the stock cube's faces, and the sprites of the
 // starfield and of the background objects (the suns).
@@ -304,4 +304,62 @@ float4 sprite_ps(SprOut i) : COLOR
     float peak = max(t.r, max(t.g, t.b));
     float lift = 1.0 + i.col.a * smoothstep(0.75, 1.0, peak);
     return float4(t * i.col.rgb * lift, 1.0);
+}
+
+// The warp tunnel of a departure from the menu scene (src/menu/, Pass::Warp): the sky's
+// quad (sky_vs, the world ray of each pixel), blended over the frame as premultiplied
+// colour over (1 - alpha), so it darkens the scene under it as it comes in.
+//
+// Stars on cylinders about the camera's forward axis rush at the eye: a star at radius
+// rho from the axis and depth s is seen at rho / s off the axis (in the tangent plane
+// at unit distance), so a star that covers depths s..s+len draws a radial streak from
+// rho / (s + len) to rho / s. Each ring of angular cells holds one star per cell, its
+// rho, depth phase and speed hashed from the cell; a pixel looks only at its own cell
+// of each ring, so the loop is fixed and branch-free (vkd3d).
+float4 k_tun   : register(c27);  // x: seconds since the departure, y: strength 0..1, z: how much it darkens, w: speed
+float4 k_tfwd  : register(c28);  // xyz: the camera's forward axis (world)
+float4 k_tright: register(c29);  // xyz: its right axis
+float4 k_tup   : register(c30);  // xyz: its up axis
+float4 k_tcol  : register(c31);  // rgb: the tint
+
+float4 tunnel_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
+{
+    float3 d = normalize(ray);
+    float z = max(dot(d, k_tfwd.xyz), 1e-3);
+    float2 q = float2(dot(d, k_tright.xyz), dot(d, k_tup.xyz)) / z;
+    float r = max(length(q), 1e-4);
+    float ang = atan2(q.y, q.x) * 0.15915494 + 0.5;
+    float k = k_tun.y;
+    float t = k_tun.x * k_tun.w;
+    // The streaks lengthen as the tunnel comes in: the speed rising to warp.
+    float len = 0.15 + 3.5 * k * k;
+    float3 col = 0.0;
+    [unroll] for (int l = 0; l < 4; l++) {
+        float n = 72.0 + 36.0 * l;
+        float a = ang * n + l * 0.37;
+        float cell = floor(a);
+        float fa = a - cell - 0.5;
+        float h1 = hash13(float3(cell, l * 7.0, 1.3));
+        float h2 = hash13(float3(cell, l * 7.0, 7.1));
+        float h3 = hash13(float3(cell, l * 7.0, 3.7));
+        float rho = 0.5 + 1.5 * h1;
+        float s = frac(h2 - t * (0.25 + 0.25 * h3)) * 14.0 + 0.3;
+        float r0 = rho / (s + len);
+        float r1 = rho / s;
+        float along = saturate((r - r0) / max(r1 - r0, 1e-4));
+        float inside = step(r0, r) * step(r, r1);
+        // A streak a constant width on screen: its cell is r * 2 pi / n wide here.
+        float wc = 0.0022 * (1.0 + 2.0 * along) * n / (6.2831853 * r);
+        float across = saturate(1.0 - abs(fa) / max(wc, 1e-4));
+        float near = saturate(1.0 - s / 14.3);
+        float b = inside * across * across * along * along * near * near * (0.4 + 0.9 * h3);
+        col += lerp(float3(1.0, 1.0, 1.0), k_tcol.rgb, 0.55 * h1) * b * 2.2;
+    }
+    // The tunnel's wall: soft tinted gas streaming past, brightest out at the edge.
+    float3 wp = float3(cos(ang * 6.2831853) * 2.5, sin(ang * 6.2831853) * 2.5, log(r) * 3.0 + t * 1.6);
+    float g = vnoise(wp) * 0.65 + vnoise(wp * 2.03 + 11.0) * 0.35;
+    float3 glow = k_tcol.rgb * g * g * smoothstep(0.08, 1.4, r) * 0.55;
+    // A bright point dead ahead, where the streaks come from.
+    glow += lerp(k_tcol.rgb, 1.0, 0.5) * exp(-r * r / 0.0015) * 0.9;
+    return float4((col + glow) * k, k * k_tun.z);
 }

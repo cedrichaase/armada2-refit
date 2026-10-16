@@ -5,6 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.27.0 — 2026-10-17
+
+### Added
+- Scenario `ui-loading-warp`: a campaign mission started from the campaign selection
+  departs from the menu scene into the warp tunnel under the loading screen (ui 0.9.0,
+  render3d 0.10.0).
+- Scenario `ui-loading-pace`: a campaign load with no hold, for UI.log's slow steps and
+  longest wait. Both click the UI's mission list by its labels.
+
+### Changed
+- `Wait for the briefing` presses Space at every look until the briefing shows, which
+  skips a campaign mission's opening cinematic (`ui.json` screen key `skip`).
+
+Confirmed in game 2026-10-17.
+
 ## 3.26.0 — 2026-10-16
 
 ### Changed

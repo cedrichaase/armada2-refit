@@ -865,6 +865,20 @@ impl Module for Hulls {
             if s.cloak.is_some_and(|k| k <= 0.0) {
                 continue;
             }
+            // Gone to warp: only its flash, for a moment, where its bow was.
+            if let Some(age) = s.gone {
+                let (half, life) = shot.flash;
+                if age < life
+                    && let Some(model) = scene::model(v.dev, &s.sod)
+                {
+                    let (c, r) = draw::model_sphere(&model);
+                    let radius = r * s.world.r[0].len().max(s.world.r[1].len()).max(s.world.r[2].len());
+                    let k = age / life;
+                    let bright = (1.0 - k) * (1.0 - k) * 4.0;
+                    crate::menu::add_flash(s.world.transform_point(c), radius * half * (0.6 + 0.8 * k), bright);
+                }
+                continue;
+            }
             let Some(model) = scene::model(v.dev, &s.sod) else { continue };
             let clock = pose::Clock::looping(v.time);
             let mut p = pose::pose(&model.sod, &model.info, &s.world, clock, lod);
@@ -895,7 +909,8 @@ impl Module for Hulls {
                 clock,
                 team: if look.team { s.team } else { None },
                 assimilated: false,
-                warp: None,
+                // Departing: the hull's warp stretch about its own sphere.
+                warp: s.warp.map(|(b, sv, n)| draw::Warp::world(b, sv, n, centre, radius)),
                 waves: None,
                 glow: None,
                 // Decloaking: as the engine's state 3, this much of the hull back.

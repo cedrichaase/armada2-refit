@@ -186,8 +186,10 @@ anything new in the game's `Logs/`.
 - **Dark art is not a pillarbox.** The main menu's plate fades to near-black space at
   21:9, and a "mostly dark column" test called that 267 px of black bar. A bar is a
   column with *no* pixel above 4/255.
-- **A campaign mission takes ~100 s to reach its briefing**, most of it an opening
-  cinematic that Esc does not skip. For anything that only needs *a map*, launch
+- **A campaign mission's opening cinematic skips with Space**, not Esc, straight to the
+  briefing, where Space does nothing: `Wait for the briefing` presses Space at every
+  look (`ui.json`'s `skip`), so the briefing is up seconds after the load instead of
+  ~70 s later. For anything that only needs *a map*, launch
   straight into one (`Launch: -nointro a2_borg01`): a bare argument is a mission name
   (see `menus/run-wine.sh`), and the HUD is up in ~30 s.
 - **A direct map launch deals a random faction.** One run drew the Federation,

@@ -129,6 +129,7 @@ pub struct Sky {
     ps_face: Shader,
     vs_spr: Shader,
     ps_spr: Shader,
+    ps_tunnel: Shader,
     quad_decl: Decl,
     face_decl: Decl,
     spr_decl: Decl,
@@ -157,6 +158,7 @@ impl Default for Sky {
             ps_face: Shader::pixel(&PS_FACE),
             vs_spr: Shader::vertex(&VS_SPRITE),
             ps_spr: Shader::pixel(&PS_SPRITE),
+            ps_tunnel: Shader::pixel(&PS_TUNNEL),
             quad_decl: Decl::new(&QUAD_DECL),
             face_decl: Decl::new(&scene::VERTEX),
             spr_decl: Decl::new(&SPRITE_DECL),
@@ -510,6 +512,69 @@ impl Sky {
         }
     }
 
+    /// A departure from the menu scene (`Render3D_MenuWarp`): the flashes of the ships
+    /// gone to warp (the stock `warp_sprite`, depth-tested against the hulls), then
+    /// the tunnel over the whole view (`tunnel_ps`), which darkens what is under it.
+    fn menu_warp(&mut self, shot: &crate::menu::Shot, v: &View) {
+        let dev = v.dev;
+        let vp = v.view.mul(&v.proj);
+        let flashes = crate::menu::take_flashes();
+        if !flashes.is_empty()
+            && let Some(info) = sprites::sprite_info("warp_sprite")
+        {
+            let (right, up) = sprites::camera_axes(&v.view);
+            let _g = gfx::Guard::new(dev);
+            dev.set_stream_freq(0, 1);
+            for (at, half, bright) in flashes {
+                self.batch.billboard(&info, at, right, up, half, half, [bright, bright, bright, 1.0]);
+            }
+            self.draw_batch(v, &vp);
+        }
+        let Some(tn) = shot.tunnel else { return };
+        let Some(inv) = vp.inverse() else { return };
+        let corner = |x: f32, y: f32| -> [f32; 3] {
+            let f = inv.transform([x, y, 1.0, 1.0]);
+            let n = inv.transform([x, y, 0.0, 1.0]);
+            let (f, n) = (v3(f[0] / f[3], f[1] / f[3], f[2] / f[3]), v3(n[0] / n[3], n[1] / n[3], n[2] / n[3]));
+            let r = f - n;
+            [r.x, r.y, r.z]
+        };
+        let quad: [QuadVert; 4] = [
+            QuadVert { pos: [-1.0, 1.0, 0.0], ray: corner(-1.0, 1.0) },
+            QuadVert { pos: [1.0, 1.0, 0.0], ray: corner(1.0, 1.0) },
+            QuadVert { pos: [-1.0, -1.0, 0.0], ray: corner(-1.0, -1.0) },
+            QuadVert { pos: [1.0, -1.0, 0.0], ray: corner(1.0, -1.0) },
+        ];
+        let _g = gfx::Guard::new(dev);
+        dev.set_stream_freq(0, 1);
+        if !(self.vs_sky.bind(dev) && self.ps_tunnel.bind(dev) && self.quad_decl.bind(dev)) {
+            return;
+        }
+        for (st, val) in [
+            (RS_ZENABLE, 0), (RS_ZWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0), (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE),
+            (RS_FILLMODE, 3), (RS_STENCILENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
+            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_INVSRCALPHA), (RS_BLENDOP, BLENDOP_ADD),
+            (RS_SEPARATEALPHABLENDENABLE, 0),
+        ] {
+            dev.set_rs(st, val);
+        }
+        // The camera's axes in world space: the rows of the view's rotation, transposed.
+        let m = &v.view.0;
+        let right = v3(m[0][0], m[1][0], m[2][0]).norm();
+        let up = v3(m[0][1], m[1][1], m[2][1]).norm();
+        let fwd = v3(m[0][2], m[1][2], m[2][2]).norm();
+        let c = tn.colour;
+        let k: [f32; 20] = [
+            tn.time, tn.k, tn.dim, tn.speed,
+            fwd.x, fwd.y, fwd.z, 0.0,
+            right.x, right.y, right.z, 0.0,
+            up.x, up.y, up.z, 0.0,
+            c.x, c.y, c.z, 0.0,
+        ];
+        dev.ps_const(27, &k);
+        dev.draw_primitive_up(PT_TRIANGLESTRIP, 2, quad.as_ptr() as *const u8, 24);
+    }
+
     fn draw_batch(&mut self, v: &View, vp: &M4) {
         let _z = crate::timing::zone("sky: sprite batch");
         if self.batch.is_empty() {
@@ -541,8 +606,10 @@ impl Module for Sky {
         self.baker.reset();
     }
     fn menu(&mut self, pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
-        if pass == crate::menu::Pass::Sky {
-            self.menu_sky(shot, v);
+        match pass {
+            crate::menu::Pass::Sky => self.menu_sky(shot, v),
+            crate::menu::Pass::Warp => self.menu_warp(shot, v),
+            _ => {}
         }
     }
     fn step(&mut self, s: Step, v: &View) -> bool {

@@ -6,7 +6,8 @@ Timeout: 12 min
 
 The whole front-end path a player takes into a campaign, in deterministic steps: every
 click is a named target in `testbench/ui.json` or text found by OCR. The mission opens
-with a ~70 s cinematic before its briefing; the briefing proves the mission loaded.
+with a ~70 s cinematic before its briefing, which the wait skips with Space; the
+briefing proves the mission loaded.
 
 1. Launch the game.
 2. Wait for the main menu.

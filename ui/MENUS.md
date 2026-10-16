@@ -697,7 +697,7 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   Options, the admiral's log and the campaign selection in turn. So the main menu and
   the campaign selection, which no mission opens, drop it (`backdrop::begin`); else the
   scene stayed off after an abort (`ui-menus-scene-abort`).
-- **How it is asked for.** `Render3D_MenuScene(name, x, y, w, h)`, render3d's one
+- **How it is asked for.** `Render3D_MenuScene(name, x, y, w, h)`, a render3d
   export, looked up once with `GetModuleHandleA("Render3D.asi")` and
   `GetProcAddress`. It draws into the whole back buffer and returns 1, or 0 when it
   cannot (no Render3D.asi, render3d stood down, no such view, no Direct3D 9 device);
@@ -722,6 +722,9 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   stock tutorial card shows, drawn as an outline round the Federation icon's delta.
   Without `allrace.tga` the names stand alone (UI.log: `menus: campaign emblems`).
   Without the scene the four cards draw in a 2x2 grid as before.
+- **A mission loaded over it departs from it**: the loading screen draws over the
+  view that showed last, whose ships go to warp into render3d's tunnel
+  (`LOADING.md`, "Over the menu scene"; `Render3D_MenuWarp`).
 - **For the bench**, UI.log says `menus: scene <name> on` and `menus: scene off` at
   each change of screen. `testbench/ui.json` gives the main menu's and the campaign
   selection's targets a `label`, which `Click the <target>` clicks (by OCR) while the

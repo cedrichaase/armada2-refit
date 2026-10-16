@@ -42,6 +42,8 @@ pub enum Pass {
     Gas,
     /// What blends over the hulls: additive meshes, decloaking hulls, running lights.
     Translucent,
+    /// A departure's warp flashes and its tunnel, over everything (`Render3D_MenuWarp`).
+    Warp,
 }
 
 /// A ship of the scene, posed for this frame.
@@ -53,6 +55,25 @@ pub struct ShipAt {
     pub team: Option<V3>,
     /// Decloaking: how much of the hull is back, 0 (not there) to 1; None when whole.
     pub cloak: Option<f32>,
+    /// Going to warp: the hull's warp stretch (its ramp 0..1, the stretch S, the way it
+    /// goes, map space); None when not.
+    pub warp: Option<(f32, f32, V3)>,
+    /// Gone to warp `age` seconds ago: not drawn, but its flash is (`Shot::flash`).
+    pub gone: Option<f32>,
+}
+
+/// A departure's tunnel: the warp's star streaks rushing at the eye (`Pass::Warp`).
+#[derive(Clone, Copy)]
+pub struct Tunnel {
+    /// How far it has come in, 0..1.
+    pub k: f32,
+    /// Seconds since the departure began (the streaks' clock).
+    pub time: f32,
+    /// How much the scene under it is darkened when it is whole.
+    pub dim: f32,
+    /// How fast the streaks come.
+    pub speed: f32,
+    pub colour: V3,
 }
 
 /// The planet, posed for this frame.
@@ -95,6 +116,23 @@ pub struct Shot {
     pub gas: Vec<Gas>,
     /// Towards the Key (the sun), which lights the gas.
     pub key: Option<V3>,
+    /// A departure's flashes: half size (times the ship's radius) and how long one
+    /// lasts; the hulls module, which knows each ship's radius, adds them (`add_flash`).
+    pub flash: (f32, f32),
+    pub tunnel: Option<Tunnel>,
+}
+
+/// Warp flashes of this frame (centre, half size, brightness), put here by the hulls
+/// module as it poses the departing ships and drawn by the sky at `Pass::Warp`.
+static mut FLASHES: Vec<(V3, f32, f32)> = Vec::new();
+
+pub fn add_flash(at: V3, half: f32, bright: f32) {
+    unsafe { (*core::ptr::addr_of_mut!(FLASHES)).push((at, half, bright)) }
+}
+
+/// This frame's flashes, emptied.
+pub fn take_flashes() -> Vec<(V3, f32, f32)> {
+    unsafe { core::mem::take(&mut *core::ptr::addr_of_mut!(FLASHES)) }
 }
 
 /// One `key=value` text recipe, sections lower-cased.
@@ -187,6 +225,8 @@ struct Group {
     cloak_delay: f32,
     cloak_time: f32,
     cloak_stagger: f32,
+    /// The tunnel's tint when this group departs (`WarpColour=`).
+    warp_colour: V3,
 }
 
 impl Group {
@@ -209,16 +249,58 @@ struct ShipDef {
     bob: f32,
     phase: f32,
     team: Option<V3>,
+    /// Goes to warp when its group departs (`Warp=0`: a station stays).
+    warp: bool,
+}
+
+impl ShipDef {
+    /// Its nose, map space: the ship's +z turned by its yaw and its group's.
+    fn nose(&self, g: &Group) -> V3 {
+        let yw = self.yaw + g.yaw;
+        v3(math::sinf(yw), 0.0, math::cosf(yw))
+    }
 }
 
 /// A view: a camera in its group's frame.
 struct ViewDef {
     name: String,
+    group: usize,
     eye: V3,
     target: V3,
     fov: f32,
     sway: V3,
     sway_period: f32,
+    /// The camera a departure from this view swings to (`WarpEye=`, `WarpTarget=`);
+    /// None: behind the departing ships, looking the way they go.
+    warp_eye: Option<V3>,
+    warp_target: Option<V3>,
+}
+
+/// How a departure goes (`[Warp]`): seconds, unless said.
+struct WarpDef {
+    /// Before the first ship goes; between one ship and the next; how long a ship
+    /// takes from impulse to gone.
+    delay: f32,
+    stagger: f32,
+    ramp: f32,
+    /// The stretch at the end of the ramp, and the impulse's acceleration (units/s²).
+    stretch: f32,
+    speed: f32,
+    /// How long the camera takes to swing behind the ships, and how hard it follows
+    /// them (units/s²).
+    turn: f32,
+    follow: f32,
+    /// The tunnel: after the last ship has gone, when it starts and how long it takes
+    /// to come in, how much it darkens the scene, how fast its streaks come; the field
+    /// of view it widens by (degrees).
+    tunnel_at: f32,
+    tunnel_in: f32,
+    dim: f32,
+    tunnel_speed: f32,
+    widen: f32,
+    /// A flash's half size (times the ship's radius) and how long it lasts.
+    flash: f32,
+    flash_time: f32,
 }
 
 /// The map, read.
@@ -239,6 +321,23 @@ struct Map {
     ships: Vec<ShipDef>,
     gas: Vec<Gas>,
     views: Vec<ViewDef>,
+    warp: WarpDef,
+}
+
+/// A departure at one moment: the camera, how far each ship has got, the tunnel.
+struct Departure {
+    /// The departing ships' way (map space).
+    dir: V3,
+    /// For each ship of the map, seconds into its own departure (None: not going yet,
+    /// or not at all).
+    tau: Vec<Option<f32>>,
+    /// The departure camera (eye, target), before the follow.
+    eye: V3,
+    target: V3,
+    /// How far the swing to it has got, 0..1, and how far the camera has followed.
+    swing: f32,
+    follow: f32,
+    tunnel: Option<Tunnel>,
 }
 
 /// Turns about the unit axis `a` by `t` radians, as an M34 of rows.
@@ -313,6 +412,7 @@ impl Map {
             cloak_delay: 0.0,
             cloak_time: 1.0,
             cloak_stagger: 0.0,
+            warp_colour: v3(0.45, 0.62, 1.0),
         }];
         for (sec, _) in &t.sections {
             let Some(name) = named(sec, "group") else { continue };
@@ -324,6 +424,7 @@ impl Map {
                 cloak_delay: t.f(sec, "cloakdelay", blend * 0.7).max(0.0),
                 cloak_time: t.f(sec, "cloaktime", 2.5).max(0.05),
                 cloak_stagger: t.f(sec, "cloakstagger", 0.5).max(0.0),
+                warp_colour: t.v(sec, "warpcolour", v3(0.45, 0.62, 1.0)),
             });
         }
         let group_of = |sec: &str| -> usize {
@@ -352,6 +453,7 @@ impl Map {
                 bob: t.f(sec, "bob", 1.0),
                 phase: t.f(sec, "phase", ships.len() as f32 * 1.7),
                 team,
+                warp: t.f(sec, "warp", 1.0) != 0.0,
             });
         }
         let mut gas = Vec::new();
@@ -397,14 +499,19 @@ impl Map {
         let mut views = Vec::new();
         for (sec, _) in &t.sections {
             let Some(name) = named(sec, "view") else { continue };
-            let g = &groups[group_of(sec)];
+            let gi = group_of(sec);
+            let g = &groups[gi];
+            let at = |k: &str| t.get(sec, k).map(|_| g.place(t.v(sec, k, V3::ZERO)));
             views.push(ViewDef {
                 name: String::from(name),
+                group: gi,
                 eye: g.place(t.v(sec, "eye", v3(0.0, 50.0, 400.0))),
                 target: g.place(t.v(sec, "target", V3::ZERO)),
                 fov: t.f(sec, "fov", 40.0).clamp(5.0, 120.0),
                 sway: t.v(sec, "sway", v3(8.0, 4.0, 6.0)),
                 sway_period: t.f(sec, "swayperiod", 40.0).max(1.0),
+                warp_eye: at("warpeye"),
+                warp_target: at("warptarget"),
             });
         }
         let m = Map {
@@ -422,6 +529,22 @@ impl Map {
             ships,
             gas,
             views,
+            warp: WarpDef {
+                delay: t.f("warp", "delay", 0.9).max(0.0),
+                stagger: t.f("warp", "stagger", 0.18).max(0.0),
+                ramp: t.f("warp", "ramp", 0.75).max(0.05),
+                stretch: t.f("warp", "stretch", 30.0).max(0.0),
+                speed: t.f("warp", "speed", 120.0),
+                turn: t.f("warp", "turn", 1.3).max(0.05),
+                follow: t.f("warp", "follow", 260.0),
+                tunnel_at: t.f("warp", "tunnelat", 0.1),
+                tunnel_in: t.f("warp", "tunnelin", 0.9).max(0.05),
+                dim: t.f("warp", "dim", 0.85).clamp(0.0, 1.0),
+                tunnel_speed: t.f("warp", "tunnelspeed", 1.0),
+                widen: t.f("warp", "widen", 18.0),
+                flash: t.f("warp", "flash", 2.2).max(0.0),
+                flash_time: t.f("warp", "flashtime", 0.45).max(0.05),
+            },
         };
         log!(
             "menu: map ({}): sky {}, planet {}, {} groups, {} ships, {} gas fields, {} views, {} stars",
@@ -463,9 +586,9 @@ impl Map {
 
     /// The scene posed at `t` seconds; `cloak(group, nth)` says how far a ship of a
     /// decloaking group is back (None: whole).
-    fn shot(&self, t: f32, cloak: impl Fn(&Group, usize) -> Option<f32>) -> Shot {
+    fn shot(&self, t: f32, cloak: impl Fn(&Group, usize) -> Option<f32>, dep: Option<&Departure>) -> Shot {
         let mut ships = Vec::new();
-        for s in &self.ships {
+        for (si, s) in self.ships.iter().enumerate() {
             let g = &self.groups[s.group];
             // Each ship bobs and rolls a little on a period of its own.
             let ph = s.phase + t * 0.21;
@@ -481,7 +604,21 @@ impl Map {
             w.r[1] = w.r[1] * s.scale;
             w.r[2] = w.r[2] * s.scale;
             w.p = g.place(s.at) + bob;
-            ships.push(ShipAt { sod: s.sod.clone(), world: w, team: s.team, cloak: cloak(g, s.nth) });
+            // Departing: impulse along the way out, the warp stretch over the ramp,
+            // then gone (its flash).
+            let (mut warp, mut gone) = (None, None);
+            if let Some((d, tau)) = dep.and_then(|d| d.tau[si].map(|tau| (d, tau))) {
+                let wd = &self.warp;
+                let tr = tau.min(wd.ramp);
+                w.p = w.p + d.dir * (0.5 * wd.speed * tr * tr);
+                if tau >= wd.ramp {
+                    gone = Some(tau - wd.ramp);
+                } else {
+                    let b = smooth(tau / wd.ramp);
+                    warp = Some((b, 1.0 + wd.stretch * b * b, d.dir));
+                }
+            }
+            ships.push(ShipAt { sod: s.sod.clone(), world: w, team: s.team, cloak: cloak(g, s.nth), warp, gone });
         }
         // The orbit: the planet turns about its axis, and the sky with the fleet's orbit.
         let orbit = -self.orbit_rate * t;
@@ -505,7 +642,58 @@ impl Map {
             ships,
             gas: self.gas.clone(),
             key: Some(-self.key.dir),
+            flash: (self.warp.flash, self.warp.flash_time),
+            tunnel: dep.and_then(|d| d.tunnel),
         }
+    }
+
+    /// A departure from the view `vd`, `tw` seconds in: its group's ships that go to
+    /// warp leave front first, the camera swings behind them and follows, and the
+    /// tunnel comes in once they have gone.
+    fn departure(&self, vd: &ViewDef, tw: f32) -> Departure {
+        let g = &self.groups[vd.group];
+        let wd = &self.warp;
+        let going: Vec<usize> = (0..self.ships.len()).filter(|&i| self.ships[i].group == vd.group && self.ships[i].warp).collect();
+        let mut dir = V3::ZERO;
+        let mut centre = V3::ZERO;
+        for &i in &going {
+            dir = dir + self.ships[i].nose(g);
+            centre = centre + g.place(self.ships[i].at);
+        }
+        let mut tau = alloc::vec![None; self.ships.len()];
+        let (eye, target, last);
+        if going.is_empty() {
+            // Nothing leaves (a station alone): the camera goes on along its own line.
+            dir = (vd.target - vd.eye).norm();
+            eye = vd.eye;
+            target = vd.target;
+            last = wd.delay;
+        } else {
+            dir = if dir.len() > 1e-3 { dir.norm() } else { v3(0.0, 0.0, 1.0) };
+            centre = centre * (1.0 / going.len() as f32);
+            let spread = going.iter().map(|&i| (g.place(self.ships[i].at) - centre).len()).fold(0.0f32, f32::max);
+            // Front first: in order along the way out.
+            let mut order = going.clone();
+            order.sort_by(|&a, &b| {
+                let (pa, pb) = (g.place(self.ships[a].at).dot(dir), g.place(self.ships[b].at).dot(dir));
+                pb.partial_cmp(&pa).unwrap_or(core::cmp::Ordering::Equal)
+            });
+            for (k, &i) in order.iter().enumerate() {
+                let t0 = wd.delay + k as f32 * wd.stagger;
+                if tw >= t0 {
+                    tau[i] = Some(tw - t0);
+                }
+            }
+            last = wd.delay + (order.len() - 1) as f32 * wd.stagger + wd.ramp;
+            eye = vd.warp_eye.unwrap_or(centre - dir * (spread + 520.0) + v3(0.0, spread * 0.25 + 90.0, 0.0));
+            target = vd.warp_target.unwrap_or(centre + dir * (spread + 900.0));
+        }
+        let swing = smooth(tw / wd.turn);
+        let tf = (tw - wd.delay - wd.ramp * 0.3).max(0.0);
+        let follow = 0.5 * wd.follow * tf * tf;
+        let k = smooth((tw - last - wd.tunnel_at) / wd.tunnel_in);
+        let tunnel = (k > 0.0).then_some(Tunnel { k, time: tw, dim: wd.dim, speed: wd.tunnel_speed, colour: g.warp_colour });
+        Departure { dir, tau, eye, target, swing, follow, tunnel }
     }
 }
 
@@ -525,6 +713,8 @@ struct State {
     cam: Option<(V3, V3, f32)>,
     from: Option<(V3, V3, f32)>,
     said: u32,
+    /// A departure: when it began, and the camera it swings from.
+    warp: Option<(f64, Option<(V3, V3, f32)>)>,
 }
 
 static mut STATE: State = State {
@@ -538,6 +728,7 @@ static mut STATE: State = State {
     cam: None,
     from: None,
     said: 0,
+    warp: None,
 };
 
 #[allow(static_mut_refs)]
@@ -588,7 +779,7 @@ fn cloak_of(g: &Group, nth: usize, view: &str, prev: &str, since: f64, now: f64,
 /// the caller's scene; the camera moves over from the view drawn before. False, with
 /// nothing drawn, when it cannot be (no such view, no device, no targets): the caller
 /// draws its own backdrop.
-pub fn draw(name: &str, rect: PRect) -> bool {
+pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     let s = st();
     let now = rt::now();
     if s.start == 0.0 || now - s.last > 600.0 {
@@ -629,9 +820,33 @@ pub fn draw(name: &str, rect: PRect) -> bool {
             s.from = None;
         }
     }
-    s.cam = Some((eye, at, fov));
+    // A departure: from the camera there was, swung behind the ships, following them.
+    if !depart {
+        s.warp = None;
+    } else if s.warp.is_none() {
+        s.warp = Some((now, s.cam));
+        log!("menu: departure from {}", name);
+    }
+    let dep = s.warp.map(|(t0, from)| {
+        let d = m.departure(vd, (now - t0) as f32);
+        let (e0, a0, f0) = from.unwrap_or((eye, at, fov));
+        // Over the top as it swings, so the camera does not pass through the ships.
+        let lift = v3(0.0, math::sinf(d.swing * 3.141_592_7) * 320.0, 0.0);
+        let off = d.dir * d.follow;
+        let (we, wt) = (e0.lerp(d.eye, d.swing) + lift + off, a0.lerp(d.target, d.swing) + off);
+        let wk = d.tunnel.map_or(0.0, |tn| tn.k);
+        let wf = f0 + (vd.fov - f0) * d.swing + m.warp.widen * wk;
+        (d, we, wt, wf)
+    });
+    if let Some((_, we, wt, wf)) = dep.as_ref() {
+        eye = *we;
+        at = *wt;
+        fov = *wf;
+    } else {
+        s.cam = Some((eye, at, fov));
+    }
     let (view, prev, since, blend) = (s.view.as_str(), s.prev.as_str(), s.since, m.blend);
-    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, now, blend));
+    let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, now, blend), dep.as_ref().map(|d| &d.0));
     let lights = Lights { dirs: alloc::vec![m.key, m.fill], points: Vec::new() };
     let planet = m.planet.as_ref().map(|p| (p.6, p.2));
     crate::frame::menu_frame(rect, move |dev: Device, frame: u32| {
@@ -671,6 +886,8 @@ pub fn draw(name: &str, rect: PRect) -> bool {
         crate::scene::flush(&near_v);
         mods::menu(Pass::Gas, &shot, &near_v);
         mods::menu(Pass::Translucent, &shot, &near_v);
+        mods::menu(Pass::Warp, &shot, &near_v);
+        take_flashes();
     })
 }
 
@@ -684,5 +901,18 @@ pub extern "C" fn Render3D_MenuScene(name: *const u8, x: u32, y: u32, w: u32, h:
         return 0;
     }
     let n = rt::lower(unsafe { rt::cstr_at(name, 32) });
-    draw(&n, PRect { x, y, w, h }) as u32
+    draw(&n, PRect { x, y, w, h }, false) as u32
+}
+
+/// `UI.asi`'s call while a mission loads from the campaign selection: as
+/// `Render3D_MenuScene`, but the view's ships go to warp, the camera follows them, and
+/// the warp's tunnel comes in. The departure begins at the first call after one of
+/// `Render3D_MenuScene` and goes on as long as this is called.
+#[unsafe(no_mangle)]
+pub extern "C" fn Render3D_MenuWarp(name: *const u8, x: u32, y: u32, w: u32, h: u32) -> u32 {
+    if name.is_null() || w == 0 || h == 0 || crate::config::get().is_none() {
+        return 0;
+    }
+    let n = rt::lower(unsafe { rt::cstr_at(name, 32) });
+    draw(&n, PRect { x, y, w, h }, true) as u32
 }

@@ -40,11 +40,46 @@ screen read what it will show (`loading::begin`). It is the one place a mission'
 begins, and what it loads is the map `GameSetup::getMapName` names (its caller passes
 exactly that).
 
+**Frames inside a step.** A step that builds a ship's class (`Building runtime class
+'fgalaxy.odf'`) or places an object reads its SODs and textures, and kept the screen
+still for up to about 300 ms (measured below; with these frames, still up to 320 ms in
+five places, which are the engine's own work between loads). So frames of ours also come after each
+SOD and each texture loads: the hook takes the three calls of `ST3D_GraphicsEngine::
+LoadDatabase` (`0x62ccd0`, thiscall, a SOD read and built) in `FindLogicalDatabase` and
+`FindVisibleDatabase` (`0x62cf2a`, `0x62cf44`, `0x62cf79`), and the one call of
+`ST3D_Texture::LoadPixelData` (`0x6434b0`, thiscall, a texture's pixels read) in
+`DemandLoad` (`0x6426e2`), each checked to call stock; each makes the engine's call
+first and then presents a frame of ours if one is a frame period due, only while a
+load's screen is up and after the engine's first frame of it. The frame is drawn only
+once the load has returned, so no texture of the engine's is locked; and a texture
+loaded while the engine draws (inside its scene) gets no frame, since `BeginScene`
+refuses inside a scene and the frame is then skipped. Each site stands down on its
+own when it is not stock.
+
 **`[Loading] Hold=N`** is for the test bench only: at the load's half-way point the
 status hook keeps presenting frames of ours for N seconds, draining the queue through
 the engine's own `HandleMessageQueue` (`0x488730`) as its status update does, so a
 screenshot can catch the screen. Never set in play (a network game's other players wait
 for it).
+
+## Over the menu scene
+
+A mission loaded while the menu scene is up (`MENUS.md`, "The menu scene": from the
+campaign selection, or a save loaded from a screen over it) keeps the scene under the
+loading screen, and departs from it: the view that showed last is asked of render3d's
+`Render3D_MenuWarp`, whose ships go to warp with the camera swinging behind them and
+following, and the warp's tunnel comes in once they have gone (render3d/README.md, "The
+menu scene"). `menus::scene::begin_departure` takes the view when the splash goes up
+(UI.log: `menus: the load departs from the scene <view>`), and every loading frame, the
+engine's and ours, draws it before the screen of ours (`draw_departure`). Over it the
+screen draws only a shade at the left and at the foot for its text, in place of the
+map's sky. The departure is taken once: the next mission of a campaign, loaded straight
+from the one won, has no menu under it and shows the map's sky. Without
+Render3D.asi, or with `[Menus] Scene=0`, the load shows the map's sky as before.
+
+The departure is shaped to the loads measured below: a campaign mission loads in about
+five seconds on the bench, so the ships are gone within two and the tunnel holds the
+rest, however long the load takes.
 
 ## What is being loaded
 
@@ -99,7 +134,22 @@ its first word or two (`src/loading.rs`, `doing`).
 
 ## Seen on the bench
 
-Not yet: the screen builds, and `testbench/scenarios/ui-loading.md` is written, but it has
-not been run (no bench slot came free before the job stopped). The measured facts this
-file refers to (how often frames of ours come, what reading the sky costs) are still to
-be taken from `UI.log`, which logs both.
+`testbench/scenarios/ui-loading-pace.md` loads the first Federation mission from the
+campaign selection with no hold (2026-10-16, a refit install, 1280x720). UI.log names
+every stretch of 100 ms or more with no frame presented (`loading: still`), with the
+step it fell in and the SODs and textures loaded in it.
+
+- **The load takes about five seconds** from the splash to the last step; frames of
+  ours start 0.7 to 0.9 s in, after the engine's first. Reading the sky's faces took
+  180 to 195 ms, before the first frame.
+- **Between the engine's steps only**, a load drew 34 frames of ours to the engine's 13
+  by 61%, and nine stretches were 110 to 290 ms still, nearly all in steps that build a
+  ship's class or place an object (`Building runtime class 'fconst.odf'`,
+  `Constructing 'cineractive_mining_station'`), the rest in the tech tree and the
+  interface's post-load.
+- **With frames inside a step** (after each SOD and texture), 45 of 49 frames of ours
+  came from inside a step, and five stretches were 140 to 320 ms still (two runs). In those the
+  engine loaded at most a few SODs and no texture, and read no file through `ReadFile`
+  (a hook on its import counted none in any of them, and was taken out again): what is
+  left is the engine's own work between loads, building a class or the tech tree, which
+  has no call of its own to draw from.

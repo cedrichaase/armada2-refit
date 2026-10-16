@@ -4,6 +4,20 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.10.0 — 2026-10-17
+
+### Added
+- The departure: a second export, `Render3D_MenuWarp(name, x, y, w, h)`, draws a view of
+  the menu map whose ships go to warp front first (the hull's warp stretch, forward
+  only, then a flash of the stock `warp_sprite`), the camera swinging behind them and
+  following, and a warp tunnel coming in once they have gone (`tunnel_ps`, a new pass
+  `Warp` drawn by the sky module). Keys `[Warp]` (`Delay`, `Stagger`, `Ramp`,
+  `Stretch`, `Speed`, `Turn`, `Follow`, `TunnelAt`, `TunnelIn`, `Dim`, `TunnelSpeed`,
+  `Widen`, `Flash`, `FlashTime`), `[Group] WarpColour`, `[View] WarpEye`/`WarpTarget`,
+  `[Ship] Warp`; the map's starbase stays (`Warp=0`) and the Borg's tunnel is green.
+
+Confirmed in game 2026-10-17.
+
 ## 0.9.0 — 2026-10-16
 
 ### Added
