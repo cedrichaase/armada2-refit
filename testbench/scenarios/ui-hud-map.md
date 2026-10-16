@@ -17,7 +17,9 @@ engine's unit view.
 
 The match is `_enter-instant-action.md`'s: Borg, Warzone. At 1280x720 the first
 Assembler sits at 640,262 and the Nexus at 755,320. The start position is dealt at
-random, so the base is at a different place on the minimap from run to run; the
+random, so the base is at a different place on the minimap from run to run. Its
+clearing is small, a few percent of the square, as the stock minimap shows it too
+(`UI.log`: "minimap: shroud N of 16384 cells clear"); the
 clicks on the minimap are checked by `UI.log` and by the outline moving.
 
 1. Include "_enter-instant-action".
@@ -26,18 +28,19 @@ clicks on the minimap are checked by `UI.log` and by the outline moving.
 4. Expect "UI.log" not contain "standing down".
 5. Wait 2 seconds.
 6. Expect "UI.log" contains "minimap: ours at".
-7. Take a screenshot called "minimap".
-8. Check that at the bottom left there is one square map panel with two small buttons reading "ALL" above it, the map in it mostly a flat grey-blue (the shroud), with one small black cleared area (the player's base, somewhere near an edge of the square: the start position is random) holding a few small coloured dots and icons, a thin white trapezoid outline (the camera's view) over that area, and that there is no second minimap anywhere on the screen.
-9. Click at 640,262.
-10. Move the mouse to 1000,150.
-11. Wait 1 second.
-12. Take a screenshot called "selected".
-13. Check that the selected unit near the middle of the screen, a small white ship at about 640,262, has small corner brackets around it and thin green and blue bars just above it.
-14. Right-click at 150,600.
-15. Wait 2 seconds.
-16. Expect "UI.log" contains "minimap: order".
-17. Click at 110,560.
-18. Wait 2 seconds.
-19. Take a screenshot called "camera moved".
-20. Check that the 3D view now shows a different part of the map than in the screenshot "selected" (probably flat grey shroud), and that the thin white camera outline on the minimap is now near the point 110,560 on the screen, no longer over the player's base.
-21. Expect the game is still running.
+7. Expect "UI.log" contains "minimap: shroud".
+8. Take a screenshot called "minimap".
+9. Check that at the bottom left there is one square map panel with two small buttons reading "ALL" above it, the map in it a flat grey-blue (the shroud) except for one small dark patch near an edge, roughly an eighth of the square across (the base's clearing: Warzone is big, so it is a few percent of the square, as on the stock minimap), with a white mark in it (the base's blips) and perhaps a magenta smudge (the nebula the base sits in), a thin white trapezoid outline (the camera's view) on or around that patch, and that there is no second minimap anywhere on the screen.
+10. Click at 640,262.
+11. Move the mouse to 1000,150.
+12. Wait 1 second.
+13. Take a screenshot called "selected".
+14. Check that the selected unit near the middle of the screen, a small white ship at about 640,262, has small corner brackets around it and thin green and blue bars just above it.
+15. Right-click at 150,600.
+16. Wait 2 seconds.
+17. Expect "UI.log" contains "minimap: order".
+18. Click at 110,560.
+19. Wait 2 seconds.
+20. Take a screenshot called "camera moved".
+21. Check that the 3D view now shows a different part of the map than in the screenshot "selected" (probably flat grey shroud), and that the thin white camera outline on the minimap is now near the point 110,560 on the screen, no longer over the player's base.
+22. Expect the game is still running.

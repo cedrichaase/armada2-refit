@@ -148,7 +148,8 @@ pub fn is_instant_action() -> bool {
     transport_flag(VT_IS_INSTANT_ACTION).unwrap_or(false)
 }
 
-/// A game on this machine alone: a campaign mission or Instant Action.
+/// A campaign mission (or a replay). Not Instant Action: `TransportLocalInstantAction`
+/// answers false, as a network transport does; ask `is_instant_action` first.
 pub fn is_single_player() -> bool {
     transport_flag(VT_IS_SINGLE_PLAYER).unwrap_or(true)
 }
