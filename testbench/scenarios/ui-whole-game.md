@@ -149,7 +149,7 @@ settings screens; Exit.
 123. Click "LAUNCH".
 124. Wait 45 seconds.
 125. Take a screenshot called "match".
-126. Check that the match shows the UI's HUD (resources at the top centre, the square minimap at the bottom left, the buttons at the top right) over the map.
+126. Check that the match shows the UI's HUD over the map, in its flat style of rounded panels: the resources at the top centre, a row of square buttons at the top right, the square minimap panel at the bottom left (still mostly unexplored and plain at the start of a match), and a square 3D picture in a rounded frame at the bottom right.
 127. Scene "succeed".
 128. Wait 20 seconds.
 129. Take a screenshot called "won".
