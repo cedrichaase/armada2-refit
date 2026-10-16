@@ -4,6 +4,37 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.2.0 — 2026-10-16
+
+### Added
+- Widgets: text field (with the clipboard), scroll area, list, dropdown, tabs, check
+  box and radio, image button, number spinner, tooltip, modal; keyboard focus (Tab,
+  Shift+Tab, Enter, Esc) and an overlay layer (481b796).
+- Our own cursor, from the game's cursor art, square at any aspect: `[UI] Cursor`
+  (default 0), `CursorSize` (481b796).
+- The style (`STYLE.md`): one theme per race and one for the shell, drawn from tokens
+  (`widgets/theme.rs`); shader kind 4 (chamfered or rounded corners, stroke, glow,
+  elbow, stripes); `[UI] Theme` (default `auto`) (08e2901).
+- `[Demo] Shell=1` shows a widget gallery; `[Demo] Style=1` a style gallery (481b796,
+  08e2901).
+- The HUD, a panel at a time (`HUD.md`): one switch skips a stock panel's drawing and
+  mouse while it keeps simulating; engine reads for the button bar, sprites, sounds,
+  the selection and resources; our own button bar as a 5x3 grid with its keys, which
+  stands down while `GridLayout.asi` is loaded. `[HUD] Enable`, `Bar` (default 0),
+  `BarKeys`, `BarLabels`; `bench-asi.sh --no-grid` (0e0cac9).
+- The menus (`MENUS.md`): the stock shell dialogs hosted hidden and drawn by the UI
+  (the dialog host, a registry of the shell's widgets, the control model, a generic
+  mirrored screen and a spec for the main menu); the shell's display mode raised to
+  the desktop size; the in-mission menus over the last frame, dimmed. `[Menus] Enable`
+  (default 0), `Generic`, `Specs`, `EscapeReturns`, `Trace`, `Host`;
+  `bench-asi.sh --menus` (f0fe918).
+
+### Fixed
+- A click no longer gives the keyboard focus to a button, toggle, slider, check box or
+  tab: it kept every key from the engine and Esc from the screen (345bc74).
+
+Installed, not yet seen in game.
+
 ## 0.1.0 — 2026-10-16
 
 ### Added

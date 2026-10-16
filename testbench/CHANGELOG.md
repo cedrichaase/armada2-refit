@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.19.0 — 2026-10-16
+
+### Added
+- Scenario step `Scroll the wheel down|up [N times]` (481b796).
+- Scenarios `ui-widgets`, `ui-widgets-cursor` (scene `ui-cursor`), `ui-style`,
+  `ui-hud-bar`, `ui-menus-options` and `ui-menus-match` (ui 0.2.0).
+- A run's report gathers `UI.log` and `UI.ini`; `design_to_screen` also reads the
+  design-area line `UI.log` writes while the UI hosts the menus.
+- Operating notes `operating/ui-widgets.md`, `ui-style.md`, `hud-takeover.md`,
+  `menus-host.md`.
+
+Installed, not yet seen in game.
+
 ## 3.18.0 — 2026-10-16
 
 ### Added
