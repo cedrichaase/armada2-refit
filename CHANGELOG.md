@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.8.1 — 2026-10-16
+
+Layers: render3d 0.6.1.
+
+### Fixed
+- `render3d/build.sh` no longer shares a fixed temp file between installs running at
+  once (render3d 0.6.1).
+
+Tooling only; nothing to see in game.
+
 ## 12.8.0 — 2026-10-16
 
 Layers: render3d 0.6.0, testbench 3.19.1.

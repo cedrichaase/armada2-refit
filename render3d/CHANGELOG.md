@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.6.1 — 2026-10-16
+
+### Fixed
+- `build.sh` writes `src/shaders/mod.rs` and `build/Render3D.asi` through temp files of
+  its own run (`mktemp`, then a rename), so installs of one checkout running at once
+  (`a2film --jobs`, `a2test -j`) no longer collide on `src/shaders/mod.rs.new`.
+
+Tooling only; nothing to see in game.
+
 ## 0.6.0 — 2026-10-16
 
 ### Changed
