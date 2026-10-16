@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.18.0 — 2026-10-16
+
+### Added
+- Scenario `ui-runtime`: `UI.asi`'s demonstration panel in a screen of ours (the
+  Credits' place), on the loading screen and over the HUD, with a click on it that the
+  engine must not see (ui 0.1.0). Its setup is `ui/bench-asi.sh`.
+
+Installed, not yet seen in game.
+
 ## 3.17.0 — 2026-10-15
 
 ### Added

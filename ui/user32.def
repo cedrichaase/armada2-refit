@@ -13,3 +13,9 @@ TranslateMessage@4
 DispatchMessageA@4
 IsWindow@4
 ShowCursor@4
+GetKeyState@4
+LoadCursorA@8
+SetCursor@4
+PostQuitMessage@4
+GetFocus@0
+SetFocus@4

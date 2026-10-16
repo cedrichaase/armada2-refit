@@ -112,4 +112,32 @@ unsafe extern "system" {
     pub fn DispatchMessageA(m: *const Msg) -> isize;
     pub fn IsWindow(w: HWND) -> i32;
     pub fn ShowCursor(show: i32) -> i32;
+    pub fn GetKeyState(vk: i32) -> i16;
+}
+
+// ---- the front end's own loop (engine/shell.rs) --------------------------------------
+
+pub const WM_QUIT: u32 = 0x12;
+pub const WM_SETCURSOR: u32 = 0x20;
+pub const WM_KEYDOWN: u32 = 0x100;
+pub const WM_SYSKEYDOWN: u32 = 0x104;
+pub const WM_LBUTTONDOWN: u32 = 0x201;
+pub const WM_RBUTTONDOWN: u32 = 0x204;
+pub const WM_MBUTTONDOWN: u32 = 0x207;
+pub const HTCLIENT: u16 = 1;
+pub const IDC_ARROW: usize = 32512;
+pub const GWL_STYLE: i32 = -16;
+
+#[link(name = "user32")]
+unsafe extern "system" {
+    pub fn LoadCursorA(inst: HANDLE, name: usize) -> HANDLE;
+    pub fn SetCursor(c: HANDLE) -> HANDLE;
+    pub fn PostQuitMessage(code: i32);
+    pub fn GetFocus() -> HWND;
+    pub fn SetFocus(w: HWND) -> HWND;
+}
+
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    pub fn Sleep(ms: u32);
 }

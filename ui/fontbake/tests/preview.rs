@@ -1,7 +1,8 @@
 //! Bakes the atlas and renders sample strings through the runtime (ui/src/text) the way
 //! the shader will: bilinear sample, then a ramp one pixel wide around 128. Writes PGMs to
-//! $CLAUDE_JOB_DIR/tmp (or the system temp dir) for a look; asserts the basics.
-//!   cargo test --features preview --target x86_64-unknown-linux-gnu --release
+//! $FONTBAKE_PREVIEW_DIR (else the system temp dir) for a look, never into the
+//! repository; asserts the basics. From ui/fontbake:
+//!   cargo test --offline --features preview --target x86_64-unknown-linux-gnu --release
 #![cfg(feature = "preview")]
 #[allow(dead_code)]
 #[path = "../../src/text/mod.rs"]
@@ -51,7 +52,7 @@ impl Canvas {
 }
 
 fn out_dir() -> std::path::PathBuf {
-    let d = std::env::var_os("CLAUDE_JOB_DIR").map(|d| std::path::PathBuf::from(d).join("tmp")).unwrap_or_else(std::env::temp_dir);
+    let d = std::env::var_os("FONTBAKE_PREVIEW_DIR").map(std::path::PathBuf::from).unwrap_or_else(std::env::temp_dir);
     std::fs::create_dir_all(&d).unwrap();
     d
 }

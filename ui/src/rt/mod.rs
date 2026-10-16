@@ -87,6 +87,20 @@ pub fn log_fmt(args: core::fmt::Arguments) {
     log_str(&s);
 }
 
+/// `format!` without `alloc::format!`, which does not link: the prebuilt `alloc` is
+/// compiled to unwind, and its `format_inner` needs the C++ runtime's frame handler.
+/// Writing into a `String` does not.
+pub fn fmt_string(args: core::fmt::Arguments) -> String {
+    let mut s = String::new();
+    let _ = s.write_fmt(args);
+    s
+}
+
+#[macro_export]
+macro_rules! sfmt {
+    ($($t:tt)*) => { $crate::rt::fmt_string(format_args!($($t)*)) };
+}
+
 #[macro_export]
 macro_rules! log {
     ($($t:tt)*) => { $crate::rt::log_fmt(format_args!($($t)*)) };

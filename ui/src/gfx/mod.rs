@@ -454,7 +454,13 @@ fn res(dev: Device) -> Option<&'static Res> {
         if FAILED == Some(dev) {
             return None;
         }
+        // Another device (the stock front end re-creates it at every switch between the
+        // shell's display and the game's): let go of everything made on the old one at
+        // once, since what we hold keeps that device alive.
         RES = None;
+        for t in TEXTURES.iter_mut() {
+            t.obj = None;
+        }
         let made = (|| {
             Some(Res {
                 dev,

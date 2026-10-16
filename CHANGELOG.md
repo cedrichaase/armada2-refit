@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.1.0 — 2026-10-16
+
+Layers: ui 0.1.0, testbench 3.18.0.
+
+### Added
+- A new layer, `ui/`: `UI.asi`, the runtime the HUD, menus and loading screen will be
+  redrawn with (`ui/PLAN.md`): a 2D renderer on the Direct3D 9 device, SDF text from a
+  vendored OFL font, immediate-mode widgets, input with capture, and hooks into a
+  mission's frame, a front-end screen of our own and the loading screen. Draws nothing
+  unless a `[Demo]` key is on; not in `./install` or `a2mod` yet (ui 0.1.0).
+- Scenario `ui-runtime` (testbench 3.18.0).
+
+Installed, not yet seen in game.
+
 ## 12.0.0 — 2026-10-15
 
 Layers: render3d 0.2.0, models 5.0.0, testbench 3.17.0.

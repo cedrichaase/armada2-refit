@@ -5,6 +5,8 @@
 //! One file per drawing context: `ingame` (a mission's HUD), `shell` (the front-end
 //! menus), `loading` (the loading screen). Each has an `install()` that patches its
 //! hooks, checked against what stock has there, and stands down on a mismatch.
+pub mod cursor;
+pub mod dev8;
 pub mod hook;
 pub mod ingame;
 pub mod loading;

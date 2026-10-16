@@ -4,7 +4,6 @@
 use crate::gfx::{fade, Weight, R};
 use crate::surface::Context;
 use crate::widgets::{Align, Anchor, Stack, Ui};
-use alloc::format;
 
 struct Demo {
     on: bool,
@@ -35,7 +34,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
         // A screen of our own: fill it.
         ui.draw.rect_vgrad(screen, 0xff050a14, 0xff0c1a2e);
     }
-    let (w, h) = (ui.u(420.0), ui.u(360.0));
+    let (w, h) = (ui.u(460.0), ui.u(400.0));
     let anchor = match ctx {
         Context::Mission => Anchor::TopRight,
         Context::Shell => Anchor::Centre,
@@ -50,17 +49,17 @@ fn demo(ctx: Context, ui: &mut Ui) {
         Context::Shell => "Shell",
         Context::Loading => "Loading",
     };
-    ui.label(s.row(row), &format!("Context: {}   {}x{}", name, ui.w as u32, ui.h as u32));
+    ui.label(s.row(row), &crate::sfmt!("Context: {}   {}x{}", name, ui.w as u32, ui.h as u32));
     let m = match ui.input.mouse {
-        Some((x, y)) => format!("Pointer {:.0}, {:.0}{}", x, y, if ui.input.down[0] { "  (held)" } else { "" }),
-        None => format!("Pointer outside the window"),
+        Some((x, y)) => crate::sfmt!("Pointer {:.0}, {:.0}{}", x, y, if ui.input.down[0] { "  (held)" } else { "" }),
+        None => crate::sfmt!("Pointer outside the window"),
     };
     ui.note(s.row(row), &m);
     if ctx == Context::Loading {
         let p = crate::engine::loading::progress();
         ui.note(s.row(row), &match p {
-            Some(f) => format!("Loading {:.0}%", f * 100.0),
-            None => format!("No load in progress"),
+            Some(f) => crate::sfmt!("Loading {:.0}%", f * 100.0),
+            None => crate::sfmt!("No load in progress"),
         });
         ui.progress(s.row(ui.u(12.0)), p.unwrap_or(0.0));
     } else {
@@ -69,7 +68,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
             d.clicks += 1;
         }
         let t = ui.theme;
-        ui.text_in(b, &format!("{} clicks", d.clicks), t.text_size, Align::Centre, t.accent, Weight::Bold);
+        ui.text_in(b, &crate::sfmt!("{} clicks", d.clicks), t.text_size, Align::Centre, t.accent, Weight::Bold);
         let mut on = d.on;
         ui.toggle(s.row(row), "A toggle", &mut on);
         d.on = on;
@@ -83,9 +82,10 @@ fn demo(ctx: Context, ui: &mut Ui) {
     let mut y = rest.y;
     for sz in sizes {
         let px = ui.u(sz);
-        ui.draw.text(&format!("{:.0} units: Sphinx of black quartz, judge my vow", sz), px, rest.x, y, fade(ui.theme.text, 0.9));
+        ui.draw.text(&crate::sfmt!("{:.0} units: Sphinx of black quartz", sz), px, rest.x, y, fade(ui.theme.text, 0.9));
         y += px * 1.25;
     }
     let pulse = 0.5 + 0.5 * libm::sinf(t as f32 * 3.0);
-    ui.draw.rect(R::new(r.x, r.bottom() - ui.u(3.0), r.w * pulse, ui.u(3.0)), ui.theme.accent);
+    let rad = ui.u(ui.theme.radius);
+    ui.draw.rect(R::new(r.x + rad, r.bottom() - ui.u(4.0), (r.w - 2.0 * rad) * pulse, ui.u(2.0)), ui.theme.accent);
 }
