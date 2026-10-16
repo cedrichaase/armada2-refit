@@ -77,10 +77,12 @@ const C_SELECTED: usize = 0xa0;
 /// ally `AllianceButton`s `+0x4c`, `+0x50`, `+0x54` (the relation in force has state
 /// 2; one proposed but not yet answered has `+0x7c` set), and the colour
 /// `ColorButton` `+0x58` (`PlayerSelectCallback` as well; the player's colour, three
-/// floats, at `+0x68`).
+/// floats, at `+0x68`, which stayed white for a computer player: the team's colour is
+/// read instead).
 const VT_BAR: usize = 0x6b5870;
 const B_PRESENT: usize = 0x28;
 const B_SLOT: usize = 0x2c;
+const B_TEAM: usize = 0x34;
 const B_SHOW_TEAM: usize = 0x38;
 const B_SHOW_ALLIANCE: usize = 0x39;
 const B_NAME_BUTTON: usize = 0x3c;
@@ -91,7 +93,6 @@ const B_ALLIANCE: [usize; 3] = [0x4c, 0x50, 0x54];
 const B_COLOUR: usize = 0x58;
 const TEXT_INLINE: usize = 0x84;
 const ALLIANCE_PENDING: usize = 0x7c;
-const COLOUR_RGB: usize = 0x68;
 
 /// A `StandardText`'s GUI config label key (`StandardText::GetLabel`, `+0x54`), which
 /// its `Render` localises.
@@ -240,7 +241,10 @@ pub fn comm() -> Option<Comm> {
             let show_team = unsafe { rd::<u8>(b + B_SHOW_TEAM) } != 0;
             let team = if show_team { Some(unsafe { rd::<i32>(field(b, B_TEAM_TEXT) + TEXT_INLINE) }) } else { None };
             let cb = field(b, B_COLOUR);
-            let rgb: [f32; 3] = if cb != 0 { unsafe { rd(cb + COLOUR_RGB) } } else { [1.0; 3] };
+            // The colour button's own colour stayed white for a computer player on the
+            // bench; the player's team (its start location) has the colour the radar and
+            // the setup screen show.
+            let rgb = super::radar::team_colour(unsafe { rd::<i32>(b + B_TEAM) });
             let select = checked(cb, CB_PLAYER_SELECT);
             let select = if select != 0 { select } else { checked(field(b, B_NAME_BUTTON), CB_PLAYER_SELECT) };
             let chat = checked(field(b, B_CHAT), CB_CHAT);

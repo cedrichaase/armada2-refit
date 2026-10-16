@@ -283,7 +283,11 @@ fn draw_comm(ui: &mut Ui, c: comm::Comm) {
         x += ar.w;
         press(ui, sb(x), r.up, "+", &crate::sfmt!("res{}.up", k), false);
         x += step + gap * 2.0;
-        press(ui, R::new(x, rr.y + ui.u(2.0), rr.right() - x, rr.h - ui.u(4.0)), r.give, &word(r.give, "Give"), &crate::sfmt!("res{}.give", k), false);
+        // The stock give buttons are pictures; their tooltip names the resource again,
+        // which the row already does.
+        let gl = buttons::label(r.give);
+        let gl = if gl.is_empty() { String::from("Give") } else { gl };
+        press(ui, R::new(x, rr.y + ui.u(2.0), rr.right() - x, rr.h - ui.u(4.0)), r.give, &gl, &crate::sfmt!("res{}.give", k), false);
     }
 
     // ---- the bottom row: the game's switches, OK
