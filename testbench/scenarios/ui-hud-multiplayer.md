@@ -3,22 +3,23 @@
 Resolutions: 1280x720
 Mod: refit
 Players: host, joiner
-Setup: ui/bench-asi.sh --dplay --menus HUD.Comm=1 HUD.DropPlayer=1 HUD.LoadWait=1 Loading.Enable=1 Loading.Hold=6
+Setup: ui/bench-asi.sh --dplay --menus HUD.Comm=1 HUD.DropPlayer=1 HUD.LoadWait=1 Loading.Enable=1 --for joiner Loading.Hold=8
 Timeout: 20 min
 
 `ui/HUD.md`, "Comms, the drop box and the load wait". Two games through the UI's menus
 (as `ui-menus-multiplayer.md`, by Manual IP), the joiner on the host's team (Team 1:
 the game lets only allies give each other resources) and the host's Advanced panel
-switched from trading by convoys to instant trade. Each game's loading screen waits 6 s
-half-way (`[Loading] Hold`), so whichever finishes first shows our load-wait box (the
-other player's bar under 100%). In the match: the joiner opens our comm panel with the
+switched from trading by convoys to instant trade. The joiner's loading screen waits 8 s half-way
+(`[Loading] Hold`, `--for joiner`), so the host, done first, shows our load-wait box
+(the joiner's bar under 100%; the stock drop box alternates with it while the joiner
+does not answer). In the match: the joiner opens our comm panel with the
 stock top-right comm button, selects the host and presses PRIVATE, then says a line,
 which reaches the host; the host's panel gives the joiner 1000 dilithium, which the
 joiner is told of. Then the joiner's game is stopped, and the host gets our
 dropped-player box, whose Eliminate (enabled once the game lets it vote) removes the
-joiner. Coordinates: `testbench/operating/ui-multiplayer.md` (the panel's rows sit a
-few pixels lower in the Klingon and Romulan themes than in LCARS; the races are random,
-so the clicks aim at the middle of each control).
+joiner. Coordinates: `testbench/operating/ui-multiplayer.md` (the panel hangs from a fixed height, so its first resource row's
+give button is at 1015,359 whatever the race and the number of resources; the themes'
+insets move it a few pixels, so the clicks aim at the middle of each control).
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -67,7 +68,7 @@ so the clicks aim at the middle of each control).
 45. Host: Click "LAUNCH".
 46. Host: Wait 90 seconds.
 47. Expect "UI.log" contains "mission: frames start".
-48. Expect "UI.log" contains "load wait: shown".
+48. Host: Expect "UI.log" contains "load wait: shown".
 49. Joiner: Click at 1194,16.
 50. Joiner: Wait 2 seconds.
 51. Joiner: Expect "COMMS/ALLIANCES" is visible.
@@ -87,7 +88,7 @@ so the clicks aim at the middle of each control).
 65. Host: Click "joiner".
 66. Host: Wait 1 second.
 67. Host: Take a screenshot called "giving".
-68. Host: Click at 1015,381.
+68. Host: Click at 1015,359.
 69. Joiner: Wait up to 20 seconds for "gave you".
 70. Host: Click "DONE".
 71. Joiner: Stop the game.

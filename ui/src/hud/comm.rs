@@ -173,7 +173,14 @@ fn draw_comm(ui: &mut Ui, c: comm::Comm) {
     let right_h = head_h + 4.0 * (bh + gap) + head_h + (bh + gap) + c.rows.len() as f32 * (row_h + gap);
     let content = left_h.max(right_h) + ui.u(t.pad * 2.0) + bh;
     let h_units = (content / ui.scale + t.title_size + 6.0 * t.pad + 40.0).min(1000.0);
-    let inner = super::panels::boxed(ui, &title, 1240.0, h_units, 1.0);
+    // Hung from a fixed height under the top bar rather than centred, so the players
+    // and the controls stand in the same place whatever the number of players and
+    // resources (the bench clicks them by place).
+    let screen = ui.screen();
+    ui.draw.rect(screen, ui.theme.scrim);
+    ui.claim(screen);
+    let (w, h) = (ui.u(1240.0).min(screen.w - ui.u(32.0)), ui.u(h_units));
+    let inner = ui.window(R::new(screen.x + (screen.w - w) * 0.5, screen.y + ui.u(160.0), w, h), &title);
     let pad = ui.u(t.pad);
     let right_w = ui.u(380.0).min(inner.w * 0.4);
     let left = R::new(inner.x, inner.y, inner.w - right_w - pad * 2.0, inner.h - bh - pad * 2.0);
