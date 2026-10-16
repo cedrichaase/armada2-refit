@@ -11,6 +11,11 @@ installing"), and is **not in `./install` or `a2mod` yet**: nothing uses it unti
 panel or screen of ours replaces a stock one. The bench gets it with
 `ui/bench-asi.sh` (below).
 
+**The menus** (`[Menus] Enable=1`, off by default): every stock shell dialog runs
+hidden and is drawn and driven by the UI, generically or by a screen spec of ours.
+[`MENUS.md`](MENUS.md) has how: the dialog host, the shell's own widgets, the control
+model, the generic screen, writing a spec, and the table of every screen.
+
 ## Where the UI draws
 
 `surface::frame(context)` is a frame of UI: it reads input, runs the UI for that
@@ -323,6 +328,12 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 | `[UI] Log` | 1 | `UI.log` in the game directory: which hooks are in, and why one stood down |
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context |
+| `[Menus] Enable` | 0 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
+| `[Menus] Generic` | mirror | a screen without a spec: `mirror` (as the game paints it) or `widgets` (its controls as ours) |
+| `[Menus] Specs` | 1 | 0: no screen spec, every screen generic |
+| `[Menus] EscapeReturns` | 1 | Esc in the in-mission menu is Return to Game |
+| `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
+| `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 
 ## The renderer (`src/gfx/`)
 
@@ -399,6 +410,9 @@ calls (`rect`, gradients, `rect_round`, `frame`, `line`, `image`, `nine`, `text`
 Assembler's place is in screen pixels): the demo screen in the Credits' place and a
 click on it, the loading-screen panel, the panel over the HUD, and a click on it that
 the engine does not see (the selection stays).
+
+`ui-menus-options.md` and `ui-menus-match.md` (`--menus`, 1280x720): the hosted menus,
+`MENUS.md`, "Testing".
 
 ## Not done
 

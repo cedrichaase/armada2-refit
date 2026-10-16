@@ -475,37 +475,6 @@ fn template_id(name: *const u8) -> usize {
 
 /// `Trace=1`: a dialog's messages of note, with what its procedure answered.
 fn trace(h: HWND, msg: u32, wp: usize, lp: isize, r: isize) {
-    static mut TIMERS: u32 = 0;
-    if msg == 0x113 {
-        unsafe {
-            TIMERS += 1;
-            if TIMERS % 40 == 1 {
-                let t = rd::<usize>(0x76b8d4);
-                let gs = if t != 0 { rd::<usize>(t + 0x30) } else { 0 };
-                let d = if gs != 0 { rd::<usize>(gs + 0x10) } else { 0 };
-                let st = |i: usize| if d != 0 { rd::<i32>(d + 0x124 + i * 0x44) } else { -1 };
-                crate::log!("menus: debug timer #{} on {:p} id {} transport {:#x} slots {} {} {} changed {}", TIMERS, h, wp, t, st(0), st(1), st(2), if d != 0 { rd::<u32>(d + 0x24) } else { 0 });
-                if t != 0 && TIMERS % 400 == 1 {
-                    for w in super::shellui::widgets_of(h) {
-                        if w.rect[1] > 80 && w.rect[1] < 300 && w.rect[0] < 300 {
-                            crate::log!("menus: debug widget {:?} @{:?} \"{}\" shown {} mode {}", w.kind, w.rect, w.label, w.shown, w.mode);
-                        }
-                    }
-                    for c in children(h) {
-                        let id = GetDlgCtrlID(c);
-                        if (2121..=2137).contains(&id) {
-                            let r = rect_in(c, h);
-                            crate::log!(
-                                "menus: debug child {} style {:#x} @{},{} {}x{} sel {} count {} parent {:p}",
-                                id, style(c), r.left, r.top, r.right - r.left, r.bottom - r.top,
-                                SendMessageA(c, 0x147, 0, 0), SendMessageA(c, 0x146, 0, 0), GetParent(c)
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
     // Not the frequent ones: paint, timers, the pointer, colours, hit-testing.
     if matches!(msg, 0x0f | 0x14 | 0x113 | 0x200 | 0x20 | 0x84 | 0x133..=0x138 | 0x2b | 0x317 | 0x318 | 0x0d | 0x0e | 0x7f) {
         return;
@@ -518,16 +487,6 @@ fn trace(h: HWND, msg: u32, wp: usize, lp: isize, r: isize) {
         }
     }
     crate::log!("menus: trace {:p} msg {:#x} wp {:#x} lp {:#x} -> {:#x}", h, msg, wp, lp, r);
-    if msg == WM_INITDIALOG || msg == 0x14f {
-        // DEBUG: the transport's game setup, as Game Setup reads it.
-        let t = rd::<usize>(0x76b8d4);
-        let gs = if t != 0 { rd::<usize>(t + 0x30) } else { 0 };
-        if gs != 0 {
-            crate::log!("menus: debug transport {:#x} setup {:#x} host {:#x} local slot {}", t, gs, rd::<usize>(gs + 0x18), rd::<i32>(gs));
-        } else {
-            crate::log!("menus: debug transport {:#x} (no setup)", t);
-        }
-    }
 }
 
 /// The stock dialogs' procedures while `Host=0` traces them, innermost last.
@@ -764,15 +723,6 @@ unsafe extern "system" fn my_end_paint(h: HWND, ps: *const PaintStruct) -> i32 {
 }
 
 unsafe extern "system" fn my_invalidate(h: HWND, r: *const WinRect, erase: i32) -> i32 {
-    if crate::config::get().menus_trace && hosting() {
-        static mut N: u32 = 0;
-        unsafe {
-            N += 1;
-            if N < 60 {
-                if slot_of(h).map_or(0, |s| s.depth) != 1 { crate::log!("menus: debug InvalidateRect {:p} hosted {} in_hosted {} top {:?}", h, is_hosted(h), in_hosted(h), top().map(|t| t.hwnd)); } else { N -= 1; }
-            }
-        }
-    }
     if let Some(s) = slot_of(h) {
         s.paint = true;
         s.erase |= erase != 0;

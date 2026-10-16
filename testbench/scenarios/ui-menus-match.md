@@ -8,16 +8,17 @@ Timeout: 15 min
 `ui/MENUS.md`. Every dialog runs hidden in the UI's dialog host and is drawn and driven
 by the UI. From the main menu's spec (Instant Action at its screen place, 1280x720
 only), Game Setup is the generic mirrored screen: the local player and a computer
-player must show in it as they do in stock (UI.log's "debug" lines are not needed:
-the picture shows it), and the two clicks of `ui-runtime.md` change player 2 to
+player must show in it as they do in stock (a hosting bug once left it at its first,
+empty picture: `ui/MENUS.md`), and the two clicks of `ui-runtime.md` change player 2 to
 "Computer AI:Easy" and player 1's side to Borg. LAUNCH starts the match.
 
 In the match, Esc opens the in-mission menu over the mission's last frame, dimmed, and
 a second Esc returns to the game (`[Menus] EscapeReturns`, as Menus.asi does). Save
 Game is then used with a name typed into its edit box (the click puts the stock edit's
 keyboard focus there; the field is cleared first: it opens with the map's name), the
-confirmation is dismissed, and Load Game loads that save, which aborts the running
-mission after a Yes and loads it.
+confirmation is dismissed, and Load Game loads that save (the second row: the clone
+holds one save of the player's own; OCR reads the row as one word, "Action-uimenus", so
+it is clicked by place), which aborts the running mission after a Yes and loads it.
 
 1. Launch the game.
 2. Wait for the main menu.
@@ -72,14 +73,14 @@ mission after a Yes and loads it.
 51. Wait 2 seconds.
 52. Click "Load Game".
 53. Wait 3 seconds.
-54. Expect "uimenus" is visible.
-55. Click "uimenus".
+54. Expect "Instant Action" is visible.
+55. Click at design 400,116.
 56. Wait 2 seconds.
 57. Click at design 400,579.
 58. Wait 3 seconds.
 59. Click "Yes".
 60. Wait 45 seconds.
-61. Expect "UI.log" contains "loading: frame".
+61. Expect "UI.log" contains "mission: frames resume".
 62. Take a screenshot called "loaded".
 63. Expect the game is still running.
 64. Quit the game.

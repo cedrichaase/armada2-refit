@@ -63,10 +63,23 @@ as stock.
   labels, the Bink animations, lands there. While a dialog is hosted, `GetDC` of the 3D
   window returns a scratch DC: the shell's background underlay (`SetCurrentBackground`
   and `SnapShotBackground` drawing onto the 3D window) is drawn into nothing.
-- **It is painted on request.** A hidden window is never sent `WM_PAINT`. The host
-  notes every `InvalidateRect` and `RedrawWindow` (`RDW_INVALIDATE`) of a hosted dialog
-  and, at the start of each frame, sends `WM_ERASEBKGND` (if an erase was asked for) and
-  `WM_PAINT` itself. A new dialog, or one that moved, is painted once anyway.
+- **It is painted on request, and only while it shows.** A hidden window is never sent
+  `WM_PAINT`. The host notes every `InvalidateRect` and `RedrawWindow`
+  (`RDW_INVALIDATE`) of a hosted dialog and, at the start of each frame, sends
+  `WM_ERASEBKGND` (if an erase was asked for) and `WM_PAINT` itself. A new dialog, or
+  one that moved, is painted once anyway. A dialog under a full-screen one is not
+  painted until it is uncovered, as Windows sends no `WM_PAINT` to a window with
+  nothing visible. That is not a nicety: the shell keeps the current screen's
+  background in globals (`SetCurrentBackground`), and the main menu, which invalidates
+  itself for its animation, painted itself under Game Setup and put its own background
+  back; Game Setup then drew its player rows against the wrong one.
+- **Its DC is not trusted to hold its bitmap.** The shell selects bitmaps of its own
+  into the DCs it is handed and does not always put ours back (Game Setup's paint left
+  our surface's bitmap selected in a DC of its own, and the menus/README.md "stock bug"
+  does the same through `WM_DRAWITEM`). So the surface's bitmap is selected back
+  whenever its DC is handed out, and the host reads a surface by its bits (after
+  `GdiFlush`), never through its DC: a `BitBlt` from our DC read a stale bitmap while
+  the surface itself was current, and Game Setup showed its first picture for ever.
 
 ### The loop
 
@@ -80,7 +93,8 @@ Each pass, about 60 a second:
    - Keys addressed to a hosted window (the focus is in the dialog, because the player
      clicked into an edit) go through `IsDialogMessageA(top, ...)`, as user32's modal
      loop gives them: the edit gets its characters, Tab moves, Enter and Esc become
-     `IDOK` and `IDCANCEL`.
+     `IDOK` and `IDCANCEL`. `IsDialogMessageA` translates the key itself; translating it
+     first as well typed every character twice.
    - Keys and mouse messages for the 3D window reach its procedure, where the UI's input
      hooks note them for the UI and keep every press from the engine
      (`input::set_hosting`): a modal dialog disables its owner, and no key or click
@@ -91,7 +105,8 @@ Each pass, about 60 a second:
    - `WM_QUIT` is posted again and ends the dialog, as user32 does.
 2. **Paint** what asked to be painted (above).
 3. **Run the queued actions** (`menus::actions`).
-4. **Compose** each modal dialog's frame: its surface, then its panes' surfaces, then
+4. **Compose** each modal dialog's frame (the ones that show): its surface's bits, then
+   its panes' surfaces, then
    each visible control printed with `WM_PRINT` (`PRF_CLIENT | PRF_NONCLIENT |
    PRF_CHILDREN`) at its place, bottom of the z-order first. An edit, a list box, a
    combo box and an owner-drawn button all paint themselves on `WM_PRINTCLIENT` with
@@ -145,6 +160,9 @@ mission's loop is blocked inside the dialog, so the host's loop is the only thin
 presents. When the first dialog opens within two seconds of a mission frame
 (`ingame::recent`), the host reads the front buffer back
 (`IDirect3DDevice9::GetFrontBufferData`) and draws the menus over that picture, dimmed.
+A menu that hands over to another (Options to Load Game returns to the shell's
+`DispatchDialog` in between, with no mission frame) keeps the picture if it opens
+within 1.5 s.
 
 **Esc closes the in-mission menu** (`[Menus] EscapeReturns=1`, the default): in stock
 Esc does nothing inside it (`EscapeMenuDlgProc`, 0x5cddb0, has no `WM_COMMAND` case).
@@ -157,7 +175,13 @@ The 3D window answers `WM_SETCURSOR` with no cursor (for the sprite cursor in a
 mission); while a dialog is hosted, `engine/shell.rs`'s subclass answers it with the
 arrow, as for a screen of ours. The keyboard focus stays where the shell leaves it: on
 the 3D window, or on a hosted edit the player clicked into. Typing reaches a stock edit
-either way (above, and "Edit boxes" below).
+either way (above, and "Driving window controls" below).
+
+**A focus left nowhere.** After a mission's load Wine had no window with the keyboard
+focus (menus/README.md, "Keyboard focus", saw the same after an embedded menu), and
+with no focus the active window gets every key as `WM_SYSKEYDOWN`: the in-mission
+menu never saw its Esc. The first hosted dialog puts the focus on the 3D window when
+it finds none, and an Esc without Alt counts as Esc whichever way it comes.
 
 ## The shell's widgets
 
@@ -175,6 +199,12 @@ memory is committed and readable, and only while its first field is one of the s
 vtables (`.rdata`, 0x6b0000–0x6d0000) other than `Shell::Widget`'s own, which is what a
 widget's destructor leaves behind. Nothing is called on a widget.
 
+**Not every button is a widget.** The main menu's three big pictures (Single Player,
+Instant Action, Multiplayer) are hit areas of `MainMenuDlgProc` itself, with Bink hover
+animations; only Options, Exit, Replay Intro and Credits are `ShellButtonSelBox`es.
+Both answer a click at a point inside them, so a spec acts on a design point when the
+model has no widget there.
+
 **Which class**, by its vtable: a class whose slot 8 is `ShellButton::UpdateButton(HDC)`
 (0x5a4af0) is a button (`ShellButton` itself, `CycleButton` 0x6bb064,
 `ShellToggleButton` 0x6bb18c, `ShellButtonSelBox` 0x6bb0e4, and the screens' own
@@ -190,6 +220,7 @@ widget's destructor leaves behind. Nothing is called on a widget.
 | label text | button +0x3c, `char[64]`, `"NULL"` for none | `SetLabelText` (0x5a5330) |
 | state | button +0xc0: 0, 1 under the pointer, 2 held | `SetButtonMode` |
 | rectangle | button +0xc4 (left, top, right, bottom) | constructor, `MoveButton` (0x5a48c0) |
+| hit rectangle | `ShellButtonSelBox` +0x178: the part of its shared picture that takes the pointer (+0xc4 is the whole picture, the same for every box of a set) | its constructor (0x5a5ee0); `CheckRollOver` (0x5a5f60) tests it |
 | shown, enabled | button +0xe4, +0xe8 | `ShowButton`/`HideButton`, `EnableButton`/`DisableButton` |
 | label colour | button +0x28 (`COLORREF`) | `SetButtonTextColor` |
 | label alignment | button +0x174 left, +0x175 right | `SetLeftJustifyText`, `SetRightJustifyText` |
@@ -315,7 +346,7 @@ scenario gets there (`testbench/ui.json` has the named targets).
 | `do_missionSelect` | 0x124 | mission select | a campaign's mission list | a campaign | `ShellButtonSelBox` rows, OK, Cancel | none |
 | `do_loadGame` | 0x123 | load game | saved games | Load Game | `FileSelectButton` rows, details | the save's details |
 | `do_saveGame` | 0x129 | save game | a mission's Save Game | Esc, Save Game | the name `Edit` (476x28 @176,551), rows | none |
-| `do_escapeMenu` | 0x123 | in-mission menu | Options in a mission | Esc in a mission | buttons; version label | none |
+| `do_escapeMenu` | 0x123 | options | Options, from the main menu and in a mission (more entries in a mission) | Options; Esc in a mission | buttons; version label | none |
 | `do_gameSettings` | 0x123 | game settings | Options -> Game Settings | Options | cycle/toggle buttons, scroll bars | scroll bars |
 | `do_graphicsOptions` | 0x1 | graphics settings | Options -> Graphics Settings | Options | display-mode list (`display mode` target), toggles | the mode list |
 | `do_soundSettings` | 0x123 | sound settings | Options -> Sound Settings | Options | `ShellScrollBar` volumes, toggles | scroll bars |
@@ -341,3 +372,38 @@ scenario gets there (`testbench/ui.json` has the named targets).
 The `g_shellMode` cases of `DispatchDialog` that open these: 1 main menu, 2 single
 player, 11 and 25 the in-mission menu, 13 multiplayer connection, 18 and 24 load game,
 22 internet game; Options and the rest are opened from those screens.
+
+## Testing
+
+`ui/bench-asi.sh --menus` (a scenario's `Setup:` line) puts `UI.asi` in a bench clone
+with `[Menus] Enable=1` and takes Menus.asi out. `testbench/operating/menus-host.md`
+has where things are and how to look inside a hosted dialog (`Menus.Trace=1` dumps the
+hidden surfaces).
+
+- `ui-menus-options.md`: the main menu's spec; Options; Graphics Settings' Bump Mapping
+  switched off, the screen left and opened again, and still off; Sound Settings' Unit
+  Speech; Game Settings; back to the main menu; quit.
+- `ui-menus-match.md`: Instant Action's Game Setup with the local and computer players
+  as stock shows them; player 2 set to Computer AI:Easy and player 1's side to Borg;
+  LAUNCH; the in-mission menu over the mission, closed by Esc; Save Game with a typed
+  name; Load Game of that save (abort, Yes); quit.
+
+## Not done
+
+- **The generic `widgets` screen and the local text field, list and drop-down are not
+  verified on the bench**; the mirrored screen is. The shared widgets (`crate::widgets`)
+  are being written elsewhere; `menus/local.rs` is to be replaced by them.
+- **Screens not reached on the bench with the host**: the campaign selection and
+  mission lists, the Admiral's Log (its panes, tabs and owner-drawn buttons are
+  composed by the code above, not seen), the Technology Tree, Multiplayer and its
+  lobbies (no network on the bench), Credits (a screen of the engine's own, not a
+  dialog: it runs as before), the licence, GameSpy and command-line screens.
+- **One spec**, the main menu, with English labels (the stock art carries the words,
+  so the spec names its buttons itself).
+- **Keyboard navigation** of a spec (arrows, Enter) and of the generic screen beyond
+  what the stock dialog does with Enter, Esc and Tab.
+- **The cursor** is the system arrow over the 3D window, as with the GDI menus; a cursor
+  of the UI's own is not drawn.
+- **A display mode other than the desktop's** for the game: the shell is raised to the
+  desktop size, so a game at another resolution re-creates the device at every switch
+  between the shell and a mission (as with Menus.asi); not measured.
