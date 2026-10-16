@@ -5,7 +5,9 @@
 //!
 //! Sizes are in units of a 1080-pixel-tall screen, times `[UI] Scale`: `Ui::u` turns
 //! one into back-buffer pixels, so a layout looks the same at any resolution.
+pub mod anim;
 pub mod layout;
+pub mod theme;
 
 mod checkbox;
 mod dropdown;
@@ -23,48 +25,11 @@ mod tooltip;
 pub use list::ListEvent;
 pub use text_field::FieldEvent;
 
-use crate::gfx::{fade, mix, Color, Draw, Weight, R};
+use crate::gfx::{Color, Draw, Weight, R};
 use crate::input::Input;
 pub use layout::{Anchor, Stack};
 
-/// Colours and sizes every widget draws with.
-#[derive(Clone, Copy, Debug)]
-pub struct Theme {
-    pub panel: Color,
-    pub panel_edge: Color,
-    pub text: Color,
-    pub text_dim: Color,
-    pub accent: Color,
-    pub button: Color,
-    pub button_hot: Color,
-    pub button_down: Color,
-    pub track: Color,
-    /// In units.
-    pub radius: f32,
-    pub edge: f32,
-    pub text_size: f32,
-    pub pad: f32,
-}
-
-impl Default for Theme {
-    fn default() -> Theme {
-        Theme {
-            panel: 0xd80a1220,
-            panel_edge: 0xff2c4a6e,
-            text: 0xffdce8f5,
-            text_dim: 0xff8aa0b8,
-            accent: 0xffe8a33a,
-            button: 0xff1b2d45,
-            button_hot: 0xff28456a,
-            button_down: 0xff3a6496,
-            track: 0xff101c2c,
-            radius: 6.0,
-            edge: 1.5,
-            text_size: 22.0,
-            pad: 12.0,
-        }
-    }
-}
+pub use theme::{Race, State, Theme};
 
 /// A widget's identity from one frame to the next: a hash of its label and the ids
 /// it is nested in.
@@ -238,25 +203,19 @@ impl<'a> Ui<'a> {
 
     // ---- widgets ---------------------------------------------------------------------
 
-    /// A panel: a rounded, edged background that keeps the mouse from the engine.
+    /// A panel in the theme's form (theme.rs) that keeps the mouse from the engine.
     pub fn panel(&mut self, r: R) {
-        let t = self.theme;
-        let (rad, e) = (self.u(t.radius), self.u(t.edge).max(1.0));
-        self.draw.rect_round(r, rad, t.panel_edge);
-        self.draw.rect_round(r.inset(e), (rad - e).max(0.0), t.panel);
+        theme::panel(self, r);
         self.claim(r);
     }
 
-    /// A panel with a title bar; returns the room left inside it, padded.
+    /// A panel with a title; returns the room left inside it, padded. Its title
+    /// underline sweeps in when it first shows (anim.rs).
     pub fn window(&mut self, r: R, title: &str) -> R {
-        self.panel(r);
-        let t = self.theme;
-        let bar_h = self.u(t.text_size + 2.0 * t.pad * 0.6);
-        let (bar, rest) = r.take_top(bar_h);
-        let pad = self.u(t.pad);
-        self.draw.rect(R::new(bar.x + pad, bar.bottom() - 1.0, bar.w - 2.0 * pad, self.u(1.0).max(1.0)), fade(t.accent, 0.6));
-        self.text_in(R::new(bar.x + pad, bar.y, bar.w - 2.0 * pad, bar.h), title, t.text_size, Align::Left, t.accent, Weight::Bold);
-        R::new(rest.x + pad, rest.y + pad, rest.w - 2.0 * pad, rest.h - 2.0 * pad)
+        let opened = anim::appear(self.id(&crate::sfmt!("window:{}", title)), 0.22, self.time());
+        let inner = theme::window(self, r, title, opened);
+        self.claim(r);
+        inner
     }
 
     /// A line of text.
@@ -268,50 +227,55 @@ impl<'a> Ui<'a> {
     /// A dimmer line of text, smaller.
     pub fn note(&mut self, r: R, s: &str) {
         let t = self.theme;
-        self.text_in(r, s, t.text_size * 0.8, Align::Left, t.text_dim, Weight::Regular);
+        self.text_in(r, s, t.small_size, Align::Left, t.text_dim, Weight::Regular);
     }
 
-    /// A push button; true on the frame it is clicked.
+    /// A push button; true on the frame it is clicked (or activated with Enter or
+    /// Space while it has the focus).
     pub fn button(&mut self, r: R, label: &str) -> bool {
         let id = self.id(label);
+        let focused = self.focus_register(id);
         let (hot, held, clicked) = self.interact(id, r);
-        let t = self.theme;
-        let bg = if held { t.button_down } else if hot { t.button_hot } else { t.button };
-        let rad = self.u(t.radius * 0.7);
-        let edge = if hot { t.accent } else { t.panel_edge };
-        self.draw.rect_round(r, rad, edge);
-        let e = self.u(t.edge).max(1.0);
-        self.draw.rect_round(r.inset(e), (rad - e).max(0.0), bg);
-        self.text_in(r, label, t.text_size, Align::Centre, if hot { 0xffffffff } else { t.text }, Weight::Bold);
-        clicked
+        if clicked {
+            self.focus(id);
+        }
+        let mut st = State::of(self, id, hot, held);
+        st.focus = focused;
+        theme::button(self, r, label, st);
+        clicked || (focused && self.activate_pressed())
     }
 
     /// A check box with its label; true on the frame it changes.
     pub fn toggle(&mut self, r: R, label: &str, on: &mut bool) -> bool {
         let id = self.id(label);
-        let (hot, _, clicked) = self.interact(id, r);
+        let focused = self.focus_register(id);
+        let (hot, held, clicked) = self.interact(id, r);
         if clicked {
+            self.focus(id);
+        }
+        let flip = clicked || (focused && self.activate_pressed());
+        if flip {
             *on = !*on;
         }
+        let mut st = State::of(self, id, hot, held);
+        st.focus = focused;
+        let bw = theme::check(self, r, *on, st);
         let t = self.theme;
-        let bs = r.h.min(self.u(t.text_size));
-        let b = R::new(r.x, r.y + (r.h - bs) * 0.5, bs, bs);
-        let rad = self.u(3.0);
-        self.draw.rect_round(b, rad, if hot { t.accent } else { t.panel_edge });
-        self.draw.rect_round(b.inset(self.u(t.edge).max(1.0)), rad, t.track);
-        if *on {
-            self.draw.rect_round(b.inset(bs * 0.25), rad * 0.5, t.accent);
-        }
-        let gap = self.u(t.pad * 0.6);
-        self.text_in(R::new(b.right() + gap, r.y, r.w - bs - gap, r.h), label, t.text_size, Align::Left, t.text, Weight::Regular);
-        clicked
+        let gap = self.u(t.pad * 0.7);
+        let col = theme::row_text(self, State { on: false, ..st });
+        self.text_in(R::new(r.x + bw + gap, r.y, r.w - bw - gap, r.h), label, t.text_size, Align::Left, col, Weight::Regular);
+        flip
     }
 
-    /// A horizontal slider over `lo..hi`; true while it changes `v`.
+    /// A horizontal slider over `lo..hi`; true while it changes `v`. Left and Right
+    /// step it by a twentieth while it has the focus.
     pub fn slider(&mut self, r: R, label: &str, v: &mut f32, lo: f32, hi: f32) -> bool {
         let id = self.id(label);
+        let focused = self.focus_register(id);
         let (hot, held, _) = self.interact(id, r);
-        let t = self.theme;
+        if held {
+            self.focus(id);
+        }
         let mut changed = false;
         if held {
             if let Some((mx, _)) = self.input.mouse {
@@ -321,26 +285,28 @@ impl<'a> Ui<'a> {
                 *v = nv;
             }
         }
+        if focused {
+            let step = (hi - lo) / 20.0;
+            let input = self.input;
+            for &k in input.keys() {
+                let nv = match k {
+                    focus::VK_LEFT => (*v - step).max(lo.min(hi)),
+                    focus::VK_RIGHT => (*v + step).min(hi.max(lo)),
+                    _ => *v,
+                };
+                changed |= nv != *v;
+                *v = nv;
+            }
+        }
         let f = ((*v - lo) / (hi - lo)).clamp(0.0, 1.0);
-        let th = self.u(6.0);
-        let track = R::new(r.x, r.y + (r.h - th) * 0.5, r.w, th);
-        self.draw.rect_round(track, th * 0.5, t.track);
-        self.draw.rect_round(R::new(track.x, track.y, track.w * f, th), th * 0.5, t.accent);
-        let k = self.u(if hot || held { 18.0 } else { 16.0 });
-        let kx = r.x + r.w * f;
-        self.draw.rect_round(R::new(kx - k * 0.5, r.y + (r.h - k) * 0.5, k, k), k * 0.5, if held { 0xffffffff } else { t.text });
+        let mut st = State::of(self, id, hot, held);
+        st.focus = focused;
+        theme::slider(self, r, f, st);
         changed
     }
 
     /// A bar filled to `f` (0..1).
     pub fn progress(&mut self, r: R, f: f32) {
-        let t = self.theme;
-        let rad = r.h * 0.5;
-        self.draw.rect_round(r, rad, t.track);
-        let f = f.clamp(0.0, 1.0);
-        if f > 0.0 {
-            let fill = R::new(r.x, r.y, (r.w * f).max(r.h), r.h);
-            self.draw.rect_round(fill, rad, mix(t.accent, 0xffffffff, 0.1));
-        }
+        theme::bar(self, r, f, None);
     }
 }

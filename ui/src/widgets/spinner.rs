@@ -24,11 +24,10 @@ impl<'a> Ui<'a> {
         let plus = R::new(r.right() - bw, r.y, bw, r.h);
         let mid = R::new(r.x + bw, r.y, r.w - 2.0 * bw, r.h);
         let mut delta = 0.0f32;
-        let rad = self.u(t.radius * 0.7);
         let e = self.u(t.edge).max(1.0);
         let big = if self.input.shift { 10.0 } else { 1.0 };
         if focused {
-            self.focus_ring(r, rad);
+            super::theme::focus_ring(self, r, super::theme::button_corners(self, r));
         }
         for (i, (b, sign, glyph)) in [(minus, -1.0f32, "-"), (plus, 1.0, "+")].into_iter().enumerate() {
             let bid = self.sub_id(id, glyph);
@@ -44,9 +43,8 @@ impl<'a> Ui<'a> {
                 delta += sign * step * big;
             }
             let _ = i;
-            self.draw.rect_round(b, rad, if hot { t.accent } else { t.panel_edge });
-            self.draw.rect_round(b.inset(e), (rad - e).max(0.0), if held { t.button_down } else if hot { t.button_hot } else { t.button });
-            self.text_in(b, glyph, t.text_size * 1.2, Align::Centre, t.text, Weight::Bold);
+            let col = super::theme::button_frame(self, b, super::theme::State::of(self, bid, hot, held));
+            self.text_in(b, glyph, t.text_size * 1.2, Align::Centre, col, Weight::Bold);
         }
         if self.mouse_in(r) {
             delta += self.input.wheel * step * big;
@@ -75,8 +73,8 @@ impl<'a> Ui<'a> {
         // Rounded to the places shown, so repeated steps do not drift.
         let k = libm::powf(10.0, decimals as f32);
         *v = libm::roundf(*v * k) / k;
-        self.draw.rect_round(mid, 0.0, t.panel_edge);
-        self.draw.rect(mid.inset(e), t.track);
+        let _ = e;
+        super::theme::field(self, mid.inset(-0.0), super::theme::State::default());
         let s = crate::sfmt!("{:.*}", decimals, *v);
         self.text_in(mid, &s, t.text_size, Align::Centre, t.text, Weight::Regular);
         self.claim(r);

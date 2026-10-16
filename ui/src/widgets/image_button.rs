@@ -12,13 +12,10 @@ impl<'a> Ui<'a> {
         let focused = self.focus_register(id);
         let (hot, held, clicked) = self.interact(id, r);
         let click = clicked || (focused && self.activate_pressed());
-        let rad = self.u(t.radius * 0.7);
         let e = self.u(t.edge).max(1.0);
-        if focused {
-            self.focus_ring(r, rad);
-        }
-        self.draw.rect_round(r, rad, if hot { t.accent } else { t.panel_edge });
-        self.draw.rect_round(r.inset(e), (rad - e).max(0.0), if held { t.button_down } else if hot { t.button_hot } else { t.button });
+        let mut st = super::theme::State::of(self, id, hot, held);
+        st.focus = focused;
+        super::theme::button_frame(self, r, st);
         let pad = self.u(t.pad * 0.5);
         let mut img = r.inset(e + pad);
         if held {

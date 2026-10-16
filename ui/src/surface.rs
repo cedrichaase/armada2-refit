@@ -25,6 +25,7 @@ pub fn frame(ctx: Context) {
     crate::gfx::frame(dev, |w, h, draw| {
         crate::input::poll(w, h);
         let mut ui = crate::widgets::Ui::begin(draw, w, h, crate::input::state());
+        ui.theme = crate::widgets::Theme::for_context(ctx);
         crate::app::run(ctx, &mut ui);
         crate::cursor::draw(ctx, &mut ui);
         let (mouse, keys) = ui.end();

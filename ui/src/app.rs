@@ -15,6 +15,10 @@ static mut DEMO: Demo = Demo { on: true, slider: 0.5, clicks: 0 };
 
 pub fn run(ctx: Context, ui: &mut Ui) {
     let cfg = crate::config::get();
+    if cfg.demo_style {
+        crate::style::run(ctx, ui);
+        return;
+    }
     let on = match ctx {
         Context::Mission => cfg.demo_mission,
         Context::Shell => cfg.demo_shell,

@@ -50,7 +50,6 @@ impl<'a> Ui<'a> {
             }
         }
 
-        let rad = self.u(t.radius * 0.7);
         let e = self.u(t.edge).max(1.0);
         let row_h = r.h.max(self.u(28.0));
         let rows = items.len().min(MAX_ROWS);
@@ -126,11 +125,7 @@ impl<'a> Ui<'a> {
                 let cur = *sel;
                 self.overlay(move |ui| {
                     let t = ui.theme;
-                    let e = ui.u(t.edge).max(1.0);
-                    let inner = pop.inset(e);
-                    ui.draw.rect_round(pop.inset(-ui.u(3.0)), rad + ui.u(3.0), 0x50000000);
-                    ui.draw.rect_round(pop, rad, t.accent);
-                    ui.draw.rect_round(inner, (rad - e).max(0.0), t.track);
+                    let inner = super::theme::popup(ui, pop);
                     ui.draw.push_clip(inner);
                     let pad = ui.u(t.pad * 0.7);
                     for (i, name) in names.iter().enumerate() {
@@ -138,13 +133,9 @@ impl<'a> Ui<'a> {
                         if rr.bottom() < inner.y || rr.y > inner.bottom() {
                             continue;
                         }
-                        if i == hl {
-                            ui.draw.rect(rr, t.button_hot);
-                        }
-                        if i == cur {
-                            ui.draw.rect(R::new(rr.x, rr.y, ui.u(3.0), rr.h), t.accent);
-                        }
-                        let c = if i == hl { 0xffffffff } else { t.text };
+                        let st = super::theme::State { hot: (i == hl) as u8 as f32, on: i == cur, ..Default::default() };
+                        super::theme::row(ui, rr, i, st);
+                        let c = super::theme::row_text(ui, st);
                         ui.text_in(R::new(rr.x + pad, rr.y, rr.w - pad, rr.h), name, t.text_size, super::Align::Left, c, crate::gfx::Weight::Regular);
                     }
                     if content > view_h {
@@ -160,22 +151,17 @@ impl<'a> Ui<'a> {
         st[0] = if open { 1.0 } else { 0.0 };
 
         // The closed field.
-        if focused {
-            self.focus_ring(r, rad);
-        }
-        let edge = if open || focused { t.accent } else if hot { t.text_dim } else { t.panel_edge };
-        self.draw.rect_round(r, rad, edge);
-        self.draw.rect_round(r.inset(e), (rad - e).max(0.0), if hot { t.button_hot } else { t.button });
+        let _ = e;
+        let mut st = super::theme::State::of(self, id, hot, false);
+        st.focus = focused || open;
+        super::theme::field(self, r, st);
         let pad = self.u(t.pad * 0.7);
         let arrow = r.h * 0.5;
         let name = items.get(*sel).copied().unwrap_or("");
         self.text_in(R::new(r.x + pad, r.y, r.w - pad - arrow - pad, r.h), name, t.text_size, super::Align::Left, t.text, crate::gfx::Weight::Regular);
         // The chevron: down when closed, up when open.
-        let (cx, cy) = (r.right() - pad - arrow * 0.5, r.y + r.h * 0.5);
-        let (dx, dy) = (arrow * 0.28, arrow * 0.14 * if open { -1.0 } else { 1.0 });
-        let w = self.u(2.0).max(1.0);
-        self.draw.line((cx - dx, cy - dy), (cx, cy + dy), w, t.text);
-        self.draw.line((cx, cy + dy), (cx + dx, cy - dy), w, t.text);
+        st.on = open;
+        super::theme::dropdown_arrow(self, r, st);
         changed
     }
 }

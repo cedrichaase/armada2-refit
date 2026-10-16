@@ -21,7 +21,7 @@ impl<'a> Ui<'a> {
         // Only the modal's own widgets take part in Tab navigation.
         self.x.order.clear();
         self.x.nav = true;
-        self.draw.rect(screen, 0xb0000000);
+        self.draw.rect(screen, self.theme.scrim);
         let r = Anchor::Centre.place(screen, self.u(w), self.u(h), 0.0);
         let inner = self.window(r, title);
         let was = core::mem::replace(&mut self.x.in_overlay, true);

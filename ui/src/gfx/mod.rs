@@ -11,6 +11,9 @@ use crate::shaders::ui::{PS_UI, VS_UI};
 use alloc::vec::Vec;
 use core::ffi::c_void;
 
+mod fx;
+pub use fx::{load_bmp, Corners, Elbow, Shape};
+
 /// A rectangle in back-buffer pixels.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct R {
@@ -178,13 +181,20 @@ struct Vertex {
     u: f32,
     v: f32,
     k: [f32; 4],
+    /// The shape kind's parameters (shaders/ui.hlsl, `fx.rs`); zero for the others.
+    s: [f32; 4],
+    t: [f32; 4],
+    p: [f32; 4],
 }
 
-static ELEMENTS: [VertexElement; 5] = [
+static ELEMENTS: [VertexElement; 8] = [
     ve(0, 0, DECLTYPE_FLOAT2, DECLUSAGE_POSITION, 0),
     ve(0, 8, DECLTYPE_D3DCOLOR, DECLUSAGE_COLOR, 0),
     ve(0, 12, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
     ve(0, 20, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 1),
+    ve(0, 36, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 2),
+    ve(0, 52, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 3),
+    ve(0, 68, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 4),
     VE_END,
 ];
 
@@ -192,6 +202,7 @@ const KIND_SOLID: f32 = 0.0;
 const KIND_TEX: f32 = 1.0;
 const KIND_SDF: f32 = 2.0;
 const KIND_BOX: f32 = 3.0;
+const KIND_SHAPE: f32 = 4.0;
 
 /// A run of indices drawn with one texture and one clip rectangle. Indices are 16-bit
 /// and relative to `vbase`, so a run never spans more than 65536 vertices.
@@ -298,7 +309,7 @@ impl Draw {
             return;
         }
         let (x0, y0, x1, y1) = (r.x, r.y, r.right(), r.bottom());
-        let vx = |x, y, col, u, v| Vertex { x, y, col, u, v, k };
+        let vx = |x, y, col, u, v| Vertex { x, y, col, u, v, k, ..Default::default() };
         self.quad(tex, [
             vx(x0, y0, cols[0], uv[0], uv[1]),
             vx(x1, y0, cols[1], uv[2], uv[1]),
@@ -350,7 +361,7 @@ impl Draw {
         }
         let (nx, ny) = (-dy / len * width * 0.5, dx / len * width * 0.5);
         let k = [KIND_SOLID, 0.0, 0.0, 0.0];
-        let vx = |x, y| Vertex { x, y, col: c, u: 0.0, v: 0.0, k };
+        let vx = |x, y| Vertex { x, y, col: c, u: 0.0, v: 0.0, k, ..Default::default() };
         self.quad(None, [vx(a.0 + nx, a.1 + ny), vx(b.0 + nx, b.1 + ny), vx(b.0 - nx, b.1 - ny), vx(a.0 - nx, a.1 - ny)]);
     }
 

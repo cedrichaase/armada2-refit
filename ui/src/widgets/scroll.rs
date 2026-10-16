@@ -21,9 +21,8 @@ impl<'a> Ui<'a> {
     pub fn scrollbar(&mut self, id: Id, track: R, content: f32, view: f32, scroll: &mut f32) -> bool {
         let max = (content - view).max(0.0);
         *scroll = scroll.clamp(0.0, max);
-        let t = self.theme;
-        self.draw.rect_round(track, track.w * 0.5, t.track);
         if max <= 0.0 {
+            super::theme::scrollbar(self, track, R::new(track.x, track.y, track.w, track.h), super::theme::State::default());
             return false;
         }
         let before = *scroll;
@@ -50,9 +49,8 @@ impl<'a> Ui<'a> {
             }
         }
         let ty = track.y + free * (*scroll / max);
-        let inset = self.u(2.0);
-        let col = if theld { t.accent } else if thot { t.button_down } else { t.button_hot };
-        self.draw.rect_round(R::new(track.x + inset, ty + inset, track.w - 2.0 * inset, th - 2.0 * inset), (track.w - 2.0 * inset) * 0.5, col);
+        let st = super::theme::State::of(self, tid, thot, theld);
+        super::theme::scrollbar(self, track, R::new(track.x, ty, track.w, th), st);
         *scroll != before
     }
 

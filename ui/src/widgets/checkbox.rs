@@ -1,5 +1,6 @@
 //! Check boxes and radio buttons, focusable (Space or Enter flips or picks the focused
 //! one).
+use super::theme::{self, State};
 use super::Ui;
 use crate::gfx::{Weight, R};
 
@@ -20,23 +21,12 @@ impl<'a> Ui<'a> {
         if flip {
             *on = !*on;
         }
-        let bs = r.h.min(self.u(t.text_size + 2.0));
-        let b = R::new(r.x, r.y + (r.h - bs) * 0.5, bs, bs);
-        let rad = self.u(3.0);
-        let e = self.u(t.edge).max(1.0);
-        if focused {
-            self.focus_ring(b, rad);
-        }
-        self.draw.rect_round(b, rad, if hot || held { t.accent } else { t.panel_edge });
-        self.draw.rect_round(b.inset(e), (rad - e).max(0.0), t.track);
-        if *on {
-            let w = self.u(2.5).max(1.5);
-            let p = |fx: f32, fy: f32| (b.x + b.w * fx, b.y + b.h * fy);
-            self.draw.line(p(0.24, 0.52), p(0.43, 0.72), w, t.accent);
-            self.draw.line(p(0.43, 0.72), p(0.78, 0.30), w, t.accent);
-        }
-        let gap = self.u(t.pad * 0.6);
-        self.text_in(R::new(b.right() + gap, r.y, r.w - bs - gap, r.h), label, t.text_size, super::Align::Left, t.text, Weight::Regular);
+        let mut st = State::of(self, id, hot, held);
+        st.focus = focused;
+        let bs = theme::check(self, r, *on, st);
+        let gap = self.u(t.pad * 0.7);
+        let col = theme::row_text(self, st);
+        self.text_in(R::new(r.x + bs + gap, r.y, r.w - bs - gap, r.h), label, t.text_size, super::Align::Left, col, Weight::Regular);
         flip
     }
 
@@ -57,19 +47,12 @@ impl<'a> Ui<'a> {
         if pick {
             *sel = value;
         }
-        let bs = r.h.min(self.u(t.text_size + 2.0));
-        let b = R::new(r.x, r.y + (r.h - bs) * 0.5, bs, bs);
-        let e = self.u(t.edge).max(1.0);
-        if focused {
-            self.focus_ring(b, bs * 0.5);
-        }
-        self.draw.rect_round(b, bs * 0.5, if hot || held { t.accent } else { t.panel_edge });
-        self.draw.rect_round(b.inset(e), bs * 0.5, t.track);
-        if *sel == value {
-            self.draw.rect_round(b.inset(bs * 0.28), bs * 0.5, t.accent);
-        }
-        let gap = self.u(t.pad * 0.6);
-        self.text_in(R::new(b.right() + gap, r.y, r.w - bs - gap, r.h), label, t.text_size, super::Align::Left, t.text, Weight::Regular);
+        let mut st = State::of(self, id, hot, held);
+        st.focus = focused;
+        let bs = theme::radio(self, r, *sel == value, st);
+        let gap = self.u(t.pad * 0.7);
+        let col = theme::row_text(self, st);
+        self.text_in(R::new(r.x + bs + gap, r.y, r.w - bs - gap, r.h), label, t.text_size, super::Align::Left, col, Weight::Regular);
         picked
     }
 

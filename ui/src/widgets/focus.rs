@@ -9,7 +9,7 @@
 //! with `keyboard_nav` (a mission's Tab is the game's).
 use super::state::persist;
 use super::{Id, Ui};
-use crate::gfx::{fade, R};
+use crate::gfx::R;
 
 pub const VK_BACK: u8 = 0x08;
 pub const VK_TAB: u8 = 0x09;
@@ -66,9 +66,7 @@ impl<'a> Ui<'a> {
     /// The mark of the focused widget: an accent outline just outside `r`. Drawn
     /// before the widget's own body, which covers its inside.
     pub fn focus_ring(&mut self, r: R, radius: f32) {
-        let c = fade(self.theme.accent, 0.9);
-        let t = self.u(2.0).max(1.0);
-        self.draw.rect_round(r.inset(-t), radius + t, c);
+        super::theme::focus_ring(self, r, crate::gfx::Corners::round(radius));
     }
 
     pub(super) fn focus_end(&mut self) {

@@ -352,15 +352,19 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
 | `[UI] Cursor` | 0 | draw the mouse cursor ourselves, from the game's own cursor art ("The cursor") |
 | `[UI] CursorSize` | 32 | its size in units (32 texels of art at 1080 lines) |
+| `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472` everywhere |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
+| `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
 
 ## The renderer (`src/gfx/`)
 
 Everything a frame of UI draws goes into one vertex list and is drawn with **one
 shader pair** (`shaders/ui.hlsl`), so a frame costs a handful of draw calls whatever is
 on screen. Each vertex carries its *kind*: solid colour, textured, signed-distance
-text, or an analytic rounded rectangle (its distance to the edge computed per pixel,
-antialiased over one pixel, so corners are smooth at any radius without a texture).
+text, an analytic rounded rectangle (its distance to the edge computed per pixel,
+antialiased over one pixel, so corners are smooth at any radius without a texture), or
+the style's *shape* (`src/gfx/fx.rs`, `STYLE.md`): each corner rounded or chamfered,
+filled or stroked, soft-edged for glows and shadows, an LCARS elbow's cut-out, stripes.
 The pixel shader weights the kinds with `step()` rather than branching on them, as
 vkd3d needs (`render3d/README.md`). A new draw call starts only when the texture or the
 clip rectangle changes; solid quads take whatever texture the run has, since they do
@@ -419,8 +423,14 @@ from `Anchor` (a rectangle against a screen edge or corner) and `Stack` (rows do
 rectangle). Panels and every interactive widget **claim** the pointer: while it is
 over one, `Ui::end` asks `input` to keep the mouse from the engine, from the next frame.
 
+**How every widget looks is `STYLE.md`**: the tokens of one theme per race and one
+for the shell are `widgets/theme.rs` (`Theme`, chosen per context by `[UI] Theme`), and
+each widget draws itself by calling a function there with its `State` (hover eased by
+`widgets/anim.rs`), so a theme restyles them all.
+
 The first widgets: `panel`, `window` (a panel with a title), `label`, `note`, `button`,
-`toggle`, `slider` and `progress`, over the drawing calls (`rect`, gradients,
+`toggle`, `slider` and `progress` (button, toggle and slider take the keyboard focus),
+over the drawing calls (`rect`, gradients,
 `rect_round`, `frame`, `line`, `image`, `nine`, `text`). The rest, one file each in
 `src/widgets/`:
 

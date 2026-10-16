@@ -7,7 +7,7 @@
 //! character, so no byte offset ever lands inside one.
 use super::focus::*;
 use super::Ui;
-use crate::gfx::{fade, R};
+use crate::gfx::R;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -270,26 +270,21 @@ impl<'a> Ui<'a> {
         st[2] = scroll;
 
         // Drawing.
-        let rad = self.u(t.radius * 0.7);
-        if focused {
-            self.focus_ring(r, rad);
-        }
-        let edge = if focused { t.accent } else if hot { t.text_dim } else { t.panel_edge };
-        self.draw.rect_round(r, rad, edge);
-        self.draw.rect_round(r.inset(e), (rad - e).max(0.0), t.track);
+        let mut fs = super::theme::State::of(self, id, hot, false);
+        fs.focus = focused;
+        super::theme::field(self, r, fs);
         self.draw.push_clip(inner);
         let y = libm::roundf(r.y + (r.h - line_h) * 0.5);
         if caret != anchor {
             let (lo, hi) = (caret.min(anchor), caret.max(anchor));
             let x0 = width(&chars[..lo], px) - scroll;
             let x1 = width(&chars[..hi], px) - scroll;
-            self.draw.rect(R::new(inner.x + x0, y, x1 - x0, line_h), fade(t.accent, 0.4));
+            self.draw.rect(R::new(inner.x + x0, y, x1 - x0, line_h), super::theme::selection(self));
         }
         self.draw.text(text, px, libm::roundf(inner.x - scroll), y, t.text);
         let since = self.time() as f32 - st[3];
-        if focused && (since < 0.5 || (since * 1.8) as u32 % 2 == 0) {
-            let cx = libm::roundf(inner.x + caret_x - scroll);
-            self.draw.rect(R::new(cx, y, self.u(1.5).max(1.0), line_h), t.text);
+        if focused {
+            super::theme::caret(self, inner.x + caret_x - scroll, y, line_h, since);
         }
         self.draw.pop_clip();
         ev

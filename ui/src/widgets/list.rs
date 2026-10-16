@@ -3,7 +3,7 @@
 //! scrollbar. The rows are drawn by a closure, so a row can be anything.
 use super::focus::*;
 use super::{Align, Ui};
-use crate::gfx::{fade, Weight, R};
+use crate::gfx::{Weight, R};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ListEvent {
@@ -109,11 +109,8 @@ impl<'a> Ui<'a> {
         sc = sc.clamp(0.0, (content - view.h).max(0.0));
 
         // Drawing.
-        if focused {
-            self.focus_ring(r, rad);
-        }
-        self.draw.rect_round(r, rad, if focused { t.accent } else { t.panel_edge });
-        self.draw.rect_round(inner, (rad - e).max(0.0), t.track);
+        let _ = (rad, e);
+        super::theme::field(self, r, super::theme::State { focus: focused, ..Default::default() });
         if needs {
             let track = R::new(inner.right() - bar_w - self.u(2.0), inner.y + self.u(2.0), bar_w, inner.h - self.u(4.0));
             self.scrollbar(self.sub_id(id, "bar"), track, content, view.h, &mut sc);
@@ -130,11 +127,8 @@ impl<'a> Ui<'a> {
                 let rr = R::new(view.x, view.y + i as f32 * row_h - sc, view.w, row_h);
                 let s = *sel == Some(i);
                 let h = hover == Some(i);
-                if s {
-                    self.draw.rect(rr, fade(t.accent, 0.28));
-                } else if h {
-                    self.draw.rect(rr, fade(t.button_hot, 0.7));
-                }
+                let st = super::theme::State { hot: h as u8 as f32, on: s, ..Default::default() };
+                super::theme::row(self, rr, i, st);
                 row(self, i, rr, s, h);
             }
         }
@@ -148,8 +142,8 @@ impl<'a> Ui<'a> {
         let t = self.theme;
         let row_h = self.u(t.text_size + 14.0);
         let pad = self.u(t.pad * 0.7);
-        self.list(r, label, items.len(), row_h, sel, |ui, i, rr, s, _| {
-            let c = if s { 0xffffffff } else { t.text };
+        self.list(r, label, items.len(), row_h, sel, |ui, i, rr, s, h| {
+            let c = super::theme::row_text(ui, super::theme::State { hot: h as u8 as f32, on: s, ..Default::default() });
             ui.text_in(R::new(rr.x + pad, rr.y, rr.w - pad, rr.h), items[i], t.text_size, Align::Left, c, Weight::Regular);
         })
     }

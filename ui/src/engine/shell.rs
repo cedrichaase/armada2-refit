@@ -90,7 +90,7 @@ pub fn install() -> bool {
         return false;
     }
     unsafe { READY = true };
-    if crate::config::get().demo_shell {
+    if crate::config::get().demo_shell || crate::config::get().demo_style {
         if !hook::patch_call(SITE_CREDITS, FN_SHOW_CREDITS, demo_credits as *const () as usize) {
             log!("shell: could not patch {:#x}", SITE_CREDITS);
             return false;

@@ -19,6 +19,7 @@ pub mod input;
 pub mod math;
 #[rustfmt::skip]
 pub mod shaders;
+pub mod style;
 pub mod surface;
 pub mod text;
 pub mod widgets;
