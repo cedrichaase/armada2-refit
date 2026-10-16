@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.7.0 — 2026-10-16
+
+### Added
+- A third view: a non-main view from a camera other than the action camera's (UI.asi's
+  info-panel close-up) keeps per-view state of its own (`View::key` 2), and is logged as
+  "other".
+
+Installed, not yet seen in game.
+
 ## 0.6.1 — 2026-10-16
 
 ### Fixed

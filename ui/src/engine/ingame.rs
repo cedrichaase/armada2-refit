@@ -63,8 +63,15 @@ unsafe extern "thiscall" fn chat_render(chat: usize) {
     let flush: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(TRIFAN_FLUSH) };
     unsafe { flush(dev + DEV_TRIFAN) };
     count();
+    // The info panel's close-up: a view of the engine's, drawn before the UI's frame
+    // and flushed with it (`engine::closeup`).
+    if crate::config::get().hud.info_camera {
+        super::closeup::render();
+        unsafe { flush(dev + DEV_TRIFAN) };
+    }
     crate::widgets::theme::set_player_race(super::race::mission_race());
     surface::frame(Context::Mission);
+    super::closeup::end_frame();
 }
 
 /// Logs the frame rate the hook runs at, a few times after each start, so UI.log

@@ -33,7 +33,7 @@ each tooltip ("info: tooltip ..."), and each press ("info: cancel queue slot 2",
 8. Move the mouse to 1000,150.
 9. Expect "UI.log" contains "Galaxy Class".
 10. Take a screenshot called "one unit".
-11. Check that at the bottom centre there is one dark square-cornered panel with green corner brackets, holding a grey wireframe of a starship at its left, a ship's name in capitals and "Galaxy Class" below it, two thin bars each with an icon at the left and "100%" at the right, a row of small green numbers with icons, and a row of five boxes along the bottom each with an icon and a percentage; and that a grid of command icons sits above or beside it.
+11. Check that at the bottom centre there is one dark square-cornered panel with green corner brackets, holding at its left a square picture of a starship drawn in 3D against space (the close-up, `[HUD] InfoCamera`), a ship's name in capitals and "Galaxy Class" below it, two thin bars each with an icon at the left and "100%" at the right, a row of small green numbers with icons, and a row of five boxes along the bottom each with an icon and a percentage; and that a grid of command icons sits above or beside it.
 12. Scene "select moon".
 13. Wait 1 second.
 14. Expect "UI.log" contains "Dilithium Moon".
@@ -41,7 +41,7 @@ each tooltip ("info: tooltip ..."), and each press ("info: cancel queue slot 2",
 16. Wait 1 second.
 17. Expect "UI.log" contains "Negh'Var Class".
 18. Take a screenshot called "enemy".
-19. Check that the panel at the bottom now names a Klingon ship of the "Negh'Var Class" and shows its wireframe.
+19. Check that the panel at the bottom now names a Klingon ship of the "Negh'Var Class" and shows it in 3D at the left.
 20. Scene "select base".
 21. Wait 1 second.
 22. Expect "UI.log" contains "info: Builder".
@@ -73,7 +73,7 @@ each tooltip ("info: tooltip ..."), and each press ("info: cancel queue slot 2",
 48. Move the mouse to 1000,150.
 49. Wait 1 second.
 50. Take a screenshot called "damaged".
-51. Check that the panel shows one destroyer whose wireframe is partly or wholly red, with its hull bar short and red or orange, and some of its five system boxes showing red percentages below 100%.
+51. Check that the panel shows one destroyer in 3D at the left, with its hull bar short and red or orange, and some of its five system boxes showing red percentages below 100%.
 52. Move the mouse to 770,270.
 53. Wait 1 second.
 54. Take a screenshot called "hover".

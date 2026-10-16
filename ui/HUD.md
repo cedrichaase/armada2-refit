@@ -12,7 +12,8 @@ anything is patched or called.
     Bar=1         ; the button bar is ours (below)
     BarKeys=1     ; with it, the grid's keys; 0 keeps stock's bar keys
     BarLabels=1   ; the key in each button's corner
-    Info=1        ; the info panel is ours (below)
+    Info=1        ; the info panel is ours (below); InfoCamera=1 its close-up,
+                  ; InfoScale=1.3 its size
     Minimap=1     ; the minimap is ours (below); MinimapSize=300, its side in units
     Selection=1   ; the selection overlay is ours; SelectionGauges=1 shows the
                   ; selected units' gauges always (0: as stock, while pointed at)
@@ -300,6 +301,44 @@ half health (`+0x158`). The gravity mine's slowing (`GameObject::GetSlowEffect`)
 Romulan spy aboard (`GetLineOfSightEffect`, its ordnance class a `RomulanSpyClass`)
 add stock's `gravmine_icon` and `romspy_icon`. The race emblem is `<race>_icon`, the
 race's name at `GameObject+0xfc`, `+0x14`.
+
+**The close-up** (`engine/closeup.rs`, `[HUD] InfoCamera=1`) takes the wireframe's
+place for a single craft (stations included; not planets): the unit drawn live by the
+engine's renderer from a camera of ours, a front three-quarter view from a little below
+its plane, drifting slowly about it, its heading following the unit's with a lag. It is
+a third view of the scene, made as the action camera's is (`CinematicView::RenderView`
+0x4e5f60, below in "The unit view"): an `Armada_Camera` made as `CinematicView::Init`
+makes its own (`operator new` 0x288 bytes, the constructor 0x590a10 with no database
+or node and a name of ours, the action camera's `Render_Stuff` 0x7637b8 at `+0x284`),
+given a viewport (`ST3D_Camera::SetViewport` 0x61a550, floats x, y, w, h at `+0x1b0`),
+near and far planes (0x6198c0, 0x6198a0), a pose (`SetTransform`, vtable `+0x14`: rows
+right, up, forward, position) framed by the unit's bounding sphere (the instance at
+`Entity+0x04`: sphere `+0x34`, transform `+0x44`) and the camera's field of view
+(`+0x1a8`), made current around the body (`ST3D_GraphicsEngine::SetCurrentCamera`
+0x62c2d0), and drawn with `isMain` false through the action camera's call site
+(0x4e60f6). Only a camera named `MainCam` is sized to the back buffer by
+`Armada_Camera::UpdateViewport`, so ours keeps its viewport.
+
+It goes through render3d only: the site must call render3d's body, which keys its
+per-view state by camera (main, action camera, other), so the close-up shares no nebula
+ladder or hull list with the action camera. The engine's own body ages particles once
+per view, so without render3d the wireframe stays. A view leaves state behind that the
+HUD and the simulation read: the on-screen byte (`Entity+0x25`, cleared once a frame
+by `Entity::ResetVisibility`, on the list at 0x76104c) and the distance cull
+(`GameObject+0x183`, on `GameObject::objectList` 0x761084) are saved before and put
+back after, and `DisplayInterface::currentCamera` (0x765010) too; with `isMain` false
+the body does not run `DisplayInterface::PreRenderAll`.
+
+It is drawn by the mission hook (`engine::ingame`) just before the UI's frame, at the
+place the panel asked for in the frame before: the back buffer's region is copied
+aside, the view drawn there, copied into the picture the panel draws, and the region
+copied back, so the back buffer is as the engine left it whatever the panel does. The
+two textures are render targets in the default pool, released before a device `Reset`
+(the d3d8 device's slot 14, chained as render3d chains it). The first frame of a unit
+shows its wireframe. `[HUD] InfoScale` (1.3) sizes the whole panel, close-up, words and
+bars alike. `UI.log`: "closeup: available", "closeup: object ..., radius ...".
+Seen on the bench 2026-10-16 at 1280x720 (`ui-hud-info` scene): the Galaxy and the
+starbase drawn live, lit, with the Galaxy's phaser fire crossing the picture.
 
 **The queue** is `Producer::GetBuildQueue` (0x4b8070): ten classes, 0 for a free slot.
 A click on one is `Producer::RequestDeleteBuildQueueItem` (vtable +0x140) with the

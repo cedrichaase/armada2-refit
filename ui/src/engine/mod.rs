@@ -7,6 +7,7 @@
 //! hooks, checked against what stock has there, and stands down on a mismatch.
 pub mod buttons;
 pub mod chat;
+pub mod closeup;
 pub mod cursor;
 pub mod dev8;
 pub mod dialogs;

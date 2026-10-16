@@ -204,6 +204,11 @@ pub fn current() -> usize {
     unsafe { rd::<usize>(SD + CURRENT) }
 }
 
+/// Whether the panel still shows `obj` alone (the close-up checks before it draws).
+pub fn still_single(obj: usize) -> bool {
+    !super::hud::hidden(SD) && !super::ingame::hud_hidden() && matches!(face(), Face::Single | Face::Builder) && current() == obj
+}
+
 /// The craft under the pointer in the 3D view this frame, and clears it as stock's
 /// `Render` does once it has drawn the hover strip.
 pub fn take_hover() -> usize {
