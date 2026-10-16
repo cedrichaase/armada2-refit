@@ -323,6 +323,7 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 | `[UI] Log` | 1 | `UI.log` in the game directory: which hooks are in, and why one stood down |
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context |
+| `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 0, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)) |
 
 ## The renderer (`src/gfx/`)
 
@@ -392,6 +393,14 @@ over one, `Ui::end` asks `input` to keep the mouse from the engine, from the nex
 The widgets so far are what the first screens need: `panel`, `window` (a panel with a
 title), `label`, `note`, `button`, `toggle`, `slider` and `progress`, over the drawing
 calls (`rect`, gradients, `rect_round`, `frame`, `line`, `image`, `nine`, `text`).
+
+## The HUD
+
+The in-mission HUD is taken over a panel at a time: each stock `DisplayInterface`
+component keeps simulating, and one switch stops it drawing and taking the mouse while a
+panel of ours reads its state and presses its buttons. The button bar is the first.
+[`HUD.md`](HUD.md) has the inventory of the HUD's components, the switch, the bar and
+the engine reads each panel uses.
 
 ## Testing
 

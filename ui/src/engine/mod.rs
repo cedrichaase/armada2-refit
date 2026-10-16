@@ -13,6 +13,8 @@ pub mod ingame;
 pub mod loading;
 pub mod msvc;
 pub mod palette;
+pub mod resources;
+pub mod selection;
 pub mod shell;
 pub mod sound;
 pub mod sprite;
