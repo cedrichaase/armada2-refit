@@ -98,7 +98,7 @@ settings screens; Exit.
 72. Wait 2 seconds.
 73. Take a screenshot called "objectives".
 74. Check that a window of the UI's style lists the mission's objectives with check boxes.
-75. Press Return.
+75. Click "OK".
 76. Wait 2 seconds.
 77. Press Escape.
 78. Wait 3 seconds.
