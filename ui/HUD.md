@@ -387,6 +387,20 @@ just outside its rectangle (`+0x04`), with the form's accent at two corners, whi
 is shown. `DisplayInterface::SetInterfaceState` shows it in state 0 and hides it in the
 others.
 
+### Seen on the bench (minimap, overlay)
+
+2026-10-16. Instant Action as the Borg at 1280x720 (`ui-hud-map`): our minimap drew at
+the bottom left with the base's clearing, its blips and the camera's outline; a right
+click on it ordered the selected Assembler there ("minimap: order 0x2b"), which moved;
+a left click moved the camera; a ship sent north carried its clearing with it (grid
+orientation). The selected Assembler showed brackets and its hull and shield gauges.
+`fog` scene at 1920x1080 (`ui-hud-overlay`): three ships in group 1 showed brackets,
+"1" badges and gauges, the destroyer under Klingon fire with a short red hull gauge;
+the minimap showed own blips green, the enemy red, and the tactical view's ring. The
+judged steps passed in earlier runs; the last runs (after the fog colour change)
+passed every logged step, their judged steps left for review (the judge was
+unavailable). `UnitView=1` was never seen drawing: the unit view stayed hidden.
+
 ## The engine API
 
 One file per area in `src/engine/`, each read by offset through small accessors, each
@@ -420,3 +434,7 @@ named here beside the panel that uses it:
   bar's `PreSimulate` sends the bar back to the top level when a click lands outside it
   while it holds the lock; ours never holds it. Not seen to matter.
 - Only the Borg have been seen, at 1280x720.
+- **Minimap / overlay**: the damaged systems' icons over a pointed unit, the shot
+  director's rings in the tactical view and the pointer's action cursor over the
+  minimap (ours shows the arrow) are not drawn; `UnitView` is unseen; the bar still
+  places itself by the stock radar's rectangle.

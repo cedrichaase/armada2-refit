@@ -486,7 +486,8 @@ demo panel, in four tabs (Text, Lists, Choice, Misc). The scenario `ui-widgets` 
 
 The in-mission HUD is taken over a panel at a time: each stock `DisplayInterface`
 component keeps simulating, and one switch stops it drawing and taking the mouse while a
-panel of ours reads its state and presses its buttons. The button bar is the first.
+panel of ours reads its state and presses its buttons. The button bar is the first;
+the minimap, the selection overlay and the unit view's frame followed.
 [`HUD.md`](HUD.md) has the inventory of the HUD's components, the switch, the bar and
 the engine reads each panel uses.
 
