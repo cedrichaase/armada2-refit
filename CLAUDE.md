@@ -689,10 +689,12 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   blue-noise thresholds stay put from frame to frame; moving either made the gas
   shimmer. The noise is spectral, not value noise (value noise's grid drew walls). In
   the shadow map a texel of 1 means no hull, never a hull at the far end.
-- **The sky's settled looks stay**: Aqua is meant to be dimmer and softer than stock
-  (the user preferred it), soft billows and no filaments; a recipe's level and colour
-  balance are its grade, fitted by `render3d/perf/sky-grade.py` from a bench bake,
-  not hand-tuned. The cube is magnified a few times at 4K, so finer detail comes from
+- **The skies follow stock by measurement**: since 2026-10-16 the user wants each
+  recipe's shape and texture to match its stock sky, Aqua and `mbgrg` included (their
+  old dimmer looks were dropped). Shape is fitted by `render3d/perf/sky-shape.py
+  --fit`, level and colour balance by `render3d/perf/sky-grade.py`, both from bench
+  bakes, not hand-tuned; soft billows, no filaments, no speckle (`Grain`/`Dust`/`Fine`
+  stay off). The cube is magnified a few times at 4K, so finer detail comes from
   the draw, not a bigger cube. A recipe in `render3d/skies/` is built in; a
   `Sky\<name>.ini` in the game directory takes precedence.
 - **Surfaces are looked up about a mesh's centre, scaled to its extents**, never its

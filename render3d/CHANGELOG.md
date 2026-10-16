@@ -4,6 +4,44 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.3.0 — 2026-10-16
+
+### Added
+- Sky: recipe key `Octaves=` (1-6, default 6): how many of the gas's octaves count, a
+  fraction fading the finest out.
+- `perf/sky-shape.py`: measures a recipe's shape against the stock faces (log
+  luminance in octave bands and standardised tones, at 512 a face with stock magnified
+  bilinearly), and with `--fit` fits `Scale`, `Detail`, `Octaves`, `Coverage`,
+  `Softness` (only wider) and `Warp` (only lower) on a running bench game.
+
+### Changed
+- Sky: every recipe in `skies/` has its shape fitted to its stock sky (distance from
+  stock's structure 0.12-0.45 after grading, from 0.13-1.16), then its grade refitted:
+  many mid-sized clumps where most skies had one or two large billows (a40a752).
+- Sky: Aqua and `mbgrg` are graded to stock like the rest (0.92 and 0.90 of stock's
+  luminance); `perf/sky-grade.py`'s POLICY is empty.
+
+### Fixed
+- Sky: a recipe star's halo was cut at the lattice cells' borders, a faint square
+  about `mbgpur`'s big star; it now fades out within the cells searched (a40a752).
+
+Installed, not yet seen in game.
+
+## 0.2.1 — 2026-10-16
+
+### Changed
+- Sky: the recipes draw the broad gas only. `Grain=` and `Dust=` are gone from every
+  recipe in `skies/`, and `Fine=` (the draw-time detail) defaults to `0` (off); the keys
+  remain. `GradeGain=`/`GradeCurve=` refitted to the stock faces without them, three
+  passes of `perf/sky-grade.py` (0.89-0.92 of stock's luminance; `mbgrg` 0.55, Aqua
+  ungraded, as before) (712a09a).
+
+### Fixed
+- `perf/sky-grade.py`: `mbgblue` is no longer fitted again on top of the `mbg02` grade
+  it is given (it wrote gains of 18-19) (712a09a).
+
+Installed, not yet seen in game.
+
 ## 0.2.0 — 2026-10-15
 
 ### Added

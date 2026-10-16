@@ -5,6 +5,30 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.3.0 — 2026-10-16
+
+Layers: render3d 0.3.0.
+
+### Changed
+- The procedural skies are fitted to their stock skies' shape (clump size, edges,
+  tones) by measurement, and graded to stock again, Aqua and `mbgrg` included; new
+  recipe key `Octaves=` and tool `render3d/perf/sky-shape.py` (render3d 0.3.0; a40a752).
+
+Installed, not yet seen in game.
+
+## 12.2.0 — 2026-10-16
+
+Layers: render3d 0.2.1, testbench 3.19.0.
+
+### Changed
+- The procedural skies lose their grain, dust and draw-time fine detail, and their
+  grades are refitted to stock without them (render3d 0.2.1; 712a09a).
+
+### Added
+- Bench scene `sky`: the sky alone (testbench 3.19.0; 712a09a).
+
+Installed, not yet seen in game.
+
 ## 12.1.0 — 2026-10-16
 
 Layers: films 1.0.0, testbench 3.18.0.
@@ -18,7 +42,6 @@ Layers: films 1.0.0, testbench 3.18.0.
   3.18.0).
 
 Tooling only; nothing to see in game.
-
 
 ## 12.0.0 — 2026-10-15
 
