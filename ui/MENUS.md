@@ -484,6 +484,40 @@ closes).
   as lists, and the buttons along the bottom. GameSpy is gone, so the account screens
   and the room list are not reached; they are forms so that they work if they are.
 
+### The Internet lobby (`lobby.rs`)
+
+`do_internetGame` (`InternetGameDlgProc`, 0x5b15f0): the screen every network
+connection type comes to before Game Setup, *Internet - Manual IP*, the LAN types and
+*Internet - Online* alike (online/README.md). Its template (0x871) holds three windows:
+the chat log (id 2098, a read-only multi-line edit), the chat line (2097) and the hidden
+combo box behind the game-type filter (2114); the rest is shell widgets the procedure
+makes in `WM_INITDIALOG`, each labelled from `label.map`'s `internet_game` section: the
+title (`internet_title`, `lan_title`, `gamespy_title` by connection), the captions
+"current games", "players in room" and "chat", Create Game and Join Game under the game
+list (design y 258), Previous Menu and Main Menu along the bottom (y 562), the game
+rows (labelled `ShellButton`s in a `RadioBox`, one per game the search has found, as
+`name (players/max) ping "map"`), the players in the room (`PlayerListButton`s, at the
+right), the filter (a shell `ComboBox`), and three of the shell's `ScrollBar`s, whose
+arrow buttons are picture buttons.
+
+The spec finds them by place: the game rows are the labelled buttons left of x 560
+between the caption and the actions, the players those right of it, the actions the
+labelled buttons at y 250..280, the way out those below y 540. Ours: the title, a
+"current games" window (the filter as our drop-down, the rows as our rows, Create Game
+and Join Game under them), the players' window, a chat window across the bottom (the
+log's last lines, the line as our field) and the way out. A click on a row is the stock
+row's click, which selects it (its held state shows as our selection); the arrows click
+the stock arrows. `Online.asi`'s messages ("No game with the join code ...", the "Local
+IP Address" line the game writes itself) are lines of the chat log, so they show there.
+
+**`Online.asi` opens no dialog of its own.** *Internet - Online* runs the Manual IP
+flow: the Manual IP dialog (`do_manual_ip`) with its prompt relabelled ("Join code or
+host address"), then this lobby, then Game Setup, and the server's messages and the
+host's join code go into the lobby's and Game Setup's chat boxes (online/README.md,
+"Showing the join code"). So every screen of the online flow is a stock dialog with a
+spec here (`forms::manual_ip`, `lobby`, `game_setup`); nothing of `Online.asi`'s needs
+to look like ours.
+
 ## The screens
 
 Every shell dialog, by the `do_*` function that opens it. Template is the resource id
@@ -507,7 +541,7 @@ scenario gets there (`testbench/ui.json` has the named targets).
 | `do_mapSelect` | 0x87f | map select | Game Setup's map list | SELECT MAP | a list box | the preview |
 | `do_mapTransfer` | 0x87e | map transfer | sending a map (multiplayer) | not on the bench | progress | — |
 | `do_multiplayerConnection` | 0x872 | multiplayer connection | name and connection type | Multiplayer | the name `Edit` (399x32 @208,171), connection buttons | none |
-| `do_internetGame` | 0x871 | internet game | the lobby | Multiplayer -> a connection | game list, chat `Edit`, player list | the lists' rows |
+| `do_internetGame` | 0x871 | internet game | the lobby | Multiplayer -> a connection | game rows, players, chat `Edit`s, filter `ComboBox` | none (spec: `lobby.rs`) |
 | `do_manual_ip` | 0x887 | manual ip | the IP field | Multiplayer -> Manual IP | an `Edit` | none |
 | `do_roomSelect` | 0x87f | room select | GameSpy rooms | not on the bench (no GameSpy) | list | — |
 | `do_createRoom`, `do_gameName` | 0x873 | create room, game name | a name | Internet lobby -> Create Game | an `Edit` | none |

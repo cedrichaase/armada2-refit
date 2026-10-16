@@ -167,6 +167,12 @@ pub fn edit(ui: &mut Ui, s: &Screen, c: &Control, r: R) -> FieldEvent {
     if ev == FieldEvent::Changed && text != c.text {
         send_text(c.hwnd, &c.text, &text);
     }
+    if ev == FieldEvent::Submit {
+        // Enter in our field is the stock edit's Enter, given to its dialog as the modal
+        // loop gives it (`IsDialogMessageA`): the default button, `IDOK`, which is how
+        // the chat lines send and the small forms are confirmed.
+        actions::push(actions::Action::Enter { h: c.hwnd });
+    }
     ev
 }
 

@@ -84,7 +84,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         lr = R::new(lr.x, fr.bottom() + ui.u(t.gap), lr.w, lr.h - fr.h - ui.u(t.gap));
     }
     rows_list(ui, s, &rows, lr, row_h, "game");
-    let arrows = arrows_in(s, 0, RIGHT);
+    let arrows = arrows_in(s, RIGHT, 700, ACTIONS + 10);
     arrow_buttons(ui, s, &arrows, lr);
     let aw = ui.u(220.0);
     let ay = gi.bottom() - bh;
@@ -99,7 +99,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     players.sort_by_key(|c| c.rect[1]);
     let pi = ui.window(players_r, players_cap);
     rows_list(ui, s, &players, pi, row_h, "player");
-    arrow_buttons(ui, s, &arrows_in(s, RIGHT, 800), pi);
+    arrow_buttons(ui, s, &arrows_in(s, 700, 800, BOTTOM), pi);
 
     // ---- the chat
     let ci = ui.window(chat_r, chat_cap);
@@ -154,11 +154,11 @@ fn rows_list(ui: &mut Ui, s: &Screen, rows: &[&Control], r: R, row_h: f32, what:
 
 /// The picture buttons (no label) of a column, top to bottom: the stock scroll bars'
 /// arrows.
-fn arrows_in<'a>(s: &'a Screen, x0: i32, x1: i32) -> Vec<&'a Control> {
+fn arrows_in<'a>(s: &'a Screen, x0: i32, x1: i32, y1: i32) -> Vec<&'a Control> {
     let mut v = kit::visible(s, |c| {
         matches!(c.what, What::Shell(Kind::Button)) && (c.text.trim().is_empty() || c.text.eq_ignore_ascii_case("NULL"))
     });
-    v.retain(|c| c.rect[0] >= x0 && c.rect[0] < x1 && c.rect[1] >= LIST_TOP && c.rect[1] < BOTTOM - 240 && c.rect[2] <= 32 && c.rect[3] <= 32);
+    v.retain(|c| c.rect[0] >= x0 && c.rect[0] < x1 && c.rect[1] >= LIST_TOP && c.rect[1] < y1 && c.rect[2] <= 32 && c.rect[3] <= 32);
     v.sort_by_key(|c| c.rect[1]);
     v
 }
