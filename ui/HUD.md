@@ -220,7 +220,10 @@ orders (W=repair E=superRepair A=patrol S=scout Z=guard X=decom G=back), R the A
 as a 3x3 with the active alert levels outlined, E formations; G came back each time; on
 the Nexus, Q opened its build list, Q twice queued two construction ships and T
 cancelled one. The selection stayed through every click on the bar, and the cursor
-over it was the arrow. `testbench/scenarios/ui-hud-bar.md` is the regression test.
+over it was the arrow. `testbench/scenarios/ui-hud-bar.md` is the regression test:
+every step passed (judged and logged), but its last, `Quit the game`, which hangs on
+a black screen after Exit to Windows on the bench that night with UI.asi taken out
+too (`testbench/operating/hud-takeover.md`).
 
 ## The engine API
 
@@ -239,7 +242,13 @@ named here beside the panel that uses it:
 
 ## Not done
 
-- **The info panel** and every other panel (the order above).
+- **The info panel** and every other panel (the order above). For the info panel the
+  likely way in is the panel's own child components rather than the objects: its texts
+  are `StandardText` subclasses (`NameText`, `ClassText`, `CrewText`, `HullText`, ...)
+  whose `GetInformation` answers the colour and the string the stock panel draws, so
+  ours would show exactly what stock computes; the bars, the wireframe and the icons
+  need their own reads, and its clicks (group icons, the build queue, system repair)
+  their own presses.
 - `GridLayout.ini`'s `[Cells]` (moving one button to another key) has no `UI.ini`
   counterpart yet; nor the trade buttons' exchange-rate label and the percentage some
   commands draw on their button (`ControlButton::Render` draws both as text).
