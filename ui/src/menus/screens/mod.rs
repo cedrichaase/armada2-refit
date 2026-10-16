@@ -11,12 +11,20 @@ use super::Screen;
 use crate::widgets::Ui;
 
 pub mod admirals_log;
+pub mod common;
+pub mod form;
+pub mod game_settings;
+pub mod graphics_settings;
 pub mod kit;
 pub mod main_menu;
 pub mod mission_select;
+pub mod notice;
+pub mod options;
 pub mod saves;
 pub mod single_player;
+pub mod sound_settings;
 pub mod tech_tree;
+pub mod text_window;
 
 pub struct Spec {
     /// The screen it lays out, as `engine::dialogs::screen_name` names it.
@@ -32,6 +40,15 @@ pub const SPECS: &[Spec] = &[
     Spec { screen: "save game", draw: saves::draw_save },
     Spec { screen: "admiral's log", draw: admirals_log::draw },
     Spec { screen: "technology tree", draw: tech_tree::draw },
+    Spec { screen: "options", draw: options::draw },
+    Spec { screen: "game settings", draw: game_settings::draw },
+    Spec { screen: "graphics settings", draw: graphics_settings::draw },
+    Spec { screen: "sound settings", draw: sound_settings::draw },
+    Spec { screen: "message", draw: notice::draw },
+    Spec { screen: "yes or no", draw: notice::draw },
+    Spec { screen: "net waiting", draw: notice::draw },
+    Spec { screen: "help", draw: text_window::draw },
+    Spec { screen: "licence agreement", draw: text_window::draw },
 ];
 
 pub fn find(screen: &str) -> Option<&'static Spec> {

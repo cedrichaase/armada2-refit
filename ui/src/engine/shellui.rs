@@ -51,6 +51,15 @@ const BTN_ENABLED: usize = 0xe8;
 const BTN_COLOUR: usize = 0x28; // label colour, COLORREF
 const BTN_LEFT: usize = 0x174; // label left-aligned
 const BTN_RIGHT: usize = 0x175; // label right-aligned
+// `ShellScrollBar` fields (ctor 0x5a6280, `CheckButtons` 0x5a63f0, `Draw` 0x5a6520).
+const SB_RECT: usize = 0x28; // the whole bar: left, top, right, bottom
+const SB_TRACK_START: usize = 0x10; // horizontal: the end of the first arrow button
+const SB_TRACK_TOP: usize = 0x14; // vertical: the end of the first arrow button
+const SB_VALUE: usize = 0x3c;
+const SB_TRACK_LEN: usize = 0x40; // the length of the track between the arrow buttons
+const SB_HORIZONTAL: usize = 0x44;
+const SB_LO: usize = 0x48;
+const SB_HI: usize = 0x4c;
 const TOGGLE_ON: usize = 0x188; // ShellToggleButton: on
 const CYCLE_SELECTION: usize = 0x198; // CycleButton: the choice shown
 // `TextLabel` fields.
@@ -178,6 +187,12 @@ pub struct Widget {
     pub colour: u32,
     /// -1 left, 0 centred, 1 right.
     pub align: i32,
+    /// `ShellScrollBar`: the value, its range, and where the track lies along the bar
+    /// (first pixel, length), in the dialog's coordinates; `horizontal`.
+    pub value: i32,
+    pub range: (i32, i32),
+    pub track: (i32, i32),
+    pub horizontal: bool,
 }
 
 fn cstr_at(a: usize, max: usize) -> String {
@@ -206,7 +221,27 @@ fn read(w: usize) -> Option<Widget> {
     let slot = |i: usize| rd::<usize>(vt + i * 4);
     if slot(8) == FN_BUTTON_UPDATE_HDC || vt == VT_SCROLLBAR {
         if vt == VT_SCROLLBAR {
-            return None; // drawn and driven as part of its dialog (mirrored)
+            let horizontal = rd::<u8>(w + SB_HORIZONTAL) != 0;
+            let r = [rd::<i32>(w + SB_RECT), rd::<i32>(w + SB_RECT + 4), rd::<i32>(w + SB_RECT + 8), rd::<i32>(w + SB_RECT + 12)];
+            let start = rd::<i32>(w + if horizontal { SB_TRACK_START } else { SB_TRACK_TOP });
+            return Some(Widget {
+                obj: w,
+                kind: Kind::Scroll,
+                hwnd: rd::<usize>(w + 4) as HWND,
+                rect: r,
+                label: String::new(),
+                shown: true,
+                enabled: true,
+                mode: 0,
+                on: false,
+                choice: -1,
+                colour: 0,
+                align: 0,
+                value: rd::<i32>(w + SB_VALUE),
+                range: (rd::<i32>(w + SB_LO), rd::<i32>(w + SB_HI)),
+                track: (start, rd::<i32>(w + SB_TRACK_LEN)),
+                horizontal,
+            });
         }
         let kind = match vt {
             VT_CYCLE_BUTTON => Kind::Cycle,
@@ -233,6 +268,10 @@ fn read(w: usize) -> Option<Widget> {
             choice: if kind == Kind::Cycle { rd::<i32>(w + CYCLE_SELECTION) } else { -1 },
             colour: rd::<u32>(w + BTN_COLOUR),
             align: if rd::<u8>(w + BTN_LEFT) != 0 { -1 } else if rd::<u8>(w + BTN_RIGHT) != 0 { 1 } else { 0 },
+            value: 0,
+            range: (0, 0),
+            track: (0, 0),
+            horizontal: true,
         });
     }
     if slot(1) == FN_TEXTLABEL_DRAW {
@@ -259,6 +298,10 @@ fn read(w: usize) -> Option<Widget> {
             colour: rd::<u32>(w + LBL_COLOUR),
             // DT_CENTER 1, DT_RIGHT 2
             align: if flags & 1 != 0 { 0 } else if flags & 2 != 0 { 1 } else { -1 },
+            value: 0,
+            range: (0, 0),
+            track: (0, 0),
+            horizontal: true,
         });
     }
     None

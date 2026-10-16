@@ -76,6 +76,10 @@ pub struct Control {
     /// A scroll bar's position and range.
     pub pos: i32,
     pub range: (i32, i32),
+    /// A shell scroll bar: where its track lies along it in design coordinates (first
+    /// pixel, length), and whether it runs horizontally.
+    pub track: (i32, i32),
+    pub horizontal: bool,
     /// The label's colour from the game, 0xAARRGGBB; -1 left, 0 centred, 1 right.
     pub colour: u32,
     pub align: i32,
@@ -190,6 +194,8 @@ fn blank(what: What, key: usize, hwnd: HWND, rect: [i32; 4]) -> Control {
         top: 0,
         pos: 0,
         range: (0, 0),
+        track: (0, 0),
+        horizontal: true,
         colour: 0xffffffff,
         align: -1,
     }
@@ -269,6 +275,12 @@ fn shell_controls(dlg: HWND, ox: i32, oy: i32, out: &mut Vec<Control>) {
         c.hover = w.mode;
         c.checked = w.on;
         c.selected = w.choice;
+        if w.kind == Kind::Scroll {
+            c.pos = w.value;
+            c.range = w.range;
+            c.horizontal = w.horizontal;
+            c.track = (w.track.0 + if w.horizontal { ox } else { oy }, w.track.1);
+        }
         c.colour = bgr_to_argb(w.colour);
         c.align = w.align;
         out.push(c);

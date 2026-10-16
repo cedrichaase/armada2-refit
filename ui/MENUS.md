@@ -210,7 +210,21 @@ model has no widget there.
 `ShellToggleButton` 0x6bb18c, `ShellButtonSelBox` 0x6bb0e4, and the screens' own
 `FileSelectButton`, `RoomSelectButton`, `PlayerListButton`, ...); one whose slot 1 is
 `TextLabel::Draw` (0x5a7590) is a label (`TextLabel`, `StdTextLabel` 0x6bbaa4).
-`ShellScrollBar` (0x6bb164) is left to the mirror.
+`ShellScrollBar` (0x6bb164) is a slider (`Kind::Scroll`): the volumes, the speeds,
+gamma, the AI handicaps.
+
+**A `ShellScrollBar` is driven by one click.** Its fields, read from its constructor
+(0x5a6280), `Draw` (0x5a6520) and `CheckButtons` (0x5a63f0): the whole bar's rectangle
+at +0x28, the first pixel of its track (the end of the first arrow button) at +0x10
+(+0x14 for a vertical bar), the value at +0x3c, the track's length at +0x40, a
+horizontal flag at +0x44, the range at +0x48 and +0x4c. It overrides only
+`NotifyMouseLeftUp` (a press and a drag do nothing): a release on the track sets the
+value to the range's low end plus the pointer's distance along the track times the
+range's span over the length plus one, and a release on an arrow button steps it; the
+screen's procedure reads the value with `GetValue`. So a slider of ours draws its own
+drag from the model's value and, when the player lets go, sends **one click at the
+point of the track that maps to the value** (`generic::click_scroll`); a key step is
+one click at once. The stock click sound plays once per change, not per pixel.
 
 **What is read**, each offset from the method that writes it:
 
@@ -286,8 +300,12 @@ Every dialog without a spec, `[Menus] Generic`:
   label is our text in the game's colour; an edit is a text field that sends its typing
   to the stock edit; a list box is a list; a combo box is a drop-down. Labels that a
   screen paints into its background art are not controls, so a screen built on them
-  (the main menu, the campaign selection) needs a spec. The local text field, list and
-  drop-down (`menus/local.rs`) stand in until `crate::widgets` has its own.
+  (the main menu, the campaign selection) needs a spec. The text field, list and
+  drop-down are `crate::widgets`': an edit's text is shown from the stock edit every
+  frame, what the player changes is sent to it as its whole new text
+  (`Action::SetText`, `WM_SETTEXT`: the edit applies its own limit, which is asked of it
+  with `EM_GETLIMITTEXT`, and notifies its parent itself); a list's or combo's choice
+  is `Action::Select`; a `ShellScrollBar` is a slider (above).
 
 **The design area** is 800x600 fitted into the back buffer as Menus.asi fits it: the
 full height, centred, at 4:3. `UI.log` logs it as Menus.asi logs its own
@@ -331,6 +349,52 @@ main menu (`src/menus/screens/main_menu.rs`). To write another:
 
 `[Menus] Specs=0` draws every screen generically, for comparing a spec with the stock
 screen.
+
+## The Options family
+
+Options (`options.rs`), Game, Graphics and Sound Settings (`game_settings.rs`,
+`graphics_settings.rs`, `sound_settings.rs`, all `form.rs`), the small confirmations
+(`notice.rs`: message, yes or no, net waiting) and the text windows (`text_window.rs`:
+help, licence). All draw with `crate::widgets` in the shell theme over `theme::backdrop`
+(a full-screen dialog), the mission's dimmed picture (in a mission) or a dimming of the
+dialog under them (a dialog smaller than the screen), and act only through the stock
+controls: a click on a stock button is `Screen::click_control`, a slider is a click on
+the bar's track, a combo choice is below. **Every word is the stock control's own**
+(`TextLabel` and `ShellButton` text, localised); the specs never write one.
+
+- **Options**: the stock buttons in the order they stand on the stock screen (y, then
+  x), in one column; the one at the foot (Previous Menu, Return to Game: a button in the
+  bottom-left corner, `common::is_footer`) is the window's footer. In a mission there
+  are nine entries; from the main menu three. The window's title is the stock label at
+  the top ("OPTIONS"); the version is the small label at the bottom.
+- **The settings form** (`form.rs`) finds what belongs together by place, not text: the
+  stock screens put a caption 16 to 30 pixels above the control it names, so each
+  control (button, slider) takes the nearest caption above it that overlaps it sideways
+  and is not taken yet. Two labels in the same place are a slider's end captions (Game
+  Settings' "Hard" and "Easy", on the line of the caption of the slider below them, the
+  right-aligned one the high end). Captions left over are headings. A screen with
+  controls on both sides of its middle is two columns. Hover and click go to the stock
+  button, so its sound and state are stock's.
+- **Display Mode and Display Driver** (`do_graphicsOptions`): the screen keeps two
+  combo boxes (ids 2102 and 2103) as hidden windows with meaningless rectangles, draws
+  the fields itself and opens a list of its own on a click. Setting the combo's
+  selection and sending the notifications changed the combo but **was not kept** when
+  the screen was left (the mode read the old one on re-entry, as `Menus.Specs=0` showed
+  stock keeping it). A choice is therefore two clicks of the screen's own: on the
+  field, which stands under its caption (the caption's centre, 15 pixels below its
+  bottom), and on the row, 30 pixels apart, the current choice first and then the combo's
+  items in order. The combo boxes are found by id and named by the place of their
+  caption (the nth caption left of the middle, counting the heading), since their
+  rectangles say nothing.
+- **Message, yes or no, net waiting**: the first stock label is the title when there is
+  a second, the rest is the text; the buttons in a row in the order they stand. Net
+  waiting has no title.
+- **Help and licence**: the text is read whole from the stock control that holds it
+  (the longest edit, static or label), since the model keeps only 4 KB of a control's
+  text; our scroll area shows it, the stock buttons stand below. **Not reached on the
+  bench**: the help is the Internet lobby's, the licence shows on a first start, net
+  waiting while a game is joined; each returns false (the generic screen draws) when it
+  does not find the controls it expects.
 
 ## The screens
 
@@ -451,8 +515,15 @@ has where things are and how to look inside a hosted dialog (`Menus.Trace=1` dum
 hidden surfaces).
 
 - `ui-menus-options.md`: the main menu's spec; Options; Graphics Settings' Bump Mapping
-  switched off, the screen left and opened again, and still off; Sound Settings' Unit
-  Speech; Game Settings; back to the main menu; quit.
+  switched off, the display-mode list opened and a mode chosen, the screen left and
+  opened again, and still off; Sound Settings' Music Volume slider and Unit Speech, the
+  screen opened again; Game Settings' Game Difficulty stepped; back to the main menu;
+  quit.
+- `ui-menus-dialogs.md`: the in-mission Options (nine entries), Abort Mission's and
+  Exit to Windows' questions answered No, Sound Settings from the mission, Save Game's
+  message and its O.K., Return to Game.
+- `ui-menus-widgets.md`: `[Menus] Generic=widgets` on the Multiplayer connection screen:
+  the name edit as our text field, typed into and read back from the stock edit.
 - `ui-menus-single.md`: Single Player's card for the Federation campaign, the mission list,
   the first mission, in it Esc, Save Game with a typed name, the Admiral's Log (Score and
   Timeline), the Technology Tree, Load Game of the save (abort, Yes); quit.
@@ -463,16 +534,20 @@ hidden surfaces).
 
 ## Not done
 
-- **The generic `widgets` screen and the local text field, list and drop-down are not
-  verified on the bench**; the mirrored screen is. The shared widgets (`crate::widgets`)
-  are being written elsewhere; `menus/local.rs` is to be replaced by them.
+- **The generic `widgets` screen is verified on the Multiplayer connection screen only**
+  (the edit and the buttons, `ui-menus-widgets.md`); its list and drop-down branches
+  have no screen on the bench (the lists the shell draws are buttons, the combo boxes
+  of Graphics Settings are hidden windows a spec drives by clicks).
+- **The text windows (help, licence) and net waiting are written from the same pattern
+  and not seen**: no way to reach them on the bench.
 - **Screens not reached on the bench with the host**: the Tutorials, Klingon and Borg
   campaigns' lists, the Admiral's Log at the end of a mission (`do_success_mission` and
-  `do_fail_mission`, above), Multiplayer and its
-  lobbies (no network on the bench), Credits (a screen of the engine's own, not a
-  dialog: it runs as before), the licence, GameSpy and command-line screens.
-- **Seven specs** (the main menu and the six above), the main menu with English labels (the stock art carries the words,
-  so the spec names its buttons itself).
+  `do_fail_mission`, above), Multiplayer and its lobbies (no network on the bench),
+  Credits (a screen of the engine's own, not a dialog: it runs as before), the licence,
+  GameSpy and command-line screens.
+- **Specs**: the main menu (English labels: the stock art carries the words, so the
+  spec names its buttons itself), the Options family and the single-player screens
+  above. Every other screen is the generic one.
 - **Keyboard navigation** of a spec (arrows, Enter) and of the generic screen beyond
   what the stock dialog does with Enter, Esc and Tab.
 - **The cursor** is the system arrow over the 3D window, as with the GDI menus; a cursor
