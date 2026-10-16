@@ -128,7 +128,7 @@ fn class_name(h: HWND) -> String {
 }
 
 pub fn window_text(h: HWND) -> String {
-    let n = unsafe { SendMessageA(h, WM_GETTEXTLENGTH, 0, 0) }.clamp(0, 4096) as usize;
+    let n = unsafe { SendMessageA(h, WM_GETTEXTLENGTH, 0, 0) }.clamp(0, 1 << 17) as usize;
     let mut b = alloc::vec![0u8; n + 1];
     let got = unsafe { SendMessageA(h, WM_GETTEXT, n + 1, b.as_mut_ptr() as isize) }.clamp(0, n as isize) as usize;
     b[..got].iter().map(|&c| char::from(c)).collect()
