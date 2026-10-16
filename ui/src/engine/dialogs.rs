@@ -1049,7 +1049,15 @@ fn pump(top: HWND) -> Option<i32> {
                     crate::input::note_message(m.message, m.wparam);
                     // IsDialogMessageA translates the key itself: a TranslateMessage here
                     // too typed every character twice.
-                    if !escape(&m, top, cfg.menus_escape) {
+                    if crate::menus::wants_keys() {
+                        // A text field of ours has the keyboard: it sends the stock edit
+                        // what changes (setup_kit::edit). The key reaches no stock control,
+                        // or every character was typed twice (the stock edit holding the
+                        // focus, as Multiplayer Connection's name edit does) or went to an
+                        // edit of a dialog under the top one; it is only translated, so
+                        // its WM_CHAR comes back here for our field.
+                        TranslateMessage(&m);
+                    } else if !escape(&m, top, cfg.menus_escape) {
                         IsDialogMessageA(top, &mut m);
                     }
                 }

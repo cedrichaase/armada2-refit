@@ -24,6 +24,10 @@ pub enum Action {
     /// sends its parent (`LBN_SELCHANGE`/`LBN_DBLCLK`, `CBN_SELCHANGE` then
     /// `CBN_SELENDOK`).
     Select { h: HWND, combo: bool, index: i32, double: bool },
+    /// Enter in the edit `h`, given to its dialog as user32's modal loop gives it
+    /// (`IsDialogMessageA`: the default button's `WM_COMMAND`, `IDOK`), which is how a
+    /// stock chat line sends.
+    Enter { h: HWND },
     /// An edit's whole text, as the player edited it in our text field.
     SetText { h: HWND, text: alloc::string::String },
 }
@@ -76,6 +80,18 @@ pub fn run() {
             Action::Key { h, msg, wp } => {
                 if unsafe { IsWindow(h) } != 0 {
                     unsafe { SendMessageA(h, msg, wp, if msg == WM_KEYDOWN { 1 } else { 1 }) };
+                }
+            }
+            Action::Enter { h } => {
+                if unsafe { IsWindow(h) } != 0 {
+                    let dlg = unsafe { GetParent(h) };
+                    // The procedure checks that the edit holds the focus (Game Setup's
+                    // chat reads the line on IDOK only then), as it would after a click.
+                    unsafe { SetFocus(h) };
+                    for msg in [WM_KEYDOWN, WM_KEYUP] {
+                        let mut m = Msg { hwnd: h, message: msg, wparam: VK_RETURN as usize, lparam: if msg == WM_KEYUP { 0xc000_0001u32 as isize } else { 1 }, time: 0, pt: Point::default() };
+                        unsafe { IsDialogMessageA(dlg, &mut m) };
+                    }
                 }
             }
             Action::SetText { h, text } => {

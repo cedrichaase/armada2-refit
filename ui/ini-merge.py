@@ -17,7 +17,7 @@ UPGRADES = {
     2: {('ui', 'cursor'): '0',
         **{('hud', k): '0' for k in ('bar', 'info', 'minimap', 'selection', 'unitview',
                                      'resources', 'buttons', 'messages', 'pause', 'replay',
-                                     'overlay', 'chat')},
+                                     'overlay', 'chat', 'comm', 'dropplayer', 'loadwait')},
         ('menus', 'enable'): '0',
         ('loading', 'enable'): '0'},
 }

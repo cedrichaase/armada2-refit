@@ -18,6 +18,8 @@ pub mod panels;
 mod pause;
 mod replay;
 mod resources;
+// ui-multiplayer: the comm panel, the drop box, the load wait.
+mod comm;
 
 use crate::engine::{self, hud};
 use crate::widgets::Ui;
@@ -35,7 +37,7 @@ pub fn install() -> bool {
         crate::log!("hud: Enable=0, the HUD is stock");
         return false;
     }
-    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !panels::any(cfg) {
+    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !panels::any(cfg) && !comm::any(cfg) {
         crate::log!("hud: no panel switched on, the HUD is stock");
         return false;
     }
@@ -69,6 +71,7 @@ pub fn install() -> bool {
         }
     }
     panels::install(cfg);
+    comm::install(cfg);
     true
 }
 
@@ -118,6 +121,12 @@ pub fn run(ui: &mut Ui) {
             hud::log_components();
         }
         LOGGED = now;
+        // A multiplayer box of ours covers the screen: nothing under it takes the mouse.
+        if comm::blocking() {
+            let screen = ui.screen();
+            ui.claim(screen);
+            ui.occlude(screen);
+        }
         if SELECTION {
             let keep = if MINIMAP { let (o, _, _) = minimap::place(ui); alloc::vec![o] } else { alloc::vec::Vec::new() };
             overlay::run(ui, &keep);
@@ -136,5 +145,6 @@ pub fn run(ui: &mut Ui) {
             bar::run(ui);
         }
         panels::run(ui);
+        comm::run(ui);
     }
 }

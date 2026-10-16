@@ -40,7 +40,7 @@ def on(s, k):
     except ValueError:
         return True
 panels = ('bar', 'info', 'minimap', 'selection', 'unitview', 'resources', 'buttons',
-          'messages', 'pause', 'replay', 'overlay', 'chat')
+          'messages', 'pause', 'replay', 'overlay', 'chat', 'comm', 'dropplayer', 'loadwait')
 ui = on('ui', 'enable')
 hud = ui and on('hud', 'enable') and any(on('hud', p) for p in panels)
 bar = hud and on('hud', 'bar')

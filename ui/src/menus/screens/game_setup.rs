@@ -99,7 +99,9 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
     }
     // The chat: a multi-line edit (the log) and a single-line one (the line typed).
     let edits = kit::visible(s, kit::is_edit);
-    let log = edits.iter().find(|c| c.style & 0x4 != 0).copied();
+    // A multiplayer game has a second multi-line edit at the right (x 600, the
+    // observers); the log is the one under the table.
+    let log = edits.iter().find(|c| c.style & 0x4 != 0 && c.rect[0] < TABLE_RIGHT).copied();
     let line = edits.iter().find(|c| c.style & 0x4 == 0).copied();
     // The log also says what the host changed ("Resources: Lots"), in Instant Action too.
     let chat = line.is_some() || log.is_some();
@@ -113,26 +115,40 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
 
     // The column headings (the screen's own labels over the table).
     let heads: Vec<&Control> = kit::visible(s, |c| kit::is_label(c) && c.rect[1] < 80 && c.rect[1] > 40 && c.rect[0] < TABLE_RIGHT && !c.text.trim().is_empty());
-    let chip = ui.u(t.row_h);
-    let cols = column_rects(ui, R::new(inner.x + chip + ui.u(t.gap), inner.y, inner.w - chip - ui.u(t.gap), head_h));
-    let names: [&str; 3] = [
-        heads.iter().find(|h| h.rect[0] > 40 && h.rect[0] < 200).map_or("Player", |h| h.text.as_str()),
-        heads.iter().find(|h| h.rect[0] >= 200 && h.rect[0] < 290).map_or("Side", |h| h.text.as_str()),
-        heads.iter().find(|h| h.rect[0] >= 360).map_or("Team", |h| h.text.as_str()),
-    ];
-    for (i, cr) in cols.iter().enumerate() {
-        kit::caption(ui, *cr, names[i]);
+    // A multiplayer game's rows have a fourth combo, the "Armada" column (x 295:
+    // Personal, Allied, ...), between the side (x 203) and the team (x 375), and a
+    // ready light left of the swatch (a 10x10 picture at x 14, under the "Comm"
+    // heading), green once the player has pressed LAUNCH.
+    let armada = rows.iter().any(|r| r.1.iter().any(|c| c.rect[0] >= 290 && c.rect[0] < 370));
+    let lights = kit::visible(s, |c| matches!(c.what, What::Shell(Kind::Button)) && c.rect[0] < 30 && c.rect[2] == 10 && c.rect[3] == 10 && c.rect[1] < TABLE_BOTTOM);
+    let light = if lights.is_empty() { 0.0 } else { ui.u(t.row_h * 0.6) + ui.u(t.gap) };
+    let chip = ui.u(t.row_h) + light;
+    let ncol = if armada { 4 } else { 3 };
+    let cols = column_rects(ui, R::new(inner.x + chip + ui.u(t.gap), inner.y, inner.w - chip - ui.u(t.gap), head_h), ncol);
+    let head = |x0: i32, x1: i32, d: &'static str| heads.iter().find(|h| h.rect[0] >= x0 && h.rect[0] < x1).map_or(d, |h| h.text.as_str());
+    let names: [&str; 4] = if armada {
+        [head(41, 200, "Player"), head(200, 290, "Side"), head(290, 370, "Armada"), head(370, 450, "Team")]
+    } else {
+        [head(41, 200, "Player"), head(200, 290, "Side"), head(360, 450, "Team"), ""]
+    };
+    for i in 0..ncol {
+        kit::caption(ui, cols[i], names[i]);
     }
     let mut y = inner.y + head_h;
     for (ry, cs) in rows.iter() {
         let rr = R::new(inner.x, y, inner.w, row_h - ui.u(4.0));
         y += row_h;
         // The slot's colour: the stock swatch, left of the row.
-        let sw = R::new(rr.x, rr.y + (rr.h - chip * 0.7) * 0.5, chip * 0.7, chip * 0.7);
+        if let Some(l) = lights.iter().find(|l| (l.rect[1] - (*ry + 3)).abs() < 6) {
+            let lz = ui.u(t.row_h * 0.6);
+            s.mirror_part(ui, l.rect, R::new(rr.x, rr.y + (rr.h - lz) * 0.5, lz, lz), 0xffffffff);
+        }
+        let cz = ui.u(t.row_h) * 0.7;
+        let sw = R::new(rr.x + light, rr.y + (rr.h - cz) * 0.5, cz, cz);
         kit::picture(ui, s, [30, *ry, 16, 16], sw, true);
-        let cols = column_rects(ui, R::new(inner.x + chip + ui.u(t.gap), rr.y, inner.w - chip - ui.u(t.gap), rr.h));
+        let cols = column_rects(ui, R::new(inner.x + chip + ui.u(t.gap), rr.y, inner.w - chip - ui.u(t.gap), rr.h), ncol);
         for c in cs.iter() {
-            let col = if c.rect[0] < 200 { 0 } else if c.rect[0] < 360 { 1 } else { 2 };
+            let col = if c.rect[0] < 200 { 0 } else if c.rect[0] < 290 { 1 } else if c.rect[0] < 370 && armada { 2 } else if armada { 3 } else { 2 };
             kit::combo(ui, s, c, cols[col]);
         }
     }
@@ -161,17 +177,32 @@ fn players(ui: &mut Ui, s: &Screen, combos: &[&Control], r: R) {
             chat_log(ui, &lc.text, R::new(ci.x, ci.y, ci.w, ci.h - fh - ui.u(t.gap)));
         }
         if let Some(lc) = line {
-            kit::edit(ui, s, lc, R::new(ci.x, ci.bottom() - fh, ci.w, fh));
+            // Beside the line, the toggle that says who it goes to ("All"), when the
+            // screen has one (a multiplayer game: a toggle right of the line).
+            let target = kit::visible(s, |c| matches!(c.what, What::Shell(Kind::Toggle)) && c.rect[1] > 500 && c.rect[0] < TABLE_RIGHT);
+            let tw = if target.is_empty() { 0.0 } else { ui.u(120.0) };
+            kit::edit(ui, s, lc, R::new(ci.x, ci.bottom() - fh, ci.w - tw - if tw > 0.0 { ui.u(t.gap) } else { 0.0 }, fh));
+            if let Some(tc) = target.first() {
+                kit::button(ui, s, tc, R::new(ci.right() - tw, ci.bottom() - fh, tw, fh), None);
+            }
         }
     }
 }
 
-/// The three columns of a player row (player, side, team) in `r`.
-fn column_rects(ui: &Ui, r: R) -> [R; 3] {
+/// The columns of a player row in `r`: player, side, team; or, with `n` 4 (a
+/// multiplayer game), player, side, armada, team.
+fn column_rects(ui: &Ui, r: R, n: usize) -> [R; 4] {
     let g = ui.u(8.0);
-    let w = r.w - 2.0 * g;
-    let (a, b) = (libm::floorf(w * 0.46), libm::floorf(w * 0.32));
-    [R::new(r.x, r.y, a, r.h), R::new(r.x + a + g, r.y, b, r.h), R::new(r.x + a + b + 2.0 * g, r.y, w - a - b, r.h)]
+    let w = r.w - (n as f32 - 1.0) * g;
+    let parts: &[f32] = if n == 4 { &[0.36, 0.24, 0.20, 0.20] } else { &[0.46, 0.32, 0.22] };
+    let mut out = [R::new(r.x, r.y, 0.0, r.h); 4];
+    let mut x = r.x;
+    for (i, f) in parts.iter().enumerate() {
+        let cw = if i + 1 == parts.len() { r.right() - x } else { libm::floorf(w * f) };
+        out[i] = R::new(x, r.y, cw, r.h);
+        x += cw + g;
+    }
+    out
 }
 
 /// The last lines of a chat log that fit in `r`, newest at the bottom.

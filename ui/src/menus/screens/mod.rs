@@ -19,6 +19,8 @@ pub mod game_settings;
 pub mod game_setup;
 pub mod graphics_settings;
 pub mod kit;
+// ui-multiplayer: the Internet lobby.
+pub mod lobby;
 pub mod main_menu;
 pub mod map_select;
 pub mod mission_select;
@@ -69,6 +71,8 @@ pub const SPECS: &[Spec] = &[
     Spec { screen: "gamespy login", draw: forms::gamespy },
     Spec { screen: "create account", draw: forms::gamespy },
     Spec { screen: "change password", draw: forms::gamespy },
+    // ui-multiplayer: the Internet lobby.
+    Spec { screen: "internet game", draw: lobby::draw },
 ];
 
 pub fn find(screen: &str) -> Option<&'static Spec> {
