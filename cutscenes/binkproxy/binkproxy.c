@@ -27,7 +27,7 @@
  * the import table, not called) to BinkSetSoundSystem, so that address is
  * ours and is swapped for the real one on the way through.
  *
- * No CRT, same toolchain as msaa/: see build.sh.
+ * No CRT, same toolchain as menus/: see build.sh.
  */
 
 typedef unsigned char       BYTE;

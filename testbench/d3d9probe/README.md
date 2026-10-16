@@ -21,7 +21,7 @@ clone, and `a2mod` does not know about it.
 
 It hooks like `testbench/d3dtrace/` (the `Direct3DCreate8` IAT entry, then
 `IDirect3D8::CreateDevice`, then the device's vtable), so the game's code is not
-touched and `MSAA.asi` composes with it.
+touched and the other plugins (`Render3D.asi` included) compose with it.
 
 - **After each `CreateDevice`:** `QueryInterface(IID_IDirect3DDevice9)`, and on success
   the Direct3D 9 caps that matter for lighting: vertex and pixel shader version, vertex
@@ -34,7 +34,7 @@ touched and `MSAA.asi` composes with it.
   texture runs with a `ps_2_0` shader that multiplies the texture, the fixed-function
   vertex colour and a red tint. That is a shader substituted per draw, in the middle of
   the game's scene, with its textures and its vertex lighting still feeding it — the
-  first thing a shader-based `Lighting.asi` has to be able to do. The previous pixel
+  first thing a shader-based renderer (`Lighting.asi`, now `Render3D.asi`) has to be able to do. The previous pixel
   shader is restored after each draw.
 - **Every `CopyRects`** whose pair of surfaces (size, sample count, pool) has not been
   seen yet, and every failing one (up to 20), with the branch crosire's d3d8to9 takes

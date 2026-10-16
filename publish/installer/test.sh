@@ -40,18 +40,19 @@ syslayer=$(ls /etc/vulkan/implicit_layer.d/*[Bb]asalt* /usr/share/vulkan/implici
 echo "(pass: ${A2_TEST_PASS:-first}; $(uname -s))"
 
 G="$T/Star Trek Armada II"; mock "$G"
+# What earlier packages and installs left: the per-part plugins Render3D.asi replaced.
+for n in MSAA Planets Lighting Sky Fog Specials; do echo old > "$G/$n.asi"; echo old > "$G/$n.ini"; done
+mkdir -p "$G/Sky"; echo old > "$G/Sky/mbgaqu.ini"; echo "[Sky]" > "$G/Sky/myown.ini"
 
-echo "== install on a GOG game: prerequisites, no DXVK, no vkBasalt"
+echo "== install on a GOG game: prerequisites, no DXVK, no vkBasalt, the old plugins out"
 "$P/install.sh" "$G" > "$T/out"
 check '[ "$(sum "$G/winmm.dll")" = baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5 ]'
 check '[ "$(sum "$G/STA2WidescreenPatch.asi")" = 193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5 ]'
 check '[ "$(cat "$G/d3d8.dll")" = gogd3d8to9 ] && [ ! -e "$G/d3d8.dll.gog-backup" ]'
-check '[ ! -e "$G/MSAA.asi" ]'
+check '[ -z "$(ls "$G" | grep -E "^(MSAA|Planets|Lighting|Sky|Fog|Specials)\.(asi|ini)$")" ]'
+check '[ "$(ls "$G/Sky")" = myown.ini ]'
 check '[ -e "$G/QOL.asi" ] && [ -e "$G/QOL.ini" ]'
 check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
-check '[ -e "$G/Lighting.asi" ] && [ -e "$G/Lighting.ini" ] && grep -q "Lighting: per vertex" "$T/out"'
-check '[ -e "$G/Sky.asi" ] && [ -e "$G/Sky.ini" ] && [ -e "$G/Sky/mbgaqu.ini" ] && grep -q "Sky: the stock sky here" "$T/out"'
-check '[ "$(count "$G/Sky")" = "$(count "$P/sky")" ] && grep -q "Sky/: $(count "$P/sky") sky recipes" "$T/out"'
 [ -n "$syslayer" ] || check '[ ! -e "$B" ]'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
@@ -73,44 +74,32 @@ check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
 check 'grep -q "; mine" "$G/HUD.ini.bak"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 if [ "$mac" = 0 ]; then
-    check '[ -e "$G/MSAA.asi" ]'
     check '[ -s "$B/Shaders/MagicBloom.fx" ] && [ -s "$B/Shaders/ReShade.fxh" ] && [ -s "$B/Shaders/ReShadeUI.fxh" ]'
     check '[ "$(head -1 "$B/vkBasalt.conf")" = "# written by armada2-refit install.sh" ]'
     check 'grep -q "^bloom = \"$B/A2Bloom.fx\"" "$B/vkBasalt.conf"'
     check '[ "$(vars | sed -n 1p)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b" ] && vars | grep -q "^    ENABLE_VKBASALT=1$"'
 else
-    # d3d8to9 in on Wine's own d3d9, DXVK's d3d8 kept; no d3d9.dll, MSAA, dxvk.conf or bloom.
+    # d3d8to9 in on Wine's own d3d9, DXVK's d3d8 kept; no d3d9.dll, dxvk.conf or bloom.
     check '[ "$(sum "$G/d3d8.dll")" = "$(sum "$D3D8TO9")" ] && [ "$(cat "$G/d3d8.dll.a2chain-backup")" = dxvk ]'
     check '[ ! -e "$G/d3d9.dll" ] && grep -q "d3d9.dll: Wine.s own (wined3d)" "$T/out"'
-    check '[ ! -e "$G/MSAA.asi" ] && grep -q "MSAA.asi skipped: needs DXVK, which a Mac" "$T/out"'
     check '[ ! -e "$G/dxvk.conf" ] && [ ! -e "$B" ]'
-    check '! grep -q "Lighting: per vertex" "$T/out" && ! grep -q "Sky: the stock sky" "$T/out"'
     check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
 
     echo "== macOS: what an earlier install put in for DXVK comes out"
     cp "$P/chain/d3d9.dll" "$G/d3d9.dll"; echo "d3d9.dll $(sum "$G/d3d9.dll")" >> "$G/armada2-refit-prereqs.txt"
-    cp "$P/game/dxvk.conf" "$G/dxvk.conf"; cp "$P/game/MSAA.asi" "$G/MSAA.asi"
+    cp "$P/game/dxvk.conf" "$G/dxvk.conf"
     "$P/install.sh" "$G" > "$T/out"
     check '[ ! -e "$G/d3d9.dll" ] && ! grep -q "^d3d9\.dll " "$G/armada2-refit-prereqs.txt"'
     check 'grep -q "d3d9.dll: took out the DXVK one" "$T/out"'
-    check '[ ! -e "$G/MSAA.asi" ] && [ ! -e "$G/dxvk.conf" ]'
+    check '[ ! -e "$G/dxvk.conf" ]'
     check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
 fi
 
-if [ "$mac" = 0 ]; then
-    echo "== d3d8to9 in front of DXVK's d3d9: MSAA, and Lighting's shaders (no note)"
-    cp "$G/d3d8.dll" "$T/dxvk8"; cp "$D3D8TO9" "$G/d3d8.dll"; echo dxvk > "$G/d3d9.dll"; rm -f "$G/MSAA.asi"
-    "$P/install.sh" "$G" > "$T/out"
-    check '[ -e "$G/MSAA.asi" ] && ! grep -q "Lighting: per vertex" "$T/out" && ! grep -q "Sky: the stock sky" "$T/out"'
-    echo gogd3d8to9 > "$G/d3d9.dll"
-    "$P/install.sh" "$G" > "$T/out"
-    check '[ ! -e "$G/MSAA.asi" ] && grep -q "MSAA.asi skipped" "$T/out"'
-    cp "$T/dxvk8" "$G/d3d8.dll"; rm -f "$G/d3d9.dll"
-else
+if [ "$mac" = 1 ]; then
     echo "== macOS: a DXVK d3d9.dll of the player's own stays, and gets its override"
     echo dxvk > "$G/d3d9.dll"
     "$P/install.sh" "$G" > "$T/out"
-    check '[ "$(cat "$G/d3d9.dll")" = dxvk ] && [ ! -e "$G/MSAA.asi" ] && grep -q "cannot run Direct3D 9 on a Mac" "$T/out"'
+    check '[ "$(cat "$G/d3d9.dll")" = dxvk ] && grep -q "cannot run Direct3D 9 on a Mac" "$T/out"'
     check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b" ]'
     rm -f "$G/d3d9.dll"
 
@@ -141,7 +130,7 @@ echo "[Sky]" > "$G/Sky/myown.ini"   # a recipe of the player's own stays
 "$P/install.sh" --uninstall "$G" > "$T/out"
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check '[ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/binkw32.dll.a2neb-backup" ]'
-check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|MSAA|QOL|Lighting|Sky|Online)\.ini$")" ]'
+check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|QOL|Online)\.ini$")" ]'
 check '[ "$(ls "$G/Sky")" = myown.ini ]'
 rm -rf "$G/Sky"
 check '[ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-prereqs.txt" ]'

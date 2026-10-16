@@ -16,7 +16,7 @@ from a 256px stock file to a 1024px plate *is* the plate.)
 
 | | Here | Why |
 |---|---|---|
-| `HUD.asi`, `Menus.asi`, `MSAA.asi` — their C source | yes | our code. It patches the game at run time and ships none of it; the byte arrays in the sources are short instruction signatures, checked before each patch |
+| `HUD.asi`, `Menus.asi` — their C source, and `Render3D.asi`'s Rust | yes | our code. It patches the game at run time and ships none of it; the byte arrays in the sources are short instruction signatures, checked before each patch |
 | the Python and shell tooling, `.ini`/`.conf` files | yes | ours |
 | docs and changelogs | yes | ours. They quote the odd config line, which is commentary, and name functions and addresses from `armada2.map` — see "Engine findings" below |
 | `armada2.map`, disassembly or decompilation listings, hex dumps of game code | **no** | the game's own code, or a mechanical translation of it. `check.sh` refuses `*.map` |
@@ -104,16 +104,11 @@ Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the pl
 and writes `armada2-refit-<version>.zip`:
 
 - `game/`: what goes beside `Armada2.exe`, which is `HUD.asi`, `Menus.asi`, `QOL.asi`,
-  `QOLRules.asi`, `GridLayout.asi`, `Planets.asi`, `Lighting.asi`, `Sky.asi`, `Online.asi`,
-  `MSAA.asi` and `binkw32.dll`, each with its `.ini`, and `dxvk.conf`
-  at stage 3 (`postfx/renderer-config.sh --print`). The installers put `MSAA.asi` in
-  only when DXVK is in the game directory: its `d3d8.dll`, or crosire's d3d8to9 (known
-  by hash) in front of its `d3d9.dll`. `Lighting.asi` goes in everywhere and lights per
-  pixel only behind d3d8to9, which `install.sh` puts in from `chain/`. `Sky.asi` too
-  goes in everywhere and draws the procedural sky only behind d3d8to9 (the stock sky
-  otherwise);
-- `sky/`: the sky recipes, `sky/skies/*.ini`, which the installers copy into the game's
-  `Sky` folder and `--uninstall` takes out again (a recipe of the player's own stays);
+  `QOLRules.asi`, `GridLayout.asi`, `Online.asi` and `binkw32.dll`, each with its
+  `.ini`, and `dxvk.conf` at stage 3 (`postfx/renderer-config.sh --print`). The package
+  leaves the 3D view to the engine: `Render3D.asi` is not in a release yet, and the
+  installers take out the per-part plugins (`MSAA`, `Planets`, `Lighting`, `Sky` and the
+  rest) that earlier packages put in, with the `Sky` recipes they copied;
 - `chain/`: crosire's d3d8to9 (`d3d8.dll`) and DXVK 3.1.1's `d3d9.dll`, from
   `platform/vendor/`. `install.sh` puts them in unless a `d3d8.dll` or `d3d9.dll` there is
   none of GOG's, DXVK's or these; a DXVK `d3d9.dll` already there stays. What it
@@ -122,7 +117,7 @@ and writes `armada2-refit-<version>.zip`:
   (Windows' own Direct3D 9 is behind it) and leaves a DXVK `d3d8.dll` the player put
   there; `install.sh` on macOS puts only `d3d8.dll` in too, on Wine's wined3d, since
   DXVK cannot run Direct3D 9 on a Mac (D3DMetal, DXMT and CrossOver's DXVK cover
-  Direct3D 10 to 12), and skips MSAA, `dxvk.conf` and bloom there;
+  Direct3D 10 to 12), and skips `dxvk.conf` and bloom there;
 - `models/` and `a2env.py`: `moon-sod.py`, `select-sod.py`, `hull-sod.py`, run by
   `install.sh` with python3 on the player's own SODs (`--revert` on `--uninstall`);
 - `bloom/`: `postfx/postfx.py --export`, which is the same bloom for vkBasalt and as a
@@ -170,9 +165,6 @@ ReShade, is documented in `README.txt` and optional. They do the same on both sy
   download, so they only name it;
 - keep the stock `binkw32.dll` as `binkw32_orig.dll`, which the proxy forwards to, and
   as `binkw32.dll.a2neb-backup`, the name `cutscenes/binkproxy/install.sh` uses;
-- install `MSAA.asi` only when the `d3d8.dll` in the game directory is DXVK's, told
-  by its content: GOG puts a `d3d8.dll` there too. Without DXVK the
-  minimap goes black;
 - set up bloom when a vkBasalt layer (Linux) or ReShade's `ReShade.ini` (Windows) is
   there. On Windows the preset also becomes `ReShadePreset.ini` when the player has
   none, which is the preset ReShade loads by default, so there is no step in the
@@ -207,16 +199,12 @@ bloom shaders for real, so CI also notices when a pinned one moves.
 ### Next
 
 **Open: DXVK.** Bundling it is allowed (zlib), and the installers could put it in the
-game directory in place of GOG's `d3d8.dll`, which would install MSAA everywhere and
-make `dxvk.conf` apply. Not decided yet. On Linux the launcher settings
+game directory in place of GOG's `d3d8.dll`, which would make `dxvk.conf` apply. Not decided yet. On Linux the launcher settings
 (`WINEDLLOVERRIDES`, and bloom's two variables) are still the player's job; `install.sh`
 prints them. What stands in the way:
 
 - **No plugin checks which `Armada2.exe` it is in.** Each should verify the exe and stand
   down on any other build rather than patch the wrong bytes.
-- **`MSAA.asi` still defaults on wherever it is installed.** The installers leave it out
-  without DXVK, but copied by hand beside native D3D8 it blacks out the minimap: the
-  minimap's `CopyRects` from a multisampled surface is illegal there (`msaa/README.md`).
 - **The ReShade preset has never run.** Only the vkBasalt path is seen in game.
 - **Untested**: Windows 11, a desktop other than Hyprland, and running without the
   widescreen patch.

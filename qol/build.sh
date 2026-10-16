@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build QOL.asi -- a 32-bit Windows DLL, cross-compiled on Linux.
-# Same toolchain and same reasons as msaa/build.sh and menus/build.sh: no CRT
+# Same toolchain and same reasons as menus/build.sh and hud/build.sh: no CRT
 # (/nodefaultlib), Win32 prototypes declared in the source, import library
 # generated from kernel32.def.  --kill-at is required; see menus/build.sh.
 set -euo pipefail

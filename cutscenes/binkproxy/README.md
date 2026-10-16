@@ -151,15 +151,16 @@ pass-through path came out pillarboxed to exactly 1920x1440.
 
 ## What depends on the setup
 
-The intro plays full screen in game here with `MSAA.asi` installed, so on this setup
+The intro plays full screen in game here (it did with `MSAA.asi` installed, and the
+engine's back buffer is no longer multisampled under `Render3D.asi`), so on this setup
 both of these hold. On another, `BinkProxy.log` says which failed:
 
-- **The back buffer has to lock with MSAA on.** `msaa` clears
+- **The back buffer has to lock.** The removed `MSAA.asi` cleared
   `LOCKABLE_BACKBUFFER` on the grounds that "the engine never locks it", but
   this path does lock it. A failed lock is caught (`IsBadWritePtr` on the first
   and last row) and logged as `back buffer not writable; frame skipped`. If
-  that line appears, the reels play black, and the fix belongs in `msaa`,
-  not here.
+  that line appears, the reels play black, and the fix belongs in whatever
+  plugin changed the back buffer, not here.
 - **The raised mode has to be found.** `FindDisplayMode` has to list the
   desktop size. Menus.asi depends on the same thing for the shell.
 

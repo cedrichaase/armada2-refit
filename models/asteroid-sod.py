@@ -21,8 +21,8 @@ out as eggs on the bench. Their edges meet at a median of 22 to 39 degrees, with
 of sharp ones up to 138; at the default --crease 55 the sharpest sixth of them stay edges,
 drawn on their own curve on both sides, so a rock keeps its broken ridges and its faces
 between them turn round. No triangle folds over at any crease up to 70. The surface
-detail is not geometry: Surfaces.asi bakes it (surfaces/recipes/Master1.ini,
-Master2.ini) and Lighting.asi lights it per pixel.
+detail is not geometry: render3d's world module bakes it from its recipes
+(render3d/surfaces/Master1.ini, Master2.ini) and lights it per pixel.
 
 The models are drawn from the engine's static vertex buffers, as stock draws asteroid
 fields, so the cost is the triangles: --split 4 makes 576 to 1,600 a rock. Master.SOD is

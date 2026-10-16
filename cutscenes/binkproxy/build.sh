@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build binkw32.dll (the Bink replacement) and binktest.exe (its harness) --
 # 32-bit Windows binaries, cross-compiled on Linux.  Same toolchain and same
-# reasons as msaa/build.sh: no CRT (/nodefaultlib), Win32 prototypes
+# reasons as menus/build.sh: no CRT (/nodefaultlib), Win32 prototypes
 # declared in the source, import libraries generated from the .def files with
 # --kill-at (the .def carries decorated names, the real DLLs export
 # undecorated ones).

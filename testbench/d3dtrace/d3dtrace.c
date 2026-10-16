@@ -13,7 +13,7 @@
  * through, then patches IDirect3D8::CreateDevice (vtable slot 15), whose
  * wrapper patches the device's vtable.  Slot numbers are the ones in Wine's
  * include/d3d8.h.  The game's own code is not touched, so this composes with
- * MSAA.asi, which edits the present parameters before CreateDevice.
+ * a plugin that edits the present parameters before CreateDevice.
  *
  * WHAT IT WRITES (D3DTrace.log, beside the exe)
  * ---------------------------------------------
