@@ -49,7 +49,7 @@ The briefing and objectives box is `ui-hud-panels-objectives.md`.
 30. Wait 1 second.
 31. Expect "UI.log" contains "chat: entry active".
 32. Take a screenshot called "typing".
-33. Check that near the top left there is a text field with a name in the accent colour followed by "hello there", and no green stock text line elsewhere on the screen.
+33. Check that the chat is drawn only at the top left, in the UI's own style: a text field with a rounded border in which a name in the accent colour is followed by "hello there", and above it a dark rounded box holding the earlier chat line about the game being unpaused (both are ours, in the race theme's colours); and that no chat text appears anywhere else on the screen.
 34. Press Return.
 35. Wait 1 second.
 36. Expect "UI.log" contains "chat: entry closed".
