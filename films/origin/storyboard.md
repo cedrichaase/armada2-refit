@@ -41,21 +41,29 @@ Layout: wipe
 Transition: cut
 In: 1.0
 Length: 12
-Status: draft
+Status: probed
 
 The prompt: "the akira class hulls look too dark". One Akira class, close and a little
-below, turning slowly: stock's hull against refit's, lit per pixel by the scene's key
-light. The eye lands on the saucer and the weapons pod above it, where stock is flat and
-dark and refit shows the plating. Stock fades a hull that comes within about 150 of the
-camera (`films/promo` h01), so the camera stays outside that.
+below, turning slowly from its bow quarter towards its side: stock's hull against
+refit's, lit per pixel by the scene's key light. The eye lands on the saucer and the
+weapons pod above it, where stock is flat and dark and refit shows the plating.
+
+Probe review 2026-10-16: at 175 the Akira was a sliver a fifth of the frame wide, and
+at pitch -6 nearly edge-on: closer (80 to 70) and lower (-12). The bow faces the camera
+at about yaw 190 and the side at 245. Stock drew the hull solid at 70-80 (no fade).
+Re-probed: stock's underside is near black, refit's blue-grey plating reads, and the
+nacelles and deflector glow in both: the prompt's before and after. Tried from above
+(pitch 14, as ak13b): both variants lit alike there, so the comparison is weaker; the
+low angle stays. The Akira is about a third of the frame wide; a 4K take may want it
+closer still (60).
 
 ```setup
 scene hover off; shieldfx off; tooltips off
-scene orbit akira 205 -6 175
+scene orbit akira 200 -12 80
 ```
 ```action
 wait 1
-scene glide 16 245 -4 165
+scene glide 16 240 -8 70
 wait 14.5
 ```
 
@@ -67,13 +75,19 @@ Layout: full refit
 Transition: cut
 In: 1.0
 Length: 10
-Status: draft
+Status: probed
 
 The prompt: "make the metreon nebula look more like actual thunderstorm clouds". A storm
 front of three Metreon clouds from outside, the camera drifting in: crimson billows,
 lit and shadowed sides, and lightning flickering inside them. Refit alone: the prompt is
 about the result, and stock's billboards answer a different question. Lightning falls at
 random: if a take has none inside the window, move `In:` or re-probe.
+
+Probe review 2026-10-16: the clouds fill the frame from the first second (the camera
+is at the storm's edge, not outside it): crimson billows with lit and shadowed sides.
+Lightning flashed at about 0.9, 2.6 and 10.0 s of the take, each a soft pale glow that
+lights a patch of cloud for about half a second; it reads as a glow more than as
+lightning. Stars draw over the densest gas.
 
 ```setup
 scene hover off; shieldfx off; tooltips off
@@ -93,11 +107,11 @@ The fifth part: the renderer rewritten in Rust, shown at its best.
 Shows: specials
 Scene: specials
 Variants: stock, refit
-Layout: wipe
+Layout: full refit
 Transition: cut
-In: 2.0
+In: 3.0
 Length: 10
-Status: draft
+Status: probed
 
 A Borg cube fires its technology assimilation beam (`gTechAssimBeam`) at the Sovereign:
 in refit a green beam with two strands twisting about it, drawing data back to the cube
@@ -111,6 +125,13 @@ beams": a fluctuating cone of light in vapour, its wide end taking in most of th
 target, washing its hull in the beam's colour) is not on `main` yet: it is on the
 unmerged branch `worktree-cloak-art-direction`. Filmed from `main`, this shot shows the
 beam as `main` draws it, and must not be cut as the result of that direction.
+
+Probe review 2026-10-16: the beam fires at about 5 s of the take (the cube turns to
+it first) and stops by 12 s. Refit's beam is the same thin cyan line as stock's, pixel
+for pixel at the same moment, although `Render3D.log` says `drawing special
+techassimbeam (Beam)`: the recipe's green beam with twisting strands does not show (a
+question for render3d's `ordnance`). So the wipe is `full refit` until it does, and
+this shot is weak: there is nothing in it render3d visibly draws.
 
 ```setup
 scene hover off; tooltips off
