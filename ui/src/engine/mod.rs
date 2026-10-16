@@ -7,10 +7,12 @@
 //! hooks, checked against what stock has there, and stands down on a mismatch.
 pub mod cursor;
 pub mod dev8;
+pub mod dialogs;
 pub mod hook;
 pub mod ingame;
 pub mod loading;
 pub mod shell;
+pub mod shellui;
 
 use core::ffi::c_void;
 

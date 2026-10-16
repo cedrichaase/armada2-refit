@@ -7,7 +7,7 @@ fn main() {
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let here = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let tool = env::var("LLVM_DLLTOOL").unwrap_or_else(|_| "llvm-dlltool".into());
-    for lib in ["kernel32", "user32"] {
+    for lib in ["kernel32", "user32", "gdi32"] {
         let def = here.join(format!("{lib}.def"));
         println!("cargo:rerun-if-changed={}", def.display());
         let st = Command::new(&tool)

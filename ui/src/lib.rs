@@ -14,6 +14,7 @@ pub mod engine;
 pub mod gfx;
 pub mod input;
 pub mod math;
+pub mod menus;
 #[rustfmt::skip]
 pub mod shaders;
 pub mod surface;
@@ -48,6 +49,12 @@ fn startup() {
     log!("mission: {}", if engine::ingame::install() { "hooked" } else { "standing down" });
     log!("shell: {}", if engine::shell::install() { "hooked" } else { "standing down" });
     log!("loading: {}", if engine::loading::install() { "hooked" } else { "standing down" });
+    // The menus: [Menus] Enable=1 hosts the stock shell's dialogs (ui/MENUS.md). Patched
+    // here, at DllMain, because the shell's display mode must be raised before the
+    // engine first sets it.
+    if config::get().menus {
+        log!("menus: {}", if engine::dialogs::install() { "hosted by the UI" } else { "standing down: the shell runs stock" });
+    }
 }
 
 #[unsafe(no_mangle)]

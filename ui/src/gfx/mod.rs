@@ -101,18 +101,20 @@ struct TexSrc {
     fmt: u32,
     pixels: Pixels,
     obj: Option<(Device, Com)>,
+    /// The pixels changed since they were last copied to `obj`.
+    dirty: bool,
 }
 
 static mut TEXTURES: Vec<TexSrc> = Vec::new();
 
 /// Registers a single-channel texture (`FMT_L8`: the font atlases).
 pub fn texture_l8(w: u32, h: u32, pixels: &'static [u8]) -> Tex {
-    register(TexSrc { w, h, fmt: FMT_L8, pixels: Pixels::Static(pixels), obj: None })
+    register(TexSrc { w, h, fmt: FMT_L8, pixels: Pixels::Static(pixels), obj: None, dirty: false })
 }
 
 /// Registers a BGRA8 texture, rows top-down (what `a2fmt::tga::decode` gives).
 pub fn texture_bgra(w: u32, h: u32, pixels: Vec<u8>) -> Tex {
-    register(TexSrc { w, h, fmt: FMT_A8R8G8B8, pixels: Pixels::Owned(pixels), obj: None })
+    register(TexSrc { w, h, fmt: FMT_A8R8G8B8, pixels: Pixels::Owned(pixels), obj: None, dirty: false })
 }
 
 #[allow(static_mut_refs)]
@@ -120,6 +122,29 @@ fn register(t: TexSrc) -> Tex {
     let v = unsafe { &mut TEXTURES };
     v.push(t);
     Tex((v.len() - 1) as u16)
+}
+
+/// Registers a texture whose pixels change: BGRX8 (`FMT_X8R8G8B8`, the alpha byte
+/// ignored), rows top-down, black until `tex_update` gives it pixels. For pictures
+/// copied off GDI (`menus`, the mirrored dialogs) every frame they change.
+pub fn texture_dynamic(w: u32, h: u32) -> Tex {
+    let px = alloc::vec![0u8; (w * h * 4) as usize];
+    register(TexSrc { w, h, fmt: FMT_X8R8G8B8, pixels: Pixels::Owned(px), obj: None, dirty: true })
+}
+
+/// New pixels for a `texture_dynamic`: `rows` rows of `w * 4` bytes from `src`, `pitch`
+/// bytes apart, written at the top-left; copied to the device when it next draws.
+#[allow(static_mut_refs)]
+pub fn tex_update(t: Tex, src: *const u8, pitch: usize, w: u32, rows: u32) {
+    let v = unsafe { &mut TEXTURES };
+    let Some(s) = v.get_mut(t.0 as usize) else { return };
+    let Pixels::Owned(px) = &mut s.pixels else { return };
+    let (w, rows) = (w.min(s.w) as usize, rows.min(s.h) as usize);
+    let row = s.w as usize * 4;
+    for y in 0..rows {
+        unsafe { core::ptr::copy_nonoverlapping(src.add(y * pitch), px.as_mut_ptr().add(y * row), w * 4) };
+    }
+    s.dirty = true;
 }
 
 /// An image from the game's files (a TGA, by path under the game directory), or None
@@ -141,8 +166,21 @@ pub fn tex_size(t: Tex) -> (u32, u32) {
 fn tex_obj(dev: Device, t: Tex) -> *mut c_void {
     let v = unsafe { &mut TEXTURES };
     let Some(s) = v.get_mut(t.0 as usize) else { return core::ptr::null_mut() };
+    if s.dirty && s.obj.as_ref().is_some_and(|(d, _)| *d == dev) {
+        // Changed pixels on a texture already made here: copy them again.
+        let (_, tex) = s.obj.as_ref().unwrap();
+        if let (Some(lr), Pixels::Owned(data)) = (tex.tex_lock(0, 0), &s.pixels) {
+            let row = (s.w * 4) as usize;
+            for y in 0..s.h as usize {
+                unsafe { core::ptr::copy_nonoverlapping(data[y * row..].as_ptr(), lr.bits.add(y * lr.pitch as usize), row) };
+            }
+            tex.tex_unlock(0);
+        }
+        s.dirty = false;
+    }
     if s.obj.as_ref().is_none_or(|(d, _)| *d != dev) {
         s.obj = None;
+        s.dirty = false;
         let bpp = if s.fmt == FMT_L8 { 1 } else { 4 };
         let data: &[u8] = match &s.pixels {
             Pixels::Static(p) => p,

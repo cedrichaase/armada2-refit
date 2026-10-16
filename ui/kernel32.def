@@ -29,3 +29,9 @@ OutputDebugStringA@4
 ExitProcess@4
 GetCurrentThreadId@0
 Sleep@4
+FindResourceA@12
+LoadResource@8
+LockResource@4
+SizeofResource@8
+VirtualQuery@12
+GetProcAddress@8

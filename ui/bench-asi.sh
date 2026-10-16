@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Build UI.asi and put it, with UI.ini, into a test-bench clone's game.
 #
-#   ui/bench-asi.sh <session state.json> [--demo mission,shell,loading] [Section.Key=Value ...]
+#   ui/bench-asi.sh <session state.json> [--demo mission,shell,loading] [--menus] [Section.Key=Value ...]
 #
 # UI.asi is not in ./install yet (README.md), so this is how the bench gets it, as
 # online/bench-asi.sh does for Online.asi. A scenario's `Setup:` line can run it.
 #
 #   --demo LIST   switches on the [Demo] overlay for each context named
+#   --menus       the UI hosts the shell's menus ([Menus] Enable=1, ui/MENUS.md), and
+#                 Menus.asi is taken out of the clone: the two must not both host them
+#                 (UI.asi stands down while it is loaded)
 #   S.K=V         any other UI.ini key, e.g. UI.Scale=1.5
 set -euo pipefail
 
@@ -14,12 +17,14 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 state="${1:?usage: bench-asi.sh <session state.json> [--demo LIST] [Section.Key=Value ...]}"
 shift
 sets=()
+menus=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --demo)
             IFS=, read -ra ctxs <<< "${2:?--demo needs a list}"
             for c in "${ctxs[@]}"; do sets+=("Demo.${c^}=1"); done
             shift 2 ;;
+        --menus) menus=1; sets+=("Menus.Enable=1"); shift ;;
         *=*) sets+=("$1"); shift ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
@@ -29,6 +34,11 @@ work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])
 
 bash "$here/build.sh" >/dev/null
 cp "$here/build/UI.asi" "$here/UI.ini" "$work/game/"
+if [ "$menus" = 1 ]; then
+    for f in Menus.asi MenuScale.asi; do
+        [ -e "$work/game/$f" ] && rm -f "$work/game/$f" && echo "removed $f from the clone"
+    done
+fi
 for s in "${sets[@]}"; do
     sec="${s%%.*}" rest="${s#*.}"
     key="${rest%%=*}" val="${rest#*=}"

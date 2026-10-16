@@ -15,10 +15,15 @@ static mut DEMO: Demo = Demo { on: true, slider: 0.5, clicks: 0 };
 
 pub fn run(ctx: Context, ui: &mut Ui) {
     let cfg = crate::config::get();
+    if ctx == Context::Menus {
+        crate::menus::frame(ui);
+        return;
+    }
     let on = match ctx {
         Context::Mission => cfg.demo_mission,
         Context::Shell => cfg.demo_shell,
         Context::Loading => cfg.demo_loading,
+        Context::Menus => false,
     };
     if on {
         demo(ctx, ui);
@@ -38,7 +43,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
     let anchor = match ctx {
         Context::Mission => Anchor::TopRight,
         Context::Shell => Anchor::Centre,
-        Context::Loading => Anchor::BottomLeft,
+        Context::Loading | Context::Menus => Anchor::BottomLeft,
     };
     let r = anchor.place(screen, w, h, ui.u(if ctx == Context::Mission { 96.0 } else { 40.0 }));
     let inner = ui.window(r, "UI RUNTIME");
@@ -48,6 +53,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
         Context::Mission => "Mission",
         Context::Shell => "Shell",
         Context::Loading => "Loading",
+        Context::Menus => "Menus",
     };
     ui.label(s.row(row), &crate::sfmt!("Context: {}   {}x{}", name, ui.w as u32, ui.h as u32));
     let m = match ui.input.mouse {
