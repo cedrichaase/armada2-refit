@@ -17,13 +17,13 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 ### Changed
 - Sky: every recipe in `skies/` has its shape fitted to its stock sky (distance from
   stock's structure 0.12-0.45 after grading, from 0.13-1.16), then its grade refitted:
-  many mid-sized clumps where most skies had one or two large billows.
+  many mid-sized clumps where most skies had one or two large billows (a40a752).
 - Sky: Aqua and `mbgrg` are graded to stock like the rest (0.92 and 0.90 of stock's
   luminance); `perf/sky-grade.py`'s POLICY is empty.
 
 ### Fixed
 - Sky: a recipe star's halo was cut at the lattice cells' borders, a faint square
-  about `mbgpur`'s big star; it now fades out within the cells searched.
+  about `mbgpur`'s big star; it now fades out within the cells searched (a40a752).
 
 Installed, not yet seen in game.
 

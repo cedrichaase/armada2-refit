@@ -12,7 +12,7 @@ Layers: render3d 0.3.0.
 ### Changed
 - The procedural skies are fitted to their stock skies' shape (clump size, edges,
   tones) by measurement, and graded to stock again, Aqua and `mbgrg` included; new
-  recipe key `Octaves=` and tool `render3d/perf/sky-shape.py` (render3d 0.3.0).
+  recipe key `Octaves=` and tool `render3d/perf/sky-shape.py` (render3d 0.3.0; a40a752).
 
 Installed, not yet seen in game.
 
