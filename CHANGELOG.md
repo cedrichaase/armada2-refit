@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.20.1 — 2026-10-17
+
+Layers: ui 0.10.1.
+
+### Fixed
+- The briefing's objectives keep a gap after their LCARS switches instead of running
+  under them (ui 0.10.1).
+
+Installed, not yet seen in game.
+
 ## 12.20.0 — 2026-10-17
 
 Layers: render3d 0.11.0.

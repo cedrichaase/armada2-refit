@@ -939,6 +939,14 @@ pub fn focus_ring(ui: &mut Ui, r: R, c: Corners) {
     ui.draw.glow(r.inset(-g), c.grown(g), ui.u(8.0), fade(t.focus, 0.25));
 }
 
+/// The width `check` takes in a rect `h` high, for laying out before drawing: a
+/// square box, or LCARS's pill switch, nearly twice as wide.
+pub fn check_w(ui: &Ui, h: f32) -> f32 {
+    let t = ui.theme;
+    let bs = h.min(ui.u(t.text_size + 2.0));
+    if t.form == Form::Lcars { libm::roundf(bs * 1.8) } else { bs }
+}
+
 /// A check box (or LCARS switch) in the left of `r`, vertically centred; returns the
 /// width it took, for the label after it.
 pub fn check(ui: &mut Ui, r: R, on: bool, st: State) -> f32 {
@@ -947,7 +955,7 @@ pub fn check(ui: &mut Ui, r: R, on: bool, st: State) -> f32 {
     let y = r.y + (r.h - bs) * 0.5;
     if t.form == Form::Lcars {
         // A pill switch: gold and lit to the right when on.
-        let w = libm::roundf(bs * 1.8);
+        let w = check_w(ui, r.h);
         let b = R::new(r.x, y, w, bs);
         let bg = if st.off { t.button_off } else if on { mix(t.accent, 0xffffffff, st.hot * 0.25) } else { mix(t.track, t.accent2, 0.25 + 0.25 * st.hot) };
         ui.draw.pill(b, bg);
