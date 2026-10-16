@@ -22,9 +22,9 @@
 use super::kit;
 use crate::engine::shellui::Kind;
 use crate::gfx::{Weight, R};
-use crate::menus::model::{Class, Control, What};
+use crate::menus::model::{Control, What};
 use crate::menus::Screen;
-use crate::widgets::{theme, Align, Anchor, Ui};
+use crate::widgets::{theme, Align, Ui};
 use alloc::vec::Vec;
 
 /// The stock layout's parts, in design coordinates: the players' table is left of
@@ -251,5 +251,4 @@ fn map(ui: &mut Ui, s: &Screen, r: R) {
             kit::button(ui, s, c, br, None);
         }
     }
-    let _ = (Anchor::Centre, Class::Edit);
 }

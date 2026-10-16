@@ -479,9 +479,6 @@ hidden surfaces).
 - `ui-menus-setup.md`: Instant Action's Game Setup through its spec: two computer
   players set through the drop-downs, a side, Fixed Placement, Map Select (scrolled,
   Four Sisters chosen), the Advanced panel (Warp off, a slider moved), LAUNCH.
-- `ui-menus-multiplayer.md`: two games, both with the UI's menus and Microsoft's
-  DirectPlay (`ui/bench-asi.sh --dplay`): Multiplayer Connection, Manual IP, the lobby,
-  Create Game, the joiner's game list, Game Setup with chat both ways, LAUNCH.
 
 ## Not done
 
@@ -494,8 +491,13 @@ hidden surfaces).
   lobbies (no network on the bench), Credits (a screen of the engine's own, not a
   dialog: it runs as before), the licence, GameSpy and command-line screens.
 - **Specs** for the main menu (English labels: the stock art carries the words), Game
-  Setup, Advanced Options, Map Select, Multiplayer Connection, the Internet lobby and
-  the small multiplayer dialogs. The other screens are generic.
+  Setup, Advanced Options, Map Select, Multiplayer Connection and the small
+  multiplayer dialogs. The other screens are generic, the Internet lobby among them.
+- **The multiplayer specs are not verified on the bench.** Multiplayer Connection,
+  Manual IP and the other forms, and Game Setup's chat line, are written from the
+  model read on the bench (Multiplayer Connection) or from the generic `form` pattern,
+  but no two-player run has been made with them (`ui/bench-asi.sh --dplay --menus` is
+  the set-up for one; `ui-menus-multiplayer.md` is still to be written).
 - **Map Select's list is the stock window of fourteen rows**, scrolled by the stock
   arrows: the whole list of maps is not read (it is `KnownMaps`'), and the stock scroll
   bar's thumb is not drawn.
