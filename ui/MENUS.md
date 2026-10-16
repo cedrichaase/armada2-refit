@@ -683,7 +683,7 @@ ui-menus-success.md` wins and loses the first Federation mission with `Scene.asi
 `[Menus] Scene=1` (the default): the main menu and the campaign selection stand over
 render3d's map, a 3D scene with a place for each of them: a Federation fleet in orbit
 over a planet, a starbase, Klingon ships before a Metreon nebula, a Borg fusion cube in
-a Mutara nebula (`render3d/README.md`, "The menu scene"). Code: `src/menus/scene.rs`.
+a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"). Code: `src/menus/scene.rs`.
 
 - **Where it is drawn.** At the start of each frame of the dialog host's loop, after
   the clear and before `surface::frame(Context::Menus)`, so it is under everything of

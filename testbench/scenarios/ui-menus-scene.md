@@ -14,7 +14,7 @@ of the stock screen's art. The campaign selection is a column too: each campaign
 emblem and its name, and pointing at one moves the camera to its scene on the same
 map: the starbase (Tutorials), the fleet (Federation), Klingon ships decloaking before
 a red Metreon nebula (Klingon), a Borg fusion cube casting its shadow through a purple
-Mutara nebula (Borg). The column's places on the main menu are the old layout's, so
+Mutara nebula with the queen's Diamond up close (Borg). The column's places on the main menu are the old layout's, so
 `Click at 228,258` still opens Single Player; the named targets click the UI's labels
 (`ui.json`, `label`) while UI.log says the scene is on.
 
@@ -48,7 +48,7 @@ Mutara nebula (Borg). The column's places on the main menu are the old layout's,
 28. Wait 5 seconds.
 29. Expect "Render3D.log" contains "menu: view borg".
 30. Take a screenshot called "borg".
-31. Check that Borg Campaign is lit and the scene shows a dark Borg cube floating in a purple, cloudy nebula, and to the right of and below the cube a darker region of gas bounded by a straight edge running from the cube down to the right (the cube's shadow).
+31. Check that Borg Campaign is lit and the scene shows a dark Borg cube floating in a purple, cloudy nebula, a large dark diamond-shaped Borg ship close to the camera below and left of the cube, and to the right of and below the cube a darker region of gas bounded by a straight edge running from the cube down to the right (the cube's shadow).
 32. Click the previous menu.
 33. Wait 3 seconds.
 34. Expect "SINGLE PLAYER" is visible.

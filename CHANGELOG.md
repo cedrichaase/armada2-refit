@@ -13,7 +13,8 @@ Layers: ui 0.8.0, render3d 0.9.0, testbench 3.26.0.
 - The campaign selection gives each campaign a scene of its own on render3d's menu
   map, the camera moving to it as the campaign is pointed at: a starbase for the
   tutorials, the fleet over the planet, Klingon ships decloaking before a Metreon
-  nebula, a Borg fusion cube casting its shadow through a Mutara nebula. Its entries
+  nebula, a Borg fusion cube casting its shadow through a Mutara nebula with the queen's
+  Diamond close by. Its entries
   are a faction emblem and a name (ui 0.8.0, render3d 0.9.0).
 
 ### Fixed

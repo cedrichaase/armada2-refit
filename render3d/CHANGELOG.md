@@ -11,7 +11,8 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   takes precedence), asked for by view: `main`, and for the campaign selection
   `tutorials` (a starbase over the planet), `federation` (the fleet), `klingon` (Klingon
   ships decloaking before a Metreon nebula), `borg` (a fusion cube casting its shadow
-  through a Mutara nebula). The camera moves across the map between views (`Blend`).
+  through a Mutara nebula, the queen's Diamond close to the camera). The camera moves
+  across the map between views (`Blend`, 1.6 s).
   Keys `[Group.*]` (with `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`),
   `[View.*]`, `[Ship.*]`, `[Nebula.*]` (its `KeyShare`, `Scatter`, `Opacity`,
   `Brightness` over the recipe's, for the menu's own class).

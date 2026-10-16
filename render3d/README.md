@@ -152,7 +152,8 @@ to 8 bits, and the log says which.
 `src/menu/`, the map in `menus/map.ini`: a map of render3d's own behind the front end's
 main menu and campaign selection, every scene on it under one sun. A Federation fleet
 in orbit over a class M planet, a starbase beside it, Klingon ships before a Metreon
-nebula far out on one side, a Borg fusion cube in a Mutara nebula on the other. `UI.asi`
+nebula far out on one side, a Borg fusion cube and the queen's Diamond in a Mutara nebula
+on the other. `UI.asi`
 asks for a **view** of it by name (`[Menus] Scene=1`, ui/MENUS.md, "The menu scene")
 through render3d's one export, `Render3D_MenuScene(name, x, y, w, h)`: inside its own
 scene, with the back buffer bound, it gets the view drawn into that rectangle and draws
@@ -212,8 +213,10 @@ nothing lit is behind it**: a view ray adds up all the gas along it, so a shadow
 along its length, or in a thick field, or in front of lit gas beyond (seen through
 it), is diluted to nothing. The Borg scene's Mutara is therefore a band about 600
 units deep laid along the cube's shadow (its own group turned with the shadow's way,
-36 degrees from +x), seen 71 degrees from the sun, all its light the sun's
-(`KeyShare=1`) and dense (`Opacity=2`): the shadow is a dark wedge through it.
+36 degrees from +x), seen 71 degrees from the sun, with the recipe's own look (a
+stronger `KeyShare`, `Opacity` and `Brightness` darkened the shadow but the user
+preferred stock). The queen's Diamond (`bqueen`) hangs close to the camera, below and
+left of the cube, a silhouette against the gas.
 
 Two things the menu found in the hulls' shadow map, both in missions too: a model
 that is no instance's (`inst` 0) read its face limit at 0 and cast nothing (now it
@@ -234,7 +237,7 @@ time it is posed (`hulls: menu scene:`). Keys:
 | | `Stars`, `StarSize`, `StarSeed` | how many stars, their half size in radians, the seed |
 | | `Sun`, `SunDistance` | the sun's ODF (none: no sun) and its distance from the eye |
 | | `KeyAxis`, `KeyColour`, `FillAxis`, `FillColour` | the two lights: the way each travels, and its colour |
-| | `Blend` | seconds the camera takes from one view to the next (2.5) |
+| | `Blend` | seconds the camera takes from one view to the next (2; the map's 1.6) |
 | `[Planet]` | `Class` | the planet class's ODF (`PB_CLSSM`); none: no planet |
 | | `Radius`, `At`, `Axis`, `Spin`, `Clouds`, `Orbit` | its radius, its centre, its pole, how much faster than `Orbit` its ground turns, the clouds' extra turn, the orbit's radians a second (the sky's turn is `SkyTurn`) |
 | `[Group.<name>]` | `At`, `Yaw` | the group's place on the map and its turn about +y in degrees |
