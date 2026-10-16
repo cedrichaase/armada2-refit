@@ -5,6 +5,15 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.3.0 — 2026-10-16
+
+### Added
+- `films/origin`: the tractor beam as a cone of light (`tr15`) and shield hits with
+  mist (`sh14`), the art direction merged with render3d 0.6.0; `as17` notes why the
+  assimilation beam does not form on the bench.
+
+Tooling only; nothing to see in game.
+
 ## 1.2.0 — 2026-10-16
 
 ### Added
