@@ -42,7 +42,6 @@ impl<'a> Ui<'a> {
             let tid = self.sub_id(id, name);
             let (hot, held, clicked) = self.interact(tid, tab);
             if clicked {
-                self.focus(id);
                 if *sel != i {
                     *sel = i;
                     changed = true;

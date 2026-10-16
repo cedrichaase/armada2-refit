@@ -12,9 +12,6 @@ impl<'a> Ui<'a> {
         let focused = self.focus_register(id);
         let (hot, held, clicked) = self.interact(id, r);
         let mut flip = clicked;
-        if clicked {
-            self.focus(id);
-        }
         if focused && self.activate_pressed() {
             flip = true;
         }
@@ -37,9 +34,6 @@ impl<'a> Ui<'a> {
         let focused = self.focus_register(id);
         let (hot, held, clicked) = self.interact(id, r);
         let mut pick = clicked;
-        if clicked {
-            self.focus(id);
-        }
         if focused && self.activate_pressed() {
             pick = true;
         }

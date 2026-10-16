@@ -1,6 +1,9 @@
 //! Keyboard focus: one widget at a time has it, Tab and Shift+Tab move it between the
 //! focusable widgets in the order they were called, Enter and Space activate the
-//! focused one, Esc takes the focus away. A focused widget keeps the keyboard from the
+//! focused one, Esc takes the focus away. A click gives the focus only to a widget
+//! that takes typing or arrow keys (text field, list, dropdown, spinner); a button,
+//! toggle, slider, check box or tab gets it from Tab alone, so a click on one never
+//! keeps the keyboard from the engine or Esc from the screen. A focused widget keeps the keyboard from the
 //! engine (`claim_keyboard`), so a screen in a mission must never leave focus behind:
 //! a click that lands on nothing focusable drops it, and so does a frame in which the
 //! focused widget was not called.

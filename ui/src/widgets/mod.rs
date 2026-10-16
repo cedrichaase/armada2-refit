@@ -236,9 +236,6 @@ impl<'a> Ui<'a> {
         let id = self.id(label);
         let focused = self.focus_register(id);
         let (hot, held, clicked) = self.interact(id, r);
-        if clicked {
-            self.focus(id);
-        }
         let mut st = State::of(self, id, hot, held);
         st.focus = focused;
         theme::button(self, r, label, st);
@@ -250,9 +247,6 @@ impl<'a> Ui<'a> {
         let id = self.id(label);
         let focused = self.focus_register(id);
         let (hot, held, clicked) = self.interact(id, r);
-        if clicked {
-            self.focus(id);
-        }
         let flip = clicked || (focused && self.activate_pressed());
         if flip {
             *on = !*on;
@@ -273,9 +267,6 @@ impl<'a> Ui<'a> {
         let id = self.id(label);
         let focused = self.focus_register(id);
         let (hot, held, _) = self.interact(id, r);
-        if held {
-            self.focus(id);
-        }
         let mut changed = false;
         if held {
             if let Some((mx, _)) = self.input.mouse {
