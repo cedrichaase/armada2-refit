@@ -12,6 +12,7 @@ anything is patched or called.
     Bar=0         ; the button bar is ours (below)
     BarKeys=1     ; with it, the grid's keys; 0 keeps stock's bar keys
     BarLabels=1   ; the key in each button's corner
+    Info=0        ; the info panel is ours (below)
 
 Every panel key defaults to 0: with the shipped `UI.ini` the HUD is stock and the
 panel switch is not even patched.
@@ -56,7 +57,7 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 | Component (global) | What it shows | Its state comes from | Input | Drawn with | Takeover needs |
 |---|---|---|---|---|---|
 | `PopupPaletteImp` (`g_pPopupPalette`) — **the button bar, ours** | the selected units' commands, menus (orders, build, AI, formations, trade), build lists, special weapons | its `Update` (always-game-step): the selection and the menu open, into 21 `ControlButton`s | its buttons on click release (focus-step); its hotkey tables and menu toggles in `mProcessKeyboardInput` | each `ControlButton`: a sprite named by the command, tinted by state; labels for trade rates | done: `engine::palette` |
-| `ShipDisplay` (`shipDisplay`) — the info panel | the selection: one unit (wireframe, name, class, captain, shields, hull, systems, crew, officers, energy), a builder's queue, or a group of icons | its `Simulate*Object` steps from the overview's selection; three heights (`infoPanelArea_0/_1/_2`) | clicks on group icons (select one), on queue items (cancel), on system icons (repair) — focus-step | `StandardBackground`, `StandardBar`, `StandardText`, `WireframeIcon`, `ShipIcon`, `BuildWireframe`, `RaceIcon`, `RepairIcon` | `engine::selection` (done: the handles); per object: name, class, health, shields, crew, officers, systems, build queue — next |
+| `ShipDisplay` (`shipDisplay`) — **the info panel, ours** | the selection: one unit (wireframe, name, class, captain, shields, hull, systems, crew, officers, energy), a builder's queue, or a group of icons | its `Simulate*Object` steps from the overview's selection; three heights (`infoPanelArea_0/_1/_2`) | a click on the one-unit face (camera to it), on group icons (select one; Shift: take it out), on queue items (cancel) — focus-step; system icons only have tooltips | `StandardBackground`, `StandardBar`, `StandardText`, `WireframeIcon`, `ShipIcon`, `BuildWireframe`, `RaceIcon`, `RepairIcon` | done: `engine::info` |
 | `SelectionDisplay` (`selectionDisplay`) | brackets, health/shield/energy gauges, group numbers and names over units in the 3D view | the overview's selection, each object's state | none of its own (tooltips on the objects) | camera-projected 2D quads and text | selection + per-object gauges + the camera's projection; draws over the 3D view, so last |
 | `MapRadar` (`mapRadar`) — the minimap | the map, fog, units, the camera's view outline; ship/station filter buttons | `RadarComponent` from the scanner grids (fog) and the object lists | click/drag moves the camera or orders a move; filter buttons | the radar's own textures (`Gminimap`, `Gfog`, ...) and sprites | the minimap picture (its texture, or ours), the camera's position, the move order: last |
 | `ResourcePanel` (`g_resourcePanel`) | the resources (dilithium, metal, latinum, biomatter, crew, officers) at the top | `ResourceComponent`s asking `Team::GetResource` | tooltips only | `StandardBackground` and text | `engine::resources` (the amounts, done); which `eResource` is which |
@@ -80,10 +81,8 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 
 1. **The button bar** (done): the logic is the stock bar's, `GridLayout.asi` already
    knew it, and every press goes through one function.
-2. **The info panel (`ShipDisplay`)**: next, because the bar is placed against it, and
-   it is the panel players read most. Its reads are per object (name, class, health,
-   shields, crew, systems, the build queue), all from `engine::selection`'s objects;
-   its clicks (group icons, the queue, system repair) each map to a game command.
+2. **The info panel (`ShipDisplay`)** (done): the bar is placed against it, and it
+   is the panel players read most.
 3. **The resources** and **the top-right buttons**: few reads, few presses.
 4. **Messages and objectives**, **the pause box**, **replay controls**: boxes with text
    and a button or two; they could share one screen spec.
@@ -225,6 +224,119 @@ every step passed (judged and logged), but its last, `Quit the game`, which hang
 a black screen after Exit to Windows on the bench that night with UI.asi taken out
 too (`testbench/operating/hud-takeover.md`).
 
+## The info panel
+
+`hud/info.rs` (the panel) over `engine/info.rs` (the reads and presses):
+`[HUD] Info=1`. The stock `ShipDisplay` keeps running and is neither drawn nor given
+the mouse (`set_taken` on `shipDisplay`); ours draws at the bottom centre, laid out by
+its content, in the player's theme. The bar is placed against ours (`hud::info::rect`).
+
+**The face.** Stock's `Render` and `FocusSimulate` both start with
+`ShipDisplay::DetermineSelectedDisplayType` (0x4f2ee0), which reads the overview's
+selection and sets the panel's object (`+0x1e8`) and height (`+0x1f4`). Ours calls it
+once a frame: 0 nothing, 1 one object, 2 a builder (an object with flag `0x200`), 3
+and 4 a group (up to 8, more). Nothing else of the panel's `Render` is needed: it only
+draws. Its `AlwaysGameSimulate` (the repair icons' and wireframe's flash) and
+`AlwaysSimulate` (the craft under the pointer, below) still run.
+
+**The children.** `ShipDisplay::PostLoad` builds the panel's parts once and keeps them
+as members; each is a `StandardComponent` whose vtable has `GetTooltip` (+0x00) and
+`GetVerboseTooltip` (+0x04) writing into a `std::stringstream`. Stock's `Render`
+hands each the object (a text's `SetCurrentObject`, +0x20; a bar's `+0x428`; an icon's
+`+0x28`) and draws it. Ours hands it the object the same way and asks for its answer
+instead of its picture: a text's `GetInformation` (+0x24) gives the colour (three
+floats) and string stock prints, `GetLabel` (+0x28) a key of the localised strings
+(`Localized_Strings::Localize` on `g_string`); a `TextAndSprite` has its icon at
+`+0x104`, tinted by `GetCurrentColor` (+0x2c); a bar's `GetBarValue` (+0x24) gives value
+and maximum, `GetBarColor` (+0x20) its colour. All return through a pointer they are
+given. The members ours uses:
+
+| `shipDisplay+` | Child | Shown for |
+|---|---|---|
+| `0x70` | `SDInfoBar`: its `ShieldText` (+0xc) and `HullText` (+0x10), with icons | a craft's shield and hull rows; the hover card |
+| `0x74`..`0x84`, `0xc4`..`0xd4` | five `SystemText`s and their `RepairIcon`s | a craft's systems (a planet: the first two) |
+| `0x88`, `0x8c`, `0x98` | `CrewNumText`, `EnergyText`, `OfficerTextAndSprite` | crew above 0.1 (`+0x1c4`), special energy above 0.1 (`+0x168`), officers when the class costs any (`+0x88`) |
+| `0x90`, `0x94` | `ClassText`, `NameText` | every object; the name for crafts and named objects |
+| `0xa0` | `HealthBar` | a craft's hull; its colour is stock's shield reading (green to red, pure blue with the shields down) |
+| `0xa4`, `0xb8` | `CargoBar`, `CargoAmtText` | a carrier's cargo; a resource's store (`+0x17c`) |
+| `0xa8`, `0xbc`, `0xc0` | `PlanetaryMetalBar`, `PopulationText`, `PlanetOwnerText` | planets |
+| `0xac` | `WireframeIcon` | its flash (+0x30) and tooltip |
+| `0xb0`, `0xb4` | `ConstructionBar`, `ResearchItemText` | a producer or colony (build progress, what it builds); an object under construction |
+| `0x120`..`0x144` | ten `BuildWireframe`s (builder +0x28, class +0x3c, slot +0x40) | the queue's tooltips |
+
+Which parts an object gets is stock's choice, made in `info::single` as
+`ShipDisplay::DisplaySingleObject` makes it, from the object's flags (`+0x14`: 0x8 a
+craft, 0x20 a producer, 0x80 and 0x80000000 cargo, 0x4000 named, 0x40000 under
+construction), `IsPlanet` (vtable +0x0c) and a `Colony` cast (`__RTDynamicCast`).
+
+**The wireframe** is the game's art, read as `WireframeIcon::GetWireframe` finds it:
+in the HUD's sprite database, by the class's wireframe name (`GameObjectClass+0x7c`;
+for a `ConstructionObject`, the class it builds, `+0x188`), as `<name>w1`..`w5`, one
+sprite per system, or `<name>_s` for an object drawn whole (flags `0x101000`, or a
+planet). Each system's part is coloured by `Craft::mComputeRepairLeft` (0x4c8ca0) on
+the craft's system (`Craft+0x1e0`, 0x30 bytes each): the theme's text when intact,
+toward `bad` with the damage, `warn` on the flash while it is repaired (in the craft's
+repair list, `Craft+0x30`, by the system's repair id 3, 2, 1, 5, 6, or a repair under
+way, system `+0x28`); stock's are white, red and yellow. A whole one goes `bad` below
+half health (`+0x158`). The gravity mine's slowing (`GameObject::GetSlowEffect`) and a
+Romulan spy aboard (`GetLineOfSightEffect`, its ordnance class a `RomulanSpyClass`)
+add stock's `gravmine_icon` and `romspy_icon`. The race emblem is `<race>_icon`, the
+race's name at `GameObject+0xfc`, `+0x14`.
+
+**The queue** is `Producer::GetBuildQueue` (0x4b8070): ten classes, 0 for a free slot.
+A click on one is `Producer::RequestDeleteBuildQueueItem` (vtable +0x140) with the
+slot, as `BuildWireframe::Simulate` does; the click sound with it.
+
+**A group** is the selection (`engine::selection`, destroyed ones left out, `+0x113`),
+each with its wireframe and hull. A click is `ShipIcon::Simulate`'s:
+`cOverViewImp::Select` (vtable +0x90) with `(unit, 0, true, true)`, or with Shift
+`(unit, 1, false, true)`, which takes it out. Shift is the game's own binding
+(`g_pCommandShift`) or the keyboard's. There is no limit of 16: with `QOL.asi`'s
+bigger selection every unit gets an icon.
+
+**A click elsewhere on the panel** takes the camera to the object, as
+`ShipDisplay::SimulateSingleObject` does on a click: the current camera of
+`gCameraManager` (its first member), `SetInterestEntity` (vtable +0x58).
+
+**The hover card.** `ShipDisplay::AlwaysSimulate` puts the craft under the pointer in
+the 3D view at `+0x1ec`, and stock's `Render` draws `SDInfoBar` for it and clears it
+(`Entity::NO_ENTITY`). Ours reads and clears it the same way, and shows that craft's
+name, class, shields and hull in a small card beside the panel.
+
+**Tooltips** are each child's own (`GetTooltip`, after 0.35 s; `GetVerboseTooltip`
+after 1.5 s), drawn in the theme's tooltip as an overlay over the bar; a group icon's
+is the unit's name and class. Stock's strings keep printf's `%%`: shown as `%`.
+
+**Log.** Each object once ("info: Single USS Argo | Galaxy Class | 500 | 10 | hull
+720/720 | shield 100% | ..."), each tooltip's text, each press ("info: cancel queue
+slot 2", "info: select 0x...", "info: camera to 0x...").
+
+### The player's race
+
+`engine/race.rs`. `Race::s_missionRace` (0x737cc0) is the race the HUD is loaded in:
+`DisplayInterface::PostLoadAll` sets it at the start of each mission, from the user's
+team's race in the game setup, before it reads that race's GUI config and sprites.
+Its name is at `+0x14` (`federation`, `borg`, ...). The mission frame hands it to
+`theme::set_player_race` every frame, so `[UI] Theme=auto` draws the HUD in the race
+whose stock HUD it replaces. The bar, too, now draws through `theme.rs` (its buttons
+`button_frame`, its keys `badge`, its tooltip `tooltip`).
+
+### Seen on the bench
+
+2026-10-16, `-nointro a2_borg01` with the `ui-hud-info` scene at 1280x720
+(`ui/bench-hud-info.sh`): the bench's HUD race came up Federation, Borg and Klingon on
+different launches, and the theme followed each. One unit (the Galaxy: name, class,
+hull and shield rows with stock's icons, crew 500, officers 10, five systems at 100%),
+an enemy Negh'Var with its special energy, the dilithium moon (its store, 20000), the
+starbase as a builder with "Construction Ship" and its queue (four queued through the
+bar's keys, the third cancelled by a click, the dilithium refunded), a destroyer under
+fire (wireframe and systems red, hull 10%, shields 0%), three destroyers as a group
+(tooltips with name and class; a click selected one alone), the hover card for the
+craft under the pointer, and stock's tooltips ("Hull Integrity at 100%"). A
+Shift-click could not be tried: the bench's virtual keyboard does not reach the game's
+Shift (a stock Shift-click in the 3D view does not add either).
+`testbench/scenarios/ui-hud-info.md` is the regression test.
+
 ## The engine API
 
 One file per area in `src/engine/`, each read by offset through small accessors, each
@@ -239,20 +351,20 @@ named here beside the panel that uses it:
 | `sound.rs` | the HUD's button sounds | every panel with buttons |
 | `selection.rs` | the selected objects' handles (the overview's `GetSelectList`, vtable +0x98, and count, +0x94: `QOL.asi`'s bigger selection reads the same way), `Entity::Get`, the user's team | the info panel, the selection overlay |
 | `resources.rs` | `Team::GetResource` for the user's team | the resource panel |
+| `info.rs` | the info panel's face, its children's answers (texts, bars, tooltips), wireframes, systems' repair state, the queue, the group; select, cancel, camera | the info panel |
+| `race.rs` | the race the HUD is loaded in | the theme |
 
 ## Not done
 
-- **The info panel** and every other panel (the order above). For the info panel the
-  likely way in is the panel's own child components rather than the objects: its texts
-  are `StandardText` subclasses (`NameText`, `ClassText`, `CrewText`, `HullText`, ...)
-  whose `GetInformation` answers the colour and the string the stock panel draws, so
-  ours would show exactly what stock computes; the bars, the wireframe and the icons
-  need their own reads, and its clicks (group icons, the build queue, system repair)
-  their own presses.
+- Every panel after the info panel (the order above).
+- The info panel: the planet face (population, owner, metal) has not been seen on the
+  bench, nor a Shift-click on a group icon, the slowed and spy icons, or the
+  verbose tooltips' wording at length. Stock's wireframe and system colours are
+  re-made in the theme's status colours rather than copied.
 - `GridLayout.ini`'s `[Cells]` (moving one button to another key) has no `UI.ini`
   counterpart yet; nor the trade buttons' exchange-rate label and the percentage some
   commands draw on their button (`ControlButton::Render` draws both as text).
 - A stock click on a palette button locks the cursor to the bar while held, and the
   bar's `PreSimulate` sends the bar back to the top level when a click lands outside it
   while it holds the lock; ours never holds it. Not seen to matter.
-- Only the Borg have been seen, at 1280x720.
+- The bar: only the Borg had been seen, at 1280x720, before the info panel's runs (Federation, Borg, Klingon themes).
