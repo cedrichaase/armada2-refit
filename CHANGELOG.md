@@ -5,6 +5,38 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.17.0 — 2026-10-16
+
+Layers: ui 0.8.0, render3d 0.9.0, testbench 3.26.0.
+
+### Changed
+- The campaign selection gives each campaign a scene of its own on render3d's menu
+  map, the camera moving to it as the campaign is pointed at: a starbase for the
+  tutorials, the fleet over the planet, Klingon ships decloaking before a Metreon
+  nebula, a Borg fusion cube casting its shadow through a Mutara nebula with the queen's
+  Diamond close by. Its entries
+  are a faction emblem and a name (ui 0.8.0, render3d 0.9.0).
+
+### Fixed
+- Ships in the menu scene cast shadows, and cut-out meshes (half a Borg fusion cube)
+  cast theirs in missions too (render3d 0.9.0).
+- After an aborted mission the campaign selection is over the menu scene again, not
+  the stock look (ui 0.8.0).
+
+Confirmed in game 2026-10-16.
+
+## 12.16.0 — 2026-10-16
+
+Layers: ui 0.7.0, render3d 0.8.0, testbench 3.25.0.
+
+### Added
+- The main menu and the campaign selection stand over a 3D scene drawn in game by
+  render3d: a Federation fleet in orbit over a class M planet, with the mission
+  renderer's lighting, shadows, running lights and bloom (`[Menus] Scene`; ui 0.7.0,
+  render3d 0.8.0). Both screens restyled over it.
+
+Confirmed in game 2026-10-16.
+
 ## 12.15.0 — 2026-10-16
 
 Layers: ui 0.6.0, render3d 0.7.1, testbench 3.24.0.

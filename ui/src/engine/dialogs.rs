@@ -1151,7 +1151,7 @@ fn run_modal(h: HWND) -> isize {
     let mut last_report = started;
     let depth = slot_of(h).map_or(0, |s| s.depth);
     if depth == 1 {
-        crate::menus::backdrop::begin();
+        crate::menus::backdrop::begin(slot_of(h).map_or("", |s| screen_name(s.proc_addr)));
     }
     let result;
     loop {
@@ -1275,6 +1275,8 @@ fn frame() -> Option<bool> {
     super::dev8::begin_scene(dev);
     super::dev8::set_viewport(dev, bb.width, bb.height);
     super::dev8::clear(dev, super::dev8::CLEAR_TARGET, 0xff000000);
+    // The main menu's and the campaign selection's 3D scene, under everything of ours.
+    crate::menus::scene::draw(bb.width, bb.height);
     crate::surface::frame(Context::Menus);
     super::dev8::end_scene(dev);
     super::dev8::present(dev);

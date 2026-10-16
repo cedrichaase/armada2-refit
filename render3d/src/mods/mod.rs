@@ -83,6 +83,11 @@ pub trait Module {
     }
     /// Once per view, after the last flush, before the lights are deleted.
     fn end_view(&mut self, _v: &View) {}
+    /// The menu scene (`crate::menu`): before its first pass that draws hulls (their
+    /// poses, the shadow map).
+    fn menu_begin(&mut self, _shot: &crate::menu::Shot, _v: &View) {}
+    /// The menu scene: one pass of it, for the part this module draws.
+    fn menu(&mut self, _pass: crate::menu::Pass, _shot: &crate::menu::Shot, _v: &View) {}
 }
 
 static mut MODS: Vec<Box<dyn Module>> = Vec::new();
@@ -227,6 +232,18 @@ pub fn feature(f: usize, v: &View) -> bool {
         }
     }
     false
+}
+
+pub fn menu_begin(shot: &crate::menu::Shot, v: &View) {
+    for m in all().iter_mut() {
+        m.menu_begin(shot, v);
+    }
+}
+
+pub fn menu(pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
+    for m in all().iter_mut() {
+        m.menu(pass, shot, v);
+    }
 }
 
 pub fn end_view(v: &View) {

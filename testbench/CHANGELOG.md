@@ -5,6 +5,32 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.26.0 — 2026-10-16
+
+### Changed
+- Scenario `ui-menus-scene` visits each campaign's scene by hovering its row (ui 0.8.0,
+  render3d 0.9.0); `ui-menus-single`'s campaign check accepts the column of emblems.
+
+### Added
+- Scenario `ui-menus-scene-abort`: the menu scene is back on the campaign selection
+  after a mission is aborted (ui 0.8.0).
+
+Confirmed in game 2026-10-16.
+
+## 3.25.0 — 2026-10-16
+
+### Added
+- `ui.json` targets take a `label`: `Click the <target>` clicks it by OCR while UI.log
+  says the UI's menus stand over render3d's scene (`menus: scene <name> on`), and the
+  bench's quit does the same for Exit; the main menu's and the campaign selection's
+  targets have one.
+- Scenario `ui-menus-scene` (ui 0.7.0, render3d 0.8.0).
+
+### Changed
+- `ui-menus-single`'s campaign check accepts the cards in a row over the scene.
+
+Confirmed in game 2026-10-16.
+
 ## 3.24.0 — 2026-10-16
 
 ### Added

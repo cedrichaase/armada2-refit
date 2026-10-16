@@ -182,6 +182,23 @@ impl Module for World {
         }
         false
     }
+    fn menu(&mut self, pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
+        if !self.enable {
+            return;
+        }
+        match pass {
+            crate::menu::Pass::Planet if self.on_planets => {
+                if let Some(p) = &shot.planet {
+                    self.planets.draw_menu(v, &mut self.surfaces, &p.ground, &p.atmo, &p.world, p.radius, p.cloud_yaw);
+                }
+            }
+            crate::menu::Pass::Gas if self.on_nebulae => {
+                let key = shot.key.map(|k| [k.x, k.y, k.z]);
+                self.nebulae.draw_menu(v, &shot.gas, key);
+            }
+            _ => {}
+        }
+    }
     fn end_view(&mut self, v: &View) {
         if v.main {
             self.planets.end_frame(v.frame);

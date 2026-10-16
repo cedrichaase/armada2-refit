@@ -14,6 +14,7 @@ pub mod engine;
 pub mod frame;
 pub mod gfx;
 pub mod math;
+pub mod menu;
 pub mod mods;
 pub mod scene;
 #[rustfmt::skip]

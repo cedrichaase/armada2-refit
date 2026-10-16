@@ -220,7 +220,7 @@ def s_quit(c, m):
         elif exit_btn:
             c.sess.click(exit_btn['x'] + exit_btn['w'] // 2, exit_btn['y'] + exit_btn['h'] // 2)
         elif c.screen_def('main') and c.screen_matches(c.screen_def('main'), words):
-            c.sess.click(*c.design_to_screen(*c.target('exit')['at']))
+            c.sess.click(*c.target_point(c.target('exit')))
         else:
             c.sess.key('Escape')
         for _ in range(16):
@@ -320,7 +320,7 @@ def s_click_named(c, m):
     t = c.target(m.group('name'))
     if t is None:
         return c.delegate(m.string)
-    x, y = c.to_screen(t.get('space', 'design'), *t['at'])
+    x, y = c.target_point(t)
     b, dbl = _button(m)
     c.sess.click(x, y, button=b, double=dbl)
     return f'clicked the {t["name"]} at screen {x},{y}'
@@ -929,6 +929,24 @@ class Case:
             if k.lower() == name or name in [a.lower() for a in v.get('aliases', [])]:
                 return dict(v, name=k)
         return None
+
+    def menu_scene_on(self):
+        """Whether UI.asi's main menu or campaign selection stands over render3d's 3D
+        scene (UI.log, "menus: scene <name> on"): the stock art is not drawn then, and
+        its design points take no clicks (ui/MENUS.md, "The menu scene")."""
+        body = self.sess.game_log('UI.log') or ''
+        found = re.findall(r'menus: scene (?:(\S+) on|off)', body)
+        return bool(found and found[-1])
+
+    def target_point(self, t):
+        """Where to click a ui.json target: its design point, or, over the menu scene,
+        its `label` as OCR finds it (the UI's own entry; the point is on nothing)."""
+        if t.get('label') and self.menu_scene_on():
+            words = vision.ocr(self.fresh_shot('target'))
+            box = vision.find_text(words, t['label'])
+            if box:
+                return box['x'] + box['w'] // 2, box['y'] + box['h'] // 2
+        return self.to_screen(t.get('space', 'design'), *t['at'])
 
     def design_to_screen(self, x, y):
         """The shell's 800x600 design space to screen pixels.  Menus.asi logs the mapping

@@ -159,6 +159,8 @@ pub struct Hulls {
     /// `Reload=1`: when `[Hulls]` was last read.
     loaded_at: f64,
     said_extra: [u32; 3],
+    /// The menu scene's ships logged, a bit each.
+    said_menu: u32,
 }
 
 impl Default for Hulls {
@@ -174,6 +176,7 @@ impl Default for Hulls {
             ab_checked: 0.0,
             loaded_at: 0.0,
             said_extra: [0; 3],
+            said_menu: 0,
         }
     }
 }
@@ -534,6 +537,23 @@ fn clean(model: &Model, class: usize, no_lights: bool, p: &mut pose::Pose) {
     }
 }
 
+/// A model with no class behind it (the menu scene) shown clean, by its nodes' names:
+/// the systems' damage effects and the crew fires (the children of `life`, `engines`,
+/// `weapons`, `shield`, `shields`, `sensors`, `crew`, `damage`) and the `borg` node.
+fn clean_named(model: &Model, p: &mut pose::Pose) {
+    let sod = &model.sod;
+    for n in ["life", "engines", "weapons", "shield", "shields", "sensors", "crew", "damage"] {
+        if let Some(i) = sod.find(n) {
+            for &c in &sod.nodes[i].children {
+                hide(sod, c, &mut p.shown, true);
+            }
+        }
+    }
+    if let Some(i) = sod.find("borg") {
+        hide(sod, i, &mut p.shown, true);
+    }
+}
+
 /// Whether a class is a `CraftClass` (its node fields are where `clean` reads them):
 /// `DisableSpecialNodes` (vtable slot 7) is `CraftClass`'s (0x4bfdf0).
 fn is_craft_class(class: usize) -> bool {
@@ -716,7 +736,7 @@ impl Module for Hulls {
         if look.shadows {
             let _z = crate::timing::zone("hulls: shadow map");
             let st = view_state(v.key());
-            self.shadow.render(v, &look, &st.posed, &mut self.draw);
+            self.shadow.render(v, &look, &st.posed, &mut self.draw, None);
         } else {
             shadow::clear_current();
         }
@@ -825,6 +845,108 @@ impl Module for Hulls {
             self.sprites.billboard(v, &look, p, name, &mut st.sprites);
         }
         true
+    }
+    fn menu_begin(&mut self, shot: &crate::menu::Shot, v: &View) {
+        unsafe { CUR = v.key() };
+        unsafe { ME = self as *mut Hulls };
+        unsafe { THIS = self as *mut Hulls };
+        let st = view_state(v.key());
+        st.posed.clear();
+        st.faded.clear();
+        st.cloaked.clear();
+        st.additive.clear();
+        st.sprites.clear();
+        st.extras.clear();
+        let look = self.look().clone();
+        // The finest level of detail at any distance: the scene is a close-up.
+        let lod = pose::Lod::Auto { eye: v.eye, settings: pose::LodSettings { detail: 4, dist: [1.0e5, 1.0e5, 1.0e5, 1.0e5] } };
+        for (i, s) in shot.ships.iter().enumerate() {
+            // Cloaked whole, a ship is not there at all (it waits to decloak).
+            if s.cloak.is_some_and(|k| k <= 0.0) {
+                continue;
+            }
+            let Some(model) = scene::model(v.dev, &s.sod) else { continue };
+            let clock = pose::Clock::looping(v.time);
+            let mut p = pose::pose(&model.sod, &model.info, &s.world, clock, lod);
+            clean(&model, 0, false, &mut p);
+            clean_named(&model, &mut p);
+            let (c, r) = draw::model_sphere(&model);
+            let centre = s.world.transform_point(c);
+            let radius = r * s.world.r[0].len().max(s.world.r[1].len()).max(s.world.r[2].len());
+            if self.said_menu & (1 << i.min(31)) == 0 {
+                self.said_menu |= 1 << i.min(31);
+                // The parts the shadow map leaves out as cut-outs (`shadow::render`).
+                let cut = model.parts.iter().filter(|part| {
+                    model.sod.nodes[part.node].mesh().is_some_and(|ms| ms.texture_material.eq_ignore_ascii_case("default")) && part.groups.iter().any(|g| !g.self_illum)
+                }).count();
+                log!("hulls: menu scene: {} ({} parts, {} cut out of the shadow map), radius {:.0}", model.name, model.parts.len(), cut, radius);
+            }
+            let posed = Posed {
+                obj: 0,
+                inst: 0,
+                model,
+                pose: p,
+                world: s.world,
+                scale: v3(1.0, 1.0, 1.0),
+                centre,
+                radius,
+                since_start: v.time,
+                flags: 3,
+                clock,
+                team: if look.team { s.team } else { None },
+                assimilated: false,
+                warp: None,
+                waves: None,
+                glow: None,
+                // Decloaking: as the engine's state 3, this much of the hull back.
+                cloak: s.cloak.map(|k| (3, k.min(1.0), 0.0)),
+                drawn: true,
+            };
+            if posed.cloak.is_some() && look.cloak {
+                st.cloaked.push(i + 1);
+            }
+            st.posed.insert(i + 1, posed);
+        }
+        if look.shadows {
+            let planets: Vec<[f32; 4]> = shot.planet.iter().map(|p| [p.world.p.x, p.world.p.y, p.world.p.z, p.radius]).collect();
+            self.shadow.render(v, &look, &st.posed, &mut self.draw, Some(&planets));
+        } else {
+            shadow::clear_current();
+        }
+    }
+    fn menu(&mut self, pass: crate::menu::Pass, _shot: &crate::menu::Shot, v: &View) {
+        use crate::menu::Pass;
+        match pass {
+            Pass::Ships => {
+                let look = self.look().clone();
+                let st = view_state(v.key());
+                let keys: Vec<usize> = st.posed.keys().copied().collect();
+                // The map's other scenes are posed too: only what is in view is drawn.
+                let vp = v.view.mul(&v.proj);
+                for k in keys {
+                    let Some(p) = st.posed.get(&k) else { continue };
+                    if !shadow::in_view(&vp, p.centre, p.radius) {
+                        st.cloaked.retain(|&c| c != k);
+                        continue;
+                    }
+                    if let Some((_, a, _)) = p.cloak {
+                        // Cloak=0: faded, as stock fades it.
+                        if !look.cloak {
+                            st.faded.push((k, 0.2 + 0.8 * a));
+                        }
+                        // No running lights until the hull is back.
+                        continue;
+                    }
+                    self.draw.draw(v, &look, p, draw::Mode::Opaque);
+                    self.sprites.collect(v, &look, p, &mut st.sprites);
+                    st.additive.push(k);
+                }
+            }
+            Pass::Translucent => {
+                self.step(Step::Translucent, v);
+            }
+            _ => {}
+        }
     }
     fn step(&mut self, s: Step, v: &View) -> bool {
         if s != Step::Translucent || self.off {

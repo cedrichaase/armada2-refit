@@ -362,10 +362,12 @@ float4 ps_holo(VO i, float2 vpos : VPOS) : COLOR
 // ---- the shadow map: depth from the Key ---------------------------------------------
 
 float4 k_spass : register(c17); // vertex: x one texel
+float4 k_dcut  : register(c0);  // pixel: x 1 to cut out at alpha 0.5 (as ps_hull's k_uv.w)
 
 struct DO {
     float4 pos : POSITION;
     float  d   : TEXCOORD0;
+    float2 uv  : TEXCOORD1;
 };
 
 DO vs_depth(VI i)
@@ -376,11 +378,15 @@ DO vs_depth(VI i)
     float3 s = float3(dot(q, smat[0]), dot(q, smat[1]), dot(q, smat[2]));
     o.pos = float4(s.x * 2.0 - 1.0 - k_spass.x, 1.0 - s.y * 2.0 + k_spass.x, s.z, 1.0);
     o.d = s.z;
+    o.uv = i.uv;
     return o;
 }
 
+// A cut-out mesh casts what the hull pass draws of it: its texture's alpha under 0.5
+// is a hole (a mesh with no texture bound reads alpha 1).
 float4 ps_depth(DO i) : COLOR
 {
+    clip(k_dcut.x > 0.5 ? tex2D(tex, i.uv).a - 0.5 : 1.0);
     return float4(i.d, 0.0, 0.0, 1.0);
 }
 

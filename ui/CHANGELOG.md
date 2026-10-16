@@ -4,6 +4,33 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.8.0 — 2026-10-16
+
+### Changed
+- Over the menu scene the campaign selection is a column like the main menu's: each
+  campaign its faction's emblem (the HUD's race icons from `allrace.tga`; for the
+  tutorials Starfleet Academy's patch, drawn) and its name, then Load Game and Previous
+  Menu. Pointing at a campaign moves render3d's camera to its scene (needs render3d
+  0.9.0). UI.log notes `menus: campaign emblems`.
+
+### Fixed
+- After a mission was aborted the campaign selection drew without the menu scene: the
+  mission's picture was handed on from Options to the admiral's log to it. The main
+  menu and the campaign selection now drop it (`backdrop::begin`).
+
+Confirmed in game 2026-10-16.
+
+## 0.7.0 — 2026-10-16
+
+### Added
+- `[Menus] Scene` (default 1): the main menu and the campaign selection stand over
+  render3d's 3D scene, a fleet in orbit over a planet (needs render3d 0.8.0; without
+  it they draw as before). Over it the main menu draws none of the stock art and takes
+  no click off its column; its entries are lit text with an accent bar. The campaign
+  cards stand in a row along the foot. UI.log notes `menus: scene <name> on`/`off`.
+
+Confirmed in game 2026-10-16.
+
 ## 0.6.0 — 2026-10-16
 
 ### Added

@@ -21,11 +21,21 @@ static mut ENDED: f64 = 0.0;
 /// `IDirect3DDevice9::GetFrontBufferData` (d3d8to9 is behind the game's device).
 const DEV9_GET_FRONT_BUFFER_DATA: usize = 33;
 
-/// The first hosted dialog is opening: keep a picture of the mission, if one runs.
-pub fn begin() {
+/// Screens no mission opens: over them the picture of a mission just left is dropped
+/// (aborting one goes Options, the admiral's log, the campaign selection, each within
+/// the handover's 1.5 s of the last, and the menu scene stayed off behind them).
+const FRONT_END: [&str; 2] = ["main menu", "single player"];
+
+/// The first hosted dialog, `screen` (its name in `engine::dialogs`), is opening: keep
+/// a picture of the mission, if one runs.
+pub fn begin(screen: &str) {
     unsafe {
         ACTIVE = true;
         SHOT = None;
+    }
+    if FRONT_END.contains(&screen) {
+        unsafe { LAST = None };
+        return;
     }
     if !crate::engine::ingame::recent() {
         unsafe {

@@ -246,6 +246,41 @@ fn begin(cfg: &Config) -> Option<Saved> {
     Some(Saved { rt, ds })
 }
 
+/// The menu scene (`crate::menu`): `draw` into our targets at `rect` of the back
+/// buffer, then the post passes put it there, as a view of the engine's. Called inside
+/// the caller's scene with the back buffer bound; it is bound again after. False, with
+/// nothing drawn, when there is no Direct3D 9 device or no targets.
+pub fn menu_frame(rect: PRect, draw: impl FnOnce(Device, u32)) -> bool {
+    let Some(cfg) = config::get() else { return false };
+    let Some(dev) = Device::from_d3d8(engine::d3d8_device()) else { return false };
+    let vp = dev.get_viewport();
+    let mut v = vp;
+    v.x = rect.x;
+    v.y = rect.y;
+    v.w = rect.w;
+    v.h = rect.h;
+    v.min_z = 0.0;
+    v.max_z = 1.0;
+    dev.set_viewport(&v);
+    let Some(saved) = begin(cfg) else {
+        dev.set_viewport(&vp);
+        return false;
+    };
+    let frames = frame().as_ref().map_or(0, |f| f.frames);
+    draw(dev, frames);
+    let Some(f) = frame().as_mut() else { return true };
+    if let (Some(t), Some(p)) = (f.targets.as_ref(), f.post.as_ref()) {
+        let r = PRect { x: rect.x.min(t.w - 1), y: rect.y.min(t.h - 1), w: rect.w.min(t.w - rect.x.min(t.w - 1)), h: rect.h.min(t.h - rect.y.min(t.h - 1)) };
+        p.run(f.dev, t, r, &saved.rt, saved.ds.as_ref(), cfg);
+    } else {
+        f.dev.set_render_target(0, saved.rt.ptr());
+        f.dev.set_depth_stencil(saved.ds.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
+    }
+    f.frames = f.frames.saturating_add(1);
+    dev.set_viewport(&vp);
+    true
+}
+
 fn end(cam: usize, main: bool, saved: Saved, cfg: &Config) {
     let Some(f) = frame().as_mut() else { return };
     let (Some(t), Some(p)) = (f.targets.as_ref(), f.post.as_ref()) else {
