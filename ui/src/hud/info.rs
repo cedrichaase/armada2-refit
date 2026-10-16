@@ -207,21 +207,26 @@ fn wireframe(ui: &mut Ui, obj: usize, r: R) {
     }
 }
 
-/// A bar with a caption in it: the label at the left, the value at the right.
+/// A bar in a row: its icon or name at the left, the bar, its value at the right.
 fn bar_with(ui: &mut Ui, r: R, f: f32, col: Color, left: &str, right: &str) {
-    theme::bar(ui, r, f, Some(col));
+    bar_icon(ui, r, f, col, 0, left, right)
+}
+
+fn bar_icon(ui: &mut Ui, r: R, f: f32, col: Color, icon: usize, left: &str, right: &str) {
     let t = ui.theme;
-    let size = t.micro_size;
-    let inner = R::new(r.x + ui.u(6.0), r.y, r.w - ui.u(12.0), r.h);
-    // Captions sit on the bar: a dark shadow keeps them readable over any fill.
-    for (dx, c) in [(ui.u(1.0), 0xc0000000u32), (0.0, t.text)] {
-        let rr = R::new(inner.x + dx, inner.y + dx, inner.w, inner.h);
-        if !left.is_empty() {
-            line(ui, rr, left, size, c, Weight::Bold, Align::Left);
-        }
-        if !right.is_empty() {
-            line(ui, rr, right, size, c, Weight::Regular, Align::Right);
-        }
+    let has_icon = icon != 0 && sprite::art(icon).is_some();
+    let lw = if has_icon { r.h + ui.u(6.0) } else if left.is_empty() { 0.0 } else { ui.u(BAR_LABEL) };
+    let vw = ui.u(BAR_VALUE);
+    if has_icon {
+        sprite_in(ui, icon, R::new(r.x, r.y, r.h, r.h), t.text);
+    } else if !left.is_empty() {
+        line(ui, R::new(r.x, r.y, lw - ui.u(4.0), r.h), left, t.small_size, t.text_dim, Weight::Regular, Align::Left);
+    }
+    let bh = ui.u(BAR_H * 0.6).max(4.0);
+    let br = R::new(r.x + lw, r.y + (r.h - bh) * 0.5, r.w - lw - vw, bh);
+    theme::bar(ui, br, f, Some(col));
+    if !right.is_empty() {
+        line(ui, R::new(r.right() - vw, r.y, vw, r.h), right, t.small_size, t.text, Weight::Bold, Align::Right);
     }
 }
 
@@ -234,7 +239,9 @@ fn label_of(t: &Text) -> String {
 
 const W_SINGLE: f32 = 600.0;
 const WIRE: f32 = 150.0;
-const BAR_H: f32 = 16.0;
+const BAR_H: f32 = 20.0;
+const BAR_LABEL: f32 = 70.0;
+const BAR_VALUE: f32 = 78.0;
 const STAT_H: f32 = 24.0;
 const SYS_H: f32 = 40.0;
 const QUEUE_CELL: f32 = 52.0;
@@ -326,9 +333,9 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
         let br = R::new(x, y, cw, bh);
         let f = hb.fraction();
         let txt = s.hull_text.as_ref();
-        let left = txt.map_or(String::from("Hull"), |t| label_of(t));
+        let left = txt.map_or(String::new(), |t| label_of(t));
         let right = txt.map_or(crate::sfmt!("{:.0}/{:.0}", hb.value, hb.max), |t| t.text.clone());
-        bar_with(ui, br, f, hull_colour(ui, f), &left, &right);
+        bar_icon(ui, br, f, hull_colour(ui, f), txt.map_or(0, |t| t.icon), &left, &right);
         let id = ui.id("info.hull");
         if ui.interact(id, br).0 {
             *tip = Tip::Comp(hb.comp, br);
@@ -340,10 +347,10 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
         let (now, max) = s.shields.unwrap_or((0.0, 0.0));
         let f = if max > 0.0 { (now / max).clamp(0.0, 1.0) } else { 0.0 };
         let txt = s.shield_text.as_ref();
-        let left = txt.map_or(String::from("Shields"), |t| label_of(t));
+        let left = txt.map_or(String::new(), |t| label_of(t));
         let right = txt.map_or(crate::sfmt!("{:.0}/{:.0}", now, max), |t| t.text.clone());
         let col = if s.shields_down { t.bad } else { t.fill };
-        bar_with(ui, br, if s.shields_down { 0.0 } else { f }, col, &left, &right);
+        bar_icon(ui, br, if s.shields_down { 0.0 } else { f }, col, txt.map_or(0, |t| t.icon), &left, &right);
         if let Some(st) = txt {
             let id = ui.id("info.shield");
             if ui.interact(id, br).0 {
@@ -355,16 +362,18 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     for (i, (kind, b)) in s.bars.iter().enumerate() {
         let br = R::new(x, y, cw, bh);
         let f = b.fraction();
+        let stock = info::colour(b.colour);
+        let bright = (stock >> 16 & 0xff).max(stock >> 8 & 0xff).max(stock & 0xff) > 0x60;
         let col = match kind {
             BarKind::Construction => t.accent,
-            _ => mix(info::colour(b.colour), t.fill, 0.25),
+            _ if bright => mix(stock, t.fill, 0.25),
+            _ => t.fill,
         };
-        let left = match kind {
-            BarKind::Cargo => "",
-            BarKind::Metal => "",
-            BarKind::Construction => "",
+        let value = match kind {
+            BarKind::Construction => crate::sfmt!("{:.0}%", f * 100.0),
+            _ => crate::sfmt!("{:.0}", b.value),
         };
-        bar_with(ui, br, f, col, left, &crate::sfmt!("{:.0}%", f * 100.0));
+        bar_with(ui, br, f, col, "", &value);
         let id = ui.id(&crate::sfmt!("info.bar{}", i));
         if ui.interact(id, br).0 {
             *tip = Tip::Comp(b.comp, br);
@@ -414,8 +423,8 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
             let damaged = sy.state.repair_left > 0.01;
             let blink = sy.state.repairing && sy.flash;
             let mut st = State::of(ui, id, hot, false);
-            st.on = blink;
-            theme::button_frame(ui, r, st);
+            st.focus = blink;
+            theme::field(ui, r, st);
             let col = system_colour(ui, &sy.state, sy.flash);
             let isz = sh - ui.u(10.0);
             let icon = if sy.text.icon != 0 { sy.text.icon } else { sy.repair_icon };
@@ -518,14 +527,14 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
     ui.panel(outer);
     let inner = theme::panel_inner(ui, outer);
     let x0 = inner.x + (inner.w - (cols as f32 * tw + (cols - 1) as f32 * gap)) * 0.5;
-    let shift = ui.input.shift;
+    let shift = ui.input.shift || info::shift_held();
     for (i, &u) in units.iter().enumerate() {
         let (c, r) = (i % cols, i / cols);
         let tr = R::new(x0 + c as f32 * (tw + gap), inner.y + r as f32 * (th + gap), tw, th);
         let id = ui.id(&crate::sfmt!("info.unit{}", u));
         let (hot, held, clicked) = ui.interact(id, tr);
         let st = State::of(ui, id, hot, held);
-        theme::button_frame(ui, tr, st);
+        theme::field(ui, tr, st);
         let bar_h = ui.u(6.0);
         let wr = R::new(tr.x + ui.u(4.0), tr.y + ui.u(4.0), tr.w - ui.u(8.0), tr.h - bar_h - ui.u(12.0));
         wireframe(ui, u, wr);
@@ -538,6 +547,7 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
             *tip = Tip::Unit(u, tr);
         }
         if clicked {
+            crate::log!("info: group click, shift: ui {} game {}", ui.input.shift, info::shift_held());
             crate::engine::sound::click();
             info::select(u, shift);
         }
@@ -548,7 +558,7 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
 // ---- the hover card and tooltips ------------------------------------------------------
 
 /// The craft under the pointer in the 3D view: name, class, shields and hull, in a
-/// small card above the panel's right end (stock's hover strip).
+/// small card beside the panel (stock's hover strip).
 fn hover_card(ui: &mut Ui, obj: usize, panel: Option<R>) {
     let t = ui.theme;
     let (name, class) = info::name_and_class(obj);
@@ -570,6 +580,9 @@ fn hover_card(ui: &mut Ui, obj: usize, panel: Option<R>) {
     let n_bars = hb.is_some() as usize;
     let h = pad * 2.0 + lines.iter().map(|l| ui.u(l.1 + 4.0)).sum::<f32>() + n_bars as f32 * (bar_h + ui.u(4.0));
     let (x, y) = match panel {
+        // Beside the panel, at its right, when there is room; else above its right end
+        // (the bar, when above the panel, sits at its left).
+        Some(p) if ui.w - p.right() >= w + ui.u(16.0) => (p.right() + ui.u(8.0), p.bottom() - h),
         Some(p) => (p.right() - w, p.y - h - ui.u(8.0)),
         None => ((ui.w - w) * 0.5, ui.h - h - ui.u(10.0)),
     };
@@ -625,6 +638,9 @@ fn tooltip(ui: &mut Ui, tip: Tip, panel: Option<R>) {
             }
             Tip::None => String::new(),
         };
+        if h.tip.is_none() {
+            crate::log!("info: tooltip {:#x}: {:?}", key, text);
+        }
         h.tip = Some((verbose, now, clean(&text)));
     }
     let Some((_, _, text)) = &h.tip else { return };
@@ -637,7 +653,8 @@ fn tooltip(ui: &mut Ui, tip: Tip, panel: Option<R>) {
     let top = panel.map_or(at.y, |p| p.y.min(at.y));
     let x = at.x.min(ui.w - w - ui.u(4.0)).max(ui.u(4.0));
     let y = (top - th - ui.u(6.0)).max(ui.u(4.0));
-    theme::tooltip(ui, R::new(x, y, w, th), &text, 1.0);
+    // Last of the frame, over the bar (which may sit above the panel).
+    ui.overlay(move |ui| theme::tooltip(ui, R::new(x, y, w, th), &text, 1.0));
 }
 
 /// The game's tooltip strings mark a hotkey's letter with `^`.
@@ -648,7 +665,8 @@ fn clean(s: &str) -> String {
             o.push(c);
         }
     }
-    String::from(o.trim())
+    // Printf's escaped percent sign comes through as written.
+    String::from(o.replace("%%", "%").trim())
 }
 
 // ---- placement --------------------------------------------------------------------------

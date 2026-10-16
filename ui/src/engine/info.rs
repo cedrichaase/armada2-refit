@@ -611,8 +611,8 @@ pub fn single(obj: usize) -> Single {
             s.shields = Some((f32_at(obj, CRAFT_SHIELD), max));
         }
         let ib = child(SD_INFOBAR);
-        s.hull_text = text_of(field(ib, IB_HULL_TEXT), obj, false);
-        s.shield_text = text_of(field(ib, IB_SHIELD_TEXT), obj, false);
+        s.hull_text = text_of(field(ib, IB_HULL_TEXT), obj, true);
+        s.shield_text = text_of(field(ib, IB_SHIELD_TEXT), obj, true);
         if fl & (F_CARGO | F_CARGO2) != 0 {
             s.stats.extend(text_of(child(CARGO_TEXT), obj, false));
             if let Some(b) = bar_of(child(CARGO_BAR), obj) {
@@ -735,6 +735,16 @@ pub fn group() -> Vec<usize> {
         .map(selection::object)
         .filter(|&o| o != 0 && flags(o) & 0x4 != 0 && unsafe { rd::<u8>(o + OBJ_DESTROYED) } == 0)
         .collect()
+}
+
+/// `g_pCommandShift`: points to the game's own state of its Shift binding, which
+/// `ShipIcon::Simulate` asks.
+const COMMAND_SHIFT: usize = 0x761340;
+
+/// Whether the game sees Shift held (its command binding, as stock's click asks).
+pub fn shift_held() -> bool {
+    let p = unsafe { rd::<usize>(COMMAND_SHIFT) };
+    p != 0 && unsafe { rd::<i32>(p) } != 0
 }
 
 /// A click on a group icon: selects that unit alone, or with Shift takes it out of
