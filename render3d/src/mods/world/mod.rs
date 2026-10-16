@@ -166,6 +166,9 @@ impl Module for World {
                     self.surfaces.enable = s;
                     log!("world: Surfaces={}", s as u32);
                 }
+                if self.on_rocks {
+                    self.rocks.reload();
+                }
                 if self.on_nebulae {
                     self.nebulae.reload();
                 }

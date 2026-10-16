@@ -4,6 +4,20 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.14.0 — 2026-10-17
+
+### Added
+- `[World] MoonCrackDepth` (0.02, in the moon's radii) and `MoonCrackFalloff` (3).
+- `[World] Reload=1` reads the rocks' keys (`Rock*`, `Moon*`) again too.
+
+### Changed
+- A dilithium moon's light lies at the bottom of its cracks (`ps_rock`, c36.zw): each
+  crack is a ravine the view is marched into, its walls dark rock and its light fading
+  up them, the near wall hiding it at an angle. Fades to the flat look where a crack is
+  only a pixel or two wide.
+
+Installed, not yet seen in game.
+
 ## 0.13.0 — 2026-10-17
 
 ### Added

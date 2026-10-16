@@ -53,7 +53,9 @@ float4 msurf_ext      : register(c34);  // xyz: 1 / the mesh's extent about its 
                                         // w: the highlight's strength (Gloss=)
 float4 msurf_core     : register(c35);  // rgb: the light inside a dilithium moon (0: none, the
                                         // cut is a hole); w: the cut's level (Cut=)
-float4 msurf_spill    : register(c36);  // x: the glow's scale (1); y: the white at a crack's core
+float4 msurf_spill    : register(c36);  // x: the glow's scale (1); y: the white at a crack's core;
+                                        // z: the cracks' depth, in the mesh's radii (0: flat);
+                                        // w: how steeply their light falls off up the walls
 samplerCUBE m_albedo : register(s0);
 samplerCUBE m_relief : register(s1);
 
@@ -132,7 +134,47 @@ float4 ps_rock(VO i) : COLOR
     c.rgb += msurf_glow.rgb * B.a * msurf_spill.x;
     // The crack: the moon's light, whiter towards the fissure's core (B.a past the cut).
     float  hot  = saturate((B.a - msurf_core.w) / max(msurf_core.w, 1e-3));
+    float  glow = 1.0;
+    float3 wall = c.rgb;
+    // How many pixels the cracks' depth spans: a crack a pixel or two wide has no room
+    // for walls (they broke it into dots), so the ravine fades in from 2 to 5.
+    float  far  = saturate((msurf_spill.z / max(length(fwidth(q)), 1e-6) - 2.0) / 3.0);
+    float  flat = hot;
+    if (msurf_spill.z > 0.0 && msurf_misc.w < 0.5) {
+        // A ravine with the light at its bottom: it opens where the cut does and is
+        // deepest at the fissure's core (where B.a reaches twice the cut), the walls
+        // steep. (Opening it wider than the cut opens the finer net of branches too.) The view's ray goes down into it until it meets a wall;
+        // how deep that is says how much light reaches it, so the walls are dark rock and
+        // the light lies at the bottom, and at an angle the near wall hides part of it.
+        // Fixed steps, branch-free (vkd3d).
+        float  D   = msurf_spill.z;
+        float  lip = msurf_core.w - 0.06;
+        float  top = max(2.0 * msurf_core.w - lip, 1e-3);
+        float3 Vw  = k_eye.xyz - i.wp;
+        float3 vq  = float3(dot(Vw, msurf_rows[0].xyz), dot(Vw, msurf_rows[1].xyz), dot(Vw, msurf_rows[2].xyz)) * msurf_ext.xyz;
+        vq /= max(length(vq), 1e-12);
+        float  h0 = D * sqrt(saturate((B.a - lip) / top));
+        float  hit = h0, found = 0.0, tp = 0.0, dp = h0;
+        [unroll] for (int s = 1; s <= 8; s++) {
+            float t  = D * s / 8.0;
+            float g  = texCUBE(m_relief, normalize(q - vq * t)).a;
+            float dd = D * sqrt(saturate((g - lip) / top)) - t;   // > 0: still in the ravine
+            float f  = (1.0 - found) * step(dd, 0.0);
+            // where the ray crossed the wall, between this step and the last
+            float x  = lerp(tp, t, saturate(dp / max(dp - dd, 1e-6)));
+            hit   = lerp(hit, x, f);
+            found = max(found, f);
+            tp = t; dp = dd;
+        }
+        hit = lerp(D, hit, found);
+        float e = saturate(hit / D);
+        glow = lerp(1.0, pow(e, msurf_spill.w), far);
+        hot  = lerp(flat, e, far);
+        // the sun reaches only the top of the walls
+        wall = c.rgb * lerp(0.5, 0.05, saturate(e * 2.0));
+    }
     float3 core = msurf_core.rgb * (1.0 + hot) + dot(msurf_core.rgb, 0.333) * hot * hot * msurf_spill.y;
+    core = lerp(wall, core, glow);
     c.rgb = lerp(c.rgb, core, (1.0 - A.a) * inside);
     return float4(c.rgb, 1.0);
 }

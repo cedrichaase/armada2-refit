@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.23.0 — 2026-10-17
+
+Layers: render3d 0.14.0.
+
+### Changed
+- The dilithium moons' light lies deep in their cracks: dark walls, the light at the
+  bottom, hidden by the near wall at an angle; `[World] MoonCrackDepth`,
+  `MoonCrackFalloff` (render3d 0.14.0).
+
+Installed, not yet seen in game.
+
 ## 12.22.0 — 2026-10-17
 
 Layers: render3d 0.13.0, testbench 3.30.0.

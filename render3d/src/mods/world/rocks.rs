@@ -127,15 +127,40 @@ struct Look {
     pulse: f32,
     /// The white at a crack's core, times the light's brightness (`MoonCrackCore`).
     crack_core: f32,
+    /// How deep the cracks are, in the mesh's radii: the light lies at their bottom and
+    /// the walls hide it at an angle (`MoonCrackDepth`; 0: flat, the light at the surface).
+    crack_depth: f32,
+    /// How steeply the light fades up a crack's walls (`MoonCrackFalloff`, an exponent).
+    crack_falloff: f32,
     /// The nimbus drawn (`MoonNimbus`): the round halo behind the moon. Off by default,
     /// since the light shows through the cracks.
     nimbus: bool,
 }
 
-impl Rocks {
-    pub fn new() -> Rocks {
+impl Look {
+    fn read() -> Look {
         let ini = crate::config::ini();
         let s = "World";
+        Look {
+            ambient: ini.floats(s, "RockAmbient", [0.05, 0.05, 0.07]),
+            spec: ini.float(s, "RockSpecular", 0.7),
+            spec_pow: ini.float(s, "RockSpecularPower", 24.0),
+            rim: ini.floats(s, "RockRimLight", [0.12, 0.14, 0.20]),
+            rim_pow: ini.float(s, "RockRimPower", 3.0),
+            sun: ini.float(s, "RockSun", 1.1),
+            dark_shell: !ini.string(s, "MoonShell").is_some_and(|m| m.trim().eq_ignore_ascii_case("glow")),
+            cracks: ini.float(s, "MoonCracks", 4.0).max(0.0),
+            pulse: ini.float(s, "MoonPulse", 0.5).clamp(0.0, 1.0),
+            crack_core: ini.float(s, "MoonCrackCore", 1.0).max(0.0),
+            crack_depth: ini.float(s, "MoonCrackDepth", 0.02).max(0.0),
+            crack_falloff: ini.float(s, "MoonCrackFalloff", 3.0).max(0.0),
+            nimbus: ini.float(s, "MoonNimbus", 0.0) != 0.0,
+        }
+    }
+}
+
+impl Rocks {
+    pub fn new() -> Rocks {
         Rocks {
             vs: Shader::vertex(&VS_ROCK),
             ps: Shader::pixel(&PS_ROCK),
@@ -149,21 +174,14 @@ impl Rocks {
             sps: Shader::pixel(&PS_RSPRITE),
             sdecl: Decl::new(&SPRITE_DECL),
             svb: gfx::DynVb::new(16 * 1024),
-            look: Look {
-                ambient: ini.floats(s, "RockAmbient", [0.05, 0.05, 0.07]),
-                spec: ini.float(s, "RockSpecular", 0.7),
-                spec_pow: ini.float(s, "RockSpecularPower", 24.0),
-                rim: ini.floats(s, "RockRimLight", [0.12, 0.14, 0.20]),
-                rim_pow: ini.float(s, "RockRimPower", 3.0),
-                sun: ini.float(s, "RockSun", 1.1),
-                dark_shell: !ini.string(s, "MoonShell").is_some_and(|m| m.trim().eq_ignore_ascii_case("glow")),
-                cracks: ini.float(s, "MoonCracks", 4.0).max(0.0),
-                pulse: ini.float(s, "MoonPulse", 0.5).clamp(0.0, 1.0),
-                crack_core: ini.float(s, "MoonCrackCore", 1.0).max(0.0),
-                nimbus: ini.float(s, "MoonNimbus", 0.0) != 0.0,
-            },
+            look: Look::read(),
             said: 0,
         }
+    }
+
+    /// The look read again (`[World] Reload=1`).
+    pub fn reload(&mut self) {
+        self.look = Look::read();
     }
 
     pub fn reset(&mut self) {
@@ -450,8 +468,8 @@ impl Rocks {
                     let ctr = w.transform_point(part.centre);
                     // c28..c30 the axes, c31 the centre, c32 the glow, c33 the relief's
                     // strength, the cut and the mapping, c34 the extents and the gloss,
-                    // c35 the light in the cracks and the cut's level, c36 the glow's scale
-                    // and the white at a crack's core.
+                    // c35 the light in the cracks and the cut's level, c36 the glow's scale,
+                    // the white at a crack's core, the cracks' depth and their light's falloff.
                     let mut k = [0.0f32; 9 * 4];
                     for i in 0..3 {
                         k[i * 4..i * 4 + 3].copy_from_slice(&[w.r[i].x, w.r[i].y, w.r[i].z]);
@@ -471,6 +489,8 @@ impl Rocks {
                         let g = v3(s.draw[0][0], s.draw[0][1], s.draw[0][2]).len() / (v3(0.0, 0.5, 1.0) * self.look.cracks).len().max(1e-6);
                         k[16..19].copy_from_slice(&[c.x * g, c.y * g, c.z * g]);
                         k[33] = self.look.crack_core;
+                        k[34] = self.look.crack_depth;
+                        k[35] = self.look.crack_falloff;
                         self.note(4, "a moon's cracks lit from inside");
                     }
                     dev.ps_const(28, &k);
