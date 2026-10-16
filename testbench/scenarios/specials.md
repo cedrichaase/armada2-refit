@@ -20,6 +20,16 @@ auto-assimilator (`ART-DIRECTION.md`, "Tractor and assimilation beams"), a pink 
 running out where stock has a textured disc, and a white flash with a blue lens streak
 and a ring where stock has a soft white star.
 
+**The assimilation beam does not form here** (seen on the bench 2026-10-16, in stock
+and refit alike). The beam only lives while the cube can take a special weapon from
+its target: one the target's team has researched (Corbomite, for a Sovereign) and the
+cube does not carry yet. The bench's Sovereign has none researched, so the beam ends as
+soon as it is fired: step 21 still passes (render3d saw it once), and
+`assimilation-beam-close` shows the holding beam, still on. Spawning a research
+station and a `fedpod1` pod for the Sovereign's team did not change that. The thin
+cyan line that shows from the cube in such shots is the cube's own Borg phaser
+(`bbphaso`) firing at the enemy Sovereign, drawn as stock draws it.
+
 1. Launch the game.
 2. Wait 50 seconds.
 3. Expect "Scene.log" contains "scene ready".
