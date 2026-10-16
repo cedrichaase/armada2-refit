@@ -58,8 +58,8 @@ they are (Klingon 0.37,0.06,0, Romulan 0.02,0.38,0, Cardassian 0.46,0.23,0, Borg
 player's race in a mission and the shell's theme in the menus and the loading screen;
 a theme's name (`shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`,
 `species8472`) puts that one everywhere. `Theme::for_context` decides; the player's
-race comes from `theme::set_player_race`, which the HUD's engine reads (`PLAN.md`,
-step 2) will call. Until something does, a mission draws in the shell's theme.
+race comes from `theme::set_player_race`, which the mission frame calls with the race
+the stock HUD is loaded in (`engine/race.rs`, HUD.md "The player's race").
 
 ## Tokens
 

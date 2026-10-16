@@ -4,11 +4,13 @@
 //! (`engine::hud`) stops it drawing and taking the mouse. Ours reads that state and
 //! acts through the component's own functions.
 pub mod bar;
+pub mod info;
 
 use crate::engine::{self, hud};
 use crate::widgets::Ui;
 
 static mut BAR: bool = false;
+static mut INFO: bool = false;
 
 /// Patches what the panels switched on in UI.ini need; each stands down on its own.
 pub fn install() -> bool {
@@ -17,7 +19,7 @@ pub fn install() -> bool {
         crate::log!("hud: Enable=0, the HUD is stock");
         return false;
     }
-    if !cfg.bar {
+    if !cfg.bar && !cfg.info {
         crate::log!("hud: no panel switched on, the HUD is stock");
         return false;
     }
@@ -40,6 +42,15 @@ pub fn install() -> bool {
             crate::log!("bar: stays stock");
         }
     }
+    if cfg.info {
+        if engine::info::functions_stock() {
+            hud::set_taken(hud::SHIP_DISPLAY, false, true);
+            unsafe { INFO = true };
+            crate::log!("info: ours");
+        } else {
+            crate::log!("info: an engine function is not stock, the info panel stays stock");
+        }
+    }
     true
 }
 
@@ -57,6 +68,10 @@ pub fn run(ui: &mut Ui) {
             hud::log_components();
         }
         LOGGED = now;
+        // The info panel first: the bar is placed against it.
+        if INFO {
+            info::run(ui);
+        }
         if BAR {
             bar::run(ui);
         }
