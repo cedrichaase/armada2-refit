@@ -342,10 +342,10 @@ scenario gets there (`testbench/ui.json` has the named targets).
 | `do_*` | Template | Name | What it is | Reach | Controls of note | Mirror |
 |---|---|---|---|---|---|---|
 | `do_mainMenu` | 0x123 | main menu | the title screen | launch | 7 picture `ShellButton`s, labels in the art; the flare Bink | the art (spec: faded behind) |
-| `do_single` | 0x73 | single player | campaign selection | Single Player | 5 picture buttons (tutorial, 3 campaigns, previous), Load Game; hover Binks | the art; labels are in it |
-| `do_missionSelect` | 0x124 | mission select | a campaign's mission list | a campaign | `ShellButtonSelBox` rows, OK, Cancel | none |
-| `do_loadGame` | 0x123 | load game | saved games | Load Game | `FileSelectButton` rows, details | the save's details |
-| `do_saveGame` | 0x129 | save game | a mission's Save Game | Esc, Save Game | the name `Edit` (476x28 @176,551), rows | none |
+| `do_single` | 0x73 | single player | campaign selection | Single Player | 5 picture buttons (tutorial, 3 campaigns, previous), Load Game; hover Binks | the art; labels are in it (spec: `single_player.rs`, a cut of the art per card) |
+| `do_missionSelect` | 0x124 | mission select | a campaign's mission list | a campaign | `ShellButtonSelBox` rows, OK, Cancel | none (spec: `mission_select.rs`) |
+| `do_loadGame` | 0x123 | load game | saved games | Load Game | `FileSelectButton` rows | none; no details in the stock list (spec: `saves.rs`) |
+| `do_saveGame` | 0x129 | save game | a mission's Save Game | Esc, Save Game | the name `Edit` (476x28 @161,504), rows | none (spec: `saves.rs`) |
 | `do_escapeMenu` | 0x123 | options | Options, from the main menu and in a mission (more entries in a mission) | Options; Esc in a mission | buttons; version label | none |
 | `do_gameSettings` | 0x123 | game settings | Options -> Game Settings | Options | cycle/toggle buttons, scroll bars | scroll bars |
 | `do_graphicsOptions` | 0x1 | graphics settings | Options -> Graphics Settings | Options | display-mode list (`display mode` target), toggles | the mode list |
@@ -365,13 +365,83 @@ scenario gets there (`testbench/ui.json` has the named targets).
 | `do_helpWindow` | 0x885 | help | the lobby's help | Internet lobby -> Help | text | the text window |
 | `do_licenseAgreement` | 0x885 | licence agreement | first start only | not reached | text | the text window |
 | `do_oneButton`, `do_yesNo` | 0x73 | message, yes or no | confirmations (Exit, abort, errors) | main menu -> Exit | text, buttons | none |
-| `do_TechTreeWindow` | 0x131 | technology tree | in a mission | the in-mission menu | an `Edit` in Courier (menus/README.md, "Edit boxes") | the tree (fixed pitch) |
-| `do_admiralsLog` | 0x880 | admiral's log | score after a mission, or from Options | end of a mission | 8 owner-drawn tab buttons, player list, 8 panes (`CreateDialogParamA` 0x123, `ScreenInformation`) | tabs, panes |
+| `do_TechTreeWindow` | 0x131 | technology tree | in a mission | the in-mission menu | an `Edit` in Courier (menus/README.md, "Edit boxes") | none: drawn from the edit's text (spec: `tech_tree.rs`) |
+| `do_admiralsLog` | 0x880 | admiral's log | score after a mission, or from Options | end of a mission | 8 owner-drawn tab buttons, player list, 8 panes (`CreateDialogParamA` 0x123, `ScreenInformation`) | the seven graph/list panes; Score is drawn from labels (spec: `admirals_log.rs`) |
 | `Shell::Screen::Show` | (varies) | shell screen | voice options, command-line host/join | not on the bench | `Shell::Screen` widgets | — |
 
 The `g_shellMode` cases of `DispatchDialog` that open these: 1 main menu, 2 single
 player, 11 and 25 the in-mission menu, 13 multiplayer connection, 18 and 24 load game,
 22 internet game; Options and the rest are opened from those screens.
+
+## The single-player specs
+
+Six specs, in `src/menus/screens/`, sharing `kit.rs` (the backdrop, a centred window, a
+stock control drawn as our button, `forward_part`). All draw with `crate::widgets` in the
+shell theme and act only by clicking stock controls.
+
+- **`single_player.rs` (campaign selection).** Four cards (Tutorials, Federation,
+  Klingon, Borg), each a cut of the stock art (`mirror_part`: the faction's picture, which
+  a theme cannot draw) under a title, and Previous Menu / Load Game at the foot. The words
+  of the stock screen are not on its controls: the two top panels are hit areas of the
+  procedure itself and the lower two picture `ShellButton`s, with no label; the four names
+  are hidden `TextLabel`s the screen shows in the middle on hover, which the cards use.
+  A click is a click on a point inside the stock panel, and the card's hover is a
+  `WM_MOUSEMOVE` to it, so the stock screen's hover animation (a Bink drawn into the art
+  the card shows) and sound play. **The stock screen opens the mission list on the button
+  *down*, not the up**; a click sent as down then up (`actions::ClickDesign`) therefore
+  never reaches the up before the nested loop starts, and the hidden dialog keeps the
+  mouse capture its down took: the real pointer's messages then went to a hosted window
+  and were dropped, so the mission list took no click. `run_modal` now releases a capture
+  held by a hosted window when a dialog opens (the generic screen never met it: it sends
+  the up as a separate action, frames later).
+- **`mission_select.rs`.** The rows (`ShellButtonSelBox`, one per mission, text from the
+  game) as our list in a window over the (dimmed) campaign screen, O.K. and Cancel. The
+  two buttons lowest on the dialog are O.K. and Cancel, the rest are rows, top to bottom.
+  A click on a row is a click on the stock row; **the stock rows do not show which one is
+  chosen** (their mode stays 0, hover 1, held 2), so the highlight is ours, the row last
+  clicked. A double click is O.K.
+- **`saves.rs` (Load Game and Save Game).** The rows (`FileSelectButton`s, "name Mon day
+  time", split by our code into name and date) as our list; Previous Menu, the action and
+  Delete Game at the foot (Load and Delete are drawn off until a row is picked: the stock
+  buttons' flag stays set); the stock scroll buttons (two 24x16 picture buttons) as our
+  arrows, also the wheel over the list. The stock list is one page whose rows are
+  re-labelled by those buttons, so the choice resets when it pages. Save adds our text
+  field for the stock name `Edit`: it keeps its own text and, when it changes, rewrites the
+  stock edit with End, one Backspace per character it held and the new characters, as
+  typed (`Action::Key`), and takes the stock text again when the stock edit changes under it
+  (a row was picked: stock copies its name in). Enter in it is the Save button. The model
+  has no "details" of a save (stock's list shows none), so there are none to draw.
+- **`admirals_log.rs`.** A window with our tab strip, the players down the left (the
+  owner-drawn buttons' text, "name", line break, "team"), the page, and Save to text / Done.
+  A click on a tab, player or button is a click on the stock owner-drawn window. Which tab
+  shows is the visible pane among the eight (the panes are listed in the tabs' order
+  backwards), the last clicked when it cannot be told. **Score** is drawn from the pane's
+  labels (the model reads them: column headers and the value rows, in the game's colours)
+  as our table, its rows level with the players'. **The other seven pages** are GDI graphs
+  and lists inside the pane that the model cannot read, so the pane is cropped from the
+  mirror into the page and `kit::forward_part` gives the stock pane the pointer, in the
+  pane's own place, for its scroll bar. The owner-drawn tabs, players and buttons are
+  blank in the mirror (their `WM_DRAWITEM` painting does not reach the composed frame:
+  not investigated, as the spec does not need it).
+- **`tech_tree.rs`.** The stock window is one disabled multi-line Courier `Edit` with the
+  tree as ASCII art and four scroll buttons. The model reads the edit's text whole (the
+  limit of its reader is now 128 KB; a full tech set's tree can pass 4 KB), and the tree is
+  drawn from it on its character grid: `|`, `-` and `\` as thin lines, `*` as a dot, a name
+  set in the theme's font at its column (`(*Name)`, a requirement shown again, dimmed), the
+  roots in amber, in a clipped scroll area of the widgets. The size is chosen so the widest
+  line fits, so there is no sideways scroll. The edit is never driven.
+- **A text field of the widgets has the keyboard**: `menus::wants_keys` now also asks
+  `input::keys_captured`, so Enter and Esc go to it and not to the dialog as `IDOK` and
+  `IDCANCEL` while it is focused (`local::focused` covered only the stand-in).
+
+**The end-of-mission screens are not dialogs.** `do_success_mission` and
+`do_fail_mission` (`SMain.obj`, 0x6079d0 and 0x6077c0) never call `DialogBoxParamA`:
+the first makes its own window and bitmap (`ItemGet`) and the second sets the display and
+cursors and goes through `DispatchDialog`, which puts the Admiral's Log up next (a
+`g_shellMode` case; `do_admirals_log` at 0x607550 wraps `do_admiralsLog`). So the
+host sees the Admiral's Log, which has a spec, and not a screen of its own for either. The
+success screen's own window is not hosted: it runs as it always did. Not reached on the
+bench (it needs a mission won or lost); read from the code only.
 
 ## Testing
 
@@ -383,6 +453,9 @@ hidden surfaces).
 - `ui-menus-options.md`: the main menu's spec; Options; Graphics Settings' Bump Mapping
   switched off, the screen left and opened again, and still off; Sound Settings' Unit
   Speech; Game Settings; back to the main menu; quit.
+- `ui-menus-single.md`: Single Player's card for the Federation campaign, the mission list,
+  the first mission, in it Esc, Save Game with a typed name, the Admiral's Log (Score and
+  Timeline), the Technology Tree, Load Game of the save (abort, Yes); quit.
 - `ui-menus-match.md`: Instant Action's Game Setup with the local and computer players
   as stock shows them; player 2 set to Computer AI:Easy and player 1's side to Borg;
   LAUNCH; the in-mission menu over the mission, closed by Esc; Save Game with a typed
@@ -393,12 +466,12 @@ hidden surfaces).
 - **The generic `widgets` screen and the local text field, list and drop-down are not
   verified on the bench**; the mirrored screen is. The shared widgets (`crate::widgets`)
   are being written elsewhere; `menus/local.rs` is to be replaced by them.
-- **Screens not reached on the bench with the host**: the campaign selection and
-  mission lists, the Admiral's Log (its panes, tabs and owner-drawn buttons are
-  composed by the code above, not seen), the Technology Tree, Multiplayer and its
+- **Screens not reached on the bench with the host**: the Tutorials, Klingon and Borg
+  campaigns' lists, the Admiral's Log at the end of a mission (`do_success_mission` and
+  `do_fail_mission`, above), Multiplayer and its
   lobbies (no network on the bench), Credits (a screen of the engine's own, not a
   dialog: it runs as before), the licence, GameSpy and command-line screens.
-- **One spec**, the main menu, with English labels (the stock art carries the words,
+- **Seven specs** (the main menu and the six above), the main menu with English labels (the stock art carries the words,
   so the spec names its buttons itself).
 - **Keyboard navigation** of a spec (arrows, Enter) and of the generic screen beyond
   what the stock dialog does with Enter, Esc and Tab.
