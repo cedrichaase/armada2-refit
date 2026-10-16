@@ -4,16 +4,17 @@
 (`PLAN.md`): a 2D renderer on the game's Direct3D 9 device, text, widgets, input with
 capture, and a hook into each of the three places the UI draws, with the HUD's panels
 (`HUD.md`) and the menus (`MENUS.md`) taken over on top of them. **With the shipped
-`UI.ini` every panel and the menus are off**: the hooks are in and nothing is drawn;
-`[HUD]` and `[Menus]` turn the parts on, `[Demo]` a demonstration per context.
+`UI.ini` every part is on**: the HUD's panels, the menus, the loading screen and the
+cursor. Each part has its key, and a part at 0 is the engine's again ("A part
+switched back to stock", below); `[Demo]` draws a demonstration per context.
 
 It is a `no_std` Rust DLL like render3d (`render3d/README.md`, "Building and
 installing"). `ui/install.sh` (run by `./install`) puts `UI.asi` and `UI.ini` in the
-game directory and keeps the player's `UI.ini` values (`ini-merge.py` adds only the
-keys theirs lacks); `--remove` takes them out. `a2mod` switches it as the `ui` layer.
-The bench gets a working copy's build with `ui/bench-asi.sh` (below).
+game directory and takes out the plugins the UI supersedes ("Installing", below);
+`--remove` takes the UI out. `a2mod` switches it as the `ui` layer. The bench gets a
+working copy's build with `ui/bench-asi.sh` (below).
 
-**The menus** (`[Menus] Enable=1`, off by default): every stock shell dialog runs
+**The menus** (`[Menus] Enable=1`): every stock shell dialog runs
 hidden and is drawn and driven by the UI, generically or by a screen spec of ours.
 [`MENUS.md`](MENUS.md) has how: the dialog host, the shell's own widgets, the control
 model, the generic screen, writing a spec, and the table of every screen.
@@ -170,8 +171,7 @@ uses of it:
 - The UI's own cursor is drawn in the mission frame, a frame earlier than the engine's
   (which `RefreshDisplay` draws at the position it reads just before presenting), at
   the pointer position `input::poll` read.
-- **Our own cursor** (`src/cursor.rs`, `[UI] Cursor=1`, default 0 until the HUD is
-  ours). It is drawn last in every frame, in all three contexts: in a mission the
+- **Our own cursor** (`src/cursor.rs`, `[UI] Cursor=1`, the default). It is drawn last in every frame, in all three contexts: in a mission the
   sprite `shape()` names (and the engine's is hidden with `hide_this_frame()`; where the
   engine's cannot be hidden, `synchronous()` false, ours is not drawn, so there are never
   two), in a screen of ours and on the loading screen the arrow `c_arrow`. Nothing
@@ -351,6 +351,97 @@ builds) and the font atlas from the vendored TTFs (`src/text/`), then the DLL.
 `bench-asi.sh` copies `UI.asi` and `UI.ini` into a bench session's clone and sets the
 keys it is given; it is what a scenario's `Setup:` line runs.
 
+### Installing
+
+`ui/install.sh` copies `UI.asi`, merges `UI.ini` into the player's (`ini-merge.py`:
+their values stay, a key they lack is added) and then runs `supersede.sh`, which
+takes out of the game directory the plugins whose places the parts switched on take:
+
+| Part on in the installed `UI.ini` | Taken out | How |
+|---|---|---|
+| `[HUD] Enable=1` with any panel on | `HUD.asi`, and the file-based HUD fixes put back to stock | `hud/install.sh --remove`, `hud/revert-files.sh` (the UI reads the stock rectangles, font and cursor art) |
+| `[HUD] Enable=1` and `Bar=1` | `GridLayout.asi` | `grid/install.sh --remove` |
+| `[Menus] Enable=1` | `Menus.asi` (and `MenuScale.asi`), with their `.ini` and `.log` | the plates in `Menus/` stay: the UI's menus draw them (`menus/install-plates.sh`, still in `./install`) |
+
+`./install` no longer runs `hud/install.sh`, `grid/install.sh` or `menus/install.sh`.
+The three layers stay in the repository: they describe the stock HUD and shell the
+UI works on, their findings are what several hooks here rest on, and a player who
+switches a part back to stock can put the old plugin back by hand (`supersede.sh`
+leaves a plugin alone while the part that supersedes it is off). Each pair also
+stands down against the other at run time: the UI's bar while `GridLayout.asi` is
+loaded, its menus while `Menus.asi` or `MenuScale.asi` is, and its square cursor
+(below) while `HUD.asi` is. `ui/bench-asi.sh` runs `supersede.sh` on a bench clone too,
+so a clone of an install from before still tests the UI alone.
+
+**Upgrading an install.** Up to ui 0.3 every part shipped off (`0`), so a player's
+`UI.ini` from then holds 0 for each. `[UI] Defaults` numbers the shipped defaults (2:
+every part on); when the shipped number is higher than the player's (none counts as
+1), `ini-merge.py` moves each key that the newer defaults switched on and that still
+holds the old default to the new value, and leaves any other value as the player set
+it. So `./install` over an older install gives the UI's parts, and a part a player
+switched on or set otherwise stays as they set it.
+
+`a2mod stock` puts `UI.asi` and `UI.ini` aside with the rest (the `ui` layer), and
+the plates under `menus`: the stock game has neither `HUD.asi` nor `Menus.asi`, so
+nothing else changes. An older install that still has the superseded plugins is
+snapshot as it is.
+
+### A part switched back to stock
+
+Every part's key can be set to 0 in the player's `UI.ini`. What they then get, now
+that the old plugins are not installed:
+
+- **A `[HUD]` panel at 0** is the stock panel, on the stock 1600 x 1200 canvas that
+  the engine scales to the screen per axis: on a wide screen it is stretched (the
+  minimap, the info panel and the bar wider than tall, their text wide), as without
+  `HUD.asi`. The panels of ours lay themselves out around what they read of it (the
+  bar is placed against the stock minimap's rectangle when ours is off). For the
+  stretch to be corrected, `hud/install.sh` puts `HUD.asi` back; with `[HUD] Enable=0`
+  the whole HUD is stock and `HUD.asi` corrects it as before. Not tested on the bench
+  with a mix of panels of ours and `HUD.asi`'s canvas.
+- **`[HUD] Bar=0`** is the stock bar with stock's keys; `grid/install.sh` gives the
+  grid back through `GridLayout.asi`.
+- **`[HUD] UnitView=0`** leaves the unit view where the stock canvas puts it (the
+  bottom right, 350 x 384 canvas units: wide on a wide screen), with its stock frame.
+- **`[Menus] Enable=0`** gives the stock GDI menus: the shell's 800 x 600 display mode,
+  every menu its own window under Wine. `menus/install.sh` gives the scaled, embedded
+  shell back through `Menus.asi`.
+- **`[Loading] Enable=0`** is the engine's logo scene and bar (the widened `logo.SOD`
+  if `models/` installed it).
+- **`[UI] Cursor=0`** is the engine's cursor, kept square by the UI (below).
+
+### What the old plugins did, and where it is now
+
+| Plugin, part | Now |
+|---|---|
+| `HUD.asi` canvas (the panels' rectangles at the screen's aspect) | every panel of ours is laid out by the UI; the unit view is placed by us (`HUD.md`, "The unit view"). Still on the stock canvas, stretched: the multiplayer comm panel, the dropped-player box and the load-percentage box (`HUD.md`, "Not done here") |
+| `HUD.asi` font (the HUD font condensed to the aspect) | every text of ours is ours; the stock font is still drawn only by the stock panels above, wide on a wide screen |
+| `HUD.asi` seams (sprite edges on pixel boundaries) | only the stock panels above still draw tiled sprites |
+| `HUD.asi` re-layout after a mode change | nothing to do: our panels lay out every frame, the stock canvas is the same at every mode |
+| `HUD.asi` cursor (square at any aspect) | ours with `Cursor=1`; with `Cursor=0` (or where ours cannot hide the engine's), `engine::cursor::install_square` makes HUD.asi's two changes (below) |
+| `GridLayout.asi` (the bar as a grid of position keys) | `[HUD] Bar`, `BarKeys` (`HUD.md`, "The button bar"). `GridLayout.ini`'s `[Cells]` has no counterpart yet |
+| `Menus.asi` display mode raised | the menu host raises it (`MENUS.md`, "The display") |
+| `Menus.asi` scaling, mouse mapping | the menus are drawn by us, and the pointer sent to each dialog in its design place |
+| `Menus.asi` `Embed=1` (one window) | every hosted dialog is a hidden child of the 3D window; the game is one window throughout |
+| `Menus.asi` `EscapeReturns` | `[Menus] EscapeReturns` |
+| `Menus.asi` `Underlay=0` (the 1:1 flash between menus) | while a dialog is hosted, the shell's paint onto the 3D window goes into a scratch DC |
+| `Menus.asi` backdrops (the plates) | drawn by the UI's menus behind the main menu; installed by `menus/install-plates.sh` |
+| `Menus.asi` `[Labels]` (labels kept off the art) | the spec screens draw labels of their own; a mirrored screen shows the stock overrun |
+
+### The engine's cursor, square
+
+`engine/cursor.rs`, `install_square`, made when the mission hook goes in unless
+`HUD.asi` is loaded or `hud/cursor-aspect.py`'s squashed art is installed (its
+`Curs_Move.tga.a2neb-backup`). The engine draws its cursor under the 2D scale it sets
+to the back buffer over 800 x 600 on each axis (hud/README.md, "HUD.asi", the
+cursors), so on a wide screen it is wide. The synchronous path's one draw (the
+`call ST3D_Sprite::DrawScaled2D` at 0x6246fa in `RefreshDisplay`) goes through a
+wrapper that, for that draw only, sets the x scale to the y scale and moves the
+position the engine computed so the hotspot (`ST3D_Sprite+0x30`) stays on the
+pointer, and puts the scale back; the hardware path's `SetCursor` multiplies the
+cursor's width by the y scale (`fmuls 0x18(%esi)` at 0x625dd9 reads `+0x1c`). Each site
+is checked to be stock first. `UI.log`: "cursor: the engine's cursor is kept square".
+
 ## `UI.ini`
 
 | Key | Default | |
@@ -358,19 +449,21 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 | `[UI] Enable` | 1 | 0: the plugin patches nothing |
 | `[UI] Log` | 1 | `UI.log` in the game directory: which hooks are in, and why one stood down |
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
-| `[UI] Cursor` | 0 | draw the mouse cursor ourselves, from the game's own cursor art ("The cursor") |
+| `[UI] Cursor` | 1 | draw the mouse cursor ourselves, from the game's own cursor art ("The cursor"); 0: the engine's, kept square |
+| `[UI] Defaults` | 2 | which shipped defaults the file was brought up to ("Installing"); not read by `UI.asi` |
 | `[UI] CursorSize` | 32 | its size in units (32 texels of art at 1080 lines) |
 | `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472` everywhere |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
-| `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 0, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)) |
-| `[Menus] Enable` | 0 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
+| `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
+| `[HUD] UnitView`, `UnitViewSize` | 1, 260 | the unit view placed by us, a square of that many units at the bottom right, in our frame (`HUD.md`, "The unit view") |
+| `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
 | `[Menus] Generic` | mirror | a screen without a spec: `mirror` (as the game paints it) or `widgets` (its controls as ours) |
 | `[Menus] Specs` | 1 | 0: no screen spec, every screen generic |
 | `[Menus] EscapeReturns` | 1 | Esc in the in-mission menu is Return to Game |
 | `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
-| `[Loading] Enable` | 0 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
+| `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
 | `[Loading] Hold` | 0 | the test bench's: seconds each load waits half-way, the screen still drawn, to be looked at. Never in play |
 
 ## The renderer (`src/gfx/`)
@@ -512,7 +605,7 @@ the engine does not see (the selection stays).
 
 ## Not done
 
-- **The cursor**: ours replaces the engine's only with `Cursor=1`; the animation rate is
+- **The cursor**: the animation rate is
   a guess, and the loading screen's cursor was not looked at on the bench.
 - **Widgets**: `button`, `toggle` and `slider` take no keyboard focus; the text field
   has no undo and no IME; a dropdown's press outside the list closes it but the press
