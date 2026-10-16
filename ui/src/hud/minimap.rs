@@ -252,6 +252,15 @@ pub fn run(ui: &mut Ui) {
             ui.draw.line(at(a.0, a.1), at(b.0, b.1), w, fade(0xffffffff, 0.85));
         }
     }
+    // The tactical view: the point the camera turns about, a ring through the eye.
+    if let Some((c, e)) = radar::tactical_camera(r) {
+        let (cx, cy) = at(c.0, c.1);
+        let (ex, ey) = at(e.0, e.1);
+        let rad = libm::sqrtf((ex - cx) * (ex - cx) + (ey - cy) * (ey - cy)).max(ui.u(4.0));
+        let w = ui.u(1.5).max(1.0);
+        ui.draw.stroke(R::new(cx - rad, cy - rad, 2.0 * rad, 2.0 * rad), Corners::round(rad), w, fade(t.warn, 0.9));
+        ui.draw.line((cx, cy), (ex, ey), w, fade(t.warn, 0.9));
+    }
     ui.draw.pop_clip();
     ui.draw.stroke(sq, Corners::SQUARE, ui.u(1.0).max(1.0), fade(t.panel_edge, 0.8));
 

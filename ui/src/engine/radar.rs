@@ -552,6 +552,25 @@ pub fn view_outline(r: usize) -> Option<[(f32, f32); 4]> {
     }
 }
 
+/// `gTacticalCamera`: in the tactical view stock marks, instead of the outline, the
+/// point the camera turns about (`+0x98`, `+0xa0`: x, z) with a ring through the eye
+/// (`+0x8c`, `+0x94`). The two in the unit square; None outside the tactical view.
+const TACTICAL_CAMERA: usize = 0x763650;
+
+pub fn tactical_camera(r: usize) -> Option<((f32, f32), (f32, f32))> {
+    if view() != 1 {
+        return None;
+    }
+    unsafe {
+        let eye = [rd::<f32>(TACTICAL_CAMERA + 0x8c), 0.0, rd::<f32>(TACTICAL_CAMERA + 0x94)];
+        let centre = [rd::<f32>(TACTICAL_CAMERA + 0x98), 0.0, rd::<f32>(TACTICAL_CAMERA + 0xa0)];
+        if !eye.iter().chain(centre.iter()).all(|v| v.is_finite()) {
+            return None;
+        }
+        Some((to_square(r, centre), to_square(r, eye)))
+    }
+}
+
 // ---- clicks -----------------------------------------------------------------------
 
 /// What the UI frame asks the panel's next always-step to do.
