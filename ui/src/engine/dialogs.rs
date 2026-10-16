@@ -1117,6 +1117,16 @@ fn run_modal(h: HWND) -> isize {
             SetFocus(game);
         }
     }
+    // A click that opened this dialog was a button down that a hosted window took the
+    // mouse on (the campaign selection opens the mission list on the down); its up is
+    // sent after this loop ends. Meanwhile the real pointer's messages would all go to
+    // that hidden window and be dropped, so the dialog would take no click.
+    unsafe {
+        let cap = GetCapture();
+        if !cap.is_null() && in_hosted(cap) {
+            ReleaseCapture();
+        }
+    }
     let mut freq = 0i64;
     unsafe { QueryPerformanceFrequency(&mut freq) };
     let period = (freq / 60).max(1);

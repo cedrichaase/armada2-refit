@@ -94,7 +94,7 @@ pub fn closed(h: HWND) {
 /// Whether a text field of ours has the keyboard (Enter and Esc are then its, not the
 /// dialog's).
 pub fn wants_keys() -> bool {
-    local::focused()
+    local::focused() || crate::input::keys_captured()
 }
 
 /// A frame of the menus: every hosted dialog, outermost first, each by its spec or the
