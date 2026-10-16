@@ -31,7 +31,7 @@ camera on the colony ship: the planet's middle is at 658,190 at 1280x720.
 13. Wait 15 seconds.
 14. Expect scene "query" not answer "team 0 population 0 ".
 15. Take a screenshot called "colonising".
-16. Check that a dotted beam runs from the small colony ship to the planet above it.
+16. Check that the small colony ship has left its place below the planet and is now beside the planet, at about the planet's height.
 17. Expect the game is still running.
 18. Quit the game.
 19. Expect no crash.
