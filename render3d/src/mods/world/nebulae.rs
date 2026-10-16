@@ -832,12 +832,14 @@ struct Shaders {
 
 /// Per view: the slices' ladder per class (rungs per doubling of distance); with
 /// `Temporal=`, the frames added up (two targets the gas target's size, in turn, `cur` the
-/// one written last) and the last frame's VIEW x PROJECTION columns and viewport (x, y,
-/// w, h), None while there is no history.
+/// one written last, each with a second beside it: how many frames, the scene's depth)
+/// and the last frame's VIEW x PROJECTION columns and viewport (x, y, w, h), None while
+/// there is no history.
 #[derive(Default)]
 struct ViewState {
     rungs: BTreeMap<String, f32>,
     hist: [Option<Com>; 2],
+    meta: [Option<Com>; 2],
     hist_wh: (u32, u32),
     cur: usize,
     prev: Option<([[f32; 4]; 4], [f32; 4])>,
@@ -967,6 +969,7 @@ impl Nebulae {
         self.gpu = Gpu::default();
         for vs in self.views.v.iter_mut() {
             vs.hist = [None, None];
+            vs.meta = [None, None];
             vs.prev = None;
         }
         for c in self.classes.values_mut() {
@@ -1702,24 +1705,30 @@ impl Nebulae {
         }
         let wh = self.gpu.zt_wh;
         let vs = self.views.get(m.view);
-        if vs.hist_wh != wh || vs.hist.iter().any(|h| h.is_none()) {
+        if vs.hist_wh != wh || vs.hist.iter().chain(vs.meta.iter()).any(|h| h.is_none()) {
             vs.prev = None;
             vs.hist_wh = wh;
-            vs.hist = [0, 1].map(|_| dev.create_texture(wh.0, wh.1, 1, USAGE_RENDERTARGET, FMT_A16B16G16R16F, POOL_DEFAULT));
-            if vs.hist.iter().any(|h| h.is_none()) {
+            let rt = || dev.create_texture(wh.0, wh.1, 1, USAGE_RENDERTARGET, FMT_A16B16G16R16F, POOL_DEFAULT);
+            vs.hist = [rt(), rt()];
+            vs.meta = [rt(), rt()];
+            if vs.hist.iter().chain(vs.meta.iter()).any(|h| h.is_none()) {
                 vs.hist = [None, None];
+                vs.meta = [None, None];
                 return None;
             }
         }
         let next = 1 - vs.cur;
         let out = vs.hist[next].as_ref()?.tex_surface(0)?;
+        let out_meta = vs.meta[next].as_ref()?.tex_surface(0)?;
         let last = vs.hist[vs.cur].as_ref()?.ptr();
+        let last_meta = vs.meta[vs.cur].as_ref()?.ptr();
         let written = vs.hist[next].as_ref()?.ptr();
         let (pcols, pvp, have) = match vs.prev {
             Some((c, p)) => (c, p, 1.0),
             None => ([[0.0; 4]; 4], [0.0; 4], 0.0),
         };
         dev.set_render_target(0, out.ptr());
+        dev.set_render_target(1, out_meta.ptr());
         dev.set_depth_stencil(core::ptr::null_mut());
         dev.set_viewport(&m.vp);
         for (s, val) in [(RS_ZENABLE, 0), (RS_ALPHABLENDENABLE, 0), (RS_COLORWRITEENABLE, 15), (RS_SCISSORTESTENABLE, 0)] {
@@ -1734,16 +1743,21 @@ impl Nebulae {
         dev.ps_const(46, &m.k[6]);
         dev.ps_const(48, edges);
         dev.ps_const(49, flat(&pcols));
-        dev.ps_const(53, &[self.cfg.temporal, have, self.cfg.temporal_clip, 0.0, pvp[0], pvp[1], pvp[2], pvp[3]]);
+        // The depth tolerance: comp_ps's, 5% of the view depth.
+        dev.ps_const(53, &[self.cfg.temporal, have, self.cfg.temporal_clip, 0.05, pvp[0], pvp[1], pvp[2], pvp[3]]);
         ss(dev, 6, &SS_CLAMP_POINT);
         ss(dev, 7, &SS_CLAMP_POINT);
         ss(dev, 9, &SS_CLAMP_LINEAR);
+        ss(dev, 10, &SS_CLAMP_POINT);
         dev.set_texture(6, self.gpu.fz.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
         dev.set_texture(7, self.gpu.fb.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
         dev.set_texture(9, last);
+        dev.set_texture(10, last_meta);
         quad(dev);
+        dev.set_render_target(1, core::ptr::null_mut());
         dev.set_texture(6, core::ptr::null_mut());
         dev.set_texture(9, core::ptr::null_mut());
+        dev.set_texture(10, core::ptr::null_mut());
         let vs = self.views.get(m.view);
         vs.prev = Some((m.cols, [m.vp.x as f32, m.vp.y as f32, m.vp.w as f32, m.vp.h as f32]));
         vs.cur = next;

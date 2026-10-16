@@ -609,18 +609,29 @@ float view_z(float z)
 // What the history holds that this frame's neighbourhood does not (gas a hull now
 // covers, gas that has moved on) is clipped to the neighbourhood's mean +- k_tm.z of its
 // spread, so it fades within a few frames rather than trailing; history from outside the
-// last frame's viewport, or none (k_tm.y 0), is not used.
+// last frame's viewport, or none (k_tm.y 0), is not used. Neither is history where the
+// scene's depth was not this pixel's (a ship has moved over the gas or off it): the march
+// stopped at a different hull there, and the clip, wide on eight steps' noise, let the
+// ship's outline trail. Beside the history its second target keeps the scene's view depth
+// and how many frames it holds, so a pixel whose history was dropped takes each frame at
+// 1 / (frames + 1) until that reaches k_tm.x, and is clean again within a few frames.
 
 sampler2D s_gz    : register(s6);  // the march's second target: x the optical depth-weighted view depth / DEPTH_UNIT
 sampler2D s_hist  : register(s9);  // the history: the last frame's result, as the gas target (linear)
+sampler2D s_hmeta : register(s10); // beside it (point): x the frames it holds, y the scene's view depth / DEPTH_UNIT
 float4 k_pv0     : register(c49);  // the columns of the last frame's VIEW x PROJECTION
 float4 k_pv1     : register(c50);
 float4 k_pv2     : register(c51);
 float4 k_pv3     : register(c52);
-float4 k_tm      : register(c53);  // x: this frame's share (Temporal=); y: 1 there is history; z: the clip, in spreads (TemporalClip=)
+float4 k_tm      : register(c53);  // x: this frame's share (Temporal=); y: 1 there is history; z: the clip, in spreads (TemporalClip=); w: the depth tolerance (of the view depth)
 float4 k_pvp     : register(c54);  // the last frame's viewport: x, y its corner, z, w its size (pixels)
 
-float4 temporal_ps(float2 vpos : VPOS) : COLOR
+struct TemporalOut {
+    float4 gas  : COLOR0;
+    float4 meta : COLOR1;
+};
+
+TemporalOut temporal_ps(float2 vpos : VPOS)
 {
     float2 px = floor(vpos) + 0.5;
     float4 c = tex2Dlod(s_gas, float4(px * k_lr.zw, 0.0, 0.0));
@@ -646,15 +657,23 @@ float4 temporal_ps(float2 vpos : VPOS) : COLOR
     float2 nd = h.xy / max(h.w, 1e-6);
     float2 pp = k_pvp.xy + float2(nd.x + 1.0, 1.0 - nd.y) * 0.5 * k_pvp.zw;
     float  ok = k_tm.y * step(1e-6, h.w) * step(k_pvp.x, pp.x) * step(pp.x, k_pvp.x + k_pvp.z) * step(k_pvp.y, pp.y) * step(pp.y, k_pvp.y + k_pvp.w);
+    float  zc = view_z(tex2Dlod(s_zfull, float4(px * k_lr.zw, 0.0, 0.0)).r);
+    float4 hm = tex2Dlod(s_hmeta, float4(pp * k_lr.zw, 0.0, 0.0));
+    ok *= step(abs(hm.y * DEPTH_UNIT - zc), k_tm.w * zc);
+    float  n = ok > 0.5 ? hm.x : 0.0;
+    n = n >= 0.0 ? n : 0.0;
     // A value the half floats cannot hold (a flash's sums, a NaN) would stay in the
     // history for good: a comparison with a NaN fails, so it takes the mean instead.
     float4 hist = tex2Dlod(s_hist, float4(pp * k_lr.zw, 0.0, 0.0));
     hist = hist >= 0.0 ? hist : m1;
     hist = hist <= 60000.0 ? hist : m1;
     hist = clamp(hist, m1 - k_tm.z * sd, m1 + k_tm.z * sd);
-    float4 r = ok > 0.5 ? lerp(c, hist, 1.0 - k_tm.x) : c;
+    float4 r = lerp(hist, c, max(1.0 / (n + 1.0), k_tm.x));
     r = r >= 0.0 ? r : 0.0;
-    return min(r, 60000.0);
+    TemporalOut o;
+    o.gas = min(r, 60000.0);
+    o.meta = float4(min(n + 1.0, 1000.0), zc / DEPTH_UNIT, 0.0, 0.0);
+    return o;
 }
 
 // ---- the gas onto the frame ------------------------------------------------------------

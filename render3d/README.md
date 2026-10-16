@@ -1171,7 +1171,13 @@ writes a second target (MRT), the view depth of each step weighted by its optica
 and that point goes through the last frame's VIEW x PROJECTION. History the present
 frame's 3x3 neighbourhood does not support (gas a hull now covers, gas that moved) is
 clipped to its mean +- `TemporalClip=` (1.25) spreads; a value the half floats cannot
-hold, or a NaN, is replaced by the mean so it cannot stay. The history is two targets
+hold, or a NaN, is replaced by the mean so it cannot stay. The clip alone let a ship
+that moved over the gas trail its outline in game (eight steps' noise makes the
+neighbourhood's spread wide), so history is also dropped wherever the scene's view depth
+differs by over 5% from what it was there (the march stopped at another hull): beside
+the history a second target keeps that depth and how many frames the history holds,
+and a pixel takes each frame at 1 / (frames + 1) until that reaches `Temporal=`, so a
+dropped pixel is clean again within a few frames. The history is four targets
 per view (the action camera keeps its own), dropped with the device and whenever no gas
 was marched. `comp_ps` then filters and composites the history as it did the march.
 The pass costs 0.22 ms at 720p. With `Temporal=0` the thresholds stay put, as before:
