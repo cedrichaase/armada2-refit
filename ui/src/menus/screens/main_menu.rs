@@ -34,6 +34,24 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let t = ui.theme;
     // Behind: the stock screen, faded, so its art and animations still show.
     ui.draw.rect_vgrad(screen, 0xff03060c, 0xff09121f);
+    // On a screen wider than 4:3, the widescreen plate of the same art (Menus.asi's,
+    // installed by menus/install-plates.sh) behind it at the same fade, so the art
+    // fills the width: the plate is the stock picture in its middle, widened.
+    // Only the sides: the middle is the mirror, which carries the animations.
+    let area = s.fit.area();
+    if let (Some(tex), true) = (crate::widgets::theme::plate(), area.x > 0.5) {
+        let (tw, th) = crate::gfx::tex_size(tex);
+        let w = area.h * tw as f32 / th.max(1) as f32;
+        let full = R::new(area.x + area.w * 0.5 - w * 0.5, area.y, w, area.h);
+        let u = |x: f32| (x - full.x) / full.w;
+        let left = R::new(full.x.max(0.0), area.y, area.x - full.x.max(0.0), area.h);
+        let right = R::new(area.right(), area.y, full.right().min(screen.w) - area.right(), area.h);
+        for r in [left, right] {
+            if r.w > 0.5 {
+                ui.draw.image_uv(tex, r, [u(r.x), 0.0, u(r.right()), 1.0], 0x40ffffff);
+            }
+        }
+    }
     s.mirror_part(ui, [0, 0, 800, 600], s.fit.area(), 0x40ffffff);
     ui.draw.rect_hgrad(R::new(0.0, 0.0, screen.w * 0.5, screen.h), 0xe0020408, 0x00020408);
 

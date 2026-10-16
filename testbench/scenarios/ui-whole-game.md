@@ -79,7 +79,7 @@ settings screens; Exit.
 53. Wait 2 seconds.
 54. Expect "UI.log" contains "bar: menu=".
 55. Take a screenshot called "mission, selected".
-56. Check that the HUD is drawn in one flat style of rounded panels with a coloured edge (the UI's, not the stock HUD's bitmap art): a resource strip at the top centre, a row of square icon buttons at the top right, a square minimap panel at the bottom left (mostly unexplored grey at the start), a grid of command buttons with letters in their corners and the selected ships as a row of icons at the bottom centre, a square 3D picture in a thin frame at the bottom right, and corner brackets with small gauges around the selected ships; and that nothing is stretched sideways.
+56. Check that the HUD is drawn in one flat style of panels with a coloured edge (the UI's, not the stock HUD's bitmap art): a resource strip at the top centre, a row of square icon buttons at the top right, a panel at the bottom left with two small filter tabs along its top (the minimap, plain grey where the map is unexplored), a grid of command buttons with letters in their corners and a row of the selected ships' icons near the bottom centre, a framed 3D picture at the bottom right, and corner brackets with small gauges around the selected ships; and that nothing is stretched sideways.
 57. Right-click at hud 700,450.
 58. Wait 3 seconds.
 59. Right-click at hud 187,1013.
@@ -149,7 +149,7 @@ settings screens; Exit.
 123. Click "LAUNCH".
 124. Wait 45 seconds.
 125. Take a screenshot called "match".
-126. Check that the match shows the UI's HUD over the map, in its flat style of rounded panels: the resources at the top centre, a row of square buttons at the top right, the square minimap panel at the bottom left (still mostly unexplored and plain at the start of a match), and a square 3D picture in a rounded frame at the bottom right.
+126. Check that the match shows the HUD drawn in the same flat style of panels as before: the resources at the top centre, a row of square buttons at the top right, the minimap panel with its two filter tabs at the bottom left (plain where the map is unexplored), and a framed 3D picture at the bottom right.
 127. Scene "succeed".
 128. Wait 20 seconds.
 129. Take a screenshot called "won".
