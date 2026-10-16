@@ -24,10 +24,12 @@ are at **1280x720**, and the traps.
   x ~180, side ~370, armada ~510, team ~637; ready lights at x 35; the chat line
   300,640 and its target ("All") 658,641; LAUNCH 987,685.
 - **In the match**, the stock top-right comm button is at 1194,16 (the fourth icon).
-  The comm panel (ours): the players' rows from y 193, 25 px apart, their chat switch
-  at x 729; ALL 918,194, ALLIES 918,226, ENEMIES 918,258, PRIVATE 918,290; UNITS
-  918,345; a resource row's minus 896, plus 963, give 1015, rows at y 377, 407, 438,
-  469; Allied Victory 260,564, High Latency 470,564, DONE 985,564.
+  The comm panel (ours) hangs from a fixed height (Cardassian theme; the other themes'
+  insets move things a few pixels): the players' rows from y 179, 25 px apart, their
+  chat switch at x 723; ALL 918,180, ALLIES 918,212, ENEMIES 918,244, PRIVATE 918,276;
+  UNITS 918,331; the resource rows at y 363, 393, 424, 455 (minus 896, plus 963, give
+  1015); Allied Victory 241,550, High Latency 452,550; DONE at the bottom right (its
+  height follows the number of players and resources: click it by its text).
 
 ## Traps
 
@@ -41,6 +43,15 @@ are at **1280x720**, and the traps.
 - **Allied victory does not change in a game whose teams are locked**, in stock too:
   the toggle flips, the order goes out, and the panel puts it back from the team's flag,
   which only a game with free alliances changes.
+- **Giving needs an ally and instant trade**: the joiner on the host's team (the team
+  drop-down), and the host's Advanced panel's "Trade Using Convoys" clicked once (the
+  give buttons are disabled with convoys). Between teams the give does nothing, in stock
+  too.
+- **The load wait** shows only while the other player is still loading: hold one game's
+  load with `--for joiner Loading.Hold=8` (and `Loading.Enable=1`); the drop box then
+  alternates with it, so look for its `UI.log` line or take several screenshots.
+- **The drop box**: kill or stop the other game; its buttons are disabled for some tens of
+  seconds, then Eliminate removes the player.
 - **A game alone with a computer is a network game**: Manual IP, Create Game, LAUNCH
   starts a match on the host alone whose comm panel works (two bars, the computer's
   chat switch disabled), which is the cheap way to see the panel with one bench slot.
