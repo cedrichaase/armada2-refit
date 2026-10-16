@@ -669,7 +669,8 @@ complete, the single-player screen; after a lost one, back to the shell. **On th
 bench the Admiral's Log came up after the first Federation mission was won** (2026-10-16,
 `Scene.asi`'s `succeed`), and its Done led to the **single-player screen**, not to the
 next mission (2026-10-16, on the way through the whole game; after an aborted mission
-the Log's Done led to the campaign's mission list, after an Instant Action match to the
+the Log's Done led to the single-player screen too (once, in a session where the save
+had been loaded before, to the campaign's mission list), after an Instant Action match to the
 main menu), which
 the reading above did not predict; so a won mission returns to the shell as a lost one
 does, and the campaign goes on from the mission list. It is a dialog, hosted with its spec, so `[Menus] Enable=1` still needs nothing

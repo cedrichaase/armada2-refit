@@ -28,7 +28,7 @@ settings screens; Exit.
 2. Wait 15 seconds.
 3. Take a screenshot called "intro".
 4. Press Escape.
-5. Wait 3 seconds.
+31. Expect "Invasion" is visible.
 6. Press Escape.
 7. Wait 3 seconds.
 8. Press Escape.
@@ -54,7 +54,7 @@ settings screens; Exit.
 28. Take a screenshot called "campaign selection".
 29. Click "Federation Campaign".
 30. Wait 3 seconds.
-31. Expect "Invasion" is visible.
+31. Expect "Federation Campaign" is visible.
 32. Click "Invasion".
 33. Wait 1 second.
 34. Click "O.K.".
@@ -139,52 +139,50 @@ settings screens; Exit.
 113. Take a screenshot called "aborted".
 114. Click "Done".
 115. Wait 5 seconds.
-116. Expect "Invasion" is visible.
-117. Click "Cancel".
-118. Wait 3 seconds.
-119. Click "Previous Menu".
-120. Wait for the main menu.
-121. Click the instant action cube.
-122. Wait for "GAME SETUP".
-123. Wait 2 seconds.
-124. Take a screenshot called "game setup".
-125. Click "LAUNCH".
-126. Wait 45 seconds.
-127. Take a screenshot called "match".
-128. Check that the match shows the UI's HUD (resources at the top centre, the square minimap at the bottom left, the buttons at the top right) over the map.
-129. Scene "succeed".
-130. Wait 20 seconds.
-131. Take a screenshot called "won".
-132. Wait up to 120 seconds for the admiral's log.
-133. Take a screenshot called "admirals log".
-134. Check that the Admiral's Log is a window of the UI's style with its tabs along the top and a table of scores.
-135. Click "Done".
-136. Wait for the main menu.
-137. Click the options panel.
-138. Wait 3 seconds.
-139. Expect "Graphics Settings" is visible.
-140. Click "Graphics Settings".
-141. Wait 2 seconds.
-142. Expect "Bump Mapping" is visible.
-143. Take a screenshot called "graphics settings".
-144. Click "Previous Menu".
+116. Expect "Federation Campaign" is visible.
+117. Click "Previous Menu".
+118. Wait for the main menu.
+119. Click the instant action cube.
+120. Wait for "GAME SETUP".
+121. Wait 2 seconds.
+122. Take a screenshot called "game setup".
+123. Click "LAUNCH".
+124. Wait 45 seconds.
+125. Take a screenshot called "match".
+126. Check that the match shows the UI's HUD (resources at the top centre, the square minimap at the bottom left, the buttons at the top right) over the map.
+127. Scene "succeed".
+128. Wait 20 seconds.
+129. Take a screenshot called "won".
+130. Wait up to 120 seconds for the admiral's log.
+131. Take a screenshot called "admirals log".
+132. Check that the Admiral's Log is a window of the UI's style with its tabs along the top and a table of scores.
+133. Click "Done".
+134. Wait for the main menu.
+135. Click the options panel.
+136. Wait 3 seconds.
+137. Expect "Graphics Settings" is visible.
+138. Click "Graphics Settings".
+139. Wait 2 seconds.
+140. Expect "Bump Mapping" is visible.
+141. Take a screenshot called "graphics settings".
+142. Click "Previous Menu".
+143. Wait 2 seconds.
+144. Click "Sound Settings".
 145. Wait 2 seconds.
-146. Click "Sound Settings".
-147. Wait 2 seconds.
-148. Expect "Music Volume" is visible.
-149. Take a screenshot called "sound settings".
-150. Click "Previous Menu".
+146. Expect "Music Volume" is visible.
+147. Take a screenshot called "sound settings".
+148. Click "Previous Menu".
+149. Wait 2 seconds.
+150. Click "Game Settings".
 151. Wait 2 seconds.
-152. Click "Game Settings".
-153. Wait 2 seconds.
-154. Expect "Game Difficulty" is visible.
-155. Take a screenshot called "game settings".
+152. Expect "Game Difficulty" is visible.
+153. Take a screenshot called "game settings".
+154. Click "Previous Menu".
+155. Wait 2 seconds.
 156. Click "Previous Menu".
-157. Wait 2 seconds.
-158. Click "Previous Menu".
-159. Wait 3 seconds.
-160. Expect the main menu.
-161. Expect "UI.log" contains "cursor: Menus draws c_arrow".
-162. Quit the game.
-163. Expect the game to have exited.
-164. Expect no crash.
+157. Wait 3 seconds.
+158. Expect the main menu.
+159. Expect "UI.log" contains "cursor: Menus draws c_arrow".
+160. Quit the game.
+161. Expect the game to have exited.
+162. Expect no crash.

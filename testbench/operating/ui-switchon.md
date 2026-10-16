@@ -34,8 +34,9 @@ What an agent driving the game as `./install` now gives it (every part of the UI
   `ARMADA.PRF`, so a second round in the same session cycles past it.
 - Federation mission 1: the loading screen of ours, then about 70 s of opening cutscene
   (view 2, no HUD), then the briefing. After Abort Mission and Yes the Admiral's Log
-  comes up over the mission; its Done leads to the campaign's mission list (Cancel,
-  then Previous Menu, for the main menu). After `Scene "succeed"` in the campaign the
+  comes up over the mission; its Done leads to the single-player screen (Previous
+  Menu for the main menu; once, in a session that had loaded a save before, to the
+  campaign's mission list). After `Scene "succeed"` in the campaign the
   Log's Done led to the single-player screen; after an Instant Action match to the main
   menu.
 - Instant Action's Game Setup defaults (Computer AI:Medium, a random side for player 1)
