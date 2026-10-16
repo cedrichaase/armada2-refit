@@ -1,6 +1,7 @@
 # The whole game with the UI's defaults: intro, menus, a campaign mission, a match, the Admiral's Log, Options
 
-Resolutions: 1280x720
+Resolutions: 1280x720, 21:9, 1024x768
+Reference: 1024x768
 Mod: refit
 Setup: testbench/scene/bench-setup.sh ending
 Timeout: 50 min
@@ -9,8 +10,8 @@ Timeout: 50 min
 puts `UI.asi` in with every part on (the HUD's panels, the menus, the loading screen,
 the cursor) and no `HUD.asi`, `GridLayout.asi` or `Menus.asi`, so this is the game a
 player gets. `Scene.asi` (the `ending` scene, which adds nothing to a mission) is only
-there for `succeed`. Run it once per aspect for the layout: `--res 1280x720` (16:9),
-`--res 21:9`, `--res 1024x768` (4:3). Every click is by text, by a `ui.json` target,
+there for `succeed`. It runs at 16:9, 21:9 and 4:3 for the layout (`-j 1`: one game at a time;
+`--res 1280x720` alone also runs the 1024x768 case, the reference). Every click is by text, by a `ui.json` target,
 or in a space that follows the screen's aspect (`design` for the menus, `hud` /
 `hud-right` for the HUD), so the steps are the same at every resolution.
 
@@ -18,7 +19,7 @@ The way through: the intro movies (skipped with Esc), the main menu; Single Play
 Federation campaign's first mission (its loading screen, the briefing); in the mission
 Ctrl+I to the interface mode with the unit view, a drag selection, a move order, the
 minimap (a left click moves the camera, a right click orders the selection), the pause
-box, the objectives (Alt+O), the in-mission menu (Esc), Save Game with a typed name,
+box, the objectives (the top-right checkmark of ours), the in-mission menu (Esc), Save Game with a typed name,
 Load Game of it; Abort Mission; Instant Action with Game Setup's defaults, the match,
 won with `succeed`, the Admiral's Log, back to the main menu; Options and its three
 settings screens; Exit.
@@ -78,7 +79,7 @@ settings screens; Exit.
 53. Wait 2 seconds.
 54. Expect "UI.log" contains "bar: menu=".
 55. Take a screenshot called "mission, selected".
-56. Check that the HUD is the UI's: a resource strip at the top centre, square icon buttons at the top right, a square minimap at the bottom left, an info panel at the bottom centre describing the selection, a grid of command buttons with letters in their corners, a square 3D view of the action in a thin frame at the bottom right, and corner brackets with gauges around the selected ships; none of the stock HUD's art (its curved panels) shows, and nothing is stretched sideways.
+56. Check that the HUD is drawn in one flat style of rounded panels with a coloured edge (the UI's, not the stock HUD's bitmap art): a resource strip at the top centre, a row of square icon buttons at the top right, a square minimap panel at the bottom left (mostly unexplored grey at the start), a grid of command buttons with letters in their corners and the selected ships as a row of icons at the bottom centre, a square 3D picture in a thin frame at the bottom right, and corner brackets with small gauges around the selected ships; and that nothing is stretched sideways.
 57. Right-click at hud 700,450.
 58. Wait 3 seconds.
 59. Right-click at hud 187,1013.
@@ -93,7 +94,7 @@ settings screens; Exit.
 68. Take a screenshot called "paused".
 69. Press Pause.
 70. Wait 2 seconds.
-71. Press alt+o.
+71. Click at hud-right 1502,55.
 72. Wait 2 seconds.
 73. Take a screenshot called "objectives".
 74. Check that a window of the UI's style lists the mission's objectives with check boxes.
