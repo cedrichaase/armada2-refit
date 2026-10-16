@@ -369,6 +369,8 @@ const VT_LOAD: usize = 0x6b5d94;
 const L_TEXT: usize = 0x2c;
 const L_MS: usize = 0x284;
 pub const LOAD_WAIT: &core::ffi::CStr = c"GUI_POP_LOAD_WAIT";
+/// The word after the seconds ("seconds"), as the stock text writes it.
+pub const LOAD_SECONDS: &core::ffi::CStr = c"GUI_POP_LOAD_SECONDS";
 
 pub fn load_shown() -> bool {
     vt_is(LOAD, VT_LOAD) && !super::hud::hidden(LOAD)

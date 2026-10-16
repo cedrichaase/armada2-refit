@@ -352,7 +352,10 @@ fn draw_load(ui: &mut Ui, secs: f32, text: String) {
     let h = (content / ui.scale + t.title_size + 6.0 * t.pad + 40.0).min(800.0);
     let inner = super::panels::boxed(ui, &title, 640.0, h, 0.6);
     let pad = ui.u(t.pad);
-    ui.text_in(R::new(inner.x, inner.y, inner.w, row_h), &crate::sfmt!("{} s", secs as i32), t.text_size, Align::Right, t.text_dim, Weight::Regular);
+    // The stock text runs on from the title: "<wait> <n> <seconds>:".
+    let unit = buttons::localize(comm::LOAD_SECONDS);
+    let unit = if unit.starts_with("GUI_") { String::from("s") } else { String::from(unit.trim_end_matches(':')) };
+    ui.text_in(R::new(inner.x, inner.y, inner.w, row_h), &crate::sfmt!("{} {}", secs as i32, unit), t.text_size, Align::Right, t.text_dim, Weight::Regular);
     let mut y = inner.y + row_h;
     for (name, f, local) in rows {
         let nw = inner.w * 0.45;
