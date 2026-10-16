@@ -203,6 +203,9 @@ unsafe extern "thiscall" fn render_component(c: usize) {
         if taken(c) {
             return;
         }
+        if c == super::unitview::CINEMATIC_VIEW && super::unitview::enabled() {
+            return super::unitview::render(c);
+        }
         let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_RENDER));
         f(c)
     }

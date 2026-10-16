@@ -275,7 +275,16 @@ fn place(ui: &Ui, w: f32, h: f32) -> R {
     // Ours when it draws, else the stock panel's rectangle.
     let ours = super::info::rect().map(|r| [r.x, r.y, r.right(), r.bottom()]);
     let info = if hud::hidden(hud::SHIP_DISPLAY) { None } else if unsafe { super::INFO } { ours } else { hud::panel_rect(hud::SHIP_DISPLAY, ui.w, ui.h) };
-    let mini = hud::panel_rect(hud::MAP_RADAR, ui.w, ui.h);
+    // Our minimap when it draws (the stock radar's rectangle is on the stock canvas,
+    // stretched without HUD.asi), else the stock one.
+    let mini = if hud::hidden(hud::MAP_RADAR) {
+        None
+    } else if unsafe { super::MINIMAP } {
+        let (o, _, _) = super::minimap::place(ui);
+        Some([o.x, o.y, o.right(), o.bottom()])
+    } else {
+        hud::panel_rect(hud::MAP_RADAR, ui.w, ui.h)
+    };
     match (info, mini) {
         (Some(i), Some(mm)) if i[0] - mm[2] >= w + 2.0 * m => {
             R::new(mm[2] + ((i[0] - mm[2]) - w) * 0.5, ui.h - m - h, w, h)

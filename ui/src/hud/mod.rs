@@ -95,7 +95,12 @@ fn map_panels(cfg: &crate::config::Hud) {
     }
     if cfg.unit_view {
         unsafe { UNIT_VIEW = true };
-        crate::log!("unit view: our frame");
+        if engine::unitview::functions_stock() {
+            engine::unitview::enable();
+            crate::log!("unit view: placed by us, in our frame");
+        } else {
+            crate::log!("unit view: its Render is not stock: our frame around the stock place");
+        }
     }
 }
 

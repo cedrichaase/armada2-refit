@@ -47,6 +47,7 @@ pub fn install() -> bool {
         return false;
     }
     crate::log!("cursor: {}", if super::cursor::install() { "can be hidden" } else { "stays the engine's" });
+    super::cursor::install_square();
     true
 }
 

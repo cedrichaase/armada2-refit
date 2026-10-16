@@ -97,3 +97,65 @@ pub fn shape() -> Option<&'static str> {
 pub fn installed() -> bool {
     unsafe { INSTALLED }
 }
+
+// ---- the engine's cursor, square at any aspect --------------------------------------
+
+/// In `RefreshDisplay`: the `call ST3D_Sprite::DrawScaled2D` that draws the
+/// synchronous cursor, after `SetScaleFactor2D(&device+0x18)`.
+const SITE_CURSOR_DRAW: usize = 0x6246fa;
+const DRAW_SCALED_2D: usize = 0x63ada0;
+/// `ST3D_Sprite`'s global 2D scale `{x, y}` that `DrawScaled2D` multiplies by.
+const SCALE_2D: usize = 0x7ad6e8;
+/// `ST3D_Sprite+0x30`: the sprite's hotspot x, in texels.
+const SPRITE_ORIGIN_X: usize = 0x30;
+/// In `SetCursor`: `fmuls 0x18(%esi)`, the hardware cursor's width times the x scale.
+const SITE_HW_SCALE: usize = 0x625dd9;
+const HW_SCALE_STOCK: [u8; 3] = [0xd8, 0x4e, 0x18];
+const HW_SCALE_SQUARE: [u8; 3] = [0xd8, 0x4e, 0x1c];
+
+/// Keeps the engine's own cursor square, as HUD.asi did (hud/README.md, "HUD.asi",
+/// the cursors), for wherever the engine's cursor still shows (`[UI] Cursor=0`, or a
+/// cursor ours cannot hide): the engine scales it by the back buffer over 800 x 600
+/// on each axis, so on a wide screen it is drawn wide. The synchronous path's one draw
+/// is wrapped so that, for that draw only, the x scale is the y scale and the
+/// position is moved so the hotspot stays on the pointer; the hardware path's width is
+/// multiplied by the y scale. Not made while HUD.asi is loaded (it makes the same two
+/// changes) or while `hud/cursor-aspect.py`'s squashed art is installed (it would be
+/// squashed twice).
+pub fn install_square() -> bool {
+    let hud_asi = unsafe { !crate::rt::win::GetModuleHandleA(c"HUD.asi".as_ptr() as *const u8).is_null() };
+    if hud_asi {
+        crate::log!("cursor: HUD.asi is loaded and keeps the engine's cursor square");
+        return false;
+    }
+    if crate::rt::file_exists(&crate::rt::game_path("Textures\\RGB\\Curs_Move.tga.a2neb-backup")) {
+        crate::log!("cursor: cursor-aspect.py's squashed art is installed: the engine's cursor is left as it is");
+        return false;
+    }
+    if super::hook::call_target(SITE_CURSOR_DRAW) != Some(DRAW_SCALED_2D) || !super::starts(SITE_HW_SCALE, &HW_SCALE_STOCK) {
+        crate::log!("cursor: RefreshDisplay's or SetCursor's site is not stock: the engine's cursor is left as it is");
+        return false;
+    }
+    let ok = super::hook::patch_call(SITE_CURSOR_DRAW, DRAW_SCALED_2D, draw_square as *const () as usize)
+        && super::hook::patch_bytes(SITE_HW_SCALE, &HW_SCALE_STOCK, &HW_SCALE_SQUARE);
+    crate::log!("cursor: the engine's cursor {}", if ok { "is kept square" } else { "could not be patched" });
+    ok
+}
+
+unsafe extern "thiscall" fn draw_square(sprite: usize, pos: *mut f32, w: f32, h: f32) {
+    let draw: unsafe extern "thiscall" fn(usize, *mut f32, f32, f32) = unsafe { core::mem::transmute(DRAW_SCALED_2D) };
+    let scale = SCALE_2D as *mut f32;
+    unsafe {
+        let (sx, sy) = (*scale, *scale.add(1));
+        if sx > 0.0 && sy > 0.0 && sx != sy && !pos.is_null() {
+            // The engine passes pointer / scale - hotspot: the same point at the y scale.
+            let ox: f32 = rd(sprite + SPRITE_ORIGIN_X);
+            *pos = (*pos + ox) * sx / sy - ox;
+            *scale = sy;
+            draw(sprite, pos, w, h);
+            *scale = sx;
+        } else {
+            draw(sprite, pos, w, h);
+        }
+    }
+}
