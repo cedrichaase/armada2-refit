@@ -161,7 +161,7 @@ Layout: full refit
 Transition: cut
 In: 2.5
 Length: 10
-Status: draft
+Status: probed
 
 The prompt behind the beams' look (`ART-DIRECTION.md`, "Tractor and assimilation
 beams"): a beam as a cone of light through vapour, fans of light coming and going,
@@ -174,18 +174,24 @@ textured beam and answers a different question.
 
 First filmed on a scratch board from the unmerged branch (2026-10-16): the cone came in
 from the right edge, the Assault ship out of frame. Here the camera sits further back
-along the beam so both ships are in frame.
+along the beam so both ships are in frame. Probe 2026-10-16 at pitch -12: both ships
+edge-on, the cone a thin blue line, since its wide end spans the target as seen across
+the beam. From below (pitch -32 to -28), about the point between the ships, both are in
+frame and the cone opens: at 3 s of the probe the fans show as streaks inside it, at 5 s
+the Sovereign's saucer is lit blue-grey, and the cone thins as the camera comes round
+towards the side (11-13 s). The cone is faint against the dark sky; a 4K take may want
+it seen a little longer from 40-55.
 
 ```setup
 scene hover off; tooltips off
 scene spawn tractor fassault 3000 0 3220 180 1
 wait 3
 scene engines tractor off; energy tractor on
-scene orbit 3000 0 3100 65 -12 270
+scene orbit 3000 0 3115 40 -32 250
 ```
 ```action
 wait 1
-scene special tractor gtracbm tgt; glide 13 105 -9 245
+scene special tractor gtracbm tgt; glide 13 70 -28 230
 wait 13
 ```
 
@@ -197,7 +203,7 @@ Layout: full refit
 Transition: cut
 In: 1.0
 Length: 10
-Status: draft
+Status: probed
 
 The prompt behind the shield hits' look (`ART-DIRECTION.md`, "Shield hits"): an uneven
 mist about each impact, a soft edge where the shell curves away, and light on the
@@ -207,7 +213,9 @@ several impacts land in frame. Refit alone: stock's hit is a smooth green shell 
 the whole ship.
 
 First filmed on a scratch board from the unmerged branch (2026-10-16): several hits
-read clearly, white-blue mist on the saucer's shell.
+read clearly, white-blue mist on the saucer's shell. Probe from `main` 2026-10-16: the
+same, a hit in frame every couple of seconds, the mist reaching across the saucer's
+rim at 10-13 s.
 
 ```setup
 scene hover off; tooltips off
