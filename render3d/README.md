@@ -525,8 +525,8 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
    `<name>.sod` or a bare prefix.
    - **With a recipe** (`render3d/skies/<name>.ini`, built into the plugin; a
      `Sky\<name>.ini` in the game directory takes precedence and is re-read when it
-     changes), the procedural sky of `Sky.asi` (its settled looks kept: Aqua
-     dimmer and softer than stock, the grades, soft billows and no filaments; "Sky recipes" below): one quad over the
+     changes), the procedural sky of `Sky.asi`, each recipe's shape and grade fitted
+     to its stock sky, with soft billows and no filaments ("Sky recipes" below): one quad over the
      viewport carrying each corner's world ray (from the inverse of view x projection,
      far point minus near point, which is affine in screen position), sampling a cube
      baked once per recipe. The bake is on the GPU only: each face is drawn by
@@ -605,6 +605,7 @@ aims at.
 | `Scale` | 2 | the largest structure's frequency over the sphere; 2-3 gives a few billows per cube face |
 | `Warp` | 0.4 | domain warp; over ~0.5 it drags streaks |
 | `Detail` | 0.5 | amplitude ratio between octaves: lower is softer |
+| `Octaves` | 6 | how many of the gas's six octaves count, 1-6; a fraction fades the finest out. Under 4 the value noise's lattice shows (blocky, axis-aligned clumps) |
 | `Coverage` | 1.0 | where the gas begins, in units of the field's spread: higher is emptier |
 | `Softness` | 2.0 | the width of the gas's edge in the same units; 2-3 is cloud (a wider one restores depth where dense skies saturate into plateaus) |
 | `Patchiness` | 0.5 | a one-octave field at a third of `Scale` that gathers the gas in parts of the sky |
@@ -627,10 +628,30 @@ within half a second (`Reload=1`). **The grade** is fitted, not hand-tuned:
 `perf/sky-grade.py` fits `GradeGain`/`GradeCurve` per channel by least squares through
 the log percentiles 50..99.5 of the bake against the stock faces (the stock faces'
 40-texel corner notches masked), then scales every gain together so the sky lands at
-0.92 of stock's luminance, a little under and never over. Aqua is deliberately left
-ungraded (dimmer and softer than stock, as the user prefers) and `mbgrg` gets its
-channel balance only, at 0.57 of stock's luminance. Refit after changing a palette or
+0.92 of stock's luminance, a little under and never over, every sky alike (Aqua was
+left ungraded and `mbgrg` at 0.57 of stock until render3d 0.3.0, when the skies were
+fitted to stock's shape). Refit after changing a palette or
 `Brightness`; its docstring has the procedure (`Dump=1` writes the faces it reads).
+
+**The shape** is fitted too, before the grade: `perf/sky-shape.py --fit` moves `Scale`,
+`Detail`, `Octaves`, `Coverage`, `Softness` and `Warp` on a running bench game
+(`SCENE=sky`) until the bake's structure matches the stock faces', in two measures the
+grade cannot change: how the log luminance's variance spreads over octave bands (clump
+size and edge hardness), and its standardised quantiles (mid-tones against plateaus on
+black). Both are taken at 512 texels a face, with stock magnified bilinearly as the
+engine shows it, so detail finer than a stock texel counts against a recipe as it would
+on screen; measured at stock's own 256 the fit put that detail into crisp, swirling
+edges. `Softness` may only widen and `Warp` only drop (soft, billowing gas, no streaks),
+and every recipe is fitted, Aqua and `mbgrg` included. Most stock skies are many
+mid-sized clumps, a few degrees across, and their fitted `Scale`s are two to five times
+the hand-set ones (`mbgborg` 2.4 to 12.1); `mbgbaku`, `mbgdom1` and `mbgpur` are large
+soft shapes and stayed near theirs. The grain, dust and draw-time detail the recipes had
+before render3d 0.2.1 stood in for that structure as speckle; with the shape fitted
+they stay off. The descent is greedy: started from the hand-set `Scale`, `mbg02`,
+`mbggb` and `mbgred` stopped in a local minimum (0.3-0.6) and were fitted again from a
+`Scale` of 7-9 (to 0.14-0.25). Read the bands before trusting a fit that stays far
+from stock, and look at it: the measure is blind to a value-noise lattice (hence the
+`Octaves` floor).
 
 ### overlays
 

@@ -4,6 +4,29 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.3.0 — 2026-10-16
+
+### Added
+- Sky: recipe key `Octaves=` (1-6, default 6): how many of the gas's octaves count, a
+  fraction fading the finest out.
+- `perf/sky-shape.py`: measures a recipe's shape against the stock faces (log
+  luminance in octave bands and standardised tones, at 512 a face with stock magnified
+  bilinearly), and with `--fit` fits `Scale`, `Detail`, `Octaves`, `Coverage`,
+  `Softness` (only wider) and `Warp` (only lower) on a running bench game.
+
+### Changed
+- Sky: every recipe in `skies/` has its shape fitted to its stock sky (distance from
+  stock's structure 0.12-0.45 after grading, from 0.13-1.16), then its grade refitted:
+  many mid-sized clumps where most skies had one or two large billows.
+- Sky: Aqua and `mbgrg` are graded to stock like the rest (0.92 and 0.90 of stock's
+  luminance); `perf/sky-grade.py`'s POLICY is empty.
+
+### Fixed
+- Sky: a recipe star's halo was cut at the lattice cells' borders, a faint square
+  about `mbgpur`'s big star; it now fades out within the cells searched.
+
+Installed, not yet seen in game.
+
 ## 0.2.1 — 2026-10-16
 
 ### Changed

@@ -23,7 +23,7 @@ numbers. Then every gain is scaled together so the sky's luminance lands at TARG
 times stock's, as the recipes' Brightness always aimed. A recipe already graded is
 refitted through its grade, so a second pass refines the first.
 
-POLICY holds the recipes the user has judged against stock and kept away from it."""
+POLICY holds any recipe the user wants kept away from stock (none at present)."""
 import math
 import os
 import re
@@ -42,10 +42,11 @@ CORNER = 40
 CURVE = (0.6, 1.6)
 LUMA = (0.2126, 0.7152, 0.0722)
 
-# 'keep':     no grade (Aqua, dimmer and softer than stock, as the user preferred it).
-# ('hue', x): channel balance only, no curve, at x times stock's luminance (mbgrg, toned
-#             down on purpose in sky 1.2.3 to 0.57 of stock; kept there).
-POLICY = {'mbgaqu': 'keep', 'mbgrg': ('hue', 0.57)}
+# 'keep':     no grade.
+# ('hue', x): channel balance only, no curve, at x times stock's luminance.
+# Aqua was 'keep' (dimmer and softer than stock) and mbgrg ('hue', 0.57) until
+# 2026-10-16, when the user had every sky fitted to stock, shape and grade.
+POLICY = {}
 
 SETS = {'mbgkling': 'MbgKling', 'mbgborg': 'MbgBorg', 'mbgdom1': 'MbgDom1', 'mbgbaku': 'MbgBaku'}
 
