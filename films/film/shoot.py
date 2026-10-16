@@ -16,8 +16,9 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from . import code
 from . import storyboard as sb
-from .cli import command, load, select, take_state
+from .cli import IGNORE_CODE, command, load, select, take_check
 
 REPO = sb.REPO
 A2TEST = os.path.join(REPO, 'a2test')
@@ -42,11 +43,6 @@ def probe_duration(path):
         return float(r.stdout.strip())
     except ValueError:
         return 0.0
-
-
-def commit():
-    r = subprocess.run(['git', '-C', REPO, 'describe', '--always', '--dirty'], capture_output=True, text=True)
-    return r.stdout.strip()
 
 
 class Take:
@@ -78,6 +74,7 @@ class Take:
     # ---------------------------------------------------------------- the session
     def start(self):
         f, s = self.film, self.shot
+        self.code = code.record(f, s, self.variant)     # the code it installs, as it starts
         env = dict(os.environ)
         ini = f.scene_ini(s)
         if ini:
@@ -471,7 +468,7 @@ class Take:
             json.dump(dict(start=t0, duration=round(duration, 3), events=events),
                       open(self.stem + '.events.json', 'w'), indent=1)
             json.dump(dict(hash=self.film.spec_hash(self.shot, self.variant, self.tier),
-                           spec=self.film.spec(self.shot, self.variant, self.tier), commit=commit(),
+                           spec=self.film.spec(self.shot, self.variant, self.tier), **self.code,
                            res=self.film.res(self.tier), tier=self.tier,
                            filmed=time.strftime('%Y-%m-%d %H:%M:%S')),
                       open(self.stem + '.spec.json', 'w'), indent=1)
@@ -556,7 +553,7 @@ class Ensemble:
                 json.dump(dict(start=t0, duration=round(duration, 3), events=mine),
                           open(t.stem + '.events.json', 'w'), indent=1)
                 json.dump(dict(hash=self.film.spec_hash(self.shot, t.variant, self.tier),
-                               spec=self.film.spec(self.shot, t.variant, self.tier), commit=commit(),
+                               spec=self.film.spec(self.shot, t.variant, self.tier), **t.code,
                                res=self.film.res(self.tier), tier=self.tier,
                                filmed=time.strftime('%Y-%m-%d %H:%M:%S')),
                           open(t.stem + '.spec.json', 'w'), indent=1)
@@ -588,7 +585,11 @@ def film_takes(a, tier):
         if not s.filmed:
             continue
         if s.players:       # all of a shot's players are filmed together, or none
-            if a.force or any(take_state(film, s, p, tier) != 'ok' for p in s.players):
+            states = {p: take_check(film, s, p, tier, a.ignore_code) for p in s.players}
+            if a.force or any(st != 'ok' for st, _ in states.values()):
+                for p, (st, why) in states.items():
+                    if why:
+                        say(f'{s.id}/{p}', why)
                 todo.append(Ensemble(film, s, tier))
             else:
                 say(f'{s.id}', 'current, skipped (--force to re-film)')
@@ -596,9 +597,12 @@ def film_takes(a, tier):
         for v in s.variants:
             if a.variant and v not in a.variant:
                 continue
-            if not a.force and take_state(film, s, v, tier) == 'ok':
+            st, why = take_check(film, s, v, tier, a.ignore_code)
+            if not a.force and st == 'ok':
                 say(f'{s.id}/{v}', 'current, skipped (--force to re-film)')
                 continue
+            if why:
+                say(f'{s.id}/{v}', why)
             todo.append(Take(film, s, v, tier))
     if not todo:
         print('nothing to film')
@@ -619,7 +623,8 @@ def film_takes(a, tier):
 
 OPTS = [(('--jobs', '-j'), dict(type=int)),
         (('--force',), dict(action='store_true', help='re-film takes that are current')),
-        (('--variant',), dict(action='append', help='only this variant (repeatable)'))]
+        (('--variant',), dict(action='append', help='only this variant (repeatable)')),
+        IGNORE_CODE]
 
 
 @command(options=OPTS)

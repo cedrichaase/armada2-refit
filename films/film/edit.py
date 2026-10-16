@@ -13,7 +13,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from . import storyboard as sb
-from .cli import command, load, select
+from .cli import IGNORE_CODE, command, load, select, take_check
 from .storyboard import a2env
 
 TIER_OPT = (('--tier',), dict(choices=('probe', 'final'), default='probe',
@@ -658,7 +658,7 @@ def sheet(a):
 
 
 # ------------------------------------------------------------------ the manifest
-@command(shots=False, options=[TIER_OPT])
+@command(shots=False, options=[TIER_OPT, IGNORE_CODE])
 def manifest(a):
     """the edit as JSON, with every take, for an editor"""
     film = load(a.board)
@@ -679,8 +679,9 @@ def manifest(a):
                         spec = json.load(open(stem + '.spec.json'))
                     except (OSError, ValueError):
                         spec = {}
-                    t.update(commit=spec.get('commit'), hash=spec.get('hash'), res=spec.get('res'),
-                             current=spec.get('hash') == film.spec_hash(s, v, a.tier))
+                    st, why = take_check(film, s, v, a.tier, a.ignore_code)
+                    t.update(commit=spec.get('commit'), dirty=spec.get('dirty'), hash=spec.get('hash'),
+                             res=spec.get('res'), current=st == 'ok', stale=why)
                     if os.path.exists(stem + '.events.json'):
                         t['events'] = events(film, s, v, a.tier)
                 t['in'] = s.in_point(v)
