@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.1.0 — 2026-10-16
+
+Layers: films 1.0.0, testbench 3.18.0.
+
+### Added
+- `films/` and `./a2film`: films written as storyboards (shots, camera, layout,
+  transitions, titles, music), probed on the test bench at 1280x720 four games at once,
+  filmed at 4K, and cut into a rough cut and an edit manifest for an editor (films
+  1.0.0). The `film` skill holds the procedure. Installs nothing.
+- `a2test session start --assets none`, the game as a release installs it (testbench
+  3.18.0).
+
+Tooling only; nothing to see in game.
+
+
 ## 12.0.0 — 2026-10-15
 
 Layers: render3d 0.2.0, models 5.0.0, testbench 3.17.0.

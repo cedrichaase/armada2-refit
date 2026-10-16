@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.18.0 — 2026-10-16
+
+### Added
+- `a2test session start --assets none`: the clone is installed from an empty `A2_DATA`
+  (no textures, menu plates or movies), as a scenario's `Assets: none` already could;
+  the game as a release installs it. Used by `films/promo`.
+
+Installs nothing into the game. Confirmed in game 2026-10-16.
+
+
 ## 3.17.0 — 2026-10-15
 
 ### Added
