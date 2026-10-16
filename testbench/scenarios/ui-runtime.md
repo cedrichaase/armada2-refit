@@ -10,7 +10,7 @@ the demonstration panel on in every context. In the shell, the Credits are repla
 by a screen of ours (`[Demo] Shell=1`): a panel with a button that counts clicks, left
 with Esc. The match is entered as `_enter-instant-action.md` does, from the main menu
 the demo screen returns to (that fragment launches the game, so its steps are
-written out here). The loading screen gets the panel over the logo, reading the load's progress,
+written out here; Game Setup is the UI's, as there). The loading screen gets the panel over the logo, reading the load's progress,
 and the match gets it over the HUD, top right, 96 units from the edges. The click count
 is the demo's own and carries over from the shell to the match, so after one click in
 each it reads "2 clicks". A click on the panel in the match is the UI's: the engine
@@ -35,13 +35,13 @@ names each hook and counts the mission frames, which must be once per presented 
 16. Expect "UI.log" contains "demo screen left".
 17. Click the instant action cube.
 18. Wait for "GAME SETUP".
-19. Click at design 124,115.
+19. Click "Computer AI:Medium".
 20. Wait 1 second.
-21. Click at design 124,143.
+21. Click "Computer AI:Easy".
 22. Wait 1 second.
-23. Click at design 246,95.
+23. Click at hud 767,203.
 24. Wait 1 second.
-25. Click at design 246,123.
+25. Click "Borg".
 26. Wait 1 second.
 27. Expect "Computer AI:Easy" is visible.
 28. Expect "Borg" is visible.
