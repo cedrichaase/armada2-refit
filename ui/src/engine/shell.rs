@@ -215,11 +215,23 @@ fn pump(p: &mut Pumped) -> Option<i32> {
 static mut PREV_PROC: isize = 0;
 static mut ARROW: HANDLE = core::ptr::null_mut();
 static mut SUBCLASS_ON: bool = false;
+static mut OS_CURSOR_HIDDEN: bool = false;
+
+/// Hides the arrow Windows draws over a screen of ours, for the UI to draw its own
+/// (cursor.rs). Lasts until the screen ends.
+pub fn hide_os_cursor() {
+    unsafe {
+        if SUBCLASS_ON {
+            OS_CURSOR_HIDDEN = true;
+            SetCursor(core::ptr::null_mut());
+        }
+    }
+}
 
 unsafe extern "system" fn screen_proc(w: HWND, msg: u32, wp: usize, lp: isize) -> isize {
     unsafe {
         if SUBCLASS_ON && msg == WM_SETCURSOR && (lp & 0xffff) as u16 == HTCLIENT {
-            SetCursor(ARROW);
+            SetCursor(if OS_CURSOR_HIDDEN { core::ptr::null_mut() } else { ARROW });
             return 1;
         }
         CallWindowProcA(PREV_PROC, w, msg, wp, lp)
@@ -240,12 +252,16 @@ fn subclass(w: HWND) {
             }
         }
         SUBCLASS_ON = true;
+        OS_CURSOR_HIDDEN = false;
         SetCursor(ARROW);
     }
 }
 
 fn unsubclass() {
-    unsafe { SUBCLASS_ON = false };
+    unsafe {
+        SUBCLASS_ON = false;
+        OS_CURSOR_HIDDEN = false;
+    }
 }
 
 static mut FACTS_LOGGED: u32 = 0;
@@ -426,7 +442,7 @@ extern "C" fn demo_credits() {
     let r = run_screen(&mut |p: &Pumped| {
         // A click in the first moment is still the one that opened the screen.
         let settled = crate::rt::now() - started > 0.3;
-        if p.escape() || p.key(0x0d) || (settled && p.clicked[1]) {
+        if ((p.escape() || p.key(0x0d)) && !crate::input::keys_captured()) || (settled && p.clicked[1]) {
             Some(0)
         } else {
             None

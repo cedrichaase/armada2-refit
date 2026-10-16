@@ -354,6 +354,16 @@ def s_press(c, m):
     return None
 
 
+@step(r'^(?:scroll|turn|roll) the (?:mouse )?wheel (?P<dir>up|down)(?: (?P<n>\d+) (?:times|notches?))?$')
+def s_wheel(c, m):
+    # a2input counts notches positive = down
+    n = int(m.group('n') or 1)
+    for _ in range(n):
+        c.sess.wheel(n=1 if m.group('dir') == 'down' else -1)
+        time.sleep(0.15)
+    return None
+
+
 @step(r'^type ' + Q.format('text') + r'$')
 def s_type(c, m):
     c.sess.type(m.group('text'))
