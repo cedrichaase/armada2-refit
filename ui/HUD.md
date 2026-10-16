@@ -12,6 +12,10 @@ anything is patched or called.
     Bar=0         ; the button bar is ours (below)
     BarKeys=1     ; with it, the grid's keys; 0 keeps stock's bar keys
     BarLabels=1   ; the key in each button's corner
+    Minimap=0     ; the minimap is ours (below); MinimapSize=300, its side in units
+    Selection=0   ; the selection overlay is ours; SelectionGauges=1 shows the
+                  ; selected units' gauges always (0: as stock, while pointed at)
+    UnitView=0    ; our frame around the unit view, which the engine still draws
 
 Every panel key defaults to 0: with the shipped `UI.ini` the HUD is stock and the
 panel switch is not even patched.
@@ -57,11 +61,11 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 |---|---|---|---|---|---|
 | `PopupPaletteImp` (`g_pPopupPalette`) — **the button bar, ours** | the selected units' commands, menus (orders, build, AI, formations, trade), build lists, special weapons | its `Update` (always-game-step): the selection and the menu open, into 21 `ControlButton`s | its buttons on click release (focus-step); its hotkey tables and menu toggles in `mProcessKeyboardInput` | each `ControlButton`: a sprite named by the command, tinted by state; labels for trade rates | done: `engine::palette` |
 | `ShipDisplay` (`shipDisplay`) — the info panel | the selection: one unit (wireframe, name, class, captain, shields, hull, systems, crew, officers, energy), a builder's queue, or a group of icons | its `Simulate*Object` steps from the overview's selection; three heights (`infoPanelArea_0/_1/_2`) | clicks on group icons (select one), on queue items (cancel), on system icons (repair) — focus-step | `StandardBackground`, `StandardBar`, `StandardText`, `WireframeIcon`, `ShipIcon`, `BuildWireframe`, `RaceIcon`, `RepairIcon` | `engine::selection` (done: the handles); per object: name, class, health, shields, crew, officers, systems, build queue — next |
-| `SelectionDisplay` (`selectionDisplay`) | brackets, health/shield/energy gauges, group numbers and names over units in the 3D view | the overview's selection, each object's state | none of its own (tooltips on the objects) | camera-projected 2D quads and text | selection + per-object gauges + the camera's projection; draws over the 3D view, so last |
-| `MapRadar` (`mapRadar`) — the minimap | the map, fog, units, the camera's view outline; ship/station filter buttons | `RadarComponent` from the scanner grids (fog) and the object lists | click/drag moves the camera or orders a move; filter buttons | the radar's own textures (`Gminimap`, `Gfog`, ...) and sprites | the minimap picture (its texture, or ours), the camera's position, the move order: last |
+| `SelectionDisplay` (`selectionDisplay`) — **the selection overlay, ours** | brackets, health/shield/energy gauges, group numbers and names over units in the 3D view | the overview's selection, each object's state | none of its own (tooltips on the objects) | camera-projected 2D quads and text | done: `engine::overlay` |
+| `MapRadar` (`mapRadar`) — **the minimap, ours** | the map, fog, units, the camera's view outline; ship/station filter buttons | `RadarComponent` from the scanner grids (fog) and the object lists | click/drag moves the camera or orders a move; filter buttons | the radar's own textures (`Gminimap`, `Gfog`, ...) and sprites | done: `engine::radar` |
 | `ResourcePanel` (`g_resourcePanel`) | the resources (dilithium, metal, latinum, biomatter, crew, officers) at the top | `ResourceComponent`s asking `Team::GetResource` | tooltips only | `StandardBackground` and text | `engine::resources` (the amounts, done); which `eResource` is which |
 | `ButtonPanel` (`g_buttonPanel`) | the top-right buttons: menu, comm, idle unit, view toggle, objectives, help, palette, more | fixed | its `StandardButton`s (focus-step) | `StandardButton` sprites with tooltips | each button's press (`OpenMenu`, `OpenComm`, `IdleShip`, `ToggleView`, `ShowObjectives`, `ToggleHelp`, `TogglePalette`, `ToggleShowMore`) |
-| `CinematicView` (`g_cinematicView`) — the unit view (`cinematicPanelArea`) | a second 3D view of the action, or a video | its camera, the action camera's target | clicks on it | a second scene render inside `RenderAll` (render3d/README.md: the action camera is a second view) | keep the engine's render; ours draws the frame around it only |
+| `CinematicView` (`g_cinematicView`) — the unit view (`cinematicPanelArea`) | a second 3D view of the action, or a video | its camera, the action camera's target | clicks on it | a second scene render inside `RenderAll` (render3d/README.md: the action camera is a second view) | keep the engine's render; ours draws the frame around it only (done, `UnitView`) |
 | `MessageDisplay` (`g_messageDisplay`) | a mission message box (text and OK) | script calls (`SetText`) | its OK button; pauses the game | `StandardBackground`, `StandardText`, `StandardButton` | the text and the OK press (`mUnpauseCallback`) |
 | `ObjectivesDisplay` (`g_objectivesDisplay`) | the briefing and objectives, ticks for completed ones | the mission's objectives file, `SetObjectiveComplete` | OK; keys while it has the mouse (`GameKeysProcessInput`) | as `MessageDisplay` | the objectives' text and completion (hud/README.md has where they are kept) |
 | `CommDisplay` (`commDisplay`), with its `CommBar`s | multiplayer comms: players, teams, alliances, give resources/units, chat targets, allied victory, latency | the transport's `GameSetup` | many buttons, toggles and amount boxes | `StandardButton`/`ToggleButton`/text | `GameSetup` reads and the comm actions (`ProcessAlliance`, `GiveResource`, ...): late, with the menus' multiplayer screens |
@@ -225,6 +229,164 @@ every step passed (judged and logged), but its last, `Quit the game`, which hang
 a black screen after Exit to Windows on the bench that night with UI.asi taken out
 too (`testbench/operating/hud-takeover.md`).
 
+## The minimap
+
+`hud/minimap.rs` (the panel) over `engine/radar.rs` (the reads, the clicks), with
+`[HUD] Minimap=1`: a square of `MinimapSize` units (300, at most 45% of the screen's
+height) at the bottom left, in a panel of the theme with the two filter buttons above
+it. The stock `MapRadar` keeps running and is neither drawn nor given the mouse.
+
+**The square.** `RadarComponent` places everything in a unit square: the map's box
+(`g_terrain`: x0 y0 z0 x1 y1 z1) centred in a square `+0x5c` world units across, the
+offsets `+0x60` / `+0x64` centring it, v running against z. Its
+`ConvertWorldToSquareNormal` (0x4e8670) and `ConvertSquareNormalToWorld` (0x4e86e0,
+which puts the point at the map's middle height) are called for every point, so ours
+is placed exactly as stock's, at any size.
+
+**What stock's `Render` draws, and where ours gets it** (stock's order, which ours
+keeps):
+
+| Layer | Stock | Ours |
+|---|---|---|
+| backing | `RadarComponent+0x3c`, a sprite | the theme's panel and a dark square |
+| the map's picture | `m_mapSprite` (0x76387c), a 128x128 texture `CacheMap` (0x4e9e40) fills with every object's `UpdateMapObject` whenever `g_cachedMapNeedsUpdate` is set, from the panel's always-step | the same texture, drawn by our renderer through its Direct3D 9 texture (an `ST3D_Texture`'s per-device texture at `+0x40` + the device index times 4, its `+4` the `IDirect3DTexture8`, which d3d8to9 answers for its `IDirect3DTexture9`: render3d reads the fog's the same way); the stock `Render` is skipped, but the always-step that fills it runs |
+| warp suppression | `m_warpSuppressionSprite` (0x763880), filled by `CacheMap` | the same, the same way |
+| blips | `RenderMapObjects` (0x4ea4c0), twice: the sprite pass, then the dot pass | `radar::blips`, drawn by us (below) |
+| fog, shroud | `m_fogSprite` / `m_shroudSprite`, written by `UpdateScanGridSprite` (0x4e96c0) from the always-step when the grid's dirty flag (`+0x18`) is set; drawn only when `GameSetup::isFog` / `isShroud` and the map editor is off (`UserProfile+0x84`) | masks of our own from the same grids (below), under the same conditions |
+| pings | the `MessageMark` list at `+0x4c` (a position, a ring's radius in pixels at `+0x1c` that the always-step counts down, a colour at `+0x20`), each a ring (`ST3D_Camera::DrawCircle2D`) | rings of ours, the radius scaled from the stock radar's width to ours |
+| the camera | `RenderCameraViewFrustum` (0x4ea760) | ours (below) |
+
+**Blips** are `RenderMapObject`'s (0x4ea150) tests, kept: every object of
+`GameObject::objectList` not being removed (`+0x113`) that `CanUserSee` (vtable
+`+0x08`), at its position (`+0xac`) for its team (`+0xec`), then every `Spirit` of
+`Ghost::ghostList` (last-known enemies under the fog: class `+0x4`, team `+0xc`,
+position from its vtable `+0x10`), drawn faint. The class (`+0x40`) is left out when
+it is hidden from the radar (`+0x18c`) or outside the map, and a craft class
+(`IsCraftClass`, vtable `+0x28`) that is not a planet (`__RTDynamicCast` to
+`PlanetClass`) passes the ship or station filter (`sg_shipFilterState` /
+`sg_stationFilterState`; a station is `CraftClass+0x20d`): 0 all, 1 allies, 2
+enemies, 3 neutral, by the user team's `Team::IsUnconfirmedAlly` / `Enemy` /
+`Neutral`. A class with a radar sprite (`+0x190`: the moons, the planets) shows it; any
+other a dot whose size is `ComputeDot`'s (0x4e99d0): `MapSize` (vtable `+0x24`) when the
+class has one (`+0x184`), else 2 for a ship, 3 for a station, 1 for anything else, in
+texels of a 128-texel map. Ours draws ships as round dots and stations as squares at
+that size (never under 7 / 10 units), with a white ring round a selected unit
+(`+0x10e`). The colour is the team's map colour (`Team::GetTeam(team)+0x14`, three
+floats, which `Team::SetMapColor` sets); a team with none (black: the bench's scenes
+make teams without a game setup) is coloured by its relation to the player instead
+(own `good`, ally `accent2`, enemy `bad`, neutral `warn`).
+
+**Fog and shroud.** `Scanner::m_fog` / `m_shroud` (0x738a54 / 0x738a58) are
+`ScanGrid`s: `+0x4` the cells, one `u32` each, row by row, `+0xc` wide and `+0x10`
+tall (128x128 on Warzone and on `a2_borg01`), each a mask of the teams that see (fog)
+or have seen (shroud) the cell. A cell is clear when it shares a bit with
+`Entity::GetTeamsVisibleToUser` (0x4d0070). Stock copies a pattern texel into its
+sprite for every hidden cell, the grid centred in the sprite's texture (`+0x1c` /
+`+0x20` its size; 128x128 too). Ours builds one A8R8G8B8 texture per layer at the
+grid's own size, white and opaque where hidden, rebuilt only when the packed
+visibility bits (or the team mask) changed, and draws it tinted over the grid's
+rectangle in the square: the fog a translucent dark, the shroud the opaque slate of the
+3D view's shroud. Grid row 0 is the square's top (seen on the bench: the clearing
+follows a ship sent north). The engine's textures are never resized or replaced
+(CLAUDE.md: `UImid` froze the game).
+
+**The camera.** In the RTS view (`View_Record` 0) stock casts the 3D view's corners
+onto the map's middle height and joins them. Ours casts the main camera's viewport
+corners (`ST3D_GraphicsEngine+0xfc`, the camera in use outside
+`CinematicView::Render`, which puts it back; its viewport `+0x1b0`, near `+0x1a0`, far
+`+0x1a4`, position `+0xe4`) with `ST3D_Camera::ProjectScreenPointToWorldRay`
+(0x619140: the distance along the ray to that height, and the ray), the distance taken
+as the far plane's when it is not between the near and far planes, and draws the four
+sides. In the tactical view (1) stock draws a ring about the point the camera turns
+about, through its eye (`gTacticalCamera+0x98` / `+0xa0` and `+0x8c` / `+0x94`, x and
+z), and ours does too. The shot director's grey rings in that view are not drawn.
+
+**Clicks** are `RadarComponent::Simulate`'s (0x4e8a90), which stock calls from the
+panel's focus-step, at the point under the pointer in the world. With something
+selected (the overview's `GetSelectNum`) the command button (the right; the left when
+`UserProfile+0x24` swaps the buttons) asks `ActionMode::GetAction` (0x44ab70: no
+target, the point) what a click there means; a plain move (`& 0xfff` = 4) without Alt
+(`g_pCommandAlt`) becomes 0x2b, keeping the queue bit 0x4000, at the height of the
+cursor (`cOverViewImp::GetWhereCursor`, vtable `+0xbc`); the overview is told
+(`SetCursorAiAction`, `+0xc8`) and the bar sends it (`PopupPaletteImp::BroadcastCommand`,
+vtable `+0xa4`), as a right click in the 3D view does. The other button held, or either
+with nothing selected, moves the camera there (`gCameraManager`'s first field, the
+camera in use, vtable `+0x54`); in the tactical view a click moves it once and
+`CameraManager::SnapToNearestVisible` (0x4de460, with `cfgTACTICAL_SNAP_DISTANCE`)
+snaps it, unless Alt is held. Ours queues the point from the UI frame and makes the
+call from the panel's always-step: `MapRadar::AlwaysGameSimulate`'s call of
+`Entity::GetTeamsVisibleToUser` (0x4eb3b2) is re-pointed at ours, which calls it and
+then acts, so the order is given in the game's simulate as stock's is. A point not
+taken within half a second (the game paused) is dropped. `UI.log`: "minimap: order
+0x2b at x,z".
+
+**The filter buttons** press the stock buttons' functions, `MapRadar::NextShipFilter`
+(0x4eb7c0) and `NextStationFilter` (0x4eb930) (static; they cycle the state and post
+its name in the chat, "All ships visible" and so on), from the same step. Each shows
+the stock button's art (`StandardButton+0x2c`: `mapfilter_ship_button` in
+`uiFilterButtons`), a coloured mark and a word for the state, and as tooltip the game's
+own strings (`Localized_Strings::Localize` on `g_string`: `GUI_MM_SHIPS_TOOLTIP`,
+`GUI_MM_ALL_SHIPS_VISIBLE`, ...).
+
+**HUD.asi** re-lays the stock `MapRadar` out after a display mode change
+(hud/README.md, "Re-layout"); ours reads no stock rectangle but the stock radar's
+width, to scale a ping, so that keeps working. The button bar (`hud/bar.rs`) still
+places itself by the stock radar's rectangle (`MapRadar+0x04`), which ours covers at
+the default size.
+
+## The selection overlay
+
+`hud/overlay.rs` over `engine/overlay.rs`, with `[HUD] Selection=1`. The stock
+`SelectionDisplay` keeps its always-step (the unit under the pointer, the gauges' fade,
+`SimulateSelectionEffects`) and its `PreRender` (the 3D selection bubbles, which the
+engine or render3d draw): only its `Render` is skipped.
+
+**What stock draws** (`SelectionDisplay::Render`, 0x509540): for each object of
+`GameObject::objectList` not being removed (`+0x113`), drawn this frame (`+0x25`) and
+seen (`CanUserSee`), and not a station (`CraftClass+0x20d`) unless it is under the
+pointer: the group number (`mDrawGroups`: `+0x120`, 0..9, -1 none) when it is selected
+(`+0x10e`) or pointed at (`selectionDisplay+0x7c`, which the always-step sets from
+`DisplayInterface::MouseOn` while the 3D view owns the mouse); and the gauges when it
+is pointed at or of the pointed unit's team (`+0x88`, the pointed unit's `+0xec`), once
+`+0x8c` has faded in above 0.5. The gauges (for a craft, `GameObject+0x14` bit 3): the
+hull `+0x158` (a fraction, while the maximum `+0x160` is above 0.1), the shields
+`Craft+0x1c8` of `+0x1cc`, the special energy `+0x164` (while `+0x168` is above 0.1),
+and the damaged systems' icons (`RepairIcon`s at `+0x54`). Stock draws no brackets: the
+selection is the 3D bubble.
+
+**Where.** `SelectionDisplay::ComputeContainerRect` (0x5081b0, called) projects the
+eight corners of the object's bounding box (`GetBoundingBox`, vtable `+0x1c`) through
+`DisplayInterface::currentCamera` (0x765010) with `ST3D_Camera::ProjectVirtualPoint`
+and returns their box, `{x, y, w, h}`, in the virtual viewport
+(`DisplayInterface::s_pVirtualViewport` 0x765004, its size at `+0x8` / `+0xc`), which
+ours scales to the back buffer per axis. Stock's `Render` points `currentCamera` at
+`ST3D_GraphicsEngine+0xfc` first; ours does the same around its calls and puts back
+what was there. So the brackets sit where the engine's gauges sit, by the engine's own
+projection, whatever renders the scene; UI.asi does not depend on render3d.
+
+**Ours** draws, for every selected unit and the pointed one: four corner brackets in
+the theme's accent (an ally `good`, an enemy `bad`, neutral `warn`; lighter when
+pointed at), at least 26 units across; above them the hull gauge (`good` above 60%,
+`warn` above 30%, else `bad`), then the shields and the special energy as thinner
+gauges; the group number in a small box at the left; and for the pointed unit its
+class's name (`GetClassDisplayName`, vtable `+0x70`; `+0x48`, which `mDrawLabel` would
+print, is the object's script label, "bconst1051", not for the player). With
+`SelectionGauges=1` (the default) the selected units always show their gauges; 0
+shows them as stock does. A unit whose middle is under a stock panel still drawn, or
+under our minimap, is left out, and the overlay draws before our other panels, so
+they cover it.
+
+## The unit view
+
+`hud/unitview.rs`, with `[HUD] UnitView=1`. `CinematicView` (`g_cinematicView`,
+0x763758) is a second render of the scene with its own camera
+(`ST3D_GraphicsEngine::SetCurrentCamera` around `RenderView`, which calls
+`Armada_RenderAllOurStuff`: render3d/README.md, the action camera) or a Bink video:
+only the engine can draw it, so it is not taken over. Ours draws a frame of the theme
+just outside its rectangle (`+0x04`), with the form's accent at two corners, while it
+is shown. `DisplayInterface::SetInterfaceState` shows it in state 0 and hides it in the
+others.
+
 ## The engine API
 
 One file per area in `src/engine/`, each read by offset through small accessors, each
@@ -239,6 +401,8 @@ named here beside the panel that uses it:
 | `sound.rs` | the HUD's button sounds | every panel with buttons |
 | `selection.rs` | the selected objects' handles (the overview's `GetSelectList`, vtable +0x98, and count, +0x94: `QOL.asi`'s bigger selection reads the same way), `Entity::Get`, the user's team | the info panel, the selection overlay |
 | `resources.rs` | `Team::GetResource` for the user's team | the resource panel |
+| `radar.rs` | the radar's square, its picture's textures, the scan grids, blips, pings, the camera's outline, team colours and relations, the filters, the move order and the camera move (the always-step hook), `Localize` | the minimap; relations for the selection overlay |
+| `overlay.rs` | the units `SelectionDisplay` marks, their boxes on screen (`ComputeContainerRect`), gauges, groups, names; `g_cinematicView` | the selection overlay, the unit view's frame |
 
 ## Not done
 
