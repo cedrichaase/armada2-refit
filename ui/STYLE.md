@@ -169,11 +169,26 @@ Each is one function in `theme.rs`, given its rectangle and a `State` (hover eas
   there). It is an asset in `$A2_DATA`, never in the repository; **without it** (no
   plate built) the screen is a dark blue gradient with a fixed field of faint stars,
   so the layer works without assets. Panels over it are translucent glass.
-- **The loading screen** keeps the engine's logo scene (`models/README.md`, the
-  widened `logo.SOD`) and puts a band across the bottom: the mission's name in title
-  type, a line of status in small type, the percentage at the right, and the shell's
-  bar. Nothing animates there, because the engine presents only at 5% steps
-  (`README.md`, "The loading screen").
+- **The loading screen** (`[Loading] Enable=1`, `LOADING.md`) is a screen of ours over
+  the whole frame, in the player's race's theme once the load knows the race (the
+  shell's until then). **The backdrop is the map's own sky**: the brightest face of the
+  skybox its `.bzn` names, cropped to cover the screen, darkened toward the bottom and
+  toward the left where the text sits. The faces are the game's own files (stock or
+  refit), so this needs no asset of ours; a map whose sky cannot be read gets the menu
+  backdrop above (the plate, or the gradient and stars). Not the menu plate everywhere:
+  it is the shell's picture, not the mission's, and a briefing has no art of its own.
+  Down the left, as a briefing reads: the kicker (the campaign and mission number,
+  Instant Action, or Multiplayer) in accent capitals, the mission's title in display
+  type, a short accent rule, the briefing in body type, the objectives under a heading
+  with accent dots, the hint dimmed. At the right, for a game set up in the shell: a
+  multiplayer map's minimap preview, then the players in a window, a row each (team
+  badge, name, race; the local player in title colour), with a thin bar each for a
+  network player's load. Across the bottom: a ring of dots turning, what the load is
+  doing in plain words, the percentage at the right in title type, and the theme's bar.
+  The ring is the screen's one living mark; it turns because frames of ours are
+  presented between the engine's 5% steps. The engine's logo scene and bar are covered,
+  so the widened `logo.SOD` is not needed for it. With `Enable=0` the engine's screen
+  stays, and `[Demo] Style=1` still shows the earlier band over it.
 - **The HUD** takes the player's race's theme. Its panels are anchored to the screen
   edges (`Anchor`) at any aspect, translucent, the 3D view showing through.
 

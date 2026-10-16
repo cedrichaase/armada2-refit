@@ -326,11 +326,12 @@ code, and HUD.asi does not touch the function.
 drawn from. It is reported only while `Armada_AssetLoadStatusVisible` is set, and is
 None otherwise. The UI sees the value the frame being drawn was made for.
 
-**Not done: smoother loading frames.** Because the engine presents only at 5% steps,
-anything animated in the loading UI moves in jumps. A later hook on `LoadBarNext`'s call
-of the status update (`0x6019eb`) could present frames of its own between the engine's,
-but it would have to redraw the logo scene, or keep a copy of it, to have something to
-draw over.
+**A loading screen of ours** (`[Loading] Enable=1`): [`LOADING.md`](LOADING.md). It
+covers this frame whole, and presents frames of its own between the engine's from a hook
+on `LoadBarNext`'s call of the status update (`0x6019eb`), so it animates; a hook on
+`GameDoOne`'s call of the splash (`0x4871ad`) tells it a load has begun. Both are
+patched only with `Enable=1`, and stand down on their own (the overlay above still
+works) when their sites are not stock.
 
 ### Facts measured on the bench
 
@@ -369,6 +370,8 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 | `[Menus] EscapeReturns` | 1 | Esc in the in-mission menu is Return to Game |
 | `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
+| `[Loading] Enable` | 0 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
+| `[Loading] Hold` | 0 | the test bench's: seconds each load waits half-way, the screen still drawn, to be looked at. Never in play |
 
 ## The renderer (`src/gfx/`)
 
@@ -519,6 +522,5 @@ the engine does not see (the selection stays).
   every switch, the last mission's device therefore lives on behind the GDI menus until
   the UI next draws. With Menus.asi at the game's resolution the device is never
   re-created. Not seen to matter; not measured.
-- **Smoother loading frames**: the engine presents only at 5% steps (above).
 - Not verified: device loss in a screen of ours, the wheel, characters outside ASCII,
   a stock 800x600 shell, `Embed=0`.
