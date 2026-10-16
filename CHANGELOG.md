@@ -13,6 +13,8 @@ Layers: render3d 0.3.0.
 - render3d ray-marches the nebulae's gas at full size; `[Nebulae]` `Steps=`,
   `Denoise=` and `Footprint=` added, `Resolution=` and `EdgeRefine=` removed
   (render3d 0.3.0).
+- render3d adds the marched gas up over frames, which takes out its grain;
+  `[Nebulae]` `Temporal=` and `TemporalClip=` added (render3d 0.3.0).
 
 ### Fixed
 - render3d's marched gas no longer slides as the RTS camera pans (render3d 0.3.0).

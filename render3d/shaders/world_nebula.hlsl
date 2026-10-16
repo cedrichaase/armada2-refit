@@ -1,4 +1,4 @@
-// entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL march_vs:vs_3_0:VS_MARCH march8_ps:ps_3_0:PS_MARCH8 march12_ps:ps_3_0:PS_MARCH12 march16_ps:ps_3_0:PS_MARCH16 march24_ps:ps_3_0:PS_MARCH24 quad_vs:vs_3_0:VS_QUAD comp_ps:ps_3_0:PS_COMP
+// entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL march_vs:vs_3_0:VS_MARCH march8_ps:ps_3_0:PS_MARCH8 march12_ps:ps_3_0:PS_MARCH12 march16_ps:ps_3_0:PS_MARCH16 march24_ps:ps_3_0:PS_MARCH24 quad_vs:vs_3_0:VS_QUAD temporal_ps:ps_3_0:PS_TEMPORAL comp_ps:ps_3_0:PS_COMP
 // The world module's nebulae (src/mods/world/nebulae.rs): Nebulae.asi's nebulae.hlsl,
 // ported unchanged but for this header.
 //
@@ -445,7 +445,7 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
 
 float4 k_ray0    : register(c41);  // xyz: the ray (view depth 1) per pixel to the right; w: the reads' footprint, in pixels (Footprint=)
 float4 k_ray1    : register(c42);  // xyz: per pixel down
-float4 k_ray2    : register(c43);  // xyz: at pixel (0, 0)
+float4 k_ray2    : register(c43);  // xyz: at pixel (0, 0); w: the frame (Temporal=: the thresholds walk on; 0 without)
 float4 k_blo     : register(c44);  // xyz: the box's low corner (world); w: the nearest view depth marched
 float4 k_bhi     : register(c45);  // xyz: its high corner
 float4 k_zp      : register(c46);  // x, y: the projection's _33 and _43 (view depth _43 / (z - _33); z - _33 is below 0)
@@ -517,9 +517,17 @@ float4 march_step(float3 p, float3 fl, float dist, float thick, float2 u, float 
 }
 
 // The gas along this pixel's ray: rgb the light added up, a the optical depth, into the
-// gas target (ONE, ONE: the classes add up there), for comp_ps.
+// gas target (ONE, ONE: the classes add up there), for comp_ps; and into the second, the
+// view depth of each step times its optical depth (over DEPTH_UNIT, for half floats), so
+// temporal_ps can find where the gas a pixel shows was the frame before.
 #define FLOW_EVERY 4
-float4 march(float2 vpos, const int n)
+#define DEPTH_UNIT 1024.0
+struct MarchOut {
+    float4 gas : COLOR0;
+    float4 z   : COLOR1;
+};
+
+MarchOut march(float2 vpos, const int n)
 {
     float2 px = floor(vpos) + 0.5;
     float3 d = k_ray0.xyz * px.x + k_ray1.xyz * px.y + k_ray2.xyz;   // eye + d s: the point at view depth s
@@ -530,13 +538,18 @@ float4 march(float2 vpos, const int n)
     float  s0 = max(max(t0.x, t0.y), max(t0.z, k_blo.w));
     float  zb = tex2Dlod(s_zfull, float4(px * k_lr.zw, 0.0, 0.0)).r;
     float  s1 = min(min(t1.x, t1.y), min(t1.z, k_zp.y / min(zb - k_zp.x, -1e-9)));
-    float4 o = 0.0;
+    MarchOut o;
+    o.gas = 0.0;
+    o.z = 0.0;
     if (s1 > s0) {
         float  q = exp2(log2(s1 / s0) / n);        // each step's span over the last's
         float  qa = q * q * q * q;                 // the flow's, FLOW_EVERY steps
-        float2 u = tex2D(s_blue, px / 64.0).rg;
+        // With Temporal=, the thresholds walk the golden ratio from frame to frame, and
+        // temporal_ps adds the frames up: each frame's samples fall between the last's.
+        float2 u = frac(tex2D(s_blue, px / 64.0).rg + k_ray2.w * float2(0.6180340, 0.7548777));
         float  ph = key_phase(dot(k_key.xyz, d) / dl);
         float4 acc = 0.0;
+        float  za = 0.0;
         float  a = s0;
         // The flow is a slow field: read at every FLOW_EVERY-th step's start and in
         // between drawn straight, which saves most of its reads.
@@ -552,22 +565,25 @@ float4 march(float2 vpos, const int n)
             float  j = frac(u.x + i * 0.6180340);
             float  s = a + j * th;
             float3 fl = lerp(fa, fb, ((i % FLOW_EVERY) + j) / FLOW_EVERY);
-            acc += march_step(k_eye.xyz + d * s, fl, s * dl, th, u, i, ph, k_ray0.xyz * (s * k_ray0.w), k_ray1.xyz * (s * k_ray0.w));
+            float4 st = march_step(k_eye.xyz + d * s, fl, s * dl, th, u, i, ph, k_ray0.xyz * (s * k_ray0.w), k_ray1.xyz * (s * k_ray0.w));
+            acc += st;
+            za += st.a * (s / DEPTH_UNIT);
             a += th;
             if (i % FLOW_EVERY == FLOW_EVERY - 1)
                 fa = fb;
         }
-        o = acc;
+        o.gas = acc;
+        o.z = float4(za, 0.0, 0.0, 0.0);
     }
     return o;
 }
 
-float4 march8_ps(float2 vpos : VPOS) : COLOR { return march(vpos, 8); }
-float4 march12_ps(float2 vpos : VPOS) : COLOR { return march(vpos, 12); }
-float4 march16_ps(float2 vpos : VPOS) : COLOR { return march(vpos, 16); }
-float4 march24_ps(float2 vpos : VPOS) : COLOR { return march(vpos, 24); }
+MarchOut march8_ps(float2 vpos : VPOS) { return march(vpos, 8); }
+MarchOut march12_ps(float2 vpos : VPOS) { return march(vpos, 12); }
+MarchOut march16_ps(float2 vpos : VPOS) { return march(vpos, 16); }
+MarchOut march24_ps(float2 vpos : VPOS) { return march(vpos, 24); }
 
-// ---- the gas onto the frame ------------------------------------------------------------
+// ---- after the march: the gas target ---------------------------------------------------
 
 sampler2D s_gas   : register(s7);  // the march's sums at full size, in half floats: rgb the light, a the optical depth
 float4 k_dn      : register(c47);  // the filter: x 1 / (2 sigma^2), sigma in pixels (Denoise=); y the depth tolerance (of the view depth)
@@ -582,6 +598,66 @@ float view_z(float z)
 {
     return k_zp.y / min(z - k_zp.x, -1e-9);
 }
+
+// ---- the frames added up (Temporal=) ------------------------------------------------------
+//
+// Eight steps a pixel leave a stipple no spatial filter takes out without blurring the
+// gas. With the thresholds walking on from frame to frame, the frames are added up
+// instead: each pixel's gas is found where it was the frame before -- at the view depth
+// its steps' optical depth weights, through the last frame's view and projection -- and
+// the history there is blended with this frame's march, a share k_tm.x of it.
+// What the history holds that this frame's neighbourhood does not (gas a hull now
+// covers, gas that has moved on) is clipped to the neighbourhood's mean +- k_tm.z of its
+// spread, so it fades within a few frames rather than trailing; history from outside the
+// last frame's viewport, or none (k_tm.y 0), is not used.
+
+sampler2D s_gz    : register(s6);  // the march's second target: x the optical depth-weighted view depth / DEPTH_UNIT
+sampler2D s_hist  : register(s9);  // the history: the last frame's result, as the gas target (linear)
+float4 k_pv0     : register(c49);  // the columns of the last frame's VIEW x PROJECTION
+float4 k_pv1     : register(c50);
+float4 k_pv2     : register(c51);
+float4 k_pv3     : register(c52);
+float4 k_tm      : register(c53);  // x: this frame's share (Temporal=); y: 1 there is history; z: the clip, in spreads (TemporalClip=)
+float4 k_pvp     : register(c54);  // the last frame's viewport: x, y its corner, z, w its size (pixels)
+
+float4 temporal_ps(float2 vpos : VPOS) : COLOR
+{
+    float2 px = floor(vpos) + 0.5;
+    float4 c = tex2Dlod(s_gas, float4(px * k_lr.zw, 0.0, 0.0));
+    float4 m1 = 0.0, m2 = 0.0;
+    float  zs = 0.0;
+    [unroll] for (int y = -1; y <= 1; y++) {
+        [unroll] for (int x = -1; x <= 1; x++) {
+            float2 uv = clamp(px + float2(x, y), k_dnv.xy, k_dnv.zw) * k_lr.zw;
+            float4 g = tex2Dlod(s_gas, float4(uv, 0.0, 0.0));
+            m1 += g;
+            m2 += g * g;
+            zs += tex2Dlod(s_gz, float4(uv, 0.0, 0.0)).r;
+        }
+    }
+    m1 /= 9.0;
+    float4 sd = sqrt(max(m2 / 9.0 - m1 * m1, 0.0));
+    // Where the gas is (its weighted view depth over the neighbourhood), or with none,
+    // the scene behind: the history there is no gas either way.
+    float  s = m1.a > 1e-5 ? zs * (DEPTH_UNIT / 9.0) / m1.a : view_z(tex2Dlod(s_zfull, float4(px * k_lr.zw, 0.0, 0.0)).r);
+    float3 p = k_eye.xyz + (k_ray0.xyz * px.x + k_ray1.xyz * px.y + k_ray2.xyz) * s;
+    float4 q = float4(p, 1.0);
+    float4 h = float4(dot(q, k_pv0), dot(q, k_pv1), dot(q, k_pv2), dot(q, k_pv3));
+    float2 nd = h.xy / max(h.w, 1e-6);
+    float2 pp = k_pvp.xy + float2(nd.x + 1.0, 1.0 - nd.y) * 0.5 * k_pvp.zw;
+    float  ok = k_tm.y * step(1e-6, h.w) * step(k_pvp.x, pp.x) * step(pp.x, k_pvp.x + k_pvp.z) * step(k_pvp.y, pp.y) * step(pp.y, k_pvp.y + k_pvp.w);
+    // A value the half floats cannot hold (a flash's sums, a NaN) would stay in the
+    // history for good: a comparison with a NaN fails, so it takes the mean instead.
+    float4 hist = tex2Dlod(s_hist, float4(pp * k_lr.zw, 0.0, 0.0));
+    hist = hist >= 0.0 ? hist : m1;
+    hist = hist <= 60000.0 ? hist : m1;
+    hist = clamp(hist, m1 - k_tm.z * sd, m1 + k_tm.z * sd);
+    float4 r = ok > 0.5 ? lerp(c, hist, 1.0 - k_tm.x) : c;
+    r = r >= 0.0 ? r : 0.0;
+    return min(r, 60000.0);
+}
+
+// ---- the gas onto the frame ------------------------------------------------------------
 
 // The gas onto the frame (ONE, INVSRCALPHA), a pixel for a pixel, through a small
 // filter. Each pixel's march is a few samples of a long path, jittered by blue noise:

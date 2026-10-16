@@ -1054,7 +1054,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1156,8 +1156,26 @@ it out while the gas's own structure stays, since the volume's texels (6.6 units
 are several pixels wide. Per sample the march costs about what the slices did; what it
 saves is the blending of every slice, and what it spends is four times the pixels.
 About 2.5 ms of the march does not depend on the step count (8 to 16 steps adds 0.29 ms
-a step): likely the unrolled shader's size (8,000 instructions at 16 steps), which real
-loops would shrink. Shadows cost 0.6 ms of 7.6 at 24 steps; the noise reads (flow, fine
+a step). It is not the unrolled shader's size: Microsoft's compiler (`d3dcompiler_43`,
+run under Wine for the measurement only, never part of the build) makes the 8-step march
+a real `rep` loop of 2,200 dwords instead of vkd3d's 10,400, and on the bench (720p) the
+march took 2.53 ms either way against vkd3d's 2.52: DXVK's SPIR-V and the driver end
+up at the same code.
+
+**`Temporal=`** (default 0.1) adds the frames up, since in game 8 steps' stipple still
+showed through the filter. The thresholds then walk the golden ratio from frame to frame
+(`k_ray2.w`, the frame), so each frame's samples fall between the last's, and
+`temporal_ps` blends this frame's march into the view's history, a share `Temporal=` of
+it. A pixel's gas is found in the history where it was the frame before: the march
+writes a second target (MRT), the view depth of each step weighted by its optical depth,
+and that point goes through the last frame's VIEW x PROJECTION. History the present
+frame's 3x3 neighbourhood does not support (gas a hull now covers, gas that moved) is
+clipped to its mean +- `TemporalClip=` (1.25) spreads; a value the half floats cannot
+hold, or a NaN, is replaced by the mean so it cannot stay. The history is two targets
+per view (the action camera keeps its own), dropped with the device and whenever no gas
+was marched. `comp_ps` then filters and composites the history as it did the march.
+The pass costs 0.22 ms at 720p. With `Temporal=0` the thresholds stay put, as before:
+moved without adding the frames up, they made the gas shimmer. Shadows cost 0.6 ms of 7.6 at 24 steps; the noise reads (flow, fine
 detail) were half of it before the flow was thinned. `Footprint=2` saved nothing.
 
 **Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view

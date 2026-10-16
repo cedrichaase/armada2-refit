@@ -686,7 +686,8 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   render3d still marks every nebula it reaches.
 - **Nebulae slices sit on a ladder fixed in distance from the eye**, per view, and the
   blue-noise thresholds stay put from frame to frame; moving either made the gas
-  shimmer. The noise is spectral, not value noise (value noise's grid drew walls). In
+  shimmer. The march's thresholds move only with `Temporal=`, which adds the frames up
+  (reprojected, clipped to the neighbourhood); never move them without it. The noise is spectral, not value noise (value noise's grid drew walls). In
   the shadow map a texel of 1 means no hull, never a hull at the far end.
 - **The sky's settled looks stay**: Aqua is meant to be dimmer and softer than stock
   (the user preferred it), soft billows and no filaments; a recipe's level and colour

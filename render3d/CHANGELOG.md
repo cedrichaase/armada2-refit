@@ -10,6 +10,10 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 - Nebulae: `[Nebulae]` `Steps=` (8, 12, 16 or 24; default 8), `Denoise=` (the
   filter's sigma in pixels, default 1.5) and `Footprint=` (the noise reads' footprint,
   default 1).
+- Nebulae: the marched gas is added up over frames (`temporal_ps`): the thresholds walk
+  on from frame to frame, and each frame is blended into a history per view, reprojected
+  by the gas's depth and clipped to the neighbourhood. `[Nebulae]` `Temporal=` (this
+  frame's share, default 0.1; 0 off) and `TemporalClip=` (default 1.25).
 
 ### Changed
 - Nebulae: the gas is ray-marched at full size, a ray per pixel through the baked
