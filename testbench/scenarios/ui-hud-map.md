@@ -27,7 +27,7 @@ clicks on the minimap are checked by `UI.log` and by the outline moving.
 5. Wait 2 seconds.
 6. Expect "UI.log" contains "minimap: ours at".
 7. Take a screenshot called "minimap".
-8. Check that at the bottom left there is one square map panel with two small buttons reading "ALL" above it, the map in it mostly a flat grey-blue (the shroud) except a small black cleared area around the player's base with a few small coloured dots and icons in it, a thin white outline (the camera's view) over that area, and that there is no second minimap anywhere on the screen.
+8. Check that at the bottom left there is one square map panel with two small buttons reading "ALL" above it, the map in it mostly a flat grey-blue (the shroud), with one small black cleared area (the player's base, somewhere near an edge of the square: the start position is random) holding a few small coloured dots and icons, a thin white trapezoid outline (the camera's view) over that area, and that there is no second minimap anywhere on the screen.
 9. Click at 640,262.
 10. Move the mouse to 1000,150.
 11. Wait 1 second.
