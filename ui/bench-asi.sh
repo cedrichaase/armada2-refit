@@ -7,19 +7,23 @@
 # online/bench-asi.sh does for Online.asi. A scenario's `Setup:` line can run it.
 #
 #   --demo LIST   switches on the [Demo] overlay for each context named
-#   S.K=V         any other UI.ini key, e.g. UI.Scale=1.5
+#   --no-grid     takes GridLayout.asi out of the clone (UI.asi's bar stands down
+#                 while it is loaded; an --install of ./install puts it in)
+#   S.K=V         any other UI.ini key, e.g. UI.Scale=1.5 or HUD.Bar=1
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 state="${1:?usage: bench-asi.sh <session state.json> [--demo LIST] [Section.Key=Value ...]}"
 shift
 sets=()
+nogrid=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --demo)
             IFS=, read -ra ctxs <<< "${2:?--demo needs a list}"
             for c in "${ctxs[@]}"; do sets+=("Demo.${c^}=1"); done
             shift 2 ;;
+        --no-grid) nogrid=1; shift ;;
         *=*) sets+=("$1"); shift ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
@@ -29,6 +33,10 @@ work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])
 
 bash "$here/build.sh" >/dev/null
 cp "$here/build/UI.asi" "$here/UI.ini" "$work/game/"
+if [ "$nogrid" = 1 ]; then
+    rm -f "$work/game/GridLayout.asi" "$work/game/GridLayout.ini"
+    echo "GridLayout.asi taken out of $work/game/"
+fi
 for s in "${sets[@]}"; do
     sec="${s%%.*}" rest="${s#*.}"
     key="${rest%%=*}" val="${rest#*=}"

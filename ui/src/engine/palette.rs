@@ -49,6 +49,14 @@ const MODE_KIND: usize = 0x04;
 const MODE_NAMES: usize = 0x709f68;
 const PRJ_GET_NAME: usize = 0x65dce0;
 
+/// `CommandInfoClass::ButtonName(std::string &) const` and `ModeInfo::ButtonName`:
+/// the name of the button's sprite.
+const CMD_BUTTON_NAME: usize = 0x519780;
+const MODE_BUTTON_NAME: usize = 0x4e7950;
+/// `DisplayInterface::m_spriteDatabase` and `ST3D_Database::FindElement(name, class)`.
+const SPRITE_DB: usize = 0x765030;
+const FIND_ELEMENT: usize = 0x620750;
+
 /// `ControlButton::mButtonPressFunction` (ControlButton's vtable `+0x20`).
 const CONTROL_BUTTON_PRESS: usize = 0x4e69e0;
 
@@ -83,10 +91,55 @@ pub fn state(b: usize) -> u32 {
     if b == 0 { 0 } else { unsafe { rd(b + BTN_STATE) } }
 }
 
-/// The icon sprite `ControlButton::Render` gave the button (0 until it is first drawn
-/// there, or when the command names no sprite).
+/// The button's icon sprite. `ControlButton::Render` looks it up each time it draws:
+/// the command's or mode's `ButtonName` names it, and it is found by that name in the
+/// HUD's sprite database (`DisplayInterface::m_spriteDatabase`, `FindElement`, as
+/// `StandardButton::SetImages` does). The stock bar no longer draws, so we look it up
+/// the same way, once per name. 0 when the button names no sprite.
 pub fn sprite(b: usize) -> usize {
-    field(b, BTN_SPRITE)
+    let cmd = field(b, BTN_COMMAND);
+    let mode = field(b, BTN_MODE);
+    let (obj, f) = if cmd != 0 {
+        (cmd, CMD_BUTTON_NAME)
+    } else if mode != 0 {
+        (mode, MODE_BUTTON_NAME)
+    } else {
+        return field(b, BTN_SPRITE);
+    };
+    let Some(name) = super::msvc::with_string(|s| unsafe {
+        let g: unsafe extern "thiscall" fn(usize, usize) -> bool = core::mem::transmute(f);
+        g(obj, s);
+    }) else {
+        return 0;
+    };
+    find_sprite(&name)
+}
+
+static mut SPRITES: alloc::vec::Vec<(String, usize)> = alloc::vec::Vec::new();
+static mut SPRITES_DB: usize = 0;
+
+/// A sprite of the HUD's sprite database by name, cached while the database is the same.
+#[allow(static_mut_refs)]
+fn find_sprite(name: &str) -> usize {
+    unsafe {
+        let db = rd::<usize>(SPRITE_DB);
+        if db == 0 {
+            return 0;
+        }
+        let cache = &mut SPRITES;
+        if SPRITES_DB != db {
+            cache.clear();
+            SPRITES_DB = db;
+        }
+        if let Some((_, sp)) = cache.iter().find(|(n, _)| n == name) {
+            return *sp;
+        }
+        let c = crate::rt::cstr(name);
+        let find: unsafe extern "thiscall" fn(usize, *const u8, u32) -> usize = core::mem::transmute(FIND_ELEMENT);
+        let sp = find(db, c.as_ptr(), 0);
+        cache.push((String::from(name), sp));
+        sp
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -198,7 +251,12 @@ pub fn install_keys(stock_keys_off: bool, on_keys: fn(usize)) -> bool {
         crate::log!("bar: the bar's keyboard call is not stock (GridLayout.asi?)");
         return false;
     }
-    if !super::starts(CONTROL_BUTTON_PRESS, &[0x8b, 0xc1, 0x56, 0x8b, 0x90]) || !super::starts(PRJ_GET_NAME, &[0x55, 0x8b, 0xec, 0x56, 0x57]) {
+    if !super::starts(CONTROL_BUTTON_PRESS, &[0x8b, 0xc1, 0x56, 0x8b, 0x90])
+        || !super::starts(PRJ_GET_NAME, &[0x55, 0x8b, 0xec, 0x56, 0x57])
+        || !super::starts(CMD_BUTTON_NAME, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x08])
+        || !super::starts(MODE_BUTTON_NAME, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x48])
+        || !super::starts(FIND_ELEMENT, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08])
+    {
         return false;
     }
     unsafe {

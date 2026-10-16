@@ -58,6 +58,25 @@ pub fn with_stringstream(f: impl FnOnce(usize)) -> Option<String> {
     }
 }
 
+/// Runs `f` with an empty `std::string` (all zero, as its default constructor leaves
+/// it), returns what `f` left in it, and frees it.
+pub fn with_string(f: impl FnOnce(usize)) -> Option<String> {
+    unsafe {
+        let sdtor: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(IMP_STR_DTOR));
+        let mut s = [0u32; 4];
+        let sp = s.as_mut_ptr() as usize;
+        f(sp);
+        let (p, n) = (s[1] as usize, s[2] as usize);
+        let out = if p != 0 && n > 0 && n < 4096 {
+            Some(core::slice::from_raw_parts(p as *const u8, n).iter().map(|&b| b as char).collect::<String>())
+        } else {
+            None
+        };
+        sdtor(sp);
+        out
+    }
+}
+
 /// The imports are filled in by the loader; each must point into `msvcp60.dll`, not at
 /// nothing.
 pub fn available() -> bool {

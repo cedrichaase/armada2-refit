@@ -62,7 +62,7 @@ struct Item {
 
 /// The bar's buttons and the cell each goes in: `cells[c]` is the button under cell
 /// `c`, 0 for an empty one.
-fn layout(p: usize) -> ([usize; CELLS], Vec<Item>) {
+fn layout(p: usize, menu: u32) -> ([usize; CELLS], Vec<Item>) {
     let mut items = Vec::new();
     for i in 0..palette::N_SLOTS {
         let b = palette::slot(p, i);
@@ -70,7 +70,7 @@ fn layout(p: usize) -> ([usize; CELLS], Vec<Item>) {
             items.push(Item { btn: b, desc: palette::describe(b) });
         }
     }
-    let at = assign(&items, palette::menu(p));
+    let at = assign(&items, menu);
     let mut cells = [0usize; CELLS];
     for (it, c) in items.iter().zip(at) {
         if let Some(c) = c {
@@ -172,6 +172,9 @@ struct State {
     tip: Option<(usize, bool, f64, String)>,
     /// The last layout logged, to log each change once.
     last_log: String,
+    /// The menu the buttons were last built for, and when (see `run`).
+    built_menu: u32,
+    built_at: f64,
 }
 
 static mut STATE: State = State {
@@ -183,6 +186,8 @@ static mut STATE: State = State {
     hover_since: 0.0,
     tip: None,
     last_log: String::new(),
+    built_menu: 0,
+    built_at: -1.0,
 };
 
 fn st() -> &'static mut State {
@@ -237,7 +242,11 @@ fn on_keys(p: usize) {
         s.pending = 0;
         return;
     }
-    let (cells, items) = layout(p);
+    // A press below changes the menu at once, and the buttons only at the bar's next
+    // update; the UI's frames in between lay out by the menu these buttons are for.
+    s.built_menu = palette::menu(p);
+    s.built_at = crate::rt::now();
+    let (cells, items) = layout(p, s.built_menu);
     if s.pending != 0 {
         let b = core::mem::take(&mut s.pending);
         if let Some(it) = items.iter().find(|it| it.btn == b) {
@@ -288,13 +297,16 @@ pub fn run(ui: &mut Ui) {
         s.tip = None;
         return;
     }
-    let (cells, items) = layout(p);
+    // The menu the buttons were built for, while the bar's updates run (they do not
+    // while the game is paused or nothing of the player's is selected).
+    let menu = if crate::rt::now() - s.built_at < 0.25 { s.built_menu } else { palette::menu(p) };
+    let (cells, items) = layout(p, menu);
     if items.is_empty() {
         s.hover = 0;
         s.tip = None;
         return;
     }
-    log_layout(p, &cells, &items);
+    log_layout(p, menu, &cells, &items);
 
     let cfg = crate::config::get();
     let t = ui.theme;
@@ -395,7 +407,21 @@ fn tooltip(ui: &mut Ui, at: R, bar: R, text: &str) {
     if text.is_empty() {
         return;
     }
-    let clean: String = text.chars().filter(|&c| c != '\r').collect();
+    // '^' marks the hotkey letter in the game's strings, and "<...>" names stock's
+    // hotkey, which does nothing while the grid's keys are on.
+    let keys = crate::config::get().hud.bar_keys;
+    let mut clean = String::new();
+    let mut depth = 0;
+    for c in text.chars() {
+        match c {
+            '\r' | '^' => {}
+            '<' if keys => depth += 1,
+            '>' if keys && depth > 0 => depth -= 1,
+            _ if depth == 0 => clean.push(c),
+            _ => {}
+        }
+    }
+    let clean = String::from(clean.replace(" :", ":").trim());
     let t = ui.theme;
     let size = ui.u(19.0);
     let maxw = ui.u(460.0);
@@ -416,8 +442,8 @@ fn tooltip(ui: &mut Ui, at: R, bar: R, text: &str) {
 }
 
 /// `bar: menu=0 | Q=build W=order ...`, once per change, as GridLayout.log does.
-fn log_layout(p: usize, cells: &[usize; CELLS], items: &[Item]) {
-    let mut line = crate::sfmt!("bar: menu={} mode={} |", palette::menu(p), palette::mode(p));
+fn log_layout(p: usize, menu: u32, cells: &[usize; CELLS], items: &[Item]) {
+    let mut line = crate::sfmt!("bar: menu={} mode={} |", menu, palette::mode(p));
     for (c, &b) in cells.iter().enumerate() {
         if b == 0 {
             continue;
