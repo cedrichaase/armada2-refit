@@ -73,116 +73,117 @@ settings screens; Exit.
 48. Wait 1 second.
 49. Press ctrl+i.
 50. Wait 2 seconds.
-51. Drag from hud 400,300 to hud-right 1200,800.
-52. Wait 2 seconds.
-53. Expect "UI.log" contains "bar: menu=".
-54. Take a screenshot called "mission, selected".
-55. Check that the HUD is the UI's: a resource strip at the top centre, square icon buttons at the top right, a square minimap at the bottom left, an info panel at the bottom centre describing the selection, a grid of command buttons with letters in their corners, a square 3D view of the action in a thin frame at the bottom right, and corner brackets with gauges around the selected ships; none of the stock HUD's art (its curved panels) shows, and nothing is stretched sideways.
-56. Right-click at hud 700,450.
-57. Wait 3 seconds.
-58. Right-click at hud 187,1013.
-59. Wait 2 seconds.
-60. Expect "UI.log" contains "minimap: order".
-61. Click at hud 120,950.
-62. Wait 2 seconds.
-63. Take a screenshot called "minimap click".
-64. Press Pause.
-65. Wait 2 seconds.
-66. Expect "UI.log" contains "pause: shown".
-67. Take a screenshot called "paused".
-68. Press Pause.
-69. Wait 2 seconds.
-70. Press alt+o.
-71. Wait 2 seconds.
-72. Take a screenshot called "objectives".
-73. Check that a window of the UI's style lists the mission's objectives with check boxes.
-74. Press Return.
-75. Wait 2 seconds.
-76. Press Escape.
-77. Wait 3 seconds.
-78. Expect "Return to Game" is visible.
-79. Take a screenshot called "in-mission menu".
-80. Click "Save Game".
-81. Wait 3 seconds.
-82. Expect "SAVE GAME" is visible.
-83. Click at design 450,506.
-84. Press End.
-85. Press BackSpace 30 times.
-86. Type "uiwhole".
-87. Wait 1 second.
-88. Expect "uiwhole" is visible.
-89. Click at design 400,532.
-90. Wait 4 seconds.
-91. Expect "Save Successful" is visible.
-92. Click "O.K.".
-93. Wait 2 seconds.
-94. Click "Previous Menu".
-95. Wait 2 seconds.
-96. Click "Load Game".
-97. Wait 3 seconds.
-98. Click "uiwhole".
-99. Wait 1 second.
-100. Click at design 400,532.
-101. Wait 3 seconds.
-102. Click "Yes".
-103. Wait 60 seconds.
-104. Expect "UI.log" contains "mission: frames resume".
-105. Take a screenshot called "loaded".
-106. Press Escape.
-107. Wait 3 seconds.
-108. Click "Abort Mission".
-109. Wait 2 seconds.
-110. Click "Yes".
-111. Wait up to 120 seconds for the admiral's log.
-112. Take a screenshot called "aborted".
-113. Click "Done".
-114. Wait 5 seconds.
-115. Expect "Invasion" is visible.
-116. Click "Cancel".
-117. Wait 3 seconds.
-118. Click "Previous Menu".
-119. Wait for the main menu.
-120. Click the instant action cube.
-121. Wait for "GAME SETUP".
-122. Wait 2 seconds.
-123. Take a screenshot called "game setup".
-124. Click "LAUNCH".
-125. Wait 45 seconds.
-126. Take a screenshot called "match".
-127. Check that the match shows the UI's HUD (resources at the top centre, the square minimap at the bottom left, the buttons at the top right) over the map.
-128. Scene "succeed".
-129. Wait 20 seconds.
-130. Take a screenshot called "won".
-131. Wait up to 120 seconds for the admiral's log.
-132. Take a screenshot called "admirals log".
-133. Check that the Admiral's Log is a window of the UI's style with its tabs along the top and a table of scores.
-134. Click "Done".
-135. Wait for the main menu.
-136. Click the options panel.
-137. Wait 3 seconds.
-138. Expect "Graphics Settings" is visible.
-139. Click "Graphics Settings".
-140. Wait 2 seconds.
-141. Expect "Bump Mapping" is visible.
-142. Take a screenshot called "graphics settings".
-143. Click "Previous Menu".
-144. Wait 2 seconds.
-145. Click "Sound Settings".
-146. Wait 2 seconds.
-147. Expect "Music Volume" is visible.
-148. Take a screenshot called "sound settings".
-149. Click "Previous Menu".
-150. Wait 2 seconds.
-151. Click "Game Settings".
-152. Wait 2 seconds.
-153. Expect "Game Difficulty" is visible.
-154. Take a screenshot called "game settings".
-155. Click "Previous Menu".
-156. Wait 2 seconds.
-157. Click "Previous Menu".
-158. Wait 3 seconds.
-159. Expect the main menu.
-160. Expect "UI.log" contains "cursor: Menus draws c_arrow".
-161. Quit the game.
-162. Expect the game to have exited.
-163. Expect no crash.
+51. Expect "UI.log" contains "unit view: shown".
+52. Drag from hud 400,300 to hud-right 1200,800.
+53. Wait 2 seconds.
+54. Expect "UI.log" contains "bar: menu=".
+55. Take a screenshot called "mission, selected".
+56. Check that the HUD is the UI's: a resource strip at the top centre, square icon buttons at the top right, a square minimap at the bottom left, an info panel at the bottom centre describing the selection, a grid of command buttons with letters in their corners, a square 3D view of the action in a thin frame at the bottom right, and corner brackets with gauges around the selected ships; none of the stock HUD's art (its curved panels) shows, and nothing is stretched sideways.
+57. Right-click at hud 700,450.
+58. Wait 3 seconds.
+59. Right-click at hud 187,1013.
+60. Wait 2 seconds.
+61. Expect "UI.log" contains "minimap: order".
+62. Click at hud 120,950.
+63. Wait 2 seconds.
+64. Take a screenshot called "minimap click".
+65. Press Pause.
+66. Wait 2 seconds.
+67. Expect "UI.log" contains "pause: shown".
+68. Take a screenshot called "paused".
+69. Press Pause.
+70. Wait 2 seconds.
+71. Press alt+o.
+72. Wait 2 seconds.
+73. Take a screenshot called "objectives".
+74. Check that a window of the UI's style lists the mission's objectives with check boxes.
+75. Press Return.
+76. Wait 2 seconds.
+77. Press Escape.
+78. Wait 3 seconds.
+79. Expect "Return to Game" is visible.
+80. Take a screenshot called "in-mission menu".
+81. Click "Save Game".
+82. Wait 3 seconds.
+83. Expect "SAVE GAME" is visible.
+84. Click at design 450,506.
+85. Press End.
+86. Press BackSpace 30 times.
+87. Type "uiwhole".
+88. Wait 1 second.
+89. Expect "uiwhole" is visible.
+90. Click at design 400,532.
+91. Wait 4 seconds.
+92. Expect "Save Successful" is visible.
+93. Click "O.K.".
+94. Wait 2 seconds.
+95. Click "Previous Menu".
+96. Wait 2 seconds.
+97. Click "Load Game".
+98. Wait 3 seconds.
+99. Click "uiwhole".
+100. Wait 1 second.
+101. Click at design 400,532.
+102. Wait 3 seconds.
+103. Click "Yes".
+104. Wait 60 seconds.
+105. Expect "UI.log" contains "mission: frames resume".
+106. Take a screenshot called "loaded".
+107. Press Escape.
+108. Wait 3 seconds.
+109. Click "Abort Mission".
+110. Wait 2 seconds.
+111. Click "Yes".
+112. Wait up to 120 seconds for the admiral's log.
+113. Take a screenshot called "aborted".
+114. Click "Done".
+115. Wait 5 seconds.
+116. Expect "Invasion" is visible.
+117. Click "Cancel".
+118. Wait 3 seconds.
+119. Click "Previous Menu".
+120. Wait for the main menu.
+121. Click the instant action cube.
+122. Wait for "GAME SETUP".
+123. Wait 2 seconds.
+124. Take a screenshot called "game setup".
+125. Click "LAUNCH".
+126. Wait 45 seconds.
+127. Take a screenshot called "match".
+128. Check that the match shows the UI's HUD (resources at the top centre, the square minimap at the bottom left, the buttons at the top right) over the map.
+129. Scene "succeed".
+130. Wait 20 seconds.
+131. Take a screenshot called "won".
+132. Wait up to 120 seconds for the admiral's log.
+133. Take a screenshot called "admirals log".
+134. Check that the Admiral's Log is a window of the UI's style with its tabs along the top and a table of scores.
+135. Click "Done".
+136. Wait for the main menu.
+137. Click the options panel.
+138. Wait 3 seconds.
+139. Expect "Graphics Settings" is visible.
+140. Click "Graphics Settings".
+141. Wait 2 seconds.
+142. Expect "Bump Mapping" is visible.
+143. Take a screenshot called "graphics settings".
+144. Click "Previous Menu".
+145. Wait 2 seconds.
+146. Click "Sound Settings".
+147. Wait 2 seconds.
+148. Expect "Music Volume" is visible.
+149. Take a screenshot called "sound settings".
+150. Click "Previous Menu".
+151. Wait 2 seconds.
+152. Click "Game Settings".
+153. Wait 2 seconds.
+154. Expect "Game Difficulty" is visible.
+155. Take a screenshot called "game settings".
+156. Click "Previous Menu".
+157. Wait 2 seconds.
+158. Click "Previous Menu".
+159. Wait 3 seconds.
+160. Expect the main menu.
+161. Expect "UI.log" contains "cursor: Menus draws c_arrow".
+162. Quit the game.
+163. Expect the game to have exited.
+164. Expect no crash.

@@ -21,13 +21,22 @@ fn frame_width(ui: &Ui) -> f32 {
     ui.u(ui.theme.edge).max(1.0) + ui.u(3.0)
 }
 
+static mut SHOWN: bool = false;
+
 pub fn run(ui: &mut Ui) {
     let c = overlay::CINEMATIC_VIEW;
     if unitview::enabled() {
         let r = place(ui);
         unitview::place([r.x, r.y, r.right(), r.bottom()], ui.w, ui.h);
     }
-    if hud::hidden(c) || crate::engine::ingame::hud_hidden() {
+    let shown = !hud::hidden(c) && !crate::engine::ingame::hud_hidden();
+    unsafe {
+        if shown != SHOWN {
+            SHOWN = shown;
+            crate::log!("unit view: {}", if shown { "shown" } else { "hidden" });
+        }
+    }
+    if !shown {
         return;
     }
     // In the cinematic view (a cutscene) the engine draws the unit view only while it
