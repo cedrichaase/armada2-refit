@@ -30,14 +30,18 @@ pub fn run(ui: &mut Ui) {
         let (tw, th) = crate::text::measure_with(crate::text::font_bold(), &l.text, px);
         let x = origin.0 + l.x as f32 * sx;
         let y = origin.1 + l.y as f32 * sy;
-        // eJustify: 0 left of the point, 1 centred on it, 2 right of it.
-        let x = match l.justify {
-            1 => x - tw * 0.5,
-            2 => x - tw,
-            _ => x,
+        // eJustify is flags: 2 centres the text on the point across, 16 down (the
+        // intro's lines are added with 18 at x 800, the mission's name with 0 at its
+        // corner); 4 is taken as right-aligned.
+        let x = if l.justify & 2 != 0 {
+            x - tw * 0.5
+        } else if l.justify & 4 != 0 {
+            x - tw
+        } else {
+            x
         };
         let x = x.clamp(0.0, (ui.w - tw).max(0.0));
-        let y = y - th * 0.5;
+        let y = if l.justify & 16 != 0 { y - th * 0.5 } else { y };
         let col = fade(buttons::colour(l.colour), l.fade);
         let sh = ui.u(2.0).max(1.0);
         ui.draw.text_w(&l.text, px, libm::roundf(x + sh), libm::roundf(y + sh), fade(0xff000000, 0.8 * l.fade), Weight::Bold);

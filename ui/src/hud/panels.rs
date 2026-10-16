@@ -48,6 +48,9 @@ pub fn install(c: &Hud) {
     o.resources = take(c.resources, topbar::RESOURCE_PANEL, "ResourcePanel");
     o.buttons = take(c.buttons, topbar::BUTTON_PANEL, "ButtonPanel");
     o.messages = take(c.messages, popups::MESSAGE, "MessageDisplay") | take(c.messages, popups::OBJECTIVES, "ObjectivesDisplay");
+    if o.messages {
+        engine::buttons::set_each_pass(popups::objectives_keys);
+    }
     o.pause = take(c.pause, popups::PAUSE, "PauseBox");
     o.replay = take(c.replay, popups::REPLAY, "ReplayPanel");
     o.overlay = take(c.overlay, engine::overlay::OVERLAY, "OverlayText");
@@ -67,6 +70,14 @@ pub fn install(c: &Hud) {
 pub fn run(ui: &mut Ui) {
     let Some(o) = on() else { return };
     let hud_hidden = engine::ingame::hud_hidden();
+    // A box that pauses the game covers everything: nothing under it takes the mouse
+    // (its own widgets are drawn in the overlay layer, above the occluder).
+    let blocking = (o.messages && (popups::message().is_some() || popups::objectives_shown())) || (o.pause && popups::pause_shown());
+    if blocking {
+        let screen = ui.screen();
+        ui.claim(screen);
+        ui.occlude(screen);
+    }
     if o.overlay {
         ui.scope("hud.overlay", overlay::run);
     }
@@ -189,4 +200,16 @@ pub fn fit(ui: &Ui, at: crate::widgets::Anchor, w: f32, h: f32, margin: f32) -> 
     let (l, t, r, b) = (i.x, i.y, probe.right() - i.right(), probe.bottom() - i.bottom());
     let outer = at.place(ui.screen(), w + l + r, h + t + b, margin);
     (outer, R::new(outer.x + l, outer.y + t, w, h))
+}
+
+/// A box over a dimmed screen, in the overlay layer: a window titled `title`, `w` x
+/// `h` units in the middle; the room inside it. Unlike `Ui::modal` it keeps the mouse
+/// but not the keyboard: the stock box's keys are the engine's (`popups`).
+pub fn boxed(ui: &mut Ui, title: &str, w: f32, h: f32, dim: f32) -> R {
+    let screen = ui.screen();
+    let scrim = crate::gfx::fade(ui.theme.scrim, dim);
+    ui.draw.rect(screen, scrim);
+    ui.claim(screen);
+    let r = crate::widgets::Anchor::Centre.place(screen, ui.u(w), ui.u(h), 0.0);
+    ui.window(r, title)
 }

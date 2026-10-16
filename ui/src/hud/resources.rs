@@ -25,7 +25,9 @@ fn names(now: f64, shown: &[(u32, usize)]) -> &'static [(usize, String, String)]
         n.names.clear();
         for &(r, c) in shown {
             let tip = topbar::tooltip(c, false).unwrap_or_default();
-            let first = String::from(tip.lines().next().unwrap_or("").trim().trim_end_matches(':'));
+            // "Crew: 1200/3250": the name is the first line up to its colon.
+            let first = tip.lines().next().unwrap_or("");
+            let first = String::from(first.split(':').next().unwrap_or("").trim());
             let name = if first.is_empty() || first.len() > 24 { String::from(topbar::NAMES[r as usize]) } else { first };
             n.names.push((c, name, tip));
         }

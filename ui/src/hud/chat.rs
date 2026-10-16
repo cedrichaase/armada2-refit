@@ -35,13 +35,13 @@ pub fn run(ui: &mut Ui) {
     let x = ui.u(16.0);
     // Under the top bar (the resources' strip and the buttons, about 80 units).
     let mut y = ui.u(110.0);
-    let px = ui.u(t.small_size);
+    let px = ui.u(t.text_size * 0.85);
     let lh = px * 1.3;
     let w = ui.u(640.0).min(ui.w * 0.5);
     if !lines.is_empty() {
         let h = lines.len() as f32 * lh + ui.u(12.0);
         // A faint backing so the lines read over bright space; no frame, no mouse.
-        ui.draw.fill(R::new(x - ui.u(8.0), y - ui.u(6.0), w + ui.u(16.0), h), crate::gfx::Corners::round(ui.u(6.0)), fade(t.panel, 0.45));
+        ui.draw.fill(R::new(x - ui.u(8.0), y - ui.u(6.0), w + ui.u(16.0), h), crate::gfx::Corners::round(ui.u(6.0)), fade(t.panel, 0.6));
         for (text, col) in &lines {
             let sh = ui.u(1.0).max(1.0);
             ui.draw.text_w(text, px, libm::roundf(x + sh), libm::roundf(y + sh), 0xc0000000, Weight::Regular);

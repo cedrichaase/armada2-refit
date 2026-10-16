@@ -39,17 +39,19 @@ pub fn run(ui: &mut Ui) {
             LOGGED = true;
         }
     }
-    let t = ui.theme;
-    let screen = ui.screen();
-    ui.draw.rect(screen, crate::gfx::fade(t.scrim, 0.5));
-    ui.claim(screen);
-    let (bw, bh) = (ui.u(240.0), ui.u(t.button_h));
-    let text_h = ui.u(t.display_size) * 1.4;
-    let (outer, inner) = super::panels::fit(ui, Anchor::Centre, ui.u(420.0), text_h + ui.u(t.pad) + bh, 0.0);
-    ui.panel(outer);
-    ui.text_in(R::new(inner.x, inner.y, inner.w, text_h), &crate::widgets::theme::caps(&w.text), t.display_size, Align::Centre, t.title, Weight::Bold);
-    let r = R::new(inner.x + (inner.w - bw) * 0.5, inner.bottom() - bh, bw, bh);
-    if b != 0 {
-        super::panels::game_text_button(ui, r, b, &w.cont, &[]);
-    }
+    ui.overlay(move |ui| {
+        let t = ui.theme;
+        let screen = ui.screen();
+        ui.draw.rect(screen, crate::gfx::fade(t.scrim, 0.5));
+        ui.claim(screen);
+        let (bw, bh) = (ui.u(240.0), ui.u(t.button_h));
+        let text_h = ui.u(t.display_size) * 1.4;
+        let (outer, inner) = super::panels::fit(ui, Anchor::Centre, ui.u(420.0), text_h + ui.u(t.pad) + bh, 0.0);
+        ui.panel(outer);
+        ui.text_in(R::new(inner.x, inner.y, inner.w, text_h), &crate::widgets::theme::caps(&w.text), t.display_size, Align::Centre, t.title, Weight::Bold);
+        let r = R::new(inner.x + (inner.w - bw) * 0.5, inner.bottom() - bh, bw, bh);
+        if b != 0 {
+            super::panels::game_text_button(ui, r, b, &w.cont, &[]);
+        }
+    });
 }

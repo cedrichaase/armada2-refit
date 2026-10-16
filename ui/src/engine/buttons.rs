@@ -59,7 +59,17 @@ pub fn label(b: usize) -> String {
     if b == 0 {
         return String::new();
     }
-    clean(&latin1(b + BTN_LABEL, 64))
+    let l = clean(&latin1(b + BTN_LABEL, 64));
+    // Some panels give the GUI config's key (`GUI_POP_PAUSE_CONTINUE`) and let the
+    // stock label localise it when it draws.
+    if l.starts_with("GUI_") {
+        let mut key = alloc::vec::Vec::from(l.as_bytes());
+        key.push(0);
+        if let Ok(k) = core::ffi::CStr::from_bytes_with_nul(&key) {
+            return localize(k);
+        }
+    }
+    l
 }
 
 /// The press function (`+0x5c`), to name a button by what it does.
@@ -112,6 +122,8 @@ const SITE_PRESSES: usize = 0x483869;
 const RESET_VISIBILITY: usize = 0x4cfac0;
 
 static mut QUEUE: [usize; 4] = [0; 4];
+/// Run at each pass too, before the presses (`set_each_pass`).
+static mut EACH_PASS: Option<fn()> = None;
 static mut QUEUED_AT: f64 = 0.0;
 static mut HOOKED: bool = false;
 
@@ -124,6 +136,12 @@ pub fn install_presses() -> bool {
     }
     unsafe { HOOKED = ok };
     ok
+}
+
+/// Something a panel must do at each simulate pass (the objectives' keys,
+/// `popups::objectives_keys`).
+pub fn set_each_pass(f: fn()) {
+    unsafe { EACH_PASS = Some(f) };
 }
 
 /// Presses `b` at the next simulate pass (`press`, there). A press not taken within
@@ -149,6 +167,9 @@ pub fn queue(b: usize) {
 unsafe extern "C" fn presses() {
     let f: unsafe extern "C" fn() = unsafe { core::mem::transmute(RESET_VISIBILITY) };
     unsafe { f() };
+    if let Some(each) = unsafe { EACH_PASS } {
+        each();
+    }
     let q = unsafe { &mut QUEUE };
     if q[0] == 0 {
         return;

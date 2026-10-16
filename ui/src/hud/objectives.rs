@@ -2,16 +2,14 @@
 //! objectives"): while the stock `ObjectivesDisplay` shows, a window over a dimmed
 //! screen with the mission's title, the briefing's summary, and the objectives, each
 //! with a check box ticked when the mission has marked it complete
-//! (`SetObjectiveComplete`). OK (or Enter, or Esc) presses the stock box's OK, which
-//! hides it; the game's objectives key and button show it again (the stock box's
-//! hidden step and `ButtonPanel::ShowObjectives`, both untouched).
+//! (`SetObjectiveComplete`). OK presses the stock box's OK, which hides it; the keys
+//! that close it are the stock box's own, run by `popups::objectives_keys`, and the
+//! game's objectives key and button show it again (the stock box's hidden step and
+//! `ButtonPanel::ShowObjectives`, both untouched).
 use crate::engine::popups;
 use crate::gfx::{Weight, R};
-use crate::widgets::{theme, Align, Ui};
+use crate::widgets::{theme, Ui};
 use alloc::string::String;
-
-const VK_RETURN: u8 = 0x0d;
-const VK_ESCAPE: u8 = 0x1b;
 
 static mut LOGGED: bool = false;
 
@@ -32,6 +30,10 @@ pub fn run(ui: &mut Ui) {
             LOGGED = true;
         }
     }
+    ui.overlay(move |ui| draw(ui, o));
+}
+
+fn draw(ui: &mut Ui, o: popups::Objectives) {
     let t = ui.theme;
     let w_units = 900.0;
     let pad = ui.u(t.pad);
@@ -52,32 +54,28 @@ pub fn run(ui: &mut Ui) {
     let bh = ui.u(t.button_h);
     let content = head_h + brief_h + pad + head_h + lines_h + pad + bh;
     let h_units = (content / ui.scale + t.title_size + 6.0 * t.pad + 40.0).min(1000.0);
-    let title = if o.title.is_empty() { String::from(" ") } else { o.title.clone() };
-    ui.modal(&title, w_units, h_units, move |ui, inner| {
-        let t = ui.theme;
-        let x = inner.x + pad * 0.5;
-        let w = inner.w - pad;
-        let mut y = inner.y;
-        theme::heading(ui, R::new(x, y, w, head_h), &o.summary_header);
-        y += head_h;
-        ui.draw.text_wrapped(&o.briefing, px, w, x, y, t.text, Weight::Regular);
-        y += brief_h + pad;
-        theme::heading(ui, R::new(x, y, w, head_h), &o.header);
-        y += head_h;
-        for (i, (l, done)) in o.lines.iter().enumerate() {
-            let h = line_hs.get(i).copied().unwrap_or(box_w);
-            let b = R::new(x, y + (ui.u(t.text_size) * 1.25 - box_w) * 0.5, box_w, box_w);
-            theme::check(ui, b, *done, theme::State::fixed(0.0, false, *done, false));
-            let col = if *done { t.text_dim } else { t.text };
-            ui.draw.text_wrapped(l, px, w - box_w - pad, x + box_w + pad, y, col, Weight::Regular);
-            y += h + ui.u(t.gap);
-        }
-        let bw = ui.u(180.0);
-        let r = R::new(inner.right() - bw, inner.bottom() - bh, bw, bh);
-        if o.ok != 0 {
-            super::panels::game_text_button(ui, r, o.ok, "OK", &[VK_RETURN, VK_ESCAPE]);
-        } else {
-            ui.text_in(r, "?", t.small_size, Align::Right, t.text_dim, Weight::Regular);
-        }
-    });
+    let title = if o.title.is_empty() { " " } else { o.title.as_str() };
+    let inner = super::panels::boxed(ui, title, w_units, h_units, 1.0);
+    let x = inner.x + pad * 0.5;
+    let w = inner.w - pad;
+    let mut y = inner.y;
+    theme::heading(ui, R::new(x, y, w, head_h), &o.summary_header);
+    y += head_h;
+    ui.draw.text_wrapped(&o.briefing, px, w, x, y, t.text, Weight::Regular);
+    y += brief_h + pad;
+    theme::heading(ui, R::new(x, y, w, head_h), &o.header);
+    y += head_h;
+    for (i, (l, done)) in o.lines.iter().enumerate() {
+        let h = line_hs.get(i).copied().unwrap_or(box_w);
+        let b = R::new(x, y + (ui.u(t.text_size) * 1.25 - box_w) * 0.5, box_w, box_w);
+        theme::check(ui, b, *done, theme::State::fixed(0.0, false, *done, false));
+        let col = if *done { t.text_dim } else { t.text };
+        ui.draw.text_wrapped(l, px, w - box_w - pad, x + box_w + pad, y, col, Weight::Regular);
+        y += h + ui.u(t.gap);
+    }
+    let bw = ui.u(180.0);
+    let r = R::new(inner.right() - bw, inner.bottom() - bh, bw, bh);
+    if o.ok != 0 {
+        super::panels::game_text_button(ui, r, o.ok, "OK", &[]);
+    }
 }

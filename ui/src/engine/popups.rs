@@ -57,8 +57,8 @@ pub fn message() -> Option<Message> {
 /// it, and again in `PostLoad` from `s_lastFilename`.
 pub const OBJECTIVES: usize = 0x7648a8;
 const OBJ_SUMMARY_HEADER: usize = 0x28;
-const OBJ_BRIEFING: usize = 0x2c;
-const OBJ_TITLE: usize = 0x30;
+const OBJ_BRIEFING: usize = 0x30;
+const OBJ_TITLE: usize = 0x2c;
 const OBJ_HEADER: usize = 0x34;
 const OBJ_LINES: usize = 0x3c;
 const OBJ_DONE: usize = 0x5c;
@@ -102,6 +102,28 @@ pub fn objectives() -> Objectives {
 
 pub fn objectives_shown() -> bool {
     !super::hud::hidden(OBJECTIVES)
+}
+
+/// `ObjectivesDisplay::FocusSimulate`: unless a video plays, simulates its OK and
+/// background, and hides the box when either of two of the game's commands is set
+/// (`s_completeCount+4`, `+8`: pointers to command flags its `PostLoad` takes; the
+/// tutorial's "press Enter" is one). Stock runs it only while the box owns the mouse,
+/// which, the box covering the screen, is whenever it shows; with the box ours it
+/// never owns the mouse, so `objectives_keys` runs it at each simulate pass while it
+/// shows, and the keys close it as in stock, by the engine's own bindings.
+const OBJ_FOCUS_SIMULATE: usize = 0x50d280;
+const VT_FOCUS_SIMULATE: usize = 0x44;
+
+pub fn objectives_keys() {
+    if !objectives_shown() {
+        return;
+    }
+    let vt = field(OBJECTIVES, 0);
+    if field(vt, VT_FOCUS_SIMULATE) != OBJ_FOCUS_SIMULATE {
+        return;
+    }
+    let f: unsafe extern "thiscall" fn(usize, f32) = unsafe { core::mem::transmute(OBJ_FOCUS_SIMULATE) };
+    unsafe { f(OBJECTIVES, 0.0) };
 }
 
 // ---- the pause box --------------------------------------------------------------------
@@ -160,5 +182,7 @@ pub fn replay_button(i: usize) -> usize {
 }
 
 pub fn functions_stock() -> bool {
-    super::starts(IS_GAME_PAUSED, &[0xa0, 0xd9, 0x7b, 0x73, 0x00]) && buttons::functions_stock()
+    super::starts(IS_GAME_PAUSED, &[0xa0, 0xd9, 0x7b, 0x73, 0x00])
+        && super::starts(OBJ_FOCUS_SIMULATE, &[0x56, 0x8b, 0xf1, 0xb9])
+        && buttons::functions_stock()
 }
