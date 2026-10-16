@@ -11,11 +11,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   recipe in `skies/`, and `Fine=` (the draw-time detail) defaults to `0` (off); the keys
   remain. `GradeGain=`/`GradeCurve=` refitted to the stock faces without them, three
   passes of `perf/sky-grade.py` (0.89-0.92 of stock's luminance; `mbgrg` 0.55, Aqua
-  ungraded, as before).
+  ungraded, as before) (712a09a).
 
 ### Fixed
 - `perf/sky-grade.py`: `mbgblue` is no longer fitted again on top of the `mbg02` grade
-  it is given (it wrote gains of 18-19).
+  it is given (it wrote gains of 18-19) (712a09a).
 
 Installed, not yet seen in game.
 

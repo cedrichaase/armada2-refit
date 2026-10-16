@@ -11,10 +11,10 @@ Layers: render3d 0.2.1, testbench 3.18.0.
 
 ### Changed
 - The procedural skies lose their grain, dust and draw-time fine detail, and their
-  grades are refitted to stock without them (render3d 0.2.1).
+  grades are refitted to stock without them (render3d 0.2.1; 712a09a).
 
 ### Added
-- Bench scene `sky`: the sky alone (testbench 3.18.0).
+- Bench scene `sky`: the sky alone (testbench 3.18.0; 712a09a).
 
 Installed, not yet seen in game.
 

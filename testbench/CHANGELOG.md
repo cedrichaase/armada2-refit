@@ -9,7 +9,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 ### Added
 - Scene `sky` (`SCENE=sky`): no objects, the free camera at the middle of the map
-  looking out, for judging the skies on their own.
+  looking out, for judging the skies on their own (712a09a).
 
 Installed, not yet seen in game.
 
