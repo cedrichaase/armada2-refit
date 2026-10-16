@@ -46,7 +46,7 @@ pub struct Config {
     pub loading_hold: f32,
 }
 
-/// `[HUD]` in UI.ini: which stock panels ours replace. Every panel is off by default,
+/// `[HUD]` in UI.ini: which stock panels ours replace. Every panel is on by default,
 /// and `Enable=0` leaves the whole HUD stock whatever the panel keys say.
 #[derive(Clone, Debug, Default)]
 pub struct Hud {
@@ -67,8 +67,10 @@ pub struct Hud {
     /// while the pointer is on one of them).
     pub selection: bool,
     pub selection_gauges: bool,
-    /// Our frame around the unit view (`CinematicView`), which the engine still draws.
+    /// The unit view (`CinematicView`) placed by us, in our frame; the engine still
+    /// draws the view. Its side in units.
     pub unit_view: bool,
+    pub unit_view_size: f32,
     /// The panels of hud-panels (HUD.md): the resources, the top-right buttons, the
     /// message and objectives boxes, the pause box, the replay controls, the overlay
     /// messages, the chat lines and the text entry.
@@ -87,7 +89,7 @@ pub fn load() -> Config {
         enable: ini.int("UI", "Enable", 1) != 0,
         log: ini.int("UI", "Log", 1) != 0,
         scale: ini.float("UI", "Scale", 1.0).clamp(0.25, 4.0),
-        cursor: ini.int("UI", "Cursor", 0) != 0,
+        cursor: ini.int("UI", "Cursor", 1) != 0,
         cursor_size: ini.float("UI", "CursorSize", 32.0).clamp(16.0, 128.0),
         theme: ini.string("UI", "Theme").filter(|s| {
             let l = rt::lower(s.trim());
@@ -99,30 +101,31 @@ pub fn load() -> Config {
         demo_style: ini.int("Demo", "Style", 0) != 0,
         hud: Hud {
             enable: ini.int("HUD", "Enable", 1) != 0,
-            bar: ini.int("HUD", "Bar", 0) != 0,
+            bar: ini.int("HUD", "Bar", 1) != 0,
             bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
             bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
-            info: ini.int("HUD", "Info", 0) != 0,
-            minimap: ini.int("HUD", "Minimap", 0) != 0,
+            info: ini.int("HUD", "Info", 1) != 0,
+            minimap: ini.int("HUD", "Minimap", 1) != 0,
             minimap_size: ini.float("HUD", "MinimapSize", 300.0).clamp(120.0, 900.0),
-            selection: ini.int("HUD", "Selection", 0) != 0,
+            selection: ini.int("HUD", "Selection", 1) != 0,
             selection_gauges: ini.int("HUD", "SelectionGauges", 1) != 0,
-            unit_view: ini.int("HUD", "UnitView", 0) != 0,
-            resources: ini.int("HUD", "Resources", 0) != 0,
-            buttons: ini.int("HUD", "Buttons", 0) != 0,
-            messages: ini.int("HUD", "Messages", 0) != 0,
-            pause: ini.int("HUD", "Pause", 0) != 0,
-            replay: ini.int("HUD", "Replay", 0) != 0,
-            overlay: ini.int("HUD", "Overlay", 0) != 0,
-            chat: ini.int("HUD", "Chat", 0) != 0,
+            unit_view: ini.int("HUD", "UnitView", 1) != 0,
+            unit_view_size: ini.float("HUD", "UnitViewSize", 260.0).clamp(120.0, 600.0),
+            resources: ini.int("HUD", "Resources", 1) != 0,
+            buttons: ini.int("HUD", "Buttons", 1) != 0,
+            messages: ini.int("HUD", "Messages", 1) != 0,
+            pause: ini.int("HUD", "Pause", 1) != 0,
+            replay: ini.int("HUD", "Replay", 1) != 0,
+            overlay: ini.int("HUD", "Overlay", 1) != 0,
+            chat: ini.int("HUD", "Chat", 1) != 0,
         },
-        menus: ini.int("Menus", "Enable", 0) != 0,
+        menus: ini.int("Menus", "Enable", 1) != 0,
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",
         menus_specs: ini.int("Menus", "Specs", 1) != 0,
         menus_escape: ini.int("Menus", "EscapeReturns", 1) != 0,
         menus_trace: ini.int("Menus", "Trace", 0) != 0,
         menus_host: ini.int("Menus", "Host", 1) != 0,
-        loading: ini.int("Loading", "Enable", 0) != 0,
+        loading: ini.int("Loading", "Enable", 1) != 0,
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),
     }
 }

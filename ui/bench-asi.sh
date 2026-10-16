@@ -3,18 +3,21 @@
 #
 #   ui/bench-asi.sh <session state.json> [--demo mission,shell,loading] [--menus] [Section.Key=Value ...]
 #
-# UI.asi is not in ./install yet (README.md), so this is how the bench gets it, as
-# online/bench-asi.sh does for Online.asi. A scenario's `Setup:` line can run it.
+# How the bench gets a working copy's UI.asi with keys of its own, as
+# online/bench-asi.sh does for Online.asi. A scenario's `Setup:` line can run it. As
+# ui/install.sh does, it then takes out of the clone the plugins the UI's parts switched
+# on take the place of (supersede.sh: HUD.asi, GridLayout.asi, Menus.asi), which a
+# clone of an older install still has.
 #
 #   --demo LIST   switches on the [Demo] overlay for each context named
-#   --no-grid     takes GridLayout.asi out of the clone (UI.asi's bar stands down
-#                 while it is loaded; an --install of ./install puts it in)
+#   --no-grid     takes GridLayout.asi out of the clone (supersede.sh does too, with
+#                 [HUD] Bar on)
 #   S.K=V         any other UI.ini key, e.g. UI.Scale=1.5 or HUD.Bar=1
 #   --scene NAME  also puts Scene.asi and testbench/scene/scenes/NAME.ini into the clone
 #                 (testbench/scene/bench-setup.sh), for a scenario that needs both
-#   --menus       the UI hosts the shell's menus ([Menus] Enable=1, ui/MENUS.md), and
-#                 Menus.asi is taken out of the clone: the two must not both host them
-#                 (UI.asi stands down while it is loaded)
+#   --menus       the UI hosts the shell's menus ([Menus] Enable=1, the default since
+#                 every part is on), and Menus.asi is taken out of the clone: the two
+#                 must not both host them (UI.asi stands down while it is loaded)
 #   --dplay       first puts Microsoft's DirectPlay and Online.asi into the clone
 #                 (online/reference-dplay.sh), for a multiplayer scenario with the
 #                 UI's menus: a scenario's Setup: line runs one script
@@ -82,6 +85,7 @@ open(path, "w").write("\r\n".join(out) + "\r\n")
 PY
 done
 echo "UI.asi -> $work/game/ ${sets[*]:-}"
+A2_GAME="$work/game" bash "$here/supersede.sh"
 if [ -n "$scene" ]; then
     bash "$here/../testbench/scene/bench-setup.sh" "$state" "$scene"
 fi
