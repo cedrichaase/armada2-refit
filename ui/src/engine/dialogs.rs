@@ -61,7 +61,7 @@ const SCREENS: &[(usize, &str)] = &[
     (0x5d6d80, "mission select"),
     (0x5d48c0, "load game"),
     (0x5d9320, "save game"),
-    (0x5cddb0, "in-mission menu"),
+    (0x5cddb0, "options"),
     (0x5cf930, "game settings"),
     (0x5d1540, "graphics settings"),
     (0x5dce60, "sound settings"),
@@ -1097,9 +1097,8 @@ fn pump(top: HWND) -> Option<i32> {
             if (key || mouse) && in_hosted(m.hwnd) {
                 if key {
                     crate::input::note_message(m.message, m.wparam);
-                    if m.message == WM_KEYDOWN {
-                        TranslateMessage(&m);
-                    }
+                    // IsDialogMessageA translates the key itself: a TranslateMessage here
+                    // too typed every character twice.
                     if !escape(&m, top, cfg.menus_escape) {
                         IsDialogMessageA(top, &mut m);
                     }
@@ -1124,6 +1123,9 @@ fn pump(top: HWND) -> Option<i32> {
                 }
                 continue;
             }
+            if escape(&m, top, cfg.menus_escape) {
+                continue;
+            }
             if m.message == WM_SYSKEYDOWN && (m.wparam == 0x09 || m.wparam == 0x1b) && rd::<u8>(shell::PROGRAM) == 0 {
                 continue;
             }
@@ -1138,7 +1140,10 @@ fn pump(top: HWND) -> Option<i32> {
 /// procedure (the same sound, result and EndDialog as the mouse; menus/README.md,
 /// "Esc"). True when it was that.
 fn escape(m: &Msg, top: HWND, on: bool) -> bool {
-    if !on || m.message != WM_KEYDOWN || m.wparam as u8 != VK_ESCAPE || m.lparam & (1 << 30) != 0 {
+    // With no window holding the focus, keys come as WM_SYSKEYDOWN; Esc without Alt
+    // (lParam bit 29) is still Esc.
+    let down = m.message == WM_KEYDOWN || (m.message == WM_SYSKEYDOWN && m.lparam & (1 << 29) == 0);
+    if !on || !down || m.wparam as u8 != VK_ESCAPE || m.lparam & (1 << 30) != 0 {
         return false;
     }
     let Some(s) = slot_of(top) else { return false };
@@ -1155,6 +1160,13 @@ fn escape(m: &Msg, top: HWND, on: bool) -> bool {
 fn run_modal(h: HWND) -> isize {
     let game = crate::input::window();
     shell::arrow_cursor(game, true);
+    // Wine leaves the focus nowhere after some menus (menus/README.md, "Keyboard
+    // focus"); then keys arrive as system keys and the dialog never sees Enter or Esc.
+    unsafe {
+        if GetFocus().is_null() && !game.is_null() {
+            SetFocus(game);
+        }
+    }
     let mut freq = 0i64;
     unsafe { QueryPerformanceFrequency(&mut freq) };
     let period = (freq / 60).max(1);

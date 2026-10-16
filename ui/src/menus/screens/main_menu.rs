@@ -70,10 +70,19 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
             s.click(dx, dy);
         }
     }
+    // Off the column, the faded stock screen still works as itself: the pointer goes
+    // to the dialog (its own hover pictures, and a click on an emblem), so the stock
+    // screen's targets keep working (the bench's `ui.json` points, its Exit panel).
+    let column = R::new(x, libm::roundf((screen.h - total) * 0.5), bw, total);
+    let over_column = ui.input.mouse.is_some_and(|p| column.contains(p));
+    if s.top && !over_column {
+        unsafe { HOVER = (s.slot.hwnd, -2) };
+        crate::menus::generic::forward_input(ui, s);
+    }
     // The stock screen hears of the hover, so its own hover sound and picture play.
     unsafe {
         let h = s.slot.hwnd;
-        if s.top && HOVER != (h, hover) {
+        if s.top && over_column && HOVER != (h, hover) {
             HOVER = (h, hover);
             let (x, y) = if hover >= 0 {
                 let e = ENTRIES[hover as usize];

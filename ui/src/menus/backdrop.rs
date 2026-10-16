@@ -12,6 +12,11 @@ static mut SHOT: Option<(Tex, u32, u32)> = None;
 static mut ACTIVE: bool = false;
 /// The texture is kept for the next time: a mission's menus open many times.
 static mut POOL: Option<(Tex, u32, u32)> = None;
+/// The last picture, and when the dialogs over it ended: an in-mission menu that hands
+/// over to another (Options to Load Game goes through the shell's loop between them)
+/// keeps the same picture, as no mission frame comes in between.
+static mut LAST: Option<(Tex, u32, u32)> = None;
+static mut ENDED: f64 = 0.0;
 
 /// `IDirect3DDevice9::GetFrontBufferData` (d3d8to9 is behind the game's device).
 const DEV9_GET_FRONT_BUFFER_DATA: usize = 33;
@@ -23,6 +28,11 @@ pub fn begin() {
         SHOT = None;
     }
     if !crate::engine::ingame::recent() {
+        unsafe {
+            if crate::rt::now() - ENDED < 1.5 {
+                SHOT = LAST;
+            }
+        }
         return;
     }
     let Some(dev) = Device::from_d3d8(crate::engine::d3d8_device()) else { return };
@@ -54,6 +64,8 @@ pub fn begin() {
 pub fn end() {
     unsafe {
         ACTIVE = false;
+        LAST = SHOT;
+        ENDED = crate::rt::now();
         SHOT = None;
     }
 }
