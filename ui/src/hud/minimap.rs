@@ -30,11 +30,13 @@ struct Layer {
     /// What the mask was built from last: the cells' visibility, packed.
     last: Vec<u32>,
     teams: u32,
+    /// Whether the first cells seen have been logged.
+    told: bool,
 }
 
 impl Layer {
     const fn new() -> Layer {
-        Layer { tex: None, w: 0, h: 0, last: Vec::new(), teams: 0 }
+        Layer { tex: None, w: 0, h: 0, last: Vec::new(), teams: 0, told: false }
     }
 }
 
@@ -92,7 +94,7 @@ fn colour3(c: [f32; 3], a: f32) -> Color {
 
 /// Rebuilds a layer's mask when what the player sees of it changed: a white texel,
 /// opaque where the cell is hidden, clear where it is seen.
-fn update_layer(l: &mut Layer, g: &radar::Grid, teams: u32) {
+fn update_layer(l: &mut Layer, name: &str, g: &radar::Grid, teams: u32) {
     if l.tex.is_none() || l.w != g.w || l.h != g.h {
         l.tex = Some(crate::gfx::texture_dynamic_argb(g.w as u32, g.h as u32));
         l.w = g.w;
@@ -109,6 +111,13 @@ fn update_layer(l: &mut Layer, g: &radar::Grid, teams: u32) {
     }
     if bits == l.last && teams == l.teams {
         return;
+    }
+    let seen: u32 = bits.iter().map(|b| b.count_ones()).sum();
+    if !l.told && seen > 0 {
+        // Once: what the scenarios check the clearing by (the base's is a few percent
+        // of a big map's cells, as stock's minimap shows it).
+        crate::log!("minimap: {} {} of {} cells clear for teams {:#x}", name, seen, n, teams);
+        l.told = true;
     }
     let mut px = alloc::vec![0u8; n * 4];
     for i in 0..n {
@@ -220,7 +229,7 @@ pub fn run(ui: &mut Ui) {
     let teams = radar::teams_visible();
     if fog_on {
         if let Some(g) = radar::fog_grid() {
-            update_layer(&mut s.fog, &g, teams);
+            update_layer(&mut s.fog, "fog", &g, teams);
             if let Some(tex) = s.fog.tex {
                 ui.draw.image(tex, grid_rect(sq, &g), fade(SHROUD, 0.6));
             }
@@ -228,7 +237,7 @@ pub fn run(ui: &mut Ui) {
     }
     if shroud_on {
         if let Some(g) = radar::shroud_grid() {
-            update_layer(&mut s.shroud, &g, teams);
+            update_layer(&mut s.shroud, "shroud", &g, teams);
             if let Some(tex) = s.shroud.tex {
                 ui.draw.image(tex, grid_rect(sq, &g), SHROUD);
             }

@@ -74,11 +74,13 @@ pub fn begin() {
 }
 
 fn kicker(map: &str, single: bool, ia: bool) -> String {
-    if !single {
-        return String::from("Multiplayer");
-    }
+    // Instant Action's transport answers false to `IsSinglePlayer` (it is set up as a
+    // game of slots, like a network one), so it is asked first.
     if ia {
         return String::from("Instant Action");
+    }
+    if !single {
+        return String::from("Multiplayer");
     }
     let m = crate::rt::lower(map);
     let campaign = [("a2_fed", "Federation campaign"), ("a2_kling", "Klingon campaign"), ("a2_borg", "Borg campaign"), ("a2_tutorial", "Tutorial")]

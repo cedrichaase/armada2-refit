@@ -68,7 +68,8 @@ fn demo(ctx: Context, ui: &mut Ui) {
         Context::Loading => "Loading",
         Context::Menus => "Menus",
     };
-    ui.label(s.row(row), &crate::sfmt!("Context: {}   {}x{}", name, ui.w as u32, ui.h as u32));
+    ui.label(s.row(row), &crate::sfmt!("Context: {}", name));
+    ui.note(s.row(row), &crate::sfmt!("Back buffer {}x{}", ui.w as u32, ui.h as u32));
     let m = match ui.input.mouse {
         Some((x, y)) => crate::sfmt!("Pointer {:.0}, {:.0}{}", x, y, if ui.input.down[0] { "  (held)" } else { "" }),
         None => crate::sfmt!("Pointer outside the window"),

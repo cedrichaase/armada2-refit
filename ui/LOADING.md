@@ -58,7 +58,7 @@ getters on `g_transport`'s (`0x76b8d4`) `GameSetup` (`Transport::getGameSetup`,
 | `GameSetup::getMapTitle` (`0x546240`) | the title, when the mission has no objectives text |
 | `getLocalSlot` (`0x547470`), `getRace` (`0x546650`), `getTeam` (`0x546610`), `isVacant` (`0x546af0`), `isGamePlayer` (`0x546b90`), `getPlayerName` (`0x5466e0`) | the players panel; `getPlayerName` answers a `std::string` through a pointer it is given, made and freed with the game's own runtime (`engine/msvc.rs`, `with_string`) |
 | `GameSetup::RaceRandom` (`0x547cd0`), `Race::FindInstantActionSlot` (`0x48b180`) | a slot's race index to a race (its name at `+0x14`); the "random" index stands for no race yet |
-| `Transport` virtuals `IsInstantAction` (`+0x10`), `IsSinglePlayer` (`+0x18`) | the kicker (Instant Action, a campaign, Multiplayer) |
+| `Transport` virtuals `IsInstantAction` (`+0x10`), `IsSinglePlayer` (`+0x18`) | the kicker (Instant Action, a campaign, Multiplayer); Instant Action's transport (`TransportLocalInstantAction`) answers false to `IsSinglePlayer`, as a network one does, so `IsInstantAction` is asked first |
 | `ShowLoadPercentages` (`+0x40`), `GetLoadPercentage(slot)` (`+0x44`), `IsSendWorthy(slot)` (`+0x5c`) | each network player's progress, as the stock `LoadPercentageBox` asks for it (HUD.md); the transport keeps the fraction each player last reported |
 
 **The player's race** is decided as `DisplayInterface::PostLoadAll` decides the HUD's
