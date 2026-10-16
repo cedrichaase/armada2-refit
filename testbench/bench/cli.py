@@ -353,7 +353,11 @@ def cmd_session(argv):
         ap.add_argument('--label', default='interactive')
         ap.add_argument('--install', action='append', default=[], metavar='PATH')
         ap.add_argument('--stock-shell', choices=['embed'], default=None)
+        ap.add_argument('--assets', choices=['none'], default=None,
+                        help='none: install into the clone from an empty A2_DATA (no textures, plates, movies)')
         a = ap.parse_args(rest)
+        if a.assets and a.mod != 'refit':
+            ap.error('--assets none goes with --mod refit')
         if a.stock_shell and a.mod != 'stock':
             ap.error('--stock-shell goes with --mod stock')
         if a.install and a.mod == 'stock':
@@ -362,7 +366,8 @@ def cmd_session(argv):
         sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
         s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
-                           label=a.label, installs=a.install, stock_shell=a.stock_shell)
+                           label=a.label, installs=a.install, stock_shell=a.stock_shell,
+                           assets=a.assets)
         # A start that fails part-way (an install, the display, a launch the audio
         # guard stops) is torn down here like any session. Left alone it kept its sway,
         # input and VNC running and stayed "active" in `session list` with no game.

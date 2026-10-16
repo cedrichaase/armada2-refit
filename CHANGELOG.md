@@ -5,21 +5,60 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 12.1.0 — 2026-10-16
+## 12.4.0 — 2026-10-16
 
-Layers: render3d 0.3.0.
+Layers: render3d 0.4.0.
 
 ### Changed
 - render3d ray-marches the nebulae's gas at full size; `[Nebulae]` `Steps=`,
   `Denoise=` and `Footprint=` added, `Resolution=` and `EdgeRefine=` removed
-  (render3d 0.3.0).
+  (render3d 0.4.0; d367dca).
 - render3d adds the marched gas up over frames, which takes out its grain;
-  `[Nebulae]` `Temporal=`, `TemporalClip=` and `Jitter=` added (render3d 0.3.0).
+  `[Nebulae]` `Temporal=`, `TemporalClip=` and `Jitter=` added (render3d 0.4.0;
+  9a54a5f, 65b182b, a9da7c5, 0e2f6ed).
 
 ### Fixed
-- render3d's marched gas no longer slides as the RTS camera pans (render3d 0.3.0).
+- render3d's marched gas no longer slides as the RTS camera pans (render3d 0.4.0; 316df23).
 
 Installed, not yet seen in game.
+
+## 12.3.0 — 2026-10-16
+
+Layers: render3d 0.3.0.
+
+### Changed
+- The procedural skies are fitted to their stock skies' shape (clump size, edges,
+  tones) by measurement, and graded to stock again, Aqua and `mbgrg` included; new
+  recipe key `Octaves=` and tool `render3d/perf/sky-shape.py` (render3d 0.3.0; a40a752).
+
+Installed, not yet seen in game.
+
+## 12.2.0 — 2026-10-16
+
+Layers: render3d 0.2.1, testbench 3.19.0.
+
+### Changed
+- The procedural skies lose their grain, dust and draw-time fine detail, and their
+  grades are refitted to stock without them (render3d 0.2.1; 712a09a).
+
+### Added
+- Bench scene `sky`: the sky alone (testbench 3.19.0; 712a09a).
+
+Installed, not yet seen in game.
+
+## 12.1.0 — 2026-10-16
+
+Layers: films 1.0.0, testbench 3.18.0.
+
+### Added
+- `films/` and `./a2film`: films written as storyboards (shots, camera, layout,
+  transitions, titles, music), probed on the test bench at 1280x720 four games at once,
+  filmed at 4K, and cut into a rough cut and an edit manifest for an editor (films
+  1.0.0). The `film` skill holds the procedure. Installs nothing.
+- `a2test session start --assets none`, the game as a release installs it (testbench
+  3.18.0).
+
+Tooling only; nothing to see in game.
 
 ## 12.0.0 — 2026-10-15
 

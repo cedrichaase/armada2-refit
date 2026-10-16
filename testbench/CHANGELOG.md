@@ -5,6 +5,23 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.19.0 — 2026-10-16
+
+### Added
+- Scene `sky` (`SCENE=sky`): no objects, the free camera at the middle of the map
+  looking out, for judging the skies on their own (712a09a).
+
+Installed, not yet seen in game.
+
+## 3.18.0 — 2026-10-16
+
+### Added
+- `a2test session start --assets none`: the clone is installed from an empty `A2_DATA`
+  (no textures, menu plates or movies), as a scenario's `Assets: none` already could;
+  the game as a release installs it. Used by `films/promo`.
+
+Installs nothing into the game. Confirmed in game 2026-10-16.
+
 ## 3.17.0 — 2026-10-15
 
 ### Added
@@ -48,7 +65,6 @@ Installed, not yet seen in game.
   with `hud on`, the action camera's inset, checked in `Render3D.log`.
 - `Render3D.log` and `Render3D.ini` are cleared at launch and gathered with the other
   logs.
-
 
 Installed, not yet seen in game.
 
