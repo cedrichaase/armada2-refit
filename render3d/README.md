@@ -781,7 +781,9 @@ are `SelectionEffect::Render`'s (0x599e80): relation to the player's team on a c
 times `0.25 + 0.2 (1 - health) sin(phase)`; on anything else the team colour times
 0.25; a second shell at 1.1 times the scale in the team colour (full under the pointer,
 else times 0.25), all times `UserProfile+0x48`; a co-player's selection blinks on wall
-time. The material `selection` is constant: the colour is added as it is, depth-tested,
+time. While the engine's `RenderSelectionEffects` has been made to return at once
+(its first byte `ret`: UI.asi's `[HUD] SelectionBubbles=0`), none is drawn, as the
+engine would draw none. The material `selection` is constant: the colour is added as it is, depth-tested,
 not written, front faces only (on the bench stock's bubble adds one layer of its
 colour, not two). Seen on the bench: own ships grey with the team shell, an enemy
 Klingon violet with a red shell, the hover shell on a cube in its team colour, each
@@ -1158,6 +1160,14 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
+
+**On screen.** Every object the module draws in the engine's place (planets, moons,
+asteroid fields, nebulae) gets the byte `Entity::Render` (0x4cfda0) writes as the
+engine draws it: `+0x25`, set when the instance's frustum test (its vtable slot 3)
+passes, cleared for every object each frame by `Entity::ResetVisibility`. The
+pointer's pick (`DisplayInterface::s_PrecomputeMouseOver`) passes over any object with
+it clear: without it a planet could be selected only with a drag box and a colony ship
+could not be right-clicked onto it (the hulls module writes it too).
 
 **Surfaces** (`surfaces.rs`, `world_surface.hlsl`): `Surfaces.asi`'s bake, unchanged,
 into three cubes per recipe (albedo, relief, clouds) that are render targets in the

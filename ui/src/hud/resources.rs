@@ -1,7 +1,7 @@
 //! The resources, ours (`[HUD] Resources=1`; HUD.md, "The resources"): a strip at the
-//! top of the screen with one cell per resource the player's race has, in the stock
-//! panel's order (crew, officers, dilithium, latinum, metal, biomatter, those the
-//! race's GUI config keeps), each its name, its amount as stock writes it (officers
+//! top of the screen with one cell per resource the player's race has (those the
+//! race's GUI config keeps), in the order `ORDER` gives (the materials first, then the
+//! people), each its name, its amount as stock writes it (officers
 //! as "have/most"), a mark in the stock panel's colour for it, and the game's tooltip.
 use crate::engine::topbar;
 use crate::gfx::{fade, Corners, Weight, R};
@@ -43,8 +43,13 @@ fn names(now: f64, shown: &[(u32, usize)]) -> &'static [(usize, String, String)]
     &n.names
 }
 
+/// The cells' order, by `eResource`: dilithium, metal, latinum, biomatter, crew,
+/// officers (stock's panel goes by `eResource`: crew first).
+const ORDER: [u32; 6] = [2, 4, 3, 5, 0, 1];
+
 pub fn run(ui: &mut Ui) {
-    let shown = topbar::shown();
+    let mut shown = topbar::shown();
+    shown.sort_by_key(|&(r, _)| ORDER.iter().position(|&o| o == r).unwrap_or(6));
     if shown.is_empty() || crate::engine::hud::hidden(topbar::RESOURCE_PANEL) {
         return;
     }

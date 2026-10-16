@@ -632,7 +632,7 @@ shell theme and act only by clicking stock controls.
   (a row was picked: stock copies its name in). Enter in it is the Save button. The model
   has no "details" of a save (stock's list shows none), so there are none to draw.
 - **`admirals_log.rs`.** A window with our tab strip, the players down the left (the
-  owner-drawn buttons' text, "name", line break, "team"), the page, and Save to text / Done.
+  owner-drawn buttons' text, "name", line break, "team"), the page, and Done (stock's Save to text is not offered).
   A click on a tab, player or button is a click on the stock owner-drawn window. Which tab
   shows is the visible pane among the eight (the panes are listed in the tabs' order
   backwards), the last clicked when it cannot be told. **Score** is drawn from the pane's

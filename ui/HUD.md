@@ -82,7 +82,7 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 | `LoadPercentageBox` (`loadPercentageBox`) | multiplayer load progress of the other players | the transport | none | box and text | done: `engine::comm`, `hud/comm.rs` (after the load; the loading screen covers the load itself) |
 | `EditMenu` (`g_editMenu`) | the map editor's menu; hidden in a game | — | — | — | not taken |
 | `cOverViewImp` (`g_pOverView`) — the 3D view itself | selection boxes, the order cursor | the selection, the pointer's target | everything not on a panel: the owner of last resort | — | not a panel: stays the engine's |
-| `CursorInterface` (`iCursor`) | the cursor shape and the tooltips (`DoTooltip`, `mDrawTooltip`) | the owner's cursor and `Tooltip` | owns the decision of who owns the mouse | the device's cursor; tooltip boxes in the HUD font | the cursor is PLAN.md's "not decided yet"; tooltips are ours per panel (the bar's are) |
+| `CursorInterface` (`iCursor`) | the cursor shape and the tooltips (`DoTooltip`, `mDrawTooltip`) | the owner's cursor and `Tooltip` | owns the decision of who owns the mouse | the device's cursor; tooltip boxes in the HUD font | the cursor is ours (README.md, "The cursor"); tooltips are ours per panel, and the engine's at the pointer are drawn by us (`Tooltips`: "The tooltips at the pointer") |
 | `ScreenFade` (`g_screenFade`) | fades to and from black | scripts | none | a full-screen quad | not taken (not in a game's list) |
 | chat lines, text entry (not components) | chat, and the line being typed | `ChatDisplay`, `TextInput_*` | the keyboard while typing | the HUD font | done: `engine::chat`, `hud/chat.rs` (drawn by us, the keys the engine's) |
 
@@ -528,9 +528,9 @@ ours scales to the back buffer per axis. Stock's `Render` points `currentCamera`
 what was there. So the brackets sit where the engine's gauges sit, by the engine's own
 projection, whatever renders the scene; UI.asi does not depend on render3d.
 
-**Ours** draws, for every selected unit and the pointed one: four corner brackets in
-the theme's accent (an ally `good`, an enemy `bad`, neutral `warn`; lighter when
-pointed at), at least 26 units across; above them the hull gauge (`good` above 60%,
+**Ours** draws, for every selected unit and the pointed one: four thin corner
+brackets (1.5 units, 2 when pointed at) in the theme's accent (an ally `good`, an
+enemy `bad`, neutral `warn`; lighter when pointed at), at least 26 units across; above them the hull gauge (`good` above 60%,
 `warn` above 30%, else `bad`), then the shields and the special energy as thinner
 gauges; the group number in a small box at the left; and for the pointed unit its
 class's name (`GetClassDisplayName`, vtable `+0x70`; `+0x48`, which `mDrawLabel` would
@@ -539,6 +539,15 @@ print, is the object's script label, "bconst1051", not for the player). With
 shows them as stock does. A unit whose middle is under a stock panel still drawn, or
 under our minimap, is left out, and the overlay draws before our other panels, so
 they cover it.
+
+**The 3D bubbles.** With the brackets marking the selection, the engine's selection
+ellipsoids (`RenderSelectionEffects`, 0x599900: an additive `select.sod` about each
+selected unit and the one under the pointer) were the same mark twice, and the user
+found them superfluous. `[HUD] SelectionBubbles=0` (the default) puts a `ret` in that
+function's first byte (cdecl, checked to be stock): the scene draws none. render3d
+draws them in that function's place from the same hash, so it follows the engine: no
+bubbles while the function's first byte is `ret` (render3d/README.md,
+`Step::Selection`). The effects themselves (the hash, the damage pulse) are untouched.
 
 ## The unit view
 
@@ -558,7 +567,8 @@ left, top, right, bottom offsets), convert it to the screen with
 `DisplayInterface::ConvertRectangle` and give it to the view's camera as its
 viewport (put back after); the still picture is drawn at the corner plus
 `cinematicBackgroundArea` (`+0x38`); `CursorOver` tests the pointer against `+0x04`.
-Stock reads them once, in `PostLoad` (`cinematicPanelArea` 350 x 384 at the bottom
+The frame is square in every theme: with LCARS's rounded corners it cut into the
+square picture's corners. Stock reads them once, in `PostLoad` (`cinematicPanelArea` 350 x 384 at the bottom
 right, both areas 320 x 320 at 25, 19 inside it), so on the stock canvas at 16:9 the
 view is stretched and its camera's viewport with it. `engine::unitview::place` writes
 all three each frame from our place: `+0x04` the square in canvas units (whole units
@@ -596,6 +606,37 @@ the minimap showed own blips green, the enemy red, and the tactical view's ring.
 judged steps passed in earlier runs; the last runs (after the fog colour change)
 passed every logged step, their judged steps left for review (the judge was
 unavailable). `UnitView=1` was never seen drawing: the unit view stayed hidden.
+
+## The tooltips at the pointer
+
+`hud/tooltips.rs` over `engine/hud.rs`, with `[HUD] Tooltips=1`. Stock's tooltip for
+the mouse's owner (in play the 3D view: `SelectionDisplay::AlwaysSimulate` hands the
+object `DisplayInterface::TooltipOn` names to `CursorInterface::DoTooltip` while the
+overview owns the mouse) is a `std::stringstream` that `DoTooltip` makes afresh at
+`iCursor+0x34` (short, after `s_tooltipDelay`) and `+0x38` (verbose, after
+`s_verboseTooltipDelay`), each only while `m_tooltipState` (0x764484, which the help
+button cycles) allows it. `CursorInterface::Render` draws the verbose one while the
+state is 0, else the short one, with `mDrawTooltip` at the pointer, 550 units wide on
+the 1600 x 1200 canvas, so stretched on a wide screen. The panel switch already calls
+that `Render` (`render_component`): with `Tooltips=1` it reads the stream's text there
+(`str()` through the game's `msvcp60.dll`, `engine::msvc::stream_text`), empties both
+fields for the call so the stock `Render` draws only the cursor, and puts them back,
+so `DoTooltip` still owns and frees the streams. Ours draws the text in the theme's
+tooltip below and right of the pointer. On the bench the tooltips are off until the
+help button is cycled once (the bench's profile).
+
+## The cursor over a box of ours
+
+The objectives box stays the mouse's owner while it shows (above), but its stock
+`Render`, which names the owner's cursor in `iCursor+0x2c`, is skipped, so at a
+mission's opening briefing the device got no cursor and ours none either (seen in a
+player's `UI.log`: "cursor None" under the Klingon campaign's first briefing; the O.K.
+could be clicked but not aimed at). Before `CursorInterface` renders, the panel switch
+names the owner's own cursor (`+0x24`, `standard_cursor` for the box), else the bar's
+arrow, whenever the owner is a component we have taken (as it already did with no
+owner over a panel of ours). And while a box of ours that pauses the game shows, ours
+draws the arrow whenever the engine names no cursor. The cursor is drawn after the
+overlay layer, where the boxes are.
 
 ## The engine API
 
@@ -655,7 +696,8 @@ and every panel checks each button's press function (`+0x5c`) is the one its
 `ResourcePanel::PostLoad` makes one `ResourceComponent` per `eResource` (0 crew, 1
 officers, 2 dilithium, 3 latinum, 4 metal, 5 biomatter, `g_eResourceToString`) at
 `+0x2c + 4 * r`, unless the race's GUI config sets `no<Name>`: so the panel's non-NULL
-slots are the race's resources, and ours shows those, in that order.
+slots are the race's resources, and ours shows those, in the order the user asked
+for: dilithium, metal, latinum, biomatter, then crew and officers.
 `ResourceComponent::Render` writes the amount into its text each frame (and draws it
 there): `Team::GetResource(r)` truncated, 0 while the team's `+0x16c` is clear, and for
 officers the team's `+0x160` over `Team::GetMaxOfficers()` ("12/30"); ours writes the

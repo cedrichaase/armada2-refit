@@ -6,7 +6,7 @@
 //! aspect) and draws the chrome around it, just outside, so nothing of the picture is
 //! covered; the stock frame is left out.
 use crate::engine::{hud, overlay, unitview};
-use crate::gfx::{fade, R};
+use crate::gfx::{fade, Corners, R};
 use crate::widgets::Ui;
 
 /// Where the view goes: a square of `[HUD] UnitViewSize` units at the bottom right,
@@ -54,9 +54,10 @@ pub fn run(ui: &mut Ui) {
     let e = ui.u(t.edge).max(1.0);
     let g = ui.u(3.0);
     let outer = r.inset(-g - e);
-    let corners = t.small.scaled(ui.scale);
-    ui.draw.stroke(outer, corners, g + e, fade(t.panel, 0.95));
-    ui.draw.stroke(outer, corners, e, t.panel_edge);
+    // Square, whatever the theme's corners: the picture is square, and a rounded
+    // frame (the LCARS theme's) cut into its corners.
+    ui.draw.stroke(outer, Corners::SQUARE, g + e, fade(t.panel, 0.95));
+    ui.draw.stroke(outer, Corners::SQUARE, e, t.panel_edge);
     // The form's accent at two opposite corners.
     let (len, w) = (ui.u(18.0), ui.u(2.5).max(1.0));
     for (x, y, sx, sy) in [(outer.x, outer.y, 1.0, 1.0), (outer.right(), outer.bottom(), -1.0, -1.0)] {

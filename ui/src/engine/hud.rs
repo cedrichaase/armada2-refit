@@ -205,12 +205,25 @@ pub fn set_pointer_over_ui(on: bool) {
 
 unsafe extern "thiscall" fn render_component(c: usize) {
     unsafe {
-        if c == CURSOR && OVER_UI && rd::<usize>(CURSOR_OWNER) == 0 && rd::<usize>(CURSOR_SPRITE) == 0 {
-            // No owner, so no cursor: show the bar's arrow, as a stock panel would.
-            let arrow = field(palette(), DI_CURSOR);
-            if arrow != 0 {
-                *(CURSOR_SPRITE as *mut usize) = arrow;
+        if c == CURSOR && rd::<usize>(CURSOR_SPRITE) == 0 {
+            // No cursor named this frame: no owner (the pointer is over a panel of
+            // ours), or an owner we have taken, whose stock `Render`, which names it,
+            // is skipped (the objectives box, which stays the owner while it shows: at
+            // a mission's start nothing else showed a cursor). Show the owner's own
+            // cursor, else the bar's arrow, as a stock panel would.
+            let owner = rd::<usize>(CURSOR_OWNER);
+            if (owner == 0 && OVER_UI) || taken(owner) {
+                let mut sprite = field(owner, DI_CURSOR);
+                if sprite == 0 {
+                    sprite = field(palette(), DI_CURSOR);
+                }
+                if sprite != 0 {
+                    *(CURSOR_SPRITE as *mut usize) = sprite;
+                }
             }
+        }
+        if c == CURSOR && TOOLTIPS {
+            return render_cursor_without_tooltip(c);
         }
         if taken(c) {
             return;
@@ -220,6 +233,52 @@ unsafe extern "thiscall" fn render_component(c: usize) {
         }
         let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_RENDER));
         f(c)
+    }
+}
+
+// ---- the tooltips at the pointer ---------------------------------------------------
+
+/// `iCursor+0x34`, `+0x38`: the short and the verbose tooltip, each a
+/// `std::stringstream *` that `CursorInterface::DoTooltip` makes afresh for the
+/// owner's tooltip once it has waited `s_tooltipDelay` / `s_verboseTooltipDelay`, NULL
+/// when there is none. `CursorInterface::Render` draws the verbose one while
+/// `m_tooltipState` is 0, else the short one, with `mDrawTooltip` at the pointer, 550
+/// units wide on the 1600 x 1200 canvas (stretched on a wide screen), and the verbose
+/// one's framing (`mDrawFramingElement`).
+const CURSOR_TIP: usize = CURSOR + 0x34;
+const CURSOR_TIP_VERBOSE: usize = CURSOR + 0x38;
+/// `CursorInterface::m_tooltipState` (the help button cycles it 0..2).
+const TOOLTIP_STATE: usize = 0x764484;
+
+static mut TOOLTIPS: bool = false;
+static mut TIP: Option<alloc::string::String> = None;
+
+/// Takes the engine's tooltips at the pointer (`[HUD] Tooltips=1`): each frame their
+/// text is read for `tooltip()`, and the stock `Render` draws the cursor without them.
+pub fn take_tooltips(on: bool) {
+    unsafe { TOOLTIPS = on };
+}
+
+/// This frame's tooltip at the pointer, as the engine would have drawn it; taken once.
+#[allow(static_mut_refs)]
+pub fn tooltip() -> Option<alloc::string::String> {
+    unsafe { TIP.take() }
+}
+
+/// `CursorInterface::Render` with its tooltips read and hidden from it: both fields are
+/// emptied for the call and put back, so `DoTooltip` still owns and frees the streams.
+#[allow(static_mut_refs)]
+unsafe fn render_cursor_without_tooltip(c: usize) {
+    unsafe {
+        let (short, verbose) = (rd::<usize>(CURSOR_TIP), rd::<usize>(CURSOR_TIP_VERBOSE));
+        let ss = if verbose != 0 && rd::<u32>(TOOLTIP_STATE) == 0 { verbose } else { short };
+        TIP = if ss != 0 && !OVER_UI { super::msvc::stream_text(ss) } else { None };
+        *(CURSOR_TIP as *mut usize) = 0;
+        *(CURSOR_TIP_VERBOSE as *mut usize) = 0;
+        let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(rd::<usize>(rd::<usize>(c) + VT_RENDER));
+        f(c);
+        *(CURSOR_TIP as *mut usize) = short;
+        *(CURSOR_TIP_VERBOSE as *mut usize) = verbose;
     }
 }
 

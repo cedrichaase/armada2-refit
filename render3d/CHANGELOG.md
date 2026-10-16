@@ -4,6 +4,17 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.7.1 — 2026-10-16
+
+### Fixed
+- Planets, moons, asteroid fields and nebulae drawn by the world module are marked on
+  screen (the byte `Entity::Render` writes), so the pointer picks them again: a planet
+  could not be clicked, nor a colony ship right-clicked onto it, only drag-selected.
+- The selection bubbles are not drawn while the engine's `RenderSelectionEffects` has
+  been made to return at once (UI.asi's `[HUD] SelectionBubbles=0`).
+
+Installed, not yet seen in game.
+
 ## 0.7.0 — 2026-10-16
 
 ### Added

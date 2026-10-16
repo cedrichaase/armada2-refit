@@ -1,6 +1,6 @@
 //! The selection overlay, ours (`[HUD] Selection=1`; HUD.md, "The selection overlay"):
 //! what `SelectionDisplay` marks over the units in the 3D view, drawn by us at the
-//! screen's resolution: corner brackets around each selected unit and the one under
+//! screen's resolution: thin corner brackets around each selected unit and the one under
 //! the pointer, its hull, shield and special-energy gauges, its group number, and the
 //! pointed unit's name. Where each unit is on screen is the engine's own answer
 //! (`engine::overlay`, `ComputeContainerRect`), so the brackets sit where stock's
@@ -103,8 +103,8 @@ pub fn run(ui: &mut Ui, keep_out: &[R]) {
 /// Four corner brackets around `r`.
 fn brackets(ui: &mut Ui, r: R, col: u32, strong: bool) {
     let len = (r.w.min(r.h) * 0.28).clamp(ui.u(6.0), ui.u(20.0));
-    let w = ui.u(if strong { 2.5 } else { 2.0 }).max(1.0);
-    let shadow = fade(0xff000000, 0.55);
+    let w = ui.u(if strong { 2.0 } else { 1.5 }).max(1.0);
+    let shadow = fade(0xff000000, 0.45);
     for (x, y, sx, sy) in [(r.x, r.y, 1.0, 1.0), (r.right(), r.y, -1.0, 1.0), (r.x, r.bottom(), 1.0, -1.0), (r.right(), r.bottom(), -1.0, -1.0)] {
         let hx = if sx > 0.0 { x } else { x - len };
         let vy = if sy > 0.0 { y } else { y - len };

@@ -72,6 +72,9 @@ pub struct Hud {
     /// while the pointer is on one of them).
     pub selection: bool,
     pub selection_gauges: bool,
+    /// The engine's 3D selection bubbles (the ellipsoid about each selected unit);
+    /// off by default while the overlay's brackets mark the selection.
+    pub selection_bubbles: bool,
     /// The unit view (`CinematicView`) placed by us, in our frame; the engine still
     /// draws the view. Its side in units.
     pub unit_view: bool,
@@ -91,6 +94,9 @@ pub struct Hud {
     pub comm: bool,
     pub drop_player: bool,
     pub load_wait: bool,
+    /// The tooltips the engine shows at the pointer (`CursorInterface`: an object's
+    /// name and description over the 3D view), drawn by us in the theme.
+    pub tooltips: bool,
 }
 
 pub fn load() -> Config {
@@ -121,6 +127,7 @@ pub fn load() -> Config {
             minimap_size: ini.float("HUD", "MinimapSize", 300.0).clamp(120.0, 900.0),
             selection: ini.int("HUD", "Selection", 1) != 0,
             selection_gauges: ini.int("HUD", "SelectionGauges", 1) != 0,
+            selection_bubbles: ini.int("HUD", "SelectionBubbles", 0) != 0,
             unit_view: ini.int("HUD", "UnitView", 1) != 0,
             unit_view_size: ini.float("HUD", "UnitViewSize", 260.0).clamp(120.0, 600.0),
             resources: ini.int("HUD", "Resources", 1) != 0,
@@ -133,6 +140,7 @@ pub fn load() -> Config {
             comm: ini.int("HUD", "Comm", 1) != 0,
             drop_player: ini.int("HUD", "DropPlayer", 1) != 0,
             load_wait: ini.int("HUD", "LoadWait", 1) != 0,
+            tooltips: ini.int("HUD", "Tooltips", 1) != 0,
         },
         menus: ini.int("Menus", "Enable", 1) != 0,
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",

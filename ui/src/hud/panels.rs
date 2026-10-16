@@ -67,12 +67,22 @@ pub fn install(c: &Hud) {
 }
 
 /// A mission's frame: every panel of these that is on.
+static mut BOX_SHOWN: bool = false;
+
+/// Whether a box of ours that pauses the game (message, objectives, pause) showed in
+/// the last frame: it wants the pointer, so the cursor shows over it even when the
+/// engine names none (`cursor::draw`).
+pub fn box_shown() -> bool {
+    unsafe { BOX_SHOWN }
+}
+
 pub fn run(ui: &mut Ui) {
     let Some(o) = on() else { return };
     let hud_hidden = engine::ingame::hud_hidden();
     // A box that pauses the game covers everything: nothing under it takes the mouse
     // (its own widgets are drawn in the overlay layer, above the occluder).
     let blocking = (o.messages && (popups::message().is_some() || popups::objectives_shown())) || (o.pause && popups::pause_shown());
+    unsafe { BOX_SHOWN = blocking };
     if blocking {
         let screen = ui.screen();
         ui.claim(screen);

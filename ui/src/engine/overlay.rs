@@ -27,7 +27,7 @@
 //! the hull `+0x158` (a fraction, shown while the maximum `+0x160` is above 0.1),
 //! shields `Craft+0x1c8` of `+0x1cc`, special energy `+0x164` (a fraction, shown while
 //! `+0x168` is above 0.1).
-use super::{field, rd};
+use super::{field, hook, rd};
 use alloc::vec::Vec;
 
 pub const SELECTION_DISPLAY: usize = 0x7645b0;
@@ -184,4 +184,22 @@ pub fn name(obj: usize) -> &'static str {
 pub fn functions_stock() -> bool {
     super::starts(CONTAINER_RECT, &[0x55, 0x8b, 0xec, 0x83, 0xec, 0x74, 0x53, 0x8b, 0x5d, 0x08])
         && super::starts(RT_DYNAMIC_CAST, &[0xff, 0x25])
+}
+
+// ---- the selection bubbles ----------------------------------------------------------
+
+/// `RenderSelectionEffects` (cdecl, the camera): the 3D selection bubbles, an additive
+/// ellipsoid about each selected unit and the one under the pointer, drawn from
+/// `SelectionEffect::sm_EffectHash` by the scene each frame (render3d draws them in its
+/// place from the same hash: render3d/README.md, `Step::Selection`). Its stock start,
+/// `push ebp; mov ebp,esp; mov eax,[Storm3D]`.
+const RENDER_SELECTION: usize = 0x599900;
+const RENDER_SELECTION_STOCK: [u8; 8] = [0x55, 0x8b, 0xec, 0xa1, 0x08, 0xd5, 0x7a, 0x00];
+
+/// Switches the bubbles off (`[HUD] SelectionBubbles=0`): the function returns at
+/// once (`ret` in its first byte). render3d sees the `ret` and draws none either. The
+/// effects themselves (the hash, their pulse) are left as they are: nothing the sim
+/// reads is changed.
+pub fn hide_bubbles() -> bool {
+    hook::patch_bytes(RENDER_SELECTION, &RENDER_SELECTION_STOCK, &[0xc3])
 }

@@ -58,6 +58,21 @@ pub fn with_stringstream(f: impl FnOnce(usize)) -> Option<String> {
     }
 }
 
+/// What an existing `std::stringstream` holds (one the engine made), or None when it
+/// is empty.
+///
+/// # Safety
+/// `ss` is a live `basic_stringstream` made by the game's `msvcp60.dll`.
+pub unsafe fn stream_text(ss: usize) -> Option<String> {
+    if ss == 0 {
+        return None;
+    }
+    let str_: unsafe extern "thiscall" fn(usize, usize) -> usize = unsafe { core::mem::transmute(rd::<usize>(IMP_SS_STR)) };
+    with_string(|sp| unsafe {
+        str_(ss, sp);
+    })
+}
+
 /// Runs `f` with an empty `std::string` (all zero, as its default constructor leaves
 /// it), returns what `f` left in it, and frees it.
 pub fn with_string(f: impl FnOnce(usize)) -> Option<String> {

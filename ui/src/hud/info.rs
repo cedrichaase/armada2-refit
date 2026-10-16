@@ -296,7 +296,9 @@ fn single(ui: &mut Ui, s: &Single, builder: bool, tip: &mut Tip) -> R {
     let queue = if builder { info::queue(s.obj) } else { [(0, 0); info::QUEUE_LEN] };
     let queue_h = if builder { ui.u(QUEUE_CELL) + gap + ui.u(t.micro_size + 4.0) } else { 0.0 };
     let w = ui.u(W_SINGLE).min(ui.w - ui.u(20.0));
-    let h = pad * 2.0 + top_h + sys_h + queue_h;
+    // The frame's own bars (an LCARS frame's top and bottom) come on top of the padding.
+    let (_, ft, _, fb) = theme::frame_margins(ui);
+    let h = pad * 2.0 + top_h + sys_h + queue_h + ft + fb;
     let outer = place(ui, w, h);
     ui.panel(outer);
     let inner = theme::panel_inner(ui, outer);
@@ -558,8 +560,10 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
     let max_cols = (((ui.w - ui.u(40.0) - 2.0 * pad + gap) / (tw + gap)) as usize).max(1);
     let cols = units.len().min(COLS.max(units.len().div_ceil(4))).min(max_cols).max(1);
     let rows = units.len().div_ceil(cols);
-    let w = cols as f32 * tw + (cols - 1) as f32 * gap + 2.0 * pad;
-    let h = rows as f32 * th + (rows - 1) as f32 * gap + 2.0 * pad;
+    // The tiles sit inside the frame (an LCARS frame's elbows and bars), padded.
+    let (fl, ft, fr, fb) = theme::frame_margins(ui);
+    let w = cols as f32 * tw + (cols - 1) as f32 * gap + 2.0 * pad + fl + fr;
+    let h = rows as f32 * th + (rows - 1) as f32 * gap + 2.0 * pad + ft + fb;
     let outer = place(ui, w.max(ui.u(300.0)), h);
     ui.panel(outer);
     let inner = theme::panel_inner(ui, outer);
@@ -611,11 +615,16 @@ fn hover_card(ui: &mut Ui, obj: usize, panel: Option<R>) {
     if lines.is_empty() && hb.is_none() {
         return;
     }
-    let pad = ui.u(t.pad * 0.75);
-    let w = ui.u(300.0);
+    // The content's size; the card is that plus the frame's own margins (an LCARS
+    // frame's elbows take the left and the top and bottom bars), so no text runs
+    // under the frame.
     let bar_h = ui.u(BAR_H);
     let n_bars = hb.is_some() as usize;
-    let h = pad * 2.0 + lines.iter().map(|l| ui.u(l.1 + 4.0)).sum::<f32>() + n_bars as f32 * (bar_h + ui.u(4.0));
+    let content_h = lines.iter().map(|l| ui.u(l.1 + 4.0)).sum::<f32>() + n_bars as f32 * (bar_h + ui.u(4.0));
+    let probe = R::new(0.0, 0.0, ui.u(300.0), ui.u(300.0));
+    let room = theme::panel_inner(ui, probe);
+    let w = ui.u(300.0);
+    let h = content_h + (probe.h - room.h);
     let (x, y) = match panel {
         // Beside the panel, at its right, when there is room; else above its right end
         // (the bar, when above the panel, sits at its left).
@@ -625,16 +634,17 @@ fn hover_card(ui: &mut Ui, obj: usize, panel: Option<R>) {
     };
     let r = R::new(x.max(ui.u(4.0)), y.max(ui.u(4.0)), w, h);
     theme::panel(ui, r);
-    let mut yy = r.y + pad;
+    let inner = theme::panel_inner(ui, r);
+    let mut yy = inner.y;
     for (s, size, c, wt) in &lines {
-        line(ui, R::new(r.x + pad, yy, r.w - 2.0 * pad, ui.u(size + 4.0)), s, *size, *c, *wt, Align::Left);
+        line(ui, R::new(inner.x, yy, inner.w, ui.u(size + 4.0)), s, *size, *c, *wt, Align::Left);
         yy += ui.u(size + 4.0);
     }
     if let Some(b) = hb {
         let f = b.fraction();
         let left = shield.map_or(String::new(), |s| crate::sfmt!("{}{}", s.label, s.text));
         let right = hull.map_or(crate::sfmt!("{:.0}/{:.0}", b.value, b.max), |h| crate::sfmt!("{}{}", h.label, h.text));
-        bar_with(ui, R::new(r.x + pad, yy, r.w - 2.0 * pad, bar_h), f, hull_colour(ui, f), left.trim(), right.trim());
+        bar_with(ui, R::new(inner.x, yy, inner.w, bar_h), f, hull_colour(ui, f), left.trim(), right.trim());
     }
 }
 
@@ -698,7 +708,7 @@ fn tooltip(ui: &mut Ui, tip: Tip, panel: Option<R>) {
 fn clean(s: &str) -> String {
     let mut o = String::new();
     for c in s.chars() {
-        if c != '^' && c != '\r' {
+        if c != '^' && c != '\r' && c != '\0' {
             o.push(c);
         }
     }

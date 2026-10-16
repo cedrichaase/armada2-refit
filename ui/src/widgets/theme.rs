@@ -651,6 +651,17 @@ pub fn panel_inner(ui: &Ui, r: R) -> R {
     r.inset(ui.u(t.pad))
 }
 
+/// What a panel's frame itself takes at each side, in pixels, before any padding:
+/// (left, top, right, bottom). An LCARS frame's elbows take the left and its bars the
+/// top and bottom; the other forms draw only an edge, which content may sit against.
+pub fn frame_margins(ui: &Ui) -> (f32, f32, f32, f32) {
+    if ui.theme.form == Form::Lcars {
+        let (side, top, bottom) = lcars_bars(ui, None);
+        return (side, top, 0.0, bottom);
+    }
+    (0.0, 0.0, 0.0, 0.0)
+}
+
 /// A panel with a title; returns the room inside, padded. `opened` (0..1, from
 /// `anim::appear`) sweeps the title's underline in and flashes the edge.
 pub fn window(ui: &mut Ui, r: R, title: &str, opened: f32) -> R {

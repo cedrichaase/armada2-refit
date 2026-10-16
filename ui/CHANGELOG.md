@@ -4,6 +4,35 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.6.0 — 2026-10-16
+
+### Added
+- `[HUD] Tooltips` (default 1): the tooltips the engine shows at the pointer (an
+  object's name and description over the 3D view) drawn by us in the theme at the
+  screen's resolution, in place of stock's, stretched on the 1600x1200 canvas.
+- `[HUD] SelectionBubbles` (default 0): with `Selection=1`, the engine's 3D selection
+  ellipsoids are switched off (`RenderSelectionEffects` returns at once; render3d
+  follows), the brackets alone mark the selection.
+
+### Changed
+- The selection brackets are thinner (1.5 units, 2 under the pointer).
+- The resources read dilithium, metal, latinum, biomatter, crew, officers.
+- The unit view's frame is square in every theme (LCARS's rounded one cut into the
+  picture's corners).
+- The Admiral's Log no longer offers Save to text.
+
+### Fixed
+- No cursor over a mission's opening briefing, so its O.K. could not be aimed at: the
+  box of ours stays the mouse's owner and its stock `Render`, which names the cursor,
+  was skipped. The owner's cursor (else the arrow) is named for it, and the arrow
+  shows whenever a box of ours is up and the engine names none.
+- The cursor was drawn under the overlay layer (the boxes, dropdowns, tooltips).
+- Under the LCARS frame the button bar, the info panel (one unit and a group), the
+  hover card and the minimap's filter buttons ran into the frame's elbows and bars:
+  each is laid out inside the frame (`theme::frame_margins`).
+
+Installed, not yet seen in game.
+
 ## 0.5.0 — 2026-10-16
 
 ### Added
