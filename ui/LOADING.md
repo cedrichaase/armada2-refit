@@ -99,4 +99,7 @@ its first word or two (`src/loading.rs`, `doing`).
 
 ## Seen on the bench
 
-Not yet.
+Not yet: the screen builds, and `testbench/scenarios/ui-loading.md` is written, but it has
+not been run (no bench slot came free before the job stopped). The measured facts this
+file refers to (how often frames of ours come, what reading the sky costs) are still to
+be taken from `UI.log`, which logs both.
