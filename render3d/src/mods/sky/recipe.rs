@@ -147,9 +147,9 @@ impl Recipe {
         k[18] = rgb("StarB");
         let gain = nums::<3>(&kv, "GradeGain").unwrap_or([1.0; 3]);
         let curve = nums::<3>(&kv, "GradeCurve").unwrap_or([1.0; 3]);
-        k[19] = [gain[0], gain[1], gain[2], 0.0];
+        k[19] = [gain[0], gain[1], gain[2], one("Octaves", 6.0).clamp(1.0, 6.0)];
         k[20] = [curve[0].max(0.2), curve[1].max(0.2), curve[2].max(0.2), 0.0];
-        let fine = nums::<3>(&kv, "Fine").unwrap_or([0.1, 0.3, 0.55]);
+        let fine = nums::<3>(&kv, "Fine").unwrap_or([0.0, 0.3, 0.55]);
         let size = fine[1].max(0.01);
         k[21] = [fine[0], FINE_FEATURE / (size * DEG), fine[2], 0.5 * fine[0] * fine[0]];
         Recipe { name: String::from(base), k, text, source }

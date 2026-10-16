@@ -5,25 +5,101 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 12.2.0 — 2026-10-15
+## 12.8.0 — 2026-10-16
 
-Layers: render3d 0.4.0, testbench 3.17.1.
+Layers: render3d 0.6.0, testbench 3.19.1.
 
 ### Changed
 - Tractor and assimilation beams as a translucent cone; shield hits with mist, Klingon
-  rays and light on the struck hull (render3d 0.4.0).
+  rays and light on the struck hull (render3d 0.6.0; 85c80d1, 424abef, 7cb274a, 8336f62).
 
 Installed, not yet seen in game.
 
-## 12.1.0 — 2026-10-15
+## 12.7.0 — 2026-10-16
+
+Layers: render3d 0.5.0.
+
+### Changed
+- Cloaking: wave-swayed transition, a drifting shimmer while cloaked, and the player's
+  own cloaked ships at 10% hull (render3d 0.5.0; 7941b19).
+
+Installed, not yet seen in game.
+
+## 12.6.0 — 2026-10-16
+
+Layers: films 1.2.0.
+
+### Added
+- The `films/origin` board: an Akira class, the Metreon nebula and the assimilation
+  beam, for the origin video (films 1.2.0; 522f9b7).
+
+Tooling only; nothing to see in game.
+
+## 12.5.0 — 2026-10-16
+
+Layers: films 1.1.0.
+
+### Changed
+- `a2film` re-films a take once the code it shows has changed since its commit, not
+  only when its spec changes, and says why a take is stale; `--ignore-code` keeps such
+  takes (films 1.1.0; 3937489).
+
+Tooling only; nothing to see in game.
+
+## 12.4.0 — 2026-10-16
+
+Layers: render3d 0.4.0.
+
+### Changed
+- render3d ray-marches the nebulae's gas at full size; `[Nebulae]` `Steps=`,
+  `Denoise=` and `Footprint=` added, `Resolution=` and `EdgeRefine=` removed
+  (render3d 0.4.0; d367dca).
+- render3d adds the marched gas up over frames, which takes out its grain;
+  `[Nebulae]` `Temporal=`, `TemporalClip=` and `Jitter=` added (render3d 0.4.0;
+  9a54a5f, 65b182b, a9da7c5, 0e2f6ed).
+
+### Fixed
+- render3d's marched gas no longer slides as the RTS camera pans (render3d 0.4.0; 316df23).
+
+Installed, not yet seen in game.
+
+## 12.3.0 — 2026-10-16
 
 Layers: render3d 0.3.0.
 
 ### Changed
-- Cloaking: wave-swayed transition, a drifting shimmer while cloaked, and the player's
-  own cloaked ships at 10% hull (render3d 0.3.0).
+- The procedural skies are fitted to their stock skies' shape (clump size, edges,
+  tones) by measurement, and graded to stock again, Aqua and `mbgrg` included; new
+  recipe key `Octaves=` and tool `render3d/perf/sky-shape.py` (render3d 0.3.0; a40a752).
 
 Installed, not yet seen in game.
+
+## 12.2.0 — 2026-10-16
+
+Layers: render3d 0.2.1, testbench 3.19.0.
+
+### Changed
+- The procedural skies lose their grain, dust and draw-time fine detail, and their
+  grades are refitted to stock without them (render3d 0.2.1; 712a09a).
+
+### Added
+- Bench scene `sky`: the sky alone (testbench 3.19.0; 712a09a).
+
+Installed, not yet seen in game.
+
+## 12.1.0 — 2026-10-16
+
+Layers: films 1.0.0, testbench 3.18.0.
+
+### Added
+- `films/` and `./a2film`: films written as storyboards (shots, camera, layout,
+  transitions, titles, music), probed on the test bench at 1280x720 four games at once,
+  filmed at 4K, and cut into a rough cut and an edit manifest for an editor (films
+  1.0.0). The `film` skill holds the procedure. Installs nothing.
+- `a2test session start --assets none`, the game as a release installs it (testbench
+  3.18.0).
+
+Tooling only; nothing to see in game.
 
 ## 12.0.0 — 2026-10-15
 

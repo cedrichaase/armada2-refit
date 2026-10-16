@@ -8,7 +8,7 @@ installed: what a module draws today is in `render3d/README.md`, and what change
 
 ## Tractor and assimilation beams (render3d's `ordnance`, `render3d/ordnance.ini`)
 
-The user's direction (2026-10-15), drawn since render3d 0.4.0 (`Kind=cone` in
+The user's direction (2026-10-15), drawn since render3d 0.6.0 (`Kind=cone` in
 `render3d/ordnance.ini`), not yet seen in game: the tractor beams
 (`tracbm`, `tracbmo`), the Borg holding beam (`holdbm`, the Borg tractor) and the
 assimilation beams should not be lasers. The current recipes draw them as ribbons with
@@ -63,7 +63,7 @@ holding beam no ship carries in stock) has no recipe.
 
 ## Shield hits (render3d's `effects`)
 
-The user's direction (2026-10-15), drawn since render3d 0.4.0 (`[Shields]`, `shaders/effects_shields.hlsl`), not yet seen in game. A shield hit
+The user's direction (2026-10-15), drawn since render3d 0.6.0 (`[Shields]`, `shaders/effects_shields.hlsl`), not yet seen in game. A shield hit
 should read as **a misty, glowing dispersal of light over a curved ellipsoid that
 encloses the ship. Only the area around the impact is actually lit up.** Federation
 shields are a pale, light blue; Klingon shields are the same pattern in a strong,
@@ -115,7 +115,7 @@ and the glow that stays near the hit already fit. Not in the references:
 - a rim that brightens where the shell is seen edge on, in place of an edge that just
   ends where the lit mist stops.
 
-Missing from the look before render3d 0.4.0, and added there (`Mist*`, `Edge`, `Ray*`,
+Missing from the look before render3d 0.6.0, and added there (`Mist*`, `Edge`, `Ray*`,
 `HitLight*`; not yet seen in game):
 - the misty, uneven texture, and the soft curved edge at the shell's silhouette;
 - the rays fanning out from the impact, on Klingon shields;
@@ -127,7 +127,7 @@ The next pass should settle whether the ring and the rim stay.
 ## Cloaking (render3d's `hulls`, the `Cloak*` keys in `Render3D.ini`)
 
 The user's direction (2026-10-15). In `ps_cloak` and `vs_hull` (`shaders/hulls.hlsl`)
-since render3d 0.3.0, not yet seen in game; the keys are in `render3d/README.md`. The
+since render3d 0.5.0, not yet seen in game; the keys are in `render3d/README.md`. The
 cloak as it is now looks good and stays the base: the hull as glass over a copy of the
 frame, bending what lies behind it. Two things should change: the transition, and how
 much is left of a ship once it is cloaked.
@@ -142,7 +142,7 @@ eating. The ship never changes shape; it is cut away.
 - **The shape moves, not just the shading, but flat, like an image.** Waves run across
   the whole hull and shift its outline a little: the silhouette ripples against the
   stars. The ripple is in the picture, across the screen: the hull must not bend or
-  wobble in depth. Swaying the geometry through its own axes (render3d 0.4.0 as first
+  wobble in depth. Swaying the geometry through its own axes (render3d 0.5.0 as first
   built) read as too three-dimensional, almost comical from the RTS camera (the user,
   2026-10-16).
 - **Waves, not noise.** Broad, regular-looking bands of distortion that travel across
@@ -188,7 +188,7 @@ patch of space that is clearly not quite right.
   (your own, and what your side can see). It must never draw a ship the engine hides
   from the player: render only, as everything in render3d is.
 
-Measured against the look before render3d 0.3.0: the glass, the colour split along the
+Measured against the look before render3d 0.5.0: the glass, the colour split along the
 bend, the rim and glint fit. Missing then, and drawn now:
 - waves large enough to move the silhouette during the transition;
 - the hull dissolving through the waves, in place of the noise threshold;
