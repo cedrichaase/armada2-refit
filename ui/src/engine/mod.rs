@@ -28,6 +28,8 @@ pub mod shell;
 pub mod sound;
 pub mod sprite;
 pub mod topbar;
+// ui-multiplayer: the comm panel, the drop box, the load wait.
+pub mod comm;
 pub mod shellui;
 pub mod radar;
 pub mod shellcombo;

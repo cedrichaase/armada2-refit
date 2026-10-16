@@ -18,6 +18,10 @@
 #   --dplay       first puts Microsoft's DirectPlay and Online.asi into the clone
 #                 (online/reference-dplay.sh), for a multiplayer scenario with the
 #                 UI's menus: a scenario's Setup: line runs one script
+#   --for P S.K=V that key only in the game of the player named P (a scenario's Players:
+#                 name): `--for joiner Loading.Hold=6` holds one game's load only
+#   --online      also online/bench-asi.sh --server: Online.asi's own transport for
+#                 Internet - Online, with a bench a2online-server (after --dplay)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,6 +32,7 @@ nogrid=0
 scene=
 menus=0
 dplay=0
+online=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --demo)
@@ -38,6 +43,11 @@ while [ $# -gt 0 ]; do
         --scene) scene="${2:?--scene needs a name}"; shift 2 ;;
         --menus) menus=1; sets+=("Menus.Enable=1"); shift ;;
         --dplay) dplay=1; shift ;;
+        --online) online=1; shift ;;
+        --for)
+            who="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print((d.get("label") or "").split("/")[-1])' "$state")"
+            [ "$who" = "${2:?--for needs a player}" ] && sets+=("${3:?--for needs S.K=V}")
+            shift 3 ;;
         *=*) sets+=("$1"); shift ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
@@ -46,6 +56,7 @@ work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])
 [ -d "$work/game" ] || { echo "no clone at $work/game" >&2; exit 1; }
 
 [ "$dplay" = 1 ] && bash "$here/../online/reference-dplay.sh" "$state"
+[ "$online" = 1 ] && bash "$here/../online/bench-asi.sh" "$state" --server
 bash "$here/build.sh" >/dev/null
 cp "$here/build/UI.asi" "$here/UI.ini" "$work/game/"
 if [ "$nogrid" = 1 ]; then

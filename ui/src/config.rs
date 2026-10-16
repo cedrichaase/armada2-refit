@@ -79,6 +79,11 @@ pub struct Hud {
     pub replay: bool,
     pub overlay: bool,
     pub chat: bool,
+    /// The multiplayer boxes (HUD.md, "Comms, the drop box and the load wait"): the comm
+    /// panel, the dropped-player box, the wait for the other players' loads.
+    pub comm: bool,
+    pub drop_player: bool,
+    pub load_wait: bool,
 }
 
 pub fn load() -> Config {
@@ -115,6 +120,9 @@ pub fn load() -> Config {
             replay: ini.int("HUD", "Replay", 0) != 0,
             overlay: ini.int("HUD", "Overlay", 0) != 0,
             chat: ini.int("HUD", "Chat", 0) != 0,
+            comm: ini.int("HUD", "Comm", 0) != 0,
+            drop_player: ini.int("HUD", "DropPlayer", 0) != 0,
+            load_wait: ini.int("HUD", "LoadWait", 0) != 0,
         },
         menus: ini.int("Menus", "Enable", 0) != 0,
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",

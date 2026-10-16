@@ -52,7 +52,9 @@ impl Fit {
 /// Each hosted dialog's mirror texture, by window.
 static mut MIRRORS: Vec<(HWND, Tex, u32)> = Vec::new();
 static mut LAST_FIT: Option<Fit> = None;
-static mut LOGGED: Vec<HWND> = Vec::new();
+/// The dialogs whose model was logged, and how many visible controls it had then: a
+/// dialog whose count changes is logged again (the lobby's game rows come and go).
+static mut LOGGED: Vec<(HWND, usize)> = Vec::new();
 
 /// The mirror of `h` (its frame, as `engine::dialogs` composed it), uploaded for this
 /// frame. Textures are reused as dialogs come and go.
@@ -86,7 +88,7 @@ pub fn closed(h: HWND) {
             m.0 = core::ptr::null_mut();
         }
     }
-    unsafe { (*core::ptr::addr_of_mut!(LOGGED)).retain(|&x| x != h) };
+    unsafe { (*core::ptr::addr_of_mut!(LOGGED)).retain(|x| x.0 != h) };
     generic::forget(h);
 }
 
@@ -121,9 +123,17 @@ pub fn frame(ui: &mut Ui) {
         let tex = mirror(s);
         let m = model::read(s);
         let logged = unsafe { &mut *core::ptr::addr_of_mut!(LOGGED) };
-        if !logged.contains(&s.hwnd) {
-            logged.push(s.hwnd);
-            model::log(&m);
+        let shown = m.controls.iter().filter(|c| c.visible).count();
+        match logged.iter_mut().find(|x| x.0 == s.hwnd) {
+            Some(x) if x.1 == shown => {}
+            Some(x) => {
+                x.1 = shown;
+                model::log(&m);
+            }
+            None => {
+                logged.push((s.hwnd, shown));
+                model::log(&m);
+            }
         }
         let scr = Screen { slot: s, model: &m, fit, mirror: tex, top };
         // Only the top dialog takes input: a lower one is drawn inert, or a widget of

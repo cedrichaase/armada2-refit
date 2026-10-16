@@ -282,6 +282,20 @@ Labels therefore come from the game, in its own (localised) strings. `UI.log` li
 dialog's model once, when it first draws (`menus: model of "main menu" ...`): that list
 is where a spec's author finds the controls.
 
+**A text field of ours and the stock edit's focus.** A screen often puts the keyboard
+focus in its stock edit (Multiplayer Connection's name, at `WM_INITDIALOG`), and keys
+for a hosted window then went both to our field (which sends the stock edit what
+changed) and, through `IsDialogMessageA`, to the stock edit itself: every character was
+typed twice ("hosthost"). Under a nested dialog the focus stays in the outer dialog's
+edit, which `IsDialogMessageA(top)` does not dispatch, so nothing was typed at all (the
+Manual IP field). While a field of ours has the keyboard (`menus::wants_keys`), the
+pump now only translates a key for a hosted window, so its `WM_CHAR` comes back for our
+field and no stock control gets it (`engine/dialogs.rs`, `pump`). **Enter in a field of
+ours** is the stock edit's Enter (`Action::Enter`): the edit is given the focus and the
+key goes through `IsDialogMessageA` of its dialog, which makes the default button's
+`IDOK`. Game Setup's procedure sends its chat line on `IDOK` only when `GetFocus()` is
+that edit, which is why the focus is moved first.
+
 **Driving window controls** (`menus::actions`): a click is the control's own mouse
 messages at its client coordinates (as the pointer would send them); typing is
 `WM_CHAR` (and `WM_KEYDOWN` for the arrows, Home, End and Delete) to the edit, which keeps
@@ -407,9 +421,9 @@ the bar's track, a combo choice is below. **Every word is the stock control's ow
   waiting has no title.
 - **Help and licence**: the text is read whole from the stock control that holds it
   (the longest edit, static or label), since the model keeps only 4 KB of a control's
-  text; our scroll area shows it, the stock buttons stand below. **Not reached on the
-  bench**: the help is the Internet lobby's, the licence shows on a first start, net
-  waiting while a game is joined; each returns false (the generic screen draws) when it
+  text; our scroll area shows it, the stock buttons stand below. The help was seen
+  from the Internet lobby (2026-10-16). **Not reached on the bench**: the licence shows
+  on a first start, net waiting while a game is joined; each returns false (the generic screen draws) when it
   does not find the controls it expects.
 
 ## The setup and multiplayer specs
@@ -448,6 +462,15 @@ Instant Action's setup and every multiplayer game's (`do_multiplayerSetup`).
   log (it says "Resources: Lots" when the host changes it, in Instant Action too); a
   single-line edit is the chat line, our field, whose typing goes to the stock edit.
 - In stock the Instant Action "Minimap Hidden" toggle does nothing when clicked.
+- **A multiplayer game's rows** have a fourth combo, the "Armada" column (x 295:
+  Personal, ...), between the side (x 203) and the team (x 375), and a ready light at
+  x 14 (a 10x10 picture, red, green once the player has pressed LAUNCH; under the
+  "Comm" heading). The spec lays four columns out when it finds the Armada combos, and
+  crops each row's light from the mirror. The screen has a second multi-line edit (id
+  2120, x 600, the observers), so the log is the multi-line edit under the table (2093);
+  the chat line (2094) has the chat target toggle ("All", x 315 y 533) beside it, which
+  the spec draws as a button beside our field. The map preview stays black in a
+  multiplayer Game Setup on the bench, in stock too (Warzone).
 
 ### Advanced Options (`advanced_options.rs`)
 
@@ -484,6 +507,51 @@ closes).
   as lists, and the buttons along the bottom. GameSpy is gone, so the account screens
   and the room list are not reached; they are forms so that they work if they are.
 
+### The Internet lobby (`lobby.rs`)
+
+`do_internetGame` (`InternetGameDlgProc`, 0x5b15f0): the screen every network
+connection type comes to before Game Setup, *Internet - Manual IP*, the LAN types and
+*Internet - Online* alike (online/README.md). Its template (0x871) holds three windows:
+the chat log (id 2098, a read-only multi-line edit), the chat line (2097) and the hidden
+combo box behind the game-type filter (2114); the rest is shell widgets the procedure
+makes in `WM_INITDIALOG`, each labelled from `label.map`'s `internet_game` section: the
+title (`internet_title`, `lan_title`, `gamespy_title` by connection), the captions
+"current games", "players in room" and "chat", Create Game and Join Game under the game
+list (design y 258), Help, Previous Menu and Main Menu along the bottom (y 562), the
+game rows (`GameSelectionSlot`s in a `RadioBox`, 537x16 from design 24,72, one per
+game the search has found: `SetDescriptor` writes `name  (players/max)  ping  "map"
+(type)` as the button's label), the players in the room (`PlayerListButton`s at
+x 598; outside GameSpy they hold the stock sentence "Player list is available in
+GameSpy sessions only.", one line per disabled row), the filter (a shell `ComboBox`),
+and three of the shell's `ScrollBar`s, whose arrow buttons are 13x10 picture buttons.
+
+**The rows are not `ShellButton::UpdateButton`'s.** Both `GameSelectionSlot` (vtable
+0x6badcc) and `PlayerListButton` (0x6bae74) draw themselves with an `UpdateButton(HDC)`
+of their own, so the model, which knows a button by that slot, left them out: the lobby
+showed no game though the search had found one (`Online.log`: `ENUM_HOSTS_RESPONSE`).
+`engine/shellui.rs` names the two vtables as buttons; their label is the text the row
+shows. Unused rows are hidden, a row of a game that can be joined is enabled.
+
+The spec finds them by place: the game rows are the labelled buttons left of x 560
+between the caption and the actions, the players those right of it, the actions the
+labelled buttons at y 250..280, the way out those below y 540, each list's arrows the
+picture buttons of its column (the games' at x 568 above y 260, the players' at x 774;
+the chat log's at x 570 below are the log's own and not drawn). Ours: the title, a
+"current games" window (the filter as our drop-down, the rows as our rows, Create Game
+and Join Game under them), the players' window, a chat window across the bottom (the
+log's last lines, the line as our field) and the way out. A click on a row is the stock
+row's click, which selects it (its held state shows as our selection); the arrows click
+the stock arrows. `Online.asi`'s messages ("No game with the join code ...", the "Local
+IP Address" line the game writes itself) are lines of the chat log, so they show there.
+
+**`Online.asi` opens no dialog of its own.** *Internet - Online* runs the Manual IP
+flow: the Manual IP dialog (`do_manual_ip`) with its prompt relabelled ("Join code or
+host address"), then this lobby, then Game Setup, and the server's messages and the
+host's join code go into the lobby's and Game Setup's chat boxes (online/README.md,
+"Showing the join code"). So every screen of the online flow is a stock dialog with a
+spec here (`forms::manual_ip`, `lobby`, `game_setup`); nothing of `Online.asi`'s needs
+to look like ours.
+
 ## The screens
 
 Every shell dialog, by the `do_*` function that opens it. Template is the resource id
@@ -507,7 +575,7 @@ scenario gets there (`testbench/ui.json` has the named targets).
 | `do_mapSelect` | 0x87f | map select | Game Setup's map list | SELECT MAP | a list box | the preview |
 | `do_mapTransfer` | 0x87e | map transfer | sending a map (multiplayer) | not on the bench | progress | — |
 | `do_multiplayerConnection` | 0x872 | multiplayer connection | name and connection type | Multiplayer | the name `Edit` (399x32 @208,171), connection buttons | none |
-| `do_internetGame` | 0x871 | internet game | the lobby | Multiplayer -> a connection | game list, chat `Edit`, player list | the lists' rows |
+| `do_internetGame` | 0x871 | internet game | the lobby | Multiplayer -> a connection | game rows, players, chat `Edit`s, filter `ComboBox` | none (spec: `lobby.rs`) |
 | `do_manual_ip` | 0x887 | manual ip | the IP field | Multiplayer -> Manual IP | an `Edit` | none |
 | `do_roomSelect` | 0x87f | room select | GameSpy rooms | not on the bench (no GameSpy) | list | — |
 | `do_createRoom`, `do_gameName` | 0x873 | create room, game name | a name | Internet lobby -> Create Game | an `Edit` | none |
@@ -632,10 +700,14 @@ hidden surfaces).
 - `ui-menus-setup.md`: Instant Action's Game Setup through its spec: two computer
   players set through the drop-downs, a side, Fixed Placement, Map Select (scrolled,
   Four Sisters chosen), the Advanced panel (Warp off, a slider moved), LAUNCH.
+- `ui-menus-multiplayer.md` (two games, `--dplay`): the connection screen, the host's
+  name typed into our field, Manual IP, the lobby, Create Game and the game's name; the
+  joiner's address typed, the host's game found as a lobby row and joined; a chat line
+  each way from our field; the joiner's side chosen; LAUNCH three times; the match.
 
 ## Not done
 
-- **Specs**: every screen has one except the Internet lobby, the `Shell::Screen::Show`
+- **Specs**: every screen has one except the `Shell::Screen::Show`
   screens (voice options, command-line host and join) and the end-of-mission flow's
   generic messages; those draw with the generic screen. The main menu's and Single
   Player's labels are English (the stock art carries the words, so the spec names its
@@ -644,11 +716,14 @@ hidden surfaces).
   Multiplayer and its lobbies; help, licence and net waiting; room select, GameSpy and
   the command-line screens. Credits is a screen of the engine's own, not a dialog, and
   runs as before.
-- **The multiplayer specs are not verified on the bench.** Multiplayer Connection,
-  Manual IP and the other forms, and Game Setup's chat line, are written from the
-  model read on the bench (Multiplayer Connection) or from the generic `form` pattern,
-  but no two-player run has been made with them (`ui/bench-asi.sh --dplay --menus` is
-  the set-up for one; `ui-menus-multiplayer.md` is still to be written).
+- **The multiplayer screens** were verified with two games (2026-10-16,
+  `ui-menus-multiplayer.md`, and by hand with `--online`: *Internet - Online*'s prompt,
+  the join code in Game Setup's chat): the connection screen, Manual IP, the lobby
+  (Help, the game row, Join and Create), the game's name, Game Setup with two humans
+  (chat both ways, a side chosen, the three LAUNCHes). Not reached: the password dialog
+  of a passworded game, map transfer, the room select and GameSpy screens; the lobby's
+  filter and its arrows with more games than rows. Game Setup shows "Download Maps: Ask"
+  and "Download this Map" both, where stock shows one (both are in the model as shown).
 - **The generic `widgets` screen is verified on the Multiplayer connection screen only**
   (the edit and the buttons, `ui-menus-widgets.md`); its list and drop-down branches
   have no screen on the bench.
