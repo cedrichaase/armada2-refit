@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.6.0 — 2026-10-16
+
+Layers: films 1.2.0.
+
+### Added
+- The `films/origin` board: an Akira class, the Metreon nebula and the assimilation
+  beam, for the origin video (films 1.2.0; 522f9b7).
+
+Tooling only; nothing to see in game.
+
 ## 12.5.0 — 2026-10-16
 
 Layers: films 1.1.0.

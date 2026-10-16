@@ -5,6 +5,16 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.2.0 — 2026-10-16
+
+### Added
+- The board `films/origin` for the origin video's game shots that `films/promo` lacks:
+  an Akira class stock and refit (`ak13`, scene `films/origin/akira.ini`), the Metreon
+  nebula (`mt14`, scene `films/origin/metreon.ini`) and the Borg cube's technology
+  assimilation beam (`as17`) (522f9b7).
+
+Tooling only; nothing to see in game.
+
 ## 1.1.0 — 2026-10-16
 
 ### Changed
