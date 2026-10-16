@@ -62,6 +62,71 @@ When the last goes, `Menus.asi` is superseded.
 Ours in place of `logo.SOD`'s quads and the percentage box: art at any aspect,
 progress, the mission's name and briefing.
 
+## How the takeover works
+
+Decided before steps 2–4 were started, so that every panel and screen is built the
+same way.
+
+### Menus: the stock dialog runs, hidden; we draw it and drive it
+
+Every shell screen is a modal `DialogBoxParamA` whose dialog procedure *is* the
+screen's logic: what it reads, what it writes, which `g_shellMode` it names next, what
+it returns. Rewriting 38 procedures would mean describing each of them. Instead,
+`UI.asi` hosts the stock dialog:
+
+- **The dialog host** (`src/engine/dialogs.rs`) takes `DialogBoxParamA`. It creates the
+  stock template, hidden, as a child of the 3D window, and runs a loop of its own in
+  place of user32's modal one. Each pass pumps the queue (timers and the procedure's
+  own messages still run) and draws a frame through the device, as `run_screen` does.
+  `EndDialog` on a hosted dialog records the result and ends the loop, so the caller
+  gets what the stock dialog returns. Nested dialogs nest the loop.
+- **The control model** (`src/menus/model.rs`) reads the hidden dialog every frame:
+  each child control's id, class, style, design rectangle, text, check state, list
+  items, selection, enabled and visible flags. Labels therefore come from the game's
+  own (localised) strings. Acting on a control sends the dialog what the stock control
+  would: the click a button sends, the text an edit holds, a list's selection
+  change.
+- **A screen** is drawn from that model by `src/menus/`. Every dialog gets the
+  **generic screen**, which draws every control by kind in its design place, scaled to
+  fit. A screen that has been laid out gets a **screen spec**, Rust code that places
+  the same controls, by id, in a layout of our own. A control the model cannot read
+  (owner-drawn art, a preview picture) is mirrored: printed off the hidden window into
+  a texture. So every menu works from the start, and laying out a screen changes only
+  how it looks.
+- **Menus.asi is superseded, not run alongside.** While `UI.asi` hosts the dialogs,
+  `Menus.asi` must not also hook them; the menu part of `UI.asi` stands down if it
+  finds `Menus.asi` loaded, and the install takes `Menus.asi` out when the UI's menus
+  are on. `UI.asi` raises the shell's display mode itself.
+
+### HUD: the stock panels keep running; we draw them and route their input
+
+The HUD is a list of `DisplayInterface` components. Their state (which buttons the
+palette shows, what the info panel describes) is worked out in their simulate step,
+and their pictures and clicks are separate steps.
+
+- **One switch per panel.** For a panel we have replaced, its `Render` and its mouse
+  handling are skipped. The skip is made where `DisplayInterface` walks its components,
+  by one hook for all panels, never in a vtable. The component's simulate step keeps
+  running, so its state stays current.
+- **Our panel reads that state** from the component and from the engine through
+  `src/engine/` (one file per area, step 2). It **acts by calling the component's own
+  functions** (the press function of a palette button, as `GridLayout.asi` does) or the
+  game's commands. It never goes around them.
+- **The layout is ours**: anchored to the screen, at any aspect, in the style of
+  `STYLE.md`. No `gui_*.cfg` rectangle is read, except for what the engine needs to
+  hit-test where we have not taken over.
+- **HUD.asi and GridLayout.asi are superseded panel by panel.** The UI's button bar has
+  the grid keys of its own (`grid/README.md` is the behaviour to match). The UI takes
+  the bar only while `GridLayout.asi` is not loaded. When the UI owns every panel, the
+  install takes `HUD.asi` and `GridLayout.asi` out.
+
+### Art
+
+`STYLE.md` holds the visual language: our own theme, one per race, drawn by our
+renderer, with the game's art (unit portraits, wireframes, icons, the cursor shapes)
+used where it carries information. The style is decided once and every panel and
+screen follows it.
+
 ## What this exposes of Armada2.exe
 
 A UI of our own reads much more of the engine's state than today's plugins patch
