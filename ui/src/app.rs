@@ -19,6 +19,10 @@ pub fn run(ctx: Context, ui: &mut Ui) {
         crate::menus::frame(ui);
         return;
     }
+    if ctx == Context::Shell && crate::credits::active() {
+        crate::credits::run(ui);
+        return;
+    }
     if ctx == Context::Loading && cfg.loading {
         crate::loading::run(ui);
     }

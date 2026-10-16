@@ -83,7 +83,7 @@ pub struct Unit {
     pub special: Option<f32>,
 }
 
-fn cast_craft_class(cls: usize) -> usize {
+pub fn cast_craft_class(cls: usize) -> usize {
     if cls == 0 {
         return 0;
     }

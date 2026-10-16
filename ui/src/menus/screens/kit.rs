@@ -14,7 +14,10 @@ use alloc::vec::Vec;
 /// (the menu plate has the main menu's words baked into it, so it is left to the main
 /// menu). In a mission the dimmed mission is already under it.
 pub fn backdrop(ui: &mut Ui) {
-    if !crate::menus::backdrop::over_mission() {
+    if crate::menus::scene::shown() {
+        let r = ui.screen();
+        theme::backdrop(ui, r);
+    } else if !crate::menus::backdrop::over_mission() {
         let (r, t) = (ui.screen(), ui.theme);
         ui.draw.rect_vgrad(r, t.backdrop_top, t.backdrop_bottom);
     }

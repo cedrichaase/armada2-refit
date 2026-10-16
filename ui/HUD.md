@@ -408,6 +408,19 @@ Shift (a stock Shift-click in the 3D view does not add either).
 height) at the bottom left, in a panel of the theme with the two filter buttons above
 it. The stock `MapRadar` keeps running and is neither drawn nor given the mouse.
 
+**The cursor over it.** A right click on the square orders the selection there with
+`GO_WARP` (0x2b), which a ship that can warp carries out at warp and one that cannot at
+impulse (qol/README.md, QOL-8). Over the square, `cursor::draw` therefore draws the
+game's warp cursor (`c_warp`, the blue target) while one of the player's selected
+ships can warp, and the move cursor (`c_move`, green) while the player's ships
+selected cannot; with none of the player's ships selected the engine's own choice
+stands. A ship can warp as `cCraftControl::TryWarp` asks it: its control
+(`Craft+0x1b0`) has a warp speed (`+0x0c`) above its speed (`+0x08`), and warp is
+allowed by the mission (`g_allowWarp`, 0x6f4de0) and the setup screen
+(`GameSetup::isAllowWarpSpeed`, through `Transport::getGameSetup`):
+`engine::selection::move_cursor`. Construction ships have none (`constphys.odf`'s
+`warpSpeed = 0`). This needs the UI's cursor (`[UI] Cursor=1`).
+
 **The square.** `RadarComponent` places everything in a unit square: the map's box
 (`g_terrain`: x0 y0 z0 x1 y1 z1) centred in a square `+0x5c` world units across, the
 offsets `+0x60` / `+0x64` centring it, v running against z. Its
@@ -731,8 +744,21 @@ objectives (`ShowObjectives`), help (`ToggleHelp`, cycles
 them only then. Their states are `PostLoad`'s: comm is disabled outside a network
 game, objectives when the profile says so, idle in some slot types. Ours: a row of
 square buttons in the top-right corner, each drawing the stock button's own picture
-(`+0x2c`, `engine::sprite`), the game's tooltip, pressing the stock button; help is
-drawn active while the tooltip level is not 0, more while "show more" is set.
+(`+0x2c`, `engine::sprite`), the game's tooltip, pressing the stock button: menu,
+comm, idle unit, view and objectives. A press calls the button's own press function,
+which works whether "show more" is set or not, so the menu button always shows.
+**Help, palette and more are left out**: help only cycles the tooltip level, which a
+player saw do nothing; the palette toggle is Game Settings' "Command Bar" (MENUS.md,
+"The Options family"), and with both gone "more" uncovered only the menu button.
+
+**The bar's shown or hidden state is the player's** (`prefs.rs`, `UIPlayer.ini`'s
+`[HUD] BarHidden`, written by Game Settings): at the first mission frame in which the
+HUD shows (not under an opening cinematic), and at the next one after the setting
+changes, `hud::apply_bar_pref` compares the bar's hidden flag (`PopupPaletteImp+0x16`)
+with it and, when they differ, queues a press of the stock palette button, so the
+bar is hidden exactly as the button hid it (UI.log: `bar: hidden as the player set
+it`). `UIPlayer.ini` is the player's file: no install ships or writes it, so a
+reinstall (which writes `UI.ini`) keeps the choice.
 
 ### Messages and objectives (`MessageDisplay`, `ObjectivesDisplay`)
 

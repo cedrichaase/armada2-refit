@@ -64,6 +64,15 @@ pub fn backdrop(ui: &mut Ui) {
     }
 }
 
+/// The box a full-screen setup screen (the lobby, Game Setup) is laid out in: the
+/// screen, no wider than 16:9 and centred, so the windows do not stretch across a
+/// wider monitor.
+pub fn wide_box(ui: &Ui) -> R {
+    let r = ui.screen();
+    let w = r.w.min(libm::floorf(r.h * 16.0 / 9.0));
+    R::new(libm::floorf(r.x + (r.w - w) * 0.5), r.y, w, r.h)
+}
+
 /// A widget id unique to the control (its object or window), so two controls with the
 /// same label (two "Computer AI" rows) are two widgets.
 fn key(c: &Control, what: &str) -> alloc::string::String {

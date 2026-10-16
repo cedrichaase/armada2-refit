@@ -4,6 +4,40 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.11.0 — 2026-10-17
+
+### Added
+- `[Menus] Credits` (default 1): the Credits are ours: `Credits.txt` page by page over
+  render3d's menu map, the camera touring its views; the four logos square in the
+  corners. Esc returns to the main menu, Space, Enter, the right arrow or a click turn
+  the page, the left arrow goes back (`credits.rs`).
+- Game Settings has a row of ours, "Command Bar" (Shown or Hidden): the button bar's
+  toggle, kept between sessions in `UIPlayer.ini` (`[HUD] BarHidden`, a file of the
+  player's that no install writes) and applied at the start of each mission
+  (`prefs.rs`).
+- Over the minimap the cursor is the warp cursor (`c_warp`) while a selected ship of
+  the player's can warp, the move cursor (`c_move`) while none can.
+- The main menu's Single Player, Instant Action and Multiplayer and the campaign
+  selection's Tutorials and Federation rows, Load Game and Previous Menu play the
+  shell's hover sound, as the stock buttons do (`sound::shell_hover`).
+
+### Changed
+- Every full-screen front-end screen (Options, Instant Action's Game Setup,
+  Multiplayer and its lobby, Load Game, the Admiral's Log from the front end) stands
+  over the menu scene, dimmed, in place of the old main menu's art.
+- The Admiral's Log's Military, Economy, Timeline, Battles, Ships, Build and Tally
+  pages are set from their labels in the theme's type, rows striped, without the frame
+  art; Timeline's graph and the Ships portraits are cropped from the stock page, and
+  our arrows and the wheel scroll the stock lists.
+- The Internet lobby and Game Setup (Instant Action's and multiplayer's) are laid out
+  in a box no wider than 16:9, centred.
+
+### Removed
+- The top-right help and palette buttons, and with them "show more": the row is menu,
+  comm, idle unit, view and objectives.
+
+Installed, not yet seen in game.
+
 ## 0.10.1 — 2026-10-17
 
 ### Fixed

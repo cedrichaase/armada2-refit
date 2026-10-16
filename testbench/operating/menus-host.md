@@ -49,6 +49,19 @@ What an agent driving the front end with the UI's menus on needs to know (`ui/ME
   design 400,403. Save Game's name field: design 600,516 (it opens holding the map's
   name; End and Backspace clear it); its Save button design 400,579, Load Game's the same.
 
+- **Credits** (the main menu's column, 228,478 at 1280x720) are a screen of ours over
+  the menu scene: `key space` turns the page, `key escape` returns to the main menu
+  (UI.log `credits: left (0) at page N`).
+- **The Admiral's Log's tabs** at 1280x720: Score 132, Military 277, Economy 422,
+  Timeline 567, Battles 712, Ships 857, Build 1002, Tally 1147, all at y 85. The
+  Ships page's arrows are at the page's right corners (1201,122 and 1201,630).
+- **Game Settings' "Command Bar"** writes `UIPlayer.ini` in the clone's game
+  directory; the next mission hides the bar (UI.log `bar: hidden as the player set
+  it`).
+- **Stopping only your own game** to relaunch after a rebuild: the processes whose
+  `/proc/<pid>/environ` names your session directory (a script, as the sandbox refuses
+  the loop inline).
+
 ## Traps
 
 - A screen that looks frozen is the first thing to suspect the host of: dump the

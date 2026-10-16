@@ -1266,6 +1266,12 @@ pub fn plate() -> Option<crate::gfx::Tex> {
 /// toward the bottom, or, without a plate, a dark gradient with a few stars.
 pub fn backdrop(ui: &mut Ui, r: R) {
     let t = ui.theme;
+    // Over render3d's menu scene the scene is the backdrop, still moving; it is
+    // dimmed so the windows over it read.
+    if crate::menus::scene::shown() {
+        ui.draw.rect_vgrad(r, 0x70000000, 0xb8000000);
+        return;
+    }
     match plate() {
         Some(tex) => {
             let (tw, th) = crate::gfx::tex_size(tex);

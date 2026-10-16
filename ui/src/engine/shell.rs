@@ -91,6 +91,16 @@ pub fn install() -> bool {
     }
     unsafe { READY = true };
     if crate::config::get().demo_shell || crate::config::get().demo_style {
+        // The demo takes the Credits' place (below).
+    } else if crate::config::get().credits {
+        if !hook::patch_call(SITE_CREDITS, FN_SHOW_CREDITS, crate::credits::show as *const () as usize) {
+            log!("shell: could not patch {:#x}", SITE_CREDITS);
+            return false;
+        }
+        log!("shell: [Menus] Credits=1 -- the Credits are ours");
+        return true;
+    }
+    if crate::config::get().demo_shell || crate::config::get().demo_style {
         if !hook::patch_call(SITE_CREDITS, FN_SHOW_CREDITS, demo_credits as *const () as usize) {
             log!("shell: could not patch {:#x}", SITE_CREDITS);
             return false;
@@ -341,6 +351,13 @@ fn log_facts(when: &str) {
 /// A frame whose device is lost is skipped (the engine's own test resets it); `f` is
 /// still asked, so the screen can be left. Frames are held to about 60 a second.
 pub fn run_screen(f: &mut dyn FnMut(&Pumped) -> Option<i32>) -> i32 {
+    run_screen_under(&mut |_, _| {}, f)
+}
+
+/// `run_screen`, with `under` drawn each frame after the clear and before the UI's
+/// frame, with the back buffer's size (the Credits draw render3d's map there, as the
+/// dialog host draws the menu scene).
+pub fn run_screen_under(under: &mut dyn FnMut(u32, u32), f: &mut dyn FnMut(&Pumped) -> Option<i32>) -> i32 {
     if !unsafe { READY } {
         return QUIT;
     }
@@ -395,6 +412,7 @@ pub fn run_screen(f: &mut dyn FnMut(&Pumped) -> Option<i32>) -> i32 {
                 dev8::begin_scene(dev);
                 dev8::set_viewport(dev, bb.width, bb.height);
                 dev8::clear(dev, dev8::CLEAR_TARGET, 0xff000000);
+                under(bb.width, bb.height);
                 crate::surface::frame(Context::Shell);
                 done = f(&p);
                 dev8::end_scene(dev);
@@ -468,8 +486,14 @@ extern "C" fn demo_credits() {
             None
         }
     });
+    leave_to_main_menu();
+    log!("shell: demo screen left ({}); g_shellMode = {}", r, SHELL_MODE_MAIN_MENU);
+}
+
+/// After a screen of ours in the Credits' place: the black background the Credits
+/// leave and the main menu next, as the stock Credits do.
+pub fn leave_to_main_menu() {
     black_background();
     unsafe { core::ptr::write_unaligned(SHELL_MODE as *mut i32, SHELL_MODE_MAIN_MENU) };
-    log!("shell: demo screen left ({}); g_shellMode = {}", r, SHELL_MODE_MAIN_MENU);
 }
 

@@ -55,6 +55,7 @@ unsafe extern "system" {
     pub fn GetPrivateProfileIntA(sec: *const u8, key: *const u8, def: i32, file: *const u8) -> u32;
     pub fn GetPrivateProfileStringA(sec: *const u8, key: *const u8, def: *const u8, out: *mut u8, n: u32, file: *const u8) -> u32;
     pub fn GetPrivateProfileSectionNamesA(out: *mut u8, n: u32, file: *const u8) -> u32;
+    pub fn WritePrivateProfileStringA(sec: *const u8, key: *const u8, val: *const u8, file: *const u8) -> i32;
     pub fn QueryPerformanceCounter(v: *mut i64) -> i32;
     pub fn QueryPerformanceFrequency(v: *mut i64) -> i32;
     pub fn GetTickCount() -> u32;

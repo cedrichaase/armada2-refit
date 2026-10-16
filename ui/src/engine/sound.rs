@@ -12,6 +12,12 @@ const ROLLOVER: usize = 0x764814;
 const SOUND2D_BYTES: usize = 0x1c;
 
 fn play(name: usize) {
+    play_as(name, 4)
+}
+
+/// An `AudioSound2D` of the sound file `name` (a C string), at priority 8: the HUD's
+/// buttons pass 4 as the third argument, the shell's 0.
+fn play_as(name: usize, third: i32) {
     unsafe {
         if rd::<u8>(name) == 0 {
             return;
@@ -20,8 +26,8 @@ fn play(name: usize) {
         let ctor: unsafe extern "thiscall" fn(usize, usize, i32, i32, i32, usize) -> usize = core::mem::transmute(SOUND2D);
         let snd = new(SOUND2D_BYTES);
         if snd != 0 {
-            // As stock: priority 8, volume 0, 4, no callback.
-            ctor(snd, name, 8, 0, 4, 0);
+            // As stock: priority 8, volume 0, then 4 (HUD) or 0 (shell), no callback.
+            ctor(snd, name, 8, 0, third, 0);
         }
     }
 }
@@ -33,6 +39,34 @@ pub fn click() {
 pub fn rollover() {
     if !super::hud::video_playing() {
         play(ROLLOVER)
+    }
+}
+
+/// `ShellButton+0xec`: the button has sounds of its own (`SetSoundFile`), its hover
+/// file at `+0xf0`; else `SetButtonMode` plays the shell's default, `cornron.wav`.
+const SB_HAS_SOUND: usize = 0xec;
+const SB_HOVER_SOUND: usize = 0xf0;
+
+/// The shell's hover sound, as `ShellButton::SetButtonMode` plays it when a button
+/// comes under the pointer: `like`'s own (a stock `ShellButton` of the same screen) or
+/// the default. For a menu entry of ours whose stock target is a hit area of the
+/// screen's procedure, not a button, and so plays none.
+pub fn shell_hover(like: Option<usize>) {
+    if !functions_stock() {
+        return;
+    }
+    let own = like.filter(|&b| b != 0 && unsafe { rd::<u32>(b + SB_HAS_SOUND) } != 0);
+    match own {
+        Some(b) => play_as(b + SB_HOVER_SOUND, 0),
+        None => play_as(c"cornron.wav".as_ptr() as usize, 0),
+    }
+}
+
+/// The shell's click (`SetButtonMode`'s for a press without a sound of its own), for
+/// a control of ours that has no stock button to click.
+pub fn shell_click() {
+    if functions_stock() {
+        play_as(c"cornrclk.wav".as_ptr() as usize, 0);
     }
 }
 

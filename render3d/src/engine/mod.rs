@@ -3,6 +3,7 @@
 //! READMEs it cites. Names come from the game's own `armada2.map`.
 pub mod hook;
 pub mod obj;
+pub mod sound;
 
 use crate::math::{M34, V3};
 use core::ffi::c_void;
