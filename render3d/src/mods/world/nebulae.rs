@@ -84,6 +84,7 @@ struct Settings {
     shadow_soft: f32,
     temporal: f32,
     temporal_clip: f32,
+    jitter: f32,
 }
 
 impl Settings {
@@ -112,6 +113,7 @@ impl Settings {
             shadow_soft: math::clamp(ini.float(s, "ShadowSoftness", 0.02), 0.0, 0.5),
             temporal: math::saturate(ini.float(s, "Temporal", 0.1)),
             temporal_clip: math::clamp(ini.float(s, "TemporalClip", 1.25), 0.25, 8.0),
+            jitter: math::clamp(ini.float(s, "Jitter", 1.0), 0.0, 2.0),
         }
     }
 }
@@ -1629,11 +1631,14 @@ impl Nebulae {
         // Temporal=: the thresholds walk on from frame to frame (the shader takes the
         // fraction; kept small so a float holds it exactly).
         let jitter = if self.temporal_on() { (v.frame % 4096) as f32 } else { 0.0 };
+        // And each pixel's ray moves within the pixel (Jitter=, its span in pixels), so
+        // the frames add up the gas over the pixel, not at its centre.
+        let span = if self.temporal_on() { self.cfg.jitter } else { 0.0 };
         Some(March {
             k: [
                 [self.cfg.obscure, 0.0, 1.0 / w as f32, 1.0 / h as f32],
                 [r[0] * ax, r[1] * ax, r[2] * ax, self.cfg.footprint],
-                [u[0] * by, u[1] * by, u[2] * by, 0.0],
+                [u[0] * by, u[1] * by, u[2] * by, span],
                 [f[0] + r[0] * cx + u[0] * cy, f[1] + r[1] * cx + u[1] * cy, f[2] + r[2] * cx + u[2] * cy, jitter],
                 [0.0; 4],
                 [0.0; 4],

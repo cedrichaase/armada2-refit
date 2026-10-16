@@ -444,7 +444,7 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
 // which the slices' derivatives took in: the fine octave is no longer blurred by it.
 
 float4 k_ray0    : register(c41);  // xyz: the ray (view depth 1) per pixel to the right; w: the reads' footprint, in pixels (Footprint=)
-float4 k_ray1    : register(c42);  // xyz: per pixel down
+float4 k_ray1    : register(c42);  // xyz: per pixel down; w: the ray's walk within its pixel, in pixels (Jitter=; 0 without Temporal=)
 float4 k_ray2    : register(c43);  // xyz: at pixel (0, 0); w: the frame (Temporal=: the thresholds walk on; 0 without)
 float4 k_blo     : register(c44);  // xyz: the box's low corner (world); w: the nearest view depth marched
 float4 k_bhi     : register(c45);  // xyz: its high corner
@@ -530,7 +530,12 @@ struct MarchOut {
 MarchOut march(float2 vpos, const int n)
 {
     float2 px = floor(vpos) + 0.5;
-    float3 d = k_ray0.xyz * px.x + k_ray1.xyz * px.y + k_ray2.xyz;   // eye + d s: the point at view depth s
+    // With Temporal=, the ray walks within its pixel from frame to frame (R2), so the
+    // frames add up the gas over the whole pixel. Through its centre alone, gas finer than
+    // a pixel (zoomed out, the volume's texels and the swirl's folds) gave every pixel a
+    // value of its own, which no number of frames took out: a still grain.
+    float2 pj = px + (frac(k_ray2.w * float2(0.7548777, 0.5698403) + 0.5) - 0.5) * k_ray1.w;
+    float3 d = k_ray0.xyz * pj.x + k_ray1.xyz * pj.y + k_ray2.xyz;   // eye + d s: the point at view depth s
     float  dl = length(d);
     float3 dz = d + step(abs(d), 1e-6) * 1e-6;
     float3 ta = (k_blo.xyz - k_eye.xyz) / dz, tb = (k_bhi.xyz - k_eye.xyz) / dz;

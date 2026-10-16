@@ -14,8 +14,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   on from frame to frame, and each frame is blended into a history per view, reprojected
   by the gas's depth, clipped to the neighbourhood and dropped where the scene's depth
   changed (a ship moved over the gas); the clip's top reaches the brightest pixel two
-  out, so thin gas keeps its history. `[Nebulae]` `Temporal=` (this
-  frame's share, default 0.1; 0 off) and `TemporalClip=` (default 1.25).
+  out, so thin gas keeps its history; and each pixel's ray moves within the pixel from
+  frame to frame, so gas finer than a pixel adds up instead of leaving a still grain.
+  `[Nebulae]` `Temporal=` (this frame's share, default 0.1; 0 off), `TemporalClip=`
+  (default 1.25) and `Jitter=` (the ray's walk within its pixel, in pixels, default 1;
+  0 keeps it at the centre).
 
 ### Changed
 - Nebulae: the gas is ray-marched at full size, a ray per pixel through the baked

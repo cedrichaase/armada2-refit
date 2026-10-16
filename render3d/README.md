@@ -1054,7 +1054,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `CityLightColour`, `PlanetHalo*`; the rocks' `RockAmbient`, `RockSpecular*`,
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1182,7 +1182,16 @@ Nebula's specks) a frame's eight steps find gas in few pixels, and a 3x3 that fo
 none has a mean and a spread of zero, which wiped the history whatever
 `TemporalClip=` was (1.25, 2.5 and 4 measured the same) and left the stipple there:
 the clip's top also reaches the brightest pixel of the ring two pixels out, which
-smoothed those wisps on the bench. The history is four targets
+smoothed those wisps on the bench. Zoomed out, a grain stayed in game that zooming in
+smoothed away: the volume's texels and the swirl's folds were then finer than a pixel,
+and a ray through the pixel's centre alone gave each pixel a value of its own that every
+frame repeated, so no number of frames averaged it out. So the ray also walks within its
+pixel from frame to frame (`Jitter=`, its span in pixels, default 1; an R2 sequence on
+the frame, `k_ray1.w`), as TAA's camera jitter does, and the frames add up the gas over
+the whole pixel. It costs nothing in the march. On the bench (720p, high above the Big
+Cerulean Nebula) the wisps came out finer and less blotchy than with `Jitter=0`, whose
+grain number was the same (0.94 / 0.95; `Footprint=2` 0.94): the metric mostly measures
+the gas's own structure there. The history is four targets
 per view (the action camera keeps its own), dropped with the device and whenever no gas
 was marched. `comp_ps` then filters and composites the history as it did the march.
 The pass costs 0.22 ms at 720p. With `Temporal=0` the thresholds stay put, as before:
