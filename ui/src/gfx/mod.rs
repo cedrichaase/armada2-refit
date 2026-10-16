@@ -407,6 +407,22 @@ impl Draw {
         adv
     }
 
+    /// Text broken into lines no wider than `max_width` (at newlines, and at spaces),
+    /// the first line's box top at `y`; returns the height it took.
+    pub fn text_wrapped(&mut self, s: &str, size: f32, max_width: f32, x: f32, y: f32, c: Color, w: Weight) -> f32 {
+        let font = font_of(w);
+        let Some(tex) = self.font_tex(w) else { return 0.0 };
+        let scale = 2.0 * font.spread * size / font.em_texels;
+        let k = [KIND_SDF, scale.max(1.0), 0.0, 0.0];
+        let mut quads = Vec::new();
+        let hgt = crate::text::layout_wrapped(font, s, size, max_width, x, y, &mut |q| quads.push(q));
+        for q in quads {
+            let [x0, y0, x1, y1] = q.rect;
+            self.aquad(Some(tex), R::new(x0, y0, x1 - x0, y1 - y0), [c; 4], q.uv, k);
+        }
+        hgt
+    }
+
     fn font_tex(&mut self, w: Weight) -> Option<Tex> {
         let i = w as usize;
         if self.font_tex[i].is_none() {

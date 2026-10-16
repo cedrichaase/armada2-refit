@@ -11,6 +11,21 @@ pub struct Config {
     pub demo_mission: bool,
     pub demo_shell: bool,
     pub demo_loading: bool,
+    /// `[HUD]`: the in-mission panels of ours that replace stock ones (HUD.md).
+    pub hud: Hud,
+}
+
+/// `[HUD]` in UI.ini: which stock panels ours replace. Every panel is off by default,
+/// and `Enable=0` leaves the whole HUD stock whatever the panel keys say.
+#[derive(Clone, Debug, Default)]
+pub struct Hud {
+    pub enable: bool,
+    /// The button bar (`PopupPaletteImp`), with the grid keys.
+    pub bar: bool,
+    /// The bar's keys are the grid's (QWERT/ASDFG/ZXCVB by position); 0 keeps stock's.
+    pub bar_keys: bool,
+    /// The key in each button's corner.
+    pub bar_labels: bool,
 }
 
 pub fn load() -> Config {
@@ -22,6 +37,12 @@ pub fn load() -> Config {
         demo_mission: ini.int("Demo", "Mission", 0) != 0,
         demo_shell: ini.int("Demo", "Shell", 0) != 0,
         demo_loading: ini.int("Demo", "Loading", 0) != 0,
+        hud: Hud {
+            enable: ini.int("HUD", "Enable", 1) != 0,
+            bar: ini.int("HUD", "Bar", 0) != 0,
+            bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
+            bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
+        },
     }
 }
 

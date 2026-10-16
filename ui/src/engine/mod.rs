@@ -8,9 +8,14 @@
 pub mod cursor;
 pub mod dev8;
 pub mod hook;
+pub mod hud;
 pub mod ingame;
 pub mod loading;
+pub mod msvc;
+pub mod palette;
 pub mod shell;
+pub mod sound;
+pub mod sprite;
 
 use core::ffi::c_void;
 
@@ -27,6 +32,15 @@ pub unsafe fn rd<T: Copy>(a: usize) -> T {
 #[inline(always)]
 pub fn field(base: usize, off: usize) -> usize {
     if base == 0 { 0 } else { unsafe { rd::<usize>(base + off) } }
+}
+
+/// Whether the code at `a` starts with `bytes` (a function checked before it is called).
+pub fn starts(a: usize, bytes: &[u8]) -> bool {
+    let ok = unsafe { core::slice::from_raw_parts(a as *const u8, bytes.len()) } == bytes;
+    if !ok {
+        crate::log!("engine: {:#x} does not start as stock", a);
+    }
+    ok
 }
 
 /// `ST3D_GraphicsEngine*` (Storm3D).

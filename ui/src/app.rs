@@ -20,6 +20,9 @@ pub fn run(ctx: Context, ui: &mut Ui) {
         Context::Shell => cfg.demo_shell,
         Context::Loading => cfg.demo_loading,
     };
+    if ctx == Context::Mission {
+        crate::hud::run(ui);
+    }
     if on {
         demo(ctx, ui);
     }

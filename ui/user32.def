@@ -19,3 +19,5 @@ SetCursor@4
 PostQuitMessage@4
 GetFocus@0
 SetFocus@4
+MapVirtualKeyA@8
+GetWindowThreadProcessId@8

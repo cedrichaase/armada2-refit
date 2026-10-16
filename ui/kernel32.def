@@ -29,3 +29,4 @@ OutputDebugStringA@4
 ExitProcess@4
 GetCurrentThreadId@0
 Sleep@4
+GetCurrentProcessId@0
