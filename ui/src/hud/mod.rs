@@ -118,7 +118,47 @@ fn map_panels(cfg: &crate::config::Hud) {
     }
 }
 
+/// The minimap's map square, when the minimap is ours and shows: a move ordered there
+/// is the radar's (`cursor::draw` shows the warp or move cursor over it).
+pub fn minimap_square(ui: &Ui) -> Option<crate::gfx::R> {
+    if unsafe { !MINIMAP } || engine::ingame::hud_hidden() || hud::hidden(engine::radar::MAP_RADAR) {
+        return None;
+    }
+    Some(minimap::place(ui).2)
+}
+
 static mut LOGGED: f64 = -10.0;
+/// The bar's shown or hidden state is still to be made the player's (`prefs`): at the
+/// start of each mission, and after Game Settings changed it.
+static mut BAR_PENDING: bool = true;
+
+/// Game Settings changed the bar's setting: the next mission frame applies it.
+pub fn bar_pref_changed() {
+    unsafe { BAR_PENDING = true };
+}
+
+/// Makes the bar shown or hidden as the player set it, once the HUD shows (not under
+/// a mission's opening cinematic), by pressing the stock palette toggle
+/// (`ButtonPanel`'s `TogglePalette`, which flips the bar's hidden flag), as the
+/// top-right button did before it moved to Game Settings.
+fn apply_bar_pref() {
+    unsafe {
+        if !BAR_PENDING || engine::ingame::hud_hidden() {
+            return;
+        }
+        let p = engine::palette::palette();
+        let b = engine::topbar::button(engine::topbar::Which::Palette);
+        if p == 0 || b == 0 {
+            return;
+        }
+        BAR_PENDING = false;
+        let want = crate::prefs::bar_hidden();
+        if hud::hidden(p) != want {
+            crate::log!("bar: {} as the player set it", if want { "hidden" } else { "shown" });
+            engine::buttons::queue(b);
+        }
+    }
+}
 
 /// A mission's frame: every panel of ours.
 pub fn run(ui: &mut Ui) {
@@ -130,8 +170,10 @@ pub fn run(ui: &mut Ui) {
     unsafe {
         if now - LOGGED > 2.0 {
             hud::log_components();
+            BAR_PENDING = true;
         }
         LOGGED = now;
+        apply_bar_pref();
         // A multiplayer box of ours covers the screen: nothing under it takes the mouse.
         if comm::blocking() {
             let screen = ui.screen();

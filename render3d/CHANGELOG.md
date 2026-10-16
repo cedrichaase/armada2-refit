@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.11.0 — 2026-10-17
+
+### Added
+- The menu scene's decloaking ships are heard: each plays its group's `CloakSound`
+  (default `clkdisen.wav`, the Klingon cloaking device's `offSound`; empty for none)
+  as its decloak begins, through the game's 2D sound (`engine/sound.rs`).
+
+Installed, not yet seen in game.
+
 ## 0.10.1 — 2026-10-17
 
 ### Fixed

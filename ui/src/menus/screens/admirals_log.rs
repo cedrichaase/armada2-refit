@@ -12,10 +12,16 @@
 //!
 //! **Score** (the first page) is a table of labels, which the model reads (the column
 //! headers and 8 rows of values, in the game's colours): it is drawn as our table, its
-//! rows level with the players'. **The other pages** are graphs and lists painted by
-//! GDI inside the pane (and a scroll bar on the lists): the model cannot read them, so
-//! the pane is cropped from the mirror into the page, and the pointer, the wheel and the
-//! scroll bar go to the stock pane (`kit::forward_part`).
+//! rows level with the players'. **The other seven pages** (Military, Economy,
+//! Timeline, Battles, Ships, Build, Tally) are the pane's frame art with
+//! `StdTextLabel`s over it, which the model also reads (each with its design
+//! rectangle, colour, alignment and every line): `typeset` sets them again in the
+//! theme's type, in their places in the pane mapped into the page, the header row in
+//! the title colour and the rows striped, with no frame art. What is a picture and
+//! not words is cropped from the mirror: Timeline's graph of the armadas' power, and
+//! the Ships page's portraits beside their rows. The stock lists scroll by their own
+//! two buttons (`Shell(Button)`s at the pane's right edge), which our arrows and the
+//! wheel click. A list with no rows (no battle yet) draws an empty page.
 use crate::gfx::{fade, Weight, R};
 use crate::menus::model::{Class, Control, What};
 use crate::menus::screens::kit::{self, Memory};
@@ -109,6 +115,8 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     ui.draw.frame(page, ui.u(t.edge).max(1.0), t.panel_edge);
     if sel == 0 && score_table(ui, s, page, header_h, row_h, &panes) {
         // drawn from the model
+    } else if sel > 0 && typeset(ui, s, page.inset(ui.u(10.0)), sel) {
+        // drawn from the pane's labels
     } else {
         let src = PANE;
         let dst = kit::contain(page.inset(ui.u(6.0)), src);
@@ -153,6 +161,142 @@ fn score_table(ui: &mut Ui, s: &Screen, page: R, header_h: f32, row_h: f32, pane
             // Numbers in the player's colour from the game.
             let colour = if c.colour == 0xffffffff || c.colour == 0xff000000 { t.text } else { c.colour };
             ui.text_in(r, text, t.text_size + 4.0, Align::Centre, colour, Weight::Regular);
+        }
+    }
+    true
+}
+
+/// The pane's visible part, design coordinates: below this the lists are clipped (the
+/// Ships page keeps labels of rows scrolled out of view, far below).
+const PANE_BOTTOM: i32 = 566;
+
+/// Timeline's graph, inside the pane (design coordinates): a picture, cropped.
+const TIMELINE_GRAPH: [i32; 4] = [177, 125, 612, 442];
+/// Its legend's two icons (a battle, a planet colonised), left of their words.
+const TIMELINE_ICONS: [[i32; 4]; 2] = [[500, 85, 27, 26], [602, 85, 27, 26]];
+/// The Ships page's portrait column (design x and width), left of each row's label.
+const SHIP_PORTRAIT: (i32, i32) = (183, 216);
+
+/// A page of the pane set from its labels (the header row, the rows, each label in
+/// its place); the Timeline's graph and the Ships page's portraits cropped from the
+/// mirror; the stock scroll buttons as our arrows. An empty list draws empty.
+fn typeset(ui: &mut Ui, s: &Screen, page: R, sel: usize) -> bool {
+    let mut labels: Vec<&Control> = kit::labels(s)
+        .into_iter()
+        .filter(|c| c.visible && !c.text.trim().is_empty() && c.rect[0] >= PANE[0] && c.rect[1] >= PANE[1] && c.rect[1] < PANE_BOTTOM)
+        .collect();
+    labels.sort_by_key(|c| (c.rect[1], c.rect[0]));
+    let t = ui.theme;
+    let dst = kit::contain(page, PANE);
+    let k = dst.w / PANE[2] as f32;
+    let map = |r: [i32; 4]| R::new(dst.x + (r[0] - PANE[0]) as f32 * k, dst.y + (r[1] - PANE[1]) as f32 * k, r[2] as f32 * k, r[3] as f32 * k);
+    // Type in units from the design size: 12 design pixels a line, as stock's.
+    let unit = ui.u(1.0).max(0.01);
+    let body = (11.5 * k / unit).clamp(9.0, 22.0);
+    let head = (13.0 * k / unit).clamp(10.0, 24.0);
+
+    // Rows: labels whose tops are within a few pixels. A row of several one-line
+    // labels without a digit is a header (Tally's stands half-way down, under its
+    // summary; Build has none).
+    let mut rows: Vec<(i32, i32, Vec<&Control>)> = Vec::new();
+    for c in labels.iter() {
+        match rows.iter_mut().find(|r| (r.0 - c.rect[1]).abs() <= 4) {
+            Some(r) => {
+                r.1 = r.1.max(c.rect[1] + c.rect[3]);
+                r.2.push(c)
+            }
+            None => rows.push((c.rect[1], c.rect[1] + c.rect[3], alloc::vec![*c])),
+        }
+    }
+    let is_header = |cells: &Vec<&Control>| cells.len() > 1 && cells.iter().all(|c| !c.text.trim().contains('\n') && !c.text.bytes().any(|b| b.is_ascii_digit()));
+    // The Ships page: one label per row, beside its portrait; the rows are as tall as
+    // the gap to the next.
+    let ships = sel == 5 && labels.iter().all(|c| c.rect[0] > SHIP_PORTRAIT.0 + SHIP_PORTRAIT.1);
+
+    if sel == 3 {
+        for src in [TIMELINE_GRAPH, TIMELINE_ICONS[0], TIMELINE_ICONS[1]] {
+            s.mirror_part(ui, src, map(src), 0xffffffff);
+        }
+        ui.draw.frame(map(TIMELINE_GRAPH), ui.u(1.0).max(1.0), t.panel_edge);
+    }
+    let mut stripe = 0usize;
+    for (i, (top, bottom, cells)) in rows.iter().enumerate() {
+        let is_head = is_header(cells);
+        let next = rows.get(i + 1).map_or(PANE_BOTTOM, |r| r.0);
+        let band_bottom = if ships { next.min(PANE_BOTTOM) } else { (*bottom).max(*top + 18).min(next) };
+        let band = map([PANE[0], *top - 2, PANE[2], band_bottom - *top + 2]);
+        if is_head && sel != 3 {
+            ui.draw.rect(R::new(band.x, band.bottom() - 1.0, band.w, ui.u(1.0).max(1.0)), fade(t.accent, 0.7));
+        } else if !is_head {
+            if stripe % 2 == 1 && sel != 3 {
+                ui.draw.rect(band, t.row_alt);
+            }
+            stripe += 1;
+        }
+        if ships {
+            let h = (next.min(PANE_BOTTOM) - *top - 4).clamp(0, 132);
+            if h > 8 {
+                let src = [SHIP_PORTRAIT.0, *top, SHIP_PORTRAIT.1, h];
+                let r = map(src).inset(ui.u(3.0));
+                s.mirror_part(ui, src, r, 0xffffffff);
+            }
+        }
+        for c in cells.iter() {
+            let r = map(c.rect);
+            let colour = if is_head {
+                t.title
+            } else if c.colour == 0xffffffff || c.colour == 0xff000000 || c.colour == 0 {
+                t.text
+            } else {
+                c.colour | 0xff000000
+            };
+            let align = match c.align {
+                -1 => Align::Left,
+                1 => Align::Right,
+                _ => Align::Centre,
+            };
+            let (mut size, weight) = if is_head { (head, Weight::Bold) } else { (body, if ships { Weight::Bold } else { Weight::Regular }) };
+            // The lines fit the room the row has (Economy's cells are four lines in a
+            // row of 55 design pixels), the type made smaller when they would not.
+            let lines = c.text.trim_end().split('\n').count().max(1) as f32;
+            let room = (next - c.rect[1] - 3).max(10) as f32 * k;
+            let mut lh = ui.u(size * 1.25);
+            if lh * lines > room {
+                lh = room / lines;
+                size = (lh / ui.u(1.2)).max(7.0);
+            }
+            let mut y = r.y + ui.u(2.0);
+            for (n, line) in c.text.trim_end().split('\n').enumerate() {
+                let line = line.trim_end_matches('\r');
+                // The Ships page's second line (the stardate and what became of the
+                // ship) in the quieter colour.
+                let col = if ships && n > 0 { fade(t.text_dim, 1.0) } else { colour };
+                let text = if is_head { theme::caps(line.trim()) } else { alloc::string::String::from(line.trim()) };
+                ui.text_in(R::new(r.x + ui.u(4.0), y, r.w.max(ui.u(40.0)) - ui.u(8.0), lh), &text, size, align, col, weight);
+                y += lh;
+            }
+        }
+    }
+
+    // The stock list's two scroll buttons, top and bottom of the pane's right edge.
+    let mut arrows: Vec<&Control> = s
+        .model
+        .controls
+        .iter()
+        .filter(|c| c.visible && c.text.is_empty() && matches!(c.what, What::Shell(crate::engine::shellui::Kind::Button)) && c.rect[0] >= 700 && c.rect[1] >= PANE[1])
+        .collect();
+    arrows.sort_by_key(|c| c.rect[1]);
+    if arrows.len() >= 2 {
+        let (up, down) = (arrows[0], arrows[arrows.len() - 1]);
+        let a = ui.u(30.0);
+        let ur = R::new(page.right() - a, page.y, a, a);
+        let dr = R::new(page.right() - a, page.bottom() - a, a, a);
+        kit::arrow(ui, s, ur, up, true);
+        kit::arrow(ui, s, dr, down, false);
+        let over = ui.input.mouse.is_some_and(|p| page.contains(p));
+        let wheel = ui.input.wheel;
+        if s.top && over && wheel != 0.0 {
+            s.click_control(if wheel > 0.0 { up } else { down });
         }
     }
     true

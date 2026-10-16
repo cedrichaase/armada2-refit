@@ -261,17 +261,27 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
             HOVER = (h, hover);
             let (x, y) = if hover >= 0 { CARDS[hover as usize].at } else { (2, 2) };
             actions::push(actions::Action::Mouse { h, msg: WM_MOUSEMOVE, keys: 0, x: x - s.model.rect[0], y: y - s.model.rect[1] });
+            // The Tutorial and Federation panels are hit areas of the procedure, which
+            // plays no sound for them: ours plays the panels' buttons' own.
+            if hover >= 0 && s.model.button_at(x, y).is_none() {
+                crate::engine::sound::shell_hover(like_button(s));
+            }
         }
     }
-    // Load Game, then Previous Menu, quieter, below a gap.
+    // Load Game, then Previous Menu, quieter, below a gap. The stock screen is not told
+    // of the pointer over them (its buttons stand elsewhere), so ours plays the sound.
     y += ui.u(26.0);
     let last = foot.len() - 1;
+    let mut foot_hover = 0usize;
     for c in [foot[last], foot[0]] {
         let r = R::new(x, y, w, fh);
         y += fh;
         let id = ui.id(c.text.as_str());
         let on = s.top && c.enabled;
         let (hot, held, clicked) = if on { ui.interact(id, r) } else { (false, false, false) };
+        if hot {
+            foot_hover = c.key;
+        }
         let st = theme::State::of(ui, id, hot, held);
         if st.hot > 0.01 {
             ui.draw.rect(R::new(r.x, r.y + ui.u(10.0), ui.u(3.0).max(2.0), r.h - ui.u(20.0)), fade(t.accent, st.hot));
@@ -282,5 +292,22 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus:
             s.click_control(c);
         }
     }
+    unsafe {
+        if s.top && FOOT_HOVER != foot_hover {
+            FOOT_HOVER = foot_hover;
+            if foot_hover != 0 {
+                crate::engine::sound::shell_hover(Some(foot_hover));
+            }
+        }
+    }
     true
+}
+
+/// The foot entry under the pointer last frame (its widget; 0 for none).
+static mut FOOT_HOVER: usize = 0;
+
+/// A picture button of the stock screen (the Klingon or Borg panel), whose hover sound
+/// the panels that are hit areas borrow.
+fn like_button(s: &Screen) -> Option<usize> {
+    CARDS.iter().find_map(|c| s.model.button_at(c.at.0, c.at.1)).map(|c| c.key)
 }

@@ -161,14 +161,33 @@ fn item_h(i: &Item) -> f32 {
     }
 }
 
+/// A setting of the UI's own on a stock settings screen (Game Settings' "Command
+/// Bar"): its caption, the choice it shows, and what a click does. Unlike every other
+/// row its words are ours (English), as the stock screen has none for it; it is kept
+/// in `prefs`, never in the game's settings.
+pub struct Own {
+    pub label: &'static str,
+    pub value: &'static str,
+    pub press: fn(),
+}
+
+const OWN_H: f32 = LABEL_H + FIELD_H + GAP;
+
 /// Draws the form's window and its rows; the footer's buttons are the stock screen's
 /// "Previous Menu".
 pub fn draw(ui: &mut Ui, s: &Screen, form: &Form) {
+    draw_with(ui, s, form, &[]);
+}
+
+/// `draw`, with settings of ours (`own`) at the foot of the shorter column.
+pub fn draw_with(ui: &mut Ui, s: &Screen, form: &Form, own: &[Own]) {
     backdrop_for(ui, s);
     let t = ui.theme;
     let two = !form.cols[1].is_empty() && !form.cols[0].is_empty();
     let col_h = |c: &Vec<Item>| c.iter().map(item_h).sum::<f32>();
-    let body_h = col_h(&form.cols[0]).max(col_h(&form.cols[1]));
+    let own_col = if two && col_h(&form.cols[1]) < col_h(&form.cols[0]) { 1 } else { 0 };
+    let with_own = |k: usize| col_h(&form.cols[k]) + if k == own_col { own.len() as f32 * OWN_H } else { 0.0 };
+    let body_h = with_own(0).max(with_own(1));
     let w = if two { 1180.0 } else { 640.0 };
     let h = (body_h + 60.0 + 44.0 + 2.0 * t.pad + 54.0 + 36.0).min(1040.0);
     let screen = ui.screen();
@@ -185,7 +204,7 @@ pub fn draw(ui: &mut Ui, s: &Screen, form: &Form) {
     let gap = ui.u(40.0);
     let cw = if two { (body.w - gap) * 0.5 } else { body.w };
     for (k, col) in form.cols.iter().enumerate() {
-        if col.is_empty() {
+        if col.is_empty() && !(k == own_col && !own.is_empty()) {
             continue;
         }
         let x = body.x + if two { k as f32 * (cw + gap) } else { 0.0 };
@@ -207,6 +226,17 @@ pub fn draw(ui: &mut Ui, s: &Screen, form: &Form) {
                 }
             }
             y += ih;
+        }
+        if k == own_col {
+            for o in own {
+                ui.text_in(R::new(x, y, cw, ui.u(LABEL_H)), o.label, t.text_size, Align::Left, t.text_dim, Weight::Regular);
+                let br = R::new(x, y + ui.u(LABEL_H), cw, ui.u(FIELD_H));
+                if s.top && ui.scope(&crate::sfmt!("own:{}", o.label), |ui| ui.button(br, o.value)) {
+                    crate::engine::sound::shell_click();
+                    (o.press)();
+                }
+                y += ui.u(OWN_H);
+            }
         }
     }
     hover_stock(s, hot);

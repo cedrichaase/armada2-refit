@@ -392,6 +392,11 @@ controls: a click on a stock button is `Screen::click_control`, a slider is a cl
 the bar's track, a combo choice is below. **Every word is the stock control's own**
 (`TextLabel` and `ShellButton` text, localised); the specs never write one.
 
+- **Game Settings' "Command Bar"** is the one row of ours on a stock settings screen
+  (`form::draw_with`, `form::Own`): the button bar shown or hidden, the toggle that was
+  the top-right palette button in a mission (HUD.md, "The top-right buttons"). It is a
+  setting of the UI's, not the game's, so it is kept in `UIPlayer.ini` (`prefs.rs`)
+  and its words are ours; a click plays the shell's click sound (`cornrclk.wav`).
 - **Options**: the stock buttons in the order they stand on the stock screen (y, then
   x), in one column; the one at the foot (Previous Menu, Return to Game: a button in the
   bottom-left corner, `common::is_footer`) is the window's footer. In a mission there
@@ -451,6 +456,9 @@ Instant Action's setup and every multiplayer game's (`do_multiplayerSetup`).
 - **Colours** are the stock swatches, cropped from the mirror, left of each row and in
   the palette under the table, and clicked where they are: a click on a row's swatch
   and then on a palette swatch recolours that player, as in stock.
+- **Width**: on a screen wider than 16:9 the screen is laid out in a centred box of
+  16:9 (`setup_kit::wide_box`), as the lobby is: the tables and the map window would
+  otherwise stretch across a 21:9 monitor.
 - **The map** window: the map's labels (name, players, "Teams are locked."), the
   minimap preview cropped from the mirror (design 627,129, 155x155: the frame's inside,
   clear of the "Shroud On, Fog On" label, which the stock screen draws across the
@@ -539,7 +547,8 @@ picture buttons of its column (the games' at x 568 above y 260, the players' at 
 the chat log's at x 570 below are the log's own and not drawn). Ours: the title, a
 "current games" window (the filter as our drop-down, the rows as our rows, Create Game
 and Join Game under them), the players' window, a chat window across the bottom (the
-log's last lines, the line as our field) and the way out. A click on a row is the stock
+log's last lines, the line as our field) and the way out, in a centred box no wider
+than 16:9 (`setup_kit::wide_box`, as Game Setup). A click on a row is the stock
 row's click, which selects it (its held state shows as our selection); the arrows click
 the stock arrows. `Online.asi`'s messages ("No game with the join code ...", the "Local
 IP Address" line the game writes itself) are lines of the chat log, so they show there.
@@ -637,10 +646,22 @@ shell theme and act only by clicking stock controls.
   shows is the visible pane among the eight (the panes are listed in the tabs' order
   backwards), the last clicked when it cannot be told. **Score** is drawn from the pane's
   labels (the model reads them: column headers and the value rows, in the game's colours)
-  as our table, its rows level with the players'. **The other seven pages** are GDI graphs
-  and lists inside the pane that the model cannot read, so the pane is cropped from the
-  mirror into the page and `kit::forward_part` gives the stock pane the pointer, in the
-  pane's own place, for its scroll bar. The owner-drawn tabs, players and buttons are
+  as our table, its rows level with the players'. **The other seven pages** (Military,
+  Economy, Timeline, Battles, Ships, Build, Tally) are frame art (`bitmaps/AdmiralsLog/
+  Screens/FRAME*.bmp`) with the pane's `StdTextLabel`s drawn over it
+  (`IndividualScreenInfo::DrawLabels`, clipped to the pane), and the model reads every
+  one: its design rectangle, colour, alignment and all its lines (Military's and
+  Economy's cells are three and four lines; the Ships page keeps labels of rows
+  scrolled out of view, below the pane). `typeset` sets them again: each label in its
+  place in the pane mapped into the page, rows (labels whose tops are within 4 pixels)
+  striped, a row of several one-line labels without a digit set as a header (Tally's
+  stands under its summary; Build has none), each cell's lines fitted to the room its
+  row has; labels below design y 566 are scrolled out and left out. What is a picture is
+  cropped from the mirror: Timeline's graph (design 177,125 612x442) and its legend's
+  two icons, and each Ships row's portrait (design x 183, 216 wide, from the row's top to
+  the next). The lists' stock scroll buttons (two unlabelled `Shell(Button)`s at x 760)
+  are our arrows at the page's corners, and the wheel over the page clicks them; the
+  stock list scrolls by pixels and hides a row that is partly out of view. The owner-drawn tabs, players and buttons are
   blank in the mirror (their `WM_DRAWITEM` painting does not reach the composed frame:
   not investigated, as the spec does not need it).
 - **`tech_tree.rs`.** The stock window is one disabled multi-line Courier `Edit` with the
@@ -690,8 +711,13 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   ours. The view is that of the full-screen dialog at the bottom of what shows: `main`
   for "main menu"; for "single player" the campaign last pointed at (`scene::choose`:
   `tutorials`, `federation`, `klingon`, `borg`), `federation` on each visit until one
-  is (the mission list over the campaign selection keeps its view); never over a
-  mission (`backdrop::over_mission`). render3d moves the camera from one view to the
+  is (the mission list over the campaign selection keeps its view); for every other
+  full-screen screen of the front end (Options and its settings, Instant Action's and
+  multiplayer's Game Setup, Multiplayer and its lobby, Load Game) the view that showed
+  last, so the camera stays where the screen was opened from; never over a mission
+  (`backdrop::over_mission`). Those screens' backdrops (`theme::backdrop`, the setup
+  and single-player kits') then dim the scene instead of drawing the old main menu's
+  plate (`Menus/mainbkgr.bmp`), which is what showed behind them before. render3d moves the camera from one view to the
   next across the map. A dialog opened within 1.5 s of the last one closing keeps the
   mission's picture (Options handing over to Load Game), and aborting a mission opens
   Options, the admiral's log and the campaign selection in turn. So the main menu and
@@ -714,7 +740,17 @@ a Mutara nebula with the queen's Diamond (`render3d/README.md`, "The menu scene"
   then Load Game and Previous Menu, quieter. Pointing at a campaign lights it and
   chooses its view; the row whose view shows keeps its accent bar at half strength. A
   click on a row is a click on the stock panel's point, as the cards' was, and the
-  stock screen still hears the hover (its sound). The emblems are the HUD's race icons,
+  stock screen still hears the hover (its sound).
+- **Hover sounds.** The stock main menu plays a hover sound only for its four
+  `ShellButtonSelBox`es (Options, Exit, Replay Intro, Credits): Single Player, Instant
+  Action and Multiplayer are hit areas of `MainMenuDlgProc` with Bink hover animations
+  and no sound, and on the campaign selection the Tutorial and Federation panels are
+  the same. `ShellButton::SetButtonMode` plays a button's hover sound as an
+  `AudioSound2D` of the file `SetSoundFile` gave it (`+0xf0`, when `+0xec` is set),
+  else `cornron.wav`, at priority 8; `engine::sound::shell_hover` plays the same for an
+  entry of ours whose stock target is no button (the screen's own buttons' file), and
+  for the campaign column's Load Game and Previous Menu, whose stock buttons the
+  pointer is never sent to. The emblems are the HUD's race icons,
   white silhouettes with their alpha (`federation_icon`, `klingon_icon`, `borg_icon` in
   `Sprites/gui_global.spr`: 84 px cells of `Textures/RGB/allrace.tga`, read from the
   game's own files, so a texture pack's version shows), tinted as the text. The
@@ -774,8 +810,8 @@ hidden surfaces).
   buttons itself).
 - **Not reached on the bench**: the Tutorials, Klingon and Borg campaigns' lists;
   Multiplayer and its lobbies; help, licence and net waiting; room select, GameSpy and
-  the command-line screens. Credits is a screen of the engine's own, not a dialog, and
-  runs as before.
+  the command-line screens. Credits is a screen of the engine's own, not a dialog: it
+  is ours with `[Menus] Credits=1` ("The Credits", below).
 - **The multiplayer screens** were verified with two games (2026-10-16,
   `ui-menus-multiplayer.md`, and by hand with `--online`: *Internet - Online*'s prompt,
   the join code in Game Setup's chat): the connection screen, Manual IP, the lobby
@@ -800,3 +836,32 @@ hidden surfaces).
 - **A display mode other than the desktop's** for the game: the shell is raised to the
   desktop size, so a game at another resolution re-creates the device at every switch
   between the shell and a mission (as with Menus.asi); not measured.
+
+## The Credits
+
+`[Menus] Credits=1` (the default): `DispatchDialog`'s call of `Show_Credits` (the
+shell mode 30 case, from the main menu and after the last campaign mission) runs
+`credits::show` instead, a screen of ours through `engine::shell::run_screen_under`,
+which draws render3d's map (`scene::draw_view`) after the clear and before the UI's
+frame, as the dialog host draws the menu scene. Leaving it does what the demo screen in
+the Credits' place does: the black shell background and `g_shellMode` = main menu.
+
+- **The words are the game's**: `Credits.txt` in the game directory, whose pages end at
+  `@cls`, each held `@hold=` seconds, the first in `@font=2` (large). A line in capitals
+  is set as a heading in the accent colour, the rest as names; each page fades in and
+  out, rising a little. A page taller than the screen is set smaller.
+- **The logos** are where the stock `Credits3D` puts them, in the four corners for the
+  whole run: Mad Doc top left, Activision top right, Bink bottom left, GameSpy bottom
+  right, the four 128 x 128 cells of `Textures/RGB/logos.tga` that
+  `Sprites/gui_credits.spr` names, drawn square (the stock screen draws them at the
+  canvas's scale, so wide on a wide screen). Their sprites are additive, so black is
+  keyed out: a texel's brightness is its opacity, its colour divided by it.
+- **The scene** tours the map's views, 16 s each: `main`, `federation`, `klingon` (its
+  ships decloak, with their sound), `tutorials`, `borg`. Without Render3D.asi the
+  theme's backdrop.
+- **Keys**: Esc or a right click returns to the main menu (the stock Credits took no
+  key); Space, Enter, the right arrow or a left click turn the page, the left arrow goes
+  back; the last page's end returns too. The foot of the screen says so.
+
+Seen on the bench (2026-10-17, 1280x720): the title page over the fleet with the four
+logos, page 5 of 30, Esc back to the main menu (`credits: left (0)`).

@@ -11,6 +11,7 @@ pub mod d3d;
 pub mod app;
 pub mod clipboard;
 pub mod config;
+pub mod credits;
 pub mod cursor;
 pub mod engine;
 pub mod gallery;
@@ -20,6 +21,7 @@ pub mod input;
 pub mod loading;
 pub mod math;
 pub mod menus;
+pub mod prefs;
 #[rustfmt::skip]
 pub mod shaders;
 pub mod style;

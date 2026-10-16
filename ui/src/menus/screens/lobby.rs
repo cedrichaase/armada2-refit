@@ -45,7 +45,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     }
     let t = ui.theme;
     kit::backdrop(ui);
-    let screen = ui.screen();
+    let screen = kit::wide_box(ui);
     let m = ui.u(32.0);
     let gap = ui.u(t.gap * 2.0);
 
@@ -58,10 +58,10 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     let players_cap = cap(RIGHT, 800, 40, LIST_TOP, "Players");
     let chat_cap = cap(0, 800, ACTIONS + 20, 320, "Chat");
 
-    let title_r = R::new(m, m * 0.5, screen.w - 2.0 * m, ui.u(t.display_size + 16.0));
+    let title_r = R::new(screen.x + m, screen.y + m * 0.5, screen.w - 2.0 * m, ui.u(t.display_size + 16.0));
     ui.text_in(title_r, &theme::caps(title), t.display_size, Align::Left, t.title, Weight::Bold);
     let bh = ui.u(t.button_h);
-    let body = R::new(m, title_r.bottom() + ui.u(8.0), screen.w - 2.0 * m, screen.h - title_r.bottom() - ui.u(8.0) - bh - m - gap);
+    let body = R::new(screen.x + m, title_r.bottom() + ui.u(8.0), screen.w - 2.0 * m, screen.bottom() - title_r.bottom() - ui.u(8.0) - bh - m - gap);
     let top_h = libm::floorf((body.h - gap) * 0.55);
     let left_w = libm::floorf((body.w - gap) * 0.64);
     let games_r = R::new(body.x, body.y, left_w, top_h);
@@ -115,9 +115,9 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     nav.sort_by_key(|c| c.rect[0]);
     kit::dedupe(&mut nav);
     let bw = ui.u(260.0);
-    let y = screen.h - m - bh;
+    let y = screen.bottom() - m - bh;
     for (i, c) in nav.iter().enumerate() {
-        let x = if i == 0 { m } else { screen.w - m - (nav.len() - i) as f32 * (bw + gap) + gap };
+        let x = if i == 0 { screen.x + m } else { screen.right() - m - (nav.len() - i) as f32 * (bw + gap) + gap };
         kit::button(ui, s, c, R::new(x, y, bw, bh), None);
     }
     true

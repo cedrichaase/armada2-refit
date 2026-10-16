@@ -5,6 +5,29 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.19.0 — 2026-10-17
+
+Layers: ui 0.10.0, render3d 0.11.0, testbench 3.28.0.
+
+### Added
+- The Credits are the UI's: the game's credits page by page over the menu scene, the
+  logos at their own aspect, Esc back to the main menu (ui 0.10.0).
+- Game Settings' "Command Bar" shows or hides the button bar, remembered between
+  sessions (ui 0.10.0).
+- The warp cursor over the minimap when a selected ship can warp (ui 0.10.0).
+- Hover sounds on every main menu and campaign selection entry (ui 0.10.0); the menu
+  scene's Klingons decloak with the cloak's sound (render3d 0.11.0).
+
+### Changed
+- Options, Instant Action, Multiplayer and the other front-end screens stand over the
+  menu scene; the Admiral's Log's seven other pages are redrawn; the lobby and Game
+  Setup are no wider than 16:9 (ui 0.10.0).
+
+### Removed
+- The top-right help and palette buttons (ui 0.10.0).
+
+Installed, not yet seen in game.
+
 ## 12.18.1 — 2026-10-17
 
 Layers: render3d 0.10.1, ui 0.9.1.

@@ -463,7 +463,12 @@ is checked to be stock first. `UI.log`: "cursor: the engine's cursor is kept squ
 | `[Menus] Generic` | mirror | a screen without a spec: `mirror` (as the game paints it) or `widgets` (its controls as ours) |
 | `[Menus] Specs` | 1 | 0: no screen spec, every screen generic |
 | `[Menus] EscapeReturns` | 1 | Esc in the in-mission menu is Return to Game |
-| `[Menus] Scene` | 1 | the main menu and the campaign selection over render3d's 3D scene (`MENUS.md`, "The menu scene"); without Render3D.asi, as before |
+| `[Menus] Scene` | 1 | the front end's screens over render3d's 3D scene (`MENUS.md`, "The menu scene"); without Render3D.asi, as before |
+| `[Menus] Credits` | 1 | the Credits are ours, over the menu scene (`MENUS.md`, "The Credits"); 0: the game's |
+
+What the player sets on a screen of ours is not in `UI.ini` but in `UIPlayer.ini` beside
+it (`prefs.rs`), a file no install ships or writes, so a reinstall keeps it: `[HUD]
+BarHidden` (Game Settings' "Command Bar", `HUD.md`, "The top-right buttons").
 | `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 | `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |

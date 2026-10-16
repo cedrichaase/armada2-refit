@@ -22,6 +22,7 @@ FindClose@4
 GetPrivateProfileIntA@16
 GetPrivateProfileStringA@24
 GetPrivateProfileSectionNamesA@12
+WritePrivateProfileStringA@16
 QueryPerformanceCounter@4
 QueryPerformanceFrequency@4
 GetTickCount@0

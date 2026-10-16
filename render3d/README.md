@@ -202,7 +202,14 @@ for; then, after `CloakDelay` seconds (the camera arriving), each of its ships
 decloaks in turn (`CloakStagger` apart, over `CloakTime`), drawn with the hulls'
 cloak as the engine's decloaking state 3 with that much of the hull back, its running
 lights only once it is whole. When the camera leaves, the group stays as it is until
-the camera has gone (`Blend`), then cloaks again for the next arrival.
+the camera has gone (`Blend`), then cloaks again for the next arrival. Each ship is
+heard as its decloak begins (fully cloaked in one frame, part of it back in the next):
+its group's `CloakSound`, by default `clkdisen.wav`, the `offSound` the Klingon
+cloaking device's ODF (`gkcloak.odf`) gives for "the ship decloaks". It is a 2D sound
+of the game's own sound system (`engine/sound.rs`: an `AudioSound2D` made with the
+game's `operator new` at priority 8, as `ShellButton::SetButtonMode` makes its hover
+sound), so the player's effects volume applies; it is a sound, not a simulation write,
+and plays only in the menu scene.
 
 **The departure.** While a mission loads from the campaign selection, `UI.asi` asks for
 the view under its loading screen through the second export,
@@ -282,7 +289,7 @@ time it is posed (`hulls: menu scene:`). Keys:
 | `[Planet]` | `Class` | the planet class's ODF (`PB_CLSSM`); none: no planet |
 | | `Radius`, `At`, `Axis`, `Spin`, `Clouds`, `Orbit` | its radius, its centre, its pole, how much faster than `Orbit` its ground turns, the clouds' extra turn, the orbit's radians a second (the sky's turn is `SkyTurn`) |
 | `[Group.<name>]` | `At`, `Yaw` | the group's place on the map and its turn about +y in degrees |
-| | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5) |
+| | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger`, `CloakSound` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5); the sound each makes as it begins (`clkdisen.wav`; empty for none) |
 | | `WarpColour` | the tunnel's tint when the group departs (0.45,0.62,1) |
 | `[View.<name>]` | `Group`, `Eye`, `Target`, `Fov` | in the group's frame; vertical field in degrees |
 | | `Sway`, `SwayPeriod` | the drift's amplitude and period |

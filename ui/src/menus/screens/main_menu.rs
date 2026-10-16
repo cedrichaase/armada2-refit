@@ -136,6 +136,13 @@ fn hover_changed(s: &Screen, hover: i32) {
                 (2, 2)
             };
             actions::push(actions::Action::Mouse { h, msg: WM_MOUSEMOVE, keys: 0, x: x - s.model.rect[0], y: y - s.model.rect[1] });
+            // Single Player, Instant Action and Multiplayer are hit areas of the
+            // procedure, which plays no sound for them (only the four buttons do): ours
+            // plays the buttons' own.
+            if hover >= 0 && s.model.button_at(x, y).is_none() {
+                let like = ENTRIES.iter().find_map(|e| s.model.button_at(e.1, e.2)).map(|c| c.key);
+                crate::engine::sound::shell_hover(like);
+            }
         }
     }
 }

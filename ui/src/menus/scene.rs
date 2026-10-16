@@ -1,4 +1,4 @@
-//! The 3D scene behind the main menu and the campaign selection (`[Menus] Scene=1`):
+//! The 3D scene behind the front end's screens (`[Menus] Scene=1`):
 //! render3d's map (`Render3D_MenuScene`, render3d's README, "The menu scene"), drawn
 //! into the back buffer at the start of the menus' frame, before anything of ours. The
 //! main menu shows its view `main`; the campaign selection the view of the campaign
@@ -54,14 +54,21 @@ fn scene_fn() -> Option<SceneFn> {
     }
 }
 
-/// The scene a screen stands over, by its name in `engine::dialogs`, or None.
+/// The scene a screen stands over, by its name in `engine::dialogs`: the main menu's
+/// view, the campaign selection's campaign, and for every other full-screen screen of
+/// the front end (Options, Instant Action, Multiplayer and its lobby, Load Game, ...)
+/// the view that showed last, so the camera stays where the screen was opened from.
+/// The specs dim it under their windows (`theme::backdrop`).
 fn scene_for(screen: &str) -> Option<&'static core::ffi::CStr> {
     match screen {
         "main menu" => Some(c"main"),
         "single player" => Some(unsafe { CHOICE }.unwrap_or(c"federation")),
-        _ => None,
+        _ => Some(unsafe { LAST_VIEW }.unwrap_or(c"main")),
     }
 }
+
+/// The view the scene last drew, kept across screens without one of their own.
+static mut LAST_VIEW: Option<&'static core::ffi::CStr> = None;
 
 /// The scene this frame stands over and render3d's function, if any.
 fn wanted() -> Option<(&'static core::ffi::CStr, SceneFn)> {
@@ -91,6 +98,9 @@ pub fn draw(w: u32, h: u32) {
     unsafe {
         SHOWN = drew;
         VIEW = if drew { Some(name) } else { None };
+        if drew {
+            LAST_VIEW = Some(name);
+        }
     }
     note(if drew { name.to_str().unwrap_or("") } else { "" });
 }
@@ -109,6 +119,15 @@ fn note(name: &'static str) {
                 crate::log!("menus: scene {} on", name);
             }
         }
+    }
+}
+
+/// Draws the view `name` of render3d's map into the whole back buffer, `w` x `h`, for
+/// a screen of ours (the Credits). False when it drew nothing.
+pub fn draw_view(name: &core::ffi::CStr, w: u32, h: u32) -> bool {
+    match scene_fn() {
+        Some(f) => unsafe { f(name.as_ptr() as *const u8, 0, 0, w, h) != 0 },
+        None => false,
     }
 }
 

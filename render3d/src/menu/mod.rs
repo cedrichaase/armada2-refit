@@ -225,6 +225,10 @@ struct Group {
     cloak_delay: f32,
     cloak_time: f32,
     cloak_stagger: f32,
+    /// The sound each ship makes as it begins to decloak (`CloakSound=`, a file the
+    /// game's sound system finds by name; default the Klingon cloak's `offSound`,
+    /// `clkdisen.wav`; empty for none).
+    cloak_sound: String,
     /// The tunnel's tint when this group departs (`WarpColour=`).
     warp_colour: V3,
 }
@@ -412,6 +416,7 @@ impl Map {
             cloak_delay: 0.0,
             cloak_time: 1.0,
             cloak_stagger: 0.0,
+            cloak_sound: String::new(),
             warp_colour: v3(0.45, 0.62, 1.0),
         }];
         for (sec, _) in &t.sections {
@@ -424,6 +429,7 @@ impl Map {
                 cloak_delay: t.f(sec, "cloakdelay", blend * 0.7).max(0.0),
                 cloak_time: t.f(sec, "cloaktime", 2.5).max(0.05),
                 cloak_stagger: t.f(sec, "cloakstagger", 0.5).max(0.0),
+                cloak_sound: t.get(sec, "cloaksound").map_or_else(|| String::from("clkdisen.wav"), String::from),
                 warp_colour: t.v(sec, "warpcolour", v3(0.45, 0.62, 1.0)),
             });
         }
@@ -715,6 +721,8 @@ struct State {
     said: u32,
     /// A departure: when it began, and the camera it swings from.
     warp: Option<(f64, Option<(V3, V3, f32)>)>,
+    /// Each ship's cloak in the last frame (`ShipAt::cloak`), to hear a decloak begin.
+    cloaks: Vec<Option<f32>>,
 }
 
 static mut STATE: State = State {
@@ -729,6 +737,7 @@ static mut STATE: State = State {
     from: None,
     said: 0,
     warp: None,
+    cloaks: Vec::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -773,6 +782,29 @@ fn cloak_of(g: &Group, nth: usize, view: &str, prev: &str, since: f64, now: f64,
         return None;
     }
     Some(0.0)
+}
+
+/// Each ship whose decloak began this frame (fully cloaked in the last frame, part of
+/// it back in this one) is heard: its group's `CloakSound`, as the game plays a
+/// cloaking device's `offSound` when a ship decloaks. A 2D sound of the game's own
+/// sound system (`AudioSound2D`, as the shell's buttons play theirs), so the player's
+/// effects volume applies. Nothing on the first frame of a visit, when there is no
+/// last frame to compare with.
+fn decloak_sounds(m: &Map, shot: &Shot, last: &mut Vec<Option<f32>>) {
+    if last.len() == shot.ships.len() {
+        for (i, (s, d)) in shot.ships.iter().zip(m.ships.iter()).enumerate() {
+            let was_hidden = matches!(last[i], Some(k) if k <= 0.0);
+            let back = s.cloak.is_none_or(|k| k > 0.0);
+            if was_hidden && back {
+                let snd = &m.groups[d.group].cloak_sound;
+                if !snd.is_empty() {
+                    crate::engine::sound::play_2d(snd);
+                }
+            }
+        }
+    }
+    last.clear();
+    last.extend(shot.ships.iter().map(|s| s.cloak));
 }
 
 /// Draws the view `name` of the map over the back buffer's rectangle `rect`, inside
@@ -847,6 +879,7 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     }
     let (view, prev, since, blend) = (s.view.as_str(), s.prev.as_str(), s.since, m.blend);
     let shot = m.shot(t, |g, nth| cloak_of(g, nth, view, prev, since, now, blend), dep.as_ref().map(|d| &d.0));
+    decloak_sounds(m, &shot, &mut s.cloaks);
     let lights = Lights { dirs: alloc::vec![m.key, m.fill], points: Vec::new() };
     let planet = m.planet.as_ref().map(|p| (p.6, p.2));
     crate::frame::menu_frame(rect, move |dev: Device, frame: u32| {

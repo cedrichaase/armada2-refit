@@ -162,10 +162,19 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
             // None: the engine shows no cursor (a right-drag); neither do we, unless a
             // box of ours wants the pointer (a mission's opening briefing: its stock box,
             // whose `Render` names the cursor, is not drawn).
-            match crate::engine::cursor::shape() {
+            let shape = match crate::engine::cursor::shape() {
                 Some(n) => n,
                 None if crate::hud::panels::box_shown() => "c_arrow",
                 None => return,
+            };
+            // Over the minimap a right click orders the selection there at warp: the
+            // warp cursor while a selected ship can warp, the move cursor while none
+            // can (the engine shows the arrow over the HUD).
+            match crate::hud::minimap_square(ui) {
+                Some(sq) if sq.contains((mx, my)) && !crate::hud::panels::box_shown() && crate::engine::selection::warp_functions_stock() => {
+                    crate::engine::selection::move_cursor().unwrap_or(shape)
+                }
+                _ => shape,
             }
         }
         _ => "c_arrow",

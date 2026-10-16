@@ -54,6 +54,81 @@ pub fn user_team() -> i32 {
     unsafe { f() }
 }
 
+// ---- whether the selection can warp (the minimap's cursor) ---------------------------
+
+/// `GameObject+0x14` (a byte, 4: a game object), `+0x40` its class, `+0xec` its team.
+const OBJ_FLAGS: usize = 0x14;
+const OBJ_CLASS: usize = 0x40;
+const OBJ_TEAM: usize = 0xec;
+/// `Craft+0x1b0`: its `cCraftControl`, whose `+0x08` is the impulse speed and `+0x0c`
+/// the warp speed (`SetWarpSpeed`), floats.
+const CRAFT_CONTROL: usize = 0x1b0;
+const CTL_SPEED: usize = 0x08;
+const CTL_WARP: usize = 0x0c;
+/// `g_allowWarp` (the mission scripts' `AllowWarp`), `g_pTransport`,
+/// `Transport::getGameSetup` and `GameSetup::isAllowWarpSpeed` (the setup screen).
+const G_ALLOW_WARP: usize = 0x6f4de0;
+const G_TRANSPORT: usize = 0x76b8d4;
+const GET_SETUP: usize = 0x557940;
+const ALLOW_WARP_SPEED: usize = 0x546280;
+
+/// Warp is allowed in this game: by the mission and by the setup screen, as
+/// `cCraftControl::TryWarp` asks (qol/README.md, QOL-8).
+fn warp_allowed() -> bool {
+    unsafe {
+        if rd::<i32>(G_ALLOW_WARP) == 0 {
+            return false;
+        }
+        let tr = rd::<usize>(G_TRANSPORT);
+        if tr == 0 {
+            return true;
+        }
+        let get: unsafe extern "thiscall" fn(usize) -> usize = core::mem::transmute(GET_SETUP);
+        let setup = get(tr);
+        if setup == 0 {
+            return true;
+        }
+        let allow: unsafe extern "thiscall" fn(usize) -> u8 = core::mem::transmute(ALLOW_WARP_SPEED);
+        allow(setup) != 0
+    }
+}
+
+/// The cursor a move ordered on the minimap shows: the minimap's order is `GO_WARP`,
+/// which a ship that can warp carries out at warp and one that cannot at impulse. Some
+/// `"c_warp"` when one of this player's selected ships can warp (its control's warp
+/// speed above its speed, as `TryWarp` tests, and warp allowed), `"c_move"` when the
+/// player's ships selected cannot, None when none of the player's ships is selected.
+pub fn move_cursor() -> Option<&'static str> {
+    let team = user_team();
+    let mut any = false;
+    let allowed = warp_allowed();
+    for h in handles() {
+        let o = object(h);
+        if o == 0 {
+            continue;
+        }
+        unsafe {
+            if rd::<u8>(o + OBJ_FLAGS) & 4 == 0 || rd::<i32>(o + OBJ_TEAM) != team {
+                continue;
+            }
+            if super::overlay::cast_craft_class(rd::<usize>(o + OBJ_CLASS)) == 0 {
+                continue;
+            }
+            any = true;
+            let ctl = rd::<usize>(o + CRAFT_CONTROL);
+            if allowed && ctl != 0 && rd::<f32>(ctl + CTL_WARP) > rd::<f32>(ctl + CTL_SPEED) {
+                return Some("c_warp");
+            }
+        }
+    }
+    if any { Some("c_move") } else { None }
+}
+
 pub fn functions_stock() -> bool {
     super::starts(ENTITY_GET, &[0x55, 0x8b, 0xec, 0x8b, 0x4d, 0x08]) && super::starts(USER_TEAM, &[0x8b, 0x0d, 0xd4, 0xb8, 0x76, 0x00])
+}
+
+/// `move_cursor`'s two calls are the stock accessors (each a field read and `ret`).
+pub fn warp_functions_stock() -> bool {
+    super::starts(GET_SETUP, &[0x8b, 0x41, 0x30, 0xc3]) && super::starts(ALLOW_WARP_SPEED, &[0x8b, 0x41, 0x10, 0x8a, 0x80, 0xd1])
 }

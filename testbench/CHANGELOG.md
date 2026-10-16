@@ -5,6 +5,12 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.28.0 — 2026-10-17
+
+### Added
+- Scenario `ui-hud-minimap-warp`: three destroyers selected, the cursor over the
+  minimap is the warp cursor (ui 0.10.0).
+
 ## 3.27.0 — 2026-10-17
 
 ### Added
