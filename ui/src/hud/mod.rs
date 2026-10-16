@@ -8,6 +8,16 @@ pub mod info;
 pub mod minimap;
 pub mod overlay;
 pub mod unitview;
+// hud-panels: the resources, the top-right buttons, the boxes, the overlay, the chat.
+mod buttons;
+mod chat;
+mod messages;
+mod objectives;
+mod overlay_text;
+pub mod panels;
+mod pause;
+mod replay;
+mod resources;
 
 use crate::engine::{self, hud};
 use crate::widgets::Ui;
@@ -25,7 +35,7 @@ pub fn install() -> bool {
         crate::log!("hud: Enable=0, the HUD is stock");
         return false;
     }
-    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view {
+    if !cfg.bar && !cfg.info && !cfg.minimap && !cfg.selection && !cfg.unit_view && !panels::any(cfg) {
         crate::log!("hud: no panel switched on, the HUD is stock");
         return false;
     }
@@ -58,6 +68,7 @@ pub fn install() -> bool {
             crate::log!("info: an engine function is not stock, the info panel stays stock");
         }
     }
+    panels::install(cfg);
     true
 }
 
@@ -119,5 +130,6 @@ pub fn run(ui: &mut Ui) {
         if BAR {
             bar::run(ui);
         }
+        panels::run(ui);
     }
 }

@@ -52,7 +52,7 @@ pub fn install() -> bool {
 
 unsafe extern "thiscall" fn chat_render(chat: usize) {
     let stock: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(CHAT_RENDER) };
-    unsafe { stock(chat) };
+    super::chat::render_stock(chat, stock);
     let dev = field(storm3d(), 0xcc);
     if dev == 0 {
         return;

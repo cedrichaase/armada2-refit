@@ -65,21 +65,21 @@ mission frame draws them itself after `RenderAll` (`ChatDisplay::Render`,
 | `SelectionDisplay` (`selectionDisplay`) — **the selection overlay, ours** | brackets, health/shield/energy gauges, group numbers and names over units in the 3D view | the overview's selection, each object's state | none of its own (tooltips on the objects) | camera-projected 2D quads and text | done: `engine::overlay` |
 | `MapRadar` (`mapRadar`) — **the minimap, ours** | the map, fog, units, the camera's view outline; ship/station filter buttons | `RadarComponent` from the scanner grids (fog) and the object lists | click/drag moves the camera or orders a move; filter buttons | the radar's own textures (`Gminimap`, `Gfog`, ...) and sprites | done: `engine::radar` |
 | `ResourcePanel` (`g_resourcePanel`) | the resources (dilithium, metal, latinum, biomatter, crew, officers) at the top | `ResourceComponent`s asking `Team::GetResource` | tooltips only | `StandardBackground` and text | `engine::resources` (the amounts, done); which `eResource` is which |
-| `ButtonPanel` (`g_buttonPanel`) | the top-right buttons: menu, comm, idle unit, view toggle, objectives, help, palette, more | fixed | its `StandardButton`s (focus-step) | `StandardButton` sprites with tooltips | each button's press (`OpenMenu`, `OpenComm`, `IdleShip`, `ToggleView`, `ShowObjectives`, `ToggleHelp`, `TogglePalette`, `ToggleShowMore`) |
+| `ButtonPanel` (`g_buttonPanel`) | the top-right buttons: menu, comm, idle unit, view toggle, objectives, help, palette, more | fixed | its `StandardButton`s (focus-step) | `StandardButton` sprites with tooltips | done: `engine::topbar`, `hud/buttons.rs` |
 | `CinematicView` (`g_cinematicView`) — the unit view (`cinematicPanelArea`) | a second 3D view of the action, or a video | its camera, the action camera's target | clicks on it | a second scene render inside `RenderAll` (render3d/README.md: the action camera is a second view) | keep the engine's render; ours draws the frame around it only (done, `UnitView`) |
-| `MessageDisplay` (`g_messageDisplay`) | a mission message box (text and OK) | script calls (`SetText`) | its OK button; pauses the game | `StandardBackground`, `StandardText`, `StandardButton` | the text and the OK press (`mUnpauseCallback`) |
-| `ObjectivesDisplay` (`g_objectivesDisplay`) | the briefing and objectives, ticks for completed ones | the mission's objectives file, `SetObjectiveComplete` | OK; keys while it has the mouse (`GameKeysProcessInput`) | as `MessageDisplay` | the objectives' text and completion (hud/README.md has where they are kept) |
+| `MessageDisplay` (`g_messageDisplay`) | a mission message box (text and OK) | script calls (`SetText`) | its OK button; pauses the game | `StandardBackground`, `StandardText`, `StandardButton` | done: `engine::popups`, `hud/messages.rs` |
+| `ObjectivesDisplay` (`g_objectivesDisplay`) | the briefing and objectives, ticks for completed ones | the mission's objectives file, `SetObjectiveComplete` | OK; keys while it has the mouse (`GameKeysProcessInput`) | as `MessageDisplay` | done: `engine::popups`, `hud/objectives.rs` |
 | `CommDisplay` (`commDisplay`), with its `CommBar`s | multiplayer comms: players, teams, alliances, give resources/units, chat targets, allied victory, latency | the transport's `GameSetup` | many buttons, toggles and amount boxes | `StandardButton`/`ToggleButton`/text | `GameSetup` reads and the comm actions (`ProcessAlliance`, `GiveResource`, ...): late, with the menus' multiplayer screens |
-| `PauseBox` (`pauseBox`) | "paused" and an unpause button | the game's pause state | unpause; it locks the mouse to itself (`AlwaysSimulate` writes the owner) | box, text, button | the unpause press |
+| `PauseBox` (`pauseBox`) | "paused" and an unpause button | the game's pause state | unpause; it locks the mouse to itself (`AlwaysSimulate` writes the owner) | box, text, button | done: `engine::popups`, `hud/pause.rs` |
 | `DropPlayerBox` (`dropPlayerBox`) | a dropped player: drop or AI takeover, with a timer | the transport | its two buttons | box, text, buttons | multiplayer: late |
-| `ReplayPanel` (`g_replayPanel`) | replay controls: restart, pause, slow, normal, fast | the replay | its buttons | `StandardButton`s | the five presses |
-| `OverlayText` (`overlayText`) | timed messages in the middle of the screen (`AddMessage`) | script and game events | none | the HUD font | the message list |
+| `ReplayPanel` (`g_replayPanel`) | replay controls: restart, pause, slow, normal, fast | the replay | its buttons | `StandardButton`s | done: `engine::popups`, `hud/replay.rs` (not seen: no replay on the bench) |
+| `OverlayText` (`overlayText`) | timed messages in the middle of the screen (`AddMessage`) | script and game events | none | the HUD font | done: `engine::overlay`, `hud/overlay.rs` |
 | `LoadPercentageBox` (`loadPercentageBox`) | multiplayer load progress of the other players | the transport | none | box and text | with the loading screen |
 | `EditMenu` (`g_editMenu`) | the map editor's menu; hidden in a game | — | — | — | not taken |
 | `cOverViewImp` (`g_pOverView`) — the 3D view itself | selection boxes, the order cursor | the selection, the pointer's target | everything not on a panel: the owner of last resort | — | not a panel: stays the engine's |
 | `CursorInterface` (`iCursor`) | the cursor shape and the tooltips (`DoTooltip`, `mDrawTooltip`) | the owner's cursor and `Tooltip` | owns the decision of who owns the mouse | the device's cursor; tooltip boxes in the HUD font | the cursor is PLAN.md's "not decided yet"; tooltips are ours per panel (the bar's are) |
 | `ScreenFade` (`g_screenFade`) | fades to and from black | scripts | none | a full-screen quad | not taken (not in a game's list) |
-| chat lines, text entry (not components) | chat, and the line being typed | `ChatDisplay`, `TextInput_*` | the keyboard while typing | the HUD font | text entry: PLAN.md's "not decided yet" |
+| chat lines, text entry (not components) | chat, and the line being typed | `ChatDisplay`, `TextInput_*` | the keyboard while typing | the HUD font | done: `engine::chat`, `hud/chat.rs` (drawn by us, the keys the engine's) |
 
 ### The order to take them over
 
@@ -530,6 +530,168 @@ named here beside the panel that uses it:
 | `race.rs` | the race the HUD is loaded in | the theme |
 | `radar.rs` | the radar's square, its picture's textures, the scan grids, blips, pings, the camera's outline, team colours and relations, the filters, the move order and the camera move (the always-step hook), `Localize` | the minimap; relations for the selection overlay |
 | `overlay.rs` | the units `SelectionDisplay` marks, their boxes on screen (`ComputeContainerRect`), gauges, groups, names; `g_cinematicView` | the selection overlay, the unit view's frame |
+| `buttons.rs` | a `StandardButton`'s picture, state, label, tooltips and press; presses queued for the simulate pass; an `ObjectivesText`'s string and colour; `Localize`; Latin-1 strings | the top-right buttons, the boxes, the replay controls |
+| `topbar.rs` | `ResourcePanel`'s components (which `eResource` the race shows), the amounts as stock writes them, the resources' colours and tooltips; `ButtonPanel`'s eight buttons and "show more" | the resources, the top-right buttons |
+| `popups.rs` | `MessageDisplay`, `ObjectivesDisplay`, `PauseBox`, `ReplayPanel`: shown, texts, objectives and their completion, their buttons | the boxes, the replay controls |
+| `overlay.rs` | `OverlayText`'s messages (point, justification, text, colour, fade) | the overlay messages |
+| `chat.rs` | the chat lines, the text-entry regions, the skip of both stock drawings | the chat |
+
+## The resources, the buttons, the boxes, the overlay and the chat
+
+Each behind its own `[HUD]` key, all 0 by default: `Resources`, `Buttons`, `Messages`
+(the message box and the objectives together), `Pause`, `Replay`, `Overlay`, `Chat`.
+`hud/panels.rs` takes each over through the panel switch (by the component's
+address: every one of them is a global instance) and draws them in one order: the
+chat first, then the resources, the buttons and the replay controls, the overlay
+messages over them (stock's `OverlayText` follows `ResourcePanel` in the list), and
+the boxes that pause the game last, in the overlay layer over everything. While a box
+shows, the screen is occluded for every other widget of ours and claimed from the
+engine, as the stock boxes (whose `CursorOver` is always true) take the mouse
+wherever it is; the keyboard is left to the engine. With the HUD hidden (a cinematic)
+the resources and the buttons are not drawn.
+
+**Presses at the simulate pass.** A stock `StandardButton` presses itself in its
+panel's focus-step, inside `DisplayInterface::SimulateAll`; ours are clicked in the
+UI's frame, which runs inside the engine's scene. A press there could open a dialog
+(the menu button's `do_escape` runs the in-mission menu's modal loop) mid-scene. So a
+click is queued (`engine::buttons::queue`) and pressed at the next pass of
+`Program::DisplayInputProcess`, at its `call Entity::ResetVisibility` (0x483869),
+which comes once per pass after the input loop that runs `SimulateAll` and before
+`Armada_RenderFrame`: where a stock click would have pressed it, give or take the
+order within the pass. The call is re-pointed, checked to be stock; without it,
+presses are made in the UI's frame. A press not taken in half a second is dropped.
+`press` checks the button's vtable slot is `StandardButton::mButtonPressFunction`,
+and every panel checks each button's press function (`+0x5c`) is the one its
+`PostLoad` set before it treats the field as that button.
+
+### The resources (`ResourcePanel`)
+
+`ResourcePanel::PostLoad` makes one `ResourceComponent` per `eResource` (0 crew, 1
+officers, 2 dilithium, 3 latinum, 4 metal, 5 biomatter, `g_eResourceToString`) at
+`+0x2c + 4 * r`, unless the race's GUI config sets `no<Name>`: so the panel's non-NULL
+slots are the race's resources, and ours shows those, in that order.
+`ResourceComponent::Render` writes the amount into its text each frame (and draws it
+there): `Team::GetResource(r)` truncated, 0 while the team's `+0x16c` is clear, and for
+officers the team's `+0x160` over `Team::GetMaxOfficers()` ("12/30"); ours writes the
+same. The colour of each is `ResourceComponent::s_ResourceColor[r]` (a `ST3D_Colour *`
+each, from the GUI config), drawn as a mark beside it; its name and tooltip are the
+component's own `GetTooltip` (vtable `+0x00`, the verbose one `+0x04`), whose first
+line is the localised name. A strip at the top centre of the screen.
+
+### The top-right buttons (`ButtonPanel`)
+
+Eight `StandardButton`s at `+0x2c..+0x48`: menu (`OpenMenu`, `do_escape`), comm
+(`OpenComm`, shows `commDisplay`), idle unit (`IdleShip`: the overview's next idle
+unit, and the camera to it), view (`ToggleView`, `CameraManager::SwapCameras`),
+objectives (`ShowObjectives`), help (`ToggleHelp`, cycles
+`CursorInterface::m_tooltipState` 0..2), palette (`TogglePalette`, the bar's vtable
+`+0x90`), more (`ToggleShowMore`). `+0x4c` is "show more": `Render` and
+`AlwaysSimulate` touch menu, help and palette only while it is set, and ours shows
+them only then. Their states are `PostLoad`'s: comm is disabled outside a network
+game, objectives when the profile says so, idle in some slot types. Ours: a row of
+square buttons in the top-right corner, each drawing the stock button's own picture
+(`+0x2c`, `engine::sprite`), the game's tooltip, pressing the stock button; help is
+drawn active while the tooltip level is not 0, more while "show more" is set.
+
+### Messages and objectives (`MessageDisplay`, `ObjectivesDisplay`)
+
+`MessageDisplay`: the title (the message's first line) and the body are two
+`ObjectivesText`s at `+0x28` and `+0x2c` (`SetText` splits the text at the first
+newline), OK at `+0x34` (`mUnpauseCallback`: hides the box, and in a network game
+clears `g_gameProcessObjectivesPause`). Its `CursorOver` is always true: stock's box
+is modal. It reads no keys. `ObjectivesDisplay`: the summary's header
+(`GUI_OD_BRIEFING_SUMMARY`) at `+0x28`, the mission's title `+0x2c`, the briefing
+`+0x30` (seen on the bench: the title "Invasion", the briefing the long text), the objectives' header
+(`GUI_OD_OBJECTIVES`) `+0x34`, the objectives a `std::vector<ObjectivesText *>` at
+`+0x3c`/`+0x40`, their completion a vector of bytes at `+0x5c`/`+0x60`
+(`SetObjectiveComplete`), OK at `+0x70` (`mUnpauseCallback`). Stock closes it from
+its focus-step (`FocusSimulate`) when either of two command flags is set (pointers at
+`s_completeCount+4` and `+8`, taken in its `PostLoad`; Enter is one, and the
+tutorial's lessons advance on the same key). A component that never owns the mouse
+never gets its focus-step, so with the box ours `popups::objectives_keys` calls
+`ObjectivesDisplay::FocusSimulate` itself at each simulate pass while the box shows
+(the presses' hook): the box closes on the engine's own bindings, as in stock.
+Measured on the bench: a first version that pressed OK on Enter itself and kept the
+key from the engine left the Starfleet Academy tutorial's lessons stuck and its
+zoom unanswered; closed by its own step, the tutorial runs as with the stock box. Its
+hidden-step, which opens it on the objectives key (Alt+O), still runs. Ours: windows
+over a dimmed screen (`panels::boxed`; not `Ui::modal`, which keeps the keyboard),
+the message's title as the window's, the text wrapped; the objectives with a check
+box per line, ticked when complete.
+
+### Pause and replay (`PauseBox`, `ReplayPanel`)
+
+The pause box is shown and hidden by the pause order (`NetOrderPause::Execute`); its
+unpause button at `+0x30` (`UnpauseCallback`) puts the unpause order into the round
+buffer and hides it. Its text is a `PauseText` whose `GetInformation` answers no
+string: the words are the GUI config's labels, `GUI_POP_PAUSE_TEXT` and
+`GUI_POP_PAUSE_CONTINUE`, which ours localises itself
+(`Localized_Strings::Localize` on `g_string`). Ours dims the screen lightly and keeps
+the mouse (the game is paused), but not the keyboard, so the pause key still
+unpauses. The box's `AlwaysSimulate` makes it the mouse's owner while the transport is
+paused in view 2, over the panel switch's decision; not seen to matter.
+
+The replay panel's five buttons at `+0x2c..+0x3c` press functions that cast the
+transport to `TransportReplay` and set its speed (`+0x84`, 0 paused .. 3 fast) or go
+to its first chapter. Ours: a row under the resources while the panel shows.
+
+### Overlay messages (`OverlayText`)
+
+`AddMessage(x, y, justify, text, colour, fade in, font)` keeps a `SingleOverlayText`
+in a `std::map` at `+0x24` (head node `+0x28`; MSVC 6's tree with the shared `_Nil`
+sentinel), keyed by a counter. Each message: its point at `+0x58` (1600 x 1200, from
+the panel's corner), justification `+0x68`, text `+0x84` (a `std::string`), colour
+`+0x94`, fade `+0xa0` (raised and lowered by the stock `AlwaysGameSimulate`, which also
+erases a faded one: it keeps running). Ours draws each in title type with a shadow,
+in its colour times its fade.
+
+### Chat and the text entry (not components)
+
+The mission frame calls `TextInput_Update` and then `ChatDisplay::Render` after
+`RenderAll` (README.md, "The mission frame"). `ChatDisplay::Render` both drops the
+expired lines and prints the rest: with `Chat=1` the UI's hook on its call
+(`engine::ingame`) calls `ChatDisplay::RemoveExpiredText`, the same drop on its own,
+instead. The call of `TextInput_Update` (0x598a07) is re-pointed at ours, which with
+the chat taken only clears each region's "changed" flag, as stock does after
+printing. The lines are a `std::list<ChatLine>` at `+0x04` (text, colour pointer);
+a text-entry region keeps its prompt and text in one buffer (`+0x10`; the prompt's
+length `+0x130`, the end `+0x134`, the caret `+0x138`) and flags at `+0x144` (1 shown,
+0x100 taking keys). Ours: the lines down the left under the top bar on a faint
+backing, and below them, while a region is shown, a field with the prompt in the
+accent, the text and the caret. The keys are never ours: `TextInput_ProcessInput`
+reads them from the engine's input as before.
+
+### Seen on the bench
+
+2026-10-16, 1280x720, the shell's theme (the race's theme is another agent's work):
+Instant Action as the Borg showed Crew, Power Nodes ("16/600", the Borg's officers),
+Dilithium and Metal, counting; the Federation campaign and the tutorial Crew,
+Officers, Dilithium, Latinum and Metal. Every top-right button pressed its stock
+function: more (menu, help and palette appeared), help (drawn active), idle (an
+Assembler selected, the camera on it), view, palette (the bar hid and came back),
+menu (the in-mission OPTIONS menu, Return to Game back), objectives (the box). The
+game's tooltips showed, the verbose one after a rest. The pause key showed our box
+("GAME PAUSED", "CONTINUE"), CONTINUE and the pause key both unpaused. Typing in chat
+showed the line with the caret where the engine has it; the pause lines showed in
+the chat. The Federation briefing and the tutorial's lesson boxes showed in ours,
+closed on OK and on Return (by their own step), and the tutorial advanced on Return
+and zoomed on the wheel as with the stock box. The intro's centre lines showed as
+ours. `testbench/scenarios/ui-hud-panels.md` and `ui-hud-panels-objectives.md`.
+
+### Not done here
+
+- **`CommDisplay` / `CommBar`, `DropPlayerBox`, `LoadPercentageBox`** (multiplayer).
+  `CommDisplay` is a panel of `CommBar`s, one per player slot, each made by
+  `CommBar::CreateButton`/`CreateToggle`/`CreateColorToggle`/`CreateAlliance` with
+  callbacks (`PlayerSelectCallback`, `MakeEnemyCallback`, `MakeNeutralCallback`,
+  `MakeAllyCallback`, ...) that a panel of ours would press as it presses a
+  `StandardButton` (toggles and colour buttons are subclasses: their press slot is
+  not `StandardButton`'s, so `engine::buttons::press` refuses them and they need
+  their own check), and it reads `GameSetup` through `g_transport` for the names,
+  teams and alliances. `DropPlayerBox` (`dropPlayerBox`, 0x764cd0) is a box with a
+  `DropPlayerText` and two buttons, shown by the transport when a player drops;
+  `LoadPercentageBox` (`loadPercentageBox`, 0x764de0) only text. Each needs a
+  network game on the bench (`online/`'s two-player scenarios) to verify.
 
 ## Not done
 

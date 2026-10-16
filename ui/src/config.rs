@@ -63,6 +63,16 @@ pub struct Hud {
     pub selection_gauges: bool,
     /// Our frame around the unit view (`CinematicView`), which the engine still draws.
     pub unit_view: bool,
+    /// The panels of hud-panels (HUD.md): the resources, the top-right buttons, the
+    /// message and objectives boxes, the pause box, the replay controls, the overlay
+    /// messages, the chat lines and the text entry.
+    pub resources: bool,
+    pub buttons: bool,
+    pub messages: bool,
+    pub pause: bool,
+    pub replay: bool,
+    pub overlay: bool,
+    pub chat: bool,
 }
 
 pub fn load() -> Config {
@@ -92,6 +102,13 @@ pub fn load() -> Config {
             selection: ini.int("HUD", "Selection", 0) != 0,
             selection_gauges: ini.int("HUD", "SelectionGauges", 1) != 0,
             unit_view: ini.int("HUD", "UnitView", 0) != 0,
+            resources: ini.int("HUD", "Resources", 0) != 0,
+            buttons: ini.int("HUD", "Buttons", 0) != 0,
+            messages: ini.int("HUD", "Messages", 0) != 0,
+            pause: ini.int("HUD", "Pause", 0) != 0,
+            replay: ini.int("HUD", "Replay", 0) != 0,
+            overlay: ini.int("HUD", "Overlay", 0) != 0,
+            chat: ini.int("HUD", "Chat", 0) != 0,
         },
         menus: ini.int("Menus", "Enable", 0) != 0,
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",

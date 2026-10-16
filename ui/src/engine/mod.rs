@@ -5,6 +5,8 @@
 //! One file per drawing context: `ingame` (a mission's HUD), `shell` (the front-end
 //! menus), `loading` (the loading screen). Each has an `install()` that patches its
 //! hooks, checked against what stock has there, and stands down on a mismatch.
+pub mod buttons;
+pub mod chat;
 pub mod cursor;
 pub mod dev8;
 pub mod dialogs;
@@ -14,16 +16,19 @@ pub mod info;
 pub mod ingame;
 pub mod loading;
 pub mod msvc;
+pub mod overlay;
 pub mod palette;
 pub mod race;
+pub mod popups;
+pub mod overlay_text;
 pub mod resources;
 pub mod selection;
 pub mod shell;
 pub mod sound;
 pub mod sprite;
+pub mod topbar;
 pub mod shellui;
 pub mod radar;
-pub mod overlay;
 
 use core::ffi::c_void;
 
