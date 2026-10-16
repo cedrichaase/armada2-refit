@@ -4,6 +4,21 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.9.0 — 2026-10-17
+
+### Added
+- A mission loaded while the menu scene is up (from the campaign selection) keeps the
+  scene under the loading screen and departs from it: the view's ships go to warp and
+  the camera follows them into the tunnel (`Render3D_MenuWarp`, needs render3d 0.10.0).
+  UI.log: `menus: the load departs from the scene <view>`.
+- Frames of ours inside a loading step, after each SOD and texture loads (hooks on the
+  calls of `LoadDatabase` and `LoadPixelData`), so the screen no longer stands still
+  through a long step.
+- UI.log names each stretch of 100 ms or more with no loading frame presented, with
+  its step and what loaded in it (`loading: still`).
+
+Installed, not yet seen in game.
+
 ## 0.8.0 — 2026-10-16
 
 ### Changed

@@ -22,7 +22,8 @@
       "aliases": ["mission briefing", "objectives", "mission"],
       "text": ["BRIEFING SUMMARY", "OBJECTIVES"],
       "timeout": 300,
-      "_note": "a campaign mission opens on its briefing, after a ~70 s opening cinematic that Esc does not skip"
+      "skip": "space",
+      "_note": "a campaign mission opens on its briefing, after a ~70 s opening cinematic; Esc does not skip it, Space does (straight to the briefing, where Space does nothing), so the wait presses Space at every look"
     },
     "options": {
       "aliases": ["in-mission menu", "in-game menu", "options menu", "pause menu", "in-mission options"],

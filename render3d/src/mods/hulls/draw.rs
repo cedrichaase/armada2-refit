@@ -61,6 +61,15 @@ impl Warp {
         let d = nw.dot(cw) + r - 2.0 * r * b;
         Warp { n: nw, d, s1: s - 1.0, o: (s - 1.0) * r * b }
     }
+
+    /// A menu ship's departure (`crate::menu`), which has no instance: from a sphere
+    /// and the way already in world space, and stretched forward only. The engine's
+    /// shift back by o, seen from the camera behind the ships, threw the stretch across
+    /// the screen towards it.
+    pub fn world(b: f32, s: f32, n: V3, centre: V3, r: f32) -> Warp {
+        let d = n.dot(centre) + r - 2.0 * r * b;
+        Warp { n, d, s1: s - 1.0, o: 0.0 }
+    }
 }
 
 /// The wave light a draw of the object turns on (the first of them), as constants.

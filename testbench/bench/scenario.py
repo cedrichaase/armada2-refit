@@ -262,8 +262,11 @@ def s_wait_screen(c, m):
     scr = c.screen_def(name)
     if scr is None:
         return c.delegate(m.string)
+    # A screen with `skip` (the briefing) presses that key at every look that does not
+    # find it yet: the cutscene before it skips to it, and the key does nothing on it.
+    skip = scr.get('skip')
     found, path = c.poll_for(lambda words: c.screen_matches(scr, words), int(m.group('n') or scr.get('timeout', 90)),
-                             f'the {name}')
+                             f'the {name}', between=(lambda: c.sess.key(skip)) if skip else None)
     time.sleep(scr.get('settle', 1.5))
     return f'on the {name}'
 
@@ -888,7 +891,7 @@ class Case:
         """The screen as it is now, for a check -- kept, so the report shows what was judged."""
         return self.shot(name)
 
-    def poll_for(self, fn, timeout, what):
+    def poll_for(self, fn, timeout, what, between=None):
         end = time.time() + timeout
         tmp = self.sess.work / 'poll.png'
         while True:
@@ -901,6 +904,8 @@ class Case:
             if time.time() > end:
                 p = self.shot(f'timeout-{self.n}')
                 raise StepFailed(f'{what} did not appear within {timeout}s (last frame: {p.name})')
+            if between:
+                between()
             time.sleep(1.0)
 
     def checked(self, ok, detail, shots=(), how=None, measure=None):

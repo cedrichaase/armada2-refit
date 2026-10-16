@@ -428,6 +428,13 @@ pub fn run(ui: &mut Ui) {
 /// The sky's face, cropped to cover the screen and darkened so the text reads; the
 /// menu backdrop without one.
 fn backdrop(ui: &mut Ui, l: &Load, r: R) {
+    if crate::menus::scene::departure_shown() {
+        // Over the departure: only enough shade for the text, at the left and the foot.
+        let half = R::new(r.x, r.y, r.w * 0.55, r.h);
+        ui.draw.rect_hgrad(half, 0x90000000, 0x00000000);
+        ui.draw.rect_vgrad(R::new(r.x, r.y + r.h * 0.7, r.w, r.h * 0.3), 0x00000000, 0xa0000000);
+        return;
+    }
     match l.sky {
         Some((tex, uv, aspect)) => {
             let ra = r.w / r.h;

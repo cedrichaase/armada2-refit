@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.18.0 — 2026-10-17
+
+Layers: ui 0.9.0, render3d 0.10.0, testbench 3.27.0.
+
+### Added
+- Starting a mission from the campaign selection keeps the menu scene running under
+  the loading screen: the campaign's ships go to warp with the camera following them
+  into a warp tunnel, which holds until the mission starts (ui 0.9.0, render3d 0.10.0).
+
+### Changed
+- The loading screen is redrawn inside long loading steps too, after each model and
+  texture loads (ui 0.9.0).
+
+Installed, not yet seen in game.
+
 ## 12.17.0 — 2026-10-16
 
 Layers: ui 0.8.0, render3d 0.9.0, testbench 3.26.0.

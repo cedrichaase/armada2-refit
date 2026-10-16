@@ -155,7 +155,7 @@ in orbit over a class M planet, a starbase beside it, Klingon ships before a Met
 nebula far out on one side, a Borg fusion cube and the queen's Diamond in a Mutara nebula
 on the other. `UI.asi`
 asks for a **view** of it by name (`[Menus] Scene=1`, ui/MENUS.md, "The menu scene")
-through render3d's one export, `Render3D_MenuScene(name, x, y, w, h)`: inside its own
+through render3d's export `Render3D_MenuScene(name, x, y, w, h)`: inside its own
 scene, with the back buffer bound, it gets the view drawn into that rectangle and draws
 the menu over it. A 0 back (no such view, no Direct3D 9 device, no targets) leaves the
 UI's own backdrop. The views UI.asi asks for: `main` (the main menu), and on the
@@ -182,6 +182,7 @@ the looks they give a mission:
 | `Ships` | hulls | `menu_begin` poses every ship of the map (finest level of detail, its animation looping, `hardpoints` and the damage, crew and Borg nodes hidden by name, as no class says which) and draws the shadow map from those in view, with the menu planet in place of the engine's; then the hull look, opaque, of the ships in view, and their running lights collected |
 | `Gas` | world | `Nebulae::draw_menu`: each `[Nebula.*]` field's nebulae as the class's gas, marched and lit by the Key with the ships' shadows, as a mission's; before the cloak, which bends a copy of what is behind a hull |
 | `Translucent` | hulls | additive meshes, decloaking hulls (the cloak's glass, as the engine's state 3) and sprite nodes, as at a mission's `Step::Translucent` |
+| `Warp` | sky | a departure's flashes (the stock `warp_sprite`) and its tunnel (`tunnel_ps`), below |
 
 **One map, one sun.** Every view looks at the same map: asking for another moves the
 camera there from where it is (eye, target and field blended over `Blend` seconds,
@@ -202,6 +203,38 @@ decloaks in turn (`CloakStagger` apart, over `CloakTime`), drawn with the hulls'
 cloak as the engine's decloaking state 3 with that much of the hull back, its running
 lights only once it is whole. When the camera leaves, the group stays as it is until
 the camera has gone (`Blend`), then cloaks again for the next arrival.
+
+**The departure.** While a mission loads from the campaign selection, `UI.asi` asks for
+the view under its loading screen through the second export,
+`Render3D_MenuWarp(name, x, y, w, h)` (ui/LOADING.md, "Over the menu scene"). The first
+call after one of `Render3D_MenuScene` begins a departure from that view (Render3D.log:
+`menu: departure from <view>`), and it goes on as long as the calls come:
+
+- The view's group's ships leave front first (`Stagger` apart, after `Delay`; a ship
+  with `Warp=0`, the starbase, stays), each along the mean of their noses: impulse
+  (`Speed`), then over `Ramp` seconds the hull's warp stretch, the shader's own (a
+  plane across the motion sweeping from bow to stern, the hull in front of it
+  stretched by up to `Stretch`), and it is gone, with a flash of the stock
+  `warp_sprite` where it was (`Flash` times its radius, for `FlashTime`). The
+  stretch is forward only: the engine's shift of the hull back, which suits a ship
+  seen from the side in a mission, threw the stretch across the screen towards a
+  camera behind the ships.
+- The camera swings from where it was to behind the ships, looking the way they go
+  (`Turn`; over the top, so it does not pass through them; `WarpEye`/`WarpTarget` set
+  it by hand), then follows them, accelerating (`Follow`).
+- Once the last ship has gone (`TunnelAt`), the tunnel comes in over `TunnelIn`:
+  `tunnel_ps` over the whole view, premultiplied over (1 - alpha), so it darkens the
+  scene under it by `Dim` as its streaks come up, and the field of view widens by
+  `Widen` degrees. Its streaks are stars on cylinders about the camera's axis rushing
+  at the eye (a star at radius rho and depth s is seen rho / s off the axis, so the
+  depths it covers in a frame draw a radial streak), one star per angular cell in four
+  rings, so each pixel looks only at its own cell of each ring: a fixed loop with no
+  branch, as vkd3d needs. A soft wall of gas in the group's `WarpColour` streams past
+  behind them (the Borg's green). The tunnel runs as long as the load does.
+
+The departure keeps the map's clock and the scene's passes; it only poses the
+departing ships and moves the camera, so the frame costs what a menu frame does, plus
+one full-screen pass.
 
 **The gas.** A `[Nebula.*]` field lays a nebula class's centres on a jittered grid over
 an ellipse in its group's frame, as a map's nebula is laid out, and the world module
@@ -238,207 +271,24 @@ time it is posed (`hulls: menu scene:`). Keys:
 | | `Sun`, `SunDistance` | the sun's ODF (none: no sun) and its distance from the eye |
 | | `KeyAxis`, `KeyColour`, `FillAxis`, `FillColour` | the two lights: the way each travels, and its colour |
 | | `Blend` | seconds the camera takes from one view to the next (2; the map's 1.6) |
+| `[Warp]` | `Delay`, `Stagger`, `Ramp` | a departure: seconds before the first ship goes (0.9), between one and the next (0.18), from impulse to gone (0.75) |
+| | `Stretch`, `Speed` | the warp stretch at the end of the ramp (30); the impulse's acceleration, units/s² (120) |
+| | `Turn`, `Follow` | seconds the camera takes to swing behind the ships (1.3); its acceleration after them, units/s² (260) |
+| | `TunnelAt`, `TunnelIn`, `Dim`, `TunnelSpeed`, `Widen` | the tunnel: seconds after the last ship has gone (0.1), to come in (0.9); how much it darkens the scene (0.85); how fast its streaks come (1); degrees the field widens by (18) |
+| | `Flash`, `FlashTime` | a flash's half size times the ship's radius (2.2), and its seconds (0.45) |
 | `[Planet]` | `Class` | the planet class's ODF (`PB_CLSSM`); none: no planet |
 | | `Radius`, `At`, `Axis`, `Spin`, `Clouds`, `Orbit` | its radius, its centre, its pole, how much faster than `Orbit` its ground turns, the clouds' extra turn, the orbit's radians a second (the sky's turn is `SkyTurn`) |
 | `[Group.<name>]` | `At`, `Yaw` | the group's place on the map and its turn about +y in degrees |
 | | `CloakView`, `CloakDelay`, `CloakTime`, `CloakStagger` | the view whose arrival decloaks its ships; the seconds before the first starts (`Blend` x 0.7), each takes (2.5), between one and the next (0.5) |
+| | `WarpColour` | the tunnel's tint when the group departs (0.45,0.62,1) |
 | `[View.<name>]` | `Group`, `Eye`, `Target`, `Fov` | in the group's frame; vertical field in degrees |
 | | `Sway`, `SwayPeriod` | the drift's amplitude and period |
+| | `WarpEye`, `WarpTarget` | the camera a departure from the view swings to, in the group's frame (default: behind the departing ships, looking the way they go) |
 | `[Ship.<name>]` | `Group`, `Odf`, `At`, `Yaw`, `Scale`, `Bob`, `Phase`, `Team` | its group; the ship's ODF (its `baseName` and `ScaleSOD`), its place in the group, a turn in degrees, a scale on top of `ScaleSOD`, how much it bobs, its phase, a team colour for its `team*` groups |
+| | `Warp` | 0: stays when its group departs (a station) |
 | `[Nebula.<name>]` | `Group`, `Odf`, `At`, `Size`, `Spacing`, `Jitter`, `Seed` | its group; a nebula ODF with a gas recipe; the field's centre (its plane's height is its y); half extents in x and z; the grid's step (the radius x 1.2) and jitter (0.35); the seed |
 | | `Radius` | the class's radius (the ODF's `effectRadius`, else 300) |
 | | `KeyShare`, `Scatter`, `Opacity`, `Brightness` | over the recipe's, for the menu's class only (one set per class: the first field of the class that sets a key) |
-
-## Modules` below) draw every
-  category of the 3D view from the game's own assets, read by `a2fmt`: hulls, the sky
-  and background, particles, ordnance, effects, the world (planets, moons, asteroids,
-  nebulae) and the overlays (fog, grid, selection, ghosts). The cosmetic simulation
-  (particles, debris, animation, LOD) is render3d's own, on the sim clock; the game's
-  simulation is only read. A part no module draws yet is the engine's, called where
-  stock calls it.
-- **It replaces the per-part plugins**, which are no longer in the repository: `MSAA.asi`,
-  `Lighting.asi`, `Sky.asi`, `Nebulae.asi`, `Surfaces.asi`, `Explosions.asi`,
-  `Shields.asi`, `Repair.asi`, `Venting.asi`, `Specials.asi`, `Fog.asi` and
-  `Planets.asi`. Their looks are ported here, with the findings the code needs written
-  beside each hook below. A module stands down while a stale copy of its old plugin is
-  loaded (`SUPERSEDED` in `src/lib.rs`), and `install.sh` takes any such copy out.
-- **New, beyond the plugins:** bloom by energy (explosions' cores, weapon cores, star
-  cores), MSAA on render3d's own targets, and shadows from this frame's hulls (the
-  plugin's were the last frame's).
-
-Still the engine's: nothing in a whole match by default. A module hands an object or
-effect back to the engine only where it cannot draw it: a SOD that does not load or
-is not a plain database (a hologram's class among them), an effect class it does not
-know, or a module switched off (construction and the bees need the hulls module, the
-emitters the particles module). Nanites have no draw of their own: `NaniteEffect` is
-never made, and what shows is the ordnance and `Step::Specials`.
-
-## Building and installing
-
-    render3d/install.sh            # build, install Render3D.asi, Render3D.ini and the recipes; take out any old plugin
-    render3d/install.sh --remove   # take it out again
-
-`./install` runs it. Building needs rustup with the 32-bit Windows
-target (`rustup target add i686-pc-windows-msvc`) and `lld-link` (LLVM); `build.sh`
-uses `~/.cargo/bin/cargo` first, since a distribution's cargo has no such target. The
-crate links with `/nodefaultlib`, `kernel32` its only import (an import library made by
-`llvm-dlltool --kill-at` from `kernel32.def` in `build.rs`), and brings its own
-allocator, memory functions and stack probe (`src/rt/`). Shaders are HLSL in
-`shaders/`, compiled by `hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders.rs`, which
-is committed with a stamp so a machine without vkd3d builds as long as it is current.
-
-## `Render3D.ini`
-
-| Key | Default | |
-|---|---|---|
-| `Enable` | 1 | 0: the engine draws the 3D view, as without the plugin |
-| `Log` | 1 | `Render3D.log` in the game directory |
-| `MSAA` | 4 | samples per pixel on the scene target: 0, 2, 4 or 8 |
-| `HDR` | 1 | 0: an 8-bit scene target (no light past white, no bloom), for comparison |
-| `Bloom` | 0.12 | how much of the light past the threshold spreads into a glow |
-| `BloomThreshold` | 1.0 | where bloom starts, in stock's white |
-| `BloomKnee` | 0.5 | how soft that threshold is |
-| `Exposure` | 1.0 | scales the scene before the tone map |
-| `Shoulder` | 0.8 | where the tone map starts to roll off towards white |
-| `Inset` | 1 | 0: the HUD's action-camera view is left to the engine |
-| `Timing` | 0 | 1: CPU and GPU time per view and step in the log (below); with `Enable=0`, the engine's own view timed |
-| `TimingEvery` | 5 | seconds between timing reports |
-
-**`[Modules]`.** Each module has a key of its own, `<name>=1` (the names are in the
-sections below: `effects`, `ordnance`, `specials`, `sky`, `overlays`, `particles`,
-`hulls`, `world`). **`<name>=0` leaves that part to the engine: its stock look, drawn by
-`Armada2.exe` at the step as without the module.** There is no plugin to fall back to
-any more, so the old plugins' looks exist only as these modules.
-
-## Timing
-
-`Timing=1` (`src/timing.rs`) times each view as a run of marks: the seam, our targets,
-each step of the body (`setup` is the lights, the distance cull, the modules' lights
-and the scene layer's shadow map; then `background`, `terrain`, `objects`, `ordnance`,
-`specials`, `features`, `warp`, `hud prep`, `chunks`, `particles`, `translucent`,
-`selection, end`) and `post` (resolve, bloom, tone map). Each mark notes the CPU clock
-and issues a Direct3D 9 timestamp query; a span is booked to the mark that ends it.
-The queries are read back from a ring four frames deep without waiting, so timing
-does not stall the GPU; a set not finished when its turn comes again is counted as
-late. Every `TimingEvery` seconds the log has the frame's period (from one main view
-to the next), each view's CPU and GPU time with their maxima, the time outside the 3D
-views (the HUD, the simulation, `Present`), and the split by step.
-
-With `Enable=0` and `Timing=1` nothing of render3d draws, but both call sites of
-`Armada_RenderAllOurStuff` go through a body that only marks around the engine's
-(`frame::install_measure`), with every plugin hooked into it at work. Installed beside
-the plugins render3d replaces, that measures them the same way: the comparison in
-`PERF.md`.
-
-## How the frame works
-
-**The seam.** The main view calls the body from `Armada_RenderFrame` (`call` at
-0x59886e), and the HUD's action camera from `CinematicView::RenderView` (0x4e60f6). Both
-calls are re-pointed at render3d's own function, each only if it still calls 0x598110,
-so a different `Armada2.exe` or another plugin at either site makes render3d stand
-down and the game draws as stock. The body is `cdecl` with three arguments (the
-camera, the `Render_Stuff` flags, `isMain`), which render3d passes on unchanged.
-
-**Into our target.** Before the body, render3d binds its scene target and depth in
-place of the engine's, keeping the viewport the caller set, and clears colour and
-depth: the engine never clears colour in a mission (it relies on the sky to cover every
-pixel), and our target has no last frame to fall back on. The body then runs as it
-always did. The two views share one set of targets the size of the back buffer, since
-each view is a rectangle of it (`camera+0x1b0`, four floats in back-buffer pixels).
-
-**Out again.** After the body, for that view's rectangle only:
-
-1. resolve the samples (`StretchRect`);
-2. bloom: a prefilter to half size with a soft threshold and a 1/(1+luma) weighting of
-   its four taps, so one hot pixel cannot flicker as a blob; four more levels down a
-   dual-filter chain, and back up adding each level onto the one above;
-3. the final pass into the engine's back buffer: the scene a texel per pixel plus the
-   bloom, through the tone map (unchanged below `Shoulder=`, rolling off towards white
-   per channel above it);
-4. the engine's depth cleared to 1 in the rectangle, for the HUD drawn over the view
-   next.
-
-Every tap is clamped to the view's rectangle, so neither view bleeds into the other's
-glow. The device's state is captured into a state block before the passes and put back
-after, and the engine's own target and depth are bound again, so the engine (and
-d3d8to9, which keeps its own record of what is bound) sees what it left.
-
-**The first row and column.** DXVK offsets a Direct3D 9 viewport by half a pixel, so
-with MSAA half the samples of the view's first row and column are never drawn. The final pass reads those pixels from their neighbours instead, which does what
-`MSAA.asi`'s edge fill did without the frame's delay.
-
-**Reset.** Every target is in the default pool and must be gone before the device
-resets. Slot 14 of the d3d8 device's vtable (`Reset`) is chained, as `Lighting.asi`
-chains it: render3d drops its targets and passes on the call, and makes new ones at
-the next frame, at the new size. A display mode chosen in Graphics Settings is not a
-`Reset`: the engine releases its device and creates another. The first frame on a
-device render3d has not seen ("frame: a new device") drops the frame's state, hooks
-the new device's `Reset` and hands the device to every module, which makes its
-resources again; scenario `render3d-mode-switch` checks it, switching to
-800x600 in a running battle.
-
-**Without Direct3D 9.** The d3d9 device is asked for behind the game's d3d8 one
-(`platform/D3D9.md`). Under DXVK's own d3d8, or when the targets cannot be made, the
-body runs as stock. An `A16B16G16R16F` target with MSAA falls back to one without, then
-to 8 bits, and the log says which.
-
-## The menu scene
-
-`src/menu/`, recipes in `menus/`: a 3D scene of render3d's own behind the front end's
-main menu and campaign selection, a fleet in orbit over a planet. `UI.asi` asks for it
-(`[Menus] Scene=1`, ui/MENUS.md, "The menu scene") through render3d's one export,
-`Render3D_MenuScene(name, x, y, w, h)`: inside its own scene, with the back buffer
-bound, it gets the scene drawn into that rectangle and draws the menu over it. A 0
-back (no recipe, no Direct3D 9 device, no targets) leaves the UI's own backdrop.
-
-**Nothing of a mission is read.** In the front end there are no game objects, no
-camera, no registered light and no sim clock, so the scene is a recipe posed on a
-clock of render3d's own (`rt::now`, restarted after ten minutes without a frame), the
-view and projection are made here, and the lights (the recipe's Key and Fill) are put
-into the scene layer in place of the engine's list (`scene::set_lights`). The frame
-goes through `frame::menu_frame`: our targets bound at the rectangle, cleared, drawn,
-then the same post passes as a mission's view (resolve, bloom, tone map), and the
-back buffer bound again.
-
-**The modules draw it**, each its own part, in `Module::menu(pass, shot, view)`, with
-the looks they give a mission:
-
-| Pass | Module | |
-|---|---|---|
-| `Sky` | sky | the recipe sky of `Sky=` (`skies/`), turned about the orbit's axis by `SkyTurn` a second; a starfield of our own (`Stars` quads of the stock `bstar.0` and `mstar.0` sprites, seeded, the brighter ones lifted past white); the sun, `Sun=`'s SOD (a background object, `Msun1`) and its sprite nodes where the Key comes from, drawn as a map's suns are |
-| `Planet` | world | `Planets::draw_menu`: the class's ground (`groundTextureName`, or its surface recipe) and cloud shell (`atmosphereTextureName`, stock's `PA_ECFR0` when the ODF names none) on render3d's sphere, the same body draw as a mission planet's (`draw_body`) without cities |
-| (depth cleared) | | the ships are drawn on a projection of their own, near 1 |
-| `Ships` | hulls | `menu_begin` poses each ship (finest level of detail, its animation looping, `hardpoints` and the damage, crew and Borg nodes hidden by name, as no class says which), draws the shadow map with the menu planet in place of the engine's; then the hull look, opaque, and the running lights collected |
-| `Translucent` | hulls | additive meshes and sprite nodes, as at a mission's `Step::Translucent` |
-
-**The scene is in the fleet's frame**: the fleet holds still with the camera and the
-sun, and the orbit shows as the planet turning under it (`Orbit Rate`, times
-`1 + Planet Spin`) and the sky turning with it. The planet's centre is the origin; the
-fleet flies along +z (the way the hulls' noses point), `Altitude` over the surface on
-+y or wherever `[Planet] At` puts the planet from it. Each ship bobs, rolls and
-pitches a little on a phase of its own; the camera sways on three slow sines
-(`Sway`, `SwayPeriod`). A new scene name (the campaign selection after the main menu)
-blends the camera over `Blend` seconds, and the clock runs on, so the fleet and the
-sky never jump.
-
-**Recipes.** `menus/<name>.ini` are built into the plugin; `Menu\<name>.ini` in the
-game directory takes precedence and is read again within a second of an edit (copy
-one there to tune it live on the bench). `Base=<other>` under `[Scene]` reads that
-recipe first and this one over it. Keys:
-
-| Section | Key | |
-|---|---|---|
-| `[Scene]` | `Sky`, `SkyTurn` | a sky recipe's name; radians a second it turns |
-| | `Stars`, `StarSize`, `StarSeed` | how many stars, their half size in radians, the seed |
-| | `Sun`, `SunDistance` | the sun's ODF (none: no sun) and its distance |
-| | `KeyAxis`, `KeyColour`, `FillAxis`, `FillColour` | the two lights: the way each travels, and its colour |
-| `[Planet]` | `Class` | the planet class's ODF (`PB_CLSSM`); none: no planet |
-| | `Radius`, `Axis`, `Spin`, `Clouds` | its radius, its pole, how much faster than the orbit its ground turns, the clouds' extra turn (radians a second) |
-| | `At` | its centre from the fleet; without it, straight below at `Altitude` over its surface (a camera at the fleet's level then sees only a strip of ground, so the main menu moves the globe behind and below) |
-| `[Orbit]` | `Altitude`, `Rate` | the fleet's height over the surface (without `[Planet] At`); the orbit's radians a second |
-| `[Camera]` | `Eye`, `Target`, `Fov` | in the fleet's frame; vertical field in degrees |
-| | `Sway`, `SwayPeriod`, `Blend` | the drift's amplitude and period; the blend from the last scene's camera |
-| `[Ship<n>]` | `Odf`, `At`, `Yaw`, `Scale`, `Bob`, `Phase`, `Team` | the ship's ODF (its `baseName` and `ScaleSOD`), its place in the formation, a turn in degrees, a scale on top of `ScaleSOD`, how much it bobs, its phase, a team colour for its `team*` groups |
 
 ## Modules
 

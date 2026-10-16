@@ -51,10 +51,21 @@ const FN_SHOW_SPLASH: usize = 0x598ff0;
 /// `HandleMessageQueue()`, cdecl: the engine's own pump, as its status update drains
 /// the queue (for `[Loading] Hold` only).
 const FN_HANDLE_MESSAGE_QUEUE: usize = 0x488730;
+/// Inside a loading step: `ST3D_GraphicsEngine::LoadDatabase(name, path, scale)`
+/// (thiscall, a SOD read and built), called by `FindLogicalDatabase` (twice) and
+/// `FindVisibleDatabase`; `ST3D_Texture::LoadPixelData(level)` (thiscall, a texture's
+/// pixels read), called once, by `DemandLoad`. A step that builds a ship's class loads
+/// its SODs and textures through them, and was the longest wait on the screen.
+const SITES_LOAD_DB: [usize; 3] = [0x62cf2a, 0x62cf44, 0x62cf79];
+const FN_LOAD_DB: usize = 0x62ccd0;
+const SITE_LOAD_PIXELS: usize = 0x6426e2;
+const FN_LOAD_PIXELS: usize = 0x6434b0;
 
 /// Frames of ours are held to this many a second, so presenting them costs the load
 /// little: a present can wait for the display.
 const OWN_FPS: f64 = 30.0;
+/// A stretch with no frame presented at least this long is logged (seconds).
+const STILL: f64 = 0.1;
 
 struct State {
     /// Loading-screen frames the engine drew, ever (logged), and in this load.
@@ -67,6 +78,13 @@ struct State {
     started: f64,
     steps: u32,
     status: String,
+    /// When the last step's status update returned (for the slow-step log).
+    last_step: f64,
+    /// Frames of ours presented inside a step (after a SOD or a texture loaded).
+    inner_frames: u32,
+    /// SODs and textures loaded since the last frame presented (the still-screen log).
+    gap_db: u32,
+    gap_px: u32,
     own: bool,
     held: bool,
 }
@@ -80,6 +98,10 @@ static mut S: State = State {
     started: 0.0,
     steps: 0,
     status: String::new(),
+    last_step: 0.0,
+    inner_frames: 0,
+    gap_db: 0,
+    gap_px: 0,
     own: false,
     held: false,
 };
@@ -115,6 +137,15 @@ pub fn install(own: bool) -> bool {
             && hook::patch_call(SITE_SPLASH, FN_SHOW_SPLASH, splash_shown as *const () as usize)
             && hook::patch_call(SITE_STATUS, FN_STATUS_UPDATE, status_update as *const () as usize);
         st().own = ok;
+        if ok {
+            // Frames inside a step: each site stands down on its own when not stock.
+            let mut inner = 0;
+            for site in SITES_LOAD_DB {
+                inner += hook::patch_call(site, FN_LOAD_DB, load_db as *const () as usize) as u32;
+            }
+            inner += hook::patch_call(SITE_LOAD_PIXELS, FN_LOAD_PIXELS, load_pixels as *const () as usize) as u32;
+            log!("loading: frames inside a step after each SOD and texture loaded ({} of 4 sites)", inner);
+        }
         log!(
             "loading: {}",
             if ok { "a screen of ours, with frames between the engine's" } else { "the splash or status-update call is not stock: the engine's frames only" }
@@ -134,12 +165,38 @@ extern "thiscall" fn loading_frame(storm3d: usize) {
     if n <= 3 || n % 20 == 0 {
         log!("loading: frame {} at {:.0}%", n, progress().unwrap_or(0.0) * 100.0);
     }
+    if s.own {
+        departure(super::d3d8_device());
+    }
     crate::surface::frame(Context::Loading);
     let now = crate::rt::now();
+    presented(s, now);
+}
+
+/// A frame was presented at `now`: the longest wait, and a stretch with no frame logged
+/// with what loaded in it.
+fn presented(s: &mut State, now: f64) {
     if s.last_present > 0.0 {
-        s.longest_gap = s.longest_gap.max(now - s.last_present);
+        let gap = now - s.last_present;
+        s.longest_gap = s.longest_gap.max(gap);
+        if gap >= STILL {
+            log!(
+                "loading: still {:.0} ms at {:.0}% in '{}': {} SODs, {} textures loaded in it",
+                gap * 1000.0,
+                progress().unwrap_or(0.0) * 100.0,
+                s.status,
+                s.gap_db,
+                s.gap_px
+            );
+        }
     }
     s.last_present = now;
+    gap_reset(s);
+}
+
+fn gap_reset(s: &mut State) {
+    s.gap_db = 0;
+    s.gap_px = 0;
 }
 
 /// In place of `RenderLoop_Show_Splash_Screen`: the engine's splash, then the screen of
@@ -149,13 +206,27 @@ extern "C" fn splash_shown() {
     let s = st();
     s.engine_frames = 0;
     s.own_frames = 0;
+    s.inner_frames = 0;
+    gap_reset(s);
     s.longest_gap = 0.0;
     s.last_present = 0.0;
     s.steps = 0;
     s.held = false;
     s.status.clear();
     s.started = crate::rt::now();
+    s.last_step = s.started;
+    crate::menus::scene::begin_departure();
     crate::loading::begin();
+}
+
+/// The menu scene's departure under the loading screen, when the load has one.
+fn departure(dev: Dev8) {
+    if dev.is_null() {
+        return;
+    }
+    if let Some(bb) = dev8::back_buffer_desc(dev) {
+        crate::menus::scene::draw_departure(bb.width, bb.height);
+    }
 }
 
 /// In place of `LoadBarNext`'s call of `RenderLoopAssetLoadStatusUpdate`: the engine's
@@ -177,6 +248,7 @@ extern "C" fn status_update(text: *const u8) {
     let before = s.engine_frames;
     unsafe { core::mem::transmute::<usize, extern "C" fn(*const u8)>(FN_STATUS_UPDATE)(text) };
     let now = crate::rt::now();
+    s.last_step = now;
     // Not before the engine's first frame of the load, which puts the 3D display up.
     if s.engine_frames == before && s.engine_frames > 0 && now - s.last_present >= 1.0 / OWN_FPS && progress().is_some() {
         own_frame(now);
@@ -198,14 +270,50 @@ extern "C" fn status_update(text: *const u8) {
     }
     if s.steps % 200 == 0 {
         log!(
-            "loading: step {} at {:.0}%, {:.1} s in: {} frames of ours, {} of the engine's, longest wait {:.0} ms",
+            "loading: step {} at {:.0}%, {:.1} s in: {} frames of ours ({} inside a step), {} of the engine's, longest wait {:.0} ms",
             s.steps,
             progress().unwrap_or(0.0) * 100.0,
             now - s.started,
             s.own_frames,
+            s.inner_frames,
             s.engine_frames,
             s.longest_gap * 1000.0
         );
+    }
+}
+
+/// In place of `LoadDatabase`: the engine's load, then a frame of ours if it is due.
+extern "thiscall" fn load_db(engine: usize, name: usize, path: usize, scale: f32) -> usize {
+    let r = unsafe { core::mem::transmute::<usize, extern "thiscall" fn(usize, usize, usize, f32) -> usize>(FN_LOAD_DB)(engine, name, path, scale) };
+    st().gap_db += 1;
+    inner_frame();
+    r
+}
+
+/// In place of `LoadPixelData`: the engine's load, then a frame of ours if it is due.
+extern "thiscall" fn load_pixels(texture: usize, level: i32) -> u32 {
+    let r = unsafe { core::mem::transmute::<usize, extern "thiscall" fn(usize, i32) -> u32>(FN_LOAD_PIXELS)(texture, level) };
+    st().gap_px += 1;
+    inner_frame();
+    r
+}
+
+/// A frame of ours inside a loading step, when one is a frame period due: only while
+/// a load's screen is up and after the engine's first frame of it. Inside the engine's
+/// own scene (a texture loaded as it draws) `BeginScene` refuses and nothing is drawn.
+fn inner_frame() {
+    let s = st();
+    if !s.own || s.engine_frames == 0 || progress().is_none() {
+        return;
+    }
+    let now = crate::rt::now();
+    if now - s.last_present < 1.0 / OWN_FPS {
+        return;
+    }
+    let before = s.own_frames;
+    own_frame(now);
+    if s.own_frames != before {
+        s.inner_frames += 1;
     }
 }
 
@@ -238,6 +346,7 @@ fn own_frame(now: f64) {
     }
     dev8::set_viewport(dev, bb.width, bb.height);
     dev8::clear(dev, dev8::CLEAR_TARGET, 0xff000000);
+    departure(dev);
     crate::surface::frame(Context::Loading);
     dev8::end_scene(dev);
     dev8::present(dev);
@@ -249,10 +358,7 @@ fn own_frame(now: f64) {
     if s.own_frames == 1 {
         log!("loading: first frame of ours, {}x{}, {:.1} s after the splash", bb.width, bb.height, now - s.started);
     }
-    if s.last_present > 0.0 {
-        s.longest_gap = s.longest_gap.max(now - s.last_present);
-    }
-    s.last_present = now;
+    presented(s, now);
 }
 
 /// How far the current load has got, 0..1; None when no load is running.
