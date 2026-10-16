@@ -4,6 +4,16 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.9.1 — 2026-10-17
+
+### Fixed
+- The campaign selection's rows could show the campaigns' names in the wrong order
+  after an aborted mission: each row now takes the stock label that names its campaign,
+  never the labels' order (UI.log notes `menus: campaign labels out of order` when they
+  come otherwise).
+
+Installed, not yet seen in game.
+
 ## 0.9.0 — 2026-10-17
 
 ### Added

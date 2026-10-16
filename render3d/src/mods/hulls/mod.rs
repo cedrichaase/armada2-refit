@@ -874,7 +874,7 @@ impl Module for Hulls {
                     let (c, r) = draw::model_sphere(&model);
                     let radius = r * s.world.r[0].len().max(s.world.r[1].len()).max(s.world.r[2].len());
                     let k = age / life;
-                    let bright = (1.0 - k) * (1.0 - k) * 4.0;
+                    let bright = (1.0 - k) * (1.0 - k) * 1.5;
                     crate::menu::add_flash(s.world.transform_point(c), radius * half * (0.6 + 0.8 * k), bright);
                 }
                 continue;

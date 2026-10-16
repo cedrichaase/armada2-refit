@@ -215,7 +215,10 @@ call after one of `Render3D_MenuScene` begins a departure from that view (Render
   (`Speed`), then over `Ramp` seconds the hull's warp stretch, the shader's own (a
   plane across the motion sweeping from bow to stern, the hull in front of it
   stretched by up to `Stretch`), and it is gone, with a flash of the stock
-  `warp_sprite` where it was (`Flash` times its radius, for `FlashTime`). The
+  `warp_sprite` where it was (`Flash` times its radius, for `FlashTime`), faded round
+  from near its centre by a shader of its own (`flash_ps`) at no more than 1.5 times
+  stock's light: the art's core is a flat white diamond and its halo reaches its
+  border, and brighter than that both showed as a hard-edged box. The
   stretch is forward only: the engine's shift of the hull back, which suits a ship
   seen from the side in a mission, threw the stretch across the screen towards a
   camera behind the ships.

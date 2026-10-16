@@ -54,6 +54,39 @@ const CARDS: [Card; 4] = [
     Card { art: [431, 340, 322, 222], at: (589, 439), name: "Borg Campaign" },
 ];
 
+/// Each card's name, from the stock screen's hidden labels, matched by the word that
+/// names the campaign (`KEYS`), never by the labels' order: the dialog's controls do
+/// not always come in the same order (after an aborted mission the rows once read in
+/// the wrong order). A card no label names keeps its own name; when no label names any
+/// card (another language), the labels are taken in order, as before.
+const KEYS: [&str; 4] = ["tutorial", "federation", "klingon", "borg"];
+/// The labels were seen out of order (logged once).
+static mut SAID_ORDER: bool = false;
+
+fn card_names<'a>(labels: &[&'a crate::menus::model::Control]) -> [&'a str; 4] {
+    let mut out = [CARDS[0].name, CARDS[1].name, CARDS[2].name, CARDS[3].name];
+    let mut any = false;
+    for (i, key) in KEYS.iter().enumerate() {
+        let hit = labels.iter().position(|c| crate::rt::lower(&c.text).contains(key));
+        if let Some(j) = hit {
+            out[i] = labels[j].text.as_str();
+            any = true;
+            if j != i && unsafe { !SAID_ORDER } {
+                unsafe { SAID_ORDER = true };
+                crate::log!("menus: campaign labels out of order (\"{}\" is label {}); matched by name", labels[j].text, j);
+            }
+        }
+    }
+    if !any {
+        for (i, c) in labels.iter().take(4).enumerate() {
+            if !c.text.is_empty() {
+                out[i] = c.text.as_str();
+            }
+        }
+    }
+    out
+}
+
 /// The card under the pointer last frame, to tell the stock screen when it changes.
 static mut HOVER: (HWND, i32) = (core::ptr::null_mut(), -1);
 
@@ -70,10 +103,11 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         return false;
     }
     if crate::menus::scene::shown() {
-        return over_scene(ui, s, &names, &foot);
+        return over_scene(ui, s, &card_names(&names), &foot);
     }
     let t = ui.theme;
     let sc = ui.screen();
+    let names = card_names(&names);
     kit::backdrop(ui);
 
     // The screen: a title, the cards (2x2), the foot.
@@ -97,7 +131,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         let st = theme::State::of(ui, id, hot, held);
         theme::panel(ui, r);
         let (bar, rest) = r.take_top(ui.u(46.0));
-        let name = names.get(i).map_or(card.name, |c| if c.text.is_empty() { card.name } else { c.text.as_str() });
+        let name = names[i];
         ui.text_in(bar.inset(ui.u(8.0)), name, t.heading_size, Align::Left, if hot { t.accent } else { t.title }, crate::gfx::Weight::Bold);
         let art = kit::contain(rest.inset(ui.u(8.0)), card.art);
         s.mirror_part(ui, card.art, art, 0xffffffff);
@@ -166,7 +200,7 @@ fn academy(ui: &mut Ui, r: R, c: crate::gfx::Color) {
 /// each campaign its emblem and its name, lit as the pointer comes over it, which
 /// moves the camera to its scene; the row whose scene shows keeps its bar. Load Game
 /// and Previous Menu follow in the column.
-fn over_scene(ui: &mut Ui, s: &Screen, names: &[&crate::menus::model::Control], foot: &[&crate::menus::model::Control]) -> bool {
+fn over_scene(ui: &mut Ui, s: &Screen, names: &[&str; 4], foot: &[&crate::menus::model::Control]) -> bool {
     use crate::gfx::Weight;
     let sc = ui.screen();
     let t = ui.theme;
@@ -209,7 +243,7 @@ fn over_scene(ui: &mut Ui, s: &Screen, names: &[&crate::menus::model::Control], 
         let nudge = ui.u(8.0) * st.hot;
         let is = ui.u(46.0);
         emblem(ui, i, R::new(r.x + ui.u(20.0) + nudge, r.y + (r.h - is) * 0.5, is, is), c);
-        let name = names.get(i).map_or(card.name, |c| if c.text.is_empty() { card.name } else { c.text.as_str() });
+        let name = names[i];
         let tr = R::new(r.x + ui.u(20.0) + is + ui.u(18.0) + nudge, r.y, r.w - is - ui.u(44.0), r.h);
         ui.text_in(tr, name, 24.0, Align::Left, c, Weight::Bold);
         if hot {
