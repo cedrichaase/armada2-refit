@@ -19,6 +19,9 @@ pub fn run(ctx: Context, ui: &mut Ui) {
         crate::menus::frame(ui);
         return;
     }
+    if ctx == Context::Loading && cfg.loading {
+        crate::loading::run(ui);
+    }
     if cfg.demo_style {
         crate::style::run(ctx, ui);
         return;

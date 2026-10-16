@@ -434,14 +434,23 @@ shell theme and act only by clicking stock controls.
   `input::keys_captured`, so Enter and Esc go to it and not to the dialog as `IDOK` and
   `IDCANCEL` while it is focused (`local::focused` covered only the stand-in).
 
-**The end-of-mission screens are not dialogs.** `do_success_mission` and
-`do_fail_mission` (`SMain.obj`, 0x6079d0 and 0x6077c0) never call `DialogBoxParamA`:
-the first makes its own window and bitmap (`ItemGet`) and the second sets the display and
-cursors and goes through `DispatchDialog`, which puts the Admiral's Log up next (a
-`g_shellMode` case; `do_admirals_log` at 0x607550 wraps `do_admiralsLog`). So the
-host sees the Admiral's Log, which has a spec, and not a screen of its own for either. The
-success screen's own window is not hosted: it runs as it always did. Not reached on the
-bench (it needs a mission won or lost); read from the code only.
+**There is no end-of-mission screen to host.** `do_success_mission` (0x6079d0) shows
+nothing: `Program::GameClose` calls it when the mission was won (`RunState`'s state 1,
+which `AiMission::DoEndOfMission` sets from the script's `SucceedMission`), and all it
+does is mark the campaign's next mission as reached (`ShellSettings::AdvanceOneMission`)
+when the one won was the furthest yet. (An earlier reading here took the functions that
+follow it in `SMain.obj`, `init_screen_pos`, `draw_cursor` and `Read_Shell_Bitmap`, for
+its body.) `do_fail_mission` (0x6077c0) is never called. What follows a mission is
+`Program::SetupNextScreen`'s choice: after a won campaign mission with another after
+it, that mission's name, and the game loads it at once, so the next thing on screen is
+its cinematic and then the loading screen (`LOADING.md`, ours with `[Loading]
+Enable=1`); after the last of the last campaign, the Credits; when the campaign is
+complete, the single-player screen; after a lost one, back to the shell. The Admiral's
+Log comes up between missions only when no next mission is queued (`GameDoOne`), and it
+is a dialog, hosted with its spec. So `[Menus] Enable=1` needs nothing for a mission's
+end, and its outcome is the stock one by construction. `testbench/scenarios/
+ui-menus-success.md` wins and loses the first Federation mission with `Scene.asi`'s
+`succeed` and `fail` and checks what comes next.
 
 ## Testing
 
@@ -467,8 +476,7 @@ hidden surfaces).
   verified on the bench**; the mirrored screen is. The shared widgets (`crate::widgets`)
   are being written elsewhere; `menus/local.rs` is to be replaced by them.
 - **Screens not reached on the bench with the host**: the Tutorials, Klingon and Borg
-  campaigns' lists, the Admiral's Log at the end of a mission (`do_success_mission` and
-  `do_fail_mission`, above), Multiplayer and its
+  campaigns' lists, Multiplayer and its
   lobbies (no network on the bench), Credits (a screen of the engine's own, not a
   dialog: it runs as before), the licence, GameSpy and command-line screens.
 - **Seven specs** (the main menu and the six above), the main menu with English labels (the stock art carries the words,

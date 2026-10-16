@@ -147,6 +147,8 @@ int _fltused = 0;   /* floats without the CRT */
 #define SI_MAX_HEALTH    0x456da0u
 #define SI_CANNOT_DIE    0x457590u
 #define SI_EXPLODE_NOW   0x456cf0u   /* ScriptInterfaceImp::ExplodeNow(int): a craft dies now, as a mission script blows one up */
+#define SI_SUCCEED       0x457d70u   /* ScriptInterfaceImp::SucceedMission(float delay, char *text): the script's win */
+#define SI_FAIL          0x457d50u   /* ScriptInterfaceImp::FailMission(float delay, char *text): the script's loss */
 #define GO_CLOAK_NOW     0x4d03e0u   /* GameObject::ImmediateCloak: thiscall, fully cloaked at once */
 #define OBJECT_CLOAK     0x108       /* a GameObject's cloaking device, if any: its state at +0x3c
                                       * (0 visible, 1 cloaking, 2 cloaked, 3 decloaking) */
@@ -276,6 +278,8 @@ static const Sig k_sigs[] = {
     { SI_MAX_HEALTH,    8, P_SI_HANDLE },
     { SI_CANNOT_DIE,    8, P_SI_HANDLE },
     { SI_EXPLODE_NOW,   8, P_SI_HANDLE },
+    { SI_SUCCEED,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x0C, 0x8B, 0x4D } },
+    { SI_FAIL,          8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x0C, 0x8B, 0x4D } },
     { GO_CLOAK_NOW,     8, { 0x8B, 0x89, 0x08, 0x01, 0x00, 0x00, 0x85, 0xC9 } },
     { SI_SET_SPECIAL,   8, P_SI_HANDLE },
     { SI_SPECIAL_AT,    8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 } },
@@ -301,6 +305,7 @@ typedef void   (__thiscall *UpdateCameraFn)(void *view, void *st3dcam);
 typedef void   (__thiscall *SetTransformFn)(void *st3dcam, const float *m34);
 typedef void   (__thiscall *SiVoidFn)(void *si);
 typedef void   (__thiscall *SiHandleFn)(void *si, int h);
+typedef void   (__thiscall *SiEndFn)(void *si, float delay, char *text);
 typedef void   (__thiscall *SiHandleBoolFn)(void *si, int h, int yes);
 typedef void   (__thiscall *SiAttackFn)(void *si, int h, int target, int unused);
 typedef void   (__thiscall *SiSpecialAtFn)(void *si, int h, int target, const char *weapon);
@@ -1456,6 +1461,14 @@ static void run_command(char *line)
         o->heal = 0;
         ((SiHandleBoolFn)SI_CANNOT_DIE)(SI_INSTANCE, o->handle, 0);
         ((SiHandleFn)SI_EXPLODE_NOW)(SI_INSTANCE, o->handle);
+        logline("  ok");
+        return;
+    }
+    if (s_eq(t[0], "succeed") || s_eq(t[0], "fail")) {
+        /* The mission ends as its script ends it, won or lost, after the delay (seconds;
+         * the script's own message is none). */
+        float delay = n >= 2 ? s_atof(t[1]) : 0.0f;
+        ((SiEndFn)(s_eq(t[0], "succeed") ? SI_SUCCEED : SI_FAIL))(SI_INSTANCE, delay, NULLPTR);
         logline("  ok");
         return;
     }

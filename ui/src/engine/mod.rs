@@ -18,6 +18,7 @@ pub mod palette;
 pub mod race;
 pub mod resources;
 pub mod selection;
+pub mod setup;
 pub mod shell;
 pub mod sound;
 pub mod sprite;

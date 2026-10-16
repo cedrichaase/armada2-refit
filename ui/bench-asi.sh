@@ -13,6 +13,8 @@
 #   --menus       the UI hosts the shell's menus ([Menus] Enable=1, ui/MENUS.md), and
 #                 Menus.asi is taken out of the clone: the two must not both host them
 #                 (UI.asi stands down while it is loaded)
+#   --scene NAME  also Scene.asi with testbench/scene/scenes/NAME.ini, for scenario
+#                 commands in the mission (a scenario has one Setup: line)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,6 +23,7 @@ shift
 sets=()
 nogrid=0
 menus=0
+scene=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --demo)
@@ -28,6 +31,7 @@ while [ $# -gt 0 ]; do
             for c in "${ctxs[@]}"; do sets+=("Demo.${c^}=1"); done
             shift 2 ;;
         --no-grid) nogrid=1; shift ;;
+        --scene) scene="${2:?--scene needs a scene name}"; shift 2 ;;
         --menus) menus=1; sets+=("Menus.Enable=1"); shift ;;
         *=*) sets+=("$1"); shift ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
@@ -72,3 +76,6 @@ open(path, "w").write("\r\n".join(out) + "\r\n")
 PY
 done
 echo "UI.asi -> $work/game/ ${sets[*]:-}"
+if [ -n "$scene" ]; then
+    bash "$here/../testbench/scene/bench-setup.sh" "$state" "$scene"
+fi
