@@ -15,6 +15,10 @@ static mut DEMO: Demo = Demo { on: true, slider: 0.5, clicks: 0 };
 
 pub fn run(ctx: Context, ui: &mut Ui) {
     let cfg = crate::config::get();
+    if ctx == Context::Menus {
+        crate::menus::frame(ui);
+        return;
+    }
     if cfg.demo_style {
         crate::style::run(ctx, ui);
         return;
@@ -23,6 +27,7 @@ pub fn run(ctx: Context, ui: &mut Ui) {
         Context::Mission => cfg.demo_mission,
         Context::Shell => cfg.demo_shell,
         Context::Loading => cfg.demo_loading,
+        Context::Menus => false,
     };
     if ctx == Context::Mission {
         crate::hud::run(ui);
@@ -45,7 +50,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
     let anchor = match ctx {
         Context::Mission => Anchor::TopRight,
         Context::Shell => Anchor::Left,
-        Context::Loading => Anchor::BottomLeft,
+        Context::Loading | Context::Menus => Anchor::BottomLeft,
     };
     if ctx == Context::Shell {
         crate::gallery::run(ui);
@@ -58,6 +63,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
         Context::Mission => "Mission",
         Context::Shell => "Shell",
         Context::Loading => "Loading",
+        Context::Menus => "Menus",
     };
     ui.label(s.row(row), &crate::sfmt!("Context: {}   {}x{}", name, ui.w as u32, ui.h as u32));
     let m = match ui.input.mouse {

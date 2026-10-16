@@ -159,6 +159,10 @@ static mut STATE: Input = Input {
 
 static mut INSTALLED: bool = false;
 
+/// A stock dialog is hosted (`engine::dialogs`): the engine gets no button, wheel or key
+/// down at all, whatever the widgets claim, as a modal dialog keeps them from its owner.
+static mut HOSTING: bool = false;
+
 fn raw() -> &'static mut Raw {
     unsafe { &mut *core::ptr::addr_of_mut!(RAW) }
 }
@@ -209,7 +213,7 @@ fn button_of(msg: u32) -> Option<(usize, u32)> {
 /// Records a mouse message; true when the engine must not see it.
 fn mouse_message(msg: u32, wp: usize) -> bool {
     let r = raw();
-    let capture = r.capture_mouse && live(r);
+    let capture = unsafe { HOSTING } || (r.capture_mouse && live(r));
     if msg == WM_MOUSEWHEEL {
         r.wheel += (wp >> 16) as u16 as i16 as i32;
         return capture;
@@ -244,7 +248,7 @@ fn key_bit(vk: usize) -> (usize, u32) {
 /// key's up is kept only when its down was.
 fn key_message(msg: u32, wp: usize) -> bool {
     let r = raw();
-    let capture = r.capture_keys && live(r);
+    let capture = unsafe { HOSTING } || (r.capture_keys && live(r));
     match msg {
         WM_KEYDOWN => {
             if (r.nkeys as usize) < MAX_KEYS {
@@ -406,6 +410,23 @@ pub fn state() -> Input {
 pub fn keys_captured() -> bool {
     let r = raw();
     r.capture_keys && live(r)
+}
+
+/// While a stock dialog is hosted (`engine::dialogs`), every button, wheel and key down
+/// is kept from the engine (and its up with it), as the stock modal dialog does by
+/// disabling its owner. Moves still pass. Nested hostings each set it again.
+pub fn set_hosting(on: bool) {
+    unsafe { HOSTING = on };
+}
+
+/// Records a mouse or keyboard message for the UI that never reaches the window
+/// procedure hooks (the dialog host's pump takes it off the queue itself).
+pub fn note_message(msg: u32, wp: usize) {
+    if (WM_LBUTTONDOWN..=WM_MOUSEWHEEL).contains(&msg) {
+        mouse_message(msg, wp);
+    } else {
+        key_message(msg, wp);
+    }
 }
 
 /// Whether the message hooks are in (input capture works).

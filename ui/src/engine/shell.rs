@@ -53,10 +53,10 @@ const ALL_BLACK_BACKGROUND: usize = 0x727fd0;
 const SHELL_MODE: usize = 0x7a8980;
 const SHELL_MODE_MAIN_MENU: i32 = 1;
 /// `ExitCode`: where the engine's pump keeps a `WM_QUIT`'s code.
-const EXIT_CODE: usize = 0x737bb0;
+pub(crate) const EXIT_CODE: usize = 0x737bb0;
 /// `star_trek` (the `Program`): its first byte lets Alt+Tab and Alt+Esc through to
 /// Windows, as `HandleMessageQueue` reads it.
-const PROGRAM: usize = 0x737b30;
+pub(crate) const PROGRAM: usize = 0x737b30;
 
 /// Each function is checked by its first bytes before anything calls it.
 const SIGS: &[(usize, &[u8])] = &[
@@ -133,7 +133,7 @@ fn set_active_display(t: u32) -> u32 {
 
 /// The current `ST3D_DeviceDirectX8` (Storm3D `+0xc0` into the table at `+0xcc`), or 0
 /// if it is not one.
-fn st3d_device() -> usize {
+pub(crate) fn st3d_device() -> usize {
     let s = storm3d();
     let d = field(s + 0xcc, field(s, 0xc0) * 4);
     if d != 0 && field(d, 0) == VT_ST3D_DX8 { d } else { 0 }
@@ -261,6 +261,26 @@ fn unsubclass() {
     unsafe {
         SUBCLASS_ON = false;
         OS_CURSOR_HIDDEN = false;
+    }
+}
+
+/// The arrow over the 3D window while a screen of ours (or a hosted dialog) is up, in
+/// place of the engine's "no cursor".
+pub(crate) fn arrow_cursor(w: HWND, on: bool) {
+    if on {
+        if !w.is_null() {
+            subclass(w);
+        }
+    } else {
+        unsubclass();
+    }
+}
+
+/// The engine's own `TestCooperativeLevel` on its device, which resets a device that
+/// can be reset.
+pub(crate) fn test_cooperative(st: usize) {
+    if unsafe { READY } && st != 0 {
+        unsafe { this0(FN_ST3D_TEST_COOP, st) };
     }
 }
 

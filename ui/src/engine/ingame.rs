@@ -94,3 +94,10 @@ fn count() {
 pub fn hud_hidden() -> bool {
     unsafe { rd::<u8>(SHIP_DISPLAY_HIDDEN) != 0 }
 }
+
+/// Whether a mission frame was drawn in the last two seconds: the in-mission menus open
+/// from a running mission.
+pub fn recent() -> bool {
+    let last = unsafe { LAST };
+    last != 0.0 && crate::rt::now() - last < 2.0
+}

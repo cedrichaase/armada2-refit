@@ -22,6 +22,21 @@ pub struct Config {
     /// a screen of ours in the front end (in the Credits' place) and over a mission.
     pub demo_style: bool,
     /// `[HUD]`: the in-mission panels of ours that replace stock ones (HUD.md).
+    /// `[Menus]`: the stock shell's dialogs hosted, drawn and driven by the UI
+    /// (`engine::dialogs`, `menus`).
+    pub menus: bool,
+    /// `[Menus] Generic`: how a screen without a spec is drawn. 0: the dialog as the
+    /// game paints it (mirrored), 1: its controls as our widgets.
+    pub menus_widgets: bool,
+    /// `[Menus] Specs`: screens with a layout of our own use it.
+    pub menus_specs: bool,
+    /// `[Menus] EscapeReturns`: Esc in the in-mission menu is Return to Game.
+    pub menus_escape: bool,
+    /// `[Menus] Trace`: log every hosted dialog's messages of note.
+    pub menus_trace: bool,
+    /// `[Menus] Host=0`: the dialogs run stock (user32's), only traced: a baseline for
+    /// `Trace=1`.
+    pub menus_host: bool,
     pub hud: Hud,
 }
 
@@ -60,6 +75,12 @@ pub fn load() -> Config {
             bar_keys: ini.int("HUD", "BarKeys", 1) != 0,
             bar_labels: ini.int("HUD", "BarLabels", 1) != 0,
         },
+        menus: ini.int("Menus", "Enable", 0) != 0,
+        menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",
+        menus_specs: ini.int("Menus", "Specs", 1) != 0,
+        menus_escape: ini.int("Menus", "EscapeReturns", 1) != 0,
+        menus_trace: ini.int("Menus", "Trace", 0) != 0,
+        menus_host: ini.int("Menus", "Host", 1) != 0,
     }
 }
 

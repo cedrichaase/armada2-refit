@@ -11,6 +11,9 @@ pub enum Context {
     Shell,
     /// The loading screen.
     Loading,
+    /// A stock shell dialog hosted by `engine::dialogs` (the front end's menus, and the
+    /// in-mission menus over the mission).
+    Menus,
 }
 
 /// Draws a frame of UI for `ctx` into the bound back buffer.

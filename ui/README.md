@@ -11,6 +11,11 @@ installing"), and is **not in `./install` or `a2mod` yet**: nothing uses it unti
 panel or screen of ours replaces a stock one. The bench gets it with
 `ui/bench-asi.sh` (below).
 
+**The menus** (`[Menus] Enable=1`, off by default): every stock shell dialog runs
+hidden and is drawn and driven by the UI, generically or by a screen spec of ours.
+[`MENUS.md`](MENUS.md) has how: the dialog host, the shell's own widgets, the control
+model, the generic screen, writing a spec, and the table of every screen.
+
 ## Where the UI draws
 
 `surface::frame(context)` is a frame of UI: it reads input, runs the UI for that
@@ -356,6 +361,12 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
 | `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 0, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)) |
+| `[Menus] Enable` | 0 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
+| `[Menus] Generic` | mirror | a screen without a spec: `mirror` (as the game paints it) or `widgets` (its controls as ours) |
+| `[Menus] Specs` | 1 | 0: no screen spec, every screen generic |
+| `[Menus] EscapeReturns` | 1 | Esc in the in-mission menu is Return to Game |
+| `[Menus] Trace` | 0 | UI.log: each hosted dialog's messages of note, its actions, and its surfaces as `UI-dlg<depth>-*.bmp` every 5 s |
+| `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 
 ## The renderer (`src/gfx/`)
 
@@ -489,6 +500,9 @@ scene); `ui/bench-widgets.sh` is the second one's setup.
 Assembler's place is in screen pixels): the demo screen in the Credits' place and a
 click on it, the loading-screen panel, the panel over the HUD, and a click on it that
 the engine does not see (the selection stays).
+
+`ui-menus-options.md` and `ui-menus-match.md` (`--menus`, 1280x720): the hosted menus,
+`MENUS.md`, "Testing".
 
 ## Not done
 

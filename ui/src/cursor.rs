@@ -189,7 +189,7 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
     ui.draw.image_uv(d.tex, R::new(x, y, w, h), uv, 0xffffffff);
     match ctx {
         Context::Mission => crate::engine::cursor::hide_this_frame(),
-        Context::Shell => crate::engine::shell::hide_os_cursor(),
+        Context::Shell | Context::Menus => crate::engine::shell::hide_os_cursor(),
         Context::Loading => {}
     }
 }
