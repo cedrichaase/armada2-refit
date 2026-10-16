@@ -31,6 +31,12 @@ What an agent driving the front end with the UI's menus on needs to know (`ui/ME
   painted into the faded art behind it ("OPTIONS" at 764,484), and `Click "OPTIONS"`
   clicked the art; the art works too (it passes clicks to the stock screen), but the
   column is what a scenario should click, by position.
+- **Over the menu scene** (`[Menus] Scene=1` with render3d 0.8.0; UI.log `menus: scene
+  main on`) the main menu has no art behind it and takes no click off the column: a
+  design point clicks nothing. `Click the single player emblem` and the other
+  `ui.json` targets with a `label` click the UI's own entry by OCR then; the column's
+  positions above are unchanged. The campaign cards stand in a row along the foot.
+  `Menu\main.ini` in the clone retunes the scene live (`render3d/README.md`).
 - Game Setup's player rows: `Click at design 124,115` opens player 2's list,
   `124,143` picks "Computer AI:Easy"; `246,95` / `246,123` set player 1's side to Borg
   (as in `ui-runtime.md`).

@@ -8,6 +8,9 @@
 //! (measured on the bench: testbench/ui.json has the same points). A click on an entry
 //! is a click on that button, which runs the stock screen's own handler (its sound,
 //! the next `g_shellMode`, the confirmation the Exit button asks for).
+//!
+//! Over render3d's menu scene (`menus::scene`) the stock art is not drawn at all and the
+//! column stands alone (`over_scene`).
 use crate::gfx::{fade, Weight, R};
 use crate::menus::generic::shell_button_look;
 use crate::menus::{actions, Screen};
@@ -30,6 +33,9 @@ const ENTRIES: &[(&str, i32, i32)] = &[
 static mut HOVER: (HWND, i32) = (core::ptr::null_mut(), -1);
 
 pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
+    if crate::menus::scene::shown() {
+        return over_scene(ui, s);
+    }
     let screen = ui.screen();
     let t = ui.theme;
     // Behind: the stock screen, faded, so its art and animations still show.
@@ -98,9 +104,30 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
         crate::menus::generic::forward_input(ui, s);
     }
     // The stock screen hears of the hover, so its own hover sound and picture play.
+    if over_column {
+        hover_changed(s, hover);
+    }
+    version(ui, s, None);
+    true
+}
+
+/// The screen's own text (the version): where the game puts it, or at `at` (the
+/// bottom-right corner) over the scene.
+fn version(ui: &mut Ui, s: &Screen, at: Option<R>) {
+    let t = ui.theme;
+    for c in s.model.controls.iter() {
+        if matches!(c.what, crate::menus::model::What::Shell(crate::engine::shellui::Kind::Label)) && c.visible && !c.text.is_empty() {
+            let r = at.unwrap_or_else(|| s.fit.rect(c.rect));
+            ui.text_in(r, &c.text, t.small_size, Align::Right, t.text_dim, Weight::Regular);
+        }
+    }
+}
+
+/// Tells the stock screen of a change of hover (its own sound plays).
+fn hover_changed(s: &Screen, hover: i32) {
     unsafe {
         let h = s.slot.hwnd;
-        if s.top && over_column && HOVER != (h, hover) {
+        if s.top && HOVER != (h, hover) {
             HOVER = (h, hover);
             let (x, y) = if hover >= 0 {
                 let e = ENTRIES[hover as usize];
@@ -111,12 +138,70 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
             actions::push(actions::Action::Mouse { h, msg: WM_MOUSEMOVE, keys: 0, x: x - s.model.rect[0], y: y - s.model.rect[1] });
         }
     }
-    // The screen's own text (the version), where the game puts it.
-    for c in s.model.controls.iter() {
-        if matches!(c.what, crate::menus::model::What::Shell(crate::engine::shellui::Kind::Label)) && c.visible && !c.text.is_empty() {
-            let r = s.fit.rect(c.rect);
-            ui.text_in(r, &c.text, 16.0, Align::Right, t.text_dim, Weight::Regular);
+}
+
+/// Over render3d's scene (`menus::scene`): the stock art is not shown, so the column is
+/// the screen's only target (a click on the scene does nothing), down the left over a
+/// band darkened for the text; the entries are lines of text that light up, an accent
+/// bar and a glow at their left, as the pointer comes over them.
+fn over_scene(ui: &mut Ui, s: &Screen) -> bool {
+    let screen = ui.screen();
+    let t = ui.theme;
+    // Shade for the text: the left, and a little at the top and the foot.
+    ui.draw.rect_hgrad(R::new(0.0, 0.0, screen.w * 0.22, screen.h), 0xd8010205, 0xa0010205);
+    ui.draw.rect_hgrad(R::new(screen.w * 0.22, 0.0, screen.w * 0.3, screen.h), 0xa0010205, 0x00010205);
+    ui.draw.rect_vgrad(R::new(0.0, 0.0, screen.w, screen.h * 0.12), 0x80000000, 0x00000000);
+    ui.draw.rect_vgrad(R::new(0.0, screen.h * 0.84, screen.w, screen.h * 0.16), 0x00000000, 0x90000000);
+
+    // The column's geometry is the faded-art layout's (`draw`), entry for entry: the
+    // bench's scenarios click its entries by position.
+    let (w, eh, gap) = (ui.u(380.0), ui.u(54.0), ui.u(12.0));
+    let n = ENTRIES.len() as f32;
+    let title_h = ui.u(90.0);
+    let total = title_h + n * eh + (n - 1.0) * gap;
+    let x = libm::roundf(screen.w * 0.08).max(ui.u(40.0));
+    let top = libm::roundf((screen.h - total) * 0.5);
+    // The title, rising above the column's own title space.
+    ui.text_in(R::new(x, top - ui.u(40.0), w, ui.u(40.0)), "STAR TREK", 28.0, Align::Left, fade(t.text, 0.85), Weight::Bold);
+    ui.text_in(R::new(x - ui.u(3.0), top - ui.u(10.0), w * 1.5, ui.u(80.0)), "ARMADA II", 68.0, Align::Left, t.title, Weight::Bold);
+    let rule = R::new(x, top + ui.u(74.0), ui.u(260.0), ui.u(2.0).max(1.0));
+    ui.draw.rect_hgrad(rule, t.accent, fade(t.accent, 0.0));
+    let mut y = top + title_h;
+    let mut hover = -1;
+    for (i, &(label, dx, dy)) in ENTRIES.iter().enumerate() {
+        let r = R::new(x, y, w, eh);
+        y += eh + gap;
+        let stock = s.model.button_at(dx, dy);
+        let enabled = s.top && stock.is_none_or(|c| c.enabled);
+        let id = ui.id(label);
+        let (hot, held, clicked) = if enabled { ui.interact(id, r) } else { (false, false, false) };
+        let st = crate::widgets::State::of(ui, id, hot, held);
+        let k = st.hot;
+        if k > 0.01 {
+            // A glow from the left fading out, the accent bar, the text nudged right.
+            ui.draw.rect_hgrad(r, fade(t.accent, 0.28 * k), fade(t.accent, 0.0));
+            ui.draw.rect(R::new(r.x, r.y + ui.u(8.0), ui.u(4.0).max(2.0), r.h - ui.u(16.0)), fade(t.accent, k));
+        }
+        let c = if !enabled {
+            t.text_off
+        } else if held {
+            t.accent
+        } else if k > 0.01 {
+            crate::gfx::mix(t.text, 0xffffffff, k)
+        } else {
+            t.text
+        };
+        let tr = R::new(r.x + ui.u(18.0) + ui.u(10.0) * k, r.y, r.w - ui.u(24.0), r.h);
+        ui.text_in(tr, label, 26.0, Align::Left, c, Weight::Bold);
+        if hot {
+            hover = i as i32;
+        }
+        if clicked {
+            s.click(dx, dy);
         }
     }
+    hover_changed(s, hover);
+    let m = ui.u(24.0);
+    version(ui, s, Some(R::new(screen.w - m - ui.u(400.0), screen.h - m - ui.u(24.0), ui.u(400.0), ui.u(24.0))));
     true
 }

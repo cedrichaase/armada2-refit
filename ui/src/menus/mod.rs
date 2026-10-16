@@ -8,10 +8,12 @@
 //! - `screens`: a layout of our own for a screen, by name (`screens::SPECS`).
 //! - `actions`: what the UI does to a dialog, run after the frame.
 //! - `backdrop`: what the menus draw over (the mission, for the in-mission menus).
+//! - `scene`: the 3D scene behind the main menu and the campaign selection (render3d's).
 pub mod actions;
 pub mod backdrop;
 pub mod generic;
 pub mod model;
+pub mod scene;
 pub mod screens;
 
 use crate::engine::dialogs::{self, DESIGN_H, DESIGN_W};

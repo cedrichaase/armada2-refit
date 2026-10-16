@@ -4,6 +4,17 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.7.0 — 2026-10-16
+
+### Added
+- `[Menus] Scene` (default 1): the main menu and the campaign selection stand over
+  render3d's 3D scene, a fleet in orbit over a planet (needs render3d 0.8.0; without
+  it they draw as before). Over it the main menu draws none of the stock art and takes
+  no click off its column; its entries are lit text with an accent bar. The campaign
+  cards stand in a row along the foot. UI.log notes `menus: scene <name> on`/`off`.
+
+Installed, not yet seen in game.
+
 ## 0.6.0 — 2026-10-16
 
 ### Added

@@ -4,6 +4,20 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.8.0 — 2026-10-16
+
+### Added
+- The menu scene: a fleet in orbit over a planet, drawn behind the front end's main
+  menu and campaign selection on request through `Render3D_MenuScene`, render3d's first
+  export (UI.asi's `[Menus] Scene`). Recipes `menus/main.ini` and `menus/single.ini`,
+  built in; `Menu\<name>.ini` in the game directory takes precedence and is read again
+  when it changes. The sky, world and hulls modules draw their parts (`Module::menu`):
+  the recipe sky with stars and a sun, a class planet with no game object behind it
+  (`Planets::draw_menu`), lit hulls with shadows and running lights; then the frame's
+  bloom and tone map (`frame::menu_frame`).
+
+Installed, not yet seen in game.
+
 ## 0.7.1 — 2026-10-16
 
 ### Fixed

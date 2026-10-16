@@ -84,7 +84,7 @@ pub fn is_day_side(light: usize) -> bool {
     unsafe { DAY_SIDE.contains(&light) }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Lights {
     pub dirs: Vec<Directional>,
     pub points: Vec<Point>,

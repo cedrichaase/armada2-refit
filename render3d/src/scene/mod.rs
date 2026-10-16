@@ -238,6 +238,13 @@ pub fn begin_view(_v: &View) {
     st().queue.clear();
 }
 
+/// The lights of a view that is not the engine's (the menu scene, `crate::menu`): no
+/// light is registered in the front end.
+pub fn set_lights(l: Lights) {
+    st().lights = l;
+    st().queue.clear();
+}
+
 /// Reads the engine's registered lights again, for a module that registered lights of
 /// its own in its `begin_view` (the ordnance module: shots, warp flashes).
 pub fn regather_lights() {

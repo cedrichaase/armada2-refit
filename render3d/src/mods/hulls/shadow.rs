@@ -100,13 +100,24 @@ impl Shadow {
     }
 
     /// Draws the view's shadow map from its posed hulls, and finds its planets.
-    pub fn render(&mut self, v: &View, look: &Look, posed: &BTreeMap<usize, Posed>, _d: &mut draw::Drawer) {
+    /// The shadow map of a view's hulls; `planets` (centre and radius each) in place of
+    /// the engine's planets where there are none (the menu scene).
+    pub fn render(&mut self, v: &View, look: &Look, posed: &BTreeMap<usize, Posed>, _d: &mut draw::Drawer, planets: Option<&[[f32; 4]]>) {
         clear_current();
         let ls = scene::lights();
         let Some(key) = ls.key() else { return };
         let to_key = -key.dir;
         unsafe { SUN = to_key };
-        self.find_planets();
+        match planets {
+            Some(list) => {
+                let mut out = [[0.0f32; 4]; 8];
+                for (o, p) in out.iter_mut().zip(list) {
+                    *o = *p;
+                }
+                unsafe { PLANETS = out };
+            }
+            None => self.find_planets(),
+        }
         // Casters: the hulls whose sphere, stretched back towards the Key, reaches the
         // view (a hull just outside it can still shade one inside).
         let vp = v.view.mul(&v.proj);

@@ -678,6 +678,36 @@ of its own for a mission's end, and its outcome is the stock one by construction
 ui-menus-success.md` wins and loses the first Federation mission with `Scene.asi`'s
 `succeed` and `fail` and checks what comes next.
 
+## The menu scene
+
+`[Menus] Scene=1` (the default): the main menu and the campaign selection stand over
+a 3D scene, a Federation fleet in orbit over a planet, drawn by render3d
+(`render3d/README.md`, "The menu scene"). Code: `src/menus/scene.rs`.
+
+- **Where it is drawn.** At the start of each frame of the dialog host's loop, after
+  the clear and before `surface::frame(Context::Menus)`, so it is under everything of
+  ours. The scene is the one of the full-screen dialog at the bottom of what shows
+  (`main` for "main menu", `single` for "single player"; the mission list over the
+  campaign selection keeps `single`), never over a mission (`backdrop::over_mission`).
+- **How it is asked for.** `Render3D_MenuScene(name, x, y, w, h)`, render3d's one
+  export, looked up once with `GetModuleHandleA("Render3D.asi")` and
+  `GetProcAddress`. It draws into the whole back buffer and returns 1, or 0 when it
+  cannot (no Render3D.asi, render3d stood down, no recipe, no Direct3D 9 device); the
+  frame then goes on as without it.
+- **The specs over it** ask `scene::shown()`. The main menu (`over_scene`) draws none
+  of the stock screen's art and **passes no input to it**: off the column a click does
+  nothing, where over the faded art it reached the stock screen's hidden targets
+  (Instant Action, Exit) from empty space. The column keeps its places entry for entry
+  (the bench clicks them by position); its entries are text that lights up with an
+  accent bar and glow, the title rises above it, and the left of the screen is shaded
+  for the text. The campaign selection lays its four cards in a row along the foot,
+  as lighter glass, so the fleet and the planet fill the middle. Without the scene both
+  draw as before.
+- **For the bench**, UI.log says `menus: scene <name> on` and `menus: scene off` at
+  each change. `testbench/ui.json` gives the main menu's and the campaign selection's
+  targets a `label`, which `Click the <target>` clicks (by OCR) while the scene is on,
+  since their stock points are on nothing then.
+
 ## Testing
 
 `ui/bench-asi.sh --menus` (a scenario's `Setup:` line) puts `UI.asi` in a bench clone
@@ -685,6 +715,8 @@ with `[Menus] Enable=1` and takes Menus.asi out. `testbench/operating/menus-host
 has where things are and how to look inside a hosted dialog (`Menus.Trace=1` dumps the
 hidden surfaces).
 
+- `ui-menus-scene.md` (run with `--install .`): the main menu and the campaign
+  selection over render3d's scene, a hover, the label clicks, back again.
 - `ui-menus-options.md`: the main menu's spec; Options; Graphics Settings' Bump Mapping
   switched off, the display-mode list opened and a mode chosen, the screen left and
   opened again, and still off; Sound Settings' Music Volume slider and Unit Speech, the

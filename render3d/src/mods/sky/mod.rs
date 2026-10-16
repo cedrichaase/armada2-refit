@@ -426,6 +426,13 @@ impl Sky {
         world.r[1] = world.r[1] * s.y;
         world.r[2] = world.r[2] * s.z;
         let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::of_instance(inst, v.time), pose::auto(v.eye));
+        self.draw_background(v, &model, &p);
+        true
+    }
+
+    /// A background object's posed model: its meshes now, lit by the view's lights, and
+    /// its sprite nodes into the batch.
+    fn draw_background(&mut self, v: &View, model: &scene::Model, p: &pose::Pose) {
         if !model.parts.is_empty() {
             let _g = gfx::Guard::new(v.dev);
             if scene::begin(v) {
@@ -454,7 +461,53 @@ impl Sky {
             let lift = self.cfg.sun_lift;
             self.batch.billboard(&info, w.p, right, up, size[0] * k, size[1] * k, [col[0], col[1], col[2], lift]);
         }
-        true
+    }
+
+    /// The menu scene's sky (`crate::menu`): its recipe turned by the orbit, its stars,
+    /// its sun. Drawn about the eye, so the sky's own view has no translation; nothing
+    /// writes depth.
+    fn menu_sky(&mut self, shot: &crate::menu::Shot, v: &View) {
+        let dev = v.dev;
+        let far = shot.sun.as_ref().map_or(1.0e4, |s| s.2) * 2.0;
+        let mut rot = v.view;
+        rot.0[3] = [0.0, 0.0, 0.0, 1.0];
+        let a = crate::frame::steps::View { view: shot.sky_turn.to_m4().mul(&rot), proj: with_far(&v.proj, far), eye: V3::ZERO, ..*v };
+        let vp = a.view.mul(&a.proj);
+        let _g = gfx::Guard::new(dev);
+        dev.set_stream_freq(0, 1);
+        let r = v.rect;
+        let rc = Rect { left: r.x as i32, top: r.y as i32, right: (r.x + r.w) as i32, bottom: (r.y + r.h) as i32 };
+        dev.clear(&[rc], CLEAR_TARGET, 0xff00_0000, 1.0, 0);
+        if self.cfg.recipes && self.recipe_now(&shot.sky).is_some() {
+            self.draw_recipe(&a, &vp);
+        }
+        // The stars, in the sky's frame.
+        let star = |n: &str| sprites::sprite_info(n);
+        if let (Some(small), Some(big)) = (star("bstar.0"), star("mstar.0")) {
+            let (right, up) = sprites::camera_axes(&a.view);
+            let d = far * 0.25;
+            let lift = self.cfg.star_lift;
+            for &(dir, size, b) in &shot.stars {
+                let info = if b > 0.7 { &big } else { &small };
+                let h = size * d;
+                self.batch.billboard(info, dir * d, right, up, h, h, [b, b, b, if b > 0.7 { lift } else { 0.0 }]);
+            }
+            self.draw_batch(&a, &vp);
+        }
+        // The sun: a background object's SOD and its flare, where the light comes from.
+        if let Some((odf, dir, dist)) = &shot.sun {
+            let b = crate::frame::steps::View { view: rot, ..a };
+            let bvp = b.view.mul(&b.proj);
+            if let Some(model) = scene::model(dev, &assets::sod_of(odf)) {
+                let s = self.scale_sod(odf);
+                let mut world = M34::IDENTITY;
+                world.r = [world.r[0] * s, world.r[1] * s, world.r[2] * s];
+                world.p = *dir * *dist;
+                let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::looping(v.time), pose::Lod::Forced(usize::MAX));
+                self.draw_background(&b, &model, &p);
+                self.draw_batch(&b, &bvp);
+            }
+        }
     }
 
     fn draw_batch(&mut self, v: &View, vp: &M4) {
@@ -486,6 +539,11 @@ impl Module for Sky {
     }
     fn reset(&mut self) {
         self.baker.reset();
+    }
+    fn menu(&mut self, pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
+        if pass == crate::menu::Pass::Sky {
+            self.menu_sky(shot, v);
+        }
     }
     fn step(&mut self, s: Step, v: &View) -> bool {
         if s != Step::Background {

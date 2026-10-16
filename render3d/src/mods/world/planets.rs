@@ -152,6 +152,23 @@ struct City {
     frame: u32,
 }
 
+/// What a planet's body is drawn from (`Planets::draw_body`).
+struct Body<'a> {
+    ground: &'a str,
+    atmo: &'a str,
+    world: M34,
+    shell_world: M34,
+    /// The hemispheres' radii (0: none) and the shell's, in the model's units.
+    ground_r: f32,
+    ground_r2: f32,
+    shell_r: f32,
+    turb: bool,
+    turb_t: f32,
+    tint: [f32; 3],
+    /// The planet and its race, for the cities.
+    people: Option<(usize, usize)>,
+}
+
 pub struct Planets {
     spheres: Option<(Device, [Sphere; 3])>,
     vs: Shader,
@@ -333,8 +350,6 @@ impl Planets {
         let atmo = unsafe { rt::cstr_at((cls + 0x4ac) as *const u8, 16) };
         let (h0, h1, shell) = (field(db, 0xa8), field(db, 0xac), field(db, 0xb0));
         let world = obj::transform(o);
-        let wscale = world.r[0].len();
-        let centre = world.p;
         let rg = if h0 != 0 { field_f32(h0, 0x150) } else { 0.0 };
         let rs = if shell != 0 { field_f32(shell, 0x150) } else { 0.0 };
 
@@ -367,6 +382,57 @@ impl Planets {
             }
         }
 
+        let b = Body {
+            ground,
+            atmo,
+            world,
+            shell_world,
+            ground_r: if h0 != 0 { rg } else { 0.0 },
+            ground_r2: if h1 != 0 { field_f32(h1, 0x150) } else { 0.0 },
+            shell_r: if shell != 0 { rs } else { 0.0 },
+            turb,
+            turb_t,
+            tint,
+            people: if race != 0 && field_u8(race, 0x452) != 0 { Some((o, race)) } else { None },
+        };
+        self.draw_body(v, surf, &b)
+    }
+
+    /// A planet of the menu scene (`crate::menu`), with no game object behind it: the
+    /// class's ground (`<ground>1`, `<ground>2`, or its recipe) and cloud shell on a
+    /// sphere of `radius` at `world`, the shell turned `yaw` about the axis.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_menu(&mut self, v: &View, surf: &mut Surfaces, ground: &str, atmo: &str, world: &M34, radius: f32, yaw: f32) -> bool {
+        if self.spheres(v.dev).is_none() {
+            return false;
+        }
+        let (sy, cy) = (math::sinf(yaw), math::cosf(yaw));
+        let yawm = M34 { r: [v3(cy, 0.0, -sy), v3(0.0, 1.0, 0.0), v3(sy, 0.0, cy)], p: V3::ZERO };
+        let b = Body {
+            ground,
+            atmo,
+            world: *world,
+            shell_world: yawm.then(world),
+            ground_r: if ground.is_empty() { 0.0 } else { radius },
+            ground_r2: if ground.is_empty() { 0.0 } else { radius },
+            // The shell sits just over the ground, as a class planet's does.
+            shell_r: if atmo.is_empty() { 0.0 } else if ground.is_empty() { radius } else { radius * 1.01 },
+            turb: false,
+            turb_t: 0.0,
+            tint: [1.0; 3],
+            people: None,
+        };
+        self.draw_body(v, surf, &b)
+    }
+
+    /// A planet's body: the ground's two hemispheres (and its cities), the cloud shell,
+    /// the air past the limb. False leaves it to the engine.
+    fn draw_body(&mut self, v: &View, surf: &mut Surfaces, b: &Body) -> bool {
+        let (ground, atmo, world, shell_world) = (b.ground, b.atmo, b.world, b.shell_world);
+        let (rg, rs, turb, turb_t, tint) = (b.ground_r, b.shell_r, b.turb, b.turb_t, b.tint);
+        let wscale = world.r[0].len();
+        let centre = world.p;
+        let dev = v.dev;
         let ground_sf = surf.has(ground);
         let atmo_sf = surf.has(atmo);
         let gc = self.ground_colour(ground, atmo);
@@ -392,11 +458,10 @@ impl Planets {
         }
 
         // The ground: two hemispheres, the class's ground texture with 1 and 2 appended.
-        for (h, mesh) in [(0usize, h0), (1usize, h1)] {
-            if mesh == 0 {
+        for (h, r) in [(0usize, rg), (1usize, b.ground_r2)] {
+            if !(r > 0.0) {
                 continue;
             }
-            let r = field_f32(mesh, 0x150);
             let mut sf_ok = false;
             if ground_sf {
                 if let Some(s) = surf.get(dev, ground, v.time) {
@@ -424,7 +489,7 @@ impl Planets {
             self.draw_sphere(dev, h, &world, r, false, 0.0);
             // The cities, blended over the ground (pass 1 of ST3D_PlanetaryMaterial): the
             // race's development texture times the planet's own picture of its people.
-            if race != 0 && field_u8(race, 0x452) != 0 {
+            if let Some((o, race)) = b.people {
                 let rname = unsafe { rt::cstr_at((race + 0x452) as *const u8, 32) };
                 let dtex = assets::texture(dev, &super::name("PD_", rname, Some(h + 1)));
                 let ctex = self.city(dev, o, race, h, v.frame);
@@ -449,7 +514,7 @@ impl Planets {
 
         // The shell: the class's atmosphere texture blended by its alpha, writing no
         // depth; a gas giant's own surface when the atmosphere has a recipe (opaque).
-        if shell != 0 {
+        if rs > 0.0 {
             let mut sf_ok = false;
             if atmo_sf {
                 if let Some(s) = surf.get(dev, atmo, v.time) {
@@ -489,7 +554,7 @@ impl Planets {
 
             // The air past the limb: the shell's sphere pushed out to PlanetHaloHeight
             // over the ground, added, no depth written.
-            if self.look.halo > 0.0 && h0 != 0 && rg > 1e-3 && rs > 1e-3 && self.ps_halo.bind(dev) {
+            if self.look.halo > 0.0 && rg > 1e-3 && rs > 1e-3 && self.ps_halo.bind(dev) {
                 let g = rg * wscale;
                 let top = g * (1.0 + self.look.halo_h.max(1e-3));
                 k[48 * 4..48 * 4 + 4].copy_from_slice(&[g, top, self.look.halo, self.look.halo_fwd]);

@@ -37,6 +37,9 @@ pub struct Config {
     /// `[Menus] Host=0`: the dialogs run stock (user32's), only traced: a baseline for
     /// `Trace=1`.
     pub menus_host: bool,
+    /// `[Menus] Scene`: the main menu and the campaign selection stand over render3d's
+    /// 3D scene (`menus::scene`), when render3d draws it.
+    pub menus_scene: bool,
     pub hud: Hud,
     /// `[Loading] Enable`: the loading screen of ours (`crate::loading`), in place of
     /// the engine's logo scene and bar.
@@ -148,6 +151,7 @@ pub fn load() -> Config {
         menus_escape: ini.int("Menus", "EscapeReturns", 1) != 0,
         menus_trace: ini.int("Menus", "Trace", 0) != 0,
         menus_host: ini.int("Menus", "Host", 1) != 0,
+        menus_scene: ini.int("Menus", "Scene", 1) != 0,
         loading: ini.int("Loading", "Enable", 1) != 0,
         loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),
     }

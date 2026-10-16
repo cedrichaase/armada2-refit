@@ -147,6 +147,64 @@ resources again; scenario `render3d-mode-switch` checks it, switching to
 body runs as stock. An `A16B16G16R16F` target with MSAA falls back to one without, then
 to 8 bits, and the log says which.
 
+## The menu scene
+
+`src/menu/`, recipes in `menus/`: a 3D scene of render3d's own behind the front end's
+main menu and campaign selection, a fleet in orbit over a planet. `UI.asi` asks for it
+(`[Menus] Scene=1`, ui/MENUS.md, "The menu scene") through render3d's one export,
+`Render3D_MenuScene(name, x, y, w, h)`: inside its own scene, with the back buffer
+bound, it gets the scene drawn into that rectangle and draws the menu over it. A 0
+back (no recipe, no Direct3D 9 device, no targets) leaves the UI's own backdrop.
+
+**Nothing of a mission is read.** In the front end there are no game objects, no
+camera, no registered light and no sim clock, so the scene is a recipe posed on a
+clock of render3d's own (`rt::now`, restarted after ten minutes without a frame), the
+view and projection are made here, and the lights (the recipe's Key and Fill) are put
+into the scene layer in place of the engine's list (`scene::set_lights`). The frame
+goes through `frame::menu_frame`: our targets bound at the rectangle, cleared, drawn,
+then the same post passes as a mission's view (resolve, bloom, tone map), and the
+back buffer bound again.
+
+**The modules draw it**, each its own part, in `Module::menu(pass, shot, view)`, with
+the looks they give a mission:
+
+| Pass | Module | |
+|---|---|---|
+| `Sky` | sky | the recipe sky of `Sky=` (`skies/`), turned about the orbit's axis by `SkyTurn` a second; a starfield of our own (`Stars` quads of the stock `bstar.0` and `mstar.0` sprites, seeded, the brighter ones lifted past white); the sun, `Sun=`'s SOD (a background object, `Msun1`) and its sprite nodes where the Key comes from, drawn as a map's suns are |
+| `Planet` | world | `Planets::draw_menu`: the class's ground (`groundTextureName`, or its surface recipe) and cloud shell (`atmosphereTextureName`, stock's `PA_ECFR0` when the ODF names none) on render3d's sphere, the same body draw as a mission planet's (`draw_body`) without cities |
+| (depth cleared) | | the ships are drawn on a projection of their own, near 1 |
+| `Ships` | hulls | `menu_begin` poses each ship (finest level of detail, its animation looping, `hardpoints` and the damage, crew and Borg nodes hidden by name, as no class says which), draws the shadow map with the menu planet in place of the engine's; then the hull look, opaque, and the running lights collected |
+| `Translucent` | hulls | additive meshes and sprite nodes, as at a mission's `Step::Translucent` |
+
+**The scene is in the fleet's frame**: the fleet holds still with the camera and the
+sun, and the orbit shows as the planet turning under it (`Orbit Rate`, times
+`1 + Planet Spin`) and the sky turning with it. The planet's centre is the origin; the
+fleet flies along +z (the way the hulls' noses point), `Altitude` over the surface on
++y or wherever `[Planet] At` puts the planet from it. Each ship bobs, rolls and
+pitches a little on a phase of its own; the camera sways on three slow sines
+(`Sway`, `SwayPeriod`). A new scene name (the campaign selection after the main menu)
+blends the camera over `Blend` seconds, and the clock runs on, so the fleet and the
+sky never jump.
+
+**Recipes.** `menus/<name>.ini` are built into the plugin; `Menu\<name>.ini` in the
+game directory takes precedence and is read again within a second of an edit (copy
+one there to tune it live on the bench). `Base=<other>` under `[Scene]` reads that
+recipe first and this one over it. Keys:
+
+| Section | Key | |
+|---|---|---|
+| `[Scene]` | `Sky`, `SkyTurn` | a sky recipe's name; radians a second it turns |
+| | `Stars`, `StarSize`, `StarSeed` | how many stars, their half size in radians, the seed |
+| | `Sun`, `SunDistance` | the sun's ODF (none: no sun) and its distance |
+| | `KeyAxis`, `KeyColour`, `FillAxis`, `FillColour` | the two lights: the way each travels, and its colour |
+| `[Planet]` | `Class` | the planet class's ODF (`PB_CLSSM`); none: no planet |
+| | `Radius`, `Axis`, `Spin`, `Clouds` | its radius, its pole, how much faster than the orbit its ground turns, the clouds' extra turn (radians a second) |
+| | `At` | its centre from the fleet; without it, straight below at `Altitude` over its surface (a camera at the fleet's level then sees only a strip of ground, so the main menu moves the globe behind and below) |
+| `[Orbit]` | `Altitude`, `Rate` | the fleet's height over the surface (without `[Planet] At`); the orbit's radians a second |
+| `[Camera]` | `Eye`, `Target`, `Fov` | in the fleet's frame; vertical field in degrees |
+| | `Sway`, `SwayPeriod`, `Blend` | the drift's amplitude and period; the blend from the last scene's camera |
+| `[Ship<n>]` | `Odf`, `At`, `Yaw`, `Scale`, `Bob`, `Phase`, `Team` | the ship's ODF (its `baseName` and `ScaleSOD`), its place in the formation, a turn in degrees, a scale on top of `ScaleSOD`, how much it bobs, its phase, a team colour for its `team*` groups |
+
 ## Modules
 
 ### effects

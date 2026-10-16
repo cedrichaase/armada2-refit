@@ -47,26 +47,49 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     }
     let t = ui.theme;
     let sc = ui.screen();
-    kit::backdrop(ui);
+    let scene = crate::menus::scene::shown();
+    if scene {
+        // Over the 3D scene: shade at the top for the title and at the foot for the cards.
+        ui.draw.rect_vgrad(R::new(0.0, 0.0, sc.w, sc.h * 0.2), 0xb0010205, 0x00010205);
+        ui.draw.rect_vgrad(R::new(0.0, sc.h * 0.45, sc.w, sc.h * 0.55), 0x00010205, 0xd0010205);
+    } else {
+        kit::backdrop(ui);
+    }
 
-    // The screen: a title, the 2x2 cards, the foot.
+    // The screen: a title, the cards (2x2, or in a row along the foot over the scene,
+    // which then fills the middle), the foot.
     let m = ui.u(40.0);
     let title_h = ui.u(74.0);
     let foot_h = ui.u(t.button_h);
     let gap = ui.u(24.0);
     ui.text_in(R::new(m, ui.u(18.0), sc.w - 2.0 * m, title_h), "SINGLE PLAYER", t.display_size, Align::Left, t.title, crate::gfx::Weight::Bold);
     let grid = R::new(m, ui.u(18.0) + title_h, sc.w - 2.0 * m, sc.h - ui.u(18.0) - title_h - foot_h - 2.0 * gap - ui.u(10.0));
-    let card_h = (grid.h - gap) * 0.5;
-    let card_w = ((grid.w - gap) * 0.5).min(card_h * 1.5 + ui.u(24.0));
-    let x0 = grid.x + (grid.w - 2.0 * card_w - gap) * 0.5;
+    let cols = if scene { 4usize } else { 2 };
+    let (card_w, card_h) = if scene {
+        let w = (grid.w - 3.0 * gap) / 4.0;
+        // The art is about 3:2 under the name bar.
+        let h = (w / 1.55 + ui.u(46.0)).min(grid.h * 0.6);
+        (w, h)
+    } else {
+        let h = (grid.h - gap) * 0.5;
+        (((grid.w - gap) * 0.5).min(h * 1.5 + ui.u(24.0)), h)
+    };
+    let x0 = grid.x + (grid.w - cols as f32 * card_w - (cols - 1) as f32 * gap) * 0.5;
+    let y0 = if scene { grid.bottom() - card_h } else { grid.y };
     let mut hover = -1i32;
     for (i, card) in CARDS.iter().enumerate() {
-        let r = R::new(x0 + (i % 2) as f32 * (card_w + gap), grid.y + (i / 2) as f32 * (card_h + gap), card_w, card_h);
+        let r = R::new(x0 + (i % cols) as f32 * (card_w + gap), y0 + (i / cols) as f32 * (card_h + gap), card_w, card_h);
         let id = ui.id(card.name);
         let live = s.top && s.model.button_at(card.at.0, card.at.1).is_none_or(|c| c.enabled);
         let (hot, held, clicked) = if live { ui.interact(id, r) } else { (false, false, false) };
         let st = theme::State::of(ui, id, hot, held);
-        theme::panel(ui, r);
+        if scene {
+            // Glass over the scene: the theme's panel, lighter.
+            ui.draw.rect_vgrad(r, fade(t.panel_top, 0.55), fade(t.panel, 0.7));
+            ui.draw.frame(r, 1.0, fade(t.panel_edge, 0.9));
+        } else {
+            theme::panel(ui, r);
+        }
         let (bar, rest) = r.take_top(ui.u(46.0));
         let name = names.get(i).map_or(card.name, |c| if c.text.is_empty() { card.name } else { c.text.as_str() });
         ui.text_in(bar.inset(ui.u(8.0)), name, t.heading_size, Align::Left, if hot { t.accent } else { t.title }, crate::gfx::Weight::Bold);

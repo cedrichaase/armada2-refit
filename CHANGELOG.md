@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.16.0 — 2026-10-16
+
+Layers: ui 0.7.0, render3d 0.8.0, testbench 3.25.0.
+
+### Added
+- The main menu and the campaign selection stand over a 3D scene drawn in game by
+  render3d: a Federation fleet in orbit over a class M planet, with the mission
+  renderer's lighting, shadows, running lights and bloom (`[Menus] Scene`; ui 0.7.0,
+  render3d 0.8.0). Both screens restyled over it.
+
+Installed, not yet seen in game.
+
 ## 12.15.0 — 2026-10-16
 
 Layers: ui 0.6.0, render3d 0.7.1, testbench 3.24.0.
