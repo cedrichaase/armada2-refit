@@ -26,6 +26,7 @@ pub fn frame(ctx: Context) {
         crate::input::poll(w, h);
         let mut ui = crate::widgets::Ui::begin(draw, w, h, crate::input::state());
         crate::app::run(ctx, &mut ui);
+        crate::cursor::draw(ctx, &mut ui);
         let (mouse, keys) = ui.end();
         crate::input::set_capture(mouse, keys);
     });

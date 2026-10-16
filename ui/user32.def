@@ -19,3 +19,8 @@ SetCursor@4
 PostQuitMessage@4
 GetFocus@0
 SetFocus@4
+OpenClipboard@4
+CloseClipboard@0
+EmptyClipboard@0
+GetClipboardData@4
+SetClipboardData@8

@@ -9,8 +9,11 @@ pub mod rt;
 #[macro_use]
 pub mod d3d;
 pub mod app;
+pub mod clipboard;
 pub mod config;
+pub mod cursor;
 pub mod engine;
+pub mod gallery;
 pub mod gfx;
 pub mod input;
 pub mod math;

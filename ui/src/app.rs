@@ -37,9 +37,12 @@ fn demo(ctx: Context, ui: &mut Ui) {
     let (w, h) = (ui.u(460.0), ui.u(400.0));
     let anchor = match ctx {
         Context::Mission => Anchor::TopRight,
-        Context::Shell => Anchor::Centre,
+        Context::Shell => Anchor::Left,
         Context::Loading => Anchor::BottomLeft,
     };
+    if ctx == Context::Shell {
+        crate::gallery::run(ui);
+    }
     let r = anchor.place(screen, w, h, ui.u(if ctx == Context::Mission { 96.0 } else { 40.0 }));
     let inner = ui.window(r, "UI RUNTIME");
     let row = ui.u(30.0);
@@ -88,4 +91,7 @@ fn demo(ctx: Context, ui: &mut Ui) {
     let pulse = 0.5 + 0.5 * libm::sinf(t as f32 * 3.0);
     let rad = ui.u(ui.theme.radius);
     ui.draw.rect(R::new(r.x + rad, r.bottom() - ui.u(4.0), (r.w - 2.0 * rad) * pulse, ui.u(2.0)), ui.theme.accent);
+    if ctx == Context::Shell {
+        crate::gallery::modal(ui);
+    }
 }

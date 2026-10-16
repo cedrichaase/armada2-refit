@@ -163,6 +163,34 @@ uses of it:
 - The UI's own cursor is drawn in the mission frame, a frame earlier than the engine's
   (which `RefreshDisplay` draws at the position it reads just before presenting), at
   the pointer position `input::poll` read.
+- **Our own cursor** (`src/cursor.rs`, `[UI] Cursor=1`, default 0 until the HUD is
+  ours). It is drawn last in every frame, in all three contexts: in a mission the
+  sprite `shape()` names (and the engine's is hidden with `hide_this_frame()`; where the
+  engine's cannot be hidden, `synchronous()` false, ours is not drawn, so there are never
+  two), in a screen of ours and on the loading screen the arrow `c_arrow`. Nothing
+  is drawn while the engine shows none (a right-drag) or the pointer is outside the window.
+  - **The art is read at run time from the player's own files, never copied**:
+    `Sprites/cursor.spr` is parsed (a line is a sprite name, a texture, a rectangle in a
+    reference size, `@anim=cursorNx1` for N frames side by side, `@origin=(x,y)` for the
+    hotspot in texels of the 32x32 sprite) and each texture is read from `Textures/RGB/`
+    with `gfx`'s TGA decoder. Black is the colour key (`@skip=(0,0,0)`), made
+    transparent when the texture is registered. If a texture has a `.a2neb-backup`
+    beside it (hud/README.md: `cursor-aspect.py` squashed the art once), that one is read,
+    so the stock art is what is drawn whatever state the files are in. Frames are
+    stepped once a second through the strip; the engine's own timing (`tex_anim.spr`'s
+    `offset N 1.0 step`) was not measured.
+  - **Size and hotspot.** 32 texels draw at `[UI] CursorSize` units (default 32: the art
+    at its own size on a 1080-line screen), snapped to a whole multiple of the art when
+    within 20% of one, so the texels land on the pixel grid; the hotspot is the
+    sprite's `@origin` scaled the same way, so the click point is exact. The engine's own
+    cursor is stretched by its 800x600 reference (hud/README.md); ours is square at any
+    aspect and at the back buffer's resolution.
+  - **In a front-end screen of ours Windows' arrow is hidden** (`shell::hide_os_cursor`,
+    the window's `WM_SETCURSOR` answer) for as long as the screen runs.
+  - `UI.log` says each change of the shape drawn (`cursor: Mission draws c_attack`), which
+    the scenario `ui-widgets-cursor` reads. Seen on the bench: `standard_cursor` with
+    nothing selected, `c_move` over empty space with a ship selected, `c_attack` over an
+    enemy.
 
 ## The front end: screens of our own
 
@@ -236,7 +264,7 @@ first bytes, and on any mismatch the shell part stands down.
 ### The demonstration
 
 `[Demo] Shell=1` puts the demo screen where the Credits were: Main menu, Options panel,
-Credits. Esc, Enter or a right click leaves it. A left click is the demo's widgets', so
+Credits. Esc, Enter (unless a widget of ours holds the keyboard: a focused text field takes them) or a right click leaves it. With the widget gallery at the right (Widgets, below). A left click is the demo's widgets', so
 it does not. It returns to the main menu over black, as the Credits do.
 
 ### Facts measured on the bench
@@ -322,7 +350,9 @@ keys it is given; it is what a scenario's `Setup:` line runs.
 | `[UI] Enable` | 1 | 0: the plugin patches nothing |
 | `[UI] Log` | 1 | `UI.log` in the game directory: which hooks are in, and why one stood down |
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
-| `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context |
+| `[UI] Cursor` | 0 | draw the mouse cursor ourselves, from the game's own cursor art ("The cursor") |
+| `[UI] CursorSize` | 32 | its size in units (32 texels of art at 1080 lines) |
+| `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 
 ## The renderer (`src/gfx/`)
 
@@ -389,11 +419,51 @@ from `Anchor` (a rectangle against a screen edge or corner) and `Stack` (rows do
 rectangle). Panels and every interactive widget **claim** the pointer: while it is
 over one, `Ui::end` asks `input` to keep the mouse from the engine, from the next frame.
 
-The widgets so far are what the first screens need: `panel`, `window` (a panel with a
-title), `label`, `note`, `button`, `toggle`, `slider` and `progress`, over the drawing
-calls (`rect`, gradients, `rect_round`, `frame`, `line`, `image`, `nine`, `text`).
+The first widgets: `panel`, `window` (a panel with a title), `label`, `note`, `button`,
+`toggle`, `slider` and `progress`, over the drawing calls (`rect`, gradients,
+`rect_round`, `frame`, `line`, `image`, `nine`, `text`). The rest, one file each in
+`src/widgets/`:
+
+| Widget | Call | Notes |
+|---|---|---|
+| text field | `text_field(r, label, &mut String, max_len) -> FieldEvent` | caret, selection by Shift+arrows, mouse drag and double-click (a word), Ctrl+Left/Right by word, Home/End, Backspace/Delete, Ctrl+A/C/V/X through `clipboard.rs` (user32's CF_TEXT), a length limit, horizontal scroll. Enter is `Submit`, Esc `Cancel` (and drops the focus). Edited as `char`s, Latin-1 |
+| scrollbar, scroll area | `scrollbar(..)`, `scroll_area(r, label, content_h, \|ui, content\| ..)` | drag the thumb, click the track to page, wheel over the view. The body gets the content rectangle already moved by the scroll; what is scrolled out neither draws nor takes the pointer |
+| list | `list(r, label, count, row_h, &mut Option<usize>, row_fn) -> ListEvent`, `list_text(..)` | single selection, Up/Down/PageUp/PageDown/Home/End when focused, double-click or Enter is `Activated`; rows are drawn by a closure |
+| dropdown | `dropdown(r, label, &[&str], &mut usize) -> bool` | the list opens below (above when there is no room), scrolls beyond eight rows, Up/Down/Enter/Esc |
+| tabs | `tabs(r, label, &[&str], &mut usize) -> bool` | the caller draws the page; Left/Right when focused |
+| check box, radio | `checkbox`, `radio`, `radio_group` | |
+| image button | `image_button(r, label, tex, uv)` | any `gfx::Tex` (game art by `load_tga`, or `cursor::sprite`) |
+| number spinner | `spinner(r, label, &mut f32, lo, hi, step, decimals)` | held buttons repeat, the wheel steps (Shift: x10), Up/Down/PageUp/PageDown/Home/End |
+| tooltip | `tooltip(r, text)` after the widget | half a second of rest, follows the pointer, kept on the screen, wraps |
+| modal | `modal(title, w, h, \|ui, inner\| ..) -> bool` | dims the screen and takes all input; true when Esc was pressed. **Call it last in the frame** (it draws where it is called) |
+
+Behind them, three pieces in `widgets/state.rs` and `focus.rs`:
+
+- **Per-widget state by id**: `Ui::slot(id)` is four `f32`s kept between frames (a caret,
+  a scroll offset, whether a dropdown is open).
+- **The overlay layer**: `Ui::overlay(closure)` is drawn last, over everything (a
+  dropdown's list, a tooltip). Input cannot be deferred, so the widget that opens
+  something answers its input in its own call and calls `Ui::occlude(rect)`; from the next
+  frame `mouse_live` keeps the widgets below from seeing the pointer there (one frame of
+  lag, invisible at 60 Hz). A modal occludes the screen and the keyboard. `scroll_area`
+  and `list` also keep widgets in their content from seeing the pointer outside the view
+  (an input clip).
+- **Keyboard focus**: a focusable widget calls `focus_register(id)` each frame; Tab and
+  Shift+Tab walk them in call order, Enter/Space activate, Esc backs out. A focused
+  widget claims the keyboard from the engine, so focus is dropped by a click on nothing
+  focusable and when the focused widget is not called. In a mission Tab only starts
+  navigation when something is focused; a screen with no game keys calls
+  `keyboard_nav()`. `button`, `toggle` and `slider` are not focusable yet (they are
+  `ui-style`'s).
+
+`gallery.rs` is every widget on one screen: `[Demo] Shell=1` shows it beside the old
+demo panel, in four tabs (Text, Lists, Choice, Misc). The scenario `ui-widgets` drives it.
 
 ## Testing
+
+`./a2test run ui-widgets ui-widgets-cursor` (1280x720): the gallery driven by click,
+keys, the wheel and the clipboard, and our cursor in a match (Scene.asi's `ui-cursor`
+scene); `ui/bench-widgets.sh` is the second one's setup.
 
 `./a2test run testbench/scenarios/ui-runtime.md --install .` (`--res 1920x1080`: the
 Assembler's place is in screen pixels): the demo screen in the Credits' place and a
@@ -402,10 +472,11 @@ the engine does not see (the selection stays).
 
 ## Not done
 
-- **A cursor of our own.** The engine's can be hidden a frame at a time and its shape
-  read (above); nothing draws one yet.
-- **Text fields.** Input has the keys and characters, and capture keeps them from the
-  engine once a widget calls `claim_keyboard`; there is no text-field widget yet.
+- **The cursor**: ours replaces the engine's only with `Cursor=1`; the animation rate is
+  a guess, and the loading screen's cursor was not looked at on the bench.
+- **Widgets**: `button`, `toggle` and `slider` take no keyboard focus; the text field
+  has no undo and no IME; a dropdown's press outside the list closes it but the press
+  also reaches whatever is below it.
 - **A device left behind.** Objects made on a device keep it alive (`platform/D3D9.md`,
   "Which device"), and the renderer lets go of them when it first draws on a new
   device. In stock, where the shell and the game's display re-create the device at

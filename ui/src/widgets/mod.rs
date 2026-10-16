@@ -7,6 +7,22 @@
 //! one into back-buffer pixels, so a layout looks the same at any resolution.
 pub mod layout;
 
+mod checkbox;
+mod dropdown;
+mod focus;
+mod image_button;
+mod list;
+mod modal;
+mod scroll;
+mod spinner;
+mod state;
+mod tabs;
+mod text_field;
+mod tooltip;
+
+pub use list::ListEvent;
+pub use text_field::FieldEvent;
+
 use crate::gfx::{fade, mix, Color, Draw, Weight, R};
 use crate::input::Input;
 pub use layout::{Anchor, Stack};
@@ -89,6 +105,10 @@ pub struct Ui<'a> {
     over_ui: bool,
     keyboard: bool,
     hot: Option<Id>,
+    /// Deferred drawing, run last by `end` (state.rs).
+    overlays: alloc::vec::Vec<alloc::boxed::Box<dyn FnOnce(&mut Ui<'a>)>>,
+    /// What the new widgets keep per frame (state.rs).
+    x: state::Frame,
 }
 
 /// How text sits in a rectangle, horizontally.
@@ -118,12 +138,15 @@ impl<'a> Ui<'a> {
             over_ui: false,
             keyboard: false,
             hot: None,
+            overlays: alloc::vec::Vec::new(),
+            x: state::Frame::default(),
         }
     }
 
     /// Ends the frame: whether the UI wants the mouse and the keyboard kept from the
     /// engine.
-    pub fn end(self) -> (bool, bool) {
+    pub fn end(mut self) -> (bool, bool) {
+        state::end_frame(&mut self);
         let m = unsafe { &mut *core::ptr::addr_of_mut!(MEMORY) };
         if !self.input.down[0] {
             m.active = None;
@@ -161,7 +184,7 @@ impl<'a> Ui<'a> {
     }
 
     fn mouse_in(&self, r: R) -> bool {
-        self.input.mouse.is_some_and(|p| r.contains(p))
+        self.input.mouse.is_some_and(|p| r.contains(p) && self.mouse_live(p))
     }
 
     /// Marks `r` as ours: while the pointer is over it, the engine does not see the

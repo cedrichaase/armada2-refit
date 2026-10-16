@@ -401,6 +401,13 @@ pub fn state() -> Input {
     unsafe { STATE }
 }
 
+/// Whether a widget of ours holds the keyboard (a focused text field): the screen loop
+/// of a front-end screen leaves its own Esc and Enter to it then.
+pub fn keys_captured() -> bool {
+    let r = raw();
+    r.capture_keys && live(r)
+}
+
 /// Whether the message hooks are in (input capture works).
 pub fn installed() -> bool {
     unsafe { INSTALLED }

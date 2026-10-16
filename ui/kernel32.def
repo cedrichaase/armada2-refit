@@ -29,3 +29,7 @@ OutputDebugStringA@4
 ExitProcess@4
 GetCurrentThreadId@0
 Sleep@4
+GlobalAlloc@8
+GlobalLock@4
+GlobalUnlock@4
+GlobalSize@4
