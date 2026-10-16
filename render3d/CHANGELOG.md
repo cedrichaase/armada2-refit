@@ -30,7 +30,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   its texture's alpha cut at 0.5 (half of a Borg fusion cube cast nothing, in missions
   too).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-16.
 
 ## 0.8.0 — 2026-10-16
 
@@ -44,7 +44,7 @@ Installed, not yet seen in game.
   (`Planets::draw_menu`), lit hulls with shadows and running lights; then the frame's
   bloom and tone map (`frame::menu_frame`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-16.
 
 ## 0.7.1 — 2026-10-16
 

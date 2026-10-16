@@ -23,7 +23,7 @@ Layers: ui 0.8.0, render3d 0.9.0, testbench 3.26.0.
 - After an aborted mission the campaign selection is over the menu scene again, not
   the stock look (ui 0.8.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-16.
 
 ## 12.16.0 — 2026-10-16
 
@@ -35,7 +35,7 @@ Layers: ui 0.7.0, render3d 0.8.0, testbench 3.25.0.
   renderer's lighting, shadows, running lights and bloom (`[Menus] Scene`; ui 0.7.0,
   render3d 0.8.0). Both screens restyled over it.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-16.
 
 ## 12.15.0 — 2026-10-16
 

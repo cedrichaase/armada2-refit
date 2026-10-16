@@ -18,7 +18,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   mission's picture was handed on from Options to the admiral's log to it. The main
   menu and the campaign selection now drop it (`backdrop::begin`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-16.
 
 ## 0.7.0 — 2026-10-16
 
@@ -29,7 +29,7 @@ Installed, not yet seen in game.
   no click off its column; its entries are lit text with an accent bar. The campaign
   cards stand in a row along the foot. UI.log notes `menus: scene <name> on`/`off`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-16.
 
 ## 0.6.0 — 2026-10-16
 

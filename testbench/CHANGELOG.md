@@ -15,7 +15,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - Scenario `ui-menus-scene-abort`: the menu scene is back on the campaign selection
   after a mission is aborted (ui 0.8.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-16.
 
 ## 3.25.0 — 2026-10-16
 
@@ -29,7 +29,7 @@ Installed, not yet seen in game.
 ### Changed
 - `ui-menus-single`'s campaign check accepts the cards in a row over the scene.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-16.
 
 ## 3.24.0 — 2026-10-16
 
