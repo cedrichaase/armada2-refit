@@ -44,7 +44,7 @@ float4 eye          : register(c11);  // the camera's world position
 float4 dusk         : register(c12);  // rgb: the light's colour where it grazes; a: how far round it wraps
 float4 haze         : register(c13);  // rgb: the atmosphere's colour at the limb; a: its exponent
 float4 shine        : register(c14);  // x: ocean glint strength, y: its exponent, z: city lights at night,
-                                      // w: the highlight knee (hull.hlsl's shoulder; 1: clip)
+                                      // w: the exposure (1; a fog-of-war ghost's dimmer, PlanetGhost)
 float4 city_col     : register(c15);  // the city lights' colour
 float4 pcol[POINTS] : register(c16);  // point light colour; 0 for none
 float4 ppos[POINTS] : register(c24);  // world position
@@ -101,10 +101,11 @@ Sky shade(float3 wp) { return shade_n(wp, normalize(wp - centre.xyz), 1.0); }
 
 // hull.hlsl's highlight shoulder rolled colour off towards white past a knee; in
 // render3d the frame's tone map does that (Shoulder= in Render3D.ini), so light past
-// white is kept here and blooms by its energy.
+// white is kept here and blooms by its energy. What is left is the exposure `k`
+// (shine.w): 1, or a fog-of-war ghost's dimmer.
 float3 shoulder(float3 x, float k)
 {
-    return max(x, 0.0);
+    return max(x, 0.0) * k;
 }
 
 // The light on the texture: clamped, as Direct3D and the CPU path clamp it, but at the
@@ -275,7 +276,7 @@ float4 halo_ps(Lit i) : COLOR
         l += dcol[k].rgb * lerp(dusk.rgb, 1.0, saturate(ndl * 3.0 + 0.3)) * lam
            * (1.0 + halo.w * pow(saturate(dot(D, dvec[k].xyz)), 6.0));
     }
-    return float4(haze.rgb * l * dens * halo.z, 1.0);
+    return float4(haze.rgb * l * dens * halo.z * shine.w, 1.0);
 }
 
 // A planet made by Surfaces.asi: the ground, or a gas giant's shell,

@@ -4,6 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.13.0 — 2026-10-17
+
+### Added
+- `[World] PlanetGhost` (0.2): a fog-of-war planet ghost's brightness against the
+  planet seen, stock's measured dimming.
+
+### Fixed
+- A planet left under the fog of war is drawn by the world module on its own sphere
+  with its own surface, dimmed, instead of falling back to the engine's low-polygon
+  sphere and stock texture (`world::planet_ghost`, called from `overlays::ghosts`).
+
+Installed, not yet seen in game.
+
 ## 0.12.0 — 2026-10-17
 
 ### Added

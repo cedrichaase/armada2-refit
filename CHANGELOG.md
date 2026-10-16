@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.22.0 — 2026-10-17
+
+Layers: render3d 0.13.0, testbench 3.30.0.
+
+### Added
+- `[World] PlanetGhost`, how dim a fogged planet is drawn (render3d 0.13.0); scene
+  `fog-planet` and scenario `render3d-planet-ghost` (testbench 3.30.0).
+
+### Fixed
+- A planet under the fog of war keeps render3d's sphere and surface instead of the
+  engine's low-polygon sphere and stock texture (render3d 0.13.0).
+
+Installed, not yet seen in game.
+
 ## 12.21.0 — 2026-10-17
 
 Layers: ui 0.11.0, render3d 0.12.0, testbench 3.29.0.

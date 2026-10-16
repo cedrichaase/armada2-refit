@@ -21,6 +21,9 @@ use alloc::vec::Vec;
 
 pub const VT_PLANET: usize = 0x6b2b3c;
 const VT_PLANET_DB: usize = 0x6bab74;
+/// `PlanetInstance`: the instance a planet's fog-of-war spirit carries a copy of.
+const VT_PLANET_INSTANCE: usize = 0x6b2ce4;
+const FN_DISTANCE_CULL: usize = 0x4d5bb0; // GameObjectInstance::DistanceCull(eye, pos), thiscall
 /// cfgPOP_HEAVY: the population a colony's city map is full at (RTS_CFG.h).
 const POP_HEAVY: usize = 0x70213c;
 
@@ -113,6 +116,8 @@ struct Look {
     halo: f32,
     halo_h: f32,
     halo_fwd: f32,
+    /// A fog-of-war ghost's exposure.
+    ghost: f32,
 }
 
 impl Look {
@@ -137,6 +142,7 @@ impl Look {
             halo: ini.float(s, "PlanetHalo", 1.0),
             halo_h: ini.float(s, "PlanetHaloHeight", 0.04),
             halo_fwd: ini.float(s, "PlanetHaloForward", 2.0),
+            ghost: ini.float(s, "PlanetGhost", 0.2),
         }
     }
 }
@@ -167,6 +173,8 @@ struct Body<'a> {
     tint: [f32; 3],
     /// The planet and its race, for the cities.
     people: Option<(usize, usize)>,
+    /// What every pass's colour is scaled by: 1, or a ghost's `PlanetGhost`.
+    exposure: f32,
 }
 
 pub struct Planets {
@@ -340,16 +348,72 @@ impl Planets {
         if obj::flags(o) & 4 == 0 || field_u8(o, 0x113) != 0 {
             return true;
         }
+        let race = field(o, 0x2c4);
+        let tint = if race != 0 { Self::race_tint(obj::class(o), race, field_f32(o, 0x2c8)) } else { [1.0; 3] };
+        let people = if race != 0 && field_u8(race, 0x452) != 0 { Some((o, race)) } else { None };
+        self.draw_instance(v, surf, obj::class(o), inst, db, obj::transform(o), tint, people, 1.0)
+    }
+
+    /// A planet's fog-of-war ghost (a spirit of `Ghost::ghostList`: `+4` its class,
+    /// `+0x10` a copy of its `PlanetInstance`), drawn on our sphere as the planet itself,
+    /// dimmed as stock dims it (`PlanetGhost`: on the bench stock's ghost is a fifth as
+    /// bright as the planet seen), without the race's tint or cities, which live on the
+    /// object. False if it is not a planet's (the caller leaves it to the engine).
+    pub fn draw_ghost(&mut self, sp: usize, v: &View, surf: &mut Surfaces) -> bool {
+        let inst = field(sp, 0x10);
+        if inst == 0 || engine::vtable(inst) != VT_PLANET_INSTANCE {
+            return false;
+        }
+        let db = field(inst, 0x80);
+        let cls = field(sp, 4);
+        if db == 0 || cls == 0 || engine::vtable(db) != VT_PLANET_DB {
+            return false;
+        }
+        // GameObjectSpirit::Render's cull (it writes only the spirit's own instance).
+        let pos: V3 = unsafe { rd(inst + 0x68) };
+        let culled = unsafe {
+            let f: unsafe extern "thiscall" fn(usize, *const V3, *const V3) -> u8 = core::mem::transmute(FN_DISTANCE_CULL);
+            f(inst, &v.eye, &pos) != 0
+        };
+        if culled {
+            return true;
+        }
+        let world: M34 = unsafe { rd(inst + 0x44) };
+        let exposure = self.look.ghost;
+        self.note(7, "a fog-of-war ghost");
+        self.draw_instance(v, surf, cls, inst, db, world, [1.0; 3], None, exposure)
+    }
+
+    /// The atmosphere's tint (mSetupAtmosphere): white, towards the race's colour as
+    /// the population nears the class's maximum.
+    fn race_tint(cls: usize, race: usize, pop: f32) -> [f32; 3] {
+        let mut tint = [1.0f32; 3];
+        let lvl = unsafe { rd::<i32>(cls + 0x490) };
+        let maxpop = match lvl {
+            1..=4 => (unsafe { rd::<i32>(0x702130 + (lvl as usize - 1) * 4) }) as f32,
+            _ => 0.0,
+        };
+        if maxpop > 0.0 {
+            let p = pop / maxpop;
+            let rt_: [f32; 3] = unsafe { rd(race + 0x464) };
+            for i in 0..3 {
+                tint[i] = (1.0 - p) + p * rt_[i];
+            }
+        }
+        tint
+    }
+
+    /// A planet from its class, its instance (`PlanetInstance`) and database, at `world`.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_instance(&mut self, v: &View, surf: &mut Surfaces, cls: usize, inst: usize, db: usize, world: M34, tint: [f32; 3], people: Option<(usize, usize)>, exposure: f32) -> bool {
         let dev = v.dev;
         if self.spheres(dev).is_none() {
             self.note(0, "the sphere could not be made: the engine draws planets");
             return false;
         }
-        let cls = obj::class(o);
         let ground = unsafe { rt::cstr_at((cls + 0x4bc) as *const u8, 16) };
         let atmo = unsafe { rt::cstr_at((cls + 0x4ac) as *const u8, 16) };
         let (h0, h1, shell) = (field(db, 0xa8), field(db, 0xac), field(db, 0xb0));
-        let world = obj::transform(o);
         let rg = if h0 != 0 { field_f32(h0, 0x150) } else { 0.0 };
         let rs = if shell != 0 { field_f32(shell, 0x150) } else { 0.0 };
 
@@ -363,25 +427,6 @@ impl Planets {
         let turb_t = field_f32(inst, 0xb8);
         let turb = field_f32(cls, 0x4cc) > 0.0;
 
-        // The atmosphere's tint (mSetupAtmosphere): white, towards the race's colour as
-        // the population nears the class's maximum.
-        let race = field(o, 0x2c4);
-        let mut tint = [1.0f32; 3];
-        if race != 0 {
-            let lvl = unsafe { rd::<i32>(cls + 0x490) };
-            let maxpop = match lvl {
-                1..=4 => (unsafe { rd::<i32>(0x702130 + (lvl as usize - 1) * 4) }) as f32,
-                _ => 0.0,
-            };
-            if maxpop > 0.0 {
-                let p = field_f32(o, 0x2c8) / maxpop;
-                let rt_: [f32; 3] = unsafe { rd(race + 0x464) };
-                for i in 0..3 {
-                    tint[i] = (1.0 - p) + p * rt_[i];
-                }
-            }
-        }
-
         let b = Body {
             ground,
             atmo,
@@ -393,7 +438,8 @@ impl Planets {
             turb,
             turb_t,
             tint,
-            people: if race != 0 && field_u8(race, 0x452) != 0 { Some((o, race)) } else { None },
+            people,
+            exposure,
         };
         self.draw_body(v, surf, &b)
     }
@@ -421,6 +467,7 @@ impl Planets {
             turb_t: 0.0,
             tint: [1.0; 3],
             people: None,
+            exposure: 1.0,
         };
         self.draw_body(v, surf, &b)
     }
@@ -437,6 +484,7 @@ impl Planets {
         let atmo_sf = surf.has(atmo);
         let gc = self.ground_colour(ground, atmo);
         let mut k = self.consts(v, centre, rg.max(rs) * wscale, gc);
+        k[14 * 4 + 3] = b.exposure;
         let _g = gfx::Guard::new(dev);
         if !(self.vs.bind(dev) && self.decl.bind(dev)) {
             return false;

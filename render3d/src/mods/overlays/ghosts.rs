@@ -13,8 +13,9 @@
 //! `Storm3D+0x4` at 0.5 for the duration (not an opacity: on the bench stock's ghosts
 //! are opaque, near black); each spirit through `GameObjectSpirit::Render`, which
 //! culls it by distance (`GameObjectInstance::DistanceCull`) and renders the instance.
-//! A spirit whose instance shows a plain SOD is drawn here; any other (a planet's, an
-//! asteroid field's, a nebula's) is left to its own `Render` under stock's state.
+//! A spirit whose instance shows a plain SOD is drawn here, a planet's by the world
+//! module on its sphere; any other (an asteroid field's, a nebula's) is left to its own
+//! `Render` under stock's state.
 //!
 //! **The build ghost.** While the player places a station, `placeholderFeature`
 //! (0x736d50) holds its class (`+0x34`), where it would stand (`+0x38`, a `Matrix34`),
@@ -137,7 +138,8 @@ impl Ghosts {
             }
             let team = unsafe { core::mem::transmute::<usize, unsafe extern "C" fn(i32) -> usize>(FN_TEAM_GET)(field(sp, 0xc) as i32) };
             let tint = if team == 0 { V3::ZERO } else { unsafe { rd::<V3>(team + 8) } } * factor;
-            if self.ghost(sp, v, tint, amb, diff) {
+            // A planet's: on the world module's sphere, as the planet itself.
+            if crate::mods::world::planet_ghost(sp, v) || self.ghost(sp, v, tint, amb, diff) {
                 continue;
             }
             // Not a plain SOD: the spirit's own Render, under stock's state.
