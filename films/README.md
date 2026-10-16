@@ -14,7 +14,8 @@ a real editor, fed by `a2film manifest`).
     ./a2film animatic films/whats-new          # a rough cut from the probe takes
     ./a2film take   films/whats-new            # the final takes, 4K, one game at a time
     ./a2film manifest films/whats-new          # the edit as JSON, for an editor
-    ./a2film status films/whats-new
+    ./a2film status films/whats-new            # which takes are current, and why not
+    ./a2film probe  films/whats-new --ignore-code   # re-film changed specs only, keep the rest
 
 Like the texture targets, a storyboard is a **recipe** and is committed. Its footage is
 an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8):
@@ -31,22 +32,62 @@ an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8
 1. **Write the board.** Sections, then shots: what each shows and why, camera, layout,
    titles. Prose is welcome anywhere: what the tool does not read is direction for the
    person (or agent) who cuts the film.
-2. **Probe.** `a2film probe` films every changed shot at 1280x720, several games in
+2. **Probe.** `a2film probe` films every shot without a current take at 1280x720, several games in
    parallel (`--jobs`, default 4), and makes a contact sheet per take. Probes are cheap
    and exist to get the *direction* right: framing, angle, timing, what is in the shot.
 3. **Review.** `a2film sheet` and `a2film animatic` show the whole film at once. Notes go
    back into the board, and each shot's `Status:` moves on.
-4. **Repeat** 2–3. A shot is only re-filmed when its spec changed (its setup, action,
-   scene file or variant), so iterating on one shot costs one shot.
+4. **Repeat** 2–3. A take is re-filmed when it is no longer current: its spec changed
+   (its setup, action, scene file or variant), or the code it shows did (below). So
+   iterating on one shot costs one shot, and after the game's look changes the takes
+   that show it are filmed again.
 5. **Final takes.** `a2film take` films the shots at 3840x2160, one game at a time by
    default (`--jobs`), because a recording game under load draws fewer frames and the
-   take shows it. The final takes record the commit they were installed from.
+   take shows it.
 6. **Cut.** `a2film manifest` writes the edit — order, in and out points, layouts,
    transitions, titles, key hints, music — with the path and length of every take.
 
 Statuses: `draft` (written, not filmed) → `probed` → `approved` (direction signed off;
 the probe is the reference) → `final` (the 4K take is accepted). `a2film` never sets a
 status: that is the reviewer's call, written into the board.
+
+### When a take is current
+
+A take is current when it still shows what filming it again would show. Two things
+decide that, and `status`, `probe`, `take` and `manifest` say which one failed:
+
+- **Its spec**: everything in the board that decides what the take looks like (film,
+  shot, variant, scene file, setup and action, the variant's installs, resolution). The
+  edit fields (`Layout`, `Title`, `In` ...) are not in it. Stale: `spec changed`.
+- **The code it shows.** The game's look changes from week to week (render3d's nebula
+  rework landed a day after the 2026-10-15 probes), so a take is as old as the checkout
+  it was installed from. Every take records, as its session starts, the commit
+  (`commit`), whether the tree had uncommitted changes (`dirty`), which paths it depends
+  on (`scope`) and a hash of the uncommitted changes to them (`code`), in its
+  `.spec.json`. It stays current while the diff from that commit to today's working tree,
+  over those paths, hashes the same: nothing changed since, or the same uncommitted
+  change was committed as it was. Stale: `code changed since 139e18a (render3d, menus)`,
+  or `uncommitted code changes since ...`.
+
+  The paths a take depends on are the whole repository, less what cannot change a take:
+  `films/` (the boards and this tool), every `*.md`, `.gitignore` and `LICENSE`,
+  `.claude/`, `.github/`, `publish/`, `testbench/scenarios/` and `render3d/perf/`. A
+  variant whose installs are all folders of this repository other than its root (the
+  stock variant, `--install testbench/scene`) depends only on them and on the bench
+  (`testbench/`, `a2test`, `a2mod`, `a2env.*`), so a render3d change keeps its stock
+  takes. A desktop shot, or one with `Prepare:`, depends on the whole repository.
+
+  A take filmed before films 1.1.0 recorded only `git describe --dirty`: a clean one is
+  judged as above; one from a dirty tree is `unknown` (which changes it had was not
+  recorded), as is a take whose commit is not in this repository, and either is
+  re-filmed.
+
+**To keep takes the code has moved past** (a look change that does not touch them, a
+deadline), pass `--ignore-code` to `probe` or `take`: only a changed spec re-films. It
+works on `status` and `manifest` too, which then count such takes as current. `--force`
+is the other way: re-film even what is current. `python3 films/film/selftest.py` pins
+these rules on a throw-away repository, without a game; run it after changing them
+(`films/film/code.py`).
 
 ## The storyboard
 
@@ -254,6 +295,14 @@ House style for showcase footage (from the October showcase):
   end as two shots (`From:` the same take).
 - **Tk is not installed here** (`libtk8.6.so`), so the Windows/macOS window
   (`A2_INSTALLER_TK=1`) cannot be filmed until `pacman -S tk`.
+- **A take's currency sees committed and uncommitted changes to tracked files, nothing
+  else.** A new file not yet added to git, an asset rebuilt in `$A2_DATA` (a texture, a
+  plate, a movie) and another checkout a variant installs (`--install ../other`) do not
+  make a take stale; a variant that installs another checkout is judged on all of this
+  one. After rebuilding assets, re-film with `--force`.
+- **Run `a2film` from the checkout whose code you mean to film.** Takes record the
+  checkout that ran `a2film`; judged from a worktree whose branch is behind or ahead of
+  main, main's takes are stale there and current again on main.
 - **Shots run in a fresh session each**, so one shot's orders never leak into the next.
   A session's start costs about a minute; that is what `--jobs` buys back.
 
@@ -269,7 +318,8 @@ The finished cut is meant to be made elsewhere, from `a2film manifest`: a
 self-describing JSON (`"format": "a2film-manifest/1"`) with the film's sections and
 music, every shot in timeline order with its start and end, layout, transition, titles,
 key hints and card lines, its prose as `direction`, and per variant the take's path,
-length, commit, in point and whether it is current. An editor driven over MCP reads
+length, commit (`dirty` if uncommitted changes were installed), in point, whether it is
+`current` and, if not, why (`stale`: "spec changed", "code changed since ..."). An editor driven over MCP reads
 that and nothing else.
 
 Not yet:

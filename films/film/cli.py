@@ -4,6 +4,7 @@ import json
 import os
 import sys
 
+from . import code
 from . import storyboard as sb
 
 COMMANDS = {}
@@ -38,16 +39,35 @@ def total_length(film):
     return sum(s.length or 0.0 for s in film.shots)
 
 
-def take_state(film, shot, variant, tier):
-    """'-' no take, 'ok' current, 'stale' filmed from a spec that has since changed."""
+def take_check(film, shot, variant, tier, ignore_code=False):
+    """A take's state and why: ('-', None) no take; ('ok', None) current; ('spec', why) filmed
+    from a spec that has since changed; ('code', why) the code it shows has changed since it
+    was filmed; ('unknown', why) it does not say which code it shows (films/README.md,
+    "When a take is current"). With `ignore_code` only the spec counts."""
     stem = film.take(shot, variant, tier)
     if not os.path.exists(stem + '.mkv'):
-        return '-'
+        return '-', None
     try:
-        old = json.load(open(stem + '.spec.json')).get('hash')
+        spec = json.load(open(stem + '.spec.json'))
     except (OSError, ValueError):
-        old = None
-    return 'ok' if old == film.spec_hash(shot, variant, tier) else 'stale'
+        spec = {}
+    if spec.get('hash') != film.spec_hash(shot, variant, tier):
+        return 'spec', 'spec changed'
+    if ignore_code:
+        return 'ok', None
+    try:
+        return code.check(spec, film, shot, variant)
+    except RuntimeError as e:
+        return 'unknown', str(e)
+
+
+def take_state(film, shot, variant, tier, ignore_code=False):
+    """'-' no take, 'ok' current, else why not: 'spec', 'code' or 'unknown' (take_check)."""
+    return take_check(film, shot, variant, tier, ignore_code)[0]
+
+
+IGNORE_CODE = (('--ignore-code',), dict(action='store_true',
+               help='a take whose code changed (or is unknown) counts as current: only a changed spec makes it stale'))
 
 
 @command(shots=False)
@@ -76,14 +96,27 @@ def check(a):
     return 1 if probs else 0
 
 
-@command
+@command(options=[IGNORE_CODE])
 def status(a):
-    """each shot's status, and which takes exist and are current"""
+    """each shot's status, and which takes exist, are current, and why not"""
     film = load(a.board)
+    count = {}
     for s in select(film, a.shots):
-        cols = [f'{tier}/{v}:{take_state(film, s, v, tier)}'
-                for tier in ('probe', 'final') for v in s.variants] if s.filmed else []
+        cols, whys = [], []
+        for tier in ('probe', 'final'):
+            for v in (s.variants if s.filmed else []):
+                st, why = take_check(film, s, v, tier, a.ignore_code)
+                count[st] = count.get(st, 0) + 1
+                cols.append(f'{tier}/{v}:{st}')
+                if why and why != 'spec changed':
+                    whys.append(f'{tier}/{v}: {why}')
         print(f'{s.id:8} {s.status:8} {" ".join(cols)}')
+        for w in whys:
+            print(f'{"":17}{w}')
+    names = {'ok': 'current', 'spec': 'spec changed', 'code': 'code changed', 'unknown': 'code unknown',
+             '-': 'not filmed'}
+    print('\ntakes: ' + ', '.join(f'{count[k]} {n}' for k, n in names.items() if count.get(k))
+          + (' (--ignore-code: code changes not counted)' if a.ignore_code else ''))
     return 0
 
 

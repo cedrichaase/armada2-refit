@@ -16,8 +16,10 @@ the procedure.
    ("The scenes", "Commands") and object names from `testbench/scene/scenes/*.ini`. A
    feature with no scene gets a scene file beside the board (`Scene: my.ini`).
 2. **Check.** `./a2film check films/<name>` must print no `!` lines.
-3. **Probe.** `./a2film probe films/<name> [ids]` (1280x720, 4 at once; only changed
-   shots are re-filmed). Run it in the background; a take is about 2–3 minutes, mostly
+3. **Probe.** `./a2film probe films/<name> [ids]` (1280x720, 4 at once; only takes
+   that are not current are re-filmed: the shot's spec changed, or the code it shows
+   did since the take's commit. `./a2film status` says which and why. `--ignore-code`
+   keeps takes the code has moved past; use it only when the user asks). Run it in the background; a take is about 2–3 minutes, mostly
    the game starting. A `FAILED` take has its log at
    `$A2_DATA/films/<name>/probe/<id>/<variant>.log`.
 4. **Look.** Read each `<variant>.sheet.png` of the shots you changed, then
