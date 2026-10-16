@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.19.0 — 2026-10-17
+
+Layers: render3d 0.11.0.
+
+### Changed
+- The dilithium moons glow from inside, through their cracks only: the cracks are lit in
+  the moon's colour, and the round nimbus behind the moon is no longer drawn (render3d
+  0.11.0).
+
+Installed, not yet seen in game.
+
 ## 12.18.1 — 2026-10-17
 
 Layers: render3d 0.10.1, ui 0.9.1.
