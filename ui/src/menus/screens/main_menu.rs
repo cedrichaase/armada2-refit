@@ -30,16 +30,11 @@ const ENTRIES: &[(&str, i32, i32)] = &[
 static mut HOVER: (HWND, i32) = (core::ptr::null_mut(), -1);
 
 pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
-    // A model without the buttons is not the screen this was written for.
-    let found = ENTRIES.iter().filter(|e| s.model.button_at(e.1, e.2).is_some()).count();
-    if found < 3 {
-        return false;
-    }
     let screen = ui.screen();
     let t = ui.theme;
     // Behind: the stock screen, faded, so its art and animations still show.
     ui.draw.rect_vgrad(screen, 0xff03060c, 0xff09121f);
-    s.mirror_part(ui, [0, 0, 800, 600], s.fit.area(), 0x58ffffff);
+    s.mirror_part(ui, [0, 0, 800, 600], s.fit.area(), 0x40ffffff);
     ui.draw.rect_hgrad(R::new(0.0, 0.0, screen.w * 0.5, screen.h), 0xe0020408, 0x00020408);
 
     // The column.
@@ -56,8 +51,11 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
     for (i, &(label, dx, dy)) in ENTRIES.iter().enumerate() {
         let r = R::new(x, y, bw, bh);
         y += bh + gap;
+        // Options, Exit, Replay Intro and Credits are `ShellButtonSelBox`es; the three
+        // big pictures are hit areas of the screen's procedure itself, not widgets. A
+        // click on the point is right for both.
         let stock = s.model.button_at(dx, dy);
-        let enabled = s.top && stock.is_some_and(|c| c.enabled);
+        let enabled = s.top && stock.is_none_or(|c| c.enabled);
         if !enabled {
             shell_button_look(ui, r, label, false, false, false);
             continue;
@@ -69,9 +67,7 @@ pub fn draw(ui: &mut Ui, s: &Screen) -> bool {
             hover = i as i32;
         }
         if clicked {
-            if let Some(c) = stock {
-                s.click_control(c);
-            }
+            s.click(dx, dy);
         }
     }
     // The stock screen hears of the hover, so its own hover sound and picture play.

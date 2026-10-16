@@ -48,7 +48,11 @@ const CBN_SELENDOK: usize = 9;
 /// Runs what was queued, in order.
 pub fn run() {
     let q = core::mem::take(unsafe { &mut *core::ptr::addr_of_mut!(QUEUE) });
+    let trace = crate::config::get().menus_trace;
     for a in q {
+        if trace && !matches!(a, Action::Mouse { msg: WM_MOUSEMOVE, .. }) {
+            crate::log!("menus: action {:?}", a);
+        }
         match a {
             Action::Mouse { h, msg, keys, x, y } => {
                 if unsafe { IsWindow(h) } != 0 {

@@ -473,6 +473,84 @@ fn template_id(name: *const u8) -> usize {
     if (name as usize) < 0x10000 { name as usize } else { 0 }
 }
 
+/// `Trace=1`: a dialog's messages of note, with what its procedure answered.
+fn trace(h: HWND, msg: u32, wp: usize, lp: isize, r: isize) {
+    static mut TIMERS: u32 = 0;
+    if msg == 0x113 {
+        unsafe {
+            TIMERS += 1;
+            if TIMERS % 40 == 1 {
+                let t = rd::<usize>(0x76b8d4);
+                let gs = if t != 0 { rd::<usize>(t + 0x30) } else { 0 };
+                let d = if gs != 0 { rd::<usize>(gs + 0x10) } else { 0 };
+                let st = |i: usize| if d != 0 { rd::<i32>(d + 0x124 + i * 0x44) } else { -1 };
+                crate::log!("menus: debug timer #{} on {:p} id {} transport {:#x} slots {} {} {} changed {}", TIMERS, h, wp, t, st(0), st(1), st(2), if d != 0 { rd::<u32>(d + 0x24) } else { 0 });
+                if t != 0 && TIMERS % 400 == 1 {
+                    for w in super::shellui::widgets_of(h) {
+                        if w.rect[1] > 80 && w.rect[1] < 300 && w.rect[0] < 300 {
+                            crate::log!("menus: debug widget {:?} @{:?} \"{}\" shown {} mode {}", w.kind, w.rect, w.label, w.shown, w.mode);
+                        }
+                    }
+                    for c in children(h) {
+                        let id = GetDlgCtrlID(c);
+                        if (2121..=2137).contains(&id) {
+                            let r = rect_in(c, h);
+                            crate::log!(
+                                "menus: debug child {} style {:#x} @{},{} {}x{} sel {} count {} parent {:p}",
+                                id, style(c), r.left, r.top, r.right - r.left, r.bottom - r.top,
+                                SendMessageA(c, 0x147, 0, 0), SendMessageA(c, 0x146, 0, 0), GetParent(c)
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Not the frequent ones: paint, timers, the pointer, colours, hit-testing.
+    if matches!(msg, 0x0f | 0x14 | 0x113 | 0x200 | 0x20 | 0x84 | 0x133..=0x138 | 0x2b | 0x317 | 0x318 | 0x0d | 0x0e | 0x7f) {
+        return;
+    }
+    static mut N: u32 = 0;
+    unsafe {
+        N += 1;
+        if N > 400 {
+            return;
+        }
+    }
+    crate::log!("menus: trace {:p} msg {:#x} wp {:#x} lp {:#x} -> {:#x}", h, msg, wp, lp, r);
+    if msg == WM_INITDIALOG || msg == 0x14f {
+        // DEBUG: the transport's game setup, as Game Setup reads it.
+        let t = rd::<usize>(0x76b8d4);
+        let gs = if t != 0 { rd::<usize>(t + 0x30) } else { 0 };
+        if gs != 0 {
+            crate::log!("menus: debug transport {:#x} setup {:#x} host {:#x} local slot {}", t, gs, rd::<usize>(gs + 0x18), rd::<i32>(gs));
+        } else {
+            crate::log!("menus: debug transport {:#x} (no setup)", t);
+        }
+    }
+}
+
+/// The stock dialogs' procedures while `Host=0` traces them, innermost last.
+static mut OBSERVED: Vec<(usize, usize)> = Vec::new();
+
+/// `Host=0`: the game's procedure, traced, in a stock dialog.
+unsafe extern "system" fn observe_proc(h: HWND, msg: u32, wp: usize, lp: isize) -> isize {
+    let v = unsafe { &mut *core::ptr::addr_of_mut!(OBSERVED) };
+    let p = match v.iter().find(|o| o.0 == h as usize) {
+        Some(o) => o.1,
+        None => match v.iter_mut().rev().find(|o| o.0 == 0) {
+            Some(o) => {
+                o.0 = h as usize;
+                o.1
+            }
+            None => return 0,
+        },
+    };
+    let r = unsafe { core::mem::transmute::<usize, DlgProc>(p)(h, msg, wp, lp) };
+    trace(h, msg, wp, lp, r);
+    r
+}
+
 /// The dialog procedure of every hosted dialog: the game's, after the window is known.
 unsafe extern "system" fn host_proc(h: HWND, msg: u32, wp: usize, lp: isize) -> isize {
     let s = match slot_of(h) {
@@ -514,7 +592,11 @@ unsafe extern "system" fn host_proc(h: HWND, msg: u32, wp: usize, lp: isize) -> 
     if proc_ == 0 {
         return 0;
     }
-    unsafe { core::mem::transmute::<usize, DlgProc>(proc_)(h, msg, wp, lp) }
+    let r = unsafe { core::mem::transmute::<usize, DlgProc>(proc_)(h, msg, wp, lp) };
+    if crate::config::get().menus_trace {
+        trace(h, msg, wp, lp, r);
+    }
+    r
 }
 
 /// Why a dialog cannot be hosted, or None.
@@ -544,6 +626,14 @@ fn refuse(proc_: usize, owner: HWND) -> Option<&'static str> {
 unsafe extern "system" fn my_dialog_box(inst: HANDLE, name: *const u8, owner: HWND, proc_: usize, lp: isize) -> isize {
     let real = |inst, name, owner, proc_, lp| orig!(O_DIALOG_BOX, fn(HANDLE, *const u8, HWND, usize, isize) -> isize, inst, name, owner, proc_, lp);
     let tpl = template_id(name);
+    if ready() && !crate::config::get().menus_host {
+        crate::log!("menus: observing dialog {} \"{}\"", tpl, screen_name(proc_));
+        unsafe { (*core::ptr::addr_of_mut!(OBSERVED)).push((0, proc_)) };
+        let r = real(inst, name, owner, observe_proc as *const () as usize, lp);
+        unsafe { (*core::ptr::addr_of_mut!(OBSERVED)).pop() };
+        crate::log!("menus: observed dialog {} returned {}", tpl, r);
+        return r;
+    }
     if let Some(why) = refuse(proc_, owner) {
         if why != "menus off" {
             crate::log!("menus: dialog {} (proc {:#x}) runs stock: {}", tpl, proc_, why);
@@ -623,6 +713,8 @@ unsafe extern "system" fn my_get_dc(h: HWND) -> HDC {
     if let Some(s) = slot_of(h) {
         if s.surface.ok() {
             s.drawn = s.drawn.wrapping_add(1);
+            // Whatever a stock helper left selected in it, the surface is what draws.
+            s.surface.reselect();
             return s.surface.dc;
         }
     }
@@ -656,6 +748,8 @@ unsafe extern "system" fn my_begin_paint(h: HWND, ps: *mut PaintStruct) -> HDC {
                 (*ps).rc = WinRect { left: 0, top: 0, right: s.w().max(1), bottom: s.h().max(1) };
             }
             s.drawn = s.drawn.wrapping_add(1);
+            // Whatever a stock helper left selected in it, the surface is what draws.
+            s.surface.reselect();
             return s.surface.dc;
         }
     }
@@ -670,6 +764,15 @@ unsafe extern "system" fn my_end_paint(h: HWND, ps: *const PaintStruct) -> i32 {
 }
 
 unsafe extern "system" fn my_invalidate(h: HWND, r: *const WinRect, erase: i32) -> i32 {
+    if crate::config::get().menus_trace && hosting() {
+        static mut N: u32 = 0;
+        unsafe {
+            N += 1;
+            if N < 60 {
+                if slot_of(h).map_or(0, |s| s.depth) != 1 { crate::log!("menus: debug InvalidateRect {:p} hosted {} in_hosted {} top {:?}", h, is_hosted(h), in_hosted(h), top().map(|t| t.hwnd)); } else { N -= 1; }
+            }
+        }
+    }
     if let Some(s) = slot_of(h) {
         s.paint = true;
         s.erase |= erase != 0;
@@ -690,9 +793,20 @@ unsafe extern "system" fn my_redraw(h: HWND, r: *const WinRect, rgn: HANDLE, fla
 
 /// Sends the paint the shell asked for to every hosted dialog that wants one: the
 /// erase first if it was asked for, as BeginPaint would.
+///
+/// Only what shows is painted, as Windows sends `WM_PAINT` only to a window with
+/// something visible: a dialog under a full-screen one waits until it is uncovered.
+/// This matters: the shell keeps its screen's background in globals (the
+/// `SetCurrentBackground` copy), and a covered main menu painting itself under Game
+/// Setup put its own back, and Game Setup's player rows were never drawn again.
 fn paint_pending() {
+    let lowest = covered_below();
     for s in slots().iter_mut() {
         if s.hwnd.is_null() || !s.paint || !s.surface.ok() {
+            continue;
+        }
+        let modal = if s.depth > 0 { s.depth } else { owner_depth(s.hwnd) };
+        if modal < lowest {
             continue;
         }
         let (h, dc, erase) = (s.hwnd, s.surface.dc, s.erase);
@@ -708,6 +822,27 @@ fn paint_pending() {
             s.surface.reselect();
         }
     }
+}
+
+/// The depth of the innermost full-screen dialog: everything below it is hidden.
+pub fn covered_below() -> u32 {
+    stack().iter().filter(|s| s.w() >= DESIGN_W && s.h() >= DESIGN_H).map(|s| s.depth).max().unwrap_or(0)
+}
+
+/// The depth of the modal dialog a pane is in.
+fn owner_depth(h: HWND) -> u32 {
+    let mut w = h;
+    for _ in 0..8 {
+        match slot_of(w) {
+            Some(s) if s.depth > 0 => return s.depth,
+            _ => {}
+        }
+        w = unsafe { GetParent(w) };
+        if w.is_null() {
+            break;
+        }
+    }
+    0
 }
 
 // ---- geometry ----------------------------------------------------------------------
@@ -838,7 +973,7 @@ fn compose_into(h: HWND, dst: &Surface, ox: i32, oy: i32) {
         if let Some(p) = slot_of(c) {
             // A pane: its own surface, then its controls.
             if p.surface.ok() {
-                unsafe { BitBlt(dst.dc, ox + r.left, oy + r.top, r.right - r.left, r.bottom - r.top, p.surface.dc, 0, 0, SRCCOPY) };
+                copy_bits(dst, ox + r.left, oy + r.top, &p.surface, r.right - r.left, r.bottom - r.top);
             }
             compose_into(c, dst, ox + r.left, oy + r.top);
             continue;
@@ -856,12 +991,36 @@ fn compose_into(h: HWND, dst: &Surface, ox: i32, oy: i32) {
 /// Composes every hosted modal dialog's frame: its surface, its panes and its
 /// controls, as the screen would show them.
 fn compose_all() {
+    let lowest = covered_below();
     for s in slots().iter() {
-        if s.hwnd.is_null() || s.depth == 0 || !s.surface.ok() || !s.frame.ok() {
+        if s.hwnd.is_null() || s.depth == 0 || s.depth < lowest || !s.surface.ok() || !s.frame.ok() {
             continue;
         }
-        unsafe { BitBlt(s.frame.dc, 0, 0, DESIGN_W, DESIGN_H, s.surface.dc, 0, 0, SRCCOPY) };
+        // The surface is copied by its bits, not through its DC: the shell selects its
+        // own bitmaps into the DCs it is handed, and Game Setup's paint left our
+        // surface's bitmap selected in a DC of its own, so a `BitBlt` from our DC read
+        // a stale bitmap while the surface itself was current.
+        copy_bits(&s.frame, 0, 0, &s.surface, DESIGN_W, DESIGN_H);
+        s.frame.reselect();
         compose_into(s.hwnd, &s.frame, 0, 0);
+    }
+    unsafe { GdiFlush() };
+}
+
+/// Copies `w` x `h` pixels of `src` (from its top-left) into `dst` at `x`, `y`, by
+/// their bits.
+fn copy_bits(dst: &Surface, x: i32, y: i32, src: &Surface, w: i32, h: i32) {
+    unsafe { GdiFlush() };
+    let (x0, y0) = (x.max(0), y.max(0));
+    let (x1, y1) = ((x + w).min(DESIGN_W), (y + h).min(DESIGN_H));
+    if x1 <= x0 || y1 <= y0 {
+        return;
+    }
+    let row = (x1 - x0) as usize * 4;
+    for yy in y0..y1 {
+        let s = ((yy - y) * DESIGN_W + (x0 - x)) as usize * 4;
+        let d = (yy * DESIGN_W + x0) as usize * 4;
+        unsafe { core::ptr::copy(src.bits.add(s), dst.bits.add(d), row) };
     }
 }
 
@@ -1001,6 +1160,7 @@ fn run_modal(h: HWND) -> isize {
     let period = (freq / 60).max(1);
     let (mut frames, mut lost) = (0u32, 0u32);
     let started = crate::rt::now();
+    let mut last_report = started;
     let depth = slot_of(h).map_or(0, |s| s.depth);
     if depth == 1 {
         crate::menus::backdrop::begin();
@@ -1038,6 +1198,17 @@ fn run_modal(h: HWND) -> isize {
             }
         }
         compose_all();
+        let now = crate::rt::now();
+        if now - last_report >= 5.0 {
+            last_report = now;
+            if crate::config::get().menus_trace {
+                for s in stack() {
+                    dump(&s.surface, &crate::sfmt!("UI-dlg{}-surface.bmp", s.depth));
+                    dump(&s.frame, &crate::sfmt!("UI-dlg{}-frame.bmp", s.depth));
+                }
+            }
+            crate::log!("menus: dialog {:p} up, {} frames so far, top {:?}", h, frames, top().map(|t| screen_name(t.proc_addr)));
+        }
         match frame() {
             Some(true) => frames += 1,
             Some(false) => lost += 1,
@@ -1073,6 +1244,29 @@ fn run_modal(h: HWND) -> isize {
         shell::arrow_cursor(game, false);
     }
     result
+}
+
+/// `Trace=1`: a surface written to the game directory as a BMP, to see what a hidden
+/// dialog drew.
+fn dump(s: &Surface, name: &str) {
+    if !s.ok() {
+        return;
+    }
+    let (w, h) = (DESIGN_W as u32, DESIGN_H as u32);
+    let size = w * h * 4;
+    let mut v: Vec<u8> = Vec::with_capacity(54 + size as usize);
+    v.extend_from_slice(b"BM");
+    v.extend_from_slice(&(54 + size).to_le_bytes());
+    v.extend_from_slice(&0u32.to_le_bytes());
+    v.extend_from_slice(&54u32.to_le_bytes());
+    v.extend_from_slice(&40u32.to_le_bytes());
+    v.extend_from_slice(&(w as i32).to_le_bytes());
+    v.extend_from_slice(&(-(h as i32)).to_le_bytes());
+    v.extend_from_slice(&1u16.to_le_bytes());
+    v.extend_from_slice(&32u16.to_le_bytes());
+    v.extend_from_slice(&[0u8; 24]);
+    v.extend_from_slice(unsafe { core::slice::from_raw_parts(s.bits, size as usize) });
+    crate::rt::write_file(&crate::rt::game_path(name), &v);
 }
 
 /// One frame through the game's device: Some(true) presented, Some(false) the device is

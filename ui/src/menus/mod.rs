@@ -111,7 +111,10 @@ pub fn frame(ui: &mut Ui) {
         }
     }
     backdrop::draw(ui);
-    let stack = dialogs::stack();
+    let all = dialogs::stack();
+    // A full-screen dialog hides everything under it.
+    let first = all.iter().rposition(|s| s.w() >= DESIGN_W && s.h() >= DESIGN_H).unwrap_or(0);
+    let stack = &all[first..];
     let n = stack.len();
     let cfg = crate::config::get();
     for (i, s) in stack.iter().enumerate() {
@@ -119,7 +122,7 @@ pub fn frame(ui: &mut Ui) {
         let tex = mirror(s);
         let m = model::read(s);
         let logged = unsafe { &mut *core::ptr::addr_of_mut!(LOGGED) };
-        if !logged.contains(&s.hwnd) && (m.controls.len() > 0 || crate::rt::now() > 0.0) {
+        if !logged.contains(&s.hwnd) {
             logged.push(s.hwnd);
             model::log(&m);
         }

@@ -23,6 +23,9 @@ pub struct Config {
     pub menus_escape: bool,
     /// `[Menus] Trace`: log every hosted dialog's messages of note.
     pub menus_trace: bool,
+    /// `[Menus] Host=0`: the dialogs run stock (user32's), only traced: a baseline for
+    /// `Trace=1`.
+    pub menus_host: bool,
 }
 
 pub fn load() -> Config {
@@ -39,6 +42,7 @@ pub fn load() -> Config {
         menus_specs: ini.int("Menus", "Specs", 1) != 0,
         menus_escape: ini.int("Menus", "EscapeReturns", 1) != 0,
         menus_trace: ini.int("Menus", "Trace", 0) != 0,
+        menus_host: ini.int("Menus", "Host", 1) != 0,
     }
 }
 

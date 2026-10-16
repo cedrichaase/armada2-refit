@@ -290,6 +290,7 @@ unsafe extern "system" {
     pub fn BitBlt(dst: HDC, x: i32, y: i32, w: i32, h: i32, src: HDC, sx: i32, sy: i32, rop: u32) -> i32;
     pub fn PatBlt(dc: HDC, x: i32, y: i32, w: i32, h: i32, rop: u32) -> i32;
     pub fn SetViewportOrgEx(dc: HDC, x: i32, y: i32, old: *mut Point) -> i32;
+    pub fn GdiFlush() -> i32;
 }
 
 #[link(name = "kernel32")]

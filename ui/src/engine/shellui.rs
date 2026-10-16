@@ -43,6 +43,9 @@ const BTN_LABEL: usize = 0x3c; // char[64]: the label, "NULL" for none
 const BTN_LABEL_LEN: usize = 0x40;
 const BTN_MODE: usize = 0xc0; // 0 normal, 1 under the pointer, 2 held
 const BTN_RECT: usize = 0xc4; // left, top, right, bottom in the dialog
+/// ShellButtonSelBox: the part of its (shared) picture that takes the pointer, which
+/// its `CheckRollOver` tests instead of the whole picture's rectangle.
+const SELBOX_RECT: usize = 0x178;
 const BTN_SHOWN: usize = 0xe4;
 const BTN_ENABLED: usize = 0xe8;
 const BTN_COLOUR: usize = 0x28; // label colour, COLORREF
@@ -215,7 +218,8 @@ fn read(w: usize) -> Option<Widget> {
         if label == "NULL" {
             label.clear();
         }
-        let r = [rd::<i32>(w + BTN_RECT), rd::<i32>(w + BTN_RECT + 4), rd::<i32>(w + BTN_RECT + 8), rd::<i32>(w + BTN_RECT + 12)];
+        let at = if kind == Kind::SelBox { SELBOX_RECT } else { BTN_RECT };
+        let r = [rd::<i32>(w + at), rd::<i32>(w + at + 4), rd::<i32>(w + at + 8), rd::<i32>(w + at + 12)];
         return Some(Widget {
             obj: w,
             kind,
