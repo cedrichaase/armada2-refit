@@ -21,15 +21,16 @@ shell draws itself are made of buttons.)
 6. Expect "Internet - Manual IP" is visible.
 7. Click at 700,224.
 8. Press End.
-9. Type "zq".
-10. Wait 1 second.
-11. Expect "zq" is visible.
-12. Take a screenshot called "name typed".
-13. Press BackSpace 2 times.
-14. Wait 1 second.
-15. Expect "zq" is not visible.
-16. Click "Previous Menu".
-17. Wait 3 seconds.
-18. Expect "ARMADA II" is visible.
-19. Quit the game.
-20. Expect no crash.
+9. Press BackSpace 14 times.
+10. Type "zqx".
+11. Wait 1 second.
+12. Expect "zqx" is visible.
+13. Take a screenshot called "name typed".
+14. Press BackSpace 3 times.
+15. Wait 1 second.
+16. Expect "zqx" is not visible.
+17. Click "Previous Menu".
+18. Wait 3 seconds.
+19. Expect "ARMADA II" is visible.
+20. Quit the game.
+21. Expect no crash.
