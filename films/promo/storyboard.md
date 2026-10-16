@@ -323,7 +323,7 @@ scene orbit target 200 -6 130
 ```action
 wait 1
 scene glide 8 235 -4 120
-wait 7
+wait 11
 ```
 
 ### b04 · Damage
@@ -377,7 +377,7 @@ scene orbit 3000 0 3110 90 -6 280
 ```action
 wait 1
 scene special holder gholdbm tgt; glide 8 110 -5 250
-wait 7
+wait 11
 ```
 
 ### b06 · The warbird cloaks
@@ -404,7 +404,7 @@ scene orbit warbird 230 -6 260
 ```action
 wait 1
 scene cloak warbird on
-wait 8
+wait 11
 ```
 
 ### b07 · Glass
