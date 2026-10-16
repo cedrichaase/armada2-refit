@@ -586,14 +586,23 @@ shell theme and act only by clicking stock controls.
   `input::keys_captured`, so Enter and Esc go to it and not to the dialog as `IDOK` and
   `IDCANCEL` while it is focused (`local::focused` covered only the stand-in).
 
-**The end-of-mission screens are not dialogs.** `do_success_mission` and
-`do_fail_mission` (`SMain.obj`, 0x6079d0 and 0x6077c0) never call `DialogBoxParamA`:
-the first makes its own window and bitmap (`ItemGet`) and the second sets the display and
-cursors and goes through `DispatchDialog`, which puts the Admiral's Log up next (a
-`g_shellMode` case; `do_admirals_log` at 0x607550 wraps `do_admiralsLog`). So the
-host sees the Admiral's Log, which has a spec, and not a screen of its own for either. The
-success screen's own window is not hosted: it runs as it always did. Not reached on the
-bench (it needs a mission won or lost); read from the code only.
+**There is no end-of-mission screen to host.** `do_success_mission` (0x6079d0) shows
+nothing: `Program::GameClose` calls it when the mission was won (`RunState`'s state 1,
+which `AiMission::DoEndOfMission` sets from the script's `SucceedMission`), and all it
+does is mark the campaign's next mission as reached (`ShellSettings::AdvanceOneMission`)
+when the one won was the furthest yet. (An earlier reading here took the functions that
+follow it in `SMain.obj`, `init_screen_pos`, `draw_cursor` and `Read_Shell_Bitmap`, for
+its body.) `do_fail_mission` (0x6077c0) is never called. What follows a mission is
+`Program::SetupNextScreen`'s choice: after a won campaign mission with another after
+it, that mission's name, and the game loads it at once, so the next thing on screen is
+its cinematic and then the loading screen (`LOADING.md`, ours with `[Loading]
+Enable=1`); after the last of the last campaign, the Credits; when the campaign is
+complete, the single-player screen; after a lost one, back to the shell. The Admiral's
+Log comes up between missions only when no next mission is queued (`GameDoOne`), and it
+is a dialog, hosted with its spec. So `[Menus] Enable=1` needs nothing for a mission's
+end, and its outcome is the stock one by construction. `testbench/scenarios/
+ui-menus-success.md` wins and loses the first Federation mission with `Scene.asi`'s
+`succeed` and `fail` and checks what comes next.
 
 ## Testing
 
@@ -619,49 +628,35 @@ hidden surfaces).
   as stock shows them; player 2 set to Computer AI:Easy and player 1's side to Borg;
   LAUNCH; the in-mission menu over the mission, closed by Esc; Save Game with a typed
   name; Load Game of that save (abort, Yes); quit.
-
 - `ui-menus-setup.md`: Instant Action's Game Setup through its spec: two computer
   players set through the drop-downs, a side, Fixed Placement, Map Select (scrolled,
   Four Sisters chosen), the Advanced panel (Warp off, a slider moved), LAUNCH.
 
 ## Not done
 
-- **The generic `widgets` screen is verified on the Multiplayer connection screen only**
-  (the edit and the buttons, `ui-menus-widgets.md`); its list and drop-down branches
-  have no screen on the bench (the lists the shell draws are buttons, the combo boxes
-  of Graphics Settings are hidden windows a spec drives by clicks).
-- **The text windows (help, licence) and net waiting are written from the same pattern
-  and not seen**: no way to reach them on the bench.
-- **Screens not reached on the bench with the host**: the Tutorials, Klingon and Borg
-  campaigns' lists, the Admiral's Log at the end of a mission (`do_success_mission` and
-  `do_fail_mission`, above), Multiplayer and its lobbies (no network on the bench),
-  Credits (a screen of the engine's own, not a dialog: it runs as before), the licence,
-  GameSpy and command-line screens.
-- **Specs**: the main menu (English labels: the stock art carries the words, so the
-  spec names its buttons itself), the Options family and the single-player screens
-  above. Every other screen is the generic one.
-- **The generic `widgets` screen and the local text field, list and drop-down are not
-  verified on the bench**; the mirrored screen is. The shared widgets (`crate::widgets`)
-  are being written elsewhere; `menus/local.rs` is to be replaced by them.
-- **Screens not reached on the bench with the host**: the campaign selection and
-  mission lists, the Admiral's Log (its panes, tabs and owner-drawn buttons are
-  composed by the code above, not seen), the Technology Tree, Multiplayer and its
-  lobbies (no network on the bench), Credits (a screen of the engine's own, not a
-  dialog: it runs as before), the licence, GameSpy and command-line screens.
-- **Specs** for the main menu (English labels: the stock art carries the words), Game
-  Setup, Advanced Options, Map Select, Multiplayer Connection and the small
-  multiplayer dialogs. The other screens are generic, the Internet lobby among them.
+- **Specs**: every screen has one except the Internet lobby, the `Shell::Screen::Show`
+  screens (voice options, command-line host and join) and the end-of-mission flow's
+  generic messages; those draw with the generic screen. The main menu's and Single
+  Player's labels are English (the stock art carries the words, so the spec names its
+  buttons itself).
+- **Not reached on the bench**: the Tutorials, Klingon and Borg campaigns' lists;
+  Multiplayer and its lobbies; help, licence and net waiting; room select, GameSpy and
+  the command-line screens. Credits is a screen of the engine's own, not a dialog, and
+  runs as before.
 - **The multiplayer specs are not verified on the bench.** Multiplayer Connection,
   Manual IP and the other forms, and Game Setup's chat line, are written from the
   model read on the bench (Multiplayer Connection) or from the generic `form` pattern,
   but no two-player run has been made with them (`ui/bench-asi.sh --dplay --menus` is
   the set-up for one; `ui-menus-multiplayer.md` is still to be written).
+- **The generic `widgets` screen is verified on the Multiplayer connection screen only**
+  (the edit and the buttons, `ui-menus-widgets.md`); its list and drop-down branches
+  have no screen on the bench.
 - **Map Select's list is the stock window of fourteen rows**, scrolled by the stock
   arrows: the whole list of maps is not read (it is `KnownMaps`'), and the stock scroll
-  bar's thumb is not drawn.
-- **The `Shell::Screen::Show` screens** (voice options, command-line host and join)
-  are hosted with the generic screen: they are not reached on the bench, so their
-  model has not been read, and they have no spec.
+  bar's thumb is not drawn. Advanced Options' sliders are the stock art, cropped.
+- **Two helper modules**: `screens/kit.rs` (single player) and `screens/setup_kit.rs`
+  (setup, multiplayer) were written in parallel and overlap with `common.rs`; to be
+  folded into one.
 - **Keyboard navigation** of a spec (arrows, Enter) and of the generic screen beyond
   what the stock dialog does with Enter, Esc and Tab.
 - **The cursor** is the system arrow over the 3D window, as with the GDI menus; a cursor

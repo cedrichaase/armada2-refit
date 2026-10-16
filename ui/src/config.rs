@@ -38,6 +38,12 @@ pub struct Config {
     /// `Trace=1`.
     pub menus_host: bool,
     pub hud: Hud,
+    /// `[Loading] Enable`: the loading screen of ours (`crate::loading`), in place of
+    /// the engine's logo scene and bar.
+    pub loading: bool,
+    /// `[Loading] Hold`: seconds the load waits at its half-way point, the screen
+    /// still drawn, for the test bench to look at it (0: never).
+    pub loading_hold: f32,
 }
 
 /// `[HUD]` in UI.ini: which stock panels ours replace. Every panel is off by default,
@@ -116,6 +122,8 @@ pub fn load() -> Config {
         menus_escape: ini.int("Menus", "EscapeReturns", 1) != 0,
         menus_trace: ini.int("Menus", "Trace", 0) != 0,
         menus_host: ini.int("Menus", "Host", 1) != 0,
+        loading: ini.int("Loading", "Enable", 0) != 0,
+        loading_hold: ini.float("Loading", "Hold", 0.0).clamp(0.0, 600.0),
     }
 }
 

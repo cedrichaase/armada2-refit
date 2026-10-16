@@ -17,6 +17,7 @@ pub mod gallery;
 pub mod gfx;
 pub mod hud;
 pub mod input;
+pub mod loading;
 pub mod math;
 pub mod menus;
 #[rustfmt::skip]
@@ -53,7 +54,7 @@ fn startup() {
     log!("input: {}", if input::install() { "captured" } else { "not captured" });
     log!("mission: {}", if engine::ingame::install() { "hooked" } else { "standing down" });
     log!("shell: {}", if engine::shell::install() { "hooked" } else { "standing down" });
-    log!("loading: {}", if engine::loading::install() { "hooked" } else { "standing down" });
+    log!("loading: {}", if engine::loading::install(config::get().loading) { "hooked" } else { "standing down" });
     log!("hud: {}", if hud::install() { "panels of ours" } else { "stock" });
     // The menus: [Menus] Enable=1 hosts the stock shell's dialogs (ui/MENUS.md). Patched
     // here, at DllMain, because the shell's display mode must be raised before the
