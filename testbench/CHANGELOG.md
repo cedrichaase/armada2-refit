@@ -5,6 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.21.0 — 2026-10-16
+
+### Added
+- Scenarios `ui-whole-game` (16:9, 21:9 and 4:3: the whole game with `./install`'s
+  defaults), `ui-menus-multiplayer`, `ui-hud-multiplayer` (ui 0.4.0); operating notes
+  `ui-switchon.md`, `ui-multiplayer.md`, `ui-fixes.md`.
+
+### Changed
+- Scenarios of the superseded plugins (`grid-layout`, `hud`, `hud-mode-switch`,
+  `escape-menu`, `main-menu`, `game-setup-labels`) put their plugin back with
+  `ui/bench-legacy.sh`; `_enter-instant-action` goes through the UI's Game Setup;
+  `ui-hud-map`, `ui-hud-panels` and `ui-hud-panels-objectives` check what stock shows.
+- A run's report gathers more of the UI's logs.
+
+Installed, not yet seen in game.
+
 ## 3.20.0 — 2026-10-16
 
 ### Added

@@ -4,6 +4,36 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.4.0 — 2026-10-16
+
+### Added
+- Multiplayer HUD panels: `[HUD] Comm` (the comm panel), `DropPlayer`, `LoadWait`; the
+  Internet lobby screen; the lobby's game rows and player list in the control model;
+  `bench-asi.sh --online`, `--for` (eed02e3).
+- The unit view placed by the UI beside its info panel, `[HUD] UnitViewSize`; the
+  engine's cursor kept square at any aspect when `[UI] Cursor=0` (8c34190).
+- `ui/supersede.sh`, run by `ui/install.sh`: takes `HUD.asi`, `GridLayout.asi` and
+  `Menus.asi` out and puts the HUD's file-based fixes back to stock;
+  `ui/bench-legacy.sh` puts an old plugin back in a bench clone (8c34190).
+- `[UI] Defaults`: a reinstall moves keys still at the old defaults to the new ones,
+  and keeps every value the player changed (`ini-merge.py`) (8c34190).
+
+### Changed
+- **Every part of the UI is on by default**: every `[HUD]` panel, `[Menus] Enable`,
+  `[Loading] Enable`, `[UI] Cursor`. A key at 0 gives that part back to the engine
+  (8c34190).
+- HUD panels draw only in their view's render list (no HUD over a cutscene); the
+  objectives box keeps the mouse while it shows, so Return closes it as stock; the main
+  menu's sides are the widescreen plate when one is installed (8c34190).
+
+### Fixed
+- Typing into a field of ours over a hosted dialog was doubled or lost; Enter in a
+  field sends (Game Setup's chat); Game Setup's multiplayer rows (eed02e3).
+- Graphics Settings drew its display-mode and driver fields twice (2e2298e).
+- The loading screen labelled Instant Action "Multiplayer" (14ec9a0).
+
+Installed, not yet seen in game.
+
 ## 0.3.0 — 2026-10-16
 
 ### Added

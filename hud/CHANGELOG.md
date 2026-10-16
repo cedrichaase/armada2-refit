@@ -5,6 +5,15 @@ before that `ui-widescreen.py`, `cursor-aspect.py` and (as the separate `font` l
 `ui-font-condense.py`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The derivations are in [`README.md`](README.md).
 
+## 2.2.2 — 2026-10-16
+
+### Changed
+- The revert of the three file-based fixes is `hud/revert-files.sh`, run by
+  `install.sh` as before and by `ui/supersede.sh` when the UI's HUD takes `HUD.asi`'s
+  place (8c34190).
+
+Installed, not yet seen in game.
+
 ## 2.2.1 — 2026-10-12
 
 ### Fixed

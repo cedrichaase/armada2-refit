@@ -5,6 +5,24 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.4.0 — 2026-10-16
+
+Layers: ui 0.4.0, hud 2.2.2, testbench 3.21.0.
+
+### Changed
+- **The UI draws the whole HUD, every menu, the loading screen and the cursor by
+  default** (ui 0.4.0). `./install` no longer runs `hud/install.sh`,
+  `grid/install.sh` or `menus/install.sh`: `ui/install.sh` takes `HUD.asi`,
+  `GridLayout.asi` and `Menus.asi` out (`ui/supersede.sh`); the menu plates stay
+  installed, for the UI's main menu. Those layers stay in the repository; `a2mod`
+  still recognises their files in an older install.
+
+### Added
+- The multiplayer HUD panels and the Internet lobby; scenario `ui-whole-game` at three
+  aspects (ui 0.4.0, testbench 3.21.0).
+
+Installed, not yet seen in game.
+
 ## 12.3.0 — 2026-10-16
 
 Layers: ui 0.3.0, testbench 3.20.0.
