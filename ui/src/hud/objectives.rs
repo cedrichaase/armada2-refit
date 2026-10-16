@@ -42,10 +42,12 @@ fn draw(ui: &mut Ui, o: popups::Objectives) {
     let font = crate::text::font();
     let (_, brief_h) = crate::text::measure_wrapped(font, &o.briefing, px, text_w);
     let box_w = ui.u(22.0);
+    // The check box's real width (a pill switch in LCARS), then a gap before the text.
+    let lead = theme::check_w(ui, box_w) + pad;
     let mut lines_h = 0.0;
     let mut line_hs = alloc::vec::Vec::new();
     for (l, _) in &o.lines {
-        let (_, h) = crate::text::measure_wrapped(font, l, px, text_w - box_w - pad);
+        let (_, h) = crate::text::measure_wrapped(font, l, px, text_w - lead);
         let h = h.max(box_w);
         line_hs.push(h);
         lines_h += h + ui.u(t.gap);
@@ -70,7 +72,7 @@ fn draw(ui: &mut Ui, o: popups::Objectives) {
         let b = R::new(x, y + (ui.u(t.text_size) * 1.25 - box_w) * 0.5, box_w, box_w);
         theme::check(ui, b, *done, theme::State::fixed(0.0, false, *done, false));
         let col = if *done { t.text_dim } else { t.text };
-        ui.draw.text_wrapped(l, px, w - box_w - pad, x + box_w + pad, y, col, Weight::Regular);
+        ui.draw.text_wrapped(l, px, w - lead, x + lead, y, col, Weight::Regular);
         y += h + ui.u(t.gap);
     }
     let bw = ui.u(180.0);

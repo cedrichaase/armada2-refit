@@ -4,6 +4,14 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.9.2 — 2026-10-17
+
+### Fixed
+- The briefing's objectives no longer run under their LCARS switches: the text starts
+  after the switch's real width plus a gap (`theme::check_w`), not after a square box.
+
+Installed, not yet seen in game.
+
 ## 0.9.1 — 2026-10-17
 
 ### Fixed
