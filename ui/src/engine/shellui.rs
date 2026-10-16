@@ -37,6 +37,12 @@ const VT_SCROLLBAR: usize = 0x6bb164;
 /// `ComboBox` (a `ShellButton` that draws a hidden Win32 combo box's choice and its own
 /// pull-down list; Game Setup's player rows): `shellcombo.rs` reads the rest.
 const VT_COMBO_BOX: usize = 0x6bad2c;
+/// The Internet lobby's rows: `GameSelectionSlot` (a game the search found; its
+/// `SetDescriptor` writes the row's text as the button's label) and `PlayerListButton`
+/// (a player in the room). Both are `ShellButton`s with an `UpdateButton(HDC)` of their
+/// own, so slot 8 does not name them (MENUS.md, "The Internet lobby").
+const VT_GAME_SLOT: usize = 0x6badcc;
+const VT_PLAYER_LIST: usize = 0x6bae74;
 /// The address range of Armada2.exe's vtables (`.rdata`).
 const RDATA: (usize, usize) = (0x6b0000, 0x6d0000);
 
@@ -224,7 +230,7 @@ fn read(w: usize) -> Option<Widget> {
         return None;
     }
     let slot = |i: usize| rd::<usize>(vt + i * 4);
-    if slot(8) == FN_BUTTON_UPDATE_HDC || vt == VT_SCROLLBAR || vt == VT_COMBO_BOX {
+    if slot(8) == FN_BUTTON_UPDATE_HDC || vt == VT_SCROLLBAR || vt == VT_COMBO_BOX || vt == VT_GAME_SLOT || vt == VT_PLAYER_LIST {
         if vt == VT_SCROLLBAR {
             let horizontal = rd::<u8>(w + SB_HORIZONTAL) != 0;
             let r = [rd::<i32>(w + SB_RECT), rd::<i32>(w + SB_RECT + 4), rd::<i32>(w + SB_RECT + 8), rd::<i32>(w + SB_RECT + 12)];

@@ -25,7 +25,7 @@ joiner quits first. Names are typed in lower case (`multiplayer-name.md`).
 5. Wait up to 20 seconds for "Internet - Manual IP".
 6. Host: Take a screenshot called "connection".
 7. Check that the multiplayer connection screen is drawn in the UI's style: a window with the player's name in a text field and one wide button per connection type, including Internet - Online.
-8. Host: Click at 640,232.
+8. Host: Click at 640,271.
 9. Host: Press End.
 10. Host: Press BackSpace 32 times.
 11. Host: Type "host".
@@ -41,13 +41,13 @@ joiner quits first. Names are typed in lower case (`multiplayer-name.md`).
 21. Host: Take a screenshot called "game name".
 22. Host: Click "O.K.".
 23. Host: Wait up to 30 seconds for "GAME SETUP".
-24. Joiner: Click at 640,232.
+24. Joiner: Click at 640,271.
 25. Joiner: Press End.
 26. Joiner: Press BackSpace 32 times.
 27. Joiner: Type "joiner".
 28. Joiner: Click "Internet - Manual IP".
 29. Joiner: Wait up to 10 seconds for "O.K.".
-30. Joiner: Click at 640,360.
+30. Joiner: Click at 640,355.
 31. Joiner: Type this machine's address.
 32. Joiner: Click "O.K.".
 33. Joiner: Wait up to 30 seconds for "host's Game".
@@ -56,11 +56,11 @@ joiner quits first. Names are typed in lower case (`multiplayer-name.md`).
 36. Joiner: Click "host's Game".
 37. Joiner: Click "Join Game".
 38. Joiner: Wait up to 30 seconds for "GAME SETUP".
-39. Joiner: Click at 400,560.
+39. Joiner: Click at 300,640.
 40. Joiner: Type "hello from joiner".
 41. Joiner: Press Return.
 42. Host: Wait up to 20 seconds for "hello from joiner".
-43. Host: Click at 400,560.
+43. Host: Click at 300,640.
 44. Host: Type "hello from host".
 45. Host: Press Return.
 46. Joiner: Wait up to 20 seconds for "hello from host".
