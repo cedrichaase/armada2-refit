@@ -13,7 +13,7 @@ in [`README.md`](README.md).
   (`<variant>.music.wav`, `.voice.wav`, `.interface.wav`, and `.effects.wav` for the rest),
   cut to the take's time line. In the spec only when set, so existing takes stay current.
 - `Audio:` takes a mix of stems, `effects + voice -6`, which the animatic plays; the
-  manifest gives each shot's `mute`, `stems` and `mix` and each take's `stems`.
+  manifest gives each shot's `mute`, `stems` and `mix` and each take's `stems` (e682c70).
 
 ### Changed
 - With stems, a take's own track is the stems summed at unity, the whole of its sound.

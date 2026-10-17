@@ -13,7 +13,7 @@ Layers: testbench 3.31.0, films 1.4.0.
 - Takes record the game's sound by category: `Mute:` silences music, voice, effects or
   interface in a take (`a2test session start --mute`), and `Stems:` records music, voice
   and interface as separate tracks beside it (`--stems`, `Stems.asi` in the bench clone
-  only), mixed per shot in the animatic with `Audio: effects + voice -6`.
+  only), mixed per shot in the animatic with `Audio: effects + voice -6` (e682c70).
 
 Installed, not yet seen in game.
 

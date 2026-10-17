@@ -14,7 +14,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   sink of its own (`a2test-<id>-<category>`) by `stems/Stems.asi`, which moves that
   category's 2D sounds to a DirectSound device on it; the rest stays on the session's
   sink as the effects stem. Stems are set to full volume. `Stems.log`, `Stems.ini`
-  gathered with the logs.
+  gathered with the logs (e682c70).
 
 Installed, not yet seen in game (measured on the bench: `a2_fed01` intro, three stems).
 
