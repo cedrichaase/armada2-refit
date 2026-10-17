@@ -1316,7 +1316,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `PlanetWrap`, `PlanetFill`, `PlanetSun`, `PlanetHaze*`, `PlanetGlint*`, `CityLights`,
 `CityLightColour`, `PlanetHalo*`, `PlanetGhost`; the rocks' `RockAmbient`, `RockSpecular*`,
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
-`MoonCrackCore`, `MoonNimbus`; the lights' `PlanetGlows`,
+`MoonCrackCore`, `MoonCrackDepth`, `MoonCrackFalloff`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
 `NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
@@ -1384,7 +1384,17 @@ at its brightest key, swung by `MoonPulse` of the pulse, times the share of dili
 left (the shell's colour over its full colour) and `MoonCracks`, past 1 so the bloom
 spreads it along the crack. It whitens towards the fissure's core (the relief cube's
 alpha past `Cut=`, times `MoonCrackCore`), and the recipe's `Glow=` beside the cracks
-takes its hue and pulse at the recipe's strength. The nimbus itself, a round billboard
+takes its hue and pulse at the recipe's strength. The light lies at the bottom of each
+crack, not on its surface: a crack is a ravine `MoonCrackDepth` deep (in the mesh's
+radii), opening where the cut does and deepest at the fissure's core (the relief alpha
+at twice `Cut=`), and the view's ray is marched down into it (eight fixed steps along
+the radial lookup, branch-free) to the wall it meets. How deep that is sets the light,
+to the power `MoonCrackFalloff`, so the walls are dark rock, the sun only on their top,
+and seen at an angle the near wall hides the light. Opening the ravine wider than the
+cut was tried and dropped: the finer net of branches peaks just under `Cut=` and opened
+as thin blue threads. A crack only a pixel or two wide has no room for walls (they broke
+it into dots at play distance), so the ravine fades in as the depth spans 2 to 5 pixels
+and a far moon keeps the flat look. The nimbus itself, a round billboard
 behind the moon that showed only past its edge as a halo, is drawn only with
 `MoonNimbus=1`, at `Step::Translucent`, its animation on the instance's clock.
 
