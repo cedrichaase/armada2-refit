@@ -140,6 +140,10 @@ researched special (a `Scene.asi` command that does not exist yet); `tr15` shows
 same cone look in the tractor beam's blue. Do not cut this shot as the assimilation
 beam.
 
+2026-10-17: the scene can now give the target's team its special (`tech tgt gcorbom`,
+testbench 3.31.0), and `films/assimilation` films the beam against a darker sky; this
+shot is not changed.
+
 ```setup
 scene hover off; tooltips off
 scene spawn holder bbattle1 3000 0 3220 180 1

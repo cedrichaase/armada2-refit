@@ -20,15 +20,14 @@ auto-assimilator (`ART-DIRECTION.md`, "Tractor and assimilation beams"), a pink 
 running out where stock has a textured disc, and a white flash with a blue lens streak
 and a ring where stock has a soft white star.
 
-**The assimilation beam does not form here** (seen on the bench 2026-10-16, in stock
-and refit alike). The beam only lives while the cube can take a special weapon from
-its target: one the target's team has researched (Corbomite, for a Sovereign) and the
-cube does not carry yet. The bench's Sovereign has none researched, so the beam ends as
-soon as it is fired: step 21 still passes (render3d saw it once), and
-`assimilation-beam-close` shows the holding beam, still on. Spawning a research
-station and a `fedpod1` pod for the Sovereign's team did not change that. The thin
-cyan line that shows from the cube in such shots is the cube's own Borg phaser
-(`bbphaso`) firing at the enemy Sovereign, drawn as stock draws it.
+**The assimilation beam needs the target's corbomite** (`tech tgt gcorbom`). It only
+lives while the cube can take a special weapon from its target, one the target's team
+has available and the cube does not carry yet; `a2_borg01`'s tech tree makes the
+Sovereign's corbomite impossible, so without the `tech` step it ended as soon as it was
+fired (bench, 2026-10-16) and `assimilation-beam-close` showed the holding beam. It
+holds about 6 s, until the cube has taken the weapon (`testbench/scene/README.md`,
+"Tech tree"). The thin cyan line that shows from the cube in such shots is the cube's
+own Borg phaser (`bbphaso`) firing at the enemy Sovereign, drawn as stock draws it.
 
 1. Launch the game.
 2. Wait 50 seconds.
@@ -48,64 +47,65 @@ cyan line that shows from the cube in such shots is the cube's own Borg phaser
 16. Wait 1 seconds.
 17. Take a screenshot called "holding-beam-above".
 18. Wait 4 seconds.
-19. Expect scene "special holder gTechAssimBeam tgt" answers "fired".
-20. Wait 2 seconds.
-21. Expect "Render3D.log" contains "ordnance: drawing special techassimbeam (Cone)".
-22. Take a screenshot called "assimilation-beam-close".
-23. Scene "camera 3600 200 3175 3000 0 3175".
-24. Scene "kill holder".
-25. Wait 5 seconds.
-26. Scene "spawn tractor bassault 3000 0 3220 180 1".
-27. Scene "engines tractor off".
-28. Scene "energy tractor on".
-29. Expect scene "special tractor gtracbm tgt" answers "fired".
-30. Wait 2 seconds.
-31. Expect "Render3D.log" contains "ordnance: drawing special tracbm (Cone)".
-32. Take a screenshot called "tractor-beam".
-33. Scene "orbit tgt 60 15 700".
-34. Wait 1 seconds.
-35. Take a screenshot called "tractor-beam-close".
-36. Scene "camera 3600 200 3175 3000 0 3175".
-37. Scene "kill tractor".
-38. Wait 5 seconds.
-39. Scene "spawn assim bcruise2 3000 0 3220 180 1".
-40. Scene "engines assim off".
-41. Scene "energy assim on".
-42. Scene "attack assim tgt".
-43. Wait 25 seconds.
-44. Expect scene "special assim gborgbor tgt" answers "fired".
-45. Wait 2 seconds.
-46. Expect "Render3D.log" contains "ordnance: drawing special borgbor (Cone)".
-47. Scene "orbit tgt 60 15 700".
-48. Wait 1 seconds.
-49. Take a screenshot called "auto-assimilator-close".
-50. Wait 1 seconds.
-51. Take a screenshot called "auto-assimilator-close-2".
-52. Scene "camera 3600 200 3175 3000 0 3175".
-53. Scene "kill assim".
-54. Wait 5 seconds.
-55. Scene "kill tgt".
-56. Wait 4 seconds.
-57. Scene "spawn psitgt fbattle 3000 0 3000 0 2".
-58. Scene "immortal psitgt on".
-59. Scene "weapons psitgt off".
-60. Scene "engines psitgt off".
-61. Scene "spawn psi 8472_battle 3000 0 3220 180 1".
-62. Scene "engines psi off".
-63. Scene "energy psi on".
-64. Expect scene "special psi gpsionicInsanity psitgt" answers "fired".
-65. Wait 6 seconds.
-66. Take a screenshot called "psionic-insanity".
-67. Wait 1 second.
-68. Scene "kill psi".
-69. Wait 5 seconds.
-70. Scene "camera 1700 60 1250 1700 0 1500".
-71. Scene "goto warper 9000 0 1500 warp".
-72. Wait 1 second.
-73. Take a screenshot called "warp-1".
-74. Take a screenshot called "warp-2".
-75. Take a screenshot called "warp-3".
-76. Expect "Render3D.log" contains "ordnance: warp flash: fgalaxy.odf".
-77. Expect the game is still running.
-78. Quit the game.
-79. Expect no crash.
+19. Scene "tech tgt gcorbom".
+20. Expect scene "special holder gTechAssimBeam tgt" answers "fired".
+21. Wait 2 seconds.
+22. Expect "Render3D.log" contains "ordnance: drawing special techassimbeam (Cone)".
+23. Take a screenshot called "assimilation-beam-close".
+24. Scene "camera 3600 200 3175 3000 0 3175".
+25. Scene "kill holder".
+26. Wait 5 seconds.
+27. Scene "spawn tractor bassault 3000 0 3220 180 1".
+28. Scene "engines tractor off".
+29. Scene "energy tractor on".
+30. Expect scene "special tractor gtracbm tgt" answers "fired".
+31. Wait 2 seconds.
+32. Expect "Render3D.log" contains "ordnance: drawing special tracbm (Cone)".
+33. Take a screenshot called "tractor-beam".
+34. Scene "orbit tgt 60 15 700".
+35. Wait 1 seconds.
+36. Take a screenshot called "tractor-beam-close".
+37. Scene "camera 3600 200 3175 3000 0 3175".
+38. Scene "kill tractor".
+39. Wait 5 seconds.
+40. Scene "spawn assim bcruise2 3000 0 3220 180 1".
+41. Scene "engines assim off".
+42. Scene "energy assim on".
+43. Scene "attack assim tgt".
+44. Wait 25 seconds.
+45. Expect scene "special assim gborgbor tgt" answers "fired".
+46. Wait 2 seconds.
+47. Expect "Render3D.log" contains "ordnance: drawing special borgbor (Cone)".
+48. Scene "orbit tgt 60 15 700".
+49. Wait 1 seconds.
+50. Take a screenshot called "auto-assimilator-close".
+51. Wait 1 seconds.
+52. Take a screenshot called "auto-assimilator-close-2".
+53. Scene "camera 3600 200 3175 3000 0 3175".
+54. Scene "kill assim".
+55. Wait 5 seconds.
+56. Scene "kill tgt".
+57. Wait 4 seconds.
+58. Scene "spawn psitgt fbattle 3000 0 3000 0 2".
+59. Scene "immortal psitgt on".
+60. Scene "weapons psitgt off".
+61. Scene "engines psitgt off".
+62. Scene "spawn psi 8472_battle 3000 0 3220 180 1".
+63. Scene "engines psi off".
+64. Scene "energy psi on".
+65. Expect scene "special psi gpsionicInsanity psitgt" answers "fired".
+66. Wait 6 seconds.
+67. Take a screenshot called "psionic-insanity".
+68. Wait 1 second.
+69. Scene "kill psi".
+70. Wait 5 seconds.
+71. Scene "camera 1700 60 1250 1700 0 1500".
+72. Scene "goto warper 9000 0 1500 warp".
+73. Wait 1 second.
+74. Take a screenshot called "warp-1".
+75. Take a screenshot called "warp-2".
+76. Take a screenshot called "warp-3".
+77. Expect "Render3D.log" contains "ordnance: warp flash: fgalaxy.odf".
+78. Expect the game is still running.
+79. Quit the game.
+80. Expect no crash.

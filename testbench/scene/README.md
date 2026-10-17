@@ -42,6 +42,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `fog` | three of the player's ships (`ship1`, `ship2`, `scout`) at 3000,0,3000 with the map's fog and shroud on (`Fog=1`) and the HUD on for the minimap; `goto scout ...` leaves fog of war behind. For the fog's and shroud's edges (`render3d/README.md`, "overlays"; `scenarios/fog-edges.md`) | 2026-10-12 |
 | `asteroids` | an asteroid field (`field`, `mafield`: 4–8 rocks) and a big one (`big`, `mafield2`: 3–6 larger rocks), 500 apart, beside a Galaxy class with its engines off; the rocks are drawn at random from the field's models, so a session shows some of them, and `spawn` adds more fields. For the asteroids' surfaces and smoothing (`render3d/README.md`, "world"; `models/README.md`, "The asteroids") | 2026-10-13 |
 | `venting` | a Galaxy class (`galaxy`) and a Klingon battleship (`klingon`) parked 300 apart, healed and immortal, every system's damage node showing as if damaged (`Vent=all`): the Galaxy's nacelle vents plasma, its hull gas. Nothing fires. For the venting plasma and gas (`render3d/README.md`, "particles") | 2026-10-13 |
+| `assimilation` | the Borg technology assimilation beam: a Borg cube (`borg`, `bbattle1`, the player's) 220 from an enemy Sovereign (`tgt`), engines and the cube's weapons off, special energy full, both healed, the Sovereign unarmed, its corbomite reflector made available to its team (`Tech=gcorbom`), shield flashes and hover gauges off. `weapons borg on`, then a moment later (not on the same tick) `special borg gTechAssimBeam tgt`: the beam reaches the Sovereign about 1 s later and holds until about 7 s after firing, when the cube has taken the weapon; a cube takes one (`maxExtraWeapons`). Weapons off ends the beam; as they come on, and after the beam, the cube fires its phasers. For render3d's assimilation cone (`render3d/README.md`, "Ordnance"; `films/assimilation`) | 2026-10-17 |
 | `specials` | an enemy Sovereign (`tgt`) that cannot die, with its weapons and engines off and not healed, and a Galaxy class (`warper`) at 1500,0,1500 for the warp flash; shooters come with `spawn` and fire with `special`. For the special weapons and the warp flash (`render3d/README.md`, "ordnance"; `scenarios/specials.md`) | 2026-10-13 |
 | `cloak` | the player's own Romulan warbird (`warbird`, `rbattle`) and Klingon Bird of Prey (`bop`, `kdestroy`) in front of a class M planet and a Galaxy class, engines and weapons off; `cloak warbird on`. For cloaked ships drawn as glass (`render3d/README.md`, "hulls"; `scenarios/cloak.md`) | 2026-10-13 |
 | `mining` | a dilithium moon (`moon`, `mdmoon`), the player's mining station (`station`) behind it, a Federation and a Borg freighter (`freighter`, `borg`) and a Galaxy class, engines off. The freighters do not mine on their own (a moon the scene builds has no resource): `special freighter gmineDilithium moon` (or `gmineLatinum`; the Borg's `gmineDilithiumBorg`, `gmineMetalBorg`) fires the beam for 1.25 s, `pause` holds it. For the mining beams (`render3d/README.md`, "Ordnance") | 2026-10-15 |
@@ -77,6 +78,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Immortal` | 1 | the object cannot die (craft only) |
 | `Heal` | 0 | 1: hull, shields, crew and every system topped up to full every tick, so it never shows damage: its shields never run out (no shields-down effect, the electric ring) and no damaged-system effect (the plasma plume, venting gas) ever shows |
 | `Energy` | 0 | 1: the craft's special energy topped up to full every tick, so a special weapon that runs on it (a tractor beam, a holding beam) keeps running |
+| `Tech` | | tech-tree items (`gcorbom`, `fedpod1` ...), space-separated, made available to the object's team as if researched, as `tech` (below) does |
 | `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving. A system switched off here is not drawn as damaged (no plume) |
 | `Vent` | | `all`, `none` or one system (`shields`, `engines`, `weapons`, `sensors`, `life`): its damage node shows as a damaged system's does -- the plume, the venting gas -- healed or not, and the system keeps working |
 | `Attack` | | the name of an object to attack, ordered once everything is built |
@@ -116,6 +118,7 @@ answer and fails if a command did.
 | `kill <name>` | the craft dies at once, as a mission script blows one up (`ScriptInterfaceImp::ExplodeNow`, 0x456cf0); its healing and immortality are switched off first |
 | `special <name> <weapon> [<target>]` | fire a craft's special weapon, by its weapon ODF's name (`gholdbm`, `gcorbom`), at a target or none: its special energy is filled first, the weapon's slot in the craft's carrier found (`WeaponClass::Find`), and `Craft::FireAtSpecial` (0x4c3820) called as a player's order does. Answers `slot N, can fire, fired` (or `cannot fire now`, `NOT fired`). The craft's weapons must be on (`Carrier::TriggerSelected` refuses while they are off) and the target within the weapon's range |
 | `energy <name> on\|off` | as `Energy=` |
+| `tech <team \| object> <item> [on\|off]` | a tech-tree item (an ODF name as the `techtree/*.tt` files spell it: `gcorbom`, `fedpod1`) made available to a team (an object's, given its name) as if researched, or not (`off`); answers what it was. Only the item changes, not what depends on it. A map's tree makes some items impossible for every team (`-1`; on `a2_borg01` `fedpod1` and with it the Sovereign's `gcorbom`): `on` makes the item possible too. For the Borg technology assimilation beam, which only holds on a ship that carries a special weapon its team has available ("How it works", "Tech tree") |
 | `cloak <name> on\|off\|now` | `on`: the craft starts to cloak, `off`: to decloak, `now`: fully cloaked at once (`GameObject::ImmediateCloak`, 0x4d03e0). Its special energy is filled and kept full while it is on. It sets the request byte of the craft's cloaking device (+0x108, byte +0x2c) that the player's button leaves for `CloakingDevice::Simulate`, rather than calling `ScriptInterfaceImp::Cloak`: that asks `AbleToCloak`, which wants the team to have researched the device, and it refused the bench's ships. `query` shows each craft's state (`cloak visible`, `cloaking`, `cloaked`, `decloaking`) |
 | `goto <name>[,<name>...] <object \| x y z> [warp]` | order a move, as a player's right-click does (AiCommand `GO`; `warp`: `GO_WARP`), and switch the engines on. To a craft, the ship follows it; to any other object (a nebula, a planet), it goes to where the object is. A point is anchored like the scene file's positions. Several names, comma-separated, keep their places: each goes to the point plus its own offset from the group's centre. It ends an `attack`, though a ship still fires at what comes in range |
 | `build <rig> <odf> <x y z \| object>` | order a construction ship to build a station (an ODF name, `fyard`, `fbase`...) at a point (anchored like the scene file's) or where an object is, as a player's build order (AiCommand `BUILD` with the class from `GameObjectClass::Find` and the point, through `GameObject::SetCommand`, 0x4d1cb0, as `ScriptInterfaceImp::SetCommandWhatWhoWhereVO` gives it). The rig's team gets every resource topped up first (`Team::AddResource`, clamped to its maximum) and its engines are switched on. The rig flies there and opens; its bees start the station at that point (fbase took about 2 minutes to start on the bench, fyard less) |
@@ -346,6 +349,25 @@ inert, and `Scene.log` says so.
   colony ship (its first argument, a craft able to colonise) to colonise the planet
   (its second), and does nothing for any other first argument. That is why it did
   nothing when tried from this plugin with the planet alone.
+- **Tech tree: `TechnologyTree::mFind(const char *)`** (0x4999e0, thiscall) on
+  `g_technologyTreeArray` (0x739000, one `TechnologyTree` of 0x98 bytes per team, 9 of
+  them) finds a `TechItem` by name (case-insensitive). `TechnologyTree::Available`
+  (0x498d60), which `Weapon::IsAvailable` asks with the weapon class's id (+0x208),
+  answers the item's +0x4 when its +0xc ("possible") is set; `Created` sets +0x4 of an
+  item's children once all its parents exist, and a tree file's `-1` clears +0xc for good.
+  `tech` sets both bytes, or clears +0x4.
+  **Why the assimilation beam needs it.** `TechAssimBeam::Simulate` (0x586720) ends the
+  beam on the tick its owner has no weapon to take from the target: a special weapon of
+  the target's (+0x20c of its class) that `Weapon::IsAvailable` says its team has, that
+  the owner does not carry, while the owner holds fewer extra weapons than its class
+  allows (`maxExtraWeapons`, 1 on a cube). When the beam has held for
+  `assimilationTime` the weapon is the owner's and the beam ends. On `a2_borg01` the tree
+  (`techtree/a2_borg01.tt`) marks `fedpod1` impossible, so the Sovereign's `gcorbom` is
+  never available and the beam ended on the tick it was fired (the 2026-10-16 note in
+  `scenarios/specials.md`); a research station and a `fedpod1` spawned for the
+  Sovereign's team could not change that. Bench, `SCENE=assimilation`, 2026-10-17:
+  `tech team 2 gcorbom: was not available, now available`, then a green cone from the
+  cube onto the saucer for about 6 s; a second cube spawned in its place fires it again.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`).

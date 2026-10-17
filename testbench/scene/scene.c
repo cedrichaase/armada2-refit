@@ -77,6 +77,9 @@
  *     0x4d1af0, (AiCommand, const Vector3 &, long, bool) 0x4d1b50 and
  *     (AiCommand, long, bool, bool) 0x4d1a40 -- with GO (4), GO_WARP (0x2b)
  *     or STOP (3); see order_goto().
+ *   TechnologyTree::mFind(const char *) 0x4999e0, on g_technologyTreeArray
+ *     (0x739000, one tree per team), finds a tech item, whose flags `tech` sets;
+ *     see set_tech().
  *
  * Matrix34 is three axis rows -- right, up, front -- then the position: a local
  * point (x, y, z) lands at x*right + y*up + z*front + position.
@@ -235,6 +238,12 @@ int _fltused = 0;   /* floats without the CRT */
 #define SET_COMMAND_BUILD 0x4d1cb0u  /* GameObject::SetCommand(AiCommand, const GameObjectClass *, const Vector3 &, bool) */
 #define CLASS_FIND       0x4cd370u   /* GameObjectClass::Find(const char *odf), static */
 #define TEAM_ADD_RES     0x4988d0u   /* Team::AddResource(float, eResource): clamped to the team's maximum */
+#define TECH_TREES       0x739000u   /* g_technologyTreeArray: one TechnologyTree per team */
+#define TECH_TREE_SIZE   0x98u
+#define MAX_TECH_TEAM    8           /* the array holds 9 (it ends where g_terrain begins) */
+#define TECH_FIND        0x4999e0u   /* TechnologyTree::mFind(const char *): thiscall, the TechItem or null */
+#define TECH_AVAILABLE   0x4u        /* TechItem: byte, what TechnologyTree::Available answers */
+#define TECH_POSSIBLE    0xcu        /* TechItem: byte, 0 for an item the map's tree makes impossible (-1) */
 
 #define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
 #define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
@@ -294,6 +303,7 @@ static const Sig k_sigs[] = {
     { SET_COMMAND_BUILD, 8, { 0x55, 0x8B, 0xEC, 0x64, 0xA1, 0x00, 0x00, 0x00 } },
     { CLASS_FIND,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x8D, 0x4D } },
     { TEAM_ADD_RES,     8, { 0x55, 0x8B, 0xEC, 0x51, 0x8B, 0x45, 0x0C, 0x56 } },
+    { TECH_FIND,        8, { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56, 0x57, 0x8B } },
 };
 
 typedef void   (__cdecl    *UpdateRangeFn)(void);
@@ -334,6 +344,7 @@ typedef BYTE  *(__cdecl    *TeamGetFn)(int team);
 typedef void   (__thiscall *SetCommandBuildFn)(void *go, int cmd, const void *cls, const float *pos, int flag);
 typedef void  *(__cdecl    *ClassFindFn)(const char *odf);
 typedef float  (__thiscall *TeamAddResFn)(void *team, float amount, int resource);
+typedef BYTE  *(__thiscall *TechFindFn)(void *tree, const char *name);
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -640,6 +651,39 @@ static void fill_special(const Obj *o)
     if (!go || !(*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT)) return;
     if (*(float *)(go + CRAFT_SPECIAL_MAX + 4) < *(float *)(go + CRAFT_SPECIAL_MAX))
         ((SiSetHealthFn)SI_SET_SPECIAL)(SI_INSTANCE, o->handle, *(float *)(go + CRAFT_SPECIAL_MAX));
+}
+
+/* A team's technology: one item of its TechnologyTree made available, as if
+ * researched, or not. TechnologyTree::Available, which Weapon::IsAvailable asks,
+ * answers an item's +0x4 when its +0xc ("possible") is set; a map's tree file
+ * marks what it leaves out -1, impossible, for every team. The Borg technology
+ * assimilation beam (TechAssimBeam::Simulate) only lives while its target carries a
+ * special weapon that is available to the target's team and that the cube does
+ * not carry yet: on a2_borg01, whose tree makes fedpod1 and with it gcorbom
+ * impossible, a Sovereign has none, and the beam ended as soon as it was fired.
+ * Only the item itself changes; what depends on it is left as it is. */
+static void set_tech(int team, const char *item, int on)
+{
+    char  b[200], nm[72];
+    BYTE *it = NULLPTR, *tree;
+    b[0] = 0;
+    s_cat(b, "  tech team "); s_num(b, team); s_cat(b, " "); s_cat(b, item);
+    if (team < 0 || team > MAX_TECH_TEAM) { s_cat(b, ": ! team 0..8"); logline(b); return; }
+    tree = (BYTE *)(TECH_TREES + (DWORD)team * TECH_TREE_SIZE);
+    s_cpy(nm, item, 64);
+    it = ((TechFindFn)TECH_FIND)(tree, nm);
+    if (!it) {   /* the other spelling: with or without .odf */
+        int k = s_len(nm);
+        if (k > 4 && s_eq(nm + k - 4, ".odf")) nm[k - 4] = 0; else s_cat(nm, ".odf");
+        it = ((TechFindFn)TECH_FIND)(tree, nm);
+    }
+    if (!it) { s_cat(b, ": ! not in the tech tree"); logline(b); return; }
+    s_cat(b, it[TECH_POSSIBLE] ? (it[TECH_AVAILABLE] ? ": was available" : ": was not available")
+                               : ": was impossible");
+    if (on) { it[TECH_POSSIBLE] = 1; it[TECH_AVAILABLE] = 1; }
+    else      it[TECH_AVAILABLE] = 0;
+    s_cat(b, on ? ", now available" : ", now not available");
+    logline(b);
 }
 
 static void heal_all(void)
@@ -1449,6 +1493,18 @@ static void run_command(char *line)
         fire_special(o, t[2], tg);
         return;
     }
+    if (s_eq(t[0], "tech") && n >= 3) {
+        /* tech <team | object> <item> [on|off]: an object stands for its team */
+        int team, on = n >= 4 ? on_arg(t[3]) : 1;
+        if (s_isnum(t[1])) team = (int)s_atof(t[1]);
+        else {
+            BYTE *go;
+            if (!(o = find_obj(t[1])) || !(go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle))) { logline("  ! no such object"); return; }
+            team = *(int *)(go + PL_TEAM);
+        }
+        set_tech(team, t[2], on);
+        return;
+    }
     if (s_eq(t[0], "energy") && n >= 3) {
         if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
         o->energy = on_arg(t[2]);
@@ -1523,7 +1579,7 @@ static void run_command(char *line)
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
     logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
-            "immortal, special, energy, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
+            "immortal, special, energy, tech, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
             "shieldfx, query, "
             "select, selection)");
 }
@@ -1622,6 +1678,14 @@ static void build_scene(void)
             o->vent = vent_mask(v) < 0 ? 0 : vent_mask(v);
         }
         o->energy = ini_int(sect, "Energy", 0);
+        {   /* Tech=<item> [<item> ...]: available to the object's team, as `tech` */
+            char v[160], *tk[MAXTOK];
+            BYTE *go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
+            int   k, m;
+            GetPrivateProfileStringA(sect, "Tech", "", v, sizeof v, g_ini);
+            m = v[0] && go ? split(v, tk) : 0;
+            for (k = 0; k < m; k++) set_tech(*(int *)(go + PL_TEAM), tk[k], 1);
+        }
         if (!ini_int(sect, "Engines", 1))
             ((SiHandleBoolFn)SI_NO_ENGINES)(SI_INSTANCE, o->handle, 1);
         if (!ini_int(sect, "Weapons", 1))
