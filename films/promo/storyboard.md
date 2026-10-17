@@ -31,7 +31,7 @@ of one, the menu scene's planet and the sky behind everything carry them. Hull l
 named only where a weapon's light falls on a hull.
 
 About 3:50 by the shot lengths, a little less once transitions overlap; the brief aims at
-3:30, so trim after the animatic (rough cut 1 was 3:22; candidates left: s05b, g03, i08). The HUD and the UI
+3:30, so trim after the animatic (rough cut 1 was 3:22, rough cut 2 3:10; g03, station groups, came out of rough cut 3: its build bars don't read at this size, and it is in git to bring back with a close crop on the queue panel; candidates left: s05b, i08). The HUD and the UI
 get a deeper video of their own later, with voice-over: here they get one beat each.
 
 For the editor:
@@ -683,49 +683,6 @@ lclick 400 640
 wait 1.2
 press 1
 wait 9.5
-```
-
-### g03 · Three shipyards, one build menu
-Shows: qol: station groups
-Scene: qol.ini
-Variants: refit
-Layout: full refit
-Transition: dissolve 0.4
-Title: Stations in groups
-Sub: One build menu for every selected shipyard; the work spread across them
-Caption: top
-Keys: auto
-In: 1.0
-Length: 10
-Status: draft
-
-Three shipyards selected together; seven presses of Q queue destroyers across all three.
-The eye goes to the three build bars filling. Probe 1 measured the yards at x 690–1460, y 150–280 (Pointer space): the box covers them now,
-clear of the resource bar above. *Unprobed*.
-
-```setup
-lclick 400 640
-wait 1
-```
-```action
-wait 1
-drag 640 120 1500 340 1.4
-ptr 1700 300 0.4
-wait 0.8
-press q
-wait 1.2
-press q
-wait 0.5
-press q
-wait 0.5
-press q
-wait 0.5
-press q
-wait 0.5
-press q
-wait 0.5
-press q
-wait 6
 ```
 
 ### g04 · The grid keys
