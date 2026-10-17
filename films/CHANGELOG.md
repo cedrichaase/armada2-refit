@@ -5,6 +5,15 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.5.0 — 2026-10-17
+
+### Added
+- `films/beams-scout`: a scratch board for the promo's beam shots, the assimilation
+  beam from a Fusion Cube with a gliding camera (`a01`, dissolve) and the Assimilator's
+  auto-assimilator (`a03`, wipe), stock and refit. Not yet probed.
+
+Installs nothing; not yet filmed.
+
 ## 1.4.0 — 2026-10-17
 
 ### Added

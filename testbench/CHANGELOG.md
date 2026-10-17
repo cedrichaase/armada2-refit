@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.33.0 — 2026-10-17
+
+### Added
+- Scene `assimilation-fusion`: the technology assimilation beam from a Borg Fusion
+  Cube (`bbattle3`) onto the Sovereign, 300 apart, for footage.
+- Scene `assimilator`: the Borg Assimilator (`bcruise2`) and its auto-assimilator
+  (`gborgbor`) on a healed Sovereign, 300 apart, for footage.
+
+Installs nothing; both beams seen firing on the bench 2026-10-17 (stock).
+
 ## 3.32.0 — 2026-10-17
 
 ### Added
