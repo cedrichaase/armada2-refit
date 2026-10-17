@@ -237,6 +237,17 @@ def boards():
               and sb.tier_res('1080', '2560x1080') == '2560x1080' and sb.tier_res('1600x900') == '1600x900',
               'tiers by height keep the probe aspect')
         raises(lambda: sb.tier_res('huge'), 'an unknown tier is an error', 'Tier huge')
+        h3 = film.spec_hash(s03, 'refit', 'probe')
+        for t in ('2160', '4k', '3840x2160', '4K'):
+            s03.fields['Tier'] = t
+            check(s03.tier == 'final' and film.shot_tier(s03, 'probe') == 'final', f'Tier: {t} equal to Final is Tier: final')
+        s03.fields['Tier'] = '1440'
+        check(s03.tier == '1440' and film.shot_tier(s03, 'probe') == 'probe', 'a Tier: below Final stays a larger probe')
+        film.fields['Final'] = '2560x1440'
+        check(s03.tier == 'final', 'Tier: 1440 is final when Final is 2560x1440')
+        del film.fields['Final']
+        del s03.fields['Tier']
+        check(film.spec_hash(s03, 'refit', 'probe') == h3, 'a shot without Tier: keeps its spec hash')
         h1 = film.spec_hash(s01, 'refit', 'probe')
         s01.fields['Tier'] = '720'
         check(film.spec_hash(s01, 'refit', 'probe') != h1, "a changed Tier: makes the shot's probe stale")

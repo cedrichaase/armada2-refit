@@ -18,7 +18,9 @@ in [`README.md`](README.md).
   with the `.spec.json` rewritten and an `adopted` key (13be105).
 - The shot field `Tier:` (`1080`, `1440`, `2160`, `4k`, `WxH` or `final`): the shot is
   probed at that size, or its final take filmed, in the same probe run; takes larger
-  than the probes run after the others, one at a time (13be105).
+  than the probes run after the others, one at a time. A size equal to `Final` (`2160`
+  or `4k` at 3840x2160) is `final`: the final take is filmed in the probe run, not a
+  probe that `take` would film again (13be105).
 - `films/reference/`, the reference catalogue (`README.md`, `catalogue.md` with one
   example entry), and `From: ref:<id>` for footage shots, with the entry's `In`/`Out` (13be105).
 - `--ignore-code` on `animatic` and `sheet` (13be105).

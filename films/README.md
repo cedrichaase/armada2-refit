@@ -238,7 +238,7 @@ a fenced block, splices that file in where it stands, as if its text were writte
 | `Audio` | `game` | `game` (the take's own sound), `none`, or `vo` (voice-over: lift it over the bed) |
 | `Keys` | `auto` | key hints: `auto` shows each `press` of the action block for 1.2 s; or `T text; T text`, times from `In`; `none` |
 | `From` | | `footage` only: `<shot> [variant]`, that shot's take at the tier being cut (its last variant by default; the best one, as "The cut today" says). For teasers and montages that reuse a take. Or `ref:<id>`, a moment from the reference catalogue (`films/reference/README.md`): its file, with the shot's `In:` counted from the entry's `In`, and running to its `Out` without a `Length:` |
-| `Tier` | `probe` | the resolution this shot is probed at, when it is not the film's `Probe`: a height (`1080`, `1440`, `2160` or `4k`) at the probes' aspect, or `WxH`; or `final`, which films its final take in the probe run. See "A shot's tier" |
+| `Tier` | `probe` | the resolution this shot is probed at, when it is not the film's `Probe`: a height (`1080`, `1440`, `2160` or `4k`) at the probes' aspect, or `WxH`; or `final` (or a size equal to `Final`), which films its final take in the probe run. See "A shot's tier" |
 | `File` | | `footage` only: a file, a path relative to `$A2_DATA` |
 | `Background` | | `card` only: a shot id whose take is blurred behind the card |
 | `Status` | `draft` | `draft`, `probed`, `approved`, `final` |
@@ -255,12 +255,15 @@ while the rest stay cheap:
 |---|---|---|---|
 | (none), `probe` | at the film's `Probe` | `probe/` | at `Final` |
 | `1080`, `1440`, `2160`, `4k`, `WxH` | at that size, the probe's quick encoding | `probe/` | at `Final` |
-| `final` | its final take: at `Final`, the final encoding | `final/` | at `Final`, unless that take is current |
+| `final`, or a size equal to `Final` (`2160` or `4k` at a 3840x2160 `Final`) | its final take: at `Final`, the final encoding | `final/` | at `Final`, unless that take is current |
 
 - The resolution is part of the spec, so changing a shot's `Tier:` makes its probe stale
   and the next `probe` films it again; a shot without one keeps the spec (and the takes)
   it had before `Tier:` existed. Final takes do not depend on it. A `Tier: final` shot's
   final take is current or stale like any other (`--force`, `--ignore-code` as usual).
+- A numeric `Tier:` that comes to the film's `Final` (a height at the probes' aspect, or a
+  `WxH`) means `final`: a 4K probe would only be filmed again by `take`, so the shot's
+  final take is filmed instead. Smaller sizes stay larger probes.
 - In a probe run the takes larger than the probes are filmed after the others, one at a
   time, whatever `--jobs` says: several large recording games at once is what died at
   1080p ("Traps").

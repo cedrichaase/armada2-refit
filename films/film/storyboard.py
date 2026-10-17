@@ -103,8 +103,16 @@ class Shot:
     def tier(self):
         """`Tier:`, the resolution this shot is probed at: `probe` (the film's, the
         default), a height (`1080`, `1440`, `2160`, `4k`) or `WxH`; or `final`, which
-        films its final take in a probe run."""
-        return (self.get('Tier') or 'probe').strip().lower()
+        films its final take in a probe run. A size equal to the film's `Final` is `final`:
+        the final take is the one worth filming, not a probe that `take` would film again."""
+        t = (self.get('Tier') or 'probe').strip().lower()
+        if t in ('probe', 'final') or self.film is None:
+            return t
+        try:
+            same = tier_res(t, self.film.res('probe')) == self.film.res('final').strip().lower()
+        except BoardError:
+            same = False        # `check` reports it
+        return 'final' if same else t
 
     @property
     def ref(self):
