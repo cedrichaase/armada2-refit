@@ -13,6 +13,10 @@ in [`README.md`](README.md).
   auto-assimilator (`a03`, wipe), stock and refit.
 - `films/fleets-scout`: a scratch board with its own scenes, a Romulan fleet leaving a
   planet's shadow (`rom-shadow.ini`) and Species 8472 against the Borg (`borg-8472.ini`).
+- `films/intros-scout`: the main menu and the first missions' intro cinematics (Federation,
+  Klingon, Borg) as long takes, music and voice as stems, to log moments for the promo.
+- `films/online-scout`: two games side by side through *Internet - Online* on a local
+  server: the host's join code, the joiner arriving (`o1`), both launching a match (`o2`).
 
 Installs nothing; not yet filmed.
 

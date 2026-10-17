@@ -12,7 +12,8 @@ Layers: testbench 3.38.0, films 1.11.0.
 ### Added
 - Scenes `assimilation-fusion` and `assimilator`, for the Fusion Cube's assimilation
   beam and the Assimilator's auto-assimilator (testbench 3.38.0); scratch boards
-  `films/beams-scout` and `films/fleets-scout` for the promo's new shots (films 1.11.0).
+  `films/beams-scout`, `films/fleets-scout`, `films/intros-scout` and `films/online-scout`
+  for the promo's new shots (films 1.11.0).
 
 Installs nothing; the beams seen firing on the bench 2026-10-17 (stock), the boards not
 yet filmed.
