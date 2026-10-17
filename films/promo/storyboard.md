@@ -289,17 +289,36 @@ beams are faint by design, so they are filmed **against dark, empty space**, nev
 nebula or a planet (the user, 2026-10-17).
 
 ### a01 · The assimilation beam
-Length: 6
+Shows: specials: assimilation beam
+Scene: assimilation
+Variants: stock, refit
+Layout: wipe
 Transition: cut
+Title: Beams, as in the series
+Sub: Assimilation, tractor and holding beams as cones of light through vapour
+In: 3.5
+Length: 3.8
+Status: draft
 
-A placeholder until the bench can stage the assimilation beam (being built on the branch
-`worktree-assimilation-scene`): a Borg ship assimilating a Sovereign, close and low,
-against black space, stock then refit as a wipe. Its scene, setup and action come from
-that branch's `films/assimilation` board once it is reviewed.
+A Borg cube assimilating the Sovereign, close and a little below, against black space
+(the user: the beam is faint, so a dark background). The cone opens from a bright point on
+the cube and takes in the saucer. Staged by `films/assimilation`'s as01 (merged from
+`worktree-assimilation-scene`): the cube's weapons must be on a tick before the special
+fires, and its phaser and a torpedo fire at 1.5–3 s, so the window starts after them.
+Stock's beam is a loud fan of green and red streaks; refit's is quieter and lights the
+hull. The cone was widest at 3–5 s on the first probe.
 
-```card
-[accent] THE ASSIMILATION BEAM
-To be filmed
+```setup
+scene orbit 3000 0 3070 150 -10 175
+```
+```action
+wait 0.8
+scene weapons borg on
+wait 0.2
+scene special borg gTechAssimBeam tgt; glide 8 162 -8 160
+wait 8
+scene weapons borg off
+wait 1
 ```
 
 ### a02 · The tractor beam
@@ -308,8 +327,6 @@ Scene: specials
 Variants: stock, refit
 Layout: wipe
 Transition: cut
-Title: Beams, as in the series
-Sub: Tractor, holding and assimilation beams as cones of light through vapour
 In: 4.0
 Length: 5
 Status: draft
