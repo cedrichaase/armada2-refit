@@ -486,14 +486,16 @@ Layout: dissolve 2 1.2
 Transition: dissolve 0.5
 Audio: none
 In: 1.0
-Length: 18
+Length: 13.5
 Status: draft
 
 The campaign selection: in refit, pointing at each campaign moves the camera to its scene
 on the same map: the starbase (training), the Federation fleet, Klingon ships decloaking
 before a red nebula, a Borg cube's shadow through the Mutara. **Each entry is hovered in
-turn, the camera panning to its scene.** The probe holds each 4.5 s, longer than needed;
-the waits are set from the pan's length as measured on the probe's take. Stock is held for two seconds, then dissolves. The pointer
+turn, the camera panning to its scene.** Measured on the 2026-10-17 probe (frame
+differences over the refit take): the pan starts about 0.5 s into the pointer's move and
+lasts 1.6–1.7 s. So each entry is a 0.6 s move, then 3 s: the rest of the pan and about
+1.5 s on the arrived scene. Stock is held for two seconds, then dissolves. The pointer
 positions are `testbench/scenarios/ui-menus-scene.md`'s (220 × 270 / 322 / 374 / 426 at
 1280x720), scaled to the Pointer space. *Unprobed*.
 
@@ -506,13 +508,13 @@ ptr 330 300 0.1
 ```action
 wait 0.5
 ptr 330 405 0.6
-wait 4.5
+wait 3
 ptr 330 483 0.6
-wait 4.5
+wait 3
 ptr 330 561 0.6
-wait 4.5
+wait 3
 ptr 330 639 0.6
-wait 5.5
+wait 5
 ```
 
 ### m03 · Into warp
