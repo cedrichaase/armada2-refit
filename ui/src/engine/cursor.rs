@@ -26,6 +26,21 @@ const ELEMENT_NAME: usize = 0x8;
 
 static mut HIDE: bool = false;
 static mut INSTALLED: bool = false;
+/// The probe on `RefreshDisplay`'s draw of the cursor (`install_probe`): the function
+/// the call went to before it (stock `DrawScaled2D`, or HUD.asi's wrap of it).
+static mut PROBE: Option<usize> = None;
+/// Whether the probe keeps the engine's cursor square (`install_square`).
+static mut SQUARE: bool = false;
+/// Set by the probe when this present's draw of the cursor reached it.
+static mut REACHED: bool = false;
+/// Set for one present by `hide_this_frame`: the probe skips the draw.
+static mut SUPPRESS: bool = false;
+/// Whether, at the last present with a cursor sprite, the engine's draw of it got as
+/// far as the probe: false while something earlier in the call's chain skips it
+/// (Scene.asi's `cursor off`).
+static mut SHOWN: bool = true;
+/// The sprite at `+0x60` at the last present (0: none, or a hardware cursor).
+static mut SPRITE: usize = 0;
 
 /// The engine's current device (`Storm3D+0xcc`), 0 before there is one.
 fn device() -> usize {
@@ -47,15 +62,36 @@ pub fn install() -> bool {
 unsafe extern "thiscall" fn refresh(dev: usize) {
     let stock: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(REFRESH_DISPLAY) };
     let hide = unsafe { core::mem::take(&mut *core::ptr::addr_of_mut!(HIDE)) };
-    if !hide || dev == 0 {
+    if dev == 0 {
         return unsafe { stock(dev) };
     }
     let p = (dev + DEV_CURSOR) as *mut usize;
     unsafe {
-        let saved = *p;
-        *p = 0;
-        stock(dev);
-        *p = saved;
+        let sprite = *p;
+        if PROBE.is_some() {
+            // The draw is let through to the call site, where `cursor_draw` notes that it
+            // was reached and, while hiding, skips it.
+            REACHED = false;
+            SUPPRESS = hide;
+            stock(dev);
+            SUPPRESS = false;
+            let sync = rd::<u8>(dev + DEV_SYNCHRONOUS) != 0;
+            let shown = sync && sprite != 0 && REACHED;
+            if sync && sprite != 0 && shown != SHOWN {
+                crate::log!("cursor: the engine's cursor is {}", if shown { "shown" } else { "held back (something before ours skips its draw)" });
+            }
+            SPRITE = if sync { sprite } else { 0 };
+            if sync && sprite != 0 {
+                SHOWN = shown;
+            }
+        } else if hide {
+            let saved = sprite;
+            *p = 0;
+            stock(dev);
+            *p = saved;
+        } else {
+            stock(dev);
+        }
     }
 }
 
@@ -93,6 +129,20 @@ pub fn shape() -> Option<&'static str> {
     core::str::from_utf8(unsafe { core::slice::from_raw_parts(p, n) }).ok()
 }
 
+/// Whether the engine would show its cursor: false while a plugin that wraps
+/// `RefreshDisplay`'s draw of it (Scene.asi's `cursor off`) skips that draw. Read from
+/// the last present that had a cursor sprite, so it follows a change a frame late.
+/// True when the probe is not in.
+pub fn engine_shows() -> bool {
+    unsafe { PROBE.is_none() || SHOWN }
+}
+
+/// Whether the engine had a cursor sprite to draw at the last present (false without
+/// the probe, or with a hardware cursor).
+pub fn engine_has_sprite() -> bool {
+    unsafe { PROBE.is_some() && SPRITE != 0 }
+}
+
 /// Whether the engine's cursor sprite can be hidden (the `RefreshDisplay` wrap is in).
 pub fn installed() -> bool {
     unsafe { INSTALLED }
@@ -113,15 +163,35 @@ const SITE_HW_SCALE: usize = 0x625dd9;
 const HW_SCALE_STOCK: [u8; 3] = [0xd8, 0x4e, 0x18];
 const HW_SCALE_SQUARE: [u8; 3] = [0xd8, 0x4e, 0x1c];
 
+/// Wraps the one `DrawScaled2D` call in `RefreshDisplay` that draws the synchronous
+/// cursor (the probe). Through it the UI learns whether the engine's draw of its cursor
+/// was reached (`engine_shows`): another plugin that wraps the same call later in the
+/// game, Scene.asi with `cursor off`, skips it before it gets here, and then the UI
+/// draws no cursor either. While the UI draws its own, the probe skips the engine's
+/// draw (`hide_this_frame`), so the engine's choices are left as they are. Chains to
+/// whatever the call went to (stock, or HUD.asi's wrap). Made before any mission.
+pub fn install_probe() -> bool {
+    let Some(next) = super::hook::call_target(SITE_CURSOR_DRAW) else {
+        crate::log!("cursor: RefreshDisplay's cursor draw is not a call: the UI cannot see whether the engine's cursor is shown");
+        return false;
+    };
+    let ok = super::hook::patch_call(SITE_CURSOR_DRAW, next, cursor_draw as *const () as usize);
+    if ok {
+        unsafe { PROBE = Some(next) };
+    }
+    crate::log!("cursor: RefreshDisplay's cursor draw {}", if ok { "is watched" } else { "could not be patched" });
+    ok
+}
+
 /// Keeps the engine's own cursor square, as HUD.asi did (hud/README.md, "HUD.asi",
 /// the cursors), for wherever the engine's cursor still shows (`[UI] Cursor=0`, or a
 /// cursor ours cannot hide): the engine scales it by the back buffer over 800 x 600
 /// on each axis, so on a wide screen it is drawn wide. The synchronous path's one draw
-/// is wrapped so that, for that draw only, the x scale is the y scale and the
-/// position is moved so the hotspot stays on the pointer; the hardware path's width is
-/// multiplied by the y scale. Not made while HUD.asi is loaded (it makes the same two
-/// changes) or while `hud/cursor-aspect.py`'s squashed art is installed (it would be
-/// squashed twice).
+/// (through the probe) is made so that, for that draw only, the x scale is the y scale
+/// and the position is moved so the hotspot stays on the pointer; the hardware path's
+/// width is multiplied by the y scale. Not made while HUD.asi is loaded (it makes the
+/// same two changes) or while `hud/cursor-aspect.py`'s squashed art is installed (it
+/// would be squashed twice), or without the probe on stock `DrawScaled2D`.
 pub fn install_square() -> bool {
     let hud_asi = unsafe { !crate::rt::win::GetModuleHandleA(c"HUD.asi".as_ptr() as *const u8).is_null() };
     if hud_asi {
@@ -132,22 +202,27 @@ pub fn install_square() -> bool {
         crate::log!("cursor: cursor-aspect.py's squashed art is installed: the engine's cursor is left as it is");
         return false;
     }
-    if super::hook::call_target(SITE_CURSOR_DRAW) != Some(DRAW_SCALED_2D) || !super::starts(SITE_HW_SCALE, &HW_SCALE_STOCK) {
+    if unsafe { PROBE } != Some(DRAW_SCALED_2D) || !super::starts(SITE_HW_SCALE, &HW_SCALE_STOCK) {
         crate::log!("cursor: RefreshDisplay's or SetCursor's site is not stock: the engine's cursor is left as it is");
         return false;
     }
-    let ok = super::hook::patch_call(SITE_CURSOR_DRAW, DRAW_SCALED_2D, draw_square as *const () as usize)
-        && super::hook::patch_bytes(SITE_HW_SCALE, &HW_SCALE_STOCK, &HW_SCALE_SQUARE);
+    let ok = super::hook::patch_bytes(SITE_HW_SCALE, &HW_SCALE_STOCK, &HW_SCALE_SQUARE);
+    unsafe { SQUARE = ok };
     crate::log!("cursor: the engine's cursor {}", if ok { "is kept square" } else { "could not be patched" });
     ok
 }
 
-unsafe extern "thiscall" fn draw_square(sprite: usize, pos: *mut f32, w: f32, h: f32) {
-    let draw: unsafe extern "thiscall" fn(usize, *mut f32, f32, f32) = unsafe { core::mem::transmute(DRAW_SCALED_2D) };
-    let scale = SCALE_2D as *mut f32;
+unsafe extern "thiscall" fn cursor_draw(sprite: usize, pos: *mut f32, w: f32, h: f32) {
     unsafe {
+        REACHED = true;
+        if SUPPRESS {
+            return;
+        }
+        let Some(next) = PROBE else { return };
+        let draw: unsafe extern "thiscall" fn(usize, *mut f32, f32, f32) = core::mem::transmute(next);
+        let scale = SCALE_2D as *mut f32;
         let (sx, sy) = (*scale, *scale.add(1));
-        if sx > 0.0 && sy > 0.0 && sx != sy && !pos.is_null() {
+        if SQUARE && sx > 0.0 && sy > 0.0 && sx != sy && !pos.is_null() {
             // The engine passes pointer / scale - hotspot: the same point at the y scale.
             let ox: f32 = rd(sprite + SPRITE_ORIGIN_X);
             *pos = (*pos + ox) * sx / sy - ox;

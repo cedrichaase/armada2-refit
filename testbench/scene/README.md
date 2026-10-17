@@ -207,7 +207,9 @@ inert, and `Scene.log` says so.
   which draws the cursor under DXVK. `HUD.asi` wraps the same call ("Cursors" in
   `hud/README.md`). So `Scene.asi` patches it only once the scene is built, by when
   `HUD.asi` has long since loaded, and chains to whatever the call went to. With the
-  cursor off, the draw is skipped. Clicks still land where the pointer is.
+  cursor off, the draw is skipped. Clicks still land where the pointer is. `UI.asi`
+  wraps the same call when it loads, behind Scene.asi's wrap, and draws no cursor of
+  its own while the draw does not reach it (ui/README.md, "The cursor").
 - **Notices: `GameEvent::TriggerEvent`.** "Enemy engaged." is the event
   `EVENTS_ENEMY_ENGAGED` from `events.dat` (text, voice, minimap marker). Events are
   fired through three entry points: `TriggerEvent()` 0x479880,

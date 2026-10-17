@@ -16,6 +16,17 @@ Layers: testbench 3.31.0, films 1.4.0.
 
 ### Fixed
 - Scenario `specials`: the assimilation beam forms (testbench 3.31.0).
+## 12.24.1 — 2026-10-17
+
+Layers: ui 0.11.1, testbench 3.30.1.
+
+### Fixed
+- `UI.asi`'s cursor is hidden while the engine's would be: Scene.asi's `Cursor=0` /
+  `cursor off` hides the pointer in refit takes again, and the loading screen shows no
+  cursor, as in stock.
+
+Installed, not yet seen in game.
+
 ## 12.24.0 — 2026-10-17
 
 Layers: gui-installer 1.6.0.

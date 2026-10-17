@@ -18,6 +18,11 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - Scenario `specials`: the assimilation beam now forms (`tech tgt gcorbom` before it
   is fired); it ended on the tick it was fired, because `a2_borg01`'s tech tree makes
   the Sovereign's corbomite impossible.
+## 3.30.1 — 2026-10-17
+
+### Changed
+- Scenario `ui-widgets-cursor`: Scene.asi's `cursor off` then `cursor on`, with
+  `UI.asi`'s cursor hidden and shown with it (ui 0.11.1).
 
 Installed, not yet seen in game.
 
