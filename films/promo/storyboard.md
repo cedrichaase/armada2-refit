@@ -327,15 +327,16 @@ Scene: specials
 Variants: stock, refit
 Layout: wipe
 Transition: cut
-In: 4.0
-Length: 5
+In: 4.5
+Length: 3.2
 Status: draft
 
 An Assault ship holds the Sovereign in its tractor beam; the eye goes from the cone to the
 light it throws on the hull. The steps are `testbench/scenarios/specials.md`'s;
 `special` must answer `fired`. *Unprobed*: the camera is b05's, and whatever lies behind
 3000,0,3110 at that heading must be dark sky: if it isn't, turn the camera. Probe 1: the cone opens at 4.5 s and is best at 5.5–8.5; the Sovereign
-leaves the frame after about 9; the ships were small at 280, so closer.
+leaves the frame after about 9; the ships were small at 280, so closer. Probe 2: the cone is excellent from 5.5 s; the beam pulls the Sovereign out of the
+bottom of the frame by 7.7, so the window is 4.5–7.7.
 
 ```setup
 scene hover off; tooltips off
@@ -401,19 +402,21 @@ Status: draft
 
 Up close: the Galaxy alone in frame, the camera under and behind it, gas sliding past
 the lens, the hull's shadow a darker shaft running back from it. The Galaxy's shaft read
-best on 2026-10-15. Probe 1 (2026-10-17): a mid-wide of six ships, no shafts: the camera looked up along the shafts, which foreshortens them. Now across them, about 90° off the fleet's heading. *Unprobed*. A hull close to the camera made the
+best on 2026-10-15. Probe 1 (2026-10-17): a mid-wide of six ships, no shafts: the camera looked up along the shafts, which foreshortens them. Now across them, about 90° off the fleet's heading. Probe 2 (across, at 280): the gas reads well around the fleet, but the Galaxy is small
+and there are still no shafts; closer (170 → 150). If the shafts stay invisible, that is
+the faint-shadow bug in `nebulae/` (PLAN.md), for the user. *Unprobed*. A hull close to the camera made the
 shafts vanish then (`orbit sov 48 -24 220`), so it stays at 260 or more; if the shafts
 still don't read, this is a bug report for `nebulae/` before it is a framing note.
 
 ```setup
 scene hover off; shieldfx off; tooltips off
 scene goto ente,sov,galaxy,akira,nebula,def1,def2 1700 0 1470
-scene orbit galaxy 125 -10 280
+scene orbit galaxy 125 -6 170
 wait 4
 ```
 ```action
 wait 0.5
-scene glide 12 140 -8 260
+scene glide 12 150 -4 150
 wait 12.5
 ```
 
