@@ -11,7 +11,9 @@ a real editor, fed by `a2film manifest`).
     ./a2film probe  films/whats-new            # every shot, 1280x720, 4 games at once
     ./a2film probe  films/whats-new g03 g04    # ... just these
     ./a2film sheet  films/whats-new            # one contact sheet: every shot, in order
-    ./a2film animatic films/whats-new          # a rough cut from the probe takes
+    ./a2film animatic films/whats-new          # a rough cut from the probe takes, kept as rc<N>
+    ./a2film animatic films/whats-new --section "Act 1"      # just a part, quickly
+    ./a2film animatic films/whats-new --from a01 --to b05    # ... or a range of shots
     ./a2film take   films/whats-new            # the final takes, 4K, one game at a time
     ./a2film manifest films/whats-new          # the edit as JSON, for an editor
     ./a2film status films/whats-new            # which takes are current, and why not
@@ -24,7 +26,10 @@ an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8
       probe/<shot>/<variant>.mkv   .wav  .events.json  .spec.json  .sheet.png
       final/<shot>/<variant>.mkv   ...
       sheet-probe.png               every shot in timeline order
-      animatic-probe.mp4            the rough cut
+      animatic-probe-rc<N>.mp4      every rough cut, numbered; .shots.json beside each
+      animatic-probe.mp4            the latest of them (a copy), with its .shots.json
+      animatic-probe-part-<label>.mp4   a partial cut, not numbered
+      cuts.json                     the log of every cut
       manifest.json
 
 ## The process
@@ -305,6 +310,44 @@ House style for showcase footage (from the October showcase):
   main, main's takes are stale there and current again on main.
 - **Shots run in a fresh session each**, so one shot's orders never leak into the next.
   A session's start costs about a minute; that is what `--jobs` buys back.
+
+## Cuts
+
+`a2film animatic` keeps every cut. A whole-film cut is written as
+`animatic-<tier>-rc<N>.mp4`, `N` the next free number (cuts made at the same moment never
+share one), and copied to `animatic-<tier>.mp4`, which is always the latest: players and
+the review page can keep pointing at it. It is a copy, not a link, because an older
+`a2film` writes that file in place. `--name <label>` writes `animatic-<tier>-<label>.mp4`
+in place of `-rc<N>` (it never overwrites one); it is still a whole cut and becomes the
+latest.
+
+A **partial cut** is for judging a few shots without waiting for the film:
+
+| Option | Cuts |
+|---|---|
+| `--only a01,b03` (or positional ids) | these shots, in the order given |
+| `--section "Act 1"` | one section, by its title or a part of it |
+| `--from a01 --to b05` | the shots between, in film order, either end optional |
+
+Several can be given and all apply. A partial cut goes to
+`animatic-<tier>-part-<label>.mp4` (the label from the options, or `--name`), is not
+numbered and does not replace the latest; positional ids keep their old file name
+`animatic-<tier>-<ids>.mp4`. It uses the same layouts, titles, transitions and beds, with
+the segments rendered in a temporary folder and a faster encode. A section's bed starts at
+the cut's first shot of that section, from its `from` point, and ends at its `until` shot
+or the last shot in the cut, so a partial cut's music is a sketch.
+
+**The shot map.** Next to every cut, `<cut>.shots.json` (`"format": "a2film-shots/1"`)
+lists the shots in cut order with `id`, `name`, `title`, `section`, `kind`, `status`,
+`start` and `end` (the shot's own span; a dissolve overlaps the shot before),
+`owns_start` and `owns_end` (the spans split without overlap, a dissolve at its middle),
+`layout`, `transition`, `variants`, `used_variants` and `takes`: the path of each take the
+layout shows, whether it is current, and its in point. Any time `t` in the cut is in the
+one shot with `owns_start <= t < owns_end`. It also holds the cut's probed `duration`, the
+board's path, hash and commit (`board_dirty` if the board has uncommitted changes).
+`cuts.json` is the log: for each cut its file, `kind` (`rc`, `named` or `part`), `rc`,
+date, duration, board hash and commit, and its shots with their takes (a partial cut also
+its selection).
 
 ## The cut today, and where this is going
 

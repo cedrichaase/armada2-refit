@@ -5,6 +5,26 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.4.0 — 2026-10-17
+
+### Added
+- `a2film animatic` keeps every cut as `animatic-<tier>-rc<N>.mp4`, with
+  `animatic-<tier>.mp4` (a copy) as the latest; `--name <label>` writes
+  `animatic-<tier>-<label>.mp4` instead. `cuts.json` logs each cut: number, date,
+  duration, board hash and commit, shots with their takes.
+- Partial cuts: `--only`, `--section` and `--from`/`--to` cut part of the film,
+  quickly, to `animatic-<tier>-part-<label>.mp4` (not numbered, the latest stays).
+- A shot map, `<cut>.shots.json` (`a2film-shots/1`), beside every cut: each shot's span
+  in the cut, a non-overlapping `owns_start`/`owns_end` that maps any time to a shot,
+  variants, layout, takes and status.
+- `python3 films/film/selftest.py` also pins the cuts (needs ffmpeg).
+
+### Changed
+- A whole-film cut no longer overwrites the previous one; `animatic-<tier>.mp4` is
+  still written, with the same content as before.
+
+Tooling only; nothing to see in game.
+
 ## 1.3.0 — 2026-10-16
 
 ### Added

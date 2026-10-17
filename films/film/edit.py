@@ -6,13 +6,19 @@ segment of its own (constant frame rate, the tier's size, 48 kHz stereo PCM, BT.
 limited range), and the segments are joined with their transitions and laid over the
 music beds. The manifest is the same edit as data, for a real editor."""
 import json
+import fcntl
+import hashlib
 import os
+import re
 import shlex
+import shutil
 import subprocess
+import sys
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 
-from . import storyboard as sb
+from . import code, storyboard as sb
 from .cli import IGNORE_CODE, command, load, select, take_check
 from .storyboard import a2env
 
@@ -305,6 +311,21 @@ def fit(W, H, fps, take):
             f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps={fps},format=yuv420p")
 
 
+def used_variants(shot, variants=None):
+    """The variants a shot's layout shows, in drawing order (`full`: one; `pip`: the corner's
+    last; `wipe`, `split`, `dissolve`: the first two)."""
+    if variants is None:
+        variants = ['footage'] if shot.kind == 'footage' else list(shot.variants)
+    lay, args = shot.layout
+    if lay == 'full':
+        named = [x for x in args if x in variants]
+        return [named[0] if named else variants[-1]]
+    if lay == 'pip':
+        corner_v = args[0] if args and args[0] in variants else variants[-1]
+        return [v for v in variants if v != corner_v][:1] + [corner_v]
+    return variants[:2]
+
+
 def render_shot(film, shot, tier, g, inputs, dur):
     """The layout of a filmed (or footage) shot. Returns (video label, audio input index or None)."""
     W, H, fps = g.W, g.H, film.fps
@@ -317,14 +338,7 @@ def render_shot(film, shot, tier, g, inputs, dur):
         variants = shot.variants
         paths = {v: take_path(film, shot, v, tier) for v in variants}
     lay, args = shot.layout
-    if lay == 'full':
-        named = [x for x in args if x in variants]
-        variants = [named[0] if named else variants[-1]]
-    elif lay == 'pip':
-        corner_v = args[0] if args and args[0] in variants else variants[-1]
-        variants = [v for v in variants if v != corner_v][:1] + [corner_v]
-    else:
-        variants = variants[:2]
+    variants = used_variants(shot, variants)
     idx, audio = {}, None
     for v in variants:
         p = paths.get(v)
@@ -469,7 +483,7 @@ def render_segment(film, shot, tier, out, fade_out, tmp):
 TAGS = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv']
 
 
-def assemble(film, tier, tl, segs, out, tmp):
+def assemble(film, tier, tl, segs, out, tmp, preset='medium'):
     """Join the segments with their transitions and lay the music beds under them."""
     g = Graph(tmp, *size(film, tier), film.fps)
     inputs = []
@@ -506,7 +520,7 @@ def assemble(film, tier, tl, segs, out, tmp):
         g.add(f"{ca}loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]")
     g.add(f"{cv}format=yuv420p[vout]")
     run([*inputs, '-/filter_complex', g.write(), '-map', '[vout]', '-map', '[aout]', '-t', str(total),
-         '-c:v', 'libx264', '-preset', 'medium', '-crf', '20' if tier == 'probe' else '16',
+         '-c:v', 'libx264', '-preset', preset, '-crf', '20' if tier == 'probe' else '16',
          '-pix_fmt', 'yuv420p', '-r', str(film.fps), *TAGS, '-c:a', 'aac', '-b:a', '192k',
          '-movflags', '+faststart', out])
 
@@ -534,18 +548,176 @@ def music_beds(film, tl):
     return beds
 
 
-@command(options=[TIER_OPT])
+# ------------------------------------------------------------------ cuts
+def slug(text):
+    return re.sub(r'[^a-z0-9]+', '-', text.lower()).strip('-')
+
+
+def select_part(film, a):
+    """The shots a partial cut is made of, in cut order, or None for the whole film:
+    positional ids (as given), `--only` (as given), `--section`, `--from`/`--to` (film order);
+    several given are all applied. Returns (shots, label) with the label a file name can carry."""
+    only = list(a.shots or [])
+    for x in a.only or []:
+        only += [i for i in re.split(r'[,\s]+', x) if i]
+    if not (only or a.section or a.from_ or a.to):
+        return None, None
+    shots = select(film, only) if only else list(film.shots)
+    label = [slug('-'.join(only))] if only else []
+    if a.section:
+        want = a.section.lower()
+        secs = [x for x in film.sections if x.title.lower() == want] or \
+               [x for x in film.sections if want in x.title.lower()]
+        if len(secs) != 1:
+            sys.exit(f'a2film: --section {a.section!r}: ' + ('no such section' if not secs else
+                     'ambiguous, one of: ' + ', '.join(x.title for x in secs)) +
+                     '; sections: ' + ', '.join(x.title for x in film.sections))
+        shots = [s for s in shots if s in secs[0].shots]
+        label.append(slug(secs[0].title))
+    if a.from_ or a.to:
+        order = [s.id for s in film.shots]
+        for i in (a.from_, a.to):
+            if i and i not in order:
+                sys.exit(f'a2film: no shot {i}')
+        lo = order.index(a.from_) if a.from_ else 0
+        hi = order.index(a.to) if a.to else len(order) - 1
+        shots = [s for s in shots if lo <= order.index(s.id) <= hi]
+        label.append(f'{a.from_ or order[0]}-to-{a.to or order[-1]}')
+    if not shots:
+        sys.exit('a2film: no shot is left to cut')
+    if only and not (a.section or a.from_ or a.to):
+        name = '-'.join(only)
+    else:
+        name = '-'.join(x for x in label if x)
+    if len(name) > 80:
+        name = name[:60] + '-' + hashlib.sha1(name.encode()).hexdigest()[:8]
+    return shots, name
+
+
+def board_state(film):
+    """What the cut was made from: the board file's hash, and the checkout's commit and
+    whether the board has uncommitted changes."""
+    d = dict(board=os.path.abspath(film.path), board_sha256=hashlib.sha256(open(film.path, 'rb').read()).hexdigest()[:16])
+    rc, out = code.git(film.dir, 'rev-parse', 'HEAD')
+    d['commit'] = out.strip() if rc == 0 else None
+    rc, out = code.git(film.dir, 'status', '--porcelain', '--', os.path.abspath(film.path))
+    d['board_dirty'] = bool(out.strip()) if rc == 0 else None
+    return d
+
+
+def shot_map(film, tier, tl, total):
+    """Every shot of the cut in order, with where it sits in it. `start`/`end` are the shot's
+    own span (a dissolve overlaps the shot before); `owns_start`/`owns_end` split the cut
+    without overlap or gap (the middle of a dissolve is the boundary), so any time t in
+    [0, duration) belongs to the one shot with owns_start <= t < owns_end."""
+    out = []
+    for i, (s, start, end, ov) in enumerate(tl):
+        takes = []
+        for v in used_variants(s) if s.kind != 'card' else []:
+            if s.kind == 'footage':
+                p = footage_path(s)
+                p = p if p and os.path.exists(p) else None
+                takes.append(dict(variant=v, path=p, current=None, **{'in': s.in_point('')}))
+                continue
+            p = take_path(film, s, v, tier)
+            st = take_check(film, s, v, tier)[0] if p else '-'
+            takes.append(dict(variant=v, path=p, current=st == 'ok' if p else False,
+                              **{'in': s.in_point(v)}))
+        lay, largs = s.layout
+        tr, td = s.transition
+        owns_start = 0.0 if i == 0 else start + ov / 2
+        owns_end = total if i + 1 == len(tl) else tl[i + 1][1] + tl[i + 1][3] / 2
+        sec = section_of(film, s)
+        out.append(dict(
+            index=i, id=s.id, name=s.name, title=s.get('Title'), sub=s.get('Sub'), section=s.section,
+            section_music=(sec.fields.get('Music') if sec else None),
+            kind=s.kind, status=s.status, start=round(start, 3), end=round(end, 3),
+            owns_start=round(owns_start, 3), owns_end=round(owns_end, 3),
+            layout=dict(type=lay, args=largs), transition=dict(type=tr, seconds=td, overlap=round(ov, 3)),
+            variants=list(s.variants) if s.filmed else [], used_variants=[t['variant'] for t in takes],
+            takes=takes, filmed=all(t['path'] for t in takes) if takes else s.kind == 'card'))
+    return out
+
+
+def write_json(path, doc):
+    tmp = f'{path}.{os.getpid()}.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(doc, f, indent=1, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def claim(tmp, d, stem, n=None):
+    """Hard-link the finished `tmp` to the first free `<stem>-rc<N>.mp4` (or the given name,
+    which must be free), so cuts made at the same moment never take one number.
+    Returns (path, N or None)."""
+    while True:
+        if n is None:
+            nums = [int(m.group(1)) for f in os.listdir(d)
+                    for m in [re.fullmatch(re.escape(stem) + r'-rc(\d+)\.mp4', f)] if m]
+            k = max(nums, default=0) + 1
+            path = os.path.join(d, f'{stem}-rc{k}.mp4')
+        else:
+            k, path = None, os.path.join(d, n)
+        try:
+            os.link(tmp, path)
+            return path, k
+        except FileExistsError:
+            if n is not None:
+                sys.exit(f'a2film: {path} exists; pick another --name')
+
+
+def publish_latest(src, dst):
+    """A copy, not a link: an older a2film writes `animatic-<tier>.mp4` in place, which would
+    otherwise overwrite the numbered cut it points to."""
+    tmp = f'{dst}.{os.getpid()}.tmp'
+    shutil.copyfile(src, tmp)
+    os.replace(tmp, dst)
+
+
+def log_cut(film, entry):
+    """Append to cuts.json (kept under a lock: several sessions cut the same film)."""
+    path = os.path.join(film.data_dir(), 'cuts.json')
+    with open(path + '.lock', 'w') as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        try:
+            doc = json.load(open(path))
+        except (OSError, ValueError):
+            doc = dict(format='a2film-cuts/1', film=film.name, cuts=[])
+        doc['cuts'].append(entry)
+        write_json(path, doc)
+
+
+PART_OPTS = [
+    (('--only',), dict(action='append', metavar='ID,ID', help='cut only these shots (a partial cut)')),
+    (('--section',), dict(metavar='NAME', help='cut only this section (its title, or a part of it)')),
+    (('--from',), dict(dest='from_', metavar='ID', help='cut from this shot on (film order)')),
+    (('--to',), dict(metavar='ID', help='cut up to and including this shot')),
+    (('--name',), dict(metavar='LABEL', help='file label: animatic-<tier>-<label>.mp4 instead of -rc<N>; '
+                                                'for a partial cut, animatic-<tier>-part-<label>.mp4')),
+]
+
+
+@command(options=[TIER_OPT, *PART_OPTS])
 def animatic(a):
-    """a rough cut from the takes: layouts, titles, key hints, transitions, music"""
+    """a rough cut from the takes, kept as animatic-<tier>-rc<N>.mp4 (and as animatic-<tier>.mp4,
+    the latest) with a .shots.json map and a cuts.json log; --only/--section/--from/--to cut a
+    part, quickly, to animatic-<tier>-part-<label>.mp4"""
     film = load(a.board)
     global TIER
     TIER = a.tier
-    shots = select(film, a.shots)
+    part, label = select_part(film, a)
+    shots = part if part is not None else film.shots
     tl = timeline(film, shots)
-    work = os.path.join(film.data_dir(), 'work', a.tier)
-    os.makedirs(work, exist_ok=True)
+    d = film.data_dir()
+    os.makedirs(d, exist_ok=True)
+    base = 'animatic-' + a.tier
+    started = time.time()
     segs = []
     with tempfile.TemporaryDirectory(prefix='a2film-') as tmp:
+        # a whole cut keeps its segments in work/ as ever; a part renders into the temp folder,
+        # so it never writes over a cut being made at the same time
+        work = os.path.join(d, 'work', a.tier) if part is None else os.path.join(tmp, 'work')
+        os.makedirs(work, exist_ok=True)
         for i, (s, start, end, _) in enumerate(tl):
             nxt = tl[i + 1][0] if i + 1 < len(tl) else None
             fo = 0.0
@@ -555,14 +727,62 @@ def animatic(a):
                 fo = min(0.5, (end - start) / 2)
             out = os.path.join(work, f'{s.id}.mkv')
             print(f'{s.id}: {s.kind}, {end - start:.1f} s', flush=True)
-            d = os.path.join(tmp, s.id)
-            os.makedirs(d)
-            render_segment(film, s, a.tier, out, fo, d)
+            sd = os.path.join(tmp, s.id)
+            os.makedirs(sd)
+            render_segment(film, s, a.tier, out, fo, sd)
             segs.append(out)
-        name = 'animatic-' + a.tier + ('' if not a.shots else '-' + '-'.join(a.shots)) + '.mp4'
-        out = os.path.join(film.data_dir(), name)
-        assemble(film, a.tier, tl, segs, out, tmp)
-    print(f'animatic: {out} ({tl[-1][2]:.1f} s)')
+        built = os.path.join(d, f'.cut-{os.getpid()}.mp4')     # beside the cuts: they are hard-linked from it
+        try:
+            assemble(film, a.tier, tl, segs, built, tmp, preset='medium' if part is None else 'veryfast')
+            rc = None
+            if part is not None:
+                # positional ids keep their old file name (animatic-<tier>-<ids>.mp4)
+                fname = (f'{base}-{label}.mp4' if a.shots and not (a.only or a.section or a.from_ or a.to or a.name)
+                         else f'{base}-part-{slug(a.name) if a.name else label}.mp4')
+                path = os.path.join(d, fname)
+                if a.name and os.path.exists(path):
+                    sys.exit(f'a2film: {path} exists; pick another --name')
+                shutil.copyfile(built, path + '.tmp')
+                os.replace(path + '.tmp', path)
+                kind = 'part'
+            elif a.name:
+                path, _ = claim(built, d, base, f'{base}-{slug(a.name)}.mp4')
+                kind = 'named'
+            else:
+                path, rc = claim(built, d, base)
+                kind = 'rc'
+        finally:
+            if os.path.exists(built):
+                os.unlink(built)
+        dur, _ = probe_media(path)
+    total = tl[-1][2]
+    stem = path[:-len('.mp4')]
+    smap = shot_map(film, a.tier, tl, total)
+    W, H = size(film, a.tier)
+    doc = dict(format='a2film-shots/1',
+               about='Where each shot sits in the cut. Times are seconds of the cut. A time t belongs to the shot '
+                     'with owns_start <= t < owns_end (these tile [0, duration) without overlap); start/end are '
+                     'the shot\'s own span, which a dissolve overlaps with the shot before.',
+               cut=os.path.basename(path), kind=kind, rc=rc, tier=a.tier, film=film.name, title=film.title,
+               width=W, height=H, fps=film.fps, duration=round(dur, 3) if dur else round(total, 3),
+               timeline_length=round(total, 3), made=time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+               **board_state(film), shots=smap)
+    write_json(stem + '.shots.json', doc)
+    latest = None
+    if part is None:
+        latest = os.path.join(d, base + '.mp4')
+        publish_latest(path, latest)
+        write_json(os.path.join(d, base + '.shots.json'), dict(doc, latest_of=os.path.basename(path)))
+    log_cut(film, dict(
+        cut=os.path.basename(path), kind=kind, rc=rc, tier=a.tier, date=doc['made'],
+        duration=doc['duration'], render_seconds=round(time.time() - started, 1),
+        board=doc['board'], board_sha256=doc['board_sha256'], commit=doc['commit'],
+        board_dirty=doc['board_dirty'], latest=part is None, selection=None if part is None else dict(
+            shots=[s.id for s in shots], only=a.only, section=a.section, **{'from': a.from_, 'to': a.to}),
+        shots=[dict(id=m['id'], start=m['start'], end=m['end'],
+                    takes={t['variant']: t['path'] for t in m['takes']}) for m in smap]))
+    print(f'animatic: {path} ({total:.1f} s)' + (f', latest {latest}' if latest else ''))
+    print(f'shots:    {stem}.shots.json')
     return 0
 
 
