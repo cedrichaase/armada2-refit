@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.30.1 — 2026-10-17
+
+### Changed
+- Scenario `ui-widgets-cursor`: Scene.asi's `cursor off` then `cursor on`, with
+  `UI.asi`'s cursor hidden and shown with it (ui 0.11.1).
+
+Installed, not yet seen in game.
+
 ## 3.30.0 — 2026-10-17
 
 ### Added

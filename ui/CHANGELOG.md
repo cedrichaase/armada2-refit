@@ -4,6 +4,19 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.11.1 — 2026-10-17
+
+### Fixed
+- Our cursor obeys a hidden engine cursor: `RefreshDisplay`'s draw of the cursor
+  (0x6246fa) is wrapped when the UI loads (`engine::cursor::install_probe`), and while
+  something before it skips that draw (Scene.asi's `Cursor=0` / `cursor off`) the UI
+  draws none either (`cursor: Mission draws none`). The engine's own is now held back
+  at that call rather than by emptying `+0x60`.
+- No cursor on the loading screen: the engine draws none there, and ours is drawn only
+  where the engine would draw one.
+
+Installed, not yet seen in game.
+
 ## 0.11.0 — 2026-10-17
 
 ### Added
