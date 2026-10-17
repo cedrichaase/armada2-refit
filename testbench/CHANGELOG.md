@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.30.1 — 2026-10-17
+
+### Changed
+- `ui-hud-info` and `ui-hud-bar` click where ui 0.11.1's bottom row puts the queue,
+  the group's tiles and the bar.
+
+Installs nothing.
+
 ## 3.30.0 — 2026-10-17
 
 ### Added

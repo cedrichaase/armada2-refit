@@ -4,6 +4,21 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.11.1 — 2026-10-17
+
+### Changed
+- The bottom row (`HUD.md`, "The bottom row"): at 16:9 and wider the info panel moves
+  right just far enough for the bar to sit at the bottom beside the minimap, at a
+  fixed place; where the row has no room for both (4:3) the bar sits above the minimap
+  and the panel is centred clear of the minimap and the unit view. Before, the bar sat
+  above the info panel at 16:9.
+- A group's tiles are smaller (46 x 40 units, were 70 x 78) with a plain hull strip,
+  in rows as wide as the one-object panel, three rows before they grow wider and no
+  wider than the room beside the bar: 30 units take three rows of ten, not four of
+  eight.
+
+Installed, not yet seen in game.
+
 ## 0.11.0 — 2026-10-17
 
 ### Added

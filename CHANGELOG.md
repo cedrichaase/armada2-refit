@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.24.1 — 2026-10-17
+
+Layers: ui 0.11.1, testbench 3.30.1.
+
+### Changed
+- The HUD's bottom row: the bar beside the minimap at 16:9 and wider, the info panel
+  moved right for it; above the minimap at 4:3. A group's tiles are smaller, so a big
+  selection stays low (ui 0.11.1; testbench 3.30.1 follows it in two scenarios).
+
+Installed, not yet seen in game.
+
 ## 12.24.0 — 2026-10-17
 
 Layers: gui-installer 1.6.0.
