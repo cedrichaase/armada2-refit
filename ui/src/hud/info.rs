@@ -64,7 +64,13 @@ enum Tip {
     Unit(usize, R),
 }
 
+/// This frame's bottom row (`hud::bottom_row`), taken at the HUD's own scale before
+/// the panel's, and the HUD's margin in pixels.
+static mut ROW: (f32, f32, Option<(f32, f32)>, f32) = (0.0, 0.0, None, 0.0);
+
 pub fn run(ui: &mut Ui) {
+    let row = super::bottom_row(ui);
+    unsafe { ROW = (row.lo, row.hi, row.bar, ui.u(10.0)) };
     // The whole panel at `[HUD] InfoScale`: its close-up, words, bars and systems alike.
     let scale = ui.scale;
     ui.scale *= crate::config::get().hud.info_scale;
@@ -553,9 +559,14 @@ fn info_wire_comp() -> usize {
 
 // ---- a group ---------------------------------------------------------------------------
 
-const TILE_W: f32 = 70.0;
-const TILE_H: f32 = 78.0;
-const COLS: usize = 8;
+/// A unit's tile: its wireframe over its hull. Small: the group shows which units are
+/// selected and how they stand, and must stay low over the play area.
+const TILE_W: f32 = 46.0;
+const TILE_H: f32 = 40.0;
+const TILE_GAP: f32 = 4.0;
+/// Rows the group takes before it grows wider than the one-object panel (where the
+/// screen has room for it).
+const ROWS: usize = 3;
 
 fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
     let units = info::group();
@@ -563,19 +574,30 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
         return None;
     }
     let t = ui.theme;
-    let pad = ui.u(t.pad);
-    let gap = ui.u(5.0);
+    let pad = ui.u(t.pad * 0.75);
+    let gap = ui.u(TILE_GAP);
     let (tw, th) = (ui.u(TILE_W), ui.u(TILE_H));
-    let max_cols = (((ui.w - ui.u(40.0) - 2.0 * pad + gap) / (tw + gap)) as usize).max(1);
-    let cols = units.len().min(COLS.max(units.len().div_ceil(4))).min(max_cols).max(1);
-    let rows = units.len().div_ceil(cols);
     // The tiles sit inside the frame (an LCARS frame's elbows and bars), padded.
     let (fl, ft, fr, fb) = theme::frame_margins(ui);
-    let w = cols as f32 * tw + (cols - 1) as f32 * gap + 2.0 * pad + fl + fr;
+    let chrome_w = 2.0 * pad + fl + fr;
+    let fit = |w: f32| (((w - chrome_w + gap) / (tw + gap)) as usize).max(1);
+    // As wide as the one-object panel, then wider rather than taller than `ROWS`, as
+    // far as the screen goes; the rows balanced.
+    // Where the bar sits beside the panel (16:9 and wider), no wider than the room
+    // beside it, so a big selection grows a row rather than push the bar above the
+    // minimap.
+    let n = units.len();
+    let (lo, hi, bar, m) = unsafe { ROW };
+    let beside = bar.map(|(bw, _)| hi - lo - bw - 3.0 * m - 2.0).filter(|&r| r >= ui.u(W_SINGLE));
+    let max_cols = fit(beside.unwrap_or(ui.w - ui.u(40.0)).min(ui.w - ui.u(40.0)));
+    let cols = fit(ui.u(W_SINGLE)).max(n.div_ceil(ROWS)).min(max_cols).min(n);
+    let rows = n.div_ceil(cols);
+    let cols = n.div_ceil(rows);
+    let w = cols as f32 * tw + (cols - 1) as f32 * gap + chrome_w;
     let h = rows as f32 * th + (rows - 1) as f32 * gap + 2.0 * pad + ft + fb;
-    let outer = place(ui, w.max(ui.u(300.0)), h);
+    let outer = place(ui, w.max(ui.u(150.0)), h);
     ui.panel(outer);
-    let inner = theme::panel_inner(ui, outer);
+    let inner = theme::panel_inner(ui, outer).inset(pad - ui.u(t.pad));
     let x0 = inner.x + (inner.w - (cols as f32 * tw + (cols - 1) as f32 * gap)) * 0.5;
     let shift = ui.input.shift || info::shift_held();
     for (i, &u) in units.iter().enumerate() {
@@ -585,13 +607,20 @@ fn group(ui: &mut Ui, tip: &mut Tip) -> Option<R> {
         let (hot, held, clicked) = ui.interact(id, tr);
         let st = State::of(ui, id, hot, held);
         theme::field(ui, tr, st);
-        let bar_h = ui.u(6.0);
-        let wr = R::new(tr.x + ui.u(4.0), tr.y + ui.u(4.0), tr.w - ui.u(8.0), tr.h - bar_h - ui.u(12.0));
+        let bar_h = libm::roundf(ui.u(4.0)).max(3.0);
+        let inset = ui.u(3.0);
+        let wr = R::new(tr.x + inset, tr.y + inset, tr.w - 2.0 * inset, tr.h - bar_h - 3.0 * inset);
         wireframe(ui, u, wr);
         if let Some(b) = info::hull(u) {
-            let br = R::new(tr.x + ui.u(5.0), tr.bottom() - bar_h - ui.u(5.0), tr.w - ui.u(10.0), bar_h);
-            let f = b.fraction();
-            theme::bar(ui, br, f, Some(hull_colour(ui, f)));
+            // A plain strip: the theme's bar insets and stripes its fill, which at
+            // this height leaves nothing to read.
+            let br = R::new(tr.x + inset + ui.u(1.0), libm::roundf(tr.bottom() - bar_h - inset), tr.w - 2.0 * inset - ui.u(2.0), bar_h);
+            let f = b.fraction().clamp(0.0, 1.0);
+            ui.draw.fill(br, Corners::round(bar_h * 0.5), t.track);
+            if f > 0.0 {
+                let fr = R::new(br.x, br.y, (br.w * f).max(bar_h), bar_h);
+                ui.draw.fill(fr, Corners::round(bar_h * 0.5), hull_colour(ui, f));
+            }
         }
         if hot {
             *tip = Tip::Unit(u, tr);
@@ -635,9 +664,9 @@ fn hover_card(ui: &mut Ui, obj: usize, panel: Option<R>) {
     let w = ui.u(300.0);
     let h = content_h + (probe.h - room.h);
     let (x, y) = match panel {
-        // Beside the panel, at its right, when there is room; else above its right end
-        // (the bar, when above the panel, sits at its left).
-        Some(p) if ui.w - p.right() >= w + ui.u(16.0) => (p.right() + ui.u(8.0), p.bottom() - h),
+        // Beside the panel, at its right, when there is room before the unit view; else
+        // above its right end.
+        Some(p) if unsafe { ROW.1 } - p.right() >= w + ui.u(16.0) => (p.right() + ui.u(8.0), p.bottom() - h),
         Some(p) => (p.right() - w, p.y - h - ui.u(8.0)),
         None => ((ui.w - w) * 0.5, ui.h - h - ui.u(10.0)),
     };
@@ -727,8 +756,20 @@ fn clean(s: &str) -> String {
 
 // ---- placement --------------------------------------------------------------------------
 
-/// The panel's place: bottom centre, above the screen's edge.
+/// The panel's place, at the bottom, in the row between the minimap and the unit view
+/// (HUD.md, "The bottom row"): centred on the screen, unless the bar then has no room
+/// at its left; then moved right just far enough for the bar to sit beside it, if the
+/// row is wide enough for both (16:9 and wider). Else centred (the bar goes above the
+/// minimap), and kept inside the row where it fits.
 fn place(ui: &Ui, w: f32, h: f32) -> R {
-    let m = ui.u(10.0);
-    R::new(libm::roundf((ui.w - w) * 0.5), libm::roundf(ui.h - m - h), libm::roundf(w), libm::roundf(h))
+    let (lo, hi, bar, m) = unsafe { ROW };
+    let centred = (ui.w - w) * 0.5;
+    let beside = bar.map(|(bw, _)| centred.max(libm::ceilf(lo + m + bw + m) + 1.0));
+    let x = match beside {
+        Some(x) if x + w <= hi - m => x,
+        // Clear of the minimap and the unit view when the row holds the panel.
+        _ if hi - lo - 2.0 * m >= w => centred.clamp(lo + m, hi - m - w),
+        _ => centred,
+    };
+    R::new(libm::roundf(x), libm::roundf(ui.h - m - h), libm::roundf(w), libm::roundf(h))
 }

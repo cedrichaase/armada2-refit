@@ -24,7 +24,7 @@ panel"), 2026-10-16 at 1280x720.
 - **The queue**: select `base`, then `key q` opens its build list and each `key q`
   queues a construction ship; five presses about half a second apart give four in the
   queue. A construction ship takes about ten seconds, so hover and click a slot soon
-  after (slot 3 of the Borg theme at 542,676).
+  after (slot 3 of the Borg theme at 579,667 since ui 0.11.2).
 - **Shift-click cannot be tested here**: a2input's `keydown shift` before a click
   does not reach the game, neither the UI (`GetKeyState`) nor the game's own Shift
   binding: a stock Shift-click on a ship in the 3D view does not add it to the
