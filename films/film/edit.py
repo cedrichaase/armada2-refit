@@ -13,7 +13,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from . import storyboard as sb
-from .cli import IGNORE_CODE, command, load, select, take_check
+from .cli import IGNORE_CODE, best_take, command, load, select, take_check
 from .storyboard import a2env
 
 TIER_OPT = (('--tier',), dict(choices=('probe', 'final'), default='probe',
@@ -58,13 +58,16 @@ def size(film, tier):
 
 
 def take_path(film, shot, variant, tier):
-    p = film.take(shot, variant, tier) + '.mkv'
-    return p if os.path.exists(p) else None
+    """The take a cut at `tier` uses (cli.best_take: at a probe tier, a final take or a
+    probe at the shot's own `Tier:` when it is the better one), or None."""
+    stem, _ = best_take(film, shot, variant, tier, IGNORE)
+    return stem + '.mkv' if stem else None
 
 
 def events(film, shot, variant, tier):
+    stem, _ = best_take(film, shot, variant, tier, IGNORE)
     try:
-        return json.load(open(film.take(shot, variant, tier) + '.events.json')).get('events', [])
+        return json.load(open(stem + '.events.json')).get('events', []) if stem else []
     except (OSError, ValueError):
         return []
 
@@ -75,10 +78,17 @@ def speed(shot):
 
 # the tier the command runs at: a footage shot's `From:` follows it
 TIER = 'probe'
+IGNORE = False      # --ignore-code: which take is best counts a code-stale one as current
 
 
 def footage_path(shot):
-    return shot.film.footage(shot, TIER)
+    return shot.film.footage(shot, TIER, best=take_path)
+
+
+def footage_in(shot):
+    """Seconds into a footage shot's file where it starts: its `In:`, counted from a
+    reference's `In` (`From: ref:<id>`)."""
+    return shot.film.footage_span(shot)[0] + shot.in_point('')
 
 
 def seg_len(shot):
@@ -88,7 +98,10 @@ def seg_len(shot):
     if shot.kind == 'footage':
         p = footage_path(shot)
         d, _ = probe_media(p) if p and os.path.exists(p) else (0, False)
-        return max(0.5, (d - shot.in_point('')) / speed(shot)) if d else 3.0
+        end = shot.film.footage_span(shot)[1]
+        if end is not None:
+            d = min(d, end) if d else end
+        return max(0.5, (d - footage_in(shot)) / speed(shot)) if d else 3.0
     return 3.0
 
 
@@ -328,7 +341,7 @@ def render_shot(film, shot, tier, g, inputs, dur):
     idx, audio = {}, None
     for v in variants:
         p = paths.get(v)
-        i0 = shot.in_point('' if shot.kind == 'footage' else v)
+        i0 = footage_in(shot) if shot.kind == 'footage' else shot.in_point(v)
         idx[v] = len([a for a in inputs if a == '-i'])
         if p:
             inputs += ['-ss', str(i0), '-t', str(dur * sp + 0.5), '-i', p]
@@ -534,12 +547,12 @@ def music_beds(film, tl):
     return beds
 
 
-@command(options=[TIER_OPT])
+@command(options=[TIER_OPT, IGNORE_CODE])
 def animatic(a):
     """a rough cut from the takes: layouts, titles, key hints, transitions, music"""
     film = load(a.board)
-    global TIER
-    TIER = a.tier
+    global TIER, IGNORE
+    TIER, IGNORE = a.tier, a.ignore_code
     shots = select(film, a.shots)
     tl = timeline(film, shots)
     work = os.path.join(film.data_dir(), 'work', a.tier)
@@ -600,12 +613,12 @@ def grab(src, t, out, w, label=None):
                '-gravity', 'northwest', '-annotate', '+6+4', label, out)
 
 
-@command(options=[TIER_OPT])
+@command(options=[TIER_OPT, IGNORE_CODE])
 def sheet(a):
     """one contact sheet of the film: a row per shot (and variant), in timeline order"""
     film = load(a.board)
-    global TIER
-    TIER = a.tier
+    global TIER, IGNORE
+    TIER, IGNORE = a.tier, a.ignore_code
     shots = select(film, a.shots)
     W, H = size(film, a.tier)
     th = TILE_W * H // W
@@ -630,7 +643,7 @@ def sheet(a):
             for j, v in enumerate(variants):
                 src = take_path(film, s, v, a.tier) if s.kind != 'footage' else (
                     footage_path(s) if footage_path(s) and os.path.exists(footage_path(s)) else None)
-                i0 = s.in_point(v if s.kind != 'footage' else '')
+                i0 = s.in_point(v) if s.kind != 'footage' else footage_in(s)
                 span = seg_len(s) * speed(s)
                 frames = []
                 for f in range(SHEET_FRAMES):
@@ -662,24 +675,25 @@ def sheet(a):
 def manifest(a):
     """the edit as JSON, with every take, for an editor"""
     film = load(a.board)
-    global TIER
-    TIER = a.tier
+    global TIER, IGNORE
+    TIER, IGNORE = a.tier, a.ignore_code
     tl = timeline(film)
     shots = []
     for s, start, end, ov in tl:
         takes = {}
         if s.filmed:
             for v in s.variants:
-                stem = film.take(s, v, a.tier)
-                path = stem + '.mkv'
-                t = dict(path=path if os.path.exists(path) else None, current=False)
+                stem, used = best_take(film, s, v, a.tier, a.ignore_code)
+                path = stem + '.mkv' if stem else None
+                t = dict(path=path, current=False)
                 if t['path']:
+                    t['tier'] = used
                     t['duration'], t['audio'] = probe_media(path)
                     try:
                         spec = json.load(open(stem + '.spec.json'))
                     except (OSError, ValueError):
                         spec = {}
-                    st, why = take_check(film, s, v, a.tier, a.ignore_code)
+                    st, why = take_check(film, s, v, used, a.ignore_code)
                     t.update(commit=spec.get('commit'), dirty=spec.get('dirty'), hash=spec.get('hash'),
                              res=spec.get('res'), current=st == 'ok', stale=why)
                     if os.path.exists(stem + '.events.json'):
@@ -688,7 +702,12 @@ def manifest(a):
                 takes[v] = t
         elif s.kind == 'footage':
             p = footage_path(s)
-            takes['footage'] = dict(path=p if p and os.path.exists(p) else None, **{'in': s.in_point('')})
+            takes['footage'] = dict(path=p if p and os.path.exists(p) else None, **{'in': footage_in(s)})
+            if s.ref:
+                r = film.references().get(s.ref)
+                takes['footage'].update(ref=s.ref, out=r.out_point if r else None,
+                                        quality=r.get('Quality') if r else None,
+                                        audio_notes=r.get('Audio') if r else None)
         lay, largs = s.layout
         tr, td = s.transition
         shots.append(dict(
@@ -699,7 +718,7 @@ def manifest(a):
             title=s.get('Title'), sub=s.get('Sub'), caption=(s.get('Caption') or 'bottom').lower(),
             audio=(s.get('Audio') or 'game').lower(), keys=s.get('Keys') or 'auto',
             card=[dict(style=st, text=t) for st, t in s.card] or None,
-            background=s.get('Background'),
+            background=s.get('Background'), file=s.file, tier=s.tier if s.filmed and s.get('Tier') else None,
             fields=s.fields, direction='\n'.join(s.prose).strip(),
             setup=[t for _, t in s.setup], action=[t for _, t in s.action], takes=takes))
     secs = []
@@ -715,7 +734,8 @@ def manifest(a):
         'about': 'The edit of an a2film storyboard (films/README.md). Times are seconds of the cut; '
                  'a take\'s "in" is seconds into its file, whose time 0 is the start of the shot\'s action. '
                  'Takes are variable frame rate H.264, BT.601 limited range; the cut is BT.709 limited range.',
-        'film': dict(title=film.title, name=film.name, board=os.path.abspath(film.path), fields=film.fields,
+        'film': dict(title=film.title, name=film.name, board=os.path.abspath(film.path), includes=film.files,
+                     fields=film.fields,
                      variants=film.variants, direction='\n'.join(film.prose).strip(),
                      tier=a.tier, width=W, height=H, fps=film.fps, length=round(tl[-1][2], 3) if tl else 0),
         'sections': secs,

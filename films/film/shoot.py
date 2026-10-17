@@ -60,7 +60,7 @@ class Take:
         # pointer coordinates are written in the film's Pointer space: a game take scales
         # them to its pixels, a desktop take to its logical units (its output is scaled to
         # DESKTOP_ROWS logical rows at every tier, so a window is the same size in each)
-        w, h = (int(v) for v in film.res(tier).split('x'))
+        w, h = (int(v) for v in film.res(tier, shot).split('x'))
         pw, ph = film.pointer
         self.scale = h / DESKTOP_ROWS
         self.k = (w / self.scale / pw, DESKTOP_ROWS / ph) if self.desktop else (w / pw, h / ph)
@@ -83,12 +83,12 @@ class Take:
             env['SCENE_MUSIC'] = '0'
         label = f'film-{f.name}-{s.id}-{self.variant}-{self.tier}'
         if self.desktop:      # no game: a stock clone to install into, and its display
-            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier), '--mod', 'stock', '--no-launch',
+            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier, s), '--mod', 'stock', '--no-launch',
                    '--label', label]
         else:
             # a shot with Prepare: starts without the game, prepares the clone, then launches
             prep = ['--no-launch'] if s.get('Prepare') else [f'--args={f.args(s)}']   # '-nointro' alone reads as a flag
-            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier),
+            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier, s),
                    *f.variants[s.install_variant(self.variant)].split(), *prep, '--label', label]
         r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True)
         self.log.write(r.stdout + r.stderr)
@@ -469,7 +469,7 @@ class Take:
                       open(self.stem + '.events.json', 'w'), indent=1)
             json.dump(dict(hash=self.film.spec_hash(self.shot, self.variant, self.tier),
                            spec=self.film.spec(self.shot, self.variant, self.tier), **self.code,
-                           res=self.film.res(self.tier), tier=self.tier,
+                           res=self.film.res(self.tier, self.shot), tier=self.tier,
                            filmed=time.strftime('%Y-%m-%d %H:%M:%S')),
                       open(self.stem + '.spec.json', 'w'), indent=1)
             self.contact_sheet(probe_duration(self.stem + '.mkv'))
@@ -554,7 +554,7 @@ class Ensemble:
                           open(t.stem + '.events.json', 'w'), indent=1)
                 json.dump(dict(hash=self.film.spec_hash(self.shot, t.variant, self.tier),
                                spec=self.film.spec(self.shot, t.variant, self.tier), **t.code,
-                               res=self.film.res(self.tier), tier=self.tier,
+                               res=self.film.res(self.tier, self.shot), tier=self.tier,
                                filmed=time.strftime('%Y-%m-%d %H:%M:%S')),
                           open(t.stem + '.spec.json', 'w'), indent=1)
                 t.contact_sheet(probe_duration(t.stem + '.mkv'))
@@ -581,9 +581,11 @@ def film_takes(a, tier):
             print(f'! {s.id if s else "film"}: {m}')
         sys.exit('a2film: the board has problems (./a2film check)')
     todo = []
+    run_tier = tier
     for s in select(film, a.shots):
         if not s.filmed:
             continue
+        tier = film.shot_tier(s, run_tier)      # a probe run films a `Tier: final` shot's final take
         if s.players:       # all of a shot's players are filmed together, or none
             states = {p: take_check(film, s, p, tier, a.ignore_code) for p in s.players}
             if a.force or any(st != 'ok' for st, _ in states.values()):
@@ -607,7 +609,24 @@ def film_takes(a, tier):
     if not todo:
         print('nothing to film')
         return 0
-    say('a2film', f'{len(todo)} takes at {film.res(tier)}, {a.jobs} at once')
+    # takes larger than the run's own resolution (a shot's `Tier:` above the probes) run
+    # after the others, one at a time: several large recording games at once is what died
+    # at 1080p (films/README.md, "Traps")
+    base = film.res(run_tier)
+
+    def res_of(t):
+        return film.res(t.tier, t.shot)
+
+    def px(r):
+        w, h = r.lower().split('x')
+        return int(w) * int(h)
+
+    light = [t for t in todo if px(res_of(t)) <= px(base)]
+    heavy = [t for t in todo if px(res_of(t)) > px(base)]
+    say('a2film', f'{len(light)} takes at {base}, {a.jobs} at once' if light else 'no takes at ' + base)
+    if heavy:
+        say('a2film', f'then {len(heavy)} at their own tier, one at a time: '
+                      + ', '.join(f'{t.tag} {res_of(t)}' for t in heavy))
 
     def staggered(i_take):
         i, t = i_take
@@ -615,7 +634,9 @@ def film_takes(a, tier):
         return t()
 
     with ThreadPoolExecutor(a.jobs) as ex:
-        results = list(ex.map(staggered, enumerate(todo)))
+        results = list(ex.map(staggered, enumerate(light)))
+    results += [t() for t in heavy]
+    todo = light + heavy
     bad = [t.tag for t, ok in zip(todo, results) if not ok]
     say('a2film', f'{len(todo) - len(bad)} of {len(todo)} takes filmed' + (f'; failed: {", ".join(bad)}' if bad else ''))
     return 1 if bad else 0

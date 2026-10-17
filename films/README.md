@@ -1,7 +1,7 @@
 # Films — storyboards shot on the test bench
 
-A film is written as a **storyboard**, one Markdown file that is both the script a person
-reads and the recipe `./a2film` shoots from: what each shot shows, how the camera moves,
+A film is written as a **storyboard**, a Markdown file (or several, see "A board over
+several files") that is both the script a person reads and the recipe `./a2film` shoots from: what each shot shows, how the camera moves,
 and how the shot is used in the cut (layout, transition, titles, music). The footage is
 filmed on the test bench (`testbench/README.md`), several games at once, and the cut is
 made from the storyboard's edit direction (today a rough cut by `a2film animatic`; later
@@ -16,6 +16,7 @@ a real editor, fed by `a2film manifest`).
     ./a2film manifest films/whats-new          # the edit as JSON, for an editor
     ./a2film status films/whats-new            # which takes are current, and why not
     ./a2film probe  films/whats-new --ignore-code   # re-film changed specs only, keep the rest
+    ./a2film adopt  films/beams-scout a01 films/promo   # take over a scratch board's takes of a01
 
 Like the texture targets, a storyboard is a **recipe** and is committed. Its footage is
 an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8):
@@ -27,6 +28,11 @@ an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8
       animatic-probe.mp4            the rough cut
       manifest.json
 
+Scouted moments worth cutting in as they are (a mission's intro cinematic, a scratch
+board's take) are catalogued in `films/reference/` (its `README.md`): an id, where the
+footage is, its in and out, its sound and its quality. A footage shot uses one with
+`From: ref:<id>`.
+
 ## The process
 
 1. **Write the board.** Sections, then shots: what each shows and why, camera, layout,
@@ -35,6 +41,8 @@ an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8
 2. **Probe.** `a2film probe` films every shot without a current take at 1280x720, several games in
    parallel (`--jobs`, default 4), and makes a contact sheet per take. Probes are cheap
    and exist to get the *direction* right: framing, angle, timing, what is in the shot.
+   A shot with a `Tier:` of its own is filmed at that tier in the same run (see "A shot's
+   tier").
 3. **Review.** `a2film sheet` and `a2film animatic` show the whole film at once. Notes go
    back into the board, and each shot's `Status:` moves on.
 4. **Repeat** 2–3. A take is re-filmed when it is no longer current: its spec changed
@@ -58,7 +66,9 @@ decide that, and `status`, `probe`, `take` and `manifest` say which one failed:
 
 - **Its spec**: everything in the board that decides what the take looks like (film,
   shot, variant, scene file, setup and action, the variant's installs, resolution). The
-  edit fields (`Layout`, `Title`, `In` ...) are not in it. Stale: `spec changed`.
+  edit fields (`Layout`, `Title`, `In` ...) are not in it, and nor is the file or the
+  section the shot is written in: a shot moved to another file or section of its film
+  keeps its takes. Stale: `spec changed`.
 - **The code it shows.** The game's look changes from week to week (render3d's nebula
   rework landed a day after the 2026-10-15 probes), so a take is as old as the checkout
   it was installed from. Every take records, as its session starts, the commit
@@ -86,8 +96,29 @@ decide that, and `status`, `probe`, `take` and `manifest` say which one failed:
 deadline), pass `--ignore-code` to `probe` or `take`: only a changed spec re-films. It
 works on `status` and `manifest` too, which then count such takes as current. `--force`
 is the other way: re-film even what is current. `python3 films/film/selftest.py` pins
-these rules on a throw-away repository, without a game; run it after changing them
-(`films/film/code.py`).
+these rules on a throw-away repository, without a game, with the board's own (included
+files, `Tier:`, the take a cut picks, `adopt`, references); run it after changing any of
+them.
+
+### Adopting takes from another board
+
+Takes are kept by film and shot id (`$A2_DATA/films/<film>/<tier>/<shot>/`), so a shot
+that moves to another film, or is renamed, has none there. When it is the same shot,
+`a2film adopt` takes the old takes over instead of filming it again:
+
+    ./a2film adopt films/beams-scout a01 films/promo            # beams-scout's a01 as promo's a01
+    ./a2film adopt films/beams-scout a01 films/promo --as b03   # ... as promo's b03
+    ./a2film adopt beams-scout a01 a02 films/promo -n           # by film name; say what it would do
+
+The source is a board, or only a film's name when its board is on another branch. For
+each tier and each variant of the target shot, a take is adopted only if the spec it was
+filmed from is the target's spec, less the film's and the shot's names (a scene file is
+compared by its text, not its path); otherwise `adopt` names the keys that differ and
+leaves it. An adopted take is a copy (a reflink where the file system has them, so it
+costs nothing on btrfs) with its `.spec.json` rewritten for the target and an `adopted`
+key saying where it came from. Its commit and code are kept, so it is exactly as current
+in its new film as it was in the old one. A target take that is current is kept unless
+`--force`; `--tier` limits it to one tier.
 
 ## The storyboard
 
@@ -125,6 +156,48 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
     wait 9
     ```
 
+### A board over several files
+
+A board can be split, so that several people (or agents) can each write their part of a
+film at once without editing one file. A line `Include: <file>.md`, on its own and outside
+a fenced block, splices that file in where it stands, as if its text were written there:
+
+    # The promo                      storyboard.md
+    Film: promo
+
+    Include: intro.md               <- its sections and shots come here, in order
+
+    ## Beams
+    Music: Mkli300.wav
+
+    Include: beams.md               <- its shots join the section Beams
+    Include: beams-borg.md
+
+    ### z01 · End card
+    ...
+
+    # Beams, part of films/promo     beams.md
+    Shots for the Beams section; the board is storyboard.md.
+
+    ### b01 · Phasers
+    ...
+
+- An included file is read from its first `##` section, `###` shot or `Include:`. What
+  stands before it is the file's own preamble, for whoever opens that file: a title, a
+  note on whose part it is. It sets no fields, and only the board itself has a `# Film`
+  heading and film fields.
+- Its paths are relative to the file that includes it, and it must lie in the film's
+  folder; it may include others in turn, but not itself. A scene file (`Scene: x.ini`)
+  in any of them is relative to the film's folder, as in the board.
+- The combined board is the film: `check`, `status`, `probe`, `take`, `sheet`,
+  `animatic` and `manifest` all see it whole. Shot ids are unique across all its files,
+  and a second use is an error that says where the first is. `check` lists the included
+  files and marks each shot written in one (`[beams.md]`); the manifest carries
+  `includes` and each shot's `file`.
+- Where a shot is written does not change its takes (its spec has no file in it), so
+  moving one between the files of a film costs nothing. Between films, see "Adopting
+  takes from another board".
+
 ### Film fields (under the H1)
 
 | Key | Default | |
@@ -148,7 +221,7 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
 
 | Key | Default | |
 |---|---|---|
-| `Kind` | `scene` | `scene`: filmed on the bench with a `Scene.asi` scene. `card`: a title card from a ```` ```card ```` block, nothing filmed. `footage`: another shot's take (`From:`) or a file (`File:`), not filmed. `mission`: a mission played from its start (`Args:` names it, `Scene: none` or a scene file with `Enable=0`). `desktop`: no game, a bare desktop running a program (`Run:`), for the GUI installer; see "Desktop shots" |
+| `Kind` | `scene` | `scene`: filmed on the bench with a `Scene.asi` scene. `card`: a title card from a ```` ```card ```` block, nothing filmed. `footage`: another shot's take (`From:`), a scouted reference (`From: ref:<id>`) or a file (`File:`), not filmed. `mission`: a mission played from its start (`Args:` names it, `Scene: none` or a scene file with `Enable=0`). `desktop`: no game, a bare desktop running a program (`Run:`), for the GUI installer; see "Desktop shots" |
 | `Shows` | | the features or layers this shot is for, comma-separated (`explosions`, `lighting: shadows`). Prose for the reader, and what `check` counts |
 | `Scene` | | a scene in `testbench/scene/scenes/` by name, or a `.ini` path relative to the board |
 | `Args` | the film's | the game's arguments for this shot |
@@ -164,12 +237,34 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
 | `Speed` | `1` | playback speed in the cut |
 | `Audio` | `game` | `game` (the take's own sound), `none`, or `vo` (voice-over: lift it over the bed) |
 | `Keys` | `auto` | key hints: `auto` shows each `press` of the action block for 1.2 s; or `T text; T text`, times from `In`; `none` |
-| `From` | | `footage` only: `<shot> [variant]`, that shot's take at the tier being cut (its last variant by default). For teasers and montages that reuse a take |
+| `From` | | `footage` only: `<shot> [variant]`, that shot's take at the tier being cut (its last variant by default; the best one, as "The cut today" says). For teasers and montages that reuse a take. Or `ref:<id>`, a moment from the reference catalogue (`films/reference/README.md`): its file, with the shot's `In:` counted from the entry's `In`, and running to its `Out` without a `Length:` |
+| `Tier` | `probe` | the resolution this shot is probed at, when it is not the film's `Probe`: a height (`1080`, `1440`, `2160` or `4k`) at the probes' aspect, or `WxH`; or `final`, which films its final take in the probe run. See "A shot's tier" |
 | `File` | | `footage` only: a file, a path relative to `$A2_DATA` |
 | `Background` | | `card` only: a shot id whose take is blurred behind the card |
 | `Status` | `draft` | `draft`, `probed`, `approved`, `final` |
 | `Run` | | `desktop` only: the program the `run` command starts. Leading `NAME=value` words are its environment; `{repo}` is this checkout |
 | `Wallpaper` | black | `desktop` only: `<shot> [variant] [t]`, a still at `t` s (1) from that shot's take at the same tier, or `#rrggbb` |
+
+### A shot's tier
+
+The film's `Probe` and `Final` apply to a whole run: `probe` films at the one, `take` at
+the other. A shot's `Tier:` lets the money shots be filmed larger in the same probe run
+while the rest stay cheap:
+
+| `Tier:` | `probe` films it | into | `take` films it |
+|---|---|---|---|
+| (none), `probe` | at the film's `Probe` | `probe/` | at `Final` |
+| `1080`, `1440`, `2160`, `4k`, `WxH` | at that size, the probe's quick encoding | `probe/` | at `Final` |
+| `final` | its final take: at `Final`, the final encoding | `final/` | at `Final`, unless that take is current |
+
+- The resolution is part of the spec, so changing a shot's `Tier:` makes its probe stale
+  and the next `probe` films it again; a shot without one keeps the spec (and the takes)
+  it had before `Tier:` existed. Final takes do not depend on it. A `Tier: final` shot's
+  final take is current or stale like any other (`--force`, `--ignore-code` as usual).
+- In a probe run the takes larger than the probes are filmed after the others, one at a
+  time, whatever `--jobs` says: several large recording games at once is what died at
+  1080p ("Traps").
+- `status` shows both tiers; a `Tier: final` shot has no probe, only its final take.
 
 ### Blocks
 
@@ -310,7 +405,17 @@ House style for showcase footage (from the October showcase):
 
 `a2film animatic` is a rough cut, there to judge structure and timing: every layout,
 caption, key hint, transition and music bed of the board, at the probe tier, with a grey
-slate for any shot not yet filmed. It approximates: a `dip` fades the shot before out
+slate for any shot not yet filmed.
+
+**Each shot is cut from its best take**, scaled to the cut's resolution (the film's
+`Probe`, or `Final` with `--tier final`). At the probe tier that is the shot's final take
+or its probe, whichever is current; with both current, the larger. A stale take whose
+spec still holds (its code changed) comes before one whose spec changed, and a stale take
+before a slate. So a money shot with a 4K take, or a probe at `Tier: 1080`, shows at its
+best in a 720p animatic. `--tier final` cuts from final takes only. `sheet` and
+`manifest` pick the same takes (each manifest take says its `tier`), and a footage shot's
+`From: <shot>` follows them. `--ignore-code` counts a take whose code changed as current
+when picking. It approximates: a `dip` fades the shot before out
 and this one in, a `dissolve` is the only overlap, `vo` is a gain with no ducking, and
 the font is the system's.
 
