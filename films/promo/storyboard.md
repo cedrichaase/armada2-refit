@@ -114,7 +114,7 @@ Background: s05b
 ```
 
 ## Combat
-Music: Mkli300.wav from 0 gain 4 until a01 fade 1.5
+Music: Mkli300.wav from 0 gain 8 until a01 fade 1.5
 
 The loud act, Klingon music, quick cuts. The argument: a battle in stock Armada II is
 flipbooks: a sprite sheet per fireball, a disc per shockwave, a green shell per shield
@@ -257,7 +257,7 @@ wait 11
 ```
 
 ## Beams
-Music: Mbor300.wav from 40 gain 2 until n01 fade 1.5
+Music: Mbor300.wav from 40 gain 6 until n01 fade 1.5
 
 The Borg bed back. The argument: the beams are drawn after the TV series (DS9, Voyager): a
 translucent cone of light through vapour, in place of stock's flat textured line. The
@@ -355,7 +355,7 @@ wait 11
 ```
 
 ## Nebulae
-Music: Mfedmp300.wav from 0 gain -2 until m01 fade 1.5
+Music: Mfedmp300.wav from 0 gain -5 until m01 fade 1.5
 
 The quiet act, long holds. The argument: stock's nebula is a stack of flat billboards;
 refit's is a volume of gas the ships are *in*, lit by the Key light, and the hulls cast
