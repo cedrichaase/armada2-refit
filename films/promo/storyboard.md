@@ -486,29 +486,34 @@ Layout: dissolve 2 1.2
 Transition: dissolve 0.5
 Audio: none
 In: 1.0
-Length: 12
+Length: 18
 Status: draft
 
 The campaign selection: in refit, pointing at each campaign moves the camera to its scene
-on the same map: the Federation fleet, Klingon ships decloaking before a red nebula, a Borg
-cube's shadow through the Mutara. Stock is held for two seconds, then dissolves. The
-pointer positions are `testbench/scenarios/ui-menus-scene.md`'s (220,322 / 374 / 426 at
+on the same map: the starbase (training), the Federation fleet, Klingon ships decloaking
+before a red nebula, a Borg cube's shadow through the Mutara. **Each entry is hovered in
+turn, and the camera needs about 3 s to pan to its scene** (the user, 2026-10-17), so each
+hover holds 4.5 s: 3 for the pan, 1.5 on the arrived scene. Cut on the arrivals, not the
+pans, if it needs to be shorter. Stock is held for two seconds, then dissolves. The pointer
+positions are `testbench/scenarios/ui-menus-scene.md`'s (220 × 270 / 322 / 374 / 426 at
 1280x720), scaled to the Pointer space. *Unprobed*.
 
 ```setup
 step Wait up to 300 seconds for the main menu
 step Click the single player emblem
 wait 3
-ptr 330 405 0.1
+ptr 330 300 0.1
 ```
 ```action
-wait 1
-ptr 330 483 0.8
-wait 3.5
-ptr 330 561 0.8
-wait 4
-ptr 330 639 0.8
-wait 5
+wait 0.5
+ptr 330 405 0.6
+wait 4.5
+ptr 330 483 0.6
+wait 4.5
+ptr 330 561 0.6
+wait 4.5
+ptr 330 639 0.6
+wait 5.5
 ```
 
 ### m03 · Into warp
