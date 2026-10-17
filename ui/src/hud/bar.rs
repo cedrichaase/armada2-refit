@@ -268,30 +268,39 @@ fn on_keys(p: usize) {
 
 // ---- the UI's frame: drawing and the mouse -----------------------------------------
 
-/// Where the bar goes: at the bottom of the screen, between the minimap and the info
-/// panel when there is room, else above the info panel, aligned to its left edge.
+/// Where the bar goes (HUD.md, "The bottom row"): at the bottom of the screen,
+/// beside the minimap (at a fixed place, so it does not move with the selection),
+/// when there is room before the info panel (the info panel moves
+/// right to make it, `info::place`: 16:9 and wider), else above the minimap, aligned
+/// to its left edge (4:3), so the middle of the screen stays clear. Without a minimap,
+/// above the info panel.
 fn place(ui: &Ui, w: f32, h: f32) -> R {
     let m = ui.u(10.0);
     // Ours when it draws, else the stock panel's rectangle.
     let ours = super::info::rect().map(|r| [r.x, r.y, r.right(), r.bottom()]);
     let info = if hud::hidden(hud::SHIP_DISPLAY) { None } else if unsafe { super::INFO } { ours } else { hud::panel_rect(hud::SHIP_DISPLAY, ui.w, ui.h) };
-    // Our minimap when it draws (the stock radar's rectangle is on the stock canvas,
-    // stretched without HUD.asi), else the stock one.
-    let mini = if hud::hidden(hud::MAP_RADAR) {
-        None
-    } else if unsafe { super::MINIMAP } {
-        let (o, _, _) = super::minimap::place(ui);
-        Some([o.x, o.y, o.right(), o.bottom()])
-    } else {
-        hud::panel_rect(hud::MAP_RADAR, ui.w, ui.h)
-    };
+    let mini = super::minimap_rect(ui);
     match (info, mini) {
-        (Some(i), Some(mm)) if i[0] - mm[2] >= w + 2.0 * m => {
-            R::new(mm[2] + ((i[0] - mm[2]) - w) * 0.5, ui.h - m - h, w, h)
-        }
-        (Some(i), _) => R::new(i[0], (i[1] - m - h).max(m), w, h),
+        (Some(i), Some(mm)) if i[0] - mm[2] >= w + 2.0 * m - 1.0 => R::new(libm::roundf(mm[2] + m), ui.h - m - h, w, h),
+        (_, Some(mm)) => R::new(mm[0], (mm[1] - m - h).max(m), w, h),
+        (Some(i), None) => R::new(i[0], (i[1] - m - h).max(m), w, h),
         _ => R::new((ui.w - w) * 0.5, ui.h - m - h, w, h),
     }
+}
+
+/// The bar's outer size in pixels, as `run` lays it out.
+pub fn outer_size(ui: &Ui) -> (f32, f32) {
+    let (cs, gap, pad) = (ui.u(62.0), ui.u(5.0), ui.u(8.0));
+    let gw = COLS as f32 * cs + (COLS - 1) as f32 * gap;
+    let gh = ROWS as f32 * cs + (ROWS - 1) as f32 * gap;
+    let (fl, ft, fr, fb) = theme::frame_margins(ui);
+    (gw + 2.0 * pad + fl + fr, gh + 2.0 * pad + ft + fb)
+}
+
+/// Whether the bar is up: the player has not hidden it and the HUD shows.
+pub fn shows() -> bool {
+    let p = palette::palette();
+    p != 0 && !hud::hidden(p) && !crate::engine::ingame::hud_hidden()
 }
 
 pub fn run(ui: &mut Ui) {
@@ -322,11 +331,11 @@ pub fn run(ui: &mut Ui) {
     let cfg = crate::config::get();
     let t = ui.theme;
     let (cs, gap, pad) = (ui.u(62.0), ui.u(5.0), ui.u(8.0));
-    let gw = COLS as f32 * cs + (COLS - 1) as f32 * gap;
     let gh = ROWS as f32 * cs + (ROWS - 1) as f32 * gap;
     // The grid sits inside the frame (an LCARS frame's elbows and bars), padded.
-    let (fl, ft, fr, fb) = theme::frame_margins(ui);
-    let outer = place(ui, gw + 2.0 * pad + fl + fr, gh + 2.0 * pad + ft + fb);
+    let (fl, ft, _, _) = theme::frame_margins(ui);
+    let (ow, oh) = outer_size(ui);
+    let outer = place(ui, ow, oh);
     ui.panel(outer);
     let (gx, gy) = (outer.x + fl + pad, outer.y + ft + pad);
     // The fifth column, cancel/back, set off from the grid proper.

@@ -128,6 +128,35 @@ pub fn minimap_square(ui: &Ui) -> Option<crate::gfx::R> {
     Some(minimap::place(ui).2)
 }
 
+/// The minimap's rectangle in pixels while it shows: ours, else the stock radar's (on
+/// the stock canvas, stretched without HUD.asi).
+pub fn minimap_rect(ui: &Ui) -> Option<[f32; 4]> {
+    if hud::hidden(hud::MAP_RADAR) {
+        None
+    } else if unsafe { MINIMAP } {
+        let (o, _, _) = minimap::place(ui);
+        Some([o.x, o.y, o.right(), o.bottom()])
+    } else {
+        hud::panel_rect(hud::MAP_RADAR, ui.w, ui.h)
+    }
+}
+
+/// The bottom row between the minimap and the unit view (HUD.md, "The bottom row"):
+/// its free span in pixels, and the bar's size while ours shows. The info panel takes
+/// its place in it from this, and the bar its place beside the info panel.
+pub struct Row {
+    pub lo: f32,
+    pub hi: f32,
+    pub bar: Option<(f32, f32)>,
+}
+
+pub fn bottom_row(ui: &Ui) -> Row {
+    let lo = minimap_rect(ui).map_or(0.0, |r| r[2]);
+    let hi = if unsafe { UNIT_VIEW } { unitview::shown_rect(ui).map_or(ui.w, |r| r.x) } else { ui.w };
+    let bar = if unsafe { BAR } && bar::shows() { Some(bar::outer_size(ui)) } else { None };
+    Row { lo, hi: hi.max(lo), bar }
+}
+
 static mut LOGGED: f64 = -10.0;
 /// The bar's shown or hidden state is still to be made the player's (`prefs`): at the
 /// start of each mission, and after Game Settings changed it.
