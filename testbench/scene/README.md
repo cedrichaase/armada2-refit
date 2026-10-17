@@ -18,7 +18,9 @@ drives it with `Scene "CMD"` and `Expect scene "CMD" answers "TEXT"` steps
 (`scenarios/README.md`).
 
 `SCENE=<name>` picks `scenes/<name>.ini`, `SCENE_INI=<file>` any file, and with neither
-set `Scene.ini` is used (one Galaxy class). `install` refuses any game directory that is
+set `Scene.ini` is used (one Galaxy class). `SCENE_RACE=federation` (or any `Race=` value) pins
+the player's race, and so the HUD's look, for whichever scene is installed: without it
+the bench draws a different race on every launch. `install` refuses any game directory that is
 not an a2test clone: this is a test tool and never goes into the player's install. The
 bench gathers `Scene.log` and `Scene.ini` with the other logs.
 
@@ -63,6 +65,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Hover` | 1 | 0 removes what the object under the pointer gets drawn over it: its hull, shield and special-energy gauges, its system icons and the hover ring, which come up even with the HUD and the cursor hidden. 1 is stock. Selection circles and group numbers stay |
 | `ShieldFx` | 1 | 0 removes the flash on a craft's shields when a weapon hits them (green on most). The shields still take the damage. 1 is stock. The shields-down effect (a blue electric ring when they run out) is separate and stays; `Heal=1` prevents it |
 | `Music` | 1 | 0 stops the game starting any music track (`StartMusic` and the jukebox's `mStartNewTrack` return at once); sound effects and voices stay. `SCENE_MUSIC=0` at install puts it into the installed copy of any scene file, so footage can be laid over its own soundtrack |
+| `Race` | | the player's race, which decides the HUD (stock's skin, and the UI's theme with `[UI] Theme=auto`): `federation`, `klingon`, `romulan`, `cardassian`, `borg` or `species8472` (races.odf's `name`s). Empty: as the game sets it, which on `a2_borg01` is a different race on every launch. Set before the mission loads, so it holds in stock and refit alike, and with `Enable=0`. `SCENE_RACE=<race>` at install puts it into the installed copy of any scene file, ahead of the file's own |
 | `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
 | `Center` | | centre the RTS camera on this object |
 | `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |
@@ -370,6 +373,27 @@ inert, and `Scene.log` says so.
   Sovereign's team could not change that. Bench, `SCENE=assimilation`, 2026-10-17:
   `tech team 2 gcorbom: was not available, now available`, then a green cone from the
   cube onto the saucer for about 6 s; a second cube spawned in its place fires it again.
+- **The player's race: the two `Race::Find` calls in `SetupDefaultGame`** (0x489590).
+  A map named on the command line (`-nointro a2_borg01`) is set up by
+  `SetupDefaultGame`, from `Program::MainLoop`: it gives slot 0, the player's, the race
+  of the map's first start location, `Race::Find(name)` (0x48b100, cdecl, an exact match
+  on races.odf's `name`) at 0x4897ad or 0x489872 depending on the branch, then
+  `GameSetup::setRace` with the race's index (`Race`+0x44c). When `Find` returns NULL
+  the slot keeps the "random" race its constructor gave it, and
+  `Program::GameOpenPreLoad` (0x4846a0) draws a random race for every playing slot
+  still random (`GameSetup::RaceRandom`, retried until `CanRacePlayCurrentGameType`)
+  before `DisplayInterface::PostLoadAll` loads that race's HUD into
+  `Race::s_missionRace`. `a2_borg01` names no race for its start location, so the
+  bench's HUD changed race from launch to launch; nothing in `ARMADA.PRF`, the command
+  line or the clone decides it. With `Race=` set, both calls go to the plugin, which
+  returns `Find(Race)`, logs it with what the map named (`race: federation for the
+  player (the map's first start location names ""; ...)`), and falls back to the map's
+  own for a name `Find` does not know. Both call sites are checked to be `call
+  Race::Find` first, and `Find` against its first bytes; the hook goes in at start-up,
+  outside `Enable`, so it is in place before the mission is set up. Bench, 2026-10-17,
+  `showcase` with `Hud=1` and `Race=federation`: the Federation HUD on three launches
+  in stock and three in refit (the log: the map names `""`); `SCENE_RACE=klingon` over
+  it gave the Klingon theme.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`).

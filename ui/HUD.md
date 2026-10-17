@@ -390,7 +390,8 @@ whose stock HUD it replaces. The bar, too, now draws through `theme.rs` (its but
 
 2026-10-16, `-nointro a2_borg01` with the `ui-hud-info` scene at 1280x720
 (`ui/bench-hud-info.sh`): the bench's HUD race came up Federation, Borg and Klingon on
-different launches, and the theme followed each. One unit (the Galaxy: name, class,
+different launches, and the theme followed each (the map names no race, so the game
+draws one; `Scene.asi`'s `Race=` pins it: `testbench/scene/README.md`). One unit (the Galaxy: name, class,
 hull and shield rows with stock's icons, crew 500, officers 10, five systems at 100%),
 an enemy Negh'Var with its special energy, the dilithium moon (its store, 20000), the
 starbase as a builder with "Construction Ship" and its queue (four queued through the
