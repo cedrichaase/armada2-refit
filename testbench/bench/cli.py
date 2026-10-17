@@ -13,7 +13,8 @@ from pathlib import Path
 
 from . import config, report, vision
 from .scenario import STEPS, Case, normalise, parse, ref_label
-from .session import GameError, Session, build_input
+from .session import STEMS, GameError, Session, build_input, parse_categories
+from .slots import SlotError
 
 HELP = """\
 a2test -- run Armada II headless and test it end to end
@@ -40,6 +41,8 @@ a2test -- run Armada II headless and test it end to end
                                        menus), gather logs, write the report. The id is
                                        required: nothing stops a session by default
   a2test session list                  active sessions: id, size, mod, game, artifacts
+  a2test slots                         the machine-wide game slots: who holds them, who waits
+                                       (A2_SLOTS sets how many; a run queues for them)
   a2test watch [--no-open]             every live session, view-only, tiled in one
                                        window (wayvnc + noVNC; needs wayvnc)
   a2test drive [--session ID] ...      every drive command takes --session ID (or
@@ -101,10 +104,13 @@ def main(argv=None):
             return cmd_session(rest)
         if cmd == 'drive':
             return cmd_drive(rest)
+        if cmd == 'slots':
+            from . import slots
+            return slots.main(rest)
         if cmd == 'watch':
             from . import watch
             return watch.main(rest, _active_sessions)
-    except GameError as e:
+    except (GameError, SlotError) as e:
         print(f'a2test: {e}', file=sys.stderr)
         return 1
     print(f'a2test: unknown command {cmd!r} (a2test help)', file=sys.stderr)
@@ -126,7 +132,7 @@ def cmd_run(argv):
     ap.add_argument('--out')
     ap.add_argument('--install', action='append', default=[], metavar='PATH')
     ap.add_argument('-j', '--jobs', type=int, default=config.JOBS,
-                    help=f'game instances at once (default {config.JOBS}; 1 = one case at a time)')
+                    help=f'cases at once (default {config.JOBS}; 1 = one case at a time); each waits for a game slot, so above A2_SLOTS they queue')
     a = ap.parse_args(argv)
     a.jobs = max(1, a.jobs)
     scns = [parse(_find_scenario(s)) for s in a.scenarios]
@@ -355,7 +361,18 @@ def cmd_session(argv):
         ap.add_argument('--stock-shell', choices=['embed'], default=None)
         ap.add_argument('--assets', choices=['none'], default=None,
                         help='none: install into the clone from an empty A2_DATA (no textures, plates, movies)')
+        ap.add_argument('--mute', default='', metavar='CATS',
+                        help='volume 0 in the clone for these of music, voice, effects, interface')
+        ap.add_argument('--stems', default='', metavar='CATS',
+                        help='record these of music, voice, interface on sinks of their own (Stems.asi); '
+                             'the rest is the effects stem')
         a = ap.parse_args(rest)
+        mute = parse_categories(a.mute, what='--mute')
+        stems = parse_categories(a.stems, STEMS, what='--stems')
+        if set(mute) & set(stems):
+            ap.error(f'{", ".join(sorted(set(mute) & set(stems)))}: both muted and a stem')
+        if stems and a.audio:
+            ap.error('--stems records from the silent sinks; it cannot go with --audio')
         if a.assets and a.mod != 'refit':
             ap.error('--assets none goes with --mod refit')
         if a.stock_shell and a.mod != 'stock':
@@ -367,7 +384,7 @@ def cmd_session(argv):
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
         s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
                            label=a.label, installs=a.install, stock_shell=a.stock_shell,
-                           assets=a.assets)
+                           assets=a.assets, mute=mute, stems=stems)
         # A start that fails part-way (an install, the display, a launch the audio
         # guard stops) is torn down here like any session. Left alone it kept its sway,
         # input and VNC running and stayed "active" in `session list` with no game.

@@ -28,7 +28,7 @@ import uuid
 import time
 from pathlib import Path
 
-from . import config
+from . import config, slots
 from .log import Log
 
 
@@ -123,12 +123,27 @@ class Session:
         self.work = Path(state['work'])          # clone, sockets, fifos: deleted
         self.res = tuple(state['res'])
         self.log = Log(self.dir)
+        self.slot = None         # the game slot, in the process that created the session
 
     # ------------------------------------------------------------------ lifecycle
 
     @classmethod
     def create(cls, artifacts_dir, res, mod='refit', vnc=False, record=False,
-               audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None):
+               audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None, slot=None,
+               mute=None, stems=None):
+        """`slot`: a game slot already taken for this session (several at once for a
+        multi-player case, or handed down in A2_SLOT_FD); without one, waits for a slot here."""
+        slot = slot or slots.adopt_from_env() or slots.acquire(label or 'session')[0]
+        try:
+            return cls._create(artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell,
+                               installs, assets, slot, mute, stems)
+        except BaseException:
+            slot.release()
+            raise
+
+    @classmethod
+    def _create(cls, artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell, installs, assets, slot,
+                mute=None, stems=None):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
             n = next(_SID_SEQ)
@@ -145,15 +160,20 @@ class Session:
         installs = [checkout_provenance(p) for p in (installs or [])]
         state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
                      installs=installs, assets=assets,
+                     mute=sorted(mute or []), stems=sorted(stems or []),
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
                      exception_mtime=None, vnc_port=None)
         sess = cls(state, work / 'session.json')
+        sess.slot = slot
+        slot.describe(session=sid, pid=os.getpid(), worktree=str(config.REPO))
         sess.save()
         (artifacts_dir / 'session.json').write_text(json.dumps({'statefile': str(sess.statefile)}))
         sess.log.meta(session=sid, resolution=config.res_name(res),
                       aspect=config.aspect_name(res), mod=mod, label=label, started=now(),
                       **({'assets': assets} if assets else {}),
+                      **({'mute': ', '.join(sorted(mute))} if mute else {}),
+                      **({'stems': ', '.join(sorted(stems))} if stems else {}),
                       **({'installs': [f"{i['path']} @ {i['describe']}" for i in installs]} if installs else {}))
         return sess
 
@@ -245,6 +265,17 @@ class Session:
                 self.log.action(f'prepare: {name} {" ".join(cmd[1:])}', detail='logs/prepare.log')
         if self.s['mod'] == 'stock' and self.s.get('stock_shell') == 'embed':
             self.embed_stock_shell()
+        self.set_volumes()
+
+    def set_volumes(self):
+        """`--mute` and `--stems` in the clone's ARMADA.PRF: a muted category at volume 0, a
+        stem at full volume (20), so the stem carries the sound at its own level and the mix
+        is made in the edit. The rest keep the player's own settings."""
+        vols = {c: 0 for c in self.s.get('mute') or []}
+        vols.update({c: VOLUME_MAX for c in self.s.get('stems') or []})
+        if vols:
+            set_prf_volumes(self.game_dir / 'ARMADA.PRF', vols)
+            self.log.action('ARMADA.PRF volumes: ' + ', '.join(f'{c} {v}' for c, v in sorted(vols.items())))
 
     def embed_stock_shell(self):
         """Stock, except that the menus are one window with the game (menus/README.md,
@@ -289,8 +320,11 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                    WLR_LIBINPUT_NO_DEVICES='1', WLR_RENDER_DRM_DEVICE=_render_node())
         slog = open(self.dir / 'logs' / 'sway.log', 'w')
         p = subprocess.Popen(['sway', '-c', str(conf)], env=env, stdout=slog, stderr=subprocess.STDOUT,
-                             stdin=subprocess.DEVNULL, start_new_session=True, cwd=str(self.work))
+                             stdin=subprocess.DEVNULL, start_new_session=True, cwd=str(self.work),
+                             pass_fds=self._slot_fds())
         self.s['pids']['sway'] = p.pid
+        if self.slot:       # the session's processes hold the slot from here: it outlives this one
+            self.slot.describe(pid=p.pid)
         for _ in range(100):
             if envfile.exists():
                 break
@@ -311,6 +345,11 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             self.start_vnc()
         if self.s['record']:
             self.start_recording()
+
+    def _slot_fds(self):
+        """The slot's descriptor, for the processes that make up the session to inherit
+        (slots.py): it is taken while any of them lives."""
+        return (self.slot.fd,) if self.slot and self.slot.fd is not None else ()
 
     def wl_env(self):
         e = self.s['env']
@@ -481,7 +520,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             raise GameError('the game is already running in this session')
         g = self.game_dir
         for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
-                     'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Armada2_d3d9.log', 'Render3D.log'):
+                     'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
+                     'Render3D.log', 'Stems.log'):
             try:
                 (g / name).unlink()
             except FileNotFoundError:
@@ -520,6 +560,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             # (mmdevapi reads Software\Wine\Drivers\<drv>\DefaultOutput).  The watchdog
             # checks the game's stream lands there and moves it there if not.
             sink = self.start_null_sink()
+            if self.s.get('stems'):
+                self.start_stems()
             env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';winealsa.drv=d;wineoss.drv=d'
             route_wine_audio(self.prefix_dir / 'pfx' / 'user.reg', sink)
         # a marker the watchdog can match whatever pid namespace the game ends up in
@@ -533,7 +575,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         wlog.flush()
         p = subprocess.Popen(['python3', str(config.UMU), str(g / 'Armada2.exe'), *args.split()],
                              env=env, cwd=str(g), stdout=wlog, stderr=subprocess.STDOUT,
-                             stdin=subprocess.DEVNULL, start_new_session=True)
+                             stdin=subprocess.DEVNULL, start_new_session=True, pass_fds=self._slot_fds())
         self.s['pids']['launcher'] = p.pid
         self.s['game_started'] = time.time()
         self.s['launch_args'] = args
@@ -571,6 +613,35 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         ns = self.s.get('null_sink')
         if ns:
             subprocess.run(['pactl', 'unload-module', str(ns['module'])], capture_output=True)
+        for st in (self.s.get('stem_sinks') or {}).values():
+            subprocess.run(['pactl', 'unload-module', str(st['module'])], capture_output=True)
+
+    def start_stems(self):
+        """`--stems`: a null sink per category, beside the session's own, and Stems.asi
+        in the clone, which plays that category's sounds on a DirectSound device of their
+        own on it (testbench/README.md, "Audio stems"). What stays on the session's sink is
+        the effects stem. Once per session: a relaunch keeps them."""
+        sinks = self.s.get('stem_sinks') or {}
+        for cat in self.s['stems']:
+            if cat in sinks:
+                continue
+            name = f'a2test-{self.s["id"]}-{cat}'
+            r = subprocess.run(['pactl', 'load-module', 'module-null-sink', f'sink_name={name}',
+                                f'sink_properties=device.description={name}'],
+                               capture_output=True, text=True)
+            if r.returncode:
+                raise GameError(f'could not create the {cat} stem sink: {r.stderr.strip()}')
+            sinks[cat] = dict(name=name, module=int(r.stdout.strip()))
+            self.s['stem_sinks'] = sinks
+            self.save()
+        r = subprocess.run(['bash', str(config.REPO / 'testbench/stems/build.sh')], capture_output=True, text=True)
+        if r.returncode:
+            raise GameError(f'building Stems.asi failed:\n{r.stdout}{r.stderr}')
+        shutil.copy2(config.REPO / 'testbench/stems/build/Stems.asi', self.game_dir / 'Stems.asi')
+        (self.game_dir / 'Stems.ini').write_text(
+            '[Stems]\r\n' + ''.join(f'{STEM_KEYS[c]}={sinks[c]["name"]}\r\n' for c in self.s['stems']))
+        self.log.action('stems: ' + ', '.join(f'{c} to {sinks[c]["name"]}' for c in self.s['stems']) +
+                        f'; the rest (effects) to {self.s["null_sink"]["name"]}')
 
     def _our_pids(self):
         """This session's processes, by host pid and by their pid inside umu's container
@@ -814,7 +885,9 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.game_dir
-        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.ini', 'ARMADA.PRF',
+        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks',
+                     'Scene.ini', 'ARMADA.PRF',
+                     'Stems.log', 'Stems.ini',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',
                      'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini', 'UI.log', 'UI.ini'):
@@ -855,6 +928,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                     kill_group(pid, signal.SIGKILL)
             self.s['ended'] = now()
             self.save()
+            if self.slot:
+                self.slot.release()
             shutil.copy2(self.statefile, self.dir / 'logs' / 'session-state.json')
             if not self.s['keep']:
                 for _ in range(5):
@@ -878,6 +953,44 @@ def set_prf_resolution(prf, w, h):
     f[6], f[7] = str(w).encode(), str(h).encode()
     lines[4] = b' '.join(f)
     Path(prf).write_bytes(b'\r\n'.join(lines))
+
+
+# The player's four volumes, in the order of ARMADA.PRF's third line (the engine's
+# eAudioVolume 1..4; testbench/README.md, "Audio stems"). 0 is silent, 20 full.
+CATEGORIES = ('music', 'voice', 'effects', 'interface')
+VOLUME_MAX = 20
+# the categories Stems.asi can move to a device of their own (the effects are 3D and stay)
+STEMS = ('music', 'voice', 'interface')
+STEM_KEYS = {'music': 'Music', 'voice': 'Voice', 'interface': 'Interface'}
+
+
+def parse_categories(text, allowed=CATEGORIES, what='category'):
+    """'music, voice' -> ['music', 'voice']; an unknown name is an error."""
+    out = [w for w in re.split(r'[\s,+]+', (text or '').strip().lower()) if w]
+    for w in out:
+        if w not in allowed:
+            raise GameError(f'{what} {w!r} is not one of {", ".join(allowed)}')
+    return sorted(set(out))
+
+
+def set_prf_volumes(prf, vols):
+    """ARMADA.PRF line 3 opens with the music, voice, effects and interface volumes
+    (0..20), the order AudioSettings writes them; set the ones in `vols` by name."""
+    data = Path(prf).read_bytes()
+    lines = data.split(b'\r\n')
+    f = lines[2].split(b' ')
+    if len(f) < 4 or not all(x.isdigit() for x in f[:4]):
+        raise GameError(f'unexpected ARMADA.PRF line 3: {lines[2]!r}')
+    for c, v in vols.items():
+        f[CATEGORIES.index(c)] = str(int(v)).encode()
+    lines[2] = b' '.join(f)
+    Path(prf).write_bytes(b'\r\n'.join(lines))
+
+
+def prf_volumes(prf):
+    """{category: volume} from ARMADA.PRF line 3."""
+    f = Path(prf).read_bytes().split(b'\r\n')[2].split(b' ')
+    return {c: int(f[i]) for i, c in enumerate(CATEGORIES)}
 
 
 def _pactl_json(what):

@@ -17,6 +17,8 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test session start --res 800x600 --mod stock --stock-shell embed   # the stock baseline, menus clickable
     ./a2test session start --assets none --install .   # as a release installs it: no textures, plates, movies
     A2_DATA=$(mktemp -d) ./a2test session start --install .   # ... as without any assets
+    ./a2test session start --mute music,voice   # the game's own music and voice volumes at 0
+    ./a2test session start --stems music,voice  # music and voice each on a silent sink of their own
     ./a2test drive --session ID shot menu    #   prints the PNG path
     ./a2test drive --session ID click-text "Single Player"
     ./a2test drive --session ID step 'Wait for the single player screen'
@@ -66,6 +68,10 @@ running, left at least 5.5 GB available and swap untouched, at a peak load of 17
 (run 20260926-142801). Past that, fixed waits such as "Wait 45 seconds" risk turning
 flaky.
 
+Since testbench 3.31.0 `--jobs` above the slot count queues: see "Game slots" below. The
+measurement above was taken before slots; two stock probes died at four games at once
+under load (2026-10-17), which is what the slots are for.
+
 **A case can run several games** (`Players: host, joiner`), each with all of the above
 to itself, steps addressed by player name (`scenarios/README.md`, "Several players").
 `multiplayer-two-players` hosts, joins and plays a match that way in under four
@@ -81,6 +87,11 @@ the menus. Fog, HUD, grid, cursor and notices are off, and the objects come from
 scene file (`SCENE=planet|nebula|firing`). A free camera can be moved while the game
 runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`; see
 `scene/README.md`.
+
+**Sound by category** (`--mute`, `--stems`; "Audio stems" below): a session can set
+the game's music, voice, effects and interface volumes to 0 in its clone, and can play
+music, voice and the interface on silent sinks of their own, so a take records each as
+a separate track and the mix is made in the edit (`films/README.md`, "Sound").
 
 ## How a case runs
 
@@ -100,9 +111,70 @@ real install's path, and fails the case if the game has it open.
 Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
 channels), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
 `xalia_dxgi.log` (DXVK), `vkBasalt.log`, `sway.log`, `input.log`, `prepare.log`,
-`launch-env.txt` (the exact environment and argv), the clone's `ARMADA.PRF`,
+`launch-env.txt` (the exact environment and argv), `Scene.log` and `Scene.marks`
+(`scene/README.md`, "Marks"), `Stems.log` and `Stems.ini`, the clone's `ARMADA.PRF`,
 `Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
 anything new in the game's `Logs/`.
+
+## Audio stems
+
+The game plays four categories of sound, each with its own volume in the options and in
+the clone's `ARMADA.PRF`, whose third line opens with them in this order (0 silent, 20
+full; the rest of the line is not volumes):
+
+| Category | What it is (eAudioVolume) | `--mute` | `--stems` |
+|---|---|---|---|
+| `music` | the jukebox's tracks and a mission's scripted music (1) | yes | yes |
+| `voice` | mission narration, and the speech `AudioQueue` plays (2) | yes | yes |
+| `effects` | the 3D sounds of the world: weapons, explosions, engines (3) | yes | no: the rest |
+| `interface` | the button bar's sounds (4) | yes | yes |
+
+**`--mute music,voice`** sets those volumes to 0 in the clone's `ARMADA.PRF` before the
+game starts; the user's install keeps its own. This is what the user did by hand on
+2026-10-17 to film mission intros without their narration and music, as a bench option.
+
+**`--stems music,voice`** records them apart. The engine plays every sound through one
+DirectSound device, and Wine mixes all of a device's buffers into one output stream, so
+the bench could only ever record the whole mix: no setting of the game or of PipeWire
+can split it. `stems/Stems.asi` (in the clone only) opens one DirectSound device more
+per category, on a null sink the session makes for it (`a2test-<id>-<category>`, beside
+the session's own), and moves every 2D sound of that category onto it as it starts.
+What stays on the session's sink is the `effects` stem: the 3D effects, plus any
+category not named. A stem's volume is set to 20 in the clone, so each stem carries its
+sound at full level; categories not named keep the user's setting. `--mute` and
+`--stems` cannot name the same category, and `--stems` cannot go with `--audio`.
+
+How `Stems.asi` finds the sound (each finding is used by its one hook, `stems.c`):
+
+- Every `AudioSound` keeps its category as the int at +0xc, where `AudioSound::mSetVolume`
+  (0x45fa60) reads it to pick the player's volume, and its file name at +4. The
+  constructors are handed the category as a constant: 1 by `AudioMusic2D`, 2 by
+  `AudioQueue::Play`, 3 by every `AudioSound3D`, 4 by `PopupPaletteImp`'s keyboard
+  handler. `AudioSettings` writes the volumes for 1 to 4, in that order, as the third
+  line of `ARMADA.PRF`; the user's change (music and voice to 0) is exactly its first
+  two fields.
+- A 2D sound gets its buffer from `SoundBuffer::RequestBuffer`, which loads the whole
+  wave (or duplicates a cached one) and calls back at once, synchronously; the callback
+  hands it to `AudioSound2D::mInit` (0x45fb90), which stores it at +0x10 and plays it.
+  There is no streaming: music and narration are loaded whole too. So the hook is that
+  one call (at 0x45fb7d): for a category with a device of its own, the buffer is copied
+  there (format, flags, every byte), the game's copy released, and the copy passed on.
+  The sound owns it and releases it when it ends, as before.
+- 3D buffers are never moved: their listener lives on the game's device. That is why
+  the effects are the remainder and not a stem of their own.
+- Each new device's primary buffer takes the game's own format
+  (`AudioDefault::s_sampleRate` and `s_bitsPerSample`, 22050 Hz and 16 bits).
+
+The plugin finds its device among DirectSound's by the sink's name (Wine lists a sink by
+its description, `Speakers (a2test-<id>-music)`); a category whose device cannot be
+found or opened stays in the game's mix, and `Stems.log` (gathered with the logs) says
+so. A device is opened only for a sink found by name, so nothing can reach a real
+output; the audio guard accepts any `a2test-` sink. `a2film` records each sink's monitor
+with its own `parec` and cuts every recording from its end, as it does the picture.
+
+Measured on 2026-10-17 (`a2_fed01.bzn`, its intro, stock, 45 s at 1280x720): the music
+stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects stem
+(-42.4 dB mean) matched a take of the same shot with `--mute music,voice` (-42.1 dB).
 
 ## Traps, each measured here
 
@@ -325,6 +397,45 @@ output: `vncviewer localhost:5910` (the port is printed; it counts up if busy). 
 writes each case to `run.mp4` with `wf-recorder`. All are optional and need `wayvnc`
 (and `wf-recorder`, or a viewer such as `tigervnc`). Without them the bench warns and
 carries on, and `watch` refuses.
+
+## Game slots
+
+Several agents run the game on the bench at once, from separate worktrees and processes
+(`a2test run --jobs`, `a2film probe --jobs`, interactive sessions), and the machine
+carries only so many games: four at once killed two stock probes. So every place that
+starts a game takes a **slot** first, from one queue shared by the whole machine
+(`bench/slots.py`). When all are taken it waits, and prints who holds them.
+
+- **How.** `N` files `slot-0` ... under `$A2_SLOTS_DIR` (default `$XDG_RUNTIME_DIR/a2-slots`,
+  else `$A2_DATA/locks`). A slot is taken while some process holds `flock` on its file. The
+  kernel drops the lock when the last holder exits, a crash or `kill -9` included, so a
+  slot never stays taken by a dead process. `slot-K.json` beside it says who has it (pid,
+  worktree, label, since); it is information only, and the lock is the truth.
+- **What holds a slot.** A bench session, from before its clone to its teardown: the file
+  descriptor is inherited by the session's sway and game launcher, so the slot outlives
+  the `a2test session start` that took it and is freed by `session stop`, or by the
+  session's processes dying. `a2test run` takes one per case, `a2film` one per take.
+- **Several games at once.** A case with `Players:` and an a2film shot with `Players`
+  take all their slots in one request: all or none, and only the oldest waiter tries.
+  Two such shots therefore cannot each hold one and wait for the other, and a shot that
+  needs two slots is not overtaken for ever by single games. A request for more slots
+  than exist is refused (raise `A2_SLOTS`). The cost is that a small request waits behind
+  a large one in front of it.
+- **How many.** `A2_SLOTS` in the environment, else `A2_SLOTS=3` in
+  `~/.config/armada2-refit.conf` (the file `a2env.sh` reads), else a default from the
+  machine: one game per 4 cores and per 5 GiB of memory, from 2 to 3 (3 on 12 cores and
+  15 GiB). The GPU is not measured. `--jobs` above the count just queues. Every process
+  should see the same count; one that is set lower or higher takes slots by the number it
+  believes in.
+- **Where it looks.** `A2_SLOTS_DIR` moves the files; `A2_SLOTS_POLL` (default 1 s) is how
+  often a waiter looks.
+- **`./a2test slots`** (and `./a2film slots`) lists the slots, their holders and the
+  queue. A waiter prints the same holders when it starts waiting, and every 30 s.
+- **Old code.** A checkout from before 3.31.0 does not know the slots and neither takes
+  one nor is stopped by them; only processes running this code queue.
+
+`python3 testbench/bench/slots_selftest.py` checks all of it with dummy processes
+and no game.
 
 ## Requirements
 

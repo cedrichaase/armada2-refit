@@ -15,6 +15,11 @@ the procedure.
    shot says what the eye should land on. Pick scenes from `testbench/scene/README.md`
    ("The scenes", "Commands") and object names from `testbench/scene/scenes/*.ini`. A
    feature with no scene gets a scene file beside the board (`Scene: my.ini`).
+   When other sessions work on the same film, write your part in a file of its own
+   that the board includes (`Include: beams.md`, "A board over several files") and
+   leave the others' files alone. A shot that moves from a scratch board keeps its
+   takes with `./a2film adopt`. A scouted moment goes into `films/reference/` and is
+   cut in with `From: ref:<id>`.
 2. **Check.** `./a2film check films/<name>` must print no `!` lines.
 3. **Probe.** `./a2film probe films/<name> [ids]` (1280x720, 4 at once; only takes
    that are not current are re-filmed: the shot's spec changed, or the code it shows
@@ -32,7 +37,8 @@ the procedure.
    and what you are unsure of. Put the user's notes into the board as edits, not as
    chat.
 6. **Final takes** only for shots the user approved: `./a2film take films/<name> [ids]`
-   (3840x2160, one at a time). Then `./a2film animatic --tier final` and
+   (3840x2160, one at a time). A shot's `Tier:` (`1080`, or `final` for its 4K take in
+   a probe run) is the same call: set it only where the user asked for it. Then `./a2film animatic --tier final` and
    `./a2film manifest films/<name> --tier final`; the manifest is the handoff to the
    editor.
 

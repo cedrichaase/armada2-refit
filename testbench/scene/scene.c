@@ -9,7 +9,7 @@
  * objects of Scene.ini's
  * [Object.<name>] sections. Commands written to Scene.cmd in the game directory
  * then change the scene while it runs: a free camera (`camera`, `orbit`),
- * `spawn`, `attack`, `pause`, `query` and more (testbench/scene/README.md).
+ * `zoom`, `spawn`, `attack`, `pause`, `query` and more (testbench/scene/README.md).
  *
  * WHAT IT CALLS IN Armada2.exe (GOG patch 1.1, addresses from armada2.map)
  * -----------------------------------------------------------------------
@@ -41,6 +41,11 @@
  *     others to 0, and GridVisible() (0x51e180) returns `visible`.
  *   gTacticalCamera (0x763650): its interest point, the map position the RTS
  *     camera looks at, is the Vector3 at +0x98 (TacticalCamera::GetInterest).
+ *   The camera in use is gCameraManager's first field (0x763370): a ParabolicCamera
+ *     (gParabolicCamera 0x763470, vtable 0x6b4598; height at +0x54, 10 to 2200)
+ *     or a TacticalCamera (vtable 0x6b46c0; distance factor at +0xd4, 1 to 20).
+ *     Both implement SetZoomLevel(0..1) at vtable +0x44, which ScriptInterfaceImp::
+ *     SetCameraZoom (0x4551d0) calls; the `zoom` command and `Zoom=` call it.
  *   s_UpdateMainCamera (0x53ed90) updates the main ST3D_Camera through one
  *     virtual call, `call *0x88(%eax)` at 0x53edac, on the view object
  *     (cOverViewImp::UpdateCamera, which hands it to gCameraManager's current
@@ -78,6 +83,11 @@
  *     leaves it "random" when the map names none (a2_borg01 names none), which
  *     Program::GameOpenPreLoad then draws at random. With Race= set both calls
  *     go to race_find(), which finds that race instead; see race_find().
+ *   Marks (Scene.marks) are read, never patched: each frame, from the camera hook,
+ *     the camera matrix, the selection, the scene's crafts' cloaks and deaths,
+ *     Ordnance::ordnanceList (0x771fac; owner +0x5c, target +0x60, its ODF through
+ *     cPrjID::GetOdfName 0x6593a0) and Explosion::explosionList (0x7367c4; its
+ *     place through Entity::GetTransform 0x4cfd50); see marks_poll().
  *   Move orders: the GameObject::SetCommand overloads the script interface's
  *     own Goto and Stop end in -- (AiCommand, const GameObject *, long, bool)
  *     0x4d1af0, (AiCommand, const Vector3 &, long, bool) 0x4d1b50 and
@@ -129,6 +139,7 @@ __declspec(dllimport) DWORD   __stdcall SetFilePointer(HANDLE, LONG, LONG *, DWO
 __declspec(dllimport) BOOL    __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) BOOL    __stdcall DeleteFileA(LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetTickCount(void);
+__declspec(dllimport) void    __stdcall GetSystemTimeAsFileTime(DWORD *ft);   /* FILETIME: low, high */
 __declspec(dllimport) UINT    __stdcall GetPrivateProfileIntA(LPCSTR, LPCSTR, INT, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPSTR, DWORD, LPCSTR);
 __declspec(dllimport) DWORD   __stdcall GetPrivateProfileSectionNamesA(LPSTR, DWORD, LPCSTR);
@@ -174,6 +185,18 @@ int _fltused = 0;   /* floats without the CRT */
 #define SI_INSTANCE      ((void *)0x735c40u)
 #define TACTICAL_CAMERA  0x763650u
 #define CAMERA_INTEREST  0x98u
+#define CAMERA_CURRENT   0x763370u   /* gCameraManager's first field: the camera in use (a GameCamera *) */
+#define CAM_VT_SET_ZOOM  0x44u       /* GameCamera vtable: SetZoomLevel(float 0..1), what SetCameraZoom calls */
+#define TACTICAL_VTABLE  0x6b46c0u   /* ??_7TacticalCamera@@6B@ */
+#define TACT_ZOOM        0xd4u       /* TacticalCamera's zoom, a distance factor: min..max below, default below */
+#define TACT_ZOOM_MIN    0x6b46a4u   /* float 1.0 */
+#define TACT_ZOOM_MAX    0x6b46a8u   /* float 20.0 */
+#define PARABOLIC_VTABLE 0x6b4598u   /* ??_7ParabolicCamera@@6B@ */
+#define PARA_HEIGHT      0x54u       /* ParabolicCamera's height above the ground */
+#define PARA_HEIGHT_MIN  0x709a20u   /* OVERVIEW_MIN_HEIGHT, float 25.0 */
+#define PARA_HEIGHT_MAX  0x709a1cu   /* OVERVIEW_MAX_HEIGHT, float 400.0 */
+#define CAM_SET_ZOOM_TAC 0x4e4db0u   /* TacticalCamera::SetZoomLevel */
+#define CAM_SET_ZOOM_PAR 0x4dfcc0u   /* ParabolicCamera::SetZoomLevel */
 #define GAME_STATE_PTR   0x76b5acu   /* -> the struct whose +0x78 is the HUD mode */
 #define IFACE_MODE       0x78u
 #define GRID_RECORDS     0x768e18u   /* GridRenderState, 3 ints per view */
@@ -254,6 +277,17 @@ int _fltused = 0;   /* floats without the CRT */
 #define TECH_FIND        0x4999e0u   /* TechnologyTree::mFind(const char *): thiscall, the TechItem or null */
 #define TECH_AVAILABLE   0x4u        /* TechItem: byte, what TechnologyTree::Available answers */
 #define TECH_POSSIBLE    0xcu        /* TechItem: byte, 0 for an item the map's tree makes impossible (-1) */
+#define ORDNANCE_HEAD    0x771facu   /* Ordnance::ordnanceList, a std::list: its head node's pointer */
+#define ORD_CLASS        0x34u       /* an ordnance's class; the class's cPrjID at +0x150 names its ODF */
+#define ORD_CLASS_PRJ    0x150u
+#define ORD_OWNER        0x5cu       /* an ordnance's shooter, a handle */
+#define ORD_TARGET       0x60u       /* ... and its target, a handle (0 for none) */
+#define PRJ_GET_ODF      0x6593a0u   /* cPrjID::GetOdfName() const, thiscall: char * */
+#define EXPLOSION_HEAD   0x7367c4u   /* Explosion::explosionList, a std::list: its head node's pointer */
+#define EXP_RADIUS       0x34u       /* an explosion's radius, as built (the dead craft's bounding radius) */
+#define VT_FIREBALL      0x6afbd4u   /* FireballExplosion's vtable */
+#define VT_SHOCKWAVE     0x6afdacu   /* ShockwaveExplosion's vtable */
+#define ENTITY_TRANSFORM 0x4cfd50u   /* Entity::GetTransform() const, thiscall: Matrix34 *, the place at +0x24 */
 
 #define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
 #define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
@@ -267,6 +301,8 @@ static const Sig k_sigs[] = {
     { FORCE_UPDATE,     8, { 0x8B, 0x0D, 0x54, 0x8A, 0x73, 0x00, 0xB0, 0x01 } },
     { SET_IFACE_STATE,  8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x83 } },
     { MAIN_CAM_CALL,    6, { 0xFF, 0x90, 0x88, 0x00, 0x00, 0x00 } },
+    { CAM_SET_ZOOM_TAC, 8, { 0x55, 0x8B, 0xEC, 0xD9, 0x05, 0xA8, 0x46, 0x6B } },
+    { CAM_SET_ZOOM_PAR, 8, { 0x55, 0x8B, 0xEC, 0xD9, 0x05, 0x1C, 0x9A, 0x70 } },
     { CURSOR_DRAW_CALL, 1, { 0xE8 } },   /* HUD.asi may have retargeted it: chained */
     { EVENT_TRIGGER_0,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_3,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
@@ -314,6 +350,8 @@ static const Sig k_sigs[] = {
     { CLASS_FIND,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x8D, 0x4D } },
     { TEAM_ADD_RES,     8, { 0x55, 0x8B, 0xEC, 0x51, 0x8B, 0x45, 0x0C, 0x56 } },
     { TECH_FIND,        8, { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56, 0x57, 0x8B } },
+    { PRJ_GET_ODF,      6, { 0x8B, 0x01, 0x85, 0xC0, 0x75, 0x06 } },
+    { ENTITY_TRANSFORM, 7, { 0x8B, 0x41, 0x04, 0x83, 0xC0, 0x44, 0xC3 } },
 };
 
 typedef void   (__cdecl    *UpdateRangeFn)(void);
@@ -355,6 +393,8 @@ typedef void   (__thiscall *SetCommandBuildFn)(void *go, int cmd, const void *cl
 typedef void  *(__cdecl    *ClassFindFn)(const char *odf);
 typedef float  (__thiscall *TeamAddResFn)(void *team, float amount, int resource);
 typedef BYTE  *(__thiscall *TechFindFn)(void *tree, const char *name);
+typedef const char  *(__thiscall *PrjOdfFn)(void *prj);
+typedef const float *(__thiscall *TransformFn)(void *entity);
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -438,14 +478,24 @@ static float s_atof(const char *s)
     return neg ? -v : v;
 }
 
-static void logline(const char *s)
+static void s_unum(char *d, DWORD v)
+{
+    char t[16];
+    int  n = 0, k = s_len(d);
+    if (!v) t[n++] = '0';
+    while (v) { t[n++] = (char)('0' + (v % 10)); v /= 10; }
+    while (n) d[k++] = t[--n];
+    d[k] = 0;
+}
+
+static void file_append(const char *path, const char *s)
 {
     HANDLE h;
     DWORD  wrote;
     char   buf[600];
 
-    if (!g_logpath[0]) return;
-    h = CreateFileA(g_logpath, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
+    if (!path[0]) return;
+    h = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, NULLPTR,
                     OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULLPTR);
     if (h == INVALID_HANDLE_VALUE) return;
     SetFilePointer(h, 0, NULLPTR, FILE_END);
@@ -456,6 +506,20 @@ static void logline(const char *s)
     CloseHandle(h);
 }
 
+static void logline(const char *s) { file_append(g_logpath, s); }
+
+static void zoom_command(int n, char **t);
+
+/* Two decimals, for the zoom. */
+static void s_flt2(char *d, float f)
+{
+    long t = (long)(f * 100.0f + (f < 0 ? -0.5f : 0.5f));
+    if (t < 0) { s_cat(d, "-"); t = -t; }
+    s_num(d, t / 100);
+    s_cat(d, ".");
+    if (t % 100 < 10) s_cat(d, "0");
+    s_num(d, t % 100);
+}
 static void cat_vec(char *b, const float *v)
 {
     s_flt(b, v[0]); s_cat(b, " ");
@@ -472,6 +536,79 @@ static void log_vec(const char *what, const float *v)
     cat_vec(b, v);
     logline(b);
 }
+
+/* ---- marks: timestamped events, for the films (Scene.marks) ----------- */
+
+/* Every line of Scene.marks starts with GetTickCount() at the moment it marks, then
+ * its kind and its fields, `key=value` with no spaces in a value, except `text`,
+ * which is last and runs to the end of the line. `epoch <hi> <lo> <tick>` lines
+ * pair a tick with GetSystemTimeAsFileTime(), the host's own clock under Wine, so a
+ * reader can put every mark on the clock the bench records video by (films/film/
+ * marks.py). Written again every 10 s, so drift between the two clocks stays out. */
+static char  g_markpath[320];
+static int   g_marks_on;       /* [Marks] Enable, read as the scene is built */
+static DWORD g_mark_epoch;     /* the tick of the last epoch line */
+static long  g_nmarks;
+static char  g_mark_ring[16][128];   /* the last marks, for the `marks` command */
+static char  g_mb[400];        /* the mark being written */
+
+static void mark_epoch(void)
+{
+    DWORD ft[2];
+    char  b[80];
+    GetSystemTimeAsFileTime(ft);
+    g_mark_epoch = GetTickCount();
+    b[0] = 0;
+    s_cat(b, "epoch ");
+    s_hex(b, ft[1]);
+    s_cat(b, " ");
+    s_hex(b, ft[0]);
+    s_cat(b, " ");
+    s_unum(b, g_mark_epoch);
+    file_append(g_markpath, b);
+}
+
+static void mark_begin(DWORD tick, const char *kind)
+{
+    g_mb[0] = 0;
+    s_unum(g_mb, tick);
+    s_cat(g_mb, " ");
+    s_cat(g_mb, kind);
+}
+
+static void mark_kv(const char *k, const char *v)
+{
+    if (s_len(g_mb) + s_len(k) + s_len(v) + 2 > (int)sizeof g_mb - 4) return;
+    s_cat(g_mb, " ");
+    s_cat(g_mb, k);
+    s_cat(g_mb, "=");
+    s_cat(g_mb, v);
+}
+
+static void mark_kn(const char *k, long v)   { char b[16]; b[0] = 0; s_num(b, v); mark_kv(k, b); }
+static void mark_kf(const char *k, float v)  { char b[24]; b[0] = 0; s_flt(b, v); mark_kv(k, b); }
+
+static void mark_kvec(const char *k, const float *v)
+{
+    char b[64];
+    b[0] = 0;
+    s_flt(b, v[0]); s_cat(b, ",");
+    s_flt(b, v[1]); s_cat(b, ",");
+    s_flt(b, v[2]);
+    mark_kv(k, b);
+}
+
+static void mark_end(void)
+{
+    if (!g_marks_on) return;
+    if (GetTickCount() - g_mark_epoch > 10000) mark_epoch();
+    file_append(g_markpath, g_mb);
+    s_cpy(g_mark_ring[g_nmarks % 16], g_mb, 128);
+    g_nmarks++;
+}
+
+/* A mark with no fields, or with one. */
+static void mark0(DWORD tick, const char *kind) { mark_begin(tick, kind); mark_end(); }
 
 /* ---- math without the CRT --------------------------------------------- */
 
@@ -507,6 +644,11 @@ typedef struct {
     int   heal;         /* topped up to full health every tick */
     int   vent;         /* systems whose damage node shows as if damaged (bit k: +0x9c+k) */
     int   energy;       /* special energy topped up to full every tick */
+    int   cloak_st;     /* marks: its cloak's state when last seen, -1 for none yet */
+    int   gone;         /* marks: 1 once seen dying, 2 once gone */
+    int   craft;        /* marks: it was a craft when last seen */
+    float last[3];      /* marks: where it was when last seen */
+    DWORD gone_t;       /* marks: when it was found gone */
 } Obj;
 
 static Obj   g_obj[MAX_OBJECTS];
@@ -591,6 +733,9 @@ static Obj *spawn(const char *name, const char *odf, int team,
     o->heal = 0;
     o->vent = 0;
     o->energy = 0;
+    o->cloak_st = -1;
+    o->gone = 0;
+    o->craft = 0;
     o->handle = *(int *)((BYTE *)go + OBJECT_HANDLE);
     s_cat(b, " team ");
     s_num(b, team);
@@ -652,6 +797,13 @@ static void fire_special(const Obj *o, const char *weapon, const Obj *tg)
     s_cat(b, "  slot "); s_num(b, slot); s_cat(b, can ? ", can fire" : ", cannot fire now");
     s_cat(b, fired ? ", fired" : ", NOT fired");
     logline(b);
+    mark_begin(GetTickCount(), "special");
+    mark_kv("obj", o->name);
+    mark_kv("weapon", weapon);
+    if (tg) mark_kv("target", tg->name);
+    mark_kn("can", can ? 1 : 0);
+    mark_kn("fired", fired ? 1 : 0);
+    mark_end();
 }
 
 /* Special energy: a craft's to its maximum (ScriptInterfaceImp::SetSpecialEnergy). */
@@ -1013,7 +1165,11 @@ static void move_step(void)
         float u = (float)(now - g_move.t0) / (float)g_move.ms;
         float *v[3] = { &g_cam.yaw, &g_cam.pitch, &g_cam.dist };
         int   i;
-        if (u >= 1) { u = 1; g_move.ms = 0; }
+        if (u >= 1) {
+            u = 1;
+            mark0(g_move.t0 + g_move.ms, "glide.end");   /* when it ended, not the frame that saw it */
+            g_move.ms = 0;
+        }
         u = u * u * (3 - 2 * u);          /* smoothstep: ease in and out */
         for (i = 0; i < 3; i++) *v[i] = g_move.from[i] + (g_move.to[i] - g_move.from[i]) * u;
     }
@@ -1072,6 +1228,7 @@ static int cam_matrix(float *m)
 static int  g_paused;
 static int  g_refresh;   /* ticks left of a run that refreshes a paused frame */
 static void process_commands(void);
+static void marks_poll(void);
 
 /* While the simulation is paused the engine leaves objects where the last
  * simulated frame placed them relative to the camera: a camera moved while
@@ -1101,11 +1258,12 @@ static void __thiscall camera_update(void *view, void *st3dcam)
         void **cvt = *(void ***)st3dcam;
         ((SetTransformFn)cvt[5])(st3dcam, g_cam_m);
     }
+    marks_poll();
 }
 
 /* ---- commands (Scene.cmd) --------------------------------------------- */
 
-#define MAXTOK 12
+#define MAXTOK 40   /* select takes up to 39 names: a 30-ship selection in one command */
 
 static int split(char *line, char **tok)
 {
@@ -1181,6 +1339,57 @@ static void query(void)
         logline(b);
     }
     log_vec("  rts interest", (const float *)(TACTICAL_CAMERA + CAMERA_INTEREST));
+    zoom_command(1, NULLPTR);
+}
+
+/* The RTS camera's zoom. The camera in use (gCameraManager's first field) is a
+ * ParabolicCamera or a TacticalCamera, and each keeps it in its own unit (a height,
+ * 25 to 400, or a distance factor, 1 to 20), but both implement SetZoomLevel(t), t
+ * from 0 (closest) to 1 (farthest), which is what the script interface's
+ * SetCameraZoom calls. `zoom` takes and answers that level, and names the camera
+ * and its raw value. Nothing is touched if the camera is neither class. */
+typedef void (__thiscall *SetZoomFn)(void *cam, float level);
+
+static void zoom_command(int n, char **t)
+{
+    BYTE  *cam = *(BYTE **)CAMERA_CURRENT;
+    DWORD  vt  = cam ? *(DWORD *)cam : 0;
+    float  lo, hi, v, level;
+    const char *name;
+    char   b[160];
+    if (vt == PARABOLIC_VTABLE) {
+        lo = *(float *)PARA_HEIGHT_MIN; hi = *(float *)PARA_HEIGHT_MAX;
+        name = "parabolic camera, height";
+    } else if (vt == TACTICAL_VTABLE) {
+        lo = *(float *)TACT_ZOOM_MIN; hi = *(float *)TACT_ZOOM_MAX;
+        name = "tactical camera, distance factor";
+    } else {
+        logline("  ! the camera in use is neither a ParabolicCamera nor a TacticalCamera");
+        return;
+    }
+    if (n >= 2) {
+        if (!s_isnum(t[1])) { logline("  ! usage: zoom [<0 closest .. 1 farthest>]"); return; }
+        level = s_atof(t[1]);
+        if (level < 0) level = 0;
+        if (level > 1) level = 1;
+        (*(SetZoomFn *)(*(BYTE **)cam + CAM_VT_SET_ZOOM))(cam, level);
+        if (g_cam.mode != CAM_RTS) logline("  (a free camera is on: the zoom shows after `camera rts`)");
+    }
+    v = *(float *)(cam + (vt == PARABOLIC_VTABLE ? PARA_HEIGHT : TACT_ZOOM));
+    level = (v - lo) / (hi - lo);
+    b[0] = 0;
+    s_cat(b, "  zoom ");
+    s_flt2(b, level);
+    s_cat(b, " (");
+    s_cat(b, name);
+    s_cat(b, " ");
+    s_flt2(b, v);
+    s_cat(b, ", limits ");
+    s_flt2(b, lo);
+    s_cat(b, " to ");
+    s_flt2(b, hi);
+    s_cat(b, ")");
+    logline(b);
 }
 
 /* An object's scene name, or its handle in hex. */
@@ -1407,6 +1616,9 @@ static void run_command(char *line)
     n = split(line, t);
     if (!n || t[0][0] == ';' || t[0][0] == '#') return;
     logline(echo);
+    mark_begin(GetTickCount(), "cmd");
+    mark_kv("text", echo + 2);
+    mark_end();
 
     if (s_eq(t[0], "camera") && n >= 2) {
         if (s_eq(t[1], "rts") || s_eq(t[1], "off")) { g_cam.mode = CAM_RTS; camera_changed(); logline("  camera: the game's own"); return; }
@@ -1452,6 +1664,10 @@ static void run_command(char *line)
         g_move.t0 = GetTickCount();
         g_move.ms = (DWORD)(s_atof(t[1]) * 1000);
         if (!g_move.ms) g_move.ms = 1;
+        mark_begin(g_move.t0, "glide.start");
+        mark_kf("secs", (float)g_move.ms / 1000.0f);
+        mark_kf("yaw", g_move.to[0]); mark_kf("pitch", g_move.to[1]); mark_kf("dist", g_move.to[2]);
+        mark_end();
         logline("  camera: glide");
         return;
     }
@@ -1462,9 +1678,13 @@ static void run_command(char *line)
     if (s_eq(t[0], "spin") && n == 2) {
         g_move.spin = s_atof(t[1]);
         g_move.spin_t = GetTickCount();
+        mark_begin(g_move.spin_t, g_move.spin != 0 ? "spin.start" : "spin.stop");
+        if (g_move.spin != 0) mark_kf("rate", g_move.spin);
+        mark_end();
         logline(g_move.spin != 0 ? "  camera: spin" : "  camera: spin off");
         return;
     }
+    if (s_eq(t[0], "zoom")) { zoom_command(n, t); return; }
     if (s_eq(t[0], "spawn") && n >= 6) {
         float p[3];
         p[0] = s_atof(t[3]); p[1] = s_atof(t[4]); p[2] = s_atof(t[5]);
@@ -1588,10 +1808,26 @@ static void run_command(char *line)
     if (s_eq(t[0], "query")) { query(); return; }
     if (s_eq(t[0], "selection")) { selection(); return; }
     if (s_eq(t[0], "select") && n >= 2) { select_objs(t + 1, n - 1); return; }
-    logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
+    if (s_eq(t[0], "marks")) {
+        long i0 = g_nmarks > 16 ? g_nmarks - 16 : 0, i;
+        char b[160];
+        b[0] = 0;
+        s_cat(b, g_marks_on ? "  marks: " : "  marks off ([Marks] Enable=0): ");
+        s_num(b, g_nmarks);
+        s_cat(b, " written to Scene.marks");
+        logline(b);
+        for (i = i0; i < g_nmarks; i++) {
+            b[0] = 0;
+            s_cat(b, "  | ");
+            s_cat(b, g_mark_ring[i % 16]);
+            logline(b);
+        }
+        return;
+    }
+    logline("  ! unknown command (camera, orbit, glide, spin, zoom, spawn, attack, heal, engines, weapons, "
             "immortal, special, energy, tech, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
             "shieldfx, query, "
-            "select, selection)");
+            "select, selection, marks)");
 }
 
 static int g_ready;   /* the scene has been built; commands may run */
@@ -1624,6 +1860,283 @@ static void process_commands(void)
     logline("< done");
 }
 
+/* ---- marks: what each frame shows changing ----------------------------- */
+
+/* Polled once a frame, from the camera hook, once the scene is built: nothing here
+ * patches or calls into the simulation, it only reads what query and selection read
+ * and the two lists the renderers walk. A change is marked with the tick it was seen
+ * at (a frame's), or, for an end found by its absence, the tick it was last seen. */
+static DWORD g_mark_gap = 1000;     /* [Marks] FireGap: ms without a shot that ends a burst */
+static DWORD g_mark_still = 300;    /* [Marks] Still: ms without motion that settles the camera */
+
+static void mark_obj(const char *k, int h)
+{
+    char b[48];
+    b[0] = 0;
+    cat_handle(b, h);
+    mark_kv(k, b);
+}
+
+/* The camera: moving when its camera-to-world matrix changes from one frame to the
+ * next (an axis by more than 2e-5, the eye by more than 0.01 units); settled after
+ * [Marks] Still of none, marked at its last change. */
+static struct { int have, moving; float m[12]; DWORD changed; } g_mcam;
+
+static void poll_camera(DWORD now)
+{
+    const float *m;
+    float d = 0;
+    int   i;
+    if (!g_st3dcam) return;
+    m = (const float *)((BYTE *)g_st3dcam + CAM_TO_WORLD);
+    for (i = 0; i < 12; i++) {
+        float e = m[i] - g_mcam.m[i];
+        if (e < 0) e = -e;
+        if (i >= 9) e *= 0.002f;
+        if (e > d) d = e;
+        g_mcam.m[i] = m[i];
+    }
+    if (!g_mcam.have) { g_mcam.have = 1; g_mcam.changed = now; return; }
+    if (d > 2e-5f) {
+        if (!g_mcam.moving) {
+            g_mcam.moving = 1;
+            mark_begin(now, "camera.move");
+            mark_kvec("eye", &m[9]);
+            mark_end();
+        }
+        g_mcam.changed = now;
+    } else if (g_mcam.moving && now - g_mcam.changed >= g_mark_still) {
+        g_mcam.moving = 0;
+        mark_begin(g_mcam.changed, "camera.still");
+        mark_kvec("eye", &m[9]);
+        mark_kvec("front", &m[6]);
+        mark_end();
+    }
+}
+
+/* The selection: how many and which, whenever either changes (and once at the start). */
+static DWORD g_msel_sig;
+static int   g_msel_have;
+
+static void poll_selection(DWORD now)
+{
+    int        n = ((OvIntFn)ov_method(OV_SELECT_NUM))(OVERVIEW);
+    const int *ids = ((OvListFn)ov_method(OV_SELECT_LIST))(OVERVIEW);
+    DWORD      sig = 2166136261u ^ (DWORD)n;
+    char       b[300];
+    int        i;
+    for (i = 0; ids && i < n; i++) sig = (sig ^ (DWORD)ids[i]) * 16777619u;
+    if (g_msel_have && sig == g_msel_sig) return;
+    g_msel_have = 1;
+    g_msel_sig = sig;
+    mark_begin(now, "select");
+    mark_kn("n", n);
+    b[0] = 0;
+    for (i = 0; ids && i < n; i++) {
+        if (s_len(b) > 240) { s_cat(b, ",..."); break; }
+        if (i) s_cat(b, ",");
+        cat_handle(b, ids[i]);
+    }
+    if (b[0]) mark_kv("names", b);
+    mark_end();
+}
+
+/* The scene's own objects: a craft dying (+0x113 set), an object gone (no entity),
+ * and each step of a cloak (its device's state at +0x3c: 0 visible, 1 cloaking,
+ * 2 cloaked, 3 decloaking). `kill` (ExplodeNow) takes a craft away within the frame,
+ * before +0x113 is ever seen set (bench, films/marks m02), so a craft that is gone
+ * without having been seen dying is marked destroyed then. Where each object was is
+ * kept, for the explosion that marks its death. */
+static void poll_objects(DWORD now)
+{
+    static const char *const k_cloak[4] = { "decloak.done", "cloak.start", "cloak.done", "decloak.start" };
+    int i;
+    for (i = 0; i < g_nobj; i++) {
+        Obj  *o = &g_obj[i];
+        BYTE *go, *dev;
+        if (o->gone == 2) continue;
+        go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
+        if (!go) {
+            if (o->craft && !o->gone) {
+                mark_begin(now, "destroyed"); mark_kv("obj", o->name); mark_kv("how", "removed"); mark_end();
+            }
+            o->gone = 2;
+            o->gone_t = now;
+            mark_begin(now, "removed"); mark_kv("obj", o->name); mark_end();
+            continue;
+        }
+        {
+            const float *p = obj_pos(o);
+            if (p) { o->last[0] = p[0]; o->last[1] = p[1]; o->last[2] = p[2]; }
+        }
+        o->craft = (*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT) != 0;
+        if (!o->craft) continue;
+        if (go[OBJECT_DEAD] && !o->gone) {
+            o->gone = 1;
+            mark_begin(now, "destroyed"); mark_kv("obj", o->name); mark_end();
+        }
+        if ((dev = *(BYTE **)(go + OBJECT_CLOAK))) {
+            int st = (int)*(DWORD *)(dev + 0x3c);
+            if (st != o->cloak_st) {
+                if (o->cloak_st >= 0 && st >= 0 && st < 4) {
+                    mark_begin(now, k_cloak[st]); mark_kv("obj", o->name); mark_end();
+                }
+                o->cloak_st = st;
+            }
+        }
+    }
+}
+
+/* Fire: every live ordnance (a beam, while it is drawn; a torpedo or pulse, in flight),
+ * gathered by shooter and weapon ODF. A burst starts with its first ordnance and ends
+ * once none of that shooter's and weapon's has been alive for [Marks] FireGap (marked
+ * at the last frame one was), with the number of ordnance it was. */
+#define MAX_FIRE  64
+#define MAX_TRACK 512
+
+typedef struct { int owner, target; char odf[24]; DWORD first, last; int shots, live; } Fire;
+
+static Fire  g_fire[MAX_FIRE];
+static int   g_nfire;
+static DWORD g_ord_prev[MAX_TRACK];
+static int   g_nord_prev;
+
+static void ord_odf(const BYTE *ord, char *out)
+{
+    const BYTE *cls = *(BYTE *const *)(ord + ORD_CLASS);
+    void       *prj = cls ? *(void *const *)(cls + ORD_CLASS_PRJ) : NULLPTR;   /* as render3d reads it */
+    const char *s = prj ? ((PrjOdfFn)PRJ_GET_ODF)(prj) : NULLPTR, *p;
+    int         n = 0;
+    if (!s) { s_cpy(out, "unknown", 24); return; }
+    for (p = s; *p; p++) if (*p == '\\' || *p == '/') s = p + 1;
+    for (; *s && *s != '.' && n < 23; s++) {
+        char c = *s;
+        if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+        out[n++] = c == ' ' || c == '=' ? '_' : c;
+    }
+    out[n] = 0;
+}
+
+static int tracked(const DWORD *list, int n, DWORD v)
+{
+    int i;
+    for (i = 0; i < n; i++) if (list[i] == v) return 1;
+    return 0;
+}
+
+static void poll_ordnance(DWORD now)
+{
+    static DWORD cur[MAX_TRACK];
+    int   ncur = 0, k, guard = 0;
+    DWORD head = *(DWORD *)ORDNANCE_HEAD, node;
+    for (k = 0; k < g_nfire; k++) g_fire[k].live = 0;
+    for (node = head ? *(DWORD *)head : 0; node && node != head && guard < 100000; guard++) {
+        BYTE *ord = *(BYTE **)(node + 8);
+        Fire *f = NULLPTR;
+        char  odf[24];
+        int   owner;
+        node = *(DWORD *)node;
+        if (!ord) continue;
+        if (ncur < MAX_TRACK) cur[ncur++] = (DWORD)ord;
+        owner = *(int *)(ord + ORD_OWNER);
+        ord_odf(ord, odf);
+        for (k = 0; k < g_nfire; k++)
+            if (g_fire[k].owner == owner && s_eq(g_fire[k].odf, odf)) { f = &g_fire[k]; break; }
+        if (!f) {
+            if (g_nfire >= MAX_FIRE) continue;
+            f = &g_fire[g_nfire++];
+            f->owner = owner;
+            f->target = *(int *)(ord + ORD_TARGET);
+            s_cpy(f->odf, odf, sizeof f->odf);
+            f->first = now;
+            f->shots = 0;
+            mark_begin(now, "fire.start");
+            mark_obj("obj", owner);
+            mark_kv("weapon", odf);
+            if (f->target) mark_obj("target", f->target);
+            mark_end();
+        }
+        if (!f->target) f->target = *(int *)(ord + ORD_TARGET);
+        f->live++;
+        f->last = now;
+        if (!tracked(g_ord_prev, g_nord_prev, (DWORD)ord)) f->shots++;
+    }
+    for (k = 0; k < g_nfire; k++) {
+        Fire *f = &g_fire[k];
+        if (f->live || now - f->last < g_mark_gap) continue;
+        mark_begin(f->last, "fire.end");
+        mark_obj("obj", f->owner);
+        mark_kv("weapon", f->odf);
+        if (f->target) mark_obj("target", f->target);
+        mark_kn("shots", f->shots);
+        mark_kf("secs", (float)(f->last - f->first) / 1000.0f);
+        mark_end();
+        *f = g_fire[--g_nfire];
+        k--;
+    }
+    for (k = 0; k < ncur; k++) g_ord_prev[k] = cur[k];
+    g_nord_prev = ncur;
+}
+
+/* Explosions: each new one on Explosion::explosionList, a fireball or a shockwave
+ * (a craft's death makes both), with its radius, its place and the scene's object
+ * nearest it. Ones already there at the first frame are not marked. */
+static DWORD g_exp_prev[256];
+static int   g_nexp_prev, g_exp_have;
+
+static void mark_explosion(DWORD now, BYTE *e)
+{
+    DWORD        vt = *(DWORD *)e;
+    const float *m = ((TransformFn)ENTITY_TRANSFORM)(e);
+    float        best = 0;
+    int          i, bi = -1;
+    mark_begin(now, "explosion");
+    mark_kv("type", vt == VT_FIREBALL ? "fireball" : vt == VT_SHOCKWAVE ? "shockwave" : "other");
+    mark_kf("r", *(float *)(e + EXP_RADIUS));
+    if (m) {
+        mark_kvec("at", &m[9]);
+        for (i = 0; i < g_nobj; i++) {
+            /* where each was last seen: the one this explosion is the death of has just gone */
+            const float *p = g_obj[i].last;
+            float dx, dy, dz, d2;
+            if (g_obj[i].gone == 2 && now - g_obj[i].gone_t > 2000) continue;
+            dx = p[0] - m[9]; dy = p[1] - m[10]; dz = p[2] - m[11];
+            d2 = dx * dx + dy * dy + dz * dz;
+            if (bi < 0 || d2 < best) { best = d2; bi = i; }
+        }
+        if (bi >= 0) { mark_kv("near", g_obj[bi].name); mark_kf("d", f_sqrt(best)); }
+    }
+    mark_end();
+}
+
+static void poll_explosions(DWORD now)
+{
+    DWORD cur[256], head = *(DWORD *)EXPLOSION_HEAD, n;
+    int   ncur = 0, guard = 0, k;
+    for (n = head ? *(DWORD *)head : 0; n && n != head && guard < 100000; guard++) {
+        BYTE *e = *(BYTE **)(n + 8);
+        n = *(DWORD *)n;
+        if (!e) continue;
+        if (ncur < 256) cur[ncur++] = (DWORD)e;
+        if (g_exp_have && !tracked(g_exp_prev, g_nexp_prev, (DWORD)e)) mark_explosion(now, e);
+    }
+    for (k = 0; k < ncur; k++) g_exp_prev[k] = cur[k];
+    g_nexp_prev = ncur;
+    g_exp_have = 1;
+}
+
+static void marks_poll(void)
+{
+    DWORD now;
+    if (!g_marks_on || !g_ready) return;
+    now = GetTickCount();
+    poll_camera(now);
+    poll_selection(now);
+    poll_objects(now);
+    poll_ordnance(now);
+    poll_explosions(now);
+}
+
 /* ---- building the scene from Scene.ini -------------------------------- */
 
 static float ini_float(const char *sect, const char *key, float dflt)
@@ -1645,6 +2158,10 @@ static void build_scene(void)
     int   i;
 
     log_vec("camera interest", interest);
+    g_marks_on = ini_int("Marks", "Enable", 1);
+    g_mark_gap = (DWORD)(ini_float("Marks", "FireGap", 1.0f) * 1000.0f);
+    g_mark_still = (DWORD)(ini_float("Marks", "Still", 0.3f) * 1000.0f);
+    if (g_marks_on) { mark_epoch(); logline("marks to Scene.marks"); }
     GetPrivateProfileStringA("Scene", "Anchor", "camera", b, 32, g_ini);
     if (b[0] == 'c' || b[0] == 'C') {
         g_anchor[0] = interest[0]; g_anchor[1] = interest[1]; g_anchor[2] = interest[2];
@@ -1718,10 +2235,17 @@ static void build_scene(void)
             logline("RTS camera centred");
         }
     }
+    /* Zoom= is a zoom command: the RTS camera's distance, set once the scene is built */
+    GetPrivateProfileStringA("Scene", "Zoom", "", b + 5, 150, g_ini);
+    if (b[5]) { logline("zoom as the game started it:"); zoom_command(1, NULLPTR); }
+    if (b[5]) { b[0] = 'z'; b[1] = 'o'; b[2] = 'o'; b[3] = 'm'; b[4] = ' '; run_command(b); }
     /* Camera= is a camera or orbit command, run as if from Scene.cmd */
     GetPrivateProfileStringA("Scene", "Camera", "", b, 190, g_ini);
     if (b[0]) run_command(b);
     g_ready = 1;
+    mark_begin(GetTickCount(), "ready");
+    mark_kn("objects", g_nobj);
+    mark_end();
     logline("scene ready");
 }
 
@@ -1793,6 +2317,7 @@ static void build_paths(void)
     g_ini[0] = 0;     s_cat(g_ini, path);     s_cat(g_ini, "Scene.ini");
     g_logpath[0] = 0; s_cat(g_logpath, path); s_cat(g_logpath, "Scene.log");
     g_cmdpath[0] = 0; s_cat(g_cmdpath, path); s_cat(g_cmdpath, "Scene.cmd");
+    g_markpath[0] = 0; s_cat(g_markpath, path); s_cat(g_markpath, "Scene.marks");
     g_sodpath[0] = 0; s_cat(g_sodpath, path); s_cat(g_sodpath, "SOD\\");
 }
 
@@ -1892,6 +2417,7 @@ static void startup(void)
     }
     logline("--- Scene");
     DeleteFileA(g_cmdpath);   /* a command left from an earlier run is stale */
+    DeleteFileA(g_markpath);  /* and so are the marks of one */
 
     bad = check_sigs();
     if (bad >= 0) {

@@ -14,3 +14,4 @@ ReadFile@20
 DeleteFileA@4
 GetPrivateProfileSectionNamesA@12
 GetTickCount@0
+GetSystemTimeAsFileTime@4

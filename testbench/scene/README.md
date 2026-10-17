@@ -28,6 +28,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 
 | `SCENE=` | What | Seen on the bench |
 |---|---|---|
+| `zoom` | the player's Galaxy class (`mine`) and two destroyers, the HUD and cursor on, the camera centred on `mine` at zoom level 0.37: the view the old workaround of 150 `ctrl+Down` then 35 `ctrl+Up` presses reaches, in none of its 28 s | 2026-10-17 |
 | `planet` | a Galaxy class beside a class M planet (`pb_clssm`) | 2026-10-04 |
 | `nebula` | a Galaxy class at the edge of the Mutara nebula (`mnebula8`) | 2026-10-04 |
 | `firing` | a Galaxy class firing at a Borg cube (`bbattle1`) without moving, for as long as the session runs: its engines are off; the cube cannot die, is healed every tick and has its weapons off | 2026-10-04, still firing after a minute |
@@ -38,6 +39,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `showcase` | a fleet action for footage: the Enterprise-E (`fente`), a Sovereign (`fbattle`), a Galaxy and two Klingon flagships (`kmartok`, `kbattle`) firing at two Borg cubes that do not fire back (a Borg attack beams boarding parties over), in front of a class M planet; everyone immortal and healed, engines off | 2026-10-07 |
 | `warp` | three of the player's Federation destroyers in open space at 3000,0,3000, with the HUD and cursor on, for long moves on the map going to warp (`scenarios/qol-warp.md`) | 2026-10-07 |
 | `ui-colonize` | the player's colony ship (`colony`, `fcolony`, engines on) and a Galaxy class (`mine`) beside an unclaimed class M planet (`planet`), with the HUD, cursor, tooltips and hover on, the camera on the colony ship: a left click on the planet selects it, a right click with the colony ship selected colonises it (`scenarios/ui-hud-colonize.md`) | 2026-10-16 |
+| `ui-hud-layout` | thirty of the player's Federation destroyers (`s1`..`s30`), engines and weapons off, six by five about the camera's start, with the HUD, cursor, tooltips and hover on, for the HUD's layout with a big selection (`scenarios/ui-hud-layout.md`) | 2026-10-17 |
 | `explosion` | a Galaxy class beside a destroyer (`small`), a cruiser (`mid`) and a battleship (`big`), none firing, to blow up with `kill`, for the explosions (`render3d/README.md`, "effects"; `scenarios/explosions.md`) | 2026-10-12 |
 | `shields` | a Galaxy class (phasers) and a Klingon battleship (`kbattle`, torpedoes) firing at a second Galaxy (`target`) as in `firing`: the target healed, its shields holding. For the shield hits (`render3d/README.md`, "effects"; `scenarios/shields-hits.md`) | 2026-10-12 |
 | `fog-planet` | a class M planet (`planet`) at 3000,0,3000 with the player's scout beside it, the map's fog and shroud on and the HUD on; the camera looks down on the planet. `goto scout 6500 0 6500` leaves the planet as a fog-of-war ghost. For render3d's planet ghosts (`render3d/README.md`, "overlays"; `scenarios/render3d-planet-ghost.md`) | 2026-10-17 |
@@ -68,7 +70,16 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Race` | | the player's race, which decides the HUD (stock's skin, and the UI's theme with `[UI] Theme=auto`): `federation`, `klingon`, `romulan`, `cardassian`, `borg` or `species8472` (races.odf's `name`s). Empty: as the game sets it, which on `a2_borg01` is a different race on every launch. Set before the mission loads, so it holds in stock and refit alike, and with `Enable=0`. `SCENE_RACE=<race>` at install puts it into the installed copy of any scene file, ahead of the file's own |
 | `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
 | `Center` | | centre the RTS camera on this object |
+| `Zoom` | | the RTS camera's zoom level, 0 (closest) to 1 (farthest), set once the scene is built (`zoom`, below; "The zoom"). Unset leaves the camera as the game started it |
 | `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |
+
+`[Marks]`, the event marks (below, "Marks"); every scene has them without the section:
+
+| Key | Default | |
+|---|---|---|
+| `Enable` | 1 | 0 writes no `Scene.marks` |
+| `FireGap` | 1.0 | seconds without a shooter's ordnance of a weapon that end its burst (`fire.end`) |
+| `Still` | 0.3 | seconds without the camera moving that settle it (`camera.still`) |
 
 `[Object.<name>]`, one per object, built in file order:
 
@@ -115,6 +126,7 @@ answer and fails if a command did.
 | `spin <degrees per second>` | after an `orbit`: turn the yaw steadily; `spin 0` stops. A new `orbit` ends a glide but not a spin |
 | `camera <ex> <ey> <ez> <object \| tx ty tz>` | free camera at an eye, looking at a point or an object |
 | `camera rts` | back to the game's own camera |
+| `zoom [<level>]` | the RTS camera's zoom level, 0 (closest) to 1 (farthest), clamped. With no level it only reads. It answers with the level the camera has now, the camera in use, its raw value and its limits: `zoom 0.37 (parabolic camera, height 809.81, limits 10.00 to 2200.00)`. `query` ends with the same line |
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
 | `attack <name> <target>` | order an attack |
 | `succeed [seconds]`, `fail [seconds]` | the mission ends, won or lost, after the delay, as its script ends it (`ScriptInterfaceImp::SucceedMission`, 0x457d70, and `FailMission`, 0x457d50); for the screens that follow a mission (`scenarios/ui-menus-success.md`) |
@@ -133,8 +145,43 @@ answer and fails if a command did.
 | `pause`, `resume` | the game's own pause (`PauseSimulation`) |
 | `hud`, `grid`, `cursor`, `notices`, `tooltips`, `hover`, `shieldfx` `on\|off` | as the keys above. `tooltips off` also clears a box already showing; `shieldfx off` lets flashes already showing run out |
 | `query` | every object's handle and position (and a producer's build queue, a planet's team, population and the population its cities are drawn at), and the camera's eye, front and up |
-| `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`); answers as `selection` |
+| `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`), up to 39 names (a command has at most 40 words); answers as `selection` |
 | `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
+| `marks` | how many marks `Scene.marks` has, and the last 16, each as written (`Expect scene "marks" answers "cloak.done obj=warbird"`) |
+
+## The zoom
+
+`Zoom=` and `zoom` set the RTS camera's zoom as a **level from 0 (closest) to 1
+(farthest)**, whichever camera the game is using. The camera in use is the first field
+of `gCameraManager` (0x763370), and on the bench it is a `ParabolicCamera`: its zoom is
+a height above the map, 10 to 2200 (`OVERVIEW_MIN_HEIGHT`, `OVERVIEW_MAX_HEIGHT` as
+the game has them at run time), and the game starts it at 150 (level 0.06). A
+`TacticalCamera` keeps a distance factor from 1 to 20 instead (start 10); the plugin
+handles it the same way, but it has not been seen in use. Both implement
+`SetZoomLevel(t)`, a straight interpolation between their limits and the call
+`ScriptInterfaceImp::SetCameraZoom` (0x4551d0) makes, so the level is the same on both.
+The plugin refuses if the camera in use is neither class.
+
+- **Level to height** (parabolic): `10 + level * 2190`. Level 0.06 is the start, 0.37 is
+  a player's-eye view of a few ships, 1 shows a patch of the map.
+- **Measuring a manual setup**: put the camera where it should be with the wheel and
+  `ctrl+Up`/`ctrl+Down`, then `zoom` (or `query`) reads the level to put in `Zoom=`.
+- **The keys are not repeatable.** Each press changes the height by a factor that
+  depends on the frame time (`ctrl+Down` x5 took 1105 to 1273, `ctrl+Up` x5 then took
+  it back only to 1113). 150 `ctrl+Down` end at the limit (1.00) whatever the frame
+  time, and 35 `ctrl+Up` after them reach **0.36 to 0.37** (heights 806 and 810, level 0.365, two
+  runs at 1920x1080 and 0.15 s a press). **`Zoom=0.37` is the workaround's view**.
+- **Free camera modes.** The free camera (`camera`, `orbit`, and so `glide` and `spin`)
+  replaces the transform the game's camera computes, so zoom does not move it: its
+  distance is the `orbit` command's own. `zoom` still sets the RTS camera underneath
+  and says so; the zoom shows after `camera rts`. A `Zoom=` and a `Camera=` orbit in
+  one scene file therefore do not fight: the scene file sets the zoom, then the orbit
+  takes over the picture. A scene that keeps the game's camera sets `Zoom=` and no `Camera=`.
+- **Anything that moves the game's camera afterwards** wins over a zoom set earlier:
+  the wheel and `ctrl+Up`/`ctrl+Down`. `Zoom=` is applied once, after
+  `Center=` and before `Camera=`, when the scene is ready.
+- The line `zoom as the game started it:` in `Scene.log` shows the zoom before `Zoom=`
+  applied it.
 
 **`glide` and `spin` run on wall-clock time, per frame** (`GetTickCount`, in the camera
 hook), not per tick, so a recording plays them smoothly whatever the tick rate. Don't
@@ -396,7 +443,70 @@ inert, and `Scene.log` says so.
   it gave the Klingon theme.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
-  (`TacticalCamera::GetInterest`).
+  (`TacticalCamera::GetInterest`). **That camera is not the one in use on the bench**
+  (bench, 2026-10-17): `gCameraManager`'s first field (0x763370) held
+  `gParabolicCamera` (0x763470), and `query`'s `rts interest` stayed at 0,0,0 while
+  `Center=` moved the view. The zoom is set through that field; see "The zoom".
+
+## Marks
+
+From the moment the scene is built, `Scene.asi` writes **`Scene.marks`** beside
+`Scene.log`: timestamped events for the films (`films/README.md`, "Marks", has the
+kinds and what `a2film` does with them). It is a file of its own so that a command's
+answer in `Scene.log`, which `drive scene` reads, never has marks in it; it is deleted
+when the game starts, and the bench gathers it with the logs.
+
+    epoch 0x01dd3f6a 0x8e0c1b40 74712093
+    74712093 ready objects=4
+    74713511 cmd text=select warbird bop
+    74713528 select n=2 names=warbird,bop
+    74717262 cloak.start obj=warbird
+    74719944 cloak.done obj=warbird
+
+Every line starts with `GetTickCount()` at the moment it marks, then its kind and its
+fields as `key=value`, no spaces in a value except `text`, which is last and runs to the
+end of the line. An `epoch <high> <low> <tick>` line pairs a tick with
+`GetSystemTimeAsFileTime()` (a FILETIME's two halves, in hex): under Wine that is the
+host's clock, the one the film runner starts its action by, so a reader places every
+mark on the take's clock without a handshake. It is written as the scene is built and
+again before any mark more than 10 s after the last, so the two clocks cannot drift
+apart over a take. The plugin never divides a 64-bit number (no CRT to do it): the
+reader does the arithmetic.
+
+**Every mark is read, never patched**: once a frame, from the camera hook
+(`camera_update`, after the camera is set), `marks_poll` compares what it reads with
+the frame before. What it reads, and why it is safe to read there (`s_UpdateMainCamera`
+runs between ticks, on the game's thread, as the renderers' walks do):
+
+- **The camera**: the main `ST3D_Camera`'s camera-to-world matrix (+0xc0), as `query`
+  reads it. An axis that changes by more than 2e-5 or an eye by more than 0.01 units is
+  motion; none for `Still` seconds settles it, marked at the last motion.
+- **The selection**: `GetSelectNum` and `GetSelectList` (vtable +0x94, +0x98), as
+  `selection` reads it, so `QOL.asi`'s larger selections are seen too.
+- **The scene's crafts**: the cloaking device's state (+0x108, then +0x3c), as `query`
+  reads it; the dying byte +0x113 that the move orders check; `Entity::Get` returning
+  nothing once an object is gone.
+- **Fire: `Ordnance::ordnanceList`**, the `std::list` whose head node's pointer is at
+  0x771fac (each node's next at +0, its ordnance at +8), walked as render3d walks it
+  (`render3d/src/mods/ordnance/eng.rs`). An ordnance's shooter is the handle at +0x5c
+  and its target the one at +0x60; its ODF is named by its class (+0x34), whose cPrjID
+  (+0x150) `cPrjID::GetOdfName` (0x6593a0, checked by its first bytes) turns into
+  the ODF's name, as render3d names a special by it. Ordnance are counted per shooter and
+  ODF, and an ordnance pointer not there the frame before is a new shot.
+- **Explosions: `Explosion::explosionList`**, the `std::list` at 0x7367c4, as
+  render3d's explosions module walks it. A fireball has the vtable 0x6afbd4, a
+  shockwave 0x6afdac; +0x34 is the radius it was built with; its place is the
+  transform `Entity::GetTransform` (0x4cfd50) returns, at +0x24.
+- **Commands and specials** are marked where they are run, `glide.end` from the glide's
+  own start and length, so it is exact rather than the frame that saw it.
+
+Bench, 2026-10-17, `films/marks` (stock, 1280x720): a selection, a glide, a cloak and
+decloak, a Galaxy's fire and a battleship blown up were each marked, the cloak's steps
+3.0 s apart; a mark leads the first frame of the video that shows it by about 0.05 s.
+**`kill` removes a craft within the frame**: +0x113 is never seen set, so `destroyed` is
+marked when a craft is found gone without it (`how=removed`), and an explosion's `near`
+uses where each object was last seen. The same take showed `attack galaxy big` leaving
+the Galaxy firing at `small` (every burst's `target=small`).
 
 ## Where this is going
 

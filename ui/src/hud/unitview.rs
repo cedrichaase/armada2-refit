@@ -21,6 +21,25 @@ fn frame_width(ui: &Ui) -> f32 {
     ui.u(ui.theme.edge).max(1.0) + ui.u(3.0)
 }
 
+/// Where the engine draws the view: our place, or the stock one when ours is not
+/// written.
+fn view(ui: &Ui) -> Option<R> {
+    let c = overlay::CINEMATIC_VIEW;
+    let p = if unitview::enabled() { unitview::view_rect(ui.w, ui.h) } else { hud::panel_rect(c, ui.w, ui.h) }?;
+    let r = R::new(p[0], p[1], p[2] - p[0], p[3] - p[1]);
+    (r.w >= 8.0 && r.h >= 8.0).then_some(r)
+}
+
+/// The view with its frame, while it shows: the bottom row ends at its left
+/// (`hud::bottom_row`).
+pub fn shown_rect(ui: &Ui) -> Option<R> {
+    if hud::hidden(overlay::CINEMATIC_VIEW) || crate::engine::ingame::hud_hidden() {
+        return None;
+    }
+    let r = view(ui)?;
+    Some(r.inset(-frame_width(ui)))
+}
+
 static mut SHOWN: bool = false;
 
 pub fn run(ui: &mut Ui) {
@@ -44,16 +63,12 @@ pub fn run(ui: &mut Ui) {
     if crate::engine::radar::view() == 2 && !hud::video_playing() {
         return;
     }
-    let p = if unitview::enabled() { unitview::view_rect(ui.w, ui.h) } else { hud::panel_rect(c, ui.w, ui.h) };
-    let Some(p) = p else { return };
-    let r = R::new(p[0], p[1], p[2] - p[0], p[3] - p[1]);
-    if r.w < 8.0 || r.h < 8.0 {
-        return;
-    }
+    let Some(r) = view(ui) else { return };
     let t = ui.theme;
     let e = ui.u(t.edge).max(1.0);
     let g = ui.u(3.0);
     let outer = r.inset(-g - e);
+    super::layout::note(outer);
     // Square, whatever the theme's corners: the picture is square, and a rounded
     // frame (the LCARS theme's) cut into its corners.
     ui.draw.stroke(outer, Corners::SQUARE, g + e, fade(t.panel, 0.95));

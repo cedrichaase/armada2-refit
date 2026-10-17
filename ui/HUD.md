@@ -223,11 +223,12 @@ sound on a press: `AudioSound2D` objects made with the game's `operator new`, na
 `StandardButton::s_buttonRolloverSound` and `s_buttonClickSound`, as the stock button
 plays them (`engine/sound.rs`).
 
-**Where it goes.** At the bottom between the minimap and the info panel when the room
-there is enough for it, else above the info panel, aligned with its left edge, moving
-with the panel's height (low, middle, tall). Both rectangles are the components' own
-(`+0x04`, scaled to the back buffer). At 1280x720 with `HUD.asi` there is no room
-beside, and the bar sits above the info panel.
+**Where it goes** is "The bottom row" below: at the bottom beside the minimap when the
+row has room for it and the info panel (16:9 and wider), else above the minimap,
+aligned with its left edge (4:3). Either place is fixed: the bar does not move with
+the selection. Without a minimap of ours the rectangles are the stock components' own
+(`+0x04`, scaled to the back buffer); without a minimap at all, the bar sits above the
+info panel.
 
 **Log.** Each layout once per change ("bar: menu=2 mode=1 | Q=bbase ... T=cancel
 G=back", `(off)` for a disabled button), each press ("bar: click build", "bar: key
@@ -247,6 +248,31 @@ over it was the arrow. `testbench/scenarios/ui-hud-bar.md` is the regression tes
 every step passed (judged and logged), but its last, `Quit the game`, which hangs on
 a black screen after Exit to Windows on the bench that night with UI.asi taken out
 too (`testbench/operating/hud-takeover.md`).
+
+## The bottom row
+
+The minimap (bottom left), the bar, the info panel and the unit view (bottom right,
+while it shows) share the bottom of the screen; `hud::bottom_row` gives the span
+between the minimap and the unit view and the bar's size, and the info panel, drawn
+first, takes its place in it (`info::place`):
+
+- **Centred**, if the bar fits between the minimap and it.
+- Else **moved right just far enough** for the bar to sit beside the minimap, if the
+  row holds both with the HUD's margin between each. At 16:9 it does: at 1280x720 the
+  row is about 860 px, the bar about 250 px with its margins and the one-object panel
+  520 px.
+- Else **centred within the row** (clear of the minimap and the unit view) with the
+  bar above the minimap (4:3: at 1024x768 the row is about 580 px).
+
+The first version centred the panel and put the bar above it whenever the gap at its
+left was too narrow, which at 16:9 was always for one unit: the bar sat over the play
+area with room to spare at both sides (the user, 2026-10-17). A group is no wider
+than the room beside the bar, so a big selection grows a row rather than push the bar
+above the minimap.
+
+Seen on the bench 2026-10-17 (a scene of 30 and of 40 destroyers, Federation theme):
+at 1280x720 the bar beside the minimap with 1, 6, 30 and 40 selected; at 1024x768 the
+bar above the minimap and the panel centred in the row, with 1, 6 and 30.
 
 ## The info panel
 
@@ -353,7 +379,14 @@ A click on one is `Producer::RequestDeleteBuildQueueItem` (vtable +0x140) with t
 slot, as `BuildWireframe::Simulate` does; the click sound with it.
 
 **A group** is the selection (`engine::selection`, destroyed ones left out, `+0x113`),
-each with its wireframe and hull. A click is `ShipIcon::Simulate`'s:
+each with its wireframe and hull, in a small tile (46 x 40 units): a group says which
+units are selected and how they stand, and the first tiles (70 x 78, eight to a row)
+made 24 units a panel half the screen's height, over the ships just selected (the
+user, 2026-10-17). The tiles fill rows as wide as the one-object panel, then up to
+three rows grow wider where the row has room, then rows are added: 30 units are three
+rows of ten, 40 (`QOL.asi`'s `MaxSelection`) four of ten. The hull is a plain strip
+under the wireframe: the theme's bar insets and stripes its fill, which at that height
+left nothing to see. A click is `ShipIcon::Simulate`'s:
 `cOverViewImp::Select` (vtable +0x90) with `(unit, 0, true, true)`, or with Shift
 `(unit, 1, false, true)`, which takes it out. Shift is the game's own binding
 (`g_pCommandShift`) or the keyboard's. There is no limit of 16: with `QOL.asi`'s
@@ -664,6 +697,30 @@ arrow, whenever the owner is a component we have taken (as it already did with n
 owner over a panel of ours). And while a box of ours that pauses the game shows, ours
 draws the arrow whenever the engine names no cursor. The cursor is drawn after the
 overlay layer, where the boxes are.
+
+## The layout log
+
+`hud/layout.rs`, with `[HUD] LayoutLog=1`, for the test bench. Every panel of ours
+draws its frame through `Ui::panel`, so that one call is where the HUD's rectangles
+can be read exactly, without measuring a screenshot. While a mission's frame is laid
+out (`hud::run`, from `layout::begin` to `layout::end`), `Ui::panel` hands each
+rectangle to `layout::note` under the name of the panel `hud::run` is drawing
+(`layout::at`: `unitview`, `minimap`, `info`, `bar`, `comm`, and the names of the
+smaller panels' scopes, `resources`, `buttons`, `replay`, `trade`, `pause`, ...). The
+unit view's frame is strokes, not a panel, so `unitview` notes its own outer edge. The
+hover card and the tooltips are left out: they come and go with the pointer.
+
+After the last panel, a layout that differs from the one last written and has held for
+five frames is written to UI.log as one line, in screen pixels, x,y,w,h rounded:
+
+    layout: 1920x1080 | unitview 1637,807,273,263 | minimap 10,770,310,300 | info ... | bar ...
+
+The five frames keep a layout that settles over a frame or two (the bar is placed
+against the info panel, which can change size the frame a selection does) to one line.
+With the key at 0, as in play, `note` tests one flag and keeps nothing.
+`testbench/scenarios/ui-hud-layout.md` reads the last line and fails on panels that
+overlap, panels at the bottom that rise too far up the screen, and panels that cover
+too much of it (`testbench/scenarios/README.md`, "The HUD's layout").
 
 ## The engine API
 

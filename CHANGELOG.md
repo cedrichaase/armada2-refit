@@ -5,39 +5,140 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 12.26.0 — 2026-10-17
+## 12.34.0 — 2026-10-17
 
-Layers: testbench 3.32.0.
+Layers: testbench 3.37.0.
 
 ### Added
 - `Scene.asi`'s `Race=` key and `SCENE_RACE=<race>` at install: the player's race, and
   so the HUD's look, pinned for a bench scene in stock and refit alike (testbench
-  3.32.0).
+  3.37.0).
 
 Installs nothing; seen working on the bench 2026-10-17 (`showcase`, `Hud=1`, `Race=federation`:
 the Federation HUD on 3 of 3 launches in stock and 3 of 3 in refit; `SCENE_RACE=klingon`
 over it: the Klingon theme).
 
-## 12.25.0 — 2026-10-17
+## 12.33.0 — 2026-10-17
 
-Layers: testbench 3.31.0, films 1.4.0.
+Layers: testbench 3.36.0, films 1.10.0.
 
 ### Added
 - Scene command `tech` and key `Tech=`, scene `assimilation`, so the bench can stage
-  the Borg technology assimilation beam (testbench 3.31.0); board `films/assimilation`
-  (films 1.4.0).
+  the Borg technology assimilation beam (testbench 3.36.0); board `films/assimilation`
+  (films 1.10.0).
 
 ### Fixed
-- Scenario `specials`: the assimilation beam forms (testbench 3.31.0).
+- Scenario `specials`: the assimilation beam forms (testbench 3.36.0).
 
-## 12.24.1 — 2026-10-17
+## 12.32.1 — 2026-10-17
 
-Layers: ui 0.11.1, testbench 3.30.1.
+Layers: ui 0.12.1, testbench 3.35.1.
 
 ### Fixed
 - `UI.asi`'s cursor is hidden while the engine's would be: Scene.asi's `Cursor=0` /
   `cursor off` hides the pointer in refit takes again, and the loading screen shows no
   cursor, as in stock.
+
+Installed, not yet seen in game.
+
+## 12.32.0 — 2026-10-17
+
+Layers: testbench 3.35.0.
+
+### Added
+- Test bench: `Scene.asi`'s `Zoom=` key and `zoom` command, the RTS camera's zoom as a
+  level from 0 to 1, for shots that need a player's-eye view without key presses.
+
+Installed, not yet seen in game.
+
+## 12.31.0 — 2026-10-17
+
+Layers: ui 0.12.0, testbench 3.34.0.
+
+### Added
+- A regression test for the HUD's layout: `./a2test run ui-hud-layout` lays the UI's
+  HUD out at 4:3, 16:9 and 21:9 with 1, 6 and 30 ships selected, from UI.asi's own
+  panel rectangles (`[HUD] LayoutLog`), and writes the shots as a contact sheet.
+
+Installed, not yet seen in game.
+
+## 12.30.0 — 2026-10-17
+
+Layers: testbench 3.33.0, films 1.9.0.
+
+### Added
+- Takes record the game's sound by category: `Mute:` silences music, voice, effects or
+  interface in a take (`a2test session start --mute`), and `Stems:` records music, voice
+  and interface as separate tracks beside it (`--stems`, `Stems.asi` in the bench clone
+  only), mixed per shot in the animatic with `Audio: effects + voice -6` (e682c70).
+
+Installed, not yet seen in game.
+
+## 12.29.0 — 2026-10-17
+
+Layers: testbench 3.32.0, films 1.8.0.
+
+### Added
+- Event marks for films: `Scene.asi` logs timestamped events per take, `a2film` keeps
+  them as `<take>.marks.json`, lists them (`a2film marks`), suggests `In`/`Length` from
+  them (`Cut:`) and checks a shot's `Expect:` after filming (1aacd31).
+
+Installed, not yet seen in game.
+
+## 12.28.0 — 2026-10-17
+
+Layers: testbench 3.31.0, films 1.7.0.
+
+### Added
+- A machine-wide queue for game slots: bench sessions, `a2test run` cases and `a2film`
+  takes wait for a free slot (`A2_SLOTS`, default 2 to 3) instead of all starting at
+  once, and say who holds the others; `a2test slots` and `a2film slots` list them
+  (testbench 3.31.0, films 1.7.0).
+- `a2film` films a take once more when its game died with it (films 1.7.0).
+
+Tooling only; nothing to see in game.
+
+## 12.27.0 — 2026-10-17
+
+Layers: films 1.6.0.
+
+### Added
+- `a2film`: boards split over files (`Include:`), `a2film adopt` for another board's
+  takes of the same shot, the shot field `Tier:` for money shots probed larger in the
+  same run (at the final resolution: filmed as the final take), and the reference catalogue `films/reference/` with `From: ref:<id>`; the
+  rough cut uses each shot's best take (films 1.6.0, 13be105).
+
+Tooling only; nothing to see in game.
+
+## 12.26.0 — 2026-10-17
+
+Layers: films 1.5.0.
+
+### Added
+- `a2film review`: contact sheets, flags, motion curves and variant differences for the
+  takes of a board, with an HTML overview (films 1.5.0).
+
+Tooling only; nothing to see in game.
+
+## 12.25.0 — 2026-10-17
+
+Layers: films 1.4.0.
+
+### Added
+- `a2film animatic`: numbered cuts (`animatic-<tier>-rc<N>.mp4`, the latest still
+  `animatic-<tier>.mp4`) with a `cuts.json` log, partial cuts (`--only`, `--section`,
+  `--from`/`--to`) and a `<cut>.shots.json` shot map beside every cut (films 1.4.0).
+
+Tooling only; nothing to see in game.
+
+## 12.24.1 — 2026-10-17
+
+Layers: ui 0.11.1, testbench 3.30.1.
+
+### Changed
+- The HUD's bottom row: the bar beside the minimap at 16:9 and wider, the info panel
+  moved right for it; above the minimap at 4:3. A group's tiles are smaller, so a big
+  selection stays low (ui 0.11.1; testbench 3.30.1 follows it in two scenarios).
 
 Installed, not yet seen in game.
 

@@ -5,13 +5,118 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
-## 1.4.0 — 2026-10-17
+## 1.10.0 — 2026-10-17
 
 ### Added
 - `films/assimilation`: the Borg technology assimilation beam on a Sovereign, stock
   and refit in a wipe, close (`as01`) and a little wider (`as02`), against dark sky.
 
 Installed, not yet seen in game.
+
+## 1.9.0 — 2026-10-17
+
+### Added
+- Fields `Mute:` and `Stems:` (shot, section or film; the nearest wins): categories
+  muted in the take, and categories recorded as stems beside it
+  (`<variant>.music.wav`, `.voice.wav`, `.interface.wav`, and `.effects.wav` for the rest),
+  cut to the take's time line. In the spec only when set, so existing takes stay current.
+- `Audio:` takes a mix of stems, `effects + voice -6`, which the animatic plays; the
+  manifest gives each shot's `mute`, `stems` and `mix` and each take's `stems` (e682c70).
+
+### Changed
+- With stems, a take's own track is the stems summed at unity, the whole of its sound.
+
+Installed, not yet seen in game.
+
+## 1.8.0 — 2026-10-17
+
+### Added
+- Event marks per take, `<take>.marks.json` (`a2film-marks/1`): Scene.asi's marks, the
+  action runner's lines (`action.<op>` and `.done`; `.events.json` gains `t1`) and the
+  UI's menu dialogs from `UI.log`, on the take's clock.
+- `a2film marks <board> [shots]` (`--tier`, `--variant`, `--kind`, `--setup`, `--json`).
+- Shot fields `Cut:` (`from <mark> to <mark> [pad S]`: `check` and `status` print the
+  `In` and `Length` it gives) and `Expect:` (checked after filming; a take that misses
+  it is `suspect`, re-filmed by `probe`/`take`, not current in the manifest).
+- The manifest's takes carry `marks`, `cut` and `expect`; the board `films/marks` and
+  `films/film/selftest_marks.py` (1aacd31).
+
+Tooling only; nothing to see in game.
+
+## 1.7.0 — 2026-10-17
+
+### Added
+- Every take starts in a game slot of the bench's machine-wide queue (testbench 3.31.0);
+  a shot with `Players` takes all its slots at once. `a2film slots` lists the holders
+  and waiters.
+- A take whose game died with it (crash, killed under load, no launch, gone before the
+  scene or at the end of the action) is filmed once more; a shot with `Players` as a
+  whole. Pinned in `film/selftest.py`.
+
+Tooling only; nothing to see in game.
+
+## 1.6.0 — 2026-10-17
+
+### Added
+- A board over several files: `Include: <file>.md` splices a file of the film's folder
+  in where it stands (sections and shots, in order, nested); shot ids are unique across
+  all of them. `check` lists the files and marks each shot's; the manifest carries
+  `includes` and each shot's `file`. Where a shot is written is not in its spec, so
+  moving it between files keeps its takes (13be105).
+- `a2film adopt <source> <shot>... <target> [--as ID]`: take over another board's takes
+  of a shot whose spec is the same, less the film's and shot's names; copied (reflinked)
+  with the `.spec.json` rewritten and an `adopted` key (13be105).
+- The shot field `Tier:` (`1080`, `1440`, `2160`, `4k`, `WxH` or `final`): the shot is
+  probed at that size, or its final take filmed, in the same probe run; takes larger
+  than the probes run after the others, one at a time. A size equal to `Final` (`2160`
+  or `4k` at 3840x2160) is `final`: the final take is filmed in the probe run, not a
+  probe that `take` would film again (13be105).
+- `films/reference/`, the reference catalogue (`README.md`, `catalogue.md` with one
+  example entry), and `From: ref:<id>` for footage shots, with the entry's `In`/`Out` (13be105).
+- `--ignore-code` on `animatic` and `sheet` (13be105).
+
+### Changed
+- `animatic`, `sheet` and `manifest` at the probe tier cut each shot from its best take,
+  final or probe (current first, then the larger), scaled to the cut; a manifest take
+  says its `tier`. With probe takes only, as before (13be105).
+- `films/film/selftest.py` also pins included files, `Tier:`, the take a cut picks,
+  `adopt` and the catalogue (13be105).
+
+Tooling only; nothing to see in game.
+
+## 1.5.0 — 2026-10-17
+
+### Added
+- `a2film review <board> [shots...]` (`--tier`, `--jobs`, `film/review.py`): a first pass
+  over the takes. A contact sheet with timecodes, a motion curve with its peaks and
+  settle point and flags with timestamps (black, frozen, flashes and white squares, a
+  take ending before `In`+`Length`, silent or clipping sound) for every take; how two
+  variants differ over time (barely differ, will not line up, constant offset); an HTML
+  overview per board next to the takes, a summary table with suggested `In` / `Length`
+  where obvious. The selftest pins the flags on clips made with ffmpeg. Needs numpy and
+  Pillow, and `a2film` runs without them (the command is missing).
+
+Tooling only; nothing to see in game.
+
+## 1.4.0 — 2026-10-17
+
+### Added
+- `a2film animatic` keeps every cut as `animatic-<tier>-rc<N>.mp4`, with
+  `animatic-<tier>.mp4` (a copy) as the latest; `--name <label>` writes
+  `animatic-<tier>-<label>.mp4` instead. `cuts.json` logs each cut: number, date,
+  duration, board hash and commit, shots with their takes.
+- Partial cuts: `--only`, `--section` and `--from`/`--to` cut part of the film,
+  quickly, to `animatic-<tier>-part-<label>.mp4` (not numbered, the latest stays).
+- A shot map, `<cut>.shots.json` (`a2film-shots/1`), beside every cut: each shot's span
+  in the cut, a non-overlapping `owns_start`/`owns_end` that maps any time to a shot,
+  variants, layout, takes and status.
+- `python3 films/film/selftest.py` also pins the cuts (needs ffmpeg).
+
+### Changed
+- A whole-film cut no longer overwrites the previous one; `animatic-<tier>.mp4` is
+  still written, with the same content as before.
+
+Tooling only; nothing to see in game.
 
 ## 1.3.0 — 2026-10-16
 

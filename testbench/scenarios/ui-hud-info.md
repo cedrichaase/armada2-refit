@@ -18,7 +18,9 @@ the look, so the clicks below land on the same places whatever race the bench's 
 gets (the race is the mission's, and `UI.log` names it: "race: the HUD's race is").
 
 At 1280x720 in the Borg theme: the starbase's queue is the bottom row of the panel,
-slot 3 at 542,676; the group's three icons sit at 590, 640 and 690 on row 680. `UI.log`
+slot 3 at 579,667; the group's three icons sit at 597, 640 and 683 on row 688 (the
+panel moved right for the bar beside the minimap, and its group tiles are small:
+HUD.md, "The bottom row"). `UI.log`
 names each object the panel describes once ("info: Single <name> | <class> | ..."),
 each tooltip ("info: tooltip ..."), and each press ("info: cancel queue slot 2",
 "info: select ...").
@@ -52,21 +54,21 @@ each tooltip ("info: tooltip ..."), and each press ("info: cancel queue slot 2",
 27. Press q.
 28. Press q.
 29. Wait 1 second.
-30. Move the mouse to 542,676.
+30. Move the mouse to 579,667.
 31. Wait 2 seconds.
 32. Take a screenshot called "queue".
 33. Check that the panel's bottom row shows several small ship wireframes in boxes, the first outlined, with a thin progress bar under it, and a tooltip naming the ship is shown above the panel.
-34. Click at 542,676.
+34. Click at 579,667.
 35. Wait 1 second.
 36. Expect "UI.log" contains "info: cancel queue slot 2".
 37. Wait 60 seconds.
 38. Scene "select d1 d2 d3".
 39. Wait 1 second.
-40. Move the mouse to 640,680.
+40. Move the mouse to 640,688.
 41. Wait 2 seconds.
 42. Take a screenshot called "group".
 43. Check that the panel at the bottom shows three boxes side by side, each with a small ship wireframe and a thin bar under it, and a tooltip naming one destroyer and its class above them.
-44. Click at 590,680.
+44. Click at 597,688.
 45. Wait 1 second.
 46. Expect "UI.log" contains "info: select".
 47. Expect scene "selection" answers "selected 1".
@@ -77,6 +79,6 @@ each tooltip ("info: tooltip ..."), and each press ("info: cancel queue slot 2",
 52. Move the mouse to 770,270.
 53. Wait 1 second.
 54. Take a screenshot called "hover".
-55. Check that a small card naming "Starbase" with a bar is shown beside the panel at the bottom, at its right.
+55. Check that a small card naming "Starbase" with a bar is shown beside the panel at the bottom, at its right, or above the panel's right end.
 56. Expect the game is still running.
 57. Expect no crash.

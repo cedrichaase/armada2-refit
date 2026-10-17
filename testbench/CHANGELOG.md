@@ -5,7 +5,7 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 3.32.0 — 2026-10-17
+## 3.37.0 — 2026-10-17
 
 ### Added
 - `Scene.asi`'s `Race=` key (`federation`, `klingon`, `romulan`, `cardassian`, `borg`,
@@ -18,7 +18,7 @@ Installs nothing; seen working on the bench 2026-10-17 (`showcase`, `Hud=1`, `Ra
 the Federation HUD on 3 of 3 launches in stock and 3 of 3 in refit; `SCENE_RACE=klingon`
 over it: the Klingon theme).
 
-## 3.31.0 — 2026-10-17
+## 3.36.0 — 2026-10-17
 
 ### Added
 - Scene command `tech <team | object> <item> [on|off]` and object key `Tech=`: a
@@ -32,13 +32,94 @@ over it: the Klingon theme).
   is fired); it ended on the tick it was fired, because `a2_borg01`'s tech tree makes
   the Sovereign's corbomite impossible.
 
-## 3.30.1 — 2026-10-17
+## 3.35.1 — 2026-10-17
 
 ### Changed
 - Scenario `ui-widgets-cursor`: Scene.asi's `cursor off` then `cursor on`, with
-  `UI.asi`'s cursor hidden and shown with it (ui 0.11.1).
+  `UI.asi`'s cursor hidden and shown with it (ui 0.12.1).
 
 Installed, not yet seen in game.
+
+## 3.35.0 — 2026-10-17
+
+### Added
+- `Scene.asi`: `Zoom=` in `[Scene]` and the `zoom [<level>]` command set the RTS
+  camera's zoom as a level from 0 (closest) to 1 (farthest), through the camera in use's
+  `SetZoomLevel`, and answer with the level, the camera and its raw limits; `query` ends
+  with the same line. `Zoom=0.37` is the view of 150 `ctrl+Down` then 35 `ctrl+Up`.
+  Scene `zoom`.
+
+Installed, not yet seen in game.
+
+## 3.34.0 — 2026-10-17
+
+### Added
+- Scenario `ui-hud-layout`: the UI's HUD at 1024x768, 1920x1080 and 2560x1080 with 1,
+  6 and 30 ships selected, failing when panels overlap, when a panel at the bottom
+  rises more than 45% up the screen, or when the panels cover more than 30% of it (60%
+  and 42% on screens narrower than 3:2, the user's call for 4:3); from UI.asi's own
+  rectangles (ui 0.12.0, `[HUD] LayoutLog=1`).
+- Checks `Expect the HUD's panels not to overlap`, `... at the bottom to rise at most
+  N% of the screen's height`, `... to cover at most N% of the screen`, each with an
+  optional `(M% at 4:3)` for screens narrower than 3:2, and `Take a
+  layout screenshot called "NAME"` (the shot with the panels drawn on it).
+- Scenario header `Sheet:` (shot names): the run writes `<scenario>/sheet.png`, a row
+  per case and a column per shot, and links it from the report.
+- Scene `ui-hud-layout`: thirty Federation destroyers, `s1`..`s30`.
+
+### Changed
+- Scene.asi's `select` takes up to 39 names in one command (a command had 12 words).
+
+Installed, not yet seen in game.
+
+## 3.33.0 — 2026-10-17
+
+### Added
+- `session start --mute CATS`: the game's `music`, `voice`, `effects` and `interface`
+  volumes at 0 in the clone's `ARMADA.PRF` (its third line), the user's install untouched.
+- `session start --stems CATS`: `music`, `voice` and `interface` each played on a null
+  sink of its own (`a2test-<id>-<category>`) by `stems/Stems.asi`, which moves that
+  category's 2D sounds to a DirectSound device on it; the rest stays on the session's
+  sink as the effects stem. Stems are set to full volume. `Stems.log`, `Stems.ini`
+  gathered with the logs (e682c70).
+
+Installed, not yet seen in game (measured on the bench: `a2_fed01` intro, three stems).
+
+## 3.32.0 — 2026-10-17
+
+### Added
+- Event marks: `Scene.asi` writes `Scene.marks`, timestamped events on the host's clock
+  (`epoch` lines from `GetSystemTimeAsFileTime`): camera move and settle, glide and spin,
+  selection (count and names), cloak and decloak steps, fire bursts per shooter and
+  weapon ODF (beams included), explosions, crafts destroyed and removed, commands and
+  specials. Read each frame from the camera hook; nothing new is patched.
+- Scene-file section `[Marks]` (`Enable`, `FireGap`, `Still`) and the command `marks`.
+- The bench clears `Scene.marks` at launch and gathers it with the logs (1aacd31).
+
+Installed, not yet seen in game (seen on the bench 2026-10-17, `films/marks`).
+
+## 3.31.0 — 2026-10-17
+
+### Added
+- Game slots (`bench/slots.py`): one machine-wide queue for game instances, `N` flock
+  files under `$A2_SLOTS_DIR` (default `$XDG_RUNTIME_DIR/a2-slots`, else
+  `$A2_DATA/locks`). `Session.create` takes a slot (or one handed down in `A2_SLOT_FD`)
+  and the session's sway and launcher hold it until teardown; `a2test run` takes one per
+  case, all of a `Players:` case's at once. `--jobs` above the count queues.
+- `A2_SLOTS` (environment, or `armada2-refit.conf`) sets the count; the default is 2 to 3
+  from cores and memory. `A2_SLOTS_DIR`, `A2_SLOTS_POLL`.
+- `a2test slots`: holders (pid, worktree, label, session, since) and waiters.
+- `bench/slots_selftest.py`: dummy-process checks of the queue.
+
+Tested with dummy processes and three real session starts; not yet seen under load.
+
+## 3.30.1 — 2026-10-17
+
+### Changed
+- `ui-hud-info` and `ui-hud-bar` click where ui 0.11.1's bottom row puts the queue,
+  the group's tiles and the bar.
+
+Installs nothing.
 
 ## 3.30.0 — 2026-10-17
 

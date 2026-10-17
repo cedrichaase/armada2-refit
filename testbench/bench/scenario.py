@@ -32,7 +32,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, judge, vision
+from . import config, judge, slots, vision
 from .log import Log
 from .session import GameError, Session
 
@@ -54,6 +54,7 @@ class Scenario:
     assets: str = ''               # 'none': install this checkout with an empty A2_DATA
     players: list = field(default_factory=list)   # ['host', 'joiner']: one game each
     setup: str = ''                # a script run on each clone before launch
+    sheet: list = field(default_factory=list)     # shot names: a contact sheet, cases x shots
     description: str = ''
     steps: list = field(default_factory=list)
 
@@ -92,7 +93,7 @@ def case_dirname(res, mod, scn_mod):
     return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
 
 
-HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup)'
+HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|sheet)'
                     r'\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
 
@@ -151,7 +152,8 @@ def parse(path):
                     stock_shell=hdr.get('stock shell', '').strip().lower(),
                     assets=hdr.get('asset', '').strip().lower(),
                     players=[w.lower() for w in re.split(r'[,\s]+', hdr.get('player', '')) if w],
-                    setup=hdr.get('setup', '').strip('` '))
+                    setup=hdr.get('setup', '').strip('` '),
+                    sheet=[w.strip().strip('"“”') for w in hdr.get('sheet', '').split(',') if w.strip()])
 
 
 # ---------------------------------------------------------------------- step table
@@ -671,6 +673,157 @@ def s_flat(c, m):
                      measure=dict(fraction=r['fraction'], regions=big[:6]))
 
 
+# -- the HUD's layout, from UI.asi's own rectangles ([HUD] LayoutLog=1)
+
+LAYOUT_LINE = re.compile(r'layout: (?P<w>\d+)x(?P<h>\d+)(?P<rest>.*)$')
+
+
+def hud_layout(c, wait=8):
+    """The HUD's panels as UI.asi last laid them out: the last `layout:` line of UI.log
+    (`ui/src/hud/layout.rs`), at this case's resolution, as a list of
+    dict(name, x, y, w, h) in screen pixels. Waits up to `wait` seconds for one."""
+    W, H = c.res
+    end = time.time() + wait
+    while True:
+        body = c.sess.game_log('UI.log') or ''
+        found = None
+        for line in body.splitlines():
+            m = LAYOUT_LINE.search(line)
+            if m and (int(m.group('w')), int(m.group('h'))) == (W, H):
+                found = m
+        if found:
+            panels = []
+            for part in found.group('rest').split('|'):
+                part = part.strip()
+                mm = re.match(r'^(\S+) (-?\d+),(-?\d+),(-?\d+),(-?\d+)$', part)
+                if mm:
+                    x, y, w, h = (int(v) for v in mm.groups()[1:])
+                    panels.append(dict(name=mm.group(1), x=x, y=y, w=w, h=h))
+            return panels, found.group(0)
+        if time.time() > end:
+            raise StepFailed('UI.log has no "layout:" line at this resolution: is [HUD] LayoutLog=1 set '
+                             '(ui/bench-asi.sh HUD.LayoutLog=1) and the HUD up?')
+        time.sleep(0.5)
+
+
+def overlaps(panels, slack=1):
+    """Every pair of panels whose rectangles share more than `slack` px on both axes."""
+    out = []
+    for i, a in enumerate(panels):
+        for b in panels[i + 1:]:
+            ox = min(a['x'] + a['w'], b['x'] + b['w']) - max(a['x'], b['x'])
+            oy = min(a['y'] + a['h'], b['y'] + b['h']) - max(a['y'], b['y'])
+            if ox > slack and oy > slack:
+                out.append((a, b, ox, oy))
+    return out
+
+
+def bottom_panels(panels, H):
+    """The panels standing on the bottom half of the screen (their bottom edge below
+    the middle): the minimap, the info panel, the bar, the unit view."""
+    return [p for p in panels if p['y'] + p['h'] > H / 2]
+
+
+def covered(panels, W, H):
+    """The share of the screen under at least one panel (the union, not the sum)."""
+    xs = sorted({min(max(v, 0), W) for p in panels for v in (p['x'], p['x'] + p['w'])})
+    area = 0
+    for x0, x1 in zip(xs, xs[1:]):
+        spans = sorted((max(p['y'], 0), min(p['y'] + p['h'], H)) for p in panels
+                       if p['x'] <= x0 and p['x'] + p['w'] >= x1)
+        y_end, h = -1, 0
+        for a, b in spans:
+            if b <= y_end:
+                continue
+            h += b - max(a, y_end)
+            y_end = b
+        area += (x1 - x0) * h
+    return area / float(W * H)
+
+
+def layout_limit(c, m):
+    """A layout check's limit as a fraction: `pct`, or `pct43` on a screen narrower than
+    3:2 (4:3, 5:4) when the step gives one ("at most 45% ... (60% at 4:3)")."""
+    W, H = c.res
+    if m.group('pct43') and W / H < 1.5:
+        return float(m.group('pct43')) / 100
+    return float(m.group('pct')) / 100
+
+
+def _layout_boxes(panels, bad=()):
+    return [dict(p, label=p['name']) for p in panels if p['name'] not in bad], \
+           [dict(p, label=p['name']) for p in panels if p['name'] in bad]
+
+
+def _layout_shot(c, panels, bad=(), line=None, name=None):
+    """A fresh screenshot (or the named one) with every panel drawn on it: green, or
+    red for the panels a check failed."""
+    path = c.shot(name) if name else c.fresh_shot(f'check-{c.n}')
+    ok, red = _layout_boxes(panels, bad)
+    out = path.with_name(path.stem + '-layout.png')
+    vision.annotate(path, out, ok)
+    if red:
+        vision.annotate(out, out, red, color=(0, 0, 255))
+    return out
+
+
+@step(r'^take a (?:hud )?layout screenshot (?:called|named) ' + Q.format('name') + r'$')
+def s_layout_shot(c, m):
+    """The named screenshot, and beside it `<name>-layout.png` with the HUD's panels
+    (UI.log's last layout) drawn on it, for the contact sheet."""
+    panels, line = hud_layout(c)
+    out = _layout_shot(c, panels, name=m.group('name'))
+    c.log.shot(out, m.group('name') + ' (layout)')
+    return f'{out.name}: {line}'
+
+
+@step(r"^expect (?:that )?(?:the )?hud(?:'s)? panels (?:do not|don't|not to|never) overlap$")
+def s_layout_overlap(c, m):
+    panels, line = hud_layout(c)
+    ov = overlaps(panels)
+    bad = {p['name'] for a, b, _, _ in ov for p in (a, b)}
+    detail = ('; '.join(f"{a['name']} and {b['name']} overlap by {ox}x{oy} px" for a, b, ox, oy in ov)
+              if ov else f'{len(panels)} panels, none overlapping') + '\n' + line
+    return c.checked(not ov, detail, [_layout_shot(c, panels, bad, line)],
+                     how="UI.asi's own panel rectangles ([HUD] LayoutLog=1, UI.log), intersected pairwise",
+                     measure=dict(panels=panels, overlaps=[[a['name'], b['name'], ox, oy] for a, b, ox, oy in ov]))
+
+
+@step(r"^expect (?:that )?(?:the )?hud(?:'s)? panels at the bottom (?:to )?(?:rise|reach|stand) "
+      r"(?:at most|no (?:more|higher) than) (?P<pct>[\d.]+)% (?:up )?(?:of )?the screen(?:'s)? (?:height)?"
+      r"(?: \((?P<pct43>[\d.]+)% at 4:3\))?$")
+def s_layout_height(c, m):
+    panels, line = hud_layout(c)
+    W, H = c.res
+    limit = layout_limit(c, m)
+    floor = H * (1 - limit)
+    low = bottom_panels(panels, H)
+    high = [p for p in low if p['y'] < floor - 0.5]
+    rises = ', '.join(f"{p['name']} {100 * (H - p['y']) / H:.0f}%" for p in low)
+    detail = (('; '.join(f"{p['name']}'s top edge at y {p['y']}, {100 * (H - p['y']) / H:.1f}% up the screen"
+                         for p in high) if high else f'every panel at the bottom within {limit:.0%}')
+              + f' (limit: top edges at y >= {floor:.0f} of {H}; {rises})\n' + line)
+    return c.checked(not high, detail, [_layout_shot(c, panels, {p['name'] for p in high}, line)],
+                     how="UI.asi's own panel rectangles ([HUD] LayoutLog=1, UI.log): the top edge of each "
+                         "panel whose bottom is in the lower half",
+                     measure=dict(panels=panels, limit=limit,
+                                  rise={p['name']: round((H - p['y']) / H, 4) for p in low}))
+
+
+@step(r"^expect (?:that )?(?:the )?hud(?:'s)? panels (?:to )?cover (?:at most|no more than) (?P<pct>[\d.]+)% "
+      r"of the screen(?: \((?P<pct43>[\d.]+)% at 4:3\))?$")
+def s_layout_cover(c, m):
+    panels, line = hud_layout(c)
+    W, H = c.res
+    limit = layout_limit(c, m)
+    share = covered(panels, W, H)
+    ok = share <= limit
+    detail = f'the panels cover {share:.1%} of the screen (limit {limit:.0%})\n' + line
+    return c.checked(ok, detail, [_layout_shot(c, panels, () if ok else {p['name'] for p in panels}, line)],
+                     how="UI.asi's own panel rectangles ([HUD] LayoutLog=1, UI.log), their union's area",
+                     measure=dict(panels=panels, share=round(share, 4), limit=limit))
+
+
 # -- judged and delegated
 
 @step(r'^(?:check|verify|ensure|expect|confirm|assert|make sure)(?: that)? (?P<what>.+)$')
@@ -711,12 +864,12 @@ class Case:
 
     # -- running
 
-    def _new_session(self, artifacts, label):
+    def _new_session(self, artifacts, label, slot=None):
         return Session.create(artifacts, self.res, mod=self.mod, stock_shell=self.scn.stock_shell,
                               assets=self.scn.assets or None, vnc=self.opts.get('vnc'),
                               record=self.opts.get('record'), audio=self.opts.get('audio'),
                               keep=self.opts.get('keep'), label=label,
-                              installs=self.opts.get('installs') if self.mod == 'refit' else None)
+                              installs=self.opts.get('installs') if self.mod == 'refit' else None, slot=slot)
 
     def _bring_up(self, sess, player=None):
         sess.clone()
@@ -753,13 +906,21 @@ class Case:
             self.dir.mkdir(parents=True, exist_ok=True)
             Log(self.dir).meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps),
                                players=', '.join(self.scn.players))
-            for p in self.scn.players:
-                sess = self._new_session(self.dir / p, f'{self.name}/{p}')
-                sess.log = _PlayerLog(self.dir, p)
-                self.sessions[p] = sess
+            # all the players' slots at once (slots.py): never one game waiting on another's
+            held = slots.acquire(self.name, n=len(self.scn.players), say=self.say, stop=self.opts.get('stop'))
+            try:
+                for p, slot in zip(self.scn.players, list(held)):
+                    sess = self._new_session(self.dir / p, f'{self.name}/{p}', slot=slot)
+                    held.remove(slot)           # the session owns it now
+                    sess.log = _PlayerLog(self.dir, p)
+                    self.sessions[p] = sess
+            finally:
+                for slot in held:
+                    slot.release()
             self.sess = self.sessions[self.scn.players[0]]
         else:
-            self.sess = self._new_session(self.dir, self.name)
+            slot = slots.acquire(self.name, say=self.say, stop=self.opts.get('stop'))[0]
+            self.sess = self._new_session(self.dir, self.name, slot=slot)
             self.log.meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps))
         try:
             if self.sessions:

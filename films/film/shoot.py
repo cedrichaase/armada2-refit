@@ -17,6 +17,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from . import code
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'testbench'))
+from bench import slots  # noqa: E402  (the machine-wide queue for game instances)
+from . import marks
 from . import storyboard as sb
 from .cli import IGNORE_CODE, command, load, select, take_check
 
@@ -45,6 +48,10 @@ def probe_duration(path):
         return 0.0
 
 
+class GameDied(RuntimeError):
+    """The game (or its start) failed the way a loaded machine makes it fail: a take is tried again once."""
+
+
 class Take:
     """One shot, one variant, one tier: a session from start to stop."""
 
@@ -55,12 +62,16 @@ class Take:
         self.sid = None
         self.sess = None
         self.log = None
+        self.slot = None        # a game slot taken for it (an Ensemble takes its players' together)
         self.app = None         # a desktop shot's program, once `run` has started it
         self.desktop = shot.kind == 'desktop'
+        self.tail = None        # UI.log, followed from the setup on (marks.Tail)
+        self.scene_marks = None  # Scene.marks, read before the session (and its clone) goes
+        self.suspect = []       # the expectations (Expect:) the take did not meet
         # pointer coordinates are written in the film's Pointer space: a game take scales
         # them to its pixels, a desktop take to its logical units (its output is scaled to
         # DESKTOP_ROWS logical rows at every tier, so a window is the same size in each)
-        w, h = (int(v) for v in film.res(tier).split('x'))
+        w, h = (int(v) for v in film.res(tier, shot).split('x'))
         pw, ph = film.pointer
         self.scale = h / DESKTOP_ROWS
         self.k = (w / self.scale / pw, DESKTOP_ROWS / ph) if self.desktop else (w / pw, h / ph)
@@ -83,18 +94,33 @@ class Take:
             env['SCENE_MUSIC'] = '0'
         label = f'film-{f.name}-{s.id}-{self.variant}-{self.tier}'
         if self.desktop:      # no game: a stock clone to install into, and its display
-            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier), '--mod', 'stock', '--no-launch',
+            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier, s), '--mod', 'stock', '--no-launch',
                    '--label', label]
         else:
             # a shot with Prepare: starts without the game, prepares the clone, then launches
             prep = ['--no-launch'] if s.get('Prepare') else [f'--args={f.args(s)}']   # '-nointro' alone reads as a flag
-            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier),
+            cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier, s),
                    *f.variants[s.install_variant(self.variant)].split(), *prep, '--label', label]
-        r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True)
+            # the sound: categories muted in the clone, and those recorded as stems
+            if s.mute:
+                cmd += ['--mute', ','.join(s.mute)]
+            if s.stems:
+                cmd += ['--stems', ','.join(s.stems)]
+        # The slot is handed to the session start, whose sway and game hold it from there
+        # on; our copy of the descriptor is dropped as soon as it returns.
+        slot = self.slot or slots.acquire(self.tag, say=lambda m: self.note(m.splitlines()[0]))[0]
+        self.slot = None
+        try:
+            env.update(slot.env())
+            r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True, pass_fds=(slot.fd,))
+        finally:
+            slot.close()
         self.log.write(r.stdout + r.stderr)
         m = re.search(r'^session (\S+)', r.stdout, re.M)
         if not m:
-            raise RuntimeError('session did not start: ' + (r.stdout + r.stderr).strip()[-300:])
+            out = (r.stdout + r.stderr).strip()
+            err = ('session did not start: ' + out[-300:])
+            raise (GameDied if re.search(r'launcher exited|did not appear', out) else RuntimeError)(err)
         self.sid = m.group(1)
         self.note(f'session {self.sid}')
         if s.get('Prepare'):
@@ -114,7 +140,7 @@ class Take:
                     break
                 self.note(f'launch {attempt} failed: {out[:200]}')
                 if attempt == 2:
-                    raise RuntimeError(f'the game did not launch: {out[:200]}')
+                    raise GameDied(f'the game did not launch: {out[:200]}')
                 time.sleep(3)
             self.note('prepared and launched')
 
@@ -137,7 +163,7 @@ class Take:
         while time.time() - t0 < READY_TIMEOUT:
             if 'not running' in self.drive('running'):
                 if seen or time.time() - t0 > 120:
-                    raise RuntimeError('the game died before the scene was built')
+                    raise GameDied('the game died before the scene was built')
                 time.sleep(3)
                 continue
             seen = True
@@ -146,6 +172,12 @@ class Take:
                 return
             time.sleep(4)
         raise RuntimeError(f'no scene after {READY_TIMEOUT} s')
+
+    def check_alive(self):
+        """A game that died under the take (a crash, or killed under load) has nothing
+        to record: GameDied, so the take is tried again."""
+        if not self.desktop and self.sid and 'not running' in self.drive('running'):
+            raise GameDied('the game died during the take')
 
     def stop(self):
         if getattr(self, 'wall', None) and self.wall.poll() is None:
@@ -288,50 +320,55 @@ class Take:
             op, _, arg = line.partition(' ')
             if events is not None:
                 events.append(dict(t=round(time.time() - t0, 3), op=op, arg=arg))
-            if op == 'wait':
-                time.sleep(float(arg))
-            elif op == 'scene':
-                out = self.drive('scene', *[c.strip() for c in arg.split(';')])
-                if re.search(r'unknown|error|no such', out, re.I):
-                    self.note(f'line {ln}: scene {arg} -> {out[:200]}')
-            elif op in ('key', 'shot', 'step'):
-                self.drive(op, arg)
-            elif op == 'click':
-                a = arg.split()
-                x, y = self.xy(float(a[0]), float(a[1]))
-                button = int(a[a.index('--button') + 1]) if '--button' in a else 1
-                if self.desktop:
-                    self.ptr(float(a[0]), float(a[1]), 0.3)
-                    self.bench().input(f'down {button}')
-                    time.sleep(0.08)
-                    self.bench().input(f'up {button}')
-                else:
-                    self.drive('click', str(round(x)), str(round(y)), *a[2:])
-            elif op == 'run':
-                self.run_app()
-            elif op == 'typelog':
-                self.typelog(*arg.split(None, 2))
-            elif op == 'ptr':
-                self.ptr(*[float(v) for v in arg.split()])
-            elif op == 'drag':
-                a = [float(v) for v in arg.split()]
-                self.ptr(a[0], a[1], 0.4)
-                time.sleep(0.15)
-                self.bench().input('down 1')
-                time.sleep(0.1)
-                self.ptr(a[2], a[3], a[4] if len(a) > 4 else 1.0)
-                time.sleep(0.2)
-                self.bench().input('up 1')
-            elif op == 'lclick':
-                a = [float(v) for v in arg.split()]
-                if a:
-                    self.ptr(*a)
-                time.sleep(0.12)
-                self.bench().input('down 1')
+            self.run_line(ln, op, arg)
+            if events is not None:
+                events[-1]['t1'] = round(time.time() - t0, 3)   # when it was done (a mark)
+
+    def run_line(self, ln, op, arg):
+        if op == 'wait':
+            time.sleep(float(arg))
+        elif op == 'scene':
+            out = self.drive('scene', *[c.strip() for c in arg.split(';')])
+            if re.search(r'unknown|error|no such', out, re.I):
+                self.note(f'line {ln}: scene {arg} -> {out[:200]}')
+        elif op in ('key', 'shot', 'step'):
+            self.drive(op, arg)
+        elif op == 'click':
+            a = arg.split()
+            x, y = self.xy(float(a[0]), float(a[1]))
+            button = int(a[a.index('--button') + 1]) if '--button' in a else 1
+            if self.desktop:
+                self.ptr(float(a[0]), float(a[1]), 0.3)
+                self.bench().input(f'down {button}')
                 time.sleep(0.08)
-                self.bench().input('up 1')
-            elif op == 'press':
-                self.bench().key(arg)
+                self.bench().input(f'up {button}')
+            else:
+                self.drive('click', str(round(x)), str(round(y)), *a[2:])
+        elif op == 'run':
+            self.run_app()
+        elif op == 'typelog':
+            self.typelog(*arg.split(None, 2))
+        elif op == 'ptr':
+            self.ptr(*[float(v) for v in arg.split()])
+        elif op == 'drag':
+            a = [float(v) for v in arg.split()]
+            self.ptr(a[0], a[1], 0.4)
+            time.sleep(0.15)
+            self.bench().input('down 1')
+            time.sleep(0.1)
+            self.ptr(a[2], a[3], a[4] if len(a) > 4 else 1.0)
+            time.sleep(0.2)
+            self.bench().input('up 1')
+        elif op == 'lclick':
+            a = [float(v) for v in arg.split()]
+            if a:
+                self.ptr(*a)
+            time.sleep(0.12)
+            self.bench().input('down 1')
+            time.sleep(0.08)
+            self.bench().input('up 1')
+        elif op == 'press':
+            self.bench().key(arg)
 
     def typelog(self, player, name, marker):
         """Type the word that follows `marker` in a log of another player's game, from its
@@ -353,6 +390,39 @@ class Take:
         self.note(f'typelog: {found[-1]} from {player}\'s {name}')
         self.drive('type', found[-1])
 
+    # ---------------------------------------------------------------- marks
+    def follow(self):
+        """Start following the game's UI.log, for the menu marks (none on a desktop)."""
+        if not self.desktop:
+            self.tail = marks.Tail(str(self.bench().game_dir / 'UI.log')).start()
+
+    def gather(self):
+        """Read what the game wrote for the marks, while its clone is still there."""
+        if self.tail:
+            self.tail.stop()
+        if not self.desktop and self.sid:
+            p = self.bench().game_dir / 'Scene.marks'
+            self.scene_marks = p.read_text(errors='replace') if p.exists() else None
+
+    def write_marks(self, t0, duration, events):
+        """<stem>.marks.json, and the shot's Expect: checked against it."""
+        ui = marks.ui_marks(self.tail.lines) if self.tail and self.tail.seen else None
+        scene = marks.parse_scene(self.scene_marks) if self.scene_marks else None
+        doc = marks.build(t0, duration, scene=scene, ui=ui, events=events)
+        exp = self.shot.get('Expect')
+        if exp:
+            try:
+                res = marks.verify(doc, exp)
+            except marks.MarkError as e:
+                res = [(exp, False, str(e))]
+            doc['expect'] = [dict(expect=e, ok=ok, detail=d) for e, ok, d in res]
+            self.suspect = [f'{e} ({d})' for e, ok, d in res if ok is False]
+            for e, ok, d in res:
+                self.note(f'expect {"ok" if ok else "FAILED" if ok is False else "not checked"}: {e} ({d})')
+        json.dump(doc, open(self.stem + '.marks.json', 'w'), indent=1)
+        n = len(doc['marks'])
+        self.note(f'{n} marks' + (f'; SUSPECT, expected {"; ".join(self.suspect)}' if self.suspect else ''))
+
     # ---------------------------------------------------------------- recording
     def record_start(self, raw):
         st = json.load(open(os.path.join(SESSIONS, self.sid, 'session.json')))
@@ -371,16 +441,24 @@ class Take:
         self.aud = subprocess.Popen(['parec', '-d', sink + '.monitor', '--file-format=wav', raw + '.wav'],
                                     stdin=subprocess.DEVNULL, stdout=self.log, stderr=subprocess.STDOUT,
                                     start_new_session=True) if sink else None
+        # each stem's own sink (Stems: ...); what stays on the session's sink is the effects
+        self.stem_recs = {}
+        for cat, ss in sorted((st.get('stem_sinks') or {}).items()):
+            self.stem_recs[cat] = subprocess.Popen(
+                ['parec', '-d', ss['name'] + '.monitor', '--file-format=wav', f'{raw}.{cat}.wav'],
+                stdin=subprocess.DEVNULL, stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
+        if self.stem_recs and self.shot.stems and set(self.stem_recs) != set(self.shot.stems):
+            self.note(f'stems: the session has {", ".join(self.stem_recs)}, the shot wants {", ".join(self.shot.stems)}')
         return time.time()
 
     def record_stop(self):
-        for p in (self.rec, self.aud):
+        for p in (self.rec, self.aud, *getattr(self, 'stem_recs', {}).values()):
             if p:
                 try:
                     os.killpg(p.pid, 2)
                 except ProcessLookupError:
                     pass
-        for p in (self.rec, self.aud):
+        for p in (self.rec, self.aud, *getattr(self, 'stem_recs', {}).values()):
             if p:
                 try:
                     p.wait(20)
@@ -414,13 +492,47 @@ class Take:
         has_audio = os.path.exists(raw + '.wav') and os.path.getsize(raw + '.wav') > 1000
         audio_in = ['-ss', f'{max(0.0, probe_duration(raw + ".wav") - duration):.3f}', '-i', raw + '.wav'] \
             if has_audio else ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
+        amap = ['-map', '1:a']
+        stems = self.mux_stems(raw, duration)
+        if stems:
+            # the take's own track stays the whole of its sound: every stem, summed at unity
+            audio_in = []
+            for p in stems.values():
+                audio_in += ['-i', p]
+            amap = ['-filter_complex', ''.join(f'[{i + 1}:a]' for i in range(len(stems))) +
+                    f'amix=inputs={len(stems)}:normalize=0:duration=longest[a]', '-map', '[a]']
         x264 = ['-preset', 'veryfast', '-crf', '18'] if self.tier == 'probe' else ['-preset', 'slow', '-crf', '14']
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{lead:.3f}', '-i', fixed, *audio_in,
-                        '-map', '0:v', '-map', '1:a', '-fps_mode', 'passthrough',
+                        '-map', '0:v', *amap, '-fps_mode', 'passthrough',
                         '-c:v', 'libx264', *x264, '-pix_fmt', 'yuv420p',
                         '-color_range', 'tv', '-colorspace', 'bt470bg', '-color_primaries', 'bt470bg',
                         '-color_trc', 'smpte170m', '-c:a', 'pcm_s16le', '-ar', '48000', '-ac', '2',
                         '-t', f'{duration:.3f}', self.stem + '.mkv'], check=True)
+
+    def mux_stems(self, raw, duration):
+        """Each stem's recording -> <stem>.<cat>.wav, cut from its end like the picture, so
+        every stem and the take share one time line: {cat: path}, effects first. Nothing
+        unless the session recorded stems. The session's own sink is the effects stem."""
+        for cat in sb.CATEGORIES:       # an earlier take's stems are not this one's
+            try:
+                os.remove(f'{self.stem}.{cat}.wav')
+            except FileNotFoundError:
+                pass
+        recs = getattr(self, 'stem_recs', {})
+        if not recs:
+            return {}
+        out = {}
+        for cat, src in [('effects', raw + '.wav')] + [(c, f'{raw}.{c}.wav') for c in sorted(recs)]:
+            dst = f'{self.stem}.{cat}.wav'
+            if os.path.exists(src) and os.path.getsize(src) > 1000:
+                inp = ['-ss', f'{max(0.0, probe_duration(src) - duration):.3f}', '-i', src]
+            else:
+                inp = ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
+                self.note(f'stem {cat}: nothing recorded, silence')
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', *inp, '-af', 'apad', '-c:a', 'pcm_s16le', '-ar', '48000',
+                            '-ac', '2', '-t', f'{duration:.3f}', dst], check=True)
+            out[cat] = dst
+        return out
 
     def contact_sheet(self, duration):
         """Six frames over the action, labelled with their time."""
@@ -447,42 +559,68 @@ class Take:
     def __call__(self):
         os.makedirs(os.path.dirname(self.stem), exist_ok=True)
         self.log = open(self.stem + '.log', 'w')
+        try:
+            for attempt in (1, 2):
+                try:
+                    return self.attempt()
+                except GameDied as e:
+                    self.cleanup_attempt()
+                    if attempt == 2:
+                        self.note(f'FAILED: {e} (second try)')
+                        return False
+                    self.note(f'{e}; trying once more')
+                except Exception as e:      # one failed take must not end the others
+                    self.note(f'FAILED: {e}')
+                    return False
+        finally:
+            self.log.close()
+
+    def cleanup_attempt(self):
+        self.rec = None          # attempt()'s `finally` has stopped everything of the attempt
+        self.sid = None
+        self.sess = None
+
+    def attempt(self):
         raw = tempfile.mkdtemp(prefix=f'{self.variant}-', dir=os.path.dirname(self.stem)) + '/raw'
         ok = False
         try:
             self.start()
             self.wait_ready()
+            self.follow()
             self.run(self.shot.setup)
+            self.check_alive()
             self.record_start(raw)
             self.wait_recording(raw)
             t0 = time.time()
             events = []
             self.run(self.shot.action, events, t0)
             time.sleep(TAIL)
+            self.check_alive()
             t1 = time.time()
             duration = t1 - t0
             self.record_stop()
+            self.gather()
             self.stop()
             self.sid = None
             self.mux(raw, duration)
             json.dump(dict(start=t0, duration=round(duration, 3), events=events),
                       open(self.stem + '.events.json', 'w'), indent=1)
+            self.write_marks(t0, duration, events)
             json.dump(dict(hash=self.film.spec_hash(self.shot, self.variant, self.tier),
                            spec=self.film.spec(self.shot, self.variant, self.tier), **self.code,
-                           res=self.film.res(self.tier), tier=self.tier,
+                           res=self.film.res(self.tier, self.shot), tier=self.tier,
                            filmed=time.strftime('%Y-%m-%d %H:%M:%S')),
                       open(self.stem + '.spec.json', 'w'), indent=1)
             self.contact_sheet(probe_duration(self.stem + '.mkv'))
             self.note(f'done, {duration:.1f} s -> {self.stem}.mkv')
             ok = True
-        except Exception as e:      # one failed take must not end the others
-            self.note(f'FAILED: {e}')
         finally:
             if getattr(self, 'rec', None):
                 self.record_stop()
+            if self.tail:
+                self.tail.stop()
             self.stop()
             shutil.rmtree(os.path.dirname(raw), ignore_errors=True)
-            self.log.close()
         return ok
 
 
@@ -512,15 +650,42 @@ class Ensemble:
             else:
                 for t in self.takes.values():
                     t.run([(ln, line)])
+            if events is not None:
+                events[-1]['t1'] = round(time.time() - t0, 3)
 
     def __call__(self):
+        takes = list(self.takes.values())
+        for t in takes:
+            os.makedirs(os.path.dirname(t.stem), exist_ok=True)
+            t.log = open(t.stem + '.log', 'w')
+        try:
+            for attempt in (1, 2):
+                try:
+                    return self.attempt()
+                except GameDied as e:
+                    for t in takes:
+                        t.rec, t.sid, t.sess = None, None, None
+                    if attempt == 2:
+                        for t in takes:
+                            t.note(f'FAILED: {e} (second try)')
+                        return False
+                    for t in takes:
+                        t.note(f'{e}; trying the whole shot once more')
+        finally:
+            for t in takes:
+                t.log.close()
+
+    def attempt(self):
         takes = list(self.takes.values())
         raws = {}
         ok = False
         for t in takes:
-            os.makedirs(os.path.dirname(t.stem), exist_ok=True)
-            t.log = open(t.stem + '.log', 'w')
             raws[t] = tempfile.mkdtemp(prefix=f'{t.variant}-', dir=os.path.dirname(t.stem)) + '/raw'
+        # every player's slot at once, or none: two shots each holding one and waiting for
+        # another would wait for ever (slots.py)
+        held = slots.acquire(self.tag, n=len(takes), say=lambda m: takes[0].note(m.splitlines()[0]))
+        for t, slot in zip(takes, held):
+            t.slot = slot
         try:
             # the players' sessions start together (a start is mostly waiting on the clone
             # and Wine), staggered: never two starts in one second
@@ -532,7 +697,11 @@ class Ensemble:
             with ThreadPoolExecutor(len(takes)) as ex:
                 for f in [ex.submit(bring_up, it) for it in enumerate(takes)]:
                     f.result()
+            for t in takes:
+                t.follow()
             self.run(self.shot.setup)
+            for t in takes:
+                t.check_alive()
             for t in takes:
                 t.record_start(raws[t])
             for t in takes:
@@ -541,10 +710,13 @@ class Ensemble:
             events = []
             self.run(self.shot.action, events, t0)
             time.sleep(TAIL)
+            for t in takes:
+                t.check_alive()
             duration = time.time() - t0
             for t in takes:
                 t.record_stop()
             for t in takes:
+                t.gather()
                 t.stop()
                 t.sid = None
             for t in takes:
@@ -552,24 +724,31 @@ class Ensemble:
                 mine = [e for e in events if e.get('player') in (None, t.variant)]
                 json.dump(dict(start=t0, duration=round(duration, 3), events=mine),
                           open(t.stem + '.events.json', 'w'), indent=1)
+                t.write_marks(t0, duration, mine)
                 json.dump(dict(hash=self.film.spec_hash(self.shot, t.variant, self.tier),
                                spec=self.film.spec(self.shot, t.variant, self.tier), **t.code,
-                               res=self.film.res(self.tier), tier=self.tier,
+                               res=self.film.res(self.tier, self.shot), tier=self.tier,
                                filmed=time.strftime('%Y-%m-%d %H:%M:%S')),
                           open(t.stem + '.spec.json', 'w'), indent=1)
                 t.contact_sheet(probe_duration(t.stem + '.mkv'))
                 t.note(f'done, {duration:.1f} s -> {t.stem}.mkv')
             ok = True
+        except GameDied:
+            raise
         except Exception as e:
             for t in takes:
                 t.note(f'FAILED: {e}')
         finally:
             for t in takes:
+                if t.slot:              # a start that never got to hand it down
+                    t.slot.close()
+                    t.slot = None
                 if getattr(t, 'rec', None):
                     t.record_stop()
+                if t.tail:
+                    t.tail.stop()
                 t.stop()
                 shutil.rmtree(os.path.dirname(raws[t]), ignore_errors=True)
-                t.log.close()
         return ok
 
 
@@ -581,9 +760,11 @@ def film_takes(a, tier):
             print(f'! {s.id if s else "film"}: {m}')
         sys.exit('a2film: the board has problems (./a2film check)')
     todo = []
+    run_tier = tier
     for s in select(film, a.shots):
         if not s.filmed:
             continue
+        tier = film.shot_tier(s, run_tier)      # a probe run films a `Tier: final` shot's final take
         if s.players:       # all of a shot's players are filmed together, or none
             states = {p: take_check(film, s, p, tier, a.ignore_code) for p in s.players}
             if a.force or any(st != 'ok' for st, _ in states.values()):
@@ -607,7 +788,26 @@ def film_takes(a, tier):
     if not todo:
         print('nothing to film')
         return 0
-    say('a2film', f'{len(todo)} takes at {film.res(tier)}, {a.jobs} at once')
+    # takes larger than the run's own resolution (a shot's `Tier:` above the probes) run
+    # after the others, one at a time: several large recording games at once is what died
+    # at 1080p (films/README.md, "Traps")
+    base = film.res(run_tier)
+
+    def res_of(t):
+        return film.res(t.tier, t.shot)
+
+    def px(r):
+        w, h = r.lower().split('x')
+        return int(w) * int(h)
+
+    light = [t for t in todo if px(res_of(t)) <= px(base)]
+    heavy = [t for t in todo if px(res_of(t)) > px(base)]
+    say('a2film', (f'{len(light)} takes at {base}, {a.jobs} at once' if light else 'no takes at ' + base)
+                  + f'; at most {slots.count()[0]} games run on the machine at a time, the rest wait for a '
+                    f'slot (./a2film slots)')
+    if heavy:
+        say('a2film', f'then {len(heavy)} at their own tier, one at a time: '
+                      + ', '.join(f'{t.tag} {res_of(t)}' for t in heavy))
 
     def staggered(i_take):
         i, t = i_take
@@ -615,10 +815,15 @@ def film_takes(a, tier):
         return t()
 
     with ThreadPoolExecutor(a.jobs) as ex:
-        results = list(ex.map(staggered, enumerate(todo)))
+        results = list(ex.map(staggered, enumerate(light)))
+    results += [t() for t in heavy]
+    todo = light + heavy
     bad = [t.tag for t, ok in zip(todo, results) if not ok]
-    say('a2film', f'{len(todo) - len(bad)} of {len(todo)} takes filmed' + (f'; failed: {", ".join(bad)}' if bad else ''))
-    return 1 if bad else 0
+    sus = [x.tag for t, ok in zip(todo, results) if ok
+           for x in (t.takes.values() if isinstance(t, Ensemble) else [t]) if x.suspect]
+    say('a2film', f'{len(todo) - len(bad)} of {len(todo)} takes filmed' + (f'; failed: {", ".join(bad)}' if bad else '')
+        + (f'; suspect (Expect not met): {", ".join(sus)}' if sus else ''))
+    return 1 if bad or sus else 0
 
 
 OPTS = [(('--jobs', '-j'), dict(type=int)),

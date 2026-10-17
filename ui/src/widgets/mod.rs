@@ -207,6 +207,7 @@ impl<'a> Ui<'a> {
     pub fn panel(&mut self, r: R) {
         theme::panel(self, r);
         self.claim(r);
+        crate::hud::layout::note(r);
     }
 
     /// A panel with a title; returns the room left inside it, padded. Its title
