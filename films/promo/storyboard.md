@@ -31,7 +31,7 @@ of one, the menu scene's planet and the sky behind everything carry them. Hull l
 named only where a weapon's light falls on a hull.
 
 About 3:50 by the shot lengths, a little less once transitions overlap; the brief aims at
-3:30, so trim after the animatic (candidates: s05b, u03, g03, i08). The HUD and the UI
+3:30, so trim after the animatic (rough cut 1 was 3:22; candidates left: s05b, g03, i08). The HUD and the UI
 get a deeper video of their own later, with voice-over: here they get one beat each.
 
 For the editor:
@@ -52,7 +52,7 @@ For the editor:
   bench; values marked *unprobed* are first guesses.
 
 ## Cold open
-Music: Mbor300.wav from 0 gain -1 until h01 fade 1.2
+Music: Mbor300.wav from 0 gain -1 until b01 fade 1.2
 
 Fifteen seconds: the game as it shipped, then what it is now. Stock's Enterprise held just
 long enough to be recognised, a hard cut to the same moment in refit on the Borg bed's
@@ -77,6 +77,8 @@ From: h03 refit
 In: 3.0
 Length: 2.5
 Audio: none
+Caption: top
+Title: now
 
 Hard cut on the bed's first hit: the same frame as o01, refit. No transition.
 
@@ -112,39 +114,13 @@ Background: s05b
 ```
 
 ## Combat
-Music: Mkli300.wav from 0 gain 0 until a02 fade 1.5
+Music: Mkli300.wav from 0 gain 4 until a01 fade 1.5
 
 The loud act, Klingon music, quick cuts. The argument: a battle in stock Armada II is
 flipbooks: a sprite sheet per fireball, a disc per shockwave, a green shell per shield
 hit. Refit draws each as light and gas in the scene, touching the hulls around it. It
-opens on the showcase fleet over its planet, which also sets the scene for the hulls and
-the sky without a word about them.
-
-### h01 · The fleet in action
-Shows: lighting, hulls
-Scene: showcase
-Variants: stock, refit
-Layout: wipe
-Transition: dissolve 1.0
-In: 0.5
-Length: 6
-Status: draft
-
-Close and low under the Enterprise-E's saucer, sliding along it, the battle beyond. No
-title: the hull's light and shadow are there to be noticed, not named. Pulled back to 170
-on 2026-10-15: stock fades a hull within about 150. If a transporter effect drifts into
-frame, move `In:`.
-
-```setup
-step Move the mouse to 1900,8
-scene hover off; shieldfx off; tooltips off
-scene orbit ente 300 -12 170
-```
-```action
-wait 1
-scene glide 10 380 -5 200
-wait 9.5
-```
+opens on the explosion (rough cut 1: the fleet shot before it was dark and small, and
+refit barely differed there, so it went).
 
 ### b01 · A cruiser explodes
 Shows: explosions
@@ -281,7 +257,7 @@ wait 11
 ```
 
 ## Beams
-Music: Mbor300.wav from 40 gain -2 until n01 fade 1.5
+Music: Mbor300.wav from 40 gain 2 until n01 fade 1.5
 
 The Borg bed back. The argument: the beams are drawn after the TV series (DS9, Voyager): a
 translucent cone of light through vapour, in place of stock's flat textured line. The
@@ -379,7 +355,7 @@ wait 11
 ```
 
 ## Nebulae
-Music: Mfedmp300.wav from 0 gain 1 until m01 fade 1.5
+Music: Mfedmp300.wav from 0 gain -2 until m01 fade 1.5
 
 The quiet act, long holds. The argument: stock's nebula is a stack of flat billboards;
 refit's is a volume of gas the ships are *in*, lit by the Key light, and the hulls cast
@@ -395,9 +371,9 @@ Variants: stock, refit
 Layout: dissolve 2.5 1.5
 Transition: dissolve 0.8
 Title: Nebulae
-Sub: A volume of gas the ships fly through, casting their shadows into it
+Sub: A volume of gas the ships fly through, lit by the light they fly into
 In: 1.0
-Length: 9
+Length: 7
 Status: draft
 
 Up close: the Galaxy alone in frame, the camera under and behind it, gas sliding past
@@ -621,31 +597,6 @@ scene orbit 2250 0 2350 160 45 1200
 wait 8
 ```
 
-### u03 · The minimap, close
-Shows: hud: minimap
-Scene: showcase
-Variants: stock, refit
-Layout: wipe
-Crop: 0 0.62 0.38 0.38
-Transition: dissolve 0.5
-Caption: top
-In: 1.0
-Length: 5
-Status: draft
-
-The minimap, bottom left: stock's against refit's, with its filters as words. Crop from
-probe 1's frames. A cut candidate.
-
-```setup
-scene hover off; shieldfx off; tooltips off
-scene hud on
-scene select ente
-scene orbit 2250 0 2350 160 45 1200
-```
-```action
-wait 7
-```
-
 ## Gameplay
 Music: Mcarmp300.wav from 24 gain -3 until i02 fade 1.5
 
@@ -658,7 +609,7 @@ top, over the HUD.
 ### g00 · Card: it plays better
 Length: 3
 Transition: dip 0.5
-Background: h01
+Background: h03
 
 ```card
 [accent] AND IT PLAYS BETTER
@@ -1038,7 +989,7 @@ Music: Mfedmp300.wav from 0 gain 0
 ### z01 · End card
 Length: 6
 Transition: dip 0.6
-Background: h01
+Background: h03
 
 The open door, not a sales line (the brand's ending): a question the comments can answer.
 
