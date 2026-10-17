@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.32.0 — 2026-10-17
+
+Layers: testbench 3.35.0.
+
+### Added
+- Test bench: `Scene.asi`'s `Zoom=` key and `zoom` command, the RTS camera's zoom as a
+  level from 0 to 1, for shots that need a player's-eye view without key presses.
+
+Installed, not yet seen in game.
+
 ## 12.31.0 — 2026-10-17
 
 Layers: ui 0.12.0, testbench 3.34.0.

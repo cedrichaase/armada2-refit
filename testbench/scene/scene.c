@@ -9,7 +9,7 @@
  * objects of Scene.ini's
  * [Object.<name>] sections. Commands written to Scene.cmd in the game directory
  * then change the scene while it runs: a free camera (`camera`, `orbit`),
- * `spawn`, `attack`, `pause`, `query` and more (testbench/scene/README.md).
+ * `zoom`, `spawn`, `attack`, `pause`, `query` and more (testbench/scene/README.md).
  *
  * WHAT IT CALLS IN Armada2.exe (GOG patch 1.1, addresses from armada2.map)
  * -----------------------------------------------------------------------
@@ -41,6 +41,11 @@
  *     others to 0, and GridVisible() (0x51e180) returns `visible`.
  *   gTacticalCamera (0x763650): its interest point, the map position the RTS
  *     camera looks at, is the Vector3 at +0x98 (TacticalCamera::GetInterest).
+ *   The camera in use is gCameraManager's first field (0x763370): a ParabolicCamera
+ *     (gParabolicCamera 0x763470, vtable 0x6b4598; height at +0x54, 10 to 2200)
+ *     or a TacticalCamera (vtable 0x6b46c0; distance factor at +0xd4, 1 to 20).
+ *     Both implement SetZoomLevel(0..1) at vtable +0x44, which ScriptInterfaceImp::
+ *     SetCameraZoom (0x4551d0) calls; the `zoom` command and `Zoom=` call it.
  *   s_UpdateMainCamera (0x53ed90) updates the main ST3D_Camera through one
  *     virtual call, `call *0x88(%eax)` at 0x53edac, on the view object
  *     (cOverViewImp::UpdateCamera, which hands it to gCameraManager's current
@@ -171,6 +176,18 @@ int _fltused = 0;   /* floats without the CRT */
 #define SI_INSTANCE      ((void *)0x735c40u)
 #define TACTICAL_CAMERA  0x763650u
 #define CAMERA_INTEREST  0x98u
+#define CAMERA_CURRENT   0x763370u   /* gCameraManager's first field: the camera in use (a GameCamera *) */
+#define CAM_VT_SET_ZOOM  0x44u       /* GameCamera vtable: SetZoomLevel(float 0..1), what SetCameraZoom calls */
+#define TACTICAL_VTABLE  0x6b46c0u   /* ??_7TacticalCamera@@6B@ */
+#define TACT_ZOOM        0xd4u       /* TacticalCamera's zoom, a distance factor: min..max below, default below */
+#define TACT_ZOOM_MIN    0x6b46a4u   /* float 1.0 */
+#define TACT_ZOOM_MAX    0x6b46a8u   /* float 20.0 */
+#define PARABOLIC_VTABLE 0x6b4598u   /* ??_7ParabolicCamera@@6B@ */
+#define PARA_HEIGHT      0x54u       /* ParabolicCamera's height above the ground */
+#define PARA_HEIGHT_MIN  0x709a20u   /* OVERVIEW_MIN_HEIGHT, float 25.0 */
+#define PARA_HEIGHT_MAX  0x709a1cu   /* OVERVIEW_MAX_HEIGHT, float 400.0 */
+#define CAM_SET_ZOOM_TAC 0x4e4db0u   /* TacticalCamera::SetZoomLevel */
+#define CAM_SET_ZOOM_PAR 0x4dfcc0u   /* ParabolicCamera::SetZoomLevel */
 #define GAME_STATE_PTR   0x76b5acu   /* -> the struct whose +0x78 is the HUD mode */
 #define IFACE_MODE       0x78u
 #define GRID_RECORDS     0x768e18u   /* GridRenderState, 3 ints per view */
@@ -265,6 +282,8 @@ static const Sig k_sigs[] = {
     { FORCE_UPDATE,     8, { 0x8B, 0x0D, 0x54, 0x8A, 0x73, 0x00, 0xB0, 0x01 } },
     { SET_IFACE_STATE,  8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x83 } },
     { MAIN_CAM_CALL,    6, { 0xFF, 0x90, 0x88, 0x00, 0x00, 0x00 } },
+    { CAM_SET_ZOOM_TAC, 8, { 0x55, 0x8B, 0xEC, 0xD9, 0x05, 0xA8, 0x46, 0x6B } },
+    { CAM_SET_ZOOM_PAR, 8, { 0x55, 0x8B, 0xEC, 0xD9, 0x05, 0x1C, 0x9A, 0x70 } },
     { CURSOR_DRAW_CALL, 1, { 0xE8 } },   /* HUD.asi may have retargeted it: chained */
     { EVENT_TRIGGER_0,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
     { EVENT_TRIGGER_3,  6, { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68 } },
@@ -468,6 +487,18 @@ static void file_append(const char *path, const char *s)
 
 static void logline(const char *s) { file_append(g_logpath, s); }
 
+static void zoom_command(int n, char **t);
+
+/* Two decimals, for the zoom. */
+static void s_flt2(char *d, float f)
+{
+    long t = (long)(f * 100.0f + (f < 0 ? -0.5f : 0.5f));
+    if (t < 0) { s_cat(d, "-"); t = -t; }
+    s_num(d, t / 100);
+    s_cat(d, ".");
+    if (t % 100 < 10) s_cat(d, "0");
+    s_num(d, t % 100);
+}
 static void cat_vec(char *b, const float *v)
 {
     s_flt(b, v[0]); s_cat(b, " ");
@@ -1254,6 +1285,57 @@ static void query(void)
         logline(b);
     }
     log_vec("  rts interest", (const float *)(TACTICAL_CAMERA + CAMERA_INTEREST));
+    zoom_command(1, NULLPTR);
+}
+
+/* The RTS camera's zoom. The camera in use (gCameraManager's first field) is a
+ * ParabolicCamera or a TacticalCamera, and each keeps it in its own unit (a height,
+ * 25 to 400, or a distance factor, 1 to 20), but both implement SetZoomLevel(t), t
+ * from 0 (closest) to 1 (farthest), which is what the script interface's
+ * SetCameraZoom calls. `zoom` takes and answers that level, and names the camera
+ * and its raw value. Nothing is touched if the camera is neither class. */
+typedef void (__thiscall *SetZoomFn)(void *cam, float level);
+
+static void zoom_command(int n, char **t)
+{
+    BYTE  *cam = *(BYTE **)CAMERA_CURRENT;
+    DWORD  vt  = cam ? *(DWORD *)cam : 0;
+    float  lo, hi, v, level;
+    const char *name;
+    char   b[160];
+    if (vt == PARABOLIC_VTABLE) {
+        lo = *(float *)PARA_HEIGHT_MIN; hi = *(float *)PARA_HEIGHT_MAX;
+        name = "parabolic camera, height";
+    } else if (vt == TACTICAL_VTABLE) {
+        lo = *(float *)TACT_ZOOM_MIN; hi = *(float *)TACT_ZOOM_MAX;
+        name = "tactical camera, distance factor";
+    } else {
+        logline("  ! the camera in use is neither a ParabolicCamera nor a TacticalCamera");
+        return;
+    }
+    if (n >= 2) {
+        if (!s_isnum(t[1])) { logline("  ! usage: zoom [<0 closest .. 1 farthest>]"); return; }
+        level = s_atof(t[1]);
+        if (level < 0) level = 0;
+        if (level > 1) level = 1;
+        (*(SetZoomFn *)(*(BYTE **)cam + CAM_VT_SET_ZOOM))(cam, level);
+        if (g_cam.mode != CAM_RTS) logline("  (a free camera is on: the zoom shows after `camera rts`)");
+    }
+    v = *(float *)(cam + (vt == PARABOLIC_VTABLE ? PARA_HEIGHT : TACT_ZOOM));
+    level = (v - lo) / (hi - lo);
+    b[0] = 0;
+    s_cat(b, "  zoom ");
+    s_flt2(b, level);
+    s_cat(b, " (");
+    s_cat(b, name);
+    s_cat(b, " ");
+    s_flt2(b, v);
+    s_cat(b, ", limits ");
+    s_flt2(b, lo);
+    s_cat(b, " to ");
+    s_flt2(b, hi);
+    s_cat(b, ")");
+    logline(b);
 }
 
 /* An object's scene name, or its handle in hex. */
@@ -1548,6 +1630,7 @@ static void run_command(char *line)
         logline(g_move.spin != 0 ? "  camera: spin" : "  camera: spin off");
         return;
     }
+    if (s_eq(t[0], "zoom")) { zoom_command(n, t); return; }
     if (s_eq(t[0], "spawn") && n >= 6) {
         float p[3];
         p[0] = s_atof(t[3]); p[1] = s_atof(t[4]); p[2] = s_atof(t[5]);
@@ -1675,7 +1758,7 @@ static void run_command(char *line)
         }
         return;
     }
-    logline("  ! unknown command (camera, orbit, glide, spin, spawn, attack, heal, engines, weapons, "
+    logline("  ! unknown command (camera, orbit, glide, spin, zoom, spawn, attack, heal, engines, weapons, "
             "immortal, special, energy, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
             "shieldfx, query, "
             "select, selection, marks)");
@@ -2078,6 +2161,10 @@ static void build_scene(void)
             logline("RTS camera centred");
         }
     }
+    /* Zoom= is a zoom command: the RTS camera's distance, set once the scene is built */
+    GetPrivateProfileStringA("Scene", "Zoom", "", b + 5, 150, g_ini);
+    if (b[5]) { logline("zoom as the game started it:"); zoom_command(1, NULLPTR); }
+    if (b[5]) { b[0] = 'z'; b[1] = 'o'; b[2] = 'o'; b[3] = 'm'; b[4] = ' '; run_command(b); }
     /* Camera= is a camera or orbit command, run as if from Scene.cmd */
     GetPrivateProfileStringA("Scene", "Camera", "", b, 190, g_ini);
     if (b[0]) run_command(b);

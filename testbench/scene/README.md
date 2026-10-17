@@ -26,6 +26,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 
 | `SCENE=` | What | Seen on the bench |
 |---|---|---|
+| `zoom` | the player's Galaxy class (`mine`) and two destroyers, the HUD and cursor on, the camera centred on `mine` at zoom level 0.37: the view the old workaround of 150 `ctrl+Down` then 35 `ctrl+Up` presses reaches, in none of its 28 s | 2026-10-17 |
 | `planet` | a Galaxy class beside a class M planet (`pb_clssm`) | 2026-10-04 |
 | `nebula` | a Galaxy class at the edge of the Mutara nebula (`mnebula8`) | 2026-10-04 |
 | `firing` | a Galaxy class firing at a Borg cube (`bbattle1`) without moving, for as long as the session runs: its engines are off; the cube cannot die, is healed every tick and has its weapons off | 2026-10-04, still firing after a minute |
@@ -65,6 +66,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Music` | 1 | 0 stops the game starting any music track (`StartMusic` and the jukebox's `mStartNewTrack` return at once); sound effects and voices stay. `SCENE_MUSIC=0` at install puts it into the installed copy of any scene file, so footage can be laid over its own soundtrack |
 | `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
 | `Center` | | centre the RTS camera on this object |
+| `Zoom` | | the RTS camera's zoom level, 0 (closest) to 1 (farthest), set once the scene is built (`zoom`, below; "The zoom"). Unset leaves the camera as the game started it |
 | `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |
 
 `[Marks]`, the event marks (below, "Marks"); every scene has them without the section:
@@ -119,6 +121,7 @@ answer and fails if a command did.
 | `spin <degrees per second>` | after an `orbit`: turn the yaw steadily; `spin 0` stops. A new `orbit` ends a glide but not a spin |
 | `camera <ex> <ey> <ez> <object \| tx ty tz>` | free camera at an eye, looking at a point or an object |
 | `camera rts` | back to the game's own camera |
+| `zoom [<level>]` | the RTS camera's zoom level, 0 (closest) to 1 (farthest), clamped. With no level it only reads. It answers with the level the camera has now, the camera in use, its raw value and its limits: `zoom 0.37 (parabolic camera, height 809.81, limits 10.00 to 2200.00)`. `query` ends with the same line |
 | `spawn <name> <odf> <x> <y> <z> [heading] [team]` | build an object (anchored like the scene file's positions) |
 | `attack <name> <target>` | order an attack |
 | `succeed [seconds]`, `fail [seconds]` | the mission ends, won or lost, after the delay, as its script ends it (`ScriptInterfaceImp::SucceedMission`, 0x457d70, and `FailMission`, 0x457d50); for the screens that follow a mission (`scenarios/ui-menus-success.md`) |
@@ -139,6 +142,40 @@ answer and fails if a command did.
 | `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`), up to 39 names (a command has at most 40 words); answers as `selection` |
 | `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
 | `marks` | how many marks `Scene.marks` has, and the last 16, each as written (`Expect scene "marks" answers "cloak.done obj=warbird"`) |
+
+## The zoom
+
+`Zoom=` and `zoom` set the RTS camera's zoom as a **level from 0 (closest) to 1
+(farthest)**, whichever camera the game is using. The camera in use is the first field
+of `gCameraManager` (0x763370), and on the bench it is a `ParabolicCamera`: its zoom is
+a height above the map, 10 to 2200 (`OVERVIEW_MIN_HEIGHT`, `OVERVIEW_MAX_HEIGHT` as
+the game has them at run time), and the game starts it at 150 (level 0.06). A
+`TacticalCamera` keeps a distance factor from 1 to 20 instead (start 10); the plugin
+handles it the same way, but it has not been seen in use. Both implement
+`SetZoomLevel(t)`, a straight interpolation between their limits and the call
+`ScriptInterfaceImp::SetCameraZoom` (0x4551d0) makes, so the level is the same on both.
+The plugin refuses if the camera in use is neither class.
+
+- **Level to height** (parabolic): `10 + level * 2190`. Level 0.06 is the start, 0.37 is
+  a player's-eye view of a few ships, 1 shows a patch of the map.
+- **Measuring a manual setup**: put the camera where it should be with the wheel and
+  `ctrl+Up`/`ctrl+Down`, then `zoom` (or `query`) reads the level to put in `Zoom=`.
+- **The keys are not repeatable.** Each press changes the height by a factor that
+  depends on the frame time (`ctrl+Down` x5 took 1105 to 1273, `ctrl+Up` x5 then took
+  it back only to 1113). 150 `ctrl+Down` end at the limit (1.00) whatever the frame
+  time, and 35 `ctrl+Up` after them reach **0.36 to 0.37** (heights 806 and 810, level 0.365, two
+  runs at 1920x1080 and 0.15 s a press). **`Zoom=0.37` is the workaround's view**.
+- **Free camera modes.** The free camera (`camera`, `orbit`, and so `glide` and `spin`)
+  replaces the transform the game's camera computes, so zoom does not move it: its
+  distance is the `orbit` command's own. `zoom` still sets the RTS camera underneath
+  and says so; the zoom shows after `camera rts`. A `Zoom=` and a `Camera=` orbit in
+  one scene file therefore do not fight: the scene file sets the zoom, then the orbit
+  takes over the picture. A scene that keeps the game's camera sets `Zoom=` and no `Camera=`.
+- **Anything that moves the game's camera afterwards** wins over a zoom set earlier:
+  the wheel and `ctrl+Up`/`ctrl+Down`. `Zoom=` is applied once, after
+  `Center=` and before `Camera=`, when the scene is ready.
+- The line `zoom as the game started it:` in `Scene.log` shows the zoom before `Zoom=`
+  applied it.
 
 **`glide` and `spin` run on wall-clock time, per frame** (`GetTickCount`, in the camera
 hook), not per tick, so a recording plays them smoothly whatever the tick rate. Don't
@@ -358,7 +395,10 @@ inert, and `Scene.log` says so.
   nothing when tried from this plugin with the planet alone.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
-  (`TacticalCamera::GetInterest`).
+  (`TacticalCamera::GetInterest`). **That camera is not the one in use on the bench**
+  (bench, 2026-10-17): `gCameraManager`'s first field (0x763370) held
+  `gParabolicCamera` (0x763470), and `query`'s `rts interest` stayed at 0,0,0 while
+  `Center=` moved the view. The zoom is set through that field; see "The zoom".
 
 ## Marks
 
