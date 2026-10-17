@@ -18,7 +18,7 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from . import code, storyboard as sb
+from . import code, marks, storyboard as sb
 from .cli import IGNORE_CODE, best_take, command, load, select, take_check
 from .storyboard import a2env
 
@@ -918,6 +918,18 @@ def manifest(a):
                              res=spec.get('res'), current=st == 'ok', stale=why)
                     if os.path.exists(stem + '.events.json'):
                         t['events'] = events(film, s, v, a.tier)
+                    doc = marks.load(film, s, v, a.tier)
+                    if doc:
+                        t['marks'] = doc['marks']
+                        if s.get('Cut'):
+                            try:
+                                i, n = marks.cut(doc, s.get('Cut'), speed(s))
+                                t['cut'] = dict(**{'in': round(i, 3)}, length=round(n, 3))
+                            except marks.MarkError as e:
+                                t['cut'] = dict(error=str(e))
+                        if s.get('Expect'):
+                            r = marks.verdict(film, s, v, a.tier)
+                            t['expect'] = [dict(expect=e, ok=ok, detail=d) for e, ok, d in r[1]] if r else None
                 t['in'] = s.in_point(v)
                 takes[v] = t
         elif s.kind == 'footage':
@@ -953,7 +965,8 @@ def manifest(a):
         'format': 'a2film-manifest/1',
         'about': 'The edit of an a2film storyboard (films/README.md). Times are seconds of the cut; '
                  'a take\'s "in" is seconds into its file, whose time 0 is the start of the shot\'s action. '
-                 'Takes are variable frame rate H.264, BT.601 limited range; the cut is BT.709 limited range.',
+                 'Takes are variable frame rate H.264, BT.601 limited range; the cut is BT.709 limited range. '
+                 'A take\'s "marks" are events on that same clock (films/README.md, "Marks").',
         'film': dict(title=film.title, name=film.name, board=os.path.abspath(film.path), includes=film.files,
                      fields=film.fields,
                      variants=film.variants, direction='\n'.join(film.prose).strip(),

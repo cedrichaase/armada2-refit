@@ -5,6 +5,21 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.8.0 — 2026-10-17
+
+### Added
+- Event marks per take, `<take>.marks.json` (`a2film-marks/1`): Scene.asi's marks, the
+  action runner's lines (`action.<op>` and `.done`; `.events.json` gains `t1`) and the
+  UI's menu dialogs from `UI.log`, on the take's clock.
+- `a2film marks <board> [shots]` (`--tier`, `--variant`, `--kind`, `--setup`, `--json`).
+- Shot fields `Cut:` (`from <mark> to <mark> [pad S]`: `check` and `status` print the
+  `In` and `Length` it gives) and `Expect:` (checked after filming; a take that misses
+  it is `suspect`, re-filmed by `probe`/`take`, not current in the manifest).
+- The manifest's takes carry `marks`, `cut` and `expect`; the board `films/marks` and
+  `films/film/selftest_marks.py` (1aacd31).
+
+Tooling only; nothing to see in game.
+
 ## 1.7.0 — 2026-10-17
 
 ### Added

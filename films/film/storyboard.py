@@ -17,7 +17,7 @@ FILM_KEYS = {'Film', 'Final', 'Probe', 'Fps', 'Args', 'Music', 'Pointer'}
 SECTION_KEYS = {'Music'}
 SHOT_KEYS = {'Kind', 'Shows', 'Scene', 'Args', 'Variants', 'Layout', 'Crop', 'Transition', 'Title', 'Sub',
              'Caption', 'In', 'Length', 'Speed', 'Audio', 'Keys', 'File', 'From', 'Status', 'Background',
-             'Run', 'Wallpaper', 'Players', 'Prepare', 'Tier'}
+             'Run', 'Wallpaper', 'Players', 'Prepare', 'Tier', 'Cut', 'Expect'}
 KINDS = {'scene', 'card', 'footage', 'mission', 'desktop'}
 LAYOUTS = {'full', 'wipe', 'dissolve', 'split', 'pip'}
 STATUSES = {'draft', 'probed', 'approved', 'final'}
@@ -295,7 +295,8 @@ class Film:
         return os.path.join(self.data_dir(), tier, shot.id)
 
     def take(self, shot, variant, tier):
-        """The take's files' common stem (add .mkv, .wav, .events.json, .spec.json, .sheet.png)."""
+        """The take's files' common stem (add .mkv, .wav, .events.json, .marks.json, .spec.json,
+        .sheet.png)."""
         return os.path.join(self.take_dir(shot, tier), variant)
 
 
@@ -677,6 +678,17 @@ def check(film):
                     tier_res(s.tier, film.res('probe'))
                 except BoardError as e:
                     out.append((s, str(e)))
+        # Cut: and Expect: are read against a take's marks; here only their spelling
+        from . import marks
+        for key, parse in (('Cut', marks.parse_cut), ('Expect', marks.parse_expect)):
+            if s.get(key):
+                if not s.filmed:
+                    out.append((s, f'{key}: only a filmed shot has marks'))
+                    continue
+                try:
+                    parse(s.get(key))
+                except marks.MarkError as e:
+                    out.append((s, f'{key}: {e}'))
         c = s.crop
         if c is not None and (len(c) != 4 or any(x < 0 or x > 1 for x in c)):
             out.append((s, 'Crop is x y w h, four fractions of the frame'))

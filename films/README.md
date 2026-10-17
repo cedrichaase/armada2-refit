@@ -19,6 +19,7 @@ a real editor, fed by `a2film manifest`).
     ./a2film take   films/whats-new            # the final takes, 4K, one game at a time
     ./a2film manifest films/whats-new          # the edit as JSON, for an editor
     ./a2film status films/whats-new            # which takes are current, and why not
+    ./a2film marks  films/whats-new e01        # what happened in a take, and when
     ./a2film probe  films/whats-new --ignore-code   # re-film changed specs only, keep the rest
     ./a2film adopt  films/beams-scout a01 films/promo   # take over a scratch board's takes of a01
 
@@ -26,7 +27,7 @@ Like the texture targets, a storyboard is a **recipe** and is committed. Its foo
 an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8):
 
     $A2_DATA/films/<film>/
-      probe/<shot>/<variant>.mkv   .wav  .events.json  .spec.json  .sheet.png
+      probe/<shot>/<variant>.mkv   .wav  .events.json  .marks.json  .spec.json  .sheet.png
       final/<shot>/<variant>.mkv   ...
       probe/<shot>/<variant>.review.png   `review`: a contact sheet and curves per take
       probe/<shot>/variants.review.png    `review`: how two variants differ over time
@@ -70,6 +71,12 @@ footage is, its in and out, its sound and its quality. A footage shot uses one w
 Statuses: `draft` (written, not filmed) → `probed` → `approved` (direction signed off;
 the probe is the reference) → `final` (the 4K take is accepted). `a2film` never sets a
 status: that is the reviewer's call, written into the board.
+
+A take can also be **suspect**: current by its spec and code, but its marks do not meet
+its shot's `Expect:` (a recording that was to select twenty ships and selected none).
+`status` says which expectation failed, `probe` and `take` film it again, and the
+manifest counts it as not current. `Expect:` is not part of the spec, so changing it
+re-judges the takes there are without filming them.
 
 ### When a take is current
 
@@ -292,6 +299,8 @@ a fenced block, splices that file in where it stands, as if its text were writte
 | `Title`, `Sub` | | a lower-third title and its line below; `Caption: top` moves them to the top (HUD footage) |
 | `In` | `0` | seconds into the take where the cut starts; per variant: `In: stock 3.3, refit 4.0` |
 | `Length` | | seconds on screen. `check` warns if the action's waits are shorter than `In` + `Length` x `Speed` |
+| `Cut` | | `from <time> to <time> [pad S]`, the `In` and `Length` two marks give (see "Marks"); `check` and `status` print them for each tier with takes, to be written into `In:` and `Length:` |
+| `Expect` | | what the take must show, checked against its marks after filming (`selected >= 20 by 3s; decloak.done before 8s`; see "Marks"). A take that misses it is `suspect` |
 | `Speed` | `1` | playback speed in the cut |
 | `Audio` | `game` | `game` (the take's own sound), `none`, or `vo` (voice-over: lift it over the bed) |
 | `Keys` | `auto` | key hints: `auto` shows each `press` of the action block for 1.2 s; or `T text; T text`, times from `In`; `none` |
@@ -405,6 +414,94 @@ the joiner too: write the action as the story the two screens tell together.
   about `Length:` there; read the takes' length off the probe.
 - Two players are two games but one job of `--jobs`: probing it beside other shots,
   lower `--jobs` so the bench is not running more games than it should.
+
+## Marks
+
+Every take records **event marks**: what happened in it and when, on the take's own
+clock (0 is the first line of the action block, the video's time 0; the setup's marks
+are negative). They replace measuring a moment from frame differences (when a pan
+settles, when a cloak is done) and finding a take that went wrong only by watching it.
+
+    ./a2film marks films/promo b07                  # every mark of b07's takes
+    ./a2film marks films/promo b07 --kind 'cloak.*' --tier final
+    ./a2film marks films/promo b07 --setup --json   # with the setup's marks, as JSON
+
+They come from three places, put on one clock:
+
+- **Scene.asi** writes `Scene.marks` in the game directory (`testbench/scene/README.md`,
+  "Marks"). Each line carries the game's `GetTickCount()`, and its `epoch` lines pair a
+  tick with `GetSystemTimeAsFileTime()`, which under Wine is the host's own clock, the
+  one the runner starts the action by: a mark lands on the take's clock without a
+  handshake. On the bench (`films/marks`, 2026-10-17) every `cmd` mark fell between the
+  runner sending its line and reading the answer, and **a mark leads the first frame
+  that shows it by about 0.05 s** (a glide's first motion 0.05 s, an explosion 0.06 s:
+  three or four frames at 60 fps, the time from the game's frame to the recording).
+- **The action runner** marks each line of the action block as it starts
+  (`action.<op>`) and, except `wait`, as it is done (`action.<op>.done`):
+  `action.step.done` is when an OCR wait found its text, `action.press` a key.
+- **UI.log**, followed from the setup on, gives `menu.open` (and `menu.pane`) for each
+  shell dialog the UI hosts, named as `UI.log` names it, as its line appears (within
+  0.05 s; what the log held before is not marked). Only takes with `UI.asi` have these:
+  a stock take's menus are not marked.
+
+| Kind | Fields | When |
+|---|---|---|
+| `ready` | `objects` | the scene is built |
+| `cmd` | `text` | Scene.asi takes a command (the frame or tick it reads `Scene.cmd`) |
+| `camera.move`, `camera.still` | `eye`, `front` | the view starts to move; it has not moved for `[Marks] Still` (0.3 s), marked at its last motion: a pan, a glide or a followed ship settled |
+| `glide.start`, `glide.end` | `secs`, `yaw`, `pitch`, `dist` | a `glide` command, and the moment it ends |
+| `spin.start`, `spin.stop` | `rate` | |
+| `select` | `n`, `names` | the selection changes (and once at `ready`): how many and which, by scene name or handle |
+| `cloak.start`, `cloak.done`, `decloak.start`, `decloak.done` | `obj` | each step of a scene craft's cloak |
+| `fire.start`, `fire.end` | `obj`, `weapon`, `target`, `shots`, `secs` | a burst: the first ordnance of a shooter and weapon ODF, and the last one, once none has been alive for `[Marks] FireGap` (1 s). Beams (phasers, the tractor, holding and assimilation beams) are ordnance while drawn, torpedoes and pulses while in flight |
+| `special` | `obj`, `weapon`, `target`, `can`, `fired` | a `special` command's answer |
+| `explosion` | `type` (`fireball`, `shockwave`), `r`, `at`, `near`, `d` | a new explosion, with the scene object nearest it |
+| `destroyed`, `removed` | `obj` (`how`) | a scene craft starts dying (or, `how=removed`, is gone without being seen dying, as `kill` does it); an object is gone |
+| `action.<op>`, `action.<op>.done` | `arg` (`player`) | the runner's lines |
+| `menu.open`, `menu.pane` | `name`, `template` | UI.log |
+
+`<take>.marks.json` (`"format": "a2film-marks/1"`) holds `start` (the action's start,
+Unix time), `duration`, `sources` (which of `scene`, `ui`, `action` the take had), the
+`marks` in time order, each `{"t", "kind", "src", ...fields}`, and, for a shot with
+`Expect:`, the verdicts as filmed. The manifest carries each take's marks, its `cut` and
+its `expect`.
+
+**A mark is named** `kind[:subject][#n]`. The kind and the subject may be globs; the
+subject matches any field (`fire.start:galaxy` by shooter, `fire.*:gholdbm` by weapon,
+`select:warbird` among the names); `#2` is the second, `#-1` (`#last`) the last. Kinds
+may be written with spaces (`decloak done:bop`).
+
+**`Cut: from <time> to <time> [pad S]`**: a time is a mark (its first, unless `#n`)
+with an optional offset (`fire.end:big +0.5`), seconds (`2.5`), `start` or `end`;
+`pad` widens both ends. It gives the `In` and the `Length` (at the shot's `Speed`), per
+variant, which `check` and `status` print as the lines to write:
+
+    m01      probe: Cut suggests In: 2.9   Length: 9.4   (the board: In: 0   Length: 10)
+
+It does not set them: `In:` and `Length:` stay what the board says, so the cut never
+moves because a take was filmed again.
+
+**`Expect:`** is `;`-separated, each one of:
+
+| Form | Holds when |
+|---|---|
+| `selected <op> N [by T \| at T]` | the selection's count reaches it at some moment up to `T` (the take's end), or is it at `T`; op is `>=`, `<=`, `==`, `!=`, `>`, `<` |
+| `<mark> [before T \| by T \| after T \| between A and B]` | a mark of that name falls in the take, then |
+| `no <mark> [...]` | none does |
+| `<mark> count <op> N [...]` | so many do |
+
+`T` is a time as in `Cut:`, so `cloak.done after glide.end +1` works. Only marks inside
+the take count (the setup's do not, but the selection at the start counts what the
+setup selected). An expectation a take cannot check (a `select` with no Scene.asi, a
+`menu.open` without UI.asi) is reported as not checked and does not make it suspect.
+`python3 films/film/selftest_marks.py` pins all of this without a game, and
+`./a2film probe films/marks --jobs 1` checks it on the bench.
+
+What the marks cannot see: anything of objects the scene did not build except fire and
+explosions (cloaks and deaths are of scene objects); the menus without `UI.asi`; a
+special weapon that makes no ordnance (a cloak, a shield effect); and the last frames:
+a take is cut from the end of its recording, so a mark is as exact as the take's own
+time line is (`.events.json` has the same error).
 
 ## What the board should say
 

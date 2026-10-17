@@ -504,7 +504,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             raise GameError('the game is already running in this session')
         g = self.game_dir
         for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
-                     'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Armada2_d3d9.log', 'Render3D.log'):
+                     'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
+                     'Render3D.log'):
             try:
                 (g / name).unlink()
             except FileNotFoundError:
@@ -837,7 +838,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def collect_logs(self):
         dst = self.dir / 'logs'
         g = self.game_dir
-        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.ini', 'ARMADA.PRF',
+        for name in ('Menus.log', 'HUD.log', 'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks',
+                     'Scene.ini', 'ARMADA.PRF',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',
                      'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini', 'UI.log', 'UI.ini'):

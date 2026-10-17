@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.29.0 — 2026-10-17
+
+Layers: testbench 3.32.0, films 1.8.0.
+
+### Added
+- Event marks for films: `Scene.asi` logs timestamped events per take, `a2film` keeps
+  them as `<take>.marks.json`, lists them (`a2film marks`), suggests `In`/`Length` from
+  them (`Cut:`) and checks a shot's `Expect:` after filming (1aacd31).
+
+Installed, not yet seen in game.
+
 ## 12.28.0 — 2026-10-17
 
 Layers: testbench 3.31.0, films 1.7.0.
