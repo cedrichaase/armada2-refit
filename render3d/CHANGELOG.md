@@ -16,7 +16,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   up them, the near wall hiding it at an angle. Fades to the flat look where a crack is
   only a pixel or two wide.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.13.0 — 2026-10-17
 
@@ -29,7 +29,7 @@ Installed, not yet seen in game.
   with its own surface, dimmed, instead of falling back to the engine's low-polygon
   sphere and stock texture (`world::planet_ghost`, called from `overlays::ghosts`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.12.0 — 2026-10-17
 
@@ -38,7 +38,7 @@ Installed, not yet seen in game.
   (default `clkdisen.wav`, the Klingon cloaking device's `offSound`; empty for none)
   as its decloak begins, through the game's 2D sound (`engine/sound.rs`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.11.0 — 2026-10-17
 
@@ -53,7 +53,7 @@ Installed, not yet seen in game.
   light's hue and pulse. The `oreglow` nimbus, the round halo behind the moon, is no
   longer drawn (`MoonNimbus=1` brings it back).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.10.1 — 2026-10-17
 
@@ -63,7 +63,7 @@ Installed, not yet seen in game.
   both showed. The flash now fades round from near its centre (`flash_ps`) at 1.5 times
   stock's light.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.10.0 — 2026-10-17
 
@@ -130,7 +130,7 @@ Confirmed in game 2026-10-16.
 - The selection bubbles are not drawn while the engine's `RenderSelectionEffects` has
   been made to return at once (UI.asi's `[HUD] SelectionBubbles=0`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.7.0 — 2026-10-16
 
@@ -139,7 +139,7 @@ Installed, not yet seen in game.
   info-panel close-up) keeps per-view state of its own (`View::key` 2), and is logged as
   "other".
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.6.1 — 2026-10-16
 
@@ -175,7 +175,7 @@ Tooling only; nothing to see in game.
   `MistDrift`, `Edge`, `Rays`, `RayLength`, `RaySharpness`, `RayFactions`, `HitLight`,
   `HitLightWhite`, `HitLightReach`, `HitLightPower`, `HitLights`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.5.0 — 2026-10-16
 
@@ -190,7 +190,7 @@ Installed, not yet seen in game.
 - Keys `CloakHullOthers` (0), `CloakWave`, `CloakWaveBands`, `CloakWaveSpeed`,
   `CloakWaveTilt`, `CloakShimmer` and `CloakShimmerSpeed` in `[Hulls]`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.4.0 — 2026-10-16
 
@@ -223,7 +223,7 @@ Installed, not yet seen in game.
 - Nebulae: the march's rays were mirrored top to bottom, so the gas was drawn
   reflected about the view and slid as the RTS camera panned (316df23).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.3.0 — 2026-10-16
 
@@ -246,7 +246,7 @@ Installed, not yet seen in game.
 - Sky: a recipe star's halo was cut at the lattice cells' borders, a faint square
   about `mbgpur`'s big star; it now fades out within the cells searched (a40a752).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.2.1 — 2026-10-16
 
@@ -261,7 +261,7 @@ Installed, not yet seen in game.
 - `perf/sky-grade.py`: `mbgblue` is no longer fitted again on top of the `mbg02` grade
   it is given (it wrote gains of 18-19) (712a09a).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.2.0 — 2026-10-15
 
@@ -361,7 +361,7 @@ Installed, not yet seen in game.
   scavenger, the 8472 hero mothership, Martok's base and the prison were left to the
   engine (stock light and cloak), as were their emitters, debris, ghosts and holograms.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.1.0 — 2026-10-15
 
@@ -376,4 +376,4 @@ Installed, not yet seen in game.
   it supersedes; `./install` runs it in MSAA's place, and `a2mod` switches it as the
   `render3d` layer.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.

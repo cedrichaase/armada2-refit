@@ -36,7 +36,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
 - The top-right help and palette buttons, and with them "show more": the row is menu,
   comm, idle unit, view and objectives.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.10.1 — 2026-10-17
 
@@ -44,7 +44,7 @@ Installed, not yet seen in game.
 - The briefing's objectives no longer run under their LCARS switches: the text starts
   after the switch's real width plus a gap (`theme::check_w`), not after a square box.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.10.0 — 2026-10-17
 
@@ -66,7 +66,7 @@ Installed, not yet seen in game.
   allies, enemies, neutral, the one in force lit) in place of the stock buttons'
   pictures; a click on a dot picks that state, a click on the word goes to the next.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.9.1 — 2026-10-17
 
@@ -76,7 +76,7 @@ Installed, not yet seen in game.
   never the labels' order (UI.log notes `menus: campaign labels out of order` when they
   come otherwise).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.9.0 — 2026-10-17
 
@@ -147,7 +147,7 @@ Confirmed in game 2026-10-16.
   hover card and the minimap's filter buttons ran into the frame's elbows and bars:
   each is laid out inside the frame (`theme::frame_margins`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.5.0 — 2026-10-16
 
@@ -157,7 +157,7 @@ Installed, not yet seen in game.
   render3d 0.7.0; without it the wireframe stays).
 - `[HUD] InfoScale` (1.3): the info panel's size.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.4.0 — 2026-10-16
 
@@ -187,7 +187,7 @@ Installed, not yet seen in game.
 - Graphics Settings drew its display-mode and driver fields twice (2e2298e).
 - The loading screen labelled Instant Action "Multiplayer" (14ec9a0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.3.0 — 2026-10-16
 
@@ -225,7 +225,7 @@ Installed, not yet seen in game.
 - A screen under the top dialog took the pointer: "Save Successful!"'s O.K. could not be
   clicked over the save list (defa59f).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.2.0 — 2026-10-16
 
@@ -256,7 +256,7 @@ Installed, not yet seen in game.
 - A click no longer gives the keyboard focus to a button, toggle, slider, check box or
   tab: it kept every key from the engine and Esc from the screen (345bc74).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 0.1.0 — 2026-10-16
 
@@ -279,4 +279,4 @@ Installed, not yet seen in game.
   our own in the front end (`[Demo] Shell=1` puts one in the Credits' place); the
   loading screen, with the load's progress.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.

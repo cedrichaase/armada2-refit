@@ -3,10 +3,12 @@
 #
 # Writes <out-dir>/armada2-refit-<version>.zip (default out-dir: dist/ under a fresh
 # mktemp -d, printed at the end):
-#   game/     what goes beside Armada2.exe: the plugins and their .ini, dxvk.conf
+#   game/     what goes beside Armada2.exe: the plugins and their .ini, dxvk.conf, and
+#             Render3D.asi's recipes in game/Surfaces/ and game/Nebulae/
 #   chain/    the Direct3D chain ./install sets up: crosire's d3d8to9 as d3d8.dll on
 #             DXVK's d3d9.dll (both from platform/vendor/, with their licences)
-#   models/   models/moon-sod.py, select-sod.py, hull-sod.py (+ hull-sod.sha256) and
+#   models/   models/moon-sod.py, select-sod.py, hull-sod.py (+ hull-sod.sha256),
+#             asteroid-sod.py and
 #   a2env.py  the a2env.py they import: they rewrite the player's own stock SODs
 #   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
 #   install.sh  install.ps1  install.bat     publish/installer/: Linux and macOS; Windows
@@ -35,6 +37,10 @@ gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer; also
 [ -n "$ver" ] || { echo "no version in CHANGELOG.md" >&2; exit 1; }
 commit="$(git -C "$root" rev-parse --short HEAD)"
 
+# Render3D.asi and UI.asi are no_std Rust: rustup's cargo with the i686-pc-windows-msvc
+# target (render3d/build.sh says how to get it).
+bash "$root/render3d/build.sh"         >/dev/null
+bash "$root/ui/build.sh"               >/dev/null
 bash "$root/hud/build.sh"              >/dev/null
 bash "$root/menus/build.sh"            >/dev/null
 bash "$root/qol/build.sh"              >/dev/null
@@ -47,6 +53,12 @@ stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 d="$stage/$name"
 mkdir -p "$d/game" "$d/bloom" "$d/chain" "$d/models"
+cp "$root/render3d/build/Render3D.asi"      "$root/render3d/Render3D.ini"       "$d/game/"
+mkdir -p "$d/game/Surfaces" "$d/game/Nebulae"
+cp "$root/render3d/surfaces/"*.ini "$d/game/Surfaces/"
+cp "$root/render3d/nebulae/"*.ini  "$d/game/Nebulae/"
+cp "$root/ui/build/UI.asi"                  "$root/ui/UI.ini"                   "$d/game/"
+# HUD.asi, Menus.asi and GridLayout.asi go in only where UI.asi cannot draw (no d3d8to9).
 cp "$root/hud/build/HUD.asi"                "$root/hud/HUD.ini"                 "$d/game/"
 cp "$root/menus/build/Menus.asi"            "$root/menus/Menus.ini"             "$d/game/"
 cp "$root/qol/build/QOL.asi"                "$root/qol/QOL.ini"                 "$d/game/"
@@ -80,7 +92,7 @@ cp "$root/platform/vendor/dxvk-3.1.1/d3d9.dll" "$d/chain/d3d9.dll"
 cp "$root/platform/vendor/dxvk-3.1.1/LICENSE" "$d/chain/dxvk-LICENSE"
 # The model rewrites: derived at install time from the player's own files, pinned by hash.
 cp "$root/models/moon-sod.py" "$root/models/select-sod.py" "$root/models/hull-sod.py" \
-   "$root/models/hull-sod.sha256" "$d/models/"
+   "$root/models/hull-sod.sha256" "$root/models/asteroid-sod.py" "$d/models/"
 cp "$root/a2env.py" "$d/"
 # cmd.exe wants CRLF.
 sed 's/$/\r/' "$root/publish/installer/install.bat" > "$d/install.bat"
@@ -110,19 +122,28 @@ it skipped and why. Each finds the game itself when the package is unzipped into
 game directory. Undo everything with --uninstall (install.bat -Uninstall).
 
 WHAT GOES IN (game/, copied beside Armada2.exe)
-  HUD.asi      + HUD.ini        hud $(version "$root/hud/CHANGELOG.md")        in-game HUD, font and cursors at any aspect
-  Menus.asi    + Menus.ini      menus $(version "$root/menus/CHANGELOG.md")      the shell menus scaled to fill the screen
+  Render3D.asi + Render3D.ini   render3d $(version "$root/render3d/CHANGELOG.md")   the 3D view through a renderer of our own:
+    Surfaces/, Nebulae/                        HDR, anti-aliasing, bloom, lit hulls with
+                                               shadows, skies, effects, planets, nebulae
+  UI.asi       + UI.ini         ui $(version "$root/ui/CHANGELOG.md")        the HUD, the menus, the loading screen and
+                                               the cursor redrawn at any aspect; the button
+                                               bar as a grid of position keys
   QOL.asi      + QOL.ini        qol $(version "$root/qol/CHANGELOG.md")        quality of life that stock players can play
                                                against: right-drag pan speed, control groups
   QOLRules.asi + QOLRules.ini   qol             pay for an item when it is queued; against
                                                the computer only, stands down online
-  GridLayout.asi + .ini         grid $(version "$root/grid/CHANGELOG.md")       the button bar as a 5x3 grid of position keys
   Online.asi   + Online.ini     online $(version "$root/online/CHANGELOG.md")     online multiplayer under Wine/Proton too: the
                                                Internet - Online entry, join codes, no port
                                                forwarding (the project's server, c20e.de)
   binkw32.dll  + BinkProxy.ini  cutscenes $(version "$root/cutscenes/CHANGELOG.md")  launch reels full screen, AV1 movie replacements
   dxvk.conf                     postfx $(version "$root/postfx/CHANGELOG.md")     16x anisotropic filtering, LOD bias, seamless
                                                cube maps; only DXVK reads it
+Render3D.asi and UI.asi draw on the Direct3D 9 device that d3d8to9 (below) gives them.
+Where the installer leaves the chain as it is, they are not installed, and these take
+the UI's place instead (the 3D view is then the engine's):
+  HUD.asi      + HUD.ini        hud $(version "$root/hud/CHANGELOG.md")        in-game HUD, font and cursors at any aspect
+  Menus.asi    + Menus.ini      menus $(version "$root/menus/CHANGELOG.md")      the shell menus scaled to fill the screen
+  GridLayout.asi + .ini         grid $(version "$root/grid/CHANGELOG.md")       the button bar as a 5x3 grid of position keys
 THE DIRECT3D CHAIN (chain/)    platform $(version "$root/platform/CHANGELOG.md")
   d3d8.dll  crosire's d3d8to9 1.16.0, on
   d3d9.dll  DXVK 3.1.1's Direct3D 9 on Vulkan, which dxvk.conf needs.
@@ -134,14 +155,16 @@ THE DIRECT3D CHAIN (chain/)    platform $(version "$root/platform/CHANGELOG.md")
   Direct3D 9 on a Mac, so dxvk.conf and bloom are skipped there.
 
 THE 3D VIEW
-  This package leaves the 3D view to the engine: the per-part plugins of earlier
-  packages (lighting, sky, planets, anti-aliasing) are taken out on install, and
-  their replacement, Render3D.asi, is not in a release yet.
+  Render3D.asi replaces the per-part plugins of earlier packages (lighting, sky,
+  planets, anti-aliasing); they are taken out on install. Each of its modules can be
+  given back to the engine in Render3D.ini ([Modules] <name>=0), and each part of the
+  UI in UI.ini (a key at 0). Seen in game on Linux (Proton, DXVK); on Windows' own
+  Direct3D 9 and on macOS (Wine's wined3d) not yet.
 
 THE MODELS (models/, needs Python 3; the graphical installer brings its own)
-  The dilithium moons and the selection bubble smoothed, and the ships and stations
-  drawn round where they are round: rewritten from your own stock SOD files, which
-  are checked by hash and kept as .a2neb-backup.
+  The dilithium moons, the asteroids and the selection bubble smoothed, and the ships
+  and stations drawn round where they are round: rewritten from your own stock SOD
+  files, which are checked by hash and kept as .a2neb-backup.
 
 The stock binkw32.dll is kept as binkw32_orig.dll, which the proxy forwards to, and as
 binkw32.dll.a2neb-backup. An existing dxvk.conf the package did not write is left alone,
@@ -237,7 +260,7 @@ json.dump({
     # The systems below install only from a package that names them (Package.for_system).
     'windows': {'script': 'install.ps1', 'uninstall': '-Uninstall', 'progress': 'A2_PROGRESS'},
     'macos': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
-    'steps': ['verify', 'prereqs', 'chain', 'hud', 'menus', 'qol', 'grid', 'models',
+    'steps': ['verify', 'prereqs', 'chain', 'render3d', 'ui', 'qol', 'models',
               'online', 'cutscenes', 'renderer', 'bloom', 'done'],
     'layers': [
         layer('prereqs', 'Widescreen patch', '1.0', ['vendor/STA2WidescreenPatch/*'],
@@ -246,18 +269,21 @@ json.dump({
         layer('chain', 'Direct3D chain', '$(version "$root/platform/CHANGELOG.md")',
               ['chain/d3d8.dll', 'chain/d3d9.dll'],
               "crosire's d3d8to9 on DXVK's d3d9: DXVK underneath"),
-        layer('hud', 'HUD', '$(version "$root/hud/CHANGELOG.md")', ['game/HUD.asi', 'game/HUD.ini'],
-              'the in-game HUD, font and cursors at any aspect ratio'),
-        layer('menus', 'Menus', '$(version "$root/menus/CHANGELOG.md")', ['game/Menus.asi', 'game/Menus.ini'],
-              'the shell menus scaled to fill the screen'),
+        layer('render3d', '3D view', '$(version "$root/render3d/CHANGELOG.md")',
+              ['game/Render3D.asi', 'game/Render3D.ini', 'game/Surfaces/*', 'game/Nebulae/*'],
+              'the 3D view through a renderer of our own: HDR, anti-aliasing, bloom, lit hulls '
+              'with shadows, skies, effects, planets and nebulae', 'd3d8to9'),
+        layer('ui', 'HUD and menus', '$(version "$root/ui/CHANGELOG.md")',
+              ['game/UI.asi', 'game/UI.ini', 'game/HUD.asi', 'game/HUD.ini', 'game/Menus.asi',
+               'game/Menus.ini', 'game/GridLayout.asi', 'game/GridLayout.ini'],
+              'the HUD, the menus, the loading screen and the cursor redrawn at any aspect ratio, '
+              'the button bar as a grid of position keys', 'd3d8to9'),
         layer('qol', 'Quality of life', '$(version "$root/qol/CHANGELOG.md")',
               ['game/QOL.asi', 'game/QOL.ini', 'game/QOLRules.asi', 'game/QOLRules.ini'],
               'right-drag pan speed, bigger selections and control groups; plays against stock players. '
               'Pay on queue against the computer'),
-        layer('grid', 'Grid keys', '$(version "$root/grid/CHANGELOG.md")', ['game/GridLayout.asi', 'game/GridLayout.ini'],
-              'the button bar as a 5×3 grid of position keys'),
         layer('models', 'Models', '$(version "$root/models/CHANGELOG.md")', ['models/*'],
-              'moons, selection bubble and hulls smoothed from your own files'),
+              'moons, asteroids, selection bubble and hulls smoothed from your own files'),
         layer('online', 'Online', '$(version "$root/online/CHANGELOG.md")', ['game/Online.asi', 'game/Online.ini'],
               'online multiplayer that works under Wine/Proton: the Internet – Online entry, '
               'join codes, no port forwarding'),
@@ -277,7 +303,7 @@ json.dump({
 }, open(sys.argv[1], 'w'), indent=1)
 EOF
 
-(cd "$d" && sha256sum -- game/* bloom/* chain/* models/* a2env.py vendor/*/* prereqs.txt manifest.json \
+(cd "$d" && sha256sum -- game/*.* game/*/* bloom/* chain/* models/* a2env.py vendor/*/* prereqs.txt manifest.json \
     armada2-refit-installer.py > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")
