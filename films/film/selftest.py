@@ -8,7 +8,9 @@ game. Exit 0 when all of it holds.
 
     python3 films/film/selftest.py
 """
+import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -28,6 +30,40 @@ Variants: stock, refit
 ### d01 · The installer
 Kind: desktop
 Run: python3 {repo}/gui-installer/installer.py
+"""
+
+CUTS = """# Cuts test
+Film: cutstest
+Probe: 320x180
+
+## One
+### c1 · Card
+Length: 1.5
+
+```card
+[accent] ONE
+```
+
+### s1 · A scene
+Scene: planet
+Variants: stock, refit
+Layout: wipe
+Length: 2
+Transition: dissolve 0.5
+
+## Two
+### c2 · Card two
+Length: 1.5
+Transition: dissolve 0.5
+
+```card
+TWO
+```
+
+### s2 · Another
+Scene: planet
+Variants: refit
+Length: 2
 """
 
 failed = []
@@ -56,7 +92,75 @@ def commit(repo, msg):
     return code.head(repo)
 
 
+def cuts():
+    """Numbered cuts, partial cuts and the shot map, on a board with no takes (slates and
+    cards), in a throw-away $A2_DATA. Needs ffmpeg."""
+    if not shutil.which('ffmpeg'):
+        print('skip  cuts (no ffmpeg)')
+        return
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    with tempfile.TemporaryDirectory() as tmp:
+        write(tmp, 'cb/storyboard.md', CUTS)
+        env = dict(os.environ, A2_DATA=os.path.join(tmp, 'data'))
+        d = os.path.join(tmp, 'data', 'films', 'cutstest')
+
+        def cut(*args):
+            r = subprocess.run([os.path.join(root, 'a2film'), 'animatic', os.path.join(tmp, 'cb'), *args],
+                               env=env, capture_output=True, text=True)
+            if r.returncode:
+                print(r.stderr[-600:])
+            return r.returncode
+
+        def doc(name):
+            return json.load(open(os.path.join(d, name)))
+
+        check(cut() == 0 and cut() == 0, 'two cuts are made')
+        check(all(os.path.exists(os.path.join(d, f)) for f in
+                  ('animatic-probe-rc1.mp4', 'animatic-probe-rc2.mp4', 'animatic-probe.mp4',
+                   'animatic-probe-rc2.shots.json', 'animatic-probe.shots.json')),
+              'every cut is kept as rc<N>, the latest is animatic-probe.mp4, each with a .shots.json')
+        check(os.path.getsize(os.path.join(d, 'animatic-probe.mp4')) ==
+              os.path.getsize(os.path.join(d, 'animatic-probe-rc2.mp4')), 'the latest is a copy of the newest rc')
+        check(os.stat(os.path.join(d, 'animatic-probe.mp4')).st_ino !=
+              os.stat(os.path.join(d, 'animatic-probe-rc2.mp4')).st_ino,
+              'the latest shares no file with the rc (an older a2film writes it in place)')
+        m = doc('animatic-probe-rc2.shots.json')
+        sh = m['shots']
+        check([x['id'] for x in sh] == ['c1', 's1', 'c2', 's2'], 'the map lists the shots in order')
+        check(sh[0]['owns_start'] == 0 and sh[-1]['owns_end'] == m['timeline_length']
+              and all(a['owns_end'] == b['owns_start'] for a, b in zip(sh, sh[1:])),
+              'the owned spans tile the cut without gap or overlap')
+        check(sh[1]['start'] == 1.0 and sh[1]['owns_start'] == 1.25 and sh[1]['transition']['overlap'] == 0.5,
+              'a dissolve overlaps in start/end and is split at its middle in owns_*')
+        check(sh[1]['used_variants'] == ['stock', 'refit'] and sh[3]['used_variants'] == ['refit']
+              and sh[1]['layout']['type'] == 'wipe' and 'status' in sh[1] and 'takes' in sh[1],
+              'the map carries variants, layout, takes and status')
+        check(abs(m['duration'] - m['timeline_length']) < 0.3, 'the cut\'s probed duration matches the timeline')
+        check(cut('--name', 'tweak') == 0 and os.path.exists(os.path.join(d, 'animatic-probe-tweak.mp4'))
+              and cut('--name', 'tweak') != 0, '--name writes that label, and will not overwrite it')
+
+        check(cut('--section', 'two') == 0 and doc('animatic-probe-part-two.shots.json')['kind'] == 'part'
+              and [x['id'] for x in doc('animatic-probe-part-two.shots.json')['shots']] == ['c2', 's2'],
+              '--section cuts that section to animatic-probe-part-<label>.mp4')
+        check(cut('--only', 's2,c1') == 0 and os.path.exists(os.path.join(d, 'animatic-probe-part-s2-c1.mp4')),
+              '--only cuts the shots, in the order given')
+        check(cut('--from', 's1', '--to', 'c2', '--name', 'mid') == 0
+              and [x['id'] for x in doc('animatic-probe-part-mid.shots.json')['shots']] == ['s1', 'c2'],
+              '--from/--to cut a range')
+        check(cut('c1', 's1') == 0 and os.path.exists(os.path.join(d, 'animatic-probe-c1-s1.mp4')),
+              'positional ids keep their old file name')
+        check(cut('--section', 'nowhere') != 0 and cut('--only', 'zz') != 0, 'an unknown section or shot is an error')
+        check(not os.path.exists(os.path.join(d, 'animatic-probe-rc3.mp4')) and
+              doc('animatic-probe.shots.json')['latest_of'] == 'animatic-probe-tweak.mp4',
+              'partial cuts do not take an rc number or replace the latest (a named full cut does)')
+        log = doc('cuts.json')['cuts']
+        check([c['kind'] for c in log][:3] == ['rc', 'rc', 'named'] and log[1]['rc'] == 2
+              and 'part' in {c['kind'] for c in log} and log[1]['shots'][1]['takes'] == {'stock': None, 'refit': None},
+              'cuts.json logs every cut: rc, date, duration, board hash, shots and their takes')
+
+
 def main():
+    cuts()
     with tempfile.TemporaryDirectory() as repo:
         git(repo, 'init', '-q')
         for path in ('render3d/src/lib.rs', 'testbench/scene/scene.c', 'testbench/scene/install', 'a2test',

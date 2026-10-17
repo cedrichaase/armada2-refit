@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.25.0 — 2026-10-17
+
+Layers: films 1.4.0.
+
+### Added
+- `a2film animatic`: numbered cuts (`animatic-<tier>-rc<N>.mp4`, the latest still
+  `animatic-<tier>.mp4`) with a `cuts.json` log, partial cuts (`--only`, `--section`,
+  `--from`/`--to`) and a `<cut>.shots.json` shot map beside every cut (films 1.4.0).
+
+Tooling only; nothing to see in game.
+
 ## 12.24.0 — 2026-10-17
 
 Layers: gui-installer 1.6.0.
