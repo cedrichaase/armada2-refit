@@ -101,6 +101,11 @@ class Take:
             prep = ['--no-launch'] if s.get('Prepare') else [f'--args={f.args(s)}']   # '-nointro' alone reads as a flag
             cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier, s),
                    *f.variants[s.install_variant(self.variant)].split(), *prep, '--label', label]
+            # the sound: categories muted in the clone, and those recorded as stems
+            if s.mute:
+                cmd += ['--mute', ','.join(s.mute)]
+            if s.stems:
+                cmd += ['--stems', ','.join(s.stems)]
         # The slot is handed to the session start, whose sway and game hold it from there
         # on; our copy of the descriptor is dropped as soon as it returns.
         slot = self.slot or slots.acquire(self.tag, say=lambda m: self.note(m.splitlines()[0]))[0]
@@ -436,16 +441,24 @@ class Take:
         self.aud = subprocess.Popen(['parec', '-d', sink + '.monitor', '--file-format=wav', raw + '.wav'],
                                     stdin=subprocess.DEVNULL, stdout=self.log, stderr=subprocess.STDOUT,
                                     start_new_session=True) if sink else None
+        # each stem's own sink (Stems: ...); what stays on the session's sink is the effects
+        self.stem_recs = {}
+        for cat, ss in sorted((st.get('stem_sinks') or {}).items()):
+            self.stem_recs[cat] = subprocess.Popen(
+                ['parec', '-d', ss['name'] + '.monitor', '--file-format=wav', f'{raw}.{cat}.wav'],
+                stdin=subprocess.DEVNULL, stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
+        if self.stem_recs and self.shot.stems and set(self.stem_recs) != set(self.shot.stems):
+            self.note(f'stems: the session has {", ".join(self.stem_recs)}, the shot wants {", ".join(self.shot.stems)}')
         return time.time()
 
     def record_stop(self):
-        for p in (self.rec, self.aud):
+        for p in (self.rec, self.aud, *getattr(self, 'stem_recs', {}).values()):
             if p:
                 try:
                     os.killpg(p.pid, 2)
                 except ProcessLookupError:
                     pass
-        for p in (self.rec, self.aud):
+        for p in (self.rec, self.aud, *getattr(self, 'stem_recs', {}).values()):
             if p:
                 try:
                     p.wait(20)
@@ -479,13 +492,47 @@ class Take:
         has_audio = os.path.exists(raw + '.wav') and os.path.getsize(raw + '.wav') > 1000
         audio_in = ['-ss', f'{max(0.0, probe_duration(raw + ".wav") - duration):.3f}', '-i', raw + '.wav'] \
             if has_audio else ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
+        amap = ['-map', '1:a']
+        stems = self.mux_stems(raw, duration)
+        if stems:
+            # the take's own track stays the whole of its sound: every stem, summed at unity
+            audio_in = []
+            for p in stems.values():
+                audio_in += ['-i', p]
+            amap = ['-filter_complex', ''.join(f'[{i + 1}:a]' for i in range(len(stems))) +
+                    f'amix=inputs={len(stems)}:normalize=0:duration=longest[a]', '-map', '[a]']
         x264 = ['-preset', 'veryfast', '-crf', '18'] if self.tier == 'probe' else ['-preset', 'slow', '-crf', '14']
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{lead:.3f}', '-i', fixed, *audio_in,
-                        '-map', '0:v', '-map', '1:a', '-fps_mode', 'passthrough',
+                        '-map', '0:v', *amap, '-fps_mode', 'passthrough',
                         '-c:v', 'libx264', *x264, '-pix_fmt', 'yuv420p',
                         '-color_range', 'tv', '-colorspace', 'bt470bg', '-color_primaries', 'bt470bg',
                         '-color_trc', 'smpte170m', '-c:a', 'pcm_s16le', '-ar', '48000', '-ac', '2',
                         '-t', f'{duration:.3f}', self.stem + '.mkv'], check=True)
+
+    def mux_stems(self, raw, duration):
+        """Each stem's recording -> <stem>.<cat>.wav, cut from its end like the picture, so
+        every stem and the take share one time line: {cat: path}, effects first. Nothing
+        unless the session recorded stems. The session's own sink is the effects stem."""
+        for cat in sb.CATEGORIES:       # an earlier take's stems are not this one's
+            try:
+                os.remove(f'{self.stem}.{cat}.wav')
+            except FileNotFoundError:
+                pass
+        recs = getattr(self, 'stem_recs', {})
+        if not recs:
+            return {}
+        out = {}
+        for cat, src in [('effects', raw + '.wav')] + [(c, f'{raw}.{c}.wav') for c in sorted(recs)]:
+            dst = f'{self.stem}.{cat}.wav'
+            if os.path.exists(src) and os.path.getsize(src) > 1000:
+                inp = ['-ss', f'{max(0.0, probe_duration(src) - duration):.3f}', '-i', src]
+            else:
+                inp = ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
+                self.note(f'stem {cat}: nothing recorded, silence')
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', *inp, '-af', 'apad', '-c:a', 'pcm_s16le', '-ar', '48000',
+                            '-ac', '2', '-t', f'{duration:.3f}', dst], check=True)
+            out[cat] = dst
+        return out
 
     def contact_sheet(self, duration):
         """Six frames over the action, labelled with their time."""

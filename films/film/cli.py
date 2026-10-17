@@ -228,7 +228,8 @@ def status(a):
     return 0
 
 
-TAKE_FILES = ('.mkv', '.wav', '.events.json', '.marks.json', '.sheet.png', '.log')
+TAKE_FILES = ('.mkv', '.wav', '.events.json', '.marks.json', '.sheet.png', '.log',
+              '.effects.wav', '.music.wav', '.voice.wav', '.interface.wav')
 
 
 def look(spec, other):

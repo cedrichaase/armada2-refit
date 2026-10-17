@@ -13,14 +13,19 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, REPO)
 import a2env  # noqa: E402
 
-FILM_KEYS = {'Film', 'Final', 'Probe', 'Fps', 'Args', 'Music', 'Pointer'}
-SECTION_KEYS = {'Music'}
+FILM_KEYS = {'Film', 'Final', 'Probe', 'Fps', 'Args', 'Music', 'Pointer', 'Mute', 'Stems'}
+SECTION_KEYS = {'Music', 'Mute', 'Stems'}
 SHOT_KEYS = {'Kind', 'Shows', 'Scene', 'Args', 'Variants', 'Layout', 'Crop', 'Transition', 'Title', 'Sub',
              'Caption', 'In', 'Length', 'Speed', 'Audio', 'Keys', 'File', 'From', 'Status', 'Background',
-             'Run', 'Wallpaper', 'Players', 'Prepare', 'Tier', 'Cut', 'Expect'}
+             'Run', 'Wallpaper', 'Players', 'Prepare', 'Tier', 'Cut', 'Expect', 'Mute', 'Stems'}
 KINDS = {'scene', 'card', 'footage', 'mission', 'desktop'}
 LAYOUTS = {'full', 'wipe', 'dissolve', 'split', 'pip'}
 STATUSES = {'draft', 'probed', 'approved', 'final'}
+# the game's sound categories (testbench/README.md, "Audio stems"): what `Mute:` silences,
+# and the stems a take can record; the effects stem is whatever is not a stem of its own
+CATEGORIES = ('music', 'voice', 'effects', 'interface')
+STEM_CATEGORIES = ('music', 'voice', 'interface')
+AUDIO_MODES = {'game', 'none', 'vo'}
 OPS = {'scene', 'wait', 'key', 'click', 'step', 'shot', 'ptr', 'drag', 'lclick', 'press', 'run', 'typelog'}
 
 DEFAULT_VARIANTS = {
@@ -156,6 +161,65 @@ class Shot:
         v = self.get('Shows')
         return [x.strip() for x in v.split(',') if x.strip()] if v else []
 
+    def inherited(self, key):
+        """A field the shot, its section or the film may set, the nearest winning."""
+        if key in self.fields:
+            return self.fields[key]
+        film = self.film
+        if film is None:
+            return None
+        for sec in film.sections:
+            if any(x is self for x in sec.shots):
+                if key in sec.fields:
+                    return sec.fields[key]
+                break
+        return film.fields.get(key)
+
+    @property
+    def mute(self):
+        """`Mute: music, voice`: categories at volume 0 in the take (`none`: nothing)."""
+        return categories(self.inherited('Mute'))
+
+    @property
+    def stems(self):
+        """`Stems: music, voice`: categories recorded as stems of their own; with any, the
+        rest of the game's sound is the `effects` stem."""
+        return categories(self.inherited('Stems'))
+
+    @property
+    def audio(self):
+        """`Audio:` as (mode, terms): ('game'|'none'|'vo', []), or ('mix', [(stem, dB)])
+        for `Audio: effects + voice -6`."""
+        return parse_audio(self.get('Audio'))
+
+
+def categories(text):
+    """'music, voice' -> ['music', 'voice'] (sorted, lower case); 'none' or nothing -> []."""
+    words = [w for w in re.split(r'[\s,+]+', (text or '').strip().lower()) if w]
+    return [] if words == ['none'] else sorted(set(words))
+
+
+def parse_audio(text):
+    v = (text or 'game').strip().lower()
+    if v in AUDIO_MODES:
+        return v, []
+    terms = []
+    for part in v.split('+'):
+        a = part.split()
+        if not a:
+            raise BoardError(f'Audio: {text}: an empty term')
+        gain = 0.0
+        if len(a) > 1:
+            g = a[1][:-2] if a[1].endswith('db') else a[1]
+            try:
+                gain = float(g)
+            except ValueError:
+                raise BoardError(f'Audio: {text}: {a[1]} is not a gain in dB')
+        if len(a) > 2:
+            raise BoardError(f'Audio: {text}: a term is <stem> [gain dB]')
+        terms.append((a[0], gain))
+    return 'mix', terms
+
 
 @dataclass
 class Section:
@@ -282,7 +346,10 @@ class Film:
                     tier=tier, res=self.res(tier, shot), args=self.args(shot), scene=shot.get('Scene'),
                     scene_ini=ini_text, music=self.music, pointer=self.fields.get('Pointer'),
                     run=shot.get('Run'), wallpaper=shot.get('Wallpaper'),
-                    setup=[t for _, t in shot.setup], action=[t for _, t in shot.action])
+                    setup=[t for _, t in shot.setup], action=[t for _, t in shot.action],
+                    # only when set, so a board that uses neither keeps its takes' hashes
+                    **({'mute': shot.mute} if shot.mute else {}),
+                    **({'stems': shot.stems} if shot.stems else {}))
 
     def spec_hash(self, shot, variant, tier):
         s = json.dumps(self.spec(shot, variant, tier), sort_keys=True)
@@ -592,6 +659,46 @@ def parse(path):
     return film
 
 
+def stem_names(shot):
+    """The stems a take of this shot has: its Stems and `effects`, the rest; none without."""
+    return [c for c in shot.stems if c != 'effects'] + ['effects'] if shot.stems else []
+
+
+def audio_problems(film, s):
+    out = []
+    mute, stems = s.mute, s.stems
+    for key, cats, allowed in (('Mute', mute, CATEGORIES), ('Stems', stems, STEM_CATEGORIES)):
+        bad = [c for c in cats if c not in allowed]
+        if bad and key in s.fields:
+            out.append(f'{key} {", ".join(bad)}: not one of {", ".join(allowed)}')
+    both = set(mute) & set(stems)
+    if both:
+        out.append(f'{", ".join(sorted(both))}: both in Mute and in Stems')
+    if (mute or stems) and s.kind == 'desktop' and ('Mute' in s.fields or 'Stems' in s.fields):
+        out.append('a desktop shot has no game sound to mute or split')
+    try:
+        mode, terms = s.audio
+    except BoardError as e:
+        return out + [str(e)]
+    if mode == 'mix':
+        src = s
+        if s.kind == 'footage':
+            a = (s.get('From') or '').split()
+            src = next((x for x in film.shots if a and x.id == a[0]), None)
+            if src is None:
+                return out + ['an Audio mix of stems needs a From: shot that records them']
+        have = stem_names(src)
+        for name, _ in terms:
+            if name == 'game':
+                continue
+            if not have:
+                out.append(f'Audio: {name}: {src.id} records no stems (Stems: ...)')
+                break
+            if name not in have:
+                out.append(f'Audio: {name} is not a stem of {src.id} ({", ".join(have)}, or game)')
+    return out
+
+
 def check(film):
     """Problems a board has, as (shot or None, message); empty when it can be filmed."""
     out = []
@@ -689,6 +796,7 @@ def check(film):
                     parse(s.get(key))
                 except marks.MarkError as e:
                     out.append((s, f'{key}: {e}'))
+        out += [(s, m) for m in audio_problems(film, s)]
         c = s.crop
         if c is not None and (len(c) != 4 or any(x < 0 or x > 1 for x in c)):
             out.append((s, 'Crop is x y w h, four fractions of the frame'))
@@ -697,6 +805,11 @@ def check(film):
         if r.id in used:
             for msg in check_reference(r):
                 out.append((None, f'reference {r.id} ({r.file}:{r.line}): {msg}'))
+    for owner, f in [(f'section {sec.title}', sec.fields) for sec in film.sections] + [('film', film.fields)]:
+        for key, allowed in (('Mute', CATEGORIES), ('Stems', STEM_CATEGORIES)):
+            bad = [c for c in categories(f.get(key)) if c not in allowed]
+            if bad:
+                out.append((None, f'{owner}: {key} {", ".join(bad)}: not one of {", ".join(allowed)}'))
     ids = {s.id for s in film.shots}
     for sec in film.sections:
         m = re.search(r'\buntil\s+(\S+)', sec.fields.get('Music', ''))
