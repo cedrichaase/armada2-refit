@@ -13,7 +13,7 @@ Layers: films 1.4.0.
 - `a2film`: boards split over files (`Include:`), `a2film adopt` for another board's
   takes of the same shot, the shot field `Tier:` for money shots probed larger in the
   same run, and the reference catalogue `films/reference/` with `From: ref:<id>`; the
-  rough cut uses each shot's best take (films 1.4.0).
+  rough cut uses each shot's best take (films 1.4.0, 13be105).
 
 Tooling only; nothing to see in game.
 

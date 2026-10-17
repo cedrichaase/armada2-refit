@@ -12,23 +12,23 @@ in [`README.md`](README.md).
   in where it stands (sections and shots, in order, nested); shot ids are unique across
   all of them. `check` lists the files and marks each shot's; the manifest carries
   `includes` and each shot's `file`. Where a shot is written is not in its spec, so
-  moving it between files keeps its takes.
+  moving it between files keeps its takes (13be105).
 - `a2film adopt <source> <shot>... <target> [--as ID]`: take over another board's takes
   of a shot whose spec is the same, less the film's and shot's names; copied (reflinked)
-  with the `.spec.json` rewritten and an `adopted` key.
+  with the `.spec.json` rewritten and an `adopted` key (13be105).
 - The shot field `Tier:` (`1080`, `1440`, `2160`, `4k`, `WxH` or `final`): the shot is
   probed at that size, or its final take filmed, in the same probe run; takes larger
-  than the probes run after the others, one at a time.
+  than the probes run after the others, one at a time (13be105).
 - `films/reference/`, the reference catalogue (`README.md`, `catalogue.md` with one
-  example entry), and `From: ref:<id>` for footage shots, with the entry's `In`/`Out`.
-- `--ignore-code` on `animatic` and `sheet`.
+  example entry), and `From: ref:<id>` for footage shots, with the entry's `In`/`Out` (13be105).
+- `--ignore-code` on `animatic` and `sheet` (13be105).
 
 ### Changed
 - `animatic`, `sheet` and `manifest` at the probe tier cut each shot from its best take,
   final or probe (current first, then the larger), scaled to the cut; a manifest take
-  says its `tier`. With probe takes only, as before.
+  says its `tier`. With probe takes only, as before (13be105).
 - `films/film/selftest.py` also pins included files, `Tier:`, the take a cut picks,
-  `adopt` and the catalogue.
+  `adopt` and the catalogue (13be105).
 
 Tooling only; nothing to see in game.
 
