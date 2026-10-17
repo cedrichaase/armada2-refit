@@ -168,14 +168,31 @@ uses of it:
   cursor's texture whenever the sprite changes, every frame. With a hardware cursor
   (`+0xe0` clear, not seen under DXVK) the wrap has no effect; `cursor::synchronous()`
   says which.
+- **Whether the engine would show it** (`cursor::install_probe`). Another plugin can
+  hide the engine's cursor by wrapping `RefreshDisplay`'s one `DrawScaled2D` call
+  (0x6246fa) and skipping it: Scene.asi's `Cursor=0` and `cursor off`
+  (testbench/scene/README.md), which patches it once the scene is built and chains to
+  whatever the call went to. The UI wraps the same call when it loads (the probe,
+  chaining to stock or to HUD.asi's wrap), so Scene.asi's wrap comes before it. Each
+  present with a cursor sprite notes whether the draw got as far as the probe:
+  `engine_shows()` is false while something before it skips it, and then the UI draws
+  no cursor either (`cursor: Mission draws none`). It follows a change a present late.
+  While the UI draws its own, `hide_this_frame()` has the probe skip the engine's draw
+  (`+0x60` is left alone when the probe is in), so the probe still sees the draw
+  reached. The probe also makes the square-cursor correction ("The engine's cursor,
+  square"). It reads the
+  engine's state, not Scene.asi's: any plugin that skips that draw is obeyed.
 - The UI's own cursor is drawn in the mission frame, a frame earlier than the engine's
   (which `RefreshDisplay` draws at the position it reads just before presenting), at
   the pointer position `input::poll` read.
 - **Our own cursor** (`src/cursor.rs`, `[UI] Cursor=1`, the default). It is drawn last in every frame, in all three contexts: in a mission the
   sprite `shape()` names (and the engine's is hidden with `hide_this_frame()`; where the
   engine's cannot be hidden, `synchronous()` false, ours is not drawn, so there are never
-  two), in a screen of ours and on the loading screen the arrow `c_arrow`. Nothing
-  is drawn while the engine shows none (a right-drag) or the pointer is outside the window.
+  two), in a screen of ours the arrow `c_arrow`, and on the loading screen the arrow
+  only while the engine would draw a cursor there itself. It has none: the bench saw
+  no cursor sprite at the loading screen's presents (`cursor: Loading draws none`), so
+  no cursor is drawn there, as in stock. Nothing is drawn while the engine shows none
+  (a right-drag, or `engine_shows()` false) or the pointer is outside the window.
   - **The art is read at run time from the player's own files, never copied**:
     `Sprites/cursor.spr` is parsed (a line is a sprite name, a texture, a rectangle in a
     reference size, `@anim=cursorNx1` for N frames side by side, `@origin=(x,y)` for the
@@ -437,12 +454,13 @@ that the old plugins are not installed:
 `Curs_Move.tga.a2neb-backup`). The engine draws its cursor under the 2D scale it sets
 to the back buffer over 800 x 600 on each axis (hud/README.md, "HUD.asi", the
 cursors), so on a wide screen it is wide. The synchronous path's one draw (the
-`call ST3D_Sprite::DrawScaled2D` at 0x6246fa in `RefreshDisplay`) goes through a
-wrapper that, for that draw only, sets the x scale to the y scale and moves the
+`call ST3D_Sprite::DrawScaled2D` at 0x6246fa in `RefreshDisplay`) goes through the
+probe ("The cursor"), which, for that draw only, sets the x scale to the y scale and moves the
 position the engine computed so the hotspot (`ST3D_Sprite+0x30`) stays on the
 pointer, and puts the scale back; the hardware path's `SetCursor` multiplies the
-cursor's width by the y scale (`fmuls 0x18(%esi)` at 0x625dd9 reads `+0x1c`). Each site
-is checked to be stock first. `UI.log`: "cursor: the engine's cursor is kept square".
+cursor's width by the y scale (`fmuls 0x18(%esi)` at 0x625dd9 reads `+0x1c`). The
+probe must have found the call going to stock `DrawScaled2D`, and `SetCursor`'s site
+is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 
 ## `UI.ini`
 
@@ -615,8 +633,7 @@ the engine does not see (the selection stays).
 
 ## Not done
 
-- **The cursor**: the animation rate is
-  a guess, and the loading screen's cursor was not looked at on the bench.
+- **The cursor**: the animation rate is a guess.
 - **Widgets**: `button`, `toggle` and `slider` take no keyboard focus; the text field
   has no undo and no IME; a dropdown's press outside the list closes it but the press
   also reaches whatever is below it.

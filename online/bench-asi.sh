@@ -54,7 +54,9 @@ if [ -n "$server" ]; then
     if ! python3 -c 'import socket,sys; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.bind(("127.0.0.1",int(sys.argv[1])))' "$port" 2>/dev/null; then
         echo "a server is already listening on 127.0.0.1:$port"
     else
-        setsid python3 "$here/server/a2online-server.py" --bind 127.0.0.1 --port "$port" --idle-exit 90 \
+        # the idle exit counts from here, before the games start: a 4K take's game takes about
+        # 100 s to reach its menus, and with 90 s the server was gone before the host asked
+        setsid python3 "$here/server/a2online-server.py" --bind 127.0.0.1 --port "$port" --idle-exit 600 \
             >>"$work/game/OnlineServer.log" 2>&1 9>&- </dev/null &
         sleep 0.5
         echo "started a2online-server on 127.0.0.1:$port (log: OnlineServer.log)"

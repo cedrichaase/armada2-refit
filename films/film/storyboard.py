@@ -17,9 +17,9 @@ FILM_KEYS = {'Film', 'Final', 'Probe', 'Fps', 'Args', 'Music', 'Pointer', 'Mute'
 SECTION_KEYS = {'Music', 'Mute', 'Stems'}
 SHOT_KEYS = {'Kind', 'Shows', 'Scene', 'Args', 'Variants', 'Layout', 'Crop', 'Transition', 'Title', 'Sub',
              'Caption', 'In', 'Length', 'Speed', 'Audio', 'Keys', 'File', 'From', 'Status', 'Background',
-             'Run', 'Wallpaper', 'Players', 'Prepare', 'Tier', 'Cut', 'Expect', 'Mute', 'Stems'}
+             'Run', 'Wallpaper', 'Players', 'Prepare', 'Tier', 'Cut', 'Expect', 'Mute', 'Stems', 'Labels'}
 KINDS = {'scene', 'card', 'footage', 'mission', 'desktop'}
-LAYOUTS = {'full', 'wipe', 'dissolve', 'split', 'pip'}
+LAYOUTS = {'full', 'wipe', 'sweep', 'dissolve', 'split', 'pip'}
 STATUSES = {'draft', 'probed', 'approved', 'final'}
 # the game's sound categories (testbench/README.md, "Audio stems"): what `Mute:` silences,
 # and the stems a take can record; the effects stem is whatever is not a stem of its own
@@ -118,6 +118,17 @@ class Shot:
         except BoardError:
             same = False        # `check` reports it
         return 'final' if same else t
+
+    @property
+    def labels(self):
+        """`Labels: host Player 1; joiner Player 2`: the text a layout shows for a variant
+        (or player) in place of its name."""
+        out = {}
+        for part in (self.get('Labels') or '').split(';'):
+            w = part.split(None, 1)
+            if len(w) == 2:
+                out[w[0]] = w[1].strip()
+        return out
 
     @property
     def ref(self):
@@ -427,7 +438,7 @@ class Reference:
 
     @property
     def quality(self):
-        return (self.get('Quality') or '').split()[0].lower() if self.get('Quality') else ''
+        return (self.get('Quality') or '').split()[0].rstrip(':,').lower() if self.get('Quality') else ''
 
 
 def load_references(folder):
@@ -682,20 +693,30 @@ def audio_problems(film, s):
         return out + [str(e)]
     if mode == 'mix':
         src = s
-        if s.kind == 'footage':
-            a = (s.get('From') or '').split()
-            src = next((x for x in film.shots if a and x.id == a[0]), None)
-            if src is None:
-                return out + ['an Audio mix of stems needs a From: shot that records them']
-        have = stem_names(src)
+        if s.kind == 'footage' and s.ref:
+            # a reference's stems are the files beside its take (`<variant>.music.wav`)
+            r = film.references().get(s.ref)
+            if r is None:
+                return out          # the unknown id is reported on its own
+            p = r.path or ''
+            have = [c for c in CATEGORIES if p.endswith('.mkv')
+                    and os.path.exists(p[:-4] + f'.{c}.wav')]
+            label = f'ref:{s.ref}'
+        else:
+            if s.kind == 'footage':
+                a = (s.get('From') or '').split()
+                src = next((x for x in film.shots if a and x.id == a[0]), None)
+                if src is None:
+                    return out + ['an Audio mix of stems needs a From: shot that records them']
+            have, label = stem_names(src), src.id
         for name, _ in terms:
             if name == 'game':
                 continue
             if not have:
-                out.append(f'Audio: {name}: {src.id} records no stems (Stems: ...)')
+                out.append(f'Audio: {name}: {label} records no stems (Stems: ...)')
                 break
             if name not in have:
-                out.append(f'Audio: {name} is not a stem of {src.id} ({", ".join(have)}, or game)')
+                out.append(f'Audio: {name} is not a stem of {label} ({", ".join(have)}, or game)')
     return out
 
 
@@ -766,7 +787,7 @@ def check(film):
                 op = s.split_line(t)[1].split()[0]
                 if op not in OPS:
                     out.append((s, f'line {ln}: unknown command {op}'))
-            if lay in ('wipe', 'dissolve', 'split', 'pip') and len(s.variants) < 2:
+            if lay in ('wipe', 'sweep', 'dissolve', 'split', 'pip') and len(s.variants) < 2:
                 out.append((s, f'Layout {lay} needs two variants'))
             # a step that waits for text on screen takes as long as the game does: no telling
             ocr_wait = any(re.match(r'step\s+wait\b.*\bfor\s+"', s.split_line(t)[1], re.I) for _, t in s.action)

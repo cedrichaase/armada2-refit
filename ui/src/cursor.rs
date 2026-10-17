@@ -1,7 +1,9 @@
 //! Our own mouse cursor, drawn at the back buffer's resolution from the game's own cursor
 //! art. In a mission it is the sprite the engine chose (`engine::cursor::shape`) and the
-//! engine's is hidden for the frame; in a screen of ours and on the loading screen it is
-//! the arrow. Off unless `[UI] Cursor=1` (README.md, "The cursor").
+//! engine's is hidden for the frame; in a screen of ours it is the arrow, and on the
+//! loading screen the arrow only where the engine would draw a cursor itself. None
+//! while the engine would show none (`engine::cursor::engine_shows`). `[UI] Cursor=1`,
+//! the default (README.md, "The cursor").
 //!
 //! The sprites come from `Sprites/cursor.spr`, read at run time: each line names a
 //! texture, a rectangle in it (in a reference size, so as fractions of the texture),
@@ -159,6 +161,15 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
             if !crate::engine::cursor::installed() || !crate::engine::cursor::synchronous() {
                 return;
             }
+            // Something before us skips the engine's draw of its cursor (Scene.asi's
+            // `cursor off`): the engine would show none, so neither do we. The engine's
+            // is still held back, so it cannot flash up for the frame it takes us to
+            // see it shown again.
+            if !crate::engine::cursor::engine_shows() {
+                crate::engine::cursor::hide_this_frame();
+                note_shape(ctx, "none (the engine's is held back)");
+                return;
+            }
             // None: the engine shows no cursor (a right-drag); neither do we, unless a
             // box of ours wants the pointer (a mission's opening briefing: its stock box,
             // whose `Render` names the cursor, is not drawn).
@@ -176,6 +187,15 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
                 }
                 _ => shape,
             }
+        }
+        // The loading screen: the arrow, only where the engine would show its own
+        // cursor there (the bench showed whether it does).
+        Context::Loading => {
+            if !crate::engine::cursor::engine_has_sprite() || !crate::engine::cursor::engine_shows() {
+                note_shape(ctx, "none (the engine shows none)");
+                return;
+            }
+            "c_arrow"
         }
         _ => "c_arrow",
     };
@@ -202,6 +222,6 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
     match ctx {
         Context::Mission => crate::engine::cursor::hide_this_frame(),
         Context::Shell | Context::Menus => crate::engine::shell::hide_os_cursor(),
-        Context::Loading => {}
+        Context::Loading => crate::engine::cursor::hide_this_frame(),
     }
 }

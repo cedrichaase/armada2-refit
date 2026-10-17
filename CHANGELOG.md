@@ -5,6 +5,85 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.36.0 — 2026-10-17
+
+Layers: films 1.12.0, online 0.6.2, render3d 0.15.0, testbench 3.39.0.
+
+### Added
+- films: `Music:` beds from a path under the game's `sounds/`; a shot's `Labels:`; the
+  intro cinematics' reference moments.
+
+- testbench: `Scene.asi`'s `Captions=0`, a mission's intro cinematics without the script's
+  subtitles, stardate lower thirds and title (`ShowTitle`/`ShowSubtitle` add no overlay
+  message); `films/intros-scout` is filmed with it.
+
+- render3d: a torpedo or pulse lights its own ship where it leaves it, for half a second in
+  the shot's colour (the muzzle light; `[Ordnance]` `MuzzleLights`, `MuzzleBrightness`,
+  `MuzzleTime`, `MuzzleReach`); until now only phasers lit their emitter.
+
+### Changed
+- render3d: the auto-assimilator's beam (the Assimilator ship's special) is brighter and
+  carries further, so it reads against dark space (`Brightness` 2.0, `Fall` 0.4); the
+  other beams are unchanged.
+
+### Fixed
+- films: `check` takes stem mixes on reference shots; a reference's `Quality:` with a note.
+- films: a 4K animatic no longer runs the machine out of memory (it is joined in runs).
+- online: the bench's local server outlives a 4K take's start, so the joiner gets a join
+  code.
+
+Installed, not yet seen in game (render3d); films, online's bench script and testbench
+install nothing.
+
+## 12.35.0 — 2026-10-17
+
+Layers: testbench 3.38.0, films 1.11.0.
+
+### Added
+- Scenes `assimilation-fusion` and `assimilator`, for the Fusion Cube's assimilation
+  beam and the Assimilator's auto-assimilator (testbench 3.38.0); scratch boards
+  `films/beams-scout`, `films/fleets-scout`, `films/intros-scout` and `films/online-scout`
+  for the promo's new shots (films 1.11.0).
+
+Installs nothing; the beams seen firing on the bench 2026-10-17 (stock), the boards not
+yet filmed.
+
+## 12.34.0 — 2026-10-17
+
+Layers: testbench 3.37.0.
+
+### Added
+- `Scene.asi`'s `Race=` key and `SCENE_RACE=<race>` at install: the player's race, and
+  so the HUD's look, pinned for a bench scene in stock and refit alike (testbench
+  3.37.0).
+
+Installs nothing; seen working on the bench 2026-10-17 (`showcase`, `Hud=1`, `Race=federation`:
+the Federation HUD on 3 of 3 launches in stock and 3 of 3 in refit; `SCENE_RACE=klingon`
+over it: the Klingon theme).
+
+## 12.33.0 — 2026-10-17
+
+Layers: testbench 3.36.0, films 1.10.0.
+
+### Added
+- Scene command `tech` and key `Tech=`, scene `assimilation`, so the bench can stage
+  the Borg technology assimilation beam (testbench 3.36.0); board `films/assimilation`
+  (films 1.10.0).
+
+### Fixed
+- Scenario `specials`: the assimilation beam forms (testbench 3.36.0).
+
+## 12.32.1 — 2026-10-17
+
+Layers: ui 0.12.1, testbench 3.35.1.
+
+### Fixed
+- `UI.asi`'s cursor is hidden while the engine's would be: Scene.asi's `Cursor=0` /
+  `cursor off` hides the pointer in refit takes again, and the loading screen shows no
+  cursor, as in stock.
+
+Installed, not yet seen in game.
+
 ## 12.32.0 — 2026-10-17
 
 Layers: testbench 3.35.0.

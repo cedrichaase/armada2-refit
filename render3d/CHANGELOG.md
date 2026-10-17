@@ -4,6 +4,26 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.15.0 — 2026-10-17
+
+### Added
+- A torpedo or pulse lights its own ship where it leaves it (`lights.rs`, the muzzle
+  light): the shot's light colour at the point it is first seen, held on the owner,
+  reaching its bounding radius and gone over 0.5 s. `[Ordnance] MuzzleLights` (1),
+  `MuzzleBrightness` (4), `MuzzleTime` (0.5), `MuzzleReach` (1).
+
+Installed, not yet seen in game.
+
+## 0.14.1 — 2026-10-17
+
+### Changed
+- The auto-assimilator's beam (`[Ordnance.borgbor]`) reads clearly against dark space
+  at 720p: `Brightness` 2.0 (was 0.9) and `Fall` 0.4 (was 0.12), so a long, thin cone
+  (a target far off, met edge-on) no longer fades out before it reaches it. Still a
+  translucent cone with fans; the other beams are unchanged.
+
+Installed, not yet seen in game.
+
 ## 0.14.0 — 2026-10-17
 
 ### Added

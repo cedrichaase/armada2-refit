@@ -163,7 +163,8 @@ def parse_music(v):
 
 def music_file(film, name):
     """A bed's file: a path (absolute or beside the board), else under the game's
-    sounds/music, matched without case (the game mixes .wav and .WAV)."""
+    sounds/music, else a path under the game's sounds/ (`effects/Shellsd0.WAV`, the
+    main menu's loop), matched without case (the game mixes .wav and .WAV)."""
     for p in (name, os.path.join(film.dir, name)):
         if os.path.isabs(p) and os.path.exists(p):
             return p
@@ -176,7 +177,13 @@ def music_file(film, name):
                 return os.path.join(d, f)
     except OSError:
         pass
-    return None
+    d = os.path.join(a2env.GAME, 'sounds')
+    for part in name.split('/'):
+        try:
+            d = os.path.join(d, next(f for f in os.listdir(d) if f.lower() == part.lower()))
+        except (OSError, StopIteration):
+            return None
+    return d if os.path.isfile(d) else None
 
 
 # ------------------------------------------------------------------ drawing
@@ -305,7 +312,7 @@ def render_card(film, shot, tier, g, inputs, dur):
     else:
         inputs += ['-f', 'lavfi', '-t', str(dur), '-i', f'color=black:s={W}x{H}:r={film.fps}']
         g.add(f"[0:v]format=yuv420p[bg]")
-    style = dict(big=(150, 'white', True), heading=(72, 'white', True), accent=(40, ACCENT, True),
+    style = dict(big=(150, 'white', True), heading=(72, 'white', True), accent=(40, ACCENT, True), mark=(150, ACCENT, True),
                  small=(34, '0xBBBBBB', False))
     lines = [(style.get(st, style['heading']), t) for st, t in shot.card]
     # the whole card shrinks, keeping its proportions, until its widest line fits 88% of
@@ -337,7 +344,7 @@ def fit(W, H, fps, take):
 
 def used_variants(shot, variants=None):
     """The variants a shot's layout shows, in drawing order (`full`: one; `pip`: the corner's
-    last; `wipe`, `split`, `dissolve`: the first two)."""
+    last; `wipe`, `sweep`, `split`, `dissolve`: the first two)."""
     if variants is None:
         variants = ['footage'] if shot.kind == 'footage' else list(shot.variants)
     lay, args = shot.layout
@@ -388,16 +395,23 @@ def render_shot(film, shot, tier, g, inputs, dur):
         g.add(pre + f",trim=duration={dur},setpts=PTS-STARTPTS[v_{idx[v]}]")
     L = [f'[v_{idx[v]}]' for v in variants]
     lab_y = int(40 * g.k)
+    names = shot.labels
+    lab = lambda v: names.get(v, v).upper()
     if lay == 'full' or len(variants) < 2:
         chain = ''
         if 'label' in args:
             v = variants[0]
-            chain = g.text(v.upper(), 'w-tw-48' if v == 'stock' else int(48 * g.k), lab_y, 54, label_color(v))
+            chain = g.text(lab(v), 'w-tw-48' if v == 'stock' else int(48 * g.k), lab_y, 54, label_color(v))
         g.add(f"{L[0]}{chain or 'null'}[lay]")
-    elif lay == 'wipe':
+    elif lay in ('wipe', 'sweep'):
         nums = [float(x) for x in args if _num(x)]
-        mid, end = (nums + [0.5, 1.0])[:2] if nums else (0.5, 1.0)
-        p = wipe_pos(dur, mid, end)
+        if lay == 'sweep':
+            # the first variant held, then one divider across the whole frame
+            hold, cross = (nums + [2.2, 1.6])[:2]
+            p = ease(hold, hold + cross, 0, 1)
+        else:
+            mid, end = (nums + [0.5, 1.0])[:2] if nums else (0.5, 1.0)
+            p = wipe_pos(dur, mid, end)
         dw = max(2, int(4 * g.k))
         # the first variant sits left of the divider, masked by a white plate whose right edge
         # rides it; overlay re-evaluates x per frame (blend expressions are far slower)
@@ -406,9 +420,9 @@ def render_shot(film, shot, tier, g, inputs, dur):
               f"{L[0]}format=yuva420p[a0];[a0][mask]alphamerge[am];"
               f"color=white:s={dw}x{H}:r={fps}:d={dur}[div];"
               f"{L[1]}[am]overlay=0:0[w0];[w0][div]overlay=x='{W}*(1-({p}))-{dw // 2}':y=0:eval=frame,"
-              + g.text(variants[0].upper(), int(48 * g.k), lab_y, 54, label_color(variants[0]),
+              + g.text(lab(variants[0]), int(48 * g.k), lab_y, 54, label_color(variants[0]),
                        f"min(1,max(0,(1-({p}))*6-0.2))") + ','
-              + g.text(variants[1].upper(), 'w-tw-48', lab_y, 54, label_color(variants[1]),
+              + g.text(lab(variants[1]), 'w-tw-48', lab_y, 54, label_color(variants[1]),
                        f"min(1,max(0,({p})*6-0.2))") + '[lay]')
     elif lay == 'dissolve':
         nums = [float(x) for x in args if _num(x)]
@@ -420,8 +434,8 @@ def render_shot(film, shot, tier, g, inputs, dur):
         lr = f"if(lt(t,{hold}),0,if(lt(t,{t1}),(t-{hold})/{fade},1))"
         g.add(f"{L[0]}trim=duration={t1}[d0];{L[1]}trim=duration={dur - hold},setpts=PTS-STARTPTS[d1];"
               f"[d0][d1]xfade=transition=fade:duration={fade}:offset={hold},"
-              + g.text(variants[0].upper(), int(48 * g.k), lab_y, 54, label_color(variants[0]), ls) + ','
-              + g.text(variants[1].upper(), int(48 * g.k), lab_y, 54, label_color(variants[1]), lr) + '[lay]')
+              + g.text(lab(variants[0]), int(48 * g.k), lab_y, 54, label_color(variants[0]), ls) + ','
+              + g.text(lab(variants[1]), int(48 * g.k), lab_y, 54, label_color(variants[1]), lr) + '[lay]')
     elif lay == 'split':
         # `split [w]`: each variant's centre w of its width (0.5), fitted into half the frame;
         # 0.75 is a 4:3 menu whole, letterboxed
@@ -431,15 +445,15 @@ def render_shot(film, shot, tier, g, inputs, dur):
                 f"pad={W // 2}:{H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1")
         g.add(f"{L[0]}{half}[s0];{L[1]}{half}[s1];[s0][s1]hstack,"
               f"drawbox=x={W // 2 - 1}:y=0:w=2:h={H}:color=white:t=fill,"
-              + g.text(variants[0].upper(), int(48 * g.k), lab_y, 54, label_color(variants[0])) + ','
-              + g.text(variants[1].upper(), 'w-tw-48', lab_y, 54, label_color(variants[1])) + '[lay]')
+              + g.text(lab(variants[0]), int(48 * g.k), lab_y, 54, label_color(variants[0])) + ','
+              + g.text(lab(variants[1]), 'w-tw-48', lab_y, 54, label_color(variants[1])) + '[lay]')
     elif lay == 'pip':
         corner = next((x for x in args if x in ('tl', 'tr', 'bl', 'br')), 'br')
         m = int(40 * g.k)
         x = m if corner[1] == 'l' else f'W-w-{m}'
         y = m if corner[0] == 't' else f'H-h-{m}'
         g.add(f"{L[1]}scale={W // 3}:-2,pad=iw+4:ih+4:2:2:white,"
-              + g.text(variants[1].upper(), 16, 12, 34, label_color(variants[1])) + "[pp];"
+              + g.text(lab(variants[1]), 16, 12, 34, label_color(variants[1])) + "[pp];"
               f"{L[0]}[pp]overlay=x={x}:y={y}[lay]")
     return '[lay]', audio
 
@@ -531,29 +545,53 @@ TAGS = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt70
 
 
 def assemble(film, tier, tl, segs, out, tmp, preset='medium'):
-    """Join the segments with their transitions and lay the music beds under them."""
-    g = Graph(tmp, *size(film, tier), film.fps)
-    inputs = []
-    for p in segs:
-        inputs += ['-i', p]
-    for i in range(len(segs)):
-        # xfade wants both its inputs on one timebase: every input, and every concat's
-        # output below, is put on 1/fps
-        g.add(f"[{i}:v]setpts=PTS-STARTPTS,fps={film.fps},settb=1/{film.fps}[v{i}];[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
-    cv, ca = '[v0]', '[a0]'
-    for i in range(1, len(segs)):
-        shot, start, end, ov = tl[i]
-        if ov > 0:
-            g.add(f"{cv}[v{i}]xfade=transition=fade:duration={ov}:offset={start}[cv{i}];"
-                  f"{ca}[a{i}]acrossfade=d={ov}[ca{i}]")
-        else:
-            g.add(f"{cv}{ca}[v{i}][a{i}]concat=n=2:v=1:a=1[cc{i}][ca{i}];[cc{i}]settb=1/{film.fps}[cv{i}]")
-        cv, ca = f'[cv{i}]', f'[ca{i}]'
+    """Join the segments with their transitions and lay the music beds under them.
+
+    One ffmpeg for the whole cut held every segment open at once, and at 3840x2160 their
+    decoders took more memory than the machine had (2026-10-17). So the cut is joined in
+    runs, the shots a dissolve holds together, each run encoded on its own; the runs are
+    then concatenated without encoding again, and the beds mixed under the whole."""
+    runs = []
+    for i, (_, _, _, ov) in enumerate(tl):
+        if i == 0 or ov <= 0:
+            runs.append([])
+        runs[-1].append(i)
+    vlist, alist = os.path.join(tmp, 'runs-v.txt'), os.path.join(tmp, 'runs-a.txt')
+    with open(vlist, 'w') as fv, open(alist, 'w') as fa:
+        for r, idx in enumerate(runs):
+            t0, t1 = tl[idx[0]][1], tl[idx[-1]][2]
+            g = Graph(tmp, *size(film, tier), film.fps)
+            inputs = []
+            for k, i in enumerate(idx):
+                inputs += ['-i', segs[i]]
+                # xfade wants both its inputs on one timebase: every input is put on 1/fps
+                g.add(f"[{k}:v]setpts=PTS-STARTPTS,fps={film.fps},settb=1/{film.fps}[v{k}];"
+                      f"[{k}:a]asetpts=PTS-STARTPTS[a{k}]")
+            cv, ca = '[v0]', '[a0]'
+            for k in range(1, len(idx)):
+                _, start, _, ov = tl[idx[k]]
+                g.add(f"{cv}[v{k}]xfade=transition=fade:duration={ov}:offset={start - t0}[cv{k}];"
+                      f"{ca}[a{k}]acrossfade=d={ov}[ca{k}]")
+                cv, ca = f'[cv{k}]', f'[ca{k}]'
+            # each run is exactly as long as its span of the cut, so the runs line up end to end
+            g.add(f"{cv}trim=duration={t1 - t0},format=yuv420p[vout];"
+                  f"{ca}aresample=48000,aformat=channel_layouts=stereo,apad,atrim=duration={t1 - t0}[aout]")
+            v, a = os.path.join(tmp, f'run{r:03d}.ts'), os.path.join(tmp, f'run{r:03d}.wav')
+            print(f'  run {r + 1}/{len(runs)}: {" ".join(tl[i][0].id for i in idx)}', flush=True)
+            run([*inputs, '-/filter_complex', g.write(),
+                 '-map', '[vout]', '-c:v', 'libx264', '-preset', preset, '-crf', '20' if tier == 'probe' else '16',
+                 '-pix_fmt', 'yuv420p', '-r', str(film.fps), *TAGS, v,
+                 '-map', '[aout]', '-c:a', 'pcm_s16le', a], quiet=True)
+            # the demuxer reads a run's length from the file, and from a transport stream it came
+            # out a frame short now and then: the 4K cut drifted two frames (2026-10-17)
+            fv.write(f"file '{v}'\nduration {t1 - t0}\n")
+            fa.write(f"file '{a}'\nduration {t1 - t0}\n")
     total = tl[-1][2]
-    beds = music_beds(film, tl)
-    mix = [ca]
-    for j, b in enumerate(beds):
-        n = len(segs) + j
+    g = Graph(tmp, *size(film, tier), film.fps)
+    inputs = ['-f', 'concat', '-safe', '0', '-i', vlist, '-f', 'concat', '-safe', '0', '-i', alist]
+    mix = ['[1:a]']
+    for j, b in enumerate(music_beds(film, tl)):
+        n = 2 + j
         inputs += ['-ss', str(b['from']), '-t', str(b['end'] - b['start'] + 0.5), '-i', b['path']]
         L = b['end'] - b['start']
         g.add(f"[{n}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=duration={L},"
@@ -564,12 +602,9 @@ def assemble(film, tier, tl, segs, out, tmp, preset='medium'):
         g.add(f"{''.join(mix)}amix=inputs={len(mix)}:normalize=0:duration=first,"
               f"loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]")
     else:
-        g.add(f"{ca}loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]")
-    g.add(f"{cv}format=yuv420p[vout]")
-    run([*inputs, '-/filter_complex', g.write(), '-map', '[vout]', '-map', '[aout]', '-t', str(total),
-         '-c:v', 'libx264', '-preset', preset, '-crf', '20' if tier == 'probe' else '16',
-         '-pix_fmt', 'yuv420p', '-r', str(film.fps), *TAGS, '-c:a', 'aac', '-b:a', '192k',
-         '-movflags', '+faststart', out])
+        g.add(f"[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]")
+    run([*inputs, '-/filter_complex', g.write(), '-map', '0:v', '-map', '[aout]', '-t', str(total),
+         '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out])
 
 
 def music_beds(film, tl):
@@ -888,8 +923,8 @@ def sheet(a):
                                          (f'{s.status} · {seg_len(s):g} s · at {start:.1f}', 15, '0xBBBBBB')])
             if s.kind == 'card':
                 body = os.path.join(tmp, f'{s.id}-card.png')
-                tile_text(body, TILE_W * SHEET_FRAMES, th, [(t, 22 if st in ('big', 'heading') else 16,
-                                                            ACCENT if st == 'accent' else 'white')
+                tile_text(body, TILE_W * SHEET_FRAMES, th, [(t, 22 if st in ('big', 'mark', 'heading') else 16,
+                                                            ACCENT if st in ('accent', 'mark') else 'white')
                                                            for st, t in s.card], bg='0x000000')
                 rows.append([head, body])
                 continue

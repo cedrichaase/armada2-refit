@@ -5,6 +5,52 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.12.0 — 2026-10-17
+
+### Added
+- A section's `Music:` bed may name a path under the game's `sounds/` when it is not in
+  `sounds/music/` (`effects/Shellsd0.WAV`, the main menu's loop), matched without case.
+- A `sweep [hold cross]` layout: the first variant held, then a wipe's divider across the
+  whole frame in one move, without the split held in the middle.
+- A card line style `[mark]`: `[big]`'s size in the accent colour.
+- A shot's `Labels:` field (`host Player 1; joiner Player 2`): the layout's corner labels
+  in place of the variants' or players' names. An edit field.
+- `films/reference/intros.md`: timed moments of the Federation, Klingon and Borg intro
+  cinematics (`intros-scout`), for the promo's cold open and intros montage.
+
+### Fixed
+- A 4K animatic ran the machine out of memory: one ffmpeg held every segment open at
+  once. The cut is now joined in runs (the shots a dissolve holds together), each encoded
+  on its own, then concatenated without encoding again, with the beds mixed in last.
+- `check` accepts an `Audio:` mix of stems on a `From: ref:<id>` shot, judged against the
+  stems beside the reference's take (the animatic already mixed them).
+- A reference's `Quality: good: <note>` is read as `good`, as the README writes it.
+
+Installs nothing.
+
+## 1.11.0 — 2026-10-17
+
+### Added
+- `films/beams-scout`: a scratch board for the promo's beam shots, the assimilation
+  beam from a Fusion Cube with a gliding camera (`a01`, dissolve) and the Assimilator's
+  auto-assimilator (`a03`, wipe), stock and refit.
+- `films/fleets-scout`: a scratch board with its own scenes, a Romulan fleet leaving a
+  planet's shadow (`rom-shadow.ini`) and Species 8472 against the Borg (`borg-8472.ini`).
+- `films/intros-scout`: the main menu and the first missions' intro cinematics (Federation,
+  Klingon, Borg) as long takes, music and voice as stems, to log moments for the promo.
+- `films/online-scout`: two games side by side through *Internet - Online* on a local
+  server: the host's join code, the joiner arriving (`o1`), both launching a match (`o2`).
+
+Installs nothing; not yet filmed.
+
+## 1.10.0 — 2026-10-17
+
+### Added
+- `films/assimilation`: the Borg technology assimilation beam on a Sovereign, stock
+  and refit in a wipe, close (`as01`) and a little wider (`as02`), against dark sky.
+
+Installed, not yet seen in game.
+
 ## 1.9.0 — 2026-10-17
 
 ### Added

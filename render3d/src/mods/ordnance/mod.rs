@@ -117,6 +117,11 @@ impl Ordnance {
             s.f("Ordnance", "PhaserImpactRange", 70.0),
             s.f("Ordnance", "PhaserImpactLift", 8.0),
         ];
+        lights.muzzle = [
+            if s.i("Ordnance", "MuzzleLights", 1) != 0 { s.f("Ordnance", "MuzzleBrightness", 4.0) } else { 0.0 },
+            s.f("Ordnance", "MuzzleTime", 0.5),
+            s.f("Ordnance", "MuzzleReach", 1.0),
+        ];
         Ordnance {
             sprites,
             fx: fx::Fx::new(&s),
@@ -298,7 +303,7 @@ impl Module for Ordnance {
     fn begin_view(&mut self, v: &View) {
         unsafe { VIEW = v as *const View };
         let ls = self.fx.take_lights(v.time, v.main).to_vec();
-        if self.lights.begin_view(&ls) {
+        if self.lights.begin_view(&ls, v.time, v.main) {
             crate::scene::regather_lights();
         }
         if v.main {

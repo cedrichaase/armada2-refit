@@ -77,6 +77,18 @@
  *     0x4c8be0; see heal_all().
  *   CraftInstance::Update (0x4cb390), slot 0x6b3e64 of CraftInstance's vtable,
  *     decides which of a model's damage nodes show; see inst_update().
+ *   The player's race: SetupDefaultGame (Program::MainLoop's set-up for a map
+ *     named on the command line) gives slot 0 the race of the map's first start
+ *     location, through Race::Find (0x48b100) at 0x4897ad and 0x489872, and
+ *     leaves it "random" when the map names none (a2_borg01 names none), which
+ *     Program::GameOpenPreLoad then draws at random. With Race= set both calls
+ *     go to race_find(), which finds that race instead; see race_find().
+ *   A mission script's captions -- the intro cinematics' subtitles, the stardate
+ *     lower thirds and the mission's title -- come from ScriptInterfaceImp::ShowTitle
+ *     (0x454ff0) and ShowSubtitle (0x4550c0), each one call to OverlayText::
+ *     AddMessage (0x5061e0) on overlayText, at 0x455081 and 0x45510c. With
+ *     Captions=0 both calls go to caption_add(), which adds nothing; see
+ *     captions_hook().
  *   Marks (Scene.marks) are read, never patched: each frame, from the camera hook,
  *     the camera matrix, the selection, the scene's crafts' cloaks and deaths,
  *     Ordnance::ordnanceList (0x771fac; owner +0x5c, target +0x60, its ODF through
@@ -87,6 +99,9 @@
  *     0x4d1af0, (AiCommand, const Vector3 &, long, bool) 0x4d1b50 and
  *     (AiCommand, long, bool, bool) 0x4d1a40 -- with GO (4), GO_WARP (0x2b)
  *     or STOP (3); see order_goto().
+ *   TechnologyTree::mFind(const char *) 0x4999e0, on g_technologyTreeArray
+ *     (0x739000, one tree per team), finds a tech item, whose flags `tech` sets;
+ *     see set_tech().
  *
  * Matrix34 is three axis rows -- right, up, front -- then the position: a local
  * point (x, y, z) lands at x*right + y*up + z*front + position.
@@ -222,8 +237,16 @@ int _fltused = 0;   /* floats without the CRT */
 #define PL_POPULATION    0x2acu      /* Planet: population, float */
 #define PL_SHOWN_RACE    0x2c4u      /* Planet: the Race whose cities are drawn */
 #define PL_SHOWN_POP     0x2c8u      /* Planet: the population drawn, eased toward +0x2ac */
+#define RACE_FIND        0x48b100u   /* Race::Find(const char *name), cdecl: the Race of that name (exact, as races.odf's
+                                      * `name`), or NULL */
+#define DEFAULT_RACE_1   0x4897adu   /* SetupDefaultGame: call Race::Find(start location 1's race) for slot 0 */
+#define DEFAULT_RACE_2   0x489872u   /* the same, on its other branch */
 #define START_MUSIC      0x4586c0u   /* StartMusic(long, int): cdecl, starts a music track */
 #define NEW_TRACK        0x463680u   /* JukeBox::mStartNewTrack: thiscall, no arguments, the in-mission music */
+#define OVERLAY_ADD      0x5061e0u   /* OverlayText::AddMessage(x, y, justify, text, colour, fade in, font): thiscall, ret 0x1c,
+                                      * the message's key */
+#define SHOW_TITLE_CALL  0x455081u   /* ScriptInterfaceImp::ShowTitle: call OverlayText::AddMessage */
+#define SHOW_SUB_CALL    0x45510cu   /* ScriptInterfaceImp::ShowSubtitle: the same */
 #define TOOLTIP_ON_CALL  0x508070u   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::TooltipOn */
 #define HOVER_SIM_CALL   0x5080fcu   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::MouseOn -> +0x7c */
 #define HOVER_PRE_CALL   0x508e72u   /* SelectionDisplay::PreRender: call DisplayInterface::MouseOn -> hover effect */
@@ -258,6 +281,12 @@ int _fltused = 0;   /* floats without the CRT */
 #define SET_COMMAND_BUILD 0x4d1cb0u  /* GameObject::SetCommand(AiCommand, const GameObjectClass *, const Vector3 &, bool) */
 #define CLASS_FIND       0x4cd370u   /* GameObjectClass::Find(const char *odf), static */
 #define TEAM_ADD_RES     0x4988d0u   /* Team::AddResource(float, eResource): clamped to the team's maximum */
+#define TECH_TREES       0x739000u   /* g_technologyTreeArray: one TechnologyTree per team */
+#define TECH_TREE_SIZE   0x98u
+#define MAX_TECH_TEAM    8           /* the array holds 9 (it ends where g_terrain begins) */
+#define TECH_FIND        0x4999e0u   /* TechnologyTree::mFind(const char *): thiscall, the TechItem or null */
+#define TECH_AVAILABLE   0x4u        /* TechItem: byte, what TechnologyTree::Available answers */
+#define TECH_POSSIBLE    0xcu        /* TechItem: byte, 0 for an item the map's tree makes impossible (-1) */
 #define ORDNANCE_HEAD    0x771facu   /* Ordnance::ordnanceList, a std::list: its head node's pointer */
 #define ORD_CLASS        0x34u       /* an ordnance's class; the class's cPrjID at +0x150 names its ODF */
 #define ORD_CLASS_PRJ    0x150u
@@ -330,6 +359,7 @@ static const Sig k_sigs[] = {
     { SET_COMMAND_BUILD, 8, { 0x55, 0x8B, 0xEC, 0x64, 0xA1, 0x00, 0x00, 0x00 } },
     { CLASS_FIND,       8, { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x8D, 0x4D } },
     { TEAM_ADD_RES,     8, { 0x55, 0x8B, 0xEC, 0x51, 0x8B, 0x45, 0x0C, 0x56 } },
+    { TECH_FIND,        8, { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56, 0x57, 0x8B } },
     { PRJ_GET_ODF,      6, { 0x8B, 0x01, 0x85, 0xC0, 0x75, 0x06 } },
     { ENTITY_TRANSFORM, 7, { 0x8B, 0x41, 0x04, 0x83, 0xC0, 0x44, 0xC3 } },
 };
@@ -372,6 +402,7 @@ typedef BYTE  *(__cdecl    *TeamGetFn)(int team);
 typedef void   (__thiscall *SetCommandBuildFn)(void *go, int cmd, const void *cls, const float *pos, int flag);
 typedef void  *(__cdecl    *ClassFindFn)(const char *odf);
 typedef float  (__thiscall *TeamAddResFn)(void *team, float amount, int resource);
+typedef BYTE  *(__thiscall *TechFindFn)(void *tree, const char *name);
 typedef const char  *(__thiscall *PrjOdfFn)(void *prj);
 typedef const float *(__thiscall *TransformFn)(void *entity);
 
@@ -792,6 +823,39 @@ static void fill_special(const Obj *o)
     if (!go || !(*(DWORD *)(go + OBJECT_FLAGS) & FLAG_CRAFT)) return;
     if (*(float *)(go + CRAFT_SPECIAL_MAX + 4) < *(float *)(go + CRAFT_SPECIAL_MAX))
         ((SiSetHealthFn)SI_SET_SPECIAL)(SI_INSTANCE, o->handle, *(float *)(go + CRAFT_SPECIAL_MAX));
+}
+
+/* A team's technology: one item of its TechnologyTree made available, as if
+ * researched, or not. TechnologyTree::Available, which Weapon::IsAvailable asks,
+ * answers an item's +0x4 when its +0xc ("possible") is set; a map's tree file
+ * marks what it leaves out -1, impossible, for every team. The Borg technology
+ * assimilation beam (TechAssimBeam::Simulate) only lives while its target carries a
+ * special weapon that is available to the target's team and that the cube does
+ * not carry yet: on a2_borg01, whose tree makes fedpod1 and with it gcorbom
+ * impossible, a Sovereign has none, and the beam ended as soon as it was fired.
+ * Only the item itself changes; what depends on it is left as it is. */
+static void set_tech(int team, const char *item, int on)
+{
+    char  b[200], nm[72];
+    BYTE *it = NULLPTR, *tree;
+    b[0] = 0;
+    s_cat(b, "  tech team "); s_num(b, team); s_cat(b, " "); s_cat(b, item);
+    if (team < 0 || team > MAX_TECH_TEAM) { s_cat(b, ": ! team 0..8"); logline(b); return; }
+    tree = (BYTE *)(TECH_TREES + (DWORD)team * TECH_TREE_SIZE);
+    s_cpy(nm, item, 64);
+    it = ((TechFindFn)TECH_FIND)(tree, nm);
+    if (!it) {   /* the other spelling: with or without .odf */
+        int k = s_len(nm);
+        if (k > 4 && s_eq(nm + k - 4, ".odf")) nm[k - 4] = 0; else s_cat(nm, ".odf");
+        it = ((TechFindFn)TECH_FIND)(tree, nm);
+    }
+    if (!it) { s_cat(b, ": ! not in the tech tree"); logline(b); return; }
+    s_cat(b, it[TECH_POSSIBLE] ? (it[TECH_AVAILABLE] ? ": was available" : ": was not available")
+                               : ": was impossible");
+    if (on) { it[TECH_POSSIBLE] = 1; it[TECH_AVAILABLE] = 1; }
+    else      it[TECH_AVAILABLE] = 0;
+    s_cat(b, on ? ", now available" : ", now not available");
+    logline(b);
 }
 
 static void heal_all(void)
@@ -1669,6 +1733,18 @@ static void run_command(char *line)
         fire_special(o, t[2], tg);
         return;
     }
+    if (s_eq(t[0], "tech") && n >= 3) {
+        /* tech <team | object> <item> [on|off]: an object stands for its team */
+        int team, on = n >= 4 ? on_arg(t[3]) : 1;
+        if (s_isnum(t[1])) team = (int)s_atof(t[1]);
+        else {
+            BYTE *go;
+            if (!(o = find_obj(t[1])) || !(go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle))) { logline("  ! no such object"); return; }
+            team = *(int *)(go + PL_TEAM);
+        }
+        set_tech(team, t[2], on);
+        return;
+    }
     if (s_eq(t[0], "energy") && n >= 3) {
         if (!(o = find_obj(t[1])) || !craft_of(o)) { logline("  ! not a craft in the scene"); return; }
         o->energy = on_arg(t[2]);
@@ -1759,7 +1835,7 @@ static void run_command(char *line)
         return;
     }
     logline("  ! unknown command (camera, orbit, glide, spin, zoom, spawn, attack, heal, engines, weapons, "
-            "immortal, special, energy, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
+            "immortal, special, energy, tech, kill, cloak, colonize, goto, stop, center, pause, resume, hud, grid, cursor, notices, tooltips, hover, "
             "shieldfx, query, "
             "select, selection, marks)");
 }
@@ -2139,6 +2215,14 @@ static void build_scene(void)
             o->vent = vent_mask(v) < 0 ? 0 : vent_mask(v);
         }
         o->energy = ini_int(sect, "Energy", 0);
+        {   /* Tech=<item> [<item> ...]: available to the object's team, as `tech` */
+            char v[160], *tk[MAXTOK];
+            BYTE *go = (BYTE *)((EntityGetFn)ENTITY_GET)(o->handle);
+            int   k, m;
+            GetPrivateProfileStringA(sect, "Tech", "", v, sizeof v, g_ini);
+            m = v[0] && go ? split(v, tk) : 0;
+            for (k = 0; k < m; k++) set_tech(*(int *)(go + PL_TEAM), tk[k], 1);
+        }
         if (!ini_int(sect, "Engines", 1))
             ((SiHandleBoolFn)SI_NO_ENGINES)(SI_INSTANCE, o->handle, 1);
         if (!ini_int(sect, "Weapons", 1))
@@ -2274,6 +2358,112 @@ static void music_off(void)
     logline("music off");
 }
 
+/* The player's race. SetupDefaultGame sets slot 0 (the player's) to whatever Race::Find
+ * returns for the map's first start location's race, and leaves the slot "random" when
+ * that is NULL. Both of its Race::Find calls come here: with Race= set, the race of that
+ * name is returned whatever the map says, so the game setup holds it before
+ * Program::GameOpenPreLoad would draw a random one and DisplayInterface::PostLoadAll
+ * loads that race's HUD. A name Race::Find does not know falls back to the map's. */
+typedef void *(__cdecl *RaceFindFn)(const char *name);
+static char g_race[32];
+
+static void *__cdecl race_find(const char *map_race)
+{
+    char  b[160];
+    void *r = ((RaceFindFn)RACE_FIND)(g_race);
+    b[0] = 0;
+    s_cat(b, "race: ");
+    s_cat(b, r ? g_race : "UNKNOWN Race= ");
+    if (!r) { s_cat(b, g_race); s_cat(b, ", kept the map's"); }
+    s_cat(b, " for the player (the map's first start location names \"");
+    s_cat(b, map_race ? map_race : "");
+    s_cat(b, "\"; none is random)");
+    logline(b);
+    return r ? r : ((RaceFindFn)RACE_FIND)(map_race);
+}
+
+static void race_hook(void)
+{
+    static const BYTE find[8] = { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 };
+    static const DWORD sites[2] = { DEFAULT_RACE_1, DEFAULT_RACE_2 };
+    int i, k;
+
+    GetPrivateProfileStringA("Scene", "Race", "", g_race, sizeof g_race, g_ini);
+    if (!g_race[0]) return;
+    for (i = 0; g_race[i]; i++)
+        if (g_race[i] >= 'A' && g_race[i] <= 'Z') g_race[i] += 'a' - 'A';
+    for (k = 0; k < 8; k++)
+        if (((const BYTE *)RACE_FIND)[k] != find[k]) goto bad;
+    for (i = 0; i < 2; i++) {
+        const BYTE *p = (const BYTE *)sites[i];
+        if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != RACE_FIND - (sites[i] + 5)) goto bad;
+    }
+    for (i = 0; i < 2; i++)
+        if (!patch_dword(sites[i] + 1, (DWORD)&race_find - (sites[i] + 5))) goto bad;
+    {
+        char b[80];
+        b[0] = 0; s_cat(b, "race: Race="); s_cat(b, g_race); s_cat(b, ", hooked");
+        logline(b);
+    }
+    return;
+bad:
+    logline("race: NOT PATCHED: Race::Find or its calls differ -- the game's own race");
+}
+
+/* Captions off. A mission script shows its captions -- the subtitles over an intro
+ * cinematic, the stardate lower third, the mission's title -- through
+ * ScriptInterfaceImp::ShowTitle and ShowSubtitle, which each make one call to
+ * OverlayText::AddMessage on overlayText and return the key it gives; the script
+ * later hands that key to RemoveTitle / RemoveSubtitle, which look it up in the
+ * overlay's map (FadeMessage, RemoveMessage) and do nothing when it is not there.
+ * With Captions=0 both calls come here instead, which adds nothing and returns -1,
+ * a key AddMessage never gives (it counts up from 0): no message exists, so neither
+ * stock's OverlayText::Render nor UI.asi's overlay (which reads the same map) draws
+ * one, and the script's timing is its own. Other overlay messages (the game's own
+ * calls of AddMessage, such as the game-over message) are untouched. */
+static int g_captions_seen;
+
+static int __thiscall caption_add(void *overlay, int x, int y, int justify, const char *text,
+                                  const void *colour, int fade_in, void *font)
+{
+    (void)overlay; (void)x; (void)y; (void)justify; (void)colour; (void)fade_in; (void)font;
+    if (g_captions_seen < 64) {
+        char b[200];
+        int  i, n;
+        g_captions_seen++;
+        b[0] = 0;
+        s_cat(b, "caption hidden: \"");
+        n = s_len(b);
+        for (i = 0; text && text[i] && i < 150; i++)
+            b[n++] = (text[i] == '\n' || text[i] == '\r') ? '|' : text[i];
+        b[n] = 0;
+        s_cat(b, "\"");
+        logline(b);
+    }
+    return -1;
+}
+
+static void captions_hook(void)
+{
+    static const BYTE add[8] = { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68, 0x20, 0xFF };
+    static const DWORD sites[2] = { SHOW_TITLE_CALL, SHOW_SUB_CALL };
+    int i, k;
+
+    if (ini_int("Scene", "Captions", 1)) return;
+    for (k = 0; k < 8; k++)
+        if (((const BYTE *)OVERLAY_ADD)[k] != add[k]) goto bad;
+    for (i = 0; i < 2; i++) {
+        const BYTE *p = (const BYTE *)sites[i];
+        if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != OVERLAY_ADD - (sites[i] + 5)) goto bad;
+    }
+    for (i = 0; i < 2; i++)
+        if (!patch_dword(sites[i] + 1, (DWORD)&caption_add - (sites[i] + 5))) goto bad;
+    logline("captions off: ShowTitle and ShowSubtitle add no overlay message");
+    return;
+bad:
+    logline("captions: NOT PATCHED: OverlayText::AddMessage or its calls differ -- captions as the game has them");
+}
+
 static void startup(void)
 {
     char b[200];
@@ -2283,6 +2473,10 @@ static void startup(void)
     /* Music has its own switch, outside Enable: a campaign take wants the music off and
      * no scene. */
     if (!ini_int("Scene", "Music", 1) && music_sigs_ok()) music_off();
+    /* So has the race: it is set before the mission loads, whatever the scene. */
+    race_hook();
+    /* And the captions: a campaign take, Enable=0, is where they show. */
+    captions_hook();
     if (!ini_int("Scene", "Enable", 1)) {
         logline("--- Scene: Enable=0, nothing else patched");
         return;

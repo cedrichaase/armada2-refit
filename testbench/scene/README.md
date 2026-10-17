@@ -18,7 +18,9 @@ drives it with `Scene "CMD"` and `Expect scene "CMD" answers "TEXT"` steps
 (`scenarios/README.md`).
 
 `SCENE=<name>` picks `scenes/<name>.ini`, `SCENE_INI=<file>` any file, and with neither
-set `Scene.ini` is used (one Galaxy class). `install` refuses any game directory that is
+set `Scene.ini` is used (one Galaxy class). `SCENE_RACE=federation` (or any `Race=` value) pins
+the player's race, and so the HUD's look, for whichever scene is installed: without it
+the bench draws a different race on every launch. `install` refuses any game directory that is
 not an a2test clone: this is a test tool and never goes into the player's install. The
 bench gathers `Scene.log` and `Scene.ini` with the other logs.
 
@@ -44,6 +46,9 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `fog` | three of the player's ships (`ship1`, `ship2`, `scout`) at 3000,0,3000 with the map's fog and shroud on (`Fog=1`) and the HUD on for the minimap; `goto scout ...` leaves fog of war behind. For the fog's and shroud's edges (`render3d/README.md`, "overlays"; `scenarios/fog-edges.md`) | 2026-10-12 |
 | `asteroids` | an asteroid field (`field`, `mafield`: 4–8 rocks) and a big one (`big`, `mafield2`: 3–6 larger rocks), 500 apart, beside a Galaxy class with its engines off; the rocks are drawn at random from the field's models, so a session shows some of them, and `spawn` adds more fields. For the asteroids' surfaces and smoothing (`render3d/README.md`, "world"; `models/README.md`, "The asteroids") | 2026-10-13 |
 | `venting` | a Galaxy class (`galaxy`) and a Klingon battleship (`klingon`) parked 300 apart, healed and immortal, every system's damage node showing as if damaged (`Vent=all`): the Galaxy's nacelle vents plasma, its hull gas. Nothing fires. For the venting plasma and gas (`render3d/README.md`, "particles") | 2026-10-13 |
+| `assimilation` | the Borg technology assimilation beam: a Borg cube (`borg`, `bbattle1`, the player's) 220 from an enemy Sovereign (`tgt`), engines and the cube's weapons off, special energy full, both healed, the Sovereign unarmed, its corbomite reflector made available to its team (`Tech=gcorbom`), shield flashes and hover gauges off. `weapons borg on`, then a moment later (not on the same tick) `special borg gTechAssimBeam tgt`: the beam reaches the Sovereign about 1 s later and holds until about 7 s after firing, when the cube has taken the weapon; a cube takes one (`maxExtraWeapons`). Weapons off ends the beam; as they come on, and after the beam, the cube fires its phasers. For render3d's assimilation cone (`render3d/README.md`, "Ordnance"; `films/assimilation`) | 2026-10-17 |
+| `assimilation-fusion` | as `assimilation`, from a Borg Fusion Cube (`borg`, `bbattle3`, about twice the cube's size) 300 from the Sovereign: `weapons borg on`, then `special borg gTechAssimBeam tgt`; its phasers fire as the weapons come on. For footage (`films/beams-scout`): the darkest sky behind the beam is seen from above, pitch +15 to +30 at yaw 60 to 100 | 2026-10-17, stock |
+| `assimilator` | the Borg Assimilator (`assim`, `bcruise2`, the player's) 300 from an enemy Sovereign (`tgt`), both healed, engines off, special energy full: `weapons assim on`, `special assim gborgbor tgt`, then `weapons assim off` at once; the auto-assimilator holds with the weapons off (its 30 s) and the torpedoes stay quiet. The healed Sovereign keeps its crew, so it is never taken. For footage (`films/beams-scout`) | 2026-10-17, stock |
 | `specials` | an enemy Sovereign (`tgt`) that cannot die, with its weapons and engines off and not healed, and a Galaxy class (`warper`) at 1500,0,1500 for the warp flash; shooters come with `spawn` and fire with `special`. For the special weapons and the warp flash (`render3d/README.md`, "ordnance"; `scenarios/specials.md`) | 2026-10-13 |
 | `cloak` | the player's own Romulan warbird (`warbird`, `rbattle`) and Klingon Bird of Prey (`bop`, `kdestroy`) in front of a class M planet and a Galaxy class, engines and weapons off; `cloak warbird on`. For cloaked ships drawn as glass (`render3d/README.md`, "hulls"; `scenarios/cloak.md`) | 2026-10-13 |
 | `mining` | a dilithium moon (`moon`, `mdmoon`), the player's mining station (`station`) behind it, a Federation and a Borg freighter (`freighter`, `borg`) and a Galaxy class, engines off. The freighters do not mine on their own (a moon the scene builds has no resource): `special freighter gmineDilithium moon` (or `gmineLatinum`; the Borg's `gmineDilithiumBorg`, `gmineMetalBorg`) fires the beam for 1.25 s, `pause` holds it. For the mining beams (`render3d/README.md`, "Ordnance") | 2026-10-15 |
@@ -57,13 +62,15 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 
 | Key | Default | |
 |---|---|---|
-| `Enable` | 1 | 0 patches nothing but the music switch below (`Enable=0` with `Music=0`: a plain game with no music, for footage of the real campaign) |
+| `Enable` | 1 | 0 patches nothing but the music, captions and race switches below (`Enable=0` with `Music=0`: a plain game with no music, for footage of the real campaign; with `Captions=0`, its cinematics without their text) |
 | `Delay` | 30 | mission ticks before the scene is built |
 | `Fog` | 0 | 0: fog and shroud off for good, the map fully explored; 1: as the map has them |
 | `Hud`, `Grid`, `Cursor`, `Notices`, `Tooltips` | 0 | 0 hides them; 1 leaves them as the game has them. Notices are the game's events: "Enemy engaged." and the like, their voice and minimap marker. Tooltips are the rollover boxes, an object's name and description, that the pointer brings up over the 3D view even when the cursor is not drawn |
 | `Hover` | 1 | 0 removes what the object under the pointer gets drawn over it: its hull, shield and special-energy gauges, its system icons and the hover ring, which come up even with the HUD and the cursor hidden. 1 is stock. Selection circles and group numbers stay |
 | `ShieldFx` | 1 | 0 removes the flash on a craft's shields when a weapon hits them (green on most). The shields still take the damage. 1 is stock. The shields-down effect (a blue electric ring when they run out) is separate and stays; `Heal=1` prevents it |
 | `Music` | 1 | 0 stops the game starting any music track (`StartMusic` and the jukebox's `mStartNewTrack` return at once); sound effects and voices stay. `SCENE_MUSIC=0` at install puts it into the installed copy of any scene file, so footage can be laid over its own soundtrack |
+| `Captions` | 1 | 0 removes a mission script's captions: the subtitles and stardate lower thirds burned into the intro cinematics and the mission's title (`ScriptInterfaceImp::ShowTitle`, `ShowSubtitle`; "How it works"). Everything else in the cinematic, its timing, sound and voices, stays, and so do the game's own overlay messages. Set at start-up, so it holds with `Enable=0`, in stock and refit alike (`films/intros-scout`) |
+| `Race` | | the player's race, which decides the HUD (stock's skin, and the UI's theme with `[UI] Theme=auto`): `federation`, `klingon`, `romulan`, `cardassian`, `borg` or `species8472` (races.odf's `name`s). Empty: as the game sets it, which on `a2_borg01` is a different race on every launch. Set before the mission loads, so it holds in stock and refit alike, and with `Enable=0`. `SCENE_RACE=<race>` at install puts it into the installed copy of any scene file, ahead of the file's own |
 | `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
 | `Center` | | centre the RTS camera on this object |
 | `Zoom` | | the RTS camera's zoom level, 0 (closest) to 1 (farthest), set once the scene is built (`zoom`, below; "The zoom"). Unset leaves the camera as the game started it |
@@ -88,6 +95,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Immortal` | 1 | the object cannot die (craft only) |
 | `Heal` | 0 | 1: hull, shields, crew and every system topped up to full every tick, so it never shows damage: its shields never run out (no shields-down effect, the electric ring) and no damaged-system effect (the plasma plume, venting gas) ever shows |
 | `Energy` | 0 | 1: the craft's special energy topped up to full every tick, so a special weapon that runs on it (a tractor beam, a holding beam) keeps running |
+| `Tech` | | tech-tree items (`gcorbom`, `fedpod1` ...), space-separated, made available to the object's team as if researched, as `tech` (below) does |
 | `Engines`, `Weapons` | 1 | 0 disables them: an attacker with no engines fires without moving. A system switched off here is not drawn as damaged (no plume) |
 | `Vent` | | `all`, `none` or one system (`shields`, `engines`, `weapons`, `sensors`, `life`): its damage node shows as a damaged system's does -- the plume, the venting gas -- healed or not, and the system keeps working |
 | `Attack` | | the name of an object to attack, ordered once everything is built |
@@ -128,6 +136,7 @@ answer and fails if a command did.
 | `kill <name>` | the craft dies at once, as a mission script blows one up (`ScriptInterfaceImp::ExplodeNow`, 0x456cf0); its healing and immortality are switched off first |
 | `special <name> <weapon> [<target>]` | fire a craft's special weapon, by its weapon ODF's name (`gholdbm`, `gcorbom`), at a target or none: its special energy is filled first, the weapon's slot in the craft's carrier found (`WeaponClass::Find`), and `Craft::FireAtSpecial` (0x4c3820) called as a player's order does. Answers `slot N, can fire, fired` (or `cannot fire now`, `NOT fired`). The craft's weapons must be on (`Carrier::TriggerSelected` refuses while they are off) and the target within the weapon's range |
 | `energy <name> on\|off` | as `Energy=` |
+| `tech <team \| object> <item> [on\|off]` | a tech-tree item (an ODF name as the `techtree/*.tt` files spell it: `gcorbom`, `fedpod1`) made available to a team (an object's, given its name) as if researched, or not (`off`); answers what it was. Only the item changes, not what depends on it. A map's tree makes some items impossible for every team (`-1`; on `a2_borg01` `fedpod1` and with it the Sovereign's `gcorbom`): `on` makes the item possible too. For the Borg technology assimilation beam, which only holds on a ship that carries a special weapon its team has available ("How it works", "Tech tree") |
 | `cloak <name> on\|off\|now` | `on`: the craft starts to cloak, `off`: to decloak, `now`: fully cloaked at once (`GameObject::ImmediateCloak`, 0x4d03e0). Its special energy is filled and kept full while it is on. It sets the request byte of the craft's cloaking device (+0x108, byte +0x2c) that the player's button leaves for `CloakingDevice::Simulate`, rather than calling `ScriptInterfaceImp::Cloak`: that asks `AbleToCloak`, which wants the team to have researched the device, and it refused the bench's ships. `query` shows each craft's state (`cloak visible`, `cloaking`, `cloaked`, `decloaking`) |
 | `goto <name>[,<name>...] <object \| x y z> [warp]` | order a move, as a player's right-click does (AiCommand `GO`; `warp`: `GO_WARP`), and switch the engines on. To a craft, the ship follows it; to any other object (a nebula, a planet), it goes to where the object is. A point is anchored like the scene file's positions. Several names, comma-separated, keep their places: each goes to the point plus its own offset from the group's centre. It ends an `attack`, though a ship still fires at what comes in range |
 | `build <rig> <odf> <x y z \| object>` | order a construction ship to build a station (an ODF name, `fyard`, `fbase`...) at a point (anchored like the scene file's) or where an object is, as a player's build order (AiCommand `BUILD` with the class from `GameObjectClass::Find` and the point, through `GameObject::SetCommand`, 0x4d1cb0, as `ScriptInterfaceImp::SetCommandWhatWhoWhereVO` gives it). The rig's team gets every resource topped up first (`Team::AddResource`, clamped to its maximum) and its engines are switched on. The rig flies there and opens; its bees start the station at that point (fbase took about 2 minutes to start on the bench, fyard less) |
@@ -251,7 +260,9 @@ inert, and `Scene.log` says so.
   which draws the cursor under DXVK. `HUD.asi` wraps the same call ("Cursors" in
   `hud/README.md`). So `Scene.asi` patches it only once the scene is built, by when
   `HUD.asi` has long since loaded, and chains to whatever the call went to. With the
-  cursor off, the draw is skipped. Clicks still land where the pointer is.
+  cursor off, the draw is skipped. Clicks still land where the pointer is. `UI.asi`
+  wraps the same call when it loads, behind Scene.asi's wrap, and draws no cursor of
+  its own while the draw does not reach it (ui/README.md, "The cursor").
 - **Notices: `GameEvent::TriggerEvent`.** "Enemy engaged." is the event
   `EVENTS_ENEMY_ENGAGED` from `events.dat` (text, voice, minimap marker). Events are
   fired through three entry points: `TriggerEvent()` 0x479880,
@@ -393,6 +404,68 @@ inert, and `Scene.log` says so.
   colony ship (its first argument, a craft able to colonise) to colonise the planet
   (its second), and does nothing for any other first argument. That is why it did
   nothing when tried from this plugin with the planet alone.
+- **Tech tree: `TechnologyTree::mFind(const char *)`** (0x4999e0, thiscall) on
+  `g_technologyTreeArray` (0x739000, one `TechnologyTree` of 0x98 bytes per team, 9 of
+  them) finds a `TechItem` by name (case-insensitive). `TechnologyTree::Available`
+  (0x498d60), which `Weapon::IsAvailable` asks with the weapon class's id (+0x208),
+  answers the item's +0x4 when its +0xc ("possible") is set; `Created` sets +0x4 of an
+  item's children once all its parents exist, and a tree file's `-1` clears +0xc for good.
+  `tech` sets both bytes, or clears +0x4.
+  **Why the assimilation beam needs it.** `TechAssimBeam::Simulate` (0x586720) ends the
+  beam on the tick its owner has no weapon to take from the target: a special weapon of
+  the target's (+0x20c of its class) that `Weapon::IsAvailable` says its team has, that
+  the owner does not carry, while the owner holds fewer extra weapons than its class
+  allows (`maxExtraWeapons`, 1 on a cube). When the beam has held for
+  `assimilationTime` the weapon is the owner's and the beam ends. On `a2_borg01` the tree
+  (`techtree/a2_borg01.tt`) marks `fedpod1` impossible, so the Sovereign's `gcorbom` is
+  never available and the beam ended on the tick it was fired (the 2026-10-16 note in
+  `scenarios/specials.md`); a research station and a `fedpod1` spawned for the
+  Sovereign's team could not change that. Bench, `SCENE=assimilation`, 2026-10-17:
+  `tech team 2 gcorbom: was not available, now available`, then a green cone from the
+  cube onto the saucer for about 6 s; a second cube spawned in its place fires it again.
+- **The player's race: the two `Race::Find` calls in `SetupDefaultGame`** (0x489590).
+  A map named on the command line (`-nointro a2_borg01`) is set up by
+  `SetupDefaultGame`, from `Program::MainLoop`: it gives slot 0, the player's, the race
+  of the map's first start location, `Race::Find(name)` (0x48b100, cdecl, an exact match
+  on races.odf's `name`) at 0x4897ad or 0x489872 depending on the branch, then
+  `GameSetup::setRace` with the race's index (`Race`+0x44c). When `Find` returns NULL
+  the slot keeps the "random" race its constructor gave it, and
+  `Program::GameOpenPreLoad` (0x4846a0) draws a random race for every playing slot
+  still random (`GameSetup::RaceRandom`, retried until `CanRacePlayCurrentGameType`)
+  before `DisplayInterface::PostLoadAll` loads that race's HUD into
+  `Race::s_missionRace`. `a2_borg01` names no race for its start location, so the
+  bench's HUD changed race from launch to launch; nothing in `ARMADA.PRF`, the command
+  line or the clone decides it. With `Race=` set, both calls go to the plugin, which
+  returns `Find(Race)`, logs it with what the map named (`race: federation for the
+  player (the map's first start location names ""; ...)`), and falls back to the map's
+  own for a name `Find` does not know. Both call sites are checked to be `call
+  Race::Find` first, and `Find` against its first bytes; the hook goes in at start-up,
+  outside `Enable`, so it is in place before the mission is set up. Bench, 2026-10-17,
+  `showcase` with `Hud=1` and `Race=federation`: the Federation HUD on three launches
+  in stock and three in refit (the log: the map names `""`); `SCENE_RACE=klingon` over
+  it gave the Klingon theme.
+- **A mission's captions: the two `OverlayText::AddMessage` calls in the script
+  interface.** The text burned into the intro cinematics -- the Federation intro's
+  subtitles at the top ("These are the voyages of the starship Enterprise..."), the
+  lower thirds (`USS Enterprise / Stardate 54522.2 / Location: Alpha Quadrant`, and
+  the Klingon and Borg intros' stardates) and the mission's title ("Invasion") -- is
+  not a game option and not part of the scene: the mission script asks for each one
+  through `ScriptInterfaceImp::ShowTitle` (0x454ff0) or `ShowSubtitle` (0x4550c0).
+  Each looks the text up (`MISSION_*_SUBTITLE*` in `Dynamic_Localized_Strings.h`),
+  makes one call to `OverlayText::AddMessage` (0x5061e0, thiscall, seven arguments,
+  `ret 0x1c`) on `overlayText` (0x764488), at 0x455081 and 0x45510c, and returns the
+  key it gives. The script later passes that key to `RemoveTitle` / `RemoveSubtitle`,
+  which hand it to `FadeMessage` (0x506400) or `RemoveMessage` (0x506460); both look
+  it up in the overlay's map and do nothing when it is not there. With `Captions=0`
+  both calls go to the plugin's `caption_add`, which takes the same arguments, adds
+  nothing and returns -1, a key `AddMessage` never gives (a counter from 0, 0x7644bc).
+  No message exists, so neither stock's `OverlayText::Render` nor `UI.asi`'s overlay,
+  which reads the same map (`ui/HUD.md`, "Overlay messages"), has anything to draw.
+  `Scene.log` names each caption it hid (`caption hidden: "..."`). The game's own
+  callers of `AddMessage` (`GameTypeGeneral::SetGameOverMessage` and the network
+  transport's) are left alone. The hook goes in at start-up, outside `Enable`, as
+  `Race=` does; the two call sites are checked to be `call AddMessage` first, and
+  `AddMessage` against its first bytes.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`). **That camera is not the one in use on the bench**

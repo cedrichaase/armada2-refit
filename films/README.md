@@ -282,7 +282,7 @@ a fenced block, splices that file in where it stands, as if its text were writte
 
 | Key | |
 |---|---|
-| `Music` | the bed under this section: `<file> [from S] [gain dB] [until <shot>] [fade S]`. `file` is under the game's `sounds/music/` or a path. A section that carries its own score (a cinematic, a movie) says `Music: none`, and the bed before it must end before it begins |
+| `Music` | the bed under this section: `<file> [from S] [gain dB] [until <shot>] [fade S]`. `file` is under the game's `sounds/music/`, a path under its `sounds/` (`effects/Shellsd0.WAV`, the main menu's loop), or a path. A section that carries its own score (a cinematic, a movie) says `Music: none`, and the bed before it must end before it begins |
 | `Mute`, `Stems` | the sound of this section's takes, as the shot fields; a shot's own wins |
 
 ### Shot fields (under an H3)
@@ -296,7 +296,7 @@ a fenced block, splices that file in where it stands, as if its text were writte
 | `Variants` | `refit` | which variants to film, in the order the layout reads them: the first is the one a wipe or dissolve starts from |
 | `Players` | | several games in one shot, filmed together: `host, joiner`. Each player is a take named after it, installed as the shot's first `Variants:` (refit by default), and the layout reads the players as its variants; see "Two games in one shot" |
 | `Prepare` | | `<script> [args]`, a script of this repository run with each take's session state file after its clone is made and before the game starts (`online/bench-asi.sh --server`), as a scenario's `Setup:` |
-| `Layout` | `full` | how the variants fill the frame: `full [<variant>] [label]` (one variant, a corner label if `label`); `wipe [<mid> <end>]` (the first variant on the left; a divider comes in from the right, eases to rest at `mid` of the width, then on to `end`, revealing the second; default `0.5 1.0`, as the October showcase); `dissolve [hold fade]` (the first variant held, then dissolved into the second; for subjects spread over the frame); `split [w]` (side by side, each variant's centre `w` of its width, 0.5 by default, fitted into half the frame; `0.75` is a 4:3 menu whole, letterboxed); `pip <variant> <corner>` (that variant small in a corner, `tl`, `tr`, `bl` or `br`, over the other) |
+| `Layout` | `full` | how the variants fill the frame: `full [<variant>] [label]` (one variant, a corner label if `label`); `wipe [<mid> <end>]` (the first variant on the left; a divider comes in from the right, eases to rest at `mid` of the width, then on to `end`, revealing the second; default `0.5 1.0`, as the October showcase); `sweep [hold cross]` (the first variant held `hold` seconds, then the divider crosses the whole frame in `cross`, revealing the second; default `2.2 1.6`; a wipe without the split held in the middle); `dissolve [hold fade]` (the first variant held, then dissolved into the second; for subjects spread over the frame); `split [w]` (side by side, each variant's centre `w` of its width, 0.5 by default, fitted into half the frame; `0.75` is a 4:3 menu whole, letterboxed); `pip <variant> <corner>` (that variant small in a corner, `tl`, `tr`, `bl` or `br`, over the other) |
 | `Crop` | | `x y w h`, fractions of the frame, applied to every variant before the layout (the HUD's grid: `0.15 0.64 0.43 0.36`) |
 | `Transition` | `cut` | how the shot comes in: `cut`, `dissolve S`, `fade S` (from black), `dip S` (through black) |
 | `Title`, `Sub` | | a lower-third title and its line below; `Caption: top` moves them to the top (HUD footage) |
@@ -308,6 +308,7 @@ a fenced block, splices that file in where it stands, as if its text were writte
 | `Audio` | `game` | `game` (the take's own sound), `none`, `vo` (voice-over: lift it over the bed), or a mix of the take's stems, `<stem> [dB] + ...`: `effects + voice -6` (see "Sound") |
 | `Mute` | | game sound categories at volume 0 in the take: `music`, `voice`, `effects`, `interface`; `none` undoes a section's. Changes the take (it is in the spec) |
 | `Stems` | | categories recorded as stems of their own: `music`, `voice`, `interface`; the rest is the `effects` stem. Not with the same category in `Mute`. Changes the take |
+| `Labels` | | the text a layout's corner labels show in place of the variants' (or players') names: `host Player 1; joiner Player 2`. An edit field: it never re-films |
 | `Keys` | `auto` | key hints: `auto` shows each `press` of the action block for 1.2 s; or `T text; T text`, times from `In`; `none` |
 | `From` | | `footage` only: `<shot> [variant]`, that shot's take at the tier being cut (its last variant by default; the best one, as "The cut today" says). For teasers and montages that reuse a take. Or `ref:<id>`, a moment from the reference catalogue (`films/reference/README.md`): its file, with the shot's `In:` counted from the entry's `In`, and running to its `Out` without a `Length:` |
 | `Tier` | `probe` | the resolution this shot is probed at, when it is not the film's `Probe`: a height (`1080`, `1440`, `2160` or `4k`) at the probes' aspect, or `WxH`; or `final` (or a size equal to `Final`), which films its final take in the probe run. See "A shot's tier" |
@@ -348,8 +349,8 @@ while the rest stay cheap:
 - **```` ```action ````** — recorded from its first line to its last. Its time line is the
   take's: `In:` and `Keys:` count from its start.
 - **```` ```card ````** — a card's lines, top to bottom, each optionally styled:
-  `[accent] KLINGON CAMPAIGN`, `[big] ARMADA II`, `[small] github.com/...`; a plain line
-  is a heading.
+  `[accent] KLINGON CAMPAIGN`, `[big] ARMADA II`, `[mark] REFIT` (big, in the accent colour),
+  `[small] github.com/...`; a plain line is a heading.
 
 The setup and action blocks take one command per line (`#` comments):
 

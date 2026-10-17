@@ -4,6 +4,16 @@
 8 with a transport of our own. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs
 and versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.6.2 — 2026-10-17
+
+### Fixed
+- `bench-asi.sh --server`: the local server waits 600 s for its first datagram, not 90.
+  Its idle time counts from the set-up, and a 4K take's games took about 100 s to reach
+  their menus: the server was gone, the host had no join code, and the joiner typed a
+  word of the error instead.
+
+Installs nothing: a bench script.
+
 ## 0.6.1 — 2026-10-12
 
 ### Fixed

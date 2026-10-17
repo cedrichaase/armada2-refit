@@ -265,7 +265,7 @@ def compare(a, b, shot):
     if out['p95'] < SAME_DIFF:
         out['flags'].append(f'{ra["variant"]} and {rb["variant"]} barely differ (mean {out["mean"]}, p95 {out["p95"]})')
     elif out['mean'] > FAR_DIFF:
-        t = 'the wipe halves will not line up' if lay == 'wipe' else 'the variants differ everywhere'
+        t = 'the wipe halves will not line up' if lay in ('wipe', 'sweep') else 'the variants differ everywhere'
         out['flags'].append(f'{t} (mean difference {out["mean"]})')
     if best:
         out['shift'] = round(best / FPS, 2)

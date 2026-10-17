@@ -629,11 +629,27 @@ scaled to the ODF colour's peak (the class's light +0x10, its colour +0xf4), whi
 `Lighting.asi`'s recolouring; every visible phaser (vtable 0x6b8ee4, not expired
 +0x27, visible +0x24) gets an emitter and an impact light in its texture's colour
 times its tint, up over 0.06 s and down over its last 0.25 s (time left +0xac of the
-class's `lifeSpan` +0x1c); and the special weapons' and the warp flashes' lights of the
+class's `lifeSpan` +0x1c); every torpedo and pulse lights its own ship where it
+leaves it (below); and the special weapons' and the warp flashes' lights of the
 last frame are registered. New lights are `ST3D_Point_Light`s made once with the
 engine's constructor (0x62f240) and registered with `RegisterLight` (0x62d250), so a
 hull the engine draws takes them too; the scene's list is then read again. With
 `Lighting.asi` loaded, it does the recolouring and the phaser lights itself.
+
+**The muzzle light.** The engine's torpedo and pulse light rides with the shot and
+reaches its ODF's `lightFalloffStart` plus `lightFalloffRange` (50 + 5 on every pulse in
+the game): at 1000 units a second it is clear of the hull in a frame or two, so a
+firing ship took no light from its own discharge, while a phaser has its emitter light.
+A shot that is in the ordnance list and was not in the last main view's (a new one; its
+owner +0x5c a live game object) leaves a light where it is first seen, at its hardpoint
+or a little out from it (bench 2026-10-17: the mothership's pulses 60 to 98 from its
+centre, its bounding radius 106), held at the same place on its owner as the owner
+moves. It is in the shot's own light colour (recoloured as above), full to a tenth of
+`MuzzleReach` times the owner's bounding radius and gone at that reach, falloff squared
+(hard, distinct, wrap 0.4), and fades linearly over `MuzzleTime` seconds of the sim
+clock. Every torpedo and pulse weapon has it, on every ship. On the bench, at the
+defaults the mothership's volley washes its bow lime green for about half a second,
+clear from 500 away; at 3, 0.35 s and half the radius (the first guess) it was not seen.
 
 **Settings.** The recipes and `[Warp]` are `render3d/ordnance.ini`, built into the
 plugin; a section or key of the same name in `Render3D.ini` overrides it. The
@@ -647,6 +663,7 @@ module's own keys, in `Render3D.ini` `[Ordnance]`:
 | `Hot`, `HotFrom` | 0.6, 0.7 | how far past white a sprite's hottest texels go, from which level |
 | `Recolour` | 1 | torpedo and pulse lights in their sprite's colour |
 | `PhaserLights` | 1 | the phasers' emitter and impact lights (`PhaserBrightness`, `PhaserStart`, `PhaserRange`, `PhaserLift`, `PhaserImpact`, `PhaserImpactStart`, `PhaserImpactRange`, `PhaserImpactLift`: `Lighting.ini`'s) |
+| `MuzzleLights` | 1 | a light on the firing ship where each torpedo or pulse leaves it (`MuzzleBrightness` 4, `MuzzleTime` 0.5 s, `MuzzleReach` 1 times the ship's bounding radius) |
 | `Models` | 1 | 0: the shots that draw a model are drawn by the engine (no vtable slot is taken) |
 | `Survey` | 0 | log every ordnance ODF the first time it shows, with its vtable and `Submit` |
 

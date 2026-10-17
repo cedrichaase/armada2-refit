@@ -12,6 +12,14 @@
 //!   of every visible phaser (vtable 0x6b8ee4), in the beam's own colour (its texture's
 //!   mean, scaled to a peak of 1, times its tint +0xf0), up in 0.06 s and down over the
 //!   last 0.25 s of its life (time left +0xac of the class's lifeSpan +0x1c).
+//! - **Muzzles** (new in render3d): a torpedo or pulse lights its own ship where it
+//!   leaves it. The engine's light rides with the shot (an ODF's `lightFalloffStart` +
+//!   `Range`, 55 on every pulse), which is clear of the hull in a frame or two, so the
+//!   firing ship took nothing of its own discharge. A shot seen for the first time (not
+//!   in the last main view's list) leaves a light at that point, kept at the same
+//!   place on its owner (owner +0x5c, its position +0xac), in the shot's light colour
+//!   (recoloured as above), reaching `MuzzleReach` times the owner's bounding radius,
+//!   down over `MuzzleTime` seconds of the sim clock.
 //! - **The special weapons and the warp flash** (Specials.asi's): `fx.rs` says where.
 //!
 //! The new lights are ordinary `ST3D_Point_Light`s (made with the engine's own
@@ -43,7 +51,23 @@ pub struct Lights {
     /// Phaser lights: emitter brightness, start, range, lift; impact brightness,
     /// start, range, lift (Lighting.ini's defaults).
     pub ph: [f32; 8],
+    /// Muzzle lights: brightness, seconds, reach in the owner's radii (0 brightness: none).
+    pub muzzle: [f32; 3],
+    /// The torpedoes and pulses of the last main view, and the muzzles still lit.
+    shots_seen: Vec<usize>,
+    muzzles: Vec<Muzzle>,
     said: u32,
+    said_muzzle: u32,
+}
+
+/// Where a shot left its ship: its owner's handle, the point's offset from the
+/// owner's position, its colour, when, and its reach.
+struct Muzzle {
+    owner: i32,
+    off: V3,
+    col: V3,
+    t0: f32,
+    reach: f32,
 }
 
 impl Lights {
@@ -54,7 +78,11 @@ impl Lights {
             recolour: true,
             phasers: true,
             ph: [4.5, 0.0, 24.0, 3.0, 2.0, 6.0, 70.0, 8.0],
+            muzzle: [4.0, 0.5, 1.0],
+            shots_seen: Vec::new(),
+            muzzles: Vec::new(),
             said: 0,
+            said_muzzle: 0,
         }
     }
 
@@ -142,6 +170,97 @@ impl Lights {
         let base = name.rsplit(['\\', '/']).next().unwrap_or(name);
         let stem = base.split('.').next().unwrap_or(base);
         Some((String::from(stem), unsafe { rd(sprite + 0x38) }))
+    }
+
+    /// A torpedo's or pulse's light colour: its class light's ODF colour (+0xf4), in
+    /// its sprite's hue when recolouring (as `recolour_registry`).
+    fn shot_colour(&mut self, l: usize, sprite: usize) -> V3 {
+        let odf: V3 = unsafe { rd(l + 0xf4) };
+        if !self.recolour {
+            return odf;
+        }
+        let peak = odf.x.max(odf.y).max(odf.z);
+        let Some((tex, r)) = Self::sprite_rect(sprite) else { return odf };
+        let Some(m) = self.mean(&tex, r) else { return odf };
+        let mp = m.x.max(m.y).max(m.z);
+        if peak <= 0.0 || mp <= 0.0 {
+            return odf;
+        }
+        m * (peak / mp)
+    }
+
+    /// Notes the torpedoes and pulses that are new since the last main view as muzzles,
+    /// drops the muzzles that are out, and registers the rest; returns how many lights
+    /// were used.
+    fn muzzle_lights(&mut self, mut n: usize, now: f32, main: bool) -> usize {
+        let (bright, time, reach) = (self.muzzle[0], self.muzzle[1].max(0.01), self.muzzle[2]);
+        if main {
+            let mut now_seen: Vec<usize> = Vec::new();
+            let mut new: Vec<(usize, usize, usize)> = Vec::new();
+            eng::for_each_ordnance(|o| {
+                if engine::vtable(o) == VT_PHASER {
+                    return;
+                }
+                let cls = field(o, 0x34);
+                let l = if cls != 0 { field(cls, 0x10) } else { 0 };
+                if l == 0 || engine::vtable(l) != VT_POINT {
+                    return;
+                }
+                now_seen.push(o);
+                new.push((o, l, field(cls, 0x12c)));
+            });
+            for (o, l, spr) in new {
+                if self.shots_seen.contains(&o) || self.muzzles.len() >= 64 {
+                    continue;
+                }
+                let h = unsafe { rd::<i32>(o + 0x5c) };
+                let owner = eng::object_of(h);
+                if owner == 0 {
+                    continue;
+                }
+                let pos = eng::transform(o).p;
+                let op = eng::obj_pos(owner);
+                let rad = eng::radius_of(owner);
+                let col = self.shot_colour(l, spr);
+                if self.said_muzzle < 16 {
+                    self.said_muzzle += 1;
+                    crate::log!(
+                        "ordnance: muzzle of {} on {} at {:.0} from its centre (radius {:.0}), colour {:.2} {:.2} {:.2}",
+                        eng::ord_odf(o), eng::odf_name(owner), (pos - op).len(), rad, col.x, col.y, col.z
+                    );
+                }
+                self.muzzles.push(Muzzle { owner: h, off: pos - op, col, t0: now, reach: rad * reach });
+            }
+            self.shots_seen = now_seen;
+            self.muzzles.retain(|m| now - m.t0 < time && now >= m.t0 - 1.0);
+        }
+        if bright <= 0.0 {
+            return n;
+        }
+        let lit: Vec<(V3, V3, f32)> = self
+            .muzzles
+            .iter()
+            .filter_map(|m| {
+                let owner = eng::object_of(m.owner);
+                if owner == 0 {
+                    return None;
+                }
+                let k = 1.0 - ((now - m.t0) / time).clamp(0.0, 1.0);
+                if k <= 0.0 {
+                    return None;
+                }
+                Some((eng::obj_pos(owner) + m.off, m.col * (bright * k), m.reach))
+            })
+            .collect();
+        for (p, c, r) in lit {
+            if n >= 112 {
+                break;
+            }
+            self.register(n, p, c, r * 0.1, r * 0.9);
+            self.style(n, crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.4, power: 2.0 });
+            n += 1;
+        }
+        n
     }
 
     /// This view's torpedo and pulse lights in their sprites' colours.
@@ -249,7 +368,7 @@ impl Lights {
 
     /// The start of a view: recolour, then register the new lights. True if the
     /// registry changed (the scene's list must be read again).
-    pub fn begin_view(&mut self, fx: &[super::fx::Lit]) -> bool {
+    pub fn begin_view(&mut self, fx: &[super::fx::Lit], now: f32, main: bool) -> bool {
         let lighting = crate::plugin_loaded("Lighting.asi");
         let mut changed = false;
         if self.recolour && !lighting {
@@ -259,6 +378,9 @@ impl Lights {
         let mut n = 0;
         if self.phasers && !lighting {
             n = self.phaser_lights(n);
+        }
+        if self.muzzle[0] > 0.0 {
+            n = self.muzzle_lights(n, now, main);
         }
         for l in fx {
             if n >= 128 {

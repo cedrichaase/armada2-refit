@@ -5,6 +5,64 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.39.0 — 2026-10-17
+
+### Added
+- `Scene.asi`'s `Captions=` key: 0 removes a mission script's captions (the intro
+  cinematics' subtitles and stardate lower thirds, the mission's title) by sending
+  `ScriptInterfaceImp::ShowTitle`'s and `ShowSubtitle`'s `OverlayText::AddMessage`
+  calls to a stub that adds nothing. Works with `Enable=0`, in stock and refit. 1 (the
+  default) is unchanged.
+
+Installs nothing; seen working on the bench 2026-10-17 (`films/intros-scout` s01 refit
+and stock, s02, s03 with `Enable=0`: every subtitle, lower third and title gone, the
+cinematics' cuts and fades within 0.15 s of the earlier takes).
+
+## 3.38.0 — 2026-10-17
+
+### Added
+- Scene `assimilation-fusion`: the technology assimilation beam from a Borg Fusion
+  Cube (`bbattle3`) onto the Sovereign, 300 apart, for footage.
+- Scene `assimilator`: the Borg Assimilator (`bcruise2`) and its auto-assimilator
+  (`gborgbor`) on a healed Sovereign, 300 apart, for footage.
+
+Installs nothing; both beams seen firing on the bench 2026-10-17 (stock).
+
+## 3.37.0 — 2026-10-17
+
+### Added
+- `Scene.asi`'s `Race=` key (`federation`, `klingon`, `romulan`, `cardassian`, `borg`,
+  `species8472`) and `SCENE_RACE=<race>` at `testbench/scene/install`: pins the
+  player's race, and with it the HUD's skin (stock) or theme (refit, `Theme=auto`),
+  which `-nointro a2_borg01` otherwise draws at random on every launch. It works with
+  `Enable=0`. Empty (the default) leaves the game's choice.
+
+Installs nothing; seen working on the bench 2026-10-17 (`showcase`, `Hud=1`, `Race=federation`:
+the Federation HUD on 3 of 3 launches in stock and 3 of 3 in refit; `SCENE_RACE=klingon`
+over it: the Klingon theme).
+
+## 3.36.0 — 2026-10-17
+
+### Added
+- Scene command `tech <team | object> <item> [on|off]` and object key `Tech=`: a
+  tech-tree item made available to a team as if researched, possible again where the
+  map's tree forbids it.
+- Scene `assimilation`: a Borg cube and an enemy Sovereign whose corbomite is
+  available, so the technology assimilation beam holds (about 6 s).
+
+### Fixed
+- Scenario `specials`: the assimilation beam now forms (`tech tgt gcorbom` before it
+  is fired); it ended on the tick it was fired, because `a2_borg01`'s tech tree makes
+  the Sovereign's corbomite impossible.
+
+## 3.35.1 — 2026-10-17
+
+### Changed
+- Scenario `ui-widgets-cursor`: Scene.asi's `cursor off` then `cursor on`, with
+  `UI.asi`'s cursor hidden and shown with it (ui 0.12.1).
+
+Installed, not yet seen in game.
+
 ## 3.35.0 — 2026-10-17
 
 ### Added
