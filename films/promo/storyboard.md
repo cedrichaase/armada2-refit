@@ -492,10 +492,8 @@ Status: draft
 The campaign selection: in refit, pointing at each campaign moves the camera to its scene
 on the same map: the starbase (training), the Federation fleet, Klingon ships decloaking
 before a red nebula, a Borg cube's shadow through the Mutara. **Each entry is hovered in
-turn, the camera panning to its scene.** The user's timing (2026-10-17): about 1.5 s of
-pan and 1.5 s on the arrived scene, 3 s an entry, about 12 s in all. The probe holds each
-4.5 s so the cut has room to trim to that; tighten the waits once the probe shows how long
-the pan really takes. Stock is held for two seconds, then dissolves. The pointer
+turn, the camera panning to its scene.** The probe holds each 4.5 s, longer than needed;
+the waits are set from the pan's length as measured on the probe's take. Stock is held for two seconds, then dissolves. The pointer
 positions are `testbench/scenarios/ui-menus-scene.md`'s (220 × 270 / 322 / 374 / 426 at
 1280x720), scaled to the Pointer space. *Unprobed*.
 
