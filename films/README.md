@@ -22,6 +22,7 @@ an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8
 
     $A2_DATA/films/<film>/
       probe/<shot>/<variant>.mkv   .wav  .events.json  .spec.json  .sheet.png
+                   <variant>.effects.wav  .music.wav  .voice.wav   with Stems: (below)
       final/<shot>/<variant>.mkv   ...
       sheet-probe.png               every shot in timeline order
       animatic-probe.mp4            the rough cut
@@ -137,12 +138,14 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
 | `Args` | `-nointro a2_borg01` | the game's arguments, for every shot that names no `Args` of its own |
 | `Variant <name>` | `refit`, `stock` | the bench `--install`s that make a variant; `refit`: `--install . --install testbench/scene`; `stock`: `--install testbench/scene`. Add your own (a branch's checkout, a setting) |
 | `Music` | | `Music=0` in every scene: `0` (the default) or `1` |
+| `Mute`, `Stems` | | the sound of every take, as the section and shot fields below; the nearest of shot, section and film wins |
 
 ### Section fields (under an H2)
 
 | Key | |
 |---|---|
 | `Music` | the bed under this section: `<file> [from S] [gain dB] [until <shot>] [fade S]`. `file` is under the game's `sounds/music/` or a path. A section that carries its own score (a cinematic, a movie) says `Music: none`, and the bed before it must end before it begins |
+| `Mute`, `Stems` | the sound of this section's takes, as the shot fields; a shot's own wins |
 
 ### Shot fields (under an H3)
 
@@ -162,7 +165,9 @@ other line is prose. Only the keys below are fields, so a sentence that happens 
 | `In` | `0` | seconds into the take where the cut starts; per variant: `In: stock 3.3, refit 4.0` |
 | `Length` | | seconds on screen. `check` warns if the action's waits are shorter than `In` + `Length` x `Speed` |
 | `Speed` | `1` | playback speed in the cut |
-| `Audio` | `game` | `game` (the take's own sound), `none`, or `vo` (voice-over: lift it over the bed) |
+| `Audio` | `game` | `game` (the take's own sound), `none`, `vo` (voice-over: lift it over the bed), or a mix of the take's stems, `<stem> [dB] + ...`: `effects + voice -6` (see "Sound") |
+| `Mute` | | game sound categories at volume 0 in the take: `music`, `voice`, `effects`, `interface`; `none` undoes a section's. Changes the take (it is in the spec) |
+| `Stems` | | categories recorded as stems of their own: `music`, `voice`, `interface`; the rest is the `effects` stem. Not with the same category in `Mute`. Changes the take |
 | `Keys` | `auto` | key hints: `auto` shows each `press` of the action block for 1.2 s; or `T text; T text`, times from `In`; `none` |
 | `From` | | `footage` only: `<shot> [variant]`, that shot's take at the tier being cut (its last variant by default). For teasers and montages that reuse a take |
 | `File` | | `footage` only: a file, a path relative to `$A2_DATA` |
@@ -249,6 +254,48 @@ the joiner too: write the action as the story the two screens tell together.
   about `Length:` there; read the takes' length off the probe.
 - Two players are two games but one job of `--jobs`: probing it beside other shots,
   lower `--jobs` so the bench is not running more games than it should.
+
+## Sound
+
+A take records the game's sound live, from the bench session's silent sink. The game
+has four categories of sound, each with its own volume (`testbench/README.md`, "Audio
+stems"): `music`, `voice` (mission narration and speech), `effects` (the 3D sounds of
+the world) and `interface` (the button bar). Two fields decide how they reach a take,
+on a shot, its section or the whole film:
+
+- **`Mute: music, voice`** sets those volumes to 0 in the take's clone of the game
+  (`a2test session start --mute`), so they are never in it: a mission intro filmed
+  without its narration and score, to be laid under a voice-over or a bed of the
+  film's own. Mutes are part of the take's spec: changing them re-films the take.
+- **`Stems: music, voice`** records them as separate tracks
+  (`a2test session start --stems`): each plays on a silent sink of its own and is
+  recorded beside the take as `<variant>.music.wav` and `<variant>.voice.wav`, and
+  whatever is left (the effects, the interface, unless it is a stem too) as
+  `<variant>.effects.wav`. Every stem is cut from its end like the picture, so all
+  share the take's time line, and each is recorded at full volume. The take's own
+  track (`<variant>.mkv`) stays the whole of its sound: the stems summed, so
+  `Audio: game` means what it always did.
+
+The mix is then the edit's: `Audio: effects + voice -6` plays the effects stem and the
+voice 6 dB down in the animatic; `Audio: game` the whole; a term `game` is the take's
+own track. `check` refuses a mix that names a stem the shot does not record, and the
+animatic leaves out a stem it cannot find (a take filmed before `Stems:`), saying so.
+The manifest gives each shot's `mute`, `stems` and `mix`, and per take the stems'
+paths (`stems`), so an editor can mix them itself.
+
+**For a music stem, the film needs `Music: 1`.** The default `Music: 0` puts `Music=0`
+into every take's scene file, and Scene.asi then never starts a track: the music stem
+would be silence. A mission shot with its own scene file (`Enable=0`, `Music=1`) is
+treated the same way.
+
+The bench measured the effects stem of a Federation intro at the level of the same
+shot filmed with `Mute: music, voice` (`testbench/README.md`, "Audio stems"). The stems
+are recorded from separate Wine devices, each with its own output buffer, and by
+separate `parec`s stopped together, so they are aligned to within that buffering, not
+to the sample; the offset has not been measured yet. Judge a hard sync point (a line
+on a cut) by ear before relying on it. Mute and stems apply
+to the game's own sound only; a Bink movie (`cutscenes/`) has its own track and is not
+split.
 
 ## What the board should say
 

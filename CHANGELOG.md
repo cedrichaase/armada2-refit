@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.25.0 — 2026-10-17
+
+Layers: testbench 3.31.0, films 1.4.0.
+
+### Added
+- Takes record the game's sound by category: `Mute:` silences music, voice, effects or
+  interface in a take (`a2test session start --mute`), and `Stems:` records music, voice
+  and interface as separate tracks beside it (`--stems`, `Stems.asi` in the bench clone
+  only), mixed per shot in the animatic with `Audio: effects + voice -6`.
+
+Installed, not yet seen in game.
+
 ## 12.24.0 — 2026-10-17
 
 Layers: gui-installer 1.6.0.

@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.31.0 — 2026-10-17
+
+### Added
+- `session start --mute CATS`: the game's `music`, `voice`, `effects` and `interface`
+  volumes at 0 in the clone's `ARMADA.PRF` (its third line), the user's install untouched.
+- `session start --stems CATS`: `music`, `voice` and `interface` each played on a null
+  sink of its own (`a2test-<id>-<category>`) by `stems/Stems.asi`, which moves that
+  category's 2D sounds to a DirectSound device on it; the rest stays on the session's
+  sink as the effects stem. Stems are set to full volume. `Stems.log`, `Stems.ini`
+  gathered with the logs.
+
+Installed, not yet seen in game (measured on the bench: `a2_fed01` intro, three stems).
+
 ## 3.30.0 — 2026-10-17
 
 ### Added

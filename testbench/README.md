@@ -17,6 +17,8 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test session start --res 800x600 --mod stock --stock-shell embed   # the stock baseline, menus clickable
     ./a2test session start --assets none --install .   # as a release installs it: no textures, plates, movies
     A2_DATA=$(mktemp -d) ./a2test session start --install .   # ... as without any assets
+    ./a2test session start --mute music,voice   # the game's own music and voice volumes at 0
+    ./a2test session start --stems music,voice  # music and voice each on a silent sink of their own
     ./a2test drive --session ID shot menu    #   prints the PNG path
     ./a2test drive --session ID click-text "Single Player"
     ./a2test drive --session ID step 'Wait for the single player screen'
@@ -82,6 +84,11 @@ scene file (`SCENE=planet|nebula|firing`). A free camera can be moved while the 
 runs: `a2test drive scene "orbit ship 120 20 250"`. `--install testbench/scene`; see
 `scene/README.md`.
 
+**Sound by category** (`--mute`, `--stems`; "Audio stems" below): a session can set
+the game's music, voice, effects and interface volumes to 0 in its clone, and can play
+music, voice and the interface on silent sinks of their own, so a take records each as
+a separate track and the mix is made in the edit (`films/README.md`, "Sound").
+
 ## How a case runs
 
 | Stage | What | Why this way |
@@ -100,9 +107,69 @@ real install's path, and fails the case if the game has it open.
 Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
 channels), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
 `xalia_dxgi.log` (DXVK), `vkBasalt.log`, `sway.log`, `input.log`, `prepare.log`,
-`launch-env.txt` (the exact environment and argv), the clone's `ARMADA.PRF`,
+`launch-env.txt` (the exact environment and argv), `Stems.log` and `Stems.ini`, the clone's `ARMADA.PRF`,
 `Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
 anything new in the game's `Logs/`.
+
+## Audio stems
+
+The game plays four categories of sound, each with its own volume in the options and in
+the clone's `ARMADA.PRF`, whose third line opens with them in this order (0 silent, 20
+full; the rest of the line is not volumes):
+
+| Category | What it is (eAudioVolume) | `--mute` | `--stems` |
+|---|---|---|---|
+| `music` | the jukebox's tracks and a mission's scripted music (1) | yes | yes |
+| `voice` | mission narration, and the speech `AudioQueue` plays (2) | yes | yes |
+| `effects` | the 3D sounds of the world: weapons, explosions, engines (3) | yes | no: the rest |
+| `interface` | the button bar's sounds (4) | yes | yes |
+
+**`--mute music,voice`** sets those volumes to 0 in the clone's `ARMADA.PRF` before the
+game starts; the user's install keeps its own. This is what the user did by hand on
+2026-10-17 to film mission intros without their narration and music, as a bench option.
+
+**`--stems music,voice`** records them apart. The engine plays every sound through one
+DirectSound device, and Wine mixes all of a device's buffers into one output stream, so
+the bench could only ever record the whole mix: no setting of the game or of PipeWire
+can split it. `stems/Stems.asi` (in the clone only) opens one DirectSound device more
+per category, on a null sink the session makes for it (`a2test-<id>-<category>`, beside
+the session's own), and moves every 2D sound of that category onto it as it starts.
+What stays on the session's sink is the `effects` stem: the 3D effects, plus any
+category not named. A stem's volume is set to 20 in the clone, so each stem carries its
+sound at full level; categories not named keep the user's setting. `--mute` and
+`--stems` cannot name the same category, and `--stems` cannot go with `--audio`.
+
+How `Stems.asi` finds the sound (each finding is used by its one hook, `stems.c`):
+
+- Every `AudioSound` keeps its category as the int at +0xc, where `AudioSound::mSetVolume`
+  (0x45fa60) reads it to pick the player's volume, and its file name at +4. The
+  constructors are handed the category as a constant: 1 by `AudioMusic2D`, 2 by
+  `AudioQueue::Play`, 3 by every `AudioSound3D`, 4 by `PopupPaletteImp`'s keyboard
+  handler. `AudioSettings` writes the volumes for 1 to 4, in that order, as the third
+  line of `ARMADA.PRF`; the user's change (music and voice to 0) is exactly its first
+  two fields.
+- A 2D sound gets its buffer from `SoundBuffer::RequestBuffer`, which loads the whole
+  wave (or duplicates a cached one) and calls back at once, synchronously; the callback
+  hands it to `AudioSound2D::mInit` (0x45fb90), which stores it at +0x10 and plays it.
+  There is no streaming: music and narration are loaded whole too. So the hook is that
+  one call (at 0x45fb7d): for a category with a device of its own, the buffer is copied
+  there (format, flags, every byte), the game's copy released, and the copy passed on.
+  The sound owns it and releases it when it ends, as before.
+- 3D buffers are never moved: their listener lives on the game's device. That is why
+  the effects are the remainder and not a stem of their own.
+- Each new device's primary buffer takes the game's own format
+  (`AudioDefault::s_sampleRate` and `s_bitsPerSample`, 22050 Hz and 16 bits).
+
+The plugin finds its device among DirectSound's by the sink's name (Wine lists a sink by
+its description, `Speakers (a2test-<id>-music)`); a category whose device cannot be
+found or opened stays in the game's mix, and `Stems.log` (gathered with the logs) says
+so. A device is opened only for a sink found by name, so nothing can reach a real
+output; the audio guard accepts any `a2test-` sink. `a2film` records each sink's monitor
+with its own `parec` and cuts every recording from its end, as it does the picture.
+
+Measured on 2026-10-17 (`a2_fed01.bzn`, its intro, stock, 45 s at 1280x720): the music
+stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects stem
+(-42.4 dB mean) matched a take of the same shot with `--mute music,voice` (-42.1 dB).
 
 ## Traps, each measured here
 

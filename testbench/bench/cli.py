@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import config, report, vision
 from .scenario import STEPS, Case, normalise, parse, ref_label
-from .session import GameError, Session, build_input
+from .session import STEMS, GameError, Session, build_input, parse_categories
 
 HELP = """\
 a2test -- run Armada II headless and test it end to end
@@ -355,7 +355,18 @@ def cmd_session(argv):
         ap.add_argument('--stock-shell', choices=['embed'], default=None)
         ap.add_argument('--assets', choices=['none'], default=None,
                         help='none: install into the clone from an empty A2_DATA (no textures, plates, movies)')
+        ap.add_argument('--mute', default='', metavar='CATS',
+                        help='volume 0 in the clone for these of music, voice, effects, interface')
+        ap.add_argument('--stems', default='', metavar='CATS',
+                        help='record these of music, voice, interface on sinks of their own (Stems.asi); '
+                             'the rest is the effects stem')
         a = ap.parse_args(rest)
+        mute = parse_categories(a.mute, what='--mute')
+        stems = parse_categories(a.stems, STEMS, what='--stems')
+        if set(mute) & set(stems):
+            ap.error(f'{", ".join(sorted(set(mute) & set(stems)))}: both muted and a stem')
+        if stems and a.audio:
+            ap.error('--stems records from the silent sinks; it cannot go with --audio')
         if a.assets and a.mod != 'refit':
             ap.error('--assets none goes with --mod refit')
         if a.stock_shell and a.mod != 'stock':
@@ -367,7 +378,7 @@ def cmd_session(argv):
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
         s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
                            label=a.label, installs=a.install, stock_shell=a.stock_shell,
-                           assets=a.assets)
+                           assets=a.assets, mute=mute, stems=stems)
         # A start that fails part-way (an install, the display, a launch the audio
         # guard stops) is torn down here like any session. Left alone it kept its sway,
         # input and VNC running and stayed "active" in `session list` with no game.

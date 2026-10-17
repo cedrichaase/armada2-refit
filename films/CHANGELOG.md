@@ -5,6 +5,21 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.4.0 — 2026-10-17
+
+### Added
+- Fields `Mute:` and `Stems:` (shot, section or film; the nearest wins): categories
+  muted in the take, and categories recorded as stems beside it
+  (`<variant>.music.wav`, `.voice.wav`, `.interface.wav`, and `.effects.wav` for the rest),
+  cut to the take's time line. In the spec only when set, so existing takes stay current.
+- `Audio:` takes a mix of stems, `effects + voice -6`, which the animatic plays; the
+  manifest gives each shot's `mute`, `stems` and `mix` and each take's `stems`.
+
+### Changed
+- With stems, a take's own track is the stems summed at unity, the whole of its sound.
+
+Installed, not yet seen in game.
+
 ## 1.3.0 — 2026-10-16
 
 ### Added

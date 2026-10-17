@@ -3,8 +3,11 @@
 throw-away git repository laid out like this one: a take is current until a file it
 depends on changes, committed or not; docs, the boards and the stock variant's unrelated
 layers do not count; a take filmed from uncommitted changes is current while the tree
-still has them; takes from before films 1.1.0 are read as they were written. Starts no
-game. Exit 0 when all of it holds.
+still has them; takes from before films 1.1.0 are read as they were written. And the
+sound fields (films 1.3.0): `Mute:` and `Stems:` inherited from film to section to shot,
+in a take's spec only when set, checked, passed to the bench, and an `Audio:` mix of
+stems rendered by the animatic from synthetic takes. Starts no game. Exit 0 when all of
+it holds.
 
     python3 films/film/selftest.py
 """
@@ -125,8 +128,144 @@ def main():
         check(state({}, t01, 'refit')[0] == 'unknown', 'a take with no commit is unknown')
         check(state(dict(commit='0123456'), t01, 'refit')[0] == 'unknown', 'a commit not in the repository is unknown')
 
+    audio_tests()
     print(f'\n{len(failed)} failed' if failed else '\nall ok')
     return 1 if failed else 0
+
+
+AUDIO_BOARD = """# Sound test
+Film: soundtest
+Stems: music, voice
+
+## Intros
+Mute: interface
+
+### m01 · A mission intro
+Kind: mission
+Scene: none
+Args: -nointro a2_borg01
+Length: 2
+Audio: effects + voice -6
+
+```action
+wait 2.5
+```
+
+### m02 · Its own sound
+Kind: mission
+Scene: none
+Mute: music, voice
+Stems: none
+Length: 2
+
+```action
+wait 2.5
+```
+
+## Plain
+
+### p01 · No fields
+Scene: planet
+Length: 2
+
+```action
+wait 2.5
+```
+
+### bad · Wrong fields
+Scene: planet
+Mute: music, drums
+Stems: voice, effects
+Audio: music + choir
+Length: 2
+
+```action
+wait 2.5
+```
+"""
+
+
+def mean_db(path):
+    r = subprocess.run(['ffmpeg', '-v', 'info', '-i', path, '-af', 'volumedetect', '-f', 'null', '-'],
+                       capture_output=True, text=True)
+    for line in r.stderr.splitlines():
+        if 'mean_volume' in line:
+            return float(line.split(':')[1].split()[0])
+    return None
+
+
+def audio_tests():
+    sys.path.insert(0, os.path.join(sb.REPO, 'testbench'))
+    from bench import session
+    from film import edit
+    with tempfile.TemporaryDirectory() as tmp:
+        write(tmp, 'films/soundtest/storyboard.md', AUDIO_BOARD)
+        film = sb.parse(os.path.join(tmp, 'films/soundtest/storyboard.md'))
+        m01, m02, p01, bad = (film.shot(i) for i in ('m01', 'm02', 'p01', 'bad'))
+        check(m01.stems == ['music', 'voice'] and m01.mute == ['interface'],
+              'Stems from the film and Mute from the section reach a shot')
+        check(m02.stems == [] and m02.mute == ['music', 'voice'], "a shot's own Mute and Stems: none win")
+        check(m01.audio == ('mix', [('effects', 0.0), ('voice', -6.0)]), 'Audio: effects + voice -6 parses')
+        check(p01.audio == ('game', []), 'no Audio is the game')
+        check(sb.stem_names(m01) == ['music', 'voice', 'effects'], 'a take with stems has an effects stem')
+        check(p01.stems == ['music', 'voice'] and p01.mute == [], "a section without them takes the film's")
+        plain = sb.parse(os.path.join(tmp, 'films/soundtest/storyboard.md'))
+        plain.fields.pop('Stems')
+        plain.sections[0].fields.pop('Mute')
+        spec = plain.spec(plain.shot('p01'), 'refit', 'probe')
+        check('mute' not in spec and 'stems' not in spec, 'a shot with neither has no mute or stems in its spec')
+        check(film.spec_hash(m01, 'refit', 'probe') != plain.spec_hash(plain.shot('m01'), 'refit', 'probe'),
+              'Mute and Stems change the spec hash, so the take is re-filmed')
+        probs = [m for s, m in sb.check(film) if s is bad]
+        check(any('drums' in m for m in probs), f'check: an unknown Mute category ({probs})')
+        check(any('Stems effects' in m for m in probs), 'check: effects is not a stem of its own')
+        check(any('choir' in m for m in probs), 'check: a mix names a stem the shot does not record')
+        check(not [m for s, m in sb.check(film) if s in (m01, m02, p01)], 'check: the good shots pass')
+        # the bench's side: ARMADA.PRF's third line, and the category names
+        prf = os.path.join(tmp, 'ARMADA.PRF')
+        with open(prf, 'wb') as f:
+            f.write(b'9704529\r\n1 3 1 2 0 0 1 0.28 1 1 0 \r\n20 20 20 20 16 1 1\r\nGPU\r\n'
+                    b'0.5 0.5 5 5 5 4 1280 720 32 1 \x00 0 1 0.625 \r\n1 0 1 0 150\r\n')
+        session.set_prf_volumes(prf, {'music': 0, 'voice': 0})
+        check(open(prf, 'rb').read().split(b'\r\n')[2] == b'0 0 20 20 16 1 1', 'Mute: music, voice in ARMADA.PRF')
+        session.set_prf_volumes(prf, {'voice': 20, 'interface': 0})
+        check(session.prf_volumes(prf) == dict(music=0, voice=20, effects=20, interface=0),
+              'a stem at full volume, the rest kept, the NUL line untouched')
+        check(b'\x00' in open(prf, 'rb').read(), '... the embedded NUL survives')
+        try:
+            session.parse_categories('music, effects', session.STEMS)
+            check(False, 'the bench refuses effects as a stem')
+        except session.GameError:
+            check(True, 'the bench refuses effects as a stem')
+        # the animatic: a take with a 440 Hz music stem, a silent effects stem, voice at 880 Hz
+        sb.a2env.DATA = tmp
+        stem = film.take(m01, 'refit', 'probe')
+        os.makedirs(os.path.dirname(stem), exist_ok=True)
+
+        def ff(*a):
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', *a], check=True)
+        ff('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '3', stem + '.effects.wav')
+        ff('-f', 'lavfi', '-i', 'sine=f=440:r=48000', '-ac', '2', '-t', '3', stem + '.music.wav')
+        ff('-f', 'lavfi', '-i', 'sine=f=880:r=48000', '-ac', '2', '-t', '3', stem + '.voice.wav')
+        ff('-f', 'lavfi', '-i', 'testsrc=s=320x180:r=30', '-i', stem + '.music.wav', '-i', stem + '.voice.wav',
+           '-filter_complex', '[1:a][2:a]amix=inputs=2:normalize=0[a]', '-map', '0:v', '-map', '[a]',
+           '-t', '3', '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'pcm_s16le', stem + '.mkv')
+        film.fields['Probe'] = '320x180'
+        levels = {}
+        for audio in ('effects + voice -6', 'effects', 'game', 'music'):
+            m01.fields['Audio'] = audio
+            out = os.path.join(tmp, 'seg.mkv')
+            edit.render_segment(film, m01, 'probe', out, 0, tmp)
+            levels[audio] = mean_db(out)
+        print('      levels:', levels)
+        check(levels['effects'] is not None and levels['effects'] < -80, 'Audio: effects is the silent stem alone')
+        check(levels['effects + voice -6'] is not None and levels['effects + voice -6'] > -60,
+              'Audio: effects + voice -6 carries the voice')
+        check(levels['game'] > levels['music'] > levels['effects + voice -6'],
+              'the whole take is louder than one stem, and -6 dB quieter still')
+        man = os.path.join(tmp, 'films', 'soundtest')
+        check(edit.stems_of(stem + '.mkv').keys() == {'effects', 'music', 'voice'}, 'the manifest finds the stems')
+        del man
 
 
 if __name__ == '__main__':

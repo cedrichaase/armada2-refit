@@ -62,6 +62,17 @@ def take_path(film, shot, variant, tier):
     return p if os.path.exists(p) else None
 
 
+def stem_file(mkv, cat):
+    """A take's stem beside its .mkv (<variant>.<cat>.wav), or None."""
+    p = mkv[:-4] + f'.{cat}.wav' if mkv and mkv.endswith('.mkv') else None
+    return p if p and os.path.exists(p) else None
+
+
+def stems_of(mkv):
+    """{cat: path} of the stems a take has."""
+    return {c: stem_file(mkv, c) for c in sb.CATEGORIES if stem_file(mkv, c)}
+
+
 def events(film, shot, variant, tier):
     try:
         return json.load(open(film.take(shot, variant, tier) + '.events.json')).get('events', [])
@@ -335,6 +346,7 @@ def render_shot(film, shot, tier, g, inputs, dur):
             _, has_a = probe_media(p)
             if has_a and (audio is None or v == variants[-1]):
                 audio = idx[v]
+                g.audio_take = (p, i0)      # whose stems an `Audio:` mix reads
             pre = f"[{idx[v]}:v]{CS},setpts=(PTS-STARTPTS)/{sp},"
             if crop:
                 x, y, w, h = crop
@@ -443,23 +455,45 @@ def render_segment(film, shot, tier, out, fade_out, tmp):
         chain.append(f'fade=t=out:st={dur - fade_out}:d={fade_out}')
     chain.append('format=yuv420p')
     g.add(f"{v}{','.join(chain)}[vout]")
-    # sound: the take's own, or silence
-    mode = (shot.get('Audio') or 'game').strip().lower()
+    # sound: the take's own, a mix of its stems, or silence
+    mode, terms = shot.audio
+    n_in = len([a for a in inputs if a == '-i'])
+    tempo, sp = '', speed(shot)
+    while sp > 1.001:
+        tempo += f",atempo={min(sp, 2.0)}"
+        sp /= min(sp, 2.0)
+    while sp < 0.999:
+        tempo += f",atempo={max(sp, 0.5)}"
+        sp /= max(sp, 0.5)
+    ends = f"afade=t=in:d=0.03,afade=t=out:st={max(0, dur - 0.05)}:d=0.05"
+    mixed = []
+    if audio is not None and mode == 'mix':
+        mp4, i0 = g.audio_take
+        for k, (name, gain) in enumerate(terms):
+            if name == 'game':
+                src = audio
+            else:
+                path = stem_file(mp4, name)
+                if not path:
+                    print(f'  {shot.id}: no {name} stem in {os.path.basename(mp4)}; left out')
+                    continue
+                src = len([a for a in inputs if a == '-i'])
+                inputs += ['-ss', str(i0), '-t', str(dur * speed(shot) + 0.5), '-i', path]
+            g.add(f"[{src}:a]aresample=48000,aformat=channel_layouts=stereo{tempo},volume={GAME_GAIN + gain}dB,"
+                  f"apad,atrim=duration={dur}[st{k}]")
+            mixed.append(f'[st{k}]')
+        if not mixed:
+            print(f'  {shot.id}: none of the stems of "Audio: {shot.get("Audio")}"; the take\'s own sound instead')
     n_in = len([a for a in inputs if a == '-i'])
     if audio is None or mode == 'none':
         inputs += ['-f', 'lavfi', '-t', str(dur), '-i', 'anullsrc=r=48000:cl=stereo']
         g.add(f"[{n_in}:a]atrim=duration={dur}[aout]")
+    elif mixed:
+        g.add(f"{''.join(mixed)}amix=inputs={len(mixed)}:normalize=0:duration=first,{ends}[aout]")
     else:
-        tempo, sp = '', speed(shot)
-        while sp > 1.001:
-            tempo += f",atempo={min(sp, 2.0)}"
-            sp /= min(sp, 2.0)
-        while sp < 0.999:
-            tempo += f",atempo={max(sp, 0.5)}"
-            sp /= max(sp, 0.5)
         gain = VO_GAIN if mode == 'vo' else GAME_GAIN
         g.add(f"[{audio}:a]aresample=48000,aformat=channel_layouts=stereo{tempo},volume={gain}dB,"
-              f"apad,atrim=duration={dur},afade=t=in:d=0.03,afade=t=out:st={max(0, dur - 0.05)}:d=0.05[aout]")
+              f"apad,atrim=duration={dur},{ends}[aout]")
     run([*inputs, '-/filter_complex', g.write(), '-map', '[vout]', '-map', '[aout]', '-t', str(dur),
          '-c:v', 'libx264', '-preset', 'veryfast' if tier == 'probe' else 'medium',
          '-crf', '18' if tier == 'probe' else '15', '-pix_fmt', 'yuv420p', '-r', str(film.fps),
@@ -675,6 +709,7 @@ def manifest(a):
                 t = dict(path=path if os.path.exists(path) else None, current=False)
                 if t['path']:
                     t['duration'], t['audio'] = probe_media(path)
+                    t['stems'] = stems_of(path) or None
                     try:
                         spec = json.load(open(stem + '.spec.json'))
                     except (OSError, ValueError):
@@ -698,6 +733,8 @@ def manifest(a):
             transition=dict(type=tr, seconds=td, overlap=round(ov, 3)),
             title=s.get('Title'), sub=s.get('Sub'), caption=(s.get('Caption') or 'bottom').lower(),
             audio=(s.get('Audio') or 'game').lower(), keys=s.get('Keys') or 'auto',
+            mix=[dict(stem=n, gain=gn) for n, gn in s.audio[1]] or None,
+            mute=s.mute or None, stems=s.stems or None,
             card=[dict(style=st, text=t) for st, t in s.card] or None,
             background=s.get('Background'),
             fields=s.fields, direction='\n'.join(s.prose).strip(),
