@@ -9,8 +9,11 @@
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
 # in vendor/, each file only if missing. Then the Direct3D chain the repository's ./install
 # sets up (chain/): crosire's d3d8to9 as d3d8.dll on DXVK's d3d9.dll, so dxvk.conf has
-# DXVK under it; the models are rewritten from the player's own
-# SOD files with python3; bloom is set up when a vkBasalt layer is installed. Textures,
+# DXVK under it. Render3D.asi (the 3D view) and UI.asi (the HUD, the menus and the
+# loading screen) draw on the Direct3D 9 device d3d8to9 gives them; where the chain is
+# left as it is, the UI's place is taken by the plugins it supersedes (HUD.asi, Menus.asi,
+# GridLayout.asi) and the 3D view stays the engine's. The models are rewritten from the
+# player's own SOD files with python3; bloom is set up when a vkBasalt layer is installed. Textures,
 # the menu backdrops and the replacement movies are built from the game's own art, so a
 # release cannot carry them.
 #
@@ -81,8 +84,8 @@ BLOOM_MARKER="# written by armada2-refit install.sh"
 MANIFEST="$game/armada2-refit-prereqs.txt"   # what the prerequisites step added
 
 step() { [ "${A2_PROGRESS:-}" != 1 ] || echo "::step $*"; }
-# The per-part plugins earlier packages and installs put in, replaced by Render3D.asi
-# (not in this package yet): taken out, so those parts are the engine's own again.
+# The per-part plugins earlier packages and installs put in, replaced by Render3D.asi:
+# taken out, in every case (a module of Render3D.asi stands down beside its old plugin).
 OLD_PLUGINS="MSAA Planets Lighting Sky Nebulae Surfaces Explosions Shields Repair Venting Specials Fog"
 old_plugins_out() {
     local n
@@ -92,6 +95,27 @@ old_plugins_out() {
         rm -f "$game/Sky"/mbg*.ini
         rmdir "$game/Sky" 2>/dev/null || true
     fi
+}
+
+# Render3D.asi's recipes (render3d/surfaces, render3d/nebulae): Surfaces/ and Nebulae/
+# in the game directory, only the files of these names; anything else there is the
+# player's.
+RECIPES="Surfaces Nebulae"
+recipes_out() {
+    local d f
+    for d in $RECIPES; do
+        [ -d "$game/$d" ] || continue
+        for f in "$here/game/$d"/*.ini; do
+            [ -e "$f" ] && rm -f "$game/$d/$(basename "$f")"
+        done
+        rmdir "$game/$d" 2>/dev/null || true
+    done
+}
+# The plugins UI.asi takes the place of (ui/supersede.sh), and Menus.asi's old name.
+LEGACY_UI="HUD Menus MenuScale GridLayout"
+legacy_ui_out() {
+    local n
+    for n in $LEGACY_UI; do rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"; done
 }
 
 is_proxy() { grep -q 'BinkProxy' "$1" 2>/dev/null; }
@@ -136,7 +160,7 @@ if [ -z "$PY" ] && command -v python3 >/dev/null 2>&1; then
 fi
 sods() {   # --install | --revert
     local s
-    for s in moon-sod select-sod hull-sod; do
+    for s in moon-sod select-sod hull-sod asteroid-sod; do
         A2_GAME="$game" "$PY" "$here/models/$s.py" "$1" 2>&1 | sed 's/^/    /' \
             || echo "  $s.py $1 failed -- the rest goes on"
     done
@@ -146,9 +170,11 @@ sods() {   # --install | --revert
 
 if [ "$action" = uninstall ]; then
     step uninstall "taking the mod out"
-    for n in HUD Menus QOL QOLRules GridLayout Online; do
+    for n in Render3D UI QOL QOLRules Online; do
         rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"
     done
+    legacy_ui_out
+    recipes_out
     old_plugins_out
     if [ -n "$PY" ] && [ -d "$here/models" ]; then
         echo "  the models back to stock:"; sods --revert
@@ -277,26 +303,48 @@ put() {   # file -- copy from the package into the game directory
     echo "  $f"
 }
 
-step hud "HUD"
-put HUD.asi; put HUD.ini
-rm -f "$game/MenuScale.asi" "$game/MenuScale.ini"   # Menus.asi's old name; never both
-old_plugins_out   # earlier packages' per-part plugins: those parts are the engine's own again
-step menus "menus"
-put Menus.asi; put Menus.ini
+# Render3D.asi and UI.asi need a Direct3D 9 device behind the game's d3d8: crosire's
+# d3d8to9, as the chain step puts in. Without it each would stand down to stock.
+d3d9=0; is_d3d8to9 "$game/d3d8.dll" && d3d9=1
+
+old_plugins_out   # earlier packages' per-part plugins: Render3D.asi's modules replace them
+step render3d "the 3D view"
+if [ "$d3d9" = 1 ]; then
+    put Render3D.asi; put Render3D.ini
+    recipes_out
+    for d in $RECIPES; do
+        mkdir -p "$game/$d"
+        cp "$here/game/$d"/*.ini "$game/$d/"
+        echo "  $d/ ($(ls "$here/game/$d" | wc -l | tr -d ' ') recipes)"
+    done
+else
+    rm -f "$game/Render3D.asi" "$game/Render3D.ini" "$game/Render3D.log"; recipes_out
+    echo "  Render3D.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the 3D view stays the engine's"
+fi
+step ui "the HUD and the menus"
+if [ "$d3d9" = 1 ]; then
+    legacy_ui_out   # UI.asi takes their place; each would stand down against the other
+    put UI.asi; put UI.ini
+else
+    # The UI cannot draw: the plugins it supersedes keep the HUD and menus widescreen.
+    rm -f "$game/UI.asi" "$game/UI.ini" "$game/UI.log" "$game/MenuScale.asi" "$game/MenuScale.ini"
+    echo "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the older plugins instead:"
+    put HUD.asi; put HUD.ini
+    put Menus.asi; put Menus.ini
+    put GridLayout.asi
+    # The player's [Cells] choices survive a reinstall; only a missing file is replaced.
+    if [ -e "$game/GridLayout.ini" ]; then echo "  GridLayout.ini (yours, kept)"; else put GridLayout.ini; fi
+fi
 step qol "quality of life"
 put QOL.asi; put QOL.ini
 # Pay on queue; against the computer only, it stands down in a network game.
 put QOLRules.asi; put QOLRules.ini
-step grid "grid keys"
-put GridLayout.asi
-# The player's [Cells] choices survive a reinstall; only a missing file is replaced.
-if [ -e "$game/GridLayout.ini" ]; then echo "  GridLayout.ini (yours, kept)"; else put GridLayout.ini; fi
 step models "models"
 if [ -n "$PY" ]; then
-    echo "  the moons, the selection bubble and the hulls, from your own SOD files:"
+    echo "  the moons, the selection bubble, the hulls and the asteroids, from your own SOD files:"
     sods --install
 else
-    echo "  moons, selection bubble and hulls skipped: needs python3"
+    echo "  moons, selection bubble, hulls and asteroids skipped: needs python3"
 fi
 # Internet - Online, on our own transport: Wine's dpnet.dll cannot host.
 step online "online multiplayer"

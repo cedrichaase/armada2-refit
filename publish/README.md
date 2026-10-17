@@ -103,12 +103,17 @@ without its history, which is full of stock art. So not every cited hash resolve
 Separate from the repository. **`publish/package.sh [<out-dir>]`** builds the plugins
 and writes `armada2-refit-<version>.zip`:
 
-- `game/`: what goes beside `Armada2.exe`, which is `HUD.asi`, `Menus.asi`, `QOL.asi`,
-  `QOLRules.asi`, `GridLayout.asi`, `Online.asi` and `binkw32.dll`, each with its
-  `.ini`, and `dxvk.conf` at stage 3 (`postfx/renderer-config.sh --print`). The package
-  leaves the 3D view to the engine: `Render3D.asi` is not in a release yet, and the
-  installers take out the per-part plugins (`MSAA`, `Planets`, `Lighting`, `Sky` and the
-  rest) that earlier packages put in, with the `Sky` recipes they copied;
+- `game/`: what goes beside `Armada2.exe`, which is `Render3D.asi`, `UI.asi`, `QOL.asi`,
+  `QOLRules.asi`, `Online.asi` and `binkw32.dll`, each with its `.ini`, Render3D's
+  recipes in `game/Surfaces/` and `game/Nebulae/`, and `dxvk.conf` at stage 3
+  (`postfx/renderer-config.sh --print`). `Render3D.asi` and `UI.asi` need a Direct3D 9
+  device behind `d3d8.dll`, so the installers put them in only where `d3d8.dll` is
+  crosire's d3d8to9 after the chain step, taking out `HUD.asi`, `Menus.asi` and
+  `GridLayout.asi` as `ui/supersede.sh` does; elsewhere those three, also in `game/`, go
+  in instead and the 3D view stays the engine's. Either way the installers take out the
+  per-part plugins (`MSAA`, `Planets`, `Lighting`, `Sky` and the rest) that earlier
+  packages put in, with the `Sky` recipes they copied. `package.sh` needs rustup's
+  cargo with the `i686-pc-windows-msvc` target for the two Rust plugins;
 - `chain/`: crosire's d3d8to9 (`d3d8.dll`) and DXVK 3.1.1's `d3d9.dll`, from
   `platform/vendor/`. `install.sh` puts them in unless a `d3d8.dll` or `d3d9.dll` there is
   none of GOG's, DXVK's or these; a DXVK `d3d9.dll` already there stays. What it
@@ -118,7 +123,8 @@ and writes `armada2-refit-<version>.zip`:
   there; `install.sh` on macOS puts only `d3d8.dll` in too, on Wine's wined3d, since
   DXVK cannot run Direct3D 9 on a Mac (D3DMetal, DXMT and CrossOver's DXVK cover
   Direct3D 10 to 12), and skips `dxvk.conf` and bloom there;
-- `models/` and `a2env.py`: `moon-sod.py`, `select-sod.py`, `hull-sod.py`, run by
+- `models/` and `a2env.py`: `moon-sod.py`, `select-sod.py`, `hull-sod.py`,
+  `asteroid-sod.py`, run by
   `install.sh` with python3 on the player's own SODs (`--revert` on `--uninstall`);
 - `bloom/`: `postfx/postfx.py --export`, which is the same bloom for vkBasalt and as a
   ReShade preset, and `shaders.txt`;

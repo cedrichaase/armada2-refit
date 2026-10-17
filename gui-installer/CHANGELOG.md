@@ -4,6 +4,21 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.6.0 — 2026-10-17
+
+Reads package schemas 0 and 1.
+
+### Added
+- Steps `render3d` ("Installing the 3D view") and `ui` ("Installing the HUD and the
+  menus"); `hud`, `menus` and `grid` stay for older packages.
+- Layer condition `when: d3d8to9`: the 3D view is skipped, and the HUD and menus are the
+  older plugins, where the chain step will not leave d3d8to9 as `d3d8.dll`.
+
+### Changed
+- An install is recognised by `UI.asi` as well as `HUD.asi`.
+
+Installed, not yet seen in game.
+
 ## 1.5.0 — 2026-10-12
 
 Reads package schemas 0 and 1; on Windows and macOS, only packages whose manifest names

@@ -5,6 +5,27 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.24.0 — 2026-10-17
+
+Layers: gui-installer 1.6.0.
+
+### Added
+- The release package carries `Render3D.asi` + `Render3D.ini` with its recipes
+  (`game/Surfaces/`, `game/Nebulae/`) and `UI.asi` + `UI.ini`; `install.sh` and
+  `install.ps1` install them in new steps `render3d` and `ui` when d3d8to9 is
+  `d3d8.dll`, and take out `HUD.asi`, `Menus.asi` and `GridLayout.asi`. Where the chain
+  is left as it is, those three go in instead and the 3D view stays the engine's.
+- `asteroid-sod.py` in the package's `models/`; the scripts smooth the asteroids too.
+
+### Changed
+- `manifest.json`: steps `render3d`, `ui` in place of `hud`, `menus`, `grid`; layers
+  `render3d` and `ui` (`when: d3d8to9`) in place of `hud`, `menus` and `grid`.
+- `publish/package.sh` builds `Render3D.asi` and `UI.asi` (rustup's cargo with
+  `i686-pc-windows-msvc`), which CI's package job now installs.
+- `--uninstall` / `-Uninstall` also take out `Render3D.*`, `UI.*` and the recipes.
+
+Installed, not yet seen in game.
+
 ## 12.23.0 — 2026-10-17
 
 Layers: render3d 0.14.0.

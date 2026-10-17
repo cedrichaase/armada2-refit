@@ -114,15 +114,16 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 | `linux` | `script` (`install.sh`), `uninstall` (its flag), `progress` (the variable) |
 | `windows`, `macos` | the same for those systems (`install.ps1`, `-Uninstall`; `install.sh`). The Windows and macOS installers install only a package that has its entry (`Package.for_system`): before 11.20.0, `install.ps1` printed no progress and `install.sh` did not run on a Mac. Adding them was not a new schema, since the Linux installer reads such a package as before |
 | `steps` | the `::step` ids `install.sh` prints, in order: the progress bar's denominator |
-| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `vkbasalt` |
+| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `vkbasalt`, `d3d8to9` (Render3D, UI: needs d3d8to9 as `d3d8.dll` after the chain step) |
 | `not_included[]` | `id`, `name`, `summary`: shown as not available (textures) |
 
 ## Progress
 
 `install.sh` and `install.ps1` with `A2_PROGRESS=1` print `::step <id> <what>` as each
-stage starts (`verify`, `prereqs`, `chain`, `hud`, `menus`, `qol`, `grid`, `models`,
-`online`, `cutscenes`, `renderer`, `bloom`, `done`; `uninstall`; before 12.0.0 also
-`lighting`, `sky` and `msaa`). The window maps the ids to its status line
+stage starts (`verify`, `prereqs`, `chain`, `render3d`, `ui`, `qol`, `models`,
+`online`, `cutscenes`, `renderer`, `bloom`, `done`; `uninstall`; before 12.24.0 `hud`,
+`menus` and `grid` in place of `render3d` and `ui`, and before 12.0.0 also `lighting`,
+`sky` and `msaa`). The window maps the ids to its status line
 (`STATUS` in the script: "Refitting the HUD", "Installing lighting"…) and fills its
 segmented bar: download 0–30 %, unpack, the script's steps 35–92 %, Heroic, done. A
 schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).

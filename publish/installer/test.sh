@@ -53,6 +53,9 @@ check '[ -z "$(ls "$G" | grep -E "^(MSAA|Planets|Lighting|Sky|Fog|Specials)\.(as
 check '[ "$(ls "$G/Sky")" = myown.ini ]'
 check '[ -e "$G/QOL.asi" ] && [ -e "$G/QOL.ini" ]'
 check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
+# The chain was left as it is: no Render3D.asi or UI.asi, the older plugins in the UI's place.
+check '[ ! -e "$G/Render3D.asi" ] && [ ! -e "$G/UI.asi" ] && [ ! -e "$G/Surfaces" ] && grep -q "Render3D.asi skipped" "$T/out"'
+check '[ -e "$G/HUD.asi" ] && [ -e "$G/Menus.asi" ] && [ -e "$G/GridLayout.asi" ] && [ -e "$G/GridLayout.ini" ]'
 [ -n "$syslayer" ] || check '[ ! -e "$B" ]'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
@@ -67,11 +70,17 @@ else
 fi
 
 echo "== DXVK takes the d3d8 slot; reinstall with a vkBasalt layer and an edited .ini"
-echo dxvk > "$G/d3d8.dll"; echo "; mine" >> "$G/HUD.ini"
+echo dxvk > "$G/d3d8.dll"; echo "; mine" >> "$G/QOL.ini"
 mkdir -p "$XDG_DATA_HOME/vulkan/implicit_layer.d"; echo '{}' > "$XDG_DATA_HOME/vulkan/implicit_layer.d/vkBasalt.x86.json"
+mkdir -p "$G/Surfaces"; echo "[Surface]" > "$G/Surfaces/myown.ini"
 "$P/install.sh" "$G" > "$T/out"
 check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
-check 'grep -q "; mine" "$G/HUD.ini.bak"'
+check 'grep -q "; mine" "$G/QOL.ini.bak"'
+# d3d8to9 is in now: Render3D.asi with its recipes, UI.asi in place of the older three.
+check '[ "$(sum "$G/d3d8.dll")" = "$(sum "$D3D8TO9")" ]'
+check 'cmp -s "$P/game/Render3D.asi" "$G/Render3D.asi" && cmp -s "$P/game/UI.asi" "$G/UI.asi" && [ -e "$G/UI.ini" ]'
+check '[ "$(count "$G/Nebulae")" = "$(count "$P/game/Nebulae")" ] && [ "$(count "$G/Surfaces")" = "$(( $(count "$P/game/Surfaces") + 1 ))" ]'
+check '[ -z "$(ls "$G" | grep -E "^(HUD|Menus|GridLayout)\.(asi|ini)$")" ]'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 if [ "$mac" = 0 ]; then
     check '[ -s "$B/Shaders/MagicBloom.fx" ] && [ -s "$B/Shaders/ReShade.fxh" ] && [ -s "$B/Shaders/ReShadeUI.fxh" ]'
@@ -130,8 +139,9 @@ echo "[Sky]" > "$G/Sky/myown.ini"   # a recipe of the player's own stays
 "$P/install.sh" --uninstall "$G" > "$T/out"
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
 check '[ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/binkw32.dll.a2neb-backup" ]'
-check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|QOL|Online)\.ini$")" ]'
-check '[ "$(ls "$G/Sky")" = myown.ini ]'
+check '[ -z "$(ls "$G" | grep -E "\.(asi|log)$|^dxvk\.conf$|^BinkProxy|^(HUD|Menus|GridLayout|QOL|Online|UI|Render3D)\.ini$")" ]'
+check '[ "$(ls "$G/Sky")" = myown.ini ] && [ "$(ls "$G/Surfaces")" = myown.ini ] && [ ! -e "$G/Nebulae" ]'
+rm -rf "$G/Surfaces"
 rm -rf "$G/Sky"
 check '[ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-prereqs.txt" ]'
 check '[ "$(cat "$G/UltimateASILoader-license.txt")" = mine ] && grep -q "left UltimateASILoader-license.txt" "$T/out"'
@@ -146,7 +156,7 @@ printf '#!/bin/sh\necho "$1" >> "%s"\nexec python3 "$@"\n' "$T/py.log" > "$T/my 
 chmod +x "$T/my python/py"
 A2_PYTHON="$T/my python/py" "$P/install.sh" "$H" > "$T/out"
 check '[ "$(cat "$H/winmm.dll")" = myloader ] && [ -e "$H/STA2WidescreenPatch.asi" ]'
-check 'grep -q "models/moon-sod.py$" "$T/py.log" && grep -q "models/hull-sod.py$" "$T/py.log"'
+check 'grep -q "models/moon-sod.py$" "$T/py.log" && grep -q "models/hull-sod.py$" "$T/py.log" && grep -q "models/asteroid-sod.py$" "$T/py.log"'
 A2_PYTHON="$T/my python/py" "$P/install.sh" --uninstall "$H" >/dev/null
 check '[ "$(cat "$H/winmm.dll")" = myloader ] && [ ! -e "$H/STA2WidescreenPatch.asi" ]'
 check '[ "$(cat "$H/dxvk.conf")" = "d3d9.foo = 1" ] && [ "$(cat "$H/d3d8.dll")" = gogd3d8to9 ]'
