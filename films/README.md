@@ -33,7 +33,8 @@ an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8
    titles. Prose is welcome anywhere: what the tool does not read is direction for the
    person (or agent) who cuts the film.
 2. **Probe.** `a2film probe` films every shot without a current take at 1280x720, several games in
-   parallel (`--jobs`, default 4), and makes a contact sheet per take. Probes are cheap
+   parallel (`--jobs`, default 4; each game waits for a machine-wide game slot, so above
+   the slot count they queue: `./a2film slots`, testbench README "Game slots"), and makes a contact sheet per take. Probes are cheap
    and exist to get the *direction* right: framing, angle, timing, what is in the shot.
 3. **Review.** `a2film sheet` and `a2film animatic` show the whole film at once. Notes go
    back into the board, and each shot's `Status:` moves on.
@@ -268,6 +269,18 @@ House style for showcase footage (from the October showcase):
   section, and **never two music sources at once**.
 - A UI feature gets a close crop held long enough to follow, with a key hint per press
   (about 18 s for the grid hotkeys; 5 s was far too short).
+
+## Game slots and retries
+
+A take starts its session in a game slot (`testbench/bench/slots.py`): at most `A2_SLOTS`
+games run on the machine at once, whoever started them, and a take waits for a free one.
+A shot with `Players` takes the slots of all its players in one request, so two such shots
+cannot deadlock. `./a2film slots` shows who holds them.
+
+A take whose game dies with it (crashed, killed under load, never launched, gone before the
+scene was built or at the end of the action) is filmed once more from a fresh session; a
+shot with `Players` is filmed again as a whole. A second death fails the take. Any other
+failure is not retried.
 
 ## Traps
 

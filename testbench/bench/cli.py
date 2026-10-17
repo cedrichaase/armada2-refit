@@ -14,6 +14,7 @@ from pathlib import Path
 from . import config, report, vision
 from .scenario import STEPS, Case, normalise, parse, ref_label
 from .session import GameError, Session, build_input
+from .slots import SlotError
 
 HELP = """\
 a2test -- run Armada II headless and test it end to end
@@ -40,6 +41,8 @@ a2test -- run Armada II headless and test it end to end
                                        menus), gather logs, write the report. The id is
                                        required: nothing stops a session by default
   a2test session list                  active sessions: id, size, mod, game, artifacts
+  a2test slots                         the machine-wide game slots: who holds them, who waits
+                                       (A2_SLOTS sets how many; a run queues for them)
   a2test watch [--no-open]             every live session, view-only, tiled in one
                                        window (wayvnc + noVNC; needs wayvnc)
   a2test drive [--session ID] ...      every drive command takes --session ID (or
@@ -101,10 +104,13 @@ def main(argv=None):
             return cmd_session(rest)
         if cmd == 'drive':
             return cmd_drive(rest)
+        if cmd == 'slots':
+            from . import slots
+            return slots.main(rest)
         if cmd == 'watch':
             from . import watch
             return watch.main(rest, _active_sessions)
-    except GameError as e:
+    except (GameError, SlotError) as e:
         print(f'a2test: {e}', file=sys.stderr)
         return 1
     print(f'a2test: unknown command {cmd!r} (a2test help)', file=sys.stderr)
@@ -126,7 +132,7 @@ def cmd_run(argv):
     ap.add_argument('--out')
     ap.add_argument('--install', action='append', default=[], metavar='PATH')
     ap.add_argument('-j', '--jobs', type=int, default=config.JOBS,
-                    help=f'game instances at once (default {config.JOBS}; 1 = one case at a time)')
+                    help=f'cases at once (default {config.JOBS}; 1 = one case at a time); each waits for a game slot, so above A2_SLOTS they queue')
     a = ap.parse_args(argv)
     a.jobs = max(1, a.jobs)
     scns = [parse(_find_scenario(s)) for s in a.scenarios]

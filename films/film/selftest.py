@@ -56,6 +56,33 @@ def commit(repo, msg):
     return code.head(repo)
 
 
+def retry_checks():
+    """A take that dies with the game is tried once more, and only once."""
+    from film import shoot
+    tmp = tempfile.mkdtemp()
+
+    def make(outcomes):
+        t = shoot.Take.__new__(shoot.Take)
+        t.stem, t.tag, t.sid, t.sess = os.path.join(tmp, 'take'), 'x/stock', None, None
+        t.calls = 0
+
+        def attempt():
+            o = outcomes[t.calls]
+            t.calls += 1
+            if isinstance(o, Exception):
+                raise o
+            return o
+        t.attempt = attempt
+        return t
+
+    t = make([shoot.GameDied('the game died'), True])
+    check(t() is True and t.calls == 2, 'a take whose game died is filmed again and can succeed')
+    t = make([shoot.GameDied('the game died'), shoot.GameDied('again')])
+    check(t() is False and t.calls == 2, '... but only once')
+    t = make([RuntimeError('a mistake in the board'), True])
+    check(t() is False and t.calls == 1, 'any other failure is not retried')
+
+
 def main():
     with tempfile.TemporaryDirectory() as repo:
         git(repo, 'init', '-q')
@@ -125,6 +152,7 @@ def main():
         check(state({}, t01, 'refit')[0] == 'unknown', 'a take with no commit is unknown')
         check(state(dict(commit='0123456'), t01, 'refit')[0] == 'unknown', 'a commit not in the repository is unknown')
 
+    retry_checks()
     print(f'\n{len(failed)} failed' if failed else '\nall ok')
     return 1 if failed else 0
 

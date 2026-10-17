@@ -5,6 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.31.0 — 2026-10-17
+
+### Added
+- Game slots (`bench/slots.py`): one machine-wide queue for game instances, `N` flock
+  files under `$A2_SLOTS_DIR` (default `$XDG_RUNTIME_DIR/a2-slots`, else
+  `$A2_DATA/locks`). `Session.create` takes a slot (or one handed down in `A2_SLOT_FD`)
+  and the session's sway and launcher hold it until teardown; `a2test run` takes one per
+  case, all of a `Players:` case's at once. `--jobs` above the count queues.
+- `A2_SLOTS` (environment, or `armada2-refit.conf`) sets the count; the default is 2 to 3
+  from cores and memory. `A2_SLOTS_DIR`, `A2_SLOTS_POLL`.
+- `a2test slots`: holders (pid, worktree, label, session, since) and waiters.
+- `bench/slots_selftest.py`: dummy-process checks of the queue.
+
+Tested with dummy processes and three real session starts; not yet seen under load.
+
 ## 3.30.0 — 2026-10-17
 
 ### Added

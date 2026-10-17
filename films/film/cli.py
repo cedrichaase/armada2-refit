@@ -121,6 +121,10 @@ def status(a):
 
 
 def main(argv):
+    if argv and argv[0] == 'slots':       # the machine-wide game slots: no board needed
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'testbench'))
+        from bench import slots
+        return slots.main()
     # the other commands register themselves on import
     from . import shoot  # noqa: F401
     try:

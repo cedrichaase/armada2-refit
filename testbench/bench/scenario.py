@@ -32,7 +32,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, judge, vision
+from . import config, judge, slots, vision
 from .log import Log
 from .session import GameError, Session
 
@@ -711,12 +711,12 @@ class Case:
 
     # -- running
 
-    def _new_session(self, artifacts, label):
+    def _new_session(self, artifacts, label, slot=None):
         return Session.create(artifacts, self.res, mod=self.mod, stock_shell=self.scn.stock_shell,
                               assets=self.scn.assets or None, vnc=self.opts.get('vnc'),
                               record=self.opts.get('record'), audio=self.opts.get('audio'),
                               keep=self.opts.get('keep'), label=label,
-                              installs=self.opts.get('installs') if self.mod == 'refit' else None)
+                              installs=self.opts.get('installs') if self.mod == 'refit' else None, slot=slot)
 
     def _bring_up(self, sess, player=None):
         sess.clone()
@@ -753,13 +753,21 @@ class Case:
             self.dir.mkdir(parents=True, exist_ok=True)
             Log(self.dir).meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps),
                                players=', '.join(self.scn.players))
-            for p in self.scn.players:
-                sess = self._new_session(self.dir / p, f'{self.name}/{p}')
-                sess.log = _PlayerLog(self.dir, p)
-                self.sessions[p] = sess
+            # all the players' slots at once (slots.py): never one game waiting on another's
+            held = slots.acquire(self.name, n=len(self.scn.players), say=self.say, stop=self.opts.get('stop'))
+            try:
+                for p, slot in zip(self.scn.players, list(held)):
+                    sess = self._new_session(self.dir / p, f'{self.name}/{p}', slot=slot)
+                    held.remove(slot)           # the session owns it now
+                    sess.log = _PlayerLog(self.dir, p)
+                    self.sessions[p] = sess
+            finally:
+                for slot in held:
+                    slot.release()
             self.sess = self.sessions[self.scn.players[0]]
         else:
-            self.sess = self._new_session(self.dir, self.name)
+            slot = slots.acquire(self.name, say=self.say, stop=self.opts.get('stop'))[0]
+            self.sess = self._new_session(self.dir, self.name, slot=slot)
             self.log.meta(scenario=self.scn.title, file=str(self.scn.path), steps=len(self.scn.steps))
         try:
             if self.sessions:

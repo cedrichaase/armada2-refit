@@ -66,6 +66,10 @@ running, left at least 5.5 GB available and swap untouched, at a peak load of 17
 (run 20260926-142801). Past that, fixed waits such as "Wait 45 seconds" risk turning
 flaky.
 
+Since testbench 3.31.0 `--jobs` above the slot count queues: see "Game slots" below. The
+measurement above was taken before slots; two stock probes died at four games at once
+under load (2026-10-17), which is what the slots are for.
+
 **A case can run several games** (`Players: host, joiner`), each with all of the above
 to itself, steps addressed by player name (`scenarios/README.md`, "Several players").
 `multiplayer-two-players` hosts, joins and plays a match that way in under four
@@ -325,6 +329,45 @@ output: `vncviewer localhost:5910` (the port is printed; it counts up if busy). 
 writes each case to `run.mp4` with `wf-recorder`. All are optional and need `wayvnc`
 (and `wf-recorder`, or a viewer such as `tigervnc`). Without them the bench warns and
 carries on, and `watch` refuses.
+
+## Game slots
+
+Several agents run the game on the bench at once, from separate worktrees and processes
+(`a2test run --jobs`, `a2film probe --jobs`, interactive sessions), and the machine
+carries only so many games: four at once killed two stock probes. So every place that
+starts a game takes a **slot** first, from one queue shared by the whole machine
+(`bench/slots.py`). When all are taken it waits, and prints who holds them.
+
+- **How.** `N` files `slot-0` ... under `$A2_SLOTS_DIR` (default `$XDG_RUNTIME_DIR/a2-slots`,
+  else `$A2_DATA/locks`). A slot is taken while some process holds `flock` on its file. The
+  kernel drops the lock when the last holder exits, a crash or `kill -9` included, so a
+  slot never stays taken by a dead process. `slot-K.json` beside it says who has it (pid,
+  worktree, label, since); it is information only, and the lock is the truth.
+- **What holds a slot.** A bench session, from before its clone to its teardown: the file
+  descriptor is inherited by the session's sway and game launcher, so the slot outlives
+  the `a2test session start` that took it and is freed by `session stop`, or by the
+  session's processes dying. `a2test run` takes one per case, `a2film` one per take.
+- **Several games at once.** A case with `Players:` and an a2film shot with `Players`
+  take all their slots in one request: all or none, and only the oldest waiter tries.
+  Two such shots therefore cannot each hold one and wait for the other, and a shot that
+  needs two slots is not overtaken for ever by single games. A request for more slots
+  than exist is refused (raise `A2_SLOTS`). The cost is that a small request waits behind
+  a large one in front of it.
+- **How many.** `A2_SLOTS` in the environment, else `A2_SLOTS=3` in
+  `~/.config/armada2-refit.conf` (the file `a2env.sh` reads), else a default from the
+  machine: one game per 4 cores and per 5 GiB of memory, from 2 to 3 (3 on 12 cores and
+  15 GiB). The GPU is not measured. `--jobs` above the count just queues. Every process
+  should see the same count; one that is set lower or higher takes slots by the number it
+  believes in.
+- **Where it looks.** `A2_SLOTS_DIR` moves the files; `A2_SLOTS_POLL` (default 1 s) is how
+  often a waiter looks.
+- **`./a2test slots`** (and `./a2film slots`) lists the slots, their holders and the
+  queue. A waiter prints the same holders when it starts waiting, and every 30 s.
+- **Old code.** A checkout from before 3.31.0 does not know the slots and neither takes
+  one nor is stopped by them; only processes running this code queue.
+
+`python3 testbench/bench/slots_selftest.py` checks all of it with dummy processes
+and no game.
 
 ## Requirements
 

@@ -28,7 +28,7 @@ import uuid
 import time
 from pathlib import Path
 
-from . import config
+from . import config, slots
 from .log import Log
 
 
@@ -123,12 +123,25 @@ class Session:
         self.work = Path(state['work'])          # clone, sockets, fifos: deleted
         self.res = tuple(state['res'])
         self.log = Log(self.dir)
+        self.slot = None         # the game slot, in the process that created the session
 
     # ------------------------------------------------------------------ lifecycle
 
     @classmethod
     def create(cls, artifacts_dir, res, mod='refit', vnc=False, record=False,
-               audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None):
+               audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None, slot=None):
+        """`slot`: a game slot already taken for this session (several at once for a
+        multi-player case, or handed down in A2_SLOT_FD); without one, waits for a slot here."""
+        slot = slot or slots.adopt_from_env() or slots.acquire(label or 'session')[0]
+        try:
+            return cls._create(artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell,
+                               installs, assets, slot)
+        except BaseException:
+            slot.release()
+            raise
+
+    @classmethod
+    def _create(cls, artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell, installs, assets, slot):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
             n = next(_SID_SEQ)
@@ -149,6 +162,8 @@ class Session:
                      created=now(), pids={}, env={}, shots=0, game_started=None,
                      exception_mtime=None, vnc_port=None)
         sess = cls(state, work / 'session.json')
+        sess.slot = slot
+        slot.describe(session=sid, pid=os.getpid(), worktree=str(config.REPO))
         sess.save()
         (artifacts_dir / 'session.json').write_text(json.dumps({'statefile': str(sess.statefile)}))
         sess.log.meta(session=sid, resolution=config.res_name(res),
@@ -289,8 +304,11 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                    WLR_LIBINPUT_NO_DEVICES='1', WLR_RENDER_DRM_DEVICE=_render_node())
         slog = open(self.dir / 'logs' / 'sway.log', 'w')
         p = subprocess.Popen(['sway', '-c', str(conf)], env=env, stdout=slog, stderr=subprocess.STDOUT,
-                             stdin=subprocess.DEVNULL, start_new_session=True, cwd=str(self.work))
+                             stdin=subprocess.DEVNULL, start_new_session=True, cwd=str(self.work),
+                             pass_fds=self._slot_fds())
         self.s['pids']['sway'] = p.pid
+        if self.slot:       # the session's processes hold the slot from here: it outlives this one
+            self.slot.describe(pid=p.pid)
         for _ in range(100):
             if envfile.exists():
                 break
@@ -311,6 +329,11 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             self.start_vnc()
         if self.s['record']:
             self.start_recording()
+
+    def _slot_fds(self):
+        """The slot's descriptor, for the processes that make up the session to inherit
+        (slots.py): it is taken while any of them lives."""
+        return (self.slot.fd,) if self.slot and self.slot.fd is not None else ()
 
     def wl_env(self):
         e = self.s['env']
@@ -533,7 +556,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         wlog.flush()
         p = subprocess.Popen(['python3', str(config.UMU), str(g / 'Armada2.exe'), *args.split()],
                              env=env, cwd=str(g), stdout=wlog, stderr=subprocess.STDOUT,
-                             stdin=subprocess.DEVNULL, start_new_session=True)
+                             stdin=subprocess.DEVNULL, start_new_session=True, pass_fds=self._slot_fds())
         self.s['pids']['launcher'] = p.pid
         self.s['game_started'] = time.time()
         self.s['launch_args'] = args
@@ -855,6 +878,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                     kill_group(pid, signal.SIGKILL)
             self.s['ended'] = now()
             self.save()
+            if self.slot:
+                self.slot.release()
             shutil.copy2(self.statefile, self.dir / 'logs' / 'session-state.json')
             if not self.s['keep']:
                 for _ in range(5):
