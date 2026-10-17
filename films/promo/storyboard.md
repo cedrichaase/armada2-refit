@@ -541,13 +541,14 @@ The same bed. The argument: the HUD is redrawn too, in LCARS and in the colours 
 player's race, with every panel where stock had it, laid out for the screen at any aspect
 ratio. One beat here; the deeper look gets a video of its own.
 
-**The race must match in both takes**: the bench's HUD race came up Federation, Borg or
-Klingon on different launches (`ui/HUD.md`, "Seen on the bench"), and stock's skin follows
-it too. Re-probe a pair until both are the same race, until Scene.asi can pin it.
+**The race is pinned to the Federation** in these shots and the QOL ones (`Race=` in
+`hud-showcase.ini`, `qol.ini`, `warp.ini`; Scene.asi, testbench 3.32.0), so stock's skin
+and the UI's theme match in every take. The choice of race is the user's; Federation goes
+with the menus' fleet.
 
 ### u01 · The HUD in battle
 Shows: hud
-Scene: showcase
+Scene: hud-showcase.ini
 Variants: stock, refit
 Layout: wipe
 Transition: dissolve 0.8
@@ -574,7 +575,7 @@ wait 9
 
 ### u02 · The info panel, close
 Shows: hud: info panel
-Scene: showcase
+Scene: hud-showcase.ini
 Variants: stock, refit
 Layout: wipe
 Crop: 0.22 0.44 0.56 0.56
@@ -771,7 +772,7 @@ wait 5
 
 ### g05 · Long moves at warp
 Shows: qol: warp
-Scene: warp
+Scene: warp.ini
 Variants: refit
 Layout: full refit
 Transition: dissolve 0.4
