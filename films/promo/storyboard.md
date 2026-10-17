@@ -516,7 +516,7 @@ wait 3
 ptr 330 561 0.6
 wait 3
 ptr 330 639 0.6
-wait 6
+wait 7.5
 ```
 
 ### m03 · Into warp
