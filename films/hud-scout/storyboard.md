@@ -86,6 +86,11 @@ Status: draft
 As in the promo: twenty-four destroyers dragged into one selection.
 
 ```setup
+# The RTS camera's zoom at the start varies from launch to launch (close in on
+# 2026-10-17, far out for the promo's probe): out to the limit, then a fixed count in,
+# so the block sits where the drags reach (x 0.44-0.70, y 0.41-0.68).
+step Press ctrl+Down 150 times
+step Press ctrl+Up 35 times
 ptr 400 640 0.1
 wait 2
 ```
@@ -111,9 +116,15 @@ Status: draft
 
 As in the promo: half the block to group 1, the other half added with Shift+1, then 1
 calls up all twenty-four. In the promo's probe the second drag began under the bar,
-which sat over the block's left column, and missed it.
+which sat over the block's left column, and missed it; in this board's first probe the
+camera started close in and each drag caught a few ships only.
 
 ```setup
+# The RTS camera's zoom at the start varies from launch to launch (close in on
+# 2026-10-17, far out for the promo's probe): out to the limit, then a fixed count in,
+# so the block sits where the drags reach (x 0.44-0.70, y 0.41-0.68).
+step Press ctrl+Down 150 times
+step Press ctrl+Up 35 times
 lclick 400 640
 wait 1
 ```
