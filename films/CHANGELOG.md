@@ -16,7 +16,7 @@ in [`README.md`](README.md).
   `In` and `Length` it gives) and `Expect:` (checked after filming; a take that misses
   it is `suspect`, re-filmed by `probe`/`take`, not current in the manifest).
 - The manifest's takes carry `marks`, `cut` and `expect`; the board `films/marks` and
-  `films/film/selftest_marks.py`.
+  `films/film/selftest_marks.py` (1aacd31).
 
 Tooling only; nothing to see in game.
 

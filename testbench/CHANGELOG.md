@@ -14,7 +14,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   weapon ODF (beams included), explosions, crafts destroyed and removed, commands and
   specials. Read each frame from the camera hook; nothing new is patched.
 - Scene-file section `[Marks]` (`Enable`, `FireGap`, `Still`) and the command `marks`.
-- The bench clears `Scene.marks` at launch and gathers it with the logs.
+- The bench clears `Scene.marks` at launch and gathers it with the logs (1aacd31).
 
 Installed, not yet seen in game (seen on the bench 2026-10-17, `films/marks`).
 

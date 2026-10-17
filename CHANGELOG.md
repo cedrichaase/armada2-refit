@@ -12,7 +12,7 @@ Layers: testbench 3.31.0, films 1.4.0.
 ### Added
 - Event marks for films: `Scene.asi` logs timestamped events per take, `a2film` keeps
   them as `<take>.marks.json`, lists them (`a2film marks`), suggests `In`/`Length` from
-  them (`Cut:`) and checks a shot's `Expect:` after filming.
+  them (`Cut:`) and checks a shot's `Expect:` after filming (1aacd31).
 
 Installed, not yet seen in game.
 
