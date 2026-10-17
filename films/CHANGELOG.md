@@ -5,6 +5,14 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.4.0 — 2026-10-17
+
+### Added
+- `films/assimilation`: the Borg technology assimilation beam on a Sovereign, stock
+  and refit in a wipe, close (`as01`) and a little wider (`as02`), against dark sky.
+
+Installed, not yet seen in game.
+
 ## 1.3.0 — 2026-10-16
 
 ### Added

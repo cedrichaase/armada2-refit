@@ -5,6 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.31.0 — 2026-10-17
+
+### Added
+- Scene command `tech <team | object> <item> [on|off]` and object key `Tech=`: a
+  tech-tree item made available to a team as if researched, possible again where the
+  map's tree forbids it.
+- Scene `assimilation`: a Borg cube and an enemy Sovereign whose corbomite is
+  available, so the technology assimilation beam holds (about 6 s).
+
+### Fixed
+- Scenario `specials`: the assimilation beam now forms (`tech tgt gcorbom` before it
+  is fired); it ended on the tick it was fired, because `a2_borg01`'s tech tree makes
+  the Sovereign's corbomite impossible.
+
+Installed, not yet seen in game.
+
 ## 3.30.0 — 2026-10-17
 
 ### Added
