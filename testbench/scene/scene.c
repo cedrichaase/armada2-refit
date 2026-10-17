@@ -83,6 +83,12 @@
  *     leaves it "random" when the map names none (a2_borg01 names none), which
  *     Program::GameOpenPreLoad then draws at random. With Race= set both calls
  *     go to race_find(), which finds that race instead; see race_find().
+ *   A mission script's captions -- the intro cinematics' subtitles, the stardate
+ *     lower thirds and the mission's title -- come from ScriptInterfaceImp::ShowTitle
+ *     (0x454ff0) and ShowSubtitle (0x4550c0), each one call to OverlayText::
+ *     AddMessage (0x5061e0) on overlayText, at 0x455081 and 0x45510c. With
+ *     Captions=0 both calls go to caption_add(), which adds nothing; see
+ *     captions_hook().
  *   Marks (Scene.marks) are read, never patched: each frame, from the camera hook,
  *     the camera matrix, the selection, the scene's crafts' cloaks and deaths,
  *     Ordnance::ordnanceList (0x771fac; owner +0x5c, target +0x60, its ODF through
@@ -237,6 +243,10 @@ int _fltused = 0;   /* floats without the CRT */
 #define DEFAULT_RACE_2   0x489872u   /* the same, on its other branch */
 #define START_MUSIC      0x4586c0u   /* StartMusic(long, int): cdecl, starts a music track */
 #define NEW_TRACK        0x463680u   /* JukeBox::mStartNewTrack: thiscall, no arguments, the in-mission music */
+#define OVERLAY_ADD      0x5061e0u   /* OverlayText::AddMessage(x, y, justify, text, colour, fade in, font): thiscall, ret 0x1c,
+                                      * the message's key */
+#define SHOW_TITLE_CALL  0x455081u   /* ScriptInterfaceImp::ShowTitle: call OverlayText::AddMessage */
+#define SHOW_SUB_CALL    0x45510cu   /* ScriptInterfaceImp::ShowSubtitle: the same */
 #define TOOLTIP_ON_CALL  0x508070u   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::TooltipOn */
 #define HOVER_SIM_CALL   0x5080fcu   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::MouseOn -> +0x7c */
 #define HOVER_PRE_CALL   0x508e72u   /* SelectionDisplay::PreRender: call DisplayInterface::MouseOn -> hover effect */
@@ -2400,6 +2410,60 @@ bad:
     logline("race: NOT PATCHED: Race::Find or its calls differ -- the game's own race");
 }
 
+/* Captions off. A mission script shows its captions -- the subtitles over an intro
+ * cinematic, the stardate lower third, the mission's title -- through
+ * ScriptInterfaceImp::ShowTitle and ShowSubtitle, which each make one call to
+ * OverlayText::AddMessage on overlayText and return the key it gives; the script
+ * later hands that key to RemoveTitle / RemoveSubtitle, which look it up in the
+ * overlay's map (FadeMessage, RemoveMessage) and do nothing when it is not there.
+ * With Captions=0 both calls come here instead, which adds nothing and returns -1,
+ * a key AddMessage never gives (it counts up from 0): no message exists, so neither
+ * stock's OverlayText::Render nor UI.asi's overlay (which reads the same map) draws
+ * one, and the script's timing is its own. Other overlay messages (the game's own
+ * calls of AddMessage, such as the game-over message) are untouched. */
+static int g_captions_seen;
+
+static int __thiscall caption_add(void *overlay, int x, int y, int justify, const char *text,
+                                  const void *colour, int fade_in, void *font)
+{
+    (void)overlay; (void)x; (void)y; (void)justify; (void)colour; (void)fade_in; (void)font;
+    if (g_captions_seen < 64) {
+        char b[200];
+        int  i, n;
+        g_captions_seen++;
+        b[0] = 0;
+        s_cat(b, "caption hidden: \"");
+        n = s_len(b);
+        for (i = 0; text && text[i] && i < 150; i++)
+            b[n++] = (text[i] == '\n' || text[i] == '\r') ? '|' : text[i];
+        b[n] = 0;
+        s_cat(b, "\"");
+        logline(b);
+    }
+    return -1;
+}
+
+static void captions_hook(void)
+{
+    static const BYTE add[8] = { 0x55, 0x8B, 0xEC, 0x6A, 0xFF, 0x68, 0x20, 0xFF };
+    static const DWORD sites[2] = { SHOW_TITLE_CALL, SHOW_SUB_CALL };
+    int i, k;
+
+    if (ini_int("Scene", "Captions", 1)) return;
+    for (k = 0; k < 8; k++)
+        if (((const BYTE *)OVERLAY_ADD)[k] != add[k]) goto bad;
+    for (i = 0; i < 2; i++) {
+        const BYTE *p = (const BYTE *)sites[i];
+        if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != OVERLAY_ADD - (sites[i] + 5)) goto bad;
+    }
+    for (i = 0; i < 2; i++)
+        if (!patch_dword(sites[i] + 1, (DWORD)&caption_add - (sites[i] + 5))) goto bad;
+    logline("captions off: ShowTitle and ShowSubtitle add no overlay message");
+    return;
+bad:
+    logline("captions: NOT PATCHED: OverlayText::AddMessage or its calls differ -- captions as the game has them");
+}
+
 static void startup(void)
 {
     char b[200];
@@ -2411,6 +2475,8 @@ static void startup(void)
     if (!ini_int("Scene", "Music", 1) && music_sigs_ok()) music_off();
     /* So has the race: it is set before the mission loads, whatever the scene. */
     race_hook();
+    /* And the captions: a campaign take, Enable=0, is where they show. */
+    captions_hook();
     if (!ini_int("Scene", "Enable", 1)) {
         logline("--- Scene: Enable=0, nothing else patched");
         return;

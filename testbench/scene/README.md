@@ -62,13 +62,14 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 
 | Key | Default | |
 |---|---|---|
-| `Enable` | 1 | 0 patches nothing but the music switch below (`Enable=0` with `Music=0`: a plain game with no music, for footage of the real campaign) |
+| `Enable` | 1 | 0 patches nothing but the music, captions and race switches below (`Enable=0` with `Music=0`: a plain game with no music, for footage of the real campaign; with `Captions=0`, its cinematics without their text) |
 | `Delay` | 30 | mission ticks before the scene is built |
 | `Fog` | 0 | 0: fog and shroud off for good, the map fully explored; 1: as the map has them |
 | `Hud`, `Grid`, `Cursor`, `Notices`, `Tooltips` | 0 | 0 hides them; 1 leaves them as the game has them. Notices are the game's events: "Enemy engaged." and the like, their voice and minimap marker. Tooltips are the rollover boxes, an object's name and description, that the pointer brings up over the 3D view even when the cursor is not drawn |
 | `Hover` | 1 | 0 removes what the object under the pointer gets drawn over it: its hull, shield and special-energy gauges, its system icons and the hover ring, which come up even with the HUD and the cursor hidden. 1 is stock. Selection circles and group numbers stay |
 | `ShieldFx` | 1 | 0 removes the flash on a craft's shields when a weapon hits them (green on most). The shields still take the damage. 1 is stock. The shields-down effect (a blue electric ring when they run out) is separate and stays; `Heal=1` prevents it |
 | `Music` | 1 | 0 stops the game starting any music track (`StartMusic` and the jukebox's `mStartNewTrack` return at once); sound effects and voices stay. `SCENE_MUSIC=0` at install puts it into the installed copy of any scene file, so footage can be laid over its own soundtrack |
+| `Captions` | 1 | 0 removes a mission script's captions: the subtitles and stardate lower thirds burned into the intro cinematics and the mission's title (`ScriptInterfaceImp::ShowTitle`, `ShowSubtitle`; "How it works"). Everything else in the cinematic, its timing, sound and voices, stays, and so do the game's own overlay messages. Set at start-up, so it holds with `Enable=0`, in stock and refit alike (`films/intros-scout`) |
 | `Race` | | the player's race, which decides the HUD (stock's skin, and the UI's theme with `[UI] Theme=auto`): `federation`, `klingon`, `romulan`, `cardassian`, `borg` or `species8472` (races.odf's `name`s). Empty: as the game sets it, which on `a2_borg01` is a different race on every launch. Set before the mission loads, so it holds in stock and refit alike, and with `Enable=0`. `SCENE_RACE=<race>` at install puts it into the installed copy of any scene file, ahead of the file's own |
 | `Anchor` | `camera` | `world`: object positions are world coordinates; `camera`: offsets from the RTS camera's interest point |
 | `Center` | | centre the RTS camera on this object |
@@ -443,6 +444,28 @@ inert, and `Scene.log` says so.
   `showcase` with `Hud=1` and `Race=federation`: the Federation HUD on three launches
   in stock and three in refit (the log: the map names `""`); `SCENE_RACE=klingon` over
   it gave the Klingon theme.
+- **A mission's captions: the two `OverlayText::AddMessage` calls in the script
+  interface.** The text burned into the intro cinematics -- the Federation intro's
+  subtitles at the top ("These are the voyages of the starship Enterprise..."), the
+  lower thirds (`USS Enterprise / Stardate 54522.2 / Location: Alpha Quadrant`, and
+  the Klingon and Borg intros' stardates) and the mission's title ("Invasion") -- is
+  not a game option and not part of the scene: the mission script asks for each one
+  through `ScriptInterfaceImp::ShowTitle` (0x454ff0) or `ShowSubtitle` (0x4550c0).
+  Each looks the text up (`MISSION_*_SUBTITLE*` in `Dynamic_Localized_Strings.h`),
+  makes one call to `OverlayText::AddMessage` (0x5061e0, thiscall, seven arguments,
+  `ret 0x1c`) on `overlayText` (0x764488), at 0x455081 and 0x45510c, and returns the
+  key it gives. The script later passes that key to `RemoveTitle` / `RemoveSubtitle`,
+  which hand it to `FadeMessage` (0x506400) or `RemoveMessage` (0x506460); both look
+  it up in the overlay's map and do nothing when it is not there. With `Captions=0`
+  both calls go to the plugin's `caption_add`, which takes the same arguments, adds
+  nothing and returns -1, a key `AddMessage` never gives (a counter from 0, 0x7644bc).
+  No message exists, so neither stock's `OverlayText::Render` nor `UI.asi`'s overlay,
+  which reads the same map (`ui/HUD.md`, "Overlay messages"), has anything to draw.
+  `Scene.log` names each caption it hid (`caption hidden: "..."`). The game's own
+  callers of `AddMessage` (`GameTypeGeneral::SetGameOverMessage` and the network
+  transport's) are left alone. The hook goes in at start-up, outside `Enable`, as
+  `Race=` does; the two call sites are checked to be `call AddMessage` first, and
+  `AddMessage` against its first bytes.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`). **That camera is not the one in use on the bench**

@@ -53,11 +53,7 @@ wait 0.8
 joiner: step Click "host's Game"
 joiner: step Click "Join Game"
 joiner: step Wait up to 30 seconds for "GAME SETUP"
-joiner: step Click at design 155,547
-joiner: step Type "hello from joiner"
-joiner: step Press Return
-host: step Wait up to 20 seconds for "hello from joiner"
-wait 3
+wait 4
 ```
 
 ### o2 · Both games launch into the same match
@@ -105,7 +101,5 @@ wait 5
 joiner: step Click "LAUNCH"
 wait 5
 host: step Click "LAUNCH"
-host: step Wait up to 180 seconds for "999999"
-joiner: step Wait up to 60 seconds for "999999"
-wait 8
+wait 22
 ```

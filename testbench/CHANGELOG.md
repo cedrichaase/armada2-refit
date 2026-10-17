@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.39.0 — 2026-10-17
+
+### Added
+- `Scene.asi`'s `Captions=` key: 0 removes a mission script's captions (the intro
+  cinematics' subtitles and stardate lower thirds, the mission's title) by sending
+  `ScriptInterfaceImp::ShowTitle`'s and `ShowSubtitle`'s `OverlayText::AddMessage`
+  calls to a stub that adds nothing. Works with `Enable=0`, in stock and refit. 1 (the
+  default) is unchanged.
+
+Installs nothing; seen working on the bench 2026-10-17 (`films/intros-scout` s01 refit
+and stock, s02, s03 with `Enable=0`: every subtitle, lower third and title gone, the
+cinematics' cuts and fades within 0.15 s of the earlier takes).
+
 ## 3.38.0 — 2026-10-17
 
 ### Added

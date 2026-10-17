@@ -24,78 +24,53 @@ not called out in the promo, the user, 2026-10-17; this is a lighting shot).
 ### f01 · Out of the planet's shadow
 Shows: lighting: planet shadows, lighting: cloak
 Scene: rom-shadow.ini
-Variants: stock, refit
-Layout: dissolve 3 1.5
+Variants: refit
+Layout: full refit
 Transition: dissolve 0.6
-In: 1.0
-Length: 9
-Status: draft
+In: 2.0
+Length: 13
+Status: probed
 
-Six Romulan ships (three warbirds, two Griffins, a Shrike) sit cloaked in the shadow of a
-class M planet, decloak one after another, and fly out across the shadow's narrow side
-into the Key light. The camera is alongside the lead warbird on the sun's side, a little
-behind it and below, following it (`orbit wb1`), so the shadow's edge stays put in the
-world and sweeps back over each hull as it leaves. The edge is the subject: the eye
-should land on the lead warbird's hull going from dark to lit, front first.
+Restaged on the user's notes on rough cut 4 (2026-10-17): refit only, no stock recording
+("it doesn't add anything here"), the fleet cloaked first, then decloaking, then flying
+out of the planet's shadow so the light moves across the hulls, with part of the planet
+in frame. Refit only, so the layout is `full refit`.
 
-A dissolve, not a wipe: the edge runs across the frame as a line of its own, and a wipe's
-divider beside it would read as a second edge; and stock decloaks on another timing
-(b06: stock 3.4–5.2 s, refit 2.8–4.0 s), so the two halves would not match.
+The six ships start cloaked inside the shadow; the lead warbird decloaks first (3.5 s to
+6.5 s of the take, the Griffins and the Shrike after it, done by 8.5 s), a beat, then
+`goto` at 8.4 s takes the echelon out across the shadow's narrow side. The camera is
+`orbit wb1`, ahead of the lead and a little to the shadow side at first (yaw 100, pitch
+-5, 190 away), so the planet's night side is in the upper left corner behind the ships;
+it glides round over 10 s to yaw 195, 150 away, the sun's side, following the lead. As
+the camera comes round the lead leaves the shadow and its far wing goes from dark to lit
+(11.5 s dark, 13 s catching the light, 15 s lit, the green hull plating and the wing
+edge bright). The planet slides out of frame to the left by about 12 s; the focus is the
+ships and the light. Probed twice: a camera at yaw 120 to 215 showed the lighting as
+well but lost the planet from the start; one at yaw 70 kept the planet large but saw the
+dark side of the hulls.
 
-Scouted 2026-10-17 (refit, interactive, 720p): the geometry is right: the whole fleet is
-dark inside the shadow, and the planet's night side reads as a disc behind it from yaw
-35–80. The fleet covers about 300 units in 4 s (75 a second): the lead leaves the shadow
-about 3 s after `goto`. From 400–500 units away and from yaw 80 (towards the planet) the
-lit hulls were hardly brighter than the shadowed ones, because that side of each hull
-faces away from the Key; from the sun's side (yaw 180–260) at 450 the hulls were small and
-the edge did not read either. Hence the close camera below: about 160 from the lead, on
-the sun's side. One frame from yaw 250, pitch 10, distance 500 had a dark diagonal band
-in a corner: probably the planet's edge, which is above that line of sight; keep the pitch
-at or below 0 there.
+The cloak holds invisible: team 2's cloaked ships draw as nothing from this side (the
+first 3.5 s is empty starfield with the planet corner), so the cloak's shimmer shows
+only as the ships decloak (3.5 to 8.5 s, the green-edged glass fading to hull). Cut the
+shot in at 2.0 s so the empty hold is short. The terminator is soft rather than a line:
+the sweep reads as the hull brightening, not as a sharp edge.
 
 ```setup
 scene hover off; shieldfx off; tooltips off
 scene cloak wb1 now; cloak wb2 now; cloak wb3 now; cloak gr1 now; cloak gr2 now; cloak sh1 now
-scene orbit wb1 245 -6 170
+scene orbit wb1 100 -5 190
 wait 3
 ```
 ```action
-wait 1
+wait 3
 scene cloak wb1 off
 wait 0.4
 scene cloak wb2 off; cloak wb3 off
 wait 0.4
 scene cloak gr1 off; cloak gr2 off; cloak sh1 off
-wait 2.2
-scene goto wb1,wb2,wb3,gr1,gr2,sh1 3380 0 1709; glide 10 270 -4 150
-wait 9
-```
-
-### f02 · The fleet leaves the night
-Shows: lighting: planet shadows
-Scene: rom-shadow.ini
-Variants: stock, refit
-Layout: dissolve 3 1.5
-Transition: dissolve 0.6
-In: 1.0
-Length: 8
-Status: draft
-
-Wider, behind the fleet, the planet's dark limb above it: the echelon flying away from
-the camera and out of the shadow, each ship lighting up in turn as it crosses the edge.
-Decloaked already in setup, so the shot is only the crossing. Behind and to the sun's side
-(the fleet's course is yaw 125, so behind is 305; the sun is at 215), looking up a
-little.
-
-```setup
-scene hover off; shieldfx off; tooltips off
-scene orbit wb1 285 -8 380
-wait 2
-```
-```action
-wait 0.5
-scene goto wb1,wb2,wb3,gr1,gr2,sh1 3380 0 1709; glide 10 270 -4 330
-wait 9.5
+wait 2.0
+scene goto wb1,wb2,wb3,gr1,gr2,sh1 3380 0 1709; glide 10 195 -3 150
+wait 10
 ```
 
 ## Species 8472 against the Borg
@@ -115,7 +90,7 @@ Layout: dissolve 3 1.5
 Transition: cut
 In: 4.0
 Length: 8
-Status: draft
+Status: probed
 
 Behind and below the lead bioship as the 8472 fleet closes on the Borg and opens fire,
 the cubes ahead in shade, the camera easing in. A dissolve: the subject is spread over the
@@ -127,12 +102,12 @@ hold.
 
 ```setup
 scene hover off; tooltips off
-scene orbit sp1 45 -8 380
+scene orbit sp1 30 -8 230
 wait 1
 ```
 ```action
 wait 0.5
-scene glide 14 30 -6 260
+scene glide 14 20 -5 170
 wait 14
 ```
 
@@ -144,7 +119,7 @@ Layout: dissolve 3 1.5
 Transition: dissolve 0.4
 In: 3.0
 Length: 6
-Status: draft
+Status: probed
 
 Close on the first cube, low, the bioships' beams striking it and lighting its plating,
 its own fire going back. The cube is the one centred subject, but the beams around it are

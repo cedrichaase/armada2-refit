@@ -6,7 +6,7 @@ Variant refit: --install . --install testbench/scene
 
 A scratch board for two beam shots of the promo (`films/promo`, "Beams"), worked out
 here so the promo board is not touched until they are reviewed: the assimilation beam
-again, from a Fusion Cube with the camera gliding round the two ships, and the
+again, from a Fusion Cube with the camera gliding round the two ships (now the holding beam, see a01), and the
 Assimilator's auto-assimilator. Variants and the refit install are the promo's.
 
 Not filmed yet: filming stopped on 2026-10-17 before the first probe. The camera
@@ -37,40 +37,45 @@ What the stock session showed, for the editor:
 
 ## Beams
 
-### a01 · The assimilation beam
-Shows: specials: assimilation beam
-Scene: assimilation-fusion
+### a01 · The holding beam
+Shows: specials: holding beam
+Scene: fusion-low.ini
 Variants: stock, refit
-Layout: dissolve
+Layout: dissolve 3 1.5
 Transition: cut
-In: 3.0
-Length: 4.0
-Status: draft
+In: 5.5
+Length: 12
+Status: probed
 
-A Borg Fusion Cube reads the Sovereign, seen from above and to the side against the
-darkest part of the sky, while the camera glides slowly round the pair (30 degrees of
-yaw over the shot, closing in a little). The eye goes from the bright point on the
-cube's top edge down the beam to the saucer. **Dissolve, not wipe**: the subject is
-spread over the frame (a huge cube on the right, a small ship on the left, the beam
-between) and the camera moves; a wipe's divider would cut through the beam and show
-half a cube in each variant, while a dissolve shows each whole, the same moment. The
-cube's phasers fire as its weapons come on (cyan lines, the first 1.5 s or so), so the
-window starts after them; the beam ends about 7 s after it is fired, when the cube has
-taken the corbomite, and the weapons go off at 9 s so its phasers stay quiet after it.
-To check on the probe: that refit's cone reads at this distance (if not, closer: the
-glide's end distance down to 340), and where the stock fan's red lines are least.
+Restaged on the user's notes on rough cut 4 (2026-10-17), and again on the director's: the
+Fusion Cube is the only beam-from-a-cube scene (the tractor is cut), it fires the holding
+beam (`gholdbm`, weapon 7 of a Fusion Cube's ODF; `special` answers fired), the shot is
+long, and the camera is under the Sovereign looking up past it at the cube. The scene is
+`fusion-low.ini`, a copy of `assimilation-fusion` with the Sovereign hung 120 below the
+cube's plane and the cube 40 above it, because with both on one plane a camera below the
+Sovereign sees the cube lower than the ship, never over it. The camera orbits a point 40
+under the cube's plane (-80), behind the Sovereign (yaw 185, pitch -28, 220 away, gliding to
+pitch -31, 205 over 15 s): the cube's face fills the frame foreshortened, the beam runs
+from its top edge down to the Sovereign. Stock is held 3 s, then a dissolve over 1.5 s to
+refit's beam, held for the rest.
+
+The cube's phasers and torpedo fire from 1.8 to 4.1 s and the Sovereign's shield bubble
+lights up under them (bright blue at 4 s, a faint shell by 6 s; `shieldfx off` does not
+remove it, it is the shield's own draw), so the shot comes in at 5.5 s. Stock's torpedo
+burst (orange) is at about 4 to 5 s, also before the window. The beam holds to the end of
+the take. Stock draws it as thick green streaks with blue shield lightning, no red;
+refit as a pale, wide green cone. The Sovereign stays whole in frame from 5.5 to 17.5 s (probed at 6, 10, 14 and 17 s), large in the lower right with the cube towering behind it; from about 14 s it covers part of the beam's lower end, the beam still reading from the cube's top edge.
 
 ```setup
-scene orbit 3000 20 3110 70 16 460
+scene hover off; shieldfx off; tooltips off
+scene orbit 3000 -80 3080 185 -28 220
 ```
 ```action
-wait 0.8
+wait 1.5
 scene weapons borg on
 wait 0.2
-scene special borg gTechAssimBeam tgt; glide 10 100 12 400
-wait 8
-scene weapons borg off
-wait 2
+scene special borg gholdbm tgt;  glide 15 196 -31 205
+wait 15.8
 ```
 
 ### a03 · The auto-assimilator
@@ -81,7 +86,7 @@ Layout: wipe
 Transition: cut
 In: 2.0
 Length: 4.0
-Status: draft
+Status: probed
 
 The Borg Assimilator fires its auto-assimilator into the Sovereign, from the side and
 a little above, the beam running across the frame from the small Borg ship on the right
@@ -93,13 +98,13 @@ fired, so the Assimilator's torpedoes never fire; the beam lasts 30 s and the So
 healed, keeps its crew, so any window after the first second works.
 
 ```setup
-scene orbit 3000 0 3150 100 12 380
+scene orbit 3000 0 3110 100 10 330
 ```
 ```action
 wait 0.8
 scene weapons assim on
 wait 0.2
-scene special assim gborgbor tgt; glide 9 118 10 340
+scene special assim gborgbor tgt; glide 9 118 8 270
 wait 0.3
 scene weapons assim off
 wait 9
