@@ -4,7 +4,9 @@ throw-away git repository laid out like this one: a take is current until a file
 depends on changes, committed or not; docs, the boards and the stock variant's unrelated
 layers do not count; a take filmed from uncommitted changes is current while the tree
 still has them; takes from before films 1.1.0 are read as they were written. Starts no
-game. Exit 0 when all of it holds.
+game. Also pins `a2film review` (films/film/review.py) on short clips made by ffmpeg: black,
+moving, frozen, a flash, a white square, a take that ends early, silent and clipping sound,
+and two variants that are the same. Exit 0 when all of it holds.
 
     python3 films/film/selftest.py
 """
@@ -56,7 +58,71 @@ def commit(repo, msg):
     return code.head(repo)
 
 
+class FakeShot:
+    """What review.analyse reads of a shot."""
+    kind, layout = 'scene', ('wipe', [])
+    players = None
+
+    def __init__(self, length, in_=0.0, audio='game'):
+        self.id, self.length, self._in, self._audio = 'x01', length, in_, audio
+
+    def in_point(self, variant):
+        return self._in
+
+    def get(self, key, default=None):
+        return self._audio if key == 'Audio' else default
+
+
+def clip(path, audio):
+    """7.1 s: black 1 s, motion 2 s, a flat blue 2 s, a white flash 0.1 s, blue 1 s, grey with a white square 1 s."""
+    sz = 's=320x180:r=30'
+    vf = (f'color=c=black:{sz}:d=1[a];testsrc2={sz}:d=2[b];color=c=0x336699:{sz}:d=2[c];color=c=white:{sz}:d=0.1[d];'
+          f'color=c=0x336699:{sz}:d=1[e];color=c=0x404040:{sz}:d=1,'
+          f"drawbox=x=100:y=60:w=30:h=30:c=white:t=fill:enable='between(t,0.4,0.7)'[f];"
+          '[a][b][c][d][e][f]concat=n=6:v=1:a=0[v]')
+    src = 'anullsrc=r=48000:d=7.1' if audio == 'silent' else 'sine=f=440:r=48000:d=7.1,volume=30'
+    cmd = ['ffmpeg', '-v', 'error', '-y', '-filter_complex', vf, '-f', 'lavfi', '-i', src,
+           '-map', '[v]', '-map', '0:a', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'pcm_s16le', path]
+    subprocess.run(cmd, check=True)
+
+
+def review_checks():
+    try:
+        from film import review
+    except ImportError as e:
+        print(f'skip  review ({e})')
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        silent, loud = os.path.join(tmp, 'silent.mkv'), os.path.join(tmp, 'loud.mkv')
+        clip(silent, 'silent')
+        clip(loud, 'loud')
+        r, fr, gray = review.analyse(silent, FakeShot(10.0), 'refit')
+        kinds = {f['kind']: f for f in r['flags']}
+        check('black' in kinds and kinds['black']['t0'] < 0.2 and 0.8 < kinds['black']['t1'] < 1.2, 'review: leading black found')
+        check('frozen' in kinds and 2.8 < kinds['frozen']['t0'] < 3.4, 'review: the flat stretch is frozen')
+        check('flash' in kinds and 4.8 < kinds['flash']['t0'] < 5.4, 'review: the white flash is found')
+        check('white' in kinds and 6.0 < kinds['white']['t0'] < 6.9, 'review: the white square is found')
+        check('early' in kinds and 2.5 < kinds['early']['t1'] - kinds['early']['t0'] < 3.3, 'review: the take ends early')
+        check('silent' in kinds, 'review: silent sound with Audio: game')
+        check(r['suggest'].get('In') == 1.2 and 5.5 < r['suggest'].get('Length', 0) < 6.0,
+              f'review: suggests In and Length ({r["suggest"]})')
+        r2, _, _ = review.analyse(silent, FakeShot(6.0, 1.0, 'none'), 'refit')
+        check(not any(f['kind'] in ('silent', 'early') for f in r2['flags']), 'review: no sound check with Audio: none')
+        r3, _, g3 = review.analyse(loud, FakeShot(6.0, 1.0), 'refit')
+        check(any(f['kind'] == 'clip' for f in r3['flags']) and not any(f['kind'] == 'silent' for f in r3['flags']),
+              'review: clipping sound found')
+        check(any(1.0 < p < 3.1 for p in r['peaks']) and any(4.8 < p < 5.4 for p in r['peaks']),
+              'review: motion peaks are the moving stretch and the flash')
+        c = review.compare((r3, g3), (r3, g3), FakeShot(6.0, 1.0))
+        check(c and c['mean'] == 0 and any('barely differ' in f for f in c['flags']), 'review: identical variants flagged')
+        out = os.path.join(tmp, 'sheet.png')
+        r['window'] = [0.0, 7.0]
+        review.sheet_png(r, fr, FakeShot(10.0), out)
+        check(os.path.getsize(out) > 5000, 'review: a contact sheet is written')
+
+
 def main():
+    review_checks()
     with tempfile.TemporaryDirectory() as repo:
         git(repo, 'init', '-q')
         for path in ('render3d/src/lib.rs', 'testbench/scene/scene.c', 'testbench/scene/install', 'a2test',

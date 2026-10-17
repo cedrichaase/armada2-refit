@@ -127,6 +127,10 @@ def main(argv):
         from . import edit  # noqa: F401
     except ImportError:
         pass
+    try:
+        from . import review  # noqa: F401  (needs numpy and Pillow)
+    except ImportError:
+        pass
     ap = argparse.ArgumentParser(prog='a2film', description='storyboards filmed on the test bench')
     sub = ap.add_subparsers(dest='cmd', required=True)
     for name, fn in COMMANDS.items():

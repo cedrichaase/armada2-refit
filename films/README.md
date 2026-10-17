@@ -11,6 +11,8 @@ a real editor, fed by `a2film manifest`).
     ./a2film probe  films/whats-new            # every shot, 1280x720, 4 games at once
     ./a2film probe  films/whats-new g03 g04    # ... just these
     ./a2film sheet  films/whats-new            # one contact sheet: every shot, in order
+    ./a2film review films/whats-new            # a first pass over the takes: sheets, flags, motion
+    ./a2film review films/whats-new g03 g04    # ... just these
     ./a2film animatic films/whats-new          # a rough cut from the probe takes
     ./a2film take   films/whats-new            # the final takes, 4K, one game at a time
     ./a2film manifest films/whats-new          # the edit as JSON, for an editor
@@ -23,6 +25,9 @@ an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8
     $A2_DATA/films/<film>/
       probe/<shot>/<variant>.mkv   .wav  .events.json  .spec.json  .sheet.png
       final/<shot>/<variant>.mkv   ...
+      probe/<shot>/<variant>.review.png   `review`: a contact sheet and curves per take
+      probe/<shot>/variants.review.png    `review`: how two variants differ over time
+      review-probe.html  .json      `review`: the overview of the board
       sheet-probe.png               every shot in timeline order
       animatic-probe.mp4            the rough cut
       manifest.json
@@ -35,7 +40,8 @@ an asset and lives in `$A2_DATA/films/<film>/`, never in a checkout (hard rule 8
 2. **Probe.** `a2film probe` films every shot without a current take at 1280x720, several games in
    parallel (`--jobs`, default 4), and makes a contact sheet per take. Probes are cheap
    and exist to get the *direction* right: framing, angle, timing, what is in the shot.
-3. **Review.** `a2film sheet` and `a2film animatic` show the whole film at once. Notes go
+3. **Review.** `a2film review` makes a first pass over the takes (below); `a2film sheet`
+   and `a2film animatic` show the whole film at once. Notes go
    back into the board, and each shot's `Status:` moves on.
 4. **Repeat** 2–3. A take is re-filmed when it is no longer current: its spec changed
    (its setup, action, scene file or variant), or the code it shows did (below). So
@@ -88,6 +94,52 @@ works on `status` and `manifest` too, which then count such takes as current. `-
 is the other way: re-film even what is current. `python3 films/film/selftest.py` pins
 these rules on a throw-away repository, without a game; run it after changing them
 (`films/film/code.py`).
+
+## Review
+
+`a2film review <board> [shots...]` (`--tier probe|final`, `--jobs 4`) is what is done by
+hand with ffmpeg before a shot is approved, made automatic. It films nothing and changes
+no take or board. Each take is decoded once, small (256 px wide, 15 frames a second, at
+most 120 s) through ffmpeg into numpy, with Pillow drawing the pictures; 43 probe takes
+take about 25 s. It writes, next to the takes:
+
+- `<shot>/<variant>.review.png`: twelve frames across the shot's `In` .. `In`+`Length`
+  window and a second either side (the margin dimmed), each with its timecode in the
+  take; below, the motion curve (mean frame difference, peaks in amber, where it settles
+  in green) and the luminance, the window shaded, flagged stretches marked on both.
+- `<shot>/variants.review.png`: for a shot with two variants, their difference over the
+  window (mean pixel difference and luma-histogram distance).
+- `review-<tier>.html` (and `.json`): one page for the board with the table, every
+  flag with its timestamp and every sheet. Running on a few shots writes the page for
+  those only.
+
+The table printed to the terminal has a row per take (shot, variant, window, flags,
+suggested `In` / `Length`) and a row per pair of variants.
+
+| Flag | Means |
+|---|---|
+| `black a-b` | at least 0.4 s of frames that are flat and near black (mean luma under 6, nothing brighter than the mean + 10). A dark sky with a ship in it is not black |
+| `frozen a-b` | at least 1.5 s with no frame-to-frame change, apart from black and `desktop` shots. Advisory: a menu waiting for a click is frozen too |
+| `flash t` | the luminance jumps up by 40 and falls back within 0.25 s |
+| `white t` | a new, solid block of saturated white, less than a fifth of the frame: the artefact, not an explosion's core |
+| `ends Ns early` | the take is shorter than `In` + `Length` |
+| `silent`, `silent gap`, `clips t` | with `Audio: game`: no sound in the window, 2 s without any, or samples at full scale |
+
+Only flags that overlap the window are in the table; the others are on the sheet and in the
+page, marked "outside the window". The sound check reads the take's own sound, and a scene
+with `Music=0` and nothing firing is silent, so read `silent` as a question.
+
+Between two variants the page gives the mean difference over the window. Below 1.5 of 255
+the pair "barely differ" (a before/after that shows nothing); above 30 the halves of a
+`wipe` will not line up ("the variants differ everywhere": camera, scene or random
+objects). It also looks for a constant offset of up to one second that makes the variants
+agree better and says which `In:` it would take.
+
+A suggestion appears only where it is obvious: `In` after a black start, or where a
+motion that peaks at the start of the window settles (a camera pan coming to rest);
+`Length` where the take ends early, or black or frozen frames start inside the window.
+They are proposals: `In` and `Length` are the reviewer's, and `Status` is only set by a
+person. `python3 films/film/selftest.py` pins the flags on short clips made with ffmpeg.
 
 ## The storyboard
 
