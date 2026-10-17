@@ -12,7 +12,7 @@ versions". Newest first. The derivations are in [`README.md`](README.md).
   `install.sh` as before and by `ui/supersede.sh` when the UI's HUD takes `HUD.asi`'s
   place (8c34190).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 2.2.1 — 2026-10-12
 

@@ -5,6 +5,32 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.24.0 — 2026-10-17
+
+Layers: gui-installer 1.6.0.
+
+### Added
+- The release package carries `Render3D.asi` + `Render3D.ini` with its recipes
+  (`game/Surfaces/`, `game/Nebulae/`) and `UI.asi` + `UI.ini`; `install.sh` and
+  `install.ps1` install them in new steps `render3d` and `ui` when d3d8to9 is
+  `d3d8.dll`, and take out `HUD.asi`, `Menus.asi` and `GridLayout.asi`. Where the chain
+  is left as it is, those three go in instead and the 3D view stays the engine's.
+- `asteroid-sod.py` in the package's `models/`; the scripts smooth the asteroids too.
+
+### Changed
+- `manifest.json`: steps `render3d`, `ui` in place of `hud`, `menus`, `grid`; layers
+  `render3d` and `ui` (`when: d3d8to9`) in place of `hud`, `menus` and `grid`.
+- `publish/package.sh` builds `Render3D.asi` and `UI.asi` (rustup's cargo with
+  `i686-pc-windows-msvc`), which CI's package job now installs.
+- `--uninstall` / `-Uninstall` also take out `Render3D.*`, `UI.*` and the recipes.
+
+### Fixed
+- CI builds `Render3D.asi` again: its `render3d` and `package` jobs link with the Rust
+  toolchain's own lld as `lld-link`, since Ubuntu's lld-link 18 refuses the `EXPORTAS`
+  export rustc now writes for `DllMain` (red on `main` since 12.21.0 at least).
+
+Installed, not yet seen in game.
+
 ## 12.23.0 — 2026-10-17
 
 Layers: render3d 0.14.0.
@@ -14,7 +40,7 @@ Layers: render3d 0.14.0.
   bottom, hidden by the near wall at an angle; `[World] MoonCrackDepth`,
   `MoonCrackFalloff` (render3d 0.14.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.22.0 — 2026-10-17
 
@@ -28,7 +54,7 @@ Layers: render3d 0.13.0, testbench 3.30.0.
 - A planet under the fog of war keeps render3d's sphere and surface instead of the
   engine's low-polygon sphere and stock texture (render3d 0.13.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.21.0 — 2026-10-17
 
@@ -51,7 +77,7 @@ Layers: ui 0.11.0, render3d 0.12.0, testbench 3.29.0.
 ### Removed
 - The top-right help and palette buttons (ui 0.11.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.20.1 — 2026-10-17
 
@@ -61,7 +87,7 @@ Layers: ui 0.10.1.
 - The briefing's objectives keep a gap after their LCARS switches instead of running
   under them (ui 0.10.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.20.0 — 2026-10-17
 
@@ -72,7 +98,7 @@ Layers: render3d 0.11.0.
   the moon's colour, and the round nimbus behind the moon is no longer drawn (render3d
   0.11.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.19.0 — 2026-10-17
 
@@ -88,7 +114,7 @@ Layers: ui 0.10.0, testbench 3.28.0.
 - The info panel no longer shows ten empty queue slots for an idle builder; the
   minimap's filters are words and state dots (ui 0.10.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.18.1 — 2026-10-17
 
@@ -100,7 +126,7 @@ Layers: render3d 0.10.1, ui 0.9.1.
 - The campaign selection keeps its campaigns' names in order after an aborted mission
   (ui 0.9.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.18.0 — 2026-10-17
 
@@ -162,7 +188,7 @@ Layers: ui 0.6.0, render3d 0.7.1, testbench 3.24.0.
   thinner brackets, the resources reordered, panels kept inside the LCARS frame, a
   square unit view frame, no Save to text in the Admiral's Log (ui 0.6.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.14.0 — 2026-10-16
 
@@ -172,7 +198,7 @@ Layers: ui 0.5.0, render3d 0.7.0.
 - The info panel shows the selected unit live, close up, in place of its wireframe,
   and is a third bigger (`[HUD] InfoCamera`, `InfoScale`; ui 0.5.0, render3d 0.7.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.13.0 — 2026-10-16
 
@@ -190,7 +216,7 @@ Layers: ui 0.4.0, hud 2.2.2, testbench 3.23.0.
 - The multiplayer HUD panels and the Internet lobby; scenario `ui-whole-game` at three
   aspects (ui 0.4.0, testbench 3.23.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.12.0 — 2026-10-16
 
@@ -201,7 +227,7 @@ Layers: ui 0.3.0, testbench 3.22.0.
   screens and a loading screen of its own, each off by default in `UI.ini` (ui 0.3.0).
 - Scenarios for each, and `Scene.asi`'s `succeed`/`fail` (testbench 3.22.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.11.0 — 2026-10-16
 
@@ -214,7 +240,7 @@ Layers: ui 0.2.0, testbench 3.21.0.
   (ui 0.2.0).
 - Scenarios for each (testbench 3.21.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.10.0 — 2026-10-16
 
@@ -228,7 +254,7 @@ Layers: ui 0.1.0, testbench 3.20.0.
   unless a `[Demo]` key is on; not in `./install` or `a2mod` yet (ui 0.1.0).
 - Scenario `ui-runtime` (testbench 3.20.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.9.0 — 2026-10-16
 
@@ -258,7 +284,7 @@ Layers: render3d 0.6.0, testbench 3.19.1.
 - Tractor and assimilation beams as a translucent cone; shield hits with mist, Klingon
   rays and light on the struck hull (render3d 0.6.0; 85c80d1, 424abef, 7cb274a, 8336f62).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.7.0 — 2026-10-16
 
@@ -268,7 +294,7 @@ Layers: render3d 0.5.0.
 - Cloaking: wave-swayed transition, a drifting shimmer while cloaked, and the player's
   own cloaked ships at 10% hull (render3d 0.5.0; 7941b19).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.6.0 — 2026-10-16
 
@@ -306,7 +332,7 @@ Layers: render3d 0.4.0.
 ### Fixed
 - render3d's marched gas no longer slides as the RTS camera pans (render3d 0.4.0; 316df23).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.3.0 — 2026-10-16
 
@@ -317,7 +343,7 @@ Layers: render3d 0.3.0.
   tones) by measurement, and graded to stock again, Aqua and `mbgrg` included; new
   recipe key `Octaves=` and tool `render3d/perf/sky-shape.py` (render3d 0.3.0; a40a752).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.2.0 — 2026-10-16
 
@@ -330,7 +356,7 @@ Layers: render3d 0.2.1, testbench 3.19.0.
 ### Added
 - Bench scene `sky`: the sky alone (testbench 3.19.0; 712a09a).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 12.1.0 — 2026-10-16
 
@@ -366,7 +392,7 @@ Layers: render3d 0.2.0, models 5.0.0, testbench 3.17.0.
   `render3d/install.sh` takes out any old plugin an earlier install left. Scenarios that
   tested the plugins check render3d's modules (testbench 3.17.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 11.41.0 — 2026-10-15
 
@@ -393,7 +419,7 @@ Layers: render3d 0.2.0, testbench 3.17.0.
   Martok's Negh'Var, Caddebostan's ship, the Ferengi scavenger, the 8472 hero mothership,
   Martok's base and the prison had stock's light and cloak (render3d 0.2.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 11.40.0 — 2026-10-15
 
@@ -410,7 +436,7 @@ Layers: render3d 0.1.0, testbench 3.16.0.
   `MSAA.asi`: render3d's scene target has samples of its own.
 - The bench gathers `Render3D.log`; scenario `render3d` (testbench 3.16.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 11.39.1 — 2026-10-13
 

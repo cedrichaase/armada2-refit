@@ -81,7 +81,10 @@ check 'grep -q "^  $pver " "$T/out"'
 
 echo "== install from the package, with the bottle's DLL overrides"
 "$X" --package "$zip" --game "$G" > "$T/out" 2> "$T/err" || { tail -30 "$T/out" "$T/err"; exit 1; }
-check '[ -e "$G/HUD.asi" ] && [ -e "$G/QOL.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
+check '[ -e "$G/QOL.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
+# No d3d8.dll in the bottle: d3d8to9 goes in (on wined3d), and with it the UI and the
+# 3D view in place of HUD.asi.
+check '[ -e "$G/UI.asi" ] && [ -e "$G/Render3D.asi" ] && [ -d "$G/Surfaces" ] && [ ! -e "$G/HUD.asi" ]'
 check '[ ! -e "$G/d3d9.dll" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/BinkProxy.ini" ]'
 check 'grep -q "Installing the HUD" "$T/err"'

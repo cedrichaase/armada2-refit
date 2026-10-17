@@ -8,6 +8,10 @@ No choices to make: what can work here is installed, the rest is skipped and say
 First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled in
 vendor\, each file only if it is missing. Then the Direct3D chain: crosire's d3d8to9 as
 d3d8.dll (chain\), in place of GOG's own d3d8to9 build, on Windows' own Direct3D 9.
+Render3D.asi (the 3D view) and UI.asi (the HUD, the menus and the loading screen) draw on
+the Direct3D 9 device d3d8to9 gives them; where the chain is left as it is, the UI's place
+is taken by the plugins it supersedes (HUD.asi, Menus.asi, GridLayout.asi) and the 3D view
+stays the engine's.
 The models are rewritten from the player's own SOD files with Python 3 (py, python or
 A2_PYTHON), skipped without it. The bloom preset goes in when ReShade is installed for the
 game; installing ReShade is optional and by hand (README.txt), then run this again.
@@ -139,7 +143,7 @@ function Invoke-Sods([string]$mode) {   # --install | --revert
     $ErrorActionPreference = "Continue"   # a script's stderr is output here, not an error
     $env:A2_GAME = $GameDir
     $exe = $Py[0]; $pre = @($Py | Select-Object -Skip 1)
-    foreach ($s in "moon-sod", "select-sod", "hull-sod") {
+    foreach ($s in "moon-sod", "select-sod", "hull-sod", "asteroid-sod") {
         $file = Join-Path $here "models\$s.py"
         try {
             & $exe @pre $file $mode 2>&1 | ForEach-Object { Say "    $_" }
@@ -151,8 +155,8 @@ function Invoke-Sods([string]$mode) {   # --install | --revert
     }
 }
 
-# The per-part plugins earlier packages put in, replaced by Render3D.asi (not in this
-# package yet): taken out, so those parts are the engine's own again.
+# The per-part plugins earlier packages put in, replaced by Render3D.asi: taken out, in
+# every case (a module of Render3D.asi stands down beside its old plugin).
 function Remove-OldPlugins {
     foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Nebulae", "Surfaces", "Explosions", "Shields", "Repair", "Venting", "Specials", "Fog") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
@@ -164,13 +168,34 @@ function Remove-OldPlugins {
     }
 }
 
+# Render3D.asi's recipes: Surfaces\ and Nebulae\ in the game directory, only the files of
+# these names; anything else there is the player's.
+$Recipes = "Surfaces", "Nebulae"
+function Remove-Recipes {
+    foreach ($d in $Recipes) {
+        if (-not (Test-Path -LiteralPath (G $d))) { continue }
+        foreach ($f in Get-ChildItem -LiteralPath (Join-Path $here "game\$d") -Filter "*.ini") {
+            Remove-Item -LiteralPath (Join-Path (G $d) $f.Name) -ErrorAction SilentlyContinue
+        }
+        if (-not (Get-ChildItem -Force -LiteralPath (G $d))) { Remove-Item -LiteralPath (G $d) }
+    }
+}
+# The plugins UI.asi takes the place of (ui/supersede.sh), and Menus.asi's old name.
+function Remove-LegacyUi {
+    foreach ($n in "HUD", "Menus", "MenuScale", "GridLayout") {
+        foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
+    }
+}
+
 # ------------------------------------------------------------------ uninstall
 
 if ($Uninstall) {
     Step uninstall "taking the mod out"
-    foreach ($n in "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Online") {
+    foreach ($n in "Render3D", "UI", "QOL", "QOLRules", "Online") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
     }
+    Remove-LegacyUi
+    Remove-Recipes
     Remove-OldPlugins
     if (Test-Path -LiteralPath (Join-Path $here "models")) {
         $Py = @(Find-Python)
@@ -300,27 +325,55 @@ function Put([string]$f) {
     Say "  $f"
 }
 
-Step hud "HUD"
-Put "HUD.asi"; Put "HUD.ini"
-foreach ($n in "MenuScale.asi", "MenuScale.ini") { Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue }   # Menus.asi's old name; never both
-Remove-OldPlugins
-Step menus "menus"
-Put "Menus.asi"; Put "Menus.ini"
+# Render3D.asi and UI.asi need a Direct3D 9 device behind the game's d3d8: crosire's
+# d3d8to9, as the chain step puts in. Without it each would stand down to stock.
+$D3d9 = Test-D3d8to9 (G "d3d8.dll")
+
+Remove-OldPlugins   # earlier packages' per-part plugins: Render3D.asi's modules replace them
+Step render3d "the 3D view"
+if ($D3d9) {
+    Put "Render3D.asi"; Put "Render3D.ini"
+    Remove-Recipes
+    foreach ($d in $Recipes) {
+        New-Item -ItemType Directory -Force -Path (G $d) | Out-Null
+        $n = 0
+        foreach ($f in Get-ChildItem -LiteralPath (Join-Path $here "game\$d") -Filter "*.ini") {
+            Copy-Item -LiteralPath $f.FullName (Join-Path (G $d) $f.Name) -Force; $n++
+        }
+        Say "  $d\ ($n recipes)"
+    }
+} else {
+    foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "Render3D$e") -ErrorAction SilentlyContinue }
+    Remove-Recipes
+    Say "  Render3D.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the 3D view stays the engine's"
+}
+Step ui "the HUD and the menus"
+if ($D3d9) {
+    Remove-LegacyUi   # UI.asi takes their place; each would stand down against the other
+    Put "UI.asi"; Put "UI.ini"
+} else {
+    # The UI cannot draw: the plugins it supersedes keep the HUD and menus widescreen.
+    foreach ($n in "UI.asi", "UI.ini", "UI.log", "MenuScale.asi", "MenuScale.ini") {
+        Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue
+    }
+    Say "  UI.asi skipped: it needs crosire's d3d8to9 as d3d8.dll -- the older plugins instead:"
+    Put "HUD.asi"; Put "HUD.ini"
+    Put "Menus.asi"; Put "Menus.ini"
+    Put "GridLayout.asi"
+    # The player's [Cells] choices survive a reinstall; only a missing file is replaced.
+    if (Test-Path -LiteralPath (G "GridLayout.ini")) { Say "  GridLayout.ini (yours, kept)" } else { Put "GridLayout.ini" }
+}
 Step qol "quality of life"
 Put "QOL.asi"; Put "QOL.ini"
 # Pay on queue; against the computer only, it stands down in a network game.
 Put "QOLRules.asi"; Put "QOLRules.ini"
-Step grid "grid keys"
-Put "GridLayout.asi"
-# The player's [Cells] choices survive a reinstall; only a missing file is replaced.
-if (Test-Path -LiteralPath (G "GridLayout.ini")) { Say "  GridLayout.ini (yours, kept)" } else { Put "GridLayout.ini" }
 Step models "models"
 $Py = @(Find-Python)
 if ($Py.Count) {
-    Say "  the moons, the selection bubble and the hulls, from your own SOD files:"
+    Say "  the moons, the selection bubble, the hulls and the asteroids, from your own SOD files:"
     Invoke-Sods "--install"
 } else {
-    Say "  moons, selection bubble and hulls skipped: needs Python 3 (py or python)"
+    Say "  moons, selection bubble, hulls and asteroids skipped: needs Python 3 (py or python)"
 }
 Step online "online multiplayer"
 Put "Online.asi"; Put "Online.ini"

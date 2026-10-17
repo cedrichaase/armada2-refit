@@ -11,7 +11,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - Scene `fog-planet` and scenario `render3d-planet-ghost`: a class M planet left as a
   fog-of-war ghost, which keeps render3d's sphere and surface.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.29.0 — 2026-10-17
 
@@ -26,7 +26,7 @@ Installed, not yet seen in game.
   UI's trade status, the starbase's shorter info panel, the bar's icons and the
   minimap's filters, and the AI menu's level icons (ui 0.10.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.27.0 — 2026-10-17
 
@@ -75,7 +75,7 @@ Confirmed in game 2026-10-16.
 - Scene `ui-colonize` and scenario `ui-hud-colonize`: a planet selected by a click and
   colonised by a right click (render3d 0.7.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.23.0 — 2026-10-16
 
@@ -91,7 +91,7 @@ Installed, not yet seen in game.
   `ui-hud-map`, `ui-hud-panels` and `ui-hud-panels-objectives` check what stock shows.
 - A run's report gathers more of the UI's logs.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.22.0 — 2026-10-16
 
@@ -106,7 +106,7 @@ Installed, not yet seen in game.
 ### Changed
 - `ui-menus-options` and `ui-menus-match` follow the menus' own layouts.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.21.0 — 2026-10-16
 
@@ -119,7 +119,7 @@ Installed, not yet seen in game.
 - Operating notes `operating/ui-widgets.md`, `ui-style.md`, `hud-takeover.md`,
   `menus-host.md`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.20.0 — 2026-10-16
 
@@ -128,7 +128,7 @@ Installed, not yet seen in game.
   Credits' place), on the loading screen and over the HUD, with a click on it that the
   engine must not see (ui 0.1.0). Its setup is `ui/bench-asi.sh`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.19.1 — 2026-10-16
 
@@ -145,7 +145,7 @@ Installs nothing; both scenarios pass on the bench.
 - Scene `sky` (`SCENE=sky`): no objects, the free camera at the middle of the map
   looking out, for judging the skies on their own (712a09a).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.18.0 — 2026-10-16
 
@@ -190,7 +190,7 @@ Installs nothing into the game. Confirmed in game 2026-10-16.
   `fog-edges` and `cloak` check render3d's modules in `Render3D.log` in place of the
   removed plugins; the session no longer clears or collects their `.ini` and `.log`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.16.0 — 2026-10-15
 
@@ -200,7 +200,7 @@ Installed, not yet seen in game.
 - `Render3D.log` and `Render3D.ini` are cleared at launch and gathered with the other
   logs.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 3.15.0 — 2026-10-13
 

@@ -13,7 +13,7 @@ $P = (Get-ChildItem -LiteralPath $T -Directory -Filter "armada2-refit-*").FullNa
 $D3d8to9 = Join-Path $PSScriptRoot "..\..\platform\vendor\d3d8to9-1.16.0\d3d8.dll"
 $D3d8to9Sha = "122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8"
 # install.sh's ::step ids, in order (manifest.json's "steps").
-$Steps = "verify prereqs chain hud menus qol grid models online cutscenes renderer bloom done"
+$Steps = "verify prereqs chain render3d ui qol models online cutscenes renderer bloom done"
 function Check([string]$what, $ok) {   # $ok untyped: a [bool] parameter refuses strings
     if ($ok) { Write-Host "ok    $what" } else { throw "FAIL  $what" }
 }
@@ -71,8 +71,8 @@ $env:A2_PROGRESS = $null
 Check "::step ids in install.sh's order" ((@($out | Where-Object { $_ -like "::step *" } |
                                            ForEach-Object { ($_ -split " ")[1] }) -join " ") -eq $Steps)
 $at = @{}; for ($i = 0; $i -lt $out.Count; $i++) { if (-not $at.ContainsKey($out[$i])) { $at[$out[$i]] = $i } }
-Check "::step lines in order with the rest" (($at["::step hud HUD"] -lt $at["  HUD.asi"]) -and
-                                             ($at["  HUD.asi"] -lt $at["::step menus menus"]) -and
+Check "::step lines in order with the rest" (($at["::step ui the HUD and the menus"] -lt $at["  HUD.asi"]) -and
+                                             ($at["  HUD.asi"] -lt $at["::step qol quality of life"]) -and
                                              ($at["::step done done"] -gt $at["  dxvk.conf"]))
 Check "winmm.dll" ((Sha (G "winmm.dll")) -eq "baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5")
 Check "STA2WidescreenPatch.asi" ((Sha (G "STA2WidescreenPatch.asi")) -eq "193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5")
@@ -87,10 +87,14 @@ Check "the player's own recipe left, Sky.asi's gone" ((@(Get-ChildItem (G "Sky")
 foreach ($n in "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Online") {
     Check "$n.asi + $n.ini" ((Test-Path (G "$n.asi")) -and (Test-Path (G "$n.ini")))
 }
+# No d3d8to9: no Render3D.asi or UI.asi; the older plugins above in the UI's place.
+Check "no Render3D.asi, no UI.asi, said so" (-not (Test-Path (G "Render3D.asi")) -and -not (Test-Path (G "UI.asi")) -and
+    -not (Test-Path (G "Surfaces")) -and (Has $out "*Render3D.asi skipped*") -and (Has $out "*UI.asi skipped*"))
 $log = Get-Content -LiteralPath $PyLog
 Check "the SOD rewrites, in order, with the game" (
     ($log[0] -like "*models\moon-sod.py --install") -and ($log[1] -like "game *Star Trek Armada II") -and
-    ($log[2] -like "*models\select-sod.py --install") -and ($log[4] -like "*models\hull-sod.py --install"))
+    ($log[2] -like "*models\select-sod.py --install") -and ($log[4] -like "*models\hull-sod.py --install") -and
+    ($log[6] -like "*models\asteroid-sod.py --install"))
 Remove-Item -LiteralPath $PyLog
 Check "no bloom" (-not (Test-Path (G "A2Bloom.ini")))
 Check "binkw32.dll is the proxy" ((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy")
@@ -135,10 +139,19 @@ foreach ($f in "MagicBloom.fx", "ReShade.fxh", "ReShadeUI.fxh") {
 Check "A2Bloom.ini" (Test-Path (G "A2Bloom.ini"))
 Check "and as ReShadePreset.ini" ((Sha (G "ReShadePreset.ini")) -eq (Sha (G "A2Bloom.ini")))
 
-Write-Host "== no d3d8.dll: d3d8to9 goes in"
+Write-Host "== no d3d8.dll: d3d8to9 goes in, and with it Render3D.asi and UI.asi"
 Remove-Item -LiteralPath (G "d3d8.dll")
+New-Item -ItemType Directory (G "Surfaces") | Out-Null
+Set-Content (G "Surfaces\myown.ini") "[Surface]"
 $out = Install @($G)
 Check "d3d8.dll is d3d8to9" ((Sha (G "d3d8.dll")) -eq $D3d8to9Sha)
+Check "Render3D.asi and UI.asi" (((Sha (G "Render3D.asi")) -eq (Sha (Join-Path $P "game\Render3D.asi"))) -and
+    ((Sha (G "UI.asi")) -eq (Sha (Join-Path $P "game\UI.asi"))) -and (Test-Path (G "Render3D.ini")) -and (Test-Path (G "UI.ini")))
+Check "the recipes" ((@(Get-ChildItem (G "Nebulae")).Count -eq @(Get-ChildItem (Join-Path $P "game\Nebulae")).Count) -and
+    (@(Get-ChildItem (G "Surfaces")).Count -eq @(Get-ChildItem (Join-Path $P "game\Surfaces")).Count + 1))
+foreach ($n in "HUD", "Menus", "GridLayout") {
+    Check "$n.asi + $n.ini out for the UI" (-not (Test-Path (G "$n.asi")) -and -not (Test-Path (G "$n.ini")))
+}
 Set-Content (G "d3d9.dll") "dxvk"
 $out = Install @($G)
 Check "d3d8to9 already" (Has $out "*d3d8.dll: crosire's d3d8to9 already")
@@ -157,12 +170,14 @@ $env:A2_PROGRESS = "1"
 $out = Install @("-Uninstall", $G)
 $env:A2_PROGRESS = $null
 Check "::step uninstall, and only that" ((@($out | Where-Object { $_ -like "::step *" }) -join "|") -eq "::step uninstall taking the mod out")
-Check "the SOD rewrites reverted" ((@(Get-Content -LiteralPath $PyLog | Where-Object { $_ -like "*--revert" }).Count -eq 3))
+Check "the SOD rewrites reverted" ((@(Get-Content -LiteralPath $PyLog | Where-Object { $_ -like "*--revert" }).Count -eq 4))
 Remove-Item -LiteralPath $PyLog
 Check "the player's own recipe left" ((@(Get-ChildItem (G "Sky")).Name -join ",") -eq "myown.ini")
+Check "Render3D's recipes out, the player's own left" (((@(Get-ChildItem (G "Surfaces")).Name -join ",") -eq "myown.ini") -and
+    -not (Test-Path (G "Nebulae")))
 Check "binkw32.dll is stock again" ((Text (G "binkw32.dll")) -eq "stockbink")
 Check "no binkw32 copies" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-Path (G "binkw32.dll.a2neb-backup")))
-foreach ($n in "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Online") {
+foreach ($n in "Render3D", "UI", "HUD", "Menus", "QOL", "QOLRules", "GridLayout", "Online") {
     foreach ($e in ".asi", ".ini", ".log") { Check "$n$e removed" (-not (Test-Path (G "$n$e"))) }
 }
 foreach ($f in "BinkProxy.ini", "dxvk.conf", "A2Bloom.ini", "ReShadePreset.ini", "winmm.dll", "STA2WidescreenPatch.asi",
