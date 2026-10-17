@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.31.0 — 2026-10-17
+
+### Added
+- `Scene.asi`: `Zoom=` in `[Scene]` and the `zoom [<level>]` command set the RTS
+  camera's zoom as a level from 0 (closest) to 1 (farthest), through the camera in use's
+  `SetZoomLevel`, and answer with the level, the camera and its raw limits; `query` ends
+  with the same line. `Zoom=0.37` is the view of 150 `ctrl+Down` then 35 `ctrl+Up`.
+  Scene `zoom`.
+
+Installed, not yet seen in game.
+
 ## 3.30.0 — 2026-10-17
 
 ### Added
