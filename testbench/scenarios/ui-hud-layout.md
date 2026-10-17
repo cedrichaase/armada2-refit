@@ -23,8 +23,12 @@ The thresholds, per layout:
 | Check | Fails when |
 |---|---|
 | overlap | two panels share more than a pixel on both axes |
-| height | a panel standing on the bottom half of the screen (minimap, info panel, bar, unit view) has its top edge more than 45% of the screen's height up from the bottom: the middle of the 3D view, where the ships are, is to stay clear |
-| cover | all the panels together (their union) cover more than 30% of the screen |
+| height | a panel standing on the bottom half of the screen (minimap, info panel, bar, unit view) has its top edge more than 45% of the screen's height up from the bottom (60% at 4:3): the middle of the 3D view, where the ships are, is to stay clear |
+| cover | all the panels together (their union) cover more than 30% of the screen (42% at 4:3) |
+
+4:3 gets looser limits (the user's call, 2026-10-17: hardly anyone plays at 4:3 any more):
+there the HUD's fixed-size panels take a larger share of a narrower screen. A step's
+`(N% at 4:3)` applies to any screen narrower than 3:2.
 
 The run's `ui-hud-layout/sheet.png` has the screenshots as a matrix, a row per
 resolution and a column per selection, with the panels drawn on them (red where a check
@@ -41,21 +45,21 @@ failed).
 9. Expect scene "selection" answers "selected 1:".
 10. Take a layout screenshot called "1 ship".
 11. Expect the HUD's panels not to overlap.
-12. Expect the HUD's panels at the bottom to rise at most 45% of the screen's height.
-13. Expect the HUD's panels to cover at most 30% of the screen.
+12. Expect the HUD's panels at the bottom to rise at most 45% of the screen's height (60% at 4:3).
+13. Expect the HUD's panels to cover at most 30% of the screen (42% at 4:3).
 14. Scene "select s13 s14 s15 s16 s17 s18".
 15. Wait 3 seconds.
 16. Expect scene "selection" answers "selected 6:".
 17. Take a layout screenshot called "6 ships".
 18. Expect the HUD's panels not to overlap.
-19. Expect the HUD's panels at the bottom to rise at most 45% of the screen's height.
-20. Expect the HUD's panels to cover at most 30% of the screen.
+19. Expect the HUD's panels at the bottom to rise at most 45% of the screen's height (60% at 4:3).
+20. Expect the HUD's panels to cover at most 30% of the screen (42% at 4:3).
 21. Scene "select s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 s16 s17 s18 s19 s20 s21 s22 s23 s24 s25 s26 s27 s28 s29 s30".
 22. Wait 3 seconds.
 23. Expect scene "selection" answers "selected 30:".
 24. Take a layout screenshot called "30 ships".
 25. Expect the HUD's panels not to overlap.
-26. Expect the HUD's panels at the bottom to rise at most 45% of the screen's height.
-27. Expect the HUD's panels to cover at most 30% of the screen.
+26. Expect the HUD's panels at the bottom to rise at most 45% of the screen's height (60% at 4:3).
+27. Expect the HUD's panels to cover at most 30% of the screen (42% at 4:3).
 28. Expect the game is still running.
 29. Expect no crash.

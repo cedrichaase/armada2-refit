@@ -741,6 +741,15 @@ def covered(panels, W, H):
     return area / float(W * H)
 
 
+def layout_limit(c, m):
+    """A layout check's limit as a fraction: `pct`, or `pct43` on a screen narrower than
+    3:2 (4:3, 5:4) when the step gives one ("at most 45% ... (60% at 4:3)")."""
+    W, H = c.res
+    if m.group('pct43') and W / H < 1.5:
+        return float(m.group('pct43')) / 100
+    return float(m.group('pct')) / 100
+
+
 def _layout_boxes(panels, bad=()):
     return [dict(p, label=p['name']) for p in panels if p['name'] not in bad], \
            [dict(p, label=p['name']) for p in panels if p['name'] in bad]
@@ -781,11 +790,12 @@ def s_layout_overlap(c, m):
 
 
 @step(r"^expect (?:that )?(?:the )?hud(?:'s)? panels at the bottom (?:to )?(?:rise|reach|stand) "
-      r"(?:at most|no (?:more|higher) than) (?P<pct>[\d.]+)% (?:up )?(?:of )?the screen(?:'s)? (?:height)?$")
+      r"(?:at most|no (?:more|higher) than) (?P<pct>[\d.]+)% (?:up )?(?:of )?the screen(?:'s)? (?:height)?"
+      r"(?: \((?P<pct43>[\d.]+)% at 4:3\))?$")
 def s_layout_height(c, m):
     panels, line = hud_layout(c)
     W, H = c.res
-    limit = float(m.group('pct')) / 100
+    limit = layout_limit(c, m)
     floor = H * (1 - limit)
     low = bottom_panels(panels, H)
     high = [p for p in low if p['y'] < floor - 0.5]
@@ -801,11 +811,11 @@ def s_layout_height(c, m):
 
 
 @step(r"^expect (?:that )?(?:the )?hud(?:'s)? panels (?:to )?cover (?:at most|no more than) (?P<pct>[\d.]+)% "
-      r"of the screen$")
+      r"of the screen(?: \((?P<pct43>[\d.]+)% at 4:3\))?$")
 def s_layout_cover(c, m):
     panels, line = hud_layout(c)
     W, H = c.res
-    limit = float(m.group('pct')) / 100
+    limit = layout_limit(c, m)
     share = covered(panels, W, H)
     ok = share <= limit
     detail = f'the panels cover {share:.1%} of the screen (limit {limit:.0%})\n' + line

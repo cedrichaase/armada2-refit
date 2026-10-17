@@ -10,10 +10,12 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - Scenario `ui-hud-layout`: the UI's HUD at 1024x768, 1920x1080 and 2560x1080 with 1,
   6 and 30 ships selected, failing when panels overlap, when a panel at the bottom
-  rises more than 45% up the screen, or when the panels cover more than 30% of it; from
-  UI.asi's own rectangles (ui 0.12.0, `[HUD] LayoutLog=1`).
+  rises more than 45% up the screen, or when the panels cover more than 30% of it (60%
+  and 42% on screens narrower than 3:2, the user's call for 4:3); from UI.asi's own
+  rectangles (ui 0.12.0, `[HUD] LayoutLog=1`).
 - Checks `Expect the HUD's panels not to overlap`, `... at the bottom to rise at most
-  N% of the screen's height`, `... to cover at most N% of the screen`, and `Take a
+  N% of the screen's height`, `... to cover at most N% of the screen`, each with an
+  optional `(M% at 4:3)` for screens narrower than 3:2, and `Take a
   layout screenshot called "NAME"` (the shot with the panels drawn on it).
 - Scenario header `Sheet:` (shot names): the run writes `<scenario>/sheet.png`, a row
   per case and a column per shot, and links it from the report.
