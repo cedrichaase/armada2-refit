@@ -2,7 +2,7 @@
 Film: fleets-scout
 Final: 3840x2160
 Pointer: 1920x1080
-Variant refit: --assets none --install . --install testbench/scene
+Variant refit: --install . --install testbench/scene
 
 A scratch board for two fleet scenes the user asked for, to be moved into the promo board
 (`films/promo/storyboard.md`) once they read well. Not part of the promo yet. Every shot

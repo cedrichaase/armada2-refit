@@ -2,7 +2,7 @@
 Film: promo
 Final: 3840x2160
 Pointer: 1920x1080
-Variant refit: --assets none --install . --install testbench/scene
+Variant refit: --install . --install testbench/scene
 
 The promo for the release that puts render3d and the UI in the installer (12.24.0): the one
 video that has to make someone who loved Armada II in 2001 install it again tonight.
@@ -42,9 +42,12 @@ For the editor:
 - **Captions are first person and plain** (maker-promo's `brand/brand.md`, "Voice"): a
   lower third names a feature once, the first time it is on screen. No act cards except
   where the film turns (gameplay, installing).
-- **"Refit" is the game as the release installs it**: every code layer, none of
-  `$A2_DATA`'s assets: no remastered textures, no backdrop plates, no movies
-  (`--assets none`). The thumbnail is the one exception.
+- **"Refit" is every code layer with the HD textures** (the user, 2026-10-17): the
+  install takes `$A2_DATA`'s built assets, the remastered textures with the backdrop
+  plates and movies (no `--assets none`). The release ships none of them (copyright:
+  they are derived from the game's art), so every video description says so; the
+  installing section's i06 shows the HD textures too, which a fresh install without a
+  pack doesn't.
 - **Every current-state shot is filmed fresh** from the release's commit; the takes from
   2026-10-15 predate the nebula rework and the UI.
 - Online play is in progress and is not in this film.

@@ -2,7 +2,7 @@
 Film: online-scout
 Final: 3840x2160
 Pointer: 1920x1080
-Variant refit: --assets none --install . --install testbench/scene
+Variant refit: --install . --install testbench/scene
 
 A scout for the promo's online beat: two games on the bench, side by side, through
 *Internet - Online* on a local `a2online-server` (the bench never talks to the public

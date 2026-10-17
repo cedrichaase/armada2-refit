@@ -3,7 +3,7 @@ Film: intros-scout
 Final: 3840x2160
 Pointer: 1920x1080
 Music: 1
-Variant refit: --assets none --install . --install testbench/scene
+Variant refit: --install . --install testbench/scene
 
 Scratch board, 2026-10-17: one long take per campaign intro (the in-engine cinematic that
 opens each first mission) plus the stock main menu with its music, to log timestamped

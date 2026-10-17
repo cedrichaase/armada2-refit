@@ -2,7 +2,7 @@
 Film: beams-scout
 Final: 3840x2160
 Pointer: 1920x1080
-Variant refit: --assets none --install . --install testbench/scene
+Variant refit: --install . --install testbench/scene
 
 A scratch board for two beam shots of the promo (`films/promo`, "Beams"), worked out
 here so the promo board is not touched until they are reviewed: the assimilation beam

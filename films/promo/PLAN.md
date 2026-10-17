@@ -22,7 +22,10 @@ after; the install guide closes, as asked.
 
 ## Decided (2026-10-14)
 
-- **D1/D2. What "refit" is:** the game as a release will install it once the new effects
+- **D1/D2, superseded 2026-10-17:** the user wants the recording done with the HD
+  textures (`Variant refit: --install . --install testbench/scene`, `$A2_DATA`'s assets),
+  and the descriptions to say they aren't redistributed, for copyright. Before that:
+  **What "refit" is:** the game as a release will install it once the new effects
   are in the installer: every code layer, no remastered textures, no menu backdrop
   plates (`Variant refit: --assets none ...`). **Published once the installer installs
   the new effects.** The menu comparison is out (black sides without plates); the guide
