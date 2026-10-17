@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.26.0 — 2026-10-17
+
+Layers: films 1.5.0.
+
+### Added
+- `a2film review`: contact sheets, flags, motion curves and variant differences for the
+  takes of a board, with an HTML overview (films 1.5.0).
+
+Tooling only; nothing to see in game.
+
 ## 12.25.0 — 2026-10-17
 
 Layers: films 1.4.0.

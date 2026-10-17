@@ -5,6 +5,20 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.5.0 — 2026-10-17
+
+### Added
+- `a2film review <board> [shots...]` (`--tier`, `--jobs`, `film/review.py`): a first pass
+  over the takes. A contact sheet with timecodes, a motion curve with its peaks and
+  settle point and flags with timestamps (black, frozen, flashes and white squares, a
+  take ending before `In`+`Length`, silent or clipping sound) for every take; how two
+  variants differ over time (barely differ, will not line up, constant offset); an HTML
+  overview per board next to the takes, a summary table with suggested `In` / `Length`
+  where obvious. The selftest pins the flags on clips made with ffmpeg. Needs numpy and
+  Pillow, and `a2film` runs without them (the command is missing).
+
+Tooling only; nothing to see in game.
+
 ## 1.4.0 — 2026-10-17
 
 ### Added
