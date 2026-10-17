@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.27.0 — 2026-10-17
+
+Layers: films 1.6.0.
+
+### Added
+- `a2film`: boards split over files (`Include:`), `a2film adopt` for another board's
+  takes of the same shot, the shot field `Tier:` for money shots probed larger in the
+  same run (at the final resolution: filmed as the final take), and the reference catalogue `films/reference/` with `From: ref:<id>`; the
+  rough cut uses each shot's best take (films 1.6.0, 13be105).
+
+Tooling only; nothing to see in game.
+
 ## 12.26.0 — 2026-10-17
 
 Layers: films 1.5.0.
