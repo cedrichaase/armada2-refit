@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.35.0 — 2026-10-17
+
+Layers: testbench 3.38.0, films 1.11.0.
+
+### Added
+- Scenes `assimilation-fusion` and `assimilator`, for the Fusion Cube's assimilation
+  beam and the Assimilator's auto-assimilator (testbench 3.38.0); scratch boards
+  `films/beams-scout` and `films/fleets-scout` for the promo's new shots (films 1.11.0).
+
+Installs nothing; the beams seen firing on the bench 2026-10-17 (stock), the boards not
+yet filmed.
+
 ## 12.34.0 — 2026-10-17
 
 Layers: testbench 3.37.0.
