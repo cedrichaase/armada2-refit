@@ -36,6 +36,7 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `showcase` | a fleet action for footage: the Enterprise-E (`fente`), a Sovereign (`fbattle`), a Galaxy and two Klingon flagships (`kmartok`, `kbattle`) firing at two Borg cubes that do not fire back (a Borg attack beams boarding parties over), in front of a class M planet; everyone immortal and healed, engines off | 2026-10-07 |
 | `warp` | three of the player's Federation destroyers in open space at 3000,0,3000, with the HUD and cursor on, for long moves on the map going to warp (`scenarios/qol-warp.md`) | 2026-10-07 |
 | `ui-colonize` | the player's colony ship (`colony`, `fcolony`, engines on) and a Galaxy class (`mine`) beside an unclaimed class M planet (`planet`), with the HUD, cursor, tooltips and hover on, the camera on the colony ship: a left click on the planet selects it, a right click with the colony ship selected colonises it (`scenarios/ui-hud-colonize.md`) | 2026-10-16 |
+| `ui-hud-layout` | thirty of the player's Federation destroyers (`s1`..`s30`), engines and weapons off, six by five about the camera's start, with the HUD, cursor, tooltips and hover on, for the HUD's layout with a big selection (`scenarios/ui-hud-layout.md`) | 2026-10-17 |
 | `explosion` | a Galaxy class beside a destroyer (`small`), a cruiser (`mid`) and a battleship (`big`), none firing, to blow up with `kill`, for the explosions (`render3d/README.md`, "effects"; `scenarios/explosions.md`) | 2026-10-12 |
 | `shields` | a Galaxy class (phasers) and a Klingon battleship (`kbattle`, torpedoes) firing at a second Galaxy (`target`) as in `firing`: the target healed, its shields holding. For the shield hits (`render3d/README.md`, "effects"; `scenarios/shields-hits.md`) | 2026-10-12 |
 | `fog-planet` | a class M planet (`planet`) at 3000,0,3000 with the player's scout beside it, the map's fog and shroud on and the HUD on; the camera looks down on the planet. `goto scout 6500 0 6500` leaves the planet as a fog-of-war ghost. For render3d's planet ghosts (`render3d/README.md`, "overlays"; `scenarios/render3d-planet-ghost.md`) | 2026-10-17 |
@@ -135,7 +136,7 @@ answer and fails if a command did.
 | `pause`, `resume` | the game's own pause (`PauseSimulation`) |
 | `hud`, `grid`, `cursor`, `notices`, `tooltips`, `hover`, `shieldfx` `on\|off` | as the keys above. `tooltips off` also clears a box already showing; `shieldfx off` lets flashes already showing run out |
 | `query` | every object's handle and position (and a producer's build queue, a planet's team, population and the population its cities are drawn at), and the camera's eye, front and up |
-| `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`); answers as `selection` |
+| `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`), up to 39 names (a command has at most 40 words); answers as `selection` |
 | `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
 | `marks` | how many marks `Scene.marks` has, and the last 16, each as written (`Expect scene "marks" answers "cloak.done obj=warbird"`) |
 

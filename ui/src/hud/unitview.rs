@@ -68,6 +68,7 @@ pub fn run(ui: &mut Ui) {
     let e = ui.u(t.edge).max(1.0);
     let g = ui.u(3.0);
     let outer = r.inset(-g - e);
+    super::layout::note(outer);
     // Square, whatever the theme's corners: the picture is square, and a rounded
     // frame (the LCARS theme's) cut into its corners.
     ui.draw.stroke(outer, Corners::SQUARE, g + e, fade(t.panel, 0.95));

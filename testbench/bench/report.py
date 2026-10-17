@@ -31,10 +31,91 @@ def summary_counts(cases):
 def write(run_dir, meta):
     run_dir = Path(run_dir)
     cases = collect(run_dir)
+    sheets = {}
+    for c in cases:
+        slug = c['dir'].split('/')[0]
+        if slug not in sheets:
+            sheets[slug] = sheet(run_dir, c)
+        c['sheet'] = sheets[slug]
     (run_dir / 'results.json').write_text(json.dumps(dict(meta=meta, cases=cases), indent=1))
     (run_dir / 'report.md').write_text(markdown(cases, meta))
     (run_dir / 'index.html').write_text(page(run_dir, cases, meta))
     return run_dir / 'index.html'
+
+
+def sheet(run_dir, case):
+    """A scenario with `Sheet: "1 ship", "6 ships", ...` gets a contact sheet in its
+    directory, `sheet.png`: a row per case (resolution), a column per named shot, each
+    cell the shot's `-layout.png` copy when it has one (the HUD's panels drawn on it),
+    labelled with the case, the shot and the case's result. Rebuilt with each report,
+    so it fills in as the cases finish. Returns its path relative to the run, or None."""
+    from . import scenario
+    try:
+        names = scenario.parse(config_repo() / case['file']).sheet
+    except Exception:
+        return None
+    if not names:
+        return None
+    import cv2
+    import numpy as np
+    run_dir = Path(run_dir)
+    slug_dir = run_dir / case['dir'].split('/')[0]
+    rows = []
+    for cd in sorted(p.parent for p in slug_dir.glob('*/result.json')):
+        r = json.loads((cd / 'result.json').read_text())
+        shots = {}
+        for line in (cd / 'steps.jsonl').read_text().splitlines() if (cd / 'steps.jsonl').exists() else []:
+            rec = json.loads(line)
+            if rec.get('kind') == 'shot' and rec.get('shots'):
+                shots[rec['text']] = cd / rec['shots'][0]
+        rows.append((r, shots))
+    rows.sort(key=lambda rs: tuple(int(v) for v in rs[0]['resolution'].split('x')))
+    CH, CW, LH = 360, 840, 56          # a cell fits 21:9 at 360 px tall; the label above it
+    sheet_img = np.full((len(rows) * (CH + LH) + 8, len(names) * (CW + 8) + 8, 3), 24, np.uint8)
+    for i, (r, shots) in enumerate(rows):
+        for j, name in enumerate(names):
+            x0, y0 = 8 + j * (CW + 8), i * (CH + LH) + 8
+            p = shots.get(name + ' (layout)') or shots.get(name)
+            img = cv2.imread(str(p)) if p and p.exists() else None
+            # Which of this shot's checks failed: the steps between it and the next shot.
+            verdict = _verdict_after(r, name, names)
+            colour = {'pass': (90, 200, 120), 'fail': (90, 90, 255)}.get(verdict, (200, 200, 200))
+            label = f"{r['resolution']} ({r['aspect']})  {name}  {verdict.upper() if verdict else ''}"
+            cv2.putText(sheet_img, label, (x0, y0 + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.9, colour, 2, cv2.LINE_AA)
+            if img is None:
+                cv2.putText(sheet_img, 'no shot', (x0 + 20, y0 + LH + CH // 2), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                            (150, 150, 150), 2, cv2.LINE_AA)
+                continue
+            h, w = img.shape[:2]
+            k = min(CH / h, CW / w)
+            img = cv2.resize(img, (max(1, int(w * k)), max(1, int(h * k))), interpolation=cv2.INTER_AREA)
+            sheet_img[y0 + LH:y0 + LH + img.shape[0], x0:x0 + img.shape[1]] = img
+    out = slug_dir / 'sheet.png'
+    cv2.imwrite(str(out), sheet_img)
+    return str(out.relative_to(run_dir))
+
+
+def _verdict_after(r, name, names):
+    """pass or fail for the checks that follow the shot called `name` in a case, up to
+    the next shot of the sheet; '' when none ran."""
+    texts = [s['text'] for s in r['steps']]
+    start = next((k for k, t in enumerate(texts) if f'"{name}"' in t), None)
+    if start is None:
+        return ''
+    out = ''
+    for s in r['steps'][start + 1:]:
+        if any(f'"{n}"' in s['text'] for n in names):
+            break
+        if s['status'] in ('fail', 'error'):
+            return 'fail'
+        if s['status'] == 'pass':
+            out = 'pass'
+    return out
+
+
+def config_repo():
+    from . import config
+    return config.REPO
 
 
 def failures(cases):
@@ -66,6 +147,8 @@ def markdown(cases, meta):
             L.append(f'- **{c["scenario"]}** at {c["resolution"]}, step {s["n"]}: {s["text"]} '
                      f'({", ".join(s.get("shots", []))})')
         L.append('')
+    for sh in sorted({c['sheet'] for c in cases if c.get('sheet')}):
+        L += [f'Contact sheet: `{sh}`', '']
     L += ['## Cases', '', '| scenario | resolution | aspect | mod | result | time |', '|---|---|---|---|---|---|']
     for c in cases:
         L.append(f'| {c["scenario"]} | {c["resolution"]} | {c["aspect"]} | {c["mod"]} | '
@@ -126,6 +209,11 @@ code {{ font:13px ui-monospace, monospace; }}
 <p>""" + ' '.join(f'<span class="b {k}">{v} {BADGE[k]}</span>' for k, v in
                    sorted(counts.items(), key=lambda kv: STATUS_ORDER.index(kv[0]))) + '</p>']
 
+    sheets = sorted({c['sheet'] for c in cases if c.get('sheet')})
+    if sheets:
+        parts.append('<h2>Contact sheets</h2>' + ''.join(
+            f'<p><a href="{_esc(sh)}"><img src="{_esc(sh)}" alt="contact sheet {_esc(sh)}" '
+            f'style="max-width:100%;border:1px solid var(--line);border-radius:4px"></a></p>' for sh in sheets))
     if fails:
         parts.append('<h2>What failed</h2><ul>')
         for c, s in fails:

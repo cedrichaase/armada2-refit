@@ -697,6 +697,30 @@ owner over a panel of ours). And while a box of ours that pauses the game shows,
 draws the arrow whenever the engine names no cursor. The cursor is drawn after the
 overlay layer, where the boxes are.
 
+## The layout log
+
+`hud/layout.rs`, with `[HUD] LayoutLog=1`, for the test bench. Every panel of ours
+draws its frame through `Ui::panel`, so that one call is where the HUD's rectangles
+can be read exactly, without measuring a screenshot. While a mission's frame is laid
+out (`hud::run`, from `layout::begin` to `layout::end`), `Ui::panel` hands each
+rectangle to `layout::note` under the name of the panel `hud::run` is drawing
+(`layout::at`: `unitview`, `minimap`, `info`, `bar`, `comm`, and the names of the
+smaller panels' scopes, `resources`, `buttons`, `replay`, `trade`, `pause`, ...). The
+unit view's frame is strokes, not a panel, so `unitview` notes its own outer edge. The
+hover card and the tooltips are left out: they come and go with the pointer.
+
+After the last panel, a layout that differs from the one last written and has held for
+five frames is written to UI.log as one line, in screen pixels, x,y,w,h rounded:
+
+    layout: 1920x1080 | unitview 1637,807,273,263 | minimap 10,770,310,300 | info ... | bar ...
+
+The five frames keep a layout that settles over a frame or two (the bar is placed
+against the info panel, which can change size the frame a selection does) to one line.
+With the key at 0, as in play, `note` tests one flag and keeps nothing.
+`testbench/scenarios/ui-hud-layout.md` reads the last line and fails on panels that
+overlap, panels at the bottom that rise too far up the screen, and panels that cover
+too much of it (`testbench/scenarios/README.md`, "The HUD's layout").
+
 ## The engine API
 
 One file per area in `src/engine/`, each read by offset through small accessors, each

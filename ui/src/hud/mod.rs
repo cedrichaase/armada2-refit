@@ -5,6 +5,7 @@
 //! acts through the component's own functions.
 pub mod bar;
 pub mod info;
+pub mod layout;
 pub mod minimap;
 pub mod overlay;
 mod tooltips;
@@ -210,25 +211,32 @@ pub fn run(ui: &mut Ui) {
             ui.claim(screen);
             ui.occlude(screen);
         }
+        layout::begin();
         if SELECTION {
             let keep = if MINIMAP { let (o, _, _) = minimap::place(ui); alloc::vec![o] } else { alloc::vec::Vec::new() };
             overlay::run(ui, &keep);
         }
         if UNIT_VIEW {
+            layout::at("unitview");
             unitview::run(ui);
         }
         if MINIMAP {
+            layout::at("minimap");
             minimap::run(ui);
         }
         // The info panel first: the bar is placed against it.
         if INFO {
+            layout::at("info");
             info::run(ui);
         }
         if BAR {
+            layout::at("bar");
             bar::run(ui);
         }
         panels::run(ui);
+        layout::at("comm");
         comm::run(ui);
+        layout::end(ui.w, ui.h);
         if TOOLTIPS {
             tooltips::run(ui);
         }

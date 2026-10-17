@@ -1178,7 +1178,7 @@ static void __thiscall camera_update(void *view, void *st3dcam)
 
 /* ---- commands (Scene.cmd) --------------------------------------------- */
 
-#define MAXTOK 12
+#define MAXTOK 40   /* select takes up to 39 names: a 30-ship selection in one command */
 
 static int split(char *line, char **tok)
 {

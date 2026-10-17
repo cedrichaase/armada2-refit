@@ -108,6 +108,9 @@ pub struct Hud {
     /// The tooltips the engine shows at the pointer (`CursorInterface`: an object's
     /// name and description over the 3D view), drawn by us in the theme.
     pub tooltips: bool,
+    /// `[HUD] LayoutLog`: for the test bench, every panel's rectangle written to UI.log
+    /// when the layout changes (`hud::layout`). 0 in play.
+    pub layout_log: bool,
 }
 
 pub fn load() -> Config {
@@ -154,6 +157,7 @@ pub fn load() -> Config {
             drop_player: ini.int("HUD", "DropPlayer", 1) != 0,
             load_wait: ini.int("HUD", "LoadWait", 1) != 0,
             tooltips: ini.int("HUD", "Tooltips", 1) != 0,
+            layout_log: ini.int("HUD", "LayoutLog", 0) != 0,
         },
         menus: ini.int("Menus", "Enable", 1) != 0,
         menus_widgets: rt::lower(&ini.string("Menus", "Generic").unwrap_or_default()).trim() == "widgets",
