@@ -672,7 +672,7 @@ wait 2
 wait 1.5
 drag 830 430 1350 745 1.6
 ptr 1700 300 0.5
-wait 6
+wait 7
 ```
 
 ### g02 · Shift adds to a group
