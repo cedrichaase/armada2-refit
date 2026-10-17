@@ -5,6 +5,18 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.7.0 — 2026-10-17
+
+### Added
+- Every take starts in a game slot of the bench's machine-wide queue (testbench 3.31.0);
+  a shot with `Players` takes all its slots at once. `a2film slots` lists the holders
+  and waiters.
+- A take whose game died with it (crash, killed under load, no launch, gone before the
+  scene or at the end of the action) is filmed once more; a shot with `Players` as a
+  whole. Pinned in `film/selftest.py`.
+
+Tooling only; nothing to see in game.
+
 ## 1.6.0 — 2026-10-17
 
 ### Added

@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.28.0 — 2026-10-17
+
+Layers: testbench 3.31.0, films 1.7.0.
+
+### Added
+- A machine-wide queue for game slots: bench sessions, `a2test run` cases and `a2film`
+  takes wait for a free slot (`A2_SLOTS`, default 2 to 3) instead of all starting at
+  once, and say who holds the others; `a2test slots` and `a2film slots` list them
+  (testbench 3.31.0, films 1.7.0).
+- `a2film` films a take once more when its game died with it (films 1.7.0).
+
+Tooling only; nothing to see in game.
+
 ## 12.27.0 — 2026-10-17
 
 Layers: films 1.6.0.

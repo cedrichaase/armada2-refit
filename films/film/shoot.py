@@ -17,6 +17,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from . import code
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'testbench'))
+from bench import slots  # noqa: E402  (the machine-wide queue for game instances)
 from . import storyboard as sb
 from .cli import IGNORE_CODE, command, load, select, take_check
 
@@ -45,6 +47,10 @@ def probe_duration(path):
         return 0.0
 
 
+class GameDied(RuntimeError):
+    """The game (or its start) failed the way a loaded machine makes it fail: a take is tried again once."""
+
+
 class Take:
     """One shot, one variant, one tier: a session from start to stop."""
 
@@ -55,6 +61,7 @@ class Take:
         self.sid = None
         self.sess = None
         self.log = None
+        self.slot = None        # a game slot taken for it (an Ensemble takes its players' together)
         self.app = None         # a desktop shot's program, once `run` has started it
         self.desktop = shot.kind == 'desktop'
         # pointer coordinates are written in the film's Pointer space: a game take scales
@@ -90,11 +97,21 @@ class Take:
             prep = ['--no-launch'] if s.get('Prepare') else [f'--args={f.args(s)}']   # '-nointro' alone reads as a flag
             cmd = [A2TEST, 'session', 'start', '--res', f.res(self.tier, s),
                    *f.variants[s.install_variant(self.variant)].split(), *prep, '--label', label]
-        r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True)
+        # The slot is handed to the session start, whose sway and game hold it from there
+        # on; our copy of the descriptor is dropped as soon as it returns.
+        slot = self.slot or slots.acquire(self.tag, say=lambda m: self.note(m.splitlines()[0]))[0]
+        self.slot = None
+        try:
+            env.update(slot.env())
+            r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True, pass_fds=(slot.fd,))
+        finally:
+            slot.close()
         self.log.write(r.stdout + r.stderr)
         m = re.search(r'^session (\S+)', r.stdout, re.M)
         if not m:
-            raise RuntimeError('session did not start: ' + (r.stdout + r.stderr).strip()[-300:])
+            out = (r.stdout + r.stderr).strip()
+            err = ('session did not start: ' + out[-300:])
+            raise (GameDied if re.search(r'launcher exited|did not appear', out) else RuntimeError)(err)
         self.sid = m.group(1)
         self.note(f'session {self.sid}')
         if s.get('Prepare'):
@@ -114,7 +131,7 @@ class Take:
                     break
                 self.note(f'launch {attempt} failed: {out[:200]}')
                 if attempt == 2:
-                    raise RuntimeError(f'the game did not launch: {out[:200]}')
+                    raise GameDied(f'the game did not launch: {out[:200]}')
                 time.sleep(3)
             self.note('prepared and launched')
 
@@ -137,7 +154,7 @@ class Take:
         while time.time() - t0 < READY_TIMEOUT:
             if 'not running' in self.drive('running'):
                 if seen or time.time() - t0 > 120:
-                    raise RuntimeError('the game died before the scene was built')
+                    raise GameDied('the game died before the scene was built')
                 time.sleep(3)
                 continue
             seen = True
@@ -146,6 +163,12 @@ class Take:
                 return
             time.sleep(4)
         raise RuntimeError(f'no scene after {READY_TIMEOUT} s')
+
+    def check_alive(self):
+        """A game that died under the take (a crash, or killed under load) has nothing
+        to record: GameDied, so the take is tried again."""
+        if not self.desktop and self.sid and 'not running' in self.drive('running'):
+            raise GameDied('the game died during the take')
 
     def stop(self):
         if getattr(self, 'wall', None) and self.wall.poll() is None:
@@ -447,18 +470,42 @@ class Take:
     def __call__(self):
         os.makedirs(os.path.dirname(self.stem), exist_ok=True)
         self.log = open(self.stem + '.log', 'w')
+        try:
+            for attempt in (1, 2):
+                try:
+                    return self.attempt()
+                except GameDied as e:
+                    self.cleanup_attempt()
+                    if attempt == 2:
+                        self.note(f'FAILED: {e} (second try)')
+                        return False
+                    self.note(f'{e}; trying once more')
+                except Exception as e:      # one failed take must not end the others
+                    self.note(f'FAILED: {e}')
+                    return False
+        finally:
+            self.log.close()
+
+    def cleanup_attempt(self):
+        self.rec = None          # attempt()'s `finally` has stopped everything of the attempt
+        self.sid = None
+        self.sess = None
+
+    def attempt(self):
         raw = tempfile.mkdtemp(prefix=f'{self.variant}-', dir=os.path.dirname(self.stem)) + '/raw'
         ok = False
         try:
             self.start()
             self.wait_ready()
             self.run(self.shot.setup)
+            self.check_alive()
             self.record_start(raw)
             self.wait_recording(raw)
             t0 = time.time()
             events = []
             self.run(self.shot.action, events, t0)
             time.sleep(TAIL)
+            self.check_alive()
             t1 = time.time()
             duration = t1 - t0
             self.record_stop()
@@ -475,14 +522,11 @@ class Take:
             self.contact_sheet(probe_duration(self.stem + '.mkv'))
             self.note(f'done, {duration:.1f} s -> {self.stem}.mkv')
             ok = True
-        except Exception as e:      # one failed take must not end the others
-            self.note(f'FAILED: {e}')
         finally:
             if getattr(self, 'rec', None):
                 self.record_stop()
             self.stop()
             shutil.rmtree(os.path.dirname(raw), ignore_errors=True)
-            self.log.close()
         return ok
 
 
@@ -515,12 +559,37 @@ class Ensemble:
 
     def __call__(self):
         takes = list(self.takes.values())
-        raws = {}
-        ok = False
         for t in takes:
             os.makedirs(os.path.dirname(t.stem), exist_ok=True)
             t.log = open(t.stem + '.log', 'w')
+        try:
+            for attempt in (1, 2):
+                try:
+                    return self.attempt()
+                except GameDied as e:
+                    for t in takes:
+                        t.rec, t.sid, t.sess = None, None, None
+                    if attempt == 2:
+                        for t in takes:
+                            t.note(f'FAILED: {e} (second try)')
+                        return False
+                    for t in takes:
+                        t.note(f'{e}; trying the whole shot once more')
+        finally:
+            for t in takes:
+                t.log.close()
+
+    def attempt(self):
+        takes = list(self.takes.values())
+        raws = {}
+        ok = False
+        for t in takes:
             raws[t] = tempfile.mkdtemp(prefix=f'{t.variant}-', dir=os.path.dirname(t.stem)) + '/raw'
+        # every player's slot at once, or none: two shots each holding one and waiting for
+        # another would wait for ever (slots.py)
+        held = slots.acquire(self.tag, n=len(takes), say=lambda m: takes[0].note(m.splitlines()[0]))
+        for t, slot in zip(takes, held):
+            t.slot = slot
         try:
             # the players' sessions start together (a start is mostly waiting on the clone
             # and Wine), staggered: never two starts in one second
@@ -534,6 +603,8 @@ class Ensemble:
                     f.result()
             self.run(self.shot.setup)
             for t in takes:
+                t.check_alive()
+            for t in takes:
                 t.record_start(raws[t])
             for t in takes:
                 t.wait_recording(raws[t])
@@ -541,6 +612,8 @@ class Ensemble:
             events = []
             self.run(self.shot.action, events, t0)
             time.sleep(TAIL)
+            for t in takes:
+                t.check_alive()
             duration = time.time() - t0
             for t in takes:
                 t.record_stop()
@@ -560,16 +633,20 @@ class Ensemble:
                 t.contact_sheet(probe_duration(t.stem + '.mkv'))
                 t.note(f'done, {duration:.1f} s -> {t.stem}.mkv')
             ok = True
+        except GameDied:
+            raise
         except Exception as e:
             for t in takes:
                 t.note(f'FAILED: {e}')
         finally:
             for t in takes:
+                if t.slot:              # a start that never got to hand it down
+                    t.slot.close()
+                    t.slot = None
                 if getattr(t, 'rec', None):
                     t.record_stop()
                 t.stop()
                 shutil.rmtree(os.path.dirname(raws[t]), ignore_errors=True)
-                t.log.close()
         return ok
 
 
@@ -623,7 +700,9 @@ def film_takes(a, tier):
 
     light = [t for t in todo if px(res_of(t)) <= px(base)]
     heavy = [t for t in todo if px(res_of(t)) > px(base)]
-    say('a2film', f'{len(light)} takes at {base}, {a.jobs} at once' if light else 'no takes at ' + base)
+    say('a2film', (f'{len(light)} takes at {base}, {a.jobs} at once' if light else 'no takes at ' + base)
+                  + f'; at most {slots.count()[0]} games run on the machine at a time, the rest wait for a '
+                    f'slot (./a2film slots)')
     if heavy:
         say('a2film', f'then {len(heavy)} at their own tier, one at a time: '
                       + ', '.join(f'{t.tag} {res_of(t)}' for t in heavy))
