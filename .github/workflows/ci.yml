@@ -66,6 +66,14 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal
           rustup target add i686-pc-windows-msvc
+          # lld-link is the toolchain's own lld (rust-lld, named lld-link so it links
+          # COFF), first on PATH: rustc writes /export lines with EXPORTAS for the 32-bit
+          # stdcall DllMain, which Ubuntu's lld-link 18 refuses ("invalid /export"). The C
+          # plugins link with it too.
+          lld="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld"
+          mkdir -p "$RUNNER_TEMP/lld"
+          ln -s "$lld" "$RUNNER_TEMP/lld/lld-link"
+          echo "$RUNNER_TEMP/lld" >> "$GITHUB_PATH"
       - name: Build Render3D.asi
         run: CARGO="$(command -v cargo)" render3d/build.sh
       - name: a2fmt on the host
@@ -87,6 +95,14 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal
           rustup target add i686-pc-windows-msvc
+          # lld-link is the toolchain's own lld (rust-lld, named lld-link so it links
+          # COFF), first on PATH: rustc writes /export lines with EXPORTAS for the 32-bit
+          # stdcall DllMain, which Ubuntu's lld-link 18 refuses ("invalid /export"). The C
+          # plugins link with it too.
+          lld="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld"
+          mkdir -p "$RUNNER_TEMP/lld"
+          ln -s "$lld" "$RUNNER_TEMP/lld/lld-link"
+          echo "$RUNNER_TEMP/lld" >> "$GITHUB_PATH"
       - name: Build and package
         id: pkg
         run: |

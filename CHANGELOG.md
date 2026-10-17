@@ -24,6 +24,11 @@ Layers: gui-installer 1.6.0.
   `i686-pc-windows-msvc`), which CI's package job now installs.
 - `--uninstall` / `-Uninstall` also take out `Render3D.*`, `UI.*` and the recipes.
 
+### Fixed
+- CI builds `Render3D.asi` again: its `render3d` and `package` jobs link with the Rust
+  toolchain's own lld as `lld-link`, since Ubuntu's lld-link 18 refuses the `EXPORTAS`
+  export rustc now writes for `DllMain` (red on `main` since 12.21.0 at least).
+
 Installed, not yet seen in game.
 
 ## 12.23.0 — 2026-10-17
