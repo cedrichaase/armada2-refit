@@ -20,8 +20,8 @@ The order is the user's, feature by feature:
 3. **Nebulae**: a volume of gas the ships fly through, up close, filmed against the Key
    light so the hulls' shadows run through it.
 4. **Menus**, and 5. **the HUD**: a rewrite of their own, not stock's art un-stretched.
-   They look very different but keep stock's geometry (the user, 2026-10-17), so a wipe
-   compares them part for part, like any other before/after.
+   The HUD looks very different but keeps stock's geometry (the user, 2026-10-17), so a
+   wipe compares it part for part; the main menu is a column over a scene, so it dissolves.
 6. **Quality of life**: limits gone, still playable against stock players.
 7. **Installing**: the installer in a few steps, ending in the game.
 
@@ -31,7 +31,7 @@ of one, the menu scene's planet and the sky behind everything carry them. Hull l
 named only where a weapon's light falls on a hull.
 
 About 3:50 by the shot lengths, a little less once transitions overlap; the brief aims at
-3:30, so trim after the animatic (candidates: h04, n02, u03, g03, i08). The HUD and the UI
+3:30, so trim after the animatic (candidates: s05b, u03, g03, i08). The HUD and the UI
 get a deeper video of their own later, with voice-over: here they get one beat each.
 
 For the editor:
@@ -83,8 +83,8 @@ Hard cut on the bed's first hit: the same frame as o01, refit. No transition.
 ### o03 · Teaser: the fireball
 Kind: footage
 From: b01 refit
-In: 1.7
-Length: 1.2
+In: 1.5
+Length: 0.9
 Transition: cut
 Audio: game
 
@@ -155,21 +155,24 @@ Transition: cut
 Title: Explosions
 Sub: Fire and smoke as a volume, lighting the ships around it
 In: 1.3
-Length: 3.5
+Length: 2.0
+Speed: 0.5
 Status: draft
 
 The fireball's core: stock's sprite turns with the camera; refit's is a volume the camera
 moves around, and the flash lights the Galaxy and the Sovereign beside it. The cut lands on
 the act's first beat of music. From 2.7 s stock's shockwave disc fills the frame in both
-variants (2026-10-15), so the shot ends before it.
+variants (2026-10-15), so the shot ends before it. Probe 1: the flash at 1.4 s lights the Galaxy and the Sovereign
+at 1.5–1.7; the disc fills the frame from 2.5, so the window is 1.3–2.3, at half speed;
+closer (150 → 120) so the fireball is bigger.
 
 ```setup
 scene hover off; shieldfx off; tooltips off
-scene orbit 2090 0 2230 80 -6 150
+scene orbit 2090 0 2230 80 -6 120
 ```
 ```action
 wait 1
-scene kill mid; glide 7 110 -4 140
+scene kill mid; glide 7 110 -4 115
 wait 7
 ```
 
@@ -182,7 +185,7 @@ Transition: cut
 Title: Weapons light the hulls
 Sub: Phasers, torpedoes and pulses, each in its own colour
 In: 1.0
-Length: 7
+Length: 6
 Status: draft
 
 From above, on purpose: the Enterprise's phaser lights its own hull, and the light on the
@@ -207,12 +210,13 @@ Layout: wipe
 Transition: cut
 Title: Shields
 Sub: Each hit lights the shield where it lands
-In: 1.0
-Length: 6
+In: 5.0
+Length: 2.8
 Status: draft
 
 Stock's green shell over the whole ship against refit's hot spot and ring where each shot
-lands.
+lands. Probe 1: an electric sphere sits on the saucer at 2.0–4.5 s (refit) and 1–2 s (stock),
+an explosion sprite at 3 s in stock: 5.0–7.8 is clean in both.
 
 ```setup
 scene hover off; tooltips off
@@ -224,30 +228,6 @@ scene glide 8 235 -4 120
 wait 11
 ```
 
-### h04 · Klingon disruptors
-Shows: lighting: weapons
-Scene: factions
-Variants: stock, refit
-Layout: wipe
-Transition: dissolve 0.4
-In: 1.0
-Length: 6
-Status: draft
-
-The Klingon battleship's disruptor beams, the red light running down its hull. A cut
-candidate.
-
-```setup
-step Move the mouse to 1900,8
-scene hover off; shieldfx off; tooltips off
-scene orbit kli 90 -6 130
-```
-```action
-wait 1
-scene glide 10 40 -3 120
-wait 7.5
-```
-
 ### b04 · Damage
 Shows: venting
 Scene: venting
@@ -256,19 +236,21 @@ Layout: wipe
 Transition: dissolve 0.4
 Title: Damage
 Sub: Venting plasma that lights the hull
-In: 0.5
-Length: 6
+In: 4.0
+Length: 3
 Status: draft
 
-The Galaxy's saucer venting plasma, the glow at the vent lighting the hull.
+The Galaxy's saucer venting plasma, the glow at the vent lighting the hull. Probe 1: the plume ran off the top of the frame at 90; pulled back to 120,
+and the window is the end of the take, where the plume leans into frame and the blue gas
+vents.
 
 ```setup
 scene hover off; tooltips off
-scene orbit galaxy 130 -6 90
+scene orbit galaxy 130 -6 120
 ```
 ```action
 wait 0.5
-scene glide 8 160 -8 85
+scene glide 8 160 -8 110
 wait 6.5
 ```
 
@@ -290,7 +272,7 @@ planet then: judge it again on the new probe before keeping the shot.
 
 ```setup
 scene hover off; tooltips off
-scene orbit warbird 230 -6 260
+scene orbit warbird 230 -6 200
 ```
 ```action
 wait 1
@@ -328,25 +310,26 @@ Layout: wipe
 Transition: cut
 Title: Beams, as in the series
 Sub: Tractor, holding and assimilation beams as cones of light through vapour
-In: 1.5
-Length: 6
+In: 4.0
+Length: 5
 Status: draft
 
 An Assault ship holds the Sovereign in its tractor beam; the eye goes from the cone to the
 light it throws on the hull. The steps are `testbench/scenarios/specials.md`'s;
 `special` must answer `fired`. *Unprobed*: the camera is b05's, and whatever lies behind
-3000,0,3110 at that heading must be dark sky: if it isn't, turn the camera.
+3000,0,3110 at that heading must be dark sky: if it isn't, turn the camera. Probe 1: the cone opens at 4.5 s and is best at 5.5–8.5; the Sovereign
+leaves the frame after about 9; the ships were small at 280, so closer.
 
 ```setup
 scene hover off; tooltips off
 scene spawn tractor bassault 3000 0 3220 180 1
 scene engines tractor off; energy tractor on
 wait 3
-scene orbit 3000 0 3110 90 -6 280
+scene orbit 3000 0 3110 90 -6 200
 ```
 ```action
 wait 1
-scene special tractor gtracbm tgt; glide 8 110 -5 250
+scene special tractor gtracbm tgt; glide 8 110 -5 180
 wait 11
 ```
 
@@ -356,22 +339,24 @@ Scene: specials
 Variants: stock, refit
 Layout: wipe
 Transition: cut
-In: 1.5
-Length: 6
+In: 4.0
+Length: 4
 Status: draft
 
 A Borg cube holds the Sovereign in a beam; the eye goes from the beam to the light it
-throws on the hull. `special` must answer `fired`.
+throws on the hull. `special` must answer `fired`. Probe 1: refit's beam read as a thin, flickering line, weaker
+than stock's thick one; closer and turned to see more of its length (*unprobed*). If it still
+doesn't win, drop it and let a02 carry the beams.
 
 ```setup
 scene hover off; tooltips off
 scene spawn holder bbattle1 3000 0 3220 180 1
 wait 3
-scene orbit 3000 0 3110 90 -6 280
+scene orbit 3000 0 3110 120 -8 180
 ```
 ```action
 wait 1
-scene special holder gholdbm tgt; glide 8 110 -5 250
+scene special holder gholdbm tgt; glide 8 140 -6 160
 wait 11
 ```
 
@@ -399,19 +384,19 @@ Status: draft
 
 Up close: the Galaxy alone in frame, the camera under and behind it, gas sliding past
 the lens, the hull's shadow a darker shaft running back from it. The Galaxy's shaft read
-best on 2026-10-15. *Unprobed*: the camera is new. A hull close to the camera made the
+best on 2026-10-15. Probe 1 (2026-10-17): a mid-wide of six ships, no shafts: the camera looked up along the shafts, which foreshortens them. Now across them, about 90° off the fleet's heading. *Unprobed*. A hull close to the camera made the
 shafts vanish then (`orbit sov 48 -24 220`), so it stays at 260 or more; if the shafts
 still don't read, this is a bug report for `nebulae/` before it is a framing note.
 
 ```setup
 scene hover off; shieldfx off; tooltips off
 scene goto ente,sov,galaxy,akira,nebula,def1,def2 1700 0 1470
-scene orbit galaxy 30 -16 300
+scene orbit galaxy 125 -10 280
 wait 4
 ```
 ```action
 wait 0.5
-scene glide 12 48 -12 260
+scene glide 12 140 -8 260
 wait 12.5
 ```
 
@@ -447,15 +432,15 @@ Music: Mcarmp300.wav from 0 gain 0 until g00 fade 1.0
 
 The film turns from the 3D view to the screens around it. The argument: the menus are new
 work, drawn by the UI over a live scene of the game's own ships (render3d's menu scene),
-where stock had 800x600 art. The entries sit where stock's did, so a wipe compares the
-same screen. The captions say who made it.
+where stock had 800x600 art. The menu shots dissolve: the entries keep stock's click
+positions but not its layout. The captions say who made it.
 
 ### m01 · The main menu
 Kind: mission
 Scene: menu.ini
 Args: -nointro
 Variants: stock, refit
-Layout: wipe
+Layout: dissolve 2 1.2
 Transition: dissolve 0.6
 Title: I redrew the menus
 Sub: The same screens, over a live scene of the game's own ships
@@ -466,8 +451,8 @@ Status: draft
 
 The main menu as the player first sees it. The eye goes to the fleet moving over the
 planet behind the column of entries, then to the entries themselves. *Unprobed*: stock's
-800x600 art at 16:9 with no Menus.asi; if it stretches, the wipe shows that too, which is
-honest.
+800x600 art, pillarboxed at 16:9. Refit's main menu is one column over the scene where
+stock scatters its entries over the art, so this one is a dissolve, not a wipe (probe 1).
 
 ```setup
 step Wait up to 300 seconds for the main menu
@@ -526,18 +511,18 @@ Args: -nointro
 Variants: refit
 Layout: full refit
 Transition: dissolve 0.5
-Sub: A mission departs from the menu scene into warp, under the loading screen
-Caption: top
 Audio: game
-In: 0.5
-Length: 7
+In: 1.8
+Length: 4.5
 Status: draft
 
 Refit only: stock goes from the menu to a still loading screen. The Federation campaign's
 first mission started from the selection: the fleet goes to warp front first, the camera
 swings behind it, and the tunnel comes in under the loading screen. The steps are
-`testbench/scenarios/ui-loading-warp.md`'s, without its `Loading.Hold`: a real load. If
-the load is too quick to see the departure, say so to the user rather than hold it.
+`testbench/scenarios/ui-loading-warp.md`'s, without its `Loading.Hold`: a real load. Probe 1: O.K. at 2.0, the loading screen at 2.25, the ships at 3–4, the warp flashes
+4.25–5, the tunnel 5.5–6.25, black at 6.4: the window is 1.8–6.3. No caption: at the top it
+meets the mission title, at the bottom the progress bar. The warp flashes draw as
+hard-edged white squares here: a render3d question, flagged to the user.
 
 ```setup
 step Wait up to 300 seconds for the main menu
@@ -596,16 +581,15 @@ Shows: hud: info panel
 Scene: showcase
 Variants: stock, refit
 Layout: wipe
-Crop: 0 0.5 0.5 0.5
+Crop: 0.22 0.44 0.56 0.56
 Transition: dissolve 0.5
 Caption: top
 In: 1.0
 Length: 6
 Status: draft
 
-The bottom left quarter at twice the size: the minimap and the selected ship's panel,
-stock's stretched sprites against refit's flat icons and live wireframe. *Unprobed*: set
-the crop from u01's probe.
+The bar and the whole info panel, bottom centre: stock's stretched sprites against
+refit's flat icons and live wireframe. Crop from probe 1's frames.
 
 ```setup
 scene hover off; shieldfx off; tooltips off
@@ -617,20 +601,20 @@ scene orbit 2250 0 2350 160 45 1200
 wait 8
 ```
 
-### u03 · The bar, close
-Shows: hud: button bar
+### u03 · The minimap, close
+Shows: hud: minimap
 Scene: showcase
 Variants: stock, refit
 Layout: wipe
-Crop: 0.5 0.5 0.5 0.5
+Crop: 0 0.62 0.38 0.38
 Transition: dissolve 0.5
 Caption: top
 In: 1.0
 Length: 5
 Status: draft
 
-The bottom right quarter: the button bar and the unit view. A cut candidate.
-*Unprobed*.
+The minimap, bottom left: stock's against refit's, with its filters as words. Crop from
+probe 1's frames. A cut candidate.
 
 ```setup
 scene hover off; shieldfx off; tooltips off
