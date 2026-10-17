@@ -467,7 +467,7 @@ Layout: dissolve 2 1.2
 Transition: dissolve 0.5
 Audio: none
 In: 1.0
-Length: 14.5
+Length: 15.5
 Status: draft
 
 The campaign selection: in refit, pointing at each campaign moves the camera to its scene
@@ -478,7 +478,8 @@ the refit takes, 2026-10-17): training's starbase is already up when the screen 
 its hover only lights the entry (2 s); the pans to Federation, Klingon and Borg take
 1.6, 2.2 and 1.9 s from about 0.4 s after the hover; the Klingon ships are in frame by the
 pan's end, the Borg cube and diamond about 4 s after the hover. So 3 s an entry, 2 for
-training and about 5 for Borg. Stock is held for two seconds, then dissolves. The pointer
+training, 4 for Klingon (the user's note of 2026-10-17: their ships need a second more to
+decloak) and about 5 for Borg. Stock is held for two seconds, then dissolves. The pointer
 positions are `testbench/scenarios/ui-menus-scene.md`'s (220 × 270 / 322 / 374 / 426 at
 1280x720), scaled to the Pointer space. *Unprobed*.
 
@@ -495,7 +496,7 @@ wait 2
 ptr 330 483 0.6
 wait 3
 ptr 330 561 0.6
-wait 3
+wait 4
 ptr 330 639 0.6
 wait 7.5
 ```
