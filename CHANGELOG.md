@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.26.0 — 2026-10-17
+
+Layers: testbench 3.32.0.
+
+### Added
+- `Scene.asi`'s `Race=` key and `SCENE_RACE=<race>` at install: the player's race, and
+  so the HUD's look, pinned for a bench scene in stock and refit alike (testbench
+  3.32.0).
+
+Installs nothing; seen working on the bench 2026-10-17 (`showcase`, `Hud=1`, `Race=federation`:
+the Federation HUD on 3 of 3 launches in stock and 3 of 3 in refit; `SCENE_RACE=klingon`
+over it: the Klingon theme).
+
 ## 12.24.0 — 2026-10-17
 
 Layers: gui-installer 1.6.0.

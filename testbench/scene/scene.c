@@ -72,6 +72,12 @@
  *     0x4c8be0; see heal_all().
  *   CraftInstance::Update (0x4cb390), slot 0x6b3e64 of CraftInstance's vtable,
  *     decides which of a model's damage nodes show; see inst_update().
+ *   The player's race: SetupDefaultGame (Program::MainLoop's set-up for a map
+ *     named on the command line) gives slot 0 the race of the map's first start
+ *     location, through Race::Find (0x48b100) at 0x4897ad and 0x489872, and
+ *     leaves it "random" when the map names none (a2_borg01 names none), which
+ *     Program::GameOpenPreLoad then draws at random. With Race= set both calls
+ *     go to race_find(), which finds that race instead; see race_find().
  *   Move orders: the GameObject::SetCommand overloads the script interface's
  *     own Goto and Stop end in -- (AiCommand, const GameObject *, long, bool)
  *     0x4d1af0, (AiCommand, const Vector3 &, long, bool) 0x4d1b50 and
@@ -199,6 +205,10 @@ int _fltused = 0;   /* floats without the CRT */
 #define PL_POPULATION    0x2acu      /* Planet: population, float */
 #define PL_SHOWN_RACE    0x2c4u      /* Planet: the Race whose cities are drawn */
 #define PL_SHOWN_POP     0x2c8u      /* Planet: the population drawn, eased toward +0x2ac */
+#define RACE_FIND        0x48b100u   /* Race::Find(const char *name), cdecl: the Race of that name (exact, as races.odf's
+                                      * `name`), or NULL */
+#define DEFAULT_RACE_1   0x4897adu   /* SetupDefaultGame: call Race::Find(start location 1's race) for slot 0 */
+#define DEFAULT_RACE_2   0x489872u   /* the same, on its other branch */
 #define START_MUSIC      0x4586c0u   /* StartMusic(long, int): cdecl, starts a music track */
 #define NEW_TRACK        0x463680u   /* JukeBox::mStartNewTrack: thiscall, no arguments, the in-mission music */
 #define TOOLTIP_ON_CALL  0x508070u   /* SelectionDisplay::AlwaysSimulate: call DisplayInterface::TooltipOn */
@@ -1749,6 +1759,58 @@ static void music_off(void)
     logline("music off");
 }
 
+/* The player's race. SetupDefaultGame sets slot 0 (the player's) to whatever Race::Find
+ * returns for the map's first start location's race, and leaves the slot "random" when
+ * that is NULL. Both of its Race::Find calls come here: with Race= set, the race of that
+ * name is returned whatever the map says, so the game setup holds it before
+ * Program::GameOpenPreLoad would draw a random one and DisplayInterface::PostLoadAll
+ * loads that race's HUD. A name Race::Find does not know falls back to the map's. */
+typedef void *(__cdecl *RaceFindFn)(const char *name);
+static char g_race[32];
+
+static void *__cdecl race_find(const char *map_race)
+{
+    char  b[160];
+    void *r = ((RaceFindFn)RACE_FIND)(g_race);
+    b[0] = 0;
+    s_cat(b, "race: ");
+    s_cat(b, r ? g_race : "UNKNOWN Race= ");
+    if (!r) { s_cat(b, g_race); s_cat(b, ", kept the map's"); }
+    s_cat(b, " for the player (the map's first start location names \"");
+    s_cat(b, map_race ? map_race : "");
+    s_cat(b, "\"; none is random)");
+    logline(b);
+    return r ? r : ((RaceFindFn)RACE_FIND)(map_race);
+}
+
+static void race_hook(void)
+{
+    static const BYTE find[8] = { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 };
+    static const DWORD sites[2] = { DEFAULT_RACE_1, DEFAULT_RACE_2 };
+    int i, k;
+
+    GetPrivateProfileStringA("Scene", "Race", "", g_race, sizeof g_race, g_ini);
+    if (!g_race[0]) return;
+    for (i = 0; g_race[i]; i++)
+        if (g_race[i] >= 'A' && g_race[i] <= 'Z') g_race[i] += 'a' - 'A';
+    for (k = 0; k < 8; k++)
+        if (((const BYTE *)RACE_FIND)[k] != find[k]) goto bad;
+    for (i = 0; i < 2; i++) {
+        const BYTE *p = (const BYTE *)sites[i];
+        if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != RACE_FIND - (sites[i] + 5)) goto bad;
+    }
+    for (i = 0; i < 2; i++)
+        if (!patch_dword(sites[i] + 1, (DWORD)&race_find - (sites[i] + 5))) goto bad;
+    {
+        char b[80];
+        b[0] = 0; s_cat(b, "race: Race="); s_cat(b, g_race); s_cat(b, ", hooked");
+        logline(b);
+    }
+    return;
+bad:
+    logline("race: NOT PATCHED: Race::Find or its calls differ -- the game's own race");
+}
+
 static void startup(void)
 {
     char b[200];
@@ -1758,6 +1820,8 @@ static void startup(void)
     /* Music has its own switch, outside Enable: a campaign take wants the music off and
      * no scene. */
     if (!ini_int("Scene", "Music", 1) && music_sigs_ok()) music_off();
+    /* So has the race: it is set before the mission loads, whatever the scene. */
+    race_hook();
     if (!ini_int("Scene", "Enable", 1)) {
         logline("--- Scene: Enable=0, nothing else patched");
         return;

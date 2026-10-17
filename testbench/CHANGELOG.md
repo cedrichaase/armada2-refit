@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.32.0 — 2026-10-17
+
+### Added
+- `Scene.asi`'s `Race=` key (`federation`, `klingon`, `romulan`, `cardassian`, `borg`,
+  `species8472`) and `SCENE_RACE=<race>` at `testbench/scene/install`: pins the
+  player's race, and with it the HUD's skin (stock) or theme (refit, `Theme=auto`),
+  which `-nointro a2_borg01` otherwise draws at random on every launch. It works with
+  `Enable=0`. Empty (the default) leaves the game's choice.
+
+Installs nothing; seen working on the bench 2026-10-17 (`showcase`, `Hud=1`, `Race=federation`:
+the Federation HUD on 3 of 3 launches in stock and 3 of 3 in refit; `SCENE_RACE=klingon`
+over it: the Klingon theme).
+
 ## 3.30.0 — 2026-10-17
 
 ### Added

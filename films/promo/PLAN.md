@@ -46,9 +46,10 @@ after; the install guide closes, as asked.
 ## Open after probe round 1 (2026-10-15)
 
 - **The HUD skin differs between takes** (purple, green, gold): the player's race is not
-  pinned on the bench, so u02's stock/refit dissolve compares two skins. Scene.asi has no
-  key for it yet. Until it has, u02 and the gameplay shots carry whatever skin a session
-  draws.
+  pinned on the bench, so u02's stock/refit dissolve compares two skins. Scene.asi's
+  `Race=` key (or `SCENE_RACE=<race>` at install) now pins it (testbench 3.32.0); the
+  promo's scene files and `films/film/shoot.py` do not set it yet, and which race the
+  takes use is the user's call.
 - **g06 shows the machine's LAN address** in the lobby chat ("Local IP Address: ...").
   Blur it in the cut, or film with the address hidden, before publishing.
 - **Bugs found while filming, for their layers** (not hidden by framing):
