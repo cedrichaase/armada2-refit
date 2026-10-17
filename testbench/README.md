@@ -100,7 +100,8 @@ real install's path, and fails the case if the game has it open.
 Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
 channels), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
 `xalia_dxgi.log` (DXVK), `vkBasalt.log`, `sway.log`, `input.log`, `prepare.log`,
-`launch-env.txt` (the exact environment and argv), the clone's `ARMADA.PRF`,
+`launch-env.txt` (the exact environment and argv), `Scene.log` and `Scene.marks`
+(`scene/README.md`, "Marks"), the clone's `ARMADA.PRF`,
 `Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
 anything new in the game's `Logs/`.
 

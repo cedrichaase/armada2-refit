@@ -66,6 +66,14 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Center` | | centre the RTS camera on this object |
 | `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |
 
+`[Marks]`, the event marks (below, "Marks"); every scene has them without the section:
+
+| Key | Default | |
+|---|---|---|
+| `Enable` | 1 | 0 writes no `Scene.marks` |
+| `FireGap` | 1.0 | seconds without a shooter's ordnance of a weapon that end its burst (`fire.end`) |
+| `Still` | 0.3 | seconds without the camera moving that settle it (`camera.still`) |
+
 `[Object.<name>]`, one per object, built in file order:
 
 | Key | Default | |
@@ -129,6 +137,7 @@ answer and fails if a command did.
 | `query` | every object's handle and position (and a producer's build queue, a planet's team, population and the population its cities are drawn at), and the camera's eye, front and up |
 | `select <name> [<name> ...]` | select the first as a click does and add the rest as Shift-clicks do (`cOverViewImp::Select`); answers as `selection` |
 | `selection` | what is selected, each one as `name[g<group> q<queue> c<class>]` (`q` for producers only; group -1 for none), then every control group that is not empty, ships' and stations' |
+| `marks` | how many marks `Scene.marks` has, and the last 16, each as written (`Expect scene "marks" answers "cloak.done obj=warbird"`) |
 
 **`glide` and `spin` run on wall-clock time, per frame** (`GetTickCount`, in the camera
 hook), not per tick, so a recording plays them smoothly whatever the tick rate. Don't
@@ -349,6 +358,66 @@ inert, and `Scene.log` says so.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`).
+
+## Marks
+
+From the moment the scene is built, `Scene.asi` writes **`Scene.marks`** beside
+`Scene.log`: timestamped events for the films (`films/README.md`, "Marks", has the
+kinds and what `a2film` does with them). It is a file of its own so that a command's
+answer in `Scene.log`, which `drive scene` reads, never has marks in it; it is deleted
+when the game starts, and the bench gathers it with the logs.
+
+    epoch 0x01dd3f6a 0x8e0c1b40 74712093
+    74712093 ready objects=4
+    74713511 cmd text=select warbird bop
+    74713528 select n=2 names=warbird,bop
+    74717262 cloak.start obj=warbird
+    74719944 cloak.done obj=warbird
+
+Every line starts with `GetTickCount()` at the moment it marks, then its kind and its
+fields as `key=value`, no spaces in a value except `text`, which is last and runs to the
+end of the line. An `epoch <high> <low> <tick>` line pairs a tick with
+`GetSystemTimeAsFileTime()` (a FILETIME's two halves, in hex): under Wine that is the
+host's clock, the one the film runner starts its action by, so a reader places every
+mark on the take's clock without a handshake. It is written as the scene is built and
+again before any mark more than 10 s after the last, so the two clocks cannot drift
+apart over a take. The plugin never divides a 64-bit number (no CRT to do it): the
+reader does the arithmetic.
+
+**Every mark is read, never patched**: once a frame, from the camera hook
+(`camera_update`, after the camera is set), `marks_poll` compares what it reads with
+the frame before. What it reads, and why it is safe to read there (`s_UpdateMainCamera`
+runs between ticks, on the game's thread, as the renderers' walks do):
+
+- **The camera**: the main `ST3D_Camera`'s camera-to-world matrix (+0xc0), as `query`
+  reads it. An axis that changes by more than 2e-5 or an eye by more than 0.01 units is
+  motion; none for `Still` seconds settles it, marked at the last motion.
+- **The selection**: `GetSelectNum` and `GetSelectList` (vtable +0x94, +0x98), as
+  `selection` reads it, so `QOL.asi`'s larger selections are seen too.
+- **The scene's crafts**: the cloaking device's state (+0x108, then +0x3c), as `query`
+  reads it; the dying byte +0x113 that the move orders check; `Entity::Get` returning
+  nothing once an object is gone.
+- **Fire: `Ordnance::ordnanceList`**, the `std::list` whose head node's pointer is at
+  0x771fac (each node's next at +0, its ordnance at +8), walked as render3d walks it
+  (`render3d/src/mods/ordnance/eng.rs`). An ordnance's shooter is the handle at +0x5c
+  and its target the one at +0x60; its ODF is named by its class (+0x34), whose cPrjID
+  (+0x150) `cPrjID::GetOdfName` (0x6593a0, checked by its first bytes) turns into
+  the ODF's name, as render3d names a special by it. Ordnance are counted per shooter and
+  ODF, and an ordnance pointer not there the frame before is a new shot.
+- **Explosions: `Explosion::explosionList`**, the `std::list` at 0x7367c4, as
+  render3d's explosions module walks it. A fireball has the vtable 0x6afbd4, a
+  shockwave 0x6afdac; +0x34 is the radius it was built with; its place is the
+  transform `Entity::GetTransform` (0x4cfd50) returns, at +0x24.
+- **Commands and specials** are marked where they are run, `glide.end` from the glide's
+  own start and length, so it is exact rather than the frame that saw it.
+
+Bench, 2026-10-17, `films/marks` (stock, 1280x720): a selection, a glide, a cloak and
+decloak, a Galaxy's fire and a battleship blown up were each marked, the cloak's steps
+3.0 s apart; a mark leads the first frame of the video that shows it by about 0.05 s.
+**`kill` removes a craft within the frame**: +0x113 is never seen set, so `destroyed` is
+marked when a craft is found gone without it (`how=removed`), and an explosion's `near`
+uses where each object was last seen. The same take showed `attack galaxy big` leaving
+the Galaxy firing at `small` (every burst's `target=small`).
 
 ## Where this is going
 

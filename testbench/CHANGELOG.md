@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.31.0 — 2026-10-17
+
+### Added
+- Event marks: `Scene.asi` writes `Scene.marks`, timestamped events on the host's clock
+  (`epoch` lines from `GetSystemTimeAsFileTime`): camera move and settle, glide and spin,
+  selection (count and names), cloak and decloak steps, fire bursts per shooter and
+  weapon ODF (beams included), explosions, crafts destroyed and removed, commands and
+  specials. Read each frame from the camera hook; nothing new is patched.
+- Scene-file section `[Marks]` (`Enable`, `FireGap`, `Still`) and the command `marks`.
+- The bench clears `Scene.marks` at launch and gathers it with the logs.
+
+Installed, not yet seen in game (seen on the bench 2026-10-17, `films/marks`).
+
 ## 3.30.0 — 2026-10-17
 
 ### Added
