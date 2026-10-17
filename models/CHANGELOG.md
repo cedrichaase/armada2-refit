@@ -13,7 +13,7 @@ dilithium moons (`moon-sod.py`), the selection bubble (`select-sod.py`), the hul
   planets are render3d's world module's own sphere. `install.sh` takes out a copy an
   earlier install left.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-17.
 
 ## 4.3.0 — 2026-10-13
 
