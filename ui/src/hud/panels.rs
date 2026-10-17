@@ -97,32 +97,32 @@ pub fn run(ui: &mut Ui) {
         ui.occlude(screen);
     }
     if o.chat {
-        ui.scope("hud.chat", chat::run);
+        { crate::hud::layout::at("chat"); ui.scope("hud.chat", chat::run); }
     }
     if !hud_hidden {
         if o.resources {
-            ui.scope("hud.resources", resources::run);
+            { crate::hud::layout::at("resources"); ui.scope("hud.resources", resources::run); }
         }
         if o.buttons {
-            ui.scope("hud.buttons", buttons::run);
+            { crate::hud::layout::at("buttons"); ui.scope("hud.buttons", buttons::run); }
         }
     }
     if o.replay {
-        ui.scope("hud.replay", replay::run);
+        { crate::hud::layout::at("replay"); ui.scope("hud.replay", replay::run); }
     }
     if o.team_texts {
-        ui.scope("hud.trade", trade::run);
+        { crate::hud::layout::at("trade"); ui.scope("hud.trade", trade::run); }
     }
     // Over the top bar, as stock's (OverlayText follows ResourcePanel in the list).
     if o.overlay {
-        ui.scope("hud.overlay", overlay_text::run);
+        { crate::hud::layout::at("overlay"); ui.scope("hud.overlay", overlay_text::run); }
     }
     if o.pause {
-        ui.scope("hud.pause", pause::run);
+        { crate::hud::layout::at("pause"); ui.scope("hud.pause", pause::run); }
     }
     if o.messages {
-        ui.scope("hud.messages", messages::run);
-        ui.scope("hud.objectives", objectives::run);
+        { crate::hud::layout::at("messages"); ui.scope("hud.messages", messages::run); }
+        { crate::hud::layout::at("objectives"); ui.scope("hud.objectives", objectives::run); }
     }
 }
 

@@ -4,6 +4,16 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.12.0 — 2026-10-17
+
+### Added
+- `[HUD] LayoutLog` (default 0), for the test bench: every panel's rectangle, as
+  `Ui::panel` draws it, written to UI.log when the HUD's layout changes and has held
+  for five frames ("layout: WxH | info x,y,w,h | bar ..."; `hud/layout.rs`, HUD.md,
+  "The layout log"). Nothing is kept or written at 0.
+
+Installed, not yet seen in game.
+
 ## 0.11.0 — 2026-10-17
 
 ### Added

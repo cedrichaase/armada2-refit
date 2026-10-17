@@ -18,6 +18,8 @@ Players: host, joiner                     (one game per player; see "Several pla
 Setup: online/bench-asi.sh --loss 10      (a script of this repo, run on each clone
                                            before launch, with its session state file
                                            and then any words after the script's name)
+Sheet: 1 ship, 6 ships, 30 ships          (shot names: <scenario>/sheet.png in the run,
+                                           a row per case and a column per shot)
 Timeout: 12 min
 
 Any prose is description.
@@ -86,6 +88,24 @@ audio reached the real output before the bench's guard stopped it (run
 | `… is stretched …` | the control form: passes only if it IS stretched |
 | `Expect no black bars` / `Expect black bars` | bounding box of non-black pixels |
 | `Expect no large flat grey areas` | untextured non-black blocks (don't use on a map: fog of war is flat grey) |
+
+### The HUD's layout
+
+These read the panels' rectangles from UI.asi itself, never from the screenshot: with
+`[HUD] LayoutLog=1` (`ui/bench-asi.sh ... HUD.LayoutLog=1`) it writes each new layout
+to UI.log (`ui/HUD.md`, "The layout log"). Each check takes the last `layout:` line at
+the case's resolution, waiting up to 8 s for one, and keeps a screenshot with every
+panel drawn on it, in red those that failed.
+
+| Check | How |
+|---|---|
+| `Take a layout screenshot called "NAME"` | the named shot, and `NAME-layout.png` with the panels drawn on it (what `Sheet:` shows) |
+| `Expect the HUD's panels not to overlap` | fails when two rectangles share more than a pixel on both axes |
+| `Expect the HUD's panels at the bottom to rise at most 45% of the screen's height` | every panel whose bottom edge is in the lower half: its top edge at or below that share of the height, counted from the bottom |
+| `Expect the HUD's panels to cover at most 30% of the screen` | the area of the panels' union, over the screen's |
+
+`ui-hud-layout.md` runs them at 4:3, 16:9 and 21:9 with one, six and thirty ships
+selected.
 
 A comparison step uses this case's latest screenshot and the reference case's shot with
 the same name, so take a named screenshot first. `a2test run` runs the reference case
