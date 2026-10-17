@@ -630,8 +630,8 @@ wait 7
 Music: Mcarmp300.wav from 24 gain -3 until i02 fade 1.5
 
 The argument: the limits that made Armada II fiddly (sixteen ships a selection, one
-shipyard at a time, a menu tree under every button) are gone, **and none of it locks out
-stock players**. Paced by the pointer: every press gets a key hint and enough time to
+shipyard at a time, a menu tree under every button) are gone. (Whether a stock player can
+join a game with them is still open in `qol/README.md`, so the film doesn't claim it.) Paced by the pointer: every press gets a key hint and enough time to
 follow. Only g01 has a before: stock has nothing to compare for the rest. Captions at the
 top, over the HUD.
 
@@ -642,7 +642,7 @@ Background: h01
 
 ```card
 [accent] AND IT PLAYS BETTER
-Quality of life that still plays with stock players
+The limits I kept running into, gone
 ```
 
 ### g01 · Selections beyond sixteen
@@ -658,8 +658,10 @@ In: 1.0
 Length: 7
 Status: draft
 
-Twenty-four destroyers dragged into one selection: stock rings sixteen, refit all
-twenty-four. The eye counts the rings. On 2026-10-15 refit's old panel showed 16 icons
+Twenty-four destroyers dragged into one selection. The eye counts the panel: two rows of
+eight in stock, three in refit (probe 1: the command panel hides part of the block, so the
+rings don't count cleanly). The pointer leaves the block after the drag so no tooltip
+comes up. On 2026-10-15 refit's old panel showed 16 icons
 even with 24 selected; the UI's panel is new, so check it on the probe.
 
 ```setup
@@ -669,7 +671,8 @@ wait 2
 ```action
 wait 1.5
 drag 830 430 1350 745 1.6
-wait 6.5
+ptr 1700 300 0.5
+wait 6
 ```
 
 ### g02 · Shift adds to a group
@@ -725,8 +728,8 @@ Length: 10
 Status: draft
 
 Three shipyards selected together; seven presses of Q queue destroyers across all three.
-The eye goes to the three build bars filling. The yards sit at about y 340–410: the drag
-from 2026-10-15 missed them, so it starts higher. *Unprobed*.
+The eye goes to the three build bars filling. Probe 1 measured the yards at x 690–1460, y 150–280 (Pointer space): the box covers them now,
+clear of the resource bar above. *Unprobed*.
 
 ```setup
 lclick 400 640
@@ -734,8 +737,9 @@ wait 1
 ```
 ```action
 wait 1
-drag 760 280 1260 460 1.4
-wait 1.2
+drag 640 120 1500 340 1.4
+ptr 1700 300 0.4
+wait 0.8
 press q
 wait 1.2
 press q
@@ -757,19 +761,20 @@ Shows: grid
 Scene: qol.ini
 Variants: refit
 Layout: full refit
-Crop: 0.15 0.64 0.43 0.36
+Crop: 0.26 0.42 0.30 0.30
 Transition: dissolve 0.5
 Title: Grid hotkeys
 Sub: Every button on a block of keys, the same place every time
 Caption: top
 Keys: auto
-In: 2.5
-Length: 17.5
+In: 3.5
+Length: 17
 Status: draft
 
 The close crop of the button bar, held long enough to follow: Q opens a menu, G goes back,
 W and E the next ones. The user's note from October: about 18 s worked, 5 s was far too
-short; trim no further. The bar is the UI's now: check the crop on the probe.
+short; trim no further. The UI moved the command grid (x 0.29–0.47, y 0.47–0.66, probe 1); the crop follows it. Presses at
+5.6 (Q), 8.6, 10.2 (W), 13.2, 14.8 (E), 17.8.
 
 ```setup
 lclick 400 640
@@ -806,17 +811,72 @@ In: 0.5
 Length: 10
 Status: draft
 
-Zoomed out, three destroyers selected, the pointer far to the right: the cursor turns to
+Probe 1: no warp at four zoom steps (the move was shorter than `WarpDistance`): zoomed out
+fully, as `scenarios/qol-warp.md` does (30 steps), and the pointer leaves the ships after
+the click. Zoomed out, three destroyers selected, the pointer far to the right: the cursor turns to
 the warp ring, a right-click, and they jump.
 
 ```setup
 press ctrl+Down
-wait 0.2
+wait 0.1
 press ctrl+Down
-wait 0.2
+wait 0.1
 press ctrl+Down
-wait 0.2
+wait 0.1
 press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
+press ctrl+Down
+wait 0.1
 wait 1
 scene select ship1 ship2 ship3
 ptr 1150 540 0.3
@@ -826,7 +886,8 @@ wait 0.5
 ptr 1850 540 1.2
 wait 1.0
 click 1850 540 --button 3
-wait 10
+ptr 960 250 0.6
+wait 9.5
 ```
 
 ## Installing
@@ -886,7 +947,8 @@ Length: 6
 Status: draft
 
 Install pressed, the sky going to warp, the engine glow riding the progress bar, the
-status line naming each layer. The install is real and takes about 40 s: this shot is its
+status line naming each layer. The probe ran the checkout's 1.5.0 script, which shows "A newer installer (1.6.0) is
+available" throughout: the final take must run the release's AppImage. The install is real and takes about 40 s: this shot is its
 start, i05b its end, one take.
 
 ```setup
@@ -905,13 +967,13 @@ wait 52
 ### i05b · Done
 Kind: footage
 From: i05
-In: 29.5
+In: 31.3
 Length: 5
 Transition: dissolve 0.8
 Audio: none
 
 The end of the same take: the bar full, "Refit installed. Heroic launch settings
-written.", Launch game lit amber. Move `In:` to land a beat after the bar fills.
+written.", Launch game lit amber. Probe 1: "installed" settles at 31.0.
 
 ### i06 · Play
 Kind: mission
@@ -945,7 +1007,7 @@ What the install does not do, said once and plainly, and the way back out.
 
 ```card
 [accent] GOOD TO KNOW
-Uninstall puts the game back as it was
+Uninstall takes it back out
 Windows: SmartScreen → More info → Run anyway · macOS: Privacy & Security → Open Anyway
 [small] Remastered textures are built from your own game files: see the README
 ```
