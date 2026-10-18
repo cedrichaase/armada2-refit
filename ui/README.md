@@ -218,7 +218,9 @@ desktop size. When the mode the new display wants differs from the current one,
 When the two modes are the same, it does nothing at all. **So the `IDirect3DDevice8` can
 change whenever the shell and the 3D display switch.** In stock (an 800x600 shell
 under a bigger game resolution) it changes on every switch. With Menus.asi and the game
-at desktop resolution it does not. Anything that keeps resources must check
+at desktop resolution it does not, which `[UI] Native` arranges from the first launch
+(`src/engine/display.rs`: a stock mode in the profile becomes the desktop's before
+`InitializeGraphicsSystem` opens the device). Anything that keeps resources must check
 `engine::d3d8_device()` every frame and drop what it made on an old device.
 
 While a GDI menu is up, the game thread is inside that dialog's modal loop. Nothing

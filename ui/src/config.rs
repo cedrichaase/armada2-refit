@@ -11,6 +11,9 @@ pub struct Config {
     /// Our own mouse cursor (cursor.rs), and its size in units.
     pub cursor: bool,
     pub cursor_size: f32,
+    /// `[UI] Native`: a game still at a stock mode (800x600, 1024x768) runs at the
+    /// desktop's (`engine::display`).
+    pub native: bool,
     /// `[UI] Theme`: a theme's name (`shell`, `federation`, `klingon`, ...) to use
     /// everywhere; None for `auto`, the player's race in a mission and the shell's
     /// theme elsewhere (widgets/theme.rs).
@@ -121,6 +124,7 @@ pub fn load() -> Config {
         scale: ini.float("UI", "Scale", 1.0).clamp(0.25, 4.0),
         cursor: ini.int("UI", "Cursor", 1) != 0,
         cursor_size: ini.float("UI", "CursorSize", 32.0).clamp(16.0, 128.0),
+        native: ini.int("UI", "Native", 1) != 0,
         theme: ini.string("UI", "Theme").filter(|s| {
             let l = rt::lower(s.trim());
             !l.is_empty() && l != "auto"
