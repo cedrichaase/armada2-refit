@@ -13,7 +13,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   in Graphics Settings is kept (`engine/display.rs`, on the call of
   `InitializeGraphicsSystem`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-18.
 
 ## 0.12.1 — 2026-10-18
 

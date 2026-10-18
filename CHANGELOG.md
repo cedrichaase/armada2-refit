@@ -13,7 +13,7 @@ Layers: ui 0.13.0.
 - The game runs at the desktop's resolution from the first launch (`[UI] Native`),
   instead of the stock 1024x768 and a mode change at every switch to the menus.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-18.
 
 ## 12.33.0 — 2026-10-18
 
