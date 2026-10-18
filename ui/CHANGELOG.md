@@ -4,6 +4,14 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.13.1 — 2026-10-18
+
+### Changed
+- The log names any default-pool object of the UI's still held at a device `Reset`
+  (`d3d::live_default`).
+
+Installed, not yet seen in game.
+
 ## 0.13.0 — 2026-10-18
 
 ### Added

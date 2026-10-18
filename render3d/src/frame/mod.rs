@@ -250,6 +250,14 @@ unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESU
     crate::gfx::reset();
     crate::scene::reset();
     timing::reset();
+    let left = live_default();
+    if !left.is_empty() {
+        let mut t = alloc::string::String::new();
+        for (k, n) in left.iter() {
+            let _ = core::fmt::Write::write_fmt(&mut t, format_args!(" {} {}", n, k));
+        }
+        log!("frame: still held at Reset:{}", t);
+    }
     log!("frame: device Reset");
     match unsafe { RESET } {
         Some(r) => unsafe { r(dev8, params) },

@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.15.1 — 2026-10-18
+
+### Fixed
+- On Windows, switching away from the game and back ended in "Fatal error in
+  Direct3D": the hulls' posed views and the ghosts' queue kept models, whose buffers
+  are in the default pool, through the device's `Reset`. Both are dropped at a `Reset`
+  now, and the log names any default-pool object still held then.
+
+Installed, not yet seen in game.
+
 ## 0.15.0 — 2026-10-18
 
 ### Added
