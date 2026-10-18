@@ -15,6 +15,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   the UI's objects kept the shell's device alive. `engine/device.rs` chains
   `DestroyRenderSurfaces` and lets go of everything first, and chains `Reset` from the
   first frame, letting go of the state block, which a native `Reset` refuses to keep.
+  The log names by kind any object of ours still held then (`d3d::live`).
 
 Installed, not yet seen in game.
 

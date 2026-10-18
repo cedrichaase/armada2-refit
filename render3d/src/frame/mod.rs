@@ -186,6 +186,32 @@ unsafe extern "thiscall" fn destroy(this: usize) {
     let dev8 = engine::field(this, 0x90) as *mut c_void;
     let held = if dev8.is_null() { None } else { Device::from_d3d8(dev8).map(|d| Com::from_borrowed(d.p())) };
     forget();
+    // Whatever is still bound is held by the device: unbind it all (the engine is about
+    // to release the device, so nothing of its own needs to stay bound either).
+    if let Some(h) = held.as_ref() {
+        let d = Device(h.ptr());
+        for s in (0..16).chain(257..261) {
+            d.set_texture(s, core::ptr::null_mut());
+        }
+        for n in 0..16 {
+            d.set_stream(n, core::ptr::null_mut(), 0, 0);
+        }
+        d.set_indices(core::ptr::null_mut());
+        d.set_vs(core::ptr::null_mut());
+        d.set_ps(core::ptr::null_mut());
+        d.set_vertex_decl(core::ptr::null_mut());
+        for i in 1..4 {
+            d.set_render_target(i, core::ptr::null_mut());
+        }
+    }
+    let left = live();
+    if !left.is_empty() {
+        let mut t = alloc::string::String::new();
+        for (k, n) in left.iter() {
+            let _ = core::fmt::Write::write_fmt(&mut t, format_args!(" {} {}", n, k));
+        }
+        log!("frame: still held after letting go:{}", t);
+    }
     let next: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(DESTROY_NEXT) };
     unsafe { next(this) };
     if let Some(h) = held {

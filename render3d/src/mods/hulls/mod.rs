@@ -681,6 +681,11 @@ impl Module for Hulls {
         self.shadow.reset();
         self.sprites.reset();
     }
+    fn forget(&mut self) {
+        self.reset();
+        // The views' posed hulls hold their models, and the models their buffers.
+        unsafe { VIEWS = [None, None, None] };
+    }
     fn begin_view(&mut self, v: &View) {
         unsafe { CUR = v.key() };
         unsafe { ME = self as *mut Hulls };

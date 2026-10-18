@@ -367,7 +367,7 @@ struct LockedBox {
 fn create_offscreen(dev: Device, w: u32, h: u32, fmt: u32, pool: u32) -> Option<Com> {
     let mut o: *mut c_void = core::ptr::null_mut();
     let hr = vcall!(dev.p(), 36, fn(u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT, w, h, fmt, pool, &mut o, core::ptr::null_mut());
-    if hr < 0 || o.is_null() { None } else { Some(Com(o)) }
+    if hr < 0 || o.is_null() { None } else { Some(Com::made(o, "create_offscreen")) }
 }
 fn rt_data(dev: Device, rt: &Com, sys: &Com) -> bool {
     vcall!(dev.p(), 32, fn(*mut c_void, *mut c_void) -> HRESULT, rt.ptr(), sys.ptr()) >= 0

@@ -23,8 +23,33 @@ pub struct Com(pub *mut c_void);
 unsafe impl Send for Com {}
 unsafe impl Sync for Com {}
 
+/// Every object made or handed out through this module and not yet released, by
+/// pointer: how many of our `Com`s hold it, and what made it. `live()` lists what is
+/// left when the engine lets go of its device (it must be nothing).
+static mut LIVE: alloc::collections::BTreeMap<usize, (u32, &'static str)> = alloc::collections::BTreeMap::new();
+
+/// What is still held, as (what made it, how many), most first.
+#[allow(static_mut_refs)]
+pub fn live() -> alloc::vec::Vec<(&'static str, u32)> {
+    let mut by: alloc::collections::BTreeMap<&'static str, u32> = alloc::collections::BTreeMap::new();
+    for (_, (_, k)) in unsafe { LIVE.iter() } {
+        *by.entry(k).or_insert(0) += 1;
+    }
+    let mut v: alloc::vec::Vec<_> = by.into_iter().collect();
+    v.sort_by(|a, b| b.1.cmp(&a.1));
+    v
+}
+
 impl Com {
     pub const NULL: Com = Com(null_mut());
+    /// A reference just handed to us (by a `Create*` or `Get*`), recorded in `LIVE`.
+    #[allow(static_mut_refs)]
+    pub fn made(p: *mut c_void, what: &'static str) -> Com {
+        if !p.is_null() {
+            unsafe { LIVE.entry(p as usize).or_insert((0, what)).0 += 1 };
+        }
+        Com(p)
+    }
     pub fn is_null(&self) -> bool {
         self.0.is_null()
     }
@@ -48,7 +73,11 @@ impl Com {
         }
     }
     /// Takes an extra reference on a borrowed pointer.
+    #[allow(static_mut_refs)]
     pub fn from_borrowed(p: *mut c_void) -> Com {
+        if let Some(e) = unsafe { LIVE.get_mut(&(p as usize)) } {
+            e.0 += 1;
+        }
         let c = Com(p);
         c.add_ref();
         c
@@ -56,8 +85,16 @@ impl Com {
 }
 
 impl Drop for Com {
+    #[allow(static_mut_refs)]
     fn drop(&mut self) {
         if !self.0.is_null() {
+            let k = self.0 as usize;
+            if let Some(e) = unsafe { LIVE.get_mut(&k) } {
+                e.0 -= 1;
+                if e.0 == 0 {
+                    unsafe { LIVE.remove(&k) };
+                }
+            }
             unsafe { self.slot::<unsafe extern "system" fn(*mut c_void) -> u32>(2)(self.0) };
             self.0 = null_mut();
         }
@@ -81,7 +118,7 @@ pub fn query(obj: *mut c_void, iid: &Guid) -> Option<Com> {
     }
     let mut out: *mut c_void = null_mut();
     let hr = vcall!(obj, 0, fn(*const Guid, *mut *mut c_void) -> HRESULT, iid, &mut out);
-    if hr < 0 || out.is_null() { None } else { Some(Com(out)) }
+    if hr < 0 || out.is_null() { None } else { Some(Com::made(out, "query")) }
 }
 
 #[repr(C)]
@@ -175,49 +212,49 @@ impl Device {
     pub fn get_back_buffer(self) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 18, fn(u32, u32, u32, *mut *mut c_void) -> HRESULT, 0, 0, 0, &mut o);
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "get_back_buffer")) }
     }
     pub fn create_texture(self, w: u32, h: u32, levels: u32, usage: u32, fmt: u32, pool: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 23, fn(u32, u32, u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT,
             w, h, levels, usage, fmt, pool, &mut o, null_mut());
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_texture")) }
     }
     pub fn create_volume_texture(self, w: u32, h: u32, d: u32, levels: u32, usage: u32, fmt: u32, pool: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 24, fn(u32, u32, u32, u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT,
             w, h, d, levels, usage, fmt, pool, &mut o, null_mut());
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_volume_texture")) }
     }
     pub fn create_cube_texture(self, edge: u32, levels: u32, usage: u32, fmt: u32, pool: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 25, fn(u32, u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT,
             edge, levels, usage, fmt, pool, &mut o, null_mut());
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_cube_texture")) }
     }
     pub fn create_vertex_buffer(self, bytes: u32, usage: u32, fvf: u32, pool: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 26, fn(u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT,
             bytes, usage, fvf, pool, &mut o, null_mut());
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_vertex_buffer")) }
     }
     pub fn create_index_buffer(self, bytes: u32, usage: u32, fmt: u32, pool: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 27, fn(u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT,
             bytes, usage, fmt, pool, &mut o, null_mut());
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_index_buffer")) }
     }
     pub fn create_render_target(self, w: u32, h: u32, fmt: u32, ms: u32, lockable: bool) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 28, fn(u32, u32, u32, u32, u32, i32, *mut *mut c_void, *mut c_void) -> HRESULT,
             w, h, fmt, ms, 0, lockable as i32, &mut o, null_mut());
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_render_target")) }
     }
     pub fn create_depth_stencil(self, w: u32, h: u32, fmt: u32, ms: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 29, fn(u32, u32, u32, u32, u32, i32, *mut *mut c_void, *mut c_void) -> HRESULT,
             w, h, fmt, ms, 0, 0, &mut o, null_mut());
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_depth_stencil")) }
     }
     pub fn update_texture(self, src: &Com, dst: &Com) -> HRESULT {
         vcall!(self.0, 31, fn(*mut c_void, *mut c_void) -> HRESULT, src.0, dst.0)
@@ -230,7 +267,7 @@ impl Device {
         let mut o = null_mut();
         let hr = vcall!(self.0, 36, fn(u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT,
             w, h, fmt, pool, &mut o, null_mut());
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_offscreen_surface")) }
     }
     pub fn stretch_rect(self, src: &Com, sr: Option<&Rect>, dst: &Com, dr: Option<&Rect>, filter: u32) -> HRESULT {
         let s = sr.map_or(null_mut(), |r| r as *const Rect as *mut Rect);
@@ -243,7 +280,7 @@ impl Device {
     pub fn get_render_target(self, idx: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 38, fn(u32, *mut *mut c_void) -> HRESULT, idx, &mut o);
-        if hr < 0 || o.is_null() { None } else { Some(Com(o)) }
+        if hr < 0 || o.is_null() { None } else { Some(Com::made(o, "get_render_target")) }
     }
     pub fn set_depth_stencil(self, surf: *mut c_void) -> HRESULT {
         vcall!(self.0, 39, fn(*mut c_void) -> HRESULT, surf)
@@ -251,7 +288,7 @@ impl Device {
     pub fn get_depth_stencil(self) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 40, fn(*mut *mut c_void) -> HRESULT, &mut o);
-        if hr < 0 || o.is_null() { None } else { Some(Com(o)) }
+        if hr < 0 || o.is_null() { None } else { Some(Com::made(o, "get_depth_stencil")) }
     }
     pub fn clear(self, rects: &[Rect], flags: u32, color: u32, z: f32, stencil: u32) -> HRESULT {
         let p = if rects.is_empty() { null_mut() } else { rects.as_ptr() as *mut Rect };
@@ -284,12 +321,12 @@ impl Device {
     pub fn create_state_block(self, kind: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 59, fn(u32, *mut *mut c_void) -> HRESULT, kind, &mut o);
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_state_block")) }
     }
     pub fn get_texture(self, stage: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 64, fn(u32, *mut *mut c_void) -> HRESULT, stage, &mut o);
-        if hr < 0 || o.is_null() { None } else { Some(Com(o)) }
+        if hr < 0 || o.is_null() { None } else { Some(Com::made(o, "get_texture")) }
     }
     pub fn set_texture(self, stage: u32, tex: *mut c_void) -> HRESULT {
         vcall!(self.0, 65, fn(u32, *mut c_void) -> HRESULT, stage, tex)
@@ -318,7 +355,7 @@ impl Device {
     pub fn create_vertex_decl(self, els: &[VertexElement]) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 86, fn(*const VertexElement, *mut *mut c_void) -> HRESULT, els.as_ptr(), &mut o);
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_vertex_decl")) }
     }
     pub fn set_vertex_decl(self, d: *mut c_void) -> HRESULT {
         vcall!(self.0, 87, fn(*mut c_void) -> HRESULT, d)
@@ -329,7 +366,7 @@ impl Device {
     pub fn create_vs(self, code: &[u32]) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 91, fn(*const u32, *mut *mut c_void) -> HRESULT, code.as_ptr(), &mut o);
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_vs")) }
     }
     pub fn set_vs(self, s: *mut c_void) -> HRESULT {
         vcall!(self.0, 92, fn(*mut c_void) -> HRESULT, s)
@@ -349,7 +386,7 @@ impl Device {
     pub fn create_ps(self, code: &[u32]) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 106, fn(*const u32, *mut *mut c_void) -> HRESULT, code.as_ptr(), &mut o);
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_ps")) }
     }
     pub fn set_ps(self, s: *mut c_void) -> HRESULT {
         vcall!(self.0, 107, fn(*mut c_void) -> HRESULT, s)
@@ -360,7 +397,7 @@ impl Device {
     pub fn create_query(self, kind: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 118, fn(u32, *mut *mut c_void) -> HRESULT, kind, &mut o);
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "create_query")) }
     }
 }
 
@@ -372,7 +409,7 @@ impl Com {
     pub fn tex_surface(&self, level: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 18, fn(u32, *mut *mut c_void) -> HRESULT, level, &mut o);
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "tex_surface")) }
     }
     pub fn tex_desc(&self, level: u32) -> SurfaceDesc {
         let mut d = SurfaceDesc::default();
@@ -391,7 +428,7 @@ impl Com {
     pub fn cube_surface(&self, face: u32, level: u32) -> Option<Com> {
         let mut o = null_mut();
         let hr = vcall!(self.0, 18, fn(u32, u32, *mut *mut c_void) -> HRESULT, face, level, &mut o);
-        if hr < 0 { None } else { Some(Com(o)) }
+        if hr < 0 { None } else { Some(Com::made(o, "cube_surface")) }
     }
     pub fn cube_lock(&self, face: u32, level: u32, flags: u32) -> Option<LockedRect> {
         let mut lr = LockedRect { pitch: 0, bits: null_mut() };

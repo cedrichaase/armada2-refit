@@ -210,7 +210,13 @@ error in Direct3D. Please reboot." from `SetActiveDisplay`). The display change 
 through `ST3D_DeviceDirectX8::DestroyRenderSurfaces` (slot 28 of its vtable, 0x6bc6ac),
 which releases the device in `DestroyDevice`; render3d chains that slot and first lets go
 of everything on the device (`frame::forget`): what a `Reset` drops, the sky's noise
-volume, and the shaders and declarations, which `gfx` keeps in one list for this. It
+volume, and the shaders and declarations, which `gfx` keeps in one list for this. The
+posed hulls of the last views and the ghosts' queue go too: they hold models, and a
+model holds its vertex and index buffers (missing them left 49 of each, and the mission
+did not start). `d3d` keeps a tally of every object made or handed out and not yet
+released; the hook logs what is left by kind ("still held after letting go"), which is
+how those were found, and unbinds every texture, stream and shader before the engine
+releases the device. It
 holds the d3d9 device across the engine's release and logs how many references are
 left: 0 means it is gone. `UI.asi` does the same (`ui/src/engine/device.rs`); when it
 is in the chain after render3d, render3d's count includes the UI's one reference.

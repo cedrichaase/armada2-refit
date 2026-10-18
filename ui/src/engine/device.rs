@@ -50,6 +50,14 @@ unsafe extern "thiscall" fn destroy(this: usize) {
     let held = if dev8.is_null() { None } else { Device::from_d3d8(dev8).map(|d| Com::from_borrowed(d.p())) };
     super::closeup::release();
     crate::gfx::forget();
+    let left = live();
+    if !left.is_empty() {
+        let mut t = alloc::string::String::new();
+        for (k, n) in left.iter() {
+            let _ = core::fmt::Write::write_fmt(&mut t, format_args!(" {} {}", n, k));
+        }
+        log!("device: still held after letting go:{}", t);
+    }
     let next: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(DESTROY_NEXT) };
     unsafe { next(this) };
     if let Some(h) = held {

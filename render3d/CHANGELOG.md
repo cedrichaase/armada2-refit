@@ -24,7 +24,8 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   what render3d held kept the shell's device alive, and the engine could not create the
   mission's. `DestroyRenderSurfaces` is chained now, and render3d lets go of every object
   on the device, its shaders and declarations included, before the engine releases it;
-  the log counts the references left.
+  the log counts the references left, and names by kind any object of ours still held
+  (`d3d::live`). The hulls' posed views and the ghosts' queue held 49 models' buffers.
 
 Installed, not yet seen in game.
 

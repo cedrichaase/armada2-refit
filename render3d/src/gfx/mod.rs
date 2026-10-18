@@ -77,7 +77,7 @@ fn recorded_block(dev: Device) -> Option<Com> {
     dev.set_scissor(&Rect { left: 0, top: 0, right: 1, bottom: 1 });
     let mut sb: *mut c_void = core::ptr::null_mut();
     let hr = vcall!(p, 61, fn(*mut *mut c_void) -> HRESULT, &mut sb);
-    if hr < 0 || sb.is_null() { None } else { Some(Com(sb)) }
+    if hr < 0 || sb.is_null() { None } else { Some(Com::made(sb, "recorded_block")) }
 }
 
 impl Guard {
