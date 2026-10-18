@@ -33,6 +33,32 @@ application directory before the system directory, so this is what makes Wine lo
 game-directory `winmm.dll` (the ASI loader), `d3d8.dll` and `d3d9.dll` (DXVK) instead of
 its own. `platform/d3d8-chain.py` owns the `d3d9` entry and `autoInstallDxvk` (below).
 
+## A new player's install, beside this one
+
+To try a release the way a new player gets it — the game fresh from GOG through Heroic,
+the mod from the graphical installer — without losing this install:
+
+    platform/heroic-clean.sh [--dry-run]     # Heroic closed
+    # Heroic: install the game, launch it once; run the installer AppImage
+    platform/heroic-restore.sh [--dry-run]   # Heroic closed
+
+`heroic-clean.sh` moves (never copies, never deletes) everything that makes this install
+what it is into `<game's parent>/.a2-clean-aside` (`A2_ASIDE` overrides): the game
+directory, with the HD textures, saves and plugins; its prefix; Heroic's
+`GamesConfig/1174788223.json` and the backups beside it; gogdl's manifest for the game;
+the installer's settings and download cache, so it downloads like a first run. It takes
+the game out of `gog_store/installed.json`, which is what Heroic reads to call a game
+installed; its library cache already says not installed. **Uninstalling Heroic would not
+do this**: the package leaves `~/.config/heroic` behind, launch settings, Proton builds
+and login with it, and wiping that folder costs the other games their setup.
+
+`heroic-restore.sh` reads the paths the clean recorded (`paths.sh` in the aside folder),
+parks what the test left at each one in `fresh-test-<time>/`, moves the originals back,
+and puts the game's own entry back in `installed.json` (games installed meanwhile stay).
+Both refuse while Heroic runs, since it rewrites its files on exit. While the game is
+aside, `A2_GAME` is the fresh install: `./install`, `./a2tex`, `./a2mod` and new bench
+sessions would act on it.
+
 ## Launch time
 
 Measured 2026-10-10 on the bench (umu as Heroic runs it, warm caches) and in Heroic's

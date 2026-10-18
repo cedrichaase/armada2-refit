@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.37.0 — 2026-10-18
+
+Layers: platform 3.5.0.
+
+### Added
+- platform: `heroic-clean.sh` and `heroic-restore.sh`, to set the Heroic install aside
+  for a new player's install from GOG and a release, and to put it back.
+
+Installs nothing; tested on a mock home, not yet run on the real install.
+
 ## 12.36.0 — 2026-10-17
 
 Layers: films 1.12.0, online 0.6.2, render3d 0.15.0, testbench 3.39.0.

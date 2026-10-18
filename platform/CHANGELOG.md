@@ -6,6 +6,17 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.5.0 — 2026-10-18
+
+### Added
+- `heroic-clean.sh` / `heroic-restore.sh`: set the Heroic install of the game aside
+  (game directory, prefix, Heroic's settings and install entry, gogdl's manifest, the
+  installer's settings and cache) for a new player's install from GOG and a release, and
+  put it back, the test's files parked rather than deleted (`README.md`, "A new player's
+  install, beside this one"). `--dry-run`; `A2_ASIDE`, `HEROIC_CONFIG`.
+
+Installs nothing; tested on a mock home, not yet run on the real install.
+
 ## 3.4.1 — 2026-10-12
 
 ### Fixed
