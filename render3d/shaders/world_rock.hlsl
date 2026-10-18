@@ -97,17 +97,24 @@ float4 ps_rock(VO i) : COLOR
              / max(dot(msurf_rows[0].xyz, msurf_rows[0].xyz), 1e-12) * msurf_ext.xyz;
     float4 A, B;
     float3 p;
+    // Both lookups' directions, and their gradients, are taken here: Windows' own
+    // Direct3D 9 refuses a texld (and ddx, ddy) inside an if (README.md, "Shaders on
+    // Windows"), so the branches sample with the gradients texCUBE would have found.
+    float3 no = float3(dot(i.n, msurf_rows[0].xyz), dot(i.n, msurf_rows[1].xyz), dot(i.n, msurf_rows[2].xyz));
+    float3 cq = clamp(q, -1.0, 1.0);
+    float3 sd = no >= 0.0 ? 1.0 : -1.0;
+    float3 cx = float3(sd.x, cq.y, cq.z), cy = float3(cq.x, sd.y, cq.z), cz = float3(cq.x, cq.y, sd.z);
+    float3 dq = normalize(q);
+    float3 cxx = ddx(cx), cxy = ddy(cx), cyx = ddx(cy), cyy = ddy(cy), czx = ddx(cz), czy = ddy(cz);
+    float3 dqx = ddx(dq), dqy = ddy(dq);
     if (msurf_misc.w > 0.5) {
         // Triplanar (the asteroids): along each object axis, the cube face on that
         // axis's side at the point's other two coordinates, blended by how squarely the
         // surface faces each axis.
-        float3 no = float3(dot(i.n, msurf_rows[0].xyz), dot(i.n, msurf_rows[1].xyz), dot(i.n, msurf_rows[2].xyz));
         float3 w  = pow(abs(no) / max(length(no), 1e-6), 4.0);
-        float3 cq = clamp(q, -1.0, 1.0);
-        float3 sd = no >= 0.0 ? 1.0 : -1.0;
-        float4 Ax = texCUBE(m_albedo, float3(sd.x, cq.y, cq.z)), Bx = texCUBE(m_relief, float3(sd.x, cq.y, cq.z));
-        float4 Ay = texCUBE(m_albedo, float3(cq.x, sd.y, cq.z)), By = texCUBE(m_relief, float3(cq.x, sd.y, cq.z));
-        float4 Az = texCUBE(m_albedo, float3(cq.x, cq.y, sd.z)), Bz = texCUBE(m_relief, float3(cq.x, cq.y, sd.z));
+        float4 Ax = texCUBEgrad(m_albedo, cx, cxx, cxy), Bx = texCUBEgrad(m_relief, cx, cxx, cxy);
+        float4 Ay = texCUBEgrad(m_albedo, cy, cyx, cyy), By = texCUBEgrad(m_relief, cy, cyx, cyy);
+        float4 Az = texCUBEgrad(m_albedo, cz, czx, czy), Bz = texCUBEgrad(m_relief, cz, czx, czy);
         w /= max(w.x + w.y + w.z, 1e-6);
         A = Ax * w.x + Ay * w.y + Az * w.z;
         B = Bx * w.x + By * w.y + Bz * w.z;
@@ -115,9 +122,8 @@ float4 ps_rock(VO i) : COLOR
           + (By.rgb - 0.5) * float3(1.0, 0.0, 1.0) * w.y
           + (Bz.rgb - 0.5) * float3(1.0, 1.0, 0.0) * w.z;
     } else {
-        float3 d = normalize(q);
-        A = texCUBE(m_albedo, d);
-        B = texCUBE(m_relief, d);
+        A = texCUBEgrad(m_albedo, dq, dqx, dqy);
+        B = texCUBEgrad(m_relief, dq, dqx, dqy);
         p = B.rgb - 0.5;
     }
     A.a = lerp(1.0, A.a, msurf_misc.z);                 // opaque unless the recipe cuts
@@ -140,6 +146,14 @@ float4 ps_rock(VO i) : COLOR
     // for walls (they broke it into dots), so the ravine fades in from 2 to 5.
     float  far  = saturate((msurf_spill.z / max(length(fwidth(q)), 1e-6) - 2.0) / 3.0);
     float  flat = hot;
+    // The ravine's view direction and the gradients its taps need, outside the branch
+    // like the ones above. A tap at q - vq * t (t the same on every pixel) has the
+    // gradient ddx(q) - ddx(vq) * t; a cube lookup reads only the direction, and so
+    // does its level, so the vector need not be normalised for either.
+    float3 Vw  = k_eye.xyz - i.wp;
+    float3 vq  = float3(dot(Vw, msurf_rows[0].xyz), dot(Vw, msurf_rows[1].xyz), dot(Vw, msurf_rows[2].xyz)) * msurf_ext.xyz;
+    vq /= max(length(vq), 1e-12);
+    float3 qx = ddx(q), qy = ddy(q), vx = ddx(vq), vy = ddy(vq);
     if (msurf_spill.z > 0.0 && msurf_misc.w < 0.5) {
         // A ravine with the light at its bottom: it opens where the cut does and is
         // deepest at the fissure's core (where B.a reaches twice the cut), the walls
@@ -150,14 +164,11 @@ float4 ps_rock(VO i) : COLOR
         float  D   = msurf_spill.z;
         float  lip = msurf_core.w - 0.06;
         float  top = max(2.0 * msurf_core.w - lip, 1e-3);
-        float3 Vw  = k_eye.xyz - i.wp;
-        float3 vq  = float3(dot(Vw, msurf_rows[0].xyz), dot(Vw, msurf_rows[1].xyz), dot(Vw, msurf_rows[2].xyz)) * msurf_ext.xyz;
-        vq /= max(length(vq), 1e-12);
         float  h0 = D * sqrt(saturate((B.a - lip) / top));
         float  hit = h0, found = 0.0, tp = 0.0, dp = h0;
         [unroll] for (int s = 1; s <= 8; s++) {
             float t  = D * s / 8.0;
-            float g  = texCUBE(m_relief, normalize(q - vq * t)).a;
+            float g  = texCUBEgrad(m_relief, q - vq * t, qx - vx * t, qy - vy * t).a;
             float dd = D * sqrt(saturate((g - lip) / top)) - t;   // > 0: still in the ravine
             float f  = (1.0 - found) * step(dd, 0.0);
             // where the ray crossed the wall, between this step and the last

@@ -40,6 +40,14 @@ static mut FRAME: Option<Frame> = None;
 static mut RESET: Option<Reset8> = None;
 static mut RESET_VT: usize = 0;
 
+/// `ST3D_DeviceDirectX8`'s vtable and its slot 28, `DestroyRenderSurfaces` (0x624760),
+/// which releases the engine's device (`DestroyDevice`) at every change of display:
+/// between the shell's display and a mission's, and in Graphics Settings.
+const DX8_VTABLE: usize = 0x6bc6ac;
+const SLOT_DESTROY: usize = 28;
+const DESTROY: usize = 0x624760;
+static mut DESTROY_NEXT: usize = 0;
+
 /// Points both call sites at our body. False, with nothing written, when either site
 /// does not call the stock body (a different `Armada2.exe`, or another plugin there).
 pub fn install() -> bool {
@@ -53,6 +61,9 @@ pub fn install() -> bool {
         hook::patch_call(s, BODY, body as *const () as usize);
     }
     log!("frame: both views come through render3d");
+    if install_destroy() {
+        log!("frame: DestroyRenderSurfaces chained: render3d lets go of the device with the engine");
+    }
     true
 }
 
@@ -149,6 +160,84 @@ fn frame() -> &'static mut Option<Frame> {
     unsafe { &mut FRAME }
 }
 
+/// Chains `DestroyRenderSurfaces`, so that render3d lets go of the device before the
+/// engine does. Under native Direct3D 9 a device lives while anything made on it is
+/// held, and the engine's next `CreateDevice` then fails ("Fatal error in Direct3D").
+/// False, with nothing written, when the slot holds neither the stock function nor
+/// another plugin's (one outside `Armada2.exe`'s code).
+pub fn install_destroy() -> bool {
+    let cur = engine::field(DX8_VTABLE, SLOT_DESTROY * 4);
+    if cur != DESTROY && (0x401000..0x6ae000).contains(&cur) {
+        log!("frame: slot {} of {:#x} is not DestroyRenderSurfaces: the device is let go of when the next one is seen", SLOT_DESTROY, DX8_VTABLE);
+        return false;
+    }
+    match hook::patch_slot(DX8_VTABLE, SLOT_DESTROY, destroy as *const () as usize) {
+        Some(old) => {
+            unsafe { DESTROY_NEXT = old };
+            true
+        }
+        None => false,
+    }
+}
+
+unsafe extern "thiscall" fn destroy(this: usize) {
+    // Hold the d3d9 device across the engine's release, to count who else still holds
+    // it: 0 once the engine has let go and so have we (and any plugin after us).
+    let dev8 = engine::field(this, 0x90) as *mut c_void;
+    let held = if dev8.is_null() { None } else { Device::from_d3d8(dev8).map(|d| Com::from_borrowed(d.p())) };
+    forget();
+    // Whatever is still bound is held by the device: unbind it all (the engine is about
+    // to release the device, so nothing of its own needs to stay bound either).
+    if let Some(h) = held.as_ref() {
+        let d = Device(h.ptr());
+        for s in (0..16).chain(257..261) {
+            d.set_texture(s, core::ptr::null_mut());
+        }
+        for n in 0..16 {
+            d.set_stream(n, core::ptr::null_mut(), 0, 0);
+        }
+        d.set_indices(core::ptr::null_mut());
+        d.set_vs(core::ptr::null_mut());
+        d.set_ps(core::ptr::null_mut());
+        d.set_vertex_decl(core::ptr::null_mut());
+        for i in 1..4 {
+            d.set_render_target(i, core::ptr::null_mut());
+        }
+    }
+    let left = live();
+    if !left.is_empty() {
+        let mut t = alloc::string::String::new();
+        for (k, n) in left.iter() {
+            let _ = core::fmt::Write::write_fmt(&mut t, format_args!(" {} {}", n, k));
+        }
+        log!("frame: still held after letting go:{}", t);
+    }
+    let next: unsafe extern "thiscall" fn(usize) = unsafe { core::mem::transmute(DESTROY_NEXT) };
+    unsafe { next(this) };
+    if let Some(h) = held {
+        let p = h.ptr();
+        core::mem::forget(h);
+        let left = vcall!(p, 2, fn() -> u32,);
+        log!("frame: the engine let go of its device; {} references to it left (0: it is gone)", left);
+    }
+}
+
+/// Lets go of everything render3d made on the device, in every pool.
+fn forget() {
+    if let Some(f) = frame() {
+        f.targets = None;
+        f.post = None;
+        f.failed = None;
+        // The next frame sees a new device, and hands it to every module.
+        f.dev = Device(core::ptr::null_mut());
+    }
+    crate::mods::forget();
+    crate::assets::reset();
+    crate::gfx::forget();
+    crate::scene::reset();
+    timing::reset();
+}
+
 /// Before a `Reset`, everything we hold in the default pool must be gone.
 unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESULT {
     if let Some(f) = frame() {
@@ -161,6 +250,14 @@ unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESU
     crate::gfx::reset();
     crate::scene::reset();
     timing::reset();
+    let left = live_default();
+    if !left.is_empty() {
+        let mut t = alloc::string::String::new();
+        for (k, n) in left.iter() {
+            let _ = core::fmt::Write::write_fmt(&mut t, format_args!(" {} {}", n, k));
+        }
+        log!("frame: still held at Reset:{}", t);
+    }
     log!("frame: device Reset");
     match unsafe { RESET } {
         Some(r) => unsafe { r(dev8, params) },
@@ -192,6 +289,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
     if f.as_ref().is_none_or(|f| f.dev != dev) {
         if f.is_some() {
             log!("frame: a new device");
+            forget();
         } else {
             crate::mods::settle();
             for name in crate::SUPERSEDED {

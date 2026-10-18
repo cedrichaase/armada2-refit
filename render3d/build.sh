@@ -5,8 +5,9 @@
 # Shaders first: each shaders/<name>.hlsl names its entry points on its first line,
 #   // entries: <entry>:<profile>:<SYMBOL> ...
 # and is compiled by hlsl-rs.sh into src/shaders/<name>.rs (committed, with a stamp, so
-# a machine without vkd3d-compiler builds as long as they are current). src/shaders/
-# mod.rs lists them and is written here too.
+# a machine without vkd3d-compiler builds as long as they are current), with --fix:
+# Windows' own Direct3D 9 refuses vkd3d's bytecode as it is (README.md, "Shaders on
+# Windows"). src/shaders/mod.rs lists them and is written here too.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +21,7 @@ for f in "$here"/shaders/*.hlsl; do
     entries=$(sed -n '1s#^// entries:##p' "$f")
     [ -n "$entries" ] || { echo "render3d: $f has no '// entries:' first line" >&2; exit 1; }
     # shellcheck disable=SC2086
-    "$here/hlsl-rs.sh" "$here/src/shaders/$name.rs" "$f" $entries
+    "$here/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
     mods="$mods$name "
 done
 # Temp files of this run's own, beside their targets so each mv is a rename: several

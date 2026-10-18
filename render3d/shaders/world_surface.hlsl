@@ -46,6 +46,11 @@ float4 k_face[4] : register(c32);  // the face's centre, right and down axes; x:
 
 samplerCUBE s_height : register(s0);
 
+// The height inside a branch (after an early return). Windows' own Direct3D 9 refuses a
+// texld inside an if (README.md, "Shaders on Windows"); the cube has one level and the
+// same filter either way, so zero gradients sample exactly what texCUBE did.
+float4 height_tap(float3 d) { return texCUBEgrad(s_height, d, 0.0, 0.0); }
+
 // sky.hlsl's lattice hash and value noise: no sine, a quintic fade.
 float hash13(float3 p)
 {
@@ -279,10 +284,10 @@ float4 albedo_ps(float2 vpos : VPOS) : COLOR
     tangents(d, t1, t2);
     float  e = k_face[3].y * 3.0;
     float  hs = max(h, k_sea.x);
-    float  lap = max(texCUBE(s_height, normalize(d + t1 * e)).r, k_sea.x)
-               + max(texCUBE(s_height, normalize(d - t1 * e)).r, k_sea.x)
-               + max(texCUBE(s_height, normalize(d + t2 * e)).r, k_sea.x)
-               + max(texCUBE(s_height, normalize(d - t2 * e)).r, k_sea.x) - 4.0 * hs;
+    float  lap = max(height_tap(normalize(d + t1 * e)).r, k_sea.x)
+               + max(height_tap(normalize(d - t1 * e)).r, k_sea.x)
+               + max(height_tap(normalize(d + t2 * e)).r, k_sea.x)
+               + max(height_tap(normalize(d - t2 * e)).r, k_sea.x) - 4.0 * hs;
     float  cav = 1.0 - saturate(lap * k_cavity.x) + saturate(-lap * k_cavity.y);
 
     c = lerp(ramp(k_ramp, h), ramp(k_alt, h), region) * cn * cav;

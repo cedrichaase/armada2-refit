@@ -4,7 +4,7 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
-## 0.12.1 — 2026-10-17
+## 0.13.2 — 2026-10-17
 
 ### Fixed
 - Our cursor obeys a hidden engine cursor: `RefreshDisplay`'s draw of the cursor
@@ -16,6 +16,39 @@ versions". Newest first. Details are in [`README.md`](README.md).
   where the engine would draw one.
 
 Installed, not yet seen in game.
+## 0.13.1 — 2026-10-18
+
+### Changed
+- The log names any default-pool object of the UI's still held at a device `Reset`
+  (`d3d::live_default`).
+
+Confirmed in game 2026-10-18.
+
+## 0.13.0 — 2026-10-18
+
+### Added
+- `[UI] Native=1`: a game whose display mode is still a stock one (800x600 with no
+  `ARMADA.PRF`, 1024x768 as GOG ships it) runs at the desktop's, so the menus, the
+  loading screen and the missions share one mode from the first launch; a mode chosen
+  in Graphics Settings is kept (`engine/display.rs`, on the call of
+  `InitializeGraphicsSystem`).
+
+Confirmed in game 2026-10-18.
+
+## 0.12.1 — 2026-10-18
+
+### Fixed
+- On Windows, without DXVK, the UI drew nothing: Direct3D 9 refused `PS_UI` as vkd3d
+  writes it ("gfx: could not make the shaders or the state block"), and the menus ran
+  on a black screen. The shaders are built with `hlsl-rs.sh --fix`; both are made on
+  Windows 10's runtime (render3d/README.md, "Shaders on Windows").
+- On Windows, starting a mission ended in "Fatal error in Direct3D. Please reboot.":
+  the UI's objects kept the shell's device alive. `engine/device.rs` chains
+  `DestroyRenderSurfaces` and lets go of everything first, and chains `Reset` from the
+  first frame, letting go of the state block, which a native `Reset` refuses to keep.
+  The log names by kind any object of ours still held then (`d3d::live`).
+
+Confirmed in game 2026-10-18.
 
 ## 0.12.0 — 2026-10-17
 

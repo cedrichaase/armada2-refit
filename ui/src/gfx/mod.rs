@@ -546,6 +546,25 @@ struct Res {
 static mut RES: Option<Res> = None;
 static mut FAILED: Option<Device> = None;
 
+/// Lets go of everything the UI made on the device, in every pool, and of the engine's
+/// textures it holds (`engine::device`, before the engine releases the device).
+#[allow(static_mut_refs)]
+pub fn forget() {
+    unsafe {
+        RES = None;
+        FAILED = None;
+        for t in TEXTURES.iter_mut() {
+            t.obj = None;
+            t.dirty = false;
+        }
+    }
+}
+
+/// Before a `Reset`: the state block must go (made again with the shaders at the next frame).
+pub fn reset() {
+    unsafe { RES = None };
+}
+
 #[allow(static_mut_refs)]
 fn res(dev: Device) -> Option<&'static Res> {
     unsafe {
@@ -557,11 +576,10 @@ fn res(dev: Device) -> Option<&'static Res> {
         }
         // Another device (the stock front end re-creates it at every switch between the
         // shell's display and the game's): let go of everything made on the old one at
-        // once, since what we hold keeps that device alive.
-        RES = None;
-        for t in TEXTURES.iter_mut() {
-            t.obj = None;
-        }
+        // once, since what we hold keeps that device alive. `engine::device` has done
+        // so already when the engine released it.
+        forget();
+        crate::engine::device::hook_reset(crate::engine::d3d8_device());
         let made = (|| {
             Some(Res {
                 dev,

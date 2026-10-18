@@ -235,7 +235,9 @@ desktop size. When the mode the new display wants differs from the current one,
 When the two modes are the same, it does nothing at all. **So the `IDirect3DDevice8` can
 change whenever the shell and the 3D display switch.** In stock (an 800x600 shell
 under a bigger game resolution) it changes on every switch. With Menus.asi and the game
-at desktop resolution it does not. Anything that keeps resources must check
+at desktop resolution it does not, which `[UI] Native` arranges from the first launch
+(`src/engine/display.rs`: a stock mode in the profile becomes the desktop's before
+`InitializeGraphicsSystem` opens the device). Anything that keeps resources must check
 `engine::d3d8_device()` every frame and drop what it made on an old device.
 
 While a GDI menu is up, the game thread is inside that dialog's modal loop. Nothing
@@ -637,11 +639,5 @@ the engine does not see (the selection stays).
 - **Widgets**: `button`, `toggle` and `slider` take no keyboard focus; the text field
   has no undo and no IME; a dropdown's press outside the list closes it but the press
   also reaches whatever is below it.
-- **A device left behind.** Objects made on a device keep it alive (`platform/D3D9.md`,
-  "Which device"), and the renderer lets go of them when it first draws on a new
-  device. In stock, where the shell and the game's display re-create the device at
-  every switch, the last mission's device therefore lives on behind the GDI menus until
-  the UI next draws. With Menus.asi at the game's resolution the device is never
-  re-created. Not seen to matter; not measured.
 - Not verified: device loss in a screen of ours, the wheel, characters outside ASCII,
   a stock 800x600 shell, `Embed=0`.

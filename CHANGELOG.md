@@ -5,9 +5,9 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 12.36.0 — 2026-10-17
+## 12.38.0 — 2026-10-17
 
-Layers: films 1.12.0, online 0.6.2, render3d 0.15.0, testbench 3.39.0.
+Layers: films 1.12.0, online 0.6.2, render3d 0.16.0, testbench 3.39.0.
 
 ### Added
 - films: `Music:` beds from a path under the game's `sounds/`; a shot's `Labels:`; the
@@ -35,7 +35,7 @@ Layers: films 1.12.0, online 0.6.2, render3d 0.15.0, testbench 3.39.0.
 Installed, not yet seen in game (render3d); films, online's bench script and testbench
 install nothing.
 
-## 12.35.0 — 2026-10-17
+## 12.37.0 — 2026-10-17
 
 Layers: testbench 3.38.0, films 1.11.0.
 
@@ -48,7 +48,7 @@ Layers: testbench 3.38.0, films 1.11.0.
 Installs nothing; the beams seen firing on the bench 2026-10-17 (stock), the boards not
 yet filmed.
 
-## 12.34.0 — 2026-10-17
+## 12.36.0 — 2026-10-17
 
 Layers: testbench 3.37.0.
 
@@ -61,7 +61,7 @@ Installs nothing; seen working on the bench 2026-10-17 (`showcase`, `Hud=1`, `Ra
 the Federation HUD on 3 of 3 launches in stock and 3 of 3 in refit; `SCENE_RACE=klingon`
 over it: the Klingon theme).
 
-## 12.33.0 — 2026-10-17
+## 12.35.0 — 2026-10-17
 
 Layers: testbench 3.36.0, films 1.10.0.
 
@@ -73,9 +73,11 @@ Layers: testbench 3.36.0, films 1.10.0.
 ### Fixed
 - Scenario `specials`: the assimilation beam forms (testbench 3.36.0).
 
-## 12.32.1 — 2026-10-17
+Installed, not yet seen in game.
 
-Layers: ui 0.12.1, testbench 3.35.1.
+## 12.34.2 — 2026-10-17
+
+Layers: ui 0.13.2, testbench 3.35.1.
 
 ### Fixed
 - `UI.asi`'s cursor is hidden while the engine's would be: Scene.asi's `Cursor=0` /
@@ -83,6 +85,40 @@ Layers: ui 0.12.1, testbench 3.35.1.
   cursor, as in stock.
 
 Installed, not yet seen in game.
+## 12.34.1 — 2026-10-18
+
+Layers: render3d 0.15.1, ui 0.13.1.
+
+### Fixed
+- Alt-tab out of the game and back on Windows no longer ends in "Fatal error in
+  Direct3D": render3d lets go of every default-pool object before the device's `Reset`.
+
+Confirmed in game 2026-10-18.
+
+## 12.34.0 — 2026-10-18
+
+Layers: ui 0.13.0.
+
+### Added
+- The game runs at the desktop's resolution from the first launch (`[UI] Native`),
+  instead of the stock 1024x768 and a mode change at every switch to the menus.
+
+Confirmed in game 2026-10-18.
+
+## 12.33.0 — 2026-10-18
+
+Layers: ui 0.12.1, render3d 0.15.0.
+
+### Fixed
+- UI.asi and Render3D.asi on Windows: their shaders are rewritten into what Windows'
+  own Direct3D 9 accepts (`render3d/d3dbc-fix.py`, `hlsl-rs.sh --fix`, and no sampling
+  inside a branch in the HLSL), so the menus and the HUD draw instead of a black screen,
+  and render3d draws the 3D view instead of standing down.
+- Both let go of everything they hold on the engine's device before it releases it
+  (`DestroyRenderSurfaces`), so a mission starts on Windows instead of ending in "Fatal
+  error in Direct3D".
+
+Confirmed in game 2026-10-18.
 
 ## 12.32.0 — 2026-10-17
 

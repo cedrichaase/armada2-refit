@@ -180,6 +180,9 @@ impl Module for Overlays {
         self.grid.reset();
         self.fog.reset();
         self.posts.reset();
+        // The queued ghosts hold their models, and the models their buffers, which are
+        // in the default pool.
+        self.ghosts.begin_view();
     }
     fn begin_view(&mut self, _v: &View) {
         self.ghosts.begin_view();

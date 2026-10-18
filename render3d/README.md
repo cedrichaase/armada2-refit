@@ -52,6 +52,67 @@ allocator, memory functions and stack probe (`src/rt/`). Shaders are HLSL in
 `shaders/`, compiled by `hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders.rs`, which
 is committed with a stamp so a machine without vkd3d builds as long as it is current.
 
+### Shaders on Windows
+
+**Windows' own Direct3D 9 refuses vkd3d's bytecode; DXVK takes it as it is.** On
+Windows the chain is crosire's d3d8to9 over the system's d3d9, with no DXVK, and the
+runtime validates every shader at `CreateVertexShader`/`CreatePixelShader`. Measured
+on Windows 10 (Radeon RX 5700 XT, a 32-bit process): 51 of the 86 shaders of
+Render3D.asi and UI.asi came back `D3DERR_INVALIDCALL`, on every kind of device
+(software, hardware, mixed and pure vertex processing). The state block and the vertex
+declarations were made. So both plugins stood down: UI.asi drew nothing (a black
+screen over working menus) and render3d left the 3D view to the engine.
+
+Taking the refused shaders apart instruction by instruction (each prefix of a shader,
+closed off with a write of `oC0`) found what the runtime refuses:
+
+1. **One constant register and one input register per instruction.** `mul r0.x, c0.x,
+   c12.x` and `mul r1.x, v0.x, v2.y` are refused; the same register twice is
+   accepted. vkd3d writes both freely.
+2. **`sincos` may not write the register it reads**: `sincos r1.y, r1.x` is refused,
+   `sincos r2.y, r1.x` accepted.
+3. **`oDepth` takes the full write mask**: `mov oDepth.x, r0.x` is refused.
+4. **No `texld` (or `dsx`, `dsy`) inside an `if`.** The same `texld` on its own is
+   accepted, on a 2D, cube or volume sampler alike, and so is any prefix that stops
+   before the first one inside a branch.
+5. **r0 to r31 only.** The nebula march shaders use r33.
+
+These five predict the runtime's verdict on all 86. `d3dbc-fix.py` mends four of them
+in the bytecode. It copies the extra register into a temporary (only the lanes the
+instruction consumes, so an input is never read outside its `dcl` mask), routes
+`sincos` through one, and widens the mask. And it gives the temporaries out again when
+a shader names more than 32: vkd3d never reuses a register, but at most 19 values are
+live at once in the march (liveness over its if/else; a value live into or out of an if
+keeps one register across all of it). `hlsl-rs.sh --fix` runs it on each shader, for
+both plugins (`build.sh`, `ui/build.sh`); `d3dbc-fix.py --check <file.bin>` lists all
+five.
+
+Rule 4 is the HLSL's to keep. **Never sample with `tex2D`/`tex3D`/`texCUBE` inside an
+`if`, or after an early `return`** (vkd3d puts the rest of the function inside one).
+Each place that did was rewritten so it samples what it sampled before:
+
+- a texture with one level and the same min and mag filter (the noise volume of the
+  fire, the surfaces' height cube, the nebulae's baked volume and blue noise) is read
+  with zero gradients or `tex2Dlod`, which is level 0, as before;
+- a mipped one (the rocks' baked cubes) is read with `texCUBEgrad`, the gradients taken
+  before the branch from the same coordinates. A tap of the crack march at
+  `q - vq * t` (t the same on every pixel) has the gradient `ddx(q) - ddx(vq) * t`, and
+  needs no normalising: a cube lookup and its level read only the direction;
+- where the branch only saved work in a pass that is rarely drawn (the nebulae's bake,
+  their reference, the slices drawn without the march), the branches are `[flatten]`ed
+  and the early returns turned into a choice at the end.
+
+vkd3d (1.19) has no `tex3Dlod` or `texCUBElod`; `tex*grad` and `tex2Dlod` it has.
+
+How this was checked: every shader as committed is made on Windows 10's runtime on all
+four kinds of device; and a d3dbc interpreter ran each shader as vkd3d wrote it and as
+`d3dbc-fix.py` rewrote it, 300 random inputs and constants each (so the recipe's
+branches go both ways), with identical outputs for all 86, and the old and new
+compiles of every rewritten entry point with identical outputs too (textures there are
+a function of the coordinate alone, so the levels are the argument above). With the
+allocator's rule for ifs taken out, the interpreter found the marches wrong in every
+run.
+
 ## `Render3D.ini`
 
 | Key | Default | |
@@ -141,6 +202,24 @@ device render3d has not seen ("frame: a new device") drops the frame's state, ho
 the new device's `Reset` and hands the device to every module, which makes its
 resources again; scenario `render3d-mode-switch` checks it, switching to
 800x600 in a running battle.
+
+**Letting go of the device.** Under DXVK that is enough. Under native Direct3D 9 it
+is not: every object holds its device, so whatever render3d still held kept the shell's
+device alive, and the engine's `CreateDevice` for the mission's display failed ("Fatal
+error in Direct3D. Please reboot." from `SetActiveDisplay`). The display change goes
+through `ST3D_DeviceDirectX8::DestroyRenderSurfaces` (slot 28 of its vtable, 0x6bc6ac),
+which releases the device in `DestroyDevice`; render3d chains that slot and first lets go
+of everything on the device (`frame::forget`): what a `Reset` drops, the sky's noise
+volume, and the shaders and declarations, which `gfx` keeps in one list for this. The
+posed hulls of the last views and the ghosts' queue go too: they hold models, and a
+model holds its vertex and index buffers (missing them left 49 of each, and the mission
+did not start). `d3d` keeps a tally of every object made or handed out and not yet
+released; the hook logs what is left by kind ("still held after letting go"), which is
+how those were found, and unbinds every texture, stream and shader before the engine
+releases the device. It
+holds the d3d9 device across the engine's release and logs how many references are
+left: 0 means it is gone. `UI.asi` does the same (`ui/src/engine/device.rs`); when it
+is in the chain after render3d, render3d's count includes the UI's one reference.
 
 **Without Direct3D 9.** The d3d9 device is asked for behind the game's d3d8 one
 (`platform/D3D9.md`). Under DXVK's own d3d8, or when the targets cannot be made, the
