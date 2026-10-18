@@ -43,7 +43,9 @@ the mod from the graphical installer — without losing this install:
     platform/heroic-restore.sh [--dry-run]   # Heroic closed
 
 `heroic-clean.sh` moves (never copies, never deletes) everything that makes this install
-what it is into `<game's parent>/.a2-clean-aside` (`A2_ASIDE` overrides): the game
+what it is into `$A2_DATA/heroic-aside` (`A2_ASIDE` overrides) — never inside a folder
+of Heroic's: a reinstall from scratch may remove `~/Games/Heroic` whole, and the first
+version's aside folder there went with it. Into it go the game
 directory, with the HD textures, saves and plugins; its prefix; Heroic's
 `GamesConfig/1174788223.json` and the backups beside it; gogdl's manifest for the game;
 the installer's settings and download cache, so it downloads like a first run. It takes

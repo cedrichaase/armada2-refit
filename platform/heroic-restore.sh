@@ -4,8 +4,8 @@
 #   platform/heroic-restore.sh            restore (Heroic must be closed)
 #   platform/heroic-restore.sh --dry-run  say what would move, move nothing
 #
-# Reads <aside>/paths.sh (A2_ASIDE, else <game's parent>/.a2-clean-aside, as
-# heroic-clean.sh chose). Deletes nothing: whatever the test left at each path (the
+# Reads <aside>/paths.sh (A2_ASIDE, else $A2_DATA/heroic-aside, as heroic-clean.sh
+# chose). Deletes nothing: whatever the test left at each path (the
 # fresh game, its prefix, Heroic's new settings, the installer's) is moved into
 # <aside>/fresh-test-<time>/, and the originals go back. Heroic's install list gets the
 # game's original entry back; any other game installed meanwhile stays listed. When
@@ -21,7 +21,7 @@ dry=0
 
 die() { echo "heroic-restore: $*" >&2; exit 1; }
 
-aside=${A2_ASIDE:-$(dirname "$A2_GAME")/.a2-clean-aside}
+aside=${A2_ASIDE:-$A2_DATA/heroic-aside}
 [ -f "$aside/paths.sh" ] || die "nothing set aside: no $aside/paths.sh (set A2_ASIDE?)"
 . "$aside/paths.sh"
 [ -d "$aside/game" ] || die "$aside/game is missing: restore by hand, nothing touched"

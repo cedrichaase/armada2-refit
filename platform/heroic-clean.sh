@@ -5,9 +5,9 @@
 #   platform/heroic-clean.sh            move everything aside (Heroic must be closed)
 #   platform/heroic-clean.sh --dry-run  say what would move, move nothing
 #
-# Moves, never copies or deletes, into one folder beside the game (A2_ASIDE overrides;
-# default <game's parent>/.a2-clean-aside, the same filesystem, so every move is a
-# rename): the game directory (HD textures, saves and every plugin go with it), its
+# Moves, never copies or deletes, into one folder (A2_ASIDE overrides; default
+# $A2_DATA/heroic-aside -- outside every folder of Heroic's, since a clean reinstall may
+# remove those whole, and on the same filesystem as the game, so a move is a rename): the game directory (HD textures, saves and every plugin go with it), its
 # Wine prefix, Heroic's settings for the game (GamesConfig/<app>.json and the backups
 # beside it), gogdl's manifest for it, the refit installer's settings and download
 # cache. Heroic's install list (gog_store/installed.json) is copied, and the game's
@@ -60,7 +60,7 @@ manifest=$heroic/gogdlConfig/heroic_gogdl/manifests/$APP
 instcfg=${XDG_CONFIG_HOME:-$HOME/.config}/armada2-refit/installer.json
 instcache=${XDG_CACHE_HOME:-$HOME/.cache}/armada2-refit/installer
 
-aside=${A2_ASIDE:-$(dirname "$game")/.a2-clean-aside}
+aside=${A2_ASIDE:-$A2_DATA/heroic-aside}
 [ -e "$aside" ] && die "$aside already exists: run heroic-restore.sh first, or set A2_ASIDE"
 [ -f "$game/Armada2.exe" ] || die "no Armada2.exe in $game"
 
@@ -106,6 +106,8 @@ Set aside. Now, as a new player:
   1. Open Heroic, install Star Trek: Armada II (default folder and Proton).
   2. Launch it once, so Heroic writes its settings file for the game.
   3. Run the refit installer (the AppImage from the GitHub release) and install.
+The original install is in $aside now, and only there: keep that folder until
+heroic-restore.sh has run. Removing Heroic and its game folders no longer touches it.
 While this lasts, a2env's A2_GAME is the fresh install: don't run ./install, ./a2tex,
 ./a2mod or new a2test sessions. To come back: quit Heroic, then
   platform/heroic-restore.sh${A2_ASIDE:+   (with A2_ASIDE=$A2_ASIDE)}
