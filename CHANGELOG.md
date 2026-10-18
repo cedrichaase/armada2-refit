@@ -13,7 +13,7 @@ Layers: render3d 0.15.1, ui 0.13.1.
 - Alt-tab out of the game and back on Windows no longer ends in "Fatal error in
   Direct3D": render3d lets go of every default-pool object before the device's `Reset`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-18.
 
 ## 12.34.0 — 2026-10-18
 

@@ -12,7 +12,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   are in the default pool, through the device's `Reset`. Both are dropped at a `Reset`
   now, and the log names any default-pool object still held then.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-18.
 
 ## 0.15.0 — 2026-10-18
 

@@ -10,7 +10,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
 - The log names any default-pool object of the UI's still held at a device `Reset`
   (`d3d::live_default`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-18.
 
 ## 0.13.0 — 2026-10-18
 
