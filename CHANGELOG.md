@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.34.0 — 2026-10-18
+
+Layers: ui 0.13.0.
+
+### Added
+- The game runs at the desktop's resolution from the first launch (`[UI] Native`),
+  instead of the stock 1024x768 and a mode change at every switch to the menus.
+
+Confirmed in game 2026-10-18.
+
 ## 12.33.0 — 2026-10-18
 
 Layers: ui 0.12.1, render3d 0.15.0.

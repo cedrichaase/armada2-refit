@@ -4,6 +4,17 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.13.0 — 2026-10-18
+
+### Added
+- `[UI] Native=1`: a game whose display mode is still a stock one (800x600 with no
+  `ARMADA.PRF`, 1024x768 as GOG ships it) runs at the desktop's, so the menus, the
+  loading screen and the missions share one mode from the first launch; a mode chosen
+  in Graphics Settings is kept (`engine/display.rs`, on the call of
+  `InitializeGraphicsSystem`).
+
+Confirmed in game 2026-10-18.
+
 ## 0.12.1 — 2026-10-18
 
 ### Fixed
