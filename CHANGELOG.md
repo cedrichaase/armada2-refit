@@ -14,7 +14,7 @@ Layers: ui 0.13.3.
   Bar" says Shown; the setting was checked against the wrong flag, and the toggle could
   hide a bar that was already up.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-19.
 
 ## 12.38.0 — 2026-10-17
 

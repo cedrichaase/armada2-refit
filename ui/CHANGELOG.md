@@ -17,7 +17,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   flag F)", with ", toggled" when it pressed.
   `testbench/scenarios/ui-hud-bar-after-cinematic.md` checks it.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-19.
 
 ## 0.13.2 — 2026-10-17
 
