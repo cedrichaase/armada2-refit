@@ -71,6 +71,14 @@ unsafe extern "thiscall" fn destroy(this: usize) {
 unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESULT {
     super::closeup::release();
     crate::gfx::reset();
+    let left = live_default();
+    if !left.is_empty() {
+        let mut t = alloc::string::String::new();
+        for (k, n) in left.iter() {
+            let _ = core::fmt::Write::write_fmt(&mut t, format_args!(" {} {}", n, k));
+        }
+        log!("device: still held at Reset:{}", t);
+    }
     log!("device: Reset");
     match unsafe { RESET } {
         0 => -1,

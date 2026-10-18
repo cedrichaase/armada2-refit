@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.34.1 — 2026-10-18
+
+Layers: render3d 0.15.1, ui 0.13.1.
+
+### Fixed
+- Alt-tab out of the game and back on Windows no longer ends in "Fatal error in
+  Direct3D": render3d lets go of every default-pool object before the device's `Reset`.
+
+Confirmed in game 2026-10-18.
+
 ## 12.34.0 — 2026-10-18
 
 Layers: ui 0.13.0.
