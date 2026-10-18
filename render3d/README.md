@@ -77,19 +77,41 @@ closed off with a write of `oC0`) found what the runtime refuses:
    before the first one inside a branch.
 5. **r0 to r31 only.** The nebula march shaders use r33.
 
-These five predict the runtime's verdict on all 86. `d3dbc-fix.py` mends the first
-three in the bytecode: it copies the extra register into a temporary (only the lanes
-the instruction consumes, so an input is never read outside its `dcl` mask), routes
-`sincos` through one, and widens the mask. It fails on the last two, which need the
-HLSL changed: sampling inside a branch with an explicit LOD or gradients, or out of it,
-and fewer live values in the march. `hlsl-rs.sh --fix` runs it on each shader;
-`d3dbc-fix.py --check <file.bin>` lists all five.
+These five predict the runtime's verdict on all 86. `d3dbc-fix.py` mends four of them
+in the bytecode. It copies the extra register into a temporary (only the lanes the
+instruction consumes, so an input is never read outside its `dcl` mask), routes
+`sincos` through one, and widens the mask. And it gives the temporaries out again when
+a shader names more than 32: vkd3d never reuses a register, but at most 19 values are
+live at once in the march (liveness over its if/else; a value live into or out of an if
+keeps one register across all of it). `hlsl-rs.sh --fix` runs it on each shader, for
+both plugins (`build.sh`, `ui/build.sh`); `d3dbc-fix.py --check <file.bin>` lists all
+five.
 
-UI.asi builds with `--fix` (`ui/build.sh`). Render3D does not yet: ten of its shaders
-still break rule 4 or 5 (the explosions' fire, the nebulae's `PS_NEB`, `PS_NBAKE`,
-`PS_VOL` and the four marches, the rocks, the surfaces' albedo), and a render3d that
-made its post shaders would take the 3D view and then draw no nebulae, asteroids or
-fire. Until they are rewritten, it stands down on Windows and the engine draws.
+Rule 4 is the HLSL's to keep. **Never sample with `tex2D`/`tex3D`/`texCUBE` inside an
+`if`, or after an early `return`** (vkd3d puts the rest of the function inside one).
+Each place that did was rewritten so it samples what it sampled before:
+
+- a texture with one level and the same min and mag filter (the noise volume of the
+  fire, the surfaces' height cube, the nebulae's baked volume and blue noise) is read
+  with zero gradients or `tex2Dlod`, which is level 0, as before;
+- a mipped one (the rocks' baked cubes) is read with `texCUBEgrad`, the gradients taken
+  before the branch from the same coordinates. A tap of the crack march at
+  `q - vq * t` (t the same on every pixel) has the gradient `ddx(q) - ddx(vq) * t`, and
+  needs no normalising: a cube lookup and its level read only the direction;
+- where the branch only saved work in a pass that is rarely drawn (the nebulae's bake,
+  their reference, the slices drawn without the march), the branches are `[flatten]`ed
+  and the early returns turned into a choice at the end.
+
+vkd3d (1.19) has no `tex3Dlod` or `texCUBElod`; `tex*grad` and `tex2Dlod` it has.
+
+How this was checked: every shader as committed is made on Windows 10's runtime on all
+four kinds of device; and a d3dbc interpreter ran each shader as vkd3d wrote it and as
+`d3dbc-fix.py` rewrote it, 300 random inputs and constants each (so the recipe's
+branches go both ways), with identical outputs for all 86, and the old and new
+compiles of every rewritten entry point with identical outputs too (textures there are
+a function of the coordinate alone, so the levels are the argument above). With the
+allocator's rule for ifs taken out, the interpreter found the marches wrong in every
+run.
 
 ## `Render3D.ini`
 

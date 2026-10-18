@@ -10,9 +10,10 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: ui 0.12.1, render3d 0.15.0.
 
 ### Fixed
-- UI.asi on Windows: its pixel shader is rewritten into what Windows' own Direct3D 9
-  accepts, so the menus and the HUD draw instead of a black screen
-  (`render3d/d3dbc-fix.py`, `hlsl-rs.sh --fix`).
+- UI.asi and Render3D.asi on Windows: their shaders are rewritten into what Windows'
+  own Direct3D 9 accepts (`render3d/d3dbc-fix.py`, `hlsl-rs.sh --fix`, and no sampling
+  inside a branch in the HLSL), so the menus and the HUD draw instead of a black screen,
+  and render3d draws the 3D view instead of standing down.
 
 Installed, not yet seen in game.
 

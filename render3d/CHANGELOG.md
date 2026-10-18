@@ -9,11 +9,17 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 ### Added
 - `d3dbc-fix.py`: rewrites the vkd3d bytecode Windows' own Direct3D 9 refuses (two
   constant or two input registers in one instruction, `sincos` into its own source,
-  `oDepth` with a partial mask); `--check` also lists a `texld` inside an `if` and
-  temporaries past r31, which it cannot rewrite.
-- `hlsl-rs.sh --fix`, which puts each shader through it. UI.asi uses it; Render3D.asi
-  does not yet, as ten of its shaders still break the last two rules, so on Windows it
-  still leaves the 3D view to the engine. Nothing it installs changes.
+  `oDepth` with a partial mask, temporaries past r31, given out again by liveness);
+  `--check` also lists a `texld` inside an `if`, which it cannot rewrite.
+- `hlsl-rs.sh --fix`, which puts each shader through it; `build.sh` and `ui/build.sh`
+  use it.
+
+### Fixed
+- On Windows, without DXVK, render3d stood down ("the post shaders could not be made:
+  stock") and the engine drew the 3D view and the menu scene: 51 of the 86 shaders were
+  refused. Every one is made now. No sampling inside a branch any more: the fire, the
+  rocks, the surfaces' albedo and the nebulae read with gradients, at level 0, or
+  flattened, each sampling what it did before (README.md, "Shaders on Windows").
 
 Installed, not yet seen in game.
 

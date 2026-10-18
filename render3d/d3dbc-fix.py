@@ -13,13 +13,19 @@ vkd3d writes freely (measured on Windows 10, render3d/README.md, "Shaders on Win
     temporary, and a `mov` puts that where it was meant to go;
   - `oDepth` written with a partial mask (`mov oDepth.x, r0.x`): it takes the full one.
 
-Two more are refused that a rewrite cannot mend, so --check reports them and a rewrite
-fails on them: a texld (or dsx, dsy) inside an `if` (the shader has to sample with an
-explicit LOD or gradients there, or outside the branch), and a temporary past r31.
+Shader model 3.0 has 32 temporaries (r0-r31), and vkd3d never reuses one, so a long
+shader can name more (the nebulae's march, r33). Then they are given out again first:
+each value's live range, found by liveness over the shader's if/else (no loops: vkd3d
+unrolls them), gets the lowest register free over all of it. A value live into or out of
+an if keeps one register across the whole of it, so both ways through agree.
 
-The temporary is one the shader never uses, else one it never reads again after that
-instruction: vkd3d's output has no loops (they are unrolled), so every instruction that
-can run later comes later in the list. Shader model 3.0 has 32 (r0-r31).
+The temporary a rewrite needs is one the shader never uses, else one it never reads
+again after that instruction (every instruction that can run later comes later in the
+list).
+
+One more is refused that a rewrite cannot mend, so --check reports it and a rewrite fails
+on it: a texld (or dsx, dsy) inside an `if`. The shader has to sample with an explicit
+LOD or gradients there, or outside the branch.
 
   d3dbc-fix.py <in.bin> <out.bin>     rewrite
   d3dbc-fix.py --check <file.bin>...  list what Windows would refuse; exit 1 if any
@@ -100,7 +106,7 @@ def problems(I):
     return out
 
 
-UNFIXABLE = ('gradient inside an if', f'a temporary past r{TEMPS - 1}')
+UNFIXABLE = ('gradient inside an if',)
 GRADIENT = {66, 91, 92}     # texld, dsx, dsy: they take neighbouring pixels' values
 
 
@@ -156,6 +162,117 @@ def scratch(ins, at, avoid, count):
     return free[:count]
 
 
+def accesses(I):
+    """(read, written) temporary components of an instruction, as bitsets of
+    register * 4 + component."""
+    c = code(I)
+    if not c:
+        return 0, 0
+    op, dst, srcs = c
+    r = w = 0
+    for k, t in enumerate(srcs):
+        if rtype(t) != T_TEMP:
+            continue
+        if op == 65:                                   # texkill: its operand is a mask
+            comps = range(4)
+        else:
+            mask, _ = lanes(op, dst, k)
+            sw = (t >> 16) & 0xff
+            comps = {(sw >> (2 * l)) & 3 for l in range(4) if mask >> l & 1}
+        for cc in comps:
+            r |= 1 << (regnum(t) * 4 + cc)
+    if dst is not None and rtype(dst) == T_TEMP:
+        for cc in range(4):
+            if (dst >> 16) >> cc & 1:
+                w |= 1 << (regnum(dst) * 4 + cc)
+    return r, w
+
+
+def liveness(ins):
+    """The temporary components live before each instruction (bitsets, as accesses()),
+    through if/else/endif: a side's own writes end a value on that side, and the two
+    sides join at the if."""
+    before, live, stack = [0] * len(ins), 0, []
+    for k in range(len(ins) - 1, -1, -1):
+        op = ins[k][0] & 0xffff
+        if op == 43:                                   # endif, met from below
+            stack.append([live, None])
+        elif op == 42:                                 # else: its side is done
+            stack[-1][1] = live
+            live = stack[-1][0]
+        elif op in (40, 41):                           # if: the then side is done
+            after, other = stack.pop()
+            live |= after if other is None else other
+        if op not in (42, 43):
+            r, w = accesses(ins[k])
+            live = (live & ~w) | r
+        before[k] = live
+    return before
+
+
+def regs_of(bits):
+    return {b // 4 for b in range(bits.bit_length()) if bits >> b & 1}
+
+
+def allocate(ins):
+    """The temporaries given out again (above): each register's uses split into the
+    runs of instructions over which it is live, and each run the lowest register no
+    overlapping run has."""
+    before = liveness(ins)
+    n = len(ins)
+    use = {}                                           # register -> instructions it is in use at
+    for k in range(n):
+        for r in regs_of(before[k]) | regs_of(accesses(ins[k])[1]):
+            use.setdefault(r, set()).add(k)
+    # A register live into or out of an if is in use over all of it.
+    opens = []
+    for k in range(n):
+        op = ins[k][0] & 0xffff
+        if op in (40, 41):
+            opens.append(k)
+        elif op == 43:
+            a = opens.pop()
+            across = regs_of(before[a]) | (regs_of(before[k + 1]) if k + 1 < n else set())
+            for r in across:
+                use.setdefault(r, set()).update(range(a, k + 1))
+    runs = []                                          # (first, last, register)
+    for r, ks in use.items():
+        ks = sorted(ks)
+        first = prev = ks[0]
+        for k in ks[1:]:
+            if k != prev + 1:
+                runs.append((first, prev, r))
+                first = k
+            prev = k
+        runs.append((first, prev, r))
+    runs.sort()
+    active, given = [], {}                             # (last, register given), run -> register
+    for first, last, r in runs:
+        active = [a for a in active if a[0] >= first]
+        taken = {g for _, g in active}
+        g = next(x for x in range(len(runs) + 1) if x not in taken)
+        given[(first, last, r)] = g
+        active.append((last, g))
+    if max(given.values(), default=0) >= TEMPS:
+        raise ValueError(f'needs {max(given.values()) + 1} temporaries at once')
+    owner = {}                                         # (instruction, register) -> register given
+    for (first, last, r), g in given.items():
+        for k in range(first, last + 1):
+            owner[(k, r)] = g
+    out = []
+    for k, I in enumerate(ins):
+        if code(I) is None:
+            out.append(I)
+            continue
+        new = [I[0]]
+        for t in I[1:]:
+            if rtype(t) == T_TEMP:
+                t = (t & ~0x7ff) | owner[(k, regnum(t))]
+            new.append(t)
+        out.append(new)
+    return out
+
+
 def mov(dst_reg, src_tok, mask=0xf, mod=0):
     return [0x02000001, 0x80000000 | (mask << 16) | (mod << 20) | dst_reg,
             src_tok]
@@ -168,7 +285,8 @@ def fix(data):
         raise ValueError(f'cannot be mended here: {bad[0]} ({len(bad)} in all)')
     if any((I[0] & 0xffff) in LOOPS for I in ins):
         raise ValueError('loops or calls: "never read again" is not linear')
-    out = list(ins)
+    past = f'a temporary past r{TEMPS - 1}'
+    out = allocate(ins) if any(past in problems(I) for I in ins) else list(ins)
     i = 0
     while i < len(out):
         I = out[i]
