@@ -18,7 +18,7 @@ Layers: ui 0.12.1, render3d 0.15.0.
   (`DestroyRenderSurfaces`), so a mission starts on Windows instead of ending in "Fatal
   error in Direct3D".
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-18.
 
 ## 12.32.0 — 2026-10-17
 

@@ -27,7 +27,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   the log counts the references left, and names by kind any object of ours still held
   (`d3d::live`). The hulls' posed views and the ghosts' queue held 49 models' buffers.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-18.
 
 ## 0.14.0 — 2026-10-17
 

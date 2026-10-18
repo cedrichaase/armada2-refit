@@ -17,7 +17,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   first frame, letting go of the state block, which a native `Reset` refuses to keep.
   The log names by kind any object of ours still held then (`d3d::live`).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-18.
 
 ## 0.12.0 — 2026-10-17
 
