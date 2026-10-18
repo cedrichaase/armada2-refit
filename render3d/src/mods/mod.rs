@@ -59,6 +59,11 @@ pub trait Module {
     fn device(&mut self, _dev: Device) {}
     /// Before a `Reset`: drop everything in the default pool.
     fn reset(&mut self) {}
+    /// Before the engine lets go of its device: drop everything made on it, in any
+    /// pool (`frame::forget`). What `reset` drops, unless a module holds more.
+    fn forget(&mut self) {
+        self.reset();
+    }
     /// Once per view, after `GameObject_PreRenderAll` and `Ordnance::PreRenderAll`
     /// registered the engine's lights: register any light of one's own with the engine
     /// (`ST3D_GraphicsEngine::RegisterLight`), so `scene::lights()` and the engine's own
@@ -162,6 +167,12 @@ pub fn device(dev: Device) {
 pub fn reset() {
     for m in all().iter_mut() {
         m.reset();
+    }
+}
+
+pub fn forget() {
+    for m in all().iter_mut() {
+        m.forget();
     }
 }
 

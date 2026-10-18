@@ -59,6 +59,7 @@ fn startup() {
     log!("shell: {}", if engine::shell::install() { "hooked" } else { "standing down" });
     log!("loading: {}", if engine::loading::install(config::get().loading) { "hooked" } else { "standing down" });
     log!("hud: {}", if hud::install() { "panels of ours" } else { "stock" });
+    log!("device: {}", if engine::device::install() { "DestroyRenderSurfaces chained: the UI lets go of the device with the engine" } else { "slot not stock: the UI lets go of the device when it sees the next one" });
     // The menus: [Menus] Enable=1 hosts the stock shell's dialogs (ui/MENUS.md). Patched
     // here, at DllMain, because the shell's display mode must be raised before the
     // engine first sets it.

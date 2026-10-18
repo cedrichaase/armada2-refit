@@ -10,6 +10,7 @@ pub mod chat;
 pub mod closeup;
 pub mod cursor;
 pub mod dev8;
+pub mod device;
 pub mod dialogs;
 pub mod hook;
 pub mod hud;

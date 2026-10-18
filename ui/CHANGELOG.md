@@ -11,6 +11,10 @@ versions". Newest first. Details are in [`README.md`](README.md).
   writes it ("gfx: could not make the shaders or the state block"), and the menus ran
   on a black screen. The shaders are built with `hlsl-rs.sh --fix`; both are made on
   Windows 10's runtime (render3d/README.md, "Shaders on Windows").
+- On Windows, starting a mission ended in "Fatal error in Direct3D. Please reboot.":
+  the UI's objects kept the shell's device alive. `engine/device.rs` chains
+  `DestroyRenderSurfaces` and lets go of everything first, and chains `Reset` from the
+  first frame, letting go of the state block, which a native `Reset` refuses to keep.
 
 Installed, not yet seen in game.
 

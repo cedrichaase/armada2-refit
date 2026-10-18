@@ -203,6 +203,18 @@ the new device's `Reset` and hands the device to every module, which makes its
 resources again; scenario `render3d-mode-switch` checks it, switching to
 800x600 in a running battle.
 
+**Letting go of the device.** Under DXVK that is enough. Under native Direct3D 9 it
+is not: every object holds its device, so whatever render3d still held kept the shell's
+device alive, and the engine's `CreateDevice` for the mission's display failed ("Fatal
+error in Direct3D. Please reboot." from `SetActiveDisplay`). The display change goes
+through `ST3D_DeviceDirectX8::DestroyRenderSurfaces` (slot 28 of its vtable, 0x6bc6ac),
+which releases the device in `DestroyDevice`; render3d chains that slot and first lets go
+of everything on the device (`frame::forget`): what a `Reset` drops, the sky's noise
+volume, and the shaders and declarations, which `gfx` keeps in one list for this. It
+holds the d3d9 device across the engine's release and logs how many references are
+left: 0 means it is gone. `UI.asi` does the same (`ui/src/engine/device.rs`); when it
+is in the chain after render3d, render3d's count includes the UI's one reference.
+
 **Without Direct3D 9.** The d3d9 device is asked for behind the game's d3d8 one
 (`platform/D3D9.md`). Under DXVK's own d3d8, or when the targets cannot be made, the
 body runs as stock. An `A16B16G16R16F` target with MSAA falls back to one without, then

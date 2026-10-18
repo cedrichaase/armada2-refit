@@ -14,6 +14,9 @@ Layers: ui 0.12.1, render3d 0.15.0.
   own Direct3D 9 accepts (`render3d/d3dbc-fix.py`, `hlsl-rs.sh --fix`, and no sampling
   inside a branch in the HLSL), so the menus and the HUD draw instead of a black screen,
   and render3d draws the 3D view instead of standing down.
+- Both let go of everything they hold on the engine's device before it releases it
+  (`DestroyRenderSurfaces`), so a mission starts on Windows instead of ending in "Fatal
+  error in Direct3D".
 
 Installed, not yet seen in game.
 

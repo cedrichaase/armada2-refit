@@ -122,11 +122,41 @@ pub fn reset() {
     unsafe { SB = None };
 }
 
+/// The objects `Shader` and `Decl` made. They hold them here rather than in
+/// themselves, so that `forget` can let go of all of them at once, wherever they are.
+static mut MADE: Vec<Com> = Vec::new();
+/// Moves on at each `forget`: a `Shader` or `Decl` made before it makes its object again.
+static mut EPOCH: u32 = 0;
+
+#[allow(static_mut_refs)]
+fn keep(c: Com) -> (u32, *mut c_void) {
+    let p = c.ptr();
+    unsafe {
+        MADE.push(c);
+        (EPOCH, p)
+    }
+}
+
+fn current(obj: &Option<(Device, u32, *mut c_void)>, dev: Device) -> bool {
+    obj.as_ref().is_some_and(|(d, e, _)| *d == dev && *e == unsafe { EPOCH })
+}
+
+/// Lets go of everything made here, when the engine lets go of its device (every
+/// object holds its device, and native Direct3D 9 cannot make another while it lives).
+#[allow(static_mut_refs)]
+pub fn forget() {
+    unsafe {
+        SB = None;
+        MADE = Vec::new();
+        EPOCH = EPOCH.wrapping_add(1);
+    }
+}
+
 /// A vertex or pixel shader from embedded bytecode, made on first use on a device.
 pub struct Shader {
     code: &'static [u32],
     pixel: bool,
-    obj: Option<(Device, Com)>,
+    obj: Option<(Device, u32, *mut c_void)>,
 }
 
 impl Shader {
@@ -138,11 +168,14 @@ impl Shader {
     }
     /// The shader on `dev`, or null if it cannot be made.
     pub fn get(&mut self, dev: Device) -> *mut c_void {
-        if self.obj.as_ref().is_none_or(|(d, _)| *d != dev) {
+        if !current(&self.obj, dev) {
             let c = if self.pixel { dev.create_ps(self.code) } else { dev.create_vs(self.code) };
-            self.obj = c.map(|c| (dev, c));
+            self.obj = c.map(|c| {
+                let (e, p) = keep(c);
+                (dev, e, p)
+            });
         }
-        self.obj.as_ref().map_or(core::ptr::null_mut(), |(_, c)| c.ptr())
+        self.obj.as_ref().map_or(core::ptr::null_mut(), |(_, _, p)| *p)
     }
     pub fn bind(&mut self, dev: Device) -> bool {
         let p = self.get(dev);
@@ -157,7 +190,7 @@ impl Shader {
 /// A vertex declaration made on first use on a device.
 pub struct Decl {
     els: &'static [VertexElement],
-    obj: Option<(Device, Com)>,
+    obj: Option<(Device, u32, *mut c_void)>,
 }
 
 impl Decl {
@@ -165,12 +198,15 @@ impl Decl {
         Decl { els, obj: None }
     }
     pub fn bind(&mut self, dev: Device) -> bool {
-        if self.obj.as_ref().is_none_or(|(d, _)| *d != dev) {
-            self.obj = dev.create_vertex_decl(self.els).map(|c| (dev, c));
+        if !current(&self.obj, dev) {
+            self.obj = dev.create_vertex_decl(self.els).map(|c| {
+                let (e, p) = keep(c);
+                (dev, e, p)
+            });
         }
         match &self.obj {
-            Some((_, c)) => {
-                dev.set_vertex_decl(c.ptr());
+            Some((_, _, p)) => {
+                dev.set_vertex_decl(*p);
                 true
             }
             None => false,

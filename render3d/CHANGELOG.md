@@ -20,6 +20,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   refused. Every one is made now. No sampling inside a branch any more: the fire, the
   rocks, the surfaces' albedo and the nebulae read with gradients, at level 0, or
   flattened, each sampling what it did before (README.md, "Shaders on Windows").
+- On Windows, starting a mission ended in "Fatal error in Direct3D. Please reboot.":
+  what render3d held kept the shell's device alive, and the engine could not create the
+  mission's. `DestroyRenderSurfaces` is chained now, and render3d lets go of every object
+  on the device, its shaders and declarations included, before the engine releases it;
+  the log counts the references left.
 
 Installed, not yet seen in game.
 
