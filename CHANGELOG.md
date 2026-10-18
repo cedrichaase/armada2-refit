@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.38.1 — 2026-10-18
+
+Layers: ui 0.13.3.
+
+### Fixed
+- ui: the button bar is shown at the start of a mission when Game Settings' "Command
+  Bar" says Shown; the setting was checked against the wrong flag, and the toggle could
+  hide a bar that was already up.
+
+Confirmed in game 2026-10-19.
+
 ## 12.38.0 — 2026-10-17
 
 Layers: films 1.12.0, online 0.6.2, render3d 0.16.0, testbench 3.39.0.
