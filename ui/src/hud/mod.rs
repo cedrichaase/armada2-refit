@@ -170,8 +170,15 @@ pub fn bar_pref_changed() {
 
 /// Makes the bar shown or hidden as the player set it, once the HUD shows (not under
 /// a mission's opening cinematic), by pressing the stock palette toggle
-/// (`ButtonPanel`'s `TogglePalette`, which flips the bar's hidden flag), as the
-/// top-right button did before it moved to Game Settings.
+/// (`ButtonPanel`'s `TogglePalette`), as the top-right button did before it moved to
+/// Game Settings.
+///
+/// The toggle is `PopupPaletteImp::NextPaletteMode`: it steps the palette mode
+/// (`+0x110`) between 1, the bar, and 0, the floating palette, which nothing of ours
+/// draws; so "hidden" is mode 0, and the mode is what is compared. The component's own
+/// hidden flag (`+0x16`) is not the toggle's: the engine sets it for other reasons
+/// too, and comparing it could press the toggle with the bar already up and take it
+/// away for the mission.
 fn apply_bar_pref() {
     unsafe {
         if !BAR_PENDING || engine::ingame::hud_hidden() {
@@ -179,13 +186,21 @@ fn apply_bar_pref() {
         }
         let p = engine::palette::palette();
         let b = engine::topbar::button(engine::topbar::Which::Palette);
-        if p == 0 || b == 0 {
+        if p == 0 || b == 0 || !hud::in_view(p) {
             return;
         }
         BAR_PENDING = false;
         let want = crate::prefs::bar_hidden();
-        if hud::hidden(p) != want {
-            crate::log!("bar: {} as the player set it", if want { "hidden" } else { "shown" });
+        let mode = engine::palette::mode(p);
+        let press = (mode == 0) != want;
+        crate::log!(
+            "bar: {} as the player set it (palette mode {}, hidden flag {}){}",
+            if want { "hidden" } else { "shown" },
+            mode,
+            hud::flag_hidden(p) as u8,
+            if press { ", toggled" } else { "" }
+        );
+        if press {
             engine::buttons::queue(b);
         }
     }

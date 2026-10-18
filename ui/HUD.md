@@ -811,12 +811,20 @@ player saw do nothing; the palette toggle is Game Settings' "Command Bar" (MENUS
 
 **The bar's shown or hidden state is the player's** (`prefs.rs`, `UIPlayer.ini`'s
 `[HUD] BarHidden`, written by Game Settings): at the first mission frame in which the
-HUD shows (not under an opening cinematic), and at the next one after the setting
-changes, `hud::apply_bar_pref` compares the bar's hidden flag (`PopupPaletteImp+0x16`)
-with it and, when they differ, queues a press of the stock palette button, so the
-bar is hidden exactly as the button hid it (UI.log: `bar: hidden as the player set
-it`). `UIPlayer.ini` is the player's file: no install ships or writes it, so a
-reinstall (which writes `UI.ini`) keeps the choice.
+HUD shows and the bar is in the view's render list, and at the next one after the
+setting changes, `hud::apply_bar_pref` compares the palette mode
+(`PopupPaletteImp+0x110`) with it and, when they differ, queues a press of the stock
+palette button (UI.log: `bar: hidden as the player set it (palette mode 1, hidden flag
+0), toggled`). The button's `TogglePalette` calls the bar's `NextPaletteMode`, which
+steps the mode between 1, the bar, and 0, the floating palette, which nothing of ours
+draws: "hidden" is mode 0. **Never compare the component's hidden flag** (`+0x16`,
+`hud::flag_hidden`): the toggle does not touch it, and the engine sets it for other
+reasons too (on the bench it was set with the mode at 0 under the first Federation
+mission's opening cinematic); compared, a "Shown" pressed the toggle with the bar
+already up and took it away for the mission (ui 0.13.3,
+`testbench/scenarios/ui-hud-bar-after-cinematic.md`). `UIPlayer.ini` is the player's
+file: no install ships or writes it, so a reinstall (which writes `UI.ini`) keeps the
+choice.
 
 ### Messages and objectives (`MessageDisplay`, `ObjectivesDisplay`)
 

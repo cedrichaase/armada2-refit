@@ -4,6 +4,21 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.13.3 — 2026-10-18
+
+### Fixed
+- Game Settings' "Command Bar" at Shown no longer starts a mission with the bar
+  hidden. The stock toggle (`NextPaletteMode`) switches the palette mode (`+0x110`)
+  between the bar (1) and the floating palette (0), but the setting was checked against
+  the component's hidden flag (`+0x16`), which the engine also sets for other reasons
+  (under the opening cinematic, before the first selection): with the bar already up the
+  toggle was pressed and took it away. It is now checked against the mode, once the bar
+  is in the view; UI.log says "bar: shown as the player set it (palette mode M, hidden
+  flag F)", with ", toggled" when it pressed.
+  `testbench/scenarios/ui-hud-bar-after-cinematic.md` checks it.
+
+Installed, not yet seen in game.
+
 ## 0.13.2 — 2026-10-17
 
 ### Fixed

@@ -89,7 +89,13 @@ pub fn panel_rect(c: usize, w: f32, h: f32) -> Option<[f32; 4]> {
 /// pause boxes in it: seen on the bench, the first Federation mission's opening
 /// showed the resources, the buttons and the minimap of ours over it until this.
 pub fn hidden(c: usize) -> bool {
-    c == 0 || unsafe { rd::<u8>(c + DI_HIDDEN) } != 0 || !in_view(c)
+    c == 0 || flag_hidden(c) || !in_view(c)
+}
+
+/// The panel's own hidden flag alone (`+0x16`), whatever the view: what a toggle such
+/// as `TogglePalette` flips.
+pub fn flag_hidden(c: usize) -> bool {
+    c != 0 && unsafe { rd::<u8>(c + DI_HIDDEN) } != 0
 }
 
 /// Whether `RenderAll` walks this component in the view in use (true when the list
