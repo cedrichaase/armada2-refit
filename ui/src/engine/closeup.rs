@@ -35,12 +35,11 @@
 //! panel covers that place), so the region is first copied aside, the view drawn, copied
 //! into the picture the panel draws, and the region copied back: the back buffer is as
 //! the engine left it, whatever the panel does this frame. Both textures are render
-//! targets in the default pool, released before a device `Reset` (the d3d8 device's
-//! slot 14, chained) and when the device changes.
+//! targets in the default pool, released before a device `Reset` and before the engine
+//! releases its device (`device.rs`).
 use super::{field, hook, rd, storm3d};
 use crate::d3d::*;
 use crate::gfx::Tex;
-use core::ffi::c_void;
 
 /// `operator new(size_t)`, cdecl: the game's heap.
 const OPERATOR_NEW: usize = 0x652710;
@@ -78,8 +77,6 @@ const OBJECT_CULLED: usize = 0x183;
 const ENTITY_INSTANCE: usize = 0x04;
 const INST_SPHERE: usize = 0x34;
 const INST_TRANSFORM: usize = 0x44;
-/// `IDirect3DDevice8::Reset`.
-const D3D8_RESET: usize = 14;
 
 struct Pics {
     dev: Device,
@@ -121,8 +118,6 @@ static mut S: State = State {
     logged: 0,
     failed: false,
 };
-static mut RESET: usize = 0;
-static mut RESET_VT: usize = 0;
 
 #[allow(static_mut_refs)]
 fn st() -> &'static mut State {
@@ -187,7 +182,7 @@ pub fn render() {
     let Some(body) = hook::call_target(SITE_INSET).filter(|&t| t != BODY) else { return };
     let dev8 = super::d3d8_device();
     let Some(dev) = Device::from_d3d8(dev8) else { return };
-    hook_reset(dev8);
+    super::device::hook_reset(dev8);
     let Some(bb) = dev.get_render_target(0) else { return };
     let bd = bb.surf_desc();
     if r[0] < 0 || r[1] < 0 || (r[0] + r[2]) as u32 > bd.width || (r[1] + r[3]) as u32 > bd.height {
@@ -237,7 +232,8 @@ fn pictures(dev: Device, w: u32, h: u32) -> bool {
     true
 }
 
-fn release() {
+/// Lets go of the pictures (before a `Reset`, and before the engine releases its device).
+pub fn release() {
     let s = st();
     if let Some(t) = s.tex {
         crate::gfx::tex_set_external(t, None, 1, 1);
@@ -397,25 +393,3 @@ unsafe fn draw_view(cam: usize, body: usize, r: [i32; 4], m: &([f32; 12], f32, f
     }
 }
 
-/// Our pictures go before the device is reset (they are in the default pool).
-unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESULT {
-    release();
-    crate::log!("closeup: device Reset");
-    match unsafe { RESET } {
-        0 => -1,
-        f => unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(*mut c_void, *mut c_void) -> HRESULT>(f)(dev8, params) },
-    }
-}
-
-fn hook_reset(dev8: *mut c_void) {
-    let vt = field(dev8 as usize, 0);
-    unsafe {
-        if vt == 0 || vt == RESET_VT || field(vt, D3D8_RESET * 4) == reset as *const () as usize {
-            return;
-        }
-        if let Some(old) = hook::patch_slot(vt, D3D8_RESET, reset as *const () as usize) {
-            RESET = old;
-            RESET_VT = vt;
-        }
-    }
-}

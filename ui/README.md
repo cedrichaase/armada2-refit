@@ -620,11 +620,5 @@ the engine does not see (the selection stays).
 - **Widgets**: `button`, `toggle` and `slider` take no keyboard focus; the text field
   has no undo and no IME; a dropdown's press outside the list closes it but the press
   also reaches whatever is below it.
-- **A device left behind.** Objects made on a device keep it alive (`platform/D3D9.md`,
-  "Which device"), and the renderer lets go of them when it first draws on a new
-  device. In stock, where the shell and the game's display re-create the device at
-  every switch, the last mission's device therefore lives on behind the GDI menus until
-  the UI next draws. With Menus.asi at the game's resolution the device is never
-  re-created. Not seen to matter; not measured.
 - Not verified: device loss in a screen of ours, the wheel, characters outside ASCII,
   a stock 800x600 shell, `Embed=0`.

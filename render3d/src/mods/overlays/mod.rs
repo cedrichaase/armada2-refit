@@ -181,6 +181,11 @@ impl Module for Overlays {
         self.fog.reset();
         self.posts.reset();
     }
+    fn forget(&mut self) {
+        self.reset();
+        // The queued ghosts hold their models, and the models their buffers.
+        self.ghosts.begin_view();
+    }
     fn begin_view(&mut self, _v: &View) {
         self.ghosts.begin_view();
         self.posts.begin_view();

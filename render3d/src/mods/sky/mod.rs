@@ -616,6 +616,10 @@ impl Module for Sky {
     fn reset(&mut self) {
         self.baker.reset();
     }
+    fn forget(&mut self) {
+        self.baker.reset();
+        self.baker.fine = None;
+    }
     fn menu(&mut self, pass: crate::menu::Pass, shot: &crate::menu::Shot, v: &View) {
         match pass {
             crate::menu::Pass::Sky => self.menu_sky(shot, v),

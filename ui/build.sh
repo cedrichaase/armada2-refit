@@ -6,7 +6,9 @@
 # Shaders first: each shaders/<name>.hlsl names its entry points on its first line,
 #   // entries: <entry>:<profile>:<SYMBOL> ...
 # and is compiled by render3d's hlsl-rs.sh into src/shaders/<name>.rs (committed, with a
-# stamp, so a machine without vkd3d-compiler builds as long as they are current).
+# stamp, so a machine without vkd3d-compiler builds as long as they are current), with
+# --fix: Windows' own Direct3D 9 refuses vkd3d's bytecode as it is (render3d/README.md,
+# "Shaders on Windows").
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,7 +24,7 @@ for f in "$here"/shaders/*.hlsl; do
     entries=$(sed -n '1s#^// entries:##p' "$f")
     [ -n "$entries" ] || { echo "ui: $f has no '// entries:' first line" >&2; exit 1; }
     # shellcheck disable=SC2086
-    "$here/../render3d/hlsl-rs.sh" "$here/src/shaders/$name.rs" "$f" $entries
+    "$here/../render3d/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
     mods="$mods$name "
 done
 {

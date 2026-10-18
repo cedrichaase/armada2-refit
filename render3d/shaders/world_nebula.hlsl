@@ -137,7 +137,11 @@ float4 gas_at(float3 p)
     // The envelope read through the warp: the outline is pushed out and in by up to
     // EdgeWarp of the reach, so it is ragged and not a ring of discs.
     float4 env = tex2D(s_env, (p.xz + w.xz * k_flow.w - k_env.xy) * k_env.zw);
-    if (env.a <= 0.002 && env.g <= 0.002) return float4(0, 1, 0, 1);
+    // Windows' own Direct3D 9 refuses a texld inside an if (README.md, "Shaders on
+    // Windows"), and an early return puts the rest of the function inside one. So outside
+    // the envelope the gas is still worked out, and given up at the end; the branches on
+    // the recipe below are flattened. The bake runs this once per class.
+    bool   none = env.a <= 0.002 && env.g <= 0.002;
 
     // A dome over each nebula, at its own height, its top and bottom pushed in and out by
     // the warp field so the field has lumps and not a flat lid.
@@ -147,16 +151,18 @@ float4 gas_at(float3 p)
     float  cover = env.a * smoothstep(1.0, 0.55, t);   // dense to over half the height
 
     float  det  = noise2(q * 3.13 + w.yzx * (k_noise.y * 0.5), rot2(p) * (k_noise.x * 2.71) + k_seed.zxy + w.xzy * (k_noise.y * 0.5));
-    float  dens = cover > 0.001 ? gas_density(p, w, cover, det) : 0.0;
+    float  dens = gas_density(p, w, cover, det);
+    dens = cover > 0.001 ? dens : 0.0;
     // Self-shading, cheaply: the density a step towards the light. Where there is
     // more gas between the point and the light, the point is in its own shadow; where
     // there is less, it is a lit edge. That is what makes billows look round.
-    float  ahead = cover > 0.001 ? gas_density(p + k_light.xyz, w, cover, det) : 0.0;
+    float  ahead = gas_density(p + k_light.xyz, w, cover, det);
+    ahead = cover > 0.001 ? ahead : 0.0;
     float  shade = clamp(1.0 + (dens - ahead) * k_light.w * 2.0, 0.25, 1.6);
 
     // Filaments: the ridges of a large, warped field, sharpened into tendrils, out to
     // the filaments' own reach and height. Off unless the recipe asks (Filaments=).
-    if (k_fil.x > 0.0) {
+    [flatten] if (k_fil.x > 0.0) {
         float  fr = tex3D(s_noise, q * k_fil.y + w * (k_noise.y * 1.5) + float3(0.13, 0.57, 0.91)).r;
         float  ridge = saturate(1.0 - abs(fr - 0.5) * 4.0);
         float  fil = pow(ridge, k_fil.z) * env.g * smoothstep(1.0, 0.2, abs(y) / k_fil.w);
@@ -168,7 +174,7 @@ float4 gas_at(float3 p)
     // Fringe: a thin haze about the body, out to the wider disc and fading all the way
     // there, so a field thins out into space instead of stopping at its outline. Its
     // noise is soft, not thresholded as the body's is. Off unless the recipe asks.
-    if (k_fuzz.x > 0.0) {
+    [flatten] if (k_fuzz.x > 0.0) {
         float  fz = noise2(q * k_fuzz.y + w * (k_noise.y * 0.7) + float3(0.37, 0.11, 0.73),
                            rot2(p) * (k_noise.x * k_fuzz.y * 0.786) + k_seed.zxy + float3(0.52, 0.23, 0.81));
         float  haze = smoothstep(0.40, 0.72, fz) * env.g * smoothstep(1.0, 0.1, abs(y) / max(k_vert.y, 1.0));
@@ -187,7 +193,7 @@ float4 gas_at(float3 p)
     float  core = 1.0 + k_core.x * pow(saturate(env.r) * saturate(1.0 - t), k_core.y);
 
     float  hue = saturate((w.x * k_gas_b.w) * 0.5 + 0.5);
-    return float4(dens, shade, hue, knot * lane * core);
+    return none ? float4(0, 1, 0, 1) : float4(dens, shade, hue, knot * lane * core);
 }
 
 // The Key's light scattered forward (Henyey-Greenstein, over its value side on), for cv
@@ -351,15 +357,18 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     // Over empty space, one small read and out: the column holds no gas, or none at
     // this height (the record is widened by the flow, so the flow cannot reach any).
     float3 uvw = (p - k_vlo.xyz) * k_vsz.xyz;
+    // (Worked out all the same and given up at the end, with the recipe's branches
+    // flattened, as in gas_at: Windows refuses a texld inside an if. Only the slices,
+    // drawn without the march, pay for it.)
     float4 o = tex2D(s_occ, uvw.xz);
     float  m = (k_flow.y + k_swirl.x) * k_vsz.y + 0.02;
-    if (o.r < 0.006 || uvw.y < o.b - m || uvw.y > o.g + m) return float4(0, 0, 0, -1);
+    bool   empty = o.r < 0.006 || uvw.y < o.b - m || uvw.y > o.g + m;
     // Flow: the volume read through a warp field that drifts with time, so the gas
     // and its outline churn slowly instead of standing still.
     // Two reads drifting opposite ways, turned apart: one drifting field only slides,
     // and the gas wobbled in place; two change shape as they pass each other.
     float3 fl = 0.0;
-    if (k_flow.y > 0.0) {
+    [flatten] if (k_flow.y > 0.0) {
         float3 fd = float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37);
         fl = (tex3D(s_noise, p * (k_noise.x * k_flow.z) + fd).gba +
               tex3D(s_noise, rot2(p) * (k_noise.x * k_flow.z * 0.786) - fd.zxy + 0.5).gba - 1.0) * 1.4142;
@@ -374,7 +383,7 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     // speck wanders in loops out of step with its neighbours. The phases are fixed in
     // the world and only the time turns them: the field is never torn apart. Within
     // Swirl= on every axis, the reach the occupancy record allows for.
-    if (k_swirl.x > 0.0) {
+    [flatten] if (k_swirl.x > 0.0) {
         float3 sn = tex3D(s_noise, rot(p) * (k_noise.x * k_swirl.y) + k_seed.yzx + float3(0.29, 0.61, 0.17)).gba;
         float  a1 = k_swirl.z + sn.x * 6.2832;
         float  a2 = -k_swirl.w + sn.y * 6.2832;
@@ -382,17 +391,17 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
         pa += r * (0.62 * float3(cos(a1), 0.4 * sin(a2), sin(a1)) + 0.38 * float3(sin(a2), 0.6 * cos(a1), cos(a2)));
     }
     float4 v;
-    if (k_samp.x > 1.5)
+    [flatten] if (k_samp.x > 1.5)
         v = 0.5 * (tex3D(s_vol, ((pa - dir - k_vlo.xyz) * k_vsz.xyz).xzy) +   // width x, height z, depth y
                    tex3D(s_vol, ((pa + dir - k_vlo.xyz) * k_vsz.xyz).xzy));
     else
         v = tex3D(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy);
-    if (v.x <= 0.002) return float4(0, 0, 0, -1);
+    empty = empty || v.x <= 0.002;
     // The fine octave, its two reads drifting opposite ways (FuzzSpeed=): the finest
     // detail is never quite still, and with Fuzz= it feathers the outline: the thin gas
     // there is raised or eaten by it, so the edge is wispy and its wisps come and go.
     float  det = 0.5;
-    if (k_vlo.w > 0.0 || k_fuzz.z > 0.0) {
+    [flatten] if (k_vlo.w > 0.0 || k_fuzz.z > 0.0) {
         float3 dd = float3(k_fuzz.w, k_fuzz.w * 0.71, k_fuzz.w * 0.37);
         det = noise2(rot(pa) * (k_noise.x * 6.1) + k_seed.zxy + dd, rot2(pa) * (k_noise.x * 5.3) + k_seed.yzx - dd.zxy);
     }
@@ -406,7 +415,8 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     // as one copy of the hull's silhouette per slice, with gaps between them.
     float  lit = k_samp.x > 1.5 ? 0.5 * (key_lit(p - dir, u, i.t.y) + key_lit(p + dir, u.yx, i.t.y)) : key_lit(p, u, i.t.y);
     float  ph = key_phase(dot(-k_key.xyz, normalize(k_eye.xyz - p)));
-    return float4(gas_colour(g, i.t.x, dist, pa, lit, ph), g.x * near * i.t.x * k_opac.x);
+    float4 r = float4(gas_colour(g, i.t.x, dist, pa, lit, ph), g.x * near * i.t.x * k_opac.x);
+    return empty ? float4(0, 0, 0, -1) : r;
 }
 
 float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
@@ -439,8 +449,10 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
 // branch that differs per pixel; so the noise is read with its gradients given
 // (tex3Dgrad: the pixel's footprint at the step's distance), and the march can skip what
 // is empty: a ray that misses the gas, a column the occupancy record says is empty at
-// that height, a point the volume says is clear. (The volume and the record have one
-// level, so their plain reads need no gradients.) The gradients leave out the jitter,
+// that height, a point the volume says is clear. (The volume, the record and the blue
+// noise have one level and the same filter either way, so they are read at level 0:
+// Windows' own Direct3D 9 refuses any implicit read inside an if, README.md, "Shaders on
+// Windows".) The gradients leave out the jitter,
 // which the slices' derivatives took in: the fine octave is no longer blurred by it.
 
 float4 k_ray0    : register(c41);  // xyz: the ray (view depth 1) per pixel to the right; w: the reads' footprint, in pixels (Footprint=)
@@ -497,7 +509,7 @@ float4 march_step(float3 p, float3 fl, float dist, float thick, float2 u, float 
             float  rr = saturate(0.35 + sn.z * 0.9) * k_swirl.x;
             pa += rr * (0.62 * float3(cos(a1), 0.4 * sin(a2), sin(a1)) + 0.38 * float3(sin(a2), 0.6 * cos(a1), cos(a2)));
         }
-        float4 v = tex3D(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy);
+        float4 v = tex3Dgrad(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy, 0.0, 0.0);
         if (v.x > 0.002) {
             float  det = 0.5;
             if (k_vlo.w > 0.0 || k_fuzz.z > 0.0) {
@@ -551,7 +563,7 @@ MarchOut march(float2 vpos, const int n)
         float  qa = q * q * q * q;                 // the flow's, FLOW_EVERY steps
         // With Temporal=, the thresholds walk the golden ratio from frame to frame, and
         // temporal_ps adds the frames up: each frame's samples fall between the last's.
-        float2 u = frac(tex2D(s_blue, px / 64.0).rg + k_ray2.w * float2(0.6180340, 0.7548777));
+        float2 u = frac(tex2Dlod(s_blue, float4(px / 64.0, 0.0, 0.0)).rg + k_ray2.w * float2(0.6180340, 0.7548777));
         float  ph = key_phase(dot(k_key.xyz, d) / dl);
         float4 acc = 0.0;
         float  za = 0.0;

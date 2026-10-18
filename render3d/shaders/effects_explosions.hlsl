@@ -36,6 +36,11 @@ float4 k_hdr    : register(c11);  // x: how far the hottest gas goes past white 
 
 sampler3D s_noise : register(s0); // r: a fractal field; gba: three soft warp fields; tiling, spectral (no lattice)
 
+// The noise inside the march's branches. Windows' own Direct3D 9 refuses a texld inside
+// an if (README.md, "Shaders on Windows"); the volume has one level and the same filter
+// either way, so zero gradients sample exactly what texld did.
+float4 noise3(float3 p) { return tex3Dgrad(s_noise, p, 0.0, 0.0); }
+
 struct VsIn  { float4 pos : POSITION; };
 struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; };
 
@@ -116,9 +121,9 @@ PsOut fire_ps(VsOut i, float2 vp : VPOS)
                 float  r = length(u);
                 // Noise in the gas's own coordinates, so its billows grow with it; the warp
                 // turns it over as it ages.
-                float3 w = tex3D(s_noise, u * 0.23 + k_seed.zxy).gba * 2.0 - 1.0;
+                float3 w = noise3(u * 0.23 + k_seed.zxy).gba * 2.0 - 1.0;
                 float3 p = u * k_seed.w + k_seed.xyz + w * (0.06 + 0.08 * s) + float3(0.0, 0.0, s * 0.2);
-                float  n1 = tex3D(s_noise, p).r, n2 = tex3D(s_noise, p * 2.13 + 0.37).r;
+                float  n1 = noise3(p).r, n2 = noise3(p * 2.13 + 0.37).r;
                 float  f = (n1 - 0.5) * 5.0 + (n2 - 0.5) * 2.5;      // about a z-score
                 float  dens = saturate((0.85 - r) * 3.0 + f * turb * 0.3) * smoothstep(1.3, 1.0, r) * fade;
                 float  temp = saturate(heat * (1.05 - r * r * 0.7) + f * 0.2 - (1.0 - dens) * 0.3);

@@ -3,18 +3,23 @@
 # platform/d3d9/hlsl.sh, with the same stamp, so a build where vkd3d is missing (CI)
 # keeps a committed file whose stamp matches and fails on a stale one.
 #
-#   hlsl-rs.sh <out.rs> <file.hlsl> <entry>:<profile>:<SYMBOL> [...]
+#   hlsl-rs.sh [--fix] <out.rs> <file.hlsl> <entry>:<profile>:<SYMBOL> [...]
 #
 # Each entry point becomes `pub static SYMBOL: [u32; N]`, legacy (d3dbc) bytecode for
-# CreateVertexShader/CreatePixelShader.
+# CreateVertexShader/CreatePixelShader. --fix puts each through d3dbc-fix.py, which
+# rewrites what Windows' own Direct3D 9 refuses and fails on what it cannot rewrite
+# (README.md, "Shaders on Windows"); DXVK takes either.
 set -euo pipefail
-[ $# -ge 3 ] || { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+fix=""
+[ "${1:-}" = "--fix" ] && { fix="$(dirname "$0")/d3dbc-fix.py"; shift; }
+[ $# -ge 3 ] || { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 out=$1 src=$2; shift 2
 inc=$(dirname "$src")
-# The stamp covers the file, every header it can include, and the entry list.
+# The stamp covers the file, every header it can include, the entry list, and with
+# --fix the rewrite.
 shopt -s nullglob
 headers=("$inc"/*.hlsli)
-stamp="source $(cat "$src" "${headers[@]}" <(printf '%s\n' "$@") | sha256sum | cut -d' ' -f1)"
+stamp="source $(cat "$src" "${headers[@]}" <(printf '%s\n' "$@") ${fix:+"$fix"} | sha256sum | cut -d' ' -f1)"
 if [ -f "$out" ] && grep -qF "$stamp" "$out"; then exit 0; fi
 command -v vkd3d-compiler >/dev/null ||
     { echo "hlsl-rs.sh: $out is stale and vkd3d-compiler is not installed (Arch: vkd3d)" >&2; exit 1; }
@@ -26,6 +31,10 @@ tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
         IFS=: read -r entry profile sym <<< "$spec"
         vkd3d-compiler -x hlsl -b d3dbc -p "$profile" -e "$entry" -o "$tmp/$sym.bin" "$src" 2> "$tmp/err" ||
             { cat "$tmp/err" >&2; echo "hlsl-rs.sh: $src:$entry failed" >&2; exit 1; }
+        if [ -n "$fix" ]; then
+            python3 "$fix" "$tmp/$sym.bin" "$tmp/$sym.fixed" || exit 1
+            mv "$tmp/$sym.fixed" "$tmp/$sym.bin"
+        fi
         n=$(( $(stat -c %s "$tmp/$sym.bin") / 4 ))
         echo "pub static $sym: [u32; $n] = [ // $entry, $profile"
         od -An -v -t x4 -w16 "$tmp/$sym.bin" | sed -E 's/ +([0-9a-f]{8})/ 0x\1,/g; s/^/   /'
