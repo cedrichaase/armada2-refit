@@ -4,6 +4,16 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.12.1 — 2026-10-18
+
+### Fixed
+- On Windows, without DXVK, the UI drew nothing: Direct3D 9 refused `PS_UI` as vkd3d
+  writes it ("gfx: could not make the shaders or the state block"), and the menus ran
+  on a black screen. The shaders are built with `hlsl-rs.sh --fix`; both are made on
+  Windows 10's runtime (render3d/README.md, "Shaders on Windows").
+
+Installed, not yet seen in game.
+
 ## 0.12.0 — 2026-10-17
 
 ### Added

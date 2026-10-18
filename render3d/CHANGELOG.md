@@ -4,6 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.15.0 — 2026-10-18
+
+### Added
+- `d3dbc-fix.py`: rewrites the vkd3d bytecode Windows' own Direct3D 9 refuses (two
+  constant or two input registers in one instruction, `sincos` into its own source,
+  `oDepth` with a partial mask); `--check` also lists a `texld` inside an `if` and
+  temporaries past r31, which it cannot rewrite.
+- `hlsl-rs.sh --fix`, which puts each shader through it. UI.asi uses it; Render3D.asi
+  does not yet, as ten of its shaders still break the last two rules, so on Windows it
+  still leaves the 3D view to the engine. Nothing it installs changes.
+
+Installed, not yet seen in game.
+
 ## 0.14.0 — 2026-10-17
 
 ### Added

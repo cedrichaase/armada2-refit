@@ -52,6 +52,45 @@ allocator, memory functions and stack probe (`src/rt/`). Shaders are HLSL in
 `shaders/`, compiled by `hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders.rs`, which
 is committed with a stamp so a machine without vkd3d builds as long as it is current.
 
+### Shaders on Windows
+
+**Windows' own Direct3D 9 refuses vkd3d's bytecode; DXVK takes it as it is.** On
+Windows the chain is crosire's d3d8to9 over the system's d3d9, with no DXVK, and the
+runtime validates every shader at `CreateVertexShader`/`CreatePixelShader`. Measured
+on Windows 10 (Radeon RX 5700 XT, a 32-bit process): 51 of the 86 shaders of
+Render3D.asi and UI.asi came back `D3DERR_INVALIDCALL`, on every kind of device
+(software, hardware, mixed and pure vertex processing). The state block and the vertex
+declarations were made. So both plugins stood down: UI.asi drew nothing (a black
+screen over working menus) and render3d left the 3D view to the engine.
+
+Taking the refused shaders apart instruction by instruction (each prefix of a shader,
+closed off with a write of `oC0`) found what the runtime refuses:
+
+1. **One constant register and one input register per instruction.** `mul r0.x, c0.x,
+   c12.x` and `mul r1.x, v0.x, v2.y` are refused; the same register twice is
+   accepted. vkd3d writes both freely.
+2. **`sincos` may not write the register it reads**: `sincos r1.y, r1.x` is refused,
+   `sincos r2.y, r1.x` accepted.
+3. **`oDepth` takes the full write mask**: `mov oDepth.x, r0.x` is refused.
+4. **No `texld` (or `dsx`, `dsy`) inside an `if`.** The same `texld` on its own is
+   accepted, on a 2D, cube or volume sampler alike, and so is any prefix that stops
+   before the first one inside a branch.
+5. **r0 to r31 only.** The nebula march shaders use r33.
+
+These five predict the runtime's verdict on all 86. `d3dbc-fix.py` mends the first
+three in the bytecode: it copies the extra register into a temporary (only the lanes
+the instruction consumes, so an input is never read outside its `dcl` mask), routes
+`sincos` through one, and widens the mask. It fails on the last two, which need the
+HLSL changed: sampling inside a branch with an explicit LOD or gradients, or out of it,
+and fewer live values in the march. `hlsl-rs.sh --fix` runs it on each shader;
+`d3dbc-fix.py --check <file.bin>` lists all five.
+
+UI.asi builds with `--fix` (`ui/build.sh`). Render3D does not yet: ten of its shaders
+still break rule 4 or 5 (the explosions' fire, the nebulae's `PS_NEB`, `PS_NBAKE`,
+`PS_VOL` and the four marches, the rocks, the surfaces' albedo), and a render3d that
+made its post shaders would take the 3D view and then draw no nebulae, asteroids or
+fire. Until they are rewritten, it stands down on Windows and the engine draws.
+
 ## `Render3D.ini`
 
 | Key | Default | |

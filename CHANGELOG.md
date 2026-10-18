@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.33.0 — 2026-10-18
+
+Layers: ui 0.12.1, render3d 0.15.0.
+
+### Fixed
+- UI.asi on Windows: its pixel shader is rewritten into what Windows' own Direct3D 9
+  accepts, so the menus and the HUD draw instead of a black screen
+  (`render3d/d3dbc-fix.py`, `hlsl-rs.sh --fix`).
+
+Installed, not yet seen in game.
+
 ## 12.32.0 — 2026-10-17
 
 Layers: testbench 3.35.0.
