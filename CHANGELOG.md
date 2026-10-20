@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.39.0 — 2026-10-20
+
+Layers: gui-installer 1.7.0.
+
+### Added
+- gui-installer: **Diagnostics for a bug report** in the window and `--report` on the
+  command line, a report a player can post: the Direct3D chain and the plugins by hash
+  against the release, changed settings, the plugins' logs, and findings such as
+  UI.asi and Render3D.asi without crosire's d3d8to9; user names and addresses left out.
+
+Installed, not yet seen in game.
+
 ## 12.38.1 — 2026-10-18
 
 Layers: ui 0.13.3.
