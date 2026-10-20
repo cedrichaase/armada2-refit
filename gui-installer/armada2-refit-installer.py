@@ -6,6 +6,7 @@
     python3 armada2-refit-installer.py --install [VERSION] [--game DIR] [--no-launcher]
     python3 armada2-refit-installer.py --package ZIP --game DIR [--no-launcher]
     python3 armada2-refit-installer.py --uninstall [--game DIR]
+    python3 armada2-refit-installer.py --report [--game DIR]    diagnostics for a bug report
     python3 armada2-refit-installer.py --selftest
 
 It finds the game, lists the releases on GitHub -- checked on every launch and on
@@ -47,7 +48,7 @@ import time
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.6.0'
+INSTALLER_VERSION = '1.7.0'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -792,6 +793,382 @@ def unproxy(game, log=print):
             os.unlink(p(n))
 
 
+# ------------------------------------------------------------------ the bug report
+
+# The files of the Direct3D chain and the loader that a release puts in, by hash
+# (platform/vendor/*/SOURCE.txt), and GOG's own d3d8.dll.
+KNOWN_FILES = {
+    D3D8TO9_SHA: "crosire's d3d8to9 1.16.0, the refit's",
+    GOG_D3D8_SHA: "GOG's own d3d8to9 build, as the game ships it",
+    '265888c31ca78dffa290c39cb7e50bfb02762590e41927906e46fb32f01497fa': "DXVK 3.1.1's d3d9, the refit's",
+    'baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5': 'Ultimate ASI Loader 4.68, the refit\'s',
+    '193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5': 'STA2WidescreenPatch 1.0, the refit\'s',
+}
+# Every plugin a release has put in, and those UI.asi and Render3D.asi took the place of.
+OUR_PLUGINS = ('Render3D', 'UI', 'QOL', 'QOLRules', 'Online', 'HUD', 'Menus', 'GridLayout',
+               'STA2WidescreenPatch')
+LEGACY_UI = ('HUD', 'Menus', 'MenuScale', 'GridLayout')
+OLD_RENDER = ('MSAA', 'Planets', 'Lighting', 'Sky', 'Nebulae', 'Surfaces', 'Explosions',
+              'Shields', 'Repair', 'Venting', 'Specials', 'Fog')
+# Lines of a log worth keeping from between its head and its tail.
+LOG_KEY = re.compile(r'(?i)stand|not stock|panic|error|fail|could not|cannot|refus|missing|'
+                     r'skipp|scene \w+ on|scene off|no direct3d|device|display')
+
+
+def redact(text):
+    """The report as it can be posted: the home folder as ~, any other user's folder
+    (C:\\Users\\name, /home/name, /Users/name, Wine's Z:\\home\\name) without the name,
+    and IPv4 addresses masked (Online.log's peers)."""
+    for h in {HOME, os.path.realpath(HOME)}:
+        if len(h) > 1:
+            text = text.replace(h, '~')
+    text = re.sub(r'(?i)([\\/](?:home|users))[\\/][^\\/\s"\';]+', r'\1\\<user>', text)
+    return re.sub(r'(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])', '<ip>', text)
+
+
+def identify(path):
+    """What a DLL is, from its hash or what it says of itself."""
+    try:
+        h = sha256(path)
+        with open(path, 'rb') as f:
+            data = f.read()
+    except OSError as e:
+        return f'unreadable ({e.strerror})'
+    what = KNOWN_FILES.get(h)
+    if not what:
+        low = data.lower()
+        what = ('DXVK' if b'dxvk' in low else "Wine's builtin" if b'wine builtin dll' in low
+                else 'dgVoodoo' if b'dgvoodoo' in low else 'BinkProxy' if b'binkproxy' in data
+                else 'unknown')
+    return f'{what} ({len(data)} bytes, sha256 {h[:16]})'
+
+
+def bmp_size(path):
+    try:
+        with open(path, 'rb') as f:
+            head = f.read(26)
+        if head[:2] == b'BM':
+            return struct.unpack('<ii', head[18:26])
+    except OSError:
+        pass
+    return None
+
+
+def ini_keys(text):
+    """{'Section.Key': value} of an .ini, comments left out."""
+    out, sec = {}, ''
+    for line in text.splitlines():
+        line = line.split(';', 1)[0].strip()
+        if line.startswith('[') and line.endswith(']'):
+            sec = line[1:-1].strip()
+        elif '=' in line and not line.startswith('#'):
+            k, _, v = line.partition('=')
+            out[f'{sec}.{k.strip()}'] = v.strip()
+    return out
+
+
+def read_lines(path):
+    try:
+        with open(path, errors='replace') as f:
+            return [l.rstrip('\n')[:240] for l in f]
+    except OSError:
+        return []
+
+
+def log_excerpt(lines, head=40, tail=60, keep=60):
+    """A plugin's log, which holds its last launch: the head, the lines in between that
+    say something went wrong or which way a choice went (LOG_KEY), and the tail."""
+    if len(lines) <= head + tail + keep:
+        return lines
+    mid, seen = [], set()
+    for i in range(head, len(lines) - tail):
+        shape = re.sub(r'\d+', '#', lines[i])     # once each, whatever its numbers
+        if LOG_KEY.search(lines[i]) and shape not in seen:
+            seen.add(shape)
+            mid.append((i, lines[i]))
+    out, last = lines[:head], head - 1
+    for i, l in mid[:keep]:
+        if i > last + 1:
+            out.append(f'  [... {i - last - 1} lines ...]')
+        out.append(l)
+        last = i
+    gap = len(lines) - tail - last - 1
+    if gap > 0:
+        out.append(f'  [... {gap} lines ...]')
+    return out + lines[-tail:]
+
+
+def package_files(version):
+    """{name in the game folder: sha256} of what the cached release `version` puts in
+    (game/, chain/ and the vendored loader), or None when it is not cached."""
+    path = os.path.join(CACHE, 'releases', f'armada2-refit-{version}.zip')
+    try:
+        out = {}
+        with zipfile.ZipFile(path) as z:
+            for n in z.namelist():
+                parts = n.split('/')
+                if len(parts) < 3 or n.endswith('/'):
+                    continue
+                if parts[1] == 'game':
+                    rel = '/'.join(parts[2:])
+                elif parts[1] == 'chain' and n.endswith('.dll'):
+                    rel = parts[2]
+                elif parts[1] == 'vendor' and len(parts) == 4 and \
+                        parts[3].lower().endswith(('.asi', '.dll')):
+                    rel = parts[3]
+                else:
+                    continue
+                out[rel] = hashlib.sha256(z.read(n)).hexdigest()
+        return out
+    except (OSError, zipfile.BadZipFile, KeyError):
+        return None
+
+
+REPORT_NAME = 'armada2-refit-report.txt'
+REPORT_HINT = ('Send this with a bug report: paste it into the GitHub issue, or save it and '
+               'attach the file. It names files by their hashes and leaves out your user '
+               'name and IP addresses.')
+
+
+def report_for_paste(text):
+    """As it is pasted: a code block, so GitHub and Discord keep the lines as they are."""
+    return '```\n' + text + '\n```'
+
+
+def diagnose(game):
+    """The bug report: what a player sends when the mod does not work. Everything that
+    tells why from a distance, nothing of the game's own files but their hashes, and
+    redacted to be posted in public (redact)."""
+    out = []
+    w = out.append
+    w(f'Armada II Refit diagnostics -- installer {INSTALLER_VERSION}, '
+      f'{time.strftime("%Y-%m-%d %H:%M")}')
+    import platform
+    osr = os_release() if SYSTEM == 'linux' else {}
+    w(f'System: {SYSTEM_NAME}, {osr.get("PRETTY_NAME") or platform.platform()}'
+      + (f' ({platform.release()})' if SYSTEM == 'linux' else '')
+      + (f', macOS {platform.mac_ver()[0]}' if SYSTEM == 'macos' else ''))
+    if not game or not exe_in(game):
+        w('Game: none found')
+        return redact('\n'.join(out))
+    p = lambda n: os.path.join(game, n)
+    try:
+        names = sorted(os.listdir(game), key=str.lower)
+    except OSError:
+        names = []
+    has = {n.lower(): n for n in names}
+    g = next((x for x in find_games() if os.path.realpath(x.path) == os.path.realpath(game)),
+             None)
+    w(f'Game: {game}' + (f'  [{g.source}]' if g else ''))
+    exe = has.get('armada2.exe')
+    if exe:
+        w(f'  Armada2.exe: {os.path.getsize(p(exe))} bytes, sha256 {sha256(p(exe))[:16]}')
+    state = load_json(p(STATE_FILE))
+    state = state if isinstance(state, dict) else {}
+    installed = state.get('version')
+    w(f'  Refit: {installed or "no record"}'
+      + (f', installed {state.get("installed")} by installer {state.get("installer")}'
+         if installed else ''))
+
+    findings = []
+    # ---- the launcher
+    w('')
+    w('Launcher:')
+    env = {}
+    if g and g.heroic:
+        data = load_json(g.heroic.config)
+        cfg = data.get(g.heroic.app) if isinstance(data, dict) else None
+        if isinstance(cfg, dict):
+            wine = cfg.get('wineVersion') if isinstance(cfg.get('wineVersion'), dict) else {}
+            w(f'  {g.heroic.label()}: {wine.get("name", "?")} ({wine.get("type", "?")})')
+            for k in ('autoInstallDxvk', 'autoInstallVkd3d', 'enableWineWayland', 'enableWoW64',
+                      'preferSystemLibs'):
+                if k in cfg:
+                    w(f'  {k}: {cfg[k]}')
+            env = {e.get('key'): e.get('value', '') for e in cfg.get('enviromentOptions', [])
+                   if isinstance(e, dict)}
+            for k, v in env.items():
+                w(f'  env {k}={v}')
+        else:
+            w(f'  {g.heroic.label()}: no settings file for the game')
+    elif g and g.prefix:
+        w(f'  Wine prefix: {g.prefix.label()}')
+        lines = read_reg(g.prefix.userreg) if os.path.isfile(g.prefix.userreg) else []
+        sec = reg_section(lines) if lines else None
+        vals = reg_values(lines, sec) if sec else {}
+        w('  DllOverrides for Armada2.exe: '
+          + (', '.join(f'{k}={v}' for k, v in sorted(vals.items())) or 'none'))
+        env = {'WINEDLLOVERRIDES': ';'.join(f'{k}={v}' for k, v in vals.items())}
+    elif SYSTEM == 'windows':
+        w('  none needed on Windows')
+    else:
+        w(f'  {g.source if g else "unknown"}: launch settings not read')
+    if SYSTEM != 'windows' and (env or (g and (g.heroic or g.prefix))):
+        ov = {k.lstrip('*').lower(): v
+              for k, v in split_overrides(env.get('WINEDLLOVERRIDES', '')).items()}
+        for dll in ('winmm', 'd3d8'):
+            if not ov.get(dll, '').startswith('n'):
+                findings.append(f'The launcher does not load the game folder\'s {dll}.dll first '
+                                f'({dll}=n,b is not in WINEDLLOVERRIDES): '
+                                + ('no plugin loads at all.' if dll == 'winmm' else
+                                   "Wine's own d3d8 runs, and UI.asi and Render3D.asi stand down."))
+
+    # ---- the Direct3D chain and the loader
+    w('')
+    w('Direct3D chain and loader:')
+    d8 = has.get('d3d8.dll')
+    d8_what = identify(p(d8)) if d8 else 'none'
+    for n in ('d3d8.dll', 'd3d9.dll', 'winmm.dll', 'binkw32.dll', 'binkw32_orig.dll',
+              'dxgi.dll', 'dinput8.dll', 'ddraw.dll'):
+        if n in has:
+            what = identify(p(has[n]))
+            if n == 'binkw32.dll' and what.startswith('unknown'):
+                what = 'not the cutscene player' + what[len('unknown'):]
+            w(f'  {n}: {what}')
+        elif n in ('d3d8.dll', 'd3d9.dll', 'winmm.dll'):
+            w(f'  {n}: none')
+    for n in names:
+        if n.lower().endswith(('.dll.gog-backup', '.dll.a2chain-backup', '.dll.a2neb-backup')):
+            w(f'  {n}: {identify(p(n))}')
+    if 'dxvk.conf' in has:
+        try:
+            ours = 'generated by tools/renderer-config.sh' in open(p(has['dxvk.conf']),
+                                                                  errors='replace').read()
+        except OSError:
+            ours = False
+        w('  dxvk.conf: ' + ("the refit's" if ours else "not the refit's"))
+    d3d8to9 = d8 is not None and sha256(p(d8)) == D3D8TO9_SHA
+
+    # ---- the plugins
+    w('')
+    w('Plugins (*.asi):')
+    shipped = package_files(installed) if installed else None
+    asis = [n for n in names if n.lower().endswith('.asi')]
+    for n in asis:
+        h = sha256(p(n))
+        tag = ''
+        if shipped is not None:
+            ref = shipped.get(n)
+            tag = '  [as released]' if ref == h else '  [differs from the release]' if ref \
+                else '  [not from the release]'
+        w(f'  {n}: {os.path.getsize(p(n))} bytes, sha256 {h[:16]}, '
+          f'{time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(p(n))))}{tag}')
+    if not asis:
+        w('  none')
+    if shipped is not None:
+        gone = [n for n in shipped if n.lower().endswith('.asi') and n.lower() not in has
+                and n.rsplit('.', 1)[0] not in LEGACY_UI + ('Render3D', 'UI')]
+        if gone:
+            w('  not in the game folder, though the release has them: ' + ', '.join(gone))
+    elif installed:
+        w(f'  (release {installed} is not in the installer\'s cache: nothing to compare against)')
+    stems = {n.rsplit('.', 1)[0].lower() for n in asis}
+
+    # ---- settings
+    w('')
+    w('Settings changed from the release (.ini):')
+    changed = False
+    if shipped is not None:
+        try:
+            with zipfile.ZipFile(os.path.join(CACHE, 'releases',
+                                              f'armada2-refit-{installed}.zip')) as z:
+                top = z.namelist()[0].split('/')[0]
+                for n in sorted(shipped):
+                    if not n.lower().endswith('.ini') or '/' in n or n.lower() not in has:
+                        continue
+                    ref = ini_keys(z.read(f'{top}/game/{n}').decode(errors='replace'))
+                    try:
+                        cur = ini_keys(open(p(has[n.lower()]), errors='replace').read())
+                    except OSError:
+                        continue
+                    for k in sorted(set(ref) | set(cur)):
+                        if ref.get(k) != cur.get(k):
+                            changed = True
+                            w(f'  {n} {k}: {cur.get(k, "(removed)")}'
+                              f' (released: {ref.get(k, "none")})')
+        except (OSError, zipfile.BadZipFile, KeyError):
+            pass
+        if not changed:
+            w('  none')
+    else:
+        w('  (no release to compare against)')
+
+    # ---- the menu backdrops
+    menus = has.get('menus')
+    if menus and os.path.isdir(p(menus)):
+        plates = []
+        for n in sorted(os.listdir(p(menus))):
+            if n.lower().endswith('.bmp'):
+                s = bmp_size(os.path.join(p(menus), n))
+                plates.append(f'{n} {s[0]}x{abs(s[1])}' if s else n)
+        w('')
+        w('Menus/: ' + (', '.join(plates) or 'no .bmp'))
+    wide = menus and any((bmp_size(os.path.join(p(menus), n)) or (0, 0))[0] > 800
+                         for n in os.listdir(p(menus)) if n.lower().endswith('.bmp')) \
+        if menus and os.path.isdir(p(menus)) else False
+
+    # ---- the logs
+    logs = [n for n in names if n.lower().endswith('.log')
+            and n.rsplit('.', 1)[0].lower() in stems | {'binkproxy'}]
+    texts = {}
+    for n in logs:
+        lines = read_lines(p(n))
+        texts[n.rsplit('.', 1)[0].lower()] = lines
+        w('')
+        w(f'{n} ({time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(p(n))))}, '
+          f'{len(lines)} lines):')
+        out.extend('  ' + l for l in log_excerpt(lines))
+
+    # ---- what it comes to
+    if asis and 'winmm.dll' not in has:
+        findings.append('No winmm.dll (the ASI loader): no plugin loads.')
+    draws_d3d9 = [s for s in ('ui', 'render3d') if s in stems]
+    if draws_d3d9 and not d3d8to9:
+        both = ' and '.join(n + '.asi' for n in ('UI', 'Render3D') if n.lower() in draws_d3d9)
+        findings.append(f'{both} installed, but d3d8.dll is {d8_what.split(" (")[0]}, not '
+                        "crosire's d3d8to9: they get no Direct3D 9 device and stand down. "
+                        'Install again.')
+        if d8 and sha256(p(d8)) == GOG_D3D8_SHA and installed:
+            findings.append("GOG's d3d8.dll is back since the install, perhaps from a GOG "
+                            'Galaxy "verify / repair".')
+        if d8 and 'DXVK' in d8_what and g and g.heroic:
+            findings.append("DXVK's d3d8.dll is in the game folder: Heroic's \"Auto install "
+                            'DXVK\" or a DXVK put in by hand replaced d3d8to9.')
+    if 'ui' in stems and any(s.lower() in stems for s in LEGACY_UI):
+        findings.append('UI.asi and the plugins it supersedes (' +
+                        ', '.join(s + '.asi' for s in LEGACY_UI if s.lower() in stems) +
+                        ') are all in the game folder: they stand down against each other.')
+    old = [s + '.asi' for s in OLD_RENDER if s.lower() in stems]
+    if old:
+        findings.append('Plugins Render3D.asi replaced are still there: ' + ', '.join(old) + '.')
+    if 'menus' in stems and 'ui' not in stems and not wide:
+        findings.append('Menus.asi draws the menus (no UI.asi) and there is no widescreen plate '
+                        'in Menus/: black at the sides of the main menu on a wide screen is '
+                        'expected (the release carries no plates).')
+    for s in draws_d3d9:
+        if s not in texts:
+            findings.append(f'{"UI" if s == "ui" else "Render3D"}.asi is installed but has '
+                            'written no log: it has not loaded (the game not started since, '
+                            'or the loader not running).')
+    r3 = texts.get('render3d', [])
+    if any('Enable=0' in l for l in r3):
+        findings.append('Render3D.ini has Enable=0: the engine draws the 3D view.')
+    ui = texts.get('ui', [])
+    if any('menus: scene off' in l for l in ui) and not any(
+            re.search(r'menus: scene \w+ on', l) for l in ui):
+        findings.append('The menus never had render3d\'s scene behind them (UI.log: "menus: '
+                        'scene off"): the main menu shows the faded stock art on black.')
+    for s, lines in texts.items():
+        if any('PANIC' in l for l in lines):
+            findings.append(f'{s}.log records a panic: the plugin stopped the game.')
+
+    head = out[:out.index('') if '' in out else len(out)]
+    tail = out[len(head):]
+    verdict = ['', 'Findings:'] + ['  - ' + f for f in findings] if findings else \
+        ['', 'Findings: nothing out of the ordinary that the installer knows to look for.']
+    return redact('\n'.join(head + verdict + tail))
+
+
 # ------------------------------------------------------------------ vkBasalt, per distro
 
 REPO_GIT = f'https://github.com/{REPO}.git'
@@ -1408,6 +1785,9 @@ def cli(argv):
     ap.add_argument('--no-launcher', action='store_true')
     ap.add_argument('--check-version')
     ap.add_argument('--selftest', action='store_true')
+    ap.add_argument('--report', action='store_true',
+                    help='print the diagnostics for a bug report (with --game DIR for another '
+                         'install)')
     ap.add_argument('--vkbasalt-howto', nargs='?', const='', metavar='FAMILY',
                     help='how to install vkBasalt here (or for FAMILY: arch, fedora, '
                          'fedora-ostree, debian, ubuntu, other, all)')
@@ -1456,6 +1836,9 @@ def cli(argv):
                   f' {"cached" if r.is_cached() else ""}')
         return 0
     game = a.game or (games[0].path if games else None)
+    if a.report:
+        print(diagnose(game))
+        return 0
     if not game or not exe_in(game):
         print('no Armada II found -- pass --game DIR', file=sys.stderr)
         return 1
@@ -1580,6 +1963,29 @@ def selftest():
               os.path.realpath(prefix_of(os.path.join(t, 'drive_c', 'x')).root) == os.path.realpath(t),
               'prefix: found above drive_c')
         check(vtuple('11.10.0') > vtuple('11.9.3'), 'versions sort as numbers')
+
+        # The bug report: nothing personal in it, and the findings it exists for.
+        r = redact(f'{HOME}/x C:\\Users\\Alice\\A2 Z:\\home\\bob\\g /Users/carol/b '
+                   'peer 203.0.113.7:2399 Render3D 12.38.1')
+        check('Alice' not in r and 'bob' not in r and 'carol' not in r and HOME not in r
+              and '<ip>:2399' in r and '12.38.1' in r, 'report: user names and addresses out')
+        lines = [f'line {i}' for i in range(600)]
+        lines[300] = 'render3d: standing down'
+        lines[301] = 'render3d: standing down'
+        ex = log_excerpt(lines)
+        check(len(ex) < 120 and ex.count('render3d: standing down') == 1 and ex[-1] == 'line 599',
+              'report: a long log is cut to its head, what went wrong once, and its tail')
+        mock = os.path.join(t, 'game')
+        os.makedirs(mock)
+        for n, data in (('Armada2.exe', 'exe'), ('UI.asi', 'ui'), ('Render3D.asi', 'r3'),
+                        ('d3d8.dll', 'someone else\'s'), ('winmm.dll', 'loader'),
+                        ('UI.log', 'UI 0.1.0 -- game dir C:\\Users\\Alice\\A2\\\nmenus: scene off\n')):
+            with open(os.path.join(mock, n), 'w') as f:
+                f.write(data)
+        rep = diagnose(mock)
+        check('no Direct3D 9 device' in rep and 'scene off' in rep and 'Alice' not in rep
+              and 'ASI loader): no plugin loads' not in rep,
+              'report: a d3d8.dll that is not d3d8to9 is named, and why the scene is off')
         keep = {k: os.environ.get(k) for k in ('A2_APPIMAGE', 'PATH', 'PYTHONHOME', 'A2_ORIG_PATH',
                                               'A2_ORIG_PYTHONHOME')}
         os.environ.update(A2_APPIMAGE='1', PATH='/bundle/bin:/usr/bin', PYTHONHOME='/bundle',
@@ -1964,6 +2370,7 @@ def run_gui():
             menu = Gio.Menu()
             menu.append('Refresh releases', 'win.refresh')
             menu.append('Installation log', 'win.log')
+            menu.append('Diagnostics for a bug report', 'win.report')
             menu.append('Releases on GitHub', 'win.releases')
             header.pack_end(Gtk.MenuButton(icon_name='open-menu-symbolic', menu_model=menu))
             view.add_top_bar(header)
@@ -2079,6 +2486,7 @@ def run_gui():
 
             for name, fn, accel in (('refresh', self.refresh, 'F5'),
                                     ('log', self.show_log, '<Control>l'),
+                                    ('report', self.show_report, None),
                                     ('install', self.on_install, '<Control>Return'),
                                     ('releases', lambda: self.open_uri(RELEASES_PAGE), None)):
                 a = Gio.SimpleAction.new(name, None)
@@ -2112,6 +2520,58 @@ def run_gui():
                 self.logdialog.connect('closed', lambda _d: setattr(self, 'logdialog', None) or
                                        tv.set_content(None))
             self.logdialog.present(self)
+
+        def show_report(self):
+            g = self.game()
+            view = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
+                                wrap_mode=Gtk.WrapMode.WORD_CHAR)
+            view.add_css_class('logview')
+            view.get_buffer().set_text('Looking at the game folder…')
+            d = Adw.Dialog(title='Diagnostics for a bug report', content_width=720,
+                           content_height=520)
+            header = Adw.HeaderBar()
+            b_copy = Gtk.Button(label='Copy', sensitive=False)
+            b_copy.add_css_class('suggested-action')
+            b_save = Gtk.Button(label='Save…', sensitive=False)
+            header.pack_start(b_copy)
+            header.pack_start(b_save)
+            tv = Adw.ToolbarView()
+            tv.add_top_bar(header)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            box.append(lab(REPORT_HINT, ('heads-up',), wrap=True, margin_start=12, margin_end=12,
+                           margin_top=6, margin_bottom=8))
+            box.append(Gtk.ScrolledWindow(child=view, vexpand=True))
+            tv.set_content(box)
+            d.set_child(tv)
+            text = ['']
+
+            def done(r):
+                text[0] = r
+                view.get_buffer().set_text(r)
+                b_copy.set_sensitive(True)
+                b_save.set_sensitive(True)
+
+            def fail(e):
+                view.get_buffer().set_text(f'Could not put the report together: {e}')
+
+            def save(_b):
+                f = Gtk.FileDialog(title='Save the report', modal=True, initial_name=REPORT_NAME)
+
+                def saved(dialog, result):
+                    try:
+                        path = dialog.save_finish(result).get_path()
+                        with open(path, 'w', encoding='utf-8') as fh:
+                            fh.write(text[0] + '\n')
+                    except (GLib.Error, OSError) as e:
+                        if not isinstance(e, GLib.Error) or 'dismiss' not in str(e).lower():
+                            self.set_status(f'Not saved: {e}', 'err')
+                        return
+                    self.set_status(f'Report saved to {short(path)}', 'ok')
+                f.save(self, None, saved)
+            b_copy.connect('clicked', lambda _b: self.copy(report_for_paste(text[0])))
+            b_save.connect('clicked', save)
+            d.present(self)
+            self.in_thread(lambda: diagnose(g.path if g else None), done, fail)
 
         def set_status(self, text, kind=''):
             self.status.set_label(text)
@@ -3215,6 +3675,73 @@ def run_tk():
             w.bind('<Escape>', lambda e: w.destroy())
             self.logwin = w
 
+        def show_report(self):
+            g = self.game()
+            w = tk.Toplevel(root, bg='#0b0e16')
+            w.title('Diagnostics for a bug report')
+            w.geometry(f'{px(760)}x{px(540)}')
+            tk.Label(w, text=REPORT_HINT, bg='#0b0e16', fg=DIM, font=F_SMALL, justify='left',
+                     anchor='w', wraplength=px(720)).pack(side='top', fill='x', padx=px(12),
+                                                          pady=(px(10), px(4)))
+            bar = tk.Frame(w, bg='#0b0e16')
+            bar.pack(side='bottom', fill='x')
+            text = tk.Text(w, bg='#0b0e16', fg=FG, insertbackground=FG, font=F_MONO, wrap='word',
+                           relief='flat', bd=0, padx=px(10), pady=px(8),
+                           selectbackground=AMBER, selectforeground=AMBER_INK,
+                           highlightthickness=0)
+            sb = tk.Scrollbar(w, command=text.yview)
+            text.configure(yscrollcommand=sb.set)
+            sb.pack(side='right', fill='y')
+            text.pack(fill='both', expand=True)
+            text.insert('end', 'Looking at the game folder…')
+            text.configure(state='disabled')
+            report = ['']
+
+            def show(r):
+                if not w.winfo_exists():
+                    return
+                report[0] = r
+                text.configure(state='normal')
+                text.delete('1.0', 'end')
+                text.insert('end', r)
+                text.configure(state='disabled')
+                for b in buttons:
+                    b.configure(state='normal')
+
+            def fail(e):
+                if w.winfo_exists():
+                    text.configure(state='normal')
+                    text.delete('1.0', 'end')
+                    text.insert('end', f'Could not put the report together: {e}')
+                    text.configure(state='disabled')
+
+            def save():
+                path = filedialog.asksaveasfilename(parent=w, initialfile=REPORT_NAME,
+                                                    defaultextension='.txt',
+                                                    filetypes=[('Text', '*.txt')])
+                if not path:
+                    return
+                try:
+                    with open(path, 'w', encoding='utf-8') as fh:
+                        fh.write(report[0] + '\n')
+                except OSError as e:
+                    self.set_status(f'Not saved: {e}', 'err')
+                    return
+                self.set_status(f'Report saved to {short(path)}', 'ok')
+
+            style = dict(font=F_SUB, bg='#1b2030', fg=FG, activebackground=AMBER,
+                         activeforeground=AMBER_INK, relief='flat', bd=0, padx=px(12),
+                         pady=px(4), highlightthickness=0, state='disabled')
+            buttons = [tk.Button(bar, text='Save…', command=save, **style),
+                       tk.Button(bar, text='Copy', command=lambda: self.copy(
+                           report_for_paste(report[0])), **style)]
+            for b in buttons:
+                b.pack(side='right', padx=(0, px(8)), pady=px(6))
+            text.bind('<1>', lambda e: text.focus_set())
+            text.bind(f'<{MOD}-a>', lambda e: (text.tag_add('sel', '1.0', 'end'), 'break')[1])
+            w.bind('<Escape>', lambda e: w.destroy())
+            self.in_thread(lambda: diagnose(g.path if g else None), show, fail)
+
         def copy(self, text):
             root.clipboard_clear()
             root.clipboard_append(text)
@@ -3727,7 +4254,7 @@ def run_tk():
                        'secondary' if primary else 'primary', self.on_launch, not self.busy)
             y += bh + px(14)
             links = ([('Uninstall', self.on_uninstall)] if uninst else []) + \
-                [('Refresh', self.refresh), ('Log', self.show_log),
+                [('Refresh', self.refresh), ('Log', self.show_log), ('Report', self.show_report),
                  ('Releases', lambda: webbrowser.open(RELEASES_PAGE))]
             dot = '   ·   '
             widths = [F_SUB.measure(s) for s, _ in links]

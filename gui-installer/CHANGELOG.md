@@ -4,6 +4,23 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.7.0 — 2026-10-20
+
+Reads package schemas 0 and 1.
+
+### Added
+- **Diagnostics for a bug report** (the menu on Linux, **Report** on Windows and macOS)
+  and `--report [--game DIR]`: a plain-text report to paste into an issue or save
+  (`diagnose`). It holds the system and launcher (Heroic's Wine, `autoInstallDxvk`, the
+  launch variables; a Mac prefix's DLL overrides), `d3d8.dll`, `d3d9.dll`, `winmm.dll`
+  and `binkw32.dll` named by hash, every `.asi` checked against the cached release, the
+  `.ini` keys changed from it, the plates in `Menus/`, an excerpt of each plugin's log,
+  and findings: no ASI loader, UI.asi or Render3D.asi without crosire's d3d8to9, GOG's
+  `d3d8.dll` back, old and new plugins together, `Enable=0`, the menu scene off, a
+  panic. The home folder, user names and IPv4 addresses are left out (`redact`).
+
+Installed, not yet seen in game.
+
 ## 1.6.0 — 2026-10-17
 
 Reads package schemas 0 and 1.

@@ -182,6 +182,38 @@ distribution (`HEROIC_HOWTO`): the AUR package on Arch, otherwise the site's `.d
 or Flathub, with the warning that bloom does not work in the Flatpak. A game found
 elsewhere (Lutris, a Wine prefix) gets the launch variables as text to copy instead.
 
+## The bug report
+
+**Diagnostics for a bug report** (the header menu on Linux, the **Report** link on
+Windows and macOS; `--report [--game DIR]` on the command line) puts together what tells
+why the mod misbehaves from a distance (`diagnose`), for the player to paste into an issue
+or save and attach. The installer is the place for it because it runs where the game
+draws nothing, and it already knows the game folder, the launcher and the release.
+
+- **Files by hash, never the files.** `d3d8.dll`, `d3d9.dll`, `winmm.dll` and
+  `binkw32.dll` are named by sha256 against what a release puts in (`KNOWN_FILES`, from
+  `platform/vendor/*/SOURCE.txt`, and GOG's own `d3d8.dll`), else by what they say of
+  themselves (DXVK, Wine's builtin, dgVoodoo). Asking a player to post the DLL itself
+  could mean posting GOG's or Microsoft's, which may not be redistributed; the hash says
+  as much. Every `.asi` is checked against the release named in the state file, read from
+  the installer's cache, and the `.ini` keys that differ from that release are listed.
+- **The logs are cut.** Each plugin rewrites its log at every launch, but `UI.log` and
+  `Render3D.log` still run to tens of thousands of lines, so the report keeps the head,
+  the lines in between that say something stood down or failed or which way the menu
+  scene went (`LOG_KEY`, each shape once, digits aside) and the tail. QOL's logs append
+  across launches; their tail is the last one.
+- **Findings come first**: the causes known so far, each tested on the files and the whole
+  logs. Among them: UI.asi or Render3D.asi without crosire's d3d8to9 (no Direct3D 9
+  device, so both stand down; GOG's `d3d8.dll` back after a Galaxy repair, or DXVK's put
+  in by Heroic), the launcher not loading the folder's `winmm`/`d3d8`, UI.asi beside the
+  plugins it supersedes, and `Menus.asi` drawing without a widescreen plate, which
+  shows black at the sides of the main menu (the release carries no plates).
+- **Safe to post** (`redact`): the home folder becomes `~`; any other user folder
+  (`C:\Users\name`, `/home/name`, `/Users/name`, Wine's `Z:\home\name`) loses the name;
+  IPv4 addresses (Online.log's peers) become `<ip>`.
+
+Copy puts it in a code block, so GitHub and Discord keep its lines.
+
 
 ## The AppImage
 
@@ -311,8 +343,9 @@ in the zip.
 ## Testing
 
 - `test.sh <zip>`: the self-test, then detection, install (cutscene skip, state file,
-  Heroic's variables) and uninstall (game and Heroic as before) against a mock game and
-  a mock Heroic in a scratch `HOME`. CI runs it on every push.
+  Heroic's variables), the bug report on that install, and uninstall (game and Heroic as
+  before) against a mock game and a mock Heroic in a scratch `HOME`. CI runs it on
+  every push.
 - `A2_INSTALLER_APPIMAGE=<file> test.sh <zip>`: the same through the AppImage. CI does it.
 - `test-windows.ps1 <zip> <exe>`: the shipping `.exe`, its standard handles redirected
   (it is windowed), in scratch `LOCALAPPDATA`/`APPDATA`/`USERPROFILE`: version resource,

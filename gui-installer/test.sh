@@ -48,6 +48,12 @@ check 'grep -q "\"version\": \"$ver\"" "$G/armada2-refit-installed.json"'
 check 'grep -q "winmm=n,b;d3d8=n,b" "$H/GamesConfig/1174788223.json"'
 check '[ -e "$H/GamesConfig/1174788223.json.a2refit-backup" ]'
 
+echo "== the bug report on what went in"
+"${run[@]}" --report > "$T/out" 2> "$T/err"
+check 'grep -q "Refit: $ver, installed" "$T/out" && grep -q "QOL.asi: .*\[as released\]" "$T/out"'
+check 'grep -q "env WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" "$T/out" && grep -q "^Findings" "$T/out"'
+check '! grep -qF "$T" "$T/out"'
+
 echo "== uninstall: the game and Heroic as they were"
 "${run[@]}" --uninstall --game "$G" > "$T/out" 2> "$T/err"
 check '[ ! -e "$G/HUD.asi" ] && [ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-installed.json" ]'
