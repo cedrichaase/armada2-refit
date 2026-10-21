@@ -12,7 +12,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   surfaces were never baked: black space behind the main menu and every map, and the
   planets in their stock texture. The sky's bake (8761 slots) is now a chain of five
   passes and the height of a planet (17812) one of up to eight (`gfx/chain.rs`), none
-  over 2940; they bake what the one shader did.
+  over 2940; they bake what the one shader did (0bd0a97).
 - `Render3D.log` names each shader Direct3D refuses, with its slots and the card's
   (`gfx: Direct3D refused ...`), and the card's slots at start; the version it logs is
   the changelog's again (it said 0.6.1).
