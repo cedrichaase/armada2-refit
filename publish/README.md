@@ -197,7 +197,9 @@ bloom shaders for real, so CI also notices when a pinned one moves.
 - on `main` only, when the root version has no release yet: tag `vX.Y.Z` and publish a
   GitHub Release with the zip, the GUI installer as a script, an AppImage, a Windows
   `.exe` and a macOS app's zip, the changelog entry as its notes. An entry that still
-  says "not yet seen in game" goes out as a pre-release. So **bumping the root version
+  says "not yet seen in game" goes out as a pre-release, and so does one with a line
+  starting "Pre-release" (confirmed on one system, not yet on another; the user makes
+  it a release on GitHub once it is). So **bumping the root version
   and pushing `main` is what releases**; a push that does not bump it releases nothing.
 - after that, on every push to `main`: delete all but the newest three releases. Their
   tags stay, so a version named anywhere still resolves to its commit.

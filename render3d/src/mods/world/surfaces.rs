@@ -9,6 +9,7 @@
 //! box-filtered on the CPU, so a device `Reset` drops them and the next draw bakes again
 //! (100-200 ms a recipe). Cloud drift runs on the sim clock.
 use crate::d3d::*;
+use crate::gfx::chain::{Chain, Pass};
 use crate::gfx::{self, Shader};
 use crate::rt::{self, Ini};
 use crate::shaders::world_surface::*;
@@ -65,7 +66,10 @@ pub struct Surfaces {
 
 struct BakeShaders {
     vs: Shader,
-    height: Shader,
+    /// The height's chain (`gfx::chain`: as one shader it took 17800 instruction
+    /// slots, past what some cards take): the warp, a gas giant whole, the ground, the
+    /// mountains, three passes of craters, two of fissures.
+    height: [Shader; 9],
     albedo: Shader,
     relief: Shader,
     cloud: Shader,
@@ -78,7 +82,11 @@ impl Surfaces {
             entries: BTreeMap::new(),
             sh: BakeShaders {
                 vs: Shader::vertex(&VS_BAKE),
-                height: Shader::pixel(&PS_HEIGHT),
+                height: [
+                    Shader::pixel(&PS_H_WARP), Shader::pixel(&PS_H_GAS), Shader::pixel(&PS_H_GROUND),
+                    Shader::pixel(&PS_H_MOUNTAINS), Shader::pixel(&PS_H_CRATERS1), Shader::pixel(&PS_H_CRATERS2),
+                    Shader::pixel(&PS_H_CRATERS3), Shader::pixel(&PS_H_FISSURE), Shader::pixel(&PS_H_END),
+                ],
                 albedo: Shader::pixel(&PS_ALBEDO),
                 relief: Shader::pixel(&PS_RELIEF),
                 cloud: Shader::pixel(&PS_CLOUD),
@@ -296,8 +304,8 @@ fn plain_states(dev: Device) {
     dev.set_stream_freq(0, 1);
 }
 
-/// One face with the bound pixel shader into the bound `s` x `s` target.
-fn draw_face(dev: Device, f: usize, s: u32) {
+/// Face `f` of an `s` x `s` cube, into `k_face`.
+fn face_consts(dev: Device, f: usize, s: u32) {
     let mut c = [0.0f32; 16];
     for i in 0..3 {
         c[i * 4..i * 4 + 3].copy_from_slice(&FACES[f][i]);
@@ -305,8 +313,18 @@ fn draw_face(dev: Device, f: usize, s: u32) {
     c[12] = 2.0 / (s - 1) as f32;
     c[13] = 2.0 / (s - 1) as f32;
     dev.ps_const(32, &c);
+}
+
+/// A quad over the bound viewport.
+fn quad(dev: Device) {
     let v: [[f32; 3]; 4] = [[-1.0, 1.0, 0.0], [1.0, 1.0, 0.0], [-1.0, -1.0, 0.0], [1.0, -1.0, 0.0]];
     dev.draw_primitive_up(PT_TRIANGLESTRIP, 2, v.as_ptr() as *const u8, 12);
+}
+
+/// One face with the bound pixel shader into the bound `s` x `s` target.
+fn draw_face(dev: Device, f: usize, s: u32) {
+    face_consts(dev, f, s);
+    quad(dev);
 }
 
 fn gen_mips(t: &Com) {
@@ -361,19 +379,44 @@ fn bake(dev: Device, r: &Recipe, s: u32, cface: u32, sh: &mut BakeShaders) -> Op
         }
     }
     if let Some(h) = height.as_ref() {
-        let mut ok = vs.bind(dev) && hps.bind(dev);
-        for f in 0..6 {
-            if !ok {
-                break;
+        let ps: Vec<*mut c_void> = hps.iter_mut().map(|p| p.get(dev)).collect();
+        // Targets 0: the warp; 1 and 2 by turns: (n, the craters' sum so far or the first
+        // fissure net). A gas giant is the warp and itself; without fissures the third
+        // pass of craters is the last.
+        let passes: Vec<Pass> = if r.k[0][3] > 0.5 {
+            alloc::vec![Pass { ps: ps[0], reads: &[], to: Some(0) }, Pass { ps: ps[1], reads: &[0], to: None }]
+        } else {
+            let fissures = r.k[4][0] > 0.0;
+            let mut v = alloc::vec![
+                Pass { ps: ps[0], reads: &[], to: Some(0) },
+                Pass { ps: ps[2], reads: &[0], to: Some(1) },
+                Pass { ps: ps[3], reads: &[0, 1], to: Some(2) },
+                Pass { ps: ps[4], reads: &[2], to: Some(1) },
+                Pass { ps: ps[5], reads: &[1], to: Some(2) },
+                Pass { ps: ps[6], reads: &[2], to: if fissures { Some(1) } else { None } },
+            ];
+            if fissures {
+                v.push(Pass { ps: ps[7], reads: &[0, 1], to: Some(2) });
+                v.push(Pass { ps: ps[8], reads: &[0, 2], to: None });
             }
+            v
+        };
+        let chain = Chain::new(dev, 3, s);
+        if chain.is_none() {
+            log!("world: no float targets for the height's bake");
+        }
+        let mut ok = chain.is_some() && vs.bind(dev);
+        for f in 0..6 {
+            let Some(chain) = chain.as_ref().filter(|_| ok) else { break };
             match h.cube_surface(f as u32, 0) {
                 Some(surf) => {
-                    dev.set_render_target(0, surf.ptr());
-                    draw_face(dev, f, s);
+                    face_consts(dev, f, s);
+                    ok = chain.draw(dev, surf.ptr(), s, &passes, &quad);
                 }
                 None => ok = false,
             }
         }
+        drop(chain);
         if ok {
             let albedo = bake_cube(dev, aps, vs, s, Some(h), FMT_A8R8G8B8);
             let relief = bake_cube(dev, rps, vs, s, Some(h), FMT_A8R8G8B8);

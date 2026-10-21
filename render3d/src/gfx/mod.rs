@@ -11,6 +11,8 @@ use crate::math::{M34, M4};
 use alloc::vec::Vec;
 use core::ffi::c_void;
 
+pub mod chain;
+
 /// Captures the device's whole state; `drop` puts it back. One state block per
 /// device, reused (made on first use).
 pub struct Guard {
@@ -88,6 +90,8 @@ impl Guard {
                 SB = match recorded_block(dev) {
                     Some(c) => {
                         crate::log!("gfx: draws save and restore a recorded state block");
+                        let (vs, ps) = slot_caps(dev);
+                        crate::log!("gfx: the card takes shaders of {} instruction slots (pixel), {} (vertex)", ps, vs);
                         Some((dev, c))
                     }
                     None => {
@@ -152,24 +156,72 @@ pub fn forget() {
     }
 }
 
+/// The most instruction slots a shader model 3 vertex and pixel shader may take on
+/// this device (`D3DCAPS9`'s last two words). Windows' own Direct3D 9 refuses a longer
+/// shader; DXVK takes any (README.md, "Shaders on Windows").
+pub fn slot_caps(dev: Device) -> (u32, u32) {
+    let mut caps = [0u32; 76]; // sizeof(D3DCAPS9) = 304
+    if dev.get_device_caps(caps.as_mut_ptr() as *mut u8) < 0 {
+        return (0, 0);
+    }
+    (caps[74], caps[75])
+}
+
+/// The instruction slots a shader takes, as the runtime counts them against
+/// `slot_caps` (d3dbc-fix.py's `slots`, which the build checks).
+pub fn slots(code: &[u32]) -> u32 {
+    let mut n = 0;
+    let mut i = 1;
+    while i < code.len() {
+        let t = code[i];
+        if t == 0xffff {
+            break;
+        }
+        let op = t & 0xffff;
+        if op == 0xfffe {
+            i += 1 + ((t >> 16) & 0x7fff) as usize;
+            continue;
+        }
+        n += match op {
+            0 | 31 | 47 | 48 | 81 | 30 => 0, // nop, dcl, defb, defi, def, label
+            18 | 24 | 25 | 29 | 33 | 39 | 65 | 91 | 92 | 95 => 2,
+            21 | 23 | 26 | 27 | 32 | 34 | 36 | 38 | 40 | 41 | 45 | 93 | 96 => 3,
+            20 | 22 => 4,
+            37 => 8,
+            _ => 1,
+        };
+        i += 1 + ((t >> 24) & 0xf) as usize;
+    }
+    n
+}
+
 /// A vertex or pixel shader from embedded bytecode, made on first use on a device.
 pub struct Shader {
     code: &'static [u32],
     pixel: bool,
     obj: Option<(Device, u32, *mut c_void)>,
+    told: bool,
 }
 
 impl Shader {
     pub const fn vertex(code: &'static [u32]) -> Shader {
-        Shader { code, pixel: false, obj: None }
+        Shader { code, pixel: false, obj: None, told: false }
     }
     pub const fn pixel(code: &'static [u32]) -> Shader {
-        Shader { code, pixel: true, obj: None }
+        Shader { code, pixel: true, obj: None, told: false }
     }
     /// The shader on `dev`, or null if it cannot be made.
     pub fn get(&mut self, dev: Device) -> *mut c_void {
         if !current(&self.obj, dev) {
             let c = if self.pixel { dev.create_ps(self.code) } else { dev.create_vs(self.code) };
+            if c.is_none() && !self.told {
+                self.told = true;
+                let (vs, ps) = slot_caps(dev);
+                crate::log!(
+                    "gfx: Direct3D refused a {} shader of {} instruction slots (the card takes {}); what draws with it stands down",
+                    if self.pixel { "pixel" } else { "vertex" }, slots(self.code), if self.pixel { ps } else { vs }
+                );
+            }
             self.obj = c.map(|c| {
                 let (e, p) = keep(c);
                 (dev, e, p)

@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.39.1 — 2026-10-21
+
+Layers: render3d 0.16.1.
+
+### Changed
+- CI: a changelog entry with a line starting "Pre-release" is released as a
+  pre-release even when confirmed in game (`publish/README.md`).
+
+### Fixed
+- render3d: on Windows, on a card that takes shaders of 4096 instruction slots, the
+  sky behind the main menu and every map was black and the planets stock: the sky's
+  and the planets' bakes are now chains of passes that fit, and `Render3D.log` names
+  any shader Direct3D refuses (0bd0a97).
+
+Confirmed in game 2026-10-21.
+Pre-release until it is seen on Windows.
+
 ## 12.39.0 — 2026-10-20
 
 Layers: gui-installer 1.7.0.

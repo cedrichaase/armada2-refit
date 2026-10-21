@@ -1,4 +1,4 @@
-// entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY bake_ps:ps_3_0:PS_BAKE down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE tunnel_ps:ps_3_0:PS_TUNNEL flash_ps:ps_3_0:PS_FLASH
+// entries: sky_vs:vs_3_0:VS_SKY sky_ps:ps_3_0:PS_SKY:long bake_warp_ps:ps_3_0:PS_BAKE_WARP bake_field_ps:ps_3_0:PS_BAKE_FIELD bake_gas_ps:ps_3_0:PS_BAKE_GAS bake_stars_ps:ps_3_0:PS_BAKE_STARS bake_end_ps:ps_3_0:PS_BAKE_END down_ps:ps_3_0:PS_DOWN draw_ps:ps_3_0:PS_DRAW face_vs:vs_3_0:VS_FACE face_ps:ps_3_0:PS_FACE sprite_vs:vs_3_0:VS_SPRITE sprite_ps:ps_3_0:PS_SPRITE tunnel_ps:ps_3_0:PS_TUNNEL flash_ps:ps_3_0:PS_FLASH
 // The background of the 3D view (src/mods/sky/): the procedural sky ported from
 // Sky.asi (its settled looks kept), the stock cube's faces, and the sprites of the
 // starfield and of the background objects (the suns).
@@ -6,7 +6,7 @@
 // The procedural sky: one quad over the viewport. Each vertex carries the world-space
 // view ray through its corner, so the interpolated ray is exact for a pinhole camera
 // and the sky is a function of that direction alone. Baked once per map into a cube
-// (bake_ps, then down_ps averages four samples a texel); draw_ps samples it every
+// (the bake_*_ps chain, then down_ps averages four samples a texel); draw_ps samples it every
 // frame with detail finer than the cube's texels. sky_ps computes it at every pixel:
 // the reference (Face=0).
 //
@@ -121,44 +121,79 @@ float fbm6(float3 p, float gain, float octaves)
 }
 
 // The sky in direction dir (unit length), before dithering: the gas, saturated, plus
-// the recipe's stars, which may pass white.
-float3 sky_colour(float3 dir)
+// the recipe's stars, which may pass white. In four stages, so that the bake can draw
+// it as a chain of passes, none longer than a card takes (chain.hlsli): the warp, the
+// field, the gas's colour, and the stars, a slab of their lattice at a time.
+
+// The direction drawn out along the stretch axis.
+float3 sky_sp(float3 dir)
 {
-    float scale = k_noise.x, warp = k_noise.y, cover = k_noise.z, soft = k_noise.w;
-    float bright = k_shape.x, ridge = k_shape.y, patch = k_shape.z, detail = k_shape.w;
+    return dir - k_stretch.xyz * dot(dir, k_stretch.xyz) * (1.0 - 1.0 / k_stretch.w);
+}
 
-    float3 sp = dir - k_stretch.xyz * dot(dir, k_stretch.xyz) * (1.0 - 1.0 / k_stretch.w);
+// Stage 1: the warp (q).
+float3 sky_warp(float3 dir)
+{
+    float3 p = sky_sp(dir) * k_noise.x + k_seed.xyz;
+    return float3(fbm3(p + float3(1.7, 9.2, 3.4), 0.5),
+                  fbm3(p + float3(8.3, 2.8, 5.1), 0.5),
+                  fbm3(p + float3(4.6, 7.1, 0.9), 0.5));
+}
+
+// The two cores' weights at dir.
+float2 sky_cores(float3 dir)
+{
+    float c1 = exp((dot(dir, k_core1.xyz) - 1.0) / max(k_core1.w * k_core1.w, 1e-4));
+    float c2 = exp((dot(dir, k_core2.xyz) - 1.0) / max(k_core2.w * k_core2.w, 1e-4));
+    return float2(c1, c2);
+}
+
+// Stage 2, from the warp: x where the gas's hue sits between its two, y the broad
+// field (before the grain), z the grain.
+float3 sky_field(float3 dir, float3 q)
+{
+    float scale = k_noise.x, warp = k_noise.y;
+    float ridge = k_shape.y, patch = k_shape.z, detail = k_shape.w;
+
+    float3 sp = sky_sp(dir);
     float3 p = sp * scale + k_seed.xyz;
-
-    float3 q = float3(fbm3(p + float3(1.7, 9.2, 3.4), 0.5),
-                      fbm3(p + float3(8.3, 2.8, 5.1), 0.5),
-                      fbm3(p + float3(4.6, 7.1, 0.9), 0.5));
     float3 pw = p + warp * (q - 0.5) * 2.0;
     float f = fbm6(pw, detail, k_gain.w);
     float n = (f - 0.5) * 8.0;
     n = lerp(n, 2.0 * exp(-n * n) - 0.6, ridge);
 
     float m = (vnoise(sp * scale * 0.33 + k_seed.zxy + 17.0) - 0.5) * 6.0;
-    float c1 = exp((dot(dir, k_core1.xyz) - 1.0) / max(k_core1.w * k_core1.w, 1e-4));
-    float c2 = exp((dot(dir, k_core2.xyz) - 1.0) / max(k_core2.w * k_core2.w, 1e-4));
+    float2 c = sky_cores(dir);
     float bd = dot(dir, k_band.xyz);
     float band = exp(-bd * bd / max(k_band.w * k_band.w, 1e-4));
 
-    float field = n + patch * m + k_core1c.w * c1 + k_core2c.w * c2 + k_misc.x * band;
+    float field = n + patch * m + k_core1c.w * c.x + k_core2c.w * c.y + k_misc.x * band;
 
-    float broad = field;
     float3 wq = warp * (q - 0.5) * 2.0;
     float g = fbm5_z(p * k_grain.y + wq + float3(31.4, 7.7, 12.9), k_grain.z);
-    field += k_grain.x * g;
+    float h = saturate((q.x - 0.5) * k_seed.w + 0.5);
+    return float3(lerp(h, saturate(n * 0.3 + 0.5), k_misc.w), field, g);
+}
+
+// Stage 3, from the warp and the field: rgb the gas, saturated; a how much of it
+// gathers at dir (the stars' weight in it).
+float4 sky_gas(float3 dir, float3 q, float3 fd)
+{
+    float cover = k_noise.z, soft = k_noise.w, bright = k_shape.x;
+    float broad = fd.y, g = fd.z;
+
+    float3 p = sky_sp(dir) * k_noise.x + k_seed.xyz;
+    float2 c = sky_cores(dir);
+    float field = broad + k_grain.x * g;
     float dens = smoothstep(cover - soft, cover + soft, field);
     dens = pow(max(dens, 0.0), k_misc.z);
 
-    float h = saturate((q.x - 0.5) * k_seed.w + 0.5);
-    float3 gas = lerp(k_gas_a.rgb, k_gas_b.rgb, lerp(h, saturate(n * 0.3 + 0.5), k_misc.w));
+    float3 gas = lerp(k_gas_a.rgb, k_gas_b.rgb, fd.x);
     float3 col = lerp(k_deep.rgb, gas, saturate(dens / 0.6)) + k_glow.rgb * smoothstep(0.55, 1.0, dens);
     col += gas * k_grain.w * smoothstep(k_dust.w - soft, k_dust.w + soft, broad);
-    col += k_core1c.rgb * c1 * (0.3 + 0.7 * dens) + k_core2c.rgb * c2 * (0.3 + 0.7 * dens);
+    col += k_core1c.rgb * c.x * (0.3 + 0.7 * dens) + k_core2c.rgb * c.y * (0.3 + 0.7 * dens);
 
+    float3 wq = k_noise.y * (q - 0.5) * 2.0;
     float dz = fbm5_z(p * k_dust.y + wq + float3(5.3, 21.1, 2.6), 0.55);
     float dt = max(dz - k_dust.z, 0.0);
     col = lerp(k_deep.rgb, col, exp(-k_dust.x * dt * dt * saturate(dens / 0.3)));
@@ -166,13 +201,15 @@ float3 sky_colour(float3 dir)
     col = lerp(k_deep.rgb, col, exp(0.3 * k_grain.x * g * saturate(dens / 0.6)));
     col *= bright;
     col = k_gain.rgb * pow(max(col, 1e-6), k_curve.rgb);
-    col = saturate(col);
+    return float4(saturate(col), smoothstep(cover - soft, cover + soft, broad));
+}
 
-    float gathered = smoothstep(cover - soft, cover + soft, broad);
+// Stage 4: the stars of one slab of the lattice about dir (z: -1, 0 or 1), added to
+// `stars`, the slabs before it. `gathered`: sky_gas's a.
+float3 sky_stars(float3 dir, float gathered, float z, float3 stars)
+{
     float3 cd = dir * 5.0;
     float3 ci = floor(cd);
-    float3 stars = 0.0;
-    [unroll] for (int z = -1; z <= 1; z++)
     [unroll] for (int y = -1; y <= 1; y++)
     [unroll] for (int x = -1; x <= 1; x++) {
         float3 c = ci + float3(x, y, z);
@@ -193,7 +230,18 @@ float3 sky_colour(float3 dir)
         float3 sc = lerp(k_star_a.rgb, k_star_b.rgb, hash13(k + float3(2.2, 8.8, 6.6)));
         stars += lerp(sc, 1.0, core * 0.35) * lum * (core + halo);
     }
-    return min(col + stars, 2.0);
+    return stars;
+}
+
+float3 sky_colour(float3 dir)
+{
+    float3 q = sky_warp(dir);
+    float3 fd = sky_field(dir, q);
+    float4 gas = sky_gas(dir, q, fd);
+    float3 stars = 0.0;
+    [unroll] for (int z = -1; z <= 1; z++)
+        stars = sky_stars(dir, gas.a, z, stars);
+    return min(gas.rgb + stars, 2.0);
 }
 
 // Dither by a step of the 8-bit back buffer: interleaved gradient noise on the pixel.
@@ -203,6 +251,8 @@ float3 dither(float3 col, float2 vpos)
     return col + (ign - 0.5) * k_misc.y / 255.0;
 }
 
+// The reference (Face=0): every pixel, every frame, in one shader of about 8800
+// slots, so only on a card that takes that many (DXVK takes any).
 float4 sky_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
 {
     float3 dir = normalize(ray);
@@ -213,14 +263,47 @@ float4 sky_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
 // texel i of an S-texel face holds the direction at face coordinate 2i/(S-1) - 1, so a
 // face's edge texels hold the edge itself; the samples sit a quarter texel either side).
 // k_face: the face's centre, its right and its down axes (Direct3D's cube layout), and
-// how a target pixel maps to face coordinates: uv = vpos * x + y.
+// how a target pixel maps to face coordinates: uv = pixel * x + y. Five passes
+// (src/mods/sky/bake.rs, gfx/chain.rs): the warp; the field, from it; the gas, from
+// both; the stars of two slabs, from the gas's a; the last slab, put together.
 float4 k_face[4] : register(c22);
 
-float4 bake_ps(float2 vpos : VPOS) : COLOR
+#include "chain.hlsli"
+
+float3 bake_dir(float2 vpos)
 {
-    float2 uv = vpos * k_face[3].x + k_face[3].y;
-    float3 dir = normalize(k_face[0].xyz + uv.x * k_face[1].xyz + uv.y * k_face[2].xyz);
-    return float4(sky_colour(dir), 1.0);
+    float2 uv = chain_face(vpos) * k_face[3].x + k_face[3].y;
+    return normalize(k_face[0].xyz + uv.x * k_face[1].xyz + uv.y * k_face[2].xyz);
+}
+
+float4 bake_warp_ps(float2 vpos : VPOS) : COLOR
+{
+    return float4(sky_warp(bake_dir(vpos)), 1.0);
+}
+
+float4 bake_field_ps(float2 vpos : VPOS) : COLOR
+{
+    return float4(sky_field(bake_dir(vpos), chain_read0(vpos).xyz), 1.0);
+}
+
+float4 bake_gas_ps(float2 vpos : VPOS) : COLOR
+{
+    return sky_gas(bake_dir(vpos), chain_read0(vpos).xyz, chain_read1(vpos).xyz);
+}
+
+float4 bake_stars_ps(float2 vpos : VPOS) : COLOR
+{
+    float3 dir = bake_dir(vpos);
+    float g = chain_read0(vpos).a;
+    return float4(sky_stars(dir, g, 0.0, sky_stars(dir, g, -1.0, 0.0)), 1.0);
+}
+
+float4 bake_end_ps(float2 vpos : VPOS) : COLOR
+{
+    float3 dir = bake_dir(vpos);
+    float4 gas = chain_read0(vpos);
+    float3 stars = sky_stars(dir, gas.a, 1.0, chain_read1(vpos).rgb);
+    return float4(min(gas.rgb + stars, 2.0), 1.0);
 }
 
 // Four samples into one texel: the bilinear tap at the corner the four share. c26.x is

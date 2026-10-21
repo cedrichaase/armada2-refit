@@ -1,11 +1,13 @@
 //! The procedural sky baked into a cube once per map, and
-//! the fine detail's noise volume. Both on the GPU only: each face is drawn by
-//! `bake_ps` into a target twice its edge, then `down_ps` averages each 2x2 into the
+//! the fine detail's noise volume. Both on the GPU only: each face is drawn by the
+//! `bake_*_ps` chain (five passes, `gfx::chain`: one shader would be longer than some
+//! cards take) into a target twice its edge, then `down_ps` averages each 2x2 into the
 //! cube face, a render target itself. The cube is half floats, so the recipe's stars
 //! can pass white; it is in the default pool and is dropped before a `Reset` and baked
 //! again after.
 use super::recipe::{NCONST, Recipe};
 use crate::d3d::*;
+use crate::gfx::chain::{Chain, Pass};
 use crate::gfx::Shader;
 use crate::log;
 use crate::rt;
@@ -50,7 +52,8 @@ pub struct Baker {
     pub fine: Option<Com>,
     fine_failed: bool,
     failed: Option<String>,
-    bake_ps: Shader,
+    /// The chain: the warp, the field, the gas, two slabs of stars, the last slab.
+    bake: [Shader; 5],
     down_ps: Shader,
 }
 
@@ -63,7 +66,8 @@ impl Baker {
             fine: None,
             fine_failed: false,
             failed: None,
-            bake_ps: Shader::pixel(&PS_BAKE),
+            bake: [Shader::pixel(&PS_BAKE_WARP), Shader::pixel(&PS_BAKE_FIELD), Shader::pixel(&PS_BAKE_GAS),
+                Shader::pixel(&PS_BAKE_STARS), Shader::pixel(&PS_BAKE_END)],
             down_ps: Shader::pixel(&PS_DOWN),
         }
     }
@@ -120,10 +124,24 @@ impl Baker {
         }
         let Some(cube) = self.cube.as_ref() else { return false };
         let fmt = cube.tex_desc(0).format;
-        let (bps, dps) = (self.bake_ps.get(dev), self.down_ps.get(dev));
-        if bps.is_null() || dps.is_null() {
+        let [w, f, g, st, e] = &mut self.bake;
+        let bps = [w.get(dev), f.get(dev), g.get(dev), st.get(dev), e.get(dev)];
+        let dps = self.down_ps.get(dev);
+        if bps.iter().any(|p| p.is_null()) || dps.is_null() {
             return false;
         }
+        // Targets 0: the warp, then the stars of the first two slabs; 1: the field; 2: the gas.
+        let passes = [
+            Pass { ps: bps[0], reads: &[], to: Some(0) },
+            Pass { ps: bps[1], reads: &[0], to: Some(1) },
+            Pass { ps: bps[2], reads: &[0, 1], to: Some(2) },
+            Pass { ps: bps[3], reads: &[2], to: Some(0) },
+            Pass { ps: bps[4], reads: &[2, 0], to: None },
+        ];
+        let Some(chain) = Chain::new(dev, 3, big) else {
+            log!("sky: no float targets for the bake");
+            return false;
+        };
         let Some(sup) = dev.create_texture(big, big, 1, USAGE_RENDERTARGET, fmt, POOL_DEFAULT) else { return false };
         let Some(sup_s) = sup.tex_surface(0) else { return false };
         let old_vp = dev.get_viewport();
@@ -146,9 +164,7 @@ impl Baker {
         ];
         let mut ok = true;
         for (f, axes) in FACES.iter().enumerate() {
-            // Pass 1: the samples.
-            dev.set_render_target(0, sup_s.ptr());
-            dev.set_ps(bps);
+            // Pass 1: the samples, by the chain.
             let mut c = [0.0f32; 16];
             for i in 0..3 {
                 c[i * 4..i * 4 + 3].copy_from_slice(&axes[i]);
@@ -158,7 +174,13 @@ impl Baker {
             c[13] = if ss == 1 { -1.0 } else { -1.0 - 0.5 / (s - 1) as f32 };
             dev.ps_const(NCONST as u32, &c);
             dev.set_texture(2, core::ptr::null_mut());
-            dev.draw_primitive_up(PT_TRIANGLESTRIP, 2, quad.as_ptr() as *const u8, 24);
+            let draw = |d: Device| {
+                d.draw_primitive_up(PT_TRIANGLESTRIP, 2, quad.as_ptr() as *const u8, 24);
+            };
+            if !chain.draw(dev, sup_s.ptr(), big, &passes, &draw) {
+                ok = false;
+                break;
+            }
             // Pass 2: four samples into each texel of the face.
             let Some(face) = cube.cube_surface(f as u32, 0) else {
                 ok = false;

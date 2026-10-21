@@ -266,9 +266,10 @@ jobs:
             printf -- '- **By hand**: README.txt in the zip, and [Installing by hand](%s/%s/blob/%s/README.md#installing-by-hand-layer-by-layer).\n' \
               "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$tag"
           } >> notes.md
-          # An entry nobody has seen working in game yet ships as a pre-release.
+          # An entry nobody has seen working in game yet ships as a pre-release, and so
+          # does one with a line starting "Pre-release" (seen, but not everywhere yet).
           pre=()
-          grep -qi 'not yet seen in game' notes.md && pre=(--prerelease)
+          grep -qiE 'not yet seen in game|^pre-release' notes.md && pre=(--prerelease)
           gh release create "$tag" "dist/armada2-refit-$VERSION.zip" dist/armada2-refit-installer.py \
             dist/armada2-refit-installer-x86_64.AppImage dist/armada2-refit-installer-windows.exe \
             dist/armada2-refit-installer-macos.zip --target "$GITHUB_SHA" \

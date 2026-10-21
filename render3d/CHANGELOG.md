@@ -4,6 +4,27 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.16.1 — 2026-10-21
+
+### Fixed
+- On Windows, on a card that takes shaders of 4096 instruction slots (Direct3D 9's own
+  runtime refuses a longer one; DXVK takes any), the procedural sky and the planets'
+  surfaces were never baked: black space behind the main menu and every map, and the
+  planets in their stock texture. The sky's bake (8761 slots) is now a chain of five
+  passes and the height of a planet (17812) one of up to eight (`gfx/chain.rs`), none
+  over 2940; they bake what the one shader did (0bd0a97).
+- `Render3D.log` names each shader Direct3D refuses, with its slots and the card's
+  (`gfx: Direct3D refused ...`), and the card's slots at start; the version it logs is
+  the changelog's again (it said 0.6.1).
+
+### Changed
+- Build: `d3dbc-fix.py` refuses a shader past 4096 slots unless its entry is marked
+  `:long` (the code stands down without it: the `Face=0` reference sky and the nebulae's
+  march, which falls back to slices on such a card). `hlsl-rs.sh` compiles from the
+  shader's directory, for `#include "chain.hlsli"`.
+
+Confirmed in game 2026-10-21.
+
 ## 0.16.0 — 2026-10-17
 
 ### Added
