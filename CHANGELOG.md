@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.40.0 — 2026-10-21
+
+Layers: render3d 0.16.2, testbench 3.40.0.
+
+### Fixed
+- render3d: a freighter carrying latinum trails its golden spray again, and every
+  freighter's cargo pods light in the colour of its cargo up to the fill, as in stock
+  (GitHub issue #2); old SODs' alpha-tested meshes are cut-outs, as the engine draws
+  them.
+
+### Added
+- testbench: the scene command `cargo`, the `freighters` scene and the scenario
+  `render3d-freighter-trail`.
+
+Installed, not yet seen in game.
+
 ## 12.39.1 — 2026-10-21
 
 Layers: render3d 0.16.1.

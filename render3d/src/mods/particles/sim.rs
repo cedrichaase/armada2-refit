@@ -18,6 +18,13 @@
 //!   each shot carries a free emitter (`crpulsar` at `ChainPulsar+0xdc`, `gemini` at
 //!   `ManheimEffect+0xd4`) that its `Submit` renders at the shot's transform, into the
 //!   engine's global list (`Storm3D+0x68`): its particles outlive the shot.
+//! - **Freighters' latinum spray** (`FreighterClass`'s constructor, 0x4a87c0): an
+//!   emitter the class adds to its database at run time, so it is in no SOD. Its
+//!   ODF's `latinum_spray_emitter` (`latinum_spray`) at the hardpoint its
+//!   `latinum_spray_hardpoint` names, with that node's own transform directly under the
+//!   database's root; it fires at a rate times `cargo / capacity` while the hold carries
+//!   latinum and not at all otherwise, the multiplier `Freighter::RenderInternal`
+//!   (0x4b22c0) writes into the emitter every frame (`cargo_rate`).
 //! - **Instances another module draws** (`feed`): a weapon's or an effect's SOD with
 //!   emitters, fed once per frame by the module that draws it in the engine's place.
 //!
@@ -116,6 +123,10 @@ pub struct EmitterNode {
     pub tpl: Rc<Template>,
     /// The damage systems among its ancestors (bit per `SYSTEMS` entry).
     pub systems: u8,
+    /// A freighter's latinum spray: placed at `node`'s own transform under the
+    /// database's root, shown whatever the LOD and the damage, firing at the cargo's
+    /// rate (`cargo_rate`).
+    pub cargo: bool,
 }
 
 /// The engine's damage-node names and the instance byte each follows. A node is hidden
@@ -128,6 +139,33 @@ const SLOT_UPDATE: usize = 14;
 const ORDNANCE_LIST: usize = 0x771fa8; // Ordnance::ordnanceList, a std::list (head node at +4)
 const VT_CHAIN_PULSAR: usize = 0x6b7c74;
 const VT_MANHEIM: usize = 0x6b89fc;
+/// `Freighter` (vtable 0x6b26a8): the resource carried (`+0x25c`, an `eResource`: 3 is
+/// latinum, 6 none), the amount (`+0x258`) and the class's capacities, one float per
+/// resource (`+0x254`, a pointer).
+const VT_FREIGHTER: usize = 0x6b26a8;
+const FREIGHTER_CAPACITY: usize = 0x254;
+const FREIGHTER_AMOUNT: usize = 0x258;
+const FREIGHTER_KIND: usize = 0x25c;
+const RESOURCE_LATINUM: usize = 3;
+
+/// The latinum spray's rate: `cargo / capacity` while the hold carries latinum, else 0,
+/// as `Freighter::RenderInternal` sets it. Reads only.
+pub fn cargo_rate(o: usize) -> f32 {
+    if o == 0 || engine::vtable(o) != VT_FREIGHTER || field(o, FREIGHTER_KIND) != RESOURCE_LATINUM {
+        return 0.0;
+    }
+    let caps = field(o, FREIGHTER_CAPACITY);
+    if caps == 0 {
+        return 0.0;
+    }
+    let cap = field_f32(caps, RESOURCE_LATINUM * 4);
+    let amount = field_f32(o, FREIGHTER_AMOUNT);
+    if cap > 0.0 && amount.is_finite() {
+        (amount / cap).clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
@@ -140,6 +178,9 @@ pub enum Kind {
 
 pub struct EmState {
     pub timer: f32,
+    /// The emitter's rate multiplier (the engine's spray `+0xf8`): 1, or a freighter's
+    /// cargo fraction for its latinum spray.
+    pub rate: f32,
     /// Shown this frame, and where its node is.
     pub shown: bool,
     pub world: M34,
@@ -165,7 +206,7 @@ pub struct Owner {
 impl Owner {
     fn new(kind: Kind, set: Option<Rc<EmitterSet>>) -> Owner {
         let n = set.as_ref().map_or(0, |s| s.emitters.len());
-        let ems = (0..n).map(|_| EmState { timer: 0.0, shown: false, world: M34::IDENTITY }).collect();
+        let ems = (0..n).map(|_| EmState { timer: 0.0, rate: 1.0, shown: false, world: M34::IDENTITY }).collect();
         Owner { kind, set, inst: 0, ems, parts: Vec::new(), seen: 0, visible: false, mult: 1.0, radius: 50.0, scale: 1.0 }
     }
 }
@@ -306,7 +347,7 @@ impl System {
                         break;
                     }
                 }
-                emitters.push(EmitterNode { node: i, tpl, systems });
+                emitters.push(EmitterNode { node: i, tpl, systems, cargo: false });
             }
             if emitters.is_empty() {
                 return None;
@@ -324,6 +365,54 @@ impl System {
         s
     }
 
+    /// A game object's emitters: its SOD's, and for a freighter whose ODF names a
+    /// latinum spray hardpoint found in that SOD, the spray (`FreighterClass`'s
+    /// constructor adds it to the class's database; an ODF without
+    /// `latinum_spray_hardpoint`, the Borg's and Species 8472's, has none).
+    fn object_set(&mut self, o: usize, odf: &str) -> Option<Rc<EmitterSet>> {
+        let sod_name = assets::sod_of(odf);
+        let base = self.set(&sod_name, true);
+        if engine::vtable(o) != VT_FREIGHTER {
+            return base;
+        }
+        let mut ck = crate::rt::lower(odf);
+        ck.push_str("|freighter");
+        if let Some(s) = self.sets.get(&ck) {
+            return s.clone();
+        }
+        let s = (|| {
+            let od = assets::odf(odf)?;
+            let hp = od.get_str("latinum_spray_hardpoint").filter(|h| !h.is_empty())?;
+            let em = od.get_str("latinum_spray_emitter").filter(|e| !e.is_empty())?;
+            let sod = match &base {
+                Some(b) => b.sod.as_ref().map(|(s, _)| s.clone())?,
+                None => assets::sod(&sod_name)?,
+            };
+            let Some(node) = sod.find(hp) else {
+                log!("particles: {}: no node {} for the latinum spray", odf, hp);
+                return None;
+            };
+            let tpl = self.template(em)?;
+            let mut emitters: Vec<EmitterNode> = Vec::new();
+            let scale_sod = match &base {
+                Some(b) => {
+                    for e in &b.emitters {
+                        emitters.push(EmitterNode { node: e.node, tpl: e.tpl.clone(), systems: e.systems, cargo: false });
+                    }
+                    b.scale_sod
+                }
+                None => od.get_f32("ScaleSOD").filter(|s| *s > 0.0).unwrap_or(1.0),
+            };
+            let info = SodInfo::new(&sod);
+            emitters.push(EmitterNode { node, tpl, systems: 0, cargo: true });
+            log!("particles: {}: latinum spray {} at {}", odf, em, hp);
+            Some(Rc::new(EmitterSet { sod: Some((sod, info)), scale_sod, emitters }))
+        })();
+        let s = s.or(base);
+        self.sets.insert(ck, s.clone());
+        s
+    }
+
     /// A set of one free emitter (the global ones).
     fn free_set(&mut self, emitter: &str) -> Option<Rc<EmitterSet>> {
         let mut ck = String::from(emitter);
@@ -331,7 +420,7 @@ impl System {
         if let Some(s) = self.sets.get(&ck) {
             return s.clone();
         }
-        let s = self.template(emitter).map(|tpl| Rc::new(EmitterSet { sod: None, scale_sod: 1.0, emitters: alloc::vec![EmitterNode { node: 0, tpl, systems: 0 }] }));
+        let s = self.template(emitter).map(|tpl| Rc::new(EmitterSet { sod: None, scale_sod: 1.0, emitters: alloc::vec![EmitterNode { node: 0, tpl, systems: 0, cargo: false }] }));
         self.sets.insert(ck, s.clone());
         s
     }
@@ -365,7 +454,7 @@ impl System {
             let key = (o, field(o, 0x28) as u32);
             if !self.owners.contains_key(&key) {
                 let name = obj::odf_name(o);
-                let set = if name.is_empty() { None } else { self.set(&assets::sod_of(name), true) };
+                let set = if name.is_empty() { None } else { self.object_set(o, name) };
                 self.owners.insert(key, Owner::new(Kind::Object, set));
             }
             let Some(ow) = self.owners.get_mut(&key) else { continue };
@@ -415,6 +504,11 @@ impl System {
             world.r[1] = world.r[1] * s.y;
             world.r[2] = world.r[2] * s.z;
             let shown = place(ow, &set, &world, if expired { 0xff } else { hidden }, pose::Clock::of_instance(inst, now), lod);
+            for (i, e) in set.emitters.iter().enumerate() {
+                if e.cargo {
+                    ow.ems[i].rate = cargo_rate(o);
+                }
+            }
             fire(ow, &set, dt, self.rate, &mut self.rng, self.cloud_fps);
             if self.said < 6 && shown > 0 {
                 self.said += 1;
@@ -519,6 +613,13 @@ fn place(ow: &mut Owner, set: &EmitterSet, world: &M34, hidden: u8, clock: pose:
             let p = pose::pose(sod, info, world, clock, lod);
             for (i, e) in set.emitters.iter().enumerate() {
                 let st = &mut ow.ems[i];
+                if e.cargo {
+                    // Under the database's root, not the hardpoint: always traversed.
+                    st.shown = true;
+                    st.world = pose::m34(&sod.nodes[e.node].transform).then(world);
+                    shown += 1;
+                    continue;
+                }
                 st.shown = e.systems & hidden == 0 && p.shown.get(e.node).copied().unwrap_or(false);
                 if st.shown {
                     st.world = p.world[e.node];
@@ -548,8 +649,8 @@ fn fire(ow: &mut Owner, set: &EmitterSet, dt: f32, rate: f32, rng: &mut Rng, fps
         match t.kind {
             EmitterType::Spray => {
                 // ST3D_ParticleEmitter_Spray::Simulate: at most one per call (Q12).
-                let dte = rate * dt;
                 let st = &mut ow.ems[i];
+                let dte = rate * st.rate * dt;
                 st.timer -= dte;
                 if st.timer < 0.0 {
                     st.timer = if dte < t.period { st.timer + t.period } else { t.period };
