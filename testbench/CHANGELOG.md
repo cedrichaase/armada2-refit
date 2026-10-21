@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.40.0 — 2026-10-21
+
+### Added
+- `Scene.asi`'s `cargo <name> <resource> [amount | full | empty]`: a freighter's hold,
+  as mining fills it (`Freighter::LoadResource`).
+- Scene `freighters`: the five freighters parked in a row, for the latinum trail and
+  the cargo markings; scenario `render3d-freighter-trail`.
+
+Installs nothing.
+
 ## 3.39.0 — 2026-10-17
 
 ### Added

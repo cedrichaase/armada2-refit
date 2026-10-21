@@ -78,6 +78,9 @@ pub struct Posed {
     pub cloak: Option<(u32, f32, f32)>,
     /// Drawn in the object loop of this view (not just posed for the shadow map).
     pub drawn: bool,
+    /// A freighter's cargo markings: lighting materials (lower case) drawn unlit in
+    /// this colour (`game::cargo_markings`). Empty for everything else.
+    pub cargo: Vec<(String, V3)>,
 }
 
 /// What `begin_view` keeps per view.
@@ -280,6 +283,7 @@ impl Hulls {
         };
         let waves = draw::Waves::of(o, craft && craft_ri(o), v.time);
         let glow = if game::render_fn(o) == game::FN_SCRAP_RENDER { game::scrap_glow(o) } else { None };
+        let cargo = game::cargo_markings(o, &model.sod);
         Some(Posed {
             obj: o,
             inst,
@@ -299,6 +303,7 @@ impl Hulls {
             glow,
             cloak,
             drawn: false,
+            cargo,
         })
     }
 }
@@ -341,6 +346,7 @@ impl Hulls {
             glow: None,
             cloak: None,
             drawn: true,
+            cargo: Vec::new(),
         })
     }
 
@@ -919,6 +925,7 @@ impl Module for Hulls {
                 // Decloaking: as the engine's state 3, this much of the hull back.
                 cloak: s.cloak.map(|k| (3, k.min(1.0), 0.0)),
                 drawn: true,
+                cargo: Vec::new(),
             };
             if posed.cloak.is_some() && look.cloak {
                 st.cloaked.push(i + 1);
@@ -1068,6 +1075,7 @@ pub fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, 
         glow: None,
         cloak: None,
         drawn: true,
+        cargo: Vec::new(),
     };
     h.draw.draw(v, &look, &posed, draw::Mode::Opaque);
     let st = view_state(v.key());

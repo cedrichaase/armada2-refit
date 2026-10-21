@@ -4,6 +4,24 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.16.2 — 2026-10-21
+
+### Fixed
+- A freighter carrying latinum trails the golden latinum spray again (GitHub issue #2):
+  the emitter `FreighterClass` adds at the ODF's `latinum_spray_hardpoint`, which is in
+  no SOD, now fires from the particles module at the hold's latinum fill
+  (`particles::sim`'s `object_set`, `cargo_rate`).
+- A freighter's cargo pods light in the colour of what it carries (dilithium pale blue,
+  latinum yellow), up to the fill, as `Freighter::UpdateDilithiumMarkings` lights them;
+  they were drawn as plain plating whatever the hold (`hulls::game::cargo_markings`).
+- Meshes of SODs older than 1.7 whose texture material is alpha-tested in the engine
+  (modes other than `2 2`) are drawn as cut-outs (`scene::mesh_blend`): the Klingon and
+  Romulan freighters' pod lattices, which hid the markings, and other old models'
+  alpha holes (`Kfreight`, `Rfreight`, `Bcruise1`, `Bbuildng`, `Fbee`, `Fresear`,
+  `Mdmoon` textures).
+
+Installed, not yet seen in game.
+
 ## 0.16.1 — 2026-10-21
 
 ### Fixed
