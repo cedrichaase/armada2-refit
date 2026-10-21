@@ -5,13 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.41.0 — 2026-10-21
+
+### Added
+- Scene `fog-blackhole`: a black hole and a quantum singularity left under the fog of
+  war, and the scenario `fog-blackhole` for render3d's ghosts of additive meshes
+  (issue #3, 7e7a184).
+
+Installs nothing; seen working on the bench 2026-10-21.
+
 ## 3.40.0 — 2026-10-21
 
 ### Added
 - `Scene.asi`'s `cargo <name> <resource> [amount | full | empty]`: a freighter's hold,
   as mining fills it (`Freighter::LoadResource`).
 - Scene `freighters`: the five freighters parked in a row, for the latinum trail and
-  the cargo markings; scenario `render3d-freighter-trail`.
+  the cargo markings; scenario `render3d-freighter-trail` (7c49408).
 
 Installs nothing.
 

@@ -4,12 +4,24 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.16.3 — 2026-10-21
+
+### Fixed
+- A black hole (`mblkhole`) under the fog of war was a near-black disc in the fog
+  (issue #3): a fog-of-war ghost's `additive` meshes (the black hole's disc, a
+  wormhole's swirl) were drawn opaque and lit like a hull. They are added now, unlit,
+  at half strength after the opaque ones, as stock draws them; an `alphathreshold` mesh
+  of a ghost is cut out at one half. `Render3D.log` says how many additive meshes the
+  first ghost of each class has (7e7a184).
+
+Installed, not yet seen in game.
+
 ## 0.16.2 — 2026-10-21
 
 ### Fixed
-- A freighter carrying latinum trails the golden latinum spray again (GitHub issue #2):
-  the emitter `FreighterClass` adds at the ODF's `latinum_spray_hardpoint`, which is in
-  no SOD, now fires from the particles module at the hold's latinum fill
+- A freighter carrying latinum trails the golden latinum spray again (GitHub issue #2,
+  7c49408): the emitter `FreighterClass` adds at the ODF's `latinum_spray_hardpoint`,
+  which is in no SOD, now fires from the particles module at the hold's latinum fill
   (`particles::sim`'s `object_set`, `cargo_rate`).
 - A freighter's cargo pods light in the colour of what it carries (dilithium pale blue,
   latinum yellow), up to the fill, as `Freighter::UpdateDilithiumMarkings` lights them;
