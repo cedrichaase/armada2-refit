@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.39.2 — 2026-10-21
+
+Layers: qol 1.6.2.
+
+### Fixed
+- qol: an order `QOLRules.asi` refuses for want of resources speaks stock's advisor
+  line again ("Insufficient crew", ...), to the refused player only (issue #1).
+
+Installed, not yet seen in game.
+
 ## 12.39.1 — 2026-10-21
 
 Layers: render3d 0.16.1.

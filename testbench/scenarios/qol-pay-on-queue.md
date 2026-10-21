@@ -27,21 +27,22 @@ after it, which is what the steps read.
 12. Expect scene "selection" answers "yard1[g-1 q3".
 13. Note "a fourth is refused: the crew is spent. Nothing is queued and the bank stays".
 14. Press x.
-15. Expect "QOLRules.log" contains "refused dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 2825 crew 0".
-16. Expect scene "selection" answers "yard1[g-1 q3".
-17. Note "a cancel takes the item in progress first, as stock does, and gives it back whole: the crew too, which stock's own refund clamps to a cap".
-18. Press t.
-19. Expect scene "selection" answers "yard1[g-1 q2".
-20. Expect "QOLRules.log" contains "cancelled in progress dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 3050 crew 250 officers free 540".
-21. Note "the next item has started by now (a start takes nothing more), so this cancel is an in-progress one too. A waiting item, cancelled before its start, logs plain `cancelled`".
-22. Press t.
-23. Expect "QOLRules.log" contains "started dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 3050 crew 250 officers free 540".
-24. Expect "QOLRules.log" contains "cancelled in progress dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 3275 crew 500 officers free 548".
-25. Expect scene "selection" answers "yard1[g-1 q1".
-26. Note "the last one is in progress by now; cancelling it leaves the bank as it was".
-27. Press t.
-28. Expect "QOLRules.log" contains "cancelled in progress dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 3500 crew 750 officers free 556".
-29. Expect scene "selection" answers "yard1[g-1 q0".
-30. Expect the game is still running.
-31. Quit the game.
-32. Expect no crash.
+15. Expect "QOLRules.log" contains "refused (crew) dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 2825 crew 0".
+16. Expect "QOLRules.log" contains "advisor: topic 10 for the local team".
+17. Expect scene "selection" answers "yard1[g-1 q3".
+18. Note "a cancel takes the item in progress first, as stock does, and gives it back whole: the crew too, which stock's own refund clamps to a cap".
+19. Press t.
+20. Expect scene "selection" answers "yard1[g-1 q2".
+21. Expect "QOLRules.log" contains "cancelled in progress dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 3050 crew 250 officers free 540".
+22. Note "the next item has started by now (a start takes nothing more), so this cancel is an in-progress one too. A waiting item, cancelled before its start, logs plain `cancelled`".
+23. Press t.
+24. Expect "QOLRules.log" contains "started dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 3050 crew 250 officers free 540".
+25. Expect "QOLRules.log" contains "cancelled in progress dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 3275 crew 500 officers free 548".
+26. Expect scene "selection" answers "yard1[g-1 q1".
+27. Note "the last one is in progress by now; cancelling it leaves the bank as it was".
+28. Press t.
+29. Expect "QOLRules.log" contains "cancelled in progress dil 225 met 0 lat 0 bio 0 crew 250 off 8; bank dil 3500 crew 750 officers free 556".
+30. Expect scene "selection" answers "yard1[g-1 q0".
+31. Expect the game is still running.
+32. Quit the game.
+33. Expect no crash.
