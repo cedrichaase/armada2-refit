@@ -23,12 +23,16 @@ The temporary a rewrite needs is one the shader never uses, else one it never re
 again after that instruction (every instruction that can run later comes later in the
 list).
 
-One more is refused that a rewrite cannot mend, so --check reports it and a rewrite fails
-on it: a texld (or dsx, dsy) inside an `if`. The shader has to sample with an explicit
-LOD or gradients there, or outside the branch.
+Two more are refused that a rewrite cannot mend, so --check reports them and a rewrite
+fails on them: a texld (or dsx, dsy) inside an `if` (the shader has to sample with an
+explicit LOD or gradients there, or outside the branch); and a shader of more
+instruction slots than the card takes (D3DCAPS9's MaxPixelShader30InstructionSlots,
+4096 on some cards; the Radeon we measured on takes 32768). Such a shader has to be cut
+into passes (src/gfx/chain.rs). --long lets one through that the code can do without
+(it logs the refusal and stands that part down).
 
-  d3dbc-fix.py <in.bin> <out.bin>     rewrite
-  d3dbc-fix.py --check <file.bin>...  list what Windows would refuse; exit 1 if any
+  d3dbc-fix.py [--long] <in.bin> <out.bin>  rewrite
+  d3dbc-fix.py --check <file.bin>...        list what Windows would refuse; exit 1 if any
 """
 import struct
 import sys
@@ -108,6 +112,20 @@ def problems(I):
 
 UNFIXABLE = ('gradient inside an if',)
 GRADIENT = {66, 91, 92}     # texld, dsx, dsy: they take neighbouring pixels' values
+
+
+# The fewest instruction slots a card may take for a shader model 3 shader is 512; 4096
+# is what the cards we know of that take fewer than the 32768 maximum report, and a shader
+# past it is refused at CreatePixelShader. Slots per instruction, as the runtime counts
+# them (most take one; render3d's gfx::slots counts the same way).
+SLOT_CAP = 4096
+SLOT_COST = {18: 2, 20: 4, 21: 3, 22: 4, 23: 3, 24: 2, 25: 2, 26: 3, 27: 3, 29: 2, 32: 3, 33: 2, 34: 3,
+             36: 3, 37: 8, 38: 3, 39: 2, 40: 3, 41: 3, 45: 3, 65: 2, 91: 2, 92: 2, 93: 3, 95: 2, 96: 3,
+             0: 0, 30: 0}
+
+
+def slots(ins):
+    return sum(SLOT_COST.get(I[0] & 0xffff, 1) for I in ins if code(I))
 
 
 def all_problems(ins):
@@ -278,7 +296,7 @@ def mov(dst_reg, src_tok, mask=0xf, mod=0):
             src_tok]
 
 
-def fix(data):
+def fix(data, long=False):
     ver, ins = parse(data)
     bad = [f'instruction {k}: {p}' for k, p in all_problems(ins) if p in UNFIXABLE]
     if bad:
@@ -328,6 +346,10 @@ def fix(data):
     left = all_problems(out)
     if left:
         raise ValueError(f'instruction {left[0][0]} still refused: {left[0][1]}')
+    n = slots(out)
+    if n > SLOT_CAP and not long:
+        raise ValueError(f'{n} instruction slots, past the {SLOT_CAP} some cards take: cut it into '
+                         'passes, or mark its entry :long if the code stands down without it')
     return emit(ver, out)
 
 
@@ -339,13 +361,19 @@ def main(argv):
             found = all_problems(ins)
             for k, p in found:
                 print(f'{f}: instruction {k}: {p}')
-            bad += bool(found)
+            n = slots(ins)
+            if n > SLOT_CAP:
+                print(f'{f}: {n} instruction slots, past {SLOT_CAP}')
+            bad += bool(found) or n > SLOT_CAP
         return 1 if bad else 0
+    long = bool(argv) and argv[0] == '--long'
+    if long:
+        argv = argv[1:]
     if len(argv) != 2:
         print(__doc__.strip(), file=sys.stderr)
         return 2
     try:
-        data = fix(open(argv[0], 'rb').read())
+        data = fix(open(argv[0], 'rb').read(), long)
     except ValueError as e:
         print(f'd3dbc-fix.py: {argv[0]}: {e}', file=sys.stderr)
         return 1

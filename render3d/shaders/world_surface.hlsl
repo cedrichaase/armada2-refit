@@ -1,4 +1,4 @@
-// entries: bake_vs:vs_3_0:VS_BAKE height_ps:ps_3_0:PS_HEIGHT albedo_ps:ps_3_0:PS_ALBEDO relief_ps:ps_3_0:PS_RELIEF cloud_ps:ps_3_0:PS_CLOUD
+// entries: bake_vs:vs_3_0:VS_BAKE height_warp_ps:ps_3_0:PS_H_WARP height_gas_ps:ps_3_0:PS_H_GAS height_ground_ps:ps_3_0:PS_H_GROUND height_mountains_ps:ps_3_0:PS_H_MOUNTAINS height_craters1_ps:ps_3_0:PS_H_CRATERS1 height_craters2_ps:ps_3_0:PS_H_CRATERS2 height_craters3_ps:ps_3_0:PS_H_CRATERS3 height_fissure_ps:ps_3_0:PS_H_FISSURE height_end_ps:ps_3_0:PS_H_END albedo_ps:ps_3_0:PS_ALBEDO relief_ps:ps_3_0:PS_RELIEF cloud_ps:ps_3_0:PS_CLOUD
 // The world module's surface bake (src/mods/world/surfaces.rs): Surfaces.asi's
 // surface.hlsl, ported unchanged but for this header.
 //
@@ -8,7 +8,8 @@
 // nothing here knows about the engine's gore unwrap, so there are no seams. Four
 // passes, each drawing one cube face per call (one texel per pixel):
 //
-//   height_ps  the height field (r) and the glow of fissures (g), into a float cube
+//   height_*_ps the height field (r) and the glow of fissures (g), into a float cube:
+//              a chain of passes (chain.hlsli), as one shader past what some cards take
 //   albedo_ps  colour by height and region, water by depth, ice; a: how wet (glint),
 //              or, with Cut, the opacity of an alpha-tested model
 //   relief_ps  the normal, from the height cube's slopes: rgb = normal - direction + 0.5;
@@ -122,14 +123,14 @@ float ridged(float3 p)
     return s / n;
 }
 
-// The craters of one lattice of cells, `cells` across the unit sphere: a share of the
-// cells holds one, at a jittered point, with its own size. A bowl, a raised rim and a
-// faint apron of ejecta, in height units times `depth`.
-float craters(float3 d, float cells, float share, float depth, float rim, float3 off)
+// The craters of one slab (z: -1, 0 or 1) of a lattice of cells, `cells` across the
+// unit sphere, added to `h`, the slabs before it: a share of the cells holds one, at a
+// jittered point, with its own size. A bowl, a raised rim and a faint apron of ejecta,
+// in height units times `depth`. A slab at a time, so the height's chain of passes
+// stays within what a card takes (chain.hlsli).
+float craters(float3 d, float cells, float share, float depth, float rim, float3 off, float z, float h)
 {
     float3 q = d * cells + off, iq = floor(q);
-    float  h = 0.0;
-    [unroll] for (int z = -1; z <= 1; z++)
     [unroll] for (int y = -1; y <= 1; y++)
     [unroll] for (int x = -1; x <= 1; x++) {
         float3 c  = iq + float3(x, y, z);
@@ -145,6 +146,16 @@ float craters(float3 d, float cells, float share, float depth, float rim, float3
         h += on * (bowl + lip + apron) * depth * (0.5 + rad * 2.5);
     }
     return h;
+}
+
+float craters1(float3 d, float z, float h)
+{
+    return craters(d, k_crater.y, k_crater.x, k_crater.z, k_crater.w, k_seed.xyz, z, h);
+}
+
+float craters2(float3 d, float z, float h)
+{
+    return craters(d, k_crater.y * 2.7, k_crater.x, k_crater.z * 0.6, k_crater.w, k_seed.yzx + 3.1, z, h);
 }
 
 // Fissures: the borders of a Voronoi net, x: the distance to the nearest border, in
@@ -181,50 +192,74 @@ float2 fissure(float3 p, float width)
     return float2(1.0 - smoothstep(0.0, width, f.x), 1.0 - smoothstep(0.0, width * 0.35, f.x)) * keep;
 }
 
-// The height at direction d, in field units, and the glow there.
-float2 height_at(float3 d)
+// The height at direction d, in field units, and the glow there: in stages, each a
+// pass of the bake's chain (surfaces.rs). The warp first, then for a gas giant the
+// whole of it, for the rest the ground, the mountains, two sizes of craters and the
+// fissures.
+
+float3 height_p(float3 d) { return d * k_noise.x + k_seed.xyz; }
+
+// The warp (q).
+float3 height_warp(float3 d)
+{
+    float3 p = height_p(d);
+    return float3(fbm3(p + float3(1.7, 9.2, 3.4), 0.5),
+                  fbm3(p + float3(8.3, 2.8, 5.1), 0.5),
+                  fbm3(p + float3(4.6, 7.1, 0.9), 0.5)) - 0.5;
+}
+
+// A gas giant: latitude, wound into bands, torn by turbulence that is drawn out along
+// the longitude. The value is the band coordinate; the albedo pass colours it.
+float2 height_gas(float3 d, float3 q)
 {
     float  scale = k_noise.x, warp = k_noise.y, detail = k_noise.z;
-    float3 p = d * scale + k_seed.xyz;
-    float3 q = float3(fbm3(p + float3(1.7, 9.2, 3.4), 0.5),
-                      fbm3(p + float3(8.3, 2.8, 5.1), 0.5),
-                      fbm3(p + float3(4.6, 7.1, 0.9), 0.5)) - 0.5;
+    float3 sp = float3(d.x, d.y * k_gas.w, d.z) * scale + k_seed.xyz;
+    float  t  = fbm7(sp + q * warp * 2.0, detail) - 0.5;
+    // The bands vary in width: latitude is bent by a slow sine before it is wound.
+    float  lat = d.y + 0.08 * sin(d.y * 7.3 + k_seed.x);
+    float  b  = lat * k_gas.x + t * k_gas.y + (q.x + q.y) * k_gas.z;
+    float  sd = dot(d, k_storm.xyz);
+    float  st = exp((sd - 1.0) / max(k_storm.w * k_storm.w, 1e-4));
+    return float2(b, st);
+}
 
-    if (k_seed.w > 0.5) {
-        // A gas giant: latitude, wound into bands, torn by turbulence that is drawn out
-        // along the longitude. The value is the band coordinate; the albedo pass colours it.
-        float3 sp = float3(d.x, d.y * k_gas.w, d.z) * scale + k_seed.xyz;
-        float  t  = fbm7(sp + q * warp * 2.0, detail) - 0.5;
-        // The bands vary in width: latitude is bent by a slow sine before it is wound.
-        float  lat = d.y + 0.08 * sin(d.y * 7.3 + k_seed.x);
-        float  b  = lat * k_gas.x + t * k_gas.y + (q.x + q.y) * k_gas.z;
-        float  sd = dot(d, k_storm.xyz);
-        float  st = exp((sd - 1.0) / max(k_storm.w * k_storm.w, 1e-4));
-        return float2(b, st);
-    }
-
+// The ground: the warped field, and continents, a slow field that lifts and sinks
+// whole regions.
+float height_ground(float3 d, float3 q)
+{
+    float  scale = k_noise.x, warp = k_noise.y, detail = k_noise.z;
+    float3 p = height_p(d);
     float n = (fbm7(p + q * warp * 2.0, detail) - 0.5) * 8.0;
-    // Continents: a slow field that lifts and sinks whole regions.
     n += (vnoise(d * scale * 0.3 + k_seed.zxy + 11.0) - 0.5) * 6.0 * k_sea.w;
-    // Mountains: ridged noise, on land only, rising with the ground under them.
+    return n;
+}
+
+// Mountains: ridged noise, on land only, rising with the ground under them.
+float height_mountains(float3 d, float3 q, float n)
+{
     float land = smoothstep(k_sea.x, k_sea.x + 1.5, n);
-    n += k_noise.w * land * (ridged(p * 1.6 + q * 1.5) - 0.3) * 5.0;
-    // Craters, two sizes.
-    n += craters(d, k_crater.y, k_crater.x, k_crater.z, k_crater.w, k_seed.xyz);
-    n += craters(d, k_crater.y * 2.7, k_crater.x, k_crater.z * 0.6, k_crater.w, k_seed.yzx + 3.1) * 0.7;
-    // Fissures: cut in, and glowing.
-    float glow = 0.0;
-    if (k_crack.x > 0.0) {
-        // Two nets, the finer one branching off the first. Warped hard (k_fiss.x 2.5)
-        // the fissures meander; barely warped, with most borders kept, they split the
-        // ground into angular plates (the moon).
-        float3 fp = d * k_crack.x + q * k_fiss.x + k_seed.zxy;
-        float2 a  = fissure(fp, k_crack.y);
-        float2 b  = fissure(fp * 2.3 + q * k_fiss.x * 0.6 + 4.1, k_crack.y * 1.4) * k_cavity.z;
-        float2 w  = max(a, b);
-        n -= k_crack.z * w.x;
-        glow = k_crack.w * w.y * (0.7 + 0.3 * vnoise(p * 6.0));
-    }
+    return n + k_noise.w * land * (ridged(height_p(d) * 1.6 + q * 1.5) - 0.3) * 5.0;
+}
+
+// Fissures, two nets, the finer one branching off the first. Warped hard (k_fiss.x
+// 2.5) the fissures meander; barely warped, with most borders kept, they split the
+// ground into angular plates (the moon). Only where k_crack.x > 0 (surfaces.rs leaves
+// these passes out otherwise).
+float3 fissure_p(float3 d, float3 q) { return d * k_crack.x + q * k_fiss.x + k_seed.zxy; }
+
+float2 fissure_a(float3 d, float3 q)
+{
+    return fissure(fissure_p(d, q), k_crack.y);
+}
+
+// Cut in, and glowing: (n, glow).
+float2 fissure_end(float3 d, float3 q, float n, float2 a)
+{
+    float3 fp = fissure_p(d, q);
+    float2 b  = fissure(fp * 2.3 + q * k_fiss.x * 0.6 + 4.1, k_crack.y * 1.4) * k_cavity.z;
+    float2 w  = max(a, b);
+    n -= k_crack.z * w.x;
+    float glow = k_crack.w * w.y * (0.7 + 0.3 * vnoise(height_p(d) * 6.0));
     return float2(n, glow);
 }
 
@@ -236,9 +271,74 @@ float3 face_dir(float2 vpos)
     return normalize(k_face[0].xyz + uv.x * k_face[1].xyz + uv.y * k_face[2].xyz);
 }
 
-float4 height_ps(float2 vpos : VPOS) : COLOR
+// The height's chain (surfaces.rs, gfx/chain.rs). Each pass writes (n, the craters'
+// sum so far or the first fissure net, ...); the last writes what the height cube
+// holds: r the height, g the glow.
+#include "chain.hlsli"
+
+float3 chain_dir(float2 vpos) { return face_dir(chain_face(vpos)); }
+
+float4 height_warp_ps(float2 vpos : VPOS) : COLOR
 {
-    return float4(height_at(face_dir(vpos)), 0.0, 1.0);
+    return float4(height_warp(chain_dir(vpos)), 1.0);
+}
+
+// reads the warp
+float4 height_gas_ps(float2 vpos : VPOS) : COLOR
+{
+    return float4(height_gas(chain_dir(vpos), chain_read0(vpos).xyz), 0.0, 1.0);
+}
+
+// reads the warp
+float4 height_ground_ps(float2 vpos : VPOS) : COLOR
+{
+    return float4(height_ground(chain_dir(vpos), chain_read0(vpos).xyz), 0.0, 0.0, 1.0);
+}
+
+// reads the warp and the ground: (n, the first craters' first slab)
+float4 height_mountains_ps(float2 vpos : VPOS) : COLOR
+{
+    float3 d = chain_dir(vpos);
+    float  n = height_mountains(d, chain_read0(vpos).xyz, chain_read1(vpos).x);
+    return float4(n, craters1(d, -1.0, 0.0), 0.0, 1.0);
+}
+
+// reads (n, h): the first craters' other two slabs, added
+float4 height_craters1_ps(float2 vpos : VPOS) : COLOR
+{
+    float3 d = chain_dir(vpos);
+    float2 nh = chain_read0(vpos).xy;
+    return float4(nh.x + craters1(d, 1.0, craters1(d, 0.0, nh.y)), 0.0, 0.0, 1.0);
+}
+
+// reads n: the second craters' first two slabs
+float4 height_craters2_ps(float2 vpos : VPOS) : COLOR
+{
+    float3 d = chain_dir(vpos);
+    return float4(chain_read0(vpos).x, craters2(d, 0.0, craters2(d, -1.0, 0.0)), 0.0, 1.0);
+}
+
+// reads (n, h): the second craters' last slab, added. The height when there are no
+// fissures (glow 0).
+float4 height_craters3_ps(float2 vpos : VPOS) : COLOR
+{
+    float3 d = chain_dir(vpos);
+    float2 nh = chain_read0(vpos).xy;
+    return float4(nh.x + craters2(d, 1.0, nh.y) * 0.7, 0.0, 0.0, 1.0);
+}
+
+// reads the warp and n: (n, the first net's trench and core)
+float4 height_fissure_ps(float2 vpos : VPOS) : COLOR
+{
+    float2 a = fissure_a(chain_dir(vpos), chain_read0(vpos).xyz);
+    return float4(chain_read1(vpos).x, a, 1.0);
+}
+
+// reads the warp and (n, a): the second net, cut in, and the glow
+float4 height_end_ps(float2 vpos : VPOS) : COLOR
+{
+    float4 na = chain_read1(vpos);
+    return float4(fissure_end(chain_dir(vpos), chain_read0(vpos).xyz, na.x, na.yz), 0.0, 1.0);
 }
 
 float3 ramp(float4 r[6], float h)

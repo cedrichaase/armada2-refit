@@ -1,4 +1,4 @@
-// entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL march_vs:vs_3_0:VS_MARCH march8_ps:ps_3_0:PS_MARCH8 march12_ps:ps_3_0:PS_MARCH12 march16_ps:ps_3_0:PS_MARCH16 march24_ps:ps_3_0:PS_MARCH24 quad_vs:vs_3_0:VS_QUAD temporal_ps:ps_3_0:PS_TEMPORAL comp_ps:ps_3_0:PS_COMP
+// entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL march_vs:vs_3_0:VS_MARCH march8_ps:ps_3_0:PS_MARCH8:long march12_ps:ps_3_0:PS_MARCH12:long march16_ps:ps_3_0:PS_MARCH16:long march24_ps:ps_3_0:PS_MARCH24:long quad_vs:vs_3_0:VS_QUAD temporal_ps:ps_3_0:PS_TEMPORAL comp_ps:ps_3_0:PS_COMP
 // The world module's nebulae (src/mods/world/nebulae.rs): Nebulae.asi's nebulae.hlsl,
 // ported unchanged but for this header.
 //

@@ -77,7 +77,31 @@ closed off with a write of `oC0`) found what the runtime refuses:
    before the first one inside a branch.
 5. **r0 to r31 only.** The nebula march shaders use r33.
 
-These five predict the runtime's verdict on all 86. `d3dbc-fix.py` mends four of them
+These five predict the runtime's verdict on all 86 on that card. A sixth depends on the
+card:
+
+6. **No more instruction slots than the card takes** (`D3DCAPS9`'s
+   `MaxPixelShader30InstructionSlots`). The Radeon above takes 32768, the most shader
+   model 3 allows, so it took everything; other cards take 4096. A player's report
+   (Windows 11, 2026-10-20) had the main menu's sky black and its planet stock: every
+   shader up to 3659 slots was made and every one from 5861 refused. That is the
+   sky's bake (8761), the planets' height (17812) and the nebulae's march (5861 at
+   `Steps=8`), the last of which fell back to slices without a word. The bakes'
+   noise is unrolled by vkd3d (a value-noise lookup is 143 slots, a lattice of 27
+   craters 3891), and shortening it would change what it draws.
+
+So **a bake longer than 4096 slots is a chain of passes** (`src/gfx/chain.rs`,
+`shaders/chain.hlsli`): each pass works out part of the function at its texel and
+hands it to the next through a float32 target. The sky is the warp, the field, the
+gas, two slabs of the star lattice, and the last slab put together. A planet's height
+is the warp, the ground, the mountains with the first slab of craters, two more crater
+passes and the two fissure nets (a gas giant is the warp and itself). The values are
+full floats, so it bakes what the one shader did. The targets are tiles of at most
+1024 on a side, so the sky's 3072 supersampled face needs 48 MB of them, not 450.
+`d3dbc-fix.py` counts slots as the runtime does and refuses a shader past 4096 unless
+its entry is marked `:long`. Two are marked: `sky_ps`, the `Face=0` reference, and the
+march, which falls back to slices; cutting the march per frame is still to do.
+`Render3D.log` names every shader the runtime refuses, with its slots and the card's. `d3dbc-fix.py` mends four of them
 in the bytecode. It copies the extra register into a temporary (only the lanes the
 instruction consumes, so an input is never read outside its `dcl` mask), routes
 `sincos` through one, and widens the mask. And it gives the temporaries out again when
@@ -843,9 +867,9 @@ supersedes `Sky.asi` (it stands down while that plugin is loaded). In stock's or
      to its stock sky, with soft billows and no filaments ("Sky recipes" below): one quad over the
      viewport carrying each corner's world ray (from the inverse of view x projection,
      far point minus near point, which is affine in screen position), sampling a cube
-     baked once per recipe. The bake is on the GPU only: each face is drawn by
-     `bake_ps` at twice its edge (Sky.asi's texel mapping, edge texels on the edges),
-     then `down_ps` averages each 2x2 with one bilinear tap into the face of a
+     baked once per recipe. The bake is on the GPU only: each face is drawn by the
+     `bake_*_ps` chain (five passes, "Shaders on Windows") at twice its edge
+     (Sky.asi's texel mapping, edge texels on the edges), then `down_ps` averages each 2x2 with one bilinear tap into the face of a
      half-float cube render target. The cube is in the default pool: dropped before a
      `Reset`, baked again after. The gas is saturated as before; the recipe's stars are
      added after that, so a star core may pass white (to 2) and bloom a little.
