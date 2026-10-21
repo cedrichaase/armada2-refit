@@ -12,7 +12,7 @@ Layers: render3d 0.16.2, testbench 3.40.0.
 ### Fixed
 - render3d: a black hole under the fog of war is no longer a dark disc in the fog: a
   fog-of-war ghost's additive meshes are added at half strength, as stock draws them
-  (issue #3).
+  (issue #3, 7e7a184).
 
 ### Added
 - testbench: scene and scenario `fog-blackhole` (issue #3).

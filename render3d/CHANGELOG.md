@@ -12,7 +12,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   wormhole's swirl) were drawn opaque and lit like a hull. They are added now, unlit,
   at half strength after the opaque ones, as stock draws them; an `alphathreshold` mesh
   of a ghost is cut out at one half. `Render3D.log` says how many additive meshes the
-  first ghost of each class has.
+  first ghost of each class has (7e7a184).
 
 Installed, not yet seen in game.
 

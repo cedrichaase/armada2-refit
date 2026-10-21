@@ -10,7 +10,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - Scene `fog-blackhole`: a black hole and a quantum singularity left under the fog of
   war, and the scenario `fog-blackhole` for render3d's ghosts of additive meshes
-  (issue #3).
+  (issue #3, 7e7a184).
 
 Installs nothing; seen working on the bench 2026-10-21.
 
