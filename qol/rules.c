@@ -20,7 +20,7 @@
  * and an id (+0xc) that the delete order carries over the network.  The head is
  * the item being built once StartBuild has run: +0x254 is then its class and
  * +0x2a0 its id.  Costs leave the bank in StartBuild only, which refuses (and the
- * advisor says so, every frame) when the bank is short; CancelBuild gives an
+ * advisor says so) when the bank is short; CancelBuild gives an
  * item in progress back in full, and deleting or clearing a waiting item gives
  * nothing, because nothing was taken.  FinishBuild pops the head.
  *
@@ -34,7 +34,9 @@
  *     here.  If the bank covers the item it is charged exactly as StartBuild
  *     charges it and queued with the mark; else the order is dropped.  Other
  *     callers of Push (loading a save, the Borg stealing technology) are left
- *     alone: they queue and start at once and expect it to succeed.
+ *     alone: they queue and start at once and expect it to succeed.  A refused
+ *     order speaks stock's advisor line for its first shortfall, as StartBuild
+ *     would have (advise(); it plays only for the local team).
  *   - StartBuild: a marked head is given back first, the mark is cleared, and
  *     stock charges it as it always did -- it cannot fail, and the advisor stays
  *     quiet.  Should it fail anyway the item is taken again and keeps its mark.
@@ -244,9 +246,12 @@ static void cost_of(const BYTE *p, void *cls, Cost *c)
     c->off  = COST_OFF(cls, t);
 }
 
-/* StartBuild's own test, field for field: a team with 0x16c clear counts as having
- * nothing; dilithium has a small margin; officers are vacancies, not a stock. */
-static int afford(const BYTE *team, const Cost *c)
+/* StartBuild's own test, field for field and in its order: a team with 0x16c clear
+ * counts as having nothing; dilithium has a small margin; officers are vacancies,
+ * not a stock.  0 if the bank covers it, else the first thing it is short of. */
+enum { SHORT_NONE, SHORT_DIL, SHORT_OFF, SHORT_CREW, SHORT_LAT, SHORT_MET, SHORT_BIO };
+
+static int short_of(const BYTE *team, const Cost *c)
 {
     float d = 0, m = 0, l = 0, b = 0, k = 0;
     if (*(const int *)(team + 0x16c)) {
@@ -256,13 +261,63 @@ static int afford(const BYTE *team, const Cost *c)
         b = *(const float *)(team + 0x168);
         k = *(const float *)(team + 0x10c);
     }
-    if ((double)d + EPSILON < (double)c->dil) return 0;
-    if ((float)c->crew > k) return 0;
-    if ((float)c->lat > l) return 0;
-    if ((float)c->met > m) return 0;
-    if ((float)c->bio > b) return 0;
-    if (c->off && c->off > VACANCIES((void *)team)) return 0;
-    return 1;
+    if ((double)d + EPSILON < (double)c->dil) return SHORT_DIL;
+    if (c->off && c->off > VACANCIES((void *)team)) return SHORT_OFF;
+    if ((float)c->crew > k) return SHORT_CREW;
+    if ((float)c->lat > l) return SHORT_LAT;
+    if ((float)c->met > m) return SHORT_MET;
+    if ((float)c->bio > b) return SHORT_BIO;
+    return SHORT_NONE;
+}
+
+/* ---- the advisor ----------------------------------------------------------
+ * A refused order says so the way stock's StartBuild says it when the bank is
+ * short: the same ComputerVoice call, the same topic per resource (and for
+ * officers the race's own event), with the producer as the object.  Everything
+ * stock does around it stays stock's: GameEvent::TriggerEvent plays only for the
+ * local player's team (Entity::GetUserTeam), at most once per the event's
+ * interval (wall clock), and picks the sound with g_asyncRandom -- nothing the
+ * simulation reads, so it is safe on every node of a network game. */
+typedef void (__cdecl *SayFn)(int topic, void *obj, const void *race);
+typedef int  (__thiscall *RaceEventFn)(const void *race);
+
+#define SAY_TOPIC     ((SayFn)0x45d8c0)        /* ComputerVoice::Say(Topic, GameObject *, const Race *) */
+#define SAY_EVENT     ((SayFn)0x45db20)        /* ComputerVoice::Say(int, GameObject *, const Race *) */
+#define OFFICER_EVENT ((RaceEventFn)0x48c120)  /* Race::GetInsufficentOfficerEventId */
+#define T_RACE        0x244                    /* Team: its Race * */
+
+static int g_voice;   /* StartBuild's calls are the ones this was read from */
+
+static const int k_topic[] = {
+    0,
+    9,      /* InsufficientDilithium */
+    0,      /* officers: the race's event */
+    10,     /* InsufficientCrew */
+    0x36,   /* InsufficientLatinum */
+    0x37,   /* InsufficientMetal */
+    0x38,   /* InsufficientBiomatter */
+};
+
+typedef long (__cdecl *UserTeamFn)(void);
+#define USER_TEAM ((UserTeamFn)0x4d0060)       /* Entity::GetUserTeam: the local player's */
+
+static void advise(BYTE *p, BYTE *team, int why)
+{
+    char m[120];
+    if (!g_voice || why == SHORT_NONE) return;
+    m[0] = 0;
+    s_cat(m, "  advisor: topic ");
+    s_num(m, why == SHORT_OFF ? -1 : k_topic[why]);
+    s_cat(m, *(const int *)(p + P_TEAMIDX) == (int)USER_TEAM()
+             ? " for the local team (stock plays it unless it just did)"
+             : " for another team (stock keeps it silent here)");
+    logline(m);
+    if (why == SHORT_OFF) {
+        const void *race = *(void *const *)(team + T_RACE);
+        SAY_EVENT(OFFICER_EVENT(race), p, race);
+    } else {
+        SAY_TOPIC(k_topic[why], p, NULLPTR);
+    }
 }
 
 /* sign -1 takes the cost out of the bank as StartBuild does, +1 puts it back as
@@ -358,18 +413,26 @@ static PtrFn  t_save, t_load;
 static OpenFn t_open;
 
 /* in place of `call Producer::PushBuildQueueItem` in Handle_New_Command */
+static const char *const k_short[] = {
+    "", "refused (dilithium)", "refused (officers)", "refused (crew)",
+    "refused (latinum)", "refused (metal)", "refused (biomatter)",
+};
+
 static void __thiscall h_push(BYTE *p, void *cls)
 {
     BYTE *team = *(BYTE **)(p + P_TEAM);
     Cost  c;
+    int   why;
 
     if (!cls || !team || !rules_on() || *(int *)(p + P_COUNT) >= Q_MAX) {
         ENGINE_PUSH(p, cls);
         return;
     }
     cost_of(p, cls, &c);
-    if (!afford(team, &c)) {
-        note("refused", team, &c);
+    why = short_of(team, &c);
+    if (why != SHORT_NONE) {
+        note(k_short[why], team, &c);
+        advise(p, team, why);
         return;
     }
     charge(team, &c, -1);
@@ -579,6 +642,20 @@ static void *hook(const Entry *e, void *fn)
     return tr;
 }
 
+static int calls(DWORD at, DWORD to)
+{
+    return *(const BYTE *)at == 0xE8 && at + 5 + *(const LONG *)(at + 1) == to;
+}
+
+/* StartBuild's own advisor calls, checked where the topics were read: the
+ * dilithium one (topic 9) and the officers' (event from the race). */
+static int voice_ok(void)
+{
+    return *(const BYTE *)0x4b826c == 0x6A && *(const BYTE *)0x4b826d == 9 &&
+           calls(0x4b826e, 0x45d8c0) && calls(0x4b829a, 0x48c120) &&
+           calls(0x4b82a0, 0x45db20);
+}
+
 static int patch_rules(void)
 {
     DWORD old;
@@ -588,8 +665,7 @@ static int patch_rules(void)
         !sig_ok(&k_clearq) || !sig_ok(&k_clearteam) || !sig_ok(&k_open) ||
         !sig_ok(&k_save) || !sig_ok(&k_load)) return 0;
     /* the push call: its target is checked from its displacement */
-    if (!(*(BYTE *)0x431532 == 0xE8 &&
-          0x431532 + 5 + *(LONG *)0x431533 == 0x4b7930)) return 0;
+    if (!calls(0x431532, 0x4b7930)) return 0;
     if (!VirtualProtect(g_tramp, sizeof g_tramp, PAGE_EXECUTE_READWRITE, &old)) return 0;
 
     t_start     = (BoolFn)hook(&k_start, (void *)h_start);
@@ -605,6 +681,7 @@ static int patch_rules(void)
     call[0] = 0xE8;
     *(LONG *)(call + 1) = (LONG)((DWORD)h_push - (0x431532 + 5));
     poke((BYTE *)0x431532, call, 5);
+    g_voice = voice_ok();
     return 1;
 }
 
@@ -629,7 +706,9 @@ static void startup(void)
         s_cat(b, "1");
         if (patch_rules()) {
             g_pay = 1;
-            s_cat(b, "  -> items are paid when queued (single player and skirmish only), patched");
+            s_cat(b, "  -> items are paid when queued, patched");
+            s_cat(b, g_voice ? "; a refused order is announced as stock announces a stalled build"
+                             : "; a refused order is NOT announced (StartBuild's advisor calls differ)");
         } else {
             s_cat(b, "  NOT PATCHED: site bytes differ -- not the Armada2.exe this was built for");
         }
