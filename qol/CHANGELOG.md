@@ -11,7 +11,7 @@ versions". Newest first. Details, and the planned changes, are in
 - `QOLRules.asi`: an order refused under `PayOnQueue=1` was dropped in silence; it now
   speaks stock's advisor line for the first resource short (dilithium, officers, crew,
   latinum, metal, biomatter, in `StartBuild`'s order), to the refused player only, with
-  stock's cadence, and logs an `advisor:` line (issue #1). Scenario `qol-refused-advisor`.
+  stock's cadence, and logs an `advisor:` line (issue #1). Scenario `qol-refused-advisor` (c23cb19).
 
 Installed, not yet seen in game.
 

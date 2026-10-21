@@ -11,7 +11,7 @@ Layers: qol 1.6.2.
 
 ### Fixed
 - qol: an order `QOLRules.asi` refuses for want of resources speaks stock's advisor
-  line again ("Insufficient crew", ...), to the refused player only (issue #1).
+  line again ("Insufficient crew", ...), to the refused player only (issue #1, c23cb19).
 
 Installed, not yet seen in game.
 
