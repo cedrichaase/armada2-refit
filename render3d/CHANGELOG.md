@@ -9,7 +9,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 ### Changed
 - `Render3D.asi` carries a version resource (`VERSIONINFO`): product, description, the
   layer's version as the file version and the project's as the product version, which
-  Windows shows in the file's Properties. Built by `platform/versioninfo/build-res.sh`.
+  Windows shows in the file's Properties. Built by `platform/versioninfo/build-res.sh` (915cad8).
 
 Installed, not yet seen in game.
 

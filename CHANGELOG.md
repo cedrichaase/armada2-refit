@@ -12,7 +12,8 @@ Layers: render3d 0.16.2, ui 0.13.4, hud 2.2.3, menus 4.3.4, qol 1.6.2, grid 1.0.
 ### Changed
 - Every plugin we build (the eight ASIs and `binkw32.dll`) carries a version resource:
   company, product, description, file and product version, copyright and the
-  repository URL, from `platform/versioninfo/` (issue #4: antivirus false positives).
+  repository URL, from `platform/versioninfo/` (issue #4: antivirus false positives;
+  915cad8).
 - `publish/package.sh` refuses to package a plugin of ours without one, and
   `publish/installer/test.ps1` reads each as Windows does. `version` moved to
   `platform/versioninfo/version.sh`, which the build scripts source too.
