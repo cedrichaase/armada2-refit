@@ -57,11 +57,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - name: Install lld-link and llvm-dlltool
+      - name: Install lld-link, llvm-dlltool and llvm-rc
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq lld llvm
-          ls -d /usr/lib/llvm-*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
+          bin=$(ls -d /usr/lib/llvm-*/bin | sort -V | tail -1)
+          # llvm-rc compiles each plugin's version resource (platform/versioninfo/).
+          test -x "$bin/llvm-rc" && test -x "$bin/llvm-dlltool"
+          echo "$bin" >> "$GITHUB_PATH"
       - name: Rust with the 32-bit Windows target
         run: |
           rustup toolchain install stable --profile minimal
@@ -85,11 +88,15 @@ jobs:
       version: ${{ steps.pkg.outputs.version }}
     steps:
       - uses: actions/checkout@v7
-      - name: Install clang, lld-link and llvm-dlltool
+      - name: Install clang, lld-link, llvm-dlltool, llvm-rc and llvm-readobj
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq clang lld llvm zip
-          ls -d /usr/lib/llvm-*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
+          bin=$(ls -d /usr/lib/llvm-*/bin | sort -V | tail -1)
+          # llvm-rc compiles each plugin's version resource (platform/versioninfo/), and
+          # package.sh checks it with llvm-readobj.
+          test -x "$bin/llvm-rc" && test -x "$bin/llvm-readobj" && test -x "$bin/llvm-dlltool"
+          echo "$bin" >> "$GITHUB_PATH"
       # Render3D.asi and UI.asi are no_std Rust (render3d/build.sh, ui/build.sh).
       - name: Rust with the 32-bit Windows target
         run: |

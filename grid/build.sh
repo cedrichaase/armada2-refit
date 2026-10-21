@@ -18,9 +18,15 @@ clang --target=i386-pc-windows-msvc \
       -fno-stack-protector -mno-stack-arg-probe \
       -c "$here/grid.c" -o "$out/grid.obj"
 
+# The file's version resource (platform/versioninfo/README.md).
+. "$here/../platform/versioninfo/version.sh"
+"$here/../platform/versioninfo/build-res.sh" "$out/GridLayout.res" GridLayout.asi \
+    "Armada II Refit: button grid plugin" \
+    "$(version "$here/CHANGELOG.md")" "$(version "$here/../CHANGELOG.md")"
+
 lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/GridLayout.asi" \
-         "$out/grid.obj" "$out/kernel32.lib" "$out/user32.lib"
+         "$out/grid.obj" "$out/GridLayout.res" "$out/kernel32.lib" "$out/user32.lib"
 
 echo "built $out/GridLayout.asi"
 objdump -f "$out/GridLayout.asi" | sed -n '2,4p'

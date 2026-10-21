@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.39.2 — 2026-10-21
+
+Layers: render3d 0.16.2, ui 0.13.4, hud 2.2.3, menus 4.3.4, qol 1.6.2, grid 1.0.2, online 0.6.3, cutscenes 2.0.3.
+
+### Changed
+- Every plugin we build (the eight ASIs and `binkw32.dll`) carries a version resource:
+  company, product, description, file and product version, copyright and the
+  repository URL, from `platform/versioninfo/` (issue #4: antivirus false positives).
+- `publish/package.sh` refuses to package a plugin of ours without one, and
+  `publish/installer/test.ps1` reads each as Windows does. `version` moved to
+  `platform/versioninfo/version.sh`, which the build scripts source too.
+
+Installed, not yet seen in game.
+
 ## 12.39.1 — 2026-10-21
 
 Layers: render3d 0.16.1.

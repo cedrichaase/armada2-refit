@@ -6,7 +6,9 @@ DXVK's `d3d8.dll`/`d3d9.dll`, the Ultimate ASI Loader (`winmm.dll`) and
 section matters to anything touching the renderer.
 
 The HUD layout and cursors are in `hud/README.md`; renderer settings, anti-aliasing and
-bloom (the Tiers) in `postfx/README.md`; the menus in `menus/README.md`.
+bloom (the Tiers) in `postfx/README.md`; the menus in `menus/README.md`. The version
+resource every plugin we build carries is `versioninfo/` (its `README.md`); it is part
+of the build and installs nothing of its own.
 
 ## The install
 

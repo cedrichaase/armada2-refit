@@ -25,9 +25,15 @@ cflags=(--target=i386-pc-windows-msvc -O2 -Wall -Wextra -msse2
 clang "${cflags[@]}" -c "$here/binkproxy.c" -o "$out/binkproxy.obj"
 clang "${cflags[@]}" -c "$here/binktest.c"  -o "$out/binktest.obj"
 
+# The DLL's version resource (platform/versioninfo/README.md).
+. "$here/../../platform/versioninfo/version.sh"
+"$here/../../platform/versioninfo/build-res.sh" "$out/binkw32.res" binkw32.dll \
+    "Armada II Refit: cutscene player proxy" \
+    "$(version "$here/../CHANGELOG.md")" "$(version "$here/../../CHANGELOG.md")"
+
 lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/binkw32.dll" \
-         "$out/binkproxy.obj" "$out/kernel32.lib" "$out/user32.lib" "$out/winmm.lib"
+         "$out/binkproxy.obj" "$out/binkw32.res" "$out/kernel32.lib" "$out/user32.lib" "$out/winmm.lib"
 
 lld-link /machine:x86 /nodefaultlib /entry:start@0 /subsystem:console \
          /out:"$out/binktest.exe" \

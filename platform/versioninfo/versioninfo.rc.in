@@ -1,0 +1,32 @@
+// The VERSIONINFO resource of every plugin we build, filled in by build-res.sh. Numbers
+// are spelled out because llvm-rc runs with -no-preprocess (no winver.h): 0x40004 is
+// VOS_NT_WINDOWS32, 2 is VFT_DLL, 0x0409 04B0 is US English in Unicode.
+1 VERSIONINFO
+FILEVERSION     @FILEVERSION_NUM@
+PRODUCTVERSION  @PRODUCTVERSION_NUM@
+FILEFLAGSMASK   0x3F
+FILEFLAGS       0
+FILEOS          0x40004
+FILETYPE        2
+FILESUBTYPE     0
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "Armada II Refit project"
+            VALUE "ProductName",      "Armada II Refit"
+            VALUE "FileDescription",  "@FILEDESCRIPTION@"
+            VALUE "FileVersion",      "@FILEVERSION@"
+            VALUE "ProductVersion",   "@PRODUCTVERSION@"
+            VALUE "OriginalFilename", "@FILENAME@"
+            VALUE "InternalName",     "@INTERNALNAME@"
+            VALUE "LegalCopyright",   "@COPYRIGHT@"
+            VALUE "Comments",         "https://github.com/cedrichaase/armada2-refit"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04B0
+    END
+END

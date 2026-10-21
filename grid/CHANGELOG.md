@@ -4,6 +4,15 @@
 position. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions".
 Newest first. How and why: [`README.md`](README.md).
 
+## 1.0.2 — 2026-10-21
+
+### Changed
+- `GridLayout.asi` carries a version resource (`VERSIONINFO`): product, description, the
+  layer's version as the file version and the project's as the product version, which
+  Windows shows in the file's Properties. Built by `platform/versioninfo/build-res.sh`.
+
+Installed, not yet seen in game.
+
 ## 1.0.1 — 2026-10-12
 
 ### Fixed
