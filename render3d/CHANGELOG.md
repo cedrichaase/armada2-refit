@@ -23,7 +23,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   march, which falls back to slices on such a card). `hlsl-rs.sh` compiles from the
   shader's directory, for `#include "chain.hlsli"`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-21.
 
 ## 0.16.0 — 2026-10-17
 
