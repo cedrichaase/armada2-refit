@@ -4,6 +4,18 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.16.2 — 2026-10-21
+
+### Fixed
+- A black hole (`mblkhole`) under the fog of war was a near-black disc in the fog
+  (issue #3): a fog-of-war ghost's `additive` meshes (the black hole's disc, a
+  wormhole's swirl) were drawn opaque and lit like a hull. They are added now, unlit,
+  at half strength after the opaque ones, as stock draws them; an `alphathreshold` mesh
+  of a ghost is cut out at one half. `Render3D.log` says how many additive meshes the
+  first ghost of each class has.
+
+Installed, not yet seen in game.
+
 ## 0.16.1 — 2026-10-21
 
 ### Fixed

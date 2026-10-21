@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.40.0 — 2026-10-21
+
+Layers: render3d 0.16.2, testbench 3.40.0.
+
+### Fixed
+- render3d: a black hole under the fog of war is no longer a dark disc in the fog: a
+  fog-of-war ghost's additive meshes are added at half strength, as stock draws them
+  (issue #3).
+
+### Added
+- testbench: scene and scenario `fog-blackhole` (issue #3).
+
+Installed, not yet seen in game.
+
 ## 12.39.1 — 2026-10-21
 
 Layers: render3d 0.16.1.

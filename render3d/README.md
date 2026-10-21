@@ -1076,7 +1076,17 @@ team colour times `ghostTeamColorFactor` (`Ghost+0x28`) on team faces, culled by
 instance), opaque: on the bench a ghost is near black and hides what is behind it.
 Here: texture times (the material's ambient + its diffuse times the directional
 lights), the team faces tinted, self-illuminated texels lit as on a hull (the windows
-show on stock's ghosts too). A planet's spirit (its instance copy a `PlanetInstance`,
+show on stock's ghosts too). That holds for a mesh drawn opaque; a ghost's mesh keeps
+its own texture material's blend in stock. An `additive` (or `wormhole`) mesh, the
+black hole's disc (`mblkhole`, `Mblackh.SOD`) or a wormhole's swirl, is added, unlit,
+at the `Storm3D+0x4` stock leaves at 0.5 for the pass: on the bench
+(`SCENE=fog-blackhole`, `scenarios/fog-blackhole.md`) stock's fogged black hole adds
+0.49 of what the seen one does, its swirl showing through the fog. So the ghosts are
+drawn in two passes, the opaque meshes (an `alphathreshold` one cut out at one half),
+then the additive ones without depth writes, the texture times 0.5. Drawn opaque and
+lit like a hull, the black hole's ghost was a near-black disc over the fog (issue #3:
+at its rim 2 and 19 against 49 and 54 of the fog about it; now 53 and 61, stock 53
+and 56). A planet's spirit (its instance copy a `PlanetInstance`,
 vtable 0x6b2ce4, over a `Planet_Database`) goes to the world module, which draws it
 on its own sphere with the planet's ground and shell, culled as the spirit's `Render`
 culls (`DistanceCull`), without the race's tint or cities (they live on the object):
