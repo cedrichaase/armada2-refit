@@ -203,6 +203,77 @@ bloom shaders for real, so CI also notices when a pinned one moves.
   and pushing `main` is what releases**; a push that does not bump it releases nothing.
 - after that, on every push to `main`: delete all but the newest three releases. Their
   tags stay, so a version named anywhere still resolves to its commit.
+- on `main` and on dispatch: every program in the release scanned on VirusTotal, and the
+  reports attached to the release (below).
+
+### VirusTotal
+
+Some antivirus programs flag the plugins (issue #4: Bitdefender quarantined four of
+them): they are unsigned DLLs that hook a game's process, a classic heuristic signal.
+CI measures it on every release, so a detection is seen before players meet it, and
+anyone who meets one can look up our files' scans.
+
+**The scan** (`publish/virustotal.py`, CI job `virustotal`) takes every PE in the
+release zip (`game/`, `chain/` and `vendor/`, matched by extension and `MZ` header, never
+by name, so a plugin that is added or merged is followed without an edit) and
+`armada2-refit-installer-windows.exe`. It looks each hash up first, which costs no upload
+and covers the vendored DLLs, uploads the rest and polls their analyses (30 minutes at
+most; a file still being analysed is reported as pending). It writes `virustotal.json`
+and `virustotal.md` (file, sha256, detections, the engines and their labels, the
+VirusTotal link), shown in the job's summary and kept as the artifact
+`virustotal-<commit>`. `--selftest` runs the whole scan against a fake VirusTotal, with
+no key and no network.
+
+- **When:** on pushes to `main` and on `workflow_dispatch` (any branch), not on every
+  push: the public API allows 4 requests a minute and 500 a day. The script spaces its
+  requests 15.5 s apart (`VT_INTERVAL` for a premium key), waits a minute on HTTP 429,
+  and the job runs one at a time across runs.
+- **The secret `VT_API_KEY`** (Settings → Secrets → Actions) is a VirusTotal API key; a
+  free public one is enough. Without it, in forks and PRs from forks, the scan is
+  skipped with a notice and the job passes.
+- **Report only.** The release does not wait for the scan and does not depend on it:
+  `release` is unchanged, and a separate job, `virustotal-release`, runs after both and
+  attaches `virustotal.json` and `virustotal.md` to `vX.Y.Z` and adds a **VirusTotal**
+  line to its notes, each file linked to its scan. It only touches a release made from
+  the same commit, replaces its own line on a re-scan (a dispatch on `main`), and does
+  nothing when the release was skipped or failed or there is no report. Making the
+  release `need` the scan instead would hold every release for the scan's half hour and
+  let a VirusTotal outage, or one engine's false positive, stop it.
+- **The variable `VT_FAIL_ABOVE`** (Settings → Variables, unset by default) makes the
+  scan fail when any file has more "malicious" verdicts than that. The reports are
+  written and attached all the same, and the release is still published: it marks the
+  commit red, it does not block. To make it a real gate, add `virustotal` to `release`'s
+  `needs`; not before there is a baseline, since a false positive must not block a
+  release.
+- **Uploading shares the files.** A file VirusTotal has not seen is uploaded, and
+  uploaded files are available to VirusTotal's partners (the antivirus vendors and its
+  premium users). These are the published release files, so that is fine; never point
+  the script at anything that is not.
+
+**False positives** (`.github/workflows/virustotal-fp.yml`, run by hand with a release
+tag, and `publish/virustotal-fp.py`). There is no one API to dispute a detection: each
+vendor has its own form or address. So the workflow prepares everything and leaves the
+submitting to a person:
+
+- it reads the release's `virustotal.json`, groups the flagged files by vendor and opens
+  (or updates, keeping what is ticked) the issue "False positives: vX.Y.Z": one checklist
+  item per vendor, with where to submit, the files with their hashes, VirusTotal links
+  and detection names, and a text to paste (what the project is, the source at the
+  tagged commit, that CI builds it in public, the build log);
+- it uploads the flagged files from the release, zipped with the password `infected`
+  that vendors expect for samples, as an artifact to attach to the forms;
+- with `vt_comment`, it comments on each flagged file on VirusTotal (the source link and
+  "built from source by CI at <commit>") and votes it harmless, once per commit. That
+  needs only `VT_API_KEY`, and helps anyone who looks the hash up.
+
+The addresses are in **`publish/av-vendors.json`, kept by hand**: an entry is filled in
+only where the address is known, and an engine listed nowhere becomes an item of its
+own with "no contact on file". Fill one in, or correct it, once a submission has gone
+through (VirusTotal keeps a list of vendor contacts, linked in the file). It works on a
+release that still exists: CI keeps the newest three.
+
+Later, not now: sending the emails from CI, once the addresses have proven themselves
+by hand. Web forms and Microsoft's portal (it needs an account) stay manual.
 
 ### Next
 
