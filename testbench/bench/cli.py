@@ -58,6 +58,9 @@ a2test -- run Armada II headless and test it end to end
   a2test drive wait SECONDS
   a2test drive wait-text "TEXT" [--timeout S]
   a2test drive step "any scenario step"   run one step of the scenario grammar
+  a2test drive dump [NAME]             Render3D.asi's targets (PFM) and UI.asi's presented
+                                       frame (PPM), read back in the game, into dumps/NAME/
+                                       with PNG previews (testbench/README.md, "Frame dumps")
   a2test drive running | log NAME | note "TEXT" | launch [ARGS] | quit
   a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
                                        e.g. "orbit ship 30 15 900", "camera rts", "query"
@@ -602,6 +605,14 @@ def cmd_drive(argv):
         st, reason = rest[0].lower(), ' '.join(rest[1:])
         log.check(reason, st if st in ('pass', 'fail', 'review') else 'inconclusive', how='recorded by the driver')
         print('ok')
+    elif sub == 'dump':
+        from . import dumps
+        name = rest[0] if rest else 'dump'
+        st, text, previews = dumps.take(s, name)
+        log.action(f'dump "{name}"', status='fail' if st == 'fail' else 'warn' if st == 'warn' else 'ok',
+                   detail=text, shots=previews)
+        print(text)
+        return 1 if st == 'fail' else 0
     elif sub == 'scene':
         return _scene_command(s, rest)
     elif sub == 'launch':

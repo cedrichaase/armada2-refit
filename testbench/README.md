@@ -385,6 +385,38 @@ posts, a hologram, the Evolver, a survey of what no module draws).
 - **Agent sandboxes** may refuse shell lines that mix variables with `sed`, loops of
   `drive` commands or heredocs: put the sequence in a small script and run that.
 
+## Frame dumps
+
+    ./a2test drive --session ID dump NAME      # or a scenario step: Dump the frame called "NAME"
+
+A grim shot is 8 bits, after the swapchain and the compositor. A dump is read from
+inside the game, byte for byte: `Render3D.asi` writes its HDR scene target, each bloom
+level (PFM, float RGB) and the back buffer after its tone map (PPM), and `UI.asi` the
+back buffer as presented, HUD and UI included (PPM). What each file is, and how it is
+read back, is in `render3d/README.md` and `ui/README.md`, "Frame dumps". The dumps are
+meant for `a2test baseline compare`, which reads PNG, PPM and PFM: a port of the
+renderer is checked against them stage by stage, so a difference shows where in the
+frame it starts.
+
+`dump` (`bench/dumps.py`) writes the trigger files `Render3D.dump` and `UI.dump`, each
+holding `NAME`, into the clone for every plugin installed there, and waits up to 20 s
+for each plugin to take its trigger and write its sidecar. It then moves the new files
+from the clone's `Dumps/` into the session's `dumps/NAME/`, writes a PNG preview beside
+each (`*.pfm.png`, `*.ppm.png`; a PFM clamped to [0, 1], a bloom level stretched to its
+99.9th percentile so it can be seen), and prints and logs each file's size and its
+min/mean/max. It fails when no plugin dumped, with the reason: neither is installed,
+or a trigger was never taken. **Render3D dumps only in a mission's main 3D view**, so in
+the menus only the UI's comes back (a warning, not a failure). Files a trigger written
+by hand leaves in `Dumps/` are gathered into `logs/Dumps/` when the session stops.
+
+**A dump is not a grim shot with more bits.** Measured on `showcase` at 1280x720
+(2026-10-22): the UI's presented PPM against a grim shot of the same paused frame
+differed by a mean absolute 3.26 (max 10, 8% of pixels equal), and the difference was
+one fixed curve per channel: every value of the PPM went to exactly one value in the
+shot (2 to 3, 10 to 13, 80 to 90, 255 to 255), and mapped through that curve the two
+were identical. Something after `Present` (the swapchain, the compositor; a gamma ramp
+would do it) lifts the frame. So compare dumps with dumps, and shots with shots.
+
 ## The stretch measurement
 
 Every aspect fix in this project keeps the vertical axis as stock draws it and corrects

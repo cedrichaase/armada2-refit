@@ -910,6 +910,9 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 shutil.copy2(g / name, dst / name)
         if self.crashed():
             shutil.copy2(g / 'exception.txt', dst / 'exception.txt')
+        # frame dumps not yet moved by `drive dump` (a trigger written by hand)
+        if (g / 'Dumps').is_dir() and any((g / 'Dumps').iterdir()):
+            shutil.copytree(g / 'Dumps', dst / 'Dumps', dirs_exist_ok=True)
         started = self.s.get('game_started') or 0
         if (g / 'Logs').is_dir():
             for f in (g / 'Logs').iterdir():

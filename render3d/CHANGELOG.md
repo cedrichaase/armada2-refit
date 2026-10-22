@@ -4,6 +4,17 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.18.0 — 2026-10-22
+
+### Added
+- Frame dumps on request: a `Render3D.dump` file beside the exe (its text names the
+  dump; looked for every 30 frames, deleted when seen) makes the next main view write
+  the resolved HDR scene target and each bloom level (down and up) as PFM, and the back
+  buffer after the tone map as PPM, into `Dumps\` with a sidecar
+  `<name>-<frame>-render3d.txt` (`src/dump.rs`; README.md, "Frame dumps").
+
+Installed, not yet seen in game.
+
 ## 0.17.0 — 2026-10-22
 
 ### Added

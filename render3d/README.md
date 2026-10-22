@@ -304,6 +304,60 @@ is in the chain after render3d, render3d's count includes the UI's one reference
 body runs as stock. An `A16B16G16R16F` target with MSAA falls back to one without, then
 to 8 bits, and the log says which.
 
+## Frame dumps
+
+A grim shot is 8 bits, taken after the swapchain and the compositor, so it cannot say
+where in the frame two renderers part. `src/dump.rs` reads render3d's own targets back
+from inside the process, byte for byte, when asked: for checking a port of the renderer
+(the shared `gpu` crate, then Vulkan and Direct3D 12) pixel for pixel, stage by stage.
+The files are what `a2test baseline compare` is meant to read (PFM and PPM, as well as
+PNG).
+
+**Asking.** Write a file `Render3D.dump` beside `Armada2.exe`; its text, if any, names
+the dump (letters, digits, `_ . -`; `dump` when empty). The main view looks for it every
+30 frames, as D3DTrace does, deletes it, and dumps in that same view; with no file the
+cost is one `GetFileAttributesA` every 30 frames. On the bench, `a2test drive dump NAME`
+writes it (`testbench/README.md`, "Frame dumps"). Only the **main** view dumps: the HUD's
+action camera draws a second view into the same targets in the same frame, and every
+file name says which view it is.
+
+**What is written**, into `Dumps\` in the game directory (made when needed), each file
+`<name>-<frame>-<what>`, `<frame>` the main views drawn since the device was made:
+
+| File | Stage | Format |
+|---|---|---|
+| `main-scene.pfm` | the scene target after the MSAA resolve, before bloom, at the view's rectangle | PFM, the half floats as they are |
+| `main-bloom0-down.pfm` … `bloom4-down` | each bloom level after the way down (level 0 is the prefilter) | PFM, at the level's own rectangle |
+| `main-bloom0-up.pfm` … `bloom3-up` | levels 0 to 3 after the way up has added the one below (level 4 is as the way down left it) | PFM |
+| `main-tonemapped.ppm` | the engine's back buffer right after the tone map, whole: the 3D view as render3d leaves it, before the HUD | PPM (P6), the bytes as they are |
+| `render3d.txt` | the sidecar: frame, targets' size, format and samples, the view's rectangle, and one line per file (or why it was skipped) | text |
+
+PFM rows are bottom-up with scale `-1.0` (little-endian), as the format has it; values
+are in stock's units, 1.0 its white, unclamped. An 8-bit scene target (`HDR=0`, or the
+fall-back) is written as PFM too, divided by 255, and has no bloom levels.
+
+**How.** Each target is copied with `GetRenderTargetData` into a system-memory surface
+of its size and format (a multisampled one is first resolved by `StretchRect` into a
+plain target of its own), locked, and converted a row at a time as it is written:
+`A16B16G16R16F` to f32 on the CPU, 8-bit formats byte for byte. The read-backs sit
+inside the post passes' state block, between the passes that make each stage, and
+change no state of the device. A format without a conversion is logged and skipped,
+not guessed at. **Depth is not dumped**: Direct3D 9 cannot read a depth surface back
+(`GetRenderTargetData` takes render targets only), and a copy through an `INTZ`
+texture would be a pass of its own. `Render3D.log` has a `dump:` line per file and one
+for the whole.
+
+The frame that dumps stalls for the read-backs (the GPU is waited for at each copy),
+so its time in `Timing=1` is not a measure of anything.
+
+Measured on the bench (`SCENE=showcase`, 1280x720, 4x MSAA, 2026-10-22): the dumping
+frame took 134 ms; the 5 s reports either side of it were 16.67 ms a frame, the main
+view's GPU time 0.83 ms in both, and nothing was written while no trigger was there.
+The scene's PFM ran from 0 to 3.07 (mean 0.092); bloom level 0 peaked at 1.77 on the
+way down and 2.25 on the way up. With the scene paused, two dumps 2790 frames apart
+were byte-identical (scene, bloom, back buffer). The tone-mapped PPM was identical to
+the UI's presented frame (the scene has no HUD).
+
 ## The menu scene
 
 `src/menu/`, the map in `menus/map.ini`: a map of render3d's own behind the front end's

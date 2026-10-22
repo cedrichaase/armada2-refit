@@ -49,6 +49,8 @@ unsafe extern "system" {
     pub fn GetFileSize(h: HANDLE, hi: *mut u32) -> u32;
     pub fn CloseHandle(h: HANDLE) -> i32;
     pub fn GetFileAttributesA(name: *const u8) -> u32;
+    pub fn CreateDirectoryA(name: *const u8, sec: *mut u8) -> i32;
+    pub fn DeleteFileA(name: *const u8) -> i32;
     pub fn FindFirstFileA(pattern: *const u8, data: *mut FindData) -> HANDLE;
     pub fn FindNextFileA(h: HANDLE, data: *mut FindData) -> i32;
     pub fn FindClose(h: HANDLE) -> i32;
