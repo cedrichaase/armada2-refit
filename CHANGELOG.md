@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.42.1 — 2026-10-22
+
+Layers: none (publish/ is versioned by the root).
+
+### Added
+- CI scans every PE in the release zip and the Windows installer on VirusTotal
+  (`publish/virustotal.py`, job `virustotal`; on `main` and on dispatch, report only)
+  and attaches `virustotal.json` and `virustotal.md` to the release with a VirusTotal line
+  in its notes (`virustotal-release`). Secret `VT_API_KEY`; variable `VT_FAIL_ABOVE`
+  makes the scan fail above that many detections (issue #4).
+- `.github/workflows/virustotal-fp.yml` and `publish/virustotal-fp.py`: for a release
+  tag, an issue "False positives: vX.Y.Z" with a checklist per antivirus vendor
+  (`publish/av-vendors.json`, kept by hand), the flagged files zipped as an artifact
+  (password `infected`), and optionally a comment and harmless vote on VirusTotal.
+
+Installs nothing.
+
 ## 12.42.0 — 2026-10-22
 
 Layers: gui-installer 1.8.0.

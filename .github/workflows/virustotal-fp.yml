@@ -1,0 +1,77 @@
+# Prepare the false-positive reports for a release, by hand (Actions → "VirusTotal false
+# positives" → Run workflow, with its tag). Reads the release's virustotal.json, which CI
+# attached (ci.yml, virustotal-release), and with publish/virustotal-fp.py:
+#   - opens or updates the issue "False positives: <tag>": a checklist item per antivirus
+#     vendor, with where to submit (publish/av-vendors.json, kept by hand), the flagged
+#     files with hashes, VirusTotal links and detection names, and a text to paste;
+#   - uploads the flagged files from the release, zipped with the password "infected"
+#     that vendors expect for samples, as an artifact to attach to the forms;
+#   - with vt_comment, comments on each flagged file on VirusTotal (the source, and that
+#     CI built it at the commit) and votes it harmless (VT_API_KEY secret).
+# The submissions themselves stay manual. Works on a release that still exists (CI keeps
+# the newest ten). publish/README.md, "VirusTotal".
+name: VirusTotal false positives
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v12.41.4
+        required: true
+        type: string
+      vt_comment:
+        description: Comment on each flagged file on VirusTotal and vote it harmless
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: The release's scan and files
+        run: |
+          mkdir dl
+          gh release download "$TAG" --dir dl --pattern virustotal.json \
+            || { echo "::error::$TAG has no virustotal.json: is it still released, and was it scanned (VT_API_KEY)?"; exit 1; }
+          gh release download "$TAG" --dir dl --pattern 'armada2-refit-[0-9]*.zip' \
+            --pattern armada2-refit-installer-windows.exe
+          echo "COMMIT=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)" >> "$GITHUB_ENV"
+      - name: The flagged files
+        run: |
+          python3 publish/virustotal-fp.py --report dl/virustotal.json --tag "$TAG" \
+            --repo "$GITHUB_REPOSITORY" --commit "$COMMIT" --files dl --samples samples \
+            --body body.md
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Zip them, password "infected"
+        id: zip
+        run: |
+          if [ -n "$(ls -A samples)" ]; then
+            (cd samples && zip -q -P infected "../false-positives-$TAG.zip" *)
+            echo "zip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v7
+        id: upload
+        if: steps.zip.outputs.zip == '1'
+        with:
+          name: false-positives-${{ inputs.tag }}
+          path: false-positives-*.zip
+          if-no-files-found: error
+      - name: Open or update the issue
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+          VT_COMMENT: ${{ inputs.vt_comment }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          args=()
+          [ "$VT_COMMENT" = true ] && args+=(--vt-comment)
+          [ -n "$ARTIFACT_URL" ] && args+=(--artifact-url "$ARTIFACT_URL")
+          python3 publish/virustotal-fp.py --report dl/virustotal.json --tag "$TAG" \
+            --repo "$GITHUB_REPOSITORY" --commit "$COMMIT" --issue "${args[@]}"
