@@ -28,6 +28,10 @@ lines from 12.42.0, which 1.7.0 and older log as ordinary output.
   `-2`..., cleared at the next unpack (`fresh_dir`, `sweep_unpacked`). A file taken
   or held while extracting is an antivirus error, not a traceback.
 - `diagnose` no longer fails on a plugin it cannot read; it is listed as unreadable.
+- `diagnose` also checks an unpack against its own `SHA256SUMS`, so a file missing from
+  the zip itself is found too.
+- The report's redaction keeps a user folder's own separator (`/home/<user>/`, not
+  `/home\<user>/`; since 1.7.0).
 
 Installed, not yet seen in game.
 

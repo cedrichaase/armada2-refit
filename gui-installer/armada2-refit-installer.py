@@ -823,7 +823,7 @@ def redact(text):
     for h in {HOME, os.path.realpath(HOME)}:
         if len(h) > 1:
             text = text.replace(h, '~')
-    text = re.sub(r'(?i)([\\/](?:home|users))[\\/][^\\/\s"\';]+', r'\1\\<user>', text)
+    text = re.sub(r'(?i)([\\/](?:home|users))([\\/])[^\\/\s"\';]+', r'\1\2<user>', text)
     return re.sub(r'(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])', '<ip>', text)
 
 
@@ -968,6 +968,18 @@ def cache_problems():
                 names = [n for n in z.namelist() if not n.endswith('/')]
         except (OSError, zipfile.BadZipFile):
             continue
+        # The package's own SHA256SUMS too: it names what the release shipped, even when
+        # an antivirus took a file out of the zip before it was unpacked.
+        for top in {n.split('/')[0] for n in names if '/' in n}:
+            try:
+                for line in open(os.path.join(udir, d, top, 'SHA256SUMS'), encoding='utf-8'):
+                    parts = line.split(None, 1)
+                    if len(parts) == 2:
+                        n = f"{top}/{parts[1].strip().lstrip('*')}"
+                        if n not in names:
+                            names.append(n)
+            except OSError:
+                pass
         for n in names:
             f = os.path.join(udir, d, *n.split('/'))
             if not os.path.isfile(f):
@@ -2233,6 +2245,8 @@ def selftest():
                    'peer 203.0.113.7:2399 Render3D 12.38.1')
         check('Alice' not in r and 'bob' not in r and 'carol' not in r and HOME not in r
               and '<ip>:2399' in r and '12.38.1' in r, 'report: user names and addresses out')
+        check('C:\\Users\\<user>\\A2' in r and 'Z:\\home\\<user>\\g' in r
+              and '/Users/<user>/b' in r, 'report: a user folder keeps its own separator')
         lines = [f'line {i}' for i in range(600)]
         lines[300] = 'render3d: standing down'
         lines[301] = 'render3d: standing down'
