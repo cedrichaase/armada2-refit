@@ -11,7 +11,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   the simulation's time and settles every transition at once (hover fades, a panel
   opening, tooltip delays through `Ui::waited`, the unit view's camera), for
   pixel-identical frames on the test bench. Lists re-read on a timer (resources, the
-  loading screen's players) now time it on the wall clock.
+  loading screen's players) now time it on the wall clock (ecbb58b).
 
 Installed, not yet seen in game.
 

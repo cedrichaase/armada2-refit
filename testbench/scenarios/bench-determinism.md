@@ -29,5 +29,5 @@ against it by a pixel diff.
 11. Wait up to 240 seconds for "Scene.log" to say "paused at tick".
 12. Wait 5 seconds.
 13. Take a screenshot called "second".
-14. Expect shots "first" and "second" to match within 0.5.
+14. Expect shots "first" and "second" to match within 0.01.
 15. Expect no crash.

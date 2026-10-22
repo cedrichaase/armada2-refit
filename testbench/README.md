@@ -334,7 +334,10 @@ next. With `Step=16` both were 3.7 s exactly (`0x406c8b57`), and what was left w
 torpedoes' starbursts and the phasers' texture, animated by the engine's sprite clock
 and seeded from heap addresses. Within one launch, before: `nebula`'s paused frame still
 moved (0.145, 4, 29.6% of pixels, 3 s apart: the gas's frames adding up); with the bench
-clock nothing moves.
+clock nothing moves. The clock's own share, `showcase` with everything of today but
+`--clock wall`: 0.122, 200, 1.9% between launches (the shots' sprite animation and
+address-seeded flicker), which is why `bench-determinism` allows a mean of 0.01 at most
+between launches and 0 within one; it passed at 0 (run 20261022-225239, 123 s).
 
 ## Operating the game: what agents learned
 

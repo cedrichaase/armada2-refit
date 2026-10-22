@@ -18,7 +18,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
   `SCENE_SEED`/`SCENE_STEP`/`SCENE_PAUSE` at install, and `Key=value` words after the
   scene in `bench-setup.sh`.
 - Steps `Wait up to N seconds for "LOG" to say "TEXT"` and `Expect shots "A" and "B" to
-  match within T`; scenario `bench-determinism`.
+  match within T`; scenario `bench-determinism` (ecbb58b, 4a64407).
 
 Installed, not yet seen in game.
 
