@@ -19,9 +19,15 @@ clang --target=i386-pc-windows-msvc \
       -fno-stack-protector -mno-stack-arg-probe \
       -c "$here/online.c" -o "$out/online.obj"     # includes peer.c
 
+# The file's version resource (platform/versioninfo/README.md).
+. "$here/../platform/versioninfo/version.sh"
+"$here/../platform/versioninfo/build-res.sh" "$out/Online.res" Online.asi \
+    "Armada II Refit: online multiplayer plugin" \
+    "$(version "$here/CHANGELOG.md")" "$(version "$here/../CHANGELOG.md")"
+
 lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/Online.asi" \
-         "$out/online.obj" "$out/kernel32.lib" "$out/ws2_32.lib" "$out/ole32.lib" "$out/user32.lib"
+         "$out/online.obj" "$out/Online.res" "$out/kernel32.lib" "$out/ws2_32.lib" "$out/ole32.lib" "$out/user32.lib"
 
 echo "built $out/Online.asi"
 objdump -f "$out/Online.asi" | sed -n '2,4p'

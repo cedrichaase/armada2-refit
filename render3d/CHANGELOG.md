@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.16.4 — 2026-10-21
+
+### Changed
+- `Render3D.asi` carries a version resource (`VERSIONINFO`): product, description, the
+  layer's version as the file version and the project's as the product version, which
+  Windows shows in the file's Properties. Built by `platform/versioninfo/build-res.sh` (915cad8).
+
+Confirmed in game 2026-10-22.
+
 ## 0.16.3 — 2026-10-21
 
 ### Fixed

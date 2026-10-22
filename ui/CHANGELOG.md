@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.13.4 — 2026-10-21
+
+### Changed
+- `UI.asi` carries a version resource (`VERSIONINFO`): product, description, the
+  layer's version as the file version and the project's as the product version, which
+  Windows shows in the file's Properties. Built by `platform/versioninfo/build-res.sh` (915cad8).
+
+Confirmed in game 2026-10-22.
+
 ## 0.13.3 — 2026-10-18
 
 ### Fixed

@@ -5,6 +5,15 @@ before that `ui-widescreen.py`, `cursor-aspect.py` and (as the separate `font` l
 `ui-font-condense.py`. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The derivations are in [`README.md`](README.md).
 
+## 2.2.3 — 2026-10-21
+
+### Changed
+- `HUD.asi` carries a version resource (`VERSIONINFO`): product, description, the
+  layer's version as the file version and the project's as the product version, which
+  Windows shows in the file's Properties. Built by `platform/versioninfo/build-res.sh` (915cad8).
+
+Installed, not yet seen in game.
+
 ## 2.2.2 — 2026-10-16
 
 ### Changed

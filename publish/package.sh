@@ -30,7 +30,7 @@ mkdir -p "$out"
 out="$(cd "$out" && pwd)"
 
 # version FILE -- the X.Y.Z of the newest "## X.Y.Z — date" heading.
-version () { sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' "$1" | head -1; }
+. "$root/platform/versioninfo/version.sh"
 ver="$(version "$root/CHANGELOG.md")"
 gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer; also the
                                                         # source of the vkBasalt how-to
@@ -102,6 +102,13 @@ cp "$root/LICENSE" "$d/"
 for f in "$d"/game/*.asi "$d"/game/*.dll "$d"/chain/*.dll "$d"/vendor/*/*.asi "$d"/vendor/*/*.dll; do
     objdump -f "$f" | grep -q 'file format pei-i386' \
         || { echo "not a 32-bit PE: $f" >&2; exit 1; }
+done
+# ...and every one we build carries its version resource (platform/versioninfo/), which
+# Windows shows in Properties and antivirus heuristics look for. The vendored ones are
+# shipped as their authors built them.
+for f in "$d"/game/*.asi "$d"/game/*.dll; do
+    llvm-readobj --coff-resources "$f" | grep -q 'Type: VERSIONINFO' \
+        || { echo "no version resource: $f (platform/versioninfo/build-res.sh)" >&2; exit 1; }
 done
 bash -n "$d/install.sh"
 

@@ -17,9 +17,15 @@ clang --target=i386-pc-windows-msvc \
       -fno-stack-protector -mno-stack-arg-probe \
       -c "$here/hud.c" -o "$out/hud.obj"
 
+# The file's version resource (platform/versioninfo/README.md).
+. "$here/../platform/versioninfo/version.sh"
+"$here/../platform/versioninfo/build-res.sh" "$out/HUD.res" HUD.asi \
+    "Armada II Refit: HUD layout plugin" \
+    "$(version "$here/CHANGELOG.md")" "$(version "$here/../CHANGELOG.md")"
+
 lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/HUD.asi" \
-         "$out/hud.obj" "$out/kernel32.lib"
+         "$out/hud.obj" "$out/HUD.res" "$out/kernel32.lib"
 
 echo "built $out/HUD.asi"
 objdump -f "$out/HUD.asi" | sed -n '2,4p'

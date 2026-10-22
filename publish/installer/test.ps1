@@ -64,6 +64,16 @@ foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Fog", "Specials") {
 New-Item -ItemType Directory (G "Sky") | Out-Null
 Set-Content (G "Sky\mbgaqu.ini") "old"; Set-Content (G "Sky\myown.ini") "[Sky]"
 
+Write-Host "== every PE of ours carries its version resource, as Windows reads it (platform/versioninfo/)"
+$Ver = (Split-Path $P -Leaf) -replace '^armada2-refit-', ''
+foreach ($f in Get-ChildItem -LiteralPath (Join-Path $P "game") -File | Where-Object { $_.Extension -in ".asi", ".dll" }) {
+    $vi = $f.VersionInfo
+    Check "$($f.Name): '$($vi.FileDescription)' $($vi.FileVersion), product $($vi.ProductVersion)" (
+        ($vi.FileDescription -like "Armada II Refit: *") -and ($vi.ProductVersion -eq $Ver) -and
+        ($vi.FileVersion -match '^\d+\.\d+\.\d+$') -and ($vi.OriginalFilename -eq $f.Name) -and
+        ($vi.ProductName -eq "Armada II Refit"))
+}
+
 Write-Host "== install on a GOG game: prerequisites, no DXVK, no ReShade, with progress, the old plugins out"
 $env:A2_PROGRESS = "1"
 $out = Install @($G)

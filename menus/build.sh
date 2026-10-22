@@ -28,9 +28,15 @@ clang --target=i386-pc-windows-msvc \
       -fno-stack-protector -mno-stack-arg-probe \
       -c "$here/menus.c" -o "$out/menus.obj"
 
+# The file's version resource (platform/versioninfo/README.md).
+. "$here/../platform/versioninfo/version.sh"
+"$here/../platform/versioninfo/build-res.sh" "$out/Menus.res" Menus.asi \
+    "Armada II Refit: menu scaling and display plugin" \
+    "$(version "$here/CHANGELOG.md")" "$(version "$here/../CHANGELOG.md")"
+
 lld-link /dll /machine:x86 /nodefaultlib /entry:DllMain@12 \
          /out:"$out/Menus.asi" \
-         "$out/menus.obj" "$out/kernel32.lib" "$out/user32.lib" "$out/gdi32.lib"
+         "$out/menus.obj" "$out/Menus.res" "$out/kernel32.lib" "$out/user32.lib" "$out/gdi32.lib"
 
 # probe.exe: a test tool that lists the game's windows and injects input from
 # inside its Wine session -- see probe.c and run-probe.sh.  Not installed.
