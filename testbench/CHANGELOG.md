@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.41.1 — 2026-10-22
+
+### Fixed
+- `umu_run.py` is found beside `A2_PROTON` (Heroic's `tools/runtimes/umu/`), so the
+  bench launches when Heroic is the Flatpak; `A2_UMU` still overrides.
+
+Installs nothing.
+
 ## 3.41.0 — 2026-10-21
 
 ### Added

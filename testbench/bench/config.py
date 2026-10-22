@@ -17,7 +17,10 @@ PROTON = Path(a2env.PROTON)
 # points XDG_DATA_HOME at its own scratch dir -- A2_DATA's default hangs off it, so a
 # ./install run into the clone would otherwise look in an empty directory.
 DATA = Path(a2env.DATA)
-UMU = Path(os.environ.get('A2_UMU', HOME / '.config/heroic/tools/runtimes/umu/umu_run.py'))
+# Heroic keeps umu beside its Proton builds (tools/proton/<name>, tools/runtimes/umu/),
+# so it is found from A2_PROTON wherever Heroic lives (the Flatpak's is under
+# ~/.var/app/com.heroicgameslauncher.hgl/); A2_UMU overrides.
+UMU = Path(os.environ.get('A2_UMU') or PROTON.parent.parent / 'runtimes/umu/umu_run.py')
 VKBASALT = Path(os.environ.get('XDG_DATA_HOME', HOME / '.local/share')) / 'a2-vkbasalt'
 
 # Clones are big (a reflink copy of 5 GB -- free on btrfs, but it must be the SAME
