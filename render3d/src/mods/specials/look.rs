@@ -11,7 +11,7 @@
 //! The hull is the hulls module's pose of the affected object (`hulls::posed`); an
 //! object it does not draw (or a cloaked one) gets no layer.
 use super::{Fx, VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};
 use crate::math::{v3, V3};

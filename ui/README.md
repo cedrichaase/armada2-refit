@@ -530,16 +530,20 @@ vkd3d needs (`render3d/README.md`). A new draw call starts only when the texture
 clip rectangle changes; solid quads take whatever texture the run has, since they do
 not sample it.
 
-**State.** d3d8to9 keeps its own record of what the game bound (`platform/D3D9.md`), so
-the frame is drawn between a `D3DSBT_ALL` state block's capture and its apply: once a
-frame, not per draw, which is where render3d found `SBT_ALL` expensive. Positions are
-in back-buffer pixels and move half a pixel on the way to clip space, so a rectangle
-with whole-number edges covers whole pixels exactly.
+**Through `gpu`.** The frame is drawn through the interface it shares with render3d
+(`gpu/README.md`): one pipeline, a pass into the engine's own back buffer and depth
+(kept as they are), the frame's vertices and indices written once into `gpu`'s rings,
+and one indexed draw per run. `gpu` captures the device's state before the frame's
+first change and puts it back after (d3d8to9 keeps its own record of what the game
+bound, `platform/D3D9.md`), with the block render3d records: once a frame, not per
+draw. Positions are in back-buffer pixels and move half a pixel on the way to clip
+space, so a rectangle with whole-number edges covers whole pixels exactly.
 
-**No `Reset` to handle.** Textures are in the managed pool and the vertices go through
-`DrawIndexedPrimitiveUP`, so nothing of ours is in the default pool. Every texture is
-registered once with its pixels (the font atlases from the DLL, images from the game's
-TGAs through `a2fmt`) and made on each device the first time it draws there.
+**`Reset` and new devices are `gpu`'s.** Every texture is registered once with its
+pixels (the font atlases from the DLL, images from the game's TGAs through `a2fmt`) as
+a `gpu::Texture`, which keeps them and is made on the device the first time it draws
+there, and again after a `Reset` or on another device. `engine/device.rs` tells `gpu`
+when the device resets or goes (`gfx::reset`, `gfx::forget`).
 
 **Without a Direct3D 9 device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
 at once and the game draws as stock.

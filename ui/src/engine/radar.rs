@@ -761,7 +761,7 @@ pub fn functions_stock() -> bool {
 /// texture (`+0x40 + device index * 4`, the index at `Storm3D+0xc0`), whose `+4` is the
 /// `IDirect3DTexture8`, which d3d8to9 answers for its `IDirect3DTexture9`
 /// (render3d/README.md reads the fog's the same way).
-pub fn d3d9_texture(st3d_tex: usize) -> Option<(crate::d3d::Com, u32, u32)> {
+pub fn d3d9_texture(st3d_tex: usize) -> Option<(gpu::d3d9::raw::Com, u32, u32)> {
     if st3d_tex == 0 {
         return None;
     }
@@ -770,7 +770,7 @@ pub fn d3d9_texture(st3d_tex: usize) -> Option<(crate::d3d::Com, u32, u32)> {
         return None;
     }
     let t8 = field(field(st3d_tex, 0x40 + idx * 4), 4);
-    let c = crate::d3d::query(t8 as *mut core::ffi::c_void, &crate::d3d::IID_TEXTURE9)?;
+    let c = gpu::d3d9::raw::query(t8 as *mut core::ffi::c_void, &gpu::d3d9::raw::IID_TEXTURE9)?;
     let (w, h) = unsafe { (rd::<u32>(st3d_tex + TEX_W), rd::<u32>(st3d_tex + TEX_H)) };
     Some((c, w, h))
 }

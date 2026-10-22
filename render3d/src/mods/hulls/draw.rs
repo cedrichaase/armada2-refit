@@ -1,7 +1,7 @@
 //! Drawing a posed hull in the hull shaders (`shaders/hulls.hlsl`).
 use super::look::{Look, Profile};
 use super::{anim, game, shadow, Posed};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Guard, Shader};

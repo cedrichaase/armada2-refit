@@ -24,7 +24,7 @@
 //! entity's bounding radius (the explosion's entity `+4`, its bounding sphere at
 //! `+0x34`, radius `+0x40`; at least 40 units), gone at `LightRange` radii.
 use super::{ff, hash32, Cam, LightPool, Sec};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, obj};
 use crate::frame::steps::View;
 use crate::gfx::{self, Shader};

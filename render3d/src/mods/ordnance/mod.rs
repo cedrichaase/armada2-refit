@@ -20,7 +20,7 @@ mod models;
 pub mod sprite;
 
 use super::{Module, Step};
-use crate::d3d::Device;
+use gpu::d3d9::raw::Device;
 use crate::engine::{self, field, field_f32, field_u8, hook, rd};
 use crate::frame::steps::View;
 use crate::log;

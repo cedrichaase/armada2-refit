@@ -3,7 +3,7 @@
 //! cooling seams and welding beams, built on the CPU facing the camera and drawn
 //! additively in one call, depth-tested against the hulls, writing no depth.
 use super::Cam;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
 use crate::gfx::{self, Shader};
 use crate::math::{v3, V3};

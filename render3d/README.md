@@ -267,6 +267,14 @@ glow. The device's state is captured into a state block before the passes and pu
 after, and the engine's own target and depth are bound again, so the engine (and
 d3d8to9, which keeps its own record of what is bound) sees what it left.
 
+**Through `gpu`.** The targets, the scene pass and the passes after it are `gpu`'s
+(`gpu/README.md`), the interface shared with `UI.asi`. The scene pass is begun before
+the body and stays bound while the engine and the modules draw into it with raw
+Direct3D 9 calls; stock's black line along the view's right column and bottom row is
+cleared in it after the body (`frame::black_lines`). The modules are ported one by one
+(`gpu/README.md`, "Porting a render3d module"); until then they draw inside
+`gfx::Guard`, a `gpu` section.
+
 **The first row and column.** DXVK offsets a Direct3D 9 viewport by half a pixel, so
 with MSAA half the samples of the view's first row and column are never drawn. The final pass reads those pixels from their neighbours instead, which does what
 `MSAA.asi`'s edge fill did without the frame's delay.
@@ -291,7 +299,7 @@ of everything on the device (`frame::forget`): what a `Reset` drops, the sky's n
 volume, and the shaders and declarations, which `gfx` keeps in one list for this. The
 posed hulls of the last views and the ghosts' queue go too: they hold models, and a
 model holds its vertex and index buffers (missing them left 49 of each, and the mission
-did not start). `d3d` keeps a tally of every object made or handed out and not yet
+did not start). `gpu`'s raw layer (`gpu::d3d9::raw`) keeps a tally of every object made or handed out and not yet
 released; the hook logs what is left by kind ("still held after letting go"), which is
 how those were found, and unbinds every texture, stream and shader before the engine
 releases the device. It

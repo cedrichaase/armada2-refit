@@ -1,15 +1,17 @@
 //! The 2D renderer: everything the UI draws in a frame goes into one vertex list and
-//! is drawn on the Direct3D 9 device in as few calls as its textures and clip
-//! rectangles allow, all with one shader pair (shaders/ui.hlsl).
+//! is drawn through `gpu` (the interface shared with render3d, gpu/README.md) in as
+//! few calls as its textures and clip rectangles allow, all with one pipeline
+//! (shaders/ui.hlsl).
 //!
-//! d3d8to9 keeps its own record of what the game bound (platform/D3D9.md), so the
-//! frame is drawn between a state block's capture and its apply: the engine's next
-//! call finds the device as it left it. Everything we make is in the managed pool,
-//! which survives a `Reset`, so nothing here needs to hear of one.
-use crate::d3d::*;
+//! `gpu` puts the engine's device state back after the frame (d3d8to9 keeps its own
+//! record of what the game bound, platform/D3D9.md), and makes every texture again
+//! after a `Reset` or on a new device, from what was registered here.
 use crate::shaders::ui::{PS_UI, VS_UI};
 use alloc::vec::Vec;
-use core::ffi::c_void;
+use gpu::{
+    attr, AttrFormat, Blend, BlendEq, BlendOp, Block, Code, ColorTarget, Contents, DepthTarget, Factor, Format, Load,
+    Pass, PipelineDesc, Rect, Sampler, Semantic, TextureDesc, Topology, Usage, VertexAttr, Viewport,
+};
 
 mod fx;
 pub use fx::{load_bmp, Corners, Elbow, Shape};
@@ -88,36 +90,30 @@ pub fn mix(a: Color, b: Color, t: f32) -> Color {
 
 // ---- textures --------------------------------------------------------------------
 
-/// A texture the UI can draw from: registered once with its pixels, and made on each
-/// device when first drawn there.
+/// A texture the UI can draw from: registered once with its pixels, made on the
+/// device by `gpu` when first drawn (and again after the device is lost).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Tex(u16);
-
-enum Pixels {
-    Static(&'static [u8]),
-    Owned(Vec<u8>),
-}
 
 struct TexSrc {
     w: u32,
     h: u32,
-    fmt: u32,
-    pixels: Pixels,
-    obj: Option<(Device, Com)>,
-    /// The pixels changed since they were last copied to `obj`.
-    dirty: bool,
+    tex: Option<gpu::Texture>,
 }
 
 static mut TEXTURES: Vec<TexSrc> = Vec::new();
 
-/// Registers a single-channel texture (`FMT_L8`: the font atlases).
+/// Registers a single-channel texture (`R8`, which Direct3D 9 samples as luminance:
+/// the font atlases).
 pub fn texture_l8(w: u32, h: u32, pixels: &'static [u8]) -> Tex {
-    register(TexSrc { w, h, fmt: FMT_L8, pixels: Pixels::Static(pixels), obj: None, dirty: false })
+    let t = gpu().texture(TextureDesc::d2(w, h, Format::R8, Usage::SAMPLED), Contents::Static(pixels));
+    register(TexSrc { w, h, tex: Some(t) })
 }
 
 /// Registers a BGRA8 texture, rows top-down (what `a2fmt::tga::decode` gives).
 pub fn texture_bgra(w: u32, h: u32, pixels: Vec<u8>) -> Tex {
-    register(TexSrc { w, h, fmt: FMT_A8R8G8B8, pixels: Pixels::Owned(pixels), obj: None, dirty: false })
+    let t = gpu().texture(TextureDesc::d2(w, h, Format::Bgra8, Usage::SAMPLED), Contents::Owned(pixels));
+    register(TexSrc { w, h, tex: Some(t) })
 }
 
 #[allow(static_mut_refs)]
@@ -127,53 +123,45 @@ fn register(t: TexSrc) -> Tex {
     Tex((v.len() - 1) as u16)
 }
 
-/// Registers a texture whose pixels change: BGRX8 (`FMT_X8R8G8B8`, the alpha byte
-/// ignored), rows top-down, black until `tex_update` gives it pixels. For pictures
-/// copied off GDI (`menus`, the mirrored dialogs) every frame they change.
+/// Registers a texture whose pixels change: BGRX8 (the alpha byte ignored), rows
+/// top-down, black until `tex_update` gives it pixels. For pictures copied off GDI
+/// (`menus`, the mirrored dialogs) every frame they change.
 pub fn texture_dynamic(w: u32, h: u32) -> Tex {
-    let px = alloc::vec![0u8; (w * h * 4) as usize];
-    register(TexSrc { w, h, fmt: FMT_X8R8G8B8, pixels: Pixels::Owned(px), obj: None, dirty: true })
+    let t = gpu().texture(TextureDesc::d2(w, h, Format::Bgrx8, Usage::SAMPLED | Usage::DYNAMIC), Contents::None);
+    register(TexSrc { w, h, tex: Some(t) })
 }
 
-/// As `texture_dynamic`, with its alpha (`FMT_A8R8G8B8`): a mask whose pixels change
-/// (the minimap's fog, `hud::minimap`). Transparent until `tex_update`.
+/// As `texture_dynamic`, with its alpha (`Bgra8`): a mask whose pixels change (the
+/// minimap's fog, `hud::minimap`). Transparent until `tex_update`.
 pub fn texture_dynamic_argb(w: u32, h: u32) -> Tex {
-    let px = alloc::vec![0u8; (w * h * 4) as usize];
-    register(TexSrc { w, h, fmt: FMT_A8R8G8B8, pixels: Pixels::Owned(px), obj: None, dirty: true })
+    let t = gpu().texture(TextureDesc::d2(w, h, Format::Bgra8, Usage::SAMPLED | Usage::DYNAMIC), Contents::None);
+    register(TexSrc { w, h, tex: Some(t) })
 }
 
-/// A texture that is the engine's (a Direct3D 9 texture it made, e.g. the minimap's
-/// picture): nothing of its own, drawn from what `tex_set_external` last gave it.
+/// A texture that is not the UI's (the engine's minimap picture, the close-up's
+/// target): nothing of its own, drawn from what `tex_set_external` last gave it.
 pub fn texture_external() -> Tex {
-    register(TexSrc { w: 1, h: 1, fmt: 0, pixels: Pixels::Static(&[]), obj: None, dirty: false })
+    register(TexSrc { w: 1, h: 1, tex: None })
 }
 
-/// The engine texture an external `Tex` draws from (None: it draws nothing).
+/// The texture an external `Tex` draws from (None: it draws nothing), and its size.
 #[allow(static_mut_refs)]
-pub fn tex_set_external(t: Tex, tex: Option<Com>, w: u32, h: u32) {
+pub fn tex_set_external(t: Tex, tex: Option<gpu::Texture>, w: u32, h: u32) {
     let v = unsafe { &mut TEXTURES };
     let Some(s) = v.get_mut(t.0 as usize) else { return };
-    if s.fmt != 0 {
-        return;
-    }
     s.w = w.max(1);
     s.h = h.max(1);
-    s.obj = tex.map(|c| (Device(core::ptr::null_mut()), c));
+    s.tex = tex;
 }
 
 /// New pixels for a `texture_dynamic`: `rows` rows of `w * 4` bytes from `src`, `pitch`
 /// bytes apart, written at the top-left; copied to the device when it next draws.
 #[allow(static_mut_refs)]
 pub fn tex_update(t: Tex, src: *const u8, pitch: usize, w: u32, rows: u32) {
-    let v = unsafe { &mut TEXTURES };
-    let Some(s) = v.get_mut(t.0 as usize) else { return };
-    let Pixels::Owned(px) = &mut s.pixels else { return };
-    let (w, rows) = (w.min(s.w) as usize, rows.min(s.h) as usize);
-    let row = s.w as usize * 4;
-    for y in 0..rows {
-        unsafe { core::ptr::copy_nonoverlapping(src.add(y * pitch), px.as_mut_ptr().add(y * row), w * 4) };
+    let v = unsafe { &TEXTURES };
+    if let Some(tex) = v.get(t.0 as usize).and_then(|s| s.tex.as_ref()) {
+        tex.write(src, pitch, w, rows);
     }
-    s.dirty = true;
 }
 
 /// An image from the game's files (a TGA, by path under the game directory), or None
@@ -192,50 +180,9 @@ pub fn tex_size(t: Tex) -> (u32, u32) {
 }
 
 #[allow(static_mut_refs)]
-fn tex_obj(dev: Device, t: Tex) -> *mut c_void {
-    let v = unsafe { &mut TEXTURES };
-    let Some(s) = v.get_mut(t.0 as usize) else { return core::ptr::null_mut() };
-    if s.fmt == 0 {
-        // The engine's own texture (`texture_external`), on the device in use.
-        return s.obj.as_ref().map_or(core::ptr::null_mut(), |(_, c)| c.ptr());
-    }
-    if s.dirty && s.obj.as_ref().is_some_and(|(d, _)| *d == dev) {
-        // Changed pixels on a texture already made here: copy them again.
-        let (_, tex) = s.obj.as_ref().unwrap();
-        if let (Some(lr), Pixels::Owned(data)) = (tex.tex_lock(0, 0), &s.pixels) {
-            let row = (s.w * 4) as usize;
-            for y in 0..s.h as usize {
-                unsafe { core::ptr::copy_nonoverlapping(data[y * row..].as_ptr(), lr.bits.add(y * lr.pitch as usize), row) };
-            }
-            tex.tex_unlock(0);
-        }
-        s.dirty = false;
-    }
-    if s.obj.as_ref().is_none_or(|(d, _)| *d != dev) {
-        s.obj = None;
-        s.dirty = false;
-        let bpp = if s.fmt == FMT_L8 { 1 } else { 4 };
-        let data: &[u8] = match &s.pixels {
-            Pixels::Static(p) => p,
-            Pixels::Owned(p) => p,
-        };
-        if let Some(tex) = dev.create_texture(s.w, s.h, 1, 0, s.fmt, POOL_MANAGED) {
-            if let Some(lr) = tex.tex_lock(0, 0) {
-                let row = (s.w * bpp) as usize;
-                for y in 0..s.h as usize {
-                    if data.len() >= (y + 1) * row {
-                        unsafe { core::ptr::copy_nonoverlapping(data[y * row..].as_ptr(), lr.bits.add(y * lr.pitch as usize), row) };
-                    }
-                }
-                tex.tex_unlock(0);
-                s.obj = Some((dev, tex));
-            }
-        }
-        if s.obj.is_none() {
-            crate::log!("gfx: texture {} ({}x{}) could not be made", t.0, s.w, s.h);
-        }
-    }
-    s.obj.as_ref().map_or(core::ptr::null_mut(), |(_, c)| c.ptr())
+fn tex_obj(t: Tex) -> Option<&'static gpu::Texture> {
+    let v = unsafe { &TEXTURES };
+    v.get(t.0 as usize).and_then(|s| s.tex.as_ref())
 }
 
 // ---- the draw list ---------------------------------------------------------------
@@ -255,15 +202,14 @@ struct Vertex {
     p: [f32; 4],
 }
 
-static ELEMENTS: [VertexElement; 8] = [
-    ve(0, 0, DECLTYPE_FLOAT2, DECLUSAGE_POSITION, 0),
-    ve(0, 8, DECLTYPE_D3DCOLOR, DECLUSAGE_COLOR, 0),
-    ve(0, 12, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
-    ve(0, 20, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 1),
-    ve(0, 36, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 2),
-    ve(0, 52, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 3),
-    ve(0, 68, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 4),
-    VE_END,
+static LAYOUT: [VertexAttr; 7] = [
+    attr(0, AttrFormat::Float2, Semantic::Position, 0),
+    attr(8, AttrFormat::Bgra8, Semantic::Color, 0),
+    attr(12, AttrFormat::Float2, Semantic::TexCoord, 0),
+    attr(20, AttrFormat::Float4, Semantic::TexCoord, 1),
+    attr(36, AttrFormat::Float4, Semantic::TexCoord, 2),
+    attr(52, AttrFormat::Float4, Semantic::TexCoord, 3),
+    attr(68, AttrFormat::Float4, Semantic::TexCoord, 4),
 ];
 
 const KIND_SOLID: f32 = 0.0;
@@ -534,147 +480,141 @@ fn font_of(w: Weight) -> &'static crate::text::Font {
 
 // ---- drawing a frame -------------------------------------------------------------
 
-/// What we make once per device.
-struct Res {
-    dev: Device,
-    sb: Com,
-    vs: Com,
-    ps: Com,
-    decl: Com,
+fn log_line(a: core::fmt::Arguments) {
+    crate::rt::log_fmt(a);
 }
 
-static mut RES: Option<Res> = None;
-static mut FAILED: Option<Device> = None;
+/// The UI's `gpu` context (each plugin keeps its own) and its frame.
+static mut GPU: gpu::Gpu = gpu::Gpu::new(log_line);
+static mut FRAME: gpu::Frame = gpu::Frame::new();
+/// The pipeline, and the back buffer's format it was made for.
+static mut PIPE: Option<(Format, gpu::Pipeline)> = None;
+/// The device the pipeline was last reported ready, or refused, on.
+static mut TOLD: Option<gpu::d3d9::raw::Device> = None;
 
-/// Lets go of everything the UI made on the device, in every pool, and of the engine's
-/// textures it holds (`engine::device`, before the engine releases the device).
 #[allow(static_mut_refs)]
-pub fn forget() {
-    unsafe {
-        RES = None;
-        FAILED = None;
-        for t in TEXTURES.iter_mut() {
-            t.obj = None;
-            t.dirty = false;
-        }
+pub fn gpu() -> &'static gpu::Gpu {
+    unsafe { &GPU }
+}
+
+/// The game's device, attached to `gpu`; None without a Direct3D 9 one behind it
+/// (DXVK's own d3d8, GOG's build). The stock front end re-creates the device at every
+/// switch between the shell's display and the game's: `gpu` lets go of everything made
+/// on the old one (what we hold keeps a device alive), and the new one's `Reset` and
+/// `Present` are chained.
+pub fn attach() -> Option<gpu::d3d9::raw::Device> {
+    let dev8 = crate::engine::d3d8_device();
+    let dev = gpu::d3d9::raw::Device::from_d3d8(dev8)?;
+    if gpu().attach(dev) {
+        crate::engine::device::hook_reset(dev8);
     }
+    Some(dev)
 }
 
-/// Before a `Reset`: the state block must go (made again with the shaders at the next frame).
+/// Before the engine releases its device: `gpu` lets go of everything the UI made on
+/// it, in every pool, and of the engine's textures it holds (`engine::device`).
+pub fn forget() {
+    gpu().release_device();
+}
+
+/// Before a `Reset`: `gpu` lets go of what is in the default pool and the state block.
 pub fn reset() {
-    unsafe { RES = None };
+    gpu().before_reset();
 }
 
 #[allow(static_mut_refs)]
-fn res(dev: Device) -> Option<&'static Res> {
+fn pipeline(dev: gpu::d3d9::raw::Device, target: Format) -> Option<&'static gpu::Pipeline> {
     unsafe {
-        if RES.as_ref().is_some_and(|r| r.dev == dev) {
-            return RES.as_ref();
+        if PIPE.as_ref().is_none_or(|(f, _)| *f != target) {
+            let stride = core::mem::size_of::<Vertex>() as u32;
+            let mut d = PipelineDesc::new(Code::d3d9(&VS_UI), Code::d3d9(&PS_UI), &LAYOUT, stride, Topology::TriangleList, target);
+            // Straight alpha over the frame; the target's alpha gathers coverage.
+            d.blend = Some(Blend {
+                color: BlendEq { src: Factor::SrcAlpha, dst: Factor::InvSrcAlpha, op: BlendOp::Add },
+                alpha: Some(BlendEq { src: Factor::One, dst: Factor::InvSrcAlpha, op: BlendOp::Add }),
+            });
+            d.scissor = true;
+            PIPE = Some((target, gpu().pipeline(d)));
         }
-        if FAILED == Some(dev) {
-            return None;
-        }
-        // Another device (the stock front end re-creates it at every switch between the
-        // shell's display and the game's): let go of everything made on the old one at
-        // once, since what we hold keeps that device alive. `engine::device` has done
-        // so already when the engine released it.
-        forget();
-        crate::engine::device::hook_reset(crate::engine::d3d8_device());
-        let made = (|| {
-            Some(Res {
-                dev,
-                sb: dev.create_state_block(SBT_ALL)?,
-                vs: dev.create_vs(&VS_UI)?,
-                ps: dev.create_ps(&PS_UI)?,
-                decl: dev.create_vertex_decl(&ELEMENTS)?,
-            })
-        })();
-        match made {
-            Some(r) => {
+        let (_, p) = PIPE.as_ref()?;
+        let ok = p.ready(gpu());
+        if TOLD != Some(dev) {
+            TOLD = Some(dev);
+            if ok {
                 crate::log!("gfx: ready on the d3d9 device");
-                RES = Some(r);
-            }
-            None => {
-                crate::log!("gfx: could not make the shaders or the state block: the UI draws nothing");
-                FAILED = Some(dev);
+            } else {
+                crate::log!("gfx: could not make the shaders: the UI draws nothing");
             }
         }
-        RES.as_ref()
+        ok.then_some(p)
     }
 }
 
 /// Runs `f` with the back buffer's size and a `Draw` to fill, then draws it into
 /// render target 0. Nothing on the device changes when `f` draws nothing.
-pub fn frame(dev: Device, f: impl FnOnce(u32, u32, &mut Draw)) {
-    let Some(rt) = dev.get_render_target(0) else { return };
-    let d = rt.surf_desc();
-    drop(rt);
-    if d.width == 0 || d.height == 0 {
+#[allow(static_mut_refs)]
+pub fn frame(f: impl FnOnce(u32, u32, &mut Draw)) {
+    let Some(dev) = attach() else { return };
+    let g = gpu();
+    let Some(bb) = g.engine_target() else { return };
+    let (w, h) = bb.size();
+    if w == 0 || h == 0 {
         return;
     }
-    let mut draw = Draw::new(d.width, d.height);
-    f(d.width, d.height, &mut draw);
+    let mut draw = Draw::new(w, h);
+    f(w, h, &mut draw);
     if draw.is_empty() {
         return;
     }
-    let Some(r) = res(dev) else { return };
-    r.sb.sb_capture();
-    submit(dev, r, &draw);
-    r.sb.sb_apply();
+    let Some(p) = pipeline(dev, bb.desc().format) else { return };
+    let ds = g.engine_depth();
+    let frame = unsafe { &mut FRAME };
+    frame.next();
+    let Some(mut cmd) = g.begin(frame) else { return };
+    submit(&mut cmd, p, &bb, ds.as_ref(), &draw);
 }
 
-fn submit(dev: Device, r: &Res, draw: &Draw) {
-    for (s, v) in [
-        (RS_ZENABLE, 0), (RS_ZWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0), (RS_ALPHABLENDENABLE, 1),
-        (RS_SRCBLEND, BLEND_SRCALPHA), (RS_DESTBLEND, BLEND_INVSRCALPHA), (RS_BLENDOP, BLENDOP_ADD),
-        (RS_SEPARATEALPHABLENDENABLE, 1), (RS_SRCBLENDALPHA, BLEND_ONE), (RS_DESTBLENDALPHA, BLEND_INVSRCALPHA),
-        (RS_CULLMODE, CULL_NONE), (RS_STENCILENABLE, 0), (RS_SCISSORTESTENABLE, 1), (RS_FOGENABLE, 0),
-        (RS_COLORWRITEENABLE, 0xf), (RS_SRGBWRITEENABLE, 0), (RS_FILLMODE, 3), (RS_CLIPPING, 1),
-        (RS_MULTISAMPLEANTIALIAS, 0),
-    ] {
-        dev.set_rs(s, v);
+/// Records into the UI's frame outside `frame` (the close-up's copies).
+#[allow(static_mut_refs)]
+pub fn with_cmd<R>(f: impl FnOnce(&mut gpu::Cmd) -> R) -> Option<R> {
+    let frame = unsafe { &mut FRAME };
+    let mut cmd = gpu().begin(frame)?;
+    Some(f(&mut cmd))
+}
+
+fn submit(cmd: &mut gpu::Cmd, p: &gpu::Pipeline, bb: &gpu::Texture, ds: Option<&gpu::Texture>, draw: &Draw) {
+    // Into the engine's own targets, as they are.
+    let colors = [ColorTarget { texture: bb, load: Load::Load }];
+    let pass = Pass { colors: &colors, depth: ds.map(|d| DepthTarget { texture: d, load: Load::Load }), area: None };
+    if !cmd.begin_pass(&pass) || !cmd.set_pipeline(p) {
+        return;
     }
-    dev.set_ss(0, SAMP_ADDRESSU, TADDRESS_CLAMP);
-    dev.set_ss(0, SAMP_ADDRESSV, TADDRESS_CLAMP);
-    dev.set_ss(0, SAMP_MAGFILTER, TEXF_LINEAR);
-    dev.set_ss(0, SAMP_MINFILTER, TEXF_LINEAR);
-    dev.set_ss(0, SAMP_MIPFILTER, TEXF_NONE);
-    dev.set_ss(0, SAMP_SRGBTEXTURE, 0);
-    dev.set_viewport(&Viewport { x: 0, y: 0, w: draw.w as u32, h: draw.h as u32, min_z: 0.0, max_z: 1.0 });
-    dev.set_vertex_decl(r.decl.ptr());
-    dev.set_vs(r.vs.ptr());
-    dev.set_ps(r.ps.ptr());
+    cmd.set_sampler(0, &Sampler::LINEAR_CLAMP);
+    cmd.set_viewport(&Viewport::of(Rect::new(0, 0, draw.w as u32, draw.h as u32)));
     // Pixel (x, y)'s centre at x + 0.5: Direct3D 9 samples a pixel at its whole
     // coordinate, so positions move by half a pixel on the way to clip space.
     let (sx, sy) = (2.0 / draw.w, -2.0 / draw.h);
-    dev.vs_const(0, &[sx, sy, -1.0 - 0.5 * sx, 1.0 - 0.5 * sy]);
-    let stride = core::mem::size_of::<Vertex>() as u32;
+    cmd.vs_block(Block::new(0, &[sx, sy, -1.0 - 0.5 * sx, 1.0 - 0.5 * sy]));
+    let (Some(vs), Some(is)) = (cmd.vertices(&draw.verts), cmd.indices(&draw.idx)) else { return };
     let mut bound: Option<Tex> = None;
     for c in &draw.cmds {
         if c.count == 0 {
             continue;
         }
         if c.tex.is_some() && c.tex != bound {
-            dev.set_texture(0, c.tex.map_or(core::ptr::null_mut(), |t| tex_obj(dev, t)));
+            cmd.bind_texture(0, c.tex.and_then(tex_obj), &Sampler::LINEAR_CLAMP);
             bound = c.tex;
         }
         let [x0, y0, x1, y1] = c.clip;
+        let (x0, y0) = (x0.max(0), y0.max(0));
         if x1 <= x0 || y1 <= y0 {
             continue;
         }
-        dev.set_scissor(&Rect { left: x0, top: y0, right: x1, bottom: y1 });
+        cmd.set_scissor(Rect::new(x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32));
         let end = c.vbase as usize
             + draw.idx[c.first as usize..(c.first + c.count) as usize].iter().map(|&i| i as usize + 1).max().unwrap_or(0);
         let nv = (end - c.vbase as usize) as u32;
-        dev.draw_indexed_up(
-            PT_TRIANGLELIST,
-            0,
-            nv,
-            c.count / 3,
-            draw.idx[c.first as usize..].as_ptr() as *const u8,
-            FMT_INDEX16,
-            draw.verts[c.vbase as usize..].as_ptr() as *const u8,
-            stride,
-        );
+        cmd.draw_indexed(&vs, c.vbase, nv, &is, c.first, c.count);
     }
+    cmd.end_pass();
 }

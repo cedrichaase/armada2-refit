@@ -20,7 +20,7 @@ mod posts;
 mod selection;
 
 use super::{Module, Step};
-use crate::d3d::Device;
+use gpu::d3d9::raw::Device;
 use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;

@@ -6,7 +6,7 @@
 //! can pass white; it is in the default pool and is dropped before a `Reset` and baked
 //! again after.
 use super::recipe::{NCONST, Recipe};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::gfx::chain::{Chain, Pass};
 use crate::gfx::Shader;
 use crate::log;

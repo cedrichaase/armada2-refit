@@ -17,7 +17,7 @@
 //! cloaked hulls, where stock's depth sort puts them.
 use super::look::Look;
 use super::{anim, Posed};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, DynVb, Guard, Shader};
 use crate::math::{v3, V3};

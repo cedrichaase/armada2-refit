@@ -3,7 +3,7 @@
 //! sprite nodes (the suns). Additive, as stock draws them, with the brightest texels
 //! lifted a little past white so a star's or a sun's core blooms.
 use crate::assets;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{field, rd};
 use crate::math::{M4, V3, v3};
 use crate::rt;

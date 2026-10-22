@@ -20,7 +20,7 @@ pub mod rocks;
 pub mod surfaces;
 
 use super::{Module, Step};
-use crate::d3d::Device;
+use gpu::d3d9::raw::Device;
 use crate::engine;
 use crate::frame::steps::View;
 use crate::log;

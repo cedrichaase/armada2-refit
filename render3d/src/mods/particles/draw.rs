@@ -5,7 +5,7 @@
 //! they were queued.
 use super::look::Material;
 use crate::assets;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, DynVb, Shader};
 use crate::math::{M34, V3};

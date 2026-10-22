@@ -5,7 +5,7 @@
 //! A module is switched per category in `Render3D.ini` (`[Modules]`, `<name>=1`), and a
 //! module that replaces a plugin's work stands down while that plugin is loaded (its
 //! `superseded()`), so the plugin keeps drawing its part inside the engine's step.
-use crate::d3d::Device;
+use gpu::d3d9::raw::Device;
 use crate::frame::steps::View;
 use crate::log;
 

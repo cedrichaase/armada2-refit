@@ -12,7 +12,7 @@
 //! With `Enable=0` the same seam is still timed (`frame::install_measure`): the
 //! engine's own body, with whatever plugins are hooked into it, between two marks. That
 //! is the reference for comparing render3d with the plugins it replaces.
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::log;
 use crate::rt;
 use alloc::vec::Vec;

@@ -14,7 +14,7 @@
 //! Every scene is on the one map, under one sun: a view names the camera, and asking
 //! for another view moves the camera over to it (`Blend=`). The planet turns about its
 //! axis and the sky about +x (the fleet's orbit).
-use crate::d3d::Device;
+use gpu::d3d9::raw::Device;
 use crate::frame::post::PRect;
 use crate::frame::steps::View;
 use crate::math::{self, M34, M4, V3, v3};
@@ -918,7 +918,7 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
         let far_v = mk(near_p, far_p.max(near_p * 2.0));
         mods::menu(Pass::Sky, &shot, &far_v);
         mods::menu(Pass::Planet, &shot, &far_v);
-        dev.clear(&[], crate::d3d::CLEAR_ZBUFFER, 0, 1.0, 0);
+        dev.clear(&[], gpu::d3d9::raw::CLEAR_ZBUFFER, 0, 1.0, 0);
         let near_v = mk(2.0, 16000.0);
         mods::menu_begin(&shot, &near_v);
         mods::menu(Pass::Ships, &shot, &near_v);

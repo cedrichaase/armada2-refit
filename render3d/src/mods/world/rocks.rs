@@ -18,7 +18,7 @@
 //!   `ScaleSOD`; `AsteroidFieldInstance::RenderInternal` draws each rock its distance
 //!   cull keeps.
 use super::surfaces::{self, Surfaces};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_f32, field_m34, field_u8, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};

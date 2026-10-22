@@ -28,7 +28,7 @@
 //! The clock is the sim clock (`View::time`): the effect stops while the game is
 //! paused, as every cosmetic simulation of render3d does.
 use super::{object_of, rnd, Cam, LightPool, Sec};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_u8, hook, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Shader};

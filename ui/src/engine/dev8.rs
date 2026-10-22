@@ -2,7 +2,8 @@
 //! present it, through the game's own device (whatever is behind it: d3d8to9, DXVK's
 //! d3d8). Slots follow d3d8.h's declaration order; the engine's own calls use the same
 //! ones (`ST3D_DeviceDirectX8::RefreshDisplay` presents through slot 15).
-use crate::d3d::{query, Guid, HRESULT, IID_DEVICE9};
+use gpu::d3d9::raw::{query, Guid, HRESULT, IID_DEVICE9};
+use gpu::vcall;
 use core::ffi::c_void;
 use core::ptr::null_mut;
 
@@ -76,7 +77,7 @@ pub fn back_buffer_desc(d: Dev8) -> Option<SurfaceDesc8> {
     }
     let mut desc = SurfaceDesc8::default();
     let hr = vcall!(s, SURFACE_GET_DESC, fn(*mut SurfaceDesc8) -> HRESULT, &mut desc);
-    drop(crate::d3d::Com(s)); // GetBackBuffer took a reference
+    drop(gpu::d3d9::raw::Com(s)); // GetBackBuffer took a reference
     if hr < 0 { None } else { Some(desc) }
 }
 
@@ -129,6 +130,6 @@ pub fn present_params9(d: Dev8) -> Option<PresentParams9> {
     }
     let mut pp = PresentParams9::default();
     let hr = vcall!(sc, SWAP9_GET_PRESENT_PARAMETERS, fn(*mut PresentParams9) -> HRESULT, &mut pp);
-    drop(crate::d3d::Com(sc));
+    drop(gpu::d3d9::raw::Com(sc));
     if hr < 0 { None } else { Some(pp) }
 }

@@ -11,7 +11,7 @@
 //! read every frame.
 use crate::timing;
 use super::post::PRect;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, hook, rd, storm3d};
 use crate::math::{M4, V3};
 use crate::mods::{self, Step};
@@ -166,8 +166,8 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         rect: cam_rect(cam, tw, th),
         dev,
         st3d,
-        view: dev.get_transform(TS_VIEW),
-        proj: dev.get_transform(TS_PROJECTION),
+        view: M4(dev.get_transform(TS_VIEW)),
+        proj: M4(dev.get_transform(TS_PROJECTION)),
         eye: engine::field_v3(cam, 0xe4),
         time: engine::sim_time(),
         frame,
@@ -266,12 +266,7 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         this0(via(SITE_DEL_LIGHTS, FN_DEL_LIGHTS), s3d);
     }
     timing::mark("selection, end");
-    // 25-26: stock's black line along the view's right column and bottom row.
-    let r = v.rect;
-    if r.w > 1 && r.h > 1 {
-        let right = Rect { left: (r.x + r.w - 1) as i32, top: r.y as i32, right: (r.x + r.w) as i32, bottom: (r.y + r.h) as i32 };
-        let bottom = Rect { left: r.x as i32, top: (r.y + r.h - 1) as i32, right: (r.x + r.w) as i32, bottom: (r.y + r.h) as i32 };
-        dev.clear(&[right, bottom], CLEAR_TARGET, 0xff00_0000, 1.0, 0);
-    }
+    // 25-26, stock's black line along the view's right column and bottom row, are the
+    // frame's (`frame::black_lines`), in the scene pass.
     v.rect
 }

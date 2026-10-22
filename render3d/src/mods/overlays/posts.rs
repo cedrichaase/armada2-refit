@@ -13,7 +13,7 @@
 //! 0x593840): while one of our views runs, the post is noted for the view and drawn at
 //! the flush as an anti-aliased line of a fixed pixel width (`shaders/overlays.hlsl`,
 //! `vs_line`/`ps_line`), depth-tested, not written; otherwise the engine's is called.
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{hook, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, DynVb, Shader};

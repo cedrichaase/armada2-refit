@@ -23,9 +23,7 @@ pub enum Context {
 /// touches, so the engine's next call finds the device as it left it. Does nothing
 /// without a Direct3D 9 device behind the game's (DXVK's own d3d8, GOG's d3d8to9).
 pub fn frame(ctx: Context) {
-    let dev8 = crate::engine::d3d8_device();
-    let Some(dev) = crate::d3d::Device::from_d3d8(dev8) else { return };
-    crate::gfx::frame(dev, |w, h, draw| {
+    crate::gfx::frame(|w, h, draw| {
         crate::input::poll(w, h);
         let mut ui = crate::widgets::Ui::begin(draw, w, h, crate::input::state());
         ui.theme = crate::widgets::Theme::for_context(ctx);

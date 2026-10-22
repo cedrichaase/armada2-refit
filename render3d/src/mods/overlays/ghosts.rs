@@ -24,7 +24,7 @@
 //! the main view only; here it is handed to the hulls module (`hulls::placeholder`),
 //! which draws it as stock fades it, with its height post (render3d/README.md, "The
 //! build ghost").
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_f32, rd, storm3d};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};

@@ -8,8 +8,6 @@ extern crate alloc;
 pub mod rt;
 pub mod assets;
 pub mod clock;
-#[macro_use]
-pub mod d3d;
 pub mod dump;
 pub mod config;
 pub mod engine;

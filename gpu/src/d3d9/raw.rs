@@ -1,12 +1,18 @@
 //! Direct3D 9 through raw COM vtables: the device behind d3d8to9 (platform/D3D9.md)
-//! and the resources we make on it. Slot numbers follow d3d9.h's declaration order.
+//! and the resources made on it. Slot numbers follow d3d9.h's declaration order.
+//!
+//! The backend (`super`) is written on this. Outside this crate it is **transitional**:
+//! what render3d's modules not yet ported to the interface draw with, and the plugins'
+//! engine glue that talks to the game's own d3d8 device (`query`, `Com`, `vcall!`).
 #![allow(clippy::too_many_arguments)]
-pub mod consts;
 
-use crate::math::M4;
 use core::ffi::c_void;
 use core::ptr::null_mut;
-pub use consts::*;
+pub use super::consts::*;
+pub use crate::vcall;
+
+/// A Direct3D matrix, rows of four.
+pub type Matrix = [[f32; 4]; 4];
 
 pub type HRESULT = i32;
 
@@ -106,17 +112,6 @@ impl Drop for Com {
         }
     }
 }
-
-macro_rules! vcall {
-    ($obj:expr, $slot:expr, fn($($t:ty),*) -> $r:ty, $($a:expr),*) => {{
-        let o: *mut c_void = $obj;
-        let f: unsafe extern "system" fn(*mut c_void $(, $t)*) -> $r =
-            unsafe { core::mem::transmute(*(*(o as *const *const usize)).add($slot)) };
-        unsafe { f(o $(, $a)*) }
-    }};
-}
-#[allow(unused_imports)]
-pub(crate) use vcall;
 
 pub fn query(obj: *mut c_void, iid: &Guid) -> Option<Com> {
     if obj.is_null() {
@@ -300,12 +295,12 @@ impl Device {
         let p = if rects.is_empty() { null_mut() } else { rects.as_ptr() as *mut Rect };
         vcall!(self.0, 43, fn(u32, *mut Rect, u32, u32, f32, u32) -> HRESULT, rects.len() as u32, p, flags, color, z, stencil)
     }
-    pub fn set_transform(self, which: u32, m: &M4) -> HRESULT {
-        vcall!(self.0, 44, fn(u32, *const M4) -> HRESULT, which, m)
+    pub fn set_transform(self, which: u32, m: &Matrix) -> HRESULT {
+        vcall!(self.0, 44, fn(u32, *const Matrix) -> HRESULT, which, m)
     }
-    pub fn get_transform(self, which: u32) -> M4 {
-        let mut m = M4::IDENTITY;
-        vcall!(self.0, 45, fn(u32, *mut M4) -> HRESULT, which, &mut m);
+    pub fn get_transform(self, which: u32) -> Matrix {
+        let mut m: Matrix = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+        vcall!(self.0, 45, fn(u32, *mut Matrix) -> HRESULT, which, &mut m);
         m
     }
     pub fn set_viewport(self, vp: &Viewport) -> HRESULT {
@@ -328,6 +323,20 @@ impl Device {
         let mut o = null_mut();
         let hr = vcall!(self.0, 59, fn(u32, *mut *mut c_void) -> HRESULT, kind, &mut o);
         if hr < 0 { None } else { Some(Com::made(o, "create_state_block (default pool)")) }
+    }
+    /// `BeginStateBlock`: the calls until `end_state_block` only name states.
+    pub fn begin_state_block(self) -> HRESULT {
+        vcall!(self.0, 60, fn() -> HRESULT,)
+    }
+    pub fn end_state_block(self) -> Option<Com> {
+        let mut o = null_mut();
+        let hr = vcall!(self.0, 61, fn(*mut *mut c_void) -> HRESULT, &mut o);
+        if hr < 0 || o.is_null() { None } else { Some(Com::made(o, "recorded_block")) }
+    }
+    /// Copies the front buffer (what was presented last) into a system-memory surface
+    /// of the display mode's size, as A8R8G8B8.
+    pub fn get_front_buffer_data(self, sys: &Com) -> HRESULT {
+        vcall!(self.0, 33, fn(u32, *mut c_void) -> HRESULT, 0, sys.0)
     }
     pub fn get_texture(self, stage: u32) -> Option<Com> {
         let mut o = null_mut();

@@ -46,3 +46,6 @@ render3d/a2fmt/target/
 ui/target/
 ui/build/
 ui/fontbake/target/
+
+# gpu: cargo's build output (a library of render3d's and ui's, built inside each)
+gpu/target/

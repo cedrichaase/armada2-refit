@@ -6,7 +6,7 @@
 //! `+0x18` z1, `+0x1c` y, with `+0x20` + 1 lines along z and `+0x24` + 1 along x, each
 //! through `ST3D_Camera::ClipAndRenderLine` in `ST3D_Colour_Dark_Orange` (0x7a8ee8),
 //! depth-tested and written. (`DRAW_PIZZA_BOX`'s blue lines are a debug switch.)
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{field, field_f32, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, DynVb, Shader};

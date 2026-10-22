@@ -10,7 +10,7 @@
 //! of megabytes of them. Each pass's shader reads `k_tile` (c29, c30: chain.hlsli):
 //! VPOS plus `[0].xy` is the texel's place in the whole face, VPOS plus `[0].zw` its
 //! texel in the tile's targets, `[1].xy` one over their edge.
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use alloc::vec::Vec;
 use core::ffi::c_void;
 

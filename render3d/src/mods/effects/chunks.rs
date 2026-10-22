@@ -30,7 +30,7 @@
 //! The simulation runs on the sim clock (`View::time`), once per frame however many
 //! views draw, so it stops while the game is paused.
 use super::Sec;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, hook, obj};
 use crate::frame::steps::View;
 use crate::gfx;

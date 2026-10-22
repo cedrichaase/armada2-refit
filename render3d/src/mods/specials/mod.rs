@@ -13,7 +13,7 @@
 pub mod look;
 
 use super::{Module, Step};
-use crate::d3d::Device;
+use gpu::d3d9::raw::Device;
 use crate::engine::{self, field, field_u8};
 use crate::engine::obj;
 use crate::frame::steps::View;

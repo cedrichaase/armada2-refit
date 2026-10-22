@@ -52,7 +52,8 @@ scene. Two causes, both fixed:
   `SBT_ALL` state block around every draw of every module, so the engine's state cache
   never sees our state: 0.77 ms capturing and 2.0 ms applying per view in the battle,
   three quarters of render3d's CPU time. It now uses a block recorded with
-  Begin/EndStateBlock that holds only what our draws change (`gfx::recorded_block`):
+  Begin/EndStateBlock that holds only what our draws change (`recorded_block`, now in
+  `gpu/src/d3d9/mod.rs`):
   0.13-0.23 ms. The transforms, lights and materials were what made the whole block
   dear; the shader constants are kept (leaving them out lost most of the starfield).
 - **Ini files read under Wine.** `GetPrivateProfileString` opens and parses the file on
