@@ -45,11 +45,12 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '1.7.0'
-SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step lines
+INSTALLER_VERSION = '1.8.0'
+SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
 RELEASES_PAGE = f'https://github.com/{REPO}/releases'
@@ -822,7 +823,7 @@ def redact(text):
     for h in {HOME, os.path.realpath(HOME)}:
         if len(h) > 1:
             text = text.replace(h, '~')
-    text = re.sub(r'(?i)([\\/](?:home|users))[\\/][^\\/\s"\';]+', r'\1\\<user>', text)
+    text = re.sub(r'(?i)([\\/](?:home|users))([\\/])[^\\/\s"\';]+', r'\1\2<user>', text)
     return re.sub(r'(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])', '<ip>', text)
 
 
@@ -924,6 +925,70 @@ def package_files(version):
         return None
 
 
+def readable(path):
+    """Whether a file can be opened and read: an antivirus holding or blocking it cannot."""
+    try:
+        with open(path, 'rb') as f:
+            f.read(1)
+        return True
+    except OSError:
+        return False
+
+
+def sha256_or(path, default=''):
+    try:
+        return sha256(path)
+    except OSError:
+        return default
+
+
+def cache_problems():
+    """[(file, 'missing' | 'unreadable')] in the installer's cache: each release zip that
+    cannot be read, and each file of an unpacked release (the newest unpack of each, as
+    Package.unpack may have fallen back to dest-N) that is gone or cannot be read."""
+    out = []
+    rels = os.path.join(CACHE, 'releases')
+    for z in sorted(glob.glob(os.path.join(rels, 'armada2-refit-*.zip'))):
+        if not readable(z):
+            out.append((short(z), 'unreadable'))
+    udir = os.path.join(CACHE, 'unpacked')
+    try:
+        dirs = [d for d in os.listdir(udir) if re.fullmatch(r'[\d.]+(-\d+)?', d)]
+    except OSError:
+        dirs = []
+    newest = {}
+    for d in dirs:
+        v = d.split('-')[0]
+        t = os.path.getmtime(os.path.join(udir, d))
+        if v not in newest or t > newest[v][0]:
+            newest[v] = (t, d)
+    for v, (_, d) in sorted(newest.items()):
+        try:
+            with zipfile.ZipFile(os.path.join(rels, f'armada2-refit-{v}.zip')) as z:
+                names = [n for n in z.namelist() if not n.endswith('/')]
+        except (OSError, zipfile.BadZipFile):
+            continue
+        # The package's own SHA256SUMS too: it names what the release shipped, even when
+        # an antivirus took a file out of the zip before it was unpacked.
+        for top in {n.split('/')[0] for n in names if '/' in n}:
+            try:
+                for line in open(os.path.join(udir, d, top, 'SHA256SUMS'), encoding='utf-8'):
+                    parts = line.split(None, 1)
+                    if len(parts) == 2:
+                        n = f"{top}/{parts[1].strip().lstrip('*')}"
+                        if n not in names:
+                            names.append(n)
+            except OSError:
+                pass
+        for n in names:
+            f = os.path.join(udir, d, *n.split('/'))
+            if not os.path.isfile(f):
+                out.append((short(f), 'missing'))
+            elif not readable(f):
+                out.append((short(f), 'unreadable'))
+    return out
+
+
 REPORT_NAME = 'armada2-refit-report.txt'
 REPORT_HINT = ('Send this with a bug report: paste it into the GitHub issue, or save it and '
                'attach the file. It names files by their hashes and leaves out your user '
@@ -935,10 +1000,11 @@ def report_for_paste(text):
     return '```\n' + text + '\n```'
 
 
-def diagnose(game):
+def diagnose(game, error=None):
     """The bug report: what a player sends when the mod does not work. Everything that
     tells why from a distance, nothing of the game's own files but their hashes, and
-    redacted to be posted in public (redact)."""
+    redacted to be posted in public (redact). `error`: the failure it is sent for, if
+    any (the error dialog's Copy report)."""
     out = []
     w = out.append
     w(f'Armada II Refit diagnostics -- installer {INSTALLER_VERSION}, '
@@ -948,8 +1014,21 @@ def diagnose(game):
     w(f'System: {SYSTEM_NAME}, {osr.get("PRETTY_NAME") or platform.platform()}'
       + (f' ({platform.release()})' if SYSTEM == 'linux' else '')
       + (f', macOS {platform.mac_ver()[0]}' if SYSTEM == 'macos' else ''))
+    if error is not None:
+        head, _todo, details = explain(error)
+        w(f'Failed: {head}' + (f' [{error_code(error)}]' if error_code(error) else ''))
+        if details and details != head:
+            w(f'  {details}')
+    # Files of a release an antivirus took or holds: the installer's cache first, the game
+    # folder below (an antivirus quarantines our plugins as false positives).
+    av = cache_problems()
+    av_lines = [f'  {f}: {why} (installer cache)' for f, why in av]
     if not game or not exe_in(game):
         w('Game: none found')
+        if av_lines:
+            w('')
+            w('Files missing or unreadable, likely an antivirus:')
+            out.extend(av_lines[:40])
         return redact('\n'.join(out))
     p = lambda n: os.path.join(game, n)
     try:
@@ -962,7 +1041,8 @@ def diagnose(game):
     w(f'Game: {game}' + (f'  [{g.source}]' if g else ''))
     exe = has.get('armada2.exe')
     if exe:
-        w(f'  Armada2.exe: {os.path.getsize(p(exe))} bytes, sha256 {sha256(p(exe))[:16]}')
+        w(f'  Armada2.exe: {os.path.getsize(p(exe))} bytes, '
+          f'sha256 {sha256_or(p(exe), "(unreadable)")[:16]}')
     state = load_json(p(STATE_FILE))
     state = state if isinstance(state, dict) else {}
     installed = state.get('version')
@@ -1037,7 +1117,7 @@ def diagnose(game):
         except OSError:
             ours = False
         w('  dxvk.conf: ' + ("the refit's" if ours else "not the refit's"))
-    d3d8to9 = d8 is not None and sha256(p(d8)) == D3D8TO9_SHA
+    d3d8to9 = d8 is not None and sha256_or(p(d8)) == D3D8TO9_SHA
 
     # ---- the plugins
     w('')
@@ -1045,9 +1125,13 @@ def diagnose(game):
     shipped = package_files(installed) if installed else None
     asis = [n for n in names if n.lower().endswith('.asi')]
     for n in asis:
-        h = sha256(p(n))
+        h = sha256_or(p(n))
         tag = ''
-        if shipped is not None:
+        if not h:
+            tag = '  [unreadable]'
+            av_lines.append(f'  {n}: unreadable (game folder)')
+            h = '(unreadable)'
+        elif shipped is not None:
             ref = shipped.get(n)
             tag = '  [as released]' if ref == h else '  [differs from the release]' if ref \
                 else '  [not from the release]'
@@ -1060,6 +1144,7 @@ def diagnose(game):
                 and n.rsplit('.', 1)[0] not in LEGACY_UI + ('Render3D', 'UI')]
         if gone:
             w('  not in the game folder, though the release has them: ' + ', '.join(gone))
+            av_lines += [f'  {n}: missing (game folder)' for n in gone]
     elif installed:
         w(f'  (release {installed} is not in the installer\'s cache: nothing to compare against)')
     stems = {n.rsplit('.', 1)[0].lower() for n in asis}
@@ -1128,7 +1213,7 @@ def diagnose(game):
         findings.append(f'{both} installed, but d3d8.dll is {d8_what.split(" (")[0]}, not '
                         "crosire's d3d8to9: they get no Direct3D 9 device and stand down. "
                         'Install again.')
-        if d8 and sha256(p(d8)) == GOG_D3D8_SHA and installed:
+        if d8 and sha256_or(p(d8)) == GOG_D3D8_SHA and installed:
             findings.append("GOG's d3d8.dll is back since the install, perhaps from a GOG "
                             'Galaxy "verify / repair".')
         if d8 and 'DXVK' in d8_what and g and g.heroic:
@@ -1161,6 +1246,13 @@ def diagnose(game):
     for s, lines in texts.items():
         if any('PANIC' in l for l in lines):
             findings.append(f'{s}.log records a panic: the plugin stopped the game.')
+    if av_lines:
+        findings.insert(0, f'{len(av_lines)} file{"s" if len(av_lines) > 1 else ""} of the '
+                        'release missing or unreadable (listed below): most likely an '
+                        "antivirus quarantined or holds them, as a false positive. Restore them "
+                        f'from its quarantine or add exclusions, then install again ({AV_HELP}).')
+        out.extend(['', 'Files missing or unreadable, likely an antivirus:'] + av_lines[:40]
+                   + ([f'  [... {len(av_lines) - 40} more]'] if len(av_lines) > 40 else []))
 
     head = out[:out.index('') if '' in out else len(out)]
     tail = out[len(head):]
@@ -1358,6 +1450,113 @@ def heroic_apply(heroic, changes, undo=False):
     return done
 
 
+# ------------------------------------------------------------------ errors
+
+# A failure said in words a player can act on: what happened, the likely cause, what to
+# do. The release scripts name the failures they understand as "::error <code> <path>"
+# before their last line (schema 1, from 12.42.0), the installer raises InstallError for
+# its own, and explain() turns either, or any exception, into the words. The raw message
+# goes to the log and the details, never the headline.
+ERROR_CODES = ('av-locked', 'av-missing', 'damaged', 'game-running', 'no-game',
+               'write-denied', 'network')
+AV_CODES = ('av-locked', 'av-missing', 'damaged', 'write-denied')   # these link AV_HELP
+AV_HELP = f'https://github.com/{REPO}#antivirus-false-positives'
+
+
+class InstallError(RuntimeError):
+    """A failure explain() knows by its code, with the files it is about."""
+    def __init__(self, code, paths, message):
+        super().__init__(message)
+        self.code, self.paths = code, [p for p in paths if p]
+
+
+def error_code(err):
+    """The ERROR_CODES entry for an InstallError, a code, or an exception (None: unknown)."""
+    if isinstance(err, InstallError):
+        return err.code
+    if isinstance(err, str):
+        return err if err in ERROR_CODES else None
+    if isinstance(err, zipfile.BadZipFile):
+        return 'damaged'
+    if isinstance(err, (urllib.error.URLError, TimeoutError, ConnectionError, ssl.SSLError)):
+        return 'network'
+    if isinstance(err, OSError):
+        # Windows: 32 is a sharing violation (an antivirus scanning or holding the file),
+        # 5 access denied. In the installer's own cache that is an antivirus too.
+        if getattr(err, 'winerror', None) == 32:
+            return 'av-locked'
+        if isinstance(err, PermissionError) or getattr(err, 'winerror', None) == 5:
+            f = os.path.abspath(str(err.filename or ''))
+            return 'av-locked' if f.startswith(os.path.abspath(CACHE) + os.sep) else 'write-denied'
+    return None
+
+
+def explain(err, path=None):
+    """(headline, what to do, details) for a failure: an InstallError, a code from
+    ERROR_CODES with the file it is about, or any exception. Every front end shows these
+    three (the GTK and Tk windows, the command line)."""
+    code = error_code(err)
+    if isinstance(err, InstallError):
+        paths = err.paths or ([path] if path else [])
+    elif isinstance(err, OSError) and err.filename and path is None:
+        paths = [short(str(err.filename))]
+    else:
+        paths = [path] if path else []
+    if isinstance(err, str):
+        details = ''
+    elif type(err) in (InstallError, RuntimeError):
+        details = str(err)
+    else:
+        details = f'{type(err).__name__}: {err}'
+    if code == 'write-denied':      # the game folder is said apart: the file's name
+        paths = [p.replace('\\', '/').rsplit('/', 1)[-1] for p in paths]
+    n = len(paths)
+    files = ', '.join(paths[:6]) + (f' and {n - 6} more' if n > 6 else '')
+    them = 'it' if n <= 1 else 'them'
+    cache = r'%LOCALAPPDATA%\armada2-refit' if SYSTEM == 'windows' else short(CACHE)
+    av = ("Some antivirus programs flag Armada II Refit's plugins as a false positive: they "
+          'are unsigned DLLs that hook into the game. Restore '
+          + (them if n else 'the files') + " from your antivirus's quarantine, or add "
+          f'exclusions for {cache} and the game folder, then install again. If it still fails, '
+          'restart the computer and try once more.')
+    admin = ('run the installer as administrator' if SYSTEM == 'windows'
+             else 'make the folder writable for you')
+    texts = {
+        'av-locked': (f'{files or "A file of the package"} could not be read: an antivirus is '
+                      f'most likely holding {them}.', av),
+        'av-missing': (f'{files or "A file of the package"} '
+                       f'{"is" if n <= 1 else "are"} missing from the package: an antivirus '
+                       f'has most likely quarantined {them}.', av),
+        'damaged': ('The package is damaged' + (f': {files} does not match its checksum.'
+                                                if n == 1 else f': {files}.' if n else '.'),
+                    'Install again. If it fails the same way, delete the release from the '
+                    f"installer's cache ({short(os.path.join(CACHE, 'releases'))}) so it is "
+                    'downloaded anew. An antivirus that cleans or cuts files in place does this '
+                    'too: look in its quarantine and history.'),
+        'game-running': ('Armada II is running.', 'Quit the game, then install again.'),
+        'no-game': (f'There is no Armada2.exe in {files}.' if n else 'The game was not found.',
+                    'Choose the folder that holds Armada2.exe.'),
+        'write-denied': (f'{files or "A file"} could not be written into the game folder.',
+                         'An antivirus may be blocking it (real-time protection guards DLLs in '
+                         'program folders), or the folder is not yours to write. Add an exclusion '
+                         f'for the game folder, or {admin}, then install again.'),
+        'network': ('Could not reach GitHub.',
+                    'Check the internet connection, then try again. A release downloaded '
+                    'before installs offline.'),
+    }
+    if code in texts:
+        head, todo = texts[code]
+    else:
+        head = ((err if isinstance(err, str) else details).strip().splitlines()
+                or ['Something went wrong.'])[0]
+        head = head[:1].upper() + head[1:]
+        if head.lower() == details.strip().lower():
+            details = ''
+        todo = ('The log has the details. If it keeps happening, Copy report puts together '
+                'what helps, to paste into an issue on GitHub.')
+    return head, todo, details
+
+
 # ------------------------------------------------------------------ releases
 
 class Release:
@@ -1452,7 +1651,7 @@ def fetch_releases():
 
 def cached_releases():
     """(releases, when last checked) from the cache, plus any zip in the cache that the
-    list no longer names -- GitHub keeps only the newest three releases."""
+    list no longer names -- GitHub keeps only the newest ten releases."""
     data = load_json(os.path.join(CACHE, 'releases.json'), {}) or {}
     rels = [Release(**r) for r in data.get('releases', [])]
     return merge_cached(rels), data.get('checked')
@@ -1498,7 +1697,8 @@ def download(rel, progress=None):
                 if progress:
                     progress(got, total)
         if rel.digest and rel.digest.startswith('sha256:') and h.hexdigest() != rel.digest[7:]:
-            raise RuntimeError(f'the download of {rel.version} is damaged (checksum)')
+            raise InstallError('damaged', [rel.zip_name],
+                               f'the download of {rel.version} is damaged (checksum)')
         Package(tmp)        # a zip we can read, with a package in it
         os.replace(tmp, rel.cached)
     finally:
@@ -1588,18 +1788,75 @@ class Package:
                     commit=m.group(2) if m else '', layers=layers, steps=STEPS)
 
     def unpack(self, dest):
-        """Into dest/, refusing any member that would land outside it."""
-        if os.path.isdir(dest):
-            shutil.rmtree(dest)
-        os.makedirs(dest)
+        """Into dest/, refusing any member that would land outside it. When an earlier
+        unpack there cannot be cleared (an antivirus still holds a file in it), into
+        dest-1, dest-2, ... instead (fresh_dir); those are cleared at the next unpack, as
+        far as they can be (sweep_unpacked). A file taken or held while it is written is
+        named as the antivirus's doing."""
+        sweep_unpacked(os.path.dirname(dest))
+        dest = fresh_dir(dest)
         root = os.path.realpath(dest)
         with zipfile.ZipFile(self.path) as z:
             for n in z.namelist():
                 t = os.path.realpath(os.path.join(dest, n))
                 if t != root and not t.startswith(root + os.sep):
                     raise RuntimeError(f'unsafe path in the package: {n}')
-            z.extractall(dest)
+            try:
+                z.extractall(dest)
+            except (PermissionError, FileNotFoundError) as e:
+                try:
+                    f = os.path.relpath(str(e.filename), os.path.join(dest, self.top)) \
+                        if e.filename else ''
+                except ValueError:
+                    f = str(e.filename)
+                raise InstallError('av-locked' if isinstance(e, PermissionError) else 'av-missing',
+                                   [f], f'{f or "a file"} could not be unpacked into '
+                                   f'{short(dest)}: {e}') from e
         return os.path.join(dest, self.top)
+
+
+UNPACK_SPARE = re.compile(r'[\d.]+-\d+')     # dest-1, dest-2, ... (Package.unpack)
+
+
+def clear_dir(path, tries=5):
+    """rmtree, retried with a growing pause (0.25 s to 2 s): an antivirus scanning a file
+    holds it only for a moment. Whether the folder is gone."""
+    for i in range(tries):
+        try:
+            shutil.rmtree(path)
+            return True
+        except FileNotFoundError:
+            return True
+        except OSError:
+            if i + 1 < tries:
+                time.sleep(0.25 * 2 ** i)
+    return not os.path.exists(path)
+
+
+def fresh_dir(dest):
+    """dest, emptied and made; or, when it cannot be cleared, the first dest-N that is
+    free or can be."""
+    if clear_dir(dest):
+        os.makedirs(dest)
+        return dest
+    for n in range(1, 50):
+        d = f'{dest}-{n}'
+        if clear_dir(d, tries=1):
+            os.makedirs(d)
+            return d
+    raise InstallError('av-locked', [short(dest)],
+                       f'{short(dest)} and every folder beside it are held by another program')
+
+
+def sweep_unpacked(parent):
+    """Clear the dest-N folders an earlier unpack fell back to, best effort."""
+    try:
+        names = os.listdir(parent)
+    except OSError:
+        return
+    for n in names:
+        if UNPACK_SPARE.fullmatch(n):
+            clear_dir(os.path.join(parent, n), tries=1)
 
 
 # ------------------------------------------------------------------ installing
@@ -1624,12 +1881,17 @@ class Job:
         proc = subprocess.Popen(cmd, cwd=pkgdir, env=env, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True, bufsize=1,
                                 encoding='utf-8', errors='replace', creationflags=NO_WINDOW)
-        out, seen = [], 0
+        out, seen, errors = [], 0, []
         for line in proc.stdout:
             line = line.rstrip('\n')
             step = None
             if line.startswith('::step '):
                 step = line.split()[1] if len(line.split()) > 1 else None
+            elif line.startswith('::error '):
+                # "::error <code> <path>": what explain() says; the path may hold spaces.
+                parts = line.split(' ', 2)
+                errors.append((parts[1] if len(parts) > 1 else '', parts[2] if len(parts) > 2 else ''))
+                self.log(line)
             else:
                 out.append(line)
                 self.log(line)
@@ -1643,13 +1905,20 @@ class Job:
                 self.report(lo + (hi - lo) * min(seen, len(steps)) / len(steps), step, None)
         if proc.wait() != 0:
             tail = [l for l in out if l.strip()][-1:] or ['the install script failed']
-            raise RuntimeError(tail[0])
+            if errors:
+                # The last code says what happened; its files, with the antivirus's together.
+                code = errors[-1][0]
+                same = (lambda c: c.startswith('av-')) if code.startswith('av-') else \
+                    (lambda c: c == code)
+                raise InstallError(code, [p for c, p in errors if same(c)], tail[0])
+            raise RuntimeError(tail[0])      # a schema-0 zip, or a failure with no code
         return out
 
     def install(self, rel, zip_path, game, launcher=True):
         """rel may be None when installing a local zip."""
         if game_running():
-            raise RuntimeError('Armada II is running — quit the game first')
+            raise InstallError('game-running', ['Armada2.exe'],
+                               'Armada II is running — quit the game first')
         if zip_path is None:
             ver = rel.version
             fresh = not rel.is_cached()
@@ -1723,7 +1992,8 @@ class Job:
 
     def uninstall(self, rels, game):
         if game_running():
-            raise RuntimeError('Armada II is running — quit the game first')
+            raise InstallError('game-running', ['Armada2.exe'],
+                               'Armada II is running — quit the game first')
         facts = inspect(game)
         state = facts['state'] or {}
         # The installed release's own script if we have it, else the newest we have.
@@ -1867,7 +2137,13 @@ def cli(argv):
         else:
             ap.print_help()
     except Exception as e:
-        print(f'error: {e}', file=sys.stderr)
+        head, todo, details = explain(e)
+        print(f'error: {head}\n  {todo}', file=sys.stderr)
+        if error_code(e) in AV_CODES:
+            print(f'  More: {AV_HELP}', file=sys.stderr)
+        if details:
+            print(f'  ({details})', file=sys.stderr)
+        print('  For a bug report: --report', file=sys.stderr)
         return 1
     return 0
 
@@ -1969,6 +2245,8 @@ def selftest():
                    'peer 203.0.113.7:2399 Render3D 12.38.1')
         check('Alice' not in r and 'bob' not in r and 'carol' not in r and HOME not in r
               and '<ip>:2399' in r and '12.38.1' in r, 'report: user names and addresses out')
+        check('C:\\Users\\<user>\\A2' in r and 'Z:\\home\\<user>\\g' in r
+              and '/Users/<user>/b' in r, 'report: a user folder keeps its own separator')
         lines = [f'line {i}' for i in range(600)]
         lines[300] = 'render3d: standing down'
         lines[301] = 'render3d: standing down'
@@ -1986,6 +2264,40 @@ def selftest():
         check('no Direct3D 9 device' in rep and 'scene off' in rep and 'Alice' not in rep
               and 'ASI loader): no plugin loads' not in rep,
               'report: a d3d8.dll that is not d3d8to9 is named, and why the scene is off')
+        # Errors in words (explain): every code its own, the files named, the cause said.
+        heads = set()
+        for code in ERROR_CODES:
+            head, todo, details = explain(code, 'game/Menus.asi')
+            heads.add(head)
+            check(head and todo and 'log has the details' not in todo
+                  and ('Menus.asi' in head or code in ('game-running', 'network')),
+                  f'explain: {code} -- {head}')
+        check(len(heads) == len(ERROR_CODES), 'explain: each code its own headline')
+        head, todo, details = explain(InstallError(
+            'av-locked', ['game\\Menus.asi', 'game\\QOL.asi'], 'the script said so'))
+        check('game\\Menus.asi, game\\QOL.asi' in head and 'antivirus' in head
+              and 'quarantine' in todo and 'exclusions' in todo
+              and details == 'the script said so', 'explain: every file named, the antivirus said')
+        head, todo, _ = explain(InstallError('av-missing', ['game/QOL.asi'], 'x'))
+        check(head.startswith('game/QOL.asi is missing') and 'quarantined it' in head,
+              'explain: one file, singular')
+        check(error_code(zipfile.BadZipFile('x')) == 'damaged', 'explain: a bad zip is damaged')
+        check(error_code(urllib.error.URLError('down')) == 'network'
+              and error_code(TimeoutError()) == 'network', 'explain: network errors')
+        check(error_code(PermissionError(13, 'denied', os.path.join(CACHE, 'unpacked', 'x')))
+              == 'av-locked', "explain: refused in the installer's cache: an antivirus")
+        check(error_code(PermissionError(13, 'denied', os.path.join(t, 'game', 'QOL.asi')))
+              == 'write-denied', 'explain: refused in the game folder: write-denied')
+        e32 = OSError(13, 'in use', 'x')
+        e32.winerror = 32
+        check(error_code(e32) == 'av-locked', 'explain: WinError 32 is a file held open')
+        head, todo, details = explain(RuntimeError('the install script failed'))
+        check(head == 'The install script failed' and not details and 'Copy report' in todo
+              and error_code(RuntimeError('x')) is None,
+              'explain: an unknown failure is said as it is, with where to look')
+        head, _, details = explain(KeyError('k'))
+        check(head == "KeyError: 'k'" and not details, 'explain: an exception by its type')
+
         keep = {k: os.environ.get(k) for k in ('A2_APPIMAGE', 'PATH', 'PYTHONHOME', 'A2_ORIG_PATH',
                                               'A2_ORIG_PYTHONHOME')}
         os.environ.update(A2_APPIMAGE='1', PATH='/bundle/bin:/usr/bin', PYTHONHOME='/bundle',
@@ -2606,10 +2918,51 @@ def run_gui():
             threading.Thread(target=run, daemon=True).start()
 
         def failed(self, e):
+            """An install or uninstall that failed: the status line, the log, and a dialog
+            saying what to do (explain)."""
             self.set_busy(False)
             self.sky.set_warp(False)
-            self.set_status(f'Failed: {e}', 'err')
-            self.log(f'error: {e}')
+            head, todo, details = explain(e)
+            self.set_status(f'Failed: {head}', 'err')
+            self.log(f'error: {details or head}')
+            self.show_error(e, head, todo)
+
+        def show_error(self, e, head, todo):
+            """The headline, what to do, the README's antivirus section where it applies,
+            the log folded away, and Copy report: the diagnostics with this failure in
+            them, ready to paste into an issue."""
+            g = self.game()
+            d = Adw.AlertDialog(heading=head, body=todo)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            if error_code(e) in AV_CODES:
+                box.append(Gtk.LinkButton(uri=AV_HELP, label='Antivirus false positives: why, '
+                                          'and what to do', halign=Gtk.Align.START))
+            buf = self.logview.get_buffer()
+            lines = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False).splitlines()
+            view = Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
+                                wrap_mode=Gtk.WrapMode.WORD_CHAR)
+            view.add_css_class('logview')
+            view.get_buffer().set_text('\n'.join(lines[-200:]))
+            exp = Gtk.Expander(label='Log')
+            exp.set_child(Gtk.ScrolledWindow(child=view, min_content_height=180,
+                                             min_content_width=480))
+            box.append(exp)
+            d.set_extra_child(box)
+            d.add_response('report', 'Copy report')
+            d.add_response('close', 'Close')
+            d.set_default_response('close')
+            d.set_close_response('close')
+
+            def copied(r):
+                self.copy(report_for_paste(r))
+                self.set_status('Report copied: paste it into an issue on GitHub', 'ok')
+
+            def response(_d, resp):
+                if resp == 'report':
+                    self.in_thread(lambda: diagnose(g.path if g else None, e), copied,
+                                   lambda x: self.set_status(f'No report: {x}', 'err'))
+            d.connect('response', response)
+            d.present(self)
 
         # ---------------------------------------------------------- the game
         def load_games(self, select=None):
@@ -3754,12 +4107,86 @@ def run_tk():
                 self.layout()
 
         def failed(self, e):
+            """An install or uninstall that failed: the status line, the log, and a window
+            saying what to do (explain)."""
             self.busy = False
             self.sky.set_warp(False)
             self.bar.set(0)
-            self.log(f'error: {e}')
-            self.set_status(f'Failed: {e}', 'err')
-            messagebox.showerror('Armada II Refit', str(e), parent=root)
+            head, todo, details = explain(e)
+            self.log(f'error: {details or head}')
+            self.set_status(f'Failed: {head}', 'err')
+            self.show_error(e, head, todo)
+
+        def show_error(self, e, head, todo):
+            """The headline, what to do, the README's antivirus section where it applies,
+            the log folded away, and Copy report: the diagnostics with this failure in
+            them, ready to paste into an issue."""
+            g = self.game()
+            bg = '#0b0e16'
+            w = tk.Toplevel(root, bg=bg)
+            w.title('Armada II Refit: the install failed')
+            w.transient(root)
+            wrap = px(560)
+            tk.Label(w, text=head, bg=bg, fg=ERR, font=font(16, 'bold'), justify='left',
+                     anchor='w', wraplength=wrap).pack(side='top', fill='x', padx=px(16),
+                                                       pady=(px(14), px(6)))
+            tk.Label(w, text=todo, bg=bg, fg=FG, font=F_SUB, justify='left', anchor='w',
+                     wraplength=wrap).pack(side='top', fill='x', padx=px(16))
+            if error_code(e) in AV_CODES:
+                link = tk.Label(w, text='Antivirus false positives: why, and what to do',
+                                bg=bg, fg=AMBER, font=F_LINK, cursor='hand2', anchor='w')
+                link.pack(side='top', fill='x', padx=px(16), pady=(px(8), 0))
+                link.bind('<1>', lambda _e: webbrowser.open(AV_HELP))
+            bar = tk.Frame(w, bg=bg)
+            bar.pack(side='bottom', fill='x')
+            logf = tk.Frame(w, bg=bg)
+            text = tk.Text(logf, bg='#05070d', fg=FG, font=F_MONO, wrap='word', relief='flat',
+                           bd=0, padx=px(8), pady=px(6), height=12, highlightthickness=0,
+                           selectbackground=AMBER, selectforeground=AMBER_INK)
+            sb = tk.Scrollbar(logf, command=text.yview)
+            text.configure(yscrollcommand=sb.set)
+            sb.pack(side='right', fill='y')
+            text.pack(fill='both', expand=True)
+            text.insert('end', '\n'.join(self.log_lines[-200:]))
+            text.configure(state='disabled')
+            text.see('end')
+            text.bind('<1>', lambda _e: text.focus_set())
+            shown = [False]
+
+            def toggle():
+                shown[0] = not shown[0]
+                if shown[0]:
+                    logf.pack(side='top', fill='both', expand=True, padx=px(16), pady=(px(8), 0))
+                else:
+                    logf.pack_forget()
+                b_log.configure(text=('Hide the log' if shown[0] else 'Show the log'))
+
+            def report():
+                b_rep.configure(state='disabled', text='Putting it together…')
+
+                def done(r):
+                    self.copy(report_for_paste(r))
+                    self.set_status('Report copied: paste it into an issue on GitHub', 'ok')
+                    if w.winfo_exists():
+                        b_rep.configure(state='normal', text='Copied')
+
+                def fail(x):
+                    self.set_status(f'No report: {x}', 'err')
+                    if w.winfo_exists():
+                        b_rep.configure(state='normal', text='Copy report')
+                self.in_thread(lambda: diagnose(g.path if g else None, e), done, fail)
+
+            style = dict(font=F_SUB, bg='#1b2030', fg=FG, activebackground=AMBER,
+                         activeforeground=AMBER_INK, relief='flat', bd=0, padx=px(12),
+                         pady=px(4), highlightthickness=0)
+            tk.Button(bar, text='Close', command=w.destroy, **style).pack(
+                side='right', padx=(0, px(12)), pady=px(10))
+            b_rep = tk.Button(bar, text='Copy report', command=report, **style)
+            b_rep.pack(side='right', padx=(0, px(8)), pady=px(10))
+            b_log = tk.Button(bar, text='Show the log', command=toggle, **style)
+            b_log.pack(side='left', padx=px(12), pady=px(10))
+            w.bind('<Escape>', lambda _e: w.destroy())
+            w.focus_set()
 
         def game(self):
             return self.games[self.gi] if 0 <= self.gi < len(self.games) else None

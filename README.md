@@ -103,6 +103,9 @@ options the game needs ([`gui-installer/README.md`](gui-installer/README.md)).
 - **Linux**: `armada2-refit-installer-x86_64.AppImage`; make it executable and run it.
   It carries GTK 4 and libadwaita itself, and writes Heroic's launch options for you.
 
+If the installer says an antivirus took or holds a file, see
+[Antivirus false positives](#antivirus-false-positives) below.
+
 **From the repository:**
 
     ./a2env.sh                    # check where it thinks the game, prefix and Proton are
@@ -119,6 +122,42 @@ Paths are taken from the environment, then `~/.config/armada2-refit.conf`
 | `A2_GAME` | Heroic's `~/Games/Heroic/Star Trek Armada II` |
 | `A2_PREFIX`, `A2_PROTON` | Heroic's prefix and Proton for it |
 | `A2_DATA` | `~/.local/share/armada2-refit` (`%LOCALAPPDATA%` on Windows): extracted stock art, paid AI layers, builds. **Back up its `ai/` folders**; everything else can be rebuilt with a command |
+
+## Antivirus false positives
+
+Some antivirus programs (Bitdefender among them) flag the mod's plugins as malware and
+quarantine them, or hold them open while they scan, so the installer cannot read or copy
+them. It is a false positive: the plugins are DLLs that are **not code-signed** and that
+**hook into another program's process**, which is what heuristic scanners look for. They
+are built from this repository's source by GitHub's CI, and each carries a version
+resource naming the project. The installer says which file it could not read or write
+and that an antivirus is the likely cause, and **Copy report** in its error window puts
+together what helps with an issue.
+
+**Which files are ours:** everything in the release zip's `game/` folder that ends in
+`.asi`, and `binkw32.dll` (the cutscene player), which is today `Render3D.asi`,
+`UI.asi`, `QOL.asi`, `QOLRules.asi`, `Online.asi`, `HUD.asi`, `Menus.asi`,
+`GridLayout.asi`; and the installer itself (`armada2-refit-installer-windows.exe`).
+The others are third-party and unmodified: `winmm.dll` (the Ultimate ASI Loader),
+`STA2WidescreenPatch.asi`, `d3d8.dll` (crosire's d3d8to9) and `d3d9.dll` (DXVK), credited
+in the zip's `CREDITS.txt`. The zip's `SHA256SUMS` holds every file's hash. Each release's notes carry a VirusTotal
+scan link per file, so you can see what the scanners make of each one before you trust
+it.
+
+**What to do:**
+
+1. Open the antivirus's quarantine (in Bitdefender under *Protection*; in Windows
+   Security under *Virus & threat protection → Protection history*) and restore the
+   mod's files.
+2. Add exclusions for the installer's folder, `%LOCALAPPDATA%\armada2-refit\` (on Linux
+   `~/.cache/armada2-refit/`, on macOS `~/Library/Caches/armada2-refit/`), and for the
+   game folder (for GOG, for example `C:\Program Files (x86)\GOG Galaxy\Games\Star Trek
+   Armada II\`).
+3. Run the installer again. If it still cannot clear its earlier unpack, restart the
+   computer first (or delete `%LOCALAPPDATA%\armada2-refit\installer\cache\unpacked\`).
+
+Reporting the false positive to the antivirus's vendor helps everyone who installs after
+you; most vendors have a form for it.
 
 ## Installing by hand, layer by layer
 

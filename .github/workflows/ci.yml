@@ -281,12 +281,12 @@ jobs:
             dist/armada2-refit-installer-x86_64.AppImage dist/armada2-refit-installer-windows.exe \
             dist/armada2-refit-installer-macos.zip --target "$GITHUB_SHA" \
             --title "Armada II Refit $VERSION" --notes-file notes.md "${pre[@]}"
-      - name: Keep only the newest three releases
+      - name: Keep only the newest ten releases
         run: |
           # Older releases are deleted; their tags stay, so changelogs and links that
           # name a version still resolve. publish/README.md, "Release packages".
           gh release list --limit 1000 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[3:][] | .tagName' |
+            --jq 'sort_by(.createdAt) | reverse | .[10:][] | .tagName' |
           while read -r tag; do
             echo "deleting release $tag (tag kept)"
             gh release delete "$tag" --yes

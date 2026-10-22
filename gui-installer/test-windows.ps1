@@ -115,9 +115,40 @@ $state = Get-Content -Raw -LiteralPath (G "armada2-refit-installed.json") | Conv
 Check "state file: version $pver, installer $ver" (($state.version -eq $pver) -and ($state.installer -eq $ver))
 Check "no launch settings on Windows" (-not $state.heroic -and -not $state.prefix)
 
+Write-Host "== install again while an antivirus holds a file of the first unpack: it goes beside it"
+$unpacked = Join-Path $env:LOCALAPPDATA "armada2-refit\installer\cache\unpacked"
+$first = Join-Path $unpacked "$pver\armada2-refit-$pver\game\QOL.asi"
+Check "the first unpack is there" (Test-Path -LiteralPath $first)
+$hold = [IO.File]::Open($first, "Open", "Read", "Read")   # no delete sharing: rmtree cannot take it
+try {
+    $r = Run @("--package", $Zip, "--game", $G)
+} finally { $hold.Dispose() }
+Check "--package exits 0 with the old unpack held" ($r.Code -eq 0)
+Check "unpacked beside it, into $pver-1" (Test-Path -LiteralPath (Join-Path $unpacked "$pver-1\armada2-refit-$pver\game\QOL.asi"))
+Check "installed" ((Sha (G "QOL.asi")) -eq (Sha (Join-Path $pkg "armada2-refit-$pver\game\QOL.asi")))
+
+Write-Host "== a package an antivirus took a plugin from: named, as an antivirus, with ::error"
+# The zip without game/QOL.asi, written by the exe as Python (Compress-Archive in
+# PowerShell 5.1 can write backslashes into the names).
+$badzip = Join-Path $T "armada2-refit-$pver.zip"
+Set-Content -LiteralPath (Join-Path $probe "strip.py") -Value @(
+    'import sys, zipfile',
+    'with zipfile.ZipFile(sys.argv[1]) as a, zipfile.ZipFile(sys.argv[2], "w") as b:',
+    '    for i in a.infolist():',
+    '        if not i.filename.endswith("/game/QOL.asi"):',
+    '            b.writestr(i, a.read(i))')
+$r = Run @((Join-Path $probe "strip.py"), $Zip, $badzip)
+Check "a zip without QOL.asi" ($r.Code -eq 0)
+$r = Run @("--package", $badzip, "--game", $G)
+Check "--package exits 1" ($r.Code -eq 1)
+Check "the window's words: the file, the antivirus, the README" ((Has $r.Err "error: game\QOL.asi is missing from the package: an antivirus*") -and
+    (Has $r.Err "*More: https://github.com/cedrichaase/armada2-refit#antivirus-false-positives"))
+Check "the script's ::error line in the log" (Has $r.Out "::error av-missing game\QOL.asi")
+
 Write-Host "== uninstall: the game as it was"
 $r = Run @("--uninstall", "--game", $G)
 Check "--uninstall exits 0" ($r.Code -eq 0)
 Check "the game as it was" ((Snap $G) -eq $before)
+Check "the spare unpack swept" (-not (Test-Path -LiteralPath (Join-Path $unpacked "$pver-1")))
 Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "all passed"

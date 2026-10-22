@@ -205,6 +205,15 @@ $(python3 "$gui" --vkbasalt-howto all | sed 's/^/              /')
               had a ReShade preset, pick A2Bloom.ini in ReShade's overlay.
   Bloom is on from launch. Not yet seen in game through this package.
 
+ANTIVIRUS
+  Some antivirus programs flag the plugins as a false positive (they are unsigned DLLs
+  that hook into the game) and quarantine or lock them; the installer then says which
+  file it could not read or write. Restore the files from the quarantine, add exclusions
+  for this folder (the graphical installer's: %LOCALAPPDATA%\armada2-refit\) and the game
+  folder, and install again. More, and which files are ours: README.md in the
+  repository, "Antivirus false positives":
+  https://github.com/cedrichaase/armada2-refit#antivirus-false-positives
+
 Full notes: README.md in the repository, "Installing by hand, layer by layer".
 MIT licence (LICENSE). An unofficial fan project; nothing of the game is included.
 EOF

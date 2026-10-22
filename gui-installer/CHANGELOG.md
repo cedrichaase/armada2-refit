@@ -4,6 +4,37 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 1.8.0 — 2026-10-22
+
+Reads package schemas 0 and 1; schema 1's scripts also print `::error <code> <path>`
+lines from 12.42.0, which 1.7.0 and older log as ordinary output.
+
+### Added
+- **Errors in words** (`explain`): the headline, what to do and the details, the same in
+  the GTK and Tk windows and on the command line. A failure is known by a code, from the
+  scripts' last `::error` line (the files of every line of that code named), from the
+  installer's own `InstallError`, or from the exception (a bad zip, a network error, a
+  file refused or held: `PermissionError`, Windows errors 5 and 32). A script with no
+  `::error` line (schema 0) fails with its last line, as before.
+- The error dialog: the headline, the steps, a link to the README's "Antivirus false
+  positives" where that is the likely cause, the log folded away, and **Copy report**,
+  the diagnostics with the failure in them.
+- `diagnose`: a finding for files of a release missing or unreadable in the
+  installer's cache or the game folder, "likely an antivirus", with the files listed.
+
+### Fixed
+- `Package.unpack` no longer wedges on an earlier unpack an antivirus still holds a file
+  of: it retries the removal with a short backoff, then unpacks into `<version>-1`,
+  `-2`..., cleared at the next unpack (`fresh_dir`, `sweep_unpacked`). A file taken
+  or held while extracting is an antivirus error, not a traceback.
+- `diagnose` no longer fails on a plugin it cannot read; it is listed as unreadable.
+- `diagnose` also checks an unpack against its own `SHA256SUMS`, so a file missing from
+  the zip itself is found too.
+- The report's redaction keeps a user folder's own separator (`/home/<user>/`, not
+  `/home\<user>/`; since 1.7.0).
+
+Confirmed in game 2026-10-22 (the error dialog and Copy report, on Linux).
+
 ## 1.7.0 — 2026-10-20
 
 Reads package schemas 0 and 1.
