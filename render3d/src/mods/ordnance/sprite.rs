@@ -229,7 +229,7 @@ impl Sprites {
             while j < quads.len() && quads[j].tex == q0.tex && quads[j].src == q0.src && quads[j].dst == q0.dst && j - i < 1000 {
                 j += 1;
             }
-            let tex = assets::texture(dev, &q0.tex).unwrap_or(core::ptr::null_mut());
+            let tex = assets::texture(&q0.tex).map(|t| t.raw_texture(crate::gfx::gpu())).unwrap_or(core::ptr::null_mut());
             if !tex.is_null() {
                 let mut verts: Vec<SVert> = Vec::with_capacity((j - i) * 6);
                 for q in &quads[i..j] {

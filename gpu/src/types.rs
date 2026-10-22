@@ -102,6 +102,9 @@ impl Usage {
     pub const COPY_SRC: Usage = Usage(16);
     /// The destination of a copy or resolve.
     pub const COPY_DST: Usage = Usage(32);
+    /// A colour target whose levels below the first are made from it by the device
+    /// (`Cmd::generate_mips`): a blit chain on Vulkan, Direct3D 9's `AUTOGENMIPMAP`.
+    pub const GEN_MIPS: Usage = Usage(64);
 
     pub const fn has(self, o: Usage) -> bool {
         self.0 & o.0 == o.0
@@ -115,8 +118,24 @@ impl core::ops::BitOr for Usage {
     }
 }
 
-/// A 2D texture's description. `samples` is 1 for an ordinary texture; more makes a
-/// multisampled target, which is drawn into and resolved, never sampled.
+/// What shape a texture is. On Vulkan a cube is an image of six layers with a cube view,
+/// and a volume a 3D image; on Direct3D 12 a 2D array of six with a cube SRV, and a 3D
+/// resource.
+#[repr(u32)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum TextureKind {
+    #[default]
+    D2,
+    /// Six square faces, in Direct3D's order (+x, -x, +y, -y, +z, -z).
+    Cube,
+    /// A volume of `depth` slices.
+    D3,
+}
+
+/// A texture's description. `samples` is 1 for an ordinary texture; more makes a
+/// multisampled target, which is drawn into and resolved, never sampled. `levels` 0
+/// is the whole chain. A depth texture that is also `SAMPLED` can be read by shaders
+/// (Direct3D 9's `INTZ`) and is filled by `Cmd::resolve_depth`.
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TextureDesc {
@@ -126,22 +145,54 @@ pub struct TextureDesc {
     pub format: Format,
     pub samples: u32,
     pub usage: Usage,
+    pub kind: TextureKind,
+    /// Slices of a volume; 1 otherwise.
+    pub depth: u32,
 }
 
 impl TextureDesc {
     /// One level, one sample.
     pub const fn d2(width: u32, height: u32, format: Format, usage: Usage) -> TextureDesc {
-        TextureDesc { width, height, levels: 1, format, samples: 1, usage }
+        TextureDesc { width, height, levels: 1, format, samples: 1, usage, kind: TextureKind::D2, depth: 1 }
+    }
+    /// A cube of `edge` on a side, with `levels` levels (0: the whole chain).
+    pub const fn cube(edge: u32, levels: u32, format: Format, usage: Usage) -> TextureDesc {
+        TextureDesc { width: edge, height: edge, levels, format, samples: 1, usage, kind: TextureKind::Cube, depth: 1 }
+    }
+    /// A volume of `width` x `height` x `depth`, with `levels` levels.
+    pub const fn d3(width: u32, height: u32, depth: u32, levels: u32, format: Format, usage: Usage) -> TextureDesc {
+        TextureDesc { width, height, levels, format, samples: 1, usage, kind: TextureKind::D3, depth }
+    }
+    /// The same with `levels` levels.
+    pub const fn with_levels(mut self, levels: u32) -> TextureDesc {
+        self.levels = levels;
+        self
+    }
+    /// How many levels it has: `levels`, or the whole chain for 0.
+    pub fn level_count(&self) -> u32 {
+        if self.levels > 0 {
+            return self.levels;
+        }
+        let d = if self.kind == TextureKind::D3 { self.depth } else { 1 };
+        let m = self.width.max(self.height).max(d).max(1);
+        32 - m.leading_zeros()
     }
 }
 
 /// What a texture starts with: its levels, tightly packed and in order (rows
-/// top-down, `Format::bytes` per texel). The texture keeps them, so that the backend can
-/// make it again after the device is lost (a static slice costs nothing to keep).
+/// top-down, `Format::bytes` per texel). A cube's are its faces in order, each with its
+/// levels; a volume's levels are each its slices in order. The texture keeps them, so
+/// that the backend can make it again after the device is lost (a static slice costs
+/// nothing to keep).
 pub enum Contents {
     None,
     Static(&'static [u8]),
     Owned(alloc::vec::Vec<u8>),
+    /// Let go of once the texture is made, to hold no memory for it (render3d's game
+    /// textures: the process has 2 GB of address space). After the device is lost such
+    /// a texture cannot be made again and draws nothing (`Texture::ready` is false): its
+    /// owner makes another.
+    Transient(alloc::vec::Vec<u8>),
 }
 
 impl Contents {
@@ -149,7 +200,7 @@ impl Contents {
         match self {
             Contents::None => &[],
             Contents::Static(s) => s,
-            Contents::Owned(v) => v,
+            Contents::Owned(v) | Contents::Transient(v) => v,
         }
     }
 }
@@ -392,6 +443,22 @@ impl Code {
 
 pub const MAX_COLORS: usize = 4;
 
+/// The alpha test: a fragment is kept when its alpha (0..255) passes `compare` against
+/// `reference`. Direct3D 9 has it as fixed-function state; a Vulkan or Direct3D 12
+/// backend makes a variant of the pixel shader that discards (a specialisation constant
+/// or a define), since neither has the state.
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct AlphaTest {
+    pub compare: Compare,
+    pub reference: u8,
+}
+
+impl AlphaTest {
+    /// Kept from alpha 128 (one half) up: what render3d's cut-out textures use.
+    pub const HALF: AlphaTest = AlphaTest { compare: Compare::GreaterEqual, reference: 128 };
+}
+
 /// Everything a draw's fixed-function state depends on, made into a `Pipeline` once.
 /// The target formats and sample count are those of the passes it is drawn in.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -409,6 +476,7 @@ pub struct PipelineDesc {
     pub cull: Cull,
     /// Whether draws are clipped to `Cmd::set_scissor`'s rectangle.
     pub scissor: bool,
+    pub alpha_test: Option<AlphaTest>,
     /// The colour targets' formats, `Format::Unknown` past the last.
     pub colors: [Format; MAX_COLORS],
     pub depth_format: Option<Format>,
@@ -430,6 +498,7 @@ impl PipelineDesc {
             depth: Depth::OFF,
             cull: Cull::None,
             scissor: false,
+            alpha_test: None,
             colors: [color, Format::Unknown, Format::Unknown, Format::Unknown],
             depth_format: None,
             samples: 1,
@@ -482,10 +551,22 @@ pub enum Load<T> {
     DontCare,
 }
 
-/// A colour target of a pass, and its clear value as R, G, B, A.
+/// A colour target of a pass, and its clear value as R, G, B, A. `layer` is a cube's
+/// face (0 otherwise); the pass draws into its first level.
 pub struct ColorTarget<'a> {
     pub texture: &'a crate::Texture,
     pub load: Load<[f32; 4]>,
+    pub layer: u32,
+}
+
+impl<'a> ColorTarget<'a> {
+    pub const fn new(texture: &'a crate::Texture, load: Load<[f32; 4]>) -> ColorTarget<'a> {
+        ColorTarget { texture, load, layer: 0 }
+    }
+    /// Face `layer` of a cube.
+    pub const fn face(texture: &'a crate::Texture, layer: u32, load: Load<[f32; 4]>) -> ColorTarget<'a> {
+        ColorTarget { texture, load, layer }
+    }
 }
 
 /// The depth target of a pass, and its clear depth. The stencil is always kept.

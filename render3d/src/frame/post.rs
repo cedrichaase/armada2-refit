@@ -100,7 +100,7 @@ impl Targets {
 
     fn try_create(gpu: &Gpu, w: u32, h: u32, fmt: Format, samples: u32, zfmt: Format) -> Option<Targets> {
         let make = |w: u32, h: u32, f: Format, s: u32, usage: Usage| {
-            let t = gpu.texture(TextureDesc { width: w, height: h, levels: 1, format: f, samples: s.max(1), usage }, Contents::None);
+            let t = gpu.texture(TextureDesc { samples: s.max(1), ..TextureDesc::d2(w, h, f, usage) }, Contents::None);
             t.ready(gpu).then_some(t)
         };
         let target = Usage::RENDER_TARGET | Usage::SAMPLED | Usage::COPY_SRC;
@@ -170,7 +170,7 @@ struct Consts([[f32; 4]; 4]);
 /// A pass into one target, keeping what is there, with no depth: a multisampled
 /// depth may not go with a 1x target.
 fn into(cmd: &mut Cmd, t: &Texture) -> bool {
-    cmd.begin_pass(&Pass { colors: &[ColorTarget { texture: t, load: Load::Load }], depth: None, area: None })
+    cmd.begin_pass(&Pass { colors: &[ColorTarget::new(t, Load::Load)], depth: None, area: None })
 }
 
 impl Post {
@@ -259,7 +259,7 @@ impl Post {
         // per pixel. With MSAA, the view's first column and row take their neighbours':
         // the scene starts half a pixel in (DXVK's viewport offset), so half their
         // samples are never drawn.
-        let colors = [ColorTarget { texture: out, load: Load::Load }];
+        let colors = [ColorTarget::new(out, Load::Load)];
         let depth = out_depth.map(|z| DepthTarget { texture: z, load: Load::Load });
         if !cmd.begin_pass(&Pass { colors: &colors, depth, area: None }) {
             return;

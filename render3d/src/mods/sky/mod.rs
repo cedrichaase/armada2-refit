@@ -162,7 +162,7 @@ impl Default for Sky {
             ps_tunnel: Shader::pixel(&PS_TUNNEL),
             ps_flash: Shader::pixel(&PS_FLASH),
             quad_decl: Decl::new(&QUAD_DECL),
-            face_decl: Decl::new(&scene::VERTEX),
+            face_decl: Decl::new(&crate::gfx::SOD_DECL),
             spr_decl: Decl::new(&SPRITE_DECL),
             said_inst: false,
             said_objects: 0,
@@ -336,7 +336,7 @@ impl Sky {
             log!("sky: background instance axes {:?}", inst.r);
         }
         if bg.contains(".sod") {
-            let Some(model) = scene::model(dev, bg) else { return };
+            let Some(model) = scene::model(bg) else { return };
             let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::looping(v.time), pose::Lod::Forced(usize::MAX));
             for part in model.parts.iter() {
                 if !p.shown.get(part.node).copied().unwrap_or(false) {
@@ -348,11 +348,11 @@ impl Sky {
                 dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CW } else { CULL_CCW });
                 let wvp = p.world[part.node].to_m4().mul(vp);
                 dev.vs_const(0, wvp.transpose().as_floats());
-                let tex = part.texture.as_deref().and_then(|t| assets::texture(dev, t));
+                let tex = part.texture.as_deref().and_then(|t| assets::texture(t).map(|t| t.raw_texture(crate::gfx::gpu())));
                 dev.set_texture(0, tex.unwrap_or(core::ptr::null_mut()));
                 dev.ps_const(0, &[1.0, 1.0, 1.0, if tex.is_some() { 0.0 } else { 1.0 }]);
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                dev.set_stream(0, part.vb.raw(crate::gfx::gpu()), 0, 32);
+                dev.set_indices(part.ib.raw(crate::gfx::gpu()));
                 for g in &part.groups {
                     dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
                 }
@@ -365,7 +365,7 @@ impl Sky {
             for (i, face) in PREFIX_FACES.iter().enumerate() {
                 let mut name = String::from(bg);
                 name.push((b'0' + i as u8) as char);
-                let tex = assets::texture(dev, &name);
+                let tex = assets::texture(&name).map(|t| t.raw_texture(crate::gfx::gpu()));
                 dev.set_texture(0, tex.unwrap_or(core::ptr::null_mut()));
                 dev.ps_const(0, &[1.0, 1.0, 1.0, if tex.is_some() { 0.0 } else { 1.0 }]);
                 let vtx: Vec<scene::Vertex> = [0usize, 1, 2, 0, 2, 3]
@@ -420,7 +420,7 @@ impl Sky {
         if name.is_empty() {
             return false;
         }
-        let Some(model) = scene::model(v.dev, &crate::assets::sod_of(name)) else { return false };
+        let Some(model) = scene::model(&crate::assets::sod_of(name)) else { return false };
         if obj::expired(o) || !obj::can_user_see(o) {
             return true;
         }
@@ -438,18 +438,19 @@ impl Sky {
     /// its sprite nodes into the batch.
     fn draw_background(&mut self, v: &View, model: &scene::Model, p: &pose::Pose) {
         if !model.parts.is_empty() {
-            let _g = gfx::Guard::new(v.dev);
-            if scene::begin(v) {
-                let params = scene::Params::default();
-                // Opaque first, then what blends, all now: the background's depth is
-                // cleared before the scene, so nothing may wait for the flush.
-                for pass in 0..2 {
-                    for (pi, part) in model.parts.iter().enumerate() {
-                        let blended = !matches!(part.blend, scene::Blend::Opaque | scene::Blend::Cutout);
-                        if blended != (pass == 1) || !p.shown.get(part.node).copied().unwrap_or(false) {
-                            continue;
+            if let Some(mut cmd) = gfx::cmd() {
+                if scene::begin(&mut cmd, v) {
+                    let params = scene::Params::default();
+                    // Opaque first, then what blends, all now: the background's depth is
+                    // cleared before the scene, so nothing may wait for the flush.
+                    for pass in 0..2 {
+                        for (pi, part) in model.parts.iter().enumerate() {
+                            let blended = !matches!(part.blend, scene::Blend::Opaque | scene::Blend::Cutout);
+                            if blended != (pass == 1) || !p.shown.get(part.node).copied().unwrap_or(false) {
+                                continue;
+                            }
+                            scene::draw_part(&mut cmd, v, model, pi, &p.world[part.node], &params);
                         }
-                        scene::draw_part(v, &model, pi, &p.world[part.node], &params);
                     }
                 }
             }
@@ -502,7 +503,7 @@ impl Sky {
         if let Some((odf, dir, dist)) = &shot.sun {
             let b = crate::frame::steps::View { view: rot, ..a };
             let bvp = b.view.mul(&b.proj);
-            if let Some(model) = scene::model(dev, &assets::sod_of(odf)) {
+            if let Some(model) = scene::model(&assets::sod_of(odf)) {
                 let s = self.scale_sod(odf);
                 let mut world = M34::IDENTITY;
                 world.r = [world.r[0] * s, world.r[1] * s, world.r[2] * s];

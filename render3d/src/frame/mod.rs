@@ -184,7 +184,7 @@ fn black_lines(r: PRect) {
 /// map) and draws into the view next. False without targets.
 pub fn scene_pass(cmd: &mut gpu::Cmd, r: PRect) -> bool {
     let Some(t) = frame().as_ref().and_then(|f| f.targets.as_ref()) else { return false };
-    let colors = [ColorTarget { texture: &t.scene, load: Load::Load }];
+    let colors = [ColorTarget::new(&t.scene, Load::Load)];
     let depth = Some(DepthTarget { texture: &t.depth, load: Load::Load });
     cmd.begin_pass(&Pass { colors: &colors, depth, area: Some(r.rect()) })
 }
@@ -199,7 +199,7 @@ pub fn scene_formats() -> Option<(Format, u32, Format)> {
 /// Binds the engine's target and depth again (when the frame has no post passes to).
 fn restore(saved: &Saved) {
     let Some(mut cmd) = gfx::gpu().begin(gfx::frame()) else { return };
-    let colors = [ColorTarget { texture: &saved.rt, load: Load::Load }];
+    let colors = [ColorTarget::new(&saved.rt, Load::Load)];
     let depth = saved.ds.as_ref().map(|d| DepthTarget { texture: d, load: Load::Load });
     cmd.begin_pass(&Pass { colors: &colors, depth, area: None });
 }
@@ -392,7 +392,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
     // on where nothing draws. The viewport is the engine's again after (`Cmd`'s end).
     let vp = dev.get_viewport();
     let mut cmd = g.begin(gfx::frame())?;
-    let colors = [ColorTarget { texture: &t.scene, load: Load::Clear([0.0, 0.0, 0.0, 1.0]) }];
+    let colors = [ColorTarget::new(&t.scene, Load::Clear([0.0, 0.0, 0.0, 1.0]))];
     let pass = Pass {
         colors: &colors,
         depth: Some(DepthTarget { texture: &t.depth, load: Load::Clear(1.0) }),

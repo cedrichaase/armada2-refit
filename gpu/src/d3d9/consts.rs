@@ -81,6 +81,12 @@ pub const RS_AMBIENT: u32 = 139;
 pub const RS_COLORVERTEX: u32 = 141;
 pub const RS_NORMALIZENORMALS: u32 = 143;
 pub const RS_CLIPPING: u32 = 136;
+pub const RS_CLIPPLANEENABLE: u32 = 152;
+pub const RS_POINTSIZE: u32 = 154;
+/// `POINTSIZE` set to this resolves the bound depth buffer into the `INTZ` texture at
+/// sampler 0 (the vendors' `RESZ` extension).
+pub const RESZ_CODE: u32 = 0x7fa0_5000;
+pub const FVF_XYZ: u32 = 0x2;
 pub const RS_MULTISAMPLEANTIALIAS: u32 = 161;
 pub const RS_COLORWRITEENABLE: u32 = 168;
 pub const RS_BLENDOP: u32 = 171;

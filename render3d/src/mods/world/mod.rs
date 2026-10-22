@@ -139,7 +139,6 @@ impl Module for World {
     }
     fn reset(&mut self) {
         self.surfaces.reset();
-        self.planets.reset();
         self.rocks.reset();
         self.nebulae.reset();
     }

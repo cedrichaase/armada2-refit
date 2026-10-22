@@ -112,7 +112,7 @@ impl Looks {
             white: s.f("CoreWhite", 0.35),
             vs: Shader::vertex(&VS_FX),
             ps: Shader::pixel(&PS_FX),
-            decl: Decl::new(&scene::VERTEX),
+            decl: Decl::new(&crate::gfx::SOD_DECL),
             pool: LightPool::new(b"special\0"),
             drawn: 0,
             said: false,
@@ -246,8 +246,8 @@ impl Looks {
                 dev.vs_const(0, world.to_m4().transpose().as_floats());
                 let mirrored = world.det3() < 0.0;
                 dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CCW } else { CULL_CW });
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                dev.set_stream(0, part.vb.raw(crate::gfx::gpu()), 0, 32);
+                dev.set_indices(part.ib.raw(crate::gfx::gpu()));
                 for g in &part.groups {
                     dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
                 }

@@ -298,7 +298,7 @@ impl Drawer {
             ps_cloak: Shader::pixel(&PS_CLOAK),
             ps_ghost: Shader::pixel(&PS_GHOST),
             ps_holo: Shader::pixel(&PS_HOLO),
-            decl: Decl::new(&scene::VERTEX),
+            decl: Decl::new(&crate::gfx::SOD_DECL),
             extra: [0.0; 8 * 4],
             nmaps: BTreeMap::new(),
             copy: None,
@@ -614,7 +614,7 @@ impl Drawer {
             // the faces not built yet: drawn two-sided, as stock shows it.
             dev.set_rs(RS_CULLMODE, if part.two_sided || limit >= 0 { CULL_NONE } else if mirrored { CULL_CCW } else { CULL_CW });
             let tex_name = if p.assimilated { second_texture(m, part.node).or(part.texture.as_deref()) } else { part.texture.as_deref() };
-            let tex = tex_name.and_then(|t| assets::texture(dev, t)).unwrap_or(core::ptr::null_mut());
+            let tex = tex_name.and_then(|t| assets::texture(t).map(|t| t.raw_texture(crate::gfx::gpu()))).unwrap_or(core::ptr::null_mut());
             dev.set_texture(0, tex);
             let uv = flipbook(m, part.node, p);
             let cut = part.blend == Blend::Cutout;
@@ -632,8 +632,8 @@ impl Drawer {
                 _ => (1.0, 0.0),
             };
             dev.ps_const(2, &[fade, prof.specular, prof.specular_power, tex_alpha]);
-            dev.set_stream(0, part.vb.ptr(), 0, 32);
-            dev.set_indices(part.ib.ptr());
+            dev.set_stream(0, part.vb.raw(crate::gfx::gpu()), 0, 32);
+            dev.set_indices(part.ib.raw(crate::gfx::gpu()));
             for g in &part.groups {
                 if faces_left <= 0 {
                     break;

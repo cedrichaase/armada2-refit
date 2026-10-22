@@ -30,7 +30,7 @@
 //! The simulation runs on the sim clock (`View::time`), once per frame however many
 //! views draw, so it stops while the game is paused.
 use super::Sec;
-use gpu::d3d9::raw::*;
+
 use crate::engine::{self, hook, obj};
 use crate::frame::steps::View;
 use crate::gfx;
@@ -271,8 +271,8 @@ impl Chunks {
         self.chunks.retain(|c| c.life >= 0.0);
     }
 
-    fn spawn(&mut self, v: &View, p: Pending) {
-        let Some(model) = scene::model(v.dev, &p.sod) else { return };
+    fn spawn(&mut self, _v: &View, p: Pending) {
+        let Some(model) = scene::model(&p.sod) else { return };
         let eye = unsafe { LAST_EYE };
         let pz = pose::pose(&model.sod, &model.info, &p.world, p.clock, pose::auto(eye));
         let mut n = 0;
@@ -285,7 +285,7 @@ impl Chunks {
                 break;
             }
             let Some(mesh) = model.sod.nodes[part.node].mesh() else { continue };
-            let (k, used) = self.break_part(v.dev, &model, pi, mesh, &pz.world[part.node], p.team, budget);
+            let (k, used) = self.break_part(&model, pi, mesh, &pz.world[part.node], p.team, budget);
             n += k;
             budget = budget.saturating_sub(used);
         }
@@ -298,7 +298,7 @@ impl Chunks {
     /// Breaks one mesh into chunks, at most its first `limit` faces: how many chunks,
     /// and how many faces it took.
     #[allow(clippy::too_many_arguments)]
-    fn break_part(&mut self, dev: Device, model: &Rc<Model>, pi: usize, mesh: &a2fmt::sod::Mesh, w0: &M34, team: V3, limit: usize) -> (usize, usize) {
+    fn break_part(&mut self, model: &Rc<Model>, pi: usize, mesh: &a2fmt::sod::Mesh, w0: &M34, team: V3, limit: usize) -> (usize, usize) {
         let part = &model.parts[pi];
         let un = mesh.unindexed();
         let idx: Vec<u32> = un.groups.iter().flatten().copied().collect();
@@ -387,14 +387,13 @@ impl Chunks {
             }
             made.push((groups, centre, rc));
         }
-        let bytes = unsafe { core::slice::from_raw_parts(all_idx.as_ptr() as *const u8, all_idx.len() * 2) };
-        let Some(ib) = upload_buffer(dev, bytes, true) else { return (0, ntri) };
+        let ib = gfx::buffer_once(&all_idx, gpu::BufferKind::Index16);
         let parts: Vec<Part> = made
             .iter()
             .map(|(groups, centre, rc)| Part {
                 node: 0,
-                vb: Com::from_borrowed(part.vb.ptr()),
-                ib: Com::from_borrowed(ib.ptr()),
+                vb: part.vb.clone(),
+                ib: ib.clone(),
                 verts: part.verts,
                 groups: groups.iter().map(|g| Group { start: g.start, tris: g.tris, material: g.material.clone(), self_illum: g.self_illum, model: g.model }).collect(),
                 texture: part.texture.clone(),
@@ -455,15 +454,15 @@ impl Chunks {
         if self.chunks.is_empty() {
             return;
         }
-        let _g = gfx::Guard::new(v.dev);
-        if !scene::begin(v) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        if !scene::begin(&mut cmd, v) {
             return;
         }
         for c in self.chunks.iter() {
             let world = M34 { r: M34::IDENTITY.r, p: -c.centre }.then(&c.m);
             let params = Params { team: Some(c.team), ..Params::default() };
             if c.model.parts[c.part].blend == Blend::Opaque || c.model.parts[c.part].blend == Blend::Cutout {
-                scene::draw_part(v, &c.model, c.part, &world, &params);
+                scene::draw_part(&mut cmd, v, &c.model, c.part, &world, &params);
             }
         }
         // The additive parts (glows), after every opaque one.
@@ -471,7 +470,7 @@ impl Chunks {
             let world = M34 { r: M34::IDENTITY.r, p: -c.centre }.then(&c.m);
             let params = Params { team: Some(c.team), ..Params::default() };
             if matches!(c.model.parts[c.part].blend, Blend::Additive | Blend::Alpha) {
-                scene::draw_part(v, &c.model, c.part, &world, &params);
+                scene::draw_part(&mut cmd, v, &c.model, c.part, &world, &params);
             }
         }
     }

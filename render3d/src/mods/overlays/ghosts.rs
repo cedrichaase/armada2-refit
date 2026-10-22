@@ -98,7 +98,7 @@ impl Ghosts {
         Ghosts {
             vs: Shader::vertex(&VS_SOD),
             ps: Shader::pixel(&PS_GHOST),
-            decl: Decl::new(&scene::VERTEX),
+            decl: Decl::new(&crate::gfx::SOD_DECL),
             scales: BTreeMap::new(),
             queue: Vec::new(),
             said: Vec::new(),
@@ -179,7 +179,7 @@ impl Ghosts {
         if name.is_empty() {
             return false;
         }
-        let Some(model) = scene::model(v.dev, &crate::assets::sod_of(name)) else { return false };
+        let Some(model) = scene::model(&crate::assets::sod_of(name)) else { return false };
         let pos: V3 = unsafe { rd(inst + 0x68) };
         // GameObjectSpirit::Render's cull (it writes only the spirit's own instance).
         let culled = unsafe {
@@ -283,15 +283,15 @@ impl Ghosts {
                 dev.vs_const(0, e.world.to_m4().transpose().as_floats());
                 let mirrored = e.world.det3() < 0.0;
                 dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CW } else { CULL_CCW });
-                let tex = part.texture.as_deref().and_then(|t| assets::texture(dev, t)).unwrap_or(core::ptr::null_mut());
+                let tex = part.texture.as_deref().and_then(|t| assets::texture(t).map(|t| t.raw_texture(crate::gfx::gpu()))).unwrap_or(core::ptr::null_mut());
                 dev.set_texture(0, tex);
                 // Additive: the texture times the constant `GHOST_ADDITIVE`, unlit (the
                 // ghost shader with that as its ambient and no diffuse).
                 let (amb, diff) = if additive { (v3(GHOST_ADDITIVE, GHOST_ADDITIVE, GHOST_ADDITIVE), V3::ZERO) } else { (e.amb, e.diff) };
                 k[0..4].copy_from_slice(&[amb.x, amb.y, amb.z, e.alpha]);
                 k[4..8].copy_from_slice(&[diff.x, diff.y, diff.z, scene::NORMAL_SIGN * if mirrored { -1.0 } else { 1.0 }]);
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                dev.set_stream(0, part.vb.raw(crate::gfx::gpu()), 0, 32);
+                dev.set_indices(part.ib.raw(crate::gfx::gpu()));
                 for g in &part.groups {
                     let t = if g.material.starts_with("team") { e.tint } else { v3(1.0, 1.0, 1.0) };
                     k[8..12].copy_from_slice(&[t.x, t.y, t.z, 1.0]);

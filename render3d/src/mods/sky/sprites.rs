@@ -86,7 +86,7 @@ impl Batch {
             if list.is_empty() {
                 continue;
             }
-            let Some(t) = assets::texture(dev, tex) else { continue };
+            let Some(t) = assets::texture(tex).map(|t| t.raw_texture(crate::gfx::gpu())) else { continue };
             dev.set_texture(0, t);
             // DrawPrimitiveUP in chunks well under any vertex limit.
             for chunk in list.chunks(6 * 2000) {

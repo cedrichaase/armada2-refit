@@ -71,7 +71,7 @@ pub struct Shadow {
 
 impl Shadow {
     pub fn new() -> Shadow {
-        Shadow { vs: Shader::vertex(&VS_DEPTH), ps: Shader::pixel(&PS_DEPTH), decl: Decl::new(&scene::VERTEX), target: None, said: (0, 0), failed: false }
+        Shadow { vs: Shader::vertex(&VS_DEPTH), ps: Shader::pixel(&PS_DEPTH), decl: Decl::new(&crate::gfx::SOD_DECL), target: None, said: (0, 0), failed: false }
     }
 
     pub fn reset(&mut self) {
@@ -221,12 +221,12 @@ impl Shadow {
                 if faces_left <= 0 {
                     break;
                 }
-                let tex = if cut { part.texture.as_deref().and_then(|t| crate::assets::texture(dev, t)).unwrap_or(core::ptr::null_mut()) } else { core::ptr::null_mut() };
+                let tex = if cut { part.texture.as_deref().and_then(|t| crate::assets::texture(t).map(|t| t.raw_texture(crate::gfx::gpu()))).unwrap_or(core::ptr::null_mut()) } else { core::ptr::null_mut() };
                 dev.set_texture(0, tex);
                 let world = p.pose.world[part.node];
                 dev.vs_const(0, world.to_m4().transpose().as_floats());
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                dev.set_stream(0, part.vb.raw(crate::gfx::gpu()), 0, 32);
+                dev.set_indices(part.ib.raw(crate::gfx::gpu()));
                 for g in &part.groups {
                     let tris = (g.tris as i64).min(faces_left) as u32;
                     if tris == 0 {

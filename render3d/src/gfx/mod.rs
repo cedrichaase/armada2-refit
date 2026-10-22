@@ -143,6 +143,15 @@ impl Shader {
     }
 }
 
+/// **Transitional**: `scene::VERTEX` as a Direct3D 9 declaration, for the modules not
+/// yet ported.
+pub static SOD_DECL: [VertexElement; 4] = [
+    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
+    ve(0, 12, DECLTYPE_FLOAT3, DECLUSAGE_NORMAL, 0),
+    ve(0, 24, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
+    VE_END,
+];
+
 /// **Transitional**: a vertex declaration made on first use on a device (a
 /// `gpu::PipelineDesc`'s layout, on `gpu`).
 pub struct Decl {
@@ -214,6 +223,101 @@ impl DynVb {
         dev.set_stream(0, vb.ptr(), 0, stride);
         Some(at / stride)
     }
+}
+
+/// render3d's command recorder for a module's draws: `gpu().begin(frame())`. None
+/// without a device.
+pub fn cmd() -> Option<gpu::Cmd<'static>> {
+    let _z = crate::timing::zone("gfx: state capture");
+    gpu().begin(frame())
+}
+
+/// A module's pipelines, one per combination of the states it draws with, kept by a
+/// key of the module's own (a few bits per state). Those that draw into the view take
+/// the scene pass's formats and samples, and are made again when they change.
+pub struct Pipes {
+    fmt: Option<(gpu::Format, u32, gpu::Format)>,
+    v: Vec<(u64, gpu::Pipeline)>,
+}
+
+impl Pipes {
+    pub const fn new() -> Pipes {
+        Pipes { fmt: None, v: Vec::new() }
+    }
+
+    /// The pipeline `key` that draws into the view: `desc` (its target formats and
+    /// samples are the scene pass's) made on first use. None without the scene's targets.
+    pub fn view(&mut self, key: u64, desc: impl FnOnce() -> gpu::PipelineDesc) -> Option<gpu::Pipeline> {
+        let f = crate::frame::scene_formats()?;
+        if self.fmt != Some(f) {
+            self.fmt = Some(f);
+            self.v.clear();
+        }
+        if let Some((_, p)) = self.v.iter().find(|(k, _)| *k == key) {
+            return Some(p.clone());
+        }
+        let mut d = desc();
+        d.colors = [f.0, gpu::Format::Unknown, gpu::Format::Unknown, gpu::Format::Unknown];
+        d.samples = f.1;
+        d.depth_format = Some(f.2);
+        let p = gpu().pipeline(d);
+        self.v.push((key, p.clone()));
+        Some(p)
+    }
+
+    /// The pipeline `key` that draws into a target of the module's own, as `desc` says.
+    pub fn own(&mut self, key: u64, desc: impl FnOnce() -> gpu::PipelineDesc) -> gpu::Pipeline {
+        let key = key | 1 << 63;
+        if let Some((_, p)) = self.v.iter().find(|(k, _)| *k == key) {
+            return p.clone();
+        }
+        let p = gpu().pipeline(desc());
+        self.v.push((key, p.clone()));
+        p
+    }
+}
+
+/// Begins the view's pass again (the scene target and depth, over the view), after a
+/// module drew into a target of its own, with the viewport `vp` the engine had set
+/// (`gpu::Gpu::engine_viewport`, read before the module's first pass).
+pub fn view_pass(cmd: &mut gpu::Cmd, v: &View, vp: Option<gpu::Viewport>) -> bool {
+    if !crate::frame::scene_pass(cmd, v.rect) {
+        return false;
+    }
+    if let Some(vp) = vp {
+        cmd.set_viewport(&vp);
+    }
+    true
+}
+
+/// A static vertex or index buffer filled with `data`.
+pub fn buffer<T: Copy>(data: &[T], kind: gpu::BufferKind) -> gpu::Buffer {
+    let bytes = unsafe { core::slice::from_raw_parts(data.as_ptr() as *const u8, core::mem::size_of_val(data)) };
+    gpu().buffer(gpu::BufferDesc { size: bytes.len() as u32, kind, dynamic: false }, bytes)
+}
+
+/// `buffer`, keeping no copy of `data` (`gpu::Gpu::buffer_transient`): gone with the
+/// device, and made again by its owner (the scene's models, after a `Reset`).
+pub fn buffer_once<T: Copy>(data: &[T], kind: gpu::BufferKind) -> gpu::Buffer {
+    let bytes = unsafe { core::slice::from_raw_parts(data.as_ptr() as *const u8, core::mem::size_of_val(data)) };
+    gpu().buffer_transient(gpu::BufferDesc { size: bytes.len() as u32, kind, dynamic: false }, bytes)
+}
+
+/// A 2D BGRA8 texture of `w` x `h` from its levels (tightly packed, the first first),
+/// sampled only.
+pub fn texture_bgra8(w: u32, h: u32, levels: &[&[u8]]) -> gpu::Texture {
+    let mut px = Vec::with_capacity(levels.iter().map(|l| l.len()).sum());
+    for l in levels {
+        px.extend_from_slice(l);
+    }
+    let d = gpu::TextureDesc::d2(w, h, gpu::Format::Bgra8, gpu::Usage::SAMPLED).with_levels(levels.len() as u32);
+    gpu().texture(d, gpu::Contents::Owned(px))
+}
+
+/// A sampler: `filter` for magnification, minification and between levels (None:
+/// one level), `u` and `v` (and `w`) addressing.
+pub const fn sampler(filter: gpu::Filter, mip: gpu::MipFilter, u: gpu::Address, v: gpu::Address) -> gpu::Sampler {
+    gpu::Sampler { min: filter, mag: filter, mip, address_u: u, address_v: v, address_w: gpu::Address::Clamp, anisotropy: 1, srgb: false }
 }
 
 /// The engine's 3x4 (rows: x, y, z axes, then position) as a Direct3D world matrix.

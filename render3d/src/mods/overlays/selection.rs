@@ -56,7 +56,7 @@ pub struct Selection {
 
 impl Selection {
     pub fn new() -> Selection {
-        Selection { vs: Shader::vertex(&VS_SOD), ps: Shader::pixel(&PS_COLOUR), decl: Decl::new(&scene::VERTEX) }
+        Selection { vs: Shader::vertex(&VS_SOD), ps: Shader::pixel(&PS_COLOUR), decl: Decl::new(&crate::gfx::SOD_DECL) }
     }
 
     /// Every bubble; true: the engine's step is skipped.
@@ -67,7 +67,7 @@ impl Selection {
         if unsafe { rd::<u8>(FN_RENDER_SELECTION) } == 0xc3 {
             return true;
         }
-        let Some(model) = scene::model(v.dev, "select") else { return false };
+        let Some(model) = scene::model("select") else { return false };
         let profile = field_f32(unsafe { rd::<usize>(super::USER_PROFILE) }, 0x48);
         let user_team = unsafe {
             let t = rd::<usize>(super::G_TRANSPORT);
@@ -120,8 +120,8 @@ impl Selection {
                 // Front faces only, whatever the SOD says: on the bench stock's bubble
                 // adds one layer of its colour, not two.
                 dev.set_rs(RS_CULLMODE, if mirrored { CULL_CW } else { CULL_CCW });
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                dev.set_stream(0, part.vb.raw(crate::gfx::gpu()), 0, 32);
+                dev.set_indices(part.ib.raw(crate::gfx::gpu()));
                 for g in &part.groups {
                     dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
                 }

@@ -240,7 +240,7 @@ impl Hulls {
         if name.is_empty() {
             return None;
         }
-        let model = scene::model(v.dev, &assets::sod_of(name))?;
+        let model = scene::model(&assets::sod_of(name))?;
         game::instance_update(o);
         let scale = game::instance_scale(inst);
         let s = scale * self.scale_sod(name);
@@ -316,7 +316,7 @@ impl Hulls {
     /// and a fresh instance leave them (damage, crew fires, the Borg's), and `lights`
     /// hidden too when `no_lights` (the build ghost's instance sets `+0x90`).
     fn pose_extra(&mut self, v: &View, odf: &str, place: &M34, scale: V3, clock: pose::Clock, team: Option<V3>, class: usize, no_lights: bool) -> Option<Posed> {
-        let model = scene::model(v.dev, &assets::sod_of(odf))?;
+        let model = scene::model(&assets::sod_of(odf))?;
         let s = scale * self.scale_sod(odf);
         let mut world = *place;
         world.r[0] = world.r[0] * s.x;
@@ -359,7 +359,7 @@ impl Hulls {
         let Some((inst, class)) = game::hologram_parts(h) else { return false };
         let db = field(inst, 0x80);
         let name = game::class_odf(class);
-        if db == 0 || engine::vtable(db) != game::VT_DATABASE || name.is_empty() || scene::model(v.dev, &assets::sod_of(name)).is_none() {
+        if db == 0 || engine::vtable(db) != game::VT_DATABASE || name.is_empty() || scene::model(&assets::sod_of(name)).is_none() {
             if self.said_extra[0] < 8 {
                 self.said_extra[0] += 1;
                 log!("hulls: a hologram of '{}' (database vtable {:#x}) is left to the engine", name, engine::vtable(db));
@@ -878,7 +878,7 @@ impl Module for Hulls {
             if let Some(age) = s.gone {
                 let (half, life) = shot.flash;
                 if age < life
-                    && let Some(model) = scene::model(v.dev, &s.sod)
+                    && let Some(model) = scene::model(&s.sod)
                 {
                     let (c, r) = draw::model_sphere(&model);
                     let radius = r * s.world.r[0].len().max(s.world.r[1].len()).max(s.world.r[2].len());
@@ -888,7 +888,7 @@ impl Module for Hulls {
                 }
                 continue;
             }
-            let Some(model) = scene::model(v.dev, &s.sod) else { continue };
+            let Some(model) = scene::model(&s.sod) else { continue };
             let clock = pose::Clock::looping(v.time);
             let mut p = pose::pose(&model.sod, &model.info, &s.world, clock, lod);
             clean(&model, 0, false, &mut p);
@@ -1047,7 +1047,7 @@ pub fn draw_instance(v: &View, key: usize, inst: usize, craft: bool, sod: &str, 
     if h.off {
         return false;
     }
-    let Some(model) = scene::model(v.dev, sod) else { return false };
+    let Some(model) = scene::model(sod) else { return false };
     let clock = pose::Clock::of_instance(inst, v.time);
     let mut p = pose::pose(&model.sod, &model.info, world, clock, pose::auto(v.eye));
     visibility(0, inst, craft, &model, &mut p);

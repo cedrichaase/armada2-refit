@@ -154,7 +154,7 @@ impl Batch {
             if verts.is_empty() {
                 continue;
             }
-            let Some(t) = assets::texture(dev, tex) else { continue };
+            let Some(t) = assets::texture(tex).map(|t| t.raw_texture(crate::gfx::gpu())) else { continue };
             dev.set_texture(0, t);
             dev.set_ss(0, SAMP_MIPFILTER, if *m == Material::AdditiveNoMip { TEXF_NONE } else { TEXF_LINEAR });
             match m {

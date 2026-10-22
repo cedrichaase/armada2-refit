@@ -241,7 +241,7 @@ impl Sprites {
                 }
             }
             if q.tex != last_tex {
-                let t = assets::texture(dev, &q.tex).unwrap_or(core::ptr::null_mut());
+                let t = assets::texture(&q.tex).map(|t| t.raw_texture(crate::gfx::gpu())).unwrap_or(core::ptr::null_mut());
                 dev.set_texture(0, t);
                 last_tex = q.tex.clone();
             }
