@@ -39,7 +39,7 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    `Armada2.exe`; the choice is remembered in `~/.config/armada2-refit/installer.json`.
 2. **Lists the releases** from the GitHub API at every launch and on **Refresh**. The
    list and every zip it fetches are cached in `~/.cache/armada2-refit/installer/`, so
-   it works offline and keeps a release GitHub has since deleted (CI keeps only three).
+   it works offline and keeps a release GitHub has since deleted (CI keeps only ten).
    The default is the newest **full** release: a pre-release is an entry still "not yet
    seen in game", and is offered but not chosen for you. A zip is about a megabyte, so
    the chosen one is fetched straight away (checked against GitHub's sha256 digest) to

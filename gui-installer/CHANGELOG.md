@@ -33,7 +33,7 @@ lines from 12.42.0, which 1.7.0 and older log as ordinary output.
 - The report's redaction keeps a user folder's own separator (`/home/<user>/`, not
   `/home\<user>/`; since 1.7.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22 (the error dialog and Copy report, on Linux).
 
 ## 1.7.0 — 2026-10-20
 

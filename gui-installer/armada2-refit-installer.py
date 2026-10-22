@@ -1651,7 +1651,7 @@ def fetch_releases():
 
 def cached_releases():
     """(releases, when last checked) from the cache, plus any zip in the cache that the
-    list no longer names -- GitHub keeps only the newest three releases."""
+    list no longer names -- GitHub keeps only the newest ten releases."""
     data = load_json(os.path.join(CACHE, 'releases.json'), {}) or {}
     rels = [Release(**r) for r in data.get('releases', [])]
     return merge_cached(rels), data.get('checked')

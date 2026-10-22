@@ -21,10 +21,11 @@ Layers: gui-installer 1.8.0.
 - README.md: "Antivirus false positives", and `README.txt` in the package points at it.
 
 ### Changed
+- CI keeps the newest ten releases on GitHub, not three (tags were always kept).
 - The damaged-package message names the files by their Windows path in `install.ps1`
   and no longer lists `sha256sum -c`'s output in `install.sh`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22 (the error dialog and Copy report, on Linux).
 
 ## 12.41.3 — 2026-10-22
 
