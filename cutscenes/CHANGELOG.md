@@ -11,7 +11,7 @@ Details are in [`binkproxy/README.md`](binkproxy/README.md).
   layer's version as the file version and the project's as the product version, which
   Windows shows in the file's Properties. Built by `platform/versioninfo/build-res.sh` (915cad8).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 2.0.2 — 2026-10-12
 

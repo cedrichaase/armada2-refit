@@ -18,7 +18,7 @@ Layers: render3d 0.16.4, ui 0.13.4, hud 2.2.3, menus 4.3.4, qol 1.6.3, grid 1.0.
   `publish/installer/test.ps1` reads each as Windows does. `version` moved to
   `platform/versioninfo/version.sh`, which the build scripts source too.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 12.41.1 — 2026-10-21
 
