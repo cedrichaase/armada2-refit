@@ -13,36 +13,45 @@
 // Blending is ONE, INVSRCALPHA: rgb is light, premultiplied; alpha what the smoke hides
 // of what is behind. The ring writes no alpha, so it only adds.
 //
-// vkd3d does not know tex3Dlod and unrolls every loop, so the march is a fixed number of
-// steps, and the noise texture has one level (its implicit level then cannot matter
+// vkd3d had no tex3Dlod when this was written (a Texture3D's SampleLevel builds now) and
+// unrolls every loop, so the march is a fixed number of steps, and the noise texture has one level (its implicit level then cannot matter
 // inside the unrolled branches).
 
-float4 k_vp0    : register(c0);   // vertex shader: the columns of VIEW x PROJECTION
-float4 k_vp1    : register(c1);
-float4 k_vp2    : register(c2);
-float4 k_vp3    : register(c3);
+#include "../../gpu/shaders/compat.hlsli"
 
-float4 k_eye    : register(c0);   // xyz the camera; w the near plane's view depth
-float4 k_ctr    : register(c1);   // xyz the centre; w the fireball's full radius (world units)
-float4 k_time   : register(c2);   // x its radius now (world); y the age over the life (0..1); z the age in seconds; w Brightness
-float4 k_seed   : register(c3);   // xyz this explosion's offset into the noise; w the noise's scale (tiles across the fireball)
-float4 k_proj   : register(c4);   // x, y the projection's _33 and _43 (depth from view depth); z Flash; w Glow (the halo)
-float4 k_look   : register(c5);   // xyz the view's forward axis
-float4 k_shape  : register(c6);   // x Smoke; y Turbulence; z Cooling; w Opacity (of the hot gas)
-float4 k_ring   : register(c8);   // ring: xyz its plane's normal; w its radius now (world)
-float4 k_ringb  : register(c9);   //   x its width (of the radius); y how bright now; z its max radius; w seed
-float4 k_ringc  : register(c10);  //   rgb its colour (the class's); w Breakup
-float4 k_hdr    : register(c11);  // x: how far the hottest gas goes past white (0: the plugin's look, capped at 1); y: the light it starts at
+cbuffer effects_explosions_vs : register(b0)
+{
+    float4 k_vp0    : CREG(0);   // vertex shader: the columns of VIEW x PROJECTION
+    float4 k_vp1    : CREG(1);
+    float4 k_vp2    : CREG(2);
+    float4 k_vp3    : CREG(3);
+};
 
-sampler3D s_noise : register(s0); // r: a fractal field; gba: three soft warp fields; tiling, spectral (no lattice)
+cbuffer effects_explosions_ps : register(b1)
+{
+    float4 k_eye    : CREG(0);   // xyz the camera; w the near plane's view depth
+    float4 k_ctr    : CREG(1);   // xyz the centre; w the fireball's full radius (world units)
+    float4 k_time   : CREG(2);   // x its radius now (world); y the age over the life (0..1); z the age in seconds; w Brightness
+    float4 k_seed   : CREG(3);   // xyz this explosion's offset into the noise; w the noise's scale (tiles across the fireball)
+    float4 k_proj   : CREG(4);   // x, y the projection's _33 and _43 (depth from view depth); z Flash; w Glow (the halo)
+    float4 k_look   : CREG(5);   // xyz the view's forward axis
+    float4 k_shape  : CREG(6);   // x Smoke; y Turbulence; z Cooling; w Opacity (of the hot gas)
+    float4 k_ring   : CREG(8);   // ring: xyz its plane's normal; w its radius now (world)
+    float4 k_ringb  : CREG(9);   //   x its width (of the radius); y how bright now; z its max radius; w seed
+    float4 k_ringc  : CREG(10);  //   rgb its colour (the class's); w Breakup
+    float4 k_hdr    : CREG(11);  // x: how far the hottest gas goes past white (0: the plugin's look, capped at 1); y: the light it starts at
+};
+
+STAGE(0) Texture3D s_noise : register(t0); // r: a fractal field; gba: three soft warp fields; tiling, spectral (no lattice)
+STAGE(0) SamplerState s_noise_s : register(s0);
 
 // The noise inside the march's branches. Windows' own Direct3D 9 refuses a texld inside
 // an if (README.md, "Shaders on Windows"); the volume has one level and the same filter
 // either way, so zero gradients sample exactly what texld did.
-float4 noise3(float3 p) { return tex3Dgrad(s_noise, p, 0.0, 0.0); }
+float4 noise3(float3 p) { return s_noise.SampleGrad(s_noise_s, p, 0.0, 0.0); }
 
 struct VsIn  { float4 pos : POSITION; };
-struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; };
+struct VsOut { float4 pos : SV_Position; float3 w : TEXCOORD0; };
 
 VsOut quad_vs(VsIn i)
 {
@@ -53,7 +62,7 @@ VsOut quad_vs(VsIn i)
     return o;
 }
 
-struct PsOut { float4 c : COLOR0; float d : DEPTH; };
+struct PsOut { float4 c : SV_Target; float d : SV_Depth; };
 
 float hash12(float2 p)
 {
@@ -80,8 +89,9 @@ float depth_of(float zv)
 
 #define STEPS 28
 
-PsOut fire_ps(VsOut i, float2 vp : VPOS)
+PsOut fire_ps(VsOut i)
 {
+    float2 vp = d3d9_vpos(i.pos);
     PsOut o;
     float3 d = normalize(i.w - k_eye.xyz);
     float3 oc = k_eye.xyz - k_ctr.xyz;
@@ -171,12 +181,12 @@ PsOut ring_ps(VsOut i)
     // plane's normal with the radius, so they are long spikes pointing in, as stock's are.
     float3 dir = x / max(length(x), 1e-4);
     float3 pt = dir * 3.2 + k_ring.xyz * rr * 0.9 + k_ringb.w;
-    float  zt = (tex3D(s_noise, pt).r - 0.5) * 3.5 + (tex3D(s_noise, pt * 2.37 + 0.5).r - 0.5) * 0.8
-                 + (tex3D(s_noise, pt * 0.43 + 0.71).r - 0.5) * 3.0;                                  // about a z-score; the last, broad lobes
+    float  zt = (s_noise.Sample(s_noise_s, pt).r - 0.5) * 3.5 + (s_noise.Sample(s_noise_s, pt * 2.37 + 0.5).r - 0.5) * 0.8
+                 + (s_noise.Sample(s_noise_s, pt * 0.43 + 0.71).r - 0.5) * 3.0;                                  // about a z-score; the last, broad lobes
     // The speckle in blotches a little drawn out along the radius, as stock's flames are, at two scales
     // whose ratio is not whole, so the noise volume's tile does not show as a pattern.
     float3 ps = dir * 4.1 + k_ring.xyz * rr * 6.0 + k_ringb.w * 1.7;
-    float  zs = clamp((tex3D(s_noise, ps).r - 0.5) * 3.5 + (tex3D(s_noise, ps * 2.29 + 0.31).r - 0.5) * 2.0, -2.0, 2.0);
+    float  zs = clamp((s_noise.Sample(s_noise_s, ps).r - 0.5) * 3.5 + (s_noise.Sample(s_noise_s, ps * 2.29 + 0.31).r - 0.5) * 2.0, -2.0, 2.0);
     float  w = k_ringb.x;                                        // the band's width, of the radius
     float  r0 = 1.0 - w + 0.06 + zt * w * 0.13 * k_ringc.w;      // where the fire starts, broken into tongues
     float  u = saturate((rr - r0) / (w * 0.25));                 // 0 at the inner edge .. 1 a little past it

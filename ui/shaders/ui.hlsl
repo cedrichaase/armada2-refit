@@ -24,8 +24,14 @@
 // The kinds are weighted with step(), not branched (vkd3d, render3d/README.md), and
 // the shape's corners and parts are chosen with lerp/step the same way.
 
-float4 VP : register(c0);
-sampler2D tex : register(s0);
+#include "../../gpu/shaders/compat.hlsli"
+
+cbuffer ui_vs : register(b0)
+{
+    float4 VP : CREG(0);
+};
+STAGE(0) Texture2D tex : register(t0);
+STAGE(0) SamplerState tex_s : register(s0);
 
 struct VI {
     float2 pos : POSITION;
@@ -38,7 +44,7 @@ struct VI {
 };
 
 struct VO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float4 col : COLOR0;
     float2 uv  : TEXCOORD0;
     float4 k   : TEXCOORD1;
@@ -84,7 +90,7 @@ float box(float2 q, float2 h, float c)
     return lerp(dr, dc, cham);
 }
 
-float4 ps_ui(VO i) : COLOR0
+float4 ps_ui(VO i) : SV_Target
 {
     float kind = i.k.x;
     float is_tex = step(0.5, kind) * (1.0 - step(1.5, kind));
@@ -93,7 +99,7 @@ float4 ps_ui(VO i) : COLOR0
     float is_shape = step(3.5, kind);
     float is_solid = 1.0 - is_tex - is_sdf - is_box - is_shape;
 
-    float4 t = tex2D(tex, i.uv);
+    float4 t = tex.Sample(tex_s, i.uv);
     float sdf = saturate((t.r - 0.5) * i.k.y + 0.5);
 
     float2 q = abs(i.uv) - i.k.zw + i.k.y;

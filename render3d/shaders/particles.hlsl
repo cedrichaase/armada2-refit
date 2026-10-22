@@ -5,7 +5,12 @@
 // fixed function did: texture colour times the vertex colour. The colour may exceed 1
 // (a vent drawn several times over in stock, as a factor): the target is HDR.
 
-float4x4 VP : register(c0);    // view x projection (transposed)
+#include "../../gpu/shaders/compat.hlsli"
+
+cbuffer particles_vs : register(b0)
+{
+    float4x4 VP : CREG(0);    // view x projection (transposed)
+};
 
 struct VI {
     float3 pos : POSITION;
@@ -14,7 +19,7 @@ struct VI {
 };
 
 struct VO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float2 uv  : TEXCOORD0;
     float4 col : TEXCOORD1;
 };
@@ -28,10 +33,11 @@ VO vs_sprite(VI i)
     return o;
 }
 
-sampler2D tex : register(s0);
+STAGE(0) Texture2D tex : register(t0);
+STAGE(0) SamplerState tex_s : register(s0);
 
-float4 ps_sprite(VO i) : COLOR
+float4 ps_sprite(VO i) : SV_Target
 {
-    float4 t = tex2D(tex, i.uv);
+    float4 t = tex.Sample(tex_s, i.uv);
     return float4(t.rgb * i.col.rgb, t.a * i.col.a);
 }

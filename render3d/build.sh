@@ -4,8 +4,9 @@
 #
 # Shaders first: each shaders/<name>.hlsl names its entry points on its first line,
 #   // entries: <entry>:<profile>:<SYMBOL> ...
-# and is compiled by hlsl-rs.sh into src/shaders/<name>.rs (committed, with a stamp, so
-# a machine without vkd3d-compiler builds as long as they are current), with --fix:
+# and is compiled by hlsl-rs.sh into src/shaders/<name>.rs, Direct3D 9 bytecode from
+# vkd3d, and src/shaders/<name>_spv.rs, SPIR-V from dxc (committed, with stamps, so a
+# machine without the compilers builds as long as they are current), with --fix:
 # Windows' own Direct3D 9 refuses vkd3d's bytecode as it is (README.md, "Shaders on
 # Windows"). src/shaders/mod.rs lists them and is written here too.
 set -euo pipefail
@@ -22,7 +23,7 @@ for f in "$here"/shaders/*.hlsl; do
     [ -n "$entries" ] || { echo "render3d: $f has no '// entries:' first line" >&2; exit 1; }
     # shellcheck disable=SC2086
     "$here/hlsl-rs.sh" --fix "$here/src/shaders/$name.rs" "$f" $entries
-    mods="$mods$name "
+    mods="$mods$name ${name}_spv "
 done
 # Temp files of this run's own, beside their targets so each mv is a rename: several
 # installs of one checkout can run at once (a2film --jobs, a2test -j).

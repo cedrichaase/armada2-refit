@@ -49,8 +49,10 @@ uses `~/.cargo/bin/cargo` first, since a distribution's cargo has no such target
 crate links with `/nodefaultlib`, `kernel32` its only import (an import library made by
 `llvm-dlltool --kill-at` from `kernel32.def` in `build.rs`), and brings its own
 allocator, memory functions and stack probe (`src/rt/`). Shaders are HLSL in
-`shaders/`, compiled by `hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders.rs`, which
-is committed with a stamp so a machine without vkd3d builds as long as it is current.
+`shaders/`, compiled by `hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders/<name>.rs`
+and with `dxc` into SPIR-V in `src/shaders/<name>_spv.rs` ("One source, two
+compilers"), both committed with a stamp so a machine without the compilers builds as
+long as they are current.
 
 ### Shaders on Windows
 
@@ -111,14 +113,14 @@ keeps one register across all of it). `hlsl-rs.sh --fix` runs it on each shader,
 both plugins (`build.sh`, `ui/build.sh`); `d3dbc-fix.py --check <file.bin>` lists all
 five.
 
-Rule 4 is the HLSL's to keep. **Never sample with `tex2D`/`tex3D`/`texCUBE` inside an
-`if`, or after an early `return`** (vkd3d puts the rest of the function inside one).
+Rule 4 is the HLSL's to keep. **Never sample with an implicit level (`Sample`) inside
+an `if`, or after an early `return`** (vkd3d puts the rest of the function inside one).
 Each place that did was rewritten so it samples what it sampled before:
 
 - a texture with one level and the same min and mag filter (the noise volume of the
   fire, the surfaces' height cube, the nebulae's baked volume and blue noise) is read
-  with zero gradients or `tex2Dlod`, which is level 0, as before;
-- a mipped one (the rocks' baked cubes) is read with `texCUBEgrad`, the gradients taken
+  with zero gradients or `SampleLevel` at 0, which is level 0, as before;
+- a mipped one (the rocks' baked cubes) is read with `SampleGrad`, the gradients taken
   before the branch from the same coordinates. A tap of the crack march at
   `q - vq * t` (t the same on every pixel) has the gradient `ddx(q) - ddx(vq) * t`, and
   needs no normalising: a cube lookup and its level read only the direction;
@@ -126,7 +128,9 @@ Each place that did was rewritten so it samples what it sampled before:
   their reference, the slices drawn without the march), the branches are `[flatten]`ed
   and the early returns turned into a choice at the end.
 
-vkd3d (1.19) has no `tex3Dlod` or `texCUBElod`; `tex*grad` and `tex2Dlod` it has.
+vkd3d (1.19) has no `tex3Dlod` or `texCUBElod` in the old dialect; the modern
+`SampleLevel` it compiles to `texldl` on every kind of texture, and `SampleGrad` to
+`texldd`.
 
 How this was checked: every shader as committed is made on Windows 10's runtime on all
 four kinds of device; and a d3dbc interpreter ran each shader as vkd3d wrote it and as
@@ -136,6 +140,56 @@ compiles of every rewritten entry point with identical outputs too (textures the
 a function of the coordinate alone, so the levels are the argument above). With the
 allocator's rule for ifs taken out, the interpreter found the marches wrong in every
 run.
+
+### One source, two compilers
+
+Every shader of render3d and UI.asi is modern HLSL (`Texture2D`/`Texture3D`/
+`TextureCube` with a `SamplerState`, `cbuffer`, `SV_Position`/`SV_Target`, `Sample`,
+`SampleLevel`, `SampleGrad`, HLSL 2021's `select`), so that one source builds both the
+Direct3D 9 shaders the plugins draw with now and SPIR-V for a Vulkan backend. vkd3d
+writes the d3dbc as before and `dxc` (`-spirv`, Vulkan 1.1) the SPIR-V, which
+`hlsl-rs.sh` puts through `spirv-val`. `gpu/shaders/compat.hlsli`, at the root because
+both plugins include it, holds the few places the two compilers part (dxc predefines
+`__hlsl_dx_compiler`; vkd3d defines nothing to tell it by, and takes no `-D` or `-I`, so
+the shaders include it by a relative path that resolves from `shaders/` for both):
+
+- **Constants keep their Direct3D 9 registers**: `CREG(n)` is `register(cn)` for vkd3d,
+  which places a cbuffer member by it and ignores `packoffset`, and `packoffset(cn)`
+  for dxc. So the Rust code sets the same registers as before, and in SPIR-V a member
+  sits at byte 16 n of its buffer (`-fvk-use-dx-layout`): each stage's buffer is its
+  register file. dxc wants a cbuffer's members in rising order, and refuses two that
+  overlap; entry points of one file that use one register for different things have a
+  cbuffer each.
+- **Samplers keep their stages, though vkd3d does not**: for shader model 1-3 it makes
+  each texture/sampler pair a combined sampler named `<sampler>+<texture>` and gives the
+  pairs s0, s1, ... in order, whatever the source declares (any `register()` on either
+  is dropped). `d3dbc-slots.py` puts each pair back on the stage the source names
+  (`register(tn)` on the texture and `register(sn)` on its sampler, which must agree),
+  in the code and the constant table, so the Rust code binds textures as before.
+- **VPOS**: a pixel shader's `SV_Position` is the pixel's centre in Vulkan and its
+  corner (VPOS, whole numbers) in Direct3D 9, where vkd3d reads it as VPOS.
+  `d3d9_vpos()` gives the corner on both. vkd3d declares a float4 `SV_Position` as
+  `vPos.xyzw`, which Windows refuses (the mask has to be `.x`, `.y` or `.xy`), so
+  `d3dbc-fix.py` narrows it to `.xy`, and refuses a shader that reads its z or w.
+- **`select`** is a macro over `?:` for vkd3d, which has the vector `?:` and no
+  `select`; dxc refuses a vector `?:` under HLSL 2021.
+
+The d3dbc this writes is the d3dbc the old sources wrote: the code token for token,
+the constant table's sampler names aside, and in five pixel shaders (`fire_ps`,
+`ps_cloak`, `ps_holo`, `neb_ps`, `vol_ps`) the `dcl` of vPos before the texture
+coordinates' instead of after.
+
+**SPIR-V's layout**, for the backend that will draw with it: every cbuffer of a vertex
+shader is `register(b0)` (set 0, binding 0) and of a pixel shader `register(b1)` (set 0,
+binding 1); several cbuffers of one stage alias that binding, which Vulkan allows. A
+texture and its sampler are one combined image sampler (`STAGE(n)`: set 1, binding n,
+the Direct3D 9 stage). Vertex shaders are compiled with `-fvk-invert-y`, so clip space
+is Direct3D 9's (y up) under a viewport of positive height; window coordinates, and so
+the winding a triangle is culled by, come out as Direct3D 9's. Interface locations are
+dxc's: each struct member in declaration order, unused ones included, so a vertex
+shader's outputs and the pixel shader's inputs agree wherever both use one struct.
+Direct3D 9's half-pixel offset (pixel centres on whole coordinates) is the caller's:
+DXVK moves the viewport by half a pixel, and the UI's `VP.zw` holds it.
 
 ## `Render3D.ini`
 
