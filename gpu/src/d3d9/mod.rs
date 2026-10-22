@@ -467,7 +467,7 @@ impl Gpu {
     /// Starts recording into `frame`. None without a device.
     pub fn begin<'a>(&'a self, frame: &'a mut Frame) -> Option<Cmd<'a>> {
         let dev = self.dev.get()?;
-        Some(Cmd { gpu: self, frame, dev, captured: false, at: None, size: (0, 0), pipe: None, samplers: [None; 16] })
+        Some(Cmd { gpu: self, frame, dev, captured: false, at: None, size: (0, 0), pipe: None, bound: None, samplers: [None; 16] })
     }
 
     /// Reads `tex` (a colour target) back: `f` sees its texels. A multisampled one is
@@ -1242,6 +1242,9 @@ pub struct Cmd<'a> {
     size: (u32, u32),
     /// The bound pipeline's topology, None when it could not be made.
     pipe: Option<Topology>,
+    /// The pipeline whose states are on the device, while nothing since has changed
+    /// any (a pass begun, a clear, a resolve): binding it again sets nothing.
+    bound: Option<*const PipeInner>,
     samplers: [Option<Sampler>; 16],
 }
 
@@ -1324,6 +1327,7 @@ impl<'a> Cmd<'a> {
         if flags != 0 {
             dev.set_rs(RS_SCISSORTESTENABLE, 0);
             dev.clear(&[], flags, color, z, 0);
+            self.bound = None;
         }
         true
     }
@@ -1355,6 +1359,10 @@ impl<'a> Cmd<'a> {
         }
         dev.set_viewport(&raw::Viewport { x: 0, y: 0, w: self.size.0, h: self.size.1, min_z: 0.0, max_z: 1.0 });
         dev.set_rs(RS_SCISSORTESTENABLE, 0);
+        if color.is_some() {
+            dev.set_rs(RS_COLORWRITEENABLE, 0xf);
+        }
+        self.bound = None;
         let rs: Vec<raw::Rect> = rects.iter().map(|r| d3d_rect(*r)).collect();
         let flags = if color.is_some() { CLEAR_TARGET } else { 0 } | if depth.is_some() { CLEAR_ZBUFFER } else { 0 };
         if flags != 0 && !rs.is_empty() {
@@ -1367,9 +1375,17 @@ impl<'a> Cmd<'a> {
         self.touch();
         if !p.0.realize(self.gpu) {
             self.pipe = None;
+            self.bound = None;
             return false;
         }
         let d = &p.0.desc;
+        let me = Rc::as_ptr(&p.0);
+        if self.bound == Some(me) {
+            // Its states are on the device as it left them.
+            self.pipe = Some(d.topology);
+            return true;
+        }
+        self.bound = Some(me);
         let dev = self.dev;
         let o = p.0.obj.borrow();
         let o = o.as_ref().unwrap();
@@ -1623,6 +1639,7 @@ impl<'a> Cmd<'a> {
         dev.set_rs(RS_POINTSIZE, 0x3f80_0000);
         dev.set_texture(0, null_mut());
         self.pipe = None;
+        self.bound = None;
         true
     }
 
