@@ -296,6 +296,14 @@ for the whole.
 The frame that dumps stalls for the read-backs (the GPU is waited for at each copy),
 so its time in `Timing=1` is not a measure of anything.
 
+Measured on the bench (`SCENE=showcase`, 1280x720, 4x MSAA, 2026-10-22): the dumping
+frame took 134 ms; the 5 s reports either side of it were 16.67 ms a frame, the main
+view's GPU time 0.83 ms in both, and nothing was written while no trigger was there.
+The scene's PFM ran from 0 to 3.07 (mean 0.092); bloom level 0 peaked at 1.77 on the
+way down and 2.25 on the way up. With the scene paused, two dumps 2790 frames apart
+were byte-identical (scene, bloom, back buffer). The tone-mapped PPM was identical to
+the UI's presented frame (the scene has no HUD).
+
 ## The menu scene
 
 `src/menu/`, the map in `menus/map.ini`: a map of render3d's own behind the front end's

@@ -360,6 +360,14 @@ or a trigger was never taken. **Render3D dumps only in a mission's main 3D view*
 the menus only the UI's comes back (a warning, not a failure). Files a trigger written
 by hand leaves in `Dumps/` are gathered into `logs/Dumps/` when the session stops.
 
+**A dump is not a grim shot with more bits.** Measured on `showcase` at 1280x720
+(2026-10-22): the UI's presented PPM against a grim shot of the same paused frame
+differed by a mean absolute 3.26 (max 10, 8% of pixels equal), and the difference was
+one fixed curve per channel: every value of the PPM went to exactly one value in the
+shot (2 to 3, 10 to 13, 80 to 90, 255 to 255), and mapped through that curve the two
+were identical. Something after `Present` (the swapchain, the compositor; a gamma ramp
+would do it) lifts the frame. So compare dumps with dumps, and shots with shots.
+
 ## The stretch measurement
 
 Every aspect fix in this project keeps the vertical axis as stock draws it and corrects
