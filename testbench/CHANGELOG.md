@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.46.0 — 2026-10-22
+
+### Added
+- `a2test watch --install-desktop` / `--uninstall-desktop`: an app-launcher entry,
+  `a2test-watch.desktop`, that runs the main checkout's `a2test watch --desktop`
+  whichever worktree installs it. `--desktop` logs to `~/.cache/a2test/watch-desktop.log`,
+  says a failure with `notify-send`, and focuses a running watcher's window instead of
+  failing on its port.
+
+Installed, not yet seen in game (tried on this desktop, Hyprland 0.56: launch, focus, close, failure notice).
+
 ## 3.45.0 — 2026-10-22
 
 ### Added

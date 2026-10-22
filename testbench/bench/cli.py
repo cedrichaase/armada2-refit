@@ -46,6 +46,7 @@ a2test -- run Armada II headless and test it end to end
                                        (A2_SLOTS sets how many; a run queues for them)
   a2test watch [--no-open]             the bench dashboard on 127.0.0.1:5950: every job,
                                        its games (noVNC), the queue, what finished
+  a2test watch --install-desktop       an app-launcher entry for it, always the main checkout's
   a2test drive [--session ID] ...      every drive command takes --session ID (or
                                        A2TEST_SESSION=ID); without one, drive refuses
                                        when more than one session is active

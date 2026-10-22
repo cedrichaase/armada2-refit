@@ -8,6 +8,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test run main-menu --res 16:9,21:9   # override the resolutions
     ./a2test run admirals-log --vnc          # ... and watch it (view-only VNC)
     ./a2test watch                           # the bench dashboard: http://127.0.0.1:5950/
+    ./a2test watch --install-desktop         # ... in the app launcher, from the main checkout
     ./a2test run hud --jobs 1                # one game at a time (default: 5 at once)
     ./a2test check hud                       # how each step would run, no launch
     ./a2test list
@@ -553,6 +554,19 @@ touches no session: input is disabled at the VNC server, and Ctrl-C (or closing 
 window) stops only the `wayvnc`s it started. The page (`bench/dash.html`) needs nothing
 from the network: noVNC is vendored in `vendor/novnc-1.6.0/` (MPL 2.0, its `SOURCE.txt`
 lists every file's hash), and the type falls back to the system's fonts.
+
+**From the app launcher.** `./a2test watch --install-desktop` writes
+`~/.local/share/applications/a2test-watch.desktop` ("Armada II Bench Watch"), whose
+`Exec=` is the absolute path of the **main checkout's** `a2test`, whichever worktree it
+is run from (the main worktree is the parent of git's common dir), so the launcher
+always shows the bench as `main` has it; `--uninstall-desktop` removes it. Re-run it if
+the checkout moves. The entry runs `a2test watch --desktop`: output goes to
+`~/.cache/a2test/watch-desktop.log` instead of a terminal, a failure is a
+`notify-send` with the log's last lines, and if a watcher already holds the port it
+brings that one's window forward instead of failing (on Hyprland by its class,
+`chrome-127.0.0.1__-Default`, with the Lua dispatcher of 0.55+ or the older syntax;
+`hyprctl` exits 0 either way, so its `ok` is what is read; elsewhere it opens the page
+with `xdg-open`).
 
 - **Header**: CPU (the 1-minute load over the cores), memory, swap and, on amdgpu, the
   GPU's busy percentage and VRAM (`/sys/class/drm/card*/device/gpu_busy_percent`,

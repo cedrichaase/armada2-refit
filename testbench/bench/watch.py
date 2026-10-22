@@ -14,6 +14,9 @@ what finished, served on 127.0.0.1:5950 (testbench/README.md, "Watching").
 Nothing a session shows is written anywhere by this: snapshots live in memory. Ctrl-C
 stops the wayvncs it started and nothing else.
 
+`--install-desktop` writes a desktop entry that runs the MAIN checkout's `a2test watch
+--desktop`, whichever worktree it is installed from (README.md, "Watching").
+
 The WebSocket bridge is here rather than `wayvnc --websocket` because that segfaults on
 the first client (wayvnc 0.10.1 / neatvnc 1.0.1, a call through a null pointer -- measured).
 """
@@ -485,13 +488,130 @@ def serve(port, vnc_port, bench=None):
     return httpd, stop, vnc, snaps, hub
 
 
+# ---------------------------------------------------------------------- desktop entry
+
+APP_CLASS = 'chrome-127.0.0.1__-Default'   # Chromium's window class for --app=http://127.0.0.1:<any port>/
+DESKTOP = (Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local/share')
+           / 'applications' / 'a2test-watch.desktop')
+DESKTOP_LOG = config.CACHE / 'watch-desktop.log'
+
+
+def _main_checkout():
+    """The main worktree of the repository this runs from (every worktree shares the main
+    checkout's .git as its common dir), else this checkout."""
+    r = subprocess.run(['git', '-C', str(config.REPO), 'rev-parse', '--path-format=absolute',
+                        '--git-common-dir'], capture_output=True, text=True)
+    common = Path(r.stdout.strip()) if r.returncode == 0 else None
+    if common and common.name == '.git' and (common.parent / 'a2test').exists():
+        return common.parent
+    return config.REPO
+
+
+def install_desktop():
+    repo = _main_checkout()
+    a2test = repo / 'a2test'
+    if any(c in str(a2test) for c in '"`$\\\n'):
+        raise GameError(f'{a2test}: a character a desktop entry cannot quote simply; '
+                        f'move the checkout')
+    DESKTOP.parent.mkdir(parents=True, exist_ok=True)
+    DESKTOP.write_text('\n'.join([
+        '[Desktop Entry]',
+        'Type=Application',
+        'Name=Armada II Bench Watch',
+        'GenericName=Test bench dashboard',
+        f'Comment=a2test watch, from {repo}',
+        f'Exec="{a2test}" watch --desktop',
+        'Icon=utilities-system-monitor',
+        'Terminal=false',
+        'Categories=Development;',
+        'Keywords=a2test;armada;bench;watch;dashboard;',
+        f'StartupWMClass={APP_CLASS}',
+        '']))
+    if shutil.which('update-desktop-database'):
+        subprocess.run(['update-desktop-database', str(DESKTOP.parent)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f'wrote {DESKTOP}\n  runs {a2test} watch --desktop (log: {DESKTOP_LOG})')
+    return 0
+
+
+def uninstall_desktop():
+    if DESKTOP.exists():
+        DESKTOP.unlink()
+        print(f'removed {DESKTOP}')
+    else:
+        print(f'no {DESKTOP}')
+    return 0
+
+
+def _focus_running(url):
+    """Bring a running watcher's window forward; open the page if there is none to find.
+    hyprctl exits 0 whether or not it found the window, so its output is what is read."""
+    if os.environ.get('HYPRLAND_INSTANCE_SIGNATURE') and shutil.which('hyprctl'):
+        rx = APP_CLASS.replace('.', '\\.')            # the class must match whole
+        lua = rx.replace('\\', '\\\\')                 # ... inside a Lua string
+        for disp in ([f'hl.dsp.focus({{ window = "class:{lua}" }})'],   # the Lua dispatchers (0.55+)
+                     ['focuswindow', f'class:^({rx})$']):               # the older syntax
+            r = subprocess.run(['hyprctl', 'dispatch', *disp], capture_output=True, text=True)
+            if r.returncode == 0 and r.stdout.strip() == 'ok':
+                return
+    subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+
+
+def _desktop(argv, active_sessions):
+    """Run from the desktop entry: no terminal, so output goes to DESKTOP_LOG and a failure
+    to a notification; a second launch focuses the first watcher's window."""
+    port = config.WATCH_PORT
+    if '--port' in argv[:-1]:
+        port = int(argv[argv.index('--port') + 1])
+    if _port_busy(port):
+        _focus_running(f'http://127.0.0.1:{port}/')
+        return 0
+    DESKTOP_LOG.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(DESKTOP_LOG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+    os.dup2(fd, 1)
+    os.dup2(fd, 2)
+    os.close(fd)
+    os.environ['NO_COLOR'] = '1'    # argparse colours its errors when FORCE_COLOR is set
+    try:
+        rc = main(argv, active_sessions)
+    except GameError as e:
+        print(f'a2test: {e}', flush=True)
+        rc = 1
+    except SystemExit as e:     # argparse
+        rc = e.code if isinstance(e.code, int) else 1
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        rc = 1
+    sys.stdout.flush()
+    if rc and shutil.which('notify-send'):
+        tail = DESKTOP_LOG.read_text(errors='replace').strip().splitlines()[-3:]
+        subprocess.run(['notify-send', '-u', 'critical', '-a', 'a2test watch',
+                        f'a2test watch stopped ({rc})', '\n'.join(tail) or str(DESKTOP_LOG)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return rc
+
+
 def main(argv, active_sessions=None):
+    if '--desktop' in argv:
+        return _desktop([a for a in argv if a != '--desktop'], active_sessions)
     ap = argparse.ArgumentParser(prog='a2test watch')
     ap.add_argument('--port', type=int, default=config.WATCH_PORT, help='the page (default %(default)s)')
     ap.add_argument('--vnc-port', type=int, default=config.WATCH_PORT + 1,
                     help='first loopback port for the wayvnc servers (default %(default)s)')
     ap.add_argument('--no-open', action='store_true', help='serve the page, open no window')
+    ap.add_argument('--desktop', action='store_true',
+                    help='as the desktop entry runs it: output to a log, failures as a notification, '
+                         'and a watcher already running is focused instead')
+    ap.add_argument('--install-desktop', action='store_true',
+                    help="write a desktop entry that runs the main checkout's watcher, and exit")
+    ap.add_argument('--uninstall-desktop', action='store_true', help='remove that entry, and exit')
     a = ap.parse_args(argv)
+    if a.install_desktop:
+        return install_desktop()
+    if a.uninstall_desktop:
+        return uninstall_desktop()
     if not shutil.which('wayvnc'):
         print('  wayvnc is not installed (pacman -S wayvnc): snapshots only, no live view', flush=True)
     url = f'http://127.0.0.1:{a.port}/'

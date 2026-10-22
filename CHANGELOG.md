@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.2.0 — 2026-10-22
+
+Layers: testbench 3.46.0.
+
+### Added
+- `a2test watch --install-desktop`: the bench dashboard in the app launcher, always run
+  from the main checkout (testbench 3.46.0).
+
+Installed, not yet seen in game.
+
 ## 13.1.0 — 2026-10-22
 
 Layers: render3d 0.18.0, ui 0.15.0, testbench 3.45.0, films 1.13.0.
