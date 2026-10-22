@@ -12,6 +12,9 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   the resolved HDR scene target and each bloom level (down and up) as PFM, and the back
   buffer after the tone map as PPM, into `Dumps\` with a sidecar
   `<name>-<frame>-render3d.txt` (`src/dump.rs`; README.md, "Frame dumps").
+- `perf/ab.sh A B`: frame time of two checkouts or revisions on the bench, each side
+  installed whole, `RUNS=` alternating the order; `perf/summary.py` takes any sides and
+  shows the spread across runs (PERF.md, "A/B"; 2ccf6ee, 8162070).
 
 Installed, not yet seen in game.
 

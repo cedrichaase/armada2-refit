@@ -5,6 +5,28 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.1.0 — 2026-10-22
+
+Layers: render3d 0.18.0, ui 0.15.0, testbench 3.45.0, films 1.13.0.
+
+### Added
+- A frame that repeats on the test bench: `[Bench] Clock=bench` in `Render3D.ini` and
+  `UI.ini` (default `wall`, as before) runs every animation on the sim time, and the
+  scene builder's `Seed=`, `Step=` and `Pause=` put two launches on the same tick;
+  `a2test --clock bench`, scenario `bench-determinism` (render3d 0.17.0, ui 0.14.0,
+  testbench 3.42.0).
+- Pixel baselines: `a2test baseline record|compare|diff|list|show` and the baseline
+  steps, for PNG, PPM and PFM (testbench 3.43.0).
+- Frame dumps: `Render3D.dump` / `UI.dump` make the plugins write the HDR scene, the bloom
+  levels and the presented frame; `a2test drive dump` (render3d 0.18.0, ui 0.15.0,
+  testbench 3.44.0).
+- The bench dashboard in place of `a2test watch`'s page, who started each job recorded
+  at start, `a2test drive note` for an agent's intent, the judge's tokens per day; noVNC
+  vendored in `testbench/vendor/` (testbench 3.45.0, films 1.13.0).
+- `render3d/perf/ab.sh`: frame-time A/B of any two checkouts or revisions (render3d 0.18.0).
+
+Installed, not yet seen in game.
+
 ## 13.0.0 — 2026-10-22
 
 Layers: renderer 2.0.0 (was postfx), gui-installer 2.0.0, testbench 3.41.2, films 1.12.1.
