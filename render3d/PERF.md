@@ -87,3 +87,7 @@ it, use `ab.sh`, which installs each side whole and times both the same way:
   and the worst of the runs for the maxima. A difference inside the spread is noise.
 - The bench presents with vsync, so compare busy times (CPU and GPU), not the frame
   period, as above.
+- **The noise floor of one run** (2026-10-22, `ab.sh main HEAD` on the same commit,
+  `showcase`, 1280x720, `SETTLE=25`): 3D view CPU 1.31 against 1.40 ms, GPU 0.84
+  against 0.83 ms. A CPU difference under ~0.1 ms in one run is noise; use `RUNS=3`
+  for anything smaller.
