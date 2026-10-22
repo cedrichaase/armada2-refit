@@ -182,9 +182,28 @@ fn hash(ctx: u16, kind: Kind, slot: u8, chain: &[usize; DEPTH]) -> u32 {
 }
 
 /// One call on an object of ours. `fp` is the method's own frame pointer.
+/// Calls still to log one by one after a `CreateDevice` or `Reset` (`after_device`).
+static AFTER: AtomicU32 = AtomicU32::new(0);
+
+/// Logs the next calls one by one: what the engine does with a new device, in order.
+pub fn after_device() {
+    AFTER.store(400, Ordering::Relaxed);
+}
+
 pub fn call(fp: usize, kind: Kind, slot: u8) {
     if !ON.load(Ordering::Relaxed) {
         return;
+    }
+    if AFTER.load(Ordering::Relaxed) > 0 {
+        let n = AFTER.fetch_sub(1, Ordering::Relaxed);
+        if n > 0 && fp != 0 {
+            let a = unsafe { *((fp + 4) as *const usize) };
+            let at = {
+                let _g = lock();
+                place(a)
+            };
+            log!("  after device: {} {} by {}", kind.name(), crate::d3d8::method_name(kind, slot), at);
+        }
     }
     let exe = unsafe { STATE.as_ref().map(|s| s.exe).unwrap_or((0, 0)) };
     let chain = walk(fp, exe, !shallow(kind, slot));

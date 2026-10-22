@@ -93,6 +93,7 @@ unsafe extern "system" fn reset(this: *mut Obj, pp: *mut PresentParams) -> HRESU
     let asked = if pp.is_null() { PresentParams::default() } else { unsafe { *pp } };
     let hr = vcall!(unsafe { (*this).real }, 14, fn(*mut PresentParams) -> HRESULT, pp);
     let n = RESETS.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
+    trace::after_device();
     log!("Reset #{}: {} -> {:#x}; by {}", n, asked.text(), hr as u32, trace::chain(fp));
     hr
 }

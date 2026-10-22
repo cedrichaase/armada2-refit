@@ -128,6 +128,7 @@ unsafe extern "system" fn create_device(
     );
     com::wrap_out(out, hr, Kind::Device, Role::Plain);
     let n = DEVICES.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
+    trace::after_device();
     if hr >= 0 {
         trace::MAIN_THREAD.store(unsafe { crate::rt::win::GetCurrentThreadId() }, core::sync::atomic::Ordering::Relaxed);
     }
