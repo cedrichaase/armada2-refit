@@ -7,6 +7,7 @@ extern crate alloc;
 
 pub mod rt;
 pub mod assets;
+pub mod clock;
 #[macro_use]
 pub mod d3d;
 pub mod config;
@@ -55,6 +56,7 @@ fn startup() {
     rt::log_open("Render3D.log", cfg.log);
     log!("Render3D {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
     timing::configure(cfg.timing, cfg.timing_every);
+    clock::load();
     if !cfg.enable {
         log!("Enable=0: standing down, the engine draws the 3D view");
         if cfg.timing && frame::install_measure() {

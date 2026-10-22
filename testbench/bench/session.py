@@ -130,20 +130,20 @@ class Session:
     @classmethod
     def create(cls, artifacts_dir, res, mod='refit', vnc=False, record=False,
                audio=False, keep=False, label='', stock_shell=None, installs=None, assets=None, slot=None,
-               mute=None, stems=None):
+               mute=None, stems=None, clock=None):
         """`slot`: a game slot already taken for this session (several at once for a
         multi-player case, or handed down in A2_SLOT_FD); without one, waits for a slot here."""
         slot = slot or slots.adopt_from_env() or slots.acquire(label or 'session')[0]
         try:
             return cls._create(artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell,
-                               installs, assets, slot, mute, stems)
+                               installs, assets, slot, mute, stems, clock)
         except BaseException:
             slot.release()
             raise
 
     @classmethod
     def _create(cls, artifacts_dir, res, mod, vnc, record, audio, keep, label, stock_shell, installs, assets, slot,
-                mute=None, stems=None):
+                mute=None, stems=None, clock=None):
         # timestamp and pid alone collide when a run starts cases in parallel threads
         with _SID_LOCK:
             n = next(_SID_SEQ)
@@ -158,9 +158,14 @@ class Session:
         if assets == 'none' and mod == 'refit' and not installs:
             installs = [config.REPO]
         installs = [checkout_provenance(p) for p in (installs or [])]
+        # The plugins' animation clock (`[Bench] Clock=`): --clock, a scenario's `Clock:`,
+        # else A2TEST_CLOCK, else the player's (wall).
+        clock = (clock or os.environ.get('A2TEST_CLOCK') or 'wall').strip().lower()
+        if clock not in CLOCKS:
+            raise GameError(f'clock {clock!r}: one of {", ".join(CLOCKS)}')
         state = dict(id=sid, dir=str(artifacts_dir), work=str(work), res=list(res), mod=mod, stock_shell=stock_shell,
                      installs=installs, assets=assets,
-                     mute=sorted(mute or []), stems=sorted(stems or []),
+                     mute=sorted(mute or []), stems=sorted(stems or []), clock=clock,
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
                      exception_mtime=None, vnc_port=None)
@@ -174,6 +179,7 @@ class Session:
                       **({'assets': assets} if assets else {}),
                       **({'mute': ', '.join(sorted(mute))} if mute else {}),
                       **({'stems': ', '.join(sorted(stems))} if stems else {}),
+                      **({'clock': clock} if clock != 'wall' else {}),
                       **({'installs': [f"{i['path']} @ {i['describe']}" for i in installs]} if installs else {}))
         return sess
 
@@ -262,6 +268,23 @@ class Session:
         if self.s['mod'] == 'stock' and self.s.get('stock_shell') == 'embed':
             self.embed_stock_shell()
         self.set_volumes()
+        self.set_clock()
+
+    def set_clock(self):
+        """`--clock bench`: `[Bench] Clock=bench` in the clone's Render3D.ini and UI.ini, so
+        every animation of the plugins runs on the simulation's time and a paused game
+        draws the same frame from launch to launch (render3d/README.md, "The animation
+        clock"). A plugin with no ini in the clone (stock) has nothing to set."""
+        clock = self.s.get('clock') or 'wall'
+        if clock == 'wall':
+            return
+        done = []
+        for name in ('Render3D.ini', 'UI.ini'):
+            ini = self.game_dir / name
+            if ini.exists():
+                set_ini_value(ini, 'Bench', 'Clock', clock)
+                done.append(name)
+        self.log.action(f'[Bench] Clock={clock} in ' + (', '.join(done) if done else 'nothing (no plugin ini in the clone)'))
 
     def set_volumes(self):
         """`--mute` and `--stems` in the clone's ARMADA.PRF: a muted category at volume 0, a
@@ -932,6 +955,36 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
 
 
 # ---------------------------------------------------------------------- helpers
+
+CLOCKS = ('wall', 'bench')
+
+
+def set_ini_value(path, section, key, value):
+    """Sets `key=value` in `[section]` of a Windows ini, keeping everything else: the
+    key replaced where it is, else added at the end of the section, which is added at
+    the end of the file when there is none. CRLF, as the game's files are."""
+    lines = Path(path).read_text(errors='replace').splitlines()
+    out, sec, done, found = [], None, False, False
+    for ln in lines:
+        t = ln.strip()
+        if t.startswith('[') and t.endswith(']'):
+            if sec == section.lower() and not done:
+                out.append(f'{key}={value}')
+                done = True
+            sec = t[1:-1].strip().lower()
+            found = found or sec == section.lower()
+        elif sec == section.lower() and not done and t.split('=', 1)[0].strip().lower() == key.lower() \
+                and not t.startswith(';'):
+            out.append(f'{key}={value}')
+            done = True
+            continue
+        out.append(ln)
+    if not done:
+        if not found:
+            out += ['', f'[{section}]']
+        out.append(f'{key}={value}')
+    Path(path).write_text('\r\n'.join(out) + '\r\n')
+
 
 def set_prf_resolution(prf, w, h):
     """ARMADA.PRF line 5 holds `... <w> <h> <bpp> ...` and the file carries an embedded

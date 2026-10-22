@@ -407,8 +407,8 @@ pub fn run(ui: &mut Ui) {
         s.hover_since = now;
         s.tip = None;
     }
-    if hovered != 0 && now - s.hover_since > 0.35 {
-        let verbose = now - s.hover_since > 1.5;
+    if hovered != 0 && ui.waited(s.hover_since, 0.35) {
+        let verbose = ui.waited(s.hover_since, 1.5);
         let stale = match &s.tip {
             Some((b, v, at, _)) => *b != hovered || *v != verbose || now - at > 0.5,
             None => true,

@@ -46,6 +46,12 @@ fn slot(id: Id, now: f64, init: f32) -> &'static mut Slot {
 /// way), and returns it. A new id starts at `target`.
 pub fn ease(id: Id, target: f32, rate: f32, now: f64) -> f32 {
     let s = slot(id, now, target);
+    if crate::clock::bench() {
+        // Under the bench clock a transition is settled at once (clock.rs).
+        s.seen = now;
+        s.v = target;
+        return target;
+    }
     let dt = (now - s.seen).clamp(0.0, 0.1) as f32;
     s.seen = now;
     s.v += (target - s.v) * (1.0 - libm::expf(-dt * rate));
@@ -57,6 +63,9 @@ pub fn ease(id: Id, target: f32, rate: f32, now: f64) -> f32 {
 pub fn appear(id: Id, secs: f32, now: f64) -> f32 {
     let s = slot(id, now, 0.0);
     s.seen = now;
+    if crate::clock::bench() {
+        return 1.0;
+    }
     let f = (((now - s.born) as f32) / secs.max(0.001)).clamp(0.0, 1.0);
     f * f * (3.0 - 2.0 * f)
 }

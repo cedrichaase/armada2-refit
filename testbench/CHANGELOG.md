@@ -5,6 +5,21 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.42.0 — 2026-10-22
+
+### Added
+- `--clock wall|bench` on `a2test session start` and `a2test run`, a scenario's `Clock:`
+  header and `A2TEST_CLOCK`: `bench` sets `[Bench] Clock=bench` in the clone's
+  `Render3D.ini` and `UI.ini`.
+- `Scene.asi`: `Seed=` and `seed <n>` (the engine's three random sequences started again
+  from a seed), `Pause=` and `pause-at <tick>` (pause a fixed number of ticks after the
+  scene is built), `tick`; `pause` answers its tick. `SCENE_SEED`/`SCENE_PAUSE` at
+  install, and `Key=value` words after the scene in `bench-setup.sh`.
+- Steps `Wait up to N seconds for "LOG" to say "TEXT"` and `Expect shots "A" and "B" to
+  match within T`; scenario `bench-determinism`.
+
+Installed, not yet seen in game.
+
 ## 3.41.2 — 2026-10-22
 
 ### Removed

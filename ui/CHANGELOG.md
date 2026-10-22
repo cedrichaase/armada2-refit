@@ -4,6 +4,17 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.14.0 — 2026-10-22
+
+### Added
+- `[Bench] Clock=` in `UI.ini` (default `wall`, as before): `bench` makes `Ui::time()`
+  the simulation's time and settles every transition at once (hover fades, a panel
+  opening, tooltip delays through `Ui::waited`, the unit view's camera), for
+  pixel-identical frames on the test bench. Lists re-read on a timer (resources, the
+  loading screen's players) now time it on the wall clock.
+
+Installed, not yet seen in game.
+
 ## 0.13.4 — 2026-10-21
 
 ### Changed

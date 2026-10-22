@@ -493,6 +493,28 @@ BarHidden` (Game Settings' "Command Bar", `HUD.md`, "The top-right buttons").
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 | `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
 | `[Loading] Hold` | 0 | the test bench's: seconds each load waits half-way, the screen still drawn, to be looked at. Never in play |
+| `[Bench] Clock` | wall | the animation clock ("The animation clock"): `wall` in play; `bench` for the test bench, on the simulation's time with transitions settled |
+
+## The animation clock
+
+`[Bench] Clock=` (`src/clock.rs`) decides what time the UI's animations run on, as
+render3d's does (`render3d/README.md`, "The animation clock"). **`Clock=wall`** (the
+default, the player's) is the wall clock. **`Clock=bench`** is the test bench's
+(`a2test --clock bench`, `testbench/README.md`, "A frame that repeats"), so that two
+sessions paused at one tick draw the same frame: `Ui::time()` is then the simulation's
+time (`Get_Time`, the float at 0x7b0fc8), which stands while the game is paused, and
+every **transition** is settled at once: a hover's fade (`anim::ease`), a panel opening
+(`anim::appear`), a tooltip's delay (`Ui::waited`) and the unit view's camera turning
+after its ship. A transition starts at a moment of the wall clock (the pointer arriving)
+and would otherwise stop half-way while paused; in the front end there is no simulation
+at all, and a window would never finish opening.
+
+**The rule: anything that moves on screen reads `Ui::time()` (or, outside a frame of
+widgets, `clock::anim_now()`), never `rt::now()`; a delay before something shows goes
+through `Ui::waited`.** `rt::now()` stays for what is not seen: how long ago a panel last
+drew, how often a list is read again, how long a screen has been up before it takes a
+click, logs. The Credits keep the wall clock on purpose: their pages are a timed
+slideshow, and a frozen one would never move on.
 
 ## The renderer (`src/gfx/`)
 

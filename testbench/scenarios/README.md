@@ -20,6 +20,8 @@ Setup: online/bench-asi.sh --loss 10      (a script of this repo, run on each cl
                                            and then any words after the script's name)
 Sheet: 1 ship, 6 ships, 30 ships          (shot names: <scenario>/sheet.png in the run,
                                            a row per case and a column per shot)
+Clock: bench                              (the plugins' animation clock on the simulation's
+                                           time: ../README.md, "A frame that repeats")
 Timeout: 12 min
 
 Any prose is description.
@@ -53,6 +55,7 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
 | `Note "TEXT"` | a line in the log |
+| `Wait up to 240 seconds for "Scene.log" to say "TEXT"` | polls a log beside `Armada2.exe` for a line with TEXT (each launch deletes the old one); fails at the time limit |
 | `Scene "select yard1 yard2"` | commands to `Scene.asi` (`../scene/README.md`), `;` between several; a refused command fails the step. Needs `Setup: testbench/scene/bench-setup.sh <scene>` |
 | `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |
@@ -88,6 +91,7 @@ audio reached the real output before the bench's guard stopped it (run
 | `… is stretched …` | the control form: passes only if it IS stretched |
 | `Expect no black bars` / `Expect black bars` | bounding box of non-black pixels |
 | `Expect no large flat grey areas` | untextured non-black blocks (don't use on a map: fog of war is flat grey) |
+| `Expect shots "first" and "second" to match` / `… within 0.5` | the newest shot of each name, pixel by pixel: mean absolute difference (0..255, every channel) at most the tolerance (default 0.5); the largest difference and the share of pixels that differ are reported |
 
 ### The HUD's layout
 

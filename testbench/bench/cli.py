@@ -131,6 +131,8 @@ def cmd_run(argv):
     ap.add_argument('--tolerance', type=float, default=0.05)
     ap.add_argument('--out')
     ap.add_argument('--install', action='append', default=[], metavar='PATH')
+    ap.add_argument('--clock', choices=['wall', 'bench'], default=None,
+                    help='the plugins\' animation clock in every case (default: the scenario\'s Clock:, else A2TEST_CLOCK, else wall)')
     ap.add_argument('-j', '--jobs', type=int, default=config.JOBS,
                     help=f'cases at once (default {config.JOBS}; 1 = one case at a time); each waits for a game slot, so above A2_SLOTS they queue')
     a = ap.parse_args(argv)
@@ -150,7 +152,7 @@ def cmd_run(argv):
                 command='a2test run ' + ' '.join(shlex.quote(x) for x in argv), repo=str(config.REPO))
     stop = threading.Event()
     opts = dict(vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep, no_claude=a.no_claude,
-                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install)
+                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install, clock=a.clock)
     print(f'run {run_id} -> {run_dir}', flush=True)
     # Each scenario's reference case runs first, so every other case has something to
     # compare with; once it is done, that scenario's other cases join the queue. Up to
@@ -366,6 +368,9 @@ def cmd_session(argv):
         ap.add_argument('--stems', default='', metavar='CATS',
                         help='record these of music, voice, interface on sinks of their own (Stems.asi); '
                              'the rest is the effects stem')
+        ap.add_argument('--clock', choices=['wall', 'bench'], default=None,
+                        help='bench: [Bench] Clock=bench in Render3D.ini and UI.ini, animations on the '
+                             'simulation\'s time (default A2TEST_CLOCK, else wall)')
         a = ap.parse_args(rest)
         mute = parse_categories(a.mute, what='--mute')
         stems = parse_categories(a.stems, STEMS, what='--stems')
@@ -384,7 +389,7 @@ def cmd_session(argv):
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
         s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
                            label=a.label, installs=a.install, stock_shell=a.stock_shell,
-                           assets=a.assets, mute=mute, stems=stems)
+                           assets=a.assets, mute=mute, stems=stems, clock=a.clock)
         # A start that fails part-way (an install, the display, a launch the audio
         # guard stops) is torn down here like any session. Left alone it kept its sway,
         # input and VNC running and stayed "active" in `session list` with no game.

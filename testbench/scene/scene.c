@@ -304,6 +304,11 @@ int _fltused = 0;   /* floats without the CRT */
 #define VT_FIREBALL      0x6afbd4u   /* FireballExplosion's vtable */
 #define VT_SHOCKWAVE     0x6afdacu   /* ShockwaveExplosion's vtable */
 #define ENTITY_TRANSFORM 0x4cfd50u   /* Entity::GetTransform() const, thiscall: Matrix34 *, the place at +0x24 */
+#define RANDOM_CTOR      0x65e1b0u   /* RandomSequence::RandomSequence(int seed, bool log), thiscall */
+#define G_RANDOM         0x7b0facu   /* g_random: RandomSequence *, the simulation's */
+#define G_MISSION_RANDOM 0x7b0fa8u   /* g_missionRandom: RandomSequence * */
+#define G_ASYNC_RANDOM   0x7300c4u   /* g_asyncRandom: RandomSequence *, the one not kept in step */
+#define RANDOM_LOG_KEEP  0x09u       /* the log flag the constructor's bool sets, as kept */
 
 #define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
 #define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
@@ -368,6 +373,7 @@ static const Sig k_sigs[] = {
     { TECH_FIND,        8, { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56, 0x57, 0x8B } },
     { PRJ_GET_ODF,      6, { 0x8B, 0x01, 0x85, 0xC0, 0x75, 0x06 } },
     { ENTITY_TRANSFORM, 7, { 0x8B, 0x41, 0x04, 0x83, 0xC0, 0x44, 0xC3 } },
+    { RANDOM_CTOR,      8, { 0x55, 0x8B, 0xEC, 0x8B, 0x55, 0x08, 0x8B, 0xC1 } },
 };
 
 typedef void   (__cdecl    *UpdateRangeFn)(void);
@@ -412,6 +418,7 @@ typedef void   (__thiscall *LoadResFn)(void *freighter, float amount, int resour
 typedef BYTE  *(__thiscall *TechFindFn)(void *tree, const char *name);
 typedef const char  *(__thiscall *PrjOdfFn)(void *prj);
 typedef const float *(__thiscall *TransformFn)(void *entity);
+typedef void  *(__thiscall *RandomCtorFn)(void *seq, int seed, int log);
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -1244,6 +1251,40 @@ static int cam_matrix(float *m)
 
 static int  g_paused;
 static int  g_refresh;   /* ticks left of a run that refreshes a paused frame */
+static int  g_ticks;     /* mission ticks before the scene was built */
+static long g_scene_ticks;   /* ticks since the scene was built: what Pause= and pause-at count */
+static long g_pause_at = -1; /* Pause= / pause-at: the tick to pause at (-1: none) */
+
+/* Seed= and `seed`: every RandomSequence the engine draws from -- the simulation's
+ * g_random, g_missionRandom and g_asyncRandom -- started again from a seed of ours,
+ * through the class's own constructor on the existing object (each keeps its log
+ * flag). So a scene that picks at random (the rocks of an asteroid field) picks the
+ * same on every launch, and the simulation runs the same ticks the same way. */
+static void seed_random(DWORD seed)
+{
+    static const DWORD k_seqs[3] = { G_RANDOM, G_MISSION_RANDOM, G_ASYNC_RANDOM };
+    char  b[96];
+    int   i, n = 0;
+    for (i = 0; i < 3; i++) {
+        BYTE *seq = *(BYTE **)k_seqs[i];
+        if (!seq) continue;
+        ((RandomCtorFn)RANDOM_CTOR)(seq, (int)(seed + (DWORD)i), seq[RANDOM_LOG_KEEP]);
+        n++;
+    }
+    s_cpy(b, "seed ", sizeof b); s_unum(b + s_len(b), seed);
+    s_cat(b, ": "); s_num(b + s_len(b), n); s_cat(b, " random sequences started again");
+    logline(b);
+}
+
+/* Pauses the simulation, as `pause` does, and says at which tick. */
+static void pause_now(const char *why)
+{
+    char b[96];
+    ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);
+    g_paused = 1;
+    s_cpy(b, why, sizeof b); s_cat(b, "paused at tick "); s_num(b + s_len(b), g_scene_ticks);
+    logline(b);
+}
 static void process_commands(void);
 static void marks_poll(void);
 
@@ -1839,7 +1880,27 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "pause"))  { ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);   g_paused = 1; logline("  paused");  return; }
+    if (s_eq(t[0], "pause"))  { pause_now("  ");  return; }
+    if (s_eq(t[0], "pause-at") && n >= 2) {
+        long at = (long)s_atof(t[1]);
+        char b[96];
+        if (at <= g_scene_ticks) {
+            s_cpy(b, "  ! tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks); s_cat(b, " already");
+            logline(b);
+            return;
+        }
+        g_pause_at = at;
+        s_cpy(b, "  ok: at tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks);
+        logline(b);
+        return;
+    }
+    if (s_eq(t[0], "tick")) {
+        char b[64];
+        s_cpy(b, "  tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks);
+        logline(b);
+        return;
+    }
+    if (s_eq(t[0], "seed") && n >= 2 && s_isnum(t[1])) { seed_random((DWORD)s_atof(t[1])); logline("  ok"); return; }
     if (s_eq(t[0], "resume")) { ((SiVoidFn)SI_UNPAUSE)(SI_INSTANCE); g_paused = 0; logline("  resumed"); return; }
     if (s_eq(t[0], "hud")  && n >= 2) { set_hud(on_arg(t[1]));  logline("  ok"); return; }
     if (s_eq(t[0], "grid") && n >= 2) { set_grid(on_arg(t[1])); logline("  ok"); return; }
@@ -2210,6 +2271,13 @@ static void build_scene(void)
         g_anchor[0] = interest[0]; g_anchor[1] = interest[1]; g_anchor[2] = interest[2];
     }
 
+    {   /* Seed=: the engine's random sequences from a seed of ours, before anything is built */
+        char v[24];
+        GetPrivateProfileStringA("Scene", "Seed", "", v, sizeof v, g_ini);
+        if (v[0] && s_isnum(v)) seed_random((DWORD)s_atof(v));
+        GetPrivateProfileStringA("Scene", "Pause", "", v, sizeof v, g_ini);
+        if (v[0] && s_isnum(v)) g_pause_at = (long)s_atof(v);
+    }
     if (!ini_int("Scene", "Fog", 0)) {
         ((ForceFogFn)FORCE_FOG)(0);
         ((VoidFn)FORCE_UPDATE)();
@@ -2294,19 +2362,28 @@ static void build_scene(void)
 
 /* ---- the tick --------------------------------------------------------- */
 
-static int g_ticks;
-
 static void __cdecl scene_tick(void)
 {
     ((UpdateRangeFn)UPDATE_RANGE)();
     if (!g_ready) {
-        if (g_ticks == 0) logline("first mission tick");
+        if (g_ticks == 0) {
+            char v[24];
+            logline("first mission tick");
+            /* Seed= also from the first tick, so the ticks before the scene run alike */
+            GetPrivateProfileStringA("Scene", "Seed", "", v, sizeof v, g_ini);
+            if (v[0] && s_isnum(v)) seed_random((DWORD)s_atof(v));
+        }
         if (g_ticks++ >= ini_int("Scene", "Delay", 30)) build_scene();
         return;
     }
+    g_scene_ticks++;
     heal_all();
     if (g_refresh && --g_refresh == 0 && g_paused)
         ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);
+    if (g_pause_at >= 0 && g_scene_ticks >= g_pause_at) {
+        g_pause_at = -1;
+        pause_now("Pause=: ");
+    }
     process_commands();
 }
 
