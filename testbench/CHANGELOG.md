@@ -19,7 +19,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `bench/baseline_selftest.py`: every number, the readers and the exit codes on
   synthetic frames, no game.
 
-Installs nothing.
+Installs nothing; seen working on the bench 2026-10-22 (`showcase`, paused, 1280x720).
 
 ## 3.41.2 — 2026-10-22
 

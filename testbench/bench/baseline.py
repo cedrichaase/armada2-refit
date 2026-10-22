@@ -367,6 +367,12 @@ def _case_meta(case_dir):
         m = re.search(r'bench-setup\.sh\s+(\S+)', rec.get('text') or '')
         if m and rec.get('kind') == 'action':
             scene = m.group(1)
+    # `SCENE=<name> ... --install testbench/scene`: the scene's install says which file
+    plog = Path(case_dir) / 'logs' / 'prepare.log'
+    if plog.exists():
+        for m in re.finditer(r'installed Scene\.asi into .*?, scene \S*?/scenes/([^/\s]+)\.ini',
+                             plog.read_text(errors='replace')):
+            scene = m.group(1)
     if scene:
         meta['scene'] = scene
     return meta
@@ -706,8 +712,8 @@ def main(argv):
             a = ap.parse_args(rest)
             ra, rb = resolve(a.a), resolve(a.b)
             sa, sb = ra['shots'], rb['shots']
-            if ra['kind'] == 'file' and rb['kind'] == 'file':
-                sb = {next(iter(sa)): next(iter(sb.values()))}       # two files: names need not match
+            if len(sa) == 1 and len(sb) == 1:
+                sb = {next(iter(sa)): next(iter(sb.values()))}       # one frame a side: names need not match
             names = a.shot or [n for n in sa if n in sb]
             if not names:
                 raise BaselineError(f'no shot name in common (A: {", ".join(sa) or "none"}; '

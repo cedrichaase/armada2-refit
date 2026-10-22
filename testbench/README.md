@@ -430,11 +430,17 @@ a channel swapped in one material, or bloom 3% too strong. It passes all three, 
 each costs money and time. The diff is exact, free and the same on every run. It
 also gives a number to track: before/after a refactor, and backend against backend.
 
-**The noise floor.** Two frames of the same paused scene are not identical yet: the
-render is not deterministic (cosmetic particles, the blue-noise march). Measured on
-`showcase`, paused, at 1280x720: NOISEFLOOR. Until the render is made deterministic,
-a tolerance has to sit above that floor; once it is, the default (nothing over 2/255)
-is the target.
+**The noise floor.** Measured on `showcase` at 1280x720, paused with `scene pause`
+(session 20261022-214129-23171): shots taken 2 s and 5 s apart in one pause are
+identical, rmse 0 and no pixel over 2/255. One second of simulation between two shots
+(`scene resume`, then `pause`) gives rmse 15.4/255, max 254/255, 10.9% of pixels over
+2/255. The beams, shields, sparks and the planet's clouds have moved, and the sky has
+not. So a paused frame is stable within a launch. What is not yet measured is two
+launches of the same scene, or two builds: the cosmetic simulation, its particles and
+the march's thresholds run on the sim clock, so a baseline compares only frames taken
+at the same tick, with the same camera. Until the render is deterministic across
+launches, a tolerance has to sit above that floor. Once it is, the default (nothing
+over 2/255) is the target.
 
 `python3 testbench/bench/baseline_selftest.py` checks every number, the readers, the
 exit codes and the steps on synthetic frames, with no game.
