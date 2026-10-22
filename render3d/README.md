@@ -190,7 +190,9 @@ sessions of one scene paused at one tick must draw the same picture, so a port o
 renderer can be checked by a pixel diff.
 
 **The rule: anything that moves on screen reads `clock::anim_now()`, never
-`rt::now()`, and a cosmetic random sequence takes its seed from `clock::seed()`.**
+`rt::now()`; a cosmetic random sequence takes its seed from `clock::seed()`; and a
+per-object seed is made from `clock::entity_key(object)`, never from the object's
+address alone.**
 `rt::now()` is for what is not seen: timing logs, how often a file is looked at again
 (`Reload=1`, the A/B files), how long a noise took to make. With the bench clock,
 `anim_now()` is the simulation's time (`Get_Time`, the float at 0x7b0fc8, written once
@@ -198,7 +200,18 @@ a tick by `Time_Simulate`), which stands while the game is paused, and `seed()` 
 fixed number. What reads it: the hologram's and the extras' phase (hulls), the vents'
 flicker, the special-object effects' flicker and light, a co-player's selection blink,
 the debris' random sequence (`seed()`), and the menu scene's map (in the front end the
-simulation's time stands, so there a move to a new view is settled at once).
+simulation's time stands, so there a move to a new view is settled at once). A seed
+made from an object's address (a beam's or torpedo's flicker and spin, a wave's, an
+ordnance model's pulse, a hologram's phase) differs from launch to launch, since the
+heap does: `entity_key()` is the address under the wall clock, as before, and under the
+bench clock the object's handle (+0x28 of every `Entity`, given out in order). A hull
+spark is no entity; under the bench clock its seed is when it was born (the sim time
+less its age) and its owner's handle. Stock's own shots are animated by the engine's
+`ST3D_Sprite::Animate`, whose channels are evaluated at the float 0x7a8e74
+(`ST3D_AnimationChannel::SetStartTime` sets it from Storm3D's wall clock); under the
+bench clock the ordnance module writes the sim time there for its call and puts the old
+value back after. Without it a torpedo's starburst turned and the phasers' texture ran
+on while paused, the last difference between two launches of `showcase`.
 
 What the sim clock (`View::time`) already drove stays as it was, with three changes
 under the bench clock, each because a value was summed or drawn **once a frame**, which

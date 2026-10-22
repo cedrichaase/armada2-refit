@@ -180,7 +180,12 @@ impl SparkFx {
 
                 colour: v3(c[0], c[1], c[2]),
                 blast,
-                seed: super::hash32(node as u32 ^ field(node, P_HANDLE) as u32),
+                // Under the bench clock not the node's address (clock.rs): when it was born.
+                seed: if crate::clock::bench() {
+                    super::hash32((engine::sim_time() - engine::field_f32(node, P_AGE)).to_bits() ^ field(node, P_HANDLE) as u32)
+                } else {
+                    super::hash32(node as u32 ^ field(node, P_HANDLE) as u32)
+                },
                 sprite,
             });
         }

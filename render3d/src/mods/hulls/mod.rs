@@ -381,7 +381,7 @@ impl Hulls {
         }
         let st = view_state(v.key());
         self.sprites.collect(v, look, &p, &mut st.sprites);
-        let seed = ((o >> 4) as u32).wrapping_mul(2654435761) as f32 / 4294967296.0;
+        let seed = ((crate::clock::entity_key(o) >> 4) as u32).wrapping_mul(2654435761) as f32 / 4294967296.0;
         st.extras.push((p, Extra::Holo(team, seed)));
         true
     }

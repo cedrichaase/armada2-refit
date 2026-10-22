@@ -46,3 +46,11 @@ pub fn anim_now() -> f64 {
 pub fn seed() -> u32 {
     if bench() { 0x2545_f491 } else { (crate::rt::now() * 1000.0) as u64 as u32 }
 }
+
+/// What a per-object cosmetic seed is made from: the object's address under the wall
+/// clock (as always), and under the bench clock its handle (+0x28 of every `Entity`,
+/// given out in order as objects are made), shifted to where an address's bits are: the
+/// heap's addresses differ from launch to launch, the handles do not.
+pub fn entity_key(e: usize) -> usize {
+    if bench() && e != 0 { crate::engine::field(e, 0x28) << 4 } else { e }
+}

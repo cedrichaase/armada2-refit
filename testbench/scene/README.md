@@ -20,10 +20,10 @@ drives it with `Scene "CMD"` and `Expect scene "CMD" answers "TEXT"` steps
 `SCENE=<name>` picks `scenes/<name>.ini`, `SCENE_INI=<file>` any file, and with neither
 set `Scene.ini` is used (one Galaxy class). `SCENE_RACE=federation` (or any `Race=` value) pins
 the player's race, and so the HUD's look, for whichever scene is installed: without it
-the bench draws a different race on every launch. `SCENE_SEED=<n>` and
-`SCENE_PAUSE=<tick>` put `Seed=` and `Pause=` in the same way, for a frame that repeats
+the bench draws a different race on every launch. `SCENE_SEED=<n>`,
+`SCENE_PAUSE=<tick>` and `SCENE_STEP=<ms>` put `Seed=`, `Pause=` and `Step=` in the same way, for a frame that repeats
 ("A frame that repeats", below); in a scenario, `Setup: testbench/scene/bench-setup.sh
-<scene> Seed=7 Pause=200` puts any `Key=value` after the scene's name into its `[Scene]`.
+<scene> Seed=7 Step=16 Pause=200` puts any `Key=value` after the scene's name into its `[Scene]`.
 `install` refuses any game directory that is
 not an a2test clone: this is a test tool and never goes into the player's install. The
 bench gathers `Scene.log` and `Scene.ini` with the other logs.
@@ -81,7 +81,8 @@ bench gathers `Scene.log` and `Scene.ini` with the other logs.
 | `Center` | | centre the RTS camera on this object |
 | `Zoom` | | the RTS camera's zoom level, 0 (closest) to 1 (farthest), set once the scene is built (`zoom`, below; "The zoom"). Unset leaves the camera as the game started it |
 | `Camera` | | a `camera` or `orbit` command (below), run once the scene is built |
-| `Seed` | | a number: every random sequence of the engine started again from it, at the first mission tick and again as the scene is built, so what a scene picks at random (an asteroid field's rocks) and how the battle runs repeat from launch to launch ("A frame that repeats") |
+| `Seed` | | a number: every random sequence of the engine started again from it, as the mission loads (before the stars are laid out) and again as the scene is built, so the sky's stars, what a scene picks at random (an asteroid field's rocks) and how the battle runs repeat from launch to launch ("A frame that repeats") |
+| `Step` | | milliseconds: every tick of the simulation that long, whatever the frame rate (the game's own tick is as long as the frame that ran it), from the first tick on. The simulation then runs faster or slower than the wall clock, the same way on every launch |
 | `Pause` | | a tick: the simulation is paused that many ticks after the scene is built, as `pause` does; `Scene.log` says `Pause=: paused at tick N` |
 
 `[Marks]`, the event marks (below, "Marks"); every scene has them without the section:
@@ -170,10 +171,13 @@ Two launches of one scene must be able to draw the same picture, so that a port 
 renderer can be checked by a pixel diff (`../README.md`, "A frame that repeats", has the
 measurements and the `--clock bench` it goes with). Three things make the scene repeat:
 
-- **`Seed=`**: the simulation is the same lockstep a network game runs, so from the same
-  random state and the same orders at the same ticks it runs the same way. The scene's
-  orders are all in its file and given as it is built; its random state is ours with
-  `Seed=` ("How it works", "Random sequences").
+- **`Seed=`**: the random state ("How it works", "Random sequences"). From the same
+  random state, the same orders at the same ticks and ticks of the same length the
+  simulation runs the same way. The scene's orders are all in its file and given as it
+  is built.
+- **`Step=`**: the length of a tick. Left to the game, a tick is as long as the frame
+  that ran it, so at tick 200 two launches had simulated 4.3550 s and 4.3484 s, and every
+  torpedo was elsewhere ("How it works", "The tick's length").
 - **`Pause=`**: the moment, in ticks after the scene was built, not in seconds after
   some command arrived. A command from `Scene.cmd` lands on whatever tick is running
   when it is read, so anything given by hand (a `spawn`, an `attack`, a camera move,
@@ -502,7 +506,20 @@ inert, and `Scene.log` says so.
   constructor, `RandomSequence::RandomSequence(int seed, bool log)` (0x65e1b0, thiscall,
   checked by its first bytes), on each existing object with seed, seed + 1 and seed + 2,
   passing back the log flag it kept (+9), so the object starts its sequence again and
-  nothing else of it changes. Nothing is seeded without `Seed=`.
+  nothing else of it changes. Nothing is seeded without `Seed=`. It is done twice: as the
+  scene is built, and as the mission loads, where `Program::GameOpenPreLoad` makes
+  `g_random` and then calls `Starfield_Initialize` (0x59ac00, the call at 0x485159,
+  checked to be that call), which lays the background's stars out from `g_asyncRandom`:
+  that call goes to the plugin, which seeds and then makes it. Without it the stars stood
+  elsewhere on every launch (bench, `showcase`).
+- **The tick's length: `Program::GameProcess(int ms)`** (0x483450) runs one tick for the
+  milliseconds the frame took: its length is `getGameSpeedModifier()` (0x604700) times
+  `ms` times 0.001, and that is what `Time_Simulate` adds to the simulation's time and
+  `Simulate` hands every object. With `Step=`, its one call of `getGameSpeedModifier`
+  (0x4834a3, checked to be that call and followed by the multiplication by `ms`) goes to
+  the plugin, which makes the same call after setting the `ms` argument in
+  `GameProcess`'s frame to `Step=`; nothing in `GameProcess` reads it before. Bench,
+  `showcase`, before: tick 200 at 4.3550 s on one launch and 4.3484 s on the next.
 - **Where the camera looks: `gTacticalCamera`** (0x763650). Its interest point, the map
   position the RTS camera looks at, is the `Vector3` at +0x98
   (`TacticalCamera::GetInterest`). **That camera is not the one in use on the bench**

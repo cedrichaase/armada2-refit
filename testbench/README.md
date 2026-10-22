@@ -17,6 +17,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test session start --res 800x600 --mod stock --stock-shell embed   # the stock baseline, menus clickable
     ./a2test session start --assets none --install .   # as a release installs it: no textures, plates, movies
     A2_DATA=$(mktemp -d) ./a2test session start --install .   # ... as without any assets
+    ./a2test session start --clock bench     # animations on the sim time: "A frame that repeats"
     ./a2test session start --mute music,voice   # the game's own music and voice volumes at 0
     ./a2test session start --stems music,voice  # music and voice each on a silent sink of their own
     ./a2test drive --session ID shot menu    #   prints the PNG path
@@ -290,6 +291,50 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
   this looked like a name leaking from one session into a later clone, but it was never
   the bench's. A scenario must not expect the default name; `multiplayer-name.md` clears
   the field before it types.
+
+## A frame that repeats
+
+Two sessions of one scene, stopped at one moment, can draw the same picture pixel for
+pixel, so that a port of the renderer can be checked against a baseline by a diff. It
+takes three things, each off by default:
+
+- **`--clock bench`** (`a2test session start`, `a2test run`; a scenario's `Clock: bench`;
+  `A2TEST_CLOCK=bench`): `[Bench] Clock=bench` in the clone's `Render3D.ini` and
+  `UI.ini`. Every animation of the plugins then runs on the simulation's time, which
+  stands while the game is paused, cosmetic seeds are fixed, and what adds frames up
+  (the nebulae's `Temporal=`) settles on one picture (`render3d/README.md` and
+  `ui/README.md`, "The animation clock").
+- **`Seed=`, `Step=` and `Pause=`** in the scene (`scene/README.md`, "A frame that
+  repeats"): the engine's random sequences from a seed, every tick the same length, and
+  the pause on a tick counted from the scene's build. `Setup:
+  testbench/scene/bench-setup.sh showcase Seed=7 Step=16 Pause=200 Race=federation`.
+- **Nothing by hand before the pause.** A command from `drive scene` lands on whatever
+  tick is running; the camera and every order belong in the scene file.
+
+`bench-determinism` is the regression scenario: a shot of the paused frame, another 3 s
+later, then a second launch of the same clone and a third, compared with `Expect shots
+"A" and "B" to match`.
+
+Measured at 1280x720, two launches each, the shot 4 s after the pause, mean absolute
+difference over every channel (0..255), the largest difference, and the share of pixels
+that differ (2026-10-22):
+
+| Scene | Before: wall clock, `scene pause` 15 s after the build | Seed, Pause, wall-length ticks | + `Step=16` | + per-object seeds from handles, the engine's sprite animation on the sim time: today |
+|---|---|---|---|---|
+| `showcase` | 3.516, 254, 15.8% | 0.557, 255, 9.5% | 0.159, 211, 2.9% | **0, 0, 0%** |
+| `nebula` | 0.220, 253, 16.7% | | 0, 0, 0% | **0, 0, 0%** (`Step=16` run) |
+| `firing` | 0.511, 254, 5.3% | | 0, 0, 0% | **0, 0, 0%** (`Step=16` run) |
+
+What each step took out: before, the battle was simply at another moment, and the
+stars of the sky stood elsewhere on each launch (the engine lays them out from a
+sequence seeded by the wall clock as the mission loads). With a seed and a fixed tick
+count the stars matched but torpedoes did not: the game's tick is as long as the frame
+that ran it, so tick 200 was 4.3550 s of simulation on one launch and 4.3484 s on the
+next. With `Step=16` both were 3.7 s exactly (`0x406c8b57`), and what was left was the
+torpedoes' starbursts and the phasers' texture, animated by the engine's sprite clock
+and seeded from heap addresses. Within one launch, before: `nebula`'s paused frame still
+moved (0.145, 4, 29.6% of pixels, 3 s apart: the gas's frames adding up); with the bench
+clock nothing moves.
 
 ## Operating the game: what agents learned
 

@@ -309,6 +309,11 @@ int _fltused = 0;   /* floats without the CRT */
 #define G_MISSION_RANDOM 0x7b0fa8u   /* g_missionRandom: RandomSequence * */
 #define G_ASYNC_RANDOM   0x7300c4u   /* g_asyncRandom: RandomSequence *, the one not kept in step */
 #define RANDOM_LOG_KEEP  0x09u       /* the log flag the constructor's bool sets, as kept */
+#define STARFIELD_INIT   0x59ac00u   /* Starfield_Initialize(), cdecl: lays the stars out from g_asyncRandom */
+#define PRELOAD_STARS    0x485159u   /* its call in Program::GameOpenPreLoad, after g_random is made */
+#define GAME_SPEED       0x604700u   /* getGameSpeedModifier(), cdecl: float */
+#define PROCESS_SPEED    0x4834a3u   /* its call in Program::GameProcess(int ms), whose tick is speed x ms x 0.001 */
+#define SIM_TIME         0x7b0fc8u   /* Get_Time's float: the simulation's time, written once a tick */
 
 #define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
 #define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
@@ -1283,6 +1288,8 @@ static void pause_now(const char *why)
     ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);
     g_paused = 1;
     s_cpy(b, why, sizeof b); s_cat(b, "paused at tick "); s_num(b + s_len(b), g_scene_ticks);
+    s_cat(b, ", sim time "); s_flt(b, *(const float *)SIM_TIME);
+    s_cat(b, " ("); s_hex(b, *(const DWORD *)SIM_TIME); s_cat(b, ")");
     logline(b);
 }
 static void process_commands(void);
@@ -2366,13 +2373,7 @@ static void __cdecl scene_tick(void)
 {
     ((UpdateRangeFn)UPDATE_RANGE)();
     if (!g_ready) {
-        if (g_ticks == 0) {
-            char v[24];
-            logline("first mission tick");
-            /* Seed= also from the first tick, so the ticks before the scene run alike */
-            GetPrivateProfileStringA("Scene", "Seed", "", v, sizeof v, g_ini);
-            if (v[0] && s_isnum(v)) seed_random((DWORD)s_atof(v));
-        }
+        if (g_ticks == 0) logline("first mission tick");
         if (g_ticks++ >= ini_int("Scene", "Delay", 30)) build_scene();
         return;
     }
@@ -2492,6 +2493,69 @@ static void *__cdecl race_find(const char *map_race)
     return r ? r : ((RaceFindFn)RACE_FIND)(map_race);
 }
 
+/* Seed= as the mission loads. Program::GameOpenPreLoad makes g_random (from the game
+ * setup's seed) and then calls Starfield_Initialize, which lays the background's stars
+ * out from g_asyncRandom, seeded from the wall clock when the game started: a different
+ * sky on every launch. That call comes here, which seeds every sequence first, so the
+ * stars and everything the mission draws from then on repeat. */
+typedef void (__cdecl *VoidCdeclFn)(void);
+static DWORD g_seed_value;
+
+static void __cdecl preload_stars(void)
+{
+    seed_random(g_seed_value);
+    ((VoidCdeclFn)STARFIELD_INIT)();
+}
+
+static void seed_hook(void)
+{
+    char v[24];
+    const BYTE *p = (const BYTE *)PRELOAD_STARS;
+    GetPrivateProfileStringA("Scene", "Seed", "", v, sizeof v, g_ini);
+    if (!v[0] || !s_isnum(v)) return;
+    g_seed_value = (DWORD)s_atof(v);
+    if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != STARFIELD_INIT - (PRELOAD_STARS + 5) ||
+        !patch_dword(PRELOAD_STARS + 1, (DWORD)&preload_stars - (PRELOAD_STARS + 5))) {
+        logline("seed: NOT PATCHED: GameOpenPreLoad's Starfield_Initialize call differs -- seeded at the scene only");
+        return;
+    }
+    logline("seed: Seed= hooked, the random sequences seeded as the mission loads");
+}
+
+/* Step=: every tick the same length. Program::GameProcess(int ms) runs one tick of the
+ * simulation for the milliseconds the frame took, times getGameSpeedModifier() and 0.001,
+ * so a tick's length -- and with it every position, reload and timer at tick N -- follows
+ * the frame rate of that run. Its one call of getGameSpeedModifier, just before the
+ * product is formed, comes here: the call is made as before, and the `ms` argument in
+ * GameProcess's frame (ebp + 8, which nothing reads before) is set to Step= first. The
+ * simulation then advances Step= ms a tick whatever the frame rate: faster or slower than
+ * the wall clock, the same on every launch. */
+typedef float (__cdecl *SpeedFn)(void);
+static int g_step_ms;
+
+static float __cdecl fixed_speed(void)
+{
+    int *frame = *(int **)__builtin_frame_address(0);   /* GameProcess's ebp */
+    frame[2] = g_step_ms;
+    return ((SpeedFn)GAME_SPEED)();
+}
+
+static void step_hook(void)
+{
+    const BYTE *p = (const BYTE *)PROCESS_SPEED;
+    char b[96];
+    g_step_ms = ini_int("Scene", "Step", 0);
+    if (g_step_ms <= 0) return;
+    if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != GAME_SPEED - (PROCESS_SPEED + 5) ||
+        p[5] != 0xDA || p[6] != 0x4D || p[7] != 0x08 ||
+        !patch_dword(PROCESS_SPEED + 1, (DWORD)&fixed_speed - (PROCESS_SPEED + 5))) {
+        logline("step: NOT PATCHED: GameProcess differs -- ticks as long as the frames");
+        return;
+    }
+    s_cpy(b, "step: Step=", sizeof b); s_num(b, g_step_ms); s_cat(b, " ms a tick, whatever the frame rate");
+    logline(b);
+}
+
 static void race_hook(void)
 {
     static const BYTE find[8] = { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 };
@@ -2585,6 +2649,10 @@ static void startup(void)
     if (!ini_int("Scene", "Music", 1) && music_sigs_ok()) music_off();
     /* So has the race: it is set before the mission loads, whatever the scene. */
     race_hook();
+    /* And the seed: the stars are laid out as the mission loads, before any tick. */
+    seed_hook();
+    /* And the tick's length, from the first tick on. */
+    step_hook();
     /* And the captions: a campaign take, Enable=0, is where they show. */
     captions_hook();
     if (!ini_int("Scene", "Enable", 1)) {

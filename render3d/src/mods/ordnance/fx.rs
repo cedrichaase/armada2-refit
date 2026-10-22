@@ -703,7 +703,7 @@ impl Fx {
             return;
         }
         let d = d * (1.0 / len);
-        let seed = hash32(ord as u32);
+        let seed = hash32(crate::clock::entity_key(ord) as u32);
         let px = cam.px * (((a + b) * 0.5) - cam.eye).len();
         let mut hw = r.width * 0.5;
         let hmin = r.min_px * px * 0.5;
@@ -798,7 +798,7 @@ impl Fx {
         let tgt = eng::object_of(unsafe { crate::engine::rd::<i32>(ord + 0x60) });
         // The target's size, or without one a cone an eighth as wide as it is long.
         let (tc, tr) = if tgt != 0 { (eng::obj_pos(tgt), eng::radius_of(tgt)) } else { (b, (len * 0.125).max(r.width)) };
-        let seed = hash32(ord as u32);
+        let seed = hash32(crate::clock::entity_key(ord) as u32);
         let bright = r.bright * clamp((now - self.ages[age].first) / r.fade_in, 0.0, 1.0) * Self::flicker(&r, seed, now);
         if bright <= 0.004 {
             return;
@@ -907,7 +907,7 @@ impl Fx {
         ag.last = Some(pos);
         let dir = ag.dir;
         let first = ag.first;
-        let seed = hash32(ord as u32);
+        let seed = hash32(crate::clock::entity_key(ord) as u32);
         let px = cam.px * (pos - cam.eye).len();
         let mut rad = r.size;
         let hmin = r.min_px * px * 0.5;
@@ -949,7 +949,7 @@ impl Fx {
         let h = unsafe { crate::engine::rd::<i32>(ord + if r.on_owner { 0x5c } else { 0x60 }) };
         let o = eng::object_of(h);
         let (c, rad) = if o != 0 { (eng::obj_pos(o), r.radius * eng::radius_of(o)) } else { (eng::transform(ord).p, r.radius * 50.0) };
-        let seed = hash32(ord as u32);
+        let seed = hash32(crate::clock::entity_key(ord) as u32);
         let bright = r.bright * clamp((now - self.ages[age].first) / r.fade_in, 0.0, 1.0) * Self::flicker(&r, seed, now);
         if bright <= 0.004 {
             return;
@@ -1037,7 +1037,7 @@ impl Fx {
         if end > 0.01 && rad > fade * end {
             k = clamp((end - rad) / ((1.0 - fade) * end + 1e-3), 0.0, 1.0);
         }
-        let seed = hash32(ex as u32);
+        let seed = hash32(crate::clock::entity_key(ex) as u32);
         let bright = r.bright * k * Self::flicker(&r, seed, v.time);
         if bright <= 0.004 {
             return;

@@ -13,7 +13,8 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   co-player selection blink, the menu scene), gives the debris a fixed seed
   (`clock::seed()`), settles the nebulae's `Temporal=` history on a standing view (32
   frames from the sequence's first step, then held), and makes the nebula pulse and
-  lightning functions of the sim time. For pixel-identical frames on the test bench.
+  lightning functions of the sim time; per-object seeds come from the object's handle,
+  not its address (`clock::entity_key`). For pixel-identical frames on the test bench.
 
 Installed, not yet seen in game.
 

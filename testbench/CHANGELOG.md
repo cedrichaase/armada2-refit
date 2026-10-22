@@ -12,9 +12,11 @@ versions". Newest first. The why is in [`README.md`](README.md).
   header and `A2TEST_CLOCK`: `bench` sets `[Bench] Clock=bench` in the clone's
   `Render3D.ini` and `UI.ini`.
 - `Scene.asi`: `Seed=` and `seed <n>` (the engine's three random sequences started again
-  from a seed), `Pause=` and `pause-at <tick>` (pause a fixed number of ticks after the
-  scene is built), `tick`; `pause` answers its tick. `SCENE_SEED`/`SCENE_PAUSE` at
-  install, and `Key=value` words after the scene in `bench-setup.sh`.
+  from a seed, as the mission loads and as the scene is built), `Step=` (every tick that
+  many ms, whatever the frame rate), `Pause=` and `pause-at <tick>` (pause a fixed number
+  of ticks after the scene is built), `tick`; `pause` answers its tick and the sim time.
+  `SCENE_SEED`/`SCENE_STEP`/`SCENE_PAUSE` at install, and `Key=value` words after the
+  scene in `bench-setup.sh`.
 - Steps `Wait up to N seconds for "LOG" to say "TEXT"` and `Expect shots "A" and "B" to
   match within T`; scenario `bench-determinism`.
 
