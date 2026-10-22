@@ -26,11 +26,6 @@ pub struct PRect {
 }
 
 impl PRect {
-    /// **Transitional**: as a Direct3D 9 rectangle, for the modules not yet on `gpu`.
-    pub fn d3d(self) -> gpu::d3d9::raw::Rect {
-        gpu::d3d9::raw::Rect { left: self.x as i32, top: self.y as i32, right: (self.x + self.w) as i32, bottom: (self.y + self.h) as i32 }
-    }
-
     pub fn rect(self) -> Rect {
         Rect::new(self.x, self.y, self.w, self.h)
     }

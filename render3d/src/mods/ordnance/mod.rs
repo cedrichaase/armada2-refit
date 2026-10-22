@@ -20,7 +20,6 @@ mod models;
 pub mod sprite;
 
 use super::{Module, Step};
-use gpu::d3d9::raw::Device;
 use crate::engine::{self, field, field_f32, field_u8, hook, rd};
 use crate::frame::steps::View;
 use crate::log;
@@ -293,7 +292,7 @@ impl Module for Ordnance {
     fn superseded(&self) -> Option<&'static str> {
         Some("Specials.asi")
     }
-    fn device(&mut self, _dev: Device) {
+    fn device(&mut self) {
         self.install();
     }
     fn reset(&mut self) {

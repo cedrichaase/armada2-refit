@@ -5,7 +5,6 @@
 //! A module is switched per category in `Render3D.ini` (`[Modules]`, `<name>=1`), and a
 //! module that replaces a plugin's work stands down while that plugin is loaded (its
 //! `superseded()`), so the plugin keeps drawing its part inside the engine's step.
-use gpu::d3d9::raw::Device;
 use crate::frame::steps::View;
 use crate::log;
 
@@ -55,12 +54,16 @@ pub trait Module {
     fn superseded(&self) -> Option<&'static str> {
         None
     }
-    /// A device to draw on (first frame, or after a new device).
-    fn device(&mut self, _dev: Device) {}
-    /// Before a `Reset`: drop everything in the default pool.
+    /// A device to draw on (first frame, or after a new device): every plugin is
+    /// loaded by now.
+    fn device(&mut self) {}
+    /// Before a `Reset`. `gpu` lets go of its objects and makes them again itself; what
+    /// a module does here is for what they held: a target's contents are lost (a bake to
+    /// do again), and a texture or buffer made `Transient` cannot be made again (made
+    /// anew by its owner).
     fn reset(&mut self) {}
-    /// Before the engine lets go of its device: drop everything made on it, in any
-    /// pool (`frame::forget`). What `reset` drops, unless a module holds more.
+    /// Before the engine lets go of its device (`frame::forget`): as `reset`, unless a
+    /// module holds more.
     fn forget(&mut self) {
         self.reset();
     }
@@ -158,9 +161,9 @@ pub fn settle() {
     unsafe { ACTIVE = true };
 }
 
-pub fn device(dev: Device) {
+pub fn device() {
     for m in all().iter_mut() {
-        m.device(dev);
+        m.device();
     }
 }
 

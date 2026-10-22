@@ -250,12 +250,6 @@ impl Gpu {
         Some(d)
     }
 
-    /// **Transitional**: the raw device, for code not yet ported to the interface
-    /// (render3d's modules). Its draws go between `Cmd`s, inside a `Section`.
-    pub fn device(&self) -> Option<Dev> {
-        self.dev.get()
-    }
-
     /// Before the device's `Reset`: everything in the default pool is let go of.
     pub fn before_reset(&self) {
         self.sweep(false);
@@ -296,13 +290,9 @@ impl Gpu {
 
     // -- sections --
 
-    /// **Transitional**: a section of raw Direct3D 9 drawing. The engine's state is
-    /// captured now and put back when the section is dropped. Sections nest, each
-    /// depth with its own block.
-    pub fn section(&self) -> Section<'_> {
-        Section { gpu: self, at: self.enter() }
-    }
-
+    /// A section: the engine's state is captured now (a `Cmd`'s first command that
+    /// changes any) and put back at `leave` (the `Cmd`'s end). Sections nest (a `Cmd`
+    /// begun while another records), each depth with its own block.
     fn enter(&self) -> Option<usize> {
         let dev = self.dev.get()?;
         let d = self.depth.get();
@@ -542,20 +532,6 @@ impl Gpu {
         let r = f(&m);
         sys.surf_unlock();
         Ok(r)
-    }
-}
-
-/// A section of raw drawing (`Gpu::section`): the engine's state is put back on drop.
-pub struct Section<'a> {
-    gpu: &'a Gpu,
-    at: Option<usize>,
-}
-
-impl Drop for Section<'_> {
-    fn drop(&mut self) {
-        if let Some(d) = self.at {
-            self.gpu.leave(d);
-        }
     }
 }
 
@@ -887,16 +863,6 @@ impl Texture {
         self.0.dirty.set(true);
     }
 
-    /// **Transitional**: the Direct3D 9 texture (null when it has none or cannot be made).
-    pub fn raw_texture(&self, gpu: &Gpu) -> *mut c_void {
-        self.0.tex(gpu)
-    }
-
-    /// **Transitional**: the Direct3D 9 surface of a target (null as above).
-    pub fn raw_surface(&self, gpu: &Gpu) -> *mut c_void {
-        self.0.surf(gpu)
-    }
-
     /// Whether two handles are the same texture.
     pub fn same(&self, o: &Texture) -> bool {
         Rc::ptr_eq(&self.0, &o.0)
@@ -1092,11 +1058,6 @@ impl BufInner {
 impl Buffer {
     pub fn desc(&self) -> BufferDesc {
         self.0.desc
-    }
-
-    /// **Transitional**: the Direct3D 9 buffer (null when it cannot be made).
-    pub fn raw(&self, gpu: &Gpu) -> *mut c_void {
-        self.0.com(gpu)
     }
 }
 

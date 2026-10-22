@@ -11,7 +11,6 @@
 //! The hull is the hulls module's pose of the affected object (`hulls::posed`); an
 //! object it does not draw (or a cloaked one) gets no layer.
 use super::{Fx, VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
-use gpu::d3d9::raw::Device;
 use gpu::{Blend, Block, Code, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
@@ -128,7 +127,6 @@ impl Looks {
         self.rim_power = n.rim_power;
         self.white = n.white;
     }
-    pub fn device(&mut self, _dev: Device) {}
     pub fn reset(&mut self) {}
 
     /// How strong an effect is now: up over `Rise` seconds from its start, down over

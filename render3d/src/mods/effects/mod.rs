@@ -34,7 +34,6 @@ pub mod sparks;
 pub mod weldfx;
 
 use super::{Module, Step};
-use gpu::d3d9::raw::Device;
 use crate::engine::{self, field, hook, rd};
 use crate::frame::steps::View;
 use crate::log;
@@ -284,7 +283,7 @@ impl Module for Effects {
     fn name(&self) -> &'static str {
         "effects"
     }
-    fn device(&mut self, _dev: Device) {
+    fn device(&mut self) {
         if self.hooked {
             return;
         }

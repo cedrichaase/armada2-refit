@@ -90,7 +90,6 @@ pub struct View {
     pub main: bool,
     /// The view's rectangle in the back buffer (and in our targets).
     pub rect: PRect,
-    pub dev: Device,
     /// The ST3D device (`ST3D_DeviceDirectX8`).
     pub st3d: usize,
     pub view: M4,
@@ -164,7 +163,6 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         rs,
         main,
         rect: cam_rect(cam, tw, th),
-        dev,
         st3d,
         view: M4(dev.get_transform(TS_VIEW)),
         proj: M4(dev.get_transform(TS_PROJECTION)),

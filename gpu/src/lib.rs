@@ -38,7 +38,7 @@ mod frame;
 pub mod pixels;
 pub mod types;
 
-pub use d3d9::{Buffer, Cmd, Gpu, Pipeline, Section, Texture, Timer, TimerResult};
+pub use d3d9::{Buffer, Cmd, Gpu, Pipeline, Texture, Timer, TimerResult};
 pub use frame::{Frame, Span};
 pub use pixels::Mapped;
 pub use types::*;

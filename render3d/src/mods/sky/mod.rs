@@ -204,7 +204,6 @@ fn view_with(v: &View, proj: M4) -> View {
         rs: v.rs,
         main: v.main,
         rect: v.rect,
-        dev: v.dev,
         st3d: v.st3d,
         view: v.view,
         proj,

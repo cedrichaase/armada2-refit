@@ -82,7 +82,8 @@ fn time_view(main: bool) -> bool {
     }
     match Device::from_d3d8(engine::d3d8_device()) {
         Some(dev) => {
-            timing::begin(dev, main);
+            crate::gfx::gpu().attach(dev);
+            timing::begin(main);
             true
         }
         None => false,
@@ -357,7 +358,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
         }
         *f = Some(Frame { dev, post: None, targets: None, failed: None, frames: 0, logged: [None; 3] });
         hook_reset(dev8);
-        crate::mods::device(dev);
+        crate::mods::device();
     }
     let g = gfx::gpu();
     g.attach(dev);
@@ -416,7 +417,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
 /// buffer, then the post passes put it there, as a view of the engine's. Called inside
 /// the caller's scene with the back buffer bound; it is bound again after. False, with
 /// nothing drawn, when there is no Direct3D 9 device or no targets.
-pub fn menu_frame(rect: PRect, draw: impl FnOnce(Device, u32)) -> bool {
+pub fn menu_frame(rect: PRect, draw: impl FnOnce(u32)) -> bool {
     let Some(cfg) = config::get() else { return false };
     let Some(dev) = Device::from_d3d8(engine::d3d8_device()) else { return false };
     let vp = dev.get_viewport();
@@ -433,7 +434,7 @@ pub fn menu_frame(rect: PRect, draw: impl FnOnce(Device, u32)) -> bool {
         return false;
     };
     let frames = frame().as_ref().map_or(0, |f| f.frames);
-    draw(dev, frames);
+    draw(frames);
     let Some(f) = frame().as_mut() else { return true };
     if let (Some(t), Some(p)) = (f.targets.as_ref(), f.post.as_ref()) {
         let r = PRect { x: rect.x.min(t.w - 1), y: rect.y.min(t.h - 1), w: rect.w.min(t.w - rect.x.min(t.w - 1)), h: rect.h.min(t.h - rect.y.min(t.h - 1)) };
