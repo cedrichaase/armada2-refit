@@ -290,6 +290,25 @@ pub fn view_pass(cmd: &mut gpu::Cmd, v: &View, vp: Option<gpu::Viewport>) -> boo
     true
 }
 
+/// An engine texture (`ST3D_Texture`) to sample: its per-device texture (`+0x40 +
+/// device index * 4`, the index at `Storm3D+0xc0`), whose `+4` is the
+/// `IDirect3DTexture8`, which d3d8to9 answers for its `IDirect3DTexture9`, wrapped
+/// (`gpu::Gpu::wrap_d3d9_texture`). Engine glue: Display8 will hand the engine's
+/// textures out itself.
+pub fn engine_texture(st3d_tex: usize) -> Option<gpu::Texture> {
+    if st3d_tex == 0 {
+        return None;
+    }
+    let idx = crate::engine::field(crate::engine::storm3d(), 0xc0);
+    if idx > 8 {
+        return None;
+    }
+    let devtex = crate::engine::field(st3d_tex, 0x40 + idx * 4);
+    let t8 = crate::engine::field(devtex, 4);
+    let t9 = query(t8 as *mut c_void, &IID_TEXTURE9)?;
+    Some(gpu().wrap_d3d9_texture(t9))
+}
+
 /// A static vertex or index buffer filled with `data`.
 pub fn buffer<T: Copy>(data: &[T], kind: gpu::BufferKind) -> gpu::Buffer {
     let bytes = unsafe { core::slice::from_raw_parts(data.as_ptr() as *const u8, core::mem::size_of_val(data)) };

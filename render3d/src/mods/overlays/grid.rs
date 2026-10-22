@@ -6,12 +6,12 @@
 //! `+0x18` z1, `+0x1c` y, with `+0x20` + 1 lines along z and `+0x24` + 1 along x, each
 //! through `ST3D_Camera::ClipAndRenderLine` in `ST3D_Colour_Dark_Orange` (0x7a8ee8),
 //! depth-tested and written. (`DRAW_PIZZA_BOX`'s blue lines are a debug switch.)
-use gpu::d3d9::raw::*;
 use crate::engine::{field, field_f32, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, DynVb, Shader};
+use crate::gfx::{self, Pipes};
 use crate::shaders::overlays::*;
 use alloc::vec::Vec;
+use gpu::{attr, AttrFormat, Block, Code, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
 
 const GRID_SIZE: usize = 0x71a78c;
 const DARK_ORANGE: usize = 0x7a8ee8;
@@ -23,24 +23,18 @@ struct Vtx {
     uv: [f32; 2],
 }
 
-static VERTEX: [VertexElement; 3] =
-    [ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0), ve(0, 12, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0), VE_END];
+static VERTEX: [VertexAttr; 2] = [attr(0, AttrFormat::Float3, Semantic::Position, 0), attr(12, AttrFormat::Float2, Semantic::TexCoord, 0)];
 
 pub struct Grid {
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
-    vb: DynVb,
+    pipes: Pipes,
 }
 
 impl Grid {
     pub fn new() -> Grid {
-        Grid { vs: Shader::vertex(&VS_PLANE), ps: Shader::pixel(&PS_COLOUR), decl: Decl::new(&VERTEX), vb: DynVb::new(64 * 1024) }
+        Grid { pipes: Pipes::new() }
     }
 
-    pub fn reset(&mut self) {
-        self.vb.reset();
-    }
+    pub fn reset(&mut self) {}
 
     pub fn draw(&mut self, v: &View, tg: usize) {
         let step = unsafe { rd::<f32>(GRID_SIZE) };
@@ -65,23 +59,25 @@ impl Grid {
             z += step;
         }
         let c: [f32; 3] = unsafe { rd(DARK_ORANGE) };
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        // Lines, depth-tested (`LESSEQUAL`) and written, opaque.
+        let pipe = self.pipes.view(0, || {
+            let mut d = PipelineDesc::new(Code::d3d9(&VS_PLANE), Code::d3d9(&PS_COLOUR), &VERTEX, 20, Topology::LineList, Format::Unknown);
+            d.depth = Depth::TEST_WRITE;
+            d
+        });
+        let Some(pipe) = pipe else { return };
+        if !cmd.set_pipeline(&pipe) {
             return;
         }
-        let Some(first) = self.vb.push(dev, &lines, core::mem::size_of::<Vtx>() as u32) else { return };
-        dev.vs_const(4, &gfx::vp_constants(v));
-        dev.ps_const(0, &[c[0], c[1], c[2], 1.0]);
-        dev.set_texture(0, core::ptr::null_mut());
-        for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ZWRITEENABLE, 1), (RS_CULLMODE, CULL_NONE),
-            (RS_ALPHATESTENABLE, 0), (RS_ALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
-            (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
+        // The old dynamic buffer held 64 KB: a grid of more lines was not drawn.
+        if core::mem::size_of_val(&lines[..]) > 64 * 1024 {
+            return;
         }
-        dev.set_stream_freq(0, 1);
-        dev.draw_primitive(PT_LINELIST, first, lines.len() as u32 / 2);
+        let Some(span) = cmd.vertices(&lines) else { return };
+        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
+        cmd.ps_block(Block::new(0, &[c[0], c[1], c[2], 1.0]));
+        cmd.bind_texture(0, None, &crate::scene::SAMPLER);
+        cmd.draw(&span);
     }
 }
