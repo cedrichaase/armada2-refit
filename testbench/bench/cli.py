@@ -62,6 +62,16 @@ a2test -- run Armada II headless and test it end to end
   a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
                                        e.g. "orbit ship 30 15 900", "camera rts", "query"
 
+  a2test baseline record NAME --from SRC... [--shot S]... [--force]
+                                       keep shots (PNG, PPM, PFM) as $A2_DATA/baselines/NAME;
+                                       SRC: an image, a case or image dir, a session id
+  a2test baseline compare NAME --from SRC... [--shot S]... [--threshold 2] [--rmse X]
+                       [--max-over N|P%] [--out DIR] [--gif]
+                                       pixel diff per shot: RMSE, max, pixels over the
+                                       threshold, PSNR, a heat map; exit 1 over tolerance
+  a2test baseline diff A B [same options]   two images, dirs, sessions or baselines
+  a2test baseline list | show NAME
+
 Results: {results}
 """.format(results=config.RESULTS)
 
@@ -107,6 +117,9 @@ def main(argv=None):
         if cmd == 'slots':
             from . import slots
             return slots.main(rest)
+        if cmd == 'baseline':
+            from . import baseline
+            return baseline.main(rest)
         if cmd == 'watch':
             from . import watch
             return watch.main(rest, _active_sessions)
