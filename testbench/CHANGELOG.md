@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.41.2 — 2026-10-22
+
+### Removed
+- A session no longer copies the user's vkBasalt config or launches with
+  `ENABLE_VKBASALT`, and gathers no `vkBasalt.log`: the vkBasalt bloom is gone (13.0.0).
+
+Installed, not yet seen in game.
+
 ## 3.41.1 — 2026-10-22
 
 ### Fixed

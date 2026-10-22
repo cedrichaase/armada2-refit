@@ -2,7 +2,7 @@
 #
 # test.sh's twin, for Windows; CI runs it on a Windows runner. The game is a few
 # placeholder files, so this proves what the installer copies, backs up and puts back --
-# not that anything loads. Needs network, for the bloom shaders. The model scripts are
+# not that anything loads. The model scripts are
 # never run for real: A2_PYTHON points at a stand-in that logs how it was called.
 param([Parameter(Mandatory)][string]$Zip)
 $ErrorActionPreference = "Stop"
@@ -74,7 +74,7 @@ foreach ($f in Get-ChildItem -LiteralPath (Join-Path $P "game") -File | Where-Ob
         ($vi.ProductName -eq "Armada II Refit"))
 }
 
-Write-Host "== install on a GOG game: prerequisites, no DXVK, no ReShade, with progress, the old plugins out"
+Write-Host "== install on a GOG game: prerequisites, no DXVK, with progress, the old plugins out"
 $env:A2_PROGRESS = "1"
 $out = Install @($G)
 $env:A2_PROGRESS = $null
@@ -134,20 +134,19 @@ Check "no proxy files" (-not (Test-Path (G "binkw32_orig.dll")) -and -not (Test-
 $out = Install @($G)
 Check "the proxy back without A2_SKIP" (((Get-Content (G "binkw32.dll") -Raw) -match "BinkProxy") -and ((Text (G "binkw32_orig.dll")) -eq "stockbink"))
 
-Write-Host "== DXVK's d3d8.dll: the player's own choice, left as it is; left as it is"
+Write-Host "== DXVK's d3d8.dll: the player's own choice, left as it is; an old package's bloom preset out"
 Set-Content (G "d3d8.dll") "dxvk"
 Set-Content (G "ReShade.ini") "[GENERAL]"
+Set-Content (G "A2Bloom.ini") "Techniques=MagicBloom"
+Copy-Item (G "A2Bloom.ini") (G "ReShadePreset.ini")
 Add-Content (G "HUD.ini") "; mine"
 $out = Install @($G)
 Check "prerequisites already installed" (Has $out "*STA2WidescreenPatch: already installed")
 Check "DXVK's d3d8.dll left, nothing recorded" (((Text (G "d3d8.dll")) -eq "dxvk") -and
     -not (Test-Path (G "d3d8.dll.a2chain-backup")) -and (Has $out "*d3d8.dll is DXVK's*"))
 Check "HUD.ini.bak kept" ((Get-Content (G "HUD.ini.bak") -Raw) -match "; mine")
-foreach ($f in "MagicBloom.fx", "ReShade.fxh", "ReShadeUI.fxh") {
-    Check "shader $f" ((Get-Item (G "reshade-shaders\Shaders\$f")).Length -gt 0)
-}
-Check "A2Bloom.ini" (Test-Path (G "A2Bloom.ini"))
-Check "and as ReShadePreset.ini" ((Sha (G "ReShadePreset.ini")) -eq (Sha (G "A2Bloom.ini")))
+Check "old bloom preset out, ReShade's own file left" (-not (Test-Path (G "A2Bloom.ini")) -and
+    -not (Test-Path (G "ReShadePreset.ini")) -and (Test-Path (G "ReShade.ini")) -and (Has $out "*removed the old bloom preset*"))
 
 Write-Host "== no d3d8.dll: d3d8to9 goes in, and with it Render3D.asi and UI.asi"
 Remove-Item -LiteralPath (G "d3d8.dll")
@@ -263,17 +262,18 @@ Check "write refused: ::error write-denied" (Has $r.Out "::error write-denied *r
 Check "write refused: named last" ($r.Last -like "QOL.asi could not be written into *readonly*")
 $env:A2_PROGRESS = $null
 
-Write-Host "== what it did not write is left alone: a loader, a dxvk.conf, a ReShade preset"
+Write-Host "== what it did not write is left alone: a loader, a dxvk.conf, a ReShade preset of the player's"
 $H = Join-Path $T "other"; Mock $H
 function O([string]$n) { Join-Path $H $n }
 Set-Content (O "winmm.dll") "myloader"
 Set-Content (O "dxvk.conf") "d3d9.foo = 1"
 Set-Content (O "ReShade.ini") "[GENERAL]"
 Set-Content (O "ReShadePreset.ini") "Techniques=Mine"
+Set-Content (O "A2Bloom.ini") "Techniques=MagicBloom"
 Install @($H) | Out-Null
 Check "own loader kept, patch added" (((Text (O "winmm.dll")) -eq "myloader") -and (Test-Path (O "STA2WidescreenPatch.asi")))
 Check "own preset kept on install" ((Text (O "ReShadePreset.ini")) -eq "Techniques=Mine")
-Check "A2Bloom.ini beside it" (Test-Path (O "A2Bloom.ini"))
+Check "the old A2Bloom.ini beside it out" (-not (Test-Path (O "A2Bloom.ini")))
 Install @("-Uninstall", $H) | Out-Null
 Check "own loader kept, patch removed" (((Text (O "winmm.dll")) -eq "myloader") -and -not (Test-Path (O "STA2WidescreenPatch.asi")))
 Check "foreign dxvk.conf kept" ((Text (O "dxvk.conf")) -eq "d3d9.foo = 1")

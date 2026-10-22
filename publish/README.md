@@ -34,8 +34,7 @@ that is `STA2WidescreenPatch` 1.0 (MIT) with the Ultimate ASI Loader 4.68 it bun
 | Third-party | Licence | Here |
 |---|---|---|
 | `STA2WidescreenPatch` 1.0, Ultimate ASI Loader 4.68 | MIT | vendored; in the zip |
-| MagicBloom, ReShade's `.fxh` headers | MIT; CC0 and none | no: fetched with bloom, since `ReShadeUI.fxh` states no licence and the three go together |
-| DXVK, vkBasalt | zlib | not yet: whether the installers should use them is open (below) |
+| DXVK | zlib | not yet: whether the installers should use it is open (below) |
 
 `CREDITS.txt` in the zip names each author, licence and source.
 
@@ -106,7 +105,7 @@ and writes `armada2-refit-<version>.zip`:
 - `game/`: what goes beside `Armada2.exe`, which is `Render3D.asi`, `UI.asi`, `QOL.asi`,
   `QOLRules.asi`, `Online.asi` and `binkw32.dll`, each with its `.ini`, Render3D's
   recipes in `game/Surfaces/` and `game/Nebulae/`, and `dxvk.conf` at stage 3
-  (`postfx/renderer-config.sh --print`). `Render3D.asi` and `UI.asi` need a Direct3D 9
+  (`renderer/renderer-config.sh --print`). `Render3D.asi` and `UI.asi` need a Direct3D 9
   device behind `d3d8.dll`, so the installers put them in only where `d3d8.dll` is
   crosire's d3d8to9 after the chain step, taking out `HUD.asi`, `Menus.asi` and
   `GridLayout.asi` as `ui/supersede.sh` does; elsewhere those three, also in `game/`, go
@@ -122,18 +121,16 @@ and writes `armada2-refit-<version>.zip`:
   (Windows' own Direct3D 9 is behind it) and leaves a DXVK `d3d8.dll` the player put
   there; `install.sh` on macOS puts only `d3d8.dll` in too, on Wine's wined3d, since
   DXVK cannot run Direct3D 9 on a Mac (D3DMetal, DXMT and CrossOver's DXVK cover
-  Direct3D 10 to 12), and skips `dxvk.conf` and bloom there;
+  Direct3D 10 to 12), and skips `dxvk.conf` there;
 - `models/` and `a2env.py`: `moon-sod.py`, `select-sod.py`, `hull-sod.py`,
   `asteroid-sod.py`, run by
   `install.sh` with python3 on the player's own SODs (`--revert` on `--uninstall`);
-- `bloom/`: `postfx/postfx.py --export`, which is the same bloom for vkBasalt and as a
-  ReShade preset, and `shaders.txt`;
 - `install.sh` (Linux and macOS) and `install.ps1` + `install.bat` (Windows), from
   `publish/installer/`. `install.sh` keeps to `/bin/bash` 3.2 and BSD tools (no
   `sha256sum`, `tac` or GNU `sed`); `test.sh` checks that on Linux by hiding those tools
   and by faking `uname -s`;
-- `prereqs.txt`, what the installers download first, and `CREDITS.txt`, generated from
-  it and from `shaders.txt`;
+- `prereqs.txt`, what the installers put in first, and `CREDITS.txt`, generated from
+  it;
 - `README.txt` (layer versions, commit, what each needs), `LICENSE` and `SHA256SUMS`;
 - `manifest.json`, the same for the GUI installer (package schema 1), and
   `armada2-refit-installer.py` itself; CI attaches the script, the AppImage, the
@@ -150,17 +147,12 @@ one line per file, before the sentence for a person (`av-locked`, `av-missing`,
 `damaged`, `game-running`, `no-game`, `write-denied`: `gui-installer/README.md`,
 "Errors"). Run by hand, they do as before, and say which file failed and why.
 
-It is our code only, compiled, and our configuration. It holds nothing of the game,
-none of the test tools, and **no third-party shader**. `ReShadeUI.fxh` carries no
-licence, so the installers fetch MagicBloom and ReShade's two headers from the
-commits `postfx/vkbasalt/build.sh` pins. They are checked against the hashes in
-`shaders.txt`, and `package.sh` refuses a pin `build.sh` does not share. The version
-is the root `CHANGELOG.md`'s newest entry.
+It is our code only, compiled, and our configuration. It holds nothing of the game and
+none of the test tools. The version is the root `CHANGELOG.md`'s newest entry.
 
 The installers stand alone, and **ask nothing**: no flags but `--uninstall`, no
 prompts unless they cannot find the game. Each installs what can work on the machine
-and names what it skipped. What they cannot do themselves, installing vkBasalt or
-ReShade, is documented in `README.txt` and optional. They do the same on both systems:
+and names what it skipped. They do the same on both systems:
 
 - find the game: the argument, else the folder they were unzipped into, else Heroic's
   default or GOG's registry entry;
@@ -174,18 +166,17 @@ ReShade, is documented in `README.txt` and optional. They do the same on both sy
   download, so they only name it;
 - keep the stock `binkw32.dll` as `binkw32_orig.dll`, which the proxy forwards to, and
   as `binkw32.dll.a2neb-backup`, the name `cutscenes/binkproxy/install.sh` uses;
-- set up bloom when a vkBasalt layer (Linux) or ReShade's `ReShade.ini` (Windows) is
-  there. On Windows the preset also becomes `ReShadePreset.ini` when the player has
-  none, which is the preset ReShade loads by default, so there is no step in the
-  overlay. A failed download skips bloom and does not fail the install;
+- take out the bloom a package before 13.0.0 set up, since `Render3D.asi` blooms the
+  3D view itself: the vkBasalt config folder `install.sh` wrote (by its marker), and on
+  Windows `A2Bloom.ini` with the `ReShadePreset.ini` copy of it, if it is still that
+  copy. vkBasalt or ReShade themselves are the player's and stay;
 - write `dxvk.conf` only over one that carries `renderer-config.sh`'s marker;
 - keep a changed `.ini` as `.ini.bak`;
 - with `--uninstall` / `-Uninstall`, put all of it back. A prerequisite file goes only
   if its hash still matches the record, so nothing replaced since is removed.
 
 `publish/installer/test.sh` and `test.ps1` run them against a mock game of placeholder
-files, so they prove the file handling, not that anything loads. They download the
-bloom shaders for real, so CI also notices when a pinned one moves.
+files, so they prove the file handling, not that anything loads.
 
 **CI** (`.github/workflows/ci.yml`) runs on every push and pull request:
 
@@ -211,11 +202,10 @@ bloom shaders for real, so CI also notices when a pinned one moves.
 
 **Open: DXVK.** Bundling it is allowed (zlib), and the installers could put it in the
 game directory in place of GOG's `d3d8.dll`, which would make `dxvk.conf` apply. Not decided yet. On Linux the launcher settings
-(`WINEDLLOVERRIDES`, and bloom's two variables) are still the player's job; `install.sh`
+(`WINEDLLOVERRIDES`) are still the player's job; `install.sh`
 prints them. What stands in the way:
 
 - **No plugin checks which `Armada2.exe` it is in.** Each should verify the exe and stand
   down on any other build rather than patch the wrong bytes.
-- **The ReShade preset has never run.** Only the vkBasalt path is seen in game.
 - **Untested**: Windows 11, a desktop other than Hyprland, and running without the
   widescreen patch.

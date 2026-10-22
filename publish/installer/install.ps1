@@ -13,8 +13,7 @@ the Direct3D 9 device d3d8to9 gives them; where the chain is left as it is, the 
 is taken by the plugins it supersedes (HUD.asi, Menus.asi, GridLayout.asi) and the 3D view
 stays the engine's.
 The models are rewritten from the player's own SOD files with Python 3 (py, python or
-A2_PYTHON), skipped without it. The bloom preset goes in when ReShade is installed for the
-game; installing ReShade is optional and by hand (README.txt), then run this again.
+A2_PYTHON), skipped without it.
 
 The game directory is the one holding Armada2.exe: the argument, else this folder's
 parent if the package was unzipped into the game, else the GOG install found in the
@@ -202,6 +201,20 @@ function Remove-LegacyUi {
     }
 }
 
+# Packages before 13.0.0 put a bloom preset in for ReShade (A2Bloom.ini, and a copy as
+# ReShadePreset.ini when the player had none); Render3D.asi blooms the 3D view itself
+# now. The preset goes only while it is still that copy; ReShade itself is the player's.
+function Remove-OldBloom {
+    $ours = G "A2Bloom.ini"
+    if (-not (Test-Path -LiteralPath $ours)) { return }
+    $preset = G "ReShadePreset.ini"
+    if ((Test-Path -LiteralPath $preset) -and (Get-Sha $preset) -eq (Get-Sha $ours)) {
+        Remove-Item -LiteralPath $preset
+    }
+    Remove-Item -LiteralPath $ours
+    Say "  removed the old bloom preset (A2Bloom.ini)"
+}
+
 # ------------------------------------------------------------------ uninstall
 
 if ($Uninstall) {
@@ -218,12 +231,7 @@ if ($Uninstall) {
         else { Say "  the models left as they are: needs Python 3 (py or python) to put them back" }
     }
     Remove-Proxy
-    # ReShadePreset.ini only if it is still ours, unchanged.
-    if ((Test-Path -LiteralPath (G "ReShadePreset.ini")) -and
-        (Get-FileHash -LiteralPath (G "ReShadePreset.ini")).Hash -eq (Get-FileHash -LiteralPath (Join-Path $here "bloom\A2Bloom.ini")).Hash) {
-        Remove-Item -LiteralPath (G "ReShadePreset.ini")
-    }
-    Remove-Item -LiteralPath (G "A2Bloom.ini") -ErrorAction SilentlyContinue
+    Remove-OldBloom
     if (Test-OurDxvkConf) { Remove-Item -LiteralPath (G "dxvk.conf") }
     # The prerequisites and the chain, newest record first; a file changed since is left,
     # and said so.
@@ -470,51 +478,11 @@ if ((Test-Path -LiteralPath (G "dxvk.conf")) -and -not (Test-OurDxvkConf)) {
     Put "dxvk.conf"
 }
 
-# ------------------------------------------------------------------ bloom
+# ------------------------------------------------------------------ old bloom
 
-# Only when ReShade is installed for the game: its setup leaves ReShade.ini beside the
-# exe, and it finds shaders in reshade-shaders\Shaders there. They are not ours to
-# redistribute, so any that are missing come from upstream, pinned by commit and checked
-# by hash; ones already there (ReShade's own) are left alone. Bloom is optional: a
-# failure skips it.
-function Install-Bloom {
-    $sh = G "reshade-shaders\Shaders"
-    New-Item -ItemType Directory -Force -Path $sh | Out-Null
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    foreach ($line in Get-Content -LiteralPath (Join-Path $here "bloom\shaders.txt")) {
-        if (-not $line.Trim()) { continue }
-        $sum, $commit, $file = $line -split "\s+"
-        $dst = Join-Path $sh $file
-        if (Test-Path -LiteralPath $dst) { continue }
-        $url = "https://raw.githubusercontent.com/crosire/reshade-shaders/$commit/Shaders/$file"
-        Invoke-WebRequest -UseBasicParsing -OutFile $dst -Uri $url
-        if ((Get-FileHash -Algorithm SHA256 -LiteralPath $dst).Hash -ne $sum) {
-            Remove-Item -LiteralPath $dst; throw "download does not match: $file"
-        }
-    }
-    Copy-Item -LiteralPath (Join-Path $here "bloom\A2Bloom.ini") (G "A2Bloom.ini") -Force
-    # ReShade loads ReShadePreset.ini unless told otherwise, so with no preset of the
-    # player's own, ours takes that name and bloom needs no step in the overlay.
-    if (-not (Test-Path -LiteralPath (G "ReShadePreset.ini"))) {
-        Copy-Item -LiteralPath (G "A2Bloom.ini") (G "ReShadePreset.ini")
-        return $true
-    }
-    return $false
-}
-Step bloom "bloom"
-if (-not (Test-Path -LiteralPath (G "ReShade.ini"))) {
-    Say "  bloom skipped: ReShade is not installed (optional -- README.txt)"
-} else {
-    try {
-        if (Install-Bloom) {
-            Say "  bloom, as ReShade's preset (ReShadePreset.ini)"
-        } else {
-            Say "  A2Bloom.ini -- you have a ReShade preset already; pick this one in its overlay"
-        }
-    } catch {
-        Say "  bloom skipped: $($_.Exception.Message)"
-    }
-}
+# Both at once would bloom the frame twice.
+Step bloom "taking out the old bloom"
+Remove-OldBloom
 
 # ------------------------------------------------------------------ what is left
 

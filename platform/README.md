@@ -5,8 +5,8 @@ DXVK's `d3d8.dll`/`d3d9.dll`, the Ultimate ASI Loader (`winmm.dll`) and
 `STA2WidescreenPatch.asi`, run through Heroic and Proton on Arch + Hyprland. The d3d8
 section matters to anything touching the renderer.
 
-The HUD layout and cursors are in `hud/README.md`; renderer settings, anti-aliasing and
-bloom (the Tiers) in `postfx/README.md`; the menus in `menus/README.md`. The version
+The HUD layout and cursors are in `hud/README.md`; renderer settings and anti-aliasing
+(the Tiers) in `renderer/README.md`; the menus in `menus/README.md`. The version
 resource every plugin we build carries is `versioninfo/` (its `README.md`); it is part
 of the build and installs nothing of its own.
 

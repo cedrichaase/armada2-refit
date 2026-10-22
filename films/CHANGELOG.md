@@ -5,6 +5,13 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.12.1 — 2026-10-22
+
+### Removed
+- The installer's scratch `HOME` no longer gets the user's vkBasalt layer copied in.
+
+Installed, not yet seen in game.
+
 ## 1.12.0 — 2026-10-17
 
 ### Added

@@ -30,7 +30,7 @@ a time, and every fix can be undone.
 | **Stretch-free HUD** | `HUD.asi` lays out the in-game HUD, font and cursors correctly at any aspect ratio (16:9, 21:9, 32:9), from the display mode the game actually sets |
 | **Full-screen menus** | `Menus.asi` scales the 800x600 shell menus to fill the screen and draws them inside the game window, with optional widescreen backdrops (black sides without them) |
 | **Our own 3D renderer** | `Render3D.asi` takes over the 3D view and draws it into a half-float, multisampled target, bloomed by energy and tone-mapped into the back buffer, with modules of its own for every category: ships and stations lit per pixel by a warm key, a dim blue fill and a faint sky light, with shadows and light from nebulae, planets, explosions and weapons; each map's sky computed in a shader from a recipe, with no cube seams; planets and the dilithium moon made from recipes (relief, craters, oceans, ice, clouds, a night side); every nebula as a cloud of gas you can fly through; fireballs and shockwaves, shield hits, repair welding, venting plasma, the warp flash and the special weapons drawn by shaders; and the fog of war and the shroud with smooth edges. It replaces the earlier per-part plugins (MSAA, lighting, sky, nebulae, surfaces, explosions, shields, repair, venting, specials, fog, planets). Needs crosire's d3d8to9 (which `./install` sets up); without it the engine draws the 3D view. Built from the repository; not in the release zip yet ([`render3d/README.md`](render3d/README.md)) |
-| **Bloom and renderer tuning** | vkBasalt bloom, on from launch, plus anisotropic filtering, LOD bias and seamless cube maps through `dxvk.conf` |
+| **Renderer tuning** | anisotropic filtering, LOD bias and seamless cube maps through `dxvk.conf` |
 | **Quality of life, stock-compatible** | `QOL.asi`: faster right-drag panning, `Shift+number` adds to a control group, selections and groups beyond 16 ships (40 by default), stations in control groups with one build menu for several, and long moves on the map going to warp as minimap moves do. Everything stays on your machine, so you can still play against unmodded players |
 | **Grid hotkeys** | `GridLayout.asi` lays the button bar out as a 5x3 grid with one key per cell by keyboard position (`QWERT`/`ASDFG`/`ZXCVB`), labelled on the buttons and placed between the minimap and the info panel on wide screens |
 | **Smoother geometry** | the dilithium moons and the asteroids are smoothed, and the selection bubble is round instead of a visible polygon (SOD rewrites from your own stock files, `models/install.sh`) |
@@ -51,8 +51,8 @@ checked against, then build and install. Builds live in `A2_DATA`, outside the
 repository.
 
 Every layer works without assets. With nothing built, the asset layers install nothing
-and the game keeps its own art, while the HUD, menus, the renderer, quality of life,
-grid and bloom still apply.
+and the game keeps its own art, while the HUD, menus, the renderer, quality of life
+and grid still apply.
 [`textures/PACKS.md`](textures/PACKS.md) is the short path to building your own
 texture pack.
 
@@ -71,9 +71,8 @@ are missing, and its `CREDITS.txt` says where they come from.
 through [Heroic](https://heroicgameslauncher.com/) and Proton:
 
 - [DXVK](https://github.com/doitsujin/dxvk)'s `d3d8.dll` and `d3d9.dll` in the game
-  directory, so the game renders through Vulkan. Bloom and the renderer settings
-  depend on it. `platform/d3d8-chain.py --use dxvk` sets it up.
-- [vkBasalt](https://github.com/DadSchoorse/vkBasalt) for bloom. It is Linux-only.
+  directory, so the game renders through Vulkan. The renderer settings depend on it.
+  `platform/d3d8-chain.py --use dxvk` sets it up.
 - For building: `clang`, `lld-link` and `llvm-dlltool` for the plugins (no MSVC or
   mingw needed), ImageMagick 7, Python 3 and `ffmpeg`.
 - Optional, for generative upscaling:
@@ -98,7 +97,7 @@ options the game needs ([`gui-installer/README.md`](gui-installer/README.md)).
   Armada II "Runs Great"). Create a bottle, run GOG's offline installer in it, then run
   this app. Sikarugir or Gcenx's Wine builds are free alternatives. Leave CrossOver's
   graphics backend on its default: Direct3D 8 and 9 run through Wine's own wined3d on a
-  Mac. Bloom is not available there. The app is not notarised, so the first
+  Mac. The app is not notarised, so the first
   launch is refused: System Settings → Privacy & Security → *Open Anyway*.
 - **Linux**: `armada2-refit-installer-x86_64.AppImage`; make it executable and run it.
   It carries GTK 4 and libadwaita itself, and writes Heroic's launch options for you.
@@ -170,7 +169,7 @@ The layers are grouped from "copy a file, works anywhere" to "needs a specific s
 `llvm-dlltool` by each folder's `build.sh`, which writes to `<folder>/build/`.
 **Prebuilt**, the zip on each
 [release](https://github.com/cedrichaase/armada2-refit/releases) has `HUD.asi`,
-`Menus.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files, `dxvk.conf` and the bloom config (`GridLayout.asi` and `Render3D.asi` are built from the repository). It also has installers that do this
+`Menus.asi`, `QOL.asi`, `Online.asi` and the Bink proxy with their `.ini` files and `dxvk.conf` (`GridLayout.asi` and `Render3D.asi` are built from the repository). It also has installers that do this
 section for you: `install.sh` on Linux and macOS, `install.bat` on Windows (`README.txt`
 in the zip), and the graphical installers for all three, which leave the Bink proxy out
 for now. `publish/package.sh` builds the same zip locally.
@@ -207,13 +206,11 @@ d3d8to9 also needs the Visual C++ 2015–2022 (x86) and DirectX end-user runtime
 | Layer | Install | Why DXVK |
 |---|---|---|
 | 3D renderer | `render3d/build/Render3D.asi`, `render3d/Render3D.ini`, its recipes (`render3d/skies/` built in; `render3d/surfaces/` and `render3d/nebulae/` into `Surfaces` and `Nebulae` folders beside it) | Draws the 3D view through Direct3D 9 behind the game's d3d8, so it needs DXVK and crosire's d3d8to9 (below); under DXVK's own d3d8 the engine draws the view. Replaces the earlier `MSAA.asi`, `Lighting.asi`, `Sky.asi` and the other per-part plugins; `render3d/install.sh` takes any of them out ([`render3d/README.md`](render3d/README.md)) |
-| Renderer | `postfx/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. The release zip has it ready, in `game/` |
+| Renderer | `renderer/renderer-config.sh --stage 3` writes `dxvk.conf` | Only DXVK reads the file. Anisotropic filtering, LOD bias and seamless cube maps. The release zip has it ready, in `game/` |
 
-### 3. Linux only: vkBasalt, launched through Heroic
-
-| Layer | Install | Needs |
-|---|---|---|
-| Bloom | `postfx/vkbasalt/build.sh`, then `postfx/postfx.py --on` | DXVK (vkBasalt is a Vulkan layer), a per-user vkBasalt build, and Heroic: `--on` sets `ENABLE_VKBASALT=1` in the game's Heroic config, so quit Heroic first. On from launch; `./a2mod stock` launches without it |
+Bloom is `Render3D.asi`'s. A vkBasalt or ReShade bloom set up by an earlier version
+(`postfx/`, before 13.0.0) is taken out by `./install` and by the release installers,
+since both would bloom the frame twice.
 
 The helper scripts (`./install`, `./a2mod`, the per-layer `install.sh`) are bash and
 assume Linux. They find the game through `a2env.sh`, which defaults to Heroic's paths.
@@ -231,7 +228,7 @@ The mod is a stack of independent layers, each in its own folder with its own RE
 | [`qol/`](qol/README.md) | qol | `QOL.asi`: gameplay quality of life that stays compatible with stock players (right-drag pan speed, `Shift+number` adds to a group, selections and groups beyond 16, stations in groups with one build menu, long moves at warp), and the plan for the rest |
 | [`grid/`](grid/README.md) | grid | `GridLayout.asi`: the button bar as a fixed 5x3 grid with one key per cell, by keyboard position, labelled on the buttons |
 | [`render3d/`](render3d/README.md) | render3d | `Render3D.asi`: the 3D view through a renderer of our own, in Rust. Half-float multisampled target with bloom by energy, and modules for hulls (scene lights, shadows), sky, particles, ordnance, effects (explosions, shields, repair, venting, warp), planets, moons, asteroids and nebulae, and fog and selection. Replaced the per-part plugins |
-| [`postfx/`](postfx/README.md) | renderer, bloom | `dxvk.conf` (anisotropic filtering, LOD bias, seamless cube maps) and vkBasalt bloom, on from launch |
+| [`renderer/`](renderer/README.md) | renderer | `dxvk.conf`: anisotropic filtering, LOD bias, seamless cube maps |
 | [`textures/`](textures/README.md) | textures | the texture pipeline, `./a2tex`: 84 targets (skyboxes, nebulae, planets, UI, hulls), each a recipe for one set of replacement textures |
 | [`models/`](models/README.md) | models | the smoothed dilithium moons and asteroids, the round selection bubble, and the loading-screen model, widened with its `LOADING` art. The planets' sphere is render3d's |
 | [`cutscenes/`](cutscenes/binkproxy/README.md) | cutscenes | `binkproxy`, a `binkw32.dll` that plays launch reels full screen and AV1 replacements in place of `.bik` movies, and the movie pipeline |

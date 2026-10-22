@@ -58,7 +58,7 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    **Uninstall** runs the installed release's `install.sh --uninstall` (or the newest
    cached one) and takes Heroic's changes back out.
 5. **Launch settings.** `install.sh` prints the variables the launcher needs
-   (`WINEDLLOVERRIDES`, and bloom's two). The game does not start right without
+   (`WINEDLLOVERRIDES`). The game does not start right without
    them, so there is no switch: with a Heroic entry for the game they always go into `GamesConfig/<app>.json` → `enviromentOptions` (Heroic's
    spelling), with the original kept once as `<file>.a2refit-backup`. A DLL override
    already there is kept and the missing ones are appended. A variable already set to
@@ -66,30 +66,11 @@ Keys: F5 refresh, Ctrl+Enter install, Ctrl+L the log.
    is reported, not created: Heroic writes the file on first opening the game's
    settings, with defaults this program does not know. If Heroic is running it asks
    first, since Heroic may write its own copy back. Uninstall restores only values that
-   are still as it left them. Any other launcher gets the text to copy.
-
-## When there is no vkBasalt
-
-Bloom needs a **32-bit** vkBasalt layer (the game is a 32-bit process), which no
-installer here ships. When none is found, the overview shows a panel with how to get one
-on this distribution, detected from `/etc/os-release`: `ID` first, then `ID_LIKE` in
-order, so Mint and Pop!_OS count as Ubuntu and CachyOS, EndeavourOS and Manjaro as
-Arch. `VKBASALT_HOWTO` in the script holds the instructions, and is their only copy:
-`install.sh` prints them through `--vkbasalt-howto` when it skips bloom, and
-`package.sh` writes all of them into `README.txt`.
-
-| Family | Command | Why |
-|---|---|---|
-| Arch | `yay -S lib32-vkbasalt` | AUR only, and it pulls the AUR `vkbasalt`; needs `[multilib]` |
-| Fedora | `sudo dnf install vkBasalt.i686` | in Fedora's own repositories |
-| Fedora Atomic | `sudo rpm-ostree install vkBasalt.i686`, then restart | the same package, layered |
-| Debian | `dpkg --add-architecture i386`, then `apt install vkbasalt:i386` | Debian builds it for i386 (bullseye on) |
-| Ubuntu | build prerequisites, then `postfx/vkbasalt/build.sh` from a clone | Ubuntu builds `vkbasalt` for every architecture but i386 |
-| other | the distribution's 32-bit package, or the same build | |
-
-These were checked against each distribution's archive on 2026-10-08. **Flatpak Heroic** cannot see
-a host layer, nor read the bloom folder in `~/.local/share` (it has no home access), so
-the panel says bloom is not supported there yet.
+   are still as it left them. Any other launcher gets the text to copy. The
+   `ENABLE_VKBASALT` and `VKBASALT_CONFIG_FILE` an install before 13.0.0 wrote for its
+   vkBasalt bloom come back out on the next install (`OLD_BLOOM_ENV`), where they are
+   still as it left them: Render3D.asi blooms the 3D view itself, and both would bloom
+   the frame twice.
 
 ## The package schema
 
@@ -114,14 +95,15 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 | `linux` | `script` (`install.sh`), `uninstall` (its flag), `progress` (the variable) |
 | `windows`, `macos` | the same for those systems (`install.ps1`, `-Uninstall`; `install.sh`). The Windows and macOS installers install only a package that has its entry (`Package.for_system`): before 11.20.0, `install.ps1` printed no progress and `install.sh` did not run on a Mac. Adding them was not a new schema, since the Linux installer reads such a package as before |
 | `steps` | the `::step` ids `install.sh` prints, in order: the progress bar's denominator |
-| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `vkbasalt`, `d3d8to9` (Render3D, UI: needs d3d8to9 as `d3d8.dll` after the chain step) |
+| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `d3d8to9` (Render3D, UI: needs d3d8to9 as `d3d8.dll` after the chain step); before 13.0.0 also `vkbasalt` (bloom), which the window no longer lists |
 | `not_included[]` | `id`, `name`, `summary`: shown as not available (textures) |
 
 ## Progress
 
 `install.sh` and `install.ps1` with `A2_PROGRESS=1` print `::step <id> <what>` as each
 stage starts (`verify`, `prereqs`, `chain`, `render3d`, `ui`, `qol`, `models`,
-`online`, `cutscenes`, `renderer`, `bloom`, `done`; `uninstall`; before 12.24.0 `hud`,
+`online`, `cutscenes`, `renderer`, `bloom` (taking out the vkBasalt or ReShade bloom
+of a package before 13.0.0, which set it up), `done`; `uninstall`; before 12.24.0 `hud`,
 `menus` and `grid` in place of `render3d` and `ui`, and before 12.0.0 also `lighting`,
 `sky` and `msaa`). The window maps the ids to its status line
 (`STATUS` in the script: "Refitting the HUD", "Installing lighting"…) and fills its
@@ -219,7 +201,9 @@ new fraction instead of jumping step to step, and the glow fades out once it is 
 When there is no Heroic at all (no config folder, no `heroic` on the `PATH`, no Flatpak)
 and the game is not one Heroic knows, an open row says how to get it for this
 distribution (`HEROIC_HOWTO`): the AUR package on Arch, otherwise the site's `.deb`/`.rpm`
-or Flathub, with the warning that bloom does not work in the Flatpak. A game found
+or Flathub. The distribution comes from `/etc/os-release` (`distro_family`): `ID` first,
+then `ID_LIKE` in order, so Mint and Pop!_OS count as Ubuntu and CachyOS, EndeavourOS and
+Manjaro as Arch. A game found
 elsewhere (Lutris, a Wine prefix) gets the launch variables as text to copy instead.
 
 ## The bug report
@@ -301,7 +285,7 @@ The core is the same on all three systems (`SYSTEM`); what differs:
 |---|---|---|
 | The game | GOG's own install: the folder in GOG's registry entry (`HKLM\SOFTWARE\[WOW6432Node\]GOG.com\Games\1174788223`, `gog_registry_dirs`), else the usual folders on every drive | inside a Wine prefix (`mac_prefixes`): CrossOver bottles (`~/Library/Application Support/CrossOver/Bottles`), Whisky's, Sikarugir / Kegworks / Wineskin / Porting Kit wrappers (the prefix inside the `.app`), `~/.wine` and the like |
 | The script | `install.ps1` through `powershell.exe -ExecutionPolicy Bypass -File`, no console window | `install.sh` through `/bin/bash` (3.2, BSD tools) |
-| The chain | crosire's d3d8to9 on Windows' own Direct3D 9; a DXVK `d3d8.dll` the player put there stays | d3d8to9 on Wine's own wined3d: DXVK cannot run Direct3D 9 on a Mac, so no MSAA, `dxvk.conf` or bloom |
+| The chain | crosire's d3d8to9 on Windows' own Direct3D 9; a DXVK `d3d8.dll` the player put there stays | d3d8to9 on Wine's own wined3d: DXVK cannot run Direct3D 9 on a Mac, so no MSAA or `dxvk.conf` |
 | Launch settings | none: the game folder's DLLs load first | the DLL overrides, written into the prefix's `user.reg` under `AppDefaults\Armada2.exe\DllOverrides` (the game's alone, not the bottle's) |
 | Launch game | the exe | the prefix's Wine: CrossOver's `wine --bottle <name>`, a wrapper's own, Whisky's, else Gcenx's or Homebrew's |
 | Cache, settings | `%LOCALAPPDATA%\armada2-refit\installer\cache`, `%APPDATA%\armada2-refit\installer.json` | `~/Library/Caches/armada2-refit/installer`, `~/Library/Application Support/armada2-refit/installer.json` |

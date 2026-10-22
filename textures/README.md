@@ -1394,7 +1394,7 @@ Even at 70 the gain is real but modest, and that is the honest ceiling. The upsc
 cleans and sharpens; it does not manufacture structure that was never in 256x256. The
 larger lever is not the texture at all — the saucer is viewed at a steep oblique angle,
 which is precisely where **anisotropic filtering** decides sharpness. That is the
-renderer layer's `dxvk.conf` (`d3d9.samplerAnisotropy = 16`, `postfx/README.md`), which
+renderer layer's `dxvk.conf` (`d3d9.samplerAnisotropy = 16`, `renderer/README.md`), which
 sharpens every oblique surface in the game at once.
 
 ## The Federation hull class, after the Sovereign

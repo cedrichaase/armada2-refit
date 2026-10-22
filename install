@@ -9,7 +9,7 @@
 #   menus      menus/install-plates.sh       the backdrop plates built in $A2_DATA, which the
 #                                            UI's menus draw behind the main menu
 #   qol        qol/install.sh                QOL.asi: right-drag pan speed
-#   renderer   postfx/renderer-config.sh     dxvk.conf at stage 3, as shipped
+#   renderer   renderer/renderer-config.sh   dxvk.conf at stage 3, as shipped
 #   textures,  ./a2tex install               every target built in $A2_DATA/textures; the
 #   models                                   loading-screen model rides with LOADING
 #   models     models/install.sh             the smoothed moons and asteroids, the selection
@@ -35,9 +35,11 @@
 # built -- anyone who has not made a texture pack -- each says so, installs nothing, and
 # the game keeps its own art. That is a supported state, not an error.
 #
-# Not here: bloom, which is switched in Heroic's launch environment rather than the game
-# directory (postfx/postfx.py). The test bench runs this into its clone of the game
-# (a2test session start --install PATH).
+# Bloom is Render3D.asi's. The per-user vkBasalt bloom that postfx/vkbasalt/build.sh put
+# in before 13.0.0 is taken out here (its layer, library and shaders, all under the
+# a2-vkbasalt name), since both would bloom the frame twice; the ENABLE_VKBASALT and
+# VKBASALT_CONFIG_FILE it set in Heroic do nothing without the layer. The test bench
+# runs this into its clone of the game (a2test session start --install PATH).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 . "$here/a2env.sh"
@@ -46,7 +48,19 @@ echo "== $(git -C "$here" describe --always --dirty 2>/dev/null || echo '?') -> 
 python3 "$here/platform/d3d8-chain.py" --upgrade
 "$here/menus/install-plates.sh"
 "$here/qol/install.sh"
-"$here/postfx/renderer-config.sh" --stage 3
+"$here/renderer/renderer-config.sh" --stage 3
+share="${XDG_DATA_HOME:-$HOME/.local/share}"
+old_bloom=("$share/a2-vkbasalt")
+# The library and the build cache only with the layer's manifest: the bench's run has its
+# own XDG_DATA_HOME, and must not reach into the real ~/.local/lib.
+manifest="$share/vulkan/implicit_layer.d/vkBasalt.a2.x86.json"
+[ -e "$manifest" ] && old_bloom+=("$manifest" "$HOME/.local/lib/a2-vkbasalt" \
+                                  "${XDG_CACHE_HOME:-$HOME/.cache}/a2-vkbasalt")
+for old in "${old_bloom[@]}"; do
+    [ -e "$old" ] || continue
+    rm -rf "$old"
+    echo "removed the old vkBasalt bloom: $old"
+done
 "$here/a2tex" install
 "$here/models/install.sh"
 "$here/cutscenes/binkproxy/install.sh"

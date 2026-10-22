@@ -5,6 +5,31 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.0.0 — 2026-10-22
+
+Layers: renderer 2.0.0 (was postfx), gui-installer 2.0.0, testbench 3.41.2, films 1.12.1.
+
+### Removed
+- The vkBasalt bloom and its ReShade preset, everywhere: `postfx/postfx.py`,
+  `postfx/vkbasalt/`, the `bloom` layer of `a2mod`, the release package's `bloom/`
+  folder and `publish/installer/shaders.txt`, the MagicBloom and ReShade header credits,
+  and the GUI installer's vkBasalt panel and how-to. Bloom, tone mapping and every
+  other post-process are `Render3D.asi`'s (renderer 2.0.0, gui-installer 2.0.0).
+- `a2mod` no longer flips vkBasalt's `enableOnLaunch`; a `bloom` key in an older
+  `state.json` is ignored.
+- The test bench and the film tooling no longer carry vkBasalt into a session
+  (testbench 3.41.2, films 1.12.1).
+
+### Changed
+- `postfx/` is `renderer/`, the name of the one `a2mod` layer it still holds.
+- What an earlier version set up comes out, since both would bloom the frame twice:
+  `./install` removes the per-user vkBasalt layer; `install.sh` the `armada2-refit-bloom`
+  folder it wrote; `install.ps1` `A2Bloom.ini` and its `ReShadePreset.ini` copy; the GUI
+  installer the vkBasalt variables it wrote into Heroic. The package's `bloom` step does
+  this now, so the step list and the package schema are unchanged.
+
+Installed, not yet seen in game.
+
 ## 12.42.0 — 2026-10-22
 
 Layers: gui-installer 1.8.0.

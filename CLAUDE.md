@@ -37,7 +37,7 @@ it bundles.
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `render3d/` | `Render3D.asi` — the 3D view through a renderer of our own, in `no_std` Rust: both views of `Armada_RenderAllOurStuff` drawn into a half-float MSAA target, bloomed by energy and tone-mapped into the back buffer; seven modules of its own draw every category (hulls with the scene lights and shadows, sky, particles, ordnance, effects, planets, moons, asteroids and nebulae, fog and selection) from the game's assets, with its own cosmetic simulation (`PLAN.md`). It replaced the per-part plugins (MSAA, Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog and Planets), which were removed from the repository; their recipes live in `render3d/skies/`, `render3d/surfaces/` and `render3d/nebulae/`, and `render3d/install.sh` takes out any of those plugins an earlier install left. In the release package since 12.24.0, with `UI.asi` | `render3d/README.md`, `render3d/PLAN.md` |
 | `ui/` | `UI.asi` — the runtime the HUD, menus and loading screen will be redrawn with, in `no_std` Rust like render3d: a 2D renderer on the d3d9 device (SDF text from a vendored OFL font, rounded panels, nine-slices), immediate-mode widgets, input with capture, and hooks into a mission's frame, a front-end screen of our own and the loading screen. Its HUD panels (`[HUD]`, `HUD.md`) and the menus hosted and drawn by it (`[Menus]`, `MENUS.md`) supersede `HUD.asi`, `GridLayout.asi` and `Menus.asi`; every part is on in the shipped `UI.ini` (a key at 0 gives a part back to the engine). `ui/install.sh` (in `./install`, the `ui` layer of `a2mod`) takes the three old plugins out (`ui/supersede.sh`); `ui/bench-legacy.sh` puts one back in a bench clone; `ui/bench-asi.sh` puts a working copy's build in a bench clone | `ui/README.md`, `ui/PLAN.md`, `ui/STYLE.md` |
-| `postfx/` | two layers: renderer (`dxvk.conf`) and bloom (vkBasalt) | `postfx/README.md` |
+| `renderer/` | `dxvk.conf`, DXVK's settings (`renderer-config.sh`). Was `postfx/`, with a vkBasalt bloom, until 13.0.0: every post-process effect is render3d's | `renderer/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), the smoothed dilithium moons (`moon-sod.py`) and asteroids (`asteroid-sod.py`), and the other SOD rewrites. The planets' sphere is render3d's | `models/README.md` |
 | `cutscenes/` | `binkproxy/`, a `binkw32.dll` that plays AV1 replacements full screen, and the `movies/` recipes | `cutscenes/binkproxy/README.md` |
@@ -313,7 +313,7 @@ Until the sign-off, the work stays on its branch and in its worktree.
 
 **`./a2mod stock` / `refit` / `status`** flips the *whole game* for
   before/after: textures, font, HUD layout, the menus (`Menus.asi`), `QOL.asi`, `GridLayout.asi`, `Render3D.asi`, cutscenes, the loading-screen
-  model, `dxvk.conf` and bloom at launch. DXVK, the ASI loader, the widescreen patch and
+  model and `dxvk.conf`. DXVK, the ASI loader, the widescreen patch and
   the player's own options (`ARMADA.PRF`, `RTS_CFG.h`) stay as they are in both states. It **snapshots** rather than
   reinstalls: modded files move to `$GAME/.a2mod/` and back, hash-checked, because some
   installed layers exist only on unmerged branches and a reinstall would not reproduce
@@ -579,7 +579,7 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `menus/install.sh` leaves them be. With no plate, `Menus.asi` draws black sides.
   `N.soften=` is a `Menus.ini` key, documented in `menus/README.md`.
 
-### postfx, platform
+### renderer, platform
 
 - **The game renders through DXVK/Vulkan.** The chain keeps a `d3d8.dll` (crosire's
   d3d8to9 since platform 3.2.0, which `./install` puts there so plugins can reach
@@ -592,8 +592,10 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `menus.c`.
   `platform/d3d8-chain.py --status` identifies every link **by hash; never identify one
   by size.** "Heroic redeploys DXVK" is `autoInstallDxvk` working as designed.
-- **Bloom** is vkBasalt, possible only because the chain is Vulkan. `postfx/postfx.py`
-  refuses any effect `fxcheck` cannot compile.
+- **Bloom, tone mapping and every other post-process are render3d's.** The vkBasalt
+  bloom (and its ReShade preset) was removed in 13.0.0; `./install` and the release
+  installers take out what an earlier version set up. Don't bring back a swapchain
+  post-process: it would bloom the frame twice and sees the HUD too.
 - **MSAA is render3d's**, on its own scene target, because nothing in DXVK or
   `dxcfg.ini` can turn it on for the engine's back buffer.
 

@@ -4,6 +4,25 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.0.0 — 2026-10-22
+
+Reads package schemas 0 and 1, unchanged; a package's `bloom` step now takes out the bloom
+an earlier one set up.
+
+### Removed
+- Everything vkBasalt: the "Bloom needs vkBasalt" panel, `--vkbasalt-howto` and
+  `--command`, the per-distribution instructions (`VKBASALT_HOWTO`), and the
+  `ENABLE_VKBASALT` / `VKBASALT_CONFIG_FILE` launch variables. An older release's bloom
+  layer is no longer listed; its own `install.sh` still decides.
+
+### Changed
+- An install takes the vkBasalt variables an earlier install wrote into Heroic back
+  out (`OLD_BLOOM_ENV`), where they are still as it left them.
+- The Heroic how-to no longer warns that bloom does not work in the Flatpak, nor the
+  macOS one that bloom is not available.
+
+Installed, not yet seen in game.
+
 ## 1.8.0 — 2026-10-22
 
 Reads package schemas 0 and 1; schema 1's scripts also print `::error <code> <path>`

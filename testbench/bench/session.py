@@ -207,10 +207,6 @@ class Session:
             if r.returncode:
                 raise GameError(f'reflink clone of {src} failed (must be btrfs, same '
                                 f'filesystem as {config.CACHE}): {r.stderr.strip()}')
-        # vkBasalt's config lives outside the game directory, and a2mod toggles it; the
-        # session gets its own copy so neither touches the user's.
-        if config.VKBASALT.is_dir():
-            shutil.copytree(config.VKBASALT, self.work / 'xdg' / 'a2-vkbasalt', symlinks=True)
         exc = self.game_dir / 'exception.txt'
         self.s['exception_mtime'] = exc.stat().st_mtime if exc.exists() else None
         self.save()
@@ -543,10 +539,6 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             WINE_FULLSCREEN_FSR='0',
             DXVK_LOG_PATH=str(logs), DXVK_LOG_LEVEL='info',
         )
-        vkconf = self.work / 'xdg' / 'a2-vkbasalt' / 'vkBasalt.conf'
-        if vkconf.exists():
-            env.update(ENABLE_VKBASALT='1', VKBASALT_CONFIG_FILE=str(vkconf),
-                       VKBASALT_LOG_FILE=str(logs / 'vkBasalt.log'), VKBASALT_LOG_LEVEL='info')
         if not self.s['audio']:
             # Silence by giving the game a device that plays nowhere.  History, all measured:
             # - PULSE_SINK at a null sink: winepulse ignores it and uses the server default;
