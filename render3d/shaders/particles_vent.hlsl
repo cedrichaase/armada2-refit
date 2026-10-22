@@ -15,21 +15,29 @@
 // (seconds of simulation: the gas stands still while the game is paused), t2.w the
 // time (seconds, wall clock) for the jet's flicker.
 
-float4 k_vp0 : register(c0);   // vertex shader: the columns of VIEW x PROJECTION
-float4 k_vp1 : register(c1);
-float4 k_vp2 : register(c2);
-float4 k_vp3 : register(c3);
+#include "../../gpu/shaders/compat.hlsli"
 
-float4 k_hot   : register(c0); // pixel shader: the plasma's hottest colour (rgb)
-float4 k_mid   : register(c1); //   its middle colour
-float4 k_cool  : register(c2); //   its coolest
-float4 k_gas   : register(c3); //   the gas's bright colour
-float4 k_gasc  : register(c4); //   its cold colour
-float4 k_shape : register(c5); //   x billow scale, y billow flow, z billow contrast, w edge softness
-float4 k_cooling : register(c6); //  x how fast the plasma cools (heat's exponent), y the gas
+cbuffer particles_vent_vs : register(b0)
+{
+    float4 k_vp0 : CREG(0);   // vertex shader: the columns of VIEW x PROJECTION
+    float4 k_vp1 : CREG(1);
+    float4 k_vp2 : CREG(2);
+    float4 k_vp3 : CREG(3);
+};
+
+cbuffer particles_vent_ps : register(b1)
+{
+    float4 k_hot   : CREG(0); // pixel shader: the plasma's hottest colour (rgb)
+    float4 k_mid   : CREG(1); //   its middle colour
+    float4 k_cool  : CREG(2); //   its coolest
+    float4 k_gas   : CREG(3); //   the gas's bright colour
+    float4 k_gasc  : CREG(4); //   its cold colour
+    float4 k_shape : CREG(5); //   x billow scale, y billow flow, z billow contrast, w edge softness
+    float4 k_cooling : CREG(6); //  x how fast the plasma cools (heat's exponent), y the gas
+};
 
 struct VsIn  { float4 pos : POSITION; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; float4 t2 : TEXCOORD2; };
-struct VsOut { float4 pos : POSITION; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; float4 t2 : TEXCOORD2; };
+struct VsOut { float4 pos : SV_Position; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; float4 t2 : TEXCOORD2; };
 
 VsOut vent_vs(VsIn i)
 {
@@ -127,7 +135,7 @@ float3 jet(float2 uv, float seed, float aspect, float time, float3 col)
     return c * core * along * knots;
 }
 
-float4 vent_ps(VsOut i) : COLOR
+float4 vent_ps(VsOut i) : SV_Target
 {
     float  kind = i.t0.z;
     float  is_puff = 1.0 - step(1.5, kind);

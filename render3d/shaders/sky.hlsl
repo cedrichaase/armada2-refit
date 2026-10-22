@@ -14,31 +14,36 @@
 // as it was, but the recipe's stars are added after that saturation, so a star core
 // may pass white (up to 2) and bloom a little. The gas keeps its level.
 
-float4 k_deep    : register(c0);   // rgb: empty space
-float4 k_gas_a   : register(c1);   // rgb: the gas, first hue
-float4 k_gas_b   : register(c2);   // rgb: the gas, second hue
-float4 k_glow    : register(c3);   // rgb: the densest gas
-float4 k_noise   : register(c4);   // scale, warp, coverage, softness
-float4 k_seed    : register(c5);   // xyz: offset of the noise domain; w: hue scale
-float4 k_core1   : register(c6);   // xyz: direction; w: size (radians)
-float4 k_core1c  : register(c7);   // rgb: colour; w: how much gas it gathers
-float4 k_core2   : register(c8);
-float4 k_core2c  : register(c9);
-float4 k_stretch : register(c10);  // xyz: axis; w: stretch (1 = none)
-float4 k_shape   : register(c11);  // brightness, ridge, patchiness, detail
-float4 k_misc    : register(c12);  // band gather, dither (in 1/255), gas gamma, hue mix
-float4 k_band    : register(c13);  // xyz: the band's pole; w: its half-width (radians)
-float4 k_grain   : register(c14);  // amount, scale (times Scale), gain; w: haze amount
-float4 k_dust    : register(c15);  // amount, scale (times Scale), coverage; w: haze coverage
-float4 k_stars   : register(c16);  // share of lattice cells with a star, brightness, size (radians), in-gas weight
-float4 k_star_a  : register(c17);  // rgb: one end of the stars' colours
-float4 k_star_b  : register(c18);  // rgb: the other
-float4 k_gain    : register(c19);  // rgb: the grade's gain per channel; w: octaves of the gas (Octaves=)
-float4 k_curve   : register(c20);  // rgb: the grade's exponent per channel
-float4 k_fine    : register(c21);  // fine detail at draw time: amount, frequency (noise tiles per radian), gain, amount^2/2
+#include "../../gpu/shaders/compat.hlsli"
+
+cbuffer sky_ps : register(b1)
+{
+    float4 k_deep    : CREG(0);   // rgb: empty space
+    float4 k_gas_a   : CREG(1);   // rgb: the gas, first hue
+    float4 k_gas_b   : CREG(2);   // rgb: the gas, second hue
+    float4 k_glow    : CREG(3);   // rgb: the densest gas
+    float4 k_noise   : CREG(4);   // scale, warp, coverage, softness
+    float4 k_seed    : CREG(5);   // xyz: offset of the noise domain; w: hue scale
+    float4 k_core1   : CREG(6);   // xyz: direction; w: size (radians)
+    float4 k_core1c  : CREG(7);   // rgb: colour; w: how much gas it gathers
+    float4 k_core2   : CREG(8);
+    float4 k_core2c  : CREG(9);
+    float4 k_stretch : CREG(10);  // xyz: axis; w: stretch (1 = none)
+    float4 k_shape   : CREG(11);  // brightness, ridge, patchiness, detail
+    float4 k_misc    : CREG(12);  // band gather, dither (in 1/255), gas gamma, hue mix
+    float4 k_band    : CREG(13);  // xyz: the band's pole; w: its half-width (radians)
+    float4 k_grain   : CREG(14);  // amount, scale (times Scale), gain; w: haze amount
+    float4 k_dust    : CREG(15);  // amount, scale (times Scale), coverage; w: haze coverage
+    float4 k_stars   : CREG(16);  // share of lattice cells with a star, brightness, size (radians), in-gas weight
+    float4 k_star_a  : CREG(17);  // rgb: one end of the stars' colours
+    float4 k_star_b  : CREG(18);  // rgb: the other
+    float4 k_gain    : CREG(19);  // rgb: the grade's gain per channel; w: octaves of the gas (Octaves=)
+    float4 k_curve   : CREG(20);  // rgb: the grade's exponent per channel
+    float4 k_fine    : CREG(21);  // fine detail at draw time: amount, frequency (noise tiles per radian), gain, amount^2/2
+};
 
 struct SkyIn  { float4 pos : POSITION; float3 ray : TEXCOORD0; };
-struct SkyOut { float4 pos : POSITION; float3 ray : TEXCOORD0; };
+struct SkyOut { float4 pos : SV_Position; float3 ray : TEXCOORD0; };
 
 SkyOut sky_vs(SkyIn i)
 {
@@ -253,8 +258,9 @@ float3 dither(float3 col, float2 vpos)
 
 // The reference (Face=0): every pixel, every frame, in one shader of about 8800
 // slots, so only on a card that takes that many (DXVK takes any).
-float4 sky_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
+float4 sky_ps(float3 ray : TEXCOORD0, float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 dir = normalize(ray);
     return float4(max(dither(sky_colour(dir), vpos), 0.0), 1.0);
 }
@@ -266,7 +272,10 @@ float4 sky_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
 // how a target pixel maps to face coordinates: uv = pixel * x + y. Five passes
 // (src/mods/sky/bake.rs, gfx/chain.rs): the warp; the field, from it; the gas, from
 // both; the stars of two slabs, from the gas's a; the last slab, put together.
-float4 k_face[4] : register(c22);
+cbuffer sky_ps1 : register(b1)
+{
+    float4 k_face[4] : CREG(22);
+};
 
 #include "chain.hlsli"
 
@@ -276,30 +285,35 @@ float3 bake_dir(float2 vpos)
     return normalize(k_face[0].xyz + uv.x * k_face[1].xyz + uv.y * k_face[2].xyz);
 }
 
-float4 bake_warp_ps(float2 vpos : VPOS) : COLOR
+float4 bake_warp_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     return float4(sky_warp(bake_dir(vpos)), 1.0);
 }
 
-float4 bake_field_ps(float2 vpos : VPOS) : COLOR
+float4 bake_field_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     return float4(sky_field(bake_dir(vpos), chain_read0(vpos).xyz), 1.0);
 }
 
-float4 bake_gas_ps(float2 vpos : VPOS) : COLOR
+float4 bake_gas_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     return sky_gas(bake_dir(vpos), chain_read0(vpos).xyz, chain_read1(vpos).xyz);
 }
 
-float4 bake_stars_ps(float2 vpos : VPOS) : COLOR
+float4 bake_stars_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 dir = bake_dir(vpos);
     float g = chain_read0(vpos).a;
     return float4(sky_stars(dir, g, 0.0, sky_stars(dir, g, -1.0, 0.0)), 1.0);
 }
 
-float4 bake_end_ps(float2 vpos : VPOS) : COLOR
+float4 bake_end_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 dir = bake_dir(vpos);
     float4 gas = chain_read0(vpos);
     float3 stars = sky_stars(dir, gas.a, 1.0, chain_read1(vpos).rgb);
@@ -308,17 +322,24 @@ float4 bake_end_ps(float2 vpos : VPOS) : COLOR
 
 // Four samples into one texel: the bilinear tap at the corner the four share. c26.x is
 // one over the supersampled target's edge.
-sampler2D s_super : register(s2);
-float4 k_down : register(c26);
-
-float4 down_ps(float2 vpos : VPOS) : COLOR
+STAGE(2) Texture2D s_super : register(t2);
+STAGE(2) SamplerState s_super_s : register(s2);
+cbuffer sky_ps2 : register(b1)
 {
+    float4 k_down : CREG(26);
+};
+
+float4 down_ps(float4 fc : SV_Position) : SV_Target
+{
+    float2 vpos = d3d9_vpos(fc);
     float2 uv = (vpos * 2.0 + 1.0) * k_down.x;
-    return float4(tex2D(s_super, uv).rgb, 1.0);
+    return float4(s_super.Sample(s_super_s, uv).rgb, 1.0);
 }
 
-samplerCUBE s_sky  : register(s0);
-sampler3D   s_fine : register(s1);
+STAGE(0) TextureCube s_sky : register(t0);
+STAGE(0) SamplerState s_sky_s : register(s0);
+STAGE(1) Texture3D s_fine : register(t1);
+STAGE(1) SamplerState s_fine_s : register(s1);
 
 // Detail finer than the cube's texels (Sky.asi's fine_z): three octaves of a tiling
 // volume of smooth noise, turned and offset, in units of their spread.
@@ -327,26 +348,30 @@ float fine_z(float3 dir)
     float3 p = dir * k_fine.y;
     float s = 0.0, a = 1.0, n = 0.0;
     [unroll] for (int o = 0; o < 3; o++) {
-        s += a * (tex3D(s_fine, p).r - 0.5) * 8.0; n += a * a; a *= k_fine.z;
+        s += a * (s_fine.Sample(s_fine_s, p).r - 0.5) * 8.0; n += a * a; a *= k_fine.z;
         p = mul(k_rot, p) * 2.03 + float3(0.37, 0.71, 0.13);
     }
     return s * rsqrt(n);
 }
 
-float4 draw_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
+float4 draw_ps(float3 ray : TEXCOORD0, float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 dir = normalize(ray);
-    float3 col = texCUBE(s_sky, dir).rgb;
+    float3 col = s_sky.Sample(s_sky_s, dir).rgb;
     col *= exp(k_fine.x * fine_z(dir) - k_fine.w);
     return float4(max(dither(col, vpos), 0.0), 1.0);
 }
 
 // The stock sky: the cube's faces (a cube SOD, or the six prefix faces) at the camera,
 // unlit, as the engine draws them. c0..c3: world x view x projection (transposed).
-float4x4 k_wvp : register(c0);
+cbuffer sky_vs : register(b0)
+{
+    float4x4 k_wvp : CREG(0);
+};
 
 struct FaceIn  { float3 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
-struct FaceOut { float4 pos : POSITION; float2 uv : TEXCOORD0; };
+struct FaceOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };
 
 FaceOut face_vs(FaceIn i)
 {
@@ -356,18 +381,22 @@ FaceOut face_vs(FaceIn i)
     return o;
 }
 
-sampler2D s_tex : register(s0);
-float4 k_tint : register(c0);   // rgb: multiplies the texture; a: 1 where the face has no texture (the engine draws it white)
-
-float4 face_ps(FaceOut i) : COLOR
+STAGE(0) Texture2D s_tex : register(t0);
+STAGE(0) SamplerState s_tex_s : register(s0);
+cbuffer sky_ps3 : register(b1)
 {
-    return float4(lerp(tex2D(s_tex, i.uv).rgb, 1.0, k_tint.a) * k_tint.rgb, 1.0);
+    float4 k_tint : CREG(0);   // rgb: multiplies the texture; a: 1 where the face has no texture (the engine draws it white)
+};
+
+float4 face_ps(FaceOut i) : SV_Target
+{
+    return float4(lerp(s_tex.Sample(s_tex_s, i.uv).rgb, 1.0, k_tint.a) * k_tint.rgb, 1.0);
 }
 
 // Sprites: the starfield's quads and the background objects' billboards, already in
 // world space. c0..c3: view x projection (transposed). Additive, as stock draws them.
 struct SprIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float4 col : COLOR0; };
-struct SprOut { float4 pos : POSITION; float2 uv : TEXCOORD0; float4 col : TEXCOORD1; };
+struct SprOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : TEXCOORD1; };
 
 SprOut sprite_vs(SprIn i)
 {
@@ -381,9 +410,9 @@ SprOut sprite_vs(SprIn i)
 // col.a: how much past white the brightest texels go (0: stock's exact light). A star's
 // or a sun's core, near white in its texture, is lifted towards 1 + a and blooms; the
 // rest of the sprite keeps stock's level.
-float4 sprite_ps(SprOut i) : COLOR
+float4 sprite_ps(SprOut i) : SV_Target
 {
-    float3 t = tex2D(s_tex, i.uv).rgb;   // added whole: the texture's alpha plays no part (bench: the suns' halos)
+    float3 t = s_tex.Sample(s_tex_s, i.uv).rgb;   // added whole: the texture's alpha plays no part (bench: the suns' halos)
     float peak = max(t.r, max(t.g, t.b));
     float lift = 1.0 + i.col.a * smoothstep(0.75, 1.0, peak);
     return float4(t * i.col.rgb * lift, 1.0);
@@ -399,14 +428,18 @@ float4 sprite_ps(SprOut i) : COLOR
 // rho / (s + len) to rho / s. Each ring of angular cells holds one star per cell, its
 // rho, depth phase and speed hashed from the cell; a pixel looks only at its own cell
 // of each ring, so the loop is fixed and branch-free (vkd3d).
-float4 k_tun   : register(c27);  // x: seconds since the departure, y: strength 0..1, z: how much it darkens, w: speed
-float4 k_tfwd  : register(c28);  // xyz: the camera's forward axis (world)
-float4 k_tright: register(c29);  // xyz: its right axis
-float4 k_tup   : register(c30);  // xyz: its up axis
-float4 k_tcol  : register(c31);  // rgb: the tint
-
-float4 tunnel_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
+cbuffer sky_ps4 : register(b1)
 {
+    float4 k_tun   : CREG(27);  // x: seconds since the departure, y: strength 0..1, z: how much it darkens, w: speed
+    float4 k_tfwd  : CREG(28);  // xyz: the camera's forward axis (world)
+    float4 k_tright: CREG(29);  // xyz: its right axis
+    float4 k_tup   : CREG(30);  // xyz: its up axis
+    float4 k_tcol  : CREG(31);  // rgb: the tint
+};
+
+float4 tunnel_ps(float3 ray : TEXCOORD0, float4 fc : SV_Position) : SV_Target
+{
+    float2 vpos = d3d9_vpos(fc);
     float3 d = normalize(ray);
     float z = max(dot(d, k_tfwd.xyz), 1e-3);
     float2 q = float2(dot(d, k_tright.xyz), dot(d, k_tup.xyz)) / z;
@@ -452,15 +485,18 @@ float4 tunnel_ps(float3 ray : TEXCOORD0, float2 vpos : VPOS) : COLOR
 // its border (12/255 on the middle row) and its core is a flat white diamond: drawn
 // brighter than stock into the HDR frame, both showed as a hard-edged box.
 // c32: the sprite's rectangle in the texture (u, v, width, height).
-float4 k_frect : register(c32);
+cbuffer sky_ps5 : register(b1)
+{
+    float4 k_frect : CREG(32);
+};
 
-float4 flash_ps(SprOut i) : COLOR
+float4 flash_ps(SprOut i) : SV_Target
 {
     float2 q = (i.uv - k_frect.xy) / k_frect.zw * 2.0 - 1.0;
     // Round and soft from near the centre out: the art's core is a flat white diamond,
     // which at more than stock's light reads as a hard-edged box.
     float edge = 1.0 - smoothstep(0.12, 0.95, length(q));
-    float3 t = tex2D(s_tex, i.uv).rgb;
+    float3 t = s_tex.Sample(s_tex_s, i.uv).rgb;
     float peak = max(t.r, max(t.g, t.b));
     float lift = 1.0 + i.col.a * smoothstep(0.75, 1.0, peak);
     return float4(t * i.col.rgb * lift * edge * edge, 1.0);

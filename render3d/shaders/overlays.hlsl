@@ -3,7 +3,12 @@
 // smooth edges (ported from Fog.asi), the tactical grid's lines, the
 // selection bubbles and the fog-of-war ghosts.
 
-float4x4 VP : register(c4);    // view x projection (transposed); world is identity
+#include "../../gpu/shaders/compat.hlsli"
+
+cbuffer overlays_vs : register(b0)
+{
+    float4x4 VP : CREG(4);    // view x projection (transposed); world is identity
+};
 
 struct PI {
     float3 pos : POSITION;
@@ -11,7 +16,7 @@ struct PI {
 };
 
 struct PO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float2 uv  : TEXCOORD0;
 };
 
@@ -44,18 +49,22 @@ PO vs_plane(PI i)
 // loses that, so it is put back as a shade from the mask: half at the threshold, full
 // where the mask has risen by the width above it.
 
-sampler2D s_layer : register(s0);
-float4 k_tex  : register(c0);
-float4 k_grid : register(c1);
-float4 k_aa   : register(c2);
-float4 k_diff : register(c3);
+STAGE(0) Texture2D s_layer : register(t0);
+STAGE(0) SamplerState s_layer_s : register(s0);
+cbuffer overlays_ps : register(b1)
+{
+    float4 k_tex  : CREG(0);
+    float4 k_grid : CREG(1);
+    float4 k_aa   : CREG(2);
+    float4 k_diff : CREG(3);
+};
 
 // One bilinear tap at p, in texel units (a texel's centre at i + 0.5), held inside the
 // grid: beyond the map the texture holds nothing the engine wrote, and a tap reaching
 // there would thin the shroud along the map's edge.
 float4 tap(float2 p)
 {
-    return tex2D(s_layer, clamp(p, k_grid.xy, k_grid.zw) * k_tex.y);
+    return s_layer.Sample(s_layer_s, clamp(p, k_grid.xy, k_grid.zw) * k_tex.y);
 }
 
 float4 finish(float4 r)
@@ -70,7 +79,7 @@ float4 finish(float4 r)
 }
 
 // Cubic B-spline: the smoothest, a circle of cells reads as a circle. Four taps.
-float4 ps_fog_bspline(PO i) : COLOR
+float4 ps_fog_bspline(PO i) : SV_Target
 {
     float2 t = i.uv * k_tex.x - 0.5;
     float2 f = frac(t);
@@ -90,7 +99,7 @@ float4 ps_fog_bspline(PO i) : COLOR
 
 // Catmull-Rom: passes through every texel, so a single cell keeps its own small
 // round patch, and corners stay closer to the cells. Nine taps.
-float4 ps_fog_catrom(PO i) : COLOR
+float4 ps_fog_catrom(PO i) : SV_Target
 {
     float2 t = i.uv * k_tex.x - 0.5;
     float2 f = frac(t);
@@ -110,9 +119,12 @@ float4 ps_fog_catrom(PO i) : COLOR
 
 // ---- one constant colour: the grid's lines, the selection bubbles -----------------
 
-float4 k_colour : register(c0);
+cbuffer overlays_ps1 : register(b1)
+{
+    float4 k_colour : CREG(0);
+};
 
-float4 ps_colour() : COLOR
+float4 ps_colour() : SV_Target
 {
     return k_colour;
 }
@@ -138,17 +150,21 @@ struct GI {
     float3 wp  : TEXCOORD2;
 };
 
-sampler2D s_tex : register(s0);
-float4 g_amb  : register(c0);
-float4 g_diff : register(c1);
-float4 g_tint : register(c2);
-float4 g_si   : register(c3);
-float4 g_ddir[4] : register(c4);
-float4 g_dcol[4] : register(c8);
-
-float4 ps_ghost(GI i) : COLOR
+STAGE(0) Texture2D s_tex : register(t0);
+STAGE(0) SamplerState s_tex_s : register(s0);
+cbuffer overlays_ps2 : register(b1)
 {
-    float4 t = tex2D(s_tex, i.uv);
+    float4 g_amb  : CREG(0);
+    float4 g_diff : CREG(1);
+    float4 g_tint : CREG(2);
+    float4 g_si   : CREG(3);
+    float4 g_ddir[4] : CREG(4);
+    float4 g_dcol[4] : CREG(8);
+};
+
+float4 ps_ghost(GI i) : SV_Target
+{
+    float4 t = s_tex.Sample(s_tex_s, i.uv);
     float3 n = normalize(i.nrm) * g_diff.w;
     float3 l = 0.0;
     for (int d = 0; d < 4; d++)
@@ -169,7 +185,10 @@ float4 ps_ghost(GI i) : COLOR
 //   vertex c8: x, y the view's size in pixels; z half the line's width (pixels);
 //              w the soft edge (pixels)
 
-float4 l_vp : register(c8);
+cbuffer overlays_vs1 : register(b0)
+{
+    float4 l_vp : CREG(8);
+};
 
 struct LI {
     float3 a   : POSITION;
@@ -179,7 +198,7 @@ struct LI {
 };
 
 struct LO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float2 d   : TEXCOORD0;   // x: pixels from the centre line; y: half the width
     float4 col : TEXCOORD1;
 };
@@ -208,9 +227,12 @@ LO vs_line(LI i)
     return o;
 }
 
-float4 l_ps : register(c0);   // x: the soft edge (pixels)
+cbuffer overlays_ps3 : register(b1)
+{
+    float4 l_ps : CREG(0);   // x: the soft edge (pixels)
+};
 
-float4 ps_line(LO i) : COLOR
+float4 ps_line(LO i) : SV_Target
 {
     float cover = saturate((i.d.y + 0.5 * l_ps.x - abs(i.d.x)) / max(l_ps.x, 1e-3));
     return float4(i.col.rgb, i.col.a * cover);

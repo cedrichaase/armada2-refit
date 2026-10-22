@@ -16,15 +16,23 @@
 //
 // Constants come from repair.rs, which must agree with the registers.
 
-float4 k_vp0 : register(c0);   // vertex shader: the columns of VIEW x PROJECTION
-float4 k_vp1 : register(c1);
-float4 k_vp2 : register(c2);
-float4 k_vp3 : register(c3);
+#include "../../gpu/shaders/compat.hlsli"
 
-float4 k_flare : register(c0); // pixel shader: x the core's sharpness, y the glow's, z the rays' share, w the rays' sharpness
+cbuffer effects_repair_vs : register(b0)
+{
+    float4 k_vp0 : CREG(0);   // vertex shader: the columns of VIEW x PROJECTION
+    float4 k_vp1 : CREG(1);
+    float4 k_vp2 : CREG(2);
+    float4 k_vp3 : CREG(3);
+};
+
+cbuffer effects_repair_ps : register(b1)
+{
+    float4 k_flare : CREG(0); // pixel shader: x the core's sharpness, y the glow's, z the rays' share, w the rays' sharpness
+};
 
 struct VsIn  { float4 pos : POSITION; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; };
-struct VsOut { float4 pos : POSITION; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; };
+struct VsOut { float4 pos : SV_Position; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; };
 
 VsOut weld_vs(VsIn i)
 {
@@ -70,7 +78,7 @@ float3 hot(float2 uv, float3 col)
     return col * (exp(-r2 * 9.0) + 0.25 * exp(-r2 * 2.5)) * saturate(1.0 - r2);
 }
 
-float4 weld_ps(VsOut i) : COLOR
+float4 weld_ps(VsOut i) : SV_Target
 {
     float  kind = i.t0.z;
     float  is_flare = 1.0 - step(0.5, kind);

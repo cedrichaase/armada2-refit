@@ -16,13 +16,18 @@
 //
 // Constants come from src/mods/specials/look.rs, which must agree with the registers.
 
-float4x4 W  : register(c0);    // world (transposed)
-float4x4 VP : register(c4);    // view x projection (transposed)
-float4 k_v  : register(c8);    // x: push out along the normal (world units), y: the normals' sign (scene::NORMAL_SIGN)
-float4 k_oc : register(c9);    // the object's centre (world); w: 1 / its radius
-float4 k_ox : register(c10);   // the object's axes (world, unit): x
-float4 k_oy : register(c11);   //   y
-float4 k_oz : register(c12);   //   z
+#include "../../gpu/shaders/compat.hlsli"
+
+cbuffer specials_vs : register(b0)
+{
+    float4x4 W  : CREG(0);    // world (transposed)
+    float4x4 VP : CREG(4);    // view x projection (transposed)
+    float4 k_v  : CREG(8);    // x: push out along the normal (world units), y: the normals' sign (scene::NORMAL_SIGN)
+    float4 k_oc : CREG(9);    // the object's centre (world); w: 1 / its radius
+    float4 k_ox : CREG(10);   // the object's axes (world, unit): x
+    float4 k_oy : CREG(11);   //   y
+    float4 k_oz : CREG(12);   //   z
+};
 
 struct VI {
     float3 pos : POSITION;
@@ -31,7 +36,7 @@ struct VI {
 };
 
 struct VO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float3 mp  : TEXCOORD0;   // the object's own space, about its centre, in radii
     float3 mn  : TEXCOORD1;   // the object's own space normal, outward
     float3 wn  : TEXCOORD2;   // world normal, outward
@@ -56,12 +61,15 @@ VO fx_vs(VI i)
 
 // ---- pixel -------------------------------------------------------------------------
 
-float4 k_col  : register(c0);   // rgb: the look's colour (light, may be above 1); a: strength (0..1, the effect's envelope)
-float4 k_mode : register(c1);   // x circuitry, y spores, z psionic: weights
-float4 k_time : register(c2);   // x: seconds (wall), y: how far the creep has got (0..1+), z: the effect's seed, w: pattern scale (cells per radius)
-float4 k_from : register(c3);   // where the creep starts, in the object's frame, in radii (unit-ish)
-float4 k_eye  : register(c4);   // the camera, world
-float4 k_rim  : register(c5);   // x: rim strength, y: rim exponent, z: the edge of the creep's width, w: core whiteness
+cbuffer specials_ps : register(b1)
+{
+    float4 k_col  : CREG(0);   // rgb: the look's colour (light, may be above 1); a: strength (0..1, the effect's envelope)
+    float4 k_mode : CREG(1);   // x circuitry, y spores, z psionic: weights
+    float4 k_time : CREG(2);   // x: seconds (wall), y: how far the creep has got (0..1+), z: the effect's seed, w: pattern scale (cells per radius)
+    float4 k_from : CREG(3);   // where the creep starts, in the object's frame, in radii (unit-ish)
+    float4 k_eye  : CREG(4);   // the camera, world
+    float4 k_rim  : CREG(5);   // x: rim strength, y: rim exponent, z: the edge of the creep's width, w: core whiteness
+};
 
 float hash3(float3 p)
 {
@@ -160,7 +168,7 @@ float psionic(float3 p, float t, float seed, float scale)
     return 1.0 - smoothstep(aw, aw * 3.0 + 0.09, a);
 }
 
-float4 fx_ps(VO i) : COLOR
+float4 fx_ps(VO i) : SV_Target
 {
     float3 p = i.mp;
     float3 n = normalize(i.mn);

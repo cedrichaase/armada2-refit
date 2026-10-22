@@ -18,44 +18,48 @@
 //
 // Constants come from shields.rs's draw_ship(), which must agree with the registers.
 
-float4 k_vp0   : register(c0);   // vertex shader: the columns of VIEW x PROJECTION
-float4 k_vp1   : register(c1);
-float4 k_vp2   : register(c2);
-float4 k_vp3   : register(c3);
-float4 k_w0    : register(c4);   // the columns of the unit sphere -> world (3x4)
-float4 k_w1    : register(c5);
-float4 k_w2    : register(c6);
-float4 k_n0    : register(c7);   // the rows of the normal matrix (its inverse transpose)
-float4 k_n1    : register(c8);
-float4 k_n2    : register(c9);
+#include "../../gpu/shaders/compat.hlsli"
 
-float4 k_eye   : register(c0);   // pixel shader: xyz the camera; w 1 / the shield's mean radius
-float4 k_col   : register(c1);   // rgb: the shield's colour; w: overall brightness (with the flicker)
-float4 k_shape : register(c2);   // x 1/spot size, y 1/ring width, z 1/glow reach, w rim power
-float4 k_mix   : register(c3);   // x spot, y ring, z lattice, w rim: how bright each part is
-float4 k_grid  : register(c4);   // x cells across the radius, y line width, z time (s, wrapped), w crackle (0..1)
-float4 k_core  : register(c5);   // x: how white the spot's core goes; y: lattice mode (0 none, 1 hex, 2 cells of noise); z: the ring's lattice share; w: the edge's width (in facing, 0..1)
-float4 k_mist  : register(c6);   // x the mist's brightness, y its share in the lattice and rim, z its contrast, w 1 / its reach (shield radii)
-float4 k_ray   : register(c7);   // x the rays' brightness (0: none), y 1 / their length (shield radii), z their sharpness, w -
-float4 k_drift : register(c24);  // xyz the mist's drift now (noise space), w its scale (cells across the unit sphere)
-// Per hit: hN.xyz where it struck (world), hN.w the spot's brightness now;
-// rN.x the ring's radius now (in shield radii), rN.y its brightness, rN.z the glow's
-// brightness about the hit (lattice, rim, mist and rays); uN.xyz where it struck on
-// the unit sphere, uN.w a seed (0..1). Eight of them, as separate constants: vkd3d
-// does not place an array at its register().
-float4 k_h0 : register(c8);   float4 k_r0 : register(c16);
-float4 k_h1 : register(c9);   float4 k_r1 : register(c17);
-float4 k_h2 : register(c10);  float4 k_r2 : register(c18);
-float4 k_h3 : register(c11);  float4 k_r3 : register(c19);
-float4 k_h4 : register(c12);  float4 k_r4 : register(c20);
-float4 k_h5 : register(c13);  float4 k_r5 : register(c21);
-float4 k_h6 : register(c14);  float4 k_r6 : register(c22);
-float4 k_h7 : register(c15);  float4 k_r7 : register(c23);
-float4 k_u0 : register(c25);  float4 k_u1 : register(c26);  float4 k_u2 : register(c27);  float4 k_u3 : register(c28);
-float4 k_u4 : register(c29);  float4 k_u5 : register(c30);  float4 k_u6 : register(c31);  float4 k_u7 : register(c32);
+cbuffer effects_shields_vs : register(b0)
+{
+    float4 k_vp0   : CREG(0);   // vertex shader: the columns of VIEW x PROJECTION
+    float4 k_vp1   : CREG(1);
+    float4 k_vp2   : CREG(2);
+    float4 k_vp3   : CREG(3);
+    float4 k_w0    : CREG(4);   // the columns of the unit sphere -> world (3x4)
+    float4 k_w1    : CREG(5);
+    float4 k_w2    : CREG(6);
+    float4 k_n0    : CREG(7);   // the rows of the normal matrix (its inverse transpose)
+    float4 k_n1    : CREG(8);
+    float4 k_n2    : CREG(9);
+};
+
+cbuffer effects_shields_ps : register(b1)
+{
+    float4 k_eye   : CREG(0);   // pixel shader: xyz the camera; w 1 / the shield's mean radius
+    float4 k_col   : CREG(1);   // rgb: the shield's colour; w: overall brightness (with the flicker)
+    float4 k_shape : CREG(2);   // x 1/spot size, y 1/ring width, z 1/glow reach, w rim power
+    float4 k_mix   : CREG(3);   // x spot, y ring, z lattice, w rim: how bright each part is
+    float4 k_grid  : CREG(4);   // x cells across the radius, y line width, z time (s, wrapped), w crackle (0..1)
+    float4 k_core  : CREG(5);   // x: how white the spot's core goes; y: lattice mode (0 none, 1 hex, 2 cells of noise); z: the ring's lattice share; w: the edge's width (in facing, 0..1)
+    float4 k_mist  : CREG(6);   // x the mist's brightness, y its share in the lattice and rim, z its contrast, w 1 / its reach (shield radii)
+    float4 k_ray   : CREG(7);   // x the rays' brightness (0: none), y 1 / their length (shield radii), z their sharpness, w -
+    // Per hit: hN.xyz where it struck (world), hN.w the spot's brightness now;
+    // rN.x the ring's radius now (in shield radii), rN.y its brightness, rN.z the glow's
+    // brightness about the hit (lattice, rim, mist and rays); uN.xyz where it struck on
+    // the unit sphere, uN.w a seed (0..1). Eight of them, as separate constants: vkd3d
+    // does not place an array at its register().
+    float4 k_h0 : CREG(8);   float4 k_h1 : CREG(9);   float4 k_h2 : CREG(10);  float4 k_h3 : CREG(11);
+    float4 k_h4 : CREG(12);  float4 k_h5 : CREG(13);  float4 k_h6 : CREG(14);  float4 k_h7 : CREG(15);
+    float4 k_r0 : CREG(16);  float4 k_r1 : CREG(17);  float4 k_r2 : CREG(18);  float4 k_r3 : CREG(19);
+    float4 k_r4 : CREG(20);  float4 k_r5 : CREG(21);  float4 k_r6 : CREG(22);  float4 k_r7 : CREG(23);
+    float4 k_drift : CREG(24);  // xyz the mist's drift now (noise space), w its scale (cells across the unit sphere)
+    float4 k_u0 : CREG(25);  float4 k_u1 : CREG(26);  float4 k_u2 : CREG(27);  float4 k_u3 : CREG(28);
+    float4 k_u4 : CREG(29);  float4 k_u5 : CREG(30);  float4 k_u6 : CREG(31);  float4 k_u7 : CREG(32);
+};
 
 struct VsIn  { float4 pos : POSITION; };
-struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; float3 n : TEXCOORD1; float3 u : TEXCOORD2; };
+struct VsOut { float4 pos : SV_Position; float3 w : TEXCOORD0; float3 n : TEXCOORD1; float3 u : TEXCOORD2; };
 
 VsOut shield_vs(VsIn i)
 {
@@ -140,22 +144,23 @@ float4 hit(float3 w, float4 h, float4 r)
 //
 // Constants from shields.rs's draw_down(), which must agree with the registers.
 
-float4 d_eye   : register(c0);   // xyz the camera; w 1 / the shield's mean radius
-float4 d_arc   : register(c1);   // rgb the arcs' core; w overall brightness
-float4 d_glow  : register(c2);   // rgb the glow about them; w the shell's haze
-float4 d_shape : register(c3);   // x arc scale (cells over the sphere), y warp, z core width (pixels), w glow width
-float4 d_seed  : register(c4);   // xyz the noise's seed now; w the branches' share
-float4 d_band  : register(c5);   // x the band's half width (in u.y), y the crackle along it, z the collapse flash now, w fade (0..1)
-float4 d_misc  : register(c6);   // x the far side's share, y rim power, z the first field's share (the second's is 1 - it), w how much of each line is lit (-1..1)
-float4 d_seed2 : register(c7);   // xyz the second field's seed: it is struck afresh half a step after the first
-float4 d_s0 : register(c8);   float4 d_q0 : register(c16);
-float4 d_s1 : register(c9);   float4 d_q1 : register(c17);
-float4 d_s2 : register(c10);  float4 d_q2 : register(c18);
-float4 d_s3 : register(c11);  float4 d_q3 : register(c19);
-float4 d_s4 : register(c12);  float4 d_q4 : register(c20);
-float4 d_s5 : register(c13);  float4 d_q5 : register(c21);
-// sN.xyz a discharge's centre (world), sN.w its brightness now; qN.x 1 / its radius
-// (in shield radii), qN.yzw its seed offset
+cbuffer effects_shields_ps1 : register(b1)
+{
+    float4 d_eye   : CREG(0);   // xyz the camera; w 1 / the shield's mean radius
+    float4 d_arc   : CREG(1);   // rgb the arcs' core; w overall brightness
+    float4 d_glow  : CREG(2);   // rgb the glow about them; w the shell's haze
+    float4 d_shape : CREG(3);   // x arc scale (cells over the sphere), y warp, z core width (pixels), w glow width
+    float4 d_seed  : CREG(4);   // xyz the noise's seed now; w the branches' share
+    float4 d_band  : CREG(5);   // x the band's half width (in u.y), y the crackle along it, z the collapse flash now, w fade (0..1)
+    float4 d_misc  : CREG(6);   // x the far side's share, y rim power, z the first field's share (the second's is 1 - it), w how much of each line is lit (-1..1)
+    float4 d_seed2 : CREG(7);   // xyz the second field's seed: it is struck afresh half a step after the first
+    // sN.xyz a discharge's centre (world), sN.w its brightness now; qN.x 1 / its radius
+    // (in shield radii), qN.yzw its seed offset
+    float4 d_s0 : CREG(8);   float4 d_s1 : CREG(9);   float4 d_s2 : CREG(10);
+    float4 d_s3 : CREG(11);  float4 d_s4 : CREG(12);  float4 d_s5 : CREG(13);
+    float4 d_q0 : CREG(16);  float4 d_q1 : CREG(17);  float4 d_q2 : CREG(18);
+    float4 d_q3 : CREG(19);  float4 d_q4 : CREG(20);  float4 d_q5 : CREG(21);
+};
 
 float3 hash33(float3 p)
 {
@@ -211,7 +216,7 @@ float strike(float3 w, float4 s, float4 q)
     return s.w * exp(-d * d);
 }
 
-float4 down_ps(VsOut i) : COLOR
+float4 down_ps(VsOut i) : SV_Target
 {
     float3 n = normalize(i.n);
     float3 v = normalize(d_eye.xyz - i.w);
@@ -273,7 +278,7 @@ float rays(float3 u, float3 w, float4 h, float4 r, float4 hu)
     return r.z * spoke * env;
 }
 
-float4 shield_ps(VsOut i) : COLOR
+float4 shield_ps(VsOut i) : SV_Target
 {
     float3 n = normalize(i.n);
     float3 v = normalize(k_eye.xyz - i.w);

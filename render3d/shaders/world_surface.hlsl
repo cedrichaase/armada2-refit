@@ -23,34 +23,40 @@
 // those units whatever the other settings. The registers are filled by surfaces.rs,
 // recipe_read(), which must agree.
 
-float4 k_seed    : register(c0);   // xyz: offset of the noise domain; w: kind (0 rock, 1 gas)
-float4 k_noise   : register(c1);   // scale, warp, detail, ridges
-float4 k_sea     : register(c2);   // sea level (-99: none), shore depth, relief, continents
-float4 k_crater  : register(c3);   // share of cells with a crater, cells across, depth, rim
-float4 k_crack   : register(c4);   // cells across, width, depth, glow
-float4 k_ice     : register(c5);   // latitude it starts at (0..1), softness, ragged, amount
-float4 k_ice_col : register(c6);
-float4 k_deep    : register(c7);   // rgb: deep water
-float4 k_shallow : register(c8);   // rgb: shallow water
-float4 k_ramp[6] : register(c9);   // rgb, w: the height of the stop (gas: 0..1 across a band)
-float4 k_alt[6]  : register(c15);  // a second ramp, for regions of another ground
-float4 k_region  : register(c21);  // region scale, how much of the second ramp, colour noise, its scale
-float4 k_cloud   : register(c22);  // scale, coverage, softness, warp
-float4 k_cloud2  : register(c23);  // stretch along longitude, detail, latitude belts, seed
-float4 k_gas     : register(c24);  // bands, band warp, turbulence, stretch along longitude
-float4 k_storm   : register(c25);  // xyz: direction; w: size (radians)
-float4 k_storm_c : register(c26);  // rgb, w: strength
-float4 k_cavity  : register(c27);  // x: cavity darkening, y: ridge lightening, z: fissures' branches,
-                                   //   w: Cut, the fissure strength cut through (0: none)
-float4 k_fiss    : register(c28);  // fissures: x the warp, y the share of borders kept
-float4 k_face[4] : register(c32);  // the face's centre, right and down axes; x: 2/(S-1), y: tap step
+#include "../../gpu/shaders/compat.hlsli"
 
-samplerCUBE s_height : register(s0);
+cbuffer world_surface_ps : register(b1)
+{
+    float4 k_seed    : CREG(0);   // xyz: offset of the noise domain; w: kind (0 rock, 1 gas)
+    float4 k_noise   : CREG(1);   // scale, warp, detail, ridges
+    float4 k_sea     : CREG(2);   // sea level (-99: none), shore depth, relief, continents
+    float4 k_crater  : CREG(3);   // share of cells with a crater, cells across, depth, rim
+    float4 k_crack   : CREG(4);   // cells across, width, depth, glow
+    float4 k_ice     : CREG(5);   // latitude it starts at (0..1), softness, ragged, amount
+    float4 k_ice_col : CREG(6);
+    float4 k_deep    : CREG(7);   // rgb: deep water
+    float4 k_shallow : CREG(8);   // rgb: shallow water
+    float4 k_ramp[6] : CREG(9);   // rgb, w: the height of the stop (gas: 0..1 across a band)
+    float4 k_alt[6]  : CREG(15);  // a second ramp, for regions of another ground
+    float4 k_region  : CREG(21);  // region scale, how much of the second ramp, colour noise, its scale
+    float4 k_cloud   : CREG(22);  // scale, coverage, softness, warp
+    float4 k_cloud2  : CREG(23);  // stretch along longitude, detail, latitude belts, seed
+    float4 k_gas     : CREG(24);  // bands, band warp, turbulence, stretch along longitude
+    float4 k_storm   : CREG(25);  // xyz: direction; w: size (radians)
+    float4 k_storm_c : CREG(26);  // rgb, w: strength
+    float4 k_cavity  : CREG(27);  // x: cavity darkening, y: ridge lightening, z: fissures' branches,
+                                       //   w: Cut, the fissure strength cut through (0: none)
+    float4 k_fiss    : CREG(28);  // fissures: x the warp, y the share of borders kept
+    float4 k_face[4] : CREG(32);  // the face's centre, right and down axes; x: 2/(S-1), y: tap step
+};
+
+STAGE(0) TextureCube s_height : register(t0);
+STAGE(0) SamplerState s_height_s : register(s0);
 
 // The height inside a branch (after an early return). Windows' own Direct3D 9 refuses a
 // texld inside an if (README.md, "Shaders on Windows"); the cube has one level and the
-// same filter either way, so zero gradients sample exactly what texCUBE did.
-float4 height_tap(float3 d) { return texCUBEgrad(s_height, d, 0.0, 0.0); }
+// same filter either way, so zero gradients sample exactly what a plain Sample does.
+float4 height_tap(float3 d) { return s_height.SampleGrad(s_height_s, d, 0.0, 0.0); }
 
 // sky.hlsl's lattice hash and value noise: no sine, a quintic fade.
 float hash13(float3 p)
@@ -278,65 +284,74 @@ float3 face_dir(float2 vpos)
 
 float3 chain_dir(float2 vpos) { return face_dir(chain_face(vpos)); }
 
-float4 height_warp_ps(float2 vpos : VPOS) : COLOR
+float4 height_warp_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     return float4(height_warp(chain_dir(vpos)), 1.0);
 }
 
 // reads the warp
-float4 height_gas_ps(float2 vpos : VPOS) : COLOR
+float4 height_gas_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     return float4(height_gas(chain_dir(vpos), chain_read0(vpos).xyz), 0.0, 1.0);
 }
 
 // reads the warp
-float4 height_ground_ps(float2 vpos : VPOS) : COLOR
+float4 height_ground_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     return float4(height_ground(chain_dir(vpos), chain_read0(vpos).xyz), 0.0, 0.0, 1.0);
 }
 
 // reads the warp and the ground: (n, the first craters' first slab)
-float4 height_mountains_ps(float2 vpos : VPOS) : COLOR
+float4 height_mountains_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 d = chain_dir(vpos);
     float  n = height_mountains(d, chain_read0(vpos).xyz, chain_read1(vpos).x);
     return float4(n, craters1(d, -1.0, 0.0), 0.0, 1.0);
 }
 
 // reads (n, h): the first craters' other two slabs, added
-float4 height_craters1_ps(float2 vpos : VPOS) : COLOR
+float4 height_craters1_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 d = chain_dir(vpos);
     float2 nh = chain_read0(vpos).xy;
     return float4(nh.x + craters1(d, 1.0, craters1(d, 0.0, nh.y)), 0.0, 0.0, 1.0);
 }
 
 // reads n: the second craters' first two slabs
-float4 height_craters2_ps(float2 vpos : VPOS) : COLOR
+float4 height_craters2_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 d = chain_dir(vpos);
     return float4(chain_read0(vpos).x, craters2(d, 0.0, craters2(d, -1.0, 0.0)), 0.0, 1.0);
 }
 
 // reads (n, h): the second craters' last slab, added. The height when there are no
 // fissures (glow 0).
-float4 height_craters3_ps(float2 vpos : VPOS) : COLOR
+float4 height_craters3_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 d = chain_dir(vpos);
     float2 nh = chain_read0(vpos).xy;
     return float4(nh.x + craters2(d, 1.0, nh.y) * 0.7, 0.0, 0.0, 1.0);
 }
 
 // reads the warp and n: (n, the first net's trench and core)
-float4 height_fissure_ps(float2 vpos : VPOS) : COLOR
+float4 height_fissure_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float2 a = fissure_a(chain_dir(vpos), chain_read0(vpos).xyz);
     return float4(chain_read1(vpos).x, a, 1.0);
 }
 
 // reads the warp and (n, a): the second net, cut in, and the glow
-float4 height_end_ps(float2 vpos : VPOS) : COLOR
+float4 height_end_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float4 na = chain_read1(vpos);
     return float4(fissure_end(chain_dir(vpos), chain_read0(vpos).xyz, na.x, na.yz), 0.0, 1.0);
 }
@@ -356,10 +371,11 @@ void tangents(float3 d, out float3 t1, out float3 t2)
     t2 = normalize(cross(d, t1));
 }
 
-float4 albedo_ps(float2 vpos : VPOS) : COLOR
+float4 albedo_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 d = face_dir(vpos);
-    float2 hg = texCUBE(s_height, d).rg;
+    float2 hg = s_height.Sample(s_height_s, d).rg;
     float  h = hg.r;
     float3 p = d * k_noise.x + k_seed.xyz;
     float  region = smoothstep(-0.12, 0.12, (fbm3(d * k_region.x + k_seed.zxy + 5.0, 0.5) - 0.5)) * k_region.y;
@@ -409,25 +425,27 @@ float4 albedo_ps(float2 vpos : VPOS) : COLOR
     return float4(saturate(c), wet);
 }
 
-float4 relief_ps(float2 vpos : VPOS) : COLOR
+float4 relief_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 d = face_dir(vpos);
-    float  glow = texCUBE(s_height, d).g;
+    float  glow = s_height.Sample(s_height_s, d).g;
     float3 t1, t2;
     tangents(d, t1, t2);
     float  e = k_face[3].y;
     // The sea is flat: the slope of the ground below it does not reach the surface.
-    float  hx1 = max(texCUBE(s_height, normalize(d + t1 * e)).r, k_sea.x);
-    float  hx0 = max(texCUBE(s_height, normalize(d - t1 * e)).r, k_sea.x);
-    float  hy1 = max(texCUBE(s_height, normalize(d + t2 * e)).r, k_sea.x);
-    float  hy0 = max(texCUBE(s_height, normalize(d - t2 * e)).r, k_sea.x);
+    float  hx1 = max(s_height.Sample(s_height_s, normalize(d + t1 * e)).r, k_sea.x);
+    float  hx0 = max(s_height.Sample(s_height_s, normalize(d - t1 * e)).r, k_sea.x);
+    float  hy1 = max(s_height.Sample(s_height_s, normalize(d + t2 * e)).r, k_sea.x);
+    float  hy0 = max(s_height.Sample(s_height_s, normalize(d - t2 * e)).r, k_sea.x);
     float3 g = (t1 * (hx1 - hx0) + t2 * (hy1 - hy0)) / (2.0 * e);
     float3 n = normalize(d - g * k_sea.z * (1.0 - k_seed.w));
     return float4(saturate(n - d + 0.5), saturate(glow));
 }
 
-float4 cloud_ps(float2 vpos : VPOS) : COLOR
+float4 cloud_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float3 d = face_dir(vpos);
     float3 sp = float3(d.x, d.y * k_cloud2.x, d.z) * k_cloud.x + k_seed.yzx + k_cloud2.w;
     float3 q = float3(fbm3(sp + float3(2.1, 7.3, 1.1), 0.5),
@@ -441,7 +459,7 @@ float4 cloud_ps(float2 vpos : VPOS) : COLOR
 }
 
 struct VsIn  { float4 pos : POSITION; };
-struct VsOut { float4 pos : POSITION; };
+struct VsOut { float4 pos : SV_Position; };
 
 VsOut bake_vs(VsIn i)
 {
