@@ -78,7 +78,7 @@ Installs nothing; seen working on the bench 2026-10-22 (`showcase`, paused, 1280
 - Steps `Wait up to N seconds for "LOG" to say "TEXT"` and `Expect shots "A" and "B" to
   match within T`; scenario `bench-determinism` (ecbb58b, 4a64407).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 3.41.2 — 2026-10-22
 

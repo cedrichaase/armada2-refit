@@ -25,7 +25,7 @@ Layers: render3d 0.18.0, ui 0.15.0, testbench 3.45.0, films 1.13.0.
   vendored in `testbench/vendor/` (testbench 3.45.0, films 1.13.0).
 - `render3d/perf/ab.sh`: frame-time A/B of any two checkouts or revisions (render3d 0.18.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 13.0.0 — 2026-10-22
 

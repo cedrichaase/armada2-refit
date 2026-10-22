@@ -12,7 +12,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   `<name>-<frame>-ui.txt`. The d3d8 device's `Present` is chained beside `Reset`
   (`src/dump.rs`, `engine/device.rs`; README.md, "Frame dumps").
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 0.14.0 — 2026-10-22
 
@@ -23,7 +23,7 @@ Installed, not yet seen in game.
   pixel-identical frames on the test bench. Lists re-read on a timer (resources, the
   loading screen's players) now time it on the wall clock (ecbb58b).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 0.13.4 — 2026-10-21
 

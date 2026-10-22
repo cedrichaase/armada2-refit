@@ -16,7 +16,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   installed whole, `RUNS=` alternating the order; `perf/summary.py` takes any sides and
   shows the spread across runs (PERF.md, "A/B"; 2ccf6ee, 8162070).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 0.17.0 — 2026-10-22
 
@@ -31,7 +31,7 @@ Installed, not yet seen in game.
   not its address (`clock::entity_key`), and stock shots' sprite animation is evaluated
   at the sim time. For pixel-identical frames on the test bench (ecbb58b, 4a64407).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 0.16.4 — 2026-10-21
 
