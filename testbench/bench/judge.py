@@ -81,11 +81,72 @@ def _run(prompt, cwd, schema, allowed, extra_dirs=(), max_turns=None, env=None, 
         out = json.loads(r.stdout)
     except json.JSONDecodeError:
         return None, dict(error=(r.stderr or r.stdout)[-2000:], exit=r.returncode)
+    used = usage_of(out)
+    record_usage(used)
     return out.get('structured_output'), dict(cost_usd=out.get('total_cost_usd'),
                                               turns=out.get('num_turns'),
                                               session_id=out.get('session_id'),
                                               is_error=out.get('is_error'),
-                                              result=out.get('result'))
+                                              result=out.get('result'), **used)
+
+
+# ---------------------------------------------------------------------- token usage
+
+USAGE = config.CACHE / 'judge-usage.json'
+USAGE_DAYS = 14
+
+
+def usage_of(out):
+    """Tokens of one `claude -p --output-format json` answer, from its `modelUsage`
+    (per model, every turn): input counts the cache reads and writes too."""
+    mu = out.get('modelUsage') or {}
+    tin = sum((m.get('inputTokens') or 0) + (m.get('cacheReadInputTokens') or 0) +
+              (m.get('cacheCreationInputTokens') or 0) for m in mu.values())
+    tout = sum(m.get('outputTokens') or 0 for m in mu.values())
+    if not mu:                           # an older CLI: the top-level usage
+        u = out.get('usage') or {}
+        tin = sum(u.get(k) or 0 for k in ('input_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'))
+        tout = u.get('output_tokens') or 0
+    return dict(tokens_in=tin, tokens_out=tout, models=sorted(mu))
+
+
+def record_usage(used, path=None):
+    """Add one call to today's totals in ~/.cache/a2test/judge-usage.json (the dashboard's
+    header). Under a lock: parallel cases judge at once."""
+    import datetime
+    import fcntl
+    path = Path(path or USAGE)
+    day = datetime.date.today().isoformat()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(str(path) + '.lock', 'a+') as lk:
+            fcntl.flock(lk, fcntl.LOCK_EX)
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, ValueError):
+                data = {}
+            d = data.setdefault(day, dict(calls=0, tokens_in=0, tokens_out=0, models={}))
+            d['calls'] += 1
+            d['tokens_in'] += used.get('tokens_in') or 0
+            d['tokens_out'] += used.get('tokens_out') or 0
+            for m in used.get('models') or []:
+                d['models'][m] = d['models'].get(m, 0) + 1
+            for k in sorted(data)[:-USAGE_DAYS]:
+                del data[k]
+            tmp = path.with_suffix('.tmp')
+            tmp.write_text(json.dumps(data, indent=1))
+            tmp.replace(path)
+    except OSError:
+        pass
+
+
+def usage_today(path=None):
+    import datetime
+    try:
+        data = json.loads(Path(path or USAGE).read_text())
+    except (OSError, ValueError):
+        data = {}
+    return data.get(datetime.date.today().isoformat()) or dict(calls=0, tokens_in=0, tokens_out=0, models={})
 
 
 def judge(assertion, images, context, cwd):

@@ -58,6 +58,7 @@ class Scenario:
     sheet: list = field(default_factory=list)     # shot names: a contact sheet, cases x shots
     description: str = ''
     steps: list = field(default_factory=list)
+    phases: list = field(default_factory=list)    # [(heading, first step's number)]: `## ` headings
 
     @property
     def slug(self):
@@ -103,6 +104,7 @@ def parse(path):
     path = Path(path)
     text = path.read_text()
     title, desc, steps = path.stem, [], []
+    heads = []                    # (`## heading`, index of the step it precedes)
     hdr = {}
     in_fence = False
     for raw in text.splitlines():
@@ -114,6 +116,9 @@ def parse(path):
             continue
         if line.startswith('# ') and title == path.stem:
             title = line[2:].strip()
+            continue
+        if line.startswith('## '):
+            heads.append((line[3:].strip(), len(steps)))
             continue
         m = HEADER.match(line.strip())
         if m and not steps:
@@ -127,8 +132,9 @@ def parse(path):
         elif line.strip() and not line.startswith('#'):
             desc.append(line.strip())
     # `Include "_file.md"`: that file's steps, in place (a shared way into the game).
-    expanded = []
+    expanded, first = [], []
     for st in steps:
+        first.append(len(expanded))
         m = re.match(r'^include\s+["“]([^"”]+)["”]\.?$', st.strip(), re.I)
         if m:
             inc = (path.parent / m.group(1))
@@ -137,6 +143,8 @@ def parse(path):
             expanded += parse(inc).steps
         else:
             expanded.append(st)
+    first.append(len(expanded))
+    phases = [(h, first[i] + 1) for h, i in heads if first[i] < len(expanded)]
     steps = expanded
     res_spec = hdr.get('resolution') or hdr.get('aspect') or ', '.join(config.DEFAULT_ASPECTS)
     if res_spec.strip().lower() in ('all', 'all relevant', 'every relevant aspect ratio'):
@@ -149,7 +157,7 @@ def parse(path):
                     mod=hdr.get('mod', 'refit').lower(),
                     launch=hdr.get('launch', '-nointro').strip('`'),
                     reference=hdr.get('reference', config.REFERENCE_ASPECT),
-                    timeout=timeout, description=' '.join(desc), steps=steps,
+                    timeout=timeout, description=' '.join(desc), steps=steps, phases=phases,
                     stock_shell=hdr.get('stock shell', '').strip().lower(),
                     assets=hdr.get('asset', '').strip().lower(),
                     players=[w.lower() for w in re.split(r'[,\s]+', hdr.get('player', '')) if w],

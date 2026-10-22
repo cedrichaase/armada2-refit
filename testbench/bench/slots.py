@@ -271,7 +271,8 @@ def acquire(label, n=1, say=None, timeout=None, stop=None, **info):
                         f'raise A2_SLOTS')
     d = lock_dir()
     _seq[0] += 1
-    me = dict(pid=os.getpid(), token=_seq[0], label=label, want=n, worktree=str(REPO), since=time.time())
+    me = dict(pid=os.getpid(), token=_seq[0], label=label, want=n, worktree=str(REPO), since=time.time(),
+              job=os.environ.get('A2TEST_JOB'))      # bench/jobs.py: the dashboard's queue names the job
     wfile = d / 'waiters' / f'{me["pid"]}-{me["token"]}.json'
     _write_json(wfile, me)
     t0 = time.time()
@@ -289,7 +290,7 @@ def acquire(label, n=1, say=None, timeout=None, stop=None, **info):
                 if got:
                     for s in got:
                         s.describe(pid=os.getpid(), label=label, worktree=str(REPO), since=time.time(),
-                                   session=None, **info)
+                                   session=None, job=os.environ.get('A2TEST_JOB'), freed=None, **info)
                     if last is not None:
                         say(f'got {n} game slot(s) after {time.time() - t0:.0f}s')
                     return got
@@ -311,6 +312,49 @@ def acquire(label, n=1, say=None, timeout=None, stop=None, **info):
             wfile.unlink()
         except OSError:
             pass
+
+
+def held_by_kernel(d, n):
+    """{index: pid} of the slots taken right now, read from /proc/locks -- without taking
+    any lock, so a watcher polling every second never makes a waiter miss its turn. None
+    when /proc/locks cannot be read (then `_holders` is the way)."""
+    inodes = {}
+    for i in range(n):
+        try:
+            inodes[os.stat(d / f'slot-{i}').st_ino] = i
+        except OSError:
+            pass
+    try:
+        text = Path('/proc/locks').read_text()
+    except OSError:
+        return None
+    out = {}
+    for line in text.splitlines():
+        f = line.split()
+        # "1: FLOCK  ADVISORY  WRITE 1234 00:2b:5678 0 EOF"; a blocked request has "->"
+        if len(f) < 6 or f[1] == '->' or f[1] != 'FLOCK':
+            continue
+        try:
+            ino = int(f[5].rsplit(':', 1)[1])
+        except (ValueError, IndexError):
+            continue
+        if ino in inodes:
+            out[inodes[ino]] = int(f[4])
+    return out
+
+
+def mark_freed(index, session):
+    """Note in a slot's sidecar when the session that held it ended (information only),
+    unless another holder has described it since."""
+    try:
+        d = lock_dir()
+        side = d / f'slot-{index}.json'
+        info = _read_json(side)
+        if info.get('session') == session:
+            info['freed'] = time.time()
+            _write_json(side, info)
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------- the status view
