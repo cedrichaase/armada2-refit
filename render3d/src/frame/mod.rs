@@ -7,15 +7,23 @@
 //! the whole stock body runs, into our scene target, so every plugin hooked inside it
 //! keeps working. Without a Direct3D 9 device behind d3d8, or when our targets cannot
 //! be made, the stock body runs as it always did.
+//!
+//! The targets and passes are `gpu`'s (gpu/README.md). The scene pass is begun before
+//! the body and left bound while it runs: the engine and the modules not yet ported to
+//! `gpu` draw into it with raw Direct3D 9 calls (a pass's targets stay bound after its
+//! `Cmd` on the Direct3D 9 backend).
 pub mod post;
 pub mod steps;
 
 use crate::config::{self, Config};
-use crate::d3d::*;
 use crate::engine::{self, hook};
+use crate::gfx;
 use crate::log;
 use crate::timing;
 use core::ffi::c_void;
+use gpu::d3d9::format_code;
+use gpu::d3d9::raw::*;
+use gpu::{ColorTarget, DepthTarget, Format, Load, Pass, Rect};
 use post::{PRect, Post, Targets};
 
 /// `Armada_RenderAllOurStuff(Armada_Camera*, Render_Stuff&, bool isMain)`, cdecl.
@@ -110,7 +118,8 @@ unsafe fn body_inner(cam: usize, rs: usize, is_main: u32) {
             let f = frame().as_mut();
             match f.as_ref().and_then(|f| f.targets.as_ref().map(|t| (f.dev, t.w, t.h, f.frames))) {
                 Some((dev, w, h, n)) if cfg.steps && steps::usable() => {
-                    steps::run(dev, cam, rs, main, w, h, n);
+                    let r = steps::run(dev, cam, rs, main, w, h, n);
+                    black_lines(r);
                 }
                 _ => {
                     unsafe { stock(cam, rs, is_main) };
@@ -151,8 +160,48 @@ unsafe extern "C" fn measure_body(cam: usize, rs: usize, is_main: u32) {
 
 /// The engine's target and depth while the body draws into ours.
 struct Saved {
-    rt: Com,
-    ds: Option<Com>,
+    rt: gpu::Texture,
+    ds: Option<gpu::Texture>,
+}
+
+/// 25-26 of the body: stock's black line along the view's right column and bottom row,
+/// in the scene target.
+fn black_lines(r: PRect) {
+    if r.w <= 1 || r.h <= 1 {
+        return;
+    }
+    let right = Rect::new(r.x + r.w - 1, r.y, 1, r.h);
+    let bottom = Rect::new(r.x, r.y + r.h - 1, r.w, 1);
+    let Some(mut cmd) = gfx::gpu().begin(gfx::frame()) else { return };
+    if scene_pass(&mut cmd, r) {
+        cmd.clear_rects(&[right, bottom], Some([0.0, 0.0, 0.0, 1.0]), None);
+        cmd.end_pass();
+    }
+}
+
+/// Begins the scene pass again over the view's rectangle `r`, keeping what is drawn:
+/// for a module on `gpu` that drew into a target of its own first (a bake, a shadow
+/// map) and draws into the view next. False without targets.
+pub fn scene_pass(cmd: &mut gpu::Cmd, r: PRect) -> bool {
+    let Some(t) = frame().as_ref().and_then(|f| f.targets.as_ref()) else { return false };
+    let colors = [ColorTarget { texture: &t.scene, load: Load::Load }];
+    let depth = Some(DepthTarget { texture: &t.depth, load: Load::Load });
+    cmd.begin_pass(&Pass { colors: &colors, depth, area: Some(r.rect()) })
+}
+
+/// The scene pass's colour format, samples (1 without MSAA) and depth format: what a
+/// module's pipelines that draw into the view are made for.
+pub fn scene_formats() -> Option<(Format, u32, Format)> {
+    let t = frame().as_ref()?.targets.as_ref()?;
+    Some((t.fmt, t.samples.max(1), t.depth.desc().format))
+}
+
+/// Binds the engine's target and depth again (when the frame has no post passes to).
+fn restore(saved: &Saved) {
+    let Some(mut cmd) = gfx::gpu().begin(gfx::frame()) else { return };
+    let colors = [ColorTarget { texture: &saved.rt, load: Load::Load }];
+    let depth = saved.ds.as_ref().map(|d| DepthTarget { texture: d, load: Load::Load });
+    cmd.begin_pass(&Pass { colors: &colors, depth, area: None });
 }
 
 #[allow(static_mut_refs)]
@@ -238,7 +287,8 @@ fn forget() {
     timing::reset();
 }
 
-/// Before a `Reset`, everything we hold in the default pool must be gone.
+/// Before a `Reset`, everything we hold in the default pool must be gone (`gfx::reset`
+/// has `gpu` let go of its own).
 unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESULT {
     if let Some(f) = frame() {
         f.targets = None;
@@ -302,45 +352,56 @@ fn begin(cfg: &Config) -> Option<Saved> {
         hook_reset(dev8);
         crate::mods::device(dev);
     }
+    let g = gfx::gpu();
+    g.attach(dev);
     let f = f.as_mut()?;
-    let rt = dev.get_render_target(0)?;
-    let ds = dev.get_depth_stencil();
-    let rd = rt.surf_desc();
-    if f.failed == Some((rd.width, rd.height)) {
+    let rt = g.engine_target()?;
+    let ds = g.engine_depth();
+    let (rd, (w, h)) = (rt.desc(), rt.size());
+    if f.failed == Some((w, h)) {
         return None;
     }
-    if f.post.is_none() {
-        f.post = Post::create(dev);
-        if f.post.is_none() {
-            log!("frame: the post shaders could not be made: stock");
-            f.failed = Some((rd.width, rd.height));
-            return None;
-        }
-    }
-    if f.targets.as_ref().is_none_or(|t| t.w != rd.width || t.h != rd.height) {
+    if f.targets.as_ref().is_none_or(|t| t.w != w || t.h != h) {
         f.targets = None;
-        let zfmt = ds.as_ref().map_or(FMT_D16, |d| d.surf_desc().format);
-        f.targets = Targets::create(dev, rd.width, rd.height, zfmt, cfg);
+        f.post = None;
+        let zfmt = ds.as_ref().map_or(Format::D16, |d| d.desc().format);
+        f.targets = Targets::create(g, w, h, zfmt, cfg);
         match &f.targets {
             Some(t) => log!(
                 "frame: targets {}x{}, format {}, {} samples, depth format {} (back buffer format {}, {} samples)",
-                t.w, t.h, t.fmt, t.samples, zfmt, rd.format, rd.ms_type
+                t.w, t.h, format_code(t.fmt), t.samples, format_code(zfmt), format_code(rd.format), if rd.samples > 1 { rd.samples } else { 0 }
             ),
             None => {
-                log!("frame: no targets at {}x{}: the engine draws the 3D view", rd.width, rd.height);
-                f.failed = Some((rd.width, rd.height));
+                log!("frame: no targets at {}x{}: the engine draws the 3D view", w, h);
+                f.failed = Some((w, h));
                 return None;
             }
         }
     }
     let t = f.targets.as_ref()?;
+    if f.post.as_ref().is_none_or(|p| p.out != rd.format) {
+        f.post = Post::create(g, t.fmt, rd.format);
+        if f.post.is_none() {
+            log!("frame: the post shaders could not be made: stock");
+            f.failed = Some((w, h));
+            return None;
+        }
+    }
+    // The view's pass, over the viewport the engine set for it. The engine never
+    // clears colour in a mission; our target has no last frame of its own to fall back
+    // on where nothing draws. The viewport is the engine's again after (`Cmd`'s end).
     let vp = dev.get_viewport();
-    dev.set_render_target(0, t.scene.ptr());
-    dev.set_depth_stencil(t.depth.ptr());
-    dev.set_viewport(&vp);
-    // The engine never clears colour in a mission; our target has no last frame of
-    // its own to fall back on where nothing draws.
-    dev.clear(&[], CLEAR_TARGET | CLEAR_ZBUFFER, 0xff00_0000, 1.0, 0);
+    let mut cmd = g.begin(gfx::frame())?;
+    let colors = [ColorTarget { texture: &t.scene, load: Load::Clear([0.0, 0.0, 0.0, 1.0]) }];
+    let pass = Pass {
+        colors: &colors,
+        depth: Some(DepthTarget { texture: &t.depth, load: Load::Clear(1.0) }),
+        area: Some(Rect::new(vp.x, vp.y, vp.w, vp.h)),
+    };
+    if !cmd.begin_pass(&pass) {
+        return None;
+    }
+    cmd.end_pass();
     Some(Saved { rt, ds })
 }
 
@@ -369,12 +430,14 @@ pub fn menu_frame(rect: PRect, draw: impl FnOnce(Device, u32)) -> bool {
     let Some(f) = frame().as_mut() else { return true };
     if let (Some(t), Some(p)) = (f.targets.as_ref(), f.post.as_ref()) {
         let r = PRect { x: rect.x.min(t.w - 1), y: rect.y.min(t.h - 1), w: rect.w.min(t.w - rect.x.min(t.w - 1)), h: rect.h.min(t.h - rect.y.min(t.h - 1)) };
-        p.run(f.dev, t, r, &saved.rt, saved.ds.as_ref(), cfg, None);
+        if let Some(mut cmd) = gfx::gpu().begin(gfx::frame()) {
+            p.run(&mut cmd, t, r, &saved.rt, saved.ds.as_ref(), cfg, None);
+        }
     } else {
-        f.dev.set_render_target(0, saved.rt.ptr());
-        f.dev.set_depth_stencil(saved.ds.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
+        restore(&saved);
     }
     f.frames = f.frames.saturating_add(1);
+    gfx::frame().next();
     dev.set_viewport(&vp);
     true
 }
@@ -382,8 +445,7 @@ pub fn menu_frame(rect: PRect, draw: impl FnOnce(Device, u32)) -> bool {
 fn end(cam: usize, main: bool, saved: Saved, cfg: &Config) {
     let Some(f) = frame().as_mut() else { return };
     let (Some(t), Some(p)) = (f.targets.as_ref(), f.post.as_ref()) else {
-        f.dev.set_render_target(0, saved.rt.ptr());
-        f.dev.set_depth_stencil(saved.ds.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
+        restore(&saved);
         return;
     };
     let view = steps::cam_rect(cam, t.w, t.h);
@@ -392,10 +454,12 @@ fn end(cam: usize, main: bool, saved: Saved, cfg: &Config) {
     // "Frame dumps"); the HUD's action camera draws a second view in the same frame.
     let mut dump = if main { crate::dump::poll("Render3D.dump").map(|n| crate::dump::Dump::new(n, f.frames, "render3d")) } else { None };
     if let Some(d) = dump.as_mut() {
-        d.note(&crate::sfmt!("targets {}x{}, format {} ({}), {} samples", t.w, t.h, t.fmt, crate::dump::format_name(t.fmt), t.samples));
+        d.note(&crate::sfmt!("targets {}x{}, format {} ({}), {} samples", t.w, t.h, format_code(t.fmt), t.fmt.name(), t.samples));
     }
     let label = ["main", "inset", "other"][which];
-    p.run(f.dev, t, view, &saved.rt, saved.ds.as_ref(), cfg, dump.as_mut().map(|d| (d, label)));
+    if let Some(mut cmd) = gfx::gpu().begin(gfx::frame()) {
+        p.run(&mut cmd, t, view, &saved.rt, saved.ds.as_ref(), cfg, dump.as_mut().map(|d| (d, label)));
+    }
     if let Some(d) = dump {
         d.finish();
     }
@@ -405,5 +469,6 @@ fn end(cam: usize, main: bool, saved: Saved, cfg: &Config) {
     }
     if main {
         f.frames = f.frames.saturating_add(1);
+        gfx::frame().next();
     }
 }

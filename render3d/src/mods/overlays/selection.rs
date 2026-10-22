@@ -21,7 +21,7 @@
 //! factor. The lighting material `selection` is constant: the colour is drawn as it
 //! is, added, depth-tested and not written. Stock stretches the bubble with a warping
 //! hull (`WarpInstance`); that is not done here yet.
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{field, field_f32, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};

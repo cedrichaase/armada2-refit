@@ -570,7 +570,7 @@ fn refuse(proc_: usize, owner: HWND) -> Option<&'static str> {
     if game.is_null() {
         return Some("no 3D window");
     }
-    if crate::engine::d3d8_device().is_null() || crate::d3d::Device::from_d3d8(crate::engine::d3d8_device()).is_none() {
+    if crate::engine::d3d8_device().is_null() || gpu::d3d9::raw::Device::from_d3d8(crate::engine::d3d8_device()).is_none() {
         return Some("no Direct3D 9 device to draw with");
     }
     if !owner.is_null() && owner != game && !is_hosted(owner) {

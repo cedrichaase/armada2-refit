@@ -9,7 +9,7 @@
 //! as spheres (`planets()`), as `Lighting.asi` did.
 use super::look::Look;
 use super::{draw, Posed};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine;
 use crate::frame::steps::View;
 use crate::gfx::{Decl, Guard, Shader};

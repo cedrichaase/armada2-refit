@@ -18,7 +18,7 @@
 //! A particle: position from `Entity::GetWorldPosition(ST3D_Node *)` (0x4cff70) at its
 //! hardpoint, or +0x10 in the object's frame; size +0x2c, age +0x34, life +0x38.
 use super::{object_of, rnd, Cam, LightPool, Sec};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, hook, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Shader};

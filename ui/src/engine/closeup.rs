@@ -34,12 +34,13 @@
 //! buffer at the viewport. The close-up is drawn just before the UI's frame (the UI's
 //! panel covers that place), so the region is first copied aside, the view drawn, copied
 //! into the picture the panel draws, and the region copied back: the back buffer is as
-//! the engine left it, whatever the panel does this frame. Both textures are render
-//! targets in the default pool, released before a device `Reset` and before the engine
-//! releases its device (`device.rs`).
+//! the engine left it, whatever the panel does this frame. Both textures are `gpu`
+//! render targets, which `gpu` lets go of before a device `Reset` and before the engine
+//! releases its device; the picture is dropped then too (`device.rs`), as its contents
+//! are lost.
 use super::{field, hook, rd, storm3d};
-use crate::d3d::*;
 use crate::gfx::Tex;
+use gpu::{Contents, Filter, Format, Rect, TextureDesc, Usage};
 
 /// `operator new(size_t)`, cdecl: the game's heap.
 const OPERATOR_NEW: usize = 0x652710;
@@ -79,12 +80,11 @@ const INST_SPHERE: usize = 0x34;
 const INST_TRANSFORM: usize = 0x44;
 
 struct Pics {
-    dev: Device,
     w: u32,
     h: u32,
     /// What the panel draws, and the back buffer's region kept aside.
-    pic: Com,
-    keep: Com,
+    pic: gpu::Texture,
+    keep: gpu::Texture,
 }
 
 struct State {
@@ -180,15 +180,16 @@ pub fn render() {
         return;
     }
     let Some(body) = hook::call_target(SITE_INSET).filter(|&t| t != BODY) else { return };
-    let dev8 = super::d3d8_device();
-    let Some(dev) = Device::from_d3d8(dev8) else { return };
-    super::device::hook_reset(dev8);
-    let Some(bb) = dev.get_render_target(0) else { return };
-    let bd = bb.surf_desc();
-    if r[0] < 0 || r[1] < 0 || (r[0] + r[2]) as u32 > bd.width || (r[1] + r[3]) as u32 > bd.height {
+    if crate::gfx::attach().is_none() {
         return;
     }
-    if !pictures(dev, r[2] as u32, r[3] as u32) {
+    let g = crate::gfx::gpu();
+    let Some(bb) = g.engine_target() else { return };
+    let (bw, bh) = bb.size();
+    if r[0] < 0 || r[1] < 0 || (r[0] + r[2]) as u32 > bw || (r[1] + r[3]) as u32 > bh {
+        return;
+    }
+    if !pictures(r[2] as u32, r[3] as u32) {
         return;
     }
     if s.cam == 0 && !make_camera() {
@@ -196,38 +197,43 @@ pub fn render() {
     }
     let Some(m) = pose(obj) else { return };
     let p = s.pics.as_ref().unwrap();
-    let (Some(keep), Some(pic)) = (p.keep.tex_surface(0), p.pic.tex_surface(0)) else { return };
-    let area = Rect { left: r[0], top: r[1], right: r[0] + r[2], bottom: r[1] + r[3] };
-    if dev.stretch_rect(&bb, Some(&area), &keep, None, TEXF_POINT) < 0 {
+    let area = Rect::new(r[0] as u32, r[1] as u32, r[2] as u32, r[3] as u32);
+    if crate::gfx::with_cmd(|c| c.copy(&bb, Some(area), &p.keep, None, Filter::Point)) != Some(true) {
         return;
     }
+    drop(bb);
     unsafe { draw_view(s.cam, body, r, &m) };
     // The body leaves render target 0 and the depth as it found them (render3d binds
     // the engine's again); read the target anew all the same.
-    let Some(bb) = dev.get_render_target(0) else { return };
-    let ok = dev.stretch_rect(&bb, Some(&area), &pic, None, TEXF_POINT) >= 0;
-    dev.stretch_rect(&keep, None, &bb, Some(&area), TEXF_POINT);
+    let Some(bb) = g.engine_target() else { return };
+    let ok = crate::gfx::with_cmd(|c| {
+        let ok = c.copy(&bb, Some(area), &p.pic, None, Filter::Point);
+        c.copy(&p.keep, None, &bb, Some(area), Filter::Point);
+        ok
+    }) == Some(true);
     if ok {
         s.shot = Some((obj, r));
     }
 }
 
-/// The two textures at `w` x `h` on `dev`, made when the size or the device changes.
-fn pictures(dev: Device, w: u32, h: u32) -> bool {
+/// The two textures at `w` x `h`, made when the size changes or after `release`.
+fn pictures(w: u32, h: u32) -> bool {
     let s = st();
-    if s.pics.as_ref().is_some_and(|p| p.dev == dev && p.w == w && p.h == h) {
+    if s.pics.as_ref().is_some_and(|p| p.w == w && p.h == h) {
         return true;
     }
     release();
-    let make = || dev.create_texture(w, h, 1, USAGE_RENDERTARGET, FMT_X8R8G8B8, POOL_DEFAULT);
-    let (Some(pic), Some(keep)) = (make(), make()) else {
+    let g = crate::gfx::gpu();
+    let make = |u| g.texture(TextureDesc::d2(w, h, Format::Bgrx8, Usage::RENDER_TARGET | Usage::COPY_DST | u), Contents::None);
+    let (pic, keep) = (make(Usage::SAMPLED), make(Usage::COPY_SRC));
+    if !pic.ready(g) || !keep.ready(g) {
         crate::log!("closeup: no {}x{} render targets: the wireframe stays", w, h);
         s.failed = true;
         return false;
-    };
+    }
     let tex = *s.tex.get_or_insert_with(crate::gfx::texture_external);
-    crate::gfx::tex_set_external(tex, Some(Com::from_borrowed(pic.ptr())), w, h);
-    s.pics = Some(Pics { dev, w, h, pic, keep });
+    crate::gfx::tex_set_external(tex, Some(pic.clone()), w, h);
+    s.pics = Some(Pics { w, h, pic, keep });
     crate::log!("closeup: pictures {}x{}", w, h);
     true
 }

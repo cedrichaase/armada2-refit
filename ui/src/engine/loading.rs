@@ -23,7 +23,7 @@ use super::{hook, rd, starts};
 use crate::log;
 use crate::surface::Context;
 use alloc::string::String;
-use core::ffi::c_void;
+use gpu::vcall;
 
 /// `RenderLoopAssetLoadStatusUpdate`'s call of `ST3D_GraphicsEngine::
 /// DeleteRegisteredLights()` (thiscall), between its `Flush` and its `EndScene`.

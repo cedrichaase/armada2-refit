@@ -7,7 +7,7 @@
 //! Settings: `Render3D.ini [Particles]`, under the names `Venting.ini` used.
 use super::draw::Cam;
 use super::sim::{System, Vent};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, DynVb, Shader};
 use crate::math::{v3, V3};

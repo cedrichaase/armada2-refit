@@ -12,7 +12,7 @@
 //! a cubic filter and draws its edge as a smoothstep never narrower than about a pixel;
 //! the shroud is blended so that edge shows. The textures are never resized: there is
 //! nothing finer to put in them, and resizing them froze the game (`UImid`).
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{field, field_f32, rd, storm3d};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};

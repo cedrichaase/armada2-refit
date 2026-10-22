@@ -15,7 +15,7 @@ pub mod lights;
 pub mod pose;
 
 use crate::assets;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};
 use crate::math::{M34, M4, V3, v3};

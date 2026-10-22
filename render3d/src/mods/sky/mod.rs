@@ -8,7 +8,7 @@ pub mod recipe;
 pub mod sprites;
 
 use super::{Module, Step};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_u8, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};

@@ -20,7 +20,7 @@
 //!   (the vertex alpha).
 use super::{eng, View};
 use crate::assets;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_f32, rd};
 use crate::gfx::{self, Decl, DynVb, Shader};
 use crate::math::{v3, V3};

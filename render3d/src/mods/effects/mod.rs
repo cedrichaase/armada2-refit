@@ -34,7 +34,7 @@ pub mod sparks;
 pub mod weldfx;
 
 use super::{Module, Step};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, hook, rd};
 use crate::frame::steps::View;
 use crate::log;

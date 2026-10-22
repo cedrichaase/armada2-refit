@@ -8,7 +8,7 @@
 //! textures' layout, which `GroundMesh::mSetUVs` gives (README, "Planets"), and which
 //! our sphere carries in its vertices, so the stock gore textures land where they did.
 use super::surfaces::{self, Surfaces};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_f32, field_u8, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};

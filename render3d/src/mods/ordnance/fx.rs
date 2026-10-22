@@ -11,7 +11,7 @@
 //! lights go to the engine's registry at the start of the next view (`lights.rs`).
 use super::eng;
 use super::ini::Settings;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{field, field_f32};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, DynVb, Shader};

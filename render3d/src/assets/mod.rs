@@ -5,7 +5,7 @@
 //!
 //! Names are looked up case-insensitively, as the engine (on Windows) does, through
 //! an index of each directory made once.
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::log;
 use crate::rt;
 use a2fmt::odf::Odf;

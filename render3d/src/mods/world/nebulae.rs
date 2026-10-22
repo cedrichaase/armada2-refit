@@ -31,7 +31,7 @@
 //! - Ghosts: slot 3 of the `GameObjectSpirit` vtable (0x6b1ca4, `GameObjectSpirit::Render`
 //!   0x4d5f70) is wrapped while this part runs, so a ghosted nebula of a class drawn as
 //!   gas keeps its gas and loses its billboards, as with the plugin.
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_u8, hook, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, PerView, Shader};

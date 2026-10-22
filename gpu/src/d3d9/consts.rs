@@ -9,8 +9,13 @@ pub const FMT_X8R8G8B8: u32 = 22;
 pub const FMT_R5G6B5: u32 = 23;
 pub const FMT_X1R5G5B5: u32 = 24;
 pub const FMT_A8: u32 = 28;
+pub const FMT_A2B10G10R10: u32 = 31;
+pub const FMT_A2R10G10B10: u32 = 35;
 pub const FMT_L8: u32 = 50;
 pub const FMT_D16: u32 = 80;
+pub const FMT_D32: u32 = 71;
+pub const FMT_D15S1: u32 = 73;
+pub const FMT_D24X4S4: u32 = 79;
 pub const FMT_D24S8: u32 = 75;
 pub const FMT_D24X8: u32 = 77;
 pub const FMT_INDEX16: u32 = 101;
@@ -86,6 +91,7 @@ pub const RS_SRGBWRITEENABLE: u32 = 194;
 pub const RS_SEPARATEALPHABLENDENABLE: u32 = 206;
 pub const RS_SRCBLENDALPHA: u32 = 207;
 pub const RS_DESTBLENDALPHA: u32 = 208;
+pub const RS_BLENDOPALPHA: u32 = 209;
 
 // blend
 pub const BLEND_ZERO: u32 = 1;
@@ -99,6 +105,9 @@ pub const BLEND_INVDESTALPHA: u32 = 8;
 pub const BLEND_DESTCOLOR: u32 = 9;
 pub const BLEND_INVDESTCOLOR: u32 = 10;
 pub const BLENDOP_ADD: u32 = 1;
+pub const BLENDOP_SUBTRACT: u32 = 2;
+pub const BLENDOP_REVSUBTRACT: u32 = 3;
+pub const BLENDOP_MIN: u32 = 4;
 pub const BLENDOP_MAX: u32 = 5;
 
 pub const CULL_NONE: u32 = 1;
@@ -110,6 +119,7 @@ pub const CMP_LESS: u32 = 2;
 pub const CMP_EQUAL: u32 = 3;
 pub const CMP_LESSEQUAL: u32 = 4;
 pub const CMP_GREATER: u32 = 5;
+pub const CMP_NOTEQUAL: u32 = 6;
 pub const CMP_GREATEREQUAL: u32 = 7;
 pub const CMP_ALWAYS: u32 = 8;
 

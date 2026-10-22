@@ -149,7 +149,7 @@ fn ext_texture(slot: &mut Option<Tex>, st3d: usize) -> Option<Tex> {
     let t = *slot.get_or_insert_with(crate::gfx::texture_external);
     match radar::d3d9_texture(st3d) {
         Some((c, w, h)) => {
-            crate::gfx::tex_set_external(t, Some(c), w, h);
+            crate::gfx::tex_set_external(t, Some(crate::gfx::gpu().wrap_d3d9_texture(c)), w, h);
             Some(t)
         }
         None => {
