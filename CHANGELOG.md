@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.3.0 — 2026-10-23
+
+Layers: display 0.1.0 (new), testbench 3.47.0.
+
+### Added
+- `display/`: Display8, a `d3d8.dll` of ours in front of the real chain, forward mode,
+  on the bench only: every Direct3D 8 call counted by context, method and caller, with
+  the answers, locks, read-backs and gamma the engine asks for, a drop switch by caller
+  and a detail capture of the engine's draws (display 0.1.0). Not in `./install` or
+  `a2mod` yet.
+- Scenario steps `Mark the display context` and `Expect the engine to draw nothing in`,
+  scenario `display-inventory` (testbench 3.47.0).
+
+Installed, not yet seen in game.
+
 ## 13.2.0 — 2026-10-22
 
 Layers: testbench 3.46.0.

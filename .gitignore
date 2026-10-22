@@ -42,6 +42,10 @@ render3d/target/
 render3d/build/
 render3d/a2fmt/target/
 
+# display: cargo's build output
+display/target/
+display/build/
+
 # ui: cargo's build output
 ui/target/
 ui/build/

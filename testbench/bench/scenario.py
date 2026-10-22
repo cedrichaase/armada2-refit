@@ -572,6 +572,62 @@ def s_wait_log(c, m):
         time.sleep(1)
 
 
+# -- Display8's tracer (display/README.md, "The inventory")
+
+@step(r'^mark the display context ' + Q.format('name') + r'$')
+def s_display_mark(c, m):
+    """`Mark the display context "mission"`: the calls Display8 counts from here on
+    belong to that context. Written into `Display8.mark`, which d3d8.dll reads at its
+    next `Present` (at most four times a second) and deletes."""
+    g = c.sess.game_dir
+    if not (g / 'Display8.log').exists():
+        raise StepFailed('Display8 is not in this game (install it: --install display)')
+    mark = g / 'Display8.mark'
+    mark.write_text(m.group('name'))
+    end = time.time() + 15
+    while mark.exists():
+        c.assert_alive()
+        if time.time() > end:
+            raise StepFailed('Display8 did not take the mark in 15 s (is the game presenting frames?)')
+        time.sleep(0.25)
+    return f'context "{m.group("name")}"'
+
+
+def display_inventory(c, since):
+    """Display8's inventory, rewritten after `since` (it is every two seconds of
+    presenting and at each mark), as rows of dicts."""
+    p = c.sess.game_dir / 'Display8.inventory.tsv'
+    end = time.time() + 10
+    while not p.exists() or p.stat().st_mtime < since:
+        c.assert_alive()
+        if time.time() > end:
+            raise StepFailed('Display8.inventory.tsv was not rewritten in 10 s')
+        time.sleep(0.5)
+    lines = [l for l in p.read_text(errors='replace').splitlines() if l and not l.startswith('#')]
+    head = lines[0].split('\t')
+    return [dict(zip(head, l.split('\t'))) for l in lines[1:]]
+
+
+@step(r'^expect the engine to draw nothing in ' + Q.format('name') + r'$')
+def s_display_nothing(c, m):
+    """`Expect the engine to draw nothing in "mission"`: no `Draw*` call on the device
+    came from `Armada2.exe` in that context. Calls the plugins make are not the
+    engine's; an address in the exe is written bare, any other module as `Name+off`."""
+    rows = display_inventory(c, time.time())
+    ctx = m.group('name')
+    mine = [r for r in rows if r['context'] == ctx]
+    if not mine:
+        return c.checked(False, f'no calls at all in context "{ctx}"', how='Display8.inventory.tsv')
+    draws = [r for r in mine if r['interface'] == 'IDirect3DDevice8' and r['method'].startswith('Draw')
+             and '+' not in r['caller']]
+    n = sum(int(r['calls']) for r in draws)
+    top = sorted(draws, key=lambda r: -int(r['calls']))[:12]
+    detail = (f'{n} engine draws in "{ctx}" from {len(draws)} call sites:\n' +
+              '\n'.join(f'{r["calls"]:>8} {r["method"]} at {r["caller"]} <- {r["chain"]}' for r in top)
+              if draws else f'no engine draws in "{ctx}" ({sum(int(r["calls"]) for r in mine)} other calls)')
+    return c.checked(n == 0, detail, how='Display8.inventory.tsv: Draw* calls whose caller is in Armada2.exe')
+
+
 @step(r'^(?:expect|check|verify)(?: that)? (?:the )?shots ' + Q.format('a') + r' and ' + Q.format('b')
       + r' (?:to )?(?:match|are the same|are identical)(?: within (?P<tol>\d+(?:\.\d+)?))?$')
 def s_shots_match(c, m):

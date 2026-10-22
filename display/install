@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Put Display8 (d3d8.dll, forward mode, tracing) into a test-bench clone:
+#   ./a2test session start --install . --install display
+# The game's d3d8.dll (the real chain: crosire's d3d8to9 after ./install) becomes
+# d3d8_real.dll and ours takes its name. Bench only for now (README.md, "Status"):
+# refuses any game directory that is not an a2test clone.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$here/../a2env.sh"
+GAME="$A2_GAME"
+
+case "$GAME" in
+    "$HOME"/.cache/a2test/*) ;;
+    *) echo "display: refusing: $GAME is not an a2test clone (Display8 is bench-only for now)" >&2; exit 1 ;;
+esac
+
+bash "$here/build.sh"
+ours() { [ -f "$1" ] && grep -qa "Display8 stopped the game" "$1"; }
+if [ ! -f "$GAME/d3d8_real.dll" ]; then
+    [ -f "$GAME/d3d8.dll" ] || { echo "display: no d3d8.dll in $GAME to stand in front of (run ./install first)" >&2; exit 1; }
+    if ours "$GAME/d3d8.dll"; then
+        echo "display: d3d8.dll is ours but d3d8_real.dll is missing" >&2
+        exit 1
+    fi
+    mv "$GAME/d3d8.dll" "$GAME/d3d8_real.dll"
+fi
+cp "$here/build/d3d8.dll" "$GAME/d3d8.dll"
+[ -f "$GAME/Display8.ini" ] || cp "$here/Display8.ini" "$GAME/Display8.ini"
+rm -f "$GAME/Display8.log" "$GAME/Display8.inventory.tsv" "$GAME/Display8.mark"
+echo "display: Display8 in front of d3d8_real.dll in $GAME"

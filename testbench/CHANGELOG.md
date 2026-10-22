@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.47.0 — 2026-10-23
+
+### Added
+- Steps for Display8's tracer (`display/README.md`): `Mark the display context "NAME"`
+  (writes `Display8.mark`, waits for d3d8.dll to take it) and `Expect the engine to draw
+  nothing in "NAME"` (no `Draw*` from `Armada2.exe` in that context, from
+  `Display8.inventory.tsv`). `Display8.log`, `Display8.ini` and the inventory are
+  gathered with the logs.
+- Scenario `display-inventory`: the whole game, a context marked at each stage, with
+  `--install . --install display`.
+
+Installed, not yet seen in game.
+
 ## 3.46.0 — 2026-10-22
 
 ### Added

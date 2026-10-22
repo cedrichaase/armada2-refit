@@ -58,6 +58,7 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
 | `Dump the frame called "NAME"` | Render3D.asi's targets (PFM) and UI.asi's presented frame (PPM), read back inside the game, into `dumps/NAME/` with PNG previews (`../README.md`, "Frame dumps"); fails when no plugin dumped |
 | `Note "TEXT"` | a line in the log |
+| `Mark the display context "NAME"` | Display8's calls from here on count under that context (`Display8.mark`; `../../display/README.md`, "The inventory"); fails without Display8 installed |
 | `Wait up to 240 seconds for "Scene.log" to say "TEXT"` | polls a log beside `Armada2.exe` for a line with TEXT (each launch deletes the old one); fails at the time limit |
 | `Scene "select yard1 yard2"` | commands to `Scene.asi` (`../scene/README.md`), `;` between several; a refused command fails the step. Needs `Setup: testbench/scene/bench-setup.sh <scene>` |
 | `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |
@@ -86,6 +87,7 @@ audio reached the real output before the bench's guard stopped it (run
 | `Expect the main menu` (any `ui.json` screen) | OCR signature |
 | `Expect the game is still running` / `Expect the game to have exited` | process table |
 | `Expect no crash` | `exception.txt` untouched |
+| `Expect the engine to draw nothing in "NAME"` | no `Draw*` call from `Armada2.exe` in that display context (`Display8.inventory.tsv`, rewritten every two seconds); lists the call sites when there are some |
 | `Expect "Menus.log" contains "TEXT"` / `… not contain …` | any log beside `Armada2.exe`, or one of the bench's |
 | `Check that the screenshot is not stretched compared with 4:3` | template match of the reference shot over horizontal scales; vertical fixed at H/H_ref |
 | `… the hud is not stretched compared with 4:3 in region X,Y,W,H` | same, for a patch in reference pixels |
