@@ -180,6 +180,60 @@ With `Enable=0` and `Timing=1` nothing of render3d draws, but both call sites of
 the plugins render3d replaces, that measures them the same way: the comparison in
 `PERF.md`.
 
+## The animation clock
+
+`[Bench] Clock=` (`src/clock.rs`) decides what time every animation of render3d's own
+runs on. **`Clock=wall`** (the default, the player's) is the wall clock, as it always
+was: a paused game still flickers, pulses and blinks. **`Clock=bench`** is for the test
+bench (`a2test --clock bench`, `testbench/README.md`, "A frame that repeats"): two
+sessions of one scene paused at one tick must draw the same picture, so a port of the
+renderer can be checked by a pixel diff.
+
+**The rule: anything that moves on screen reads `clock::anim_now()`, never
+`rt::now()`; a cosmetic random sequence takes its seed from `clock::seed()`; and a
+per-object seed is made from `clock::entity_key(object)`, never from the object's
+address alone.**
+`rt::now()` is for what is not seen: timing logs, how often a file is looked at again
+(`Reload=1`, the A/B files), how long a noise took to make. With the bench clock,
+`anim_now()` is the simulation's time (`Get_Time`, the float at 0x7b0fc8, written once
+a tick by `Time_Simulate`), which stands while the game is paused, and `seed()` is a
+fixed number. What reads it: the hologram's and the extras' phase (hulls), the vents'
+flicker, the special-object effects' flicker and light, a co-player's selection blink,
+the debris' random sequence (`seed()`), and the menu scene's map (in the front end the
+simulation's time stands, so there a move to a new view is settled at once). A seed
+made from an object's address (a beam's or torpedo's flicker and spin, a wave's, an
+ordnance model's pulse, a hologram's phase) differs from launch to launch, since the
+heap does: `entity_key()` is the address under the wall clock, as before, and under the
+bench clock the object's handle (+0x28 of every `Entity`, given out in order). A hull
+spark is no entity; under the bench clock its seed is when it was born (the sim time
+less its age) and its owner's handle. Stock's own shots are animated by the engine's
+`ST3D_Sprite::Animate`, whose channels are evaluated at the float 0x7a8e74
+(`ST3D_AnimationChannel::SetStartTime` sets it from Storm3D's wall clock); under the
+bench clock the ordnance module writes the sim time there for its call and puts the old
+value back after. Without it a torpedo's starburst turned and the phasers' texture ran
+on while paused, the last difference between two launches of `showcase`.
+
+What the sim clock (`View::time`) already drove stays as it was, with three changes
+under the bench clock, each because a value was summed or drawn **once a frame**, which
+depends on how the ticks fell between frames on that run:
+
+- **The nebulae's `Temporal=`.** The thresholds and the ray's jitter walk a sequence on
+  the frame count, and the history adds the frames up; paused, the history kept moving
+  about its mean. Under the bench clock, a view that stands (the same sim time and the
+  same VIEW x PROJECTION as the frame before) drops its history, walks the sequence from
+  its first step, and after `SETTLE` (32) frames holds the history as it is: the same
+  32 frames added up the same way on every launch, then a still picture. While the view
+  moves, nothing changes. The cost: in a running game under the bench clock the history
+  starts again each tick, so the gas is grainier than in play.
+- **The nebulae's pulse** is a closed form of the sim time (the same wander, integrated)
+  instead of a sum of frame steps, and **the lightning's** draws are a hash of the sim
+  time and the class instead of a sequence advanced each frame.
+
+Left as it was: render3d's particles are simulated once a frame with the sim clock's
+step, so a frame that sees two ticks at once emits as one; the paused frame depends on
+that only where the ticks bunched (a hitch) on one run and not the other. The engine's
+own selection pulse runs on its display tick; the bench's scenes select nothing.
+
 ## How the frame works
 
 **The seam.** The main view calls the body from `Armada_RenderFrame` (`call` at

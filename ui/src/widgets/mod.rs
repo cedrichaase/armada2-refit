@@ -91,7 +91,9 @@ impl<'a> Ui<'a> {
         let now = crate::rt::now();
         let dt = if m.last == 0.0 { 0.0 } else { (now - m.last).clamp(0.0, 0.25) };
         m.last = now;
-        m.time += dt;
+        // The animation clock (clock.rs): the wall clock's frames added up, or the
+        // simulation's time under the bench clock.
+        m.time = if crate::clock::bench() { crate::clock::anim_now() } else { m.time + dt };
         Ui {
             draw,
             w: w as f32,
@@ -129,9 +131,16 @@ impl<'a> Ui<'a> {
         R::new(0.0, 0.0, self.w, self.h)
     }
 
-    /// Seconds since the UI first drew, for animation.
+    /// Seconds since the UI first drew, for animation: the one clock anything that moves
+    /// on screen reads (clock.rs; under the bench clock, the simulation's time).
     pub fn time(&self) -> f64 {
         unsafe { (*core::ptr::addr_of!(MEMORY)).time }
+    }
+
+    /// Whether `secs` have passed on `time()` since `since`: a hover's delay before its
+    /// tooltip. Under the bench clock a delay is a transition, settled at once.
+    pub fn waited(&self, since: f64, secs: f64) -> bool {
+        crate::clock::bench() || self.time() - since > secs
     }
 
     /// An id for a widget labelled `s`, inside the ids pushed so far.

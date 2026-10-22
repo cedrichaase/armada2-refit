@@ -845,7 +845,15 @@ struct ViewState {
     hist_wh: (u32, u32),
     cur: usize,
     prev: Option<([[f32; 4]; 4], [f32; 4])>,
+    /// Under the bench clock (`clock.rs`): the sim time and VIEW x PROJECTION the view
+    /// last stood at, and how many frames it has stood there (None while it moves).
+    stand: Option<(f32, [[f32; 4]; 4])>,
+    stood: Option<u32>,
 }
+
+/// Under the bench clock, the frames a standing view adds up before its history is
+/// held (README.md, "The animation clock"): the jitter's first SETTLE steps.
+const SETTLE: u32 = 32;
 
 /// The march of one view: c21 (Obscure=, 1 / the depth copy's size) and c41..c46 (the
 /// rays per pixel, the projection's depth terms), the same for every class but the box;
@@ -1139,6 +1147,12 @@ impl Nebulae {
 
     /// Lightning: flashes scheduled per class (as Nebulae.asi's).
     fn lightning(&mut self, key: &str, now: f32, dt: f32) {
+        if crate::clock::bench() {
+            // The draws below come once a frame: under the bench clock they are a
+            // function of the sim time and the class instead, as many frames as fell.
+            let k = key.bytes().fold(0x811c_9dc5u32, |h, b| (h ^ b as u32).wrapping_mul(0x0100_0193));
+            self.bolt_seed = hash32(now.to_bits() ^ k);
+        }
         let r0 = self.rnd01();
         let (r1, r2, r3, r4, r5) = (self.rnd01(), self.rnd01(), self.rnd01(), self.rnd01(), self.rnd01());
         let Some(c) = self.classes.get_mut(key) else { return };
@@ -1464,7 +1478,15 @@ impl Nebulae {
                 let dt = if c.pulse_last < 0.0 || sec < c.pulse_last || sec - c.pulse_last > 0.5 { 0.0 } else { sec - c.pulse_last };
                 let spd = c.pulse_speed * (1.0 + c.pulse_wander * math::sinf(sec * 0.37) * math::cosf(sec * 0.13));
                 c.pulse_last = sec;
-                c.pulse_phase = math::fmodf(c.pulse_phase + dt * spd * 6.283_185_3, 6.283_185_3);
+                c.pulse_phase = if crate::clock::bench() {
+                    // The same pulse in closed form, a function of the sim time alone: summed
+                    // frame by frame it depends on how the ticks fell between frames.
+                    // sin(0.37 s) cos(0.13 s) = (sin 0.5 s + sin 0.24 s) / 2, integrated.
+                    let w = 0.5 * c.pulse_wander * ((1.0 - math::cosf(sec * 0.5)) / 0.5 + (1.0 - math::cosf(sec * 0.24)) / 0.24);
+                    6.283_185_3 * math::fmodf(c.pulse_speed * (sec + w), 1.0)
+                } else {
+                    math::fmodf(c.pulse_phase + dt * spd * 6.283_185_3, 6.283_185_3)
+                };
                 c.ex[0][3] = c.pulse_phase;
             }
             {
@@ -1675,7 +1697,14 @@ impl Nebulae {
         crate::timing::mark("gas: depth copy, clear");
         // Temporal=: the thresholds walk on from frame to frame (the shader takes the
         // fraction; kept small so a float holds it exactly).
-        let jitter = if self.temporal_on() { (v.frame % 4096) as f32 } else { 0.0 };
+        // Under the bench clock a view that stands (same sim time, same camera) starts
+        // its history afresh and walks the sequence from its first step, so two sessions
+        // stopped at one tick add up the same frames (`settle`).
+        let step = match self.settle(v.key(), v.time, cols) {
+            Some(k) => k,
+            None => v.frame,
+        };
+        let jitter = if self.temporal_on() { (step % 4096) as f32 } else { 0.0 };
         // And each pixel's ray moves within the pixel (Jitter=, its span in pixels), so
         // the frames add up the gas over the pixel, not at its centre.
         let span = if self.temporal_on() { self.cfg.jitter } else { 0.0 };
@@ -1745,6 +1774,31 @@ impl Nebulae {
         self.cfg.temporal > 0.0 && self.cfg.temporal < 1.0
     }
 
+    /// Under the bench clock with `Temporal=`: Some(k) while the view stands, its k-th
+    /// frame standing (the history dropped at k = 0, held from k = SETTLE); None while it
+    /// moves, and always under the wall clock.
+    fn settle(&mut self, view: usize, time: f32, cols: &[[f32; 4]; 4]) -> Option<u32> {
+        if !crate::clock::bench() || !self.temporal_on() {
+            return None;
+        }
+        let vs = self.views.get(view);
+        let key = (time, *cols);
+        if vs.stand != Some(key) {
+            vs.stand = Some(key);
+            vs.stood = None;
+            return None;
+        }
+        let k = match vs.stood {
+            Some(k) => k,
+            None => {
+                vs.prev = None;
+                0
+            }
+        };
+        vs.stood = Some(k.saturating_add(1));
+        Some(k)
+    }
+
     /// `Temporal=`: this frame's march added to the view's history (temporal_ps), into
     /// the other of its two targets, which is returned for comp_ps to put onto the frame.
     /// None: no history (off, or no target), and the march goes onto the frame as it is.
@@ -1755,6 +1809,12 @@ impl Nebulae {
         }
         let wh = self.gpu.zt_wh;
         let vs = self.views.get(m.view);
+        // Settled under the bench clock: the history as it stands, nothing added.
+        if vs.stood.is_some_and(|k| k > SETTLE) && vs.prev.is_some() && vs.hist_wh == wh {
+            if let Some(h) = vs.hist[vs.cur].as_ref() {
+                return Some(h.ptr());
+            }
+        }
         if vs.hist_wh != wh || vs.hist.iter().chain(vs.meta.iter()).any(|h| h.is_none()) {
             vs.prev = None;
             vs.hist_wh = wh;

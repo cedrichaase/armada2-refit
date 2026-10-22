@@ -54,6 +54,7 @@ class Scenario:
     assets: str = ''               # 'none': install this checkout with an empty A2_DATA
     players: list = field(default_factory=list)   # ['host', 'joiner']: one game each
     setup: str = ''                # a script run on each clone before launch
+    clock: str = ''                # 'bench': the plugins' animation clock on the simulation's time
     sheet: list = field(default_factory=list)     # shot names: a contact sheet, cases x shots
     description: str = ''
     steps: list = field(default_factory=list)
@@ -93,7 +94,7 @@ def case_dirname(res, mod, scn_mod):
     return config.res_name(res) + ('' if mod == scn_mod else f'-{mod}')
 
 
-HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|sheet)'
+HEADER = re.compile(r'^(resolutions?|aspects?|mod|launch|reference|timeout|stock shell|assets?|players?|setup|sheet|clock)'
                     r'\s*:\s*(.+)$', re.I)
 STEP = re.compile(r'^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$')
 
@@ -153,6 +154,7 @@ def parse(path):
                     assets=hdr.get('asset', '').strip().lower(),
                     players=[w.lower() for w in re.split(r'[,\s]+', hdr.get('player', '')) if w],
                     setup=hdr.get('setup', '').strip('` '),
+                    clock=hdr.get('clock', '').strip().lower(),
                     sheet=[w.strip().strip('"“”') for w in hdr.get('sheet', '').split(',') if w.strip()])
 
 
@@ -531,6 +533,53 @@ def s_log(c, m):
                      how=f'substring search in {name}')
 
 
+@step(r'^wait ' + SECS + r'(?:for|until) (?:the )?(?:log )?' + Q.format('log') + r' (?:to )?(?:says?|contains?|mentions?) '
+      + Q.format('text') + r'$')
+def s_wait_log(c, m):
+    """`Wait up to 240 seconds for "Scene.log" to say "paused at tick"`: polls the log the
+    game writes (the game's launch deletes the old one)."""
+    end = time.time() + int(m.group('n') or 90)
+    text = m.group('text').lower()
+    while True:
+        c.assert_alive()
+        body = c.sess.game_log(m.group('log')) or ''
+        hit = next((l for l in body.splitlines() if text in l.lower()), None)
+        if hit:
+            return hit.strip()
+        if time.time() > end:
+            raise StepFailed(f'"{m.group("text")}" not in {m.group("log")} after {m.group("n") or 90} s')
+        time.sleep(1)
+
+
+@step(r'^(?:expect|check|verify)(?: that)? (?:the )?shots ' + Q.format('a') + r' and ' + Q.format('b')
+      + r' (?:to )?(?:match|are the same|are identical)(?: within (?P<tol>\d+(?:\.\d+)?))?$')
+def s_shots_match(c, m):
+    """`Expect shots "first" and "second" to match within 0.5`: the newest shot of each
+    name, compared pixel by pixel: the mean absolute difference (0..255, over every
+    channel of every pixel) at most the tolerance (default 0.5). The largest difference
+    and the share of pixels that differ at all are reported beside it."""
+    def newest(name):
+        safe = re.sub(r'[^A-Za-z0-9_.-]+', '-', name).strip('-') or 'shot'
+        found = sorted((c.sess.dir / 'shots').glob(f'[0-9][0-9][0-9]-{safe}.png'))
+        return found[-1] if found else None
+    a, b = newest(m.group('a')), newest(m.group('b'))
+    if not a or not b:
+        return c.checked(False, f'no shot called {m.group("a") if not a else m.group("b")}', how='shots')
+    tol = float(m.group('tol') or 0.5)
+    import cv2
+    import numpy as np
+    ia, ib = cv2.imread(str(a)), cv2.imread(str(b))
+    if ia is None or ib is None or ia.shape != ib.shape:
+        return c.checked(False, f'{a.name} and {b.name} cannot be compared (unreadable or different sizes)',
+                         shots=[a, b], how='mean absolute difference')
+    d = cv2.absdiff(ia, ib)
+    mean, mx = float(d.mean()), int(d.max())
+    share = float((d.max(axis=2) > 0).mean()) * 100
+    return c.checked(mean <= tol, f'mean absolute difference {mean:.4f} (at most {tol}), largest {mx}, '
+                     f'{share:.3f}% of pixels differ', shots=[a, b], how='mean absolute difference, 0..255',
+                     measure=dict(mean=round(mean, 4), max=mx, differing=round(share, 3)))
+
+
 @step(r'^scene ' + Q.format('cmd') + r'$')
 def s_scene(c, m):
     """`Scene "select yard1 yard2"`: commands to Scene.asi (testbench/scene), ';'
@@ -869,7 +918,8 @@ class Case:
                               assets=self.scn.assets or None, vnc=self.opts.get('vnc'),
                               record=self.opts.get('record'), audio=self.opts.get('audio'),
                               keep=self.opts.get('keep'), label=label,
-                              installs=self.opts.get('installs') if self.mod == 'refit' else None, slot=slot)
+                              installs=self.opts.get('installs') if self.mod == 'refit' else None, slot=slot,
+                              clock=self.opts.get('clock') or self.scn.clock or None)
 
     def _bring_up(self, sess, player=None):
         sess.clone()

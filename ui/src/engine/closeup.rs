@@ -314,9 +314,11 @@ fn pose(obj: usize) -> Option<([f32; 12], f32, f32)> {
             obj, radius, centre[0], centre[1], centre[2], if world { "world" } else { "local" }
         );
     }
-    let now = crate::rt::now();
+    // The camera's drift is an animation (clock.rs); under the bench clock its easing
+    // after the heading is settled at once.
+    let now = crate::clock::anim_now();
     let heading = libm::atan2f(front[0], front[2]);
-    if s.follow != obj || now - s.last > 1.0 {
+    if s.follow != obj || now - s.last > 1.0 || crate::clock::bench() {
         s.follow = obj;
         s.yaw = heading;
     } else {

@@ -813,15 +813,18 @@ fn decloak_sounds(m: &Map, shot: &Shot, last: &mut Vec<Option<f32>>) {
 /// draws its own backdrop.
 pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     let s = st();
-    let now = rt::now();
+    // The map's clock is an animation's (`clock::anim_now`); how often the file is
+    // looked at again is not.
+    let now = crate::clock::anim_now();
     if s.start == 0.0 || now - s.last > 600.0 {
         s.start = now;
         s.cam = None;
     }
     s.last = now;
     let t = (now - s.start) as f32;
-    if s.map.is_none() || now - s.checked > 1.0 {
-        s.checked = now;
+    let wall = rt::now();
+    if s.map.is_none() || wall - s.checked > 1.0 {
+        s.checked = wall;
         if s.map.as_ref().is_none_or(|m| m.text != text_of().0) {
             s.map = Some(Map::read());
         }
@@ -836,8 +839,11 @@ pub fn draw(name: &str, rect: PRect, depart: bool) -> bool {
     };
     if s.view != name {
         s.prev = core::mem::replace(&mut s.view, String::from(name));
-        s.since = now;
-        s.from = s.cam;
+        // Under the bench clock the front end's time stands (there is no simulation),
+        // so a move to the new view has already happened: the view as it settles.
+        let bench = crate::clock::bench();
+        s.since = if bench { now - 1.0e6 } else { now };
+        s.from = if bench { None } else { s.cam };
         log!("menu: view {}", name);
     }
     let (mut eye, mut at) = Map::camera(vd, t);

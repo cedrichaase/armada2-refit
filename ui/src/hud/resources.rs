@@ -53,8 +53,7 @@ pub fn run(ui: &mut Ui) {
     if shown.is_empty() || crate::engine::hud::hidden(topbar::RESOURCE_PANEL) {
         return;
     }
-    let now = ui.time();
-    let names = names(now, &shown);
+    let names = names(crate::rt::now(), &shown);
     let t = ui.theme;
     let (cell_w, h, gap) = (ui.u(150.0), ui.u(46.0), ui.u(6.0));
     let w = shown.len() as f32 * cell_w + (shown.len() - 1) as f32 * gap;

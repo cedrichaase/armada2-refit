@@ -73,7 +73,7 @@ impl Selection {
             let t = rd::<usize>(super::G_TRANSPORT);
             if t == 0 { -1 } else { core::mem::transmute::<usize, unsafe extern "thiscall" fn(usize) -> i32>(FN_USER_TEAM)(t) }
         };
-        let now_ms = (crate::rt::now() * 1000.0) as u64;
+        let now_ms = (crate::clock::anim_now() * 1000.0) as u64;
         let mut passes: alloc::vec::Vec<(M34, V3)> = alloc::vec::Vec::new();
         for b in 0..16 {
             let mut e = unsafe { rd::<usize>(BUCKETS + b * 4) };

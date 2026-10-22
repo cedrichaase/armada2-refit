@@ -90,7 +90,7 @@ unsafe extern "C" fn hook_add(name: *const u8, colour: *const f32, o: usize, hp:
             handle: field(node, P_HANDLE) as i32,
             hp: field(node, P_NODE),
             sprite: field(node, P_SPRITE),
-            seed: super::hash32(MADE.wrapping_mul(2654435761).wrapping_add(node as u32)),
+            seed: super::hash32(MADE.wrapping_mul(2654435761).wrapping_add(if crate::clock::bench() { 0 } else { node as u32 })),
         });
         if MADE <= 8 {
             log!("effects: weld on {}, size {:.2}, life {:.2}{}", crate::engine::obj::odf_name(o), size, life, if hp != 0 { ", at a hardpoint" } else { "" });
