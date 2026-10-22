@@ -11,7 +11,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - A session no longer copies the user's vkBasalt config or launches with
   `ENABLE_VKBASALT`, and gathers no `vkBasalt.log`: the vkBasalt bloom is gone (13.0.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 3.41.1 — 2026-10-22
 

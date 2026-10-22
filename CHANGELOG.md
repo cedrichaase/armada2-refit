@@ -28,7 +28,7 @@ Layers: renderer 2.0.0 (was postfx), gui-installer 2.0.0, testbench 3.41.2, film
   installer the vkBasalt variables it wrote into Heroic. The package's `bloom` step does
   this now, so the step list and the package schema are unchanged.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 12.42.0 — 2026-10-22
 

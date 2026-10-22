@@ -10,7 +10,7 @@ in [`README.md`](README.md).
 ### Removed
 - The installer's scratch `HOME` no longer gets the user's vkBasalt layer copied in.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 1.12.0 — 2026-10-17
 

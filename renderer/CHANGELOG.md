@@ -19,7 +19,7 @@ versions". Newest first. The tables behind the numbers are in [`README.md`](READ
 - The folder is `renderer/`, not `postfx/`: `renderer/renderer-config.sh`. `dxvk.conf`
   and its marker are unchanged.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 1.2.1 — 2026-10-08
 

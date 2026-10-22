@@ -21,7 +21,7 @@ an earlier one set up.
 - The Heroic how-to no longer warns that bloom does not work in the Flatpak, nor the
   macOS one that bloom is not available.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 1.8.0 — 2026-10-22
 
