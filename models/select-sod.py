@@ -6,7 +6,7 @@
     models/select-sod.py --revert          put stock back
 
 The grey translucent ellipse drawn around each selected ship is SelectionEffect, an
-instance of SOD/select.sod scaled to the ship's shield ellipse (postfx/README.md,
+instance of SOD/select.sod scaled to the ship's shield ellipse (renderer/README.md,
 "Reading back a dynamic vertex buffer"). The model is a 3ds Max GeoSphere at frequency
 4: 162 vertices and 320 triangles, about 20 segments around its rim, every vertex at
 radius 89.943 about the origin. Unlike a planet (models/README.md) it is drawn as its

@@ -3,8 +3,7 @@
 #
 # The game is a few placeholder files, so this proves what the installer copies, backs
 # up and puts back -- not that anything loads. CI runs it on every push, on Linux and on
-# macOS; test.ps1 is the same for install.ps1. Downloads the bloom shaders on Linux, so
-# it needs network -- and so it also notices a download that has moved.
+# macOS; test.ps1 is the same for install.ps1.
 #
 # Portable like install.sh (bash 3.2, BSD tools). Run as usual, it then runs itself
 # again with sha256sum and tac hidden from PATH, as on a Mac -- and, on Linux, once more
@@ -20,7 +19,7 @@ P=$(ls -d "$T"/armada2-refit-*/)
 # crosire's d3d8to9 as the repository vendors it: the installers know it by hash.
 D3D8TO9="$src/../../platform/vendor/d3d8to9-1.16.0/d3d8.dll"
 export XDG_DATA_HOME="$T/share"
-B="$XDG_DATA_HOME/armada2-refit-bloom"
+B="$XDG_DATA_HOME/armada2-refit-bloom"   # where packages before 13.0.0 put a vkBasalt bloom
 mac=0; [ "$(uname -s)" = Darwin ] && mac=1
 check () { if eval "$1"; then echo "ok    $1"; else echo "FAIL  $1" >&2; exit 1; fi; }
 if command -v sha256sum >/dev/null 2>&1; then
@@ -35,16 +34,15 @@ mock () {   # dir -- a GOG install: the exe, the stock Bink DLL, GOG's d3d8to9
 }
 # The GUI installer takes every line "    NAME=value" for a launcher variable.
 vars () { grep -E '^ {4}[A-Z][A-Z0-9_]*=' "$T/out" || true; }
-syslayer=$(ls /etc/vulkan/implicit_layer.d/*[Bb]asalt* /usr/share/vulkan/implicit_layer.d/*[Bb]asalt* 2>/dev/null || true)
-[ "$mac" = 0 ] || syslayer=""   # a Mac never has bloom
 echo "(pass: ${A2_TEST_PASS:-first}; $(uname -s))"
 
 G="$T/Star Trek Armada II"; mock "$G"
 # What earlier packages and installs left: the per-part plugins Render3D.asi replaced.
 for n in MSAA Planets Lighting Sky Fog Specials; do echo old > "$G/$n.asi"; echo old > "$G/$n.ini"; done
 mkdir -p "$G/Sky"; echo old > "$G/Sky/mbgaqu.ini"; echo "[Sky]" > "$G/Sky/myown.ini"
+mkdir -p "$B/Shaders"; printf '# written by armada2-refit install.sh\nbloom = "%s/A2Bloom.fx"\n' "$B" > "$B/vkBasalt.conf"
 
-echo "== install on a GOG game: prerequisites, no DXVK, no vkBasalt, the old plugins out"
+echo "== install on a GOG game: prerequisites, no DXVK, the old plugins and the old bloom out"
 "$P/install.sh" "$G" > "$T/out"
 check '[ "$(sum "$G/winmm.dll")" = baba99929487b005bb9b168acfd852550055f22e5f1059c9032765209bb185e5 ]'
 check '[ "$(sum "$G/STA2WidescreenPatch.asi")" = 193828b15b8cdba84617dd9a359b555302132a35bbaa6fd3143fdb99442343c5 ]'
@@ -56,22 +54,19 @@ check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
 # The chain was left as it is: no Render3D.asi or UI.asi, the older plugins in the UI's place.
 check '[ ! -e "$G/Render3D.asi" ] && [ ! -e "$G/UI.asi" ] && [ ! -e "$G/Surfaces" ] && grep -q "Render3D.asi skipped" "$T/out"'
 check '[ -e "$G/HUD.asi" ] && [ -e "$G/Menus.asi" ] && [ -e "$G/GridLayout.asi" ] && [ -e "$G/GridLayout.ini" ]'
-[ -n "$syslayer" ] || check '[ ! -e "$B" ]'
+check '[ ! -e "$B" ] && grep -q "removed the old bloom" "$T/out"'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
-[ -n "$syslayer" ] || check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
+check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
 if [ "$mac" = 0 ]; then
-    [ -n "$syslayer" ] || check 'grep -q "Bloom needs a 32-bit vkBasalt" "$T/out"'
     check 'cmp -s "$P/game/dxvk.conf" "$G/dxvk.conf"'
 else
     check '[ ! -e "$G/d3d9.dll" ] && [ ! -e "$G/dxvk.conf" ] && grep -q "dxvk.conf skipped" "$T/out"'
-    check 'grep -q "bloom skipped: not available on macOS yet" "$T/out"'
     check 'grep -q "^In CrossOver" "$T/out"'
 fi
 
-echo "== DXVK takes the d3d8 slot; reinstall with a vkBasalt layer and an edited .ini"
+echo "== DXVK takes the d3d8 slot; reinstall with an edited .ini"
 echo dxvk > "$G/d3d8.dll"; echo "; mine" >> "$G/QOL.ini"
-mkdir -p "$XDG_DATA_HOME/vulkan/implicit_layer.d"; echo '{}' > "$XDG_DATA_HOME/vulkan/implicit_layer.d/vkBasalt.x86.json"
 mkdir -p "$G/Surfaces"; echo "[Surface]" > "$G/Surfaces/myown.ini"
 "$P/install.sh" "$G" > "$T/out"
 check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
@@ -83,15 +78,12 @@ check '[ "$(count "$G/Nebulae")" = "$(count "$P/game/Nebulae")" ] && [ "$(count 
 check '[ -z "$(ls "$G" | grep -E "^(HUD|Menus|GridLayout)\.(asi|ini)$")" ]'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 if [ "$mac" = 0 ]; then
-    check '[ -s "$B/Shaders/MagicBloom.fx" ] && [ -s "$B/Shaders/ReShade.fxh" ] && [ -s "$B/Shaders/ReShadeUI.fxh" ]'
-    check '[ "$(head -1 "$B/vkBasalt.conf")" = "# written by armada2-refit install.sh" ]'
-    check 'grep -q "^bloom = \"$B/A2Bloom.fx\"" "$B/vkBasalt.conf"'
-    check '[ "$(vars | sed -n 1p)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b" ] && vars | grep -q "^    ENABLE_VKBASALT=1$"'
+    check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b" ]'
 else
-    # d3d8to9 in on Wine's own d3d9, DXVK's d3d8 kept; no d3d9.dll, dxvk.conf or bloom.
+    # d3d8to9 in on Wine's own d3d9, DXVK's d3d8 kept; no d3d9.dll or dxvk.conf.
     check '[ "$(sum "$G/d3d8.dll")" = "$(sum "$D3D8TO9")" ] && [ "$(cat "$G/d3d8.dll.a2chain-backup")" = dxvk ]'
     check '[ ! -e "$G/d3d9.dll" ] && grep -q "d3d9.dll: Wine.s own (wined3d)" "$T/out"'
-    check '[ ! -e "$G/dxvk.conf" ] && [ ! -e "$B" ]'
+    check '[ ! -e "$G/dxvk.conf" ]'
     check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
 
     echo "== macOS: what an earlier install put in for DXVK comes out"

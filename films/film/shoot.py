@@ -3,7 +3,6 @@
 Every take is a fresh bench session: started with the shot's scene and the variant's
 installs, the setup block run, the action block recorded, the session stopped. Takes run
 in parallel, `--jobs` at once."""
-import glob
 import json
 import os
 import re
@@ -246,11 +245,6 @@ class Take:
         game = os.path.join(home, 'Games', 'Heroic', 'Star Trek Armada II')
         os.makedirs(game, exist_ok=True)
         self.clone, self.game = clone, game
-        # the user's own vkBasalt layer, which the installer looks for under XDG_DATA_HOME
-        layers = os.path.join(home, '.local', 'share', 'vulkan', 'implicit_layer.d')
-        os.makedirs(layers, exist_ok=True)
-        for src in glob.glob(os.path.expanduser('~/.local/share/vulkan/implicit_layer.d/vkBasalt*.json')):
-            shutil.copy(src, layers)
         json.dump(dict(installed=[dict(appName=GOG_APP, install_path=game, platform='windows')]),
                   open(os.path.join(heroic, 'gog_store', 'installed.json'), 'w'))
         json.dump({GOG_APP: dict(enviromentOptions=[]), 'version': 'v0', 'explicit': True},

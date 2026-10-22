@@ -386,8 +386,8 @@ game running. The runner then
 - floats every window in the middle, over the wallpaper, which is an `mpv` window tiled
   underneath (there is no `swaybg` here);
 - makes a scratch `HOME` in which Heroic (`gog_store/installed.json`, `GamesConfig`)
-  knows the game at `~/Games/Heroic/Star Trek Armada II`, with the user's own vkBasalt
-  layer copied in, and the clone's record of an earlier release removed: the installer
+  knows the game at `~/Games/Heroic/Star Trek Armada II`, and the clone's record of an
+  earlier release removed: the installer
   finds a fresh stock game and really installs into it;
 - runs the program in user, mount and PID namespaces of its own: the clone is bind-mounted
   at that path (the installer resolves links, and would show the bench's), and it sees

@@ -87,9 +87,9 @@ blended, and draws from a vertex buffer. So by default only the rock is smoothed
 `--split 2` (1,152 triangles, the shell's 288 unchanged), which the user judged a good
 trade in game. `--glow` smooths the shell too.
 
-That was judged without `d3d9.cachedWriteOnlyBuffers`. Before postfx 1.1.1, the CPU
+That was judged without `d3d9.cachedWriteOnlyBuffers`. Before postfx 1.1.1 (now renderer), the CPU
 path read back every vertex it wrote from a buffer DXVK keeps in GPU memory, which made
-it far slower than its triangle count suggests (`postfx/README.md`, "Reading back a
+it far slower than its triangle count suggests (`renderer/README.md`, "Reading back a
 dynamic vertex buffer"). The shell's cost with that key set has not been measured.
 
 ## The selection bubble
@@ -99,7 +99,7 @@ dynamic vertex buffer"). The shell's cost with that key set has not been measure
 The translucent ellipse around each selected ship shows its polygon: a run of straight
 segments around the rim, with corners, and flat facets in its shading. It is
 `SelectionEffect`, an instance of `SOD/select.sod` scaled to the ship's shield ellipse
-(`postfx/README.md`, "Reading back a dynamic vertex buffer"). The model is a 3ds Max
+(`renderer/README.md`, "Reading back a dynamic vertex buffer"). The model is a 3ds Max
 GeoSphere at frequency 4: 162 vertices, 320 triangles, about 20 segments around a great
 circle, every vertex at radius 89.943 about the origin. Like the moons, and unlike the
 planets, the engine draws the mesh the SOD stores.
@@ -124,7 +124,7 @@ is 2.
 The bubble is blended, so it goes down the CPU path (`RenderInternalNonVB`), as the
 moons' glow shell does, and its cost grows with the face count. With
 `d3d9.cachedWriteOnlyBuffers`, 30 selected stock bubbles took 0.60–0.81 ms
-(`postfx/README.md`). Four times the faces suggests about 3 ms at 30 selected. That is
+(`renderer/README.md`). Four times the faces suggests about 3 ms at 30 selected. That is
 an estimate from that measurement, not a measurement of its own.
 
 ## Rounder hulls

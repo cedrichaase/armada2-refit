@@ -10,7 +10,6 @@
 #   models/   models/moon-sod.py, select-sod.py, hull-sod.py (+ hull-sod.sha256),
 #             asteroid-sod.py and
 #   a2env.py  the a2env.py they import: they rewrite the player's own stock SODs
-#   bloom/    postfx.py --export (vkBasalt and ReShade) and the pinned shader list
 #   install.sh  install.ps1  install.bat     publish/installer/: Linux and macOS; Windows
 #   vendor/   third-party files whose licence allows bundling (platform/vendor/)
 #   prereqs.txt  CREDITS.txt  what they install first, and who made it
@@ -19,7 +18,7 @@
 #   armada2-refit-installer.py  the GUI installer (gui-installer/), also written beside
 #                               the zip, so a release carries it as an asset of its own
 # <version> is the root CHANGELOG.md's newest entry. Only our own code goes in: no asset,
-# nothing from the game, no third-party shader, none of the test tools (probe.exe,
+# nothing from the game, none of the test tools (probe.exe,
 # binktest.exe). CI runs this
 # on every push; see publish/README.md, "Release packages".
 set -euo pipefail
@@ -32,8 +31,7 @@ out="$(cd "$out" && pwd)"
 # version FILE -- the X.Y.Z of the newest "## X.Y.Z — date" heading.
 . "$root/platform/versioninfo/version.sh"
 ver="$(version "$root/CHANGELOG.md")"
-gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer; also the
-                                                        # source of the vkBasalt how-to
+gui="$root/gui-installer/armada2-refit-installer.py"   # the GUI installer
 [ -n "$ver" ] || { echo "no version in CHANGELOG.md" >&2; exit 1; }
 commit="$(git -C "$root" rev-parse --short HEAD)"
 
@@ -52,7 +50,7 @@ name="armada2-refit-$ver"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 d="$stage/$name"
-mkdir -p "$d/game" "$d/bloom" "$d/chain" "$d/models"
+mkdir -p "$d/game" "$d/chain" "$d/models"
 cp "$root/render3d/build/Render3D.asi"      "$root/render3d/Render3D.ini"       "$d/game/"
 mkdir -p "$d/game/Surfaces" "$d/game/Nebulae"
 cp "$root/render3d/surfaces/"*.ini "$d/game/Surfaces/"
@@ -67,16 +65,7 @@ cp "$root/grid/build/GridLayout.asi"        "$root/grid/GridLayout.ini"         
 cp "$root/online/build/Online.asi"          "$root/online/Online.ini"           "$d/game/"
 cp "$root/cutscenes/binkproxy/build/binkw32.dll" "$root/cutscenes/binkproxy/BinkProxy.ini" "$d/game/"
 # dxvk.conf as ./install writes it (stage 3); only DXVK reads it.
-bash "$root/postfx/renderer-config.sh" --print --stage 3 > "$d/game/dxvk.conf"
-# Bloom: the effect and settings of postfx/postfx.py, for vkBasalt and for ReShade, and
-# the pinned shaders the installers fetch.
-python3 "$root/postfx/postfx.py" --export "$d/bloom" >/dev/null
-cp "$root/publish/installer/shaders.txt" "$d/bloom/"
-# ...pinned to the same commits the vkBasalt build uses, which is what was seen in game.
-for c in $(awk '{print $2}' "$root/publish/installer/shaders.txt"); do
-    grep -q "$c" "$root/postfx/vkbasalt/build.sh" \
-        || { echo "shaders.txt pins $c, which postfx/vkbasalt/build.sh does not" >&2; exit 1; }
-done
+bash "$root/renderer/renderer-config.sh" --print --stage 3 > "$d/game/dxvk.conf"
 cp "$root/publish/installer/install.sh" "$root/publish/installer/install.ps1" "$d/"
 # What the installers put in first, from platform/vendor/: its licence allows bundling.
 cp "$root/publish/installer/prereqs.txt" "$d/"
@@ -143,7 +132,7 @@ WHAT GOES IN (game/, copied beside Armada2.exe)
                                                Internet - Online entry, join codes, no port
                                                forwarding (the project's server, c20e.de)
   binkw32.dll  + BinkProxy.ini  cutscenes $(version "$root/cutscenes/CHANGELOG.md")  launch reels full screen, AV1 movie replacements
-  dxvk.conf                     postfx $(version "$root/postfx/CHANGELOG.md")     16x anisotropic filtering, LOD bias, seamless
+  dxvk.conf                     renderer $(version "$root/renderer/CHANGELOG.md")   16x anisotropic filtering, LOD bias, seamless
                                                cube maps; only DXVK reads it
 Render3D.asi and UI.asi draw on the Direct3D 9 device that d3d8to9 (below) gives them.
 Where the installer leaves the chain as it is, they are not installed, and these take
@@ -159,7 +148,7 @@ THE DIRECT3D CHAIN (chain/)    platform $(version "$root/platform/CHANGELOG.md")
   d3d8.dll.gog-backup) and put back by --uninstall. That is Linux. On Windows only
   d3d8.dll goes in, on Windows' own Direct3D 9, and a DXVK d3d8.dll is left as it is.
   On macOS only d3d8.dll goes in, on Wine's own Direct3D 9 (wined3d): DXVK cannot run
-  Direct3D 9 on a Mac, so dxvk.conf and bloom are skipped there.
+  Direct3D 9 on a Mac, so dxvk.conf is skipped there.
 
 THE 3D VIEW
   Render3D.asi replaces the per-part plugins of earlier packages (lighting, sky,
@@ -192,18 +181,13 @@ NEEDS FROM YOU
   file-based fixes (hud/ui-widescreen.py and friends): every correction would apply
   twice.
 
-OPTIONAL, BY HAND -- only if you want what the installer skipped
-  Bloom needs a post-processing layer the installer cannot install for you. Set it up,
-  then run the installer again; it finds it and does the rest (downloading MagicBloom
-  and ReShade's headers from GitHub, pinned by hash).
-    Linux:    install a 32-bit vkBasalt, then run the installer again; it prints two
-              variables to add to the launcher (the GUI installer writes them into
-              Heroic). By distribution:
-$(python3 "$gui" --vkbasalt-howto all | sed 's/^/              /')
-    Windows:  install ReShade (reshade.me) for Armada2.exe -- for Vulkan when DXVK's DLLs
-              are in the game directory. No effect packages are needed. If you already
-              had a ReShade preset, pick A2Bloom.ini in ReShade's overlay.
-  Bloom is on from launch. Not yet seen in game through this package.
+BLOOM
+  Render3D.asi blooms the 3D view itself. Packages before 13.0.0 set up a separate
+  bloom through vkBasalt (Linux) or ReShade (Windows); the installer takes that out
+  (the vkBasalt files it wrote, the A2Bloom.ini preset), since both would bloom the
+  frame twice. On Linux, also take ENABLE_VKBASALT and VKBASALT_CONFIG_FILE out of the
+  launcher's variables if you set them by hand (the graphical installer does it in
+  Heroic). ReShade or vkBasalt themselves are yours, and are left installed.
 
 ANTIVIRUS
   Some antivirus programs flag the plugins as a false positive (they are unsigned DLLs
@@ -221,9 +205,7 @@ EOF
 # Credits for everything the installers fetch, from the same lists they read.
 {
     echo "Armada II Refit installs these beside its own work. Thank you to all of them."
-    echo "The prerequisites are in this zip, in vendor/ with their licence text. The bloom"
-    echo "shaders are downloaded from where their authors publish them, checked against the"
-    echo "SHA-256 in bloom/shaders.txt."
+    echo "The prerequisites are in this zip, in vendor/ with their licence text."
     echo
     while IFS='|' read -r pname pver pauthor plic ppage _; do
         [ -n "$pname" ] || continue
@@ -242,16 +224,6 @@ EOF
     echo "    by       Philip Rebohle and the DXVK contributors"
     echo "    licence  zlib/libpng (chain/dxvk-LICENSE)"
     echo "    in       chain/d3d9.dll, as published at https://github.com/doitsujin/dxvk/releases/tag/v3.1.1"
-    echo
-    echo "MagicBloom (bloom, only with vkBasalt or ReShade)"
-    echo "    by       luluco250"
-    echo "    licence  MIT (in the file's header)"
-    echo "    from     https://github.com/crosire/reshade-shaders (legacy branch)"
-    echo
-    echo "ReShade.fxh, ReShadeUI.fxh (bloom, only with vkBasalt or ReShade)"
-    echo "    by       crosire and the ReShade contributors"
-    echo "    licence  CC0 (ReShade.fxh); none stated (ReShadeUI.fxh)"
-    echo "    from     https://github.com/crosire/reshade-shaders"
 } > "$d/CREDITS.txt"
 
 # The GUI installer, and the manifest it reads: what the package installs, layer by
@@ -306,10 +278,8 @@ json.dump({
         layer('cutscenes', 'Cutscene player', '$(version "$root/cutscenes/CHANGELOG.md")',
               ['game/binkw32.dll', 'game/BinkProxy.ini'],
               'launch reels full screen; the stock binkw32.dll is kept'),
-        layer('renderer', 'Renderer', '$(version "$root/postfx/CHANGELOG.md")', ['game/dxvk.conf'],
+        layer('renderer', 'Renderer', '$(version "$root/renderer/CHANGELOG.md")', ['game/dxvk.conf'],
               '16x anisotropic filtering, LOD bias, seamless cube maps (read by DXVK)', 'dxvk.conf'),
-        layer('bloom', 'Bloom', '$(version "$root/postfx/CHANGELOG.md")', ['bloom/*'],
-              'MagicBloom through vkBasalt; its shaders are downloaded, pinned by hash', 'vkbasalt'),
     ],
     'not_included': [
         dict(id='textures', name='Textures',
@@ -319,7 +289,7 @@ json.dump({
 }, open(sys.argv[1], 'w'), indent=1)
 EOF
 
-(cd "$d" && sha256sum -- game/*.* game/*/* bloom/* chain/* models/* a2env.py vendor/*/* prereqs.txt manifest.json \
+(cd "$d" && sha256sum -- game/*.* game/*/* chain/* models/* a2env.py vendor/*/* prereqs.txt manifest.json \
     armada2-refit-installer.py > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")

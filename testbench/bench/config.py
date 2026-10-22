@@ -21,7 +21,6 @@ DATA = Path(a2env.DATA)
 # so it is found from A2_PROTON wherever Heroic lives (the Flatpak's is under
 # ~/.var/app/com.heroicgameslauncher.hgl/); A2_UMU overrides.
 UMU = Path(os.environ.get('A2_UMU') or PROTON.parent.parent / 'runtimes/umu/umu_run.py')
-VKBASALT = Path(os.environ.get('XDG_DATA_HOME', HOME / '.local/share')) / 'a2-vkbasalt'
 
 # Clones are big (a reflink copy of 5 GB -- free on btrfs, but it must be the SAME
 # filesystem as the game) and transient.  Results are small and kept.

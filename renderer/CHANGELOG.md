@@ -1,10 +1,25 @@
-# Changelog — postfx
+# Changelog — renderer
 
-Two `a2mod` layers share this folder: **renderer** (`dxvk.conf`, written by
-`renderer-config.sh`) and **bloom** (vkBasalt, built by `vkbasalt/build.sh` and
-configured by `postfx.py`). They are versioned together as one folder. Versioning rules:
-[`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The tables behind
-the numbers are in [`README.md`](README.md).
+The **renderer** `a2mod` layer: `dxvk.conf`, written by `renderer-config.sh`. This
+folder was `postfx/` before 2.0.0 and also held a **bloom** layer (vkBasalt, built by
+`vkbasalt/build.sh` and configured by `postfx.py`), versioned with it; the entries below
+2.0.0 are that folder's. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
+versions". Newest first. The tables behind the numbers are in [`README.md`](README.md).
+
+## 2.0.0 — 2026-10-22
+
+### Removed
+- The **bloom** layer: `postfx.py` (`--on`, `--off`, `--set`, `--check`, `--export`),
+  `vkbasalt/build.sh` and `fxcheck`. Bloom and every other post-process are
+  `Render3D.asi`'s now. `./install` takes out the per-user vkBasalt layer `build.sh` put
+  in (`~/.local/share/a2-vkbasalt`, and with its manifest `vkBasalt.a2.x86.json`,
+  `~/.local/lib/a2-vkbasalt` and the build cache).
+
+### Changed
+- The folder is `renderer/`, not `postfx/`: `renderer/renderer-config.sh`. `dxvk.conf`
+  and its marker are unchanged.
+
+Confirmed in game 2026-10-22.
 
 ## 1.2.1 — 2026-10-08
 
