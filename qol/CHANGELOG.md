@@ -13,7 +13,7 @@ versions". Newest first. Details, and the planned changes, are in
   latinum, metal, biomatter, in `StartBuild`'s order), to the refused player only, with
   stock's cadence, and logs an `advisor:` line (issue #1). Scenario `qol-refused-advisor` (c23cb19).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 1.6.1 — 2026-10-12
 

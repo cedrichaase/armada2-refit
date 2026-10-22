@@ -13,7 +13,7 @@ Layers: qol 1.6.2.
 - qol: an order `QOLRules.asi` refuses for want of resources speaks stock's advisor
   line again ("Insufficient crew", ...), to the refused player only (issue #1, c23cb19).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 12.41.0 — 2026-10-21
 
@@ -27,7 +27,7 @@ Layers: render3d 0.16.3, testbench 3.41.0.
 ### Added
 - testbench: scene and scenario `fog-blackhole` (issue #3).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 12.40.0 — 2026-10-21
 
@@ -43,7 +43,7 @@ Layers: render3d 0.16.2, testbench 3.40.0.
 - testbench: the scene command `cargo`, the `freighters` scene and the scenario
   `render3d-freighter-trail`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 12.39.1 — 2026-10-21
 

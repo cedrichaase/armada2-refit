@@ -14,7 +14,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   of a ghost is cut out at one half. `Render3D.log` says how many additive meshes the
   first ghost of each class has (7e7a184).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 0.16.2 — 2026-10-21
 
@@ -32,7 +32,7 @@ Installed, not yet seen in game.
   alpha holes (`Kfreight`, `Rfreight`, `Bcruise1`, `Bbuildng`, `Fbee`, `Fresear`,
   `Mdmoon` textures).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-22.
 
 ## 0.16.1 — 2026-10-21
 
