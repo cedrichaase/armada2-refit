@@ -483,8 +483,13 @@ impl Gpu {
     /// Reads `tex` (a colour target) back: `f` sees its texels. A multisampled one is
     /// resolved into a plain target first. Changes nothing of the device's state.
     pub fn read_back<R>(&self, tex: &Texture, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
+        self.read_back_layer(tex, 0, f)
+    }
+
+    /// `read_back` of face `layer` of a cube target.
+    pub fn read_back_layer<R>(&self, tex: &Texture, layer: u32, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
         let dev = self.dev.get().ok_or("no device")?;
-        let src = tex.0.surf(self);
+        let src = tex.0.surf_layer(self, layer);
         if src.is_null() {
             return Err("the target is not made");
         }
@@ -1379,6 +1384,13 @@ impl<'a> Cmd<'a> {
     pub fn clear_rects(&mut self, rects: &[Rect], color: Option<[f32; 4]>, depth: Option<f32>) {
         self.touch();
         let dev = self.dev;
+        if self.size == (0, 0) {
+            // No pass begun in this `Cmd`: the targets bound are an earlier one's.
+            if let Some(rt) = dev.get_render_target(0) {
+                let d = rt.surf_desc();
+                self.size = (d.width, d.height);
+            }
+        }
         dev.set_viewport(&raw::Viewport { x: 0, y: 0, w: self.size.0, h: self.size.1, min_z: 0.0, max_z: 1.0 });
         dev.set_rs(RS_SCISSORTESTENABLE, 0);
         let rs: Vec<raw::Rect> = rects.iter().map(|r| d3d_rect(*r)).collect();
@@ -1677,5 +1689,10 @@ impl<'a> Cmd<'a> {
     /// `Gpu::read_back`, in the frame.
     pub fn read_back<R>(&mut self, tex: &Texture, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
         self.gpu.read_back(tex, f)
+    }
+
+    /// `Gpu::read_back_layer`, in the frame.
+    pub fn read_back_layer<R>(&mut self, tex: &Texture, layer: u32, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
+        self.gpu.read_back_layer(tex, layer, f)
     }
 }
