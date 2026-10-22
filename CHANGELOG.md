@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.41.3 — 2026-10-22
+
+Layers: testbench 3.41.1.
+
+### Fixed
+- testbench: `umu_run.py` is found beside `A2_PROTON`, so the bench launches with
+  Heroic's Flatpak.
+
+Installs nothing.
+
 ## 12.41.2 — 2026-10-21
 
 Layers: render3d 0.16.4, ui 0.13.4, hud 2.2.3, menus 4.3.4, qol 1.6.3, grid 1.0.2, online 0.6.3, cutscenes 2.0.3.
