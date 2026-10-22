@@ -28,7 +28,7 @@ import uuid
 import time
 from pathlib import Path
 
-from . import config, slots
+from . import config, jobs, slots
 from .log import Log
 
 
@@ -163,10 +163,14 @@ class Session:
                      mute=sorted(mute or []), stems=sorted(stems or []),
                      vnc=vnc, record=record, audio=audio, keep=keep, label=label,
                      created=now(), pids={}, env={}, shots=0, game_started=None,
-                     exception_mtime=None, vnc_port=None)
+                     exception_mtime=None, vnc_port=None,
+                     # for the dashboard (bench/dash.py): the job it belongs to, its slot,
+                     # the scene and the film take it was started for
+                     job=jobs.current(), slot=slot.index, started=round(time.time(), 1),
+                     scene=os.environ.get('SCENE'), take=os.environ.get('A2TEST_TAKE'))
         sess = cls(state, work / 'session.json')
         sess.slot = slot
-        slot.describe(session=sid, pid=os.getpid(), worktree=str(config.REPO))
+        slot.describe(session=sid, pid=os.getpid(), worktree=str(config.REPO), job=state['job'])
         sess.save()
         (artifacts_dir / 'session.json').write_text(json.dumps({'statefile': str(sess.statefile)}))
         sess.log.meta(session=sid, resolution=config.res_name(res),
@@ -922,6 +926,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
             self.save()
             if self.slot:
                 self.slot.release()
+            if self.s.get('slot') is not None:
+                slots.mark_freed(self.s['slot'], self.s['id'])
             shutil.copy2(self.statefile, self.dir / 'logs' / 'session-state.json')
             if not self.s['keep']:
                 for _ in range(5):

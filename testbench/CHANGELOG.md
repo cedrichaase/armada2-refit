@@ -5,6 +5,37 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.42.0 — 2026-10-22
+
+### Added
+- `a2test watch` serves the bench dashboard (`bench/dash.html`, `bench/dash.py`) on the
+  same port, 5950: a column per job (a run's cases, a film's players and an A/B's
+  sessions are one column each), the queue with why each waiter waits, what finished in
+  the last 2 h, CPU, memory, swap, GPU and VRAM gauges (amdgpu sysfs), and the judge's
+  tokens today. State over Server-Sent Events (`/events`, `/api/state`); live noVNC for the
+  maximized column only, from a `wayvnc` started on demand; in-memory `grim` snapshots
+  (`/snap/<id>.jpg`, at most 5 s old) for the rest; nothing live while a perf A/B runs.
+- noVNC 1.6.0 vendored in `testbench/vendor/novnc-1.6.0/`: the page loads nothing from the
+  network.
+- Who started a job, recorded at `a2test run`, `session start` and `a2film`
+  (`bench/who.py`): the Claude Code session, main or subagent and the parent's worktree,
+  or by hand; the worktree, branch and commit. Job records in `~/.cache/a2test/jobs/`
+  (`bench/jobs.py`); sessions, slot sidecars and waiters carry the job's id
+  (`A2TEST_JOB`); a session under `render3d/perf/ab.sh` belongs to the A/B.
+- `a2test drive note "..."` records the driver's intent (`intent` in `steps.jsonl`), and
+  `session start --note "..."` the first one. Every record of a drive command carries
+  its command line and an invocation id (`src`, `cmd`, `inv`).
+- The judge's token usage per call (`claude -p`'s `modelUsage`), in the step's `judge`
+  note and summed per day in `~/.cache/a2test/judge-usage.json`.
+- A scenario's `## ` headings name its phases. `slots.held_by_kernel()` reads the held
+  slots from `/proc/locks` without taking a lock; a session's teardown notes `freed` in
+  its slot's sidecar. `bench/dash_selftest.py`.
+
+### Removed
+- `bench/watch.html`, the tiled view, and its noVNC import from jsdelivr.
+
+Installs nothing; seen working on the bench 2026-10-22.
+
 ## 3.41.2 — 2026-10-22
 
 ### Removed

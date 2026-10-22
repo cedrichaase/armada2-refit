@@ -12,9 +12,17 @@ class Log:
         self.dir = Path(d)
         self.jsonl = self.dir / 'steps.jsonl'
         self.txt = self.dir / 'log.txt'
+        # Set by `a2test drive`: every record of one drive command carries the command
+        # line and an id for the invocation, so the dashboard shows one timeline entry per
+        # command and can tell the agent's commands from the bench's own lines.
+        self.drive = None        # dict(cmd=..., inv=...) or None
 
     def _write(self, rec):
         rec.setdefault('t', datetime.datetime.now().isoformat(timespec='milliseconds'))
+        if self.drive:
+            rec.setdefault('src', 'drive')
+            rec.setdefault('cmd', self.drive['cmd'])
+            rec.setdefault('inv', self.drive['inv'])
         with open(self.jsonl, 'a') as f:
             f.write(json.dumps(rec) + '\n')
         mark = {'pass': 'PASS', 'fail': 'FAIL', 'warn': 'WARN', 'skip': 'SKIP',
@@ -45,8 +53,11 @@ class Log:
     def shot(self, path, name):
         self._write(dict(kind='shot', text=name, shots=[_rel(self.dir, path)]))
 
-    def note(self, text, status=None, detail=None):
-        self._write(dict(kind='note', text=text, status=status, detail=detail))
+    def note(self, text, status=None, detail=None, intent=False):
+        rec = dict(kind='note', text=text, status=status, detail=detail)
+        if intent:
+            rec['intent'] = True       # `a2test drive note`: what the driver means to do from here on
+        self._write(rec)
 
     def records(self):
         if not self.jsonl.exists():

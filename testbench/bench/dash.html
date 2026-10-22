@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>a2test bench</title>
+<!-- The bench dashboard (testbench/README.md, "Watching"). Served by bench/watch.py; the
+     state comes from bench/dash.py over /events. Nothing is loaded from the network:
+     noVNC is vendored (/novnc/), and the type falls back to the system's fonts. The look
+     is the "Bench live" design (IBM Plex where installed). -->
+<style>
+html,body{margin:0;background:#0e1216}
+body.light-bg{background:#eef1f4}
+a{color:#7fb0ff}a:hover{color:#a9caff}
+.app{--bg:#0e1216;--panel:#141a20;--panel2:#1a2129;--sunk:#10151a;--line:#26303a;--line2:#323e4a;--text:#dbe2e8;--muted:#a2adb8;--faint:#8592a0;--pass:#5cc4a4;--fail:#ff9466;--run:#7fb0ff;--rev:#e3c06a;--pend:#5f6b78;--chip:#1f2730;--screen:#06080a;font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:13px;line-height:1.4;color:var(--text);background:var(--bg);min-height:100vh;box-sizing:border-box;padding:14px 16px 28px}
+.app.light{--bg:#eef1f4;--panel:#ffffff;--panel2:#f6f8fa;--sunk:#e6eaee;--line:#dbe1e7;--line2:#c9d1d9;--text:#18212a;--muted:#46525e;--faint:#56626e;--pass:#17775c;--fail:#b8461a;--run:#2a5fc0;--rev:#7d600c;--pend:#8794a1;--chip:#edf1f5;--screen:#1b2026}
+.app.light a{color:#2a5fc0}
+.app *{box-sizing:border-box}
+.mono{font-family:'IBM Plex Mono',ui-monospace,'DejaVu Sans Mono',monospace;font-size:12px}
+.muted{color:var(--muted)}.faint{color:var(--faint)}
+.k-run{color:var(--run)}.k-pass{color:var(--pass)}.k-fail{color:var(--fail)}.k-rev{color:var(--rev)}.k-pend{color:var(--faint)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.sec{margin:0;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:999px;background:var(--chip);border:1px solid var(--line);font-size:11px;color:var(--muted);white-space:nowrap}
+.btn{font:inherit;color:var(--text);background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer;min-height:30px}
+.btn:hover{border-color:var(--line2)}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.icon-btn:hover{color:var(--text);border-color:var(--line2);background:var(--panel2)}
+.gauge{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:96px}
+.gauge .val{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:16px;font-weight:500;margin-top:-22px}
+.gauge .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.gauge .sub{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:var(--faint)}
+.gtrack{stroke:var(--sunk)}
+.light .gtrack{stroke:#dfe4e9}
+.gz-ok{stroke:var(--pass)}.gz-warn{stroke:var(--rev);filter:drop-shadow(0 0 3px color-mix(in srgb,var(--rev) 55%,transparent))}.gz-hot{stroke:var(--fail);filter:drop-shadow(0 0 5px color-mix(in srgb,var(--fail) 70%,transparent))}
+.slotseg{width:22px;height:10px;border-radius:3px;border:1px solid var(--line2)}
+.slotseg.busy{background:var(--run);border-color:var(--run)}
+.cols{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:stretch}
+.col{display:flex;flex-direction:column;min-width:0;transition:flex-grow .3s ease,min-width .3s ease,box-shadow .3s ease}
+.col.free{border-style:dashed;background:transparent}
+.col.max{border-color:color-mix(in srgb,var(--run) 60%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--run) 22%,transparent),0 10px 36px -10px color-mix(in srgb,var(--run) 40%,transparent)}
+.colhd{padding:10px 12px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--line)}
+.vnc{position:relative;aspect-ratio:16/9;background:var(--screen);display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:5px}
+.vnc-in{position:relative;max-width:100%;max-height:100%;background:repeating-linear-gradient(135deg,#141b22 0 10px,#19222b 10px 20px);display:flex;align-items:center;justify-content:center;color:#8592a0;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;overflow:hidden}
+.vnc-in img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block}
+.vnc-in .rfb{position:absolute;inset:0}
+.vnc .ov{position:absolute;left:8px;top:8px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
+.vnc .ov .chip{background:rgba(10,14,18,.78);border-color:#323e4a;color:#c3ccd5}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#ff7a59;display:inline-block}
+.bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--sunk)}
+.bar span{display:block;height:100%}
+.light .bar{background:#e1e6eb}
+.seg-pass{background:var(--pass)}.seg-fail{background:var(--fail)}.seg-rev{background:var(--rev)}.seg-run{background:var(--run)}
+.case{flex:1 1 0;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.case.cur{border-color:var(--run);box-shadow:inset 0 -2px 0 var(--run)}
+.now{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;padding:8px 10px;border-radius:6px;background:color-mix(in srgb,var(--run) 10%,transparent);border:1px solid color-mix(in srgb,var(--run) 30%,var(--line))}
+.spin{width:14px;height:14px;margin-top:2px;border:1.5px solid var(--run);border-right-color:transparent;border-radius:50%;animation:spin 1.1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto 64px;gap:8px;align-items:center;padding:4px 0;border-top:1px solid var(--line)}
+.tl{display:grid;grid-template-columns:58px 14px minmax(0,1fr);gap:0 8px;padding:5px 0}
+.tl .rail{display:flex;flex-direction:column;align-items:center}
+.tl .rail i{display:block;width:9px;height:9px;border-radius:50%;margin-top:4px;border:2px solid var(--pend)}
+.tl .rail b{display:block;width:2px;flex:1;background:var(--line);margin-top:3px}
+.tl.ok .rail i{border-color:var(--faint)}.tl.pass .rail i{border-color:var(--pass);background:var(--pass)}.tl.fail .rail i{border-color:var(--fail);background:var(--fail)}.tl.rev .rail i{border-color:var(--rev)}.tl.run .rail i{border-color:var(--run)}.tl.bench .rail i{border-color:var(--line2);border-radius:2px}
+.tl.note .rail i{border-color:var(--rev);background:color-mix(in srgb,var(--rev) 35%,transparent);border-radius:2px;transform:rotate(45deg) scale(.85)}
+.tl.note .tl-cmd{font-family:'IBM Plex Sans',system-ui,sans-serif;font-style:italic;font-weight:400;font-size:12.5px}
+.who b{font-weight:500;color:var(--muted)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.tab{font:inherit;color:var(--muted);background:none;border:0;border-bottom:2px solid transparent;padding:7px 10px;cursor:pointer;min-height:34px}
+.tab.on{color:var(--text);border-bottom-color:var(--run)}
+.tab:hover{color:var(--text)}
+.logbox{max-height:60vh;overflow:auto}
+.logline{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px;padding:1px 0}
+.logline.hit{color:var(--pass)}.logline.err{color:var(--fail)}.logline.dim{color:var(--faint)}
+.row{display:grid;gap:10px;align-items:baseline;padding:8px 12px;border-top:1px solid var(--line)}
+.qrow{grid-template-columns:22px minmax(160px,1.2fr) minmax(120px,.8fr) minmax(0,2fr) 64px}
+.frow{grid-template-columns:110px minmax(160px,1.2fr) minmax(120px,.8fr) minmax(0,2fr) 92px;color:inherit;text-decoration:none}
+a.frow:hover{background:var(--panel2);color:inherit}
+.badge{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;font-weight:500;letter-spacing:.04em;padding:1px 6px;border-radius:4px;border:1px solid currentColor;white-space:nowrap}
+.ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scroll{overflow:auto}
+.sec-main{font-size:13px;color:var(--text)}
+.info-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;color:var(--faint);background:transparent;border:1px solid transparent;border-radius:50%;cursor:pointer;align-self:center}
+.info-btn:hover,.info-btn.on{color:var(--text);border-color:var(--line2);background:var(--panel2)}
+.info-pop{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;max-width:640px}
+.col.st-run{border-top:2px solid var(--run)}.col.st-rev{border-top:2px solid var(--rev)}
+.col.st-rev .vnc-in{filter:saturate(.35) brightness(.85)}
+.sdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none;align-self:center}
+.sdot-run{background:var(--run);animation:breathe 2.4s ease-in-out infinite}
+.sdot-rev{background:var(--rev)}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--run) 50%,transparent)}60%{box-shadow:0 0 0 6px color-mix(in srgb,var(--run) 0%,transparent)}}
+.live-dot{animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.35}}
+.gauge path{transition:stroke-dasharray .6s ease}
+.seg-run{background:linear-gradient(90deg,var(--run) 0%,color-mix(in srgb,var(--run) 60%,#fff) 50%,var(--run) 100%);background-size:200% 100%;animation:sheen 2.2s linear infinite}
+@keyframes sheen{from{background-position:100% 0}to{background-position:-100% 0}}
+.now{animation:glow 3.2s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 16px -3px color-mix(in srgb,var(--run) 40%,transparent)}}
+.tl.run .rail i,.tl.new .rail i{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--run) 25%,transparent)}}
+.banner{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);margin-bottom:10px}
+.banner.err{color:var(--fail);border-color:color-mix(in srgb,var(--fail) 40%,var(--line))}
+.hidden{display:none!important}
+@media (max-width: 640px){.cols>.col:not(.free){min-width:calc(100vw - 34px)!important;flex:none!important;width:calc(100vw - 34px)}.cols{scroll-snap-type:x mandatory}.cols>.col{scroll-snap-align:start}}
+@media (prefers-reduced-motion: reduce){.app *{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px 28px; margin-bottom: 16px">
+  <div style="display: flex; flex-direction: column; gap: 2px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="font-size: 19px; font-weight: 600; letter-spacing: -0.01em">a2test bench</div>
+      <button class="icon-btn" id="theme" data-act="theme" aria-label="Light theme" aria-pressed="false" title="Light theme">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="3"></circle><path d="M7 1v1.4M7 11.6V13M1 7h1.4M11.6 7H13M2.8 2.8l1 1M10.2 10.2l1 1M2.8 11.2l1-1M10.2 3.8l1-1"></path></svg>
+      </button>
+    </div>
+    <div class="faint mono" id="machine">this machine</div>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end" role="group" aria-label="System load" id="gauges"></div>
+  <div style="flex: 1 1 0px"></div>
+  <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px" aria-label="LLM judge usage today" role="group">
+    <span class="faint" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em">LLM judge today</span>
+    <span class="mono" style="font-size: 15px; font-weight: 500"><span id="jtok">0</span> <span class="faint" style="font-size: 12px; font-weight: 400">tokens</span></span>
+    <span class="mono faint" id="jsub">no calls</span>
+  </div>
+</header>
+
+<div class="banner err hidden" id="conn" role="status"></div>
+
+<section aria-label="On the bench now" style="margin-bottom: 16px">
+  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap">
+    <h2 class="sec sec-main">On the bench</h2>
+    <button class="info-btn" data-act="info" data-k="bench" aria-label="About this section" aria-expanded="false">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="6"></circle><path d="M7 6.2v3.8M7 4.1v.1"></path></svg>
+    </button>
+    <span class="chip hidden" id="abchip" style="color: var(--rev)">perf A/B running · snapshots only</span>
+  </div>
+  <div class="info-pop hidden" id="info-bench" style="margin-bottom: 10px">One column per job. Maximize a column to see its logs, baseline and dumps; the others shrink to a snapshot. Only the maximized column streams live, the rest refresh every 5 s, and while a perf A/B runs nothing streams live. A single job is always shown wide. Who started a job is recorded by the bench when it starts: the Claude Code session (main, or a subagent and whose), its worktree and commit, or "by hand". A session's intent line is the agent's latest <span class="mono">a2test drive note</span>; a session with no drive command for <span id="idlemin">10</span> min is idle.</div>
+  <div class="cols" id="cols"></div>
+</section>
+
+<div style="display: flex; flex-direction: column; gap: 16px">
+  <section class="panel" aria-label="Queue">
+    <div style="display: flex; align-items: center; gap: 6px; padding: 6px 12px">
+      <h2 class="sec">Queue</h2>
+      <button class="info-btn" data-act="info" data-k="queue" aria-label="About the queue" aria-expanded="false">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="6"></circle><path d="M7 6.2v3.8M7 4.1v.1"></path></svg>
+      </button>
+    </div>
+    <div class="info-pop hidden" id="info-queue" style="margin: 0 12px 10px">Oldest first. A job takes all the slots it needs at once or keeps waiting, and only the oldest waiter tries, so a smaller job never overtakes a bigger one.</div>
+    <div id="queue"></div>
+  </section>
+
+  <section class="panel" aria-label="Recently finished">
+    <div style="display: flex; align-items: baseline; gap: 10px; padding: 10px 12px">
+      <h2 class="sec">Recently finished</h2>
+      <span class="faint" style="font-size: 12px">last 2 h</span>
+    </div>
+    <div id="finished"></div>
+  </section>
+</div>
+
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('a2bench.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('a2bench.' + k, JSON.stringify(v)); } catch (e) { /* private window */ } },
+};
+
+let RFB = null;
+import('/novnc/core/rfb.js').then((m) => { RFB = m.default; render(); }).catch(() => { RFB = null; });
+
+let S = null;                       // the latest state
+let maxId = store.get('max', null); // the maximized job, if any
+const tabs = store.get('tabs', {}); // job id -> tab
+const info = { bench: false, queue: false };
+const Q = new URLSearchParams(location.search);    // ?max=<job id>&tab=logs: open the page on a column
+if (Q.has('max')) { maxId = Q.get('max'); if (Q.has('tab')) tabs[maxId] = Q.get('tab'); }
+if (Q.has('light')) store.set('light', Q.get('light') !== '0');
+const cols = new Map();             // id -> {el, hd, views, body, sig, html, rfbs}
+
+// ------------------------------------------------------------------ theme
+const app = $('app');
+function theme(light) {
+  app.classList.toggle('light', light);
+  document.body.classList.toggle('light-bg', light);
+  const b = $('theme');
+  b.setAttribute('aria-pressed', String(light));
+  b.setAttribute('aria-label', light ? 'Dark theme' : 'Light theme');
+  b.title = light ? 'Dark theme' : 'Light theme';
+}
+theme(!!store.get('light', false));
+
+// ------------------------------------------------------------------ header
+const ARC = 119.38;
+const zone = (p) => (p >= 85 ? 'gz-hot' : p >= 60 ? 'gz-warn' : 'gz-ok');
+const GAUGES = [['cpu', 'CPU'], ['mem', 'Memory'], ['swap', 'Swap'], ['gpu', 'GPU'], ['vram', 'VRAM']];
+const gEls = {};
+for (const [k, label] of GAUGES) {
+  const d = document.createElement('div');
+  d.className = 'gauge hidden';
+  d.setAttribute('role', 'img');
+  d.innerHTML = `<svg width="92" height="54" viewBox="0 0 92 54" aria-hidden="true">
+    <path class="gtrack" d="M8 48 A38 38 0 0 1 84 48" fill="none" stroke-width="8" stroke-linecap="round"></path>
+    <path class="gz-ok" d="M8 48 A38 38 0 0 1 84 48" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="0.01 200"></path></svg>
+    <div class="val"></div><div class="lab">${label}</div><div class="sub"></div>`;
+  $('gauges').appendChild(d);
+  gEls[k] = d;
+}
+const slotG = document.createElement('div');
+slotG.className = 'gauge';
+slotG.setAttribute('role', 'img');
+slotG.style.justifyContent = 'flex-end';
+slotG.innerHTML = `<div class="pips" style="display: flex; gap: 4px; height: 32px; align-items: center"></div>
+  <div class="val" style="margin-top: 0"></div><div class="lab">Slots</div><div class="sub"></div>`;
+$('gauges').appendChild(slotG);
+
+function header() {
+  const m = S.machine || {};
+  $('machine').textContent = `this machine · ${m.cores} cores · ${m.mem_gib} GiB · ${new Date().toLocaleTimeString('en-GB')}`;
+  for (const [k, label] of GAUGES) {
+    const g = (S.gauges || {})[k], el = gEls[k];
+    el.classList.toggle('hidden', !g);
+    if (!g) continue;
+    const v = Math.round(g.pct);
+    const arc = el.querySelectorAll('path')[1];
+    arc.setAttribute('class', zone(g.pct));
+    arc.setAttribute('stroke-dasharray', `${Math.max(0.01, (g.pct / 100) * ARC).toFixed(2)} 200`);
+    el.querySelector('.val').textContent = `${v} %`;
+    el.querySelector('.sub').textContent = g.sub;
+    el.setAttribute('aria-label', `${label} ${v} percent, ${g.sub}`);
+  }
+  const sl = S.slots || { total: 0, held: 0, waiting: 0 };
+  slotG.querySelector('.pips').innerHTML = Array.from({ length: sl.total }, (_, i) => `<span class="slotseg${i < sl.held ? ' busy' : ''}"></span>`).join('');
+  slotG.querySelector('.val').textContent = `${sl.held} / ${sl.total}`;
+  slotG.querySelector('.sub').textContent = sl.waiting ? `${sl.waiting} waiting` : 'none waiting';
+  slotG.setAttribute('aria-label', `${sl.held} of ${sl.total} slots held, ${sl.waiting} waiting`);
+  const j = S.judge || {};
+  const k = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1000 ? Math.round(n / 1000) + 'k' : String(n || 0));
+  $('jtok').textContent = k(j.tokens);
+  $('jsub').textContent = j.calls ? `${j.calls} calls · ${j.model || '?'} · ${k(j.tokens_in)} in / ${k(j.tokens_out)} out` : 'no calls';
+  $('abchip').classList.toggle('hidden', !S.ab_running);
+  $('idlemin').textContent = Math.round((S.idle_after || 600) / 60);
+}
+setInterval(() => { if (S) $('machine').textContent = $('machine').textContent.replace(/\d\d:\d\d:\d\d$/, new Date().toLocaleTimeString('en-GB')); }, 1000);
+
+// ------------------------------------------------------------------ columns
+const segs = (list) => (list || []).map(([w, c]) => `<span class="${c}" style="width: ${w}%"></span>`).join('');
+const ICON_MAX = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M8.5 1.5h4v4M5.5 12.5h-4v-4M12.5 1.5 8 6M1.5 12.5 6 8"></path></svg>';
+const ICON_RESTORE = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M1.5 5.5h4v-4M12.5 8.5h-4v4M5.5 5.5 1 1M8.5 8.5 13 13"></path></svg>';
+
+function letterbox(res) {
+  if (!res) return 'width: 100%; height: 100%';
+  const [w, h] = res, r = w / h;
+  if (Math.abs(r - 16 / 9) < 0.01) return 'width: 100%; height: 100%';
+  return r > 16 / 9 ? `width: 100%; aspect-ratio: ${w} / ${h}` : `height: 100%; aspect-ratio: ${w} / ${h}`;
+}
+
+function layout() {
+  const jobs = S.columns || [];
+  const single = jobs.length === 1;
+  let mx = single ? jobs[0].id : maxId;
+  if (mx && !jobs.some((c) => c.id === mx)) mx = null;
+  return { jobs, single, mx };
+}
+
+function render() {
+  if (!S) return;
+  header();
+  const { jobs, single, mx } = layout();
+  const anyMax = !!mx;
+  const want = [...jobs.map((c) => c.id), ...(S.free || []).map((f) => 'free:' + f.slot)];
+  for (const [id, c] of cols) if (!want.includes(id)) { dropViews(c); c.el.remove(); cols.delete(id); }
+  const box = $('cols');
+  want.forEach((id, i) => {
+    let c = cols.get(id);
+    if (!c) {
+      c = { el: document.createElement('section'), sig: '', html: '', hdHtml: '', rfbs: [], imgs: [] };
+      if (id.startsWith('free:')) {
+        c.el.innerHTML = '';
+      } else {
+        c.hd = document.createElement('div'); c.hd.className = 'colhd';
+        c.views = document.createElement('div'); c.views.style.padding = '10px 12px 0';
+        c.body = document.createElement('div');
+        c.el.append(c.hd, c.views, c.body);
+      }
+      cols.set(id, c);
+    }
+    if (box.children[i] !== c.el) box.insertBefore(c.el, box.children[i] || null);
+    if (id.startsWith('free:')) freeCol(c, S.free.find((f) => 'free:' + f.slot === id), anyMax);
+    else jobCol(c, jobs.find((j) => j.id === id), { isMax: mx === id, compact: anyMax && mx !== id, single });
+  });
+  $('info-bench').classList.toggle('hidden', !info.bench);
+  $('info-queue').classList.toggle('hidden', !info.queue);
+  queue();
+  finished();
+}
+
+function freeCol(c, f, anyMax) {
+  c.el.className = 'panel col free';
+  c.el.style.cssText = anyMax ? 'flex: 0.5 1 0px; min-width: 190px' : 'flex: 0.7 1 0px; min-width: 240px';
+  c.el.setAttribute('aria-label', `${f.slotsLabel}, free`);
+  const html = `<div style="padding: 12px; display: flex; flex-direction: column; gap: 10px; height: 100%">
+      <div style="display: flex; gap: 8px; align-items: baseline"><span class="mono faint">${esc(f.slotsLabel)}</span><span class="k-pass" style="font-weight: 600">free</span></div>
+      <div class="vnc" style="background: transparent; border: 1px dashed var(--line2)"><span class="faint mono" style="font-size: 11px">no game running</span></div>
+      <div class="muted" style="font-size: 12px">${esc(f.note)}</div></div>`;
+  if (html !== c.html) { c.el.innerHTML = html; c.html = html; }
+}
+
+function jobCol(c, j, { isMax, compact, single }) {
+  const grow = j.slots.length;
+  const idle = j.state.cls === 'rev';
+  c.el.className = `panel col ${idle ? 'st-rev' : 'st-run'}${isMax ? ' max' : ''}`;
+  c.el.style.cssText = isMax ? 'flex: 4 1 0px; min-width: 760px'
+    : compact ? `flex: ${grow} 1 0px; min-width: ${250 * grow}px` : `flex: ${grow} 1 0px; min-width: ${400 * grow}px`;
+  c.el.setAttribute('aria-label', `${j.slotsLabel}: ${j.title}`);
+  const maxLabel = isMax ? 'Restore equal widths' : `Maximize ${j.title}`;
+  const hd = `<div style="display: flex; gap: 8px; align-items: center; min-width: 0">
+      <span class="mono faint" style="white-space: nowrap">${esc(j.slotsLabel)}</span>
+      <span class="chip">${esc(j.kindLabel)}</span>
+      <span class="ell" style="font-weight: 600; font-size: 14px; min-width: 0" title="${esc(j.title)}">${esc(j.title)}</span>
+      <span style="flex: 1 1 0px"></span>
+      ${single ? '' : `<button class="icon-btn" data-act="max" data-id="${esc(j.id)}" aria-label="${esc(maxLabel)}" aria-pressed="${isMax}" title="${esc(maxLabel)}">${isMax ? ICON_RESTORE : ICON_MAX}</button>`}
+    </div>
+    <div style="display: flex; gap: 10px; align-items: baseline">
+      <span class="sdot ${idle ? 'sdot-rev' : 'sdot-run'}" aria-hidden="true"></span>
+      <span class="${idle ? 'k-rev' : 'k-run'}" style="font-weight: 500">${esc(j.state.label)}</span>
+      <span class="mono faint" style="margin-left: auto; white-space: nowrap">${esc(j.elapsed)}</span>
+    </div>
+    <div class="faint mono ell who" style="font-size: 11px" title="${esc(j.who.full)}"><b>${esc(j.who.short)}</b> · ${esc(j.who.worktree)}${j.who.commit ? ' @ ' + esc(j.who.commit) : ''}</div>`;
+  if (hd !== c.hdHtml) { c.hd.innerHTML = hd; c.hdHtml = hd; }
+  views(c, j, isMax);
+  body(c, j, isMax, compact);
+}
+
+// -- the screens: live (noVNC) in the maximized column, else a snapshot every 5 s
+function dropViews(c) {
+  for (const r of c.rfbs || []) { try { r.rfb && r.rfb.disconnect(); } catch (e) { /* gone */ } clearTimeout(r.retry); r.dead = true; }
+  c.rfbs = []; c.imgs = [];
+}
+
+function views(c, j, isMax) {
+  const live = isMax && !S.ab_running && !!RFB;
+  const sig = JSON.stringify([j.views.map((v) => [v.sid, v.res, v.label, v.game, v.clock]), live]);
+  if (sig === c.sig) return;
+  c.sig = sig;
+  dropViews(c);
+  const multi = j.views.length > 1;
+  const chip = live ? '<span class="chip"><span class="live-dot" aria-hidden="true"></span>LIVE · 30 fps</span>'
+    : `<span class="chip">snapshot · 5 s</span>`;
+  c.views.innerHTML = `<div style="display: grid; gap: 8px; grid-template-columns: repeat(${j.views.length}, minmax(0, 1fr))">` +
+    j.views.map((v, i) => `<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+      <div class="vnc"><div class="vnc-in" data-i="${i}" style="${letterbox(v.res)}">${v.res ? esc(v.res.join('x')) : 'no session'}</div>
+        <div class="ov">${chip}<span class="chip">${v.res ? esc(v.res.join('x')) : '?'}</span>${v.clock === 'bench' ? '<span class="chip">bench clock</span>' : ''}${v.game ? '' : '<span class="chip">no game</span>'}</div></div>
+      ${multi ? `<div class="faint mono" style="font-size: 11px">${esc(v.label)}</div>` : ''}</div>`).join('') + '</div>';
+  j.views.forEach((v, i) => {
+    const box = c.views.querySelector(`.vnc-in[data-i="${i}"]`);
+    if (!v.sid) return;
+    if (live) {
+      const holder = document.createElement('div'); holder.className = 'rfb'; box.appendChild(holder);
+      const r = { sid: v.sid, holder };
+      c.rfbs.push(r);
+      connect(r);
+    } else {
+      const img = document.createElement('img'); img.alt = `${j.title}, ${v.label}`; img.dataset.sid = v.sid;
+      img.onerror = () => { img.style.visibility = 'hidden'; };
+      img.onload = () => { img.style.visibility = 'visible'; };
+      img.src = `/snap/${encodeURIComponent(v.sid)}.jpg?t=${Date.now()}`;
+      box.appendChild(img);
+      c.imgs.push(img);
+    }
+  });
+}
+
+function connect(r) {
+  if (r.dead || !RFB) return;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const rfb = new RFB(r.holder, `${proto}://${location.host}/ws/${encodeURIComponent(r.sid)}`, { shared: true });
+  rfb.viewOnly = true;
+  rfb.scaleViewport = true;
+  rfb.background = '#000';
+  rfb.addEventListener('disconnect', () => { r.rfb = null; if (!r.dead) r.retry = setTimeout(() => connect(r), 3000); });
+  r.rfb = rfb;
+}
+
+setInterval(() => {
+  for (const c of cols.values()) for (const img of c.imgs || []) {
+    if (img.complete) img.src = `/snap/${encodeURIComponent(img.dataset.sid)}.jpg?t=${Date.now()}`;
+  }
+}, 5000);
+
+// -- the status, logs, baseline and dump parts
+function body(c, j, isMax, compact) {
+  const tab = (isMax && tabs[j.id]) || 'status';
+  let h = '';
+  if (compact) {
+    h = `<div style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px">
+      <div style="font-size: 12px">${esc(j.nowLine)}</div>
+      ${j.segs ? `<div class="bar">${segs(j.segs)}</div>` : ''}</div>`;
+  } else {
+    if (isMax) {
+      h += `<div class="tabs" role="tablist" style="margin: 10px 12px 0">` +
+        [['status', 'Status'], ['logs', 'Logs'], ['base', 'Baseline'], ['dump', 'Dump']].map(([k, l]) =>
+          `<button class="tab${tab === k ? ' on' : ''}" role="tab" aria-selected="${tab === k}" data-act="tab" data-id="${esc(j.id)}" data-tab="${k}">${l}</button>`).join('') + '</div>';
+    }
+    if (tab === 'status') h += status(j, isMax);
+    else if (tab === 'logs') h += logs(j);
+    else if (tab === 'base') h += base(j);
+    else h += dumpsTab(j);
+  }
+  if (h === c.html) return;
+  const keep = c.body.querySelector('.logbox');
+  const atEnd = keep && keep.scrollTop + keep.clientHeight >= keep.scrollHeight - 4;
+  const top = keep ? keep.scrollTop : 0;
+  c.body.innerHTML = h;
+  c.html = h;
+  const lb = c.body.querySelector('.logbox');
+  if (lb) lb.scrollTop = (!keep || atEnd) ? lb.scrollHeight : top;
+}
+
+function status(j, isMax) {
+  let h = '<div style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px">';
+  if (j.run) {
+    const r = j.run;
+    h += `<div style="display: flex; gap: 6px; flex-wrap: wrap">` + r.cases.map((k) => `<div class="case${k.cur ? ' cur' : ''}">
+        <div class="mono ell" style="font-weight: 500">${esc(k.res)}</div><div class="${k.stCls} ell" style="font-size: 11px">${esc(k.stLabel)}</div></div>`).join('') + '</div>';
+    h += `<div style="display: flex; flex-direction: column; gap: 5px"><div class="bar">${segs(j.segs)}</div>
+      <div class="mono" style="display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px">
+        <span class="k-pass">✓ ${r.sum.pass_}</span><span class="k-fail">✕ ${r.sum.fail}</span><span class="k-rev">? ${r.sum.rev}</span>
+        <span class="faint" style="margin-left: auto">${r.sum.steps ? `step ${r.sum.step} of ${r.sum.steps}` : esc(j.nowLine)}</span></div></div>`;
+    if (r.cur) h += `<div class="now"><span class="spin" aria-hidden="true"></span><div style="min-width: 0">
+        <div class="mono faint" style="font-size: 11px">step ${r.cur.n} · ${esc(r.cur.method)} · ${esc(r.cur.dur)}</div><div>${esc(r.cur.text)}</div></div></div>`;
+    if (r.phases.length) h += '<div>' + r.phases.map((p) => `<div class="prow">
+        <span class="ell"><span style="font-weight: 500">${esc(p.name)}</span> <span class="mono faint" style="font-size: 11px">${esc(p.range)}</span></span>
+        <span class="${p.stCls} mono" style="font-size: 11px">${esc(p.stLabel)}</span><span class="bar">${segs(p.segs)}</span></div>`).join('') + '</div>';
+    if (isMax && r.next.length) h += `<div><div class="faint" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px">Up next</div>` +
+      r.next.map((x) => `<div style="display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 8px; padding: 3px 0; border-top: 1px solid var(--line)"><span class="mono faint">${x.n}</span><span class="muted ell" title="${esc(x.text)}">${esc(x.text)}</span><span class="chip">${esc(x.method)}</span></div>`).join('') + '</div>';
+  } else if (j.film) {
+    h += `<div class="mono faint" style="font-size: 11.5px; word-break: break-word">${esc(j.film.storyboard)}</div>`;
+    if (j.segs) h += `<div class="bar">${segs(j.segs)}</div>`;
+    h += '<div>' + j.film.steps.map((f) => `<div class="prow" style="grid-template-columns: minmax(0,1fr) auto"><span>${esc(f.text)}</span>
+        <span class="${f.stCls} mono" style="font-size: 11px">${esc(f.stLabel)}</span></div>`).join('') + '</div>';
+  }
+  if (j.session && !j.ab) {
+    const s = j.session;
+    h += `<div style="display: flex; gap: 8px; align-items: baseline"><span class="chip">${esc(s.intentLabel)}</span>
+        <span style="min-width: 0">${esc(s.intent)} <span class="mono faint" style="font-size: 11px; white-space: nowrap">${esc(s.intentAge)}</span></span></div>`;
+    h += `<div class="mono muted" style="display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px">` +
+      (s.counts || []).map((n) => `<span class="${n.cls}">${esc(n.t)}</span>`).join('') + '</div>';
+  }
+  if (j.session) {
+    const tl = isMax ? j.session.timeline : j.session.timeline.slice(-6);
+    h += '<div>' + tl.map((e) => `<div class="tl ${esc(e.cls)}"><span class="mono faint" style="font-size: 11px; padding-top: 1px">${esc(e.t)}</span>
+        <span class="rail" aria-hidden="true"><i></i><b></b></span><div style="min-width: 0">
+        <div class="mono tl-cmd" style="font-size: 11.5px; font-weight: 500; word-break: break-word">${esc(e.cmd)}</div>
+        <div class="muted" style="font-size: 12px; word-break: break-word">${esc(e.out)}</div></div></div>`).join('') + '</div>';
+  }
+  return h + '</div>';
+}
+
+function logs(j) {
+  if (!j.logs) return '<div style="padding: 10px 12px 12px" class="muted">No log yet.</div>';
+  return `<div style="padding: 10px 12px 12px" class="mono"><div class="faint" style="font-size: 11px; margin-bottom: 6px; word-break: break-all">${esc(j.logs.path)}</div>
+    <div class="logbox">` + j.logs.lines.map((l) => `<div class="logline${l.cls ? ' ' + l.cls : ''}" style="font-size: 11.5px"><span class="faint">${esc(l.t)}</span><span style="word-break: break-word">${esc(l.x)}</span></div>`).join('') + '</div></div>';
+}
+
+function base(j) {
+  if (!j.base.length) return '<div style="padding: 10px 12px 12px"><div class="muted">No baseline compared in this run.</div></div>';
+  return '<div style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px">' + j.base.map((b) => `
+    <div style="display: grid; grid-template-columns: 160px minmax(0,1fr); gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line)">
+      <div class="vnc" style="border-radius: 4px">${b.heat ? `<a href="${esc(b.heat)}" target="_blank" rel="noopener" style="display: contents"><img src="${esc(b.heat)}" alt="heat map of ${esc(b.name)}" style="width: 100%; height: 100%; object-fit: contain"></a>` : '<div class="vnc-in" style="width: 100%; height: 100%">no heat map</div>'}</div>
+      <div style="min-width: 0"><div style="display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap"><span class="mono" style="font-weight: 500">${esc(b.name)}</span>
+        <span class="faint mono" style="font-size: 11px">${esc(b.base)}</span><span class="${b.cls} badge">${esc(b.verdict)}</span></div>
+        <div class="mono muted" style="font-size: 11.5px">${esc(b.stats)}</div></div></div>`).join('') + '</div>';
+}
+
+function dumpsTab(j) {
+  if (!j.dumps.length) return '<div style="padding: 10px 12px 12px"><div class="muted">No frame dump in this run.</div></div>';
+  return '<div style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px">' + j.dumps.map((d) => `
+    <div style="display: grid; grid-template-columns: ${d.thumb ? '120px ' : ''}minmax(0,1fr); gap: 10px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line)">
+      ${d.thumb ? `<img src="${esc(d.thumb)}" alt="" style="width: 120px; border-radius: 4px; background: var(--screen)">` : ''}
+      <div><span class="mono" style="font-weight: 500">${esc(d.name)}</span> <span class="muted">${esc(d.text)}</span></div></div>`).join('') + '</div>';
+}
+
+// ------------------------------------------------------------------ queue and finished
+let qHtml = '', fHtml = '';
+function queue() {
+  const q = S.queue || [];
+  const h = q.length ? `<div class="scroll"><div style="min-width: 760px">` + q.map((r) => `<div class="row qrow">
+      <span class="mono k-rev">${esc(r.pos)}</span>
+      <div style="min-width: 0"><div class="ell" style="font-weight: 600">${esc(r.title)}</div><div class="faint mono ell" style="font-size: 11px">${esc(r.who)}</div></div>
+      <div><span class="chip">${esc(r.kindLabel)}</span><div class="mono muted" style="font-size: 11px; margin-top: 2px">wants ${esc(r.wants)}</div></div>
+      <div class="muted" style="font-size: 12px">${esc(r.why)}</div>
+      <span class="mono k-rev" style="text-align: right">${esc(r.age)}</span></div>`).join('') + '</div></div>'
+    : '<div class="muted" style="padding: 10px 12px; border-top: 1px solid var(--line)">Nothing waiting.</div>';
+  if (h !== qHtml) { $('queue').innerHTML = h; qHtml = h; }
+}
+function finished() {
+  const f = S.finished || [];
+  const row = (r) => {
+    const inner = `<span><span class="${r.cls} badge">${esc(r.result)}</span></span>
+      <div style="min-width: 0"><div class="ell" style="font-weight: 600">${esc(r.title)}</div><div class="faint mono ell" style="font-size: 11px">${esc(r.who)}</div></div>
+      <span class="chip" style="justify-self: start">${esc(r.kindLabel)}</span>
+      <div class="muted ell" style="font-size: 12px" title="${esc(r.note)}">${esc(r.note)}</div>
+      <span class="mono faint" style="text-align: right">${esc(r.when)}</span>`;
+    return r.link ? `<a class="row frow" href="${esc(r.link)}" target="_blank" rel="noopener" title="Open the report">${inner}</a>` : `<div class="row frow">${inner}</div>`;
+  };
+  const h = f.length ? `<div class="scroll"><div style="min-width: 760px">${f.map(row).join('')}</div></div>`
+    : '<div class="muted" style="padding: 10px 12px; border-top: 1px solid var(--line)">Nothing finished in the last 2 h.</div>';
+  if (h !== fHtml) { $('finished').innerHTML = h; fHtml = h; }
+}
+
+// ------------------------------------------------------------------ events
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'max') { maxId = maxId === b.dataset.id ? null : b.dataset.id; store.set('max', maxId); }
+  else if (act === 'tab') { tabs[b.dataset.id] = b.dataset.tab; store.set('tabs', tabs); }
+  else if (act === 'info') { info[b.dataset.k] = !info[b.dataset.k]; b.classList.toggle('on', info[b.dataset.k]); b.setAttribute('aria-expanded', String(info[b.dataset.k])); }
+  else if (act === 'theme') { const l = !app.classList.contains('light'); store.set('light', l); theme(l); }
+  render();
+});
+
+function apply(s) {
+  const conn = $('conn');
+  if (s.error) { conn.textContent = 'The dashboard could not read the bench: ' + s.error; conn.classList.remove('hidden'); return; }
+  conn.classList.add('hidden');
+  S = s;
+  render();
+}
+// The state is pushed (Server-Sent Events); `?poll` fetches it every 2 s instead (a
+// headless screenshot waits for the page to finish loading, which a stream never does).
+const lost = () => { const c = $('conn'); c.textContent = 'Lost the watcher (./a2test watch); retrying…'; c.classList.remove('hidden'); };
+if (Q.has('poll')) {
+  const poll = () => fetch('/api/state', { cache: 'no-store' }).then((r) => r.json()).then(apply).catch(lost);
+  poll();
+  setInterval(poll, 2000);
+} else {
+  const es = new EventSource('/events');
+  es.addEventListener('state', (ev) => apply(JSON.parse(ev.data)));
+  es.onerror = lost;
+}
+</script>
+</body>
+</html>

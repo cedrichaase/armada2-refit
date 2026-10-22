@@ -29,7 +29,9 @@ Any prose is description.
 ```
 
 Every numbered or bulleted line is one step. Quotes may be straight or curly, and a
-leading "Then" or "And", or a trailing full stop, is ignored.
+leading "Then" or "And", or a trailing full stop, is ignored. A `## ` heading among the
+steps names a phase (`## Main menu`, `## Mission HUD`): the bench dashboard shows how far
+each phase has got. Without headings it makes one phase per screenshot.
 
 ## Deterministic steps
 

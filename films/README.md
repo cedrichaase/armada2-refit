@@ -575,7 +575,10 @@ House style for showcase footage (from the October showcase):
 A take starts its session in a game slot (`testbench/bench/slots.py`): at most `A2_SLOTS`
 games run on the machine at once, whoever started them, and a take waits for a free one.
 A shot with `Players` takes the slots of all its players in one request, so two such shots
-cannot deadlock. `./a2film slots` shows who holds them.
+cannot deadlock. `./a2film slots` shows who holds them. A `probe` or `take` run is one job
+on the bench dashboard (`./a2test watch`, testbench/README.md "Watching"): its takes'
+sessions share one column, and each take reports its phase there (queued, starting,
+scene, setup, recording with its time against the action's waits, finishing, done).
 
 A take whose game dies with it (crashed, killed under load, never launched, gone before the
 scene was built or at the end of the action) is filmed once more from a fresh session; a
