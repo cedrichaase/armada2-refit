@@ -5,7 +5,7 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
-## 1.6.2 — 2026-10-21
+## 1.6.3 — 2026-10-21
 
 ### Changed
 - `QOL.asi` and `QOLRules.asi` each carry a version resource (`VERSIONINFO`): product,
@@ -13,6 +13,16 @@ versions". Newest first. Details, and the planned changes, are in
   product version, which Windows shows in the file's Properties. Built by `platform/versioninfo/build-res.sh` (915cad8).
 
 Installed, not yet seen in game.
+
+## 1.6.2 — 2026-10-21
+
+### Fixed
+- `QOLRules.asi`: an order refused under `PayOnQueue=1` was dropped in silence; it now
+  speaks stock's advisor line for the first resource short (dilithium, officers, crew,
+  latinum, metal, biomatter, in `StartBuild`'s order), to the refused player only, with
+  stock's cadence, and logs an `advisor:` line (issue #1). Scenario `qol-refused-advisor` (c23cb19).
+
+Confirmed in game 2026-10-22.
 
 ## 1.6.1 — 2026-10-12
 

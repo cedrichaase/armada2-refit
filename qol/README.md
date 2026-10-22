@@ -480,8 +480,10 @@ items can still stall at the third.
 - **Spreading orders (QOL-6) needs no extra rule.** Each order is charged when it is
   placed, whichever building it goes to.
 
-**Feedback.** No voice-over. Use the button's own disabled state, a short click, or one
-line in the chat box (`notice()`, as `online/` does). Never a window of our own.
+**Feedback.** At first: no voice-over. Since issue #1 (qol 1.6.2) a refused order says
+so the way stock says a stalled build does, with the same advisor line, once per click
+at most and only to the player refused (see "The advisor on a refused order" below).
+Never a window of our own.
 
 **Multiplayer: this one is not client-side.** Every peer simulates the bank. If only one
 side charges on enqueue, the banks drift apart and the game desyncs. So the charge,
@@ -541,8 +543,39 @@ answers with whether everyone has the plugin; `QOLRules_Network`), and the plugi
 the answer, until the next game opens (`Program::GameOpenPreLoad`). Only *Internet –
 Online* has it; other transports stand down.
 
-Not done: a refusal only reaches `QOLRules.log`, no on-screen
-feedback; destruction, capture and save/load paths are built but not bench-tested; a
+### The advisor on a refused order (issue #1, qol 1.6.2)
+
+Stock's only word that the bank is short comes from `Producer::StartBuild` (0x4b8180)
+when it fails: it tests the bank in the order dilithium (with the `EPSILON` margin),
+officers (cost above `Team::GetOfficerVacancies`), crew, latinum, metal, biomatter, and
+at the first shortfall calls `ComputerVoice::Say(Topic, GameObject *, const Race *)`
+(0x45d8c0, `__cdecl`) with the producer and a null race, topic 9, 10, 0x36, 0x37 or 0x38
+for dilithium, crew, latinum, metal and biomatter. For officers it asks the team's race
+(`Team` +0x244) for `Race::GetInsufficentOfficerEventId` (0x48c120, `__thiscall`) and
+passes that to the int overload, `ComputerVoice::Say(int, GameObject *, const Race *)`
+(0x45db20). Under `PayOnQueue` a refused order never reaches `StartBuild`, so `h_push`
+dropped it in silence; it now makes the same call for the same first shortfall
+(`short_of` keeps `StartBuild`'s order, so the line is the one stock would have
+spoken). `voice_ok()` checks, before anything is called, that `StartBuild` still pushes
+topic 9 at 0x4b826c and calls the three functions at 0x4b826e, 0x4b829a and 0x4b82a0;
+if not, refusals stay silent and the startup line says so.
+
+Why this is safe on every node: both `Say`s end in `GameEvent::TriggerEvent(GameObject *,
+const Race *)` (0x479b70), which plays only when the object's team is
+`Entity::GetUserTeam()` (unless the event is flagged for everyone), and not again within
+the event's own interval, timed with `Get_TimeLocal` (wall clock). The sound is picked
+with `g_asyncRandom` in `GameEvent::mTriggerRaceSound`; the rest is the chat line and
+minimap mark the event carries. Nothing the simulation reads changes and `g_random` is
+not drawn, so `Handle_New_Command` running on every node of a network game speaks only
+on the machine of the player refused, and repeated clicks are held back by the same
+gates as stock's. Measured on the bench (Instant Action, Federation, `--stems voice`):
+stock, with a build stalled on dilithium, spoke once in 100 s, and once more per order
+added to the stalled queue (three orders 0.15 s apart: one line; 0.5 s apart: two; 2 s
+apart: three); the plugin, refusing for crew, spoke one line for three orders 0.15 s
+apart and three for three 0.5 s apart -- the same, within the timing of the clicks. Each call writes an `advisor:` line in
+`QOLRules.log` naming the topic (-1 for officers) and whether the team is the local one.
+
+Not done: destruction, capture and save/load paths are built but not bench-tested; a
 refit save with paid items loaded in stock loses what was paid; construction ships and
 the AI's own orders (if it bypasses the command) are untested.
 

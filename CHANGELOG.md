@@ -5,9 +5,9 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 12.39.2 — 2026-10-21
+## 12.41.2 — 2026-10-21
 
-Layers: render3d 0.16.2, ui 0.13.4, hud 2.2.3, menus 4.3.4, qol 1.6.2, grid 1.0.2, online 0.6.3, cutscenes 2.0.3.
+Layers: render3d 0.16.4, ui 0.13.4, hud 2.2.3, menus 4.3.4, qol 1.6.3, grid 1.0.2, online 0.6.3, cutscenes 2.0.3.
 
 ### Changed
 - Every plugin we build (the eight ASIs and `binkw32.dll`) carries a version resource:
@@ -19,6 +19,46 @@ Layers: render3d 0.16.2, ui 0.13.4, hud 2.2.3, menus 4.3.4, qol 1.6.2, grid 1.0.
   `platform/versioninfo/version.sh`, which the build scripts source too.
 
 Installed, not yet seen in game.
+
+## 12.41.1 — 2026-10-21
+
+Layers: qol 1.6.2.
+
+### Fixed
+- qol: an order `QOLRules.asi` refuses for want of resources speaks stock's advisor
+  line again ("Insufficient crew", ...), to the refused player only (issue #1, c23cb19).
+
+Confirmed in game 2026-10-22.
+
+## 12.41.0 — 2026-10-21
+
+Layers: render3d 0.16.3, testbench 3.41.0.
+
+### Fixed
+- render3d: a black hole under the fog of war is no longer a dark disc in the fog: a
+  fog-of-war ghost's additive meshes are added at half strength, as stock draws them
+  (issue #3, 7e7a184).
+
+### Added
+- testbench: scene and scenario `fog-blackhole` (issue #3).
+
+Confirmed in game 2026-10-22.
+
+## 12.40.0 — 2026-10-21
+
+Layers: render3d 0.16.2, testbench 3.40.0.
+
+### Fixed
+- render3d: a freighter carrying latinum trails its golden spray again, and every
+  freighter's cargo pods light in the colour of its cargo up to the fill, as in stock
+  (GitHub issue #2, 7c49408); old SODs' alpha-tested meshes are cut-outs, as the
+  engine draws them.
+
+### Added
+- testbench: the scene command `cargo`, the `freighters` scene and the scenario
+  `render3d-freighter-trail`.
+
+Confirmed in game 2026-10-22.
 
 ## 12.39.1 — 2026-10-21
 
