@@ -4,6 +4,22 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.16.0 — 2026-10-23
+
+### Changed
+- `shaders/ui.hlsl` is modern HLSL, built for Direct3D 9 as before and for SPIR-V
+  (`src/shaders/ui_spv.rs`) (729f9bb).
+- The 2D renderer, the close-up's pictures, the menus' backdrop, the minimap's engine
+  textures and `UI.dump` go through `gpu/`: the frame's state is saved with the
+  recorded state block instead of `D3DSBT_ALL`, vertices go through gpu's ring
+  buffers, and textures are made again by gpu after a `Reset` or a new device (caef061).
+
+### Removed
+- `src/d3d` (now `gpu::d3d9::raw`).
+
+Measured on the bench: the showcase's presented frame with the HUD is the same pixels
+as before (RMSE 0). Installed, not yet seen in game.
+
 ## 0.15.0 — 2026-10-22
 
 ### Added

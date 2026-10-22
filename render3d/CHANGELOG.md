@@ -4,6 +4,31 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.19.0 — 2026-10-23
+
+### Changed
+- Every shader (`shaders/*.hlsl`, `chain.hlsli`) is modern HLSL (`Texture*` and
+  `SamplerState`, `cbuffer`, `SV_Position`/`SV_Target`, `Sample*`, `select`), with what
+  differs between vkd3d and dxc in `gpu/shaders/compat.hlsli` (729f9bb). The Direct3D 9
+  bytecode is the same code with the same constant registers and sampler stages:
+  `d3dbc-slots.py` puts vkd3d's renumbered samplers back on their stages, and
+  `d3dbc-fix.py` narrows vPos's declaration to `.xy`.
+- The frame's targets, scene pass, resolve, bloom, tone map and frame dumps go through
+  `gpu/`, the graphics interface shared with UI.asi; `gfx::Guard` is a gpu section with
+  a state block per nesting depth; the black line at the view's right and bottom edges
+  is cleared after the body (`frame::black_lines`) (caef061).
+
+### Added
+- `hlsl-rs.sh` also writes SPIR-V for each shader (`src/shaders/<name>_spv.rs`: dxc,
+  Vulkan 1.1, checked by `spirv-val`, stamped), not linked in yet.
+
+### Removed
+- `src/d3d` (now `gpu::d3d9::raw`).
+
+Measured on the bench: `port-showcase`, `port-nebula`, `port-firing` draw the same pixels
+as before (39 frames, scene targets, bloom levels and presented frames: RMSE 0).
+Installed, not yet seen in game.
+
 ## 0.18.0 — 2026-10-22
 
 ### Added
