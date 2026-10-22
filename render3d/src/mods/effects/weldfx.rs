@@ -3,9 +3,9 @@
 //! cooling seams and welding beams, built on the CPU facing the camera and drawn
 //! additively in one call, depth-tested against the hulls, writing no depth.
 use super::Cam;
-use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
-use crate::gfx::{self, Shader};
+use crate::gfx::{self, Pipes};
+use gpu::{Blend, Block, Topology};
 use crate::math::{v3, V3};
 use crate::shaders::effects_construction::*;
 use alloc::vec::Vec;
@@ -27,8 +27,7 @@ struct Vert {
 const MAX_QUADS: usize = 4096;
 
 pub struct Fx {
-    vs: Shader,
-    ps: Shader,
+    pipes: Pipes,
     quads: Vec<Vert>,
     /// The flare's shape: core sharpness, glow sharpness, rays' share, rays' sharpness.
     pub flare: [f32; 4],
@@ -36,7 +35,7 @@ pub struct Fx {
 
 impl Fx {
     pub fn new() -> Fx {
-        Fx { vs: Shader::vertex(&VS_CWELD), ps: Shader::pixel(&PS_CWELD), quads: Vec::new(), flare: [60.0, 3.5, 1.4, 30.0] }
+        Fx { pipes: Pipes::new(), quads: Vec::new(), flare: [60.0, 3.5, 1.4, 30.0] }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -102,22 +101,16 @@ impl Fx {
         if self.quads.is_empty() {
             return;
         }
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if self.vs.bind(dev) && self.ps.bind(dev) {
-            for (st, val) in [
-                (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0),
-                (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
-                (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3),
-                (RS_STENCILENABLE, 0), (152, 0), (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-            ] {
-                dev.set_rs(st, val);
+        let _ = v;
+        let pipe = self.pipes.view(0, || super::fx_desc(&VS_CWELD, &PS_CWELD, &super::QUAD2, 44, Topology::TriangleList, Blend::ADD));
+        if let (Some(mut cmd), Some(pipe)) = (gfx::cmd(), pipe) {
+            if cmd.set_pipeline(&pipe) {
+                cmd.vs_block(Block::new(0, &c.vp));
+                cmd.ps_block(Block::new(0, &self.flare));
+                if let Some(s) = cmd.vertices(&self.quads) {
+                    cmd.draw(&s);
+                }
             }
-            // XYZ, two sets of four-float texture coordinates
-            dev.set_fvf(0x2 | 0x200 | (2 << 16) | (2 << 18));
-            dev.vs_const(0, &c.vp);
-            dev.ps_const(0, &self.flare);
-            dev.draw_primitive_up(PT_TRIANGLELIST, (self.quads.len() / 3) as u32, self.quads.as_ptr() as *const u8, core::mem::size_of::<Vert>() as u32);
         }
         self.quads.clear();
     }
