@@ -63,3 +63,27 @@ scene. Two causes, both fixed:
 Where the rest goes in the battle (`Timing=1`'s zones, CPU per view): the hulls' draws
 0.08 ms, their posing 0.07 ms and shadow map 0.03 ms; the sky's 770 star quads,
 gathered on the CPU each frame, 0.2 ms; the effects 0.1-0.2 ms.
+
+## A/B: any two checkouts or commits
+
+`compare.sh` measures render3d against the engine with the old plugins. To measure a
+change to render3d (or ui, or anything `./install` puts in) against what came before
+it, use `ab.sh`, which installs each side whole and times both the same way:
+
+    render3d/perf/ab.sh main HEAD                      # two revisions
+    RUNS=3 SCENES=showcase render3d/perf/ab.sh ../other-worktree .   # two directories, three passes
+
+- A side is a checkout directory or a git revision. A revision is exported with
+  `git archive` into `~/.cache/armada2-refit/perf-trees/<sha>/` and built there, kept
+  for the next run; nothing is built in the user's checkout or a worktree that is not
+  named.
+- Each side gets its own `./install`, the scene builder and `probe-new` (`Timing=1`).
+  `RES` (default 1920x1080), `SETTLE` (seconds after the scene is ready, default 80)
+  and `SCENES` (default `showcase match nebula`) as in `compare.sh`; logs and shots go
+  to `$A2_DATA/perf/ab-<time>/`, with `sides.tsv` naming what `a` and `b` were.
+- `RUNS=N` repeats each pair, alternating the order (a b, then b a), so a machine that
+  warms up or drifts does not land on one side. `summary.py` gives a column per side,
+  the mean of the runs with their spread (min-max) for the frame, CPU and GPU times,
+  and the worst of the runs for the maxima. A difference inside the spread is noise.
+- The bench presents with vsync, so compare busy times (CPU and GPU), not the frame
+  period, as above.
