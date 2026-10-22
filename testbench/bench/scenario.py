@@ -824,6 +824,31 @@ def s_layout_cover(c, m):
                      measure=dict(panels=panels, share=round(share, 4), limit=limit))
 
 
+# -- pixel baselines ($A2_DATA/baselines; bench/baseline.py, testbench/README.md "Baselines")
+
+@step(r'^record (?:the )?(?:screenshot|shot|dump) ' + Q.format('name') + r' as (?:the )?baseline ' + Q.format('base') + r'$|'
+      r'^record (?:every|each|all(?: the)?) (?:screenshots?|shots) as (?:the )?baseline ' + Q.format('base2') + r'$')
+def s_baseline_record(c, m):
+    from . import baseline
+    try:
+        return baseline.step_record(c, [m.group('name')] if m.group('name') else None,
+                                    m.group('base') or m.group('base2'))
+    except baseline.BaselineError as e:
+        raise StepFailed(str(e))
+
+
+@step(r'^(?:expect|check|verify)(?: that)? (?:the )?(?:screenshot|shot|dump) ' + Q.format('name') +
+      r' (?:matches|is the same as) (?:the )?baseline ' + Q.format('base') +
+      r'(?:,? within (?:an )?rmse (?:of )?(?P<rmse>[\d.]+)(?:/255)?)?'
+      r'(?:,? (?:and )?with at most (?P<pct>[\d.]+) ?% of (?:the )?pixels over (?P<thr>[\d.]+)(?:/255)?)?$')
+def s_baseline_expect(c, m):
+    from . import baseline
+    f = lambda k: float(m.group(k)) if m.group(k) else None  # noqa: E731
+    ok, detail, shots, measure = baseline.step_expect(c, m.group('name'), m.group('base'), rmse=f('rmse'),
+                                                      pct=f('pct'), threshold=f('thr') or 2.0)
+    return c.checked(ok, detail, shots, how='pixel diff against the baseline (bench/baseline.py)', measure=measure)
+
+
 # -- judged and delegated
 
 @step(r'^(?:check|verify|ensure|expect|confirm|assert|make sure)(?: that)? (?P<what>.+)$')

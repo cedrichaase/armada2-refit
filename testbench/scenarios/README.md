@@ -125,6 +125,24 @@ A missing baseline is the reference case's failure, not an unclear result in thi
 Judged steps that ask for a comparison are skipped the same way rather than sent to the
 judge with nothing to compare against.
 
+## Baselines (pixel diff)
+
+Frames kept in `$A2_DATA/baselines/<B>/` and compared pixel for pixel
+(`../README.md`, "Baselines", has what each number means).
+
+| Step | What it does |
+|---|---|
+| `Record the screenshot "NAME" as baseline "B"` | copies this case's latest frame of that name into baseline B, with the case's commits, resolution and scene; replaces a shot of that name. `the dump "NAME"` finds a `.ppm`/`.pfm` dump of that name in the case |
+| `Record every screenshot as baseline "B"` | the same for every named screenshot the case has taken so far |
+| `Expect the screenshot "NAME" matches baseline "B"` | RMSE, max, pixels over 2/255 and PSNR against the baseline; with no tolerance, no pixel may be over 2/255. The heat map and a side by side go into the case's `baseline/` and the report |
+| `… within RMSE 0.5` | passes at an RMSE (in 1/255) up to that |
+| `… with at most 0.1% of pixels over 4` | at most that share of pixels with a channel more than 4/255 off. Both tolerances may be given, RMSE first |
+
+A missing baseline, or a baseline without that shot, fails the step and names the step
+or command that records it. A baseline holds one size of frame: a scenario run at
+several resolutions needs a baseline per resolution (`"pre-gpu-720"`), or the
+comparison fails on the size.
+
 ## Judged and delegated steps
 
 - **`Check that …` / `Verify …` / `Make sure …`** that is none of the above is *judged*:

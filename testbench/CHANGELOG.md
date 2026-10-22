@@ -5,6 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.42.0 — 2026-10-22
+
+### Added
+- `./a2test baseline record | compare | diff | list | show` (`bench/baseline.py`): named
+  frames in `$A2_DATA/baselines/<NAME>/` with their provenance (`meta.json`), and a pixel
+  diff per shot: RMSE, max, pixels over `--threshold`, PSNR, a heat map and a side by
+  side (`--gif`: a flicker GIF); `--rmse`, `--max-over` set the exit status. Reads PNG,
+  PPM (P6/P5, 8 and 16 bit) and PFM, compared in linear float and after a fixed tone map.
+- Scenario steps `Record the screenshot "NAME" as baseline "B"`, `Record every
+  screenshot as baseline "B"` and `Expect the screenshot "NAME" matches baseline "B"
+  [within RMSE X] [with at most N% of pixels over T]`.
+- `bench/baseline_selftest.py`: every number, the readers and the exit codes on
+  synthetic frames, no game.
+
+Installs nothing.
+
 ## 3.41.2 — 2026-10-22
 
 ### Removed

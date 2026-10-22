@@ -24,6 +24,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test drive --session ID step 'Wait for the single player screen'
     ./a2test session stop ID                 #   ends the game, gathers logs, writes the report
     ./a2test session list                    # the active sessions and their IDs
+    ./a2test baseline compare NAME --from ID # pixel diff against a baseline ("Baselines")
 
 ### Which session a command acts on
 
@@ -355,6 +356,88 @@ every resolution), and a comparison against it would pass anything the mod gets
 consistently wrong. At 800x600 the front end's own 800x600 mode fills the screen, so
 clicks map 1:1 and the game quits through its menus. At 1600x1200, stock did neither.
 `hud.md` says `Reference: 800x600 stock` and `Stock shell: embed`.
+
+## Baselines
+
+A port of the renderer (render3d and ui onto a shared `gpu` crate, then Vulkan and
+Direct3D 12) is right when it draws the same pixels. That is checked against
+**baselines**: named sets of frames, kept with their provenance, and a pixel diff
+against them (`bench/baseline.py`).
+
+    ./a2test baseline record pre-gpu --from SESSION_ID --shot orbit --shot wide
+    ./a2test baseline compare pre-gpu --from ~/.local/share/a2test/results/<run>/<scenario>/1280x720
+    ./a2test baseline diff a.pfm b.pfm --gif        # any two frames, dirs, sessions or baselines
+    ./a2test baseline list
+    ./a2test baseline show pre-gpu
+
+**Where they live.** `$A2_DATA/baselines/<NAME>/` (`A2_BASELINES` overrides): one file
+per shot, copied as it was (PNG, PPM or PFM), and `meta.json`. Each shot there carries
+its own provenance: when it was recorded, the bench's commit, the `installs=` commits
+of the session or case it came from, its resolution, mod state, scene and session. A
+frame is game-derived, so neither a baseline nor a comparison's output may go into a
+checkout (hard rule 8): the tool refuses a path inside one. Comparisons write to
+`~/.cache/a2test/baselines/<time>-<name>/` (or `--out`): a heat map and a side by side
+per shot, `compare.json` and an `index.html`.
+
+**Where frames come from** (`--from`, and both sides of `diff`): an image file, named
+by its stem; a case directory of a run or a session, whose screenshots are named as the
+step log names them (the last of each name) and whose `.ppm`/`.pfm` dumps anywhere
+under it are named by stem; a scenario or run directory holding one case; any other
+directory of images; a session ID, live or ended; or a baseline's name. `record` adds
+to a baseline and refuses to replace a shot it holds unless given `--force`.
+
+**What the numbers mean.** Every frame is compared as RGB; an alpha channel is dropped,
+and the report says so.
+
+| Number | What |
+|---|---|
+| `rmse` | root mean square of every channel's difference, in 1/255 |
+| `max` | the largest single channel difference, in 1/255 |
+| `over` | pixels where any channel differs by more than `--threshold` (default 2/255), as a count and a share of the frame. Strictly more: a difference of exactly the threshold is not over it |
+| `psnr` | 20 log10(255 / rmse), in dB; `inf` when identical |
+
+A PFM (float, the HDR scene target and the bloom levels) is compared in linear values:
+`linear rmse` and `linear max` as stored. The other four are then measured after a fixed
+tone map (Reinhard, x/(1+x) per channel, times 255), so the same `--threshold` and
+tolerances read the same way for a float frame as for an 8-bit one. Frames of different
+sizes, or an 8-bit frame against a float one, are not compared; that is a failure with
+its reason, never a number. PFM rows are stored bottom to top and the sign of its scale
+is the byte order (negative: little-endian); the reader undoes both, and the self-test
+checks it against hand-made bytes and against OpenCV.
+
+**The heat map** shows each pixel's largest channel difference (linear for a PFM) on a
+square-root scale up to that frame's own maximum, so that one changed pixel still
+shows. It is drawn over a dimmed grey copy of the baseline, and identical pixels stay
+grey. The legend under it gives the scale. `--gif` adds a two-frame flicker GIF
+(ImageMagick): a one-pixel shift that a heat map shows as an outline is obvious there.
+
+**Pass or fail.** `--rmse X` and `--max-over N` (a count, or `P%`) are the tolerances.
+With neither, no pixel may be over the threshold. `compare` and `diff` exit 0 when
+every shot is within tolerance, 1 when any is not (or a shot is missing, or the sizes
+differ), and 2 on a usage error such as a missing baseline.
+
+**In a scenario** (`scenarios/README.md`, "Baselines"):
+
+    1. Take a screenshot called "orbit".
+    2. Expect the screenshot "orbit" matches baseline "pre-gpu" within RMSE 0.5.
+
+A missing baseline fails the step and says how to record it. The report shows the
+numbers and links the heat map and the side by side, kept in the case's `baseline/`.
+
+**Why not the judge.** A judged step asks a model whether a picture looks right. A port
+is right only when it draws the same pixels, and a model cannot see a half-texel shift,
+a channel swapped in one material, or bloom 3% too strong. It passes all three, and
+each costs money and time. The diff is exact, free and the same on every run. It
+also gives a number to track: before/after a refactor, and backend against backend.
+
+**The noise floor.** Two frames of the same paused scene are not identical yet: the
+render is not deterministic (cosmetic particles, the blue-noise march). Measured on
+`showcase`, paused, at 1280x720: NOISEFLOOR. Until the render is made deterministic,
+a tolerance has to sit above that floor; once it is, the default (nothing over 2/255)
+is the target.
+
+`python3 testbench/bench/baseline_selftest.py` checks every number, the readers, the
+exit codes and the steps on synthetic frames, with no game.
 
 ## Judged and agent steps
 
