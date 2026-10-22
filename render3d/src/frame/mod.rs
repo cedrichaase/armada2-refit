@@ -196,6 +196,13 @@ pub fn scene_formats() -> Option<(Format, u32, Format)> {
     Some((t.fmt, t.samples.max(1), t.depth.desc().format))
 }
 
+/// The scene pass's colour and depth targets: what a module copies the view from, or
+/// resolves its depth from.
+pub fn scene_targets() -> Option<(gpu::Texture, gpu::Texture)> {
+    let t = frame().as_ref()?.targets.as_ref()?;
+    Some((t.scene.clone(), t.depth.clone()))
+}
+
 /// Binds the engine's target and depth again (when the frame has no post passes to).
 fn restore(saved: &Saved) {
     let Some(mut cmd) = gfx::gpu().begin(gfx::frame()) else { return };

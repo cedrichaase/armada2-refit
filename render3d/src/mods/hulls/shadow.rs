@@ -40,6 +40,13 @@ pub struct ShadowMap {
     pub range: f32,
 }
 
+impl ShadowMap {
+    /// **Transitional**: the map as a `gpu` texture, until this module is ported.
+    pub fn texture(&self) -> gpu::Texture {
+        crate::gfx::gpu().wrap_d3d9_texture(Com::from_borrowed(self.tex))
+    }
+}
+
 static mut CURRENT: Option<ShadowMap> = None;
 static mut PLANETS: [[f32; 4]; 8] = [[0.0; 4]; 8];
 static mut SUN: V3 = v3(0.0, 1.0, 0.0);

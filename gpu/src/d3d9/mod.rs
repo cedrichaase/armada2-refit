@@ -1344,6 +1344,8 @@ impl<'a> Cmd<'a> {
         let mut color = 0;
         let mut z = 1.0;
         if let Some(Load::Clear(c)) = pass.colors.first().map(|c| c.load) {
+            // A load operation clears every channel, whatever a pipeline masked last.
+            dev.set_rs(RS_COLORWRITEENABLE, 0xf);
             flags |= CLEAR_TARGET;
             color = d3d_color(c);
         }
