@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.46.1 — 2026-10-23
+
+### Fixed
+- `a2test watch`: a screen tile is plain black until its frame arrives, instead of a
+  striped placeholder that flickered with black while a session or game was launching;
+  the resolution is no longer drawn across it (the chip still shows it).
+
+Installed, not yet seen in game.
+
 ## 3.46.0 — 2026-10-22
 
 ### Added

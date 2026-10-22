@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.2.1 — 2026-10-23
+
+Layers: testbench 3.46.1.
+
+### Fixed
+- The bench dashboard's screens stay black while a game launches, without the striped
+  placeholder (testbench 3.46.1).
+
+Installed, not yet seen in game.
+
 ## 13.2.0 — 2026-10-22
 
 Layers: testbench 3.46.0.
