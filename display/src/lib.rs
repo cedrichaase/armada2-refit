@@ -12,12 +12,15 @@ extern crate alloc;
 #[macro_use]
 pub mod macros;
 pub mod rt;
+#[rustfmt::skip]
+pub mod shaders;
 pub mod api;
 pub mod com;
 pub mod d3d8;
 pub mod detail;
 pub mod drop;
 pub mod trace;
+pub mod stub;
 pub mod user32;
 
 use core::ffi::c_void;
@@ -41,6 +44,22 @@ struct Config {
 
 static mut CONFIG: Option<Config> = None;
 static mut REAL: HANDLE = core::ptr::null_mut();
+/// `Mode=stub` asked for; whether it runs is decided at `Direct3DCreate8`.
+static mut STUB_ASKED: bool = false;
+
+/// The plugins that change what the engine draws, which in stub mode would draw
+/// nothing (README.md, "Stub mode"): with any loaded, the stub stands down.
+const ENGINE_PLUGINS: [&str; 3] = ["HUD.asi", "GridLayout.asi", "Menus.asi"];
+
+fn stub_allowed() -> bool {
+    for p in ENGINE_PLUGINS {
+        if !unsafe { GetModuleHandleA(rt::cstr(p).as_ptr()) }.is_null() {
+            log!("Mode=stub: {} is loaded and changes what the engine draws, which the stub drops; forward mode instead", p);
+            return false;
+        }
+    }
+    true
+}
 
 fn config() -> &'static Config {
     unsafe { CONFIG.as_ref().expect("config") }
@@ -61,9 +80,10 @@ fn startup() {
     };
     rt::log_open("Display8.log", cfg.log || cfg.trace);
     let mode = ini.string("Display8", "Mode").unwrap_or_else(|| alloc::string::String::from("forward"));
-    log!("Display8 {} -- game dir {}; mode {}; forward to {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
-    if !mode.eq_ignore_ascii_case("forward") {
-        log!("Mode={}: not a mode of this version (forward only); forward it is", mode);
+    log!("Display8 {} -- game dir {}; mode {}; the real chain: {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
+    unsafe { STUB_ASKED = mode.eq_ignore_ascii_case("stub") };
+    if !mode.eq_ignore_ascii_case("forward") && !mode.eq_ignore_ascii_case("stub") {
+        log!("Mode={}: not a mode of this version (forward, stub); forward it is", mode);
     }
     unsafe { CONFIG = Some(cfg) };
     d3d8::install();
@@ -119,6 +139,13 @@ fn real_proc(name: &str) -> usize {
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Direct3DCreate8(sdk: u32) -> *mut c_void {
+    if unsafe { STUB_ASKED } && stub_allowed() {
+        if let Some(d) = stub::start() {
+            log!("Direct3DCreate8({}) -> the stub: the engine draws nothing from here", sdk);
+            return d;
+        }
+        log!("Mode=stub: no Direct3D 9 for the stub; forward mode instead");
+    }
     let f = real_proc("Direct3DCreate8");
     if f == 0 {
         return core::ptr::null_mut();

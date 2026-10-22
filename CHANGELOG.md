@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.6.0 — 2026-10-23
+
+Layers: display 0.3.0, testbench 3.48.0.
+
+### Added
+- Display8's stub mode (`Mode=stub`, off by default): the engine draws nothing and
+  render3d and the UI draw the whole frame on a Direct3D 9 device of Display8's own
+  (display 0.3.0). Scenarios `port-*` and `display-stub` (testbench 3.48.0).
+
+Installed, not yet seen in game.
+
 ## 13.5.0 — 2026-10-23
 
 Layers: display 0.2.0, platform 3.5.0.

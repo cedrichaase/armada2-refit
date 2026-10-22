@@ -79,16 +79,6 @@ pub fn locked(vb: *mut Obj, data: *mut *mut u8, off: u32, size: u32) {
     if !on() || data.is_null() {
         return;
     }
-    let p = unsafe { *data } as usize;
-    st().open.insert(vb as usize, (p, off, size));
-}
-
-pub fn unlocked(vb: *mut Obj) {
-    let s = st();
-    let Some((p, off, size)) = s.open.remove(&(vb as usize)) else { return };
-    if p == 0 {
-        return;
-    }
     let n = if size == 0 {
         // The whole buffer from `off`: its size from the description.
         let mut d = crate::d3d8::BufferDesc::default();
@@ -97,7 +87,30 @@ pub fn unlocked(vb: *mut Obj) {
     } else {
         size
     };
-    let sh = s.shadow.entry(vb as usize).or_default();
+    locked_ptr(vb as usize, unsafe { *data } as usize, off, n);
+}
+
+pub fn unlocked(vb: *mut Obj) {
+    unlocked_ptr(vb as usize);
+}
+
+/// A buffer (by the object's address, ours in either mode) locked at `p` for `n` bytes
+/// from `off`.
+pub fn locked_ptr(key: usize, p: usize, off: u32, n: u32) {
+    if !on() || p == 0 {
+        return;
+    }
+    st().open.insert(key, (p, off, n));
+}
+
+pub fn unlocked_ptr(key: usize) {
+    let s = st();
+    let Some((p, off, n)) = s.open.remove(&key) else { return };
+    if p == 0 {
+        return;
+    }
+    let vb = key;
+    let sh = s.shadow.entry(vb).or_default();
     let end = (off + n) as usize;
     if sh.len() < end {
         sh.resize(end, 0);

@@ -4,6 +4,28 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.3.0 — 2026-10-23
+
+### Added
+- `Mode=stub` (off by default): the real chain is never loaded; the engine gets an
+  `IDirect3D8` and devices of ours that accept everything and draw nothing, with
+  textures, surfaces and buffers in memory, and one display mode, the desktop's.
+  Display8 makes its own Direct3D 9 device on the game's window, which render3d and the
+  UI draw the whole frame on; what they read of the engine's state (transforms,
+  viewport, `Clear`, `BeginScene`/`EndScene`) reaches it. A texture a plugin asks for as
+  Direct3D 9 is mirrored there; the back buffer's movie frames are copied to the swap
+  chain; the engine's gamma ramp is drawn in the frame's last pass
+  (`shaders/present.hlsl`). Stands down to forward mode beside `HUD.asi`,
+  `GridLayout.asi` or `Menus.asi`.
+- `display/bench-mode.sh`: Display8's mode (and keys) in a bench clone from a scenario's
+  `Setup:`.
+
+Measured on the bench: the showcase frame's scene, bloom and presented frame are the
+same pixels as on the real chain, the screen within 1/255 (the gamma ramp); the whole
+game (`display-stub`) runs through, intro to Exit. What the stub drops that the engine
+still drew (the fade from black, the order ring, the menu backdrop read from the front
+buffer) is phase 1's to take over. Installed, not yet seen in game.
+
 ## 0.2.0 — 2026-10-23
 
 ### Added

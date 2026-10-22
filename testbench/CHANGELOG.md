@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.48.0 — 2026-10-23
+
+### Added
+- Scenarios `port-showcase`, `port-nebula`, `port-firing` (one paused frame each with the
+  bench clock, a shot and a frame dump: what a port of the renderer is compared by) and
+  `display-stub` (the whole game with Display8 in stub mode).
+
+Installed, not yet seen in game.
+
 ## 3.47.0 — 2026-10-23
 
 ### Added

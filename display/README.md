@@ -146,3 +146,51 @@ context is proved done before the stub drops everything.
   during a capture each `Unlock` copies what was written. This names a draw without a
   picture: the fade from black is a full-screen black quad whose alpha falls frame by
   frame, the drag box four white lines.
+
+## Stub mode
+
+`Mode=stub` (`src/stub/`): the real chain is never loaded. The engine gets an
+`IDirect3D8` and devices of ours that accept everything and draw nothing, and Display8
+makes a Direct3D 9 device of its own (`d3d9.dll` as the loader finds it: DXVK's beside
+the exe under Proton, Windows' own) on the game's window. render3d and the UI find it
+exactly as they found d3d8to9's, through `QueryInterface(IID_IDirect3DDevice9)` on the
+engine's device, and draw the whole frame on it.
+
+- **One Direct3D 9 device for the game's life**, made at the engine's first
+  `CreateDevice`. Its later `CreateDevice`s and `Reset`s get a new device object of
+  ours on the same Direct3D 9 device, or nothing at all.
+- **One display mode: the desktop's.** The engine is offered only that one (X8R8G8B8,
+  the adapter's refresh), so it draws at the size the swap chain has and no mouse
+  coordinate needs translating (phase 0 found the engine reads the mouse only through
+  `GetCursorPos`, `ScreenToClient` and `GetClientRect`). The game's window becomes a
+  borderless one covering the screen, and the swap chain is windowed on it.
+- **What the plugins read of the engine's state reaches the Direct3D 9 device**: the
+  transforms (render3d reads the view and the projection), the viewport, `Clear` of the
+  engine's own back buffer and depth, `BeginScene` and `EndScene`. Everything else is
+  kept for the engine's own `Get*` and goes nowhere.
+- **Resources are memory.** A texture's levels, a surface's pixels and a buffer's bytes
+  live in Display8, and a lock hands out a pointer into them, as the managed pool's
+  system copy did. Draws are counted (the inventory) and dropped.
+- **The mirror table.** A texture a plugin asks for as Direct3D 9 (the radar's two
+  scan-grid sprites, phase 0's only ones; the unit view's Bink frame) is made there
+  once with every level and brought up to date when the engine unlocks a level, at
+  once on the device's thread, else at the next `BeginScene` or `Present`
+  (`BinkThread` writes from its own).
+- **The back buffer's pixels** (the movie path locks it and writes each frame) are
+  copied into the swap chain's at `Present`.
+- **The gamma ramp in the last pass** (`src/stub/gamma.rs`, `shaders/present.hlsl`): a
+  windowed swap chain ignores `SetGammaRamp`, and on the real chain the ramp the engine
+  sets at start-up lifts every frame (DXVK's presenter applies it: 2 to 3, 80 to 90).
+  So the back buffer is copied and drawn back through a 256x1 lookup. Measured on the
+  showcase frame against the real chain's screen: the frames the plugins render are the
+  same to the last pixel (RMSE 0: scene, bloom levels, presented frame), and the screen
+  differs by at most 1/255 (RMSE 0.28): DXVK's mapping of a ramp value to 8 bits is none
+  of rounding (64 values of 256 per channel off by one), truncating ramp/257 (142),
+  interpolating half a texel back (13) or the high byte (13, what is used).
+- **Stands down** to forward mode when `HUD.asi`, `GridLayout.asi` or `Menus.asi` is
+  loaded (each changes what the engine draws, which the stub drops; `GridLayout.asi`
+  would leave no button bar at all, since the UI's stands down beside it), or when
+  Direct3D 9 cannot be made. The log says which.
+
+`display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
+`display-stub` walks the whole game on it.

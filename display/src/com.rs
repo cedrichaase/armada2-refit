@@ -192,6 +192,9 @@ pub fn is_ours(p: *mut c_void) -> bool {
     if p.is_null() {
         return false;
     }
+    if crate::stub::obj::is_stub(p) {
+        return false;
+    }
     let vt = unsafe { *(p as *const usize) };
     let first = vtable(Kind::D3D) as usize;
     let end = first + KINDS * MAX_SLOTS * 4;
