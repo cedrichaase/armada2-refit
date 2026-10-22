@@ -4,6 +4,16 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.14.0 — 2026-10-22
+
+### Added
+- Frame dumps on request: a `UI.dump` file beside the exe makes the next `Present`
+  write the back buffer, the frame as presented, as PPM into `Dumps\` with a sidecar
+  `<name>-<frame>-ui.txt`. The d3d8 device's `Present` is chained beside `Reset`
+  (`src/dump.rs`, `engine/device.rs`; README.md, "Frame dumps").
+
+Installed, not yet seen in game.
+
 ## 0.13.4 — 2026-10-21
 
 ### Changed

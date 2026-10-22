@@ -52,6 +52,7 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Type this machine's address` | the source address of the default route: what the game shows as "Local IP Address", and where every player of a case is |
 | `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
+| `Dump the frame called "NAME"` | Render3D.asi's targets (PFM) and UI.asi's presented frame (PPM), read back inside the game, into `dumps/NAME/` with PNG previews (`../README.md`, "Frame dumps"); fails when no plugin dumped |
 | `Note "TEXT"` | a line in the log |
 | `Scene "select yard1 yard2"` | commands to `Scene.asi` (`../scene/README.md`), `;` between several; a refused command fails the step. Needs `Setup: testbench/scene/bench-setup.sh <scene>` |
 | `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |

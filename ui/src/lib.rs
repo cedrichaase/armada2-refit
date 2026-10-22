@@ -8,6 +8,7 @@ extern crate alloc;
 pub mod rt;
 #[macro_use]
 pub mod d3d;
+pub mod dump;
 pub mod app;
 pub mod clipboard;
 pub mod config;

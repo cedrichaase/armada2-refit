@@ -617,6 +617,31 @@ the minimap, the selection overlay and the unit view's frame followed.
 [`HUD.md`](HUD.md) has the inventory of the HUD's components, the switch, the bar and
 the engine reads each panel uses.
 
+## Frame dumps
+
+The frame as presented, read back from inside the process: `UI.dump` beside
+`Armada2.exe` (its text, if any, names the dump) makes the UI write the back buffer at
+the next `Present` as a binary PPM (P6), byte for byte, into `Dumps\` in the game
+directory: `<name>-<frame>-present.ppm`, with a sidecar `<name>-<frame>-ui.txt` (the
+frame, the back buffer's size, format and samples) and a `dump:` line in `UI.log`.
+`<frame>` counts the presents since the hook went in. This is the whole frame, the 3D
+view with the HUD, the UI and the engine's cursor (when it draws one), before the
+swapchain and the compositor that a grim shot goes through; render3d dumps the stages
+before it (`render3d/README.md`, "Frame dumps"). The files are what `a2test baseline
+compare` is meant to read. On the bench, `a2test drive dump NAME` asks both plugins at
+once (`testbench/README.md`).
+
+The hook is the d3d8 device's `Present` (slot 15 of its vtable), chained beside
+`Reset` (`engine/device.rs`, once per vtable): every present goes through it, the
+engine's `RefreshDisplay` and the screens of our own alike, and it looks for the
+trigger every 30 presents, so without one it costs a counter and one
+`GetFileAttributesA` every 30 frames. The read-back is `src/dump.rs` (the same file as
+render3d's): `GetRenderTargetData` into a system-memory copy (through a plain target
+first if the back buffer is multisampled), converted a row at a time; it changes no
+state of the device. A format it has no conversion for is logged and skipped. Without
+a Direct3D 9 device behind the game's (DXVK's own d3d8) nothing is read, and the
+sidecar says so.
+
 ## Testing
 
 `./a2test run ui-widgets ui-widgets-cursor` (1280x720): the gallery driven by click,

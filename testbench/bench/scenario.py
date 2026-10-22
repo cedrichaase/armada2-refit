@@ -434,6 +434,19 @@ def s_shot(c, m):
     return f'{p.name}'
 
 
+@step(r'^dump the frame(?: (?:called|named|as) ' + Q.format('name') + r')?$')
+def s_dump(c, m):
+    """`Dump the frame called "NAME"`: Render3D.asi's targets and UI.asi's presented
+    frame read back in the game (bench/dumps.py). Fails when no plugin dumped."""
+    from . import dumps
+    st, text, previews = dumps.take(c.sess, m.group('name') or f'step-{c.n}')
+    for p in previews:
+        c.log.shot(p, p.name)
+    if st == 'fail':
+        raise StepFailed(text)
+    return text
+
+
 @step(r'^note ' + Q.format('text') + r'$')
 def s_note(c, m):
     c.log.note(m.group('text'))

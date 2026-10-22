@@ -143,6 +143,54 @@ pub fn write_file(path: &str, data: &[u8]) -> bool {
     }
 }
 
+/// Deletes a file; false if it could not be.
+pub fn delete_file(path: &str) -> bool {
+    let p = cstr(path);
+    unsafe { DeleteFileA(p.as_ptr()) != 0 }
+}
+
+/// Makes a directory (its parent must exist); true if it exists afterwards.
+pub fn create_dir(path: &str) -> bool {
+    let p = cstr(path);
+    unsafe {
+        CreateDirectoryA(p.as_ptr(), core::ptr::null_mut());
+        let a = GetFileAttributesA(p.as_ptr());
+        a != INVALID_FILE_ATTRIBUTES && a & FILE_ATTRIBUTE_DIRECTORY != 0
+    }
+}
+
+/// A file written a piece at a time (frame dumps, too big to build in memory first).
+/// Closed on drop.
+pub struct Writer {
+    h: HANDLE,
+    pub ok: bool,
+}
+
+impl Writer {
+    pub fn create(path: &str) -> Option<Writer> {
+        let p = cstr(path);
+        let h = unsafe {
+            CreateFileA(p.as_ptr(), GENERIC_WRITE, FILE_SHARE_READ, core::ptr::null_mut(),
+                CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, core::ptr::null_mut())
+        };
+        if h == INVALID_HANDLE { None } else { Some(Writer { h, ok: true }) }
+    }
+    pub fn write(&mut self, data: &[u8]) {
+        let mut w = 0u32;
+        if unsafe { WriteFile(self.h, data.as_ptr(), data.len() as u32, &mut w, core::ptr::null_mut()) } == 0
+            || w as usize != data.len()
+        {
+            self.ok = false;
+        }
+    }
+}
+
+impl Drop for Writer {
+    fn drop(&mut self) {
+        unsafe { CloseHandle(self.h) };
+    }
+}
+
 pub fn file_exists(path: &str) -> bool {
     let p = cstr(path);
     let a = unsafe { GetFileAttributesA(p.as_ptr()) };

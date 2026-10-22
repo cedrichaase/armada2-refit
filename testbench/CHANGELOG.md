@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.42.0 — 2026-10-22
+
+### Added
+- `a2test drive dump [NAME]` and the scenario step `Dump the frame called "NAME"`:
+  both plugins' frame dumps (Render3D's targets as PFM/PPM, UI's presented frame as
+  PPM) asked for through their trigger files, moved into the session's `dumps/NAME/`
+  with PNG previews and per-file min/mean/max (`bench/dumps.py`). A session gathers a
+  left-over `Dumps/` into `logs/Dumps/` when it stops.
+
+Installed, not yet seen in game.
+
 ## 3.41.2 — 2026-10-22
 
 ### Removed

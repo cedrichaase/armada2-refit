@@ -11,6 +11,9 @@
 //! - **`Reset`** (slot 14 of the d3d8 device's vtable, chained) fails while a state block
 //!   or anything in the default pool is held: the UI's state block and the close-up's
 //!   pictures go first.
+//! - **`Present`** (slot 15, chained with `Reset`) is where a frame dump asked for with
+//!   `UI.dump` reads the back buffer: the frame as presented, HUD, UI and the engine's
+//!   cursor included (README.md, "Frame dumps").
 use super::{field, hook};
 use crate::d3d::*;
 use crate::log;
@@ -22,10 +25,16 @@ const SLOT_DESTROY: usize = 28;
 const DESTROY: usize = 0x624760;
 /// `IDirect3DDevice8::Reset`.
 const D3D8_RESET: usize = 14;
+/// `IDirect3DDevice8::Present`.
+const D3D8_PRESENT: usize = 15;
 
 static mut DESTROY_NEXT: usize = 0;
 static mut RESET: usize = 0;
 static mut RESET_VT: usize = 0;
+static mut PRESENT: usize = 0;
+static mut PRESENT_VT: usize = 0;
+/// Frames presented through the chained `Present` (the dumps' frame number).
+static mut PRESENTS: u32 = 0;
 
 /// Chains `DestroyRenderSurfaces`. False, with nothing written, when the slot holds
 /// neither the stock function nor another plugin's (one outside `Armada2.exe`'s code).
@@ -86,10 +95,49 @@ unsafe extern "system" fn reset(dev8: *mut c_void, params: *mut c_void) -> HRESU
     }
 }
 
-/// Chains the d3d8 device's `Reset`, once per vtable (every device made after has the
-/// same one).
+type Present8 = unsafe extern "system" fn(*mut c_void, *const c_void, *const c_void, *mut c_void, *const c_void) -> HRESULT;
+
+/// Every present of the d3d8 device: a frame dump when `UI.dump` has appeared, read
+/// from the back buffer just before it is presented.
+unsafe extern "system" fn present(dev8: *mut c_void, src: *const c_void, dst: *const c_void, wnd: *mut c_void, dirty: *const c_void) -> HRESULT {
+    let n = unsafe { PRESENTS };
+    unsafe { PRESENTS = n.wrapping_add(1) };
+    if let Some(name) = crate::dump::poll("UI.dump") {
+        dump_back_buffer(dev8, name, n);
+    }
+    match unsafe { PRESENT } {
+        0 => -1,
+        f => unsafe { core::mem::transmute::<usize, Present8>(f)(dev8, src, dst, wnd, dirty) },
+    }
+}
+
+fn dump_back_buffer(dev8: *mut c_void, name: alloc::string::String, frame: u32) {
+    let mut d = crate::dump::Dump::new(name, frame, "ui");
+    match Device::from_d3d8(dev8).and_then(|dev| dev.get_back_buffer().map(|bb| (dev, bb))) {
+        Some((dev, bb)) => {
+            d.note("the back buffer at Present: the frame as presented");
+            d.surface(dev, &bb, None, "present", crate::dump::Kind::Ppm);
+        }
+        None => {
+            log!("dump: no Direct3D 9 device or back buffer behind the game's: nothing to read");
+            d.note("no Direct3D 9 device behind the game's (DXVK's own d3d8?): nothing read");
+        }
+    }
+    d.finish();
+}
+
+/// Chains the d3d8 device's `Reset` and `Present`, once per vtable (every device made
+/// after has the same one).
 pub fn hook_reset(dev8: *mut c_void) {
     let vt = field(dev8 as usize, 0);
+    unsafe {
+        if vt != 0 && vt != PRESENT_VT && field(vt, D3D8_PRESENT * 4) != present as *const () as usize {
+            if let Some(old) = hook::patch_slot(vt, D3D8_PRESENT, present as *const () as usize) {
+                PRESENT = old;
+                PRESENT_VT = vt;
+            }
+        }
+    }
     unsafe {
         if vt == 0 || vt == RESET_VT || field(vt, D3D8_RESET * 4) == reset as *const () as usize {
             return;

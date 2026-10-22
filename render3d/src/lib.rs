@@ -9,6 +9,7 @@ pub mod rt;
 pub mod assets;
 #[macro_use]
 pub mod d3d;
+pub mod dump;
 pub mod config;
 pub mod engine;
 pub mod frame;
