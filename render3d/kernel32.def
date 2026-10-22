@@ -16,6 +16,8 @@ SetFilePointer@16
 GetFileSize@8
 CloseHandle@4
 GetFileAttributesA@4
+CreateDirectoryA@8
+DeleteFileA@4
 FindFirstFileA@8
 FindNextFileA@8
 FindClose@4

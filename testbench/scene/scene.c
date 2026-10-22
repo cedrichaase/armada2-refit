@@ -304,6 +304,16 @@ int _fltused = 0;   /* floats without the CRT */
 #define VT_FIREBALL      0x6afbd4u   /* FireballExplosion's vtable */
 #define VT_SHOCKWAVE     0x6afdacu   /* ShockwaveExplosion's vtable */
 #define ENTITY_TRANSFORM 0x4cfd50u   /* Entity::GetTransform() const, thiscall: Matrix34 *, the place at +0x24 */
+#define RANDOM_CTOR      0x65e1b0u   /* RandomSequence::RandomSequence(int seed, bool log), thiscall */
+#define G_RANDOM         0x7b0facu   /* g_random: RandomSequence *, the simulation's */
+#define G_MISSION_RANDOM 0x7b0fa8u   /* g_missionRandom: RandomSequence * */
+#define G_ASYNC_RANDOM   0x7300c4u   /* g_asyncRandom: RandomSequence *, the one not kept in step */
+#define RANDOM_LOG_KEEP  0x09u       /* the log flag the constructor's bool sets, as kept */
+#define STARFIELD_INIT   0x59ac00u   /* Starfield_Initialize(), cdecl: lays the stars out from g_asyncRandom */
+#define PRELOAD_STARS    0x485159u   /* its call in Program::GameOpenPreLoad, after g_random is made */
+#define GAME_SPEED       0x604700u   /* getGameSpeedModifier(), cdecl: float */
+#define PROCESS_SPEED    0x4834a3u   /* its call in Program::GameProcess(int ms), whose tick is speed x ms x 0.001 */
+#define SIM_TIME         0x7b0fc8u   /* Get_Time's float: the simulation's time, written once a tick */
 
 #define P_SI_HANDLE      { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x50, 0xE8 }  /* script methods taking a handle */
 #define P_SI_PAUSE       { 0xB9, 0x58, 0x37, 0x76, 0x00, 0xC6, 0x05, 0xDA }
@@ -368,6 +378,7 @@ static const Sig k_sigs[] = {
     { TECH_FIND,        8, { 0x55, 0x8B, 0xEC, 0x51, 0x53, 0x56, 0x57, 0x8B } },
     { PRJ_GET_ODF,      6, { 0x8B, 0x01, 0x85, 0xC0, 0x75, 0x06 } },
     { ENTITY_TRANSFORM, 7, { 0x8B, 0x41, 0x04, 0x83, 0xC0, 0x44, 0xC3 } },
+    { RANDOM_CTOR,      8, { 0x55, 0x8B, 0xEC, 0x8B, 0x55, 0x08, 0x8B, 0xC1 } },
 };
 
 typedef void   (__cdecl    *UpdateRangeFn)(void);
@@ -412,6 +423,7 @@ typedef void   (__thiscall *LoadResFn)(void *freighter, float amount, int resour
 typedef BYTE  *(__thiscall *TechFindFn)(void *tree, const char *name);
 typedef const char  *(__thiscall *PrjOdfFn)(void *prj);
 typedef const float *(__thiscall *TransformFn)(void *entity);
+typedef void  *(__thiscall *RandomCtorFn)(void *seq, int seed, int log);
 
 /* ---- tiny string/log helpers (no CRT) --------------------------------- */
 
@@ -1244,6 +1256,42 @@ static int cam_matrix(float *m)
 
 static int  g_paused;
 static int  g_refresh;   /* ticks left of a run that refreshes a paused frame */
+static int  g_ticks;     /* mission ticks before the scene was built */
+static long g_scene_ticks;   /* ticks since the scene was built: what Pause= and pause-at count */
+static long g_pause_at = -1; /* Pause= / pause-at: the tick to pause at (-1: none) */
+
+/* Seed= and `seed`: every RandomSequence the engine draws from -- the simulation's
+ * g_random, g_missionRandom and g_asyncRandom -- started again from a seed of ours,
+ * through the class's own constructor on the existing object (each keeps its log
+ * flag). So a scene that picks at random (the rocks of an asteroid field) picks the
+ * same on every launch, and the simulation runs the same ticks the same way. */
+static void seed_random(DWORD seed)
+{
+    static const DWORD k_seqs[3] = { G_RANDOM, G_MISSION_RANDOM, G_ASYNC_RANDOM };
+    char  b[96];
+    int   i, n = 0;
+    for (i = 0; i < 3; i++) {
+        BYTE *seq = *(BYTE **)k_seqs[i];
+        if (!seq) continue;
+        ((RandomCtorFn)RANDOM_CTOR)(seq, (int)(seed + (DWORD)i), seq[RANDOM_LOG_KEEP]);
+        n++;
+    }
+    s_cpy(b, "seed ", sizeof b); s_unum(b + s_len(b), seed);
+    s_cat(b, ": "); s_num(b + s_len(b), n); s_cat(b, " random sequences started again");
+    logline(b);
+}
+
+/* Pauses the simulation, as `pause` does, and says at which tick. */
+static void pause_now(const char *why)
+{
+    char b[96];
+    ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);
+    g_paused = 1;
+    s_cpy(b, why, sizeof b); s_cat(b, "paused at tick "); s_num(b + s_len(b), g_scene_ticks);
+    s_cat(b, ", sim time "); s_flt(b, *(const float *)SIM_TIME);
+    s_cat(b, " ("); s_hex(b, *(const DWORD *)SIM_TIME); s_cat(b, ")");
+    logline(b);
+}
 static void process_commands(void);
 static void marks_poll(void);
 
@@ -1839,7 +1887,27 @@ static void run_command(char *line)
         logline("  ok");
         return;
     }
-    if (s_eq(t[0], "pause"))  { ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);   g_paused = 1; logline("  paused");  return; }
+    if (s_eq(t[0], "pause"))  { pause_now("  ");  return; }
+    if (s_eq(t[0], "pause-at") && n >= 2) {
+        long at = (long)s_atof(t[1]);
+        char b[96];
+        if (at <= g_scene_ticks) {
+            s_cpy(b, "  ! tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks); s_cat(b, " already");
+            logline(b);
+            return;
+        }
+        g_pause_at = at;
+        s_cpy(b, "  ok: at tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks);
+        logline(b);
+        return;
+    }
+    if (s_eq(t[0], "tick")) {
+        char b[64];
+        s_cpy(b, "  tick ", sizeof b); s_num(b + s_len(b), g_scene_ticks);
+        logline(b);
+        return;
+    }
+    if (s_eq(t[0], "seed") && n >= 2 && s_isnum(t[1])) { seed_random((DWORD)s_atof(t[1])); logline("  ok"); return; }
     if (s_eq(t[0], "resume")) { ((SiVoidFn)SI_UNPAUSE)(SI_INSTANCE); g_paused = 0; logline("  resumed"); return; }
     if (s_eq(t[0], "hud")  && n >= 2) { set_hud(on_arg(t[1]));  logline("  ok"); return; }
     if (s_eq(t[0], "grid") && n >= 2) { set_grid(on_arg(t[1])); logline("  ok"); return; }
@@ -2210,6 +2278,13 @@ static void build_scene(void)
         g_anchor[0] = interest[0]; g_anchor[1] = interest[1]; g_anchor[2] = interest[2];
     }
 
+    {   /* Seed=: the engine's random sequences from a seed of ours, before anything is built */
+        char v[24];
+        GetPrivateProfileStringA("Scene", "Seed", "", v, sizeof v, g_ini);
+        if (v[0] && s_isnum(v)) seed_random((DWORD)s_atof(v));
+        GetPrivateProfileStringA("Scene", "Pause", "", v, sizeof v, g_ini);
+        if (v[0] && s_isnum(v)) g_pause_at = (long)s_atof(v);
+    }
     if (!ini_int("Scene", "Fog", 0)) {
         ((ForceFogFn)FORCE_FOG)(0);
         ((VoidFn)FORCE_UPDATE)();
@@ -2294,8 +2369,6 @@ static void build_scene(void)
 
 /* ---- the tick --------------------------------------------------------- */
 
-static int g_ticks;
-
 static void __cdecl scene_tick(void)
 {
     ((UpdateRangeFn)UPDATE_RANGE)();
@@ -2304,9 +2377,14 @@ static void __cdecl scene_tick(void)
         if (g_ticks++ >= ini_int("Scene", "Delay", 30)) build_scene();
         return;
     }
+    g_scene_ticks++;
     heal_all();
     if (g_refresh && --g_refresh == 0 && g_paused)
         ((SiVoidFn)SI_PAUSE)(SI_INSTANCE);
+    if (g_pause_at >= 0 && g_scene_ticks >= g_pause_at) {
+        g_pause_at = -1;
+        pause_now("Pause=: ");
+    }
     process_commands();
 }
 
@@ -2415,6 +2493,69 @@ static void *__cdecl race_find(const char *map_race)
     return r ? r : ((RaceFindFn)RACE_FIND)(map_race);
 }
 
+/* Seed= as the mission loads. Program::GameOpenPreLoad makes g_random (from the game
+ * setup's seed) and then calls Starfield_Initialize, which lays the background's stars
+ * out from g_asyncRandom, seeded from the wall clock when the game started: a different
+ * sky on every launch. That call comes here, which seeds every sequence first, so the
+ * stars and everything the mission draws from then on repeat. */
+typedef void (__cdecl *VoidCdeclFn)(void);
+static DWORD g_seed_value;
+
+static void __cdecl preload_stars(void)
+{
+    seed_random(g_seed_value);
+    ((VoidCdeclFn)STARFIELD_INIT)();
+}
+
+static void seed_hook(void)
+{
+    char v[24];
+    const BYTE *p = (const BYTE *)PRELOAD_STARS;
+    GetPrivateProfileStringA("Scene", "Seed", "", v, sizeof v, g_ini);
+    if (!v[0] || !s_isnum(v)) return;
+    g_seed_value = (DWORD)s_atof(v);
+    if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != STARFIELD_INIT - (PRELOAD_STARS + 5) ||
+        !patch_dword(PRELOAD_STARS + 1, (DWORD)&preload_stars - (PRELOAD_STARS + 5))) {
+        logline("seed: NOT PATCHED: GameOpenPreLoad's Starfield_Initialize call differs -- seeded at the scene only");
+        return;
+    }
+    logline("seed: Seed= hooked, the random sequences seeded as the mission loads");
+}
+
+/* Step=: every tick the same length. Program::GameProcess(int ms) runs one tick of the
+ * simulation for the milliseconds the frame took, times getGameSpeedModifier() and 0.001,
+ * so a tick's length -- and with it every position, reload and timer at tick N -- follows
+ * the frame rate of that run. Its one call of getGameSpeedModifier, just before the
+ * product is formed, comes here: the call is made as before, and the `ms` argument in
+ * GameProcess's frame (ebp + 8, which nothing reads before) is set to Step= first. The
+ * simulation then advances Step= ms a tick whatever the frame rate: faster or slower than
+ * the wall clock, the same on every launch. */
+typedef float (__cdecl *SpeedFn)(void);
+static int g_step_ms;
+
+static float __cdecl fixed_speed(void)
+{
+    int *frame = *(int **)__builtin_frame_address(0);   /* GameProcess's ebp */
+    frame[2] = g_step_ms;
+    return ((SpeedFn)GAME_SPEED)();
+}
+
+static void step_hook(void)
+{
+    const BYTE *p = (const BYTE *)PROCESS_SPEED;
+    char b[96];
+    g_step_ms = ini_int("Scene", "Step", 0);
+    if (g_step_ms <= 0) return;
+    if (p[0] != 0xE8 || *(const DWORD *)(p + 1) != GAME_SPEED - (PROCESS_SPEED + 5) ||
+        p[5] != 0xDA || p[6] != 0x4D || p[7] != 0x08 ||
+        !patch_dword(PROCESS_SPEED + 1, (DWORD)&fixed_speed - (PROCESS_SPEED + 5))) {
+        logline("step: NOT PATCHED: GameProcess differs -- ticks as long as the frames");
+        return;
+    }
+    s_cpy(b, "step: Step=", sizeof b); s_num(b, g_step_ms); s_cat(b, " ms a tick, whatever the frame rate");
+    logline(b);
+}
+
 static void race_hook(void)
 {
     static const BYTE find[8] = { 0x55, 0x8B, 0xEC, 0x8B, 0x45, 0x08, 0x53, 0x56 };
@@ -2508,6 +2649,10 @@ static void startup(void)
     if (!ini_int("Scene", "Music", 1) && music_sigs_ok()) music_off();
     /* So has the race: it is set before the mission loads, whatever the scene. */
     race_hook();
+    /* And the seed: the stars are laid out as the mission loads, before any tick. */
+    seed_hook();
+    /* And the tick's length, from the first tick on. */
+    step_hook();
     /* And the captions: a campaign take, Enable=0, is where they show. */
     captions_hook();
     if (!ini_int("Scene", "Enable", 1)) {

@@ -70,7 +70,9 @@ started, never one from `session list` you don't recognise (`testbench/README.md
 "Which session a command acts on"). **The bench runs on the user's own GPU**: a GPU
 hang in a bench game crashed the user's desktop once, so run one game at a time
 (`a2test run -j 1`), at `--res 1280x720` unless fine detail is judged, and stop
-sessions promptly. Before driving the game, read `testbench/README.md`, "Operating the
+sessions promptly. **Say what you are doing**: `./a2test drive --session ID note "..."`
+when you start driving and whenever your intent changes (the dashboard, `./a2test watch`,
+shows it). Before driving the game, read `testbench/README.md`, "Operating the
 game: what agents learned", and the staging recipes in `testbench/operating/`. Write regression scenarios in `testbench/scenarios/` for fixes
 worth keeping fixed. A bench pass is evidence for the user, not their sign-off
 ("Finishing work" still applies).

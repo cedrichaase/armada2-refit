@@ -237,7 +237,7 @@ impl Models {
             }
             if n > 0.0 {
                 let c = c * (1.0 / n);
-                let seed = (ord as u32 >> 4).wrapping_mul(2654435761) >> 22;
+                let seed = (crate::clock::entity_key(ord) as u32 >> 4).wrapping_mul(2654435761) >> 22;
                 let ph = seed as f32 * 0.0061;
                 let pulse = 1.0 + look.pulse * sinf(v.time * look.rate + ph);
                 let h = look.size * r.max(1.0);

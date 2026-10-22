@@ -364,7 +364,7 @@ fn filters(ui: &mut Ui, strip: R) {
         s.tip_on = key;
         s.tip_since = now;
     }
-    if hovered.0 != 0 && now - s.tip_since > 0.35 {
+    if hovered.0 != 0 && ui.waited(s.tip_since, 0.35) {
         let station = hovered.0 == 2;
         let current = if station { station_f } else { ship_f };
         let shown = if hovered.1 == 4 { current } else { hovered.1 as u32 };

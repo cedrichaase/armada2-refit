@@ -345,11 +345,11 @@ pub fn run(ui: &mut Ui) {
     {
         ui.theme = Theme::for_race(r);
     }
-    if l.players.is_empty() || now - l.players_at > 0.5 {
+    if l.players.is_empty() || crate::rt::now() - l.players_at > 0.5 {
         if !l.single || setup::is_instant_action() {
             l.players = setup::players();
         }
-        l.players_at = now;
+        l.players_at = crate::rt::now();
     }
     let screen = ui.screen();
     backdrop(ui, l, screen);

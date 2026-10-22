@@ -213,7 +213,7 @@ impl Chunks {
                 max_chunks: c.i("MaxChunks", 1500).max(1) as usize,
             },
             chunks: VecDeque::new(),
-            rng: Lcg((crate::rt::now() * 1000.0) as u64 as u32 | 1),
+            rng: Lcg(crate::clock::seed() | 1),
             last: -1.0,
             made: 0,
         }

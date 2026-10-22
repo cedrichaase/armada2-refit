@@ -159,7 +159,7 @@ impl Looks {
                 continue;
             }
             let r = radius_of(f.target);
-            let flick = 0.85 + 0.15 * libm::sinf(libm::fmod(crate::rt::now(), 10000.0) as f32 * 9.0 + (f.effect as f32) * 0.37);
+            let flick = 0.85 + 0.15 * libm::sinf(libm::fmod(crate::clock::anim_now(), 10000.0) as f32 * 9.0 + (f.effect as f32) * 0.37);
             let col = kd.light * (kd.light_brightness * e * flick);
             if self.pool.register(n, f.world.p, col, kd.light_range * r, kd.light_range * r * 0.5) {
                 n += 1;
@@ -175,7 +175,7 @@ impl Looks {
         let dev = v.dev;
         let mut began = false;
         let _g = gfx::Guard::new(dev);
-        let wall = libm::fmod(crate::rt::now(), 10000.0) as f32;
+        let wall = libm::fmod(crate::clock::anim_now(), 10000.0) as f32;
         for f in fx {
             let Some(k) = kind(f.vt) else { continue };
             let kd = self.kinds[k];

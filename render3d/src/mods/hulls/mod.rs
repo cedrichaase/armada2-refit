@@ -381,7 +381,7 @@ impl Hulls {
         }
         let st = view_state(v.key());
         self.sprites.collect(v, look, &p, &mut st.sprites);
-        let seed = ((o >> 4) as u32).wrapping_mul(2654435761) as f32 / 4294967296.0;
+        let seed = ((crate::clock::entity_key(o) >> 4) as u32).wrapping_mul(2654435761) as f32 / 4294967296.0;
         st.extras.push((p, Extra::Holo(team, seed)));
         true
     }
@@ -1003,7 +1003,7 @@ impl Module for Hulls {
             order.push((v.view.transform_point(p.centre).z, EXTRA + i, 1.0, false));
         }
         order.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(core::cmp::Ordering::Equal));
-        let now = { let n = crate::rt::now(); (n - 1000.0 * libm::floor(n / 1000.0)) as f32 };
+        let now = { let n = crate::clock::anim_now(); (n - 1000.0 * libm::floor(n / 1000.0)) as f32 };
         for (_, o, f, ck) in order {
             if o >= EXTRA {
                 let Some((p, e)) = st.extras.get(o - EXTRA) else { continue };

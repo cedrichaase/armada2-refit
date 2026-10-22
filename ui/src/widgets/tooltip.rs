@@ -27,12 +27,12 @@ impl<'a> Ui<'a> {
             p.tip_since = now;
             return;
         }
-        if now - p.tip_since < DELAY {
+        if !self.waited(p.tip_since, DELAY) {
             return;
         }
         let Some((mx, my)) = self.input.mouse else { return };
         let text = String::from(text);
-        let shown = now - p.tip_since - DELAY;
+        let shown = if crate::clock::bench() { 1.0 } else { now - p.tip_since - DELAY };
         self.overlay(move |ui| {
             let (w, h) = super::theme::tooltip_size(ui, &text, ui.u(360.0));
             let mut x = mx + ui.u(14.0);

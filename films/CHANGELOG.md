@@ -5,6 +5,16 @@ manifest. It installs nothing into the game: every take runs on a bench clone. V
 rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The why is
 in [`README.md`](README.md).
 
+## 1.13.0 — 2026-10-22
+
+### Added
+- `probe` and `take` record their run as a bench job (testbench 3.42.0, `A2TEST_JOB`) and
+  each take its phase in it (queued, starting, scene, setup, recording with its start and
+  the action's planned length, finishing, done, failed), for the bench dashboard; a
+  take's session gets `A2TEST_TAKE`.
+
+Installs nothing; not yet seen on the bench (no film was shot with it).
+
 ## 1.12.1 — 2026-10-22
 
 ### Removed

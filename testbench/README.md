@@ -7,7 +7,7 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test run main-menu hud font          # scenarios in testbench/scenarios/
     ./a2test run main-menu --res 16:9,21:9   # override the resolutions
     ./a2test run admirals-log --vnc          # ... and watch it (view-only VNC)
-    ./a2test watch                           # every live session, tiled in one window
+    ./a2test watch                           # the bench dashboard: http://127.0.0.1:5950/
     ./a2test run hud --jobs 1                # one game at a time (default: 5 at once)
     ./a2test check hud                       # how each step would run, no launch
     ./a2test list
@@ -17,13 +17,16 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test session start --res 800x600 --mod stock --stock-shell embed   # the stock baseline, menus clickable
     ./a2test session start --assets none --install .   # as a release installs it: no textures, plates, movies
     A2_DATA=$(mktemp -d) ./a2test session start --install .   # ... as without any assets
+    ./a2test session start --clock bench     # animations on the sim time: "A frame that repeats"
     ./a2test session start --mute music,voice   # the game's own music and voice volumes at 0
     ./a2test session start --stems music,voice  # music and voice each on a silent sink of their own
     ./a2test drive --session ID shot menu    #   prints the PNG path
     ./a2test drive --session ID click-text "Single Player"
     ./a2test drive --session ID step 'Wait for the single player screen'
+    ./a2test drive --session ID note "Checking the bloom on the nacelles at 21:9"   # your intent, now
     ./a2test session stop ID                 #   ends the game, gathers logs, writes the report
     ./a2test session list                    # the active sessions and their IDs
+    ./a2test baseline compare NAME --from ID # pixel diff against a baseline ("Baselines")
 
 ### Which session a command acts on
 
@@ -291,6 +294,53 @@ stem held `Mfed300.wav`, the voice stem `a2_fed01_intro.wav`, and the effects st
   the bench's. A scenario must not expect the default name; `multiplayer-name.md` clears
   the field before it types.
 
+## A frame that repeats
+
+Two sessions of one scene, stopped at one moment, can draw the same picture pixel for
+pixel, so that a port of the renderer can be checked against a baseline by a diff. It
+takes three things, each off by default:
+
+- **`--clock bench`** (`a2test session start`, `a2test run`; a scenario's `Clock: bench`;
+  `A2TEST_CLOCK=bench`): `[Bench] Clock=bench` in the clone's `Render3D.ini` and
+  `UI.ini`. Every animation of the plugins then runs on the simulation's time, which
+  stands while the game is paused, cosmetic seeds are fixed, and what adds frames up
+  (the nebulae's `Temporal=`) settles on one picture (`render3d/README.md` and
+  `ui/README.md`, "The animation clock").
+- **`Seed=`, `Step=` and `Pause=`** in the scene (`scene/README.md`, "A frame that
+  repeats"): the engine's random sequences from a seed, every tick the same length, and
+  the pause on a tick counted from the scene's build. `Setup:
+  testbench/scene/bench-setup.sh showcase Seed=7 Step=16 Pause=200 Race=federation`.
+- **Nothing by hand before the pause.** A command from `drive scene` lands on whatever
+  tick is running; the camera and every order belong in the scene file.
+
+`bench-determinism` is the regression scenario: a shot of the paused frame, another 3 s
+later, then a second launch of the same clone and a third, compared with `Expect shots
+"A" and "B" to match`.
+
+Measured at 1280x720, two launches each, the shot 4 s after the pause, mean absolute
+difference over every channel (0..255), the largest difference, and the share of pixels
+that differ (2026-10-22):
+
+| Scene | Before: wall clock, `scene pause` 15 s after the build | Seed, Pause, wall-length ticks | + `Step=16` | + per-object seeds from handles, the engine's sprite animation on the sim time: today |
+|---|---|---|---|---|
+| `showcase` | 3.516, 254, 15.8% | 0.557, 255, 9.5% | 0.159, 211, 2.9% | **0, 0, 0%** |
+| `nebula` | 0.220, 253, 16.7% | | 0, 0, 0% | **0, 0, 0%** (`Step=16` run) |
+| `firing` | 0.511, 254, 5.3% | | 0, 0, 0% | **0, 0, 0%** (`Step=16` run) |
+
+What each step took out: before, the battle was simply at another moment, and the
+stars of the sky stood elsewhere on each launch (the engine lays them out from a
+sequence seeded by the wall clock as the mission loads). With a seed and a fixed tick
+count the stars matched but torpedoes did not: the game's tick is as long as the frame
+that ran it, so tick 200 was 4.3550 s of simulation on one launch and 4.3484 s on the
+next. With `Step=16` both were 3.7 s exactly (`0x406c8b57`), and what was left was the
+torpedoes' starbursts and the phasers' texture, animated by the engine's sprite clock
+and seeded from heap addresses. Within one launch, before: `nebula`'s paused frame still
+moved (0.145, 4, 29.6% of pixels, 3 s apart: the gas's frames adding up); with the bench
+clock nothing moves. The clock's own share, `showcase` with everything of today but
+`--clock wall`: 0.122, 200, 1.9% between launches (the shots' sprite animation and
+address-seeded flicker), which is why `bench-determinism` allows a mean of 0.01 at most
+between launches and 0 within one; it passed at 0 (run 20261022-225239, 123 s).
+
 ## Operating the game: what agents learned
 
 Lessons from agents driving the game on the bench, kept so the next one need not
@@ -335,6 +385,45 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   stops reading commands until "Return to Game" is clicked.
 - **Agent sandboxes** may refuse shell lines that mix variables with `sed`, loops of
   `drive` commands or heredocs: put the sequence in a small script and run that.
+- **Say what you are doing**: `a2test drive --session ID note "what, and why"` when
+  you start driving a session and whenever your intent changes (a new scene, a new
+  question, waiting on a build). The dashboard shows the latest note as the session's
+  intent line, with its age, and every note in its timeline, so the user and the other
+  agents on the bench can see what each game is for. `session start --note "..."` gives
+  the first one. A note is a line in the session's log like any drive command; it
+  touches nothing in the game.
+
+## Frame dumps
+
+    ./a2test drive --session ID dump NAME      # or a scenario step: Dump the frame called "NAME"
+
+A grim shot is 8 bits, after the swapchain and the compositor. A dump is read from
+inside the game, byte for byte: `Render3D.asi` writes its HDR scene target, each bloom
+level (PFM, float RGB) and the back buffer after its tone map (PPM), and `UI.asi` the
+back buffer as presented, HUD and UI included (PPM). What each file is, and how it is
+read back, is in `render3d/README.md` and `ui/README.md`, "Frame dumps". The dumps are
+meant for `a2test baseline compare`, which reads PNG, PPM and PFM: a port of the
+renderer is checked against them stage by stage, so a difference shows where in the
+frame it starts.
+
+`dump` (`bench/dumps.py`) writes the trigger files `Render3D.dump` and `UI.dump`, each
+holding `NAME`, into the clone for every plugin installed there, and waits up to 20 s
+for each plugin to take its trigger and write its sidecar. It then moves the new files
+from the clone's `Dumps/` into the session's `dumps/NAME/`, writes a PNG preview beside
+each (`*.pfm.png`, `*.ppm.png`; a PFM clamped to [0, 1], a bloom level stretched to its
+99.9th percentile so it can be seen), and prints and logs each file's size and its
+min/mean/max. It fails when no plugin dumped, with the reason: neither is installed,
+or a trigger was never taken. **Render3D dumps only in a mission's main 3D view**, so in
+the menus only the UI's comes back (a warning, not a failure). Files a trigger written
+by hand leaves in `Dumps/` are gathered into `logs/Dumps/` when the session stops.
+
+**A dump is not a grim shot with more bits.** Measured on `showcase` at 1280x720
+(2026-10-22): the UI's presented PPM against a grim shot of the same paused frame
+differed by a mean absolute 3.26 (max 10, 8% of pixels equal), and the difference was
+one fixed curve per channel: every value of the PPM went to exactly one value in the
+shot (2 to 3, 10 to 13, 80 to 90, 255 to 255), and mapped through that curve the two
+were identical. Something after `Present` (the swapchain, the compositor; a gamma ramp
+would do it) lifts the frame. So compare dumps with dumps, and shots with shots.
 
 ## The stretch measurement
 
@@ -356,6 +445,94 @@ consistently wrong. At 800x600 the front end's own 800x600 mode fills the screen
 clicks map 1:1 and the game quits through its menus. At 1600x1200, stock did neither.
 `hud.md` says `Reference: 800x600 stock` and `Stock shell: embed`.
 
+## Baselines
+
+A port of the renderer (render3d and ui onto a shared `gpu` crate, then Vulkan and
+Direct3D 12) is right when it draws the same pixels. That is checked against
+**baselines**: named sets of frames, kept with their provenance, and a pixel diff
+against them (`bench/baseline.py`).
+
+    ./a2test baseline record pre-gpu --from SESSION_ID --shot orbit --shot wide
+    ./a2test baseline compare pre-gpu --from ~/.local/share/a2test/results/<run>/<scenario>/1280x720
+    ./a2test baseline diff a.pfm b.pfm --gif        # any two frames, dirs, sessions or baselines
+    ./a2test baseline list
+    ./a2test baseline show pre-gpu
+
+**Where they live.** `$A2_DATA/baselines/<NAME>/` (`A2_BASELINES` overrides): one file
+per shot, copied as it was (PNG, PPM or PFM), and `meta.json`. Each shot there carries
+its own provenance: when it was recorded, the bench's commit, the `installs=` commits
+of the session or case it came from, its resolution, mod state, scene and session. A
+frame is game-derived, so neither a baseline nor a comparison's output may go into a
+checkout (hard rule 8): the tool refuses a path inside one. Comparisons write to
+`~/.cache/a2test/baselines/<time>-<name>/` (or `--out`): a heat map and a side by side
+per shot, `compare.json` and an `index.html`.
+
+**Where frames come from** (`--from`, and both sides of `diff`): an image file, named
+by its stem; a case directory of a run or a session, whose screenshots are named as the
+step log names them (the last of each name) and whose `.ppm`/`.pfm` dumps anywhere
+under it are named by stem; a scenario or run directory holding one case; any other
+directory of images; a session ID, live or ended; or a baseline's name. `record` adds
+to a baseline and refuses to replace a shot it holds unless given `--force`.
+
+**What the numbers mean.** Every frame is compared as RGB; an alpha channel is dropped,
+and the report says so.
+
+| Number | What |
+|---|---|
+| `rmse` | root mean square of every channel's difference, in 1/255 |
+| `max` | the largest single channel difference, in 1/255 |
+| `over` | pixels where any channel differs by more than `--threshold` (default 2/255), as a count and a share of the frame. Strictly more: a difference of exactly the threshold is not over it |
+| `psnr` | 20 log10(255 / rmse), in dB; `inf` when identical |
+
+A PFM (float, the HDR scene target and the bloom levels) is compared in linear values:
+`linear rmse` and `linear max` as stored. The other four are then measured after a fixed
+tone map (Reinhard, x/(1+x) per channel, times 255), so the same `--threshold` and
+tolerances read the same way for a float frame as for an 8-bit one. Frames of different
+sizes, or an 8-bit frame against a float one, are not compared; that is a failure with
+its reason, never a number. PFM rows are stored bottom to top and the sign of its scale
+is the byte order (negative: little-endian); the reader undoes both, and the self-test
+checks it against hand-made bytes and against OpenCV.
+
+**The heat map** shows each pixel's largest channel difference (linear for a PFM) on a
+square-root scale up to that frame's own maximum, so that one changed pixel still
+shows. It is drawn over a dimmed grey copy of the baseline, and identical pixels stay
+grey. The legend under it gives the scale. `--gif` adds a two-frame flicker GIF
+(ImageMagick): a one-pixel shift that a heat map shows as an outline is obvious there.
+
+**Pass or fail.** `--rmse X` and `--max-over N` (a count, or `P%`) are the tolerances.
+With neither, no pixel may be over the threshold. `compare` and `diff` exit 0 when
+every shot is within tolerance, 1 when any is not (or a shot is missing, or the sizes
+differ), and 2 on a usage error such as a missing baseline.
+
+**In a scenario** (`scenarios/README.md`, "Baselines"):
+
+    1. Take a screenshot called "orbit".
+    2. Expect the screenshot "orbit" matches baseline "pre-gpu" within RMSE 0.5.
+
+A missing baseline fails the step and says how to record it. The report shows the
+numbers and links the heat map and the side by side, kept in the case's `baseline/`.
+
+**Why not the judge.** A judged step asks a model whether a picture looks right. A port
+is right only when it draws the same pixels, and a model cannot see a half-texel shift,
+a channel swapped in one material, or bloom 3% too strong. It passes all three, and
+each costs money and time. The diff is exact, free and the same on every run. It
+also gives a number to track: before/after a refactor, and backend against backend.
+
+**The noise floor.** Measured on `showcase` at 1280x720, paused with `scene pause`
+(session 20261022-214129-23171): shots taken 2 s and 5 s apart in one pause are
+identical, rmse 0 and no pixel over 2/255. One second of simulation between two shots
+(`scene resume`, then `pause`) gives rmse 15.4/255, max 254/255, 10.9% of pixels over
+2/255. The beams, shields, sparks and the planet's clouds have moved, and the sky has
+not. So a paused frame is stable within a launch. What is not yet measured is two
+launches of the same scene, or two builds: the cosmetic simulation, its particles and
+the march's thresholds run on the sim clock, so a baseline compares only frames taken
+at the same tick, with the same camera. Until the render is deterministic across
+launches, a tolerance has to sit above that floor. Once it is, the default (nothing
+over 2/255) is the target.
+
+`python3 testbench/bench/baseline_selftest.py` checks every number, the readers, the
+exit codes and the steps on synthetic frames, with no game.
+
 ## Judged and agent steps
 
 Steps that name no measurable check go to `claude -p` (`bench/judge.py`). A judged
@@ -369,34 +546,102 @@ war, the 21:9-tuned font). Add to it when it flags something known.
 
 ## Watching
 
-**`./a2test watch`** shows every live session at once, view-only, in one window, whoever
-started it and whether or not it was started with `--vnc`. For each session whose sway
-is up, it starts its own `wayvnc --disable-input --render-cursor` on a loopback port
-(so the virtual pointer is visible), and it serves a page on `127.0.0.1:5950` that tiles
-them with noVNC, choosing the column count that makes the tiles largest. It opens that
-page as a Chromium `--app` window with its own profile. Sessions that start later appear
-within two seconds, and ended ones drop out. Ctrl-C, or closing the window, stops the
-`wayvnc`s it started and nothing else: no session is touched, and input is disabled at
-the server. `--no-open` only serves the page, `--port` moves it (`A2TEST_WATCH_PORT`),
-and `?debug` on the URL turns on noVNC's console logging. Runtime files (control
-sockets, logs, the browser profile) are in `~/.cache/a2test/watch/`.
+**`./a2test watch`** serves the bench dashboard on `127.0.0.1:5950` and opens it as a
+Chromium `--app` window (`--no-open` only serves it; `--port` or `A2TEST_WATCH_PORT`
+moves it). It shows what is happening on the whole bench, whoever started it, and
+touches no session: input is disabled at the VNC server, and Ctrl-C (or closing the
+window) stops only the `wayvnc`s it started. The page (`bench/dash.html`) needs nothing
+from the network: noVNC is vendored in `vendor/novnc-1.6.0/` (MPL 2.0, its `SOURCE.txt`
+lists every file's hash), and the type falls back to the system's fonts.
 
-Two things it works around, both measured:
+- **Header**: CPU (the 1-minute load over the cores), memory, swap and, on amdgpu, the
+  GPU's busy percentage and VRAM (`/sys/class/drm/card*/device/gpu_busy_percent`,
+  `mem_info_vram_used`/`_total`; the two gauges are hidden without them). Green under
+  60 %, amber to 85 %, orange-red above. The slots held and waiting, and the LLM
+  judge's tokens today.
+- **On the bench**: one column per *job*, not per slot: a run's cases, a film's players,
+  ab.sh's sessions are one column, with a view per slot. A free slot is a dashed column
+  that says why nobody has taken it. One job alone is shown wide; otherwise a column can
+  be maximized, with tabs **Status** (a run's cases, steps and phases; a session's
+  intent, counters and timeline; a film's takes; an A/B's plan), **Logs** (the tail of
+  its `log.txt`), **Baseline** (every compare against a baseline: the scenario steps and
+  `a2test baseline compare --from` runs on its frames) and **Dump** (its `dumps/NAME/`).
+- **Queue**: the waiters, oldest first, each with the reason it waits, worked out from
+  the rules in "Game slots" (all or none, only the oldest tries).
+- **Recently finished**: jobs that ended in the last 2 h, with how they ended; a row
+  opens the run's report.
 
-- **`wayvnc --websocket` segfaults on the first client** (wayvnc 0.10.1 with neatvnc
-  1.0.1: a call through a null pointer in `libneatvnc`). The watcher therefore bridges
-  each tile's WebSocket (`/ws/<session id>`) to the plain RFB port itself
-  (`bench/watch.py`, stdlib only). It answers as HTTP/1.1, because Chromium refuses an
-  upgrade answered as 1.0.
-- **noVNC's npm package is CommonJS**, and jsdelivr's `/+esm` fails to bundle it. The
-  page imports noVNC's own ES-module source (`core/rfb.js`) from jsdelivr's GitHub mirror,
-  pinned to v1.6.0. The page needs the network to load it.
+Where it reads each part (`bench/dash.py`, no game needed to check it:
+`python3 testbench/bench/dash_selftest.py`, which also serves its fixtures with
+`--serve NAME` for a look at the page):
+
+| Part | Read from |
+|---|---|
+| slots held | `/proc/locks` (no lock is taken, so a watcher never makes a waiter miss its turn); `slot-K.json` for who |
+| queue | `waiters/*.json`, and the job each names |
+| jobs | `~/.cache/a2test/jobs/<id>.json`, written by `a2test run`, `session start` and `a2film` (below) |
+| a run's progress | its cases' `steps.jsonl` and `result.json`; the scenario file for the steps to come, its `## ` headings as phases (else one phase per screenshot) |
+| a session | its `steps.jsonl`: drive commands (each record carries the command line), notes, bench lines |
+| a film take | the phase `a2film` writes into its job (queued, starting, scene, setup, recording, finishing, done) |
+| a perf A/B | an `ab.sh` among the session's parent processes; its `sides.tsv` and the logs in its output directory |
+| baselines | the case's checks with `how` naming the baseline, and `~/.cache/a2test/baselines/*/compare.json` naming a frame of the session |
+| judge tokens | `~/.cache/a2test/judge-usage.json`, summed per day as each `claude -p` call returns (`modelUsage`: input with the cache reads and writes, and output) |
+
+**Live and snapshots.** Only the maximized column streams live (noVNC over a WebSocket
+the watcher bridges to a view-only `wayvnc` it starts when the column opens and stops
+20 s after the last viewer leaves). Every other view is a JPEG snapshot, taken with
+`grim` when the page asks for it and the last one is over 5 s old, kept in memory and
+never written to disk. **While a perf A/B runs nothing streams live**: the page shows
+snapshots, and the watcher refuses the WebSocket and stops its `wayvnc`s, so encoding
+cannot skew the frame times being measured.
+
+A snapshot costs, measured on a 1280x720 session (2026-10-22, ten each, medians): **10
+ms of CPU and 17 ms wall, 61 KB**, as a full-size JPEG (quality 75). Asking grim to
+scale makes it dearer, not cheaper, since it scales on the CPU: 23 ms of CPU at `-s
+0.75`, 105 ms at `-s 0.5`; a PNG is 242 ms. So snapshots are taken at full size: one
+every 5 s is about 0.2 % of one core per 720p session, and a 3440x1440 game (5.4 times
+the pixels) roughly 1 %. Nobody looking means no snapshot at all. `/api/snapcost` on
+the watcher lists what each one cost.
+
+**Idle.** A session with no drive command (or drive note) for **10 minutes** is shown
+idle: an amber edge, a still dot and a desaturated view, and the time it has held its
+slot while others wait. It is a state, not an alert. The threshold sits above every gap
+between commands in the bench's session logs so far (729 gaps: median 2 s, 99th
+percentile 124 s, longest 429 s, measured 2026-10-22), so an agent that is still at work
+does not read as idle. Runs, films and A/Bs are driven by the bench and never idle.
+
+**Who started it.** `a2test run`, `session start` and `a2film probe`/`take` record, as
+they start, who started them (`bench/who.py`): the checkout's worktree, branch and
+commit (`-dirty` with uncommitted changes), and, from the environment Claude Code gives
+every command it runs:
+
+| Recorded | From | Reliable? |
+|---|---|---|
+| the Claude Code session | `CLAUDE_CODE_SESSION_ID` | yes; a subagent's commands carry its main session's id |
+| main session or subagent | `AI_AGENT` ends in `_agent` only on a subagent's commands | yes (Claude Code 2.1) |
+| which subagent | its worktree, `.claude/worktrees/agent-<id>` | only when it works in a worktree of its own; not in the environment |
+| the parent's worktree | the main session's transcript, `~/.claude/projects/<its cwd, every non-alphanumeric as ->/<session>.jsonl`, matched against `git worktree list` | yes, while the transcript exists |
+| attended or not, a background session's name | `CLAUDE_CODE_SESSION_ATTENDED`, `CLAUDE_JOB_DIR/state.json` | yes |
+| by hand | no `CLAUDECODE` in the environment: the user's name | a script a person ran counts as by hand |
+
+The column shows `Claude Code <session>`, `subagent of <parent's worktree>` or `by hand ·
+<user>`, then `worktree @ commit`; hovering it gives the whole record. A session a run or
+a film starts belongs to that job (`A2TEST_JOB` in its environment), and a session under
+`render3d/perf/ab.sh` to the A/B. A checkout from before this records nothing, and
+shows as "not recorded" with the worktree its slot names.
 
 `--vnc` (per case) or `session start --vnc` starts a view-only `wayvnc` on the headless
 output: `vncviewer localhost:5910` (the port is printed; it counts up if busy). `--record`
 writes each case to `run.mp4` with `wf-recorder`. All are optional and need `wayvnc`
 (and `wf-recorder`, or a viewer such as `tigervnc`). Without them the bench warns and
-carries on, and `watch` refuses.
+carries on; without `wayvnc` the dashboard shows snapshots only.
+
+The WebSocket bridge is the watcher's own (`bench/watch.py`, stdlib only) because
+**`wayvnc --websocket` segfaults on the first client** (wayvnc 0.10.1 with neatvnc 1.0.1:
+a call through a null pointer in `libneatvnc`). It answers as HTTP/1.1, because Chromium
+refuses an upgrade answered as 1.0. noVNC is vendored as its ES-module source
+(`core/rfb.js`) because its npm package is CommonJS and jsdelivr's `/+esm` fails to
+bundle it.
 
 ## Game slots
 
@@ -442,8 +687,8 @@ and no game.
 `sway`, `grim`, `python-opencv` (numpy with it; its `dnn` module runs the OCR models),
 `wayland-scanner`
 and `cc` (for `a2input`), `pactl`, Heroic's Proton-CachyOS and umu, and `claude` for
-judged and agent steps. Optional: `wayvnc` (for `watch` and `--vnc`, with Chromium for
-`watch`), `wf-recorder`, `tigervnc`. The texture
+judged and agent steps. Optional: `wayvnc` (for the dashboard's live view and `--vnc`,
+with Chromium for `watch`'s window), `wf-recorder`, `tigervnc`. The texture
 pipeline's "no numpy" rule is about what that pipeline may assume. The bench is
 separate and needs opencv.
 

@@ -5,6 +5,81 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.45.0 — 2026-10-22
+
+### Added
+- `a2test watch` serves the bench dashboard (`bench/dash.html`, `bench/dash.py`) on the
+  same port, 5950: a column per job (a run's cases, a film's players and an A/B's
+  sessions are one column each), the queue with why each waiter waits, what finished in
+  the last 2 h, CPU, memory, swap, GPU and VRAM gauges (amdgpu sysfs), and the judge's
+  tokens today. State over Server-Sent Events (`/events`, `/api/state`); live noVNC for the
+  maximized column only, from a `wayvnc` started on demand; in-memory `grim` snapshots
+  (`/snap/<id>.jpg`, at most 5 s old) for the rest; nothing live while a perf A/B runs.
+- noVNC 1.6.0 vendored in `testbench/vendor/novnc-1.6.0/`: the page loads nothing from the
+  network.
+- Who started a job, recorded at `a2test run`, `session start` and `a2film`
+  (`bench/who.py`): the Claude Code session, main or subagent and the parent's worktree,
+  or by hand; the worktree, branch and commit. Job records in `~/.cache/a2test/jobs/`
+  (`bench/jobs.py`); sessions, slot sidecars and waiters carry the job's id
+  (`A2TEST_JOB`); a session under `render3d/perf/ab.sh` belongs to the A/B.
+- `a2test drive note "..."` records the driver's intent (`intent` in `steps.jsonl`), and
+  `session start --note "..."` the first one. Every record of a drive command carries
+  its command line and an invocation id (`src`, `cmd`, `inv`).
+- The judge's token usage per call (`claude -p`'s `modelUsage`), in the step's `judge`
+  note and summed per day in `~/.cache/a2test/judge-usage.json`.
+- A scenario's `## ` headings name its phases. `slots.held_by_kernel()` reads the held
+  slots from `/proc/locks` without taking a lock; a session's teardown notes `freed` in
+  its slot's sidecar. `bench/dash_selftest.py`.
+
+### Removed
+- `bench/watch.html`, the tiled view, and its noVNC import from jsdelivr.
+
+Installs nothing; seen working on the bench 2026-10-22.
+
+## 3.44.0 — 2026-10-22
+
+### Added
+- `a2test drive dump [NAME]` and the scenario step `Dump the frame called "NAME"`:
+  both plugins' frame dumps (Render3D's targets as PFM/PPM, UI's presented frame as
+  PPM) asked for through their trigger files, moved into the session's `dumps/NAME/`
+  with PNG previews and per-file min/mean/max (`bench/dumps.py`). A session gathers a
+  left-over `Dumps/` into `logs/Dumps/` when it stops.
+
+Installs nothing; seen working on the bench 2026-10-22 (`showcase`, 1280x720).
+
+## 3.43.0 — 2026-10-22
+
+### Added
+- `./a2test baseline record | compare | diff | list | show` (`bench/baseline.py`): named
+  frames in `$A2_DATA/baselines/<NAME>/` with their provenance (`meta.json`), and a pixel
+  diff per shot: RMSE, max, pixels over `--threshold`, PSNR, a heat map and a side by
+  side (`--gif`: a flicker GIF); `--rmse`, `--max-over` set the exit status. Reads PNG,
+  PPM (P6/P5, 8 and 16 bit) and PFM, compared in linear float and after a fixed tone map.
+- Scenario steps `Record the screenshot "NAME" as baseline "B"`, `Record every
+  screenshot as baseline "B"` and `Expect the screenshot "NAME" matches baseline "B"
+  [within RMSE X] [with at most N% of pixels over T]`.
+- `bench/baseline_selftest.py`: every number, the readers and the exit codes on
+  synthetic frames, no game.
+
+Installs nothing; seen working on the bench 2026-10-22 (`showcase`, paused, 1280x720).
+
+## 3.42.0 — 2026-10-22
+
+### Added
+- `--clock wall|bench` on `a2test session start` and `a2test run`, a scenario's `Clock:`
+  header and `A2TEST_CLOCK`: `bench` sets `[Bench] Clock=bench` in the clone's
+  `Render3D.ini` and `UI.ini`.
+- `Scene.asi`: `Seed=` and `seed <n>` (the engine's three random sequences started again
+  from a seed, as the mission loads and as the scene is built), `Step=` (every tick that
+  many ms, whatever the frame rate), `Pause=` and `pause-at <tick>` (pause a fixed number
+  of ticks after the scene is built), `tick`; `pause` answers its tick and the sim time.
+  `SCENE_SEED`/`SCENE_STEP`/`SCENE_PAUSE` at install, and `Key=value` words after the
+  scene in `bench-setup.sh`.
+- Steps `Wait up to N seconds for "LOG" to say "TEXT"` and `Expect shots "A" and "B" to
+  match within T`; scenario `bench-determinism` (ecbb58b, 4a64407).
+
+Confirmed in game 2026-10-22.
+
 ## 3.41.2 — 2026-10-22
 
 ### Removed

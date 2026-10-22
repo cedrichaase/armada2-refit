@@ -699,10 +699,10 @@ fn tooltip(ui: &mut Ui, tip: Tip, panel: Option<R>) {
         h.since = now;
         h.tip = None;
     }
-    if key == 0 || now - h.since < 0.35 {
+    if key == 0 || !ui.waited(h.since, 0.35) {
         return;
     }
-    let verbose = now - h.since > 1.5;
+    let verbose = ui.waited(h.since, 1.5);
     let stale = match &h.tip {
         Some((v, when, _)) => *v != verbose || now - when > 0.5,
         None => true,

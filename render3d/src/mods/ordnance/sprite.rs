@@ -30,6 +30,10 @@ use alloc::vec::Vec;
 
 const FN_ANIMATE: usize = 0x63a580; // ST3D_Sprite::Animate(), thiscall
 const TEX_OFFSET: usize = 0x7ad6d0; // ST3D_Sprite::m_texture_coordinate_offset, Vector2
+/// The time the engine's animation channels are evaluated at (`ST3D_AnimationChannel::
+/// Evaluate` reads it; `SetStartTime` sets it from Storm3D's wall clock): under the bench
+/// clock, the sim time while we call `Animate`, then put back (README "The animation clock").
+const ANIM_TIME: usize = 0x7a8e74;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -98,7 +102,15 @@ impl Sprites {
         if flags & 0x10 == 0 {
             unsafe {
                 let f: unsafe extern "thiscall" fn(usize) = core::mem::transmute(FN_ANIMATE);
-                f(sprite);
+                if crate::clock::bench() {
+                    let t = ANIM_TIME as *mut f32;
+                    let saved = t.read_unaligned();
+                    t.write_unaligned(crate::clock::anim_now() as f32);
+                    f(sprite);
+                    t.write_unaligned(saved);
+                } else {
+                    f(sprite);
+                }
             }
         }
         let off: [f32; 2] = unsafe { rd(TEX_OFFSET) };

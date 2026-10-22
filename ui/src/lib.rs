@@ -8,8 +8,10 @@ extern crate alloc;
 pub mod rt;
 #[macro_use]
 pub mod d3d;
+pub mod dump;
 pub mod app;
 pub mod clipboard;
+pub mod clock;
 pub mod config;
 pub mod credits;
 pub mod cursor;
@@ -46,6 +48,7 @@ fn startup() {
     rt::init();
     let cfg = config::load();
     rt::log_open("UI.log", cfg.log);
+    clock::load();
     log!("UI {} -- game dir {}", env!("CARGO_PKG_VERSION"), rt::game_dir());
     if !cfg.enable {
         log!("Enable=0: standing down");

@@ -4,6 +4,35 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.18.0 — 2026-10-22
+
+### Added
+- Frame dumps on request: a `Render3D.dump` file beside the exe (its text names the
+  dump; looked for every 30 frames, deleted when seen) makes the next main view write
+  the resolved HDR scene target and each bloom level (down and up) as PFM, and the back
+  buffer after the tone map as PPM, into `Dumps\` with a sidecar
+  `<name>-<frame>-render3d.txt` (`src/dump.rs`; README.md, "Frame dumps").
+- `perf/ab.sh A B`: frame time of two checkouts or revisions on the bench, each side
+  installed whole, `RUNS=` alternating the order; `perf/summary.py` takes any sides and
+  shows the spread across runs (PERF.md, "A/B"; 2ccf6ee, 8162070).
+
+Confirmed in game 2026-10-22.
+
+## 0.17.0 — 2026-10-22
+
+### Added
+- `[Bench] Clock=` in `Render3D.ini` (default `wall`, as before): `bench` runs every
+  animation of render3d's own on the simulation's time through one function,
+  `clock::anim_now()` (hologram and extras phase, vent and special-effect flicker, the
+  co-player selection blink, the menu scene), gives the debris a fixed seed
+  (`clock::seed()`), settles the nebulae's `Temporal=` history on a standing view (32
+  frames from the sequence's first step, then held), and makes the nebula pulse and
+  lightning functions of the sim time; per-object seeds come from the object's handle,
+  not its address (`clock::entity_key`), and stock shots' sprite animation is evaluated
+  at the sim time. For pixel-identical frames on the test bench (ecbb58b, 4a64407).
+
+Confirmed in game 2026-10-22.
+
 ## 0.16.4 — 2026-10-21
 
 ### Changed

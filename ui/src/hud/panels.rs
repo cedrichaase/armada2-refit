@@ -181,7 +181,7 @@ pub fn game_button(ui: &mut Ui, r: R, b: usize, name: &str, on: bool) -> bool {
         h.tip = None;
     }
     if hot && h.btn == b && !held {
-        let verbose = now - h.since > 1.5;
+        let verbose = ui.waited(h.since, 1.5);
         if h.tip.as_ref().map(|t| t.0) != Some(verbose) {
             let text = engine::buttons::tooltip(b, verbose).or_else(|| engine::buttons::tooltip(b, false)).unwrap_or_default();
             h.tip = Some((verbose, text));

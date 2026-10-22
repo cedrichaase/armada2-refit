@@ -493,6 +493,28 @@ BarHidden` (Game Settings' "Command Bar", `HUD.md`, "The top-right buttons").
 | `[Menus] Host` | 1 | 0 (with `Trace=1`): the dialogs run stock and are only traced, for comparing |
 | `[Loading] Enable` | 1 | the loading screen of ours (`LOADING.md`) in place of the engine's logo scene and bar |
 | `[Loading] Hold` | 0 | the test bench's: seconds each load waits half-way, the screen still drawn, to be looked at. Never in play |
+| `[Bench] Clock` | wall | the animation clock ("The animation clock"): `wall` in play; `bench` for the test bench, on the simulation's time with transitions settled |
+
+## The animation clock
+
+`[Bench] Clock=` (`src/clock.rs`) decides what time the UI's animations run on, as
+render3d's does (`render3d/README.md`, "The animation clock"). **`Clock=wall`** (the
+default, the player's) is the wall clock. **`Clock=bench`** is the test bench's
+(`a2test --clock bench`, `testbench/README.md`, "A frame that repeats"), so that two
+sessions paused at one tick draw the same frame: `Ui::time()` is then the simulation's
+time (`Get_Time`, the float at 0x7b0fc8), which stands while the game is paused, and
+every **transition** is settled at once: a hover's fade (`anim::ease`), a panel opening
+(`anim::appear`), a tooltip's delay (`Ui::waited`) and the unit view's camera turning
+after its ship. A transition starts at a moment of the wall clock (the pointer arriving)
+and would otherwise stop half-way while paused; in the front end there is no simulation
+at all, and a window would never finish opening.
+
+**The rule: anything that moves on screen reads `Ui::time()` (or, outside a frame of
+widgets, `clock::anim_now()`), never `rt::now()`; a delay before something shows goes
+through `Ui::waited`.** `rt::now()` stays for what is not seen: how long ago a panel last
+drew, how often a list is read again, how long a screen has been up before it takes a
+click, logs. The Credits keep the wall clock on purpose: their pages are a timed
+slideshow, and a frozen one would never move on.
 
 ## The renderer (`src/gfx/`)
 
@@ -616,6 +638,31 @@ panel of ours reads its state and presses its buttons. The button bar is the fir
 the minimap, the selection overlay and the unit view's frame followed.
 [`HUD.md`](HUD.md) has the inventory of the HUD's components, the switch, the bar and
 the engine reads each panel uses.
+
+## Frame dumps
+
+The frame as presented, read back from inside the process: `UI.dump` beside
+`Armada2.exe` (its text, if any, names the dump) makes the UI write the back buffer at
+the next `Present` as a binary PPM (P6), byte for byte, into `Dumps\` in the game
+directory: `<name>-<frame>-present.ppm`, with a sidecar `<name>-<frame>-ui.txt` (the
+frame, the back buffer's size, format and samples) and a `dump:` line in `UI.log`.
+`<frame>` counts the presents since the hook went in. This is the whole frame, the 3D
+view with the HUD, the UI and the engine's cursor (when it draws one), before the
+swapchain and the compositor that a grim shot goes through; render3d dumps the stages
+before it (`render3d/README.md`, "Frame dumps"). The files are what `a2test baseline
+compare` is meant to read. On the bench, `a2test drive dump NAME` asks both plugins at
+once (`testbench/README.md`).
+
+The hook is the d3d8 device's `Present` (slot 15 of its vtable), chained beside
+`Reset` (`engine/device.rs`, once per vtable): every present goes through it, the
+engine's `RefreshDisplay` and the screens of our own alike, and it looks for the
+trigger every 30 presents, so without one it costs a counter and one
+`GetFileAttributesA` every 30 frames. The read-back is `src/dump.rs` (the same file as
+render3d's): `GetRenderTargetData` into a system-memory copy (through a plain target
+first if the back buffer is multisampled), converted a row at a time; it changes no
+state of the device. A format it has no conversion for is logged and skipped. Without
+a Direct3D 9 device behind the game's (DXVK's own d3d8) nothing is read, and the
+sidecar says so.
 
 ## Testing
 

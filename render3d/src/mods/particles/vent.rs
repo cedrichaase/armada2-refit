@@ -132,9 +132,9 @@ fn rnd(seed: u32) -> f32 {
     (hash32(seed) & 0xff_ffff) as f32 / 16_777_216.0
 }
 
-/// Wall-clock seconds, kept small for the shader.
+/// Animation seconds (`clock::anim_now`: the wall clock, or the bench's), kept small.
 fn wall() -> f32 {
-    let t = crate::rt::now();
+    let t = crate::clock::anim_now();
     (t - libm::floor(t / 1000.0) * 1000.0) as f32
 }
 

@@ -20,6 +20,8 @@ Setup: online/bench-asi.sh --loss 10      (a script of this repo, run on each cl
                                            and then any words after the script's name)
 Sheet: 1 ship, 6 ships, 30 ships          (shot names: <scenario>/sheet.png in the run,
                                            a row per case and a column per shot)
+Clock: bench                              (the plugins' animation clock on the simulation's
+                                           time: ../README.md, "A frame that repeats")
 Timeout: 12 min
 
 Any prose is description.
@@ -29,7 +31,9 @@ Any prose is description.
 ```
 
 Every numbered or bulleted line is one step. Quotes may be straight or curly, and a
-leading "Then" or "And", or a trailing full stop, is ignored.
+leading "Then" or "And", or a trailing full stop, is ignored. A `## ` heading among the
+steps names a phase (`## Main menu`, `## Mission HUD`): the bench dashboard shows how far
+each phase has got. Without headings it makes one phase per screenshot.
 
 ## Deterministic steps
 
@@ -52,7 +56,9 @@ leading "Then" or "And", or a trailing full stop, is ignored.
 | `Type this machine's address` | the source address of the default route: what the game shows as "Local IP Address", and where every player of a case is |
 | `Type what follows "TEXT" in "LOG" of PLAYER` | the word after TEXT on the last line of that player's log that has it (`of PLAYER` left out: this game's), waiting up to 30 s for it: how a joiner types the host's join code |
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
+| `Dump the frame called "NAME"` | Render3D.asi's targets (PFM) and UI.asi's presented frame (PPM), read back inside the game, into `dumps/NAME/` with PNG previews (`../README.md`, "Frame dumps"); fails when no plugin dumped |
 | `Note "TEXT"` | a line in the log |
+| `Wait up to 240 seconds for "Scene.log" to say "TEXT"` | polls a log beside `Armada2.exe` for a line with TEXT (each launch deletes the old one); fails at the time limit |
 | `Scene "select yard1 yard2"` | commands to `Scene.asi` (`../scene/README.md`), `;` between several; a refused command fails the step. Needs `Setup: testbench/scene/bench-setup.sh <scene>` |
 | `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |
@@ -88,6 +94,7 @@ audio reached the real output before the bench's guard stopped it (run
 | `… is stretched …` | the control form: passes only if it IS stretched |
 | `Expect no black bars` / `Expect black bars` | bounding box of non-black pixels |
 | `Expect no large flat grey areas` | untextured non-black blocks (don't use on a map: fog of war is flat grey) |
+| `Expect shots "first" and "second" to match` / `… within 0.5` | the newest shot of each name, pixel by pixel: mean absolute difference (0..255, every channel) at most the tolerance (default 0.5); the largest difference and the share of pixels that differ are reported |
 
 ### The HUD's layout
 
@@ -124,6 +131,24 @@ are SKIP too, and each one says why ("the stock 4:3 reference case failed at ste
 A missing baseline is the reference case's failure, not an unclear result in this case.
 Judged steps that ask for a comparison are skipped the same way rather than sent to the
 judge with nothing to compare against.
+
+## Baselines (pixel diff)
+
+Frames kept in `$A2_DATA/baselines/<B>/` and compared pixel for pixel
+(`../README.md`, "Baselines", has what each number means).
+
+| Step | What it does |
+|---|---|
+| `Record the screenshot "NAME" as baseline "B"` | copies this case's latest frame of that name into baseline B, with the case's commits, resolution and scene; replaces a shot of that name. `the dump "NAME"` finds a `.ppm`/`.pfm` dump of that name in the case |
+| `Record every screenshot as baseline "B"` | the same for every named screenshot the case has taken so far |
+| `Expect the screenshot "NAME" matches baseline "B"` | RMSE, max, pixels over 2/255 and PSNR against the baseline; with no tolerance, no pixel may be over 2/255. The heat map and a side by side go into the case's `baseline/` and the report |
+| `… within RMSE 0.5` | passes at an RMSE (in 1/255) up to that |
+| `… with at most 0.1% of pixels over 4` | at most that share of pixels with a channel more than 4/255 off. Both tolerances may be given, RMSE first |
+
+A missing baseline, or a baseline without that shot, fails the step and names the step
+or command that records it. A baseline holds one size of frame: a scenario run at
+several resolutions needs a baseline per resolution (`"pre-gpu-720"`), or the
+comparison fails on the size.
 
 ## Judged and delegated steps
 

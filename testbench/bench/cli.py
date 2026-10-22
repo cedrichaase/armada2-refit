@@ -11,8 +11,8 @@ import threading
 import time
 from pathlib import Path
 
-from . import config, report, vision
-from .scenario import STEPS, Case, normalise, parse, ref_label
+from . import config, jobs, report, vision
+from .scenario import STEPS, Case, case_dirname, normalise, parse, ref_label
 from .session import STEMS, GameError, Session, build_input, parse_categories
 from .slots import SlotError
 
@@ -36,6 +36,7 @@ a2test -- run Armada II headless and test it end to end
                        [--vnc] [--no-launch]
       --install PATH                   start from stock, then run PATH/install into the
                                        clone; repeat to stack checkouts (public, private)
+      --note "TEXT"                    the session's first intent (as drive note)
   a2test session stop ID [--keep] [--graceful]
                                        end session ID (terminated; --graceful: through its
                                        menus), gather logs, write the report. The id is
@@ -43,8 +44,8 @@ a2test -- run Armada II headless and test it end to end
   a2test session list                  active sessions: id, size, mod, game, artifacts
   a2test slots                         the machine-wide game slots: who holds them, who waits
                                        (A2_SLOTS sets how many; a run queues for them)
-  a2test watch [--no-open]             every live session, view-only, tiled in one
-                                       window (wayvnc + noVNC; needs wayvnc)
+  a2test watch [--no-open]             the bench dashboard on 127.0.0.1:5950: every job,
+                                       its games (noVNC), the queue, what finished
   a2test drive [--session ID] ...      every drive command takes --session ID (or
                                        A2TEST_SESSION=ID); without one, drive refuses
                                        when more than one session is active
@@ -58,9 +59,24 @@ a2test -- run Armada II headless and test it end to end
   a2test drive wait SECONDS
   a2test drive wait-text "TEXT" [--timeout S]
   a2test drive step "any scenario step"   run one step of the scenario grammar
-  a2test drive running | log NAME | note "TEXT" | launch [ARGS] | quit
+  a2test drive dump [NAME]             Render3D.asi's targets (PFM) and UI.asi's presented
+                                       frame (PPM), read back in the game, into dumps/NAME/
+                                       with PNG previews (testbench/README.md, "Frame dumps")
+  a2test drive note "TEXT"             say what you are doing now (the session's intent on
+                                       the dashboard); again whenever it changes
+  a2test drive running | log NAME | launch [ARGS] | quit
   a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
                                        e.g. "orbit ship 30 15 900", "camera rts", "query"
+
+  a2test baseline record NAME --from SRC... [--shot S]... [--force]
+                                       keep shots (PNG, PPM, PFM) as $A2_DATA/baselines/NAME;
+                                       SRC: an image, a case or image dir, a session id
+  a2test baseline compare NAME --from SRC... [--shot S]... [--threshold 2] [--rmse X]
+                       [--max-over N|P%] [--out DIR] [--gif]
+                                       pixel diff per shot: RMSE, max, pixels over the
+                                       threshold, PSNR, a heat map; exit 1 over tolerance
+  a2test baseline diff A B [same options]   two images, dirs, sessions or baselines
+  a2test baseline list | show NAME
 
 Results: {results}
 """.format(results=config.RESULTS)
@@ -107,6 +123,9 @@ def main(argv=None):
         if cmd == 'slots':
             from . import slots
             return slots.main(rest)
+        if cmd == 'baseline':
+            from . import baseline
+            return baseline.main(rest)
         if cmd == 'watch':
             from . import watch
             return watch.main(rest, _active_sessions)
@@ -131,6 +150,8 @@ def cmd_run(argv):
     ap.add_argument('--tolerance', type=float, default=0.05)
     ap.add_argument('--out')
     ap.add_argument('--install', action='append', default=[], metavar='PATH')
+    ap.add_argument('--clock', choices=['wall', 'bench'], default=None,
+                    help='the plugins\' animation clock in every case (default: the scenario\'s Clock:, else A2TEST_CLOCK, else wall)')
     ap.add_argument('-j', '--jobs', type=int, default=config.JOBS,
                     help=f'cases at once (default {config.JOBS}; 1 = one case at a time); each waits for a game slot, so above A2_SLOTS they queue')
     a = ap.parse_args(argv)
@@ -150,7 +171,7 @@ def cmd_run(argv):
                 command='a2test run ' + ' '.join(shlex.quote(x) for x in argv), repo=str(config.REPO))
     stop = threading.Event()
     opts = dict(vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep, no_claude=a.no_claude,
-                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install)
+                tolerance=a.tolerance, stop=stop, tag=a.jobs > 1, installs=a.install, clock=a.clock)
     print(f'run {run_id} -> {run_dir}', flush=True)
     # Each scenario's reference case runs first, so every other case has something to
     # compare with; once it is done, that scenario's other cases join the queue. Up to
@@ -168,14 +189,27 @@ def cmd_run(argv):
             print(f'  (adding the {ref_label(ref)} reference case to {scn.slug}: it compares against it)')
         cases.sort(key=lambda k: k != ref)
         ref_dirs = {}
-        jobs = [(scn, r, mod, ref_dirs) for r, mod in cases]
+        todo = [(scn, r, mod, ref_dirs) for r, mod in cases]
         if needs_ref:
-            ready.append(jobs[0])
-            later[(scn.slug, jobs[0][1], jobs[0][2])] = jobs[1:]
+            ready.append(todo[0])
+            later[(scn.slug, todo[0][1], todo[0][2])] = todo[1:]
         else:
-            ready += jobs
+            ready += todo
     print(f'{len(ready) + sum(len(v) for v in later.values())} case(s), '
           f'up to {a.jobs} at once', flush=True)
+    planned = [dict(scenario=scn.slug, title=scn.title, file=str(scn.path), res=config.res_name(r), mod=mod,
+                    dir=str(run_dir / scn.slug / case_dirname(r, mod, scn.mod)))
+               for scn, r, mod, _ in ready + [j for v in later.values() for j in v]]
+    jid = jobs.start('run', ', '.join(dict.fromkeys(scn.slug for scn in scns)), run=run_id, dir=str(run_dir),
+                     cases=planned, jobs=a.jobs)
+    try:
+        return _run_cases(a, ready, later, run_dir, meta, opts, stop, jid)
+    finally:
+        if not (jobs.read(jid) or {}).get('ended'):
+            jobs.finish(jid, 'stopped', 'a2test run ended before its report was written')
+
+
+def _run_cases(a, ready, later, run_dir, meta, opts, stop, jid):
     build_input()                  # once, before any case would race to compile it
 
     active, lock = set(), threading.Lock()
@@ -228,17 +262,24 @@ def cmd_run(argv):
                         pass
             concurrent.futures.wait(running, timeout=120)
             report.write(run_dir, meta)
+            jobs.finish(jid, 'stopped', 'interrupted; ' + _run_outcome(run_dir)[1])
             print(f'report (partial): {run_dir / "index.html"}', flush=True)
             return 130
     page = report.write(run_dir, meta)
     cases = report.collect(run_dir)
     counts = report.summary_counts(cases)
+    jobs.finish(jid, *_run_outcome(run_dir))
     print('\n' + ', '.join(f'{v} {k}' for k, v in counts.items()))
     for c, s in report.failures(cases):
         print(f'  FAIL {c["scenario"]} @ {c["resolution"]} step {s["n"]}: {s["text"]}\n'
               f'       {(s.get("detail") or "").strip().splitlines()[0][:160] if s.get("detail") else ""}')
     print(f'\nreport: {page}\n        {run_dir / "report.md"}')
     return 1 if counts.get('fail') else 0
+
+
+def _run_outcome(run_dir):
+    from . import dash
+    return dash.run_outcome(run_dir)
 
 
 def _find_scenario(s):
@@ -357,6 +398,8 @@ def cmd_session(argv):
         ap.add_argument('--no-launch', action='store_true')
         ap.add_argument('--args', default='-nointro')
         ap.add_argument('--label', default='interactive')
+        ap.add_argument('--note', default='', metavar='TEXT',
+                        help='what this session is for: its first intent, as `drive note` (the dashboard shows it)')
         ap.add_argument('--install', action='append', default=[], metavar='PATH')
         ap.add_argument('--stock-shell', choices=['embed'], default=None)
         ap.add_argument('--assets', choices=['none'], default=None,
@@ -366,6 +409,9 @@ def cmd_session(argv):
         ap.add_argument('--stems', default='', metavar='CATS',
                         help='record these of music, voice, interface on sinks of their own (Stems.asi); '
                              'the rest is the effects stem')
+        ap.add_argument('--clock', choices=['wall', 'bench'], default=None,
+                        help='bench: [Bench] Clock=bench in Render3D.ini and UI.ini, animations on the '
+                             'simulation\'s time (default A2TEST_CLOCK, else wall)')
         a = ap.parse_args(rest)
         mute = parse_categories(a.mute, what='--mute')
         stems = parse_categories(a.stems, STEMS, what='--stems')
@@ -382,9 +428,29 @@ def cmd_session(argv):
         res = config.parse_res(a.res)
         sid = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         d = config.RESULTS / f'session-{sid}' / re.sub(r'[^A-Za-z0-9_.-]+', '-', a.label) / config.res_name(res)
-        s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
-                           label=a.label, installs=a.install, stock_shell=a.stock_shell,
-                           assets=a.assets, mute=mute, stems=stems)
+        # The job it belongs to (bench/jobs.py): a2film's or a run's when started by one
+        # (A2TEST_JOB), ab.sh's when under it, else a job of its own -- recorded before it
+        # queues for a slot, so the queue can say whose it is.
+        jid = jobs.current() or jobs.ab_job()
+        own = jid is None
+        if own:
+            jid = jobs.start('session', a.label if a.label != 'interactive' else 'interactive session',
+                             res=config.res_name(res), label=a.label, mod=a.mod, args=a.args,
+                             installs=[str(Path(p).resolve()) for p in a.install], scene=os.environ.get('SCENE'))
+        else:
+            os.environ[jobs.ENV] = jid
+        try:
+            s = Session.create(d, res, mod=a.mod, vnc=a.vnc, record=a.record, audio=a.audio, keep=a.keep,
+                               label=a.label, installs=a.install, stock_shell=a.stock_shell,
+                               assets=a.assets, mute=mute, stems=stems, clock=a.clock)
+        except BaseException as e:
+            if own:
+                jobs.finish(jid, 'start-failed', f'no session: {e}'.splitlines()[0][:300])
+            raise
+        if own:
+            jobs.update(jid, lambda r: r.update(session=s.s['id'], dir=str(s.dir)))
+        if a.note:
+            s.log.note(a.note, intent=True)
         # A start that fails part-way (an install, the display, a launch the audio
         # guard stops) is torn down here like any session. Left alone it kept its sway,
         # input and VNC running and stayed "active" in `session list` with no game.
@@ -398,6 +464,8 @@ def cmd_session(argv):
             s.log.action(f'session start failed: {e}', status='fail')
             s.teardown()
             _session_report(s)
+            if own:
+                jobs.finish(jid, 'start-failed', str(e).splitlines()[0][:300] if str(e) else type(e).__name__)
             raise
         print(f'session {s.s["id"]}\n  artifacts: {s.dir}\n  state:     {s.statefile}\n'
               f'  drive it:  a2test drive --session {s.s["id"]} ...\n'
@@ -422,8 +490,10 @@ def cmd_session(argv):
         how = 'terminated'
         if '--graceful' in rest and s.running():
             how = 'closed' if _adhoc_step(s, 'Quit the game')['status'] == 'ok' else 'forced'
+        crashed = s.crashed()
         s.teardown()
         _session_report(s)
+        _finish_session_job(s, crashed)
         print(f'stopped ({how}); report: {s.dir.parent.parent / "index.html"}')
         return 0
     if sub == 'list':
@@ -432,6 +502,16 @@ def cmd_session(argv):
                   f'{"running" if s.running() else "not running"}  {s.dir}')
         return 0
     raise GameError(f'unknown session command {sub}')
+
+
+def _finish_session_job(s, crashed):
+    """A session's own job ends with it (one started by a run or a film ends with that)."""
+    jid = s.s.get('job')
+    rec = jobs.read(jid) if jid else None
+    if not rec or rec.get('kind') != 'session' or rec.get('ended'):
+        return
+    from . import dash
+    jobs.finish(jid, *dash.session_outcome(s.dir, crashed))
 
 
 def _session_report(s):
@@ -476,6 +556,8 @@ def cmd_drive(argv):
     sub, rest = argv[0], argv[1:]
     s = _current(sid)
     log = s.log
+    import uuid
+    log.drive = dict(cmd='drive ' + shlex.join(argv), inv=uuid.uuid4().hex[:8])
 
     def xy(args, design):
         x, y = int(float(args[0])), int(float(args[1]))
@@ -578,12 +660,23 @@ def cmd_drive(argv):
         body = s.game_log(rest[0]) if rest else None
         print((body or f'no log {rest[0] if rest else ""}')[-4000:])
     elif sub == 'note':
-        log.note(' '.join(rest))
+        text = ' '.join(rest).strip()
+        if not text:
+            raise GameError('note what? a2test drive --session ID note "what you are doing now"')
+        log.note(text, intent=True)
         print('ok')
     elif sub == 'verdict':
         st, reason = rest[0].lower(), ' '.join(rest[1:])
         log.check(reason, st if st in ('pass', 'fail', 'review') else 'inconclusive', how='recorded by the driver')
         print('ok')
+    elif sub == 'dump':
+        from . import dumps
+        name = rest[0] if rest else 'dump'
+        st, text, previews = dumps.take(s, name)
+        log.action(f'dump "{name}"', status='fail' if st == 'fail' else 'warn' if st == 'warn' else 'ok',
+                   detail=text, shots=previews)
+        print(text)
+        return 1 if st == 'fail' else 0
     elif sub == 'scene':
         return _scene_command(s, rest)
     elif sub == 'launch':

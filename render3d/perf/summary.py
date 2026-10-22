@@ -1,6 +1,10 @@
 """render3d/PERF.md: summarise DIR/<cfg>-<scene>.log, the mean of every timing report after the first.
 
     python3 render3d/perf/summary.py DIR
+
+<cfg> is a side: old/new (compare.sh) or a/b (ab.sh), one column each. A side run
+several times (<cfg>.<run>-<scene>.log, ab.sh's RUNS=) is the mean of its runs, and
+the frame, CPU and GPU rows add the spread across runs (min-max) beside it.
 """
 import glob, os, re, sys
 
@@ -45,18 +49,36 @@ def read(path):
     return out
 
 
-scenes = sorted({os.path.basename(p).split('-', 1)[1][:-4] for p in glob.glob(os.path.join(D, '*-*.log'))})
+logs = glob.glob(os.path.join(D, '*-*.log'))
+scenes = sorted({os.path.basename(p).split('-', 1)[1][:-4] for p in logs})
+order = {'old': 0, 'new': 1, 'a': 2, 'b': 3}
+sides = sorted({os.path.basename(p).split('-', 1)[0].split('.')[0] for p in logs}, key=lambda c: (order.get(c, 9), c))
+title = {'old': 'old (main)'}
+KEYS = [('frame', 'frame period ms'), ('fps', 'fps'), ('longest', 'longest frame ms'),
+        ('cpu', '3D view CPU ms'), ('cpu_max', '3D view CPU max ms'),
+        ('gpu', '3D view GPU ms'), ('gpu_max', '3D view GPU max ms'),
+        ('outside', 'outside the 3D view ms'), ('late', 'GPU sets late'), ('reports', 'reports')]
 for sc in scenes:
-    r = {cfg: read(os.path.join(D, f'{cfg}-{sc}.log')) if os.path.exists(os.path.join(D, f'{cfg}-{sc}.log')) else None
-         for cfg in ('old', 'new')}
+    runs = {}
+    for c in sides:
+        paths = sorted(glob.glob(os.path.join(D, f'{c}-{sc}.log')) + glob.glob(os.path.join(D, f'{c}.*-{sc}.log')))
+        runs[c] = [x for x in (read(p) for p in paths) if x]
     print(f'## {sc}')
-    print(f'{"":28} {"old (main)":>12} {"new":>12}')
-    for key, label in [('frame', 'frame period ms'), ('fps', 'fps'), ('longest', 'longest frame ms'),
-                       ('cpu', '3D view CPU ms'), ('cpu_max', '3D view CPU max ms'),
-                       ('gpu', '3D view GPU ms'), ('gpu_max', '3D view GPU max ms'),
-                       ('outside', 'outside the 3D view ms'), ('late', 'GPU sets late'), ('reports', 'reports')]:
-        vals = [r[c][key] if r[c] else float('nan') for c in ('old', 'new')]
-        print(f'{label:28} {vals[0]:12.2f} {vals[1]:12.2f}')
-    if r['new']:
-        print('new, per step (cpu/gpu ms): ' + ', '.join(f'{k} {c:.2f}/{g:.2f}' for k, (c, g) in r['new']['steps'].items()))
+    print(f'{"":28} ' + ' '.join(f'{title.get(c, c):>20}' for c in sides))
+    for key, label in KEYS:
+        cells = []
+        for c in sides:
+            v = [x[key] for x in runs[c]]
+            if not v:
+                cells.append(f'{"-":>20}')
+            elif key in ('longest', 'cpu_max', 'gpu_max'):
+                cells.append(f'{max(v):20.2f}')
+            elif len(v) > 1 and key in ('cpu', 'gpu', 'frame'):
+                cells.append(f'{mean(v):9.2f} ({min(v):.2f}-{max(v):.2f})'.rjust(20))
+            else:
+                cells.append(f'{mean(v):20.2f}')
+        print(f'{label:28} ' + ' '.join(cells))
+    for c in sides:
+        if c in ('new', 'a', 'b') and runs[c]:
+            print(f'{c}, per step (cpu/gpu ms): ' + ', '.join(f'{k} {cc:.2f}/{g:.2f}' for k, (cc, g) in runs[c][0]['steps'].items()))
     print()

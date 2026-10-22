@@ -369,7 +369,7 @@ pub fn menu_frame(rect: PRect, draw: impl FnOnce(Device, u32)) -> bool {
     let Some(f) = frame().as_mut() else { return true };
     if let (Some(t), Some(p)) = (f.targets.as_ref(), f.post.as_ref()) {
         let r = PRect { x: rect.x.min(t.w - 1), y: rect.y.min(t.h - 1), w: rect.w.min(t.w - rect.x.min(t.w - 1)), h: rect.h.min(t.h - rect.y.min(t.h - 1)) };
-        p.run(f.dev, t, r, &saved.rt, saved.ds.as_ref(), cfg);
+        p.run(f.dev, t, r, &saved.rt, saved.ds.as_ref(), cfg, None);
     } else {
         f.dev.set_render_target(0, saved.rt.ptr());
         f.dev.set_depth_stencil(saved.ds.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
@@ -387,8 +387,18 @@ fn end(cam: usize, main: bool, saved: Saved, cfg: &Config) {
         return;
     };
     let view = steps::cam_rect(cam, t.w, t.h);
-    p.run(f.dev, t, view, &saved.rt, saved.ds.as_ref(), cfg);
     let which = steps::view_key(cam, main);
+    // A dump asked for with `Render3D.dump` is taken in the main view (README.md,
+    // "Frame dumps"); the HUD's action camera draws a second view in the same frame.
+    let mut dump = if main { crate::dump::poll("Render3D.dump").map(|n| crate::dump::Dump::new(n, f.frames, "render3d")) } else { None };
+    if let Some(d) = dump.as_mut() {
+        d.note(&crate::sfmt!("targets {}x{}, format {} ({}), {} samples", t.w, t.h, t.fmt, crate::dump::format_name(t.fmt), t.samples));
+    }
+    let label = ["main", "inset", "other"][which];
+    p.run(f.dev, t, view, &saved.rt, saved.ds.as_ref(), cfg, dump.as_mut().map(|d| (d, label)));
+    if let Some(d) = dump {
+        d.finish();
+    }
     if f.logged[which] != Some(view) {
         f.logged[which] = Some(view);
         log!("frame {}: {} view {}x{} at {},{}", f.frames, ["main", "inset", "other"][which], view.w, view.h, view.x, view.y);

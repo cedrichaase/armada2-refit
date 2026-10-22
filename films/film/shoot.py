@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import code
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'testbench'))
-from bench import slots  # noqa: E402  (the machine-wide queue for game instances)
+from bench import jobs, slots  # noqa: E402  (the machine-wide queue for game instances; the dashboard's jobs)
 from . import marks
 from . import storyboard as sb
 from .cli import IGNORE_CODE, command, load, select, take_check
@@ -81,11 +81,36 @@ class Take:
             self.log.write(f'{time.strftime("%H:%M:%S")} {msg}\n')
             self.log.flush()
 
+    def progress(self, phase, **kw):
+        """Where this take is, in its job's record (testbench/bench/jobs.py), for the bench
+        dashboard: queued, starting, scene, setup, recording, finishing, done, failed."""
+        jid = os.environ.get(jobs.ENV)
+        if not jid:
+            return
+        tag = self.tag
+
+        def f(rec):
+            t = rec.setdefault('takes', {}).setdefault(tag, {})
+            t.update(kw, phase=phase, t=round(time.time(), 1), log=self.stem + '.log',
+                     shot=self.shot.id, variant=self.variant, tier=self.tier)
+        try:
+            jobs.update(jid, f)
+        except OSError:
+            pass
+
+    def planned(self):
+        """The action's length as written: the sum of its waits."""
+        try:
+            return sum(float(t.split()[1]) for t in (self.shot.split_line(x)[1] for _, x in self.shot.action)
+                       if t.startswith('wait '))
+        except (ValueError, IndexError):
+            return None
+
     # ---------------------------------------------------------------- the session
     def start(self):
         f, s = self.film, self.shot
         self.code = code.record(f, s, self.variant)     # the code it installs, as it starts
-        env = dict(os.environ)
+        env = dict(os.environ, A2TEST_TAKE=self.tag)
         ini = f.scene_ini(s)
         if ini:
             env['SCENE_INI'] = ini
@@ -107,8 +132,11 @@ class Take:
                 cmd += ['--stems', ','.join(s.stems)]
         # The slot is handed to the session start, whose sway and game hold it from there
         # on; our copy of the descriptor is dropped as soon as it returns.
+        if not self.slot:
+            self.progress('queued')
         slot = self.slot or slots.acquire(self.tag, say=lambda m: self.note(m.splitlines()[0]))[0]
         self.slot = None
+        self.progress('starting', slot=slot.index)
         try:
             env.update(slot.env())
             r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True, pass_fds=(slot.fd,))
@@ -122,6 +150,7 @@ class Take:
             raise (GameDied if re.search(r'launcher exited|did not appear', out) else RuntimeError)(err)
         self.sid = m.group(1)
         self.note(f'session {self.sid}')
+        self.progress('scene', session=self.sid)
         if s.get('Prepare'):
             words = s.get('Prepare').split()
             m = re.search(r'^\s*state:\s*(\S+)', r.stdout, re.M)
@@ -561,10 +590,13 @@ class Take:
                     self.cleanup_attempt()
                     if attempt == 2:
                         self.note(f'FAILED: {e} (second try)')
+                        self.progress('failed', why=str(e)[:200])
                         return False
                     self.note(f'{e}; trying once more')
+                    self.progress('retrying', why=str(e)[:200])
                 except Exception as e:      # one failed take must not end the others
                     self.note(f'FAILED: {e}')
+                    self.progress('failed', why=str(e)[:200])
                     return False
         finally:
             self.log.close()
@@ -580,12 +612,14 @@ class Take:
         try:
             self.start()
             self.wait_ready()
+            self.progress('setup')
             self.follow()
             self.run(self.shot.setup)
             self.check_alive()
             self.record_start(raw)
             self.wait_recording(raw)
             t0 = time.time()
+            self.progress('recording', rec_start=round(t0, 1), planned=self.planned())
             events = []
             self.run(self.shot.action, events, t0)
             time.sleep(TAIL)
@@ -593,6 +627,7 @@ class Take:
             t1 = time.time()
             duration = t1 - t0
             self.record_stop()
+            self.progress('finishing', duration=round(duration, 1))
             self.gather()
             self.stop()
             self.sid = None
@@ -607,6 +642,7 @@ class Take:
                       open(self.stem + '.spec.json', 'w'), indent=1)
             self.contact_sheet(probe_duration(self.stem + '.mkv'))
             self.note(f'done, {duration:.1f} s -> {self.stem}.mkv')
+            self.progress('done', duration=round(duration, 1))
             ok = True
         finally:
             if getattr(self, 'rec', None):
@@ -677,6 +713,8 @@ class Ensemble:
             raws[t] = tempfile.mkdtemp(prefix=f'{t.variant}-', dir=os.path.dirname(t.stem)) + '/raw'
         # every player's slot at once, or none: two shots each holding one and waiting for
         # another would wait for ever (slots.py)
+        for t in takes:
+            t.progress('queued')
         held = slots.acquire(self.tag, n=len(takes), say=lambda m: takes[0].note(m.splitlines()[0]))
         for t, slot in zip(takes, held):
             t.slot = slot
@@ -692,6 +730,7 @@ class Ensemble:
                 for f in [ex.submit(bring_up, it) for it in enumerate(takes)]:
                     f.result()
             for t in takes:
+                t.progress('setup')
                 t.follow()
             self.run(self.shot.setup)
             for t in takes:
@@ -701,6 +740,8 @@ class Ensemble:
             for t in takes:
                 t.wait_recording(raws[t])
             t0 = time.time()
+            for t in takes:
+                t.progress('recording', rec_start=round(t0, 1), planned=t.planned())
             events = []
             self.run(self.shot.action, events, t0)
             time.sleep(TAIL)
@@ -709,6 +750,7 @@ class Ensemble:
             duration = time.time() - t0
             for t in takes:
                 t.record_stop()
+                t.progress('finishing', duration=round(duration, 1))
             for t in takes:
                 t.gather()
                 t.stop()
@@ -726,12 +768,14 @@ class Ensemble:
                           open(t.stem + '.spec.json', 'w'), indent=1)
                 t.contact_sheet(probe_duration(t.stem + '.mkv'))
                 t.note(f'done, {duration:.1f} s -> {t.stem}.mkv')
+                t.progress('done', duration=round(duration, 1))
             ok = True
         except GameDied:
             raise
         except Exception as e:
             for t in takes:
                 t.note(f'FAILED: {e}')
+                t.progress('failed', why=str(e)[:200])
         finally:
             for t in takes:
                 if t.slot:              # a start that never got to hand it down
@@ -808,15 +852,29 @@ def film_takes(a, tier):
         time.sleep(min(i, a.jobs - 1) * 8 if i < a.jobs else 0)   # never two starts in one second
         return t()
 
-    with ThreadPoolExecutor(a.jobs) as ex:
-        results = list(ex.map(staggered, enumerate(light)))
-    results += [t() for t in heavy]
+    # the run is one job on the bench dashboard (testbench/bench/jobs.py); its sessions
+    # inherit the id in A2TEST_JOB and each take reports its phase into it
+    ids = list(dict.fromkeys(t.shot.id for t in light + heavy))
+    jid = jobs.start('film', f'{film.name} · ' + (', '.join(ids[:4]) + (f' +{len(ids) - 4}' if len(ids) > 4 else '')),
+                     film=film.name, board=os.path.relpath(os.path.abspath(a.board), REPO), tier=run_tier,
+                     shots=ids, takes_total=sum(len(t.takes) if isinstance(t, Ensemble) else 1 for t in light + heavy))
+    results = []
+    try:
+        with ThreadPoolExecutor(a.jobs) as ex:
+            results = list(ex.map(staggered, enumerate(light)))
+        results += [t() for t in heavy]
+    finally:
+        n_ok = sum(1 for r in results if r)
+        if len(results) < len(light) + len(heavy):
+            jobs.finish(jid, 'stopped', f'{n_ok} of {len(light) + len(heavy)} takes filmed before it stopped')
     todo = light + heavy
     bad = [t.tag for t, ok in zip(todo, results) if not ok]
     sus = [x.tag for t, ok in zip(todo, results) if ok
            for x in (t.takes.values() if isinstance(t, Ensemble) else [t]) if x.suspect]
-    say('a2film', f'{len(todo) - len(bad)} of {len(todo)} takes filmed' + (f'; failed: {", ".join(bad)}' if bad else '')
-        + (f'; suspect (Expect not met): {", ".join(sus)}' if sus else ''))
+    summary = f'{len(todo) - len(bad)} of {len(todo)} takes filmed' + (f'; failed: {", ".join(bad)}' if bad else '') \
+        + (f'; suspect (Expect not met): {", ".join(sus)}' if sus else '')
+    say('a2film', summary)
+    jobs.finish(jid, 'fail' if bad else 'review' if sus else 'done', summary)
     return 1 if bad or sus else 0
 
 

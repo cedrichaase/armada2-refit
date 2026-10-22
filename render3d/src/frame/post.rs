@@ -4,6 +4,7 @@
 //! viewport is a rectangle of the back buffer in either. Every pass works inside the
 //! view's rectangle (scaled down for each bloom level), and every tap is clamped to it.
 use crate::config::Config;
+use crate::dump::{Area, Dump, Kind};
 use crate::d3d::*;
 use crate::shaders::post::*;
 use alloc::vec::Vec;
@@ -139,6 +140,10 @@ fn uv(r: PRect, w: u32, h: u32) -> ([f32; 4], [f32; 4]) {
     (rect, clamp)
 }
 
+fn area(r: PRect) -> Area {
+    Area { x: r.x, y: r.y, w: r.w, h: r.h }
+}
+
 fn level_rect(view: PRect, k: usize) -> PRect {
     PRect { x: 0, y: 0, w: level_size(view.w, k), h: level_size(view.h, k) }
 }
@@ -196,12 +201,19 @@ impl Post {
     /// scene target, `out` the engine's render target (the back buffer), `out_depth`
     /// the engine's depth, which is cleared in the rectangle for the HUD. The caller has
     /// put the engine's target and depth back already or not; this leaves them set.
-    pub fn run(&self, dev: Device, t: &Targets, view: PRect, out: &Com, out_depth: Option<&Com>, cfg: &Config) {
+    /// With `dump`, each stage is read back as it is made (`crate::dump`, README.md,
+    /// "Frame dumps"), its files named after `label` (the view).
+    pub fn run(&self, dev: Device, t: &Targets, view: PRect, out: &Com, out_depth: Option<&Com>, cfg: &Config,
+        mut dump: Option<(&mut Dump, &str)>) {
         self.sb.sb_capture();
         // 1. Resolve the view's samples.
         if t.samples != 0 {
             let r = view.d3d();
             dev.stretch_rect(&t.scene, Some(&r), &t.resolve_surf, Some(&r), TEXF_NONE);
+        }
+        if let Some((d, label)) = dump.as_mut() {
+            d.note(&crate::sfmt!("view {} {}x{} at {},{}", label, view.w, view.h, view.x, view.y));
+            d.surface(dev, &t.resolve_surf, Some(area(view)), &crate::sfmt!("{}-scene", label), Kind::Pfm);
         }
         // No depth while the bloom levels are drawn: a multisampled depth may not go with
         // a 1x target.
@@ -226,6 +238,11 @@ impl Post {
                 self.ps(dev, &self.ps_down, [1.0 / s.w as f32, 1.0 / s.h as f32, 0.0, 0.0], sc, [0.0; 4], [0.0; 4]);
                 quad(dev, d.w, d.h, level_rect(view, k), su, su);
             }
+            if let Some((d, label)) = dump.as_mut() {
+                for (k, l) in t.levels.iter().enumerate() {
+                    d.surface(dev, &l.surf, Some(area(level_rect(view, k))), &crate::sfmt!("{}-bloom{}-down", label, k), Kind::Pfm);
+                }
+            }
             dev.set_rs(RS_ALPHABLENDENABLE, 1);
             dev.set_rs(RS_SRCBLEND, BLEND_ONE);
             dev.set_rs(RS_DESTBLEND, BLEND_ONE);
@@ -238,6 +255,15 @@ impl Post {
                 quad(dev, d.w, d.h, level_rect(view, k - 1), su, su);
             }
             dev.set_rs(RS_ALPHABLENDENABLE, 0);
+            // The way up adds each level onto the one above; the last, level 4, is as the
+            // way down left it.
+            if let Some((d, label)) = dump.as_mut() {
+                for (k, l) in t.levels.iter().enumerate().take(BLOOM_LEVELS - 1) {
+                    d.surface(dev, &l.surf, Some(area(level_rect(view, k))), &crate::sfmt!("{}-bloom{}-up", label, k), Kind::Pfm);
+                }
+            }
+        } else if let Some((d, _)) = dump.as_mut() {
+            d.note("bloom: off (an 8-bit scene target, or Bloom=0): no levels");
         }
         // 3. Tone map into the back buffer at the view's rectangle. The scene is read a
         // texel per pixel. With MSAA, the view's first column and row take their
@@ -259,6 +285,10 @@ impl Post {
         let shoulder = if hdr { cfg.shoulder.clamp(0.0, 0.99) } else { 1.0e9 };
         self.ps(dev, &self.ps_final, [0.0; 4], sc, [if bloom { cfg.bloom } else { 0.0 }, cfg.exposure, shoulder, 0.0], bc);
         quad(dev, od.width, od.height, view, su, bu);
+        if let Some((d, label)) = dump.as_mut() {
+            d.surface(dev, out, None, &crate::sfmt!("{}-tonemapped", label), Kind::Ppm);
+            d.note("depth: not dumped (Direct3D 9 cannot read a depth surface back with GetRenderTargetData)");
+        }
         // 4. The engine's depth, for the HUD drawn over the view next.
         if let Some(z) = out_depth {
             dev.set_depth_stencil(z.ptr());

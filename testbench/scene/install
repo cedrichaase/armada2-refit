@@ -28,5 +28,10 @@ cp "$ini" "$GAME/Scene.ini"
 if [ "${SCENE_MUSIC:-1}" = 0 ]; then sed -i 's/^\[Scene\]\r\?$/&\nMusic=0/' "$GAME/Scene.ini"; fi
 # SCENE_RACE=<race> puts Race=<race> into it the same way, ahead of any Race= of the file's own
 if [ -n "${SCENE_RACE:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nRace=$SCENE_RACE/" "$GAME/Scene.ini"; fi
+# SCENE_SEED=<n>, SCENE_PAUSE=<tick> and SCENE_STEP=<ms> likewise put Seed=, Pause= and Step= into it, for a
+# frame that repeats from launch to launch (README.md, "A frame that repeats")
+if [ -n "${SCENE_SEED:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nSeed=$SCENE_SEED/" "$GAME/Scene.ini"; fi
+if [ -n "${SCENE_PAUSE:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nPause=$SCENE_PAUSE/" "$GAME/Scene.ini"; fi
+if [ -n "${SCENE_STEP:-}" ]; then sed -i "s/^\[Scene\]\r\?\$/&\nStep=$SCENE_STEP/" "$GAME/Scene.ini"; fi
 rm -f "$GAME/Scene.log" "$GAME/Scene.cmd"
 echo "installed Scene.asi into $GAME, scene $ini"
