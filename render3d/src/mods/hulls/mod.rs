@@ -685,7 +685,7 @@ impl Module for Hulls {
     fn reset(&mut self) {
         self.draw.reset();
         self.shadow.reset();
-        self.sprites.reset();
+
         // The views' posed hulls hold their models, and the models their buffers, which
         // are in the default pool.
         unsafe { VIEWS = [None, None, None] };
