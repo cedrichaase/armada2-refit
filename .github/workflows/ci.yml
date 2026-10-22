@@ -247,6 +247,8 @@ jobs:
     concurrency:
       group: virustotal
       cancel-in-progress: false
+    outputs:
+      reports: ${{ steps.scan.outputs.reports }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -258,13 +260,18 @@ jobs:
           name: armada2-refit-installer-windows-${{ github.sha }}
           path: dist
       - name: Scan on VirusTotal
+        id: scan
         env:
           VT_API_KEY: ${{ secrets.VT_API_KEY }}
           VT_FAIL_ABOVE: ${{ vars.VT_FAIL_ABOVE }}
         run: |
+          rc=0
           python3 publish/virustotal.py scan --zip "$(ls dist/armada2-refit-[0-9]*.zip)" \
             --extra dist/armada2-refit-installer-windows.exe --out vt --commit "$GITHUB_SHA" \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || rc=$?
+          # Reports are written even when VT_FAIL_ABOVE fails the scan (exit 3).
+          [ -f vt/virustotal.json ] && echo "reports=1" >> "$GITHUB_OUTPUT"
+          exit $rc
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -339,11 +346,11 @@ jobs:
   # The scan's reports onto the release, once both exist: virustotal.json and
   # virustotal.md as assets, and a VirusTotal line in the notes (replaced on a re-scan).
   # Only onto vX.Y.Z made from this very commit, so a push that releases nothing, or a
-  # dispatch on a branch, attaches nothing. A failed or skipped release, or no report,
-  # leaves the release as it is.
+  # dispatch on a branch, attaches nothing. A failed or skipped release, or no report (no
+  # key, or a scan that broke), leaves the release as it is.
   virustotal-release:
     needs: [package, virustotal, release]
-    if: always() && (needs.virustotal.result == 'success' || needs.virustotal.result == 'failure')
+    if: always() && needs.virustotal.outputs.reports == '1'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -353,13 +360,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
-        continue-on-error: true
         with:
           name: virustotal-${{ github.sha }}
           path: vt
       - name: Attach the reports to vX.Y.Z
         run: |
-          [ -f vt/virustotal.json ] || { echo "no VirusTotal report (no key, or the scan failed)"; exit 0; }
           tag="v$VERSION"
           target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish 2>/dev/null) \
             || { echo "$tag is not released"; exit 0; }
