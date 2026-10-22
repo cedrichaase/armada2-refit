@@ -641,8 +641,11 @@ impl Drawer {
                 let tris = (g.tris as i64).min(faces_left) as u32;
                 faces_left -= tris as i64;
                 let team = if g.material.starts_with("team") { p.team } else { None };
-                let t = team.unwrap_or(v3(1.0, 1.0, 1.0));
-                let unlit = matches!(mode, Mode::Additive(_));
+                // A freighter's cargo markings: the resource's colour or black, unlit (the
+                // engine's material colour; `game::cargo_markings`).
+                let cargo = p.cargo.iter().find(|(k, _)| *k == g.material).map(|(_, c)| *c);
+                let t = cargo.or(team).unwrap_or(v3(1.0, 1.0, 1.0));
+                let unlit = matches!(mode, Mode::Additive(_)) || cargo.is_some();
                 let tint = match mode {
                     Mode::Additive(f) => t * (look.additive * f),
                     _ => t,

@@ -178,6 +178,12 @@ int _fltused = 0;   /* floats without the CRT */
 #define GO_CLOAK_NOW     0x4d03e0u   /* GameObject::ImmediateCloak: thiscall, fully cloaked at once */
 #define OBJECT_CLOAK     0x108       /* a GameObject's cloaking device, if any: its state at +0x3c
                                       * (0 visible, 1 cloaking, 2 cloaked, 3 decloaking) */
+#define FREIGHTER_VT     0x6b26a8u   /* Freighter's vtable */
+#define FREIGHTER_LOAD   0x4b16f0u   /* Freighter::LoadResource(float amount, eResource): thiscall; a new
+                                      * resource empties the hold first, the amount is clamped to the
+                                      * class's capacity for it and to 0 */
+#define FREIGHTER_KIND   0x25c       /* the resource carried (eResource; 6: none) */
+#define FREIGHTER_AMOUNT 0x258       /* how much of it */
 #define SI_SPECIAL_AT    0x452d10u   /* ScriptInterfaceImp::Special_Attack(int, int target, const char *weapon) */
 #define SI_SPECIAL       0x452dc0u   /* ScriptInterfaceImp::Special_Attack(int, const char *weapon): no target */
 #define SI_SET_SPECIAL   0x456280u   /* ScriptInterfaceImp::SetSpecialEnergy(int, float) */
@@ -402,6 +408,7 @@ typedef BYTE  *(__cdecl    *TeamGetFn)(int team);
 typedef void   (__thiscall *SetCommandBuildFn)(void *go, int cmd, const void *cls, const float *pos, int flag);
 typedef void  *(__cdecl    *ClassFindFn)(const char *odf);
 typedef float  (__thiscall *TeamAddResFn)(void *team, float amount, int resource);
+typedef void   (__thiscall *LoadResFn)(void *freighter, float amount, int resource);
 typedef BYTE  *(__thiscall *TechFindFn)(void *tree, const char *name);
 typedef const char  *(__thiscall *PrjOdfFn)(void *prj);
 typedef const float *(__thiscall *TransformFn)(void *entity);
@@ -1750,6 +1757,32 @@ static void run_command(char *line)
         o->energy = on_arg(t[2]);
         if (o->energy) fill_special(o);
         logline("  ok");
+        return;
+    }
+    if (s_eq(t[0], "cargo") && n >= 3) {
+        /* cargo <name> <resource> [amount | full | empty]: the freighter's hold, as mining
+         * fills it (Freighter::LoadResource). Resources by eResource: the order of the
+         * class's max<Resource> keys. */
+        static const char *const res[] = { "crew", "officers", "dilithium", "latinum", "metal", "biomatter" };
+        BYTE *go;
+        int r = -1, i;
+        float amount = 1e9f;
+        if (!(o = find_obj(t[1])) || !(go = (BYTE *)craft_of(o)) || *(DWORD *)go != FREIGHTER_VT) { logline("  ! not a freighter in the scene"); return; }
+        for (i = 0; i < 6; i++) if (s_eq(t[2], res[i])) r = i;
+        if (r < 0) { logline("  ! resource: dilithium, latinum, metal, biomatter, crew or officers"); return; }
+        if (n >= 4 && s_eq(t[3], "empty")) amount = -1e9f;
+        else if (n >= 4 && !s_eq(t[3], "full")) amount = s_atof(t[3]);
+        if (*(int *)(go + FREIGHTER_KIND) == r && amount < 1e9f && amount > -1e9f)
+            amount -= *(float *)(go + FREIGHTER_AMOUNT);           /* a number is the hold's new level */
+        ((LoadResFn)FREIGHTER_LOAD)(go, amount, r);
+        {
+            char b[96] = "  ok: ";
+            int k = *(int *)(go + FREIGHTER_KIND);
+            s_cat(b, k >= 0 && k < 6 ? res[k] : "none");
+            s_cat(b, " ");
+            s_flt(b, *(float *)(go + FREIGHTER_AMOUNT));
+            logline(b);
+        }
         return;
     }
     if (s_eq(t[0], "kill") && n >= 2) {

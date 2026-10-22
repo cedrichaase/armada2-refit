@@ -1076,7 +1076,17 @@ team colour times `ghostTeamColorFactor` (`Ghost+0x28`) on team faces, culled by
 instance), opaque: on the bench a ghost is near black and hides what is behind it.
 Here: texture times (the material's ambient + its diffuse times the directional
 lights), the team faces tinted, self-illuminated texels lit as on a hull (the windows
-show on stock's ghosts too). A planet's spirit (its instance copy a `PlanetInstance`,
+show on stock's ghosts too). That holds for a mesh drawn opaque; a ghost's mesh keeps
+its own texture material's blend in stock. An `additive` (or `wormhole`) mesh, the
+black hole's disc (`mblkhole`, `Mblackh.SOD`) or a wormhole's swirl, is added, unlit,
+at the `Storm3D+0x4` stock leaves at 0.5 for the pass: on the bench
+(`SCENE=fog-blackhole`, `scenarios/fog-blackhole.md`) stock's fogged black hole adds
+0.49 of what the seen one does, its swirl showing through the fog. So the ghosts are
+drawn in two passes, the opaque meshes (an `alphathreshold` one cut out at one half),
+then the additive ones without depth writes, the texture times 0.5. Drawn opaque and
+lit like a hull, the black hole's ghost was a near-black disc over the fog (issue #3:
+at its rim 2 and 19 against 49 and 54 of the fog about it; now 53 and 61, stock 53
+and 56). A planet's spirit (its instance copy a `PlanetInstance`,
 vtable 0x6b2ce4, over a `Planet_Database`) goes to the world module, which draws it
 on its own sphere with the planet's ground and shell, culled as the spirit's `Render`
 culls (`DistanceCull`), without the race's tint or cities (they live on the object):
@@ -1165,8 +1175,27 @@ vents (the look settled with the user, and the settings keep its keys, in
   is dropped. The special-object effects' clouds are fed by the `specials` module.
   Every other instance's particles (the emitters on weapons' SODs: contrails, rockets,
   rifts) are still the engine's, drawn into our target. A module that draws such an instance in the engine's place calls
-  `particles::feed` with it every frame instead. (The freighter's `latinum_spray`,
-  which `Freighter::RenderInternal`, 0x4b22c0, looks up by name, is in no stock SOD.)
+  `particles::feed` with it every frame instead.
+- **Freighters' latinum spray** (`sim::object_set`, `cargo_rate`): the golden trail of
+  a freighter carrying latinum. It is in no SOD: `FreighterClass`'s constructor
+  (0x4a87c0) reads the ODF's `latinum_spray_hardpoint` (`hp08` on `ffreight`, `hp10`
+  on `kfreight` and `rfreight`, `hp04` on `cfreight`; none on `bfreight`, the Species
+  8472 collector or `fdata`, which have none) and, when the class's database has that
+  node, makes the emitter its `latinum_spray_emitter` names (`freight.odf`:
+  `latinum_spray`, a spray of `starfade` in `emitter.spr`) with
+  `CreateParticleEmitterInstance` (0x62cf90) under the database's root, at the
+  hardpoint's own transform. `Freighter::RenderInternal` (0x4b22c0) finds it by name
+  (`latinum_spray`) every frame and sets its rate multiplier (`+0xf8`, which
+  `ST3D_ParticleEmitter_Spray::Simulate`, 0x612a70, takes the time step times) to the
+  amount over the capacity while the resource carried (`+0x25c`) is latinum (3), else
+  0: full, a particle every firing period; half, every second one; empty or another
+  resource, none. Other resources make no trail; they light the cargo markings in
+  their colour ("hulls", "A freighter's cargo markings"). The module adds that
+  emitter to a freighter's set (vtable 0x6b26a8): placed at the hardpoint's transform
+  times the object's, shown whatever the damage and the level of detail, and counted
+  among the owner's shown emitters (Q1) at any rate, as the engine renders the node
+  whether it fires or not. The rate is read every frame, for every freighter drawn or
+  not.
 - **The look.** Drawn at `Step::Translucent` as one batch per texture and material
   through a `DynVb`: quads parallel to the image plane, half extents = the sprite node's
   size plus growth × age (times the instance's scale), the node data's colour animation
@@ -1269,6 +1298,40 @@ texture flipbook (a SOD animation reference) and the engine's wave lights
 (`GameObject::RenderInternal`'s four special-weapon getters, `Craft::RenderInternal`'s
 white one while +0x240; colour +0xf4, wavelength +0x13c, speed +0x140, direction
 +0x144) are reproduced; the construction face limit (+0x10) too.
+
+**A freighter's cargo markings** (`game::cargo_markings`). `Freighter::RenderInternal`
+(0x4b22c0) calls `Freighter::UpdateDilithiumMarkings` (0x4b1fa0) before
+`Craft::RenderInternal` draws: the children of the node `ore` that
+`Freighter::InitializeGeometry` (0x4b1660) found in the database (`+0x250`) are
+numbered by their names after three characters (`ore1`..`ore10`), and each one's
+lighting material gets the colour of the resource carried
+(`ResourceComponent::s_ResourceColor`, 0x764664, a pointer per resource: crew green,
+officers white, dilithium pale blue, latinum yellow, metal grey, biomatter red) while
+its number times 10 is at most the fill in percent (amount `+0x258` over the class's
+capacity for the resource `+0x25c`, from the float per resource at `+0x254`), black
+otherwise. So the cargo pods are a gauge in the cargo's colour, for every resource;
+only latinum adds a trail (the particles module, "Freighters' latinum spray"). The
+colour lands on the shared material, and the engine walks children last in the file
+first, so where meshes share one material the first child in the file decides for all
+of them: the Klingon freighter's ten share `ore` (its first is `ore10`: lit only when
+full), the Romulan's too (`ore1`: lit from 10 %), and the Federation's have one each
+(a true gauge); the Cardassian and Borg freighters have no `ore` node. Seen on the
+bench in stock (2026-10-21: the Federation's three pods of five at half, the
+Klingon's dark at 80 %, the Romulan's lit at 13 %). The module draws those materials'
+groups unlit in that colour, black when off: the hull look ignores a SOD's lighting
+material colours, which drew the pods as plain lit plating whatever the hold.
+
+**Alpha-tested meshes in old SODs** (`scene::mesh_blend`). Before version 1.7 a mesh
+names its texture material by an ident in the file's table (`a2fmt`'s
+`TextureMaterialDef`), not by a blend mode, and `ST3D_Stream::ReadTextureMaterial`
+(0x63eb10) builds each with alpha testing on unless both of its first two mode bytes
+(the material's two `ST3D_BlendMode`s) are 2. So such a mesh is a cut-out, its
+texture's alpha holes: the Klingon and Romulan freighters' cargo pods are lattices
+over the `ore` markings, which were drawn solid and hid them. Of the stock files, 70 are
+older than 1.7; their meshes with modes `2 1` (275) are cut-outs, those with `2 2` (46)
+are drawn as before. The textures among them with alpha are `Kfreight`, `Rfreight`,
+`Bcruise1` (the assimilated parts), `Bbuildng`, `Fbee`, `Fresear` and `Mdmoon`
+(`Mmooninf.SOD`).
 
 **Point lights**, per mesh, as `Lighting.asi`'s `pick_points` chose them for its
 shaders: a hard light (fading over under a quarter of its start: torpedoes, the

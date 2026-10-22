@@ -482,3 +482,61 @@ pub fn rig_placeholder_of(o: usize) -> Option<(usize, M34, V3)> {
         Some((item, core::ptr::read_unaligned(mp), c))
     }
 }
+
+/// `Freighter` (vtable 0x6b26a8): its cargo, as `particles::sim` reads it too: the
+/// resource carried (`+0x25c`, an `eResource`: crew, officers, dilithium, latinum,
+/// metal, biomatter; 6 none), the amount (`+0x258`) and the class's capacities, a float
+/// per resource (`+0x254`, a pointer).
+const VT_FREIGHTER: usize = 0x6b26a8;
+/// `ResourceComponent::s_ResourceColor`: a pointer per resource to its colour (three
+/// floats), made by `InitResourceComponents`; stock's values when it has not run.
+const RESOURCE_COLOURS: usize = 0x764664;
+const RESOURCE_COLOURS_STOCK: [[f32; 3]; 6] =
+    [[0.0, 1.0, 0.0], [1.0, 1.0, 1.0], [0.6, 0.9, 1.0], [1.0, 1.0, 0.0], [0.8, 0.8, 0.8], [1.0, 0.0, 0.0]];
+
+/// A freighter's cargo markings, as `Freighter::UpdateDilithiumMarkings` (0x4b1fa0)
+/// sets them before each draw: every mesh among the children of the SOD's `ore` node
+/// (the first so named, `Freighter::InitializeGeometry`) is numbered by its name after
+/// three characters (`ore7`: 7), and its lighting material takes the colour of the
+/// resource carried while that number times 10 is at most the hold's fill in percent,
+/// black otherwise. The colour is the material's, which several meshes may share: the
+/// engine walks the children last in the file first, so a shared material ends with
+/// the first child's verdict (the Klingon and Romulan freighters' ten meshes share one
+/// `ore`: all lit only when full, and from 10 % on). Empty for anything else.
+pub fn cargo_markings(o: usize, sod: &a2fmt::sod::Sod) -> alloc::vec::Vec<(alloc::string::String, V3)> {
+    use a2fmt::sod::NodeKind;
+    let mut out: alloc::vec::Vec<(alloc::string::String, V3)> = alloc::vec::Vec::new();
+    if o == 0 || vtable(o) != VT_FREIGHTER {
+        return out;
+    }
+    let Some(ore) = sod.find("ore") else { return out };
+    let kind = field(o, 0x25c);
+    let amount = field_f32(o, 0x258);
+    let caps = field(o, 0x254);
+    let (fill, colour) = if kind < 6 && caps != 0 {
+        let cap = field_f32(caps, kind * 4);
+        let fill = if cap > 0.0 && amount.is_finite() { amount / cap * 100.0 } else { 0.0 };
+        let p = field(RESOURCE_COLOURS, kind * 4);
+        let c = if p != 0 { unsafe { rd::<[f32; 3]>(p) } } else { RESOURCE_COLOURS_STOCK[kind] };
+        (fill, v3(c[0], c[1], c[2]))
+    } else {
+        (-1.0, v3(0.0, 0.0, 0.0))
+    };
+    // File order reversed is the engine's walk: the last write wins, so walk the file
+    // forwards and keep each material's first verdict.
+    for &ci in &sod.nodes[ore].children {
+        let nd = &sod.nodes[ci];
+        let NodeKind::Mesh(m) = &nd.kind else { continue };
+        let digits: alloc::string::String = nd.name.chars().skip(3).take_while(|c| c.is_ascii_digit()).collect();
+        let n: i32 = digits.parse().unwrap_or(0);
+        let lit = fill >= 0.0 && (n * 10) as f32 <= fill;
+        let c = if lit { colour } else { v3(0.0, 0.0, 0.0) };
+        for g in &m.groups {
+            let name = crate::rt::lower(&g.material);
+            if !out.iter().any(|(k, _)| *k == name) {
+                out.push((name, c));
+            }
+        }
+    }
+    out
+}

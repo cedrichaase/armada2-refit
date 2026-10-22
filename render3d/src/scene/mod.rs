@@ -102,6 +102,21 @@ fn blend_of(name: &str) -> Blend {
     }
 }
 
+/// A mesh's blend: its texture material's name from version 1.7 on. Before, the name
+/// is an ident in the file's texture-material table, and `ST3D_Stream::ReadTextureMaterial`
+/// (0x63eb10) makes the material alpha-tested unless both of the entry's first two mode
+/// bytes are 2 (the engine's two `ST3D_BlendMode`s): the texture's alpha cuts holes, as
+/// in the Klingon and Romulan freighters' cargo pods.
+fn mesh_blend(sod: &a2fmt::sod::Sod, name: &str) -> Blend {
+    if sod.texture_materials.is_empty() {
+        return blend_of(name);
+    }
+    match sod.texture_materials.iter().find(|t| t.ident.eq_ignore_ascii_case(name)) {
+        Some(t) if !(t.modes[0] == 2 && t.modes[1] == 2) => Blend::Cutout,
+        _ => blend_of(name),
+    }
+}
+
 impl Model {
     fn build(dev: Device, name: &str, sod: Rc<Sod>) -> Model {
         let info = SodInfo::new(&sod);
@@ -162,7 +177,7 @@ impl Model {
                 groups,
                 texture,
                 bump: mesh.height_map().map(String::from),
-                blend: blend_of(&mesh.texture_material),
+                blend: mesh_blend(&sod, &mesh.texture_material),
                 two_sided: mesh.cull == 0,
                 centre: v3(c[0], c[1], c[2]),
                 radius: r,

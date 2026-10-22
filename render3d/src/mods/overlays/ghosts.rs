@@ -11,7 +11,8 @@
 //! 0.1, at `+0x18` and `+0x24` of the material), with the team colour times
 //! `ghostTeamColorFactor` (`Ghost+0x28`) as the team colour (`Storm3D+0x34`), and
 //! `Storm3D+0x4` at 0.5 for the duration (not an opacity: on the bench stock's ghosts
-//! are opaque, near black); each spirit through `GameObjectSpirit::Render`, which
+//! are opaque, near black, but an `additive` mesh, such as a black hole's disc, is
+//! added at half strength); each spirit through `GameObjectSpirit::Render`, which
 //! culls it by distance (`GameObjectInstance::DistanceCull`) and renders the instance.
 //! A spirit whose instance shows a plain SOD is drawn here, a planet's by the world
 //! module on its sphere; any other (an asteroid field's, a nebula's) is left to its own
@@ -28,7 +29,7 @@ use crate::engine::{self, field, field_f32, rd, storm3d};
 use crate::frame::steps::View;
 use crate::gfx::{self, Decl, Shader};
 use crate::math::{v3, M34, V3};
-use crate::scene::{self, pose, Model};
+use crate::scene::{self, pose, Blend, Model};
 use crate::shaders::overlays::PS_GHOST;
 use crate::shaders::sod::VS_SOD;
 use crate::{assets, log};
@@ -46,6 +47,10 @@ const SPIRIT_RENDER: usize = 0xc; // Spirit vtable: Render(ST3D_Camera*)
 const S3D_MATERIAL: usize = 0xa8; // Storm3D: the lighting material in place of every mesh's
 const S3D_ALPHA: usize = 0x4;
 const S3D_TEAM: usize = 0x34;
+/// What stock's ghost pass leaves at `Storm3D+0x4` (0.5): not an opacity on an opaque
+/// mesh, but on an `additive` one the scale of what it adds. Measured on the bench
+/// (`SCENE=fog-blackhole`): stock's fogged black hole adds 0.49 of what the seen one does.
+const GHOST_ADDITIVE: f32 = 0.5;
 
 struct Queued {
     model: Rc<Model>,
@@ -64,7 +69,8 @@ pub struct Ghosts {
     decl: Decl,
     scales: BTreeMap<String, f32>,
     queue: Vec<Queued>,
-    said: u32,
+    /// The classes whose first ghost has been logged.
+    said: Vec<String>,
     said_build: u32,
 }
 
@@ -95,7 +101,7 @@ impl Ghosts {
             decl: Decl::new(&scene::VERTEX),
             scales: BTreeMap::new(),
             queue: Vec::new(),
-            said: 0,
+            said: Vec::new(),
             said_build: 0,
         }
     }
@@ -145,7 +151,7 @@ impl Ghosts {
             // Not a plain SOD: the spirit's own Render, under stock's state.
             unsafe {
                 core::ptr::write_unaligned((s3d + S3D_MATERIAL) as *mut usize, mat);
-                core::ptr::write_unaligned((s3d + S3D_ALPHA) as *mut f32, 0.5);
+                core::ptr::write_unaligned((s3d + S3D_ALPHA) as *mut f32, GHOST_ADDITIVE);
                 core::ptr::write_unaligned((s3d + S3D_TEAM) as *mut V3, tint);
                 let r: unsafe extern "thiscall" fn(usize, usize) = core::mem::transmute(field(engine::vtable(sp), SPIRIT_RENDER));
                 r(sp, v.cam);
@@ -158,7 +164,7 @@ impl Ghosts {
                 core::ptr::write_unaligned((s3d + S3D_MATERIAL) as *mut usize, 0);
             }
         }
-        self.draw_queue(v, false);
+        self.draw_queue(v);
         true
     }
 
@@ -190,16 +196,18 @@ impl Ghosts {
         world.r[2] = world.r[2] * s.z;
         let mut p = pose::pose(&model.sod, &model.info, &world, pose::Clock::of_instance(inst, v.time), pose::auto(v.eye));
         crate::mods::hulls::instance_visibility(inst, &model, &mut p);
-        if self.said < 4 {
-            self.said += 1;
-            log!("overlays: ghost of {} at {:.0},{:.0},{:.0}", name, world.p.x, world.p.y, world.p.z);
-        }
+        let mut added = 0;
         for (pi, part) in model.parts.iter().enumerate() {
             if !p.shown.get(part.node).copied().unwrap_or(false) {
                 continue;
             }
+            added += (part.blend == Blend::Additive) as u32;
             let w = p.world[part.node];
             self.queue.push(Queued { model: model.clone(), part: pi, world: w, tint, amb, diff, alpha: 1.0, self_illum: 1.0 });
+        }
+        if self.said.len() < 16 && !self.said.iter().any(|n| n == name) {
+            self.said.push(String::from(name));
+            log!("overlays: ghost of {} at {:.0},{:.0},{:.0}, {} additive mesh(es)", name, world.p.x, world.p.y, world.p.z, added);
         }
         true
     }
@@ -227,8 +235,13 @@ impl Ghosts {
         crate::mods::hulls::placeholder(v, class, &place, colour, blocked)
     }
 
-    /// The ghosts gathered: opaque, or blended without depth writes.
-    fn draw_queue(&mut self, v: &View, blended: bool) {
+    /// The ghosts gathered, as stock draws a spirit's meshes: each by its own texture
+    /// material's blend. Opaque meshes (and `alphathreshold` ones, cut out at one half)
+    /// first, lit by the ghost material and written to depth; then the `additive` ones
+    /// (a black hole's disc, a wormhole's swirl), added unlit at `GHOST_ADDITIVE` without
+    /// depth writes. Drawn opaque and lit like a hull, the black hole's ghost was a near
+    /// black disc over the fog (issue #3).
+    fn draw_queue(&mut self, v: &View) {
         if self.queue.is_empty() {
             return;
         }
@@ -240,10 +253,9 @@ impl Ghosts {
         }
         dev.vs_const(4, &gfx::vp_constants(v));
         for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ZWRITEENABLE, !blended as u32), (RS_ALPHATESTENABLE, 0),
-            (RS_ALPHABLENDENABLE, blended as u32), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
+            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
             (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0), (RS_SCISSORTESTENABLE, 0),
-            (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_SRGBWRITEENABLE, 0),
+            (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_SRGBWRITEENABLE, 0), (RS_ALPHAREF, 128), (RS_ALPHAFUNC, CMP_GREATEREQUAL),
         ] {
             dev.set_rs(st, val);
         }
@@ -259,23 +271,34 @@ impl Ghosts {
             k[(4 + i) * 4..(4 + i) * 4 + 4].copy_from_slice(&[d.dir.x, d.dir.y, d.dir.z, 0.0]);
             k[(8 + i) * 4..(8 + i) * 4 + 4].copy_from_slice(&[d.colour.x, d.colour.y, d.colour.z, 0.0]);
         }
-        for e in &q {
-            let part = &e.model.parts[e.part];
-            dev.vs_const(0, e.world.to_m4().transpose().as_floats());
-            let mirrored = e.world.det3() < 0.0;
-            dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CW } else { CULL_CCW });
-            let tex = part.texture.as_deref().and_then(|t| assets::texture(dev, t)).unwrap_or(core::ptr::null_mut());
-            dev.set_texture(0, tex);
-            k[0..4].copy_from_slice(&[e.amb.x, e.amb.y, e.amb.z, e.alpha]);
-            k[4..8].copy_from_slice(&[e.diff.x, e.diff.y, e.diff.z, scene::NORMAL_SIGN * if mirrored { -1.0 } else { 1.0 }]);
-            dev.set_stream(0, part.vb.ptr(), 0, 32);
-            dev.set_indices(part.ib.ptr());
-            for g in &part.groups {
-                let t = if g.material.starts_with("team") { e.tint } else { v3(1.0, 1.0, 1.0) };
-                k[8..12].copy_from_slice(&[t.x, t.y, t.z, 1.0]);
-                k[12] = if g.self_illum { e.self_illum } else { 0.0 };
-                dev.ps_const(0, &k);
-                dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
+        for additive in [false, true] {
+            dev.set_rs(RS_ALPHABLENDENABLE, additive as u32);
+            dev.set_rs(RS_ZWRITEENABLE, !additive as u32);
+            for e in &q {
+                let part = &e.model.parts[e.part];
+                if (part.blend == Blend::Additive) != additive {
+                    continue;
+                }
+                dev.set_rs(RS_ALPHATESTENABLE, (part.blend == Blend::Cutout) as u32);
+                dev.vs_const(0, e.world.to_m4().transpose().as_floats());
+                let mirrored = e.world.det3() < 0.0;
+                dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CW } else { CULL_CCW });
+                let tex = part.texture.as_deref().and_then(|t| assets::texture(dev, t)).unwrap_or(core::ptr::null_mut());
+                dev.set_texture(0, tex);
+                // Additive: the texture times the constant `GHOST_ADDITIVE`, unlit (the
+                // ghost shader with that as its ambient and no diffuse).
+                let (amb, diff) = if additive { (v3(GHOST_ADDITIVE, GHOST_ADDITIVE, GHOST_ADDITIVE), V3::ZERO) } else { (e.amb, e.diff) };
+                k[0..4].copy_from_slice(&[amb.x, amb.y, amb.z, e.alpha]);
+                k[4..8].copy_from_slice(&[diff.x, diff.y, diff.z, scene::NORMAL_SIGN * if mirrored { -1.0 } else { 1.0 }]);
+                dev.set_stream(0, part.vb.ptr(), 0, 32);
+                dev.set_indices(part.ib.ptr());
+                for g in &part.groups {
+                    let t = if g.material.starts_with("team") { e.tint } else { v3(1.0, 1.0, 1.0) };
+                    k[8..12].copy_from_slice(&[t.x, t.y, t.z, 1.0]);
+                    k[12] = if g.self_illum && !additive { e.self_illum } else { 0.0 };
+                    dev.ps_const(0, &k);
+                    dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
+                }
             }
         }
     }

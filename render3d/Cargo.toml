@@ -1,6 +1,6 @@
 [package]
 name = "render3d"
-version = "0.16.1"
+version = "0.16.3"
 edition = "2024"
 publish = false
 description = "Render3D.asi: Star Trek: Armada II's 3D view drawn by our own renderer"
