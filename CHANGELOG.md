@@ -5,6 +5,31 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.5.0 — 2026-10-23
+
+Layers: display 0.2.0, platform 3.5.0.
+
+### Added
+- Display8 in the install: `./install` puts it in front of the d3d8 chain, `a2mod`
+  switches it (layer `display`: stock puts the chain's own `d3d8.dll` back), drop
+  switches by category, and the plugins can ask it for the device's epoch (display
+  0.2.0). `d3d8-chain.py` switches the chain behind it (platform 3.5.0).
+
+Installed, not yet seen in game.
+
+## 13.4.0 — 2026-10-23
+
+Layers: render3d 0.19.0, ui 0.16.0.
+
+### Changed
+- `gpu/`: one graphics interface for render3d and the UI, shaped for Vulkan and
+  Direct3D 12, on Direct3D 9 for now; the UI and render3d's frame draw through it. Every
+  shader is modern HLSL, one source for the Direct3D 9 bytecode and SPIR-V
+  (`gpu/shaders/compat.hlsli`). The same pixels as before on the bench (render3d
+  0.19.0, ui 0.16.0).
+
+Installed, not yet seen in game.
+
 ## 13.3.0 — 2026-10-23
 
 Layers: display 0.1.0 (new), testbench 3.47.0.

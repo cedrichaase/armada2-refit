@@ -10,11 +10,49 @@ engine ends up drawing nothing: Display8 gives it a device that accepts everythi
 
 ## Status
 
-**Forward mode, bench only.** Display8 stands in front of the real chain and passes
-every call through, tracing it. `display/install` puts it into an `a2test` clone and
-refuses anything else; `./install` and `a2mod` do not know it yet.
+**Forward mode.** Display8 stands in front of the real chain and passes every call
+through. `./install` puts it in (`display/install`), `a2mod` switches it as the
+`display` layer, and `platform/d3d8-chain.py` switches the chain behind it. On the
+test bench it traces every call (`Trace=auto`: on in an `a2test` clone). It is not in
+the release package: in forward mode it changes nothing a player sees; it joins with
+the stub.
 
-    ./a2test session start --res 1280x720 --install . --install display
+    ./a2test session start --res 1280x720 --install .
+
+## Installing
+
+`display/install` (and `--remove`):
+
+| File | What |
+|---|---|
+| `d3d8.dll` | Display8 |
+| `d3d8_real.dll` | the `d3d8.dll` that was there: crosire's d3d8to9 after `./install`'s platform step. Display8 loads it (`Real=auto`) and passes every call to it |
+| `d3d8.dll.a2display-backup` | the same file again: what `a2mod stock` copies back into `d3d8.dll`. Stock is the stock chain's binary, not ours passing through |
+| `Display8.ini` | the settings; a key the player's copy lacks is added (`ui/ini-merge.py`) |
+
+With no `d3d8.dll` in the game directory (the system's is the chain), Display8 goes in
+alone and loads the system's own (`GetSystemDirectory`: SysWOW64 on 64-bit Windows,
+Wine's builtin under Wine). Run again, the installer replaces only `d3d8.dll`.
+`d3d8-chain.py` knows Display8 by the panic message every build carries, not by a hash
+(ours changes with every build); behind it, the chain's slot is `d3d8_real.dll`, and
+every switch there rewrites the backup with it, so `a2mod stock` restores the chain in
+use.
+
+Wine loads the game directory's `d3d8.dll` because of the `d3d8=n,b` override
+(`platform/README.md`); `d3d8_real.dll` is loaded by full path, so it needs none.
+
+## What the plugins can ask of it
+
+Plain C exports, found with `GetProcAddress(GetModuleHandleA("d3d8.dll"), name)`
+(`src/api.rs`); a plugin that does not find them is on another `d3d8.dll` and works
+as before:
+
+| Export | What |
+|---|---|
+| `display8_version()` | the version, a NUL-terminated string |
+| `display8_device_epoch()` | moves on at every `CreateDevice`, every `Reset` that succeeds, and when the device goes: whatever a plugin made at another epoch must be made again |
+| `display8_device()` | the engine's device now (ours, not referenced), or null |
+| `display8_frame()` | frames presented so far |
 
 ## How it works
 
@@ -81,11 +119,25 @@ With `Trace=1` in `Display8.ini`:
 - **`Expect the engine to draw nothing in "mission"`** reads the inventory: no `Draw*`
   on the device whose caller is in `Armada2.exe`, in that context.
 
+## Drop switches
+
+`[Drop]` in `Display8.ini` (`src/drop.rs`): the engine's draws, accepted and not passed
+on. Read again every 60 presents, so one session can shoot a frame with and without.
+
+| Key | Drops |
+|---|---|
+| `Drop2D=1` | the engine's 2D: its batched quads (the trifan buffer), its lines, the fades |
+| `Drop3D=1` | the meshes it still draws (render3d's hand-backs): every draw whose immediate caller is a workspace's `Submit` (`ST3D_WorkspaceDirectX8::Submit` 0x648af0..0x648c30, `ST3D_WorkspaceDirectX8NonVB::Submit` 0x648520..0x6485d0), which every mesh the engine draws goes through |
+| `DropLoading=1` | everything drawn from the engine's loading loop: any draw with a return address in `RenderLoopAssetLoadStatusUpdate` (0x598ba0..0x598ff0) among the sixteen found up its stack, which is the function the loop calls to draw each step's frame (the logo scene, the load bar) |
+| `Callers=0x..., 0x...` | any draw with one of these return addresses on its call chain |
+
+A draw is the engine's when its immediate caller is in `Armada2.exe`; the plugins draw
+through Direct3D 9 and never pass here. With the refit installed and every category's
+work taken over, the game must look the same with the switch on: that is how each
+context is proved done before the stub drops everything.
+
 ## Naming a draw
 
-- **`[Drop] Callers=`** (`src/drop.rs`): a draw whose call chain has one of these return
-  addresses is accepted and not passed on. Read again every 60 presents, so one session
-  can shoot a frame with and without it.
 - **`Display8.go`** (`src/detail.rs`): while it exists beside the exe (looked for every
   30 presents, then deleted), the next `[Trace] Frames=` frames (default 3) log a `DRAW`
   line for each draw from `Armada2.exe`: the blend and depth state, the texture, and for

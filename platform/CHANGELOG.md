@@ -6,6 +6,16 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.5.0 — 2026-10-23
+
+### Added
+- `d3d8-chain.py` knows Display8 (`display/`), by the message every build carries:
+  with it in the game directory's `d3d8.dll`, `--status`, `--use`, `--revert` and
+  `--upgrade` act on the chain behind it (`d3d8_real.dll`) and keep
+  `d3d8.dll.a2display-backup` the same file.
+
+Installed, not yet seen in game.
+
 ## 3.4.1 — 2026-10-12
 
 ### Fixed

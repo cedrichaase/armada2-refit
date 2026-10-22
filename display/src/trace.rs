@@ -137,7 +137,7 @@ pub fn looks_like_return(exe: (usize, usize), ra: usize) -> bool {
     [2usize, 3, 4, 6, 7].iter().any(|&n| b(n) == 0xff && (b(n - 1) >> 3) & 7 == 2)
 }
 
-fn stack_base() -> usize {
+pub fn stack_base() -> usize {
     let v: usize;
     unsafe { core::arch::asm!("mov {}, fs:[4]", out(reg) v, options(nostack, readonly, preserves_flags)) };
     v

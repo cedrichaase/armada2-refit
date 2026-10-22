@@ -80,5 +80,6 @@ unsafe extern "system" {
     pub fn GetProcAddress(module: HANDLE, name: *const u8) -> usize;
     pub fn VirtualQuery(p: *const u8, info: *mut MemInfo, n: usize) -> usize;
     pub fn GetCurrentProcessId() -> u32;
+    pub fn GetSystemDirectoryA(buf: *mut u8, n: u32) -> u32;
     pub fn MoveFileExA(from: *const u8, to: *const u8, flags: u32) -> i32;
 }

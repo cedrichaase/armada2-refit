@@ -1,7 +1,9 @@
 //! Display8: Star Trek: Armada II's `d3d8.dll`, ours. In forward mode, the only one so
 //! far, it stands in front of the real chain (`d3d8_real.dll`: crosire's d3d8to9, then
 //! DXVK's or Windows' d3d9) and passes every call through, tracing it on the bench
-//! (`Trace=1`). See README.md beside this crate.
+//! (`Trace=1`), dropping the engine's draws by category (`[Drop]`), and telling the
+//! plugins of the device's comings and goings (`api.rs`). See README.md beside this
+//! crate.
 #![no_std]
 #![allow(clippy::missing_safety_doc, static_mut_refs)]
 
@@ -10,6 +12,7 @@ extern crate alloc;
 #[macro_use]
 pub mod macros;
 pub mod rt;
+pub mod api;
 pub mod com;
 pub mod d3d8;
 pub mod detail;
@@ -48,11 +51,20 @@ fn startup() {
     let ini = rt::Ini::open(&rt::game_path("Display8.ini"));
     let cfg = Config {
         log: ini.int("Display8", "Log", 1) != 0,
-        trace: ini.int("Display8", "Trace", 0) != 0,
-        real: ini.string("Display8", "Real").filter(|s| !s.is_empty()).unwrap_or_else(|| alloc::string::String::from("d3d8_real.dll")),
+        trace: match ini.string("Display8", "Trace").as_deref().map(|s| s.to_ascii_lowercase()) {
+            Some(ref s) if s == "1" => true,
+            Some(ref s) if s == "0" => false,
+            // auto: on in a test bench clone, which is where the inventory is wanted.
+            _ => rt::lower(rt::game_dir()).contains("\\a2test\\sessions\\"),
+        },
+        real: real_path(ini.string("Display8", "Real").filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("auto"))),
     };
     rt::log_open("Display8.log", cfg.log || cfg.trace);
-    log!("Display8 {} -- game dir {}; forward to {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), cfg.real);
+    let mode = ini.string("Display8", "Mode").unwrap_or_else(|| alloc::string::String::from("forward"));
+    log!("Display8 {} -- game dir {}; mode {}; forward to {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
+    if !mode.eq_ignore_ascii_case("forward") {
+        log!("Mode={}: not a mode of this version (forward only); forward it is", mode);
+    }
     unsafe { CONFIG = Some(cfg) };
     d3d8::install();
     drop::load(&ini);
@@ -63,11 +75,30 @@ fn startup() {
     }
 }
 
+/// The real chain's `d3d8.dll`: `Real=` (a name in the game directory, or a full
+/// path), else `d3d8_real.dll` beside the exe if there is one (what `display/install`
+/// puts there), else the system's own (`GetSystemDirectory`: SysWOW64 for a 32-bit
+/// process on 64-bit Windows, Wine's builtin under Wine).
+fn real_path(set: Option<alloc::string::String>) -> alloc::string::String {
+    if let Some(s) = set {
+        return if s.contains(':') || s.starts_with('\\') { s } else { rt::game_path(&s) };
+    }
+    let local = rt::game_path("d3d8_real.dll");
+    if rt::file_exists(&local) {
+        return local;
+    }
+    let mut buf = [0u8; 300];
+    let n = unsafe { GetSystemDirectoryA(buf.as_mut_ptr(), 280) } as usize;
+    let mut s = alloc::string::String::from(core::str::from_utf8(&buf[..n.min(280)]).unwrap_or("C:\\windows\\system32"));
+    s.push_str("\\d3d8.dll");
+    s
+}
+
 /// The real chain's `d3d8.dll`, loaded on first use (not in `DllMain`).
 fn real() -> HANDLE {
     unsafe {
         if REAL.is_null() {
-            let p = rt::cstr(&rt::game_path(&config().real));
+            let p = rt::cstr(&config().real);
             REAL = LoadLibraryA(p.as_ptr());
             if REAL.is_null() {
                 log!("cannot load {}: no Direct3D for the game", config().real);

@@ -35,3 +35,4 @@ GetProcAddress@8
 VirtualQuery@12
 GetCurrentProcessId@0
 MoveFileExA@12
+GetSystemDirectoryA@8

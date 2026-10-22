@@ -6,8 +6,8 @@ Mod: refit
 Setup: testbench/scene/bench-setup.sh ending
 Timeout: 50 min
 
-Run with `--install . --install display`: the game as `./install` gives it, with
-Display8 (forward mode, `Trace=1`) in front of the real chain (`display/README.md`).
+Run with `--install .`: the game as `./install` gives it, Display8 (forward mode,
+tracing in a bench clone) in front of the real chain (`display/README.md`).
 `ui-whole-game`'s way through the game, a context marked at each stage, so that
 `Display8.inventory.tsv` (gathered into the case's `logs/`) counts every Direct3D 8
 call by context, method and caller. Phase 0 of the display plan: no step expects

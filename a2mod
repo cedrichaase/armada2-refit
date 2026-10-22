@@ -47,10 +47,16 @@ WHAT COUNTS AS A CHANGE
     cutscenes    binkw32.dll.a2neb-backup, binkw32_orig.dll, BinkProxy.ini, and every
                   animations/<Name>.mp4/.wav beside a <Name>.bik  -- cutscenes/binkproxy
     renderer      dxvk.conf                    -- AF, LOD bias, seamless cubes
+    display       d3d8.dll.a2display-backup, d3d8_real.dll, Display8.ini
+                                               -- Display8, the d3d8.dll of ours in
+                  front of the real chain (display/install): stock puts the chain's own
+                  d3d8.dll back in its slot, so stock is the stock chain, not ours
+                  passing through
 
 DELIBERATELY NOT SWITCHED, in both states:
 
-    DXVK itself (d3d8.dll/d3d9.dll in the game dir) -- plumbing, not a look; stock
+    DXVK itself (d3d8.dll/d3d9.dll in the game dir, the chain behind Display8) --
+        plumbing, not a look; stock
         wined3d is a different renderer and would make the comparison two changes.
     The ASI loader (winmm.dll) and STA2WidescreenPatch.asi -- base setup; the menu
         and renderer hooks cannot load without the loader.
@@ -80,7 +86,7 @@ STORE = os.path.join(GAME, '.a2mod')
 SNAP = os.path.join(STORE, 'refit')
 STATE = os.path.join(STORE, 'state.json')
 
-BACKUPS = ('.a2neb-backup', '.a2font-backup')
+BACKUPS = ('.a2neb-backup', '.a2font-backup', '.a2display-backup')
 # Backups that exist but are not a visual change -- see "deliberately not switched".
 EXCLUDE = {'ARMADA.PRF', 'RTS_CFG.h'}
 # The menus plugin was MenuScale.asi (with .ini and a MenuScale/ plate folder) before
@@ -102,10 +108,11 @@ ADDED = [('Menus.asi', 'menus'), ('Menus.ini', 'menus'),
          ('GridLayout.asi', 'grid'), ('GridLayout.ini', 'grid'),
          ('UI.asi', 'ui'), ('UI.ini', 'ui'),
          ('binkw32_orig.dll', 'cutscenes'), ('BinkProxy.ini', 'cutscenes'),
-         ('dxvk.conf', 'renderer')] + \
+         ('dxvk.conf', 'renderer'),
+         ('d3d8_real.dll', 'display'), ('Display8.ini', 'display')] + \
         [(f'{n}.{x}', 'render3d') for n in LEGACY_RENDER for x in ('asi', 'ini')]
 LAYERS = ['textures', 'models', 'hud', 'menus', 'render3d', 'qol', 'grid', 'ui', 'cutscenes',
-          'renderer', 'other']
+          'renderer', 'display', 'other']
 # Replacement movies are whatever pairs cutscenes/binkproxy installed: <Name>.mp4 / .wav
 # beside a <Name>.bik.  The .bik itself is never touched, so it is not a change.
 MOVIE_DIR = 'animations'
@@ -123,6 +130,8 @@ def sha(path):
 def layer_of(rel, suffix):
     if suffix == '.a2font-backup':
         return 'hud'
+    if suffix == '.a2display-backup':
+        return 'display'
     top = rel.split('/')[0]
     # cursor-aspect.py's squashed art, from before HUD.asi (hud 2.0.0)
     if rel.lower().startswith('textures/rgb/curs_'):

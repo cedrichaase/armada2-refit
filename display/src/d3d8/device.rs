@@ -94,6 +94,9 @@ unsafe extern "system" fn reset(this: *mut Obj, pp: *mut PresentParams) -> HRESU
     let hr = vcall!(unsafe { (*this).real }, 14, fn(*mut PresentParams) -> HRESULT, pp);
     let n = RESETS.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
     trace::after_device();
+    if hr >= 0 {
+        crate::api::device_reset();
+    }
     log!("Reset #{}: {} -> {:#x}; by {}", n, asked.text(), hr as u32, trace::chain(fp));
     hr
 }
@@ -109,6 +112,7 @@ unsafe extern "system" fn present(this: *mut Obj, src: P, dst: P, wnd: P, dirty:
     }
     let t0 = crate::rt::now();
     let hr = vcall!(unsafe { (*this).real }, 15, fn(P, P, P, P) -> HRESULT, src, dst, wnd, dirty);
+    crate::api::presented();
     trace::frame_end(crate::rt::now() - t0);
     crate::drop::present();
     crate::detail::present();

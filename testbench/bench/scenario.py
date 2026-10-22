@@ -581,7 +581,7 @@ def s_display_mark(c, m):
     next `Present` (at most four times a second) and deletes."""
     g = c.sess.game_dir
     if not (g / 'Display8.log').exists():
-        raise StepFailed('Display8 is not in this game (install it: --install display)')
+        raise StepFailed('Display8 is not in this game (./install puts it in: --install .)')
     mark = g / 'Display8.mark'
     mark.write_text(m.group('name'))
     end = time.time() + 15

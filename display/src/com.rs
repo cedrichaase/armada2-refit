@@ -275,6 +275,9 @@ pub unsafe fn release(o: *mut Obj) -> u32 {
     let real = unsafe { (*o).real };
     let n = vcall!(real, 2, fn() -> u32,);
     if n == 0 {
+        if unsafe { (*o).kind } == Kind::Device {
+            crate::api::device_gone(o as *mut c_void);
+        }
         let _g = lock();
         let r = reg();
         if r.by_real.get(&(real as usize)) == Some(&(o as usize)) {

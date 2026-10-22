@@ -127,6 +127,9 @@ unsafe extern "system" fn create_device(
         adapter, dt, hwnd, flags, pp, out
     );
     com::wrap_out(out, hr, Kind::Device, Role::Plain);
+    if hr >= 0 && !out.is_null() {
+        crate::api::device_made(unsafe { *out });
+    }
     let n = DEVICES.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
     trace::after_device();
     if hr >= 0 {
