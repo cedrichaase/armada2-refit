@@ -11,10 +11,10 @@
 //! lights go to the engine's registry at the start of the next view (`lights.rs`).
 use super::eng;
 use super::ini::Settings;
-use gpu::d3d9::raw::*;
+use gpu::{attr, AttrFormat, Blend, Block, Semantic, Topology, VertexAttr};
 use crate::engine::{field, field_f32};
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, DynVb, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{clamp, expf, powf, sinf, sqrtf, v3, V3};
 use crate::shaders::ordnance::*;
 use alloc::collections::BTreeMap;
@@ -282,14 +282,13 @@ struct FxVert {
     t4: [f32; 4],
 }
 
-static FXDECL: [VertexElement; 7] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 0),
-    ve(0, 28, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 1),
-    ve(0, 44, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 2),
-    ve(0, 60, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 3),
-    ve(0, 76, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 4),
-    VE_END,
+static FXLAYOUT: [VertexAttr; 6] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float4, Semantic::TexCoord, 0),
+    attr(28, AttrFormat::Float4, Semantic::TexCoord, 1),
+    attr(44, AttrFormat::Float4, Semantic::TexCoord, 2),
+    attr(60, AttrFormat::Float4, Semantic::TexCoord, 3),
+    attr(76, AttrFormat::Float4, Semantic::TexCoord, 4),
 ];
 const FX_STRIDE: u32 = 92;
 
@@ -347,10 +346,7 @@ pub struct Fx {
     lights_next: Vec<Lit>,
     /// The view being drawn is the main one (only its effects make lights).
     main: bool,
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
-    vb: DynVb,
+    pipes: Pipes,
     said: Vec<usize>,
 }
 
@@ -388,16 +384,13 @@ impl Fx {
             lights: Vec::new(),
             lights_next: Vec::new(),
             main: true,
-            vs: Shader::vertex(&VS_ORD_FX),
-            ps: Shader::pixel(&PS_ORD_FX),
-            decl: Decl::new(&FXDECL),
-            vb: DynVb::new(FX_STRIDE * 6 * 2048),
+            pipes: Pipes::new(),
             said: Vec::new(),
         }
     }
 
     pub fn reset(&mut self) {
-        self.vb.reset();
+
     }
 
     pub fn warp_on(&self) -> bool {
@@ -1088,26 +1081,19 @@ impl Fx {
             return;
         }
         let verts = core::mem::take(&mut self.verts);
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        // Added, depth-tested and not written, red, green and blue, no culling.
+        let pipe = self.pipes.view(0, || crate::mods::effects::fx_desc(&VS_ORD_FX, &PS_ORD_FX, &FXLAYOUT, FX_STRIDE, Topology::TriangleList, Blend::ADD));
+        let Some(pipe) = pipe else { return };
+        if !cmd.set_pipeline(&pipe) {
             return;
         }
-        dev.vs_const(0, &gfx::vp_constants(v));
+        cmd.vs_block(Block::new(0, &gfx::vp_constants(v)));
         let t = v.time - (v.time / 1000.0) as i32 as f32 * 1000.0;
-        dev.ps_const(0, &[t, 0.0, 0.0, 0.0]);
-        for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0),
-            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3),
-            (RS_STENCILENABLE, 0), (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
-        }
-        dev.set_stream_freq(0, 1);
+        cmd.ps_block(Block::new(0, &[t, 0.0, 0.0, 0.0]));
         for chunk in verts.chunks(6 * 2048) {
-            if let Some(first) = self.vb.push(dev, chunk, FX_STRIDE) {
-                dev.draw_primitive(PT_TRIANGLELIST, first, (chunk.len() / 3) as u32);
+            if let Some(s) = cmd.vertices(chunk) {
+                cmd.draw(&s);
             }
         }
     }

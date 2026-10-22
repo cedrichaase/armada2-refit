@@ -1214,6 +1214,7 @@ fn blend_factor(f: Factor) -> u32 {
         Factor::InvDstAlpha => BLEND_INVDESTALPHA,
         Factor::DstColor => BLEND_DESTCOLOR,
         Factor::InvDstColor => BLEND_INVDESTCOLOR,
+        Factor::SrcAlphaSat => BLEND_SRCALPHASAT,
     }
 }
 

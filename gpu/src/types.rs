@@ -289,6 +289,8 @@ pub enum Factor {
     InvDstAlpha,
     DstColor,
     InvDstColor,
+    /// min(src alpha, 1 - dst alpha) for colour, 1 for alpha.
+    SrcAlphaSat,
 }
 
 #[repr(u32)]

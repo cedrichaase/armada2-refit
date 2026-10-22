@@ -110,6 +110,7 @@ pub const BLEND_DESTALPHA: u32 = 7;
 pub const BLEND_INVDESTALPHA: u32 = 8;
 pub const BLEND_DESTCOLOR: u32 = 9;
 pub const BLEND_INVDESTCOLOR: u32 = 10;
+pub const BLEND_SRCALPHASAT: u32 = 11;
 pub const BLENDOP_ADD: u32 = 1;
 pub const BLENDOP_SUBTRACT: u32 = 2;
 pub const BLENDOP_REVSUBTRACT: u32 = 3;
