@@ -145,7 +145,10 @@ and writes `armada2-refit-<version>.zip`:
 `::step <id>` as each stage starts, `A2_SKIP=cutscenes` leaves the Bink proxy out (and
 puts back a stock `binkw32.dll` an earlier install replaced), and `A2_PYTHON` names the
 program that runs the SOD scripts (the frozen installer itself on Windows and macOS).
-Run by hand, they do as before.
+With `A2_PROGRESS=1` a failure they understand is also named as `::error <code> <path>`,
+one line per file, before the sentence for a person (`av-locked`, `av-missing`,
+`damaged`, `game-running`, `no-game`, `write-denied`: `gui-installer/README.md`,
+"Errors"). Run by hand, they do as before, and say which file failed and why.
 
 It is our code only, compiled, and our configuration. It holds nothing of the game,
 none of the test tools, and **no third-party shader**. `ReShadeUI.fxh` carries no

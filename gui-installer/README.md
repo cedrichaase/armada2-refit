@@ -103,7 +103,7 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 | Schema | Zips | What the installer reads |
 |---|---|---|
 | 0 | 11.6.0 and older: no `manifest.json` | the layers from `README.txt` ("WHAT GOES IN", continuation lines joined), progress from `install.sh`'s ordinary output, no `A2_SKIP` |
-| 1 | 11.7.0 on | `manifest.json` (below); `install.sh` honours `A2_PROGRESS` and `A2_SKIP` |
+| 1 | 11.7.0 on | `manifest.json` (below); `install.sh` honours `A2_PROGRESS` and `A2_SKIP`; from 12.42.0 the scripts also print `::error` lines ("Errors"), which an older installer logs as ordinary output |
 
 `manifest.json` (schema 1), written by `publish/package.sh`:
 
@@ -127,6 +127,46 @@ stage starts (`verify`, `prereqs`, `chain`, `render3d`, `ui`, `qol`, `models`,
 (`STATUS` in the script: "Refitting the HUD", "Installing lighting"…) and fills its
 segmented bar: download 0–30 %, unpack, the script's steps 35–92 %, Heroic, done. A
 schema-0 zip's stages are recognised from the lines it prints (`LEGACY_MARKS`).
+
+## Errors
+
+A failure says what happened, the likely cause and what to do, in a dialog: the
+headline, the steps, a link to the root README's "Antivirus false positives" where
+that is the likely cause, the log folded away, and **Copy report**, which puts the
+diagnostics ("The bug report") with this failure in them on the clipboard, ready to
+paste into an issue. The command line prints the same three parts. One function makes
+the words, `explain(err)` → (headline, what to do, details), and the raw message only
+goes to the details and the log.
+
+It knows a failure by a code. The release scripts (with `A2_PROGRESS=1`, from 12.42.0)
+print `::error <code> <path>` on stdout before their last line, one line per file, so
+the installer never parses their sentences; the installer raises `InstallError` with a
+code for its own; and `error_code` maps exceptions (a bad zip, a network error, a file
+refused or held open: `PermissionError`, Windows errors 5 and 32).
+
+| Code | Meaning |
+|---|---|
+| `av-locked` | a file of the package cannot be read: an antivirus holds or blocks it |
+| `av-missing` | a file of the package has gone: an antivirus quarantined it |
+| `damaged` | a file or the zip does not match its checksum (a bad download, or an antivirus that cleans files in place) |
+| `game-running` | `Armada2.exe` is running |
+| `no-game` | no `Armada2.exe` in the folder given |
+| `write-denied` | a file cannot be written into the game folder: an antivirus, or the folder's permissions |
+| `network` | GitHub cannot be reached (the installer's own) |
+
+The scripts check every file of `SHA256SUMS` before they stop, so every file an
+antivirus took is named at once (Bitdefender took four). `Job._run_script` takes the
+last `::error` line's code, with the files of every line of that code (the two `av-`
+codes together). A script that prints none, a schema-0 zip or a failure with no code,
+fails with its last line as before. Messages name the files that failed, never a fixed
+list, so they hold when plugins are merged.
+
+An unpack the antivirus still holds a file of cannot be removed, and it once made every
+retry fail at the same point. `Package.unpack` now retries the removal with a short
+backoff (about four seconds in all), then unpacks beside it, into `<version>-1`,
+`<version>-2`..., and clears those spares at the next unpack, as far as it can
+(`fresh_dir`, `sweep_unpacked`). A file taken or held while the zip is extracted is an
+`av-` error too.
 
 ## The window
 
@@ -207,7 +247,10 @@ draws nothing, and it already knows the game folder, the launcher and the releas
   device, so both stand down; GOG's `d3d8.dll` back after a Galaxy repair, or DXVK's put
   in by Heroic), the launcher not loading the folder's `winmm`/`d3d8`, UI.asi beside the
   plugins it supersedes, and `Menus.asi` drawing without a widescreen plate, which
-  shows black at the sides of the main menu (the release carries no plates).
+  shows black at the sides of the main menu (the release carries no plates). First of
+  all: files of a release missing or unreadable in the installer's cache (each file of
+  the newest unpack of each version, against its zip) or in the game folder, as an
+  antivirus leaves them.
 - **Safe to post** (`redact`): the home folder becomes `~`; any other user folder
   (`C:\Users\name`, `/home/name`, `/Users/name`, Wine's `Z:\home\name`) loses the name;
   IPv4 addresses (Online.log's peers) become `<ip>`.
@@ -342,14 +385,17 @@ in the zip.
 
 ## Testing
 
-- `test.sh <zip>`: the self-test, then detection, install (cutscene skip, state file,
-  Heroic's variables), the bug report on that install, and uninstall (game and Heroic as
-  before) against a mock game and a mock Heroic in a scratch `HOME`. CI runs it on
-  every push.
+- `test.sh <zip>`: the self-test (with `explain` for every code), then detection, install
+  (cutscene skip, state file, Heroic's variables), the bug report on that install, a
+  package missing two plugins (the words, both files named, the report's antivirus
+  finding), `_run_script` on `::error` lines and on a schema-0 script's last line, an
+  unpack that cannot be cleared, and uninstall (game and Heroic as before) against a
+  mock game and a mock Heroic in a scratch `HOME`. CI runs it on every push.
 - `A2_INSTALLER_APPIMAGE=<file> test.sh <zip>`: the same through the AppImage. CI does it.
 - `test-windows.ps1 <zip> <exe>`: the shipping `.exe`, its standard handles redirected
   (it is windowed), in scratch `LOCALAPPDATA`/`APPDATA`/`USERPROFILE`: version resource,
-  self-test, the exe as Python, install (cutscene skip, state file) and uninstall (the
+  self-test, the exe as Python, install (cutscene skip, state file), a second install
+  while a file of the first unpack is held open (it goes beside it), and uninstall (the
   game as before). CI runs it on windows-2025.
 - `test-macos.sh <zip> <app or its zip>`: the `.app` in a scratch `HOME` with a mock
   CrossOver bottle: detection, the app as Python, install, the DLL overrides written into

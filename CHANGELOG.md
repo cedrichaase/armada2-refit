@@ -5,6 +5,27 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 12.42.0 — 2026-10-22
+
+Layers: gui-installer 1.8.0.
+
+### Added
+- Installer errors that explain themselves (issue #4): `install.ps1` and `install.sh`
+  check every file of the package before stopping and name each one an antivirus took
+  or locked, as an antivirus; a file the game folder refuses is named too. With
+  `A2_PROGRESS=1` each failure is first printed as `::error <code> <path>` (`av-locked`,
+  `av-missing`, `damaged`, `game-running`, `no-game`, `write-denied`).
+- gui-installer: those failures in words, with what to do, a **Copy report** button and
+  the README's new "Antivirus false positives"; an unpack an antivirus still holds no
+  longer blocks every retry.
+- README.md: "Antivirus false positives", and `README.txt` in the package points at it.
+
+### Changed
+- The damaged-package message names the files by their Windows path in `install.ps1`
+  and no longer lists `sha256sum -c`'s output in `install.sh`.
+
+Installed, not yet seen in game.
+
 ## 12.41.3 — 2026-10-22
 
 Layers: testbench 3.41.1.

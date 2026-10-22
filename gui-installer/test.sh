@@ -54,6 +54,86 @@ check 'grep -q "Refit: $ver, installed" "$T/out" && grep -q "QOL.asi: .*\[as rel
 check 'grep -q "env WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" "$T/out" && grep -q "^Findings" "$T/out"'
 check '! grep -qF "$T" "$T/out"'
 
+echo "== a package file an antivirus took: the window's words, every file named"
+python3 - "$zip" "$T/av.zip" <<'PY'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1]) as a, zipfile.ZipFile(sys.argv[2], 'w') as b:
+    for i in a.infolist():
+        if not i.filename.endswith(('/game/QOL.asi', '/game/Online.asi')):
+            b.writestr(i, a.read(i))
+PY
+check '! "${run[@]}" --package "$T/av.zip" --game "$G" --no-launcher > "$T/out" 2> "$T/err"'
+check 'grep -q "^error: game/QOL.asi, game/Online.asi are missing from the package: an antivirus has most likely quarantined them" "$T/err" || grep -q "^error: game/Online.asi, game/QOL.asi are missing" "$T/err"'
+check 'grep -q "add exclusions for" "$T/err" && grep -q "More: https://github.com/cedrichaase/armada2-refit#antivirus-false-positives" "$T/err"'
+"${run[@]}" --report > "$T/out" 2> "$T/err"
+check 'grep -q "Files missing or unreadable, likely an antivirus" "$T/out" && grep -q "game/QOL.asi: missing (installer cache)" "$T/out"'
+
+echo "== the scripts' ::error lines, a schema-0 script's last line, an unpack an antivirus holds"
+if [ -z "${A2_INSTALLER_APPIMAGE:-}" ]; then
+python3 - "$gui" "$T" <<'PY'
+import importlib.util, os, stat, sys, zipfile
+spec = importlib.util.spec_from_file_location('inst', sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+T = sys.argv[2]
+ok = True
+def check(cond, what):
+    global ok
+    print(('ok    ' if cond else 'FAIL  ') + what); ok = ok and cond
+
+class Fake:     # a package whose script prints what it is given, then fails
+    def __init__(self, lines): self.lines = lines
+    def command(self, pkgdir, args):
+        f = os.path.join(T, 'fake.py')
+        with open(f, 'w') as fh:
+            fh.write('import sys\nprint(%r)\nsys.exit(1)\n' % '\n'.join(self.lines))
+        return [sys.executable, f]
+job = m.Job(lambda *a: None, lambda line: None)
+def run(lines):
+    try:
+        job._run_script(Fake(lines), T, [], ['verify'], 0, 1)
+    except Exception as e:
+        return e
+e = run(['::step verify checking', '::error damaged game\\HUD.ini',
+         '::error av-missing game\\Online.asi', '::error av-locked game\\Menus.asi',
+         'game\\Online.asi, game\\Menus.asi from the package ... (the sentence)'])
+check(isinstance(e, m.InstallError) and e.code == 'av-locked'
+      and e.paths == ['game\\Online.asi', 'game\\Menus.asi'] and 'the sentence' in str(e),
+      '::error: the last code, with the antivirus files together, the sentence as details')
+e = run(['::error write-denied C:\\Games\\Armada II\\QOL.asi', 'QOL.asi could not be written'])
+check(isinstance(e, m.InstallError) and e.paths == ['C:\\Games\\Armada II\\QOL.asi']
+      and m.explain(e)[0] == 'QOL.asi could not be written into the game folder.',
+      '::error: a path with spaces, said by its name')
+e = run(['prerequisites:', 'the package is damaged (SHA256SUMS)', ''])
+check(type(e) is RuntimeError and str(e) == 'the package is damaged (SHA256SUMS)'
+      and m.explain(e)[0] == 'The package is damaged (SHA256SUMS)',
+      'schema 0: no ::error, the last line is the message, as before')
+
+# An earlier unpack that cannot be cleared: the next goes beside it, and is swept later.
+z = os.path.join(T, 'pkg.zip')
+with zipfile.ZipFile(z, 'w') as zf:
+    zf.writestr('armada2-refit-9.9.9/install.sh', '#!/bin/sh\n')
+    zf.writestr('armada2-refit-9.9.9/manifest.json', '{"schema": 1, "version": "9.9.9"}')
+    zf.writestr('armada2-refit-9.9.9/game/QOL.asi', 'x')
+pkg = m.Package(z)
+base = os.path.join(T, 'unpacked', '9.9.9')
+first = pkg.unpack(base)
+held = os.path.join(base, 'armada2-refit-9.9.9', 'game')
+os.chmod(held, stat.S_IRUSR | stat.S_IXUSR)       # rmtree cannot empty it, as when a file is held
+if not os.access(held, os.W_OK):                   # not as root
+    m.time.sleep = lambda s: None
+    second = pkg.unpack(base)
+    check(second == os.path.join(base + '-1', 'armada2-refit-9.9.9')
+          and os.path.isfile(os.path.join(second, 'game', 'QOL.asi')),
+          'unpack: a folder that cannot be cleared is left, the package goes beside it')
+    os.chmod(held, stat.S_IRWXU)
+    third = pkg.unpack(base)
+    check(third == first and not os.path.exists(base + '-1'),
+          'unpack: back in its own folder once it clears, the spare swept')
+os.chmod(held, stat.S_IRWXU) if os.path.isdir(held) else None
+sys.exit(0 if ok else 1)
+PY
+fi
+
 echo "== uninstall: the game and Heroic as they were"
 "${run[@]}" --uninstall --game "$G" > "$T/out" 2> "$T/err"
 check '[ ! -e "$G/HUD.asi" ] && [ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-installed.json" ]'

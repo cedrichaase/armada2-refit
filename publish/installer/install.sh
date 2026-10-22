@@ -31,7 +31,10 @@
 #
 # With A2_PROGRESS=1 it also prints "::step <id> <what>" as each stage starts, for the
 # GUI installer (gui-installer/README.md, "Progress"). The package's manifest.json lists
-# the ids in order; keep the two in step (publish/package.sh writes it).
+# the ids in order; keep the two in step (publish/package.sh writes it). An error the GUI
+# can explain is first named as "::error <code> <path>", one line per file, before the
+# sentence for a person on stderr (codes: av-locked, av-missing, damaged, game-running,
+# no-game, write-denied; gui-installer/README.md, "Errors").
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,9 +46,18 @@ if command -v sha256sum >/dev/null 2>&1; then SHA256="sha256sum"
 elif command -v shasum >/dev/null 2>&1; then SHA256="shasum -a 256"
 else echo "neither sha256sum nor shasum found" >&2; exit 1; fi
 sha256() { $SHA256 "$1" | cut -d' ' -f1; }
-# Check a sums file in the current directory; only the failures are printed, the same
-# with either tool.
-sha256_check() { $SHA256 -c "$1" 2>&1 | { grep -v ': OK$' || true; } >&2; }
+# An error the GUI installer can explain (code, the files it is about, the sentence).
+stop_with() {
+    local code="$1" msg="$2" p; shift 2
+    if [ "${A2_PROGRESS:-}" = 1 ]; then for p in "$@"; do echo "::error $code $p"; done; fi
+    echo "$msg" >&2; exit 1
+}
+AV_HELP="https://github.com/cedrichaase/armada2-refit#antivirus-false-positives"
+av_advice() {
+    echo "Some antivirus programs flag Armada II Refit's plugins as a false positive." \
+         "Restore the files from the antivirus's quarantine, or add exclusions for $here" \
+         "and $game, then try again ($AV_HELP)."
+}
 reverse_lines() { awk '{ l[NR] = $0 } END { for (i = NR; i > 0; i--) print l[i] }' "$1"; }
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -68,11 +80,11 @@ if [ -z "$game" ] && [ "$mac" = 1 ]; then
 fi
 game="${game:-$HOME/Games/Heroic/Star Trek Armada II}"
 exe=$(ls "$game/Armada2.exe" "$game/armada2.exe" "$game/ARMADA2.EXE" 2>/dev/null | head -1 || true)
-[ -n "$exe" ] || { echo "no Armada2.exe in $game -- pass the game directory as an argument" >&2; exit 1; }
+[ -n "$exe" ] || stop_with no-game "no Armada2.exe in $game -- pass the game directory as an argument" "$game"
 game="$(cd "$game" && pwd)"
 
 if pgrep -if 'armada2\.exe' >/dev/null 2>&1; then
-    echo "Armada2.exe is running -- quit the game first" >&2; exit 1
+    stop_with game-running "Armada2.exe is running -- quit the game first" Armada2.exe
 fi
 
 # Where bloom's files go. vkBasalt's config parser cannot take a space or a '#' in a
@@ -211,8 +223,37 @@ if [ "$action" = uninstall ]; then
     exit 0
 fi
 
+# Every file checked before anything is said: an antivirus seldom takes only one.
 step verify "checking the package"
-(cd "$here" && sha256_check SHA256SUMS) || { echo "the package is damaged (SHA256SUMS)" >&2; exit 1; }
+missing=() unreadable=() damaged=()
+while read -r sum file || [ -n "$sum" ]; do
+    [ -n "$sum" ] || continue
+    file="${file#\*}"
+    if [ ! -f "$here/$file" ]; then missing+=("$file")
+    elif [ ! -r "$here/$file" ] || ! got="$(sha256 "$here/$file" 2>/dev/null)"; then unreadable+=("$file")
+    elif [ "$got" != "$sum" ]; then damaged+=("$file")
+    fi
+done < "$here/SHA256SUMS"
+list() { local IFS=,; echo "$*" | sed 's/,/, /g'; }
+if [ ${#missing[@]} -gt 0 ] || [ ${#unreadable[@]} -gt 0 ]; then
+    if [ "${A2_PROGRESS:-}" = 1 ]; then
+        for p in ${damaged[@]+"${damaged[@]}"}; do echo "::error damaged $p"; done
+        for p in ${missing[@]+"${missing[@]}"}; do echo "::error av-missing $p"; done
+    fi
+    what="could not be read" them=them
+    if [ ${#missing[@]} -gt 0 ]; then
+        what="are missing"; [ ${#unreadable[@]} -eq 0 ] || what="are missing or could not be read"
+    fi
+    if [ $(( ${#missing[@]} + ${#unreadable[@]} )) -eq 1 ]; then what="${what/#are/is}"; them=it; fi
+    stop_with av-locked "$(list ${missing[@]+"${missing[@]}"} ${unreadable[@]+"${unreadable[@]}"}) from the package \
+$what. An antivirus has most likely quarantined or locked $them. $(av_advice)" \
+        ${unreadable[@]+"${unreadable[@]}"}
+fi
+if [ ${#damaged[@]} -gt 0 ]; then
+    stop_with damaged "the package is damaged: $(list "${damaged[@]}") does not match SHA256SUMS. \
+Download it again. An antivirus that cleans or cuts files in place can do this too: look in its \
+quarantine and history." "${damaged[@]}"
+fi
 echo "installing into $game"
 
 # ------------------------------------------------------------------ prerequisites
@@ -222,6 +263,17 @@ echo "installing into $game"
 # adds is recorded in $MANIFEST with its hash, so --uninstall takes out only that, and
 # only unchanged.
 record() { echo "$1 $(sha256 "$game/$1")" >> "$MANIFEST"; }
+# A file of the package into the game. What stops it is named: the package's copy gone or
+# unreadable (an antivirus, after the check above), else the game folder refusing it.
+copy_into() {   # src dst
+    local err rel="${1#"$here"/}"
+    err="$(cp "$1" "$2" 2>&1)" && return 0
+    [ -e "$1" ] || stop_with av-missing "$rel has gone from the package. An antivirus has most likely quarantined it. $(av_advice)" "$rel"
+    [ -r "$1" ] || stop_with av-locked "$rel from the package could not be read. An antivirus has most likely locked it. $(av_advice)" "$rel"
+    stop_with write-denied "$(basename "$2") could not be written into $game ($err). An antivirus \
+may be blocking it, or the folder is not yours to write: add an exclusion for $game, or fix \
+its permissions, then try again ($AV_HELP)." "$2"
+}
 
 prereq() {   # name|version|author|licence|page|files
     local name ver author lic page files f
@@ -229,7 +281,7 @@ prereq() {   # name|version|author|licence|page|files
     f="${files%% *}"
     if [ -e "$game/$f" ]; then echo "  $name: already installed"; return 0; fi
     for f in $files; do
-        [ -e "$game/$f" ] || { cp "$here/vendor/$name/$f" "$game/$f"; record "$f"; }
+        [ -e "$game/$f" ] || { copy_into "$here/vendor/$name/$f" "$game/$f"; record "$f"; }
     done
     echo "  $name $ver -- $author; $lic"
     echo "      from $page"
@@ -259,7 +311,7 @@ chain_put() {   # d3d8.dll | d3d9.dll
         fi
         rm -f "$f"
     fi
-    cp "$here/chain/$1" "$f"; record "$1"
+    copy_into "$here/chain/$1" "$f"; record "$1"
 }
 
 step chain "Direct3D chain"
@@ -299,7 +351,7 @@ put() {   # file -- copy from the package into the game directory
     if [ -f "$d" ] && [ "${f##*.}" = ini ] && ! cmp -s "$here/game/$f" "$d"; then
         cp -p "$d" "$d.bak"; echo "  kept your old $f as $f.bak"
     fi
-    cp "$here/game/$f" "$d"
+    copy_into "$here/game/$f" "$d"
     echo "  $f"
 }
 
@@ -314,7 +366,7 @@ if [ "$d3d9" = 1 ]; then
     recipes_out
     for d in $RECIPES; do
         mkdir -p "$game/$d"
-        cp "$here/game/$d"/*.ini "$game/$d/"
+        for f in "$here/game/$d"/*.ini; do copy_into "$f" "$game/$d/$(basename "$f")"; done
         echo "  $d/ ($(ls "$here/game/$d" | wc -l | tr -d ' ') recipes)"
     done
 else

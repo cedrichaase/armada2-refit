@@ -127,11 +127,36 @@ cp -R "$P" "$G/pkg"
 check 'grep -q "^installing into $G\$" "$T/out"'
 rm -rf "$G/pkg"
 
-echo "== a damaged package is refused"
+echo "== a damaged package is refused, each file named, with ::error lines for the GUI"
 cp -R "$P" "$T/damaged"; echo x >> "$T/damaged/game/HUD.ini"
-check '! "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err" && grep -q "game/HUD.ini: FAILED" "$T/err" && grep -q "the package is damaged" "$T/err"'
-check '! grep -q ": OK$" "$T/err"'
+check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
+check 'grep -qx "::error damaged game/HUD.ini" "$T/out" && grep -q "^the package is damaged: game/HUD.ini does not match" "$T/err"'
+check '! "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err" && ! grep -q "^::error" "$T/out"'
+
+echo "== files an antivirus took or locked: all of them named, as an antivirus"
+rm -f "$T/damaged/game/QOL.asi" "$T/damaged/game/Online.asi"
+check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
+check 'grep -qx "::error av-missing game/QOL.asi" "$T/out" && grep -qx "::error av-missing game/Online.asi" "$T/out"'
+check 'grep -qx "::error damaged game/HUD.ini" "$T/out" && [ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-missing game/QOL.asi" ]'
+check 'grep -q "game/Online.asi, game/QOL.asi from the package are missing. An antivirus" "$T/err" && grep -q "add exclusions for $T/damaged and $G" "$T/err"'
+chmod 000 "$T/damaged/game/Menus.asi"
+if [ ! -r "$T/damaged/game/Menus.asi" ]; then   # not as root
+    check '! A2_PROGRESS=1 "$T/damaged/install.sh" "$G" > "$T/out" 2> "$T/err"'
+    check '[ "$(grep "^::error" "$T/out" | tail -1)" = "::error av-locked game/Menus.asi" ] && grep -q "are missing or could not be read" "$T/err"'
+fi
+chmod 644 "$T/damaged/game/Menus.asi"
 rm -rf "$T/damaged"
+
+echo "== a file the game folder refuses is named"
+W="$T/readonly"; mock "$W"; echo locked > "$W/QOL.asi"; chmod 444 "$W/QOL.asi"
+if ! ( : > "$W/QOL.asi" ) 2>/dev/null; then   # not as root
+    check '! A2_PROGRESS=1 "$P/install.sh" "$W" > "$T/out" 2> "$T/err"'
+    check '[ "$(grep "^::error" "$T/out")" = "::error write-denied $W/QOL.asi" ] && grep -q "^QOL.asi could not be written into $W" "$T/err"'
+fi
+chmod 644 "$W/QOL.asi"; rm -rf "$W"
+
+echo "== no game"
+check '! A2_PROGRESS=1 "$P/install.sh" "$T/nowhere" > "$T/out" 2> "$T/err" && grep -qx "::error no-game $T/nowhere" "$T/out"'
 
 echo "== uninstall: what it added goes, what changed since stays"
 echo mine > "$G/UltimateASILoader-license.txt"

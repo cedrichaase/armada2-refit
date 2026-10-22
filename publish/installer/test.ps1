@@ -224,8 +224,44 @@ $D = Join-Path $T "damaged"; Copy-Item -Recurse $P $D
 Add-Content (Join-Path $D "game\HUD.ini") "; tampered"
 $r = Fail (Join-Path $D "install.ps1") @($M)
 Check "damaged package: exit 1" ($r.Code -eq 1)
-Check "damaged package: said last" ($r.Last -eq "the package is damaged: game/HUD.ini does not match SHA256SUMS")
+Check "damaged package: said last" ($r.Last -like "the package is damaged: game\HUD.ini does not match SHA256SUMS*")
 Check "damaged package: nothing installed" (-not (Test-Path (Join-Path $M "HUD.asi")))
+Check "no ::error lines unasked" (-not (Has $r.Out "::error*"))
+$env:A2_PROGRESS = "1"
+$r = Fail (Join-Path $D "install.ps1") @($M)
+Check "damaged package: ::error damaged game\HUD.ini" (Has $r.Out "::error damaged game\HUD.ini")
+$r = Fail (Join-Path $P "install.ps1") @((Join-Path $T "nowhere"))
+Check "no game: ::error no-game" (Has $r.Out "::error no-game *nowhere")
+
+Write-Host "== an antivirus holding package files open: every one named, as an antivirus"
+$A = Join-Path $T "locked"; Copy-Item -Recurse $P $A
+$held = foreach ($n in "Menus.asi", "QOL.asi") { [IO.File]::Open((Join-Path $A "game\$n"), "Open", "Read", "None") }
+try {
+    $r = Fail (Join-Path $A "install.ps1") @($M)
+} finally { foreach ($h in $held) { $h.Dispose() } }
+Check "locked: exit 1" ($r.Code -eq 1)
+Check "locked: ::error av-locked for each" ((Has $r.Out "::error av-locked game\Menus.asi") -and (Has $r.Out "::error av-locked game\QOL.asi"))
+Check "locked: both named, as an antivirus, last" (($r.Last -like "*game\Menus.asi, game\QOL.asi from the package could not be read. An antivirus*") -and
+    ($r.Last -like "*exclusions for *locked and *roundtrip*"))
+Check "locked: nothing installed" (-not (Test-Path (Join-Path $M "HUD.asi")))
+
+Write-Host "== an antivirus quarantined a package file: named, as an antivirus"
+Remove-Item -LiteralPath (Join-Path $A "game\Online.asi")
+$r = Fail (Join-Path $A "install.ps1") @($M)
+Check "missing: exit 1" ($r.Code -eq 1)
+Check "missing: ::error av-missing" (Has $r.Out "::error av-missing game\Online.asi")
+Check "missing: named, as an antivirus, last" ($r.Last -like "game\Online.asi from the package is missing. An antivirus has most likely quarantined*")
+
+Write-Host "== a file the game folder refuses is named"
+$R = Join-Path $T "readonly"; Mock $R
+Set-Content (Join-Path $R "QOL.asi") "locked"
+$hold = [IO.File]::Open((Join-Path $R "QOL.asi"), "Open", "Read", "None")
+try {
+    $r = Fail (Join-Path $P "install.ps1") @($R)
+} finally { $hold.Dispose() }
+Check "write refused: ::error write-denied" (Has $r.Out "::error write-denied *readonly\QOL.asi")
+Check "write refused: named last" ($r.Last -like "QOL.asi could not be written into *readonly*")
+$env:A2_PROGRESS = $null
 
 Write-Host "== what it did not write is left alone: a loader, a dxvk.conf, a ReShade preset"
 $H = Join-Path $T "other"; Mock $H
