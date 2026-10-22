@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 # Set Display8's mode in a test-bench clone, from a scenario's `Setup:` line, and then
-# (with any words after the mode) run the scene setup with them:
+# run the setup the scenario would have run, if any:
 #
 #   Setup: display/bench-mode.sh stub
-#   Setup: display/bench-mode.sh stub ending
-#   Setup: display/bench-mode.sh stub showcase Seed=7 Step=16 Pause=200
+#   Setup: display/bench-mode.sh stub ending                         a scene (testbench/scene)
+#   Setup: display/bench-mode.sh stub showcase Seed=7 Pause=200
+#   Setup: display/bench-mode.sh stub ui/bench-asi.sh --menus        any setup script
 #
-# Any `Key=value` before the scene's name goes into Display8.ini's own keys instead
-# (`Drop2D=1`). The bench passes the session's state file first.
+# `Key=value` words right after the mode go into Display8.ini (`Drop2D=1`). The bench
+# passes the session's state file first. display/stub-scenario.sh writes a scenario's
+# stub variant with such a line.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-state="${1:?usage: bench-mode.sh <session state.json> <mode> [Key=value ...] [scene ...]}"
-mode="${2:?usage: bench-mode.sh <session state.json> <mode> [Key=value ...] [scene ...]}"
+repo="$(cd "$here/.." && pwd)"
+usage="usage: bench-mode.sh <session state.json> <mode> [Key=value ...] [scene ... | script.sh ...]"
+state="${1:?$usage}"
+mode="${2:?$usage}"
 shift 2
 work="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["work"])' "$state")"
 ini="$work/game/Display8.ini"
@@ -26,5 +30,12 @@ while [ $# -gt 0 ] && [[ "$1" == *=* ]]; do
 done
 echo "Display8: Mode=$mode in $ini"
 if [ $# -gt 0 ]; then
-    exec bash "$here/../testbench/scene/bench-setup.sh" "$state" "$@"
+    case "$1" in
+        *.sh)
+            script="$1"
+            shift
+            exec bash "$repo/$script" "$state" "$@"
+            ;;
+        *) exec bash "$repo/testbench/scene/bench-setup.sh" "$state" "$@" ;;
+    esac
 fi

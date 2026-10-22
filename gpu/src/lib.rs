@@ -33,6 +33,7 @@ macro_rules! vcall {
 }
 
 pub mod d3d9;
+pub mod display;
 mod frame;
 pub mod pixels;
 pub mod types;
