@@ -4,6 +4,23 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.24.0 — 2026-10-23
+
+### Added
+- Light inside the nebulae on Vulkan and Direct3D 12: the march's lit twins
+  (`PS_MARCH8_LIT` .. `PS_MARCH24_LIT`, `PS_TEMPORAL_LIT`, dxc's alone) scatter the
+  view's clustered lights in the gas at every step, of one colour only the strongest;
+  fireballs, torpedoes and pulses (a corona about the shot), phaser beams' line lights,
+  vents and the rest light the vapour, the nebulae's own lights and planets' day sides
+  none. Where lights make the gas's light, the frames added up clip harder and take
+  more of this frame, so a moving light does not trail.
+- `[Nebulae]` keys `Lit`, `LitStrength`, `LitTint`, `LitExplosion`, `LitBolt`,
+  `LitBeam`, `LitCorona`, `LitTemporal`, `LitClip`; the shipped `Render3D.ini` lists
+  `Lit` and `LitStrength`.
+- `scene::lights::Gas`: what a light is to the gas, in the cluster list's `t.z`.
+
+Installed, not yet seen in game.
+
 ## 0.23.0 — 2026-10-23
 
 ### Added

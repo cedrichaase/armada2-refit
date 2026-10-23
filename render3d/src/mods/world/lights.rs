@@ -217,6 +217,8 @@ unsafe extern "thiscall" fn nebula_lights(neb: usize, _dt: f32) {
         }
     }
     let rgb = [col[0] * c.neb_bright, col[1] * c.neb_bright, col[2] * c.neb_bright, 1.0];
+    // It lights the hulls near it, never the gas (`[Nebulae] Lit=`).
+    scene::lights::set_gas(light, scene::lights::Gas::OwnGlow);
     unsafe {
         core::ptr::write_unaligned((light + 0x100) as *mut f32, field_f32(cls, 0x244) * c.neb_range);
         core::ptr::write_unaligned((light + 0x104) as *mut f32, field_f32(cls, 0x248) * c.neb_range);

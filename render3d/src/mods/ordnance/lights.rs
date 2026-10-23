@@ -400,6 +400,16 @@ impl Lights {
         self.cl = crate::scene::clusters::on();
         self.points.clear();
         let mut changed = false;
+        // The shots' own lights (each class's, riding with its shots) are bolts to the
+        // gas (`[Nebulae] LitBolt=`): a corona about the shot, not a lit ball.
+        if self.cl {
+            eng::for_each_ordnance(|o| {
+                let l = field(field(o, 0x34), 0x10);
+                if l != 0 && engine::vtable(l) == VT_POINT {
+                    crate::scene::lights::set_gas(l, crate::scene::lights::Gas::Bolt);
+                }
+            });
+        }
         if self.recolour && !lighting {
             self.recolour_registry();
             changed = true;

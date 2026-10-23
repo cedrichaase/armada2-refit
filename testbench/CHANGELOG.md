@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.59.0 — 2026-10-23
+
+### Added
+- The `nebula-battle` scene (two Borg cubes and eight ships firing at them inside the
+  Mutara nebula) and `render3d-nebula-lit`: a paused frame, frames in motion and a
+  ship blown up in the gas, timed, for render3d's light inside the nebulae.
+
+Installed, not yet seen in game.
+
 ## 3.56.0 — 2026-10-23
 
 ### Fixed

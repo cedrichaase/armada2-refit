@@ -84,6 +84,46 @@ pub fn is_day_side(light: usize) -> bool {
     unsafe { DAY_SIDE.contains(&light) }
 }
 
+/// What a light is to the nebulae's gas (`[Nebulae] Lit=`; `world_nebula.hlsl`, "light
+/// inside the gas"): how much of it the gas scatters, and how it falls off there.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u32)]
+pub enum Gas {
+    /// Any other light: scattered as it falls off on the plating.
+    Plain = 0,
+    /// A fireball's (`LitExplosion=`).
+    Fireball = 1,
+    /// A torpedo's or pulse's, the class's light that rides with the shot: a corona close
+    /// about it fading softly outward (`LitBolt=`), not a lit ball of gas.
+    Bolt = 2,
+    /// A nebula's own glow (`world::lights`): it lights what is near it, never the gas,
+    /// whose look without lights is its own.
+    OwnGlow = 3,
+}
+
+static mut GAS: alloc::collections::BTreeMap<usize, Gas> = alloc::collections::BTreeMap::new();
+
+/// Marks a light object as what it is to the gas; it stays so for as long as the object
+/// lives (a module's pool, a class's light, a nebula's).
+#[allow(static_mut_refs)]
+pub fn set_gas(light: usize, g: Gas) {
+    unsafe {
+        if g == Gas::Plain {
+            GAS.remove(&light);
+        } else {
+            GAS.insert(light, g);
+        }
+    }
+}
+
+#[allow(static_mut_refs)]
+pub fn gas_of(light: usize) -> Gas {
+    if light == 0 {
+        return Gas::Plain;
+    }
+    unsafe { GAS.get(&light).copied().unwrap_or(Gas::Plain) }
+}
+
 #[derive(Default, Clone)]
 pub struct Lights {
     pub dirs: Vec<Directional>,

@@ -1644,7 +1644,9 @@ alike:
   pixel; and of each group only the strongest at that pixel counts, so a volley of
   one colour lights as its brightest bolt did, without the per-mesh cut. The highlight
   shoulder keeps plating within 1, and the Borg profile and the inward normals are as
-  before. Cloaked hulls, ghosts and holograms keep the per-mesh lights.
+  before. Cloaked hulls, ghosts and holograms keep the per-mesh lights. The nebulae's
+  march reads the same clusters for the light inside the gas (`[Nebulae] Lit=`, under
+  world, "Nebulae"); each light's `t.z` says what it is to the gas.
 - **Per view.** Each view (`View::key`: the HUD's action camera draws the scene a
   second time) has its buffers; a draw binds them only in the view they were built for
   (the menu scene has none).
@@ -1809,7 +1811,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
 `MoonCrackCore`, `MoonCrackDepth`, `MoonCrackFalloff`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 1.5, `LitBeam` 1.3, `LitCorona` 0.15, `LitTemporal` 0.5, `LitClip` 0.5), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1984,6 +1986,39 @@ was marched. `comp_ps` then filters and composites the history as it did the mar
 The pass costs 0.22 ms at 720p. With `Temporal=0` the thresholds stay put, as before:
 moved without adding the frames up, they made the gas shimmer. Shadows cost 0.6 ms of 7.6 at 24 steps; the noise reads (flow, fine
 detail) were half of it before the flow was thinned. `Footprint=2` saved nothing.
+
+**Light inside the gas** (`[Nebulae] Lit=1`, Vulkan and Direct3D 12, with the clustered
+lights: "Clustered lights" under hulls). A breach lights the cloud about it, and
+torpedoes, pulses and phaser beams light the vapour they pass through. The march takes
+a twin (`march*_lit_ps`, dxc's alone) that, at every step with gas, walks the step's
+cluster (the pixel's tile, the step's slice of view depth: the clusters' own mapping,
+bound with `clusters::bind`, so the march's pass needs nothing of its own) and adds
+the light the gas scatters there: density times step times `LitStrength=` / 100 per
+world unit, the light's colour tinted `LitTint=` of the way towards the gas's hue; no
+phase (the gas glows alike from every side) and no shadowing by the gas between. Of
+each colour group only the strongest light at the step counts, as on the plating, and
+the cull's `ClusterPerColour` holds, so a volley of one colour does not blow out. The
+light joins the step's own, so the composite takes it through the gas's opacity, and
+the gas with no lights is drawn as before. Which light is what, to the gas
+(`scene::lights::Gas`, the cluster list's `t.z`): a fireball's takes `LitExplosion=`;
+a torpedo's or pulse's (each ordnance class's light, which rides with its shots) is a
+**corona**, bright within `LitCorona=` of its reach and fading softly to it,
+(1 - x)^2 (0.3 + 0.7 / (1 + (x / LitCorona)^2)) for x the distance over the reach,
+since a ball lit evenly to its edge read as a sphere in the gas; a beam's line light
+takes `LitBeam=`; the nebulae's own lights (`world::lights`) and a planet's day side
+light no gas at all. The shape is the clusters' first choice (the alternative, a froxel
+volume filled by compute and integrated, would spend a pass and a 3D storage image on
+what the march, which already walks the depth, reads for one buffer word per step
+where no light reaches).
+
+Lights move and the gas adds its frames up (`Temporal=`), so a torpedo would trail
+its glow through the history. The march writes the luminance of the lights' share
+into its second target's green; `temporal_ps`'s twin weighs it against the gas's own
+over the 3x3 and keeps that share in the history's meta (blue), and where either is
+large (now, or where a light just was) the clip narrows to `LitClip=` of
+`TemporalClip=` and this frame's share rises to `LitTemporal=`, so the glow follows its
+light within a frame or two. The pass with `Lit=0`, on Direct3D 9, or where no
+clusters run is the plain one (the same d3dbc; the port scenes as before).
 
 **Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view
 (`Module::lights`), a point light at its centre (the instance's transform +0x44 plus

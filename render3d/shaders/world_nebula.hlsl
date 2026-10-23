@@ -1,4 +1,4 @@
-// entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL march_vs:vs_3_0:VS_MARCH march8_ps:ps_3_0:PS_MARCH8:long march12_ps:ps_3_0:PS_MARCH12:long march16_ps:ps_3_0:PS_MARCH16:long march24_ps:ps_3_0:PS_MARCH24:long quad_vs:vs_3_0:VS_QUAD temporal_ps:ps_3_0:PS_TEMPORAL comp_ps:ps_3_0:PS_COMP
+// entries: neb_vs:vs_3_0:VS_NEB neb_ps:ps_3_0:PS_NEB bake_vs:vs_3_0:VS_NBAKE bake_ps:ps_3_0:PS_NBAKE vol_ps:ps_3_0:PS_VOL march_vs:vs_3_0:VS_MARCH march8_ps:ps_3_0:PS_MARCH8:long march12_ps:ps_3_0:PS_MARCH12:long march16_ps:ps_3_0:PS_MARCH16:long march24_ps:ps_3_0:PS_MARCH24:long quad_vs:vs_3_0:VS_QUAD temporal_ps:ps_3_0:PS_TEMPORAL comp_ps:ps_3_0:PS_COMP march8_lit_ps:ps_3_0:PS_MARCH8_LIT:dxc march12_lit_ps:ps_3_0:PS_MARCH12_LIT:dxc march16_lit_ps:ps_3_0:PS_MARCH16_LIT:dxc march24_lit_ps:ps_3_0:PS_MARCH24_LIT:dxc temporal_lit_ps:ps_3_0:PS_TEMPORAL_LIT:dxc
 // The world module's nebulae (src/mods/world/nebulae.rs): Nebulae.asi's nebulae.hlsl,
 // ported unchanged but for this header.
 //
@@ -17,6 +17,7 @@
 // agree with the registers below.
 
 #include "../../gpu/shaders/compat.hlsli"
+#include "clustered.hlsli"
 
 cbuffer world_nebula_vs : register(b0)
 {
@@ -517,6 +518,80 @@ float3 march_flow(float3 p, float3 gx, float3 gy)
     return clamp(fl, -1.0, 1.0);
 }
 
+#ifdef __hlsl_dx_compiler
+// ---- light inside the gas (Vulkan and Direct3D 12, `[Nebulae] Lit=1`) ---------------------
+//
+// The view's lights (an explosion, a torpedo, a phaser beam's line, a vent, a shield hit:
+// the clustered lights' list, clustered.hlsli) scattered by the gas they are in: at each
+// step with gas, the lights of the step's cluster (the pixel's tile, the step's slice of
+// view depth), of each colour group only the strongest there, as the plating takes
+// them, so a volley lights as its brightest bolt. No phase (the gas is lit alike from
+// every side), no shadowing by the gas between; added to the step's light, so the
+// composite takes it through the gas's opacity as its own glow. The nebulae's own
+// lights (t.x & 32) and the planets' day sides (16) are not taken: the gas's look
+// without lights is its own.
+cbuffer world_nebula_lit : register(b1)
+{
+    float4 k_nl      : CREG(104); // x: light scattered per world unit of the densest gas (LitStrength= / 100); y: tinted by the gas's hue (LitTint=); z: the lit share's weight (temporal_ps); w: the clip where lit (of TemporalClip=)
+    float4 k_nlt     : CREG(105); // x: this frame's share where lit (LitTemporal=); y: a bolt's corona, of its reach (LitCorona=)
+    float4 k_nlk     : CREG(106); // the gas's share of a fireball's light (LitExplosion=), a bolt's (LitBolt=), a beam's line (LitBeam=)
+};
+
+static bool nl_on = false;
+static float3 nl_sum = 0.0;
+static float nl_lum = 0.0;
+
+// The lights reaching p (world), of each group only the strongest.
+float3 nl_light(float3 p)
+{
+    uint at = cl_cluster(cl_fc, p);
+    uint n = cl_index[at];
+    float3 sum = 0.0, bc = 0.0;
+    float bs = 0.0;
+    uint g = 0xffffffffu;
+    for (uint i = 0u; i < n; i++) {
+        ClLight l = cl_lights[cl_index[at + 1u + i]];
+        if (l.t.y != g) {
+            sum += bc;
+            bc = 0.0;
+            bs = 0.0;
+            g = l.t.y;
+        }
+        uint gk = l.t.z;
+        if ((l.t.x & 16u) != 0u || gk == 3u)
+            continue;
+        float3 L;
+        float3 c;
+        if (gk == 2u) {
+            // A bolt: a corona, bright close about the shot (within LitCorona= of its
+            // reach) on a soft tail out to the reach, never a ball lit to its edge.
+            float x = length(l.a.xyz - p) * l.c.w / (1.0 + l.a.w * l.c.w);
+            float e = saturate(1.0 - x), q = x / k_nlt.y;
+            c = l.c.rgb * (e * e * (0.3 + 0.7 / (1.0 + q * q)));
+        } else {
+            c = cl_eval(l, p, L);
+        }
+        c *= gk == 1u ? k_nlk.x : gk == 2u ? k_nlk.y : (l.t.x & 15u) == 1u ? k_nlk.z : 1.0;
+        float s = dot(c, float3(0.299, 0.587, 0.114));
+        if (s > bs) {
+            bs = s;
+            bc = c;
+        }
+    }
+    return sum + bc;
+}
+
+// The light the gas of density `dens` at p scatters over `thick`, `near` its near fade.
+float3 nl_step(float3 p, float dens, float hue, float thick, float near)
+{
+    float3 gas = lerp(k_gas_a.rgb, k_gas_b.rgb, hue);
+    float3 tint = lerp(1.0, gas / max(max(gas.r, max(gas.g, gas.b)), 1e-3), k_nl.y);
+    float3 c = nl_light(p) * tint * (dens * thick * near * k_nl.x);
+    nl_sum += c;
+    return c;
+}
+#endif
+
 // One step: the light the gas adds over `thick` (view depth) about p, and in w its
 // optical depth -- vol_gas's, with fl the flow's offset there. gx, gy: a pixel's
 // footprint at p (world units).
@@ -550,6 +625,10 @@ float4 march_step(float3 p, float3 fl, float dist, float thick, float2 u, float 
             float4 g = float4(dn, v.y * 1.6, v.z, v.w * 4.0);
             float  near = saturate((dist - k_eye.w * 0.25) / k_eye.w);
             r = float4(gas_colour(g, thick, dist, pa, key_lit(p, u, k), ph), g.x * near * thick * k_opac.x);
+#ifdef __hlsl_dx_compiler
+            if (nl_on)
+                r.rgb += nl_step(p, dn, saturate(lerp(g.z, dn, k_shape.y)), thick, near);
+#endif
         }
     }
     return r;
@@ -568,6 +647,9 @@ struct MarchOut {
 
 MarchOut march(float2 vpos, const int n)
 {
+#ifdef __hlsl_dx_compiler
+    nl_sum = 0.0;
+#endif
     float2 px = floor(vpos) + 0.5;
     // With Temporal=, the ray walks within its pixel from frame to frame (R2), so the
     // frames add up the gas over the whole pixel. Through its centre alone, gas finer than
@@ -618,6 +700,11 @@ MarchOut march(float2 vpos, const int n)
         }
         o.gas = acc;
         o.z = float4(za, 0.0, 0.0, 0.0);
+#ifdef __hlsl_dx_compiler
+        // The lights' share, for temporal_ps's twin.
+        if (nl_on)
+            o.z.y = dot(nl_sum, float3(0.299, 0.587, 0.114));
+#endif
     }
     return o;
 }
@@ -626,6 +713,15 @@ MarchOut march8_ps(float4 fc : SV_Position) { return march(d3d9_vpos(fc), 8); }
 MarchOut march12_ps(float4 fc : SV_Position) { return march(d3d9_vpos(fc), 12); }
 MarchOut march16_ps(float4 fc : SV_Position) { return march(d3d9_vpos(fc), 16); }
 MarchOut march24_ps(float4 fc : SV_Position) { return march(d3d9_vpos(fc), 24); }
+
+#ifdef __hlsl_dx_compiler
+// The lit twins (Vulkan and Direct3D 12, `[Nebulae] Lit=1`): the march with the view's
+// clustered lights scattered by the gas at each step (nl_light).
+MarchOut march8_lit_ps(float4 fc : SV_Position) { nl_on = true; cl_fc = fc; return march(d3d9_vpos(fc), 8); }
+MarchOut march12_lit_ps(float4 fc : SV_Position) { nl_on = true; cl_fc = fc; return march(d3d9_vpos(fc), 12); }
+MarchOut march16_lit_ps(float4 fc : SV_Position) { nl_on = true; cl_fc = fc; return march(d3d9_vpos(fc), 16); }
+MarchOut march24_lit_ps(float4 fc : SV_Position) { nl_on = true; cl_fc = fc; return march(d3d9_vpos(fc), 24); }
+#endif
 
 // ---- after the march: the gas target ---------------------------------------------------
 
@@ -699,6 +795,10 @@ TemporalOut temporal_ps(float4 fc : SV_Position)
             m1 += g;
             m2 += g * g;
             zs += s_gz.SampleLevel(s_gz_s, uv, 0.0).r;
+#ifdef __hlsl_dx_compiler
+            if (nl_on)
+                nl_lum += s_gz.SampleLevel(s_gz_s, uv, 0.0).g;
+#endif
         }
     }
     // The ring about them, two pixels out: only its brightest counts (below).
@@ -737,14 +837,40 @@ TemporalOut temporal_ps(float4 fc : SV_Position)
     // In thin gas a frame's eight steps find gas in few pixels, and a neighbourhood that
     // found none has no spread to clip to: the history would be wiped and the stipple
     // stay. So the clip's top reaches up to the brightest pixel two out as well.
-    hist = clamp(hist, m1 - k_tm.z * sd, max(m1 + k_tm.z * sd, mx));
-    float4 r = lerp(hist, c, max(1.0 / (n + 1.0), k_tm.x));
+    float  clip = k_tm.z, share = k_tm.x;
+#ifdef __hlsl_dx_compiler
+    // Lit=1: where the view's lights make much of the gas's light, now or in the
+    // history (meta's z), a light that moves would trail its glow through the
+    // history: there the history is clipped harder and this frame weighs more.
+    float  lw = 0.0;
+    if (nl_on) {
+        float lf = saturate(nl_lum * (1.0 / 9.0) / max(dot(m1.rgb, float3(0.299, 0.587, 0.114)), 1e-5));
+        lw = saturate(max(lf, hm.z * ok) * k_nl.z);
+        clip = k_tm.z * lerp(1.0, k_nl.w, lw);
+        share = lerp(k_tm.x, k_nlt.x, lw);
+        nl_lum = lf;
+    }
+#endif
+    hist = clamp(hist, m1 - clip * sd, max(m1 + clip * sd, mx));
+    float4 r = lerp(hist, c, max(1.0 / (n + 1.0), share));
     r = select(r >= 0.0, r, 0.0);
     TemporalOut o;
     o.gas = min(r, 60000.0);
     o.meta = float4(min(n + 1.0, 1000.0), zc / DEPTH_UNIT, 0.0, 0.0);
+#ifdef __hlsl_dx_compiler
+    if (nl_on)
+        o.meta.z = nl_lum;
+#endif
     return o;
 }
+
+#ifdef __hlsl_dx_compiler
+TemporalOut temporal_lit_ps(float4 fc : SV_Position)
+{
+    nl_on = true;
+    return temporal_ps(fc);
+}
+#endif
 
 // ---- the gas onto the frame ------------------------------------------------------------
 
