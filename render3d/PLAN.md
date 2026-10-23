@@ -141,9 +141,11 @@ What every module uses, rather than writing its own:
 - `scene`: SOD instances (`scene::model`, `pose::pose`, `scene::draw` or
   `draw_part` with one's own shaders), the view's registered lights
   (`scene::lights()`), the translucent queue;
-- `gfx`: `Guard` (put the engine's device state back), `Shader`/`Decl` made on first
-  use, `DynVb` for geometry rebuilt every frame, `PerView` for per-view state (the HUD's
-  action camera is a second view: `View::key`);
+- `gfx`: `cmd()` (a `gpu::Cmd`, which puts the engine's device state back when
+  dropped), `Pipes` (a module's pipelines by a key of its states), `view_pass` (the
+  view's pass again after a target of one's own), `PerView` for per-view state (the
+  HUD's action camera is a second view: `View::key`); geometry rebuilt every frame
+  goes in the frame's rings (`Cmd::vertices`);
 - `engine`, `engine::obj`: addresses and reads of the engine's state. **Never write
   anything the simulation reads**, never draw from `g_random` (0x7b0fac).
 - Shaders: `shaders/<name>.hlsl` with an `// entries:` first line; `build.sh` compiles
