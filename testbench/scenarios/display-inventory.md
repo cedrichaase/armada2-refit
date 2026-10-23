@@ -3,11 +3,12 @@
 Resolutions: 1280x720
 Reference: 1280x720
 Mod: refit
-Setup: testbench/scene/bench-setup.sh ending
+Setup: display/bench-mode.sh forward ending
 Timeout: 50 min
 
-Run with `--install .`: the game as `./install` gives it, Display8 (forward mode,
-tracing in a bench clone) in front of the real chain (`display/README.md`).
+Run with `--install .`: the game as `./install` gives it, Display8 switched to forward mode
+(`display/bench-mode.sh`; stub is the shipped default since display 0.8.0), tracing in a
+bench clone, in front of the real chain (`display/README.md`).
 `ui-whole-game`'s way through the game, a context marked at each stage, so that
 `Display8.inventory.tsv` (gathered into the case's `logs/`) counts every Direct3D 8
 call by context, method and caller. Phase 0 of the display plan: no step expects

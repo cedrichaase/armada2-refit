@@ -5,6 +5,33 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.23.0 — 2026-10-23
+
+Layers: display 0.8.0, ui 0.19.2, testbench 3.57.1.
+
+### Changed
+- Display8 ships in stub mode on `Backend=auto` (display 0.8.0): render3d and the UI
+  draw the whole frame on Vulkan, else Direct3D 12, else Direct3D 9. An install brings
+  a `Display8.ini` that still holds the old defaults (`forward`, `d3d9`) to the new ones
+  and keeps a value set by hand (`Defaults=2`, `ui/ini-merge.py`, ui 0.19.2).
+  `display-inventory` and `display-engine-draws` pin forward mode (testbench 3.57.1).
+
+Installed, not yet seen in game.
+
+## 13.22.0 — 2026-10-23
+
+Layers: display 0.7.0, testbench 3.57.0.
+
+### Added
+- Display8's `Backend=auto` (display 0.7.0): the stub tries Vulkan, Direct3D 12, then
+  Direct3D 9 at the engine's first `CreateDevice`, and any `Backend=` falls back to Direct3D 9 when its own cannot
+  start, with each attempt in `Display8.log`. `display8_backend` answers once the device
+  is made. The shipped defaults are unchanged (`Mode=forward`, `Backend=d3d9`).
+- `display-fallback` (testbench 3.57.0): Vulkan and Direct3D 12 made to fail on
+  purpose (`FailBackend=vulkan,d3d12`), Direct3D 9 drawing the game.
+
+Installed, not yet seen in game.
+
 ## 13.21.1 — 2026-10-23
 
 Layers: display 0.6.2.

@@ -129,7 +129,13 @@ def vulkan_env(game_dir, logs=None):
     validation layer under vkd3d-proton (`VK_INSTANCE_LAYERS`), writing its errors and
     warnings to `logs/vvl.log` itself (`VK_LAYER_DEBUG_ACTION`, `VK_LAYER_LOG_FILENAME`):
     a messenger of vkd3d-proton's (`VKD3D_CONFIG=vk_debug`) hears nothing through the
-    32-bit winevulkan, and would take the layer's own log away."""
+    32-bit winevulkan, and would take the layer's own log away.
+
+    On `Backend=auto` or a list that names Vulkan (display 0.7.0; `auto` is the shipped
+    default from display 0.8.0): the drivers as they are, so the default game runs on
+    the GPU as a player's does; with `Validate=1` the Khronos layer too, which Display8's
+    messenger reports. `display/bench-mode.sh` puts such a Vulkan on lavapipe by
+    `Device=llvmpipe` instead, keeping the GPU for the backends after it."""
     ini = Path(game_dir) / 'Display8.ini'
     try:
         text = ini.read_text(errors='replace')
@@ -143,7 +149,12 @@ def vulkan_env(game_dir, logs=None):
         if logs is not None:
             env['VK_LAYER_LOG_FILENAME'] = str(Path(logs) / 'vvl.log')
         return env
-    if keys.get('mode') != 'stub' or keys.get('backend') != 'vulkan':
+    if keys.get('mode') != 'stub':
+        return {}
+    order = {w.strip() for w in keys.get('backend', '').split(',')}
+    if keys.get('backend') != 'vulkan':
+        if order & {'vulkan', 'auto'} and keys.get('validate') == '1':
+            return {'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation'}
         return {}
     env = {'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation'}
     if os.environ.get('A2TEST_VULKAN_GPU') != '1':

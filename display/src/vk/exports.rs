@@ -3,22 +3,21 @@
 //! state the plugins read (its viewport and transforms), on whatever backend runs.
 use super::get;
 use crate::stub::obj::SObj;
+use crate::stub::Backend;
 use core::ffi::c_void;
 use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8, BACKEND_D3D12, BACKEND_D3D9, BACKEND_NONE, BACKEND_VULKAN};
 
-/// Vulkan from the moment the stub starts on it (the engine's `Direct3DCreate8`), before
-/// the device: a plugin that asks early makes its objects for the right backend. A stub
-/// on Vulkan has no Direct3D 9 to fall back to.
+/// The backend the stub's device was made on, and none before it exists (the engine's
+/// first `CreateDevice`, where `Backend=`'s order is tried): a plugin is never told a
+/// backend that a fallback then leaves (README.md, "Choosing a backend"). `gpu` asks again
+/// while the answer is none.
 #[unsafe(no_mangle)]
 pub extern "C" fn display8_backend() -> u32 {
-    if get().is_some() || crate::stub::vulkan() {
-        BACKEND_VULKAN
-    } else if crate::dx12::get().is_some() || crate::stub::d3d12() {
-        BACKEND_D3D12
-    } else if !crate::stub::dev9().is_null() {
-        BACKEND_D3D9
-    } else {
-        BACKEND_NONE
+    match crate::stub::made() {
+        Some(Backend::Vulkan) => BACKEND_VULKAN,
+        Some(Backend::D3d12) => BACKEND_D3D12,
+        Some(Backend::D3d9) => BACKEND_D3D9,
+        None => BACKEND_NONE,
     }
 }
 

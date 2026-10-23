@@ -30,7 +30,7 @@ pub mod mirror;
 pub mod raw;
 
 use crate::log;
-use crate::rt::win::{CreateEventA, GetProcAddress, LoadLibraryA, WaitForSingleObject, HANDLE};
+use crate::rt::win::{CloseHandle, CreateEventA, GetProcAddress, LoadLibraryA, WaitForSingleObject, HANDLE};
 use crate::shaders::present_dxil::{PS_GAMMA_DXIL, VS_PRESENT_DXIL};
 use alloc::vec::Vec;
 use core::ffi::c_void;
@@ -185,10 +185,12 @@ impl Dx {
         let hr = unsafe { create_device(core::ptr::null_mut(), FEATURE_LEVEL_11_0, &IID_DEVICE, &mut dev) };
         let dev = made(hr, dev, "D3D12CreateDevice at feature level 11_0")?;
 
+        // From here what is made is released again if the start fails, so that another
+        // backend can have the window (Backend=auto; README.md, "Choosing a backend").
         let qd = CommandQueueDesc { ty: COMMAND_LIST_TYPE_DIRECT, ..Default::default() };
         let mut queue: P = core::ptr::null_mut();
         let hr = vcall!(dev, slot::DEV_CREATE_COMMAND_QUEUE, fn(*const CommandQueueDesc, *const crate::com::Guid, *mut P) -> i32, &qd, &IID_COMMAND_QUEUE, &mut queue);
-        let queue = made(hr, queue, "CreateCommandQueue")?;
+        let queue = made(hr, queue, "CreateCommandQueue").inspect_err(|_| release(dev))?;
 
         let inc = [
             DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
@@ -200,9 +202,15 @@ impl Dx {
 
         let mut fence: P = core::ptr::null_mut();
         let hr = vcall!(dev, slot::DEV_CREATE_FENCE, fn(u64, u32, *const crate::com::Guid, *mut P) -> i32, 0, 0, &IID_FENCE, &mut fence);
-        let fence = made(hr, fence, "CreateFence")?;
+        let fence = made(hr, fence, "CreateFence").inspect_err(|_| {
+            release(queue);
+            release(dev);
+        })?;
         let fence_event = unsafe { CreateEventA(core::ptr::null_mut(), 0, 0, core::ptr::null()) };
         if fence_event.is_null() {
+            release(fence);
+            release(queue);
+            release(dev);
             return Err("CreateEventA failed");
         }
 
@@ -264,6 +272,22 @@ impl Dx {
             frame_out: Dx12Frame8::default(),
             lost: false,
         };
+        if let Err(e) = me.build(create_factory, hwnd, serialize) {
+            me.destroy();
+            return Err(e);
+        }
+        log!(
+            "d3d12: device {:#x} at feature level 11_0; swap chain {}x{} flip-discard B8G8R8A8, sync interval {}; targets {}x{} B8G8R8A8 + D16",
+            dev as usize, me.sc_w, me.sc_h, me.sync_interval, w, h
+        );
+        unsafe { DX = Some(me) };
+        Ok(())
+    }
+
+    /// The heaps, swap chain, targets, pipeline and frame slots of a device just made.
+    fn build(&mut self, create_factory: usize, hwnd: *mut c_void, serialize: usize) -> Result<(), &'static str> {
+        let me = self;
+        let (w, h, dev, inc) = (me.sc_w, me.sc_h, me.dev, me.inc);
         me.make_heaps()?;
         me.make_swapchain(create_factory, hwnd)?;
         me.color = me.texture(w, h, 1, FORMAT_B8G8R8A8_UNORM, RESOURCE_FLAG_ALLOW_RENDER_TARGET, STATE_RENDER_TARGET, None)?;
@@ -283,12 +307,41 @@ impl Dx {
             let s = me.make_slot()?;
             me.slots.push(s);
         }
-        log!(
-            "d3d12: device {:#x} at feature level 11_0; swap chain {}x{} flip-discard B8G8R8A8, sync interval {}; targets {}x{} B8G8R8A8 + D16",
-            dev as usize, me.sc_w, me.sc_h, me.sync_interval, w, h
-        );
-        unsafe { DX = Some(me) };
+        // The bench's deliberate failure (FailBackend=d3d12), after everything is made,
+        // so that the teardown is what the next backend starts after.
+        if crate::fail_backend(crate::stub::Backend::D3d12) {
+            return Err("FailBackend=d3d12 (the test bench's deliberate failure)");
+        }
         Ok(())
+    }
+
+    /// Releases everything `start` made, when it fails: the swap chain first, so that the
+    /// window is free again for the next backend. Nothing has been submitted yet.
+    fn destroy(mut self) {
+        for s in self.slots.drain(..) {
+            for c in s.chunks {
+                release(c.res);
+            }
+            release(s.list);
+            release(s.alloc);
+        }
+        for b in self.sc_buffers.drain(..) {
+            release(b);
+        }
+        release(self.swap);
+        release(self.pso);
+        release(self.root);
+        for img in [&self.color, &self.depth, &self.ramp] {
+            release(img.res);
+        }
+        for heap in [self.rtv_heap, self.dsv_heap, self.own_heap, self.views_heap, self.samplers_heap] {
+            release(heap);
+        }
+        release(self.fence);
+        unsafe { CloseHandle(self.fence_event) };
+        release(self.queue);
+        release(self.dev);
+        log!("d3d12: what was made is released again");
     }
 
     fn heap(&self, ty: u32, count: u32, flags: u32) -> Result<P, &'static str> {
