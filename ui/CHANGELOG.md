@@ -4,6 +4,17 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.21.0 — 2026-10-23
+
+### Added
+- `[UI] PointerLog=1` (off as shipped): `UI.log` says each change of the game window's
+  foreground, active and focus state, with the pointer, the engine's mouse buttons and
+  whether its pan holds the pointer, and each jump of the pointer between two frames
+  that the pan did not make ("focus: ...", "pointer: jumped ..."). For the cursor that
+  jumps after the game lost the focus (README.md, "Focus and the pointer").
+
+Installed, not yet seen in game.
+
 ## 0.20.1 — 2026-10-23
 
 ### Fixed

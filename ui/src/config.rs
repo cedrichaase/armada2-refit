@@ -17,6 +17,9 @@ pub struct Config {
     /// `[UI] Movies`: the cutscene proxy's full-screen movies are drawn by the UI
     /// (`movie`), not copied into the engine's locked back buffer.
     pub movies: bool,
+    /// `[UI] PointerLog`: log the focus changes and the pointer's jumps between two
+    /// frames (`input::diagnose`), for the cursor that jumps after a change of focus.
+    pub pointer_log: bool,
     /// `[UI] Theme`: a theme's name (`shell`, `federation`, `klingon`, ...) to use
     /// everywhere; None for `auto`, the player's race in a mission and the shell's
     /// theme elsewhere (widgets/theme.rs).
@@ -139,7 +142,9 @@ pub fn load() -> Config {
         cursor: ini.int("UI", "Cursor", 1) != 0,
         cursor_size: ini.float("UI", "CursorSize", 32.0).clamp(16.0, 128.0),
         native: ini.int("UI", "Native", 1) != 0,
-        movies: ini.int("UI", "Movies", 1) != 0,        theme: ini.string("UI", "Theme").filter(|s| {
+        movies: ini.int("UI", "Movies", 1) != 0,
+        pointer_log: ini.int("UI", "PointerLog", 0) != 0,
+        theme: ini.string("UI", "Theme").filter(|s| {
             let l = rt::lower(s.trim());
             !l.is_empty() && l != "auto"
         }),

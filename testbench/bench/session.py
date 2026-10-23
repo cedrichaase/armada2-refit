@@ -618,6 +618,56 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
     def wheel(self, n):
         self.input(f'wheel {n}')
 
+    def take_focus(self, seconds=1.0, how='window'):
+        """Take the focus away from the game for a while and give it back, as a player
+        does who switches to another window (`window`: a terminal on the session's sway,
+        focused, which takes the game out of full screen, then closed) or takes a
+        region screenshot (`overlay`: `slurp`, a layer-shell overlay over everything,
+        with a region dragged on it). The pointer ends where it started."""
+        env = self.wl_env()
+        if how == 'overlay':
+            if not shutil.which('slurp'):
+                raise GameError('slurp is not installed: no overlay to take the focus with')
+            slog = open(self.dir / 'logs' / 'slurp.log', 'a')
+            p = subprocess.Popen(['slurp'], env=env, stdout=slog, stderr=subprocess.STDOUT)
+            time.sleep(max(seconds, 0.5))
+            # a move first: the overlay takes the pointer only once it moves over it
+            self.input('rel 10 10')
+            time.sleep(0.3)
+            self.input('down 1')
+            time.sleep(0.1)
+            self.input('rel 120 80')
+            time.sleep(0.2)
+            self.input('up 1')
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                raise GameError('slurp did not take the region dragged on it (logs/slurp.log)')
+            self.input('rel -130 -90')
+        else:
+            term = next((t for t in ('foot', 'alacritty', 'kitty') if shutil.which(t)), None)
+            if not term:
+                raise GameError('no terminal (foot, alacritty, kitty) to take the focus with')
+            app = f'a2test-focus-{os.getpid()}'
+            args = [term, '-a', app] if term == 'foot' else [term, '--class', app]
+            p = subprocess.Popen(args, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 start_new_session=True)
+            for _ in range(50):
+                if f'"app_id": "{app}"' in self.swaymsg('-t', 'get_tree'):
+                    break
+                time.sleep(0.1)
+            self.swaymsg(f'[app_id="{app}"] focus')
+            time.sleep(seconds)
+            self.swaymsg(f'[app_id="{app}"] kill')
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+            self.swaymsg('[shell="xwayland"] focus')
+            self.swaymsg('[shell="xwayland"] fullscreen enable')
+        time.sleep(0.5)
+
     # ------------------------------------------------------------------ game
 
     def launch(self, args='-nointro'):

@@ -143,6 +143,58 @@ Alt. A button released outside the window after a press the engine did not see s
 up (nothing captured the mouse), so `poll` also asks `GetAsyncKeyState` and releases a
 button the hardware says is up.
 
+## Focus and the pointer
+
+`[UI] PointerLog=1` (off as shipped; `input::diagnose`, `engine/mouse.rs`) logs, in
+`UI.log`, each change of whether the game's window is the foreground, active and focus
+window, with the pointer and the engine's mouse state at that moment, and each jump of
+the pointer of more than 320 pixels between two frames that the engine's own pan did not
+make; 60 lines a game at most. It is for the cursor a player saw jump about in a mission
+after a region screenshot took the focus from the game (Hyprland, Display8 on Vulkan),
+until the mission was left.
+
+What the engine does with the mouse, from the bench and its symbols: the input thread's
+`MouseDriver::ReadChannels` keeps the button bits (0x763308) from the messages posted
+to it and reads the position with `GetCursorPos`. A right-drag or a both-buttons drag
+(`cOverViewImp::mMouseRightDrag`, `mMouseBothDown`) calls `MouseLockPosition`, and
+while that holds (0x763350) every read puts the pointer back in the middle of the
+window with `SetCursorPos` and takes the motion from there; `MouseUnlockPosition` at the
+release puts it back where the drag began. Those two `SetCursorPos` are the only ones
+the game makes (none in Display8, the UI or QOL, and no `ClipCursor` in its imports).
+`MouseInit`, from `cOverViewImp::PostLoad`, clears the buttons and the hold at each
+mission's start; `WindowProc`'s `WM_ACTIVATE` clears only the keyboard's state. The
+diagnostic reads the two, nothing more.
+
+What Wine and Xwayland do, measured on the bench (headless sway, Xwayland,
+`WINEDEBUG=+cursor`, Display8 stub on Vulkan):
+
+- **In a mission the pointer is clipped and locked.** Wine clips the pointer to a
+  window that covers the screen (`grab_clipping_window clipping to (0,0)-(1280,720)`),
+  and the engine answers `WM_SETCURSOR` with no cursor. Clipped with no cursor, Xwayland
+  locks the Wayland pointer and moves the X pointer by relative motion: an absolute move
+  of the compositor's pointer arrives as a jump from a point that stays fixed. Wine
+  then moves its cursor by XInput2 raw motion. In the front end the arrow is shown and
+  nothing is locked.
+- **The game is never told it lost the focus.** Under Proton its window stays the
+  foreground, active and focus window throughout, whether another window took the focus
+  or a layer-shell overlay (`slurp`) did. Wine only drops its clip
+  (`ungrab_clipping_window`), which ends Xwayland's lock.
+- **Getting the focus back may or may not redo the clip.** After one round trip Wine
+  clipped again at once; after another (the window taken out of full screen and back)
+  it did not, and the pointer stayed unlocked until the engine's next right-drag warp
+  had Xwayland lock it again by warp emulation.
+- **The two pointers part.** Motion made while the game's surface does not have the
+  pointer moves the compositor's pointer and not the game's: after a dragged region on
+  the overlay and the pointer moved back, the game's cursor stood about 107,62 pixels
+  from where the moves put the compositor's.
+
+So the likely cause of the jumps is not in Display8, the UI or QOL. It is the stock
+engine's hidden cursor and warping pan, on Wine's full-screen clip, under Xwayland's
+pointer lock, which a change of focus takes apart and puts back differently. Each later
+switch between locked (relative) and unlocked (absolute) motion would then move the X
+pointer to wherever the compositor's pointer is. The bench (sway) has shown the parts
+but not the jumps themselves. `ui-focus-pointer` walks both ways of losing the focus.
+
 ## The cursor
 
 `engine/cursor.rs`. hud/README.md has how the engine draws its cursor; what the UI

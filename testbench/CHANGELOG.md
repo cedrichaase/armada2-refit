@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.65.0 — 2026-10-23
+
+### Added
+- The step `Take the focus from the game [with a window | with an overlay] [for N
+  seconds]`: a terminal on the session's sway takes the focus and is closed, or a
+  region screenshot's overlay (`slurp`) has a region dragged on it (`logs/slurp.log`);
+  `Session.take_focus`.
+- `ui-focus-pointer`: a right-drag, each way of losing the focus, moves and a right-drag
+  after, with `[UI] PointerLog=1`: no jump of the pointer, the engine not left holding
+  it.
+
+Installed, not yet seen in game.
+
 ## 3.64.0 — 2026-10-23
 
 ### Added

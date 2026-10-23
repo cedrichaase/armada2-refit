@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.31.0 — 2026-10-23
+
+Layers: ui 0.21.0, testbench 3.65.0.
+
+### Added
+- `[UI] PointerLog=1`, off as shipped: UI.log records changes of the game window's
+  focus and jumps of the pointer, for the cursor that jumps after a change of focus
+  (ui 0.21.0).
+- testbench: the step `Take the focus from the game ...` and `ui-focus-pointer`
+  (testbench 3.65.0).
+
+Installed, not yet seen in game.
+
 ## 13.30.0 — 2026-10-23
 
 Layers: render3d 0.26.0, testbench 3.64.0.

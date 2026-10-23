@@ -51,6 +51,7 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Move the mouse to …` / `Hover over …` | same four coordinate spaces |
 | `Drag from hud 400,300 to hud 1400,900` | press, glide with the button held, release (a selection box); either end in any of the four spaces |
 | `Right-drag from 960,500 to 760,500` | the same with the right button: pans the map in a mission |
+| `Take the focus from the game` / `… with an overlay for 2 seconds` | another window on the session's sway (a terminal) takes the focus, which takes the game out of full screen, and is closed, the game focused and full screen again; or a region screenshot's overlay (`slurp`) with a region dragged on it. The pointer ends where it was. Under Proton the game is not told: Wine only drops and maybe redoes its pointer clip (`ui/README.md`, "Focus and the pointer") |
 | `Press Escape` / `Press ctrl+s` / `Press Return 3 times` | virtual keyboard; xkb key names |
 | `Type "TEXT"` | |
 | `Type this machine's address` | the source address of the default route: what the game shows as "Local IP Address", and where every player of a case is |

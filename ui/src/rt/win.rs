@@ -140,6 +140,7 @@ unsafe extern "system" {
     pub fn SetCursor(c: HANDLE) -> HANDLE;
     pub fn PostQuitMessage(code: i32);
     pub fn GetFocus() -> HWND;
+    pub fn GetActiveWindow() -> HWND;
     pub fn SetFocus(w: HWND) -> HWND;
 }
 

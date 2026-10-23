@@ -344,6 +344,71 @@ pub fn window() -> HWND {
     unsafe { f(s) }
 }
 
+/// A move of the pointer between two frames longer than this, in pixels, is logged as a
+/// jump (README.md, "Focus and the pointer").
+const JUMP: i32 = 320;
+/// At most this many focus and jump lines a game, so a pointer gone wrong for good
+/// cannot fill the log.
+const DIAG_LINES: u32 = 60;
+
+struct Diag {
+    /// Whether the game's window was the foreground, the active and the focus window
+    /// (bits 0, 1, 2) at the last poll; None before the first.
+    has: Option<u32>,
+    /// The pointer on the screen at the last poll, and whether the engine held it then.
+    last: Option<(i32, i32)>,
+    held: bool,
+    lines: u32,
+}
+
+static mut DIAG: Diag = Diag { has: None, last: None, held: false, lines: 0 };
+
+/// `[UI] PointerLog=1` (README.md, "Focus and the pointer"): logs what the window's
+/// focus and the pointer do, for the cursor that jumps after the game loses the focus
+/// and gets it back. Each change of the foreground, active or focus window, with the
+/// pointer and the engine's mouse state at that moment, and each jump of the pointer
+/// between two frames that the engine's own pan did not make.
+fn diagnose(hwnd: HWND, screen: Option<(i32, i32)>) {
+    if !crate::config::try_get().is_some_and(|c| c.pointer_log) {
+        return;
+    }
+    let d = unsafe { &mut *core::ptr::addr_of_mut!(DIAG) };
+    let has = unsafe {
+        (GetForegroundWindow() == hwnd) as u32
+            | ((GetActiveWindow() == hwnd) as u32) << 1
+            | ((GetFocus() == hwnd) as u32) << 2
+    };
+    let held = engine::mouse::held();
+    if d.lines < DIAG_LINES && d.has != Some(has) {
+        d.lines += 1;
+        let (x, y) = screen.unwrap_or((-1, -1));
+        let yn = |bit: u32| if has & bit != 0 { "yes" } else { "no" };
+        crate::log!(
+            "focus: foreground {}, active {}, focus {}; pointer {},{}; engine buttons {:#x}{}",
+            yn(1),
+            yn(2),
+            yn(4),
+            x,
+            y,
+            engine::mouse::buttons(),
+            if held { ", pointer held for a pan" } else { "" }
+        );
+    }
+    d.has = Some(has);
+    if let (Some((x0, y0)), Some((x, y))) = (d.last, screen) {
+        // The engine's pan moves the pointer to the middle at every read and back at the
+        // release: not a jump.
+        let pan = held || d.held;
+        if !pan && d.lines < DIAG_LINES && ((x - x0).abs() > JUMP || (y - y0).abs() > JUMP) {
+            d.lines += 1;
+            crate::log!("pointer: jumped from {},{} to {},{} between two frames; engine buttons {:#x}", x0, y0, x, y,
+                engine::mouse::buttons());
+        }
+    }
+    d.last = screen;
+    d.held = held;
+}
+
 /// Reads this frame's input. `w`, `h`: the back buffer's size.
 pub fn poll(w: u32, h: u32) {
     let r = raw();
@@ -353,7 +418,9 @@ pub fn poll(w: u32, h: u32) {
         let mut p = Point::default();
         let mut c = WinRect::default();
         unsafe {
-            if GetCursorPos(&mut p) != 0 && ScreenToClient(hwnd, &mut p) != 0 && GetClientRect(hwnd, &mut c) != 0 {
+            let got = GetCursorPos(&mut p) != 0;
+            diagnose(hwnd, got.then_some((p.x, p.y)));
+            if got && ScreenToClient(hwnd, &mut p) != 0 && GetClientRect(hwnd, &mut c) != 0 {
                 let (cw, ch) = (c.right - c.left, c.bottom - c.top);
                 if cw > 0 && ch > 0 && p.x >= 0 && p.y >= 0 && p.x < cw && p.y < ch {
                     // The back buffer can differ from the client area (a window
