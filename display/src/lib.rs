@@ -129,12 +129,12 @@ fn platform() -> &'static str {
     }
 }
 
-/// `Backend=auto`'s order on each system (the display plan, phase 6): Windows Direct3D 12,
-/// then Vulkan; Linux and macOS Vulkan (Direct3D 12 there is vkd3d-proton, for testing
-/// only, by name). Direct3D 9 last everywhere.
-fn auto_order(platform: &str) -> alloc::vec::Vec<stub::Backend> {
+/// `Backend=auto`'s order: Vulkan, then Direct3D 12, then Direct3D 9, on every system (the
+/// user's decision of 2026-10-23, over the display plan's Direct3D 12 first on Windows).
+/// `platform` is only logged.
+fn auto_order(_platform: &str) -> alloc::vec::Vec<stub::Backend> {
     use stub::Backend::*;
-    if platform == "Windows" { alloc::vec![D3d12, Vulkan, D3d9] } else { alloc::vec![Vulkan, D3d9] }
+    alloc::vec![Vulkan, D3d12, D3d9]
 }
 
 /// `Backend=`: `auto`, one backend, or a list (`d3d12,vulkan`), tried in that order;

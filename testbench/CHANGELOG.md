@@ -9,8 +9,8 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 ### Added
 - `display-fallback`: Display8 in stub mode with `Backend=auto` and
-  `FailBackend=vulkan`; checks that Vulkan is taken down and the engine's first
-  `CreateDevice` lands on Direct3D 9, that the UI and render3d draw on it, the main menu
+  `FailBackend=vulkan,d3d12`; checks that Vulkan and Direct3D 12 are taken down and the
+  engine's first `CreateDevice` lands on Direct3D 9, that the UI and render3d draw on it, the main menu
   and an Instant Action match.
 
 Installed, not yet seen in game.

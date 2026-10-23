@@ -8,8 +8,7 @@ in [`README.md`](README.md).
 
 ### Added
 - `Backend=auto`: the first backend that starts at the engine's first `CreateDevice`,
-  in the display plan's order (Windows Direct3D 12, Vulkan, Direct3D 9; Linux and macOS
-  under Wine Vulkan, Direct3D 9). `Backend=` also takes a list (`d3d12,vulkan`).
+  in the user's order: Vulkan, Direct3D 12, Direct3D 9, on every system. `Backend=` also takes a list (`d3d12,vulkan`).
   Available, not the default: the shipped values stay `Mode=forward`, `Backend=d3d9`.
 - A fallback at that `CreateDevice`: whatever `Backend=` names, Direct3D 9 comes last,
   so `Backend=vulkan` or `d3d12` that cannot start falls back to it instead of failing

@@ -243,16 +243,17 @@ cannot start never fails the game while d3d9 lives.
 | `d3d9` (shipped) | Direct3D 9, opened at `Direct3DCreate8` as before |
 | `vulkan` | Vulkan, then Direct3D 9 |
 | `d3d12` | Direct3D 12, then Direct3D 9 |
-| `auto` | Windows: Direct3D 12, Vulkan, Direct3D 9. Linux and macOS (Wine): Vulkan, Direct3D 9 |
+| `auto` | Vulkan, then Direct3D 12, then Direct3D 9, on every system |
 | a list, `d3d12,vulkan` | in that order, then Direct3D 9 |
 
-`auto` is the display plan's order (phase 6): Direct3D 12 is Windows' own API; under
-Wine it is vkd3d-proton over Vulkan, a layer more for nothing, so there it is for
-testing only and is tried only when named. The system is told by Wine's `ntdll.dll`
-(`wine_get_host_version`: `Darwin` is macOS). On macOS Vulkan is MoltenVK, which may not
-map memory where a 32-bit process reaches it ("Will Vulkan work on a Mac?"); if the
-device or its mapped ring cannot be made there, Direct3D 9 is what follows. `auto` is
-available, not the default: no backend but Direct3D 9 has been seen in game yet.
+`auto`'s order is the user's (2026-10-23), not the display plan's (phase 6 had Direct3D
+12 first on Windows and none under Wine): Vulkan is the backend confirmed in game first.
+Under Wine Direct3D 12 is vkd3d-proton over Vulkan, so it rarely starts where Vulkan
+did not; on Windows it is the native API for a machine without a Vulkan driver. The
+log names the system, told by Wine's `ntdll.dll` (`wine_get_host_version`: `Darwin` is
+macOS). On macOS Vulkan is MoltenVK, which may not map memory where a 32-bit process
+reaches it ("Will Vulkan work on a Mac?"); if the device or its mapped ring cannot be
+made there, the next backend is what follows.
 
 - **The engine sees one thing whatever is chosen**: the desktop's mode is offered at
   `Direct3DCreate8` from the system (`GetSystemMetrics`) when the order does not start
@@ -271,12 +272,12 @@ available, not the default: no backend but Direct3D 9 has been seen in game yet.
   bench, and `gpu` could not have opened Vulkan then anyway (no device yet).
 - **The log says each step**, in `Display8.log`:
 
-      Backend=auto: on Linux: vulkan, then d3d9
-      stub mode on vulkan, then d3d9
-      stub: trying Vulkan (1 of 2)
-      stub: Vulkan could not start: <why>; falling back to Direct3D 9
-      stub: trying Direct3D 9 (2 of 2)
-      stub: the backend is Direct3D 9, after vulkan could not start
+      Backend=auto: on Linux: vulkan, then d3d12, then d3d9
+      stub mode on vulkan, then d3d12, then d3d9
+      stub: trying Vulkan (1 of 3)
+      stub: Vulkan could not start: <why>; falling back to Direct3D 12
+      stub: trying Direct3D 12 (2 of 3)
+      stub: the backend is Direct3D 12, after vulkan could not start
 
   and with nothing able to start, `stub: no backend could start (...)`, and the engine's
   `CreateDevice` fails as it did before.
