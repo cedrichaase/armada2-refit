@@ -430,17 +430,29 @@ pub const fn attr(offset: u16, format: AttrFormat, semantic: Semantic, index: u8
     VertexAttr { offset, format, semantic, index }
 }
 
-/// Shader code for each backend a pipeline may be made on. Only Direct3D 9's bytecode
-/// exists yet; SPIR-V and DXIL join it as fields when their backends do.
+/// Shader code for each backend a pipeline may be made on: Direct3D 9's bytecode
+/// (vkd3d's d3dbc) and SPIR-V (dxc's), compiled from one HLSL source
+/// (render3d/README.md, "One source, two compilers"). DXIL joins them with Direct3D 12.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Code {
     pub d3d9: &'static [u32],
+    pub spirv: &'static [u32],
 }
 
 impl Code {
-    pub const fn d3d9(code: &'static [u32]) -> Code {
-        Code { d3d9: code }
+    /// The same shader as d3dbc and as SPIR-V (`SYMBOL` and `SYMBOL_SPV`).
+    pub const fn new(d3d9: &'static [u32], spirv: &'static [u32]) -> Code {
+        Code { d3d9, spirv }
     }
+}
+
+/// `Code::new(&SYMBOL, &SYMBOL_SPV)`, for a shader whose two forms are the generated
+/// statics (`shaders/<name>.rs`, `<name>_spv.rs`), both in scope.
+#[macro_export]
+macro_rules! code {
+    ($d3d9:ident, $spirv:ident) => {
+        $crate::Code::new(&$d3d9, &$spirv)
+    };
 }
 
 pub const MAX_COLORS: usize = 4;
@@ -624,4 +636,13 @@ pub struct Bindings<'a> {
     pub textures: &'a [TexSlot<'a>],
     pub vs: &'a [Block<'a>],
     pub ps: &'a [Block<'a>],
+}
+
+/// What a finished `Timer` holds besides its stamps.
+#[derive(Clone, Copy, Debug)]
+pub struct TimerResult {
+    /// The GPU's clock changed in between: the stamps mean nothing.
+    pub disjoint: bool,
+    /// Ticks per second.
+    pub frequency: u64,
 }

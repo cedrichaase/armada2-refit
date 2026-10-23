@@ -8,6 +8,7 @@ use crate::gfx::{self, Pipes};
 use gpu::{Blend, Block, Topology};
 use crate::math::{v3, V3};
 use crate::shaders::effects_construction::*;
+use crate::shaders::effects_construction_spv::*;
 use alloc::vec::Vec;
 
 pub const FLARE: f32 = 0.0;
@@ -102,7 +103,7 @@ impl Fx {
             return;
         }
         let _ = v;
-        let pipe = self.pipes.view(0, || super::fx_desc(&VS_CWELD, &PS_CWELD, &super::QUAD2, 44, Topology::TriangleList, Blend::ADD));
+        let pipe = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_CWELD, VS_CWELD_SPV), gpu::code!(PS_CWELD, PS_CWELD_SPV), &super::QUAD2, 44, Topology::TriangleList, Blend::ADD));
         if let (Some(mut cmd), Some(pipe)) = (gfx::cmd(), pipe) {
             if cmd.set_pipeline(&pipe) {
                 cmd.vs_block(Block::new(0, &c.vp));

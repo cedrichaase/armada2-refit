@@ -33,6 +33,7 @@
 //! | `display8_vk_defer` | `fn(f: extern "C" fn(*mut c_void), arg: *mut c_void)` | `f(arg)` once the frame now is done on the GPU: destroying what it may still read |
 //! | `display8_vk_target` | `fn(which: u32, out: *mut VkImage8) -> bool` | `TARGET_COLOR`, `TARGET_DEPTH`: the engine's back buffer and depth |
 //! | `display8_vk_mirror` | `fn(tex8: *mut c_void, out: *mut VkImage8) -> bool` | an engine texture (an `IDirect3DTexture8` the engine made) as a sampled image, kept up to date by Display8 |
+//! | `display8_vk_flush` | `fn() -> bool` | submits what the frame now has recorded and waits for it; the frame goes on in the same command buffer (begun again), its ring, pool and deferred calls untouched: for a read-back. Called with no render pass open |
 //! | `display8_engine_viewport` | `fn(out: *mut [u32; 6]) -> bool` | the engine's viewport (`D3DVIEWPORT8`: x, y, w, h, min z, max z as f32 bits) |
 //! | `display8_engine_transform` | `fn(state: u32, out: *mut [f32; 16]) -> bool` | the engine's transform (`D3DTRANSFORMSTATETYPE`), row-major as Direct3D sets it |
 //!
@@ -47,6 +48,16 @@ pub const BACKEND_NONE: u32 = 0;
 pub const BACKEND_D3D9: u32 = 1;
 pub const BACKEND_VULKAN: u32 = 2;
 pub const BACKEND_D3D12: u32 = 3;
+
+/// `VkDevice8::features`: `VK_KHR_dynamic_rendering` (or Vulkan 1.3) is enabled; else
+/// render passes (gpu uses render passes either way).
+pub const FEATURE_DYNAMIC_RENDERING: u32 = 1;
+/// Direct3D 9's pixel centres: the plugins draw as on Direct3D 9 (gpu's viewport moved
+/// by DXVK's offset, `Gpu::half_pixel` 0.5), for comparing with it pixel for pixel
+/// (Display8.ini `PixelCentres=d3d9`).
+pub const FEATURE_D3D9_CENTRES: u32 = 2;
+/// `samplerAnisotropy` is enabled.
+pub const FEATURE_ANISOTROPY: u32 = 4;
 
 pub const TARGET_COLOR: u32 = 0;
 pub const TARGET_DEPTH: u32 = 1;
@@ -67,7 +78,7 @@ pub struct VkDevice8 {
     pub api_version: u32,
     pub pipeline_cache: u64,
     pub frames_in_flight: u32,
-    /// Bit 0: `VK_KHR_dynamic_rendering` (or Vulkan 1.3) is enabled; else render passes.
+    /// `FEATURE_*`.
     pub features: u32,
     /// `VkPhysicalDeviceLimits.minUniformBufferOffsetAlignment`.
     pub uniform_align: u32,
@@ -126,6 +137,7 @@ pub struct Display8 {
     pub vk_defer: extern "C" fn(extern "C" fn(*mut c_void), *mut c_void),
     pub vk_target: extern "C" fn(u32, *mut VkImage8) -> bool,
     pub vk_mirror: extern "C" fn(*mut c_void, *mut VkImage8) -> bool,
+    pub vk_flush: extern "C" fn() -> bool,
     pub engine_viewport: extern "C" fn(*mut [u32; 6]) -> bool,
     pub engine_transform: extern "C" fn(u32, *mut [f32; 16]) -> bool,
 }
@@ -147,6 +159,7 @@ impl Display8 {
                 vk_defer: core::mem::transmute::<usize, extern "C" fn(extern "C" fn(*mut c_void), *mut c_void)>(f("display8_vk_defer")?),
                 vk_target: core::mem::transmute::<usize, extern "C" fn(u32, *mut VkImage8) -> bool>(f("display8_vk_target")?),
                 vk_mirror: core::mem::transmute::<usize, extern "C" fn(*mut c_void, *mut VkImage8) -> bool>(f("display8_vk_mirror")?),
+                vk_flush: core::mem::transmute::<usize, extern "C" fn() -> bool>(f("display8_vk_flush")?),
                 engine_viewport: core::mem::transmute::<usize, extern "C" fn(*mut [u32; 6]) -> bool>(f("display8_engine_viewport")?),
                 engine_transform: core::mem::transmute::<usize, extern "C" fn(u32, *mut [f32; 16]) -> bool>(f("display8_engine_transform")?),
             })

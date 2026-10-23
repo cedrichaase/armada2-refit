@@ -8,9 +8,10 @@ use crate::config::Config;
 use crate::dump::{Area, Dump, Kind};
 use crate::log;
 use crate::shaders::post::*;
+use crate::shaders::post_spv::*;
 use alloc::vec::Vec;
 use gpu::{
-    attr, AttrFormat, Blend, Block, Cmd, Code, ColorTarget, Contents, DepthTarget, Format, Gpu, Load, Pass, Pipeline,
+    attr, AttrFormat, Blend, Block, Cmd, ColorTarget, Contents, DepthTarget, Format, Gpu, Load, Pass, Pipeline,
     PipelineDesc, Rect, Sampler, Semantic, Texture, TextureDesc, Topology, Usage, VertexAttr,
 };
 
@@ -122,13 +123,15 @@ static LAYOUT: [VertexAttr; 3] = [
 ];
 
 /// A quad over `r` of a `dw` x `dh` target, `a` and `b` the two sets of texture
-/// coordinates at its corners (u0, v0, u1, v1). Positions are shifted half a pixel:
-/// Direct3D 9 puts pixel centres on integers.
+/// coordinates at its corners (u0, v0, u1, v1). Positions are shifted half a pixel on
+/// Direct3D 9, which puts pixel centres on integers (`gpu::Gpu::half_pixel`; none on
+/// Vulkan).
 fn quad(cmd: &mut Cmd, dw: u32, dh: u32, r: PRect, a: [f32; 4], b: [f32; 4]) {
-    let x0 = (r.x as f32 - 0.5) / dw as f32 * 2.0 - 1.0;
-    let x1 = ((r.x + r.w) as f32 - 0.5) / dw as f32 * 2.0 - 1.0;
-    let y0 = 1.0 - (r.y as f32 - 0.5) / dh as f32 * 2.0;
-    let y1 = 1.0 - ((r.y + r.h) as f32 - 0.5) / dh as f32 * 2.0;
+    let hp = cmd.gpu().half_pixel();
+    let x0 = (r.x as f32 - hp) / dw as f32 * 2.0 - 1.0;
+    let x1 = ((r.x + r.w) as f32 - hp) / dw as f32 * 2.0 - 1.0;
+    let y0 = 1.0 - (r.y as f32 - hp) / dh as f32 * 2.0;
+    let y1 = 1.0 - ((r.y + r.h) as f32 - hp) / dh as f32 * 2.0;
     let v = [
         Vtx([x0, y0, 0.5, 1.0, a[0], a[1], b[0], b[1]]),
         Vtx([x1, y0, 0.5, 1.0, a[2], a[1], b[2], b[1]]),
@@ -172,17 +175,17 @@ impl Post {
     /// The pipelines, for targets of `fmt` and a back buffer of `out`. None if the
     /// device refuses a shader.
     pub fn create(gpu: &Gpu, fmt: Format, out: Format) -> Option<Post> {
-        let p = |ps: &'static [u32], target: Format, blend: Option<Blend>| {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_QUAD), Code::d3d9(ps), &LAYOUT, 32, Topology::TriangleStrip, target);
+        let p = |ps: gpu::Code, target: Format, blend: Option<Blend>| {
+            let mut d = PipelineDesc::new(gpu::code!(VS_QUAD, VS_QUAD_SPV), ps, &LAYOUT, 32, Topology::TriangleStrip, target);
             d.blend = blend;
             let p = gpu.pipeline(d);
             p.ready(gpu).then_some(p)
         };
         Some(Post {
-            prefilter: p(&PS_PREFILTER, fmt, None)?,
-            down: p(&PS_DOWN, fmt, None)?,
-            up: p(&PS_UP, fmt, Some(Blend::ADD))?,
-            fin: p(&PS_FINAL, out, None)?,
+            prefilter: p(gpu::code!(PS_PREFILTER, PS_PREFILTER_SPV), fmt, None)?,
+            down: p(gpu::code!(PS_DOWN, PS_DOWN_SPV), fmt, None)?,
+            up: p(gpu::code!(PS_UP, PS_UP_SPV), fmt, Some(Blend::ADD))?,
+            fin: p(gpu::code!(PS_FINAL, PS_FINAL_SPV), out, None)?,
             out,
         })
     }
@@ -253,7 +256,7 @@ impl Post {
         // depth bound again (the pipeline does not test it). The scene is read a texel
         // per pixel. With MSAA, the view's first column and row take their neighbours':
         // the scene starts half a pixel in (DXVK's viewport offset), so half their
-        // samples are never drawn.
+        // samples are never drawn. Not on Vulkan, whose pixel centres need no offset.
         let colors = [ColorTarget::new(out, Load::Load)];
         let depth = out_depth.map(|z| DepthTarget { texture: z, load: Load::Load });
         if !cmd.begin_pass(&Pass { colors: &colors, depth, area: None }) {
@@ -262,7 +265,7 @@ impl Post {
         let (ow, oh) = out.size();
         let l0 = &t.levels[0];
         let (su, mut sc) = uv(view, t.w, t.h);
-        if t.samples != 0 && view.w > 2 && view.h > 2 {
+        if t.samples != 0 && view.w > 2 && view.h > 2 && gpu.half_pixel() > 0.0 {
             sc[0] += 1.0 / t.w as f32;
             sc[1] += 1.0 / t.h as f32;
         }

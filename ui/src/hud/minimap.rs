@@ -147,9 +147,9 @@ fn grid_rect(sq: R, g: &radar::Grid) -> R {
 
 fn ext_texture(slot: &mut Option<Tex>, st3d: usize) -> Option<Tex> {
     let t = *slot.get_or_insert_with(crate::gfx::texture_external);
-    match radar::d3d9_texture(st3d) {
+    match radar::engine_texture(st3d) {
         Some((c, w, h)) => {
-            crate::gfx::tex_set_external(t, Some(crate::gfx::gpu().wrap_d3d9_texture(c)), w, h);
+            crate::gfx::tex_set_external(t, Some(c), w, h);
             Some(t)
         }
         None => {
@@ -284,7 +284,7 @@ pub fn run(ui: &mut Ui) {
         let g = radar::fog_grid();
         crate::log!("minimap: ours at {:.0},{:.0} {:.0}px; map texture {}; fog grid {}x{} in a {}x{} texture; fog {} shroud {}; {} blips; clicks {}",
             sq.x, sq.y, sq.w,
-            match radar::d3d9_texture(radar::map_texture()) { Some((_, w, h)) => crate::sfmt!("{}x{}", w, h), None => crate::sfmt!("none") },
+            match radar::engine_texture(radar::map_texture()) { Some((_, w, h)) => crate::sfmt!("{}x{}", w, h), None => crate::sfmt!("none") },
             g.as_ref().map_or(0, |g| g.w), g.as_ref().map_or(0, |g| g.h), tw, th, fog_on, shroud_on, blips.len(),
             if radar::hooked() { "through the radar's always-step" } else { "off" });
     }

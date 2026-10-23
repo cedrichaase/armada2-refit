@@ -25,6 +25,7 @@ use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::math::{v3, V3};
 use crate::shaders::effects_repair::*;
+use crate::shaders::effects_repair_spv::*;
 use alloc::vec::Vec;
 
 const SITE_ADD: usize = 0x4c90c0;
@@ -397,7 +398,7 @@ impl Repair {
         }
         let _ = v;
         let Some(mut cmd) = gfx::cmd() else { return };
-        let pipe = self.pipes.view(0, || super::fx_desc(&VS_WELD, &PS_WELD, &super::QUAD2, 44, Topology::TriangleList, Blend::ADD));
+        let pipe = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_WELD, VS_WELD_SPV), gpu::code!(PS_WELD, PS_WELD_SPV), &super::QUAD2, 44, Topology::TriangleList, Blend::ADD));
         let Some(pipe) = pipe else { return };
         if !cmd.set_pipeline(&pipe) {
             return;

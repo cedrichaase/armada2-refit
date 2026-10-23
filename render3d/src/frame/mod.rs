@@ -37,7 +37,8 @@ type BodyFn = unsafe extern "C" fn(usize, usize, u32);
 type Reset8 = unsafe extern "system" fn(*mut c_void, *mut c_void) -> HRESULT;
 
 struct Frame {
-    dev: Device,
+    /// The engine's device it was made for (`gpu::Gpu::engine_id`).
+    dev: usize,
     post: Option<Post>,
     targets: Option<Targets>,
     /// Targets could not be made at this size: stock until the size changes.
@@ -83,9 +84,8 @@ fn time_view(main: bool) -> bool {
     if !timing::on() {
         return false;
     }
-    match Device::from_d3d8(engine::d3d8_device()) {
-        Some(dev) => {
-            crate::gfx::gpu().attach(dev);
+    match crate::gfx::gpu().attach_engine(engine::d3d8_device()) {
+        Some(_) => {
             timing::begin(main);
             true
         }
@@ -112,7 +112,7 @@ unsafe fn body_inner(cam: usize, rs: usize, is_main: u32) {
         unsafe { stock(cam, rs, is_main) };
         return timing::mark("stock");
     }
-    match begin(cfg) {
+    match begin(cfg, None) {
         None => {
             unsafe { stock(cam, rs, is_main) };
             timing::mark("stock");
@@ -120,9 +120,9 @@ unsafe fn body_inner(cam: usize, rs: usize, is_main: u32) {
         Some(saved) => {
             timing::mark("targets");
             let f = frame().as_mut();
-            match f.as_ref().and_then(|f| f.targets.as_ref().map(|t| (f.dev, t.w, t.h, f.frames))) {
-                Some((dev, w, h, n)) if cfg.steps && steps::usable() => {
-                    let r = steps::run(dev, cam, rs, main, w, h, n);
+            match f.as_ref().and_then(|f| f.targets.as_ref().map(|t| (t.w, t.h, f.frames))) {
+                Some((w, h, n)) if cfg.steps && steps::usable() => {
+                    let r = steps::run(cam, rs, main, w, h, n);
                     black_lines(r);
                 }
                 _ => {
@@ -289,7 +289,7 @@ fn forget() {
         f.post = None;
         f.failed = None;
         // The next frame sees a new device, and hands it to every module.
-        f.dev = Device(core::ptr::null_mut());
+        f.dev = 0;
     }
     crate::mods::forget();
     crate::assets::reset();
@@ -343,9 +343,13 @@ fn hook_reset(dev8: *mut c_void) {
     }
 }
 
-fn begin(cfg: &Config) -> Option<Saved> {
+/// The view's targets and pass, before the body. `over`: the viewport to draw in, in
+/// place of the engine's (the menu scene's on Vulkan, where it cannot be set on the
+/// engine's device).
+fn begin(cfg: &Config, over: Option<gpu::Viewport>) -> Option<Saved> {
     let dev8 = engine::d3d8_device();
-    let dev = Device::from_d3d8(dev8)?;
+    let g = gfx::gpu();
+    let dev = g.engine_id(dev8)?;
     let f = frame();
     if f.as_ref().is_none_or(|f| f.dev != dev) {
         if f.is_some() {
@@ -363,8 +367,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
         hook_reset(dev8);
         crate::mods::device();
     }
-    let g = gfx::gpu();
-    g.attach(dev);
+    g.attach_engine(dev8)?;
     let f = f.as_mut()?;
     let rt = g.engine_target()?;
     let ds = g.engine_depth();
@@ -401,7 +404,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
     // The view's pass, over the viewport the engine set for it. The engine never
     // clears colour in a mission; our target has no last frame of its own to fall back
     // on where nothing draws. The viewport is the engine's again after (`Cmd`'s end).
-    let vp = dev.get_viewport();
+    let vp = over.or_else(|| g.engine_viewport())?;
     let mut cmd = g.begin(gfx::frame())?;
     let colors = [ColorTarget::new(&t.scene, Load::Clear([0.0, 0.0, 0.0, 1.0]))];
     let pass = Pass {
@@ -422,18 +425,22 @@ fn begin(cfg: &Config) -> Option<Saved> {
 /// nothing drawn, when there is no Direct3D 9 device or no targets.
 pub fn menu_frame(rect: PRect, draw: impl FnOnce(u32)) -> bool {
     let Some(cfg) = config::get() else { return false };
-    let Some(dev) = Device::from_d3d8(engine::d3d8_device()) else { return false };
-    let vp = dev.get_viewport();
-    let mut v = vp;
-    v.x = rect.x;
-    v.y = rect.y;
-    v.w = rect.w;
-    v.h = rect.h;
-    v.min_z = 0.0;
-    v.max_z = 1.0;
-    dev.set_viewport(&v);
-    let Some(saved) = begin(cfg) else {
-        dev.set_viewport(&vp);
+    let over = gpu::Viewport { x: rect.x, y: rect.y, w: rect.w, h: rect.h, min_z: 0.0, max_z: 1.0 };
+    // On Direct3D 9 the rectangle is the device's viewport while the scene draws (what
+    // the modules read as the engine's); on Vulkan the engine's viewport is Display8's
+    // record, so the pass is given it.
+    let dev = if gfx::gpu().is_vulkan() { None } else { Device::from_d3d8(engine::d3d8_device()) };
+    if dev.is_none() && !gfx::gpu().is_vulkan() {
+        return false;
+    }
+    let vp = dev.map(|d| d.get_viewport());
+    if let Some(d) = dev {
+        d.set_viewport(&Viewport { x: rect.x, y: rect.y, w: rect.w, h: rect.h, min_z: 0.0, max_z: 1.0 });
+    }
+    let Some(saved) = begin(cfg, dev.is_none().then_some(over)) else {
+        if let (Some(d), Some(vp)) = (dev, vp) {
+            d.set_viewport(&vp);
+        }
         return false;
     };
     let frames = frame().as_ref().map_or(0, |f| f.frames);
@@ -449,7 +456,9 @@ pub fn menu_frame(rect: PRect, draw: impl FnOnce(u32)) -> bool {
     }
     f.frames = f.frames.saturating_add(1);
     gfx::frame().next();
-    dev.set_viewport(&vp);
+    if let (Some(d), Some(vp)) = (dev, vp) {
+        d.set_viewport(&vp);
+    }
     true
 }
 

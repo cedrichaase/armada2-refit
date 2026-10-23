@@ -6,9 +6,12 @@ use crate::stub::obj::SObj;
 use core::ffi::c_void;
 use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8, BACKEND_D3D9, BACKEND_NONE, BACKEND_VULKAN};
 
+/// Vulkan from the moment the stub starts on it (the engine's `Direct3DCreate8`), before
+/// the device: a plugin that asks early makes its objects for the right backend. A stub
+/// on Vulkan has no Direct3D 9 to fall back to.
 #[unsafe(no_mangle)]
 pub extern "C" fn display8_backend() -> u32 {
-    if get().is_some() {
+    if get().is_some() || crate::stub::vulkan() {
         BACKEND_VULKAN
     } else if !crate::stub::dev9().is_null() {
         BACKEND_D3D9
@@ -50,6 +53,14 @@ pub extern "C" fn display8_vk_defer(f: extern "C" fn(*mut c_void), arg: *mut c_v
     match get() {
         Some(v) => v.defer(f, arg),
         None => f(arg),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn display8_vk_flush() -> bool {
+    match get() {
+        Some(v) => v.flush(),
+        None => false,
     }
 }
 

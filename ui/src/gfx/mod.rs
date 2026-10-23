@@ -7,9 +7,10 @@
 //! record of what the game bound, platform/D3D9.md), and makes every texture again
 //! after a `Reset` or on a new device, from what was registered here.
 use crate::shaders::ui::{PS_UI, VS_UI};
+use crate::shaders::ui_spv::{PS_UI_SPV, VS_UI_SPV};
 use alloc::vec::Vec;
 use gpu::{
-    attr, AttrFormat, Blend, BlendEq, BlendOp, Block, Code, ColorTarget, Contents, DepthTarget, Factor, Format, Load,
+    attr, AttrFormat, Blend, BlendEq, BlendOp, Block, ColorTarget, Contents, DepthTarget, Factor, Format, Load,
     Pass, PipelineDesc, Rect, Sampler, Semantic, TextureDesc, Topology, Usage, VertexAttr, Viewport,
 };
 
@@ -484,31 +485,43 @@ fn log_line(a: core::fmt::Arguments) {
     crate::rt::log_fmt(a);
 }
 
-/// The UI's `gpu` context (each plugin keeps its own) and its frame.
-static mut GPU: gpu::Gpu = gpu::Gpu::new(log_line);
+/// An export of Display8 (`d3d8.dll`), for `gpu` to ask which backend it draws on
+/// (gpu/src/display.rs); 0 when there is none.
+fn display_export(name: &str) -> usize {
+    use crate::rt::win::{GetModuleHandleA, GetProcAddress};
+    let m = unsafe { GetModuleHandleA(c"d3d8.dll".as_ptr() as *const u8) };
+    if m.is_null() {
+        return 0;
+    }
+    unsafe { GetProcAddress(m, crate::rt::cstr(name).as_ptr()) }
+}
+
+/// The UI's `gpu` context (each plugin keeps its own) and its frame. Its backend is
+/// Direct3D 9, or Vulkan when Display8 draws on it (gpu/README.md).
+static mut GPU: gpu::Gpu = gpu::Gpu::with_display(log_line, display_export);
 static mut FRAME: gpu::Frame = gpu::Frame::new();
 /// The pipeline, and the back buffer's format it was made for.
 static mut PIPE: Option<(Format, gpu::Pipeline)> = None;
 /// The device the pipeline was last reported ready, or refused, on.
-static mut TOLD: Option<gpu::d3d9::raw::Device> = None;
+static mut TOLD: Option<usize> = None;
 
 #[allow(static_mut_refs)]
 pub fn gpu() -> &'static gpu::Gpu {
     unsafe { &GPU }
 }
 
-/// The game's device, attached to `gpu`; None without a Direct3D 9 one behind it
-/// (DXVK's own d3d8, GOG's build). The stock front end re-creates the device at every
-/// switch between the shell's display and the game's: `gpu` lets go of everything made
-/// on the old one (what we hold keeps a device alive), and the new one's `Reset` and
-/// `Present` are chained.
-pub fn attach() -> Option<gpu::d3d9::raw::Device> {
+/// The game's device, attached to `gpu`: the Direct3D 9 one behind the engine's, or
+/// Display8's Vulkan device; None without either (DXVK's own d3d8, GOG's build). The
+/// stock front end re-creates the device at every switch between the shell's display
+/// and the game's: on Direct3D 9 `gpu` lets go of everything made on the old one (what
+/// we hold keeps a device alive), and the new one's `Reset` and `Present` are chained.
+pub fn attach() -> Option<gpu::Attached> {
     let dev8 = crate::engine::d3d8_device();
-    let dev = gpu::d3d9::raw::Device::from_d3d8(dev8)?;
-    if gpu().attach(dev) {
+    let a = gpu().attach_engine(dev8)?;
+    if a.new && !dev8.is_null() {
         crate::engine::device::hook_reset(dev8);
     }
-    Some(dev)
+    Some(a)
 }
 
 /// Before the engine releases its device: `gpu` lets go of everything the UI made on
@@ -523,11 +536,11 @@ pub fn reset() {
 }
 
 #[allow(static_mut_refs)]
-fn pipeline(dev: gpu::d3d9::raw::Device, target: Format) -> Option<&'static gpu::Pipeline> {
+fn pipeline(dev: usize, target: Format) -> Option<&'static gpu::Pipeline> {
     unsafe {
         if PIPE.as_ref().is_none_or(|(f, _)| *f != target) {
             let stride = core::mem::size_of::<Vertex>() as u32;
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_UI), Code::d3d9(&PS_UI), &LAYOUT, stride, Topology::TriangleList, target);
+            let mut d = PipelineDesc::new(gpu::code!(VS_UI, VS_UI_SPV), gpu::code!(PS_UI, PS_UI_SPV), &LAYOUT, stride, Topology::TriangleList, target);
             // Straight alpha over the frame; the target's alpha gathers coverage.
             d.blend = Some(Blend {
                 color: BlendEq { src: Factor::SrcAlpha, dst: Factor::InvSrcAlpha, op: BlendOp::Add },
@@ -541,7 +554,7 @@ fn pipeline(dev: gpu::d3d9::raw::Device, target: Format) -> Option<&'static gpu:
         if TOLD != Some(dev) {
             TOLD = Some(dev);
             if ok {
-                crate::log!("gfx: ready on the d3d9 device");
+                crate::log!("gfx: ready on the {} device", if gpu().is_vulkan() { "Vulkan" } else { "d3d9" });
             } else {
                 crate::log!("gfx: could not make the shaders: the UI draws nothing");
             }
@@ -554,7 +567,7 @@ fn pipeline(dev: gpu::d3d9::raw::Device, target: Format) -> Option<&'static gpu:
 /// render target 0. Nothing on the device changes when `f` draws nothing.
 #[allow(static_mut_refs)]
 pub fn frame(f: impl FnOnce(u32, u32, &mut Draw)) {
-    let Some(dev) = attach() else { return };
+    let Some(dev) = attach().map(|a| a.id) else { return };
     let g = gpu();
     let Some(bb) = g.engine_target() else { return };
     let (w, h) = bb.size();
@@ -592,9 +605,11 @@ fn submit(cmd: &mut gpu::Cmd, p: &gpu::Pipeline, bb: &gpu::Texture, ds: Option<&
     cmd.set_sampler(0, &Sampler::LINEAR_CLAMP);
     cmd.set_viewport(&Viewport::of(Rect::new(0, 0, draw.w as u32, draw.h as u32)));
     // Pixel (x, y)'s centre at x + 0.5: Direct3D 9 samples a pixel at its whole
-    // coordinate, so positions move by half a pixel on the way to clip space.
+    // coordinate, so positions move by half a pixel on the way to clip space (Vulkan
+    // samples at the half: `half_pixel` is 0 there).
+    let hp = cmd.gpu().half_pixel();
     let (sx, sy) = (2.0 / draw.w, -2.0 / draw.h);
-    cmd.vs_block(Block::new(0, &[sx, sy, -1.0 - 0.5 * sx, 1.0 - 0.5 * sy]));
+    cmd.vs_block(Block::new(0, &[sx, sy, -1.0 - hp * sx, 1.0 - hp * sy]));
     let (Some(vs), Some(is)) = (cmd.vertices(&draw.verts), cmd.indices(&draw.idx)) else { return };
     let mut bound: Option<Tex> = None;
     for c in &draw.cmds {

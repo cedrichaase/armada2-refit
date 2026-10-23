@@ -19,10 +19,11 @@ use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{M34, M4, V3, v3};
 use gpu::{
-    attr, Address, AlphaTest, AttrFormat, Blend as GBlend, Block, Buffer, BufferKind, Cmd, Code, Compare, Cull, Depth,
+    attr, Address, AlphaTest, AttrFormat, Blend as GBlend, Block, Buffer, BufferKind, Cmd, Compare, Cull, Depth,
     Filter, Format, MipFilter, Pipeline, PipelineDesc, Sampler, Semantic, Topology, VertexAttr,
 };
 use crate::shaders::sod::*;
+use crate::shaders::sod_spv::*;
 use a2fmt::sod::{NodeKind, Sod};
 use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
@@ -356,7 +357,7 @@ pub fn cull_of(part: &Part, world: &M34) -> Cull {
 /// The baseline's pipeline for a cull and a blend: depth-tested against the scene.
 fn pipeline(cull: Cull, mode: Mode) -> Option<Pipeline> {
     st().pipes.view(cull as u64 * 4 + mode as u64, || {
-        let mut d = PipelineDesc::new(Code::d3d9(&VS_SOD), Code::d3d9(&PS_SOD), &VERTEX, 32, Topology::TriangleList, Format::Unknown);
+        let mut d = PipelineDesc::new(gpu::code!(VS_SOD, VS_SOD_SPV), gpu::code!(PS_SOD, PS_SOD_SPV), &VERTEX, 32, Topology::TriangleList, Format::Unknown);
         let write = matches!(mode, Mode::Cutout | Mode::Opaque);
         d.depth = Depth { test: true, write, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
         d.cull = cull;

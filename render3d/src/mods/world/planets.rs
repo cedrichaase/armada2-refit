@@ -13,12 +13,13 @@ use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{self, M34, V3, v3};
 use crate::shaders::world_planet::*;
+use crate::shaders::world_planet_spv::*;
 use crate::{assets, log, rt, scene};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use gpu::{
-    attr, Address, AttrFormat, Blend, Block, BufferKind, Buffer, Cmd, Code, Compare, Cull, Depth, Filter, Format,
+    attr, Address, AttrFormat, Blend, Block, BufferKind, Buffer, Cmd, Compare, Cull, Depth, Filter, Format,
     MipFilter, Pipeline, PipelineDesc, Sampler, Semantic, Texture, Topology, VertexAttr,
 };
 
@@ -58,7 +59,7 @@ struct Sphere {
 }
 
 /// The pixel shaders, by the index the pipelines' keys carry.
-const PS: [&[u32]; 5] = [&PS_GROUND, &PS_CITY, &PS_CLOUD, &PS_HALO, &PS_SURFACE];
+const PS: [gpu::Code; 5] = [gpu::code!(PS_GROUND, PS_GROUND_SPV), gpu::code!(PS_CITY, PS_CITY_SPV), gpu::code!(PS_CLOUD, PS_CLOUD_SPV), gpu::code!(PS_HALO, PS_HALO_SPV), gpu::code!(PS_SURFACE, PS_SURFACE_SPV)];
 const P_GROUND: usize = 0;
 const P_CITY: usize = 1;
 const P_CLOUD: usize = 2;
@@ -224,7 +225,7 @@ impl Planets {
     /// depth-tested against the scene, its outside's faces (`CULL_CCW`).
     fn pipe(&mut self, ps: usize, mode: u8) -> Option<Pipeline> {
         self.pipes.view((ps * 4 + mode as usize) as u64, || {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_PLANET), Code::d3d9(PS[ps]), &LAYOUT, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_PLANET, VS_PLANET_SPV), PS[ps], &LAYOUT, 32, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: mode == OPAQUE, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.cull = Cull::CounterClockwise;
             d.blend = match mode {

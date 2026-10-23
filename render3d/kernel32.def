@@ -30,3 +30,4 @@ GetTickCount@0
 OutputDebugStringA@4
 ExitProcess@4
 GetCurrentThreadId@0
+GetProcAddress@8

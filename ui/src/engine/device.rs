@@ -113,15 +113,21 @@ unsafe extern "system" fn present(dev8: *mut c_void, src: *const c_void, dst: *c
 
 fn dump_back_buffer(dev8: *mut c_void, name: alloc::string::String, frame: u32) {
     let mut d = crate::dump::Dump::new(name, frame, "ui");
-    let bb = Device::from_d3d8(dev8).and_then(|dev| {
-        crate::gfx::attach()?;
-        dev.get_back_buffer()
-    });
+    let g = crate::gfx::gpu();
+    let bb = if g.is_vulkan() {
+        // Display8's image of the engine's back buffer, before its gamma pass.
+        crate::gfx::attach().and_then(|_| g.engine_target())
+    } else {
+        Device::from_d3d8(dev8).and_then(|dev| {
+            crate::gfx::attach()?;
+            dev.get_back_buffer()
+        })
+        .map(|bb| g.wrap_d3d9_surface(bb))
+    };
     match bb {
         Some(bb) => {
-            let g = crate::gfx::gpu();
             d.note("the back buffer at Present: the frame as presented");
-            d.surface(g, &g.wrap_d3d9_surface(bb), None, "present", crate::dump::Kind::Ppm);
+            d.surface(g, &bb, None, "present", crate::dump::Kind::Ppm);
         }
         None => {
             log!("dump: no Direct3D 9 device or back buffer behind the game's: nothing to read");

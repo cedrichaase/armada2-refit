@@ -54,6 +54,13 @@ static mut VALIDATE: bool = false;
 /// empty: a discrete one first (README.md, "Vulkan").
 static mut VK_DEVICE: alloc::string::String = alloc::string::String::new();
 
+/// `PixelCentres=d3d9`: on Vulkan, the plugins draw with Direct3D 9's pixel centres.
+static mut D3D9_CENTRES: bool = false;
+
+pub fn d3d9_centres() -> bool {
+    unsafe { D3D9_CENTRES }
+}
+
 /// `Device=` (empty: any).
 #[allow(static_mut_refs)]
 pub fn vk_device() -> &'static str {
@@ -105,6 +112,7 @@ fn startup() {
         BACKEND = if backend.eq_ignore_ascii_case("vulkan") { stub::Backend::Vulkan } else { stub::Backend::D3d9 };
         VALIDATE = ini.int("Display8", "Validate", 0) != 0;
         VK_DEVICE = ini.string("Display8", "Device").unwrap_or_default();
+        D3D9_CENTRES = ini.string("Display8", "PixelCentres").is_some_and(|s| s.eq_ignore_ascii_case("d3d9"));
     }
     if STUB_ASKED_NOW() {
         log!("stub mode on {:?}{}", unsafe { BACKEND }, if unsafe { VALIDATE } { ", with the validation layer" } else { "" });

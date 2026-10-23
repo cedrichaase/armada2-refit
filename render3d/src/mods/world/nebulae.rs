@@ -35,13 +35,14 @@ use crate::engine::{self, field, field_u8, hook, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, PerView, Pipes};
 use gpu::{
-    attr, Address, AttrFormat, Blend, BlendEq, BlendOp, Block, Cmd, Code, ColorTarget, Compare, Contents, Depth, Factor,
+    attr, Address, AttrFormat, Blend, BlendEq, BlendOp, Block, Cmd, ColorTarget, Compare, Contents, Depth, Factor,
     Filter, Format, Load, MipFilter, Pass, Pipeline, PipelineDesc, Rect, Sampler, Semantic, Texture, TextureDesc,
     Topology, Usage, VertexAttr, Viewport,
 };
 use crate::math;
 use crate::rt::{self, Ini};
 use crate::shaders::world_nebula::*;
+use crate::shaders::world_nebula_spv::*;
 use crate::{log, scene};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -835,7 +836,7 @@ const P_TEMPORAL: u64 = 3;
 const P_COMP: u64 = 4;
 /// The march in 8, 12, 16 and 24 steps (`Steps=`): P_MARCH + 0..3.
 const P_MARCH: u64 = 8;
-const MARCH_PS: [&[u32]; 4] = [&PS_MARCH8, &PS_MARCH12, &PS_MARCH16, &PS_MARCH24];
+const MARCH_PS: [gpu::Code; 4] = [gpu::code!(PS_MARCH8, PS_MARCH8_SPV), gpu::code!(PS_MARCH12, PS_MARCH12_SPV), gpu::code!(PS_MARCH16, PS_MARCH16_SPV), gpu::code!(PS_MARCH24, PS_MARCH24_SPV)];
 
 pub struct Nebulae {
     cfg: Settings,
@@ -914,15 +915,15 @@ impl Nebulae {
     /// the gas onto the view over what is there (red, green, blue). None culls.
     fn pipe(&mut self, which: u64) -> Option<Pipeline> {
         let f16 = Format::Rgba16F;
-        let (vs, ps, layout, stride, topo): (&'static [u32], &'static [u32], &'static [VertexAttr], u32, Topology) = match which {
-            P_NEB => (&VS_NEB, &PS_NEB, &SLICE, 20, Topology::TriangleList),
-            P_VOL => (&VS_NEB, &PS_VOL, &SLICE, 20, Topology::TriangleList),
-            P_BAKE => (&VS_NBAKE, &PS_NBAKE, &SLICE, 20, Topology::TriangleStrip),
-            P_TEMPORAL => (&VS_QUAD, &PS_TEMPORAL, &SLICE, 20, Topology::TriangleStrip),
-            P_COMP => (&VS_QUAD, &PS_COMP, &SLICE, 20, Topology::TriangleStrip),
-            _ => (&VS_MARCH, MARCH_PS[(which - P_MARCH) as usize & 3], &XYZ, 12, Topology::TriangleList),
+        let (vs, ps, layout, stride, topo): (gpu::Code, gpu::Code, &'static [VertexAttr], u32, Topology) = match which {
+            P_NEB => (gpu::code!(VS_NEB, VS_NEB_SPV), gpu::code!(PS_NEB, PS_NEB_SPV), &SLICE, 20, Topology::TriangleList),
+            P_VOL => (gpu::code!(VS_NEB, VS_NEB_SPV), gpu::code!(PS_VOL, PS_VOL_SPV), &SLICE, 20, Topology::TriangleList),
+            P_BAKE => (gpu::code!(VS_NBAKE, VS_NBAKE_SPV), gpu::code!(PS_NBAKE, PS_NBAKE_SPV), &SLICE, 20, Topology::TriangleStrip),
+            P_TEMPORAL => (gpu::code!(VS_QUAD, VS_QUAD_SPV), gpu::code!(PS_TEMPORAL, PS_TEMPORAL_SPV), &SLICE, 20, Topology::TriangleStrip),
+            P_COMP => (gpu::code!(VS_QUAD, VS_QUAD_SPV), gpu::code!(PS_COMP, PS_COMP_SPV), &SLICE, 20, Topology::TriangleStrip),
+            _ => (gpu::code!(VS_MARCH, VS_MARCH_SPV), MARCH_PS[(which - P_MARCH) as usize & 3], &XYZ, 12, Topology::TriangleList),
         };
-        let mut d = PipelineDesc::new(Code::d3d9(vs), Code::d3d9(ps), layout, stride, topo, Format::Unknown);
+        let mut d = PipelineDesc::new(vs, ps, layout, stride, topo, Format::Unknown);
         match which {
             P_NEB | P_VOL => {
                 d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };

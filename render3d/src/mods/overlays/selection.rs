@@ -21,14 +21,16 @@
 //! factor. The lighting material `selection` is constant: the colour is drawn as it
 //! is, added, depth-tested and not written. Stock stretches the bubble with a warping
 //! hull (`WarpInstance`); that is not done here yet.
-use gpu::{Blend, Block, Code, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
+use gpu::{Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
 use crate::engine::{field, field_f32, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{v3, M34, V3};
 use crate::scene::{self, pose};
 use crate::shaders::overlays::PS_COLOUR;
+use crate::shaders::overlays_spv::PS_COLOUR_SPV;
 use crate::shaders::sod::VS_SOD;
+use crate::shaders::sod_spv::VS_SOD_SPV;
 
 const BUCKETS: usize = 0x773c8c;
 const FN_RENDER_SELECTION: usize = 0x599900; // RenderSelectionEffects, cdecl
@@ -61,7 +63,7 @@ impl Selection {
     /// written.
     fn pipe(&mut self, cull: Cull) -> Option<Pipeline> {
         self.pipes.view(cull as u64, || {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_SOD), Code::d3d9(&PS_COLOUR), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_SOD, VS_SOD_SPV), gpu::code!(PS_COLOUR, PS_COLOUR_SPV), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = Some(Blend::ADD);
             d.cull = cull;

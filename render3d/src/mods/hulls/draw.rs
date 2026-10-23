@@ -7,12 +7,13 @@ use crate::gfx::{self, Pipes};
 use crate::math::{v3, M34, V3};
 use crate::scene::{self, Blend, Model};
 use crate::shaders::hulls::*;
+use crate::shaders::hulls_spv::*;
 use crate::{assets, log};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use gpu::{
-    Address, Blend as GBlend, BlendEq, BlendOp, Block, Code, Compare, Contents, Cull, Depth, Factor, Filter, Format,
+    Address, Blend as GBlend, BlendEq, BlendOp, Block, Compare, Contents, Cull, Depth, Factor, Filter, Format,
     MipFilter, Pipeline, PipelineDesc, Rect, Sampler, Texture, TextureDesc, Topology, Usage,
 };
 
@@ -286,7 +287,7 @@ pub struct Drawer {
 }
 
 /// The hull's pixel shaders (`Drawer::pipe`).
-const PS_LIST: [&[u32]; 5] = [&PS_HULL, &PS_BUMP, &PS_CLOAK, &PS_GHOST, &PS_HOLO];
+const PS_LIST: [gpu::Code; 5] = [gpu::code!(PS_HULL, PS_HULL_SPV), gpu::code!(PS_BUMP, PS_BUMP_SPV), gpu::code!(PS_CLOAK, PS_CLOAK_SPV), gpu::code!(PS_GHOST, PS_GHOST_SPV), gpu::code!(PS_HOLO, PS_HOLO_SPV)];
 const S_HULL: usize = 0;
 const S_BUMP: usize = 1;
 const S_CLOAK: usize = 2;
@@ -327,7 +328,7 @@ impl Drawer {
             Mode::Ghost | Mode::Holo => 4,
         };
         self.pipes.view((ps as u64 * 8 + m) * 4 + cull as u64, || {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_HULL), Code::d3d9(PS_LIST[ps]), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_HULL, VS_HULL_SPV), PS_LIST[ps], &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
             d.cull = cull;
             let (blend, write, mask) = match m {
                 0 => (None, true, 0xf),

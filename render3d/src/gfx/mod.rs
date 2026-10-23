@@ -7,7 +7,6 @@
 //! d3d8to9 keeps its own record of what the game bound (platform/D3D9.md), so a
 //! module that changes device state between the engine's steps must leave it as it
 //! found it: a `Cmd` does that with one of `gpu`'s state blocks, put back when dropped.
-use gpu::d3d9::raw::{query, IID_TEXTURE9};
 use crate::frame::steps::View;
 use crate::math::{M34, M4};
 use alloc::vec::Vec;
@@ -17,9 +16,21 @@ fn log_line(a: core::fmt::Arguments) {
     crate::rt::log_fmt(a);
 }
 
+/// An export of Display8 (`d3d8.dll`), for `gpu` to ask which backend it draws on
+/// (gpu/src/display.rs); 0 when there is none.
+fn display_export(name: &str) -> usize {
+    use crate::rt::win::{GetModuleHandleA, GetProcAddress};
+    let m = unsafe { GetModuleHandleA(c"d3d8.dll".as_ptr() as *const u8) };
+    if m.is_null() {
+        return 0;
+    }
+    unsafe { GetProcAddress(m, crate::rt::cstr(name).as_ptr()) }
+}
+
 /// render3d's `gpu` context (each plugin keeps its own) and the frame it records into,
-/// moved on after each main view.
-static mut GPU: gpu::Gpu = gpu::Gpu::new(log_line);
+/// moved on after each main view. Its backend is Direct3D 9, or Vulkan when Display8
+/// draws on it (gpu/README.md).
+static mut GPU: gpu::Gpu = gpu::Gpu::with_display(log_line, display_export);
 static mut FRAME: gpu::Frame = gpu::Frame::new();
 
 #[allow(static_mut_refs)]
@@ -111,9 +122,8 @@ pub fn view_pass(cmd: &mut gpu::Cmd, v: &View, vp: Option<gpu::Viewport>) -> boo
 
 /// An engine texture (`ST3D_Texture`) to sample: its per-device texture (`+0x40 +
 /// device index * 4`, the index at `Storm3D+0xc0`), whose `+4` is the
-/// `IDirect3DTexture8`, which d3d8to9 answers for its `IDirect3DTexture9`, wrapped
-/// (`gpu::Gpu::wrap_d3d9_texture`). Engine glue: Display8 will hand the engine's
-/// textures out itself.
+/// `IDirect3DTexture8`, which `gpu` makes a texture of (`gpu::Gpu::engine_texture`:
+/// d3d8to9's `IDirect3DTexture9` behind it, or Display8's Vulkan mirror of it).
 pub fn engine_texture(st3d_tex: usize) -> Option<gpu::Texture> {
     if st3d_tex == 0 {
         return None;
@@ -124,8 +134,7 @@ pub fn engine_texture(st3d_tex: usize) -> Option<gpu::Texture> {
     }
     let devtex = crate::engine::field(st3d_tex, 0x40 + idx * 4);
     let t8 = crate::engine::field(devtex, 4);
-    let t9 = query(t8 as *mut c_void, &IID_TEXTURE9)?;
-    Some(gpu().wrap_d3d9_texture(t9))
+    gpu().engine_texture(t8 as *mut c_void)
 }
 
 /// A static vertex or index buffer filled with `data`.

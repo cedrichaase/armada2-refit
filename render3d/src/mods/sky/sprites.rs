@@ -7,11 +7,12 @@ use crate::engine::{field, rd};
 use crate::math::{M4, V3, v3};
 use crate::rt;
 use crate::shaders::sky::VS_SPRITE;
+use crate::shaders::sky_spv::VS_SPRITE_SPV;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use gpu::{
-    attr, Address, AttrFormat, Blend, Block, Cmd, Code, Compare, Depth, Filter, Format, MipFilter, Pipeline, PipelineDesc,
+    attr, Address, AttrFormat, Blend, Block, Cmd, Compare, Depth, Filter, Format, MipFilter, Pipeline, PipelineDesc,
     Sampler, Semantic, Topology, VertexAttr,
 };
 
@@ -101,8 +102,8 @@ const SAMPLER: Sampler = crate::gfx::sampler(Filter::Linear, MipFilter::Linear, 
 
 /// The sprites' pipeline with pixel shader `ps`: added, depth-tested (`LESSEQUAL`) and
 /// not written, no culling.
-pub fn sprite_desc(ps: &'static [u32]) -> PipelineDesc {
-    let mut d = PipelineDesc::new(Code::d3d9(&VS_SPRITE), Code::d3d9(ps), &SPRITE_LAYOUT, 36, Topology::TriangleList, Format::Unknown);
+pub fn sprite_desc(ps: gpu::Code) -> PipelineDesc {
+    let mut d = PipelineDesc::new(gpu::code!(VS_SPRITE, VS_SPRITE_SPV), ps, &SPRITE_LAYOUT, 36, Topology::TriangleList, Format::Unknown);
     d.blend = Some(Blend::ADD);
     d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
     d
