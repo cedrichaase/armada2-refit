@@ -15,6 +15,22 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   PCIe window; it reads host-cached memory now (`gpu/README.md`, "Read-backs").
 
 Installed, not yet seen in game.
+## 0.22.0 — 2026-10-23
+
+### Added
+- The frame and every module on `gpu`'s Direct3D 12 backend when Display8 draws on
+  Direct3D 12: every pipeline carries its DXIL (`gpu::code!`'s third name), and a pixel
+  shader drawn with an alpha test its alpha-tested twin, built from entries marked `:at`
+  (`hlsl-rs.sh`, `dxil-alpha.py`: `PS_SOD`, the particles' `PS_SPRITE`, `PS_GHOST`).
+
+### Fixed
+- In the DXIL, the post passes', the sky's quad shaders' and the ghosts' pixel shaders
+  take the position first, so their inputs sit at the registers their vertex shaders
+  write (`DXIL_POS`, `DXIL_POS_FIRST`, `DXIL_POS_MEMBER`); the d3dbc and SPIR-V are
+  unchanged.
+
+Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.97, nebula 0.39,
+firing 0.41 (/255). Installed, not yet seen in game.
 
 ## 0.21.0 — 2026-10-23
 

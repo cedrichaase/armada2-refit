@@ -84,7 +84,8 @@ pub struct Span {
     /// The ring's buffer when the span was written (kept alive by the frame if the
     /// ring has grown since): Direct3D 9's.
     pub(crate) buf: *mut c_void,
-    /// The `VkBuffer` on Vulkan (the display's upload ring, or a static buffer's).
+    /// The `VkBuffer` on Vulkan (the display's upload ring, or a static buffer's); on
+    /// Direct3D 12 that buffer's GPU address (`first` counts from it).
     pub(crate) vk: u64,
     /// The first element (vertex or index) in the buffer.
     pub first: u32,

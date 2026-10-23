@@ -207,14 +207,12 @@ engine's device, and draw the whole frame on it.
 at all: Display8 owns the device, the swap chain and the frame, and render3d's and the
 UI's `gpu` record into that frame through the plain C exports of
 `gpu/src/display.rs`, the contract both sides build against (its doc comment is the
-specification). `gpu` has its Vulkan backend (`gpu/README.md`, "The Vulkan backend"),
-so on `vulkan` render3d and the UI draw the whole frame as on `d3d9`. Where `gpu` does
-not yet have the backend (`d3d12`), the plugins find no device to draw with and stand
-down (the UI's menus run as stock dialogs, "no Direct3D 9
-device to draw with"), and what is seen is what Display8 draws itself: the engine's
-`Clear`s, the movie frames the engine writes into the back buffer by lock, and the last
-pass through the gamma ramp. `Validate=1` asks for the Vulkan validation layer or
-Direct3D 12's debug layer, where the system has one.
+specification). `gpu` has a backend for each (`gpu/README.md`, "The Vulkan backend",
+"The Direct3D 12 backend"), so on `vulkan` and `d3d12` render3d and the UI draw the
+whole frame as on `d3d9`. What Display8 draws itself is the engine's `Clear`s, the
+movie frames the engine writes into the back buffer by lock, and the last pass through
+the gamma ramp. `Validate=1` asks for the Vulkan validation layer or Direct3D 12's
+debug layer, where the system has one.
 
 ### Vulkan
 
@@ -300,6 +298,25 @@ nothing.
   a root signature of four root constants (b0) and a table of the frame and the ramp
   (t0, t1) under two static point samplers.
 - A device that is removed is logged with its reason, and nothing is drawn after.
+- **The backend is said early**, as on Vulkan: `display8_backend` answers Direct3D 12
+  from the engine's `Direct3DCreate8` on; `gpu` opens its backend once the device is
+  made (`display8_dx12` is null before).
+- **`display8_dx12_flush`** closes the frame's list, submits it, waits for its fence and
+  opens the same list again (its allocator reset, the heaps set again): a plugin's
+  read-back (the frame dumps, render3d's nebula bake). The frame's ring, descriptors and
+  deferred calls stay as they are.
+- **`PixelCentres=d3d9`** and the samplers as the game's `dxvk.conf` has DXVK make them,
+  as on Vulkan: `Dx12Device8::features` (`FEATURE_D3D9_CENTRES`; anisotropy is always
+  there), `sampler_anisotropy`, `sampler_lod_bias`.
+
+On the bench a `Backend=d3d12` game runs on the GPU (vkd3d-proton has no CPU driver to
+run on here); with `Validate=1` the bench loads the Khronos layer under vkd3d-proton
+(`testbench/bench/session.py`, `vulkan_env`), which writes `logs/vvl.log`. Neither layer
+reaches anyone there: vkd3d-proton has no Microsoft debug layer
+(`D3D12GetDebugInterface` answers `DXGI_ERROR_SDK_COMPONENT_MISSING`, logged as "no
+debug layer"), and its own check finds the Khronos layer's messages do not come
+through the 32-bit winevulkan. vkd3d-proton keeps its pipeline cache in
+`vkd3d-proton.cache` in the game directory.
 
 **On the bench** (Proton-CachyOS), the 32-bit game gets Direct3D 12 with no setting:
 the prefix's `syswow64/d3d12.dll` is vkd3d-proton and its `dxgi.dll` DXVK's, and

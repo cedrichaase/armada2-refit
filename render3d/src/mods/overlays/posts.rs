@@ -21,6 +21,7 @@ use crate::log;
 use crate::math::V3;
 use crate::shaders::overlays::*;
 use crate::shaders::overlays_spv::*;
+use crate::shaders::overlays_dxil::*;
 use alloc::vec::Vec;
 
 const FN_HEIGHT_POST: usize = 0x593840;
@@ -160,7 +161,7 @@ impl Posts {
         let Some(mut cmd) = gfx::cmd() else { return };
         // Depth-tested (`LESSEQUAL`) and not written, blended by alpha, no culling.
         let pipe = self.pipes.view(0, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_LINE, VS_LINE_SPV), gpu::code!(PS_LINE, PS_LINE_SPV), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_LINE, VS_LINE_SPV, VS_LINE_DXIL), gpu::code!(PS_LINE, PS_LINE_SPV, PS_LINE_DXIL), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = Some(Blend::ALPHA);
             d

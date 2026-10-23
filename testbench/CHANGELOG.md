@@ -10,6 +10,24 @@ versions". Newest first. The why is in [`README.md`](README.md).
 ### Added
 - `display-movie`: the launch reels and the intro on screen (a 4:3 picture between
   bars, not a black frame), through the UI; on the stub with `display/stub-scenario.sh`.
+## 3.53.0 — 2026-10-23
+
+### Added
+- A game with `Mode=stub`, `Backend=d3d12` and `Validate=1` in its clone's
+  `Display8.ini` gets the Khronos validation layer under vkd3d-proton, writing
+  `logs/vvl.log` (`session.vulkan_env`).
+
+Installed, not yet seen in game.
+
+## 3.52.0 — 2026-10-23
+
+### Added
+- The stock cache (`bench/stockcache.py`): a session that starts from stock (`--mod
+  stock`, `--install`, `--assets none`) copies the game from `~/.cache/a2test/stock/<key>/`,
+  where `a2mod stock` has run once per state of the install, instead of running it on
+  every clone (12 s a session). Keyed by the install's tree (`lstat`, ctime included)
+  and the `a2mod` script; built under a flock and renamed into place.
+  `a2test stock-cache status | rebuild | drop`; `A2TEST_STOCK_CACHE=0` turns it off.
 
 Installed, not yet seen in game.
 

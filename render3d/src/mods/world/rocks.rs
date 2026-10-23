@@ -26,6 +26,7 @@ use crate::math::{M34, V3, v3};
 use crate::scene::{self, pose, Model};
 use crate::shaders::world_rock::*;
 use crate::shaders::world_rock_spv::*;
+use crate::shaders::world_rock_dxil::*;
 use crate::{assets, log, rt};
 use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
@@ -514,9 +515,9 @@ impl Rocks {
     fn pipe(&mut self, kind: u64, cull: Cull) -> Option<Pipeline> {
         self.pipes.view(kind * 4 + cull as u64, || {
             let (vs, ps, layout, stride): (gpu::Code, gpu::Code, &'static [VertexAttr], u32) = match kind {
-                FLAT | GLOW => (gpu::code!(VS_ROCK, VS_ROCK_SPV), gpu::code!(PS_FLAT, PS_FLAT_SPV), &scene::VERTEX, 32),
-                ROCK => (gpu::code!(VS_ROCK, VS_ROCK_SPV), gpu::code!(PS_ROCK, PS_ROCK_SPV), &scene::VERTEX, 32),
-                _ => (gpu::code!(VS_RSPRITE, VS_RSPRITE_SPV), gpu::code!(PS_RSPRITE, PS_RSPRITE_SPV), &SPRITE_LAYOUT, 36),
+                FLAT | GLOW => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_FLAT, PS_FLAT_SPV, PS_FLAT_DXIL), &scene::VERTEX, 32),
+                ROCK => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK, PS_ROCK_SPV, PS_ROCK_DXIL), &scene::VERTEX, 32),
+                _ => (gpu::code!(VS_RSPRITE, VS_RSPRITE_SPV, VS_RSPRITE_DXIL), gpu::code!(PS_RSPRITE, PS_RSPRITE_SPV, PS_RSPRITE_DXIL), &SPRITE_LAYOUT, 36),
             };
             let mut d = PipelineDesc::new(vs, ps, layout, stride, Topology::TriangleList, Format::Unknown);
             let write = matches!(kind, FLAT | ROCK);

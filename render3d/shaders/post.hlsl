@@ -55,7 +55,7 @@ float3 sane(float3 c)
 // the destination texel; each is weighted by 1/(1+luma) (Karis) so one hot pixel
 // cannot make a flickering blob. Then the threshold, with a soft knee:
 // k2 = (threshold, knee).
-float4 ps_prefilter(float2 uv : TEXCOORD0) : SV_Target
+float4 ps_prefilter(DXIL_POS float2 uv : TEXCOORD0) : SV_Target
 {
     float2 t = k0.xy;
     float3 a = sane(tap(uv + float2(-t.x, -t.y)));
@@ -76,7 +76,7 @@ float4 ps_prefilter(float2 uv : TEXCOORD0) : SV_Target
 }
 
 // Level n -> n+1 (dual filter): the centre four times, the four diagonals once.
-float4 ps_down(float2 uv : TEXCOORD0) : SV_Target
+float4 ps_down(DXIL_POS float2 uv : TEXCOORD0) : SV_Target
 {
     float2 t = k0.xy;
     float3 s = tap(uv) * 4.0;
@@ -89,7 +89,7 @@ float4 ps_down(float2 uv : TEXCOORD0) : SV_Target
 
 // Level n+1 -> n, added onto level n by the blend (ONE, ONE): a tent of eight taps.
 // k2.x scales what is added (1 everywhere but the last step).
-float4 ps_up(float2 uv : TEXCOORD0) : SV_Target
+float4 ps_up(DXIL_POS float2 uv : TEXCOORD0) : SV_Target
 {
     float2 t = k0.xy;
     float3 s = tap(uv + float2(-2.0 * t.x, 0.0));
@@ -107,7 +107,7 @@ float4 ps_up(float2 uv : TEXCOORD0) : SV_Target
 // into the back buffer. k2 = (bloom, exposure, shoulder, 0). Below the shoulder the
 // colour passes unchanged, so stock's content looks as it did; above it, each
 // channel rolls off towards white instead of clipping.
-float4 ps_final(float2 uv0 : TEXCOORD0, float2 uv1 : TEXCOORD1) : SV_Target
+float4 ps_final(DXIL_POS float2 uv0 : TEXCOORD0, float2 uv1 : TEXCOORD1) : SV_Target
 {
     float3 c = sane(tap(uv0));
     float3 b = sane(s1.Sample(s1_s, clamp(uv1, k3.xy, k3.zw)).rgb);

@@ -23,6 +23,7 @@ use gpu::{attr, AttrFormat, Blend, Block, Compare, Depth, Format, Pipeline, Pipe
 use crate::math::{v3, V3};
 use crate::shaders::hulls::*;
 use crate::shaders::hulls_spv::*;
+use crate::shaders::hulls_dxil::*;
 use crate::assets;
 use a2fmt::sod::NodeKind;
 use a2fmt::spr::SpriteTable;
@@ -223,7 +224,7 @@ impl Sprites {
     /// (by the shader, writing depth) or blended by alpha.
     fn pipe(&mut self, kind: Kind) -> Option<Pipeline> {
         self.pipes.view(kind as u64, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_SPRITE, VS_SPRITE_SPV), gpu::code!(PS_SPRITE, PS_SPRITE_SPV), &SPRITE_LAYOUT, 36, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_SPRITE, VS_SPRITE_SPV, VS_SPRITE_DXIL), gpu::code!(PS_SPRITE, PS_SPRITE_SPV, PS_SPRITE_DXIL), &SPRITE_LAYOUT, 36, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: kind == Kind::Cut, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = match kind {
                 Kind::Add => Some(Blend::ADD),

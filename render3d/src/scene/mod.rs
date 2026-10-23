@@ -24,6 +24,7 @@ use gpu::{
 };
 use crate::shaders::sod::*;
 use crate::shaders::sod_spv::*;
+use crate::shaders::sod_dxil::*;
 use a2fmt::sod::{NodeKind, Sod};
 use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
@@ -357,7 +358,7 @@ pub fn cull_of(part: &Part, world: &M34) -> Cull {
 /// The baseline's pipeline for a cull and a blend: depth-tested against the scene.
 fn pipeline(cull: Cull, mode: Mode) -> Option<Pipeline> {
     st().pipes.view(cull as u64 * 4 + mode as u64, || {
-        let mut d = PipelineDesc::new(gpu::code!(VS_SOD, VS_SOD_SPV), gpu::code!(PS_SOD, PS_SOD_SPV), &VERTEX, 32, Topology::TriangleList, Format::Unknown);
+        let mut d = PipelineDesc::new(gpu::code!(VS_SOD, VS_SOD_SPV, VS_SOD_DXIL), gpu::code!(PS_SOD, PS_SOD_SPV, PS_SOD_DXIL, PS_SOD_AT_DXIL), &VERTEX, 32, Topology::TriangleList, Format::Unknown);
         let write = matches!(mode, Mode::Cutout | Mode::Opaque);
         d.depth = Depth { test: true, write, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
         d.cull = cull;
