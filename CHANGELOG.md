@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.32.0 — 2026-10-23
+
+Layers: render3d 0.26.1, testbench 3.66.0.
+
+### Fixed
+- render3d: on Vulkan and Direct3D 12, the auto-assimilator's emitter flare drew as a
+  black square on the Assimilator (a NaN from the fx shader's kinds weighted by zero);
+  the shader selects the quad's kind (render3d 0.26.1).
+
+### Added
+- testbench: `render3d-cone-emitter`, for that flare on Vulkan (testbench 3.66.0).
+
+Installed, not yet seen in game.
+
 ## 13.31.0 — 2026-10-23
 
 Layers: ui 0.21.0, testbench 3.65.0.
