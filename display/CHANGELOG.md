@@ -11,6 +11,9 @@ in [`README.md`](README.md).
   ...") instead of "no Direct3D 9", which was wrong on Vulkan and Direct3D 12.
 - `Display8.ini`'s `Mode=` comment names the device `Backend=` chooses, not Direct3D 9
   alone. The shipped values are unchanged (`Mode=forward`, `Backend=d3d9`).
+- `stub-scenario.sh` on a scenario whose `Setup:` is already `display/bench-mode.sh`
+  (`display-stub`, `display-drop`) writes one call with the mode replaced and the keys
+  added, instead of nesting a second `bench-mode.sh` inside the first.
 
 Installed, not yet seen in game.
 
