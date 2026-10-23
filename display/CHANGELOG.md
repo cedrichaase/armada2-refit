@@ -4,6 +4,25 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.4.0 — 2026-10-23
+
+### Added
+- `Backend=d3d12` (stub mode): Display8's own Direct3D 12 device (feature level 11_0),
+  a flip-model DXGI swap chain on the game's window, the engine's colour and depth
+  targets, two frames in flight with fences and an upload ring, two shader-visible
+  descriptor heaps split per frame, the clear pass, mirrors, and the gamma pass
+  (`shaders/present.hlsl` as DXIL) (`src/dx12/`). Exports for the plugins' `gpu`:
+  `display8_dx12`, `display8_dx12_frame`, `display8_dx12_alloc`,
+  `display8_dx12_descriptors`, `display8_dx12_defer`, `display8_dx12_target`,
+  `display8_dx12_mirror`; `display8_backend` answers `BACKEND_D3D12`.
+- `Backend=` (`d3d9`, `vulkan`, `d3d12`) and `Validate=` in the shipped
+  `Display8.ini`; `Validate=1` turns on Direct3D 12's debug layer on `d3d12`. An
+  unknown backend is logged and taken as `d3d9`.
+- The present shader's DXIL (`src/shaders/present_dxil.rs`).
+
+Measured on the bench: the intro movies and a mission run on `Backend=d3d12`
+(vkd3d-proton, 32-bit), the plugins standing down. Installed, not yet seen in game.
+
 ## 0.3.0 — 2026-10-23
 
 ### Added
