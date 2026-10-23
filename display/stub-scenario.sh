@@ -33,4 +33,6 @@ else:
 text = re.sub(r'^# (.*)$', lambda t: '# (Display8 ' + mode + ') ' + t.group(1), text, count=1, flags=re.M)
 open(out, 'w').write(text)
 EOF
+# The fragments a scenario includes are looked up beside it.
+cp "$here/../testbench/scenarios/"_*.md "$(dirname "$out")/"
 echo "$out"
