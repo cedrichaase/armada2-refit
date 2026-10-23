@@ -23,6 +23,12 @@ pub mod slot {
     pub const RELEASE: usize = 2;
     // ID3D12Device
     pub const DEV_CREATE_GRAPHICS_PIPELINE_STATE: usize = 10;
+    pub const DEV_CREATE_COMPUTE_PIPELINE_STATE: usize = 11;
+    pub const DEV_CREATE_UNORDERED_ACCESS_VIEW: usize = 19;
+    pub const LIST_DISPATCH: usize = 14;
+    pub const LIST_SET_COMPUTE_ROOT_SIGNATURE: usize = 29;
+    pub const LIST_SET_COMPUTE_ROOT_DESCRIPTOR_TABLE: usize = 31;
+    pub const LIST_SET_COMPUTE_ROOT_CONSTANT_BUFFER_VIEW: usize = 37;
     pub const DEV_CREATE_DESCRIPTOR_HEAP: usize = 14;
     pub const DEV_CREATE_ROOT_SIGNATURE: usize = 16;
     pub const DEV_CREATE_SHADER_RESOURCE_VIEW: usize = 18;
@@ -85,6 +91,14 @@ pub const TEXTURE_LAYOUT_UNKNOWN: u32 = 0;
 pub const TEXTURE_LAYOUT_ROW_MAJOR: u32 = 1;
 pub const RESOURCE_FLAG_ALLOW_RENDER_TARGET: u32 = 1;
 pub const RESOURCE_FLAG_ALLOW_DEPTH_STENCIL: u32 = 2;
+pub const RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS: u32 = 4;
+pub const STATE_UNORDERED_ACCESS: u32 = 0x8;
+pub const BARRIER_TYPE_UAV: u32 = 2;
+pub const SRV_DIMENSION_BUFFER: u32 = 1;
+pub const UAV_DIMENSION_BUFFER: u32 = 1;
+pub const UAV_DIMENSION_TEXTURE2D: u32 = 4;
+pub const UAV_DIMENSION_TEXTURE3D: u32 = 8;
+pub const DESCRIPTOR_RANGE_TYPE_UAV: u32 = 1;
 
 pub const STATE_COMMON: u32 = 0;
 pub const STATE_VERTEX_AND_INDEX: u32 = 0x1 | 0x2;
@@ -531,6 +545,28 @@ pub struct GraphicsPipelineDesc {
     pub flags: u32,
 }
 
+/// `D3D12_UNORDERED_ACCESS_VIEW_DESC`: the union (8-aligned) as eight words, in the
+/// order the dimension's member has them (a buffer: first element as two words, count,
+/// stride, the counter's offset as two words, flags).
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct UavDesc {
+    pub format: u32,
+    pub dimension: u32,
+    pub u: [u32; 8],
+}
+
+/// `D3D12_COMPUTE_PIPELINE_STATE_DESC`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ComputePipelineDesc {
+    pub root: P,
+    pub cs: ShaderBytecode,
+    pub node_mask: u32,
+    pub cached: CachedPso,
+    pub flags: u32,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct QueryHeapDesc {
@@ -566,6 +602,8 @@ const _: () = {
     assert!(size_of::<InputElement>() == 28);
     assert!(size_of::<GraphicsPipelineDesc>() == 572);
     assert!(size_of::<QueryHeapDesc>() == 12);
+    assert!(size_of::<UavDesc>() == 40);
+    assert!(size_of::<ComputePipelineDesc>() == 28);
     assert!(core::mem::offset_of!(ResourceDesc, alignment) == 8);
     assert!(core::mem::offset_of!(CopyLocation, offset) == 8);
     assert!(core::mem::offset_of!(SrvDesc, u) == 16);
@@ -590,6 +628,12 @@ pub fn barrier(list: P, res: P, sub: u32, before: u32, after: u32) {
         return;
     }
     let b = [Barrier { ty: BARRIER_TYPE_TRANSITION, flags: 0, resource: res, subresource: sub, before, after }];
+    crate::vcall!(list, slot::LIST_RESOURCE_BARRIER, fn(u32, *const Barrier) -> (), 1, b.as_ptr());
+}
+
+/// A barrier between unordered accesses: of `res`, or of every resource (null).
+pub fn uav_barrier(list: P, res: P) {
+    let b = [Barrier { ty: BARRIER_TYPE_UAV, flags: 0, resource: res, subresource: 0, before: 0, after: 0 }];
     crate::vcall!(list, slot::LIST_RESOURCE_BARRIER, fn(u32, *const Barrier) -> (), 1, b.as_ptr());
 }
 

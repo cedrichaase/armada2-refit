@@ -44,7 +44,7 @@ pub mod pixels;
 pub mod types;
 pub mod vulkan;
 
-pub use api::{Attached, Backend, Buffer, Cmd, Gpu, Pipeline, Texture, Timer};
+pub use api::{Attached, Backend, Buffer, Cmd, ComputePipeline, Gpu, Pipeline, Storage, Texture, Timer};
 pub use frame::{Frame, Span};
 pub use pixels::Mapped;
 pub use types::*;

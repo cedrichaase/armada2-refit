@@ -105,6 +105,11 @@ impl Usage {
     /// A colour target whose levels below the first are made from it by the device
     /// (`Cmd::generate_mips`): a blit chain on Vulkan, Direct3D 9's `AUTOGENMIPMAP`.
     pub const GEN_MIPS: Usage = Usage(64);
+    /// Written by compute shaders as a storage image (`Cmd::bind_storage_image`):
+    /// Vulkan's `STORAGE`, Direct3D 12's unordered access. Only where `Gpu::compute`
+    /// says so; Direct3D 12 at feature level 11_0 stores any format but loads only the
+    /// 32-bit single-channel ones (`R32F`).
+    pub const STORAGE: Usage = Usage(128);
 
     pub const fn has(self, o: Usage) -> bool {
         self.0 & o.0 == o.0
@@ -657,6 +662,30 @@ pub struct Bindings<'a> {
     pub vs: &'a [Block<'a>],
     pub ps: &'a [Block<'a>],
 }
+
+/// A storage buffer (`Gpu::storage`): `size` bytes of elements of `stride` bytes (a
+/// structured buffer's element; 4 for a plain array of words). Read by any shader as a
+/// `StructuredBuffer` (`Cmd::bind_storage`), written by compute shaders as a
+/// `RWStructuredBuffer` (`Cmd::bind_storage_rw`) or from the CPU through the frame's
+/// ring (`Cmd::write_storage`). Its contents start undefined.
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct StorageDesc {
+    pub size: u32,
+    pub stride: u32,
+}
+
+/// A compute pipeline: one compute shader (dxc's only: `Code::spirv`, `Code::dxil`).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct ComputeDesc {
+    pub cs: Code,
+}
+
+/// The storage slots a `Cmd` binds: read-only buffers (`t16 + n`, SPIR-V set 2 binding
+/// n, every stage), read-write buffers (`u n`, set 3 binding n, compute) and storage
+/// images (`u 8 + n`, set 3 binding 8 + n, compute). `gpu/shaders/compat.hlsli` spells
+/// them `STORAGE(n)`, `STORAGE_RW(n)` and `STORAGE_IMAGE(n)`.
+pub const STORAGE_SLOTS: usize = 8;
 
 /// What a finished `Timer` holds besides its stamps.
 #[derive(Clone, Copy, Debug)]

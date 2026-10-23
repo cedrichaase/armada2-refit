@@ -20,21 +20,30 @@
 # take, unless its entry is marked :long (the code stands down without it); DXVK takes
 # either. An entry marked :at (`entry:profile:SYMBOL:at`) also gets an alpha-tested
 # twin in the DXIL, `SYMBOL_AT_DXIL` (dxil-alpha.py: Direct3D 12 has no alpha test);
-# the mark changes nothing in the d3dbc or the SPIR-V.
+# the mark changes nothing in the d3dbc or the SPIR-V. An entry marked :dxc
+# (`entry:profile:SYMBOL:dxc`, after any :at) is dxc's alone: no d3dbc, `SYMBOL` an empty
+# array. It is for what Direct3D 9 cannot run (compute, profile `cs_5_0`; storage
+# buffers), so it and everything it reads sit under `#ifdef __hlsl_dx_compiler`, where
+# vkd3d never sees them.
 set -euo pipefail
 here=$(dirname "$0")
 fix=""
 [ "${1:-}" = "--fix" ] && { fix="$here/d3dbc-fix.py"; shift; }
-[ $# -ge 3 ] || { sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+[ $# -ge 3 ] || { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 out=$1 src=$2; shift 2
-# The entries without the :at mark (what the d3dbc and SPIR-V see), and the entries with it.
-plain=() at=()
+# The entries without the :at and :dxc marks (what the d3dbc and SPIR-V see), the
+# entries with :at, and those with :dxc.
+plain=() at=() dxconly=()
 for spec in "$@"; do
-    p=${spec%:at}
+    s=${spec%:dxc}
+    [ "$s" = "$spec" ] || dxconly+=("${spec%%:*}")
+    p=${s%:at}
     p=${p/:at:/:}
     plain+=("$p")
-    [ "$p" = "$spec" ] || at+=("${spec%%:*}")
+    [ "$p" = "$s" ] || at+=("${spec%%:*}")
 done
+# Whether entry $1 is dxc's alone.
+dxc_only() { [[ " ${dxconly[*]:-} " == *" $1 "* ]]; }
 spv_out="${out%.rs}_spv.rs"
 dxil_out="${out%.rs}_dxil.rs"
 inc=$(dirname "$src")
@@ -52,7 +61,7 @@ dxil_flags=(-Qstrip_debug -Qstrip_reflect)
 # steps after the compiler.
 shopt -s nullglob
 headers=("$inc"/*.hlsli "$here"/../gpu/shaders/*.hlsli)
-stamp="source $(cat "$src" "${headers[@]}" <(printf '%s\n' "${plain[@]}") "$slots" ${fix:+"$fix"} | sha256sum | cut -d' ' -f1)"
+stamp="source $(cat "$src" "${headers[@]}" <(printf '%s\n' "${plain[@]}" "${dxconly[@]:+dxc:}" "${dxconly[@]:-}") "$slots" ${fix:+"$fix"} | sha256sum | cut -d' ' -f1)"
 spv_stamp="spirv $(cat "$src" "${headers[@]}" <(printf '%s\n' "${plain[@]}" "${dxc_flags[@]}" "${dxc_vs_flags[@]}") | sha256sum | cut -d' ' -f1)"
 spaces="$here/dxil-spaces.py"
 alpha="$here/dxil-alpha.py"
@@ -77,6 +86,10 @@ if [ -n "$need_d3dbc" ]; then
         echo "// $stamp"
         for spec in "${plain[@]}"; do
             IFS=: read -r entry profile sym long <<< "$spec"
+            if dxc_only "$entry"; then
+                echo "pub static $sym: [u32; 0] = []; // $entry: dxc's alone"
+                continue
+            fi
             env -C "$inc" vkd3d-compiler -x hlsl -b d3dbc -p "$profile" -e "$entry" -o "$tmp/$sym.bin" \
                 "$(basename "$src")" 2> "$tmp/err" ||
                 { cat "$tmp/err" >&2; echo "hlsl-rs.sh: $src:$entry failed" >&2; exit 1; }

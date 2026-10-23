@@ -11,7 +11,7 @@
 //! with every register zero, nothing bound and the engine's viewport, as a Direct3D 9
 //! one begins with the engine's state that its state block puts back at the end.
 use super::spirv::Dim;
-use super::tex::{Buffer, Texture};
+use super::tex::{Buffer, Storage, Texture};
 use super::{is_depth_vk, samples_flag, vlog, Att, Garbage, Gpu, PassKey, PassState, PS_REGS, SLOTS, VS_REGS};
 use crate::frame::{Frame, Span};
 use crate::pixels::Mapped;
@@ -46,6 +46,14 @@ pub struct Cmd<'a> {
     bound_pipe: vk::Pipeline,
     bound_vb: [u64; 2],
     bound_ib: (u64, u32),
+    /// Storage bound by slot: read-only buffers, read-write ones, storage images; and
+    /// whether the draws' set 2 must be written again.
+    sto: [Option<Storage>; STORAGE_SLOTS],
+    sto_rw: [Option<Storage>; STORAGE_SLOTS],
+    simg: [Option<Texture>; STORAGE_SLOTS],
+    sto_dirty: bool,
+    /// The compute shaders' register file.
+    cs: Vec<f32>,
 }
 
 impl Drop for Cmd<'_> {
@@ -98,6 +106,11 @@ impl<'a> Cmd<'a> {
             bound_pipe: vk::Pipeline::null(),
             bound_vb: [0; 2],
             bound_ib: (0, 0),
+            sto: Default::default(),
+            sto_rw: Default::default(),
+            simg: Default::default(),
+            sto_dirty: true,
+            cs: alloc::vec![0.0; VS_REGS * 4],
         })
     }
 
@@ -351,6 +364,183 @@ impl<'a> Cmd<'a> {
         }
     }
 
+    // -- storage and compute --
+
+    pub fn bind_storage(&mut self, slot: u32, s: Option<&Storage>) {
+        if let Some(x) = self.sto.get_mut(slot as usize) {
+            let same = match (&*x, s) {
+                (Some(a), Some(b)) => a.same(b),
+                (None, None) => true,
+                _ => false,
+            };
+            if !same {
+                *x = s.cloned();
+                self.sto_dirty = true;
+            }
+        }
+    }
+
+    pub fn bind_storage_rw(&mut self, slot: u32, s: Option<&Storage>) {
+        if let Some(x) = self.sto_rw.get_mut(slot as usize) {
+            *x = s.cloned();
+        }
+    }
+
+    pub fn bind_storage_image(&mut self, slot: u32, t: Option<&Texture>) {
+        if let Some(x) = self.simg.get_mut(slot as usize) {
+            *x = t.cloned();
+        }
+    }
+
+    pub fn cs_block(&mut self, b: Block) {
+        let at = b.base as usize * 4;
+        if at + b.data.len() <= self.cs.len() {
+            self.cs[at..at + b.data.len()].copy_from_slice(b.data);
+        }
+    }
+
+    /// The eight read-only (`rw` false) or read-write storage slots as descriptors, an
+    /// empty one the placeholder. None: a buffer could not be made.
+    fn storage_infos(&self, rw: bool) -> Option<Vec<[vk::DescriptorBufferInfo; 1]>> {
+        let g = self.gpu;
+        let list = if rw { &self.sto_rw } else { &self.sto };
+        let mut v = Vec::with_capacity(STORAGE_SLOTS);
+        for s in list.iter() {
+            let s = match s {
+                Some(s) => s.clone(),
+                None => g.dummy_storage()?,
+            };
+            let b = s.realize(g);
+            if b == vk::Buffer::null() {
+                return None;
+            }
+            v.push([vk::DescriptorBufferInfo { buffer: b, offset: 0, range: s.range() }]);
+        }
+        Some(v)
+    }
+
+    /// `data` into `s` at byte `offset`, through the frame's upload ring: a copy in the
+    /// command buffer, ordered before whatever reads it after.
+    pub fn write_storage(&mut self, s: &Storage, offset: u32, data: &[u8]) {
+        let g = self.gpu;
+        let n = data.len().min(s.0.desc.size.saturating_sub(offset) as usize) as u64 & !3;
+        if n == 0 {
+            return;
+        }
+        let b = s.realize(g);
+        if b == vk::Buffer::null() {
+            return;
+        }
+        let Some(sh) = g.sh() else { return };
+        let Some((src, off)) = g.staging(n, |cpu| unsafe { core::ptr::copy_nonoverlapping(data.as_ptr(), cpu, n as usize) }) else {
+            g.once(1 << 27, format_args!("gpu: Vulkan: no upload space for a storage buffer's {} bytes", n));
+            return;
+        };
+        let Some(cb) = g.outside() else { return };
+        super::memory_barrier(&sh, cb);
+        let r = [vk::BufferCopy { src_offset: off, dst_offset: offset as u64, size: n }];
+        unsafe { sh.dev.cmd_copy_buffer(cb, src, b, &r) };
+        super::memory_barrier(&sh, cb);
+    }
+
+    /// Everything recorded before is done, and its writes seen, before anything after.
+    pub fn barrier(&mut self) {
+        let g = self.gpu;
+        if let (Some(sh), Some(cb)) = (g.sh(), g.outside()) {
+            super::memory_barrier(&sh, cb);
+        }
+    }
+
+    /// Runs `p` over `x` by `y` by `z` groups, outside any render pass, with the
+    /// textures, storage and compute register file bound now; ordered after what came
+    /// before and before what comes after by broad barriers. False if it could not.
+    pub fn dispatch(&mut self, p: &super::ComputePipeline, x: u32, y: u32, z: u32) -> bool {
+        let g = self.gpu;
+        if !p.realize(g) || x == 0 || y == 0 || z == 0 {
+            return false;
+        }
+        let (pipe, uses, cs_bytes, simg_used) = {
+            let o = p.0.obj.borrow();
+            let Some(o) = o.as_ref() else { return false };
+            (o.pipe, o.textures.clone(), o.cs_bytes, o.storage.iter().any(|s| s.image))
+        };
+        let (Some(sh), Some(layout)) = (g.sh(), g.with(|s| s.clayout)) else { return false };
+        let Some(rd) = self.storage_infos(false) else { return false };
+        let Some(rw) = self.storage_infos(true) else { return false };
+        let Some(cb) = g.outside() else { return false };
+        // Textures, in the layout shaders read; storage images in GENERAL.
+        let mut views: Vec<(u32, vk::ImageView, vk::Sampler)> = Vec::new();
+        for u in &uses {
+            let b = u.binding as usize;
+            let t = match self.tex[b].clone().filter(|t| t.realize(g)) {
+                Some(t) => t,
+                None => {
+                    let Some(d) = g.dummy(u.dim) else { return false };
+                    if !d.realize(g) {
+                        return false;
+                    }
+                    d
+                }
+            };
+            g.transition(cb, &t, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL);
+            views.push((u.binding, t.view(), g.sampler(&self.samp[b])));
+        }
+        let mut imgs: Vec<(u32, vk::ImageView)> = Vec::new();
+        if simg_used {
+            for (i, t) in self.simg.iter().enumerate() {
+                let Some(t) = t else { continue };
+                if !t.realize(g) || t.storage_view() == vk::ImageView::null() {
+                    g.once(1 << 28, format_args!("gpu: Vulkan: a storage image bound is not one (Usage::STORAGE)"));
+                    continue;
+                }
+                g.transition(cb, t, vk::ImageLayout::GENERAL);
+                imgs.push(((STORAGE_SLOTS + i) as u32, t.storage_view()));
+            }
+        }
+        // The register file, as the vertex stage's binding (set 0, binding 0).
+        let n = (cs_bytes as usize).clamp(16, VS_REGS * 16);
+        let csb = unsafe { core::slice::from_raw_parts(self.cs.as_ptr() as *const u8, n) };
+        let Some((set0, vo, _)) = g.ubo_alloc(csb, &[]) else { return false };
+        let Some(set2) = g.storage_set(2) else { return false };
+        let Some(set3) = g.storage_set(3) else { return false };
+        let mut w: Vec<vk::WriteDescriptorSet> = Vec::new();
+        for (i, b) in rd.iter().enumerate() {
+            w.push(vk::WriteDescriptorSet::default().dst_set(set2).dst_binding(i as u32).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(b));
+        }
+        for (i, b) in rw.iter().enumerate() {
+            w.push(vk::WriteDescriptorSet::default().dst_set(set3).dst_binding(i as u32).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(b));
+        }
+        let ii: Vec<[vk::DescriptorImageInfo; 1]> = imgs.iter().map(|v| [vk::DescriptorImageInfo { sampler: vk::Sampler::null(), image_view: v.1, image_layout: vk::ImageLayout::GENERAL }]).collect();
+        for (v, i) in imgs.iter().zip(ii.iter()) {
+            w.push(vk::WriteDescriptorSet::default().dst_set(set3).dst_binding(v.0).descriptor_type(vk::DescriptorType::STORAGE_IMAGE).image_info(i));
+        }
+        let ti: Vec<[vk::DescriptorImageInfo; 1]> = views.iter().map(|v| [vk::DescriptorImageInfo { sampler: v.2, image_view: v.1, image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL }]).collect();
+        let set1 = if views.is_empty() {
+            None
+        } else {
+            let Some(s) = g.texture_set() else { return false };
+            Some(s)
+        };
+        if let Some(s1) = set1 {
+            for (v, i) in views.iter().zip(ti.iter()) {
+                w.push(vk::WriteDescriptorSet::default().dst_set(s1).dst_binding(v.0).descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER).image_info(i));
+            }
+        }
+        unsafe {
+            sh.dev.update_descriptor_sets(&w, &[]);
+            super::memory_barrier(&sh, cb);
+            sh.dev.cmd_bind_pipeline(cb, vk::PipelineBindPoint::COMPUTE, pipe);
+            sh.dev.cmd_bind_descriptor_sets(cb, vk::PipelineBindPoint::COMPUTE, layout, 0, &[set0], &[vo, vo]);
+            if let Some(s1) = set1 {
+                sh.dev.cmd_bind_descriptor_sets(cb, vk::PipelineBindPoint::COMPUTE, layout, 1, &[s1], &[]);
+            }
+            sh.dev.cmd_bind_descriptor_sets(cb, vk::PipelineBindPoint::COMPUTE, layout, 2, &[set2, set3], &[]);
+            sh.dev.cmd_dispatch(cb, x, y, z);
+            super::memory_barrier(&sh, cb);
+        }
+        true
+    }
+
     // -- geometry --
 
     fn ring(&mut self, src: *const u8, n: u32, stride: u32) -> Option<Span> {
@@ -398,13 +588,16 @@ impl<'a> Cmd<'a> {
             self.vs_dirty = true;
             self.ps_dirty = true;
             self.vp_dirty = true;
+            self.sto_dirty = true;
         }
         let p = self.pipe.clone()?;
-        let (uses, vs_bytes, ps_bytes, dummy_vb) = {
+        let (uses, vs_bytes, ps_bytes, dummy_vb, storage) = {
             let o = p.0.obj.borrow();
             let o = o.as_ref()?;
-            (o.textures.clone(), o.vs_bytes, o.ps_bytes, o.needs_dummy_vb)
+            (o.textures.clone(), o.vs_bytes, o.ps_bytes, o.needs_dummy_vb, o.storage)
         };
+        // The storage buffers it reads, made (outside a render pass) before it opens.
+        let sto_bufs = if storage && self.sto_dirty { Some(self.storage_infos(false)?) } else { None };
         // Textures first: making, copying and layouts are outside a render pass. Each
         // draw looks at them again (one may have been drawn into since it was bound); the
         // set is written again only when what it holds changes.
@@ -495,6 +688,16 @@ impl<'a> Cmd<'a> {
                 }
             }
             self.last_views = views;
+        }
+        if let Some(bufs) = sto_bufs {
+            let set = g.storage_set(2)?;
+            let w: Vec<vk::WriteDescriptorSet> =
+                bufs.iter().enumerate().map(|(i, b)| vk::WriteDescriptorSet::default().dst_set(set).dst_binding(i as u32).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(b)).collect();
+            unsafe {
+                sh.dev.update_descriptor_sets(&w, &[]);
+                sh.dev.cmd_bind_descriptor_sets(cb, vk::PipelineBindPoint::GRAPHICS, layout, 2, &[set], &[]);
+            }
+            self.sto_dirty = false;
         }
         if self.vs_dirty || self.ps_dirty || self.sent.0 < vs_bytes || self.sent.1 < ps_bytes {
             let vn = (vs_bytes as usize).max(self.sent.0 as usize).clamp(16, VS_REGS * 16);

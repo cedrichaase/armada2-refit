@@ -271,6 +271,20 @@ pub struct Lit {
     pub col: V3,
     pub start: f32,
     pub range: f32,
+    /// A cone's wash as the cone (`scene::clusters::add_spot`), where clustered lights
+    /// take it; otherwise the point above.
+    pub cone: Option<ConeLight>,
+}
+
+/// A cone of light: its apex, its axis (unit), how far along it reaches, its half width
+/// at the apex and how much that grows per unit along.
+#[derive(Clone, Copy)]
+pub struct ConeLight {
+    pub apex: V3,
+    pub axis: V3,
+    pub reach: f32,
+    pub hw0: f32,
+    pub slope: f32,
 }
 
 #[repr(C)]
@@ -651,7 +665,7 @@ impl Fx {
             }
             let c = rgb(w.light_col) * (w.light * b.min(3.0));
             let reach = w.light_reach * f.r;
-            self.lights_next.push(Lit { pos: f.pos, col: c, start: reach, range: reach * 0.2 });
+            self.lights_next.push(Lit { pos: f.pos, col: c, start: reach, range: reach * 0.2, cone: None });
         }
     }
 
@@ -685,7 +699,7 @@ impl Fx {
             return;
         }
         // Full to the reach, gone a fifth of it further.
-        self.lights_next.push(Lit { pos, col: rgb(col) * k, start: reach, range: reach * 0.2 });
+        self.lights_next.push(Lit { pos, col: rgb(col) * k, start: reach, range: reach * 0.2, cone: None });
     }
 
     fn beam(&mut self, cam: &Cam, ord: usize, rc: usize, age: usize, now: f32) {
@@ -876,7 +890,11 @@ impl Fx {
             let reach = tr * r.wash_reach;
             let k = r.light * bright;
             if k > 0.01 {
-                self.lights_next.push(Lit { pos, col: rgb(r.light_col) * k, start: reach, range: reach * 0.6 });
+                // With clustered lights the wash is a spot in the cone itself
+                // (ART-DIRECTION.md: the hull inside the cone takes it, and only there):
+                // from the emitter, as wide as the cone, out past the target's far side.
+                let cone = ConeLight { apex: a, axis: d, reach: len + tr * 2.0, hw0, slope: (hw1 - hw0) / len };
+                self.lights_next.push(Lit { pos, col: rgb(r.light_col) * k, start: reach, range: reach * 0.6, cone: Some(cone) });
             }
         }
     }

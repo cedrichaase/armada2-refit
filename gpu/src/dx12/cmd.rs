@@ -13,8 +13,8 @@
 //! scissor. A `Cmd` begins with every register zero, nothing bound and the engine's
 //! viewport, as a Direct3D 9 one does.
 use super::raw::*;
-use super::tex::{Buffer, Texture};
-use super::{dlog, shaders, Att, Garbage, Gpu, PassKey, PassState, Shared, H_RTV, H_SRV, K_WORDS, NULL_2D, NULL_2DMS, NULL_3D, NULL_CUBE, PS_REGS, RP_K, RP_PS, RP_SAMPLER, RP_SRV, RP_VS, SLOTS, SPACES, VS_REGS};
+use super::tex::{Buffer, Storage, Texture};
+use super::{dlog, shaders, Att, Garbage, Gpu, PassKey, PassState, Shared, H_RTV, H_SRV, K_WORDS, NULL_2D, NULL_2DMS, NULL_3D, NULL_CUBE, PS_REGS, RPC_CB, RPC_SAMPLER, RPC_SRV, RPC_STORAGE, RPC_UAV, RP_K, RP_PS, RP_SAMPLER, RP_SRV, RP_STORAGE, RP_VS, SLOTS, SPACES, VS_REGS};
 use crate::frame::{Frame, Span};
 use crate::pixels::Mapped;
 use crate::types::*;
@@ -53,9 +53,11 @@ struct Bound {
     vb: VertexBufferView,
     dummy: u64,
     ib: IndexBufferView,
+    sto: u64,
 }
 
 const UNBOUND: Bound = Bound {
+    sto: 0,
     root: false,
     pso: core::ptr::null_mut(),
     targets: u32::MAX,
@@ -88,6 +90,12 @@ pub struct Cmd<'a> {
     scissor: Rect,
     vp_dirty: bool,
     b: Bound,
+    /// Storage bound by slot: read-only buffers, read-write ones, storage images.
+    sto: [Option<Storage>; STORAGE_SLOTS],
+    sto_rw: [Option<Storage>; STORAGE_SLOTS],
+    simg: [Option<Texture>; STORAGE_SLOTS],
+    /// The compute shaders' register file.
+    cs: Vec<f32>,
 }
 
 impl Drop for Cmd<'_> {
@@ -128,6 +136,10 @@ impl<'a> Cmd<'a> {
             scissor: Rect::new(0, 0, 1 << 15, 1 << 15),
             vp_dirty: true,
             b: UNBOUND,
+            sto: Default::default(),
+            sto_rw: Default::default(),
+            simg: Default::default(),
+            cs: alloc::vec![0.0; VS_REGS * 4],
         })
     }
 
@@ -303,6 +315,161 @@ impl<'a> Cmd<'a> {
         }
     }
 
+    // -- storage and compute --
+
+    pub fn bind_storage(&mut self, slot: u32, s: Option<&Storage>) {
+        if let Some(x) = self.sto.get_mut(slot as usize) {
+            *x = s.cloned();
+        }
+    }
+
+    pub fn bind_storage_rw(&mut self, slot: u32, s: Option<&Storage>) {
+        if let Some(x) = self.sto_rw.get_mut(slot as usize) {
+            *x = s.cloned();
+        }
+    }
+
+    pub fn bind_storage_image(&mut self, slot: u32, t: Option<&Texture>) {
+        if let Some(x) = self.simg.get_mut(slot as usize) {
+            *x = t.cloned();
+        }
+    }
+
+    pub fn cs_block(&mut self, b: Block) {
+        let at = b.base as usize * 4;
+        if at + b.data.len() <= self.cs.len() {
+            self.cs[at..at + b.data.len()].copy_from_slice(b.data);
+        }
+    }
+
+    /// The read-only storage slots' views, each buffer made and put in `state`; an
+    /// empty slot the null view.
+    fn storage_views(&mut self, l: P, state: u32) -> Option<[usize; STORAGE_SLOTS]> {
+        let g = self.gpu;
+        let sh = g.sh()?;
+        let mut v = [sh.null_sto; STORAGE_SLOTS];
+        for (i, s) in self.sto.iter().enumerate() {
+            let Some(s) = s else { continue };
+            if !s.realize(g) {
+                return None;
+            }
+            s.transition(g, l, state);
+            v[i] = s.srv();
+        }
+        Some(v)
+    }
+
+    /// `data` into `s` at byte `offset`, through Display8's upload ring: a copy in the
+    /// list.
+    pub fn write_storage(&mut self, s: &Storage, offset: u32, data: &[u8]) {
+        let g = self.gpu;
+        let n = (data.len().min(s.0.desc.size.saturating_sub(offset) as usize) & !3) as u64;
+        if n == 0 || !s.realize(g) {
+            return;
+        }
+        let Some((src, off)) = g.staging(n, |cpu| unsafe { core::ptr::copy_nonoverlapping(data.as_ptr(), cpu, n as usize) }) else {
+            g.once(1 << 18, format_args!("gpu: Direct3D 12: no upload space for a storage buffer's {} bytes", n));
+            return;
+        };
+        let Some(l) = g.list() else { return };
+        s.transition(g, l, STATE_COPY_DEST);
+        vcall!(l, slot::LIST_COPY_BUFFER_REGION, fn(P, u64, P, u64, u64) -> (), s.res(), offset as u64, src, off, n);
+    }
+
+    /// Every unordered access before is done before any after.
+    pub fn barrier(&mut self) {
+        if let Some(l) = self.gpu.list() {
+            uav_barrier(l, core::ptr::null_mut());
+        }
+    }
+
+    /// Runs `p` over `x` by `y` by `z` groups with the textures, storage and compute
+    /// register file bound now (the compute root signature); the read-write storage
+    /// and images in unordered access, the rest in shader resource, and a barrier
+    /// between unordered accesses after. Whatever draws next sets everything again.
+    pub fn dispatch(&mut self, p: &super::ComputePipeline, x: u32, y: u32, z: u32) -> bool {
+        let g = self.gpu;
+        if !p.realize(g) || x == 0 || y == 0 || z == 0 {
+            return false;
+        }
+        let (pso, uses, cs_bytes) = {
+            let o = p.0.obj.borrow();
+            let Some(o) = o.as_ref() else { return false };
+            (o.pso, o.textures.clone(), o.cs_bytes)
+        };
+        let (Some(sh), Some(l)) = (g.sh(), g.list()) else { return false };
+        let point = g.sampler(&Sampler::POINT_CLAMP);
+        let mut views = [sh.null_srv[NULL_2D]; SLOTS];
+        let mut samps = [point; SLOTS];
+        for u in &uses {
+            let b = u.binding as usize;
+            match self.tex[b].clone().filter(|t| t.realize(g) && t.srv() != 0) {
+                Some(t) => {
+                    g.transition(&t, STATE_SHADER_RESOURCE);
+                    views[b] = t.srv();
+                    samps[b] = g.sampler(&self.samp[b]);
+                }
+                None => {
+                    views[b] = sh.null_srv[match u.dim {
+                        Dim::D3 => NULL_3D,
+                        Dim::Cube => NULL_CUBE,
+                        _ => NULL_2D,
+                    }];
+                }
+            }
+        }
+        let Some(sto) = self.storage_views(l, STATE_SHADER_RESOURCE) else { return false };
+        let mut uav = [sh.null_uav_buf; 2 * STORAGE_SLOTS];
+        for i in 0..STORAGE_SLOTS {
+            uav[STORAGE_SLOTS + i] = sh.null_uav_img;
+            if let Some(s) = self.sto_rw[i].clone() {
+                if !s.realize(g) {
+                    return false;
+                }
+                s.transition(g, l, STATE_UNORDERED_ACCESS);
+                uav[i] = s.uav();
+            }
+            if let Some(t) = self.simg[i].clone() {
+                if !t.realize(g) || t.uav() == 0 {
+                    g.once(1 << 17, format_args!("gpu: Direct3D 12: a storage image bound is not one (Usage::STORAGE)"));
+                    continue;
+                }
+                if t.0.state.get() == STATE_UNORDERED_ACCESS {
+                    uav_barrier(l, t.res());
+                }
+                g.transition(&t, STATE_UNORDERED_ACCESS);
+                uav[STORAGE_SLOTS + i] = t.uav();
+            }
+        }
+        let n = (cs_bytes as usize).clamp(16, VS_REGS * 16);
+        let Some(ca) = upload(&sh, self.cs.as_ptr() as *const u8, n) else { return false };
+        let Some(st) = g.srv_table(&views) else { return false };
+        let Some(sto_t) = g.sto_table(&sto) else { return false };
+        let Some(uav_t) = g.uav_table(&uav) else { return false };
+        let mut stabs = [0u64; SLOTS];
+        for (i, &s) in samps.iter().enumerate() {
+            let Some(t) = g.sampler_table(s) else { return false };
+            stabs[i] = t;
+        }
+        vcall!(l, slot::LIST_SET_COMPUTE_ROOT_SIGNATURE, fn(P) -> (), sh.croot);
+        vcall!(l, slot::LIST_SET_PIPELINE_STATE, fn(P) -> (), pso);
+        for s in 0..SPACES {
+            vcall!(l, slot::LIST_SET_COMPUTE_ROOT_CONSTANT_BUFFER_VIEW, fn(u32, u64) -> (), RPC_CB + s, ca);
+        }
+        vcall!(l, slot::LIST_SET_COMPUTE_ROOT_DESCRIPTOR_TABLE, fn(u32, u64) -> (), RPC_SRV, st);
+        for (i, &t) in stabs.iter().enumerate() {
+            vcall!(l, slot::LIST_SET_COMPUTE_ROOT_DESCRIPTOR_TABLE, fn(u32, u64) -> (), RPC_SAMPLER + i as u32, t);
+        }
+        vcall!(l, slot::LIST_SET_COMPUTE_ROOT_DESCRIPTOR_TABLE, fn(u32, u64) -> (), RPC_STORAGE, sto_t);
+        vcall!(l, slot::LIST_SET_COMPUTE_ROOT_DESCRIPTOR_TABLE, fn(u32, u64) -> (), RPC_UAV, uav_t);
+        vcall!(l, slot::LIST_DISPATCH, fn(u32, u32, u32) -> (), x, y, z);
+        uav_barrier(l, core::ptr::null_mut());
+        // The pipeline state set is a compute one now: every recorder sets its own again.
+        self.forget();
+        g.bump();
+        true
+    }
+
     // -- geometry --
 
     fn ring(&mut self, src: *const u8, n: u32, stride: u32) -> Option<Span> {
@@ -348,10 +515,10 @@ impl<'a> Cmd<'a> {
             self.forget();
         }
         let p = self.pipe.clone()?;
-        let (uses, vs_bytes, ps_bytes, dummy, k, topology) = {
+        let (uses, vs_bytes, ps_bytes, dummy, k, topology, storage) = {
             let o = p.0.obj.borrow();
             let o = o.as_ref()?;
-            (o.textures.clone(), o.vs_bytes, o.ps_bytes, o.needs_dummy_vb, o.k, o.topology)
+            (o.textures.clone(), o.vs_bytes, o.ps_bytes, o.needs_dummy_vb, o.k, o.topology, o.storage)
         };
         let pass = g.with(|s| s.pass.clone().map(|p| (p, s.pass_gen))).flatten()?;
         let (ps, pgen) = pass;
@@ -427,6 +594,14 @@ impl<'a> Cmd<'a> {
         if self.b.srv != table {
             vcall!(l, slot::LIST_SET_GRAPHICS_ROOT_DESCRIPTOR_TABLE, fn(u32, u64) -> (), RP_SRV, table);
             self.b.srv = table;
+        }
+        if storage {
+            let views = self.storage_views(l, STATE_SHADER_RESOURCE)?;
+            let t = g.sto_table(&views)?;
+            if self.b.sto != t {
+                vcall!(l, slot::LIST_SET_GRAPHICS_ROOT_DESCRIPTOR_TABLE, fn(u32, u64) -> (), RP_STORAGE, t);
+                self.b.sto = t;
+            }
         }
         for (i, &s) in samps.iter().enumerate() {
             let t = g.sampler_table(s)?;

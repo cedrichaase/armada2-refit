@@ -305,6 +305,11 @@ impl Module for Ordnance {
         if self.lights.begin_view(&ls, v.time, v.main) {
             crate::scene::regather_lights();
         }
+        // With clustered lights, this module's points are the scene's own (not
+        // registered with the engine): added after the list is read again.
+        for p in self.lights.take_points() {
+            crate::scene::add_point(p);
+        }
         if v.main {
             self.frames = self.frames.wrapping_add(1);
         }

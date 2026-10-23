@@ -34,8 +34,8 @@ mod tex;
 
 pub use cmd::Cmd;
 pub(crate) use cmd::gpu_engine_viewport as engine_viewport;
-pub use pipe::Pipeline;
-pub use tex::{Buffer, Texture, Timer};
+pub use pipe::{ComputePipeline, Pipeline};
+pub use tex::{Buffer, Storage, Texture, Timer};
 
 use crate::display::{Display8, VkFrame8, VkImage8};
 use crate::types::*;
@@ -204,8 +204,20 @@ pub(crate) struct State {
     pub sh: Rc<Shared>,
     pub set0: vk::DescriptorSetLayout,
     pub set1: vk::DescriptorSetLayout,
+    /// Set 2: the read-only storage buffers (every stage); set 3: the read-write ones
+    /// and the storage images (compute).
+    pub set2: vk::DescriptorSetLayout,
+    pub set3: vk::DescriptorSetLayout,
+    /// Graphics: sets 0..2. Compute: sets 0..3.
     pub layout: vk::PipelineLayout,
+    pub clayout: vk::PipelineLayout,
     ubo_pool: vk::DescriptorPool,
+    /// Pools of the backend's own for the storage sets (Display8's frame pool has no
+    /// storage descriptors), one per frame slot, reset when its slot comes round: (the
+    /// frame it was last reset for, the pool).
+    spools: Vec<(u64, vk::DescriptorPool)>,
+    /// A small storage buffer bound where a slot a shader reads has nothing.
+    pub dummy_storage: Option<Storage>,
     samplers: Vec<(Sampler, vk::Sampler)>,
     /// Render passes by (compatibility, loads: 2 bits each, colours then depth).
     passes: Vec<((PassKey, u32), vk::RenderPass)>,
@@ -357,9 +369,12 @@ impl Gpu {
         let dv = &sh.dev;
         // Set 0: each stage's register file, a dynamic uniform buffer. Set 1: the
         // Direct3D 9 stages' textures, combined image samplers.
+        // A compute shader's register file is binding 0's (its cbuffers at b0), and it
+        // reads textures as the other stages do.
+        let (vsf, psf, csf) = (vk::ShaderStageFlags::VERTEX, vk::ShaderStageFlags::FRAGMENT, vk::ShaderStageFlags::COMPUTE);
         let b0 = [
-            vk::DescriptorSetLayoutBinding::default().binding(0).descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC).descriptor_count(1).stage_flags(vk::ShaderStageFlags::VERTEX),
-            vk::DescriptorSetLayoutBinding::default().binding(1).descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC).descriptor_count(1).stage_flags(vk::ShaderStageFlags::FRAGMENT),
+            vk::DescriptorSetLayoutBinding::default().binding(0).descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC).descriptor_count(1).stage_flags(vsf | csf),
+            vk::DescriptorSetLayoutBinding::default().binding(1).descriptor_type(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC).descriptor_count(1).stage_flags(psf),
         ];
         let mut b1 = Vec::new();
         for i in 0..SLOTS as u32 {
@@ -368,19 +383,33 @@ impl Gpu {
                     .binding(i)
                     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .descriptor_count(1)
-                    .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT),
+                    .stage_flags(vsf | psf | csf),
             );
+        }
+        // Set 2: read-only storage buffers; set 3: read-write ones, then storage images.
+        let mut b2 = Vec::new();
+        let mut b3 = Vec::new();
+        for i in 0..STORAGE_SLOTS as u32 {
+            b2.push(vk::DescriptorSetLayoutBinding::default().binding(i).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vsf | psf | csf));
+            b3.push(vk::DescriptorSetLayoutBinding::default().binding(i).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(csf));
+        }
+        for i in 0..STORAGE_SLOTS as u32 {
+            b3.push(vk::DescriptorSetLayoutBinding::default().binding(STORAGE_SLOTS as u32 + i).descriptor_type(vk::DescriptorType::STORAGE_IMAGE).descriptor_count(1).stage_flags(csf));
         }
         let made = (|| unsafe {
             let set0 = dv.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&b0), None).ok()?;
             let set1 = dv.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&b1), None).ok()?;
-            let sets = [set0, set1];
+            let set2 = dv.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&b2), None).ok()?;
+            let set3 = dv.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo::default().bindings(&b3), None).ok()?;
+            let sets = [set0, set1, set2];
             let layout = dv.create_pipeline_layout(&vk::PipelineLayoutCreateInfo::default().set_layouts(&sets), None).ok()?;
+            let csets = [set0, set1, set2, set3];
+            let clayout = dv.create_pipeline_layout(&vk::PipelineLayoutCreateInfo::default().set_layouts(&csets), None).ok()?;
             let sizes = [vk::DescriptorPoolSize { ty: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, descriptor_count: 512 }];
             let ubo_pool = dv.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(256).pool_sizes(&sizes), None).ok()?;
-            Some((set0, set1, layout, ubo_pool))
+            Some((set0, set1, set2, set3, layout, clayout, ubo_pool))
         })();
-        let Some((set0, set1, layout, ubo_pool)) = made else {
+        let Some((set0, set1, set2, set3, layout, clayout, ubo_pool)) = made else {
             vlog!(self, "gpu: Vulkan: the pipeline layout could not be made");
             return false;
         };
@@ -403,8 +432,13 @@ impl Gpu {
             sh,
             set0,
             set1,
+            set2,
+            set3,
             layout,
+            clayout,
             ubo_pool,
+            spools: Vec::new(),
+            dummy_storage: None,
             samplers: Vec::new(),
             passes: Vec::new(),
             dummies: [None, None, None],
@@ -425,6 +459,11 @@ impl Gpu {
 
     pub fn ready(&self) -> bool {
         self.st.borrow().is_some()
+    }
+
+    /// Compute and storage: every Vulkan device's graphics queue has them.
+    pub fn compute(&self) -> bool {
+        self.ready()
     }
 
     pub(crate) fn sh(&self) -> Option<Rc<Shared>> {
@@ -806,6 +845,51 @@ impl Gpu {
         }
     }
 
+    /// A storage set (set 2 or 3's layout) from the backend's pool of the frame slot
+    /// now; the pool is reset the first time its slot is asked for in a new frame
+    /// (whatever it held is two frames old by then).
+    pub(crate) fn storage_set(&self, which: u32) -> Option<vk::DescriptorSet> {
+        let sh = self.sh()?;
+        let (slot, index, layout) = self.with(|s| (s.frame.slot as usize % sh.fif.max(1) as usize, s.frame.index, if which == 3 { s.set3 } else { s.set2 }))?;
+        let pool = self.with(|s| {
+            while s.spools.len() <= slot {
+                let sizes = [
+                    vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_BUFFER, descriptor_count: 4096 },
+                    vk::DescriptorPoolSize { ty: vk::DescriptorType::STORAGE_IMAGE, descriptor_count: 1024 },
+                ];
+                let p = unsafe { sh.dev.create_descriptor_pool(&vk::DescriptorPoolCreateInfo::default().max_sets(512).pool_sizes(&sizes), None) }.unwrap_or_default();
+                s.spools.push((u64::MAX, p));
+            }
+            let e = &mut s.spools[slot];
+            if e.0 != index {
+                e.0 = index;
+                unsafe { sh.dev.reset_descriptor_pool(e.1, vk::DescriptorPoolResetFlags::empty()) }.ok();
+            }
+            e.1
+        })?;
+        if pool == vk::DescriptorPool::null() {
+            return None;
+        }
+        let layouts = [layout];
+        match unsafe { sh.dev.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(&layouts)) } {
+            Ok(v) => Some(v[0]),
+            Err(e) => {
+                self.once(1 << 26, format_args!("gpu: Vulkan: the frame's storage descriptors are spent ({:?}); draws and dispatches are dropped", e));
+                None
+            }
+        }
+    }
+
+    /// The storage buffer bound where a slot a shader uses has nothing (16 bytes).
+    pub(crate) fn dummy_storage(&self) -> Option<Storage> {
+        if let Some(Some(b)) = self.with(|s| s.dummy_storage.clone()) {
+            return Some(b);
+        }
+        let b = Storage::new(StorageDesc { size: 64, stride: 4 });
+        self.with(|s| s.dummy_storage = Some(b.clone()));
+        Some(b)
+    }
+
     // -- Display8's objects --
 
     /// One of Display8's images, wrapped (one wrapper per image while it lives).
@@ -896,6 +980,14 @@ impl Gpu {
 
     pub fn pipeline(&self, desc: PipelineDesc) -> Pipeline {
         pipe::Pipeline::new(desc)
+    }
+
+    pub fn storage(&self, desc: StorageDesc) -> Storage {
+        Storage::new(desc)
+    }
+
+    pub fn compute_pipeline(&self, desc: ComputeDesc) -> ComputePipeline {
+        pipe::ComputePipeline::new(desc)
     }
 
     pub fn begin<'a>(&'a self, frame: &'a mut crate::Frame) -> Option<Cmd<'a>> {

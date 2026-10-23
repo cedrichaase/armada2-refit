@@ -177,6 +177,12 @@ pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> P
     }
     mods::begin_view(&v);
     timing::mark("setup");
+    // Every light of the view is in by now: binned for the clustered draws (Vulkan and
+    // Direct3D 12, `[Lights] Clustered=1`).
+    if crate::scene::clusters::on() {
+        crate::scene::clusters::build(&v);
+        timing::mark("light clusters");
+    }
     unsafe {
         // 8: sky, stars, background objects; then the depth is cleared for the scene.
         if !mods::step(Step::Background, &v) {

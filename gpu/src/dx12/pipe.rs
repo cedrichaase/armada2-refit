@@ -52,6 +52,8 @@ pub(crate) struct PipeObj {
     pub vs_bytes: u32,
     pub ps_bytes: u32,
     pub needs_dummy_vb: bool,
+    /// The shaders read storage buffers (t16..t23).
+    pub storage: bool,
     /// The root constants at b2: the alpha test's interval (lo, hi, invert).
     pub k: [f32; K_WORDS as usize],
     pub topology: u32,
@@ -243,6 +245,7 @@ impl Pipeline {
             vs_bytes: vr.ubo_bytes.div_ceil(16) * 16,
             ps_bytes: pr.ubo_bytes.div_ceil(16) * 16,
             needs_dummy_vb: dummy,
+            storage: vr.storage.iter().chain(pr.storage.iter()).any(|s| s.set == 2),
             k,
             topology: topology(d.topology).1,
         })
@@ -402,4 +405,81 @@ pub(crate) fn create(sh: &Shared, pd: &GraphicsPipelineDesc) -> Option<P> {
     let mut pso: P = core::ptr::null_mut();
     let hr = vcall!(sh.dev, slot::DEV_CREATE_GRAPHICS_PIPELINE_STATE, fn(*const GraphicsPipelineDesc, *const Guid, *mut P) -> i32, pd, &IID_PIPELINE_STATE, &mut pso);
     (hr >= 0 && !pso.is_null()).then_some(pso)
+}
+
+// ---- compute --------------------------------------------------------------------------
+
+/// A compute pipeline (`ComputeDesc`): its DXIL with the compute root signature; what it
+/// reads is read out of the SPIR-V of the same source, as for the graphics ones.
+#[derive(Clone)]
+pub struct ComputePipeline(pub(crate) Rc<CompInner>);
+
+pub(crate) struct CompInner {
+    pub desc: ComputeDesc,
+    pub obj: RefCell<Option<CompObj>>,
+    failed: Cell<bool>,
+}
+
+pub(crate) struct CompObj {
+    sh: Rc<Shared>,
+    pub pso: P,
+    pub textures: Vec<TexUse>,
+    pub cs_bytes: u32,
+}
+
+impl Drop for CompObj {
+    fn drop(&mut self) {
+        self.sh.retire(super::Garbage::Com(self.pso));
+    }
+}
+
+impl ComputePipeline {
+    pub(crate) fn new(desc: ComputeDesc) -> ComputePipeline {
+        ComputePipeline(Rc::new(CompInner { desc, obj: RefCell::new(None), failed: Cell::new(false) }))
+    }
+
+    pub fn desc(&self) -> &ComputeDesc {
+        &self.0.desc
+    }
+
+    pub fn ready(&self, gpu: &Gpu) -> bool {
+        self.realize(gpu)
+    }
+
+    pub(crate) fn realize(&self, gpu: &Gpu) -> bool {
+        let p = &self.0;
+        if p.obj.borrow().is_some() {
+            return true;
+        }
+        if p.failed.get() {
+            return false;
+        }
+        let made = (|| {
+            let sh = gpu.sh()?;
+            if sh.croot.is_null() || p.desc.cs.dxil.is_empty() {
+                dlog!(gpu, "gpu: Direct3D 12: a compute pipeline without DXIL or a compute root signature; what dispatches it stands down");
+                return None;
+            }
+            let r = spirv::reflect(p.desc.cs.spirv)?;
+            let pd = ComputePipelineDesc { root: sh.croot, cs: ShaderBytecode::of(p.desc.cs.dxil), node_mask: 0, cached: CachedPso { blob: core::ptr::null(), len: 0 }, flags: 0 };
+            let mut pso: P = core::ptr::null_mut();
+            let hr = vcall!(sh.dev, slot::DEV_CREATE_COMPUTE_PIPELINE_STATE, fn(*const ComputePipelineDesc, *const Guid, *mut P) -> i32, &pd, &IID_PIPELINE_STATE, &mut pso);
+            if hr < 0 || pso.is_null() {
+                dlog!(gpu, "gpu: Direct3D 12: the device refused a compute pipeline ({:#x})", hr);
+                return None;
+            }
+            let textures = r.textures.iter().copied().filter(|t| (t.binding as usize) < super::SLOTS).collect();
+            Some(CompObj { sh, pso, textures, cs_bytes: r.ubo_bytes.div_ceil(16) * 16 })
+        })();
+        match made {
+            Some(o) => {
+                *p.obj.borrow_mut() = Some(o);
+                true
+            }
+            None => {
+                p.failed.set(true);
+                false
+            }
+        }
+    }
 }

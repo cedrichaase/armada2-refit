@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.58.0 — 2026-10-23
+
+### Added
+- The `battle` scene (sixteen ships and a planet, over a hundred lights) and
+  `render3d-clustered`, which pauses it on one tick for render3d's clustered lights and
+  their GPU timings (`render3d/bench-ini.sh`).
+
+Installed, not yet seen in game.
+
 ## 3.57.1 — 2026-10-23
 
 ### Changed

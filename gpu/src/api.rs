@@ -359,6 +359,35 @@ impl Gpu {
         }
     }
 
+    /// Whether compute and storage are there (`Cmd::dispatch`, `Gpu::storage`, storage
+    /// images): on Vulkan and Direct3D 12; never on Direct3D 9, where every storage
+    /// object is an empty one and every dispatch does nothing.
+    pub fn compute(&self) -> bool {
+        match self.mode() {
+            VULKAN => self.vk.compute(),
+            D3D12 => self.dx.compute(),
+            _ => false,
+        }
+    }
+
+    /// A storage buffer (`StorageDesc`); an empty one on Direct3D 9.
+    pub fn storage(&self, desc: StorageDesc) -> Storage {
+        match self.make_on() {
+            VULKAN => Storage::Vk(self.vk.storage(desc)),
+            D3D12 => Storage::Dx(self.dx.storage(desc)),
+            _ => Storage::None,
+        }
+    }
+
+    /// A compute pipeline; an empty one on Direct3D 9 (never ready).
+    pub fn compute_pipeline(&self, desc: ComputeDesc) -> ComputePipeline {
+        match self.make_on() {
+            VULKAN => ComputePipeline::Vk(self.vk.compute_pipeline(desc)),
+            D3D12 => ComputePipeline::Dx(self.dx.compute_pipeline(desc)),
+            _ => ComputePipeline::None,
+        }
+    }
+
     pub fn timer(&self, n: usize) -> Timer {
         match self.make_on() {
             VULKAN => Timer::Vk(self.vk.timer(n)),
@@ -531,6 +560,57 @@ impl Pipeline {
     }
 }
 
+/// A storage buffer (`Gpu::storage`). Clones share it. `None` on Direct3D 9.
+#[derive(Clone)]
+pub enum Storage {
+    None,
+    Vk(vulkan::Storage),
+    Dx(dx12::Storage),
+}
+
+impl Storage {
+    pub fn desc(&self) -> Option<StorageDesc> {
+        match self {
+            Storage::None => None,
+            Storage::Vk(s) => Some(s.desc()),
+            Storage::Dx(s) => Some(s.desc()),
+        }
+    }
+
+    fn vk(&self) -> Option<&vulkan::Storage> {
+        match self {
+            Storage::Vk(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    fn dx(&self) -> Option<&dx12::Storage> {
+        match self {
+            Storage::Dx(s) => Some(s),
+            _ => None,
+        }
+    }
+}
+
+/// A compute pipeline (`Gpu::compute_pipeline`). `None` on Direct3D 9.
+#[derive(Clone)]
+pub enum ComputePipeline {
+    None,
+    Vk(vulkan::ComputePipeline),
+    Dx(dx12::ComputePipeline),
+}
+
+impl ComputePipeline {
+    /// Made on the device now: false if it cannot be (or on Direct3D 9).
+    pub fn ready(&self, gpu: &Gpu) -> bool {
+        match self {
+            ComputePipeline::None => false,
+            ComputePipeline::Vk(p) => p.ready(&gpu.vk),
+            ComputePipeline::Dx(p) => p.ready(&gpu.dx),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum Timer {
     D9(d3d9::Timer),
@@ -666,6 +746,77 @@ impl<'a> Cmd<'a> {
         }
         for b in g.ps {
             self.ps_block(*b);
+        }
+    }
+
+    // -- storage and compute (nothing on Direct3D 9) --
+
+    /// A read-only storage buffer at `slot` (`STORAGE(n)`: t16 + n), for draws and
+    /// dispatches.
+    pub fn bind_storage(&mut self, slot: u32, s: Option<&Storage>) {
+        match &mut self.inner {
+            CmdInner::D9(_) => {}
+            CmdInner::Vk(c) => c.bind_storage(slot, s.and_then(|s| s.vk())),
+            CmdInner::Dx(c) => c.bind_storage(slot, s.and_then(|s| s.dx())),
+        }
+    }
+
+    /// A read-write storage buffer at `slot` (`STORAGE_RW(n)`: u n), for dispatches.
+    pub fn bind_storage_rw(&mut self, slot: u32, s: Option<&Storage>) {
+        match &mut self.inner {
+            CmdInner::D9(_) => {}
+            CmdInner::Vk(c) => c.bind_storage_rw(slot, s.and_then(|s| s.vk())),
+            CmdInner::Dx(c) => c.bind_storage_rw(slot, s.and_then(|s| s.dx())),
+        }
+    }
+
+    /// A storage image (a texture made with `Usage::STORAGE`) at `slot`
+    /// (`STORAGE_IMAGE_*(n)`: u 8 + n), for dispatches; its first level.
+    pub fn bind_storage_image(&mut self, slot: u32, t: Option<&Texture>) {
+        match &mut self.inner {
+            CmdInner::D9(_) => {}
+            CmdInner::Vk(c) => c.bind_storage_image(slot, t.and_then(|t| t.vk())),
+            CmdInner::Dx(c) => c.bind_storage_image(slot, t.and_then(|t| t.dx())),
+        }
+    }
+
+    /// Registers of the compute shaders' register file (their cbuffers at b0).
+    pub fn cs_block(&mut self, b: Block) {
+        match &mut self.inner {
+            CmdInner::D9(_) => {}
+            CmdInner::Vk(c) => c.cs_block(b),
+            CmdInner::Dx(c) => c.cs_block(b),
+        }
+    }
+
+    /// `data` into a storage buffer at byte `offset`, through the frame's upload ring,
+    /// ordered before whatever reads it after (whole words).
+    pub fn write_storage(&mut self, s: &Storage, offset: u32, data: &[u8]) {
+        match (&mut self.inner, s) {
+            (CmdInner::Vk(c), Storage::Vk(s)) => c.write_storage(s, offset, data),
+            (CmdInner::Dx(c), Storage::Dx(s)) => c.write_storage(s, offset, data),
+            _ => {}
+        }
+    }
+
+    /// Runs a compute pipeline over `x` by `y` by `z` groups with what is bound now.
+    /// Ordered after what came before and before what comes after: what it writes is
+    /// read by the next draw or dispatch as it left it. False: nothing was run.
+    pub fn dispatch(&mut self, p: &ComputePipeline, x: u32, y: u32, z: u32) -> bool {
+        match (&mut self.inner, p) {
+            (CmdInner::Vk(c), ComputePipeline::Vk(p)) => c.dispatch(p, x, y, z),
+            (CmdInner::Dx(c), ComputePipeline::Dx(p)) => c.dispatch(p, x, y, z),
+            _ => false,
+        }
+    }
+
+    /// A barrier between everything recorded before and after (a dispatch and a copy
+    /// already place their own).
+    pub fn barrier(&mut self) {
+        match &mut self.inner {
+            CmdInner::D9(_) => {}
+            CmdInner::Vk(c) => c.barrier(),
+            CmdInner::Dx(c) => c.barrier(),
         }
     }
 

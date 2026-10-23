@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.24.0 — 2026-10-23
+
+Layers: render3d 0.23.0 (with gpu's compute), testbench 3.58.0.
+
+### Added
+- render3d's clustered lights on Vulkan and Direct3D 12: every light lights the hulls,
+  planets, moons and asteroids near it per pixel; phaser beams as line lights; the
+  tractor and assimilation wash confined to the cone. `[Lights] Clustered=0` turns it
+  off; Direct3D 9 is unchanged (render3d 0.23.0).
+- gpu: compute (storage buffers and images, compute pipelines, dispatches, barriers) on
+  Vulkan and Direct3D 12, `Gpu::compute` off on Direct3D 9 (render3d 0.23.0).
+- testbench: the `battle` scene and `render3d-clustered` (testbench 3.58.0).
+
+Installed, not yet seen in game.
+
 ## 13.23.0 — 2026-10-23
 
 Layers: display 0.8.0, ui 0.19.2, testbench 3.57.1.
