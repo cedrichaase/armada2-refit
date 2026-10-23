@@ -9,9 +9,12 @@
 //! be made, the stock body runs as it always did.
 //!
 //! The targets and passes are `gpu`'s (gpu/README.md). The scene pass is begun before
-//! the body and left bound while it runs: the engine and the modules not yet ported to
-//! `gpu` draw into it with raw Direct3D 9 calls (a pass's targets stay bound after its
-//! `Cmd` on the Direct3D 9 backend).
+//! the body and left bound while it runs: the engine draws into it with its own calls
+//! (a pass's targets stay bound after its `Cmd` on the Direct3D 9 backend), and the
+//! modules through `gpu`, beginning it again after a pass of their own (`scene_pass`,
+//! `gfx::view_pass`). What this module reads of the engine's device (the d3d9 device
+//! behind d3d8, the view's viewport, the `Reset` and `DestroyRenderSurfaces` hooks) is
+//! the one raw Direct3D 9 left in render3d, glue Display8 will answer itself.
 pub mod post;
 pub mod steps;
 
