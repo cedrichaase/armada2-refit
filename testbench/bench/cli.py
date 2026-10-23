@@ -61,8 +61,11 @@ a2test -- run Armada II headless and test it end to end
   a2test drive wait-text "TEXT" [--timeout S]
   a2test drive where                   which ui.json screen this is, its known edges and
                                        the labels on it not yet followed (UI graph)
-  a2test drive goto SCREEN [--verify]  walk the UI graph there, every hop confirmed (by
-                                       its earned log line; --verify: by OCR as well)
+  a2test drive goto SCREEN [--verify] [--allow EFFECT]
+                                       walk the UI graph there, every hop confirmed (by
+                                       its earned log line; --verify: by OCR as well);
+                                       --allow ends-game|destroys|changes-settings: take
+                                       such an action (ui.json `effects`) on the way
   a2test drive step "any scenario step"   run one step of the scenario grammar
   a2test drive dump [NAME]             Render3D.asi's targets (PFM) and UI.asi's presented
                                        frame (PPM), read back in the game, into dumps/NAME/
@@ -597,6 +600,8 @@ def cmd_graph(argv):
             if want and e['frm'] != want:
                 continue
             sig = f'  log: {e["signature"]["log"]} "{e["signature"]["line"]}"' if e.get('signature') else ''
+            eff = g.effect(e['action'])
+            sig += f'  ({eff})' if eff else ''
             print(f'{e["frm"]} -> {uigraph.describe(e["action"])} -> {e["to"] or "?"}  '
                   f'[{e["variant"]}, x{e["n"]} of {e["seen"]}]{sig}')
         return 0
@@ -775,8 +780,13 @@ def cmd_drive(argv):
         return 0 if scr else 1
     elif sub == 'goto':
         from . import uigraph, uigraph_a2
-        verify = '--verify' in rest
-        name = ' '.join(a for a in rest if a != '--verify')
+        ap = argparse.ArgumentParser(prog='a2test drive goto')
+        ap.add_argument('screen', nargs='+')
+        ap.add_argument('--verify', action='store_true')
+        ap.add_argument('--allow', action='append', default=[],
+                        choices=['ends-game', 'destroys', 'changes-settings', 'leaves-mission'])
+        a = ap.parse_args(rest)
+        verify, name, allow = a.verify, ' '.join(a.screen), uigraph.ALLOW | set(a.allow)
         g = uigraph_a2.load_graph()
         dst = g.screen(name)
         if dst is None:
@@ -784,7 +794,7 @@ def cmd_drive(argv):
         lines = []
         try:
             uigraph.goto(uigraph_a2.Adapter(_bare_case(s)), g, dst, uigraph_a2.STORE, verify=verify,
-                         say=lambda l: (lines.append(l), print(l)))
+                         say=lambda l: (lines.append(l), print(l)), allow=allow)
         except uigraph.GraphError as e:
             log.action(f'goto {dst}: {e}', status='fail', detail='\n'.join(lines) or None)
             print(f'failed: {e}')

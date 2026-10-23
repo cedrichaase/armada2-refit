@@ -24,6 +24,10 @@ from pathlib import Path
 
 from . import vision
 
+# What a walk may do on its way unless told otherwise (ui.json `effects`): leaving a
+# mission is a route back to the shell; ending the game, destroying something (a save)
+# or changing a setting (the display mode) never is.
+ALLOW = frozenset({'leaves-mission'})
 EARN = 3          # visual arrivals that must all carry a log line before goto may trust it
 SETTLE = 1.5      # after an action, before the first look: a frame or two must be drawn
 LOOK_TIMEOUT = 8  # how long an observed action watches for a screen change
@@ -281,7 +285,7 @@ class Graph:
         self.ui = ui
         self.screens = ui.get('screens', {})
         self.edges = folded.get('edges', [])
-        self.avoid = {a.lower() for a in ui.get('avoid', [])}
+        self.effects = {k.lower(): v for k, v in ui.get('effects', {}).items() if not k.startswith('_')}
 
     def screen(self, name):
         """A screen by name or alias, as ui.json names it."""
@@ -291,15 +295,22 @@ class Graph:
                 return k
         return None
 
-    def avoided(self, e):
-        a = e['action']
-        return any(str(a.get(k, '')).lower() in self.avoid for k in ('target', 'text', 'key', 'near'))
+    def effect(self, a):
+        """What an action does besides moving between screens (ui.json `effects`, by
+        target, label or key), or None."""
+        for k in ('target', 'text', 'key', 'near'):
+            eff = self.effects.get(str(a.get(k, '')).lower())
+            if eff:
+                return eff
+        return None
 
-    def path(self, src, dst, variant=None):
+    def path(self, src, dst, variant=None, allow=ALLOW):
         """The fewest hops from src to dst over edges known to land somewhere, this
-        front end's first; None if there is no known way."""
+        front end's first, taking only actions whose effect is in `allow`; None if there
+        is no known way."""
         for pool in ([e for e in self.edges if e.get('variant') == variant], self.edges):
-            usable = [e for e in pool if e.get('to') and e['to'] != e['frm'] and not self.avoided(e)]
+            usable = [e for e in pool if e.get('to') and e['to'] != e['frm']
+                      and (self.effect(e['action']) or 'none') in set(allow) | {'none'}]
             prev = {src: None}
             q = collections.deque([src])
             while q:
@@ -317,10 +328,11 @@ class Graph:
         return None
 
 
-def goto(ad, graph, dst, store, verify=False, max_hops=12, say=print):
+def goto(ad, graph, dst, store, verify=False, max_hops=12, say=print, allow=ALLOW):
     """Walk to `dst` over the known edges.  A hop with an earned signature waits for its
     log line (unless `verify`); every other hop, and every hop under `verify`, waits to
-    see the screen.  Each hop is recorded, so walking keeps the graph true; a hop that
+    see the screen.  Only actions whose ui.json effect is in `allow` are taken.  Each
+    hop is recorded, so walking keeps the graph true; a hop that
     lands elsewhere is recorded as such and the walk goes on from there."""
     words, _ = ad.look()
     cur = identify(graph.screens, words)
@@ -332,9 +344,15 @@ def goto(ad, graph, dst, store, verify=False, max_hops=12, say=print):
     for _ in range(max_hops):
         if cur == dst:
             return hops
-        way = graph.path(cur, dst, variant)
+        way = graph.path(cur, dst, variant, allow)
         if not way:
-            raise GraphError(f'on the {cur}: no known way to the {dst} (a2test graph show {cur!r}; '
+            barred = graph.path(cur, dst, variant, allow={'ends-game', 'destroys', 'changes-settings',
+                                                          'leaves-mission'})
+            why = ''
+            if barred:
+                effs = sorted({graph.effect(e['action']) for e in barred} - set(allow) - {None})
+                why = f'; the only known way {", ".join(effs)} (--allow {" --allow ".join(effs)})'
+            raise GraphError(f'on the {cur}: no known way to the {dst}{why} (a2test graph show {cur!r}; '
                              f'explore with drive click and fold)')
         e = way[0]
         scr = graph.screens.get(e['to'], {})

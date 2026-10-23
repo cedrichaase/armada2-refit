@@ -17,7 +17,7 @@ UI = {
     },
     'targets': {'single player': {'at': [141, 111], 'label': 'SINGLE PLAYER'},
                 'previous menu': {'at': [113, 580], 'label': 'Previous Menu'}},
-    'avoid': ['exit'],
+    'effects': {'exit': 'ends-game', 'abort mission': 'leaves-mission'},
 }
 
 # What each screen shows, and which actions go where, writing which log lines.
@@ -138,9 +138,19 @@ def main():
         e = next(e for e in folded['edges'] if e['action'] == sp)
         check('signature' not in e, 'a visual arrival without the line demotes the edge')
 
-        # No way there; an avoided edge is never taken.
-        graph = uigraph.Graph(dict(UI, avoid=['single player']), folded)
-        check(graph.path('main', 'single player', 'ui') is None, 'an avoided action is no way')
+        # An action with an effect a walk may not afford is no way, unless allowed.
+        graph = uigraph.Graph(dict(UI, effects={'single player': 'destroys'}), folded)
+        check(graph.path('main', 'single player', 'ui') is None, 'a destroying action is no way by default')
+        check(graph.path('main', 'single player', 'ui', allow={'destroys'}) is not None, '... unless allowed')
+        graph = uigraph.Graph(dict(UI, effects={'single player': 'leaves-mission'}), folded)
+        check(graph.path('main', 'single player', 'ui') is not None, 'leaving a mission is a route by default')
+        try:
+            uigraph.goto(FakeGame(), uigraph.Graph(dict(UI, effects={'single player': 'ends-game'}), folded),
+                         'single player', store, say=said.append)
+            check(False, 'goto names the effect that bars the only way')
+        except uigraph.GraphError as e:
+            check('ends-game' in str(e) and '--allow ends-game' in str(e), 'goto names the effect that bars the only way')
+        graph = uigraph.Graph(UI, folded)
         try:
             uigraph.goto(FakeGame(at='credits'), graph, 'main', store, say=said.append)
             check(False, 'goto refuses on a screen it cannot name')

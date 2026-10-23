@@ -11,11 +11,13 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - The UI graph (`UIGRAPH.md`): `a2test drive click`, `click-text` and `key` record where
   they went, starting from a known screen, into `$A2_DATA/uigraph/observations.jsonl`
   (`A2TEST_GRAPH=0` turns it off). `a2test drive where`, `a2test drive goto SCREEN
-  [--verify]` and the step `Go to the <screen>` walk the graph, every hop confirmed on
+  [--verify] [--allow EFFECT]` and the step `Go to the <screen>` walk the graph, every hop confirmed on
   sight or by a log line the edge has earned. `a2test graph fold` writes
   `testbench/uigraph.json`; `graph show`, `path`, `frontier` and `unknown` read it.
   `bench/uigraph_selftest.py` covers folding and walking.
-- `ui.json` key `avoid`: actions that `goto` never takes.
+- `ui.json` key `effects`: what an action does besides moving between screens (`ends-game`,
+  `destroys`, `changes-settings`, `leaves-mission`); `drive goto` takes `leaves-mission`
+  on its way and the others only with `--allow EFFECT`.
 
 ### Fixed
 - Design-space clicks under a refit install whose UI.asi stood down (no Direct3D 9

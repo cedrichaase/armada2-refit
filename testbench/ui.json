@@ -1,7 +1,14 @@
 {
   "_about": "Named screens and click targets for scenario steps. A target's `label` is clicked instead of its point (by OCR) while UI.asi draws the main menu or the campaign selection over render3d's 3D scene, where the stock art and its points are not shown (UI.log: menus: scene <name> on). Screens are recognised by text OCR must find on them. Targets are in the shell's 800x600 DESIGN space unless they name another `space` (hud: HUD canvas units anchored top left; hud-right: anchored top right, at stock's 1600-wide position) (Menus.asi maps them to the screen; see Case.design_to_screen) and were measured off bench screenshots. Menu buttons are the pictures, not the labels under them: the labels are painted into the background and do not take clicks.",
-  "avoid": ["exit", "exit to windows", "quit", "delete", "abort mission"],
-  "_avoid": "UI graph (testbench/UIGRAPH.md): actions on these targets, labels or keys are recorded but never taken by `drive goto` or a mapping pass: they end the game or destroy something",
+  "effects": {
+    "_about": "UI graph (testbench/UIGRAPH.md): what an action on this target, label or key does besides moving between screens. Every action is recorded; `drive goto` takes leaves-mission on its way and the others only with --allow EFFECT (a mapping pass likewise): ends-game kills the session, destroys removes what a later step may need, changes-settings changes how the rest of the session runs",
+    "exit": "ends-game",
+    "exit to windows": "ends-game",
+    "quit": "ends-game",
+    "abort mission": "leaves-mission",
+    "delete": "destroys",
+    "display mode": "changes-settings"
+  },
   "screens": {
     "main": {
       "aliases": ["main menu", "title", "title screen"],

@@ -97,9 +97,26 @@ breadth-first from where it starts, walking back with `goto`, until the frontier
 empty or a budget is spent, writing the same observations. Run it when there is no
 graph (another game, a fresh `ui.json`), or after a change to a large part of the menus,
 scoped to that part (`--from "single player"`). Many edges going stale at once is the
-hint that one is due. `ui.json`'s `avoid` lists actions that end the game or destroy
-something (Exit, Exit to Windows, Delete). They are recorded when an agent takes them
-by hand, but neither `goto` nor a mapping pass ever takes them.
+hint that one is due.
+
+## Effects: what a walk may do on its way
+
+`goto` and a mapping pass choose their own clicks, and a few clicks do more than move
+between screens. `ui.json`'s `effects` tags those by target, label or key, and a walk
+takes one only if it can afford what it does:
+
+| Effect | Examples | Taken by `goto` | Why |
+|---|---|---|---|
+| `leaves-mission` | Abort Mission | yes | the route from a mission back to the shell |
+| `ends-game` | Exit, Exit to Windows, Quit | with `--allow ends-game` | the session is dead after it; a relaunch costs 40 s to 2 min, and a mapping pass would keep "discovering" it |
+| `destroys` | Delete | with `--allow destroys` | removes what a later step may need (a save in the clone) |
+| `changes-settings` | the display mode | with `--allow changes-settings` | the rest of the session runs differently, at another resolution |
+
+The bench runs on a throwaway clone, so none of this can harm the install. The costs
+fall on the session and the steps after the walk. Every action is still recorded when
+an agent takes it by hand, so the graph knows these edges. When the only known way
+needs one, `goto` says which effect and which `--allow` would take it. A mapping pass
+puts these labels on the frontier and clicks none of them unless allowed.
 
 ## The adapter
 
