@@ -726,6 +726,33 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `PB_CLSS*.sod` drew pixel for pixel like stock, so don't re-try new planet meshes.
   The dilithium moons are ordinary SODs smoothed by `models/moon-sod.py`.
 
+### display
+
+- **Display8 is the game's `d3d8.dll`**; the real chain (d3d8to9) sits behind it as
+  `d3d8_real.dll`, and `d3d8.dll.a2display-backup` is what `a2mod stock` puts back. Every
+  Direct3D 8 interface is an object of ours with every slot's exact `__stdcall` argument
+  list (Wine's `d3d8.h`): one argument off unbalances the engine's stack.
+- **The plugins chain slots of our device's vtable** (`Reset`, `Present`) as they did on
+  d3d8to9's, so the vtables are patchable statics and Display8 never calls its own
+  methods through them. `MoveWindow` and `SetWindowPos` in the exe's imports are the
+  UI's to hook: the tracer leaves them alone (the UI stands down if they are hooked).
+- **Callers are read off the stack**: the exact return address, then a scan for values
+  just past a `call` in the exe. The scan finds stale addresses too: the `BeginScene`
+  "caller" of the order ring was one. Confirm with `Display8.go` (a detail capture of the
+  draws) or a `[Drop]` A/B before acting on a deep caller.
+- **Stub mode offers one display mode, the desktop's**, so the engine, the HUD and the
+  mouse all agree with the swap chain; never add the engine's mode list back. What the
+  plugins read of the engine's state (transforms, viewport, `Clear`, the targets) must
+  reach whatever they draw on; everything else stays in Display8. A texture a plugin
+  samples is a mirror (`stub/mod.rs`); the gamma ramp is the frame's last pass.
+- **One device and one frame for both plugins**: on Vulkan (and Direct3D 12) Display8
+  owns them and hands them out through the plain C exports of `gpu/src/display.rs`, the
+  contract both sides build against; change both sides together.
+- Bench: `--install .` installs Display8 (tracing in a clone, `Trace=auto`);
+  `display/bench-mode.sh` sets its mode from a `Setup:`; `display/stub-scenario.sh`
+  makes any scenario's stub variant; `display-inventory`, `display-engine-draws`,
+  `display-drop`, `display-stub`.
+
 ### ui
 
 - **Every frame of UI is `surface::frame(context)`**, called by one hook per context in
