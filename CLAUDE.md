@@ -70,9 +70,11 @@ the install and a headless display. **Keep the ID `session start` prints, pass
 required). Other jobs run sessions on the same bench: stop only the sessions you
 started, never one from `session list` you don't recognise (`testbench/README.md`,
 "Which session a command acts on"). **The bench runs on the user's own GPU**: a GPU
-hang in a bench game crashed the user's desktop once, so run one game at a time
-(`a2test run -j 1`), at `--res 1280x720` unless fine detail is judged, and stop
-sessions promptly. **Say what you are doing**: `./a2test drive --session ID note "..."`
+hang in a bench game crashed the user's desktop once, so run at 1280x720 unless fine
+detail is judged and stop sessions promptly. Bench games may use `a2test`'s slots in
+parallel (up to three at once, across agents); a run whose result is a GPU time in
+milliseconds (`Timing=1`) runs alone, since other games skew it, while pixel
+comparisons under `--clock bench` are unaffected. **Say what you are doing**: `./a2test drive --session ID note "..."`
 when you start driving and whenever your intent changes (the dashboard, `./a2test watch`,
 shows it). Before driving the game, read `testbench/README.md`, "Operating the
 game: what agents learned", and the staging recipes in `testbench/operating/`. Write regression scenarios in `testbench/scenarios/` for fixes
