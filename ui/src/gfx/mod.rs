@@ -8,6 +8,7 @@
 //! after a `Reset` or on a new device, from what was registered here.
 use crate::shaders::ui::{PS_UI, VS_UI};
 use crate::shaders::ui_spv::{PS_UI_SPV, VS_UI_SPV};
+use crate::shaders::ui_dxil::{PS_UI_DXIL, VS_UI_DXIL};
 use alloc::vec::Vec;
 use gpu::{
     attr, AttrFormat, Blend, BlendEq, BlendOp, Block, ColorTarget, Contents, DepthTarget, Factor, Format, Load,
@@ -561,7 +562,7 @@ fn pipeline_additive(target: Format) -> Option<&'static gpu::Pipeline> {
     unsafe {
         if PIPE_ADD.as_ref().is_none_or(|(f, _)| *f != target) {
             let stride = core::mem::size_of::<Vertex>() as u32;
-            let mut d = PipelineDesc::new(gpu::code!(VS_UI, VS_UI_SPV), gpu::code!(PS_UI, PS_UI_SPV), &LAYOUT, stride, Topology::TriangleList, target);
+            let mut d = PipelineDesc::new(gpu::code!(VS_UI, VS_UI_SPV, VS_UI_DXIL), gpu::code!(PS_UI, PS_UI_SPV, PS_UI_DXIL), &LAYOUT, stride, Topology::TriangleList, target);
             d.blend = Some(Blend {
                 color: BlendEq { src: Factor::SrcAlpha, dst: Factor::One, op: BlendOp::Add },
                 alpha: Some(BlendEq { src: Factor::Zero, dst: Factor::One, op: BlendOp::Add }),
@@ -579,7 +580,7 @@ fn pipeline(dev: usize, target: Format) -> Option<&'static gpu::Pipeline> {
     unsafe {
         if PIPE.as_ref().is_none_or(|(f, _)| *f != target) {
             let stride = core::mem::size_of::<Vertex>() as u32;
-            let mut d = PipelineDesc::new(gpu::code!(VS_UI, VS_UI_SPV), gpu::code!(PS_UI, PS_UI_SPV), &LAYOUT, stride, Topology::TriangleList, target);
+            let mut d = PipelineDesc::new(gpu::code!(VS_UI, VS_UI_SPV, VS_UI_DXIL), gpu::code!(PS_UI, PS_UI_SPV, PS_UI_DXIL), &LAYOUT, stride, Topology::TriangleList, target);
             // Straight alpha over the frame; the target's alpha gathers coverage.
             d.blend = Some(Blend {
                 color: BlendEq { src: Factor::SrcAlpha, dst: Factor::InvSrcAlpha, op: BlendOp::Add },
@@ -593,7 +594,7 @@ fn pipeline(dev: usize, target: Format) -> Option<&'static gpu::Pipeline> {
         if TOLD != Some(dev) {
             TOLD = Some(dev);
             if ok {
-                crate::log!("gfx: ready on the {} device", if gpu().is_vulkan() { "Vulkan" } else { "d3d9" });
+                crate::log!("gfx: ready on the {} device", gpu().backend_name());
             } else {
                 crate::log!("gfx: could not make the shaders: the UI draws nothing");
             }

@@ -258,7 +258,7 @@ float3 dither(float3 col, float2 vpos)
 
 // The reference (Face=0): every pixel, every frame, in one shader of about 8800
 // slots, so only on a card that takes that many (DXVK takes any).
-float4 sky_ps(float3 ray : TEXCOORD0, float4 fc : SV_Position) : SV_Target
+float4 sky_ps(DXIL_POS_FIRST(float3 ray : TEXCOORD0, float4 fc : SV_Position)) : SV_Target
 {
     float2 vpos = d3d9_vpos(fc);
     float3 dir = normalize(ray);
@@ -354,7 +354,7 @@ float fine_z(float3 dir)
     return s * rsqrt(n);
 }
 
-float4 draw_ps(float3 ray : TEXCOORD0, float4 fc : SV_Position) : SV_Target
+float4 draw_ps(DXIL_POS_FIRST(float3 ray : TEXCOORD0, float4 fc : SV_Position)) : SV_Target
 {
     float2 vpos = d3d9_vpos(fc);
     float3 dir = normalize(ray);
@@ -437,7 +437,7 @@ cbuffer sky_ps4 : register(b1)
     float4 k_tcol  : CREG(31);  // rgb: the tint
 };
 
-float4 tunnel_ps(float3 ray : TEXCOORD0, float4 fc : SV_Position) : SV_Target
+float4 tunnel_ps(DXIL_POS_FIRST(float3 ray : TEXCOORD0, float4 fc : SV_Position)) : SV_Target
 {
     float2 vpos = d3d9_vpos(fc);
     float3 d = normalize(ray);

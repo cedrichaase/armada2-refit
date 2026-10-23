@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.53.0 — 2026-10-23
+
+### Added
+- A game with `Mode=stub`, `Backend=d3d12` and `Validate=1` in its clone's
+  `Display8.ini` gets the Khronos validation layer under vkd3d-proton, writing
+  `logs/vvl.log` (`session.vulkan_env`).
+
+Installed, not yet seen in game.
+
 ## 3.52.0 — 2026-10-23
 
 ### Added

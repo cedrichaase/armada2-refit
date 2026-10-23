@@ -1,4 +1,4 @@
-// entries: vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE
+// entries: vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE:at
 // Sprites of the particles module (src/mods/particles/): particles and SOD sprite
 // nodes, built on the CPU as quads in the world (parallel to the image plane, as the
 // engine's ST3D_Sprite::DrawScaled3D draws them), textured and tinted as stock's

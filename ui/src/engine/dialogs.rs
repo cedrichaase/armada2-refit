@@ -571,9 +571,9 @@ fn refuse(proc_: usize, owner: HWND) -> Option<&'static str> {
         return Some("no 3D window");
     }
     if crate::engine::d3d8_device().is_null()
-        || (!crate::gfx::gpu().is_vulkan() && gpu::d3d9::raw::Device::from_d3d8(crate::engine::d3d8_device()).is_none())
+        || (!crate::gfx::gpu().on_display() && gpu::d3d9::raw::Device::from_d3d8(crate::engine::d3d8_device()).is_none())
     {
-        return Some("no Direct3D 9 or Vulkan device to draw with");
+        return Some("no Direct3D 9, Vulkan or Direct3D 12 device to draw with");
     }
     if !owner.is_null() && owner != game && !is_hosted(owner) {
         return Some("its owner is a window the UI does not host");

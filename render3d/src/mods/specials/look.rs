@@ -20,6 +20,7 @@ use crate::rt::Ini;
 use crate::scene;
 use crate::shaders::specials::*;
 use crate::shaders::specials_spv::*;
+use crate::shaders::specials_dxil::*;
 
 pub const KINDS: usize = 3;
 const NAMES: [&str; KINDS] = ["Override", "Drain", "Psionic"];
@@ -250,7 +251,7 @@ impl Looks {
     /// and not written, red, green and blue.
     fn pipe(&mut self, cull: Cull) -> Option<Pipeline> {
         self.pipes.view(cull as u64, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_FX, VS_FX_SPV), gpu::code!(PS_FX, PS_FX_SPV), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_FX, VS_FX_SPV, VS_FX_DXIL), gpu::code!(PS_FX, PS_FX_SPV, PS_FX_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = Some(Blend::ADD);
             d.write_mask = 7;

@@ -38,6 +38,7 @@ mod api;
 pub mod chain;
 pub mod d3d9;
 pub mod display;
+pub mod dx12;
 mod frame;
 pub mod pixels;
 pub mod types;

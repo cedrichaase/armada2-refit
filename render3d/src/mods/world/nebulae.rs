@@ -43,6 +43,7 @@ use crate::math;
 use crate::rt::{self, Ini};
 use crate::shaders::world_nebula::*;
 use crate::shaders::world_nebula_spv::*;
+use crate::shaders::world_nebula_dxil::*;
 use crate::{log, scene};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -836,7 +837,7 @@ const P_TEMPORAL: u64 = 3;
 const P_COMP: u64 = 4;
 /// The march in 8, 12, 16 and 24 steps (`Steps=`): P_MARCH + 0..3.
 const P_MARCH: u64 = 8;
-const MARCH_PS: [gpu::Code; 4] = [gpu::code!(PS_MARCH8, PS_MARCH8_SPV), gpu::code!(PS_MARCH12, PS_MARCH12_SPV), gpu::code!(PS_MARCH16, PS_MARCH16_SPV), gpu::code!(PS_MARCH24, PS_MARCH24_SPV)];
+const MARCH_PS: [gpu::Code; 4] = [gpu::code!(PS_MARCH8, PS_MARCH8_SPV, PS_MARCH8_DXIL), gpu::code!(PS_MARCH12, PS_MARCH12_SPV, PS_MARCH12_DXIL), gpu::code!(PS_MARCH16, PS_MARCH16_SPV, PS_MARCH16_DXIL), gpu::code!(PS_MARCH24, PS_MARCH24_SPV, PS_MARCH24_DXIL)];
 
 pub struct Nebulae {
     cfg: Settings,
@@ -916,12 +917,12 @@ impl Nebulae {
     fn pipe(&mut self, which: u64) -> Option<Pipeline> {
         let f16 = Format::Rgba16F;
         let (vs, ps, layout, stride, topo): (gpu::Code, gpu::Code, &'static [VertexAttr], u32, Topology) = match which {
-            P_NEB => (gpu::code!(VS_NEB, VS_NEB_SPV), gpu::code!(PS_NEB, PS_NEB_SPV), &SLICE, 20, Topology::TriangleList),
-            P_VOL => (gpu::code!(VS_NEB, VS_NEB_SPV), gpu::code!(PS_VOL, PS_VOL_SPV), &SLICE, 20, Topology::TriangleList),
-            P_BAKE => (gpu::code!(VS_NBAKE, VS_NBAKE_SPV), gpu::code!(PS_NBAKE, PS_NBAKE_SPV), &SLICE, 20, Topology::TriangleStrip),
-            P_TEMPORAL => (gpu::code!(VS_QUAD, VS_QUAD_SPV), gpu::code!(PS_TEMPORAL, PS_TEMPORAL_SPV), &SLICE, 20, Topology::TriangleStrip),
-            P_COMP => (gpu::code!(VS_QUAD, VS_QUAD_SPV), gpu::code!(PS_COMP, PS_COMP_SPV), &SLICE, 20, Topology::TriangleStrip),
-            _ => (gpu::code!(VS_MARCH, VS_MARCH_SPV), MARCH_PS[(which - P_MARCH) as usize & 3], &XYZ, 12, Topology::TriangleList),
+            P_NEB => (gpu::code!(VS_NEB, VS_NEB_SPV, VS_NEB_DXIL), gpu::code!(PS_NEB, PS_NEB_SPV, PS_NEB_DXIL), &SLICE, 20, Topology::TriangleList),
+            P_VOL => (gpu::code!(VS_NEB, VS_NEB_SPV, VS_NEB_DXIL), gpu::code!(PS_VOL, PS_VOL_SPV, PS_VOL_DXIL), &SLICE, 20, Topology::TriangleList),
+            P_BAKE => (gpu::code!(VS_NBAKE, VS_NBAKE_SPV, VS_NBAKE_DXIL), gpu::code!(PS_NBAKE, PS_NBAKE_SPV, PS_NBAKE_DXIL), &SLICE, 20, Topology::TriangleStrip),
+            P_TEMPORAL => (gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), gpu::code!(PS_TEMPORAL, PS_TEMPORAL_SPV, PS_TEMPORAL_DXIL), &SLICE, 20, Topology::TriangleStrip),
+            P_COMP => (gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), gpu::code!(PS_COMP, PS_COMP_SPV, PS_COMP_DXIL), &SLICE, 20, Topology::TriangleStrip),
+            _ => (gpu::code!(VS_MARCH, VS_MARCH_SPV, VS_MARCH_DXIL), MARCH_PS[(which - P_MARCH) as usize & 3], &XYZ, 12, Topology::TriangleList),
         };
         let mut d = PipelineDesc::new(vs, ps, layout, stride, topo, Format::Unknown);
         match which {

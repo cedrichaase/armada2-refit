@@ -206,6 +206,11 @@ impl Dx {
             return Err("CreateEventA failed");
         }
 
+        let samplers = crate::dxvk_samplers();
+        log!("d3d12: the plugins' samplers as dxvk.conf has DXVK make them: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
+        if crate::d3d9_centres() {
+            log!("d3d12: PixelCentres=d3d9: the plugins draw with Direct3D 9's pixel centres (for comparing)");
+        }
         let mut me = Dx {
             dev,
             queue,
@@ -252,6 +257,9 @@ impl Dx {
                 increments: inc,
                 heaps: [0, 0],
                 uniform_align: CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+                features: gpu::display::FEATURE_ANISOTROPY | if crate::d3d9_centres() { gpu::display::FEATURE_D3D9_CENTRES } else { 0 },
+                sampler_anisotropy: samplers.0,
+                sampler_lod_bias: samplers.1,
             },
             frame_out: Dx12Frame8::default(),
             lost: false,
@@ -827,6 +835,35 @@ impl Dx {
         } else if self.index == 1 || self.index == 1000 {
             log!("d3d12: frame {} presented", self.index);
         }
+        true
+    }
+
+    /// Submits what the frame now has recorded, waits for it, and opens the same list
+    /// again with its heaps set (`display8_dx12_flush`: a plugin's read-back). The
+    /// frame's ring, descriptors and deferred calls stay as they are.
+    pub fn flush(&mut self) -> bool {
+        if self.lost {
+            return false;
+        }
+        if !self.recording {
+            return true;
+        }
+        let s = &self.slots[self.slot];
+        let (alloc, l) = (s.alloc, s.list);
+        let hr = vcall!(l, slot::LIST_CLOSE, fn() -> i32,);
+        if hr < 0 {
+            log!("d3d12: flush: the frame's command list did not close: {:#x}", hr as u32);
+            return false;
+        }
+        let lists = [l];
+        vcall!(self.queue, slot::QUEUE_EXECUTE_COMMAND_LISTS, fn(u32, *const P) -> (), 1, lists.as_ptr());
+        self.fence_value += 1;
+        vcall!(self.queue, slot::QUEUE_SIGNAL, fn(P, u64) -> i32, self.fence, self.fence_value);
+        self.wait(self.fence_value);
+        vcall!(alloc, slot::ALLOC_RESET, fn() -> i32,);
+        vcall!(l, slot::LIST_RESET, fn(P, P) -> i32, alloc, core::ptr::null_mut());
+        let heaps = [self.views_heap, self.samplers_heap];
+        vcall!(l, slot::LIST_SET_DESCRIPTOR_HEAPS, fn(u32, *const P) -> (), 2, heaps.as_ptr());
         true
     }
 

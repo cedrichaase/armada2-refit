@@ -1,4 +1,4 @@
-// entries: vs_plane:vs_3_0:VS_PLANE ps_fog_bspline:ps_3_0:PS_FOG_BSPLINE ps_fog_catrom:ps_3_0:PS_FOG_CATROM ps_colour:ps_3_0:PS_COLOUR ps_ghost:ps_3_0:PS_GHOST vs_line:vs_3_0:VS_LINE ps_line:ps_3_0:PS_LINE
+// entries: vs_plane:vs_3_0:VS_PLANE ps_fog_bspline:ps_3_0:PS_FOG_BSPLINE ps_fog_catrom:ps_3_0:PS_FOG_CATROM ps_colour:ps_3_0:PS_COLOUR ps_ghost:ps_3_0:PS_GHOST:at vs_line:vs_3_0:VS_LINE ps_line:ps_3_0:PS_LINE
 // The overlays module (src/mods/overlays/): the fog of war and the shroud with
 // smooth edges (ported from Fog.asi), the tactical grid's lines, the
 // selection bubbles and the fog-of-war ghosts.
@@ -145,6 +145,7 @@ float4 ps_colour() : SV_Target
 //   c8..c11  their colours
 
 struct GI {
+    DXIL_POS_MEMBER
     float2 uv  : TEXCOORD0;
     float3 nrm : TEXCOORD1;
     float3 wp  : TEXCOORD2;
