@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.27.0 — 2026-10-23
+
+Layers: testbench 3.61.0, ui 0.20.1, render3d 0.23.2, qol 1.6.4, cutscenes 2.1.1.
+
+### Fixed
+- `ui-hud-bar` and `ui-hud-map` press Home before selecting at measured places, and
+  check in `UI.log` that the click selected the unit: the Warzone start view now opens
+  zoomed out in some runs, where their fixed clicks selected nothing (testbench 3.61.0).
+- Several `./install`s of one tree at once (`a2test -j`) no longer clash in its builds:
+  `ui/build.sh` writes `mod.rs` and `UI.asi` through temp files of its own (ui 0.20.1),
+  `render3d/hlsl-rs.sh` puts each shader file in place by one rename (render3d 0.23.2),
+  and the QOL and Bink proxy builds take a lock (qol 1.6.4, cutscenes 2.1.1).
+
+Installed, not yet seen in game.
+
 ## 13.26.0 — 2026-10-23
 
 Layers: ui 0.20.0, testbench 3.60.0.

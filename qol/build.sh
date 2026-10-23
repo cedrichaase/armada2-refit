@@ -8,6 +8,10 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 out="$here/build"
 mkdir -p "$out"
+# One build of this tree at a time: several installs of one checkout can run at once
+# (a2test -j), and every file below has a fixed name in build/.
+exec 9>"$out/.build.lock"
+flock 9
 
 llvm-dlltool -m i386 --kill-at -d "$here/kernel32.def" -l "$out/kernel32.lib"
 

@@ -5,6 +5,20 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.61.0 — 2026-10-23
+
+### Fixed
+- `ui-hud-bar` and `ui-hud-map` press Home (`center_player`) before they select, and
+  click at the places measured after it (the first Assembler at 640,175, the Nexus at
+  870,290 at 1280x720; `ui-hud-bar` places the station at 450,450): the Warzone start
+  view opens zoomed out in some runs, where the click at 890,60 selected nothing.
+  `ui-hud-bar` now checks each selection in `UI.log` ("| Assembler |", "| Nexus |").
+- `ui-hud-map`'s minimap check asks for the base's race emblem and lets it cover the
+  clearing, which it does when the start is in a corner of the map.
+- `README.md`: parallel installs of one tree, and Home before a click on a unit.
+
+Installed, not yet seen in game.
+
 ## 3.60.0 — 2026-10-23
 
 ### Added

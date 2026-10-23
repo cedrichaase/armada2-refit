@@ -5,6 +5,14 @@ plan for the rest. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs an
 versions". Newest first. Details, and the planned changes, are in
 [`README.md`](README.md).
 
+## 1.6.4 — 2026-10-23
+
+### Fixed
+- `build.sh` takes a lock (`build/.build.lock`), so two builds of one tree at once
+  (`a2test -j` installing one checkout twice) no longer write the same files in `build/`.
+
+Installed, not yet seen in game.
+
 ## 1.6.3 — 2026-10-21
 
 ### Changed
