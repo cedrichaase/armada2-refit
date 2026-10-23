@@ -5,6 +5,24 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.26.0 — 2026-10-23
+
+Layers: ui 0.20.0, testbench 3.60.0.
+
+### Added
+- The placement markers drawn by the UI in the theme, in every Display8 mode and on
+  every backend: the footprint under a station being placed (clear: green, bracketed;
+  blocked: red, hatched) and the cells other objects take (amber tiles; red and crossed
+  under the footprint). `[HUD] Placement=0` gives the engine's sprites (ui 0.20.0).
+- `ui-placement` (testbench 3.60.0).
+
+### Fixed
+- The footprint under a station being placed went missing on maps with many taken
+  cells, wherever the UI draws the engine's last draws (in stub mode nothing else
+  draws it) (ui 0.20.0).
+
+Installed, not yet seen in game.
+
 ## 13.24.1 — 2026-10-23
 
 Layers: render3d 0.23.1.

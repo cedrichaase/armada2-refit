@@ -1,9 +1,10 @@
 //! The engine's last draws in a mission, drawn by the UI (`engine::leftovers`; HUD.md,
 //! "The engine's last draws"). Each keeps the engine's look: the drag box four white
 //! lines a pixel wide, the height posts green or red lines a pixel wide, the fade a
-//! rectangle of its colour at its alpha, the unit view's video between two black bars.
-//! They are drawn first in the UI's frame, under every panel of ours, where the engine
-//! drew them (in the 3D view, under its HUD).
+//! rectangle of its colour at its alpha, the unit view's video between two black bars;
+//! all but the placement markers, which are drawn in the theme (`placement`, `[HUD]
+//! Placement=1`). They are drawn first in the UI's frame, under every panel of ours,
+//! where the engine drew them (in the 3D view, under its HUD).
 use crate::engine::leftovers;
 use crate::gfx::{Color, R};
 use crate::widgets::Ui;
@@ -25,6 +26,13 @@ pub fn run(ui: &mut Ui) {
     let f = leftovers::take();
     for r in &f.rings {
         ring(ui, r);
+    }
+    let ours = crate::config::get().hud.placement;
+    for p in &f.places {
+        super::placement::run(ui, p, ours);
+    }
+    if f.places.is_empty() {
+        super::placement::none();
     }
     for v in &f.video {
         video(ui, v);
@@ -72,14 +80,20 @@ fn ring_tex(texture: usize) -> crate::gfx::Tex {
 /// The order ring or a build footprint: its sprite's rectangle of its texture on the
 /// four projected corners, added to the frame as the engine's z-sorted sprites are.
 fn ring(ui: &mut Ui, r: &leftovers::Ring) {
-    let tex = ring_tex(r.texture);
-    let Some((c, tw, th)) = crate::engine::radar::engine_texture(r.texture) else { return };
-    crate::gfx::tex_set_external(tex, Some(c), tw, th);
-    let [u0, v0, u1, v1] = r.uv;
-    let uv = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)];
     ui.draw.push_clip(clip_rect(r.clip));
-    ui.draw.quad_additive(tex, r.corners, uv, rgb(r.rgb, 1.0));
+    engine_sprite(ui, r.corners, r.texture, r.uv, r.rgb);
     ui.draw.pop_clip();
+}
+
+/// An engine sprite on four corners on the screen: its rectangle (`uv`: u0, v0, u1, v1)
+/// of the engine's texture (`ST3D_Texture`), tinted, added to the frame.
+pub fn engine_sprite(ui: &mut Ui, corners: [(f32, f32); 4], texture: usize, uv: [f32; 4], col: [f32; 3]) {
+    let tex = ring_tex(texture);
+    let Some((c, tw, th)) = crate::engine::radar::engine_texture(texture) else { return };
+    crate::gfx::tex_set_external(tex, Some(c), tw, th);
+    let [u0, v0, u1, v1] = uv;
+    let uv = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)];
+    ui.draw.quad_additive(tex, corners, uv, rgb(col, 1.0));
 }
 
 /// The video as `BlitToBlackBackground` lays it out: as wide as the rectangle, at the

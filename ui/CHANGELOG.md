@@ -4,6 +4,24 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.20.0 — 2026-10-23
+
+### Added
+- The placement markers in the theme (`hud::placement`, `[HUD] Placement=1`): a
+  station's footprint green with corner brackets where the place is clear, red and
+  hatched where it is not; the cells other objects take as amber tiles fading with
+  distance from it, and those under it red and crossed. `Placement=0` draws the
+  engine's sprites. Validity stays the engine's. `UI.log`: "placement: footprint
+  blocked, ...". `gfx::Draw::poly`, `line_soft` and `band` draw them.
+
+### Fixed
+- The footprint under a station being placed was not drawn when the map had more than
+  256 taken cells (`RenderFootprints` draws one quad per taken cell before the
+  footprint, and the UI kept 256 quads a frame): the cells are now recorded apart, up to
+  8192, with their camera, and culled to the viewport when drawn.
+
+Installed, not yet seen in game.
+
 ## 0.19.2 — 2026-10-23
 
 ### Changed
