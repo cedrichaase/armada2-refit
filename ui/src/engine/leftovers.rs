@@ -22,6 +22,12 @@
 //!   grid effects (the ring at a move order's destination) into a quad on the map's
 //!   plane and submits it to the z-sort through `ST3D_Sprite::DrawQuad` (a `call
 //!   rel32`). Ours projects the corners as for the height posts.
+//! - **The build footprints**: `PlaceholderFeature::RenderFootprints` (which render3d's
+//!   terrain step calls as stock's does) draws a placement's footprint the same way,
+//!   one quad on the map's plane through `ST3D_Sprite::DrawQuad`: the sprite at `+0x28`
+//!   when the place is clear (`+0x74`), else the one at `+0x2c`; in the map editor, a
+//!   quad per grid cell with the sprite at `+0x24`. Its three calls are taken as the
+//!   order ring's are, and drawn the same way.
 //! - **The fade**: `ScreenFade::Render` (in the cinematic view's render list only)
 //!   steps the fade's alpha (`+0x2c`, by `+0x30` a frame), finishes a script's wait when
 //!   it reaches 0 or 1, writes the alpha into its material (`+0x24`) and draws the
@@ -53,6 +59,9 @@ const SITE_GRID_FX: usize = 0x522537;
 /// `cOverViewImp::mRenderWhere`'s: the same sprite, still, at the point it marks.
 const SITE_WHERE: usize = 0x5222f0;
 const FN_SPRITE_DRAW_QUAD: usize = 0x63a7c0;
+/// `PlaceholderFeature::RenderFootprints`'s three `call ST3D_Sprite::DrawQuad`: the
+/// editor's cells, a clear placement, a blocked one.
+const SITES_FOOTPRINT: [usize; 3] = [0x473a05, 0x473a77, 0x473a8e];
 /// `ST3D_Texture::DemandLoad(device index)`, thiscall: 0 when the texture is on that
 /// device.
 const FN_DEMAND_LOAD: usize = 0x642610;
@@ -115,12 +124,15 @@ pub struct Video {
     pub size: (u32, u32),
 }
 
-/// The order ring: its four corners on screen, the sprite's texture (`ST3D_Texture`)
-/// and its colour.
+/// The order ring or a build footprint: its four corners on screen, the sprite's
+/// texture (`ST3D_Texture`) and its colour.
 #[derive(Clone, Copy)]
 pub struct Ring {
     pub corners: [(f32, f32); 4],
     pub texture: usize,
+    /// The sprite's rectangle of it: u0, v0, u1, v1 (the footprints are quarters of
+    /// one texture; the ring is all of its own).
+    pub uv: [f32; 4],
     pub rgb: [f32; 3],
     pub clip: [f32; 4],
 }
@@ -198,6 +210,18 @@ pub fn install(overview: bool, fade: bool, video: bool) -> u32 {
             } else {
                 crate::log!("leftovers: the order ring's call at {:#x} is not stock: the engine draws it", site);
             }
+        }
+        // All three or none, so a placement is never drawn by both.
+        let feet = tex_stock
+            && unsafe { DEMAND_LOAD_OK }
+            && SITES_FOOTPRINT.iter().all(|&s| hook::call_target(s) == Some(FN_SPRITE_DRAW_QUAD));
+        if feet {
+            for &s in &SITES_FOOTPRINT {
+                hook::patch_call(s, FN_SPRITE_DRAW_QUAD, footprint as *const () as usize);
+            }
+            n += 1;
+        } else {
+            crate::log!("leftovers: RenderFootprints' draws are not stock: the engine draws the build footprints");
         }
     }
     if fade {
@@ -328,6 +352,17 @@ unsafe extern "thiscall" fn height_post(cam: usize, a: *const [f32; 3], b: *cons
 /// plane at the order's destination. The sprite (`gridFXSprite`) covers its whole
 /// texture.
 unsafe extern "thiscall" fn grid_fx(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4]) {
+    unsafe { quad(sprite, cam, corners, "order ring", 16) }
+}
+
+/// `ST3D_Sprite::DrawQuad` as `RenderFootprints` calls it: the footprint's four corners
+/// on the map's plane, its sprite green or red by whether the place is clear.
+unsafe extern "thiscall" fn footprint(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4]) {
+    unsafe { quad(sprite, cam, corners, "build footprint", 64) }
+}
+
+/// A sprite's quad on the map's plane, projected and recorded to be drawn by the UI.
+unsafe fn quad(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4], what: &str, bit: u32) {
     if sprite == 0 || cam == 0 || corners.is_null() {
         return;
     }
@@ -340,7 +375,7 @@ unsafe extern "thiscall" fn grid_fx(sprite: usize, cam: usize, corners: *const [
         for (k, v) in o.iter_mut().enumerate() {
             *v = p[0] * m[k] + p[1] * m[4 + k] + p[2] * m[8 + k] + m[12 + k];
         }
-        // A corner behind the eye: the ring is under the camera, not drawn.
+        // A corner behind the eye: the quad is under the camera, not drawn.
         if o[3] < 1.0e-3 {
             return;
         }
@@ -352,7 +387,7 @@ unsafe extern "thiscall" fn grid_fx(sprite: usize, cam: usize, corners: *const [
     let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(FN_SPRITE_TEXTURE) };
     let tex = unsafe { get(sprite) };
     let rgb = colour(sprite + SPRITE_COLOUR);
-    log_once(16, || crate::log!("leftovers: order ring at {:.0},{:.0} {:.0},{:.0} {:.0},{:.0} {:.0},{:.0}, colour {:.2} {:.2} {:.2}", out[0].0, out[0].1, out[1].0, out[1].1, out[2].0, out[2].1, out[3].0, out[3].1, rgb[0], rgb[1], rgb[2]));
+    log_once(bit, || crate::log!("leftovers: {} at {:.0},{:.0} {:.0},{:.0} {:.0},{:.0} {:.0},{:.0}, colour {:.2} {:.2} {:.2}", what, out[0].0, out[0].1, out[1].0, out[1].1, out[2].0, out[2].1, out[3].0, out[3].1, rgb[0], rgb[1], rgb[2]));
     if tex == 0 {
         return;
     }
@@ -366,8 +401,10 @@ unsafe extern "thiscall" fn grid_fx(sprite: usize, cam: usize, corners: *const [
         }
     }
     let f = unsafe { &mut *core::ptr::addr_of_mut!(FRAME) };
-    if f.rings.len() < 64 {
-        f.rings.push(Ring { corners: out, texture: tex, rgb, clip: vp });
+    if f.rings.len() < 256 {
+        let uv = super::sprite::uv(sprite);
+        let uv = if uv.iter().all(|v| v.is_finite() && (-0.01..=1.01).contains(v)) { uv } else { [0.0, 0.0, 1.0, 1.0] };
+        f.rings.push(Ring { corners: out, texture: tex, uv, rgb, clip: vp });
     }
 }
 

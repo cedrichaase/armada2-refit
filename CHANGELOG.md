@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.10.0 — 2026-10-23
+
+Layers: ui 0.17.2, testbench 3.49.1.
+
+### Fixed
+- A placement's build footprint was not drawn with Display8 in stub mode; the UI now
+  draws it, as the order ring (ui 0.17.2).
+- `ui-hud-map` and `ui-hud-bar` click the Assembler and the Nexus where the start view
+  puts them (testbench 3.49.1).
+
+Installed, not yet seen in game.
+
 ## 13.9.0 — 2026-10-23
 
 Layers: display 0.4.0, render3d 0.20.0, ui 0.17.1.

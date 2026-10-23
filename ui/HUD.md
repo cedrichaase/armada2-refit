@@ -1070,7 +1070,7 @@ frame, under every panel of ours, as the engine drew it under its HUD. Each keep
 engine's look; nothing here is restyled.
 
     [HUD]
-    Overview=1    ; the drag box, the height posts and the order ring
+    Overview=1    ; the drag box, the height posts, the order ring and the build footprints
     Fade=1        ; ScreenFade
     UnitVideo=1   ; the in-mission Bink (the unit view's video)
 
@@ -1079,6 +1079,7 @@ engine's look; nothing here is restyled.
 | The drag box | `cOverViewImp::mNormalModeRender`'s `call ST3D_Device::DrawWireframeRectangle` (0x52220a) | the box (left, top, width, height) in the main camera's viewport, which is in pixels (`ST3D_Camera+0x1b0`: left, top, width, height), and its colour (white) | four lines a pixel wide along its edges, clipped to that viewport |
 | The height posts | `DrawHeightPost`'s `call ST3D_Camera::ClipAndRenderLine` (0x5938a0) | the line from the unit to the map's plane, projected with the camera it was given (`+0x160`, a 4x4 matrix; the screen is `left + (width - 1) * x / w`, as `ST3D_Camera::ProjectPoint` maps it), cut at the eye; green above the plane, red below | a line a pixel wide, clipped to the viewport |
 | The order ring | `cOverViewImp::mRenderGridFX`'s `call ST3D_Sprite::DrawQuad` (0x522537), and `mRenderWhere`'s (0x5222f0), the same sprite standing still at the point it marks | the four corners of the turning ring (`gridFXSprite`, which covers its whole texture `GgridFX`) projected as the height posts are, the sprite's texture and colour (`+0x24`) | the texture on those corners, added to the frame (an additive pipeline of the UI's, `Draw::quad_additive`), clipped to the viewport |
+| The build footprints | `PlaceholderFeature::RenderFootprints`'s three `call ST3D_Sprite::DrawQuad`: the editor's cells (0x473a05), a clear placement (0x473a77), a blocked one (0x473a8e) | the footprint's corners on the map's plane, projected as the order ring's, the sprite's texture, colour and rectangle of the texture (`+0x38`) | as the order ring |
 | The fade | `ScreenFade::Render`'s two `call [edx+0x1c]` (the device's `DrawClippedRectangle`), white at 0x5076cc and black at 0x507704 | the rectangle (the camera's viewport), the colour and the alpha the fade wrote into its material (`+0x24`) | a rectangle of that colour at that alpha |
 | The unit view's video | `CinematicView`'s two calls of `BinkThread::BlitToBlackBackground` (0x4e5da5, 0x4e6153), and inside it the two `call ST3D_Device::DrawRectangle` (0x46457c, 0x4645cd) and the `call ST3D_Sprite::DrawScaled2D` (0x464656) | the rectangle it was called with, the sprite's texture (`ST3D_Sprite::GetTexture`) and the video's size (`s_width`, `s_height`) | the rectangle black, then the video as wide as it at the video's aspect, centred, from the engine's texture (its Direct3D 9 twin, as the minimap's picture) |
 
@@ -1117,6 +1118,18 @@ fans through the trifan buffer. Display8 named it by `BeginScene`'s return addre
 (0x623ea5): a stale address its stack scan found, not a caller. Ours is drawn over
 the 3D view without its depth, so a ship between the camera and the ring no longer
 hides it.
+
+**The build footprints** are what a placement draws on the map's plane under the
+cursor: render3d's terrain step calls `RenderFootprints` as stock's does, which draws
+one quad, the sprite `valid_build` (`+0x28`) when the place is clear (`+0x74`) and
+`invalid_build` (`+0x2c`) when not; in the map editor (`UserProfile+0x84`, with no
+placement) a quad per grid cell with `footprint` (`+0x24`). The three are quarters of
+one texture (`MBuild`, `Sprites/gui_map.spr`, `add_nomipf`), so each is drawn with its
+sprite's rectangle (`ST3D_Sprite+0x38`), which the order ring, the whole of `GgridFX`,
+did not need; and since two textures can be drawn in one frame, each engine texture
+has a slot of its own. All three calls are taken or none. They were the engine's until
+the bench placed a station with Display8 in stub mode (`ui-hud-bar`'s stub variant):
+the stub drops every draw of the engine's, and nothing else drew the footprint.
 
 **Not taken**: the damaged systems' icons
 over a pointed unit, the shot director's rings, the action cursor over the minimap,
