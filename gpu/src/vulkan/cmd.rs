@@ -821,7 +821,12 @@ impl Gpu {
         let bci = vk::BufferCreateInfo::default().size(bytes).usage(vk::BufferUsageFlags::TRANSFER_DST).sharing_mode(vk::SharingMode::EXCLUSIVE);
         let buf = unsafe { dv.create_buffer(&bci, None) }.map_err(|_| "no read-back buffer")?;
         let req = unsafe { dv.get_buffer_memory_requirements(buf) };
-        let mem = sh.alloc(req, vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT, false).ok_or("no host memory")?;
+        // Memory the CPU reads fast: cached. The first host-visible type is often the
+        // device's own memory through the PCIe window (resizable BAR), which the CPU
+        // reads at a few tens of MB/s: a nebula's bake took a second a class (README.md,
+        // "Read-backs").
+        let hv = vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
+        let mem = sh.alloc(req, hv | vk::MemoryPropertyFlags::HOST_CACHED, false).or_else(|| sh.alloc(req, hv, false)).ok_or("no host memory")?;
         let done = |sh: &super::Shared, buf, mem| {
             unsafe { sh.dev.destroy_buffer(buf, None) };
             sh.pools.borrow_mut().free(&sh.dev, mem);

@@ -1816,7 +1816,12 @@ marked on screen (+0x25) as `Entity::Render` marks it when the instance's frustu
 The Key is the main view's (the action camera's view keeps the bake), the ships'
 shadows the hulls module's map (`hulls::shadow_map()`, sampler 8). A ghosted nebula of
 a gas class keeps its gas: slot 3 of the `GameObjectSpirit` vtable (0x6b1ca4) is
-wrapped. Everything is in the default pool; a `Reset` bakes again.
+wrapped. Everything is in the default pool; a `Reset` bakes again. A class is baked
+again only when its nebulae, the Key or its recipe change (the log says which); until
+render3d 0.22.1 every class was baked twice on its first two frames, since a class made
+in the middle of a gather started its signature from 0 and every later frame from
+FNV's offset basis (`SIG0`). On Vulkan the bake's read-back is from host-cached memory
+(`gpu/README.md`, "Read-backs"): from the card's memory it took a second a class.
 The gas is **marched** at full size, not sliced. Each class draws its gas box once
 (the faces facing the eye, or those facing away when the eye is in or near it), and each
 pixel finds its own ray (c41..c43: the ray at view depth 1 is linear in the pixel), cuts

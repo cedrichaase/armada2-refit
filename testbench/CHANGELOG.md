@@ -5,6 +5,11 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.55.0 — 2026-10-23
+
+### Added
+- `display-movie`: the launch reels and the intro on screen (a 4:3 picture between
+  bars, not a black frame), through the UI; on the stub with `display/stub-scenario.sh`.
 ## 3.53.0 — 2026-10-23
 
 ### Added

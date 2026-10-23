@@ -364,49 +364,72 @@ pub fn gamma_changed(ramp: &[u16; 768]) {
     }
 }
 
-/// The engine's `Present`: what it wrote into the back buffer by lock (a movie's
-/// frames) goes to the swap chain first, then the frame is presented.
-pub fn present(dev: &mut device::Dev, _src: *mut c_void, _dst: *mut c_void, _wnd: *mut c_void, _dirty: *mut c_void) -> i32 {
+/// The back buffer unlocked: what the engine wrote into it by lock (a movie's frames,
+/// `PlayMovie`) goes into the frame now, on the device's thread, as a real back buffer
+/// has it at once. So what is drawn after it lands on top: the UI's movie frame, drawn
+/// at the `Present` that follows, when the cutscene proxy hands the frame to the UI and
+/// writes nothing into the locked buffer. Copied at `Present` instead, the untouched
+/// buffer covered the UI's frame and every movie was black (README.md, "Stub mode").
+/// Off the device's thread it waits for `Present`.
+pub fn back_buffer_written(sf: &mut obj::Surf) {
+    if unsafe { GetCurrentThreadId() } != stub().main_thread {
+        return;
+    }
+    if sf.dirty.swap(false, Ordering::AcqRel) {
+        back_buffer_to_frame(sf);
+    }
+}
+
+/// The back buffer's pixels into the frame: Vulkan's or Direct3D 12's colour image, or
+/// the Direct3D 9 swap chain's back buffer.
+fn back_buffer_to_frame(sf: &obj::Surf) {
     if let Some(v) = crate::vk::get() {
-        flush_mirrors();
-        let bb = dev.back_buffer;
+        let c = v.color.image;
+        let (w, h, pitch) = (sf.w.min(v.color.w), sf.h.min(v.color.h), sf.pitch);
+        let layout = ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+        v.upload(c, ash::vk::ImageAspectFlags::COLOR, 0, w, h, &sf.data, pitch, 4, layout, layout);
+    } else if let Some(x) = crate::dx12::get() {
+        let (c, fmt) = (x.color.res, x.color.format);
+        let (w, h, pitch) = (sf.w.min(x.color.w), sf.h.min(x.color.h), sf.pitch);
+        let rt = crate::dx12::raw::STATE_RENDER_TARGET;
+        x.upload(c, fmt, 0, w, h, &sf.data, pitch, 4, rt, rt);
+    } else {
+        let d = dev9();
+        if !d.is_null() {
+            copy_back_buffer(d, sf);
+        }
+    }
+}
+
+/// The engine's `Present`: what it wrote into the back buffer by lock off the device's
+/// thread (`back_buffer_written` copies it at once on it) goes to the frame first,
+/// then the frame is presented.
+pub fn present(dev: &mut device::Dev, _src: *mut c_void, _dst: *mut c_void, _wnd: *mut c_void, _dirty: *mut c_void) -> i32 {
+    let bb = dev.back_buffer;
+    let written = |flush: bool| {
+        if flush {
+            flush_mirrors();
+        }
         if !bb.is_null() {
             let sf = unsafe { (*bb).surf() };
             if sf.dirty.swap(false, Ordering::AcqRel) {
-                let c = v.color.image;
-                let (w, h, pitch) = (sf.w.min(v.color.w), sf.h.min(v.color.h), sf.pitch);
-                let layout = ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
-                v.upload(c, ash::vk::ImageAspectFlags::COLOR, 0, w, h, &sf.data, pitch, 4, layout, layout);
+                back_buffer_to_frame(sf);
             }
         }
+    };
+    if let Some(v) = crate::vk::get() {
+        written(true);
         return if v.present() { 0 } else { 0x8876_0868u32 as i32 }; // D3DERR_DEVICELOST
     }
     if let Some(x) = crate::dx12::get() {
-        flush_mirrors();
-        let bb = dev.back_buffer;
-        if !bb.is_null() {
-            let sf = unsafe { (*bb).surf() };
-            if sf.dirty.swap(false, Ordering::AcqRel) {
-                let (c, fmt) = (x.color.res, x.color.format);
-                let (w, h, pitch) = (sf.w.min(x.color.w), sf.h.min(x.color.h), sf.pitch);
-                let rt = crate::dx12::raw::STATE_RENDER_TARGET;
-                x.upload(c, fmt, 0, w, h, &sf.data, pitch, 4, rt, rt);
-            }
-        }
+        written(true);
         return if x.present() { 0 } else { 0x8876_0868u32 as i32 }; // D3DERR_DEVICELOST
     }
     let d = dev9();
     if d.is_null() {
         return 0;
     }
-    flush_mirrors();
-    let bb = dev.back_buffer;
-    if !bb.is_null() {
-        let sf = unsafe { (*bb).surf() };
-        if sf.dirty.swap(false, Ordering::AcqRel) {
-            copy_back_buffer(d, sf);
-        }
-    }
+    written(true);
     let m = stub().mode;
     gamma::apply(d, m.width, m.height);
     vcall!(d, 17, fn(*const c_void, *const c_void, *mut c_void, *const c_void) -> i32,
