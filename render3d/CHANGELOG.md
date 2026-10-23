@@ -20,6 +20,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   section.
 - `scene::lights::Gas`: what a light is to the gas, in the cluster list's `t.z`.
 
+### Changed
+- The clustered lights' cull (`CS_CLUSTER`) reads the lights through group-shared
+  memory, 64 at a time, each put into view space once per group; the clusters it
+  writes are the same.
+
 Installed, not yet seen in game.
 
 ## 0.23.1 — 2026-10-23
