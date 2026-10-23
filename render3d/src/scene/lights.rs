@@ -99,7 +99,16 @@ pub enum Gas {
     /// A nebula's own glow (`world::lights`): it lights what is near it, never the gas,
     /// whose look without lights is its own.
     OwnGlow = 3,
+    /// A small light at a hull (a repair or construction weld, a shields-down
+    /// discharge, a damaged sensor's glow): a corona about it as a bolt's, its share
+    /// `LitSpark=`, so it does not light a ball of gas its reach wide.
+    Spark = 4,
 }
+
+/// The light "object" of a point a module adds to the scene's list by hand
+/// (`scene::add_point`) that the gas takes as a spark: not an engine light, only a
+/// key for `gas_of`.
+pub const SPARK_POINT: usize = 1;
 
 static mut GAS: alloc::collections::BTreeMap<usize, Gas> = alloc::collections::BTreeMap::new();
 
@@ -120,6 +129,9 @@ pub fn set_gas(light: usize, g: Gas) {
 pub fn gas_of(light: usize) -> Gas {
     if light == 0 {
         return Gas::Plain;
+    }
+    if light == SPARK_POINT {
+        return Gas::Spark;
     }
     unsafe { GAS.get(&light).copied().unwrap_or(Gas::Plain) }
 }

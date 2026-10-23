@@ -73,6 +73,12 @@ fn kind_of(material: &str) -> Kind {
     }
 }
 
+/// A damaged-sensor node's look (`sensor`, `sensorftur`, ...: damage.spr's green spark
+/// flipbook, shown while the craft's sensors are down, as in the Mutara nebula).
+fn is_sensor(id: &str) -> bool {
+    id.len() >= 6 && id.as_bytes()[..6].eq_ignore_ascii_case(b"sensor")
+}
+
 /// A sprite's rectangle in 0..1 units, its own flipbook offset added.
 fn sprite_uv(t: &SpriteTable, sprite: &a2fmt::spr::Sprite, time: f32) -> [f32; 4] {
     let r = sprite.uv_rect().unwrap_or_else(|| {
@@ -158,8 +164,52 @@ impl Sprites {
             }
             let id = n.sprite_node_id();
             let glow = if id.eq_ignore_ascii_case("glowdmoon") { p.glow } else { None };
+            if look.sensor_steady && is_sensor(id) {
+                // Held on the flipbook's first frame (a full star), smaller: steady.
+                self.node_quad(v, &t, id, &p.pose.world[i], scale * look.sensor_size, 0.0, anim::LOOP, glow, look.sprites, None, out);
+                continue;
+            }
             self.node_quad(v, &t, id, &p.pose.world[i], scale, p.since_start, p.flags, glow, look.sprites, None, out);
         }
+    }
+
+    /// The posed hull's shown damaged-sensor nodes as steady point lights of their
+    /// colour (`SensorLight=`, `SensorLightReach=`), into the view's scene list; each a
+    /// spark to the nebulae's gas. At most `max` of them; the number added.
+    pub fn sensor_lights(look: &Look, p: &Posed, max: usize) -> usize {
+        // A cloaking hull gives no light away.
+        if !look.sensor_steady || look.sensor_light <= 0.0 || look.sensor_reach <= 0.0 || max == 0 || p.cloak.is_some() {
+            return 0;
+        }
+        let t = assets::sprites();
+        let mut n = 0;
+        for (i, nd) in p.model.sod.nodes.iter().enumerate() {
+            if n >= max {
+                break;
+            }
+            if !matches!(nd.kind, NodeKind::Sprite) || !p.pose.shown.get(i).copied().unwrap_or(false) {
+                continue;
+            }
+            let id = nd.sprite_node_id();
+            if !is_sensor(id) {
+                continue;
+            }
+            let Some(def) = t.sprite_node(id) else { continue };
+            let half = def.size[0].max(def.size[1]) * p.scale.x * look.sensor_size;
+            let reach = look.sensor_reach * half.max(0.05);
+            let c = def.colour;
+            let colour = v3(c[0], c[1], c[2]) * look.sensor_light;
+            crate::scene::add_point(crate::scene::lights::Point {
+                pos: p.pose.world[i].p,
+                colour,
+                start: reach * 0.3,
+                range: reach * 0.7,
+                light: crate::scene::lights::SPARK_POINT,
+                style: crate::scene::lights::Style::default(),
+            });
+            n += 1;
+        }
+        n
     }
 
     /// The billboard effect pinned to the object: at its bounding sphere's centre

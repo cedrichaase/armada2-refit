@@ -247,7 +247,7 @@ impl Bees {
         for (n, w) in ws.iter().take(12).enumerate() {
             let k = self.flicker(w.seed, v.time);
             let back = (w.from - w.spot).norm();
-            self.lights.register(n, w.spot + back * 2.0, self.s.light_col * (self.s.light * k), self.s.light_reach * 0.3, self.s.light_reach * 0.7);
+            self.lights.register_spark(n, w.spot + back * 2.0, self.s.light_col * (self.s.light * k), self.s.light_reach * 0.3, self.s.light_reach * 0.7);
         }
     }
 

@@ -382,12 +382,9 @@ impl Lights {
                 self.emit(&mut n, p, c * ph[4], ph[5], ph[6] - ph[5], crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.0, power: 1.0 });
             }
             if self.cl {
-                // The beam itself, a line light washing the plating it passes close to.
-                let cc = crate::scene::clusters::config();
-                if cc.beam > 0.0 {
-                    let r = cc.beam_reach;
-                    crate::scene::clusters::add_line(a, b, c * cc.beam, r * 0.1, r * 0.9, cc.beam_wrap, 2.0);
-                }
+                // The beam itself, a line light, even along its length, lighting the
+                // plating, rocks and gas it passes.
+                crate::scene::clusters::add_line(a, b, c);
             }
         }
         n
