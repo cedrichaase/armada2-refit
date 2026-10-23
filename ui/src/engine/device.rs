@@ -102,6 +102,7 @@ type Present8 = unsafe extern "system" fn(*mut c_void, *const c_void, *const c_v
 unsafe extern "system" fn present(dev8: *mut c_void, src: *const c_void, dst: *const c_void, wnd: *mut c_void, dirty: *const c_void) -> HRESULT {
     let n = unsafe { PRESENTS };
     unsafe { PRESENTS = n.wrapping_add(1) };
+    crate::movie::present(dev8);
     if let Some(name) = crate::dump::poll("UI.dump") {
         dump_back_buffer(dev8, name, n);
     }

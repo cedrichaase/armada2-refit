@@ -73,6 +73,10 @@ unsafe extern "thiscall" fn chat_render(chat: usize) {
     crate::widgets::theme::set_player_race(super::race::mission_race());
     surface::frame(Context::Mission);
     super::closeup::end_frame();
+    // The frame as it stands, kept for the in-mission menus to draw over.
+    if crate::config::get().menus {
+        crate::menus::backdrop::keep_mission_frame();
+    }
 }
 
 /// Logs the frame rate the hook runs at, a few times after each start, so UI.log
