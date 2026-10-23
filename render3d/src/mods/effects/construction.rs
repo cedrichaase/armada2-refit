@@ -351,7 +351,7 @@ impl Construction {
                 let p = e.s + (e.e - e.s) * e.t;
                 let out = (p - e.centre).norm();
                 let reach = self.s.light_reach * e.radius;
-                if self.lights.register(n, p + out * (0.03 * e.radius), self.s.light_col * (self.s.light * arc), reach * 0.3, reach * 0.7) {
+                if self.lights.register_spark(n, p + out * (0.03 * e.radius), self.s.light_col * (self.s.light * arc), reach * 0.3, reach * 0.7) {
                     n += 1;
                 }
             }

@@ -4,7 +4,7 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
-## 0.25.0 — 2026-10-23
+## 0.26.0 — 2026-10-23
 
 ### Changed
 - A phaser beam's line light (`cl_line` in `clustered.hlsli`) emits alike along the
@@ -28,7 +28,31 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   section, before the next section's comment, not after it.
 
 Measured on the bench (`battle`, 1280x720, Vulkan on the GPU): the objects step 1.27 ms
-of GPU time against 0.91 before, the cull 0.22 against 0.18. Direct3D 9 and `Clustered=0` are unchanged (the two ends light, the length does not).
+of GPU time against 0.91 before, the cull 0.22 against 0.18. Direct3D 9 and
+`Clustered=0` are unchanged (the two ends light, the length does not). Installed, not yet seen in game.
+
+## 0.25.0 — 2026-10-23
+
+### Added
+- `scene::lights::Gas::Spark`: a small light at a hull, which the gas takes as a
+  corona like a torpedo's, at `[Nebulae] LitSpark=` (0.3). Used by the shields-down
+  discharges, the repair, construction and bee welds (`LightPool::register_spark`),
+  and the damaged sensors.
+- The damaged sensors' green spark nodes (`sensor*` sprite nodes, shown while a
+  craft's sensors are down, as in the Mutara) are held on one frame at half size, each
+  with a small steady point light of its colour. New `[Hulls]` keys: `SensorSteady`
+  (1), `SensorSize` (0.5), `SensorLight` (2) and `SensorLightReach` (4, in drawn half
+  sizes).
+- The shipped `Render3D.ini` lists `LitSpark=0.3` and `LitCorona=0.25` under
+  `[Nebulae]`.
+
+### Fixed
+- In the Mutara, the shields-down discharges lit a wide round ball of gas, blue, beside
+  every shielded Borg ship. They now give a tight corona.
+- Points that a module adds to the scene's list by hand (`scene::add_point`) are kept
+  when the ordnance module reads the engine's lights again (`regather_lights`). Before,
+  that read dropped the points of every module whose `begin_view` ran before it.
+
 Installed, not yet seen in game.
 
 ## 0.24.0 — 2026-10-23

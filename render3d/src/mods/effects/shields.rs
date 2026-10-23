@@ -800,7 +800,7 @@ impl Shields {
             let u = d.st[kb].dir;
             let pos = a[0] * u.x + a[1] * u.y + a[2] * u.z + t;
             let reach = self.s.down_light_reach * br;
-            if self.lights.register(n, pos, self.s.down_light_col * (self.s.down_light * best * lv), reach, reach * 0.2) {
+            if self.lights.register_spark(n, pos, self.s.down_light_col * (self.s.down_light * best * lv), reach, reach * 0.2) {
                 n += 1;
             }
         }

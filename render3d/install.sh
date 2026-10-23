@@ -76,7 +76,7 @@ lines = open(sys.argv[2]).read().splitlines()
 # it is still the old default an earlier install wrote (a value they set stays).
 # (section, key): the old default.
 RETIRED = {
-    ('lights', 'beamlight'): '1.0',   # render3d 0.25.0: a line of even emission
+    ('lights', 'beamlight'): '1.0',   # render3d 0.26.0: a line of even emission
     ('lights', 'beamreach'): '40',
 }
 shipped = {}

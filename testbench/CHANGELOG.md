@@ -5,12 +5,20 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 3.63.0 — 2026-10-23
+## 3.64.0 — 2026-10-23
 
 ### Added
 - The `beam-pass` scene (a Galaxy class firing past a parked destroyer and an asteroid
   field at a Borg cube) and `render3d-beam-light`: paused frames for render3d's phaser
   beams as line lights.
+
+Installed, not yet seen in game.
+
+## 3.63.0 — 2026-10-23
+
+### Added
+- `render3d-hull-sparks`: the shields-down discharges in the Mutara gas, and a Borg
+  scout's damaged sensors in two frames, on Display8's Vulkan stub.
 
 Installed, not yet seen in game.
 
