@@ -4,6 +4,32 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.7.0 — 2026-10-23
+
+### Added
+- `Backend=auto`: the first backend that starts at the engine's first `CreateDevice`,
+  in the display plan's order (Windows Direct3D 12, Vulkan, Direct3D 9; Linux and macOS
+  under Wine Vulkan, Direct3D 9). `Backend=` also takes a list (`d3d12,vulkan`).
+  Available, not the default: the shipped values stay `Mode=forward`, `Backend=d3d9`.
+- A fallback at that `CreateDevice`: whatever `Backend=` names, Direct3D 9 comes last,
+  so `Backend=vulkan` or `d3d12` that cannot start falls back to it instead of failing
+  the engine's `CreateDevice`. Each attempt and its reason are in `Display8.log`
+  ("stub: trying ...", "... could not start: ...; falling back to ...", "stub: the
+  backend is ...").
+- `FailBackend=` (the test bench only, ignored outside a bench clone and not in the
+  shipped `Display8.ini`): the named backends fail on purpose once made.
+  `display/bench-mode.sh` adds it to a clone's `Display8.ini`, and applies the bench's
+  lavapipe rule to `Backend=auto` and to lists that name Vulkan.
+
+### Changed
+- `display8_backend` answers only once the stub's device is made (none before), so a
+  plugin is never told a backend that a fallback then leaves; Vulkan and Direct3D 12
+  were said from `Direct3DCreate8` on.
+- A Vulkan or Direct3D 12 start that fails takes down everything it made (instance,
+  surface, device, swap chain, frame), so that the next backend can have the window.
+
+Installed, not yet seen in game.
+
 ## 0.6.2 — 2026-10-23
 
 ### Fixed

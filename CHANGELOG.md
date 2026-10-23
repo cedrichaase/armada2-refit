@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.22.0 — 2026-10-23
+
+Layers: display 0.7.0, testbench 3.57.0.
+
+### Added
+- Display8's `Backend=auto` (display 0.7.0): the stub tries the display plan's order at
+  the engine's first `CreateDevice` (Windows Direct3D 12, Vulkan, Direct3D 9; Wine
+  Vulkan, Direct3D 9), and any `Backend=` falls back to Direct3D 9 when its own cannot
+  start, with each attempt in `Display8.log`. `display8_backend` answers once the device
+  is made. The shipped defaults are unchanged (`Mode=forward`, `Backend=d3d9`).
+- `display-fallback` (testbench 3.57.0): Vulkan made to fail on purpose
+  (`FailBackend=vulkan`), Direct3D 9 drawing the game.
+
+Installed, not yet seen in game.
+
 ## 13.21.1 — 2026-10-23
 
 Layers: display 0.6.2.

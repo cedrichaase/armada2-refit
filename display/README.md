@@ -18,7 +18,8 @@ real chain and passes every call through; on the test bench it traces every call
 (`Trace=auto`: on in an `a2test` clone). In **stub mode** (`Mode=stub`, "Stub mode"
 below) the real chain is never loaded, and render3d and the UI draw the whole frame on a
 device of Display8's own: Direct3D 9 (`Backend=d3d9`, shipped), Vulkan or Direct3D 12
-("Backends"). Forward stays the default until a backend has been confirmed in game.
+("Backends"), or the first of them that starts (`Backend=auto`, "Choosing a backend").
+Forward stays the default until a backend has been confirmed in game.
 Display8 is not in the release package yet: in forward mode it changes nothing a player
 sees.
 
@@ -210,9 +211,9 @@ engine's device, and draw the whole frame on it.
   would leave no button bar at all, since the UI's stands down beside it), or, on
   `Backend=d3d9`, when Direct3D 9 cannot be made. The log says which. A Vulkan or
   Direct3D 12 device is made at the engine's first `CreateDevice`, after the choice
-  between the modes is past: if it cannot be made, the log says so ("could not
-  start") and that `CreateDevice` fails. There is no `Backend=auto` yet, which would
-  try the next backend there.
+  between the modes is past: if it cannot be made, the next backend is tried there,
+  Direct3D 9 last ("Choosing a backend"), and that `CreateDevice` fails only when none
+  starts.
 
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
@@ -220,7 +221,7 @@ engine's device, and draw the whole frame on it.
 ## Backends
 
 `Backend=` in `Display8.ini` says what the stub draws on: `d3d9` (above, the default),
-`vulkan` (`src/vk/`) or `d3d12` (`src/dx12/`). On the last two no `d3d9.dll` is loaded
+`vulkan` (`src/vk/`), `d3d12` (`src/dx12/`), or `auto` (below). On `vulkan` and `d3d12` no `d3d9.dll` is loaded
 at all: Display8 owns the device, the swap chain and the frame, and render3d's and the
 UI's `gpu` record into that frame through the plain C exports of
 `gpu/src/display.rs`, the contract both sides build against (its doc comment is the
@@ -230,6 +231,61 @@ whole frame as on `d3d9`. What Display8 draws itself is the engine's `Clear`s, t
 movie frames the engine writes into the back buffer by lock, and the last pass through
 the gamma ramp. `Validate=1` asks for the Vulkan validation layer or Direct3D 12's
 debug layer, where the system has one.
+
+### Choosing a backend
+
+`Backend=` is an order, tried at the engine's first `CreateDevice`
+(`stub::ensure_device`), with **Direct3D 9 always last**, named or not: a backend that
+cannot start never fails the game while d3d9 lives.
+
+| `Backend=` | Tried |
+|---|---|
+| `d3d9` (shipped) | Direct3D 9, opened at `Direct3DCreate8` as before |
+| `vulkan` | Vulkan, then Direct3D 9 |
+| `d3d12` | Direct3D 12, then Direct3D 9 |
+| `auto` | Windows: Direct3D 12, Vulkan, Direct3D 9. Linux and macOS (Wine): Vulkan, Direct3D 9 |
+| a list, `d3d12,vulkan` | in that order, then Direct3D 9 |
+
+`auto` is the display plan's order (phase 6): Direct3D 12 is Windows' own API; under
+Wine it is vkd3d-proton over Vulkan, a layer more for nothing, so there it is for
+testing only and is tried only when named. The system is told by Wine's `ntdll.dll`
+(`wine_get_host_version`: `Darwin` is macOS). On macOS Vulkan is MoltenVK, which may not
+map memory where a 32-bit process reaches it ("Will Vulkan work on a Mac?"); if the
+device or its mapped ring cannot be made there, Direct3D 9 is what follows. `auto` is
+available, not the default: no backend but Direct3D 9 has been seen in game yet.
+
+- **The engine sees one thing whatever is chosen**: the desktop's mode is offered at
+  `Direct3DCreate8` from the system (`GetSystemMetrics`) when the order does not start
+  with Direct3D 9, and a Direct3D 9 that comes last is opened only when its turn comes
+  (no `d3d9.dll` is loaded on Vulkan or Direct3D 12); the engine keeps the mode it was
+  offered.
+- **A backend that fails is taken down whole** before the next is tried
+  (`Vk::destroy`, `Dx::destroy`, and the partial instance and surface before them): a
+  Vulkan surface or swap chain left on the game's window keeps another from being made
+  on it.
+- **`display8_backend` answers only once the device is made** (`stub::made`), and none
+  before: a plugin is never told a backend that a fallback then leaves. `gpu` asks
+  again while the answer is none and opens its backend at the first frame, after the
+  engine's `CreateDevice` has returned (`gpu/src/api.rs`). Until display 0.7.0 Vulkan
+  and Direct3D 12 were said from `Direct3DCreate8` on; no plugin asked that early on the
+  bench, and `gpu` could not have opened Vulkan then anyway (no device yet).
+- **The log says each step**, in `Display8.log`:
+
+      Backend=auto: on Linux: vulkan, then d3d9
+      stub mode on vulkan, then d3d9
+      stub: trying Vulkan (1 of 2)
+      stub: Vulkan could not start: <why>; falling back to Direct3D 9
+      stub: trying Direct3D 9 (2 of 2)
+      stub: the backend is Direct3D 9, after vulkan could not start
+
+  and with nothing able to start, `stub: no backend could start (...)`, and the engine's
+  `CreateDevice` fails as it did before.
+- **`FailBackend=` (the test bench only)** makes the named backends (`vulkan`, `d3d12`,
+  `d3d9`, a list) fail on purpose once everything is made, so that the teardown is
+  exercised too. Honoured only in a bench clone (a game directory under
+  `a2test\sessions\`) and ignored with a line in the log anywhere else; it is not in the
+  shipped `Display8.ini`, and `display/bench-mode.sh` adds it to a clone's. The
+  `display-fallback` scenario uses it.
 
 ### Vulkan
 
@@ -244,9 +300,9 @@ buffer, reaching all of it through the exports of `gpu/src/display.rs` (the cont
 at the engine's `Present` Display8 draws the colour image through the gamma ramp into
 the swap chain's image, submits and presents.
 
-- **The backend is said early.** `display8_backend` answers Vulkan from the engine's
-  `Direct3DCreate8` on, before the device: an object a plugin makes then is made for
-  the right backend. A stub on Vulkan has no Direct3D 9 to fall back to.
+- **The backend is said once the device is made** ("Choosing a backend"):
+  `display8_backend` answers Vulkan from the engine's first `CreateDevice` on. If
+  Vulkan cannot start there, the next backend in `Backend=`'s order is tried.
 - **The engine's targets** are in their attachment layouts between recorders, the
   mirrors in `SHADER_READ_ONLY`; whoever changes one puts it back. The depth image is
   sampled and copied too (render3d's depth resolve, the dumps).
@@ -315,9 +371,9 @@ nothing.
   a root signature of four root constants (b0) and a table of the frame and the ramp
   (t0, t1) under two static point samplers.
 - A device that is removed is logged with its reason, and nothing is drawn after.
-- **The backend is said early**, as on Vulkan: `display8_backend` answers Direct3D 12
-  from the engine's `Direct3DCreate8` on; `gpu` opens its backend once the device is
-  made (`display8_dx12` is null before).
+- **The backend is said once the device is made**, as on Vulkan: `display8_backend`
+  answers Direct3D 12 from the engine's first `CreateDevice` on, and `gpu` opens its
+  backend then (`display8_dx12` is null before).
 - **`display8_dx12_flush`** closes the frame's list, submits it, waits for its fence and
   opens the same list again (its allocator reset, the heaps set again): a plugin's
   read-back (the frame dumps, render3d's nebula bake). The frame's ring, descriptors and

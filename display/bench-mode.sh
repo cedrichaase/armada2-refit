@@ -24,14 +24,20 @@ ini="$work/game/Display8.ini"
 sed -i "s/^Mode=.*/Mode=$mode/" "$ini"
 while [ $# -gt 0 ] && [[ "$1" == *=* ]]; do
     key=${1%%=*}
-    grep -q "^$key=" "$ini" || { echo "Display8.ini has no key $key" >&2; exit 1; }
+    if ! grep -q "^$key=" "$ini"; then
+        # FailBackend= is the bench's alone (README.md, "Choosing a backend"): not in the
+        # shipped Display8.ini, so it is added under [Display8].
+        [ "$key" = FailBackend ] || { echo "Display8.ini has no key $key" >&2; exit 1; }
+        sed -i 's/^\[Display8\]\r\?$/&\nFailBackend=/' "$ini"
+    fi
     sed -i "s/^$key=.*/${1//\//\\/}/" "$ini"
     shift
 done
 # On Vulkan the bench draws on lavapipe with the validation layer, never on the GPU
 # (README.md, "Vulkan"; the bench sets the drivers in the game's environment):
-# Device=llvmpipe unless a Device= was given, and Validate=1.
-if grep -qi '^Backend=vulkan' "$ini" && [ "${A2TEST_VULKAN_GPU:-}" != 1 ]; then
+# Device=llvmpipe unless a Device= was given, and Validate=1. Backend=auto is Vulkan first
+# here, and a list may name it.
+if grep -qiE '^Backend=.*(vulkan|auto)' "$ini" && [ "${A2TEST_VULKAN_GPU:-}" != 1 ]; then
     grep -q '^Device=.' "$ini" || sed -i 's/^Device=.*/Device=llvmpipe/' "$ini"
     sed -i 's/^Validate=.*/Validate=1/' "$ini"
 fi

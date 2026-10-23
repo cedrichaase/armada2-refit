@@ -54,6 +54,43 @@ pub enum Backend {
     D3d12,
 }
 
+impl Backend {
+    /// `Backend=`'s word for one (any case).
+    pub fn parse(word: &str) -> Option<Backend> {
+        [Backend::D3d9, Backend::Vulkan, Backend::D3d12].into_iter().find(|b| word.eq_ignore_ascii_case(b.key()))
+    }
+
+    /// The word `Backend=` and `FailBackend=` take.
+    pub fn key(self) -> &'static str {
+        match self {
+            Backend::D3d9 => "d3d9",
+            Backend::Vulkan => "vulkan",
+            Backend::D3d12 => "d3d12",
+        }
+    }
+
+    /// Its name in the log.
+    pub fn name(self) -> &'static str {
+        match self {
+            Backend::D3d9 => "Direct3D 9",
+            Backend::Vulkan => "Vulkan",
+            Backend::D3d12 => "Direct3D 12",
+        }
+    }
+}
+
+/// `vulkan, then d3d9`, for the log.
+pub fn names(order: &[Backend]) -> alloc::string::String {
+    let mut s = alloc::string::String::new();
+    for (i, b) in order.iter().enumerate() {
+        if i > 0 {
+            s.push_str(", then ");
+        }
+        s.push_str(b.key());
+    }
+    s
+}
+
 /// `D3DPRESENT_PARAMETERS`, d3d9's.
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -84,7 +121,14 @@ pub struct Stub {
     pub main_thread: u32,
     /// The stub's `IDirect3D8`, for `GetDirect3D`.
     pub d3d8: *mut SObj,
+    /// The backend drawn on once the device is made; until then, the next to try.
     pub backend: Backend,
+    /// `Backend=`'s order (Direct3D 9 last), tried at the engine's first `CreateDevice`
+    /// from `next` on (README.md, "Choosing a backend").
+    pub order: Vec<Backend>,
+    pub next: usize,
+    /// The device is made (on `backend`), or every backend has failed.
+    pub decided: bool,
     /// The Vulkan validation layer (`Validate=1`).
     pub validate: bool,
 }
@@ -102,11 +146,13 @@ pub fn dev9() -> *mut c_void {
     unsafe { STUB.as_ref().map_or(core::ptr::null_mut(), |s| s.dev9) }
 }
 
-/// Starts stub mode: Direct3D 9 (`d3d9.dll` as the loader finds it: DXVK's beside the
-/// exe under Proton, Windows' own) and the desktop's mode. None: stay in forward mode.
-pub fn start(backend: Backend, validate: bool) -> Option<*mut c_void> {
-    if backend != Backend::D3d9 {
-        // No Direct3D 9 at all: the desktop's size from the system, the device at the
+/// Starts stub mode on `order` (Direct3D 9 last): the backend itself is chosen at the
+/// engine's first `CreateDevice` (`ensure_device`). With Direct3D 9 alone, Direct3D 9 is
+/// opened now, as before, and its mode offered. None: stay in forward mode.
+pub fn start(order: Vec<Backend>, validate: bool) -> Option<*mut c_void> {
+    let first = order.first().copied().unwrap_or(Backend::D3d9);
+    if first != Backend::D3d9 {
+        // No Direct3D 9 yet: the desktop's size from the system, the device at the
         // engine's first CreateDevice.
         let (w, h) = unsafe { (GetSystemMetrics(0), GetSystemMetrics(1)) };
         if w <= 0 || h <= 0 {
@@ -114,9 +160,19 @@ pub fn start(backend: Backend, validate: bool) -> Option<*mut c_void> {
             return None;
         }
         let mode = crate::d3d8::DisplayMode { width: w as u32, height: h as u32, refresh: 60, format: 22 };
-        log!("stub: on {:?}; the one mode offered: {}x{}", backend, w, h);
-        return Some(started(core::ptr::null_mut(), mode, backend, validate));
+        log!("stub: the backend is chosen at the first CreateDevice, from {}; the one mode offered: {}x{}", names(&order), w, h);
+        return Some(started(core::ptr::null_mut(), mode, order, validate));
     }
+    let (d3d9, mut mode) = open_d3d9()?;
+    // The engine is offered X8R8G8B8 at the desktop's size, whatever the desktop's format.
+    mode.format = 22;
+    log!("stub: Direct3D 9 at {:#x}; the one mode offered: {}x{} {} Hz", d3d9 as usize, mode.width, mode.height, mode.refresh);
+    Some(started(d3d9, mode, order, validate))
+}
+
+/// Direct3D 9 (`d3d9.dll` as the loader finds it: DXVK's beside the exe under Proton,
+/// Windows' own) and its adapter's mode.
+fn open_d3d9() -> Option<(*mut c_void, crate::d3d8::DisplayMode)> {
     let name = rt::cstr("d3d9.dll");
     let m = unsafe { LoadLibraryA(name.as_ptr()) };
     if m.is_null() {
@@ -140,13 +196,10 @@ pub fn start(backend: Backend, validate: bool) -> Option<*mut c_void> {
         log!("stub: no display mode from Direct3D 9 ({:#x})", hr as u32);
         return None;
     }
-    // The engine is offered X8R8G8B8 at the desktop's size, whatever the desktop's format.
-    mode.format = 22;
-    log!("stub: Direct3D 9 at {:#x}; the one mode offered: {}x{} {} Hz", d3d9 as usize, mode.width, mode.height, mode.refresh);
-    Some(started(d3d9, mode, backend, validate))
+    Some((d3d9, mode))
 }
 
-fn started(d3d9: *mut c_void, mode: crate::d3d8::DisplayMode, backend: Backend, validate: bool) -> *mut c_void {
+fn started(d3d9: *mut c_void, mode: crate::d3d8::DisplayMode, order: Vec<Backend>, validate: bool) -> *mut c_void {
     unsafe {
         STUB = Some(Stub {
             d3d9,
@@ -156,7 +209,10 @@ fn started(d3d9: *mut c_void, mode: crate::d3d8::DisplayMode, backend: Backend, 
             mirrors: Vec::new(),
             main_thread: 0,
             d3d8: core::ptr::null_mut(),
-            backend,
+            backend: order.first().copied().unwrap_or(Backend::D3d9),
+            order,
+            next: 0,
+            decided: false,
             validate,
         })
     };
@@ -168,42 +224,37 @@ fn started(d3d9: *mut c_void, mode: crate::d3d8::DisplayMode, backend: Backend, 
     d as *mut c_void
 }
 
+/// The backend the device was made on; None before it is made, or when none could be.
+/// What `display8_backend` reports: a plugin is never told a backend before its device
+/// exists, so a fallback can never leave it on another.
+pub fn made() -> Option<Backend> {
+    unsafe { STUB.as_ref().filter(|s| s.decided && device_exists(s)).map(|s| s.backend) }
+}
+
+fn device_exists(s: &Stub) -> bool {
+    match s.backend {
+        Backend::D3d9 => !s.dev9.is_null(),
+        Backend::Vulkan => crate::vk::get().is_some(),
+        Backend::D3d12 => crate::dx12::get().is_some(),
+    }
+}
+
 pub fn vulkan() -> bool {
-    unsafe { STUB.as_ref().is_some_and(|s| s.backend == Backend::Vulkan) }
+    made() == Some(Backend::Vulkan)
 }
 
 pub fn d3d12() -> bool {
-    unsafe { STUB.as_ref().is_some_and(|s| s.backend == Backend::D3d12) }
+    made() == Some(Backend::D3d12)
 }
 
-/// The backend's device (Direct3D 9, Vulkan or Direct3D 12), made on the first
-/// `CreateDevice` on `hwnd`; the game's window covers the screen from then on.
+/// The backend's device, made on the first `CreateDevice` on `hwnd`: each backend of
+/// `Backend=`'s order in turn until one starts (README.md, "Choosing a backend"), each
+/// attempt and why it failed in the log. The game's window covers the screen from then
+/// on.
 pub fn ensure_device(hwnd: *mut c_void, flags: u32, depth: u32, interval: u32) -> bool {
     let s = stub();
-    if !s.dev9.is_null() || (s.backend == Backend::Vulkan && crate::vk::get().is_some()) || (s.backend == Backend::D3d12 && crate::dx12::get().is_some()) {
-        return true;
-    }
-    if s.backend != Backend::D3d9 {
-        let (w, h) = (s.mode.width, s.mode.height);
-        unsafe {
-            SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
-            SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040);
-        }
-        s.hwnd = hwnd;
-        s.main_thread = unsafe { GetCurrentThreadId() };
-        crate::trace::MAIN_THREAD.store(s.main_thread, Ordering::Relaxed);
-        let started = if s.backend == Backend::D3d12 {
-            crate::dx12::Dx::start(hwnd, w, h, interval, s.validate)
-        } else {
-            crate::vk::Vk::start(hwnd, w, h, interval, s.validate)
-        };
-        return match started {
-            Ok(()) => true,
-            Err(e) => {
-                log!("stub: {:?} could not start: {}", s.backend, e);
-                false
-            }
-        };
+    if s.decided {
+        return device_exists(s);
     }
     let (w, h) = (s.mode.width, s.mode.height);
     unsafe {
@@ -211,6 +262,53 @@ pub fn ensure_device(hwnd: *mut c_void, flags: u32, depth: u32, interval: u32) -
         SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
         SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040); // FRAMECHANGED | SHOWWINDOW
     }
+    s.hwnd = hwnd;
+    s.main_thread = unsafe { GetCurrentThreadId() };
+    crate::trace::MAIN_THREAD.store(s.main_thread, Ordering::Relaxed);
+    let mut failed: Vec<Backend> = Vec::new();
+    while s.next < s.order.len() {
+        let b = s.order[s.next];
+        s.next += 1;
+        s.backend = b;
+        log!("stub: trying {} ({} of {})", b.name(), s.next, s.order.len());
+        let r = match b {
+            Backend::Vulkan => crate::vk::Vk::start(hwnd, w, h, interval, s.validate),
+            Backend::D3d12 => crate::dx12::Dx::start(hwnd, w, h, interval, s.validate),
+            Backend::D3d9 => start_d3d9(s, hwnd, flags, depth, interval),
+        };
+        match r {
+            Ok(()) => {
+                s.decided = true;
+                if failed.is_empty() {
+                    log!("stub: the backend is {}", b.name());
+                } else {
+                    log!("stub: the backend is {}, after {} could not start", b.name(), names(&failed));
+                }
+                return true;
+            }
+            Err(e) => {
+                failed.push(b);
+                match s.order.get(s.next) {
+                    Some(n) => log!("stub: {} could not start: {}; falling back to {}", b.name(), e, n.name()),
+                    None => log!("stub: {} could not start: {}", b.name(), e),
+                }
+            }
+        }
+    }
+    s.decided = true;
+    log!("stub: no backend could start ({}): the engine's CreateDevice fails", names(&s.order));
+    false
+}
+
+/// The Direct3D 9 device, on Direct3D 9 opened at `Direct3DCreate8` (`Backend=d3d9`) or
+/// now (the last of `Backend=`'s order).
+fn start_d3d9(s: &mut Stub, hwnd: *mut c_void, flags: u32, depth: u32, interval: u32) -> Result<(), &'static str> {
+    if s.d3d9.is_null() {
+        let Some((d3d9, mode)) = open_d3d9() else { return Err("no Direct3D 9 (the line above says why)") };
+        log!("stub: Direct3D 9 at {:#x} (its mode {}x{} {} Hz); the engine keeps the mode it was offered", d3d9 as usize, mode.width, mode.height, mode.refresh);
+        s.d3d9 = d3d9;
+    }
+    let (w, h) = (s.mode.width, s.mode.height);
     let mut pp = Present9 {
         width: w,
         height: h,
@@ -229,14 +327,15 @@ pub fn ensure_device(hwnd: *mut c_void, flags: u32, depth: u32, interval: u32) -
     let hr = vcall!(s.d3d9, 16, fn(u32, u32, *mut c_void, u32, *mut Present9, *mut *mut c_void) -> i32, 0, 1, hwnd, flags, &mut pp, &mut dev);
     if hr < 0 || dev.is_null() {
         log!("stub: CreateDevice on Direct3D 9 failed: {:#x}", hr as u32);
-        return false;
+        return Err("CreateDevice failed");
+    }
+    if crate::fail_backend(Backend::D3d9) {
+        vcall!(dev, 2, fn() -> u32,);
+        return Err("FailBackend=d3d9 (the test bench's deliberate failure)");
     }
     s.dev9 = dev;
-    s.hwnd = hwnd;
-    s.main_thread = unsafe { GetCurrentThreadId() };
-    crate::trace::MAIN_THREAD.store(s.main_thread, Ordering::Relaxed);
     log!("stub: Direct3D 9 device {:#x}, {}x{} windowed on the game's window, depth fmt {}, interval {:#x}", dev as usize, w, h, pp.depth_format, interval);
-    true
+    Ok(())
 }
 
 /// A texture's mirror, made at the first ask with every level.
