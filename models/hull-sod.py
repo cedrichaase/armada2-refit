@@ -401,6 +401,43 @@ def build(stock, n, crease):
     return bytes(b), stats
 
 
+# The rounded models are a pure function of the stock bytes, this script and --split and
+# --crease, and take 25 s of Python to make (all 225 at once), which every ./install paid
+# again -- the test bench, which installs into a stock clone, at every session. So each is
+# kept in A2_DATA (they are derived from the game's own files, so never in a checkout),
+# under a key of all four, and read back instead of rebuilt. A changed script or setting
+# is a different key; a damaged entry fails the same read-back build() makes and is
+# rebuilt. A2_HULL_SOD_CACHE=0 turns it off.
+CACHE = os.path.join(a2env.DATA, 'cache', 'hull-sod')
+with open(os.path.abspath(__file__), 'rb') as _fh:
+    SCRIPT_SHA = hashlib.sha256(_fh.read()).hexdigest()
+
+
+def cached_build(stock, n, crease):
+    key = sha(f'{SCRIPT_SHA}\0{n}\0{crease!r}\0{sha(stock)}'.encode())
+    p = os.path.join(CACHE, key[:32] + '.sod')
+    use = os.environ.get('A2_HULL_SOD_CACHE', '1') not in ('0', 'no', 'off')
+    if use and os.path.exists(p):
+        b = open(p, 'rb').read()
+        meshes, again = parse(stock), parse(b)
+        if meshes and again and len(again) == len(meshes) and all(
+                V2[:len(V)] == V for (_, _, V, _, _), (_, _, V2, _, _) in zip(meshes, again)):
+            stats = [(sum(len(F) for _, F in G), sum(len(F) for _, F in G2))
+                     for (_, _, _, _, G), (_, _, _, _, G2) in zip(meshes, again)]
+            return b, stats
+    b, stats = build(stock, n, crease)
+    if use:
+        try:
+            os.makedirs(CACHE, exist_ok=True)
+            tmp = f'{p}.{os.getpid()}.tmp'
+            with open(tmp, 'wb') as fh:
+                fh.write(b)
+            os.replace(tmp, p)
+        except OSError:
+            pass                                    # a cache that cannot be written is no cache
+    return b, stats
+
+
 def stock_bytes(name, want):
     p = path(name)
     src = p + SUFFIX if os.path.exists(p + SUFFIX) else p
@@ -455,7 +492,7 @@ def main():
 
     if a.split < 1:
         sys.exit('--split must be at least 1')
-    built = {nme: build(stock_bytes(nme, pins.get(nme)), a.split, a.crease) for nme in names}
+    built = {nme: cached_build(stock_bytes(nme, pins.get(nme)), a.split, a.crease) for nme in names}
     if a.out:
         os.makedirs(a.out, exist_ok=True)
     for nme, (b, stats) in built.items():
