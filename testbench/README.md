@@ -484,7 +484,9 @@ drivers alone for a deliberate run there. Judge such a run against a baseline ta
 on the GPU (`pre-gpu-*`), not against `Backend=d3d9` on lavapipe: DXVK on lavapipe
 draws the port scenes visibly differently from DXVK on the GPU (`port-nebula` at RMSE
 25.8, `port-firing` 7.0), while render3d on Vulkan on lavapipe is within 1 to 2 of the
-GPU's (`gpu/README.md`, "Measured").
+GPU's (`gpu/README.md`, "Measured"). A whole campaign mission does not load on
+lavapipe on either backend (32-bit address space, likely): run `display-stub` on Vulkan
+with `A2TEST_VULKAN_GPU=1` once the port scenes are clean under the layer.
 
 **What the numbers mean.** Every frame is compared as RGB; an alpha channel is dropped,
 and the report says so.

@@ -25,8 +25,9 @@ in [`README.md`](README.md).
 - `bench-mode.sh`: with `Backend=vulkan`, `Device=llvmpipe` and `Validate=1` unless
   `A2TEST_VULKAN_GPU=1`.
 
-Measured on the bench (lavapipe): the port scenes within RMSE 0.6 to 1.7 of Direct3D 9
-on the GPU (`gpu/README.md`, "Measured"). Installed, not yet seen in game.
+Measured on the bench: the port scenes within RMSE 0.4 to 0.9 of Direct3D 9 on the GPU
+(`gpu/README.md`, "Measured"), and `display-stub`, the whole game, through on Vulkan,
+with no validation message. Installed, not yet seen in game.
 
 ## 0.4.0 — 2026-10-23
 

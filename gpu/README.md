@@ -323,18 +323,20 @@ a level blurrier than on Direct3D 9. Cube maps are seamless on Vulkan, as
 
 ### Measured
 
-render3d and the UI on Vulkan (`Backend=vulkan`, `PixelCentres=d3d9`, on lavapipe with
-the validation layer, the bench's way) against the same scenes on Direct3D 9 on the
-GPU (the `pre-gpu-*` baselines, which the Direct3D 9 backend draws at RMSE 0), the
-screenshot of each port scene, 2026-10-23:
+render3d and the UI on Vulkan (`Backend=vulkan`, `PixelCentres=d3d9`, the validation
+layer on) against the same scenes on Direct3D 9 on the GPU (the `pre-gpu-*` baselines,
+which the Direct3D 9 backend draws at RMSE 0), the screenshot of each port scene,
+2026-10-23. On the GPU (RX 5700, RADV) and on lavapipe (the bench's default for Vulkan):
 
-| Scene | RMSE (/255) | Pixels over 2/255 |
-|---|---|---|
-| `port-showcase` | 1.68 | 4.2% |
-| `port-nebula` | 0.57 | 0.6% |
-| `port-firing` | 0.97 | 1.0% |
+| Scene | GPU: RMSE (/255) | over 2/255 | lavapipe: RMSE | over 2/255 |
+|---|---|---|---|---|
+| `port-showcase` | 0.87 | 0.47% | 1.68 | 4.2% |
+| `port-nebula` | 0.36 | 0.02% | 0.57 | 0.6% |
+| `port-firing` | 0.40 | 0.12% | 0.97 | 1.0% |
 
-No validation message in any of them. What is left is one or two levels over the sky
+No validation message in any of them, nor in `display-stub` (the whole game, intro to
+Exit) on Vulkan on the GPU, which passes as on Direct3D 9. What is left is one or two
+levels over the sky
 and the hulls, and single pixels at edges and on small bright details (the maxima, 117
 to 221, are on the Borg hulls' lights and the sprites): the rasteriser and the filtering of a CPU
 driver against a GPU's, and dxc's floating point against DXVK's translation of
@@ -344,6 +346,14 @@ tens of thousands, so one rounding apart, a fused multiply-add or not, moves a l
 value. The same scene on Direct3D 9 on lavapipe (DXVK there) is further from the GPU's
 than Vulkan on lavapipe is (showcase 4.1, nebula 25.8, firing 7.0): DXVK on a CPU
 driver is not a reference for these.
+
+lavapipe cannot take the whole game: a campaign mission (`display-stub`'s `a2_fed01`)
+kills the game while it loads, on `Backend=vulkan` and on `Backend=d3d9` (DXVK) alike,
+as the nebulae are baked; on the GPU both pass. Every allocation of a CPU driver is
+host memory, likely mapped into the 32-bit process's address space, which a mission's
+textures and nebula volumes fill. So the whole game on Vulkan is a run on the GPU
+(`A2TEST_VULKAN_GPU=1`), after the port scenes have come through the validation layer
+clean on lavapipe.
 
 ## render3d on gpu
 

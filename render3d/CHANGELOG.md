@@ -14,8 +14,8 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   (`gfx::engine_texture`), and the post passes leave out Direct3D 9's half-pixel offset
   there (`gpu::Gpu::half_pixel`). The menu scene's viewport is handed to its pass.
 
-Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 1.68, nebula 0.57,
-firing 0.97 (/255). Installed, not yet seen in game.
+Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.87, nebula 0.36,
+firing 0.40 (/255). Installed, not yet seen in game.
 
 ## 0.20.0 — 2026-10-23
 

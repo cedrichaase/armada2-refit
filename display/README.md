@@ -251,8 +251,7 @@ the swap chain's image, submits and presents.
   every sampler with mips a LOD bias of -0.5. Display8 reads the same keys
   (`d3d9.samplerAnisotropy`, `d3d9.samplerLodBias`, `d3d9.clampNegativeLodBias`) and
   hands them to `gpu` (`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`), so the two
-  backends filter alike. Without it every hull read a level blurrier on Vulkan
-  (showcase RMSE 5.07 -> 4.05). Vulkan's cube maps are always seamless, as
+  backends filter alike. Without it every hull read a level blurrier on Vulkan. Vulkan's cube maps are always seamless, as
   `d3d9.seamlessCubes = True` makes DXVK's.
 
 On the bench every Vulkan game runs on lavapipe with the layer on (unless

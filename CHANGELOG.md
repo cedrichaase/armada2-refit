@@ -17,8 +17,9 @@ Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.50.0.
 - The bench runs a Vulkan game on lavapipe with the validation layer, never on the GPU
   (testbench 3.50.0, display 0.5.0).
 
-Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 1.68, nebula 0.57,
-firing 0.97 (/255), no validation message. Installed, not yet seen in game.
+Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.87, nebula 0.36,
+firing 0.40 (/255) on the GPU; `display-stub` (the whole game) passes on Vulkan; no
+validation message. Installed, not yet seen in game.
 
 ## 13.10.0 — 2026-10-23
 
