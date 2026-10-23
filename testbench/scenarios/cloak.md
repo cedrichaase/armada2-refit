@@ -17,7 +17,7 @@ ships being the player's own, the planet and the Galaxy behind it a little bent 
 fringed in colour; decloaked, the warbird as before.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Take a screenshot called "cloak-before".
 5. Scene "cloak warbird on".

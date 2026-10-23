@@ -20,7 +20,7 @@ warp spin-up makes the arrival time vary, and an early version that expected arr
 within 4 seconds failed with the warp cursor showing. Judge the hover shots.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "QOL.log" contains "goes to warp, patched".
 4. Expect "Scene.log" contains "scene ready".
 5. Press ctrl+Down 30 times.

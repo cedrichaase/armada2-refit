@@ -30,7 +30,7 @@ holds about 6 s, until the cube has taken the weapon (`testbench/scene/README.md
 own Borg phaser (`bbphaso`) firing at the enemy Sovereign, drawn as stock draws it.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "module ordnance: on".
 5. Scene "spawn holder bbattle1 3000 0 3220 180 1".

@@ -16,7 +16,7 @@ The scene (`testbench/scene/scenes/warp.ini`) is three Federation destroyers, wh
 have warp. At 1280x720 the minimap's square spans about 24..224 x 500..700.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Scene "select ship1 ship2 ship3".
 5. Wait 2 seconds.

@@ -16,7 +16,7 @@ space, is a smooth curve with no steps a cell wide, and the map's own border, se
 from far off, stays straight and fully covered.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "module overlays: on".
 5. Expect "Render3D.log" contains "overlays: first shroud drawn".

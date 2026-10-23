@@ -28,7 +28,7 @@ The campaign is reached from Instant Action's match by Esc, Exit to the main men
 8. Wait 2 seconds.
 9. Take a screenshot called "instant action load later".
 10. Check that the ring of dots at the left of the status line has turned since the previous screenshot (the frames between the engine's are animated).
-11. Wait 25 seconds.
+11. Wait up to 25 seconds for the logs the next steps expect.
 12. Expect "UI.log" contains "hold over".
 13. Expect "UI.log" contains "first frame of ours".
 14. Take a screenshot called "match".

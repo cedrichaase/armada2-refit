@@ -28,7 +28,7 @@ layouts, their buttons at the foot of the window.
 7. Expect "Computer AI:Medium" is visible.
 8. Take a screenshot called "game setup".
 9. Click "LAUNCH".
-10. Wait 45 seconds.
+10. Wait up to 45 seconds for the logs the next steps expect.
 11. Expect "UI.log" contains "dialog".
 12. Take a screenshot called "match".
 13. Press Escape.
@@ -68,7 +68,7 @@ layouts, their buttons at the foot of the window.
 47. Click at 640,639.
 48. Wait 3 seconds.
 49. Click "Yes".
-50. Wait 45 seconds.
+50. Wait up to 45 seconds for the logs the next steps expect.
 51. Expect "UI.log" contains "mission: frames resume".
 52. Take a screenshot called "loaded".
 53. Expect the game is still running.

@@ -127,7 +127,7 @@ settings screens; Exit.
 101. Click at design 400,532.
 102. Wait 3 seconds.
 103. Click "Yes".
-104. Wait 60 seconds.
+104. Wait up to 60 seconds for the logs the next steps expect.
 105. Expect "UI.log" contains "mission: frames resume".
 106. Take a screenshot called "loaded".
 107. Press Escape.

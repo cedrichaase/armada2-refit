@@ -37,7 +37,7 @@ render3d's `menu: view borg` can only come from the campaign selection after it.
 23. Click "Done".
 24. Wait 4 seconds.
 25. Move the mouse to 220,426.
-26. Wait 5 seconds.
+26. Wait up to 5 seconds for the logs the next steps expect.
 27. Expect "Render3D.log" contains "menu: view borg".
 28. Take a screenshot called "campaign selection after the abort".
 29. Check that the screenshot shows a column at the left under SINGLE PLAYER of four campaigns each with a white emblem (Borg Campaign lit), then LOAD GAME and PREVIOUS MENU, over a 3D scene of a dark Borg cube in a purple nebula, and not four picture cards in a 2x2 grid.

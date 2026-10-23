@@ -17,7 +17,7 @@ blue vapour jet where stock has blue-grey puffs; and on the moving ship one unbr
 trail from each vent.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "module particles: on".
 5. Scene "orbit galaxy 200 15 120".

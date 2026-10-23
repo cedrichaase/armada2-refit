@@ -58,10 +58,27 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Take a screenshot called "NAME"` | kept in the report; same-named shots are compared across resolutions |
 | `Dump the frame called "NAME"` | Render3D.asi's targets (PFM) and UI.asi's presented frame (PPM), read back inside the game, into `dumps/NAME/` with PNG previews (`../README.md`, "Frame dumps"); fails when no plugin dumped |
 | `Note "TEXT"` | a line in the log |
-| `Wait up to 240 seconds for "Scene.log" to say "TEXT"` | polls a log beside `Armada2.exe` for a line with TEXT (each launch deletes the old one); fails at the time limit |
+| `Wait up to 240 seconds for "Scene.log" to say "TEXT"` | polls a log beside `Armada2.exe` for a line with TEXT written since the last action (a launch, click, key, typing, drag or Scene command; each launch deletes the old logs), and goes on as soon as one is. At the time limit a line from before that action passes; none at all is a failed check |
+| `Wait up to 50 seconds for the logs the next steps expect` | the fixed wait before a run of `Expect "LOG" contains "TEXT"` steps, ended as soon as every line they expect has been written since the last action; when one has not, the whole time, as `Wait 50 seconds` would. It checks nothing: the Expect steps after it do. See "Waiting on logs" |
 | `Scene "select yard1 yard2"` | commands to `Scene.asi` (`../scene/README.md`), `;` between several; a refused command fails the step. Needs `Setup: testbench/scene/bench-setup.sh <scene>` |
 | `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |
+
+## Waiting on logs
+
+A fixed `Wait 50 seconds` before `Expect "Scene.log" contains "scene ready"` waits 50 s
+whether the scene took 15 or 45. Where the steps after a wait are log checks, wait for
+the logs instead (`Wait up to 50 seconds for the logs the next steps expect`): the same
+checks pass and fail, sooner. A log line says what a plugin did, not what is on the
+screen, so it is a signal to go on, never the check itself: where a screenshot, OCR or a
+judged step follows, it still decides.
+
+Only lines written since the last action count, so a line an earlier step left in the
+log cannot end the wait for the next one. A log line logged when a plugin loads ("module
+effects: on") is written before any click; after one it never counts, and the wait runs
+its whole time, as before. Keep short waits between an input and a screenshot or an OCR
+check fixed: they also give the frame time to be drawn, which a log line written while
+the frame is built does not promise.
 
 ## Several players
 

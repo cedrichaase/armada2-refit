@@ -14,7 +14,7 @@ waiting item. `QOLRules.log` writes every payment, refusal and refund with the b
 after it, which is what the steps read.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "QOLRules.log" contains "items are paid when queued".
 4. Expect "Scene.log" contains "scene ready".
 5. Note "three orders for a ship the bank can cover: each leaves the bank at once, the start takes nothing more".

@@ -16,13 +16,13 @@ the shield ellipsoid where stock has a turning band of lightning texture, and bl
 arc flares with rays and sparks on the hull where stock has white star sprites.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "module effects: on".
 5. Expect "Render3D.log" contains "effects: repair: AddParticle".
 6. Scene "heal target off".
 7. Scene "orbit target 150 25 150".
-8. Wait 45 seconds.
+8. Wait up to 45 seconds for the logs the next steps expect.
 9. Expect "Render3D.log" contains "effects: shields down on fgalaxy.odf".
 10. Take a screenshot called "shields-down-close".
 11. Scene "orbit target 150 -25 150".
@@ -34,7 +34,7 @@ arc flares with rays and sparks on the hull where stock has white star sprites.
 17. Scene "weapons shooter off".
 18. Scene "weapons klingon off".
 19. Scene "orbit target 140 30 95".
-20. Wait 20 seconds.
+20. Wait up to 20 seconds for the logs the next steps expect.
 21. Expect "Render3D.log" contains "effects: weld on fgalaxy.odf".
 22. Expect "Render3D.log" contains "effects: first welds drawn".
 23. Take a screenshot called "welds-1".

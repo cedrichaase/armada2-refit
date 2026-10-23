@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.3.0 — 2026-10-23
+
+Layers: testbench 3.47.0.
+
+### Added
+- Bench scenarios wait for the log lines they check instead of a fixed time
+  (`Wait up to N seconds for the logs the next steps expect`), and a log wait counts only
+  lines written since the last action, and `Quit the game` no longer waits out each
+  menu press (testbench 3.47.0).
+
+Bench-only; installs nothing into the game.
+
 ## 13.2.1 — 2026-10-23
 
 Layers: testbench 3.46.1.

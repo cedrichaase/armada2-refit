@@ -17,7 +17,7 @@ whole picture: hulls, weapons, shields, explosions, debris, vents of damaged shi
 sky, fog and selection, in the main view and the inset.
 
 1. Include "_enter-instant-action".
-2. Wait 20 seconds.
+2. Wait up to 20 seconds for the logs the next steps expect.
 3. Expect "Render3D.log" contains "module world: on".
 4. Expect "Render3D.log" contains "module hulls: on".
 5. Expect "Render3D.log" contains "module overlays: on".
