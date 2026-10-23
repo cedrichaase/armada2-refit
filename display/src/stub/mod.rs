@@ -176,8 +176,8 @@ pub fn d3d12() -> bool {
     unsafe { STUB.as_ref().is_some_and(|s| s.backend == Backend::D3d12) }
 }
 
-/// The Direct3D 9 device, made on the first `CreateDevice` on `hwnd`; the game's window
-/// covers the screen from then on.
+/// The backend's device (Direct3D 9, Vulkan or Direct3D 12), made on the first
+/// `CreateDevice` on `hwnd`; the game's window covers the screen from then on.
 pub fn ensure_device(hwnd: *mut c_void, flags: u32, depth: u32, interval: u32) -> bool {
     let s = stub();
     if !s.dev9.is_null() || (s.backend == Backend::Vulkan && crate::vk::get().is_some()) || (s.backend == Backend::D3d12 && crate::dx12::get().is_some()) {

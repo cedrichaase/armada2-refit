@@ -5,6 +5,18 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.21.1 — 2026-10-23
+
+Layers: display 0.6.2.
+
+### Fixed
+- Display8's stub logs the backend that could not start, and `Display8.ini` describes
+  the stub's three backends (display 0.6.2). The docs of display, gpu, render3d, ui and
+  platform describe the chain as `./install` leaves it, Display8 in front, and the stub
+  on Direct3D 9, Vulkan and Direct3D 12. The shipped defaults are unchanged.
+
+Installed, not yet seen in game.
+
 ## 13.21.0 — 2026-10-23
 
 Layers: platform 3.6.0, menus 4.3.5, renderer 2.0.1.
