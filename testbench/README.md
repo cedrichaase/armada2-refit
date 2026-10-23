@@ -154,8 +154,11 @@ The launch step also proves isolation: it scans `/proc/<pid>/maps` and `fd` for 
 real install's path, and fails the case if the game has it open.
 
 Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
-channels), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
-`xalia_dxgi.log` (DXVK), `sway.log`, `input.log`, `prepare.log`,
+channels, `trace+cursor` for Wine's pointer clip), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
+`xalia_dxgi.log` (DXVK), `sway.log` (with `A2TEST_XWAYLAND_DEBUG=1` in the
+environment of `session start` or `run`, every Wayland request and event of Xwayland's:
+its pointer's enter and leave, locks and confinements; large, so for short runs),
+`bar.log` (`Show a bar ...`), `input.log`, `prepare.log`,
 `launch-env.txt` (the exact environment and argv), `Scene.log` and `Scene.marks`
 (`scene/README.md`, "Marks"), `Stems.log` and `Stems.ini`, the clone's `ARMADA.PRF`,
 `Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
