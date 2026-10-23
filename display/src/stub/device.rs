@@ -103,6 +103,11 @@ pub fn gone(o: *mut SObj) {
     let _ = o;
 }
 
+/// A device of ours's state (the exports read the engine's viewport and transforms).
+pub fn state(this: *mut SObj) -> &'static mut Dev {
+    dev(this)
+}
+
 fn dev(this: *mut SObj) -> &'static mut Dev {
     match unsafe { &mut (*this).body } {
         Body::Device(d) => d,
@@ -376,6 +381,9 @@ unsafe extern "system" fn get_depth_stencil_surface(this: *mut SObj, out: Out) -
 
 unsafe extern "system" fn begin_scene(this: *mut SObj) -> HRESULT {
     trace::call(frame!(), Kind::Device, 34);
+    if let Some(v) = crate::vk::get() {
+        v.frame();
+    }
     super::flush_mirrors();
     dev(this).in_scene = true;
     let d = d9();
@@ -393,8 +401,18 @@ unsafe extern "system" fn end_scene(this: *mut SObj) -> HRESULT {
 unsafe extern "system" fn clear(this: *mut SObj, n: u32, rects: P, flags: u32, color: u32, z: f32, stencil: u32) -> HRESULT {
     trace::call(frame!(), Kind::Device, 36);
     let dv = dev(this);
+    if dv.target != dv.back_buffer {
+        return S_OK;
+    }
+    if let Some(v) = crate::vk::get() {
+        let list: &[[i32; 4]] = if rects.is_null() || n == 0 { &[] } else { unsafe { core::slice::from_raw_parts(rects as *const [i32; 4], n as usize) } };
+        let vp = dv.viewport;
+        let f = if dv.zbuffer.is_null() { flags & 1 } else { flags };
+        v.clear(list, [vp[0], vp[1], vp[2], vp[3]], f, color, z);
+        return S_OK;
+    }
     let d = d9();
-    if d.is_null() || dv.target != dv.back_buffer {
+    if d.is_null() {
         return S_OK;
     }
     let mut f = flags;

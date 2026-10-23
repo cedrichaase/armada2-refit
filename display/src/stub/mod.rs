@@ -35,6 +35,21 @@ use obj::{SObj, IID_TEXTURE9};
 unsafe extern "system" {
     fn SetWindowLongA(hwnd: *mut c_void, index: i32, v: i32) -> i32;
     fn SetWindowPos(hwnd: *mut c_void, after: *mut c_void, x: i32, y: i32, cx: i32, cy: i32, flags: u32) -> i32;
+    fn GetSystemMetrics(index: i32) -> i32;
+    fn MonitorFromPoint(x: i32, y: i32, flags: u32) -> usize;
+}
+
+/// The primary monitor (`MONITOR_DEFAULTTOPRIMARY`), for `GetAdapterMonitor` with no
+/// Direct3D 9 to ask.
+pub fn primary_monitor() -> usize {
+    unsafe { MonitorFromPoint(0, 0, 1) }
+}
+
+/// What the stub draws on: its own Direct3D 9 device, or Vulkan (`vk/`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Backend {
+    D3d9,
+    Vulkan,
 }
 
 /// `D3DPRESENT_PARAMETERS`, d3d9's.
@@ -67,6 +82,9 @@ pub struct Stub {
     pub main_thread: u32,
     /// The stub's `IDirect3D8`, for `GetDirect3D`.
     pub d3d8: *mut SObj,
+    pub backend: Backend,
+    /// The Vulkan validation layer (`Validate=1`).
+    pub validate: bool,
 }
 
 static mut STUB: Option<Stub> = None;
@@ -84,7 +102,19 @@ pub fn dev9() -> *mut c_void {
 
 /// Starts stub mode: Direct3D 9 (`d3d9.dll` as the loader finds it: DXVK's beside the
 /// exe under Proton, Windows' own) and the desktop's mode. None: stay in forward mode.
-pub fn start() -> Option<*mut c_void> {
+pub fn start(backend: Backend, validate: bool) -> Option<*mut c_void> {
+    if backend == Backend::Vulkan {
+        // No Direct3D 9 at all: the desktop's size from the system, the device at the
+        // engine's first CreateDevice.
+        let (w, h) = unsafe { (GetSystemMetrics(0), GetSystemMetrics(1)) };
+        if w <= 0 || h <= 0 {
+            log!("stub: no screen size");
+            return None;
+        }
+        let mode = crate::d3d8::DisplayMode { width: w as u32, height: h as u32, refresh: 60, format: 22 };
+        log!("stub: on Vulkan; the one mode offered: {}x{}", w, h);
+        return Some(started(core::ptr::null_mut(), mode, backend, validate));
+    }
     let name = rt::cstr("d3d9.dll");
     let m = unsafe { LoadLibraryA(name.as_ptr()) };
     if m.is_null() {
@@ -111,6 +141,10 @@ pub fn start() -> Option<*mut c_void> {
     // The engine is offered X8R8G8B8 at the desktop's size, whatever the desktop's format.
     mode.format = 22;
     log!("stub: Direct3D 9 at {:#x}; the one mode offered: {}x{} {} Hz", d3d9 as usize, mode.width, mode.height, mode.refresh);
+    Some(started(d3d9, mode, backend, validate))
+}
+
+fn started(d3d9: *mut c_void, mode: crate::d3d8::DisplayMode, backend: Backend, validate: bool) -> *mut c_void {
     unsafe {
         STUB = Some(Stub {
             d3d9,
@@ -120,6 +154,8 @@ pub fn start() -> Option<*mut c_void> {
             mirrors: Vec::new(),
             main_thread: 0,
             d3d8: core::ptr::null_mut(),
+            backend,
+            validate,
         })
     };
     d3d::install();
@@ -127,15 +163,36 @@ pub fn start() -> Option<*mut c_void> {
     res::install();
     let d = SObj::new(crate::com::Kind::D3D, crate::com::Role::Plain, obj::Body::D3D);
     stub().d3d8 = d;
-    Some(d as *mut c_void)
+    d as *mut c_void
+}
+
+pub fn vulkan() -> bool {
+    unsafe { STUB.as_ref().is_some_and(|s| s.backend == Backend::Vulkan) }
 }
 
 /// The Direct3D 9 device, made on the first `CreateDevice` on `hwnd`; the game's window
 /// covers the screen from then on.
 pub fn ensure_device(hwnd: *mut c_void, flags: u32, depth: u32, interval: u32) -> bool {
     let s = stub();
-    if !s.dev9.is_null() {
+    if !s.dev9.is_null() || (s.backend == Backend::Vulkan && crate::vk::get().is_some()) {
         return true;
+    }
+    if s.backend == Backend::Vulkan {
+        let (w, h) = (s.mode.width, s.mode.height);
+        unsafe {
+            SetWindowLongA(hwnd, -16, 0x9000_0000u32 as i32);
+            SetWindowPos(hwnd, core::ptr::null_mut(), 0, 0, w as i32, h as i32, 0x0020 | 0x0040);
+        }
+        s.hwnd = hwnd;
+        s.main_thread = unsafe { GetCurrentThreadId() };
+        crate::trace::MAIN_THREAD.store(s.main_thread, Ordering::Relaxed);
+        return match crate::vk::Vk::start(hwnd, w, h, interval, s.validate) {
+            Ok(()) => true,
+            Err(e) => {
+                log!("stub: Vulkan could not start: {}", e);
+                false
+            }
+        };
     }
     let (w, h) = (s.mode.width, s.mode.height);
     unsafe {
@@ -202,6 +259,10 @@ pub fn mirror(o: *mut SObj) -> *mut c_void {
 
 /// Copies the levels written since into the mirror.
 pub fn update_mirror(o: *mut SObj) {
+    if vulkan() {
+        crate::vk::mirror::update(o);
+        return;
+    }
     let t = unsafe { (*o).tex() };
     let dirty = t.dirty.swap(0, Ordering::AcqRel);
     if dirty == 0 || t.mirror.is_null() {
@@ -240,7 +301,7 @@ pub fn update_mirror(o: *mut SObj) {
 /// now on the device's thread, else at the next `BeginScene` or `Present`.
 pub fn level_written(o: *mut SObj, index: u32) {
     let t = unsafe { (*o).tex() };
-    if t.mirror.is_null() {
+    if t.mirror.is_null() && t.vk == 0 {
         return;
     }
     let level = index % t.nlev;
@@ -279,12 +340,29 @@ pub fn d3d8_object() -> *mut SObj {
 
 /// The engine's gamma ramp (the Options slider): drawn in the last pass (`gamma.rs`).
 pub fn gamma_changed(ramp: &[u16; 768]) {
-    gamma::set(ramp);
+    match crate::vk::get() {
+        Some(v) => v.set_ramp(ramp),
+        None => gamma::set(ramp),
+    }
 }
 
 /// The engine's `Present`: what it wrote into the back buffer by lock (a movie's
 /// frames) goes to the swap chain first, then the frame is presented.
 pub fn present(dev: &mut device::Dev, _src: *mut c_void, _dst: *mut c_void, _wnd: *mut c_void, _dirty: *mut c_void) -> i32 {
+    if let Some(v) = crate::vk::get() {
+        flush_mirrors();
+        let bb = dev.back_buffer;
+        if !bb.is_null() {
+            let sf = unsafe { (*bb).surf() };
+            if sf.dirty.swap(false, Ordering::AcqRel) {
+                let c = v.color.image;
+                let (w, h, pitch) = (sf.w.min(v.color.w), sf.h.min(v.color.h), sf.pitch);
+                let layout = ash::vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+                v.upload(c, ash::vk::ImageAspectFlags::COLOR, 0, w, h, &sf.data, pitch, 4, layout, layout);
+            }
+        }
+        return if v.present() { 0 } else { 0x8876_0868u32 as i32 }; // D3DERR_DEVICELOST
+    }
     let d = dev9();
     if d.is_null() {
         return 0;

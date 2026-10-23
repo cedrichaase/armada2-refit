@@ -66,6 +66,8 @@ pub struct Tex {
     pub mirror: *mut c_void,
     /// A level written since the mirror was last brought up to date (bit per level).
     pub dirty: AtomicU32,
+    /// The Vulkan mirror (`vk::mirror`): a boxed image, or 0.
+    pub vk: usize,
 }
 
 pub struct Surf {
@@ -207,6 +209,10 @@ fn free(o: *mut SObj) {
             if !t.mirror.is_null() {
                 super::forget_mirror(o, t.mirror);
                 vcall!(t.mirror, 2, fn() -> u32,);
+            }
+            if t.vk != 0 {
+                super::forget_mirror(o, core::ptr::null_mut());
+                crate::vk::mirror::forget(t.vk);
             }
         }
         Body::Device(d) => {

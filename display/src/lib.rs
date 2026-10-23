@@ -22,6 +22,7 @@ pub mod drop;
 pub mod trace;
 pub mod stub;
 pub mod user32;
+pub mod vk;
 
 use core::ffi::c_void;
 use rt::win::*;
@@ -46,6 +47,14 @@ static mut CONFIG: Option<Config> = None;
 static mut REAL: HANDLE = core::ptr::null_mut();
 /// `Mode=stub` asked for; whether it runs is decided at `Direct3DCreate8`.
 static mut STUB_ASKED: bool = false;
+/// `Backend=`: what the stub draws on (d3d9 until every plugin draws on Vulkan).
+static mut BACKEND: stub::Backend = stub::Backend::D3d9;
+static mut VALIDATE: bool = false;
+
+#[allow(non_snake_case)]
+fn STUB_ASKED_NOW() -> bool {
+    unsafe { STUB_ASKED }
+}
 
 /// The plugins that change what the engine draws, which in stub mode would draw
 /// nothing (README.md, "Stub mode"): with any loaded, the stub stands down.
@@ -82,6 +91,14 @@ fn startup() {
     let mode = ini.string("Display8", "Mode").unwrap_or_else(|| alloc::string::String::from("forward"));
     log!("Display8 {} -- game dir {}; mode {}; the real chain: {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
     unsafe { STUB_ASKED = mode.eq_ignore_ascii_case("stub") };
+    let backend = ini.string("Display8", "Backend").unwrap_or_else(|| alloc::string::String::from("d3d9"));
+    unsafe {
+        BACKEND = if backend.eq_ignore_ascii_case("vulkan") { stub::Backend::Vulkan } else { stub::Backend::D3d9 };
+        VALIDATE = ini.int("Display8", "Validate", 0) != 0;
+    }
+    if STUB_ASKED_NOW() {
+        log!("stub mode on {:?}{}", unsafe { BACKEND }, if unsafe { VALIDATE } { ", with the validation layer" } else { "" });
+    }
     if !mode.eq_ignore_ascii_case("forward") && !mode.eq_ignore_ascii_case("stub") {
         log!("Mode={}: not a mode of this version (forward, stub); forward it is", mode);
     }
@@ -140,7 +157,7 @@ fn real_proc(name: &str) -> usize {
 #[unsafe(no_mangle)]
 pub extern "system" fn Direct3DCreate8(sdk: u32) -> *mut c_void {
     if unsafe { STUB_ASKED } && stub_allowed() {
-        if let Some(d) = stub::start() {
+        if let Some(d) = stub::start(unsafe { BACKEND }, unsafe { VALIDATE }) {
             log!("Direct3DCreate8({}) -> the stub: the engine draws nothing from here", sdk);
             return d;
         }
