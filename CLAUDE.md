@@ -74,7 +74,8 @@ sessions promptly. **Say what you are doing**: `./a2test drive --session ID note
 when you start driving and whenever your intent changes (the dashboard, `./a2test watch`,
 shows it). Before driving the game, read `testbench/README.md`, "Operating the
 game: what agents learned", and the staging recipes in `testbench/operating/`. Write regression scenarios in `testbench/scenarios/` for fixes
-worth keeping fixed. A bench pass is evidence for the user, not their sign-off
+worth keeping fixed, and wait on what the game logs rather than for a fixed time
+(`testbench/scenarios/README.md`, "Waits and checks"). A bench pass is evidence for the user, not their sign-off
 ("Finishing work" still applies).
 **To test a checkout as installed**, `./a2test session start --install <checkout>` (or
 `a2test run ... --install ...`) starts the clone from stock and runs that checkout's

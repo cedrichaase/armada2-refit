@@ -32,7 +32,7 @@ The starbase is at the centre of the screen after the launch (the camera starts 
 12. Wait 1 second.
 13. Expect "Federation" is visible.
 14. Click "LAUNCH".
-15. Wait 12 seconds.
+15. Wait up to 12 seconds for the logs the next steps expect.
 16. Expect "QOLRules.log" contains "a refused order is announced".
 17. Click at 735,305.
 18. Wait 1 second.

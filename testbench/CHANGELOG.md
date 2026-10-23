@@ -5,6 +5,26 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.47.0 — 2026-10-23
+
+### Added
+- `Wait up to N seconds for the logs the next steps expect`: a wait that ends as soon as
+  every line the following `Expect "LOG" contains "TEXT"` steps check has been written
+  since the last action, else after N s. 48 fixed waits of 5 s or more in 39 scenarios
+  (1825 s at one resolution) now use it.
+
+### Changed
+- `Wait up to N seconds for "LOG" to say "TEXT"` counts only lines written since the last
+  action (launch, click, key, typing, drag, Scene command). At the time limit, a line
+  from before it passes and none is a failed check that lets the run go on (it was an
+  error that ended the case). Polls every 0.5 s.
+- A launch also deletes `UI.log` and `Online.log` (both plugins rewrite them as they load).
+- `Quit the game` goes on as soon as the screen has the next button instead of waiting
+  8 s for an exit after every press: from a mission it took ~19.5 s, two presses that
+  could not end the game waited out.
+
+Bench-only; installs nothing into the game.
+
 ## 3.46.1 — 2026-10-23
 
 ### Fixed

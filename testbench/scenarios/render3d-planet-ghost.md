@@ -18,12 +18,12 @@ under the fog, as round and with the same surface, only darker; never a faceted
 outline or the stock texture.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "module world: on".
 5. Take a screenshot called "planet-seen".
 6. Scene "goto scout 6500 0 6500".
-7. Wait 30 seconds.
+7. Wait up to 30 seconds for the logs the next steps expect.
 8. Expect "Render3D.log" contains "world: planets: a fog-of-war ghost".
 9. Take a screenshot called "planet-ghost".
 10. Expect the game is still running.

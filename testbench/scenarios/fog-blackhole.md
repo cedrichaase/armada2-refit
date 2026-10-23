@@ -18,12 +18,12 @@ disc's outline is the same grey (measured 2026-10-21 at the disc's rim: before t
 fix 2 and 19 against 49 and 54 outside, after 53 and 61; stock 53 and 56).
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "module overlays: on".
 5. Take a screenshot called "hole-seen".
 6. Scene "goto scout 6500 0 6500".
-7. Wait 35 seconds.
+7. Wait up to 35 seconds for the logs the next steps expect.
 8. Expect "Render3D.log" contains "overlays: ghost of mblkhole at 3000,-70,3000, 2 additive mesh(es)".
 9. Expect "Render3D.log" contains "overlays: ghost of quantumsingularity".
 10. Take a screenshot called "hole-fogged".

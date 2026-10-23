@@ -17,10 +17,10 @@ within seconds of the order and `fbase` takes 100 s to build (12192 faces), so t
 scene is paused part-built, 50 s in, to be looked at.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Scene "build rig fbase 2300 0 2000".
-5. Wait 50 seconds.
+5. Wait up to 50 seconds for the logs the next steps expect.
 6. Expect "Render3D.log" contains "effects: bees: fbee drawn".
 7. Expect "Render3D.log" contains "effects: construction: fbase at".
 8. Scene "pause; orbit 2300 0 2000 160 30 300".

@@ -15,7 +15,7 @@ real key presses. `selection` answers with what is selected, each one's group la
 (`g`), queue (`q`) and class, and every group that is not empty.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "QOL.log" contains "stations of one kind select and group together, patched".
 4. Expect "Scene.log" contains "scene ready".
 5. Scene "select yard1 yard2 yard3".

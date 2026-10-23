@@ -26,7 +26,7 @@ each tooltip ("info: tooltip ..."), and each press ("info: cancel queue slot 2",
 "info: select ...").
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "UI.log" contains "info: ours".
 5. Expect "UI.log" contains "race: the HUD's race is".

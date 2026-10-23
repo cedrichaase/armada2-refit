@@ -17,7 +17,7 @@ the UI reads that from the engine's draw (`cursor: the engine's cursor is held b
 and draws none either (`Mission draws none`); `cursor on` brings both back.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "UI.log" contains "sprites from cursor.spr".
 4. Expect "Scene.log" contains "scene ready".
 5. Move the mouse to 900,250.

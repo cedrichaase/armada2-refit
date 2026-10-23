@@ -15,7 +15,7 @@ against stock: the same picture, with light past white blooming (weapon impacts,
 warp core, the hits on the shields), and edges smoothed by the scene target's MSAA.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "frame: both views come through render3d".
 5. Expect "Render3D.log" contains "frame: targets".
@@ -26,7 +26,7 @@ warp core, the hits on the shields), and edges smoothed by the scene target's MS
 10. Take a screenshot called "close".
 11. Scene "hud on".
 12. Scene "select ente".
-13. Wait 5 seconds.
+13. Wait up to 5 seconds for the logs the next steps expect.
 14. Expect "Render3D.log" contains "inset view".
 15. Take a screenshot called "hud-and-inset".
 16. Wait 20 seconds.

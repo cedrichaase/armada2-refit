@@ -33,7 +33,7 @@ Player.
 12. Wait up to 300 seconds for the briefing.
 13. Wait 3 seconds.
 14. Click "OK".
-15. Wait 10 seconds.
+15. Wait up to 10 seconds for the logs the next steps expect.
 16. Expect "UI.log" contains "a2_fed01".
 17. Scene "succeed".
 18. Wait 5 seconds.

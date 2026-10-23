@@ -24,7 +24,7 @@ glow at the heart; the shuttle's rocket trails and the myotron's contrails drawn
 every other particle.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Scene "spawn fd fdestroy 3000 0 3400 180 1".
 5. Scene "spawn kd kdestroy 3200 0 3350 210 1".
@@ -82,7 +82,7 @@ every other particle.
 57. Scene "camera rts".
 58. Scene "center tgt".
 59. Expect scene "special kc gkcteam tgt" answers ", fired".
-60. Wait 5 seconds.
+60. Wait up to 5 seconds for the logs the next steps expect.
 61. Expect "Render3D.log" contains "inset view".
 62. Take a screenshot called "hud-and-inset".
 63. Wait 30 seconds.

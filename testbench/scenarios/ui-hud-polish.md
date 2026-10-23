@@ -26,7 +26,7 @@ selection ("info: Single ..."), and the bar's layout ("bar: menu=7 ... Q=galert"
 9. Click "O.K.".
 10. Wait up to 300 seconds for the briefing.
 11. Click "OK".
-12. Wait 6 seconds.
+12. Wait up to 6 seconds for the logs the next steps expect.
 13. Expect "UI.log" contains "panels: team texts ours".
 14. Expect "UI.log" contains "trade: Sent to Team 2".
 15. Click at 890,172.

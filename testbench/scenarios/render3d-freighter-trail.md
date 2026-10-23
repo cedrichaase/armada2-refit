@@ -17,7 +17,7 @@ when full, the Romulan's from 10 %): yellow for latinum, pale blue for dilithium
 render3d 0.16.2 there was no trail and the pods never lit.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "particles: ffreight: latinum spray latinum_spray at hp08".
 5. Expect "Render3D.log" contains "particles: kfreight: latinum spray latinum_spray at hp10".
