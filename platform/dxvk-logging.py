@@ -40,7 +40,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import a2env  # noqa: E402  (the repository root, for where the game is)
 GAME = a2env.GAME
-CONFIG_DIR = os.path.expanduser('~/.config/heroic/GamesConfig')
+CONFIG_DIR = os.path.join(a2env.HEROIC, 'GamesConfig')  # native or Flatpak (a2env)
 ENV_KEY = 'enviromentOptions'          # Heroic's typo, deliberate -- see docstring
 MANAGED = ('DXVK_LOG_LEVEL', 'DXVK_LOG_PATH', 'DXVK_HUD')
 OVERRIDE_KEY = 'WINEDLLOVERRIDES'
@@ -61,7 +61,12 @@ def heroic_running():
 
 def find_config():
     """The GamesConfig json whose winePrefix matches this game."""
-    for name in sorted(os.listdir(CONFIG_DIR)):
+    try:
+        names = sorted(os.listdir(CONFIG_DIR))
+    except OSError:
+        raise SystemExit('no Heroic config: %s does not exist (A2_HEROIC sets where '
+                         'Heroic keeps it)' % CONFIG_DIR)
+    for name in names:
         if not name.endswith('.json'):
             continue
         path = os.path.join(CONFIG_DIR, name)

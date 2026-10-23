@@ -84,7 +84,7 @@ ls -l "$GAME/Menus.asi" "$GAME/Menus.ini"
 grep '^Mode=' "$GAME/Menus.ini"
 
 # The loader only runs because winmm is overridden to the game-directory copy.
-cfg="$HOME/.config/heroic/GamesConfig/1174788223.json"
+cfg="$A2_HEROIC/GamesConfig/1174788223.json"   # native or Flatpak (a2env.sh)
 if [ -f "$cfg" ]; then
     # A check, not a step: whatever it finds, the install has happened, so it must
     # never fail the script (./install runs every layer under set -e).

@@ -5,6 +5,14 @@ window, with hi-res outpainted backdrops. Versioning rules: [`CLAUDE.md`](../CLA
 "Changelogs and versions". Newest first. The full write-up is in
 [`README.md`](README.md).
 
+## 4.3.5 — 2026-10-23
+
+### Fixed
+- `install.sh` checks the `WINEDLLOVERRIDES` of the Heroic config `A2_HEROIC` names,
+  so the Flatpak Heroic's too.
+
+Installed, not yet seen in game.
+
 ## 4.3.4 — 2026-10-21
 
 ### Changed

@@ -6,6 +6,14 @@ folder was `postfx/` before 2.0.0 and also held a **bloom** layer (vkBasalt, bui
 2.0.0 are that folder's. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The tables behind the numbers are in [`README.md`](README.md).
 
+## 2.0.1 — 2026-10-23
+
+### Fixed
+- `renderer-config.sh` looks for Heroic's DXVK under `$A2_HEROIC/tools/dxvk`, the
+  Flatpak Heroic's included, when the game directory has no `d3d9.dll`.
+
+Installed, not yet seen in game.
+
 ## 2.0.0 — 2026-10-22
 
 ### Removed

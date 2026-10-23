@@ -38,7 +38,10 @@ it found.  A chain member that cannot be identified is reported as unknown rathe
 guessed at.
 
 Heroic must be CLOSED: switching the chain also sets `autoInstallDxvk`, and Heroic
-rewrites GamesConfig on exit.
+rewrites GamesConfig on exit. Heroic's config is A2_HEROIC (a2env): the native
+package's ~/.config/heroic or the Flatpak's
+~/.var/app/com.heroicgameslauncher.hgl/config/heroic. The DXVK builds Heroic keeps
+under tools/dxvk/ are recognised from both.
 """
 import hashlib
 import json
@@ -53,7 +56,7 @@ GAME = a2env.GAME
 PREFIX = a2env.PREFIX
 SYSWOW = os.path.join(PREFIX, 'pfx/drive_c/windows/syswow64')
 PROTON = os.path.join(a2env.PROTON, 'files/lib/wine')
-CONFIG_DIR = os.path.expanduser('~/.config/heroic/GamesConfig')
+CONFIG_DIR = os.path.join(a2env.HEROIC, 'GamesConfig')
 BACKUP_SUFFIX = '.a2chain-backup'
 # GOG's d3d8.dll (its d3d8to9 translator) as the GOG release ships it. Known by hash so
 # that it is recognised, and backed up, before anything has ever replaced it.
@@ -116,14 +119,20 @@ def candidates():
         'DXVK d3d8 (proton)': os.path.join(PROTON, 'dxvk/i386-windows/d3d8.dll'),
         'DXVK d3d9 (proton)': os.path.join(PROTON, 'dxvk/i386-windows/d3d9.dll'),
     }
-    heroic = os.path.expanduser('~/.config/heroic/tools/dxvk')
-    latest = os.path.join(heroic, 'latest_dxvk')
-    if os.path.exists(latest):
-        name = open(latest).read().strip()
-        for api in ('d3d8', 'd3d9'):
-            p = os.path.join(heroic, name, 'x32', api + '.dll')
-            if os.path.exists(p):
-                c['DXVK %s (heroic %s)' % (api, name)] = p
+    # Every DXVK build Heroic keeps (tools/dxvk/dxvk-<version>/), native and Flatpak:
+    # latest_dxvk names only the newest, and the one in the game may be older.
+    for root in a2env.heroic_roots():
+        heroic = os.path.join(root, 'tools/dxvk')
+        flatpak = ' flatpak' if root == a2env.HEROIC_FLATPAK else ''
+        try:
+            names = sorted(os.listdir(heroic))
+        except OSError:
+            continue
+        for name in names:
+            for api in ('d3d8', 'd3d9'):
+                p = os.path.join(heroic, name, 'x32', api + '.dll')
+                if os.path.isfile(p):
+                    c.setdefault('DXVK %s (heroic%s %s)' % (api, flatpak, name), p)
     return {k: v for k, v in c.items() if os.path.exists(v)}
 
 
@@ -148,7 +157,12 @@ def heroic_running():
 
 
 def find_config():
-    for name in sorted(os.listdir(CONFIG_DIR)):
+    try:
+        names = sorted(os.listdir(CONFIG_DIR))
+    except OSError:
+        raise SystemExit('no Heroic config: %s does not exist (A2_HEROIC sets where '
+                         'Heroic keeps it)' % CONFIG_DIR)
+    for name in names:
         if not name.endswith('.json'):
             continue
         path = os.path.join(CONFIG_DIR, name)
@@ -159,7 +173,7 @@ def find_config():
         for key, val in data.items():
             if isinstance(val, dict) and 'Armada' in str(val.get('winePrefix', '')):
                 return path, data, key
-    raise SystemExit('no Heroic config found for an Armada II prefix')
+    raise SystemExit('no Heroic config found for an Armada II prefix in %s' % CONFIG_DIR)
 
 
 ENV_KEY = 'enviromentOptions'          # Heroic's typo; matching it is required
@@ -245,9 +259,10 @@ def status():
     print('    d3d9.dll   %s' % identify(os.path.join(SYSWOW, 'd3d9.dll')))
     try:
         path, data, key = find_config()
-        print('autoInstallDxvk    %s' % data[key].get('autoInstallDxvk'))
-    except SystemExit:
-        pass
+        print('HEROIC %s' % path)
+        print('    autoInstallDxvk  %s' % data[key].get('autoInstallDxvk'))
+    except SystemExit as exc:
+        print('HEROIC %s' % exc)
 
     # What the game actually gets is the game-directory d3d8, because of the
     # d3d8=n,b override plus Wine's application-directory-first search -- or, with

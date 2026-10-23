@@ -90,7 +90,7 @@ if '"dpnet"="native"' not in t:
     open(p, 'w', encoding='utf-8', errors='surrogateescape').write(t)
 EOF
 
-umu="${A2_UMU:-$HOME/.config/heroic/tools/runtimes/umu/umu_run.py}"
+umu="${A2_UMU:-$A2_HEROIC/tools/runtimes/umu/umu_run.py}"
 for d in dplayx.dll dpnet.dll dpnhpast.dll dpnhupnp.dll; do
     env DISPLAY="$display" GAMEID=umu-0 STORE=gog PROTONPATH="$A2_PROTON" \
         WINEPREFIX="$prefix" STEAM_COMPAT_DATA_PATH="$prefix" \

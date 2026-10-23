@@ -16,7 +16,7 @@ of the build and installs nothing of its own.
 |---|---|
 | Game | `~/Games/Heroic/Star Trek Armada II` (`A2_GAME`, see `a2env.sh`) |
 | Prefix | `~/Games/Heroic/Prefixes/Star Trek Armada II` (`A2_PREFIX`) |
-| Heroic config | `~/.config/heroic/GamesConfig/1174788223.json` |
+| Heroic config | `$A2_HEROIC/GamesConfig/1174788223.json`: `~/.config/heroic` for the native package, `~/.var/app/com.heroicgameslauncher.hgl/config/heroic` for the Flatpak (`a2env.sh` takes whichever exists, native first) |
 | Runner | Proton-CachyOS-latest |
 | Base | GOG release = Armada II + patch 1.1 |
 | GPU | RX 5700 XT (Navi 10 / gfx1010), 8 GB — Vulkan fine, **ROCm effectively unsupported** |
@@ -302,7 +302,8 @@ ten each for Federation, Klingon and Borg.
 
 ## Verification recipes
 
-    # what implements d3d8 right now? by hash, never by size
+    # what implements d3d8 right now? by hash, never by size. Heroic's DXVK builds
+    # (tools/dxvk/dxvk-*/) are recognised from the native and the Flatpak Heroic
     platform/d3d8-chain.py --status
 
     # did Heroic redeploy DXVK into the prefix? these four sharing an mtime means yes
@@ -312,7 +313,7 @@ ten each for Federation, Klingon and Borg.
     objdump -p Armada2.exe | grep -i 'DLL Name'
 
     # current overrides, without opening Heroic
-    python3 -c "import json;print(json.load(open('$HOME/.config/heroic/GamesConfig/1174788223.json'))['1174788223']['enviromentOptions'])"
+    python3 platform/dxvk-logging.py --status
 
     # is the game really running?  NOT `pgrep -x Armada2.exe` -- Wine calls it "Main"
     ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'

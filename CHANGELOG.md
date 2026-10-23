@@ -5,6 +5,25 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.21.0 — 2026-10-23
+
+Layers: platform 3.6.0, menus 4.3.5, renderer 2.0.1.
+
+### Added
+- `A2_HEROIC` in `a2env.sh`/`a2env.py`: Heroic's config directory, the native
+  `~/.config/heroic` or else the Flatpak's
+  `~/.var/app/com.heroicgameslauncher.hgl/config/heroic`; `A2_PROTON`'s default hangs
+  off it, and `a2env.heroic_roots()` lists every one present.
+
+### Fixed
+- Every Heroic config and tool lookup goes through `A2_HEROIC`, so the Flatpak Heroic
+  works: `d3d8-chain.py --status` no longer crashes without `~/.config/heroic` and
+  recognises the Flatpak Heroic's DXVK by hash (platform 3.6.0); `menus/install.sh`'s
+  override check (menus 4.3.5); `renderer-config.sh`'s DXVK lookup (renderer 2.0.1);
+  umu in `online/reference-dplay.sh` and Proton in `cutscenes/binkproxy/run-test.sh`.
+
+Installed, not yet seen in game.
+
 ## 13.18.0 — 2026-10-23
 
 Layers: display 0.6.1, render3d 0.22.1, ui 0.19.1, testbench 3.55.0.
