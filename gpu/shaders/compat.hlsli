@@ -29,6 +29,28 @@
 #define STAGE(n)
 #endif
 
+// Storage (compute, dxc only: an entry marked :dxc in hlsl-rs.sh has no d3dbc, so
+// vkd3d must never see these; guard them with #ifdef __hlsl_dx_compiler). gpu's slots
+// (`gpu::STORAGE_SLOTS`, `Cmd::bind_storage*`):
+//   STORAGE(n)        StructuredBuffer<T> x : register(t<16 + n>);    any stage
+//   STORAGE_RW(n)     RWStructuredBuffer<T> x : register(u<n>);        compute
+//   STORAGE_IMAGE(n)  RWTexture2D/3D<float> x : register(u<8 + n>);   compute
+// On Vulkan set 2 binding n, set 3 binding n and set 3 binding 8 + n; on Direct3D 12
+// the registers as declared, space 0. A storage image's format is given for SPIR-V
+// (Vulkan's storage without a format is an optional feature): STORAGE_IMAGE_R32F(n),
+// STORAGE_IMAGE_RGBA16F(n).
+#ifdef __spirv__
+#define STORAGE(n) [[vk::binding(n, 2)]]
+#define STORAGE_RW(n) [[vk::binding(n, 3)]]
+#define STORAGE_IMAGE_R32F(n) [[vk::binding(8 + n, 3)]] [[vk::image_format("r32f")]]
+#define STORAGE_IMAGE_RGBA16F(n) [[vk::binding(8 + n, 3)]] [[vk::image_format("rgba16f")]]
+#else
+#define STORAGE(n)
+#define STORAGE_RW(n)
+#define STORAGE_IMAGE_R32F(n)
+#define STORAGE_IMAGE_RGBA16F(n)
+#endif
+
 // The pixel's place as Direct3D 9's VPOS has it: its top-left corner, whole numbers.
 // SV_Position (Vulkan's FragCoord) is its centre, half a pixel on.
 float2 d3d9_vpos(float4 fc) { return fc.xy - 0.5; }

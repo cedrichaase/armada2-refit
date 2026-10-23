@@ -63,6 +63,7 @@ const SC_UNIFORM_CONSTANT: u32 = 0;
 const SC_INPUT: u32 = 1;
 const SC_UNIFORM: u32 = 2;
 const SC_OUTPUT: u32 = 3;
+const SC_STORAGE_BUFFER: u32 = 12;
 
 /// A semantic: `TEXCOORD` and 3 for `TEXCOORD3` (upper case; no digits: index 0).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -112,6 +113,17 @@ pub struct Reflect {
     /// The bytes of the uniform blocks at set 0 (several alias one binding).
     pub ubo_bytes: u32,
     pub textures: Vec<TexUse>,
+    /// The storage a stage reads or writes (`gpu::STORAGE_SLOTS`): set 2 (read-only
+    /// buffers) and set 3 (read-write buffers, storage images), by binding.
+    pub storage: Vec<StorageUse>,
+}
+
+/// A storage buffer or image a stage uses: its set (2 or 3) and binding.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct StorageUse {
+    pub set: u32,
+    pub binding: u32,
+    pub image: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -299,6 +311,14 @@ pub fn reflect(w: &[u32]) -> Option<Reflect> {
             }
             SC_UNIFORM if m.deco(id, DEC_SET) == Some(0) => {
                 r.ubo_bytes = r.ubo_bytes.max(m.size(pointee, None, 0));
+            }
+            SC_UNIFORM | SC_STORAGE_BUFFER if matches!(m.deco(id, DEC_SET), Some(2 | 3)) => {
+                r.storage.push(StorageUse { set: m.deco(id, DEC_SET).unwrap_or(2), binding: m.deco(id, DEC_BINDING).unwrap_or(0), image: false });
+            }
+            SC_UNIFORM_CONSTANT if m.deco(id, DEC_SET) == Some(3) => {
+                if let Ty::Image(..) = m.ty(pointee) {
+                    r.storage.push(StorageUse { set: 3, binding: m.deco(id, DEC_BINDING).unwrap_or(0), image: true });
+                }
             }
             SC_UNIFORM_CONSTANT if m.deco(id, DEC_SET) == Some(1) => {
                 let binding = m.deco(id, DEC_BINDING).unwrap_or(0);

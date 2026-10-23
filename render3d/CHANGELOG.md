@@ -4,6 +4,20 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.23.0 — 2026-10-23
+
+### Added
+- `hlsl-rs.sh`: an entry marked `:dxc` is dxc's alone (no d3dbc), for compute and
+  storage.
+- gpu (no changelog of its own): compute on Vulkan and Direct3D 12 (`Gpu::compute`,
+  `Gpu::storage`, `Gpu::compute_pipeline`, `Usage::STORAGE`, `Cmd::dispatch`,
+  `bind_storage`, `bind_storage_rw`, `bind_storage_image`, `cs_block`, `write_storage`,
+  `barrier`), storage bindings in the SPIR-V reflection, a compute root signature and a
+  storage table in the graphics one on Direct3D 12; nothing on Direct3D 9. Nothing
+  uses it yet: every frame is as before.
+
+Installed, not yet seen in game.
+
 ## 0.22.1 — 2026-10-23
 
 ### Fixed

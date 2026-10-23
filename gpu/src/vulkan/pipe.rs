@@ -47,6 +47,8 @@ pub(crate) struct PipeObj {
     pub vs_bytes: u32,
     pub ps_bytes: u32,
     pub needs_dummy_vb: bool,
+    /// The shaders read storage buffers (set 2).
+    pub storage: bool,
 }
 
 impl Drop for PipeObj {
@@ -230,6 +232,7 @@ impl Pipeline {
             vs_bytes: vr.ubo_bytes.div_ceil(16) * 16,
             ps_bytes: pr.ubo_bytes.div_ceil(16) * 16,
             needs_dummy_vb: dummy,
+            storage: vr.storage.iter().chain(pr.storage.iter()).any(|s| s.set == 2),
         })
     }
 
@@ -395,4 +398,92 @@ pub(crate) fn entry_name(w: &[u32]) -> Option<alloc::ffi::CString> {
         i += n;
     }
     None
+}
+
+// ---- compute --------------------------------------------------------------------------
+
+/// A compute pipeline (`ComputeDesc`): the SPIR-V's compute shader with the compute
+/// layout (sets 0..3), made at its first use.
+#[derive(Clone)]
+pub struct ComputePipeline(pub(crate) Rc<CompInner>);
+
+pub(crate) struct CompInner {
+    pub desc: ComputeDesc,
+    pub obj: RefCell<Option<CompObj>>,
+    failed: Cell<bool>,
+}
+
+pub(crate) struct CompObj {
+    sh: Rc<Shared>,
+    pub pipe: vk::Pipeline,
+    module: vk::ShaderModule,
+    /// The textures it reads (set 1, by binding), its register file's bytes, its storage.
+    pub textures: Vec<TexUse>,
+    pub cs_bytes: u32,
+    pub storage: Vec<spirv::StorageUse>,
+}
+
+impl Drop for CompObj {
+    fn drop(&mut self) {
+        self.sh.retire(Garbage::Pipeline(self.pipe));
+        self.sh.retire(Garbage::Module(self.module));
+    }
+}
+
+impl ComputePipeline {
+    pub(crate) fn new(desc: ComputeDesc) -> ComputePipeline {
+        ComputePipeline(Rc::new(CompInner { desc, obj: RefCell::new(None), failed: Cell::new(false) }))
+    }
+
+    pub fn desc(&self) -> &ComputeDesc {
+        &self.0.desc
+    }
+
+    pub fn ready(&self, gpu: &Gpu) -> bool {
+        self.realize(gpu)
+    }
+
+    pub(crate) fn realize(&self, gpu: &Gpu) -> bool {
+        let p = &self.0;
+        if p.obj.borrow().is_some() {
+            return true;
+        }
+        if p.failed.get() {
+            return false;
+        }
+        let made = (|| {
+            let sh = gpu.sh()?;
+            let code = p.desc.cs.spirv;
+            if code.is_empty() {
+                vlog!(gpu, "gpu: Vulkan: a compute pipeline without SPIR-V; what dispatches it stands down");
+                return None;
+            }
+            let r = spirv::reflect(code)?;
+            let module = module(&sh, code)?;
+            let name = entry_name(code)?;
+            let layout = gpu.with(|s| s.clayout)?;
+            let stage = vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::COMPUTE).module(module).name(&name);
+            let ci = vk::ComputePipelineCreateInfo::default().stage(stage).layout(layout);
+            let pipe = match unsafe { sh.dev.create_compute_pipelines(sh.cache, &[ci], None) } {
+                Ok(v) => v[0],
+                Err(_) => {
+                    unsafe { sh.dev.destroy_shader_module(module, None) };
+                    vlog!(gpu, "gpu: Vulkan: the device refused a compute pipeline");
+                    return None;
+                }
+            };
+            let textures = r.textures.iter().copied().filter(|t| (t.binding as usize) < super::SLOTS).collect();
+            Some(CompObj { sh, pipe, module, textures, cs_bytes: r.ubo_bytes.div_ceil(16) * 16, storage: r.storage })
+        })();
+        match made {
+            Some(o) => {
+                *p.obj.borrow_mut() = Some(o);
+                true
+            }
+            None => {
+                p.failed.set(true);
+                false
+            }
+        }
+    }
 }

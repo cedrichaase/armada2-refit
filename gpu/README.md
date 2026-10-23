@@ -20,11 +20,11 @@ Moving both plugins onto it changed nothing on screen, so each move is judged by
 
 | File | What |
 |---|---|
-| `src/types.rs` | the descriptions and small values: `Format`, `Usage`, `TextureKind`, `TextureDesc`, `Contents`, `BufferDesc`, `Sampler`, `Blend`, `Depth`, `AlphaTest`, `Cull`, `Topology`, `VertexAttr`, `Code`, `PipelineDesc`, `Rect`, `Viewport`, `Load`, `Pass`, `Block`, `Bindings` |
+| `src/types.rs` | the descriptions and small values: `Format`, `Usage`, `TextureKind`, `TextureDesc`, `Contents`, `BufferDesc`, `Sampler`, `Blend`, `Depth`, `AlphaTest`, `Cull`, `Topology`, `VertexAttr`, `Code`, `PipelineDesc`, `Rect`, `Viewport`, `Load`, `Pass`, `Block`, `Bindings`; for compute `StorageDesc`, `ComputeDesc`, `STORAGE_SLOTS` |
 | `src/frame.rs` | `Frame`: the frame a `Cmd` records into, owned by the caller; `Span` |
 | `src/pixels.rs` | `Mapped`, texels read back, and their conversion to RGB (the frame dumps) |
 | `src/chain.rs` | a bake too long for one shader, as a chain of passes (`Chain`), on the interface |
-| `src/api.rs` | `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Timer`, `Cmd` as the plugins see them: each an enum of the two backends' own, every call going to the one it was made on; the backend chosen at run time |
+| `src/api.rs` | `Gpu`, `Texture`, `Buffer`, `Storage`, `Pipeline`, `ComputePipeline`, `Timer`, `Cmd` as the plugins see them: each an enum of the two backends' own, every call going to the one it was made on; the backend chosen at run time |
 | `src/d3d9/mod.rs` | the Direct3D 9 backend: `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Cmd`, `Timer` |
 | `src/d3d9/raw.rs`, `consts.rs` | Direct3D 9 through raw COM vtables, once `render3d/src/d3d` and `ui/src/d3d` (identical copies) |
 | `src/display.rs` | the contract with Display8 (`display/`, the game's `d3d8.dll` of ours): the device, frame, upload ring, targets and mirrors it owns and exports, on Vulkan (`display8_vk_*`) and Direct3D 12 (`display8_dx12_*`), as `#[repr(C)]` types; its doc comment is the specification |
@@ -82,6 +82,27 @@ creation, or read the engine's viewport. The backend-neutral ones: `engine_textu
 Vulkan mirror), `engine_target` / `engine_depth` (the engine's back buffer and depth:
 Display8's images on Vulkan), `engine_viewport` and `engine_transform` (Display8's
 record of the engine's calls on Vulkan), and `half_pixel` ("Pixel centres").
+
+**Compute** (Vulkan and Direct3D 12; `Gpu::compute` says whether it is there, and on
+Direct3D 9 it never is): `Gpu::storage(StorageDesc)` makes a storage buffer (elements
+of `stride` bytes), `Gpu::compute_pipeline(ComputeDesc)` a compute pipeline (dxc's
+SPIR-V and DXIL; no d3dbc), and a texture made with `Usage::STORAGE` is a storage
+image (its first level; `R32F` is the format Direct3D 12's feature level 11_0 also
+loads, `Rgba16F` it only stores). A `Cmd` binds read-only storage buffers
+(`bind_storage`, any stage: draws read them too), read-write ones
+(`bind_storage_rw`) and storage images (`bind_storage_image`) by slot, the compute
+shader's register file (`cs_block`, its cbuffers at b0), writes a storage buffer from
+the CPU through the frame's ring (`write_storage`), and `dispatch`es. Ordering is the
+backend's: a copy into a storage buffer and every dispatch are fenced off from what
+comes before and after, so what a dispatch writes is what the next draw or dispatch
+reads; `barrier` is there for anything else. One queue: no async compute. The
+shaders spell the slots `STORAGE(n)` (t16 + n), `STORAGE_RW(n)` (u n) and
+`STORAGE_IMAGE_R32F(n)` / `_RGBA16F(n)` (u 8 + n) (`shaders/compat.hlsli`), and an
+entry dxc alone compiles is marked `:dxc` (`render3d/hlsl-rs.sh`). On Direct3D 9
+every storage object is an empty one, a compute pipeline is never ready, and a
+dispatch does nothing: what uses compute asks `Gpu::compute` first and keeps its
+Direct3D 9 path as it was. render3d's clustered lights are the first user
+(`render3d/README.md`, "Clustered lights").
 
 **`Frame`** is what a `Cmd` records into: its number, the rings the frame's dynamic
 vertices and indices are written to (`Cmd::vertices`, `Cmd::indices`, giving a `Span`
@@ -143,8 +164,11 @@ registers from a base (`Block::of(base, &my_repr_c_struct)`).
 - **Timestamps** are a query set made once and read later without waiting: a Vulkan
   timestamp query pool (reset at `begin`, `vkCmdWriteTimestamp`, the period from the
   device's limits, never disjoint), a Direct3D 12 timestamp heap resolved into a buffer.
-- **No compute yet**: Direct3D 9 has none. A `Cmd::dispatch` and a compute pipeline
-  join when the Vulkan backend does; nothing in the interface stands in their way.
+- **Compute as a capability.** Direct3D 9 has none, so it is asked for
+  (`Gpu::compute`), never assumed, and the Direct3D 9 path of whatever uses it stays as
+  it was. Storage is bound by slot, as textures are by stage: a descriptor set on
+  Vulkan, a root table on Direct3D 12. Barriers are placed by the backend around each
+  dispatch and copy, broad rather than tight: a frame has a handful of dispatches.
 
 ## The Direct3D 9 backend
 
@@ -300,6 +324,16 @@ engine's `Present`. How each part of the interface maps, and why:
   Display8 has begun the frame two after (its fence has passed).
 - **Timers** are a timestamp query pool, reset at `begin`, read without waiting once
   the frame that wrote it is done; never disjoint, the frequency from `timestampPeriod`.
+- **Compute**: a compute pipeline layout of sets 0..3 (the register file at set 0's
+  binding 0, which the vertex stage's file takes in a draw; the textures at set 1; set 2
+  the read-only storage buffers, which draws read too and the graphics layout also
+  has; set 3 the read-write ones at bindings 0..7 and the storage images at 8..15). The
+  storage sets come from pools of the backend's own, one per frame slot and reset when
+  its slot comes round (Display8's frame pool has no storage descriptors); an empty
+  slot gets a small placeholder buffer. A storage image has a view of its own without
+  the format's swizzle (a storage view takes none) and is in `GENERAL` while compute
+  uses it. A copy into a storage buffer and a dispatch are recorded outside any render
+  pass, between broad memory barriers.
 - **Never lost**: Display8's device lives as long as the game. `before_reset` and
   `release_device` do nothing on Vulkan, and nothing is made twice.
 
@@ -390,7 +424,9 @@ plan in Direct3D 12's terms; what differs, and why:
   eight spaces a cbuffer may take (`render3d/dxil-spaces.py` puts the k-th cbuffer of a
   stage in space k, all of them views of the one register file); one table of the
   sixteen stages' shader views (t0..t15); one table of one sampler per stage (s0..s15);
-  eight root constants at b2 (the alpha test, the blit's region). 53 of the 64 words. A
+  eight root constants at b2 (the alpha test, the blit's region); one table of the eight
+  read-only storage buffers (t16..t23). 58 of the 64 words (a root descriptor takes
+  two, a table and a constant one each). A
   draw after a change uploads each register file whole up to what the pipeline's
   shaders read into Display8's ring and points all eight spaces of its stage at it.
 - **Descriptors.** Every view of the backend's lives in heaps of its own that shaders
@@ -442,6 +478,18 @@ plan in Direct3D 12's terms; what differs, and why:
 - **Pixel centres and samplers** as on Vulkan ("Pixel centres", "Samplers as DXVK makes
   them"): `Dx12Device8::features` carries `FEATURE_D3D9_CENTRES`, and the samplers are
   made with `dxvk.conf`'s anisotropy and LOD bias.
+- **Compute** has a root signature of its own: the register file at b0 in each space,
+  the sixteen textures, a sampler per stage, the read-only storage (t16..t23) and the
+  read-write storage and storage images (u0..u15, one table), each slot without
+  anything a null view. A storage buffer is a structured buffer in the default heap that
+  allows unordered access, with a shader view and an unordered access view of its own.
+  Its state is tracked as a texture's is, but a buffer decays to `COMMON` at every
+  submission (`Gpu::epoch` moves on at each new frame and flush), so its first use in a
+  list starts from there. A dispatch puts what it writes in `UNORDERED_ACCESS` (a
+  barrier between unordered accesses when it already was), the rest in shader
+  resource, and ends with a barrier between unordered accesses; it sets a compute
+  pipeline state, so every recorder sets its own again. Feature level 11_0: structured
+  buffers and `R32` storage images, no typed half-float loads.
 - **Pipeline states** are made at the first draw in a pass of their kind and kept. No
   cache of ours on disk yet: vkd3d-proton keeps its own (`vkd3d-proton.cache`), and a
   Windows driver keeps its own shader cache.
@@ -512,7 +560,8 @@ shader may later be handed it as a single pass, with nothing changed for the cal
 
 Mip chains of a `DYNAMIC` texture; a second vertex stream (instancing: nothing uses
 it); a 32-bit index ring (every index is 16-bit); stencil state (only ever off); render
-targets in a volume's slices or a cube's levels below the first; compute. Each joins
+targets in a volume's slices or a cube's levels below the first; async compute; a
+storage image's levels below the first. Each joins
 when something needs it. On Vulkan also: sRGB sampling (a sampler asking for it reads
 linear; nothing does), sampling a multisampled colour target, render passes into a
 volume. On Direct3D 12 also: sRGB sampling, render targets in a volume, a copy of part

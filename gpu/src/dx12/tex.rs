@@ -40,6 +40,8 @@ pub(crate) struct Img {
     /// The views a pass draws into: level 0 of each layer.
     pub rtvs: Vec<usize>,
     pub dsv: usize,
+    /// A storage image's unordered access view (level 0), or 0.
+    pub uav: usize,
     /// Descriptors of the backend's own to free: (heap kind, index).
     views: Vec<(usize, u32)>,
 }
@@ -125,6 +127,7 @@ impl Texture {
             srv: i.srv,
             rtvs: if i.rtv != 0 { alloc::vec![i.rtv] } else { Vec::new() },
             dsv: i.dsv,
+            uav: 0,
             views: Vec::new(),
         };
         Texture(Rc::new(TexInner {
@@ -184,6 +187,10 @@ impl Texture {
 
     pub(crate) fn rtv(&self, layer: u32) -> usize {
         self.0.obj.borrow().as_ref().and_then(|o| o.rtvs.get(layer as usize).copied()).unwrap_or(0)
+    }
+
+    pub(crate) fn uav(&self) -> usize {
+        self.0.obj.borrow().as_ref().map_or(0, |o| o.uav)
     }
 
     pub(crate) fn dsv(&self) -> usize {
@@ -255,14 +262,32 @@ impl Texture {
             layout: TEXTURE_LAYOUT_UNKNOWN,
             flags: if fmt.depth { RESOURCE_FLAG_ALLOW_DEPTH_STENCIL } else if wants_rt { RESOURCE_FLAG_ALLOW_RENDER_TARGET } else { 0 },
         };
+        let storage = d.usage.has(Usage::STORAGE) && !fmt.depth && samples == 1 && d.kind != TextureKind::Cube;
+        if d.usage.has(Usage::STORAGE) && !storage {
+            return None;
+        }
+        if storage {
+            rd.flags |= RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        }
         let clear = ClearValue { format: fmt.view, color: [1.0, 0.0, 0.0, 0.0] };
         let mut res = committed(sh.dev, HEAP_TYPE_DEFAULT, &rd, STATE_COMMON, fmt.depth.then_some(&clear));
         if res.is_none() && wants_rt && !needs_rt {
-            rd.flags = 0;
+            rd.flags &= !RESOURCE_FLAG_ALLOW_RENDER_TARGET;
             res = committed(sh.dev, HEAP_TYPE_DEFAULT, &rd, STATE_COMMON, None);
         }
         let res = res?;
-        let mut img = Img { sh: Some(sh.clone()), res, fmt, levels, layers, srv: 0, rtvs: Vec::new(), dsv: 0, views: Vec::new() };
+        let mut img = Img { sh: Some(sh.clone()), res, fmt, levels, layers, srv: 0, rtvs: Vec::new(), dsv: 0, uav: 0, views: Vec::new() };
+        if storage {
+            let (cpu, i) = sh.view(H_SRV)?;
+            img.views.push((H_SRV, i));
+            let v = if d.kind == TextureKind::D3 {
+                UavDesc { format: fmt.res, dimension: UAV_DIMENSION_TEXTURE3D, u: [0, 0, d.depth.max(1), 0, 0, 0, 0, 0] }
+            } else {
+                UavDesc { format: fmt.res, dimension: UAV_DIMENSION_TEXTURE2D, u: [0; 8] }
+            };
+            vcall!(sh.dev, slot::DEV_CREATE_UNORDERED_ACCESS_VIEW, fn(P, P, *const UavDesc, usize) -> (), res, core::ptr::null_mut(), &v, cpu);
+            img.uav = cpu;
+        }
         self.0.state.set(STATE_COMMON);
         // The shader view.
         let (dim, u) = match d.kind {
@@ -456,6 +481,130 @@ impl Buffer {
             barrier(l, res, ALL_SUBRESOURCES, STATE_COPY_DEST, STATE_VERTEX_AND_INDEX);
         }
         Some(o)
+    }
+}
+
+// ---- storage buffers ------------------------------------------------------------------
+
+/// A storage buffer: a committed buffer in the default heap that allows unordered
+/// access, with a structured shader view and unordered access view of its own. Its
+/// state is tracked as a texture's is, but a buffer decays to `COMMON` whenever
+/// Display8 submits the list (`Gpu::epoch`). Clones share it.
+#[derive(Clone)]
+pub struct Storage(pub(crate) Rc<StoInner>);
+
+pub(crate) struct StoInner {
+    pub desc: StorageDesc,
+    obj: RefCell<Option<StoObj>>,
+    failed: Cell<bool>,
+    /// (the submission it was recorded in, its state there).
+    state: Cell<(u64, u32)>,
+}
+
+struct StoObj {
+    sh: Rc<Shared>,
+    res: P,
+    srv: usize,
+    uav: usize,
+    views: [u32; 2],
+}
+
+impl Drop for StoObj {
+    fn drop(&mut self) {
+        for &i in &self.views {
+            self.sh.free_view(H_SRV, i);
+        }
+        self.sh.retire(Garbage::Com(self.res));
+    }
+}
+
+impl Storage {
+    pub(crate) fn new(desc: StorageDesc) -> Storage {
+        Storage(Rc::new(StoInner { desc, obj: RefCell::new(None), failed: Cell::new(false), state: Cell::new((0, STATE_COMMON)) }))
+    }
+
+    pub fn desc(&self) -> StorageDesc {
+        self.0.desc
+    }
+
+    pub fn same(&self, o: &Storage) -> bool {
+        Rc::ptr_eq(&self.0, &o.0)
+    }
+
+    fn stride(&self) -> u32 {
+        self.0.desc.stride.max(4)
+    }
+
+    fn elements(&self) -> u32 {
+        (self.0.desc.size.max(16) / self.stride()).max(1)
+    }
+
+    /// Made at the first ask: false if it cannot be.
+    pub(crate) fn realize(&self, gpu: &Gpu) -> bool {
+        let s = &self.0;
+        if s.obj.borrow().is_some() {
+            return true;
+        }
+        if s.failed.get() {
+            return false;
+        }
+        let made = (|| {
+            let sh = gpu.sh()?;
+            let stride = self.stride();
+            let n = self.elements();
+            let mut rd = buffer_desc(n as u64 * stride as u64);
+            rd.flags = RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+            let res = committed(sh.dev, HEAP_TYPE_DEFAULT, &rd, STATE_COMMON, None)?;
+            let (srv, si) = sh.view(H_SRV)?;
+            let (uav, ui) = sh.view(H_SRV)?;
+            let v = SrvDesc { format: FORMAT_UNKNOWN, dimension: SRV_DIMENSION_BUFFER, mapping: DEFAULT_COMPONENT_MAPPING, _pad: 0, u: [0, 0, n, stride, 0, 0] };
+            vcall!(sh.dev, slot::DEV_CREATE_SHADER_RESOURCE_VIEW, fn(P, *const SrvDesc, usize) -> (), res, &v, srv);
+            let u = UavDesc { format: FORMAT_UNKNOWN, dimension: UAV_DIMENSION_BUFFER, u: [0, 0, n, stride, 0, 0, 0, 0] };
+            vcall!(sh.dev, slot::DEV_CREATE_UNORDERED_ACCESS_VIEW, fn(P, P, *const UavDesc, usize) -> (), res, core::ptr::null_mut(), &u, uav);
+            Some(StoObj { sh: sh.clone(), res, srv, uav, views: [si, ui] })
+        })();
+        match made {
+            Some(o) => {
+                *s.obj.borrow_mut() = Some(o);
+                true
+            }
+            None => {
+                s.failed.set(true);
+                dlog!(gpu, "gpu: Direct3D 12: a storage buffer of {} bytes could not be made", s.desc.size);
+                false
+            }
+        }
+    }
+
+    pub(crate) fn res(&self) -> P {
+        self.0.obj.borrow().as_ref().map_or(core::ptr::null_mut(), |o| o.res)
+    }
+
+    pub(crate) fn srv(&self) -> usize {
+        self.0.obj.borrow().as_ref().map_or(0, |o| o.srv)
+    }
+
+    pub(crate) fn uav(&self) -> usize {
+        self.0.obj.borrow().as_ref().map_or(0, |o| o.uav)
+    }
+
+    /// Puts it in `to` on `list` (`COMMON` once the list it was last used in is
+    /// submitted). Unordered access after unordered access gets a barrier of its own.
+    pub(crate) fn transition(&self, gpu: &Gpu, list: P, to: u32) {
+        let res = self.res();
+        if res.is_null() {
+            return;
+        }
+        let (ep, st) = self.0.state.get();
+        let from = if ep == gpu.epoch.get() { st } else { STATE_COMMON };
+        if from == to {
+            if to == STATE_UNORDERED_ACCESS {
+                uav_barrier(list, res);
+            }
+        } else {
+            barrier(list, res, ALL_SUBRESOURCES, from, to);
+        }
+        self.0.state.set((gpu.epoch.get(), to));
     }
 }
 

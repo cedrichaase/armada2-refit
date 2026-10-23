@@ -39,11 +39,16 @@ pub(crate) struct Img {
     pub atts: Vec<vk::ImageView>,
     pub format: vk::Format,
     pub aspect: vk::ImageAspectFlags,
+    /// A storage image's view (level 0, no swizzle: a storage view takes none), or null.
+    pub storage: vk::ImageView,
 }
 
 impl Drop for Img {
     fn drop(&mut self) {
         let Some(sh) = self.sh.take() else { return };
+        if self.storage != vk::ImageView::null() {
+            sh.retire(Garbage::View(self.storage));
+        }
         sh.retire(Garbage::View(self.view));
         for &v in &self.atts {
             if v != self.view {
@@ -123,6 +128,7 @@ impl Texture {
             atts: alloc::vec![view],
             format,
             aspect: aspect_of(format),
+            storage: vk::ImageView::null(),
         };
         Texture(Rc::new(TexInner {
             desc,
@@ -183,6 +189,10 @@ impl Texture {
         self.0.obj.borrow().as_ref().and_then(|o| o.atts.get(layer as usize).copied()).unwrap_or_default()
     }
 
+    pub(crate) fn storage_view(&self) -> vk::ImageView {
+        self.0.obj.borrow().as_ref().map_or(vk::ImageView::null(), |o| o.storage)
+    }
+
     pub(crate) fn aspect(&self) -> vk::ImageAspectFlags {
         self.0.obj.borrow().as_ref().map_or(vk::ImageAspectFlags::COLOR, |o| o.aspect)
     }
@@ -236,6 +246,12 @@ impl Texture {
             usage |= vk::ImageUsageFlags::SAMPLED;
         } else if d.usage.has(Usage::SAMPLED) {
             return None;
+        }
+        if d.usage.has(Usage::STORAGE) {
+            if !feats.contains(vk::FormatFeatureFlags::STORAGE_IMAGE) || d.samples > 1 {
+                return None;
+            }
+            usage |= vk::ImageUsageFlags::STORAGE;
         }
         if d.usage.has(Usage::RENDER_TARGET) {
             if !feats.contains(vk::FormatFeatureFlags::COLOR_ATTACHMENT) {
@@ -292,8 +308,16 @@ impl Texture {
             .format(format)
             .components(if depth { vk::ComponentMapping::default() } else { swizzle(d.format) })
             .subresource_range(vk::ImageSubresourceRange { aspect_mask: sample_aspect, base_mip_level: 0, level_count: levels, base_array_layer: 0, layer_count: layers });
-        let mut img = Img { sh: Some(sh.clone()), image, mem: Some(mem), view: vk::ImageView::null(), atts: Vec::new(), format, aspect };
+        let mut img = Img { sh: Some(sh.clone()), image, mem: Some(mem), view: vk::ImageView::null(), atts: Vec::new(), format, aspect, storage: vk::ImageView::null() };
         img.view = unsafe { dv.create_image_view(&vci, None) }.ok()?;
+        if d.usage.has(Usage::STORAGE) {
+            let sci = vk::ImageViewCreateInfo::default()
+                .image(image)
+                .view_type(if d.kind == TextureKind::D3 { vk::ImageViewType::TYPE_3D } else { vk::ImageViewType::TYPE_2D })
+                .format(format)
+                .subresource_range(vk::ImageSubresourceRange { aspect_mask: aspect, base_mip_level: 0, level_count: 1, base_array_layer: 0, layer_count: 1 });
+            img.storage = unsafe { dv.create_image_view(&sci, None) }.ok()?;
+        }
         if d.usage.has(Usage::RENDER_TARGET) || d.usage.has(Usage::DEPTH) {
             for layer in 0..layers {
                 let vci = vk::ImageViewCreateInfo::default()
@@ -491,6 +515,82 @@ impl Buffer {
             memory_barrier(&sh, cb);
         }
         Some(o)
+    }
+}
+
+// ---- storage buffers ------------------------------------------------------------------
+
+/// A storage buffer, in device memory, made at its first use. Clones share it. What
+/// reads or writes it is ordered by broad barriers (`Cmd::dispatch`, `write_storage`).
+#[derive(Clone)]
+pub struct Storage(pub(crate) Rc<StoInner>);
+
+pub(crate) struct StoInner {
+    pub desc: StorageDesc,
+    obj: RefCell<Option<BufObj>>,
+    failed: Cell<bool>,
+}
+
+impl Storage {
+    pub(crate) fn new(desc: StorageDesc) -> Storage {
+        Storage(Rc::new(StoInner { desc, obj: RefCell::new(None), failed: Cell::new(false) }))
+    }
+
+    pub fn desc(&self) -> StorageDesc {
+        self.0.desc
+    }
+
+    pub fn same(&self, o: &Storage) -> bool {
+        Rc::ptr_eq(&self.0, &o.0)
+    }
+
+    /// The buffer, made at the first ask (null: it cannot be).
+    pub(crate) fn realize(&self, gpu: &Gpu) -> vk::Buffer {
+        let s = &self.0;
+        if let Some(o) = s.obj.borrow().as_ref() {
+            return o.buf;
+        }
+        if s.failed.get() {
+            return vk::Buffer::null();
+        }
+        let made = (|| {
+            let sh = gpu.sh()?;
+            let dv = &sh.dev;
+            let size = (s.desc.size.max(16) as u64).div_ceil(16) * 16;
+            let bci = vk::BufferCreateInfo::default()
+                .size(size)
+                .usage(vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC)
+                .sharing_mode(vk::SharingMode::EXCLUSIVE);
+            let buf = unsafe { dv.create_buffer(&bci, None) }.ok()?;
+            let req = unsafe { dv.get_buffer_memory_requirements(buf) };
+            let Some(mem) = sh.alloc(req, vk::MemoryPropertyFlags::DEVICE_LOCAL, false) else {
+                unsafe { dv.destroy_buffer(buf, None) };
+                return None;
+            };
+            if unsafe { dv.bind_buffer_memory(buf, mem.mem, mem.offset) }.is_err() {
+                unsafe { dv.destroy_buffer(buf, None) };
+                sh.pools.borrow_mut().free(dv, mem);
+                return None;
+            }
+            Some(BufObj { sh: sh.clone(), buf, mem: Some(mem) })
+        })();
+        match made {
+            Some(o) => {
+                let h = o.buf;
+                *s.obj.borrow_mut() = Some(o);
+                h
+            }
+            None => {
+                s.failed.set(true);
+                vlog!(gpu, "gpu: Vulkan: a storage buffer of {} bytes could not be made", s.desc.size);
+                vk::Buffer::null()
+            }
+        }
+    }
+
+    /// Its size as made (whole 16 bytes).
+    pub(crate) fn range(&self) -> u64 {
+        (self.0.desc.size.max(16) as u64).div_ceil(16) * 16
     }
 }
 

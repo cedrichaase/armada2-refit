@@ -34,8 +34,8 @@ mod pipe;
 mod tex;
 
 pub use cmd::Cmd;
-pub use pipe::Pipeline;
-pub use tex::{Buffer, Texture, Timer};
+pub use pipe::{ComputePipeline, Pipeline};
+pub use tex::{Buffer, Storage, Texture, Timer};
 
 use crate::d3d9::raw::Guid;
 use crate::display::{Display8, Display8Dx12, Dx12Frame8, Dx12Image8, FEATURE_D3D9_CENTRES, HEAP_CBV_SRV_UAV, HEAP_SAMPLER};
@@ -64,6 +64,16 @@ pub(crate) const RP_PS: u32 = SPACES;
 pub(crate) const RP_SRV: u32 = 2 * SPACES;
 pub(crate) const RP_SAMPLER: u32 = RP_SRV + 1;
 pub(crate) const RP_K: u32 = RP_SAMPLER + SLOTS as u32;
+/// The table of the read-only storage buffers (t16..t23).
+pub(crate) const RP_STORAGE: u32 = RP_K + 1;
+/// The compute root signature's parameters: the register file at b0 in each space, the
+/// textures, a sampler per stage, the read-only storage, the read-write storage and
+/// storage images (u0..u15).
+pub(crate) const RPC_CB: u32 = 0;
+pub(crate) const RPC_SRV: u32 = SPACES;
+pub(crate) const RPC_SAMPLER: u32 = RPC_SRV + 1;
+pub(crate) const RPC_STORAGE: u32 = RPC_SAMPLER + SLOTS as u32;
+pub(crate) const RPC_UAV: u32 = RPC_STORAGE + 1;
 /// Root constants at b2: words.
 pub(crate) const K_WORDS: u32 = 8;
 /// The stages' register files, as Direct3D 9 has them (float4 registers).
@@ -142,6 +152,13 @@ pub(crate) struct Shared {
     pub dev: P,
     pub queue: P,
     pub root: P,
+    /// The compute root signature (null: no compute).
+    pub croot: P,
+    /// Null views for empty storage slots: a buffer's shader view, a buffer's unordered
+    /// access view, a 2D texture's.
+    pub null_sto: usize,
+    pub null_uav_buf: usize,
+    pub null_uav_img: usize,
     pub fif: u64,
     pub features: u32,
     /// What DXVK's `dxvk.conf` makes of every sampler (`Dx12Device8::sampler_*`).
@@ -238,6 +255,8 @@ pub(crate) struct State {
     tables_frame: u64,
     srv_tables: BTreeMap<[usize; SLOTS], u64>,
     sampler_tables: BTreeMap<usize, u64>,
+    sto_tables: BTreeMap<[usize; STORAGE_SLOTS], u64>,
+    uav_tables: BTreeMap<[usize; 2 * STORAGE_SLOTS], u64>,
     /// The frame's list and its `ID3D12GraphicsCommandList1` (0: none).
     list1: (usize, usize),
     pub depth_psos: Vec<((bool, u32), P)>,
@@ -255,34 +274,55 @@ pub struct Gpu {
     /// everything again (another recorder may have set its own since).
     serial: Cell<u32>,
     depth: Cell<u32>,
+    /// Moves on with every submission Display8 makes of the list (a new frame, a
+    /// flush): buffers decay to `COMMON` then, so a storage buffer's state recorded in
+    /// an earlier one is `COMMON` now.
+    pub(crate) epoch: Cell<u64>,
 }
 
 /// The root signature every pipeline of the backend shares (the module doc).
-fn root_signature(dev: P, serialize: usize, log: Log) -> Option<P> {
+fn root_signature(dev: P, serialize: usize, log: Log, compute: bool) -> Option<P> {
     let srv = [DescriptorRange { ty: DESCRIPTOR_RANGE_TYPE_SRV, count: SLOTS as u32, base_register: 0, space: 0, offset_in_table: 0 }];
+    let sto = [DescriptorRange { ty: DESCRIPTOR_RANGE_TYPE_SRV, count: STORAGE_SLOTS as u32, base_register: 16, space: 0, offset_in_table: 0 }];
+    let uav = [DescriptorRange { ty: DESCRIPTOR_RANGE_TYPE_UAV, count: 2 * STORAGE_SLOTS as u32, base_register: 0, space: 0, offset_in_table: 0 }];
     let mut samp = Vec::new();
     for i in 0..SLOTS as u32 {
         samp.push(DescriptorRange { ty: DESCRIPTOR_RANGE_TYPE_SAMPLER, count: 1, base_register: i, space: 0, offset_in_table: 0 });
     }
+    let table = |r: *const DescriptorRange| RootParameter { ty: ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, a: 1, b: r as usize, c: 0, visibility: SHADER_VISIBILITY_ALL };
     let mut params = Vec::new();
-    for s in 0..SPACES {
-        params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_CBV, a: 0, b: s as usize, c: 0, visibility: SHADER_VISIBILITY_VERTEX });
+    if compute {
+        for s in 0..SPACES {
+            params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_CBV, a: 0, b: s as usize, c: 0, visibility: SHADER_VISIBILITY_ALL });
+        }
+        params.push(table(srv.as_ptr()));
+        for r in &samp {
+            params.push(table(r));
+        }
+        params.push(table(sto.as_ptr()));
+        params.push(table(uav.as_ptr()));
+        debug_assert!(params.len() as u32 == RPC_UAV + 1);
+    } else {
+        for s in 0..SPACES {
+            params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_CBV, a: 0, b: s as usize, c: 0, visibility: SHADER_VISIBILITY_VERTEX });
+        }
+        for s in 0..SPACES {
+            params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_CBV, a: 1, b: s as usize, c: 0, visibility: SHADER_VISIBILITY_PIXEL });
+        }
+        params.push(table(srv.as_ptr()));
+        for r in &samp {
+            params.push(table(r));
+        }
+        params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, a: 2, b: 0, c: K_WORDS, visibility: SHADER_VISIBILITY_ALL });
+        params.push(table(sto.as_ptr()));
+        debug_assert!(params.len() as u32 == RP_STORAGE + 1);
     }
-    for s in 0..SPACES {
-        params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_CBV, a: 1, b: s as usize, c: 0, visibility: SHADER_VISIBILITY_PIXEL });
-    }
-    params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, a: 1, b: srv.as_ptr() as usize, c: 0, visibility: SHADER_VISIBILITY_ALL });
-    for r in &samp {
-        params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, a: 1, b: r as *const DescriptorRange as usize, c: 0, visibility: SHADER_VISIBILITY_ALL });
-    }
-    params.push(RootParameter { ty: ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, a: 2, b: 0, c: K_WORDS, visibility: SHADER_VISIBILITY_ALL });
-    debug_assert!(params.len() as u32 == RP_K + 1);
     let desc = RootSignatureDesc {
         count: params.len() as u32,
         params: params.as_ptr(),
         samplers_count: 0,
         samplers: core::ptr::null(),
-        flags: ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+        flags: if compute { 0 } else { ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT },
     };
     let serialize: unsafe extern "system" fn(*const RootSignatureDesc, u32, *mut P, *mut P) -> i32 = unsafe { core::mem::transmute(serialize) };
     let (mut blob, mut err): (P, P) = (core::ptr::null_mut(), core::ptr::null_mut());
@@ -344,7 +384,7 @@ pub(crate) fn dxgi(f: Format) -> Option<Fmt> {
 
 impl Gpu {
     pub const fn new(log: Log) -> Gpu {
-        Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0) }
+        Gpu { log, st: RefCell::new(None), serial: Cell::new(0), depth: Cell::new(0), epoch: Cell::new(0) }
     }
 
     /// Opens the backend on Display8's device. None: Display8 has no device yet (asked
@@ -359,10 +399,14 @@ impl Gpu {
         }
         let d = unsafe { *d };
         let dev = d.device as P;
-        let Some(root) = root_signature(dev, d.serialize_root_signature, self.log) else {
+        let Some(root) = root_signature(dev, d.serialize_root_signature, self.log, false) else {
             dlog!(self, "gpu: Direct3D 12: the root signature could not be made");
             return Some(false);
         };
+        let croot = root_signature(dev, d.serialize_root_signature, self.log, true).unwrap_or_else(|| {
+            dlog!(self, "gpu: Direct3D 12: the compute root signature could not be made: no compute");
+            core::ptr::null_mut()
+        });
         let heaps = HEAP_TYPES.map(|ty| CpuHeap { ty, inc: d.increments[ty as usize], blocks: Vec::new(), free: Vec::new(), next: 0 });
         let mut sh = Shared {
             disp,
@@ -370,6 +414,10 @@ impl Gpu {
             dev,
             queue: d.queue as P,
             root,
+            croot,
+            null_sto: 0,
+            null_uav_buf: 0,
+            null_uav_img: 0,
             fif: d.frames_in_flight.max(1) as u64,
             features: d.features,
             force_aniso: d.sampler_anisotropy,
@@ -397,6 +445,19 @@ impl Gpu {
             vcall!(dev, slot::DEV_CREATE_SHADER_RESOURCE_VIEW, fn(P, *const SrvDesc, usize) -> (), core::ptr::null_mut(), &v, cpu);
             sh.null_srv[i] = cpu;
         }
+        // The null storage views: a buffer of words, read and written; a 2D float texture.
+        let Some((cpu, _)) = sh.view(H_SRV) else { return Some(false) };
+        let v = SrvDesc { format: FORMAT_R32_FLOAT, dimension: SRV_DIMENSION_BUFFER, mapping: DEFAULT_COMPONENT_MAPPING, _pad: 0, u: [0, 0, 1, 0, 0, 0] };
+        vcall!(dev, slot::DEV_CREATE_SHADER_RESOURCE_VIEW, fn(P, *const SrvDesc, usize) -> (), core::ptr::null_mut(), &v, cpu);
+        sh.null_sto = cpu;
+        let Some((cpu, _)) = sh.view(H_SRV) else { return Some(false) };
+        let v = UavDesc { format: FORMAT_R32_FLOAT, dimension: UAV_DIMENSION_BUFFER, u: [0, 0, 1, 0, 0, 0, 0, 0] };
+        vcall!(dev, slot::DEV_CREATE_UNORDERED_ACCESS_VIEW, fn(P, P, *const UavDesc, usize) -> (), core::ptr::null_mut(), core::ptr::null_mut(), &v, cpu);
+        sh.null_uav_buf = cpu;
+        let Some((cpu, _)) = sh.view(H_SRV) else { return Some(false) };
+        let v = UavDesc { format: FORMAT_R32_FLOAT, dimension: UAV_DIMENSION_TEXTURE2D, u: [0; 8] };
+        vcall!(dev, slot::DEV_CREATE_UNORDERED_ACCESS_VIEW, fn(P, P, *const UavDesc, usize) -> (), core::ptr::null_mut(), core::ptr::null_mut(), &v, cpu);
+        sh.null_uav_img = cpu;
         dlog!(
             self,
             "gpu: on Direct3D 12: feature level {:#x}, {} frames in flight, {}",
@@ -416,6 +477,8 @@ impl Gpu {
             tables_frame: u64::MAX,
             srv_tables: BTreeMap::new(),
             sampler_tables: BTreeMap::new(),
+            sto_tables: BTreeMap::new(),
+            uav_tables: BTreeMap::new(),
             list1: (0, 0),
             depth_psos: Vec::new(),
             blit_psos: Vec::new(),
@@ -486,6 +549,9 @@ impl Gpu {
                 s.tables_frame = f.index;
                 s.srv_tables.clear();
                 s.sampler_tables.clear();
+                s.sto_tables.clear();
+                s.uav_tables.clear();
+                self.epoch.set(self.epoch.get() + 1);
             }
         });
         Some(f.command_list as P)
@@ -642,6 +708,44 @@ impl Gpu {
         Some(r.gpu)
     }
 
+    /// A range of the frame's shader-visible heap holding copies of `views`: its GPU
+    /// handle.
+    fn copy_table(&self, views: &[usize]) -> Option<u64> {
+        let sh = self.sh()?;
+        let n = views.len() as u32;
+        let mut r = crate::display::Dx12Descriptors8::default();
+        if !(sh.dx.descriptors)(HEAP_CBV_SRV_UAV, n, &mut r) {
+            self.once(1 << 21, format_args!("gpu: Direct3D 12: the frame's descriptors are spent; draws are dropped"));
+            return None;
+        }
+        let one = alloc::vec![1u32; views.len()];
+        let dst = [r.cpu];
+        let nn = [n];
+        vcall!(sh.dev, 23, fn(u32, *const usize, *const u32, u32, *const usize, *const u32, u32) -> (),
+            1, dst.as_ptr(), nn.as_ptr(), n, views.as_ptr(), one.as_ptr(), DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        Some(r.gpu)
+    }
+
+    /// The frame's table of the eight read-only storage views (made once a frame per set).
+    pub(crate) fn sto_table(&self, views: &[usize; STORAGE_SLOTS]) -> Option<u64> {
+        if let Some(Some(g)) = self.with(|s| s.sto_tables.get(views).copied()) {
+            return Some(g);
+        }
+        let g = self.copy_table(views)?;
+        self.with(|s| s.sto_tables.insert(*views, g));
+        Some(g)
+    }
+
+    /// The frame's table of the sixteen unordered access views (u0..u15).
+    pub(crate) fn uav_table(&self, views: &[usize; 2 * STORAGE_SLOTS]) -> Option<u64> {
+        if let Some(Some(g)) = self.with(|s| s.uav_tables.get(views).copied()) {
+            return Some(g);
+        }
+        let g = self.copy_table(views)?;
+        self.with(|s| s.uav_tables.insert(*views, g));
+        Some(g)
+    }
+
     /// The frame's copy of a sampler (made once a frame).
     pub(crate) fn sampler_table(&self, cpu: usize) -> Option<u64> {
         if let Some(Some(g)) = self.with(|s| s.sampler_tables.get(&cpu).copied()) {
@@ -747,6 +851,19 @@ impl Gpu {
         pipe::Pipeline::new(desc)
     }
 
+    pub fn storage(&self, desc: StorageDesc) -> Storage {
+        tex::Storage::new(desc)
+    }
+
+    pub fn compute_pipeline(&self, desc: ComputeDesc) -> ComputePipeline {
+        pipe::ComputePipeline::new(desc)
+    }
+
+    /// Compute and storage: with the compute root signature made.
+    pub fn compute(&self) -> bool {
+        self.sh().is_some_and(|s| !s.croot.is_null())
+    }
+
     pub fn begin<'a>(&'a self, frame: &'a mut crate::Frame) -> Option<Cmd<'a>> {
         Cmd::new(self, frame)
     }
@@ -756,6 +873,7 @@ impl Gpu {
     pub(crate) fn flush(&self) -> bool {
         let Some(sh) = self.sh() else { return false };
         self.serial.set(self.serial.get().wrapping_add(1));
+        self.epoch.set(self.epoch.get() + 1);
         match sh.dx.flush {
             Some(f) => f(),
             None => {

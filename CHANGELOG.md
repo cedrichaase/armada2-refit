@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.23.0 — 2026-10-23
+
+Layers: render3d 0.23.0 (with gpu's compute).
+
+### Added
+- gpu: compute (storage buffers and images, compute pipelines, dispatches, barriers) on
+  Vulkan and Direct3D 12, `Gpu::compute` off on Direct3D 9 (render3d 0.23.0).
+
+Installed, not yet seen in game.
+
 ## 13.21.1 — 2026-10-23
 
 Layers: display 0.6.2.
