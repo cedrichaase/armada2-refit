@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.28.0 — 2026-10-23
+
+Layers: render3d 0.24.0, testbench 3.62.0.
+
+### Added
+- render3d's light inside the nebulae on Vulkan and Direct3D 12: explosions,
+  torpedoes, pulses, phaser beams and vents light the gas they are in, from the
+  clustered lights. `[Nebulae] Lit=0` turns it off; Direct3D 9 is unchanged
+  (render3d 0.24.0).
+- testbench: the `nebula-battle` scene and `render3d-nebula-lit` (testbench 3.62.0).
+
+### Changed
+- render3d's clustered lights' cull tightened, the same clusters (render3d 0.24.0).
+
+Installed, not yet seen in game.
+
 ## 13.27.0 — 2026-10-23
 
 Layers: testbench 3.61.0, ui 0.20.1, render3d 0.23.2, qol 1.6.4, cutscenes 2.1.1.

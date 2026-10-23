@@ -4,6 +4,33 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.24.0 — 2026-10-23
+
+### Added
+- Light inside the nebulae on Vulkan and Direct3D 12: the march's lit twins
+  (`PS_MARCH8_LIT` .. `PS_MARCH24_LIT`, `PS_TEMPORAL_LIT`, dxc's alone) scatter the
+  view's clustered lights in the gas at every step, of one colour only the strongest;
+  fireballs, torpedoes and pulses (a corona about the shot), phaser beams' line lights,
+  vents and the rest light the vapour, the nebulae's own lights and planets' day sides
+  none. Where lights make the gas's light, the frames added up clip harder and take
+  more of this frame, so a moving light does not trail; the light along a ray rolls
+  off at a soft knee, so a breach does not white the frame out.
+- `[Nebulae]` keys `Lit`, `LitStrength`, `LitTint`, `LitExplosion`, `LitBolt`,
+  `LitBeam`, `LitCorona`, `LitKnee`, `LitTemporal`, `LitClip`; the shipped `Render3D.ini` lists
+  `Lit`, `LitStrength`, `LitExplosion`, `LitBolt`, `LitBeam` and `LitKnee` in a `[Nebulae]`
+  section.
+- `scene::lights::Gas`: what a light is to the gas, in the cluster list's `t.z`.
+
+### Changed
+- The clustered lights' cull (`CS_CLUSTER`) reads the lights through group-shared
+  memory, 64 at a time, each put into view space once per group, leaves out for a
+  group the lights that cannot reach its slices, keeps each group's count and weakest
+  as it goes and sorts only a list an entry was replaced in; the clusters it writes
+  are the same (the `battle` frame at RMSE 0 on Vulkan and Direct3D 12), 0.19 to
+  0.16 ms at 3440x1440.
+
+Installed, not yet seen in game.
+
 ## 0.23.2 — 2026-10-23
 
 ### Fixed

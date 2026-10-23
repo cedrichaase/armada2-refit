@@ -233,7 +233,7 @@ fn gather() -> Vec<GpuLight> {
                 c: [p.colour.x, p.colour.y, p.colour.z, fade],
                 b: [kd.x, kd.y, kd.z, 0.0],
                 k: [p.style.wrap, p.style.power, 0.0, 0.0],
-                t: [if day && key.is_some() { DAY_SIDE } else { 0 }, g, 0, 0],
+                t: [if day && key.is_some() { DAY_SIDE } else { 0 }, g, lights::gas_of(p.light) as u32, 0],
             },
         ));
     }

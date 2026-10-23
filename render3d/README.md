@@ -1644,14 +1644,25 @@ alike:
   pixel; and of each group only the strongest at that pixel counts, so a volley of
   one colour lights as its brightest bolt did, without the per-mesh cut. The highlight
   shoulder keeps plating within 1, and the Borg profile and the inward normals are as
-  before. Cloaked hulls, ghosts and holograms keep the per-mesh lights.
+  before. Cloaked hulls, ghosts and holograms keep the per-mesh lights. The nebulae's
+  march reads the same clusters for the light inside the gas (`[Nebulae] Lit=`, under
+  world, "Nebulae"); each light's `t.z` says what it is to the gas.
 - **Per view.** Each view (`View::key`: the HUD's action camera draws the scene a
   second time) has its buffers; a draw binds them only in the view they were built for
   (the menu scene has none).
 - **Cost** (`Timing=1`; the `battle` scene, sixteen ships and a planet, 73 lights,
   1280x720, RX 5700, 2026-10-23): the cull 0.20 ms of GPU time a view on Vulkan and on
   Direct3D 12; the objects step 0.91 ms against 0.90 without (Vulkan), 0.45 against
-  0.42 (Direct3D 12).
+  0.42 (Direct3D 12). At 3440x1440 (the user's) the cull was 0.20 ms (Vulkan) and
+  0.19 ms (Direct3D 12) and the objects step 1.38 and 0.95 ms. The cull's time hardly
+  moves with the resolution (29808 clusters against 5760) and goes with the lights
+  (0.04 ms for the 32 of `nebula-battle`): it is each thread's walk of the list, not
+  the number of threads. So the lights come through group-shared memory, put into
+  view space once a group; a group leaves out the points and spots that cannot reach
+  its slices; and the per-colour count and weakest are kept as the sorted list goes
+  by, the list scanned only to replace an entry and sorted only when one was: 0.16
+  and 0.17 ms, the same clusters (the frame at RMSE 0 on both). What remains looks
+  like the private arrays' traffic and the upload and barriers round the dispatch.
 - **Off** (`Clustered=0`, or Direct3D 9): nothing of it runs, and every draw is as
   before: the port scenes draw the same pixels as without it (`gpu/README.md`,
   "Measured").
@@ -1809,7 +1820,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
 `MoonCrackCore`, `MoonCrackDepth`, `MoonCrackFalloff`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 3.5, `LitBeam` 1.5, `LitCorona` 0.25, `LitKnee` 6, `LitTemporal` 0.5, `LitClip` 0.5), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1984,6 +1995,58 @@ was marched. `comp_ps` then filters and composites the history as it did the mar
 The pass costs 0.22 ms at 720p. With `Temporal=0` the thresholds stay put, as before:
 moved without adding the frames up, they made the gas shimmer. Shadows cost 0.6 ms of 7.6 at 24 steps; the noise reads (flow, fine
 detail) were half of it before the flow was thinned. `Footprint=2` saved nothing.
+
+**Light inside the gas** (`[Nebulae] Lit=1`, Vulkan and Direct3D 12, with the clustered
+lights: "Clustered lights" under hulls). A breach lights the cloud about it, and
+torpedoes, pulses and phaser beams light the vapour they pass through. The march takes
+a twin (`march*_lit_ps`, dxc's alone) that, at every step with gas, walks the step's
+cluster (the pixel's tile, the step's slice of view depth: the clusters' own mapping,
+bound with `clusters::bind`, so the march's pass needs nothing of its own) and adds
+the light the gas scatters there: density times step times `LitStrength=` / 100 per
+world unit, the light's colour tinted `LitTint=` of the way towards the gas's hue; no
+phase (the gas glows alike from every side) and no shadowing by the gas between. Of
+each colour group only the strongest light at the step counts, as on the plating, and
+the cull's `ClusterPerColour` holds, so a volley of one colour does not blow out. The
+lights' light is added up along the ray and joins the gas's own at its end through a
+soft knee, L / (1 + L / `LitKnee=`) on its luminance: a light or two in thin gas is as
+it was, and a battleship's breach, whose fireball reaches across half the view, rolls
+off instead of whiting the frame out (at the knee's peak, 0.35 s after the kill in
+`render3d-nebula-lit`, 6 kept the glow's gradient where 0.75 to 2.5 flattened it into
+a uniform wash). The composite takes it through the gas's opacity, and the gas with
+no lights is drawn as before. Which light is what, to the gas
+(`scene::lights::Gas`, the cluster list's `t.z`): a fireball's takes `LitExplosion=`;
+a torpedo's or pulse's (each ordnance class's light, which rides with its shots) is a
+**corona**, bright within `LitCorona=` of its reach and fading softly to it,
+(1 - x)^1.5 (0.45 + 0.55 / (1 + (x / LitCorona)^2)) for x the distance over the reach,
+since a ball lit evenly to its edge read as a sphere in the gas; a beam's line light
+takes `LitBeam=`; the nebulae's own lights (`world::lights`) and a planet's day side
+light no gas at all. The shape is the clusters' first choice (the alternative, a froxel
+volume filled by compute and integrated, would spend a pass and a 3D storage image on
+what the march, which already walks the depth, reads for one buffer word per step
+where no light reaches).
+
+Lights move and the gas adds its frames up (`Temporal=`), so a torpedo would trail
+its glow through the history. The march writes the luminance of the lights' share
+into its second target's green; `temporal_ps`'s twin weighs it against the gas's own
+over the 3x3 and keeps that share in the history's meta (blue), and where either is
+large (now, or where a light just was) the clip narrows to `LitClip=` of
+`TemporalClip=` and this frame's share rises to `LitTemporal=`, so the glow follows its
+light within a frame or two. The pass with `Lit=0`, on Direct3D 9, or where no
+clusters run is the plain one (the same d3dbc; the port scenes as before).
+
+Cost (`Timing=1`, `render3d-nebula-lit`'s paused frame: the `nebula-battle` scene, 32
+lights in the view, the camera in the gas; RX 5700, 2026-10-23), the march's GPU time
+without and with `Lit=1`: at 1280x720 2.63 against 2.70 ms on Vulkan and 2.61 against
+2.69 ms on Direct3D 12; at 3440x1440 6.76 against 7.16 ms on Vulkan and 7.06 against
+7.20 ms on Direct3D 12. Measured, this settled the design: the march already walks
+the depth through the clusters' own mapping, so a step where no light reaches costs a
+buffer word, and a froxel volume (a compute fill of some 215x90x64 cells and a pass to
+integrate them, about the cost of the lit march's whole addition before any light) had
+nothing left to win. Checked: the plain march with `Lit=0` at RMSE 0 against the
+clustered lights' commit on Vulkan and Direct3D 12 (`port-nebula`, all 25 frames of
+its dump), and Direct3D 9 at RMSE 0 against `pre-gpu-nebula`; on lavapipe the
+validation layer finds nothing but `Timing=1`'s query messages, which the scene
+without the gas gives too.
 
 **Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view
 (`Module::lights`), a point light at its centre (the instance's transform +0x44 plus
