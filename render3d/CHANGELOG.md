@@ -16,7 +16,8 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   more of this frame, so a moving light does not trail.
 - `[Nebulae]` keys `Lit`, `LitStrength`, `LitTint`, `LitExplosion`, `LitBolt`,
   `LitBeam`, `LitCorona`, `LitTemporal`, `LitClip`; the shipped `Render3D.ini` lists
-  `Lit` and `LitStrength`.
+  `Lit`, `LitStrength`, `LitExplosion`, `LitBolt` and `LitBeam` in a `[Nebulae]`
+  section.
 - `scene::lights::Gas`: what a light is to the gas, in the cluster list's `t.z`.
 
 Installed, not yet seen in game.
