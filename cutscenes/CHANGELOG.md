@@ -4,6 +4,15 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.1.1 — 2026-10-23
+
+### Fixed
+- `binkproxy/build.sh` takes a lock (`build/.build.lock`), so two builds of one tree at
+  once (`a2test -j` installing one checkout twice) no longer write the same files in
+  `build/`.
+
+Installed, not yet seen in game.
+
 ## 2.1.0 — 2026-10-23
 
 ### Added

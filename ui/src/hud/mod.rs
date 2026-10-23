@@ -9,6 +9,7 @@ pub mod layout;
 pub mod leftovers;
 pub mod minimap;
 pub mod overlay;
+pub mod placement;
 mod tooltips;
 pub mod unitview;
 // hud-panels: the resources, the top-right buttons, the boxes, the overlay, the chat.
