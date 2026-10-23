@@ -24,15 +24,14 @@
 //! entity's bounding radius (the explosion's entity `+4`, its bounding sphere at
 //! `+0x34`, radius `+0x40`; at least 40 units), gone at `LightRange` radii.
 use super::{ff, hash32, Cam, LightPool, Sec};
-use gpu::d3d9::raw::*;
 use crate::engine::{self, field, obj};
 use crate::frame::steps::View;
-use crate::gfx::{self, Shader};
+use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::math::{sqrtf, V3};
 use crate::shaders::effects_explosions::*;
 use alloc::vec::Vec;
-use core::ffi::c_void;
+use gpu::{Address, Block, Contents, Filter, Format, MipFilter, Sampler, Texture, TextureDesc, Topology, Usage};
 
 const EXPLOSION_HEAD: usize = 0x7367c4;
 const VT_FIREBALL: usize = 0x6afbd4;
@@ -72,11 +71,10 @@ pub struct Explosions {
     s: Set,
     /// What `ExplosionFeature` handed us in this view: (explosion, is a ring).
     pub notes: Vec<(usize, bool)>,
-    vol: Option<(Device, Com)>,
+    vol: Option<Texture>,
     vol_failed: bool,
-    vs: Shader,
-    fire: Shader,
-    ring: Shader,
+    /// The fireball's and the shock ring's pipelines.
+    pipes: Pipes,
     lights: LightPool,
     logged: u32,
 }
@@ -119,9 +117,7 @@ impl Explosions {
             notes: Vec::new(),
             vol: None,
             vol_failed: false,
-            vs: Shader::vertex(&VS_QUAD),
-            fire: Shader::pixel(&PS_FIRE),
-            ring: Shader::pixel(&PS_RING),
+            pipes: Pipes::new(),
             lights: LightPool::new(b"explosion\0"),
             logged: 0,
         }
@@ -202,43 +198,29 @@ impl Explosions {
         }
     }
 
-    fn volume(&mut self, dev: Device) -> Option<*mut c_void> {
-        if self.vol.as_ref().is_none_or(|(d, _)| *d != dev) {
-            self.vol = None;
+    /// The fireballs' noise volume, made once (its texels kept, so the device can make
+    /// it again after a `Reset`, as the managed pool did).
+    fn volume(&mut self) -> Option<Texture> {
+        if self.vol.is_none() {
             if self.vol_failed {
                 return None;
             }
             let t0 = crate::rt::now();
             let sz = self.s.noise;
             let data = noise_fill(sz as usize);
-            let v = dev.create_volume_texture(sz, sz, sz, 1, 0, FMT_A8R8G8B8, POOL_MANAGED).and_then(|v| {
-                let mut b = LockedBox { row: 0, slice: 0, bits: core::ptr::null_mut() };
-                let hr = vcall!(v.ptr(), 19, fn(u32, *mut LockedBox, *const u8, u32) -> HRESULT, 0, &mut b, core::ptr::null(), 0);
-                if hr < 0 || b.bits.is_null() {
-                    return None;
-                }
-                let s = sz as usize;
-                for z in 0..s {
-                    for y in 0..s {
-                        unsafe {
-                            let d = b.bits.add(z * b.slice as usize + y * b.row as usize);
-                            core::ptr::copy_nonoverlapping(data[(z * s + y) * s * 4..].as_ptr(), d, s * 4);
-                        }
-                    }
-                }
-                vcall!(v.ptr(), 20, fn(u32) -> HRESULT, 0);
-                Some(v)
-            });
+            let g = gfx::gpu();
+            let t = g.texture(TextureDesc::d3(sz, sz, sz, 1, Format::Bgra8, Usage::SAMPLED), Contents::Owned(data));
+            let v = t.ready(g).then_some(t);
             log!("effects: explosion noise {}^3 in {:.0} ms{}", sz, (crate::rt::now() - t0) * 1000.0, if v.is_none() { " FAILED: no fireballs" } else { "" });
             match v {
-                Some(v) => self.vol = Some((dev, v)),
+                Some(v) => self.vol = Some(v),
                 None => {
                     self.vol_failed = true;
                     return None;
                 }
             }
         }
-        self.vol.as_ref().map(|(_, v)| v.ptr())
+        self.vol.clone()
     }
 
     pub fn draw(&mut self, v: &View, c: &Cam) {
@@ -250,27 +232,25 @@ impl Explosions {
             for_each_explosion(|e| l.push(e));
             l
         };
-        let dev = v.dev;
-        let Some(vol) = self.volume(dev) else { return };
-        let _g = gfx::Guard::new(dev);
-        if !self.vs.bind(dev) {
-            return;
-        }
-        for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0),
-            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_INVSRCALPHA), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3),
-            (RS_STENCILENABLE, 0), (152, 0), (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
-        }
-        dev.set_fvf(0x2);
-        dev.vs_const(0, &c.vp);
-        dev.set_texture(0, vol);
-        for (t, val) in [(SAMP_ADDRESSU, TADDRESS_WRAP), (SAMP_ADDRESSV, TADDRESS_WRAP), (SAMP_ADDRESSW, TADDRESS_WRAP),
-            (SAMP_MAGFILTER, TEXF_LINEAR), (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_NONE), (SAMP_SRGBTEXTURE, 0)] {
-            dev.set_ss(0, t, val);
-        }
+        let _ = v;
+        let Some(vol) = self.volume() else { return };
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let cmd = &mut cmd;
+        let fire = self.pipes.view(0, || super::fx_desc(&VS_QUAD, &PS_FIRE, &super::XYZ, 12, Topology::TriangleStrip, super::PREMUL));
+        let ring = self.pipes.view(1, || super::fx_desc(&VS_QUAD, &PS_RING, &super::XYZ, 12, Topology::TriangleStrip, super::PREMUL));
+        let (Some(p_fire), Some(p_ring)) = (fire, ring) else { return };
+        cmd.vs_block(Block::new(0, &c.vp));
+        let wrap = Sampler {
+            min: Filter::Linear,
+            mag: Filter::Linear,
+            mip: MipFilter::None,
+            address_u: Address::Wrap,
+            address_v: Address::Wrap,
+            address_w: Address::Wrap,
+            anisotropy: 1,
+            srgb: false,
+        };
+        cmd.bind_texture(0, Some(&vol), &wrap);
         let s = &self.s;
         for &(e, ring) in &self.notes {
             if !alive.contains(&e) {
@@ -322,7 +302,7 @@ impl Explosions {
                 k[4][2] = s.flash;
                 k[4][3] = s.glow;
                 k[6] = [s.smoke, s.turb, s.cool, s.opacity];
-                if !self.fire.bind(dev) {
+                if !cmd.set_pipeline(&p_fire) {
                     continue;
                 }
             } else {
@@ -355,23 +335,19 @@ impl Explosions {
                 let col = super::rv3(cls + 0xd0);
                 k[10] = [col.x, col.y, col.z, s.ring_break];
                 rq = r * 1.03;
-                if !self.ring.bind(dev) {
+                if !cmd.set_pipeline(&p_ring) {
                     continue;
                 }
             }
             let quad = quad(c, cpos, rq);
-            dev.ps_const(0, k.as_flattened());
-            dev.draw_primitive_up(PT_TRIANGLESTRIP, 2, quad.as_ptr() as *const u8, 12);
+            cmd.ps_block(Block::new(0, k.as_flattened()));
+            if let Some(s) = cmd.vertices(&quad) {
+                cmd.draw(&s);
+            }
         }
     }
 }
 
-#[repr(C)]
-struct LockedBox {
-    row: i32,
-    slice: i32,
-    bits: *mut u8,
-}
 
 /// Calls `f` with every live explosion, in the list's order.
 pub fn for_each_explosion(mut f: impl FnMut(usize)) {

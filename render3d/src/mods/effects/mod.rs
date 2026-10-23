@@ -34,12 +34,34 @@ pub mod sparks;
 pub mod weldfx;
 
 use super::{Module, Step};
-use gpu::d3d9::raw::*;
 use crate::engine::{self, field, hook, rd};
 use crate::frame::steps::View;
 use crate::log;
 use crate::math::{v3, M34, V3};
 use alloc::vec::Vec;
+
+/// Positions alone (the fireballs' and the shields' quads and spheres).
+pub static XYZ: [gpu::VertexAttr; 1] = [gpu::attr(0, gpu::AttrFormat::Float3, gpu::Semantic::Position, 0)];
+/// A position and two float4 texture coordinates (the welds' and construction's quads).
+pub static QUAD2: [gpu::VertexAttr; 3] = [
+    gpu::attr(0, gpu::AttrFormat::Float3, gpu::Semantic::Position, 0),
+    gpu::attr(12, gpu::AttrFormat::Float4, gpu::Semantic::TexCoord, 0),
+    gpu::attr(28, gpu::AttrFormat::Float4, gpu::Semantic::TexCoord, 1),
+];
+
+/// An effect's pipeline into the view: depth-tested (`LESSEQUAL`) and not written, red,
+/// green and blue, no culling, blended as `blend`.
+pub fn fx_desc(vs: &'static [u32], ps: &'static [u32], layout: &'static [gpu::VertexAttr], stride: u32, topology: gpu::Topology, blend: gpu::Blend) -> gpu::PipelineDesc {
+    let mut d = gpu::PipelineDesc::new(gpu::Code::d3d9(vs), gpu::Code::d3d9(ps), layout, stride, topology, gpu::Format::Unknown);
+    d.depth = gpu::Depth { test: true, write: false, compare: gpu::Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+    d.blend = Some(blend);
+    d.write_mask = 7;
+    d
+}
+
+/// Premultiplied over what is there: `ONE`, `INVSRCALPHA`.
+pub const PREMUL: gpu::Blend =
+    gpu::Blend { color: gpu::BlendEq { src: gpu::Factor::One, dst: gpu::Factor::InvSrcAlpha, op: gpu::BlendOp::Add }, alpha: None };
 
 const SITE_CHUNKS: usize = 0x598446; // ST3D_GraphicsEngine::RenderChunks(), thiscall
 const FN_CHUNKS: usize = 0x62d470;
@@ -261,7 +283,7 @@ impl Module for Effects {
     fn name(&self) -> &'static str {
         "effects"
     }
-    fn device(&mut self, _dev: Device) {
+    fn device(&mut self) {
         if self.hooked {
             return;
         }

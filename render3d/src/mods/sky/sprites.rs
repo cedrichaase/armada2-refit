@@ -3,13 +3,17 @@
 //! sprite nodes (the suns). Additive, as stock draws them, with the brightest texels
 //! lifted a little past white so a star's or a sun's core blooms.
 use crate::assets;
-use gpu::d3d9::raw::*;
 use crate::engine::{field, rd};
 use crate::math::{M4, V3, v3};
 use crate::rt;
+use crate::shaders::sky::VS_SPRITE;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
+use gpu::{
+    attr, Address, AttrFormat, Blend, Block, Cmd, Code, Compare, Depth, Filter, Format, MipFilter, Pipeline, PipelineDesc,
+    Sampler, Semantic, Topology, VertexAttr,
+};
 
 /// One vertex: world position, texture coordinate, colour (a: the lift past white).
 #[repr(C)]
@@ -20,11 +24,10 @@ pub struct SprVert {
     pub col: [f32; 4],
 }
 
-pub static SPRITE_DECL: [VertexElement; 4] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
-    ve(0, 20, DECLTYPE_FLOAT4, DECLUSAGE_COLOR, 0),
-    VE_END,
+pub static SPRITE_LAYOUT: [VertexAttr; 3] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float2, Semantic::TexCoord, 0),
+    attr(20, AttrFormat::Float4, Semantic::Color, 0),
 ];
 
 /// What a sprite draws: its texture and the rectangle of it, 0..1.
@@ -68,35 +71,41 @@ impl Batch {
     pub fn is_empty(&self) -> bool {
         self.by_tex.values().all(|l| l.is_empty())
     }
-    /// Draws every quad, additive, with the sprite shaders and declaration bound by the
-    /// caller; `vp` is view x projection.
-    pub fn draw(&mut self, dev: Device, vp: &M4) {
-        dev.vs_const(0, vp.transpose().as_floats());
-        for (st, v) in [
-            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_ALPHATESTENABLE, 0), (RS_ZWRITEENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_SEPARATEALPHABLENDENABLE, 0),
-        ] {
-            dev.set_rs(st, v);
-        }
-        for (s, v) in [(SAMP_ADDRESSU, TADDRESS_CLAMP), (SAMP_ADDRESSV, TADDRESS_CLAMP), (SAMP_MAGFILTER, TEXF_LINEAR),
-            (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_LINEAR), (SAMP_SRGBTEXTURE, 0)] {
-            dev.set_ss(0, s, v);
-        }
-        for (tex, list) in self.by_tex.iter() {
-            if list.is_empty() {
-                continue;
-            }
-            let Some(t) = assets::texture(dev, tex) else { continue };
-            dev.set_texture(0, t);
-            // DrawPrimitiveUP in chunks well under any vertex limit.
-            for chunk in list.chunks(6 * 2000) {
-                dev.draw_primitive_up(PT_TRIANGLELIST, (chunk.len() / 3) as u32, chunk.as_ptr() as *const u8, 36);
+    /// Draws every quad with `pipe` (the sprite shaders, added; `sprite_desc`); `vp` is
+    /// view x projection.
+    pub fn draw(&mut self, cmd: &mut Cmd, pipe: &Pipeline, vp: &M4) {
+        if cmd.set_pipeline(pipe) {
+            cmd.vs_block(Block::new(0, vp.transpose().as_floats()));
+            for (tex, list) in self.by_tex.iter() {
+                if list.is_empty() {
+                    continue;
+                }
+                let Some(t) = assets::texture(tex) else { continue };
+                cmd.bind_texture(0, Some(&t), &SAMPLER);
+                // In chunks well under any vertex limit, as before.
+                for chunk in list.chunks(6 * 2000) {
+                    if let Some(s) = cmd.vertices(chunk) {
+                        cmd.draw(&s);
+                    }
+                }
             }
         }
         for l in self.by_tex.values_mut() {
             l.clear();
         }
     }
+}
+
+/// The sprites' texture sampler: clamped, filtered through the levels.
+const SAMPLER: Sampler = crate::gfx::sampler(Filter::Linear, MipFilter::Linear, Address::Clamp, Address::Clamp);
+
+/// The sprites' pipeline with pixel shader `ps`: added, depth-tested (`LESSEQUAL`) and
+/// not written, no culling.
+pub fn sprite_desc(ps: &'static [u32]) -> PipelineDesc {
+    let mut d = PipelineDesc::new(Code::d3d9(&VS_SPRITE), Code::d3d9(ps), &SPRITE_LAYOUT, 36, Topology::TriangleList, Format::Unknown);
+    d.blend = Some(Blend::ADD);
+    d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+    d
 }
 
 // ---- the starfield ------------------------------------------------------------------

@@ -20,9 +20,9 @@
 //!   (the vertex alpha).
 use super::{eng, View};
 use crate::assets;
-use gpu::d3d9::raw::*;
+use gpu::{attr, AttrFormat, Blend, BlendEq, BlendOp, Block, Code, Compare, Depth, Factor, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::engine::{self, field, field_f32, rd};
-use crate::gfx::{self, Decl, DynVb, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{v3, V3};
 use crate::shaders::ordnance::*;
 use alloc::string::String;
@@ -43,11 +43,10 @@ pub struct SVert {
     pub col: [f32; 4],
 }
 
-static SDECL: [VertexElement; 4] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
-    ve(0, 20, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 1),
-    VE_END,
+static SLAYOUT: [VertexAttr; 3] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float2, Semantic::TexCoord, 0),
+    attr(20, AttrFormat::Float4, Semantic::TexCoord, 1),
 ];
 
 /// One quad waiting to be drawn, in the order stock would have drawn it.
@@ -60,10 +59,7 @@ struct Quad {
 
 pub struct Sprites {
     quads: Vec<Quad>,
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
-    vb: DynVb,
+    pipes: Pipes,
     pub hot: f32,
     pub hot_from: f32,
     said: Vec<usize>,
@@ -73,10 +69,7 @@ impl Sprites {
     pub fn new() -> Sprites {
         Sprites {
             quads: Vec::new(),
-            vs: Shader::vertex(&VS_ORD_SPRITE),
-            ps: Shader::pixel(&PS_ORD_SPRITE),
-            decl: Decl::new(&SDECL),
-            vb: DynVb::new(36 * 6 * 1024),
+            pipes: Pipes::new(),
             hot: 0.6,
             hot_from: 0.7,
             said: Vec::new(),
@@ -84,7 +77,7 @@ impl Sprites {
     }
 
     pub fn reset(&mut self) {
-        self.vb.reset();
+
         self.quads.clear();
     }
 
@@ -199,28 +192,13 @@ impl Sprites {
             return;
         }
         let quads = core::mem::take(&mut self.quads);
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        if !self.pipe(BLEND_ONE, BLEND_ONE).is_some_and(|p| p.ready(gfx::gpu())) {
             return;
         }
-        dev.vs_const(0, &gfx::vp_constants(v));
-        dev.ps_const(0, &[self.hot, self.hot_from, 0.0, 0.0]);
-        for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0),
-            (RS_ALPHABLENDENABLE, 1), (RS_BLENDOP, BLENDOP_ADD), (RS_SEPARATEALPHABLENDENABLE, 0),
-            (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3), (RS_STENCILENABLE, 0),
-            (RS_COLORWRITEENABLE, 0xf), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
-        }
-        for (s, val) in [
-            (SAMP_ADDRESSU, TADDRESS_WRAP), (SAMP_ADDRESSV, TADDRESS_WRAP), (SAMP_MAGFILTER, TEXF_LINEAR),
-            (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_LINEAR), (SAMP_SRGBTEXTURE, 0),
-        ] {
-            dev.set_ss(0, s, val);
-        }
-        dev.set_stream_freq(0, 1);
+        cmd.vs_block(Block::new(0, &gfx::vp_constants(v)));
+        cmd.ps_block(Block::new(0, &[self.hot, self.hot_from, 0.0, 0.0]));
+        cmd.set_sampler(0, &crate::scene::SAMPLER);
         let mut i = 0;
         while i < quads.len() {
             // A run of quads that share a texture and a blend: one draw.
@@ -229,22 +207,59 @@ impl Sprites {
             while j < quads.len() && quads[j].tex == q0.tex && quads[j].src == q0.src && quads[j].dst == q0.dst && j - i < 1000 {
                 j += 1;
             }
-            let tex = assets::texture(dev, &q0.tex).unwrap_or(core::ptr::null_mut());
-            if !tex.is_null() {
+            if let Some(tex) = assets::texture(&q0.tex) {
                 let mut verts: Vec<SVert> = Vec::with_capacity((j - i) * 6);
                 for q in &quads[i..j] {
                     for k in [0, 1, 2, 0, 2, 3] {
                         verts.push(q.v[k]);
                     }
                 }
-                dev.set_texture(0, tex);
-                dev.set_rs(RS_SRCBLEND, q0.src);
-                dev.set_rs(RS_DESTBLEND, q0.dst);
-                if let Some(first) = self.vb.push(dev, &verts, 36) {
-                    dev.draw_primitive(PT_TRIANGLELIST, first, (verts.len() / 3) as u32);
+                if let Some(p) = self.pipe(q0.src, q0.dst) {
+                    cmd.set_pipeline(&p);
+                    cmd.bind_texture(0, Some(&tex), &crate::scene::SAMPLER);
+                    if let Some(s) = cmd.vertices(&verts) {
+                        cmd.draw(&s);
+                    }
                 }
             }
             i = j;
         }
     }
+
+    /// The pipeline for a sprite material's blend (Direct3D's `D3DBLEND` codes, as the
+    /// engine's material holds them): depth-tested and not written, no culling.
+    fn pipe(&mut self, src: u32, dst: u32) -> Option<Pipeline> {
+        self.pipes.view((src as u64) << 8 | dst as u64, || {
+            let mut d = PipelineDesc::new(Code::d3d9(&VS_ORD_SPRITE), Code::d3d9(&PS_ORD_SPRITE), &SLAYOUT, 36, Topology::TriangleList, Format::Unknown);
+            d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.blend = Some(blend_of(src, dst));
+            d
+        })
+    }
+}
+
+const BLEND_ONE: u32 = 2;
+
+/// A `D3DBLEND` pair as a blend. `BOTHSRCALPHA` (12) and `BOTHINVSRCALPHA` (13) as the
+/// source set both factors, as Direct3D does.
+fn blend_of(src: u32, dst: u32) -> Blend {
+    let f = |c: u32| match c {
+        1 => Factor::Zero,
+        3 => Factor::SrcColor,
+        4 => Factor::InvSrcColor,
+        5 => Factor::SrcAlpha,
+        6 => Factor::InvSrcAlpha,
+        7 => Factor::DstAlpha,
+        8 => Factor::InvDstAlpha,
+        9 => Factor::DstColor,
+        10 => Factor::InvDstColor,
+        11 => Factor::SrcAlphaSat,
+        _ => Factor::One,
+    };
+    let (s, d) = match src {
+        12 => (Factor::SrcAlpha, Factor::InvSrcAlpha),
+        13 => (Factor::InvSrcAlpha, Factor::SrcAlpha),
+        _ => (f(src), f(dst)),
+    };
+    Blend { color: BlendEq { src: s, dst: d, op: BlendOp::Add }, alpha: None }
 }

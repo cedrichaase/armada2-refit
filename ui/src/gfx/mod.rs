@@ -584,7 +584,7 @@ pub fn with_cmd<R>(f: impl FnOnce(&mut gpu::Cmd) -> R) -> Option<R> {
 
 fn submit(cmd: &mut gpu::Cmd, p: &gpu::Pipeline, bb: &gpu::Texture, ds: Option<&gpu::Texture>, draw: &Draw) {
     // Into the engine's own targets, as they are.
-    let colors = [ColorTarget { texture: bb, load: Load::Load }];
+    let colors = [ColorTarget::new(bb, Load::Load)];
     let pass = Pass { colors: &colors, depth: ds.map(|d| DepthTarget { texture: d, load: Load::Load }), area: None };
     if !cmd.begin_pass(&pass) || !cmd.set_pipeline(p) {
         return;

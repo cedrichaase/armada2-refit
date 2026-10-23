@@ -20,7 +20,6 @@ pub mod rocks;
 pub mod surfaces;
 
 use super::{Module, Step};
-use gpu::d3d9::raw::Device;
 use crate::engine;
 use crate::frame::steps::View;
 use crate::log;
@@ -134,12 +133,11 @@ impl Module for World {
     fn name(&self) -> &'static str {
         "world"
     }
-    fn device(&mut self, _dev: Device) {
+    fn device(&mut self) {
         self.settle();
     }
     fn reset(&mut self) {
         self.surfaces.reset();
-        self.planets.reset();
         self.rocks.reset();
         self.nebulae.reset();
     }

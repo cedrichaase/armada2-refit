@@ -8,16 +8,19 @@
 //! textures' layout, which `GroundMesh::mSetUVs` gives (README, "Planets"), and which
 //! our sphere carries in its vertices, so the stock gore textures land where they did.
 use super::surfaces::{self, Surfaces};
-use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_f32, field_u8, obj, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{self, M34, V3, v3};
 use crate::shaders::world_planet::*;
 use crate::{assets, log, rt, scene};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
+use gpu::{
+    attr, Address, AttrFormat, Blend, Block, BufferKind, Buffer, Cmd, Code, Compare, Cull, Depth, Filter, Format,
+    MipFilter, Pipeline, PipelineDesc, Sampler, Semantic, Texture, Topology, VertexAttr,
+};
 
 pub const VT_PLANET: usize = 0x6b2b3c;
 const VT_PLANET_DB: usize = 0x6bab74;
@@ -41,26 +44,44 @@ struct Vtx {
     aux: [f32; 3],
 }
 
-static DECL: [VertexElement; 4] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
-    ve(0, 20, DECLTYPE_FLOAT3, DECLUSAGE_TEXCOORD, 1),
-    VE_END,
+static LAYOUT: [VertexAttr; 3] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float2, Semantic::TexCoord, 0),
+    attr(20, AttrFormat::Float3, Semantic::TexCoord, 1),
 ];
 
 struct Sphere {
-    vb: Com,
-    ib: Com,
+    vb: Buffer,
+    ib: Buffer,
     verts: u32,
     tris: u32,
 }
+
+/// The pixel shaders, by the index the pipelines' keys carry.
+const PS: [&[u32]; 5] = [&PS_GROUND, &PS_CITY, &PS_CLOUD, &PS_HALO, &PS_SURFACE];
+const P_GROUND: usize = 0;
+const P_CITY: usize = 1;
+const P_CLOUD: usize = 2;
+const P_HALO: usize = 3;
+const P_SURFACE: usize = 4;
+/// How a pass blends: opaque writing depth, alpha-blended or added writing none.
+const OPAQUE: u8 = 0;
+const ALPHA: u8 = 1;
+const ADD: u8 = 2;
+
+/// The planets' samplers 0 and 1: filtered through their levels, addressed as each
+/// pass says.
+const fn tex_sampler(u: Address, v: Address) -> Sampler {
+    gfx::sampler(Filter::Linear, MipFilter::Linear, u, v)
+}
+const CLAMP: Sampler = tex_sampler(Address::Clamp, Address::Clamp);
 
 /// A unit sphere's share as one GroundMesh holds it: `count` quarter turns of longitude
 /// from quarter `start`, the UVs of a texture holding `n` quarters (2 for a hemisphere,
 /// 4 for the shell). Per quarter q, at longitude l into it and polar angle t from +y:
 /// u = lerp((2q+1)/8, (q pi/2 + l) / 2pi, w) 4/n, v = t/pi, with w rising from 0 at a
 /// pole to 1 at 45 degrees from it (the gores' diamonds).
-fn sphere(dev: Device, start: usize, count: usize, n: usize) -> Option<Sphere> {
+fn sphere(start: usize, count: usize, n: usize) -> Sphere {
     let mut v = Vec::new();
     let mut idx: Vec<u16> = Vec::new();
     for q in 0..count {
@@ -93,9 +114,9 @@ fn sphere(dev: Device, start: usize, count: usize, n: usize) -> Option<Sphere> {
             }
         }
     }
-    let vb = upload_buffer(dev, unsafe { core::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 32) }, false)?;
-    let ib = upload_buffer(dev, unsafe { core::slice::from_raw_parts(idx.as_ptr() as *const u8, idx.len() * 2) }, true)?;
-    Some(Sphere { vb, ib, verts: v.len() as u32, tris: idx.len() as u32 / 3 })
+    let vb = gfx::buffer(&v, BufferKind::Vertex);
+    let ib = gfx::buffer(&idx, BufferKind::Index16);
+    Sphere { vb, ib, verts: v.len() as u32, tris: idx.len() as u32 / 3 }
 }
 
 /// The look's settings (`Lighting.ini`'s planet keys, under `[World]` in Render3D.ini).
@@ -151,7 +172,7 @@ impl Look {
 /// `cityAllocTexture` (`PlanetInstance::mSetupHemisphere`), made again from the same
 /// `CityAllocArray` and population.
 struct City {
-    tex: Com,
+    tex: Texture,
     pop: f32,
     w: u32,
     h: u32,
@@ -178,14 +199,8 @@ struct Body<'a> {
 }
 
 pub struct Planets {
-    spheres: Option<(Device, [Sphere; 3])>,
-    vs: Shader,
-    ps_ground: Shader,
-    ps_city: Shader,
-    ps_cloud: Shader,
-    ps_halo: Shader,
-    ps_surface: Shader,
-    decl: Decl,
+    spheres: Option<[Sphere; 3]>,
+    pipes: Pipes,
     look: Look,
     /// The mean colour of a ground texture's lit texels, by name.
     ground_mean: BTreeMap<String, [f32; 3]>,
@@ -197,13 +212,7 @@ impl Planets {
     pub fn new() -> Planets {
         Planets {
             spheres: None,
-            vs: Shader::vertex(&VS_PLANET),
-            ps_ground: Shader::pixel(&PS_GROUND),
-            ps_city: Shader::pixel(&PS_CITY),
-            ps_cloud: Shader::pixel(&PS_CLOUD),
-            ps_halo: Shader::pixel(&PS_HALO),
-            ps_surface: Shader::pixel(&PS_SURFACE),
-            decl: Decl::new(&DECL),
+            pipes: Pipes::new(),
             look: Look::read(),
             ground_mean: BTreeMap::new(),
             cities: BTreeMap::new(),
@@ -211,18 +220,27 @@ impl Planets {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.spheres = None;
-        self.cities.clear();
+    /// The pipeline of pixel shader `ps` (`P_*`) blending as `mode` says: the sphere,
+    /// depth-tested against the scene, its outside's faces (`CULL_CCW`).
+    fn pipe(&mut self, ps: usize, mode: u8) -> Option<Pipeline> {
+        self.pipes.view((ps * 4 + mode as usize) as u64, || {
+            let mut d = PipelineDesc::new(Code::d3d9(&VS_PLANET), Code::d3d9(PS[ps]), &LAYOUT, 32, Topology::TriangleList, Format::Unknown);
+            d.depth = Depth { test: true, write: mode == OPAQUE, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.cull = Cull::CounterClockwise;
+            d.blend = match mode {
+                OPAQUE => None,
+                ALPHA => Some(Blend::ALPHA),
+                _ => Some(Blend::ADD),
+            };
+            d
+        })
     }
 
-    fn spheres(&mut self, dev: Device) -> Option<&[Sphere; 3]> {
-        if self.spheres.as_ref().is_none_or(|(d, _)| *d != dev) {
-            self.spheres = None;
-            let s = [sphere(dev, 0, 2, 2)?, sphere(dev, 2, 2, 2)?, sphere(dev, 0, 4, 4)?];
-            self.spheres = Some((dev, s));
+    fn spheres(&mut self) -> Option<&[Sphere; 3]> {
+        if self.spheres.is_none() {
+            self.spheres = Some([sphere(0, 2, 2), sphere(2, 2, 2), sphere(0, 4, 4)]);
         }
-        self.spheres.as_ref().map(|(_, s)| s)
+        self.spheres.as_ref()
     }
 
     fn note(&mut self, bit: u32, what: &str) {
@@ -290,7 +308,7 @@ impl Planets {
     }
 
     /// The planet's city picture for hemisphere `h`, made again when its population moves.
-    fn city(&mut self, dev: Device, o: usize, race: usize, h: usize, frame: u32) -> Option<*mut core::ffi::c_void> {
+    fn city(&mut self, o: usize, race: usize, h: usize, frame: u32) -> Option<Texture> {
         let arr = field(race, 0x514 + h * 4);
         let (w, hh) = (field(arr, 0) as u32, field(arr, 4) as u32);
         let data = field(arr, 8);
@@ -301,7 +319,7 @@ impl Planets {
         let key = (o, h);
         if let Some(c) = self.cities.get(&key) {
             if c.w == w && c.h == hh && (c.pop == pop || frame.wrapping_sub(c.frame) < 30) {
-                return Some(c.tex.ptr());
+                return Some(c.tex.clone());
             }
         }
         // mSetupHemisphere: each texel's alpha is 0.4 x clamp((P - value) k), with k the
@@ -320,10 +338,9 @@ impl Planets {
                 px.extend_from_slice(&[255, 255, 255, a]);
             }
         }
-        let tex = upload_texture(dev, w, hh, FMT_A8R8G8B8, &[&px])?;
-        let ptr = tex.ptr();
-        self.cities.insert(key, City { tex, pop, w, h: hh, frame });
-        Some(ptr)
+        let tex = gfx::texture_bgra8(w, hh, &[&px]);
+        self.cities.insert(key, City { tex: tex.clone(), pop, w, h: hh, frame });
+        Some(tex)
     }
 
     /// Forgets planets that are gone (their city pictures), now and then.
@@ -406,8 +423,7 @@ impl Planets {
     /// A planet from its class, its instance (`PlanetInstance`) and database, at `world`.
     #[allow(clippy::too_many_arguments)]
     fn draw_instance(&mut self, v: &View, surf: &mut Surfaces, cls: usize, inst: usize, db: usize, world: M34, tint: [f32; 3], people: Option<(usize, usize)>, exposure: f32) -> bool {
-        let dev = v.dev;
-        if self.spheres(dev).is_none() {
+        if self.spheres().is_none() {
             self.note(0, "the sphere could not be made: the engine draws planets");
             return false;
         }
@@ -449,7 +465,7 @@ impl Planets {
     /// sphere of `radius` at `world`, the shell turned `yaw` about the axis.
     #[allow(clippy::too_many_arguments)]
     pub fn draw_menu(&mut self, v: &View, surf: &mut Surfaces, ground: &str, atmo: &str, world: &M34, radius: f32, yaw: f32) -> bool {
-        if self.spheres(v.dev).is_none() {
+        if self.spheres().is_none() {
             return false;
         }
         let (sy, cy) = (math::sinf(yaw), math::cosf(yaw));
@@ -479,81 +495,69 @@ impl Planets {
         let (rg, rs, turb, turb_t, tint) = (b.ground_r, b.shell_r, b.turb, b.turb_t, b.tint);
         let wscale = world.r[0].len();
         let centre = world.p;
-        let dev = v.dev;
         let ground_sf = surf.has(ground);
         let atmo_sf = surf.has(atmo);
         let gc = self.ground_colour(ground, atmo);
         let mut k = self.consts(v, centre, rg.max(rs) * wscale, gc);
         k[14 * 4 + 3] = b.exposure;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return false };
+        let cmd = &mut cmd;
+        // The surfaces this body reads, baked first if they are not yet (a bake draws
+        // into targets of its own and begins the view's pass again).
+        if ground_sf && (rg > 0.0 || b.ground_r2 > 0.0 || rs > 0.0) {
+            surf.get(cmd, v, ground);
+        }
+        if atmo_sf && rs > 0.0 {
+            surf.get(cmd, v, atmo);
+        }
+        if !self.pipe(P_GROUND, OPAQUE).is_some_and(|p| p.ready(gfx::gpu())) {
             return false;
         }
-        dev.vs_const(4, &gfx::vp_constants(v));
-        for (s, val) in [
-            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0), (RS_SCISSORTESTENABLE, 0),
-            (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_BLENDOP, BLENDOP_ADD), (RS_SEPARATEALPHABLENDENABLE, 0),
-            (RS_SRGBWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0), (RS_CULLMODE, CULL_CCW),
-        ] {
-            dev.set_rs(s, val);
-        }
-        dev.set_stream_freq(0, 1);
-        for s in 0..2 {
-            dev.set_ss(s, SAMP_MAGFILTER, TEXF_LINEAR);
-            dev.set_ss(s, SAMP_MINFILTER, TEXF_LINEAR);
-            dev.set_ss(s, SAMP_MIPFILTER, TEXF_LINEAR);
-            dev.set_ss(s, SAMP_SRGBTEXTURE, 0);
-        }
+        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
 
         // The ground: two hemispheres, the class's ground texture with 1 and 2 appended.
         for (h, r) in [(0usize, rg), (1usize, b.ground_r2)] {
             if !(r > 0.0) {
                 continue;
             }
-            let mut sf_ok = false;
+            let mut sf = None;
             if ground_sf {
-                if let Some(s) = surf.get(dev, ground, v.time) {
-                    surfaces::bind(dev, s, 2, 3);
+                if let Some(s) = surf.get(cmd, v, ground) {
+                    surfaces::bind(cmd, s, 2, 3);
                     surf_consts(&mut k, &world, s);
-                    sf_ok = self.ps_surface.bind(dev);
+                    sf = self.pipe(P_SURFACE, OPAQUE);
                     self.note(1, "a ground from its recipe");
                 }
             }
-            if !sf_ok {
-                let tex = assets::texture(dev, &super::name(ground, "", Some(h + 1))).unwrap_or(core::ptr::null_mut());
-                dev.set_texture(0, tex);
-                dev.set_ss(0, SAMP_ADDRESSU, TADDRESS_CLAMP);
-                dev.set_ss(0, SAMP_ADDRESSV, TADDRESS_CLAMP);
-                if !self.ps_ground.bind(dev) {
-                    return false;
+            let pipe = match sf {
+                Some(p) => p,
+                None => {
+                    let tex = assets::texture(&super::name(ground, "", Some(h + 1)));
+                    cmd.bind_texture(0, tex.as_ref(), &CLAMP);
+                    let Some(p) = self.pipe(P_GROUND, OPAQUE) else { return false };
+                    self.note(2, "a ground from its texture");
+                    p
                 }
-                self.note(2, "a ground from its texture");
-            }
+            };
             set_material(&mut k, self.look.ambient, self.look.diffuse);
             k[47 * 4] = 1.0;
-            dev.ps_const(0, &k);
-            dev.set_rs(RS_ALPHABLENDENABLE, 0);
-            dev.set_rs(RS_ZWRITEENABLE, 1);
-            self.draw_sphere(dev, h, &world, r, false, 0.0);
+            cmd.ps_block(Block::new(0, &k));
+            if !cmd.set_pipeline(&pipe) {
+                return false;
+            }
+            self.draw_sphere(cmd, h, &world, r, false, 0.0);
             // The cities, blended over the ground (pass 1 of ST3D_PlanetaryMaterial): the
             // race's development texture times the planet's own picture of its people.
             if let Some((o, race)) = b.people {
                 let rname = unsafe { rt::cstr_at((race + 0x452) as *const u8, 32) };
-                let dtex = assets::texture(dev, &super::name("PD_", rname, Some(h + 1)));
-                let ctex = self.city(dev, o, race, h, v.frame);
+                let dtex = assets::texture(&super::name("PD_", rname, Some(h + 1)));
+                let ctex = self.city(o, race, h, v.frame);
                 if let (Some(d), Some(c)) = (dtex, ctex) {
-                    if self.ps_city.bind(dev) {
-                        dev.set_texture(0, d);
-                        dev.set_texture(1, c);
-                        for s in 0..2 {
-                            dev.set_ss(s, SAMP_ADDRESSU, TADDRESS_CLAMP);
-                            dev.set_ss(s, SAMP_ADDRESSV, TADDRESS_CLAMP);
-                        }
-                        dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                        dev.set_rs(RS_SRCBLEND, BLEND_SRCALPHA);
-                        dev.set_rs(RS_DESTBLEND, BLEND_INVSRCALPHA);
-                        dev.set_rs(RS_ZWRITEENABLE, 0);
-                        self.draw_sphere(dev, h, &world, r, false, 0.0);
+                    if let Some(p) = self.pipe(P_CITY, ALPHA).filter(|p| cmd.set_pipeline(p)) {
+                        let _ = p;
+                        cmd.bind_texture(0, Some(&d), &CLAMP);
+                        cmd.bind_texture(1, Some(&c), &CLAMP);
+                        self.draw_sphere(cmd, h, &world, r, false, 0.0);
                         self.note(3, "a colony's cities");
                     }
                 }
@@ -563,12 +567,12 @@ impl Planets {
         // The shell: the class's atmosphere texture blended by its alpha, writing no
         // depth; a gas giant's own surface when the atmosphere has a recipe (opaque).
         if rs > 0.0 {
-            let mut sf_ok = false;
+            let mut sf = None;
             if atmo_sf {
-                if let Some(s) = surf.get(dev, atmo, v.time) {
-                    surfaces::bind(dev, s, 2, 3);
+                if let Some(s) = surf.get(cmd, v, atmo) {
+                    surfaces::bind(cmd, s, 2, 3);
                     surf_consts(&mut k, &shell_world, s);
-                    sf_ok = self.ps_surface.bind(dev);
+                    sf = self.pipe(P_SURFACE, OPAQUE);
                     self.note(4, "a gas giant from its recipe");
                 }
             }
@@ -576,57 +580,54 @@ impl Planets {
             // ambient is PlanetAmbient x tint.
             let amb = [self.look.ambient[0] * tint[0], self.look.ambient[1] * tint[1], self.look.ambient[2] * tint[2]];
             set_material(&mut k, amb, tint);
-            if sf_ok {
-                k[47 * 4] = 1.0;
-                dev.set_rs(RS_ALPHABLENDENABLE, 0);
-                dev.set_rs(RS_ZWRITEENABLE, 1);
-            } else {
-                let tex = assets::texture(dev, atmo).unwrap_or(core::ptr::null_mut());
-                dev.set_texture(0, tex);
-                dev.set_ss(0, SAMP_ADDRESSU, TADDRESS_WRAP);
-                dev.set_ss(0, SAMP_ADDRESSV, TADDRESS_CLAMP);
-                if !self.ps_cloud.bind(dev) {
-                    return true;
+            let sf_ok = sf.is_some();
+            let pipe = match sf {
+                Some(p) => {
+                    k[47 * 4] = 1.0;
+                    p
                 }
-                // Over a ground from a recipe, which brings clouds of its own, only the
-                // shell's halo at the limb is left.
-                k[47 * 4] = if ground_sf && surf.get(dev, ground, v.time).is_some() { 0.0 } else { 1.0 };
-                dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                dev.set_rs(RS_SRCBLEND, BLEND_SRCALPHA);
-                dev.set_rs(RS_DESTBLEND, BLEND_INVSRCALPHA);
-                dev.set_rs(RS_ZWRITEENABLE, 0);
-                self.note(5, "a cloud shell");
+                None => {
+                    let tex = assets::texture(atmo);
+                    cmd.bind_texture(0, tex.as_ref(), &tex_sampler(Address::Wrap, Address::Clamp));
+                    let Some(p) = self.pipe(P_CLOUD, ALPHA) else { return true };
+                    // Over a ground from a recipe, which brings clouds of its own, only the
+                    // shell's halo at the limb is left.
+                    k[47 * 4] = if ground_sf && surf.get(cmd, v, ground).is_some() { 0.0 } else { 1.0 };
+                    self.note(5, "a cloud shell");
+                    p
+                }
+            };
+            if !cmd.set_pipeline(&pipe) {
+                return true;
             }
-            dev.ps_const(0, &k);
-            self.draw_sphere(dev, 2, &shell_world, rs, turb && !sf_ok, turb_t);
+            cmd.ps_block(Block::new(0, &k));
+            self.draw_sphere(cmd, 2, &shell_world, rs, turb && !sf_ok, turb_t);
 
             // The air past the limb: the shell's sphere pushed out to PlanetHaloHeight
             // over the ground, added, no depth written.
-            if self.look.halo > 0.0 && rg > 1e-3 && rs > 1e-3 && self.ps_halo.bind(dev) {
-                let g = rg * wscale;
-                let top = g * (1.0 + self.look.halo_h.max(1e-3));
-                k[48 * 4..48 * 4 + 4].copy_from_slice(&[g, top, self.look.halo, self.look.halo_fwd]);
-                dev.ps_const(0, &k);
-                dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                dev.set_rs(RS_SRCBLEND, BLEND_ONE);
-                dev.set_rs(RS_DESTBLEND, BLEND_ONE);
-                dev.set_rs(RS_ZWRITEENABLE, 0);
-                let r = (top * 1.03 / wscale).max(rs);
-                self.draw_sphere(dev, 2, &shell_world, r, false, 0.0);
-                self.note(6, "the air past a limb");
+            if self.look.halo > 0.0 && rg > 1e-3 && rs > 1e-3 {
+                if let Some(p) = self.pipe(P_HALO, ADD).filter(|p| cmd.set_pipeline(p)) {
+                    let _ = p;
+                    let g = rg * wscale;
+                    let top = g * (1.0 + self.look.halo_h.max(1e-3));
+                    k[48 * 4..48 * 4 + 4].copy_from_slice(&[g, top, self.look.halo, self.look.halo_fwd]);
+                    cmd.ps_block(Block::new(0, &k));
+                    let r = (top * 1.03 / wscale).max(rs);
+                    self.draw_sphere(cmd, 2, &shell_world, r, false, 0.0);
+                    self.note(6, "the air past a limb");
+                }
             }
         }
         true
     }
 
-    fn draw_sphere(&self, dev: Device, which: usize, world: &M34, radius: f32, turb: bool, t: f32) {
-        let Some((_, s)) = self.spheres.as_ref() else { return };
+    fn draw_sphere(&self, cmd: &mut Cmd, which: usize, world: &M34, radius: f32, turb: bool, t: f32) {
+        let Some(s) = self.spheres.as_ref() else { return };
         let s = &s[which];
-        dev.vs_const(0, world.to_m4().transpose().as_floats());
-        dev.vs_const(8, &[radius, if turb { 1.0 } else { 0.0 }, t, 0.0]);
-        dev.set_stream(0, s.vb.ptr(), 0, 32);
-        dev.set_indices(s.ib.ptr());
-        dev.draw_indexed(PT_TRIANGLELIST, 0, 0, s.verts, 0, s.tris);
+        cmd.vs_block(Block::new(0, world.to_m4().transpose().as_floats()));
+        cmd.vs_block(Block::new(8, &[radius, if turb { 1.0 } else { 0.0 }, t, 0.0]));
+        let (Some(vb), Some(ib)) = (cmd.span_of(&s.vb, 32), cmd.span_of(&s.ib, 2)) else { return };
+        cmd.draw_indexed(&vb, 0, s.verts, &ib, 0, s.tris * 3);
     }
 
     /// planet.hlsl's c0..c48 for one planet: lights, the camera, the look.

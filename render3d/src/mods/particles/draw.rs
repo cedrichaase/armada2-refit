@@ -5,13 +5,16 @@
 //! they were queued.
 use super::look::Material;
 use crate::assets;
-use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, DynVb, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{M34, V3};
 use crate::shaders::particles::*;
 use alloc::string::String;
 use alloc::vec::Vec;
+use gpu::{
+    attr, Address, AlphaTest, AttrFormat, Blend, Block, Code, Compare, Depth, Filter, Format, MipFilter, Pipeline,
+    PipelineDesc, Semantic, Topology, VertexAttr,
+};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -21,11 +24,10 @@ pub struct Vert {
     pub col: [f32; 4],
 }
 
-static DECL: [VertexElement; 4] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
-    ve(0, 20, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 1),
-    VE_END,
+static LAYOUT: [VertexAttr; 3] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float2, Semantic::TexCoord, 0),
+    attr(20, AttrFormat::Float4, Semantic::TexCoord, 1),
 ];
 
 /// The camera of the view: its axes in the world and its position.
@@ -54,27 +56,15 @@ impl Cam {
 pub struct Batch {
     groups: Vec<(Material, String, Vec<Vert>)>,
     last: usize,
-    vb: DynVb,
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
+    pipes: Pipes,
     pub quads: u32,
 }
 
 impl Batch {
     pub const fn new() -> Batch {
-        Batch {
-            groups: Vec::new(),
-            last: 0,
-            vb: DynVb::new(4 << 20),
-            vs: Shader::vertex(&VS_SPRITE),
-            ps: Shader::pixel(&PS_SPRITE),
-            decl: Decl::new(&DECL),
-            quads: 0,
-        }
+        Batch { groups: Vec::new(), last: 0, pipes: Pipes::new(), quads: 0 }
     }
     pub fn reset(&mut self) {
-        self.vb.reset();
         self.groups.clear();
     }
     pub fn clear(&mut self) {
@@ -130,64 +120,52 @@ impl Batch {
         if self.quads == 0 {
             return;
         }
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        if !self.pipe(Material::Additive).is_some_and(|p| p.ready(gfx::gpu())) {
             self.clear();
             return;
         }
-        dev.vs_const(0, &gfx::vp_constants(v));
-        for (s, val) in [
-            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
-            (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 7), (RS_FILLMODE, 3), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_SRGBWRITEENABLE, 0), (RS_CULLMODE, CULL_NONE),
-        ] {
-            dev.set_rs(s, val);
-        }
-        dev.set_stream_freq(0, 1);
-        dev.set_ss(0, SAMP_ADDRESSU, TADDRESS_WRAP);
-        dev.set_ss(0, SAMP_ADDRESSV, TADDRESS_WRAP);
-        dev.set_ss(0, SAMP_MAGFILTER, TEXF_LINEAR);
-        dev.set_ss(0, SAMP_MINFILTER, TEXF_LINEAR);
+        cmd.vs_block(Block::new(0, &gfx::vp_constants(v)));
         let groups = core::mem::take(&mut self.groups);
         for (m, tex, verts) in groups.iter() {
             if verts.is_empty() {
                 continue;
             }
-            let Some(t) = assets::texture(dev, tex) else { continue };
-            dev.set_texture(0, t);
-            dev.set_ss(0, SAMP_MIPFILTER, if *m == Material::AdditiveNoMip { TEXF_NONE } else { TEXF_LINEAR });
-            match m {
-                Material::Additive | Material::AdditiveNoMip => {
-                    dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                    dev.set_rs(RS_SRCBLEND, BLEND_ONE);
-                    dev.set_rs(RS_DESTBLEND, BLEND_ONE);
-                    dev.set_rs(RS_ZWRITEENABLE, 0);
-                    dev.set_rs(RS_ALPHATESTENABLE, 0);
-                }
-                Material::Translucent => {
-                    dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                    dev.set_rs(RS_SRCBLEND, BLEND_SRCALPHA);
-                    dev.set_rs(RS_DESTBLEND, BLEND_INVSRCALPHA);
-                    dev.set_rs(RS_ZWRITEENABLE, 0);
-                    dev.set_rs(RS_ALPHATESTENABLE, 0);
-                }
-                Material::Cutout => {
-                    dev.set_rs(RS_ALPHABLENDENABLE, 0);
-                    dev.set_rs(RS_ZWRITEENABLE, 1);
-                    dev.set_rs(RS_ALPHATESTENABLE, 1);
-                    dev.set_rs(RS_ALPHAREF, 128);
-                    dev.set_rs(RS_ALPHAFUNC, CMP_GREATEREQUAL);
-                }
-            }
-            // In pieces the buffer holds.
+            let Some(t) = assets::texture(tex) else { continue };
+            let Some(pipe) = self.pipe(*m) else { continue };
+            cmd.set_pipeline(&pipe);
+            let mip = if *m == Material::AdditiveNoMip { MipFilter::None } else { MipFilter::Linear };
+            cmd.bind_texture(0, Some(&t), &gfx::sampler(Filter::Linear, mip, Address::Wrap, Address::Wrap));
+            // In pieces, as the old dynamic buffer held them.
             for chunk in verts.chunks(6 * 8192) {
-                if let Some(first) = self.vb.push(dev, chunk, core::mem::size_of::<Vert>() as u32) {
-                    dev.draw_primitive(PT_TRIANGLELIST, first, chunk.len() as u32 / 3);
+                if let Some(s) = cmd.vertices(chunk) {
+                    cmd.draw(&s);
                 }
             }
         }
         self.groups = groups;
         self.clear();
+    }
+
+    /// A material's pipeline: depth-tested (`LESSEQUAL`), red, green and blue written,
+    /// no culling; added, blended by alpha, or cut out at alpha one half (writing depth).
+    fn pipe(&mut self, m: Material) -> Option<Pipeline> {
+        let key = match m {
+            Material::Additive | Material::AdditiveNoMip => 0,
+            Material::Translucent => 1,
+            Material::Cutout => 2,
+        };
+        self.pipes.view(key, || {
+            let mut d = PipelineDesc::new(Code::d3d9(&VS_SPRITE), Code::d3d9(&PS_SPRITE), &LAYOUT, 36, Topology::TriangleList, Format::Unknown);
+            d.write_mask = 7;
+            d.depth = Depth { test: true, write: key == 2, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.blend = match key {
+                0 => Some(Blend::ADD),
+                1 => Some(Blend::ALPHA),
+                _ => None,
+            };
+            d.alpha_test = if key == 2 { Some(AlphaTest::HALF) } else { None };
+            d
+        })
     }
 }

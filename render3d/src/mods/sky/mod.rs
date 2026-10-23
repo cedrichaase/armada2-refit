@@ -8,10 +8,9 @@ pub mod recipe;
 pub mod sprites;
 
 use super::{Module, Step};
-use gpu::d3d9::raw::*;
 use crate::engine::{self, field, field_u8, obj, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{M34, M4, V3, v3};
 use crate::scene::{self, pose};
 use crate::shaders::sky::*;
@@ -19,9 +18,13 @@ use crate::{assets, log, rt};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
-use bake::{Baker, QUAD_DECL, QuadVert};
+use bake::{draw_quad, quad_desc, Baker, QuadVert};
+use gpu::{
+    Address, Blend, BlendEq, BlendOp, Block, Cmd, Code, Cull, Factor, Filter, Format, MipFilter, Pipeline, PipelineDesc,
+    Rect, Sampler, Topology, Viewport,
+};
 use recipe::Recipe;
-use sprites::{Batch, SPRITE_DECL, SprInfo, Starfield};
+use sprites::{Batch, SprInfo, Starfield};
 
 // ---- Armada2.exe ------------------------------------------------------------------
 
@@ -122,18 +125,7 @@ pub struct Sky {
     scales: BTreeMap<String, f32>,
     /// Sprite nodes by id: their sprite, half extents and colour.
     nodes: BTreeMap<String, Option<(SprInfo, [f32; 2], [f32; 3])>>,
-    vs_sky: Shader,
-    ps_sky: Shader,
-    ps_draw: Shader,
-    vs_face: Shader,
-    ps_face: Shader,
-    vs_spr: Shader,
-    ps_spr: Shader,
-    ps_tunnel: Shader,
-    ps_flash: Shader,
-    quad_decl: Decl,
-    face_decl: Decl,
-    spr_decl: Decl,
+    pipes: Pipes,
     said_inst: bool,
     said_objects: usize,
     tick: u32,
@@ -152,18 +144,7 @@ impl Default for Sky {
             batch: Batch::default(),
             scales: BTreeMap::new(),
             nodes: BTreeMap::new(),
-            vs_sky: Shader::vertex(&VS_SKY),
-            ps_sky: Shader::pixel(&PS_SKY),
-            ps_draw: Shader::pixel(&PS_DRAW),
-            vs_face: Shader::vertex(&VS_FACE),
-            ps_face: Shader::pixel(&PS_FACE),
-            vs_spr: Shader::vertex(&VS_SPRITE),
-            ps_spr: Shader::pixel(&PS_SPRITE),
-            ps_tunnel: Shader::pixel(&PS_TUNNEL),
-            ps_flash: Shader::pixel(&PS_FLASH),
-            quad_decl: Decl::new(&QUAD_DECL),
-            face_decl: Decl::new(&scene::VERTEX),
-            spr_decl: Decl::new(&SPRITE_DECL),
+            pipes: Pipes::new(),
             said_inst: false,
             said_objects: 0,
             tick: 0,
@@ -171,6 +152,32 @@ impl Default for Sky {
         }
     }
 }
+
+/// The pipelines (`Sky::pipe`): the sky from its cube, or computed at every pixel; the
+/// stock faces (with a cull); the sprites, the warp flashes; the tunnel.
+const P_DRAW: u64 = 0;
+const P_DIRECT: u64 = 1;
+const P_FACE: u64 = 2;
+const P_SPRITE: u64 = 3;
+const P_FLASH: u64 = 4;
+const P_TUNNEL: u64 = 5;
+
+/// The stock faces' textures: clamped (the engine clamps every sky texture,
+/// `ClampTexturesRecursive`), filtered through their levels.
+const FACE_SAMPLER: Sampler = gfx::sampler(Filter::Linear, MipFilter::Linear, Address::Clamp, Address::Clamp);
+/// The baked cube: clamped, filtered, one level.
+const CUBE_SAMPLER: Sampler = gfx::sampler(Filter::Linear, MipFilter::None, Address::Clamp, Address::Clamp);
+/// The fine detail's volume: wrapping, filtered through its chain.
+const FINE_SAMPLER: Sampler = Sampler {
+    min: Filter::Linear,
+    mag: Filter::Linear,
+    mip: MipFilter::Linear,
+    address_u: Address::Wrap,
+    address_v: Address::Wrap,
+    address_w: Address::Wrap,
+    anisotropy: 1,
+    srgb: false,
+};
 
 /// The view's projection with its far plane moved out to `far`, as the engine's CPU
 /// projection is while it draws the background (the device's keeps the scene's far
@@ -197,7 +204,6 @@ fn view_with(v: &View, proj: M4) -> View {
         rs: v.rs,
         main: v.main,
         rect: v.rect,
-        dev: v.dev,
         st3d: v.st3d,
         view: v.view,
         proj,
@@ -208,6 +214,28 @@ fn view_with(v: &View, proj: M4) -> View {
 }
 
 impl Sky {
+    /// The pipeline `which` (`P_*`), with `cull` for the stock faces. All draw into the
+    /// view: the sky and its faces with no depth, no blending; the sprites added and
+    /// depth-tested; the tunnel over what is there (premultiplied).
+    fn pipe(&mut self, which: u64, cull: Cull) -> Option<Pipeline> {
+        self.pipes.view(which * 4 + cull as u64, || match which {
+            P_DRAW => quad_desc(&PS_DRAW, Format::Unknown),
+            P_DIRECT => quad_desc(&PS_SKY, Format::Unknown),
+            P_FACE => {
+                let mut d = PipelineDesc::new(Code::d3d9(&VS_FACE), Code::d3d9(&PS_FACE), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+                d.cull = cull;
+                d
+            }
+            P_SPRITE => sprites::sprite_desc(&PS_SPRITE),
+            P_FLASH => sprites::sprite_desc(&PS_FLASH),
+            _ => {
+                let mut d = quad_desc(&PS_TUNNEL, Format::Unknown);
+                d.blend = Some(Blend { color: BlendEq { src: Factor::One, dst: Factor::InvSrcAlpha, op: BlendOp::Add }, alpha: None });
+                d
+            }
+        })
+    }
+
     /// The recipe for the map's sky now, looked up again when the name changes, and
     /// re-read every 30 frames from the game directory's file when `Reload=1`.
     fn recipe_now(&mut self, bg: &str) -> Option<&Recipe> {
@@ -238,10 +266,10 @@ impl Sky {
 
     /// The procedural sky: a quad over the viewport carrying the world ray of each
     /// corner, sampling the baked cube (or computing every pixel, `Face=0`). False if
-    /// it cannot draw (the stock faces are drawn instead).
-    fn draw_recipe(&mut self, v: &View, vp: &M4) -> bool {
+    /// it cannot draw (the stock faces are drawn instead). A bake draws into targets of
+    /// its own; `v`'s pass is begun again after it, with the engine's viewport `evp`.
+    fn draw_recipe(&mut self, cmd: &mut Cmd, v: &View, vp: &M4, evp: Option<Viewport>) -> bool {
         let _z = crate::timing::zone("sky: cube");
-        let dev = v.dev;
         let Some(inv) = vp.inverse() else { return false };
         let corner = |x: f32, y: f32| -> [f32; 3] {
             let f = inv.transform([x, y, 1.0, 1.0]);
@@ -256,75 +284,43 @@ impl Sky {
             QuadVert { pos: [-1.0, -1.0, 0.0], ray: corner(-1.0, -1.0) },
             QuadVert { pos: [1.0, -1.0, 0.0], ray: corner(1.0, -1.0) },
         ];
-        if !(self.vs_sky.bind(dev) && self.quad_decl.bind(dev)) {
-            return false;
-        }
         let edge = self.cfg.face;
         let dump = self.cfg.dump;
-        let Some(r) = self.recipe.as_ref() else { return false };
         let direct = edge == 0;
-        if !direct && !self.baker.holds(r, edge) && !self.baker.bake(dev, r, edge, dump) {
+        let Some(pipe) = self.pipe(if direct { P_DIRECT } else { P_DRAW }, Cull::None) else { return false };
+        let Some(r) = self.recipe.as_ref() else { return false };
+        if !direct && !self.baker.holds(r, edge) {
+            let ok = self.baker.bake(cmd, r, edge, dump);
+            gfx::view_pass(cmd, v, evp);
+            if !ok {
+                return false;
+            }
+        }
+        if !cmd.set_pipeline(&pipe) {
             return false;
         }
-        let ps = if direct { &mut self.ps_sky } else { &mut self.ps_draw };
-        if !ps.bind(dev) {
-            return false;
-        }
-        for (st, val) in [
-            (RS_ZENABLE, 0), (RS_ZWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0), (RS_ALPHABLENDENABLE, 0), (RS_FOGENABLE, 0),
-            (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3), (RS_STENCILENABLE, 0), (RS_COLORWRITEENABLE, 0xf),
-            (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0), (152, 0),
-        ] {
-            dev.set_rs(st, val);
-        }
-        dev.ps_const(0, r.floats());
+        cmd.ps_block(Block::new(0, r.floats()));
         if !direct {
-            let cube = self.baker.cube.as_ref().map_or(core::ptr::null_mut(), |c| c.ptr());
-            dev.set_texture(0, cube);
-            for (s, val) in [(SAMP_ADDRESSU, TADDRESS_CLAMP), (SAMP_ADDRESSV, TADDRESS_CLAMP), (SAMP_ADDRESSW, TADDRESS_CLAMP),
-                (SAMP_MAGFILTER, TEXF_LINEAR), (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_NONE), (SAMP_SRGBTEXTURE, 0)] {
-                dev.set_ss(0, s, val);
-            }
-            let fine = if r.k[21][0] != 0.0 { self.baker.fine(dev) } else { None };
+            cmd.bind_texture(0, self.baker.cube.as_ref(), &CUBE_SAMPLER);
+            let fine = if r.k[21][0] != 0.0 { self.baker.fine() } else { None };
             match fine {
-                Some(f) => {
-                    dev.set_texture(1, f);
-                    for (s, val) in [(SAMP_ADDRESSU, TADDRESS_WRAP), (SAMP_ADDRESSV, TADDRESS_WRAP), (SAMP_ADDRESSW, TADDRESS_WRAP),
-                        (SAMP_MAGFILTER, TEXF_LINEAR), (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_LINEAR), (SAMP_SRGBTEXTURE, 0)] {
-                        dev.set_ss(1, s, val);
-                    }
-                }
-                None => {
-                    dev.ps_const(21, &[0.0; 4]); // no detail: exp(0)
-                }
+                Some(f) => cmd.bind_texture(1, Some(&f), &FINE_SAMPLER),
+                None => cmd.ps_block(Block::new(21, &[0.0; 4])), // no detail: exp(0)
             }
         }
-        dev.draw_primitive_up(PT_TRIANGLESTRIP, 2, quad.as_ptr() as *const u8, 24);
-        dev.set_texture(1, core::ptr::null_mut());
+        draw_quad(cmd, &quad);
+        cmd.bind_texture(1, None, &FINE_SAMPLER);
         true
     }
 
     /// The stock sky: the cube SOD's meshes, or the six prefix faces, at the camera,
     /// unlit, depth off.
-    fn draw_stock(&mut self, v: &View, vp: &M4, bg: &str) {
+    fn draw_stock(&mut self, cmd: &mut Cmd, v: &View, vp: &M4, bg: &str) {
         let _z = crate::timing::zone("sky: stock faces");
-        let dev = v.dev;
-        if !(self.vs_face.bind(dev) && self.ps_face.bind(dev) && self.face_decl.bind(dev)) {
+        if !self.pipe(P_FACE, Cull::None).is_some_and(|p| p.ready(gfx::gpu())) {
             return;
         }
-        for (st, val) in [
-            (RS_ZENABLE, 0), (RS_ZWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0), (RS_ALPHABLENDENABLE, 0), (RS_FOGENABLE, 0),
-            (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3), (RS_STENCILENABLE, 0), (RS_COLORWRITEENABLE, 0xf),
-            (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
-        }
-        // The engine clamps every sky texture (`ClampTexturesRecursive`).
-        for (s, val) in [(SAMP_ADDRESSU, TADDRESS_CLAMP), (SAMP_ADDRESSV, TADDRESS_CLAMP), (SAMP_MAGFILTER, TEXF_LINEAR),
-            (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_LINEAR), (SAMP_SRGBTEXTURE, 0)] {
-            dev.set_ss(0, s, val);
-        }
-        dev.ps_const(0, &[1.0, 1.0, 1.0, 0.0]);
+        cmd.ps_block(Block::new(0, &[1.0, 1.0, 1.0, 0.0]));
         // The background instance sits at the camera; its turn and scale are its own.
         let inst = engine::field_m34(0x772068, 0x44);
         let mut world = M34 { r: inst.r, p: v.eye };
@@ -336,7 +332,7 @@ impl Sky {
             log!("sky: background instance axes {:?}", inst.r);
         }
         if bg.contains(".sod") {
-            let Some(model) = scene::model(dev, bg) else { return };
+            let Some(model) = scene::model(bg) else { return };
             let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::looping(v.time), pose::Lod::Forced(usize::MAX));
             for part in model.parts.iter() {
                 if !p.shown.get(part.node).copied().unwrap_or(false) {
@@ -345,34 +341,37 @@ impl Sky {
                 // The engine culls the sky's back faces as any mesh's: `mbg02.sod`
                 // holds two cubes, and only the one wound inwards shows.
                 let mirrored = p.world[part.node].det3() < 0.0;
-                dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CW } else { CULL_CCW });
+                let cull = if part.two_sided { Cull::None } else if mirrored { Cull::Clockwise } else { Cull::CounterClockwise };
+                let Some(pipe) = self.pipe(P_FACE, cull) else { continue };
+                cmd.set_pipeline(&pipe);
                 let wvp = p.world[part.node].to_m4().mul(vp);
-                dev.vs_const(0, wvp.transpose().as_floats());
-                let tex = part.texture.as_deref().and_then(|t| assets::texture(dev, t));
-                dev.set_texture(0, tex.unwrap_or(core::ptr::null_mut()));
-                dev.ps_const(0, &[1.0, 1.0, 1.0, if tex.is_some() { 0.0 } else { 1.0 }]);
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                cmd.vs_block(Block::new(0, wvp.transpose().as_floats()));
+                let tex = part.texture.as_deref().and_then(assets::texture);
+                cmd.bind_texture(0, tex.as_ref(), &FACE_SAMPLER);
+                cmd.ps_block(Block::new(0, &[1.0, 1.0, 1.0, if tex.is_some() { 0.0 } else { 1.0 }]));
                 for g in &part.groups {
-                    dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
+                    part.draw(cmd, g.start, g.tris);
                 }
             }
         } else {
+            let Some(pipe) = self.pipe(P_FACE, Cull::CounterClockwise) else { return };
+            cmd.set_pipeline(&pipe);
             let wvp = world.to_m4().mul(vp);
-            dev.vs_const(0, wvp.transpose().as_floats());
-            dev.set_rs(RS_CULLMODE, CULL_CCW);
+            cmd.vs_block(Block::new(0, wvp.transpose().as_floats()));
             let uv = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
             for (i, face) in PREFIX_FACES.iter().enumerate() {
                 let mut name = String::from(bg);
                 name.push((b'0' + i as u8) as char);
-                let tex = assets::texture(dev, &name);
-                dev.set_texture(0, tex.unwrap_or(core::ptr::null_mut()));
-                dev.ps_const(0, &[1.0, 1.0, 1.0, if tex.is_some() { 0.0 } else { 1.0 }]);
+                let tex = assets::texture(&name);
+                cmd.bind_texture(0, tex.as_ref(), &FACE_SAMPLER);
+                cmd.ps_block(Block::new(0, &[1.0, 1.0, 1.0, if tex.is_some() { 0.0 } else { 1.0 }]));
                 let vtx: Vec<scene::Vertex> = [0usize, 1, 2, 0, 2, 3]
                     .iter()
                     .map(|&k| scene::Vertex { pos: face[k], nrm: [0.0; 3], uv: uv[k] })
                     .collect();
-                dev.draw_primitive_up(PT_TRIANGLELIST, 2, vtx.as_ptr() as *const u8, 32);
+                if let Some(s) = cmd.vertices(&vtx) {
+                    cmd.draw(&s);
+                }
             }
         }
     }
@@ -420,7 +419,7 @@ impl Sky {
         if name.is_empty() {
             return false;
         }
-        let Some(model) = scene::model(v.dev, &crate::assets::sod_of(name)) else { return false };
+        let Some(model) = scene::model(&crate::assets::sod_of(name)) else { return false };
         if obj::expired(o) || !obj::can_user_see(o) {
             return true;
         }
@@ -438,18 +437,19 @@ impl Sky {
     /// its sprite nodes into the batch.
     fn draw_background(&mut self, v: &View, model: &scene::Model, p: &pose::Pose) {
         if !model.parts.is_empty() {
-            let _g = gfx::Guard::new(v.dev);
-            if scene::begin(v) {
-                let params = scene::Params::default();
-                // Opaque first, then what blends, all now: the background's depth is
-                // cleared before the scene, so nothing may wait for the flush.
-                for pass in 0..2 {
-                    for (pi, part) in model.parts.iter().enumerate() {
-                        let blended = !matches!(part.blend, scene::Blend::Opaque | scene::Blend::Cutout);
-                        if blended != (pass == 1) || !p.shown.get(part.node).copied().unwrap_or(false) {
-                            continue;
+            if let Some(mut cmd) = gfx::cmd() {
+                if scene::begin(&mut cmd, v) {
+                    let params = scene::Params::default();
+                    // Opaque first, then what blends, all now: the background's depth is
+                    // cleared before the scene, so nothing may wait for the flush.
+                    for pass in 0..2 {
+                        for (pi, part) in model.parts.iter().enumerate() {
+                            let blended = !matches!(part.blend, scene::Blend::Opaque | scene::Blend::Cutout);
+                            if blended != (pass == 1) || !p.shown.get(part.node).copied().unwrap_or(false) {
+                                continue;
+                            }
+                            scene::draw_part(&mut cmd, v, model, pi, &p.world[part.node], &params);
                         }
-                        scene::draw_part(v, &model, pi, &p.world[part.node], &params);
                     }
                 }
             }
@@ -467,49 +467,60 @@ impl Sky {
         }
     }
 
+    /// The only colour clear of the view stock makes: black over the view where no sky
+    /// is; the engine's viewport `evp` is put back after.
+    fn clear(cmd: &mut Cmd, v: &View, evp: Option<Viewport>) {
+        let r = v.rect;
+        cmd.clear_rects(&[Rect::new(r.x, r.y, r.w, r.h)], Some([0.0, 0.0, 0.0, 1.0]), None);
+        if let Some(vp) = evp {
+            cmd.set_viewport(&vp);
+        }
+    }
+
     /// The menu scene's sky (`crate::menu`): its recipe turned by the orbit, its stars,
     /// its sun. Drawn about the eye, so the sky's own view has no translation; nothing
     /// writes depth.
     fn menu_sky(&mut self, shot: &crate::menu::Shot, v: &View) {
-        let dev = v.dev;
         let far = shot.sun.as_ref().map_or(1.0e4, |s| s.2) * 2.0;
         let mut rot = v.view;
         rot.0[3] = [0.0, 0.0, 0.0, 1.0];
         let a = crate::frame::steps::View { view: shot.sky_turn.to_m4().mul(&rot), proj: with_far(&v.proj, far), eye: V3::ZERO, ..*v };
         let vp = a.view.mul(&a.proj);
-        let _g = gfx::Guard::new(dev);
-        dev.set_stream_freq(0, 1);
-        let r = v.rect;
-        let rc = Rect { left: r.x as i32, top: r.y as i32, right: (r.x + r.w) as i32, bottom: (r.y + r.h) as i32 };
-        dev.clear(&[rc], CLEAR_TARGET, 0xff00_0000, 1.0, 0);
-        if self.cfg.recipes && self.recipe_now(&shot.sky).is_some() {
-            self.draw_recipe(&a, &vp);
-        }
-        // The stars, in the sky's frame.
-        let star = |n: &str| sprites::sprite_info(n);
-        if let (Some(small), Some(big)) = (star("bstar.0"), star("mstar.0")) {
-            let (right, up) = sprites::camera_axes(&a.view);
-            let d = far * 0.25;
-            let lift = self.cfg.star_lift;
-            for &(dir, size, b) in &shot.stars {
-                let info = if b > 0.7 { &big } else { &small };
-                let h = size * d;
-                self.batch.billboard(info, dir * d, right, up, h, h, [b, b, b, if b > 0.7 { lift } else { 0.0 }]);
+        {
+            let Some(mut cmd) = gfx::cmd() else { return };
+            let evp = gfx::gpu().engine_viewport();
+            Self::clear(&mut cmd, v, evp);
+            if self.cfg.recipes && self.recipe_now(&shot.sky).is_some() {
+                self.draw_recipe(&mut cmd, &a, &vp, evp);
             }
-            self.draw_batch(&a, &vp);
+            // The stars, in the sky's frame.
+            let star = |n: &str| sprites::sprite_info(n);
+            if let (Some(small), Some(big)) = (star("bstar.0"), star("mstar.0")) {
+                let (right, up) = sprites::camera_axes(&a.view);
+                let d = far * 0.25;
+                let lift = self.cfg.star_lift;
+                for &(dir, size, b) in &shot.stars {
+                    let info = if b > 0.7 { &big } else { &small };
+                    let h = size * d;
+                    self.batch.billboard(info, dir * d, right, up, h, h, [b, b, b, if b > 0.7 { lift } else { 0.0 }]);
+                }
+                self.draw_batch(&mut cmd, &vp);
+            }
         }
         // The sun: a background object's SOD and its flare, where the light comes from.
         if let Some((odf, dir, dist)) = &shot.sun {
             let b = crate::frame::steps::View { view: rot, ..a };
             let bvp = b.view.mul(&b.proj);
-            if let Some(model) = scene::model(dev, &assets::sod_of(odf)) {
+            if let Some(model) = scene::model(&assets::sod_of(odf)) {
                 let s = self.scale_sod(odf);
                 let mut world = M34::IDENTITY;
                 world.r = [world.r[0] * s, world.r[1] * s, world.r[2] * s];
                 world.p = *dir * *dist;
                 let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::looping(v.time), pose::Lod::Forced(usize::MAX));
                 self.draw_background(&b, &model, &p);
-                self.draw_batch(&b, &bvp);
+                if let Some(mut cmd) = gfx::cmd() {
+                    self.draw_batch(&mut cmd, &bvp);
+                }
             }
         }
     }
@@ -518,27 +529,22 @@ impl Sky {
     /// gone to warp (the stock `warp_sprite`, depth-tested against the hulls), then
     /// the tunnel over the whole view (`tunnel_ps`), which darkens what is under it.
     fn menu_warp(&mut self, shot: &crate::menu::Shot, v: &View) {
-        let dev = v.dev;
         let vp = v.view.mul(&v.proj);
         let flashes = crate::menu::take_flashes();
         if !flashes.is_empty()
             && let Some(info) = sprites::sprite_info("warp_sprite")
         {
             let (right, up) = sprites::camera_axes(&v.view);
-            let _g = gfx::Guard::new(dev);
-            dev.set_stream_freq(0, 1);
             for (at, half, bright) in flashes {
                 self.batch.billboard(&info, at, right, up, half, half, [bright, bright, bright, 1.0]);
             }
             // The sprite shader with the fade to its edge (`flash_ps`): the art's halo
             // reaches its border, which showed as a box at the menu's brightness.
-            if self.vs_spr.bind(dev) && self.ps_flash.bind(dev) && self.spr_decl.bind(dev) {
-                dev.ps_const(32, &info.uv);
-                for (st, val) in [(RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
-                    (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_SRGBWRITEENABLE, 0)] {
-                    dev.set_rs(st, val);
+            if let (Some(mut cmd), Some(pipe)) = (gfx::cmd(), self.pipe(P_FLASH, Cull::None)) {
+                if pipe.ready(gfx::gpu()) {
+                    cmd.ps_block(Block::new(32, &info.uv));
+                    self.batch.draw(&mut cmd, &pipe, &vp);
                 }
-                self.batch.draw(dev, &vp);
             }
         }
         let Some(tn) = shot.tunnel else { return };
@@ -556,18 +562,10 @@ impl Sky {
             QuadVert { pos: [-1.0, -1.0, 0.0], ray: corner(-1.0, -1.0) },
             QuadVert { pos: [1.0, -1.0, 0.0], ray: corner(1.0, -1.0) },
         ];
-        let _g = gfx::Guard::new(dev);
-        dev.set_stream_freq(0, 1);
-        if !(self.vs_sky.bind(dev) && self.ps_tunnel.bind(dev) && self.quad_decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let Some(pipe) = self.pipe(P_TUNNEL, Cull::None) else { return };
+        if !cmd.set_pipeline(&pipe) {
             return;
-        }
-        for (st, val) in [
-            (RS_ZENABLE, 0), (RS_ZWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0), (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE),
-            (RS_FILLMODE, 3), (RS_STENCILENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_INVSRCALPHA), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
         }
         // The camera's axes in world space: the rows of the view's rotation, transposed.
         let m = &v.view.0;
@@ -582,27 +580,21 @@ impl Sky {
             up.x, up.y, up.z, 0.0,
             c.x, c.y, c.z, 0.0,
         ];
-        dev.ps_const(27, &k);
-        dev.draw_primitive_up(PT_TRIANGLESTRIP, 2, quad.as_ptr() as *const u8, 24);
+        cmd.ps_block(Block::new(27, &k));
+        draw_quad(&mut cmd, &quad);
     }
 
-    fn draw_batch(&mut self, v: &View, vp: &M4) {
+    /// The batch's sprites, added and depth-tested.
+    fn draw_batch(&mut self, cmd: &mut Cmd, vp: &M4) {
         let _z = crate::timing::zone("sky: sprite batch");
         if self.batch.is_empty() {
             return;
         }
-        let dev = v.dev;
-        if !(self.vs_spr.bind(dev) && self.ps_spr.bind(dev) && self.spr_decl.bind(dev)) {
+        let Some(pipe) = self.pipe(P_SPRITE, Cull::None) else { return };
+        if !pipe.ready(gfx::gpu()) {
             return;
         }
-        dev.set_rs(RS_ZENABLE, 1);
-        dev.set_rs(RS_ZFUNC, CMP_LESSEQUAL);
-        dev.set_rs(RS_FOGENABLE, 0);
-        dev.set_rs(RS_STENCILENABLE, 0);
-        dev.set_rs(RS_SCISSORTESTENABLE, 0);
-        dev.set_rs(RS_COLORWRITEENABLE, 0xf);
-        dev.set_rs(RS_SRGBWRITEENABLE, 0);
-        self.batch.draw(dev, vp);
+        self.batch.draw(cmd, &pipe, vp);
     }
 }
 
@@ -631,7 +623,6 @@ impl Module for Sky {
         if s != Step::Background {
             return false;
         }
-        let dev = v.dev;
         let cam = v.cam;
         // Render3D.ini's [Sky] is read again every 60 views, for tuning live.
         self.tick = self.tick.wrapping_add(1);
@@ -656,27 +647,24 @@ impl Module for Sky {
         unsafe { set_far(cam, star_far) };
         let vf = view_with(v, with_far(&v.proj, star_far));
         let vp = vf.view.mul(&vf.proj);
-        {
-            let _g = gfx::Guard::new(dev);
-            dev.set_stream_freq(0, 1);
+        if let Some(mut cmd) = gfx::cmd() {
+            let cmd = &mut cmd;
+            let evp = gfx::gpu().engine_viewport();
             let bg = unsafe { String::from(rt::cstr_at(BG_NAME as *const u8, 64)) };
             let have_db = unsafe { rd::<usize>(G_BG_DB) } != 0;
             if sky_on && have_db {
                 let recipe = self.cfg.recipes && self.recipe_now(&bg).is_some();
-                if !(recipe && self.draw_recipe(&vf, &vp)) {
-                    self.draw_stock(&vf, &vp, &bg);
+                if !(recipe && self.draw_recipe(cmd, &vf, &vp, evp)) {
+                    self.draw_stock(cmd, &vf, &vp, &bg);
                 }
             } else {
-                // The only colour clear of the view stock makes: black where no sky is.
-                let r = v.rect;
-                let rc = Rect { left: r.x as i32, top: r.y as i32, right: (r.x + r.w) as i32, bottom: (r.y + r.h) as i32 };
-                dev.clear(&[rc], CLEAR_TARGET, 0xff00_0000, 1.0, 0);
+                Self::clear(cmd, v, evp);
             }
             if stars_on && unsafe { rd::<usize>(G_STARFIELD) } != 0 {
                 let lift = self.cfg.star_lift;
                 let _z = crate::timing::zone("sky: stars");
                 self.stars.gather(&mut self.batch, lift);
-                self.draw_batch(&vf, &vp);
+                self.draw_batch(cmd, &vp);
             }
         }
         // The background objects, with depth: each draws itself, or the engine does.
@@ -700,9 +688,8 @@ impl Module for Sky {
                 unsafe { this1(field(engine::vtable(o), SLOT_RENDER * 4), o, cam) };
             }
         }
-        {
-            let _g = gfx::Guard::new(dev);
-            self.draw_batch(&vf, &vp);
+        if let Some(mut cmd) = gfx::cmd() {
+            self.draw_batch(&mut cmd, &vp);
         }
         unsafe {
             let dvt = engine::vtable(v.st3d);

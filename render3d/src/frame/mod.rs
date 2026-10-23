@@ -9,9 +9,12 @@
 //! be made, the stock body runs as it always did.
 //!
 //! The targets and passes are `gpu`'s (gpu/README.md). The scene pass is begun before
-//! the body and left bound while it runs: the engine and the modules not yet ported to
-//! `gpu` draw into it with raw Direct3D 9 calls (a pass's targets stay bound after its
-//! `Cmd` on the Direct3D 9 backend).
+//! the body and left bound while it runs: the engine draws into it with its own calls
+//! (a pass's targets stay bound after its `Cmd` on the Direct3D 9 backend), and the
+//! modules through `gpu`, beginning it again after a pass of their own (`scene_pass`,
+//! `gfx::view_pass`). What this module reads of the engine's device (the d3d9 device
+//! behind d3d8, the view's viewport, the `Reset` and `DestroyRenderSurfaces` hooks) is
+//! the one raw Direct3D 9 left in render3d, glue Display8 will answer itself.
 pub mod post;
 pub mod steps;
 
@@ -82,7 +85,8 @@ fn time_view(main: bool) -> bool {
     }
     match Device::from_d3d8(engine::d3d8_device()) {
         Some(dev) => {
-            timing::begin(dev, main);
+            crate::gfx::gpu().attach(dev);
+            timing::begin(main);
             true
         }
         None => false,
@@ -184,7 +188,7 @@ fn black_lines(r: PRect) {
 /// map) and draws into the view next. False without targets.
 pub fn scene_pass(cmd: &mut gpu::Cmd, r: PRect) -> bool {
     let Some(t) = frame().as_ref().and_then(|f| f.targets.as_ref()) else { return false };
-    let colors = [ColorTarget { texture: &t.scene, load: Load::Load }];
+    let colors = [ColorTarget::new(&t.scene, Load::Load)];
     let depth = Some(DepthTarget { texture: &t.depth, load: Load::Load });
     cmd.begin_pass(&Pass { colors: &colors, depth, area: Some(r.rect()) })
 }
@@ -196,10 +200,17 @@ pub fn scene_formats() -> Option<(Format, u32, Format)> {
     Some((t.fmt, t.samples.max(1), t.depth.desc().format))
 }
 
+/// The scene pass's colour and depth targets: what a module copies the view from, or
+/// resolves its depth from.
+pub fn scene_targets() -> Option<(gpu::Texture, gpu::Texture)> {
+    let t = frame().as_ref()?.targets.as_ref()?;
+    Some((t.scene.clone(), t.depth.clone()))
+}
+
 /// Binds the engine's target and depth again (when the frame has no post passes to).
 fn restore(saved: &Saved) {
     let Some(mut cmd) = gfx::gpu().begin(gfx::frame()) else { return };
-    let colors = [ColorTarget { texture: &saved.rt, load: Load::Load }];
+    let colors = [ColorTarget::new(&saved.rt, Load::Load)];
     let depth = saved.ds.as_ref().map(|d| DepthTarget { texture: d, load: Load::Load });
     cmd.begin_pass(&Pass { colors: &colors, depth, area: None });
 }
@@ -350,7 +361,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
         }
         *f = Some(Frame { dev, post: None, targets: None, failed: None, frames: 0, logged: [None; 3] });
         hook_reset(dev8);
-        crate::mods::device(dev);
+        crate::mods::device();
     }
     let g = gfx::gpu();
     g.attach(dev);
@@ -392,7 +403,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
     // on where nothing draws. The viewport is the engine's again after (`Cmd`'s end).
     let vp = dev.get_viewport();
     let mut cmd = g.begin(gfx::frame())?;
-    let colors = [ColorTarget { texture: &t.scene, load: Load::Clear([0.0, 0.0, 0.0, 1.0]) }];
+    let colors = [ColorTarget::new(&t.scene, Load::Clear([0.0, 0.0, 0.0, 1.0]))];
     let pass = Pass {
         colors: &colors,
         depth: Some(DepthTarget { texture: &t.depth, load: Load::Clear(1.0) }),
@@ -409,7 +420,7 @@ fn begin(cfg: &Config) -> Option<Saved> {
 /// buffer, then the post passes put it there, as a view of the engine's. Called inside
 /// the caller's scene with the back buffer bound; it is bound again after. False, with
 /// nothing drawn, when there is no Direct3D 9 device or no targets.
-pub fn menu_frame(rect: PRect, draw: impl FnOnce(Device, u32)) -> bool {
+pub fn menu_frame(rect: PRect, draw: impl FnOnce(u32)) -> bool {
     let Some(cfg) = config::get() else { return false };
     let Some(dev) = Device::from_d3d8(engine::d3d8_device()) else { return false };
     let vp = dev.get_viewport();
@@ -426,7 +437,7 @@ pub fn menu_frame(rect: PRect, draw: impl FnOnce(Device, u32)) -> bool {
         return false;
     };
     let frames = frame().as_ref().map_or(0, |f| f.frames);
-    draw(dev, frames);
+    draw(frames);
     let Some(f) = frame().as_mut() else { return true };
     if let (Some(t), Some(p)) = (f.targets.as_ref(), f.post.as_ref()) {
         let r = PRect { x: rect.x.min(t.w - 1), y: rect.y.min(t.h - 1), w: rect.w.min(t.w - rect.x.min(t.w - 1)), h: rect.h.min(t.h - rect.y.min(t.h - 1)) };

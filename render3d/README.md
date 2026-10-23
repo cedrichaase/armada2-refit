@@ -92,7 +92,7 @@ card:
    noise is unrolled by vkd3d (a value-noise lookup is 143 slots, a lattice of 27
    craters 3891), and shortening it would change what it draws.
 
-So **a bake longer than 4096 slots is a chain of passes** (`src/gfx/chain.rs`,
+So **a bake longer than 4096 slots is a chain of passes** (`gpu/src/chain.rs`,
 `shaders/chain.hlsli`): each pass works out part of the function at its texel and
 hands it to the next through a float32 target. The sky is the warp, the field, the
 gas, two slabs of the star lattice, and the last slab put together. A planet's height
@@ -321,13 +321,18 @@ glow. The device's state is captured into a state block before the passes and pu
 after, and the engine's own target and depth are bound again, so the engine (and
 d3d8to9, which keeps its own record of what is bound) sees what it left.
 
-**Through `gpu`.** The targets, the scene pass and the passes after it are `gpu`'s
-(`gpu/README.md`), the interface shared with `UI.asi`. The scene pass is begun before
-the body and stays bound while the engine and the modules draw into it with raw
-Direct3D 9 calls; stock's black line along the view's right column and bottom row is
-cleared in it after the body (`frame::black_lines`). The modules are ported one by one
-(`gpu/README.md`, "Porting a render3d module"); until then they draw inside
-`gfx::Guard`, a `gpu` section.
+**Through `gpu`.** Everything render3d draws goes through `gpu` (`gpu/README.md`),
+the interface shared with `UI.asi`: the targets, the scene pass and the passes after
+it, and every module's draws, each through a `gpu::Cmd` (`gfx::cmd()`) with pipelines
+made once per combination of states (`gfx::Pipes`), dynamic geometry in the frame's
+rings, and the scene's models in static buffers. No module calls Direct3D 9; the frame's
+glue in `frame/` still reads the engine's device (its transforms, its viewport, its
+`Reset` and `DestroyRenderSurfaces`), which Display8 will answer itself. The scene pass
+is begun before the body and stays bound while the engine draws into it; a module that
+draws into a target of its own (a bake, the shadow map, the nebulae's march) begins
+the view's pass again after it (`gfx::view_pass`), with the viewport the engine had
+set. Stock's black line along the view's right column and bottom row is cleared in it
+after the body (`frame::black_lines`).
 
 **The first row and column.** DXVK offsets a Direct3D 9 viewport by half a pixel, so
 with MSAA half the samples of the view's first row and column are never drawn. The final pass reads those pixels from their neighbours instead, which does what
@@ -350,7 +355,8 @@ error in Direct3D. Please reboot." from `SetActiveDisplay`). The display change 
 through `ST3D_DeviceDirectX8::DestroyRenderSurfaces` (slot 28 of its vtable, 0x6bc6ac),
 which releases the device in `DestroyDevice`; render3d chains that slot and first lets go
 of everything on the device (`frame::forget`): what a `Reset` drops, the sky's noise
-volume, and the shaders and declarations, which `gfx` keeps in one list for this. The
+volume, and every object `gpu` made (`Gpu::release_device`: it keeps them all in one
+registry for this, and makes each again from its description at its next use). The
 posed hulls of the last views and the ghosts' queue go too: they hold models, and a
 model holds its vertex and index buffers (missing them left 49 of each, and the mission
 did not start). `gpu`'s raw layer (`gpu::d3d9::raw`) keeps a tally of every object made or handed out and not yet
@@ -1367,7 +1373,7 @@ vents (the look settled with the user, and the settings keep its keys, in
   whether it fires or not. The rate is read every frame, for every freighter drawn or
   not.
 - **The look.** Drawn at `Step::Translucent` as one batch per texture and material
-  through a `DynVb`: quads parallel to the image plane, half extents = the sprite node's
+  through the frame's vertex ring: quads parallel to the image plane, half extents = the sprite node's
   size plus growth × age (times the instance's scale), the node data's colour animation
   and the sprite's flipbook on the particle's age, additive. Each particle's colour is
   multiplied by 1 + the emitters its owner showed this frame, which is what stock's

@@ -17,9 +17,9 @@
 //! cloaked hulls, where stock's depth sort puts them.
 use super::look::Look;
 use super::{anim, Posed};
-use gpu::d3d9::raw::*;
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, DynVb, Guard, Shader};
+use crate::gfx::{self, Pipes};
+use gpu::{attr, AttrFormat, Blend, Block, Code, Compare, Depth, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::math::{v3, V3};
 use crate::shaders::hulls::*;
 use crate::assets;
@@ -53,18 +53,14 @@ struct SVert {
     uv: [f32; 2],
 }
 
-static SPRITE_DECL: [VertexElement; 4] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT4, DECLUSAGE_COLOR, 0),
-    ve(0, 28, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
-    VE_END,
+static SPRITE_LAYOUT: [VertexAttr; 3] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float4, Semantic::Color, 0),
+    attr(28, AttrFormat::Float2, Semantic::TexCoord, 0),
 ];
 
 pub struct Sprites {
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
-    vb: DynVb,
+    pipes: Pipes,
 }
 
 fn kind_of(material: &str) -> Kind {
@@ -95,11 +91,7 @@ fn sprite_uv(t: &SpriteTable, sprite: &a2fmt::spr::Sprite, time: f32) -> [f32; 4
 
 impl Sprites {
     pub fn new() -> Sprites {
-        Sprites { vs: Shader::vertex(&VS_SPRITE), ps: Shader::pixel(&PS_SPRITE), decl: Decl::new(&SPRITE_DECL), vb: DynVb::new(64 * 1024) }
-    }
-
-    pub fn reset(&mut self) {
-        self.vb.reset();
+        Sprites { pipes: Pipes::new() }
     }
 
     /// A quad for a sprite node look (`@sprite_node` id) at a node's world matrix.
@@ -187,25 +179,11 @@ impl Sprites {
         if quads.is_empty() {
             return;
         }
-        let dev = v.dev;
-        let _g = Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
-            return;
-        }
-        dev.vs_const(4, &gfx::vp_constants(v));
-        for (s, val) in [
-            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0), (RS_CULLMODE, CULL_NONE),
-            (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_ALPHATESTENABLE, 0),
-        ] {
-            dev.set_rs(s, val);
-        }
-        dev.set_ss(0, SAMP_ADDRESSU, TADDRESS_WRAP);
-        dev.set_ss(0, SAMP_ADDRESSV, TADDRESS_WRAP);
-        dev.set_ss(0, SAMP_MAGFILTER, TEXF_LINEAR);
-        dev.set_ss(0, SAMP_MINFILTER, TEXF_LINEAR);
-        dev.set_ss(0, SAMP_MIPFILTER, TEXF_LINEAR);
-        dev.set_stream_freq(0, 1);
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let pipes: Option<[Pipeline; 3]> = (|| Some([self.pipe(Kind::Add)?, self.pipe(Kind::Cut)?, self.pipe(Kind::Alpha)?]))();
+        let Some(pipes) = pipes.filter(|p| p.iter().all(|p| p.ready(gfx::gpu()))) else { return };
+        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
+        cmd.set_sampler(0, &crate::scene::SAMPLER);
         let mut order: Vec<usize> = (0..quads.len()).collect();
         order.sort_by(|&a, &b| {
             let ka = (quads[a].kind != Kind::Cut) as u8;
@@ -213,45 +191,45 @@ impl Sprites {
             ka.cmp(&kb).then(quads[b].depth.partial_cmp(&quads[a].depth).unwrap_or(core::cmp::Ordering::Equal))
         });
         let mut last_kind = None;
-        let mut last_tex = String::new();
+        let mut last_tex: &str = "";
         for i in order {
             let q = &quads[i];
             if last_kind != Some(q.kind) {
                 last_kind = Some(q.kind);
-                match q.kind {
-                    Kind::Add => {
-                        dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                        dev.set_rs(RS_SRCBLEND, BLEND_ONE);
-                        dev.set_rs(RS_DESTBLEND, BLEND_ONE);
-                        dev.set_rs(RS_ZWRITEENABLE, 0);
-                        dev.ps_const(0, &[1.0, 0.0, 0.0, 0.0]);
-                    }
-                    Kind::Cut => {
-                        dev.set_rs(RS_ALPHABLENDENABLE, 0);
-                        dev.set_rs(RS_ZWRITEENABLE, 1);
-                        dev.ps_const(0, &[1.0, 1.0, 0.0, 0.0]);
-                    }
-                    Kind::Alpha => {
-                        dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                        dev.set_rs(RS_SRCBLEND, BLEND_SRCALPHA);
-                        dev.set_rs(RS_DESTBLEND, BLEND_INVSRCALPHA);
-                        dev.set_rs(RS_ZWRITEENABLE, 0);
-                        dev.ps_const(0, &[1.0, 0.0, 0.0, 0.0]);
-                    }
-                }
+                let (p, k) = match q.kind {
+                    Kind::Add => (&pipes[0], [1.0, 0.0, 0.0, 0.0]),
+                    Kind::Cut => (&pipes[1], [1.0, 1.0, 0.0, 0.0]),
+                    Kind::Alpha => (&pipes[2], [1.0, 0.0, 0.0, 0.0]),
+                };
+                cmd.set_pipeline(p);
+                cmd.ps_block(Block::new(0, &k));
             }
             if q.tex != last_tex {
-                let t = assets::texture(dev, &q.tex).unwrap_or(core::ptr::null_mut());
-                dev.set_texture(0, t);
-                last_tex = q.tex.clone();
+                cmd.bind_texture(0, assets::texture(&q.tex).as_ref(), &crate::scene::SAMPLER);
+                last_tex = &q.tex;
             }
             let vs: [SVert; 6] = {
                 let mk = |k: usize| SVert { pos: [q.corners[k].x, q.corners[k].y, q.corners[k].z], col: q.colour, uv: q.uv[k] };
                 [mk(0), mk(1), mk(2), mk(0), mk(2), mk(3)]
             };
-            if let Some(first) = self.vb.push(dev, &vs, core::mem::size_of::<SVert>() as u32) {
-                dev.draw_primitive(PT_TRIANGLELIST, first, 2);
+            if let Some(s) = cmd.vertices(&vs) {
+                cmd.draw(&s);
             }
         }
+    }
+
+    /// The sprites' pipeline for a kind: depth-tested, no culling; added, cut out
+    /// (by the shader, writing depth) or blended by alpha.
+    fn pipe(&mut self, kind: Kind) -> Option<Pipeline> {
+        self.pipes.view(kind as u64, || {
+            let mut d = PipelineDesc::new(Code::d3d9(&VS_SPRITE), Code::d3d9(&PS_SPRITE), &SPRITE_LAYOUT, 36, Topology::TriangleList, Format::Unknown);
+            d.depth = Depth { test: true, write: kind == Kind::Cut, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.blend = match kind {
+                Kind::Add => Some(Blend::ADD),
+                Kind::Cut => None,
+                Kind::Alpha => Some(Blend::ALPHA),
+            };
+            d
+        })
     }
 }

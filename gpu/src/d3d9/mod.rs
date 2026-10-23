@@ -250,12 +250,6 @@ impl Gpu {
         Some(d)
     }
 
-    /// **Transitional**: the raw device, for code not yet ported to the interface
-    /// (render3d's modules). Its draws go between `Cmd`s, inside a `Section`.
-    pub fn device(&self) -> Option<Dev> {
-        self.dev.get()
-    }
-
     /// Before the device's `Reset`: everything in the default pool is let go of.
     pub fn before_reset(&self) {
         self.sweep(false);
@@ -296,13 +290,9 @@ impl Gpu {
 
     // -- sections --
 
-    /// **Transitional**: a section of raw Direct3D 9 drawing. The engine's state is
-    /// captured now and put back when the section is dropped. Sections nest, each
-    /// depth with its own block.
-    pub fn section(&self) -> Section<'_> {
-        Section { gpu: self, at: self.enter() }
-    }
-
+    /// A section: the engine's state is captured now (a `Cmd`'s first command that
+    /// changes any) and put back at `leave` (the `Cmd`'s end). Sections nest (a `Cmd`
+    /// begun while another records), each depth with its own block.
     fn enter(&self) -> Option<usize> {
         let dev = self.dev.get()?;
         let d = self.depth.get();
@@ -365,6 +355,7 @@ impl Gpu {
             dirty: Cell::new(false),
             obj: RefCell::new(None),
             failed: Cell::new(0),
+            spent: Cell::new(false),
         });
         self.register(Rc::downgrade(&t) as Weak<dyn Sweep>);
         Texture(t)
@@ -376,8 +367,9 @@ impl Gpu {
             external: true,
             contents: RefCell::new(Contents::None),
             dirty: Cell::new(false),
-            obj: RefCell::new(Some(TexObj { epoch: self.epoch.get(), tex, surf, managed: false })),
+            obj: RefCell::new(Some(TexObj { epoch: self.epoch.get(), tex, surf, faces: Vec::new(), managed: false })),
             failed: Cell::new(0),
+            spent: Cell::new(false),
         });
         self.register(Rc::downgrade(&t) as Weak<dyn Sweep>);
         Texture(t)
@@ -394,6 +386,8 @@ impl Gpu {
             format: format_of(d.format),
             samples: 1,
             usage: Usage::SAMPLED,
+            kind: TextureKind::D2,
+            depth: 1,
         };
         let surf = tex.tex_surface(0).unwrap_or(Com::NULL);
         self.wrap(desc, tex, surf)
@@ -411,6 +405,8 @@ impl Gpu {
             format: format_of(d.format),
             samples: d.ms_type.max(1),
             usage,
+            kind: TextureKind::D2,
+            depth: 1,
         };
         self.wrap(desc, Com::NULL, surf)
     }
@@ -430,9 +426,33 @@ impl Gpu {
     /// A buffer of `desc`; a static one is filled with `data` (kept, to be made again
     /// after the device is lost).
     pub fn buffer(&self, desc: BufferDesc, data: &[u8]) -> Buffer {
-        let b = Rc::new(BufInner { desc, contents: data.into(), obj: RefCell::new(None), failed: Cell::new(0) });
+        let b = Rc::new(BufInner { desc, contents: RefCell::new(data.into()), transient: false, obj: RefCell::new(None), failed: Cell::new(0) });
         self.register(Rc::downgrade(&b) as Weak<dyn Sweep>);
         Buffer(b)
+    }
+
+    /// A static buffer filled with `data` and made at once, keeping no copy of it (as
+    /// `Contents::Transient`): after the device is lost it cannot be made again and
+    /// draws nothing; its owner makes another.
+    pub fn buffer_transient(&self, desc: BufferDesc, data: &[u8]) -> Buffer {
+        let b = Rc::new(BufInner { desc, contents: RefCell::new(data.into()), transient: true, obj: RefCell::new(None), failed: Cell::new(0) });
+        self.register(Rc::downgrade(&b) as Weak<dyn Sweep>);
+        b.com(self);
+        Buffer(b)
+    }
+
+    /// A set of `n` GPU timestamps (`Timer`), made on the device at its first use.
+    pub fn timer(&self, n: usize) -> Timer {
+        let t = Rc::new(TimerInner { n, obj: RefCell::new(None), failed: Cell::new(0) });
+        self.register(Rc::downgrade(&t) as Weak<dyn Sweep>);
+        Timer(t)
+    }
+
+    /// The viewport the engine has set: what a pass of ours over the engine's view
+    /// puts back. (Display8 will know it from its own record of the engine's calls.)
+    pub fn engine_viewport(&self) -> Option<Viewport> {
+        let v = self.dev.get()?.get_viewport();
+        Some(Viewport { x: v.x, y: v.y, w: v.w, h: v.h, min_z: v.min_z, max_z: v.max_z })
     }
 
     /// A pipeline of `desc`, made on the device at its first use (`Pipeline::ready`).
@@ -447,14 +467,19 @@ impl Gpu {
     /// Starts recording into `frame`. None without a device.
     pub fn begin<'a>(&'a self, frame: &'a mut Frame) -> Option<Cmd<'a>> {
         let dev = self.dev.get()?;
-        Some(Cmd { gpu: self, frame, dev, captured: false, at: None, size: (0, 0), pipe: None, samplers: [None; 16] })
+        Some(Cmd { gpu: self, frame, dev, captured: false, at: None, size: (0, 0), pipe: None, bound: None, samplers: [None; 16] })
     }
 
     /// Reads `tex` (a colour target) back: `f` sees its texels. A multisampled one is
     /// resolved into a plain target first. Changes nothing of the device's state.
     pub fn read_back<R>(&self, tex: &Texture, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
+        self.read_back_layer(tex, 0, f)
+    }
+
+    /// `read_back` of face `layer` of a cube target.
+    pub fn read_back_layer<R>(&self, tex: &Texture, layer: u32, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
         let dev = self.dev.get().ok_or("no device")?;
-        let src = tex.0.surf(self);
+        let src = tex.0.surf_layer(self, layer);
         if src.is_null() {
             return Err("the target is not made");
         }
@@ -510,20 +535,6 @@ impl Gpu {
     }
 }
 
-/// A section of raw drawing (`Gpu::section`): the engine's state is put back on drop.
-pub struct Section<'a> {
-    gpu: &'a Gpu,
-    at: Option<usize>,
-}
-
-impl Drop for Section<'_> {
-    fn drop(&mut self) {
-        if let Some(d) = self.at {
-            self.gpu.leave(d);
-        }
-    }
-}
-
 // ---- textures -------------------------------------------------------------------------
 
 /// A texture: sampled, a target, or both. Clones share it. Valid until the last clone
@@ -541,14 +552,19 @@ struct TexInner {
     obj: RefCell<Option<TexObj>>,
     /// The epoch in which making it failed (not tried again in it).
     failed: Cell<u32>,
+    /// Its `Transient` contents were let go of: it cannot be made again.
+    spent: Cell<bool>,
 }
 
 struct TexObj {
     epoch: u32,
     /// The texture (null for a multisampled target or a depth surface).
     tex: Com,
-    /// Its first level's surface (null for a texture that is only sampled).
+    /// Its first level's surface (null for a texture that is only sampled); a cube
+    /// target's first face.
     surf: Com,
+    /// A cube target's faces' first levels, in order.
+    faces: Vec<Com>,
     /// In the managed pool: survives a `Reset`.
     managed: bool,
 }
@@ -567,7 +583,7 @@ impl Sweep for TexInner {
 fn fill(tex: &Com, desc: &TextureDesc, data: &[u8]) -> bool {
     let bpp = desc.format.bytes().unwrap_or(4);
     let mut at = 0usize;
-    for i in 0..desc.levels {
+    for i in 0..desc.level_count() {
         let lw = (desc.width >> i).max(1) as usize;
         let lh = (desc.height >> i).max(1) as usize;
         let row = lw * bpp;
@@ -585,20 +601,85 @@ fn fill(tex: &Com, desc: &TextureDesc, data: &[u8]) -> bool {
     true
 }
 
+/// A cube's faces, each with its levels, into a locked cube texture.
+fn fill_cube(tex: &Com, desc: &TextureDesc, data: &[u8]) -> bool {
+    let bpp = desc.format.bytes().unwrap_or(4);
+    let mut at = 0usize;
+    for f in 0..6 {
+        for i in 0..desc.level_count() {
+            let lw = (desc.width >> i).max(1) as usize;
+            let row = lw * bpp;
+            let Some(lr) = tex.cube_lock(f, i, 0) else { return false };
+            for y in 0..lw {
+                let s = at + y * row;
+                if data.len() < s + row {
+                    break;
+                }
+                unsafe { core::ptr::copy_nonoverlapping(data[s..].as_ptr(), lr.bits.add(y * lr.pitch as usize), row) };
+            }
+            tex.cube_unlock(f, i);
+            at += row * lw;
+        }
+    }
+    true
+}
+
+/// A volume's levels, each its slices in order, into a locked volume texture.
+fn fill_volume(tex: &Com, desc: &TextureDesc, data: &[u8]) -> bool {
+    let bpp = desc.format.bytes().unwrap_or(4);
+    let mut at = 0usize;
+    for i in 0..desc.level_count() {
+        let lw = (desc.width >> i).max(1) as usize;
+        let lh = (desc.height >> i).max(1) as usize;
+        let ld = (desc.depth >> i).max(1) as usize;
+        let row = lw * bpp;
+        let Some(b) = tex.vol_lock(i, 0) else { return false };
+        for z in 0..ld {
+            for y in 0..lh {
+                let s = at + (z * lh + y) * row;
+                if data.len() < s + row {
+                    break;
+                }
+                unsafe {
+                    core::ptr::copy_nonoverlapping(data[s..].as_ptr(), b.bits.add(z * b.slice_pitch as usize + y * b.row_pitch as usize), row)
+                };
+            }
+        }
+        tex.vol_unlock(i);
+        at += row * lh * ld;
+    }
+    true
+}
+
 impl TexInner {
     fn make(&self, dev: Dev, epoch: u32) -> Option<TexObj> {
+        let d = &self.desc;
+        match d.kind {
+            TextureKind::D2 => self.make_2d(dev, epoch),
+            TextureKind::Cube => self.make_cube(dev, epoch),
+            TextureKind::D3 => self.make_volume(dev, epoch),
+        }
+    }
+
+    fn make_2d(&self, dev: Dev, epoch: u32) -> Option<TexObj> {
         let d = &self.desc;
         let fmt = format_code(d.format);
         let ms = if d.samples > 1 { d.samples } else { MS_NONE };
         let contents = self.contents.borrow();
         let data = contents.bytes();
-        let (tex, surf, managed) = if d.usage.has(Usage::DEPTH) {
+        let (tex, surf, managed) = if d.usage.has(Usage::DEPTH) && d.usage.has(Usage::SAMPLED) {
+            // A depth texture shaders read: the vendors' INTZ (`Cmd::resolve_depth`).
+            let t = dev.create_texture(d.width, d.height, 1, USAGE_DEPTHSTENCIL, FMT_INTZ, POOL_DEFAULT)?;
+            let s = t.tex_surface(0)?;
+            (t, s, false)
+        } else if d.usage.has(Usage::DEPTH) {
             (Com::NULL, dev.create_depth_stencil(d.width, d.height, fmt, ms)?, false)
         } else if d.usage.has(Usage::RENDER_TARGET) {
             if ms != MS_NONE {
                 (Com::NULL, dev.create_render_target(d.width, d.height, fmt, ms, false)?, false)
             } else {
-                let t = dev.create_texture(d.width, d.height, d.levels, USAGE_RENDERTARGET, fmt, POOL_DEFAULT)?;
+                let usage = USAGE_RENDERTARGET | if d.usage.has(Usage::GEN_MIPS) { USAGE_AUTOGENMIPMAP } else { 0 };
+                let t = dev.create_texture(d.width, d.height, d.levels, usage, fmt, POOL_DEFAULT)?;
                 let s = t.tex_surface(0)?;
                 (t, s, false)
             }
@@ -625,7 +706,60 @@ impl TexInner {
             }
             (t, Com::NULL, false)
         };
-        Some(TexObj { epoch, tex, surf, managed })
+        Some(TexObj { epoch, tex, surf, faces: Vec::new(), managed })
+    }
+
+    fn make_cube(&self, dev: Dev, epoch: u32) -> Option<TexObj> {
+        let d = &self.desc;
+        let fmt = format_code(d.format);
+        if d.usage.has(Usage::RENDER_TARGET) {
+            let usage = USAGE_RENDERTARGET | if d.usage.has(Usage::GEN_MIPS) { USAGE_AUTOGENMIPMAP } else { 0 };
+            let t = dev.create_cube_texture(d.width, d.levels, usage, fmt, POOL_DEFAULT)?;
+            let mut faces = Vec::with_capacity(6);
+            for f in 0..6 {
+                faces.push(t.cube_surface(f, 0)?);
+            }
+            let surf = Com::from_borrowed(faces[0].ptr());
+            return Some(TexObj { epoch, tex: t, surf, faces, managed: false });
+        }
+        let contents = self.contents.borrow();
+        let data = contents.bytes();
+        let t = if data.is_empty() {
+            dev.create_cube_texture(d.width, d.levels, 0, fmt, POOL_DEFAULT)?
+        } else {
+            let stage = dev.create_cube_texture(d.width, d.levels, 0, fmt, POOL_SYSTEMMEM)?;
+            if !fill_cube(&stage, d, data) {
+                return None;
+            }
+            let t = dev.create_cube_texture(d.width, d.levels, 0, fmt, POOL_DEFAULT)?;
+            if dev.update_texture(&stage, &t) < 0 {
+                return None;
+            }
+            t
+        };
+        Some(TexObj { epoch, tex: t, surf: Com::NULL, faces: Vec::new(), managed: false })
+    }
+
+    fn make_volume(&self, dev: Dev, epoch: u32) -> Option<TexObj> {
+        let d = &self.desc;
+        let fmt = format_code(d.format);
+        let contents = self.contents.borrow();
+        let data = contents.bytes();
+        let t = if data.is_empty() {
+            dev.create_volume_texture(d.width, d.height, d.depth, d.levels, 0, fmt, POOL_DEFAULT)?
+        } else {
+            // As a 2D texture filled once: the default pool through a system-memory copy.
+            let stage = dev.create_volume_texture(d.width, d.height, d.depth, d.levels, 0, fmt, POOL_SYSTEMMEM)?;
+            if !fill_volume(&stage, d, data) {
+                return None;
+            }
+            let t = dev.create_volume_texture(d.width, d.height, d.depth, d.levels, 0, fmt, POOL_DEFAULT)?;
+            if dev.update_texture(&stage, &t) < 0 {
+                return None;
+            }
+            t
+        };
+        Some(TexObj { epoch, tex: t, surf: Com::NULL, faces: Vec::new(), managed: false })
     }
 
     /// Made on the current device (and its contents copied if they changed); false if
@@ -635,13 +769,18 @@ impl TexInner {
         let ep = gpu.epoch.get();
         if self.obj.borrow().as_ref().is_none_or(|o| o.epoch != ep) {
             *self.obj.borrow_mut() = None;
-            if self.external || self.failed.get() == ep {
+            if self.external || self.failed.get() == ep || self.spent.get() {
                 return false;
             }
             match self.make(dev, ep) {
                 Some(o) => {
                     *self.obj.borrow_mut() = Some(o);
                     self.dirty.set(false);
+                    let mut c = self.contents.borrow_mut();
+                    if matches!(*c, Contents::Transient(_)) {
+                        *c = Contents::None;
+                        self.spent.set(true);
+                    }
                 }
                 None => {
                     self.failed.set(ep);
@@ -674,6 +813,19 @@ impl TexInner {
             return null_mut();
         }
         self.obj.borrow().as_ref().map_or(null_mut(), |o| o.surf.ptr())
+    }
+
+    /// The surface of face `layer` of a cube target (the first level's surface of
+    /// anything else).
+    fn surf_layer(&self, gpu: &Gpu, layer: u32) -> *mut c_void {
+        if !self.realize(gpu) {
+            return null_mut();
+        }
+        self.obj.borrow().as_ref().map_or(null_mut(), |o| match o.faces.get(layer as usize) {
+            Some(f) => f.ptr(),
+            None if layer == 0 => o.surf.ptr(),
+            None => null_mut(),
+        })
     }
 }
 
@@ -711,19 +863,119 @@ impl Texture {
         self.0.dirty.set(true);
     }
 
-    /// **Transitional**: the Direct3D 9 texture (null when it has none or cannot be made).
-    pub fn raw_texture(&self, gpu: &Gpu) -> *mut c_void {
-        self.0.tex(gpu)
-    }
-
-    /// **Transitional**: the Direct3D 9 surface of a target (null as above).
-    pub fn raw_surface(&self, gpu: &Gpu) -> *mut c_void {
-        self.0.surf(gpu)
-    }
-
     /// Whether two handles are the same texture.
     pub fn same(&self, o: &Texture) -> bool {
         Rc::ptr_eq(&self.0, &o.0)
+    }
+}
+
+// ---- timestamps -----------------------------------------------------------------------
+
+/// A set of GPU timestamps (`Gpu::timer`): `begin`, `stamp` each mark, `end`, then
+/// `read` it a few frames later. On Direct3D 9 a disjoint and a frequency query around
+/// `n` timestamp queries; on Vulkan a timestamp query pool (reset at `begin`, written
+/// by `vkCmdWriteTimestamp`, the frequency from `timestampPeriod`, never disjoint); on
+/// Direct3D 12 a timestamp query heap resolved into a buffer, the frequency the
+/// queue's. Clones share it.
+#[derive(Clone)]
+pub struct Timer(Rc<TimerInner>);
+
+struct TimerInner {
+    n: usize,
+    obj: RefCell<Option<(u32, Com, Com, Vec<Com>)>>,
+    failed: Cell<u32>,
+}
+
+impl Sweep for TimerInner {
+    fn release(&self, _all: bool) {
+        // Queries do not outlive a `Reset`.
+        *self.obj.borrow_mut() = None;
+    }
+}
+
+/// What a finished `Timer` holds besides its stamps.
+#[derive(Clone, Copy, Debug)]
+pub struct TimerResult {
+    /// The GPU's clock changed in between: the stamps mean nothing.
+    pub disjoint: bool,
+    /// Ticks per second.
+    pub frequency: u64,
+}
+
+impl TimerInner {
+    fn with<R>(&self, gpu: &Gpu, f: impl FnOnce(&Com, &Com, &[Com]) -> R) -> Option<R> {
+        let dev = gpu.dev.get()?;
+        let ep = gpu.epoch.get();
+        if self.obj.borrow().as_ref().is_none_or(|o| o.0 != ep) {
+            *self.obj.borrow_mut() = None;
+            if self.failed.get() == ep {
+                return None;
+            }
+            let made = (|| {
+                let d = dev.create_query(QUERYTYPE_TIMESTAMPDISJOINT)?;
+                let fr = dev.create_query(QUERYTYPE_TIMESTAMPFREQ)?;
+                let mut s = Vec::with_capacity(self.n);
+                for _ in 0..self.n {
+                    s.push(dev.create_query(QUERYTYPE_TIMESTAMP)?);
+                }
+                Some((ep, d, fr, s))
+            })();
+            match made {
+                Some(o) => *self.obj.borrow_mut() = Some(o),
+                None => {
+                    self.failed.set(ep);
+                    return None;
+                }
+            }
+        }
+        let o = self.obj.borrow();
+        let o = o.as_ref()?;
+        Some(f(&o.1, &o.2, &o.3))
+    }
+}
+
+impl Timer {
+    /// Starts a run of stamps; false when the device makes no timestamp queries.
+    pub fn begin(&self, gpu: &Gpu) -> bool {
+        self.0.with(gpu, |d, _, _| d.query_issue(ISSUE_BEGIN)).is_some()
+    }
+
+    /// Stamp `i` (0..n): the time the GPU gets here.
+    pub fn stamp(&self, gpu: &Gpu, i: usize) {
+        self.0.with(gpu, |_, _, s| {
+            if let Some(q) = s.get(i) {
+                q.query_issue(ISSUE_END);
+            }
+        });
+    }
+
+    /// Ends the run.
+    pub fn end(&self, gpu: &Gpu) {
+        self.0.with(gpu, |d, f, _| {
+            d.query_issue(ISSUE_END);
+            f.query_issue(ISSUE_END);
+        });
+    }
+
+    /// The first `out.len()` stamps of the last run, without waiting: None while the
+    /// GPU has not finished it (or the queries were lost with the device).
+    pub fn read(&self, gpu: &Gpu, out: &mut [u64]) -> Option<TimerResult> {
+        self.0.with(gpu, |d, f, s| {
+            let mut disjoint: u32 = 0;
+            let mut frequency: u64 = 0;
+            if d.query_data(&mut disjoint as *mut u32 as *mut u8, 4, 0) != 0 {
+                return None;
+            }
+            if f.query_data(&mut frequency as *mut u64 as *mut u8, 8, 0) != 0 {
+                return None;
+            }
+            for (i, t) in out.iter_mut().enumerate() {
+                if s.get(i)?.query_data(t as *mut u64 as *mut u8, 8, 0) != 0 {
+                    return None;
+                }
+            }
+            Some(TimerResult { disjoint: disjoint != 0, frequency })
+        })?
     }
 }
 
@@ -735,7 +987,9 @@ pub struct Buffer(Rc<BufInner>);
 
 struct BufInner {
     desc: BufferDesc,
-    contents: Vec<u8>,
+    contents: RefCell<Vec<u8>>,
+    /// The contents are let go of once it is made (`Gpu::buffer_transient`).
+    transient: bool,
     obj: RefCell<Option<(u32, Com)>>,
     failed: Cell<u32>,
 }
@@ -761,6 +1015,10 @@ impl BufInner {
             return null_mut();
         }
         let d = &self.desc;
+        if self.transient && self.contents.borrow().is_empty() && d.size > 0 {
+            // Its contents went with the device it was made on.
+            return null_mut();
+        }
         let usage = if d.dynamic { USAGE_DYNAMIC | USAGE_WRITEONLY } else { USAGE_WRITEONLY };
         let n = d.size.max(4);
         let made = match d.kind {
@@ -769,12 +1027,13 @@ impl BufInner {
             BufferKind::Index32 => dev.create_index_buffer(n, usage, FMT_INDEX32, POOL_DEFAULT),
         };
         let made = made.filter(|b| {
-            if d.dynamic || self.contents.is_empty() {
+            let contents = self.contents.borrow();
+            if d.dynamic || contents.is_empty() {
                 return true;
             }
             let Some(p) = b.buf_lock(0, 0, 0) else { return false };
-            let k = self.contents.len().min(n as usize);
-            unsafe { core::ptr::copy_nonoverlapping(self.contents.as_ptr(), p, k) };
+            let k = contents.len().min(n as usize);
+            unsafe { core::ptr::copy_nonoverlapping(contents.as_ptr(), p, k) };
             b.buf_unlock();
             true
         });
@@ -782,6 +1041,9 @@ impl BufInner {
             Some(c) => {
                 let p = c.ptr();
                 *self.obj.borrow_mut() = Some((ep, c));
+                if self.transient {
+                    *self.contents.borrow_mut() = Vec::new();
+                }
                 p
             }
             None => {
@@ -796,11 +1058,6 @@ impl BufInner {
 impl Buffer {
     pub fn desc(&self) -> BufferDesc {
         self.0.desc
-    }
-
-    /// **Transitional**: the Direct3D 9 buffer (null when it cannot be made).
-    pub fn raw(&self, gpu: &Gpu) -> *mut c_void {
-        self.0.com(gpu)
     }
 }
 
@@ -918,6 +1175,7 @@ fn blend_factor(f: Factor) -> u32 {
         Factor::InvDstAlpha => BLEND_INVDESTALPHA,
         Factor::DstColor => BLEND_DESTCOLOR,
         Factor::InvDstColor => BLEND_INVDESTCOLOR,
+        Factor::SrcAlphaSat => BLEND_SRCALPHASAT,
     }
 }
 
@@ -984,6 +1242,9 @@ pub struct Cmd<'a> {
     size: (u32, u32),
     /// The bound pipeline's topology, None when it could not be made.
     pipe: Option<Topology>,
+    /// The pipeline whose states are on the device, while nothing since has changed
+    /// any (a pass begun, a clear, a resolve): binding it again sets nothing.
+    bound: Option<*const PipeInner>,
     samplers: [Option<Sampler>; 16],
 }
 
@@ -1022,7 +1283,7 @@ impl<'a> Cmd<'a> {
     pub fn begin_pass(&mut self, pass: &Pass) -> bool {
         let mut surfs = [null_mut(); MAX_COLORS];
         for (i, c) in pass.colors.iter().take(MAX_COLORS).enumerate() {
-            surfs[i] = c.texture.0.surf(self.gpu);
+            surfs[i] = c.texture.0.surf_layer(self.gpu, c.layer);
             if surfs[i].is_null() {
                 return false;
             }
@@ -1053,6 +1314,8 @@ impl<'a> Cmd<'a> {
         let mut color = 0;
         let mut z = 1.0;
         if let Some(Load::Clear(c)) = pass.colors.first().map(|c| c.load) {
+            // A load operation clears every channel, whatever a pipeline masked last.
+            dev.set_rs(RS_COLORWRITEENABLE, 0xf);
             flags |= CLEAR_TARGET;
             color = d3d_color(c);
         }
@@ -1064,6 +1327,7 @@ impl<'a> Cmd<'a> {
         if flags != 0 {
             dev.set_rs(RS_SCISSORTESTENABLE, 0);
             dev.clear(&[], flags, color, z, 0);
+            self.bound = None;
         }
         true
     }
@@ -1086,8 +1350,19 @@ impl<'a> Cmd<'a> {
     pub fn clear_rects(&mut self, rects: &[Rect], color: Option<[f32; 4]>, depth: Option<f32>) {
         self.touch();
         let dev = self.dev;
+        if self.size == (0, 0) {
+            // No pass begun in this `Cmd`: the targets bound are an earlier one's.
+            if let Some(rt) = dev.get_render_target(0) {
+                let d = rt.surf_desc();
+                self.size = (d.width, d.height);
+            }
+        }
         dev.set_viewport(&raw::Viewport { x: 0, y: 0, w: self.size.0, h: self.size.1, min_z: 0.0, max_z: 1.0 });
         dev.set_rs(RS_SCISSORTESTENABLE, 0);
+        if color.is_some() {
+            dev.set_rs(RS_COLORWRITEENABLE, 0xf);
+        }
+        self.bound = None;
         let rs: Vec<raw::Rect> = rects.iter().map(|r| d3d_rect(*r)).collect();
         let flags = if color.is_some() { CLEAR_TARGET } else { 0 } | if depth.is_some() { CLEAR_ZBUFFER } else { 0 };
         if flags != 0 && !rs.is_empty() {
@@ -1100,9 +1375,17 @@ impl<'a> Cmd<'a> {
         self.touch();
         if !p.0.realize(self.gpu) {
             self.pipe = None;
+            self.bound = None;
             return false;
         }
         let d = &p.0.desc;
+        let me = Rc::as_ptr(&p.0);
+        if self.bound == Some(me) {
+            // Its states are on the device as it left them.
+            self.pipe = Some(d.topology);
+            return true;
+        }
+        self.bound = Some(me);
         let dev = self.dev;
         let o = p.0.obj.borrow();
         let o = o.as_ref().unwrap();
@@ -1113,7 +1396,16 @@ impl<'a> Cmd<'a> {
             dev.set_rs(RS_DEPTHBIAS, d.depth.bias.to_bits());
             dev.set_rs(RS_SLOPESCALEDEPTHBIAS, d.depth.slope_bias.to_bits());
         }
-        dev.set_rs(RS_ALPHATESTENABLE, 0);
+        match d.alpha_test {
+            Some(a) => {
+                dev.set_rs(RS_ALPHATESTENABLE, 1);
+                dev.set_rs(RS_ALPHAREF, a.reference as u32);
+                dev.set_rs(RS_ALPHAFUNC, compare(a.compare));
+            }
+            None => {
+                dev.set_rs(RS_ALPHATESTENABLE, 0);
+            }
+        }
         match d.blend {
             Some(b) => {
                 dev.set_rs(RS_ALPHABLENDENABLE, 1);
@@ -1145,6 +1437,7 @@ impl<'a> Cmd<'a> {
         dev.set_rs(RS_SRGBWRITEENABLE, 0);
         dev.set_rs(RS_FILLMODE, 3);
         dev.set_rs(RS_CLIPPING, 1);
+        dev.set_rs(RS_CLIPPLANEENABLE, 0);
         dev.set_rs(RS_MULTISAMPLEANTIALIAS, (d.samples > 1) as u32);
         dev.set_stream_freq(0, 1);
         dev.set_vertex_decl(o.decl.ptr());
@@ -1299,27 +1592,86 @@ impl<'a> Cmd<'a> {
         self.dev.draw_primitive(primitive(t), first, t.primitives(count));
     }
 
+    /// A static buffer as a span of `stride`-byte elements (all of it), to draw from as
+    /// a frame's ring span is (`draw`, `draw_indexed`). None when it cannot be made.
+    pub fn span_of(&mut self, b: &Buffer, stride: u32) -> Option<Span> {
+        let p = b.0.com(self.gpu);
+        if p.is_null() || stride == 0 {
+            return None;
+        }
+        Some(Span { buf: p, first: 0, count: b.0.desc.size / stride, stride })
+    }
+
+    /// Makes the levels below the first of a `GEN_MIPS` target from its first, after it
+    /// was drawn (Direct3D 9's `GenerateMipSubLevels`).
+    pub fn generate_mips(&mut self, t: &Texture) {
+        let p = t.0.tex(self.gpu);
+        if !p.is_null() {
+            vcall!(p, 16, fn() -> (),);
+        }
+    }
+
+    /// Resolves the depth target `src` (multisampled or not) into `dst`, a depth
+    /// texture that is `SAMPLED`, of the same size. On Direct3D 9 the vendors' RESZ:
+    /// `src` bound as the depth buffer, `dst` (INTZ) at sampler 0, one point drawn with
+    /// nothing written, then `POINTSIZE` set to the RESZ code; the pass's colour targets
+    /// stay bound. Vulkan resolves through a depth resolve attachment (or samples a
+    /// single-sample depth directly); Direct3D 12 with `ResolveSubresource` or a shader.
+    /// The bound pipeline is unbound: bind one before the next draw.
+    pub fn resolve_depth(&mut self, src: &Texture, dst: &Texture) -> bool {
+        let (s, d) = (src.0.surf(self.gpu), dst.0.tex(self.gpu));
+        if s.is_null() || d.is_null() {
+            return false;
+        }
+        self.touch();
+        let dev = self.dev;
+        dev.set_depth_stencil(s);
+        dev.set_vs(null_mut());
+        dev.set_ps(null_mut());
+        dev.set_fvf(FVF_XYZ);
+        dev.set_rs(RS_ZENABLE, 0);
+        dev.set_rs(RS_ZWRITEENABLE, 0);
+        dev.set_rs(RS_COLORWRITEENABLE, 0);
+        dev.set_texture(0, d);
+        let pt = [0.0f32; 3];
+        dev.draw_primitive_up(PT_POINTLIST, 1, pt.as_ptr() as *const u8, 12);
+        dev.set_rs(RS_POINTSIZE, RESZ_CODE);
+        dev.set_rs(RS_POINTSIZE, 0x3f80_0000);
+        dev.set_texture(0, null_mut());
+        self.pipe = None;
+        self.bound = None;
+        true
+    }
+
     /// Resolves `r` of a multisampled target into the same place of `dst`.
     pub fn resolve(&mut self, src: &Texture, dst: &Texture, r: Rect) {
-        self.copy(src, Some(r), dst, Some(r), Filter::Point);
+        self.blit(src, Some(r), dst, Some(r), TEXF_NONE);
     }
 
     /// Copies (and scales) `sr` of `src` into `dr` of `dst` (None: the whole), both
-    /// targets. Changes no state.
+    /// targets, filtered by `f` (a multisampled `src` is resolved as it is copied).
+    /// Changes no state.
     pub fn copy(&mut self, src: &Texture, sr: Option<Rect>, dst: &Texture, dr: Option<Rect>, f: Filter) -> bool {
+        self.blit(src, sr, dst, dr, filter(f))
+    }
+
+    fn blit(&mut self, src: &Texture, sr: Option<Rect>, dst: &Texture, dr: Option<Rect>, filter: u32) -> bool {
         let (s, d) = (src.0.surf(self.gpu), dst.0.surf(self.gpu));
         if s.is_null() || d.is_null() {
             return false;
         }
         let (s, d) = (core::mem::ManuallyDrop::new(Com(s)), core::mem::ManuallyDrop::new(Com(d)));
         let (sr, dr) = (sr.map(d3d_rect), dr.map(d3d_rect));
-        // A resolve takes no filter; a copy of the same size is exact either way.
-        let filter = if src.0.desc.samples > 1 { TEXF_NONE } else { filter(f) };
         self.dev.stretch_rect(&s, sr.as_ref(), &d, dr.as_ref(), filter) >= 0
     }
 
     /// `Gpu::read_back`, in the frame.
     pub fn read_back<R>(&mut self, tex: &Texture, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
         self.gpu.read_back(tex, f)
+    }
+
+    /// `Gpu::read_back_layer`, in the frame.
+    pub fn read_back_layer<R>(&mut self, tex: &Texture, layer: u32, f: impl FnOnce(&Mapped) -> R) -> Result<R, &'static str> {
+        self.gpu.read_back_layer(tex, layer, f)
     }
 }

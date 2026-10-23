@@ -17,10 +17,11 @@ no worse), apart from the change of API that comes later.
 
 | File | What |
 |---|---|
-| `src/types.rs` | the descriptions and small values: `Format`, `Usage`, `TextureDesc`, `Contents`, `BufferDesc`, `Sampler`, `Blend`, `Depth`, `Cull`, `Topology`, `VertexAttr`, `Code`, `PipelineDesc`, `Rect`, `Viewport`, `Load`, `Pass`, `Block`, `Bindings` |
+| `src/types.rs` | the descriptions and small values: `Format`, `Usage`, `TextureKind`, `TextureDesc`, `Contents`, `BufferDesc`, `Sampler`, `Blend`, `Depth`, `AlphaTest`, `Cull`, `Topology`, `VertexAttr`, `Code`, `PipelineDesc`, `Rect`, `Viewport`, `Load`, `Pass`, `Block`, `Bindings` |
 | `src/frame.rs` | `Frame`: the frame a `Cmd` records into, owned by the caller; `Span` |
 | `src/pixels.rs` | `Mapped`, texels read back, and their conversion to RGB (the frame dumps) |
-| `src/d3d9/mod.rs` | the Direct3D 9 backend: `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Cmd`, `Section` |
+| `src/chain.rs` | a bake too long for one shader, as a chain of passes (`Chain`), on the interface |
+| `src/d3d9/mod.rs` | the Direct3D 9 backend: `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Cmd`, `Timer` |
 | `src/d3d9/raw.rs`, `consts.rs` | Direct3D 9 through raw COM vtables, once `render3d/src/d3d` and `ui/src/d3d` (identical copies) |
 
 `gpu::Gpu`, `gpu::Texture` and the rest are the backend in use, re-exported at the
@@ -35,17 +36,25 @@ and attaches the game's device to it every frame (`attach`, `attach_d3d8`). Noth
 it is per frame.
 
 **Resources** are made once from a description and stay valid until the last clone is
-dropped, across `Reset`s and devices. `Gpu::texture(TextureDesc, Contents)` makes a 2D
-texture: sampled, a colour target, a depth target, multisampled, or rewritten from the
-CPU (`Usage::DYNAMIC`, `Texture::write`). The contents are kept, so the texture can be
-made again. `Gpu::buffer` makes a vertex or index buffer. `Gpu::pipeline(PipelineDesc)`
-makes an immutable pipeline: shaders, vertex layout and stride, topology, blend (with a
-separate alpha equation), write mask, depth test and bias, cull, whether the scissor
-applies, the targets' formats and the sample count. Each is made on the device at its
-first use; `ready` makes it at once and says whether the device took it.
-`Gpu::wrap_d3d9_texture` / `wrap_d3d9_surface` and `engine_target` / `engine_depth`
-wrap a Direct3D 9 object someone else made (the engine's minimap picture, its back
-buffer) without owning its creation.
+dropped, across `Reset`s and devices. `Gpu::texture(TextureDesc, Contents)` makes a
+texture: 2D, a cube (`TextureDesc::cube`, six faces) or a volume (`TextureDesc::d3`);
+sampled, a colour target (a cube's faces each a target: `ColorTarget::face`), a depth
+target (sampled too: `Usage::DEPTH | SAMPLED`, filled by `Cmd::resolve_depth`),
+multisampled, with a chain the device makes (`Usage::GEN_MIPS`, `levels` 0,
+`Cmd::generate_mips`), or rewritten from the CPU (`Usage::DYNAMIC`, `Texture::write`).
+The contents are kept, so the texture can be made again; `Contents::Transient` lets
+go of them once it is made, for art that would hold too much of the process's 2 GB
+(its owner makes another after the device is lost). `Gpu::buffer` makes a vertex or
+index buffer (`buffer_transient` likewise). `Gpu::pipeline(PipelineDesc)` makes an
+immutable pipeline: shaders, vertex layout and stride, topology, blend (with a
+separate alpha equation), write mask, depth test and bias, the alpha test, cull,
+whether the scissor applies, the targets' formats and the sample count. Each is made on
+the device at its first use; `ready` makes it at once and says whether the device took
+it. `Gpu::timer(n)` makes a set of GPU timestamps (`Timer`: `begin`, `stamp`, `end`,
+`read` a few frames later). `Gpu::wrap_d3d9_texture` / `wrap_d3d9_surface` and
+`engine_target` / `engine_depth` / `engine_viewport` wrap a Direct3D 9 object someone
+else made (the engine's minimap picture, its fog, its back buffer) without owning its
+creation, or read the engine's viewport.
 
 **`Frame`** is what a `Cmd` records into: its number, the rings the frame's dynamic
 vertices and indices are written to (`Cmd::vertices`, `Cmd::indices`, giving a `Span`
@@ -55,9 +64,11 @@ caller owns it and calls `next` once per presented frame.
 **`Cmd`** records commands (`Gpu::begin(&mut frame)`): `begin_pass(&Pass)` with its
 colour targets and optional depth, each with a load operation (`Load`, `Clear(value)`,
 `DontCare`) acting inside the pass's area, and `end_pass`; `set_pipeline`;
-`bind(&Bindings)` (or `bind_texture` / `vs_block` / `ps_block` one by one); `draw`,
-`draw_indexed`, `draw_buffer`; `set_viewport`, `set_scissor`, `clear_rects`; `resolve`
-and `copy` between targets; `read_back` of a target. Uniforms go in blocks of float4
+`bind(&Bindings)` (or `bind_texture` / `set_sampler` / `vs_block` / `ps_block` one by
+one); `draw`, `draw_indexed` (from the frame's rings, or a static buffer as a span:
+`span_of`), `draw_buffer`; `set_viewport`, `set_scissor`, `clear_rects`; `resolve`,
+`resolve_depth` and `copy` (filtered) between targets; `generate_mips`; `read_back`
+of a target (`read_back_layer`: a cube's face). Uniforms go in blocks of float4
 registers from a base (`Block::of(base, &my_repr_c_struct)`).
 
 ## Why it is shaped so
@@ -91,6 +102,20 @@ registers from a base (`Block::of(base, &my_repr_c_struct)`).
   in, and this crate keeps no static of its own for anything per frame. Descriptions
   and handles are plain data (`#[repr(C)]`, `#[repr(u32)]`) where they may cross that
   boundary.
+- **Cubes and volumes as kinds of texture.** A cube is a 2D image of six layers with
+  a cube view on Vulkan, a 2D array with a cube SRV on Direct3D 12; a volume a 3D image
+  or resource. A pass draws into one face (`ColorTarget::layer`), as a Vulkan render
+  pass takes a single-layer view. A chain the device makes (`GEN_MIPS`) is a blit
+  chain there.
+- **A sampled depth, filled by a resolve.** `resolve_depth` is a command between
+  passes, as on Vulkan (a depth resolve attachment, or sampling a single-sample depth
+  directly) and Direct3D 12 (`ResolveSubresource`, or a shader); on Direct3D 9 the
+  vendors' RESZ into an `INTZ` texture.
+- **The alpha test as pipeline state.** Neither newer API has it: a backend there makes
+  a variant of the pixel shader that discards (a specialisation constant or a define).
+- **Timestamps** are a query set made once and read later without waiting: a Vulkan
+  timestamp query pool (reset at `begin`, `vkCmdWriteTimestamp`, the period from the
+  device's limits, never disjoint), a Direct3D 12 timestamp heap resolved into a buffer.
 - **No compute yet**: Direct3D 9 has none. A `Cmd::dispatch` and a compute pipeline
   join when the Vulkan backend does; nothing in the interface stands in their way.
 
@@ -119,12 +144,22 @@ one's changes back instead of the engine's state; the log says once if any nest)
 **Targets stay bound.** A state block never holds the render targets or the depth
 surface, so the targets of the last pass begun stay bound after the `Cmd` ends. That
 is how render3d's frame works today: the scene pass is begun before the engine's
-body, and the engine and the modules not yet ported draw into it.
+body, and the engine draws into it.
+
+**A pipeline is applied whole**, every state it names, so no draw depends on what the
+one before it left, and the clip planes are off; binding the same pipeline again in a
+`Cmd`, with nothing in between that changed state (a pass that cleared, a clear, a
+depth resolve), sets nothing. A colour clear (a load operation, `clear_rects`) writes
+every channel whatever the last pipeline masked. Samplers set in a `Cmd` are
+remembered in it, and a sampler bound again as it is sets nothing.
 
 **Pools.** Targets and depth surfaces are in the default pool; a texture filled once
 goes to the default pool through a system-memory copy released at once, so no address
 space is held for it; a `DYNAMIC` texture is in the managed pool, its contents copied
-in when it is next bound after a `write`; buffers are in the default pool.
+in when it is next bound after a `write`; buffers are in the default pool. Cubes and
+volumes go the same ways (a cube target is made with each face's surface held; a
+sampled depth is an `INTZ` texture). Queries do not outlive a `Reset` and are made
+again at their next use.
 
 **Losing the device.** `before_reset` (from the plugin's `Reset` hook) lets go of the
 state blocks and everything in the default pool; `release_device` (from the hook of
@@ -140,57 +175,58 @@ until wrapped anew. `raw::live` still counts every object made and not released.
 state block chosen and the card's shader slots once per device, a shader, declaration,
 texture or buffer the device refused (once per device each).
 
-### Transitional
+### What stays raw
 
-`gpu::d3d9::raw` is the old `d3d` module: what render3d's modules not yet ported draw
-with, and what the plugins' engine glue uses to reach the game's d3d8 device (`query`,
-`Com`, `vcall!`). `Gpu::device`, `Gpu::section`, `Texture::raw_texture` /
-`raw_surface` and `Buffer::raw` let raw code and `gpu` code meet: a module calling raw
-Direct3D 9 between `Cmd`s keeps working, inside a `Section` (render3d's `gfx::Guard`
-is one). These go when the last module is ported.
+`gpu::d3d9::raw` is the old `d3d` module: the backend's own calls, and what the
+plugins' engine glue uses to reach the game's d3d8 device (`query`, `Com`, `vcall!`):
+render3d's `frame/` (finding the d3d9 device, the view's transforms, the hooks of
+`Reset` and `DestroyRenderSurfaces`) and `gfx::engine_texture` (an `ST3D_Texture`'s
+d3d9 texture, wrapped). No module draws with it. Display8 will answer those questions
+itself, and they go then.
 
-## Porting a render3d module
+## render3d on gpu
 
-The frame (`render3d/src/frame/`) and the UI are on `gpu`; the modules under
-`render3d/src/mods/` are not yet. For each module, in its own commit, judged by the
-bench's pixels (RMSE 0 against a baseline taken before the change, the module's
-scenario, frame time no worse):
+Every part of render3d draws through the interface: the frame and its post passes, and
+every module under `render3d/src/mods/`, the scene layer (`scene/`), the assets'
+textures, the menu scene and the timing. How a module draws, as they all do now:
 
-1. **List its states.** For each draw, note every `set_rs`, `set_ss`, shader, declaration
-   and FVF it sets, and which it relies on from an earlier draw or from the engine.
-   A state the module never sets is the engine's: find what the engine leaves there
-   (`get_rs` logged once) before deciding the pipeline's value, which then sets it.
-2. **Make its pipelines** once, in the module's own state: one `gfx::gpu().pipeline(desc)`
-   per distinct combination, from `PipelineDesc::new(Code::d3d9(&VS), Code::d3d9(&PS),
-   &LAYOUT, stride, topology, colour)` and its fields (`blend`, `depth`, `cull`,
-   `scissor`, `write_mask`). Draws into the view take the scene pass's formats and
-   samples from `frame::scene_formats()`. `Shader`, `Decl` and the module's
-   `slot_caps` check go: a refused shader is logged by `gpu`, and `set_pipeline`
-   returns false.
-3. **Turn its constants into blocks**: each run of `vs_const` / `ps_const` registers
-   becomes a `#[repr(C)]` struct of float4s bound with `Block::of(base, &s)`, at the
-   registers the shader declares (do not renumber them; another branch ports the
-   shaders).
-4. **Turn its textures into `gpu::Texture`s** (`Contents::Owned` for what it uploads,
-   `Usage::RENDER_TARGET | Usage::SAMPLED` for its bakes) and each `set_texture` with
-   its sampler states into a `TexSlot` with a `Sampler`. An engine texture it reads is
-   wrapped (`wrap_d3d9_texture`).
-5. **Draw through a `Cmd`.** In place of `let _g = Guard::new(dev)`, take
-   `let Some(mut cmd) = gfx::gpu().begin(gfx::frame())`. The scene pass is bound
-   already; a module that draws into a target of its own (a bake, the shadow map)
-   begins that target's pass, and `frame::scene_pass(&mut cmd, v.rect)` before it
-   draws into the view again. `DynVb::push` becomes `cmd.vertices(&data)` and
-   `cmd.draw(&span)`; a static buffer is `gfx::gpu().buffer(...)`.
-6. **Drop its device handling.** What its `reset`, `forget` and `device` did for
-   Direct3D objects goes: `gpu` lets go of them and makes them again. What they did for
-   CPU state (caches keyed by device, half-built bakes) stays.
-7. **Check** that the module no longer names `gpu::d3d9::raw`, build both plugins, and
-   hand it to the bench. A module that keeps one raw call for now marks it
-   **transitional** in a comment, with the reason.
+1. **Pipelines** are made once per combination of the states the module draws with,
+   kept by a small key in a `gfx::Pipes` (`view` for the scene pass's formats and
+   samples, made again when they change; `own` for a target of its own). Each says
+   every state a draw relies on, so no draw depends on what the one before left; a
+   state the module never set before is the engine's (the depth bias, the clip planes:
+   0), which the pipeline now sets.
+2. **Constants** are blocks at the registers the shader declares
+   (`Block::new(base, &floats)`, `Block::of`). Between `set_pipeline`s of one `Cmd`
+   they persist, as Direct3D 9's registers do; a later backend gives each draw the
+   blocks it reads.
+3. **Textures** are `gpu::Texture`s bound with their sampler (`bind_texture`); the
+   game's art is `assets::texture` (made at once, keeping no copy: `Contents::Transient`,
+   loaded again after a `Reset`), an engine texture is wrapped.
+4. **Draws go through a `Cmd`** (`gfx::cmd()`), which puts the engine's state back
+   when dropped. The scene pass is bound already; a module that draws into a target of
+   its own (a bake, the shadow map, the nebulae's march) begins that pass, and
+   `gfx::view_pass` before it draws into the view again. Geometry rebuilt every frame
+   goes into the frame's rings (`cmd.vertices`), a model's into static buffers
+   (`gfx::buffer`, `buffer_once`).
+5. **A module's `reset` and `forget`** are for what the objects held: a target's
+   contents are lost (a bake to do again), and a `Transient` texture or buffer cannot be
+   made again (its owner makes another).
+
+## The bake chain
+
+`src/chain.rs` draws a bake too long for one pixel shader as a chain of passes through
+float targets, tile by tile (render3d/README.md, "Shaders on Windows"): render3d's
+sky and planet surfaces. It is built on the interface, not the Direct3D 9 backend: the
+split is in the HLSL source, so the SPIR-V has the same passes, and a Vulkan or
+Direct3D 12 backend runs the same chain. A backend that takes the whole function in one
+shader may later be handed it as a single pass, with nothing changed for the callers.
 
 ## What is not there yet
 
-Cube and volume textures (the sky's cube, the nebulae's volumes) and their uploads;
-mip chains of a `DYNAMIC` texture; a second vertex stream (instancing); a 32-bit index
-ring; stencil state; GPU timestamp queries (render3d's `timing` still uses raw ones);
-compute. Each joins when the first module that needs it is ported.
+Mip chains of a `DYNAMIC` texture; a second vertex stream (instancing: nothing uses
+it); a 32-bit index ring (every index is 16-bit); stencil state (only ever off); render
+targets in a volume's slices or a cube's levels below the first; compute. Each joins
+when something needs it. A Vulkan or Direct3D 12 backend has two of today's features to
+carry differently: the alpha test (a variant of the pixel shader that discards) and
+the depth resolve (a resolve attachment, or a shader).

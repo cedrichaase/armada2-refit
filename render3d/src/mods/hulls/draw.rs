@@ -1,10 +1,9 @@
 //! Drawing a posed hull in the hull shaders (`shaders/hulls.hlsl`).
 use super::look::{Look, Profile};
 use super::{anim, game, shadow, Posed};
-use gpu::d3d9::raw::*;
-use crate::engine::{self, field};
+use crate::engine;
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, Guard, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{v3, M34, V3};
 use crate::scene::{self, Blend, Model};
 use crate::shaders::hulls::*;
@@ -12,7 +11,10 @@ use crate::{assets, log};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::ffi::c_void;
+use gpu::{
+    Address, Blend as GBlend, BlendEq, BlendOp, Block, Code, Compare, Contents, Cull, Depth, Factor, Filter, Format,
+    MipFilter, Pipeline, PipelineDesc, Rect, Sampler, Texture, TextureDesc, Topology, Usage,
+};
 
 /// How a hull is drawn.
 #[derive(Clone, Copy, PartialEq)]
@@ -273,39 +275,38 @@ pub fn fade(p: &Posed, v: &View, look: &Look) -> f32 {
 
 
 pub struct Drawer {
-    vs: Shader,
-    ps: Shader,
-    ps_bump: Shader,
-    ps_cloak: Shader,
-    ps_ghost: Shader,
-    ps_holo: Shader,
-    decl: Decl,
+    pipes: Pipes,
     /// Pixel constants c80.. for `Mode::Ghost` and `Mode::Holo`, set by the caller.
     pub extra: [f32; 8 * 4],
     /// Normal maps made from height maps, by name.
-    nmaps: BTreeMap<String, Option<Com>>,
+    nmaps: BTreeMap<String, Option<Texture>>,
     /// The copy of the frame a cloaked hull bends.
-    copy: Option<(Com, Com, u32, u32, u32)>,
+    copy: Option<Texture>,
     said_bump: bool,
 }
 
+/// The hull's pixel shaders (`Drawer::pipe`).
+const PS_LIST: [&[u32]; 5] = [&PS_HULL, &PS_BUMP, &PS_CLOAK, &PS_GHOST, &PS_HOLO];
+const S_HULL: usize = 0;
+const S_BUMP: usize = 1;
+const S_CLOAK: usize = 2;
+const S_GHOST: usize = 3;
+const S_HOLO: usize = 4;
+
+/// The hull's textures and normal maps: wrapped, filtered through their levels.
+const WRAP: Sampler = gfx::sampler(Filter::Linear, MipFilter::Linear, Address::Wrap, Address::Wrap);
+/// The shadow map: clamped, a texel each.
+const SHADOW: Sampler = gfx::sampler(Filter::Point, MipFilter::None, Address::Clamp, Address::Clamp);
+/// The frame's copy under a cloaked hull: clamped, filtered.
+const COPY: Sampler = gfx::sampler(Filter::Linear, MipFilter::None, Address::Clamp, Address::Clamp);
+
 impl Drawer {
     pub fn new() -> Drawer {
-        Drawer {
-            vs: Shader::vertex(&VS_HULL),
-            ps: Shader::pixel(&PS_HULL),
-            ps_bump: Shader::pixel(&PS_BUMP),
-            ps_cloak: Shader::pixel(&PS_CLOAK),
-            ps_ghost: Shader::pixel(&PS_GHOST),
-            ps_holo: Shader::pixel(&PS_HOLO),
-            decl: Decl::new(&scene::VERTEX),
-            extra: [0.0; 8 * 4],
-            nmaps: BTreeMap::new(),
-            copy: None,
-            said_bump: false,
-        }
+        Drawer { pipes: Pipes::new(), extra: [0.0; 8 * 4], nmaps: BTreeMap::new(), copy: None, said_bump: false }
     }
 
+    /// Before a `Reset`: the normal maps keep no copy of their texels, and the frame's
+    /// copy is a target.
     pub fn reset(&mut self) {
         self.nmaps.clear();
         self.copy = None;
@@ -313,13 +314,42 @@ impl Drawer {
 
     pub fn begin_view(&mut self, _v: &View, _look: &Look) {}
 
+    /// The pipeline of pixel shader `ps` (`S_*`) for a mode and a cull: depth-tested
+    /// against the scene (`LESSEQUAL`); opaque and cloaked hulls write depth, a depth
+    /// pass writes depth alone, a faded hull blends by alpha, additive meshes add, a
+    /// ghost or hologram goes over what is there premultiplied.
+    fn pipe(&mut self, ps: usize, mode: Mode, cull: Cull) -> Option<Pipeline> {
+        let m = match mode {
+            Mode::Opaque | Mode::Cloak => 0u64,
+            Mode::DepthOnly => 1,
+            Mode::Faded(_) => 2,
+            Mode::Additive(_) => 3,
+            Mode::Ghost | Mode::Holo => 4,
+        };
+        self.pipes.view((ps as u64 * 8 + m) * 4 + cull as u64, || {
+            let mut d = PipelineDesc::new(Code::d3d9(&VS_HULL), Code::d3d9(PS_LIST[ps]), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            d.cull = cull;
+            let (blend, write, mask) = match m {
+                0 => (None, true, 0xf),
+                1 => (None, true, 0),
+                2 => (Some(GBlend::ALPHA), false, 0xf),
+                3 => (Some(GBlend::ADD), false, 0xf),
+                _ => (Some(GBlend { color: BlendEq { src: Factor::One, dst: Factor::InvSrcAlpha, op: BlendOp::Add }, alpha: None }), false, 0xf),
+            };
+            d.blend = blend;
+            d.write_mask = mask;
+            d.depth = Depth { test: true, write, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d
+        })
+    }
+
     /// The normal map of a height map (`ST3D_CreateNormalMap`): from each texel's
     /// neighbours across and down, wrapping, (-dh/du, -dh/dv, 1) made unit, height in
     /// 0..1 from the red channel.
-    fn normal_map(&mut self, dev: Device, name: &str) -> *mut c_void {
+    fn normal_map(&mut self, name: &str) -> Option<Texture> {
         let key = crate::rt::lower(name);
         if let Some(t) = self.nmaps.get(&key) {
-            return t.as_ref().map_or(core::ptr::null_mut(), |c| c.ptr());
+            return t.clone();
         }
         let t = assets::image(&key).and_then(|img| {
             let (w, h) = (img.width as i32, img.height as i32);
@@ -367,15 +397,18 @@ impl Drawer {
                 lw = nw;
                 lh = nh;
             }
-            let refs: Vec<&[u8]> = levels.iter().map(|l| l.as_slice()).collect();
-            upload_texture(dev, w as u32, h as u32, FMT_A8R8G8B8, &refs)
+            let n = levels.len() as u32;
+            let px: Vec<u8> = levels.concat();
+            let g = gfx::gpu();
+            let d = TextureDesc::d2(w as u32, h as u32, Format::Bgra8, Usage::SAMPLED).with_levels(n);
+            let t = g.texture(d, Contents::Transient(px));
+            t.ready(g).then_some(t)
         });
         if t.is_none() {
             log!("hulls: no normal map from {}", key);
         }
-        let p = t.as_ref().map_or(core::ptr::null_mut(), |c| c.ptr());
-        self.nmaps.insert(key, t);
-        p
+        self.nmaps.insert(key, t.clone());
+        t
     }
 
     /// The constants every hull of the view shares: lights, eye, shadow, planets (pixel
@@ -411,7 +444,6 @@ impl Drawer {
     /// Draws one hull in one mode.
     pub fn draw(&mut self, v: &View, look: &Look, p: &Posed, mode: Mode) {
         let _z = crate::timing::zone("hulls: draw");
-        let dev = v.dev;
         let m = &p.model;
         // Which parts this mode draws.
         let want = |b: Blend| match mode {
@@ -421,32 +453,33 @@ impl Drawer {
         if !m.parts.iter().enumerate().any(|(_, part)| want(part.blend) && p.pose.shown.get(part.node).copied().unwrap_or(false)) {
             return;
         }
-        let _g = Guard::new(dev);
-        let ps_ok = match mode {
-            Mode::Cloak => self.ps_cloak.bind(dev),
-            Mode::Ghost => self.ps_ghost.bind(dev),
-            Mode::Holo => self.ps_holo.bind(dev),
-            _ => self.ps.bind(dev),
+        let own = match mode {
+            Mode::Cloak => Some(S_CLOAK),
+            Mode::Ghost => Some(S_GHOST),
+            Mode::Holo => Some(S_HOLO),
+            _ => None,
         };
-        let own_ps = matches!(mode, Mode::Cloak | Mode::Ghost | Mode::Holo);
-        if matches!(mode, Mode::Ghost | Mode::Holo) {
-            dev.ps_const(80, &self.extra);
-        }
-        if !(self.vs.bind(dev) && ps_ok && self.decl.bind(dev)) {
+        let own_ps = own.is_some();
+        if !self.pipe(own.unwrap_or(S_HULL), mode, Cull::None).is_some_and(|pl| pl.ready(gfx::gpu())) {
             return;
         }
-        let cloak_copy = if mode == Mode::Cloak { self.copy_frame(v) } else { None };
+        let Some(mut cmd) = gfx::cmd() else { return };
+        if matches!(mode, Mode::Ghost | Mode::Holo) {
+            cmd.ps_block(Block::new(80, &self.extra));
+        }
+        let cloak_copy = if mode == Mode::Cloak { self.copy_frame(&mut cmd, v) } else { None };
         if mode == Mode::Cloak && cloak_copy.is_none() {
             // No copy: drawn faded instead, as stock fades it.
-            drop(_g);
+            drop(cmd);
             let a = p.cloak.map_or(0.2, |c| 0.2 + 0.8 * c.1);
             self.draw(v, look, p, Mode::DepthOnly);
             self.draw(v, look, p, Mode::Faded(a));
             return;
         }
+        let cmd = &mut cmd;
         // Vertex constants every part shares: VP (c4), the warp (c8, c9), the shadow
         // map's rows (c10..c13), the Key (c14), the wave light (c15, c16).
-        dev.vs_const(4, &gfx::vp_constants(v));
+        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
         let mut vk = [0.0f32; 13 * 4];
         if let Some(w) = p.warp {
             vk[0..4].copy_from_slice(&[w.n.x, w.n.y, w.n.z, w.d]);
@@ -472,68 +505,14 @@ impl Drawer {
             vk[36..48].copy_from_slice(&w);
             ck_wave.copy_from_slice(&w[0..4]);
         }
-        dev.vs_const(8, &vk[..48]);
-        // States.
-        for (s, val) in [
-            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
-            (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_SRGBWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0),
-        ] {
-            dev.set_rs(s, val);
-        }
-        match mode {
-            Mode::Opaque | Mode::Cloak => {
-                dev.set_rs(RS_ALPHABLENDENABLE, 0);
-                dev.set_rs(RS_ZWRITEENABLE, 1);
-            }
-            Mode::DepthOnly => {
-                dev.set_rs(RS_ALPHABLENDENABLE, 0);
-                dev.set_rs(RS_ZWRITEENABLE, 1);
-                dev.set_rs(RS_COLORWRITEENABLE, 0);
-            }
-            Mode::Faded(_) => {
-                dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                dev.set_rs(RS_SRCBLEND, BLEND_SRCALPHA);
-                dev.set_rs(RS_DESTBLEND, BLEND_INVSRCALPHA);
-                dev.set_rs(RS_ZWRITEENABLE, 0);
-                dev.set_rs(RS_ZFUNC, CMP_LESSEQUAL);
-            }
-            Mode::Additive(_) => {
-                dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                dev.set_rs(RS_SRCBLEND, BLEND_ONE);
-                dev.set_rs(RS_DESTBLEND, BLEND_ONE);
-                dev.set_rs(RS_ZWRITEENABLE, 0);
-            }
-            Mode::Ghost | Mode::Holo => {
-                dev.set_rs(RS_ALPHABLENDENABLE, 1);
-                dev.set_rs(RS_SRCBLEND, BLEND_ONE);
-                dev.set_rs(RS_DESTBLEND, BLEND_INVSRCALPHA);
-                dev.set_rs(RS_ZWRITEENABLE, 0);
-            }
-        }
-        for s in [0u32, 1] {
-            dev.set_ss(s, SAMP_ADDRESSU, TADDRESS_WRAP);
-            dev.set_ss(s, SAMP_ADDRESSV, TADDRESS_WRAP);
-            dev.set_ss(s, SAMP_MAGFILTER, TEXF_LINEAR);
-            dev.set_ss(s, SAMP_MINFILTER, TEXF_LINEAR);
-            dev.set_ss(s, SAMP_MIPFILTER, TEXF_LINEAR);
-        }
-        dev.set_stream_freq(0, 1);
+        cmd.vs_block(Block::new(8, &vk[..48]));
+        cmd.set_sampler(0, &WRAP);
+        cmd.set_sampler(1, &WRAP);
         if let Some(sm) = shadow::current() {
-            dev.set_texture(3, sm.tex);
-            dev.set_ss(3, SAMP_ADDRESSU, TADDRESS_CLAMP);
-            dev.set_ss(3, SAMP_ADDRESSV, TADDRESS_CLAMP);
-            dev.set_ss(3, SAMP_MAGFILTER, TEXF_POINT);
-            dev.set_ss(3, SAMP_MINFILTER, TEXF_POINT);
-            dev.set_ss(3, SAMP_MIPFILTER, TEXF_NONE);
+            cmd.bind_texture(3, Some(&sm.tex), &SHADOW);
         }
         if let Some((tex, ox, oy, cw, ch)) = cloak_copy {
-            dev.set_texture(6, tex);
-            dev.set_ss(6, SAMP_ADDRESSU, TADDRESS_CLAMP);
-            dev.set_ss(6, SAMP_ADDRESSV, TADDRESS_CLAMP);
-            dev.set_ss(6, SAMP_MAGFILTER, TEXF_LINEAR);
-            dev.set_ss(6, SAMP_MINFILTER, TEXF_LINEAR);
-            dev.set_ss(6, SAMP_MIPFILTER, TEXF_NONE);
+            cmd.bind_texture(6, Some(&tex), &COPY);
             let (st, vis, _) = p.cloak.unwrap_or((2, 0.0, 0.0));
             let _ = st;
             let vw = &v.view.0;
@@ -561,7 +540,7 @@ impl Drawer {
             ck[40..44].copy_from_slice(&[ox as f32, oy as f32, 0.0, 0.0]);
             ck[44..48].copy_from_slice(&ck_wave);
             ck[48..52].copy_from_slice(&[look.cloak_shimmer, look.cloak_wave_tilt, v.time * look.cloak_shimmer_speed, 0.0]);
-            dev.ps_const(80, &ck);
+            cmd.ps_block(Block::new(80, &ck));
         }
         let mut shared: Option<(bool, [f32; 74 * 4])> = None;
         // The faces the instance draws (`sm_faces_remaining`, `+0x10`: construction).
@@ -584,38 +563,40 @@ impl Drawer {
             let prof = if bump { &look.borg } else { &look.hull };
             if shared.is_none_or(|s| s.0 != bump) {
                 shared = Some((bump, self.shared(v, look, prof, p.centre, p.radius)));
-                dev.ps_const(3, &shared.as_ref().unwrap().1[3 * 4..]);
+                cmd.ps_block(Block::new(3, &shared.as_ref().unwrap().1[3 * 4..]));
             }
             // Bump-mapped meshes go through ps_bump with their normal map.
             let nmap = if bump && mode != Mode::DepthOnly && !own_ps {
-                let n = self.normal_map(dev, part.bump.as_deref().unwrap_or(""));
+                let n = self.normal_map(part.bump.as_deref().unwrap_or(""));
                 if !self.said_bump {
                     self.said_bump = true;
                     log!("hulls: bump-mapped meshes (the Borg profile), normal map from {}", part.bump.as_deref().unwrap_or(""));
                 }
                 n
             } else {
-                core::ptr::null_mut()
+                None
             };
-            if !nmap.is_null() {
-                self.ps_bump.bind(dev);
-                dev.set_texture(1, nmap);
-            } else if !own_ps {
-                self.ps.bind(dev);
-            }
-            dev.ps_const(73, &[if nmap.is_null() { 0.0 } else { 1.0 }, look.bump, look.knee, 0.0]);
             let world = p.pose.world[part.node];
-            dev.vs_const(0, world.to_m4().transpose().as_floats());
-            if mode != Mode::DepthOnly {
-                dev.ps_const(16, &pick_points(world.p, look.point_lights));
-            }
             let mirrored = world.det3() < 0.0;
             // A face-limited instance (a station being built) shows its inside through
             // the faces not built yet: drawn two-sided, as stock shows it.
-            dev.set_rs(RS_CULLMODE, if part.two_sided || limit >= 0 { CULL_NONE } else if mirrored { CULL_CCW } else { CULL_CW });
+            let cull = if part.two_sided || limit >= 0 { Cull::None } else if mirrored { Cull::CounterClockwise } else { Cull::Clockwise };
+            let ps = if nmap.is_some() { S_BUMP } else { own.unwrap_or(S_HULL) };
+            let Some(pipe) = self.pipe(ps, mode, cull) else { continue };
+            if !cmd.set_pipeline(&pipe) {
+                continue;
+            }
+            if let Some(n) = nmap.as_ref() {
+                cmd.bind_texture(1, Some(n), &WRAP);
+            }
+            cmd.ps_block(Block::new(73, &[if nmap.is_none() { 0.0 } else { 1.0 }, look.bump, look.knee, 0.0]));
+            cmd.vs_block(Block::new(0, world.to_m4().transpose().as_floats()));
+            if mode != Mode::DepthOnly {
+                cmd.ps_block(Block::new(16, &pick_points(world.p, look.point_lights)));
+            }
             let tex_name = if p.assimilated { second_texture(m, part.node).or(part.texture.as_deref()) } else { part.texture.as_deref() };
-            let tex = tex_name.and_then(|t| assets::texture(dev, t)).unwrap_or(core::ptr::null_mut());
-            dev.set_texture(0, tex);
+            let tex = tex_name.and_then(assets::texture);
+            cmd.bind_texture(0, tex.as_ref(), &WRAP);
             let uv = flipbook(m, part.node, p);
             let cut = part.blend == Blend::Cutout;
             // A `default` mesh's texture alpha is a cut-out where its lighting material
@@ -623,17 +604,15 @@ impl Drawer {
             // stock and Lighting.asi draw open); see render3d/README.md, "Hulls".
             let default_mat = m.sod.nodes[part.node].mesh().is_some_and(|ms| ms.texture_material.eq_ignore_ascii_case("default"));
             let wave = if p.waves.is_some() { 1.0 } else { 0.0 };
-            dev.ps_const(6, &[uv[0], uv[1], wave, if cut { 1.0 } else { 0.0 }]);
+            cmd.ps_block(Block::new(6, &[uv[0], uv[1], wave, if cut { 1.0 } else { 0.0 }]));
             if let Some(wv) = p.waves {
-                dev.ps_const(7, &[wv.colour.x, wv.colour.y, wv.colour.z, 0.0]);
+                cmd.ps_block(Block::new(7, &[wv.colour.x, wv.colour.y, wv.colour.z, 0.0]));
             }
             let (fade, tex_alpha) = match mode {
                 Mode::Faded(f) => (f, 0.0),
                 _ => (1.0, 0.0),
             };
-            dev.ps_const(2, &[fade, prof.specular, prof.specular_power, tex_alpha]);
-            dev.set_stream(0, part.vb.ptr(), 0, 32);
-            dev.set_indices(part.ib.ptr());
+            cmd.ps_block(Block::new(2, &[fade, prof.specular, prof.specular_power, tex_alpha]));
             for g in &part.groups {
                 if faces_left <= 0 {
                     break;
@@ -652,36 +631,35 @@ impl Drawer {
                 };
                 let selfi = if g.self_illum { prof.self_illum } else { 0.0 };
                 if default_mat && !cut {
-                    dev.ps_const(6, &[uv[0], uv[1], wave, if g.self_illum { 0.0 } else { 1.0 }]);
+                    cmd.ps_block(Block::new(6, &[uv[0], uv[1], wave, if g.self_illum { 0.0 } else { 1.0 }]));
                 }
-                dev.ps_const(0, &[prof.ambient.x, prof.ambient.y, prof.ambient.z, selfi]);
-                dev.ps_const(1, &[tint.x, tint.y, tint.z, if unlit { 1.0 } else { 0.0 }]);
-                dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, tris);
+                cmd.ps_block(Block::new(0, &[prof.ambient.x, prof.ambient.y, prof.ambient.z, selfi]));
+                cmd.ps_block(Block::new(1, &[tint.x, tint.y, tint.z, if unlit { 1.0 } else { 0.0 }]));
+                part.draw(cmd, g.start, tris);
             }
         }
-        let _ = field;
     }
 
     /// A copy of the view's part of the frame, for a cloaked hull to bend (the farther
     /// cloaked hulls already in it): (texture, its top left in the target, its size).
-    fn copy_frame(&mut self, v: &View) -> Option<(*mut c_void, u32, u32, u32, u32)> {
-        let dev = v.dev;
-        let rt = dev.get_render_target(0)?;
-        let d = rt.surf_desc();
+    fn copy_frame(&mut self, cmd: &mut gpu::Cmd, v: &View) -> Option<(Texture, u32, u32, u32, u32)> {
+        let (scene, _) = crate::frame::scene_targets()?;
+        let fmt = scene.desc().format;
         let (w, h) = (v.rect.w.max(1), v.rect.h.max(1));
-        if self.copy.as_ref().is_none_or(|c| c.2 != w || c.3 != h || c.4 != d.format) {
+        if self.copy.as_ref().is_none_or(|c| c.size() != (w, h) || c.desc().format != fmt) {
             self.copy = None;
-            let tex = dev.create_texture(w, h, 1, USAGE_RENDERTARGET, d.format, POOL_DEFAULT)?;
-            let surf = tex.tex_surface(0)?;
-            self.copy = Some((tex, surf, w, h, d.format));
+            let g = gfx::gpu();
+            let t = g.texture(TextureDesc::d2(w, h, fmt, Usage::RENDER_TARGET | Usage::SAMPLED | Usage::COPY_DST), Contents::None);
+            if !t.ready(g) {
+                return None;
+            }
+            self.copy = Some(t);
         }
-        let (tex, surf, ..) = self.copy.as_ref()?;
-        let src = v.rect.d3d();
-        let dst = Rect { left: 0, top: 0, right: w as i32, bottom: h as i32 };
-        if dev.stretch_rect(&rt, Some(&src), surf, Some(&dst), TEXF_LINEAR) < 0 {
+        let tex = self.copy.clone()?;
+        if !cmd.copy(&scene, Some(v.rect.rect()), &tex, Some(Rect::new(0, 0, w, h)), Filter::Linear) {
             return None;
         }
-        Some((tex.ptr(), v.rect.x, v.rect.y, w, h))
+        Some((tex, v.rect.x, v.rect.y, w, h))
     }
 }
 
