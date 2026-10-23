@@ -164,6 +164,8 @@ pub struct Hulls {
     said_extra: [u32; 3],
     /// The menu scene's ships logged, a bit each.
     said_menu: u32,
+    /// The most damaged-sensor lights one view had, logged.
+    said_sensors: usize,
 }
 
 impl Default for Hulls {
@@ -180,6 +182,7 @@ impl Default for Hulls {
             loaded_at: 0.0,
             said_extra: [0; 3],
             said_menu: 0,
+            said_sensors: 0,
         }
     }
 }
@@ -741,6 +744,20 @@ impl Module for Hulls {
             if let Some(p) = self.prepare(o, v) {
                 view_state(v.key()).posed.insert(o, p);
             }
+        }
+        // The damaged sensors' steady lights, into this view's list before anything
+        // lit reads it (the clusters are built after every module's `begin_view`).
+        let mut left = 32;
+        for p in view_state(v.key()).posed.values() {
+            left -= sprites::Sprites::sensor_lights(&look, p, left);
+            if left == 0 {
+                break;
+            }
+        }
+        // Logged as the most in one view grows (at most 32 lines).
+        if 32 - left > self.said_sensors {
+            self.said_sensors = 32 - left;
+            log!("hulls: {} damaged-sensor light(s) in the view (SensorLight={:.2}, SensorLightReach={:.1})", 32 - left, look.sensor_light, look.sensor_reach);
         }
         if look.shadows {
             let _z = crate::timing::zone("hulls: shadow map");

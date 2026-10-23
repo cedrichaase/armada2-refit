@@ -205,6 +205,9 @@ impl Model {
 struct State {
     models: BTreeMap<String, Option<Rc<Model>>>,
     lights: Lights,
+    /// The points modules added by hand this view (`add_point`), kept across
+    /// `regather_lights`.
+    added: Vec<lights::Point>,
     queue: Vec<Queued>,
     pipes: Pipes,
 }
@@ -221,6 +224,7 @@ struct Queued {
 static mut STATE: State = State {
     models: BTreeMap::new(),
     lights: Lights { dirs: Vec::new(), points: Vec::new() },
+    added: Vec::new(),
     queue: Vec::new(),
     pipes: Pipes::new(),
 };
@@ -253,6 +257,7 @@ pub fn reset() {
 /// Once per view, before any module draws: the lights of this view.
 pub fn begin_view(_v: &View) {
     st().lights = Lights::gather();
+    st().added.clear();
     st().queue.clear();
     clusters::begin_view();
 }
@@ -268,7 +273,10 @@ pub fn set_lights(l: Lights) {
 /// Reads the engine's registered lights again, for a module that registered lights of
 /// its own in its `begin_view` (the ordnance module: shots, warp flashes).
 pub fn regather_lights() {
-    st().lights = Lights::gather();
+    let s = st();
+    s.lights = Lights::gather();
+    // What modules before it added by hand stays (the hulls' damaged sensors).
+    s.lights.points.extend(s.added.iter().copied());
 }
 
 /// The registered lights of the view being drawn.
@@ -281,6 +289,7 @@ pub fn lights() -> &'static Lights {
 /// `begin_view`; the list is gathered again for the next view.
 pub fn add_point(p: lights::Point) {
     st().lights.points.push(p);
+    st().added.push(p);
 }
 
 /// How to draw an instance.

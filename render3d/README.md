@@ -1505,7 +1505,8 @@ hull path (and stands down while a stale `Lighting.asi` is loaded). Settings in 
 `RimLight`, `RimPower`, `HullSun`, `HighlightKnee`, `SelfIllumination`, the `Borg*`
 profile, `PointLights`, `NearFade*`, `Cloak*`, plus `Shadows`, `ShadowSize`,
 `ShadowStrength`, `PlanetShadows`, `BumpStrength`, `SpriteNodes`, `AdditiveMeshes`,
-`TeamColours`, `Scrap`) and the scene lights in `[Lights]` (`Replace`, `KeyColour`,
+`TeamColours`, `Scrap`, and the damaged sensors' `SensorSteady`, `SensorSize`,
+`SensorLight`, `SensorLightReach`, under "Sprites") and the scene lights in `[Lights]` (`Replace`, `KeyColour`,
 `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`).
 
 **What it claims.** An object whose class's `Render` (vtable slot 11) is
@@ -1709,6 +1710,21 @@ Evaluate` plays them (quirks kept: unevenly judged keys played evenly, `linear`
 wrapping), at `Step::Translucent` after the hulls. A scrap object's `glowdmoon` node
 takes `Scrap::Render`'s colour.
 
+**Damaged sensors.** A craft's `sensors` group holds the `sensor` sprite nodes
+(`sensorftur` and the rest on Federation stations). `damage.spr` draws them as the
+`origin` sprite, green: the `xspark01` spark flipbook, 16 frames in 0.5 s. They show
+while the craft's sensors are down (byte `+0x9f`, `game::DAMAGE_NODES`), and in the
+Mutara nebula, which takes every ship's sensors down, that means on most Borg ships
+(the scout has two). Played as stock, the flipbook read in game as a flickering green
+light. The user wanted it steady, smaller, and a light source. So, with
+`SensorSteady=1`, such a node is held on the flipbook's first frame (a full star) at
+`SensorSize=` (0.5) of stock's size. Each shown node is also a steady point light of
+the node's colour times `SensorLight=` (2), reaching `SensorLightReach=` (4) times its
+drawn half size: a small green glow on the plating beside it (about 7 units on a
+scout). `begin_view` adds these lights to the scene's list by hand, at most 32 a view.
+The cluster list takes them, and the gas takes them as sparks (`Gas::Spark`). A
+cloaking hull gives none.
+
 **Holograms** (`TimedHoloEffect`, the object's `+0x174`). `GameObject::RenderInternal`
 draws an object with a hologram as the class the hologram shows, in place of its hull:
 `TimedHoloEffect::RenderHologram` (0x60f730) calls that class's `DisableSpecialNodes`
@@ -1820,7 +1836,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
 `MoonCrackCore`, `MoonCrackDepth`, `MoonCrackFalloff`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 3.5, `LitBeam` 1.5, `LitCorona` 0.25, `LitKnee` 6, `LitTemporal` 0.5, `LitClip` 0.5), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 3.5, `LitBeam` 1.5, `LitSpark` 0.3, `LitCorona` 0.25, `LitKnee` 6, `LitTemporal` 0.5, `LitClip` 0.5), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -2018,8 +2034,16 @@ no lights is drawn as before. Which light is what, to the gas
 a torpedo's or pulse's (each ordnance class's light, which rides with its shots) is a
 **corona**, bright within `LitCorona=` of its reach and fading softly to it,
 (1 - x)^1.5 (0.45 + 0.55 / (1 + (x / LitCorona)^2)) for x the distance over the reach,
-since a ball lit evenly to its edge read as a sphere in the gas; a beam's line light
-takes `LitBeam=`; the nebulae's own lights (`world::lights`) and a planet's day side
+since a ball lit evenly to its edge read as a sphere in the gas. A **spark** at a hull
+gets the same corona, at `LitSpark=` (0.3) of its light: the repair and construction
+welds, the bees' welds, the shields-down discharges and the damaged sensors' glow
+(`Gas::Spark`; `LightPool::register_spark`, or `scene::lights::SPARK_POINT` for a
+point added by hand). Taken as plain lights, the shields-down discharges lit a ball of
+gas 1.2 bounding radii wide about the strike they were at, blue. In the Mutara, which
+takes every ship's shields down, the user saw these as big round blue blobs beside
+every Borg ship (2026-10-23). A/B on the bench with `[Shields] DownLight=0` put the
+blobs on the discharges, not the welds or the hits. A beam's line light takes
+`LitBeam=`; the nebulae's own lights (`world::lights`) and a planet's day side
 light no gas at all. The shape is the clusters' first choice (the alternative, a froxel
 volume filled by compute and integrated, would spend a pass and a 3D storage image on
 what the march, which already walks the depth, reads for one buffer word per step

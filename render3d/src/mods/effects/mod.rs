@@ -194,6 +194,15 @@ impl LightPool {
         }
         true
     }
+    /// `register`, the light then a spark to the nebulae's gas (`Gas::Spark`,
+    /// `[Nebulae] LitSpark=`): a small corona about it, not a ball its reach wide.
+    pub fn register_spark(&mut self, i: usize, pos: V3, colour: V3, start: f32, range: f32) -> bool {
+        if !self.register(i, pos, colour, start, range) {
+            return false;
+        }
+        crate::scene::lights::set_gas(self.objs[i], crate::scene::lights::Gas::Spark);
+        true
+    }
 }
 
 /// Settings from `Render3D.ini`, one section per part.

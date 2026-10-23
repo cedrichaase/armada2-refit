@@ -5,6 +5,25 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.29.0 — 2026-10-23
+
+Layers: render3d 0.25.0, testbench 3.63.0.
+
+### Added
+- render3d: the Borg's damaged sensors (the green sparks seen in the Mutara) hold
+  still at half size and give a small steady light. New `[Hulls]` keys:
+  `SensorSteady`, `SensorSize`, `SensorLight`, `SensorLightReach`. New
+  `[Nebulae] LitSpark=` key (render3d 0.25.0).
+- testbench: `render3d-hull-sparks` (testbench 3.63.0).
+
+### Fixed
+- render3d: welds and shields-down discharges light only a tight corona of nebula gas,
+  no longer a wide round blue ball. The shipped `Render3D.ini` lists `LitCorona=`. The
+  scene's hand-added lights survive the ordnance module's second read of the engine's
+  lights (render3d 0.25.0).
+
+Installed, not yet seen in game.
+
 ## 13.28.0 — 2026-10-23
 
 Layers: render3d 0.24.0, testbench 3.62.0.
