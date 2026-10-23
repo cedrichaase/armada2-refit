@@ -5,6 +5,19 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.54.0 — 2026-10-23
+
+### Fixed
+- `qol-refused-advisor` selects the starbase after Home (`center_player`), which puts it
+  at 835,250 whatever the random start position; the start view's own place for it
+  varies from run to run, and the old click at 735,305 selected nothing in some runs, so
+  its presses queued nothing. It now checks each link: the selection (`info: Builder Starbase`, the bar's layout), the
+  keys the bar took (`Q=build`, `Q=fconst`), the local bank's payments (3250, 3000), the
+  refusal, the advisor for the local team and its chat line. Its log waits end on lines
+  written after the action (the startup line is checked before LAUNCH).
+
+Installed, not yet seen in game.
+
 ## 3.51.0 — 2026-10-23
 
 ### Added

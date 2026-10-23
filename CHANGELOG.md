@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.17.0 — 2026-10-23
+
+Layers: testbench 3.54.0.
+
+### Fixed
+- `qol-refused-advisor` selects the starbase after Home, wherever the start view put it, and checks
+  the selection, the keys, the payments and the refusal it stages (testbench 3.54.0).
+
+Installed, not yet seen in game.
+
 ## 13.12.0 — 2026-10-23
 
 Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.51.0.
