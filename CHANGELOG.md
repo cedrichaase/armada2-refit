@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.15.0 — 2026-10-23
+
+Layers: testbench 3.52.0, models 5.0.1.
+
+### Added
+- The bench's stock cache: stock-start sessions copy a kept `a2mod stock` of the install
+  instead of running it on each clone (testbench 3.52.0).
+
+### Changed
+- `hull-sod.py` keeps its rounded models in `$A2_DATA/cache/hull-sod/`, so a repeat
+  install takes 3 s instead of 25 s (models 5.0.1).
+
+Installed, not yet seen in game.
+
 ## 13.12.0 — 2026-10-23
 
 Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.51.0.

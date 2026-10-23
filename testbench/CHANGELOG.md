@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.52.0 — 2026-10-23
+
+### Added
+- The stock cache (`bench/stockcache.py`): a session that starts from stock (`--mod
+  stock`, `--install`, `--assets none`) copies the game from `~/.cache/a2test/stock/<key>/`,
+  where `a2mod stock` has run once per state of the install, instead of running it on
+  every clone (12 s a session). Keyed by the install's tree (`lstat`, ctime included)
+  and the `a2mod` script; built under a flock and renamed into place.
+  `a2test stock-cache status | rebuild | drop`; `A2TEST_STOCK_CACHE=0` turns it off.
+
+Installed, not yet seen in game.
+
 ## 3.51.0 — 2026-10-23
 
 ### Added

@@ -148,6 +148,14 @@ drawn on the CPU every frame, and a box gains nothing. 176 of 225 hull models ch
 largest, a station, gains 32k triangles. Only v1.93 models, found by the eight zero bytes ahead of a
 mesh and read back after writing; other versions are skipped.
 
+Rounding all 225 takes 25 s of Python, and every `./install` used to pay it again (the
+test bench at every `--install` session). The result is a pure function of the stock
+bytes, the script and `--split`/`--crease`, so each model is kept in
+`$A2_DATA/cache/hull-sod/` (derived from the game's files, so never in a checkout), named
+by a hash of all four, and read back instead of rebuilt: 3 s, byte for byte the same
+(measured over all 225). An entry that fails the read-back check `build()` makes is
+rebuilt; `A2_HULL_SOD_CACHE=0` turns it off.
+
 ## The asteroids
 
 An asteroid field draws three to eight rocks out of the models the engine lists:

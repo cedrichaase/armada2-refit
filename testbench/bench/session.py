@@ -28,7 +28,7 @@ import uuid
 import time
 from pathlib import Path
 
-from . import config, jobs, slots
+from . import config, jobs, slots, stockcache
 from .log import Log
 
 
@@ -231,9 +231,35 @@ class Session:
 
     # ------------------------------------------------------------------ clone + prepare
 
+    def starts_from_stock(self):
+        """`--mod stock` and `--install` (and so `--assets none`) start from stock."""
+        return self.s['mod'] == 'stock' or bool(self.s.get('installs'))
+
     def clone(self):
         t = time.time()
-        for src, dst in ((config.GAME, self.game_dir), (config.PREFIX, self.prefix_dir)):
+        pairs = [(config.GAME, self.game_dir), (config.PREFIX, self.prefix_dir)]
+        # A stock start takes the game from the stock cache (bench/stockcache.py): the
+        # install with `a2mod stock` already run, made once per state of the install.
+        self.s['stock_cache'] = None
+        if self.starts_from_stock() and stockcache.enabled():
+            if not config.GAME.is_dir():
+                raise GameError(f'no {config.GAME}')
+            try:
+                info = stockcache.clone_stock(self.game_dir)
+            except stockcache.StockCacheError as e:
+                shutil.rmtree(self.game_dir, ignore_errors=True)
+                self.log.action(f'stock cache not used: {str(e).splitlines()[0]}', status='warn',
+                                detail=str(e))
+            else:
+                pairs = pairs[1:]
+                self.s['stock_cache'] = {k: info[k] for k in ('key', 'built', 'built_now', 'build_seconds')}
+                self.s['stock_cache_log'] = info['log']
+                self.log.action(
+                    f"stock game from the stock cache {info['key']}"
+                    + (f" (built now, in {info['build_seconds']:.1f}s)" if info['built_now']
+                       else f" (built {info['built']})"),
+                    detail=f"{stockcache.ROOT / info['key'] / 'game'} -> {self.game_dir}")
+        for src, dst in pairs:
             if not src.is_dir():
                 raise GameError(f'no {src}')
             r = subprocess.run(['cp', '-a', '--reflink=always', str(src), str(dst)],
@@ -244,8 +270,9 @@ class Session:
         exc = self.game_dir / 'exception.txt'
         self.s['exception_mtime'] = exc.stat().st_mtime if exc.exists() else None
         self.save()
-        self.log.action(f'cloned the game and prefix (reflink) in {time.time() - t:.1f}s',
-                        detail=f'{config.GAME} -> {self.game_dir}\n{config.PREFIX} -> {self.prefix_dir}')
+        what = 'the prefix' if self.s.get('stock_cache') else 'the game and prefix'
+        self.log.action(f'cloned {what} (reflink) in {time.time() - t:.1f}s',
+                        detail='\n'.join(f'{a} -> {b}' for a, b in pairs))
 
     def prepare(self):
         w, h = self.res
@@ -260,15 +287,23 @@ class Session:
                    XDG_DATA_HOME=str(self.work / 'xdg'), TMPDIR=str(self.work))
         plog = self.dir / 'logs' / 'prepare.log'
         installs = self.s.get('installs') or []
+        stock = [] if self.s.get('stock_cache') else [[str(config.REPO / 'a2mod'), 'stock']]
+        if self.s.get('stock_cache'):
+            # Already stock: the clone came from the stock cache. Its a2mod output goes in
+            # the log where the step's own would have been.
+            with open(plog, 'a') as f:
+                f.write(f"$ a2mod stock  (stock cache {self.s['stock_cache']['key']}, "
+                        f"built {self.s['stock_cache']['built']})\n{self.s.get('stock_cache_log', '')}[cached]\n\n")
+            self.log.action(f"prepare: a2mod stock, from the stock cache {self.s['stock_cache']['key']}",
+                            detail='logs/prepare.log')
         if self.s['mod'] == 'stock':
-            steps = [[str(config.REPO / 'a2mod'), 'stock']]
+            steps = stock
         elif installs:
             # Checkouts stacked with --install: a known baseline first -- stock, whatever
             # the user's install happens to carry -- then each checkout's ./install, in
             # the order given, into the clone. So what the case shows is those commits
             # and nothing else, and the report names them.
-            steps = [[str(config.REPO / 'a2mod'), 'stock']] + \
-                    [[str(Path(i['path']) / 'install')] for i in installs]
+            steps = stock + [[str(Path(i['path']) / 'install')] for i in installs]
         else:
             # The user's install with this checkout's UI.asi: the UI lays the HUD, menus
             # and cursor out at run time for whatever mode is set, so the install takes
