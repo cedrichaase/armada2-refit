@@ -18,6 +18,7 @@ LoadCursorA@8
 SetCursor@4
 PostQuitMessage@4
 GetFocus@0
+GetActiveWindow@0
 SetFocus@4
 OpenClipboard@4
 CloseClipboard@0

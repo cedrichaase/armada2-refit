@@ -422,6 +422,23 @@ def s_move(c, m):
     return f'mouse at {x},{y}'
 
 
+@step(r'^take the focus (?:away )?from the game(?: with (?:an? )?(?P<how>overlay|window|screenshot))?'
+      r'(?: for (?P<n>\d+(?:\.\d+)?) ?(?:seconds?|secs?|s))?(?:,? then give it back)?$')
+def s_take_focus(c, m):
+    """`take the focus from the game [with a window | with an overlay] [for N seconds]`:
+    another window on the session's display takes the focus and is closed, or a region
+    screenshot's overlay (`slurp`) is put over the game and a region dragged on it; the
+    game has the focus again after."""
+    how = (m.group('how') or 'window').lower()
+    how = 'overlay' if how in ('overlay', 'screenshot') else 'window'
+    from .session import GameError
+    try:
+        c.sess.take_focus(float(m.group('n') or 1), how)
+    except GameError as e:
+        raise StepFailed(str(e))
+    return f'focus taken with {"an overlay" if how == "overlay" else "a window"} and given back'
+
+
 @step(r'^press (?:the )?(?P<key>[\w+-]+)(?: key)?(?: (?P<n>\d+) times)?$')
 def s_press(c, m):
     for _ in range(int(m.group('n') or 1)):
