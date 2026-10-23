@@ -3,11 +3,11 @@
 Resolutions: 1280x720
 Reference: 1280x720
 Mod: refit
-Setup: testbench/scene/bench-setup.sh ending
+Setup: display/bench-mode.sh forward ending
 Timeout: 25 min
 
 Run with `--install . --install display`: the game as `./install` gives it, with
-Display8 (forward mode, `Trace=1`) counting every Direct3D 8 call by context
+Display8 (switched to forward mode by `display/bench-mode.sh`, `Trace=1`) counting every Direct3D 8 call by context
 (`display/README.md`). Phase 1 of the display plan: the contexts whose last engine
 draws the UI took over (`ui/HUD.md`, "The engine's last draws"; `ui/README.md`,
 "Movies") must show no `Draw*` call from `Armada2.exe`. The intro movie is drawn by

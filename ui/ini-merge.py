@@ -3,23 +3,32 @@
 shipped one has and it lacks, in its own section; the player's values stay (as
 render3d/install.sh does for Render3D.ini).
 
-One exception, when the shipped defaults themselves change: `[UI] Defaults` numbers
-them, and a file brought up to an older number (or none: 1) has each key that a newer
-set switched on moved to the new default, but only where it still holds the old
-default. A value the player changed stays. Defaults 2 switched every part of the UI
-on (the HUD's panels, the menus, the loading screen, the cursor), which were all 0
-before; ui/README.md, "Installing"."""
+One exception, when the shipped defaults themselves change: a `Defaults=` key numbers
+them, in whichever section of the shipped file has it (`[UI]` in UI.ini, `[Display8]`
+in Display8.ini), and a file brought up to an older number (or none: 1) has each key
+that a newer set changed moved to the new default, but only where it still holds the
+old default. A value the player changed stays. UI.ini's Defaults 2 switched every part
+of the UI on (the HUD's panels, the menus, the loading screen, the cursor), which were
+all 0 before (ui/README.md, "Installing"); Display8.ini's Defaults 2 made the stub on
+Backend=auto the default (display/README.md, "Installing")."""
 import re
 import sys
 
-# Defaults number -> {(section, key): the value the previous defaults had}.
+# The section that holds `Defaults=` -> {defaults number -> {(section, key): the value
+# the previous defaults had}}.
 UPGRADES = {
-    2: {('ui', 'cursor'): '0',
-        **{('hud', k): '0' for k in ('bar', 'info', 'minimap', 'selection', 'unitview',
-                                     'resources', 'buttons', 'messages', 'pause', 'replay',
-                                     'overlay', 'chat', 'comm', 'dropplayer', 'loadwait')},
-        ('menus', 'enable'): '0',
-        ('loading', 'enable'): '0'},
+    'ui': {
+        2: {('ui', 'cursor'): '0',
+            **{('hud', k): '0' for k in ('bar', 'info', 'minimap', 'selection', 'unitview',
+                                         'resources', 'buttons', 'messages', 'pause', 'replay',
+                                         'overlay', 'chat', 'comm', 'dropplayer', 'loadwait')},
+            ('menus', 'enable'): '0',
+            ('loading', 'enable'): '0'},
+    },
+    'display8': {
+        2: {('display8', 'mode'): 'forward',
+            ('display8', 'backend'): 'd3d9'},
+    },
 }
 
 KEY = re.compile(r'^\s*(\w+)\s*=\s*(.*?)\s*$')
@@ -59,20 +68,23 @@ lines = open(sys.argv[2]).read().splitlines()
 # The defaults' upgrade, before any key is added.
 ship_vals = values(shipped_text.splitlines())
 have_vals = values(lines)
-ship_n = int(ship_vals.get(('ui', 'defaults'), (0, '1'))[1] or 1)
-have_n = int(have_vals.get(('ui', 'defaults'), (0, '1'))[1] or 1)
-for n in sorted(UPGRADES):
+dsec = next((s for (s, k) in ship_vals if k == 'defaults'), None)
+label = sys.argv[2].replace('\\', '/').rsplit('/', 1)[-1]
+ship_n = int(ship_vals.get((dsec, 'defaults'), (0, '1'))[1] or 1)
+have_n = int(have_vals.get((dsec, 'defaults'), (0, '1'))[1] or 1)
+upgrades = UPGRADES.get(dsec, {})
+for n in sorted(upgrades):
     if not have_n < n <= ship_n:
         continue
-    for (sec, key), old in UPGRADES[n].items():
+    for (sec, key), old in upgrades[n].items():
         if (sec, key) in have_vals and (sec, key) in ship_vals:
             i, v = have_vals[(sec, key)]
             if v == old and v != ship_vals[(sec, key)][1]:
                 name = KEY.match(lines[i]).group(1)
                 lines[i] = f'{name}={ship_vals[(sec, key)][1]}'
-                print(f'  UI.ini: [{sec}] {name} {v} -> {ship_vals[(sec, key)][1]} (defaults {n})')
-if ('ui', 'defaults') in have_vals and have_n < ship_n:
-    i, _ = have_vals[('ui', 'defaults')]
+                print(f'  {label}: [{sec}] {name} {v} -> {ship_vals[(sec, key)][1]} (defaults {n})')
+if (dsec, 'defaults') in have_vals and have_n < ship_n:
+    i, _ = have_vals[(dsec, 'defaults')]
     lines[i] = f'{KEY.match(lines[i]).group(1)}={ship_n}'
 
 have = parse('\n'.join(lines))

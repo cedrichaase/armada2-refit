@@ -4,6 +4,17 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.8.0 — 2026-10-23
+
+### Changed
+- The shipped default is the stub on `Backend=auto` (`Mode=stub`, `Backend=auto`; were
+  `forward`, `d3d9`), the user's decision once Vulkan was confirmed in game.
+- `Defaults=2` in `Display8.ini`: `display/install` (`ui/ini-merge.py`) moves an
+  installed `Mode=forward` and `Backend=d3d9` to the new defaults, and keeps any other
+  value a player set.
+
+Installed, not yet seen in game.
+
 ## 0.7.0 — 2026-10-23
 
 ### Added

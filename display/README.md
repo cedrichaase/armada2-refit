@@ -11,17 +11,18 @@ engine ends up drawing nothing: Display8 gives it a device that accepts everythi
 
 ## Status
 
-**Two modes, forward by default.** `./install` puts Display8 in (`display/install`),
-`a2mod` switches it as the `display` layer, and `platform/d3d8-chain.py` switches the
-chain behind it. In **forward mode** (`Mode=forward`, shipped) it stands in front of the
-real chain and passes every call through; on the test bench it traces every call
-(`Trace=auto`: on in an `a2test` clone). In **stub mode** (`Mode=stub`, "Stub mode"
-below) the real chain is never loaded, and render3d and the UI draw the whole frame on a
-device of Display8's own: Direct3D 9 (`Backend=d3d9`, shipped), Vulkan or Direct3D 12
-("Backends"), or the first of them that starts (`Backend=auto`, "Choosing a backend").
-Forward stays the default until a backend has been confirmed in game.
-Display8 is not in the release package yet: in forward mode it changes nothing a player
-sees.
+**Two modes, the stub by default (since display 0.8.0).** `./install` puts Display8 in
+(`display/install`), `a2mod` switches it as the `display` layer, and
+`platform/d3d8-chain.py` switches the chain behind it. In **stub mode** (`Mode=stub`,
+shipped; "Stub mode" below) the real chain is never loaded, and render3d and the UI
+draw the whole frame on a device of Display8's own: the first that starts of Vulkan,
+Direct3D 12 and Direct3D 9 (`Backend=auto`, shipped; "Choosing a backend"), or the one
+`Backend=` names ("Backends"). The user confirmed Vulkan in game on 2026-10-23 and made
+this the default. In **forward mode** (`Mode=forward`, the default until display 0.7.0)
+it stands in front of the real chain and passes every call through; on the test bench
+it traces every call (`Trace=auto`: on in an `a2test` clone). A `Display8.ini` with
+neither key falls back to forward and d3d9 in the code; the shipped file names both.
+Display8 is not in the release package yet.
 
     ./a2test session start --res 1280x720 --install .
 
@@ -34,7 +35,18 @@ sees.
 | `d3d8.dll` | Display8 |
 | `d3d8_real.dll` | the `d3d8.dll` that was there: crosire's d3d8to9 after `./install`'s platform step. Display8 loads it (`Real=auto`) and passes every call to it |
 | `d3d8.dll.a2display-backup` | the same file again: what `a2mod stock` copies back into `d3d8.dll`. Stock is the stock chain's binary, not ours passing through |
-| `Display8.ini` | the settings; a key the player's copy lacks is added (`ui/ini-merge.py`) |
+| `Display8.ini` | the settings; a key the player's copy lacks is added (`ui/ini-merge.py`), and a value that still holds an older shipped default is moved to the new one (below) |
+
+**When the shipped defaults change**, an install must not keep the old ones by
+accident nor undo a player's choice. `Defaults=` numbers the set a file holds (as
+`UI.ini`'s does), and `ui/ini-merge.py` brings a copy with an older number (or none: 1)
+up to the new one: each key the newer set changed moves to its new value only where it
+still holds the old default. Defaults 2 (display 0.8.0) is `Mode=stub`,
+`Backend=auto`, where 1 was `forward` and `d3d9`: a game installed with display 0.7.0 or
+earlier comes to the stub on `auto`, and a game whose `Backend=vulkan` (or any value
+other than d3d9) was set by hand keeps it, its `Mode=forward` moved to stub. A player
+who had chosen `forward` or `d3d9` before their default changed is moved too; the merge
+cannot tell that choice from the old default, and prints each key it moves.
 
 With no `d3d8.dll` in the game directory (the system's is the chain), Display8 goes in
 alone and loads the system's own (`GetSystemDirectory`: SysWOW64 on 64-bit Windows,
@@ -240,10 +252,10 @@ cannot start never fails the game while d3d9 lives.
 
 | `Backend=` | Tried |
 |---|---|
-| `d3d9` (shipped) | Direct3D 9, opened at `Direct3DCreate8` as before |
+| `d3d9` | Direct3D 9, opened at `Direct3DCreate8` as before |
 | `vulkan` | Vulkan, then Direct3D 9 |
 | `d3d12` | Direct3D 12, then Direct3D 9 |
-| `auto` | Vulkan, then Direct3D 12, then Direct3D 9, on every system |
+| `auto` (shipped) | Vulkan, then Direct3D 12, then Direct3D 9, on every system |
 | a list, `d3d12,vulkan` | in that order, then Direct3D 9 |
 
 `auto`'s order is the user's (2026-10-23), not the display plan's (phase 6 had Direct3D

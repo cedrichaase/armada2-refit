@@ -5,11 +5,12 @@ Reference: 1280x720
 Mod: refit
 Timeout: 15 min
 
-Run with `--install .`, and on the stub through `display/stub-scenario.sh`:
+Run with `--install .` (the stub on `Backend=auto`, shipped since display 0.8.0: Vulkan
+on the GPU), and in the other modes and backends through `display/stub-scenario.sh`:
 
     ./a2test run display-movie --install . -j 1
-    ./a2test run "$(display/stub-scenario.sh display-movie)" --install . -j 1
-    A2TEST_VULKAN_GPU=1 ./a2test run "$(display/stub-scenario.sh display-movie stub Backend=vulkan)" --install . -j 1
+    ./a2test run "$(display/stub-scenario.sh display-movie forward)" --install . -j 1
+    ./a2test run "$(display/stub-scenario.sh display-movie stub Backend=d3d9)" --install . -j 1
 
 The cutscene proxy hands each frame to the UI (`ui_present_movie`), which draws it at
 the engine's `Present` (`ui/README.md`, "Movies"). In stub mode Display8 used to copy

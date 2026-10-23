@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.19.2 — 2026-10-23
+
+### Changed
+- `ini-merge.py`'s defaults upgrade reads `Defaults=` from whichever section of the
+  shipped file has it, with the upgrades kept per file (`[UI]` for `UI.ini`,
+  `[Display8]` for `Display8.ini`); `UI.ini`'s merge is as before.
+
+Installed, not yet seen in game.
+
 ## 0.19.1 — 2026-10-23
 
 ### Fixed

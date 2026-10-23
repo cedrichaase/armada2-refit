@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.23.0 — 2026-10-23
+
+Layers: display 0.8.0, ui 0.19.2, testbench 3.57.1.
+
+### Changed
+- Display8 ships in stub mode on `Backend=auto` (display 0.8.0): render3d and the UI
+  draw the whole frame on Vulkan, else Direct3D 12, else Direct3D 9. An install brings
+  a `Display8.ini` that still holds the old defaults (`forward`, `d3d9`) to the new ones
+  and keeps a value set by hand (`Defaults=2`, `ui/ini-merge.py`, ui 0.19.2).
+  `display-inventory` and `display-engine-draws` pin forward mode (testbench 3.57.1).
+
+Installed, not yet seen in game.
+
 ## 13.22.0 — 2026-10-23
 
 Layers: display 0.7.0, testbench 3.57.0.
