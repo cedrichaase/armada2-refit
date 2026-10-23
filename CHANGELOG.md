@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.30.0 — 2026-10-23
+
+Layers: render3d 0.26.0, testbench 3.64.0.
+
+### Changed
+- render3d's phaser beams light the hulls, stations, rocks and planets they pass on
+  Vulkan and Direct3D 12, evenly along the beam, falling off with distance from it,
+  out to 200 units (was 4 full, 40 gone); the emitter and the hit stay brighter. New
+  keys `BeamCore`, `BeamGasReach`; `BeamLight` and `BeamReach` take new defaults, and
+  an install moves a player's old defaults to them (render3d 0.26.0).
+
+### Added
+- testbench: the `beam-pass` scene and `render3d-beam-light` (testbench 3.64.0).
+
+Installed, not yet seen in game.
+
 ## 13.29.0 — 2026-10-23
 
 Layers: render3d 0.25.0, testbench 3.63.0.
