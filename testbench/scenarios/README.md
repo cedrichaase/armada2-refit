@@ -59,26 +59,48 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Dump the frame called "NAME"` | Render3D.asi's targets (PFM) and UI.asi's presented frame (PPM), read back inside the game, into `dumps/NAME/` with PNG previews (`../README.md`, "Frame dumps"); fails when no plugin dumped |
 | `Note "TEXT"` | a line in the log |
 | `Wait up to 240 seconds for "Scene.log" to say "TEXT"` | polls a log beside `Armada2.exe` for a line with TEXT written since the last action (a launch, click, key, typing, drag or Scene command; each launch deletes the old logs), and goes on as soon as one is. At the time limit a line from before that action passes; none at all is a failed check |
-| `Wait up to 50 seconds for the logs the next steps expect` | the fixed wait before a run of `Expect "LOG" contains "TEXT"` steps, ended as soon as every line they expect has been written since the last action; when one has not, the whole time, as `Wait 50 seconds` would. It checks nothing: the Expect steps after it do. See "Waiting on logs" |
+| `Wait up to 50 seconds for the logs the next steps expect` | the fixed wait before a run of `Expect "LOG" contains "TEXT"` steps, ended as soon as every line they expect has been written since the last action; when one has not, the whole time, as `Wait 50 seconds` would. It checks nothing: the Expect steps after it do. See "Waits and checks" |
 | `Scene "select yard1 yard2"` | commands to `Scene.asi` (`../scene/README.md`), `;` between several; a refused command fails the step. Needs `Setup: testbench/scene/bench-setup.sh <scene>` |
 | `Expect scene "selection" answers "TEXT"` / `… not answer …` | that command's own answer, not the whole `Scene.log` (a check) |
 | `Include "_enter-borg-mission"` | that file's steps, in place, at parse time. Files starting with `_` are fragments and are not listed |
 
-## Waiting on logs
+## Waits and checks
 
-A fixed `Wait 50 seconds` before `Expect "Scene.log" contains "scene ready"` waits 50 s
-whether the scene took 15 or 45. Where the steps after a wait are log checks, wait for
-the logs instead (`Wait up to 50 seconds for the logs the next steps expect`): the same
-checks pass and fail, sooner. A log line says what a plugin did, not what is on the
-screen, so it is a signal to go on, never the check itself: where a screenshot, OCR or a
-judged step follows, it still decides.
+A wait decides **when** the next step runs; a check decides **whether** the case passes.
+Keep them apart: a wait never stands in for a check, and a fixed wait is the last resort,
+because it costs its whole time in every case at every resolution even when the game was
+ready long before.
 
-Only lines written since the last action count, so a line an earlier step left in the
-log cannot end the wait for the next one. A log line logged when a plugin loads ("module
-effects: on") is written before any click; after one it never counts, and the wait runs
-its whole time, as before. Keep short waits between an input and a screenshot or an OCR
-check fixed: they also give the frame time to be drawn, which a log line written while
-the frame is built does not promise.
+Pick the wait by what the next steps need:
+
+| The next steps need | Wait with | Then check with |
+|---|---|---|
+| something a plugin does (the scene is up, an effect drawn, a key handled) | `Wait up to N seconds for the logs the next steps expect` | `Expect "LOG" contains "TEXT"`, one per line |
+| a log line the steps after it read (a join code) | `Wait up to N seconds for "LOG" to say "TEXT"` | whatever follows |
+| text or a screen to show | `Wait up to N seconds for "TEXT"` / `Wait for the main menu` (OCR) | the wait is the check: it fails at the limit |
+| the result of a Scene command | nothing: `Scene "…"` returns on Scene.asi's answer | `Expect scene "…" answers "…"` |
+| the next frame to be drawn, before a screenshot or OCR check | a short fixed `Wait 2 seconds` | the screenshot, OCR or judged step |
+| time to pass in the game (a battle, an effect developing, a cooldown) | a fixed `Wait N seconds`: here the time is the point | the screenshot or check after it |
+
+The rules behind the table:
+
+- **A log line says what a plugin did, not what is on the screen.** Waiting on one is a
+  signal to go on; where a screenshot, OCR or a judged step follows, that still decides.
+  Don't replace a visual check with a log check because it is faster.
+- **Only lines written since the last action count** (a launch, click, key, typing, drag
+  or Scene command), so a line an earlier step left cannot end the wait for the next.
+  A line written as a plugin loads ("module effects: on") is older than any click; after
+  one, a wait on it runs its whole time. Wait on something the action causes.
+- **A log wait can end before the frame is drawn**, since plugins log while they build
+  it. Keep the short fixed wait between an input and a screenshot or OCR check.
+- **Set N to the slowest you have seen, with margin.** A log wait that passes costs only
+  the time it took, so a generous limit is free; a fixed wait costs all of it.
+- **Need a wait nothing logs for?** Add the line to the plugin (or to Scene.asi), written
+  when the thing has happened, and wait on it. That is better than guessing a time.
+- **Prove a wait waits on the right thing**: run the scenario and read the step's detail
+  in `steps.jsonl`. "all 3 written after 0.1 s" right after a launch is right when the
+  launch step itself took 12 s; "waited the full 45 s" means the line never came after the
+  action and the wait did nothing for you.
 
 ## Several players
 
