@@ -98,6 +98,10 @@ struct Settings {
     /// The gas's share of a fireball's light, a bolt's and a beam's line; a bolt's
     /// corona, of its reach (`LitExplosion=`, `LitBolt=`, `LitBeam=`, `LitCorona=`).
     lit_explosion: f32,
+    /// A fireball's core in the gas, in the dead craft's radii, and the wash beyond it
+    /// out to the light's reach (`LitExplosionCore=`, `LitExplosionFar=`).
+    lit_explosion_core: f32,
+    lit_explosion_far: f32,
     lit_bolt: f32,
     lit_beam: f32,
     /// A spark's at a hull (a weld, a shields-down discharge, a sensor's glow): a
@@ -140,7 +144,9 @@ impl Settings {
             lit_tint: math::saturate(ini.float(s, "LitTint", 0.5)),
             lit_temporal: math::saturate(ini.float(s, "LitTemporal", 0.5)),
             lit_clip: math::clamp(ini.float(s, "LitClip", 0.5), 0.1, 1.0),
-            lit_explosion: ini.float(s, "LitExplosion", 0.75).max(0.0),
+            lit_explosion: ini.float(s, "LitExplosion", 1.5).max(0.0),
+            lit_explosion_core: math::clamp(ini.float(s, "LitExplosionCore", 2.0), 0.1, 20.0),
+            lit_explosion_far: math::saturate(ini.float(s, "LitExplosionFar", 0.12)),
             lit_bolt: ini.float(s, "LitBolt", 3.5).max(0.0),
             lit_beam: ini.float(s, "LitBeam", 1.5).max(0.0),
             lit_spark: ini.float(s, "LitSpark", 0.3).max(0.0),
@@ -863,7 +869,7 @@ struct March {
     view: usize,
     eye: [f32; 4],
     cols: [[f32; 4]; 4],
-    /// `Lit=`: the march and `Temporal=` take their lit twins, c104..c105 (`lit_k`).
+    /// `Lit=`: the march and `Temporal=` take their lit twins, c104..c107 (`lit_k`).
     lit: bool,
 }
 
@@ -1821,16 +1827,17 @@ impl Nebulae {
         crate::timing::mark("gas: filter, onto the frame");
     }
 
-    /// c104..c105 of the lit twins (`world_nebula.hlsl`, "light inside the gas"): the
+    /// c104..c107 of the lit twins (`world_nebula.hlsl`, "light inside the gas"): the
     /// light scattered per world unit of the densest gas, its tint, the weight of the lit
     /// share in `temporal_ps` (full from half the gas's light), the clip there; this
-    /// frame's share there.
-    fn lit_k(&self) -> [f32; 12] {
+    /// frame's share there; each kind's share; a fireball's core and wash.
+    fn lit_k(&self) -> [f32; 16] {
         let c = &self.cfg;
         [
             c.lit_strength * 0.01, c.lit_tint, 2.0, c.lit_clip,
             c.lit_temporal.max(c.temporal), c.lit_corona, if c.lit_knee > 0.0 { 1.0 / c.lit_knee } else { 0.0 }, 0.0,
             c.lit_explosion, c.lit_bolt, c.lit_beam, c.lit_spark,
+            1.0 / c.lit_explosion_core, c.lit_explosion_far, 0.0, 0.0,
         ]
     }
 

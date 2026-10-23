@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.68.0 — 2026-10-23
+
+### Added
+- `render3d-nebula-explosion`: on Display8's Vulkan stub, a Sovereign blown up inside
+  the Mutara gas and another just outside it, paused 22 and 60 ticks after each, for
+  how far a fireball lights the gas.
+
+Installed, not yet seen in game.
+
 ## 3.67.0 — 2026-10-23
 
 ### Added
