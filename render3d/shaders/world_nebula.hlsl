@@ -534,7 +534,7 @@ cbuffer world_nebula_lit : register(b1)
 {
     float4 k_nl      : CREG(104); // x: light scattered per world unit of the densest gas (LitStrength= / 100); y: tinted by the gas's hue (LitTint=); z: the lit share's weight (temporal_ps); w: the clip where lit (of TemporalClip=)
     float4 k_nlt     : CREG(105); // x: this frame's share where lit (LitTemporal=); y: a bolt's corona, of its reach (LitCorona=); z: 1 / the knee (LitKnee=, 0: none)
-    float4 k_nlk     : CREG(106); // the gas's share of a fireball's light (LitExplosion=), a bolt's (LitBolt=), a beam's line (LitBeam=)
+    float4 k_nlk     : CREG(106); // the gas's share of a fireball's light (LitExplosion=), a bolt's (LitBolt=), a beam's line (LitBeam=), a spark's (LitSpark=)
 };
 
 static bool nl_on = false;
@@ -562,16 +562,17 @@ float3 nl_light(float3 p)
             continue;
         float3 L;
         float3 c;
-        if (gk == 2u) {
-            // A bolt: a corona, bright close about the shot (within LitCorona= of its
-            // reach) on a soft tail out to the reach, never a ball lit to its edge.
+        if (gk == 2u || gk == 4u) {
+            // A bolt, or a spark at a hull (a weld, a shields-down discharge, a
+            // sensor's glow): a corona, bright close about it (within LitCorona= of
+            // its reach) on a soft tail out to the reach, never a ball lit to its edge.
             float x = length(l.a.xyz - p) * l.c.w / (1.0 + l.a.w * l.c.w);
             float e = saturate(1.0 - x), q = x / k_nlt.y;
             c = l.c.rgb * (pow(e, 1.5) * (0.45 + 0.55 / (1.0 + q * q)));
         } else {
             c = cl_eval(l, p, L);
         }
-        c *= gk == 1u ? k_nlk.x : gk == 2u ? k_nlk.y : (l.t.x & 15u) == 1u ? k_nlk.z : 1.0;
+        c *= gk == 1u ? k_nlk.x : gk == 2u ? k_nlk.y : gk == 4u ? k_nlk.w : (l.t.x & 15u) == 1u ? k_nlk.z : 1.0;
         float s = dot(c, float3(0.299, 0.587, 0.114));
         if (s > bs) {
             bs = s;

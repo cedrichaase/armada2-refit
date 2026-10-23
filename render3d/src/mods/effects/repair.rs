@@ -373,7 +373,7 @@ impl Repair {
                 continue;
             }
             let reach = self.s.light_reach * pl.r;
-            if self.lights.register(n, pl.p + pl.n * (self.s.light_lift * pl.r), self.s.light_col * (self.s.light * arc), reach, reach * 0.2) {
+            if self.lights.register_spark(n, pl.p + pl.n * (self.s.light_lift * pl.r), self.s.light_col * (self.s.light * arc), reach, reach * 0.2) {
                 n += 1;
             }
         }
