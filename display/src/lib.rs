@@ -50,6 +50,15 @@ static mut STUB_ASKED: bool = false;
 /// `Backend=`: what the stub draws on (d3d9 until every plugin draws on Vulkan).
 static mut BACKEND: stub::Backend = stub::Backend::D3d9;
 static mut VALIDATE: bool = false;
+/// `Device=`: on Vulkan, only a physical device whose name contains this (any case);
+/// empty: a discrete one first (README.md, "Vulkan").
+static mut VK_DEVICE: alloc::string::String = alloc::string::String::new();
+
+/// `Device=` (empty: any).
+#[allow(static_mut_refs)]
+pub fn vk_device() -> &'static str {
+    unsafe { VK_DEVICE.as_str() }
+}
 
 #[allow(non_snake_case)]
 fn STUB_ASKED_NOW() -> bool {
@@ -95,6 +104,7 @@ fn startup() {
     unsafe {
         BACKEND = if backend.eq_ignore_ascii_case("vulkan") { stub::Backend::Vulkan } else { stub::Backend::D3d9 };
         VALIDATE = ini.int("Display8", "Validate", 0) != 0;
+        VK_DEVICE = ini.string("Display8", "Device").unwrap_or_default();
     }
     if STUB_ASKED_NOW() {
         log!("stub mode on {:?}{}", unsafe { BACKEND }, if unsafe { VALIDATE } { ", with the validation layer" } else { "" });

@@ -183,11 +183,18 @@ impl Vk {
             .hwnd(hwnd as vk::HWND);
         let surface = unsafe { w32.create_win32_surface(&sci, None) }.map_err(|_| "vkCreateWin32SurfaceKHR failed")?;
 
-        // A device with one family that draws and presents; a discrete one first.
+        // A device with one family that draws and presents; a discrete one first, or
+        // only one whose name has `Device=` in it (the bench: lavapipe, never the GPU).
         let pdevs = unsafe { instance.enumerate_physical_devices() }.map_err(|_| "no physical devices")?;
+        let want = crate::rt::lower(crate::vk_device());
         let mut pick: Option<(vk::PhysicalDevice, u32, bool)> = None;
         for &pd in &pdevs {
             let props = unsafe { instance.get_physical_device_properties(pd) };
+            let pname = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
+            log!("vulkan: physical device {}", pname);
+            if !want.is_empty() && !crate::rt::lower(pname).contains(want.as_str()) {
+                continue;
+            }
             let fams = unsafe { instance.get_physical_device_queue_family_properties(pd) };
             for (i, f) in fams.iter().enumerate() {
                 let present = unsafe { surface_fn.get_physical_device_surface_support(pd, i as u32, surface) }.unwrap_or(false);
@@ -200,7 +207,7 @@ impl Vk {
                 }
             }
         }
-        let (pdev, qfam, _) = pick.ok_or("no device that draws and presents on the window")?;
+        let (pdev, qfam, _) = pick.ok_or(if want.is_empty() { "no device that draws and presents on the window" } else { "no device named as Device= says that draws and presents" })?;
         let props = unsafe { instance.get_physical_device_properties(pdev) };
         let name = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
         log!(
