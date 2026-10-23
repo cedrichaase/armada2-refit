@@ -6,6 +6,21 @@ patch, and the Heroic/Proton setup, with the tools that manage them (`d3d8-chain
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. Details are in
 [`README.md`](README.md).
 
+## 3.6.0 — 2026-10-23
+
+### Added
+- `d3d8-chain.py` recognises, by hash, every DXVK build Heroic keeps in
+  `tools/dxvk/dxvk-*/`, the Flatpak Heroic's as well as the native one's (named
+  `DXVK d3d9 (heroic flatpak dxvk-3.1.1)`), not only the one `latest_dxvk` names.
+
+### Fixed
+- `d3d8-chain.py` and `dxvk-logging.py` (and so `heroic-umu.py`) read Heroic's config
+  from `A2_HEROIC` (a2env), which finds the Flatpak Heroic's; `--status` crashed with a
+  `FileNotFoundError` without `~/.config/heroic` and now says which config it could not
+  find. `--upgrade` never read it and is unchanged.
+
+Installed, not yet seen in game.
+
 ## 3.5.0 — 2026-10-23
 
 ### Added

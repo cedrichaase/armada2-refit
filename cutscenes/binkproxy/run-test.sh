@@ -14,7 +14,7 @@
 set -euo pipefail
 
 dir="$1"; shift
-PROTON="${A2_PROTON:-$HOME/.config/heroic/tools/proton/Proton-CachyOS-latest}"
+PROTON="${A2_PROTON:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && . ./a2env.sh && echo "$A2_PROTON")}"
 lib="$PROTON/files/lib"
 export WINEPREFIX="${BINKTEST_PREFIX:-$dir/pfx}"
 export WINEDEBUG="${WINEDEBUG:--all}"
