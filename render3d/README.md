@@ -1653,7 +1653,16 @@ alike:
 - **Cost** (`Timing=1`; the `battle` scene, sixteen ships and a planet, 73 lights,
   1280x720, RX 5700, 2026-10-23): the cull 0.20 ms of GPU time a view on Vulkan and on
   Direct3D 12; the objects step 0.91 ms against 0.90 without (Vulkan), 0.45 against
-  0.42 (Direct3D 12).
+  0.42 (Direct3D 12). At 3440x1440 (the user's) the cull was 0.20 ms (Vulkan) and
+  0.19 ms (Direct3D 12) and the objects step 1.38 and 0.95 ms. The cull's time hardly
+  moves with the resolution (29808 clusters against 5760) and goes with the lights
+  (0.04 ms for the 32 of `nebula-battle`): it is each thread's walk of the list, not
+  the number of threads. So the lights come through group-shared memory, put into
+  view space once a group; a group leaves out the points and spots that cannot reach
+  its slices; and the per-colour count and weakest are kept as the sorted list goes
+  by, the list scanned only to replace an entry and sorted only when one was: 0.16
+  and 0.17 ms, the same clusters (the frame at RMSE 0 on both). What remains looks
+  like the private arrays' traffic and the upload and barriers round the dispatch.
 - **Off** (`Clustered=0`, or Direct3D 9): nothing of it runs, and every draw is as
   before: the port scenes draw the same pixels as without it (`gpu/README.md`,
   "Measured").
@@ -2024,6 +2033,20 @@ large (now, or where a light just was) the clip narrows to `LitClip=` of
 `TemporalClip=` and this frame's share rises to `LitTemporal=`, so the glow follows its
 light within a frame or two. The pass with `Lit=0`, on Direct3D 9, or where no
 clusters run is the plain one (the same d3dbc; the port scenes as before).
+
+Cost (`Timing=1`, `render3d-nebula-lit`'s paused frame: the `nebula-battle` scene, 32
+lights in the view, the camera in the gas; RX 5700, 2026-10-23), the march's GPU time
+without and with `Lit=1`: at 1280x720 2.63 against 2.70 ms on Vulkan and 2.61 against
+2.69 ms on Direct3D 12; at 3440x1440 6.76 against 7.16 ms on Vulkan and 7.06 against
+7.20 ms on Direct3D 12. Measured, this settled the design: the march already walks
+the depth through the clusters' own mapping, so a step where no light reaches costs a
+buffer word, and a froxel volume (a compute fill of some 215x90x64 cells and a pass to
+integrate them, about the cost of the lit march's whole addition before any light) had
+nothing left to win. Checked: the plain march with `Lit=0` at RMSE 0 against the
+clustered lights' commit on Vulkan and Direct3D 12 (`port-nebula`, all 25 frames of
+its dump), and Direct3D 9 at RMSE 0 against `pre-gpu-nebula`; on lavapipe the
+validation layer finds nothing but `Timing=1`'s query messages, which the scene
+without the gas gives too.
 
 **Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view
 (`Module::lights`), a point light at its centre (the instance's transform +0x44 plus
