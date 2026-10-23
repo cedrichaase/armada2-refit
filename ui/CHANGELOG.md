@@ -14,7 +14,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   that escaped into Omarchy's bar and left the game's cursor standing (README.md,
   "Focus and the pointer"). `PointerLog=1` logs the first re-clip.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.21.0 — 2026-10-23
 
@@ -52,7 +52,7 @@ Installed, not yet seen in game.
   footprint, and the UI kept 256 quads a frame): the cells are now recorded apart, up to
   8192, with their camera, and culled to the viewport when drawn.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.19.2 — 2026-10-23
 

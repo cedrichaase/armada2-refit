@@ -19,7 +19,7 @@ Layers: render3d 0.27.0, testbench 3.68.0.
 ### Added
 - testbench: `render3d-nebula-explosion` (testbench 3.68.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.33.0 — 2026-10-23
 
@@ -32,7 +32,7 @@ Layers: ui 0.22.0, testbench 3.67.0.
 - testbench: a bar step, an Omarchy-like screenshot, a corner push, an Xwayland
   protocol trace and `ui-pointer-bar` (testbench 3.67.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.32.0 — 2026-10-23
 
@@ -46,7 +46,7 @@ Layers: render3d 0.26.1, testbench 3.66.0.
 ### Added
 - testbench: `render3d-cone-emitter`, for that flare on Vulkan (testbench 3.66.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.31.0 — 2026-10-23
 
@@ -75,7 +75,7 @@ Layers: render3d 0.26.0, testbench 3.64.0.
 ### Added
 - testbench: the `beam-pass` scene and `render3d-beam-light` (testbench 3.64.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.29.0 — 2026-10-23
 
@@ -94,7 +94,7 @@ Layers: render3d 0.25.0, testbench 3.63.0.
   scene's hand-added lights survive the ordnance module's second read of the engine's
   lights (render3d 0.25.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.28.0 — 2026-10-23
 
@@ -110,7 +110,7 @@ Layers: render3d 0.24.0, testbench 3.62.0.
 ### Changed
 - render3d's clustered lights' cull tightened, the same clusters (render3d 0.24.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.27.0 — 2026-10-23
 
@@ -143,7 +143,7 @@ Layers: ui 0.20.0, testbench 3.60.0.
   cells, wherever the UI draws the engine's last draws (in stub mode nothing else
   draws it) (ui 0.20.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.24.1 — 2026-10-23
 

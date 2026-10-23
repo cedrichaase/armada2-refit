@@ -20,7 +20,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 - `[Nebulae]` keys `LitExplosionCore` (2) and `LitExplosionFar` (0.12), in the shipped
   `Render3D.ini`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.26.1 — 2026-10-23
 
@@ -32,7 +32,7 @@ Installed, not yet seen in game.
   term, run on a flare's parameters, overflowed to infinity, and 0 x infinity is NaN
   there (Direct3D 9 takes it as 0). The cone's rim no longer overflows past its outline.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.26.0 — 2026-10-23
 
@@ -59,7 +59,7 @@ Installed, not yet seen in game.
 
 Measured on the bench (`battle`, 1280x720, Vulkan on the GPU): the objects step 1.27 ms
 of GPU time against 0.91 before, the cull 0.22 against 0.18. Direct3D 9 and
-`Clustered=0` are unchanged (the two ends light, the length does not). Installed, not yet seen in game.
+`Clustered=0` are unchanged (the two ends light, the length does not). Confirmed in game 2026-10-23.
 
 ## 0.25.0 — 2026-10-23
 
@@ -83,7 +83,7 @@ of GPU time against 0.91 before, the cull 0.22 against 0.18. Direct3D 9 and
   when the ordnance module reads the engine's lights again (`regather_lights`). Before,
   that read dropped the points of every module whose `begin_view` ran before it.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.24.0 — 2026-10-23
 
@@ -110,7 +110,7 @@ Installed, not yet seen in game.
   are the same (the `battle` frame at RMSE 0 on Vulkan and Direct3D 12), 0.19 to
   0.16 ms at 3440x1440.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.23.2 — 2026-10-23
 
