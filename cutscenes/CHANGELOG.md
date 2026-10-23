@@ -4,6 +4,16 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.1.0 — 2026-10-23
+
+### Added
+- `binkw32.dll`: with `UI.asi` loaded, each full-screen frame (the launch reels and the
+  intro, replacement or real Bink) is handed to the UI's `ui_present_movie` to draw,
+  not copied into the locked back buffer; without the UI, or when it declines, the
+  copy as before. `UseUI=` in `BinkProxy.ini` (default 1) (binkproxy/README.md).
+
+Installed, not yet seen in game.
+
 ## 2.0.3 — 2026-10-21
 
 ### Changed

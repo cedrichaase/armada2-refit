@@ -4,6 +4,33 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.16.0 — 2026-10-23
+
+### Added
+- The engine's last draws in a mission are the UI's (`engine/leftovers.rs`,
+  `hud/leftovers.rs`; HUD.md, "The engine's last draws"), each in the engine's look:
+  the selection drag box, the height posts, the order ring (`mRenderGridFX`,
+  `mRenderWhere`, drawn through a new additive pipeline, `Draw::quad_additive`),
+  `ScreenFade`'s fade, and the unit view's Bink video from the engine's texture. New
+  `[HUD]` keys `Overview`, `Fade`, `UnitVideo` (default 1).
+- Movies through the UI: `UI.asi` exports `ui_present_movie(bgrx, w, h, pitch)`, which
+  the cutscene proxy hands each full-screen frame to; the UI draws it fitted at the
+  next `Present` (`src/movie.rs`; README.md, "Movies"). `[UI] Movies` (default 1).
+
+### Changed
+- The in-mission menus draw over a copy of the last mission frame the UI keeps (a GPU
+  copy at the end of each mission frame); the front buffer is read back only when
+  there is none (MENUS.md, "The in-mission menus").
+
+### Fixed
+- Choosing a display mode in Graphics Settings in the middle of a mission no longer
+  kills the game with a stack overflow: the arrow over hosted dialogs and screens of
+  ours comes from a patch of the engine's own `WM_SETCURSOR` answer instead of a
+  subclass of the 3D window, which looped with DXVK's window hook once the device was
+  re-created (README.md, "The front end: screens of our own").
+
+Installed, not yet seen in game.
+
 ## 0.15.0 — 2026-10-22
 
 ### Added

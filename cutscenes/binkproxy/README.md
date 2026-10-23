@@ -16,6 +16,14 @@ Armada II plays every movie through RAD's Bink 1, via ten functions in
    applies to the three logo reels too: they stay real Bink, decoded into a
    scratch buffer and scaled from there.
 
+**With `UI.asi`** (its `[UI] Movies=1`, the default), a full-screen frame is not
+written into the locked back buffer at all: the proxy hands it, as BGRX at its own
+size, to the UI's export `ui_present_movie(bgrx, w, h, pitch)`, which draws it fitted
+at the present that follows (`ui/README.md`, "Movies"). The export is looked up at the
+first frame (the ASI loader may load `UI.asi` after this DLL); when it is missing or
+answers 0 the frame is copied as before. `UseUI=0` in `BinkProxy.ini` keeps the copy.
+`BinkProxy.log` says which: "UI.asi draws the full-screen frames" or "no UI.asi".
+
 Why a code change and not a re-encode: a larger `.bik` in that path would
 have been copied into a 640x480 back buffer at its own height, past the end of
 the buffer. Nothing in the game's config reaches either number.
@@ -77,7 +85,7 @@ size as the 640x480, 15 fps stock `.bik`**, plus an 11.9 MB WAV.
 `build-movie.sh Intro` rebuilds it from `ai/upscale/`: the joined master's
 decoded frames match the original MD5 for MD5.
 
-`BinkProxy.ini` switches each part off separately (`ReplaceMovies`,
+`BinkProxy.ini` switches each part off separately (`ReplaceMovies`, `UseUI`,
 `RaiseIntroMode`, `FitIntro`) and can pin the intro mode (`IntroWidth` and
 `IntroHeight`). `BinkProxy.log` records every open and close, with decode
 timing and a count of late frames.

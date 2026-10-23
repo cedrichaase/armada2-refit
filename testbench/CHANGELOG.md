@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.48.0 — 2026-10-23
+
+### Added
+- Scenario `display-engine-draws` (`--install . --install display`): the intro movie,
+  the first Federation mission's opening cinematic, the mission with a drag box, a
+  pointed unit and move orders, the unit view and the pause, each expected to show no
+  draw from `Armada2.exe`; and the in-mission menu over the UI's own copy of the frame.
+
+Installed, not yet seen in game.
+
 ## 3.47.0 — 2026-10-23
 
 ### Added
