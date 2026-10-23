@@ -4,6 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.21.0 — 2026-10-23
+
+### Added
+- The frame and every module on `gpu`'s Vulkan backend when Display8 draws on Vulkan:
+  every pipeline carries its SPIR-V beside its d3dbc (`gpu::code!`), the engine's
+  targets, viewport and transforms come from Display8 (`gpu::Gpu::engine_target`,
+  `engine_viewport`, `engine_transform`), the engine's textures from its mirrors
+  (`gfx::engine_texture`), and the post passes leave out Direct3D 9's half-pixel offset
+  there (`gpu::Gpu::half_pixel`). The menu scene's viewport is handed to its pass.
+
+Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 1.68, nebula 0.57,
+firing 0.97 (/255). Installed, not yet seen in game.
+
 ## 0.20.0 — 2026-10-23
 
 ### Added

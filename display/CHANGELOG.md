@@ -4,6 +4,30 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.5.0 — 2026-10-23
+
+### Added
+- `Backend=vulkan` (stub mode): Display8's own Vulkan 1.1 device on the game's window
+  (`src/vk/`): swap chain, the engine's colour and depth images, two frames in flight
+  with an upload ring and descriptor pools, mirrors, the gamma pass; the exports of
+  `gpu/src/display.rs` for the plugins' `gpu` (`display8_vk`, `display8_vk_frame`,
+  `display8_vk_alloc`, `display8_vk_defer`, `display8_vk_target`, `display8_vk_mirror`,
+  `display8_vk_flush`, `display8_engine_viewport`, `display8_engine_transform`).
+- `Device=` (only a Vulkan device whose name has it), `PixelCentres=` (`d3d9`: Direct3D
+  9's pixel centres, for comparing with `Backend=d3d9`), and on Vulkan `Validate=1` the
+  Khronos validation layer, its messages in `Display8.log`.
+- The pipeline cache on disk, `%LOCALAPPDATA%\armada2-refit\Display8.pipelines`
+  (`src/vk/cache.rs`).
+- The plugins' samplers on Vulkan as the game's `dxvk.conf` has DXVK make them on
+  Direct3D 9 (`d3d9.samplerAnisotropy`, `d3d9.samplerLodBias`,
+  `d3d9.clampNegativeLodBias`), handed over in `VkDevice8::sampler_anisotropy` and
+  `sampler_lod_bias`.
+- `bench-mode.sh`: with `Backend=vulkan`, `Device=llvmpipe` and `Validate=1` unless
+  `A2TEST_VULKAN_GPU=1`.
+
+Measured on the bench (lavapipe): the port scenes within RMSE 0.6 to 1.7 of Direct3D 9
+on the GPU (`gpu/README.md`, "Measured"). Installed, not yet seen in game.
+
 ## 0.4.0 — 2026-10-23
 
 ### Added

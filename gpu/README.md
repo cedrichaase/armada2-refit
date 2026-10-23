@@ -309,6 +309,42 @@ it. For comparing a frame with Direct3D 9's pixel for pixel, Display8's
 `PixelCentres=d3d9` keeps Direct3D 9's rule on Vulkan: the viewport moved as DXVK moves
 it and `half_pixel` 0.5 (`VkDevice8::features`, `FEATURE_D3D9_CENTRES`).
 
+### Samplers as DXVK makes them
+
+On Direct3D 9 the frame is filtered as the game's `dxvk.conf` has DXVK make every
+sampler (`renderer/README.md`): 16x anisotropy in place of every linear filter, and a
+LOD bias of -0.5 on every sampler with mips. The plugins never ask for either; DXVK
+adds them. So on Vulkan Display8 reads the same keys and hands them over
+(`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`), and `Gpu::sampler` makes each
+sampler as DXVK would: a linear filter anisotropic at that much, the bias on a sampler
+with mips (none on one without, which has no level to pick). Without it every hull read
+a level blurrier than on Direct3D 9. Cube maps are seamless on Vulkan, as
+`d3d9.seamlessCubes` makes them on DXVK.
+
+### Measured
+
+render3d and the UI on Vulkan (`Backend=vulkan`, `PixelCentres=d3d9`, on lavapipe with
+the validation layer, the bench's way) against the same scenes on Direct3D 9 on the
+GPU (the `pre-gpu-*` baselines, which the Direct3D 9 backend draws at RMSE 0), the
+screenshot of each port scene, 2026-10-23:
+
+| Scene | RMSE (/255) | Pixels over 2/255 |
+|---|---|---|
+| `port-showcase` | 1.68 | 4.2% |
+| `port-nebula` | 0.57 | 0.6% |
+| `port-firing` | 0.97 | 1.0% |
+
+No validation message in any of them. What is left is one or two levels over the sky
+and the hulls, and single pixels at edges and on small bright details (the maxima, 117
+to 221, are on the Borg hulls' lights and the sprites): the rasteriser and the filtering of a CPU
+driver against a GPU's, and dxc's floating point against DXVK's translation of
+vkd3d's. The procedural bakes are where that shows most: their hashes
+(`render3d/shaders/world_surface.hlsl`, `hash13`) take the fraction of products in the
+tens of thousands, so one rounding apart, a fused multiply-add or not, moves a lattice
+value. The same scene on Direct3D 9 on lavapipe (DXVK there) is further from the GPU's
+than Vulkan on lavapipe is (showcase 4.1, nebula 25.8, firing 7.0): DXVK on a CPU
+driver is not a reference for these.
+
 ## render3d on gpu
 
 Every part of render3d draws through the interface: the frame and its post passes, and
