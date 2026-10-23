@@ -5,6 +5,20 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.49.1 — 2026-10-23
+
+### Fixed
+- `ui-hud-map` and `ui-hud-bar` select the first Assembler where the start view puts it
+  (890,60, at the top) and the Nexus at 1150,300: at 640,262 they clicked empty space,
+  and every step after the selection failed, on `main` as on Display8, forward or stub.
+  `ui-hud-map` puts the Assembler in group 1 and double-taps it to centre the camera
+  for the bracket check; its minimap check names the SHIPS and STATIONS buttons (not
+  "ALL") and the camera's outline as a few pixels at the start's zoom. `ui-hud-bar`'s
+  checks name the minimap and the tooltip as they are drawn, and it expects the UI's
+  build footprint ("leftovers: build footprint at").
+
+Installed, not yet seen in game.
+
 ## 3.49.0 — 2026-10-23
 
 ### Added

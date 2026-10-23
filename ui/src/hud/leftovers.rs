@@ -54,15 +54,29 @@ pub fn run(ui: &mut Ui) {
     }
 }
 
-static mut RING_TEX: Option<crate::gfx::Tex> = None;
+/// The external textures the rings and footprints draw from, one per engine texture
+/// (`ST3D_Texture`): a slot is read when the frame is drawn, so two textures in one
+/// frame need two.
+static mut RING_TEX: [(usize, Option<crate::gfx::Tex>); 4] = [(0, None); 4];
 
-/// The order ring: its sprite's texture on the four projected corners, added to the
-/// frame as the engine's z-sorted sprites are.
+#[allow(static_mut_refs)]
+fn ring_tex(texture: usize) -> crate::gfx::Tex {
+    let slots = unsafe { &mut RING_TEX };
+    let i = slots.iter().position(|s| s.0 == texture)
+        .or_else(|| slots.iter().position(|s| s.0 == 0))
+        .unwrap_or(slots.len() - 1);
+    slots[i].0 = texture;
+    *slots[i].1.get_or_insert_with(crate::gfx::texture_external)
+}
+
+/// The order ring or a build footprint: its sprite's rectangle of its texture on the
+/// four projected corners, added to the frame as the engine's z-sorted sprites are.
 fn ring(ui: &mut Ui, r: &leftovers::Ring) {
-    let tex = unsafe { *RING_TEX.get_or_insert_with(crate::gfx::texture_external) };
+    let tex = ring_tex(r.texture);
     let Some((c, tw, th)) = crate::engine::radar::d3d9_texture(r.texture) else { return };
     crate::gfx::tex_set_external(tex, Some(crate::gfx::gpu().wrap_d3d9_texture(c)), tw, th);
-    let uv = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
+    let [u0, v0, u1, v1] = r.uv;
+    let uv = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)];
     ui.draw.push_clip(clip_rect(r.clip));
     ui.draw.quad_additive(tex, r.corners, uv, rgb(r.rgb, 1.0));
     ui.draw.pop_clip();

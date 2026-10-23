@@ -115,7 +115,8 @@ pub struct Hud {
     /// name and description over the 3D view), drawn by us in the theme.
     pub tooltips: bool,
     /// The engine's last draws in a mission, drawn by us (`engine::leftovers`):
-    /// `Overview`, the 3D view's drag box, height posts and order ring; `Fade`, the scripts' fade
+    /// `Overview`, the 3D view's drag box, height posts, order ring and build footprints;
+    /// `Fade`, the scripts' fade
     /// to and from black; `UnitVideo`, the in-mission Bink video (the unit view's).
     pub overview: bool,
     pub fade: bool,
