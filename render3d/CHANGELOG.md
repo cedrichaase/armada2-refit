@@ -23,8 +23,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
 ### Changed
 - The clustered lights' cull (`CS_CLUSTER`) reads the lights through group-shared
-  memory, 64 at a time, each put into view space once per group; the clusters it
-  writes are the same.
+  memory, 64 at a time, each put into view space once per group, leaves out for a
+  group the lights that cannot reach its slices, keeps each group's count and weakest
+  as it goes and sorts only a list an entry was replaced in; the clusters it writes
+  are the same (the `battle` frame at RMSE 0 on Vulkan and Direct3D 12), 0.19 to
+  0.16 ms at 3440x1440.
 
 Installed, not yet seen in game.
 
