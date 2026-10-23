@@ -13,6 +13,11 @@ versions". Newest first. The why is in [`README.md`](README.md).
   engine's first `CreateDevice` lands on Direct3D 9, that the UI and render3d draw on it, the main menu
   and an Instant Action match.
 
+### Changed
+- `vulkan_env`: a stub on `Backend=auto` or a list that names Vulkan, with
+  `Validate=1`, gets the Khronos validation layer (`VK_INSTANCE_LAYERS`); the drivers
+  stay as they are (the GPU). Only `Backend=vulkan` alone is held to lavapipe.
+
 Installed, not yet seen in game.
 
 ## 3.56.0 — 2026-10-23
