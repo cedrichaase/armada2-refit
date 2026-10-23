@@ -195,6 +195,60 @@ switch between locked (relative) and unlocked (absolute) motion would then move 
 pointer to wherever the compositor's pointer is. The bench (sway) has shown the parts
 but not the jumps themselves. `ui-focus-pointer` walks both ways of losing the focus.
 
+**The player's report with `PointerLog=1` (2026-10-23, Hyprland on Omarchy, 3440x1440
+at scale 1.25):** after a screenshot, the cursor went wrong once the pointer reached
+the top rows of the screen, where Omarchy's bar is: the desktop's cursor showed and the
+game's stood still. UI.log has no focus change and no jump in the mission: the game's
+window stayed the foreground, active and focus window throughout, and the pointer it
+reads never moved more than 320 pixels between two frames.
+
+What that comes from, put together from the bench above and the Wine (11) and
+Xwayland (24.1) sources:
+
+- **Where the pointer goes is decided twice.** Xwayland holds the Wayland pointer for
+  the game only while it is locked (the cursor hidden and Wine's clip set: Xwayland's
+  pointer warp emulator) or confined. Without either, the compositor moves its pointer
+  freely and gives it to whatever surface is under it, and Xwayland moves the X pointer
+  only while the game's surface has it.
+- **Omarchy's screenshot** (Print, `omarchy-capture-screenshot`) puts two layer-shell
+  overlays over the game, a frozen screen (`hyprpicker`) and `slurp`, which take the
+  keyboard and the pointer. Wine gets a FocusOut while the keyboard is grabbed and lets
+  go of its clip; Xwayland, the pointer gone from the game, drops its lock. When the
+  keyboard comes back Wine puts the clip back (`reapply_cursor_clipping`, which hands
+  the clip rectangle it has to `ClipCursor` again), but only if that FocusIn ends a
+  grab it saw and if the X focus is already the game's when the clip is handled; a
+  click activating the window also clips again. On the bench, of eleven such
+  screenshots and two window round trips, Wine kept its clip off twice.
+- **An unclipped pointer can reach the bar.** The bar is a layer-shell surface on the
+  top layer; Hyprland gave it the pointer over the full-screen game (the player saw its
+  cursor). The game's surface gets a leave, the X pointer stays where it left, and
+  `GetCursorPos` returns that point from then on: the engine's cursor stands still, a
+  pointer standing at the top edge can keep the camera scrolling, and the desktop shows its
+  own cursor. Nothing in Win32 says so: the game stays the foreground window, and Wine
+  keeps the full-screen rectangle as its clip, so `GetClipCursor` reads the same with
+  and without the X grab. Everywhere else the full-screen window covers the screen and
+  there is nowhere to leave to, which is why it is the top rows.
+
+`[UI] KeepClip=1` (on as shipped; `input::keep_clip`, `engine/mouse.rs` for the engine's
+state) does what Wine does when the keyboard comes back, from the game's own thread: in
+a mission under Wine (`wine_get_version` in ntdll), at most every 500 ms and only on a
+frame where the pointer moved, while the game's window is the foreground and active one
+and the engine has no button down and no pan holding the pointer, it reads the clip
+rectangle with `GetClipCursor` and hands it back to `ClipCursor`. Wine then clips to
+the full-screen window again (`clip_fullscreen_window`), which Xwayland turns back into
+a lock as soon as the pointer is over the game. Wine itself declines when the window
+does not cover its monitor or the X input focus is another program's
+(`grab_clipping_window`), so the pointer is never held while another window has the
+keyboard; and since only motion of the game's own pointer triggers it, a pointer over
+another window does nothing. On Windows nothing is done. With `PointerLog=1` the first
+re-clip is logged ("pointer: Wine's clip asked for again"). `ui-pointer-bar` takes
+three such screenshots with a bar up and walks into it after each (testbench).
+
+What a player can do meanwhile, on their side: hide the bar while playing (Omarchy:
+Super+Shift+Space), which parks it off the screen; or, once the cursor has gone wrong,
+click in the game or open and close the in-mission menu, either of which has Wine clip
+again.
+
 ## The cursor
 
 `engine/cursor.rs`. hud/README.md has how the engine draws its cursor; what the UI

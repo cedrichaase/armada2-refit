@@ -409,6 +409,87 @@ fn diagnose(hwnd: HWND, screen: Option<(i32, i32)>) {
     d.held = held;
 }
 
+/// How often, at most, `keep_clip` asks Wine for its clip again, in milliseconds.
+const KEEP_CLIP_MS: u32 = 500;
+
+struct Clip {
+    /// Whether the game runs under Wine: None until asked.
+    wine: Option<bool>,
+    /// The pointer at the last frame, and when the clip was last asked for.
+    last: Option<(i32, i32)>,
+    tick: u32,
+    /// How many times it was asked for, for the log.
+    count: u32,
+}
+
+static mut CLIP: Clip = Clip { wine: None, last: None, tick: 0, count: 0 };
+
+fn on_wine() -> bool {
+    let ntdll = unsafe { GetModuleHandleA(c"ntdll.dll".as_ptr() as *const u8) };
+    !ntdll.is_null() && unsafe { GetProcAddress(ntdll, c"wine_get_version".as_ptr() as *const u8) } != 0
+}
+
+/// `[UI] KeepClip=1` (README.md, "Focus and the pointer"): in a mission, puts Wine's
+/// pointer clip back as Wine itself does when the keyboard comes back
+/// (`reapply_cursor_clipping`): the clip rectangle it has, handed to `ClipCursor`
+/// again. For a full-screen window that rectangle is the whole screen, and Wine
+/// answers it by clipping the pointer to the window again (`clip_fullscreen_window`)
+/// if the window covers its monitor and is the foreground one and the X input focus
+/// is the game's, and by nothing otherwise. A screenshot's overlay takes the
+/// keyboard and Wine lets go of its clip; when the keyboard comes back Wine does
+/// not always clip again, and an unclipped pointer can move onto a desktop bar at
+/// the top of the screen, which takes it from the game.
+///
+/// Asked at most every `KEEP_CLIP_MS`, on a frame where the pointer has moved, while
+/// the game's window is the foreground and active one and the engine neither holds
+/// the pointer for a pan nor has a button down. Called once per mission frame.
+pub fn keep_clip() {
+    if !crate::config::try_get().is_some_and(|c| c.keep_clip) {
+        return;
+    }
+    let c = unsafe { &mut *core::ptr::addr_of_mut!(CLIP) };
+    if !*c.wine.get_or_insert_with(on_wine) {
+        return;
+    }
+    let hwnd = window();
+    if hwnd.is_null() {
+        return;
+    }
+    let mut p = Point::default();
+    if unsafe { GetCursorPos(&mut p) } == 0 {
+        return;
+    }
+    let moved = c.last.is_some_and(|l| l != (p.x, p.y));
+    c.last = Some((p.x, p.y));
+    let now = unsafe { GetTickCount() };
+    if !moved || now.wrapping_sub(c.tick) < KEEP_CLIP_MS {
+        return;
+    }
+    if unsafe { GetForegroundWindow() != hwnd || GetActiveWindow() != hwnd } {
+        return;
+    }
+    if engine::mouse::held() || engine::mouse::buttons() != 0 {
+        return;
+    }
+    let mut r = WinRect::default();
+    if unsafe { GetClipCursor(&mut r) } == 0 {
+        return;
+    }
+    unsafe { ClipCursor(&r) };
+    c.tick = now;
+    c.count += 1;
+    if c.count == 1 && crate::config::try_get().is_some_and(|c| c.pointer_log) {
+        crate::log!(
+            "pointer: Wine's clip asked for again ({},{} {},{}), every {} ms at most while the pointer moves",
+            r.left,
+            r.top,
+            r.right,
+            r.bottom,
+            KEEP_CLIP_MS
+        );
+    }
+}
+
 /// Reads this frame's input. `w`, `h`: the back buffer's size.
 pub fn poll(w: u32, h: u32) {
     let r = raw();

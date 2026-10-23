@@ -422,21 +422,49 @@ def s_move(c, m):
     return f'mouse at {x},{y}'
 
 
+@step(r'^(?:move|push) the (?:mouse|pointer) into the bottom right corner$')
+def s_corner(c, m):
+    """`move the mouse into the bottom right corner`: a long push down and right, so
+    the compositor's pointer and the game's are both in the corner, wherever each was
+    (they part after a change of focus); later moves aim from there."""
+    c.sess.to_corner()
+    w, h = c.sess.res
+    return f'mouse in the corner, {w - 1},{h - 1}'
+
+
 @step(r'^take the focus (?:away )?from the game(?: with (?:an? )?(?P<how>overlay|window|screenshot))?'
       r'(?: for (?P<n>\d+(?:\.\d+)?) ?(?:seconds?|secs?|s))?(?:,? then give it back)?$')
 def s_take_focus(c, m):
-    """`take the focus from the game [with a window | with an overlay] [for N seconds]`:
-    another window on the session's display takes the focus and is closed, or a region
-    screenshot's overlay (`slurp`) is put over the game and a region dragged on it; the
-    game has the focus again after."""
+    """`take the focus from the game [with a window | with an overlay | with a
+    screenshot] [for N seconds]`: another window on the session's display takes the
+    focus and is closed, or a region screenshot's overlay (`slurp`) is put over the
+    game and a region dragged on it, or a screenshot is taken as Omarchy's key does (a
+    frozen screen, `hyprpicker`, under the `slurp`); the game has the focus again
+    after."""
     how = (m.group('how') or 'window').lower()
-    how = 'overlay' if how in ('overlay', 'screenshot') else 'window'
     from .session import GameError
     try:
         c.sess.take_focus(float(m.group('n') or 1), how)
     except GameError as e:
         raise StepFailed(str(e))
-    return f'focus taken with {"an overlay" if how == "overlay" else "a window"} and given back'
+    what = {'window': 'a window', 'overlay': 'an overlay', 'screenshot': 'a screenshot'}[how]
+    return f'focus taken with {what} and given back'
+
+
+@step(r'^(?P<what>show|hide) (?:a |the )?(?:top )?bar(?: along the top of the screen)?$')
+def s_bar(c, m):
+    """`show a bar along the top of the screen` / `hide the bar`: a desktop panel's
+    stand-in (`swaynag` on the overlay layer), which takes the pointer that moves over
+    it and never the keyboard, as Omarchy's bar and waybar do."""
+    from .session import GameError
+    try:
+        if m.group('what').lower() == 'show':
+            c.sess.show_bar()
+            return 'a bar along the top of the screen'
+        c.sess.hide_bar()
+        return 'the bar hidden'
+    except GameError as e:
+        raise StepFailed(str(e))
 
 
 @step(r'^press (?:the )?(?P<key>[\w+-]+)(?: key)?(?: (?P<n>\d+) times)?$')

@@ -5,6 +5,22 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.67.0 — 2026-10-23
+
+### Added
+- `Show a bar along the top of the screen` / `Hide the bar`: a desktop panel's
+  stand-in, `swaynag` on the overlay layer, that takes the pointer and not the keyboard
+  (`logs/bar.log`; `Session.show_bar`, `hide_bar`).
+- `Take the focus from the game with a screenshot`: as Omarchy's Print key, a frozen
+  screen (`hyprpicker -r -z`) under the `slurp` (it was another name for the overlay).
+- `Move the mouse into the bottom right corner`: puts the compositor's and the game's
+  pointers back together after a change of focus parted them (`Session.to_corner`).
+- `A2TEST_XWAYLAND_DEBUG=1`: Xwayland's Wayland protocol trace in `sway.log`.
+- `ui-pointer-bar`: three such screenshots with a bar up and a walk into it after each,
+  with `[UI] KeepClip=1`: the re-clip runs, no jump of the pointer.
+
+Installed, not yet seen in game.
+
 ## 3.66.0 — 2026-10-23
 
 ### Added

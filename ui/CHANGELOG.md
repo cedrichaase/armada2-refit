@@ -4,6 +4,18 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.22.0 — 2026-10-23
+
+### Added
+- `[UI] KeepClip=1` (on as shipped): in a mission under Wine, UI.asi hands Wine's clip
+  rectangle back to `ClipCursor` at most every 500 ms while the pointer moves and the
+  game is the foreground window, so Wine clips the pointer to the full-screen game
+  again after a screenshot's overlay let it go (`input::keep_clip`). For the pointer
+  that escaped into Omarchy's bar and left the game's cursor standing (README.md,
+  "Focus and the pointer"). `PointerLog=1` logs the first re-clip.
+
+Installed, not yet seen in game.
+
 ## 0.21.0 — 2026-10-23
 
 ### Added

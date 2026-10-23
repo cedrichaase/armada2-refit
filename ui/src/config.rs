@@ -20,6 +20,10 @@ pub struct Config {
     /// `[UI] PointerLog`: log the focus changes and the pointer's jumps between two
     /// frames (`input::diagnose`), for the cursor that jumps after a change of focus.
     pub pointer_log: bool,
+    /// `[UI] KeepClip`: in a mission under Wine, has Wine put its full-screen pointer
+    /// clip back while the pointer moves (`input::keep_clip`), for the pointer that
+    /// escapes into a desktop bar after a screenshot.
+    pub keep_clip: bool,
     /// `[UI] Theme`: a theme's name (`shell`, `federation`, `klingon`, ...) to use
     /// everywhere; None for `auto`, the player's race in a mission and the shell's
     /// theme elsewhere (widgets/theme.rs).
@@ -144,6 +148,7 @@ pub fn load() -> Config {
         native: ini.int("UI", "Native", 1) != 0,
         movies: ini.int("UI", "Movies", 1) != 0,
         pointer_log: ini.int("UI", "PointerLog", 0) != 0,
+        keep_clip: ini.int("UI", "KeepClip", 1) != 0,
         theme: ini.string("UI", "Theme").filter(|s| {
             let l = rt::lower(s.trim());
             !l.is_empty() && l != "auto"

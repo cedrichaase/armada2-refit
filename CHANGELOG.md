@@ -5,6 +5,19 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.33.0 — 2026-10-23
+
+Layers: ui 0.22.0, testbench 3.67.0.
+
+### Added
+- `[UI] KeepClip=1`, on as shipped: in a mission under Wine, UI.asi has Wine clip the
+  pointer to the full-screen game again while it moves, for the pointer that escaped
+  into the desktop's bar after a screenshot (ui 0.22.0).
+- testbench: a bar step, an Omarchy-like screenshot, a corner push, an Xwayland
+  protocol trace and `ui-pointer-bar` (testbench 3.67.0).
+
+Installed, not yet seen in game.
+
 ## 13.32.0 — 2026-10-23
 
 Layers: render3d 0.26.1, testbench 3.66.0.
