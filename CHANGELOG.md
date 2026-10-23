@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.7.0 — 2026-10-23
+
+Layers: ui 0.17.0, cutscenes 2.1.0, testbench 3.49.0.
+
+### Added
+- Phase 1 of the display plan, the UI's part: the engine's last draws in a mission
+  (drag box, height posts, order ring, fade, the unit view's video) drawn by the UI
+  (ui 0.17.0); full-screen movies handed by the cutscene proxy to the UI to draw
+  (ui 0.17.0, cutscenes 2.1.0); the in-mission menus over the UI's own copy of the
+  frame (ui 0.17.0); scenario `display-engine-draws` (testbench 3.49.0).
+
+### Fixed
+- A display mode chosen in the middle of a mission no longer crashes the game (a stack
+  overflow between the UI's window subclass and DXVK's window hook) (ui 0.17.0).
+
+Installed, not yet seen in game.
+
 ## 13.6.0 — 2026-10-23
 
 Layers: display 0.3.0, testbench 3.48.0.

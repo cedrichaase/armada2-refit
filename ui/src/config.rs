@@ -14,6 +14,9 @@ pub struct Config {
     /// `[UI] Native`: a game still at a stock mode (800x600, 1024x768) runs at the
     /// desktop's (`engine::display`).
     pub native: bool,
+    /// `[UI] Movies`: the cutscene proxy's full-screen movies are drawn by the UI
+    /// (`movie`), not copied into the engine's locked back buffer.
+    pub movies: bool,
     /// `[UI] Theme`: a theme's name (`shell`, `federation`, `klingon`, ...) to use
     /// everywhere; None for `auto`, the player's race in a mission and the shell's
     /// theme elsewhere (widgets/theme.rs).
@@ -111,6 +114,12 @@ pub struct Hud {
     /// The tooltips the engine shows at the pointer (`CursorInterface`: an object's
     /// name and description over the 3D view), drawn by us in the theme.
     pub tooltips: bool,
+    /// The engine's last draws in a mission, drawn by us (`engine::leftovers`):
+    /// `Overview`, the 3D view's drag box, height posts and order ring; `Fade`, the scripts' fade
+    /// to and from black; `UnitVideo`, the in-mission Bink video (the unit view's).
+    pub overview: bool,
+    pub fade: bool,
+    pub unit_video: bool,
     /// `[HUD] LayoutLog`: for the test bench, every panel's rectangle written to UI.log
     /// when the layout changes (`hud::layout`). 0 in play.
     pub layout_log: bool,
@@ -125,7 +134,7 @@ pub fn load() -> Config {
         cursor: ini.int("UI", "Cursor", 1) != 0,
         cursor_size: ini.float("UI", "CursorSize", 32.0).clamp(16.0, 128.0),
         native: ini.int("UI", "Native", 1) != 0,
-        theme: ini.string("UI", "Theme").filter(|s| {
+        movies: ini.int("UI", "Movies", 1) != 0,        theme: ini.string("UI", "Theme").filter(|s| {
             let l = rt::lower(s.trim());
             !l.is_empty() && l != "auto"
         }),
@@ -161,6 +170,9 @@ pub fn load() -> Config {
             drop_player: ini.int("HUD", "DropPlayer", 1) != 0,
             load_wait: ini.int("HUD", "LoadWait", 1) != 0,
             tooltips: ini.int("HUD", "Tooltips", 1) != 0,
+            overview: ini.int("HUD", "Overview", 1) != 0,
+            fade: ini.int("HUD", "Fade", 1) != 0,
+            unit_video: ini.int("HUD", "UnitVideo", 1) != 0,
             layout_log: ini.int("HUD", "LayoutLog", 0) != 0,
         },
         menus: ini.int("Menus", "Enable", 1) != 0,
@@ -180,6 +192,12 @@ static mut CONFIG: Option<Config> = None;
 
 pub fn set(c: Config) {
     unsafe { CONFIG = Some(c) };
+}
+
+/// The configuration, None before it is read or with `Enable=0`.
+#[allow(static_mut_refs)]
+pub fn try_get() -> Option<&'static Config> {
+    unsafe { CONFIG.as_ref() }
 }
 
 #[allow(static_mut_refs)]

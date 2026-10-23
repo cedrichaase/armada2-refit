@@ -227,6 +227,8 @@ struct Cmd {
     vbase: u32,
     first: u32,
     count: u32,
+    /// Drawn additively (`Draw::quad_additive`).
+    add: bool,
 }
 
 /// What the UI draws into during a frame.
@@ -238,6 +240,8 @@ pub struct Draw {
     cmds: Vec<Cmd>,
     clips: Vec<R>,
     font_tex: [Option<Tex>; 2],
+    /// The quads being added are additive.
+    add: bool,
 }
 
 /// The font's weights.
@@ -258,6 +262,7 @@ impl Draw {
             cmds: Vec::new(),
             clips: Vec::new(),
             font_tex: unsafe { FONT_TEX },
+            add: false,
         }
     }
 
@@ -295,7 +300,7 @@ impl Draw {
         let clip = self.clip_px();
         let nv = self.verts.len() as u32;
         let reuse = match self.cmds.last_mut() {
-            Some(c) if c.clip == clip && nv + 4 - c.vbase <= 65536 && (tex.is_none() || c.tex.is_none() || c.tex == tex) => {
+            Some(c) if c.clip == clip && c.add == self.add && nv + 4 - c.vbase <= 65536 && (tex.is_none() || c.tex.is_none() || c.tex == tex) => {
                 if c.tex.is_none() {
                     c.tex = tex;
                 }
@@ -304,7 +309,7 @@ impl Draw {
             _ => false,
         };
         if !reuse {
-            self.cmds.push(Cmd { tex, clip, vbase: nv, first: self.idx.len() as u32, count: 0 });
+            self.cmds.push(Cmd { tex, clip, vbase: nv, first: self.idx.len() as u32, count: 0, add: self.add });
         }
         self.cmds.last().unwrap().vbase
     }
@@ -331,6 +336,17 @@ impl Draw {
             vx(x1, y1, cols[2], uv[2], uv[3]),
             vx(x0, y1, cols[3], uv[0], uv[3]),
         ]);
+    }
+
+    /// A textured quad of any shape (corners in order around it, each with its `uv`),
+    /// tinted by `c` and added to what is there (the engine's additive effects: black
+    /// adds nothing).
+    pub fn quad_additive(&mut self, t: Tex, p: [(f32, f32); 4], uv: [(f32, f32); 4], c: Color) {
+        let k = [KIND_TEX, 0.0, 0.0, 0.0];
+        let vx = |i: usize| Vertex { x: p[i].0, y: p[i].1, col: c, u: uv[i].0, v: uv[i].1, k, ..Default::default() };
+        self.add = true;
+        self.quad(Some(t), [vx(0), vx(1), vx(2), vx(3)]);
+        self.add = false;
     }
 
     /// A filled rectangle.
@@ -535,6 +551,29 @@ pub fn reset() {
     gpu().before_reset();
 }
 
+/// The additive pipeline (`Draw::quad_additive`): the same shaders, light added to the
+/// frame (source alpha times colour, plus what is there), as the engine draws its
+/// additive effects.
+static mut PIPE_ADD: Option<(Format, gpu::Pipeline)> = None;
+
+#[allow(static_mut_refs)]
+fn pipeline_additive(target: Format) -> Option<&'static gpu::Pipeline> {
+    unsafe {
+        if PIPE_ADD.as_ref().is_none_or(|(f, _)| *f != target) {
+            let stride = core::mem::size_of::<Vertex>() as u32;
+            let mut d = PipelineDesc::new(Code::d3d9(&VS_UI), Code::d3d9(&PS_UI), &LAYOUT, stride, Topology::TriangleList, target);
+            d.blend = Some(Blend {
+                color: BlendEq { src: Factor::SrcAlpha, dst: Factor::One, op: BlendOp::Add },
+                alpha: Some(BlendEq { src: Factor::Zero, dst: Factor::One, op: BlendOp::Add }),
+            });
+            d.scissor = true;
+            PIPE_ADD = Some((target, gpu().pipeline(d)));
+        }
+        let (_, p) = PIPE_ADD.as_ref()?;
+        p.ready(gpu()).then_some(p)
+    }
+}
+
 #[allow(static_mut_refs)]
 fn pipeline(dev: usize, target: Format) -> Option<&'static gpu::Pipeline> {
     unsafe {
@@ -612,9 +651,22 @@ fn submit(cmd: &mut gpu::Cmd, p: &gpu::Pipeline, bb: &gpu::Texture, ds: Option<&
     cmd.vs_block(Block::new(0, &[sx, sy, -1.0 - hp * sx, 1.0 - hp * sy]));
     let (Some(vs), Some(is)) = (cmd.vertices(&draw.verts), cmd.indices(&draw.idx)) else { return };
     let mut bound: Option<Tex> = None;
+    let mut add = false;
+    let fmt = bb.desc().format;
     for c in &draw.cmds {
         if c.count == 0 {
             continue;
+        }
+        if c.add != add {
+            let next = if c.add { pipeline_additive(fmt) } else { Some(p) };
+            let Some(next) = next else { continue };
+            if !cmd.set_pipeline(next) {
+                return;
+            }
+            add = c.add;
+            bound = None;
+            cmd.set_sampler(0, &Sampler::LINEAR_CLAMP);
+            cmd.vs_block(Block::new(0, &[sx, sy, -1.0 - 0.5 * sx, 1.0 - 0.5 * sy]));
         }
         if c.tex.is_some() && c.tex != bound {
             cmd.bind_texture(0, c.tex.and_then(tex_obj), &Sampler::LINEAR_CLAMP);

@@ -22,6 +22,7 @@ pub mod input;
 pub mod loading;
 pub mod math;
 pub mod menus;
+pub mod movie;
 pub mod prefs;
 #[rustfmt::skip]
 pub mod shaders;
@@ -59,7 +60,14 @@ fn startup() {
         log!("display: {}", if engine::display::install() { "a stock mode becomes the desktop's" } else { "the call is not stock: the game's mode is as set" });
     }
     log!("input: {}", if input::install() { "captured" } else { "not captured" });
-    log!("mission: {}", if engine::ingame::install() { "hooked" } else { "standing down" });
+    let mission = engine::ingame::install();
+    log!("mission: {}", if mission { "hooked" } else { "standing down" });
+    let h = &config::get().hud;
+    if mission && h.enable {
+        // Drawn in the mission frame: without its hook they stay the engine's.
+        let n = engine::leftovers::install(h.overview, h.fade, h.unit_video);
+        log!("leftovers: {} of the engine's last draws are ours", n);
+    }
     log!("shell: {}", if engine::shell::install() { "hooked" } else { "standing down" });
     log!("loading: {}", if engine::loading::install(config::get().loading) { "hooked" } else { "standing down" });
     log!("hud: {}", if hud::install() { "panels of ours" } else { "stock" });

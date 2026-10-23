@@ -37,6 +37,7 @@ pub fn run(ctx: Context, ui: &mut Ui) {
         Context::Menus => false,
     };
     if ctx == Context::Mission {
+        crate::hud::leftovers::run(ui);
         crate::hud::run(ui);
     }
     if on {

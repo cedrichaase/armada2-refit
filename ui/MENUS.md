@@ -164,8 +164,13 @@ The in-mission menus run on the 3D display that is already up.
 Load Game, the Technology Tree and the Admiral's Log are opened from a mission. The
 mission's loop is blocked inside the dialog, so the host's loop is the only thing that
 presents. When the first dialog opens within two seconds of a mission frame
-(`ingame::recent`), the host reads the front buffer back
-(`IDirect3DDevice9::GetFrontBufferData`) and draws the menus over that picture, dimmed.
+(`ingame::recent`), the host draws the menus over the mission's last frame, dimmed.
+That frame is the UI's own: at the end of every mission frame (after the UI's frame,
+so with the HUD and the UI on it) the back buffer is copied on the GPU into a target
+the UI keeps (`menus::backdrop::keep_mission_frame`, a `StretchRect` of the same
+size). The front buffer is read back (`IDirect3DDevice9::GetFrontBufferData`, as
+before) only when no copy was made, so nothing is read back from the swapchain in the
+usual case, and a display of ours (the display plan) needs no front buffer.
 A menu that hands over to another (Options to Load Game returns to the shell's
 `DispatchDialog` in between, with no mission frame) keeps the picture if it opens
 within 1.5 s.
