@@ -178,6 +178,15 @@ the shaders include it by a relative path that resolves from `shaders/` for both
   `d3dbc-fix.py` narrows it to `.xy`, and refuses a shader that reads its z or w.
 - **`select`** is a macro over `?:` for vkd3d, which has the vector `?:` and no
   `select`; dxc refuses a vector `?:` under HLSL 2021.
+- **0 x infinity is NaN on SPIR-V and DXIL, and 0 in Direct3D 9's shaders** (DXVK
+  emulates the legacy rule). So a branch-free shader that evaluates every kind and
+  keeps one must `select` it, never weight each by 0 or 1 and add them up: a kind run
+  on another kind's parameters may reach an infinity, and its 0 weight then turns the
+  pixel to NaN, which an additive blend carries into the frame as black. The ordnance
+  module's fx shader did that until 0.26.1: the auto-assimilator's emitter flare (a
+  flare quad, whose cone term divided by the flare's zero streak colour and overflowed
+  an `exp` past the cone's outline) drew as an opaque black square on Vulkan and
+  Direct3D 12 and right on Direct3D 9 (`testbench/scenarios/render3d-cone-emitter.md`).
 
 The d3dbc this writes is the d3dbc the old sources wrote: the code token for token,
 the constant table's sampler names aside, and in five pixel shaders (`fire_ps`,

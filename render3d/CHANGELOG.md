@@ -4,6 +4,18 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.26.1 — 2026-10-23
+
+### Fixed
+- On Vulkan and Direct3D 12, the emitter flare of a `Kind=cone` beam (the
+  Assimilator's auto-assimilator, `borgbor`) drew as an opaque black square at the
+  beam's start. The fx pixel shader (`fx_ps` in `ordnance.hlsl`) now `select`s the
+  quad's kind instead of weighting every kind by 0 or 1 and adding them up: the cone's
+  term, run on a flare's parameters, overflowed to infinity, and 0 x infinity is NaN
+  there (Direct3D 9 takes it as 0). The cone's rim no longer overflows past its outline.
+
+Installed, not yet seen in game.
+
 ## 0.26.0 — 2026-10-23
 
 ### Changed
