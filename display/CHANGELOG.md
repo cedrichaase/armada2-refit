@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.6.1 — 2026-10-23
+
+### Fixed
+- Stub mode: the movies were black, their sound playing, on every backend. The back
+  buffer the engine writes by lock goes into the frame when it is unlocked
+  (`stub::back_buffer_written`), not at `Present`, where it covered the frame the UI had
+  just drawn from the cutscene proxy's (`src/stub/res.rs`, `src/stub/mod.rs`).
+
+Installed, not yet seen in game.
+
 ## 0.5.0 — 2026-10-23
 
 ### Added

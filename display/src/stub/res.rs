@@ -498,7 +498,7 @@ unsafe extern "system" fn surf_lock_rect(this: *mut SObj, lr: *mut Locked, rect:
         }
         None => {
             if role == Role::BackBuffer && flags & 0x10 == 0 {
-                once(&sfmt!("STUB the back buffer locked for writing (copied to the swap chain at Present), by {}", trace::chain(fp)));
+                once(&sfmt!("STUB the back buffer locked for writing (into the frame when unlocked), by {}", trace::chain(fp)));
             }
             let mut l = Level { w: sf.w, h: sf.h, d: 1, pitch: sf.pitch, slice: sf.pitch * sf.h, data: Vec::new(), child: core::ptr::null_mut() };
             core::mem::swap(&mut l.data, &mut sf.data);
@@ -511,6 +511,9 @@ unsafe extern "system" fn surf_lock_rect(this: *mut SObj, lr: *mut Locked, rect:
 unsafe extern "system" fn surf_unlock_rect(this: *mut SObj) -> HRESULT {
     trace::call(frame!(), Kind::Surface, 10);
     mark_written(this);
+    if unsafe { (*this).role } == Role::BackBuffer {
+        super::back_buffer_written(unsafe { &mut *this }.surf());
+    }
     S_OK
 }
 unsafe extern "system" fn vol_get_desc(this: *mut SObj, d: *mut VolumeDesc) -> HRESULT {

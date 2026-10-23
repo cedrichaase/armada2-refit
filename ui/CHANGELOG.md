@@ -4,6 +4,14 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.19.1 — 2026-10-23
+
+### Fixed
+- On Vulkan `gpu`'s read-back (the frame dumps) reads host-cached memory, not the card's
+  memory through the PCIe window (`gpu/README.md`, "Read-backs").
+
+Installed, not yet seen in game.
+
 ## 0.18.0 — 2026-10-23
 
 ### Added

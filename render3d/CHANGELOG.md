@@ -4,6 +4,18 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.22.1 — 2026-10-23
+
+### Fixed
+- Every nebula class was baked twice, on its first two frames (the menu's and a
+  mission's start): a class made in the middle of a gather started its signature from 0
+  (`SIG0`). The log says why a class is baked again.
+- On Vulkan a nebula bake took 0.4 to 1.5 s a class, a stall of seconds at the main
+  menu and at a mission's start: `gpu`'s read-back read the card's memory through the
+  PCIe window; it reads host-cached memory now (`gpu/README.md`, "Read-backs").
+
+Installed, not yet seen in game.
+
 ## 0.21.0 — 2026-10-23
 
 ### Added

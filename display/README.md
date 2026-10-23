@@ -176,8 +176,13 @@ engine's device, and draw the whole frame on it.
   once with every level and brought up to date when the engine unlocks a level, at
   once on the device's thread, else at the next `BeginScene` or `Present`
   (`BinkThread` writes from its own).
-- **The back buffer's pixels** (the movie path locks it and writes each frame) are
-  copied into the swap chain's at `Present`.
+- **The back buffer's pixels** (the movie path locks it and writes each frame) go into
+  the frame when it is unlocked, as on a real device, so what is drawn after lands on
+  top: the UI draws each movie frame at the `Present` that follows, and the cutscene
+  proxy then writes nothing into the locked buffer. Copied at `Present` instead (until
+  display 0.6.1), the untouched buffer covered the UI's frame, and every movie played
+  black with its sound, on every backend. An unlock off the device's thread waits for
+  `Present`. `display-movie` checks it.
 - **The gamma ramp in the last pass** (`src/stub/gamma.rs`, `shaders/present.hlsl`): a
   windowed swap chain ignores `SetGammaRamp`, and on the real chain the ramp the engine
   sets at start-up lifts every frame (DXVK's presenter applies it: 2 to 3, 80 to 90).
