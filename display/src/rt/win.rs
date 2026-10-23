@@ -83,4 +83,6 @@ unsafe extern "system" {
     pub fn GetCurrentProcessId() -> u32;
     pub fn GetSystemDirectoryA(buf: *mut u8, n: u32) -> u32;
     pub fn MoveFileExA(from: *const u8, to: *const u8, flags: u32) -> i32;
+    pub fn CreateEventA(sec: *mut u8, manual: i32, initial: i32, name: *const u8) -> HANDLE;
+    pub fn WaitForSingleObject(h: HANDLE, ms: u32) -> u32;
 }

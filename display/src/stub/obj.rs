@@ -68,6 +68,8 @@ pub struct Tex {
     pub dirty: AtomicU32,
     /// The Vulkan mirror (`vk::mirror`): a boxed image, or 0.
     pub vk: usize,
+    /// The Direct3D 12 mirror (`dx12::mirror`): a boxed texture, or 0.
+    pub dx12: usize,
 }
 
 pub struct Surf {
@@ -213,6 +215,10 @@ fn free(o: *mut SObj) {
             if t.vk != 0 {
                 super::forget_mirror(o, core::ptr::null_mut());
                 crate::vk::mirror::forget(t.vk);
+            }
+            if t.dx12 != 0 {
+                super::forget_mirror(o, core::ptr::null_mut());
+                crate::dx12::mirror::forget(t.dx12);
             }
         }
         Body::Device(d) => {

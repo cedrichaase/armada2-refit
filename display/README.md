@@ -195,6 +195,22 @@ engine's device, and draw the whole frame on it.
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
 
+## Backends
+
+`Backend=` in `Display8.ini` says what the stub draws on: `d3d9` (above, the default),
+`vulkan` (`src/vk/`) or `d3d12` (`src/dx12/`). On the last two no `d3d9.dll` is loaded
+at all: Display8 owns the device, the swap chain and the frame, and render3d's and the
+UI's `gpu` record into that frame through the plain C exports of
+`gpu/src/display.rs`, the contract both sides build against (its doc comment is the
+specification). `gpu` has its Vulkan backend (`gpu/README.md`, "The Vulkan backend"),
+so on `vulkan` render3d and the UI draw the whole frame as on `d3d9`. Where `gpu` does
+not yet have the backend (`d3d12`), the plugins find no device to draw with and stand
+down (the UI's menus run as stock dialogs, "no Direct3D 9
+device to draw with"), and what is seen is what Display8 draws itself: the engine's
+`Clear`s, the movie frames the engine writes into the back buffer by lock, and the last
+pass through the gamma ramp. `Validate=1` asks for the Vulkan validation layer or
+Direct3D 12's debug layer, where the system has one.
+
 ### Vulkan
 
 `Backend=vulkan` (`src/vk/`): no Direct3D 9 at all. Display8 opens `vulkan-1.dll` and
@@ -250,6 +266,45 @@ cannot reach the GPU. `Display8.log` names the device (`vulkan: physical device
 llvmpipe ...`); the process's maps show `libVkLayer_khronos_validation.so` and
 `libvulkan_lvp.so`, and no other driver. A frame takes seconds there: its time means
 nothing.
+
+### Direct3D 12
+
+`src/dx12/`, the same stub as on Vulkan, by the same plan:
+
+- `d3d12.dll` and `dxgi.dll` by `LoadLibraryA`; the device at feature level 11_0 on the
+  default adapter, one direct queue. Every interface is called by vtable slot, declared
+  by hand from Wine's IDLs (`src/dx12/raw.rs`, each structure's 32-bit size checked at
+  compile time). A method that returns a structure (a descriptor heap's start) takes a
+  hidden pointer after `this`, as Microsoft's compiler passes it.
+- A flip-model swap chain (`FLIP_DISCARD`, two B8G8R8A8 buffers) on the game's window,
+  with DXGI's Alt+Enter and window changes off; sync interval 1 unless the engine asks
+  for `D3DPRESENT_INTERVAL_IMMEDIATE`.
+- The engine's back buffer and depth are B8G8R8A8 and D16 resources of ours, in
+  `RENDER_TARGET` and `DEPTH_WRITE` between recorders; `Clear` clears them by
+  rectangles, clipped to the viewport.
+- Two frames in flight, each with a command allocator and list, its fence value, an
+  upload ring (upload-heap buffers mapped for good, 4 MB chunks added as a frame needs
+  them) and the frees deferred to it.
+- Descriptors: two shader-visible heaps, CBV/SRV/UAV (32768 a frame) and samplers (1024
+  a frame, Direct3D 12's 2048 in all), set on the frame's list when it begins; the
+  views of Display8's own textures live in a heap that is not shader-visible and are
+  copied into a frame's range to be bound. A recorder takes its descriptors from those
+  ranges and never sets heaps of its own (only one of each type can be set).
+- Mirrors as on Vulkan: B8G8R8A8 textures with every level, X8R8G8B8 through a view
+  whose alpha reads one, in `PIXEL_SHADER_RESOURCE | NON_PIXEL_SHADER_RESOURCE`.
+- The last pass is `shaders/present.hlsl` as DXIL (`src/shaders/present_dxil.rs`), with
+  a root signature of four root constants (b0) and a table of the frame and the ramp
+  (t0, t1) under two static point samplers.
+- A device that is removed is logged with its reason, and nothing is drawn after.
+
+**On the bench** (Proton-CachyOS), the 32-bit game gets Direct3D 12 with no setting:
+the prefix's `syswow64/d3d12.dll` is vkd3d-proton and its `dxgi.dll` DXVK's, and
+Proton's own launch makes both native (the bench's overrides name only `winmm`, `d3d8`
+and `d3d9`). DXVK's DXGI logs that it ignores `MakeWindowAssociation`'s flags.
+Measured 2026-10-23: the device comes up at 11_0 on the RX 5700, the intro movies play
+through the back buffer, the gamma pass and the flip-model swap chain, and a mission
+(`-nointro a2_borg01`, the plugins standing down) presents past frame 1000 and opens
+the in-mission menu.
 
 ## Will Vulkan work on a Mac?
 

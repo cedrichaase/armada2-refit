@@ -24,9 +24,11 @@ Moving both plugins onto it changed nothing on screen, so each move is judged by
 | `src/pixels.rs` | `Mapped`, texels read back, and their conversion to RGB (the frame dumps) |
 | `src/chain.rs` | a bake too long for one shader, as a chain of passes (`Chain`), on the interface |
 | `src/api.rs` | `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Timer`, `Cmd` as the plugins see them: each an enum of the two backends' own, every call going to the one it was made on; the backend chosen at run time |
-| `src/display.rs` | the contract with Display8: its exports, the plain `#[repr(C)]` values they pass |
 | `src/d3d9/mod.rs` | the Direct3D 9 backend: `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Cmd`, `Timer` |
 | `src/d3d9/raw.rs`, `consts.rs` | Direct3D 9 through raw COM vtables, once `render3d/src/d3d` and `ui/src/d3d` (identical copies) |
+| `src/display.rs` | the contract with Display8 (`display/`, the game's `d3d8.dll` of ours): the device, frame, upload ring, targets and mirrors it owns and exports, on Vulkan (`display8_vk_*`) and Direct3D 12 (`display8_dx12_*`), as `#[repr(C)]` types; its doc comment is the specification |
+| `shaders/compat.hlsli` | what the shader compilers need apart: vkd3d (d3dbc), dxc to SPIR-V, dxc to DXIL (`render3d/README.md`, "One source, two compilers") |
+| `shaders/fetch-dxc.sh` | the dxc that writes the DXIL, DirectXShaderCompiler v1.9.2609, fetched into `$A2_DATA/tools/` by version and sha256 (`render3d/hlsl-rs.sh` runs it when a DXIL file is stale) |
 | `src/vulkan/mod.rs` | the Vulkan backend's `Gpu`: Display8's device opened, the recording state (the pass now, layouts), samplers, render passes, the uniform ring, Display8's images wrapped |
 | `src/vulkan/tex.rs`, `pipe.rs`, `cmd.rs`, `mem.rs` | its textures, buffers and timestamps; pipelines; `Cmd` and the read-back; device memory in blocks |
 | `src/vulkan/spirv.rs` | what it reads out of dxc's SPIR-V (reflection) and the two patches it makes to a pixel shader; built on the host too by `spirv-selftest.sh` |

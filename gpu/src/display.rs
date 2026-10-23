@@ -41,7 +41,44 @@
 //! reach the device as before (`QueryInterface(IID_IDirect3DDevice9)` on the engine's
 //! device) and keep their own `Frame`s, which on Direct3D 9 are trivial.
 //!
-//! **Direct3D 12** (phase 6) gets its own block here, shaped the same way.
+//! **Direct3D 12** (Display8 `Mode=stub`, `Backend=d3d12`), shaped the same way. Display8
+//! makes the device (feature level 11_0, the default adapter) and one direct queue, owns
+//! a flip-model swap chain on the game's window, the colour and depth targets that
+//! stand for the engine's back buffer and depth surface, two frames in flight with a
+//! command allocator, a command list, a fence value and an upload ring each, and two
+//! **shader-visible descriptor heaps** (CBV/SRV/UAV and sampler), which it sets on the
+//! frame's command list when the frame begins. Only one heap of each type can be set at
+//! a time, so a recorder never sets heaps of its own: it takes a frame's descriptors
+//! from Display8's (`display8_dx12_descriptors`), writes or copies its views into them
+//! (a texture's view lives in a heap of the recorder's own that is not shader-visible,
+//! and is copied in with `CopyDescriptorsSimple`), and binds them with its own root
+//! signature. Root signatures and pipeline states are each recorder's, set by it
+//! before it draws; nothing of them is assumed between recorders.
+//!
+//! States between recorders: the colour target in `RENDER_TARGET`, the depth target in
+//! `DEPTH_WRITE`, a mirror in `PIXEL_SHADER_RESOURCE | NON_PIXEL_SHADER_RESOURCE`; a
+//! recorder that changes one puts it back before it returns control. The upload ring is
+//! in an upload heap (`GENERIC_READ`), so a span of it can be a vertex, index or
+//! constant buffer (at `uniform_align`, 256) or a copy source as it is.
+//!
+//! Shaders are DXIL from the same sources (`render3d/hlsl-rs.sh`, `*_dxil.rs`): a
+//! stage's cbuffers at b0 (vertex) and b1 (pixel), the k-th cbuffer of a source in
+//! space k (each module's `CB_SPACES` says how many), all of them views of the stage's
+//! one register file; textures at tN and samplers at sN of space 0
+//! (`gpu/shaders/compat.hlsli`, `render3d/dxil-spaces.py`).
+//!
+//! | Export | Signature | What |
+//! |---|---|---|
+//! | `display8_dx12` | `fn() -> *const Dx12Device8` | the device, or null |
+//! | `display8_dx12_frame` | `fn() -> *const Dx12Frame8` | the frame now, begun at the first ask after a `Present` |
+//! | `display8_dx12_alloc` | `fn(bytes: u32, align: u32, out: *mut Dx12Alloc8) -> bool` | space in the frame's upload ring |
+//! | `display8_dx12_descriptors` | `fn(heap: u32, count: u32, out: *mut Dx12Descriptors8) -> bool` | `count` contiguous descriptors of the frame in a shader-visible heap (`HEAP_CBV_SRV_UAV`, `HEAP_SAMPLER`), valid until the frame is done |
+//! | `display8_dx12_defer` | `fn(f: extern "C" fn(*mut c_void), arg: *mut c_void)` | `f(arg)` once the frame now is done on the GPU |
+//! | `display8_dx12_target` | `fn(which: u32, out: *mut Dx12Image8) -> bool` | `TARGET_COLOR`, `TARGET_DEPTH` |
+//! | `display8_dx12_mirror` | `fn(tex8: *mut c_void, out: *mut Dx12Image8) -> bool` | an engine texture as a sampled texture, kept up to date by Display8 |
+//!
+//! `display8_backend`, `display8_engine_viewport` and `display8_engine_transform` are
+//! the same exports on every backend.
 use core::ffi::c_void;
 
 pub const BACKEND_NONE: u32 = 0;
@@ -169,6 +206,132 @@ impl Display8 {
                 vk_flush: core::mem::transmute::<usize, extern "C" fn() -> bool>(f("display8_vk_flush")?),
                 engine_viewport: core::mem::transmute::<usize, extern "C" fn(*mut [u32; 6]) -> bool>(f("display8_engine_viewport")?),
                 engine_transform: core::mem::transmute::<usize, extern "C" fn(u32, *mut [f32; 16]) -> bool>(f("display8_engine_transform")?),
+            })
+        }
+    }
+}
+
+/// Shader-visible heaps a frame's descriptors come from (`display8_dx12_descriptors`).
+pub const HEAP_CBV_SRV_UAV: u32 = 0;
+pub const HEAP_SAMPLER: u32 = 1;
+
+/// The Direct3D 12 device Display8 made. COM objects are pointers, not referenced:
+/// valid as long as Display8 is loaded.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Dx12Device8 {
+    /// `ID3D12Device*`.
+    pub device: usize,
+    /// `ID3D12CommandQueue*`: the direct queue Display8 submits the frame on.
+    pub queue: usize,
+    /// `D3D12SerializeRootSignature` of the `d3d12.dll` Display8 loaded.
+    pub serialize_root_signature: usize,
+    /// `D3D_FEATURE_LEVEL` the device was made at.
+    pub feature_level: u32,
+    pub frames_in_flight: u32,
+    /// `GetDescriptorHandleIncrementSize` of CBV/SRV/UAV, sampler, RTV and DSV.
+    pub increments: [u32; 4],
+    /// The shader-visible heaps the frame's command list has set
+    /// (`ID3D12DescriptorHeap*`): CBV/SRV/UAV, sampler.
+    pub heaps: [usize; 2],
+    /// Constant-buffer placement alignment (256).
+    pub uniform_align: u32,
+}
+
+/// The frame now.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct Dx12Frame8 {
+    pub index: u64,
+    /// Which of the frames in flight (0 .. frames_in_flight).
+    pub slot: u32,
+    /// `ID3D12GraphicsCommandList*`, open, with Display8's heaps set.
+    pub command_list: usize,
+}
+
+/// Space in the frame's upload ring.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Dx12Alloc8 {
+    /// `ID3D12Resource*`: an upload-heap buffer.
+    pub resource: usize,
+    pub offset: u32,
+    /// The space's GPU virtual address (the buffer's plus `offset`).
+    pub gpu: u64,
+    pub cpu: *mut u8,
+}
+
+impl Default for Dx12Alloc8 {
+    fn default() -> Self {
+        Dx12Alloc8 { resource: 0, offset: 0, gpu: 0, cpu: core::ptr::null_mut() }
+    }
+}
+
+/// A frame's run of descriptors in a shader-visible heap.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct Dx12Descriptors8 {
+    /// `D3D12_CPU_DESCRIPTOR_HANDLE` of the first: where to write or copy them.
+    pub cpu: usize,
+    /// `D3D12_GPU_DESCRIPTOR_HANDLE` of the first: what a root table binds.
+    pub gpu: u64,
+    pub count: u32,
+}
+
+/// A texture Display8 owns: the engine's targets, a mirror.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct Dx12Image8 {
+    /// `ID3D12Resource*`.
+    pub resource: usize,
+    /// `DXGI_FORMAT`.
+    pub format: u32,
+    pub width: u32,
+    pub height: u32,
+    pub levels: u32,
+    pub samples: u32,
+    /// `D3D12_RESOURCE_STATES` it is in between recorders (above).
+    pub state: u32,
+    /// Its render-target view (the colour target), or 0.
+    pub rtv: usize,
+    /// Its depth-stencil view (the depth target), or 0.
+    pub dsv: usize,
+    /// A shader-resource view in a heap of Display8's that is not shader-visible (the
+    /// colour target, a mirror; 0 for the depth target), to copy into a frame's
+    /// descriptors.
+    pub srv: usize,
+}
+
+/// The Direct3D 12 exports, looked up once; beside `Display8`, which holds the ones
+/// every backend has.
+#[derive(Clone, Copy)]
+pub struct Display8Dx12 {
+    pub dx12: extern "C" fn() -> *const Dx12Device8,
+    pub frame: extern "C" fn() -> *const Dx12Frame8,
+    pub alloc: extern "C" fn(u32, u32, *mut Dx12Alloc8) -> bool,
+    pub descriptors: extern "C" fn(u32, u32, *mut Dx12Descriptors8) -> bool,
+    pub defer: extern "C" fn(extern "C" fn(*mut c_void), *mut c_void),
+    pub target: extern "C" fn(u32, *mut Dx12Image8) -> bool,
+    pub mirror: extern "C" fn(*mut c_void, *mut Dx12Image8) -> bool,
+}
+
+impl Display8Dx12 {
+    /// The exports, through `lookup` (as `Display8::load`). None: not Display8, or one
+    /// without Direct3D 12.
+    pub fn load(lookup: impl Fn(&str) -> usize) -> Option<Display8Dx12> {
+        let f = |n: &str| match lookup(n) {
+            0 => None,
+            p => Some(p),
+        };
+        unsafe {
+            Some(Display8Dx12 {
+                dx12: core::mem::transmute::<usize, extern "C" fn() -> *const Dx12Device8>(f("display8_dx12")?),
+                frame: core::mem::transmute::<usize, extern "C" fn() -> *const Dx12Frame8>(f("display8_dx12_frame")?),
+                alloc: core::mem::transmute::<usize, extern "C" fn(u32, u32, *mut Dx12Alloc8) -> bool>(f("display8_dx12_alloc")?),
+                descriptors: core::mem::transmute::<usize, extern "C" fn(u32, u32, *mut Dx12Descriptors8) -> bool>(f("display8_dx12_descriptors")?),
+                defer: core::mem::transmute::<usize, extern "C" fn(extern "C" fn(*mut c_void), *mut c_void)>(f("display8_dx12_defer")?),
+                target: core::mem::transmute::<usize, extern "C" fn(u32, *mut Dx12Image8) -> bool>(f("display8_dx12_target")?),
+                mirror: core::mem::transmute::<usize, extern "C" fn(*mut c_void, *mut Dx12Image8) -> bool>(f("display8_dx12_mirror")?),
             })
         }
     }
