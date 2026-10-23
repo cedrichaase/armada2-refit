@@ -194,3 +194,11 @@ engine's device, and draw the whole frame on it.
 
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
+
+## Will Vulkan work on a Mac?
+
+`vkprobe/` is a small 32-bit program that does what the Vulkan backend does (a mapped
+upload ring, dynamic uniform offsets, a texture upload, a present pass) and checks the
+pixels: the question is whether winevulkan on MoltenVK maps host-visible memory where
+a 32-bit process can reach it, in the new-style WoW64 that macOS Wine always is. How to
+run it on a Mac, and what it showed here: `vkprobe/README.md`.

@@ -1,0 +1,19 @@
+LIBRARY KERNEL32.dll
+EXPORTS
+HeapAlloc@12
+HeapFree@12
+HeapReAlloc@16
+GetProcessHeap@0
+GetModuleFileNameA@12
+GetModuleHandleA@4
+CreateFileA@28
+WriteFile@20
+CloseHandle@4
+QueryPerformanceCounter@4
+QueryPerformanceFrequency@4
+ExitProcess@4
+LoadLibraryA@4
+GetProcAddress@8
+VirtualQuery@12
+GetCurrentProcess@0
+SetUnhandledExceptionFilter@4
