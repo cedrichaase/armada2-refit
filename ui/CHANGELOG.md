@@ -4,6 +4,18 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.17.2 — 2026-10-23
+
+### Fixed
+- A placement's build footprint is drawn again with Display8 in stub mode: the three
+  `ST3D_Sprite::DrawQuad` calls in `PlaceholderFeature::RenderFootprints` are taken
+  under `[HUD] Overview` as the order ring's are, and drawn by the UI with each
+  sprite's rectangle of its texture (`MBuild`'s quarters) and a texture slot per engine
+  texture (`engine/leftovers.rs`, `hud/leftovers.rs`; HUD.md, "The engine's last
+  draws"). `UI.log`: "leftovers: build footprint at ...".
+
+Installed, not yet seen in game.
+
 ## 0.17.1 — 2026-10-23
 
 ### Added
