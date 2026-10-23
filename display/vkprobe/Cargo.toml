@@ -1,0 +1,26 @@
+[package]
+name = "vkprobe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "vkprobe: does Vulkan work for Display8 in this 32-bit process? (README.md)"
+license = "MIT"
+
+[[bin]]
+name = "vkprobe"
+path = "src/main.rs"
+
+[dependencies]
+# "debug": the Debug impls that name formats, flags and modes in the report.
+ash = { version = "0.38", default-features = false, features = ["debug"] }
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true
+codegen-units = 1
+debug = 1
+
+[profile.dev]
+panic = "abort"
+opt-level = 1
