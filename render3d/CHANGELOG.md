@@ -4,6 +4,18 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.20.0 — 2026-10-23
+
+### Added
+- `hlsl-rs.sh` also writes DXIL for Direct3D 12 (`src/shaders/<name>_dxil.rs`,
+  `pub static <SYMBOL>_DXIL`, and each module's `CB_SPACES`), signed, from the pinned
+  dxc v1.9.2609 (`gpu/shaders/fetch-dxc.sh`, `DXC=`); `dxil-spaces.py` puts each
+  cbuffer of a stage in a register space of its own for it. Every shader's DXIL is
+  committed. `gpu/shaders/compat.hlsli`: `STAGE(n)`'s `vk::` attributes only in SPIR-V.
+  The d3dbc and SPIR-V are byte for byte as before (only their stamps changed).
+
+Installed, not yet seen in game.
+
 ## 0.19.0 — 2026-10-23
 
 ### Changed

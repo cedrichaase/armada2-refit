@@ -384,6 +384,9 @@ unsafe extern "system" fn begin_scene(this: *mut SObj) -> HRESULT {
     if let Some(v) = crate::vk::get() {
         v.frame();
     }
+    if let Some(d) = crate::dx12::get() {
+        d.frame();
+    }
     super::flush_mirrors();
     dev(this).in_scene = true;
     let d = d9();
@@ -409,6 +412,13 @@ unsafe extern "system" fn clear(this: *mut SObj, n: u32, rects: P, flags: u32, c
         let vp = dv.viewport;
         let f = if dv.zbuffer.is_null() { flags & 1 } else { flags };
         v.clear(list, [vp[0], vp[1], vp[2], vp[3]], f, color, z);
+        return S_OK;
+    }
+    if let Some(x) = crate::dx12::get() {
+        let list: &[[i32; 4]] = if rects.is_null() || n == 0 { &[] } else { unsafe { core::slice::from_raw_parts(rects as *const [i32; 4], n as usize) } };
+        let vp = dv.viewport;
+        let f = if dv.zbuffer.is_null() { flags & 1 } else { flags };
+        x.clear(list, [vp[0], vp[1], vp[2], vp[3]], f, color, z);
         return S_OK;
     }
     let d = d9();

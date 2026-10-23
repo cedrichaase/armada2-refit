@@ -23,6 +23,9 @@ no worse), apart from the change of API that comes later.
 | `src/chain.rs` | a bake too long for one shader, as a chain of passes (`Chain`), on the interface |
 | `src/d3d9/mod.rs` | the Direct3D 9 backend: `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Cmd`, `Timer` |
 | `src/d3d9/raw.rs`, `consts.rs` | Direct3D 9 through raw COM vtables, once `render3d/src/d3d` and `ui/src/d3d` (identical copies) |
+| `src/display.rs` | the contract with Display8 (`display/`, the game's `d3d8.dll` of ours): the device, frame, upload ring, targets and mirrors it owns and exports, on Vulkan (`display8_vk_*`) and Direct3D 12 (`display8_dx12_*`), as `#[repr(C)]` types; its doc comment is the specification |
+| `shaders/compat.hlsli` | what the shader compilers need apart: vkd3d (d3dbc), dxc to SPIR-V, dxc to DXIL (`render3d/README.md`, "One source, two compilers") |
+| `shaders/fetch-dxc.sh` | the dxc that writes the DXIL, DirectXShaderCompiler v1.9.2609, fetched into `$A2_DATA/tools/` by version and sha256 (`render3d/hlsl-rs.sh` runs it when a DXIL file is stale) |
 
 `gpu::Gpu`, `gpu::Texture` and the rest are the backend in use, re-exported at the
 crate's root; a later backend is chosen at build time behind the same names.

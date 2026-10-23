@@ -19,6 +19,7 @@ pub mod com;
 pub mod d3d8;
 pub mod detail;
 pub mod drop;
+pub mod dx12;
 pub mod trace;
 pub mod stub;
 pub mod user32;
@@ -47,7 +48,8 @@ static mut CONFIG: Option<Config> = None;
 static mut REAL: HANDLE = core::ptr::null_mut();
 /// `Mode=stub` asked for; whether it runs is decided at `Direct3DCreate8`.
 static mut STUB_ASKED: bool = false;
-/// `Backend=`: what the stub draws on (d3d9 until every plugin draws on Vulkan).
+/// `Backend=`: what the stub draws on (d3d9 until every plugin draws on Vulkan or
+/// Direct3D 12).
 static mut BACKEND: stub::Backend = stub::Backend::D3d9;
 static mut VALIDATE: bool = false;
 
@@ -93,7 +95,16 @@ fn startup() {
     unsafe { STUB_ASKED = mode.eq_ignore_ascii_case("stub") };
     let backend = ini.string("Display8", "Backend").unwrap_or_else(|| alloc::string::String::from("d3d9"));
     unsafe {
-        BACKEND = if backend.eq_ignore_ascii_case("vulkan") { stub::Backend::Vulkan } else { stub::Backend::D3d9 };
+        BACKEND = if backend.eq_ignore_ascii_case("vulkan") {
+            stub::Backend::Vulkan
+        } else if backend.eq_ignore_ascii_case("d3d12") {
+            stub::Backend::D3d12
+        } else {
+            if !backend.eq_ignore_ascii_case("d3d9") {
+                log!("Backend={}: not a backend of this version (d3d9, vulkan, d3d12); d3d9 it is", backend);
+            }
+            stub::Backend::D3d9
+        };
         VALIDATE = ini.int("Display8", "Validate", 0) != 0;
     }
     if STUB_ASKED_NOW() {

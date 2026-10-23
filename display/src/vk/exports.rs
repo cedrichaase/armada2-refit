@@ -4,12 +4,14 @@
 use super::get;
 use crate::stub::obj::SObj;
 use core::ffi::c_void;
-use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8, BACKEND_D3D9, BACKEND_NONE, BACKEND_VULKAN};
+use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8, BACKEND_D3D12, BACKEND_D3D9, BACKEND_NONE, BACKEND_VULKAN};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn display8_backend() -> u32 {
     if get().is_some() {
         BACKEND_VULKAN
+    } else if crate::dx12::get().is_some() {
+        BACKEND_D3D12
     } else if !crate::stub::dev9().is_null() {
         BACKEND_D3D9
     } else {

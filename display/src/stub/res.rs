@@ -55,7 +55,7 @@ pub fn create_texture(kind: Kind, w: u32, h: u32, d: u32, levels: u32, usage: u3
             }
         }
     }
-    let t = Tex { format: fmt, usage, pool, faces, nlev, levels: ls, lod: 0, priority: 0, mirror: core::ptr::null_mut(), dirty: AtomicU32::new(0), vk: 0 };
+    let t = Tex { format: fmt, usage, pool, faces, nlev, levels: ls, lod: 0, priority: 0, mirror: core::ptr::null_mut(), dirty: AtomicU32::new(0), vk: 0, dx12: 0 };
     unsafe { *out = SObj::new(kind, Role::Plain, Body::Tex(t)) as P };
     S_OK
 }

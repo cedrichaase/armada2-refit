@@ -4,6 +4,14 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.17.1 — 2026-10-23
+
+### Added
+- The UI shader's DXIL for Direct3D 12 (`src/shaders/ui_dxil.rs`), from
+  `render3d/hlsl-rs.sh`; the d3dbc and SPIR-V are byte for byte as before.
+
+Installed, not yet seen in game.
+
 ## 0.17.0 — 2026-10-23
 
 ### Added

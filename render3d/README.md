@@ -50,9 +50,9 @@ crate links with `/nodefaultlib`, `kernel32` its only import (an import library 
 `llvm-dlltool --kill-at` from `kernel32.def` in `build.rs`), and brings its own
 allocator, memory functions and stack probe (`src/rt/`). Shaders are HLSL in
 `shaders/`, compiled by `hlsl-rs.sh` with `vkd3d-compiler` into `src/shaders/<name>.rs`
-and with `dxc` into SPIR-V in `src/shaders/<name>_spv.rs` ("One source, two
-compilers"), both committed with a stamp so a machine without the compilers builds as
-long as they are current.
+and with `dxc` into SPIR-V in `src/shaders/<name>_spv.rs` and DXIL in
+`src/shaders/<name>_dxil.rs` ("One source, two compilers"), all committed with a stamp
+so a machine without the compilers builds as long as they are current.
 
 ### Shaders on Windows
 
@@ -190,6 +190,25 @@ dxc's: each struct member in declaration order, unused ones included, so a verte
 shader's outputs and the pixel shader's inputs agree wherever both use one struct.
 Direct3D 9's half-pixel offset (pixel centres on whole coordinates) is the caller's:
 DXVK moves the viewport by half a pixel, and the UI's `VP.zw` holds it.
+
+**DXIL**, for Direct3D 12, from the same sources: `hlsl-rs.sh` writes it into
+`src/shaders/<name>_dxil.rs` with dxc too, but a pinned release, DirectXShaderCompiler
+v1.9.2609, which `gpu/shaders/fetch-dxc.sh` fetches into `$A2_DATA/tools/` by version
+and sha256 the first time a DXIL file is stale (`DXC=` names another copy of the same
+release; the version is checked). Arch's dxc 1.10 asserts writing DXIL, and what one
+release writes is not what the next writes, so the stamp names the release. The DXIL
+is signed (the release's `libdxil.so` validates and signs it, which Windows' Direct3D
+12 requires; `hlsl-rs.sh` checks the container's hash is set), without debug info or
+reflection (`-Qstrip_debug -Qstrip_reflect`), shader model 6.0. Its layout: textures
+at `tN` and samplers at `sN` of space 0 (`STAGE(n)` is empty there: the `vk::`
+attributes are SPIR-V's alone); clip space is Direct3D's already. **The cbuffers need
+one change**: DXIL refuses two cbuffers at one register of one space, and several
+cbuffers of a stage alias its one register on purpose, some overlapping in it (one
+entry point's `c0` is not another's). So the source is preprocessed once (`dxc -P`)
+and `dxil-spaces.py` puts the k-th cbuffer at `register(bN)` in space k: a stage's
+register file is bound at b0 (vertex) or b1 (pixel) in every space 0..k, and each
+module's `CB_SPACES` says how many (at most 8, which it checks). The d3dbc and SPIR-V
+are untouched by it: they compile the source as it is.
 
 ## `Render3D.ini`
 

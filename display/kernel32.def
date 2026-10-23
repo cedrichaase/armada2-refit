@@ -36,3 +36,5 @@ VirtualQuery@12
 GetCurrentProcessId@0
 MoveFileExA@12
 GetSystemDirectoryA@8
+CreateEventA@16
+WaitForSingleObject@8

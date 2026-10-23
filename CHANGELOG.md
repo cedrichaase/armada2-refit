@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.9.0 — 2026-10-23
+
+Layers: display 0.4.0, render3d 0.20.0, ui 0.17.1.
+
+### Added
+- Phase 6 of the display plan, Display8's side: stub mode on Direct3D 12
+  (`Backend=d3d12`) with the contract's Direct3D 12 exports in `gpu/src/display.rs`
+  (display 0.4.0).
+- Every shader also built as signed DXIL by a pinned dxc (v1.9.2609, fetched into
+  `$A2_DATA/tools/` by `gpu/shaders/fetch-dxc.sh`) (render3d 0.20.0, ui 0.17.1,
+  display 0.4.0).
+
+Installed, not yet seen in game.
+
 ## 13.7.0 — 2026-10-23
 
 Layers: ui 0.17.0, cutscenes 2.1.0, testbench 3.49.0.
