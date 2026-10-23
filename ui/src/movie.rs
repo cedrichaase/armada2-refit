@@ -20,7 +20,7 @@ static mut PENDING: Option<Pending> = None;
 static mut TEX: Option<(Tex, u32, u32)> = None;
 static mut FRAMES: u32 = 0;
 
-/// Whether the UI draws movies (`[UI] Movies`, and a Direct3D 9 device to draw on).
+/// Whether the UI draws movies (`[UI] Movies`; the device is checked by the caller).
 fn on() -> bool {
     crate::config::try_get().is_some_and(|c| c.movies)
 }

@@ -5,8 +5,9 @@
 #   ./a2test run "$(display/stub-scenario.sh ui-hud-map)" --install . -j 1
 #   display/stub-scenario.sh ui-hud-bar stub Drop2D=1
 #
-# The variant's `Setup:` becomes `display/bench-mode.sh <mode> [keys] <the old setup>`;
-# everything else is the scenario as it is. Written to a temporary file outside the
+# The variant's `Setup:` becomes `display/bench-mode.sh <mode> [keys] <the old setup>`,
+# or, when the old setup is a `display/bench-mode.sh` already, that one call with the
+# mode replaced and the keys added; everything else is the scenario as it is. Written to a temporary file outside the
 # checkout (a2test takes a scenario by path).
 set -euo pipefail
 
@@ -24,7 +25,18 @@ text = open(src).read()
 pre = ' '.join(['display/bench-mode.sh', mode] + keys)
 m = re.search(r'^Setup:\s*(.*)$', text, re.M)
 if m:
-    text = text[:m.start()] + 'Setup: ' + pre + ' ' + m.group(1).strip() + text[m.end():]
+    old = m.group(1).split()
+    if old[:1] == ['display/bench-mode.sh']:
+        # Already a bench-mode setup (display-stub, display-drop): one call, its mode
+        # replaced, its keys kept and these after them (a later key wins).
+        rest = old[2:]
+        n = 0
+        while n < len(rest) and '=' in rest[n]:
+            n += 1
+        new = ' '.join(['display/bench-mode.sh', mode] + rest[:n] + keys + rest[n:])
+    else:
+        new = pre + ' ' + m.group(1).strip()
+    text = text[:m.start()] + 'Setup: ' + new.strip() + text[m.end():]
 else:
     # After the title's header block: before the first blank line that follows a header.
     h = re.search(r'^(Resolutions|Mod|Launch|Timeout|Players|Reference):.*$', text, re.M)

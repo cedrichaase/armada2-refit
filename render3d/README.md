@@ -145,8 +145,9 @@ run.
 
 Every shader of render3d and UI.asi is modern HLSL (`Texture2D`/`Texture3D`/
 `TextureCube` with a `SamplerState`, `cbuffer`, `SV_Position`/`SV_Target`, `Sample`,
-`SampleLevel`, `SampleGrad`, HLSL 2021's `select`), so that one source builds both the
-Direct3D 9 shaders the plugins draw with now and SPIR-V for a Vulkan backend. vkd3d
+`SampleLevel`, `SampleGrad`, HLSL 2021's `select`), so that one source builds the
+Direct3D 9 shaders, the SPIR-V for `gpu`'s Vulkan backend and the DXIL for its
+Direct3D 12 one (below). vkd3d
 writes the d3dbc as before and `dxc` (`-spirv`, Vulkan 1.1) the SPIR-V, which
 `hlsl-rs.sh` puts through `spirv-val`. `gpu/shaders/compat.hlsli`, at the root because
 both plugins include it, holds the few places the two compilers part (dxc predefines
@@ -363,7 +364,8 @@ it, and every module's draws, each through a `gpu::Cmd` (`gfx::cmd()`) with pipe
 made once per combination of states (`gfx::Pipes`), dynamic geometry in the frame's
 rings, and the scene's models in static buffers. No module calls Direct3D 9; the frame's
 glue in `frame/` still reads the engine's device (its transforms, its viewport, its
-`Reset` and `DestroyRenderSurfaces`), which Display8 will answer itself. The scene pass
+`Reset` and `DestroyRenderSurfaces`) on Direct3D 9; on Vulkan and Direct3D 12 Display8
+answers them itself (below). The scene pass
 is begun before the body and stays bound while the engine draws into it; a module that
 draws into a target of its own (a bake, the shadow map, the nebulae's march) begins
 the view's pass again after it (`gfx::view_pass`), with the viewport the engine had
@@ -385,7 +387,8 @@ from the SPIR-V compiled beside each shader's d3dbc. The frame is told a new dev
 `gpu::Gpu::engine_id`, which on Vulkan never changes; `Reset` and
 `DestroyRenderSurfaces` find nothing to let go of. The menu scene's viewport is handed
 to the pass rather than set on the engine's device, so the modules there read the
-engine's own.
+engine's own. **On Direct3D 12** (`Backend=d3d12`) it is the same, through `gpu`'s
+Direct3D 12 backend and the DXIL beside each shader ("One source, two compilers", above).
 
 **Reset.** Every target is in the default pool and must be gone before the device
 resets. Slot 14 of the d3d8 device's vtable (`Reset`) is chained, as `Lighting.asi`

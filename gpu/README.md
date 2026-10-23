@@ -110,21 +110,21 @@ registers from a base (`Block::of(base, &my_repr_c_struct)`).
   reason: on Vulkan it is a resolve attachment or a blit, on Direct3D 9 `StretchRect`.
 - **Uniform blocks at a register base.** Direct3D 9 sets constant registers; Vulkan
   and Direct3D 12 bind buffers. A block of a `#[repr(C)]` struct at the base the
-  shader declares fits both: the base is Direct3D 9's truth, and a later backend gives
-  each block a buffer binding, in the order a binding group lists them. The existing
+  shader declares fits both: the base is Direct3D 9's truth, and Vulkan and Direct3D 12
+  give each block a buffer binding, in the order a binding group lists them. The existing
   register layouts (`k_tile` at c29, the post passes' c0..c3) keep working unchanged.
 - **Binding groups** of a few (texture, sampler) slots and uniform blocks per draw map
   onto a descriptor set and onto a root table alike. The sampler goes with its slot:
   Direct3D 9 has no separate sampler objects, and the newer APIs take static or
   combined samplers well.
-- **Resources valid until dropped, and no device-loss callbacks.** Display8 will own
-  the device, which is never lost then. The Direct3D 9 backend handles losing it
+- **Resources valid until dropped, and no device-loss callbacks.** On Vulkan and
+  Direct3D 12 Display8 owns the device, which is never lost there. The Direct3D 9 backend handles losing it
   inside (below), so no module is written around `Reset`.
 - **Usage flags** (`SAMPLED`, `RENDER_TARGET`, `DEPTH`, `DYNAMIC`, `COPY_SRC`,
-  `COPY_DST`) say what a texture is for, so a later backend can place its barriers.
+  `COPY_DST`) say what a texture is for, so Vulkan and Direct3D 12 can place their barriers.
   Direct3D 9 picks its pool and usage from them.
 - **Per-frame state from outside.** Each plugin links this crate statically, so two
-  copies of it run in one process, and later Display8 owns the frame and exports it
+  copies of it run in one process, and on Vulkan and Direct3D 12 Display8 owns the frame and exports it
   through an `extern "C"` interface of plain handles. So the frame is a value handed
   in, and this crate keeps no static of its own for anything per frame. Descriptions
   and handles are plain data (`#[repr(C)]`, `#[repr(u32)]`) where they may cross that
@@ -484,7 +484,7 @@ textures, the menu scene and the timing. How a module draws, as they all do now:
    0), which the pipeline now sets.
 2. **Constants** are blocks at the registers the shader declares
    (`Block::new(base, &floats)`, `Block::of`). Between `set_pipeline`s of one `Cmd`
-   they persist, as Direct3D 9's registers do; a later backend gives each draw the
+   they persist, as Direct3D 9's registers do; Vulkan and Direct3D 12 give each draw the
    blocks it reads.
 3. **Textures** are `gpu::Texture`s bound with their sampler (`bind_texture`); the
    game's art is `assets::texture` (made at once, keeping no copy: `Contents::Transient`,

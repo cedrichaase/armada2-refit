@@ -1,9 +1,10 @@
-//! Display8: Star Trek: Armada II's `d3d8.dll`, ours. In forward mode, the only one so
-//! far, it stands in front of the real chain (`d3d8_real.dll`: crosire's d3d8to9, then
-//! DXVK's or Windows' d3d9) and passes every call through, tracing it on the bench
-//! (`Trace=1`), dropping the engine's draws by category (`[Drop]`), and telling the
-//! plugins of the device's comings and goings (`api.rs`). See README.md beside this
-//! crate.
+//! Display8: Star Trek: Armada II's `d3d8.dll`, ours. In forward mode (the default) it
+//! stands in front of the real chain (`d3d8_real.dll`: crosire's d3d8to9, then DXVK's or
+//! Windows' d3d9) and passes every call through, tracing it on the bench (`Trace=1`),
+//! dropping the engine's draws by category (`[Drop]`), and telling the plugins of the
+//! device's comings and goings (`api.rs`). In stub mode (`stub/`) the engine draws
+//! nothing, and render3d and the UI draw the whole frame on a device of ours: Direct3D 9,
+//! Vulkan (`vk/`) or Direct3D 12 (`dx12/`). See README.md beside this crate.
 #![no_std]
 #![allow(clippy::missing_safety_doc, static_mut_refs)]
 
@@ -48,8 +49,8 @@ static mut CONFIG: Option<Config> = None;
 static mut REAL: HANDLE = core::ptr::null_mut();
 /// `Mode=stub` asked for; whether it runs is decided at `Direct3DCreate8`.
 static mut STUB_ASKED: bool = false;
-/// `Backend=`: what the stub draws on (d3d9 until every plugin draws on Vulkan or
-/// Direct3D 12).
+/// `Backend=`: what the stub draws on (d3d9 by default, until a backend is confirmed in
+/// game).
 static mut BACKEND: stub::Backend = stub::Backend::D3d9;
 static mut VALIDATE: bool = false;
 /// `Device=`: on Vulkan, only a physical device whose name contains this (any case);
@@ -216,7 +217,7 @@ pub extern "system" fn Direct3DCreate8(sdk: u32) -> *mut c_void {
             log!("Direct3DCreate8({}) -> the stub: the engine draws nothing from here", sdk);
             return d;
         }
-        log!("Mode=stub: no Direct3D 9 for the stub; forward mode instead");
+        log!("Mode=stub: the stub could not start on {:?}; forward mode instead", unsafe { BACKEND });
     }
     let f = real_proc("Direct3DCreate8");
     if f == 0 {

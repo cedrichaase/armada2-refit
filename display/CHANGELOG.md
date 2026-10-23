@@ -4,6 +4,19 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.6.2 — 2026-10-23
+
+### Fixed
+- A stub that cannot start logs the backend it tried ("the stub could not start on
+  ...") instead of "no Direct3D 9", which was wrong on Vulkan and Direct3D 12.
+- `Display8.ini`'s `Mode=` comment names the device `Backend=` chooses, not Direct3D 9
+  alone. The shipped values are unchanged (`Mode=forward`, `Backend=d3d9`).
+- `stub-scenario.sh` on a scenario whose `Setup:` is already `display/bench-mode.sh`
+  (`display-stub`, `display-drop`) writes one call with the mode replaced and the keys
+  added, instead of nesting a second `bench-mode.sh` inside the first.
+
+Installed, not yet seen in game.
+
 ## 0.6.1 — 2026-10-23
 
 ### Fixed
