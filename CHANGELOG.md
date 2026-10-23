@@ -24,6 +24,16 @@ Layers: platform 3.6.0, menus 4.3.5, renderer 2.0.1.
 
 Installed, not yet seen in game.
 
+## 13.19.0 — 2026-10-23
+
+Layers: testbench 3.56.0.
+
+### Fixed
+- `qol-refused-advisor` selects the starbase after Home, wherever the start view put
+  it, and checks the selection, the keys, the payments and the refusal it stages (testbench 3.56.0).
+
+Installed, not yet seen in game.
+
 ## 13.18.0 — 2026-10-23
 
 Layers: display 0.6.1, render3d 0.22.1, ui 0.19.1, testbench 3.55.0.
