@@ -40,6 +40,8 @@ Installed, not yet seen in game.
   textures and `UI.dump` go through `gpu/`: the frame's state is saved with the
   recorded state block instead of `D3DSBT_ALL`, vertices go through gpu's ring
   buffers, and textures are made again by gpu after a `Reset` or a new device (caef061).
+- Its pipelines turn the clip planes off; binding the same pipeline again sets nothing; a
+  colour clear writes every channel (gpu, 1b63c7f).
 
 ### Removed
 - `src/d3d` (now `gpu::d3d9::raw`).

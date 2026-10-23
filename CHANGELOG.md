@@ -51,10 +51,11 @@ Layers: render3d 0.19.0, ui 0.16.0.
 
 ### Changed
 - `gpu/`: one graphics interface for render3d and the UI, shaped for Vulkan and
-  Direct3D 12, on Direct3D 9 for now; the UI and render3d's frame draw through it. Every
-  shader is modern HLSL, one source for the Direct3D 9 bytecode and SPIR-V
-  (`gpu/shaders/compat.hlsli`). The same pixels as before on the bench (render3d
-  0.19.0, ui 0.16.0).
+  Direct3D 12, on Direct3D 9 for now; the UI and every module of render3d draw through
+  it. Every shader is modern HLSL, one source for the Direct3D 9 bytecode and SPIR-V
+  (`gpu/shaders/compat.hlsli`). The same pixels as before on the bench: 39 frames of
+  `port-showcase`, `port-nebula` and `port-firing` at RMSE 0 (render3d 0.19.0, ui
+  0.16.0).
 
 Installed, not yet seen in game.
 

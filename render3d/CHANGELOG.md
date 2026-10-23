@@ -14,9 +14,14 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   `d3dbc-slots.py` puts vkd3d's renumbered samplers back on their stages, and
   `d3dbc-fix.py` narrows vPos's declaration to `.xy`.
 - The frame's targets, scene pass, resolve, bloom, tone map and frame dumps go through
-  `gpu/`, the graphics interface shared with UI.asi; `gfx::Guard` is a gpu section with
-  a state block per nesting depth; the black line at the view's right and bottom edges
-  is cleared after the body (`frame::black_lines`) (caef061).
+  `gpu/`, the graphics interface shared with UI.asi; the black line at the view's right
+  and bottom edges is cleared after the body (`frame::black_lines`) (caef061).
+- Every module draws through `gpu` (1b63c7f): a pipeline per combination of states,
+  uniform blocks at the registers the shaders declare, gpu textures and buffers, the
+  frame's vertex rings; `gfx::Guard`, `Shader`, `Decl`, `DynVb` and `gfx/chain.rs` are
+  gone (the bake chain is `gpu::chain`); game textures, models and nebula volumes keep
+  no CPU copy (`Contents::Transient`); timing uses `gpu::Timer`. Every pipeline sets the
+  depth bias and the clip planes to 0.
 
 ### Added
 - `hlsl-rs.sh` also writes SPIR-V for each shader (`src/shaders/<name>_spv.rs`: dxc,
