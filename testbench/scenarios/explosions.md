@@ -13,7 +13,7 @@ Galaxy class beside a destroyer (`small`), a cruiser (`mid`) and a battleship (`
 effects module.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Render3D.log" contains "module effects: on".
 4. Expect "Render3D.log" not contain "FAILED: no fireballs".
 5. Expect "Scene.log" contains "scene ready".

@@ -39,13 +39,13 @@ Mutara nebula with the queen's Diamond up close (Borg). The column's places on t
 19. Take a screenshot called "federation".
 20. Check that Federation Campaign is lit and the scene shows Starfleet ships over a planet.
 21. Move the mouse to 220,374.
-22. Wait 8 seconds.
+22. Wait up to 8 seconds for the logs the next steps expect.
 23. Expect "Render3D.log" contains "menu: view klingon".
 24. Expect "Render3D.log" contains "hulls: menu scene: kbattle".
 25. Take a screenshot called "klingon".
 26. Check that Klingon Campaign is lit and the scene shows several dark green Klingon warships (a large one near the centre, two Birds of Prey with their wings down) in front of a red, cloudy nebula.
 27. Move the mouse to 220,426.
-28. Wait 5 seconds.
+28. Wait up to 5 seconds for the logs the next steps expect.
 29. Expect "Render3D.log" contains "menu: view borg".
 30. Take a screenshot called "borg".
 31. Check that Borg Campaign is lit and the scene shows a dark Borg cube floating in a purple, cloudy nebula, a large dark diamond-shaped Borg ship close to the camera below and left of the cube, and to the right of and below the cube a darker region of gas bounded by a straight edge running from the cube down to the right (the cube's shadow).

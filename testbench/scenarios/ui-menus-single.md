@@ -88,7 +88,7 @@ Save Game's name field and its Save button.
 68. Click at 640,639.
 69. Wait 3 seconds.
 70. Click "Yes".
-71. Wait 60 seconds.
+71. Wait up to 60 seconds for the logs the next steps expect.
 72. Expect "UI.log" contains "mission: frames resume".
 73. Expect the game is still running.
 74. Quit the game.

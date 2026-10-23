@@ -5,9 +5,9 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 13.11.0 — 2026-10-23
+## 13.12.0 — 2026-10-23
 
-Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.50.0.
+Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.51.0.
 
 ### Added
 - Phase 5 of the display plan: Display8's stub mode on Vulkan (`Backend=vulkan`), and
@@ -15,25 +15,25 @@ Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.50.0.
   from the SPIR-V built beside every shader's d3dbc (display 0.5.0, render3d 0.21.0,
   ui 0.18.0). Off by default (`Backend=d3d9`).
 - The bench runs a Vulkan game on lavapipe with the validation layer, never on the GPU
-  (testbench 3.50.0, display 0.5.0).
+  (testbench 3.51.0, display 0.5.0).
 
 Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.87, nebula 0.36,
 firing 0.40 (/255) on the GPU; `display-stub` (the whole game) passes on Vulkan; no
 validation message. Installed, not yet seen in game.
 
-## 13.10.0 — 2026-10-23
+## 13.11.0 — 2026-10-23
 
-Layers: ui 0.17.2, testbench 3.49.1.
+Layers: ui 0.17.2, testbench 3.50.1.
 
 ### Fixed
 - A placement's build footprint was not drawn with Display8 in stub mode; the UI now
   draws it, as the order ring (ui 0.17.2).
 - `ui-hud-map` and `ui-hud-bar` click the Assembler and the Nexus where the start view
-  puts them (testbench 3.49.1).
+  puts them (testbench 3.50.1).
 
 Installed, not yet seen in game.
 
-## 13.9.0 — 2026-10-23
+## 13.10.0 — 2026-10-23
 
 Layers: display 0.4.0, render3d 0.20.0, ui 0.17.1.
 
@@ -47,16 +47,16 @@ Layers: display 0.4.0, render3d 0.20.0, ui 0.17.1.
 
 Installed, not yet seen in game.
 
-## 13.7.0 — 2026-10-23
+## 13.8.0 — 2026-10-23
 
-Layers: ui 0.17.0, cutscenes 2.1.0, testbench 3.49.0.
+Layers: ui 0.17.0, cutscenes 2.1.0, testbench 3.50.0.
 
 ### Added
 - Phase 1 of the display plan, the UI's part: the engine's last draws in a mission
   (drag box, height posts, order ring, fade, the unit view's video) drawn by the UI
   (ui 0.17.0); full-screen movies handed by the cutscene proxy to the UI to draw
   (ui 0.17.0, cutscenes 2.1.0); the in-mission menus over the UI's own copy of the
-  frame (ui 0.17.0); scenario `display-engine-draws` (testbench 3.49.0).
+  frame (ui 0.17.0); scenario `display-engine-draws` (testbench 3.50.0).
 
 ### Fixed
 - A display mode chosen in the middle of a mission no longer crashes the game (a stack
@@ -64,18 +64,18 @@ Layers: ui 0.17.0, cutscenes 2.1.0, testbench 3.49.0.
 
 Installed, not yet seen in game.
 
-## 13.6.0 — 2026-10-23
+## 13.7.0 — 2026-10-23
 
-Layers: display 0.3.0, testbench 3.48.0.
+Layers: display 0.3.0, testbench 3.49.0.
 
 ### Added
 - Display8's stub mode (`Mode=stub`, off by default): the engine draws nothing and
   render3d and the UI draw the whole frame on a Direct3D 9 device of Display8's own
-  (display 0.3.0). Scenarios `port-*` and `display-stub` (testbench 3.48.0).
+  (display 0.3.0). Scenarios `port-*` and `display-stub` (testbench 3.49.0).
 
 Installed, not yet seen in game.
 
-## 13.5.0 — 2026-10-23
+## 13.6.0 — 2026-10-23
 
 Layers: display 0.2.0, platform 3.5.0.
 
@@ -87,7 +87,7 @@ Layers: display 0.2.0, platform 3.5.0.
 
 Installed, not yet seen in game.
 
-## 13.4.0 — 2026-10-23
+## 13.5.0 — 2026-10-23
 
 Layers: render3d 0.19.0, ui 0.16.0.
 
@@ -101,9 +101,9 @@ Layers: render3d 0.19.0, ui 0.16.0.
 
 Installed, not yet seen in game.
 
-## 13.3.0 — 2026-10-23
+## 13.4.0 — 2026-10-23
 
-Layers: display 0.1.0 (new), testbench 3.47.0.
+Layers: display 0.1.0 (new), testbench 3.48.0.
 
 ### Added
 - `display/`: Display8, a `d3d8.dll` of ours in front of the real chain, forward mode,
@@ -112,7 +112,29 @@ Layers: display 0.1.0 (new), testbench 3.47.0.
   and a detail capture of the engine's draws (display 0.1.0). Not in `./install` or
   `a2mod` yet.
 - Scenario steps `Mark the display context` and `Expect the engine to draw nothing in`,
-  scenario `display-inventory` (testbench 3.47.0).
+  scenario `display-inventory` (testbench 3.48.0).
+
+Installed, not yet seen in game.
+
+## 13.3.0 — 2026-10-23
+
+Layers: testbench 3.47.0.
+
+### Added
+- Bench scenarios wait for the log lines they check instead of a fixed time
+  (`Wait up to N seconds for the logs the next steps expect`), and a log wait counts only
+  lines written since the last action, and `Quit the game` no longer waits out each
+  menu press (testbench 3.47.0).
+
+Bench-only; installs nothing into the game.
+
+## 13.2.1 — 2026-10-23
+
+Layers: testbench 3.46.1.
+
+### Fixed
+- The bench dashboard's screens stay black while a game launches, without the striped
+  placeholder (testbench 3.46.1).
 
 Installed, not yet seen in game.
 

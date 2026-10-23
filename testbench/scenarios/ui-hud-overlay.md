@@ -18,7 +18,7 @@ blips by relation: own green, enemy red.
 At 1920x1080 the minimap's square is about 27..327 x 753..1053.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "UI.log" contains "minimap: ours".
 5. Expect "UI.log" contains "selection: ours".

@@ -40,8 +40,8 @@ a{color:#7fb0ff}a:hover{color:#a9caff}
 .col.free{border-style:dashed;background:transparent}
 .col.max{border-color:color-mix(in srgb,var(--run) 60%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--run) 22%,transparent),0 10px 36px -10px color-mix(in srgb,var(--run) 40%,transparent)}
 .colhd{padding:10px 12px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--line)}
-.vnc{position:relative;aspect-ratio:16/9;background:var(--screen);display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:5px}
-.vnc-in{position:relative;max-width:100%;max-height:100%;background:repeating-linear-gradient(135deg,#141b22 0 10px,#19222b 10px 20px);display:flex;align-items:center;justify-content:center;color:#8592a0;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;overflow:hidden}
+.vnc{position:relative;aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:5px}
+.vnc-in{position:relative;max-width:100%;max-height:100%;background:#000;display:flex;align-items:center;justify-content:center;color:#8592a0;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;overflow:hidden}
 .vnc-in img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block}
 .vnc-in .rfb{position:absolute;inset:0}
 .vnc .ov{position:absolute;left:8px;top:8px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
@@ -355,7 +355,7 @@ function views(c, j, isMax) {
     : `<span class="chip">snapshot · 5 s</span>`;
   c.views.innerHTML = `<div style="display: grid; gap: 8px; grid-template-columns: repeat(${j.views.length}, minmax(0, 1fr))">` +
     j.views.map((v, i) => `<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
-      <div class="vnc"><div class="vnc-in" data-i="${i}" style="${letterbox(v.res)}">${v.res ? esc(v.res.join('x')) : 'no session'}</div>
+      <div class="vnc"><div class="vnc-in" data-i="${i}" style="${letterbox(v.res)}"></div>
         <div class="ov">${chip}<span class="chip">${v.res ? esc(v.res.join('x')) : '?'}</span>${v.clock === 'bench' ? '<span class="chip">bench clock</span>' : ''}${v.game ? '' : '<span class="chip">no game</span>'}</div></div>
       ${multi ? `<div class="faint mono" style="font-size: 11px">${esc(v.label)}</div>` : ''}</div>`).join('') + '</div>';
   j.views.forEach((v, i) => {

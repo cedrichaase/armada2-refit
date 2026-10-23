@@ -20,7 +20,7 @@ battleship, which then shows as a hologram of the Romulan's class. An 8472 Evolv
 cocoon (`8472_cocoon.sod`) grows, bursts, and the Transmuter comes out.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "height posts: 5 of 5 calls ours".
 5. Note "the build ghost".

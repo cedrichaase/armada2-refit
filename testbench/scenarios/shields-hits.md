@@ -18,11 +18,11 @@ flat shell; then a Klingon cruiser taking the same fire, its hits in strong gree
 rays fanning out from each (`ART-DIRECTION.md`, "Shield hits").
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "effects: shields: the weapons' hits noted at: beam shot mine missile".
 5. Scene "orbit target 160 20 170".
-6. Wait 6 seconds.
+6. Wait up to 6 seconds for the logs the next steps expect.
 7. Expect "Render3D.log" contains "effects: first shield hits drawn".
 8. Expect "Render3D.log" contains "by a beam".
 9. Expect "Render3D.log" contains "by a missile".

@@ -46,7 +46,7 @@ names each hook and counts the mission frames, which must be once per presented 
 27. Expect "Computer AI:Easy" is visible.
 28. Expect "Borg" is visible.
 29. Click "LAUNCH".
-30. Wait 8 seconds.
+30. Wait up to 8 seconds for the logs the next steps expect.
 31. Expect "UI.log" contains "loading: frame".
 32. Take a screenshot called "mission panel".
 33. Expect "Context: Mission" is visible.

@@ -205,6 +205,7 @@ def s_launch(c, m):
     if m.group('mission'):
         args = f'{args} {m.group("mission")}'.strip()
     c.sess.launch(args)
+    c.sess.log_marks = {}                         # the launch deleted the old logs
     time.sleep(2)
     iso = c.sess.isolation_check()
     if iso:
@@ -219,26 +220,47 @@ def s_quit(c, m):
     """The way a player leaves.  The game ignores WM_CLOSE (measured: still up 20s after
     one), so this goes through its own menus -- in a mission Esc, "Exit to Windows",
     "Yes"; on the main menu the Exit panel, then "Yes".  Only if that fails is the
-    prefix stopped, and then the step fails and says so."""
+    prefix stopped, and then the step fails and says so.  After each press it goes on as
+    soon as the screen has the next button (or the game has gone), not after a fixed
+    time: a press that cannot end the game is not waited out."""
     if not c.sess.running():
         return 'the game was not running'
-    for attempt in range(5):
-        path = c.fresh_shot(f'quit-{attempt}')
-        words = vision.ocr(path)
+    import subprocess
+    tmp = c.sess.work / 'poll.png'
+
+    def ask(words):
         yes = vision.find_text(words, 'Yes')
-        exit_btn = vision.find_text(words, 'Exit to Windows')
         if yes and (vision.find_text(words, 'Are you sure') or vision.find_text(words, 'Warning')):
-            c.sess.click(yes['x'] + yes['w'] // 2, yes['y'] + yes['h'] // 2)
-        elif exit_btn:
-            c.sess.click(exit_btn['x'] + exit_btn['w'] // 2, exit_btn['y'] + exit_btn['h'] // 2)
-        elif c.screen_def('main') and c.screen_matches(c.screen_def('main'), words):
+            return 'yes', yes
+        exit_btn = vision.find_text(words, 'Exit to Windows')
+        if exit_btn:
+            return 'exit', exit_btn
+        if c.screen_def('main') and c.screen_matches(c.screen_def('main'), words):
+            return 'main', None
+        return None, None
+
+    words = vision.ocr(c.fresh_shot('quit-0'))
+    for attempt in range(5):
+        what, box = ask(words)
+        if box:
+            c.sess.click(box['x'] + box['w'] // 2, box['y'] + box['h'] // 2)
+        elif what == 'main':
             c.sess.click(*c.target_point(c.target('exit')))
         else:
             c.sess.key('Escape')
-        for _ in range(16):
+        end = time.time() + 8
+        while time.time() < end:
             time.sleep(0.5)
             if not c.sess.running():
                 return 'exited through the menus'
+            if what == 'yes':
+                continue                          # nothing left to press: wait for the exit
+            subprocess.run(['grim', '-o', 'HEADLESS-1', str(tmp)], env=c.sess.wl_env(), capture_output=True)
+            words = vision.ocr(tmp)
+            nxt = ask(words)[0]
+            if nxt and nxt != what:
+                break
+        words = vision.ocr(c.fresh_shot(f'quit-{attempt + 1}'))
     c.sess.stop_game()
     raise StepFailed('the game did not exit through its menus; the prefix was stopped instead')
 
@@ -258,6 +280,45 @@ def s_wait(c, m):
         c.assert_alive()
         time.sleep(min(1.0, max(0.0, end - time.time())))
     return None
+
+
+@step(r'^wait ' + SECS + r'(?:for|until) the logs? (?:that |which )?the (?:next|following) steps? expects?$')
+def s_wait_expected(c, m):
+    """`Wait up to 50 seconds for the logs the next steps expect`: the fixed wait before a
+    run of `Expect "LOG" contains "TEXT"` steps, ended as soon as every line they expect
+    has been written since the last action (launch, click, key, typing, drag, Scene
+    command).  If one was not, it waits the whole time, as the fixed wait did: a line that
+    was already there before the action proves nothing about it.  It checks nothing; the
+    Expect steps do, as before."""
+    n = int(m.group('n') or 90)
+    raw = c.scn.steps[c.n - 1]
+    who = re.match(r'^\s*(\w+)\s*:', raw) if c.sessions else None
+    expect = next(rx for rx, fn in STEPS if fn is s_log)
+    want = []
+    for s in c.scn.steps[c.n:]:
+        if c.sessions:
+            p = re.match(r'^\s*(\w+)\s*:\s*(.+)$', s)
+            if (p.group(1).lower() if p and p.group(1).lower() in c.sessions else None) != \
+                    (who.group(1).lower() if who and who.group(1).lower() in c.sessions else None):
+                break
+            s = p.group(2) if p and p.group(1).lower() in c.sessions else s
+        e = expect.match(normalise(s))
+        if not e:
+            break
+        if not (e.group('neg') or e.group('neg2')):
+            want.append((e.group('log') or e.group('log2'), (e.group('text') or e.group('text2')).lower()))
+    if not want:
+        raise StepFailed('no `Expect "LOG" contains "TEXT"` step follows this one')
+    end = time.time() + n
+    while True:
+        c.assert_alive()
+        missing = [(log, t) for log, t in want if not any(t in l.lower() for l in c.new_log_lines(log))]
+        if not missing:
+            return f'all {len(want)} written after {n - (end - time.time()):.1f} s'
+        if time.time() > end:
+            return f'waited the full {n} s; not written since the last action: ' + \
+                ', '.join(f'"{t}" in {log}' for log, t in missing)
+        time.sleep(0.5)
 
 
 @step(r'^wait ' + SECS + r'(?:for|until) ' + Q.format('text') +
@@ -557,19 +618,28 @@ def s_log(c, m):
 @step(r'^wait ' + SECS + r'(?:for|until) (?:the )?(?:log )?' + Q.format('log') + r' (?:to )?(?:says?|contains?|mentions?) '
       + Q.format('text') + r'$')
 def s_wait_log(c, m):
-    """`Wait up to 240 seconds for "Scene.log" to say "paused at tick"`: polls the log the
-    game writes (the game's launch deletes the old one)."""
-    end = time.time() + int(m.group('n') or 90)
+    """`Wait up to 50 seconds for "Scene.log" to say "scene ready"`: polls a log the game
+    writes for a line with TEXT written since the last action (launch, click, key, typing,
+    drag, Scene command), and goes on as soon as one appears.  At the time limit, a line
+    that was there before that action passes, after the whole wait: what a fixed wait
+    followed by `Expect "LOG" contains "TEXT"` did, which most of these replaced.  Without
+    one it is a failed check, and the run goes on, as it did after the fixed wait."""
+    n = int(m.group('n') or 90)
+    end = time.time() + n
     text = m.group('text').lower()
     while True:
         c.assert_alive()
-        body = c.sess.game_log(m.group('log')) or ''
-        hit = next((l for l in body.splitlines() if text in l.lower()), None)
+        hit = next((l for l in c.new_log_lines(m.group('log')) if text in l.lower()), None)
         if hit:
             return hit.strip()
         if time.time() > end:
-            raise StepFailed(f'"{m.group("text")}" not in {m.group("log")} after {m.group("n") or 90} s')
-        time.sleep(1)
+            break
+        time.sleep(0.5)
+    old = next((l for l in (c.sess.game_log(m.group('log')) or '').splitlines() if text in l.lower()), None)
+    if old:
+        return f'{old.strip()} (there before the last action; waited the full {n} s)'
+    return c.checked(False, f'"{m.group("text")}" not in {m.group("log")} after {n} s',
+                     how=f'{m.group("log")} polled for lines written since the last action')
 
 
 # -- Display8's tracer (display/README.md, "The inventory")
@@ -982,6 +1052,11 @@ def s_judge(c, m):
     return c.judge_step(m.group('what'))
 
 
+# The steps that act on the game: a log wait reads what was written after the last one.
+ACTIONS = {s_launch, s_quit, s_stop, s_click_at, s_click_text, s_click_named, s_drag, s_move, s_press,
+           s_wheel, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer}
+
+
 # ---------------------------------------------------------------------- one case
 
 class Case:
@@ -1163,6 +1238,8 @@ class Case:
             for rx, fn in STEPS:
                 m = rx.match(t)
                 if m:
+                    if fn in ACTIONS:
+                        self.mark_logs()
                     out = fn(self, m)
                     break
             else:
@@ -1194,6 +1271,25 @@ class Case:
         if not self.sess.running():
             raise StepFailed('the game is no longer running' + (' (it crashed: exception.txt was written)'
                                                                  if self.sess.crashed() else ''))
+
+    def mark_logs(self):
+        """How far each log beside Armada2.exe has got, before an action: a log wait reads
+        only what is written after it."""
+        self.sess.log_marks = {p.name: p.stat().st_size for p in self.sess.game_dir.glob('*.log')}
+
+    def new_log_lines(self, name):
+        """The lines of a game log written since the last action.  A log shorter than its
+        mark was written afresh (each launch deletes the old ones) and is read whole."""
+        p = self.sess.game_dir / name
+        try:
+            with open(p, 'rb') as f:
+                size = f.seek(0, 2)
+                mark = getattr(self.sess, 'log_marks', {}).get(name, 0)
+                f.seek(mark if mark <= size else 0)
+                body = f.read().decode(errors='replace')
+        except FileNotFoundError:
+            return []
+        return body.splitlines()
 
     def shot(self, name):
         p = self.sess.screenshot(name)

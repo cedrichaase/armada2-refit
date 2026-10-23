@@ -17,7 +17,7 @@ coloured stars or spores, and over the Sovereign green circuitry creeping from t
 ship's side, a pink film of veins, and violet ripples; then the HUD's action camera on.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "module specials: on".
 5. Scene "camera 3150 90 3120 3000 0 3080".

@@ -568,7 +568,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         g = self.game_dir
         for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
                      'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
-                     'Render3D.log', 'Stems.log', 'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):
+                     'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
+                     'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):
             try:
                 (g / name).unlink()
             except FileNotFoundError:

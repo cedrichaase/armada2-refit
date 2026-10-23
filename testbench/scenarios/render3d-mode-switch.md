@@ -16,7 +16,7 @@ it has no 1024x768); the shot after the switch must show the same scene as
 before it, pillarboxed into the 1080p output, not black and not stretched.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Expect "Render3D.log" contains "frame: targets".
 5. Take a screenshot called "before".
@@ -31,7 +31,7 @@ before it, pillarboxed into the 1080p output, not black and not stretched.
 14. Click "Previous Menu".
 15. Wait for the options menu.
 16. Press Escape.
-17. Wait 10 seconds.
+17. Wait up to 10 seconds for the logs the next steps expect.
 18. Expect "Render3D.log" contains "frame: a new device".
 19. Expect "Render3D.log" contains "frame: targets 800x600".
 20. Take a screenshot called "after".

@@ -5,7 +5,7 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
-## 3.50.0 — 2026-10-23
+## 3.51.0 — 2026-10-23
 
 ### Added
 - A game whose clone's `Display8.ini` has `Mode=stub` and `Backend=vulkan` is launched
@@ -15,7 +15,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 Installed, not yet seen in game.
 
-## 3.49.1 — 2026-10-23
+## 3.50.1 — 2026-10-23
 
 ### Fixed
 - `ui-hud-map` and `ui-hud-bar` select the first Assembler where the start view puts it
@@ -29,7 +29,7 @@ Installed, not yet seen in game.
 
 Installed, not yet seen in game.
 
-## 3.49.0 — 2026-10-23
+## 3.50.0 — 2026-10-23
 
 ### Added
 - Scenario `display-engine-draws` (`--install . --install display`): the intro movie,
@@ -39,7 +39,7 @@ Installed, not yet seen in game.
 
 Installed, not yet seen in game.
 
-## 3.48.0 — 2026-10-23
+## 3.49.0 — 2026-10-23
 
 ### Added
 - Scenarios `port-showcase`, `port-nebula`, `port-firing` (one paused frame each with the
@@ -48,7 +48,7 @@ Installed, not yet seen in game.
 
 Installed, not yet seen in game.
 
-## 3.47.0 — 2026-10-23
+## 3.48.0 — 2026-10-23
 
 ### Added
 - Steps for Display8's tracer (`display/README.md`): `Mark the display context "NAME"`
@@ -58,6 +58,35 @@ Installed, not yet seen in game.
   gathered with the logs.
 - Scenario `display-inventory`: the whole game, a context marked at each stage, with
   `--install . --install display`.
+
+Installed, not yet seen in game.
+
+## 3.47.0 — 2026-10-23
+
+### Added
+- `Wait up to N seconds for the logs the next steps expect`: a wait that ends as soon as
+  every line the following `Expect "LOG" contains "TEXT"` steps check has been written
+  since the last action, else after N s. 48 fixed waits of 5 s or more in 39 scenarios
+  (1825 s at one resolution) now use it.
+
+### Changed
+- `Wait up to N seconds for "LOG" to say "TEXT"` counts only lines written since the last
+  action (launch, click, key, typing, drag, Scene command). At the time limit, a line
+  from before it passes and none is a failed check that lets the run go on (it was an
+  error that ended the case). Polls every 0.5 s.
+- A launch also deletes `UI.log` and `Online.log` (both plugins rewrite them as they load).
+- `Quit the game` goes on as soon as the screen has the next button instead of waiting
+  8 s for an exit after every press: from a mission it took ~19.5 s, two presses that
+  could not end the game waited out.
+
+Bench-only; installs nothing into the game.
+
+## 3.46.1 — 2026-10-23
+
+### Fixed
+- `a2test watch`: a screen tile is plain black until its frame arrives, instead of a
+  striped placeholder that flickered with black while a session or game was launching;
+  the resolution is no longer drawn across it (the chip still shows it).
 
 Installed, not yet seen in game.
 

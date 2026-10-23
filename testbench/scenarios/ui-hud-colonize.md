@@ -17,7 +17,7 @@ the player's colony ship and a Galaxy class beside an unclaimed class M planet, 
 camera on the colony ship: the planet's middle is at 658,190 at 1280x720.
 
 1. Launch the game.
-2. Wait 50 seconds.
+2. Wait up to 50 seconds for the logs the next steps expect.
 3. Expect "Scene.log" contains "scene ready".
 4. Click at 658,190.
 5. Wait 1 second.

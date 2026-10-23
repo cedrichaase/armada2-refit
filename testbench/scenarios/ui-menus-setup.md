@@ -79,7 +79,7 @@ The drop-downs' items are clicked by place: their order is the stock combo boxes
 55. Expect "ADVANCED OPTIONS" is not visible.
 56. Expect "Computer AI:Hard" is visible.
 57. Click "LAUNCH".
-58. Wait 60 seconds.
+58. Wait up to 60 seconds for the logs the next steps expect.
 59. Expect "UI.log" contains "mission: frames start".
 60. Take a screenshot called "match".
 61. Expect the game is still running.
