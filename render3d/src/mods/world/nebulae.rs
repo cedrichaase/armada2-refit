@@ -101,6 +101,8 @@ struct Settings {
     lit_bolt: f32,
     lit_beam: f32,
     lit_corona: f32,
+    /// The knee the lights' light along a ray rolls off at (`LitKnee=`, 0: none).
+    lit_knee: f32,
 }
 
 impl Settings {
@@ -139,6 +141,7 @@ impl Settings {
             lit_bolt: ini.float(s, "LitBolt", 3.5).max(0.0),
             lit_beam: ini.float(s, "LitBeam", 1.5).max(0.0),
             lit_corona: math::clamp(ini.float(s, "LitCorona", 0.25), 0.02, 1.0),
+            lit_knee: ini.float(s, "LitKnee", 6.0).max(0.0),
         }
     }
 }
@@ -1822,7 +1825,7 @@ impl Nebulae {
         let c = &self.cfg;
         [
             c.lit_strength * 0.01, c.lit_tint, 2.0, c.lit_clip,
-            c.lit_temporal.max(c.temporal), c.lit_corona, 0.0, 0.0,
+            c.lit_temporal.max(c.temporal), c.lit_corona, if c.lit_knee > 0.0 { 1.0 / c.lit_knee } else { 0.0 }, 0.0,
             c.lit_explosion, c.lit_bolt, c.lit_beam, 1.0,
         ]
     }

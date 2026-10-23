@@ -533,7 +533,7 @@ float3 march_flow(float3 p, float3 gx, float3 gy)
 cbuffer world_nebula_lit : register(b1)
 {
     float4 k_nl      : CREG(104); // x: light scattered per world unit of the densest gas (LitStrength= / 100); y: tinted by the gas's hue (LitTint=); z: the lit share's weight (temporal_ps); w: the clip where lit (of TemporalClip=)
-    float4 k_nlt     : CREG(105); // x: this frame's share where lit (LitTemporal=); y: a bolt's corona, of its reach (LitCorona=)
+    float4 k_nlt     : CREG(105); // x: this frame's share where lit (LitTemporal=); y: a bolt's corona, of its reach (LitCorona=); z: 1 / the knee (LitKnee=, 0: none)
     float4 k_nlk     : CREG(106); // the gas's share of a fireball's light (LitExplosion=), a bolt's (LitBolt=), a beam's line (LitBeam=)
 };
 
@@ -627,7 +627,7 @@ float4 march_step(float3 p, float3 fl, float dist, float thick, float2 u, float 
             r = float4(gas_colour(g, thick, dist, pa, key_lit(p, u, k), ph), g.x * near * thick * k_opac.x);
 #ifdef __hlsl_dx_compiler
             if (nl_on)
-                r.rgb += nl_step(p, dn, saturate(lerp(g.z, dn, k_shape.y)), thick, near);
+                nl_step(p, dn, saturate(lerp(g.z, dn, k_shape.y)), thick, near);   // added up in nl_sum, onto the ray's light at its end (march)
 #endif
         }
     }
@@ -701,9 +701,15 @@ MarchOut march(float2 vpos, const int n)
         o.gas = acc;
         o.z = float4(za, 0.0, 0.0, 0.0);
 #ifdef __hlsl_dx_compiler
-        // The lights' share, for temporal_ps's twin.
-        if (nl_on)
-            o.z.y = dot(nl_sum, float3(0.299, 0.587, 0.114));
+        // The lights' light along the ray, through a soft knee (LitKnee=): what a
+        // light or two make is as it was, a breach's flash through a long path of gas
+        // rolls off instead of whiting out the frame. Its share, for temporal_ps's twin.
+        if (nl_on) {
+            float  ll = dot(nl_sum, float3(0.299, 0.587, 0.114));
+            float3 lit = nl_sum / (1.0 + ll * k_nlt.z);
+            o.gas.rgb += lit;
+            o.z.y = ll / (1.0 + ll * k_nlt.z);
+        }
 #endif
     }
     return o;

@@ -1811,7 +1811,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
 `MoonCrackCore`, `MoonCrackDepth`, `MoonCrackFalloff`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 3.5, `LitBeam` 1.5, `LitCorona` 0.25, `LitTemporal` 0.5, `LitClip` 0.5), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 3.5, `LitBeam` 1.5, `LitCorona` 0.25, `LitKnee` 6, `LitTemporal` 0.5, `LitClip` 0.5), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1998,8 +1998,13 @@ world unit, the light's colour tinted `LitTint=` of the way towards the gas's hu
 phase (the gas glows alike from every side) and no shadowing by the gas between. Of
 each colour group only the strongest light at the step counts, as on the plating, and
 the cull's `ClusterPerColour` holds, so a volley of one colour does not blow out. The
-light joins the step's own, so the composite takes it through the gas's opacity, and
-the gas with no lights is drawn as before. Which light is what, to the gas
+lights' light is added up along the ray and joins the gas's own at its end through a
+soft knee, L / (1 + L / `LitKnee=`) on its luminance: a light or two in thin gas is as
+it was, and a battleship's breach, whose fireball reaches across half the view, rolls
+off instead of whiting the frame out (at the knee's peak, 0.35 s after the kill in
+`render3d-nebula-lit`, 6 kept the glow's gradient where 0.75 to 2.5 flattened it into
+a uniform wash). The composite takes it through the gas's opacity, and the gas with
+no lights is drawn as before. Which light is what, to the gas
 (`scene::lights::Gas`, the cluster list's `t.z`): a fireball's takes `LitExplosion=`;
 a torpedo's or pulse's (each ordnance class's light, which rides with its shots) is a
 **corona**, bright within `LitCorona=` of its reach and fading softly to it,

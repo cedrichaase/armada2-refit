@@ -13,10 +13,11 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   fireballs, torpedoes and pulses (a corona about the shot), phaser beams' line lights,
   vents and the rest light the vapour, the nebulae's own lights and planets' day sides
   none. Where lights make the gas's light, the frames added up clip harder and take
-  more of this frame, so a moving light does not trail.
+  more of this frame, so a moving light does not trail; the light along a ray rolls
+  off at a soft knee, so a breach does not white the frame out.
 - `[Nebulae]` keys `Lit`, `LitStrength`, `LitTint`, `LitExplosion`, `LitBolt`,
-  `LitBeam`, `LitCorona`, `LitTemporal`, `LitClip`; the shipped `Render3D.ini` lists
-  `Lit`, `LitStrength`, `LitExplosion`, `LitBolt` and `LitBeam` in a `[Nebulae]`
+  `LitBeam`, `LitCorona`, `LitKnee`, `LitTemporal`, `LitClip`; the shipped `Render3D.ini` lists
+  `Lit`, `LitStrength`, `LitExplosion`, `LitBolt`, `LitBeam` and `LitKnee` in a `[Nebulae]`
   section.
 - `scene::lights::Gas`: what a light is to the gas, in the cluster list's `t.z`.
 
