@@ -12,7 +12,7 @@ Details are in [`binkproxy/README.md`](binkproxy/README.md).
   not copied into the locked back buffer; without the UI, or when it declines, the
   copy as before. `UseUI=` in `BinkProxy.ini` (default 1) (binkproxy/README.md).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 2.0.3 — 2026-10-21
 

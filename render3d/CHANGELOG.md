@@ -14,7 +14,8 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
   menu and at a mission's start: `gpu`'s read-back read the card's memory through the
   PCIe window; it reads host-cached memory now (`gpu/README.md`, "Read-backs").
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
+
 ## 0.22.0 — 2026-10-23
 
 ### Added
@@ -43,7 +44,7 @@ firing 0.41 (/255). Installed, not yet seen in game.
   there (`gpu::Gpu::half_pixel`). The menu scene's viewport is handed to its pass.
 
 Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.87, nebula 0.36,
-firing 0.40 (/255). Installed, not yet seen in game.
+firing 0.40 (/255). Confirmed in game 2026-10-23.
 
 ## 0.20.0 — 2026-10-23
 
@@ -85,7 +86,7 @@ Installed, not yet seen in game.
 
 Measured on the bench: `port-showcase`, `port-nebula`, `port-firing` draw the same pixels
 as before (39 frames, scene targets, bloom levels and presented frames: RMSE 0).
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.18.0 — 2026-10-22
 

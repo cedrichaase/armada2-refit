@@ -9,6 +9,9 @@ versions". Newest first. Details are in [`README.md`](README.md).
 ### Fixed
 - On Vulkan `gpu`'s read-back (the frame dumps) reads host-cached memory, not the card's
   memory through the PCIe window (`gpu/README.md`, "Read-backs").
+
+Confirmed in game 2026-10-23.
+
 ## 0.19.0 — 2026-10-23
 
 ### Added
@@ -27,7 +30,7 @@ Installed, not yet seen in game.
   reads the frame before the gamma pass; positions leave out Direct3D 9's half pixel
   there.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.17.2 — 2026-10-23
 
@@ -39,7 +42,7 @@ Installed, not yet seen in game.
   texture (`engine/leftovers.rs`, `hud/leftovers.rs`; HUD.md, "The engine's last
   draws"). `UI.log`: "leftovers: build footprint at ...".
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.17.1 — 2026-10-23
 
@@ -74,7 +77,7 @@ Installed, not yet seen in game.
   subclass of the 3D window, which looped with DXVK's window hook once the device was
   re-created (README.md, "The front end: screens of our own").
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.16.0 — 2026-10-23
 
@@ -92,7 +95,7 @@ Installed, not yet seen in game.
 - `src/d3d` (now `gpu::d3d9::raw`).
 
 Measured on the bench: the showcase's presented frame with the HUD is the same pixels
-as before (RMSE 0). Installed, not yet seen in game.
+as before (RMSE 0). Confirmed in game 2026-10-23.
 
 ## 0.15.0 — 2026-10-22
 

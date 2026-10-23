@@ -15,7 +15,7 @@ in [`README.md`](README.md).
   (`display-stub`, `display-drop`) writes one call with the mode replaced and the keys
   added, instead of nesting a second `bench-mode.sh` inside the first.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.6.1 — 2026-10-23
 
@@ -24,6 +24,9 @@ Installed, not yet seen in game.
   buffer the engine writes by lock goes into the frame when it is unlocked
   (`stub::back_buffer_written`), not at `Present`, where it covered the frame the UI had
   just drawn from the cutscene proxy's (`src/stub/res.rs`, `src/stub/mod.rs`).
+
+Confirmed in game 2026-10-23.
+
 ## 0.6.0 — 2026-10-23
 
 ### Added
@@ -63,7 +66,7 @@ Installed, not yet seen in game.
 
 Measured on the bench: the port scenes within RMSE 0.4 to 0.9 of Direct3D 9 on the GPU
 (`gpu/README.md`, "Measured"), and `display-stub`, the whole game, through on Vulkan,
-with no validation message. Installed, not yet seen in game.
+with no validation message. Confirmed in game 2026-10-23.
 
 ## 0.4.0 — 2026-10-23
 
@@ -104,7 +107,7 @@ Measured on the bench: the showcase frame's scene, bloom and presented frame are
 same pixels as on the real chain, the screen within 1/255 (the gamma ramp); the whole
 game (`display-stub`) runs through, intro to Exit. What the stub drops that the engine
 still drew (the fade from black, the order ring, the menu backdrop read from the front
-buffer) is phase 1's to take over. Installed, not yet seen in game.
+buffer) is phase 1's to take over. Confirmed in game 2026-10-23.
 
 ## 0.2.0 — 2026-10-23
 
@@ -126,7 +129,7 @@ buffer) is phase 1's to take over. Installed, not yet seen in game.
 ### Removed
 - The bench-only refusal of `display/install`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.1.0 — 2026-10-23
 
@@ -142,4 +145,4 @@ Installed, not yet seen in game.
   passed on (read again while the game runs); `Display8.go` logs the engine's draws of
   the next `[Trace] Frames=` frames with their state and vertices.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
