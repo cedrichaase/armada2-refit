@@ -5,6 +5,25 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.48.0 — 2026-10-23
+
+### Added
+- The UI graph (`UIGRAPH.md`): `a2test drive click`, `click-text` and `key` record where
+  they went, starting from a known screen, into `$A2_DATA/uigraph/observations.jsonl`
+  (`A2TEST_GRAPH=0` turns it off). `a2test drive where`, `a2test drive goto SCREEN
+  [--verify]` and the step `Go to the <screen>` walk the graph, every hop confirmed on
+  sight or by a log line the edge has earned. `a2test graph fold` writes
+  `testbench/uigraph.json`; `graph show`, `path`, `frontier` and `unknown` read it.
+  `bench/uigraph_selftest.py` covers folding and walking.
+- `ui.json` key `avoid`: actions that `goto` never takes.
+
+### Fixed
+- Design-space clicks under a refit install whose UI.asi stood down (no Direct3D 9
+  device): the stock shell draws unscaled at the top left of the raised mode, not
+  stretched (`Case.shell_map`).
+
+Bench-only; installs nothing into the game.
+
 ## 3.47.0 — 2026-10-23
 
 ### Added

@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.4.0 — 2026-10-23
+
+Layers: testbench 3.48.0.
+
+### Added
+- The UI graph: agents' bench clicks record which screen leads to which, and `a2test
+  drive goto SCREEN` walks there, each hop confirmed on sight or by a log line it has
+  earned (testbench 3.48.0, `testbench/UIGRAPH.md`).
+
+Bench-only; installs nothing into the game.
+
 ## 13.3.0 — 2026-10-23
 
 Layers: testbench 3.47.0.

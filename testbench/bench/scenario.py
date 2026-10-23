@@ -344,6 +344,24 @@ def s_wait_screen(c, m):
     return f'on the {name}'
 
 
+@step(r'^(?:go|navigate|walk) to the (?P<screen>[\w\' -]+?)$')
+def s_goto(c, m):
+    """`Go to the briefing`: the shortest known way there over the UI graph
+    (testbench/UIGRAPH.md), every hop confirmed: by its log line where the edge has
+    earned one, else by the screen's OCR signature."""
+    from . import uigraph, uigraph_a2
+    g = uigraph_a2.load_graph()
+    dst = g.screen(m.group('screen'))
+    if dst is None:
+        return c.delegate(m.string)
+    lines = []
+    try:
+        uigraph.goto(uigraph_a2.Adapter(c), g, dst, uigraph_a2.STORE, say=lines.append)
+    except uigraph.GraphError as e:
+        raise StepFailed('; '.join(lines + [str(e)]))
+    return '; '.join(lines) or f'already on the {dst}'
+
+
 # -- input
 
 BTN = r'(?P<btn>click|left-click|right-click|double-click)(?: on)?'
@@ -997,7 +1015,7 @@ def s_judge(c, m):
 
 
 # The steps that act on the game: a log wait reads what was written after the last one.
-ACTIONS = {s_launch, s_quit, s_stop, s_click_at, s_click_text, s_click_named, s_drag, s_move, s_press,
+ACTIONS = {s_goto, s_launch, s_quit, s_stop, s_click_at, s_click_text, s_click_named, s_drag, s_move, s_press,
            s_wheel, s_type, s_type_address, s_type_from_log, s_scene, s_scene_answer}
 
 
@@ -1306,25 +1324,39 @@ class Case:
                 return box['x'] + box['w'] // 2, box['y'] + box['h'] // 2
         return self.to_screen(t.get('space', 'design'), *t['at'])
 
-    def design_to_screen(self, x, y):
-        """The shell's 800x600 design space to screen pixels.  Menus.asi logs the mapping
-        it applied ('MoveWindow 800x600 @0,0 -> 1440x1080 @240,0'), and so does UI.asi
-        when it draws the menus; without either (stock),
-        the 800x600 display mode fills the output, stretched."""
+    def shell_map(self):
+        """Where the shell's 800x600 design space is on the screen: (w, h, x, y).
+        Menus.asi logs the mapping it applied ('MoveWindow 800x600 @0,0 -> 1440x1080
+        @240,0'), and so does UI.asi when it draws the menus (ui/MENUS.md).  Without
+        either, the stock 800x600 display mode fills the output, stretched -- unless
+        UI.asi raised the shell's display mode ('menus: shell display mode -> WxH') and
+        then stood down (no Direct3D 9 device): the stock dialogs then draw unscaled at
+        the top left of the bigger mode (seen 2026-10-23, 1280x720)."""
+        W, H = self.res
         if self.mod == 'stock':
             # the stock 800x600 shell mode fills the output, stretched -- also with the
             # embed-only Menus.asi (`Stock shell: embed`), whose log maps 800x600 onto the
             # 800x600 MODE, not onto the screen: clicking that 1:1 missed (2026-09-26)
-            W, H = self.res
-            return int(x * W / 800), int(y * H / 600)
-        # UI.asi logs the same line when it draws the menus itself (ui/MENUS.md).
-        body = (self.sess.game_log('Menus.log') or '') + '\n' + (self.sess.game_log('UI.log') or '')
+            return W, H, 0, 0
+        ui = self.sess.game_log('UI.log') or ''
+        body = (self.sess.game_log('Menus.log') or '') + '\n' + ui
         found = re.findall(r'MoveWindow 800x600 @0,0\s+->\s+(\d+)x(\d+) @(-?\d+),(-?\d+)', body)
         if found:
-            w, h, ox, oy = map(int, found[-1])
-            return int(ox + x * w / 800), int(oy + y * h / 600)
-        W, H = self.res
-        return int(x * W / 800), int(y * H / 600)
+            return tuple(map(int, found[-1]))
+        if 'menus: shell display mode ->' in ui and 'runs stock' in ui:
+            return 800, 600, 0, 0
+        return W, H, 0, 0
+
+    def design_to_screen(self, x, y):
+        """The shell's 800x600 design space to screen pixels (shell_map)."""
+        w, h, ox, oy = self.shell_map()
+        return int(ox + x * w / 800), int(oy + y * h / 600)
+
+    def screen_to_design(self, x, y):
+        """Screen pixels back to the shell's 800x600 design space, for recording a click
+        as a point that holds at any resolution (the UI graph)."""
+        w, h, ox, oy = self.shell_map()
+        return round((x - ox) * 800 / w), round((y - oy) * 600 / h)
 
     def to_screen(self, space, x, y):
         """A ui.json target's point in its own space: design, hud, hud-right or screen."""

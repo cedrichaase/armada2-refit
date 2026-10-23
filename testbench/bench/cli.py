@@ -59,6 +59,10 @@ a2test -- run Armada II headless and test it end to end
   a2test drive ocr                     words on screen, with boxes
   a2test drive wait SECONDS
   a2test drive wait-text "TEXT" [--timeout S]
+  a2test drive where                   which ui.json screen this is, its known edges and
+                                       the labels on it not yet followed (UI graph)
+  a2test drive goto SCREEN [--verify]  walk the UI graph there, every hop confirmed (by
+                                       its earned log line; --verify: by OCR as well)
   a2test drive step "any scenario step"   run one step of the scenario grammar
   a2test drive dump [NAME]             Render3D.asi's targets (PFM) and UI.asi's presented
                                        frame (PPM), read back in the game, into dumps/NAME/
@@ -68,6 +72,12 @@ a2test -- run Armada II headless and test it end to end
   a2test drive running | log NAME | launch [ARGS] | quit
   a2test drive scene "CMD" ["CMD" ...]  commands to Scene.asi (testbench/scene/README.md),
                                        e.g. "orbit ship 30 15 900", "camera rts", "query"
+
+  a2test graph fold                    observations ($A2_DATA/uigraph) -> testbench/uigraph.json
+  a2test graph show [SCREEN] | path FROM TO | frontier [SCREEN] | unknown
+                                       the UI graph (testbench/UIGRAPH.md). drive click,
+                                       click-text and key record where they went unless
+                                       A2TEST_GRAPH=0
 
   a2test baseline record NAME --from SRC... [--shot S]... [--force]
                                        keep shots (PNG, PPM, PFM) as $A2_DATA/baselines/NAME;
@@ -121,6 +131,8 @@ def main(argv=None):
             return cmd_session(rest)
         if cmd == 'drive':
             return cmd_drive(rest)
+        if cmd == 'graph':
+            return cmd_graph(rest)
         if cmd == 'slots':
             from . import slots
             return slots.main(rest)
@@ -534,10 +546,67 @@ def _session_report(s):
     report.write(run_dir, dict(run=run_dir.name, started=s.s['created'], command='a2test session'))
 
 
+# ---------------------------------------------------------------------- graph
+
+def cmd_graph(argv):
+    """The UI graph (testbench/UIGRAPH.md): fold the observations into
+    testbench/uigraph.json, and read it."""
+    from . import uigraph, uigraph_a2
+    sub, rest = (argv[0], argv[1:]) if argv else ('show', [])
+    if sub == 'fold':
+        obs = uigraph.observations(uigraph_a2.STORE)
+        g = uigraph.fold(obs, uigraph_a2.load_ui())
+        uigraph_a2.GRAPH.write_text(json.dumps(g, indent=1) + '\n')
+        earned = sum(1 for e in g['edges'] if e.get('signature'))
+        print(f'{len(obs)} observations -> {len(g["edges"])} edges ({earned} with an earned log line), '
+              f'{sum(map(len, g["frontier"].values()))} labels not yet followed, {len(g["unknown"])} '
+              f'edges to unknown screens\n  {uigraph_a2.GRAPH}')
+        return 0
+    folded = json.loads(uigraph_a2.GRAPH.read_text()) if uigraph_a2.GRAPH.exists() else {}
+    g = uigraph_a2.load_graph()
+    if sub == 'path':
+        names = [r for r in rest if not r.startswith('--variant=')]
+        variant = next((r.split('=', 1)[1] for r in rest if r.startswith('--variant=')), None)
+        if len(names) != 2:
+            raise GameError('graph path FROM TO [--variant=ui] (screen names, quoted)')
+        a, b = g.screen(names[0]), g.screen(names[1])
+        if not a or not b:
+            raise GameError(f'not a ui.json screen: {names[0] if not a else names[1]!r}')
+        way = g.path(a, b, variant)
+        if way is None:
+            print(f'no known way from the {a} to the {b}')
+            return 1
+        for e in way:
+            print(f'{e["frm"]} -> {uigraph.describe(e["action"])} -> {e["to"]}'
+                  f'  [{e["variant"]}, x{e["n"]}{", log" if e.get("signature") else ""}]')
+        return 0
+    if sub == 'frontier':
+        for scr, labs in folded.get('frontier', {}).items():
+            if not rest or g.screen(rest[0]) == scr:
+                print(f'{scr}: {", ".join(labs)}')
+        return 0
+    if sub == 'unknown':
+        for u in folded.get('unknown', []):
+            print(f'{u["frm"]} -> {uigraph.describe(u["action"])} [{u["variant"]}] x{u["seen"]}: '
+                  f'{", ".join(u["labels"])}')
+        return 0
+    if sub == 'show':
+        want = g.screen(rest[0]) if rest else None
+        print(f'{folded.get("observations", 0)} observations folded; screens: {", ".join(g.screens)}')
+        for e in folded.get('edges', []):
+            if want and e['frm'] != want:
+                continue
+            sig = f'  log: {e["signature"]["log"]} "{e["signature"]["line"]}"' if e.get('signature') else ''
+            print(f'{e["frm"]} -> {uigraph.describe(e["action"])} -> {e["to"] or "?"}  '
+                  f'[{e["variant"]}, x{e["n"]} of {e["seen"]}]{sig}')
+        return 0
+    raise GameError(f'unknown graph command {sub} (fold, show, path, frontier, unknown)')
+
+
 # ---------------------------------------------------------------------- drive
 
-def _adhoc_step(s, text):
-    """One step of the scenario grammar against a live session, outside any scenario."""
+def _bare_case(s, text=''):
+    """A Case bound to a live session, outside any scenario: the grammar's helpers."""
     from .scenario import Scenario
     c = Case.__new__(Case)
     c.scn = Scenario(path=Path('interactive.md'), title='interactive', resolutions=[s.res],
@@ -545,7 +614,35 @@ def _adhoc_step(s, text):
     c.res, c.mod, c.sess, c.opts, c.dir = s.res, s.s["mod"], s, {}, s.dir
     c.reference_dirs, c.tolerance, c.n, c.results, c.sessions = {}, 0.05, 1, [], {}
     c.ui = json.loads((config.BENCH / 'ui.json').read_text())
-    return c.run_step(text)
+    c._check_result = None
+    return c
+
+
+def _adhoc_step(s, text):
+    """One step of the scenario grammar against a live session, outside any scenario."""
+    return _bare_case(s, text).run_step(text)
+
+
+def _observed(s, log, action_of, do, before=None):
+    """Carry out a drive action and, unless A2TEST_GRAPH=0, record where it went in the
+    UI graph (testbench/UIGRAPH.md).  `action_of(ad, words)` names the action once the
+    screen before has been read.  Returns a line for the log, or ''."""
+    from . import uigraph, uigraph_a2
+    if not uigraph_a2.enabled():
+        do()
+        return ''
+    ad = uigraph_a2.Adapter(_bare_case(s))
+    words = before if before is not None else ad.look()[0]
+    try:
+        r = uigraph.observe(ad, ad.c.ui.get('screens', {}), action_of(ad, words), uigraph_a2.STORE,
+                            before=words, do=do)
+    except uigraph.GraphError as e:
+        return f'graph: {e}'
+    if not r.get('recorded'):
+        return ''
+    line = f'graph: {r["frm"]} -> {uigraph.describe(r["action"])} -> {r["to"] or "an unknown screen"}'
+    log.note(line, detail='\n'.join(r.get('to_labels', [])) or None)
+    return line
 
 
 def cmd_drive(argv):
@@ -582,13 +679,16 @@ def cmd_drive(argv):
         ap.add_argument('--double', action='store_true')
         a = ap.parse_args(rest)
         x, y = xy([a.x, a.y], a.design)
-        if sub == 'click':
+        graph = ''
+        if sub == 'click' and a.button == 1 and not a.double:
+            graph = _observed(s, log, lambda ad, words: ad.click_action(x, y, words), lambda: s.click(x, y))
+        elif sub == 'click':
             s.click(x, y, button=a.button, double=a.double)
         else:
             s.glide(x, y)
         log.action(f'{sub} at {x},{y}' + (f' (design {a.x},{a.y})' if a.design else '') +
                    (f' button {a.button}' if a.button != 1 else ''))
-        print('ok')
+        print(graph or 'ok')
     elif sub == 'click-text':
         text = ' '.join(rest)
         p = s.screenshot('before-click')
@@ -599,19 +699,24 @@ def cmd_drive(argv):
             print(f'"{text}" not found on screen')
             return 1
         x, y = box['x'] + box['w'] // 2, box['y'] + box['h'] // 2
-        s.click(x, y)
+        graph = _observed(s, log, lambda ad, words: dict(kind='text', text=text), lambda: s.click(x, y),
+                          before=vision.ocr(p))
         log.action(f'clicked "{box["text"]}" at {x},{y}')
-        print(f'clicked "{box["text"]}" at {x},{y}')
+        print(f'clicked "{box["text"]}" at {x},{y}' + (f'\n{graph}' if graph else ''))
     elif sub == 'key':
         ap = argparse.ArgumentParser(prog='a2test drive key')
         ap.add_argument('key')
         ap.add_argument('--times', type=int, default=1)
         a = ap.parse_args(rest)
-        for _ in range(a.times):
-            s.key(a.key)
-            time.sleep(0.15)
+        graph = ''
+        if a.times == 1:
+            graph = _observed(s, log, lambda ad, words: dict(kind='key', key=a.key), lambda: s.key(a.key))
+        else:
+            for _ in range(a.times):
+                s.key(a.key)
+                time.sleep(0.15)
         log.action(f'key {a.key}' + (f' x{a.times}' if a.times > 1 else ''))
-        print('ok')
+        print(graph or 'ok')
     elif sub == 'type':
         text = ' '.join(rest)
         s.type(text)
@@ -650,6 +755,42 @@ def cmd_drive(argv):
         log.action(f'"{text}" did not appear within {a.timeout:g}s', status='fail')
         print('timeout')
         return 1
+    elif sub == 'where':
+        from . import uigraph, uigraph_a2
+        g = uigraph_a2.load_graph()
+        ad = uigraph_a2.Adapter(_bare_case(s))
+        scr, words = uigraph.visit(ad, g.screens, uigraph_a2.STORE)
+        log.action(f'where: {scr or "a screen the graph does not know"}')
+        print(scr or 'unknown: no ui.json signature matches')
+        folded = json.loads(uigraph_a2.GRAPH.read_text()) if uigraph_a2.GRAPH.exists() else {}
+        for e in folded.get('edges', []):
+            if e['frm'] == scr and e['variant'] == ad.variant():
+                sig = ' [log]' if e.get('signature') else ''
+                print(f'  {uigraph.describe(e["action"])} -> {e["to"] or "?"} (x{e["n"]}){sig}')
+        front = folded.get('frontier', {}).get(scr, []) if scr else []
+        if front:
+            print('  not yet followed: ' + ', '.join(front))
+        if not scr:
+            print('  on screen: ' + ', '.join(uigraph.labels(words)))
+        return 0 if scr else 1
+    elif sub == 'goto':
+        from . import uigraph, uigraph_a2
+        verify = '--verify' in rest
+        name = ' '.join(a for a in rest if a != '--verify')
+        g = uigraph_a2.load_graph()
+        dst = g.screen(name)
+        if dst is None:
+            raise GameError(f'no screen {name!r} in ui.json (known: {", ".join(g.screens)})')
+        lines = []
+        try:
+            uigraph.goto(uigraph_a2.Adapter(_bare_case(s)), g, dst, uigraph_a2.STORE, verify=verify,
+                         say=lambda l: (lines.append(l), print(l)))
+        except uigraph.GraphError as e:
+            log.action(f'goto {dst}: {e}', status='fail', detail='\n'.join(lines) or None)
+            print(f'failed: {e}')
+            return 1
+        log.action(f'goto {dst}' + (' (verified)' if verify else ''), detail='\n'.join(lines) or None)
+        print(f'on the {dst}')
     elif sub == 'step':
         r = _adhoc_step(s, ' '.join(rest))
         print(f'{r["status"].upper()}: {r.get("detail") or ""}')

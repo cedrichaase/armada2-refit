@@ -25,6 +25,8 @@ against it. Each run leaves a report with screenshots, logs and every verdict.
     ./a2test drive --session ID click-text "Single Player"
     ./a2test drive --session ID step 'Wait for the single player screen'
     ./a2test drive --session ID note "Checking the bloom on the nacelles at 21:9"   # your intent, now
+    ./a2test drive --session ID where        # which screen this is, its known ways out (UIGRAPH.md)
+    ./a2test drive --session ID goto briefing   # walk the UI graph there; clicks and keys add to it
     ./a2test session stop ID                 #   ends the game, gathers logs, writes the report
     ./a2test session list                    # the active sessions and their IDs
     ./a2test baseline compare NAME --from ID # pixel diff against a baseline ("Baselines")
@@ -345,7 +347,9 @@ between launches and 0 within one; it passed at 0 (run 20261022-225239, 123 s).
 ## Operating the game: what agents learned
 
 Lessons from agents driving the game on the bench, kept so the next one need not
-re-learn them. Recipes for staging particular things are in `operating/`, one file
+re-learn them. **Navigation between screens is the UI graph's** (`UIGRAPH.md`):
+`drive where`, `drive goto SCREEN`, and `a2test graph fold` after a session whose
+clicks reached screens it did not know a way to. Recipes for staging particular things are in `operating/`, one file
 per topic: `construction.md` (a station built by a construction ship, sparks),
 `special-weapons-and-mining.md` (mines, model-drawn special weapons, mining beams),
 `special-object-effects.md` (Computer Override, Energy Dissipator, Psionic

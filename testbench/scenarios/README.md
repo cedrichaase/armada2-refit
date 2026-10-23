@@ -45,6 +45,7 @@ each phase has got. Without headings it makes one phase per screenshot.
 | `Wait 5 seconds` | the game must stay alive meanwhile |
 | `Wait for "TEXT"` / `Wait up to 60 seconds for "TEXT"` | OCR poll |
 | `Wait for the main menu` / `… the single player screen` / `… the briefing` / `… the options menu` / `… the admiral's log` / `… the mission selection` | OCR signature from `../ui.json` |
+| `Go to the briefing` (any `ui.json` screen) | the shortest known way over the UI graph, each hop confirmed by its earned log line or on sight (`../UIGRAPH.md`) |
 | `Click the single player emblem` (any `ui.json` target) | design coordinates, mapped the way Menus.asi maps them, unless the target names another space (`objectives`, `minimap fog` are HUD targets) |
 | `Click "TEXT"` / `Right-click …` / `Double-click …` | OCR, then click the centre |
 | `Click at 100,200` / `… at design 400,300` / `… at hud 25,27` / `… at hud-right 1500,26` | screen pixels, 800x600 shell space, HUD canvas (1200 high, top-left), or HUD canvas anchored top right at its stock 1600-wide position |

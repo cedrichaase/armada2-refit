@@ -73,7 +73,10 @@ hang in a bench game crashed the user's desktop once, so run one game at a time
 sessions promptly. **Say what you are doing**: `./a2test drive --session ID note "..."`
 when you start driving and whenever your intent changes (the dashboard, `./a2test watch`,
 shows it). Before driving the game, read `testbench/README.md`, "Operating the
-game: what agents learned", and the staging recipes in `testbench/operating/`. Write regression scenarios in `testbench/scenarios/` for fixes
+game: what agents learned", and the staging recipes in `testbench/operating/`. To get
+to a screen, use the UI graph (`testbench/UIGRAPH.md`): `drive where`, `drive goto
+SCREEN`; your `drive` clicks and keys add to it, `./a2test graph fold` folds them in, and
+a plugin's new screen goes into `testbench/ui.json` in the same change. Write regression scenarios in `testbench/scenarios/` for fixes
 worth keeping fixed, and wait on what the game logs rather than for a fixed time
 (`testbench/scenarios/README.md`, "Waits and checks"). A bench pass is evidence for the user, not their sign-off
 ("Finishing work" still applies).
