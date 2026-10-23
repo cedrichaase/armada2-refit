@@ -5,16 +5,36 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
-## 13.17.0 — 2026-10-23
+## 13.19.0 — 2026-10-23
 
-Layers: testbench 3.54.0.
+Layers: testbench 3.56.0.
 
 ### Fixed
-- `qol-refused-advisor` selects the starbase after Home, wherever the start view put it, and checks
-  the selection, the keys, the payments and the refusal it stages (testbench 3.54.0).
+- `qol-refused-advisor` selects the starbase after Home, wherever the start view put
+  it, and checks the selection, the keys, the payments and the refusal it stages (testbench 3.56.0).
 
 Installed, not yet seen in game.
 
+## 13.18.0 — 2026-10-23
+
+Layers: display 0.6.1, render3d 0.22.1, ui 0.19.1, testbench 3.55.0.
+
+### Fixed
+- Stub mode: the movies played black with their sound, on every backend; Display8 now
+  puts what the engine writes into the locked back buffer into the frame at the unlock,
+  under the UI's movie frame (display 0.6.1).
+- The long waits on Vulkan before the main menu and at a mission's start: `gpu`'s
+  read-back read the card's memory through the PCIe window, and render3d's nebula bake,
+  which reads its whole volume back, took 0.4 to 1.5 s a class; every class was also
+  baked twice (render3d 0.22.1, ui 0.19.1).
+
+### Added
+- `display-movie`: the movies on screen (testbench 3.55.0).
+
+Measured on the bench (1280x720, RX 5700, cold pipeline cache, `a2_fed01`): nebula
+bakes on Vulkan before 4.3 s at the main menu and 11.5 s at the mission's first frames,
+after 0.35 s and 0.68 s (forward mode: 0.32 s and 0.80 s). Installed, not yet seen in
+game.
 ## 13.16.0 — 2026-10-23
 
 Layers: display 0.6.0, render3d 0.22.0, ui 0.19.0, testbench 3.53.0.

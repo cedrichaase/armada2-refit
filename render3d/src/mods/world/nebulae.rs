@@ -119,6 +119,11 @@ impl Settings {
     }
 }
 
+/// The empty signature of a class's nebulae (FNV-1a's offset basis). A class is made
+/// with it too: made with 0, a class first seen in the middle of a gather hashed its
+/// nebulae from another start than every later frame, and every bake was done twice.
+const SIG0: u32 = 2_166_136_261;
+
 /// A nebula class with its recipe, and what is on the device for it.
 struct Cls {
     odf: String,
@@ -218,7 +223,7 @@ impl Cls {
             extent: 1.3, height: 3.0, radius: radius0, radius0, flow_speed: 0.0, edge_warp: 0.0, fil_reach: 0.0,
             edge_dim: 0.5, opacity: 0.0, key_share: -1.0, scatter: -1.0, shade_step: 60.0, light0: [0.0; 3], ydev: 1.0,
             hue_cycle: 0.0, hue_swing: 0.5, bolt_rate: 0.0, bolt_size: 0.3, bolt_bright: 1.0, bolt_t0: [0.0; 4],
-            bolt_pos: [[0.0; 3]; 4], bolt_amp: [0.0; 4], bolt_last: -1.0, pos: Vec::new(), sig: 0, cur: 0, env: None, env_sig: 0,
+            bolt_pos: [[0.0; 3]; 4], bolt_amp: [0.0; 4], bolt_last: -1.0, pos: Vec::new(), sig: SIG0, cur: 0, env: None, env_sig: 0,
             env_gen: u32::MAX, ex0: 0.0, ez0: 0.0, ex1: 0.0, ez1: 0.0, ey: 0.0, vol: None, occ: None, vol_sig: 0,
             vol_gen: u32::MAX, vx: 0, vy: 0, vz: 0, vlo: [0.0; 3], vsize: [0.0; 3], glo: [0.0; 3], ghi: [0.0; 3], gbox: false,
         };
@@ -980,6 +985,10 @@ impl Nebulae {
             vs.meta = [None, None];
             vs.prev = None;
         }
+        let held = self.classes.values().filter(|c| c.vol.is_some()).count();
+        if held > 0 {
+            log!("world: nebulae: {} baked volumes let go of (a Reset or a new device): baked again", held);
+        }
         for c in self.classes.values_mut() {
             c.drop_device();
         }
@@ -1093,7 +1102,7 @@ impl Nebulae {
     fn gather(&mut self) -> bool {
         for c in self.classes.values_mut() {
             c.pos.clear();
-            c.sig = 2_166_136_261;
+            c.sig = SIG0;
         }
         self.gather_ghosts();
         let mut any = false;
@@ -1235,7 +1244,7 @@ impl Nebulae {
         }
         for c in self.classes.values_mut() {
             c.pos.clear();
-            c.sig = 2_166_136_261;
+            c.sig = SIG0;
         }
         for g in gas {
             let mut name = rt::lower(&g.odf);
@@ -1350,6 +1359,13 @@ impl Nebulae {
                 let bake = self.pipe(P_BAKE);
                 let noise = self.held.noise.clone();
                 let c = self.classes.get_mut(&key_name).unwrap();
+                if c.vol_gen != u32::MAX {
+                    log!(
+                        "world: nebulae: {} baked again: {}",
+                        c.odf,
+                        if c.vol.is_none() { "the volume was let go of" } else if c.vol_gen != c.generation { "the recipe changed" } else if c.vol_sig != c.cur { "the nebulae or the Key changed" } else { "?" }
+                    );
+                }
                 // The bake draws into a target of its own.
                 let ok = bake.is_some_and(|bp| bake_volume(cmd, &bp, c, half, &cfg, noise.as_ref()));
                 if !ok {

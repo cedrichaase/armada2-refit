@@ -303,6 +303,19 @@ engine's `Present`. How each part of the interface maps, and why:
 - **Never lost**: Display8's device lives as long as the game. `before_reset` and
   `release_device` do nothing on Vulkan, and nothing is made twice.
 
+### Read-backs
+
+`read_back` copies the target into a buffer of its own, has Display8 submit the frame
+so far and wait (`display8_vk_flush`), and hands the mapped bytes over. The buffer is
+**host-cached** memory where the device has it, and only then the first host-visible
+coherent type: on the RX 5700 (RADV, resizable BAR) that first type is the card's own
+memory through the PCIe window, which the CPU reads at a few tens of MB/s. render3d's
+nebula bake reads its whole volume back, 6 to 34 MB a class, and took 0.4 to 1.5 s a
+class there (0.1 to 0.2 s on Direct3D 9 on the same card), so a menu or a mission's
+first frame stalled for seconds; from cached memory a class takes 20 to 230 ms. The
+flushes themselves were not the cost: stacking 16 layers to a read-back changed nothing
+measurable.
+
 ### Pixel centres
 
 Direct3D 9 puts a pixel's centre on whole coordinates, Vulkan (and Direct3D 12) at the
