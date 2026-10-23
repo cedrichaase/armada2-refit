@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.23.1 — 2026-10-23
+
+### Changed
+- The shipped `Render3D.ini` has a `[Lights]` section with the clustered lights' keys
+  at their defaults (`Clustered=1` and the rest), so an install adds them to a
+  player's file and `Clustered=0` is there to switch.
+
+Installed, not yet seen in game.
+
 ## 0.23.0 — 2026-10-23
 
 ### Added

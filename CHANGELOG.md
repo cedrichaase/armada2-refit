@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.24.1 — 2026-10-23
+
+Layers: render3d 0.23.1.
+
+### Changed
+- The shipped `Render3D.ini` lists `[Lights]` with the clustered lights' keys at their
+  defaults, so `./install` merges them into the game's file (render3d 0.23.1).
+
+Installed, not yet seen in game.
+
 ## 13.24.0 — 2026-10-23
 
 Layers: render3d 0.23.0 (with gpu's compute), testbench 3.58.0.
