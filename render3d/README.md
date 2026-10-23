@@ -269,9 +269,11 @@ as before).
 | `ClusterSlices` | 24 | slices of view depth, exponential from the near plane to the far one |
 | `ClusterLights` | 24 | the most lights a cluster lists (at most 32), the strongest at its box |
 | `ClusterPerColour` | 2 | the most of one colour (one group: a volley's bolts) a cluster lists |
-| `BeamLight` | 1.0 | a phaser beam's line light, times the beam's colour (0: none) |
-| `BeamReach` | 40 | how far from the beam it reaches, world units (full to a tenth of it) |
+| `BeamLight` | 4.0 | a phaser beam's line light, times the beam's colour, beside the middle of a long beam at `BeamCore` from it (0: none); every unit of the beam emits alike ("Clustered lights", "Beams") |
+| `BeamCore` | 8 | world units: closer to the beam than this its light grows no brighter |
+| `BeamReach` | 200 | world units from the beam where its light on surfaces has faded to nothing (it falls as 1 / distance before) |
 | `BeamWrap` | 0.4 | how far round the plating it wraps |
+| `BeamGasReach` | 40 | world units: how far into the gas of a nebula the beam's light reaches (full to a tenth of it, falloff squared), as the march was tuned |
 | `ConeSpot` | 1 | the tractor and assimilation beams' wash as a spot confined to the cone (0: the point it was) |
 
 The scene lights (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`,
@@ -1619,8 +1621,9 @@ alike:
   `light clusters` mark, after `mods::begin_view`), `clusters::build` takes the
   scene's list (`scene::lights()`: the engine's records, torpedoes, pulses, shield
   hits, welds, vents, fireballs, the modules' points) and the shapes render3d adds
-  for the view: a phaser beam as a **line light** (`add_line`, `BeamLight`) that washes
-  the plating it passes close to, a tractor or assimilation beam's wash as a **spot
+  for the view: a phaser beam as a **line light** (`add_line`, `BeamLight`; "Beams",
+  below) that lights the plating, rocks and planets it passes, a tractor or
+  assimilation beam's wash as a **spot
   confined to its cone** (`add_spot`, `ConeSpot`: from the emitter, as wide as the
   cone, out past the target; ART-DIRECTION.md, "It lights the target"). The ordnance
   module's own points (phaser emitters and impacts, muzzles, the fx lights) go into
@@ -1666,6 +1669,37 @@ alike:
 - **Off** (`Clustered=0`, or Direct3D 9): nothing of it runs, and every draw is as
   before: the port scenes draw the same pixels as without it (`gpu/README.md`,
   "Measured").
+- **Beams** (`cl_line` in `clustered.hlsli`). A phaser beam emits alike along its
+  whole length, so what reaches a point is the sum of 1 / r² over the segment: the
+  angle the segment spans from the point over its distance from the beam's line,
+  `(θ1 − θ0) / h`. Beside any part of a long beam that is the same (π / h), so no part
+  of the beam lights more than another; it falls as 1 / distance, and past either end
+  it dims by itself as the angle closes. It is scaled to `BeamLight` at `BeamCore`
+  from the middle of a long beam (nearer, `h` is held at the core, so a hull the beam
+  grazes does not white out), and windowed, `(1 − (d / BeamReach)²)²` of the
+  distance from the segment, to nothing at `BeamReach`, where the cull stops. Its
+  direction is the representative point: the point of the segment at the middle of
+  the angle it spans (beside the middle, the nearest point; near an end, towards the
+  rest of the beam). The two ends are brighter by points of their own, the ordnance
+  module's emitter and impact lights (`PhaserBrightness`, `PhaserImpact`, under
+  ordnance). In the gas the line is taken as it was tuned for the march: from its
+  nearest point, full to a tenth of `BeamGasReach` and gone at it, in the beam's
+  colour (`BeamLight` does not scale it; `[Nebulae] LitBeam=` does).
+  Until 0.25.0 the line was a point light stretched along the beam, full to 4 units
+  and gone at `BeamReach=40` with its falloff squared: a Galaxy class is about 100
+  units long, so a beam passing a hull or a rock 30 units off lit almost nothing (the
+  bench, `beam-pass`; the user, in the Klingon intro's fire over the station). An
+  install replaces a player's `BeamLight=1.0` and `BeamReach=40`, the old defaults,
+  by the new ones (`install.sh`, `RETIRED`); a value they set stays.
+  Cost (`Timing=1`, the `battle` scene, 1280x720, Vulkan on the RX 5700,
+  2026-10-23): the objects step 1.27 ms of GPU time against 0.91 with the old line
+  and 0.76 with no beam lights (`BeamLight=0`); the cull 0.22 ms against 0.18. The
+  time goes with how many clusters a beam reaches: `BeamReach=120` takes the objects
+  step to 1.16 ms. The angle is one `atan2` and the direction a bisector (two
+  `atan2`s and a `tan` cost the same within 0.03 ms).
+  On Direct3D 9 (and with `Clustered=0`) a beam lights nothing but its two end
+  points: the per-mesh constants hold twelve points, and a point standing in for a
+  line would light one patch of it, not the length.
 
 **Scene lights.** `scene::Lights::gather` replaces the map's directional lights with
 `Lighting.asi`'s Key, Fill and sky light (the sky's mean colour weighted by chroma,

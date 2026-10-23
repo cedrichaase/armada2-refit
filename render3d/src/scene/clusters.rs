@@ -49,11 +49,15 @@ pub struct Config {
     pub slices: u32,
     pub per_cluster: u32,
     pub per_colour: u32,
-    /// A phaser beam's line light: its brightness (times the beam's colour, 0: none),
-    /// how far from the beam it reaches, its wrap.
+    /// A phaser beam's line light (`add_line`): its brightness beside the middle of a
+    /// long beam at `beam_core` from it (times the beam's colour, 0: none), falling as
+    /// 1 / distance and gone at `beam_reach`; how far round the plating it wraps; its
+    /// reach in the gas (the nebulae's march, as it was tuned).
     pub beam: f32,
+    pub beam_core: f32,
     pub beam_reach: f32,
     pub beam_wrap: f32,
+    pub beam_gas_reach: f32,
     /// The tractor and assimilation beams' wash as a spot in the cone (else a point).
     pub cone_spot: bool,
 }
@@ -123,9 +127,11 @@ pub fn config() -> &'static Config {
             slices: ini.int(s, "ClusterSlices", 24).clamp(4, 64) as u32,
             per_cluster: (ini.int(s, "ClusterLights", 24).clamp(1, MAX_PER_CLUSTER as i32)) as u32,
             per_colour: ini.int(s, "ClusterPerColour", 2).clamp(1, MAX_PER_CLUSTER as i32) as u32,
-            beam: ini.float(s, "BeamLight", 1.0).max(0.0),
-            beam_reach: ini.float(s, "BeamReach", 40.0).max(1.0),
+            beam: ini.float(s, "BeamLight", BEAM_LIGHT).max(0.0),
+            beam_core: ini.float(s, "BeamCore", 8.0).max(0.5),
+            beam_reach: ini.float(s, "BeamReach", 200.0).max(1.0),
             beam_wrap: ini.float(s, "BeamWrap", 0.4).clamp(0.0, 1.0),
+            beam_gas_reach: ini.float(s, "BeamGasReach", 40.0).max(1.0),
             cone_spot: ini.int(s, "ConeSpot", 1) != 0,
         }
     })
@@ -172,15 +178,27 @@ pub fn forget_view() {
     st().built = None;
 }
 
-/// A line light from `a` to `b` for the view being drawn (call from a module's
-/// `begin_view`): full out to `start` from the line, gone `range` further, its falloff
-/// to `power`, wrapped `wrap` round the plating. A light of its own (never merged).
-pub fn add_line(a: V3, b: V3, colour: V3, start: f32, range: f32, wrap: f32, power: f32) {
+/// `BeamLight`'s default.
+pub const BEAM_LIGHT: f32 = 4.0;
+
+/// A phaser beam from `a` to `b` as a line light for the view being drawn (call from a
+/// module's `begin_view`), in the beam's `colour` (its peak 1 at full strength): every
+/// unit of it emits alike (`clustered.hlsli`, `cl_line`), `BeamLight` beside the middle
+/// of a long beam at `BeamCore` from it, falling as 1 / distance, gone at `BeamReach`,
+/// wrapped `BeamWrap` round the plating. In the gas it is the beam's colour from its
+/// nearest point out to `BeamGasReach`. A light of its own (never merged).
+pub fn add_line(a: V3, b: V3, colour: V3) {
+    let c = config();
+    if c.beam <= 0.0 {
+        return;
+    }
+    let core = c.beam_core.min(c.beam_reach * 0.5);
+    let col = colour * c.beam;
     let l = GpuLight {
-        a: [a.x, a.y, a.z, start],
-        c: [colour.x, colour.y, colour.z, 1.0 / range.max(1e-3)],
-        b: [b.x, b.y, b.z, 0.0],
-        k: [wrap, power, 0.0, 0.0],
+        a: [a.x, a.y, a.z, core],
+        c: [col.x, col.y, col.z, 1.0 / (c.beam_reach - core).max(1e-3)],
+        b: [b.x, b.y, b.z, c.beam_gas_reach],
+        k: [c.beam_wrap, 2.0, 0.0, 1.0 / c.beam],
         t: [KIND_LINE, 0, 0, 0],
     };
     st().extra.push(Extra { l, distinct: true });

@@ -4,6 +4,33 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.25.0 — 2026-10-23
+
+### Changed
+- A phaser beam's line light (`cl_line` in `clustered.hlsli`) emits alike along the
+  whole beam: what reaches a surface is the integral along the segment, the angle it
+  spans over the distance from it, so it is even beside every part of the beam, falls
+  as 1 / distance and dims past the ends by itself; its direction is the segment's
+  representative point. It was a point light stretched along the beam, full to 4
+  units and gone at 40 (falloff squared), so a beam passing a hull or a rock 30 units
+  off lit almost nothing. The ends stay brighter by the emitter and impact lights.
+- `BeamLight` is the brightness at `BeamCore` beside a long beam (default 4.0, was
+  1.0), `BeamReach` where it has faded to nothing (default 200, was 40). An install
+  replaces a player's old defaults (`BeamLight=1.0`, `BeamReach=40`) with the new ones
+  (`install.sh`, `RETIRED`); values a player set stay.
+
+### Added
+- `[Lights]` keys `BeamCore` (8) and `BeamGasReach` (40: the beam's reach in a
+  nebula's gas, which keeps the look the march was tuned to).
+
+### Fixed
+- `install.sh` adds a key missing from a player's `Render3D.ini` at the end of its own
+  section, before the next section's comment, not after it.
+
+Measured on the bench (`battle`, 1280x720, Vulkan on the GPU): the objects step 1.27 ms
+of GPU time against 0.91 before, the cull 0.22 against 0.18. Direct3D 9 and `Clustered=0` are unchanged (the two ends light, the length does not).
+Installed, not yet seen in game.
+
 ## 0.24.0 — 2026-10-23
 
 ### Added
