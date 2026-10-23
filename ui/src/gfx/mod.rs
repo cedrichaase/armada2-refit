@@ -397,6 +397,69 @@ impl Draw {
         self.quad(None, [vx(a.0 + nx, a.1 + ny), vx(b.0 + nx, b.1 + ny), vx(b.0 - nx, b.1 - ny), vx(a.0 - nx, a.1 - ny)]);
     }
 
+    /// A filled quad of any shape (corners in order around it), each corner its own
+    /// colour, shaded between them: geometry on the map's plane, seen in perspective.
+    pub fn poly(&mut self, p: [(f32, f32); 4], cols: [Color; 4]) {
+        let k = [KIND_SOLID, 0.0, 0.0, 0.0];
+        let vx = |i: usize| Vertex { x: p[i].0, y: p[i].1, col: cols[i], u: 0.0, v: 0.0, k, ..Default::default() };
+        self.quad(None, [vx(0), vx(1), vx(2), vx(3)]);
+    }
+
+    /// A line `width` pixels wide with soft sides: `feather` pixels either side, fading
+    /// from `c` to nothing (an antialiased line, or with a wider feather a glow).
+    pub fn line_soft(&mut self, a: (f32, f32), b: (f32, f32), width: f32, feather: f32, c: Color) {
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let len = libm::sqrtf(dx * dx + dy * dy);
+        if len <= 0.0 {
+            return;
+        }
+        let (nx, ny) = (-dy / len, dx / len);
+        let o = fade(c, 0.0);
+        let h = width * 0.5;
+        let at = |p: (f32, f32), d: f32| (p.0 + nx * d, p.1 + ny * d);
+        if h > 0.0 {
+            self.poly([at(a, h), at(b, h), at(b, -h), at(a, -h)], [c; 4]);
+        }
+        if feather > 0.0 {
+            self.poly([at(a, h + feather), at(b, h + feather), at(b, h), at(a, h)], [o, o, c, c]);
+            self.poly([at(a, -h), at(b, -h), at(b, -h - feather), at(a, -h - feather)], [c, c, o, o]);
+        }
+    }
+
+    /// A band along the edges of a convex polygon (corners in order, either way round):
+    /// from `d0` to `d1` pixels out from its edges (negative: inside), coloured `c0` at
+    /// `d0` and `c1` at `d1`, with mitred corners. An outline, a glow, an inner light.
+    pub fn band(&mut self, p: &[(f32, f32)], d0: f32, d1: f32, c0: Color, c1: Color) {
+        let n = p.len();
+        if n < 3 {
+            return;
+        }
+        // Outward is to the right of each edge for a clockwise polygon on screen (y down).
+        let mut area = 0.0;
+        for i in 0..n {
+            let (a, b) = (p[i], p[(i + 1) % n]);
+            area += a.0 * b.1 - b.0 * a.1;
+        }
+        let s = if area >= 0.0 { 1.0 } else { -1.0 };
+        let normal = |a: (f32, f32), b: (f32, f32)| -> (f32, f32) {
+            let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+            let l = libm::sqrtf(dx * dx + dy * dy).max(1.0e-6);
+            (dy / l * s, -dx / l * s)
+        };
+        // The offset corner `d` out at corner i: along the mitre, at most four times `d`.
+        let offset = |i: usize, d: f32| -> (f32, f32) {
+            let prev = p[(i + n - 1) % n];
+            let (n0, n1) = (normal(prev, p[i]), normal(p[i], p[(i + 1) % n]));
+            let (mx, my) = (n0.0 + n1.0, n0.1 + n1.1);
+            let dot = (mx * n1.0 + my * n1.1).max(0.25);
+            (p[i].0 + mx / dot * d, p[i].1 + my / dot * d)
+        };
+        for i in 0..n {
+            let j = (i + 1) % n;
+            self.poly([offset(i, d0), offset(j, d0), offset(j, d1), offset(i, d1)], [c0, c0, c1, c1]);
+        }
+    }
+
     /// Part of a texture (`uv`: u0 v0 u1 v1) drawn into `r`, tinted.
     pub fn image_uv(&mut self, t: Tex, r: R, uv: [f32; 4], tint: Color) {
         self.aquad(Some(t), r, [tint; 4], uv, [KIND_TEX, 0.0, 0.0, 0.0]);

@@ -22,12 +22,16 @@
 //!   grid effects (the ring at a move order's destination) into a quad on the map's
 //!   plane and submits it to the z-sort through `ST3D_Sprite::DrawQuad` (a `call
 //!   rel32`). Ours projects the corners as for the height posts.
-//! - **The build footprints**: `PlaceholderFeature::RenderFootprints` (which render3d's
-//!   terrain step calls as stock's does) draws a placement's footprint the same way,
-//!   one quad on the map's plane through `ST3D_Sprite::DrawQuad`: the sprite at `+0x28`
-//!   when the place is clear (`+0x74`), else the one at `+0x2c`; in the map editor, a
-//!   quad per grid cell with the sprite at `+0x24`. Its three calls are taken as the
-//!   order ring's are, and drawn the same way.
+//! - **The placement markers**: `PlaceholderFeature::RenderFootprints` (which render3d's
+//!   terrain step calls as stock's does) draws, while a station is being placed, a quad
+//!   on the map's plane through `ST3D_Sprite::DrawQuad` for every cell of the station
+//!   placement grid (`g_station_placement`) that is not clear for placement
+//!   (`Station_Placement::Is_Clear_For_Placement`) and not under the fog
+//!   (`Scanner::IsFogged`), with the sprite at `+0x24`; then the placement's footprint,
+//!   the sprite at `+0x28` when the place is clear (`+0x74`), else the one at `+0x2c`.
+//!   In the map editor it draws the cells without a placement. Its three calls are
+//!   taken; each records the quad's corners on the map's plane, in the world, with the
+//!   camera it was given and its sprite (HUD.md, "The placement markers").
 //! - **The fade**: `ScreenFade::Render` (in the cinematic view's render list only)
 //!   steps the fade's alpha (`+0x2c`, by `+0x30` a frame), finishes a script's wait when
 //!   it reaches 0 or 1, writes the alpha into its material (`+0x24`) and draws the
@@ -59,9 +63,12 @@ const SITE_GRID_FX: usize = 0x522537;
 /// `cOverViewImp::mRenderWhere`'s: the same sprite, still, at the point it marks.
 const SITE_WHERE: usize = 0x5222f0;
 const FN_SPRITE_DRAW_QUAD: usize = 0x63a7c0;
-/// `PlaceholderFeature::RenderFootprints`'s three `call ST3D_Sprite::DrawQuad`: the
-/// editor's cells, a clear placement, a blocked one.
+/// `PlaceholderFeature::RenderFootprints`'s three `call ST3D_Sprite::DrawQuad`: a cell
+/// that is not clear, a clear placement, a blocked one.
 const SITES_FOOTPRINT: [usize; 3] = [0x473a05, 0x473a77, 0x473a8e];
+/// Cells recorded a frame, at most: a big map's occupied cells, all of them, so the
+/// footprint drawn after them is never crowded out.
+const MAX_CELLS: usize = 8192;
 /// `ST3D_Texture::DemandLoad(device index)`, thiscall: 0 when the texture is on that
 /// device.
 const FN_DEMAND_LOAD: usize = 0x642610;
@@ -137,8 +144,65 @@ pub struct Ring {
     pub clip: [f32; 4],
 }
 
+/// A sprite as the engine would have drawn it: its texture (`ST3D_Texture`, loaded on
+/// the device), its rectangle of it (u0, v0, u1, v1) and its colour.
+#[derive(Clone, Copy)]
+pub struct Art {
+    pub texture: usize,
+    pub uv: [f32; 4],
+    pub rgb: [f32; 3],
+}
+
+/// A placement's footprint: its corners on the map's plane, whether the engine finds
+/// the place clear (`PlaceholderFeature+0x74`, which chose the sprite), and the sprite.
+#[derive(Clone, Copy)]
+pub struct Foot {
+    pub corners: [[f32; 3]; 4],
+    pub clear: bool,
+    pub art: Option<Art>,
+}
+
+/// What `RenderFootprints` drew for one camera: the cells that are not clear, each its
+/// four corners on the map's plane, and the footprint, with the camera to project them.
+pub struct Placement {
+    pub cam: usize,
+    pub view: Projector,
+    pub cells: Vec<[[f32; 3]; 4]>,
+    pub cell_art: Option<Art>,
+    pub foot: Option<Foot>,
+}
+
+/// A camera's projection (`ST3D_Camera+0x160`) and viewport (`+0x1b0`), as the engine
+/// maps a point to the screen.
+#[derive(Clone, Copy)]
+pub struct Projector {
+    pub m: [f32; 16],
+    pub vp: [f32; 4],
+}
+
+impl Projector {
+    fn of(cam: usize) -> Projector {
+        Projector { m: unsafe { rd(cam + CAM_PROJECTION) }, vp: viewport(cam) }
+    }
+
+    /// A point in the world on the screen, in pixels; None behind the eye.
+    pub fn project(&self, p: [f32; 3]) -> Option<(f32, f32)> {
+        let (m, vp) = (&self.m, &self.vp);
+        let mut o = [0f32; 4];
+        for (k, v) in o.iter_mut().enumerate() {
+            *v = p[0] * m[k] + p[1] * m[4 + k] + p[2] * m[8 + k] + m[12 + k];
+        }
+        if o[3] < 1.0e-3 {
+            return None;
+        }
+        let s = (vp[0] + (vp[2] - 1.0) * o[0] / o[3], vp[1] + (vp[3] - 1.0) * o[1] / o[3]);
+        if s.0.is_finite() && s.1.is_finite() { Some(s) } else { None }
+    }
+}
+
 pub struct Frame {
     pub rings: Vec<Ring>,
+    pub places: Vec<Placement>,
     pub drag: Option<Line4>,
     pub posts: Vec<Line>,
     pub fade: Option<Fade>,
@@ -153,7 +217,7 @@ pub struct Line4 {
     pub clip: [f32; 4],
 }
 
-static mut FRAME: Frame = Frame { rings: Vec::new(), drag: None, posts: Vec::new(), fade: None, video: Vec::new() };
+static mut FRAME: Frame = Frame { rings: Vec::new(), places: Vec::new(), drag: None, posts: Vec::new(), fade: None, video: Vec::new() };
 /// The rectangle `BlitToBlackBackground` was called with, while it runs.
 static mut BLIT_RECT: Option<[f32; 4]> = None;
 
@@ -170,6 +234,7 @@ pub fn take() -> Frame {
         let f = &mut *core::ptr::addr_of_mut!(FRAME);
         Frame {
             rings: core::mem::take(&mut f.rings),
+            places: core::mem::take(&mut f.places),
             drag: f.drag.take(),
             posts: core::mem::take(&mut f.posts),
             fade: f.fade.take(),
@@ -216,8 +281,9 @@ pub fn install(overview: bool, fade: bool, video: bool) -> u32 {
             && unsafe { DEMAND_LOAD_OK }
             && SITES_FOOTPRINT.iter().all(|&s| hook::call_target(s) == Some(FN_SPRITE_DRAW_QUAD));
         if feet {
-            for &s in &SITES_FOOTPRINT {
-                hook::patch_call(s, FN_SPRITE_DRAW_QUAD, footprint as *const () as usize);
+            let ours = [foot_cell as *const () as usize, foot_clear as *const () as usize, foot_blocked as *const () as usize];
+            for (&s, &to) in SITES_FOOTPRINT.iter().zip(ours.iter()) {
+                hook::patch_call(s, FN_SPRITE_DRAW_QUAD, to);
             }
             n += 1;
         } else {
@@ -355,10 +421,82 @@ unsafe extern "thiscall" fn grid_fx(sprite: usize, cam: usize, corners: *const [
     unsafe { quad(sprite, cam, corners, "order ring", 16) }
 }
 
-/// `ST3D_Sprite::DrawQuad` as `RenderFootprints` calls it: the footprint's four corners
-/// on the map's plane, its sprite green or red by whether the place is clear.
-unsafe extern "thiscall" fn footprint(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4]) {
-    unsafe { quad(sprite, cam, corners, "build footprint", 64) }
+// ---- the placement markers --------------------------------------------------------
+
+/// `ST3D_Sprite::DrawQuad` as `RenderFootprints` calls it for a cell that is not clear
+/// for placement: the cell's four corners on the map's plane.
+unsafe extern "thiscall" fn foot_cell(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4]) {
+    if cam == 0 || corners.is_null() {
+        return;
+    }
+    let c = unsafe { *corners };
+    let p = placement(cam);
+    if p.cell_art.is_none() {
+        p.cell_art = art(sprite);
+    }
+    if p.cells.len() < MAX_CELLS && c.iter().all(|v| v.iter().all(|x| x.is_finite())) {
+        p.cells.push(c);
+    }
+}
+
+/// The same for the placement's footprint, the place clear.
+unsafe extern "thiscall" fn foot_clear(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4]) {
+    unsafe { foot(sprite, cam, corners, true) }
+}
+
+/// The same, the place blocked.
+unsafe extern "thiscall" fn foot_blocked(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4]) {
+    unsafe { foot(sprite, cam, corners, false) }
+}
+
+unsafe fn foot(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4], clear: bool) {
+    if cam == 0 || corners.is_null() {
+        return;
+    }
+    let c = unsafe { *corners };
+    if !c.iter().all(|v| v.iter().all(|x| x.is_finite())) {
+        return;
+    }
+    let p = placement(cam);
+    p.foot = Some(Foot { corners: c, clear, art: art(sprite) });
+}
+
+/// This frame's record for `cam`: `RenderFootprints` runs once per view, its cells
+/// first and the footprint last.
+fn placement(cam: usize) -> &'static mut Placement {
+    let f = unsafe { &mut *core::ptr::addr_of_mut!(FRAME) };
+    if !f.places.last().is_some_and(|p| p.cam == cam) {
+        match f.places.iter().position(|p| p.cam == cam) {
+            Some(i) => {
+                let p = f.places.remove(i);
+                f.places.push(p);
+            }
+            None => f.places.push(Placement { cam, view: Projector::of(cam), cells: Vec::new(), cell_art: None, foot: None }),
+        }
+    }
+    f.places.last_mut().unwrap()
+}
+
+/// A sprite's texture, rectangle and colour, its texture loaded on the device as
+/// `SetTexture` would have (the engine no longer draws it); None when it cannot be.
+fn art(sprite: usize) -> Option<Art> {
+    if sprite == 0 {
+        return None;
+    }
+    let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(FN_SPRITE_TEXTURE) };
+    let tex = unsafe { get(sprite) };
+    if tex == 0 {
+        return None;
+    }
+    if unsafe { DEMAND_LOAD_OK } {
+        let load: unsafe extern "thiscall" fn(usize, u32) -> u32 = unsafe { core::mem::transmute(FN_DEMAND_LOAD) };
+        if unsafe { load(tex, field(storm3d(), 0xc0) as u32) } != 0 {
+            return None;
+        }
+    }
+    let uv = super::sprite::uv(sprite);
+    let uv = if uv.iter().all(|v| v.is_finite() && (-0.01..=1.01).contains(v)) { uv } else { [0.0, 0.0, 1.0, 1.0] };
+    Some(Art { texture: tex, uv, rgb: colour(sprite + SPRITE_COLOUR) })
 }
 
 /// A sprite's quad on the map's plane, projected and recorded to be drawn by the UI.
@@ -367,22 +505,13 @@ unsafe fn quad(sprite: usize, cam: usize, corners: *const [[f32; 3]; 4], what: &
         return;
     }
     let c = unsafe { *corners };
-    let vp = viewport(cam);
-    let m: [f32; 16] = unsafe { rd(cam + CAM_PROJECTION) };
+    let pr = Projector::of(cam);
+    let vp = pr.vp;
     let mut out = [(0f32, 0f32); 4];
     for (i, p) in c.iter().enumerate() {
-        let mut o = [0f32; 4];
-        for (k, v) in o.iter_mut().enumerate() {
-            *v = p[0] * m[k] + p[1] * m[4 + k] + p[2] * m[8 + k] + m[12 + k];
-        }
         // A corner behind the eye: the quad is under the camera, not drawn.
-        if o[3] < 1.0e-3 {
-            return;
-        }
-        out[i] = (vp[0] + (vp[2] - 1.0) * o[0] / o[3], vp[1] + (vp[3] - 1.0) * o[1] / o[3]);
-        if !out[i].0.is_finite() || !out[i].1.is_finite() {
-            return;
-        }
+        let Some(s) = pr.project(*p) else { return };
+        out[i] = s;
     }
     let get: unsafe extern "thiscall" fn(usize) -> usize = unsafe { core::mem::transmute(FN_SPRITE_TEXTURE) };
     let tex = unsafe { get(sprite) };

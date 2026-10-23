@@ -24,8 +24,8 @@ about 250,598 and S (Transport) at 295,643; the Nexus's AI menu is opened by its
 E.
 `UI.log` names each layout ("bar: menu=0 ... | Q=build ...") and each press ("bar:
 click build", "bar: key S=bmining"), and the placement's footprint, which the UI draws
-in the engine's place ("leftovers: build footprint at", HUD.md, "The engine's last
-draws"; with Display8's stub nothing else would draw it). A click on the bar is the
+in the engine's place, in the theme ("placement: footprint ...", HUD.md, "The
+placement markers"; with Display8's stub nothing else would draw it). A click on the bar is the
 UI's, so the Assembler stays selected through it (capture).
 
 1. Include "_enter-instant-action".
@@ -51,9 +51,9 @@ UI's, so the Assembler stays selected through it (capture).
 21. Move the mouse to 900,300.
 22. Wait 1 second.
 23. Expect "UI.log" contains "bar: key S=bmining".
-24. Expect "UI.log" contains "leftovers: build footprint at".
+24. Expect "UI.log" contains "placement: footprint".
 25. Take a screenshot called "placing".
-26. Check that a placement is shown in the 3D view: a translucent ghost of the station near 900,300, on a footprint drawn on the map's plane, a large glowing square outline of thick corner brackets (red where the place is blocked, green where it is clear) over a yellow grid of cells; at this zoom the footprint can run off the screen's edges.
+26. Check that a placement is shown in the 3D view: a translucent ghost of the station near 900,300, on a footprint drawn on the map's plane, a large square with a glowing outline, either red and hatched with diagonal stripes (the place blocked) or green with thicker brackets at its corners (clear), with small amber square tiles, or red ones with an X, on the cells the base's stations take; at this zoom the footprint can run off the screen's edges.
 27. Click at 900,300.
 28. Wait 2 seconds.
 29. Click at 1150,300.

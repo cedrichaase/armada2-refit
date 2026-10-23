@@ -5,6 +5,18 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.60.0 — 2026-10-23
+
+### Added
+- `ui-placement`: a starbase placed in the `stations` scene, blocked against the yards
+  and clear in open space, for the UI's placement markers (any Display8 mode through
+  `display/stub-scenario.sh`).
+
+### Changed
+- `ui-hud-bar` waits on "placement: footprint" and judges the placement's new look.
+
+Installed, not yet seen in game.
+
 ## 3.58.0 — 2026-10-23
 
 ### Added

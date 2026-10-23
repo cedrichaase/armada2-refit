@@ -115,10 +115,14 @@ pub struct Hud {
     /// name and description over the 3D view), drawn by us in the theme.
     pub tooltips: bool,
     /// The engine's last draws in a mission, drawn by us (`engine::leftovers`):
-    /// `Overview`, the 3D view's drag box, height posts, order ring and build footprints;
+    /// `Overview`, the 3D view's drag box, height posts, order ring and placement markers;
     /// `Fade`, the scripts' fade
     /// to and from black; `UnitVideo`, the in-mission Bink video (the unit view's).
     pub overview: bool,
+    /// `Placement`, how the placement markers (a placement's footprint and the cells
+    /// that are not clear) are drawn under `Overview`: 1 in the theme (`hud::placement`),
+    /// 0 with the engine's sprites.
+    pub placement: bool,
     pub fade: bool,
     pub unit_video: bool,
     /// `[HUD] LayoutLog`: for the test bench, every panel's rectangle written to UI.log
@@ -172,6 +176,7 @@ pub fn load() -> Config {
             load_wait: ini.int("HUD", "LoadWait", 1) != 0,
             tooltips: ini.int("HUD", "Tooltips", 1) != 0,
             overview: ini.int("HUD", "Overview", 1) != 0,
+            placement: ini.int("HUD", "Placement", 1) != 0,
             fade: ini.int("HUD", "Fade", 1) != 0,
             unit_video: ini.int("HUD", "UnitVideo", 1) != 0,
             layout_log: ini.int("HUD", "LayoutLog", 0) != 0,
