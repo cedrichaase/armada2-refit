@@ -14,6 +14,39 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 Installed, not yet seen in game.
 
+## 3.58.0 — 2026-10-23
+
+### Added
+- The `battle` scene (sixteen ships and a planet, over a hundred lights) and
+  `render3d-clustered`, which pauses it on one tick for render3d's clustered lights and
+  their GPU timings (`render3d/bench-ini.sh`).
+
+Installed, not yet seen in game.
+
+## 3.57.1 — 2026-10-23
+
+### Changed
+- `display-inventory` and `display-engine-draws` switch Display8 to forward mode
+  themselves (`display/bench-mode.sh forward`), since the shipped default is now the
+  stub; `display-stub` and `display-movie` describe the stub on `Backend=auto`.
+
+Installed, not yet seen in game.
+
+## 3.57.0 — 2026-10-23
+
+### Added
+- `display-fallback`: Display8 in stub mode with `Backend=auto` and
+  `FailBackend=vulkan,d3d12`; checks that Vulkan and Direct3D 12 are taken down and the
+  engine's first `CreateDevice` lands on Direct3D 9, that the UI and render3d draw on it, the main menu
+  and an Instant Action match.
+
+### Changed
+- `vulkan_env`: a stub on `Backend=auto` or a list that names Vulkan, with
+  `Validate=1`, gets the Khronos validation layer (`VK_INSTANCE_LAYERS`); the drivers
+  stay as they are (the GPU). Only `Backend=vulkan` alone is held to lavapipe.
+
+Installed, not yet seen in game.
+
 ## 3.56.0 — 2026-10-23
 
 ### Fixed

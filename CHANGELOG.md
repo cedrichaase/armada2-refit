@@ -18,9 +18,19 @@ Layers: render3d 0.24.0, testbench 3.59.0.
 
 Installed, not yet seen in game.
 
-## 13.23.0 — 2026-10-23
+## 13.24.1 — 2026-10-23
 
-Layers: render3d 0.23.0 (with gpu's compute).
+Layers: render3d 0.23.1.
+
+### Changed
+- The shipped `Render3D.ini` lists `[Lights]` with the clustered lights' keys at their
+  defaults, so `./install` merges them into the game's file (render3d 0.23.1).
+
+Installed, not yet seen in game.
+
+## 13.24.0 — 2026-10-23
+
+Layers: render3d 0.23.0 (with gpu's compute), testbench 3.58.0.
 
 ### Added
 - render3d's clustered lights on Vulkan and Direct3D 12: every light lights the hulls,
@@ -29,7 +39,34 @@ Layers: render3d 0.23.0 (with gpu's compute).
   off; Direct3D 9 is unchanged (render3d 0.23.0).
 - gpu: compute (storage buffers and images, compute pipelines, dispatches, barriers) on
   Vulkan and Direct3D 12, `Gpu::compute` off on Direct3D 9 (render3d 0.23.0).
-- testbench: the `battle` scene and `render3d-clustered`.
+- testbench: the `battle` scene and `render3d-clustered` (testbench 3.58.0).
+
+Installed, not yet seen in game.
+
+## 13.23.0 — 2026-10-23
+
+Layers: display 0.8.0, ui 0.19.2, testbench 3.57.1.
+
+### Changed
+- Display8 ships in stub mode on `Backend=auto` (display 0.8.0): render3d and the UI
+  draw the whole frame on Vulkan, else Direct3D 12, else Direct3D 9. An install brings
+  a `Display8.ini` that still holds the old defaults (`forward`, `d3d9`) to the new ones
+  and keeps a value set by hand (`Defaults=2`, `ui/ini-merge.py`, ui 0.19.2).
+  `display-inventory` and `display-engine-draws` pin forward mode (testbench 3.57.1).
+
+Installed, not yet seen in game.
+
+## 13.22.0 — 2026-10-23
+
+Layers: display 0.7.0, testbench 3.57.0.
+
+### Added
+- Display8's `Backend=auto` (display 0.7.0): the stub tries Vulkan, Direct3D 12, then
+  Direct3D 9 at the engine's first `CreateDevice`, and any `Backend=` falls back to Direct3D 9 when its own cannot
+  start, with each attempt in `Display8.log`. `display8_backend` answers once the device
+  is made. The shipped defaults are unchanged (`Mode=forward`, `Backend=d3d9`).
+- `display-fallback` (testbench 3.57.0): Vulkan and Direct3D 12 made to fail on
+  purpose (`FailBackend=vulkan,d3d12`), Direct3D 9 drawing the game.
 
 Installed, not yet seen in game.
 
@@ -43,7 +80,7 @@ Layers: display 0.6.2.
   platform describe the chain as `./install` leaves it, Display8 in front, and the stub
   on Direct3D 9, Vulkan and Direct3D 12. The shipped defaults are unchanged.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.21.0 — 2026-10-23
 
@@ -92,8 +129,8 @@ Layers: display 0.6.1, render3d 0.22.1, ui 0.19.1, testbench 3.55.0.
 
 Measured on the bench (1280x720, RX 5700, cold pipeline cache, `a2_fed01`): nebula
 bakes on Vulkan before 4.3 s at the main menu and 11.5 s at the mission's first frames,
-after 0.35 s and 0.68 s (forward mode: 0.32 s and 0.80 s). Installed, not yet seen in
-game.
+after 0.35 s and 0.68 s (forward mode: 0.32 s and 0.80 s). Confirmed in game 2026-10-23.
+
 ## 13.16.0 — 2026-10-23
 
 Layers: display 0.6.0, render3d 0.22.0, ui 0.19.0, testbench 3.53.0.
@@ -144,7 +181,7 @@ Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.51.0.
 
 Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.87, nebula 0.36,
 firing 0.40 (/255) on the GPU; `display-stub` (the whole game) passes on Vulkan; no
-validation message. Installed, not yet seen in game.
+validation message. Confirmed in game 2026-10-23.
 
 ## 13.11.0 — 2026-10-23
 
@@ -156,7 +193,7 @@ Layers: ui 0.17.2, testbench 3.50.1.
 - `ui-hud-map` and `ui-hud-bar` click the Assembler and the Nexus where the start view
   puts them (testbench 3.50.1).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.10.0 — 2026-10-23
 
@@ -187,7 +224,7 @@ Layers: ui 0.17.0, cutscenes 2.1.0, testbench 3.50.0.
 - A display mode chosen in the middle of a mission no longer crashes the game (a stack
   overflow between the UI's window subclass and DXVK's window hook) (ui 0.17.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.7.0 — 2026-10-23
 
@@ -198,7 +235,7 @@ Layers: display 0.3.0, testbench 3.49.0.
   render3d and the UI draw the whole frame on a Direct3D 9 device of Display8's own
   (display 0.3.0). Scenarios `port-*` and `display-stub` (testbench 3.49.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.6.0 — 2026-10-23
 
@@ -210,7 +247,7 @@ Layers: display 0.2.0, platform 3.5.0.
   switches by category, and the plugins can ask it for the device's epoch (display
   0.2.0). `d3d8-chain.py` switches the chain behind it (platform 3.5.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.5.0 — 2026-10-23
 
@@ -224,7 +261,7 @@ Layers: render3d 0.19.0, ui 0.16.0.
   `port-showcase`, `port-nebula` and `port-firing` at RMSE 0 (render3d 0.19.0, ui
   0.16.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.4.0 — 2026-10-23
 
@@ -239,7 +276,7 @@ Layers: display 0.1.0 (new), testbench 3.48.0.
 - Scenario steps `Mark the display context` and `Expect the engine to draw nothing in`,
   scenario `display-inventory` (testbench 3.48.0).
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 13.3.0 — 2026-10-23
 

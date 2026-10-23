@@ -105,6 +105,30 @@ pub struct Vk {
     pub frame_out: VkFrame8,
     pub uniform_align: u32,
     stale: bool,
+    /// The validation layer's messenger (`Validate=1`), destroyed with the instance.
+    messenger: (Option<ash::ext::debug_utils::Instance>, vk::DebugUtilsMessengerEXT),
+}
+
+/// What `Vk::start` has made before there is a `Vk` to own it: destroyed if the start
+/// fails there (dropped), forgotten once the `Vk` owns it.
+struct Partial {
+    instance: ash::Instance,
+    surface_fn: ash::khr::surface::Instance,
+    surface: vk::SurfaceKHR,
+    du: Option<ash::ext::debug_utils::Instance>,
+    messenger: vk::DebugUtilsMessengerEXT,
+}
+
+impl Drop for Partial {
+    fn drop(&mut self) {
+        unsafe {
+            self.surface_fn.destroy_surface(self.surface, None);
+            if let Some(du) = self.du.take() {
+                du.destroy_debug_utils_messenger(self.messenger, None);
+            }
+            self.instance.destroy_instance(None);
+        }
+    }
 }
 
 static mut VK: Option<Vk> = None;
@@ -179,25 +203,37 @@ impl Vk {
         }
         let ici = vk::InstanceCreateInfo::default().application_info(&app).enabled_extension_names(&exts).enabled_layer_names(&layers).flags(flags);
         let instance = unsafe { entry.create_instance(&ici, None) }.map_err(|_| "vkCreateInstance failed")?;
+        // From here what is made is destroyed again if the start fails, so that another
+        // backend can have the window (Backend=auto; README.md, "Choosing a backend").
+        let surface_fn = ash::khr::surface::Instance::new(&entry, &instance);
+        let mut part = Partial {
+            instance: instance.clone(),
+            surface_fn: surface_fn.clone(),
+            surface: vk::SurfaceKHR::null(),
+            du: None,
+            messenger: vk::DebugUtilsMessengerEXT::null(),
+        };
         if messenger {
             let du = ash::ext::debug_utils::Instance::new(&entry, &instance);
             let ci = vk::DebugUtilsMessengerCreateInfoEXT::default()
                 .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR)
                 .message_type(vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE)
                 .pfn_user_callback(Some(debug_callback));
-            if unsafe { du.create_debug_utils_messenger(&ci, None) }.is_ok() {
+            if let Ok(m) = unsafe { du.create_debug_utils_messenger(&ci, None) } {
+                part.messenger = m;
                 log!(
                     "vulkan: validation messages follow here ({})",
                     if listed { "the layer asked for by name" } else { "the layer only if VK_INSTANCE_LAYERS brings it" }
                 );
             }
+            part.du = Some(du);
         }
-        let surface_fn = ash::khr::surface::Instance::new(&entry, &instance);
         let w32 = ash::khr::win32_surface::Instance::new(&entry, &instance);
         let sci = vk::Win32SurfaceCreateInfoKHR::default()
             .hinstance(unsafe { GetModuleHandleA(core::ptr::null()) } as vk::HINSTANCE)
             .hwnd(hwnd as vk::HWND);
         let surface = unsafe { w32.create_win32_surface(&sci, None) }.map_err(|_| "vkCreateWin32SurfaceKHR failed")?;
+        part.surface = surface;
 
         // A device with one family that draws and presents; a discrete one first, or
         // only one whose name has `Device=` in it (the bench: lavapipe, never the GPU).
@@ -326,6 +362,7 @@ impl Vk {
             frame_out: VkFrame8::default(),
             uniform_align: props.limits.min_uniform_buffer_offset_alignment as u32,
             stale: true,
+            messenger: (None, vk::DebugUtilsMessengerEXT::null()),
         };
         me.exported.instance = vk::Handle::as_raw(me.instance.handle()) as usize;
         me.exported.physical_device = vk::Handle::as_raw(pdev) as usize;
@@ -333,6 +370,24 @@ impl Vk {
         me.exported.queue = vk::Handle::as_raw(queue) as usize;
         me.exported.pipeline_cache = vk::Handle::as_raw(cache);
         me.present_mode = me.choose_present_mode(interval);
+        // `me` owns everything from here: a failure destroys it whole.
+        me.messenger = (part.du.take(), core::mem::replace(&mut part.messenger, vk::DebugUtilsMessengerEXT::null()));
+        core::mem::forget(part);
+        if let Err(e) = me.build(w, h) {
+            me.destroy();
+            return Err(e);
+        }
+        log!(
+            "vulkan: swap chain {}x{} format {}, present mode {}; targets {}x{} B8G8R8A8 + D16",
+            me.sc_extent.width, me.sc_extent.height, me.sc_format.as_raw(), me.present_mode.as_raw(), w, h
+        );
+        unsafe { VK = Some(me) };
+        Ok(())
+    }
+
+    /// The targets, passes, swap chain, pipeline and frame slots of a device just made.
+    fn build(&mut self, w: u32, h: u32) -> Result<(), &'static str> {
+        let me = self;
         me.color = me.image(w, h, 1, vk::Format::B8G8R8A8_UNORM, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST, vk::ImageAspectFlags::COLOR)?;
         me.depth = me.image(
             w,
@@ -350,12 +405,63 @@ impl Vk {
             let s = me.make_slot()?;
             me.slots.push(s);
         }
-        log!(
-            "vulkan: swap chain {}x{} format {}, present mode {}; targets {}x{} B8G8R8A8 + D16",
-            me.sc_extent.width, me.sc_extent.height, me.sc_format.as_raw(), me.present_mode.as_raw(), w, h
-        );
-        unsafe { VK = Some(me) };
+        // The bench's deliberate failure (FailBackend=vulkan), after everything is made,
+        // so that the teardown is what the next backend starts after.
+        if crate::fail_backend(crate::stub::Backend::Vulkan) {
+            return Err("FailBackend=vulkan (the test bench's deliberate failure)");
+        }
         Ok(())
+    }
+
+    /// Destroys everything `start` made, when it fails: the window is free again for the
+    /// next backend (a surface or swap chain left on it keeps another's from being made).
+    /// Null handles are no-ops in Vulkan.
+    fn destroy(mut self) {
+        unsafe {
+            let _ = self.dev.device_wait_idle();
+            for s in self.slots.drain(..) {
+                for c in s.chunks {
+                    self.dev.destroy_buffer(c.buf, None);
+                    self.dev.free_memory(c.mem, None);
+                }
+                self.dev.destroy_semaphore(s.acquired, None);
+                self.dev.destroy_descriptor_pool(s.dpool, None);
+                self.dev.destroy_fence(s.fence, None);
+                self.dev.destroy_command_pool(s.pool, None);
+            }
+            self.dev.destroy_pipeline(self.pipeline, None);
+            self.dev.destroy_pipeline_layout(self.layout, None);
+            for l in self.dsl {
+                self.dev.destroy_descriptor_set_layout(l, None);
+            }
+            self.dev.destroy_sampler(self.sampler, None);
+            for &fb in &self.sc_fbs {
+                self.dev.destroy_framebuffer(fb, None);
+            }
+            for &v in &self.sc_views {
+                self.dev.destroy_image_view(v, None);
+            }
+            for &s in &self.sc_done {
+                self.dev.destroy_semaphore(s, None);
+            }
+            self.swap_fn.destroy_swapchain(self.swapchain, None);
+            self.dev.destroy_render_pass(self.present_pass, None);
+            self.dev.destroy_framebuffer(self.clear_fb, None);
+            self.dev.destroy_render_pass(self.clear_pass, None);
+            for img in [&self.color, &self.depth, &self.ramp] {
+                self.dev.destroy_image_view(img.view, None);
+                self.dev.destroy_image(img.image, None);
+                self.dev.free_memory(img.mem, None);
+            }
+            self.dev.destroy_pipeline_cache(self.cache, None);
+            self.dev.destroy_device(None);
+            self.surface_fn.destroy_surface(self.surface, None);
+            if let Some(du) = self.messenger.0.take() {
+                du.destroy_debug_utils_messenger(self.messenger.1, None);
+            }
+            self.instance.destroy_instance(None);
+        }
+        log!("vulkan: what was made is destroyed again");
     }
 
     fn choose_present_mode(&self, interval: u32) -> vk::PresentModeKHR {

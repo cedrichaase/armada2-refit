@@ -26,7 +26,7 @@
 //!
 //! | Export | Signature | What |
 //! |---|---|---|
-//! | `display8_backend` | `fn() -> u32` | `BACKEND_*`: what the plugins draw on |
+//! | `display8_backend` | `fn() -> u32` | `BACKEND_*`: what the plugins draw on; `BACKEND_NONE` until the stub's device is made (since display 0.7.0: `Backend=`'s order is tried at the engine's first `CreateDevice`, so nothing is said before), asked again then |
 //! | `display8_vk` | `fn() -> *const VkDevice8` | the device, or null |
 //! | `display8_vk_frame` | `fn() -> *const VkFrame8` | the frame now, begun at the first ask after a `Present` |
 //! | `display8_vk_alloc` | `fn(bytes: u32, align: u32, out: *mut VkAlloc8) -> bool` | space in the frame's upload ring (host-visible, mapped, coherent; vertex, index, uniform and transfer-source usage) |

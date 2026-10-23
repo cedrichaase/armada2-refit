@@ -8,8 +8,11 @@ Timeout: 50 min
 
 Run with `--install .`: the game as `./install` gives it, with Display8 switched to
 stub mode (`display/bench-mode.sh`): the engine's Direct3D 8 is ours and draws
-nothing, and render3d and the UI draw the whole frame on Display8's own Direct3D 9
-device (`display/README.md`, "Stub mode"). `display-inventory`'s way through the
+nothing, and render3d and the UI draw the whole frame on Display8's own device, the
+one `Backend=` chooses (`display/README.md`, "Stub mode", "Choosing a backend"):
+`auto` as shipped, which `display/bench-mode.sh` puts on lavapipe unless
+`A2TEST_VULKAN_GPU=1`; `display/stub-scenario.sh display-stub stub Backend=d3d9` for
+Direct3D 9. `display-inventory`'s way through the
 game: the intro movies, the menus, a campaign mission from its loading screen and
 cinematic, save and load, an Instant Action match won, Options, the Credits and Exit,
 each stage marked as a context so the inventory says what the engine still asked for.

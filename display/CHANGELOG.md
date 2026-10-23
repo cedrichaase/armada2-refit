@@ -4,6 +4,42 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.8.0 — 2026-10-23
+
+### Changed
+- The shipped default is the stub on `Backend=auto` (`Mode=stub`, `Backend=auto`; were
+  `forward`, `d3d9`), the user's decision once Vulkan was confirmed in game.
+- `Defaults=2` in `Display8.ini`: `display/install` (`ui/ini-merge.py`) moves an
+  installed `Mode=forward` and `Backend=d3d9` to the new defaults, and keeps any other
+  value a player set.
+
+Installed, not yet seen in game.
+
+## 0.7.0 — 2026-10-23
+
+### Added
+- `Backend=auto`: the first backend that starts at the engine's first `CreateDevice`,
+  in the user's order: Vulkan, Direct3D 12, Direct3D 9, on every system. `Backend=` also takes a list (`d3d12,vulkan`).
+  Available, not the default: the shipped values stay `Mode=forward`, `Backend=d3d9`.
+- A fallback at that `CreateDevice`: whatever `Backend=` names, Direct3D 9 comes last,
+  so `Backend=vulkan` or `d3d12` that cannot start falls back to it instead of failing
+  the engine's `CreateDevice`. Each attempt and its reason are in `Display8.log`
+  ("stub: trying ...", "... could not start: ...; falling back to ...", "stub: the
+  backend is ...").
+- `FailBackend=` (the test bench only, ignored outside a bench clone and not in the
+  shipped `Display8.ini`): the named backends fail on purpose once made.
+  `display/bench-mode.sh` adds it to a clone's `Display8.ini`, and applies the bench's
+  lavapipe rule to `Backend=auto` and to lists that name Vulkan.
+
+### Changed
+- `display8_backend` answers only once the stub's device is made (none before), so a
+  plugin is never told a backend that a fallback then leaves; Vulkan and Direct3D 12
+  were said from `Direct3DCreate8` on.
+- A Vulkan or Direct3D 12 start that fails takes down everything it made (instance,
+  surface, device, swap chain, frame), so that the next backend can have the window.
+
+Installed, not yet seen in game.
+
 ## 0.6.2 — 2026-10-23
 
 ### Fixed
@@ -15,7 +51,7 @@ in [`README.md`](README.md).
   (`display-stub`, `display-drop`) writes one call with the mode replaced and the keys
   added, instead of nesting a second `bench-mode.sh` inside the first.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.6.1 — 2026-10-23
 
@@ -24,6 +60,9 @@ Installed, not yet seen in game.
   buffer the engine writes by lock goes into the frame when it is unlocked
   (`stub::back_buffer_written`), not at `Present`, where it covered the frame the UI had
   just drawn from the cutscene proxy's (`src/stub/res.rs`, `src/stub/mod.rs`).
+
+Confirmed in game 2026-10-23.
+
 ## 0.6.0 — 2026-10-23
 
 ### Added
@@ -63,7 +102,7 @@ Installed, not yet seen in game.
 
 Measured on the bench: the port scenes within RMSE 0.4 to 0.9 of Direct3D 9 on the GPU
 (`gpu/README.md`, "Measured"), and `display-stub`, the whole game, through on Vulkan,
-with no validation message. Installed, not yet seen in game.
+with no validation message. Confirmed in game 2026-10-23.
 
 ## 0.4.0 — 2026-10-23
 
@@ -104,7 +143,7 @@ Measured on the bench: the showcase frame's scene, bloom and presented frame are
 same pixels as on the real chain, the screen within 1/255 (the gamma ramp); the whole
 game (`display-stub`) runs through, intro to Exit. What the stub drops that the engine
 still drew (the fade from black, the order ring, the menu backdrop read from the front
-buffer) is phase 1's to take over. Installed, not yet seen in game.
+buffer) is phase 1's to take over. Confirmed in game 2026-10-23.
 
 ## 0.2.0 — 2026-10-23
 
@@ -126,7 +165,7 @@ buffer) is phase 1's to take over. Installed, not yet seen in game.
 ### Removed
 - The bench-only refusal of `display/install`.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 0.1.0 — 2026-10-23
 
@@ -142,4 +181,4 @@ Installed, not yet seen in game.
   passed on (read again while the game runs); `Display8.go` logs the engine's draws of
   the next `[Trace] Frames=` frames with their state and vertices.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.

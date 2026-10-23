@@ -49,9 +49,12 @@ static mut CONFIG: Option<Config> = None;
 static mut REAL: HANDLE = core::ptr::null_mut();
 /// `Mode=stub` asked for; whether it runs is decided at `Direct3DCreate8`.
 static mut STUB_ASKED: bool = false;
-/// `Backend=`: what the stub draws on (d3d9 by default, until a backend is confirmed in
-/// game).
-static mut BACKEND: stub::Backend = stub::Backend::D3d9;
+/// `Backend=`: the backends the stub tries, in order, at the engine's first
+/// `CreateDevice` (d3d9 alone by default, until a backend is confirmed in game; README.md,
+/// "Choosing a backend").
+static mut ORDER: alloc::vec::Vec<stub::Backend> = alloc::vec::Vec::new();
+/// `FailBackend=`: backends that fail on purpose once made (a test bench clone only).
+static mut FAIL: alloc::vec::Vec<stub::Backend> = alloc::vec::Vec::new();
 static mut VALIDATE: bool = false;
 /// `Device=`: on Vulkan, only a physical device whose name contains this (any case);
 /// empty: a discrete one first (README.md, "Vulkan").
@@ -96,6 +99,76 @@ pub fn vk_device() -> &'static str {
     unsafe { VK_DEVICE.as_str() }
 }
 
+/// Whether the game runs in a test bench clone (a game directory under
+/// `a2test\sessions\`).
+fn bench_clone() -> bool {
+    rt::lower(rt::game_dir()).contains("\\a2test\\sessions\\")
+}
+
+/// `FailBackend=` names `b`: its start fails on purpose once everything is made.
+pub fn fail_backend(b: stub::Backend) -> bool {
+    unsafe { FAIL.contains(&b) }
+}
+
+/// The system the game runs on, for `Backend=auto`: Windows, or Wine on Linux or macOS
+/// (`wine_get_host_version` in Wine's `ntdll.dll`).
+fn platform() -> &'static str {
+    unsafe {
+        let ntdll = GetModuleHandleA(c"ntdll.dll".as_ptr() as *const u8);
+        if ntdll.is_null() {
+            return "Windows";
+        }
+        let host = GetProcAddress(ntdll, c"wine_get_host_version".as_ptr() as *const u8);
+        if host == 0 {
+            return if GetProcAddress(ntdll, c"wine_get_version".as_ptr() as *const u8) != 0 { "Linux" } else { "Windows" };
+        }
+        let host: unsafe extern "C" fn(*mut *const u8, *mut *const u8) = core::mem::transmute(host);
+        let (mut sys, mut rel) = (core::ptr::null::<u8>(), core::ptr::null::<u8>());
+        host(&mut sys, &mut rel);
+        if !sys.is_null() && rt::cstr_at(sys, 64) == "Darwin" { "macOS" } else { "Linux" }
+    }
+}
+
+/// `Backend=auto`'s order: Vulkan, then Direct3D 12, then Direct3D 9, on every system (the
+/// user's decision of 2026-10-23, over the display plan's Direct3D 12 first on Windows).
+/// `platform` is only logged.
+fn auto_order(_platform: &str) -> alloc::vec::Vec<stub::Backend> {
+    use stub::Backend::*;
+    alloc::vec![Vulkan, D3d12, D3d9]
+}
+
+/// `Backend=`: `auto`, one backend, or a list (`d3d12,vulkan`), tried in that order;
+/// Direct3D 9 is always the last, named or not, so that a backend that cannot start never
+/// fails the game. Unknown names are logged and skipped.
+fn backends(value: &str) -> alloc::vec::Vec<stub::Backend> {
+    let mut order = alloc::vec::Vec::new();
+    for word in value.split(',').map(str::trim).filter(|w| !w.is_empty()) {
+        let more = if word.eq_ignore_ascii_case("auto") {
+            let p = platform();
+            let o = auto_order(p);
+            log!("Backend=auto: on {}: {}", p, stub::names(&o));
+            o
+        } else {
+            match stub::Backend::parse(word) {
+                Some(b) => alloc::vec![b],
+                None => {
+                    log!("Backend={}: not a backend of this version (auto, d3d9, vulkan, d3d12); skipped", word);
+                    alloc::vec::Vec::new()
+                }
+            }
+        };
+        for b in more {
+            if !order.contains(&b) {
+                order.push(b);
+            }
+        }
+    }
+    // Direct3D 9 last: what every system has while d3d9 lives.
+    order.retain(|&b| b != stub::Backend::D3d9);
+    order.push(stub::Backend::D3d9);
+    order
+}
+
 #[allow(non_snake_case)]
 fn STUB_ASKED_NOW() -> bool {
     unsafe { STUB_ASKED }
@@ -128,7 +201,7 @@ fn startup() {
             Some(ref s) if s == "1" => true,
             Some(ref s) if s == "0" => false,
             // auto: on in a test bench clone, which is where the inventory is wanted.
-            _ => rt::lower(rt::game_dir()).contains("\\a2test\\sessions\\"),
+            _ => bench_clone(),
         },
         real: real_path(ini.string("Display8", "Real").filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("auto"))),
     };
@@ -137,23 +210,29 @@ fn startup() {
     log!("Display8 {} -- game dir {}; mode {}; the real chain: {}", env!("CARGO_PKG_VERSION"), rt::game_dir(), mode, cfg.real);
     unsafe { STUB_ASKED = mode.eq_ignore_ascii_case("stub") };
     let backend = ini.string("Display8", "Backend").unwrap_or_else(|| alloc::string::String::from("d3d9"));
+    let fail = ini.string("Display8", "FailBackend").unwrap_or_default();
     unsafe {
-        BACKEND = if backend.eq_ignore_ascii_case("vulkan") {
-            stub::Backend::Vulkan
-        } else if backend.eq_ignore_ascii_case("d3d12") {
-            stub::Backend::D3d12
+        if STUB_ASKED {
+            ORDER = backends(&backend);
         } else {
-            if !backend.eq_ignore_ascii_case("d3d9") {
-                log!("Backend={}: not a backend of this version (d3d9, vulkan, d3d12); d3d9 it is", backend);
+            ORDER = alloc::vec![stub::Backend::D3d9];
+        }
+        for word in fail.split(',').map(str::trim).filter(|w| !w.is_empty()) {
+            match stub::Backend::parse(word) {
+                Some(b) if bench_clone() => FAIL.push(b),
+                Some(_) => log!("FailBackend={}: for the test bench only; ignored outside a bench clone", word),
+                None => log!("FailBackend={}: not a backend (d3d9, vulkan, d3d12); ignored", word),
             }
-            stub::Backend::D3d9
-        };
+        }
+        if !FAIL.is_empty() {
+            log!("FailBackend={}: these fail on purpose once made (the test bench)", stub::names(&FAIL));
+        }
         VALIDATE = ini.int("Display8", "Validate", 0) != 0;
         VK_DEVICE = ini.string("Display8", "Device").unwrap_or_default();
         D3D9_CENTRES = ini.string("Display8", "PixelCentres").is_some_and(|s| s.eq_ignore_ascii_case("d3d9"));
     }
     if STUB_ASKED_NOW() {
-        log!("stub mode on {:?}{}", unsafe { BACKEND }, if unsafe { VALIDATE } { ", with the validation layer" } else { "" });
+        log!("stub mode on {}{}", stub::names(unsafe { &ORDER }), if unsafe { VALIDATE } { ", with the validation layer" } else { "" });
     }
     if !mode.eq_ignore_ascii_case("forward") && !mode.eq_ignore_ascii_case("stub") {
         log!("Mode={}: not a mode of this version (forward, stub); forward it is", mode);
@@ -213,11 +292,11 @@ fn real_proc(name: &str) -> usize {
 #[unsafe(no_mangle)]
 pub extern "system" fn Direct3DCreate8(sdk: u32) -> *mut c_void {
     if unsafe { STUB_ASKED } && stub_allowed() {
-        if let Some(d) = stub::start(unsafe { BACKEND }, unsafe { VALIDATE }) {
+        if let Some(d) = stub::start(unsafe { ORDER.clone() }, unsafe { VALIDATE }) {
             log!("Direct3DCreate8({}) -> the stub: the engine draws nothing from here", sdk);
             return d;
         }
-        log!("Mode=stub: the stub could not start on {:?}; forward mode instead", unsafe { BACKEND });
+        log!("Mode=stub: the stub could not start on {}; forward mode instead", stub::names(unsafe { &ORDER }));
     }
     let f = real_proc("Direct3DCreate8");
     if f == 0 {

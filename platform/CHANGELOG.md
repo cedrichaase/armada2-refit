@@ -29,7 +29,7 @@ Installed, not yet seen in game.
   `--upgrade` act on the chain behind it (`d3d8_real.dll`) and keep
   `d3d8.dll.a2display-backup` the same file.
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-23.
 
 ## 3.4.1 — 2026-10-12
 
