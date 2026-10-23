@@ -475,6 +475,19 @@ under it are named by stem; a scenario or run directory holding one case; any ot
 directory of images; a session ID, live or ended; or a baseline's name. `record` adds
 to a baseline and refuses to replace a shot it holds unless given `--force`.
 
+**Vulkan on the bench.** A game whose clone's `Display8.ini` says `Mode=stub` and
+`Backend=vulkan` runs on lavapipe, Mesa's CPU Vulkan, with the Khronos validation layer
+(`bench/session.py`, `vulkan_env`: `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`,
+`VK_INSTANCE_LAYERS`; `display/bench-mode.sh` adds `Device=llvmpipe` and `Validate=1`),
+so new Vulkan code never runs on the user's GPU; `A2TEST_VULKAN_GPU=1` leaves the
+drivers alone for a deliberate run there. Judge such a run against a baseline taken
+on the GPU (`pre-gpu-*`), not against `Backend=d3d9` on lavapipe: DXVK on lavapipe
+draws the port scenes visibly differently from DXVK on the GPU (`port-nebula` at RMSE
+25.8, `port-firing` 7.0), while render3d on Vulkan on lavapipe is within 1 to 2 of the
+GPU's (`gpu/README.md`, "Measured"). A whole campaign mission does not load on
+lavapipe on either backend (32-bit address space, likely): run `display-stub` on Vulkan
+with `A2TEST_VULKAN_GPU=1` once the port scenes are clean under the layer.
+
 **What the numbers mean.** Every frame is compared as RGB; an alpha channel is dropped,
 and the report says so.
 

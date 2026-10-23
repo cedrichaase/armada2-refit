@@ -560,7 +560,16 @@ and one indexed draw per run. `gpu` captures the device's state before the frame
 first change and puts it back after (d3d8to9 keeps its own record of what the game
 bound, `platform/D3D9.md`), with the block render3d records: once a frame, not per
 draw. Positions are in back-buffer pixels and move half a pixel on the way to clip
-space, so a rectangle with whole-number edges covers whole pixels exactly.
+space on Direct3D 9 (`gpu::Gpu::half_pixel`; none on Vulkan, whose pixel centres are
+at the half), so a rectangle with whole-number edges covers whole pixels exactly.
+
+**On Vulkan** (Display8's stub mode with `Backend=vulkan`) the same calls record into
+Display8's frame (`gpu/README.md`, "The Vulkan backend"): the back buffer and depth are
+Display8's images, the engine's textures (the minimap's, the radar's sprites, the unit
+view's video) Display8's mirrors (`gpu::Gpu::engine_texture`), and a dump reads the
+colour image before Display8's gamma pass. `gfx::attach` takes either device
+(`attach_engine`); the `Reset` and `DestroyRenderSurfaces` hooks have nothing to let go
+of there.
 
 **`Reset` and new devices are `gpu`'s.** Every texture is registered once with its
 pixels (the font atlases from the DLL, images from the game's TGAs through `a2fmt`) as
@@ -568,7 +577,7 @@ a `gpu::Texture`, which keeps them and is made on the device the first time it d
 there, and again after a `Reset` or on another device. `engine/device.rs` tells `gpu`
 when the device resets or goes (`gfx::reset`, `gfx::forget`).
 
-**Without a Direct3D 9 device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
+**Without a Direct3D 9 or Vulkan device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
 at once and the game draws as stock.
 
 ## Text (`src/text/`)

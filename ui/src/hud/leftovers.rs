@@ -73,8 +73,8 @@ fn ring_tex(texture: usize) -> crate::gfx::Tex {
 /// four projected corners, added to the frame as the engine's z-sorted sprites are.
 fn ring(ui: &mut Ui, r: &leftovers::Ring) {
     let tex = ring_tex(r.texture);
-    let Some((c, tw, th)) = crate::engine::radar::d3d9_texture(r.texture) else { return };
-    crate::gfx::tex_set_external(tex, Some(crate::gfx::gpu().wrap_d3d9_texture(c)), tw, th);
+    let Some((c, tw, th)) = crate::engine::radar::engine_texture(r.texture) else { return };
+    crate::gfx::tex_set_external(tex, Some(c), tw, th);
     let [u0, v0, u1, v1] = r.uv;
     let uv = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)];
     ui.draw.push_clip(clip_rect(r.clip));
@@ -88,11 +88,11 @@ fn video(ui: &mut Ui, v: &leftovers::Video) {
     let [x, y, w, h] = v.rect;
     ui.draw.rect(R::new(x, y, w, h), 0xff000000);
     let tex = unsafe { *VIDEO_TEX.get_or_insert_with(crate::gfx::texture_external) };
-    let Some((c, tw, th)) = crate::engine::radar::d3d9_texture(v.texture) else {
+    let Some((c, tw, th)) = crate::engine::radar::engine_texture(v.texture) else {
         crate::gfx::tex_set_external(tex, None, 1, 1);
         return;
     };
-    crate::gfx::tex_set_external(tex, Some(crate::gfx::gpu().wrap_d3d9_texture(c)), tw, th);
+    crate::gfx::tex_set_external(tex, Some(c), tw, th);
     if tw == 0 || th == 0 {
         return;
     }

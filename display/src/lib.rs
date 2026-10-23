@@ -52,6 +52,48 @@ static mut STUB_ASKED: bool = false;
 /// Direct3D 12).
 static mut BACKEND: stub::Backend = stub::Backend::D3d9;
 static mut VALIDATE: bool = false;
+/// `Device=`: on Vulkan, only a physical device whose name contains this (any case);
+/// empty: a discrete one first (README.md, "Vulkan").
+static mut VK_DEVICE: alloc::string::String = alloc::string::String::new();
+
+/// `PixelCentres=d3d9`: on Vulkan, the plugins draw with Direct3D 9's pixel centres.
+static mut D3D9_CENTRES: bool = false;
+
+pub fn d3d9_centres() -> bool {
+    unsafe { D3D9_CENTRES }
+}
+
+/// What the game's `dxvk.conf` makes of every sampler on Direct3D 9 (renderer/README.md):
+/// `d3d9.samplerAnisotropy` (-1 when not set) and `d3d9.samplerLodBias` (0 when not set;
+/// held at 0 or above when `d3d9.clampNegativeLodBias` is true, DXVK's default). On
+/// Vulkan the plugins' samplers are given the same, so the two backends' pictures agree.
+pub fn dxvk_samplers() -> (i32, f32) {
+    let text = rt::read_file(&rt::game_path("dxvk.conf")).unwrap_or_default();
+    let text = alloc::string::String::from_utf8_lossy(&text);
+    let (mut aniso, mut bias, mut clamp) = (-1i32, 0f32, true);
+    for line in text.lines() {
+        let line = line.split('#').next().unwrap_or("");
+        let Some((k, v)) = line.split_once('=') else { continue };
+        let (k, v) = (k.trim(), v.trim());
+        if k.eq_ignore_ascii_case("d3d9.samplerAnisotropy") {
+            aniso = rt::parse_f32(v).map_or(-1, |f| f as i32);
+        } else if k.eq_ignore_ascii_case("d3d9.samplerLodBias") {
+            bias = rt::parse_f32(v).unwrap_or(0.0);
+        } else if k.eq_ignore_ascii_case("d3d9.clampNegativeLodBias") {
+            clamp = !v.eq_ignore_ascii_case("false");
+        }
+    }
+    if clamp && bias < 0.0 {
+        bias = 0.0;
+    }
+    (aniso, bias)
+}
+
+/// `Device=` (empty: any).
+#[allow(static_mut_refs)]
+pub fn vk_device() -> &'static str {
+    unsafe { VK_DEVICE.as_str() }
+}
 
 #[allow(non_snake_case)]
 fn STUB_ASKED_NOW() -> bool {
@@ -106,6 +148,8 @@ fn startup() {
             stub::Backend::D3d9
         };
         VALIDATE = ini.int("Display8", "Validate", 0) != 0;
+        VK_DEVICE = ini.string("Display8", "Device").unwrap_or_default();
+        D3D9_CENTRES = ini.string("Display8", "PixelCentres").is_some_and(|s| s.eq_ignore_ascii_case("d3d9"));
     }
     if STUB_ASKED_NOW() {
         log!("stub mode on {:?}{}", unsafe { BACKEND }, if unsafe { VALIDATE } { ", with the validation layer" } else { "" });

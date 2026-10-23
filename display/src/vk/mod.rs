@@ -17,6 +17,7 @@
 //!   more, so the address space it takes stays small in a 32-bit process) and the
 //!   callbacks deferred until its fence has passed. A frame is begun at the first call
 //!   that needs it after a `Present`, and ended, submitted and presented at the next.
+mod cache;
 pub mod exports;
 pub mod mirror;
 
@@ -98,6 +99,8 @@ pub struct Vk {
     ramp: Img,
     ramp_values: Option<[u16; 768]>,
     cache: vk::PipelineCache,
+    /// The size the cache on disk was last written at (cache.rs).
+    cache_saved: usize,
     pub exported: VkDevice8,
     pub frame_out: VkFrame8,
     pub uniform_align: u32,
@@ -196,11 +199,18 @@ impl Vk {
             .hwnd(hwnd as vk::HWND);
         let surface = unsafe { w32.create_win32_surface(&sci, None) }.map_err(|_| "vkCreateWin32SurfaceKHR failed")?;
 
-        // A device with one family that draws and presents; a discrete one first.
+        // A device with one family that draws and presents; a discrete one first, or
+        // only one whose name has `Device=` in it (the bench: lavapipe, never the GPU).
         let pdevs = unsafe { instance.enumerate_physical_devices() }.map_err(|_| "no physical devices")?;
+        let want = crate::rt::lower(crate::vk_device());
         let mut pick: Option<(vk::PhysicalDevice, u32, bool)> = None;
         for &pd in &pdevs {
             let props = unsafe { instance.get_physical_device_properties(pd) };
+            let pname = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
+            log!("vulkan: physical device {}", pname);
+            if !want.is_empty() && !crate::rt::lower(pname).contains(want.as_str()) {
+                continue;
+            }
             let fams = unsafe { instance.get_physical_device_queue_family_properties(pd) };
             for (i, f) in fams.iter().enumerate() {
                 let present = unsafe { surface_fn.get_physical_device_surface_support(pd, i as u32, surface) }.unwrap_or(false);
@@ -213,7 +223,7 @@ impl Vk {
                 }
             }
         }
-        let (pdev, qfam, _) = pick.ok_or("no device that draws and presents on the window")?;
+        let (pdev, qfam, _) = pick.ok_or(if want.is_empty() { "no device that draws and presents on the window" } else { "no device named as Device= says that draws and presents" })?;
         let props = unsafe { instance.get_physical_device_properties(pdev) };
         let name = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
         log!(
@@ -234,13 +244,33 @@ impl Vk {
             dexts.push(c"VK_KHR_portability_subset".as_ptr());
             log!("vulkan: a portability device (VK_KHR_portability_subset): no triangle fans, no point polygons");
         }
-        let dci = vk::DeviceCreateInfo::default().queue_create_infos(&qci).enabled_extension_names(&dexts);
+        // Anisotropic filtering where the device has it (gpu's samplers ask for it by
+        // `Filter::Anisotropic`).
+        let have = unsafe { instance.get_physical_device_features(pdev) };
+        let feats = vk::PhysicalDeviceFeatures { sampler_anisotropy: have.sampler_anisotropy, ..Default::default() };
+        let dci = vk::DeviceCreateInfo::default().queue_create_infos(&qci).enabled_extension_names(&dexts).enabled_features(&feats);
         let dev = unsafe { instance.create_device(pdev, &dci, None) }.map_err(|_| "vkCreateDevice failed")?;
+        let mut features = 0;
+        if have.sampler_anisotropy != 0 {
+            features |= gpu::display::FEATURE_ANISOTROPY;
+        }
+        if crate::d3d9_centres() {
+            features |= gpu::display::FEATURE_D3D9_CENTRES;
+            log!("vulkan: PixelCentres=d3d9: the plugins draw with Direct3D 9's pixel centres (for comparing)");
+        }
         let queue = unsafe { dev.get_device_queue(qfam, 0) };
         let mem = unsafe { instance.get_physical_device_memory_properties(pdev) };
         let swap_fn = ash::khr::swapchain::Device::new(&instance, &dev);
-        let cache = unsafe { dev.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None) }.unwrap_or_default();
+        // The pipeline cache, from disk when this device saved one (cache.rs).
+        let saved = cache::load(&props);
+        let cache = unsafe { dev.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default().initial_data(&saved), None) }
+            .or_else(|_| unsafe { dev.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None) })
+            .unwrap_or_default();
+        let cache_saved = saved.len();
+        drop(saved);
 
+        let samplers = crate::dxvk_samplers();
+        log!("vulkan: the plugins' samplers as dxvk.conf has DXVK make them: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
         let mut me = Vk {
             _entry: entry,
             instance,
@@ -277,6 +307,7 @@ impl Vk {
             ramp: Img::null(),
             ramp_values: None,
             cache,
+            cache_saved,
             exported: VkDevice8 {
                 get_instance_proc_addr: gipa,
                 instance: 0,
@@ -287,8 +318,10 @@ impl Vk {
                 api_version: props.api_version,
                 pipeline_cache: 0,
                 frames_in_flight: SLOTS as u32,
-                features: 0,
+                features,
                 uniform_align: props.limits.min_uniform_buffer_offset_alignment as u32,
+                sampler_anisotropy: samplers.0,
+                sampler_lod_bias: samplers.1,
             },
             frame_out: VkFrame8::default(),
             uniform_align: props.limits.min_uniform_buffer_offset_alignment as u32,
@@ -301,7 +334,14 @@ impl Vk {
         me.exported.pipeline_cache = vk::Handle::as_raw(cache);
         me.present_mode = me.choose_present_mode(interval);
         me.color = me.image(w, h, 1, vk::Format::B8G8R8A8_UNORM, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST, vk::ImageAspectFlags::COLOR)?;
-        me.depth = me.image(w, h, 1, vk::Format::D16_UNORM, vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST, vk::ImageAspectFlags::DEPTH)?;
+        me.depth = me.image(
+            w,
+            h,
+            1,
+            vk::Format::D16_UNORM,
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
+            vk::ImageAspectFlags::DEPTH,
+        )?;
         me.ramp = me.image(256, 1, 1, vk::Format::B8G8R8A8_UNORM, vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST, vk::ImageAspectFlags::COLOR)?;
         me.make_passes()?;
         me.make_swapchain()?;
@@ -916,6 +956,39 @@ impl Vk {
         self.recording = false;
         self.slot = (self.slot + 1) % SLOTS;
         self.index += 1;
+        if self.index % cache::EVERY == 0 {
+            self.cache_saved = cache::save(&self.dev, self.cache, self.cache_saved);
+        }
+        true
+    }
+
+    /// Submits what the frame has recorded and waits for it, then begins its command
+    /// buffer again (`display8_vk_flush`: a plugin's read-back). The frame's ring, pool
+    /// and deferred calls stay as they are; its fence is left signalled, as it was.
+    pub fn flush(&mut self) -> bool {
+        if !self.recording {
+            return true;
+        }
+        let s = &self.slots[self.slot];
+        let (cmd, fence, pool) = (s.cmd, s.fence, s.pool);
+        unsafe {
+            if self.dev.end_command_buffer(cmd).is_err() {
+                log!("vulkan: flush: vkEndCommandBuffer failed");
+                return false;
+            }
+            let _ = self.dev.reset_fences(&[fence]);
+            let cmds = [cmd];
+            let submit = [vk::SubmitInfo::default().command_buffers(&cmds)];
+            if self.dev.queue_submit(self.queue, &submit, fence).is_err() {
+                log!("vulkan: flush: vkQueueSubmit failed");
+                return false;
+            }
+            let _ = self.dev.wait_for_fences(&[fence], true, u64::MAX);
+            // The pool's one command buffer, begun again (a transient pool's buffers are
+            // reset with their pool).
+            let _ = self.dev.reset_command_pool(pool, vk::CommandPoolResetFlags::empty());
+            let _ = self.dev.begin_command_buffer(cmd, &vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT));
+        }
         true
     }
 

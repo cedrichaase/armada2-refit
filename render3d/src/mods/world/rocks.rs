@@ -21,10 +21,11 @@ use super::surfaces::{self, Surfaces};
 use crate::engine::{self, field, field_f32, field_m34, field_u8, obj, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
-use gpu::{attr, AttrFormat, Blend, Block, Code, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
+use gpu::{attr, AttrFormat, Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::math::{M34, V3, v3};
 use crate::scene::{self, pose, Model};
 use crate::shaders::world_rock::*;
+use crate::shaders::world_rock_spv::*;
 use crate::{assets, log, rt};
 use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
@@ -512,12 +513,12 @@ impl Rocks {
     /// write no depth.
     fn pipe(&mut self, kind: u64, cull: Cull) -> Option<Pipeline> {
         self.pipes.view(kind * 4 + cull as u64, || {
-            let (vs, ps, layout, stride): (&'static [u32], &'static [u32], &'static [VertexAttr], u32) = match kind {
-                FLAT | GLOW => (&VS_ROCK, &PS_FLAT, &scene::VERTEX, 32),
-                ROCK => (&VS_ROCK, &PS_ROCK, &scene::VERTEX, 32),
-                _ => (&VS_RSPRITE, &PS_RSPRITE, &SPRITE_LAYOUT, 36),
+            let (vs, ps, layout, stride): (gpu::Code, gpu::Code, &'static [VertexAttr], u32) = match kind {
+                FLAT | GLOW => (gpu::code!(VS_ROCK, VS_ROCK_SPV), gpu::code!(PS_FLAT, PS_FLAT_SPV), &scene::VERTEX, 32),
+                ROCK => (gpu::code!(VS_ROCK, VS_ROCK_SPV), gpu::code!(PS_ROCK, PS_ROCK_SPV), &scene::VERTEX, 32),
+                _ => (gpu::code!(VS_RSPRITE, VS_RSPRITE_SPV), gpu::code!(PS_RSPRITE, PS_RSPRITE_SPV), &SPRITE_LAYOUT, 36),
             };
-            let mut d = PipelineDesc::new(Code::d3d9(vs), Code::d3d9(ps), layout, stride, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(vs, ps, layout, stride, Topology::TriangleList, Format::Unknown);
             let write = matches!(kind, FLAT | ROCK);
             d.depth = Depth { test: true, write, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.cull = cull;

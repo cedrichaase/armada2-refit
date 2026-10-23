@@ -35,6 +35,7 @@ use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::math::{v3, V3};
 use crate::shaders::effects_shields::*;
+use crate::shaders::effects_shields_spv::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -812,8 +813,8 @@ impl Shields {
             return;
         }
         let g = gfx::gpu();
-        let hit = self.pipes.view(0, || super::fx_desc(&VS_SHIELD, &PS_SHIELD, &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
-        let down = self.pipes.view(1, || super::fx_desc(&VS_SHIELD, &PS_DOWN, &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
+        let hit = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_SHIELD, VS_SHIELD_SPV), gpu::code!(PS_SHIELD, PS_SHIELD_SPV), &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
+        let down = self.pipes.view(1, || super::fx_desc(gpu::code!(VS_SHIELD, VS_SHIELD_SPV), gpu::code!(PS_DOWN, PS_DOWN_SPV), &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
         let Some(hit) = hit.filter(|p| p.ready(g)) else { return };
         let down = down.filter(|p| p.ready(g));
         self.down_ok = down.is_some();

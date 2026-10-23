@@ -115,6 +115,30 @@ def checkout_provenance(path):
     return dict(path=str(p), describe=r.stdout.strip() if r.returncode == 0 else 'not a git checkout')
 
 
+LAVAPIPE_ICD = '/usr/share/vulkan/icd.d/lvp_icd.json'
+
+
+def vulkan_env(game_dir):
+    """The environment of a game whose Display8 draws on Vulkan (`Mode=stub`,
+    `Backend=vulkan` in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
+    driver and the Khronos validation layer, so a bench game never puts new Vulkan code
+    on the user's GPU (display/README.md, "Vulkan"). `A2TEST_VULKAN_GPU=1` leaves the
+    drivers as they are, for a deliberate run on the GPU."""
+    ini = Path(game_dir) / 'Display8.ini'
+    try:
+        text = ini.read_text(errors='replace')
+    except OSError:
+        return {}
+    keys = {m.group(1).lower(): m.group(2).strip().lower()
+            for m in re.finditer(r'^\s*(\w+)\s*=\s*(.*?)\s*$', text, re.M)}
+    if keys.get('mode') != 'stub' or keys.get('backend') != 'vulkan':
+        return {}
+    env = {'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation'}
+    if os.environ.get('A2TEST_VULKAN_GPU') != '1':
+        env.update(VK_DRIVER_FILES=LAVAPIPE_ICD, VK_ICD_FILENAMES=LAVAPIPE_ICD)
+    return env
+
+
 class Session:
     def __init__(self, state, statefile):
         self.s = state
@@ -583,6 +607,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 self.start_stems()
             env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';winealsa.drv=d;wineoss.drv=d'
             route_wine_audio(self.prefix_dir / 'pfx' / 'user.reg', sink)
+        env.update(vulkan_env(g))
         # a marker the watchdog can match whatever pid namespace the game ends up in
         env['PULSE_PROP'] = f'a2test.session={self.s["id"]}'
         env['PIPEWIRE_PROPS'] = f'{{ a2test.session = "{self.s["id"]}" }}'

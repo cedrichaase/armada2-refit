@@ -9,12 +9,13 @@ use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::rt;
 use crate::shaders::sky::*;
+use crate::shaders::sky_spv::*;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use gpu::chain::{Chain, ChainDest, ChainPass};
 use gpu::{
-    attr, Address, AttrFormat, Bindings, Block, Cmd, Code, ColorTarget, Contents, Filter, Format, Load, MipFilter, Pass,
+    attr, Address, AttrFormat, Bindings, Block, Cmd, ColorTarget, Contents, Filter, Format, Load, MipFilter, Pass,
     PipelineDesc, Sampler, Semantic, Texture, TextureDesc, Topology, Usage, VertexAttr,
 };
 
@@ -41,8 +42,8 @@ pub static QUAD_LAYOUT: [VertexAttr; 2] = [attr(0, AttrFormat::Float3, Semantic:
 
 /// A pipeline of `sky_vs` and `ps` over a `QuadVert` strip, writing a target of `fmt`
 /// whole: no depth, no blending.
-pub fn quad_desc(ps: &'static [u32], fmt: Format) -> PipelineDesc {
-    PipelineDesc::new(Code::d3d9(&VS_SKY), Code::d3d9(ps), &QUAD_LAYOUT, 24, Topology::TriangleStrip, fmt)
+pub fn quad_desc(ps: gpu::Code, fmt: Format) -> PipelineDesc {
+    PipelineDesc::new(gpu::code!(VS_SKY, VS_SKY_SPV), ps, &QUAD_LAYOUT, 24, Topology::TriangleStrip, fmt)
 }
 
 /// Draws a quad of `QuadVert`s, a strip.
@@ -66,7 +67,7 @@ pub struct Baker {
 }
 
 /// The chain's pixel shaders, in order.
-const BAKE_PS: [&[u32]; 5] = [&PS_BAKE_WARP, &PS_BAKE_FIELD, &PS_BAKE_GAS, &PS_BAKE_STARS, &PS_BAKE_END];
+const BAKE_PS: [gpu::Code; 5] = [gpu::code!(PS_BAKE_WARP, PS_BAKE_WARP_SPV), gpu::code!(PS_BAKE_FIELD, PS_BAKE_FIELD_SPV), gpu::code!(PS_BAKE_GAS, PS_BAKE_GAS_SPV), gpu::code!(PS_BAKE_STARS, PS_BAKE_STARS_SPV), gpu::code!(PS_BAKE_END, PS_BAKE_END_SPV)];
 
 impl Baker {
     pub const fn new() -> Baker {
@@ -137,7 +138,7 @@ impl Baker {
                 self.pipes.own((i as u64) << 16 | gpu::d3d9::format_code(f) as u64, || quad_desc(BAKE_PS[i], f))
             })
             .collect();
-        let down = self.pipes.own(9 << 16 | fc, || quad_desc(&PS_DOWN, fmt));
+        let down = self.pipes.own(9 << 16 | fc, || quad_desc(gpu::code!(PS_DOWN, PS_DOWN_SPV), fmt));
         if !pls.iter().chain(core::iter::once(&down)).all(|p| p.ready(g)) {
             return false;
         }

@@ -140,7 +140,7 @@ pub fn cam_rect(cam: usize, w: u32, h: u32) -> PRect {
 }
 
 /// The body, as the stock one runs it, with each step offered to the modules first.
-pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> PRect {
+pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> PRect {
     let s3d = storm3d();
     let st3d = engine::st3d_device();
     let rsf = |o: usize| engine::field(rs, o) != 0;
@@ -164,8 +164,8 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         main,
         rect: cam_rect(cam, tw, th),
         st3d,
-        view: M4(dev.get_transform(TS_VIEW)),
-        proj: M4(dev.get_transform(TS_PROJECTION)),
+        view: M4(transform(TS_VIEW)),
+        proj: M4(transform(TS_PROJECTION)),
         eye: engine::field_v3(cam, 0xe4),
         time: engine::sim_time(),
         frame,
@@ -267,4 +267,9 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
     // 25-26, stock's black line along the view's right column and bottom row, are the
     // frame's (`frame::black_lines`), in the scene pass.
     v.rect
+}
+
+/// A transform the engine set (`gpu::Gpu::engine_transform`), or the identity.
+fn transform(state: u32) -> [[f32; 4]; 4] {
+    crate::gfx::gpu().engine_transform(state).unwrap_or([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
 }

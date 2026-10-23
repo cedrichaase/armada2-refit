@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.11.0 — 2026-10-23
+
+Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.50.0.
+
+### Added
+- Phase 5 of the display plan: Display8's stub mode on Vulkan (`Backend=vulkan`), and
+  render3d and the UI drawing the whole frame on it through `gpu`'s Vulkan backend,
+  from the SPIR-V built beside every shader's d3dbc (display 0.5.0, render3d 0.21.0,
+  ui 0.18.0). Off by default (`Backend=d3d9`).
+- The bench runs a Vulkan game on lavapipe with the validation layer, never on the GPU
+  (testbench 3.50.0, display 0.5.0).
+
+Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.87, nebula 0.36,
+firing 0.40 (/255) on the GPU; `display-stub` (the whole game) passes on Vulkan; no
+validation message. Installed, not yet seen in game.
+
 ## 13.10.0 — 2026-10-23
 
 Layers: ui 0.17.2, testbench 3.49.1.

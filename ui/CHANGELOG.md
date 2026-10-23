@@ -4,6 +4,17 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.18.0 — 2026-10-23
+
+### Added
+- The UI on `gpu`'s Vulkan backend when Display8 draws on Vulkan (`gfx::attach` takes
+  either device): the back buffer is Display8's image, the engine's textures (minimap,
+  radar sprites, order ring and footprints, the unit view's video) its mirrors, a dump
+  reads the frame before the gamma pass; positions leave out Direct3D 9's half pixel
+  there.
+
+Installed, not yet seen in game.
+
 ## 0.17.2 — 2026-10-23
 
 ### Fixed

@@ -752,6 +752,11 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   `display/bench-mode.sh` sets its mode from a `Setup:`; `display/stub-scenario.sh`
   makes any scenario's stub variant; `display-inventory`, `display-engine-draws`,
   `display-drop`, `display-stub`.
+- **`Backend=vulkan` on the bench runs on lavapipe with the validation layer**, never the
+  GPU (`testbench/bench/session.py`, `vulkan_env`). Judge it against a GPU baseline
+  (`pre-gpu-*`), not `Backend=d3d9` on lavapipe, which DXVK draws differently there.
+  On Vulkan the plugins' samplers take `dxvk.conf`'s anisotropy and LOD bias from
+  Display8, as DXVK gives them on Direct3D 9.
 
 ### ui
 

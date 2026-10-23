@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.50.0 — 2026-10-23
+
+### Added
+- A game whose clone's `Display8.ini` has `Mode=stub` and `Backend=vulkan` is launched
+  on lavapipe with the Khronos validation layer (`VK_DRIVER_FILES`,
+  `VK_ICD_FILENAMES`, `VK_INSTANCE_LAYERS`; `session.vulkan_env`);
+  `A2TEST_VULKAN_GPU=1` leaves the drivers as they are.
+
+Installed, not yet seen in game.
+
 ## 3.49.1 — 2026-10-23
 
 ### Fixed

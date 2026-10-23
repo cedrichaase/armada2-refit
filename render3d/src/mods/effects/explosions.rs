@@ -30,6 +30,7 @@ use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::math::{sqrtf, V3};
 use crate::shaders::effects_explosions::*;
+use crate::shaders::effects_explosions_spv::*;
 use alloc::vec::Vec;
 use gpu::{Address, Block, Contents, Filter, Format, MipFilter, Sampler, Texture, TextureDesc, Topology, Usage};
 
@@ -236,8 +237,8 @@ impl Explosions {
         let Some(vol) = self.volume() else { return };
         let Some(mut cmd) = gfx::cmd() else { return };
         let cmd = &mut cmd;
-        let fire = self.pipes.view(0, || super::fx_desc(&VS_QUAD, &PS_FIRE, &super::XYZ, 12, Topology::TriangleStrip, super::PREMUL));
-        let ring = self.pipes.view(1, || super::fx_desc(&VS_QUAD, &PS_RING, &super::XYZ, 12, Topology::TriangleStrip, super::PREMUL));
+        let fire = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_QUAD, VS_QUAD_SPV), gpu::code!(PS_FIRE, PS_FIRE_SPV), &super::XYZ, 12, Topology::TriangleStrip, super::PREMUL));
+        let ring = self.pipes.view(1, || super::fx_desc(gpu::code!(VS_QUAD, VS_QUAD_SPV), gpu::code!(PS_RING, PS_RING_SPV), &super::XYZ, 12, Topology::TriangleStrip, super::PREMUL));
         let (Some(p_fire), Some(p_ring)) = (fire, ring) else { return };
         cmd.vs_block(Block::new(0, &c.vp));
         let wrap = Sampler {

@@ -10,7 +10,7 @@ checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
 
 [[package]]
 name = "display"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ash",
  "gpu",
@@ -19,3 +19,6 @@ dependencies = [
 [[package]]
 name = "gpu"
 version = "0.1.0"
+dependencies = [
+ "ash",
+]

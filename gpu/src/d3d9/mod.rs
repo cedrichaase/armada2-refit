@@ -250,6 +250,11 @@ impl Gpu {
         Some(d)
     }
 
+    /// The device attached now.
+    pub fn device(&self) -> Option<Dev> {
+        self.dev.get()
+    }
+
     /// Before the device's `Reset`: everything in the default pool is let go of.
     pub fn before_reset(&self) {
         self.sweep(false);
@@ -893,15 +898,6 @@ impl Sweep for TimerInner {
     }
 }
 
-/// What a finished `Timer` holds besides its stamps.
-#[derive(Clone, Copy, Debug)]
-pub struct TimerResult {
-    /// The GPU's clock changed in between: the stamps mean nothing.
-    pub disjoint: bool,
-    /// Ticks per second.
-    pub frequency: u64,
-}
-
 impl TimerInner {
     fn with<R>(&self, gpu: &Gpu, f: impl FnOnce(&Com, &Com, &[Com]) -> R) -> Option<R> {
         let dev = gpu.dev.get()?;
@@ -1283,14 +1279,17 @@ impl<'a> Cmd<'a> {
     pub fn begin_pass(&mut self, pass: &Pass) -> bool {
         let mut surfs = [null_mut(); MAX_COLORS];
         for (i, c) in pass.colors.iter().take(MAX_COLORS).enumerate() {
-            surfs[i] = c.texture.0.surf_layer(self.gpu, c.layer);
+            surfs[i] = match c.texture.d9() {
+                Some(t) => t.0.surf_layer(self.gpu, c.layer),
+                None => null_mut(),
+            };
             if surfs[i].is_null() {
                 return false;
             }
         }
         let depth = match &pass.depth {
             Some(d) => {
-                let s = d.texture.0.surf(self.gpu);
+                let s = d.texture.d9().map_or(null_mut(), |t| t.0.surf(self.gpu));
                 if s.is_null() {
                     return false;
                 }
@@ -1493,19 +1492,6 @@ impl<'a> Cmd<'a> {
         self.dev.ps_const(b.base, b.data);
     }
 
-    /// Binds a binding group: its textures with their samplers, its uniform blocks.
-    pub fn bind(&mut self, g: &Bindings) {
-        for t in g.textures {
-            self.bind_texture(t.slot, t.texture, &t.sampler);
-        }
-        for b in g.vs {
-            self.vs_block(*b);
-        }
-        for b in g.ps {
-            self.ps_block(*b);
-        }
-    }
-
     /// Writes `n` bytes into one of the frame's rings, at a whole element of `stride`.
     fn ring_write(&mut self, index: bool, src: *const u8, n: u32, stride: u32) -> Option<Span> {
         if n == 0 || stride == 0 {
@@ -1527,7 +1513,7 @@ impl<'a> Cmd<'a> {
                 let want = (ring.used + n).max(ring.bytes * 2).max(RING_MIN[index as usize]);
                 let bytes = want.next_power_of_two().min(RING_MAX.max(n));
                 if let Some(old) = ring.buf.take() {
-                    self.frame.retired.push(crate::frame::Retired::Buffer(old));
+                    self.frame.retired.push(crate::frame::Retired::D9Buffer(old));
                 }
                 let ring: &mut Ring = if index { &mut self.frame.indices } else { &mut self.frame.vertices };
                 ring.buf = Some(gpu.buffer(BufferDesc { size: bytes, kind, dynamic: true }, &[]));
@@ -1549,7 +1535,7 @@ impl<'a> Cmd<'a> {
         c.buf_unlock();
         ring.pos = at + n;
         ring.used = ring.used.saturating_add(n);
-        Some(Span { buf: p, first: at / stride, count: n / stride, stride })
+        Some(Span { buf: p, vk: 0, first: at / stride, count: n / stride, stride })
     }
 
     /// Vertices written into the frame's ring, to be drawn in this frame.
@@ -1599,7 +1585,7 @@ impl<'a> Cmd<'a> {
         if p.is_null() || stride == 0 {
             return None;
         }
-        Some(Span { buf: p, first: 0, count: b.0.desc.size / stride, stride })
+        Some(Span { buf: p, vk: 0, first: 0, count: b.0.desc.size / stride, stride })
     }
 
     /// Makes the levels below the first of a `GEN_MIPS` target from its first, after it

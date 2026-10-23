@@ -10,8 +10,9 @@ use crate::engine::{field, field_f32, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::shaders::overlays::*;
+use crate::shaders::overlays_spv::*;
 use alloc::vec::Vec;
-use gpu::{attr, AttrFormat, Block, Code, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
+use gpu::{attr, AttrFormat, Block, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
 
 const GRID_SIZE: usize = 0x71a78c;
 const DARK_ORANGE: usize = 0x7a8ee8;
@@ -62,7 +63,7 @@ impl Grid {
         let Some(mut cmd) = gfx::cmd() else { return };
         // Lines, depth-tested (`LESSEQUAL`) and written, opaque.
         let pipe = self.pipes.view(0, || {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_PLANE), Code::d3d9(&PS_COLOUR), &VERTEX, 20, Topology::LineList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_PLANE, VS_PLANE_SPV), gpu::code!(PS_COLOUR, PS_COLOUR_SPV), &VERTEX, 20, Topology::LineList, Format::Unknown);
             d.depth = Depth::TEST_WRITE;
             d
         });

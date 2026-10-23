@@ -20,11 +20,12 @@
 //!   (the vertex alpha).
 use super::{eng, View};
 use crate::assets;
-use gpu::{attr, AttrFormat, Blend, BlendEq, BlendOp, Block, Code, Compare, Depth, Factor, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
+use gpu::{attr, AttrFormat, Blend, BlendEq, BlendOp, Block, Compare, Depth, Factor, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::engine::{self, field, field_f32, rd};
 use crate::gfx::{self, Pipes};
 use crate::math::{v3, V3};
 use crate::shaders::ordnance::*;
+use crate::shaders::ordnance_spv::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -230,7 +231,7 @@ impl Sprites {
     /// engine's material holds them): depth-tested and not written, no culling.
     fn pipe(&mut self, src: u32, dst: u32) -> Option<Pipeline> {
         self.pipes.view((src as u64) << 8 | dst as u64, || {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_ORD_SPRITE), Code::d3d9(&PS_ORD_SPRITE), &SLAYOUT, 36, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_ORD_SPRITE, VS_ORD_SPRITE_SPV), gpu::code!(PS_ORD_SPRITE, PS_ORD_SPRITE_SPV), &SLAYOUT, 36, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = Some(blend_of(src, dst));
             d

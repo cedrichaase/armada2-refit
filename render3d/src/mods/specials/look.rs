@@ -11,7 +11,7 @@
 //! The hull is the hulls module's pose of the affected object (`hulls::posed`); an
 //! object it does not draw (or a cloaked one) gets no layer.
 use super::{Fx, VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
-use gpu::{Blend, Block, Code, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
+use gpu::{Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{v3, V3};
@@ -19,6 +19,7 @@ use crate::mods::effects::{rnd, Cam, LightPool, Sec};
 use crate::rt::Ini;
 use crate::scene;
 use crate::shaders::specials::*;
+use crate::shaders::specials_spv::*;
 
 pub const KINDS: usize = 3;
 const NAMES: [&str; KINDS] = ["Override", "Drain", "Psionic"];
@@ -249,7 +250,7 @@ impl Looks {
     /// and not written, red, green and blue.
     fn pipe(&mut self, cull: Cull) -> Option<Pipeline> {
         self.pipes.view(cull as u64, || {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_FX), Code::d3d9(&PS_FX), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_FX, VS_FX_SPV), gpu::code!(PS_FX, PS_FX_SPV), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = Some(Blend::ADD);
             d.write_mask = 7;

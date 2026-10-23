@@ -9,10 +9,11 @@ use super::draw::Cam;
 use super::sim::{System, Vent};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
-use gpu::{attr, AttrFormat, Blend, Block, Code, Compare, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
+use gpu::{attr, AttrFormat, Blend, Block, Compare, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::math::{v3, V3};
 use crate::rt::Ini;
 use crate::shaders::particles_vent::*;
+use crate::shaders::particles_vent_spv::*;
 use alloc::vec::Vec;
 
 /// Per kind of vent: [0] plasma, [1] gas.
@@ -291,7 +292,7 @@ impl Drawer {
         let Some(mut cmd) = gfx::cmd() else { return };
         // Added, depth-tested and not written, red, green and blue, no culling.
         let pipe = self.pipes.view(0, || {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_VENT), Code::d3d9(&PS_VENT), &LAYOUT, 60, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_VENT, VS_VENT_SPV), gpu::code!(PS_VENT, PS_VENT_SPV), &LAYOUT, 60, Topology::TriangleList, Format::Unknown);
             d.blend = Some(Blend::ADD);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.write_mask = 7;

@@ -17,6 +17,7 @@ use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::math::{clamp, expf, powf, sinf, sqrtf, v3, V3};
 use crate::shaders::ordnance::*;
+use crate::shaders::ordnance_spv::*;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -1083,7 +1084,7 @@ impl Fx {
         let verts = core::mem::take(&mut self.verts);
         let Some(mut cmd) = gfx::cmd() else { return };
         // Added, depth-tested and not written, red, green and blue, no culling.
-        let pipe = self.pipes.view(0, || crate::mods::effects::fx_desc(&VS_ORD_FX, &PS_ORD_FX, &FXLAYOUT, FX_STRIDE, Topology::TriangleList, Blend::ADD));
+        let pipe = self.pipes.view(0, || crate::mods::effects::fx_desc(gpu::code!(VS_ORD_FX, VS_ORD_FX_SPV), gpu::code!(PS_ORD_FX, PS_ORD_FX_SPV), &FXLAYOUT, FX_STRIDE, Topology::TriangleList, Blend::ADD));
         let Some(pipe) = pipe else { return };
         if !cmd.set_pipeline(&pipe) {
             return;

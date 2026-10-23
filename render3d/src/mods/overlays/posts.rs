@@ -13,13 +13,14 @@
 //! 0x593840): while one of our views runs, the post is noted for the view and drawn at
 //! the flush as an anti-aliased line of a fixed pixel width (`shaders/overlays.hlsl`,
 //! `vs_line`/`ps_line`), depth-tested, not written; otherwise the engine's is called.
-use gpu::{attr, AttrFormat, Blend, Block, Code, Compare, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
+use gpu::{attr, AttrFormat, Blend, Block, Compare, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::engine::{hook, rd};
 use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::math::V3;
 use crate::shaders::overlays::*;
+use crate::shaders::overlays_spv::*;
 use alloc::vec::Vec;
 
 const FN_HEIGHT_POST: usize = 0x593840;
@@ -159,7 +160,7 @@ impl Posts {
         let Some(mut cmd) = gfx::cmd() else { return };
         // Depth-tested (`LESSEQUAL`) and not written, blended by alpha, no culling.
         let pipe = self.pipes.view(0, || {
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_LINE), Code::d3d9(&PS_LINE), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_LINE, VS_LINE_SPV), gpu::code!(PS_LINE, PS_LINE_SPV), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = Some(Blend::ALPHA);
             d

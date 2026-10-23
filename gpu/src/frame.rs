@@ -8,12 +8,13 @@
 //! `DISCARD`, and a resource can be released at once. A later backend waits on the
 //! frame's fence before reusing its ring space or freeing what was retired in it.
 use crate::{Buffer, Texture};
+use crate::d3d9::Buffer as D9Buffer;
 use alloc::vec::Vec;
 use core::ffi::c_void;
 
 /// A ring of dynamic data in one buffer, grown when a frame needs more of it.
 pub(crate) struct Ring {
-    pub(crate) buf: Option<Buffer>,
+    pub(crate) buf: Option<D9Buffer>,
     pub(crate) bytes: u32,
     pub(crate) pos: u32,
     /// Bytes written into the ring in this frame (none of them may be overwritten
@@ -27,11 +28,12 @@ impl Ring {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) enum Retired {
-    #[allow(dead_code)]
     Texture(Texture),
-    #[allow(dead_code)]
     Buffer(Buffer),
+    /// A ring of the Direct3D 9 backend's own, outgrown in this frame.
+    D9Buffer(D9Buffer),
 }
 
 pub struct Frame {
@@ -80,8 +82,10 @@ impl Frame {
 #[derive(Clone, Copy, Debug)]
 pub struct Span {
     /// The ring's buffer when the span was written (kept alive by the frame if the
-    /// ring has grown since).
+    /// ring has grown since): Direct3D 9's.
     pub(crate) buf: *mut c_void,
+    /// The `VkBuffer` on Vulkan (the display's upload ring, or a static buffer's).
+    pub(crate) vk: u64,
     /// The first element (vertex or index) in the buffer.
     pub first: u32,
     pub count: u32,

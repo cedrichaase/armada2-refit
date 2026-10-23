@@ -12,13 +12,14 @@ use crate::frame::steps::View;
 use crate::gfx::{self, Pipes};
 use crate::rt::{self, Ini};
 use crate::shaders::world_surface::*;
+use crate::shaders::world_surface_spv::*;
 use crate::{log, math};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use gpu::chain::{Chain, ChainDest, ChainPass};
 use gpu::{
-    attr, Address, AttrFormat, Bindings, Block, Cmd, Code, ColorTarget, Contents, Filter, Format, Load, MipFilter, Pass,
+    attr, Address, AttrFormat, Bindings, Block, Cmd, ColorTarget, Contents, Filter, Format, Load, MipFilter, Pass,
     PipelineDesc, Sampler, Semantic, TexSlot, Texture, TextureDesc, Topology, Usage, VertexAttr,
 };
 
@@ -285,8 +286,8 @@ const FACES: [[[f32; 3]; 3]; 6] = [
 static XYZ: [VertexAttr; 1] = [attr(0, AttrFormat::Float3, Semantic::Position, 0)];
 
 /// A bake's pipeline: no depth, no blending, no culling, every channel written.
-fn bake_desc(ps: &'static [u32], fmt: Format) -> PipelineDesc {
-    PipelineDesc::new(Code::d3d9(&VS_BAKE), Code::d3d9(ps), &XYZ, 12, Topology::TriangleStrip, fmt)
+fn bake_desc(ps: gpu::Code, fmt: Format) -> PipelineDesc {
+    PipelineDesc::new(gpu::code!(VS_BAKE, VS_BAKE_SPV), ps, &XYZ, 12, Topology::TriangleStrip, fmt)
 }
 
 /// Face `f` of an `s` x `s` cube: `k_face` (c32..c35).
@@ -312,7 +313,7 @@ fn quad(cmd: &mut Cmd) {
 const HEIGHT_SAMPLER: Sampler = gfx::sampler(Filter::Linear, MipFilter::None, Address::Clamp, Address::Clamp);
 
 /// Six faces drawn by `ps` into a render-target cube of `s` with generated levels.
-fn bake_cube(cmd: &mut Cmd, pipes: &mut Pipes, key: u64, ps: &'static [u32], s: u32, height: Option<&Texture>, recipe: &[f32]) -> Option<Texture> {
+fn bake_cube(cmd: &mut Cmd, pipes: &mut Pipes, key: u64, ps: gpu::Code, s: u32, height: Option<&Texture>, recipe: &[f32]) -> Option<Texture> {
     let g = gfx::gpu();
     let cube = g.texture(TextureDesc::cube(s, 0, Format::Bgra8, Usage::RENDER_TARGET | Usage::SAMPLED | Usage::GEN_MIPS), Contents::None);
     if !cube.ready(g) {
@@ -358,8 +359,8 @@ fn bake(cmd: &mut Cmd, r: &Recipe, s: u32, cface: u32, pipes: &mut Pipes) -> Opt
     }
     if let Some(h) = height.as_ref() {
         let hf = h.desc().format;
-        let hps: [&'static [u32]; 9] =
-            [&PS_H_WARP, &PS_H_GAS, &PS_H_GROUND, &PS_H_MOUNTAINS, &PS_H_CRATERS1, &PS_H_CRATERS2, &PS_H_CRATERS3, &PS_H_FISSURE, &PS_H_END];
+        let hps: [gpu::Code; 9] =
+            [gpu::code!(PS_H_WARP, PS_H_WARP_SPV), gpu::code!(PS_H_GAS, PS_H_GAS_SPV), gpu::code!(PS_H_GROUND, PS_H_GROUND_SPV), gpu::code!(PS_H_MOUNTAINS, PS_H_MOUNTAINS_SPV), gpu::code!(PS_H_CRATERS1, PS_H_CRATERS1_SPV), gpu::code!(PS_H_CRATERS2, PS_H_CRATERS2_SPV), gpu::code!(PS_H_CRATERS3, PS_H_CRATERS3_SPV), gpu::code!(PS_H_FISSURE, PS_H_FISSURE_SPV), gpu::code!(PS_H_END, PS_H_END_SPV)];
         // A pass that writes a chain target draws into its float format; the last, the
         // height cube's.
         let mut pipe = |i: usize, last: bool| {
@@ -403,9 +404,9 @@ fn bake(cmd: &mut Cmd, r: &Recipe, s: u32, cface: u32, pipes: &mut Pipes) -> Opt
         }
         drop(chain);
         if ok {
-            let albedo = bake_cube(cmd, pipes, 100, &PS_ALBEDO, s, Some(h), flat);
-            let relief = bake_cube(cmd, pipes, 101, &PS_RELIEF, s, Some(h), flat);
-            let cloud = if r.clouds { bake_cube(cmd, pipes, 102, &PS_CLOUD, cface, None, flat) } else { None };
+            let albedo = bake_cube(cmd, pipes, 100, gpu::code!(PS_ALBEDO, PS_ALBEDO_SPV), s, Some(h), flat);
+            let relief = bake_cube(cmd, pipes, 101, gpu::code!(PS_RELIEF, PS_RELIEF_SPV), s, Some(h), flat);
+            let cloud = if r.clouds { bake_cube(cmd, pipes, 102, gpu::code!(PS_CLOUD, PS_CLOUD_SPV), cface, None, flat) } else { None };
             if let (Some(albedo), Some(relief)) = (albedo, relief) {
                 if !r.clouds || cloud.is_some() {
                     out = Some(Surface { albedo, relief, cloud, draw: r.draw, model: r.model });

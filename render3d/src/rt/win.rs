@@ -39,6 +39,7 @@ unsafe extern "system" {
     pub fn GetProcessHeap() -> HANDLE;
     pub fn GetModuleFileNameA(module: HANDLE, buf: *mut u8, n: u32) -> u32;
     pub fn GetModuleHandleA(name: *const u8) -> HANDLE;
+    pub fn GetProcAddress(module: HANDLE, name: *const u8) -> usize;
     pub fn VirtualProtect(p: *mut u8, n: usize, prot: u32, old: *mut u32) -> i32;
     pub fn FlushInstructionCache(proc_: HANDLE, p: *const u8, n: usize) -> i32;
     pub fn GetCurrentProcess() -> HANDLE;
