@@ -892,6 +892,8 @@ impl Gpu {
     pub(crate) fn flush(&self) -> bool {
         self.suspend();
         let Some(sh) = self.sh() else { return false };
+        // The command buffer is begun again: nothing bound in it is bound any more.
+        self.serial.set(self.serial.get().wrapping_add(1));
         (sh.disp.vk_flush)()
     }
 }

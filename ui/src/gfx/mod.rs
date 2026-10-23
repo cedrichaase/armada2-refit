@@ -561,7 +561,7 @@ fn pipeline_additive(target: Format) -> Option<&'static gpu::Pipeline> {
     unsafe {
         if PIPE_ADD.as_ref().is_none_or(|(f, _)| *f != target) {
             let stride = core::mem::size_of::<Vertex>() as u32;
-            let mut d = PipelineDesc::new(Code::d3d9(&VS_UI), Code::d3d9(&PS_UI), &LAYOUT, stride, Topology::TriangleList, target);
+            let mut d = PipelineDesc::new(gpu::code!(VS_UI, VS_UI_SPV), gpu::code!(PS_UI, PS_UI_SPV), &LAYOUT, stride, Topology::TriangleList, target);
             d.blend = Some(Blend {
                 color: BlendEq { src: Factor::SrcAlpha, dst: Factor::One, op: BlendOp::Add },
                 alpha: Some(BlendEq { src: Factor::Zero, dst: Factor::One, op: BlendOp::Add }),
