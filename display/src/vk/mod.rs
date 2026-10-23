@@ -149,31 +149,44 @@ impl Vk {
             .application_name(c"Armada2")
             .engine_name(c"Display8")
             .api_version(vk::make_api_version(0, 1, 1, 0));
+        let offered = unsafe { entry.enumerate_instance_extension_properties(None) }.unwrap_or_default();
+        let has = |n: &core::ffi::CStr| offered.iter().any(|e| e.extension_name_as_c_str().is_ok_and(|x| x == n));
         let mut exts = alloc::vec![ash::khr::surface::NAME.as_ptr(), ash::khr::win32_surface::NAME.as_ptr()];
+        // MoltenVK lists its devices only to an instance that takes portability drivers
+        // (display/vkprobe: Wine offers the extension, and the flag is harmless elsewhere).
+        let mut flags = vk::InstanceCreateFlags::empty();
+        if has(ash::khr::portability_enumeration::NAME) {
+            exts.push(ash::khr::portability_enumeration::NAME.as_ptr());
+            flags |= vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
+        }
+        // The validation layer: by name when the loader lists it; under Wine it does not
+        // (winevulkan's vulkan-1.dll lists none) and the host loader takes it from
+        // VK_INSTANCE_LAYERS instead. Either way its messages come through debug_utils.
+        let listed = unsafe { entry.enumerate_instance_layer_properties() }
+            .unwrap_or_default()
+            .iter()
+            .any(|l| l.layer_name_as_c_str().is_ok_and(|x| x == c"VK_LAYER_KHRONOS_validation"));
         let mut layers = Vec::new();
-        if validate {
+        let messenger = validate && has(ash::ext::debug_utils::NAME);
+        if validate && listed {
             layers.push(c"VK_LAYER_KHRONOS_validation".as_ptr());
+        }
+        if messenger {
             exts.push(ash::ext::debug_utils::NAME.as_ptr());
         }
-        let ici = vk::InstanceCreateInfo::default().application_info(&app).enabled_extension_names(&exts).enabled_layer_names(&layers);
-        let instance = match unsafe { entry.create_instance(&ici, None) } {
-            Ok(i) => i,
-            Err(e) if validate => {
-                log!("vulkan: no instance with the validation layer ({:?}); without it", e);
-                exts.pop();
-                let ici = vk::InstanceCreateInfo::default().application_info(&app).enabled_extension_names(&exts);
-                unsafe { entry.create_instance(&ici, None) }.map_err(|_| "vkCreateInstance failed")?
-            }
-            Err(_) => return Err("vkCreateInstance failed"),
-        };
-        if validate && exts.len() == 3 {
+        let ici = vk::InstanceCreateInfo::default().application_info(&app).enabled_extension_names(&exts).enabled_layer_names(&layers).flags(flags);
+        let instance = unsafe { entry.create_instance(&ici, None) }.map_err(|_| "vkCreateInstance failed")?;
+        if messenger {
             let du = ash::ext::debug_utils::Instance::new(&entry, &instance);
             let ci = vk::DebugUtilsMessengerCreateInfoEXT::default()
                 .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR)
                 .message_type(vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE)
                 .pfn_user_callback(Some(debug_callback));
             if unsafe { du.create_debug_utils_messenger(&ci, None) }.is_ok() {
-                log!("vulkan: the validation layer is on; its messages follow here");
+                log!(
+                    "vulkan: validation messages follow here ({})",
+                    if listed { "the layer asked for by name" } else { "the layer only if VK_INSTANCE_LAYERS brings it" }
+                );
             }
         }
         let surface_fn = ash::khr::surface::Instance::new(&entry, &instance);
@@ -214,7 +227,13 @@ impl Vk {
         );
         let prio = [1.0f32];
         let qci = [vk::DeviceQueueCreateInfo::default().queue_family_index(qfam).queue_priorities(&prio)];
-        let dexts = [ash::khr::swapchain::NAME.as_ptr()];
+        let mut dexts = alloc::vec![ash::khr::swapchain::NAME.as_ptr()];
+        // A portability device (MoltenVK) must have its subset enabled when it offers it.
+        let dev_offered = unsafe { instance.enumerate_device_extension_properties(pdev) }.unwrap_or_default();
+        if dev_offered.iter().any(|e| e.extension_name_as_c_str().is_ok_and(|x| x == c"VK_KHR_portability_subset")) {
+            dexts.push(c"VK_KHR_portability_subset".as_ptr());
+            log!("vulkan: a portability device (VK_KHR_portability_subset): no triangle fans, no point polygons");
+        }
         let dci = vk::DeviceCreateInfo::default().queue_create_infos(&qci).enabled_extension_names(&dexts);
         let dev = unsafe { instance.create_device(pdev, &dci, None) }.map_err(|_| "vkCreateDevice failed")?;
         let queue = unsafe { dev.get_device_queue(qfam, 0) };
@@ -815,7 +834,7 @@ impl Vk {
         }
         let s = self.slot;
         let acquired = self.slots[s].acquired;
-        let image = match unsafe { self.swap_fn.acquire_next_image(self.swapchain, u64::MAX, acquired, vk::Fence::null()) } {
+        let image = match unsafe { self.swap_fn.acquire_next_image(self.swapchain, 5_000_000_000, acquired, vk::Fence::null()) } {
             Ok((i, _)) => i,
             Err(e) => {
                 log!("vulkan: no swap chain image ({:?}); the swap chain is made again", e);
@@ -823,7 +842,7 @@ impl Vk {
                 if self.make_swapchain().is_err() {
                     return false;
                 }
-                match unsafe { self.swap_fn.acquire_next_image(self.swapchain, u64::MAX, acquired, vk::Fence::null()) } {
+                match unsafe { self.swap_fn.acquire_next_image(self.swapchain, 5_000_000_000, acquired, vk::Fence::null()) } {
                     Ok((i, _)) => i,
                     Err(_) => return false,
                 }
