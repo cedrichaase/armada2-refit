@@ -563,8 +563,9 @@ draw. Positions are in back-buffer pixels and move half a pixel on the way to cl
 space on Direct3D 9 (`gpu::Gpu::half_pixel`; none on Vulkan, whose pixel centres are
 at the half), so a rectangle with whole-number edges covers whole pixels exactly.
 
-**On Vulkan** (Display8's stub mode with `Backend=vulkan`) the same calls record into
-Display8's frame (`gpu/README.md`, "The Vulkan backend"): the back buffer and depth are
+**On Vulkan and Direct3D 12** (Display8's stub mode with `Backend=vulkan` or `d3d12`)
+the same calls record into Display8's frame (`gpu/README.md`, "The Vulkan backend",
+"The Direct3D 12 backend"): the back buffer and depth are
 Display8's images, the engine's textures (the minimap's, the radar's sprites, the unit
 view's video) Display8's mirrors (`gpu::Gpu::engine_texture`), and a dump reads the
 colour image before Display8's gamma pass. `gfx::attach` takes either device
@@ -577,7 +578,7 @@ a `gpu::Texture`, which keeps them and is made on the device the first time it d
 there, and again after a `Reset` or on another device. `engine/device.rs` tells `gpu`
 when the device resets or goes (`gfx::reset`, `gfx::forget`).
 
-**Without a Direct3D 9 or Vulkan device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
+**Without a Direct3D 9, Vulkan or Direct3D 12 device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
 at once and the game draws as stock.
 
 ## Text (`src/text/`)
@@ -687,9 +688,9 @@ draws it over the whole back buffer, fitted, centred, between black bars, in a s
 of its own (opened only when none is). It attaches to the device when the first frame
 comes, since the intro plays before any frame of UI. The proxy writes nothing into the
 locked back buffer then, so the engine's pixels are no longer the picture: the frame
-reaches the screen through the UI's renderer, as the rest will when the device is a
-stub (the display plan). It returns 0, and the proxy copies the frame itself as
-before, without a Direct3D 9 device or with `Movies=0`; without `UI.asi` the proxy finds
+reaches the screen through the UI's renderer, as all of it does in Display8's stub
+mode (`display/README.md`, "Stub mode"). It returns 0, and the proxy copies the frame
+itself as before, without a device to draw on or with `Movies=0`; without `UI.asi` the proxy finds
 no export and copies.
 
 The proxy's real-Bink reels (Activision, Paramount, Mad Doc) take the same way: it

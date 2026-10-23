@@ -6,16 +6,21 @@ Rust like render3d and the UI. The aim (the plan in the user's `plans/`) is that
 engine ends up drawing nothing: Display8 gives it a device that accepts everything, and
 `Render3D.asi` and `UI.asi` draw the whole frame on Vulkan or Direct3D 12 directly.
 
-    Armada2.exe -> d3d8.dll (Display8) -> d3d8_real.dll (crosire's d3d8to9) -> d3d9.dll (DXVK; Windows' own)
+    Mode=forward  Armada2.exe -> d3d8.dll (Display8) -> d3d8_real.dll (crosire's d3d8to9) -> d3d9.dll (DXVK; Windows' own)
+    Mode=stub     Armada2.exe -> d3d8.dll (Display8, draws nothing) -> Display8's own device: d3d9.dll, vulkan-1.dll or d3d12.dll
 
 ## Status
 
-**Forward mode.** Display8 stands in front of the real chain and passes every call
-through. `./install` puts it in (`display/install`), `a2mod` switches it as the
-`display` layer, and `platform/d3d8-chain.py` switches the chain behind it. On the
-test bench it traces every call (`Trace=auto`: on in an `a2test` clone). It is not in
-the release package: in forward mode it changes nothing a player sees; it joins with
-the stub.
+**Two modes, forward by default.** `./install` puts Display8 in (`display/install`),
+`a2mod` switches it as the `display` layer, and `platform/d3d8-chain.py` switches the
+chain behind it. In **forward mode** (`Mode=forward`, shipped) it stands in front of the
+real chain and passes every call through; on the test bench it traces every call
+(`Trace=auto`: on in an `a2test` clone). In **stub mode** (`Mode=stub`, "Stub mode"
+below) the real chain is never loaded, and render3d and the UI draw the whole frame on a
+device of Display8's own: Direct3D 9 (`Backend=d3d9`, shipped), Vulkan or Direct3D 12
+("Backends"). Forward stays the default until a backend has been confirmed in game.
+Display8 is not in the release package yet: in forward mode it changes nothing a player
+sees.
 
     ./a2test session start --res 1280x720 --install .
 
@@ -53,6 +58,14 @@ as before:
 | `display8_device_epoch()` | moves on at every `CreateDevice`, every `Reset` that succeeds, and when the device goes: whatever a plugin made at another epoch must be made again |
 | `display8_device()` | the engine's device now (ours, not referenced), or null |
 | `display8_frame()` | frames presented so far |
+| `display8_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
+| `display8_vk*`, `display8_dx12*`, `display8_engine_viewport`, `display8_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
+
+The first four are the forward mode's (`src/api.rs`). No plugin reads
+`display8_device_epoch` yet: on Direct3D 9 render3d and the UI still tell a new device
+by the Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`), which they need
+on the chains without Display8 too; the epoch replaces that polling once the Direct3D 9
+backend goes (the display plan's last phase).
 
 ## How it works
 
@@ -194,8 +207,12 @@ engine's device, and draw the whole frame on it.
   interpolating half a texel back (13) or the high byte (13, what is used).
 - **Stands down** to forward mode when `HUD.asi`, `GridLayout.asi` or `Menus.asi` is
   loaded (each changes what the engine draws, which the stub drops; `GridLayout.asi`
-  would leave no button bar at all, since the UI's stands down beside it), or when
-  Direct3D 9 cannot be made. The log says which.
+  would leave no button bar at all, since the UI's stands down beside it), or, on
+  `Backend=d3d9`, when Direct3D 9 cannot be made. The log says which. A Vulkan or
+  Direct3D 12 device is made at the engine's first `CreateDevice`, after the choice
+  between the modes is past: if it cannot be made, the log says so ("could not
+  start") and that `CreateDevice` fails. There is no `Backend=auto` yet, which would
+  try the next backend there.
 
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
@@ -324,8 +341,9 @@ Proton's own launch makes both native (the bench's overrides name only `winmm`, 
 and `d3d9`). DXVK's DXGI logs that it ignores `MakeWindowAssociation`'s flags.
 Measured 2026-10-23: the device comes up at 11_0 on the RX 5700, the intro movies play
 through the back buffer, the gamma pass and the flip-model swap chain, and a mission
-(`-nointro a2_borg01`, the plugins standing down) presents past frame 1000 and opens
-the in-mission menu.
+(`-nointro a2_borg01`, the plugins standing down, as they did before display 0.6.0)
+presents past frame 1000 and opens the in-mission menu. With render3d and the UI
+drawing on it: `gpu/README.md`, "The Direct3D 12 backend", "Measured".
 
 ## Will Vulkan work on a Mac?
 
