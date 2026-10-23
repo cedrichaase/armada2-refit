@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.20.1 — 2026-10-23
+
+### Fixed
+- `build.sh` writes `src/shaders/mod.rs` and `build/UI.asi` through temp files of its
+  own, renamed into place: two builds of one tree at once (`a2test -j` installing one
+  checkout twice) failed on the shared `mod.rs.new`.
+
+Installed, not yet seen in game.
+
 ## 0.20.0 — 2026-10-23
 
 ### Added

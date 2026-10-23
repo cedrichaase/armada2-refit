@@ -71,7 +71,10 @@ need_d3dbc=1 need_spv=1 need_dxil=1
 [ -f "$spv_out" ] && grep -qF "$spv_stamp" "$spv_out" && need_spv=""
 [ -f "$dxil_out" ] && grep -qF "$dxil_stamp" "$dxil_out" && need_dxil=""
 [ -n "$need_d3dbc$need_spv$need_dxil" ] || exit 0
-tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+# Scratch of this run's own beside the outputs, not in /tmp (a tmpfs, where the mv into
+# the tree is a copy): each output goes into place by one rename, so a build of the same
+# tree running at once (a2test -j, a2film --jobs) never reads a file half written.
+tmp=$(mktemp -d "$(cd "$(dirname "$out")" && pwd)/.hlsl-rs.XXXXXX"); trap 'rm -rf "$tmp"' EXIT
 
 # Words of a binary file as the body of a Rust array.
 words() { od -An -v -t x4 -w16 "$1" | sed -E 's/ +([0-9a-f]{8})/ 0x\1,/g; s/^/   /'; }

@@ -412,6 +412,16 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   `Setup:` path. `a2test run` takes a scenario by path.
 - **`--install` runs that tree's `./install`, which builds into it**: for a stock
   comparison install a reflink copy of a pristine tree, never the tree itself.
+  Several cases may install one tree at once (`-j`): the builds write their
+  temporaries under names of their own and rename them into place, or take a lock
+  (`build/.build.lock`), and cargo locks its target directory. A build script that
+  writes a fixed temporary name into the tree (`mod.rs.new`, until ui 0.20.1) fails
+  one of them.
+- **A start view is not a place to click**: the start position is dealt at random and
+  the camera can open zoomed in or out. Press Home (`center_player`, "Recenter camera
+  on mission start") first, which sets the camera's place and zoom, click where the
+  unit is after it, and check the selection in `UI.log` ("info: ... | Assembler |")
+  before going on (`ui-hud-bar.md`, `qol-refused-advisor.md`).
 - **A stock reference in the same setup** (`--install` cannot go with `--mod stock`):
   `session start --no-launch`, set `Enable=0` under `[Render3D]` in the clone's
   `Render3D.ini`, then `drive launch -nointro a2_borg01`.

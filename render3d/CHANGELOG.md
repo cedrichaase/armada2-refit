@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.23.2 — 2026-10-23
+
+### Fixed
+- `hlsl-rs.sh` (which ui and display build their shaders with too) compiles in a scratch
+  directory beside its outputs instead of `/tmp`, so each generated file goes into place
+  by one rename: two builds of one tree at once never read one half written.
+
+Installed, not yet seen in game.
+
 ## 0.23.1 — 2026-10-23
 
 ### Changed
