@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Rewrite vkd3d's legacy (d3dbc) shader bytecode into what Windows' own Direct3D 9
 accepts. DXVK takes vkd3d's output as it is; Windows' runtime validates every shader at
-CreateVertexShader/CreatePixelShader and refuses, with D3DERR_INVALIDCALL, three things
-vkd3d writes freely (measured on Windows 10, render3d/README.md, "Shaders on Windows"):
+CreateVertexShader/CreatePixelShader and refuses, with D3DERR_INVALIDCALL, four things
+vkd3d writes freely (the first three measured on Windows 10, render3d/README.md,
+"Shaders on Windows"; the fourth is the ps_3_0 register reference's rule):
 
   - an instruction reading two different constant registers (`mul r0.x, c0.x, c12.x`),
     or two different input registers (`mul r1.x, v0.x, v2.y`): shader model 3.0 reads
@@ -11,7 +12,10 @@ vkd3d writes freely (measured on Windows 10, render3d/README.md, "Shaders on Win
     is never read outside its dcl mask (`mov rT.x, v2.y` then `mul r1.x, v0.x, rT.x`);
   - `sincos` writing the register it reads (`sincos r1.y, r1.x`). It writes a
     temporary, and a `mov` puts that where it was meant to go;
-  - `oDepth` written with a partial mask (`mov oDepth.x, r0.x`): it takes the full one.
+  - `oDepth` written with a partial mask (`mov oDepth.x, r0.x`): it takes the full one;
+  - vPos declared with lanes past .xy (`dcl_position0 vPos`, from a float4 SV_Position):
+    its mask has to be .x, .y or .xy, the rest is undefined. It is declared .xy, which
+    is refused instead if the shader reads its z or w.
 
 Shader model 3.0 has 32 temporaries (r0-r31), and vkd3d never reuses one, so a long
 shader can name more (the nebulae's march, r33). Then they are given out again first:
@@ -43,7 +47,7 @@ OP_MOV, OP_SINCOS, OP_DCL, OP_DEF, OP_DEFI, OP_DEFB = 1, 37, 31, 81, 49, 48
 # endrep, break, breakc, texkill, call, callnz, ret, label.
 NO_DST = {40, 41, 42, 43, 27, 29, 38, 39, 44, 45, 65, 25, 26, 28, 30}
 LOOPS = {27, 38, 25, 26}    # loop, rep, call, callnz: not linear any more
-T_TEMP, T_INPUT, T_CONST, T_DEPTH = 0, 1, 2, 9
+T_TEMP, T_INPUT, T_CONST, T_DEPTH, T_MISC = 0, 1, 2, 9, 17     # vPos is misc 0
 PORTS = {T_INPUT: 'input', T_CONST: 'constant'}     # one register of each per instruction
 # Instructions whose sources are read as one lane through a replicate swizzle: rcp, rsq,
 # exp, log, pow, sincos.
@@ -128,12 +132,36 @@ def slots(ins):
     return sum(SLOT_COST.get(I[0] & 0xffff, 1) for I in ins if code(I))
 
 
+VPOS_MASK = 'vPos declared past .xy'
+
+
+def is_vpos_dcl(I):
+    return (I[0] & 0xffff) == OP_DCL and rtype(I[2]) == T_MISC and regnum(I[2]) == 0
+
+
+def vpos_zw_read(ins):
+    """Whether any instruction reads lane z or w of vPos."""
+    for I in ins:
+        c = code(I)
+        if not c:
+            continue
+        op, dst, srcs = c
+        for k, t in enumerate(srcs):
+            if rtype(t) == T_MISC and regnum(t) == 0:
+                mask, _ = lanes(op, dst, k)
+                if any(mask >> lane & 1 and (t >> (16 + 2 * lane)) & 3 > 1 for lane in range(4)):
+                    return True
+    return False
+
+
 def all_problems(ins):
     """[(instruction index, problem)] for a whole shader: problems() of each, and a
     gradient instruction inside an if."""
     found, depth = [], 0
     for k, I in enumerate(ins):
         op = I[0] & 0xffff
+        if is_vpos_dcl(I) and (I[2] >> 16) & 0xf not in (1, 2, 3):
+            found.append((k, VPOS_MASK))
         depth += (op in (40, 41)) - (op == 43)
         found += [(k, p) for p in problems(I)]
         if op in GRADIENT and depth > 0:
@@ -305,6 +333,9 @@ def fix(data, long=False):
         raise ValueError('loops or calls: "never read again" is not linear')
     past = f'a temporary past r{TEMPS - 1}'
     out = allocate(ins) if any(past in problems(I) for I in ins) else list(ins)
+    for k, I in enumerate(out):
+        if is_vpos_dcl(I) and not vpos_zw_read(out):
+            out[k] = [I[0], I[1], I[2] & ~(0xc << 16)]
     i = 0
     while i < len(out):
         I = out[i]

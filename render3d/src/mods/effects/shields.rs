@@ -28,13 +28,15 @@
 //! The clock is the sim clock (`View::time`): the effect stops while the game is
 //! paused, as every cosmetic simulation of render3d does.
 use super::{object_of, rnd, Cam, LightPool, Sec};
-use crate::d3d::*;
+use gpu::{Blend, Block, Cmd, Topology};
 use crate::engine::{self, field, field_u8, hook, obj, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, Shader};
+use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::math::{v3, V3};
 use crate::shaders::effects_shields::*;
+use crate::shaders::effects_shields_spv::*;
+use crate::shaders::effects_shields_dxil::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -374,9 +376,8 @@ pub struct Shields {
     hits: Vec<Hit>,
     downs: Vec<Down>,
     sphere: Vec<[f32; 3]>,
-    vs: Shader,
-    ps: Shader,
-    dps: Shader,
+    sphere_vb: core::cell::OnceCell<gpu::Buffer>,
+    pipes: Pipes,
     lights: LightPool,
     /// The hits' light on the hull, and how many of its lights are styled yet.
     hit_lights: LightPool,
@@ -400,9 +401,8 @@ impl Shields {
             hits: Vec::new(),
             downs: Vec::new(),
             sphere: make_sphere(),
-            vs: Shader::vertex(&VS_SHIELD),
-            ps: Shader::pixel(&PS_SHIELD),
-            dps: Shader::pixel(&PS_DOWN),
+            sphere_vb: core::cell::OnceCell::new(),
+            pipes: Pipes::new(),
             lights: LightPool::new(b"shieldsdown\0"),
             hit_lights: LightPool::new(b"shieldhit\0"),
             hit_styled: 0,
@@ -813,26 +813,19 @@ impl Shields {
         if self.hits.is_empty() && !(self.down_ok && !self.downs.is_empty()) {
             return;
         }
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !self.vs.bind(dev) || self.ps.get(dev).is_null() {
-            return;
-        }
-        self.down_ok = !self.dps.get(dev).is_null();
-        for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0),
-            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3),
-            (RS_STENCILENABLE, 0), (152, 0), (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
-        }
-        dev.set_fvf(0x2);
-        dev.vs_const(0, &c.vp);
+        let g = gfx::gpu();
+        let hit = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_SHIELD, VS_SHIELD_SPV, VS_SHIELD_DXIL), gpu::code!(PS_SHIELD, PS_SHIELD_SPV, PS_SHIELD_DXIL), &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
+        let down = self.pipes.view(1, || super::fx_desc(gpu::code!(VS_SHIELD, VS_SHIELD_SPV, VS_SHIELD_DXIL), gpu::code!(PS_DOWN, PS_DOWN_SPV, PS_DOWN_DXIL), &super::XYZ, 12, Topology::TriangleList, Blend::ADD));
+        let Some(hit) = hit.filter(|p| p.ready(g)) else { return };
+        let down = down.filter(|p| p.ready(g));
+        self.down_ok = down.is_some();
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let cmd = &mut cmd;
+        cmd.vs_block(Block::new(0, &c.vp));
         // The ordinary hits and the shells: per ship and type, its brightest eight.
         let mut done = alloc::vec![false; self.hits.len()];
         let mut drawn = 0;
-        self.ps.bind(dev);
+        cmd.set_pipeline(&hit);
         for i in 0..self.hits.len() {
             if done[i] {
                 continue;
@@ -860,18 +853,18 @@ impl Shields {
             if o == 0 || pick.is_empty() || !obj::can_user_see(o) {
                 continue;
             }
-            self.draw_ship(v, c, o, &pick, now, hi.ty, hi.whole);
+            self.draw_ship(cmd, c, o, &pick, now, hi.ty, hi.whole);
             drawn += 1;
         }
-        if self.s.down && self.down_ok && !self.downs.is_empty() {
-            self.dps.bind(dev);
+        if let Some(down) = down.filter(|_| self.s.down && !self.downs.is_empty()) {
+            cmd.set_pipeline(&down);
             let mut downs = core::mem::take(&mut self.downs);
             for d in downs.iter_mut() {
                 let o = object_of(d.handle);
                 if o == 0 || !obj::can_user_see(o) {
                     continue;
                 }
-                self.draw_down(v, c, o, d, now);
+                self.draw_down(cmd, c, o, d, now);
             }
             self.downs = downs;
         }
@@ -881,8 +874,12 @@ impl Shields {
         }
     }
 
-    fn sphere_draw(&self, dev: Device) {
-        dev.draw_primitive_up(PT_TRIANGLELIST, (self.sphere.len() / 3) as u32, self.sphere.as_ptr() as *const u8, 12);
+    /// The unit sphere, with the bound pipeline (made into a buffer at the first draw).
+    fn sphere_draw(&self, cmd: &mut Cmd) {
+        let vb = self.sphere_vb.get_or_init(|| gfx::buffer(&self.sphere, gpu::BufferKind::Vertex));
+        if let Some(s) = cmd.span_of(vb, 12) {
+            cmd.draw(&s);
+        }
     }
 
     /// A ship's shield colour and brightness for hits of type `ty` now: by faction (or
@@ -925,10 +922,10 @@ impl Shields {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn draw_ship(&self, v: &View, c: &Cam, o: usize, pick: &[(usize, f32)], now: f64, ty: usize, whole: bool) {
+    fn draw_ship(&self, cmd: &mut Cmd, c: &Cam, o: usize, pick: &[(usize, f32)], now: f64, ty: usize, whole: bool) {
         let s = &self.s;
         let Some((a, t, r)) = ship_xform(o) else { return };
-        ship_vsconst(v.dev, &a, t);
+        ship_vsconst(cmd, &a, t);
         let (col, bright) = self.look(o, ty, now);
         let lvl = Self::level(o, ty);
         let mut pc = [[0.0f32; 4]; 33];
@@ -963,14 +960,14 @@ impl Shields {
             pc[16 + k] = [ring_r, ring, glow, 0.0];
             pc[25 + k] = [h.dir.x, h.dir.y, h.dir.z, rnd(h.id as u32 ^ 0x5bd1e995)];
         }
-        v.dev.ps_const(0, pc.as_flattened());
-        self.sphere_draw(v.dev);
+        cmd.ps_block(Block::new(0, pc.as_flattened()));
+        self.sphere_draw(cmd);
     }
 
-    fn draw_down(&self, v: &View, c: &Cam, o: usize, d: &mut Down, now: f64) {
+    fn draw_down(&self, cmd: &mut Cmd, c: &Cam, o: usize, d: &mut Down, now: f64) {
         let s = &self.s;
         let Some((a, t, r)) = ship_xform(o) else { return };
-        ship_vsconst(v.dev, &a, t);
+        ship_vsconst(cmd, &a, t);
         let mut pc = [[0.0f32; 4]; 22];
         pc[0] = [c.eye.x, c.eye.y, c.eye.z, 1.0 / r];
         pc[1] = [s.down_arc.x, s.down_arc.y, s.down_arc.z, s.down_bright];
@@ -997,8 +994,8 @@ impl Shields {
             pc[8 + k] = [p.x, p.y, p.z, e];
             pc[16 + k][0] = 1.0 / s.down_size;
         }
-        v.dev.ps_const(0, pc.as_flattened());
-        self.sphere_draw(v.dev);
+        cmd.ps_block(Block::new(0, pc.as_flattened()));
+        self.sphere_draw(cmd);
     }
 }
 
@@ -1130,7 +1127,7 @@ pub fn ship_xform(o: usize) -> Option<([V3; 3], V3, f32)> {
 
 /// The vertex shader's constants for one ellipsoid (c4..c9): the columns of the unit
 /// sphere -> world map, and the rows of its normal matrix.
-fn ship_vsconst(dev: Device, a: &[V3; 3], t: V3) {
+fn ship_vsconst(cmd: &mut Cmd, a: &[V3; 3], t: V3) {
     let m = [a[0].x, a[0].y, a[0].z, a[1].x, a[1].y, a[1].z, a[2].x, a[2].y, a[2].z];
     let b = inv3(&m).unwrap_or([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
     let tt = [t.x, t.y, t.z];
@@ -1141,7 +1138,7 @@ fn ship_vsconst(dev: Device, a: &[V3; 3], t: V3) {
     for k in 0..3 {
         vc[3 + k] = [b[k * 3], b[k * 3 + 1], b[k * 3 + 2], 0.0];
     }
-    dev.vs_const(4, vc.as_flattened());
+    cmd.vs_block(Block::new(4, vc.as_flattened()));
 }
 
 fn fac_of(o: usize) -> usize {

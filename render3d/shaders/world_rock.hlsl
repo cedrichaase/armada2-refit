@@ -1,4 +1,4 @@
-// entries: vs_rock:vs_3_0:VS_ROCK ps_rock:ps_3_0:PS_ROCK ps_flat:ps_3_0:PS_FLAT vs_sprite:vs_3_0:VS_RSPRITE ps_sprite:ps_3_0:PS_RSPRITE
+// entries: vs_rock:vs_3_0:VS_ROCK ps_rock:ps_3_0:PS_ROCK ps_flat:ps_3_0:PS_FLAT vs_sprite:vs_3_0:VS_RSPRITE ps_sprite:ps_3_0:PS_RSPRITE ps_rock_cl:ps_3_0:PS_ROCK_CL:dxc
 // The world module's rocks (src/mods/world/rocks.rs): the dilithium moons' rock and the
 // asteroids', surfaces from recipes, as Lighting.asi's moon_ps drew
 // them (in its hull shader): the colour, the relief and the cut-out from three cubes in
@@ -6,8 +6,14 @@
 // Lighting.asi lit its hulls (diffuse, a highlight by the texture's brightness, a rim),
 // by the view's registered lights. No shadow map yet.
 
-float4x4 W  : register(c0);    // world (transposed)
-float4x4 VP : register(c4);    // view x projection (transposed)
+#include "../../gpu/shaders/compat.hlsli"
+#include "clustered.hlsli"
+
+cbuffer world_rock_vs : register(b0)
+{
+    float4x4 W  : CREG(0);    // world (transposed)
+    float4x4 VP : CREG(4);    // view x projection (transposed)
+};
 
 struct VI {
     float3 pos : POSITION;
@@ -16,7 +22,7 @@ struct VI {
 };
 
 struct VO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float2 uv  : TEXCOORD0;
     float3 n   : TEXCOORD1;    // world space, outward
     float3 wp  : TEXCOORD2;
@@ -36,28 +42,33 @@ VO vs_rock(VI i)
 }
 
 #define POINTS 8
-float4 k_amb     : register(c0);   // ambient rgb
-float4 k_shine   : register(c1);   // x: specular strength, y: its exponent, z: the rim's exponent, w: the Key's strength
-float4 k_eye     : register(c2);   // the camera's world position
-float4 k_rim     : register(c3);   // the rim light's colour
-float4 k_ddir[4] : register(c4);   // directional: the way the light travels; w: 1 for the Key
-float4 k_dcol[4] : register(c8);
-float4 k_ppos[POINTS] : register(c12);  // point: position, w: falloff start
-float4 k_pcol[POINTS] : register(c20);  // colour, w: falloff range
-float4 msurf_rows[3]  : register(c28);  // WORLD's three axes (object to world)
-float4 msurf_ctr      : register(c31);  // the mesh's bounding-sphere centre, world space
-float4 msurf_glow     : register(c32);  // rgb: the glow's colour
-float4 msurf_misc     : register(c33);  // x: the relief's strength; z: 1 when the albedo's alpha cuts;
-                                        // w: 1 for Mapping=triplanar
-float4 msurf_ext      : register(c34);  // xyz: 1 / the mesh's extent about its centre, per object axis;
-                                        // w: the highlight's strength (Gloss=)
-float4 msurf_core     : register(c35);  // rgb: the light inside a dilithium moon (0: none, the
-                                        // cut is a hole); w: the cut's level (Cut=)
-float4 msurf_spill    : register(c36);  // x: the glow's scale (1); y: the white at a crack's core;
+cbuffer world_rock_ps : register(b1)
+{
+    float4 k_amb     : CREG(0);   // ambient rgb
+    float4 k_shine   : CREG(1);   // x: specular strength, y: its exponent, z: the rim's exponent, w: the Key's strength
+    float4 k_eye     : CREG(2);   // the camera's world position
+    float4 k_rim     : CREG(3);   // the rim light's colour
+    float4 k_ddir[4] : CREG(4);   // directional: the way the light travels; w: 1 for the Key
+    float4 k_dcol[4] : CREG(8);
+    float4 k_ppos[POINTS] : CREG(12);  // point: position, w: falloff start
+    float4 k_pcol[POINTS] : CREG(20);  // colour, w: falloff range
+    float4 msurf_rows[3]  : CREG(28);  // WORLD's three axes (object to world)
+    float4 msurf_ctr      : CREG(31);  // the mesh's bounding-sphere centre, world space
+    float4 msurf_glow     : CREG(32);  // rgb: the glow's colour
+    float4 msurf_misc     : CREG(33);  // x: the relief's strength; z: 1 when the albedo's alpha cuts;
+                                            // w: 1 for Mapping=triplanar
+    float4 msurf_ext      : CREG(34);  // xyz: 1 / the mesh's extent about its centre, per object axis;
+                                            // w: the highlight's strength (Gloss=)
+    float4 msurf_core     : CREG(35);  // rgb: the light inside a dilithium moon (0: none, the
+                                            // cut is a hole); w: the cut's level (Cut=)
+    float4 msurf_spill    : CREG(36);  // x: the glow's scale (1); y: the white at a crack's core;
+};
                                         // z: the cracks' depth, in the mesh's radii (0: flat);
                                         // w: how steeply their light falls off up the walls
-samplerCUBE m_albedo : register(s0);
-samplerCUBE m_relief : register(s1);
+STAGE(0) TextureCube m_albedo : register(t0);
+STAGE(0) SamplerState m_albedo_s : register(s0);
+STAGE(1) TextureCube m_relief : register(t1);
+STAGE(1) SamplerState m_relief_s : register(s1);
 
 float glint(float3 N, float3 L, float3 V)
 {
@@ -75,6 +86,11 @@ float4 shade(float3 N, float3 wp, float4 t, float gk)
         sum  += c * max(0.0, dot(N, L));
         spec += c * glint(N, L, V);
     }
+#ifdef __hlsl_dx_compiler
+    if (cl_on)
+        cl_add(N, wp, V, k_shine.y, false, sum, spec);
+    else
+#endif
     for (int j = 0; j < POINTS; j++) {
         float3 L = k_ppos[j].xyz - wp;
         float  d = length(L);
@@ -88,7 +104,7 @@ float4 shade(float3 N, float3 wp, float4 t, float gk)
     return float4(t.rgb * max(sum, 0.0) + spec * k_shine.x * gloss, t.a);
 }
 
-float4 ps_rock(VO i) : COLOR
+float4 ps_rock(VO i) : SV_Target
 {
     float3 v = i.wp - msurf_ctr.xyz;
     // object space (the axes carry WORLD's scale, squared in the dot products), over the
@@ -99,10 +115,11 @@ float4 ps_rock(VO i) : COLOR
     float3 p;
     // Both lookups' directions, and their gradients, are taken here: Windows' own
     // Direct3D 9 refuses a texld (and ddx, ddy) inside an if (README.md, "Shaders on
-    // Windows"), so the branches sample with the gradients texCUBE would have found.
+    // Windows"), so the branches sample with the gradients a plain Sample would have
+    // found.
     float3 no = float3(dot(i.n, msurf_rows[0].xyz), dot(i.n, msurf_rows[1].xyz), dot(i.n, msurf_rows[2].xyz));
     float3 cq = clamp(q, -1.0, 1.0);
-    float3 sd = no >= 0.0 ? 1.0 : -1.0;
+    float3 sd = select(no >= 0.0, 1.0, -1.0);
     float3 cx = float3(sd.x, cq.y, cq.z), cy = float3(cq.x, sd.y, cq.z), cz = float3(cq.x, cq.y, sd.z);
     float3 dq = normalize(q);
     float3 cxx = ddx(cx), cxy = ddy(cx), cyx = ddx(cy), cyy = ddy(cy), czx = ddx(cz), czy = ddy(cz);
@@ -112,9 +129,9 @@ float4 ps_rock(VO i) : COLOR
         // axis's side at the point's other two coordinates, blended by how squarely the
         // surface faces each axis.
         float3 w  = pow(abs(no) / max(length(no), 1e-6), 4.0);
-        float4 Ax = texCUBEgrad(m_albedo, cx, cxx, cxy), Bx = texCUBEgrad(m_relief, cx, cxx, cxy);
-        float4 Ay = texCUBEgrad(m_albedo, cy, cyx, cyy), By = texCUBEgrad(m_relief, cy, cyx, cyy);
-        float4 Az = texCUBEgrad(m_albedo, cz, czx, czy), Bz = texCUBEgrad(m_relief, cz, czx, czy);
+        float4 Ax = m_albedo.SampleGrad(m_albedo_s, cx, cxx, cxy), Bx = m_relief.SampleGrad(m_relief_s, cx, cxx, cxy);
+        float4 Ay = m_albedo.SampleGrad(m_albedo_s, cy, cyx, cyy), By = m_relief.SampleGrad(m_relief_s, cy, cyx, cyy);
+        float4 Az = m_albedo.SampleGrad(m_albedo_s, cz, czx, czy), Bz = m_relief.SampleGrad(m_relief_s, cz, czx, czy);
         w /= max(w.x + w.y + w.z, 1e-6);
         A = Ax * w.x + Ay * w.y + Az * w.z;
         B = Bx * w.x + By * w.y + Bz * w.z;
@@ -122,8 +139,8 @@ float4 ps_rock(VO i) : COLOR
           + (By.rgb - 0.5) * float3(1.0, 0.0, 1.0) * w.y
           + (Bz.rgb - 0.5) * float3(1.0, 1.0, 0.0) * w.z;
     } else {
-        A = texCUBEgrad(m_albedo, dq, dqx, dqy);
-        B = texCUBEgrad(m_relief, dq, dqx, dqy);
+        A = m_albedo.SampleGrad(m_albedo_s, dq, dqx, dqy);
+        B = m_relief.SampleGrad(m_relief_s, dq, dqx, dqy);
         p = B.rgb - 0.5;
     }
     A.a = lerp(1.0, A.a, msurf_misc.z);                 // opaque unless the recipe cuts
@@ -168,7 +185,7 @@ float4 ps_rock(VO i) : COLOR
         float  hit = h0, found = 0.0, tp = 0.0, dp = h0;
         [unroll] for (int s = 1; s <= 8; s++) {
             float t  = D * s / 8.0;
-            float g  = texCUBEgrad(m_relief, q - vq * t, qx - vx * t, qy - vy * t).a;
+            float g  = m_relief.SampleGrad(m_relief_s, q - vq * t, qx - vx * t, qy - vy * t).a;
             float dd = D * sqrt(saturate((g - lip) / top)) - t;   // > 0: still in the ravine
             float f  = (1.0 - found) * step(dd, 0.0);
             // where the ray crossed the wall, between this step and the last
@@ -192,10 +209,20 @@ float4 ps_rock(VO i) : COLOR
 
 // A glow shell drawn in one colour (LightVertices_Constant: the dilithium moons' glow,
 // whose material the engine tints by the moon's dilithium left).
-float4 ps_flat(VO i) : COLOR
+float4 ps_flat(VO i) : SV_Target
 {
     return float4(k_amb.rgb, 1.0);
 }
+
+#ifdef __hlsl_dx_compiler
+// The clustered twin (Vulkan and Direct3D 12, clustered.hlsli).
+float4 ps_rock_cl(VO i) : SV_Target
+{
+    cl_on = true;
+    cl_fc = i.pos;
+    return ps_rock(i);
+}
+#endif
 
 // A model's sprite nodes (the dilithium moon's `oreglow` nimbus): a quad in world space,
 // its texture times the node's colour (c0.x: 1 to keep the texture's alpha, for a
@@ -207,7 +234,7 @@ struct SVI {
 };
 
 struct SVO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float4 col : COLOR0;
     float2 uv  : TEXCOORD0;
 };
@@ -221,10 +248,11 @@ SVO vs_sprite(SVI i)
     return o;
 }
 
-sampler2D s_sprite : register(s0);
+STAGE(0) Texture2D s_sprite : register(t0);
+STAGE(0) SamplerState s_sprite_s : register(s0);
 
-float4 ps_sprite(SVO i) : COLOR
+float4 ps_sprite(SVO i) : SV_Target
 {
-    float4 t = tex2D(s_sprite, i.uv);
+    float4 t = s_sprite.Sample(s_sprite_s, i.uv);
     return float4(t.rgb * i.col.rgb, lerp(1.0, t.a, k_amb.x) * i.col.a);
 }

@@ -196,7 +196,7 @@ impl Models {
         if emitters && !crate::mods::particles::live() {
             return false;
         }
-        let Some(model) = scene::model(v.dev, &sod) else { return false };
+        let Some(model) = scene::model(&sod) else { return false };
         // Entity::Render: the instance's frustum test (which takes the scale the class's
         // Submit has just set), and the on-screen byte, as stock writes it.
         if !game::frustum_test(inst, cam) {

@@ -11,14 +11,16 @@
 //! The hull is the hulls module's pose of the affected object (`hulls::posed`); an
 //! object it does not draw (or a cloaked one) gets no layer.
 use super::{Fx, VT_CHANGE_TEAM, VT_CREW_DISRUPTION, VT_DRAIN};
-use crate::d3d::*;
+use gpu::{Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{v3, V3};
 use crate::mods::effects::{rnd, Cam, LightPool, Sec};
 use crate::rt::Ini;
 use crate::scene;
 use crate::shaders::specials::*;
+use crate::shaders::specials_spv::*;
+use crate::shaders::specials_dxil::*;
 
 pub const KINDS: usize = 3;
 const NAMES: [&str; KINDS] = ["Override", "Drain", "Psionic"];
@@ -61,9 +63,7 @@ pub struct Looks {
     push: f32,
     rim_power: f32,
     white: f32,
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
+    pipes: Pipes,
     pool: LightPool,
     drawn: u32,
     said: bool,
@@ -110,9 +110,7 @@ impl Looks {
             push: s.f("Push", 0.004),
             rim_power: s.f("RimPower", 2.5),
             white: s.f("CoreWhite", 0.35),
-            vs: Shader::vertex(&VS_FX),
-            ps: Shader::pixel(&PS_FX),
-            decl: Decl::new(&scene::VERTEX),
+            pipes: Pipes::new(),
             pool: LightPool::new(b"special\0"),
             drawn: 0,
             said: false,
@@ -131,7 +129,6 @@ impl Looks {
         self.rim_power = n.rim_power;
         self.white = n.white;
     }
-    pub fn device(&mut self, _dev: Device) {}
     pub fn reset(&mut self) {}
 
     /// How strong an effect is now: up over `Rise` seconds from its start, down over
@@ -172,9 +169,8 @@ impl Looks {
             return;
         }
         let Some(cam) = Cam::of(v) else { return };
-        let dev = v.dev;
         let mut began = false;
-        let _g = gfx::Guard::new(dev);
+        let Some(mut cmd) = gfx::cmd() else { return };
         let wall = libm::fmod(crate::clock::anim_now(), 10000.0) as f32;
         for f in fx {
             let Some(k) = kind(f.vt) else { continue };
@@ -191,19 +187,10 @@ impl Looks {
                 continue;
             }
             if !began {
-                if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+                if !self.pipe(Cull::None).is_some_and(|p| p.ready(gfx::gpu())) {
                     return;
                 }
-                for (st, val) in [
-                    (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0),
-                    (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
-                    (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_FILLMODE, 3),
-                    (RS_STENCILENABLE, 0), (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-                ] {
-                    dev.set_rs(st, val);
-                }
-                dev.set_stream_freq(0, 1);
-                dev.vs_const(4, &gfx::vp_constants(v));
+                cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
                 began = true;
             }
             // The object's frame: its axes, unit; its centre and radius.
@@ -227,7 +214,7 @@ impl Looks {
             kv[8..12].copy_from_slice(&[x.x, x.y, x.z, 0.0]);
             kv[12..16].copy_from_slice(&[y.x, y.y, y.z, 0.0]);
             kv[16..20].copy_from_slice(&[z.x, z.y, z.z, 0.0]);
-            dev.vs_const(8, &kv);
+            cmd.vs_block(Block::new(8, &kv));
             let mode = [(k == 0) as u32 as f32, (k == 1) as u32 as f32, (k == 2) as u32 as f32, 0.0];
             let pk: [f32; 24] = [
                 kd.colour.x, kd.colour.y, kd.colour.z, e,
@@ -237,19 +224,17 @@ impl Looks {
                 cam.eye.x, cam.eye.y, cam.eye.z, 0.0,
                 kd.rim, self.rim_power, 0.08, self.white,
             ];
-            dev.ps_const(0, &pk);
+            cmd.ps_block(Block::new(0, &pk));
             for part in p.model.parts.iter() {
                 if !p.pose.shown.get(part.node).copied().unwrap_or(false) || part.blend == scene::Blend::Additive {
                     continue;
                 }
                 let world = p.pose.world[part.node];
-                dev.vs_const(0, world.to_m4().transpose().as_floats());
-                let mirrored = world.det3() < 0.0;
-                dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CCW } else { CULL_CW });
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                let Some(pipe) = self.pipe(scene::cull_of(part, &world)) else { continue };
+                cmd.set_pipeline(&pipe);
+                cmd.vs_block(Block::new(0, world.to_m4().transpose().as_floats()));
                 for g in &part.groups {
-                    dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
+                    part.draw(&mut cmd, g.start, g.tris);
                 }
             }
             self.drawn += 1;
@@ -258,6 +243,21 @@ impl Looks {
                 crate::log!("specials: first layer drawn: {} over {} (radius {:.0})", NAMES[k], crate::engine::obj::odf_name(f.victim), radius);
             }
         }
+    }
+}
+
+impl Looks {
+    /// The layer's pipeline for a cull: added over the hull, depth-tested (`LESSEQUAL`)
+    /// and not written, red, green and blue.
+    fn pipe(&mut self, cull: Cull) -> Option<Pipeline> {
+        self.pipes.view(cull as u64, || {
+            let mut d = PipelineDesc::new(gpu::code!(VS_FX, VS_FX_SPV, VS_FX_DXIL), gpu::code!(PS_FX, PS_FX_SPV, PS_FX_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.blend = Some(Blend::ADD);
+            d.write_mask = 7;
+            d.cull = cull;
+            d
+        })
     }
 }
 

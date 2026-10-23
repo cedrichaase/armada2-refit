@@ -13,7 +13,6 @@
 pub mod look;
 
 use super::{Module, Step};
-use crate::d3d::Device;
 use crate::engine::{self, field, field_u8};
 use crate::engine::obj;
 use crate::frame::steps::View;
@@ -330,12 +329,11 @@ impl Module for Specials {
     fn name(&self) -> &'static str {
         "specials"
     }
-    fn device(&mut self, dev: Device) {
+    fn device(&mut self) {
         if !self.hooked {
             self.hooked = true;
             log!("specials: {} (Render3D.ini [Specials] Enable)", if self.on { "on" } else { "off: the engine draws the special-object effects" });
         }
-        self.look.device(dev);
     }
     fn reset(&mut self) {
         self.look.reset();

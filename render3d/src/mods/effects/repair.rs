@@ -18,13 +18,15 @@
 //! A particle: position from `Entity::GetWorldPosition(ST3D_Node *)` (0x4cff70) at its
 //! hardpoint, or +0x10 in the object's frame; size +0x2c, age +0x34, life +0x38.
 use super::{object_of, rnd, Cam, LightPool, Sec};
-use crate::d3d::*;
+use gpu::{Blend, Block, Topology};
 use crate::engine::{self, field, hook, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, Shader};
+use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::math::{v3, V3};
 use crate::shaders::effects_repair::*;
+use crate::shaders::effects_repair_spv::*;
+use crate::shaders::effects_repair_dxil::*;
 use alloc::vec::Vec;
 
 const SITE_ADD: usize = 0x4c90c0;
@@ -186,8 +188,7 @@ struct Vert {
 pub struct Repair {
     pub on: bool,
     s: Set,
-    vs: Shader,
-    ps: Shader,
+    pipes: Pipes,
     lights: LightPool,
     quads: Vec<Vert>,
     said_first: bool,
@@ -231,8 +232,7 @@ impl Repair {
                 light_lift: c.f("LightLift", 0.06),
                 pull: c.f("Pull", 2.0),
             },
-            vs: Shader::vertex(&VS_WELD),
-            ps: Shader::pixel(&PS_WELD),
+            pipes: Pipes::new(),
             lights: LightPool::new(b"weld\0"),
             quads: Vec::new(),
             said_first: false,
@@ -397,24 +397,18 @@ impl Repair {
         if self.quads.is_empty() {
             return;
         }
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev)) {
+        let _ = v;
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let pipe = self.pipes.view(0, || super::fx_desc(gpu::code!(VS_WELD, VS_WELD_SPV, VS_WELD_DXIL), gpu::code!(PS_WELD, PS_WELD_SPV, PS_WELD_DXIL), &super::QUAD2, 44, Topology::TriangleList, Blend::ADD));
+        let Some(pipe) = pipe else { return };
+        if !cmd.set_pipeline(&pipe) {
             return;
         }
-        for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0),
-            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3),
-            (RS_STENCILENABLE, 0), (152, 0), (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
+        cmd.vs_block(Block::new(0, &c.vp));
+        cmd.ps_block(Block::new(0, &[self.s.core, self.s.glow, self.s.rays, self.s.ray_sharp]));
+        if let Some(s) = cmd.vertices(&self.quads) {
+            cmd.draw(&s);
         }
-        // XYZ, two sets of four-float texture coordinates
-        dev.set_fvf(0x2 | 0x200 | (2 << 16) | (2 << 18));
-        dev.vs_const(0, &c.vp);
-        dev.ps_const(0, &[self.s.core, self.s.glow, self.s.rays, self.s.ray_sharp]);
-        dev.draw_primitive_up(PT_TRIANGLELIST, (self.quads.len() / 3) as u32, self.quads.as_ptr() as *const u8, core::mem::size_of::<Vert>() as u32);
         if !self.said_first {
             self.said_first = true;
             log!("effects: first welds drawn: {} weld(s), {} quads", ws.len(), self.quads.len() / 6);

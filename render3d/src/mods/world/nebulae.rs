@@ -31,19 +31,24 @@
 //! - Ghosts: slot 3 of the `GameObjectSpirit` vtable (0x6b1ca4, `GameObjectSpirit::Render`
 //!   0x4d5f70) is wrapped while this part runs, so a ghosted nebula of a class drawn as
 //!   gas keeps its gas and loses its billboards, as with the plugin.
-use crate::d3d::*;
 use crate::engine::{self, field, field_u8, hook, obj, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, PerView, Shader};
+use crate::gfx::{self, PerView, Pipes};
+use gpu::{
+    attr, Address, AttrFormat, Blend, BlendEq, BlendOp, Block, Cmd, ColorTarget, Compare, Contents, Depth, Factor,
+    Filter, Format, Load, MipFilter, Pass, Pipeline, PipelineDesc, Rect, Sampler, Semantic, Texture, TextureDesc,
+    Topology, Usage, VertexAttr, Viewport,
+};
 use crate::math;
 use crate::rt::{self, Ini};
 use crate::shaders::world_nebula::*;
+use crate::shaders::world_nebula_spv::*;
+use crate::shaders::world_nebula_dxil::*;
 use crate::{log, scene};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::ffi::c_void;
 
 pub const VT_NEBULA: usize = 0x6b148c;
 pub const VT_LATINUM: usize = 0x6b132c;
@@ -58,10 +63,6 @@ const NCONST: usize = 21;
 const MAX_NEB: usize = 256;
 const ENV_MAX: u32 = 512;
 const BN: usize = 64;
-const FVF_XYZ: u32 = 0x2;
-const FVF_SLICE: u32 = 0x2 | 0x100; // XYZ | TEX1 (a float2)
-const RS_POINTSIZE: u32 = 154;
-const RESZ_CODE: u32 = 0x7fa0_5000;
 
 #[derive(Clone, Copy)]
 struct Settings {
@@ -118,6 +119,11 @@ impl Settings {
     }
 }
 
+/// The empty signature of a class's nebulae (FNV-1a's offset basis). A class is made
+/// with it too: made with 0, a class first seen in the middle of a gather hashed its
+/// nebulae from another start than every later frame, and every bake was done twice.
+const SIG0: u32 = 2_166_136_261;
+
 /// A nebula class with its recipe, and what is on the device for it.
 struct Cls {
     odf: String,
@@ -169,7 +175,7 @@ struct Cls {
     sig: u32,
     /// The signature this view draws with: the nebulae's and the Key's.
     cur: u32,
-    env: Option<Com>,
+    env: Option<Texture>,
     env_sig: u32,
     env_gen: u32,
     ex0: f32,
@@ -177,8 +183,8 @@ struct Cls {
     ex1: f32,
     ez1: f32,
     ey: f32,
-    vol: Option<Com>,
-    occ: Option<Com>,
+    vol: Option<Texture>,
+    occ: Option<Texture>,
     vol_sig: u32,
     vol_gen: u32,
     vx: u32,
@@ -217,7 +223,7 @@ impl Cls {
             extent: 1.3, height: 3.0, radius: radius0, radius0, flow_speed: 0.0, edge_warp: 0.0, fil_reach: 0.0,
             edge_dim: 0.5, opacity: 0.0, key_share: -1.0, scatter: -1.0, shade_step: 60.0, light0: [0.0; 3], ydev: 1.0,
             hue_cycle: 0.0, hue_swing: 0.5, bolt_rate: 0.0, bolt_size: 0.3, bolt_bright: 1.0, bolt_t0: [0.0; 4],
-            bolt_pos: [[0.0; 3]; 4], bolt_amp: [0.0; 4], bolt_last: -1.0, pos: Vec::new(), sig: 0, cur: 0, env: None, env_sig: 0,
+            bolt_pos: [[0.0; 3]; 4], bolt_amp: [0.0; 4], bolt_last: -1.0, pos: Vec::new(), sig: SIG0, cur: 0, env: None, env_sig: 0,
             env_gen: u32::MAX, ex0: 0.0, ez0: 0.0, ex1: 0.0, ez1: 0.0, ey: 0.0, vol: None, occ: None, vol_sig: 0,
             vol_gen: u32::MAX, vx: 0, vy: 0, vz: 0, vlo: [0.0; 3], vsize: [0.0; 3], glo: [0.0; 3], ghi: [0.0; 3], gbox: false,
         };
@@ -355,39 +361,7 @@ impl Cls {
     }
 }
 
-// ---- Direct3D 9 helpers this part needs beyond the shared layer ----------------------
-
-#[repr(C)]
-struct LockedBox {
-    row: i32,
-    slice: i32,
-    bits: *mut u8,
-}
-
-fn create_offscreen(dev: Device, w: u32, h: u32, fmt: u32, pool: u32) -> Option<Com> {
-    let mut o: *mut c_void = core::ptr::null_mut();
-    let hr = vcall!(dev.p(), 36, fn(u32, u32, u32, u32, *mut *mut c_void, *mut c_void) -> HRESULT, w, h, fmt, pool, &mut o, core::ptr::null_mut());
-    if hr < 0 || o.is_null() { None } else { Some(Com::made(o, "create_offscreen")) }
-}
-fn rt_data(dev: Device, rt: &Com, sys: &Com) -> bool {
-    vcall!(dev.p(), 32, fn(*mut c_void, *mut c_void) -> HRESULT, rt.ptr(), sys.ptr()) >= 0
-}
-fn surf_lock(s: &Com, flags: u32) -> Option<LockedRect> {
-    let mut lr = LockedRect { pitch: 0, bits: core::ptr::null_mut() };
-    let hr = vcall!(s.ptr(), 13, fn(*mut LockedRect, *const Rect, u32) -> HRESULT, &mut lr, core::ptr::null(), flags);
-    if hr < 0 { None } else { Some(lr) }
-}
-fn surf_unlock(s: &Com) {
-    vcall!(s.ptr(), 14, fn() -> HRESULT,);
-}
-fn vol_lock(v: &Com, level: u32) -> Option<LockedBox> {
-    let mut b = LockedBox { row: 0, slice: 0, bits: core::ptr::null_mut() };
-    let hr = vcall!(v.ptr(), 19, fn(u32, *mut LockedBox, *const u32, u32) -> HRESULT, level, &mut b, core::ptr::null(), 0);
-    if hr < 0 { None } else { Some(b) }
-}
-fn vol_unlock(v: &Com, level: u32) {
-    vcall!(v.ptr(), 20, fn(u32) -> HRESULT, level);
-}
+// ---- what the draws share ---------------------------------------------------------------
 
 /// A slice or quad vertex: position, then (thickness, rung).
 #[repr(C)]
@@ -400,22 +374,32 @@ struct Vert {
     k: f32,
 }
 
-fn quad(dev: Device) {
+/// The slices' and quads' vertices (position, a float2 at TEXCOORD0), and the march's
+/// box faces' (position alone).
+static SLICE: [VertexAttr; 2] = [attr(0, AttrFormat::Float3, Semantic::Position, 0), attr(12, AttrFormat::Float2, Semantic::TexCoord, 0)];
+static XYZ: [VertexAttr; 1] = [attr(0, AttrFormat::Float3, Semantic::Position, 0)];
+
+/// A quad over the viewport.
+fn quad(cmd: &mut Cmd) {
     let mut v = [Vert::default(); 4];
     for (j, p) in v.iter_mut().enumerate() {
         p.x = if j & 1 != 0 { 1.0 } else { -1.0 };
         p.y = if j & 2 != 0 { -1.0 } else { 1.0 };
     }
-    dev.draw_primitive_up(PT_TRIANGLESTRIP, 2, v.as_ptr() as *const u8, 20);
-}
-
-fn ss(dev: Device, s: u32, list: &[(u32, u32)]) {
-    for &(k, v) in list {
-        dev.set_ss(s, k, v);
+    if let Some(s) = cmd.vertices(&v) {
+        cmd.draw(&s);
     }
 }
-const SS_CLAMP_POINT: [(u32, u32); 7] = [(SAMP_ADDRESSU, TADDRESS_CLAMP), (SAMP_ADDRESSV, TADDRESS_CLAMP), (SAMP_ADDRESSW, TADDRESS_CLAMP), (SAMP_MAGFILTER, TEXF_POINT), (SAMP_MINFILTER, TEXF_POINT), (SAMP_MIPFILTER, TEXF_NONE), (SAMP_SRGBTEXTURE, 0)];
-const SS_CLAMP_LINEAR: [(u32, u32); 7] = [(SAMP_ADDRESSU, TADDRESS_CLAMP), (SAMP_ADDRESSV, TADDRESS_CLAMP), (SAMP_ADDRESSW, TADDRESS_CLAMP), (SAMP_MAGFILTER, TEXF_LINEAR), (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_NONE), (SAMP_SRGBTEXTURE, 0)];
+
+const fn smp(f: Filter, mip: MipFilter, a: Address) -> Sampler {
+    Sampler { min: f, mag: f, mip, address_u: a, address_v: a, address_w: a, anisotropy: 1, srgb: false }
+}
+const CLAMP_POINT: Sampler = smp(Filter::Point, MipFilter::None, Address::Clamp);
+const CLAMP_LINEAR: Sampler = smp(Filter::Linear, MipFilter::None, Address::Clamp);
+/// The noise volume: wrapping, filtered through its chain.
+const NOISE: Sampler = smp(Filter::Linear, MipFilter::Linear, Address::Wrap);
+/// The blue noise: wrapping, a texel each.
+const BLUE: Sampler = smp(Filter::Point, MipFilter::None, Address::Wrap);
 
 // ---- the noise volume ----------------------------------------------------------------
 
@@ -583,33 +567,27 @@ fn noise_fill(s: usize) -> Vec<u8> {
     out
 }
 
-/// A volume texture in the default pool from levels of BGRA8 bytes, through a staging
-/// copy in system memory.
-fn upload_volume(dev: Device, w: u32, h: u32, d: u32, levels: &[Vec<u8>]) -> Option<Com> {
-    let n = levels.len() as u32;
-    let stage = dev.create_volume_texture(w, h, d, n, 0, FMT_A8R8G8B8, POOL_SYSTEMMEM)?;
-    for (l, data) in levels.iter().enumerate() {
-        let (lw, lh, ld) = ((w >> l).max(1) as usize, (h >> l).max(1) as usize, (d >> l).max(1) as usize);
-        let b = vol_lock(&stage, l as u32)?;
-        for z in 0..ld {
-            for y in 0..lh {
-                let src = &data[((z * lh + y) * lw) * 4..((z * lh + y) * lw + lw) * 4];
-                unsafe {
-                    core::ptr::copy_nonoverlapping(src.as_ptr(), b.bits.add(z * b.slice as usize + y * b.row as usize), lw * 4);
-                }
-            }
-        }
-        vol_unlock(&stage, l as u32);
+/// A sampled BGRA8 volume from its levels, each its slices in order, made on the device
+/// at once and keeping no copy (`Transient`: a `Reset` makes it again from scratch).
+fn upload_volume(w: u32, h: u32, d: u32, levels: &[Vec<u8>]) -> Option<Texture> {
+    let mut px = Vec::with_capacity(levels.iter().map(|l| l.len()).sum());
+    for l in levels {
+        px.extend_from_slice(l);
     }
-    let v = dev.create_volume_texture(w, h, d, n, 0, FMT_A8R8G8B8, POOL_DEFAULT)?;
-    if dev.update_texture(&stage, &v) < 0 {
-        return None;
-    }
-    Some(v)
+    let g = gfx::gpu();
+    let t = g.texture(TextureDesc::d3(w, h, d, levels.len() as u32, Format::Bgra8, Usage::SAMPLED), Contents::Transient(px));
+    t.ready(g).then_some(t)
+}
+
+/// A sampled BGRA8 2D texture of one level, as `upload_volume`.
+fn upload_2d(w: u32, h: u32, px: Vec<u8>) -> Option<Texture> {
+    let g = gfx::gpu();
+    let t = g.texture(TextureDesc::d2(w, h, Format::Bgra8, Usage::SAMPLED), Contents::Transient(px));
+    t.ready(g).then_some(t)
 }
 
 /// The noise volume with its chain (box-filtered, wrapping).
-fn make_noise(dev: Device, s: u32) -> Option<Com> {
+fn make_noise(s: u32) -> Option<Texture> {
     let t0 = rt::now();
     let su = s as usize;
     let mut levels = vec![noise_fill(su)];
@@ -638,7 +616,7 @@ fn make_noise(dev: Device, s: u32) -> Option<Com> {
         levels.push(nxt);
         n = h;
     }
-    let v = upload_volume(dev, s, s, s, &levels);
+    let v = upload_volume(s, s, s, &levels);
     log!("world: nebula noise {}^3, {} levels, {} in {:.0} ms", s, levels.len(), if v.is_some() { "made" } else { "FAILED" }, (rt::now() - t0) * 1000.0);
     v
 }
@@ -806,30 +784,17 @@ fn cut_box(lo: &[f32; 3], hi: &[f32; 3], eye: &[f32; 3], f: &[f32; 3], r: &[f32;
 /// What the device holds for every class: the noise, the blue noise, the copy of the
 /// scene's depth the march reads, and the gas target it adds up into.
 #[derive(Default)]
-struct Gpu {
-    noise: Option<Com>,
-    blue: Option<Com>,
+struct Held {
+    noise: Option<Texture>,
+    blue: Option<Texture>,
     failed: bool,
-    zt: Option<Com>,
-    fb: Option<Com>,
+    /// The scene's depth, resolved for the march to read (Direct3D 9's INTZ).
+    zt: Option<Texture>,
+    fb: Option<Texture>,
     /// The march's second target: its steps' view depth, weighted by optical depth.
-    fz: Option<Com>,
+    fz: Option<Texture>,
     zt_wh: (u32, u32),
     zt_broken: bool,
-}
-
-struct Shaders {
-    vs: Shader,
-    ps: Shader,
-    bake_vs: Shader,
-    bake_ps: Shader,
-    vol_ps: Shader,
-    march_vs: Shader,
-    /// The march in 8, 12, 16 and 24 steps (`Steps=`).
-    march: [Shader; 4],
-    quad_vs: Shader,
-    temporal_ps: Shader,
-    comp_ps: Shader,
 }
 
 /// Per view: the slices' ladder per class (rungs per doubling of distance); with
@@ -840,8 +805,8 @@ struct Shaders {
 #[derive(Default)]
 struct ViewState {
     rungs: BTreeMap<String, f32>,
-    hist: [Option<Com>; 2],
-    meta: [Option<Com>; 2],
+    hist: [Option<Texture>; 2],
+    meta: [Option<Texture>; 2],
     hist_wh: (u32, u32),
     cur: usize,
     prev: Option<([[f32; 4]; 4], [f32; 4])>,
@@ -857,14 +822,10 @@ const SETTLE: u32 = 32;
 
 /// The march of one view: c21 (Obscure=, 1 / the depth copy's size) and c41..c46 (the
 /// rays per pixel, the projection's depth terms), the same for every class but the box;
-/// the frame's target and depth to go back to, the gas target, the viewport.
+/// the viewport the engine set for the view.
 struct March {
     k: [[f32; 4]; 7],
     ps: usize,
-    rt0: Com,
-    ds0: Option<Com>,
-    fs: Com,
-    fz: Com,
     vp: Viewport,
     drawn: bool,
     /// The view (`View::key`), its eye and VIEW x PROJECTION columns, for `Temporal=`.
@@ -873,13 +834,22 @@ struct March {
     cols: [[f32; 4]; 4],
 }
 
+/// The pipelines (`Nebulae::pipe`).
+const P_NEB: u64 = 0;
+const P_VOL: u64 = 1;
+const P_BAKE: u64 = 2;
+const P_TEMPORAL: u64 = 3;
+const P_COMP: u64 = 4;
+/// The march in 8, 12, 16 and 24 steps (`Steps=`): P_MARCH + 0..3.
+const P_MARCH: u64 = 8;
+const MARCH_PS: [gpu::Code; 4] = [gpu::code!(PS_MARCH8, PS_MARCH8_SPV, PS_MARCH8_DXIL), gpu::code!(PS_MARCH12, PS_MARCH12_SPV, PS_MARCH12_DXIL), gpu::code!(PS_MARCH16, PS_MARCH16_SPV, PS_MARCH16_DXIL), gpu::code!(PS_MARCH24, PS_MARCH24_SPV, PS_MARCH24_DXIL)];
+
 pub struct Nebulae {
     cfg: Settings,
     classes: BTreeMap<String, Cls>,
     /// This frame's nebula objects, by class; their stock draw skipped.
-    gpu: Gpu,
-    dev: Option<Device>,
-    sh: Shaders,
+    held: Held,
+    pipes: Pipes,
     views: PerView<ViewState>,
     ghosts: Vec<i32>,
     bolt_seed: u32,
@@ -889,8 +859,8 @@ pub struct Nebulae {
     /// The main view's Key (towards it): the bake's signature takes it, so the action
     /// camera's view, whose lights may differ, uses the main view's and does not bake again.
     key_main: Option<[f32; 3]>,
-    /// This view's shadow map from the hulls (a texture), or 0.
-    sh_tex: usize,
+    /// This view's shadow map from the hulls.
+    sh_tex: Option<Texture>,
     said: u32,
 }
 
@@ -926,26 +896,14 @@ impl Nebulae {
         Nebulae {
             cfg: Settings::read(),
             classes: BTreeMap::new(),
-            gpu: Gpu::default(),
-            dev: None,
-            sh: Shaders {
-                vs: Shader::vertex(&VS_NEB),
-                ps: Shader::pixel(&PS_NEB),
-                bake_vs: Shader::vertex(&VS_NBAKE),
-                bake_ps: Shader::pixel(&PS_NBAKE),
-                vol_ps: Shader::pixel(&PS_VOL),
-                march_vs: Shader::vertex(&VS_MARCH),
-                march: [Shader::pixel(&PS_MARCH8), Shader::pixel(&PS_MARCH12), Shader::pixel(&PS_MARCH16), Shader::pixel(&PS_MARCH24)],
-                quad_vs: Shader::vertex(&VS_QUAD),
-                temporal_ps: Shader::pixel(&PS_TEMPORAL),
-                comp_ps: Shader::pixel(&PS_COMP),
-            },
+            held: Held::default(),
+            pipes: Pipes::new(),
             views: PerView::new(),
             ghosts: Vec::new(),
             bolt_seed: 0x9e37_79b9,
             checked: -1.0,
             key_main: None,
-            sh_tex: 0,
+            sh_tex: None,
             said: 0,
         }
     }
@@ -954,6 +912,49 @@ impl Nebulae {
         if self.said & (1 << bit) == 0 {
             self.said |= 1 << bit;
             log!("world: nebulae: {}", what);
+        }
+    }
+
+    /// The pipeline `which` (`P_*`). The slices draw into the view, depth-tested and
+    /// added (red, green, blue only); the march adds into the gas target and its second
+    /// beside it; the bake and `Temporal=` write their targets whole; the filter puts
+    /// the gas onto the view over what is there (red, green, blue). None culls.
+    fn pipe(&mut self, which: u64) -> Option<Pipeline> {
+        let f16 = Format::Rgba16F;
+        let (vs, ps, layout, stride, topo): (gpu::Code, gpu::Code, &'static [VertexAttr], u32, Topology) = match which {
+            P_NEB => (gpu::code!(VS_NEB, VS_NEB_SPV, VS_NEB_DXIL), gpu::code!(PS_NEB, PS_NEB_SPV, PS_NEB_DXIL), &SLICE, 20, Topology::TriangleList),
+            P_VOL => (gpu::code!(VS_NEB, VS_NEB_SPV, VS_NEB_DXIL), gpu::code!(PS_VOL, PS_VOL_SPV, PS_VOL_DXIL), &SLICE, 20, Topology::TriangleList),
+            P_BAKE => (gpu::code!(VS_NBAKE, VS_NBAKE_SPV, VS_NBAKE_DXIL), gpu::code!(PS_NBAKE, PS_NBAKE_SPV, PS_NBAKE_DXIL), &SLICE, 20, Topology::TriangleStrip),
+            P_TEMPORAL => (gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), gpu::code!(PS_TEMPORAL, PS_TEMPORAL_SPV, PS_TEMPORAL_DXIL), &SLICE, 20, Topology::TriangleStrip),
+            P_COMP => (gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), gpu::code!(PS_COMP, PS_COMP_SPV, PS_COMP_DXIL), &SLICE, 20, Topology::TriangleStrip),
+            _ => (gpu::code!(VS_MARCH, VS_MARCH_SPV, VS_MARCH_DXIL), MARCH_PS[(which - P_MARCH) as usize & 3], &XYZ, 12, Topology::TriangleList),
+        };
+        let mut d = PipelineDesc::new(vs, ps, layout, stride, topo, Format::Unknown);
+        match which {
+            P_NEB | P_VOL => {
+                d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+                d.blend = Some(Blend::ADD);
+                d.write_mask = 7;
+                self.pipes.view(which, || d)
+            }
+            P_COMP => {
+                d.blend = Some(Blend { color: BlendEq { src: Factor::One, dst: Factor::InvSrcAlpha, op: BlendOp::Add }, alpha: None });
+                d.write_mask = 7;
+                self.pipes.view(which, || d)
+            }
+            P_BAKE => {
+                d.colors[0] = Format::Bgra8;
+                Some(self.pipes.own(which, || d))
+            }
+            P_TEMPORAL => {
+                d.colors = [f16, f16, Format::Unknown, Format::Unknown];
+                Some(self.pipes.own(which, || d))
+            }
+            _ => {
+                d.blend = Some(Blend::ADD);
+                d.colors = [f16, f16, Format::Unknown, Format::Unknown];
+                Some(self.pipes.own(which, || d))
+            }
         }
     }
 
@@ -975,17 +976,22 @@ impl Nebulae {
         unsafe { SPIRIT_ACTIVE = on && self.cfg.enable };
     }
 
+    /// Before a `Reset`, or with a new device: the targets lose what they hold and the
+    /// textures keep no copy of theirs (`Transient`), so all of it is made again.
     pub fn reset(&mut self) {
-        self.gpu = Gpu::default();
+        self.held = Held::default();
         for vs in self.views.v.iter_mut() {
             vs.hist = [None, None];
             vs.meta = [None, None];
             vs.prev = None;
         }
+        let held = self.classes.values().filter(|c| c.vol.is_some()).count();
+        if held > 0 {
+            log!("world: nebulae: {} baked volumes let go of (a Reset or a new device): baked again", held);
+        }
         for c in self.classes.values_mut() {
             c.drop_device();
         }
-        self.dev = None;
     }
 
     /// Settings and recipes again (with `Reload=1`, once a second).
@@ -998,9 +1004,9 @@ impl Nebulae {
                 c.failed = false;
             }
             if old.noise != self.cfg.noise {
-                self.gpu.noise = None;
+                self.held.noise = None;
             }
-            self.gpu.failed = false;
+            self.held.failed = false;
         }
         for c in self.classes.values_mut() {
             c.reload();
@@ -1036,7 +1042,7 @@ impl Nebulae {
         if engine::vtable(o) == VT_NEBULA {
             mark_on_screen(o, v.cam);
         }
-        if !self.cfg.enable || self.gpu.failed {
+        if !self.cfg.enable || self.held.failed {
             return false;
         }
         let Some(c) = self.class_of(o) else { return false };
@@ -1096,7 +1102,7 @@ impl Nebulae {
     fn gather(&mut self) -> bool {
         for c in self.classes.values_mut() {
             c.pos.clear();
-            c.sig = 2_166_136_261;
+            c.sig = SIG0;
         }
         self.gather_ghosts();
         let mut any = false;
@@ -1182,26 +1188,22 @@ impl Nebulae {
         }
     }
 
-    /// The noise and the blue noise on this device.
-    fn device_ready(&mut self, dev: Device) -> bool {
-        if self.dev != Some(dev) {
-            self.reset();
-            self.dev = Some(dev);
-        }
-        if self.gpu.failed {
+    /// The noise and the blue noise on the device.
+    fn device_ready(&mut self) -> bool {
+        if self.held.failed {
             return false;
         }
-        if self.gpu.noise.is_none() {
-            self.gpu.noise = make_noise(dev, self.cfg.noise);
+        if self.held.noise.is_none() {
+            self.held.noise = make_noise(self.cfg.noise);
         }
-        if self.gpu.blue.is_none() {
+        if self.held.blue.is_none() {
             let t0 = rt::now();
             let px = blue_noise();
-            self.gpu.blue = upload_texture(dev, BN as u32, BN as u32, FMT_A8R8G8B8, &[&px]);
+            self.held.blue = upload_2d(BN as u32, BN as u32, px);
             log!("world: nebula blue noise in {:.0} ms", (rt::now() - t0) * 1000.0);
         }
-        if self.gpu.noise.is_none() || self.gpu.blue.is_none() {
-            self.gpu.failed = true;
+        if self.held.noise.is_none() || self.held.blue.is_none() {
+            self.held.failed = true;
             self.note(0, "the noise could not be made: the stock billboards");
             return false;
         }
@@ -1213,7 +1215,7 @@ impl Nebulae {
         if !self.cfg.enable {
             return;
         }
-        if !self.device_ready(v.dev) {
+        if !self.device_ready() {
             return;
         }
         // The nebulae are gathered once a frame (the action camera's view draws the same).
@@ -1237,12 +1239,12 @@ impl Nebulae {
     /// map sets over its recipe. Its classes are its own (`<odf>@menu`), so a mission's
     /// nebulae of the same class keep their own radius, recipe and bake.
     pub fn draw_menu(&mut self, v: &View, gas: &[crate::menu::Gas], key: Option<[f32; 3]>) {
-        if !self.cfg.enable || gas.is_empty() || !self.device_ready(v.dev) {
+        if !self.cfg.enable || gas.is_empty() || !self.device_ready() {
             return;
         }
         for c in self.classes.values_mut() {
             c.pos.clear();
-            c.sig = 2_166_136_261;
+            c.sig = SIG0;
         }
         for g in gas {
             let mut name = rt::lower(&g.odf);
@@ -1275,7 +1277,6 @@ impl Nebulae {
     /// Every class's gas with this frame's centres into the view, lit by `key_main`.
     /// `menu`: the menu scene's view, whose clock runs the lightning too.
     fn draw_classes(&mut self, v: &View, menu: bool) {
-        let dev = v.dev;
         let p = v.proj.0;
         if p[2][2] == 0.0 || p[2][3] == 0.0 {
             return;
@@ -1292,11 +1293,14 @@ impl Nebulae {
         let eye = [v.eye.x, v.eye.y, v.eye.z];
         let zn = -p[3][2] / p[2][2];
         let key = self.key_main;
-        let _g = gfx::Guard::new(dev);
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let cmd = &mut cmd;
+        // The viewport the engine set for the view, put back after any pass of our own.
+        let view_vp = gfx::gpu().engine_viewport();
         // Ships' shadows in the gas: the hulls' shadow map of the Key, this view's
         // (bound by draw_states).
         let shadow = if self.cfg.shadows && key.is_some() { crate::mods::hulls::shadow_map() } else { None };
-        self.sh_tex = shadow.as_ref().map_or(0, |sm| sm.tex as usize);
+        self.sh_tex = shadow.as_ref().map(|sm| sm.texture());
         if shadow.is_some() {
             self.note(4, "ships' shadows in the gas: the hulls' shadow map");
         }
@@ -1313,9 +1317,9 @@ impl Nebulae {
             if !began {
                 began = true;
                 if self.cfg.bake {
-                    mr = self.march_begin(dev, &p, &r, &u, &f, v, &cols);
+                    mr = self.march_begin(cmd, &p, &r, &u, &f, v, &cols);
                 }
-                self.draw_states(dev, &cols);
+                self.draw_states(cmd, &cols);
             }
             let share = {
                 let c = self.classes.get_mut(&key_name).unwrap();
@@ -1337,7 +1341,7 @@ impl Nebulae {
             // The envelope, and the bake, when the class's nebulae or recipe changed.
             {
                 let c = self.classes.get_mut(&key_name).unwrap();
-                if (c.env.is_none() || c.env_sig != c.cur || c.env_gen != c.generation) && !bake_envelope(dev, c) {
+                if (c.env.is_none() || c.env_sig != c.cur || c.env_gen != c.generation) && !bake_envelope(c) {
                     c.failed = true;
                     continue;
                 }
@@ -1352,22 +1356,31 @@ impl Nebulae {
             };
             if need_bake {
                 let cfg = self.cfg;
+                let bake = self.pipe(P_BAKE);
+                let noise = self.held.noise.clone();
                 let c = self.classes.get_mut(&key_name).unwrap();
-                if let Some(env) = c.env.as_ref() {
-                    dev.set_texture(1, env.ptr());
+                if c.vol_gen != u32::MAX {
+                    log!(
+                        "world: nebulae: {} baked again: {}",
+                        c.odf,
+                        if c.vol.is_none() { "the volume was let go of" } else if c.vol_gen != c.generation { "the recipe changed" } else if c.vol_sig != c.cur { "the nebulae or the Key changed" } else { "?" }
+                    );
                 }
-                // The bake draws into targets of its own, beside which the march's second may not stay bound.
-                if mr.is_some() {
-                    dev.set_render_target(1, core::ptr::null_mut());
-                }
-                let ok = bake_volume(dev, c, half, &cfg, &mut self.sh, self.gpu.noise.as_ref());
+                // The bake draws into a target of its own.
+                let ok = bake.is_some_and(|bp| bake_volume(cmd, &bp, c, half, &cfg, noise.as_ref()));
                 if !ok {
                     c.failed = true;
                 }
-                self.draw_states(dev, &cols);
-                if let Some(m) = mr.as_ref() {
-                    march_rebind(dev, m);
+                // Back to the gas target (or the view), with every state the draws share.
+                match mr.as_ref() {
+                    Some(m) => {
+                        self.gas_pass(cmd, m, Load::Load);
+                    }
+                    None => {
+                        gfx::view_pass(cmd, v, view_vp);
+                    }
                 }
+                self.draw_states(cmd, &cols);
                 if !ok {
                     continue;
                 }
@@ -1513,28 +1526,28 @@ impl Nebulae {
             c.bolt_last = sec;
             let dt = if last > 0.0 && (v.main || menu) { sec - last } else { 0.0 };
             self.lightning(&key_name, sec, dt);
+            let baked = self.cfg.bake && self.classes[&key_name].vol.is_some();
+            let which = match mr.as_ref() {
+                Some(m) if baked => P_MARCH + m.ps as u64,
+                None if baked => P_VOL,
+                _ => P_NEB,
+            };
+            let Some(pipe) = self.pipe(which) else { continue };
+            if !cmd.set_pipeline(&pipe) {
+                continue;
+            }
             let c = self.classes.get_mut(&key_name).unwrap();
-            let baked = self.cfg.bake && c.vol.is_some();
             if baked {
                 for i in 0..3 {
                     c.k[12][i] = 1.0 / c.vsize[i];
                 }
-                let ok = match mr.as_ref() {
-                    Some(m) => self.sh.march_vs.bind(dev) && self.sh.march[m.ps].bind(dev),
-                    None => self.sh.vs.bind(dev) && self.sh.vol_ps.bind(dev),
-                };
-                if !ok {
-                    continue;
-                }
-                dev.set_texture(2, c.vol.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
-                dev.set_texture(3, c.occ.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
-            } else if !(self.sh.vs.bind(dev) && self.sh.ps.bind(dev)) {
-                continue;
+                cmd.bind_texture(2, c.vol.as_ref(), &CLAMP_LINEAR);
+                cmd.bind_texture(3, c.occ.as_ref(), &CLAMP_POINT);
             }
-            dev.ps_const(0, flat(&c.k));
-            dev.ps_const(24, flat(&c.ex));
-            dev.ps_const(38, &c.fz);
-            dev.ps_const(40, &c.sw);
+            cmd.ps_block(Block::new(0, flat(&c.k)));
+            cmd.ps_block(Block::new(24, flat(&c.ex)));
+            cmd.ps_block(Block::new(38, &c.fz));
+            cmd.ps_block(Block::new(40, &c.sw));
             {
                 // c32..c35: the hulls' shadow map of the Key (as Lighting.asi's export was:
                 // twice the hulls' bias, since the gas has no faces to fight it; the
@@ -1551,103 +1564,103 @@ impl Nebulae {
                     k[12..16].copy_from_slice(&[1.0, sm.bias * 2.0, pen, sm.texel]);
                 }
                 k[16..24].copy_from_slice(&[kd[0], kd[1], kd[2], share, 1.0 + g * g, 2.0 * g, 0.0, 0.0]);
-                dev.ps_const(32, &k);
+                cmd.ps_block(Block::new(32, &k));
             }
-            dev.set_texture(1, c.env.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
+            cmd.bind_texture(1, c.env.as_ref(), &CLAMP_LINEAR);
             if let Some(m) = mr.as_mut() {
-                // The box, and the states the march draws with: its sums are added into
-                // the gas target, all four channels, with no depth buffer (the march
-                // reads the scene's depth itself).
+                // The box: its sums are added into the gas target, all four channels,
+                // with no depth buffer (the march reads the scene's depth itself).
                 m.k[4] = [lo[0], lo[1], lo[2], dnear];
                 m.k[5] = [hi[0], hi[1], hi[2], 0.0];
-                dev.ps_const(21, &m.k[0]);
-                dev.ps_const(41, &flat(&m.k)[4..]);
-                dev.vs_const(4, &[1.0, 0.0, 0.0, 0.0]);
-                for (s, val) in [(RS_ZENABLE, 0), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_COLORWRITEENABLE, 15)] {
-                    dev.set_rs(s, val);
-                }
+                cmd.ps_block(Block::new(21, &m.k[0]));
+                cmd.ps_block(Block::new(41, &flat(&m.k)[4..]));
+                cmd.vs_block(Block::new(4, &[1.0, 0.0, 0.0, 0.0]));
                 m.drawn = true;
-                dev.set_fvf(FVF_XYZ);
-                dev.draw_primitive_up(PT_TRIANGLELIST, faces.len() as u32 / 3, faces.as_ptr() as *const u8, 12);
-                dev.set_fvf(FVF_SLICE);
+                if let Some(s) = cmd.vertices(&faces) {
+                    cmd.draw(&s);
+                }
                 self.note(1, "gas marched");
             } else {
-                dev.draw_primitive_up(PT_TRIANGLELIST, verts.len() as u32 / 3, verts.as_ptr() as *const u8, 20);
+                if let Some(s) = cmd.vertices(&verts) {
+                    cmd.draw(&s);
+                }
                 self.note(1, "gas drawn");
             }
         }
         if let Some(m) = mr {
-            self.march_end(dev, m);
+            self.march_end(cmd, v, view_vp, m);
         }
     }
 
-    /// The states every slice draw sets; the guard puts the engine's back.
-    fn draw_states(&mut self, dev: Device, cols: &[[f32; 4]; 4]) {
-        for (s, val) in [
-            (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0), (RS_ALPHABLENDENABLE, 1),
-            (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD), (RS_SEPARATEALPHABLENDENABLE, 0),
-            (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3), (RS_STENCILENABLE, 0), (152, 0),
-            (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(s, val);
-        }
-        dev.set_fvf(FVF_SLICE);
-        dev.set_stream_freq(0, 1);
-        self.sh.vs.bind(dev);
-        dev.vs_const(0, flat(cols));
-        dev.set_texture(0, self.gpu.noise.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
-        dev.set_texture(4, self.gpu.blue.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
-        ss(dev, 0, &[(SAMP_ADDRESSU, TADDRESS_WRAP), (SAMP_ADDRESSV, TADDRESS_WRAP), (SAMP_ADDRESSW, TADDRESS_WRAP), (SAMP_MAGFILTER, TEXF_LINEAR), (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_LINEAR), (SAMP_SRGBTEXTURE, 0)]);
-        ss(dev, 4, &[(SAMP_ADDRESSU, TADDRESS_WRAP), (SAMP_ADDRESSV, TADDRESS_WRAP), (SAMP_ADDRESSW, TADDRESS_WRAP), (SAMP_MAGFILTER, TEXF_POINT), (SAMP_MINFILTER, TEXF_POINT), (SAMP_MIPFILTER, TEXF_NONE), (SAMP_SRGBTEXTURE, 0)]);
-        ss(dev, 1, &SS_CLAMP_LINEAR);
-        ss(dev, 2, &SS_CLAMP_LINEAR);
-        ss(dev, 3, &SS_CLAMP_POINT);
-        ss(dev, 8, &SS_CLAMP_POINT);
+    /// What every draw of the gas reads besides its class's: the view's columns, the
+    /// noise, the blue noise, the hulls' shadow map; the samplers of the class's own.
+    fn draw_states(&mut self, cmd: &mut Cmd, cols: &[[f32; 4]; 4]) {
+        cmd.vs_block(Block::new(0, flat(cols)));
+        cmd.bind_texture(0, self.held.noise.as_ref(), &NOISE);
+        cmd.bind_texture(4, self.held.blue.as_ref(), &BLUE);
+        cmd.set_sampler(1, &CLAMP_LINEAR);
+        cmd.set_sampler(2, &CLAMP_LINEAR);
+        cmd.set_sampler(3, &CLAMP_POINT);
         // The hulls' shadow map, while this view has one (the constants per class).
-        dev.set_texture(8, self.sh_tex as *mut core::ffi::c_void);
-        dev.ps_const(32, &[0.0; 12]);
+        cmd.bind_texture(8, self.sh_tex.as_ref(), &CLAMP_POINT);
+        cmd.ps_block(Block::new(32, &[0.0; 12]));
     }
 
     // ---- the march, with a copy of the scene's depth ------------------------------------
 
-    fn z_target(&mut self, dev: Device, w: u32, h: u32) -> bool {
-        let g = &mut self.gpu;
+    fn z_target(&mut self, w: u32, h: u32) -> bool {
+        let g = &mut self.held;
         if g.zt.is_some() && g.zt_wh != (w, h) {
             g.zt = None;
             g.fb = None;
             g.fz = None;
         }
         if g.zt.is_none() {
-            g.zt = dev.create_texture(w, h, 1, USAGE_DEPTHSTENCIL, FMT_INTZ, POOL_DEFAULT);
-            g.fb = dev.create_texture(w, h, 1, USAGE_RENDERTARGET, FMT_A16B16G16R16F, POOL_DEFAULT);
-            g.fz = dev.create_texture(w, h, 1, USAGE_RENDERTARGET, FMT_A16B16G16R16F, POOL_DEFAULT);
-            if g.zt.is_none() || g.fb.is_none() || g.fz.is_none() {
-                g.zt = None;
-                g.fb = None;
-                g.fz = None;
+            let gp = gfx::gpu();
+            let zt = gp.texture(TextureDesc::d2(w, h, Format::D24S8, Usage::DEPTH | Usage::SAMPLED), Contents::None);
+            let rt = || gp.texture(TextureDesc::d2(w, h, Format::Rgba16F, Usage::RENDER_TARGET | Usage::SAMPLED), Contents::None);
+            let (fb, fz) = (rt(), rt());
+            if !(zt.ready(gp) && fb.ready(gp) && fz.ready(gp)) {
                 return false;
             }
+            g.zt = Some(zt);
+            g.fb = Some(fb);
+            g.fz = Some(fz);
             g.zt_wh = (w, h);
             log!("world: nebulae: marched, with the scene's depth at {}x{}", w, h);
         }
         true
     }
 
-    /// Copies the scene's depth (RESZ) into the INTZ texture the march reads, binds it,
-    /// and works out the march's constants for this view (p the projection; r, u, f the
-    /// view's axes in the world). None: no INTZ, and the gas is sliced as the plugin's
+    /// Begins the pass into the gas target and the depths' beside it, over the view's
+    /// viewport, no depth buffer.
+    fn gas_pass(&self, cmd: &mut Cmd, m: &March, load: Load<[f32; 4]>) -> bool {
+        let (Some(fb), Some(fz)) = (self.held.fb.as_ref(), self.held.fz.as_ref()) else { return false };
+        let colors = [ColorTarget::new(fb, load), ColorTarget::new(fz, Load::Load)];
+        let area = Rect::new(m.vp.x, m.vp.y, m.vp.w, m.vp.h);
+        if !cmd.begin_pass(&Pass { colors: &colors, depth: None, area: Some(area) }) {
+            return false;
+        }
+        cmd.set_viewport(&m.vp);
+        true
+    }
+
+    /// Resolves the scene's depth into the texture the march reads, binds it, and works
+    /// out the march's constants for this view (p the projection; r, u, f the view's
+    /// axes in the world). None: no sampled depth, and the gas is sliced as the plugin's
     /// was, added to the frame directly.
-    fn march_begin(&mut self, dev: Device, p: &[[f32; 4]; 4], r: &[f32; 3], u: &[f32; 3], f: &[f32; 3], v: &View, cols: &[[f32; 4]; 4]) -> Option<March> {
-        if self.gpu.zt_broken {
+    #[allow(clippy::too_many_arguments)]
+    fn march_begin(&mut self, cmd: &mut Cmd, p: &[[f32; 4]; 4], r: &[f32; 3], u: &[f32; 3], f: &[f32; 3], v: &View, cols: &[[f32; 4]; 4]) -> Option<March> {
+        if self.held.zt_broken {
             return None;
         }
         // Timing=1: the translucent step split at the gas (setup, march, filter).
         crate::timing::mark("translucent before gas");
-        let rt0 = dev.get_render_target(0)?;
-        let ds0 = dev.get_depth_stencil();
-        let dd = ds0.as_ref()?.surf_desc();
-        if !self.z_target(dev, dd.width, dd.height) {
-            self.gpu.zt_broken = true;
+        let vp = gfx::gpu().engine_viewport()?;
+        let (_, depth) = crate::frame::scene_targets()?;
+        let (dw, dh) = depth.size();
+        if !self.z_target(dw, dh) {
+            self.held.zt_broken = true;
             self.note(2, "no INTZ depth texture or float target: the gas sliced and added to the frame directly");
             return None;
         }
@@ -1657,44 +1670,24 @@ impl Nebulae {
             13..=16 => 2,
             _ => 3,
         };
-        if self.sh.march_vs.get(dev).is_null() || self.sh.march[ps].get(dev).is_null() || self.sh.quad_vs.get(dev).is_null() || self.sh.comp_ps.get(dev).is_null() {
+        let g = gfx::gpu();
+        let ok = [P_MARCH + ps as u64, P_COMP].into_iter().all(|w| self.pipe(w).is_some_and(|p| p.ready(g)));
+        if !ok {
             return None;
         }
-        // RESZ: the depth buffer into the INTZ texture bound at stage 0.
-        let zt = self.gpu.zt.as_ref()?.ptr();
-        dev.set_vs(core::ptr::null_mut());
-        dev.set_ps(core::ptr::null_mut());
-        dev.set_fvf(FVF_XYZ);
-        dev.set_rs(RS_ZENABLE, 0);
-        dev.set_rs(RS_ZWRITEENABLE, 0);
-        dev.set_rs(RS_COLORWRITEENABLE, 0);
-        dev.set_texture(0, zt);
-        let pt = [0.0f32; 3];
-        dev.draw_primitive_up(PT_POINTLIST, 1, pt.as_ptr() as *const u8, 12);
-        dev.set_rs(RS_POINTSIZE, RESZ_CODE);
-        dev.set_rs(RS_POINTSIZE, 0x3f80_0000);
-        dev.set_texture(0, core::ptr::null_mut());
-        dev.set_texture(5, zt);
-        ss(dev, 5, &SS_CLAMP_POINT);
+        // The scene's depth into the texture the march reads (RESZ into INTZ).
+        let zt = self.held.zt.clone()?;
+        if !cmd.resolve_depth(&depth, &zt) {
+            return None;
+        }
+        cmd.bind_texture(5, Some(&zt), &CLAMP_POINT);
         // The ray through a pixel's centre (x, y in the target), scaled to view depth 1:
         // f + r (ndc.x - _31) / _11 + u (ndc.y - _32) / _22, which is linear in x and y.
-        let vp = dev.get_viewport();
         let (vx, vy, vw, vh) = (vp.x as f32, vp.y as f32, vp.w.max(1) as f32, vp.h.max(1) as f32);
         // ndc.x = 2 (x - vx) / vw - 1, and ndc.y = 1 - 2 (y - vy) / vh: y runs down.
         let (ax, by) = (2.0 / vw / p[0][0], -2.0 / vh / p[1][1]);
         let (cx, cy) = ((-2.0 * vx / vw - 1.0 - p[2][0]) / p[0][0], (2.0 * vy / vh + 1.0 - p[2][1]) / p[1][1]);
-        let (w, h) = self.gpu.zt_wh;
-        let fs = self.gpu.fb.as_ref()?.tex_surface(0)?;
-        let fz = self.gpu.fz.as_ref()?.tex_surface(0)?;
-        // The gas target and the depths', cleared to no gas (in the viewport).
-        dev.set_render_target(0, fs.ptr());
-        dev.set_render_target(1, fz.ptr());
-        dev.set_depth_stencil(core::ptr::null_mut());
-        dev.set_viewport(&vp);
-        dev.set_rs(RS_SCISSORTESTENABLE, 0);
-        dev.set_rs(RS_COLORWRITEENABLE, 15);
-        dev.clear(&[], CLEAR_TARGET, 0, 1.0, 0);
-        crate::timing::mark("gas: depth copy, clear");
+        let (w, h) = self.held.zt_wh;
         // Temporal=: the thresholds walk on from frame to frame (the shader takes the
         // fraction; kept small so a float holds it exactly).
         // Under the bench clock a view that stands (same sim time, same camera) starts
@@ -1708,7 +1701,7 @@ impl Nebulae {
         // And each pixel's ray moves within the pixel (Jitter=, its span in pixels), so
         // the frames add up the gas over the pixel, not at its centre.
         let span = if self.temporal_on() { self.cfg.jitter } else { 0.0 };
-        Some(March {
+        let m = March {
             k: [
                 [self.cfg.obscure, 0.0, 1.0 / w as f32, 1.0 / h as f32],
                 [r[0] * ax, r[1] * ax, r[2] * ax, self.cfg.footprint],
@@ -1719,54 +1712,50 @@ impl Nebulae {
                 [p[2][2], p[3][2], 0.0, 0.0],
             ],
             ps,
-            rt0,
-            ds0,
-            fs,
-            fz,
             vp,
             drawn: false,
             view: v.key(),
             eye: [v.eye.x, v.eye.y, v.eye.z, 0.0],
             cols: *cols,
-        })
+        };
+        // The gas target and the depths', cleared to no gas (in the viewport).
+        if !self.gas_pass(cmd, &m, Load::Clear([0.0; 4])) {
+            return None;
+        }
+        crate::timing::mark("gas: depth copy, clear");
+        Some(m)
     }
 
-    /// The gas onto the frame, through the filter (comp_ps); the frame's target and depth
-    /// back.
-    fn march_end(&mut self, dev: Device, m: March) {
+    /// The gas onto the frame, through the filter (comp_ps); the view's pass again.
+    fn march_end(&mut self, cmd: &mut Cmd, v: &View, view_vp: Option<Viewport>, m: March) {
         crate::timing::mark("gas: march");
-        dev.set_render_target(1, core::ptr::null_mut());
         let (x0, y0) = (m.vp.x as f32 + 0.5, m.vp.y as f32 + 0.5);
         let edges = [x0, y0, x0 + m.vp.w.max(1) as f32 - 1.0, y0 + m.vp.h.max(1) as f32 - 1.0];
-        let gas = if m.drawn { self.temporal(dev, &m, &edges) } else { None };
+        let gas = if m.drawn { self.temporal(cmd, &m, &edges) } else { None };
         if !m.drawn {
             self.views.get(m.view).prev = None;
         }
         crate::timing::mark("gas: frames added up");
-        dev.set_render_target(0, m.rt0.ptr());
-        dev.set_depth_stencil(m.ds0.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
-        dev.set_viewport(&m.vp);
+        gfx::view_pass(cmd, v, view_vp.or(Some(m.vp)));
+        cmd.set_viewport(&m.vp);
         if m.drawn {
-            for (s, val) in [(RS_ZENABLE, 0), (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_INVSRCALPHA), (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0)] {
-                dev.set_rs(s, val);
+            if let Some(pipe) = self.pipe(P_COMP).filter(|p| cmd.set_pipeline(p)) {
+                let _ = pipe;
+                let sg = self.cfg.denoise;
+                let k = [
+                    if sg > 0.05 { 0.5 / (sg * sg) } else { 100.0 }, 0.05, 0.0, 0.0,
+                    edges[0], edges[1], edges[2], edges[3],
+                ];
+                cmd.ps_block(Block::new(21, &m.k[0]));
+                cmd.ps_block(Block::new(46, &m.k[6]));
+                cmd.ps_block(Block::new(47, &k));
+                let gas = gas.or_else(|| self.held.fb.clone());
+                cmd.bind_texture(7, gas.as_ref(), &CLAMP_POINT);
+                quad(cmd);
+                cmd.bind_texture(7, None, &CLAMP_POINT);
             }
-            dev.set_fvf(FVF_SLICE);
-            self.sh.quad_vs.bind(dev);
-            self.sh.comp_ps.bind(dev);
-            let sg = self.cfg.denoise;
-            let k = [
-                if sg > 0.05 { 0.5 / (sg * sg) } else { 100.0 }, 0.05, 0.0, 0.0,
-                edges[0], edges[1], edges[2], edges[3],
-            ];
-            dev.ps_const(21, &m.k[0]);
-            dev.ps_const(46, &m.k[6]);
-            dev.ps_const(47, &k);
-            ss(dev, 7, &SS_CLAMP_POINT);
-            dev.set_texture(7, gas.unwrap_or_else(|| self.gpu.fb.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr())));
-            quad(dev);
-            dev.set_texture(7, core::ptr::null_mut());
         }
-        dev.set_texture(5, core::ptr::null_mut());
+        cmd.bind_texture(5, None, &CLAMP_POINT);
         crate::timing::mark("gas: filter, onto the frame");
     }
 
@@ -1802,23 +1791,29 @@ impl Nebulae {
     /// `Temporal=`: this frame's march added to the view's history (temporal_ps), into
     /// the other of its two targets, which is returned for comp_ps to put onto the frame.
     /// None: no history (off, or no target), and the march goes onto the frame as it is.
-    fn temporal(&mut self, dev: Device, m: &March, edges: &[f32; 4]) -> Option<*mut core::ffi::c_void> {
-        if !self.temporal_on() || self.sh.temporal_ps.get(dev).is_null() {
+    fn temporal(&mut self, cmd: &mut Cmd, m: &March, edges: &[f32; 4]) -> Option<Texture> {
+        let g = gfx::gpu();
+        let pipe = self.pipe(P_TEMPORAL);
+        if !self.temporal_on() || !pipe.as_ref().is_some_and(|p| p.ready(g)) {
             self.views.get(m.view).prev = None;
             return None;
         }
-        let wh = self.gpu.zt_wh;
+        let pipe = pipe?;
+        let wh = self.held.zt_wh;
         let vs = self.views.get(m.view);
         // Settled under the bench clock: the history as it stands, nothing added.
         if vs.stood.is_some_and(|k| k > SETTLE) && vs.prev.is_some() && vs.hist_wh == wh {
             if let Some(h) = vs.hist[vs.cur].as_ref() {
-                return Some(h.ptr());
+                return Some(h.clone());
             }
         }
         if vs.hist_wh != wh || vs.hist.iter().chain(vs.meta.iter()).any(|h| h.is_none()) {
             vs.prev = None;
             vs.hist_wh = wh;
-            let rt = || dev.create_texture(wh.0, wh.1, 1, USAGE_RENDERTARGET, FMT_A16B16G16R16F, POOL_DEFAULT);
+            let rt = || {
+                let t = g.texture(TextureDesc::d2(wh.0, wh.1, Format::Rgba16F, Usage::RENDER_TARGET | Usage::SAMPLED), Contents::None);
+                t.ready(g).then_some(t)
+            };
             vs.hist = [rt(), rt()];
             vs.meta = [rt(), rt()];
             if vs.hist.iter().chain(vs.meta.iter()).any(|h| h.is_none()) {
@@ -1828,60 +1823,45 @@ impl Nebulae {
             }
         }
         let next = 1 - vs.cur;
-        let out = vs.hist[next].as_ref()?.tex_surface(0)?;
-        let out_meta = vs.meta[next].as_ref()?.tex_surface(0)?;
-        let last = vs.hist[vs.cur].as_ref()?.ptr();
-        let last_meta = vs.meta[vs.cur].as_ref()?.ptr();
-        let written = vs.hist[next].as_ref()?.ptr();
+        let out = vs.hist[next].clone()?;
+        let out_meta = vs.meta[next].clone()?;
+        let last = vs.hist[vs.cur].clone()?;
+        let last_meta = vs.meta[vs.cur].clone()?;
         let (pcols, pvp, have) = match vs.prev {
             Some((c, p)) => (c, p, 1.0),
             None => ([[0.0; 4]; 4], [0.0; 4], 0.0),
         };
-        dev.set_render_target(0, out.ptr());
-        dev.set_render_target(1, out_meta.ptr());
-        dev.set_depth_stencil(core::ptr::null_mut());
-        dev.set_viewport(&m.vp);
-        for (s, val) in [(RS_ZENABLE, 0), (RS_ALPHABLENDENABLE, 0), (RS_COLORWRITEENABLE, 15), (RS_SCISSORTESTENABLE, 0)] {
-            dev.set_rs(s, val);
+        let colors = [ColorTarget::new(&out, Load::Load), ColorTarget::new(&out_meta, Load::Load)];
+        let area = Rect::new(m.vp.x, m.vp.y, m.vp.w, m.vp.h);
+        if !cmd.begin_pass(&Pass { colors: &colors, depth: None, area: Some(area) }) {
+            return None;
         }
-        dev.set_fvf(FVF_SLICE);
-        self.sh.quad_vs.bind(dev);
-        self.sh.temporal_ps.bind(dev);
-        dev.ps_const(0, &m.eye);
-        dev.ps_const(21, &m.k[0]);
-        dev.ps_const(41, &flat(&m.k)[4..16]);
-        dev.ps_const(46, &m.k[6]);
-        dev.ps_const(48, edges);
-        dev.ps_const(49, flat(&pcols));
+        cmd.set_viewport(&m.vp);
+        if !cmd.set_pipeline(&pipe) {
+            return None;
+        }
+        cmd.ps_block(Block::new(0, &m.eye));
+        cmd.ps_block(Block::new(21, &m.k[0]));
+        cmd.ps_block(Block::new(41, &flat(&m.k)[4..16]));
+        cmd.ps_block(Block::new(46, &m.k[6]));
+        cmd.ps_block(Block::new(48, edges));
+        cmd.ps_block(Block::new(49, flat(&pcols)));
         // The depth tolerance: comp_ps's, 5% of the view depth.
-        dev.ps_const(53, &[self.cfg.temporal, have, self.cfg.temporal_clip, 0.05, pvp[0], pvp[1], pvp[2], pvp[3]]);
-        ss(dev, 6, &SS_CLAMP_POINT);
-        ss(dev, 7, &SS_CLAMP_POINT);
-        ss(dev, 9, &SS_CLAMP_LINEAR);
-        ss(dev, 10, &SS_CLAMP_POINT);
-        dev.set_texture(6, self.gpu.fz.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
-        dev.set_texture(7, self.gpu.fb.as_ref().map_or(core::ptr::null_mut(), |x| x.ptr()));
-        dev.set_texture(9, last);
-        dev.set_texture(10, last_meta);
-        quad(dev);
-        dev.set_render_target(1, core::ptr::null_mut());
-        dev.set_texture(6, core::ptr::null_mut());
-        dev.set_texture(9, core::ptr::null_mut());
-        dev.set_texture(10, core::ptr::null_mut());
+        cmd.ps_block(Block::new(53, &[self.cfg.temporal, have, self.cfg.temporal_clip, 0.05, pvp[0], pvp[1], pvp[2], pvp[3]]));
+        cmd.bind_texture(6, self.held.fz.as_ref(), &CLAMP_POINT);
+        cmd.bind_texture(7, self.held.fb.as_ref(), &CLAMP_POINT);
+        cmd.bind_texture(9, Some(&last), &CLAMP_LINEAR);
+        cmd.bind_texture(10, Some(&last_meta), &CLAMP_POINT);
+        quad(cmd);
+        cmd.bind_texture(6, None, &CLAMP_POINT);
+        cmd.bind_texture(9, None, &CLAMP_LINEAR);
+        cmd.bind_texture(10, None, &CLAMP_POINT);
         let vs = self.views.get(m.view);
         vs.prev = Some((m.cols, [m.vp.x as f32, m.vp.y as f32, m.vp.w as f32, m.vp.h as f32]));
         vs.cur = next;
         self.note(5, "the gas's frames added up (Temporal=)");
-        Some(written)
+        Some(out)
     }
-}
-
-/// After a bake or `draw_states`: the gas target, no depth buffer, the view's viewport.
-fn march_rebind(dev: Device, m: &March) {
-    dev.set_render_target(0, m.fs.ptr());
-    dev.set_render_target(1, m.fz.ptr());
-    dev.set_depth_stencil(core::ptr::null_mut());
-    dev.set_viewport(&m.vp);
 }
 
 /// The faces of the box lo..hi the march draws, each pixel of its outline once: those
@@ -1954,7 +1934,7 @@ fn mark_on_screen(o: usize, cam: usize) {
 /// Where a class's gas may be, from above (Nebulae.asi's bake_envelope): alpha each nebula
 /// a soft disc out to its reach, red the domes' height, green the filaments' (or the
 /// fringe's) wider disc, blue the nebulae's height there.
-fn bake_envelope(dev: Device, c: &mut Cls) -> bool {
+fn bake_envelope(c: &mut Cls) -> bool {
     let reach = c.reach();
     let mut freach = reach * if c.k[14][0] > 0.0 && c.fil_reach > 1.0 { c.fil_reach } else { 1.0 };
     if c.fz[0] > 0.0 && reach * c.fringe_reach > freach {
@@ -2016,7 +1996,7 @@ fn bake_envelope(dev: Device, c: &mut Cls) -> bool {
             px[o + 3] = a.clamp(0, 255) as u8;
         }
     }
-    c.env = upload_texture(dev, w, h, FMT_A8R8G8B8, &[&px]);
+    c.env = upload_2d(w, h, px);
     if c.env.is_none() {
         log!("world: nebulae: envelope {}: no texture", c.odf);
         return false;
@@ -2030,10 +2010,11 @@ fn bake_envelope(dev: Device, c: &mut Cls) -> bool {
     true
 }
 
-/// Bakes a class's gas into its volume: each layer drawn by `bake_ps` into a render
-/// target, read back and gathered into a system-memory volume, then copied to the
-/// device; the per-column record of where gas is (`occ`) beside it.
-fn bake_volume(dev: Device, c: &mut Cls, half: f32, cfg: &Settings, sh: &mut Shaders, noise: Option<&Com>) -> bool {
+/// Bakes a class's gas into its volume: each layer drawn by `bake_ps` into a target,
+/// read back and gathered into a volume made on the device; the per-column record of
+/// where gas is (`occ`) beside it. Draws into a target of its own: the caller begins
+/// its pass again after.
+fn bake_volume(cmd: &mut Cmd, pipe: &Pipeline, c: &mut Cls, half: f32, cfg: &Settings, noise: Option<&Texture>) -> bool {
     let t0 = rt::now();
     c.vlo = [c.ex0, c.ey - half, c.ez0];
     let size = [c.ex1 - c.ex0, 2.0 * half, c.ez1 - c.ez0];
@@ -2047,77 +2028,56 @@ fn bake_volume(dev: Device, c: &mut Cls, half: f32, cfg: &Settings, sh: &mut Sha
     let mut occ_max = vec![0u8; xn * zn];
     let mut occ_lo = vec![255u8; xn * zn];
     let mut occ_hi = vec![0u8; xn * zn];
-    if !(sh.bake_vs.bind(dev) && sh.bake_ps.bind(dev)) {
+    let g = gfx::gpu();
+    if !pipe.ready(g) {
         return false;
     }
-    let Some(rt) = dev.create_texture(x_n, z_n, 1, USAGE_RENDERTARGET, FMT_A8R8G8B8, POOL_DEFAULT) else { return false };
-    let Some(rts) = rt.tex_surface(0) else { return false };
-    let Some(sys) = create_offscreen(dev, x_n, z_n, FMT_A8R8G8B8, POOL_SYSTEMMEM) else { return false };
-    let Some(stage) = dev.create_volume_texture(x_n, z_n, y_n, 1, 0, FMT_A8R8G8B8, POOL_SYSTEMMEM) else { return false };
-    let old_vp = dev.get_viewport();
-    let Some(old_rt) = dev.get_render_target(0) else { return false };
-    let old_ds = dev.get_depth_stencil();
-    dev.set_render_target(0, rts.ptr());
-    dev.set_depth_stencil(core::ptr::null_mut());
-    dev.set_rs(RS_ZENABLE, 0);
-    dev.set_rs(RS_ALPHABLENDENABLE, 0);
-    dev.set_rs(RS_COLORWRITEENABLE, 15);
-    dev.set_rs(RS_SCISSORTESTENABLE, 0);
-    dev.set_fvf(FVF_SLICE);
-    dev.set_texture(0, noise.map_or(core::ptr::null_mut(), |n| n.ptr()));
+    let rt = g.texture(TextureDesc::d2(x_n, z_n, Format::Bgra8, Usage::RENDER_TARGET | Usage::COPY_SRC), Contents::None);
+    if !rt.ready(g) {
+        return false;
+    }
+    let colors = [ColorTarget::new(&rt, Load::Load)];
+    if !cmd.begin_pass(&Pass { colors: &colors, depth: None, area: None }) || !cmd.set_pipeline(pipe) {
+        return false;
+    }
+    cmd.bind_texture(0, noise, &NOISE);
+    cmd.bind_texture(1, c.env.as_ref(), &CLAMP_LINEAR);
     c.place();
     let mut ok = true;
-    let Some(dst) = vol_lock(&stage, 0) else {
-        dev.set_render_target(0, old_rt.ptr());
-        dev.set_depth_stencil(old_ds.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
-        dev.set_viewport(&old_vp);
-        return false;
-    };
+    let mut vol = vec![0u8; xn * zn * yn * 4];
     for j in 0..yn {
         c.k[12] = [size[0] / x_n as f32, size[1] / y_n as f32, size[2] / z_n as f32, c.vlo[1] + (j as f32 + 0.5) * size[1] / y_n as f32];
-        dev.ps_const(0, flat(&c.k));
-        dev.ps_const(24, flat(&c.ex));
-        dev.ps_const(38, &c.fz);
-        quad(dev);
-        if !rt_data(dev, &rts, &sys) {
-            ok = false;
-            break;
-        }
-        let Some(src) = surf_lock(&sys, LOCK_READONLY) else {
-            ok = false;
-            break;
-        };
+        cmd.ps_block(Block::new(0, flat(&c.k)));
+        cmd.ps_block(Block::new(24, flat(&c.ex)));
+        cmd.ps_block(Block::new(38, &c.fz));
+        quad(cmd);
         let lay = ((j * 255 + (yn - 1) / 2) / (yn - 1).max(1)) as u8;
-        for r in 0..zn {
-            let srow = unsafe { core::slice::from_raw_parts(src.bits.add(r * src.pitch as usize) as *const u32, xn) };
-            unsafe {
-                core::ptr::copy_nonoverlapping(srow.as_ptr() as *const u8, dst.bits.add(j * dst.slice as usize + r * dst.row as usize), xn * 4);
-            }
-            for x in 0..xn {
-                let d = (srow[x] >> 16) as u8;
-                if d > 1 {
-                    let i = r * xn + x;
-                    occ_max[i] = occ_max[i].max(d);
-                    occ_lo[i] = occ_lo[i].min(lay);
-                    occ_hi[i] = occ_hi[i].max(lay);
+        let read = cmd.read_back(&rt, |src| {
+            for r in 0..zn {
+                let srow = unsafe { core::slice::from_raw_parts(src.ptr().add(r * src.pitch()) as *const u32, xn) };
+                let at = (j * zn + r) * xn * 4;
+                unsafe { core::ptr::copy_nonoverlapping(srow.as_ptr() as *const u8, vol[at..].as_mut_ptr(), xn * 4) };
+                for x in 0..xn {
+                    let d = (srow[x] >> 16) as u8;
+                    if d > 1 {
+                        let i = r * xn + x;
+                        occ_max[i] = occ_max[i].max(d);
+                        occ_lo[i] = occ_lo[i].min(lay);
+                        occ_hi[i] = occ_hi[i].max(lay);
+                    }
                 }
             }
+        });
+        if read.is_err() {
+            ok = false;
+            break;
         }
-        surf_unlock(&sys);
     }
-    vol_unlock(&stage, 0);
-    dev.set_render_target(0, old_rt.ptr());
-    dev.set_depth_stencil(old_ds.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
-    dev.set_viewport(&old_vp);
+    cmd.end_pass();
+    drop(rt);
     if ok {
-        let v = dev.create_volume_texture(x_n, z_n, y_n, 1, 0, FMT_A8R8G8B8, POOL_DEFAULT);
-        ok = match v {
-            Some(v) if dev.update_texture(&stage, &v) >= 0 => {
-                c.vol = Some(v);
-                true
-            }
-            _ => false,
-        };
+        c.vol = upload_volume(x_n, z_n, y_n, &[vol]);
+        ok = c.vol.is_some();
     }
     if ok {
         // The occupancy: widened by the flow and the swirl, then uploaded.
@@ -2151,7 +2111,7 @@ fn bake_volume(dev: Device, c: &mut Cls, half: f32, cfg: &Settings, sh: &mut Sha
             px[i * 4 + 2] = occ_max[i];
             px[i * 4 + 3] = 0;
         }
-        c.occ = upload_texture(dev, x_n, z_n, FMT_A8R8G8B8, &[&px]);
+        c.occ = upload_2d(x_n, z_n, px);
         ok = c.occ.is_some();
     }
     c.vx = x_n;

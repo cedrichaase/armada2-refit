@@ -6,15 +6,22 @@
 // for the second texture) clamp every tap to the view's rectangle in that texture, so
 // nothing outside the view (another view, last frame) bleeds in at its edges.
 
-sampler2D s0 : register(s0);
-sampler2D s1 : register(s1);
-float4 k0 : register(c0);   // texel size of s0 (xy)
-float4 k1 : register(c1);   // s0 clamp: min uv (xy), max uv (zw)
-float4 k2 : register(c2);   // per pass: see each
-float4 k3 : register(c3);   // s1 clamp
+#include "../../gpu/shaders/compat.hlsli"
+
+STAGE(0) Texture2D s0 : register(t0);
+STAGE(0) SamplerState s0_s : register(s0);
+STAGE(1) Texture2D s1 : register(t1);
+STAGE(1) SamplerState s1_s : register(s1);
+cbuffer post_ps : register(b1)
+{
+    float4 k0 : CREG(0);   // texel size of s0 (xy)
+    float4 k1 : CREG(1);   // s0 clamp: min uv (xy), max uv (zw)
+    float4 k2 : CREG(2);   // per pass: see each
+    float4 k3 : CREG(3);   // s1 clamp
+};
 
 struct VO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float2 uv0 : TEXCOORD0;
     float2 uv1 : TEXCOORD1;
 };
@@ -30,7 +37,7 @@ VO vs_quad(float4 p : POSITION, float2 a : TEXCOORD0, float2 b : TEXCOORD1)
 
 float3 tap(float2 uv)
 {
-    return tex2D(s0, clamp(uv, k1.xy, k1.zw)).rgb;
+    return s0.Sample(s0_s, clamp(uv, k1.xy, k1.zw)).rgb;
 }
 
 float luma(float3 c)
@@ -48,7 +55,7 @@ float3 sane(float3 c)
 // the destination texel; each is weighted by 1/(1+luma) (Karis) so one hot pixel
 // cannot make a flickering blob. Then the threshold, with a soft knee:
 // k2 = (threshold, knee).
-float4 ps_prefilter(float2 uv : TEXCOORD0) : COLOR
+float4 ps_prefilter(DXIL_POS float2 uv : TEXCOORD0) : SV_Target
 {
     float2 t = k0.xy;
     float3 a = sane(tap(uv + float2(-t.x, -t.y)));
@@ -69,7 +76,7 @@ float4 ps_prefilter(float2 uv : TEXCOORD0) : COLOR
 }
 
 // Level n -> n+1 (dual filter): the centre four times, the four diagonals once.
-float4 ps_down(float2 uv : TEXCOORD0) : COLOR
+float4 ps_down(DXIL_POS float2 uv : TEXCOORD0) : SV_Target
 {
     float2 t = k0.xy;
     float3 s = tap(uv) * 4.0;
@@ -82,7 +89,7 @@ float4 ps_down(float2 uv : TEXCOORD0) : COLOR
 
 // Level n+1 -> n, added onto level n by the blend (ONE, ONE): a tent of eight taps.
 // k2.x scales what is added (1 everywhere but the last step).
-float4 ps_up(float2 uv : TEXCOORD0) : COLOR
+float4 ps_up(DXIL_POS float2 uv : TEXCOORD0) : SV_Target
 {
     float2 t = k0.xy;
     float3 s = tap(uv + float2(-2.0 * t.x, 0.0));
@@ -100,10 +107,10 @@ float4 ps_up(float2 uv : TEXCOORD0) : COLOR
 // into the back buffer. k2 = (bloom, exposure, shoulder, 0). Below the shoulder the
 // colour passes unchanged, so stock's content looks as it did; above it, each
 // channel rolls off towards white instead of clipping.
-float4 ps_final(float2 uv0 : TEXCOORD0, float2 uv1 : TEXCOORD1) : COLOR
+float4 ps_final(DXIL_POS float2 uv0 : TEXCOORD0, float2 uv1 : TEXCOORD1) : SV_Target
 {
     float3 c = sane(tap(uv0));
-    float3 b = sane(tex2D(s1, clamp(uv1, k3.xy, k3.zw)).rgb);
+    float3 b = sane(s1.Sample(s1_s, clamp(uv1, k3.xy, k3.zw)).rgb);
     float3 x = (c + b * k2.x) * k2.y;
     float s = k2.z;
     float3 over = max(x - s, 0.0);

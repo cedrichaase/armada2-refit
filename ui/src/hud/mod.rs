@@ -6,6 +6,7 @@
 pub mod bar;
 pub mod info;
 pub mod layout;
+pub mod leftovers;
 pub mod minimap;
 pub mod overlay;
 mod tooltips;

@@ -1,0 +1,15 @@
+# d3d8.dll is a 32-bit Windows DLL with no C runtime, linked like the plugins
+# (render3d/.cargo/config.toml): lld-link, /nodefaultlib, kernel32 through an import
+# library that build.rs generates. Frame pointers are kept so that a method of ours can
+# read its caller's return address and walk the engine's stack (README.md, "Callers").
+[build]
+target = "i686-pc-windows-msvc"
+
+[target.i686-pc-windows-msvc]
+linker = "lld-link"
+rustflags = [
+    "-C", "target-feature=+sse2",
+    "-C", "force-frame-pointers=yes",
+    "-C", "link-arg=/nodefaultlib",
+    "-C", "link-arg=/entry:DllMain",
+]

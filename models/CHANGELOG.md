@@ -6,6 +6,16 @@ dilithium moons (`moon-sod.py`), the selection bubble (`select-sod.py`), the hul
 (`hull-sod.py`) and the asteroids (`asteroid-sod.py`); `Planets.asi` until 5.0.0. Versioning rules: [`CLAUDE.md`](../CLAUDE.md),
 "Changelogs and versions". Newest first. The reasoning is in [`README.md`](README.md).
 
+## 5.0.1 — 2026-10-23
+
+### Changed
+- `hull-sod.py --install` keeps each rounded model in `$A2_DATA/cache/hull-sod/`, keyed by
+  the stock file, the script and `--split`/`--crease`, and reads it back instead of
+  rebuilding: 25 s to 3 s per install, byte for byte the same. `A2_HULL_SOD_CACHE=0`
+  turns it off.
+
+Installed, not yet seen in game.
+
 ## 5.0.0 — 2026-10-15
 
 ### Removed

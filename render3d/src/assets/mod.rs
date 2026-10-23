@@ -5,7 +5,7 @@
 //!
 //! Names are looked up case-insensitively, as the engine (on Windows) does, through
 //! an index of each directory made once.
-use crate::d3d::*;
+
 use crate::log;
 use crate::rt;
 use a2fmt::odf::Odf;
@@ -16,7 +16,7 @@ use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::ffi::c_void;
+
 
 /// Every file under a game directory (recursively), by lower-case file name, to its
 /// path relative to the game directory.
@@ -71,8 +71,7 @@ struct Store {
     bases: BTreeMap<String, String>,
     sprites: Option<Rc<SpriteTable>>,
     widths: BTreeMap<String, Option<u32>>,
-    textures: BTreeMap<String, Option<Com>>,
-    dev: Option<Device>,
+    textures: BTreeMap<String, Option<gpu::Texture>>,
 }
 
 static mut STORE: Option<Store> = None;
@@ -96,7 +95,6 @@ fn store() -> &'static mut Store {
                 sprites: None,
                 widths: BTreeMap::new(),
                 textures: BTreeMap::new(),
-                dev: None,
             };
             log!(
                 "assets: {} SODs, {} textures, {} sprite files, {} ODFs indexed in {:.0} ms",
@@ -216,29 +214,25 @@ fn tex_width(s: &mut Store, file: &str) -> Option<u32> {
     w
 }
 
-/// A texture by name (no extension), on `dev`, with its whole chain: stock's own
-/// levels where it has them (`mip_name()`'s rule), the rest box-filtered. None if
-/// there is no such texture. The pointer is valid until the next `reset()`.
-pub fn texture(dev: Device, name: &str) -> Option<*mut c_void> {
+/// A texture by name (no extension), with its whole chain: stock's own levels where it
+/// has them (`mip_name()`'s rule), the rest box-filtered. None if there is no such
+/// texture. Made on the device at once, holding no copy of its texels (`Transient`):
+/// it is loaded again after the next `reset()`.
+pub fn texture(name: &str) -> Option<gpu::Texture> {
     let s = store();
-    if s.dev != Some(dev) {
-        s.textures.clear();
-        s.dev = Some(dev);
-    }
     let key = rt::lower(name);
     if let Some(t) = s.textures.get(&key) {
-        return t.as_ref().map(|c| c.ptr());
+        return t.clone();
     }
-    let t = load_texture(s, dev, &key);
+    let t = load_texture(s, &key).filter(|t| t.ready(crate::gfx::gpu()));
     if t.is_none() {
         log!("assets: texture {} not loaded", key);
     }
-    let p = t.as_ref().map(|c| c.ptr());
-    s.textures.insert(key, t);
-    p
+    s.textures.insert(key, t.clone());
+    t
 }
 
-fn load_texture(s: &mut Store, dev: Device, name: &str) -> Option<Com> {
+fn load_texture(s: &mut Store, name: &str) -> Option<gpu::Texture> {
     let base = String::from(s.tex_index.find(name)?);
     let img = tga::decode(&s.tex_dir.read(&base)?).ok()?;
     let (w, h) = (img.width, img.height);
@@ -266,8 +260,14 @@ fn load_texture(s: &mut Store, dev: Device, name: &str) -> Option<Com> {
         lw = nw;
         lh = nh;
     }
-    let refs: Vec<&[u8]> = levels.iter().map(|l| l.as_slice()).collect();
-    upload_texture(dev, w, h, FMT_A8R8G8B8, &refs)
+    let n = levels.len() as u32;
+    let mut px = Vec::with_capacity(levels.iter().map(|l| l.len()).sum());
+    for l in &levels {
+        px.extend_from_slice(l);
+    }
+    drop(levels);
+    let d = gpu::TextureDesc::d2(w, h, gpu::Format::Bgra8, gpu::Usage::SAMPLED).with_levels(n);
+    Some(crate::gfx::gpu().texture(d, gpu::Contents::Transient(px)))
 }
 
 /// A 2x2 box filter of a BGRA8 image.

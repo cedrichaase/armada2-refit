@@ -11,7 +11,7 @@
 //! read every frame.
 use crate::timing;
 use super::post::PRect;
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::engine::{self, hook, rd, storm3d};
 use crate::math::{M4, V3};
 use crate::mods::{self, Step};
@@ -90,7 +90,6 @@ pub struct View {
     pub main: bool,
     /// The view's rectangle in the back buffer (and in our targets).
     pub rect: PRect,
-    pub dev: Device,
     /// The ST3D device (`ST3D_DeviceDirectX8`).
     pub st3d: usize,
     pub view: M4,
@@ -141,7 +140,7 @@ pub fn cam_rect(cam: usize, w: u32, h: u32) -> PRect {
 }
 
 /// The body, as the stock one runs it, with each step offered to the modules first.
-pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> PRect {
+pub fn run(cam: usize, rs: usize, main: bool, tw: u32, th: u32, frame: u32) -> PRect {
     let s3d = storm3d();
     let st3d = engine::st3d_device();
     let rsf = |o: usize| engine::field(rs, o) != 0;
@@ -164,10 +163,9 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         rs,
         main,
         rect: cam_rect(cam, tw, th),
-        dev,
         st3d,
-        view: dev.get_transform(TS_VIEW),
-        proj: dev.get_transform(TS_PROJECTION),
+        view: M4(transform(TS_VIEW)),
+        proj: M4(transform(TS_PROJECTION)),
         eye: engine::field_v3(cam, 0xe4),
         time: engine::sim_time(),
         frame,
@@ -179,6 +177,12 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
     }
     mods::begin_view(&v);
     timing::mark("setup");
+    // Every light of the view is in by now: binned for the clustered draws (Vulkan and
+    // Direct3D 12, `[Lights] Clustered=1`).
+    if crate::scene::clusters::on() {
+        crate::scene::clusters::build(&v);
+        timing::mark("light clusters");
+    }
     unsafe {
         // 8: sky, stars, background objects; then the depth is cleared for the scene.
         if !mods::step(Step::Background, &v) {
@@ -266,12 +270,12 @@ pub fn run(dev: Device, cam: usize, rs: usize, main: bool, tw: u32, th: u32, fra
         this0(via(SITE_DEL_LIGHTS, FN_DEL_LIGHTS), s3d);
     }
     timing::mark("selection, end");
-    // 25-26: stock's black line along the view's right column and bottom row.
-    let r = v.rect;
-    if r.w > 1 && r.h > 1 {
-        let right = Rect { left: (r.x + r.w - 1) as i32, top: r.y as i32, right: (r.x + r.w) as i32, bottom: (r.y + r.h) as i32 };
-        let bottom = Rect { left: r.x as i32, top: (r.y + r.h - 1) as i32, right: (r.x + r.w) as i32, bottom: (r.y + r.h) as i32 };
-        dev.clear(&[right, bottom], CLEAR_TARGET, 0xff00_0000, 1.0, 0);
-    }
+    // 25-26, stock's black line along the view's right column and bottom row, are the
+    // frame's (`frame::black_lines`), in the scene pass.
     v.rect
+}
+
+/// A transform the engine set (`gpu::Gpu::engine_transform`), or the identity.
+fn transform(state: u32) -> [[f32; 4]; 4] {
+    crate::gfx::gpu().engine_transform(state).unwrap_or([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
 }

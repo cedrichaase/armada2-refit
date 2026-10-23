@@ -12,7 +12,6 @@
 //! With `Enable=0` the same seam is still timed (`frame::install_measure`): the
 //! engine's own body, with whatever plugins are hooked into it, between two marks. That
 //! is the reference for comparing render3d with the plugins it replaces.
-use crate::d3d::*;
 use crate::log;
 use crate::rt;
 use alloc::vec::Vec;
@@ -20,18 +19,12 @@ use core::fmt::Write;
 
 const RING: usize = 4;
 const MAX_MARKS: usize = 24;
-const Q_TIMESTAMP: u32 = 10;
-const Q_DISJOINT: u32 = 11;
-const Q_FREQ: u32 = 12;
-const ISSUE_END: u32 = 1;
-const ISSUE_BEGIN: u32 = 2;
 /// A view whose CPU time passes this is logged with its steps.
 const SLOW_MS: f64 = 8.0;
 
 struct Set {
-    disjoint: Com,
-    freq: Com,
-    stamps: Vec<Com>,
+    /// The view's GPU timestamps (`gpu::Timer`).
+    timer: gpu::Timer,
     labels: [&'static str; MAX_MARKS],
     n: usize,
     pending: bool,
@@ -69,7 +62,6 @@ impl Acc {
 struct State {
     on: bool,
     every: f64,
-    dev: Option<Device>,
     sets: [Vec<Set>; 2],
     next: [usize; 2],
     /// The set the current view marks into, by kind (0 main, 1 inset).
@@ -89,7 +81,6 @@ struct State {
 static mut STATE: State = State {
     on: false,
     every: 5.0,
-    dev: None,
     sets: [Vec::new(), Vec::new()],
     next: [0, 0],
     cur: None,
@@ -124,46 +115,26 @@ pub fn configure(on: bool, every: f32) {
 pub fn on() -> bool {
     st().on
 }
-
 /// Drops every query (a `Reset` or a new device).
 pub fn reset() {
     let s = st();
     s.sets = [Vec::new(), Vec::new()];
     s.cur = None;
-    s.dev = None;
 }
 
-fn make_set(dev: Device) -> Option<Set> {
-    let disjoint = dev.create_query(Q_DISJOINT)?;
-    let freq = dev.create_query(Q_FREQ)?;
-    let mut stamps = Vec::with_capacity(MAX_MARKS);
-    for _ in 0..MAX_MARKS {
-        stamps.push(dev.create_query(Q_TIMESTAMP)?);
-    }
-    Some(Set { disjoint, freq, stamps, labels: [""; MAX_MARKS], n: 0, pending: false })
+fn make_set() -> Set {
+    Set { timer: crate::gfx::gpu().timer(MAX_MARKS), labels: [""; MAX_MARKS], n: 0, pending: false }
 }
 
 /// Reads a finished set into the accumulator; false while the GPU has not finished it.
 fn collect(set: &mut Set, acc: &mut Acc) -> bool {
-    let mut disjoint: u32 = 0;
-    let mut freq: u64 = 0;
-    if set.disjoint.query_data(&mut disjoint as *mut u32 as *mut u8, 4, 0) != 0 {
-        return false;
-    }
-    if set.freq.query_data(&mut freq as *mut u64 as *mut u8, 8, 0) != 0 {
-        return false;
-    }
     let mut t = [0u64; MAX_MARKS];
-    for i in 0..set.n {
-        if set.stamps[i].query_data(&mut t[i] as *mut u64 as *mut u8, 8, 0) != 0 {
-            return false;
-        }
-    }
+    let Some(r) = set.timer.read(crate::gfx::gpu(), &mut t[..set.n]) else { return false };
     set.pending = false;
-    if disjoint != 0 || freq == 0 || set.n < 2 {
+    if r.disjoint || r.frequency == 0 || set.n < 2 {
         return true;
     }
-    let ms = 1000.0 / freq as f64;
+    let ms = 1000.0 / r.frequency as f64;
     let total = t[set.n - 1].wrapping_sub(t[0]) as f64 * ms;
     for i in 1..set.n {
         let d = t[i].wrapping_sub(t[i - 1]) as f64 * ms;
@@ -175,17 +146,14 @@ fn collect(set: &mut Set, acc: &mut Acc) -> bool {
     true
 }
 
+
 /// A view begins: `main` is the main view, else the HUD's inset.
-pub fn begin(dev: Device, main: bool) {
+pub fn begin(main: bool) {
     let s = st();
     if !s.on || s.failed {
         return;
     }
     let now = rt::now();
-    if s.dev != Some(dev) {
-        s.sets = [Vec::new(), Vec::new()];
-        s.dev = Some(dev);
-    }
     let k = if main { 0 } else { 1 };
     if main {
         if s.last_main > 0.0 {
@@ -203,14 +171,7 @@ pub fn begin(dev: Device, main: bool) {
         }
     }
     if s.sets[k].len() < RING {
-        match make_set(dev) {
-            Some(set) => s.sets[k].push(set),
-            None => {
-                log!("timing: the device makes no timestamp queries: CPU times only");
-                s.failed = true;
-                return;
-            }
-        }
+        s.sets[k].push(make_set());
     }
     let i = s.next[k] % s.sets[k].len();
     s.next[k] = s.next[k].wrapping_add(1);
@@ -221,7 +182,11 @@ pub fn begin(dev: Device, main: bool) {
         set.pending = false;
     }
     set.n = 0;
-    set.disjoint.query_issue(ISSUE_BEGIN);
+    if !set.timer.begin(crate::gfx::gpu()) {
+        log!("timing: the device makes no timestamp queries: CPU times only");
+        s.failed = true;
+        return;
+    }
     s.cur = Some((k, i));
     mark("begin");
 }
@@ -234,7 +199,7 @@ pub fn mark(label: &'static str) {
     if set.n >= MAX_MARKS {
         return;
     }
-    set.stamps[set.n].query_issue(ISSUE_END);
+    set.timer.stamp(crate::gfx::gpu(), set.n);
     set.labels[set.n] = label;
     s.cpu[set.n] = rt::now();
     set.n += 1;
@@ -270,8 +235,7 @@ pub fn end() {
     let s = st();
     let Some((k, i)) = s.cur.take() else { return };
     let set = &mut s.sets[k][i];
-    set.disjoint.query_issue(ISSUE_END);
-    set.freq.query_issue(ISSUE_END);
+    set.timer.end(crate::gfx::gpu());
     set.pending = true;
     let n = set.n;
     let labels = set.labels;

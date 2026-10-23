@@ -1,0 +1,18 @@
+# vkprobe.exe is a 32-bit Windows program with no C runtime, linked like Display8
+# (../../.cargo/config.toml): lld-link, /nodefaultlib, kernel32 and user32 through
+# import libraries that build.rs generates. A GUI program (no console window), entered
+# at `start`, and not large-address-aware: Armada2.exe is not, so the probe gets the
+# same 2 GB of address space the game does, and a mapping has to fit where the game's
+# would have to.
+[build]
+target = "i686-pc-windows-msvc"
+
+[target.i686-pc-windows-msvc]
+linker = "lld-link"
+rustflags = [
+    "-C", "target-feature=+sse2",
+    "-C", "link-arg=/nodefaultlib",
+    "-C", "link-arg=/entry:start",
+    "-C", "link-arg=/subsystem:windows",
+    "-C", "link-arg=/largeaddressaware:no",
+]

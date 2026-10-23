@@ -1,0 +1,8 @@
+LIBRARY USER32.dll
+EXPORTS
+SetWindowLongA@12
+GetWindowLongA@8
+SetWindowPos@28
+GetClientRect@8
+GetSystemMetrics@4
+MonitorFromPoint@12

@@ -58,6 +58,9 @@ pub struct Lights {
     muzzles: Vec<Muzzle>,
     said: u32,
     said_muzzle: u32,
+    /// This view's lights go to the clusters (`emit`), and the points kept for them.
+    cl: bool,
+    points: Vec<crate::scene::lights::Point>,
 }
 
 /// Where a shot left its ship: its owner's handle, the point's offset from the
@@ -83,6 +86,8 @@ impl Lights {
             muzzles: Vec::new(),
             said: 0,
             said_muzzle: 0,
+            cl: false,
+            points: Vec::new(),
         }
     }
 
@@ -118,6 +123,26 @@ impl Lights {
             let f: unsafe extern "thiscall" fn(usize, usize, *const f32, *const M34) = core::mem::transmute(FN_REGISTER_LIGHT);
             f(engine::storm3d(), l, c.as_ptr(), &m);
         }
+    }
+
+    /// A light of this module's for the view: with clustered lights (`scene::clusters`)
+    /// a point of the scene's own list, kept here until the list is read again
+    /// (`take_points`), which spares the engine a light object and its registry a
+    /// record; else pool light `n` registered with the engine and styled, and `n`
+    /// moves on.
+    fn emit(&mut self, n: &mut usize, pos: V3, col: V3, start: f32, range: f32, style: crate::scene::lights::Style) {
+        if self.cl {
+            self.points.push(crate::scene::lights::Point { pos, colour: col, start, range: range.max(0.01), light: 0, style });
+            return;
+        }
+        self.register(*n, pos, col, start, range);
+        self.style(*n, style);
+        *n += 1;
+    }
+
+    /// The points `emit` kept for the scene's list (after the module read it again).
+    pub fn take_points(&mut self) -> Vec<crate::scene::lights::Point> {
+        core::mem::take(&mut self.points)
     }
 
     /// How the lit draws take pool light `n` (render3d's hulls: as Lighting.asi took
@@ -256,9 +281,7 @@ impl Lights {
             if n >= 112 {
                 break;
             }
-            self.register(n, p, c, r * 0.1, r * 0.9);
-            self.style(n, crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.4, power: 2.0 });
-            n += 1;
+            self.emit(&mut n, p, c, r * 0.1, r * 0.9, crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.4, power: 2.0 });
         }
         n
     }
@@ -352,15 +375,19 @@ impl Lights {
             let ph = self.ph;
             if ph[0] > 0.0 {
                 let p = a + d * (len.min(ph[3]) / len);
-                self.register(n, p, c * ph[0], ph[1], ph[2] - ph[1]);
-                self.style(n, crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.6, power: 2.0 });
-                n += 1;
+                self.emit(&mut n, p, c * ph[0], ph[1], ph[2] - ph[1], crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.6, power: 2.0 });
             }
             if ph[4] > 0.0 {
                 let p = b - d * (len.min(ph[7]) / len);
-                self.register(n, p, c * ph[4], ph[5], ph[6] - ph[5]);
-                self.style(n, crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.0, power: 1.0 });
-                n += 1;
+                self.emit(&mut n, p, c * ph[4], ph[5], ph[6] - ph[5], crate::scene::lights::Style { hard: true, distinct: true, wrap: 0.0, power: 1.0 });
+            }
+            if self.cl {
+                // The beam itself, a line light washing the plating it passes close to.
+                let cc = crate::scene::clusters::config();
+                if cc.beam > 0.0 {
+                    let r = cc.beam_reach;
+                    crate::scene::clusters::add_line(a, b, c * cc.beam, r * 0.1, r * 0.9, cc.beam_wrap, 2.0);
+                }
             }
         }
         n
@@ -370,6 +397,8 @@ impl Lights {
     /// registry changed (the scene's list must be read again).
     pub fn begin_view(&mut self, fx: &[super::fx::Lit], now: f32, main: bool) -> bool {
         let lighting = crate::plugin_loaded("Lighting.asi");
+        self.cl = crate::scene::clusters::on();
+        self.points.clear();
         let mut changed = false;
         if self.recolour && !lighting {
             self.recolour_registry();
@@ -382,13 +411,16 @@ impl Lights {
         if self.muzzle[0] > 0.0 {
             n = self.muzzle_lights(n, now, main);
         }
+        let spot = crate::scene::clusters::config().cone_spot;
         for l in fx {
             if n >= 128 {
                 break;
             }
-            self.register(n, l.pos, l.col, l.start, l.range);
-            self.style(n, crate::scene::lights::Style::default());
-            n += 1;
+            match (self.cl && spot, l.cone) {
+                // A tractor's or an assimilation beam's wash: the cone's footprint.
+                (true, Some(c)) => crate::scene::clusters::add_spot(c.apex, c.axis, c.reach, c.hw0, c.slope, l.col, c.reach * 0.15, 0.2),
+                _ => self.emit(&mut n, l.pos, l.col, l.start, l.range, crate::scene::lights::Style::default()),
+            }
         }
         changed || n > 0
     }

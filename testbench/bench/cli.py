@@ -44,6 +44,10 @@ a2test -- run Armada II headless and test it end to end
   a2test session list                  active sessions: id, size, mod, game, artifacts
   a2test slots                         the machine-wide game slots: who holds them, who waits
                                        (A2_SLOTS sets how many; a run queues for them)
+  a2test stock-cache [status|rebuild|drop]
+                                       the stock game stock sessions clone from: `a2mod stock`
+                                       run once per state of the install (README, "How a case
+                                       runs"); A2TEST_STOCK_CACHE=0 turns it off
   a2test watch [--no-open]             the bench dashboard on 127.0.0.1:5950: every job,
                                        its games (noVNC), the queue, what finished
   a2test watch --install-desktop       an app-launcher entry for it, always the main checkout's
@@ -124,6 +128,13 @@ def main(argv=None):
         if cmd == 'slots':
             from . import slots
             return slots.main(rest)
+        if cmd == 'stock-cache':
+            from . import stockcache
+            try:
+                return stockcache.main(rest)
+            except stockcache.StockCacheError as e:
+                print(f'a2test: {e}', file=sys.stderr)
+                return 1
         if cmd == 'baseline':
             from . import baseline
             return baseline.main(rest)

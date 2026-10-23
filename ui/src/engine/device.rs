@@ -9,13 +9,13 @@
 //!   error in Direct3D. Please reboot."). The slot is chained: the UI lets go of all it
 //!   holds on the device, in every pool, before the engine releases it.
 //! - **`Reset`** (slot 14 of the d3d8 device's vtable, chained) fails while a state block
-//!   or anything in the default pool is held: the UI's state block and the close-up's
-//!   pictures go first.
+//!   or anything in the default pool is held: `gpu` lets go of them first (`gfx::reset`),
+//!   and the close-up drops its pictures, whose contents are lost.
 //! - **`Present`** (slot 15, chained with `Reset`) is where a frame dump asked for with
 //!   `UI.dump` reads the back buffer: the frame as presented, HUD, UI and the engine's
 //!   cursor included (README.md, "Frame dumps").
 use super::{field, hook};
-use crate::d3d::*;
+use gpu::d3d9::raw::*;
 use crate::log;
 use core::ffi::c_void;
 
@@ -102,6 +102,7 @@ type Present8 = unsafe extern "system" fn(*mut c_void, *const c_void, *const c_v
 unsafe extern "system" fn present(dev8: *mut c_void, src: *const c_void, dst: *const c_void, wnd: *mut c_void, dirty: *const c_void) -> HRESULT {
     let n = unsafe { PRESENTS };
     unsafe { PRESENTS = n.wrapping_add(1) };
+    crate::movie::present(dev8);
     if let Some(name) = crate::dump::poll("UI.dump") {
         dump_back_buffer(dev8, name, n);
     }
@@ -113,10 +114,21 @@ unsafe extern "system" fn present(dev8: *mut c_void, src: *const c_void, dst: *c
 
 fn dump_back_buffer(dev8: *mut c_void, name: alloc::string::String, frame: u32) {
     let mut d = crate::dump::Dump::new(name, frame, "ui");
-    match Device::from_d3d8(dev8).and_then(|dev| dev.get_back_buffer().map(|bb| (dev, bb))) {
-        Some((dev, bb)) => {
+    let g = crate::gfx::gpu();
+    let bb = if g.on_display() {
+        // Display8's image of the engine's back buffer, before its gamma pass.
+        crate::gfx::attach().and_then(|_| g.engine_target())
+    } else {
+        Device::from_d3d8(dev8).and_then(|dev| {
+            crate::gfx::attach()?;
+            dev.get_back_buffer()
+        })
+        .map(|bb| g.wrap_d3d9_surface(bb))
+    };
+    match bb {
+        Some(bb) => {
             d.note("the back buffer at Present: the frame as presented");
-            d.surface(dev, &bb, None, "present", crate::dump::Kind::Ppm);
+            d.surface(g, &bb, None, "present", crate::dump::Kind::Ppm);
         }
         None => {
             log!("dump: no Direct3D 9 device or back buffer behind the game's: nothing to read");

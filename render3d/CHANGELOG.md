@@ -4,6 +4,127 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.23.1 — 2026-10-23
+
+### Changed
+- The shipped `Render3D.ini` has a `[Lights]` section with the clustered lights' keys
+  at their defaults (`Clustered=1` and the rest), so an install adds them to a
+  player's file and `Clustered=0` is there to switch.
+
+Installed, not yet seen in game.
+
+## 0.23.0 — 2026-10-23
+
+### Added
+- Clustered lights on Vulkan and Direct3D 12 (`scene/clusters.rs`,
+  `shaders/clusters.hlsl`, `shaders/clustered.hlsli`): every light of the view lights
+  the hulls, planets, moons and asteroids per pixel, binned by a compute pass into
+  screen tiles by depth slices, with no cap per mesh; of one colour only the strongest
+  at each pixel. Clustered twins `PS_HULL_CL`, `PS_BUMP_CL`, `PS_ROCK_CL`,
+  `PS_GROUND_CL`, `PS_CITY_CL`, `PS_CLOUD_CL`, `PS_SURFACE_CL`; the cull `CS_CLUSTER`.
+- Phaser beams as line lights, and the tractor and assimilation beams' wash as a spot
+  confined to the cone (ART-DIRECTION.md), where clustered lights run.
+- `[Lights]` keys `Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`,
+  `ClusterPerColour`, `BeamLight`, `BeamReach`, `BeamWrap`, `ConeSpot`.
+- `hlsl-rs.sh`: an entry marked `:dxc` is dxc's alone (no d3dbc), for compute and
+  storage. `bench-ini.sh` sets a bench clone's `Render3D.ini` keys from a `Setup:` line.
+- gpu (no changelog of its own): compute on Vulkan and Direct3D 12 (`Gpu::compute`,
+  `Gpu::storage`, `Gpu::compute_pipeline`, `Usage::STORAGE`, `Cmd::dispatch`,
+  `bind_storage`, `bind_storage_rw`, `bind_storage_image`, `cs_block`, `write_storage`,
+  `barrier`), storage bindings in the SPIR-V reflection, a compute root signature and a
+  storage table in the graphics one on Direct3D 12; nothing on Direct3D 9.
+
+### Changed
+- With clustered lights, the ordnance module's phaser, muzzle and effect lights are
+  points of the scene's own list, not engine light objects.
+
+With `Clustered=0` and on Direct3D 9 every frame is as before (the port scenes at
+RMSE 0 against `pre-gpu-*` on Direct3D 9). Installed, not yet seen in game.
+
+## 0.22.1 — 2026-10-23
+
+### Fixed
+- Every nebula class was baked twice, on its first two frames (the menu's and a
+  mission's start): a class made in the middle of a gather started its signature from 0
+  (`SIG0`). The log says why a class is baked again.
+- On Vulkan a nebula bake took 0.4 to 1.5 s a class, a stall of seconds at the main
+  menu and at a mission's start: `gpu`'s read-back read the card's memory through the
+  PCIe window; it reads host-cached memory now (`gpu/README.md`, "Read-backs").
+
+Confirmed in game 2026-10-23.
+
+## 0.22.0 — 2026-10-23
+
+### Added
+- The frame and every module on `gpu`'s Direct3D 12 backend when Display8 draws on
+  Direct3D 12: every pipeline carries its DXIL (`gpu::code!`'s third name), and a pixel
+  shader drawn with an alpha test its alpha-tested twin, built from entries marked `:at`
+  (`hlsl-rs.sh`, `dxil-alpha.py`: `PS_SOD`, the particles' `PS_SPRITE`, `PS_GHOST`).
+
+### Fixed
+- In the DXIL, the post passes', the sky's quad shaders' and the ghosts' pixel shaders
+  take the position first, so their inputs sit at the registers their vertex shaders
+  write (`DXIL_POS`, `DXIL_POS_FIRST`, `DXIL_POS_MEMBER`); the d3dbc and SPIR-V are
+  unchanged.
+
+Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.97, nebula 0.39,
+firing 0.41 (/255). Installed, not yet seen in game.
+
+## 0.21.0 — 2026-10-23
+
+### Added
+- The frame and every module on `gpu`'s Vulkan backend when Display8 draws on Vulkan:
+  every pipeline carries its SPIR-V beside its d3dbc (`gpu::code!`), the engine's
+  targets, viewport and transforms come from Display8 (`gpu::Gpu::engine_target`,
+  `engine_viewport`, `engine_transform`), the engine's textures from its mirrors
+  (`gfx::engine_texture`), and the post passes leave out Direct3D 9's half-pixel offset
+  there (`gpu::Gpu::half_pixel`). The menu scene's viewport is handed to its pass.
+
+Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.87, nebula 0.36,
+firing 0.40 (/255). Confirmed in game 2026-10-23.
+
+## 0.20.0 — 2026-10-23
+
+### Added
+- `hlsl-rs.sh` also writes DXIL for Direct3D 12 (`src/shaders/<name>_dxil.rs`,
+  `pub static <SYMBOL>_DXIL`, and each module's `CB_SPACES`), signed, from the pinned
+  dxc v1.9.2609 (`gpu/shaders/fetch-dxc.sh`, `DXC=`); `dxil-spaces.py` puts each
+  cbuffer of a stage in a register space of its own for it. Every shader's DXIL is
+  committed. `gpu/shaders/compat.hlsli`: `STAGE(n)`'s `vk::` attributes only in SPIR-V.
+  The d3dbc and SPIR-V are byte for byte as before (only their stamps changed).
+
+Installed, not yet seen in game.
+
+## 0.19.0 — 2026-10-23
+
+### Changed
+- Every shader (`shaders/*.hlsl`, `chain.hlsli`) is modern HLSL (`Texture*` and
+  `SamplerState`, `cbuffer`, `SV_Position`/`SV_Target`, `Sample*`, `select`), with what
+  differs between vkd3d and dxc in `gpu/shaders/compat.hlsli` (729f9bb). The Direct3D 9
+  bytecode is the same code with the same constant registers and sampler stages:
+  `d3dbc-slots.py` puts vkd3d's renumbered samplers back on their stages, and
+  `d3dbc-fix.py` narrows vPos's declaration to `.xy`.
+- The frame's targets, scene pass, resolve, bloom, tone map and frame dumps go through
+  `gpu/`, the graphics interface shared with UI.asi; the black line at the view's right
+  and bottom edges is cleared after the body (`frame::black_lines`) (caef061).
+- Every module draws through `gpu` (1b63c7f): a pipeline per combination of states,
+  uniform blocks at the registers the shaders declare, gpu textures and buffers, the
+  frame's vertex rings; `gfx::Guard`, `Shader`, `Decl`, `DynVb` and `gfx/chain.rs` are
+  gone (the bake chain is `gpu::chain`); game textures, models and nebula volumes keep
+  no CPU copy (`Contents::Transient`); timing uses `gpu::Timer`. Every pipeline sets the
+  depth bias and the clip planes to 0.
+
+### Added
+- `hlsl-rs.sh` also writes SPIR-V for each shader (`src/shaders/<name>_spv.rs`: dxc,
+  Vulkan 1.1, checked by `spirv-val`, stamped), not linked in yet.
+
+### Removed
+- `src/d3d` (now `gpu::d3d9::raw`).
+
+Measured on the bench: `port-showcase`, `port-nebula`, `port-firing` draw the same pixels
+as before (39 frames, scene targets, bloom levels and presented frames: RMSE 0).
+Confirmed in game 2026-10-23.
+
 ## 0.18.0 — 2026-10-22
 
 ### Added

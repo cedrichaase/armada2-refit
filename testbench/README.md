@@ -101,13 +101,54 @@ a separate track and the mix is made in the edit (`films/README.md`, "Sound").
 
 | Stage | What | Why this way |
 |---|---|---|
-| clone | `cp -a --reflink=always` of the game (4.5 GB) and the prefix (558 MB) into `~/.cache/a2test/sessions/<id>/` | btrfs: 0.7 s and no space. Must be the same filesystem as the game |
-| prepare | `ARMADA.PRF` line 5 set to the resolution, then `ui/install.sh` with `A2_GAME=<clone>`: this checkout's `UI.asi` in, and what it supersedes taken out (`HUD.asi`, `GridLayout.asi`, `Menus.asi`, the file-based HUD fixes: `ui/README.md`, "Installing"). For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order, so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted) | `UI.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims |
+| clone | `cp -a --reflink=always` of the game (4.5 GB) and the prefix (558 MB) into `~/.cache/a2test/sessions/<id>/`. A case that starts from stock (`Mod: stock`, `--install`, `--assets none`) copies the game from the stock cache instead (below) | btrfs: 0.7 s and no space. Must be the same filesystem as the game |
+| prepare | `ARMADA.PRF` line 5 set to the resolution, then `ui/install.sh` with `A2_GAME=<clone>`: this checkout's `UI.asi` in, and what it supersedes taken out (`HUD.asi`, `GridLayout.asi`, `Menus.asi`, the file-based HUD fixes: `ui/README.md`, "Installing"). For `Mod: stock`, `a2mod stock` on the clone instead. With `--install PATH` (repeatable), `a2mod stock` and then each `PATH/install` in order, so the case shows exactly those checkouts; the log's `installs=` names each one's commit (`-dirty` if uncommitted). The `a2mod stock` comes done from the stock cache, and `prepare.log` carries its output from when the entry was made | `UI.asi` takes no resolution, so every case runs the same install: a pass at every aspect is what it claims |
 | display | `sway` with `WLR_BACKENDS=headless`, one output at exactly the resolution, `xwayland force` | the game gets the same Xwayland path it has under Hyprland, and nothing appears on the desktop |
 | input | `input/a2input`: a wlr virtual pointer and virtual keyboard on sway's seat, fed through a FIFO | see "Input" |
 | game | `umu_run.py` with Heroic's environment, the clone as `WINEPREFIX`/`STEAM_COMPAT_DATA_PATH`; silent: `winepulse.drv=d;winealsa.drv=d` | see "Traps" |
 | capture | `grim -o HEADLESS-1` | what the compositor actually shows, scaling included |
 | teardown | Proton's `wineserver -k` on the clone, the launcher's process group, sway; logs gathered; clone deleted | also when `session start` fails part-way (an install, the display, a launch the audio guard stops): before 2.12.1 such a session kept its sway, input and VNC running and stayed in `session list` with no game |
+
+### The stock cache
+
+`a2mod stock` on a clone of the user's install is the same work with the same result
+every time: hashing and moving the 1879 files the install carries of ours and copying
+the stock backups back, 12 s per session, measured. So it runs once per state of the
+install, on a reflink clone kept in `~/.cache/a2test/stock/<key>/game` (the bench's own
+cache, since it is the game's own files; never a checkout or `A2_DATA`), and every
+stock-start session takes a reflink copy of that (0.7 s). `bench/stockcache.py`.
+
+- **What stock is** here is exactly what `a2mod stock` makes of the install: what
+  `a2mod` deliberately leaves (DXVK and the d3d8 chain behind Display8, the ASI loader,
+  the widescreen patch, `ARMADA.PRF`, `RTS_CFG.h`) is the user's, as before. Measured:
+  a fresh clone with `a2mod stock` and a copy from the cache are the same over all
+  10,734 entries by type, mode, size, mtime and sha256, except `.a2mod/state.json`'s
+  `since` time.
+- **The key** is the install's tree by `lstat` (path, mode, size, inode, mtime, ctime of
+  every entry), the hash of the `a2mod` the bench runs from, and a version of the cache's
+  own logic. ctime cannot be set from user space, so anything that changes the install
+  (the user playing, which writes `ARMADA.PRF` and the plugins' logs; `./install`;
+  `a2mod`; Heroic or DXVK replacing a DLL) makes a new key, and the next stock session
+  builds a new entry. Taking it costs 0.3 s. It is taken again after a build, and an
+  entry is not kept if the install changed meanwhile (that session then falls back to
+  `a2mod stock` on its own clone).
+- **Concurrency**: the check, build, prune and copy run under one flock
+  (`stock/.lock`); a build goes into `.build-<key>-<pid>` and is renamed into place. A
+  session that finds another building waits about 12 s and copies the result. The three
+  most recently used entries are kept; an entry shares all its data with the install
+  (`btrfs filesystem du`: 0 B exclusive), so it costs only metadata.
+- **The real install is only read**: `a2mod stock` runs with `A2_GAME` on the build's
+  own clone.
+- `a2test stock-cache status` shows the install's key and the entries;
+  `rebuild` makes the current one again; `drop` removes them all.
+  `A2TEST_STOCK_CACHE=0` turns the cache off for a run (the old clone and `a2mod stock`).
+
+What it saves is the 12 s, out of a stock start of about 80 s: the rest of a
+`--install` start is the checkout's `./install`, measured in a clone at steady state as
+`a2tex install` 23–37 s, `models/install.sh` 25 s (all of it `hull-sod.py`, which
+keeps its models in `$A2_DATA/cache/hull-sod/` since models 5.0.1 and so takes 3 s), and
+under 2 s for the rest. The first `--install` of a checkout also builds its plugins
+(`render3d`, `ui`, `display`: about 50 s together), once.
 
 The launch step also proves isolation: it scans `/proc/<pid>/maps` and `fd` for the
 real install's path, and fails the case if the game has it open.
@@ -359,7 +400,7 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   (`--res 1280x720`) unless fine detail is judged, and keep every new shader pass
   fixed-cost. A session whose game died shows "game not running" in `session list`;
   `session stop` still cleans it up (exit code 2 then).
-- **Starting takes two to three minutes** (clone, both installs, the first tick), so
+- **Starting takes one to three minutes** (clone, both installs, the first tick), so
   `session start` can outlast a 120 s tool timeout: start it in the background and
   wait for `stop it:` in its output. The scene is built 30-60 s after that: wait for
   `scene ready` in the clone's `Scene.log`, not a fixed time.
@@ -474,6 +515,26 @@ step log names them (the last of each name) and whose `.ppm`/`.pfm` dumps anywhe
 under it are named by stem; a scenario or run directory holding one case; any other
 directory of images; a session ID, live or ended; or a baseline's name. `record` adds
 to a baseline and refuses to replace a shot it holds unless given `--force`.
+
+**Vulkan on the bench.** A game whose clone's `Display8.ini` says `Mode=stub` and
+`Backend=vulkan` runs on lavapipe, Mesa's CPU Vulkan, with the Khronos validation layer
+(`bench/session.py`, `vulkan_env`: `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`,
+`VK_INSTANCE_LAYERS`; `display/bench-mode.sh` adds `Device=llvmpipe` and `Validate=1`),
+so new Vulkan code never runs on the user's GPU; `A2TEST_VULKAN_GPU=1` leaves the
+drivers alone for a deliberate run there. Judge such a run against a baseline taken
+on the GPU (`pre-gpu-*`), not against `Backend=d3d9` on lavapipe: DXVK on lavapipe
+draws the port scenes visibly differently from DXVK on the GPU (`port-nebula` at RMSE
+25.8, `port-firing` 7.0), while render3d on Vulkan on lavapipe is within 1 to 2 of the
+GPU's (`gpu/README.md`, "Measured"). A whole campaign mission does not load on
+lavapipe on either backend (32-bit address space, likely): run `display-stub` on Vulkan
+with `A2TEST_VULKAN_GPU=1` once the port scenes are clean under the layer.
+
+**Direct3D 12 on the bench** (`Backend=d3d12`) runs through Proton's vkd3d-proton on
+the GPU; there is no CPU driver for it here. With `Validate=1` the game gets the Khronos
+layer under vkd3d-proton, writing `logs/vvl.log` (`vulkan_env`), but its messages do
+not come through the 32-bit winevulkan and vkd3d-proton has no Microsoft debug layer
+(`display/README.md`, "Direct3D 12"): judge a run by its pictures against the GPU's
+baselines.
 
 **What the numbers mean.** Every frame is compared as RGB; an alpha channel is dropped,
 and the report says so.

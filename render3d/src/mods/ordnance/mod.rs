@@ -20,7 +20,6 @@ mod models;
 pub mod sprite;
 
 use super::{Module, Step};
-use crate::d3d::Device;
 use crate::engine::{self, field, field_f32, field_u8, hook, rd};
 use crate::frame::steps::View;
 use crate::log;
@@ -293,7 +292,7 @@ impl Module for Ordnance {
     fn superseded(&self) -> Option<&'static str> {
         Some("Specials.asi")
     }
-    fn device(&mut self, _dev: Device) {
+    fn device(&mut self) {
         self.install();
     }
     fn reset(&mut self) {
@@ -305,6 +304,11 @@ impl Module for Ordnance {
         let ls = self.fx.take_lights(v.time, v.main).to_vec();
         if self.lights.begin_view(&ls, v.time, v.main) {
             crate::scene::regather_lights();
+        }
+        // With clustered lights, this module's points are the scene's own (not
+        // registered with the engine): added after the list is read again.
+        for p in self.lights.take_points() {
+            crate::scene::add_point(p);
         }
         if v.main {
             self.frames = self.frames.wrapping_add(1);

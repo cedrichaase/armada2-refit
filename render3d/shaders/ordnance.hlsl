@@ -43,15 +43,20 @@
 //     speed along the beam (half widths a second), the brightness at the target
 //     against the emitter's.
 
-float4 k_vp0 : register(c0);   // vertex shaders: the columns of VIEW x PROJECTION
-float4 k_vp1 : register(c1);
-float4 k_vp2 : register(c2);
-float4 k_vp3 : register(c3);
+#include "../../gpu/shaders/compat.hlsli"
+
+cbuffer ordnance_vs : register(b0)
+{
+    float4 k_vp0 : CREG(0);   // vertex shaders: the columns of VIEW x PROJECTION
+    float4 k_vp1 : CREG(1);
+    float4 k_vp2 : CREG(2);
+    float4 k_vp3 : CREG(3);
+};
 
 // ---- stock's sprites -------------------------------------------------------------
 
 struct SpIn  { float4 pos : POSITION; float2 uv : TEXCOORD0; float4 col : TEXCOORD1; };
-struct SpOut { float4 pos : POSITION; float2 uv : TEXCOORD0; float4 col : TEXCOORD1; };
+struct SpOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : TEXCOORD1; };
 
 SpOut vs_sprite(SpIn i)
 {
@@ -63,12 +68,16 @@ SpOut vs_sprite(SpIn i)
     return o;
 }
 
-sampler2D k_tex : register(s0);
-float4 k_hot : register(c0);   // x: how far past white the hottest texels go, y: from which level
-
-float4 ps_sprite(SpOut i) : COLOR
+STAGE(0) Texture2D k_tex : register(t0);
+STAGE(0) SamplerState k_tex_s : register(s0);
+cbuffer ordnance_ps : register(b1)
 {
-    float4 c = tex2D(k_tex, i.uv) * i.col;
+    float4 k_hot : CREG(0);   // x: how far past white the hottest texels go, y: from which level
+};
+
+float4 ps_sprite(SpOut i) : SV_Target
+{
+    float4 c = k_tex.Sample(k_tex_s, i.uv) * i.col;
     float  m = max(c.r, max(c.g, c.b));
     float  h = saturate((m - k_hot.y) / max(1.0 - k_hot.y, 1e-3));
     c.rgb *= 1.0 + k_hot.x * h * h;
@@ -77,11 +86,14 @@ float4 ps_sprite(SpOut i) : COLOR
 
 // ---- Specials.asi's effects ---------------------------------------------------------
 
-float4 k_time : register(c0);  // fx pixel shader: x the clock (s), wrapped
+cbuffer ordnance_ps1 : register(b1)
+{
+    float4 k_time : CREG(0);  // fx pixel shader: x the clock (s), wrapped
+};
 
 struct VsIn  { float4 pos : POSITION; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; float4 t2 : TEXCOORD2;
                float4 t3 : TEXCOORD3; float4 t4 : TEXCOORD4; };
-struct VsOut { float4 pos : POSITION; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; float4 t2 : TEXCOORD2;
+struct VsOut { float4 pos : SV_Position; float4 t0 : TEXCOORD0; float4 t1 : TEXCOORD1; float4 t2 : TEXCOORD2;
                float4 t3 : TEXCOORD3; float4 t4 : TEXCOORD4; };
 
 VsOut fx_vs(VsIn i)
@@ -278,7 +290,7 @@ float3 cone(float2 uv, float lw, float3 col, float2 sw, float seed, float4 p, fl
     return col * streak * vap * along * far * near * edge * rim;
 }
 
-float4 fx_ps(VsOut i) : COLOR
+float4 fx_ps(VsOut i) : SV_Target
 {
     float  kind = i.t0.z;
     float  k0 = 1.0 - step(0.5, kind);

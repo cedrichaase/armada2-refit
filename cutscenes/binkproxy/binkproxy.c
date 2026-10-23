@@ -854,6 +854,32 @@ static int intro_backbuffer(void *ret, BYTE *callerEbp, DWORD pitch, int *w, int
 static BYTE *g_scratch;
 static DWORD g_scratchSize;
 
+/* ---- the UI draws the frame ----------------------------------------------------
+ * With UI.asi loaded (and its [UI] Movies on), a full-screen frame is handed to
+ * its ui_present_movie(bgrx, w, h, pitch), which draws it fitted at the present
+ * that follows; it returns 0 when it cannot, and the frame is copied into the
+ * locked back buffer as before.  Looked up at each movie's first frame, since
+ * the ASI loader may load UI.asi after this DLL.  UseUI=0 in BinkProxy.ini
+ * keeps the copy. */
+typedef int (__cdecl *pUiMovie)(const BYTE *, int, int, int);
+static int g_useUi = 1;
+static int ui_movie(const BYTE *bgrx, int w, int h, int pitch)
+{
+    static pUiMovie f;
+    static int looked, said;
+    if (!g_useUi) return 0;
+    if (!looked) {
+        HMODULE ui = GetModuleHandleA("UI.asi");
+        f = ui ? (pUiMovie)GetProcAddress(ui, "ui_present_movie") : (pUiMovie)NULLPTR;
+        looked = 1;
+        logline(f ? "UI.asi draws the full-screen frames" : "no UI.asi: frames copied into the back buffer");
+    }
+    if (!f) return 0;
+    if (f(bgrx, w, h, pitch)) return 1;
+    if (!said) { said = 1; logline("UI.asi declined a frame: copied into the back buffer"); }
+    return 0;
+}
+
 /* ---- exports ------------------------------------------------------------------- */
 EXPORT void *WINAPI BinkOpen(const char *name, DWORD flags)
 {
@@ -961,6 +987,7 @@ EXPORT int WINAPI BinkCopyToBuffer(void *bink, void *dest, DWORD pitch, DWORD de
             return 1;
         }
         if (mv) {
+            if (ui_movie(mv->frame, mv->w, mv->h, mv->w * 4)) return 0;
             fit_blit(mv->frame, mv->w, mv->h, dest, (int)pitch, bw, bh, type);
         } else {
             DWORD sw = ((DWORD *)bink)[0], sh = ((DWORD *)bink)[1], need = sw * sh * 4;
@@ -972,6 +999,7 @@ EXPORT int WINAPI BinkCopyToBuffer(void *bink, void *dest, DWORD pitch, DWORD de
                 if (!g_scratch) return R.CopyToBuffer(bink, dest, pitch, destH, x, y, flags);
             }
             if (R.CopyToBuffer(bink, g_scratch, sw * 4, sh, 0, 0, (flags & ~15u) | 3) != 0) return 1;
+            if (ui_movie(g_scratch, (int)sw, (int)sh, (int)(sw * 4))) return 0;
             fit_blit(g_scratch, (int)sw, (int)sh, dest, (int)pitch, bw, bh, type);
         }
         return 0;
@@ -1065,6 +1093,7 @@ BOOL WINAPI DllMain(HANDLE inst, DWORD reason, void *res)
     g_replace = (int)GetPrivateProfileIntA("BinkProxy", "ReplaceMovies",  1, g_ini);
     g_raise   = (int)GetPrivateProfileIntA("BinkProxy", "RaiseIntroMode", 1, g_ini);
     g_fit     = (int)GetPrivateProfileIntA("BinkProxy", "FitIntro",       1, g_ini);
+    g_useUi   = (int)GetPrivateProfileIntA("BinkProxy", "UseUI",          1, g_ini);
     w         = (int)GetPrivateProfileIntA("BinkProxy", "IntroWidth",     0, g_ini);
     h         = (int)GetPrivateProfileIntA("BinkProxy", "IntroHeight",    0, g_ini);
 

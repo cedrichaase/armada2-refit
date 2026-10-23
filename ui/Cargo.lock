@@ -10,6 +10,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ash"
+version = "0.38.0+1.3.281"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
+
+[[package]]
 name = "bytemuck"
 version = "1.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -43,6 +49,13 @@ name = "fontbake"
 version = "0.1.0"
 dependencies = [
  "skrifa",
+]
+
+[[package]]
+name = "gpu"
+version = "0.1.0"
+dependencies = [
+ "ash",
 ]
 
 [[package]]
@@ -113,6 +126,7 @@ version = "0.1.0"
 dependencies = [
  "a2fmt",
  "fontbake",
+ "gpu",
  "libm",
 ]
 

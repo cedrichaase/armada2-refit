@@ -10,6 +10,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ash"
+version = "0.38.0+1.3.281"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
+
+[[package]]
+name = "gpu"
+version = "0.1.0"
+dependencies = [
+ "ash",
+]
+
+[[package]]
 name = "libm"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -20,5 +33,6 @@ name = "render3d"
 version = "0.16.3"
 dependencies = [
  "a2fmt",
+ "gpu",
  "libm",
 ]

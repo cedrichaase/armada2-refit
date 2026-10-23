@@ -220,48 +220,77 @@ fn pump(p: &mut Pumped) -> Option<i32> {
 }
 
 // The 3D window answers WM_SETCURSOR with no cursor, for the engine's sprite cursor in
-// a mission. A screen of ours has the arrow, as the GDI menus do: its window is
-// subclassed while it runs.
-static mut PREV_PROC: isize = 0;
+// a mission. A screen of ours (and a hosted dialog) has the arrow, as the GDI menus do,
+// or none while the UI draws its own.
+//
+// Not by subclassing the window (README.md, "The front end: screens of our own"): DXVK
+// hooks the procedure of a full-screen device's window and gives it back only if its
+// own is still on top when the device goes. A subclass made while a device was up kept
+// DXVK's procedure as the one before it; a new device then took the subclass as its
+// own "before", and the two called each other until the stack ran out. So the engine's
+// own answer is changed instead, at the one `call [SetCursor]` in its `WM_SETCURSOR`
+// case.
+/// In `WindowProc`, the `WM_SETCURSOR` case: `push 0` then this `call [SetCursor]`.
+const SITE_WM_SETCURSOR: usize = 0x488883;
+/// `call dword ptr [__imp__SetCursor@4]`.
+const STOCK_WM_SETCURSOR: [u8; 6] = [0xff, 0x15, 0xa8, 0x81, 0x7b, 0x00];
 static mut ARROW: HANDLE = core::ptr::null_mut();
-static mut SUBCLASS_ON: bool = false;
+static mut ARROW_ON: bool = false;
 static mut OS_CURSOR_HIDDEN: bool = false;
+static mut SETCURSOR_PATCHED: bool = false;
+
+/// Points the engine's `WM_SETCURSOR` answer at ours (once); false, and the engine's
+/// "no cursor" kept, when the site is not stock.
+fn patch_wm_setcursor() -> bool {
+    unsafe {
+        if SETCURSOR_PATCHED {
+            return true;
+        }
+        let at = SITE_WM_SETCURSOR;
+        let rel = (wm_setcursor as *const () as usize as i64 - (at as i64 + 5)) as i32;
+        let mut new = [0xe8u8, 0, 0, 0, 0, 0x90];
+        new[1..5].copy_from_slice(&rel.to_le_bytes());
+        if !hook::patch_bytes(at, &STOCK_WM_SETCURSOR, &new) {
+            log!("shell: WindowProc's WM_SETCURSOR at {:#x} is not stock: the 3D window keeps no cursor", at);
+            return false;
+        }
+        SETCURSOR_PATCHED = true;
+        log!("shell: WindowProc's WM_SETCURSOR answered by us");
+        true
+    }
+}
+
+/// `SetCursor` as the engine's `WM_SETCURSOR` calls it (stdcall, the cursor it wants:
+/// none).
+unsafe extern "system" fn wm_setcursor(c: HANDLE) -> HANDLE {
+    unsafe {
+        if ARROW_ON {
+            return SetCursor(if OS_CURSOR_HIDDEN { core::ptr::null_mut() } else { ARROW });
+        }
+        SetCursor(c)
+    }
+}
 
 /// Hides the arrow Windows draws over a screen of ours, for the UI to draw its own
 /// (cursor.rs). Lasts until the screen ends.
 pub fn hide_os_cursor() {
     unsafe {
-        if SUBCLASS_ON {
+        if ARROW_ON {
             OS_CURSOR_HIDDEN = true;
             SetCursor(core::ptr::null_mut());
         }
     }
 }
 
-unsafe extern "system" fn screen_proc(w: HWND, msg: u32, wp: usize, lp: isize) -> isize {
-    unsafe {
-        if SUBCLASS_ON && msg == WM_SETCURSOR && (lp & 0xffff) as u16 == HTCLIENT {
-            SetCursor(if OS_CURSOR_HIDDEN { core::ptr::null_mut() } else { ARROW });
-            return 1;
-        }
-        CallWindowProcA(PREV_PROC, w, msg, wp, lp)
-    }
-}
-
-fn subclass(w: HWND) {
+fn subclass(_w: HWND) {
     unsafe {
         if ARROW.is_null() {
             ARROW = LoadCursorA(core::ptr::null_mut(), IDC_ARROW);
         }
-        let ours = screen_proc as *const () as usize as isize;
-        if GetWindowLongA(w, GWL_WNDPROC) != ours {
-            // Installed once; afterwards it only passes messages on while no screen of
-            // ours runs, so a subclass someone else adds on top is never cut off.
-            if PREV_PROC == 0 {
-                PREV_PROC = SetWindowLongA(w, GWL_WNDPROC, ours);
-            }
+        if !patch_wm_setcursor() {
+            return;
         }
-        SUBCLASS_ON = true;
+        ARROW_ON = true;
         OS_CURSOR_HIDDEN = false;
         SetCursor(ARROW);
     }
@@ -269,7 +298,7 @@ fn subclass(w: HWND) {
 
 fn unsubclass() {
     unsafe {
-        SUBCLASS_ON = false;
+        ARROW_ON = false;
         OS_CURSOR_HIDDEN = false;
     }
 }

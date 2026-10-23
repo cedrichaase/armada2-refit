@@ -1,18 +1,24 @@
-// entries: planet_vs:vs_3_0:VS_PLANET ground_ps:ps_3_0:PS_GROUND city_ps:ps_3_0:PS_CITY cloud_ps:ps_3_0:PS_CLOUD halo_ps:ps_3_0:PS_HALO surface_ps:ps_3_0:PS_SURFACE
+// entries: planet_vs:vs_3_0:VS_PLANET ground_ps:ps_3_0:PS_GROUND city_ps:ps_3_0:PS_CITY cloud_ps:ps_3_0:PS_CLOUD halo_ps:ps_3_0:PS_HALO surface_ps:ps_3_0:PS_SURFACE ground_ps_cl:ps_3_0:PS_GROUND_CL:dxc city_ps_cl:ps_3_0:PS_CITY_CL:dxc cloud_ps_cl:ps_3_0:PS_CLOUD_CL:dxc surface_ps_cl:ps_3_0:PS_SURFACE_CL:dxc
 // The world module's planets (src/mods/world/planets.rs): Lighting.asi's planet shaders
 // (its planet.hlsl) over a sphere of our
 // own instead of the engine's re-tessellated GroundMesh. The pixel shaders are the
 // plugin's, but for the highlight shoulder, which the frame's tone map now does.
 
+#include "../../gpu/shaders/compat.hlsli"
+#include "clustered.hlsli"
+
 // ---- vertex: our sphere, unit radius, with the engine's gore UVs baked in ----
 
-float4x4 W  : register(c0);    // world (transposed)
-float4x4 VP : register(c4);    // view x projection (transposed)
-float4 vk   : register(c8);    // x: radius; y: 1 with the shell's turbulence; z: its time (seconds)
+cbuffer world_planet_vs : register(b0)
+{
+    float4x4 W  : CREG(0);    // world (transposed)
+    float4x4 VP : CREG(4);    // view x projection (transposed)
+    float4 k_sphere : CREG(8);   // x: radius; y: 1 with the shell's turbulence; z: its time (seconds)
+};
 
 struct Lit
 {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float2 uv  : TEXCOORD0;
     float3 n   : TEXCOORD1;       // unused: a planet's normal is taken from the sphere
     float3 wp  : TEXCOORD2;       // world position
@@ -23,34 +29,39 @@ struct Lit
 Lit planet_vs(float3 d : POSITION, float2 uv : TEXCOORD0, float3 aux : TEXCOORD1)
 {
     Lit o;
-    float4 w = mul(float4(d * vk.x, 1.0), W);
+    float4 w = mul(float4(d * k_sphere.x, 1.0), W);
     o.pos = mul(w, VP);
     o.wp  = w.xyz;
     o.n   = d;
-    float t = vk.z;
+    float t = k_sphere.z;
     float2 turb = float2(sin(aux.x * 3.0 + aux.y * 7.0 + t), sin(aux.x * 1.5 + aux.y * 5.0 + 0.6 * t)) * 0.01;
-    o.uv  = uv + turb * vk.y * aux.z;
+    o.uv  = uv + turb * k_sphere.y * aux.z;
     return o;
 }
 
 #define DIRS   4
 #define POINTS 8
-float4 base         : register(c0);   // the material's constant term (rgb)
-float4 mat_diffuse  : register(c1);   // the material's diffuse colour (rgb)
-float4 dcol[DIRS]   : register(c2);   // directional lights' colour; 0 for none; dcol[0].a: the cap on the light
-float4 dvec[DIRS]   : register(c6);   // towards each, world space, unit
-float4 centre       : register(c10);  // the sphere's centre, world space
-float4 eye          : register(c11);  // the camera's world position
-float4 dusk         : register(c12);  // rgb: the light's colour where it grazes; a: how far round it wraps
-float4 haze         : register(c13);  // rgb: the atmosphere's colour at the limb; a: its exponent
-float4 shine        : register(c14);  // x: ocean glint strength, y: its exponent, z: city lights at night,
-                                      // w: the exposure (1; a fog-of-war ghost's dimmer, PlanetGhost)
-float4 city_col     : register(c15);  // the city lights' colour
-float4 pcol[POINTS] : register(c16);  // point light colour; 0 for none
-float4 ppos[POINTS] : register(c24);  // world position
-float4 pfall[POINTS]: register(c32);  // x: full to this distance, y: 1 / the fade after it
-sampler2D tex0 : register(s0);
-sampler2D tex1 : register(s1);
+cbuffer world_planet_ps : register(b1)
+{
+    float4 base         : CREG(0);   // the material's constant term (rgb)
+    float4 mat_diffuse  : CREG(1);   // the material's diffuse colour (rgb)
+    float4 dcol[DIRS]   : CREG(2);   // directional lights' colour; 0 for none; dcol[0].a: the cap on the light
+    float4 dvec[DIRS]   : CREG(6);   // towards each, world space, unit
+    float4 centre       : CREG(10);  // the sphere's centre, world space
+    float4 eye          : CREG(11);  // the camera's world position
+    float4 dusk         : CREG(12);  // rgb: the light's colour where it grazes; a: how far round it wraps
+    float4 haze         : CREG(13);  // rgb: the atmosphere's colour at the limb; a: its exponent
+    float4 shine        : CREG(14);  // x: ocean glint strength, y: its exponent, z: city lights at night,
+                                          // w: the exposure (1; a fog-of-war ghost's dimmer, PlanetGhost)
+    float4 city_col     : CREG(15);  // the city lights' colour
+    float4 pcol[POINTS] : CREG(16);  // point light colour; 0 for none
+    float4 ppos[POINTS] : CREG(24);  // world position
+    float4 pfall[POINTS]: CREG(32);  // x: full to this distance, y: 1 / the fade after it
+};
+STAGE(0) Texture2D tex0 : register(t0);
+STAGE(0) SamplerState tex0_s : register(s0);
+STAGE(1) Texture2D tex1 : register(t1);
+STAGE(1) SamplerState tex1_s : register(s1);
 
 // What a planet's surface takes from the lights at a point with the outward normal N.
 // light: the diffuse sum; glow: the atmosphere lit at the limb; day: how much of the
@@ -87,6 +98,14 @@ Sky shade_n(float3 wp, float3 Ns, float key)
         s.spec  += dcol[k].rgb * (ndl > 0.0 ? pow(saturate(dot(Ns, H)), shine.y) : 0.0) * (k == 0 ? key : 1.0);
         if (k == 0) s.day = saturate(ndl * 4.0 + 0.3);
     }
+#ifdef __hlsl_dx_compiler
+    if (cl_on) {
+        // The cluster's lights, diffuse only, none of a planet's day side.
+        float3 cd = 0.0, cs = 0.0;
+        cl_add(Ns, wp, V, 1.0, true, cd, cs);
+        s.light += cd * mat_diffuse.rgb;
+    } else
+#endif
     for (int j = 0; j < POINTS; j++) {
         float3 L = ppos[j].xyz - wp;
         float  d = length(L);
@@ -115,10 +134,10 @@ float3 lit(Sky s) { return clamp(s.light, 0.0, max(1.0, dcol[0].a)); }
 // The ground (ST3D_PlanetaryMaterial pass 0, opaque): the ground texture lit, the
 // atmosphere seen edge-on at the limb, and a glint off water, which is taken to be
 // where the ground is bluer than it is red or green.
-float4 ground_ps(Lit i) : COLOR
+float4 ground_ps(Lit i) : SV_Target
 {
     Sky    s = shade(i.wp);
-    float4 t = tex2D(tex0, i.uv);
+    float4 t = tex0.Sample(tex0_s, i.uv);
     float  wet = saturate((t.b - max(t.r, t.g)) * 8.0 + 0.15) * saturate(1.2 - dot(t.rgb, 0.333) * 1.5);
     float3 c = t.rgb * lit(s) + s.glow + s.spec * shine.x * wet;
     return float4(shoulder(c, shine.w), 1.0);
@@ -180,8 +199,8 @@ float roads(float2 p, float fw, float width, float keep, out float id)
 // population map, as stock multiplies them, whichever channel the engine paints.
 float town_at(float2 uv)
 {
-    float4 p = tex2D(tex1, uv);
-    return tex2D(tex0, uv).a * p.a * max(p.r, max(p.g, p.b));
+    float4 p = tex1.Sample(tex1_s, uv);
+    return tex0.Sample(tex0_s, uv).a * p.a * max(p.r, max(p.g, p.b));
 }
 
 // How bright the cities are at night at uv: a faint glow over each town, downtown
@@ -222,10 +241,10 @@ float city_night(float2 uv)
 // The cities (pass 1, blended by alpha over the ground): the development texture
 // times the planet's own city map in stage 1, as stock; by day lit like the ground,
 // at night lit from within by city_night, warm, whitening where it is brightest.
-float4 city_ps(Lit i) : COLOR
+float4 city_ps(Lit i) : SV_Target
 {
     Sky    s = shade(i.wp);
-    float4 t = tex2D(tex0, i.uv) * tex2D(tex1, i.uv);
+    float4 t = tex0.Sample(tex0_s, i.uv) * tex1.Sample(tex1_s, i.uv);
     float  night = (1.0 - s.day) * shine.z;
     float  L = city_night(i.uv) * night;
     float3 e = city_col.rgb * L + saturate(L - 0.9) * 0.4;
@@ -238,12 +257,15 @@ float4 city_ps(Lit i) : COLOR
 // and the atmosphere at the limb, which shows past the ground's edge as a halo.
 // x: how much of the shell's own texture shows: 0 over a ground made by Surfaces.asi,
 // which brings clouds of its own, so only the halo at the limb is left.
-float4 shell : register(c47);
+cbuffer world_planet_ps1 : register(b1)
+{
+    float4 shell : CREG(47);
+};
 
-float4 cloud_ps(Lit i) : COLOR
+float4 cloud_ps(Lit i) : SV_Target
 {
     Sky    s = shade(i.wp);
-    float4 t = tex2D(tex0, i.uv) * shell.x;
+    float4 t = tex0.Sample(tex0_s, i.uv) * shell.x;
     float  g = dot(s.glow, float3(0.3, 0.5, 0.2));
     float3 c = t.rgb * lit(s) + s.glow;
     return float4(shoulder(c, shine.w), saturate(t.a + g));
@@ -256,10 +278,13 @@ float4 cloud_ps(Lit i) : COLOR
 // disc it fades out over the ground, whose own limb haze carries on from it. Lit by the
 // sphere at the line's lowest point, reddened at dusk, and brighter looking towards the
 // Key (forward scattering), so a planet against its sun shows a bright ring.
-float4 halo : register(c48);   // x: the ground's radius, y: the top of the air (world units),
+cbuffer world_planet_ps2 : register(b1)
+{
+    float4 halo : CREG(48);   // x: the ground's radius, y: the top of the air (world units),
+};
                                // z: strength, w: the brightening looking towards the Key
 
-float4 halo_ps(Lit i) : COLOR
+float4 halo_ps(Lit i) : SV_Target
 {
     float3 D = normalize(i.wp - eye.xyz);
     float3 P = eye.xyz + D * dot(centre.xyz - eye.xyz, D);   // the line's lowest point
@@ -284,28 +309,34 @@ float4 halo_ps(Lit i) : COLOR
 // mesh and has no seams. The relief's normal takes the light (shade_n); the clouds drift
 // about the pole, cast their shadow onto the ground towards the sun, and are lit by the
 // sphere; fissures and the like glow, most on the night side.
-float4 surf_rows[3] : register(c40);  // the world matrix's three axes (object to world)
-float4 surf_glow    : register(c43);  // rgb: the glow's colour; a: how much shows by day
-float4 surf_cloud   : register(c44);  // rgb: the clouds' colour; a: their opacity
-float4 surf_drift   : register(c45);  // cos, sin of the drift; the shadow's strength; its reach
-float4 surf_misc    : register(c46);  // x: the relief's strength; y: 1 with clouds
-samplerCUBE s_albedo : register(s2);  // rgb: ground; a: wet
-samplerCUBE s_relief : register(s3);  // rgb: normal - direction + 0.5; a: glow
-samplerCUBE s_clouds : register(s4);
+cbuffer world_planet_ps3 : register(b1)
+{
+    float4 surf_rows[3] : CREG(40);  // the world matrix's three axes (object to world)
+    float4 surf_glow    : CREG(43);  // rgb: the glow's colour; a: how much shows by day
+    float4 surf_cloud   : CREG(44);  // rgb: the clouds' colour; a: their opacity
+    float4 surf_drift   : CREG(45);  // cos, sin of the drift; the shadow's strength; its reach
+    float4 surf_misc    : CREG(46);  // x: the relief's strength; y: 1 with clouds
+};
+STAGE(2) TextureCube s_albedo : register(t2);  // rgb: ground; a: wet
+STAGE(2) SamplerState s_albedo_s : register(s2);
+STAGE(3) TextureCube s_relief : register(t3);  // rgb: normal - direction + 0.5; a: glow
+STAGE(3) SamplerState s_relief_s : register(s3);
+STAGE(4) TextureCube s_clouds : register(t4);
+STAGE(4) SamplerState s_clouds_s : register(s4);
 
 float3 to_obj(float3 v)   { return float3(dot(v, surf_rows[0].xyz), dot(v, surf_rows[1].xyz), dot(v, surf_rows[2].xyz)); }
 float3 to_world(float3 o) { return o.x * surf_rows[0].xyz + o.y * surf_rows[1].xyz + o.z * surf_rows[2].xyz; }
 float3 drifted(float3 d)  { return float3(surf_drift.x * d.x + surf_drift.y * d.z, d.y, surf_drift.x * d.z - surf_drift.y * d.x); }
 
-float4 surface_ps(Lit i) : COLOR
+float4 surface_ps(Lit i) : SV_Target
 {
     float3 d  = normalize(to_obj(i.wp - centre.xyz));
-    float4 A  = texCUBE(s_albedo, d);
-    float4 B  = texCUBE(s_relief, d);
+    float4 A  = s_albedo.Sample(s_albedo_s, d);
+    float4 B  = s_relief.Sample(s_relief_s, d);
     float3 Ns = normalize(to_world(normalize(d + (B.rgb - 0.5) * surf_misc.x)));
     float3 Lo = normalize(to_obj(dvec[0].xyz));
-    float  cl = texCUBE(s_clouds, drifted(d)).r * surf_cloud.a * surf_misc.y;
-    float  cs = texCUBE(s_clouds, drifted(normalize(d + (Lo - d * dot(Lo, d)) * surf_drift.w))).r;
+    float  cl = s_clouds.Sample(s_clouds_s, drifted(d)).r * surf_cloud.a * surf_misc.y;
+    float  cs = s_clouds.Sample(s_clouds_s, drifted(normalize(d + (Lo - d * dot(Lo, d)) * surf_drift.w))).r;
     float  key = 1.0 - surf_drift.z * cs * surf_cloud.a * surf_misc.y;
     Sky    s = shade_n(i.wp, Ns, key);
     float3 c = A.rgb * lit(s) + s.glow + s.spec * shine.x * A.a;
@@ -314,3 +345,11 @@ float4 surface_ps(Lit i) : COLOR
     c = lerp(c, surf_cloud.rgb * lit(sc) + sc.glow, cl);
     return float4(shoulder(c, shine.w), 1.0);
 }
+
+#ifdef __hlsl_dx_compiler
+// The clustered twins (Vulkan and Direct3D 12, clustered.hlsli).
+float4 ground_ps_cl(Lit i) : SV_Target { cl_on = true; cl_fc = i.pos; return ground_ps(i); }
+float4 city_ps_cl(Lit i) : SV_Target { cl_on = true; cl_fc = i.pos; return city_ps(i); }
+float4 cloud_ps_cl(Lit i) : SV_Target { cl_on = true; cl_fc = i.pos; return cloud_ps(i); }
+float4 surface_ps_cl(Lit i) : SV_Target { cl_on = true; cl_fc = i.pos; return surface_ps(i); }
+#endif

@@ -210,7 +210,11 @@ uses of it:
     cursor is stretched by its 800x600 reference (hud/README.md); ours is square at any
     aspect and at the back buffer's resolution.
   - **In a front-end screen of ours Windows' arrow is hidden** (`shell::hide_os_cursor`,
-    the window's `WM_SETCURSOR` answer) for as long as the screen runs.
+    the window's `WM_SETCURSOR` answer) for as long as the screen runs. The same holds
+    for every hosted dialog (`Context::Menus`: the main menu, every shell menu and the
+    in-mission ones), so with `Cursor=1` the cursor is ours in every context of the
+    game: the shell's system arrow shows only while no dialog is hosted and no screen
+    of ours runs (between two screens, for a frame), or with `[Menus] Enable=0`.
   - `UI.log` says each change of the shape drawn (`cursor: Mission draws c_attack`), which
     the scenario `ui-widgets-cursor` reads. Seen on the bench: `standard_cursor` with
     nothing selected, `c_move` over empty space with a ship selected, `c_attack` over an
@@ -275,10 +279,27 @@ Each frame, `run_screen`:
 - holds itself to about 60 frames a second.
 
 The 3D window's `WindowProc` answers `WM_SETCURSOR` with no cursor, so that the sprite
-cursor shows in a mission (and the Credits show none). While a screen of ours runs,
-the window is subclassed to answer it with the arrow, as the GDI menus have. The
-subclass is installed once and only passes messages on while no screen runs, so it never
-unhooks a subclass someone else added on top of it. A screen that starts with no
+cursor shows in a mission (and the Credits show none): `push 0; call [SetCursor]`, the
+call at 0x488883. While a screen of ours or a hosted dialog runs, that one call is
+ours (patched once, checked to be stock, `shell::patch_wm_setcursor`): it sets the
+arrow, as the GDI menus have, or no cursor while the UI draws its own; otherwise it
+passes the engine's "none" on.
+
+**Never subclass the 3D window.** Up to ui 0.15 the arrow came from a subclass of the
+window procedure (`SetWindowLongA(GWL_WNDPROC)`), installed the first time a dialog
+was hosted. DXVK hooks the window procedure of a full-screen device's window too, and
+when the device goes it puts the old procedure back only if its own is still on top,
+else it just forgets the window. So with the subclass made over the first device's
+hook, the engine's second `CreateDevice` (a display mode chosen in Graphics Settings
+in the middle of a mission) hooked the window again and took the subclass as the
+procedure before its own; the subclass's "previous procedure" was DXVK's hook. The
+first message after the new device (the `UpdateWindow` in
+`ST3D_DeviceDirectX8::CreateRenderSurfaces`) went round the two until the stack ran
+out: `virtual_setup_exception stack overflow` after `dispatch_user_callback` in
+`wine.log`, the last Display8 lines the new device's `CreateVertexBuffer`
+(`render3d-mode-switch`, which failed the same way on `main`). Any procedure chain
+over a window DXVK hooks has this shape; a patch at the engine's own answer has none.
+A screen that starts with no
 keyboard focus (Wine leaves it `NULL` after an embedded menu, `menus/README.md`) puts
 it on the 3D window.
 
@@ -472,12 +493,14 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[UI] Log` | 1 | `UI.log` in the game directory: which hooks are in, and why one stood down |
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
 | `[UI] Cursor` | 1 | draw the mouse cursor ourselves, from the game's own cursor art ("The cursor"); 0: the engine's, kept square |
+| `[UI] Movies` | 1 | the cutscene proxy's full-screen frames drawn by the UI ("Movies"); 0: the proxy copies them into the locked back buffer |
 | `[UI] Defaults` | 2 | which shipped defaults the file was brought up to ("Installing"); not read by `UI.asi` |
 | `[UI] CursorSize` | 32 | its size in units (32 texels of art at 1080 lines) |
 | `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472` everywhere |
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
 | `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
+| `[HUD] Overview`, `Fade`, `UnitVideo` | 1, 1, 1 | the engine's last draws in a mission drawn by us: the drag box, height posts and order ring, the scripts' fade, the unit view's video (`HUD.md`, "The engine's last draws") |
 | `[HUD] UnitView`, `UnitViewSize` | 1, 260 | the unit view placed by us, a square of that many units at the bottom right, in our frame (`HUD.md`, "The unit view") |
 | `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
 | `[Menus] Generic` | mirror | a screen without a spec: `mirror` (as the game paints it) or `widgets` (its controls as ours) |
@@ -530,18 +553,32 @@ vkd3d needs (`render3d/README.md`). A new draw call starts only when the texture
 clip rectangle changes; solid quads take whatever texture the run has, since they do
 not sample it.
 
-**State.** d3d8to9 keeps its own record of what the game bound (`platform/D3D9.md`), so
-the frame is drawn between a `D3DSBT_ALL` state block's capture and its apply: once a
-frame, not per draw, which is where render3d found `SBT_ALL` expensive. Positions are
-in back-buffer pixels and move half a pixel on the way to clip space, so a rectangle
-with whole-number edges covers whole pixels exactly.
+**Through `gpu`.** The frame is drawn through the interface it shares with render3d
+(`gpu/README.md`): one pipeline, a pass into the engine's own back buffer and depth
+(kept as they are), the frame's vertices and indices written once into `gpu`'s rings,
+and one indexed draw per run. `gpu` captures the device's state before the frame's
+first change and puts it back after (d3d8to9 keeps its own record of what the game
+bound, `platform/D3D9.md`), with the block render3d records: once a frame, not per
+draw. Positions are in back-buffer pixels and move half a pixel on the way to clip
+space on Direct3D 9 (`gpu::Gpu::half_pixel`; none on Vulkan, whose pixel centres are
+at the half), so a rectangle with whole-number edges covers whole pixels exactly.
 
-**No `Reset` to handle.** Textures are in the managed pool and the vertices go through
-`DrawIndexedPrimitiveUP`, so nothing of ours is in the default pool. Every texture is
-registered once with its pixels (the font atlases from the DLL, images from the game's
-TGAs through `a2fmt`) and made on each device the first time it draws there.
+**On Vulkan and Direct3D 12** (Display8's stub mode with `Backend=vulkan` or `d3d12`)
+the same calls record into Display8's frame (`gpu/README.md`, "The Vulkan backend",
+"The Direct3D 12 backend"): the back buffer and depth are
+Display8's images, the engine's textures (the minimap's, the radar's sprites, the unit
+view's video) Display8's mirrors (`gpu::Gpu::engine_texture`), and a dump reads the
+colour image before Display8's gamma pass. `gfx::attach` takes either device
+(`attach_engine`); the `Reset` and `DestroyRenderSurfaces` hooks have nothing to let go
+of there.
 
-**Without a Direct3D 9 device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
+**`Reset` and new devices are `gpu`'s.** Every texture is registered once with its
+pixels (the font atlases from the DLL, images from the game's TGAs through `a2fmt`) as
+a `gpu::Texture`, which keeps them and is made on the device the first time it draws
+there, and again after a `Reset` or on another device. `engine/device.rs` tells `gpu`
+when the device resets or goes (`gfx::reset`, `gfx::forget`).
+
+**Without a Direct3D 9, Vulkan or Direct3D 12 device** (DXVK's own d3d8, GOG's d3d8to9) `surface::frame` returns
 at once and the game draws as stock.
 
 ## Text (`src/text/`)
@@ -638,6 +675,28 @@ panel of ours reads its state and presses its buttons. The button bar is the fir
 the minimap, the selection overlay and the unit view's frame followed.
 [`HUD.md`](HUD.md) has the inventory of the HUD's components, the switch, the bar and
 the engine reads each panel uses.
+
+## Movies
+
+`src/movie.rs`. The launch reels and the intro are played by `Program::PlayMovie`,
+which locks the back buffer, has `BinkCopyToBuffer` write the frame into it and
+presents; the cutscene proxy (`cutscenes/binkproxy/README.md`) already scaled each
+frame to fit. With `[UI] Movies=1` the proxy hands the frame instead to
+`ui_present_movie(bgrx, w, h, pitch)`, which `UI.asi` exports: the UI copies it and,
+at the `Present` that follows (the d3d8 device's, chained in `engine/device.rs`),
+draws it over the whole back buffer, fitted, centred, between black bars, in a scene
+of its own (opened only when none is). It attaches to the device when the first frame
+comes, since the intro plays before any frame of UI. The proxy writes nothing into the
+locked back buffer then, so the engine's pixels are no longer the picture: the frame
+reaches the screen through the UI's renderer, as all of it does in Display8's stub
+mode (`display/README.md`, "Stub mode"). It returns 0, and the proxy copies the frame
+itself as before, without a device to draw on or with `Movies=0`; without `UI.asi` the proxy finds
+no export and copies.
+
+The proxy's real-Bink reels (Activision, Paramount, Mad Doc) take the same way: it
+decodes them into its scratch buffer and hands that over. The in-mission Bink
+(`BinkThread`, the unit view's video) is not a movie in this sense: it is decoded into
+an engine texture, which the UI draws (`HUD.md`, "The engine's last draws").
 
 ## Frame dumps
 

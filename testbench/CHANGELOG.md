@@ -5,6 +5,134 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.58.0 — 2026-10-23
+
+### Added
+- The `battle` scene (sixteen ships and a planet, over a hundred lights) and
+  `render3d-clustered`, which pauses it on one tick for render3d's clustered lights and
+  their GPU timings (`render3d/bench-ini.sh`).
+
+Installed, not yet seen in game.
+
+## 3.57.1 — 2026-10-23
+
+### Changed
+- `display-inventory` and `display-engine-draws` switch Display8 to forward mode
+  themselves (`display/bench-mode.sh forward`), since the shipped default is now the
+  stub; `display-stub` and `display-movie` describe the stub on `Backend=auto`.
+
+Installed, not yet seen in game.
+
+## 3.57.0 — 2026-10-23
+
+### Added
+- `display-fallback`: Display8 in stub mode with `Backend=auto` and
+  `FailBackend=vulkan,d3d12`; checks that Vulkan and Direct3D 12 are taken down and the
+  engine's first `CreateDevice` lands on Direct3D 9, that the UI and render3d draw on it, the main menu
+  and an Instant Action match.
+
+### Changed
+- `vulkan_env`: a stub on `Backend=auto` or a list that names Vulkan, with
+  `Validate=1`, gets the Khronos validation layer (`VK_INSTANCE_LAYERS`); the drivers
+  stay as they are (the GPU). Only `Backend=vulkan` alone is held to lavapipe.
+
+Installed, not yet seen in game.
+
+## 3.56.0 — 2026-10-23
+
+### Fixed
+- `qol-refused-advisor` selects the starbase after Home (`center_player`), which puts it
+  at 835,250 whatever the random start position; the start view's own place for it
+  varies from run to run, and the old click at 735,305 selected nothing in some runs, so
+  its presses queued nothing. It now checks each link: the selection (`info: Builder
+  Starbase`, the bar's layout), the keys the bar took (`Q=build`, `Q=fconst`), the local
+  bank's payments (3250, 3000), the refusal, the advisor for the local team and its chat line. Its log waits end on lines
+  written after the action (the startup line is checked before LAUNCH).
+
+Installed, not yet seen in game.
+
+## 3.55.0 — 2026-10-23
+
+### Added
+- `display-movie`: the launch reels and the intro on screen (a 4:3 picture between
+  bars, not a black frame), through the UI; on the stub with `display/stub-scenario.sh`.
+## 3.53.0 — 2026-10-23
+
+### Added
+- A game with `Mode=stub`, `Backend=d3d12` and `Validate=1` in its clone's
+  `Display8.ini` gets the Khronos validation layer under vkd3d-proton, writing
+  `logs/vvl.log` (`session.vulkan_env`).
+
+Installed, not yet seen in game.
+
+## 3.52.0 — 2026-10-23
+
+### Added
+- The stock cache (`bench/stockcache.py`): a session that starts from stock (`--mod
+  stock`, `--install`, `--assets none`) copies the game from `~/.cache/a2test/stock/<key>/`,
+  where `a2mod stock` has run once per state of the install, instead of running it on
+  every clone (12 s a session). Keyed by the install's tree (`lstat`, ctime included)
+  and the `a2mod` script; built under a flock and renamed into place.
+  `a2test stock-cache status | rebuild | drop`; `A2TEST_STOCK_CACHE=0` turns it off.
+
+Installed, not yet seen in game.
+
+## 3.51.0 — 2026-10-23
+
+### Added
+- A game whose clone's `Display8.ini` has `Mode=stub` and `Backend=vulkan` is launched
+  on lavapipe with the Khronos validation layer (`VK_DRIVER_FILES`,
+  `VK_ICD_FILENAMES`, `VK_INSTANCE_LAYERS`; `session.vulkan_env`);
+  `A2TEST_VULKAN_GPU=1` leaves the drivers as they are.
+
+Installed, not yet seen in game.
+
+## 3.50.1 — 2026-10-23
+
+### Fixed
+- `ui-hud-map` and `ui-hud-bar` select the first Assembler where the start view puts it
+  (890,60, at the top) and the Nexus at 1150,300: at 640,262 they clicked empty space,
+  and every step after the selection failed, on `main` as on Display8, forward or stub.
+  `ui-hud-map` puts the Assembler in group 1 and double-taps it to centre the camera
+  for the bracket check; its minimap check names the SHIPS and STATIONS buttons (not
+  "ALL") and the camera's outline as a few pixels at the start's zoom. `ui-hud-bar`'s
+  checks name the minimap and the tooltip as they are drawn, and it expects the UI's
+  build footprint ("leftovers: build footprint at").
+
+Installed, not yet seen in game.
+
+## 3.50.0 — 2026-10-23
+
+### Added
+- Scenario `display-engine-draws` (`--install . --install display`): the intro movie,
+  the first Federation mission's opening cinematic, the mission with a drag box, a
+  pointed unit and move orders, the unit view and the pause, each expected to show no
+  draw from `Armada2.exe`; and the in-mission menu over the UI's own copy of the frame.
+
+Installed, not yet seen in game.
+
+## 3.49.0 — 2026-10-23
+
+### Added
+- Scenarios `port-showcase`, `port-nebula`, `port-firing` (one paused frame each with the
+  bench clock, a shot and a frame dump: what a port of the renderer is compared by) and
+  `display-stub` (the whole game with Display8 in stub mode).
+
+Installed, not yet seen in game.
+
+## 3.48.0 — 2026-10-23
+
+### Added
+- Steps for Display8's tracer (`display/README.md`): `Mark the display context "NAME"`
+  (writes `Display8.mark`, waits for d3d8.dll to take it) and `Expect the engine to draw
+  nothing in "NAME"` (no `Draw*` from `Armada2.exe` in that context, from
+  `Display8.inventory.tsv`). `Display8.log`, `Display8.ini` and the inventory are
+  gathered with the logs.
+- Scenario `display-inventory`: the whole game, a context marked at each stage, with
+  `--install . --install display`.
+
+Installed, not yet seen in game.
+
 ## 3.47.0 — 2026-10-23
 
 ### Added

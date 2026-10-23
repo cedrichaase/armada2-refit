@@ -9,12 +9,13 @@
 //! `<name>-<frame>-<what>.pfm|.ppm`, and a sidecar `<name>-<frame>-<plugin>.txt`
 //! lists them with the frame number, each target's size, format and samples.
 //!
-//! A target is copied with `GetRenderTargetData` into a system-memory surface of its
-//! size and format (a multisampled one is first resolved with `StretchRect` into a
-//! plain target), locked and converted row by row on the CPU, so nothing of the
-//! device's state changes. A format with no conversion here is logged and skipped.
-use crate::d3d::*;
+//! A target is read back through `gpu` (`Gpu::read_back`: on Direct3D 9 copied with
+//! `GetRenderTargetData` into a system-memory surface of its size and format, a
+//! multisampled one resolved with `StretchRect` first) and converted row by row on the
+//! CPU, so nothing of the device's state changes. A format with no conversion
+//! (`gpu::Format::readable`) is logged and skipped.
 use crate::rt;
+use gpu::d3d9::format_code;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Write;
@@ -82,89 +83,9 @@ pub struct Dump {
     skipped: u32,
 }
 
-pub fn format_name(f: u32) -> &'static str {
-    match f {
-        FMT_A16B16G16R16F => "A16B16G16R16F",
-        FMT_A32B32G32R32F => "A32B32G32R32F",
-        FMT_A8R8G8B8 => "A8R8G8B8",
-        FMT_X8R8G8B8 => "X8R8G8B8",
-        FMT_R5G6B5 => "R5G6B5",
-        FMT_A2R10G10B10 => "A2R10G10B10",
-        FMT_A2B10G10R10 => "A2B10G10R10",
-        _ => "?",
-    }
-}
-
-const FMT_A2B10G10R10: u32 = 31;
-const FMT_A2R10G10B10: u32 = 35;
-
-/// Bytes per pixel of the formats read here; None for the rest.
-fn bpp(f: u32) -> Option<usize> {
-    match f {
-        FMT_A16B16G16R16F => Some(8),
-        FMT_A32B32G32R32F => Some(16),
-        FMT_A8R8G8B8 | FMT_X8R8G8B8 | FMT_A2R10G10B10 | FMT_A2B10G10R10 => Some(4),
-        FMT_R5G6B5 => Some(2),
-        _ => None,
-    }
-}
-
-pub fn half(h: u16) -> f32 {
-    let s = ((h >> 15) & 1) as u32;
-    let e = ((h >> 10) & 0x1f) as u32;
-    let m = (h & 0x3ff) as u32;
-    let bits = if e == 0 {
-        if m == 0 {
-            s << 31
-        } else {
-            // Subnormal: m * 2^-24.
-            let v = m as f32 * (1.0 / 16_777_216.0);
-            return if s != 0 { -v } else { v };
-        }
-    } else if e == 31 {
-        (s << 31) | 0x7f80_0000 | (m << 13)
-    } else {
-        (s << 31) | ((e + 112) << 23) | (m << 13)
-    };
-    f32::from_bits(bits)
-}
-
-/// One pixel as float RGB. `p` points at the pixel in format `f`.
-fn rgb_f32(f: u32, p: &[u8]) -> [f32; 3] {
-    let u16_at = |i: usize| u16::from_le_bytes([p[i], p[i + 1]]);
-    let f32_at = |i: usize| f32::from_le_bytes([p[i], p[i + 1], p[i + 2], p[i + 3]]);
-    let u32_at = |i: usize| u32::from_le_bytes([p[i], p[i + 1], p[i + 2], p[i + 3]]);
-    match f {
-        FMT_A16B16G16R16F => [half(u16_at(0)), half(u16_at(2)), half(u16_at(4))],
-        FMT_A32B32G32R32F => [f32_at(0), f32_at(4), f32_at(8)],
-        FMT_A8R8G8B8 | FMT_X8R8G8B8 => [p[2] as f32 / 255.0, p[1] as f32 / 255.0, p[0] as f32 / 255.0],
-        FMT_R5G6B5 => {
-            let v = u16_at(0) as u32;
-            [((v >> 11) & 31) as f32 / 31.0, ((v >> 5) & 63) as f32 / 63.0, (v & 31) as f32 / 31.0]
-        }
-        FMT_A2R10G10B10 => {
-            let v = u32_at(0);
-            [((v >> 20) & 1023) as f32 / 1023.0, ((v >> 10) & 1023) as f32 / 1023.0, (v & 1023) as f32 / 1023.0]
-        }
-        FMT_A2B10G10R10 => {
-            let v = u32_at(0);
-            [(v & 1023) as f32 / 1023.0, ((v >> 10) & 1023) as f32 / 1023.0, ((v >> 20) & 1023) as f32 / 1023.0]
-        }
-        _ => [0.0; 3],
-    }
-}
-
-/// One pixel as 8-bit RGB: the bytes as they are for 8-bit formats (byte-exact), else
-/// the float value clamped and rounded.
-fn rgb_u8(f: u32, p: &[u8]) -> [u8; 3] {
-    match f {
-        FMT_A8R8G8B8 | FMT_X8R8G8B8 => [p[2], p[1], p[0]],
-        _ => {
-            let c = rgb_f32(f, p);
-            let q = |v: f32| if v.is_nan() || v <= 0.0 { 0 } else if v >= 1.0 { 255 } else { (v * 255.0 + 0.5) as u8 };
-            [q(c[0]), q(c[1]), q(c[2])]
-        }
-    }
+/// The sidecar's samples: 0 for a target of one, as Direct3D 9 counts them.
+fn ms(samples: u32) -> u32 {
+    if samples > 1 { samples } else { 0 }
 }
 
 impl Dump {
@@ -184,66 +105,52 @@ impl Dump {
         crate::sfmt!("{}-{}-{}.{}", self.name, self.frame, what, ext)
     }
 
-    /// Reads `src` (a render target surface) back and writes `area` of it (None: the
-    /// whole) as `what`. Logs and notes what it wrote, or why not.
-    pub fn surface(&mut self, dev: Device, src: &Com, area: Option<Area>, what: &str, kind: Kind) {
-        let d = src.surf_desc();
+    /// Reads `src` (a colour target) back and writes `area` of it (None: the whole)
+    /// as `what`. Logs and notes what it wrote, or why not.
+    pub fn surface(&mut self, gpu: &gpu::Gpu, src: &gpu::Texture, area: Option<Area>, what: &str, kind: Kind) {
+        let d = src.desc();
         let a = area.unwrap_or(Area { x: 0, y: 0, w: d.width, h: d.height });
         let ext = if kind == Kind::Pfm { "pfm" } else { "ppm" };
         let file = self.file(what, ext);
-        let r = self.read_write(dev, src, &d, a, &file, kind);
+        let r = self.read_write(gpu, src, &d, a, &file, kind);
+        let (code, name) = (format_code(d.format), d.format.name());
         let line = match r {
             Ok(()) => {
                 self.written += 1;
                 crate::sfmt!(
                     "{} {}x{} at {},{} of {}x{}, format {} ({}), {} samples",
-                    file, a.w, a.h, a.x, a.y, d.width, d.height, d.format, format_name(d.format), d.ms_type
+                    file, a.w, a.h, a.x, a.y, d.width, d.height, code, name, ms(d.samples)
                 )
             }
             Err(why) => {
                 self.skipped += 1;
-                crate::sfmt!("skipped {}: {} (format {} ({}), {}x{}, {} samples)", file, why, d.format, format_name(d.format), d.width, d.height, d.ms_type)
+                crate::sfmt!("skipped {}: {} (format {} ({}), {}x{}, {} samples)", file, why, code, name, d.width, d.height, ms(d.samples))
             }
         };
         crate::log!("dump: {}", line);
         self.note(&line);
     }
 
-    fn read_write(&self, dev: Device, src: &Com, d: &SurfaceDesc, a: Area, file: &str, kind: Kind) -> Result<(), &'static str> {
-        let bpp = bpp(d.format).ok_or("a format this dump cannot read")?;
+    fn read_write(&self, gpu: &gpu::Gpu, src: &gpu::Texture, d: &gpu::TextureDesc, a: Area, file: &str, kind: Kind) -> Result<(), &'static str> {
+        if !d.format.readable() {
+            return Err("a format this dump cannot read");
+        }
         if a.w == 0 || a.h == 0 || a.x + a.w > d.width || a.y + a.h > d.height {
             return Err("the area is outside the target");
         }
-        // A multisampled target cannot be read back: resolve it into a plain one first.
-        let plain;
-        let from = if d.ms_type != 0 {
-            plain = dev.create_render_target(d.width, d.height, d.format, 0, false).ok_or("no plain target to resolve into")?;
-            if dev.stretch_rect(src, None, &plain, None, TEXF_NONE) < 0 {
-                return Err("the resolve (StretchRect) failed");
-            }
-            &plain
-        } else {
-            src
-        };
-        let sys = dev.create_offscreen_surface(d.width, d.height, d.format, POOL_SYSTEMMEM).ok_or("no system-memory surface")?;
-        if dev.get_render_target_data(from, &sys) < 0 {
-            return Err("GetRenderTargetData failed");
-        }
-        let lr = sys.surf_lock(LOCK_READONLY).ok_or("the copy could not be locked")?;
         let path = rt::game_path(&crate::sfmt!("Dumps\\{}", file));
-        let res = (|| {
+        gpu.read_back(src, |px| {
+            let bpp = px.format.bytes().unwrap_or(4);
+            let fmt = px.format;
             let mut w = rt::Writer::create(&path).ok_or("the file could not be made")?;
-            let row_at = |y: u32| unsafe {
-                core::slice::from_raw_parts(lr.bits.add(y as usize * lr.pitch as usize + a.x as usize * bpp), a.w as usize * bpp)
-            };
             match kind {
                 Kind::Pfm => {
                     w.write(crate::sfmt!("PF\n{} {}\n-1.0\n", a.w, a.h).as_bytes());
                     let mut buf: Vec<u8> = Vec::with_capacity(a.w as usize * 12);
                     for y in (a.y..a.y + a.h).rev() {
                         buf.clear();
-                        for px in row_at(y).chunks_exact(bpp) {
-                            for v in rgb_f32(d.format, px) {
+                        for t in px.row(a.x, y, a.w).chunks_exact(bpp) {
+                            for v in fmt.rgb_f32(t) {
                                 buf.extend_from_slice(&v.to_le_bytes());
                             }
                         }
@@ -255,17 +162,15 @@ impl Dump {
                     let mut buf: Vec<u8> = Vec::with_capacity(a.w as usize * 3);
                     for y in a.y..a.y + a.h {
                         buf.clear();
-                        for px in row_at(y).chunks_exact(bpp) {
-                            buf.extend_from_slice(&rgb_u8(d.format, px));
+                        for t in px.row(a.x, y, a.w).chunks_exact(bpp) {
+                            buf.extend_from_slice(&fmt.rgb_u8(t));
                         }
                         w.write(&buf);
                     }
                 }
             }
             if w.ok { Ok(()) } else { Err("writing the file failed") }
-        })();
-        sys.surf_unlock();
-        res
+        })?
     }
 
     /// Writes the sidecar and logs the dump.

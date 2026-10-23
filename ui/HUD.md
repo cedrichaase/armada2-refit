@@ -1056,6 +1056,87 @@ alternate while the other player does not answer.
 not reached: every game on the bench had "Teams are locked."), give units, the high
 latency switch's effect, AI Takeover.
 
+## The engine's last draws
+
+`engine/leftovers.rs` (the patches and what they record) and `hud/leftovers.rs` (the
+drawing). After the panels, Display8's inventory (`display/README.md`) still counted a
+few draws of the engine's own in a mission: the selection drag box, the height posts,
+the scripts' fade and the unit view's video. Each is now taken at the one call that
+draws it, by a short patch checked against stock; the code around the call still runs,
+so the state the engine keeps there (the fade's progress and the script waiting on
+it, the video's texture) stays the engine's. The patch records, in back-buffer pixels,
+what would have been drawn, and draws nothing. The UI draws it first in the mission
+frame, under every panel of ours, as the engine drew it under its HUD. Each keeps the
+engine's look; nothing here is restyled.
+
+    [HUD]
+    Overview=1    ; the drag box, the height posts, the order ring and the build footprints
+    Fade=1        ; ScreenFade
+    UnitVideo=1   ; the in-mission Bink (the unit view's video)
+
+| Draw | Site | What is recorded | Drawn by us as |
+|---|---|---|---|
+| The drag box | `cOverViewImp::mNormalModeRender`'s `call ST3D_Device::DrawWireframeRectangle` (0x52220a) | the box (left, top, width, height) in the main camera's viewport, which is in pixels (`ST3D_Camera+0x1b0`: left, top, width, height), and its colour (white) | four lines a pixel wide along its edges, clipped to that viewport |
+| The height posts | `DrawHeightPost`'s `call ST3D_Camera::ClipAndRenderLine` (0x5938a0) | the line from the unit to the map's plane, projected with the camera it was given (`+0x160`, a 4x4 matrix; the screen is `left + (width - 1) * x / w`, as `ST3D_Camera::ProjectPoint` maps it), cut at the eye; green above the plane, red below | a line a pixel wide, clipped to the viewport |
+| The order ring | `cOverViewImp::mRenderGridFX`'s `call ST3D_Sprite::DrawQuad` (0x522537), and `mRenderWhere`'s (0x5222f0), the same sprite standing still at the point it marks | the four corners of the turning ring (`gridFXSprite`, which covers its whole texture `GgridFX`) projected as the height posts are, the sprite's texture and colour (`+0x24`) | the texture on those corners, added to the frame (an additive pipeline of the UI's, `Draw::quad_additive`), clipped to the viewport |
+| The build footprints | `PlaceholderFeature::RenderFootprints`'s three `call ST3D_Sprite::DrawQuad`: the editor's cells (0x473a05), a clear placement (0x473a77), a blocked one (0x473a8e) | the footprint's corners on the map's plane, projected as the order ring's, the sprite's texture, colour and rectangle of the texture (`+0x38`) | as the order ring |
+| The fade | `ScreenFade::Render`'s two `call [edx+0x1c]` (the device's `DrawClippedRectangle`), white at 0x5076cc and black at 0x507704 | the rectangle (the camera's viewport), the colour and the alpha the fade wrote into its material (`+0x24`) | a rectangle of that colour at that alpha |
+| The unit view's video | `CinematicView`'s two calls of `BinkThread::BlitToBlackBackground` (0x4e5da5, 0x4e6153), and inside it the two `call ST3D_Device::DrawRectangle` (0x46457c, 0x4645cd) and the `call ST3D_Sprite::DrawScaled2D` (0x464656) | the rectangle it was called with, the sprite's texture (`ST3D_Sprite::GetTexture`) and the video's size (`s_width`, `s_height`) | the rectangle black, then the video as wide as it at the video's aspect, centred, from the engine's texture (its Direct3D 9 twin, as the minimap's picture) |
+
+Why these sites:
+
+- `DrawHeightPost` is called for the pointed unit (`mNormalModeRender`), a placement
+  (`mRenderWhere`, `PlaceholderFeature`) and the editor's posts (`mDrawPosts`); the
+  one call inside it covers all of them.
+- `ScreenFade::Render` steps the fade: it adds the rate (`+0x30`) to the alpha
+  (`+0x2c`) each frame and, at 0 or 1, ends the fade and lets the script waiting on
+  it go on. Skipping the component (the panel switch) would stop the fade and the
+  script with it, so only its draw is taken. The two draws are indirect calls of three
+  bytes, too short for a `call rel32`: each is replaced together with the instruction
+  before it (`mov ecx, edi`, and `lea eax, [ebp-0x14]; push eax`) by a call to a
+  thunk that does the same and comes to ours, so the stack is as the stock call left
+  it. `ScreenFade` is in the cinematic view's render list only (view 2), so the fade is
+  seen in a mission's opening and the scripts' cutscenes.
+- `BlitToBlackBackground` also copies a decoded frame into the sprite's texture (on
+  the game's thread, under the video thread's mutex). That part stays; only the three
+  draws after it are taken. When this texture becomes a mirror entry (display plan,
+  phase 4) the drawing here is unchanged.
+
+The fade over the opening cinematic covers what the engine drew before `ScreenFade`
+in that list (the 3D view, the unit view's video); our overlay messages, drawn after,
+are not faded, where stock's (`OverlayText`, before `ScreenFade`) were. The first draw
+of each kind is logged once (`leftovers: drag box ...`), with its rectangle and the
+viewport, so the units can be checked against the back buffer.
+
+**The order ring** is the green four-bladed ring at a move order's destination: an
+entry in `cOverViewImp`'s grid effects (`+0x2b0`, added with the order), drawn each
+frame by `mRenderGridFX` (from `cOverViewImp::PreRender`) as a quad on the map's plane,
+turning (`GRID_FX_ROTATION_SPEED`) and shrinking until it is dropped. `DrawQuad` does
+not draw: it submits the quad to the z-sort (`ST3D_Sprite::ClipAndRender3D`), which the
+device's `Flush` (vtable `+0x38`, from `Armada_RenderAllOurStuff`) draws as triangle
+fans through the trifan buffer. Display8 named it by `BeginScene`'s return address
+(0x623ea5): a stale address its stack scan found, not a caller. Ours is drawn over
+the 3D view without its depth, so a ship between the camera and the ring no longer
+hides it.
+
+**The build footprints** are what a placement draws on the map's plane under the
+cursor: render3d's terrain step calls `RenderFootprints` as stock's does, which draws
+one quad, the sprite `valid_build` (`+0x28`) when the place is clear (`+0x74`) and
+`invalid_build` (`+0x2c`) when not; in the map editor (`UserProfile+0x84`, with no
+placement) a quad per grid cell with `footprint` (`+0x24`). The three are quarters of
+one texture (`MBuild`, `Sprites/gui_map.spr`, `add_nomipf`), so each is drawn with its
+sprite's rectangle (`ST3D_Sprite+0x38`), which the order ring, the whole of `GgridFX`,
+did not need; and since two textures can be drawn in one frame, each engine texture
+has a slot of its own. All three calls are taken or none. They were the engine's until
+the bench placed a station with Display8 in stub mode (`ui-hud-bar`'s stub variant):
+the stub drops every draw of the engine's, and nothing else drew the footprint.
+
+**Not taken**: the damaged systems' icons
+over a pointed unit, the shot director's rings, the action cursor over the minimap,
+and the frame rate and team data `Armada_RenderFrame` prints (`FRAMERATE_DISPLAY`,
+off in a normal game). The editor's own drag box (`mEditModeRender`,
+`mSelectionBox`) stays the engine's.
+
 ## Not done
 
 - Every panel after the info panel (the order above).

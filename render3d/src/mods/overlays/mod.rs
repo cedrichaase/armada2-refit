@@ -20,7 +20,6 @@ mod posts;
 mod selection;
 
 use super::{Module, Step};
-use crate::d3d::Device;
 use crate::engine::{self, field, rd};
 use crate::frame::steps::View;
 use crate::log;
@@ -173,7 +172,7 @@ impl Module for Overlays {
     fn superseded(&self) -> Option<&'static str> {
         Some("Fog.asi")
     }
-    fn device(&mut self, _dev: Device) {
+    fn device(&mut self) {
         self.posts.install();
     }
     fn reset(&mut self) {

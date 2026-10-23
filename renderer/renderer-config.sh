@@ -107,7 +107,7 @@ fi
 # the live DXVK does not know would still be reported "ok"; all four happen to exist in
 # both, but that is luck, not a guarantee.
 dxvk_dll() {
-    local root="$HOME/.config/heroic/tools/dxvk" d name
+    local root="$A2_HEROIC/tools/dxvk" d name
     if [ -f "$GAME/d3d9.dll" ]; then
         echo "$GAME/d3d9.dll"
         return 0

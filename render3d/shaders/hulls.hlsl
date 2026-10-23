@@ -1,4 +1,4 @@
-// entries: vs_hull:vs_3_0:VS_HULL ps_hull:ps_3_0:PS_HULL ps_bump:ps_3_0:PS_BUMP ps_cloak:ps_3_0:PS_CLOAK ps_ghost:ps_3_0:PS_GHOST ps_holo:ps_3_0:PS_HOLO vs_depth:vs_3_0:VS_DEPTH ps_depth:ps_3_0:PS_DEPTH vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE
+// entries: vs_hull:vs_3_0:VS_HULL ps_hull:ps_3_0:PS_HULL ps_bump:ps_3_0:PS_BUMP ps_cloak:ps_3_0:PS_CLOAK ps_ghost:ps_3_0:PS_GHOST ps_holo:ps_3_0:PS_HOLO vs_depth:vs_3_0:VS_DEPTH ps_depth:ps_3_0:PS_DEPTH vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE ps_hull_cl:ps_3_0:PS_HULL_CL:dxc ps_bump_cl:ps_3_0:PS_BUMP_CL:dxc
 // Hulls: ships, stations and the like, drawn from their SODs by render3d's hulls module
 // (src/mods/hulls/). Lighting.asi's hull look ported, drawn into render3d's half-float target. The lit hull
 // keeps Lighting.asi's highlight shoulder (`shoulder`): it stays within 1, as it did
@@ -8,20 +8,26 @@
 // Normals are outward here (the scene layer builds them so), where the engine's point
 // inward; every light direction below is "towards the light".
 
+#include "../../gpu/shaders/compat.hlsli"
+#include "clustered.hlsli"
+
 // ---- vertex ------------------------------------------------------------------------
 
-float4x4 W  : register(c0);    // world (transposed)
-float4x4 VP : register(c4);    // view x projection (transposed)
-float4 warp_n  : register(c8);  // the warp stretch: x,y,z the motion's direction (world), w: the plane's distance along it
-float4 warp_k  : register(c9);  // x: S - 1, y: the shift o (world units), z: 1 while warping; w: the normals' sign (scene::NORMAL_SIGN)
-float4 smat[3] : register(c10); // world -> shadow map u, v, depth (rows)
-float4 soff    : register(c13); // x: the normal offset for the shadow lookup (world units, a texel)
-float4 skey    : register(c14); // towards the Key, world, unit
-float4 wave_d  : register(c15); // a wave light: x,y,z its direction (mesh space), w: 2 pi / wavelength
-float4 wave_t  : register(c16); // x: its phase now (time x speed x 2 pi), y: 1 when there is one
-float4 ck_vw   : register(c17); // the cloak's waves: xyz the travel axis (world) x the wave number, w: the phase now
-float4 ck_vu   : register(c18); // xyz: the first sway (world units, the hull's up axis); 0 unless cloaking
-float4 ck_vs   : register(c19); // xyz: the second sway (world units, its side axis)
+cbuffer hulls_vs : register(b0)
+{
+    float4x4 W  : CREG(0);    // world (transposed)
+    float4x4 VP : CREG(4);    // view x projection (transposed)
+    float4 warp_n  : CREG(8);  // the warp stretch: x,y,z the motion's direction (world), w: the plane's distance along it
+    float4 warp_k  : CREG(9);  // x: S - 1, y: the shift o (world units), z: 1 while warping; w: the normals' sign (scene::NORMAL_SIGN)
+    float4 smat[3] : CREG(10); // world -> shadow map u, v, depth (rows)
+    float4 soff    : CREG(13); // x: the normal offset for the shadow lookup (world units, a texel)
+    float4 skey    : CREG(14); // towards the Key, world, unit
+    float4 wave_d  : CREG(15); // a wave light: x,y,z its direction (mesh space), w: 2 pi / wavelength
+    float4 wave_t  : CREG(16); // x: its phase now (time x speed x 2 pi), y: 1 when there is one
+    float4 ck_vw   : CREG(17); // the cloak's waves: xyz the travel axis (world) x the wave number, w: the phase now
+    float4 ck_vu   : CREG(18); // xyz: the first sway (world units, the hull's up axis); 0 unless cloaking
+    float4 ck_vs   : CREG(19); // xyz: the second sway (world units, its side axis)
+};
 
 struct VI {
     float3 pos : POSITION;
@@ -30,7 +36,7 @@ struct VI {
 };
 
 struct VO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float2 uv  : TEXCOORD0;
     float3 n   : TEXCOORD1;   // world
     float3 wp  : TEXCOORD2;   // world position
@@ -85,26 +91,32 @@ VO vs_hull(VI i)
 #define DIRS   4
 #define POINTS 16
 #define PLANETS 8
-float4 k_amb   : register(c0);   // ambient rgb; a: self-illumination (0: none; above 1 brighter than the texture)
-float4 k_tint  : register(c1);   // the diffuse colour (team colour on team groups, else white); a: unlit (1) or lit (0)
-float4 k_misc  : register(c2);   // x: fade (alpha out); y: specular strength; z: its exponent; w: alpha out = texture alpha (1) or the fade (0)
-float4 k_rim   : register(c3);   // rim light colour; a: its exponent
-float4 k_eye   : register(c4);   // the camera, world
-float4 k_shad  : register(c5);   // x: 1 with a shadow map; y: one texel (uv); z: depth bias; w: how much of the Key a shadow takes
-float4 k_uv    : register(c6);   // xy: the flipbook's UV offset; z: the wave light's strength; w: 1 to cut out at alpha 0.5
-float4 k_wave  : register(c7);   // the wave light's colour
-float4 k_dvec[DIRS] : register(c8);   // towards each directional light
-float4 k_dcol[DIRS] : register(c12);  // its colour; a: 1 for the Key (the light shadows take away)
-float4 k_ppos[POINTS] : register(c16); // point light position; w: full to this distance
-float4 k_pcol[POINTS] : register(c32); // colour; w: 1 / the distance it fades over
-float4 k_pfall[POINTS] : register(c48); // x: wrap, y: power
-float4 k_planet[PLANETS] : register(c64); // a planet: centre, radius (0: none)
-float4 k_sun   : register(c72);  // towards the Key; w: how much planets shadow
-float4 k_bump  : register(c73);  // x: 1 with a normal map; y: its strength; z: the highlight knee
+cbuffer hulls_ps : register(b1)
+{
+    float4 k_amb   : CREG(0);   // ambient rgb; a: self-illumination (0: none; above 1 brighter than the texture)
+    float4 k_tint  : CREG(1);   // the diffuse colour (team colour on team groups, else white); a: unlit (1) or lit (0)
+    float4 k_misc  : CREG(2);   // x: fade (alpha out); y: specular strength; z: its exponent; w: alpha out = texture alpha (1) or the fade (0)
+    float4 k_rim   : CREG(3);   // rim light colour; a: its exponent
+    float4 k_eye   : CREG(4);   // the camera, world
+    float4 k_shad  : CREG(5);   // x: 1 with a shadow map; y: one texel (uv); z: depth bias; w: how much of the Key a shadow takes
+    float4 k_uv    : CREG(6);   // xy: the flipbook's UV offset; z: the wave light's strength; w: 1 to cut out at alpha 0.5
+    float4 k_wave  : CREG(7);   // the wave light's colour
+    float4 k_dvec[DIRS] : CREG(8);   // towards each directional light
+    float4 k_dcol[DIRS] : CREG(12);  // its colour; a: 1 for the Key (the light shadows take away)
+    float4 k_ppos[POINTS] : CREG(16); // point light position; w: full to this distance
+    float4 k_pcol[POINTS] : CREG(32); // colour; w: 1 / the distance it fades over
+    float4 k_pfall[POINTS] : CREG(48); // x: wrap, y: power
+    float4 k_planet[PLANETS] : CREG(64); // a planet: centre, radius (0: none)
+    float4 k_sun   : CREG(72);  // towards the Key; w: how much planets shadow
+    float4 k_bump  : CREG(73);  // x: 1 with a normal map; y: its strength; z: the highlight knee
+};
 
-sampler2D tex  : register(s0);
-sampler2D nmap : register(s1);   // a bump-mapped mesh's normal map (from its height map)
-sampler2D smap : register(s3);   // the shadow map: depth 0..1 from the Key, 1 where nothing is
+STAGE(0) Texture2D tex : register(t0);
+STAGE(0) SamplerState tex_s : register(s0);
+STAGE(1) Texture2D nmap : register(t1);   // a bump-mapped mesh's normal map (from its height map)
+STAGE(1) SamplerState nmap_s : register(s1);
+STAGE(3) Texture2D smap : register(t3);   // the shadow map: depth 0..1 from the Key, 1 where nothing is
+STAGE(3) SamplerState smap_s : register(s3);
 
 float glint(float3 N, float3 L, float3 V)
 {
@@ -125,7 +137,7 @@ float map_shadow(float3 sc)
         float wy = y == -1 ? 1.0 - f.y : (y == 2 ? f.y : 1.0);
         for (int x = -1; x <= 2; x++) {
             float wx = x == -1 ? 1.0 - f.x : (x == 2 ? f.x : 1.0);
-            float z = tex2Dlod(smap, float4(b + float2(x, y) * k_shad.y, 0.0, 0.0)).r;
+            float z = smap.SampleLevel(smap_s, b + float2(x, y) * k_shad.y, 0.0).r;
             lit += (d <= z ? 1.0 : 0.0) * wx * wy;
         }
     }
@@ -169,6 +181,11 @@ float4 shade(float3 N, float3 wp, float4 t, float3 sc, float wv)
         sum += c * max(0.0, dot(N, k_dvec[k].xyz));
         spec += c * glint(N, k_dvec[k].xyz, V);
     }
+#ifdef __hlsl_dx_compiler
+    if (cl_on)
+        cl_add(N, wp, V, k_misc.z, false, sum, spec);
+    else
+#endif
     for (int j = 0; j < POINTS; j++) {
         float3 L = k_ppos[j].xyz - wp;
         float d = length(L);
@@ -188,12 +205,12 @@ float4 shade(float3 N, float3 wp, float4 t, float3 sc, float wv)
 
 float4 sample_tex(float2 uv)
 {
-    float4 t = tex2D(tex, uv + k_uv.xy);
+    float4 t = tex.Sample(tex_s, uv + k_uv.xy);
     clip(k_uv.w > 0.5 ? t.a - 0.5 : 1.0);
     return t;
 }
 
-float4 ps_hull(VO i) : COLOR
+float4 ps_hull(VO i) : SV_Target
 {
     return shade(normalize(i.n), i.wp, sample_tex(i.uv), i.sc, i.wv);
 }
@@ -208,7 +225,7 @@ float3 bumped(VO i, float3 N)
     float3 T = a * du1.x + b * du2.x;
     float3 B = a * du1.y + b * du2.y;
     float s = rsqrt(max(max(dot(T, T), dot(B, B)), 1e-20));
-    float3 m = tex2D(nmap, i.uv + k_uv.xy).rgb * 2.0 - 1.0;
+    float3 m = nmap.Sample(nmap_s, i.uv + k_uv.xy).rgb * 2.0 - 1.0;
     m.xy *= k_bump.y;
     // the map's y runs down the texture, as the engine's normal map is built
     float3 n = T * s * m.x - B * s * m.y + N * m.z;
@@ -216,40 +233,63 @@ float3 bumped(VO i, float3 N)
     return l > 1e-5 ? n / l : N;
 }
 
-float4 ps_bump(VO i) : COLOR
+float4 ps_bump(VO i) : SV_Target
 {
     float3 N = normalize(i.n);
     return shade(bumped(i, N), i.wp, sample_tex(i.uv), i.sc, i.wv);
 }
 
+#ifdef __hlsl_dx_compiler
+// The clustered twins (Vulkan and Direct3D 12, clustered.hlsli): every light of the
+// pixel's cluster in place of the point lights in the constants.
+float4 ps_hull_cl(VO i) : SV_Target
+{
+    cl_on = true;
+    cl_fc = i.pos;
+    return ps_hull(i);
+}
+
+float4 ps_bump_cl(VO i) : SV_Target
+{
+    cl_on = true;
+    cl_fc = i.pos;
+    return ps_bump(i);
+}
+#endif
+
 // ---- cloaked hulls: thick glass over a copy of the frame (Lighting.asi's Cloak=1) ----
-float4 ck_view[3] : register(c80);  // rows of VIEW's 3x3 (world -> view x, y, z)
-float4 ck_proj    : register(c83);  // x, y: the projection's scale over the copy's size; z, w: 1 / the copy's size
-float4 ck_ctr     : register(c84);  // the hull's bounding sphere: centre; w: radius
-float4 ck_a       : register(c85);  // x: how much of the hull is left; y: time; z: the bend; w: the colour split
-float4 ck_b       : register(c86);  // x: ripple; y: rim; z: glint; w: the hull's floor
-float4 ck_tint    : register(c87);  // rgb: what the glass passes; a: the front's glow
-float4 ck_rim     : register(c88);
-float4 ck_edge    : register(c89);
-float4 ck_org     : register(c90);  // xy: the copy's top left in the target, pixels
-float4 ck_wave    : register(c91);  // the transition's bands, as the vertex's ck_vw
-float4 ck_c       : register(c92);  // x: the cloaked shimmer (of the radius); y: how far the bands tilt the glass; z: the shimmer's clock
-sampler2D ck_scene : register(s6);
+cbuffer hulls_ps1 : register(b1)
+{
+    float4 ck_view[3] : CREG(80);  // rows of VIEW's 3x3 (world -> view x, y, z)
+    float4 ck_proj    : CREG(83);  // x, y: the projection's scale over the copy's size; z, w: 1 / the copy's size
+    float4 ck_ctr     : CREG(84);  // the hull's bounding sphere: centre; w: radius
+    float4 ck_a       : CREG(85);  // x: how much of the hull is left; y: time; z: the bend; w: the colour split
+    float4 ck_b       : CREG(86);  // x: ripple; y: rim; z: glint; w: the hull's floor
+    float4 ck_tint    : CREG(87);  // rgb: what the glass passes; a: the front's glow
+    float4 ck_rim     : CREG(88);
+    float4 ck_edge    : CREG(89);
+    float4 ck_org     : CREG(90);  // xy: the copy's top left in the target, pixels
+    float4 ck_wave    : CREG(91);  // the transition's bands, as the vertex's ck_vw
+    float4 ck_c       : CREG(92);  // x: the cloaked shimmer (of the radius); y: how far the bands tilt the glass; z: the shimmer's clock
+};
+STAGE(6) Texture2D ck_scene : register(t6);
+STAGE(6) SamplerState ck_scene_s : register(s6);
 
 float3 ck_scene_at(float2 uv, float2 off, float split)
 {
     float3 c = 0.0;
     for (int k = -1; k <= 1; k++) {
         float s = 1.0 + split * 0.35 * k;
-        c.r += tex2Dlod(ck_scene, float4(uv + off * (s + split), 0.0, 0.0)).r;
-        c.g += tex2Dlod(ck_scene, float4(uv + off * s, 0.0, 0.0)).g;
-        c.b += tex2Dlod(ck_scene, float4(uv + off * (s - split), 0.0, 0.0)).b;
+        c.r += ck_scene.SampleLevel(ck_scene_s, uv + off * (s + split), 0.0).r;
+        c.g += ck_scene.SampleLevel(ck_scene_s, uv + off * s, 0.0).g;
+        c.b += ck_scene.SampleLevel(ck_scene_s, uv + off * (s - split), 0.0).b;
     }
     return c / 3.0;
 }
 
-float4 ps_cloak(VO i, float2 vpos : VPOS) : COLOR
+float4 ps_cloak(VO i) : SV_Target
 {
+    float2 vpos = d3d9_vpos(i.pos);
     float3 N = normalize(i.n);
     float4 hull = shade(N, i.wp, sample_tex(i.uv), i.sc, i.wv);
     float3 V = normalize(k_eye.xyz - i.wp);
@@ -297,15 +337,18 @@ float4 ps_cloak(VO i, float2 vpos : VPOS) : COLOR
 // light. Here: the lit hull lifted towards its texture at full light, a broad highlight
 // towards each directional light past white (so it blooms), and a blocked placement's
 // red added as stock adds its red ambient. Premultiplied (ONE, INVSRCALPHA).
-float4 gh_a   : register(c80); // x: alpha; y: lift; z: sheen; w: the sheen's exponent
-float4 gh_add : register(c81); // rgb: light added on the texture (a blocked placement's red)
+cbuffer hulls_ps2 : register(b1)
+{
+    float4 gh_a   : CREG(80); // x: alpha; y: lift; z: sheen; w: the sheen's exponent
+    float4 gh_add : CREG(81); // rgb: light added on the texture (a blocked placement's red)
+};
 
 float lum(float3 c)
 {
     return dot(c, float3(0.299, 0.587, 0.114));
 }
 
-float4 ps_ghost(VO i) : COLOR
+float4 ps_ghost(VO i) : SV_Target
 {
     float3 N = normalize(i.n);
     float4 t = sample_tex(i.uv);
@@ -325,20 +368,24 @@ float4 ps_ghost(VO i) : COLOR
 // The lit hull of the class it shows, drawn as a hologram in the object's team colour:
 // scanlines rolling down the screen, a bright band sweeping along the hull, a stepped
 // flicker with rare dropouts, and a glow at the silhouette past white. Premultiplied.
-float4 ho_a    : register(c82); // x: alpha; y: scanline depth; z: scanline pitch (pixels); w: time (s)
-float4 ho_b    : register(c83); // x: flicker; y: edge glow; z: its exponent; w: this hologram's seed
-float4 ho_tint : register(c84); // rgb: the hologram's colour; w: the sweep's strength
-float4 ho_ax   : register(c85); // xyz: the hull's up axis (world, unit); w: 1 / its radius
-float4 ho_ctr  : register(c86); // xyz: its centre; w: how far the hull goes towards the colour
-float4 ho_c    : register(c87); // x: the scanlines' roll (pitches per second); y: the sweeps per second; z: dropout chance
+cbuffer hulls_ps3 : register(b1)
+{
+    float4 ho_a    : CREG(82); // x: alpha; y: scanline depth; z: scanline pitch (pixels); w: time (s)
+    float4 ho_b    : CREG(83); // x: flicker; y: edge glow; z: its exponent; w: this hologram's seed
+    float4 ho_tint : CREG(84); // rgb: the hologram's colour; w: the sweep's strength
+    float4 ho_ax   : CREG(85); // xyz: the hull's up axis (world, unit); w: 1 / its radius
+    float4 ho_ctr  : CREG(86); // xyz: its centre; w: how far the hull goes towards the colour
+    float4 ho_c    : CREG(87); // x: the scanlines' roll (pitches per second); y: the sweeps per second; z: dropout chance
+};
 
 float hash1(float x)
 {
     return frac(sin(x * 12.9898 + 78.233) * 43758.5453);
 }
 
-float4 ps_holo(VO i, float2 vpos : VPOS) : COLOR
+float4 ps_holo(VO i) : SV_Target
 {
+    float2 vpos = d3d9_vpos(i.pos);
     float3 N = normalize(i.n);
     float4 t = sample_tex(i.uv);
     float3 c = shade(N, i.wp, t, i.sc, i.wv).rgb;
@@ -361,11 +408,17 @@ float4 ps_holo(VO i, float2 vpos : VPOS) : COLOR
 
 // ---- the shadow map: depth from the Key ---------------------------------------------
 
-float4 k_spass : register(c17); // vertex: x one texel
-float4 k_dcut  : register(c0);  // pixel: x 1 to cut out at alpha 0.5 (as ps_hull's k_uv.w)
+cbuffer hulls_vs1 : register(b0)
+{
+    float4 k_spass : CREG(17); // vertex: x one texel
+};
+cbuffer hulls_ps4 : register(b1)
+{
+    float4 k_dcut  : CREG(0);  // pixel: x 1 to cut out at alpha 0.5 (as ps_hull's k_uv.w)
+};
 
 struct DO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float  d   : TEXCOORD0;
     float2 uv  : TEXCOORD1;
 };
@@ -384,9 +437,9 @@ DO vs_depth(VI i)
 
 // A cut-out mesh casts what the hull pass draws of it: its texture's alpha under 0.5
 // is a hole (a mesh with no texture bound reads alpha 1).
-float4 ps_depth(DO i) : COLOR
+float4 ps_depth(DO i) : SV_Target
 {
-    clip(k_dcut.x > 0.5 ? tex2D(tex, i.uv).a - 0.5 : 1.0);
+    clip(k_dcut.x > 0.5 ? tex.Sample(tex_s, i.uv).a - 0.5 : 1.0);
     return float4(i.d, 0.0, 0.0, 1.0);
 }
 
@@ -400,7 +453,7 @@ struct SI {
 };
 
 struct SO {
-    float4 pos : POSITION;
+    float4 pos : SV_Position;
     float4 col : COLOR0;
     float2 uv  : TEXCOORD0;
 };
@@ -414,11 +467,14 @@ SO vs_sprite(SI i)
     return o;
 }
 
-float4 k_sprite : register(c0); // x: colour scale (HDR); y: 1 to cut out at alpha 0.5
-
-float4 ps_sprite(SO i) : COLOR
+cbuffer hulls_ps5 : register(b1)
 {
-    float4 t = tex2D(tex, i.uv);
+    float4 k_sprite : CREG(0); // x: colour scale (HDR); y: 1 to cut out at alpha 0.5
+};
+
+float4 ps_sprite(SO i) : SV_Target
+{
+    float4 t = tex.Sample(tex_s, i.uv);
     clip(k_sprite.y > 0.5 ? t.a - 0.5 : 1.0);
     return float4(t.rgb * i.col.rgb * k_sprite.x, t.a * i.col.a);
 }

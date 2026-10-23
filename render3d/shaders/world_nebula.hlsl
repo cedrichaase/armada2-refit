@@ -16,60 +16,77 @@
 // the class's recipe (Nebulae\<odf>.ini) through nebulae.rs, which must
 // agree with the registers below.
 
-float4 k_vp0     : register(c0);   // the columns of VIEW x PROJECTION
-float4 k_vp1     : register(c1);
-float4 k_vp2     : register(c2);
-float4 k_vp3     : register(c3);
+#include "../../gpu/shaders/compat.hlsli"
 
-float4 k_eye     : register(c0);   // pixel shader: xyz the camera; w the near fade (units)
-float4 k_gas_a   : register(c1);   // rgb: the gas; w: brightness
-float4 k_gas_b   : register(c2);   // rgb: the gas, second hue; w: hue scale
-float4 k_glow    : register(c3);   // rgb: the densest gas; w: gamma on the density
-float4 k_noise   : register(c4);   // 1/tile (world units), warp, coverage, softness
-float4 k_seed    : register(c5);   // xyz: offset of the noise domain; w: detail
-float4 k_env     : register(c6);   // xy: envelope origin (x, z); zw: 1/its size
-float4 k_vert    : register(c7);   // x: the field's y; y: the domes' full height; z: 1/255; w: 1/reach, times the edge-on dimming
-float4 k_shape   : register(c8);   // x: ridge; y: hue mix; z: warp scale; w: lumps (of the height)
-float4 k_knots   : register(c9);   // x: knots; y: their scale; z: lanes; w: their scale
-float4 k_light   : register(c10);  // xyz: towards the light, times the step (world units); w: shading
-float4 k_vlo     : register(c11);  // the baked volume: xyz its low corner (world); w: fine detail
-float4 k_vsz     : register(c12);  // bake: xyz world units per texel, w the layer's y; draw: xyz 1/its size, w the frame
-float4 k_flow    : register(c13);  // x: the drift (noise units, grows with time); y: flow (world units); z: its scale; w: edge warp (world units)
-float4 k_samp    : register(c15);  // x: reads per slice pixel (1 or 2); y: the jitter's span (1, or 0.5 with two reads); z: hue swing now; w: lightning on (0/1)
-float4 k_flash0  : register(c16);  // lightning: xyz where (world), w how bright now (0: dark);
-float4 k_flash1  : register(c17);  //   four of them, as separate constants: vkd3d does not
-float4 k_flash2  : register(c18);  //   place an array at its register()
-float4 k_flash3  : register(c19);
-float4 k_flashc  : register(c20);  // rgb: the lightning's colour; w: 1 / its radius squared
-float4 k_fil     : register(c14);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
-float4 k_core    : register(c24);  // x: Core, the gas brighter towards each nebula's centre (0: off); y: how sharply; z: Pulse; w: its phase now (radians)
-float4 k_ring    : register(c25);  // the ring about the core: x how much it tints (0: off, 1: wholly), y where (core profile), z its width, w the colours' phase now
-float4 k_rpatch  : register(c26);  //   x its patches' scale (of the tile), y how much of the ring they cover, z their softness, w the colours' spread
-float4 k_ringa   : register(c27);  //   rgb: its four colours, in turn
-float4 k_ringb   : register(c28);
-float4 k_ringc   : register(c29);
-float4 k_ringd   : register(c30);
-float4 k_opac    : register(c31);  // x: Opacity= over the reach: optical depth a world unit of the densest gas (0: none); y: the envelope's height range (s_env.b)
-float4 k_sh0     : register(c32);  // the Key's shadow map (Lighting.asi): world -> u,
-float4 k_sh1     : register(c33);  //   v,
-float4 k_sh2     : register(c34);  //   and depth along the Key (0..1 over the hulls)
-float4 k_sh      : register(c35);  //   x 1: there is a map (0: none), y the depth bias, z the penumbra (u, v per depth behind the caster), w half a texel (u, v)
-float4 k_key     : register(c36);  // xyz: towards the Key (Lighting.asi); w: the Key's share of the gas's light (0: none, all the gas's own)
-float4 k_scat    : register(c37);
-float4 k_swirl   : register(c40);  // x: Swirl, how far the gas wanders about its place (world units); y: its phases' scale (of the tile); z, w: the two circles' phases now (radians)
-float4 k_fuzz    : register(c38);  // x: Fringe, a thin haze about the body; y: its noise's scale (of the tile); z: Fuzz, the outline feathered; w: the fine octave's drift now (noise tiles)  // the Key scattered forward: x 1 + g*g, y 2g (Henyey-Greenstein's g, Scatter=)
+cbuffer world_nebula_vs : register(b0)
+{
+    float4 k_vp0     : CREG(0);   // the columns of VIEW x PROJECTION
+    float4 k_vp1     : CREG(1);
+    float4 k_vp2     : CREG(2);
+    float4 k_vp3     : CREG(3);
+};
 
-sampler3D s_noise : register(s0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
-sampler2D s_env   : register(s1);  // r: the domes' height (fraction); g: the filaments' reach; b: the nebulae's height there (0.5: the field's); a: envelope
-sampler3D s_vol   : register(s2);  // the baked gas: density, shading, hue, emission
-sampler2D s_blue  : register(s4);  // a 64x64 blue-noise tile: r and g two independent thresholds
-sampler2D s_occ   : register(s3);  // per column of it: r the most gas, b and g the lowest and highest layer with any
-sampler2D s_shadow : register(s8); // the Key's shadow map, R32F, point-sampled: the depth of the nearest hull
+cbuffer world_nebula_ps : register(b1)
+{
+    float4 k_eye     : CREG(0);   // pixel shader: xyz the camera; w the near fade (units)
+    float4 k_gas_a   : CREG(1);   // rgb: the gas; w: brightness
+    float4 k_gas_b   : CREG(2);   // rgb: the gas, second hue; w: hue scale
+    float4 k_glow    : CREG(3);   // rgb: the densest gas; w: gamma on the density
+    float4 k_noise   : CREG(4);   // 1/tile (world units), warp, coverage, softness
+    float4 k_seed    : CREG(5);   // xyz: offset of the noise domain; w: detail
+    float4 k_env     : CREG(6);   // xy: envelope origin (x, z); zw: 1/its size
+    float4 k_vert    : CREG(7);   // x: the field's y; y: the domes' full height; z: 1/255; w: 1/reach, times the edge-on dimming
+    float4 k_shape   : CREG(8);   // x: ridge; y: hue mix; z: warp scale; w: lumps (of the height)
+    float4 k_knots   : CREG(9);   // x: knots; y: their scale; z: lanes; w: their scale
+    float4 k_light   : CREG(10);  // xyz: towards the light, times the step (world units); w: shading
+    float4 k_vlo     : CREG(11);  // the baked volume: xyz its low corner (world); w: fine detail
+    float4 k_vsz     : CREG(12);  // bake: xyz world units per texel, w the layer's y; draw: xyz 1/its size, w the frame
+    float4 k_flow    : CREG(13);  // x: the drift (noise units, grows with time); y: flow (world units); z: its scale; w: edge warp (world units)
+    float4 k_fil     : CREG(14);  // x: filaments; y: their scale; z: their sharpness; w: their height (world units)
+    float4 k_samp    : CREG(15);  // x: reads per slice pixel (1 or 2); y: the jitter's span (1, or 0.5 with two reads); z: hue swing now; w: lightning on (0/1)
+    float4 k_flash0  : CREG(16);  // lightning: xyz where (world), w how bright now (0: dark);
+    float4 k_flash1  : CREG(17);  //   four of them, as separate constants: vkd3d does not
+    float4 k_flash2  : CREG(18);  //   place an array at its register()
+    float4 k_flash3  : CREG(19);
+    float4 k_flashc  : CREG(20);  // rgb: the lightning's colour; w: 1 / its radius squared
+    float4 k_core    : CREG(24);  // x: Core, the gas brighter towards each nebula's centre (0: off); y: how sharply; z: Pulse; w: its phase now (radians)
+    float4 k_ring    : CREG(25);  // the ring about the core: x how much it tints (0: off, 1: wholly), y where (core profile), z its width, w the colours' phase now
+    float4 k_rpatch  : CREG(26);  //   x its patches' scale (of the tile), y how much of the ring they cover, z their softness, w the colours' spread
+    float4 k_ringa   : CREG(27);  //   rgb: its four colours, in turn
+    float4 k_ringb   : CREG(28);
+    float4 k_ringc   : CREG(29);
+    float4 k_ringd   : CREG(30);
+    float4 k_opac    : CREG(31);  // x: Opacity= over the reach: optical depth a world unit of the densest gas (0: none); y: the envelope's height range (s_env.b)
+    float4 k_sh0     : CREG(32);  // the Key's shadow map (Lighting.asi): world -> u,
+    float4 k_sh1     : CREG(33);  //   v,
+    float4 k_sh2     : CREG(34);  //   and depth along the Key (0..1 over the hulls)
+    float4 k_sh      : CREG(35);  //   x 1: there is a map (0: none), y the depth bias, z the penumbra (u, v per depth behind the caster), w half a texel (u, v)
+    float4 k_key     : CREG(36);  // xyz: towards the Key (Lighting.asi); w: the Key's share of the gas's light (0: none, all the gas's own)
+    float4 k_scat    : CREG(37);  // the Key scattered forward: x 1 + g*g, y 2g (Henyey-Greenstein's g, Scatter=)
+    float4 k_fuzz    : CREG(38);  // x: Fringe, a thin haze about the body; y: its noise's scale (of the tile); z: Fuzz, the outline feathered; w: the fine octave's drift now (noise tiles)
+    float4 k_swirl   : CREG(40);  // x: Swirl, how far the gas wanders about its place (world units); y: its phases' scale (of the tile); z, w: the two circles' phases now (radians)
+};
 
-float4 k_lr      : register(c21);  // the march: x Obscure=; zw 1 / the scene depth's size
+STAGE(0) Texture3D s_noise : register(t0);  // r: a fractal field; gba: three soft warp fields; all tiling, spectral (no lattice)
+STAGE(0) SamplerState s_noise_s : register(s0);
+STAGE(1) Texture2D s_env : register(t1);  // r: the domes' height (fraction); g: the filaments' reach; b: the nebulae's height there (0.5: the field's); a: envelope
+STAGE(1) SamplerState s_env_s : register(s1);
+STAGE(2) Texture3D s_vol : register(t2);  // the baked gas: density, shading, hue, emission
+STAGE(2) SamplerState s_vol_s : register(s2);
+STAGE(4) Texture2D s_blue : register(t4);  // a 64x64 blue-noise tile: r and g two independent thresholds
+STAGE(4) SamplerState s_blue_s : register(s4);
+STAGE(3) Texture2D s_occ : register(t3);  // per column of it: r the most gas, b and g the lowest and highest layer with any
+STAGE(3) SamplerState s_occ_s : register(s3);
+STAGE(8) Texture2D s_shadow : register(t8); // the Key's shadow map, R32F, point-sampled: the depth of the nearest hull
+STAGE(8) SamplerState s_shadow_s : register(s8);
+
+cbuffer world_nebula_ps1 : register(b1)
+{
+    float4 k_lr      : CREG(21);  // the march: x Obscure=; zw 1 / the scene depth's size
+};
 
 struct VsIn  { float4 pos : POSITION; float2 t : TEXCOORD0; };
-struct VsOut { float4 pos : POSITION; float3 w : TEXCOORD0; float2 t : TEXCOORD1; float2 zw : TEXCOORD2; };
+struct VsOut { float4 pos : SV_Position; float3 w : TEXCOORD0; float2 t : TEXCOORD1; float2 zw : TEXCOORD2; };
 
 VsOut neb_vs(VsIn i)
 {
@@ -107,7 +124,7 @@ float3 rot2(float3 p)
 // x, y and z before the domain was turned. Two lattices never line up together.
 float noise2(float3 a, float3 b)
 {
-    return (tex3D(s_noise, a).r + tex3D(s_noise, b).r - 1.0) * 0.7071 + 0.5;
+    return (s_noise.Sample(s_noise_s, a).r + s_noise.Sample(s_noise_s, b).r - 1.0) * 0.7071 + 0.5;
 }
 
 // The gas's density at q (noise coordinates), from the warp w and the disc's cover.
@@ -132,11 +149,11 @@ float gas_density(float3 p, float3 w, float cover, float det)
 float4 gas_at(float3 p)
 {
     float3 q = rot(p) * k_noise.x + k_seed.xyz;
-    float3 w = tex3D(s_noise, q * k_shape.z).gba * 2.0 - 1.0;
+    float3 w = s_noise.Sample(s_noise_s, q * k_shape.z).gba * 2.0 - 1.0;
 
     // The envelope read through the warp: the outline is pushed out and in by up to
     // EdgeWarp of the reach, so it is ragged and not a ring of discs.
-    float4 env = tex2D(s_env, (p.xz + w.xz * k_flow.w - k_env.xy) * k_env.zw);
+    float4 env = s_env.Sample(s_env_s, (p.xz + w.xz * k_flow.w - k_env.xy) * k_env.zw);
     // Windows' own Direct3D 9 refuses a texld inside an if (README.md, "Shaders on
     // Windows"), and an early return puts the rest of the function inside one. So outside
     // the envelope the gas is still worked out, and given up at the end; the branches on
@@ -163,7 +180,7 @@ float4 gas_at(float3 p)
     // Filaments: the ridges of a large, warped field, sharpened into tendrils, out to
     // the filaments' own reach and height. Off unless the recipe asks (Filaments=).
     [flatten] if (k_fil.x > 0.0) {
-        float  fr = tex3D(s_noise, q * k_fil.y + w * (k_noise.y * 1.5) + float3(0.13, 0.57, 0.91)).r;
+        float  fr = s_noise.Sample(s_noise_s, q * k_fil.y + w * (k_noise.y * 1.5) + float3(0.13, 0.57, 0.91)).r;
         float  ridge = saturate(1.0 - abs(fr - 0.5) * 4.0);
         float  fil = pow(ridge, k_fil.z) * env.g * smoothstep(1.0, 0.2, abs(y) / k_fil.w);
         fil *= k_fil.x * saturate(det * 1.6);         // broken up along their length
@@ -183,9 +200,9 @@ float4 gas_at(float3 p)
 
     // Knots: a coarse field whose peaks are brighter pockets of gas. Lanes: a softer
     // one whose ridges are darker channels through it.
-    float  kn = tex3D(s_noise, q * k_knots.y + float3(0.31, 0.17, 0.53)).r;
+    float  kn = s_noise.Sample(s_noise_s, q * k_knots.y + float3(0.31, 0.17, 0.53)).r;
     float  knot = 1.0 + k_knots.x * smoothstep(0.5, 0.8, kn);
-    float  ln = tex3D(s_noise, q * k_knots.w + float3(0.71, 0.43, 0.29)).g;
+    float  ln = s_noise.Sample(s_noise_s, q * k_knots.w + float3(0.71, 0.43, 0.29)).g;
     float  lane = 1.0 - k_knots.z * smoothstep(0.35, 0.05, abs(ln - 0.5) * 2.0);
 
     // Core: brighter towards each nebula's centre, by the envelope's dome (1 at a centre,
@@ -215,13 +232,13 @@ float3 gas_colour(float4 g, float thick, float dist, float3 p, float lit, float 
     // About the core (Pulse=, Ring=), drawn per frame as they change with time: the
     // core profile again, from the envelope (1 at a centre, 0 at the reach).
     if (k_core.z > 0.0 || k_ring.x > 0.0) {
-        float4 e = tex2Dlod(s_env, float4((p.xz - k_env.xy) * k_env.zw, 0.0, 0.0));
+        float4 e = s_env.SampleLevel(s_env_s, (p.xz - k_env.xy) * k_env.zw, 0.0);
         float  t = abs(p.y - k_vert.x - (e.b * 2.0 - 1.0) * k_opac.y) / max(e.r * k_vert.y, 1.0);
         float  cp = saturate(e.r) * saturate(1.0 - t);
         // Pulse: the core brightens and dims, out of step from one nebula to the next
         // (a very large noise offsets the phase).
         if (k_core.z > 0.0) {
-            float off = tex3Dgrad(s_noise, p * (k_noise.x * 0.05), 0.0, 0.0).g * 12.566;   // the top level: inside the march's branches
+            float off = s_noise.SampleGrad(s_noise_s, p * (k_noise.x * 0.05), 0.0, 0.0).g * 12.566;   // the top level: inside the march's branches
             c *= 1.0 + k_core.z * sin(k_core.w + off) * pow(cp, k_core.y * 0.5);
         }
         // Ring: about the core, in patches, the gas takes colours that go round in turn
@@ -229,7 +246,7 @@ float3 gas_colour(float4 g, float thick, float dist, float3 p, float lit, float 
         // teal, violet, pink and green.
         if (k_ring.x > 0.0) {
             float  ring = saturate(1.0 - abs(cp - k_ring.y) / k_ring.z);
-            float  n = tex3Dgrad(s_noise, p * (k_noise.x * k_rpatch.x) + float3(0.37, 0.11, 0.73), 0.0, 0.0).g;
+            float  n = s_noise.SampleGrad(s_noise_s, p * (k_noise.x * k_rpatch.x) + float3(0.37, 0.11, 0.73), 0.0, 0.0).g;
             ring *= smoothstep(1.0 - k_rpatch.y - k_rpatch.z, 1.0 - k_rpatch.y + k_rpatch.z, n);
             float  s = frac(k_ring.w + n * k_rpatch.w) * 4.0, f = frac(s);
             float3 a = s < 1.0 ? k_ringa.rgb : s < 2.0 ? k_ringb.rgb : s < 3.0 ? k_ringc.rgb : k_ringd.rgb;
@@ -282,9 +299,9 @@ float key_lit(float3 p, float2 u, float k)
     // a hull at the far end: gas beyond every hull along the Key (z > 1) would otherwise
     // be in shadow wherever there is no hull at all.
     float  z = s.z - k_sh.y;
-    float  d = tex2Dlod(s_shadow, float4(s.xy + da * (k_sh.w + z * k_sh.z), 0, 0)).r;
+    float  d = s_shadow.SampleLevel(s_shadow_s, s.xy + da * (k_sh.w + z * k_sh.z), 0).r;
     float  r = k_sh.w + (d < min(z, 0.999) ? z - d : 0.0) * k_sh.z;
-    d = tex2Dlod(s_shadow, float4(s.xy + db * r, 0, 0)).r;
+    d = s_shadow.SampleLevel(s_shadow_s, s.xy + db * r, 0).r;
     return 1.0 - on * (d < min(z, 0.999) ? 1.0 : 0.0);
 }
 
@@ -299,7 +316,7 @@ float3 slice_point(VsOut i, float2 vpos, out float dist, out float2 u)
     // stratified and the errors cancel. They stay put from frame to frame (k_vsz.w is
     // 0): moved on each frame, they shifted every slice's samples together, and the
     // gas flickered.
-    u = tex2D(s_blue, (vpos + 0.5) / 64.0).rg + k_vsz.w * float2(0.6180340, 0.7548777);
+    u = s_blue.Sample(s_blue_s, (vpos + 0.5) / 64.0).rg + k_vsz.w * float2(0.6180340, 0.7548777);
     // Over the whole gap to the next slice (with vol_ps's two reads): a part left
     // unsampled shows as bands where the slices turn through the gas.
     float  jit = (frac(u.x + i.t.y * 0.6180340) - 0.5) * k_samp.y;   // with two reads, vol_ps covers the rest
@@ -317,8 +334,9 @@ float4 slice_out(float3 c, float2 u, float k)
 }
 
 // The reference: every slice pixel computes the gas itself (Bake=0). Costly.
-float4 neb_ps(VsOut i, float2 vpos : VPOS) : COLOR
+float4 neb_ps(VsOut i) : SV_Target
 {
+    float2 vpos = d3d9_vpos(i.pos);
     float  dist;
     float2 u0;
     float3 p = slice_point(i, vpos, dist, u0);
@@ -328,15 +346,16 @@ float4 neb_ps(VsOut i, float2 vpos : VPOS) : COLOR
     return slice_out(gas_colour(g, i.t.x, dist, p, key_lit(p, u0, i.t.y), ph), u0, i.t.y);
 }
 
-float4 bake_vs(float4 pos : POSITION) : POSITION
+float4 bake_vs(float4 pos : POSITION) : SV_Position
 {
     return float4(pos.xy, 0.0, 1.0);
 }
 
 // The bake: one layer of the volume per draw, a texel per pixel. Stored as
 // density, shading / 1.6, hue, emission / 4.
-float4 bake_ps(float2 vpos : VPOS) : COLOR
+float4 bake_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     // Each texel's point jittered within it. The noise's mips are chosen to be about a
     // texel wide, so their grid beat against the bake's like two fine screens laid over
     // each other: parallel lines through the gas (the detail octave's most, its mips the
@@ -360,7 +379,7 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     // (Worked out all the same and given up at the end, with the recipe's branches
     // flattened, as in gas_at: Windows refuses a texld inside an if. Only the slices,
     // drawn without the march, pay for it.)
-    float4 o = tex2D(s_occ, uvw.xz);
+    float4 o = s_occ.Sample(s_occ_s, uvw.xz);
     float  m = (k_flow.y + k_swirl.x) * k_vsz.y + 0.02;
     bool   empty = o.r < 0.006 || uvw.y < o.b - m || uvw.y > o.g + m;
     // Flow: the volume read through a warp field that drifts with time, so the gas
@@ -370,8 +389,8 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     float3 fl = 0.0;
     [flatten] if (k_flow.y > 0.0) {
         float3 fd = float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37);
-        fl = (tex3D(s_noise, p * (k_noise.x * k_flow.z) + fd).gba +
-              tex3D(s_noise, rot2(p) * (k_noise.x * k_flow.z * 0.786) - fd.zxy + 0.5).gba - 1.0) * 1.4142;
+        fl = (s_noise.Sample(s_noise_s, p * (k_noise.x * k_flow.z) + fd).gba +
+              s_noise.Sample(s_noise_s, rot2(p) * (k_noise.x * k_flow.z * 0.786) - fd.zxy + 0.5).gba - 1.0) * 1.4142;
         fl = clamp(fl, -1.0, 1.0);                    // within the reach the occupancy record allows for
     }
     // Samples=2: two reads a quarter of the gap either side of the jittered point, one
@@ -384,7 +403,7 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     // the world and only the time turns them: the field is never torn apart. Within
     // Swirl= on every axis, the reach the occupancy record allows for.
     [flatten] if (k_swirl.x > 0.0) {
-        float3 sn = tex3D(s_noise, rot(p) * (k_noise.x * k_swirl.y) + k_seed.yzx + float3(0.29, 0.61, 0.17)).gba;
+        float3 sn = s_noise.Sample(s_noise_s, rot(p) * (k_noise.x * k_swirl.y) + k_seed.yzx + float3(0.29, 0.61, 0.17)).gba;
         float  a1 = k_swirl.z + sn.x * 6.2832;
         float  a2 = -k_swirl.w + sn.y * 6.2832;
         float  r  = saturate(0.35 + sn.z * 0.9) * k_swirl.x;
@@ -392,10 +411,10 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     }
     float4 v;
     [flatten] if (k_samp.x > 1.5)
-        v = 0.5 * (tex3D(s_vol, ((pa - dir - k_vlo.xyz) * k_vsz.xyz).xzy) +   // width x, height z, depth y
-                   tex3D(s_vol, ((pa + dir - k_vlo.xyz) * k_vsz.xyz).xzy));
+        v = 0.5 * (s_vol.Sample(s_vol_s, ((pa - dir - k_vlo.xyz) * k_vsz.xyz).xzy) +   // width x, height z, depth y
+                   s_vol.Sample(s_vol_s, ((pa + dir - k_vlo.xyz) * k_vsz.xyz).xzy));
     else
-        v = tex3D(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy);
+        v = s_vol.Sample(s_vol_s, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy);
     empty = empty || v.x <= 0.002;
     // The fine octave, its two reads drifting opposite ways (FuzzSpeed=): the finest
     // detail is never quite still, and with Fuzz= it feathers the outline: the thin gas
@@ -419,8 +438,9 @@ float4 vol_gas(VsOut i, float3 p, float dist, float2 u)
     return empty ? float4(0, 0, 0, -1) : r;
 }
 
-float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
+float4 vol_ps(VsOut i) : SV_Target
 {
+    float2 vpos = d3d9_vpos(i.pos);
     float  dist;
     float2 u0;
     float3 p = slice_point(i, vpos, dist, u0);
@@ -444,10 +464,10 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
 // ratio from step to step, so over the steps the errors cancel. The thresholds stay put
 // from frame to frame.
 //
-// vkd3d unrolls the loop, so its count is fixed per entry point (march8_ps ...). It has
-// no tex3Dlod, and a read's level from the hardware's derivatives is undefined inside a
-// branch that differs per pixel; so the noise is read with its gradients given
-// (tex3Dgrad: the pixel's footprint at the step's distance), and the march can skip what
+// vkd3d unrolls the loop, so its count is fixed per entry point (march8_ps ...). It had
+// no tex3Dlod when this was written, and a read's level from the hardware's derivatives
+// is undefined inside a branch that differs per pixel; so the noise is read with its
+// gradients given (SampleGrad: the pixel's footprint at the step's distance), and the march can skip what
 // is empty: a ray that misses the gas, a column the occupancy record says is empty at
 // that height, a point the volume says is clear. (The volume, the record and the blue
 // noise have one level and the same filter either way, so they are read at level 0:
@@ -455,17 +475,24 @@ float4 vol_ps(VsOut i, float2 vpos : VPOS) : COLOR
 // Windows".) The gradients leave out the jitter,
 // which the slices' derivatives took in: the fine octave is no longer blurred by it.
 
-float4 k_ray0    : register(c41);  // xyz: the ray (view depth 1) per pixel to the right; w: the reads' footprint, in pixels (Footprint=)
-float4 k_ray1    : register(c42);  // xyz: per pixel down; w: the ray's walk within its pixel, in pixels (Jitter=; 0 without Temporal=)
-float4 k_ray2    : register(c43);  // xyz: at pixel (0, 0); w: the frame (Temporal=: the thresholds walk on; 0 without)
-float4 k_blo     : register(c44);  // xyz: the box's low corner (world); w: the nearest view depth marched
-float4 k_bhi     : register(c45);  // xyz: its high corner
-float4 k_zp      : register(c46);  // x, y: the projection's _33 and _43 (view depth _43 / (z - _33); z - _33 is below 0)
-sampler2D s_zfull : register(s5);  // the scene's depth (INTZ), point-sampled
+cbuffer world_nebula_ps2 : register(b1)
+{
+    float4 k_ray0    : CREG(41);  // xyz: the ray (view depth 1) per pixel to the right; w: the reads' footprint, in pixels (Footprint=)
+    float4 k_ray1    : CREG(42);  // xyz: per pixel down; w: the ray's walk within its pixel, in pixels (Jitter=; 0 without Temporal=)
+    float4 k_ray2    : CREG(43);  // xyz: at pixel (0, 0); w: the frame (Temporal=: the thresholds walk on; 0 without)
+    float4 k_blo     : CREG(44);  // xyz: the box's low corner (world); w: the nearest view depth marched
+    float4 k_bhi     : CREG(45);  // xyz: its high corner
+    float4 k_zp      : CREG(46);  // x, y: the projection's _33 and _43 (view depth _43 / (z - _33); z - _33 is below 0)
+};
+STAGE(5) Texture2D s_zfull : register(t5);  // the scene's depth (INTZ), point-sampled
+STAGE(5) SamplerState s_zfull_s : register(s5);
 
-float4 k_mode    : register(c4);   // vertex shader: x 1 (the box's faces at mid depth: no depth test, never past the far plane)
+cbuffer world_nebula_vs1 : register(b0)
+{
+    float4 k_mode    : CREG(4);   // vertex shader: x 1 (the box's faces at mid depth: no depth test, never past the far plane)
+};
 
-float4 march_vs(float4 pos : POSITION) : POSITION
+float4 march_vs(float4 pos : POSITION) : SV_Position
 {
     float4 p = float4(pos.xyz, 1.0);
     float4 o = float4(dot(p, k_vp0), dot(p, k_vp1), dot(p, k_vp2), dot(p, k_vp3));
@@ -477,7 +504,7 @@ float4 march_vs(float4 pos : POSITION) : POSITION
 // noise2 with its gradients (gx, gy: a pixel's footprint, in the first read's units).
 float noise2g(float3 a, float3 b, float3 gx, float3 gy)
 {
-    return (tex3Dgrad(s_noise, a, gx, gy).r + tex3Dgrad(s_noise, b, gx * 0.786, gy * 0.786).r - 1.0) * 0.7071 + 0.5;
+    return (s_noise.SampleGrad(s_noise_s, a, gx, gy).r + s_noise.SampleGrad(s_noise_s, b, gx * 0.786, gy * 0.786).r - 1.0) * 0.7071 + 0.5;
 }
 
 // The flow's offset at p (world units, before Flow=): vol_gas's, with gradients.
@@ -485,8 +512,8 @@ float3 march_flow(float3 p, float3 gx, float3 gy)
 {
     float3 fd = float3(k_flow.x, k_flow.x * 0.71, k_flow.x * 0.37);
     float  f = k_noise.x * k_flow.z;
-    float3 fl = (tex3Dgrad(s_noise, p * f + fd, gx * f, gy * f).gba +
-                 tex3Dgrad(s_noise, rot2(p) * (f * 0.786) - fd.zxy + 0.5, gx * (f * 0.786), gy * (f * 0.786)).gba - 1.0) * 1.4142;
+    float3 fl = (s_noise.SampleGrad(s_noise_s, p * f + fd, gx * f, gy * f).gba +
+                 s_noise.SampleGrad(s_noise_s, rot2(p) * (f * 0.786) - fd.zxy + 0.5, gx * (f * 0.786), gy * (f * 0.786)).gba - 1.0) * 1.4142;
     return clamp(fl, -1.0, 1.0);
 }
 
@@ -497,19 +524,19 @@ float4 march_step(float3 p, float3 fl, float dist, float thick, float2 u, float 
 {
     float4 r = 0.0;
     float3 uvw = (p - k_vlo.xyz) * k_vsz.xyz;
-    float4 o = tex2Dlod(s_occ, float4(uvw.xz, 0.0, 0.0));
+    float4 o = s_occ.SampleLevel(s_occ_s, uvw.xz, 0.0);
     float  m = (k_flow.y + k_swirl.x) * k_vsz.y + 0.02;
     if (o.r >= 0.006 && uvw.y >= o.b - m && uvw.y <= o.g + m) {
         float3 pa = p + fl * k_flow.y;
         if (k_swirl.x > 0.0) {
             float  f = k_noise.x * k_swirl.y;
-            float3 sn = tex3Dgrad(s_noise, rot(p) * f + k_seed.yzx + float3(0.29, 0.61, 0.17), gx * f, gy * f).gba;
+            float3 sn = s_noise.SampleGrad(s_noise_s, rot(p) * f + k_seed.yzx + float3(0.29, 0.61, 0.17), gx * f, gy * f).gba;
             float  a1 = k_swirl.z + sn.x * 6.2832;
             float  a2 = -k_swirl.w + sn.y * 6.2832;
             float  rr = saturate(0.35 + sn.z * 0.9) * k_swirl.x;
             pa += rr * (0.62 * float3(cos(a1), 0.4 * sin(a2), sin(a1)) + 0.38 * float3(sin(a2), 0.6 * cos(a1), cos(a2)));
         }
-        float4 v = tex3Dgrad(s_vol, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy, 0.0, 0.0);
+        float4 v = s_vol.SampleGrad(s_vol_s, ((pa - k_vlo.xyz) * k_vsz.xyz).xzy, 0.0, 0.0);
         if (v.x > 0.002) {
             float  det = 0.5;
             if (k_vlo.w > 0.0 || k_fuzz.z > 0.0) {
@@ -535,8 +562,8 @@ float4 march_step(float3 p, float3 fl, float dist, float thick, float2 u, float 
 #define FLOW_EVERY 4
 #define DEPTH_UNIT 1024.0
 struct MarchOut {
-    float4 gas : COLOR0;
-    float4 z   : COLOR1;
+    float4 gas : SV_Target0;
+    float4 z   : SV_Target1;
 };
 
 MarchOut march(float2 vpos, const int n)
@@ -553,7 +580,7 @@ MarchOut march(float2 vpos, const int n)
     float3 ta = (k_blo.xyz - k_eye.xyz) / dz, tb = (k_bhi.xyz - k_eye.xyz) / dz;
     float3 t0 = min(ta, tb), t1 = max(ta, tb);
     float  s0 = max(max(t0.x, t0.y), max(t0.z, k_blo.w));
-    float  zb = tex2Dlod(s_zfull, float4(px * k_lr.zw, 0.0, 0.0)).r;
+    float  zb = s_zfull.SampleLevel(s_zfull_s, px * k_lr.zw, 0.0).r;
     float  s1 = min(min(t1.x, t1.y), min(t1.z, k_zp.y / min(zb - k_zp.x, -1e-9)));
     MarchOut o;
     o.gas = 0.0;
@@ -563,7 +590,7 @@ MarchOut march(float2 vpos, const int n)
         float  qa = q * q * q * q;                 // the flow's, FLOW_EVERY steps
         // With Temporal=, the thresholds walk the golden ratio from frame to frame, and
         // temporal_ps adds the frames up: each frame's samples fall between the last's.
-        float2 u = frac(tex2Dlod(s_blue, float4(px / 64.0, 0.0, 0.0)).rg + k_ray2.w * float2(0.6180340, 0.7548777));
+        float2 u = frac(s_blue.SampleLevel(s_blue_s, px / 64.0, 0.0).rg + k_ray2.w * float2(0.6180340, 0.7548777));
         float  ph = key_phase(dot(k_key.xyz, d) / dl);
         float4 acc = 0.0;
         float  za = 0.0;
@@ -595,18 +622,22 @@ MarchOut march(float2 vpos, const int n)
     return o;
 }
 
-MarchOut march8_ps(float2 vpos : VPOS) { return march(vpos, 8); }
-MarchOut march12_ps(float2 vpos : VPOS) { return march(vpos, 12); }
-MarchOut march16_ps(float2 vpos : VPOS) { return march(vpos, 16); }
-MarchOut march24_ps(float2 vpos : VPOS) { return march(vpos, 24); }
+MarchOut march8_ps(float4 fc : SV_Position) { return march(d3d9_vpos(fc), 8); }
+MarchOut march12_ps(float4 fc : SV_Position) { return march(d3d9_vpos(fc), 12); }
+MarchOut march16_ps(float4 fc : SV_Position) { return march(d3d9_vpos(fc), 16); }
+MarchOut march24_ps(float4 fc : SV_Position) { return march(d3d9_vpos(fc), 24); }
 
 // ---- after the march: the gas target ---------------------------------------------------
 
-sampler2D s_gas   : register(s7);  // the march's sums at full size, in half floats: rgb the light, a the optical depth
-float4 k_dn      : register(c47);  // the filter: x 1 / (2 sigma^2), sigma in pixels (Denoise=); y the depth tolerance (of the view depth)
-float4 k_dnv     : register(c48);  //   the viewport's first and last pixel centre: x0, y0, x1, y1
+STAGE(7) Texture2D s_gas : register(t7);  // the march's sums at full size, in half floats: rgb the light, a the optical depth
+STAGE(7) SamplerState s_gas_s : register(s7);
+cbuffer world_nebula_ps3 : register(b1)
+{
+    float4 k_dn      : CREG(47);  // the filter: x 1 / (2 sigma^2), sigma in pixels (Denoise=); y the depth tolerance (of the view depth)
+    float4 k_dnv     : CREG(48);  //   the viewport's first and last pixel centre: x0, y0, x1, y1
+};
 
-float4 quad_vs(float4 pos : POSITION) : POSITION
+float4 quad_vs(float4 pos : POSITION) : SV_Position
 {
     return float4(pos.xy, 0.0, 1.0);
 }
@@ -633,34 +664,41 @@ float view_z(float z)
 // and how many frames it holds, so a pixel whose history was dropped takes each frame at
 // 1 / (frames + 1) until that reaches k_tm.x, and is clean again within a few frames.
 
-sampler2D s_gz    : register(s6);  // the march's second target: x the optical depth-weighted view depth / DEPTH_UNIT
-sampler2D s_hist  : register(s9);  // the history: the last frame's result, as the gas target (linear)
-sampler2D s_hmeta : register(s10); // beside it (point): x the frames it holds, y the scene's view depth / DEPTH_UNIT
-float4 k_pv0     : register(c49);  // the columns of the last frame's VIEW x PROJECTION
-float4 k_pv1     : register(c50);
-float4 k_pv2     : register(c51);
-float4 k_pv3     : register(c52);
-float4 k_tm      : register(c53);  // x: this frame's share (Temporal=); y: 1 there is history; z: the clip, in spreads (TemporalClip=); w: the depth tolerance (of the view depth)
-float4 k_pvp     : register(c54);  // the last frame's viewport: x, y its corner, z, w its size (pixels)
-
-struct TemporalOut {
-    float4 gas  : COLOR0;
-    float4 meta : COLOR1;
+STAGE(6) Texture2D s_gz : register(t6);  // the march's second target: x the optical depth-weighted view depth / DEPTH_UNIT
+STAGE(6) SamplerState s_gz_s : register(s6);
+STAGE(9) Texture2D s_hist : register(t9);  // the history: the last frame's result, as the gas target (linear)
+STAGE(9) SamplerState s_hist_s : register(s9);
+STAGE(10) Texture2D s_hmeta : register(t10); // beside it (point): x the frames it holds, y the scene's view depth / DEPTH_UNIT
+STAGE(10) SamplerState s_hmeta_s : register(s10);
+cbuffer world_nebula_ps4 : register(b1)
+{
+    float4 k_pv0     : CREG(49);  // the columns of the last frame's VIEW x PROJECTION
+    float4 k_pv1     : CREG(50);
+    float4 k_pv2     : CREG(51);
+    float4 k_pv3     : CREG(52);
+    float4 k_tm      : CREG(53);  // x: this frame's share (Temporal=); y: 1 there is history; z: the clip, in spreads (TemporalClip=); w: the depth tolerance (of the view depth)
+    float4 k_pvp     : CREG(54);  // the last frame's viewport: x, y its corner, z, w its size (pixels)
 };
 
-TemporalOut temporal_ps(float2 vpos : VPOS)
+struct TemporalOut {
+    float4 gas  : SV_Target0;
+    float4 meta : SV_Target1;
+};
+
+TemporalOut temporal_ps(float4 fc : SV_Position)
 {
+    float2 vpos = d3d9_vpos(fc);
     float2 px = floor(vpos) + 0.5;
-    float4 c = tex2Dlod(s_gas, float4(px * k_lr.zw, 0.0, 0.0));
+    float4 c = s_gas.SampleLevel(s_gas_s, px * k_lr.zw, 0.0);
     float4 m1 = 0.0, m2 = 0.0;
     float  zs = 0.0;
     [unroll] for (int y = -1; y <= 1; y++) {
         [unroll] for (int x = -1; x <= 1; x++) {
             float2 uv = clamp(px + float2(x, y), k_dnv.xy, k_dnv.zw) * k_lr.zw;
-            float4 g = tex2Dlod(s_gas, float4(uv, 0.0, 0.0));
+            float4 g = s_gas.SampleLevel(s_gas_s, uv, 0.0);
             m1 += g;
             m2 += g * g;
-            zs += tex2Dlod(s_gz, float4(uv, 0.0, 0.0)).r;
+            zs += s_gz.SampleLevel(s_gz_s, uv, 0.0).r;
         }
     }
     // The ring about them, two pixels out: only its brightest counts (below).
@@ -668,40 +706,40 @@ TemporalOut temporal_ps(float2 vpos : VPOS)
     [unroll] for (int i = -2; i <= 2; i++) {
         float2 ra = clamp(px + float2(i, -2), k_dnv.xy, k_dnv.zw) * k_lr.zw;
         float2 rb = clamp(px + float2(i, 2), k_dnv.xy, k_dnv.zw) * k_lr.zw;
-        mx = max(mx, max(tex2Dlod(s_gas, float4(ra, 0.0, 0.0)), tex2Dlod(s_gas, float4(rb, 0.0, 0.0))));
+        mx = max(mx, max(s_gas.SampleLevel(s_gas_s, ra, 0.0), s_gas.SampleLevel(s_gas_s, rb, 0.0)));
     }
     [unroll] for (int j = -1; j <= 1; j++) {
         float2 ra = clamp(px + float2(-2, j), k_dnv.xy, k_dnv.zw) * k_lr.zw;
         float2 rb = clamp(px + float2(2, j), k_dnv.xy, k_dnv.zw) * k_lr.zw;
-        mx = max(mx, max(tex2Dlod(s_gas, float4(ra, 0.0, 0.0)), tex2Dlod(s_gas, float4(rb, 0.0, 0.0))));
+        mx = max(mx, max(s_gas.SampleLevel(s_gas_s, ra, 0.0), s_gas.SampleLevel(s_gas_s, rb, 0.0)));
     }
     m1 /= 9.0;
     float4 sd = sqrt(max(m2 / 9.0 - m1 * m1, 0.0));
     // Where the gas is (its weighted view depth over the neighbourhood), or with none,
     // the scene behind: the history there is no gas either way.
-    float  s = m1.a > 1e-5 ? zs * (DEPTH_UNIT / 9.0) / m1.a : view_z(tex2Dlod(s_zfull, float4(px * k_lr.zw, 0.0, 0.0)).r);
+    float  s = m1.a > 1e-5 ? zs * (DEPTH_UNIT / 9.0) / m1.a : view_z(s_zfull.SampleLevel(s_zfull_s, px * k_lr.zw, 0.0).r);
     float3 p = k_eye.xyz + (k_ray0.xyz * px.x + k_ray1.xyz * px.y + k_ray2.xyz) * s;
     float4 q = float4(p, 1.0);
     float4 h = float4(dot(q, k_pv0), dot(q, k_pv1), dot(q, k_pv2), dot(q, k_pv3));
     float2 nd = h.xy / max(h.w, 1e-6);
     float2 pp = k_pvp.xy + float2(nd.x + 1.0, 1.0 - nd.y) * 0.5 * k_pvp.zw;
     float  ok = k_tm.y * step(1e-6, h.w) * step(k_pvp.x, pp.x) * step(pp.x, k_pvp.x + k_pvp.z) * step(k_pvp.y, pp.y) * step(pp.y, k_pvp.y + k_pvp.w);
-    float  zc = view_z(tex2Dlod(s_zfull, float4(px * k_lr.zw, 0.0, 0.0)).r);
-    float4 hm = tex2Dlod(s_hmeta, float4(pp * k_lr.zw, 0.0, 0.0));
+    float  zc = view_z(s_zfull.SampleLevel(s_zfull_s, px * k_lr.zw, 0.0).r);
+    float4 hm = s_hmeta.SampleLevel(s_hmeta_s, pp * k_lr.zw, 0.0);
     ok *= step(abs(hm.y * DEPTH_UNIT - zc), k_tm.w * zc);
     float  n = ok > 0.5 ? hm.x : 0.0;
     n = n >= 0.0 ? n : 0.0;
     // A value the half floats cannot hold (a flash's sums, a NaN) would stay in the
     // history for good: a comparison with a NaN fails, so it takes the mean instead.
-    float4 hist = tex2Dlod(s_hist, float4(pp * k_lr.zw, 0.0, 0.0));
-    hist = hist >= 0.0 ? hist : m1;
-    hist = hist <= 60000.0 ? hist : m1;
+    float4 hist = s_hist.SampleLevel(s_hist_s, pp * k_lr.zw, 0.0);
+    hist = select(hist >= 0.0, hist, m1);
+    hist = select(hist <= 60000.0, hist, m1);
     // In thin gas a frame's eight steps find gas in few pixels, and a neighbourhood that
     // found none has no spread to clip to: the history would be wiped and the stipple
     // stay. So the clip's top reaches up to the brightest pixel two out as well.
     hist = clamp(hist, m1 - k_tm.z * sd, max(m1 + k_tm.z * sd, mx));
     float4 r = lerp(hist, c, max(1.0 / (n + 1.0), k_tm.x));
-    r = r >= 0.0 ? r : 0.0;
+    r = select(r >= 0.0, r, 0.0);
     TemporalOut o;
     o.gas = min(r, 60000.0);
     o.meta = float4(min(n + 1.0, 1000.0), zc / DEPTH_UNIT, 0.0, 0.0);
@@ -721,18 +759,19 @@ TemporalOut temporal_ps(float2 vpos : VPOS)
 // C (1 - e^-t) / t, which is C where the gas is thin and the gas's own colour where it
 // is thick, at any angle; what is behind loses e^-t of itself, times Obscure=. The frame
 // is in half floats, so no dither.
-float4 comp_ps(float2 vpos : VPOS) : COLOR
+float4 comp_ps(float4 fc : SV_Position) : SV_Target
 {
+    float2 vpos = d3d9_vpos(fc);
     float2 px = floor(vpos) + 0.5;
-    float  zc = view_z(tex2Dlod(s_zfull, float4(px * k_lr.zw, 0.0, 0.0)).r);
+    float  zc = view_z(s_zfull.SampleLevel(s_zfull_s, px * k_lr.zw, 0.0).r);
     float4 sum = 0.0;
     float  wsum = 0.0;
     [unroll] for (int y = -2; y <= 2; y++) {
         [unroll] for (int x = -2; x <= 2; x++) {
             float2 uv = clamp(px + float2(x, y), k_dnv.xy, k_dnv.zw) * k_lr.zw;
-            float  zt = view_z(tex2Dlod(s_zfull, float4(uv, 0.0, 0.0)).r);
+            float  zt = view_z(s_zfull.SampleLevel(s_zfull_s, uv, 0.0).r);
             float  w = exp(-(x * x + y * y) * k_dn.x) * saturate(1.0 - abs(zt - zc) / (k_dn.y * zc));
-            sum += w * tex2Dlod(s_gas, float4(uv, 0.0, 0.0));
+            sum += w * s_gas.SampleLevel(s_gas_s, uv, 0.0);
             wsum += w;
         }
     }

@@ -16,7 +16,7 @@ of the build and installs nothing of its own.
 |---|---|
 | Game | `~/Games/Heroic/Star Trek Armada II` (`A2_GAME`, see `a2env.sh`) |
 | Prefix | `~/Games/Heroic/Prefixes/Star Trek Armada II` (`A2_PREFIX`) |
-| Heroic config | `~/.config/heroic/GamesConfig/1174788223.json` |
+| Heroic config | `$A2_HEROIC/GamesConfig/1174788223.json`: `~/.config/heroic` for the native package, `~/.var/app/com.heroicgameslauncher.hgl/config/heroic` for the Flatpak (`a2env.sh` takes whichever exists, native first) |
 | Runner | Proton-CachyOS-latest |
 | Base | GOG release = Armada II + patch 1.1 |
 | GPU | RX 5700 XT (Navi 10 / gfx1010), 8 GB — Vulkan fine, **ROCm effectively unsupported** |
@@ -109,8 +109,25 @@ game rewrites the file on exit and the resolution persists.
 
 ## The d3d8 chain
 
-The game renders through DXVK and Vulkan. Confirmed in game at 3440x1440, with every
-key in `dxvk.conf` applied and no errors in DXVK's log:
+**What `./install` leaves** (on Linux, from the DXVK chain below):
+
+    Armada2.exe
+      -> <game dir>/d3d8.dll          Display8 (display/), Mode=forward: passes every call on
+      -> <game dir>/d3d8_real.dll     crosire's d3d8to9 (vendored; --upgrade, below)
+      -> <game dir>/d3d9.dll          DXVK d3d9
+      -> Vulkan
+
+The platform step (`d3d8-chain.py --upgrade`) puts d3d8to9 in the slot, then
+`display/install` moves it behind Display8 as `d3d8_real.dll`. `d3d8-chain.py` acts on
+`d3d8_real.dll` whenever Display8 is in front (it knows Display8 by the message every
+build carries), so everything below about the slot holds for the file behind it. With
+`Mode=stub` in `Display8.ini` none of this is loaded: Display8 makes a device of its own
+(Direct3D 9 through the game directory's `d3d9.dll`, Vulkan or Direct3D 12) and the
+engine draws nothing (`display/README.md`). Forward mode is the default until a stub
+backend has been confirmed in game; until then the chain below stays required.
+
+The base chain, from which `--upgrade` starts: DXVK and Vulkan. Confirmed in game at
+3440x1440, with every key in `dxvk.conf` applied and no errors in DXVK's log:
 
     Armada2.exe
       -> <game dir>/d3d8.dll          DXVK d3d8
@@ -302,7 +319,8 @@ ten each for Federation, Klingon and Borg.
 
 ## Verification recipes
 
-    # what implements d3d8 right now? by hash, never by size
+    # what implements d3d8 right now? by hash, never by size. Heroic's DXVK builds
+    # (tools/dxvk/dxvk-*/) are recognised from the native and the Flatpak Heroic
     platform/d3d8-chain.py --status
 
     # did Heroic redeploy DXVK into the prefix? these four sharing an mtime means yes
@@ -312,7 +330,7 @@ ten each for Federation, Klingon and Borg.
     objdump -p Armada2.exe | grep -i 'DLL Name'
 
     # current overrides, without opening Heroic
-    python3 -c "import json;print(json.load(open('$HOME/.config/heroic/GamesConfig/1174788223.json'))['1174788223']['enviromentOptions'])"
+    python3 platform/dxvk-logging.py --status
 
     # is the game really running?  NOT `pgrep -x Armada2.exe` -- Wine calls it "Main"
     ps -eo pid=,args= | awk '/Armada2\.exe/ { print $1 }'

@@ -1,0 +1,27 @@
+[package]
+name = "display"
+version = "0.8.0"
+edition = "2024"
+publish = false
+description = "Display8: Star Trek: Armada II's d3d8.dll, our own (README.md)"
+license = "MIT"
+
+[lib]
+name = "display"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+gpu = { path = "../gpu" }
+ash = { version = "0.38", default-features = false }
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true
+codegen-units = 1
+debug = 1
+
+[profile.dev]
+panic = "abort"
+opt-level = 1

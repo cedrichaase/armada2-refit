@@ -12,7 +12,7 @@ held was removed in favour of render3d's own.
 Everything in this section is global — it applies to every texture and every model at
 once, costs nothing per-asset, and is reversible by deleting one file. All of it is
 independent of the texture pipeline. Verified against **DXVK 3.1.1**, the version Heroic
-actually deploys (`~/.config/heroic/tools/dxvk/dxvk-3.1.1/`), by reading the config keys
+actually deploys (`$A2_HEROIC/tools/dxvk/dxvk-3.1.1/`, native or Flatpak), by reading the config keys
 out of the shipped `d3d9.dll` rather than from documentation — the key list below is what
 this binary honours, not what some DXVK version honours.
 

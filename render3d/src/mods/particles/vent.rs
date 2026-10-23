@@ -7,12 +7,14 @@
 //! Settings: `Render3D.ini [Particles]`, under the names `Venting.ini` used.
 use super::draw::Cam;
 use super::sim::{System, Vent};
-use crate::d3d::*;
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, DynVb, Shader};
+use crate::gfx::{self, Pipes};
+use gpu::{attr, AttrFormat, Blend, Block, Compare, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::math::{v3, V3};
 use crate::rt::Ini;
 use crate::shaders::particles_vent::*;
+use crate::shaders::particles_vent_spv::*;
+use crate::shaders::particles_vent_dxil::*;
 use alloc::vec::Vec;
 
 /// Per kind of vent: [0] plasma, [1] gas.
@@ -184,20 +186,16 @@ struct Vert {
     t2: [f32; 4],
 }
 
-static DECL: [VertexElement; 5] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 0),
-    ve(0, 28, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 1),
-    ve(0, 44, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 2),
-    VE_END,
+static LAYOUT: [VertexAttr; 4] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float4, Semantic::TexCoord, 0),
+    attr(28, AttrFormat::Float4, Semantic::TexCoord, 1),
+    attr(44, AttrFormat::Float4, Semantic::TexCoord, 2),
 ];
 
 pub struct Drawer {
     verts: Vec<Vert>,
-    vb: DynVb,
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
+    pipes: Pipes,
 }
 
 /// A puff as the draw sees it.
@@ -215,17 +213,9 @@ struct Puff {
 
 impl Drawer {
     pub const fn new() -> Drawer {
-        Drawer {
-            verts: Vec::new(),
-            vb: DynVb::new(2 << 20),
-            vs: Shader::vertex(&VS_VENT),
-            ps: Shader::pixel(&PS_VENT),
-            decl: Decl::new(&DECL),
-        }
+        Drawer { verts: Vec::new(), pipes: Pipes::new() }
     }
-    pub fn reset(&mut self) {
-        self.vb.reset();
-    }
+    pub fn reset(&mut self) {}
 
     #[allow(clippy::too_many_arguments)]
     fn quad(&mut self, c: V3, a: V3, s: V3, hl: f32, hw: f32, jet: bool, kind: f32, seed: f32, col: V3, bright: f32, t2: [f32; 4]) {
@@ -300,21 +290,20 @@ impl Drawer {
         if self.verts.is_empty() {
             return;
         }
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        // Added, depth-tested and not written, red, green and blue, no culling.
+        let pipe = self.pipes.view(0, || {
+            let mut d = PipelineDesc::new(gpu::code!(VS_VENT, VS_VENT_SPV, VS_VENT_DXIL), gpu::code!(PS_VENT, PS_VENT_SPV, PS_VENT_DXIL), &LAYOUT, 60, Topology::TriangleList, Format::Unknown);
+            d.blend = Some(Blend::ADD);
+            d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.write_mask = 7;
+            d
+        });
+        let Some(pipe) = pipe else { return };
+        if !cmd.set_pipeline(&pipe) {
             return;
         }
-        for (s, val) in [
-            (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 0), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHATESTENABLE, 0),
-            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3),
-            (RS_STENCILENABLE, 0), (RS_COLORWRITEENABLE, 7), (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(s, val);
-        }
-        dev.set_stream_freq(0, 1);
-        dev.vs_const(0, &gfx::vp_constants(v));
+        cmd.vs_block(Block::new(0, &gfx::vp_constants(v)));
         let c4 = |c: V3| [c.x, c.y, c.z, 0.0];
         let mut pc = [0.0f32; 28];
         pc[0..4].copy_from_slice(&c4(cfg.hot));
@@ -324,11 +313,11 @@ impl Drawer {
         pc[16..20].copy_from_slice(&c4(cfg.gas_cold));
         pc[20..24].copy_from_slice(&[cfg.scale, cfg.flow, cfg.contrast, cfg.soft]);
         pc[24..28].copy_from_slice(&[cfg.cooling[0], cfg.cooling[1], 0.0, 0.0]);
-        dev.ps_const(0, &pc);
+        cmd.ps_block(Block::new(0, &pc));
         let verts = core::mem::take(&mut self.verts);
         for chunk in verts.chunks(6 * 4096) {
-            if let Some(first) = self.vb.push(dev, chunk, core::mem::size_of::<Vert>() as u32) {
-                dev.draw_primitive(PT_TRIANGLELIST, first, chunk.len() as u32 / 3);
+            if let Some(s) = cmd.vertices(chunk) {
+                cmd.draw(&s);
             }
         }
         self.verts = verts;

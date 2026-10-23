@@ -13,13 +13,15 @@
 //! 0x593840): while one of our views runs, the post is noted for the view and drawn at
 //! the flush as an anti-aliased line of a fixed pixel width (`shaders/overlays.hlsl`,
 //! `vs_line`/`ps_line`), depth-tested, not written; otherwise the engine's is called.
-use crate::d3d::*;
+use gpu::{attr, AttrFormat, Blend, Block, Compare, Depth, Format, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::engine::{hook, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, DynVb, Shader};
+use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::math::V3;
 use crate::shaders::overlays::*;
+use crate::shaders::overlays_spv::*;
+use crate::shaders::overlays_dxil::*;
 use alloc::vec::Vec;
 
 const FN_HEIGHT_POST: usize = 0x593840;
@@ -71,12 +73,11 @@ struct Vtx {
     col: [f32; 4],
 }
 
-static VERTEX: [VertexElement; 5] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT3, DECLUSAGE_TEXCOORD, 0),
-    ve(0, 24, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 1),
-    ve(0, 32, DECLTYPE_FLOAT4, DECLUSAGE_TEXCOORD, 2),
-    VE_END,
+static VERTEX: [VertexAttr; 4] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float3, Semantic::TexCoord, 0),
+    attr(24, AttrFormat::Float2, Semantic::TexCoord, 1),
+    attr(32, AttrFormat::Float4, Semantic::TexCoord, 2),
 ];
 
 pub struct Posts {
@@ -87,10 +88,7 @@ pub struct Posts {
     soft: f32,
     /// The colour times this (above 1 the post glows).
     bright: f32,
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
-    vb: DynVb,
+    pipes: Pipes,
     hooked: bool,
     said: u32,
 }
@@ -102,10 +100,7 @@ impl Posts {
             width: ini.float("Overlays", "HeightPostWidth", 1.5).max(0.5),
             soft: ini.float("Overlays", "HeightPostSoft", 1.0).max(0.25),
             bright: ini.float("Overlays", "HeightPostBrightness", 1.0),
-            vs: Shader::vertex(&VS_LINE),
-            ps: Shader::pixel(&PS_LINE),
-            decl: Decl::new(&VERTEX),
-            vb: DynVb::new(64 * 1024),
+            pipes: Pipes::new(),
             hooked: false,
             said: 0,
         }
@@ -129,7 +124,7 @@ impl Posts {
     }
 
     pub fn reset(&mut self) {
-        self.vb.reset();
+
     }
 
     pub fn begin_view(&mut self) {
@@ -163,26 +158,28 @@ impl Posts {
             self.said += 1;
             log!("overlays: {} height post(s), the first from {:.0},{:.0},{:.0} to y {:.0}", ps.len(), ps[0].0.x, ps[0].0.y, ps[0].0.z, ps[0].1);
         }
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        // Depth-tested (`LESSEQUAL`) and not written, blended by alpha, no culling.
+        let pipe = self.pipes.view(0, || {
+            let mut d = PipelineDesc::new(gpu::code!(VS_LINE, VS_LINE_SPV, VS_LINE_DXIL), gpu::code!(PS_LINE, PS_LINE_SPV, PS_LINE_DXIL), &VERTEX, 48, Topology::TriangleList, Format::Unknown);
+            d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.blend = Some(Blend::ALPHA);
+            d
+        });
+        let Some(pipe) = pipe else { return };
+        if !cmd.set_pipeline(&pipe) {
             return;
         }
-        let Some(first) = self.vb.push(dev, &vs, core::mem::size_of::<Vtx>() as u32) else { return };
-        let scale = (v.rect.h as f32 / 1080.0).max(0.5);
-        dev.vs_const(4, &gfx::vp_constants(v));
-        dev.vs_const(8, &[v.rect.w as f32, v.rect.h as f32, 0.5 * self.width * scale, self.soft]);
-        dev.ps_const(0, &[self.soft, 0.0, 0.0, 0.0]);
-        dev.set_texture(0, core::ptr::null_mut());
-        for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ZWRITEENABLE, 0), (RS_CULLMODE, CULL_NONE),
-            (RS_ALPHATESTENABLE, 0), (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_SRCALPHA), (RS_DESTBLEND, BLEND_INVSRCALPHA),
-            (RS_BLENDOP, BLENDOP_ADD), (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
-            (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
+        // The old dynamic buffer held 64 KB: more posts than that were not drawn.
+        if core::mem::size_of_val(&vs[..]) > 64 * 1024 {
+            return;
         }
-        dev.set_stream_freq(0, 1);
-        dev.draw_primitive(PT_TRIANGLELIST, first, vs.len() as u32 / 3);
+        let Some(span) = cmd.vertices(&vs) else { return };
+        let scale = (v.rect.h as f32 / 1080.0).max(0.5);
+        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
+        cmd.vs_block(Block::new(8, &[v.rect.w as f32, v.rect.h as f32, 0.5 * self.width * scale, self.soft]));
+        cmd.ps_block(Block::new(0, &[self.soft, 0.0, 0.0, 0.0]));
+        cmd.bind_texture(0, None, &crate::scene::SAMPLER);
+        cmd.draw(&span);
     }
 }

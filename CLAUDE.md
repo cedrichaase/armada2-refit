@@ -37,6 +37,8 @@ it bundles.
 | `grid/` | `GridLayout.asi` — the button bar as a 5×3 grid of position keys (QOL-1), placed between the minimap and the info panel where there is room | `grid/README.md` |
 | `render3d/` | `Render3D.asi` — the 3D view through a renderer of our own, in `no_std` Rust: both views of `Armada_RenderAllOurStuff` drawn into a half-float MSAA target, bloomed by energy and tone-mapped into the back buffer; seven modules of its own draw every category (hulls with the scene lights and shadows, sky, particles, ordnance, effects, planets, moons, asteroids and nebulae, fog and selection) from the game's assets, with its own cosmetic simulation (`PLAN.md`). It replaced the per-part plugins (MSAA, Lighting, Sky, Nebulae, Surfaces, Explosions, Shields, Repair, Venting, Specials, Fog and Planets), which were removed from the repository; their recipes live in `render3d/skies/`, `render3d/surfaces/` and `render3d/nebulae/`, and `render3d/install.sh` takes out any of those plugins an earlier install left. In the release package since 12.24.0, with `UI.asi` | `render3d/README.md`, `render3d/PLAN.md` |
 | `ui/` | `UI.asi` — the runtime the HUD, menus and loading screen will be redrawn with, in `no_std` Rust like render3d: a 2D renderer on the d3d9 device (SDF text from a vendored OFL font, rounded panels, nine-slices), immediate-mode widgets, input with capture, and hooks into a mission's frame, a front-end screen of our own and the loading screen. Its HUD panels (`[HUD]`, `HUD.md`) and the menus hosted and drawn by it (`[Menus]`, `MENUS.md`) supersede `HUD.asi`, `GridLayout.asi` and `Menus.asi`; every part is on in the shipped `UI.ini` (a key at 0 gives a part back to the engine). `ui/install.sh` (in `./install`, the `ui` layer of `a2mod`) takes the three old plugins out (`ui/supersede.sh`); `ui/bench-legacy.sh` puts one back in a bench clone; `ui/bench-asi.sh` puts a working copy's build in a bench clone | `ui/README.md`, `ui/PLAN.md`, `ui/STYLE.md` |
+| `gpu/` | not a layer: the graphics interface render3d and the UI draw through (`no_std`, linked into each), on Direct3D 9, and on Display8's Vulkan or Direct3D 12 device in its stub mode; `gpu/shaders/compat.hlsli` lets one HLSL source build d3dbc (vkd3d), SPIR-V and DXIL (dxc) | `gpu/README.md` |
+| `display/` | `d3d8.dll`, "Display8": the game's Direct3D 8, ours, in front of the real chain (`d3d8_real.dll`). Forward mode passes every call through; on the bench it traces every call by context and caller (`Display8.inventory.tsv`), names the engine's draws (`Display8.go`) and drops them by category (`[Drop]`). The way to the stub that draws nothing (the display plan, `plans/` in the main checkout) | `display/README.md` |
 | `renderer/` | `dxvk.conf`, DXVK's settings (`renderer-config.sh`). Was `postfx/`, with a vkBasalt bloom, until 13.0.0: every post-process effect is render3d's | `renderer/README.md` |
 | `textures/` | the texture pipeline: `lib/`, `tools/`, and 84 `targets/` — recipes only | `textures/README.md` |
 | `models/` | 3D geometry — the widened loading screen (`SOD`), the smoothed dilithium moons (`moon-sod.py`) and asteroids (`asteroid-sod.py`), and the other SOD rewrites. The planets' sphere is render3d's | `models/README.md` |
@@ -68,9 +70,11 @@ the install and a headless display. **Keep the ID `session start` prints, pass
 required). Other jobs run sessions on the same bench: stop only the sessions you
 started, never one from `session list` you don't recognise (`testbench/README.md`,
 "Which session a command acts on"). **The bench runs on the user's own GPU**: a GPU
-hang in a bench game crashed the user's desktop once, so run one game at a time
-(`a2test run -j 1`), at `--res 1280x720` unless fine detail is judged, and stop
-sessions promptly. **Say what you are doing**: `./a2test drive --session ID note "..."`
+hang in a bench game crashed the user's desktop once, so run at 1280x720 unless fine
+detail is judged and stop sessions promptly. Bench games may use `a2test`'s slots in
+parallel (up to three at once, across agents); a run whose result is a GPU time in
+milliseconds (`Timing=1`) runs alone, since other games skew it, while pixel
+comparisons under `--clock bench` are unaffected. **Say what you are doing**: `./a2test drive --session ID note "..."`
 when you start driving and whenever your intent changes (the dashboard, `./a2test watch`,
 shows it). Before driving the game, read `testbench/README.md`, "Operating the
 game: what agents learned", and the staging recipes in `testbench/operating/`. Write regression scenarios in `testbench/scenarios/` for fixes
@@ -724,6 +728,38 @@ has been seen in game, read that layer's `CHANGELOG.md`**; for the derivations, 
   re-tessellates its own sphere against a tolerance set for 640x480, and a denser
   `PB_CLSS*.sod` drew pixel for pixel like stock, so don't re-try new planet meshes.
   The dilithium moons are ordinary SODs smoothed by `models/moon-sod.py`.
+
+### display
+
+- **Display8 is the game's `d3d8.dll`**; the real chain (d3d8to9) sits behind it as
+  `d3d8_real.dll`, and `d3d8.dll.a2display-backup` is what `a2mod stock` puts back. Every
+  Direct3D 8 interface is an object of ours with every slot's exact `__stdcall` argument
+  list (Wine's `d3d8.h`): one argument off unbalances the engine's stack.
+- **The plugins chain slots of our device's vtable** (`Reset`, `Present`) as they did on
+  d3d8to9's, so the vtables are patchable statics and Display8 never calls its own
+  methods through them. `MoveWindow` and `SetWindowPos` in the exe's imports are the
+  UI's to hook: the tracer leaves them alone (the UI stands down if they are hooked).
+- **Callers are read off the stack**: the exact return address, then a scan for values
+  just past a `call` in the exe. The scan finds stale addresses too: the `BeginScene`
+  "caller" of the order ring was one. Confirm with `Display8.go` (a detail capture of the
+  draws) or a `[Drop]` A/B before acting on a deep caller.
+- **Stub mode offers one display mode, the desktop's**, so the engine, the HUD and the
+  mouse all agree with the swap chain; never add the engine's mode list back. What the
+  plugins read of the engine's state (transforms, viewport, `Clear`, the targets) must
+  reach whatever they draw on; everything else stays in Display8. A texture a plugin
+  samples is a mirror (`stub/mod.rs`); the gamma ramp is the frame's last pass.
+- **One device and one frame for both plugins**: on Vulkan (and Direct3D 12) Display8
+  owns them and hands them out through the plain C exports of `gpu/src/display.rs`, the
+  contract both sides build against; change both sides together.
+- Bench: `--install .` installs Display8 (tracing in a clone, `Trace=auto`);
+  `display/bench-mode.sh` sets its mode from a `Setup:`; `display/stub-scenario.sh`
+  makes any scenario's stub variant; `display-inventory`, `display-engine-draws`,
+  `display-drop`, `display-stub`.
+- **`Backend=vulkan` on the bench runs on lavapipe with the validation layer**, never the
+  GPU (`testbench/bench/session.py`, `vulkan_env`). Judge it against a GPU baseline
+  (`pre-gpu-*`), not `Backend=d3d9` on lavapipe, which DXVK draws differently there.
+  On Vulkan the plugins' samplers take `dxvk.conf`'s anisotropy and LOD bias from
+  Display8, as DXVK gives them on Direct3D 9.
 
 ### ui
 

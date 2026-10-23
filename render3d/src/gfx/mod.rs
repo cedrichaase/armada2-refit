@@ -1,313 +1,170 @@
-//! Drawing helpers every module shares: putting the engine's device state back after
-//! our draws, shaders made on first use, a dynamic vertex buffer for things rebuilt
-//! every frame (sprites, particles, beams), and the camera's matrices.
+//! Drawing helpers every module shares: render3d's `gpu` context and frame (the
+//! interface shared with UI.asi, gpu/README.md), a module's pipelines kept per
+//! combination of states (`Pipes`), the view's pass begun again after a pass of a
+//! module's own (`view_pass`), and the engine's textures wrapped (`engine_texture`).
+//! Every module draws through a `gpu::Cmd` (`cmd`); none calls Direct3D 9 itself.
 //!
 //! d3d8to9 keeps its own record of what the game bound (platform/D3D9.md), so a
 //! module that changes device state between the engine's steps must leave it as it
-//! found it: `Guard` does that with one state block.
-use crate::d3d::*;
+//! found it: a `Cmd` does that with one of `gpu`'s state blocks, put back when dropped.
 use crate::frame::steps::View;
 use crate::math::{M34, M4};
 use alloc::vec::Vec;
 use core::ffi::c_void;
 
-pub mod chain;
-
-/// Captures the device's whole state; `drop` puts it back. One state block per
-/// device, reused (made on first use).
-pub struct Guard {
-    sb: *mut c_void,
+fn log_line(a: core::fmt::Arguments) {
+    crate::rt::log_fmt(a);
 }
 
-static mut SB: Option<(Device, Com)> = None;
+/// An export of Display8 (`d3d8.dll`), for `gpu` to ask which backend it draws on
+/// (gpu/src/display.rs); 0 when there is none.
+fn display_export(name: &str) -> usize {
+    use crate::rt::win::{GetModuleHandleA, GetProcAddress};
+    let m = unsafe { GetModuleHandleA(c"d3d8.dll".as_ptr() as *const u8) };
+    if m.is_null() {
+        return 0;
+    }
+    unsafe { GetProcAddress(m, crate::rt::cstr(name).as_ptr()) }
+}
 
-/// Every render state Direct3D 9 defines.
-const RENDER_STATES: &[u32] = &[
-    7, 8, 9, 14, 15, 16, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 34, 35, 36, 37, 38, 48, 52, 53, 54, 55, 56, 57,
-    58, 59, 60, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 139, 140, 141, 142, 143, 145, 146, 147, 148,
-    151, 152, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 165, 166, 167, 168, 170, 171, 172, 173, 174, 175,
-    176, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 198, 199, 200,
-    201, 202, 203, 204, 205, 206, 207, 208, 209,
-];
-const TSS_TYPES: &[u32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 22, 23, 24, 26, 27, 28, 32];
-/// The pixel samplers and the vertex texture samplers (`D3DVERTEXTEXTURESAMPLER0..3`).
-const SAMPLERS: &[u32] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 257, 258, 259, 260];
+/// render3d's `gpu` context (each plugin keeps its own) and the frame it records into,
+/// moved on after each main view. Its backend is Direct3D 9, or Vulkan when Display8
+/// draws on it (gpu/README.md).
+static mut GPU: gpu::Gpu = gpu::Gpu::with_display(log_line, display_export);
+static mut FRAME: gpu::Frame = gpu::Frame::new();
 
-/// A state block holding only what render3d's draws change: every render state,
-/// texture-stage and sampler state, the textures, shaders, vertex declaration and FVF,
-/// the streams, the indices, the shader constants, the viewport and the scissor
-/// rectangle. Not the transforms, lights, materials or clip planes, which no draw of
-/// ours sets. `SBT_ALL` captured and applied all of those around every draw: three
-/// quarters of render3d's CPU time in a battle (README.md, "Timing"). The constants
-/// stay in: leaving them out saved almost nothing and lost most of the starfield on the
-/// bench (some draw relies on constants being put back; not traced). Recorded with
-/// Begin/EndStateBlock, during which the calls only name the states and change nothing
-/// on the device.
-fn recorded_block(dev: Device) -> Option<Com> {
-    let p = dev.p();
-    if vcall!(p, 60, fn() -> HRESULT,) < 0 {
+#[allow(static_mut_refs)]
+pub fn gpu() -> &'static gpu::Gpu {
+    unsafe { &GPU }
+}
+
+#[allow(static_mut_refs)]
+pub fn frame() -> &'static mut gpu::Frame {
+    unsafe { &mut FRAME }
+}
+
+/// Before a `Reset`: `gpu` lets go of its state blocks and what it holds in the
+/// default pool.
+pub fn reset() {
+    gpu().before_reset();
+}
+
+/// When the engine lets go of its device: `gpu` lets go of everything it holds (every
+/// object holds its device, and native Direct3D 9 cannot make another while it lives).
+pub fn forget() {
+    gpu().release_device();
+}
+
+/// render3d's command recorder for a module's draws: `gpu().begin(frame())`. None
+/// without a device.
+pub fn cmd() -> Option<gpu::Cmd<'static>> {
+    let _z = crate::timing::zone("gfx: state capture");
+    gpu().begin(frame())
+}
+
+/// A module's pipelines, one per combination of the states it draws with, kept by a
+/// key of the module's own (a few bits per state). Those that draw into the view take
+/// the scene pass's formats and samples, and are made again when they change.
+pub struct Pipes {
+    fmt: Option<(gpu::Format, u32, gpu::Format)>,
+    v: Vec<(u64, gpu::Pipeline)>,
+}
+
+impl Pipes {
+    pub const fn new() -> Pipes {
+        Pipes { fmt: None, v: Vec::new() }
+    }
+
+    /// The pipeline `key` that draws into the view: `desc` (its target formats and
+    /// samples are the scene pass's) made on first use. None without the scene's targets.
+    pub fn view(&mut self, key: u64, desc: impl FnOnce() -> gpu::PipelineDesc) -> Option<gpu::Pipeline> {
+        let f = crate::frame::scene_formats()?;
+        if self.fmt != Some(f) {
+            self.fmt = Some(f);
+            self.v.clear();
+        }
+        if let Some((_, p)) = self.v.iter().find(|(k, _)| *k == key) {
+            return Some(p.clone());
+        }
+        let mut d = desc();
+        d.colors = [f.0, gpu::Format::Unknown, gpu::Format::Unknown, gpu::Format::Unknown];
+        d.samples = f.1;
+        d.depth_format = Some(f.2);
+        let p = gpu().pipeline(d);
+        self.v.push((key, p.clone()));
+        Some(p)
+    }
+
+    /// The pipeline `key` that draws into a target of the module's own, as `desc` says.
+    pub fn own(&mut self, key: u64, desc: impl FnOnce() -> gpu::PipelineDesc) -> gpu::Pipeline {
+        let key = key | 1 << 63;
+        if let Some((_, p)) = self.v.iter().find(|(k, _)| *k == key) {
+            return p.clone();
+        }
+        let p = gpu().pipeline(desc());
+        self.v.push((key, p.clone()));
+        p
+    }
+}
+
+/// Begins the view's pass again (the scene target and depth, over the view), after a
+/// module drew into a target of its own, with the viewport `vp` the engine had set
+/// (`gpu::Gpu::engine_viewport`, read before the module's first pass).
+pub fn view_pass(cmd: &mut gpu::Cmd, v: &View, vp: Option<gpu::Viewport>) -> bool {
+    if !crate::frame::scene_pass(cmd, v.rect) {
+        return false;
+    }
+    if let Some(vp) = vp {
+        cmd.set_viewport(&vp);
+    }
+    true
+}
+
+/// An engine texture (`ST3D_Texture`) to sample: its per-device texture (`+0x40 +
+/// device index * 4`, the index at `Storm3D+0xc0`), whose `+4` is the
+/// `IDirect3DTexture8`, which `gpu` makes a texture of (`gpu::Gpu::engine_texture`:
+/// d3d8to9's `IDirect3DTexture9` behind it, or Display8's Vulkan mirror of it).
+pub fn engine_texture(st3d_tex: usize) -> Option<gpu::Texture> {
+    if st3d_tex == 0 {
         return None;
     }
-    for &rs in RENDER_STATES {
-        dev.set_rs(rs, 0);
+    let idx = crate::engine::field(crate::engine::storm3d(), 0xc0);
+    if idx > 8 {
+        return None;
     }
-    for stage in 0..8 {
-        for &t in TSS_TYPES {
-            dev.set_tss(stage, t, 0);
-        }
-    }
-    for &s in SAMPLERS {
-        for t in 1..=13 {
-            dev.set_ss(s, t, 0);
-        }
-        dev.set_texture(s, core::ptr::null_mut());
-    }
-    dev.set_vs(core::ptr::null_mut());
-    dev.set_ps(core::ptr::null_mut());
-    dev.set_vertex_decl(core::ptr::null_mut());
-    dev.set_fvf(2);
-    for n in 0..4 {
-        dev.set_stream(n, core::ptr::null_mut(), 0, 0);
-        dev.set_stream_freq(n, 1);
-    }
-    dev.set_indices(core::ptr::null_mut());
-    let zero = [0.0f32; 4 * 224];
-    dev.vs_const(0, &zero);
-    dev.vs_const(224, &zero[..4 * 32]);
-    dev.ps_const(0, &zero);
-    dev.set_viewport(&Viewport { x: 0, y: 0, w: 1, h: 1, min_z: 0.0, max_z: 1.0 });
-    dev.set_scissor(&Rect { left: 0, top: 0, right: 1, bottom: 1 });
-    let mut sb: *mut c_void = core::ptr::null_mut();
-    let hr = vcall!(p, 61, fn(*mut *mut c_void) -> HRESULT, &mut sb);
-    if hr < 0 || sb.is_null() { None } else { Some(Com::made(sb, "recorded_block")) }
+    let devtex = crate::engine::field(st3d_tex, 0x40 + idx * 4);
+    let t8 = crate::engine::field(devtex, 4);
+    gpu().engine_texture(t8 as *mut c_void)
 }
 
-impl Guard {
-    #[allow(static_mut_refs)]
-    pub fn new(dev: Device) -> Guard {
-        unsafe {
-            if SB.as_ref().is_none_or(|(d, _)| *d != dev) {
-                SB = match recorded_block(dev) {
-                    Some(c) => {
-                        crate::log!("gfx: draws save and restore a recorded state block");
-                        let (vs, ps) = slot_caps(dev);
-                        crate::log!("gfx: the card takes shaders of {} instruction slots (pixel), {} (vertex)", ps, vs);
-                        Some((dev, c))
-                    }
-                    None => {
-                        crate::log!("gfx: no recorded state block: the whole state is saved around each draw");
-                        dev.create_state_block(SBT_ALL).map(|c| (dev, c))
-                    }
-                };
-            }
-            match SB.as_ref() {
-                Some((_, sb)) => {
-                    let _z = crate::timing::zone("gfx: state capture");
-                    sb.sb_capture();
-                    Guard { sb: sb.ptr() }
-                }
-                None => Guard { sb: core::ptr::null_mut() },
-            }
-        }
-    }
+/// A static vertex or index buffer filled with `data`.
+pub fn buffer<T: Copy>(data: &[T], kind: gpu::BufferKind) -> gpu::Buffer {
+    let bytes = unsafe { core::slice::from_raw_parts(data.as_ptr() as *const u8, core::mem::size_of_val(data)) };
+    gpu().buffer(gpu::BufferDesc { size: bytes.len() as u32, kind, dynamic: false }, bytes)
 }
 
-impl Drop for Guard {
-    fn drop(&mut self) {
-        if !self.sb.is_null() {
-            let _z = crate::timing::zone("gfx: state restore");
-            vcall!(self.sb, 5, fn() -> HRESULT,);
-        }
-    }
+/// `buffer`, keeping no copy of `data` (`gpu::Gpu::buffer_transient`): gone with the
+/// device, and made again by its owner (the scene's models, after a `Reset`).
+pub fn buffer_once<T: Copy>(data: &[T], kind: gpu::BufferKind) -> gpu::Buffer {
+    let bytes = unsafe { core::slice::from_raw_parts(data.as_ptr() as *const u8, core::mem::size_of_val(data)) };
+    gpu().buffer_transient(gpu::BufferDesc { size: bytes.len() as u32, kind, dynamic: false }, bytes)
 }
 
-/// Drops the shared state block (before a `Reset`).
-pub fn reset() {
-    unsafe { SB = None };
+/// A 2D BGRA8 texture of `w` x `h` from its levels (tightly packed, the first first),
+/// sampled only.
+pub fn texture_bgra8(w: u32, h: u32, levels: &[&[u8]]) -> gpu::Texture {
+    let mut px = Vec::with_capacity(levels.iter().map(|l| l.len()).sum());
+    for l in levels {
+        px.extend_from_slice(l);
+    }
+    let d = gpu::TextureDesc::d2(w, h, gpu::Format::Bgra8, gpu::Usage::SAMPLED).with_levels(levels.len() as u32);
+    gpu().texture(d, gpu::Contents::Owned(px))
 }
 
-/// The objects `Shader` and `Decl` made. They hold them here rather than in
-/// themselves, so that `forget` can let go of all of them at once, wherever they are.
-static mut MADE: Vec<Com> = Vec::new();
-/// Moves on at each `forget`: a `Shader` or `Decl` made before it makes its object again.
-static mut EPOCH: u32 = 0;
-
-#[allow(static_mut_refs)]
-fn keep(c: Com) -> (u32, *mut c_void) {
-    let p = c.ptr();
-    unsafe {
-        MADE.push(c);
-        (EPOCH, p)
-    }
-}
-
-fn current(obj: &Option<(Device, u32, *mut c_void)>, dev: Device) -> bool {
-    obj.as_ref().is_some_and(|(d, e, _)| *d == dev && *e == unsafe { EPOCH })
-}
-
-/// Lets go of everything made here, when the engine lets go of its device (every
-/// object holds its device, and native Direct3D 9 cannot make another while it lives).
-#[allow(static_mut_refs)]
-pub fn forget() {
-    unsafe {
-        SB = None;
-        MADE = Vec::new();
-        EPOCH = EPOCH.wrapping_add(1);
-    }
-}
-
-/// The most instruction slots a shader model 3 vertex and pixel shader may take on
-/// this device (`D3DCAPS9`'s last two words). Windows' own Direct3D 9 refuses a longer
-/// shader; DXVK takes any (README.md, "Shaders on Windows").
-pub fn slot_caps(dev: Device) -> (u32, u32) {
-    let mut caps = [0u32; 76]; // sizeof(D3DCAPS9) = 304
-    if dev.get_device_caps(caps.as_mut_ptr() as *mut u8) < 0 {
-        return (0, 0);
-    }
-    (caps[74], caps[75])
-}
-
-/// The instruction slots a shader takes, as the runtime counts them against
-/// `slot_caps` (d3dbc-fix.py's `slots`, which the build checks).
-pub fn slots(code: &[u32]) -> u32 {
-    let mut n = 0;
-    let mut i = 1;
-    while i < code.len() {
-        let t = code[i];
-        if t == 0xffff {
-            break;
-        }
-        let op = t & 0xffff;
-        if op == 0xfffe {
-            i += 1 + ((t >> 16) & 0x7fff) as usize;
-            continue;
-        }
-        n += match op {
-            0 | 31 | 47 | 48 | 81 | 30 => 0, // nop, dcl, defb, defi, def, label
-            18 | 24 | 25 | 29 | 33 | 39 | 65 | 91 | 92 | 95 => 2,
-            21 | 23 | 26 | 27 | 32 | 34 | 36 | 38 | 40 | 41 | 45 | 93 | 96 => 3,
-            20 | 22 => 4,
-            37 => 8,
-            _ => 1,
-        };
-        i += 1 + ((t >> 24) & 0xf) as usize;
-    }
-    n
-}
-
-/// A vertex or pixel shader from embedded bytecode, made on first use on a device.
-pub struct Shader {
-    code: &'static [u32],
-    pixel: bool,
-    obj: Option<(Device, u32, *mut c_void)>,
-    told: bool,
-}
-
-impl Shader {
-    pub const fn vertex(code: &'static [u32]) -> Shader {
-        Shader { code, pixel: false, obj: None, told: false }
-    }
-    pub const fn pixel(code: &'static [u32]) -> Shader {
-        Shader { code, pixel: true, obj: None, told: false }
-    }
-    /// The shader on `dev`, or null if it cannot be made.
-    pub fn get(&mut self, dev: Device) -> *mut c_void {
-        if !current(&self.obj, dev) {
-            let c = if self.pixel { dev.create_ps(self.code) } else { dev.create_vs(self.code) };
-            if c.is_none() && !self.told {
-                self.told = true;
-                let (vs, ps) = slot_caps(dev);
-                crate::log!(
-                    "gfx: Direct3D refused a {} shader of {} instruction slots (the card takes {}); what draws with it stands down",
-                    if self.pixel { "pixel" } else { "vertex" }, slots(self.code), if self.pixel { ps } else { vs }
-                );
-            }
-            self.obj = c.map(|c| {
-                let (e, p) = keep(c);
-                (dev, e, p)
-            });
-        }
-        self.obj.as_ref().map_or(core::ptr::null_mut(), |(_, _, p)| *p)
-    }
-    pub fn bind(&mut self, dev: Device) -> bool {
-        let p = self.get(dev);
-        if p.is_null() {
-            return false;
-        }
-        if self.pixel { dev.set_ps(p) } else { dev.set_vs(p) };
-        true
-    }
-}
-
-/// A vertex declaration made on first use on a device.
-pub struct Decl {
-    els: &'static [VertexElement],
-    obj: Option<(Device, u32, *mut c_void)>,
-}
-
-impl Decl {
-    pub const fn new(els: &'static [VertexElement]) -> Decl {
-        Decl { els, obj: None }
-    }
-    pub fn bind(&mut self, dev: Device) -> bool {
-        if !current(&self.obj, dev) {
-            self.obj = dev.create_vertex_decl(self.els).map(|c| {
-                let (e, p) = keep(c);
-                (dev, e, p)
-            });
-        }
-        match &self.obj {
-            Some((_, _, p)) => {
-                dev.set_vertex_decl(*p);
-                true
-            }
-            None => false,
-        }
-    }
-}
-
-/// A dynamic vertex buffer filled with `DISCARD` / `NOOVERWRITE` as a ring. Dropped
-/// before a `Reset` (it is in the default pool).
-pub struct DynVb {
-    bytes: u32,
-    pos: u32,
-    vb: Option<(Device, Com)>,
-}
-
-impl DynVb {
-    pub const fn new(bytes: u32) -> DynVb {
-        DynVb { bytes, pos: 0, vb: None }
-    }
-    pub fn reset(&mut self) {
-        self.vb = None;
-    }
-    /// Copies `data` into the buffer and binds it as stream 0 with `stride`; returns
-    /// the first vertex's index, or None if it does not fit or cannot be made.
-    pub fn push<T: Copy>(&mut self, dev: Device, data: &[T], stride: u32) -> Option<u32> {
-        let n = core::mem::size_of_val(data) as u32;
-        if n == 0 || n > self.bytes {
-            return None;
-        }
-        if self.vb.as_ref().is_none_or(|(d, _)| *d != dev) {
-            self.vb = dev.create_vertex_buffer(self.bytes, USAGE_DYNAMIC | USAGE_WRITEONLY, 0, POOL_DEFAULT).map(|c| (dev, c));
-            self.pos = self.bytes;
-        }
-        let (_, vb) = self.vb.as_ref()?;
-        // Start each push on a whole vertex of this stride.
-        let mut at = self.pos.div_ceil(stride) * stride;
-        let flags = if at + n > self.bytes {
-            at = 0;
-            LOCK_DISCARD
-        } else {
-            LOCK_NOOVERWRITE
-        };
-        let p = vb.buf_lock(at, n, flags)?;
-        unsafe { core::ptr::copy_nonoverlapping(data.as_ptr() as *const u8, p, n as usize) };
-        vb.buf_unlock();
-        self.pos = at + n;
-        dev.set_stream(0, vb.ptr(), 0, stride);
-        Some(at / stride)
-    }
+/// A sampler: `filter` for magnification, minification and between levels (None:
+/// one level), `u` and `v` (and `w`) addressing.
+pub const fn sampler(filter: gpu::Filter, mip: gpu::MipFilter, u: gpu::Address, v: gpu::Address) -> gpu::Sampler {
+    gpu::Sampler { min: filter, mag: filter, mip, address_u: u, address_v: v, address_w: gpu::Address::Clamp, anisotropy: 1, srgb: false }
 }
 
 /// The engine's 3x4 (rows: x, y, z axes, then position) as a Direct3D world matrix.

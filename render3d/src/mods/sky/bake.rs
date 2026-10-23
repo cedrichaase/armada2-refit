@@ -1,23 +1,24 @@
 //! The procedural sky baked into a cube once per map, and
 //! the fine detail's noise volume. Both on the GPU only: each face is drawn by the
-//! `bake_*_ps` chain (five passes, `gfx::chain`: one shader would be longer than some
+//! `bake_*_ps` chain (five passes, `gpu::chain`: one shader would be longer than some
 //! cards take) into a target twice its edge, then `down_ps` averages each 2x2 into the
 //! cube face, a render target itself. The cube is half floats, so the recipe's stars
-//! can pass white; it is in the default pool and is dropped before a `Reset` and baked
-//! again after.
+//! can pass white; a `Reset` loses what a target holds, so it is baked again after.
 use super::recipe::{NCONST, Recipe};
-use crate::d3d::*;
-use crate::gfx::chain::{Chain, Pass};
-use crate::gfx::Shader;
+use crate::gfx::{self, Pipes};
 use crate::log;
 use crate::rt;
 use crate::shaders::sky::*;
+use crate::shaders::sky_spv::*;
+use crate::shaders::sky_dxil::*;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-
-/// 10-bit RGB, the fallback when a half-float cube cannot be a render target.
-const FMT_A2B10G10R10: u32 = 31;
+use gpu::chain::{Chain, ChainDest, ChainPass};
+use gpu::{
+    attr, Address, AttrFormat, Bindings, Block, Cmd, ColorTarget, Contents, Filter, Format, Load, MipFilter, Pass,
+    PipelineDesc, Sampler, Semantic, Texture, TextureDesc, Topology, Usage, VertexAttr,
+};
 
 /// Direct3D's cube faces in order (+x, -x, +y, -y, +z, -z): the direction at a face's
 /// centre, and the directions its texel column and row grow along.
@@ -38,38 +39,40 @@ pub struct QuadVert {
     pub ray: [f32; 3],
 }
 
-pub static QUAD_DECL: [VertexElement; 3] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT3, DECLUSAGE_TEXCOORD, 0),
-    VE_END,
-];
+pub static QUAD_LAYOUT: [VertexAttr; 2] = [attr(0, AttrFormat::Float3, Semantic::Position, 0), attr(12, AttrFormat::Float3, Semantic::TexCoord, 0)];
+
+/// A pipeline of `sky_vs` and `ps` over a `QuadVert` strip, writing a target of `fmt`
+/// whole: no depth, no blending.
+pub fn quad_desc(ps: gpu::Code, fmt: Format) -> PipelineDesc {
+    PipelineDesc::new(gpu::code!(VS_SKY, VS_SKY_SPV, VS_SKY_DXIL), ps, &QUAD_LAYOUT, 24, Topology::TriangleStrip, fmt)
+}
+
+/// Draws a quad of `QuadVert`s, a strip.
+pub fn draw_quad(cmd: &mut Cmd, quad: &[QuadVert; 4]) {
+    if let Some(s) = cmd.vertices(quad) {
+        cmd.draw(&s);
+    }
+}
 
 pub struct Baker {
-    pub cube: Option<Com>,
+    pub cube: Option<Texture>,
     pub edge: u32,
     /// The recipe text the cube holds (a changed text bakes again).
     pub baked: Option<(String, String)>,
-    pub fine: Option<Com>,
+    pub fine: Option<Texture>,
     fine_failed: bool,
     failed: Option<String>,
-    /// The chain: the warp, the field, the gas, two slabs of stars, the last slab.
-    bake: [Shader; 5],
-    down_ps: Shader,
+    /// The chain's pipelines (the warp, the field, the gas, two slabs of stars, the last
+    /// slab) and `down_ps`'s, by format.
+    pipes: Pipes,
 }
+
+/// The chain's pixel shaders, in order.
+const BAKE_PS: [gpu::Code; 5] = [gpu::code!(PS_BAKE_WARP, PS_BAKE_WARP_SPV, PS_BAKE_WARP_DXIL), gpu::code!(PS_BAKE_FIELD, PS_BAKE_FIELD_SPV, PS_BAKE_FIELD_DXIL), gpu::code!(PS_BAKE_GAS, PS_BAKE_GAS_SPV, PS_BAKE_GAS_DXIL), gpu::code!(PS_BAKE_STARS, PS_BAKE_STARS_SPV, PS_BAKE_STARS_DXIL), gpu::code!(PS_BAKE_END, PS_BAKE_END_SPV, PS_BAKE_END_DXIL)];
 
 impl Baker {
     pub const fn new() -> Baker {
-        Baker {
-            cube: None,
-            edge: 0,
-            baked: None,
-            fine: None,
-            fine_failed: false,
-            failed: None,
-            bake: [Shader::pixel(&PS_BAKE_WARP), Shader::pixel(&PS_BAKE_FIELD), Shader::pixel(&PS_BAKE_GAS),
-                Shader::pixel(&PS_BAKE_STARS), Shader::pixel(&PS_BAKE_END)],
-            down_ps: Shader::pixel(&PS_DOWN),
-        }
+        Baker { cube: None, edge: 0, baked: None, fine: None, fine_failed: false, failed: None, pipes: Pipes::new() }
     }
 
     pub fn reset(&mut self) {
@@ -84,15 +87,14 @@ impl Baker {
         self.cube.is_some() && self.edge == edge && self.baked.as_ref().is_some_and(|(n, t)| *n == r.name && *t == r.text)
     }
 
-    /// Bakes `r` into the cube, inside the caller's state guard and with its quad
-    /// declaration and `sky_vs` bound. Render target, depth and viewport are put back
-    /// here (a state block does not hold them). One try per recipe text.
-    pub fn bake(&mut self, dev: Device, r: &Recipe, edge: u32, dump: bool) -> bool {
+    /// Bakes `r` into the cube. It draws into targets of its own: the caller begins its
+    /// pass again after. One try per recipe text.
+    pub fn bake(&mut self, cmd: &mut Cmd, r: &Recipe, edge: u32, dump: bool) -> bool {
         if self.failed.as_deref() == Some(r.text.as_str()) {
             return false;
         }
         let t0 = rt::now();
-        let ok = self.bake_inner(dev, r, edge, dump);
+        let ok = self.bake_inner(cmd, r, edge, dump);
         log!(
             "sky: bake \"{}\" ({}) {}: six faces of {} in {:.0} ms",
             r.name, r.source, if ok { "done" } else { "FAILED" }, edge, (rt::now() - t0) * 1000.0
@@ -107,61 +109,65 @@ impl Baker {
         ok
     }
 
-    fn bake_inner(&mut self, dev: Device, r: &Recipe, edge: u32, dump: bool) -> bool {
+    fn bake_inner(&mut self, cmd: &mut Cmd, r: &Recipe, edge: u32, dump: bool) -> bool {
+        let g = gfx::gpu();
         let s = edge;
         let ss = if 2 * s <= 4096 { 2 } else { 1 };
         let big = s * ss;
         if self.cube.is_none() || self.edge != s {
             self.cube = None;
-            for fmt in [FMT_A16B16G16R16F, FMT_A2B10G10R10, FMT_A8R8G8B8] {
-                if let Some(c) = dev.create_cube_texture(s, 1, USAGE_RENDERTARGET, fmt, POOL_DEFAULT) {
-                    log!("sky: cube {}x{} in format {}", s, s, fmt);
+            for fmt in [Format::Rgba16F, Format::Rgb10A2, Format::Bgra8] {
+                let c = g.texture(TextureDesc::cube(s, 1, fmt, Usage::RENDER_TARGET | Usage::SAMPLED | Usage::COPY_SRC), Contents::None);
+                if c.ready(g) {
+                    log!("sky: cube {}x{} in format {}", s, s, gpu::d3d9::format_code(fmt));
                     self.cube = Some(c);
                     break;
                 }
             }
             self.edge = s;
         }
-        let Some(cube) = self.cube.as_ref() else { return false };
-        let fmt = cube.tex_desc(0).format;
-        let [w, f, g, st, e] = &mut self.bake;
-        let bps = [w.get(dev), f.get(dev), g.get(dev), st.get(dev), e.get(dev)];
-        let dps = self.down_ps.get(dev);
-        if bps.iter().any(|p| p.is_null()) || dps.is_null() {
+        let Some(cube) = self.cube.clone() else { return false };
+        let fmt = cube.desc().format;
+        let fc = gpu::d3d9::format_code(fmt) as u64;
+        // Targets 0: the warp, then the stars of the first two slabs; 1: the field; 2: the gas.
+        let spec: [(usize, &'static [usize], Option<usize>); 5] =
+            [(0, &[], Some(0)), (1, &[0], Some(1)), (2, &[0, 1], Some(2)), (3, &[2], Some(0)), (4, &[2, 0], None)];
+        let pls: Vec<gpu::Pipeline> = spec
+            .iter()
+            .map(|&(i, _, to)| {
+                let f = if to.is_some() { gpu::chain::FORMAT } else { fmt };
+                self.pipes.own((i as u64) << 16 | gpu::d3d9::format_code(f) as u64, || quad_desc(BAKE_PS[i], f))
+            })
+            .collect();
+        let down = self.pipes.own(9 << 16 | fc, || quad_desc(gpu::code!(PS_DOWN, PS_DOWN_SPV, PS_DOWN_DXIL), fmt));
+        if !pls.iter().chain(core::iter::once(&down)).all(|p| p.ready(g)) {
             return false;
         }
-        // Targets 0: the warp, then the stars of the first two slabs; 1: the field; 2: the gas.
-        let passes = [
-            Pass { ps: bps[0], reads: &[], to: Some(0) },
-            Pass { ps: bps[1], reads: &[0], to: Some(1) },
-            Pass { ps: bps[2], reads: &[0, 1], to: Some(2) },
-            Pass { ps: bps[3], reads: &[2], to: Some(0) },
-            Pass { ps: bps[4], reads: &[2, 0], to: None },
-        ];
-        let Some(chain) = Chain::new(dev, 3, big) else {
+        let passes: Vec<ChainPass> = spec.iter().zip(pls.iter()).map(|(&(_, reads, to), p)| ChainPass { pipeline: p, reads, to }).collect();
+        let Some(chain) = Chain::new(g, 3, big) else {
             log!("sky: no float targets for the bake");
             return false;
         };
-        let Some(sup) = dev.create_texture(big, big, 1, USAGE_RENDERTARGET, fmt, POOL_DEFAULT) else { return false };
-        let Some(sup_s) = sup.tex_surface(0) else { return false };
-        let old_vp = dev.get_viewport();
-        let old_rt = dev.get_render_target(0);
-        let old_ds = dev.get_depth_stencil();
-        dev.set_depth_stencil(core::ptr::null_mut());
-        for (st, v) in [
-            (RS_ZENABLE, 0), (RS_ZWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0), (RS_ALPHABLENDENABLE, 0), (RS_FOGENABLE, 0),
-            (RS_CULLMODE, CULL_NONE), (RS_FILLMODE, 3), (RS_STENCILENABLE, 0), (RS_COLORWRITEENABLE, 0xf),
-            (RS_SCISSORTESTENABLE, 0), (RS_SRGBWRITEENABLE, 0), (152, 0), // CLIPPLANEENABLE
-        ] {
-            dev.set_rs(st, v);
+        let sup = g.texture(TextureDesc::d2(big, big, fmt, Usage::RENDER_TARGET | Usage::SAMPLED), Contents::None);
+        if !sup.ready(g) {
+            return false;
         }
-        dev.ps_const(0, r.floats());
         let quad: [QuadVert; 4] = [
             QuadVert { pos: [-1.0, 1.0, 0.0], ray: [0.0; 3] },
             QuadVert { pos: [1.0, 1.0, 0.0], ray: [0.0; 3] },
             QuadVert { pos: [-1.0, -1.0, 0.0], ray: [0.0; 3] },
             QuadVert { pos: [1.0, -1.0, 0.0], ray: [0.0; 3] },
         ];
+        let down_s = Sampler {
+            min: if ss == 2 { Filter::Linear } else { Filter::Point },
+            mag: Filter::Linear,
+            mip: MipFilter::None,
+            address_u: Address::Clamp,
+            address_v: Address::Clamp,
+            address_w: Address::Clamp,
+            anisotropy: 1,
+            srgb: false,
+        };
         let mut ok = true;
         for (f, axes) in FACES.iter().enumerate() {
             // Pass 1: the samples, by the chain.
@@ -172,53 +178,44 @@ impl Baker {
             // target pixel a -> face coordinate: a texel's samples at i -+ 1/4 (sky.hlsl)
             c[12] = 2.0 / (ss * (s - 1)) as f32;
             c[13] = if ss == 1 { -1.0 } else { -1.0 - 0.5 / (s - 1) as f32 };
-            dev.ps_const(NCONST as u32, &c);
-            dev.set_texture(2, core::ptr::null_mut());
-            let draw = |d: Device| {
-                d.draw_primitive_up(PT_TRIANGLESTRIP, 2, quad.as_ptr() as *const u8, 24);
-            };
-            if !chain.draw(dev, sup_s.ptr(), big, &passes, &draw) {
+            cmd.bind_texture(2, None, &down_s);
+            let common = Bindings { textures: &[], vs: &[], ps: &[Block::new(0, r.floats()), Block::new(NCONST as u32, &c)] };
+            let draw = |cmd: &mut Cmd| draw_quad(cmd, &quad);
+            if !chain.draw(cmd, ChainDest { texture: &sup, layer: 0 }, big, &passes, &common, &draw) {
                 ok = false;
                 break;
             }
             // Pass 2: four samples into each texel of the face.
-            let Some(face) = cube.cube_surface(f as u32, 0) else {
+            let colors = [ColorTarget::face(&cube, f as u32, Load::Load)];
+            if !cmd.begin_pass(&Pass { colors: &colors, depth: None, area: None }) || !cmd.set_pipeline(&down) {
                 ok = false;
                 break;
-            };
-            dev.set_render_target(0, face.ptr());
-            dev.set_ps(dps);
-            dev.set_texture(2, sup.ptr());
-            for (t, v) in [(SAMP_ADDRESSU, TADDRESS_CLAMP), (SAMP_ADDRESSV, TADDRESS_CLAMP), (SAMP_MAGFILTER, TEXF_LINEAR),
-                (SAMP_MINFILTER, if ss == 2 { TEXF_LINEAR } else { TEXF_POINT }), (SAMP_MIPFILTER, TEXF_NONE), (SAMP_SRGBTEXTURE, 0)] {
-                dev.set_ss(2, t, v);
             }
-            dev.ps_const(26, &[if ss == 2 { 1.0 / big as f32 } else { 0.5 / big as f32 }, 0.0, 0.0, 0.0]);
-            dev.draw_primitive_up(PT_TRIANGLESTRIP, 2, quad.as_ptr() as *const u8, 24);
-            dev.set_texture(2, core::ptr::null_mut());
+            cmd.bind_texture(2, Some(&sup), &down_s);
+            cmd.ps_block(Block::new(26, &[if ss == 2 { 1.0 / big as f32 } else { 0.5 / big as f32 }, 0.0, 0.0, 0.0]));
+            draw_quad(cmd, &quad);
+            cmd.bind_texture(2, None, &down_s);
+            cmd.end_pass();
             if dump {
-                dump_face(dev, r, f, &face, s, fmt);
+                dump_face(cmd, r, f, &cube, s, fmt);
             }
         }
-        dev.set_render_target(0, old_rt.as_ref().map_or(core::ptr::null_mut(), |c| c.ptr()));
-        dev.set_depth_stencil(old_ds.as_ref().map_or(core::ptr::null_mut(), |c| c.ptr()));
-        dev.set_viewport(&old_vp);
         ok
     }
 
     /// The fine detail's noise (`Sky.asi`'s `fine_volume`): white noise blurred by a
     /// Gaussian of 1.2 texels with wrap-around, so it tiles and is smooth under
     /// trilinear filtering; L8 at 0.5 + z/8 for z in units of its own spread, with a
-    /// box-filtered chain so an octave finer than a pixel fades to the mean. Made once
-    /// per device, in the managed pool (survives a `Reset`), 300 KB.
-    pub fn fine(&mut self, dev: Device) -> Option<*mut core::ffi::c_void> {
+    /// box-filtered chain so an octave finer than a pixel fades to the mean. Made once,
+    /// 300 KB, kept (made again on the device after a `Reset` from its copy).
+    pub fn fine(&mut self) -> Option<Texture> {
         if let Some(f) = &self.fine {
-            return Some(f.ptr());
+            return Some(f.clone());
         }
         if self.fine_failed {
             return None;
         }
-        let f = make_fine(dev);
+        let f = make_fine();
         if f.is_none() {
             self.fine_failed = true;
             log!("sky: no noise volume for the fine detail: the baked sky alone");
@@ -226,7 +223,7 @@ impl Baker {
             log!("sky: fine detail: noise volume made");
         }
         self.fine = f;
-        self.fine.as_ref().map(|c| c.ptr())
+        self.fine.clone()
     }
 }
 
@@ -257,10 +254,9 @@ fn fine_blur(src: &[f32], dst: &mut [f32], stride: usize) {
     }
 }
 
-fn make_fine(dev: Device) -> Option<Com> {
+fn make_fine() -> Option<Texture> {
     let n3 = FINE_N * FINE_N * FINE_N;
     let levels = 7u32; // 64 .. 1
-    let vol = dev.create_volume_texture(FINE_N as u32, FINE_N as u32, FINE_N as u32, levels, 0, FMT_L8, POOL_MANAGED)?;
     let mut a: Vec<f32> = (0..n3).map(|i| (fine_hash(i as u32 + 0x51) >> 8) as f32 / 16_777_216.0 - 0.5).collect();
     let mut b = vec![0.0f32; n3];
     fine_blur(&a, &mut b, 1);
@@ -269,18 +265,16 @@ fn make_fine(dev: Device) -> Option<Com> {
     let sd = crate::math::sqrtf(b.iter().map(|v| v * v).sum::<f32>() / n3 as f32);
     let mut cur: Vec<f32> = b.iter().map(|v| 127.5 + v / sd * 32.0).collect();
     let mut n = FINE_N;
-    for lv in 0..levels {
-        let lb = vol.vol_lock(lv, 0)?;
+    let mut px: Vec<u8> = Vec::with_capacity(n3 + n3 / 7 + 1);
+    for _ in 0..levels {
         for z in 0..n {
             for y in 0..n {
                 for x in 0..n {
                     let v = cur[(z * n + y) * n + x];
-                    let byte = if v < 0.0 { 0 } else if v > 255.0 { 255 } else { (v + 0.5) as u8 };
-                    unsafe { *lb.bits.add(z * lb.slice_pitch as usize + y * lb.row_pitch as usize + x) = byte };
+                    px.push(if v < 0.0 { 0 } else if v > 255.0 { 255 } else { (v + 0.5) as u8 });
                 }
             }
         }
-        vol.vol_unlock(lv);
         if n > 1 {
             let h = n / 2;
             let mut next = vec![0.0f32; h * h * h];
@@ -303,7 +297,10 @@ fn make_fine(dev: Device) -> Option<Com> {
             n = h;
         }
     }
-    Some(vol)
+    let g = gfx::gpu();
+    let f = FINE_N as u32;
+    let t = g.texture(TextureDesc::d3(f, f, f, levels, Format::R8, Usage::SAMPLED), Contents::Owned(px));
+    t.ready(g).then_some(t)
 }
 
 /// A half float to a float.
@@ -320,41 +317,40 @@ fn half(h: u16) -> f32 {
 
 /// `Dump=1`: a baked face as a 24-bit TGA, `Sky\<name>.dump<f>.tga` in the game
 /// directory, for `render3d/perf/sky-grade.py`.
-fn dump_face(dev: Device, r: &Recipe, f: usize, face: &Com, s: u32, fmt: u32) {
-    let Some(sys) = dev.create_offscreen_surface(s, s, fmt, POOL_SYSTEMMEM) else { return };
-    if dev.get_render_target_data(face, &sys) < 0 {
-        return;
-    }
-    let Some(lr) = sys.surf_lock(LOCK_READONLY) else { return };
+fn dump_face(cmd: &mut Cmd, r: &Recipe, f: usize, cube: &Texture, s: u32, fmt: Format) {
     let mut out = Vec::with_capacity(18 + (s * s * 3) as usize);
     out.extend_from_slice(&[0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     out.extend_from_slice(&(s as u16).to_le_bytes());
     out.extend_from_slice(&(s as u16).to_le_bytes());
     out.extend_from_slice(&[24, 0x20]);
     let to8 = |v: f32| (crate::math::saturate(v) * 255.0 + 0.5) as u8;
-    for y in 0..s as usize {
-        let row = unsafe { lr.bits.add(y * lr.pitch as usize) };
-        for x in 0..s as usize {
-            let (rr, gg, bb) = unsafe {
-                match fmt {
-                    FMT_A16B16G16R16F => {
-                        let p = row.add(x * 8) as *const u16;
-                        (half(p.read_unaligned()), half(p.add(1).read_unaligned()), half(p.add(2).read_unaligned()))
+    let read = cmd.read_back_layer(cube, f as u32, |m| {
+        for y in 0..s as usize {
+            let row = unsafe { m.ptr().add(y * m.pitch()) };
+            for x in 0..s as usize {
+                let (rr, gg, bb) = unsafe {
+                    match fmt {
+                        Format::Rgba16F => {
+                            let p = row.add(x * 8) as *const u16;
+                            (half(p.read_unaligned()), half(p.add(1).read_unaligned()), half(p.add(2).read_unaligned()))
+                        }
+                        Format::Rgb10A2 => {
+                            let v = (row.add(x * 4) as *const u32).read_unaligned();
+                            ((v & 1023) as f32 / 1023.0, ((v >> 10) & 1023) as f32 / 1023.0, ((v >> 20) & 1023) as f32 / 1023.0)
+                        }
+                        _ => {
+                            let v = (row.add(x * 4) as *const u32).read_unaligned();
+                            (((v >> 16) & 255) as f32 / 255.0, ((v >> 8) & 255) as f32 / 255.0, (v & 255) as f32 / 255.0)
+                        }
                     }
-                    FMT_A2B10G10R10 => {
-                        let v = (row.add(x * 4) as *const u32).read_unaligned();
-                        ((v & 1023) as f32 / 1023.0, ((v >> 10) & 1023) as f32 / 1023.0, ((v >> 20) & 1023) as f32 / 1023.0)
-                    }
-                    _ => {
-                        let v = (row.add(x * 4) as *const u32).read_unaligned();
-                        (((v >> 16) & 255) as f32 / 255.0, ((v >> 8) & 255) as f32 / 255.0, (v & 255) as f32 / 255.0)
-                    }
-                }
-            };
-            out.extend_from_slice(&[to8(bb), to8(gg), to8(rr)]);
+                };
+                out.extend_from_slice(&[to8(bb), to8(gg), to8(rr)]);
+            }
         }
+    });
+    if read.is_err() {
+        return;
     }
-    sys.surf_unlock();
     let mut path = String::from("Sky\\");
     path.push_str(&r.name);
     path.push_str(".dump");

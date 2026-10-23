@@ -4,6 +4,108 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.19.2 — 2026-10-23
+
+### Changed
+- `ini-merge.py`'s defaults upgrade reads `Defaults=` from whichever section of the
+  shipped file has it, with the upgrades kept per file (`[UI]` for `UI.ini`,
+  `[Display8]` for `Display8.ini`); `UI.ini`'s merge is as before.
+
+Installed, not yet seen in game.
+
+## 0.19.1 — 2026-10-23
+
+### Fixed
+- On Vulkan `gpu`'s read-back (the frame dumps) reads host-cached memory, not the card's
+  memory through the PCIe window (`gpu/README.md`, "Read-backs").
+
+Confirmed in game 2026-10-23.
+
+## 0.19.0 — 2026-10-23
+
+### Added
+- The UI on `gpu`'s Direct3D 12 backend when Display8 draws on Direct3D 12: its
+  pipelines carry their DXIL, and what took Display8's Vulkan device takes either of
+  Display8's own (`gpu::Gpu::on_display`); the log names the backend.
+
+Installed, not yet seen in game.
+
+## 0.18.0 — 2026-10-23
+
+### Added
+- The UI on `gpu`'s Vulkan backend when Display8 draws on Vulkan (`gfx::attach` takes
+  either device): the back buffer is Display8's image, the engine's textures (minimap,
+  radar sprites, order ring and footprints, the unit view's video) its mirrors, a dump
+  reads the frame before the gamma pass; positions leave out Direct3D 9's half pixel
+  there.
+
+Confirmed in game 2026-10-23.
+
+## 0.17.2 — 2026-10-23
+
+### Fixed
+- A placement's build footprint is drawn again with Display8 in stub mode: the three
+  `ST3D_Sprite::DrawQuad` calls in `PlaceholderFeature::RenderFootprints` are taken
+  under `[HUD] Overview` as the order ring's are, and drawn by the UI with each
+  sprite's rectangle of its texture (`MBuild`'s quarters) and a texture slot per engine
+  texture (`engine/leftovers.rs`, `hud/leftovers.rs`; HUD.md, "The engine's last
+  draws"). `UI.log`: "leftovers: build footprint at ...".
+
+Confirmed in game 2026-10-23.
+
+## 0.17.1 — 2026-10-23
+
+### Added
+- The UI shader's DXIL for Direct3D 12 (`src/shaders/ui_dxil.rs`), from
+  `render3d/hlsl-rs.sh`; the d3dbc and SPIR-V are byte for byte as before.
+
+Installed, not yet seen in game.
+
+## 0.17.0 — 2026-10-23
+
+### Added
+- The engine's last draws in a mission are the UI's (`engine/leftovers.rs`,
+  `hud/leftovers.rs`; HUD.md, "The engine's last draws"), each in the engine's look:
+  the selection drag box, the height posts, the order ring (`mRenderGridFX`,
+  `mRenderWhere`, drawn through a new additive pipeline, `Draw::quad_additive`),
+  `ScreenFade`'s fade, and the unit view's Bink video from the engine's texture. New
+  `[HUD]` keys `Overview`, `Fade`, `UnitVideo` (default 1).
+- Movies through the UI: `UI.asi` exports `ui_present_movie(bgrx, w, h, pitch)`, which
+  the cutscene proxy hands each full-screen frame to; the UI draws it fitted at the
+  next `Present` (`src/movie.rs`; README.md, "Movies"). `[UI] Movies` (default 1).
+
+### Changed
+- The in-mission menus draw over a copy of the last mission frame the UI keeps (a GPU
+  copy at the end of each mission frame); the front buffer is read back only when
+  there is none (MENUS.md, "The in-mission menus").
+
+### Fixed
+- Choosing a display mode in Graphics Settings in the middle of a mission no longer
+  kills the game with a stack overflow: the arrow over hosted dialogs and screens of
+  ours comes from a patch of the engine's own `WM_SETCURSOR` answer instead of a
+  subclass of the 3D window, which looped with DXVK's window hook once the device was
+  re-created (README.md, "The front end: screens of our own").
+
+Confirmed in game 2026-10-23.
+
+## 0.16.0 — 2026-10-23
+
+### Changed
+- `shaders/ui.hlsl` is modern HLSL, built for Direct3D 9 as before and for SPIR-V
+  (`src/shaders/ui_spv.rs`) (729f9bb).
+- The 2D renderer, the close-up's pictures, the menus' backdrop, the minimap's engine
+  textures and `UI.dump` go through `gpu/`: the frame's state is saved with the
+  recorded state block instead of `D3DSBT_ALL`, vertices go through gpu's ring
+  buffers, and textures are made again by gpu after a `Reset` or a new device (caef061).
+- Its pipelines turn the clip planes off; binding the same pipeline again sets nothing; a
+  colour clear writes every channel (gpu, 1b63c7f).
+
+### Removed
+- `src/d3d` (now `gpu::d3d9::raw`).
+
+Measured on the bench: the showcase's presented frame with the HUD is the same pixels
+as before (RMSE 0). Confirmed in game 2026-10-23.
+
 ## 0.15.0 — 2026-10-22
 
 ### Added

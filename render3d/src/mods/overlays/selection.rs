@@ -21,14 +21,18 @@
 //! factor. The lighting material `selection` is constant: the colour is drawn as it
 //! is, added, depth-tested and not written. Stock stretches the bubble with a warping
 //! hull (`WarpInstance`); that is not done here yet.
-use crate::d3d::*;
+use gpu::{Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Topology};
 use crate::engine::{field, field_f32, obj, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{v3, M34, V3};
 use crate::scene::{self, pose};
 use crate::shaders::overlays::PS_COLOUR;
+use crate::shaders::overlays_spv::PS_COLOUR_SPV;
+use crate::shaders::overlays_dxil::PS_COLOUR_DXIL;
 use crate::shaders::sod::VS_SOD;
+use crate::shaders::sod_spv::VS_SOD_SPV;
+use crate::shaders::sod_dxil::VS_SOD_DXIL;
 
 const BUCKETS: usize = 0x773c8c;
 const FN_RENDER_SELECTION: usize = 0x599900; // RenderSelectionEffects, cdecl
@@ -49,14 +53,24 @@ pub fn team_colour(o: usize) -> V3 {
 }
 
 pub struct Selection {
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
+    pipes: Pipes,
 }
 
 impl Selection {
     pub fn new() -> Selection {
-        Selection { vs: Shader::vertex(&VS_SOD), ps: Shader::pixel(&PS_COLOUR), decl: Decl::new(&scene::VERTEX) }
+        Selection { pipes: Pipes::new() }
+    }
+
+    /// The bubble's pipeline for a cull: added, depth-tested (`LESSEQUAL`) and not
+    /// written.
+    fn pipe(&mut self, cull: Cull) -> Option<Pipeline> {
+        self.pipes.view(cull as u64, || {
+            let mut d = PipelineDesc::new(gpu::code!(VS_SOD, VS_SOD_SPV, VS_SOD_DXIL), gpu::code!(PS_COLOUR, PS_COLOUR_SPV, PS_COLOUR_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.blend = Some(Blend::ADD);
+            d.cull = cull;
+            d
+        })
     }
 
     /// Every bubble; true: the engine's step is skipped.
@@ -67,7 +81,7 @@ impl Selection {
         if unsafe { rd::<u8>(FN_RENDER_SELECTION) } == 0xc3 {
             return true;
         }
-        let Some(model) = scene::model(v.dev, "select") else { return false };
+        let Some(model) = scene::model("select") else { return false };
         let profile = field_f32(unsafe { rd::<usize>(super::USER_PROFILE) }, 0x48);
         let user_team = unsafe {
             let t = rd::<usize>(super::G_TRANSPORT);
@@ -88,42 +102,31 @@ impl Selection {
         if passes.is_empty() {
             return true;
         }
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return true };
+        let (Some(cw), Some(ccw)) = (self.pipe(Cull::Clockwise), self.pipe(Cull::CounterClockwise)) else { return true };
+        if !cw.ready(gfx::gpu()) || !ccw.ready(gfx::gpu()) {
             return true;
         }
-        dev.vs_const(4, &gfx::vp_constants(v));
-        dev.set_texture(0, core::ptr::null_mut());
-        for (st, val) in [
-            (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ZWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0),
-            (RS_ALPHABLENDENABLE, 1), (RS_SRCBLEND, BLEND_ONE), (RS_DESTBLEND, BLEND_ONE), (RS_BLENDOP, BLENDOP_ADD),
-            (RS_SEPARATEALPHABLENDENABLE, 0), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0), (RS_SCISSORTESTENABLE, 0),
-            (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_SRGBWRITEENABLE, 0),
-        ] {
-            dev.set_rs(st, val);
-        }
-        dev.set_stream_freq(0, 1);
+        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
+        cmd.bind_texture(0, None, &scene::SAMPLER);
         for (world, colour) in passes {
             if colour.x <= 0.0 && colour.y <= 0.0 && colour.z <= 0.0 {
                 continue;
             }
             let p = pose::pose(&model.sod, &model.info, &world, pose::Clock::looping(v.time), pose::auto(v.eye));
-            dev.ps_const(0, &[colour.x, colour.y, colour.z, 1.0]);
+            cmd.ps_block(Block::new(0, &[colour.x, colour.y, colour.z, 1.0]));
             for part in &model.parts {
                 if !p.shown.get(part.node).copied().unwrap_or(false) {
                     continue;
                 }
                 let w = p.world[part.node];
-                dev.vs_const(0, w.to_m4().transpose().as_floats());
                 let mirrored = w.det3() < 0.0;
                 // Front faces only, whatever the SOD says: on the bench stock's bubble
                 // adds one layer of its colour, not two.
-                dev.set_rs(RS_CULLMODE, if mirrored { CULL_CW } else { CULL_CCW });
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                cmd.set_pipeline(if mirrored { &cw } else { &ccw });
+                cmd.vs_block(Block::new(0, w.to_m4().transpose().as_floats()));
                 for g in &part.groups {
-                    dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
+                    part.draw(&mut cmd, g.start, g.tris);
                 }
             }
         }

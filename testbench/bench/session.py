@@ -28,7 +28,7 @@ import uuid
 import time
 from pathlib import Path
 
-from . import config, jobs, slots
+from . import config, jobs, slots, stockcache
 from .log import Log
 
 
@@ -113,6 +113,53 @@ def checkout_provenance(path):
     r = subprocess.run(['git', '-C', str(p), 'describe', '--always', '--dirty', '--abbrev=10'],
                        capture_output=True, text=True)
     return dict(path=str(p), describe=r.stdout.strip() if r.returncode == 0 else 'not a git checkout')
+
+
+LAVAPIPE_ICD = '/usr/share/vulkan/icd.d/lvp_icd.json'
+
+
+def vulkan_env(game_dir, logs=None):
+    """The environment of a game whose Display8 draws on Vulkan (`Mode=stub`,
+    `Backend=vulkan` in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
+    driver and the Khronos validation layer, so a bench game never puts new Vulkan code
+    on the user's GPU (display/README.md, "Vulkan"). `A2TEST_VULKAN_GPU=1` leaves the
+    drivers as they are, for a deliberate run on the GPU.
+
+    On `Backend=d3d12` (vkd3d-proton, on the GPU) with `Validate=1`: the Khronos
+    validation layer under vkd3d-proton (`VK_INSTANCE_LAYERS`), writing its errors and
+    warnings to `logs/vvl.log` itself (`VK_LAYER_DEBUG_ACTION`, `VK_LAYER_LOG_FILENAME`):
+    a messenger of vkd3d-proton's (`VKD3D_CONFIG=vk_debug`) hears nothing through the
+    32-bit winevulkan, and would take the layer's own log away.
+
+    On `Backend=auto` or a list that names Vulkan (display 0.7.0; `auto` is the shipped
+    default from display 0.8.0): the drivers as they are, so the default game runs on
+    the GPU as a player's does; with `Validate=1` the Khronos layer too, which Display8's
+    messenger reports. `display/bench-mode.sh` puts such a Vulkan on lavapipe by
+    `Device=llvmpipe` instead, keeping the GPU for the backends after it."""
+    ini = Path(game_dir) / 'Display8.ini'
+    try:
+        text = ini.read_text(errors='replace')
+    except OSError:
+        return {}
+    keys = {m.group(1).lower(): m.group(2).strip().lower()
+            for m in re.finditer(r'^\s*(\w+)\s*=\s*(.*?)\s*$', text, re.M)}
+    if keys.get('mode') == 'stub' and keys.get('backend') == 'd3d12' and keys.get('validate') == '1':
+        env = {'VKD3D_CONFIG': 'vk_debug', 'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation', 'VK_LAYER_DEBUG_ACTION': 'VK_DBG_LAYER_ACTION_LOG_MSG',
+               'VK_LAYER_REPORT_FLAGS': 'error,warn'}
+        if logs is not None:
+            env['VK_LAYER_LOG_FILENAME'] = str(Path(logs) / 'vvl.log')
+        return env
+    if keys.get('mode') != 'stub':
+        return {}
+    order = {w.strip() for w in keys.get('backend', '').split(',')}
+    if keys.get('backend') != 'vulkan':
+        if order & {'vulkan', 'auto'} and keys.get('validate') == '1':
+            return {'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation'}
+        return {}
+    env = {'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation'}
+    if os.environ.get('A2TEST_VULKAN_GPU') != '1':
+        env.update(VK_DRIVER_FILES=LAVAPIPE_ICD, VK_ICD_FILENAMES=LAVAPIPE_ICD)
+    return env
 
 
 class Session:
@@ -207,9 +254,35 @@ class Session:
 
     # ------------------------------------------------------------------ clone + prepare
 
+    def starts_from_stock(self):
+        """`--mod stock` and `--install` (and so `--assets none`) start from stock."""
+        return self.s['mod'] == 'stock' or bool(self.s.get('installs'))
+
     def clone(self):
         t = time.time()
-        for src, dst in ((config.GAME, self.game_dir), (config.PREFIX, self.prefix_dir)):
+        pairs = [(config.GAME, self.game_dir), (config.PREFIX, self.prefix_dir)]
+        # A stock start takes the game from the stock cache (bench/stockcache.py): the
+        # install with `a2mod stock` already run, made once per state of the install.
+        self.s['stock_cache'] = None
+        if self.starts_from_stock() and stockcache.enabled():
+            if not config.GAME.is_dir():
+                raise GameError(f'no {config.GAME}')
+            try:
+                info = stockcache.clone_stock(self.game_dir)
+            except stockcache.StockCacheError as e:
+                shutil.rmtree(self.game_dir, ignore_errors=True)
+                self.log.action(f'stock cache not used: {str(e).splitlines()[0]}', status='warn',
+                                detail=str(e))
+            else:
+                pairs = pairs[1:]
+                self.s['stock_cache'] = {k: info[k] for k in ('key', 'built', 'built_now', 'build_seconds')}
+                self.s['stock_cache_log'] = info['log']
+                self.log.action(
+                    f"stock game from the stock cache {info['key']}"
+                    + (f" (built now, in {info['build_seconds']:.1f}s)" if info['built_now']
+                       else f" (built {info['built']})"),
+                    detail=f"{stockcache.ROOT / info['key'] / 'game'} -> {self.game_dir}")
+        for src, dst in pairs:
             if not src.is_dir():
                 raise GameError(f'no {src}')
             r = subprocess.run(['cp', '-a', '--reflink=always', str(src), str(dst)],
@@ -220,8 +293,9 @@ class Session:
         exc = self.game_dir / 'exception.txt'
         self.s['exception_mtime'] = exc.stat().st_mtime if exc.exists() else None
         self.save()
-        self.log.action(f'cloned the game and prefix (reflink) in {time.time() - t:.1f}s',
-                        detail=f'{config.GAME} -> {self.game_dir}\n{config.PREFIX} -> {self.prefix_dir}')
+        what = 'the prefix' if self.s.get('stock_cache') else 'the game and prefix'
+        self.log.action(f'cloned {what} (reflink) in {time.time() - t:.1f}s',
+                        detail='\n'.join(f'{a} -> {b}' for a, b in pairs))
 
     def prepare(self):
         w, h = self.res
@@ -236,15 +310,23 @@ class Session:
                    XDG_DATA_HOME=str(self.work / 'xdg'), TMPDIR=str(self.work))
         plog = self.dir / 'logs' / 'prepare.log'
         installs = self.s.get('installs') or []
+        stock = [] if self.s.get('stock_cache') else [[str(config.REPO / 'a2mod'), 'stock']]
+        if self.s.get('stock_cache'):
+            # Already stock: the clone came from the stock cache. Its a2mod output goes in
+            # the log where the step's own would have been.
+            with open(plog, 'a') as f:
+                f.write(f"$ a2mod stock  (stock cache {self.s['stock_cache']['key']}, "
+                        f"built {self.s['stock_cache']['built']})\n{self.s.get('stock_cache_log', '')}[cached]\n\n")
+            self.log.action(f"prepare: a2mod stock, from the stock cache {self.s['stock_cache']['key']}",
+                            detail='logs/prepare.log')
         if self.s['mod'] == 'stock':
-            steps = [[str(config.REPO / 'a2mod'), 'stock']]
+            steps = stock
         elif installs:
             # Checkouts stacked with --install: a known baseline first -- stock, whatever
             # the user's install happens to carry -- then each checkout's ./install, in
             # the order given, into the clone. So what the case shows is those commits
             # and nothing else, and the report names them.
-            steps = [[str(config.REPO / 'a2mod'), 'stock']] + \
-                    [[str(Path(i['path']) / 'install')] for i in installs]
+            steps = stock + [[str(Path(i['path']) / 'install')] for i in installs]
         else:
             # The user's install with this checkout's UI.asi: the UI lays the HUD, menus
             # and cursor out at run time for whatever mode is set, so the install takes
@@ -544,7 +626,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         g = self.game_dir
         for name in ('Menus.log', 'HUD.log', 'QOL.log', 'QOLRules.log', 'GridLayout.log',
                      'BinkProxy.log', 'D3DTrace.log', 'D3D9Probe.log', 'Scene.log', 'Scene.marks', 'Armada2_d3d9.log',
-                     'Render3D.log', 'Stems.log', 'UI.log', 'Online.log'):
+                     'Render3D.log', 'Stems.log', 'UI.log', 'Online.log',
+                     'Display8.log', 'Display8.inventory.tsv', 'Display8.mark'):
             try:
                 (g / name).unlink()
             except FileNotFoundError:
@@ -583,6 +666,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 self.start_stems()
             env['WINEDLLOVERRIDES'] = config.DLL_OVERRIDES + ';winealsa.drv=d;wineoss.drv=d'
             route_wine_audio(self.prefix_dir / 'pfx' / 'user.reg', sink)
+        env.update(vulkan_env(g, self.dir / 'logs'))
         # a marker the watchdog can match whatever pid namespace the game ends up in
         env['PULSE_PROP'] = f'a2test.session={self.s["id"]}'
         env['PIPEWIRE_PROPS'] = f'{{ a2test.session = "{self.s["id"]}" }}'
@@ -909,7 +993,8 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                      'Stems.log', 'Stems.ini',
                      'Menus.ini', 'HUD.ini', 'QOL.log', 'QOL.ini', 'QOLRules.log', 'QOLRules.ini', 'GridLayout.log',
                      'GridLayout.ini', 'dxvk.conf', 'Online.log',
-                     'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini', 'UI.log', 'UI.ini'):
+                     'Online.ini', 'OnlineServer.log', 'Render3D.log', 'Render3D.ini', 'UI.log', 'UI.ini',
+                     'Display8.log', 'Display8.ini', 'Display8.inventory.tsv'):
             if (g / name).exists():
                 shutil.copy2(g / name, dst / name)
         if self.crashed():

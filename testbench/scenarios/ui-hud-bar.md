@@ -13,27 +13,31 @@ the setup takes it out of the clone (an `--install` of `./install` puts it in); 
 loaded the UI's bar stands down. Run with `--install <checkout>` or without: the
 prepare step does not install the grid.
 
-The match is `_enter-instant-action.md`'s: Borg, Warzone. At 1280x720 the first
-Assembler sits at 640,262 and the Nexus at 755,320 (the second Assembler drifts, so
-it is not used). The UI's bar sits at the bottom beside the minimap, the info panel
+The match is `_enter-instant-action.md`'s: Borg, Warzone. At 1280x720 the start view
+is close in on the base, the same whatever the start position: the first Assembler sits
+at the top, at about 890,60 (hovering it names it, "Assembler"), and the Nexus fills the
+right edge, its hull at 1150,300 (the second Assembler, at the top behind the resource
+panel, is not used). The UI's bar sits at the bottom beside the minimap, the info panel
 moved right to make room (HUD.md, "The bottom row"). With every part of the UI on (the
 default since ui-switchon) and the Assembler selected, the top-left cell (Q) is at
 about 250,598 and S (Transport) at 295,643; the Nexus's AI menu is opened by its key,
 E.
 `UI.log` names each layout ("bar: menu=0 ... | Q=build ...") and each press ("bar:
-click build", "bar: key S=bmining"). A click on the bar is the UI's, so the Assembler
-stays selected through it (capture).
+click build", "bar: key S=bmining"), and the placement's footprint, which the UI draws
+in the engine's place ("leftovers: build footprint at", HUD.md, "The engine's last
+draws"; with Display8's stub nothing else would draw it). A click on the bar is the
+UI's, so the Assembler stays selected through it (capture).
 
 1. Include "_enter-instant-action".
 2. Expect "UI.log" contains "bar: ours".
 3. Expect "UI.log" not contain "standing down".
-4. Click at 640,262.
+4. Click at 890,60.
 5. Wait 1 second.
 6. Expect "UI.log" contains "Q=build W=order E=form R=aiMenu A=stop S=transport Z=gtracbm".
 7. Move the mouse to 295,643.
 8. Wait 2 seconds.
 9. Take a screenshot called "top level".
-10. Check that at the bottom, between the minimap and the info panel, there is one dark rounded panel holding a grid of square icon buttons, each with a small yellow letter in its top-left corner (Q W E R in the top row, A S in the middle, Z at the bottom), that a tooltip box reading "Transport" is shown above it, and that there is no other row of command buttons anywhere on the screen.
+10. Check that at the bottom, between the minimap (the grey-blue square at the bottom left, under its SHIPS and STATIONS buttons) and the info panel (the Assembler's name and gauges), there is one dark panel holding a grid of square icon buttons, each with a small yellow letter in its top-left corner (Q W E R in the top row, A S in the middle, Z at the bottom), that a tooltip box whose text begins "Transport" is shown above it, and that there is no other row of command buttons anywhere on the screen.
 11. Click at 250,598.
 12. Wait 1 second.
 13. Expect "UI.log" contains "bar: click build".
@@ -47,29 +51,30 @@ stays selected through it (capture).
 21. Move the mouse to 900,300.
 22. Wait 1 second.
 23. Expect "UI.log" contains "bar: key S=bmining".
-24. Take a screenshot called "placing".
-25. Check that a building footprint (a square of green or red brackets) follows the cursor.
-26. Click at 900,300.
-27. Wait 2 seconds.
-28. Click at 755,320.
-29. Wait 1 second.
-30. Expect "UI.log" contains "Q=build W=order E=aiMenu A=recrew S=transport D=rally".
-31. Press w.
-32. Wait 1 second.
-33. Expect "UI.log" contains "bar: key W=order".
-34. Press g.
-35. Wait 1 second.
-36. Expect "UI.log" contains "bar: key G=back".
-37. Press e.
-38. Wait 1 second.
-39. Expect "UI.log" contains "bar: key E=aiMenu".
-40. Press g.
-41. Wait 1 second.
-42. Press Return.
-43. Type "vvv".
-44. Press Return.
-45. Wait 1 second.
-46. Expect "UI.log" not contain "key V".
-47. Expect the game is still running.
-48. Quit the game.
-49. Expect no crash.
+24. Expect "UI.log" contains "leftovers: build footprint at".
+25. Take a screenshot called "placing".
+26. Check that a placement is shown in the 3D view: a translucent ghost of the station near 900,300, on a footprint drawn on the map's plane, a large glowing square outline of thick corner brackets (red where the place is blocked, green where it is clear) over a yellow grid of cells; at this zoom the footprint can run off the screen's edges.
+27. Click at 900,300.
+28. Wait 2 seconds.
+29. Click at 1150,300.
+30. Wait 1 second.
+31. Expect "UI.log" contains "Q=build W=order E=aiMenu A=recrew S=transport D=rally".
+32. Press w.
+33. Wait 1 second.
+34. Expect "UI.log" contains "bar: key W=order".
+35. Press g.
+36. Wait 1 second.
+37. Expect "UI.log" contains "bar: key G=back".
+38. Press e.
+39. Wait 1 second.
+40. Expect "UI.log" contains "bar: key E=aiMenu".
+41. Press g.
+42. Wait 1 second.
+43. Press Return.
+44. Type "vvv".
+45. Press Return.
+46. Wait 1 second.
+47. Expect "UI.log" not contain "key V".
+48. Expect the game is still running.
+49. Quit the game.
+50. Expect no crash.

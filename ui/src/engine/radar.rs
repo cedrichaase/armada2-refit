@@ -757,11 +757,12 @@ pub fn functions_stock() -> bool {
 
 // ---- the engine's textures and strings ----------------------------------------------
 
-/// The Direct3D 9 texture behind an `ST3D_Texture`, and its size: its per-device
+/// The texture behind an `ST3D_Texture`, to sample, and its size: its per-device
 /// texture (`+0x40 + device index * 4`, the index at `Storm3D+0xc0`), whose `+4` is the
-/// `IDirect3DTexture8`, which d3d8to9 answers for its `IDirect3DTexture9`
-/// (render3d/README.md reads the fog's the same way).
-pub fn d3d9_texture(st3d_tex: usize) -> Option<(crate::d3d::Com, u32, u32)> {
+/// `IDirect3DTexture8`, which `gpu` makes a texture of (d3d8to9's `IDirect3DTexture9`
+/// behind it, or Display8's Vulkan mirror; render3d/README.md reads the fog's the same
+/// way).
+pub fn engine_texture(st3d_tex: usize) -> Option<(gpu::Texture, u32, u32)> {
     if st3d_tex == 0 {
         return None;
     }
@@ -770,7 +771,7 @@ pub fn d3d9_texture(st3d_tex: usize) -> Option<(crate::d3d::Com, u32, u32)> {
         return None;
     }
     let t8 = field(field(st3d_tex, 0x40 + idx * 4), 4);
-    let c = crate::d3d::query(t8 as *mut core::ffi::c_void, &crate::d3d::IID_TEXTURE9)?;
+    let c = crate::gfx::gpu().engine_texture(t8 as *mut core::ffi::c_void)?;
     let (w, h) = unsafe { (rd::<u32>(st3d_tex + TEX_W), rd::<u32>(st3d_tex + TEX_H)) };
     Some((c, w, h))
 }

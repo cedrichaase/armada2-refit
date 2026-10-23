@@ -14,6 +14,7 @@ path = "src/lib.rs"
 [dependencies]
 libm = "0.2"
 a2fmt = { path = "a2fmt" }
+gpu = { path = "../gpu" }
 
 [profile.release]
 panic = "abort"

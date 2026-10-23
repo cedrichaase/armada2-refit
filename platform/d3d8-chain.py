@@ -16,6 +16,11 @@
 --use keeps GOG's d3d8.dll as d3d8.dll.gog-backup the first time it replaces it, and
 refuses to replace a d3d8.dll it cannot identify.
 
+With Display8 (display/: the game's d3d8.dll of ours, in front of the real chain) in
+the game directory, the chain's own d3d8.dll is d3d8_real.dll behind it: every option
+here reads and writes that slot instead, and keeps d3d8.dll.a2display-backup (what
+`a2mod stock` puts back) the same file.
+
 WHY THIS EXISTS
 
 SETUP.md (now platform/README.md) recorded that `syswow64/d3d8.dll` at 320548 bytes was "DXVK's exact size" and
@@ -33,7 +38,10 @@ it found.  A chain member that cannot be identified is reported as unknown rathe
 guessed at.
 
 Heroic must be CLOSED: switching the chain also sets `autoInstallDxvk`, and Heroic
-rewrites GamesConfig on exit.
+rewrites GamesConfig on exit. Heroic's config is A2_HEROIC (a2env): the native
+package's ~/.config/heroic or the Flatpak's
+~/.var/app/com.heroicgameslauncher.hgl/config/heroic. The DXVK builds Heroic keeps
+under tools/dxvk/ are recognised from both.
 """
 import hashlib
 import json
@@ -48,7 +56,7 @@ GAME = a2env.GAME
 PREFIX = a2env.PREFIX
 SYSWOW = os.path.join(PREFIX, 'pfx/drive_c/windows/syswow64')
 PROTON = os.path.join(a2env.PROTON, 'files/lib/wine')
-CONFIG_DIR = os.path.expanduser('~/.config/heroic/GamesConfig')
+CONFIG_DIR = os.path.join(a2env.HEROIC, 'GamesConfig')
 BACKUP_SUFFIX = '.a2chain-backup'
 # GOG's d3d8.dll (its d3d8to9 translator) as the GOG release ships it. Known by hash so
 # that it is recognised, and backed up, before anything has ever replaced it.
@@ -59,6 +67,40 @@ GOG_BACKUP = os.path.join(GAME, 'd3d8.dll.gog-backup')
 D3D8TO9 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        'vendor/d3d8to9-1.16.0/d3d8.dll')
 D3D8TO9_SHA = '122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8'
+
+
+# Display8 is our own build, so it is known by what it says, not by a hash that changes
+# with every build: the panic message every version carries.
+DISPLAY8_MARK = b'Display8 stopped the game'
+DISPLAY_BACKUP = os.path.join(GAME, 'd3d8.dll.a2display-backup')
+
+
+def is_display8(path):
+    try:
+        with open(path, 'rb') as fh:
+            return DISPLAY8_MARK in fh.read()
+    except OSError:
+        return False
+
+
+def slot():
+    """The game directory's d3d8.dll as the chain sees it: d3d8_real.dll when Display8
+    stands in front of it, else d3d8.dll itself."""
+    gamed8 = os.path.join(GAME, 'd3d8.dll')
+    if is_display8(gamed8):
+        return os.path.join(GAME, 'd3d8_real.dll')
+    return gamed8
+
+
+def slot_written():
+    """After the chain's slot changed behind Display8: the backup a2mod restores in
+    stock follows it."""
+    real = os.path.join(GAME, 'd3d8_real.dll')
+    if is_display8(os.path.join(GAME, 'd3d8.dll')):
+        if os.path.exists(real):
+            shutil.copy2(real, DISPLAY_BACKUP)
+        elif os.path.exists(DISPLAY_BACKUP):
+            os.remove(DISPLAY_BACKUP)
 
 
 def sha(path):
@@ -77,14 +119,20 @@ def candidates():
         'DXVK d3d8 (proton)': os.path.join(PROTON, 'dxvk/i386-windows/d3d8.dll'),
         'DXVK d3d9 (proton)': os.path.join(PROTON, 'dxvk/i386-windows/d3d9.dll'),
     }
-    heroic = os.path.expanduser('~/.config/heroic/tools/dxvk')
-    latest = os.path.join(heroic, 'latest_dxvk')
-    if os.path.exists(latest):
-        name = open(latest).read().strip()
-        for api in ('d3d8', 'd3d9'):
-            p = os.path.join(heroic, name, 'x32', api + '.dll')
-            if os.path.exists(p):
-                c['DXVK %s (heroic %s)' % (api, name)] = p
+    # Every DXVK build Heroic keeps (tools/dxvk/dxvk-<version>/), native and Flatpak:
+    # latest_dxvk names only the newest, and the one in the game may be older.
+    for root in a2env.heroic_roots():
+        heroic = os.path.join(root, 'tools/dxvk')
+        flatpak = ' flatpak' if root == a2env.HEROIC_FLATPAK else ''
+        try:
+            names = sorted(os.listdir(heroic))
+        except OSError:
+            continue
+        for name in names:
+            for api in ('d3d8', 'd3d9'):
+                p = os.path.join(heroic, name, 'x32', api + '.dll')
+                if os.path.isfile(p):
+                    c.setdefault('DXVK %s (heroic%s %s)' % (api, flatpak, name), p)
     return {k: v for k, v in c.items() if os.path.exists(v)}
 
 
@@ -96,6 +144,8 @@ def identify(path):
         return 'GOG d3d8to9'
     if h == D3D8TO9_SHA:
         return 'd3d8to9 1.16.0 (vendored)'
+    if is_display8(path):
+        return 'Display8 (ours: display/)'
     for name, cand in candidates().items():
         if sha(cand) == h:
             return name
@@ -107,7 +157,12 @@ def heroic_running():
 
 
 def find_config():
-    for name in sorted(os.listdir(CONFIG_DIR)):
+    try:
+        names = sorted(os.listdir(CONFIG_DIR))
+    except OSError:
+        raise SystemExit('no Heroic config: %s does not exist (A2_HEROIC sets where '
+                         'Heroic keeps it)' % CONFIG_DIR)
+    for name in names:
         if not name.endswith('.json'):
             continue
         path = os.path.join(CONFIG_DIR, name)
@@ -118,7 +173,7 @@ def find_config():
         for key, val in data.items():
             if isinstance(val, dict) and 'Armada' in str(val.get('winePrefix', '')):
                 return path, data, key
-    raise SystemExit('no Heroic config found for an Armada II prefix')
+    raise SystemExit('no Heroic config found for an Armada II prefix in %s' % CONFIG_DIR)
 
 
 ENV_KEY = 'enviromentOptions'          # Heroic's typo; matching it is required
@@ -187,10 +242,14 @@ def set_auto_dxvk(value):
 
 
 def status():
-    gamed8 = os.path.join(GAME, 'd3d8.dll')
+    gamed8 = slot()
     gamed9 = os.path.join(GAME, 'd3d9.dll')
     print('GAME DIR (searched first by Wine -- the durable slot)')
-    print('    d3d8.dll   %s' % identify(gamed8))
+    if is_display8(os.path.join(GAME, 'd3d8.dll')):
+        print('    d3d8.dll   Display8 (ours: display/), in front of:')
+        print('    d3d8_real.dll %s' % identify(gamed8))
+    else:
+        print('    d3d8.dll   %s' % identify(gamed8))
     print('    d3d9.dll   %s' % (identify(gamed9)
                                  if os.path.exists(gamed9) else '(absent)'))
     if os.path.exists(GOG_BACKUP):
@@ -200,9 +259,10 @@ def status():
     print('    d3d9.dll   %s' % identify(os.path.join(SYSWOW, 'd3d9.dll')))
     try:
         path, data, key = find_config()
-        print('autoInstallDxvk    %s' % data[key].get('autoInstallDxvk'))
-    except SystemExit:
-        pass
+        print('HEROIC %s' % path)
+        print('    autoInstallDxvk  %s' % data[key].get('autoInstallDxvk'))
+    except SystemExit as exc:
+        print('HEROIC %s' % exc)
 
     # What the game actually gets is the game-directory d3d8, because of the
     # d3d8=n,b override plus Wine's application-directory-first search -- or, with
@@ -243,7 +303,7 @@ def _place(src, dst):
 
 def install(which):
     """which: dxvk, d3d8to9, gog, wine, or stock (--revert)."""
-    gamed8 = os.path.join(GAME, 'd3d8.dll')
+    gamed8 = slot()
     gamed9 = os.path.join(GAME, 'd3d9.dll')
 
     # Never replace or remove a d3d8.dll that is not one of ours to switch between:
@@ -333,6 +393,7 @@ def install(which):
             _place(GOG_BACKUP, gamed8)
         _place(dxvk9, gamed9)
 
+    slot_written()
     print()
     status()
 
@@ -347,7 +408,7 @@ def upgrade():
     in a test-bench clone. Any chain but exactly DXVK's d3d8 on DXVK's d3d9 (GOG's,
     Wine's, one of the player's own) is left alone and named; `--use dxvk` goes back.
     """
-    gamed8 = os.path.join(GAME, 'd3d8.dll')
+    gamed8 = slot()
     gamed9 = os.path.join(GAME, 'd3d9.dll')
     have8 = identify(gamed8)
     have9 = identify(gamed9) if os.path.exists(gamed9) else '(absent)'
@@ -361,6 +422,7 @@ def upgrade():
     if sha(D3D8TO9) != D3D8TO9_SHA:
         raise SystemExit('%s does not match its SOURCE.txt hash' % D3D8TO9)
     _place(D3D8TO9, gamed8)
+    slot_written()
     print('d3d8 chain: DXVK d3d8 -> d3d8to9 1.16.0 on %s (back: platform/d3d8-chain.py '
           '--use dxvk)' % have9)
     return 0

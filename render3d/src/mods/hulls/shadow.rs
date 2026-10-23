@@ -9,22 +9,23 @@
 //! as spheres (`planets()`), as `Lighting.asi` did.
 use super::look::Look;
 use super::{draw, Posed};
-use crate::d3d::*;
 use crate::engine;
 use crate::frame::steps::View;
-use crate::gfx::{Decl, Guard, Shader};
+use crate::gfx::{self, Pipes};
 use crate::math::{v3, V3};
 use crate::scene::{self, Blend};
 use crate::shaders::hulls::*;
+use crate::shaders::hulls_spv::*;
+use crate::shaders::hulls_dxil::*;
 use crate::log;
 use alloc::collections::BTreeMap;
-use core::ffi::c_void;
+use gpu::{Block, ColorTarget, Contents, Depth, DepthTarget, Format, Load, Pass, PipelineDesc, Texture, TextureDesc, Topology, Usage};
 
 /// The shadow map of the view being drawn.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ShadowMap {
     /// R32F: depth 0..1 from the Key, 1 where no hull is. Valid until the next view.
-    pub tex: *mut c_void,
+    pub tex: Texture,
     /// World -> u, v, depth, as rows (x, y, z, w) dotted with (p, 1).
     pub rows: [[f32; 4]; 3],
     /// A texel, in u and v.
@@ -40,12 +41,20 @@ pub struct ShadowMap {
     pub range: f32,
 }
 
+impl ShadowMap {
+    /// The map, to bind.
+    pub fn texture(&self) -> Texture {
+        self.tex.clone()
+    }
+}
+
 static mut CURRENT: Option<ShadowMap> = None;
 static mut PLANETS: [[f32; 4]; 8] = [[0.0; 4]; 8];
 static mut SUN: V3 = v3(0.0, 1.0, 0.0);
 
+#[allow(static_mut_refs)]
 pub fn current() -> Option<ShadowMap> {
-    unsafe { CURRENT }
+    unsafe { CURRENT.clone() }
 }
 
 pub fn clear_current() {
@@ -60,10 +69,9 @@ pub fn planets() -> ([[f32; 4]; 8], V3) {
 const VT_PLANET: usize = 0x6b2b3c;
 
 pub struct Shadow {
-    vs: Shader,
-    ps: Shader,
-    decl: Decl,
-    target: Option<(Com, Com, Com, u32)>,
+    pipes: Pipes,
+    /// The map and its depth buffer, and their size.
+    target: Option<(Texture, Texture, u32)>,
     /// The casters and meshes last logged.
     said: (usize, usize),
     failed: bool,
@@ -71,33 +79,31 @@ pub struct Shadow {
 
 impl Shadow {
     pub fn new() -> Shadow {
-        Shadow { vs: Shader::vertex(&VS_DEPTH), ps: Shader::pixel(&PS_DEPTH), decl: Decl::new(&scene::VERTEX), target: None, said: (0, 0), failed: false }
+        Shadow { pipes: Pipes::new(), target: None, said: (0, 0), failed: false }
     }
 
+    /// Before a `Reset`: the map is a target, which loses what it holds.
     pub fn reset(&mut self) {
         self.target = None;
         self.failed = false;
         clear_current();
     }
 
-    fn targets(&mut self, dev: Device, size: u32) -> Option<(*mut c_void, *mut c_void, *mut c_void)> {
-        if self.target.as_ref().is_none_or(|t| t.3 != size) && !self.failed {
+    fn targets(&mut self, size: u32) -> Option<(Texture, Texture)> {
+        if self.target.as_ref().is_none_or(|t| t.2 != size) && !self.failed {
             self.target = None;
-            let tex = dev.create_texture(size, size, 1, USAGE_RENDERTARGET, FMT_R32F, POOL_DEFAULT);
-            let depth = dev.create_depth_stencil(size, size, FMT_D24X8, 0);
-            match (tex, depth) {
-                (Some(t), Some(d)) => {
-                    let s = t.tex_surface(0)?;
-                    self.target = Some((t, s, d, size));
-                    log!("hulls: shadow map {}x{}", size, size);
-                }
-                _ => {
-                    log!("hulls: no shadow map ({}x{} R32F)", size, size);
-                    self.failed = true;
-                }
+            let g = gfx::gpu();
+            let tex = g.texture(TextureDesc::d2(size, size, Format::R32F, Usage::RENDER_TARGET | Usage::SAMPLED), Contents::None);
+            let depth = g.texture(TextureDesc::d2(size, size, Format::D24X8, Usage::DEPTH), Contents::None);
+            if tex.ready(g) && depth.ready(g) {
+                self.target = Some((tex, depth, size));
+                log!("hulls: shadow map {}x{}", size, size);
+            } else {
+                log!("hulls: no shadow map ({}x{} R32F)", size, size);
+                self.failed = true;
             }
         }
-        self.target.as_ref().map(|t| (t.0.ptr(), t.1.ptr(), t.2.ptr()))
+        self.target.as_ref().map(|t| (t.0.clone(), t.1.clone()))
     }
 
     /// Draws the view's shadow map from its posed hulls, and finds its planets.
@@ -163,38 +169,34 @@ impl Shadow {
             [-vv.x / width, -vv.y / width, -vv.z / width, 0.5 + cv / width],
             [w.x / range, w.y / range, w.z / range, -z0 / range],
         ];
-        let dev = v.dev;
-        let Some((tex, surf, depth)) = self.targets(dev, size) else { return };
-        let _g = Guard::new(dev);
-        if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+        let Some((tex, depth)) = self.targets(size) else { return };
+        // Depth tested and written, no culling, every channel; into the map's R32F and
+        // its depth buffer, one sample.
+        let pipe = self.pipes.own(0, || {
+            let mut d = PipelineDesc::new(gpu::code!(VS_DEPTH, VS_DEPTH_SPV, VS_DEPTH_DXIL), gpu::code!(PS_DEPTH, PS_DEPTH_SPV, PS_DEPTH_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::R32F);
+            d.depth = Depth::TEST_WRITE;
+            d.depth_format = Some(Format::D24X8);
+            d
+        });
+        if !pipe.ready(gfx::gpu()) {
             return;
         }
-        let (Some(rt0), ds0) = (dev.get_render_target(0), dev.get_depth_stencil()) else { return };
-        let vp0 = dev.get_viewport();
-        dev.set_render_target(0, surf);
-        dev.set_depth_stencil(depth);
-        dev.set_viewport(&Viewport { x: 0, y: 0, w: size, h: size, min_z: 0.0, max_z: 1.0 });
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let cmd = &mut cmd;
+        let vp0 = gfx::gpu().engine_viewport();
         // Depth 1 (no hull) everywhere; R32F clears from the colour's red.
-        dev.clear(&[], CLEAR_TARGET | CLEAR_ZBUFFER, 0xffff_ffff, 1.0, 0);
-        for (s, val) in [
-            (RS_ZENABLE, 1), (RS_ZWRITEENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ALPHABLENDENABLE, 0),
-            (RS_ALPHATESTENABLE, 0), (RS_CULLMODE, CULL_NONE), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
-            (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_MULTISAMPLEANTIALIAS, 0),
-        ] {
-            dev.set_rs(s, val);
+        let colors = [ColorTarget::new(&tex, Load::Clear([1.0; 4]))];
+        if !cmd.begin_pass(&Pass { colors: &colors, depth: Some(DepthTarget { texture: &depth, load: Load::Clear(1.0) }), area: None }) {
+            return;
         }
-        dev.set_stream_freq(0, 1);
-        // The cut-out meshes' textures (their alpha only).
-        dev.set_ss(0, SAMP_ADDRESSU, TADDRESS_WRAP);
-        dev.set_ss(0, SAMP_ADDRESSV, TADDRESS_WRAP);
-        dev.set_ss(0, SAMP_MAGFILTER, TEXF_LINEAR);
-        dev.set_ss(0, SAMP_MINFILTER, TEXF_LINEAR);
-        dev.set_ss(0, SAMP_MIPFILTER, TEXF_LINEAR);
+        cmd.set_pipeline(&pipe);
         let mut vk = [0.0f32; 4 * 10];
         for r in 0..3 {
             vk[8 + r * 4..12 + r * 4].copy_from_slice(&rows[r]);
         }
-        dev.vs_const(17, &[1.0 / size as f32, 0.0, 0.0, 0.0]);
+        cmd.vs_block(Block::new(17, &[1.0 / size as f32, 0.0, 0.0, 0.0]));
+        // The cut-out meshes' textures (their alpha only).
+        cmd.set_sampler(0, &scene::SAMPLER);
         let mut parts = 0;
         for p in &casters {
             let mut k = vk;
@@ -202,7 +204,7 @@ impl Shadow {
                 k[0..4].copy_from_slice(&[wp.n.x, wp.n.y, wp.n.z, wp.d]);
                 k[4..8].copy_from_slice(&[wp.s1, wp.o, 1.0, 0.0]);
             }
-            dev.vs_const(8, &k[..20]);
+            cmd.vs_block(Block::new(8, &k[..20]));
             // The faces the instance draws (construction); a model that is no
             // instance's (the menu scene) draws them all.
             let limit = if p.inst == 0 { -1 } else { engine::field(p.inst, 0x10) as i32 };
@@ -221,28 +223,25 @@ impl Shadow {
                 if faces_left <= 0 {
                     break;
                 }
-                let tex = if cut { part.texture.as_deref().and_then(|t| crate::assets::texture(dev, t)).unwrap_or(core::ptr::null_mut()) } else { core::ptr::null_mut() };
-                dev.set_texture(0, tex);
+                let t = if cut { part.texture.as_deref().and_then(crate::assets::texture) } else { None };
+                cmd.bind_texture(0, t.as_ref(), &scene::SAMPLER);
                 let world = p.pose.world[part.node];
-                dev.vs_const(0, world.to_m4().transpose().as_floats());
-                dev.set_stream(0, part.vb.ptr(), 0, 32);
-                dev.set_indices(part.ib.ptr());
+                cmd.vs_block(Block::new(0, world.to_m4().transpose().as_floats()));
                 for g in &part.groups {
                     let tris = (g.tris as i64).min(faces_left) as u32;
                     if tris == 0 {
                         break;
                     }
-                    dev.ps_const(0, &[if cut && !g.self_illum && !tex.is_null() { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0]);
+                    cmd.ps_block(Block::new(0, &[if cut && !g.self_illum && t.is_some() { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0]));
                     faces_left -= tris as i64;
-                    dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, tris);
+                    part.draw(cmd, g.start, tris);
                 }
                 parts += 1;
             }
         }
-        dev.set_texture(0, core::ptr::null_mut());
-        dev.set_render_target(0, rt0.ptr());
-        dev.set_depth_stencil(ds0.as_ref().map_or(core::ptr::null_mut(), |d| d.ptr()));
-        dev.set_viewport(&vp0);
+        cmd.bind_texture(0, None, &scene::SAMPLER);
+        cmd.end_pass();
+        gfx::view_pass(cmd, v, vp0);
         let texel = 1.0 / size as f32;
         unsafe {
             CURRENT = Some(ShadowMap {

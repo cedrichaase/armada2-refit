@@ -18,13 +18,15 @@
 //!   `ScaleSOD`; `AsteroidFieldInstance::RenderInternal` draws each rock its distance
 //!   cull keeps.
 use super::surfaces::{self, Surfaces};
-use crate::d3d::*;
 use crate::engine::{self, field, field_f32, field_m34, field_u8, obj, rd};
 use crate::frame::steps::View;
-use crate::gfx::{self, Decl, Shader};
+use crate::gfx::{self, Pipes};
+use gpu::{attr, AttrFormat, Blend, Block, Compare, Cull, Depth, Format, Pipeline, PipelineDesc, Semantic, Topology, VertexAttr};
 use crate::math::{M34, V3, v3};
 use crate::scene::{self, pose, Model};
 use crate::shaders::world_rock::*;
+use crate::shaders::world_rock_spv::*;
+use crate::shaders::world_rock_dxil::*;
 use crate::{assets, log, rt};
 use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
@@ -77,11 +79,10 @@ struct SVert {
     uv: [f32; 2],
 }
 
-static SPRITE_DECL: [VertexElement; 4] = [
-    ve(0, 0, DECLTYPE_FLOAT3, DECLUSAGE_POSITION, 0),
-    ve(0, 12, DECLTYPE_FLOAT4, DECLUSAGE_COLOR, 0),
-    ve(0, 28, DECLTYPE_FLOAT2, DECLUSAGE_TEXCOORD, 0),
-    VE_END,
+static SPRITE_LAYOUT: [VertexAttr; 3] = [
+    attr(0, AttrFormat::Float3, Semantic::Position, 0),
+    attr(12, AttrFormat::Float4, Semantic::Color, 0),
+    attr(28, AttrFormat::Float2, Semantic::TexCoord, 0),
 ];
 
 /// A glow shell waiting for the translucent step.
@@ -93,18 +94,11 @@ struct Glow {
 }
 
 pub struct Rocks {
-    vs: Shader,
-    ps: Shader,
-    flat: Shader,
-    decl: Decl,
+    pipes: Pipes,
     info: BTreeMap<String, Info>,
     scales: BTreeMap<String, f32>,
     glows: Vec<Glow>,
     sprites: Vec<Spr>,
-    svs: Shader,
-    sps: Shader,
-    sdecl: Decl,
-    svb: gfx::DynVb,
     look: Look,
     said: u32,
 }
@@ -162,18 +156,11 @@ impl Look {
 impl Rocks {
     pub fn new() -> Rocks {
         Rocks {
-            vs: Shader::vertex(&VS_ROCK),
-            ps: Shader::pixel(&PS_ROCK),
-            flat: Shader::pixel(&PS_FLAT),
-            decl: Decl::new(&scene::VERTEX),
+            pipes: Pipes::new(),
             info: BTreeMap::new(),
             scales: BTreeMap::new(),
             glows: Vec::new(),
             sprites: Vec::new(),
-            svs: Shader::vertex(&VS_RSPRITE),
-            sps: Shader::pixel(&PS_RSPRITE),
-            sdecl: Decl::new(&SPRITE_DECL),
-            svb: gfx::DynVb::new(16 * 1024),
             look: Look::read(),
             said: 0,
         }
@@ -187,7 +174,6 @@ impl Rocks {
     pub fn reset(&mut self) {
         self.glows.clear();
         self.sprites.clear();
-        self.svb.reset();
     }
 
     fn note(&mut self, bit: u32, what: &str) {
@@ -249,7 +235,7 @@ impl Rocks {
         if name.is_empty() {
             return false;
         }
-        let Some(model) = scene::model(v.dev, &crate::assets::sod_of(name)) else { return false };
+        let Some(model) = scene::model(&crate::assets::sod_of(name)) else { return false };
         // Only a scrap with a surface from a recipe (the dilithium moons): any other is
         // the hulls module's (or the engine's), drawn as any plain SOD.
         if !self.info(&model, surf).surface {
@@ -396,7 +382,7 @@ impl Rocks {
             if engine::field_u8(a, 0x84) != 0 || (d.x * d.x + d.y * d.y / 16.0 + d.z * d.z) > limit * limit {
                 continue;
             }
-            let Some(model) = scene::model(v.dev, nm) else { continue };
+            let Some(model) = scene::model(nm) else { continue };
             let mut world = world0;
             world.r[0] = world.r[0] * scale;
             world.r[1] = world.r[1] * scale;
@@ -416,8 +402,10 @@ impl Rocks {
             scene::draw(v, model, p, &scene::Params::default());
             return;
         }
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let cmd = &mut cmd;
+        // Every light near it, per pixel, from the view's clusters (Vulkan, Direct3D 12).
+        let rock = if scene::clusters::on() && self.pipe(ROCK_CL, Cull::None).is_some_and(|p| p.ready(gfx::gpu())) && scene::clusters::bind(cmd, v) { ROCK_CL } else { ROCK };
         let mut plain = false;
         let mut fallback: Vec<usize> = Vec::new();
         for pi in 0..model.parts.len() {
@@ -433,18 +421,16 @@ impl Rocks {
                         // As Lighting.asi drew it (a hull, lit from inside its rock): dark,
                         // opaque. Through the rock's cracks it shows black, and the nimbus
                         // behind the moon only where a crack opens past its edge.
-                        if !(self.vs.bind(dev) && self.flat.bind(dev) && self.decl.bind(dev)) {
+                        let cull = if part.two_sided { Cull::None } else { Cull::Clockwise };
+                        let Some(pipe) = self.pipe(FLAT, cull) else { continue };
+                        if !cmd.set_pipeline(&pipe) {
                             continue;
                         }
-                        begin_states(dev);
-                        dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else { CULL_CW });
-                        dev.vs_const(0, world.to_m4().transpose().as_floats());
-                        dev.vs_const(4, &gfx::vp_constants(v));
-                        dev.ps_const(0, &[self.look.ambient[0], self.look.ambient[1], self.look.ambient[2], 1.0]);
-                        dev.set_stream(0, part.vb.ptr(), 0, 32);
-                        dev.set_indices(part.ib.ptr());
+                        cmd.vs_block(Block::new(0, world.to_m4().transpose().as_floats()));
+                        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
+                        cmd.ps_block(Block::new(0, &[self.look.ambient[0], self.look.ambient[1], self.look.ambient[2], 1.0]));
                         for g in &part.groups {
-                            dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
+                            part.draw(cmd, g.start, g.tris);
                         }
                     } else if let Some(c) = glow {
                         self.glows.push(Glow { model: model.clone(), part: pi, world, colour: c });
@@ -453,18 +439,23 @@ impl Rocks {
                 Kind::Surface => {
                     let tex = part.texture.clone().unwrap_or_default();
                     let ext = self.info[&model.name].ext[pi];
-                    let Some(s) = surf.get(dev, &tex, v.time) else {
+                    if surf.get(cmd, v, &tex).is_none() {
                         // No surface now (Surfaces=0, or the bake failed): the stock texture.
                         fallback.push(pi);
                         plain = true;
                         continue;
-                    };
-                    if !(self.vs.bind(dev) && self.ps.bind(dev) && self.decl.bind(dev)) {
+                    }
+                    let w = &world;
+                    let mirrored = w.det3() < 0.0;
+                    let cull = if part.two_sided { Cull::None } else if mirrored { Cull::CounterClockwise } else { Cull::Clockwise };
+                    let Some(pipe) = self.pipe(rock, cull) else { continue };
+                    if !cmd.set_pipeline(&pipe) {
                         continue;
                     }
-                    self.consts(v, &world, part.centre, part.radius);
-                    surfaces::bind(dev, s, 0, 2);
-                    let w = &world;
+                    let Some(s) = surf.get(cmd, v, &tex) else { continue };
+                    let lk = self.consts(v, &world, part.centre, part.radius);
+                    cmd.ps_block(Block::new(0, &lk));
+                    surfaces::bind(cmd, s, 0, 2);
                     let ctr = w.transform_point(part.centre);
                     // c28..c30 the axes, c31 the centre, c32 the glow, c33 the relief's
                     // strength, the cut and the mapping, c34 the extents and the gloss,
@@ -479,6 +470,7 @@ impl Rocks {
                     k[20..24].copy_from_slice(&[relief_strength(s), 0.0, s.draw[3][2], s.model[0]]);
                     k[24..28].copy_from_slice(&[ext.x, ext.y, ext.z, s.model[1]]);
                     k[32] = 1.0;
+                    let mut lit = false;
                     if let Some(c) = core.filter(|_| s.draw[3][2] > 0.0) {
                         // The cracks lit from inside: no hole, so neither the shell nor the
                         // space behind shows through; the recipe's glow beside them follows
@@ -491,18 +483,16 @@ impl Rocks {
                         k[33] = self.look.crack_core;
                         k[34] = self.look.crack_depth;
                         k[35] = self.look.crack_falloff;
-                        self.note(4, "a moon's cracks lit from inside");
+                        lit = true;
                     }
-                    dev.ps_const(28, &k);
-                    begin_states(dev);
-                    let mirrored = w.det3() < 0.0;
-                    dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else if mirrored { CULL_CCW } else { CULL_CW });
-                    dev.vs_const(0, w.to_m4().transpose().as_floats());
-                    dev.vs_const(4, &gfx::vp_constants(v));
-                    dev.set_stream(0, part.vb.ptr(), 0, 32);
-                    dev.set_indices(part.ib.ptr());
+                    cmd.ps_block(Block::new(28, &k));
+                    cmd.vs_block(Block::new(0, w.to_m4().transpose().as_floats()));
+                    cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
                     for g in &part.groups {
-                        dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, g.start, g.tris);
+                        part.draw(cmd, g.start, g.tris);
+                    }
+                    if lit {
+                        self.note(4, "a moon's cracks lit from inside");
                     }
                     self.note(1, "a surface from its recipe on a model");
                 }
@@ -510,19 +500,43 @@ impl Rocks {
         }
         if plain {
             // The parts without a recipe: the scene's own draw, of those parts only.
-            if scene::begin(v) {
+            if scene::begin(cmd, v) {
                 for pi in 0..model.parts.len() {
                     let part = &model.parts[pi];
                     if (self.info[&model.name].kinds[pi] == Kind::Plain || fallback.contains(&pi)) && p.shown.get(part.node).copied().unwrap_or(false) {
-                        scene::draw_part(v, model, pi, &p.world[part.node], &scene::Params::default());
+                        scene::draw_part(cmd, v, model, pi, &p.world[part.node], &scene::Params::default());
                     }
                 }
             }
         }
     }
 
+    /// A rock's pipeline: `kind` (`FLAT`, `ROCK`, `GLOW`, `SPRITE_ADD`, `SPRITE_ALPHA`)
+    /// and its cull. All depth-tested against the scene; the glow shells and sprites
+    /// write no depth.
+    fn pipe(&mut self, kind: u64, cull: Cull) -> Option<Pipeline> {
+        self.pipes.view(kind * 4 + cull as u64, || {
+            let (vs, ps, layout, stride): (gpu::Code, gpu::Code, &'static [VertexAttr], u32) = match kind {
+                FLAT | GLOW => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_FLAT, PS_FLAT_SPV, PS_FLAT_DXIL), &scene::VERTEX, 32),
+                ROCK => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK, PS_ROCK_SPV, PS_ROCK_DXIL), &scene::VERTEX, 32),
+                ROCK_CL => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK_CL, PS_ROCK_CL_SPV, PS_ROCK_CL_DXIL), &scene::VERTEX, 32),
+                _ => (gpu::code!(VS_RSPRITE, VS_RSPRITE_SPV, VS_RSPRITE_DXIL), gpu::code!(PS_RSPRITE, PS_RSPRITE_SPV, PS_RSPRITE_DXIL), &SPRITE_LAYOUT, 36),
+            };
+            let mut d = PipelineDesc::new(vs, ps, layout, stride, Topology::TriangleList, Format::Unknown);
+            let write = matches!(kind, FLAT | ROCK | ROCK_CL);
+            d.depth = Depth { test: true, write, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
+            d.cull = cull;
+            d.blend = match kind {
+                GLOW | SPRITE_ADD => Some(Blend::ADD),
+                SPRITE_ALPHA => Some(Blend::ALPHA),
+                _ => None,
+            };
+            d
+        })
+    }
+
     /// The lights and the look (c0..c27).
-    fn consts(&self, v: &View, world: &M34, centre: V3, radius: f32) {
+    fn consts(&self, v: &View, world: &M34, centre: V3, radius: f32) -> [f32; 28 * 4] {
         let mut k = [0.0f32; 28 * 4];
         let ls = scene::lights();
         k[0..3].copy_from_slice(&self.look.ambient);
@@ -541,7 +555,7 @@ impl Rocks {
             k[(12 + i) * 4..(12 + i) * 4 + 4].copy_from_slice(&[p.pos.x, p.pos.y, p.pos.z, p.start]);
             k[(20 + i) * 4..(20 + i) * 4 + 4].copy_from_slice(&[p.colour.x, p.colour.y, p.colour.z, p.range]);
         }
-        v.dev.ps_const(0, &k);
+        k
     }
 
     /// At the translucent step: the glow shells, added, writing no depth.
@@ -556,29 +570,21 @@ impl Rocks {
         }
         let mut sprites = core::mem::take(&mut self.sprites);
         sprites.sort_by(|a, b| b.depth.partial_cmp(&a.depth).unwrap_or(core::cmp::Ordering::Equal));
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.svs.bind(dev) && self.sps.bind(dev) && self.sdecl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        let (Some(add), Some(alpha)) = (self.pipe(SPRITE_ADD, Cull::None), self.pipe(SPRITE_ALPHA, Cull::None)) else { return };
+        if !(add.ready(gfx::gpu()) && alpha.ready(gfx::gpu())) {
             return;
         }
-        begin_states(dev);
-        dev.set_rs(RS_CULLMODE, CULL_NONE);
-        dev.set_rs(RS_ZWRITEENABLE, 0);
-        dev.set_rs(RS_ALPHABLENDENABLE, 1);
-        dev.vs_const(4, &gfx::vp_constants(v));
-        for (st, val) in [(SAMP_ADDRESSU, TADDRESS_WRAP), (SAMP_ADDRESSV, TADDRESS_WRAP), (SAMP_MAGFILTER, TEXF_LINEAR), (SAMP_MINFILTER, TEXF_LINEAR), (SAMP_MIPFILTER, TEXF_LINEAR), (SAMP_SRGBTEXTURE, 0)] {
-            dev.set_ss(0, st, val);
-        }
+        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
         for q in &sprites {
-            dev.set_rs(RS_SRCBLEND, if q.add { BLEND_ONE } else { BLEND_SRCALPHA });
-            dev.set_rs(RS_DESTBLEND, if q.add { BLEND_ONE } else { BLEND_INVSRCALPHA });
-            dev.ps_const(0, &[if q.add { 0.0 } else { 1.0 }, 0.0, 0.0, 0.0]);
-            dev.set_texture(0, assets::texture(dev, &q.tex).unwrap_or(core::ptr::null_mut()));
+            cmd.set_pipeline(if q.add { &add } else { &alpha });
+            cmd.ps_block(Block::new(0, &[if q.add { 0.0 } else { 1.0 }, 0.0, 0.0, 0.0]));
+            cmd.bind_texture(0, assets::texture(&q.tex).as_ref(), &scene::SAMPLER);
             let uv = [[q.uv[0], q.uv[1]], [q.uv[2], q.uv[1]], [q.uv[2], q.uv[3]], [q.uv[0], q.uv[3]]];
             let mk = |k: usize| SVert { pos: [q.corners[k].x, q.corners[k].y, q.corners[k].z], col: q.colour, uv: uv[k] };
             let vs = [mk(0), mk(1), mk(2), mk(0), mk(2), mk(3)];
-            if let Some(first) = self.svb.push(dev, &vs, core::mem::size_of::<SVert>() as u32) {
-                dev.draw_primitive(PT_TRIANGLELIST, first, 2);
+            if let Some(s) = cmd.vertices(&vs) {
+                cmd.draw(&s);
             }
         }
         self.note(3, "a moon's sprite nodes");
@@ -589,47 +595,38 @@ impl Rocks {
             return;
         }
         let glows = core::mem::take(&mut self.glows);
-        let dev = v.dev;
-        let _g = gfx::Guard::new(dev);
-        if !(self.vs.bind(dev) && self.flat.bind(dev) && self.decl.bind(dev)) {
+        let Some(mut cmd) = gfx::cmd() else { return };
+        if !self.pipe(GLOW, Cull::None).is_some_and(|p| p.ready(gfx::gpu())) {
             return;
         }
-        begin_states(dev);
-        dev.set_rs(RS_ALPHABLENDENABLE, 1);
-        dev.set_rs(RS_SRCBLEND, BLEND_ONE);
-        dev.set_rs(RS_DESTBLEND, BLEND_ONE);
-        dev.set_rs(RS_ZWRITEENABLE, 0);
-        dev.vs_const(4, &gfx::vp_constants(v));
+        cmd.vs_block(Block::new(4, &gfx::vp_constants(v)));
         for g in &glows {
             let part = &g.model.parts[g.part];
-            dev.set_rs(RS_CULLMODE, if part.two_sided { CULL_NONE } else { CULL_CW });
-            dev.vs_const(0, g.world.to_m4().transpose().as_floats());
-            dev.ps_const(0, &[g.colour.x, g.colour.y, g.colour.z, 1.0]);
-            dev.set_stream(0, part.vb.ptr(), 0, 32);
-            dev.set_indices(part.ib.ptr());
+            let Some(pipe) = self.pipe(GLOW, if part.two_sided { Cull::None } else { Cull::Clockwise }) else { continue };
+            cmd.set_pipeline(&pipe);
+            cmd.vs_block(Block::new(0, g.world.to_m4().transpose().as_floats()));
+            cmd.ps_block(Block::new(0, &[g.colour.x, g.colour.y, g.colour.z, 1.0]));
             for gr in &part.groups {
-                dev.draw_indexed(PT_TRIANGLELIST, 0, 0, part.verts, gr.start, gr.tris);
+                part.draw(&mut cmd, gr.start, gr.tris);
             }
         }
         self.note(2, "a moon's glow shell");
     }
 }
 
+/// The kinds of pipeline (`Rocks::pipe`).
+const FLAT: u64 = 0;
+const ROCK: u64 = 1;
+const GLOW: u64 = 2;
+const SPRITE_ADD: u64 = 3;
+const SPRITE_ALPHA: u64 = 4;
+/// `ROCK`'s clustered twin (`scene::clusters`).
+const ROCK_CL: u64 = 5;
+
 fn relief_strength(s: &surfaces::Surface) -> f32 {
     // Surfaces.asi's k[3].x, the relief's strength in the light ("Depth="), is the
     // tilt's scale for a model too.
     s.draw[3][0]
-}
-
-fn begin_states(dev: Device) {
-    for (s, val) in [
-        (RS_ZENABLE, 1), (RS_ZFUNC, CMP_LESSEQUAL), (RS_ZWRITEENABLE, 1), (RS_FOGENABLE, 0), (RS_STENCILENABLE, 0),
-        (RS_SCISSORTESTENABLE, 0), (RS_COLORWRITEENABLE, 0xf), (RS_FILLMODE, 3), (RS_BLENDOP, BLENDOP_ADD),
-        (RS_SEPARATEALPHABLENDENABLE, 0), (RS_SRGBWRITEENABLE, 0), (RS_ALPHATESTENABLE, 0), (RS_ALPHABLENDENABLE, 0),
-    ] {
-        dev.set_rs(s, val);
-    }
-    dev.set_stream_freq(0, 1);
 }
 
 /// The moon's glow colour as `Scrap::Render` sets it, or None for a Scrap without
