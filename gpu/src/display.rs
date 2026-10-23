@@ -76,6 +76,13 @@
 //! | `display8_dx12_defer` | `fn(f: extern "C" fn(*mut c_void), arg: *mut c_void)` | `f(arg)` once the frame now is done on the GPU |
 //! | `display8_dx12_target` | `fn(which: u32, out: *mut Dx12Image8) -> bool` | `TARGET_COLOR`, `TARGET_DEPTH` |
 //! | `display8_dx12_mirror` | `fn(tex8: *mut c_void, out: *mut Dx12Image8) -> bool` | an engine texture as a sampled texture, kept up to date by Display8 |
+//! | `display8_dx12_flush` | `fn() -> bool` | submits what the frame now has recorded and waits for it; the frame goes on in the same command list (reset, its heaps set again), its ring, descriptors and deferred calls untouched: for a read-back (display 0.6.0) |
+//!
+//! `Dx12Device8::features`, `sampler_anisotropy` and `sampler_lod_bias` (display 0.6.0,
+//! after the fields before them) are as `VkDevice8`'s: `PixelCentres=d3d9`, and the
+//! samplers as the game's `dxvk.conf` has DXVK make them. A frame's descriptors come
+//! back to a recorder only through `display8_dx12_descriptors`, so a set of views a
+//! recorder binds again in the same frame may keep the range it was given.
 //!
 //! `display8_backend`, `display8_engine_viewport` and `display8_engine_transform` are
 //! the same exports on every backend.
@@ -236,6 +243,12 @@ pub struct Dx12Device8 {
     pub heaps: [usize; 2],
     /// Constant-buffer placement alignment (256).
     pub uniform_align: u32,
+    /// `FEATURE_*` (as `VkDevice8::features`; added in display 0.6.0).
+    pub features: u32,
+    /// The anisotropy every linear sampler is given, as `VkDevice8::sampler_anisotropy`.
+    pub sampler_anisotropy: i32,
+    /// The LOD bias of every sampler with mips, as `VkDevice8::sampler_lod_bias`.
+    pub sampler_lod_bias: f32,
 }
 
 /// The frame now.
@@ -313,6 +326,8 @@ pub struct Display8Dx12 {
     pub defer: extern "C" fn(extern "C" fn(*mut c_void), *mut c_void),
     pub target: extern "C" fn(u32, *mut Dx12Image8) -> bool,
     pub mirror: extern "C" fn(*mut c_void, *mut Dx12Image8) -> bool,
+    /// None: a Display8 before 0.6.0, which reads nothing back.
+    pub flush: Option<extern "C" fn() -> bool>,
 }
 
 impl Display8Dx12 {
@@ -332,6 +347,7 @@ impl Display8Dx12 {
                 defer: core::mem::transmute::<usize, extern "C" fn(extern "C" fn(*mut c_void), *mut c_void)>(f("display8_dx12_defer")?),
                 target: core::mem::transmute::<usize, extern "C" fn(u32, *mut Dx12Image8) -> bool>(f("display8_dx12_target")?),
                 mirror: core::mem::transmute::<usize, extern "C" fn(*mut c_void, *mut Dx12Image8) -> bool>(f("display8_dx12_mirror")?),
+                flush: f("display8_dx12_flush").map(|p| core::mem::transmute::<usize, extern "C" fn() -> bool>(p)),
             })
         }
     }

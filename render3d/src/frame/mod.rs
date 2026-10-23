@@ -427,10 +427,10 @@ pub fn menu_frame(rect: PRect, draw: impl FnOnce(u32)) -> bool {
     let Some(cfg) = config::get() else { return false };
     let over = gpu::Viewport { x: rect.x, y: rect.y, w: rect.w, h: rect.h, min_z: 0.0, max_z: 1.0 };
     // On Direct3D 9 the rectangle is the device's viewport while the scene draws (what
-    // the modules read as the engine's); on Vulkan the engine's viewport is Display8's
-    // record, so the pass is given it.
-    let dev = if gfx::gpu().is_vulkan() { None } else { Device::from_d3d8(engine::d3d8_device()) };
-    if dev.is_none() && !gfx::gpu().is_vulkan() {
+    // the modules read as the engine's); on Vulkan and Direct3D 12 the engine's viewport
+    // is Display8's record, so the pass is given it.
+    let dev = if gfx::gpu().on_display() { None } else { Device::from_d3d8(engine::d3d8_device()) };
+    if dev.is_none() && !gfx::gpu().on_display() {
         return false;
     }
     let vp = dev.map(|d| d.get_viewport());

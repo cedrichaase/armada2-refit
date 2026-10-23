@@ -63,6 +63,11 @@ pub extern "C" fn display8_dx12_target(which: u32, out: *mut Dx12Image8) -> bool
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn display8_dx12_flush() -> bool {
+    get().is_some_and(|d| d.flush())
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn display8_dx12_mirror(tex8: *mut c_void, out: *mut Dx12Image8) -> bool {
     if out.is_null() || !crate::stub::obj::is_stub(tex8) {
         return false;

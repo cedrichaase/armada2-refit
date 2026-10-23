@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.19.0 — 2026-10-23
+
+### Added
+- The UI on `gpu`'s Direct3D 12 backend when Display8 draws on Direct3D 12: its
+  pipelines carry their DXIL, and what took Display8's Vulkan device takes either of
+  Display8's own (`gpu::Gpu::on_display`); the log names the backend.
+
+Installed, not yet seen in game.
+
 ## 0.18.0 — 2026-10-23
 
 ### Added

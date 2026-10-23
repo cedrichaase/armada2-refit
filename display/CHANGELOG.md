@@ -4,6 +4,22 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.6.0 — 2026-10-23
+
+### Added
+- `Backend=d3d12`: render3d and the UI draw the whole frame on Display8's Direct3D 12
+  device through `gpu`'s Direct3D 12 backend.
+- `display8_dx12_flush` (submit the frame so far, wait, go on in the same list: a
+  plugin's read-back) and `Dx12Device8::features`, `sampler_anisotropy`,
+  `sampler_lod_bias` (`PixelCentres=d3d9`, the samplers as `dxvk.conf` has DXVK make
+  them), appended to the contract (`gpu/src/display.rs`).
+
+### Changed
+- `display8_backend` answers Direct3D 12 from the engine's `Direct3DCreate8` on, as it
+  does Vulkan.
+
+Installed, not yet seen in game.
+
 ## 0.5.0 — 2026-10-23
 
 ### Added

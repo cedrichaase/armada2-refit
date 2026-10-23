@@ -529,6 +529,13 @@ GPU's (`gpu/README.md`, "Measured"). A whole campaign mission does not load on
 lavapipe on either backend (32-bit address space, likely): run `display-stub` on Vulkan
 with `A2TEST_VULKAN_GPU=1` once the port scenes are clean under the layer.
 
+**Direct3D 12 on the bench** (`Backend=d3d12`) runs through Proton's vkd3d-proton on
+the GPU; there is no CPU driver for it here. With `Validate=1` the game gets the Khronos
+layer under vkd3d-proton, writing `logs/vvl.log` (`vulkan_env`), but its messages do
+not come through the 32-bit winevulkan and vkd3d-proton has no Microsoft debug layer
+(`display/README.md`, "Direct3D 12"): judge a run by its pictures against the GPU's
+baselines.
+
 **What the numbers mean.** Every frame is compared as RGB; an alpha channel is dropped,
 and the report says so.
 

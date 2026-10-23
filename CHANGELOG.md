@@ -19,6 +19,28 @@ Layers: testbench 3.52.0, models 5.0.1.
 
 Installed, not yet seen in game.
 
+## 13.13.0 — 2026-10-23
+
+Layers: display 0.6.0, render3d 0.22.0, ui 0.19.0, testbench 3.53.0.
+
+### Added
+- Phase 6 of the display plan: render3d and the UI draw the whole frame on Display8's
+  Direct3D 12 device (`Backend=d3d12`) through `gpu`'s Direct3D 12 backend, from the
+  DXIL built beside every shader, with alpha-tested twins where a pipeline has an alpha
+  test (display 0.6.0, render3d 0.22.0, ui 0.19.0). Off by default (`Backend=d3d9`).
+- `display8_dx12_flush` and `Dx12Device8::features`, `sampler_anisotropy`,
+  `sampler_lod_bias` in the contract (display 0.6.0).
+- The bench loads the Khronos layer under vkd3d-proton for `Backend=d3d12` with
+  `Validate=1` (testbench 3.53.0).
+
+### Fixed
+- In the DXIL, pixel shaders that left out or reordered their vertex shader's position
+  take it first, as Direct3D 12 links stages by register (render3d 0.22.0).
+
+Measured on the bench against Direct3D 9 on the GPU: showcase RMSE 0.97, nebula 0.39,
+firing 0.41 (/255); `display-stub` (the whole game) passes on Direct3D 12. Installed,
+not yet seen in game.
+
 ## 13.12.0 — 2026-10-23
 
 Layers: display 0.5.0, render3d 0.21.0, ui 0.18.0, testbench 3.51.0.

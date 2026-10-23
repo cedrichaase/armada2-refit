@@ -7,10 +7,11 @@ through the two plugins, and their changelogs say so.
 
 It exists for the display plan: the game's d3d8 device becomes a null stub of ours
 (Display8, `display/`), and render3d and the UI draw the whole frame on Vulkan, then
-Direct3D 12. The interface is shaped for those two and implemented on two backends:
+Direct3D 12. The interface is shaped for those two and implemented on three backends:
 **Direct3D 9**, the device behind the game's d3d8 one (crosire's d3d8to9,
-`platform/D3D9.md`, or Display8's own in its stub mode), and **Vulkan**, Display8's
-device in its stub mode with `Backend=vulkan` ("The Vulkan backend" below). Which one
+`platform/D3D9.md`, or Display8's own in its stub mode), **Vulkan**, Display8's
+device in its stub mode with `Backend=vulkan` ("The Vulkan backend" below), and
+**Direct3D 12**, Display8's with `Backend=d3d12` ("The Direct3D 12 backend"). Which one
 draws is decided at run time, by what Display8 says; the modules see one interface.
 Moving both plugins onto it changed nothing on screen, so each move is judged by pixels
 (the bench's baselines, `testbench/README.md`).
@@ -33,6 +34,9 @@ Moving both plugins onto it changed nothing on screen, so each move is judged by
 | `src/vulkan/tex.rs`, `pipe.rs`, `cmd.rs`, `mem.rs` | its textures, buffers and timestamps; pipelines; `Cmd` and the read-back; device memory in blocks |
 | `src/vulkan/spirv.rs` | what it reads out of dxc's SPIR-V (reflection) and the two patches it makes to a pixel shader; built on the host too by `spirv-selftest.sh` |
 | `shaders/vk_depth.hlsl`, `src/vulkan/shaders.rs` | its own shaders (the depth resolve), SPIR-V by `vk-shaders.sh` |
+| `src/dx12/mod.rs` | the Direct3D 12 backend's `Gpu`: Display8's device opened, the root signature, descriptor heaps of its own, the frame's tables, Display8's textures wrapped |
+| `src/dx12/tex.rs`, `pipe.rs`, `cmd.rs`, `raw.rs` | its textures, buffers and timestamps; pipeline states; `Cmd`, the blits, the depth resolve and the read-back; Direct3D 12 by vtable slot |
+| `shaders/dx12.hlsl`, `src/dx12/shaders.rs` | its own shaders (the depth resolve, the blit), DXIL by `dx12-shaders.sh` |
 
 `gpu::Gpu`, `gpu::Texture` and the rest are `api.rs`'s, re-exported at the crate's
 root.
@@ -41,16 +45,18 @@ root.
 
 **`Gpu`** is the backends' state for one plugin: on Direct3D 9 the device, every
 resource made through it (held weakly, to let go of them when the device goes) and the
-state blocks; on Vulkan Display8's device and what the backend keeps for recording.
-Each plugin keeps one in a static of its own (`ui/src/gfx`, `render3d/src/gfx`), made
-with `Gpu::with_display(log, lookup)`, `lookup` its `GetProcAddress` on `d3d8.dll`, and
-attaches the game's device to it every frame (`attach_engine`: the Direct3D 9 device
-behind the engine's, or Display8's Vulkan one; `engine_id` names it without attaching).
-Nothing in it is per frame. **The backend** is Display8's answer to `display8_backend`,
-asked until it gives one: Vulkan from the engine's `Direct3DCreate8` when the stub runs
-on it, Direct3D 9 otherwise, and Direct3D 9 for good with no Display8, an older one, or
-once the engine has a device and Display8 has said nothing (forward mode). An object
-made before the answer is made for Direct3D 9, and the log says so once.
+state blocks; on Vulkan and Direct3D 12 Display8's device and what the backend keeps
+for recording. Each plugin keeps one in a static of its own (`ui/src/gfx`,
+`render3d/src/gfx`), made with `Gpu::with_display(log, lookup)`, `lookup` its
+`GetProcAddress` on `d3d8.dll`, and attaches the game's device to it every frame
+(`attach_engine`: the Direct3D 9 device behind the engine's, or Display8's own;
+`engine_id` names it without attaching; `on_display` says which). Nothing in it is per
+frame. **The backend** is Display8's answer to `display8_backend`, asked until it gives
+one: Vulkan or Direct3D 12 from the engine's `Direct3DCreate8` when the stub runs on it
+(on Direct3D 12 the backend opens once Display8 has made the device), Direct3D 9
+otherwise, and Direct3D 9 for good with no Display8, an older one, or once the engine
+has a device and Display8 has said nothing (forward mode). An object made before the
+answer is made for Direct3D 9, and the log says so once.
 
 **Resources** are made once from a description and stay valid until the last clone is
 dropped, across `Reset`s and devices. `Gpu::texture(TextureDesc, Contents)` makes a
@@ -355,6 +361,102 @@ textures and nebula volumes fill. So the whole game on Vulkan is a run on the GP
 (`A2TEST_VULKAN_GPU=1`), after the port scenes have come through the validation layer
 clean on lavapipe.
 
+## The Direct3D 12 backend
+
+`src/dx12/` draws on the device Display8 makes in its stub mode with `Backend=d3d12`
+(`display/README.md`, "Direct3D 12"): Display8 owns the device and queue, the swap
+chain, the textures standing for the engine's back buffer and depth, the two
+shader-visible descriptor heaps and the frame (two in flight, each with a command
+allocator and list, an upload ring and a range of each heap). The backend reaches them
+through the `display8_dx12_*` exports of `src/display.rs` and records into the frame's
+list, on the game's thread, in the order the calls come. It is the Vulkan backend's
+plan in Direct3D 12's terms; what differs, and why:
+
+- **One root signature** for every pipeline, serialized once per plugin: each stage's
+  register file as a root constant buffer, at b0 (vertex) or b1 (pixel) in each of the
+  eight spaces a cbuffer may take (`render3d/dxil-spaces.py` puts the k-th cbuffer of a
+  stage in space k, all of them views of the one register file); one table of the
+  sixteen stages' shader views (t0..t15); one table of one sampler per stage (s0..s15);
+  eight root constants at b2 (the alpha test, the blit's region). 53 of the 64 words. A
+  draw after a change uploads each register file whole up to what the pipeline's
+  shaders read into Display8's ring and points all eight spaces of its stage at it.
+- **Descriptors.** Every view of the backend's lives in heaps of its own that shaders
+  do not see (blocks of 1024 per type). A draw copies the sixteen views it reads into a
+  range of the frame's (`display8_dx12_descriptors`), once a frame per set of views,
+  and each sampler once a frame; the sampler heap's 1024 a frame would not take a table
+  of sixteen per set. A freed view waits with its resource, so that no handle stands for
+  two textures in one frame (the frame's tables are kept by handle). An empty stage the
+  shader reads gets a null view of the dimension it declares, which reads (0, 0, 0, 0)
+  as DXVK's empty slots do.
+- **What the shaders read** comes from the SPIR-V of the same source (`vulkan::spirv`):
+  the DXIL is built without reflection. The vertex inputs come from the DXIL's own
+  input signature (`ISG1`), by semantic; one the layout lacks reads (0, 0, 0, 1) from a
+  placeholder buffer per instance.
+- **Pixel shaders' inputs** must sit at the registers their vertex shader writes them
+  to: Direct3D 12 links stages by register, where Direct3D 9 and Vulkan match
+  semantics. A pixel shader that leaves out the position its vertex shader writes first
+  (render3d's post passes, the sky's quad shaders, the ghosts) takes it first in DXIL
+  alone (`DXIL_POS`, `DXIL_POS_MEMBER`, `DXIL_POS_FIRST` in `shaders/compat.hlsli`);
+  the d3dbc and the SPIR-V are as they were.
+- **The alpha test** cannot be patched into DXIL (it is LLVM bitcode, and signed), so a
+  pixel shader drawn with one has an alpha-tested twin built beside it
+  (`render3d/dxil-alpha.py`, an entry marked `:at`, `Code::dxil_at`), which discards
+  as Direct3D 9's test would by the interval at b2 (`spirv::alpha_interval`).
+- **The pass now** stays the pass across `Cmd`s, as on Vulkan; Direct3D 12 has no render
+  pass to open or close, so its targets are set at the first draw of a `Cmd` (and when
+  the pass changes), and a clear (a load operation, `clear_rects`) is
+  `ClearRenderTargetView` / `ClearDepthStencilView` over the area at once.
+- **States** are tracked per texture, the whole of it in one, and changed by a barrier
+  when the next use needs another (the shaders read a texture in
+  `PIXEL | NON_PIXEL_SHADER_RESOURCE`). Display8's textures go back to theirs when the
+  `Cmd` that changed them ends. Buffers are made in `COMMON` and promoted by their use,
+  as Direct3D 12 does with buffers.
+- **Formats** as on Vulkan, through the view's component mapping: `L8` is `R8` read
+  (r, r, r, 1), `X8R8G8B8` `B8G8R8A8` with an alpha of one, a float format's missing
+  channels one; `A8` is Direct3D 12's own `A8_UNORM`. A depth texture is typeless (its
+  depth view `D16`/`D24S8`/`D32`, its shader view the matching colour format), so any
+  of ours can be sampled; Display8's depth cannot.
+- **What Direct3D 12 has no command for** is a draw of the backend's own shaders
+  (`shaders/dx12.hlsl`, DXIL by `dx12-shaders.sh`): `copy` at another size or format
+  and `generate_mips` (each level drawn from the one above, linear, every face) are a
+  blit; `resolve_depth` a pass writing each pixel's depth from the source's texel,
+  sample 0 of a multisampled one. `resolve` is `ResolveSubresourceRegion`
+  (`ID3D12GraphicsCommandList1`; the whole subresource without it), `copy` at the same
+  size and format `CopyTextureRegion`.
+- **Read-back** copies the target into a read-back buffer and has Display8 submit the
+  frame so far and wait for it (`display8_dx12_flush`); every `Cmd` sets everything
+  again after. Timers are a timestamp query heap resolved into a read-back buffer.
+- **Pixel centres and samplers** as on Vulkan ("Pixel centres", "Samplers as DXVK makes
+  them"): `Dx12Device8::features` carries `FEATURE_D3D9_CENTRES`, and the samplers are
+  made with `dxvk.conf`'s anisotropy and LOD bias.
+- **Pipeline states** are made at the first draw in a pass of their kind and kept. No
+  cache of ours on disk yet: vkd3d-proton keeps its own (`vkd3d-proton.cache`), and a
+  Windows driver keeps its own shader cache.
+
+### Measured
+
+render3d and the UI on Direct3D 12 (`Backend=d3d12`, `PixelCentres=d3d9`), through
+Proton's vkd3d-proton on the GPU (RX 5700, RADV), against the same scenes on Direct3D 9
+on the GPU (the `pre-gpu-*` baselines), the screenshot of each port scene, 2026-10-23:
+
+| Scene | RMSE (/255) | over 2/255 | max |
+|---|---|---|---|
+| `port-showcase` | 0.97 | 0.75% | 221 |
+| `port-nebula` | 0.39 | 0.19% | 32 |
+| `port-firing` | 0.41 | 0.12% | 55 |
+
+As on Vulkan: one or two levels over the sky and the hulls, and single pixels on the
+Borg hulls' lights and small bright details, which is dxc's floating point (fused
+multiply-adds in the procedural bakes, `hash13`) against DXVK's translation of vkd3d's
+d3dbc. `display-stub` (the whole game, intro to Exit) passes on `Backend=d3d12`; one
+earlier run found the in-mission menu's "Save Not Allowed" while the mission's opening
+still ran (the scenario's fixed waits), and the next passed. **Validation**: Microsoft's debug layer is not there under vkd3d-proton
+(`D3D12GetDebugInterface` answers `DXGI_ERROR_SDK_COMPONENT_MISSING`), and the Khronos
+layer under it reaches no one: it loads (the loader says so) and writes nothing, and
+vkd3d-proton's own check (`VKD3D_CONFIG=vk_debug`) finds its messenger hears nothing
+through the 32-bit winevulkan. So the bench checks pictures, not API use; the debug
+layer on Windows is for a machine there.
+
 ## render3d on gpu
 
 Every part of render3d draws through the interface: the frame and its post passes, and
@@ -400,5 +502,6 @@ it); a 32-bit index ring (every index is 16-bit); stencil state (only ever off);
 targets in a volume's slices or a cube's levels below the first; compute. Each joins
 when something needs it. On Vulkan also: sRGB sampling (a sampler asking for it reads
 linear; nothing does), sampling a multisampled colour target, render passes into a
-volume. Direct3D 12 carries the alpha test and the depth resolve as Vulkan does (the
-patched pixel shader, a pass of its own).
+volume. On Direct3D 12 also: sRGB sampling, render targets in a volume, a copy of part
+of a depth target, a depth resolve from Display8's depth (which has no shader view), a
+pipeline cache of its own on disk.

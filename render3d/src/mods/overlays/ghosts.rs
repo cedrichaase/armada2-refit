@@ -32,8 +32,10 @@ use crate::math::{v3, M34, V3};
 use crate::scene::{self, pose, Blend, Model};
 use crate::shaders::overlays::PS_GHOST;
 use crate::shaders::overlays_spv::PS_GHOST_SPV;
+use crate::shaders::overlays_dxil::{PS_GHOST_DXIL, PS_GHOST_AT_DXIL};
 use crate::shaders::sod::VS_SOD;
 use crate::shaders::sod_spv::VS_SOD_SPV;
+use crate::shaders::sod_dxil::VS_SOD_DXIL;
 use crate::{assets, log};
 use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
@@ -289,7 +291,7 @@ impl Ghosts {
     /// depth writes, the rest opaque writing depth, cut out at one half if `cut`.
     fn pipe(&mut self, additive: bool, cut: bool, cull: Cull) -> Option<Pipeline> {
         self.pipes.view((additive as u64 * 2 + cut as u64) * 4 + cull as u64, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_SOD, VS_SOD_SPV), gpu::code!(PS_GHOST, PS_GHOST_SPV), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_SOD, VS_SOD_SPV, VS_SOD_DXIL), gpu::code!(PS_GHOST, PS_GHOST_SPV, PS_GHOST_DXIL, PS_GHOST_AT_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: !additive, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.blend = if additive { Some(GBlend::ADD) } else { None };
             d.alpha_test = if cut { Some(AlphaTest::HALF) } else { None };

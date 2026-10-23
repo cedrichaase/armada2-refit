@@ -13,6 +13,7 @@ use crate::gfx::{self, Pipes};
 use crate::rt::{self, Ini};
 use crate::shaders::world_surface::*;
 use crate::shaders::world_surface_spv::*;
+use crate::shaders::world_surface_dxil::*;
 use crate::{log, math};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -287,7 +288,7 @@ static XYZ: [VertexAttr; 1] = [attr(0, AttrFormat::Float3, Semantic::Position, 0
 
 /// A bake's pipeline: no depth, no blending, no culling, every channel written.
 fn bake_desc(ps: gpu::Code, fmt: Format) -> PipelineDesc {
-    PipelineDesc::new(gpu::code!(VS_BAKE, VS_BAKE_SPV), ps, &XYZ, 12, Topology::TriangleStrip, fmt)
+    PipelineDesc::new(gpu::code!(VS_BAKE, VS_BAKE_SPV, VS_BAKE_DXIL), ps, &XYZ, 12, Topology::TriangleStrip, fmt)
 }
 
 /// Face `f` of an `s` x `s` cube: `k_face` (c32..c35).
@@ -360,7 +361,7 @@ fn bake(cmd: &mut Cmd, r: &Recipe, s: u32, cface: u32, pipes: &mut Pipes) -> Opt
     if let Some(h) = height.as_ref() {
         let hf = h.desc().format;
         let hps: [gpu::Code; 9] =
-            [gpu::code!(PS_H_WARP, PS_H_WARP_SPV), gpu::code!(PS_H_GAS, PS_H_GAS_SPV), gpu::code!(PS_H_GROUND, PS_H_GROUND_SPV), gpu::code!(PS_H_MOUNTAINS, PS_H_MOUNTAINS_SPV), gpu::code!(PS_H_CRATERS1, PS_H_CRATERS1_SPV), gpu::code!(PS_H_CRATERS2, PS_H_CRATERS2_SPV), gpu::code!(PS_H_CRATERS3, PS_H_CRATERS3_SPV), gpu::code!(PS_H_FISSURE, PS_H_FISSURE_SPV), gpu::code!(PS_H_END, PS_H_END_SPV)];
+            [gpu::code!(PS_H_WARP, PS_H_WARP_SPV, PS_H_WARP_DXIL), gpu::code!(PS_H_GAS, PS_H_GAS_SPV, PS_H_GAS_DXIL), gpu::code!(PS_H_GROUND, PS_H_GROUND_SPV, PS_H_GROUND_DXIL), gpu::code!(PS_H_MOUNTAINS, PS_H_MOUNTAINS_SPV, PS_H_MOUNTAINS_DXIL), gpu::code!(PS_H_CRATERS1, PS_H_CRATERS1_SPV, PS_H_CRATERS1_DXIL), gpu::code!(PS_H_CRATERS2, PS_H_CRATERS2_SPV, PS_H_CRATERS2_DXIL), gpu::code!(PS_H_CRATERS3, PS_H_CRATERS3_SPV, PS_H_CRATERS3_DXIL), gpu::code!(PS_H_FISSURE, PS_H_FISSURE_SPV, PS_H_FISSURE_DXIL), gpu::code!(PS_H_END, PS_H_END_SPV, PS_H_END_DXIL)];
         // A pass that writes a chain target draws into its float format; the last, the
         // height cube's.
         let mut pipe = |i: usize, last: bool| {
@@ -404,9 +405,9 @@ fn bake(cmd: &mut Cmd, r: &Recipe, s: u32, cface: u32, pipes: &mut Pipes) -> Opt
         }
         drop(chain);
         if ok {
-            let albedo = bake_cube(cmd, pipes, 100, gpu::code!(PS_ALBEDO, PS_ALBEDO_SPV), s, Some(h), flat);
-            let relief = bake_cube(cmd, pipes, 101, gpu::code!(PS_RELIEF, PS_RELIEF_SPV), s, Some(h), flat);
-            let cloud = if r.clouds { bake_cube(cmd, pipes, 102, gpu::code!(PS_CLOUD, PS_CLOUD_SPV), cface, None, flat) } else { None };
+            let albedo = bake_cube(cmd, pipes, 100, gpu::code!(PS_ALBEDO, PS_ALBEDO_SPV, PS_ALBEDO_DXIL), s, Some(h), flat);
+            let relief = bake_cube(cmd, pipes, 101, gpu::code!(PS_RELIEF, PS_RELIEF_SPV, PS_RELIEF_DXIL), s, Some(h), flat);
+            let cloud = if r.clouds { bake_cube(cmd, pipes, 102, gpu::code!(PS_CLOUD, PS_CLOUD_SPV, PS_CLOUD_DXIL), cface, None, flat) } else { None };
             if let (Some(albedo), Some(relief)) = (albedo, relief) {
                 if !r.clouds || cloud.is_some() {
                     out = Some(Surface { albedo, relief, cloud, draw: r.draw, model: r.model });
