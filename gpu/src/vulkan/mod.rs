@@ -86,6 +86,10 @@ pub(crate) struct Shared {
     pub limits: vk::PhysicalDeviceLimits,
     pub fif: u64,
     pub features: u32,
+    /// What DXVK's `dxvk.conf` makes of every sampler (`VkDevice8::sampler_anisotropy`,
+    /// `sampler_lod_bias`): applied to ours, so the pictures agree with Direct3D 9's.
+    pub force_aniso: i32,
+    pub lod_bias: f32,
     pub cache: vk::PipelineCache,
     pub pools: RefCell<Pools>,
     garbage: RefCell<Vec<(u64, Garbage)>>,
@@ -343,6 +347,8 @@ impl Gpu {
             limits: props.limits,
             fif: d.frames_in_flight.max(1) as u64,
             features: d.features,
+            force_aniso: d.sampler_anisotropy,
+            lod_bias: d.sampler_lod_bias,
             cache: vk::Handle::from_raw(d.pipeline_cache),
             pools: RefCell::new(Pools::default()),
             garbage: RefCell::new(Vec::new()),
@@ -579,7 +585,15 @@ impl Gpu {
             Address::Mirror => vk::SamplerAddressMode::MIRRORED_REPEAT,
             Address::Clamp => vk::SamplerAddressMode::CLAMP_TO_EDGE,
         };
-        let aniso = (d.min == Filter::Anisotropic || d.mag == Filter::Anisotropic) && sh.features & FEATURE_ANISOTROPY != 0;
+        // As DXVK makes a sampler under the game's dxvk.conf (renderer/README.md): with
+        // `d3d9.samplerAnisotropy`, a linear filter is an anisotropic one of that much;
+        // `d3d9.samplerLodBias` biases every sampler with mips (one without has no level
+        // to pick; DXVK zeroes its bias too).
+        let forced = sh.force_aniso >= 0;
+        let wants = |x: Filter| x == Filter::Anisotropic || (forced && x == Filter::Linear);
+        let aniso = (wants(d.min) || wants(d.mag)) && sh.features & FEATURE_ANISOTROPY != 0;
+        let most = if forced { sh.force_aniso as u32 } else { d.anisotropy };
+        let bias = if d.mip == MipFilter::None { 0.0 } else { sh.lod_bias.clamp(-sh.limits.max_sampler_lod_bias, sh.limits.max_sampler_lod_bias) };
         let ci = vk::SamplerCreateInfo::default()
             .mag_filter(f(d.mag))
             .min_filter(f(d.min))
@@ -588,7 +602,8 @@ impl Gpu {
             .address_mode_v(a(d.address_v))
             .address_mode_w(a(d.address_w))
             .anisotropy_enable(aniso)
-            .max_anisotropy(if aniso { (d.anisotropy.max(1) as f32).min(sh.limits.max_sampler_anisotropy) } else { 1.0 })
+            .max_anisotropy(if aniso { (most.clamp(1, 16) as f32).min(sh.limits.max_sampler_anisotropy) } else { 1.0 })
+            .mip_lod_bias(bias)
             .min_lod(0.0)
             .max_lod(if d.mip == MipFilter::None { 0.0 } else { vk::LOD_CLAMP_NONE });
         if d.srgb {

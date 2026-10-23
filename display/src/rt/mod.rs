@@ -154,6 +154,17 @@ pub fn delete_file(path: &str) -> bool {
     unsafe { DeleteFileA(p.as_ptr()) != 0 }
 }
 
+/// An environment variable of the process; None when it is not set or empty.
+pub fn env(name: &str) -> Option<String> {
+    let n = cstr(name);
+    let mut buf = [0u8; 520];
+    let got = unsafe { GetEnvironmentVariableA(n.as_ptr(), buf.as_mut_ptr(), buf.len() as u32) } as usize;
+    if got == 0 || got >= buf.len() {
+        return None;
+    }
+    core::str::from_utf8(&buf[..got]).ok().map(String::from)
+}
+
 /// Makes a directory (its parent must exist); true if it exists afterwards.
 pub fn create_dir(path: &str) -> bool {
     let p = cstr(path);

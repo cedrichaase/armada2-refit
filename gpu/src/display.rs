@@ -82,6 +82,13 @@ pub struct VkDevice8 {
     pub features: u32,
     /// `VkPhysicalDeviceLimits.minUniformBufferOffsetAlignment`.
     pub uniform_align: u32,
+    /// The anisotropy every linear sampler is given, as DXVK's `d3d9.samplerAnisotropy`
+    /// in the game's `dxvk.conf` gives it on Direct3D 9 (renderer/README.md); -1: each
+    /// sampler as it asks.
+    pub sampler_anisotropy: i32,
+    /// The LOD bias of every sampler with mips (`d3d9.samplerLodBias`, held at zero or
+    /// above when `d3d9.clampNegativeLodBias` says so).
+    pub sampler_lod_bias: f32,
 }
 
 /// The frame now.

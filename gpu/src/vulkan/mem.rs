@@ -98,6 +98,15 @@ impl Pools {
     }
 }
 
+impl Pools {
+    /// Unmaps an allocation of its own (a block stays mapped).
+    pub fn unmap(&mut self, dev: &ash::Device, a: &Alloc) {
+        if a.block.is_none() {
+            unsafe { dev.unmap_memory(a.mem) };
+        }
+    }
+}
+
 /// The first free range that takes `size` at `align`, cut out of the list.
 fn take(free: &mut Vec<(u64, u64)>, size: u64, align: u64) -> Option<u64> {
     for i in 0..free.len() {

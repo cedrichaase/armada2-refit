@@ -323,7 +323,14 @@ impl Texture {
             return true;
         }
         let total: usize = regs.iter().map(|r| r.bytes.div_ceil(4) * 4).sum();
-        let Some((buf, base, cpu)) = gpu.staging(total as u64) else {
+        let staged = gpu.staging(total as u64, |cpu| {
+            let mut off = 0usize;
+            for r in &regs {
+                unsafe { core::ptr::copy_nonoverlapping(data.as_ptr().add(r.at), cpu.add(off), r.bytes) };
+                off += r.bytes.div_ceil(4) * 4;
+            }
+        });
+        let Some((buf, base)) = staged else {
             vlog!(gpu, "gpu: Vulkan: no staging space for {} bytes", total);
             return false;
         };
@@ -331,7 +338,6 @@ impl Texture {
         let mut off = 0usize;
         let aspect = if is_depth_vk(self.vk_format()) { vk::ImageAspectFlags::DEPTH } else { vk::ImageAspectFlags::COLOR };
         for r in &regs {
-            unsafe { core::ptr::copy_nonoverlapping(data.as_ptr().add(r.at), cpu.add(off), r.bytes) };
             copies.push(
                 vk::BufferImageCopy::default()
                     .buffer_offset(base + off as u64)
@@ -342,7 +348,7 @@ impl Texture {
         }
         drop(contents);
         let Some(cb) = gpu.outside() else { return false };
-        let to = if first { vk::ImageLayout::TRANSFER_DST_OPTIMAL } else { vk::ImageLayout::TRANSFER_DST_OPTIMAL };
+        let to = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
         if !first {
             // The whole image is written: what was there does not matter.
             t.layout.set(vk::ImageLayout::UNDEFINED);
@@ -355,16 +361,19 @@ impl Texture {
 }
 
 impl Gpu {
-    /// Host-visible space for `bytes` the frame's copies read: Display8's upload ring for
-    /// a small one, a buffer of its own (let go of with the frame) for a big one, so the
-    /// ring does not grow to the size of the biggest texture for good.
-    pub(crate) fn staging(&self, bytes: u64) -> Option<(vk::Buffer, u64, *mut u8)> {
+    /// Host-visible space for `bytes` the frame's copies read, filled by `fill`:
+    /// Display8's upload ring for a small one, a buffer of its own (let go of with the
+    /// frame) for a big one, so the ring does not grow to the size of the biggest texture
+    /// for good. A big one is mapped only while `fill` writes it: a mission's textures
+    /// all made in one frame must not hold their size of the 32-bit address space.
+    pub(crate) fn staging(&self, bytes: u64, fill: impl FnOnce(*mut u8)) -> Option<(vk::Buffer, u64)> {
         let sh = self.sh()?;
         self.cmdbuf()?;
         if bytes <= 1 << 20 {
             let mut a = crate::display::VkAlloc8::default();
             if (sh.disp.vk_alloc)(bytes as u32, 16, &mut a) {
-                return Some((vk::Handle::from_raw(a.buffer), a.offset as u64, a.cpu));
+                fill(a.cpu);
+                return Some((vk::Handle::from_raw(a.buffer), a.offset as u64));
             }
             return None;
         }
@@ -378,9 +387,13 @@ impl Gpu {
         };
         let ok = unsafe { dv.bind_buffer_memory(buf, mem.mem, mem.offset) }.is_ok();
         let cpu = if ok { sh.pools.borrow_mut().map(dv, &mem) } else { None };
+        if let Some(p) = cpu {
+            fill(p);
+            sh.pools.borrow_mut().unmap(dv, &mem);
+        }
         sh.retire(Garbage::Buffer(buf));
         sh.retire(Garbage::Memory(mem));
-        Some((buf, 0, cpu?))
+        cpu.map(|_| (buf, 0))
     }
 }
 
@@ -471,8 +484,7 @@ impl Buffer {
         let data = self.0.contents.borrow();
         if !data.is_empty() {
             let n = data.len().min(size as usize);
-            let (sbuf, soff, cpu) = gpu.staging(n.div_ceil(4) as u64 * 4)?;
-            unsafe { core::ptr::copy_nonoverlapping(data.as_ptr(), cpu, n) };
+            let (sbuf, soff) = gpu.staging(n.div_ceil(4) as u64 * 4, |cpu| unsafe { core::ptr::copy_nonoverlapping(data.as_ptr(), cpu, n) })?;
             let cb = gpu.outside()?;
             let r = [vk::BufferCopy { src_offset: soff, dst_offset: 0, size: n.div_ceil(4) as u64 * 4 }];
             unsafe { dv.cmd_copy_buffer(cb, sbuf, buf, &r) };

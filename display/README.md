@@ -195,6 +195,62 @@ engine's device, and draw the whole frame on it.
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
 
+### Vulkan
+
+`Backend=vulkan` (`src/vk/`): no Direct3D 9 at all. Display8 opens `vulkan-1.dll` and
+makes the instance and device (Vulkan 1.1, one queue family that draws and presents,
+`VK_KHR_swapchain`; anisotropic filtering where the device has it), a swap chain on the
+game's window, an offscreen `B8G8R8A8` colour image and a `D16` depth image standing for
+the engine's back buffer and depth, and two frames in flight, each with a command
+buffer, a fence, a descriptor pool and an upload ring. render3d and the UI draw through
+`gpu`'s Vulkan backend (`gpu/README.md`, "The Vulkan backend") into the frame's command
+buffer, reaching all of it through the exports of `gpu/src/display.rs` (the contract);
+at the engine's `Present` Display8 draws the colour image through the gamma ramp into
+the swap chain's image, submits and presents.
+
+- **The backend is said early.** `display8_backend` answers Vulkan from the engine's
+  `Direct3DCreate8` on, before the device: an object a plugin makes then is made for
+  the right backend. A stub on Vulkan has no Direct3D 9 to fall back to.
+- **The engine's targets** are in their attachment layouts between recorders, the
+  mirrors in `SHADER_READ_ONLY`; whoever changes one puts it back. The depth image is
+  sampled and copied too (render3d's depth resolve, the dumps).
+- **`display8_vk_flush`** submits what the frame has recorded and waits, then begins the
+  same command buffer again (its pool reset): a plugin's read-back (the frame dumps).
+- **Mirrors** are the engine textures a plugin samples (`display8_vk_mirror`), as the
+  Direct3D 9 mirror table has them, brought up to date when the frame is asked for.
+- **`Device=`** takes only a device whose name has it (the test bench: `llvmpipe`,
+  Mesa's CPU Vulkan, never the GPU); **`Validate=1`** the Khronos validation layer, its
+  warnings and errors in `Display8.log` (`vulkan 0x...:`); **`PixelCentres=d3d9`**
+  Direct3D 9's pixel centres for the plugins (`gpu/README.md`, "Pixel centres"), for
+  comparing with `Backend=d3d9` pixel for pixel.
+
+- **The pipeline cache is kept on disk**, in `%LOCALAPPDATA%\armada2-refit\Display8.pipelines`
+  (`src/vk/cache.rs`), not the game directory: GOG installs into `Program Files`,
+  which is not writable, and an exe with no manifest is silently redirected to
+  VirtualStore there. It is read when the device is made, only if its header names this
+  device and driver (vendor, device, cache UUID), and written again, through a
+  temporary file and a rename, whenever it has grown (looked at every 600 frames).
+- **Samplers as DXVK makes them.** On Direct3D 9 the game's `dxvk.conf` (the renderer
+  layer, `renderer/README.md`) has DXVK give every linear sampler 16x anisotropy and
+  every sampler with mips a LOD bias of -0.5. Display8 reads the same keys
+  (`d3d9.samplerAnisotropy`, `d3d9.samplerLodBias`, `d3d9.clampNegativeLodBias`) and
+  hands them to `gpu` (`VkDevice8::sampler_anisotropy`, `sampler_lod_bias`), so the two
+  backends filter alike. Without it every hull read a level blurrier on Vulkan
+  (showcase RMSE 5.07 -> 4.05). Vulkan's cube maps are always seamless, as
+  `d3d9.seamlessCubes = True` makes DXVK's.
+
+On the bench every Vulkan game runs on lavapipe with the layer on (unless
+`A2TEST_VULKAN_GPU=1`, for a deliberate run on the GPU): the game's
+environment gets `VK_DRIVER_FILES` (and `VK_ICD_FILENAMES`) naming
+`/usr/share/vulkan/icd.d/lvp_icd.json` and `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation`
+(umu passes the bench's environment on; pressure-vessel honours both;
+`testbench/bench/session.py`, `vulkan_env`, sets them from the clone's `Display8.ini`),
+and `display/bench-mode.sh` gives `Display8.ini` `Device=llvmpipe` and `Validate=1`, so even an environment that lost the variables
+cannot reach the GPU. `Display8.log` names the device (`vulkan: physical device
+llvmpipe ...`); the process's maps show `libVkLayer_khronos_validation.so` and
+`libvulkan_lvp.so`, and no other driver. A frame takes seconds there: its time means
+nothing.
+
 ## Will Vulkan work on a Mac?
 
 `vkprobe/` is a small 32-bit program that does what the Vulkan backend does (a mapped

@@ -5,13 +5,15 @@ one `no_std` crate, a path dependency of both, linked into each plugin on its ow
 is not a layer of `a2mod` and installs nothing; what it changes reaches the game
 through the two plugins, and their changelogs say so.
 
-It exists for the display plan: the game's d3d8 device is to become a null stub of
-ours (Display8), and render3d and the UI are to draw the whole frame on Vulkan, then
-Direct3D 12. The interface is shaped for those two and, for now, implemented on
-Direct3D 9 only, the device behind the game's d3d8 one (crosire's d3d8to9,
-`platform/D3D9.md`). Moving both plugins onto it changes nothing on screen, so the move
-is judged by pixels alone (per-pixel RMSE 0 against the bench's baselines, frame time
-no worse), apart from the change of API that comes later.
+It exists for the display plan: the game's d3d8 device becomes a null stub of ours
+(Display8, `display/`), and render3d and the UI draw the whole frame on Vulkan, then
+Direct3D 12. The interface is shaped for those two and implemented on two backends:
+**Direct3D 9**, the device behind the game's d3d8 one (crosire's d3d8to9,
+`platform/D3D9.md`, or Display8's own in its stub mode), and **Vulkan**, Display8's
+device in its stub mode with `Backend=vulkan` ("The Vulkan backend" below). Which one
+draws is decided at run time, by what Display8 says; the modules see one interface.
+Moving both plugins onto it changed nothing on screen, so each move is judged by pixels
+(the bench's baselines, `testbench/README.md`).
 
 ## Layout
 
@@ -21,19 +23,32 @@ no worse), apart from the change of API that comes later.
 | `src/frame.rs` | `Frame`: the frame a `Cmd` records into, owned by the caller; `Span` |
 | `src/pixels.rs` | `Mapped`, texels read back, and their conversion to RGB (the frame dumps) |
 | `src/chain.rs` | a bake too long for one shader, as a chain of passes (`Chain`), on the interface |
+| `src/api.rs` | `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Timer`, `Cmd` as the plugins see them: each an enum of the two backends' own, every call going to the one it was made on; the backend chosen at run time |
+| `src/display.rs` | the contract with Display8: its exports, the plain `#[repr(C)]` values they pass |
 | `src/d3d9/mod.rs` | the Direct3D 9 backend: `Gpu`, `Texture`, `Buffer`, `Pipeline`, `Cmd`, `Timer` |
 | `src/d3d9/raw.rs`, `consts.rs` | Direct3D 9 through raw COM vtables, once `render3d/src/d3d` and `ui/src/d3d` (identical copies) |
+| `src/vulkan/mod.rs` | the Vulkan backend's `Gpu`: Display8's device opened, the recording state (the pass now, layouts), samplers, render passes, the uniform ring, Display8's images wrapped |
+| `src/vulkan/tex.rs`, `pipe.rs`, `cmd.rs`, `mem.rs` | its textures, buffers and timestamps; pipelines; `Cmd` and the read-back; device memory in blocks |
+| `src/vulkan/spirv.rs` | what it reads out of dxc's SPIR-V (reflection) and the two patches it makes to a pixel shader; built on the host too by `spirv-selftest.sh` |
+| `shaders/vk_depth.hlsl`, `src/vulkan/shaders.rs` | its own shaders (the depth resolve), SPIR-V by `vk-shaders.sh` |
 
-`gpu::Gpu`, `gpu::Texture` and the rest are the backend in use, re-exported at the
-crate's root; a later backend is chosen at build time behind the same names.
+`gpu::Gpu`, `gpu::Texture` and the rest are `api.rs`'s, re-exported at the crate's
+root.
 
 ## The interface
 
-**`Gpu`** is the backend's state for one plugin: the device, every resource made
-through it (held weakly, to let go of them when the device goes) and the state
-blocks. Each plugin keeps one in a static of its own (`ui/src/gfx`, `render3d/src/gfx`)
-and attaches the game's device to it every frame (`attach`, `attach_d3d8`). Nothing in
-it is per frame.
+**`Gpu`** is the backends' state for one plugin: on Direct3D 9 the device, every
+resource made through it (held weakly, to let go of them when the device goes) and the
+state blocks; on Vulkan Display8's device and what the backend keeps for recording.
+Each plugin keeps one in a static of its own (`ui/src/gfx`, `render3d/src/gfx`), made
+with `Gpu::with_display(log, lookup)`, `lookup` its `GetProcAddress` on `d3d8.dll`, and
+attaches the game's device to it every frame (`attach_engine`: the Direct3D 9 device
+behind the engine's, or Display8's Vulkan one; `engine_id` names it without attaching).
+Nothing in it is per frame. **The backend** is Display8's answer to `display8_backend`,
+asked until it gives one: Vulkan from the engine's `Direct3DCreate8` when the stub runs
+on it, Direct3D 9 otherwise, and Direct3D 9 for good with no Display8, an older one, or
+once the engine has a device and Display8 has said nothing (forward mode). An object
+made before the answer is made for Direct3D 9, and the log says so once.
 
 **Resources** are made once from a description and stay valid until the last clone is
 dropped, across `Reset`s and devices. `Gpu::texture(TextureDesc, Contents)` makes a
@@ -54,7 +69,11 @@ it. `Gpu::timer(n)` makes a set of GPU timestamps (`Timer`: `begin`, `stamp`, `e
 `read` a few frames later). `Gpu::wrap_d3d9_texture` / `wrap_d3d9_surface` and
 `engine_target` / `engine_depth` / `engine_viewport` wrap a Direct3D 9 object someone
 else made (the engine's minimap picture, its fog, its back buffer) without owning its
-creation, or read the engine's viewport.
+creation, or read the engine's viewport. The backend-neutral ones: `engine_texture`
+(an engine `IDirect3DTexture8`: d3d8to9's Direct3D 9 texture behind it, or Display8's
+Vulkan mirror), `engine_target` / `engine_depth` (the engine's back buffer and depth:
+Display8's images on Vulkan), `engine_viewport` and `engine_transform` (Display8's
+record of the engine's calls on Vulkan), and `half_pixel` ("Pixel centres").
 
 **`Frame`** is what a `Cmd` records into: its number, the rings the frame's dynamic
 vertices and indices are written to (`Cmd::vertices`, `Cmd::indices`, giving a `Span`
@@ -179,10 +198,114 @@ texture or buffer the device refused (once per device each).
 
 `gpu::d3d9::raw` is the old `d3d` module: the backend's own calls, and what the
 plugins' engine glue uses to reach the game's d3d8 device (`query`, `Com`, `vcall!`):
-render3d's `frame/` (finding the d3d9 device, the view's transforms, the hooks of
-`Reset` and `DestroyRenderSurfaces`) and `gfx::engine_texture` (an `ST3D_Texture`'s
-d3d9 texture, wrapped). No module draws with it. Display8 will answer those questions
-itself, and they go then.
+render3d's `frame/` (the hooks of `Reset` and `DestroyRenderSurfaces`, which let go of
+the Direct3D 9 device, and the menu scene's viewport) and the UI's `engine/` (the same
+hooks, the dumps' back buffer, the swap chain's parameters). No module draws with it.
+What both backends answer went behind the interface: the engine's device
+(`attach_engine`), its viewport and transforms (`engine_viewport`,
+`engine_transform`), its textures (`engine_texture`).
+
+## The Vulkan backend
+
+`src/vulkan/` draws on the device Display8 makes in its stub mode with
+`Backend=vulkan` (`display/README.md`, "Vulkan"). Display8 owns the instance, the
+device and queue, the swap chain, images standing for the engine's back buffer and
+depth, the pipeline cache and the frame (two in flight, each with a command buffer, a
+descriptor pool and an upload ring); the backend reaches them through the exports of
+`src/display.rs`, loads the device's functions through the `vkGetInstanceProcAddr`
+Display8 hands over (`ash`, no loader of its own), and records into the frame's command
+buffer on the game's thread, in the order the calls come. Display8 submits it at the
+engine's `Present`. How each part of the interface maps, and why:
+
+- **The pass now.** On Direct3D 9 a pass's targets stay bound after its `Cmd`, and the
+  modules rely on it (render3d's scene pass is begun before the body and drawn into by
+  every module after). So a begun pass stays *the* pass (`PassState`), across `Cmd`s,
+  until another is begun; a draw opens a render pass on it when none is open. A render
+  pass is closed whenever something must happen outside one (an upload, a layout
+  change, a copy, a resolve, Display8's mirror updates when the frame is asked for) and
+  at every `Cmd`'s end, so none is ever open between recorders, as the contract has it,
+  and the next draw opens it again keeping what was drawn. A pass that clears does so at
+  once: by the render pass's load operation when the area is the whole target, else by
+  `vkCmdClearAttachments` over the area; the first colour target's clear colour clears
+  every colour target, as Direct3D 9's `Clear` does. `DontCare` keeps the contents, as
+  Direct3D 9 did (a render pass may not draw over all of it).
+- **Render passes, not dynamic rendering**: Vulkan 1.1 and MoltenVK have them without
+  an extension. One per kind (the attachments' formats and samples, and the load
+  operations), every attachment in its attachment layout before and after, with
+  dependencies on everything before and after (broad masks: a frame recorded once,
+  correct before tight). A framebuffer is made for each render pass opened and let go
+  of with the frame (cheap, and nothing has to know when a view dies).
+- **Layouts** are tracked per image, the whole image in one layout, and changed by a
+  barrier outside a render pass when the next use needs another: a sampled texture is
+  put in `SHADER_READ_ONLY` before the render pass opens (a draw looks at every texture
+  its shaders read, each time), a target in its attachment layout, a copy's two ends in
+  the transfer layouts. Display8's images (its back buffer, depth and mirrors) are put
+  back in their own layout when the `Cmd` that changed it ends. A texture that is
+  sampled by a draw into its own pass reads the placeholder instead (logged once).
+- **Pipelines** are made per kind of pass they are drawn in, at the first draw there,
+  from the SPIR-V beside the d3dbc (`Code::spirv`): the description's target formats
+  are not trusted (render3d's name the scene's, the UI's the back buffer's). The SPIR-V
+  is read (`spirv.rs`): the vertex input is each input the vertex shader declares,
+  matched to the layout's attribute **by semantic** (dxc names them `in.var.TEXCOORD3`);
+  one the layout lacks reads (0, 0, 0, 1) from a buffer of its own at stride 0, as a
+  Direct3D 9 element left out does. dxc numbers each stage's interface by its own
+  struct, so the pixel shader's inputs are **moved to its vertex shader's outputs of
+  the same semantic**. The **alpha test**, which Vulkan does not have, is put into the
+  pixel shader: after the store of its colour, a fragment whose alpha, as Direct3D 9
+  compares it (255ths, rounded), fails is discarded. The vertex shaders are compiled
+  with `-fvk-invert-y`, so a triangle lands where Direct3D 9 puts it and is wound on
+  screen as there: `Cull::Clockwise` is Vulkan's back face with a counter-clockwise
+  front. The **depth bias** is Direct3D 9's in depth units, scaled to the format's step
+  (2^16, 2^24, 2^23 for a float depth, as DXVK does). Depth state is off in a pass
+  without depth. Viewport and scissor are dynamic.
+- **Uniform blocks**: each stage's SPIR-V uniform block is its Direct3D 9 register file
+  (a member at byte 16 n for `cn`). A `Cmd` keeps a shadow of both files (from zero, as
+  a fresh `Cmd` on Direct3D 9 finds the engine's, which never sets ours), and a draw
+  after a change uploads each file up to what the pipeline's shaders read into a ring of
+  the backend's own (1 MB chunks per frame slot, mapped once), bound as two dynamic
+  uniform buffers of one set per chunk, with the offsets per draw. render3d makes a
+  thousand and more draws a frame: one set write per chunk, not per draw.
+- **Textures** are combined image samplers at the Direct3D 9 stage's binding (set 1);
+  a set from the frame's pool is written when what a draw reads changes. An empty
+  stage the shader reads gets a placeholder of its dimension, (0, 0, 0, 0), as DXVK's
+  empty slots read; a stage with no sampler set has Direct3D 9's default (point, no
+  mips, wrap). Samplers are made once per description. Formats Vulkan lacks are views
+  with a swizzle: Direct3D 9's `L8` is `R8` read as (r, r, r, 1), `A8` as (0, 0, 0, r),
+  `X8R8G8B8` `B8G8R8A8` with an alpha of one, and a float format's missing channels read
+  one, as Direct3D 9's do. `D24` without a device format is `D32_SFLOAT`.
+- **Memory** comes in blocks (32 MB of device memory, 4 MB of host memory mapped once),
+  first fit, images and buffers apart (`mem.rs`): a mission's thousand textures and
+  models would otherwise be a thousand allocations, past some drivers' 4096. Contents go
+  in through a staging copy: Display8's upload ring for a small one, a buffer of its own
+  for a big one, mapped only while it is written and let go of with the frame, so a
+  mission's textures, all made in the frame that loads them, do not hold their size of
+  a 32-bit process's address space.
+- **Copies**: `resolve` is `vkCmdResolveImage`; `copy` a copy at the same size and
+  format, a blit otherwise (a multisampled source resolved into an image of its own
+  first when it is also scaled); `generate_mips` a chain of 2:1 linear blits over every
+  face; `resolve_depth` a pass of its own (`shaders/vk_depth.hlsl`) writing each pixel's
+  depth from the source's texel, sample 0 of a multisampled one, as RESZ takes.
+- **Read-back** (the frame dumps) copies the target into a buffer and has Display8
+  submit what the frame has recorded so far and wait for it (`display8_vk_flush`); the
+  frame goes on in the same command buffer, and every `Cmd` binds everything again.
+- **Nothing is destroyed while the GPU may read it**: what is let go of waits until
+  Display8 has begun the frame two after (its fence has passed).
+- **Timers** are a timestamp query pool, reset at `begin`, read without waiting once
+  the frame that wrote it is done; never disjoint, the frequency from `timestampPeriod`.
+- **Never lost**: Display8's device lives as long as the game. `before_reset` and
+  `release_device` do nothing on Vulkan, and nothing is made twice.
+
+### Pixel centres
+
+Direct3D 9 puts a pixel's centre on whole coordinates, Vulkan (and Direct3D 12) at the
+half. DXVK moves a Direct3D 9 viewport by 0.5 - 1/128 of a pixel to keep Direct3D 9's
+rule, and the callers that map pixels to clip space move their positions by half a
+pixel the other way (the UI's `VP`, render3d's post passes). On Vulkan that half pixel is
+the caller's to leave out: `Gpu::half_pixel()` is 0.5 on Direct3D 9 and 0 on Vulkan, and
+a 3D scene, whose projection is the engine's, lands half a pixel from where DXVK puts
+it. For comparing a frame with Direct3D 9's pixel for pixel, Display8's
+`PixelCentres=d3d9` keeps Direct3D 9's rule on Vulkan: the viewport moved as DXVK moves
+it and `half_pixel` 0.5 (`VkDevice8::features`, `FEATURE_D3D9_CENTRES`).
 
 ## render3d on gpu
 
@@ -227,6 +350,7 @@ shader may later be handed it as a single pass, with nothing changed for the cal
 Mip chains of a `DYNAMIC` texture; a second vertex stream (instancing: nothing uses
 it); a 32-bit index ring (every index is 16-bit); stencil state (only ever off); render
 targets in a volume's slices or a cube's levels below the first; compute. Each joins
-when something needs it. A Vulkan or Direct3D 12 backend has two of today's features to
-carry differently: the alpha test (a variant of the pixel shader that discards) and
-the depth resolve (a resolve attachment, or a shader).
+when something needs it. On Vulkan also: sRGB sampling (a sampler asking for it reads
+linear; nothing does), sampling a multisampled colour target, render passes into a
+volume. Direct3D 12 carries the alpha test and the depth resolve as Vulkan does (the
+patched pixel shader, a pass of its own).

@@ -336,7 +336,20 @@ after the body (`frame::black_lines`).
 
 **The first row and column.** DXVK offsets a Direct3D 9 viewport by half a pixel, so
 with MSAA half the samples of the view's first row and column are never drawn. The final pass reads those pixels from their neighbours instead, which does what
-`MSAA.asi`'s edge fill did without the frame's delay.
+`MSAA.asi`'s edge fill did without the frame's delay. On Vulkan (below) there is no
+offset and no such fill, and the post passes' quads do not move by half a pixel
+(`gpu::Gpu::half_pixel`).
+
+**On Vulkan.** In Display8's stub mode with `Backend=vulkan` the same frame records into
+Display8's command buffer through `gpu`'s Vulkan backend (`gpu/README.md`): the engine's
+back buffer and depth are Display8's images, the view's transforms and viewport
+Display8's record of the engine's calls (`engine_transform`, `engine_viewport`), the
+fog's textures Display8's mirrors (`gfx::engine_texture`), and every pipeline is made
+from the SPIR-V compiled beside each shader's d3dbc. The frame is told a new device by
+`gpu::Gpu::engine_id`, which on Vulkan never changes; `Reset` and
+`DestroyRenderSurfaces` find nothing to let go of. The menu scene's viewport is handed
+to the pass rather than set on the engine's device, so the modules there read the
+engine's own.
 
 **Reset.** Every target is in the default pool and must be gone before the device
 resets. Slot 14 of the d3d8 device's vtable (`Reset`) is chained, as `Lighting.asi`

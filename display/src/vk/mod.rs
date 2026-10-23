@@ -17,6 +17,7 @@
 //!   more, so the address space it takes stays small in a 32-bit process) and the
 //!   callbacks deferred until its fence has passed. A frame is begun at the first call
 //!   that needs it after a `Present`, and ended, submitted and presented at the next.
+mod cache;
 pub mod exports;
 pub mod mirror;
 
@@ -98,6 +99,8 @@ pub struct Vk {
     ramp: Img,
     ramp_values: Option<[u16; 768]>,
     cache: vk::PipelineCache,
+    /// The size the cache on disk was last written at (cache.rs).
+    cache_saved: usize,
     pub exported: VkDevice8,
     pub frame_out: VkFrame8,
     pub uniform_align: u32,
@@ -258,8 +261,16 @@ impl Vk {
         let queue = unsafe { dev.get_device_queue(qfam, 0) };
         let mem = unsafe { instance.get_physical_device_memory_properties(pdev) };
         let swap_fn = ash::khr::swapchain::Device::new(&instance, &dev);
-        let cache = unsafe { dev.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None) }.unwrap_or_default();
+        // The pipeline cache, from disk when this device saved one (cache.rs).
+        let saved = cache::load(&props);
+        let cache = unsafe { dev.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default().initial_data(&saved), None) }
+            .or_else(|_| unsafe { dev.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None) })
+            .unwrap_or_default();
+        let cache_saved = saved.len();
+        drop(saved);
 
+        let samplers = crate::dxvk_samplers();
+        log!("vulkan: the plugins' samplers as dxvk.conf has DXVK make them: anisotropy {}, LOD bias {}", samplers.0, samplers.1);
         let mut me = Vk {
             _entry: entry,
             instance,
@@ -296,6 +307,7 @@ impl Vk {
             ramp: Img::null(),
             ramp_values: None,
             cache,
+            cache_saved,
             exported: VkDevice8 {
                 get_instance_proc_addr: gipa,
                 instance: 0,
@@ -308,6 +320,8 @@ impl Vk {
                 frames_in_flight: SLOTS as u32,
                 features,
                 uniform_align: props.limits.min_uniform_buffer_offset_alignment as u32,
+                sampler_anisotropy: samplers.0,
+                sampler_lod_bias: samplers.1,
             },
             frame_out: VkFrame8::default(),
             uniform_align: props.limits.min_uniform_buffer_offset_alignment as u32,
@@ -942,6 +956,9 @@ impl Vk {
         self.recording = false;
         self.slot = (self.slot + 1) % SLOTS;
         self.index += 1;
+        if self.index % cache::EVERY == 0 {
+            self.cache_saved = cache::save(&self.dev, self.cache, self.cache_saved);
+        }
         true
     }
 

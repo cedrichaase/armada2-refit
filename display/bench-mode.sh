@@ -28,6 +28,13 @@ while [ $# -gt 0 ] && [[ "$1" == *=* ]]; do
     sed -i "s/^$key=.*/${1//\//\\/}/" "$ini"
     shift
 done
+# On Vulkan the bench draws on lavapipe with the validation layer, never on the GPU
+# (README.md, "Vulkan"; the bench sets the drivers in the game's environment):
+# Device=llvmpipe unless a Device= was given, and Validate=1.
+if grep -qi '^Backend=vulkan' "$ini" && [ "${A2TEST_VULKAN_GPU:-}" != 1 ]; then
+    grep -q '^Device=.' "$ini" || sed -i 's/^Device=.*/Device=llvmpipe/' "$ini"
+    sed -i 's/^Validate=.*/Validate=1/' "$ini"
+fi
 echo "Display8: Mode=$mode in $ini"
 if [ $# -gt 0 ]; then
     case "$1" in
