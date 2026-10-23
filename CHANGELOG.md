@@ -10,8 +10,13 @@ conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning 
 Layers: render3d 0.23.0 (with gpu's compute).
 
 ### Added
+- render3d's clustered lights on Vulkan and Direct3D 12: every light lights the hulls,
+  planets, moons and asteroids near it per pixel; phaser beams as line lights; the
+  tractor and assimilation wash confined to the cone. `[Lights] Clustered=0` turns it
+  off; Direct3D 9 is unchanged (render3d 0.23.0).
 - gpu: compute (storage buffers and images, compute pipelines, dispatches, barriers) on
   Vulkan and Direct3D 12, `Gpu::compute` off on Direct3D 9 (render3d 0.23.0).
+- testbench: the `battle` scene and `render3d-clustered`.
 
 Installed, not yet seen in game.
 

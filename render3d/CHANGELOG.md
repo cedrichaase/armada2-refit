@@ -7,16 +7,30 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 ## 0.23.0 — 2026-10-23
 
 ### Added
+- Clustered lights on Vulkan and Direct3D 12 (`scene/clusters.rs`,
+  `shaders/clusters.hlsl`, `shaders/clustered.hlsli`): every light of the view lights
+  the hulls, planets, moons and asteroids per pixel, binned by a compute pass into
+  screen tiles by depth slices, with no cap per mesh; of one colour only the strongest
+  at each pixel. Clustered twins `PS_HULL_CL`, `PS_BUMP_CL`, `PS_ROCK_CL`,
+  `PS_GROUND_CL`, `PS_CITY_CL`, `PS_CLOUD_CL`, `PS_SURFACE_CL`; the cull `CS_CLUSTER`.
+- Phaser beams as line lights, and the tractor and assimilation beams' wash as a spot
+  confined to the cone (ART-DIRECTION.md), where clustered lights run.
+- `[Lights]` keys `Clustered`, `ClusterTile`, `ClusterSlices`, `ClusterLights`,
+  `ClusterPerColour`, `BeamLight`, `BeamReach`, `BeamWrap`, `ConeSpot`.
 - `hlsl-rs.sh`: an entry marked `:dxc` is dxc's alone (no d3dbc), for compute and
-  storage.
+  storage. `bench-ini.sh` sets a bench clone's `Render3D.ini` keys from a `Setup:` line.
 - gpu (no changelog of its own): compute on Vulkan and Direct3D 12 (`Gpu::compute`,
   `Gpu::storage`, `Gpu::compute_pipeline`, `Usage::STORAGE`, `Cmd::dispatch`,
   `bind_storage`, `bind_storage_rw`, `bind_storage_image`, `cs_block`, `write_storage`,
   `barrier`), storage bindings in the SPIR-V reflection, a compute root signature and a
-  storage table in the graphics one on Direct3D 12; nothing on Direct3D 9. Nothing
-  uses it yet: every frame is as before.
+  storage table in the graphics one on Direct3D 12; nothing on Direct3D 9.
 
-Installed, not yet seen in game.
+### Changed
+- With clustered lights, the ordnance module's phaser, muzzle and effect lights are
+  points of the scene's own list, not engine light objects.
+
+With `Clustered=0` and on Direct3D 9 every frame is as before (the port scenes at
+RMSE 0 against `pre-gpu-*` on Direct3D 9). Installed, not yet seen in game.
 
 ## 0.22.1 — 2026-10-23
 

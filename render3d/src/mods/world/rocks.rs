@@ -404,6 +404,8 @@ impl Rocks {
         }
         let Some(mut cmd) = gfx::cmd() else { return };
         let cmd = &mut cmd;
+        // Every light near it, per pixel, from the view's clusters (Vulkan, Direct3D 12).
+        let rock = if scene::clusters::on() && self.pipe(ROCK_CL, Cull::None).is_some_and(|p| p.ready(gfx::gpu())) && scene::clusters::bind(cmd, v) { ROCK_CL } else { ROCK };
         let mut plain = false;
         let mut fallback: Vec<usize> = Vec::new();
         for pi in 0..model.parts.len() {
@@ -446,7 +448,7 @@ impl Rocks {
                     let w = &world;
                     let mirrored = w.det3() < 0.0;
                     let cull = if part.two_sided { Cull::None } else if mirrored { Cull::CounterClockwise } else { Cull::Clockwise };
-                    let Some(pipe) = self.pipe(ROCK, cull) else { continue };
+                    let Some(pipe) = self.pipe(rock, cull) else { continue };
                     if !cmd.set_pipeline(&pipe) {
                         continue;
                     }
@@ -517,10 +519,11 @@ impl Rocks {
             let (vs, ps, layout, stride): (gpu::Code, gpu::Code, &'static [VertexAttr], u32) = match kind {
                 FLAT | GLOW => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_FLAT, PS_FLAT_SPV, PS_FLAT_DXIL), &scene::VERTEX, 32),
                 ROCK => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK, PS_ROCK_SPV, PS_ROCK_DXIL), &scene::VERTEX, 32),
+                ROCK_CL => (gpu::code!(VS_ROCK, VS_ROCK_SPV, VS_ROCK_DXIL), gpu::code!(PS_ROCK_CL, PS_ROCK_CL_SPV, PS_ROCK_CL_DXIL), &scene::VERTEX, 32),
                 _ => (gpu::code!(VS_RSPRITE, VS_RSPRITE_SPV, VS_RSPRITE_DXIL), gpu::code!(PS_RSPRITE, PS_RSPRITE_SPV, PS_RSPRITE_DXIL), &SPRITE_LAYOUT, 36),
             };
             let mut d = PipelineDesc::new(vs, ps, layout, stride, Topology::TriangleList, Format::Unknown);
-            let write = matches!(kind, FLAT | ROCK);
+            let write = matches!(kind, FLAT | ROCK | ROCK_CL);
             d.depth = Depth { test: true, write, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.cull = cull;
             d.blend = match kind {
@@ -617,6 +620,8 @@ const ROCK: u64 = 1;
 const GLOW: u64 = 2;
 const SPRITE_ADD: u64 = 3;
 const SPRITE_ALPHA: u64 = 4;
+/// `ROCK`'s clustered twin (`scene::clusters`).
+const ROCK_CL: u64 = 5;
 
 fn relief_strength(s: &surfaces::Surface) -> f32 {
     // Surfaces.asi's k[3].x, the relief's strength in the light ("Depth="), is the

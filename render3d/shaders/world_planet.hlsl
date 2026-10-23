@@ -1,10 +1,11 @@
-// entries: planet_vs:vs_3_0:VS_PLANET ground_ps:ps_3_0:PS_GROUND city_ps:ps_3_0:PS_CITY cloud_ps:ps_3_0:PS_CLOUD halo_ps:ps_3_0:PS_HALO surface_ps:ps_3_0:PS_SURFACE
+// entries: planet_vs:vs_3_0:VS_PLANET ground_ps:ps_3_0:PS_GROUND city_ps:ps_3_0:PS_CITY cloud_ps:ps_3_0:PS_CLOUD halo_ps:ps_3_0:PS_HALO surface_ps:ps_3_0:PS_SURFACE ground_ps_cl:ps_3_0:PS_GROUND_CL:dxc city_ps_cl:ps_3_0:PS_CITY_CL:dxc cloud_ps_cl:ps_3_0:PS_CLOUD_CL:dxc surface_ps_cl:ps_3_0:PS_SURFACE_CL:dxc
 // The world module's planets (src/mods/world/planets.rs): Lighting.asi's planet shaders
 // (its planet.hlsl) over a sphere of our
 // own instead of the engine's re-tessellated GroundMesh. The pixel shaders are the
 // plugin's, but for the highlight shoulder, which the frame's tone map now does.
 
 #include "../../gpu/shaders/compat.hlsli"
+#include "clustered.hlsli"
 
 // ---- vertex: our sphere, unit radius, with the engine's gore UVs baked in ----
 
@@ -97,6 +98,14 @@ Sky shade_n(float3 wp, float3 Ns, float key)
         s.spec  += dcol[k].rgb * (ndl > 0.0 ? pow(saturate(dot(Ns, H)), shine.y) : 0.0) * (k == 0 ? key : 1.0);
         if (k == 0) s.day = saturate(ndl * 4.0 + 0.3);
     }
+#ifdef __hlsl_dx_compiler
+    if (cl_on) {
+        // The cluster's lights, diffuse only, none of a planet's day side.
+        float3 cd = 0.0, cs = 0.0;
+        cl_add(Ns, wp, V, 1.0, true, cd, cs);
+        s.light += cd * mat_diffuse.rgb;
+    } else
+#endif
     for (int j = 0; j < POINTS; j++) {
         float3 L = ppos[j].xyz - wp;
         float  d = length(L);
@@ -336,3 +345,11 @@ float4 surface_ps(Lit i) : SV_Target
     c = lerp(c, surf_cloud.rgb * lit(sc) + sc.glow, cl);
     return float4(shoulder(c, shine.w), 1.0);
 }
+
+#ifdef __hlsl_dx_compiler
+// The clustered twins (Vulkan and Direct3D 12, clustered.hlsli).
+float4 ground_ps_cl(Lit i) : SV_Target { cl_on = true; cl_fc = i.pos; return ground_ps(i); }
+float4 city_ps_cl(Lit i) : SV_Target { cl_on = true; cl_fc = i.pos; return city_ps(i); }
+float4 cloud_ps_cl(Lit i) : SV_Target { cl_on = true; cl_fc = i.pos; return cloud_ps(i); }
+float4 surface_ps_cl(Lit i) : SV_Target { cl_on = true; cl_fc = i.pos; return surface_ps(i); }
+#endif

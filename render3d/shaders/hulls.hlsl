@@ -1,4 +1,4 @@
-// entries: vs_hull:vs_3_0:VS_HULL ps_hull:ps_3_0:PS_HULL ps_bump:ps_3_0:PS_BUMP ps_cloak:ps_3_0:PS_CLOAK ps_ghost:ps_3_0:PS_GHOST ps_holo:ps_3_0:PS_HOLO vs_depth:vs_3_0:VS_DEPTH ps_depth:ps_3_0:PS_DEPTH vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE
+// entries: vs_hull:vs_3_0:VS_HULL ps_hull:ps_3_0:PS_HULL ps_bump:ps_3_0:PS_BUMP ps_cloak:ps_3_0:PS_CLOAK ps_ghost:ps_3_0:PS_GHOST ps_holo:ps_3_0:PS_HOLO vs_depth:vs_3_0:VS_DEPTH ps_depth:ps_3_0:PS_DEPTH vs_sprite:vs_3_0:VS_SPRITE ps_sprite:ps_3_0:PS_SPRITE ps_hull_cl:ps_3_0:PS_HULL_CL:dxc ps_bump_cl:ps_3_0:PS_BUMP_CL:dxc
 // Hulls: ships, stations and the like, drawn from their SODs by render3d's hulls module
 // (src/mods/hulls/). Lighting.asi's hull look ported, drawn into render3d's half-float target. The lit hull
 // keeps Lighting.asi's highlight shoulder (`shoulder`): it stays within 1, as it did
@@ -9,6 +9,7 @@
 // inward; every light direction below is "towards the light".
 
 #include "../../gpu/shaders/compat.hlsli"
+#include "clustered.hlsli"
 
 // ---- vertex ------------------------------------------------------------------------
 
@@ -180,6 +181,11 @@ float4 shade(float3 N, float3 wp, float4 t, float3 sc, float wv)
         sum += c * max(0.0, dot(N, k_dvec[k].xyz));
         spec += c * glint(N, k_dvec[k].xyz, V);
     }
+#ifdef __hlsl_dx_compiler
+    if (cl_on)
+        cl_add(N, wp, V, k_misc.z, false, sum, spec);
+    else
+#endif
     for (int j = 0; j < POINTS; j++) {
         float3 L = k_ppos[j].xyz - wp;
         float d = length(L);
@@ -232,6 +238,24 @@ float4 ps_bump(VO i) : SV_Target
     float3 N = normalize(i.n);
     return shade(bumped(i, N), i.wp, sample_tex(i.uv), i.sc, i.wv);
 }
+
+#ifdef __hlsl_dx_compiler
+// The clustered twins (Vulkan and Direct3D 12, clustered.hlsli): every light of the
+// pixel's cluster in place of the point lights in the constants.
+float4 ps_hull_cl(VO i) : SV_Target
+{
+    cl_on = true;
+    cl_fc = i.pos;
+    return ps_hull(i);
+}
+
+float4 ps_bump_cl(VO i) : SV_Target
+{
+    cl_on = true;
+    cl_fc = i.pos;
+    return ps_bump(i);
+}
+#endif
 
 // ---- cloaked hulls: thick glass over a copy of the frame (Lighting.asi's Cloak=1) ----
 cbuffer hulls_ps1 : register(b1)

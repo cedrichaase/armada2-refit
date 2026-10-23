@@ -43,6 +43,10 @@ never made, and what shows is the ordnance and `Step::Specials`.
     render3d/install.sh            # build, install Render3D.asi, Render3D.ini and the recipes; take out any old plugin
     render3d/install.sh --remove   # take it out again
 
+On the test bench, `render3d/bench-ini.sh` sets keys of a clone's `Render3D.ini` from
+a scenario's `Setup:` line (`Lights:Clustered=0`, `Render3D:Timing=1`) and then runs the
+setup that follows it, as `display/bench-mode.sh` does for `Display8.ini`.
+
 `./install` runs it. Building needs rustup with the 32-bit Windows
 target (`rustup target add i686-pc-windows-msvc`) and `lld-link` (LLVM); `build.sh`
 uses `~/.cargo/bin/cargo` first, since a distribution's cargo has no such target. The
@@ -228,6 +232,17 @@ Two more things are DXIL's alone, both for `gpu`'s Direct3D 12 backend
   first in DXIL alone: `DXIL_POS`, `DXIL_POS_FIRST`, `DXIL_POS_MEMBER`
   (`gpu/shaders/compat.hlsli`).
 
+**Entries dxc alone compiles.** Compute shaders, and pixel shaders that read storage
+buffers, cannot be Direct3D 9's: an entry marked `:dxc` on the entries line has no
+d3dbc (`SYMBOL` is an empty array) and its SPIR-V and DXIL as any other. Its code,
+and every declaration only it reads, sits under `#ifdef __hlsl_dx_compiler`, so vkd3d,
+which compiles the file as it stands, sees the same tokens as before and writes the
+same d3dbc. The clustered lights' twins (`ps_hull_cl`, `ps_bump_cl`, `ps_rock_cl`, the
+planets' `*_ps_cl`) are such entries: each sets a static `cl_on` and calls its plain
+twin, whose light loop takes the cluster's lights when it is set; in the plain entry
+`cl_on` is a constant false and dxc folds it away (their SPIR-V and DXIL are as long
+as before).
+
 ## `Render3D.ini`
 
 | Key | Default | |
@@ -244,6 +259,23 @@ Two more things are DXIL's alone, both for `gpu`'s Direct3D 12 backend
 | `Inset` | 1 | 0: the HUD's action-camera view is left to the engine |
 | `Timing` | 0 | 1: CPU and GPU time per view and step in the log (below); with `Enable=0`, the engine's own view timed |
 | `TimingEvery` | 5 | seconds between timing reports |
+
+**`[Lights]`**, the clustered lights ("Clustered lights" below; Vulkan and Direct3D 12):
+
+| Key | Default | |
+|---|---|---|
+| `Clustered` | 1 | 0: every lit draw takes its lights from its constants, the strongest few per mesh, as on Direct3D 9 (for an A/B in game) |
+| `ClusterTile` | 64 | a tile's side in pixels (larger when the view is wider than 64 tiles or taller than 40) |
+| `ClusterSlices` | 24 | slices of view depth, exponential from the near plane to the far one |
+| `ClusterLights` | 24 | the most lights a cluster lists (at most 32), the strongest at its box |
+| `ClusterPerColour` | 2 | the most of one colour (one group: a volley's bolts) a cluster lists |
+| `BeamLight` | 1.0 | a phaser beam's line light, times the beam's colour (0: none) |
+| `BeamReach` | 40 | how far from the beam it reaches, world units (full to a tenth of it) |
+| `BeamWrap` | 0.4 | how far round the plating it wraps |
+| `ConeSpot` | 1 | the tractor and assimilation beams' wash as a spot confined to the cone (0: the point it was) |
+
+The scene lights (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`,
+`SkyLight`) share the section ("Scene lights", under hulls).
 
 **`[Modules]`.** Each module has a key of its own, `<name>=1` (the names are in the
 sections below: `effects`, `ordnance`, `specials`, `sky`, `overlays`, `particles`,
@@ -1575,6 +1607,54 @@ it is lit the far side of a hull in `Lighting.asi`'s fixed-function path (it han
 soft light to Direct3D mirrored through the draw's origin); the shaders here take every
 point light where it is and turn the normal round instead (`scene::NORMAL_SIGN`), so no
 mirroring is needed.
+
+**Clustered lights** (`scene/clusters.rs`, `shaders/clusters.hlsl`,
+`shaders/clustered.hlsli`; `[Lights] Clustered=1`, Vulkan and Direct3D 12 only). Per
+mesh, the strongest twelve lights pop as a volley passes, and a light that falls on
+one end of a station counts for the whole of it. So on a backend with compute every
+light of the view lights every pixel it reaches, hulls, planets, moons and asteroids
+alike:
+
+- **One list a view.** After every module has registered its lights (the body's
+  `light clusters` mark, after `mods::begin_view`), `clusters::build` takes the
+  scene's list (`scene::lights()`: the engine's records, torpedoes, pulses, shield
+  hits, welds, vents, fireballs, the modules' points) and the shapes render3d adds
+  for the view: a phaser beam as a **line light** (`add_line`, `BeamLight`) that washes
+  the plating it passes close to, a tractor or assimilation beam's wash as a **spot
+  confined to its cone** (`add_spot`, `ConeSpot`: from the emitter, as wide as the
+  cone, out past the target; ART-DIRECTION.md, "It lights the target"). The ordnance
+  module's own points (phaser emitters and impacts, muzzles, the fx lights) go into
+  the scene's list as points of its own rather than the engine's light objects, which
+  spares the engine's heap and the 32-bit address space a light object each.
+- **Groups.** Lights of one colour share a group, as `pick_points` merged them (a
+  volley's bolts are one colour); a styled `distinct` light, a line, a spot and a
+  planet's day side are each their own. The list goes up sorted by group.
+- **The cull** (compute, one thread a cluster): the view's rectangle in tiles of
+  `ClusterTile` pixels by `ClusterSlices` slices of view depth, exponential between the
+  projection's near and far planes. Each cluster's box in view space is tested against
+  each light's reach (a point's sphere; a line's distance from the box's middle less
+  its half diagonal; a spot's sphere about its cone), and the cluster keeps at most
+  `ClusterLights` of them and `ClusterPerColour` of a group, the strongest at the box,
+  in the list's order.
+- **The shading.** A lit draw binds the view's buffers (`clusters::bind`: storage
+  slots 0 and 1, pixel constants c100..c103) and draws with its pixel shader's
+  clustered twin, which walks its pixel's cluster in place of the point lights in its
+  constants: each light's falloff (start, fade, power) and wrap as before, a line from
+  its nearest point, a spot only inside its cone, a day side by the share facing the
+  pixel; and of each group only the strongest at that pixel counts, so a volley of
+  one colour lights as its brightest bolt did, without the per-mesh cut. The highlight
+  shoulder keeps plating within 1, and the Borg profile and the inward normals are as
+  before. Cloaked hulls, ghosts and holograms keep the per-mesh lights.
+- **Per view.** Each view (`View::key`: the HUD's action camera draws the scene a
+  second time) has its buffers; a draw binds them only in the view they were built for
+  (the menu scene has none).
+- **Cost** (`Timing=1`; the `battle` scene, sixteen ships and a planet, 73 lights,
+  1280x720, RX 5700, 2026-10-23): the cull 0.20 ms of GPU time a view on Vulkan and on
+  Direct3D 12; the objects step 0.91 ms against 0.90 without (Vulkan), 0.45 against
+  0.42 (Direct3D 12).
+- **Off** (`Clustered=0`, or Direct3D 9): nothing of it runs, and every draw is as
+  before: the port scenes draw the same pixels as without it (`gpu/README.md`,
+  "Measured").
 
 **Scene lights.** `scene::Lights::gather` replaces the map's directional lights with
 `Lighting.asi`'s Key, Fill and sky light (the sky's mean colour weighted by chroma,

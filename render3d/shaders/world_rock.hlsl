@@ -1,4 +1,4 @@
-// entries: vs_rock:vs_3_0:VS_ROCK ps_rock:ps_3_0:PS_ROCK ps_flat:ps_3_0:PS_FLAT vs_sprite:vs_3_0:VS_RSPRITE ps_sprite:ps_3_0:PS_RSPRITE
+// entries: vs_rock:vs_3_0:VS_ROCK ps_rock:ps_3_0:PS_ROCK ps_flat:ps_3_0:PS_FLAT vs_sprite:vs_3_0:VS_RSPRITE ps_sprite:ps_3_0:PS_RSPRITE ps_rock_cl:ps_3_0:PS_ROCK_CL:dxc
 // The world module's rocks (src/mods/world/rocks.rs): the dilithium moons' rock and the
 // asteroids', surfaces from recipes, as Lighting.asi's moon_ps drew
 // them (in its hull shader): the colour, the relief and the cut-out from three cubes in
@@ -7,6 +7,7 @@
 // by the view's registered lights. No shadow map yet.
 
 #include "../../gpu/shaders/compat.hlsli"
+#include "clustered.hlsli"
 
 cbuffer world_rock_vs : register(b0)
 {
@@ -85,6 +86,11 @@ float4 shade(float3 N, float3 wp, float4 t, float gk)
         sum  += c * max(0.0, dot(N, L));
         spec += c * glint(N, L, V);
     }
+#ifdef __hlsl_dx_compiler
+    if (cl_on)
+        cl_add(N, wp, V, k_shine.y, false, sum, spec);
+    else
+#endif
     for (int j = 0; j < POINTS; j++) {
         float3 L = k_ppos[j].xyz - wp;
         float  d = length(L);
@@ -207,6 +213,16 @@ float4 ps_flat(VO i) : SV_Target
 {
     return float4(k_amb.rgb, 1.0);
 }
+
+#ifdef __hlsl_dx_compiler
+// The clustered twin (Vulkan and Direct3D 12, clustered.hlsli).
+float4 ps_rock_cl(VO i) : SV_Target
+{
+    cl_on = true;
+    cl_fc = i.pos;
+    return ps_rock(i);
+}
+#endif
 
 // A model's sprite nodes (the dilithium moon's `oreglow` nimbus): a quad in world space,
 // its texture times the node's colour (c0.x: 1 to keep the texture's alpha, for a

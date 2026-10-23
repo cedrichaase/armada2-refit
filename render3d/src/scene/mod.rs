@@ -11,6 +11,7 @@
 //!
 //! A module with its own look binds its own shaders around `draw_part`, or walks the
 //! model's parts itself.
+pub mod clusters;
 pub mod lights;
 pub mod pose;
 
@@ -253,6 +254,7 @@ pub fn reset() {
 pub fn begin_view(_v: &View) {
     st().lights = Lights::gather();
     st().queue.clear();
+    clusters::begin_view();
 }
 
 /// The lights of a view that is not the engine's (the menu scene, `crate::menu`): no
@@ -260,6 +262,7 @@ pub fn begin_view(_v: &View) {
 pub fn set_lights(l: Lights) {
     st().lights = l;
     st().queue.clear();
+    clusters::forget_view();
 }
 
 /// Reads the engine's registered lights again, for a module that registered lights of

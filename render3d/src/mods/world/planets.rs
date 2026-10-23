@@ -60,7 +60,29 @@ struct Sphere {
 }
 
 /// The pixel shaders, by the index the pipelines' keys carry.
-const PS: [gpu::Code; 5] = [gpu::code!(PS_GROUND, PS_GROUND_SPV, PS_GROUND_DXIL), gpu::code!(PS_CITY, PS_CITY_SPV, PS_CITY_DXIL), gpu::code!(PS_CLOUD, PS_CLOUD_SPV, PS_CLOUD_DXIL), gpu::code!(PS_HALO, PS_HALO_SPV, PS_HALO_DXIL), gpu::code!(PS_SURFACE, PS_SURFACE_SPV, PS_SURFACE_DXIL)];
+const PS: [gpu::Code; 9] = [
+    gpu::code!(PS_GROUND, PS_GROUND_SPV, PS_GROUND_DXIL),
+    gpu::code!(PS_CITY, PS_CITY_SPV, PS_CITY_DXIL),
+    gpu::code!(PS_CLOUD, PS_CLOUD_SPV, PS_CLOUD_DXIL),
+    gpu::code!(PS_HALO, PS_HALO_SPV, PS_HALO_DXIL),
+    gpu::code!(PS_SURFACE, PS_SURFACE_SPV, PS_SURFACE_DXIL),
+    // The clustered twins of ground, city, cloud and surface (`scene::clusters`).
+    gpu::code!(PS_GROUND_CL, PS_GROUND_CL_SPV, PS_GROUND_CL_DXIL),
+    gpu::code!(PS_CITY_CL, PS_CITY_CL_SPV, PS_CITY_CL_DXIL),
+    gpu::code!(PS_CLOUD_CL, PS_CLOUD_CL_SPV, PS_CLOUD_CL_DXIL),
+    gpu::code!(PS_SURFACE_CL, PS_SURFACE_CL_SPV, PS_SURFACE_CL_DXIL),
+];
+
+/// A pixel shader's clustered twin, if it has one.
+fn clustered_twin(ps: usize) -> Option<usize> {
+    match ps {
+        P_GROUND => Some(5),
+        P_CITY => Some(6),
+        P_CLOUD => Some(7),
+        P_SURFACE => Some(8),
+        _ => None,
+    }
+}
 const P_GROUND: usize = 0;
 const P_CITY: usize = 1;
 const P_CLOUD: usize = 2;
@@ -208,6 +230,8 @@ pub struct Planets {
     ground_mean: BTreeMap<String, [f32; 3]>,
     cities: BTreeMap<(usize, usize), City>,
     said: u32,
+    /// The body being drawn takes its lights from the view's clusters.
+    cl: bool,
 }
 
 impl Planets {
@@ -219,12 +243,14 @@ impl Planets {
             ground_mean: BTreeMap::new(),
             cities: BTreeMap::new(),
             said: 0,
+            cl: false,
         }
     }
 
     /// The pipeline of pixel shader `ps` (`P_*`) blending as `mode` says: the sphere,
     /// depth-tested against the scene, its outside's faces (`CULL_CCW`).
     fn pipe(&mut self, ps: usize, mode: u8) -> Option<Pipeline> {
+        let ps = if self.cl { clustered_twin(ps).unwrap_or(ps) } else { ps };
         self.pipes.view((ps * 4 + mode as usize) as u64, || {
             let mut d = PipelineDesc::new(gpu::code!(VS_PLANET, VS_PLANET_SPV, VS_PLANET_DXIL), PS[ps], &LAYOUT, 32, Topology::TriangleList, Format::Unknown);
             d.depth = Depth { test: true, write: mode == OPAQUE, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
@@ -511,6 +537,13 @@ impl Planets {
         }
         if atmo_sf && rs > 0.0 {
             surf.get(cmd, v, atmo);
+        }
+        // Every light near it, per pixel, from the view's clusters (Vulkan, Direct3D 12).
+        self.cl = false;
+        if scene::clusters::on() {
+            self.cl = true;
+            let ok = self.pipe(P_GROUND, OPAQUE).is_some_and(|p| p.ready(gfx::gpu())) && scene::clusters::bind(cmd, v);
+            self.cl = ok;
         }
         if !self.pipe(P_GROUND, OPAQUE).is_some_and(|p| p.ready(gfx::gpu())) {
             return false;

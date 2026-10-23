@@ -288,12 +288,23 @@ pub struct Drawer {
 }
 
 /// The hull's pixel shaders (`Drawer::pipe`).
-const PS_LIST: [gpu::Code; 5] = [gpu::code!(PS_HULL, PS_HULL_SPV, PS_HULL_DXIL), gpu::code!(PS_BUMP, PS_BUMP_SPV, PS_BUMP_DXIL), gpu::code!(PS_CLOAK, PS_CLOAK_SPV, PS_CLOAK_DXIL), gpu::code!(PS_GHOST, PS_GHOST_SPV, PS_GHOST_DXIL), gpu::code!(PS_HOLO, PS_HOLO_SPV, PS_HOLO_DXIL)];
+const PS_LIST: [gpu::Code; 7] = [
+    gpu::code!(PS_HULL, PS_HULL_SPV, PS_HULL_DXIL),
+    gpu::code!(PS_BUMP, PS_BUMP_SPV, PS_BUMP_DXIL),
+    gpu::code!(PS_CLOAK, PS_CLOAK_SPV, PS_CLOAK_DXIL),
+    gpu::code!(PS_GHOST, PS_GHOST_SPV, PS_GHOST_DXIL),
+    gpu::code!(PS_HOLO, PS_HOLO_SPV, PS_HOLO_DXIL),
+    gpu::code!(PS_HULL_CL, PS_HULL_CL_SPV, PS_HULL_CL_DXIL),
+    gpu::code!(PS_BUMP_CL, PS_BUMP_CL_SPV, PS_BUMP_CL_DXIL),
+];
 const S_HULL: usize = 0;
 const S_BUMP: usize = 1;
 const S_CLOAK: usize = 2;
 const S_GHOST: usize = 3;
 const S_HOLO: usize = 4;
+/// The clustered twins of `S_HULL` and `S_BUMP` (`scene::clusters`).
+const S_HULL_CL: usize = 5;
+const S_BUMP_CL: usize = 6;
 
 /// The hull's textures and normal maps: wrapped, filtered through their levels.
 const WRAP: Sampler = gfx::sampler(Filter::Linear, MipFilter::Linear, Address::Wrap, Address::Wrap);
@@ -544,6 +555,11 @@ impl Drawer {
             ck[48..52].copy_from_slice(&[look.cloak_shimmer, look.cloak_wave_tilt, v.time * look.cloak_shimmer_speed, 0.0]);
             cmd.ps_block(Block::new(80, &ck));
         }
+        // Lit opaque and faded hulls take every light of their pixel's cluster on Vulkan
+        // and Direct3D 12 (`scene::clusters`), in place of the strongest few per mesh.
+        let clustered = matches!(mode, Mode::Opaque | Mode::Faded(_))
+            && self.pipe(S_HULL_CL, mode, Cull::None).is_some_and(|pl| pl.ready(gfx::gpu()))
+            && scene::clusters::bind(cmd, v);
         let mut shared: Option<(bool, [f32; 74 * 4])> = None;
         // The faces the instance draws (`sm_faces_remaining`, `+0x10`: construction).
         // (None for a model that is not an instance's: inst 0.)
@@ -583,7 +599,12 @@ impl Drawer {
             // A face-limited instance (a station being built) shows its inside through
             // the faces not built yet: drawn two-sided, as stock shows it.
             let cull = if part.two_sided || limit >= 0 { Cull::None } else if mirrored { Cull::CounterClockwise } else { Cull::Clockwise };
-            let ps = if nmap.is_some() { S_BUMP } else { own.unwrap_or(S_HULL) };
+            let ps = match (nmap.is_some(), clustered) {
+                (true, true) => S_BUMP_CL,
+                (true, false) => S_BUMP,
+                (false, true) if own.is_none() => S_HULL_CL,
+                _ => own.unwrap_or(S_HULL),
+            };
             let Some(pipe) = self.pipe(ps, mode, cull) else { continue };
             if !cmd.set_pipeline(&pipe) {
                 continue;
@@ -593,7 +614,7 @@ impl Drawer {
             }
             cmd.ps_block(Block::new(73, &[if nmap.is_none() { 0.0 } else { 1.0 }, look.bump, look.knee, 0.0]));
             cmd.vs_block(Block::new(0, world.to_m4().transpose().as_floats()));
-            if mode != Mode::DepthOnly {
+            if mode != Mode::DepthOnly && !clustered {
                 cmd.ps_block(Block::new(16, &pick_points(world.p, look.point_lights)));
             }
             let tex_name = if p.assimilated { second_texture(m, part.node).or(part.texture.as_deref()) } else { part.texture.as_deref() };
