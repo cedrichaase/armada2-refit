@@ -23,6 +23,7 @@ use crate::log;
 use crate::rt::Ini;
 use crate::shaders::overlays::*;
 use crate::shaders::overlays_spv::*;
+use crate::shaders::overlays_dxil::*;
 
 const SCAN_FOG: usize = 0x738a54;
 const SCAN_SHROUD: usize = 0x738a58;
@@ -147,11 +148,11 @@ impl Fog {
             );
         }
         let Some(mut cmd) = gfx::cmd() else { return };
-        let ps: gpu::Code = if s.catrom { gpu::code!(PS_FOG_CATROM, PS_FOG_CATROM_SPV) } else { gpu::code!(PS_FOG_BSPLINE, PS_FOG_BSPLINE_SPV) };
+        let ps: gpu::Code = if s.catrom { gpu::code!(PS_FOG_CATROM, PS_FOG_CATROM_SPV, PS_FOG_CATROM_DXIL) } else { gpu::code!(PS_FOG_BSPLINE, PS_FOG_BSPLINE_SPV, PS_FOG_BSPLINE_DXIL) };
         // The depth test on and always passing (as stock: `ZENABLE` on, `ALWAYS`), no
         // depth written, blended by alpha, no culling.
         let pipe = self.pipes.view(s.catrom as u64, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_PLANE, VS_PLANE_SPV), ps, &VERTEX, 20, Topology::TriangleStrip, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_PLANE, VS_PLANE_SPV, VS_PLANE_DXIL), ps, &VERTEX, 20, Topology::TriangleStrip, Format::Unknown);
             d.depth = Depth { test: true, write: false, compare: Compare::Always, bias: 0.0, slope_bias: 0.0 };
             d.blend = Some(Blend::ALPHA);
             d

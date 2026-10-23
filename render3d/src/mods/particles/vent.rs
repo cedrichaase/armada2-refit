@@ -14,6 +14,7 @@ use crate::math::{v3, V3};
 use crate::rt::Ini;
 use crate::shaders::particles_vent::*;
 use crate::shaders::particles_vent_spv::*;
+use crate::shaders::particles_vent_dxil::*;
 use alloc::vec::Vec;
 
 /// Per kind of vent: [0] plasma, [1] gas.
@@ -292,7 +293,7 @@ impl Drawer {
         let Some(mut cmd) = gfx::cmd() else { return };
         // Added, depth-tested and not written, red, green and blue, no culling.
         let pipe = self.pipes.view(0, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_VENT, VS_VENT_SPV), gpu::code!(PS_VENT, PS_VENT_SPV), &LAYOUT, 60, Topology::TriangleList, Format::Unknown);
+            let mut d = PipelineDesc::new(gpu::code!(VS_VENT, VS_VENT_SPV, VS_VENT_DXIL), gpu::code!(PS_VENT, PS_VENT_SPV, PS_VENT_DXIL), &LAYOUT, 60, Topology::TriangleList, Format::Unknown);
             d.blend = Some(Blend::ADD);
             d.depth = Depth { test: true, write: false, compare: Compare::LessEqual, bias: 0.0, slope_bias: 0.0 };
             d.write_mask = 7;

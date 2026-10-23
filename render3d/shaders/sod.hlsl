@@ -1,4 +1,4 @@
-// entries: vs_sod:vs_3_0:VS_SOD ps_sod:ps_3_0:PS_SOD
+// entries: vs_sod:vs_3_0:VS_SOD ps_sod:ps_3_0:PS_SOD:at
 // A SOD mesh drawn by render3d's scene layer (src/scene/): the baseline every module
 // that draws a SOD instance shares. Lit by the engine's registered lights: up to four
 // directional and eight point lights, with the engine's point-light falloff (full

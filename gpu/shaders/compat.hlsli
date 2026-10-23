@@ -33,7 +33,27 @@
 // SV_Position (Vulkan's FragCoord) is its centre, half a pixel on.
 float2 d3d9_vpos(float4 fc) { return fc.xy - 0.5; }
 
-#else  // vkd3d, Direct3D 9
+#endif
+
+// Direct3D 12 links a pixel shader's inputs to its vertex shader's outputs by
+// register, and dxc packs each signature in the order it is declared: a pixel shader
+// whose inputs leave out the SV_Position its vertex shader writes first, or take it
+// after the rest, reads every varying a register off. Direct3D 9 and Vulkan match them
+// by semantic (gpu's Vulkan backend moves the locations). So in DXIL alone, such a
+// pixel shader takes the position first: DXIL_POS before its first parameter,
+// DXIL_POS_MEMBER as its input struct's first member, DXIL_POS_FIRST(a, b) for a pair
+// of parameters `a` then an SV_Position `b`.
+#if defined(__hlsl_dx_compiler) && !defined(__spirv__)
+#define DXIL_POS float4 dxil_pos : SV_Position,
+#define DXIL_POS_MEMBER float4 dxil_pos : SV_Position;
+#define DXIL_POS_FIRST(a, b) b, a
+#else
+#define DXIL_POS
+#define DXIL_POS_MEMBER
+#define DXIL_POS_FIRST(a, b) a, b
+#endif
+
+#ifndef __hlsl_dx_compiler  // vkd3d, Direct3D 9
 
 #define CREG(n) register(c##n)
 #define STAGE(n)

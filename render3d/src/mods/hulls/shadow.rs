@@ -16,6 +16,7 @@ use crate::math::{v3, V3};
 use crate::scene::{self, Blend};
 use crate::shaders::hulls::*;
 use crate::shaders::hulls_spv::*;
+use crate::shaders::hulls_dxil::*;
 use crate::log;
 use alloc::collections::BTreeMap;
 use gpu::{Block, ColorTarget, Contents, Depth, DepthTarget, Format, Load, Pass, PipelineDesc, Texture, TextureDesc, Topology, Usage};
@@ -172,7 +173,7 @@ impl Shadow {
         // Depth tested and written, no culling, every channel; into the map's R32F and
         // its depth buffer, one sample.
         let pipe = self.pipes.own(0, || {
-            let mut d = PipelineDesc::new(gpu::code!(VS_DEPTH, VS_DEPTH_SPV), gpu::code!(PS_DEPTH, PS_DEPTH_SPV), &scene::VERTEX, 32, Topology::TriangleList, Format::R32F);
+            let mut d = PipelineDesc::new(gpu::code!(VS_DEPTH, VS_DEPTH_SPV, VS_DEPTH_DXIL), gpu::code!(PS_DEPTH, PS_DEPTH_SPV, PS_DEPTH_DXIL), &scene::VERTEX, 32, Topology::TriangleList, Format::R32F);
             d.depth = Depth::TEST_WRITE;
             d.depth_format = Some(Format::D24X8);
             d

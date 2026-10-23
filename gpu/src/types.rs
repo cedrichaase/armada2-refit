@@ -431,36 +431,56 @@ pub const fn attr(offset: u16, format: AttrFormat, semantic: Semantic, index: u8
 }
 
 /// Shader code for each backend a pipeline may be made on: Direct3D 9's bytecode
-/// (vkd3d's d3dbc) and SPIR-V (dxc's), compiled from one HLSL source
-/// (render3d/README.md, "One source, two compilers"). DXIL joins them with Direct3D 12.
+/// (vkd3d's d3dbc), SPIR-V (dxc's) and DXIL (the pinned dxc's, signed), compiled from
+/// one HLSL source (render3d/README.md, "One source, two compilers"). `dxil_at` is a
+/// pixel shader's alpha-tested twin (an entry marked `:at`, `render3d/dxil-alpha.py`):
+/// Direct3D 12 has no alpha test, so a pipeline with one draws with the twin. Empty
+/// where a form was not built.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Code {
     pub d3d9: &'static [u32],
     pub spirv: &'static [u32],
+    pub dxil: &'static [u32],
+    pub dxil_at: &'static [u32],
 }
 
 impl Code {
-    /// The same shader as d3dbc and as SPIR-V (`SYMBOL` and `SYMBOL_SPV`).
+    /// The same shader as d3dbc and as SPIR-V (`SYMBOL` and `SYMBOL_SPV`), no DXIL.
     pub const fn new(d3d9: &'static [u32], spirv: &'static [u32]) -> Code {
-        Code { d3d9, spirv }
+        Code { d3d9, spirv, dxil: &[], dxil_at: &[] }
+    }
+    /// With its DXIL (`SYMBOL_DXIL`).
+    pub const fn with_dxil(d3d9: &'static [u32], spirv: &'static [u32], dxil: &'static [u32]) -> Code {
+        Code { d3d9, spirv, dxil, dxil_at: &[] }
+    }
+    /// With its DXIL and its alpha-tested twin (`SYMBOL_AT_DXIL`).
+    pub const fn with_dxil_at(d3d9: &'static [u32], spirv: &'static [u32], dxil: &'static [u32], dxil_at: &'static [u32]) -> Code {
+        Code { d3d9, spirv, dxil, dxil_at }
     }
 }
 
-/// `Code::new(&SYMBOL, &SYMBOL_SPV)`, for a shader whose two forms are the generated
-/// statics (`shaders/<name>.rs`, `<name>_spv.rs`), both in scope.
+/// A shader's forms from the generated statics (`shaders/<name>.rs`, `<name>_spv.rs`,
+/// `<name>_dxil.rs`), all in scope: `code!(PS_X, PS_X_SPV, PS_X_DXIL)`, and
+/// `PS_X_AT_DXIL` after them for a pixel shader drawn with an alpha test.
 #[macro_export]
 macro_rules! code {
     ($d3d9:ident, $spirv:ident) => {
         $crate::Code::new(&$d3d9, &$spirv)
+    };
+    ($d3d9:ident, $spirv:ident, $dxil:ident) => {
+        $crate::Code::with_dxil(&$d3d9, &$spirv, &$dxil)
+    };
+    ($d3d9:ident, $spirv:ident, $dxil:ident, $at:ident) => {
+        $crate::Code::with_dxil_at(&$d3d9, &$spirv, &$dxil, &$at)
     };
 }
 
 pub const MAX_COLORS: usize = 4;
 
 /// The alpha test: a fragment is kept when its alpha (0..255) passes `compare` against
-/// `reference`. Direct3D 9 has it as fixed-function state; a Vulkan or Direct3D 12
-/// backend makes a variant of the pixel shader that discards (a specialisation constant
-/// or a define), since neither has the state.
+/// `reference`. Direct3D 9 has it as fixed-function state, Vulkan and Direct3D 12 do
+/// not: the Vulkan backend patches a discard into the pixel shader's SPIR-V, the
+/// Direct3D 12 one draws with its alpha-tested twin (`Code::dxil_at`).
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct AlphaTest {

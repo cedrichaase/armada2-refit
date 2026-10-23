@@ -210,6 +210,23 @@ register file is bound at b0 (vertex) or b1 (pixel) in every space 0..k, and eac
 module's `CB_SPACES` says how many (at most 8, which it checks). The d3dbc and SPIR-V
 are untouched by it: they compile the source as it is.
 
+Two more things are DXIL's alone, both for `gpu`'s Direct3D 12 backend
+(`gpu/README.md`, "The Direct3D 12 backend"):
+
+- **The alpha test.** Direct3D 12 has none, and DXIL cannot be patched as the SPIR-V
+  is, so a pixel shader drawn with one (`PS_SOD`, the particles' `PS_SPRITE`, the
+  ghosts' `PS_GHOST`) is marked `:at` on its entries line, and `dxil-alpha.py` adds
+  `<entry>__alpha_test` beside it in the DXIL source: the entry called, then the
+  fragment discarded by the interval gpu passes at b2. It is `SYMBOL_AT_DXIL`, the
+  fourth name in `gpu::code!`. The mark changes nothing in the d3dbc or the SPIR-V.
+- **Stage linkage by register.** Direct3D 12 links a pixel shader's inputs to its
+  vertex shader's outputs by register, as dxc packs each signature in declaration
+  order; Direct3D 9 and Vulkan go by semantic. A pixel shader whose inputs leave out the
+  position its vertex shader writes first (the post passes) or take it last (the sky's
+  quad shaders), or whose input struct is another (the ghosts'), takes the position
+  first in DXIL alone: `DXIL_POS`, `DXIL_POS_FIRST`, `DXIL_POS_MEMBER`
+  (`gpu/shaders/compat.hlsli`).
+
 ## `Render3D.ini`
 
 | Key | Default | |

@@ -9,6 +9,7 @@ use crate::dump::{Area, Dump, Kind};
 use crate::log;
 use crate::shaders::post::*;
 use crate::shaders::post_spv::*;
+use crate::shaders::post_dxil::*;
 use alloc::vec::Vec;
 use gpu::{
     attr, AttrFormat, Blend, Block, Cmd, ColorTarget, Contents, DepthTarget, Format, Gpu, Load, Pass, Pipeline,
@@ -176,16 +177,16 @@ impl Post {
     /// device refuses a shader.
     pub fn create(gpu: &Gpu, fmt: Format, out: Format) -> Option<Post> {
         let p = |ps: gpu::Code, target: Format, blend: Option<Blend>| {
-            let mut d = PipelineDesc::new(gpu::code!(VS_QUAD, VS_QUAD_SPV), ps, &LAYOUT, 32, Topology::TriangleStrip, target);
+            let mut d = PipelineDesc::new(gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), ps, &LAYOUT, 32, Topology::TriangleStrip, target);
             d.blend = blend;
             let p = gpu.pipeline(d);
             p.ready(gpu).then_some(p)
         };
         Some(Post {
-            prefilter: p(gpu::code!(PS_PREFILTER, PS_PREFILTER_SPV), fmt, None)?,
-            down: p(gpu::code!(PS_DOWN, PS_DOWN_SPV), fmt, None)?,
-            up: p(gpu::code!(PS_UP, PS_UP_SPV), fmt, Some(Blend::ADD))?,
-            fin: p(gpu::code!(PS_FINAL, PS_FINAL_SPV), out, None)?,
+            prefilter: p(gpu::code!(PS_PREFILTER, PS_PREFILTER_SPV, PS_PREFILTER_DXIL), fmt, None)?,
+            down: p(gpu::code!(PS_DOWN, PS_DOWN_SPV, PS_DOWN_DXIL), fmt, None)?,
+            up: p(gpu::code!(PS_UP, PS_UP_SPV, PS_UP_DXIL), fmt, Some(Blend::ADD))?,
+            fin: p(gpu::code!(PS_FINAL, PS_FINAL_SPV, PS_FINAL_DXIL), out, None)?,
             out,
         })
     }

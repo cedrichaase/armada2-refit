@@ -13,7 +13,7 @@ use gpu::display::{VkAlloc8, VkDevice8, VkFrame8, VkImage8, BACKEND_D3D12, BACKE
 pub extern "C" fn display8_backend() -> u32 {
     if get().is_some() || crate::stub::vulkan() {
         BACKEND_VULKAN
-    } else if crate::dx12::get().is_some() {
+    } else if crate::dx12::get().is_some() || crate::stub::d3d12() {
         BACKEND_D3D12
     } else if !crate::stub::dev9().is_null() {
         BACKEND_D3D9

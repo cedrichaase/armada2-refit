@@ -115,7 +115,7 @@ unsafe extern "system" fn present(dev8: *mut c_void, src: *const c_void, dst: *c
 fn dump_back_buffer(dev8: *mut c_void, name: alloc::string::String, frame: u32) {
     let mut d = crate::dump::Dump::new(name, frame, "ui");
     let g = crate::gfx::gpu();
-    let bb = if g.is_vulkan() {
+    let bb = if g.on_display() {
         // Display8's image of the engine's back buffer, before its gamma pass.
         crate::gfx::attach().and_then(|_| g.engine_target())
     } else {

@@ -11,10 +11,31 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `qol-refused-advisor` selects the starbase after Home (`center_player`), which puts it
   at 835,250 whatever the random start position; the start view's own place for it
   varies from run to run, and the old click at 735,305 selected nothing in some runs, so
-  its presses queued nothing. It now checks each link: the selection (`info: Builder Starbase`, the bar's layout), the
-  keys the bar took (`Q=build`, `Q=fconst`), the local bank's payments (3250, 3000), the
+  its presses queued nothing. It now checks each link: the
+  selection (`info: Builder Starbase`, the bar's layout), the keys the bar took (`Q=build`, `Q=fconst`), the local bank's payments (3250, 3000), the
   refusal, the advisor for the local team and its chat line. Its log waits end on lines
   written after the action (the startup line is checked before LAUNCH).
+
+Installed, not yet seen in game.
+
+## 3.53.0 — 2026-10-23
+
+### Added
+- A game with `Mode=stub`, `Backend=d3d12` and `Validate=1` in its clone's
+  `Display8.ini` gets the Khronos validation layer under vkd3d-proton, writing
+  `logs/vvl.log` (`session.vulkan_env`).
+
+Installed, not yet seen in game.
+
+## 3.52.0 — 2026-10-23
+
+### Added
+- The stock cache (`bench/stockcache.py`): a session that starts from stock (`--mod
+  stock`, `--install`, `--assets none`) copies the game from `~/.cache/a2test/stock/<key>/`,
+  where `a2mod stock` has run once per state of the install, instead of running it on
+  every clone (12 s a session). Keyed by the install's tree (`lstat`, ctime included)
+  and the `a2mod` script; built under a flock and renamed into place.
+  `a2test stock-cache status | rebuild | drop`; `A2TEST_STOCK_CACHE=0` turns it off.
 
 Installed, not yet seen in game.
 
