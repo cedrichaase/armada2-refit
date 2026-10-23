@@ -567,7 +567,7 @@ float3 nl_light(float3 p)
             // reach) on a soft tail out to the reach, never a ball lit to its edge.
             float x = length(l.a.xyz - p) * l.c.w / (1.0 + l.a.w * l.c.w);
             float e = saturate(1.0 - x), q = x / k_nlt.y;
-            c = l.c.rgb * (e * e * (0.3 + 0.7 / (1.0 + q * q)));
+            c = l.c.rgb * (pow(e, 1.5) * (0.45 + 0.55 / (1.0 + q * q)));
         } else {
             c = cl_eval(l, p, L);
         }

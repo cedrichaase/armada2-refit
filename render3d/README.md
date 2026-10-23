@@ -1811,7 +1811,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
 `MoonCrackCore`, `MoonCrackDepth`, `MoonCrackFalloff`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 1.5, `LitBeam` 1.3, `LitCorona` 0.15, `LitTemporal` 0.5, `LitClip` 0.5), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 3.5, `LitBeam` 1.5, `LitCorona` 0.25, `LitTemporal` 0.5, `LitClip` 0.5), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -2003,7 +2003,7 @@ the gas with no lights is drawn as before. Which light is what, to the gas
 (`scene::lights::Gas`, the cluster list's `t.z`): a fireball's takes `LitExplosion=`;
 a torpedo's or pulse's (each ordnance class's light, which rides with its shots) is a
 **corona**, bright within `LitCorona=` of its reach and fading softly to it,
-(1 - x)^2 (0.3 + 0.7 / (1 + (x / LitCorona)^2)) for x the distance over the reach,
+(1 - x)^1.5 (0.45 + 0.55 / (1 + (x / LitCorona)^2)) for x the distance over the reach,
 since a ball lit evenly to its edge read as a sphere in the gas; a beam's line light
 takes `LitBeam=`; the nebulae's own lights (`world::lights`) and a planet's day side
 light no gas at all. The shape is the clusters' first choice (the alternative, a froxel

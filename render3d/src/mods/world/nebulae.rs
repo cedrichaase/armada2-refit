@@ -136,9 +136,9 @@ impl Settings {
             lit_temporal: math::saturate(ini.float(s, "LitTemporal", 0.5)),
             lit_clip: math::clamp(ini.float(s, "LitClip", 0.5), 0.1, 1.0),
             lit_explosion: ini.float(s, "LitExplosion", 0.75).max(0.0),
-            lit_bolt: ini.float(s, "LitBolt", 1.5).max(0.0),
-            lit_beam: ini.float(s, "LitBeam", 1.3).max(0.0),
-            lit_corona: math::clamp(ini.float(s, "LitCorona", 0.15), 0.02, 1.0),
+            lit_bolt: ini.float(s, "LitBolt", 3.5).max(0.0),
+            lit_beam: ini.float(s, "LitBeam", 1.5).max(0.0),
+            lit_corona: math::clamp(ini.float(s, "LitCorona", 0.25), 0.02, 1.0),
         }
     }
 }
