@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.34.0 — 2026-10-23
+
+Layers: render3d 0.27.0, testbench 3.68.0.
+
+### Changed
+- render3d: an explosion inside a nebula lights the gas strongly about the breach,
+  within two of the ship's radii, and the rest of the cloud with a dim wash, instead
+  of lighting the whole cloud in view alike. New `[Nebulae]` keys `LitExplosionCore`
+  and `LitExplosionFar`; `LitExplosion` defaults to 1.5, and an install moves a
+  player's old 0.75 to it (render3d 0.27.0).
+
+### Added
+- testbench: `render3d-nebula-explosion` (testbench 3.68.0).
+
+Installed, not yet seen in game.
+
 ## 13.33.0 — 2026-10-23
 
 Layers: ui 0.22.0, testbench 3.67.0.

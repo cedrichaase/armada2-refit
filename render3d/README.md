@@ -1879,7 +1879,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
 `MoonCrackCore`, `MoonCrackDepth`, `MoonCrackFalloff`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 0.75, `LitBolt` 3.5, `LitBeam` 1.5, `LitSpark` 0.3, `LitCorona` 0.25, `LitKnee` 6, `LitTemporal` 0.5, `LitClip` 0.5), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 1.5, `LitExplosionCore` 2, `LitExplosionFar` 0.12, `LitBolt` 3.5, `LitBeam` 1.5, `LitSpark` 0.3, `LitCorona` 0.25, `LitKnee` 6, `LitTemporal` 0.5, `LitClip` 0.5), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -2073,7 +2073,28 @@ off instead of whiting the frame out (at the knee's peak, 0.35 s after the kill 
 `render3d-nebula-lit`, 6 kept the glow's gradient where 0.75 to 2.5 flattened it into
 a uniform wash). The composite takes it through the gas's opacity, and the gas with
 no lights is drawn as before. Which light is what, to the gas
-(`scene::lights::Gas`, the cluster list's `t.z`): a fireball's takes `LitExplosion=`;
+(`scene::lights::Gas`, the cluster list's `t.z`): a fireball's takes `LitExplosion=`
+in a **core** about the breach and a dim **wash** beyond it. Its light is full out to
+the dead craft's bounding radius r (at least 40) and gone at `[Explosions]
+LightRange=` radii (10), linearly: as a plain light in the gas that lit everything
+within some ten radii almost alike, and a view ray inside the cloud crosses hundreds
+of units of that gas, so the sum along every ray in view went up to the knee and the
+whole cloud went white to the frame's edge (the user, in game, 2026-10-23: a breach
+*inside* the gas "out of proportion"; one just outside it looked right). So the gas
+takes that light times wash + (1 - wash) / sqrt(1 + (d / (c r))^4), c =
+`LitExplosionCore=` (2) and wash = `LitExplosionFar=` (0.12): about full within c
+radii, falling as the inverse square past them, down to the wash (`LitExplosionFar=1`
+is the plain light as before), and `LitExplosion=` went from 0.75 to 1.5, so the core
+is hotter than before while the cloud beyond takes about a quarter of what it did (an
+install moves a player's 0.75 to 1.5: `install.sh`, `RETIRED`). Judged on the bench
+(`render3d-nebula-explosion`, Vulkan on the GPU, 1280x720, 2026-10-23) against a core
+of 1.5 to 4 radii, a wash of 0.1 to 0.3 and `LitExplosion=` 0.75 to 2: a wider core or
+a stronger wash brought the pink over the whole cloud back. A falloff by distance
+cannot tell apart the two cases the user judged: gas a few hundred units from a breach
+just outside the cloud is as far from it as the far gas is from a breach inside, so
+the cloud's edge beside a breach outside now glows less than it did (pink, not
+salmon), while gas within two radii of a breach glows as before or brighter. The hulls
+take the fireball's light as before;
 a torpedo's or pulse's (each ordnance class's light, which rides with its shots) is a
 **corona**, bright within `LitCorona=` of its reach and fading softly to it,
 (1 - x)^1.5 (0.45 + 0.55 / (1 + (x / LitCorona)^2)) for x the distance over the reach,

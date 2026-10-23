@@ -78,6 +78,7 @@ lines = open(sys.argv[2]).read().splitlines()
 RETIRED = {
     ('lights', 'beamlight'): '1.0',   # render3d 0.26.0: a line of even emission
     ('lights', 'beamreach'): '40',
+    ('nebulae', 'litexplosion'): '0.75',  # render3d 0.27.0: a core and a wash in the gas
 }
 shipped = {}
 for sec, body in new.items():

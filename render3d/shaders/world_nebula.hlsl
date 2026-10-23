@@ -535,6 +535,7 @@ cbuffer world_nebula_lit : register(b1)
     float4 k_nl      : CREG(104); // x: light scattered per world unit of the densest gas (LitStrength= / 100); y: tinted by the gas's hue (LitTint=); z: the lit share's weight (temporal_ps); w: the clip where lit (of TemporalClip=)
     float4 k_nlt     : CREG(105); // x: this frame's share where lit (LitTemporal=); y: a bolt's corona, of its reach (LitCorona=); z: 1 / the knee (LitKnee=, 0: none)
     float4 k_nlk     : CREG(106); // the gas's share of a fireball's light (LitExplosion=), a bolt's (LitBolt=), a beam's line (LitBeam=), a spark's (LitSpark=)
+    float4 k_nle     : CREG(107); // a fireball's core: x 1 / its radius, in the light's full radius (1 / LitExplosionCore=); y the wash beyond it (LitExplosionFar=)
 };
 
 static bool nl_on = false;
@@ -571,6 +572,15 @@ float3 nl_light(float3 p)
             c = l.c.rgb * (pow(e, 1.5) * (0.45 + 0.55 / (1.0 + q * q)));
         } else {
             c = cl_eval(l, p, L);
+            if (gk == 1u) {
+                // A fireball: a core about the breach, LitExplosionCore= of the dead
+                // craft's radius (the light's full radius, a.w), past which it falls as
+                // the inverse square, over a wash of LitExplosionFar= out to the
+                // light's reach. Lit evenly to that radius and then linearly over nine
+                // more, a breach in the gas lit the whole cloud about alike.
+                float q = length(l.a.xyz - p) / max(l.a.w, 1e-3) * k_nle.x;
+                c *= lerp(rsqrt(1.0 + q * q * q * q), 1.0, k_nle.y);
+            }
         }
         c *= gk == 1u ? k_nlk.x : gk == 2u ? k_nlk.y : gk == 4u ? k_nlk.w : (l.t.x & 15u) == 1u ? k_nlk.z : 1.0;
         float s = dot(c, float3(0.299, 0.587, 0.114));

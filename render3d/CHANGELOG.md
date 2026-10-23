@@ -4,6 +4,24 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.27.0 — 2026-10-23
+
+### Changed
+- A fireball's light in a nebula's gas has a core and a wash: about full within
+  `LitExplosionCore=` of the dead craft's radii, falling as the inverse square past
+  them to a wash of `LitExplosionFar=` out to the light's reach (`nl_light` in
+  `world_nebula.hlsl`). It lit the gas evenly to one radius and linearly to ten, so a
+  breach inside the gas lit the whole cloud in view to the knee. The hulls take the
+  fireball's light as before.
+- `[Nebulae] LitExplosion` defaults to 1.5 (was 0.75), for a hotter core; an install
+  replaces a player's old default (`install.sh`, `RETIRED`), a value they set stays.
+
+### Added
+- `[Nebulae]` keys `LitExplosionCore` (2) and `LitExplosionFar` (0.12), in the shipped
+  `Render3D.ini`.
+
+Installed, not yet seen in game.
+
 ## 0.26.1 — 2026-10-23
 
 ### Fixed
