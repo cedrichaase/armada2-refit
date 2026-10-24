@@ -86,6 +86,30 @@ struct Settings {
     temporal: f32,
     temporal_clip: f32,
     jitter: f32,
+    /// `Lit=`: the view's clustered lights scattered by the gas (Vulkan, Direct3D 12),
+    /// how much (`LitStrength=`), tinted how far by the gas's hue (`LitTint=`); where they
+    /// make the gas's light, this frame's share in the history (`LitTemporal=`) and the
+    /// clip there (`LitClip=`, of `TemporalClip=`).
+    lit: bool,
+    lit_strength: f32,
+    lit_tint: f32,
+    lit_temporal: f32,
+    lit_clip: f32,
+    /// The gas's share of a fireball's light, a bolt's and a beam's line; a bolt's
+    /// corona, of its reach (`LitExplosion=`, `LitBolt=`, `LitBeam=`, `LitCorona=`).
+    lit_explosion: f32,
+    /// A fireball's core in the gas, in the dead craft's radii, and the wash beyond it
+    /// out to the light's reach (`LitExplosionCore=`, `LitExplosionFar=`).
+    lit_explosion_core: f32,
+    lit_explosion_far: f32,
+    lit_bolt: f32,
+    lit_beam: f32,
+    /// A spark's at a hull (a weld, a shields-down discharge, a sensor's glow): a
+    /// corona as a bolt's, its share `LitSpark=`.
+    lit_spark: f32,
+    lit_corona: f32,
+    /// The knee the lights' light along a ray rolls off at (`LitKnee=`, 0: none).
+    lit_knee: f32,
 }
 
 impl Settings {
@@ -115,6 +139,19 @@ impl Settings {
             temporal: math::saturate(ini.float(s, "Temporal", 0.1)),
             temporal_clip: math::clamp(ini.float(s, "TemporalClip", 1.25), 0.25, 8.0),
             jitter: math::clamp(ini.float(s, "Jitter", 1.0), 0.0, 2.0),
+            lit: ini.int(s, "Lit", 1) != 0,
+            lit_strength: ini.float(s, "LitStrength", 1.0).max(0.0),
+            lit_tint: math::saturate(ini.float(s, "LitTint", 0.5)),
+            lit_temporal: math::saturate(ini.float(s, "LitTemporal", 0.5)),
+            lit_clip: math::clamp(ini.float(s, "LitClip", 0.5), 0.1, 1.0),
+            lit_explosion: ini.float(s, "LitExplosion", 1.5).max(0.0),
+            lit_explosion_core: math::clamp(ini.float(s, "LitExplosionCore", 2.0), 0.1, 20.0),
+            lit_explosion_far: math::saturate(ini.float(s, "LitExplosionFar", 0.12)),
+            lit_bolt: ini.float(s, "LitBolt", 3.5).max(0.0),
+            lit_beam: ini.float(s, "LitBeam", 1.5).max(0.0),
+            lit_spark: ini.float(s, "LitSpark", 0.3).max(0.0),
+            lit_corona: math::clamp(ini.float(s, "LitCorona", 0.25), 0.02, 1.0),
+            lit_knee: ini.float(s, "LitKnee", 6.0).max(0.0),
         }
     }
 }
@@ -832,6 +869,8 @@ struct March {
     view: usize,
     eye: [f32; 4],
     cols: [[f32; 4]; 4],
+    /// `Lit=`: the march and `Temporal=` take their lit twins, c104..c107 (`lit_k`).
+    lit: bool,
 }
 
 /// The pipelines (`Nebulae::pipe`).
@@ -843,6 +882,15 @@ const P_COMP: u64 = 4;
 /// The march in 8, 12, 16 and 24 steps (`Steps=`): P_MARCH + 0..3.
 const P_MARCH: u64 = 8;
 const MARCH_PS: [gpu::Code; 4] = [gpu::code!(PS_MARCH8, PS_MARCH8_SPV, PS_MARCH8_DXIL), gpu::code!(PS_MARCH12, PS_MARCH12_SPV, PS_MARCH12_DXIL), gpu::code!(PS_MARCH16, PS_MARCH16_SPV, PS_MARCH16_DXIL), gpu::code!(PS_MARCH24, PS_MARCH24_SPV, PS_MARCH24_DXIL)];
+/// `Lit=`'s twins (dxc's alone): `temporal_ps`'s, and the march's, P_MARCH_LIT + 0..3.
+const P_TEMPORAL_LIT: u64 = 5;
+const P_MARCH_LIT: u64 = 12;
+const MARCH_LIT_PS: [gpu::Code; 4] = [
+    gpu::code!(PS_MARCH8_LIT, PS_MARCH8_LIT_SPV, PS_MARCH8_LIT_DXIL),
+    gpu::code!(PS_MARCH12_LIT, PS_MARCH12_LIT_SPV, PS_MARCH12_LIT_DXIL),
+    gpu::code!(PS_MARCH16_LIT, PS_MARCH16_LIT_SPV, PS_MARCH16_LIT_DXIL),
+    gpu::code!(PS_MARCH24_LIT, PS_MARCH24_LIT_SPV, PS_MARCH24_LIT_DXIL),
+];
 
 pub struct Nebulae {
     cfg: Settings,
@@ -926,7 +974,9 @@ impl Nebulae {
             P_VOL => (gpu::code!(VS_NEB, VS_NEB_SPV, VS_NEB_DXIL), gpu::code!(PS_VOL, PS_VOL_SPV, PS_VOL_DXIL), &SLICE, 20, Topology::TriangleList),
             P_BAKE => (gpu::code!(VS_NBAKE, VS_NBAKE_SPV, VS_NBAKE_DXIL), gpu::code!(PS_NBAKE, PS_NBAKE_SPV, PS_NBAKE_DXIL), &SLICE, 20, Topology::TriangleStrip),
             P_TEMPORAL => (gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), gpu::code!(PS_TEMPORAL, PS_TEMPORAL_SPV, PS_TEMPORAL_DXIL), &SLICE, 20, Topology::TriangleStrip),
+            P_TEMPORAL_LIT => (gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), gpu::code!(PS_TEMPORAL_LIT, PS_TEMPORAL_LIT_SPV, PS_TEMPORAL_LIT_DXIL), &SLICE, 20, Topology::TriangleStrip),
             P_COMP => (gpu::code!(VS_QUAD, VS_QUAD_SPV, VS_QUAD_DXIL), gpu::code!(PS_COMP, PS_COMP_SPV, PS_COMP_DXIL), &SLICE, 20, Topology::TriangleStrip),
+            P_MARCH_LIT.. => (gpu::code!(VS_MARCH, VS_MARCH_SPV, VS_MARCH_DXIL), MARCH_LIT_PS[(which - P_MARCH_LIT) as usize & 3], &XYZ, 12, Topology::TriangleList),
             _ => (gpu::code!(VS_MARCH, VS_MARCH_SPV, VS_MARCH_DXIL), MARCH_PS[(which - P_MARCH) as usize & 3], &XYZ, 12, Topology::TriangleList),
         };
         let mut d = PipelineDesc::new(vs, ps, layout, stride, topo, Format::Unknown);
@@ -946,7 +996,7 @@ impl Nebulae {
                 d.colors[0] = Format::Bgra8;
                 Some(self.pipes.own(which, || d))
             }
-            P_TEMPORAL => {
+            P_TEMPORAL | P_TEMPORAL_LIT => {
                 d.colors = [f16, f16, Format::Unknown, Format::Unknown];
                 Some(self.pipes.own(which, || d))
             }
@@ -1528,6 +1578,7 @@ impl Nebulae {
             self.lightning(&key_name, sec, dt);
             let baked = self.cfg.bake && self.classes[&key_name].vol.is_some();
             let which = match mr.as_ref() {
+                Some(m) if baked && m.lit => P_MARCH_LIT + m.ps as u64,
                 Some(m) if baked => P_MARCH + m.ps as u64,
                 None if baked => P_VOL,
                 _ => P_NEB,
@@ -1575,6 +1626,12 @@ impl Nebulae {
                 cmd.ps_block(Block::new(21, &m.k[0]));
                 cmd.ps_block(Block::new(41, &flat(&m.k)[4..]));
                 cmd.vs_block(Block::new(4, &[1.0, 0.0, 0.0, 0.0]));
+                if m.lit {
+                    // The view's clusters (storage 0, 1; c100..c103), bound again after
+                    // any bake's pass in between.
+                    scene::clusters::bind(cmd, v);
+                    cmd.ps_block(Block::new(104, &self.lit_k()));
+                }
                 m.drawn = true;
                 if let Some(s) = cmd.vertices(&faces) {
                     cmd.draw(&s);
@@ -1675,6 +1732,16 @@ impl Nebulae {
         if !ok {
             return None;
         }
+        // Lit=1: the view's clustered lights in the gas, while this view has clusters and
+        // the twins are made (Vulkan, Direct3D 12).
+        let lit = self.cfg.lit
+            && self.cfg.lit_strength > 0.0
+            && scene::clusters::on()
+            && [P_MARCH_LIT + ps as u64, P_TEMPORAL_LIT].into_iter().all(|w| self.pipe(w).is_some_and(|p| p.ready(g)))
+            && scene::clusters::bind(cmd, v);
+        if lit {
+            self.note(6, "the view's lights in the gas (Lit=)");
+        }
         // The scene's depth into the texture the march reads (RESZ into INTZ).
         let zt = self.held.zt.clone()?;
         if !cmd.resolve_depth(&depth, &zt) {
@@ -1717,6 +1784,7 @@ impl Nebulae {
             view: v.key(),
             eye: [v.eye.x, v.eye.y, v.eye.z, 0.0],
             cols: *cols,
+            lit,
         };
         // The gas target and the depths', cleared to no gas (in the viewport).
         if !self.gas_pass(cmd, &m, Load::Clear([0.0; 4])) {
@@ -1759,6 +1827,20 @@ impl Nebulae {
         crate::timing::mark("gas: filter, onto the frame");
     }
 
+    /// c104..c107 of the lit twins (`world_nebula.hlsl`, "light inside the gas"): the
+    /// light scattered per world unit of the densest gas, its tint, the weight of the lit
+    /// share in `temporal_ps` (full from half the gas's light), the clip there; this
+    /// frame's share there; each kind's share; a fireball's core and wash.
+    fn lit_k(&self) -> [f32; 16] {
+        let c = &self.cfg;
+        [
+            c.lit_strength * 0.01, c.lit_tint, 2.0, c.lit_clip,
+            c.lit_temporal.max(c.temporal), c.lit_corona, if c.lit_knee > 0.0 { 1.0 / c.lit_knee } else { 0.0 }, 0.0,
+            c.lit_explosion, c.lit_bolt, c.lit_beam, c.lit_spark,
+            1.0 / c.lit_explosion_core, c.lit_explosion_far, 0.0, 0.0,
+        ]
+    }
+
     fn temporal_on(&self) -> bool {
         self.cfg.temporal > 0.0 && self.cfg.temporal < 1.0
     }
@@ -1793,7 +1875,7 @@ impl Nebulae {
     /// None: no history (off, or no target), and the march goes onto the frame as it is.
     fn temporal(&mut self, cmd: &mut Cmd, m: &March, edges: &[f32; 4]) -> Option<Texture> {
         let g = gfx::gpu();
-        let pipe = self.pipe(P_TEMPORAL);
+        let pipe = self.pipe(if m.lit { P_TEMPORAL_LIT } else { P_TEMPORAL });
         if !self.temporal_on() || !pipe.as_ref().is_some_and(|p| p.ready(g)) {
             self.views.get(m.view).prev = None;
             return None;
@@ -1848,6 +1930,9 @@ impl Nebulae {
         cmd.ps_block(Block::new(49, flat(&pcols)));
         // The depth tolerance: comp_ps's, 5% of the view depth.
         cmd.ps_block(Block::new(53, &[self.cfg.temporal, have, self.cfg.temporal_clip, 0.05, pvp[0], pvp[1], pvp[2], pvp[3]]));
+        if m.lit {
+            cmd.ps_block(Block::new(104, &self.lit_k()));
+        }
         cmd.bind_texture(6, self.held.fz.as_ref(), &CLAMP_POINT);
         cmd.bind_texture(7, self.held.fb.as_ref(), &CLAMP_POINT);
         cmd.bind_texture(9, Some(&last), &CLAMP_LINEAR);

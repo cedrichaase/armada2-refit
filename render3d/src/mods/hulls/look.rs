@@ -54,6 +54,14 @@ pub struct Look {
     /// Sprite nodes (running lights) and billboard effects: their colour times this
     /// (above 1 they bloom).
     pub sprites: f32,
+    /// The damaged-sensor sprite nodes (`sensor*`, stock's sparks flipbook in green):
+    /// held still on one frame (`SensorSteady=`), drawn this size of stock's
+    /// (`SensorSize=`), and each a steady point light of its colour times
+    /// `SensorLight=` reaching `SensorLightReach=` times its drawn half size (0: none).
+    pub sensor_steady: bool,
+    pub sensor_size: f32,
+    pub sensor_light: f32,
+    pub sensor_reach: f32,
     /// Additive meshes (engine glows and the like): their colour times this.
     pub additive: f32,
     /// Whether team groups take the team's colour.
@@ -172,6 +180,10 @@ pub fn load() -> Look {
         cloak_front: f("CloakFront", 1.0),
         cloak_front_colour: c("CloakFrontColour", [0.3, 1.0, 0.55]),
         sprites: f("SpriteNodes", 1.5),
+        sensor_steady: ini.int(s, "SensorSteady", 1) != 0,
+        sensor_size: f("SensorSize", 0.5).clamp(0.05, 4.0),
+        sensor_light: f("SensorLight", 2.0).max(0.0),
+        sensor_reach: f("SensorLightReach", 4.0).max(0.0),
         additive: f("AdditiveMeshes", 1.0),
         team: ini.int(s, "TeamColours", 1) != 0,
         scrap: ini.int(s, "Scrap", 1) != 0,

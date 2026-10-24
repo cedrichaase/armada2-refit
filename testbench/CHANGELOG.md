@@ -5,6 +5,105 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.68.0 — 2026-10-23
+
+### Added
+- `render3d-nebula-explosion`: on Display8's Vulkan stub, a Sovereign blown up inside
+  the Mutara gas and another just outside it, paused 22 and 60 ticks after each, for
+  how far a fireball lights the gas.
+
+Installed, not yet seen in game.
+
+## 3.67.0 — 2026-10-23
+
+### Added
+- `Show a bar along the top of the screen` / `Hide the bar`: a desktop panel's
+  stand-in, `swaynag` on the overlay layer, that takes the pointer and not the keyboard
+  (`logs/bar.log`; `Session.show_bar`, `hide_bar`).
+- `Take the focus from the game with a screenshot`: as Omarchy's Print key, a frozen
+  screen (`hyprpicker -r -z`) under the `slurp` (it was another name for the overlay).
+- `Move the mouse into the bottom right corner`: puts the compositor's and the game's
+  pointers back together after a change of focus parted them (`Session.to_corner`).
+- `A2TEST_XWAYLAND_DEBUG=1`: Xwayland's Wayland protocol trace in `sway.log`.
+- `ui-pointer-bar`: three such screenshots with a bar up and a walk into it after each,
+  with `[UI] KeepClip=1`: the re-clip runs, no jump of the pointer.
+
+Installed, not yet seen in game.
+
+## 3.66.0 — 2026-10-23
+
+### Added
+- `render3d-cone-emitter`: the Assimilator's auto-assimilator on Display8's stub with
+  `Backend=auto` (Vulkan, on the GPU with `A2TEST_VULKAN_GPU=1`), shots of its emitter
+  flare, which drew as a black square.
+
+Installed, not yet seen in game.
+
+## 3.65.0 — 2026-10-23
+
+### Added
+- The step `Take the focus from the game [with a window | with an overlay] [for N
+  seconds]`: a terminal on the session's sway takes the focus and is closed, or a
+  region screenshot's overlay (`slurp`) has a region dragged on it (`logs/slurp.log`);
+  `Session.take_focus`.
+- `ui-focus-pointer`: a right-drag, each way of losing the focus, moves and a right-drag
+  after, with `[UI] PointerLog=1`: no jump of the pointer, the engine not left holding
+  it.
+
+Installed, not yet seen in game.
+
+## 3.64.0 — 2026-10-23
+
+### Added
+- The `beam-pass` scene (a Galaxy class firing past a parked destroyer and an asteroid
+  field at a Borg cube) and `render3d-beam-light`: paused frames for render3d's phaser
+  beams as line lights.
+
+Installed, not yet seen in game.
+
+## 3.63.0 — 2026-10-23
+
+### Added
+- `render3d-hull-sparks`: the shields-down discharges in the Mutara gas, and a Borg
+  scout's damaged sensors in two frames, on Display8's Vulkan stub.
+
+Installed, not yet seen in game.
+
+## 3.62.0 — 2026-10-23
+
+### Added
+- The `nebula-battle` scene (two Borg cubes and eight ships firing at them inside the
+  Mutara nebula) and `render3d-nebula-lit`: a paused frame, frames in motion and a
+  ship blown up in the gas, timed, for render3d's light inside the nebulae.
+
+Installed, not yet seen in game.
+
+## 3.61.0 — 2026-10-23
+
+### Fixed
+- `ui-hud-bar` and `ui-hud-map` press Home (`center_player`) before they select, and
+  click at the places measured after it (the first Assembler at 640,175, the Nexus at
+  870,290 at 1280x720; `ui-hud-bar` places the station at 450,450): the Warzone start
+  view opens zoomed out in some runs, where the click at 890,60 selected nothing.
+  `ui-hud-bar` now checks each selection in `UI.log` ("| Assembler |", "| Nexus |").
+- `ui-hud-map`'s minimap check asks for the base's race emblem and lets it cover the
+  clearing, which it does when the start is in a corner of the map.
+- `README.md`: parallel installs of one tree, and Home before a click on a unit.
+
+Installed, not yet seen in game.
+
+## 3.60.0 — 2026-10-23
+
+### Added
+- `ui-placement`: a starbase placed in the `stations` scene, blocked against the yards
+  and clear in open space, for the UI's placement markers (any Display8 mode through
+  `display/stub-scenario.sh`).
+
+### Changed
+- `ui-hud-bar` waits on "placement: footprint" and judges the placement's new look.
+
+Installed, not yet seen in game.
+
 ## 3.58.0 — 2026-10-23
 
 ### Added

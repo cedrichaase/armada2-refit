@@ -344,6 +344,152 @@ pub fn window() -> HWND {
     unsafe { f(s) }
 }
 
+/// A move of the pointer between two frames longer than this, in pixels, is logged as a
+/// jump (README.md, "Focus and the pointer").
+const JUMP: i32 = 320;
+/// At most this many focus and jump lines a game, so a pointer gone wrong for good
+/// cannot fill the log.
+const DIAG_LINES: u32 = 60;
+
+struct Diag {
+    /// Whether the game's window was the foreground, the active and the focus window
+    /// (bits 0, 1, 2) at the last poll; None before the first.
+    has: Option<u32>,
+    /// The pointer on the screen at the last poll, and whether the engine held it then.
+    last: Option<(i32, i32)>,
+    held: bool,
+    lines: u32,
+}
+
+static mut DIAG: Diag = Diag { has: None, last: None, held: false, lines: 0 };
+
+/// `[UI] PointerLog=1` (README.md, "Focus and the pointer"): logs what the window's
+/// focus and the pointer do, for the cursor that jumps after the game loses the focus
+/// and gets it back. Each change of the foreground, active or focus window, with the
+/// pointer and the engine's mouse state at that moment, and each jump of the pointer
+/// between two frames that the engine's own pan did not make.
+fn diagnose(hwnd: HWND, screen: Option<(i32, i32)>) {
+    if !crate::config::try_get().is_some_and(|c| c.pointer_log) {
+        return;
+    }
+    let d = unsafe { &mut *core::ptr::addr_of_mut!(DIAG) };
+    let has = unsafe {
+        (GetForegroundWindow() == hwnd) as u32
+            | ((GetActiveWindow() == hwnd) as u32) << 1
+            | ((GetFocus() == hwnd) as u32) << 2
+    };
+    let held = engine::mouse::held();
+    if d.lines < DIAG_LINES && d.has != Some(has) {
+        d.lines += 1;
+        let (x, y) = screen.unwrap_or((-1, -1));
+        let yn = |bit: u32| if has & bit != 0 { "yes" } else { "no" };
+        crate::log!(
+            "focus: foreground {}, active {}, focus {}; pointer {},{}; engine buttons {:#x}{}",
+            yn(1),
+            yn(2),
+            yn(4),
+            x,
+            y,
+            engine::mouse::buttons(),
+            if held { ", pointer held for a pan" } else { "" }
+        );
+    }
+    d.has = Some(has);
+    if let (Some((x0, y0)), Some((x, y))) = (d.last, screen) {
+        // The engine's pan moves the pointer to the middle at every read and back at the
+        // release: not a jump.
+        let pan = held || d.held;
+        if !pan && d.lines < DIAG_LINES && ((x - x0).abs() > JUMP || (y - y0).abs() > JUMP) {
+            d.lines += 1;
+            crate::log!("pointer: jumped from {},{} to {},{} between two frames; engine buttons {:#x}", x0, y0, x, y,
+                engine::mouse::buttons());
+        }
+    }
+    d.last = screen;
+    d.held = held;
+}
+
+/// How often, at most, `keep_clip` asks Wine for its clip again, in milliseconds.
+const KEEP_CLIP_MS: u32 = 500;
+
+struct Clip {
+    /// Whether the game runs under Wine: None until asked.
+    wine: Option<bool>,
+    /// The pointer at the last frame, and when the clip was last asked for.
+    last: Option<(i32, i32)>,
+    tick: u32,
+    /// How many times it was asked for, for the log.
+    count: u32,
+}
+
+static mut CLIP: Clip = Clip { wine: None, last: None, tick: 0, count: 0 };
+
+fn on_wine() -> bool {
+    let ntdll = unsafe { GetModuleHandleA(c"ntdll.dll".as_ptr() as *const u8) };
+    !ntdll.is_null() && unsafe { GetProcAddress(ntdll, c"wine_get_version".as_ptr() as *const u8) } != 0
+}
+
+/// `[UI] KeepClip=1` (README.md, "Focus and the pointer"): in a mission, puts Wine's
+/// pointer clip back as Wine itself does when the keyboard comes back
+/// (`reapply_cursor_clipping`): the clip rectangle it has, handed to `ClipCursor`
+/// again. For a full-screen window that rectangle is the whole screen, and Wine
+/// answers it by clipping the pointer to the window again (`clip_fullscreen_window`)
+/// if the window covers its monitor and is the foreground one and the X input focus
+/// is the game's, and by nothing otherwise. A screenshot's overlay takes the
+/// keyboard and Wine lets go of its clip; when the keyboard comes back Wine does
+/// not always clip again, and an unclipped pointer can move onto a desktop bar at
+/// the top of the screen, which takes it from the game.
+///
+/// Asked at most every `KEEP_CLIP_MS`, on a frame where the pointer has moved, while
+/// the game's window is the foreground and active one and the engine neither holds
+/// the pointer for a pan nor has a button down. Called once per mission frame.
+pub fn keep_clip() {
+    if !crate::config::try_get().is_some_and(|c| c.keep_clip) {
+        return;
+    }
+    let c = unsafe { &mut *core::ptr::addr_of_mut!(CLIP) };
+    if !*c.wine.get_or_insert_with(on_wine) {
+        return;
+    }
+    let hwnd = window();
+    if hwnd.is_null() {
+        return;
+    }
+    let mut p = Point::default();
+    if unsafe { GetCursorPos(&mut p) } == 0 {
+        return;
+    }
+    let moved = c.last.is_some_and(|l| l != (p.x, p.y));
+    c.last = Some((p.x, p.y));
+    let now = unsafe { GetTickCount() };
+    if !moved || now.wrapping_sub(c.tick) < KEEP_CLIP_MS {
+        return;
+    }
+    if unsafe { GetForegroundWindow() != hwnd || GetActiveWindow() != hwnd } {
+        return;
+    }
+    if engine::mouse::held() || engine::mouse::buttons() != 0 {
+        return;
+    }
+    let mut r = WinRect::default();
+    if unsafe { GetClipCursor(&mut r) } == 0 {
+        return;
+    }
+    unsafe { ClipCursor(&r) };
+    c.tick = now;
+    c.count += 1;
+    if c.count == 1 && crate::config::try_get().is_some_and(|c| c.pointer_log) {
+        crate::log!(
+            "pointer: Wine's clip asked for again ({},{} {},{}), every {} ms at most while the pointer moves",
+            r.left,
+            r.top,
+            r.right,
+            r.bottom,
+            KEEP_CLIP_MS
+        );
+    }
+}
+
 /// Reads this frame's input. `w`, `h`: the back buffer's size.
 pub fn poll(w: u32, h: u32) {
     let r = raw();
@@ -353,7 +499,9 @@ pub fn poll(w: u32, h: u32) {
         let mut p = Point::default();
         let mut c = WinRect::default();
         unsafe {
-            if GetCursorPos(&mut p) != 0 && ScreenToClient(hwnd, &mut p) != 0 && GetClientRect(hwnd, &mut c) != 0 {
+            let got = GetCursorPos(&mut p) != 0;
+            diagnose(hwnd, got.then_some((p.x, p.y)));
+            if got && ScreenToClient(hwnd, &mut p) != 0 && GetClientRect(hwnd, &mut c) != 0 {
                 let (cw, ch) = (c.right - c.left, c.bottom - c.top);
                 if cw > 0 && ch > 0 && p.x >= 0 && p.y >= 0 && p.x < cw && p.y < ch {
                     // The back buffer can differ from the client area (a window

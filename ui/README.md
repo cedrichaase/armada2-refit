@@ -143,6 +143,112 @@ Alt. A button released outside the window after a press the engine did not see s
 up (nothing captured the mouse), so `poll` also asks `GetAsyncKeyState` and releases a
 button the hardware says is up.
 
+## Focus and the pointer
+
+`[UI] PointerLog=1` (off as shipped; `input::diagnose`, `engine/mouse.rs`) logs, in
+`UI.log`, each change of whether the game's window is the foreground, active and focus
+window, with the pointer and the engine's mouse state at that moment, and each jump of
+the pointer of more than 320 pixels between two frames that the engine's own pan did not
+make; 60 lines a game at most. It is for the cursor a player saw jump about in a mission
+after a region screenshot took the focus from the game (Hyprland, Display8 on Vulkan),
+until the mission was left.
+
+What the engine does with the mouse, from the bench and its symbols: the input thread's
+`MouseDriver::ReadChannels` keeps the button bits (0x763308) from the messages posted
+to it and reads the position with `GetCursorPos`. A right-drag or a both-buttons drag
+(`cOverViewImp::mMouseRightDrag`, `mMouseBothDown`) calls `MouseLockPosition`, and
+while that holds (0x763350) every read puts the pointer back in the middle of the
+window with `SetCursorPos` and takes the motion from there; `MouseUnlockPosition` at the
+release puts it back where the drag began. Those two `SetCursorPos` are the only ones
+the game makes (none in Display8, the UI or QOL, and no `ClipCursor` in its imports).
+`MouseInit`, from `cOverViewImp::PostLoad`, clears the buttons and the hold at each
+mission's start; `WindowProc`'s `WM_ACTIVATE` clears only the keyboard's state. The
+diagnostic reads the two, nothing more.
+
+What Wine and Xwayland do, measured on the bench (headless sway, Xwayland,
+`WINEDEBUG=+cursor`, Display8 stub on Vulkan):
+
+- **In a mission the pointer is clipped and locked.** Wine clips the pointer to a
+  window that covers the screen (`grab_clipping_window clipping to (0,0)-(1280,720)`),
+  and the engine answers `WM_SETCURSOR` with no cursor. Clipped with no cursor, Xwayland
+  locks the Wayland pointer and moves the X pointer by relative motion: an absolute move
+  of the compositor's pointer arrives as a jump from a point that stays fixed. Wine
+  then moves its cursor by XInput2 raw motion. In the front end the arrow is shown and
+  nothing is locked.
+- **The game is never told it lost the focus.** Under Proton its window stays the
+  foreground, active and focus window throughout, whether another window took the focus
+  or a layer-shell overlay (`slurp`) did. Wine only drops its clip
+  (`ungrab_clipping_window`), which ends Xwayland's lock.
+- **Getting the focus back may or may not redo the clip.** After one round trip Wine
+  clipped again at once; after another (the window taken out of full screen and back)
+  it did not, and the pointer stayed unlocked until the engine's next right-drag warp
+  had Xwayland lock it again by warp emulation.
+- **The two pointers part.** Motion made while the game's surface does not have the
+  pointer moves the compositor's pointer and not the game's: after a dragged region on
+  the overlay and the pointer moved back, the game's cursor stood about 107,62 pixels
+  from where the moves put the compositor's.
+
+So the likely cause of the jumps is not in Display8, the UI or QOL. It is the stock
+engine's hidden cursor and warping pan, on Wine's full-screen clip, under Xwayland's
+pointer lock, which a change of focus takes apart and puts back differently. Each later
+switch between locked (relative) and unlocked (absolute) motion would then move the X
+pointer to wherever the compositor's pointer is. The bench (sway) has shown the parts
+but not the jumps themselves. `ui-focus-pointer` walks both ways of losing the focus.
+
+**The player's report with `PointerLog=1` (2026-10-23, Hyprland on Omarchy, 3440x1440
+at scale 1.25):** after a screenshot, the cursor went wrong once the pointer reached
+the top rows of the screen, where Omarchy's bar is: the desktop's cursor showed and the
+game's stood still. UI.log has no focus change and no jump in the mission: the game's
+window stayed the foreground, active and focus window throughout, and the pointer it
+reads never moved more than 320 pixels between two frames.
+
+What that comes from, put together from the bench above and the Wine (11) and
+Xwayland (24.1) sources:
+
+- **Where the pointer goes is decided twice.** Xwayland holds the Wayland pointer for
+  the game only while it is locked (the cursor hidden and Wine's clip set: Xwayland's
+  pointer warp emulator) or confined. Without either, the compositor moves its pointer
+  freely and gives it to whatever surface is under it, and Xwayland moves the X pointer
+  only while the game's surface has it.
+- **Omarchy's screenshot** (Print, `omarchy-capture-screenshot`) puts two layer-shell
+  overlays over the game, a frozen screen (`hyprpicker`) and `slurp`, which take the
+  keyboard and the pointer. Wine gets a FocusOut while the keyboard is grabbed and lets
+  go of its clip; Xwayland, the pointer gone from the game, drops its lock. When the
+  keyboard comes back Wine puts the clip back (`reapply_cursor_clipping`, which hands
+  the clip rectangle it has to `ClipCursor` again), but only if that FocusIn ends a
+  grab it saw and if the X focus is already the game's when the clip is handled; a
+  click activating the window also clips again. On the bench, of eleven such
+  screenshots and two window round trips, Wine kept its clip off twice.
+- **An unclipped pointer can reach the bar.** The bar is a layer-shell surface on the
+  top layer; Hyprland gave it the pointer over the full-screen game (the player saw its
+  cursor). The game's surface gets a leave, the X pointer stays where it left, and
+  `GetCursorPos` returns that point from then on: the engine's cursor stands still, a
+  pointer standing at the top edge can keep the camera scrolling, and the desktop shows its
+  own cursor. Nothing in Win32 says so: the game stays the foreground window, and Wine
+  keeps the full-screen rectangle as its clip, so `GetClipCursor` reads the same with
+  and without the X grab. Everywhere else the full-screen window covers the screen and
+  there is nowhere to leave to, which is why it is the top rows.
+
+`[UI] KeepClip=1` (on as shipped; `input::keep_clip`, `engine/mouse.rs` for the engine's
+state) does what Wine does when the keyboard comes back, from the game's own thread: in
+a mission under Wine (`wine_get_version` in ntdll), at most every 500 ms and only on a
+frame where the pointer moved, while the game's window is the foreground and active one
+and the engine has no button down and no pan holding the pointer, it reads the clip
+rectangle with `GetClipCursor` and hands it back to `ClipCursor`. Wine then clips to
+the full-screen window again (`clip_fullscreen_window`), which Xwayland turns back into
+a lock as soon as the pointer is over the game. Wine itself declines when the window
+does not cover its monitor or the X input focus is another program's
+(`grab_clipping_window`), so the pointer is never held while another window has the
+keyboard; and since only motion of the game's own pointer triggers it, a pointer over
+another window does nothing. On Windows nothing is done. With `PointerLog=1` the first
+re-clip is logged ("pointer: Wine's clip asked for again"). `ui-pointer-bar` takes
+three such screenshots with a bar up and walks into it after each (testbench).
+
+What a player can do meanwhile, on their side: hide the bar while playing (Omarchy:
+Super+Shift+Space), which parks it off the screen; or, once the cursor has gone wrong,
+click in the game or open and close the in-mission menu, either of which has Wine clip
+again.
+
 ## The cursor
 
 `engine/cursor.rs`. hud/README.md has how the engine draws its cursor; what the UI
@@ -500,7 +606,8 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[Demo] Mission`, `Shell`, `Loading` | 0 | the demonstration panel in that context (`Shell`: with the widget gallery) |
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
 | `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
-| `[HUD] Overview`, `Fade`, `UnitVideo` | 1, 1, 1 | the engine's last draws in a mission drawn by us: the drag box, height posts and order ring, the scripts' fade, the unit view's video (`HUD.md`, "The engine's last draws") |
+| `[HUD] Overview`, `Fade`, `UnitVideo` | 1, 1, 1 | the engine's last draws in a mission drawn by us: the drag box, height posts, order ring and placement markers, the scripts' fade, the unit view's video (`HUD.md`, "The engine's last draws") |
+| `[HUD] Placement` | 1 | with `Overview=1`, a placement's markers (the footprint, the cells other objects take) in the theme; 0 with the engine's sprites (`HUD.md`, "The placement markers") |
 | `[HUD] UnitView`, `UnitViewSize` | 1, 260 | the unit view placed by us, a square of that many units at the bottom right, in our frame (`HUD.md`, "The unit view") |
 | `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
 | `[Menus] Generic` | mirror | a screen without a spec: `mirror` (as the game paints it) or `widgets` (its controls as ours) |

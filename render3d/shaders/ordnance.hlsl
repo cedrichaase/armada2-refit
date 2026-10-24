@@ -286,26 +286,30 @@ float3 cone(float2 uv, float lw, float3 col, float2 sw, float seed, float4 p, fl
     float  f = saturate((s_end - s) / max(s_end - 1.0 + 0.1, 0.05));
     float  far = f * f * (3.0 - 2.0 * f);
     float  near = saturate(s * 40.0);
-    float  rim = 1.0 + 0.25 * exp(-(1.0 - av) * 12.0);
+    // saturate: past the outline (av > 1) the exponent grew without bound, to infinity
+    float  rim = 1.0 + 0.25 * exp(-saturate(1.0 - av) * 12.0);
     return col * streak * vap * along * far * near * edge * rim;
 }
 
 float4 fx_ps(VsOut i) : SV_Target
 {
+    // Every kind is evaluated (branch-free) and the quad's own is selected, never
+    // weighted by 0 and summed: a kind run on another kind's parameters can reach an
+    // infinity, and 0 x infinity is NaN on SPIR-V and DXIL (Direct3D 9's shaders take
+    // it as 0), which drew the auto-assimilator's emitter flare as a black square.
     float  kind = i.t0.z;
-    float  k0 = 1.0 - step(0.5, kind);
-    float  k1 = step(0.5, kind) * (1.0 - step(1.5, kind));
-    float  k2 = step(1.5, kind) * (1.0 - step(2.5, kind));
-    float  k3 = step(2.5, kind) * (1.0 - step(3.5, kind));
-    float  k4 = step(3.5, kind) * (1.0 - step(4.5, kind));
-    float  k5 = step(4.5, kind) * (1.0 - step(5.5, kind));
-    float  k6 = step(5.5, kind);
-    float3 c = flare(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t3, i.t4) * k0
-             + ring(i.t0.xy, i.t3.x, i.t3.y, i.t1.rgb) * k1
-             + beam(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k2
-             + bolt(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t3) * k3
-             + field(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k4
-             + wave(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4) * k5
-             + cone(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rg, i.t2.a, i.t3, i.t4) * k6;
+    float3 c0 = flare(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t3, i.t4);
+    float3 c1 = ring(i.t0.xy, i.t3.x, i.t3.y, i.t1.rgb);
+    float3 c2 = beam(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4);
+    float3 c3 = bolt(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rgb, i.t3);
+    float3 c4 = field(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4);
+    float3 c5 = wave(i.t0.xy, i.t1.rgb, i.t2.rgb, i.t2.a, i.t3, i.t4);
+    float3 c6 = cone(i.t0.xy, i.t0.w, i.t1.rgb, i.t2.rg, i.t2.a, i.t3, i.t4);
+    float3 c = select(kind < 5.5, c5, c6);
+    c = select(kind < 4.5, c4, c);
+    c = select(kind < 3.5, c3, c);
+    c = select(kind < 2.5, c2, c);
+    c = select(kind < 1.5, c1, c);
+    c = select(kind < 0.5, c0, c);
     return float4(c * i.t1.a, 0.0);
 }

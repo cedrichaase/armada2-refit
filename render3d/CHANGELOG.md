@@ -4,6 +4,123 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.27.0 — 2026-10-23
+
+### Changed
+- A fireball's light in a nebula's gas has a core and a wash: about full within
+  `LitExplosionCore=` of the dead craft's radii, falling as the inverse square past
+  them to a wash of `LitExplosionFar=` out to the light's reach (`nl_light` in
+  `world_nebula.hlsl`). It lit the gas evenly to one radius and linearly to ten, so a
+  breach inside the gas lit the whole cloud in view to the knee. The hulls take the
+  fireball's light as before.
+- `[Nebulae] LitExplosion` defaults to 1.5 (was 0.75), for a hotter core; an install
+  replaces a player's old default (`install.sh`, `RETIRED`), a value they set stays.
+
+### Added
+- `[Nebulae]` keys `LitExplosionCore` (2) and `LitExplosionFar` (0.12), in the shipped
+  `Render3D.ini`.
+
+Confirmed in game 2026-10-23.
+
+## 0.26.1 — 2026-10-23
+
+### Fixed
+- On Vulkan and Direct3D 12, the emitter flare of a `Kind=cone` beam (the
+  Assimilator's auto-assimilator, `borgbor`) drew as an opaque black square at the
+  beam's start. The fx pixel shader (`fx_ps` in `ordnance.hlsl`) now `select`s the
+  quad's kind instead of weighting every kind by 0 or 1 and adding them up: the cone's
+  term, run on a flare's parameters, overflowed to infinity, and 0 x infinity is NaN
+  there (Direct3D 9 takes it as 0). The cone's rim no longer overflows past its outline.
+
+Confirmed in game 2026-10-23.
+
+## 0.26.0 — 2026-10-23
+
+### Changed
+- A phaser beam's line light (`cl_line` in `clustered.hlsli`) emits alike along the
+  whole beam: what reaches a surface is the integral along the segment, the angle it
+  spans over the distance from it, so it is even beside every part of the beam, falls
+  as 1 / distance and dims past the ends by itself; its direction is the segment's
+  representative point. It was a point light stretched along the beam, full to 4
+  units and gone at 40 (falloff squared), so a beam passing a hull or a rock 30 units
+  off lit almost nothing. The ends stay brighter by the emitter and impact lights.
+- `BeamLight` is the brightness at `BeamCore` beside a long beam (default 4.0, was
+  1.0), `BeamReach` where it has faded to nothing (default 200, was 40). An install
+  replaces a player's old defaults (`BeamLight=1.0`, `BeamReach=40`) with the new ones
+  (`install.sh`, `RETIRED`); values a player set stay.
+
+### Added
+- `[Lights]` keys `BeamCore` (8) and `BeamGasReach` (40: the beam's reach in a
+  nebula's gas, which keeps the look the march was tuned to).
+
+### Fixed
+- `install.sh` adds a key missing from a player's `Render3D.ini` at the end of its own
+  section, before the next section's comment, not after it.
+
+Measured on the bench (`battle`, 1280x720, Vulkan on the GPU): the objects step 1.27 ms
+of GPU time against 0.91 before, the cull 0.22 against 0.18. Direct3D 9 and
+`Clustered=0` are unchanged (the two ends light, the length does not). Confirmed in game 2026-10-23.
+
+## 0.25.0 — 2026-10-23
+
+### Added
+- `scene::lights::Gas::Spark`: a small light at a hull, which the gas takes as a
+  corona like a torpedo's, at `[Nebulae] LitSpark=` (0.3). Used by the shields-down
+  discharges, the repair, construction and bee welds (`LightPool::register_spark`),
+  and the damaged sensors.
+- The damaged sensors' green spark nodes (`sensor*` sprite nodes, shown while a
+  craft's sensors are down, as in the Mutara) are held on one frame at half size, each
+  with a small steady point light of its colour. New `[Hulls]` keys: `SensorSteady`
+  (1), `SensorSize` (0.5), `SensorLight` (2) and `SensorLightReach` (4, in drawn half
+  sizes).
+- The shipped `Render3D.ini` lists `LitSpark=0.3` and `LitCorona=0.25` under
+  `[Nebulae]`.
+
+### Fixed
+- In the Mutara, the shields-down discharges lit a wide round ball of gas, blue, beside
+  every shielded Borg ship. They now give a tight corona.
+- Points that a module adds to the scene's list by hand (`scene::add_point`) are kept
+  when the ordnance module reads the engine's lights again (`regather_lights`). Before,
+  that read dropped the points of every module whose `begin_view` ran before it.
+
+Confirmed in game 2026-10-23.
+
+## 0.24.0 — 2026-10-23
+
+### Added
+- Light inside the nebulae on Vulkan and Direct3D 12: the march's lit twins
+  (`PS_MARCH8_LIT` .. `PS_MARCH24_LIT`, `PS_TEMPORAL_LIT`, dxc's alone) scatter the
+  view's clustered lights in the gas at every step, of one colour only the strongest;
+  fireballs, torpedoes and pulses (a corona about the shot), phaser beams' line lights,
+  vents and the rest light the vapour, the nebulae's own lights and planets' day sides
+  none. Where lights make the gas's light, the frames added up clip harder and take
+  more of this frame, so a moving light does not trail; the light along a ray rolls
+  off at a soft knee, so a breach does not white the frame out.
+- `[Nebulae]` keys `Lit`, `LitStrength`, `LitTint`, `LitExplosion`, `LitBolt`,
+  `LitBeam`, `LitCorona`, `LitKnee`, `LitTemporal`, `LitClip`; the shipped `Render3D.ini` lists
+  `Lit`, `LitStrength`, `LitExplosion`, `LitBolt`, `LitBeam` and `LitKnee` in a `[Nebulae]`
+  section.
+- `scene::lights::Gas`: what a light is to the gas, in the cluster list's `t.z`.
+
+### Changed
+- The clustered lights' cull (`CS_CLUSTER`) reads the lights through group-shared
+  memory, 64 at a time, each put into view space once per group, leaves out for a
+  group the lights that cannot reach its slices, keeps each group's count and weakest
+  as it goes and sorts only a list an entry was replaced in; the clusters it writes
+  are the same (the `battle` frame at RMSE 0 on Vulkan and Direct3D 12), 0.19 to
+  0.16 ms at 3440x1440.
+
+Confirmed in game 2026-10-23.
+
+## 0.23.2 — 2026-10-23
+
+### Fixed
+- `hlsl-rs.sh` (which ui and display build their shaders with too) compiles in a scratch
+  directory beside its outputs instead of `/tmp`, so each generated file goes into place
+  by one rename: two builds of one tree at once never read one half written.
+
+Installed, not yet seen in game.
+
 ## 0.23.1 — 2026-10-23
 
 ### Changed

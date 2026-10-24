@@ -1067,10 +1067,11 @@ so the state the engine keeps there (the fade's progress and the script waiting 
 it, the video's texture) stays the engine's. The patch records, in back-buffer pixels,
 what would have been drawn, and draws nothing. The UI draws it first in the mission
 frame, under every panel of ours, as the engine drew it under its HUD. Each keeps the
-engine's look; nothing here is restyled.
+engine's look but the placement markers, which are drawn in the theme.
 
     [HUD]
-    Overview=1    ; the drag box, the height posts, the order ring and the build footprints
+    Overview=1    ; the drag box, the height posts, the order ring and the placement markers
+    Placement=1   ; with Overview=1: the placement markers in the theme; 0 the engine's sprites
     Fade=1        ; ScreenFade
     UnitVideo=1   ; the in-mission Bink (the unit view's video)
 
@@ -1079,7 +1080,7 @@ engine's look; nothing here is restyled.
 | The drag box | `cOverViewImp::mNormalModeRender`'s `call ST3D_Device::DrawWireframeRectangle` (0x52220a) | the box (left, top, width, height) in the main camera's viewport, which is in pixels (`ST3D_Camera+0x1b0`: left, top, width, height), and its colour (white) | four lines a pixel wide along its edges, clipped to that viewport |
 | The height posts | `DrawHeightPost`'s `call ST3D_Camera::ClipAndRenderLine` (0x5938a0) | the line from the unit to the map's plane, projected with the camera it was given (`+0x160`, a 4x4 matrix; the screen is `left + (width - 1) * x / w`, as `ST3D_Camera::ProjectPoint` maps it), cut at the eye; green above the plane, red below | a line a pixel wide, clipped to the viewport |
 | The order ring | `cOverViewImp::mRenderGridFX`'s `call ST3D_Sprite::DrawQuad` (0x522537), and `mRenderWhere`'s (0x5222f0), the same sprite standing still at the point it marks | the four corners of the turning ring (`gridFXSprite`, which covers its whole texture `GgridFX`) projected as the height posts are, the sprite's texture and colour (`+0x24`) | the texture on those corners, added to the frame (an additive pipeline of the UI's, `Draw::quad_additive`), clipped to the viewport |
-| The build footprints | `PlaceholderFeature::RenderFootprints`'s three `call ST3D_Sprite::DrawQuad`: the editor's cells (0x473a05), a clear placement (0x473a77), a blocked one (0x473a8e) | the footprint's corners on the map's plane, projected as the order ring's, the sprite's texture, colour and rectangle of the texture (`+0x38`) | as the order ring |
+| The placement markers | `PlaceholderFeature::RenderFootprints`'s three `call ST3D_Sprite::DrawQuad`: a cell that is not clear (0x473a05), a clear placement (0x473a77), a blocked one (0x473a8e) | each quad's four corners on the map's plane, in the world, grouped by the camera it was given (its projection and viewport), which of the three calls drew it, and the sprite's texture, colour and rectangle of the texture (`+0x38`) | in the theme (below, "The placement markers"); with `Placement=0` as the order ring |
 | The fade | `ScreenFade::Render`'s two `call [edx+0x1c]` (the device's `DrawClippedRectangle`), white at 0x5076cc and black at 0x507704 | the rectangle (the camera's viewport), the colour and the alpha the fade wrote into its material (`+0x24`) | a rectangle of that colour at that alpha |
 | The unit view's video | `CinematicView`'s two calls of `BinkThread::BlitToBlackBackground` (0x4e5da5, 0x4e6153), and inside it the two `call ST3D_Device::DrawRectangle` (0x46457c, 0x4645cd) and the `call ST3D_Sprite::DrawScaled2D` (0x464656) | the rectangle it was called with, the sprite's texture (`ST3D_Sprite::GetTexture`) and the video's size (`s_width`, `s_height`) | the rectangle black, then the video as wide as it at the video's aspect, centred, from the engine's texture (its Direct3D 9 twin, as the minimap's picture) |
 
@@ -1119,17 +1120,58 @@ fans through the trifan buffer. Display8 named it by `BeginScene`'s return addre
 the 3D view without its depth, so a ship between the camera and the ring no longer
 hides it.
 
-**The build footprints** are what a placement draws on the map's plane under the
-cursor: render3d's terrain step calls `RenderFootprints` as stock's does, which draws
-one quad, the sprite `valid_build` (`+0x28`) when the place is clear (`+0x74`) and
-`invalid_build` (`+0x2c`) when not; in the map editor (`UserProfile+0x84`, with no
-placement) a quad per grid cell with `footprint` (`+0x24`). The three are quarters of
-one texture (`MBuild`, `Sprites/gui_map.spr`, `add_nomipf`), so each is drawn with its
-sprite's rectangle (`ST3D_Sprite+0x38`), which the order ring, the whole of `GgridFX`,
-did not need; and since two textures can be drawn in one frame, each engine texture
-has a slot of its own. All three calls are taken or none. They were the engine's until
-the bench placed a station with Display8 in stub mode (`ui-hud-bar`'s stub variant):
-the stub drops every draw of the engine's, and nothing else drew the footprint.
+**The placement markers** are what the engine draws while a station is being placed.
+render3d's terrain step calls `PlaceholderFeature::RenderFootprints` as stock's does.
+While a placement is under way (`+0x34`, the class being placed), it walks the whole
+station placement grid (`g_station_placement`: its width and height at `+0` and `+4`)
+and, for every cell that `Station_Placement::Is_Clear_For_Placement` says is not clear
+and `Scanner::IsFogged` (for the teams the user sees, `Entity::GetTeamsVisibleToUser`)
+says is not under the fog, draws one quad on the map's plane with the sprite
+`footprint` (`+0x24`), the cell's corners from
+`Station_Placement::Convert_Placement_Map_To_World_Coords`. In the map editor
+(`UserProfile+0x84` with `SHOW_FOOTPRINTS_IN_EDIT_MODE`) it draws the cells without a
+placement and without the fog test. Then it asks the class being placed for its
+footprint's corners about the grid position (`+0x5c`, `+0x64`; the class's vtable
+`+0x18`) and draws one quad with `valid_build` (`+0x28`) when the place is clear
+(`+0x74`) and `invalid_build` (`+0x2c`) when not. The three sprites are quarters of
+one texture (`MBuild`, `Sprites/gui_map.spr`, `add_nomipf`): yellow cell outlines,
+green and red corner brackets. So "the markers underneath objects" in stock are a
+yellow outline on every cell a station, a planet or an asteroid takes, over the whole
+visible map, and the bracketed footprint under the ghost.
+
+They were the engine's until the bench placed a station with Display8 in stub mode
+(`ui-hud-bar`'s stub variant): the stub drops every draw of the engine's, and nothing
+else drew them. ui 0.17.2 took the three calls as the order ring's, into the same list
+of quads, kept to 256 a frame; the `stations` scene's five stations take some 280
+cells, drawn before the footprint, so the footprint was crowded out in every mode
+(ui 0.20.0 fixed it). Now each call records the quad's four corners in the world, not
+on the screen, under the camera it was given (`RenderFootprints` runs once per view;
+its cells first, the footprint last), up to 8192 cells a frame, and which call it was:
+that is the engine's decision whether the place is clear, which ours never makes.
+
+Drawn in the theme (`hud::placement`, `[HUD] Placement=1`, the default):
+
+- **The footprint**, in `good` where the place is clear and `bad` where it is not: a
+  faint fill, a soft light inside its edge, an outline with a glow outside it. Clear,
+  thicker brackets along each corner, a quarter of each edge (stock's bracket shape);
+  blocked, hatched across, one stripe a cell. Shape and colour both tell the two apart,
+  so the state reads without telling red from green.
+- **The cells that are not clear**: each an inset tile (the cell drawn 12% smaller about
+  its centre, so neighbours read as tiles, not a sheet) in `warn`, stock's amber,
+  strongest within the footprint's reach and fading with distance from it to a fifth,
+  which still shows where the map is taken further off. A cell whose centre is inside
+  the footprint's corners (on the map's plane) is `bad` and crossed: what is in the way.
+  Without a footprint (the map editor) every cell alike.
+- Everything is projected with the camera the engine gave, as the order ring is, and
+  clipped to its viewport; a quad with a corner behind the eye, or wholly outside the
+  viewport, is not drawn. Line weights are in units (`Ui::u`), so they keep their
+  weight at 4K, with a pixel of feather for antialiasing (`gfx::Draw::line_soft`,
+  `band`, `poly`).
+
+With `Placement=0` the UI draws the engine's sprites as the engine did (additive, the
+sprite's rectangle of `MBuild`). `UI.log` says each time the footprint's state changes
+("placement: footprint blocked, 280 cells not clear, 12 under the footprint, drawn in
+the theme"); `testbench/scenarios/ui-placement.md` checks both states.
 
 **Not taken**: the damaged systems' icons
 over a pointed unit, the shot director's rings, the action cursor over the minimap,

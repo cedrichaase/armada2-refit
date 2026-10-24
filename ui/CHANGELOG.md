@@ -4,6 +4,56 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.22.0 — 2026-10-23
+
+### Added
+- `[UI] KeepClip=1` (on as shipped): in a mission under Wine, UI.asi hands Wine's clip
+  rectangle back to `ClipCursor` at most every 500 ms while the pointer moves and the
+  game is the foreground window, so Wine clips the pointer to the full-screen game
+  again after a screenshot's overlay let it go (`input::keep_clip`). For the pointer
+  that escaped into Omarchy's bar and left the game's cursor standing (README.md,
+  "Focus and the pointer"). `PointerLog=1` logs the first re-clip.
+
+Confirmed in game 2026-10-23.
+
+## 0.21.0 — 2026-10-23
+
+### Added
+- `[UI] PointerLog=1` (off as shipped): `UI.log` says each change of the game window's
+  foreground, active and focus state, with the pointer, the engine's mouse buttons and
+  whether its pan holds the pointer, and each jump of the pointer between two frames
+  that the pan did not make ("focus: ...", "pointer: jumped ..."). For the cursor that
+  jumps after the game lost the focus (README.md, "Focus and the pointer").
+
+Installed, not yet seen in game.
+
+## 0.20.1 — 2026-10-23
+
+### Fixed
+- `build.sh` writes `src/shaders/mod.rs` and `build/UI.asi` through temp files of its
+  own, renamed into place: two builds of one tree at once (`a2test -j` installing one
+  checkout twice) failed on the shared `mod.rs.new`.
+
+Installed, not yet seen in game.
+
+## 0.20.0 — 2026-10-23
+
+### Added
+- The placement markers in the theme (`hud::placement`, `[HUD] Placement=1`): a
+  station's footprint green with corner brackets where the place is clear, red and
+  hatched where it is not; the cells other objects take as amber tiles fading with
+  distance from it, and those under it red and crossed. `Placement=0` draws the
+  engine's sprites. Validity stays the engine's. `UI.log`: "placement: footprint
+  blocked, ...". `gfx::Draw::poly`, `line_soft` and `band` draw them.
+
+### Fixed
+- The footprint under a station being placed was not drawn when the map had more than
+  256 taken cells (`RenderFootprints` draws one quad per taken cell before the
+  footprint, and the UI kept 256 quads a frame): the cells are now recorded apart, up to
+  8192, with their camera, and culled to the viewport when drawn.
+
+Confirmed in game 2026-10-23.
+
 ## 0.19.2 — 2026-10-23
 
 ### Changed

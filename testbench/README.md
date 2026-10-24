@@ -154,8 +154,11 @@ The launch step also proves isolation: it scans `/proc/<pid>/maps` and `fd` for 
 real install's path, and fails the case if the game has it open.
 
 Logs gathered per case: `wine.log` (umu, Proton, Wine; `A2TEST_WINEDEBUG` sets
-channels), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
-`xalia_dxgi.log` (DXVK), `sway.log`, `input.log`, `prepare.log`,
+channels, `trace+cursor` for Wine's pointer clip), `Menus.log`, `Render3D.log`, `BinkProxy.log`, `D3DTrace.log` (`d3dtrace/`), `D3D9Probe.log` (`d3d9probe/`), `Armada2_d3d9.log` and
+`xalia_dxgi.log` (DXVK), `sway.log` (with `A2TEST_XWAYLAND_DEBUG=1` in the
+environment of `session start` or `run`, every Wayland request and event of Xwayland's:
+its pointer's enter and leave, locks and confinements; large, so for short runs),
+`bar.log` (`Show a bar ...`), `input.log`, `prepare.log`,
 `launch-env.txt` (the exact environment and argv), `Scene.log` and `Scene.marks`
 (`scene/README.md`, "Marks"), `Stems.log` and `Stems.ini`, the clone's `ARMADA.PRF`,
 `Menus.ini`, `Render3D.ini` and `dxvk.conf`, `exception.txt` if the game crashed, and
@@ -412,6 +415,16 @@ posts, a hologram, the Evolver, a survey of what no module draws).
   `Setup:` path. `a2test run` takes a scenario by path.
 - **`--install` runs that tree's `./install`, which builds into it**: for a stock
   comparison install a reflink copy of a pristine tree, never the tree itself.
+  Several cases may install one tree at once (`-j`): the builds write their
+  temporaries under names of their own and rename them into place, or take a lock
+  (`build/.build.lock`), and cargo locks its target directory. A build script that
+  writes a fixed temporary name into the tree (`mod.rs.new`, until ui 0.20.1) fails
+  one of them.
+- **A start view is not a place to click**: the start position is dealt at random and
+  the camera can open zoomed in or out. Press Home (`center_player`, "Recenter camera
+  on mission start") first, which sets the camera's place and zoom, click where the
+  unit is after it, and check the selection in `UI.log` ("info: ... | Assembler |")
+  before going on (`ui-hud-bar.md`, `qol-refused-advisor.md`).
 - **A stock reference in the same setup** (`--install` cannot go with `--mod stock`):
   `session start --no-launch`, set `Enable=0` under `[Render3D]` in the clone's
   `Render3D.ini`, then `drive launch -nointro a2_borg01`.

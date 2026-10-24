@@ -11,12 +11,15 @@
 #ifdef __hlsl_dx_compiler
 
 // One light (80 bytes; clusters.rs `GpuLight`):
-//   a: position (a line's start, a spot's apex); w: full out to this distance
-//   c: colour; w: 1 / the distance it fades over after that
-//   b: a line's end; a spot's axis (unit), w: how far along it the spot reaches;
-//      a day side's direction of the Key
+//   a: position (a line's start, a spot's apex); w: full out to this distance (a
+//      line's core: closer than this it grows no brighter)
+//   c: colour (a line's at its core); w: 1 / the distance it fades over after that
+//      (a line: its reach less its core)
+//   b: a line's end, w: its reach in the gas; a spot's axis (unit), w: how far along
+//      it the spot reaches; a day side's direction of the Key
 //   k: x wrap, y power of the falloff, z a spot's half width at its apex, w how much
-//      the half width grows per unit along the axis
+//      the half width grows per unit along the axis; a line's w: its colour's share
+//      in the gas
 //   t: x kind (0 point, 1 line, 2 spot) | 16 for a planet's day side; y its group
 //      (lights of one colour share one: only the strongest of a group lights a pixel)
 struct ClLight
@@ -43,16 +46,24 @@ cbuffer clustered_ps : register(b1)
 static bool cl_on = false;
 static float4 cl_fc = 0.0;
 
-// The light `l` reaching `wp`: its colour there (falloff, spot and day side taken),
-// and the way towards it in L.
+// The light `l` reaching `wp` in the gas (the nebulae's march): its colour there
+// (falloff, spot and day side taken), and the way towards it in L. A line is taken from
+// its nearest point, full to a tenth of its gas reach (b.w) and gone at it, its falloff
+// squared, in its colour's gas share (k.w): the look the march was tuned to.
 float3 cl_eval(ClLight l, float3 wp, out float3 L)
 {
     uint kind = l.t.x & 15u;
     float3 p = l.a.xyz;
+    float start = l.a.w, fade = l.c.w, power = l.k.y;
+    float3 col = l.c.rgb;
     if (kind == 1u) {
         float3 ab = l.b.xyz - l.a.xyz;
         float s = saturate(dot(wp - l.a.xyz, ab) / max(dot(ab, ab), 1e-6));
         p = l.a.xyz + ab * s;
+        start = l.b.w * 0.1;
+        fade = 1.0 / max(l.b.w * 0.9, 1e-3);
+        power = 2.0;
+        col *= l.k.w;
     }
     float3 d3 = p - wp;
     float d = length(d3);
@@ -66,14 +77,47 @@ float3 cl_eval(ClLight l, float3 wp, out float3 L)
         float inside = saturate((1.0 - rho / max(r, 1e-3)) * 3.0) * step(0.0, s);
         f = inside * saturate((l.b.w - s) * l.c.w);
     } else {
-        f = saturate(1.0 - max(0.0, d - l.a.w) * l.c.w);
+        f = saturate(1.0 - max(0.0, d - start) * fade);
     }
-    f = pow(f, l.k.y);
+    f = pow(f, power);
     if ((l.t.x & 16u) != 0u) {
         // A planet's day side: the share of it facing wp.
         f *= saturate(0.5 - 0.5 * dot(-L, l.b.xyz));
     }
-    return l.c.rgb * f;
+    return col * f;
+}
+
+// A line light on a surface (README.md, "Clustered lights", "Beams"): every unit of
+// the beam emits alike, so what reaches wp is the integral of 1 / r^2 along the
+// segment, (angle it spans) / (distance from its line): even beside the whole length
+// of the beam, falling as 1 / distance from it, and dimming past its ends by itself.
+// Scaled to 1 beside the middle of a long beam at its core (a.w; nearer, it grows no
+// brighter), and windowed smoothly to nothing at its reach (core + 1 / c.w) from the
+// segment, where the cull stops. The way to it is the representative point: the point
+// of the segment at the middle of the angle it spans (beside its middle, the nearest).
+float3 cl_line(ClLight l, float3 wp, out float3 L)
+{
+    float3 ab = l.b.xyz - l.a.xyz;
+    float len = length(ab);
+    float3 u = ab / max(len, 1e-6);
+    float3 w = wp - l.a.xyz;
+    float t = dot(w, u);
+    float h = length(w - u * t);
+    float core = max(l.a.w, 1e-3);
+    float hc = max(h, core);
+    // The angle between the ways to the two ends (seen from hc off the line): one
+    // atan2 of their cross and dot products.
+    float share = atan2(hc * len, hc * hc - t * (len - t)) * 0.31830989;
+    // The middle of that angle: the bisector of the ways to the two ends.
+    float3 e0 = l.a.xyz - wp, e1 = l.b.xyz - wp;
+    float3 m = e0 * rsqrt(max(dot(e0, e0), 1e-6)) + e1 * rsqrt(max(dot(e1, e1), 1e-6));
+    float ml = length(m);
+    L = ml > 1e-4 ? m / ml : u; // on the beam itself
+    float ds = length(l.a.xyz + u * clamp(t, 0.0, len) - wp);
+    float reach = core + 1.0 / max(l.c.w, 1e-6);
+    float x = saturate(ds / reach);
+    float win = (1.0 - x * x) * (1.0 - x * x);
+    return l.c.rgb * (share * (core / hc) * win);
 }
 
 float cl_glint(float3 N, float3 L, float3 V, float e)
@@ -114,7 +158,7 @@ void cl_add(float3 N, float3 wp, float3 V, float e, bool no_day, inout float3 su
         if (no_day && (l.t.x & 16u) != 0u)
             continue;
         float3 L;
-        float3 c = cl_eval(l, wp, L);
+        float3 c = (l.t.x & 15u) == 1u ? cl_line(l, wp, L) : cl_eval(l, wp, L);
         float s = dot(c, float3(0.299, 0.587, 0.114));
         if (s > bs) {
             bs = s;

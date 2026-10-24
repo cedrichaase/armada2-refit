@@ -178,6 +178,15 @@ the shaders include it by a relative path that resolves from `shaders/` for both
   `d3dbc-fix.py` narrows it to `.xy`, and refuses a shader that reads its z or w.
 - **`select`** is a macro over `?:` for vkd3d, which has the vector `?:` and no
   `select`; dxc refuses a vector `?:` under HLSL 2021.
+- **0 x infinity is NaN on SPIR-V and DXIL, and 0 in Direct3D 9's shaders** (DXVK
+  emulates the legacy rule). So a branch-free shader that evaluates every kind and
+  keeps one must `select` it, never weight each by 0 or 1 and add them up: a kind run
+  on another kind's parameters may reach an infinity, and its 0 weight then turns the
+  pixel to NaN, which an additive blend carries into the frame as black. The ordnance
+  module's fx shader did that until 0.26.1: the auto-assimilator's emitter flare (a
+  flare quad, whose cone term divided by the flare's zero streak colour and overflowed
+  an `exp` past the cone's outline) drew as an opaque black square on Vulkan and
+  Direct3D 12 and right on Direct3D 9 (`testbench/scenarios/render3d-cone-emitter.md`).
 
 The d3dbc this writes is the d3dbc the old sources wrote: the code token for token,
 the constant table's sampler names aside, and in five pixel shaders (`fire_ps`,
@@ -269,9 +278,11 @@ as before).
 | `ClusterSlices` | 24 | slices of view depth, exponential from the near plane to the far one |
 | `ClusterLights` | 24 | the most lights a cluster lists (at most 32), the strongest at its box |
 | `ClusterPerColour` | 2 | the most of one colour (one group: a volley's bolts) a cluster lists |
-| `BeamLight` | 1.0 | a phaser beam's line light, times the beam's colour (0: none) |
-| `BeamReach` | 40 | how far from the beam it reaches, world units (full to a tenth of it) |
+| `BeamLight` | 4.0 | a phaser beam's line light, times the beam's colour, beside the middle of a long beam at `BeamCore` from it (0: none); every unit of the beam emits alike ("Clustered lights", "Beams") |
+| `BeamCore` | 8 | world units: closer to the beam than this its light grows no brighter |
+| `BeamReach` | 200 | world units from the beam where its light on surfaces has faded to nothing (it falls as 1 / distance before) |
 | `BeamWrap` | 0.4 | how far round the plating it wraps |
+| `BeamGasReach` | 40 | world units: how far into the gas of a nebula the beam's light reaches (full to a tenth of it, falloff squared), as the march was tuned |
 | `ConeSpot` | 1 | the tractor and assimilation beams' wash as a spot confined to the cone (0: the point it was) |
 
 The scene lights (`Replace`, `KeyColour`, `KeyAxis`, `FillColour`, `FillAxis`,
@@ -1505,7 +1516,8 @@ hull path (and stands down while a stale `Lighting.asi` is loaded). Settings in 
 `RimLight`, `RimPower`, `HullSun`, `HighlightKnee`, `SelfIllumination`, the `Borg*`
 profile, `PointLights`, `NearFade*`, `Cloak*`, plus `Shadows`, `ShadowSize`,
 `ShadowStrength`, `PlanetShadows`, `BumpStrength`, `SpriteNodes`, `AdditiveMeshes`,
-`TeamColours`, `Scrap`) and the scene lights in `[Lights]` (`Replace`, `KeyColour`,
+`TeamColours`, `Scrap`, and the damaged sensors' `SensorSteady`, `SensorSize`,
+`SensorLight`, `SensorLightReach`, under "Sprites") and the scene lights in `[Lights]` (`Replace`, `KeyColour`,
 `KeyAxis`, `FillColour`, `FillAxis`, `SkyLight`).
 
 **What it claims.** An object whose class's `Render` (vtable slot 11) is
@@ -1619,8 +1631,9 @@ alike:
   `light clusters` mark, after `mods::begin_view`), `clusters::build` takes the
   scene's list (`scene::lights()`: the engine's records, torpedoes, pulses, shield
   hits, welds, vents, fireballs, the modules' points) and the shapes render3d adds
-  for the view: a phaser beam as a **line light** (`add_line`, `BeamLight`) that washes
-  the plating it passes close to, a tractor or assimilation beam's wash as a **spot
+  for the view: a phaser beam as a **line light** (`add_line`, `BeamLight`; "Beams",
+  below) that lights the plating, rocks and planets it passes, a tractor or
+  assimilation beam's wash as a **spot
   confined to its cone** (`add_spot`, `ConeSpot`: from the emitter, as wide as the
   cone, out past the target; ART-DIRECTION.md, "It lights the target"). The ordnance
   module's own points (phaser emitters and impacts, muzzles, the fx lights) go into
@@ -1644,17 +1657,59 @@ alike:
   pixel; and of each group only the strongest at that pixel counts, so a volley of
   one colour lights as its brightest bolt did, without the per-mesh cut. The highlight
   shoulder keeps plating within 1, and the Borg profile and the inward normals are as
-  before. Cloaked hulls, ghosts and holograms keep the per-mesh lights.
+  before. Cloaked hulls, ghosts and holograms keep the per-mesh lights. The nebulae's
+  march reads the same clusters for the light inside the gas (`[Nebulae] Lit=`, under
+  world, "Nebulae"); each light's `t.z` says what it is to the gas.
 - **Per view.** Each view (`View::key`: the HUD's action camera draws the scene a
   second time) has its buffers; a draw binds them only in the view they were built for
   (the menu scene has none).
 - **Cost** (`Timing=1`; the `battle` scene, sixteen ships and a planet, 73 lights,
   1280x720, RX 5700, 2026-10-23): the cull 0.20 ms of GPU time a view on Vulkan and on
   Direct3D 12; the objects step 0.91 ms against 0.90 without (Vulkan), 0.45 against
-  0.42 (Direct3D 12).
+  0.42 (Direct3D 12). At 3440x1440 (the user's) the cull was 0.20 ms (Vulkan) and
+  0.19 ms (Direct3D 12) and the objects step 1.38 and 0.95 ms. The cull's time hardly
+  moves with the resolution (29808 clusters against 5760) and goes with the lights
+  (0.04 ms for the 32 of `nebula-battle`): it is each thread's walk of the list, not
+  the number of threads. So the lights come through group-shared memory, put into
+  view space once a group; a group leaves out the points and spots that cannot reach
+  its slices; and the per-colour count and weakest are kept as the sorted list goes
+  by, the list scanned only to replace an entry and sorted only when one was: 0.16
+  and 0.17 ms, the same clusters (the frame at RMSE 0 on both). What remains looks
+  like the private arrays' traffic and the upload and barriers round the dispatch.
 - **Off** (`Clustered=0`, or Direct3D 9): nothing of it runs, and every draw is as
   before: the port scenes draw the same pixels as without it (`gpu/README.md`,
   "Measured").
+- **Beams** (`cl_line` in `clustered.hlsli`). A phaser beam emits alike along its
+  whole length, so what reaches a point is the sum of 1 / r² over the segment: the
+  angle the segment spans from the point over its distance from the beam's line,
+  `(θ1 − θ0) / h`. Beside any part of a long beam that is the same (π / h), so no part
+  of the beam lights more than another; it falls as 1 / distance, and past either end
+  it dims by itself as the angle closes. It is scaled to `BeamLight` at `BeamCore`
+  from the middle of a long beam (nearer, `h` is held at the core, so a hull the beam
+  grazes does not white out), and windowed, `(1 − (d / BeamReach)²)²` of the
+  distance from the segment, to nothing at `BeamReach`, where the cull stops. Its
+  direction is the representative point: the point of the segment at the middle of
+  the angle it spans (beside the middle, the nearest point; near an end, towards the
+  rest of the beam). The two ends are brighter by points of their own, the ordnance
+  module's emitter and impact lights (`PhaserBrightness`, `PhaserImpact`, under
+  ordnance). In the gas the line is taken as it was tuned for the march: from its
+  nearest point, full to a tenth of `BeamGasReach` and gone at it, in the beam's
+  colour (`BeamLight` does not scale it; `[Nebulae] LitBeam=` does).
+  Until 0.26.0 the line was a point light stretched along the beam, full to 4 units
+  and gone at `BeamReach=40` with its falloff squared: a Galaxy class is about 100
+  units long, so a beam passing a hull or a rock 30 units off lit almost nothing (the
+  bench, `beam-pass`; the user, in the Klingon intro's fire over the station). An
+  install replaces a player's `BeamLight=1.0` and `BeamReach=40`, the old defaults,
+  by the new ones (`install.sh`, `RETIRED`); a value they set stays.
+  Cost (`Timing=1`, the `battle` scene, 1280x720, Vulkan on the RX 5700,
+  2026-10-23): the objects step 1.27 ms of GPU time against 0.91 with the old line
+  and 0.76 with no beam lights (`BeamLight=0`); the cull 0.22 ms against 0.18. The
+  time goes with how many clusters a beam reaches: `BeamReach=120` takes the objects
+  step to 1.16 ms. The angle is one `atan2` and the direction a bisector (two
+  `atan2`s and a `tan` cost the same within 0.03 ms).
+  On Direct3D 9 (and with `Clustered=0`) a beam lights nothing but its two end
+  points: the per-mesh constants hold twelve points, and a point standing in for a
+  line would light one patch of it, not the length.
 
 **Scene lights.** `scene::Lights::gather` replaces the map's directional lights with
 `Lighting.asi`'s Key, Fill and sky light (the sky's mean colour weighted by chroma,
@@ -1697,6 +1752,21 @@ RenderSpriteNodeEffect` draw them, their animations played as `ST3D_AnimationCha
 Evaluate` plays them (quirks kept: unevenly judged keys played evenly, `linear`
 wrapping), at `Step::Translucent` after the hulls. A scrap object's `glowdmoon` node
 takes `Scrap::Render`'s colour.
+
+**Damaged sensors.** A craft's `sensors` group holds the `sensor` sprite nodes
+(`sensorftur` and the rest on Federation stations). `damage.spr` draws them as the
+`origin` sprite, green: the `xspark01` spark flipbook, 16 frames in 0.5 s. They show
+while the craft's sensors are down (byte `+0x9f`, `game::DAMAGE_NODES`), and in the
+Mutara nebula, which takes every ship's sensors down, that means on most Borg ships
+(the scout has two). Played as stock, the flipbook read in game as a flickering green
+light. The user wanted it steady, smaller, and a light source. So, with
+`SensorSteady=1`, such a node is held on the flipbook's first frame (a full star) at
+`SensorSize=` (0.5) of stock's size. Each shown node is also a steady point light of
+the node's colour times `SensorLight=` (2), reaching `SensorLightReach=` (4) times its
+drawn half size: a small green glow on the plating beside it (about 7 units on a
+scout). `begin_view` adds these lights to the scene's list by hand, at most 32 a view.
+The cluster list takes them, and the gas takes them as sparks (`Gas::Spark`). A
+cloaking hull gives none.
 
 **Holograms** (`TimedHoloEffect`, the object's `+0x174`). `GameObject::RenderInternal`
 draws an object with a hologram as the class the hologram shows, in place of its hull:
@@ -1809,7 +1879,7 @@ is loaded: the planets beside `Lighting.asi`, the moons and asteroids beside
 `RockRimLight`, `RockRimPower`, `RockSun`, `MoonShell`, `MoonCracks`, `MoonPulse`,
 `MoonCrackCore`, `MoonCrackDepth`, `MoonCrackFalloff`, `MoonNimbus`; the lights' `PlanetGlows`,
 `PlanetGlow`, `PlanetGlowRange`, `NebulaLights`, `NebulaBrightness`, `NebulaRange`,
-`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02), read again
+`NebulaRecipeColour`, `NebulaCull`) and `[Nebulae]` (`Enable` 1, `Steps` 8, `Denoise` 1.5, `Footprint` 1, `Temporal` 0.1, `TemporalClip` 1.25, `Jitter` 1, `Slices` 40, `MinStep` 6, `NoiseSize` 128, `Obscure` 0.5, `Samples` 2, `KeyShare` 0.8, `Scatter` 0.2, `Bake` 1, `VolumeSize` 256, `VolumeHeight` 160, `VolumeTexel` 3, `Shadows` 1, `ShadowSoftness` 0.02; light inside the gas, below: `Lit` 1, `LitStrength` 1, `LitTint` 0.5, `LitExplosion` 1.5, `LitExplosionCore` 2, `LitExplosionFar` 0.12, `LitBolt` 3.5, `LitBeam` 1.5, `LitSpark` 0.3, `LitCorona` 0.25, `LitKnee` 6, `LitTemporal` 0.5, `LitClip` 0.5), read again
 every second with `[World] Reload=1`; `[World] Enable=0` hands everything back to the
 engine at once, for comparing with stock at the same moment. `BesidePlugins=1` (bench
 only) draws even with an old plugin loaded, so `Enable` flips between theirs and ours.
@@ -1984,6 +2054,87 @@ was marched. `comp_ps` then filters and composites the history as it did the mar
 The pass costs 0.22 ms at 720p. With `Temporal=0` the thresholds stay put, as before:
 moved without adding the frames up, they made the gas shimmer. Shadows cost 0.6 ms of 7.6 at 24 steps; the noise reads (flow, fine
 detail) were half of it before the flow was thinned. `Footprint=2` saved nothing.
+
+**Light inside the gas** (`[Nebulae] Lit=1`, Vulkan and Direct3D 12, with the clustered
+lights: "Clustered lights" under hulls). A breach lights the cloud about it, and
+torpedoes, pulses and phaser beams light the vapour they pass through. The march takes
+a twin (`march*_lit_ps`, dxc's alone) that, at every step with gas, walks the step's
+cluster (the pixel's tile, the step's slice of view depth: the clusters' own mapping,
+bound with `clusters::bind`, so the march's pass needs nothing of its own) and adds
+the light the gas scatters there: density times step times `LitStrength=` / 100 per
+world unit, the light's colour tinted `LitTint=` of the way towards the gas's hue; no
+phase (the gas glows alike from every side) and no shadowing by the gas between. Of
+each colour group only the strongest light at the step counts, as on the plating, and
+the cull's `ClusterPerColour` holds, so a volley of one colour does not blow out. The
+lights' light is added up along the ray and joins the gas's own at its end through a
+soft knee, L / (1 + L / `LitKnee=`) on its luminance: a light or two in thin gas is as
+it was, and a battleship's breach, whose fireball reaches across half the view, rolls
+off instead of whiting the frame out (at the knee's peak, 0.35 s after the kill in
+`render3d-nebula-lit`, 6 kept the glow's gradient where 0.75 to 2.5 flattened it into
+a uniform wash). The composite takes it through the gas's opacity, and the gas with
+no lights is drawn as before. Which light is what, to the gas
+(`scene::lights::Gas`, the cluster list's `t.z`): a fireball's takes `LitExplosion=`
+in a **core** about the breach and a dim **wash** beyond it. Its light is full out to
+the dead craft's bounding radius r (at least 40) and gone at `[Explosions]
+LightRange=` radii (10), linearly: as a plain light in the gas that lit everything
+within some ten radii almost alike, and a view ray inside the cloud crosses hundreds
+of units of that gas, so the sum along every ray in view went up to the knee and the
+whole cloud went white to the frame's edge (the user, in game, 2026-10-23: a breach
+*inside* the gas "out of proportion"; one just outside it looked right). So the gas
+takes that light times wash + (1 - wash) / sqrt(1 + (d / (c r))^4), c =
+`LitExplosionCore=` (2) and wash = `LitExplosionFar=` (0.12): about full within c
+radii, falling as the inverse square past them, down to the wash (`LitExplosionFar=1`
+is the plain light as before), and `LitExplosion=` went from 0.75 to 1.5, so the core
+is hotter than before while the cloud beyond takes about a quarter of what it did (an
+install moves a player's 0.75 to 1.5: `install.sh`, `RETIRED`). Judged on the bench
+(`render3d-nebula-explosion`, Vulkan on the GPU, 1280x720, 2026-10-23) against a core
+of 1.5 to 4 radii, a wash of 0.1 to 0.3 and `LitExplosion=` 0.75 to 2: a wider core or
+a stronger wash brought the pink over the whole cloud back. A falloff by distance
+cannot tell apart the two cases the user judged: gas a few hundred units from a breach
+just outside the cloud is as far from it as the far gas is from a breach inside, so
+the cloud's edge beside a breach outside now glows less than it did (pink, not
+salmon), while gas within two radii of a breach glows as before or brighter. The hulls
+take the fireball's light as before;
+a torpedo's or pulse's (each ordnance class's light, which rides with its shots) is a
+**corona**, bright within `LitCorona=` of its reach and fading softly to it,
+(1 - x)^1.5 (0.45 + 0.55 / (1 + (x / LitCorona)^2)) for x the distance over the reach,
+since a ball lit evenly to its edge read as a sphere in the gas. A **spark** at a hull
+gets the same corona, at `LitSpark=` (0.3) of its light: the repair and construction
+welds, the bees' welds, the shields-down discharges and the damaged sensors' glow
+(`Gas::Spark`; `LightPool::register_spark`, or `scene::lights::SPARK_POINT` for a
+point added by hand). Taken as plain lights, the shields-down discharges lit a ball of
+gas 1.2 bounding radii wide about the strike they were at, blue. In the Mutara, which
+takes every ship's shields down, the user saw these as big round blue blobs beside
+every Borg ship (2026-10-23). A/B on the bench with `[Shields] DownLight=0` put the
+blobs on the discharges, not the welds or the hits. A beam's line light takes
+`LitBeam=`; the nebulae's own lights (`world::lights`) and a planet's day side
+light no gas at all. The shape is the clusters' first choice (the alternative, a froxel
+volume filled by compute and integrated, would spend a pass and a 3D storage image on
+what the march, which already walks the depth, reads for one buffer word per step
+where no light reaches).
+
+Lights move and the gas adds its frames up (`Temporal=`), so a torpedo would trail
+its glow through the history. The march writes the luminance of the lights' share
+into its second target's green; `temporal_ps`'s twin weighs it against the gas's own
+over the 3x3 and keeps that share in the history's meta (blue), and where either is
+large (now, or where a light just was) the clip narrows to `LitClip=` of
+`TemporalClip=` and this frame's share rises to `LitTemporal=`, so the glow follows its
+light within a frame or two. The pass with `Lit=0`, on Direct3D 9, or where no
+clusters run is the plain one (the same d3dbc; the port scenes as before).
+
+Cost (`Timing=1`, `render3d-nebula-lit`'s paused frame: the `nebula-battle` scene, 32
+lights in the view, the camera in the gas; RX 5700, 2026-10-23), the march's GPU time
+without and with `Lit=1`: at 1280x720 2.63 against 2.70 ms on Vulkan and 2.61 against
+2.69 ms on Direct3D 12; at 3440x1440 6.76 against 7.16 ms on Vulkan and 7.06 against
+7.20 ms on Direct3D 12. Measured, this settled the design: the march already walks
+the depth through the clusters' own mapping, so a step where no light reaches costs a
+buffer word, and a froxel volume (a compute fill of some 215x90x64 cells and a pass to
+integrate them, about the cost of the lit march's whole addition before any light) had
+nothing left to win. Checked: the plain march with `Lit=0` at RMSE 0 against the
+clustered lights' commit on Vulkan and Direct3D 12 (`port-nebula`, all 25 frames of
+its dump), and Direct3D 9 at RMSE 0 against `pre-gpu-nebula`; on lavapipe the
+validation layer finds nothing but `Timing=1`'s query messages, which the scene
+without the gas gives too.
 
 **Lights** (`lights.rs`), without `Lighting.asi`. *Planet glows*: per planet and view
 (`Module::lights`), a point light at its centre (the instance's transform +0x44 plus

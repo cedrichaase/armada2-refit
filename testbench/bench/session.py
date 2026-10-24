@@ -423,6 +423,10 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         env = dict(HOME=str(config.HOME), PATH=os.environ['PATH'], XDG_RUNTIME_DIR=str(rt),
                    WLR_BACKENDS='headless', WLR_HEADLESS_OUTPUTS='1',
                    WLR_LIBINPUT_NO_DEVICES='1', WLR_RENDER_DRM_DEVICE=_render_node())
+        if os.environ.get('A2TEST_XWAYLAND_DEBUG'):
+            # Xwayland inherits it: every request and event between it and sway, in
+            # sway.log (pointer focus, locks and confinements). Large; for a short run.
+            env['WAYLAND_DEBUG'] = 'client'
         slog = open(self.dir / 'logs' / 'sway.log', 'w')
         p = subprocess.Popen(['sway', '-c', str(conf)], env=env, stdout=slog, stderr=subprocess.STDOUT,
                              stdin=subprocess.DEVNULL, start_new_session=True, cwd=str(self.work),
@@ -580,6 +584,21 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
         self.s['cursor'] = [x, y]
         self.save()
 
+    def to_corner(self):
+        """Push the pointer into the bottom right corner, where every pointer stops
+        whatever it was: the compositor's, a locked one and the game's alike. After a
+        change of focus the compositor's and the game's pointers can part (the motion
+        made while one is locked moves only the other), and `move` then aims from a
+        place neither is at; this puts both back where `move` thinks they are."""
+        w, h = self.res
+        # in steps short enough not to read as a jump of the pointer (UI.asi's
+        # PointerLog logs one of more than 320 pixels between two frames)
+        for _ in range((2 * max(w, h)) // 100 + 1):
+            self.input('rel 100 100')
+            time.sleep(0.02)
+        self.s['cursor'] = [w - 1, h - 1]
+        self.save()
+
     def glide(self, x, y, steps=8):
         """Move there in a few steps: the menu buttons only light up (and the shell only
         tracks the hover) on WM_MOUSEMOVE inside them, which a single jump can skip."""
@@ -617,6 +636,115 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
 
     def wheel(self, n):
         self.input(f'wheel {n}')
+
+    def take_focus(self, seconds=1.0, how='window'):
+        """Take the focus away from the game for a while and give it back, as a player
+        does who switches to another window (`window`: a terminal on the session's sway,
+        focused, which takes the game out of full screen, then closed) or takes a
+        region screenshot (`overlay`: `slurp`, a layer-shell overlay over everything,
+        with a region dragged on it; `screenshot`: as Omarchy's screenshot key takes
+        one, a frozen screen first, `hyprpicker -r -z`, another layer-shell overlay
+        that takes the keyboard, then `slurp` over it, the freeze ended after). The
+        pointer ends where it started."""
+        env = self.wl_env()
+        if how in ('overlay', 'screenshot'):
+            if not shutil.which('slurp'):
+                raise GameError('slurp is not installed: no overlay to take the focus with')
+            slog = open(self.dir / 'logs' / 'slurp.log', 'a')
+            freeze = None
+            if how == 'screenshot':
+                if not shutil.which('hyprpicker'):
+                    raise GameError('hyprpicker is not installed: no screen freeze to take a screenshot with')
+                # the session's sway only: nothing of the user's own session
+                fenv = {k: v for k, v in env.items()
+                        if k not in ('HYPRLAND_INSTANCE_SIGNATURE', 'NIRI_SOCKET', 'DISPLAY')}
+                freeze = subprocess.Popen(['hyprpicker', '-r', '-z'], env=fenv, stdout=slog,
+                                          stderr=subprocess.STDOUT, start_new_session=True)
+                time.sleep(0.1)
+            p = subprocess.Popen(['slurp'], env=env, stdout=slog, stderr=subprocess.STDOUT)
+            time.sleep(max(seconds, 0.5))
+            # a move first: the overlay takes the pointer only once it moves over it
+            self.input('rel 10 10')
+            time.sleep(0.3)
+            self.input('down 1')
+            time.sleep(0.1)
+            self.input('rel 120 80')
+            time.sleep(0.2)
+            self.input('up 1')
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                raise GameError('slurp did not take the region dragged on it (logs/slurp.log)')
+            if freeze:
+                time.sleep(0.1)
+                freeze.terminate()
+                try:
+                    freeze.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    freeze.kill()
+            self.input('rel -130 -90')
+        else:
+            term = next((t for t in ('foot', 'alacritty', 'kitty') if shutil.which(t)), None)
+            if not term:
+                raise GameError('no terminal (foot, alacritty, kitty) to take the focus with')
+            app = f'a2test-focus-{os.getpid()}'
+            args = [term, '-a', app] if term == 'foot' else [term, '--class', app]
+            p = subprocess.Popen(args, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 start_new_session=True)
+            for _ in range(50):
+                if f'"app_id": "{app}"' in self.swaymsg('-t', 'get_tree'):
+                    break
+                time.sleep(0.1)
+            self.swaymsg(f'[app_id="{app}"] focus')
+            time.sleep(seconds)
+            self.swaymsg(f'[app_id="{app}"] kill')
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+            self.swaymsg('[shell="xwayland"] focus')
+            self.swaymsg('[shell="xwayland"] fullscreen enable')
+        time.sleep(0.5)
+
+    def show_bar(self, height=None):
+        """A bar along the top of the screen, as a desktop's panel is (Omarchy's,
+        waybar): a layer-shell surface that takes the pointer and never the keyboard.
+        `swaynag` on the overlay layer, since sway draws its top layer under a
+        full-screen window where Hyprland still gives that layer the pointer. Stays
+        until `hide_bar` or the session ends."""
+        if self.s.get('pids', {}).get('bar'):
+            return
+        if not shutil.which('swaynag'):
+            raise GameError('swaynag is not installed: no bar to show')
+        # the session's sway only: nothing of the user's own session
+        env = {k: v for k, v in self.wl_env().items()
+               if k not in ('HYPRLAND_INSTANCE_SIGNATURE', 'NIRI_SOCKET', 'DISPLAY')}
+        args = ['swaynag', '-y', 'overlay', '-e', 'top', '-t', 'warning', '-m', 'a2test bar',
+                '--background', '202020', '--text', 'cccccc', '--border-bottom-size', '0']
+        if height:
+            pad = max(0, (int(height) - 14) // 2)
+            args += ['--message-padding', str(pad)]
+        blog = open(self.dir / 'logs' / 'bar.log', 'a')
+        p = subprocess.Popen(args, env=env, stdout=blog, stderr=subprocess.STDOUT,
+                             start_new_session=True)
+        self.s['pids']['bar'] = p.pid
+        self.save()
+        time.sleep(1.0)
+        if p.poll() is not None:
+            self.s['pids'].pop('bar', None)
+            self.save()
+            raise GameError('swaynag exited at once (logs/bar.log)')
+
+    def hide_bar(self):
+        pid = self.s.get('pids', {}).pop('bar', None)
+        self.save()
+        if pid:
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            time.sleep(0.3)
 
     # ------------------------------------------------------------------ game
 
@@ -1024,7 +1152,7 @@ exec sh -c 'env > {envfile}.tmp && mv {envfile}.tmp {envfile}'
                 self.collect_logs()
             except Exception as e:  # never let log collection keep a display alive
                 self.log.note(f'collecting logs failed: {e}', status='warn')
-            for k in ('record', 'vnc', 'input', 'sway'):
+            for k in ('record', 'bar', 'vnc', 'input', 'sway'):
                 pid = self.s['pids'].get(k)
                 if pid_alive(pid):
                     kill_group(pid, signal.SIGINT if k == 'record' else signal.SIGTERM)

@@ -19,6 +19,7 @@ pub mod info;
 pub mod leftovers;
 pub mod ingame;
 pub mod loading;
+pub mod mouse;
 pub mod msvc;
 pub mod overlay;
 pub mod palette;

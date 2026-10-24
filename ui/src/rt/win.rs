@@ -140,7 +140,10 @@ unsafe extern "system" {
     pub fn SetCursor(c: HANDLE) -> HANDLE;
     pub fn PostQuitMessage(code: i32);
     pub fn GetFocus() -> HWND;
+    pub fn GetActiveWindow() -> HWND;
     pub fn SetFocus(w: HWND) -> HWND;
+    pub fn ClipCursor(r: *const WinRect) -> i32;
+    pub fn GetClipCursor(r: *mut WinRect) -> i32;
 }
 
 #[link(name = "kernel32")]

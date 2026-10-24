@@ -5,6 +5,146 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.34.0 — 2026-10-23
+
+Layers: render3d 0.27.0, testbench 3.68.0.
+
+### Changed
+- render3d: an explosion inside a nebula lights the gas strongly about the breach,
+  within two of the ship's radii, and the rest of the cloud with a dim wash, instead
+  of lighting the whole cloud in view alike. New `[Nebulae]` keys `LitExplosionCore`
+  and `LitExplosionFar`; `LitExplosion` defaults to 1.5, and an install moves a
+  player's old 0.75 to it (render3d 0.27.0).
+
+### Added
+- testbench: `render3d-nebula-explosion` (testbench 3.68.0).
+
+Confirmed in game 2026-10-23.
+
+## 13.33.0 — 2026-10-23
+
+Layers: ui 0.22.0, testbench 3.67.0.
+
+### Added
+- `[UI] KeepClip=1`, on as shipped: in a mission under Wine, UI.asi has Wine clip the
+  pointer to the full-screen game again while it moves, for the pointer that escaped
+  into the desktop's bar after a screenshot (ui 0.22.0).
+- testbench: a bar step, an Omarchy-like screenshot, a corner push, an Xwayland
+  protocol trace and `ui-pointer-bar` (testbench 3.67.0).
+
+Confirmed in game 2026-10-23.
+
+## 13.32.0 — 2026-10-23
+
+Layers: render3d 0.26.1, testbench 3.66.0.
+
+### Fixed
+- render3d: on Vulkan and Direct3D 12, the auto-assimilator's emitter flare drew as a
+  black square on the Assimilator (a NaN from the fx shader's kinds weighted by zero);
+  the shader selects the quad's kind (render3d 0.26.1).
+
+### Added
+- testbench: `render3d-cone-emitter`, for that flare on Vulkan (testbench 3.66.0).
+
+Confirmed in game 2026-10-23.
+
+## 13.31.0 — 2026-10-23
+
+Layers: ui 0.21.0, testbench 3.65.0.
+
+### Added
+- `[UI] PointerLog=1`, off as shipped: UI.log records changes of the game window's
+  focus and jumps of the pointer, for the cursor that jumps after a change of focus
+  (ui 0.21.0).
+- testbench: the step `Take the focus from the game ...` and `ui-focus-pointer`
+  (testbench 3.65.0).
+
+Installed, not yet seen in game.
+
+## 13.30.0 — 2026-10-23
+
+Layers: render3d 0.26.0, testbench 3.64.0.
+
+### Changed
+- render3d's phaser beams light the hulls, stations, rocks and planets they pass on
+  Vulkan and Direct3D 12, evenly along the beam, falling off with distance from it,
+  out to 200 units (was 4 full, 40 gone); the emitter and the hit stay brighter. New
+  keys `BeamCore`, `BeamGasReach`; `BeamLight` and `BeamReach` take new defaults, and
+  an install moves a player's old defaults to them (render3d 0.26.0).
+
+### Added
+- testbench: the `beam-pass` scene and `render3d-beam-light` (testbench 3.64.0).
+
+Confirmed in game 2026-10-23.
+
+## 13.29.0 — 2026-10-23
+
+Layers: render3d 0.25.0, testbench 3.63.0.
+
+### Added
+- render3d: the Borg's damaged sensors (the green sparks seen in the Mutara) hold
+  still at half size and give a small steady light. New `[Hulls]` keys:
+  `SensorSteady`, `SensorSize`, `SensorLight`, `SensorLightReach`. New
+  `[Nebulae] LitSpark=` key (render3d 0.25.0).
+- testbench: `render3d-hull-sparks` (testbench 3.63.0).
+
+### Fixed
+- render3d: welds and shields-down discharges light only a tight corona of nebula gas,
+  no longer a wide round blue ball. The shipped `Render3D.ini` lists `LitCorona=`. The
+  scene's hand-added lights survive the ordnance module's second read of the engine's
+  lights (render3d 0.25.0).
+
+Confirmed in game 2026-10-23.
+
+## 13.28.0 — 2026-10-23
+
+Layers: render3d 0.24.0, testbench 3.62.0.
+
+### Added
+- render3d's light inside the nebulae on Vulkan and Direct3D 12: explosions,
+  torpedoes, pulses, phaser beams and vents light the gas they are in, from the
+  clustered lights. `[Nebulae] Lit=0` turns it off; Direct3D 9 is unchanged
+  (render3d 0.24.0).
+- testbench: the `nebula-battle` scene and `render3d-nebula-lit` (testbench 3.62.0).
+
+### Changed
+- render3d's clustered lights' cull tightened, the same clusters (render3d 0.24.0).
+
+Confirmed in game 2026-10-23.
+
+## 13.27.0 — 2026-10-23
+
+Layers: testbench 3.61.0, ui 0.20.1, render3d 0.23.2, qol 1.6.4, cutscenes 2.1.1.
+
+### Fixed
+- `ui-hud-bar` and `ui-hud-map` press Home before selecting at measured places, and
+  check in `UI.log` that the click selected the unit: the Warzone start view now opens
+  zoomed out in some runs, where their fixed clicks selected nothing (testbench 3.61.0).
+- Several `./install`s of one tree at once (`a2test -j`) no longer clash in its builds:
+  `ui/build.sh` writes `mod.rs` and `UI.asi` through temp files of its own (ui 0.20.1),
+  `render3d/hlsl-rs.sh` puts each shader file in place by one rename (render3d 0.23.2),
+  and the QOL and Bink proxy builds take a lock (qol 1.6.4, cutscenes 2.1.1).
+
+Installed, not yet seen in game.
+
+## 13.26.0 — 2026-10-23
+
+Layers: ui 0.20.0, testbench 3.60.0.
+
+### Added
+- The placement markers drawn by the UI in the theme, in every Display8 mode and on
+  every backend: the footprint under a station being placed (clear: green, bracketed;
+  blocked: red, hatched) and the cells other objects take (amber tiles; red and crossed
+  under the footprint). `[HUD] Placement=0` gives the engine's sprites (ui 0.20.0).
+- `ui-placement` (testbench 3.60.0).
+
+### Fixed
+- The footprint under a station being placed went missing on maps with many taken
+  cells, wherever the UI draws the engine's last draws (in stub mode nothing else
+  draws it) (ui 0.20.0).
+
+Confirmed in game 2026-10-23.
+
 ## 13.24.1 — 2026-10-23
 
 Layers: render3d 0.23.1.
