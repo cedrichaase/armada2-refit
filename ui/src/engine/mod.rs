@@ -16,6 +16,7 @@ pub mod display;
 pub mod hook;
 pub mod hud;
 pub mod info;
+pub mod intro;
 pub mod leftovers;
 pub mod ingame;
 pub mod loading;

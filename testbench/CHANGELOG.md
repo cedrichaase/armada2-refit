@@ -5,6 +5,14 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.69.0 — 2026-10-25
+
+### Added
+- `display-movie-no-proxy`: the launch reels and the intro on Display8's stub without
+  the cutscene proxy, as the release package installs them (ui 0.23.0).
+
+Installed, not yet seen in game.
+
 ## 3.68.0 — 2026-10-23
 
 ### Added

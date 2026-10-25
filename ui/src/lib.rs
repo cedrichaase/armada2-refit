@@ -58,6 +58,11 @@ fn startup() {
     // of the game as it was, and the others still work.
     if config::get().native {
         log!("display: {}", if engine::display::install() { "a stock mode becomes the desktop's" } else { "the call is not stock: the game's mode is as set" });
+        // The intro's 640x480 is not in Display8's mode list (one mode, the desktop's).
+        engine::intro::raise_mode();
+    }
+    if config::get().movies {
+        engine::intro::route_frames();
     }
     log!("input: {}", if input::install() { "captured" } else { "not captured" });
     let mission = engine::ingame::install();
