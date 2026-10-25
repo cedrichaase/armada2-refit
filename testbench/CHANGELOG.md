@@ -9,7 +9,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 
 ### Added
 - `display-movie-no-proxy`: the launch reels and the intro on Display8's stub without
-  the cutscene proxy, as the release package installs them (ui 0.23.0).
+  the cutscene proxy, as the release package installs them (ui 0.23.0). `6d7180d`
 
 Installed, not yet seen in game.
 

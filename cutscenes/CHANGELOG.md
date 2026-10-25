@@ -8,7 +8,7 @@ Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
 ### Added
 - `binkproxy/bench-unproxy.sh`: a scenario's `Setup:` that takes the proxy out of a
-  bench clone (`install.sh --remove`), as the release package leaves the game.
+  bench clone (`install.sh --remove`), as the release package leaves the game. `6d7180d`
 
 Installed, not yet seen in game.
 
