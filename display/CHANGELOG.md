@@ -13,7 +13,7 @@ in [`README.md`](README.md).
   Direct3D 9 and the forward chain immediate). An install adds the key to an existing
   `Display8.ini`. `4f1d1de`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-25.
 
 ## 0.8.0 — 2026-10-23
 
