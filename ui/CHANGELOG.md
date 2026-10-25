@@ -4,6 +4,21 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.23.0 — 2026-10-25
+
+### Fixed
+- The game crashed before the first movie with Display8's stub and no cutscene proxy
+  (the release package): `Program::PlayIntroMovie`'s 640x480 lookups are raised to the
+  desktop's size with `[UI] Native=1` (`engine/intro.rs`), as the proxy does; with the
+  proxy installed they stay its. `6d7180d`
+
+### Added
+- With `[UI] Movies=1` and no cutscene proxy, the launch reels and the intro are drawn
+  by the UI, fitted between black bars: `NextBinkFrame`'s `BinkCopyToBuffer` call is
+  re-pointed and the frame handed to `ui_present_movie`. `6d7180d`
+
+Installed, not yet seen in game.
+
 ## 0.22.0 — 2026-10-23
 
 ### Added

@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.36.0 — 2026-10-25
+
+Layers: ui 0.23.0, cutscenes 2.2.0, testbench 3.69.0.
+
+### Fixed
+- ui: the release package crashed before the first movie (Display8's stub offers no
+  640x480 and the package has no cutscene proxy to raise the intro's mode): `UI.asi`
+  raises it, and draws the reels' and the intro's frames fitted without the proxy. `6d7180d`
+
+### Added
+- testbench: `display-movie-no-proxy`, the movies on the stub without the proxy, set up
+  by `cutscenes/binkproxy/bench-unproxy.sh` (cutscenes 2.2.0, testbench 3.69.0, `6d7180d`).
+
+Installed, not yet seen in game.
+
 ## 13.35.0 — 2026-10-25
 
 Layers: display 0.9.0, gui-installer 2.1.0.

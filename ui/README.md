@@ -599,7 +599,7 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[UI] Log` | 1 | `UI.log` in the game directory: which hooks are in, and why one stood down |
 | `[UI] Scale` | 1.0 | the UI's size, as a multiple of a 1080-pixel-tall screen |
 | `[UI] Cursor` | 1 | draw the mouse cursor ourselves, from the game's own cursor art ("The cursor"); 0: the engine's, kept square |
-| `[UI] Movies` | 1 | the cutscene proxy's full-screen frames drawn by the UI ("Movies"); 0: the proxy copies them into the locked back buffer |
+| `[UI] Movies` | 1 | the launch reels' and the intro's frames drawn by the UI, fitted ("Movies"), from the cutscene proxy or, without it, from the engine's own copy; 0: copied into the locked back buffer, scaled by the proxy or 640x480 without it |
 | `[UI] Defaults` | 2 | which shipped defaults the file was brought up to ("Installing"); not read by `UI.asi` |
 | `[UI] CursorSize` | 32 | its size in units (32 texels of art at 1080 lines) |
 | `[UI] Theme` | auto | the look (`STYLE.md`): `auto` is the player's race in a mission and the shell's theme elsewhere; or `shell`, `federation`, `klingon`, `romulan`, `cardassian`, `borg`, `species8472` everywhere |
@@ -804,6 +804,34 @@ The proxy's real-Bink reels (Activision, Paramount, Mad Doc) take the same way: 
 decodes them into its scratch buffer and hands that over. The in-mission Bink
 (`BinkThread`, the unit view's video) is not a movie in this sense: it is decoded into
 an engine texture, which the UI draws (`HUD.md`, "The engine's last draws").
+
+### The intro without the cutscene proxy
+
+`src/engine/intro.rs`. The release package installs no cutscene proxy (the GUI
+installer holds it back), and with Display8's stub that crashed the game before the
+first movie: `Program::PlayIntroMovie` looks up a hard-coded 640x480 in the engine's
+mode list, at 32 bits (the pushes at 0x4861bf) and failing that at 16 (0x4861e6), and
+re-creates the device at the mode it found. The stub offers one mode, the desktop's
+(`display/README.md`, "Stub mode"), so the lookup came back empty and
+`ST3D_DeviceDirectX8::CreateDevice` read the missing mode (an access violation at
+0x623607, seen on Windows 2026-10-25). The proxy never let it happen: it raises both
+lookups to the desktop's size from its DllMain. `UI.asi` now does the same with `[UI]
+Native=1`, keeping the depth stock asks for. Armada2.exe imports `binkw32.dll`, so the
+proxy is loaded and has patched the sites before any ASI; the UI then finds them not
+stock and leaves them.
+
+The frames then reach the screen without the proxy too. The back-buffer overload of
+`NextBinkFrame` (0x4637f0, the one `PlayMovie` uses) copies each frame with the
+`BinkCopyToBuffer` import, called at 0x4638af, unscaled at (0,0): at the raised mode
+that is a 640x480 picture in a corner. With `Movies=1` that one call is re-pointed (a
+`call rel32` and a `nop` over the `call [import]`): the frame is copied at its own size
+as 32-bit BGRX into a buffer of the UI's, the format the proxy hands over, and goes to
+`ui_present_movie` as above; when that declines, the stock copy runs. The other three
+calls of the import (the HDC overload the shell's backdrops use) are left alone. With
+the proxy loaded the site stays stock: the proxy tells the intro's copy by its return
+address, which a call through the UI would hide, and it hands the frames over itself.
+The proxy is told by its exports: it has only the ten the game imports, and stock's
+`_BinkGetError@0` is not one of them.
 
 ## Frame dumps
 

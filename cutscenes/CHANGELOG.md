@@ -4,6 +4,14 @@
 Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first.
 Details are in [`binkproxy/README.md`](binkproxy/README.md).
 
+## 2.2.0 — 2026-10-25
+
+### Added
+- `binkproxy/bench-unproxy.sh`: a scenario's `Setup:` that takes the proxy out of a
+  bench clone (`install.sh --remove`), as the release package leaves the game. `6d7180d`
+
+Installed, not yet seen in game.
+
 ## 2.1.1 — 2026-10-23
 
 ### Fixed
