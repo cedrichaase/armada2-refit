@@ -85,6 +85,9 @@ check '[ -e "$G/QOL.asi" ] && [ -e "$G/Online.asi" ] && [ -e "$G/winmm.dll" ]'
 # No d3d8.dll in the bottle: d3d8to9 goes in (on wined3d), and with it the UI and the
 # 3D view in place of HUD.asi.
 check '[ -e "$G/UI.asi" ] && [ -e "$G/Render3D.asi" ] && [ -d "$G/Surfaces" ] && [ ! -e "$G/HUD.asi" ]'
+# Display8 in front of it, on Direct3D 9 alone on a Mac.
+check 'grep -q "Display8 stopped the game" "$G/d3d8.dll" && [ -e "$G/d3d8_real.dll" ] && grep -qx "Backend=d3d9" "$G/Display8.ini"'
+check 'grep -q "Installing Display8" "$T/err"'
 check '[ ! -e "$G/d3d9.dll" ]'
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ] && [ ! -e "$G/binkw32_orig.dll" ] && [ ! -e "$G/BinkProxy.ini" ]'
 check 'grep -q "Installing the HUD" "$T/err"'

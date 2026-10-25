@@ -7,6 +7,8 @@
 #             Render3D.asi's recipes in game/Surfaces/ and game/Nebulae/
 #   chain/    the Direct3D chain ./install sets up: crosire's d3d8to9 as d3d8.dll on
 #             DXVK's d3d9.dll (both from platform/vendor/, with their licences)
+#   display/  Display8 (display/): d3d8.dll, ours, which the installers put in front of
+#             the chain's (d3d8to9 behind it as d3d8_real.dll), and Display8.ini
 #   models/   models/moon-sod.py, select-sod.py, hull-sod.py (+ hull-sod.sha256),
 #             asteroid-sod.py and
 #   a2env.py  the a2env.py they import: they rewrite the player's own stock SODs
@@ -45,12 +47,13 @@ bash "$root/qol/build.sh"              >/dev/null
 bash "$root/grid/build.sh"             >/dev/null
 bash "$root/online/build.sh"           >/dev/null
 bash "$root/cutscenes/binkproxy/build.sh" >/dev/null
+bash "$root/display/build.sh"          >/dev/null
 
 name="armada2-refit-$ver"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 d="$stage/$name"
-mkdir -p "$d/game" "$d/chain" "$d/models"
+mkdir -p "$d/game" "$d/chain" "$d/display" "$d/models"
 cp "$root/render3d/build/Render3D.asi"      "$root/render3d/Render3D.ini"       "$d/game/"
 mkdir -p "$d/game/Surfaces" "$d/game/Nebulae"
 cp "$root/render3d/surfaces/"*.ini "$d/game/Surfaces/"
@@ -79,6 +82,9 @@ cp "$root/platform/vendor/d3d8to9-1.16.0/d3d8.dll" "$d/chain/d3d8.dll"
 cp "$root/platform/vendor/d3d8to9-1.16.0/LICENSE.md" "$d/chain/d3d8to9-LICENSE.md"
 cp "$root/platform/vendor/dxvk-3.1.1/d3d9.dll" "$d/chain/d3d9.dll"
 cp "$root/platform/vendor/dxvk-3.1.1/LICENSE" "$d/chain/dxvk-LICENSE"
+# Display8, the game's d3d8.dll of ours, as display/install puts it in front of the chain.
+# Not in game/: it takes the d3d8.dll slot, which the installers hand over with care.
+cp "$root/display/build/d3d8.dll" "$root/display/Display8.ini" "$d/display/"
 # The model rewrites: derived at install time from the player's own files, pinned by hash.
 cp "$root/models/moon-sod.py" "$root/models/select-sod.py" "$root/models/hull-sod.py" \
    "$root/models/hull-sod.sha256" "$root/models/asteroid-sod.py" "$d/models/"
@@ -88,14 +94,14 @@ sed 's/$/\r/' "$root/publish/installer/install.bat" > "$d/install.bat"
 cp "$root/LICENSE" "$d/"
 
 # Every binary must be a 32-bit PE: a host-arch object here would load nowhere.
-for f in "$d"/game/*.asi "$d"/game/*.dll "$d"/chain/*.dll "$d"/vendor/*/*.asi "$d"/vendor/*/*.dll; do
+for f in "$d"/game/*.asi "$d"/game/*.dll "$d"/display/*.dll "$d"/chain/*.dll "$d"/vendor/*/*.asi "$d"/vendor/*/*.dll; do
     objdump -f "$f" | grep -q 'file format pei-i386' \
         || { echo "not a 32-bit PE: $f" >&2; exit 1; }
 done
 # ...and every one we build carries its version resource (platform/versioninfo/), which
 # Windows shows in Properties and antivirus heuristics look for. The vendored ones are
 # shipped as their authors built them.
-for f in "$d"/game/*.asi "$d"/game/*.dll; do
+for f in "$d"/game/*.asi "$d"/game/*.dll "$d"/display/*.dll; do
     llvm-readobj --coff-resources "$f" | grep -q 'Type: VERSIONINFO' \
         || { echo "no version resource: $f (platform/versioninfo/build-res.sh)" >&2; exit 1; }
 done
@@ -134,12 +140,25 @@ WHAT GOES IN (game/, copied beside Armada2.exe)
   binkw32.dll  + BinkProxy.ini  cutscenes $(version "$root/cutscenes/CHANGELOG.md")  launch reels full screen, AV1 movie replacements
   dxvk.conf                     renderer $(version "$root/renderer/CHANGELOG.md")   16x anisotropic filtering, LOD bias, seamless
                                                cube maps; only DXVK reads it
-Render3D.asi and UI.asi draw on the Direct3D 9 device that d3d8to9 (below) gives them.
-Where the installer leaves the chain as it is, they are not installed, and these take
-the UI's place instead (the 3D view is then the engine's):
+Render3D.asi and UI.asi draw on Display8's own device (below), or on the Direct3D 9
+device of d3d8to9 behind it. Where the installer leaves the chain as it is, they are not
+installed, and these take the UI's place instead (the 3D view is then the engine's):
   HUD.asi      + HUD.ini        hud $(version "$root/hud/CHANGELOG.md")        in-game HUD, font and cursors at any aspect
   Menus.asi    + Menus.ini      menus $(version "$root/menus/CHANGELOG.md")      the shell menus scaled to fill the screen
   GridLayout.asi + .ini         grid $(version "$root/grid/CHANGELOG.md")       the button bar as a 5x3 grid of position keys
+DISPLAY8 (display/)            display $(version "$root/display/CHANGELOG.md")
+  d3d8.dll     + Display8.ini   the game's Direct3D 8, ours, in front of d3d8to9 (below),
+                                which goes behind it as d3d8_real.dll. In stub mode, as
+                                shipped, the engine draws nothing and Render3D.asi and
+                                UI.asi draw the whole frame on Display8's own device: the
+                                first that starts of Vulkan, Direct3D 12 and Direct3D 9
+                                (Backend=auto). VSync=0 in Display8.ini lifts the frame
+                                limit. On macOS it goes in on Direct3D 9 alone
+                                (Backend=d3d9). Put in only where d3d8.dll is d3d8to9
+                                after the chain step; an existing Display8.ini keeps your
+                                values and gains the new keys. --uninstall puts d3d8to9
+                                back as d3d8.dll. Seen in game on Linux (Proton); on
+                                Windows and macOS not yet.
 THE DIRECT3D CHAIN (chain/)    platform $(version "$root/platform/CHANGELOG.md")
   d3d8.dll  crosire's d3d8to9 1.16.0, on
   d3d9.dll  DXVK 3.1.1's Direct3D 9 on Vulkan, which dxvk.conf needs.
@@ -248,7 +267,7 @@ json.dump({
     # The systems below install only from a package that names them (Package.for_system).
     'windows': {'script': 'install.ps1', 'uninstall': '-Uninstall', 'progress': 'A2_PROGRESS'},
     'macos': {'script': 'install.sh', 'uninstall': '--uninstall', 'progress': 'A2_PROGRESS'},
-    'steps': ['verify', 'prereqs', 'chain', 'render3d', 'ui', 'qol', 'models',
+    'steps': ['verify', 'prereqs', 'chain', 'display', 'render3d', 'ui', 'qol', 'models',
               'online', 'cutscenes', 'renderer', 'bloom', 'done'],
     'layers': [
         layer('prereqs', 'Widescreen patch', '1.0', ['vendor/STA2WidescreenPatch/*'],
@@ -257,6 +276,11 @@ json.dump({
         layer('chain', 'Direct3D chain', '$(version "$root/platform/CHANGELOG.md")',
               ['chain/d3d8.dll', 'chain/d3d9.dll'],
               "crosire's d3d8to9 on DXVK's d3d9: DXVK underneath"),
+        layer('display', 'Display8', '$(version "$root/display/CHANGELOG.md")',
+              ['display/d3d8.dll', 'display/Display8.ini'],
+              "the game's Direct3D 8, ours, in front of d3d8to9: the 3D view and the UI draw "
+              'the whole frame on Vulkan, Direct3D 12 or Direct3D 9, whichever starts first; '
+              'VSync= in Display8.ini', 'display8'),
         layer('render3d', '3D view', '$(version "$root/render3d/CHANGELOG.md")',
               ['game/Render3D.asi', 'game/Render3D.ini', 'game/Surfaces/*', 'game/Nebulae/*'],
               'the 3D view through a renderer of our own: HDR, anti-aliasing, bloom, lit hulls '
@@ -289,7 +313,7 @@ json.dump({
 }, open(sys.argv[1], 'w'), indent=1)
 EOF
 
-(cd "$d" && sha256sum -- game/*.* game/*/* chain/* models/* a2env.py vendor/*/* prereqs.txt manifest.json \
+(cd "$d" && sha256sum -- game/*.* game/*/* chain/* display/* models/* a2env.py vendor/*/* prereqs.txt manifest.json \
     armada2-refit-installer.py > SHA256SUMS)
 rm -f "$out/$name.zip"
 (cd "$stage" && zip -qrX "$out/$name.zip" "$name")

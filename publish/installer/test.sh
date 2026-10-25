@@ -54,6 +54,8 @@ check '[ -e "$G/Online.asi" ] && [ -e "$G/Online.ini" ]'
 # The chain was left as it is: no Render3D.asi or UI.asi, the older plugins in the UI's place.
 check '[ ! -e "$G/Render3D.asi" ] && [ ! -e "$G/UI.asi" ] && [ ! -e "$G/Surfaces" ] && grep -q "Render3D.asi skipped" "$T/out"'
 check '[ -e "$G/HUD.asi" ] && [ -e "$G/Menus.asi" ] && [ -e "$G/GridLayout.asi" ] && [ -e "$G/GridLayout.ini" ]'
+# ...and Display8 too, which goes in front of d3d8to9 only.
+check 'grep -q "Display8 skipped" "$T/out" && [ ! -e "$G/d3d8_real.dll" ] && [ ! -e "$G/Display8.ini" ]'
 check '[ ! -e "$B" ] && grep -q "removed the old bloom" "$T/out"'
 check 'grep -q BinkProxy "$G/binkw32.dll"'
 check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
@@ -71,8 +73,16 @@ mkdir -p "$G/Surfaces"; echo "[Surface]" > "$G/Surfaces/myown.ini"
 "$P/install.sh" "$G" > "$T/out"
 check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
 check 'grep -q "; mine" "$G/QOL.ini.bak"'
-# d3d8to9 is in now: Render3D.asi with its recipes, UI.asi in place of the older three.
-check '[ "$(sum "$G/d3d8.dll")" = "$(sum "$D3D8TO9")" ]'
+# d3d8to9 is in now, with Display8 in front of it (d3d8to9 behind as d3d8_real.dll, and
+# Display8.ini as shipped; on a Mac on Direct3D 9 alone): Render3D.asi with its recipes,
+# UI.asi in place of the older three.
+check 'cmp -s "$P/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
+if [ "$mac" = 0 ]; then
+    check 'cmp -s "$P/display/Display8.ini" "$G/Display8.ini"'
+else
+    check 'grep -qx "Backend=d3d9" "$G/Display8.ini" && [ "$(diff "$P/display/Display8.ini" "$G/Display8.ini" | grep -c "^[<>]")" = 2 ]'
+fi
+check '[ ! -e "$G/Display8.ini.a2ship" ] && [ ! -e "$G/d3d8.dll.a2display-new" ]'
 check 'cmp -s "$P/game/Render3D.asi" "$G/Render3D.asi" && cmp -s "$P/game/UI.asi" "$G/UI.asi" && [ -e "$G/UI.ini" ]'
 check '[ "$(count "$G/Nebulae")" = "$(count "$P/game/Nebulae")" ] && [ "$(count "$G/Surfaces")" = "$(( $(count "$P/game/Surfaces") + 1 ))" ]'
 check '[ -z "$(ls "$G" | grep -E "^(HUD|Menus|GridLayout)\.(asi|ini)$")" ]'
@@ -80,9 +90,10 @@ check '[ "$(cat "$G/binkw32_orig.dll")" = stockbink ]'
 if [ "$mac" = 0 ]; then
     check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b;d3d9=n,b" ]'
 else
-    # d3d8to9 in on Wine's own d3d9, DXVK's d3d8 kept; no d3d9.dll or dxvk.conf.
-    check '[ "$(sum "$G/d3d8.dll")" = "$(sum "$D3D8TO9")" ] && [ "$(cat "$G/d3d8.dll.a2chain-backup")" = dxvk ]'
+    # d3d8to9 in (behind Display8) on Wine's own d3d9, DXVK's d3d8 kept; no d3d9.dll or dxvk.conf.
+    check '[ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ] && [ "$(cat "$G/d3d8.dll.a2chain-backup")" = dxvk ]'
     check '[ ! -e "$G/d3d9.dll" ] && grep -q "d3d9.dll: Wine.s own (wined3d)" "$T/out"'
+    check 'grep -q "on Direct3D 9 (Backend=d3d9)" "$T/out"'
     check '[ ! -e "$G/dxvk.conf" ]'
     check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
 
@@ -95,6 +106,28 @@ else
     check '[ ! -e "$G/dxvk.conf" ]'
     check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
 fi
+
+echo "== reinstall over Display8: an older build replaced, d3d8to9 still behind, Display8.ini merged"
+printf 'MZ Display8 stopped the game: an older build\n' > "$G/d3d8.dll"
+printf '[Display8]\nMode=forward\nBackend=d3d9\nVSync=0\nLog=1\n\n[Drop]\nDrop2D=1\n' > "$G/Display8.ini"
+A2_PROGRESS=1 "$P/install.sh" "$G" > "$T/out"
+check 'cmp -s "$P/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
+check 'grep -q "d3d8.dll: crosire.s d3d8to9 already" "$T/out" && cmp -s "$P/game/UI.asi" "$G/UI.asi"'
+# the step after the chain's, before the plugins'
+check '[ "$(grep "^::step" "$T/out" | sed -n "3,5p" | cut -d" " -f2 | tr "\n" " ")" = "chain display render3d " ]'
+# the old defaults moved (the shipped Defaults=2), the player's own values kept, every
+# missing key added, each once
+check 'grep -qx "Mode=stub" "$G/Display8.ini" && grep -q "Display8.ini: \[display8\] Mode forward -> stub (defaults 2)" "$T/out"'
+check 'grep -qx "VSync=0" "$G/Display8.ini" && grep -qx "Drop2D=1" "$G/Display8.ini" && grep -qx "Defaults=2" "$G/Display8.ini"'
+check 'grep -qx "Real=auto" "$G/Display8.ini" && grep -qx "Frames=3" "$G/Display8.ini" && [ "$(grep -c "^Backend=" "$G/Display8.ini")" = 1 ]'
+if [ "$mac" = 0 ]; then
+    check 'grep -qx "Backend=auto" "$G/Display8.ini"'
+else
+    check 'grep -qx "Backend=d3d9" "$G/Display8.ini"'
+fi
+cp "$G/Display8.ini" "$T/d8.ini"
+"$P/install.sh" "$G" > "$T/out"
+check 'cmp -s "$T/d8.ini" "$G/Display8.ini"'   # merged again: nothing left to change
 
 if [ "$mac" = 1 ]; then
     echo "== macOS: a DXVK d3d9.dll of the player's own stays, and gets its override"
@@ -152,6 +185,7 @@ check '! A2_PROGRESS=1 "$P/install.sh" "$T/nowhere" > "$T/out" 2> "$T/err" && gr
 
 echo "== uninstall: what it added goes, what changed since stays"
 echo mine > "$G/UltimateASILoader-license.txt"
+echo log > "$G/Display8.log"
 echo "[Sky]" > "$G/Sky/myown.ini"   # a recipe of the player's own stays
 "$P/install.sh" --uninstall "$G" > "$T/out"
 check '[ "$(cat "$G/binkw32.dll")" = stockbink ]'
@@ -163,6 +197,7 @@ rm -rf "$G/Sky"
 check '[ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-prereqs.txt" ]'
 check '[ "$(cat "$G/UltimateASILoader-license.txt")" = mine ] && grep -q "left UltimateASILoader-license.txt" "$T/out"'
 check '[ "$(cat "$G/d3d8.dll")" = dxvk ] && [ ! -e "$G/d3d9.dll" ]'
+check '[ -z "$(ls "$G" | grep -E "^d3d8_real\.dll$|^Display8\.|a2display")" ]'
 check '[ ! -e "$B" ]'
 
 echo "== what it did not write is left alone: a loader, a dxvk.conf; A2_PYTHON runs the models"

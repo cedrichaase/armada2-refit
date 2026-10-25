@@ -188,7 +188,9 @@ Any other chain (GOG's, Wine's, a `d3d8.dll` of the player's own) is left as it 
 named. `--use dxvk` goes back. The release zip's `install.sh` does the same with its own
 copies, d3d8to9 and DXVK 3.1.1's d3d9 (`vendor/dxvk-3.1.1/`), since it cannot know
 which Proton the player runs; it also replaces GOG's `d3d8.dll`, kept as
-`d3d8.dll.gog-backup` (`publish/README.md`).
+`d3d8.dll.gog-backup` (`publish/README.md`). Then, as `./install` does, it puts Display8
+(`display/`) in front of that d3d8to9, which moves behind it as `d3d8_real.dll`; the
+release chain is then the one `display/README.md` draws, in stub mode as shipped.
 
 The GOG release as shipped, which `--revert` returns to, is GOG's translator on the
 prefix's d3d9 — Heroic's DXVK while `autoInstallDxvk` is on, else Wine's:

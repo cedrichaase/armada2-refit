@@ -13,7 +13,7 @@ $P = (Get-ChildItem -LiteralPath $T -Directory -Filter "armada2-refit-*").FullNa
 $D3d8to9 = Join-Path $PSScriptRoot "..\..\platform\vendor\d3d8to9-1.16.0\d3d8.dll"
 $D3d8to9Sha = "122928cfe225c25d30decf7184a5d37e490cecf3b58256ba3206c7e1853f8ab8"
 # install.sh's ::step ids, in order (manifest.json's "steps").
-$Steps = "verify prereqs chain render3d ui qol models online cutscenes renderer bloom done"
+$Steps = "verify prereqs chain display render3d ui qol models online cutscenes renderer bloom done"
 function Check([string]$what, $ok) {   # $ok untyped: a [bool] parameter refuses strings
     if ($ok) { Write-Host "ok    $what" } else { throw "FAIL  $what" }
 }
@@ -66,7 +66,8 @@ Set-Content (G "Sky\mbgaqu.ini") "old"; Set-Content (G "Sky\myown.ini") "[Sky]"
 
 Write-Host "== every PE of ours carries its version resource, as Windows reads it (platform/versioninfo/)"
 $Ver = (Split-Path $P -Leaf) -replace '^armada2-refit-', ''
-foreach ($f in Get-ChildItem -LiteralPath (Join-Path $P "game") -File | Where-Object { $_.Extension -in ".asi", ".dll" }) {
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $P "game"), (Join-Path $P "display") -File |
+                 Where-Object { $_.Extension -in ".asi", ".dll" })) {
     $vi = $f.VersionInfo
     Check "$($f.Name): '$($vi.FileDescription)' $($vi.FileVersion), product $($vi.ProductVersion)" (
         ($vi.FileDescription -like "Armada II Refit: *") -and ($vi.ProductVersion -eq $Ver) -and
@@ -90,6 +91,8 @@ Check "a d3d8.dll that is neither GOG's nor d3d8to9 left as it is" (((Text (G "d
     -not (Test-Path (G "d3d8.dll.gog-backup")) -and -not (Test-Path (G "d3d8.dll.a2chain-backup")) -and
     (Has $out "*left as it is: d3d8.dll is neither GOG*") -and -not (Select-String -Quiet -SimpleMatch "d3d8.dll" (G "armada2-refit-prereqs.txt")))
 Check "no d3d9.dll" (-not (Test-Path (G "d3d9.dll")))
+Check "Display8 skipped: it goes in front of d3d8to9 only" ((Has $out "*Display8 skipped*") -and
+    -not (Test-Path (G "d3d8_real.dll")) -and -not (Test-Path (G "Display8.ini")))
 foreach ($n in "MSAA", "Planets", "Lighting", "Sky", "Fog", "Specials") {
     Check "$n.asi + $n.ini out" (-not (Test-Path (G "$n.asi")) -and -not (Test-Path (G "$n.ini")))
 }
@@ -144,16 +147,19 @@ $out = Install @($G)
 Check "prerequisites already installed" (Has $out "*STA2WidescreenPatch: already installed")
 Check "DXVK's d3d8.dll left, nothing recorded" (((Text (G "d3d8.dll")) -eq "dxvk") -and
     -not (Test-Path (G "d3d8.dll.a2chain-backup")) -and (Has $out "*d3d8.dll is DXVK's*"))
+Check "no Display8 in front of DXVK" ((Has $out "*Display8 skipped*") -and -not (Test-Path (G "d3d8_real.dll")))
 Check "HUD.ini.bak kept" ((Get-Content (G "HUD.ini.bak") -Raw) -match "; mine")
 Check "old bloom preset out, ReShade's own file left" (-not (Test-Path (G "A2Bloom.ini")) -and
     -not (Test-Path (G "ReShadePreset.ini")) -and (Test-Path (G "ReShade.ini")) -and (Has $out "*removed the old bloom preset*"))
 
-Write-Host "== no d3d8.dll: d3d8to9 goes in, and with it Render3D.asi and UI.asi"
+Write-Host "== no d3d8.dll: d3d8to9 goes in with Display8 in front, and with them Render3D.asi and UI.asi"
 Remove-Item -LiteralPath (G "d3d8.dll")
 New-Item -ItemType Directory (G "Surfaces") | Out-Null
 Set-Content (G "Surfaces\myown.ini") "[Surface]"
 $out = Install @($G)
-Check "d3d8.dll is d3d8to9" ((Sha (G "d3d8.dll")) -eq $D3d8to9Sha)
+Check "d3d8.dll is Display8, d3d8_real.dll d3d8to9" (((Sha (G "d3d8.dll")) -eq (Sha (Join-Path $P "display\d3d8.dll"))) -and
+    ((Sha (G "d3d8_real.dll")) -eq $D3d8to9Sha) -and -not (Test-Path (G "d3d8.dll.a2display-new")))
+Check "Display8.ini as shipped" ((Sha (G "Display8.ini")) -eq (Sha (Join-Path $P "display\Display8.ini")))
 Check "Render3D.asi and UI.asi" (((Sha (G "Render3D.asi")) -eq (Sha (Join-Path $P "game\Render3D.asi"))) -and
     ((Sha (G "UI.asi")) -eq (Sha (Join-Path $P "game\UI.asi"))) -and (Test-Path (G "Render3D.ini")) -and (Test-Path (G "UI.ini")))
 Check "the recipes" ((@(Get-ChildItem (G "Nebulae")).Count -eq @(Get-ChildItem (Join-Path $P "game\Nebulae")).Count) -and
@@ -162,8 +168,24 @@ foreach ($n in "HUD", "Menus", "GridLayout") {
     Check "$n.asi + $n.ini out for the UI" (-not (Test-Path (G "$n.asi")) -and -not (Test-Path (G "$n.ini")))
 }
 Set-Content (G "d3d9.dll") "dxvk"
+# Reinstalled over Display8: an older build replaced, d3d8to9 still behind it, and
+# Display8.ini merged: the old defaults moved, the player's own values kept, every key
+# the player's lacks added, each once.
+[IO.File]::WriteAllText((G "d3d8.dll"), "MZ Display8 stopped the game: an older build")
+[IO.File]::WriteAllText((G "Display8.ini"), "[Display8]`nMode=forward`nBackend=d3d9`nVSync=0`nLog=1`n`n[Drop]`nDrop2D=1`n")
 $out = Install @($G)
 Check "d3d8to9 already" (Has $out "*d3d8.dll: crosire's d3d8to9 already")
+Check "Display8 replaced, d3d8to9 behind it" (((Sha (G "d3d8.dll")) -eq (Sha (Join-Path $P "display\d3d8.dll"))) -and
+    ((Sha (G "d3d8_real.dll")) -eq $D3d8to9Sha) -and ((Sha (G "UI.asi")) -eq (Sha (Join-Path $P "game\UI.asi"))))
+$ini = @(Get-Content -LiteralPath (G "Display8.ini"))
+Check "Display8.ini: the old defaults moved, said so" (($ini -ccontains "Mode=stub") -and ($ini -ccontains "Backend=auto") -and
+    ($ini -ccontains "Defaults=2") -and ($out -ccontains "  Display8.ini: [display8] Mode forward -> stub (defaults 2)"))
+Check "Display8.ini: the player's values kept, the missing keys added once" (($ini -ccontains "VSync=0") -and
+    ($ini -ccontains "Drop2D=1") -and ($ini -ccontains "Real=auto") -and ($ini -ccontains "Frames=3") -and
+    (@($ini | Where-Object { $_ -like "Backend=*" }).Count -eq 1))
+$merged = Sha (G "Display8.ini")
+Install @($G) | Out-Null
+Check "Display8.ini merged again: nothing left to change" ((Sha (G "Display8.ini")) -eq $merged)
 Set-Content (G "d3d9.dll") "dxvk"
 
 Write-Host "== unzipped into the game directory, run with no argument"
@@ -175,6 +197,7 @@ Remove-Item -Recurse (G "pkg")
 Write-Host "== uninstall: what it added goes, what changed since stays"
 Set-Content (G "UltimateASILoader-license.txt") "mine"
 Set-Content (G "Sky\myown.ini") "[Sky]"   # a recipe of the player's own stays
+Set-Content (G "Display8.log") "log"
 $env:A2_PROGRESS = "1"
 $out = Install @("-Uninstall", $G)
 $env:A2_PROGRESS = $null
@@ -190,7 +213,8 @@ foreach ($n in "Render3D", "UI", "HUD", "Menus", "QOL", "QOLRules", "GridLayout"
     foreach ($e in ".asi", ".ini", ".log") { Check "$n$e removed" (-not (Test-Path (G "$n$e"))) }
 }
 foreach ($f in "BinkProxy.ini", "dxvk.conf", "A2Bloom.ini", "ReShadePreset.ini", "winmm.dll", "STA2WidescreenPatch.asi",
-               "armada2-refit-prereqs.txt", "d3d8.dll.a2chain-backup") {
+               "armada2-refit-prereqs.txt", "d3d8.dll.a2chain-backup", "d3d8_real.dll", "Display8.ini",
+               "Display8.log", "d3d8.dll.a2display-backup") {
     Check "$f removed" (-not (Test-Path (G $f)))
 }
 Check "changed file left" (((Text (G "UltimateASILoader-license.txt")) -eq "mine") -and (Has $out "*left UltimateASILoader-license.txt*"))
@@ -201,7 +225,7 @@ Write-Host "== no d3d8.dll at all: d3d8to9 goes in, and out again; the game as i
 $N = Join-Path $T "nod3d8"; Mock $N -NoD3d8
 $before = Snap $N
 $out = Install @($N)
-Check "d3d8.dll is d3d8to9" ((Sha (Join-Path $N "d3d8.dll")) -eq $D3d8to9Sha)
+Check "d3d8to9 behind Display8" ((Sha (Join-Path $N "d3d8_real.dll")) -eq $D3d8to9Sha)
 Check "recorded" (Select-String -Quiet -SimpleMatch "d3d8.dll $D3d8to9Sha" (Join-Path $N "armada2-refit-prereqs.txt"))
 Check "no d3d9.dll, no backup" (-not (Test-Path (Join-Path $N "d3d9.dll")) -and -not (Test-Path (Join-Path $N "d3d8.dll.a2chain-backup")))
 Install @("-Uninstall", $N) | Out-Null
