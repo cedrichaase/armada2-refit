@@ -230,6 +230,25 @@ engine's device, and draw the whole frame on it.
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
 
+## VSync
+
+The game has no frame limit of its own: the only cap is the vertical blank. The engine
+makes its device with `D3DPRESENT_INTERVAL_DEFAULT` (`interval 0x0` in the log), which
+every backend reads as "wait for the vertical blank", so the frame rate is held to the
+display's refresh rate: Vulkan presents FIFO, Direct3D 12 at sync interval 1, Direct3D 9
+and the real chain at interval one. (The two `Sleep`s in the engine's own loop are not
+a limit: `Program::GameDoOne` sleeps once, and `Transport::DoGameCycleDelay` sleeps only
+for a delay that is 0 in an ordinary game.)
+
+**`VSync=0`** in `Display8.ini` gives the device `D3DPRESENT_INTERVAL_IMMEDIATE`
+instead, at the engine's `CreateDevice` (and, forward, at its `Reset`), so frames are
+presented as fast as they are drawn: on Vulkan the surface's mailbox mode, else
+immediate (tearing); on Direct3D 12 sync interval 0; on Direct3D 9 and the real chain
+(DXVK) the immediate interval. `Display8.log` says so at start, and the swap chain's
+line names the present mode (Vulkan's 1 is mailbox, 0 immediate, 2 FIFO). A windowed
+device of the real chain keeps the engine's interval, since Direct3D 8 takes only the
+default there; the game runs full screen. The shipped value is `VSync=1`.
+
 ## Backends
 
 `Backend=` in `Display8.ini` says what the stub draws on: `d3d9` (above, the default),

@@ -91,6 +91,9 @@ unsafe extern "system" fn reset(this: *mut Obj, pp: *mut PresentParams) -> HRESU
     trace::call(fp, Kind::Device, 14);
     trace::check_mark(true);
     let asked = if pp.is_null() { PresentParams::default() } else { unsafe { *pp } };
+    if !pp.is_null() {
+        unsafe { (*pp).interval = crate::present_interval(asked.interval, asked.windowed != 0) };
+    }
     let hr = vcall!(unsafe { (*this).real }, 14, fn(*mut PresentParams) -> HRESULT, pp);
     let n = RESETS.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1;
     trace::after_device();

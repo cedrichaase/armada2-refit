@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.35.0 — 2026-10-25
+
+Layers: display 0.9.0.
+
+### Added
+- display: `[Display8] VSync=0` turns the frame limit off (the vertical blank, the
+  game's only one); `VSync=1`, as shipped, keeps it (display 0.9.0).
+
+Installed, not yet seen in game.
+
 ## 13.34.0 — 2026-10-23
 
 Layers: render3d 0.27.0, testbench 3.68.0.

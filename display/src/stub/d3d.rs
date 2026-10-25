@@ -170,7 +170,8 @@ unsafe extern "system" fn create_device(
     let asked = unsafe { *pp };
     let window = if asked.window != 0 { asked.window as *mut c_void } else { hwnd };
     let depth = if asked.auto_depth != 0 { asked.depth_format } else { 0 };
-    if !super::ensure_device(window, flags, depth, asked.interval) {
+    // The stub's own device is windowed whatever the engine asks, so any interval holds.
+    if !super::ensure_device(window, flags, depth, crate::present_interval(asked.interval, false)) {
         return D3DERR_NOTAVAILABLE;
     }
     let dev = super::device::make(asked);

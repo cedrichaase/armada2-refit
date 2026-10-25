@@ -4,6 +4,17 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.9.0 — 2026-10-25
+
+### Added
+- `VSync=` in `Display8.ini` (1 as shipped): at 0 the device is made with
+  `D3DPRESENT_INTERVAL_IMMEDIATE`, so the frame rate is no longer held to the
+  display's refresh rate (Vulkan mailbox or immediate, Direct3D 12 sync interval 0,
+  Direct3D 9 and the forward chain immediate). An install adds the key to an existing
+  `Display8.ini`.
+
+Installed, not yet seen in game.
+
 ## 0.8.0 — 2026-10-23
 
 ### Changed
