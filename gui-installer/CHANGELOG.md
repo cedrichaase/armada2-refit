@@ -4,6 +4,23 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.1.0 — 2026-10-25
+
+Reads package schemas 0 and 1, unchanged; a package from 13.35.0 has the layer `display`
+(`when` `display8`) and the step `display`, which 2.0.0 shows as "will install" and counts
+as it comes.
+
+### Added
+- Display8 in the game folder (`is_display8`, by the panic message every build carries):
+  `inspect` reads the chain's `d3d8.dll` behind it (`d3d8_real.dll`), so a reinstall
+  over Display8 still sees d3d8to9, and Display8, which holds the word "dxvk", is not
+  taken for DXVK. The `display8` layer goes in only where d3d8to9 will be, on macOS on
+  Direct3D 9; the status line "Installing Display8".
+- The bug report names Display8 and `d3d8_real.dll`, and no longer says the plugins get
+  no Direct3D 9 device when Display8 stands in front of d3d8to9. `2af094a`
+
+Installed, not yet seen in game.
+
 ## 2.0.0 — 2026-10-22
 
 Reads package schemas 0 and 1, unchanged; a package's `bloom` step now takes out the bloom

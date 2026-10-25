@@ -67,6 +67,20 @@ pub fn d3d9_centres() -> bool {
     unsafe { D3D9_CENTRES }
 }
 
+/// `VSync=0`: present without waiting for the vertical blank, so the frame rate is not
+/// held to the display's refresh rate (README.md, "VSync").
+static mut VSYNC: bool = true;
+
+/// `D3DPRESENT_INTERVAL_IMMEDIATE`.
+const INTERVAL_IMMEDIATE: u32 = 0x8000_0000;
+
+/// The presentation interval to make a device with, for the engine's `asked`: the
+/// engine's own, or IMMEDIATE under `VSync=0`. A windowed Direct3D 8 device keeps the
+/// engine's: Direct3D 8 takes only the default there.
+pub fn present_interval(asked: u32, windowed: bool) -> u32 {
+    if unsafe { VSYNC } || windowed { asked } else { INTERVAL_IMMEDIATE }
+}
+
 /// What the game's `dxvk.conf` makes of every sampler on Direct3D 9 (renderer/README.md):
 /// `d3d9.samplerAnisotropy` (-1 when not set) and `d3d9.samplerLodBias` (0 when not set;
 /// held at 0 or above when `d3d9.clampNegativeLodBias` is true, DXVK's default). On
@@ -230,6 +244,10 @@ fn startup() {
         VALIDATE = ini.int("Display8", "Validate", 0) != 0;
         VK_DEVICE = ini.string("Display8", "Device").unwrap_or_default();
         D3D9_CENTRES = ini.string("Display8", "PixelCentres").is_some_and(|s| s.eq_ignore_ascii_case("d3d9"));
+        VSYNC = ini.int("Display8", "VSync", 1) != 0;
+        if !VSYNC {
+            log!("VSync=0: frames are presented without waiting for the vertical blank");
+        }
     }
     if STUB_ASKED_NOW() {
         log!("stub mode on {}{}", stub::names(unsafe { &ORDER }), if unsafe { VALIDATE } { ", with the validation layer" } else { "" });

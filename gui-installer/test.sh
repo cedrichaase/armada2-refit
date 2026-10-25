@@ -134,6 +134,14 @@ sys.exit(0 if ok else 1)
 PY
 fi
 
+echo "== a game with no d3d8.dll: d3d8to9 with Display8 in front of it, and out again"
+N="$T/Games/nod3d8"; mkdir -p "$N"; echo exe > "$N/Armada2.exe"; echo stockbink > "$N/binkw32.dll"
+"${run[@]}" --package "$zip" --game "$N" --no-launcher > "$T/out" 2> "$T/err"
+check 'grep -q "Display8 stopped the game" "$N/d3d8.dll" && [ -e "$N/d3d8_real.dll" ] && [ -e "$N/Display8.ini" ] && [ -e "$N/UI.asi" ]'
+check 'grep -q "Installing Display8" "$T/err"'
+"${run[@]}" --uninstall --game "$N" --no-launcher > "$T/out" 2> "$T/err"
+check '[ ! -e "$N/d3d8.dll" ] && [ ! -e "$N/d3d8_real.dll" ] && [ ! -e "$N/Display8.ini" ] && [ ! -e "$N/UI.asi" ]'
+
 echo "== uninstall: the game and Heroic as they were"
 "${run[@]}" --uninstall --game "$G" > "$T/out" 2> "$T/err"
 check '[ ! -e "$G/HUD.asi" ] && [ ! -e "$G/winmm.dll" ] && [ ! -e "$G/armada2-refit-installed.json" ]'

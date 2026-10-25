@@ -9,16 +9,22 @@
 # First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled
 # in vendor/, each file only if missing. Then the Direct3D chain the repository's ./install
 # sets up (chain/): crosire's d3d8to9 as d3d8.dll on DXVK's d3d9.dll, so dxvk.conf has
-# DXVK under it. Render3D.asi (the 3D view) and UI.asi (the HUD, the menus and the
-# loading screen) draw on the Direct3D 9 device d3d8to9 gives them; where the chain is
-# left as it is, the UI's place is taken by the plugins it supersedes (HUD.asi, Menus.asi,
+# DXVK under it. In front of it Display8 (display/), the game's d3d8.dll of ours, with
+# d3d8to9 behind it as d3d8_real.dll: in stub mode, as shipped, the engine draws
+# nothing and Render3D.asi (the 3D view) and UI.asi (the HUD, the menus and the loading
+# screen) draw the whole frame on Display8's own device, the first that starts of
+# Vulkan, Direct3D 12 and Direct3D 9. Where the chain is left as it is, Display8 stays
+# out, the UI's place is taken by the plugins it supersedes (HUD.asi, Menus.asi,
 # GridLayout.asi) and the 3D view stays the engine's. The models are rewritten from the
 # player's own SOD files with python3. Textures,
 # the menu backdrops and the replacement movies are built from the game's own art, so a
 # release cannot carry them.
 #
 # On macOS Direct3D 9 can only be Wine's own (wined3d, on OpenGL): DXVK's d3d9.dll cannot
-# run there, so d3d8to9 goes in on Wine's d3d9, and dxvk.conf is skipped. The script keeps to the /bin/bash 3.2 and BSD tools a Mac ships.
+# run there, so d3d8to9 goes in on Wine's d3d9, and dxvk.conf is skipped; Display8 goes
+# in on Direct3D 9 alone (Backend=d3d9): Vulkan and Direct3D 12 there are MoltenVK
+# under a 32-bit process, not yet seen to work (display/README.md, "Will Vulkan work on
+# a Mac?"). The script keeps to the /bin/bash 3.2 and BSD tools a Mac ships.
 #
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
 # parent if the package was unzipped into the game, else $A2_GAME, else (macOS) the GOG
@@ -153,6 +159,28 @@ unproxy() {
     fi
     rm -f "$game/BinkProxy.ini" "$game/BinkProxy.log"
 }
+# Display8 (display/), by content: the panic message every build carries. Its hash
+# changes with every build. Display8 holds the word "dxvk" too, so ask this first.
+is_display8() { [ -f "$1" ] && grep -qa "Display8 stopped the game" "$1"; }
+# What Display8 writes beside the exe (display/install --remove takes the same out).
+DISPLAY_FILES="Display8.ini Display8.log Display8.inventory.tsv Display8.inventory.tmp Display8.mark Display8.go"
+# Display8 out of the d3d8 slot, and the chain's d3d8.dll it stood in front of
+# (d3d8_real.dll) back in it. With --all, its settings and logs go too.
+display_out() {
+    if is_display8 "$game/d3d8.dll"; then
+        rm -f "$game/d3d8.dll"
+        if [ -f "$game/d3d8_real.dll" ]; then mv -f "$game/d3d8_real.dll" "$game/d3d8.dll"; fi
+    fi
+    if [ "${1:-}" = --all ]; then
+        local n
+        for n in $DISPLAY_FILES; do rm -f "$game/$n"; done
+        # The repository's display/install leaves these: a2mod's copy of the chain, and
+        # d3d8to9 behind a Display8 since taken out by hand.
+        rm -f "$game/d3d8.dll.a2display-backup"
+        if is_d3d8to9 "$game/d3d8_real.dll"; then rm -f "$game/d3d8_real.dll"; fi
+    fi
+    return 0
+}
 # DXVK by content, never by name: GOG puts a d3d8.dll there too.
 is_dxvk() { grep -a -q -i 'dxvk' "$1" 2>/dev/null; }
 # crosire's d3d8to9 1.16.0, as the repository's ./install places it (platform/vendor/), by hash.
@@ -187,6 +215,8 @@ sods() {   # --install | --revert
 
 if [ "$action" = uninstall ]; then
     step uninstall "taking the mod out"
+    # Display8 first: d3d8.dll is the chain's again, so the records below hold for it.
+    display_out --all
     for n in Render3D UI QOL QOLRules Online; do
         rm -f "$game/$n.asi" "$game/$n.ini" "$game/$n.log"
     done
@@ -319,6 +349,9 @@ chain_put() {   # d3d8.dll | d3d9.dll
 step chain "Direct3D chain"
 echo "Direct3D chain:"
 d8="$game/d3d8.dll" d9="$game/d3d9.dll"
+# Display8 from an earlier install steps aside while the chain is looked at: d3d8.dll is
+# the chain's again (its d3d8_real.dll), and the display step puts Display8 back in front.
+display_out
 # On a Mac, never DXVK's d3d9.dll: Wine's own is behind d3d8to9. One an earlier install
 # put in (recorded with chain/d3d9.dll's hash) comes out again, and out of $MANIFEST.
 if [ "$mac" = 1 ] && [ -f "$d9" ] && [ -f "$MANIFEST" ] \
@@ -343,6 +376,128 @@ else
     elif [ "$mac" = 1 ]; then echo "  d3d9.dll: Wine's own (wined3d) -- DXVK cannot run Direct3D 9 on a Mac"
     else chain_put d3d9.dll; echo "  d3d9.dll: DXVK 3.1.1 -- zlib/libpng"; fi
 fi
+
+# ------------------------------------------------------------------ Display8
+
+# Display8 (display/) in front of crosire's d3d8to9, as the repository's display/install
+# puts it: d3d8to9 behind it as d3d8_real.dll, which it loads by full path (no override
+# needed), and Display8.ini written if missing, else merged. Only in front of d3d8to9: a
+# chain left as it is stays the player's whole. Re-run, Display8 is replaced (the chain
+# step took it out) and Display8.ini merged again.
+#
+# The merge is ui/ini-merge.py's, without Python: every key the shipped file has and the
+# player's lacks is added, in its section, and the player's values stay -- except that a
+# value still at an older set's default moves to the new one (Defaults=, numbered in the
+# shipped file). DISPLAY_UPGRADES is ui/ini-merge.py's table for Display8.ini, one
+# "<section with Defaults=> <n> <section> <key> <old value>", separated by ";"; keep them in step.
+DISPLAY_UPGRADES="display8 2 display8 mode forward;display8 2 display8 backend d3d9"
+ini_merge() {   # shipped installed upgrades
+    local new="$2.a2merge"
+    awk -v label="$(basename "$2")" -v up="$3" -v out="$new" '
+    function trim(s) { sub(/^[ \t\r]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+    function secname(l) {
+        if (l !~ /^[ \t]*\[[^]]+\]/) return ""
+        sub(/^[ \t]*\[/, "", l); sub(/\].*$/, "", l); return tolower(l)
+    }
+    function iskey(l) { return l !~ /^[ \t]*;/ && l ~ /^[ \t]*[A-Za-z0-9_]+[ \t]*=/ }
+    function keyof(l) { sub(/=.*$/, "", l); return tolower(trim(l)) }
+    function nameof(l) { sub(/=.*$/, "", l); return trim(l) }
+    function valof(l) { sub(/^[^=]*=/, "", l); return trim(l) }
+    { sub(/\r$/, "") }   # line ends as Python reads them: CRLF comes out LF
+    NR == FNR {
+        sn = secname($0)
+        if (sn != "") { cur = sn; if (!(sn in shead)) { ns++; sorder[ns] = sn; shead[sn] = $0 }; next }
+        if (cur != "" && iskey($0)) {
+            k = keyof($0); sval[cur SUBSEP k] = valof($0)
+            nk[cur]++; skl[cur, nk[cur]] = $0; skk[cur, nk[cur]] = k
+        }
+        next
+    }
+    { n++; L[n] = $0 }
+    END {
+        cur = ""
+        for (i = 1; i <= n; i++) {
+            sn = secname(L[i])
+            if (sn != "") { cur = sn; hsec[sn] = 1; continue }
+            if (cur != "" && iskey(L[i])) { k = keyof(L[i]); hidx[cur SUBSEP k] = i; hval[cur SUBSEP k] = valof(L[i]) }
+        }
+        # The defaults upgrade, before any key is added.
+        dsec = ""
+        for (s = 1; s <= ns; s++) if ((sorder[s] SUBSEP "defaults") in sval) { dsec = sorder[s]; break }
+        shipn = 1; if (((dsec SUBSEP "defaults") in sval) && sval[dsec SUBSEP "defaults"] != "") shipn = sval[dsec SUBSEP "defaults"] + 0
+        haven = 1; if (((dsec SUBSEP "defaults") in hval) && hval[dsec SUBSEP "defaults"] != "") haven = hval[dsec SUBSEP "defaults"] + 0
+        nu = split(up, U, ";")
+        for (u = 1; u <= nu; u++) {
+            if (split(U[u], f, " ") < 5 || f[1] != dsec) continue
+            un = f[2] + 0
+            if (!(haven < un && un <= shipn)) continue
+            sk = f[3] SUBSEP f[4]
+            if ((sk in hidx) && (sk in sval) && hval[sk] == f[5] && hval[sk] != sval[sk]) {
+                i = hidx[sk]; name = nameof(L[i])
+                L[i] = name "=" sval[sk]
+                printf "  %s: [%s] %s %s -> %s (defaults %d)\n", label, f[3], name, f[5], sval[sk], un
+            }
+        }
+        if (((dsec SUBSEP "defaults") in hidx) && haven < shipn) {
+            i = hidx[dsec SUBSEP "defaults"]; L[i] = nameof(L[i]) "=" shipn
+        }
+        # Every key the player lacks, after the last line of its section (or the section
+        # added at the end).
+        for (s = 1; s <= ns; s++) {
+            sec = sorder[s]; cnt = 0
+            for (j = 1; j <= nk[sec]; j++)
+                if (!((sec SUBSEP skk[sec, j]) in hidx)) { cnt++; miss[cnt] = skl[sec, j] }
+            if (!cnt) continue
+            if (sec in hsec) {
+                at = n + 1; cur = ""
+                for (i = 1; i <= n; i++) {
+                    sn = secname(L[i])
+                    if (sn != "") { if (cur == sec) { at = i; break }; cur = sn }
+                }
+                while (at > 1 && trim(L[at - 1]) == "") at--
+                for (i = n; i >= at; i--) L[i + cnt] = L[i]
+                for (j = 1; j <= cnt; j++) L[at + j - 1] = miss[j]
+                n += cnt
+            } else {
+                L[++n] = ""; L[++n] = shead[sec]
+                for (j = 1; j <= cnt; j++) L[++n] = miss[j]
+            }
+        }
+        for (i = 1; i <= n; i++) print L[i] > out
+        close(out)
+    }' "$1" "$2"
+    mv -f "$new" "$2"
+}
+
+step display "Display8"
+if is_d3d8to9 "$game/d3d8.dll"; then
+    # The new one beside it first: a copy that fails leaves the chain as it was.
+    copy_into "$here/display/d3d8.dll" "$game/d3d8.dll.a2display-new"
+    mv -f "$game/d3d8.dll" "$game/d3d8_real.dll"
+    mv -f "$game/d3d8.dll.a2display-new" "$game/d3d8.dll"
+    echo "  d3d8.dll: Display8, with crosire's d3d8to9 behind it as d3d8_real.dll"
+    ship="$here/display/Display8.ini"
+    if [ "$mac" = 1 ]; then
+        # Direct3D 9 alone on a Mac (Wine's wined3d, what d3d8to9 had under it): Vulkan
+        # and Direct3D 12 there are MoltenVK under a 32-bit process, not yet seen to work.
+        ship="$game/Display8.ini.a2ship"
+        sed 's/^Backend=auto$/Backend=d3d9/' "$here/display/Display8.ini" > "$ship"
+    fi
+    if [ -f "$game/Display8.ini" ]; then
+        ini_merge "$ship" "$game/Display8.ini" "$DISPLAY_UPGRADES"
+        echo "  Display8.ini (yours, brought up to date)"
+    else
+        copy_into "$ship" "$game/Display8.ini"
+        echo "  Display8.ini"
+    fi
+    [ "$ship" = "$here/display/Display8.ini" ] || rm -f "$ship"
+    if [ "$mac" = 1 ]; then
+        echo "  on Direct3D 9 (Backend=d3d9): Vulkan and Direct3D 12 on a Mac are not yet known to work for it"
+    fi
+else
+    echo "  Display8 skipped: it goes in front of crosire's d3d8to9, and d3d8.dll is not that"
+fi
+
 echo "the mod:"
 
 # ------------------------------------------------------------------ plugins
@@ -357,9 +512,15 @@ put() {   # file -- copy from the package into the game directory
     echo "  $f"
 }
 
-# Render3D.asi and UI.asi need a Direct3D 9 device behind the game's d3d8: crosire's
-# d3d8to9, as the chain step puts in. Without it each would stand down to stock.
-d3d9=0; is_d3d8to9 "$game/d3d8.dll" && d3d9=1
+# Render3D.asi and UI.asi need what the chain and display steps put in: Display8 in
+# front of crosire's d3d8to9, which gives them its own device (stub mode) or stands in
+# front of d3d8to9's (forward mode), or d3d8to9 alone, which gives them a Direct3D 9
+# device. Without either each would stand down to stock.
+d3d9=0
+if is_d3d8to9 "$game/d3d8.dll" \
+   || { is_display8 "$game/d3d8.dll" && is_d3d8to9 "$game/d3d8_real.dll"; }; then
+    d3d9=1
+fi
 
 old_plugins_out   # earlier packages' per-part plugins: Render3D.asi's modules replace them
 step render3d "the 3D view"

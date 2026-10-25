@@ -7,11 +7,13 @@ Armada II Refit -- install the release package into the game, on Windows.
 No choices to make: what can work here is installed, the rest is skipped and says why.
 First the prerequisites (prereqs.txt: the ASI loader with STA2WidescreenPatch), bundled in
 vendor\, each file only if it is missing. Then the Direct3D chain: crosire's d3d8to9 as
-d3d8.dll (chain\), in place of GOG's own d3d8to9 build, on Windows' own Direct3D 9.
-Render3D.asi (the 3D view) and UI.asi (the HUD, the menus and the loading screen) draw on
-the Direct3D 9 device d3d8to9 gives them; where the chain is left as it is, the UI's place
-is taken by the plugins it supersedes (HUD.asi, Menus.asi, GridLayout.asi) and the 3D view
-stays the engine's.
+d3d8.dll (chain\), in place of GOG's own d3d8to9 build, on Windows' own Direct3D 9. In
+front of it Display8 (display\), the game's d3d8.dll of ours, with d3d8to9 behind it as
+d3d8_real.dll: in stub mode, as shipped, the engine draws nothing and Render3D.asi (the 3D
+view) and UI.asi (the HUD, the menus and the loading screen) draw the whole frame on
+Display8's own device, the first that starts of Vulkan, Direct3D 12 and Direct3D 9. Where
+the chain is left as it is, Display8 stays out, the UI's place is taken by the plugins it
+supersedes (HUD.asi, Menus.asi, GridLayout.asi) and the 3D view stays the engine's.
 The models are rewritten from the player's own SOD files with Python 3 (py, python or
 A2_PYTHON), skipped without it.
 
@@ -105,6 +107,34 @@ function Test-GogD3d8([string]$f) {
     (Test-Path -LiteralPath $f) -and ((Get-Sha $f) -eq "735dbb81a5fa0368c6436349fc5bf97a9ae15daeb6829dfe95a17704294e6719")
 }
 $ChainBackup = ".a2chain-backup"   # any other d3d8.dll the chain step replaced
+# Display8 (display\), by content: the panic message every build carries (its hash
+# changes with every build). Display8 holds the word "dxvk" too, so ask this first.
+function Test-Display8([string]$f) {
+    (Test-Path -LiteralPath $f) -and
+        [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($f)).Contains("Display8 stopped the game")
+}
+# What Display8 writes beside the exe (display/install --remove takes the same out).
+$DisplayFiles = "Display8.ini", "Display8.log", "Display8.inventory.tsv", "Display8.inventory.tmp", "Display8.mark", "Display8.go"
+# Display8 out of the d3d8 slot, and the chain's d3d8.dll it stood in front of
+# (d3d8_real.dll) back in it. With -All, its settings, logs and pipeline cache go too.
+function Remove-Display8([switch]$All) {
+    if (Test-Display8 (G "d3d8.dll")) {
+        Remove-Item -LiteralPath (G "d3d8.dll")
+        if (Test-Path -LiteralPath (G "d3d8_real.dll")) { Move-Item -LiteralPath (G "d3d8_real.dll") (G "d3d8.dll") }
+    }
+    if ($All) {
+        foreach ($n in $DisplayFiles) { Remove-Item -LiteralPath (G $n) -ErrorAction SilentlyContinue }
+        # The repository's display/install leaves these: a2mod's copy of the chain, and
+        # d3d8to9 behind a Display8 since taken out by hand.
+        Remove-Item -LiteralPath (G "d3d8.dll.a2display-backup") -ErrorAction SilentlyContinue
+        if (Test-D3d8to9 (G "d3d8_real.dll")) { Remove-Item -LiteralPath (G "d3d8_real.dll") }
+        # Its Vulkan pipeline cache (display/src/vk/cache.rs); the folder is the GUI
+        # installer's too, so only the file.
+        if ($env:LOCALAPPDATA) {
+            Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA "armada2-refit\Display8.pipelines") -ErrorAction SilentlyContinue
+        }
+    }
+}
 function Test-Proxy([string]$f) {
     (Test-Path -LiteralPath $f) -and (Select-String -LiteralPath $f -Pattern "BinkProxy" -SimpleMatch -Quiet)
 }
@@ -219,6 +249,8 @@ function Remove-OldBloom {
 
 if ($Uninstall) {
     Step uninstall "taking the mod out"
+    # Display8 first: d3d8.dll is the chain's again, so the records below hold for it.
+    Remove-Display8 -All
     foreach ($n in "Render3D", "UI", "QOL", "QOLRules", "Online") {
         foreach ($e in ".asi", ".ini", ".log") { Remove-Item -LiteralPath (G "$n$e") -ErrorAction SilentlyContinue }
     }
@@ -369,6 +401,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $env:WINDIR "$sysdir\vcruntime140.dl
 # -Uninstall takes it out, unchanged only, and puts the old one back.
 Step chain "Direct3D chain"
 Say "Direct3D chain:"
+# Display8 from an earlier install steps aside while the chain is looked at: d3d8.dll is
+# the chain's again (its d3d8_real.dll), and the display step puts Display8 back in front.
+Remove-Display8
 $d8 = G "d3d8.dll"
 if (Test-D3d8to9 $d8) {
     Say "  d3d8.dll: crosire's d3d8to9 already"
@@ -387,6 +422,120 @@ if (Test-D3d8to9 $d8) {
     Add-Record "d3d8.dll"
     Say "  d3d8.dll: crosire's d3d8to9 1.16.0 -- BSD-2-Clause"
 }
+
+# ------------------------------------------------------------------ Display8
+
+# Display8 (display\) in front of crosire's d3d8to9, as the repository's display/install
+# puts it: d3d8to9 behind it as d3d8_real.dll, which it loads by full path, and
+# Display8.ini written if missing, else merged. Only in front of d3d8to9: a chain left as
+# it is stays the player's whole. Run again, Display8 is replaced (the chain step took it
+# out) and Display8.ini merged again.
+#
+# The merge is ui/ini-merge.py's, without Python: every key the shipped file has and the
+# player's lacks is added, in its section, and the player's values stay -- except that a
+# value still at an older set's default moves to the new one (Defaults=, numbered in the
+# shipped file). $DisplayUpgrades is ui/ini-merge.py's table for Display8.ini: the
+# section with Defaults=, the number, the section, the key, the old value. Keep them in step.
+$DisplayUpgrades = @(
+    @("display8", 2, "display8", "mode", "forward"),
+    @("display8", 2, "display8", "backend", "d3d9"))
+function Merge-Ini([string]$shipped, [string]$installed, $upgrades) {
+    $label = Split-Path -Leaf $installed
+    $secRe = '^\s*\[([^\]]+)\]'
+    $keyRe = '^\s*(\w+)\s*=\s*(.*?)\s*$'
+    $ship = @([IO.File]::ReadAllLines($shipped))
+    $lines = New-Object Collections.Generic.List[string]
+    foreach ($l in [IO.File]::ReadAllLines($installed)) { $lines.Add($l) }
+    # "section|key" -> (line index, value), of the lines that are not comments
+    function Get-IniValues($ls) {
+        $out = @{}; $cur = $null
+        for ($i = 0; $i -lt $ls.Count; $i++) {
+            $l = $ls[$i]
+            if ($l -match $secRe) { $cur = $Matches[1].ToLower(); continue }
+            if ($null -ne $cur -and -not $l.TrimStart().StartsWith(";") -and $l -match $keyRe) {
+                $out["$cur|$($Matches[1].ToLower())"] = @($i, $Matches[2])
+            }
+        }
+        $out
+    }
+    $shipVals = Get-IniValues $ship
+    $haveVals = Get-IniValues $lines
+    # The defaults upgrade, before any key is added.
+    $dsec = $null
+    foreach ($k in $shipVals.Keys) { if ($k.EndsWith("|defaults")) { $dsec = $k.Split("|")[0]; break } }
+    $shipN = 1; $haveN = 1
+    if ($dsec -and $shipVals.ContainsKey("$dsec|defaults") -and $shipVals["$dsec|defaults"][1]) { $shipN = [int]$shipVals["$dsec|defaults"][1] }
+    if ($dsec -and $haveVals.ContainsKey("$dsec|defaults") -and $haveVals["$dsec|defaults"][1]) { $haveN = [int]$haveVals["$dsec|defaults"][1] }
+    foreach ($u in $upgrades) {
+        $d, $n, $s, $k, $old = $u
+        if ($d -ne $dsec -or -not ($haveN -lt $n -and $n -le $shipN)) { continue }
+        $sk = "$s|$k"
+        if (-not ($haveVals.ContainsKey($sk) -and $shipVals.ContainsKey($sk))) { continue }
+        $i, $v = $haveVals[$sk]; $new = $shipVals[$sk][1]
+        if ($v -ceq $old -and $v -cne $new) {
+            $null = $lines[$i] -match $keyRe; $name = $Matches[1]
+            $lines[$i] = "$name=$new"
+            Say "  ${label}: [$s] $name $v -> $new (defaults $n)"
+        }
+    }
+    if ($dsec -and $haveVals.ContainsKey("$dsec|defaults") -and $haveN -lt $shipN) {
+        $i = $haveVals["$dsec|defaults"][0]
+        $null = $lines[$i] -match $keyRe
+        $lines[$i] = "$($Matches[1])=$shipN"
+    }
+    # Every key the player lacks, after the last line of its section (or the section
+    # added at the end).
+    $order = New-Object Collections.Generic.List[string]; $body = @{}; $head = @{}; $cur = $null
+    foreach ($l in $ship) {
+        if ($l -match $secRe) {
+            $cur = $Matches[1].ToLower()
+            if (-not $body.ContainsKey($cur)) { $order.Add($cur); $body[$cur] = New-Object Collections.Generic.List[string]; $head[$cur] = $l }
+            continue
+        }
+        if ($null -ne $cur -and $l -match '^(\w+)=') { $body[$cur].Add($l) }
+    }
+    $haveKeys = @{}; $cur = $null
+    foreach ($l in $lines) {
+        if ($l -match $secRe) { $cur = $Matches[1].ToLower(); if (-not $haveKeys.ContainsKey($cur)) { $haveKeys[$cur] = @{} }; continue }
+        if ($null -ne $cur -and -not $l.TrimStart().StartsWith(";") -and $l -match $keyRe) { $haveKeys[$cur][$Matches[1].ToLower()] = 1 }
+    }
+    foreach ($s in $order) {
+        $missing = @($body[$s] | Where-Object { -not ($haveKeys.ContainsKey($s) -and $haveKeys[$s].ContainsKey(($_ -split "=")[0].ToLower())) })
+        if (-not $missing.Count) { continue }
+        if ($haveKeys.ContainsKey($s)) {
+            $at = $lines.Count; $c = $null
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+                if ($lines[$i] -match $secRe) { if ($c -eq $s) { $at = $i; break }; $c = $Matches[1].ToLower() }
+            }
+            while ($at -gt 0 -and -not $lines[$at - 1].Trim()) { $at-- }
+            $lines.InsertRange($at, [string[]]$missing)
+        } else {
+            $lines.Add(""); $lines.Add($head[$s]); $lines.AddRange([string[]]$missing)
+        }
+    }
+    [IO.File]::WriteAllText($installed, (($lines -join "`n") + "`n"))
+}
+
+Step display "Display8"
+if (Test-D3d8to9 (G "d3d8.dll")) {
+    # The new one beside it first: a copy that fails leaves the chain as it was.
+    Copy-Into (Join-Path $here "display\d3d8.dll") (G "d3d8.dll.a2display-new")
+    if (Test-Path -LiteralPath (G "d3d8_real.dll")) { Remove-Item -LiteralPath (G "d3d8_real.dll") }
+    Move-Item -LiteralPath (G "d3d8.dll") (G "d3d8_real.dll")
+    Move-Item -LiteralPath (G "d3d8.dll.a2display-new") (G "d3d8.dll")
+    Say "  d3d8.dll: Display8, with crosire's d3d8to9 behind it as d3d8_real.dll"
+    $ship = Join-Path $here "display\Display8.ini"
+    if (Test-Path -LiteralPath (G "Display8.ini")) {
+        Merge-Ini $ship (G "Display8.ini") $DisplayUpgrades
+        Say "  Display8.ini (yours, brought up to date)"
+    } else {
+        Copy-Into $ship (G "Display8.ini")
+        Say "  Display8.ini"
+    }
+} else {
+    Say "  Display8 skipped: it goes in front of crosire's d3d8to9, and d3d8.dll is not that"
+}
+
 Say "the mod:"
 
 # ------------------------------------------------------------------ plugins
@@ -403,9 +552,12 @@ function Put([string]$f) {
     Say "  $f"
 }
 
-# Render3D.asi and UI.asi need a Direct3D 9 device behind the game's d3d8: crosire's
-# d3d8to9, as the chain step puts in. Without it each would stand down to stock.
-$D3d9 = Test-D3d8to9 (G "d3d8.dll")
+# Render3D.asi and UI.asi need what the chain and display steps put in: Display8 in
+# front of crosire's d3d8to9, which gives them its own device (stub mode) or stands in
+# front of d3d8to9's (forward mode), or d3d8to9 alone, which gives them a Direct3D 9
+# device. Without either each would stand down to stock.
+$D3d9 = (Test-D3d8to9 (G "d3d8.dll")) -or
+    ((Test-Display8 (G "d3d8.dll")) -and (Test-D3d8to9 (G "d3d8_real.dll")))
 
 Remove-OldPlugins   # earlier packages' per-part plugins: Render3D.asi's modules replace them
 Step render3d "the 3D view"

@@ -136,9 +136,12 @@ together what helps with an issue.
 **Which files are ours:** everything in the release zip's `game/` folder that ends in
 `.asi`, and `binkw32.dll` (the cutscene player), which is today `Render3D.asi`,
 `UI.asi`, `QOL.asi`, `QOLRules.asi`, `Online.asi`, `HUD.asi`, `Menus.asi`,
-`GridLayout.asi`; and the installer itself (`armada2-refit-installer-windows.exe`).
+`GridLayout.asi`; the zip's `display/d3d8.dll` (Display8, the game's Direct3D 8 of
+ours, which the installers put in front of d3d8to9); and the installer itself
+(`armada2-refit-installer-windows.exe`).
 The others are third-party and unmodified: `winmm.dll` (the Ultimate ASI Loader),
-`STA2WidescreenPatch.asi`, `d3d8.dll` (crosire's d3d8to9) and `d3d9.dll` (DXVK), credited
+`STA2WidescreenPatch.asi`, `chain/d3d8.dll` (crosire's d3d8to9, `d3d8_real.dll` in the
+game folder once Display8 stands in front of it) and `d3d9.dll` (DXVK), credited
 in the zip's `CREDITS.txt`. The zip's `SHA256SUMS` holds every file's hash. Each release's notes carry a VirusTotal
 scan link per file, so you can see what the scanners make of each one before you trust
 it.

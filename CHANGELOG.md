@@ -5,6 +5,25 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.35.0 — 2026-10-25
+
+Layers: display 0.9.0, gui-installer 2.1.0.
+
+### Added
+- display: `[Display8] VSync=0` turns the frame limit off (the vertical blank, the
+  game's only one); `VSync=1`, as shipped, keeps it (display 0.9.0, `4f1d1de`).
+- Display8 in the release package (`display/d3d8.dll`, `display/Display8.ini`; display
+  0.9.0): `install.sh` and `install.ps1` put it in front of crosire's d3d8to9, which
+  goes behind it as `d3d8_real.dll`, in stub mode on `Backend=auto` (`Backend=d3d9` on
+  macOS), merge an existing `Display8.ini` by `ui/ini-merge.py`'s rules without Python,
+  and put d3d8to9 back on `--uninstall`; `Render3D.asi` and `UI.asi` go in behind it.
+  manifest.json: the layer `display` (`when` `display8`) and the step `display`. `2af094a`
+- gui-installer: Display8 known by content, the chain read behind it, its layer and
+  status line; the bug report names it (gui-installer 2.1.0, `2af094a`).
+
+`VSync=` confirmed in game 2026-10-25. Display8 from the release package: installed, not
+yet seen in game.
+
 ## 13.34.0 — 2026-10-23
 
 Layers: render3d 0.27.0, testbench 3.68.0.

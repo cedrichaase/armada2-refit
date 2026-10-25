@@ -95,13 +95,13 @@ a layer or a step is not a new schema: unknown ids are shown and counted as they
 | `linux` | `script` (`install.sh`), `uninstall` (its flag), `progress` (the variable) |
 | `windows`, `macos` | the same for those systems (`install.ps1`, `-Uninstall`; `install.sh`). The Windows and macOS installers install only a package that has its entry (`Package.for_system`): before 11.20.0, `install.ps1` printed no progress and `install.sh` did not run on a Mac. Adding them was not a new schema, since the Linux installer reads such a package as before |
 | `steps` | the `::step` ids `install.sh` prints, in order: the progress bar's denominator |
-| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `d3d8to9` (Render3D, UI: needs d3d8to9 as `d3d8.dll` after the chain step); before 13.0.0 also `vkbasalt` (bloom), which the window no longer lists |
+| `layers[]` | `id`, `name`, `version`, `files`, `summary`, `when`: `always`, `missing` (prerequisites), `dxvk`, `dxvk.conf`, `d3d8to9` (Render3D, UI: needs d3d8to9 as `d3d8.dll` after the chain step, or behind Display8), from 13.35.0 `display8` (Display8: in front of d3d8to9 only; on macOS on Direct3D 9); before 13.0.0 also `vkbasalt` (bloom), which the window no longer lists |
 | `not_included[]` | `id`, `name`, `summary`: shown as not available (textures) |
 
 ## Progress
 
 `install.sh` and `install.ps1` with `A2_PROGRESS=1` print `::step <id> <what>` as each
-stage starts (`verify`, `prereqs`, `chain`, `render3d`, `ui`, `qol`, `models`,
+stage starts (`verify`, `prereqs`, `chain`, `display` (from 13.35.0), `render3d`, `ui`, `qol`, `models`,
 `online`, `cutscenes`, `renderer`, `bloom` (taking out the vkBasalt or ReShade bloom
 of a package before 13.0.0, which set it up), `done`; `uninstall`; before 12.24.0 `hud`,
 `menus` and `grid` in place of `render3d` and `ui`, and before 12.0.0 also `lighting`,
@@ -217,7 +217,8 @@ draws nothing, and it already knows the game folder, the launcher and the releas
 - **Files by hash, never the files.** `d3d8.dll`, `d3d9.dll`, `winmm.dll` and
   `binkw32.dll` are named by sha256 against what a release puts in (`KNOWN_FILES`, from
   `platform/vendor/*/SOURCE.txt`, and GOG's own `d3d8.dll`), else by what they say of
-  themselves (DXVK, Wine's builtin, dgVoodoo). Asking a player to post the DLL itself
+  themselves (Display8, ours, by its panic message, with `d3d8_real.dll` behind it; DXVK,
+  Wine's builtin, dgVoodoo). Asking a player to post the DLL itself
   could mean posting GOG's or Microsoft's, which may not be redistributed; the hash says
   as much. Every `.asi` is checked against the release named in the state file, read from
   the installer's cache, and the `.ini` keys that differ from that release are listed.
@@ -285,7 +286,7 @@ The core is the same on all three systems (`SYSTEM`); what differs:
 |---|---|---|
 | The game | GOG's own install: the folder in GOG's registry entry (`HKLM\SOFTWARE\[WOW6432Node\]GOG.com\Games\1174788223`, `gog_registry_dirs`), else the usual folders on every drive | inside a Wine prefix (`mac_prefixes`): CrossOver bottles (`~/Library/Application Support/CrossOver/Bottles`), Whisky's, Sikarugir / Kegworks / Wineskin / Porting Kit wrappers (the prefix inside the `.app`), `~/.wine` and the like |
 | The script | `install.ps1` through `powershell.exe -ExecutionPolicy Bypass -File`, no console window | `install.sh` through `/bin/bash` (3.2, BSD tools) |
-| The chain | crosire's d3d8to9 on Windows' own Direct3D 9; a DXVK `d3d8.dll` the player put there stays | d3d8to9 on Wine's own wined3d: DXVK cannot run Direct3D 9 on a Mac, so no MSAA or `dxvk.conf` |
+| The chain | crosire's d3d8to9 on Windows' own Direct3D 9, with Display8 in front (stub mode, `Backend=auto`); a DXVK `d3d8.dll` the player put there stays, without Display8 | d3d8to9 on Wine's own wined3d: DXVK cannot run Direct3D 9 on a Mac, so no MSAA or `dxvk.conf`; Display8 in front on `Backend=d3d9` |
 | Launch settings | none: the game folder's DLLs load first | the DLL overrides, written into the prefix's `user.reg` under `AppDefaults\Armada2.exe\DllOverrides` (the game's alone, not the bottle's) |
 | Launch game | the exe | the prefix's Wine: CrossOver's `wine --bottle <name>`, a wrapper's own, Whisky's, else Gcenx's or Homebrew's |
 | Cache, settings | `%LOCALAPPDATA%\armada2-refit\installer\cache`, `%APPDATA%\armada2-refit\installer.json` | `~/Library/Caches/armada2-refit/installer`, `~/Library/Application Support/armada2-refit/installer.json` |

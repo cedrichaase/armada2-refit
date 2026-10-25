@@ -120,6 +120,9 @@ unsafe extern "system" fn create_device(
     trace::call(fp, Kind::D3D, 15);
     trace::check_mark(true);
     let asked = if pp.is_null() { PresentParams::default() } else { unsafe { *pp } };
+    if !pp.is_null() {
+        unsafe { (*pp).interval = crate::present_interval(asked.interval, asked.windowed != 0) };
+    }
     let hr = vcall!(
         unsafe { (*this).real },
         15,

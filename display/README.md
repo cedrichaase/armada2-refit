@@ -22,7 +22,7 @@ this the default. In **forward mode** (`Mode=forward`, the default until display
 it stands in front of the real chain and passes every call through; on the test bench
 it traces every call (`Trace=auto`: on in an `a2test` clone). A `Display8.ini` with
 neither key falls back to forward and d3d9 in the code; the shipped file names both.
-Display8 is not in the release package yet.
+The release package carries it too, from 13.35.0 ("Installing", below).
 
     ./a2test session start --res 1280x720 --install .
 
@@ -58,6 +58,21 @@ use.
 
 Wine loads the game directory's `d3d8.dll` because of the `d3d8=n,b` override
 (`platform/README.md`); `d3d8_real.dll` is loaded by full path, so it needs none.
+
+**The release package** (`publish/README.md`, "Release packages") carries Display8 in
+`display/` with the shipped `Display8.ini`, and its installers (`install.sh`,
+`install.ps1`) put it in the same way, with two differences. They put it only in front
+of crosire's d3d8to9 after their chain step (a chain left as the player's gets none),
+and they make no `d3d8.dll.a2display-backup`, since there is no `a2mod` in a release.
+They merge `Display8.ini` without Python, in awk and in PowerShell, by `ini-merge.py`'s
+rules and upgrade table. On macOS `install.sh` writes `Backend=d3d9`: Vulkan and Direct3D
+12 there would both run on MoltenVK under a 32-bit process, which "Will Vulkan work on a
+Mac?" leaves open, while Direct3D 9 is Wine's own, the device d3d8to9 used there before.
+Nothing in Display8 is Wine-specific (`platform()` only names the system in the log), so
+on Windows the stub runs on the GPU vendor's Vulkan, Direct3D 12 or Windows' own
+Direct3D 9; it has not been seen there yet. `--uninstall` puts d3d8to9 back as `d3d8.dll`
+and takes out what `display/install --remove` takes out (on Windows also
+`Display8.pipelines`).
 
 ## What the plugins can ask of it
 
@@ -229,6 +244,25 @@ engine's device, and draw the whole frame on it.
 
 `display/bench-mode.sh stub` sets the mode in a bench clone from a scenario's `Setup:`;
 `display-stub` walks the whole game on it.
+
+## VSync
+
+The game has no frame limit of its own: the only cap is the vertical blank. The engine
+makes its device with `D3DPRESENT_INTERVAL_DEFAULT` (`interval 0x0` in the log), which
+every backend reads as "wait for the vertical blank", so the frame rate is held to the
+display's refresh rate: Vulkan presents FIFO, Direct3D 12 at sync interval 1, Direct3D 9
+and the real chain at interval one. (The two `Sleep`s in the engine's own loop are not
+a limit: `Program::GameDoOne` sleeps once, and `Transport::DoGameCycleDelay` sleeps only
+for a delay that is 0 in an ordinary game.)
+
+**`VSync=0`** in `Display8.ini` gives the device `D3DPRESENT_INTERVAL_IMMEDIATE`
+instead, at the engine's `CreateDevice` (and, forward, at its `Reset`), so frames are
+presented as fast as they are drawn: on Vulkan the surface's mailbox mode, else
+immediate (tearing); on Direct3D 12 sync interval 0; on Direct3D 9 and the real chain
+(DXVK) the immediate interval. `Display8.log` says so at start, and the swap chain's
+line names the present mode (Vulkan's 1 is mailbox, 0 immediate, 2 FIFO). A windowed
+device of the real chain keeps the engine's interval, since Direct3D 8 takes only the
+default there; the game runs full screen. The shipped value is `VSync=1`.
 
 ## Backends
 

@@ -105,9 +105,9 @@ and writes `armada2-refit-<version>.zip`:
 - `game/`: what goes beside `Armada2.exe`, which is `Render3D.asi`, `UI.asi`, `QOL.asi`,
   `QOLRules.asi`, `Online.asi` and `binkw32.dll`, each with its `.ini`, Render3D's
   recipes in `game/Surfaces/` and `game/Nebulae/`, and `dxvk.conf` at stage 3
-  (`renderer/renderer-config.sh --print`). `Render3D.asi` and `UI.asi` need a Direct3D 9
-  device behind `d3d8.dll`, so the installers put them in only where `d3d8.dll` is
-  crosire's d3d8to9 after the chain step, taking out `HUD.asi`, `Menus.asi` and
+  (`renderer/renderer-config.sh --print`). `Render3D.asi` and `UI.asi` need a device to
+  draw on behind `d3d8.dll`, so the installers put them in only where `d3d8.dll` is
+  crosire's d3d8to9 after the chain step, or Display8 in front of it (below), taking out `HUD.asi`, `Menus.asi` and
   `GridLayout.asi` as `ui/supersede.sh` does; elsewhere those three, also in `game/`, go
   in instead and the 3D view stays the engine's. Either way the installers take out the
   per-part plugins (`MSAA`, `Planets`, `Lighting`, `Sky` and the rest) that earlier
@@ -122,6 +122,25 @@ and writes `armada2-refit-<version>.zip`:
   there; `install.sh` on macOS puts only `d3d8.dll` in too, on Wine's wined3d, since
   DXVK cannot run Direct3D 9 on a Mac (D3DMetal, DXMT and CrossOver's DXVK cover
   Direct3D 10 to 12), and skips `dxvk.conf` there;
+- `display/`: Display8 (`display/build/d3d8.dll`, `display/build.sh`) and its
+  `Display8.ini` as shipped (`Mode=stub`, `Backend=auto`, `VSync=1`). After the chain
+  step, where `d3d8.dll` is crosire's d3d8to9, both installers put it in as
+  `display/install` does (`display/README.md`, "Installing"): d3d8to9 moves behind it as
+  `d3d8_real.dll`, and `Display8.ini` is copied if missing, else merged as
+  `ui/ini-merge.py` merges it (the missing keys added, the player's values kept, the
+  `Defaults=` upgrade applied), in awk and in PowerShell, since neither may assume
+  Python; keep their upgrade tables (`DISPLAY_UPGRADES`, `$DisplayUpgrades`) in step
+  with `ini-merge.py`'s. On macOS `install.sh` writes it with `Backend=d3d9`: Vulkan and
+  Direct3D 12 there would both be MoltenVK under a 32-bit process, which no one has seen
+  work ("Will Vulkan work on a Mac?"), and Direct3D 9 is Wine's own, what d3d8to9 drew
+  on before. A chain left as it is gets no Display8. Display8 is known by content (the
+  panic message every build carries; it also holds the word "dxvk", so that is asked
+  first), never by hash. Each run first takes it out of the slot, putting
+  `d3d8_real.dll` back as `d3d8.dll`, so the chain step sees the chain as before and a
+  re-run simply updates it; `--uninstall` does the same first, then takes out
+  `Display8.ini`, its logs and trace files (and on Windows its Vulkan pipeline cache in
+  `%LOCALAPPDATA%\armada2-refit\`), so the chain's own records then put back what was
+  there before;
 - `models/` and `a2env.py`: `moon-sod.py`, `select-sod.py`, `hull-sod.py`,
   `asteroid-sod.py`, run by
   `install.sh` with python3 on the player's own SODs (`--revert` on `--uninstall`);
@@ -171,7 +190,7 @@ and names what it skipped. They do the same on both systems:
   Windows `A2Bloom.ini` with the `ReShadePreset.ini` copy of it, if it is still that
   copy. vkBasalt or ReShade themselves are the player's and stay;
 - write `dxvk.conf` only over one that carries `renderer-config.sh`'s marker;
-- keep a changed `.ini` as `.ini.bak`;
+- keep a changed `.ini` as `.ini.bak` (`Display8.ini` is merged instead, above);
 - with `--uninstall` / `-Uninstall`, put all of it back. A prerequisite file goes only
   if its hash still matches the record, so nothing replaced since is removed.
 

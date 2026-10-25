@@ -7,7 +7,8 @@
     publish/virustotal.py --selftest
 
 `scan` takes every PE in the release zip (the members ending .asi, .dll or .exe that start
-with "MZ": the plugins in game/, the chain in chain/, the prerequisites in vendor/), and
+with "MZ": the plugins in game/, Display8 in display/, the chain in chain/, the
+prerequisites in vendor/), and
 each --extra file (CI passes the Windows GUI installer). Nothing is named here, so a
 plugin that is added, merged or removed is followed without an edit. For each one it
 looks the hash up first (GET /files/{sha256}: a known file costs no upload, which covers
