@@ -17,7 +17,7 @@ as it comes.
   taken for DXVK. The `display8` layer goes in only where d3d8to9 will be, on macOS on
   Direct3D 9; the status line "Installing Display8".
 - The bug report names Display8 and `d3d8_real.dll`, and no longer says the plugins get
-  no Direct3D 9 device when Display8 stands in front of d3d8to9.
+  no Direct3D 9 device when Display8 stands in front of d3d8to9. `2af094a`
 
 Installed, not yet seen in game.
 

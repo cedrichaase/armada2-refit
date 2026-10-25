@@ -17,9 +17,9 @@ Layers: display 0.9.0, gui-installer 2.1.0.
   goes behind it as `d3d8_real.dll`, in stub mode on `Backend=auto` (`Backend=d3d9` on
   macOS), merge an existing `Display8.ini` by `ui/ini-merge.py`'s rules without Python,
   and put d3d8to9 back on `--uninstall`; `Render3D.asi` and `UI.asi` go in behind it.
-  manifest.json: the layer `display` (`when` `display8`) and the step `display`.
+  manifest.json: the layer `display` (`when` `display8`) and the step `display`. `2af094a`
 - gui-installer: Display8 known by content, the chain read behind it, its layer and
-  status line; the bug report names it (gui-installer 2.1.0).
+  status line; the bug report names it (gui-installer 2.1.0, `2af094a`).
 
 `VSync=` confirmed in game 2026-10-25. Display8 from the release package: installed, not
 yet seen in game.
