@@ -11,7 +11,7 @@ in [`README.md`](README.md).
   `D3DPRESENT_INTERVAL_IMMEDIATE`, so the frame rate is no longer held to the
   display's refresh rate (Vulkan mailbox or immediate, Direct3D 12 sync interval 0,
   Direct3D 9 and the forward chain immediate). An install adds the key to an existing
-  `Display8.ini`.
+  `Display8.ini`. `4f1d1de`
 
 Installed, not yet seen in game.
 

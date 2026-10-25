@@ -11,7 +11,7 @@ Layers: display 0.9.0.
 
 ### Added
 - display: `[Display8] VSync=0` turns the frame limit off (the vertical blank, the
-  game's only one); `VSync=1`, as shipped, keeps it (display 0.9.0).
+  game's only one); `VSync=1`, as shipped, keeps it (display 0.9.0, `4f1d1de`).
 
 Installed, not yet seen in game.
 
