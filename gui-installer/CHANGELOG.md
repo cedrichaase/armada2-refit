@@ -15,12 +15,12 @@ Reads package schemas 0 and 1, unchanged.
   (pinned by sha256), builds `~/Applications/Sikarugir/Armada II.app` as Sikarugir
   Creator would, makes its prefix, runs GOG's installer in it silently, then installs the
   release into it (`Job.setup_mac`). The no-game text says where in the GOG library the
-  installer is, and whether it was found in Downloads.
+  installer is, and whether it was found in Downloads. `5477ac7`
 
 ### Fixed
 - macOS: **Launch game** in a Sikarugir (or Kegworks, Wineskin) wrapper starts its Wine
   with the wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH` (`wrapper_env`); without
-  them Sikarugir's wineserver stopped and the game never started.
+  them Sikarugir's wineserver stopped and the game never started. `5477ac7`
 
 Installed, not yet seen in game.
 

@@ -13,11 +13,11 @@ Layers: gui-installer 2.2.0.
 - gui-installer: on macOS, **Set up Armada II** puts the game into a Sikarugir wrapper of
   its own from GOG's offline installer in Downloads (Rosetta 2, Sikarugir's template and
   engine, the prefix, GOG's installer run silently), then installs the refit into it;
-  `--setup-mac` on the command line (gui-installer 2.2.0).
+  `--setup-mac` on the command line (gui-installer 2.2.0, `5477ac7`).
 
 ### Fixed
 - gui-installer: **Launch game** starts a Sikarugir wrapper's Wine with the wrapper's
-  libraries (gui-installer 2.2.0).
+  libraries (gui-installer 2.2.0, `5477ac7`).
 
 Installed, not yet seen in game.
 
