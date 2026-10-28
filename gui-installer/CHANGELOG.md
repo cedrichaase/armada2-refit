@@ -15,19 +15,20 @@ Reads package schemas 0 and 1, unchanged.
   (pinned by sha256), builds `~/Applications/Sikarugir/Armada II.app` as Sikarugir
   Creator would, makes its prefix, runs GOG's installer in it silently, then installs the
   release into it (`Job.setup_mac`). The no-game text says where in the GOG library the
-  installer is, and whether it was found in Downloads. `5477ac7`
+  installer is, and whether it was found in Downloads. `5477ac7`, `cd520b2`
 
 ### Fixed
 - macOS: **Launch game** in a Sikarugir (or Kegworks, Wineskin) wrapper whose program is
   `Armada2.exe` opens the wrapper, as a double click does (`wrapper_runs_game`): its Wine
   started bare, from outside its launcher, ran nothing and the game never started. Any
   other wrapper's Wine gets the wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH`
-  (`wrapper_env`), without which Sikarugir's wineserver stops. `5477ac7`
+  (`wrapper_env`), without which Sikarugir's wineserver stops. `5477ac7`, `c96259e`
 - macOS: the game and version pickers are lists drawn in the window (`open_picker`).
   Tk's native popup menu left the whole window unresponsive to the mouse once opened,
-  so no version could be picked and the window not closed.
+  so no version could be picked and the window not closed. `3239c25`
 
-Installed, not yet seen in game.
+Confirmed in game 2026-10-28 (Apple M1, macOS 27; Rosetta 2 was already installed, so
+its install is not yet seen).
 
 ## 2.1.1 — 2026-10-28
 
