@@ -153,12 +153,12 @@ DISPLAY8 (display/)            display $(version "$root/display/CHANGELOG.md")
                                 UI.asi draw the whole frame on Display8's own device: the
                                 first that starts of Vulkan, Direct3D 12 and Direct3D 9
                                 (Backend=auto). VSync=0 in Display8.ini lifts the frame
-                                limit. On macOS it goes in on Direct3D 9 alone
-                                (Backend=d3d9). Put in only where d3d8.dll is d3d8to9
+                                limit. Put in only where d3d8.dll is d3d8to9
                                 after the chain step; an existing Display8.ini keeps your
                                 values and gains the new keys. --uninstall puts d3d8to9
-                                back as d3d8.dll. Seen in game on Linux (Proton); on
-                                Windows and macOS not yet.
+                                back as d3d8.dll. Seen in game on Linux (Proton) and on
+                                macOS (a Sikarugir wrapper, on Vulkan); on Windows not
+                                yet.
 THE DIRECT3D CHAIN (chain/)    platform $(version "$root/platform/CHANGELOG.md")
   d3d8.dll  crosire's d3d8to9 1.16.0, on
   d3d9.dll  DXVK 3.1.1's Direct3D 9 on Vulkan, which dxvk.conf needs.

@@ -20,11 +20,12 @@
 # the menu backdrops and the replacement movies are built from the game's own art, so a
 # release cannot carry them.
 #
-# On macOS Direct3D 9 can only be Wine's own (wined3d, on OpenGL): DXVK's d3d9.dll cannot
-# run there, so d3d8to9 goes in on Wine's d3d9, and dxvk.conf is skipped; Display8 goes
-# in on Direct3D 9 alone (Backend=d3d9): Vulkan and Direct3D 12 there are MoltenVK
-# under a 32-bit process, not yet seen to work (display/README.md, "Will Vulkan work on
-# a Mac?"). The script keeps to the /bin/bash 3.2 and BSD tools a Mac ships.
+# On macOS DXVK's d3d9.dll cannot run, so d3d8to9 goes in on the prefix's own d3d9
+# (Wine's wined3d, or a Sikarugir wrapper's D9VK), and dxvk.conf is skipped; Display8
+# goes in on Backend=auto as everywhere: Vulkan on MoltenVK first, which works under a
+# 32-bit process there (display/README.md, "Will Vulkan work on a Mac?"), and Direct3D
+# 9 last if it cannot start. The script keeps to the /bin/bash 3.2 and BSD tools a Mac
+# ships.
 #
 # The game directory is the one holding Armada2.exe: the argument, else this folder's
 # parent if the package was unzipped into the game, else $A2_GAME, else (macOS) the GOG
@@ -476,23 +477,12 @@ if is_d3d8to9 "$game/d3d8.dll"; then
     mv -f "$game/d3d8.dll" "$game/d3d8_real.dll"
     mv -f "$game/d3d8.dll.a2display-new" "$game/d3d8.dll"
     echo "  d3d8.dll: Display8, with crosire's d3d8to9 behind it as d3d8_real.dll"
-    ship="$here/display/Display8.ini"
-    if [ "$mac" = 1 ]; then
-        # Direct3D 9 alone on a Mac (Wine's wined3d, what d3d8to9 had under it): Vulkan
-        # and Direct3D 12 there are MoltenVK under a 32-bit process, not yet seen to work.
-        ship="$game/Display8.ini.a2ship"
-        sed 's/^Backend=auto$/Backend=d3d9/' "$here/display/Display8.ini" > "$ship"
-    fi
     if [ -f "$game/Display8.ini" ]; then
-        ini_merge "$ship" "$game/Display8.ini" "$DISPLAY_UPGRADES"
+        ini_merge "$here/display/Display8.ini" "$game/Display8.ini" "$DISPLAY_UPGRADES"
         echo "  Display8.ini (yours, brought up to date)"
     else
-        copy_into "$ship" "$game/Display8.ini"
+        copy_into "$here/display/Display8.ini" "$game/Display8.ini"
         echo "  Display8.ini"
-    fi
-    [ "$ship" = "$here/display/Display8.ini" ] || rm -f "$ship"
-    if [ "$mac" = 1 ]; then
-        echo "  on Direct3D 9 (Backend=d3d9): Vulkan and Direct3D 12 on a Mac are not yet known to work for it"
     fi
 else
     echo "  Display8 skipped: it goes in front of crosire's d3d8to9, and d3d8.dll is not that"

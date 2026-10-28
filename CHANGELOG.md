@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.36.1 — 2026-10-28
+
+Layers: gui-installer 2.1.1.
+
+### Fixed
+- The release package's `install.sh` puts `Display8.ini` in on macOS as shipped, on
+  `Backend=auto` (Vulkan on MoltenVK first, Direct3D 9 last), instead of rewriting it to
+  `Backend=d3d9`. On a Sikarugir wrapper, Direct3D 9 is the wrapper's D9VK, where the
+  main menu crashed as Render3D baked its nebulae (#19). An existing `Display8.ini`
+  keeps the `Backend=` it has. `publish/installer/test.sh` expects the shipped file on
+  macOS too.
+- gui-installer: the `display8` line on macOS no longer says "on Direct3D 9"
+  (gui-installer 2.1.1).
+
+`Backend=vulkan` on macOS (Apple M1, Sikarugir, Wine 11) confirmed in game 2026-10-28,
+set by hand; the installer change: installed, not yet seen in game.
+
 ## 13.36.0 — 2026-10-25
 
 Layers: ui 0.23.0, cutscenes 2.2.0, testbench 3.69.0.

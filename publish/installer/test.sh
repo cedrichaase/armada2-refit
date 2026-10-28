@@ -74,14 +74,10 @@ mkdir -p "$G/Surfaces"; echo "[Surface]" > "$G/Surfaces/myown.ini"
 check 'grep -q "STA2WidescreenPatch: already installed" "$T/out"'
 check 'grep -q "; mine" "$G/QOL.ini.bak"'
 # d3d8to9 is in now, with Display8 in front of it (d3d8to9 behind as d3d8_real.dll, and
-# Display8.ini as shipped; on a Mac on Direct3D 9 alone): Render3D.asi with its recipes,
-# UI.asi in place of the older three.
+# Display8.ini as shipped, on a Mac too): Render3D.asi with its recipes, UI.asi in place
+# of the older three.
 check 'cmp -s "$P/display/d3d8.dll" "$G/d3d8.dll" && [ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ]'
-if [ "$mac" = 0 ]; then
-    check 'cmp -s "$P/display/Display8.ini" "$G/Display8.ini"'
-else
-    check 'grep -qx "Backend=d3d9" "$G/Display8.ini" && [ "$(diff "$P/display/Display8.ini" "$G/Display8.ini" | grep -c "^[<>]")" = 2 ]'
-fi
+check 'cmp -s "$P/display/Display8.ini" "$G/Display8.ini"'
 check '[ ! -e "$G/Display8.ini.a2ship" ] && [ ! -e "$G/d3d8.dll.a2display-new" ]'
 check 'cmp -s "$P/game/Render3D.asi" "$G/Render3D.asi" && cmp -s "$P/game/UI.asi" "$G/UI.asi" && [ -e "$G/UI.ini" ]'
 check '[ "$(count "$G/Nebulae")" = "$(count "$P/game/Nebulae")" ] && [ "$(count "$G/Surfaces")" = "$(( $(count "$P/game/Surfaces") + 1 ))" ]'
@@ -93,7 +89,6 @@ else
     # d3d8to9 in (behind Display8) on Wine's own d3d9, DXVK's d3d8 kept; no d3d9.dll or dxvk.conf.
     check '[ "$(sum "$G/d3d8_real.dll")" = "$(sum "$D3D8TO9")" ] && [ "$(cat "$G/d3d8.dll.a2chain-backup")" = dxvk ]'
     check '[ ! -e "$G/d3d9.dll" ] && grep -q "d3d9.dll: Wine.s own (wined3d)" "$T/out"'
-    check 'grep -q "on Direct3D 9 (Backend=d3d9)" "$T/out"'
     check '[ ! -e "$G/dxvk.conf" ]'
     check '[ "$(vars)" = "    WINEDLLOVERRIDES=winmm=n,b;d3d8=n,b" ]'
 
@@ -120,11 +115,7 @@ check '[ "$(grep "^::step" "$T/out" | sed -n "3,5p" | cut -d" " -f2 | tr "\n" " 
 check 'grep -qx "Mode=stub" "$G/Display8.ini" && grep -q "Display8.ini: \[display8\] Mode forward -> stub (defaults 2)" "$T/out"'
 check 'grep -qx "VSync=0" "$G/Display8.ini" && grep -qx "Drop2D=1" "$G/Display8.ini" && grep -qx "Defaults=2" "$G/Display8.ini"'
 check 'grep -qx "Real=auto" "$G/Display8.ini" && grep -qx "Frames=3" "$G/Display8.ini" && [ "$(grep -c "^Backend=" "$G/Display8.ini")" = 1 ]'
-if [ "$mac" = 0 ]; then
-    check 'grep -qx "Backend=auto" "$G/Display8.ini"'
-else
-    check 'grep -qx "Backend=d3d9" "$G/Display8.ini"'
-fi
+check 'grep -qx "Backend=auto" "$G/Display8.ini"'
 cp "$G/Display8.ini" "$T/d8.ini"
 "$P/install.sh" "$G" > "$T/out"
 check 'cmp -s "$T/d8.ini" "$G/Display8.ini"'   # merged again: nothing left to change
