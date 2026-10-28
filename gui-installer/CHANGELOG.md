@@ -18,9 +18,11 @@ Reads package schemas 0 and 1, unchanged.
   installer is, and whether it was found in Downloads. `5477ac7`
 
 ### Fixed
-- macOS: **Launch game** in a Sikarugir (or Kegworks, Wineskin) wrapper starts its Wine
-  with the wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH` (`wrapper_env`); without
-  them Sikarugir's wineserver stopped and the game never started. `5477ac7`
+- macOS: **Launch game** in a Sikarugir (or Kegworks, Wineskin) wrapper whose program is
+  `Armada2.exe` opens the wrapper, as a double click does (`wrapper_runs_game`): its Wine
+  started bare, from outside its launcher, ran nothing and the game never started. Any
+  other wrapper's Wine gets the wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH`
+  (`wrapper_env`), without which Sikarugir's wineserver stops. `5477ac7`
 - macOS: the game and version pickers are lists drawn in the window (`open_picker`).
   Tk's native popup menu left the whole window unresponsive to the mouse once opened,
   so no version could be picked and the window not closed.

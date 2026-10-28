@@ -539,6 +539,17 @@ def prefix_wine(pre):
     return None
 
 
+def wrapper_runs_game(bundle):
+    """Whether a wrapper's launcher starts the game itself: its program (Info.plist's
+    `Program Name and Path`) is Armada2.exe."""
+    try:
+        with open(os.path.join(bundle, 'Contents', 'Info.plist'), 'rb') as f:
+            exe = plistlib.load(f).get('Program Name and Path') or ''
+    except (OSError, ValueError, plistlib.InvalidFileException):
+        return False
+    return exe.replace('\\', '/').rsplit('/', 1)[-1].lower() == 'armada2.exe'
+
+
 def wrapper_env(bundle, prefix):
     """What a wrapper's own Wine needs started outside the wrapper's launcher: the prefix,
     and the wrapper's libraries (Sikarugir's wineserver finds libinotify only through
@@ -741,9 +752,11 @@ def prefix_apply(pre, changes, undo=False):
 
 
 def launch_game_native(game, env_add=None):
-    """Start the game without Heroic: the exe itself on Windows, through the prefix's
-    Wine on macOS (with the launch variables in its environment too, should the
-    registry not have them). False when there is no way to."""
+    """Start the game without Heroic: the exe itself on Windows; on macOS a wrapper whose
+    program is the game as a double click starts it (its launcher sets up the Wine it
+    carries, which started bare runs nothing), else through the prefix's Wine (with the
+    launch variables in its environment too, should the registry not have them). False
+    when there is no way to."""
     try:
         exe = next((os.path.join(game.path, n) for n in os.listdir(game.path)
                     if n.lower() == 'armada2.exe'), None)
@@ -755,6 +768,10 @@ def launch_game_native(game, env_add=None):
         if SYSTEM == 'windows':
             subprocess.Popen([exe], cwd=game.path, close_fds=True,
                              creationflags=0x00000008 | 0x00000200)   # DETACHED, NEW_GROUP
+            return True
+        if game.prefix and game.prefix.bundle and wrapper_runs_game(game.prefix.bundle):
+            subprocess.Popen(['/usr/bin/open', game.prefix.bundle], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
             return True
         w = prefix_wine(game.prefix) if game.prefix else None
         if not w:
@@ -2572,6 +2589,11 @@ def selftest():
         check(pl['CFBundleIdentifier'] == 'com.sikarugir.ArmadaII' and pl['CFBundleName'] ==
               'Armada II' and pl['Program Name and Path'].endswith('/Armada2.exe') and
               pl['D9VK'] == 1, "setup: the template's Info.plist made the game's, the rest kept")
+        check(wrapper_runs_game(app), 'wrapper: its program is the game, so Launch game opens it')
+        wrapper_plist(plist, 'Armada II', '/a2refit-setup/setup.exe', '/VERYSILENT')
+        check(not wrapper_runs_game(app) and not wrapper_runs_game(t),
+              'wrapper: another program, or no wrapper, is not the game')
+        wrapper_plist(plist, 'Armada II', '/GOG Games/Star Trek Armada II/Armada2.exe')
         pre = os.path.join(app, 'Contents', 'SharedSupport', 'prefix')
         env = wrapper_env(app, pre)
         check(env['WINEPREFIX'] == pre and env['DYLD_FALLBACK_LIBRARY_PATH'].startswith(

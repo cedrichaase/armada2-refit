@@ -289,7 +289,7 @@ The core is the same on all three systems (`SYSTEM`); what differs:
 | The script | `install.ps1` through `powershell.exe -ExecutionPolicy Bypass -File`, no console window | `install.sh` through `/bin/bash` (3.2, BSD tools) |
 | The chain | crosire's d3d8to9 on Windows' own Direct3D 9, with Display8 in front (stub mode, `Backend=auto`); a DXVK `d3d8.dll` the player put there stays, without Display8 | d3d8to9 on the prefix's own Direct3D 9 (wined3d, or a Sikarugir wrapper's D9VK): DXVK's `d3d9.dll` cannot run on a Mac, so no MSAA or `dxvk.conf`; Display8 in front on `Backend=auto`, Vulkan on MoltenVK first |
 | Launch settings | none: the game folder's DLLs load first | the DLL overrides, written into the prefix's `user.reg` under `AppDefaults\Armada2.exe\DllOverrides` (the game's alone, not the bottle's) |
-| Launch game | the exe | the prefix's Wine: CrossOver's `wine --bottle <name>`, a wrapper's own (with the wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH`, `wrapper_env`), Whisky's, else Gcenx's or Homebrew's |
+| Launch game | the exe | the prefix's Wine: CrossOver's `wine --bottle <name>`, a wrapper whose program is `Armada2.exe` opened as a double click opens it (`wrapper_runs_game`: its own Wine started bare runs nothing), another wrapper's own Wine (with the wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH`, `wrapper_env`), Whisky's, else Gcenx's or Homebrew's |
 | Cache, settings | `%LOCALAPPDATA%\armada2-refit\installer\cache`, `%APPDATA%\armada2-refit\installer.json` | `~/Library/Caches/armada2-refit/installer`, `~/Library/Application Support/armada2-refit/installer.json` |
 
 **The registry, on macOS** (`prefix_plan`, `prefix_apply`). Only the overrides the game
@@ -361,7 +361,7 @@ that lists what follows, `Job.setup_mac` does what Sikarugir Creator and the wra
 
 The window then finds the game in the new wrapper and installs the chosen release into
 it as usual (the DLL overrides into its `user.reg`). The player starts it with
-`~/Applications/Sikarugir/Armada II.app` or **Launch game**. The app itself stays
+`~/Applications/Sikarugir/Armada II.app` or **Launch game**, which opens that wrapper. The app itself stays
 unnotarised: its first launch still needs *Open Anyway*.
 
 ### The window on Windows and macOS
