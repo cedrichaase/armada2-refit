@@ -130,10 +130,9 @@ and writes `armada2-refit-<version>.zip`:
   `ui/ini-merge.py` merges it (the missing keys added, the player's values kept, the
   `Defaults=` upgrade applied), in awk and in PowerShell, since neither may assume
   Python; keep their upgrade tables (`DISPLAY_UPGRADES`, `$DisplayUpgrades`) in step
-  with `ini-merge.py`'s. On macOS `install.sh` writes it with `Backend=d3d9`: Vulkan and
-  Direct3D 12 there would both be MoltenVK under a 32-bit process, which no one has seen
-  work ("Will Vulkan work on a Mac?"), and Direct3D 9 is Wine's own, what d3d8to9 drew
-  on before. A chain left as it is gets no Display8. Display8 is known by content (the
+  with `ini-merge.py`'s. On macOS too it goes in as shipped, on `Backend=auto`: Vulkan
+  on MoltenVK under a 32-bit process works there (`display/README.md`, "Will Vulkan work
+  on a Mac?"), and Direct3D 9 comes last. A chain left as it is gets no Display8. Display8 is known by content (the
   panic message every build carries; it also holds the word "dxvk", so that is asked
   first), never by hash. Each run first takes it out of the slot, putting
   `d3d8_real.dll` back as `d3d8.dll`, so the chain step sees the chain as before and a

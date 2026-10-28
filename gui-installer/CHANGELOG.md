@@ -4,6 +4,17 @@ The graphical installer, `armada2-refit-installer.py`. Its version is `INSTALLER
 in the script, which `publish/package.sh` checks against the newest heading here. The
 package schemas it reads are listed in each entry. Newest first.
 
+## 2.1.1 — 2026-10-28
+
+Reads package schemas 0 and 1, unchanged.
+
+### Fixed
+- macOS: the `display8` layer's line says "will install", as on the other systems, and
+  no longer "on Direct3D 9": `install.sh` now leaves `Display8.ini` on `Backend=auto`
+  there (root 13.36.1). `test-macos.sh` expects `Backend=auto`. `4c0f9e4`
+
+Installed, not yet seen in game.
+
 ## 2.1.0 — 2026-10-25
 
 Reads package schemas 0 and 1, unchanged; a package from 13.35.0 has the layer `display`

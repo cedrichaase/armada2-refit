@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-INSTALLER_VERSION = '2.1.0'
+INSTALLER_VERSION = '2.1.1'
 SCHEMAS = (0, 1)          # 0: the zips before manifest.json; 1: manifest.json, ::step and ::error lines
 REPO = 'cedrichaase/armada2-refit'
 API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'
@@ -752,11 +752,9 @@ def layer_verdict(layer, facts):
     if when == 'dxvk.conf' and facts['foreign_conf']:
         return False, 'skipped — your own dxvk.conf stays'
     d3d8to9 = facts.get('after_d3d8to9', facts['d3d8to9'])
-    # Display8 goes in front of d3d8to9 only; on a Mac on Direct3D 9 alone.
+    # Display8 goes in front of d3d8to9 only.
     if when == 'display8' and not d3d8to9:
         return False, 'skipped — goes in front of d3d8to9 only'
-    if when == 'display8' and SYSTEM == 'macos':
-        return True, 'will install · on Direct3D 9'
     # Render3D.asi and UI.asi draw on the Direct3D 9 device behind d3d8to9; without it the
     # scripts leave the 3D view to the engine, and put the older HUD, menus and grid in.
     if when == 'd3d8to9' and not d3d8to9 and layer['id'] == 'render3d':

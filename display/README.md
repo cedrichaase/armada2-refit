@@ -65,9 +65,10 @@ Wine loads the game directory's `d3d8.dll` because of the `d3d8=n,b` override
 of crosire's d3d8to9 after their chain step (a chain left as the player's gets none),
 and they make no `d3d8.dll.a2display-backup`, since there is no `a2mod` in a release.
 They merge `Display8.ini` without Python, in awk and in PowerShell, by `ini-merge.py`'s
-rules and upgrade table. On macOS `install.sh` writes `Backend=d3d9`: Vulkan and Direct3D
-12 there would both run on MoltenVK under a 32-bit process, which "Will Vulkan work on a
-Mac?" leaves open, while Direct3D 9 is Wine's own, the device d3d8to9 used there before.
+rules and upgrade table. On macOS too `Display8.ini` goes in as shipped, on
+`Backend=auto`: Vulkan on MoltenVK under a 32-bit process works there ("Will Vulkan work
+on a Mac?"), and Direct3D 9 (Wine's wined3d, or a wrapper's D9VK) comes last if it
+cannot start.
 Nothing in Display8 is Wine-specific (`platform()` only names the system in the log), so
 on Windows the stub runs on the GPU vendor's Vulkan, Direct3D 12 or Windows' own
 Direct3D 9; it has not been seen there yet. `--uninstall` puts d3d8to9 back as `d3d8.dll`
@@ -455,3 +456,11 @@ upload ring, dynamic uniform offsets, a texture upload, a present pass) and chec
 pixels: the question is whether winevulkan on MoltenVK maps host-visible memory where
 a 32-bit process can reach it, in the new-style WoW64 that macOS Wine always is. How to
 run it on a Mac, and what it showed here: `vkprobe/README.md`.
+
+**Seen in game on a Mac (2026-10-28):** Apple M1, macOS 27.0.1, a Sikarugir wrapper on
+`WS12WineSikarugir11.0_1` (Wine 11, new-style WoW64). Display8 on `Backend=vulkan` made
+its device on MoltenVK (`vulkan: physical device Apple M1`, Vulkan 1.4), and the menu
+scene drew with Render3D's nebulae baked at full size. On `Backend=d3d9` the same scene
+crashed there. The wrapper's D9VK, under d3d8to9, emulates the nebulae's RESZ depth
+resolve, and Metal aborts on a pipeline with `MTLPixelFormatDepth16Unorm` as colour
+target 0 (issue #19). So Direct3D 9 is the fallback on a Mac, not the first choice.
