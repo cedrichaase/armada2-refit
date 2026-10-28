@@ -18,6 +18,8 @@ Layers: gui-installer 2.2.0.
 ### Fixed
 - gui-installer: **Launch game** starts a Sikarugir wrapper's Wine with the wrapper's
   libraries (gui-installer 2.2.0, `5477ac7`).
+- gui-installer: on macOS the version and game pickers no longer leave the window
+  unresponsive (gui-installer 2.2.0).
 
 Installed, not yet seen in game.
 

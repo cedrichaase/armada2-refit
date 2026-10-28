@@ -3772,6 +3772,8 @@ def run_tk():
     PANEL = ((16, 20, 31, 0.78), (255, 255, 255, 0.09))
     FIELD = ((0, 0, 0, 0.28), (255, 255, 255, 0.13))
     FIELD_HOT = ((0, 0, 0, 0.28), (245, 168, 73, 0.75))
+    PICKER = ((20, 25, 39, 0.97), (255, 255, 255, 0.13))       # the canvas picker (macOS)
+    PICKER_ROW = ((245, 168, 73, 0.22), None)
     AMBER_RGB, AMBER_LIGHT_RGB = (232, 146, 47), (245, 168, 73)
     BUTTONS = {     # kind: ((fill, edge), (hover fill, edge), text)
         'primary': (((*AMBER_RGB, 1.0), (*AMBER_LIGHT_RGB, 1.0)),
@@ -4655,8 +4657,49 @@ def run_tk():
             if self.size:
                 self.layout()
 
+        def open_picker(self, labels, current, pick, x, y):
+            """The game and version pickers on macOS, drawn on the canvas: Tk's native
+            popup menu, posted from a click on the canvas, leaves the whole window deaf to
+            the mouse there (Tk 8.6.16), until it is killed. A click on a row picks it,
+            anywhere else (or Escape) closes it; a new layout closes it too."""
+            cv = self.cv
+            self.close_picker()
+            W, H = self.size
+            rh = F_SUB.metrics('linespace') + px(12)
+            w = max(F_SUB.measure(l) for l in labels) + px(48)
+            h = rh * len(labels) + px(8)
+            x, y = max(px(8), min(x, W - w - px(8))), max(px(8), min(y, H - h - px(8)))
+            # Over the whole window, see-through: the click outside lands here, not on
+            # what is under it. (A canvas image takes clicks on all of its box.)
+            veil = photo_png(W, H, [bytes(W * 4)] * H)
+            self.picker_imgs = [veil]
+            v = cv.create_image(0, 0, anchor='nw', image=veil, tags=('pick',))
+            cv.tag_bind(v, '<Button-1>', lambda e: self.close_picker())
+            cv.create_image(x, y, anchor='nw', image=shape(w, h, px(9), PICKER), tags=('pick',))
+            for i, label in enumerate(labels):
+                t = f'pick{i}'
+                ry = y + px(4) + i * rh
+                row = cv.create_image(x + px(4), ry, anchor='nw', tags=('pick', t))
+                hot = shape(w - px(8), rh, px(6), PICKER_ROW)
+                if i == current:
+                    cv.create_text(x + px(16), ry + rh // 2, text='✓', font=F_SUB,
+                                   fill=AMBER_LIGHT, anchor='center', tags=('pick', t))
+                cv.create_text(x + px(30), ry + rh // 2, text=label, font=F_SUB, fill=FG,
+                               anchor='w', tags=('pick', t))
+                cv.tag_bind(t, '<Enter>', lambda e, r=row, h_=hot: cv.itemconfigure(r, image=h_))
+                cv.tag_bind(t, '<Leave>', lambda e, r=row: cv.itemconfigure(r, image=''))
+                cv.tag_bind(t, '<Button-1>', lambda e, i=i: (self.close_picker(), pick(i)))
+            cv.configure(cursor='')
+            root.bind('<Escape>', lambda e: self.close_picker())
+
+        def close_picker(self):
+            self.cv.delete('pick')
+            self.picker_imgs = []
+            root.unbind('<Escape>')
+
         def layout(self):
             cv = self.cv
+            self.close_picker()
             cv.delete('ui')
             cv.configure(cursor='')
             if len(shapes) > 48:        # sizes the window had; nothing shows them now
@@ -4738,6 +4781,8 @@ def run_tk():
 
             def popup(labels, current, pick):
                 def show(x, y):
+                    if SYSTEM == 'macos':
+                        return self.open_picker(labels, current, pick, x, y + px(2))
                     m = tk.Menu(root, tearoff=0, bg='#141927', fg=FG, activebackground=AMBER,
                                 activeforeground=AMBER_INK, selectcolor=AMBER_LIGHT,
                                 relief='flat', bd=px(1), font=F_SUB)

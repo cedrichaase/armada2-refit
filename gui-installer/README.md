@@ -371,7 +371,9 @@ library), in `run_tk()`. Everything is drawn on a single Canvas — the sky, the
 translucent card, the buttons and the pickers — since a Tk widget is opaque and would
 cut a box out of the sky. The card, buttons and fields are antialiased rounded
 rectangles with an alpha channel, built as PNGs in Python (`rounded_rows`, `tk_png`) and
-blended by Tk over the canvas; the pickers open a menu.
+blended by Tk over the canvas; the pickers open a menu on Windows, and on macOS a list
+drawn on the canvas too (`open_picker`): Tk's native popup menu (8.6.16), posted from a
+click on the canvas, left the whole window deaf to the mouse there until it was killed.
 
 The sky is `Sky` redone for a Canvas: the same `nebula_pixels`, composited over the
 gradient and scaled to the window height in a thread (`nebula_rgb`, a third of a second),
