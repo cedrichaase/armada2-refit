@@ -5,6 +5,22 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.37.0 — 2026-10-28
+
+Layers: gui-installer 2.2.0.
+
+### Added
+- gui-installer: on macOS, **Set up Armada II** puts the game into a Sikarugir wrapper of
+  its own from GOG's offline installer in Downloads (Rosetta 2, Sikarugir's template and
+  engine, the prefix, GOG's installer run silently), then installs the refit into it;
+  `--setup-mac` on the command line (gui-installer 2.2.0).
+
+### Fixed
+- gui-installer: **Launch game** starts a Sikarugir wrapper's Wine with the wrapper's
+  libraries (gui-installer 2.2.0).
+
+Installed, not yet seen in game.
+
 ## 13.36.1 — 2026-10-28
 
 Layers: gui-installer 2.1.1.

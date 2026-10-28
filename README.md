@@ -93,12 +93,14 @@ options the game needs ([`gui-installer/README.md`](gui-installer/README.md)).
   one portable file. It is not signed, so SmartScreen may ask first: *More info* →
   *Run anyway*.
 - **macOS**: `armada2-refit-installer-macos.zip`, an app for Apple Silicon and Intel.
-  The game runs in Wine: **CrossOver 26** is the recommended way (paid; CodeWeavers rate
-  Armada II "Runs Great"). Create a bottle, run GOG's offline installer in it, then run
-  this app. Sikarugir or Gcenx's Wine builds are free alternatives. Leave CrossOver's
-  graphics backend on its default: Direct3D 8 and 9 run through Wine's own wined3d on a
-  Mac. The app is not notarised, so the first
-  launch is refused: System Settings → Privacy & Security → *Open Anyway*.
+  The game runs in Wine. Download GOG's Windows offline installer for the game from
+  your GOG library into Downloads, open this app and press **Set up Armada II**: it
+  makes a free [Sikarugir](https://github.com/Sikarugir-App/Sikarugir) wrapper in
+  `~/Applications/Sikarugir`, installs the game into it and then the refit
+  ([`gui-installer/README.md`](gui-installer/README.md), "Setting the game up on a
+  Mac"). A game already in a **CrossOver** bottle or another wrapper is found as it is.
+  The app is not notarised, so the first launch is refused: System Settings → Privacy
+  & Security → *Open Anyway*.
 - **Linux**: `armada2-refit-installer-x86_64.AppImage`; make it executable and run it.
   It carries GTK 4 and libadwaita itself, and writes Heroic's launch options for you.
 
