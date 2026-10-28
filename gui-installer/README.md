@@ -343,13 +343,21 @@ that lists what follows, `Job.setup_mac` does what Sikarugir Creator and the wra
    `CFBundleIdentifier`, `CFBundleName`, `Program Name and Path`, the exe in
    `drive_c`); the rest of the template's settings stay, D9VK on among them, which the
    game does not use with Display8 on Vulkan.
-4. **The prefix**: the wrapper's `wine wineboot --init`, with `wrapper_env` (the
-   wrapper's `Frameworks` on `DYLD_FALLBACK_LIBRARY_PATH`, without which Sikarugir's
-   wineserver stops before anything runs). The engine carries Wine Mono and Gecko, so
-   nothing asks to download them.
-5. **The game**: GOG's installer is Inno Setup, run `/VERYSILENT /SUPPRESSMSGBOXES
-   /NORESTART /SP- /DIR=C:\GOG Games\Star Trek Armada II`, then `wineserver -w`.
-   No `Armada2.exe` there afterwards is an error that names the installer.
+4. **The prefix**, by the wrapper's own launcher, as Creator makes it:
+   `Contents/MacOS/wineskinlauncher WSS-wineprefixcreate` (Sikarugir's environment and
+   its default registry, which a bare `wineboot` lacks). The launcher is one binary
+   under three names (`Sikarugir`, `launcher`, `wineskinlauncher`); the `sikarugir
+   create-prefix` / `run` usage in its strings is not answered inside a wrapper. It may
+   return before Wine is done, so `_wait_wine` waits until no process of the wrapper's
+   Wine is left. The engine carries Wine Mono and Gecko, so nothing asks to download
+   them.
+5. **The game**: GOG's installer is Inno Setup's, run `/VERYSILENT /SUPPRESSMSGBOXES
+   /NORESTART /SP-` into GOG's own default folder, `C:\GOG Games\Star Trek Armada II`.
+   The launcher passes flags only to the wrapper's own program, so for this one run
+   `Program Name and Path` is a copy of the installer at `C:\a2refit-setup\setup.exe`
+   (an APFS clone, `cp -c`) and `Program Flags` Inno's; the launcher is started without
+   arguments, and the copy goes and `Armada2.exe` becomes the program again afterwards.
+   No `Armada2.exe` there is an error that names the installer.
 
 The window then finds the game in the new wrapper and installs the chosen release into
 it as usual (the DLL overrides into its `user.reg`). The player starts it with

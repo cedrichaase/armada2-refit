@@ -586,14 +586,15 @@ def find_setup_exe(where=DOWNLOADS):
     return max(hits, key=os.path.getmtime) if hits else None
 
 
-def wrapper_plist(path, name, exe):
+def wrapper_plist(path, name, exe, flags=''):
     """A wrapper template's Info.plist made the game's, as Creator does: its own bundle id
-    and name, and the program its launcher starts (a path in drive_c)."""
+    and name, and the program its launcher starts (a path in drive_c) with its flags."""
     with open(path, 'rb') as f:
         pl = plistlib.load(f)
     pl['CFBundleIdentifier'] = 'com.sikarugir.' + re.sub(r'[^A-Za-z0-9]', '', name)
     pl['CFBundleName'] = name
     pl['Program Name and Path'] = exe
+    pl['Program Flags'] = flags
     with open(path, 'wb') as f:
         plistlib.dump(pl, f)
 
@@ -1987,6 +1988,20 @@ class Job:
             self.log(line.rstrip('\n'))
         return proc.wait()
 
+    def _wait_wine(self, contents, limit=1800):
+        """Until no process of the wrapper's Wine (at `contents`) runs any more: its
+        wineserver lasts as long as anything in the prefix does, and a few seconds more.
+        Waits up to 15 s for one to start, in case the launcher returned first."""
+        mark = os.path.join(contents, 'SharedSupport', 'wine') + '/'
+        t0, seen = time.time(), False
+        while time.time() - t0 < limit:
+            busy = any(mark in cmd for _, cmd in processes())
+            seen = seen or busy
+            if not busy and (seen or time.time() - t0 > 15):
+                return
+            time.sleep(1)
+        raise RuntimeError(f'Wine in the new wrapper was still busy after {limit // 60} minutes')
+
     def setup_mac(self, setup):
         """Armada II from GOG's offline installer `setup` into a Sikarugir wrapper of our own
         (WRAPPER_APP), as Sikarugir Creator and the wrapper's Install Software would make
@@ -2031,31 +2046,48 @@ class Job:
             contents = os.path.join(app, 'Contents')
             shared = os.path.join(contents, 'SharedSupport')
             os.rename(engine, os.path.join(shared, 'wine'))
+            plist = os.path.join(contents, 'Info.plist')
             exe_in_c = '/' + '/'.join(GAME_IN_PREFIX) + '/Armada2.exe'
-            wrapper_plist(os.path.join(contents, 'Info.plist'), 'Armada II', exe_in_c)
+            wrapper_plist(plist, 'Armada II', exe_in_c)
             prefix = os.path.join(shared, 'prefix')
             if not os.path.lexists(os.path.join(contents, 'drive_c')):
                 os.symlink('SharedSupport/prefix/drive_c', os.path.join(contents, 'drive_c'))
 
-            env = dict(host_env(), **wrapper_env(app, prefix), WINEDEBUG='-all')
-            wine = os.path.join(shared, 'wine', 'bin', 'wine')
+            # The wrapper's own launcher runs Wine, as Creator and Install Software do: it
+            # sets up Sikarugir's environment and the prefix's default registry, which a
+            # bare wineboot lacks. It may return before Wine is done (_wait_wine).
+            launcher = os.path.join(contents, 'MacOS', 'wineskinlauncher')
             server = os.path.join(shared, 'wine', 'bin', 'wineserver')
+            env = dict(host_env(), **wrapper_env(app, prefix))
             self.report(0.50, 'prefix', None)
-            if self._run([wine, 'wineboot', '--init'], env) != 0 or \
-                    not os.path.isdir(os.path.join(prefix, 'drive_c', 'windows')):
-                raise RuntimeError('Wine could not make its prefix in the wrapper')
-            self._run([server, '-w'], env)
+            code = self._run([launcher, 'WSS-wineprefixcreate'], host_env())
+            self._wait_wine(contents, limit=600)
+            if not os.path.isdir(os.path.join(prefix, 'drive_c', 'windows')):
+                raise RuntimeError(f'Wine could not make its prefix in the wrapper (exit {code})')
 
-            # GOG's installers are Inno Setup's: silent, into the folder we name.
+            # GOG's installers are Inno Setup's, run silently into GOG's own default
+            # folder, GAME_IN_PREFIX. The launcher takes flags only for the wrapper's own
+            # program, so for this one run that is a copy of the installer under a plain
+            # name in drive_c (an APFS clone, no space taken), with Inno's flags; then the
+            # game.
             self.report(0.60, 'game', None)
-            code = self._run([wine, setup, '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
-                              '/SP-', '/DIR=C:\\' + '\\'.join(GAME_IN_PREFIX)], env)
-            self._run([server, '-w'], env)
+            stage = os.path.join(prefix, 'drive_c', 'a2refit-setup')
+            os.makedirs(stage, exist_ok=True)
+            copy = os.path.join(stage, 'setup.exe')
+            if subprocess.run(['/bin/cp', '-c', setup, copy]).returncode != 0:
+                shutil.copyfile(setup, copy)
+            wrapper_plist(plist, 'Armada II', '/a2refit-setup/setup.exe',
+                          '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-')
+            code = self._run([os.path.join(contents, 'MacOS', 'launcher')], host_env())
+            self._wait_wine(contents)
+            clear_dir(stage)
+            wrapper_plist(plist, 'Armada II', exe_in_c)
             game = os.path.join(prefix, 'drive_c', *GAME_IN_PREFIX)
             if not exe_in(game):
-                raise RuntimeError(f"GOG's installer did not install the game (exit {code}) "
-                                   f'— is {os.path.basename(setup)} the Windows offline '
-                                   'installer of Star Trek: Armada II?')
+                win = 'C:\\' + '\\'.join(GAME_IN_PREFIX)
+                raise RuntimeError(f"GOG's installer did not install the game in {win} (exit "
+                                   f'{code}) — is {os.path.basename(setup)} the Windows '
+                                   'offline installer of Star Trek: Armada II?')
             server = None
             os.rename(app, WRAPPER_APP)
         except BaseException:
@@ -2219,7 +2251,7 @@ def cli(argv):
     ap.add_argument('--setup-mac', nargs='?', const='', metavar='SETUP_EXE',
                     help="macOS: set the game up in a Sikarugir wrapper from GOG's offline "
                          'installer (the one in ~/Downloads if none is given), then install '
-                         'the newest release into it')
+                         'the newest release into it (or --install VERSION)')
     ap.add_argument('--check-version')
     ap.add_argument('--selftest', action='store_true')
     ap.add_argument('--report', action='store_true',
@@ -2279,9 +2311,12 @@ def cli(argv):
     job = Job(report, print)
     try:
         if setup:
-            rel = default_release(releases())
+            rels = releases()
+            rel = next((r for r in rels if r.version == a.install), None) if a.install \
+                else default_release(rels)
             if not rel:
-                print('no release to install -- check the connection', file=sys.stderr)
+                print(f'no release {a.install or "to install -- check the connection"}',
+                      file=sys.stderr)
                 return 1
             game = job.setup_mac(setup)
             job.install(rel, None, game, launcher=not a.no_launcher)
