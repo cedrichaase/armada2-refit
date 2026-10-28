@@ -15,9 +15,9 @@ Layers: gui-installer 2.1.1.
   `Backend=d3d9`. On a Sikarugir wrapper, Direct3D 9 is the wrapper's D9VK, where the
   main menu crashed as Render3D baked its nebulae (#19). An existing `Display8.ini`
   keeps the `Backend=` it has. `publish/installer/test.sh` expects the shipped file on
-  macOS too.
+  macOS too. `4c0f9e4`
 - gui-installer: the `display8` line on macOS no longer says "on Direct3D 9"
-  (gui-installer 2.1.1).
+  (gui-installer 2.1.1, `4c0f9e4`).
 
 `Backend=vulkan` on macOS (Apple M1, Sikarugir, Wine 11) confirmed in game 2026-10-28,
 set by hand; the installer change: installed, not yet seen in game.

@@ -11,7 +11,7 @@ Reads package schemas 0 and 1, unchanged.
 ### Fixed
 - macOS: the `display8` layer's line says "will install", as on the other systems, and
   no longer "on Direct3D 9": `install.sh` now leaves `Display8.ini` on `Backend=auto`
-  there (root 13.36.1). `test-macos.sh` expects `Backend=auto`.
+  there (root 13.36.1). `test-macos.sh` expects `Backend=auto`. `4c0f9e4`
 
 Installed, not yet seen in game.
 
