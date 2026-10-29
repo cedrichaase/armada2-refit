@@ -4,6 +4,26 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.24.0 — 2026-10-29
+
+### Added
+- `[HUD] SystemIcons=1`: with `Selection=1`, the damaged systems of every unit whose
+  gauges show (the pointed one; the selection's with `SelectionGauges=1`) in a row of
+  chips under its brackets, as stock's `SelectionDisplay` showed its `RepairIcon`s
+  (`engine::overlay::systems`). `UI.log`: "overlay: systems of ...".
+- `[HUD] ShotScenes=1`: with `Minimap=1`, in the tactical view, a faint ring on the
+  minimap about each of the shot director's scenes (the fights), as stock's radar
+  drew them (`engine::radar::shot_scenes`).
+- `[HUD] MinimapCursor=1`: over our minimap, the action cursor stock's showed
+  (`ActionMode::GetAction` at the point, `SetCursorAiAction`'s table: patrol, the
+  "cannot" cursors...), keeping the warp/move choice for a plain move; 0 the arrow.
+- `[HUD] FrameRate=1`: what `RTS_CFG.h`'s `FRAMERATE_DISPLAY` prints (triangles, frame
+  rates, the timing slots) in a panel of the theme; `Armada_RenderFrame`'s two prints
+  are re-pointed (`engine::leftovers`). 0 the engine's lines.
+- `ui/bench-asi.sh --rts K=V`: an `int` of the clone's `RTS_CFG.h` (`FRAMERATE_DISPLAY=1`).
+
+Installed, not yet seen in game.
+
 ## 0.23.0 — 2026-10-25
 
 ### Fixed

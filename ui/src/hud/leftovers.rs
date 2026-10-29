@@ -60,6 +60,37 @@ pub fn run(ui: &mut Ui) {
             ui.draw.rect(clip_rect(fd.rect), rgb(fd.rgb, fd.alpha));
         }
     }
+    if let Some(fr) = leftovers::frame_rate() {
+        frame_rate(ui, fr);
+    }
+}
+
+/// What `FRAMERATE_DISPLAY` prints (the engine's top-left lines: the triangles, the
+/// frame rate, the total frame rate, each timing slot), in a small panel of the theme
+/// at the top left: a label and its value a line, the frame rate first and largest.
+fn frame_rate(ui: &mut Ui, fr: &leftovers::FrameRate) {
+    use crate::gfx::Weight;
+    use crate::widgets::Align;
+    let t = ui.theme;
+    let mut rows: alloc::vec::Vec<(alloc::string::String, alloc::string::String)> = alloc::vec::Vec::new();
+    rows.push((alloc::string::String::from("Total FPS"), crate::sfmt!("{:.1}", fr.total_fps)));
+    rows.push((alloc::string::String::from("Triangles"), crate::sfmt!("{}", fr.triangles)));
+    for (name, ms) in &fr.slots {
+        rows.push((crate::sfmt!("{} (ms)", name.trim()), crate::sfmt!("{:.1}", ms)));
+    }
+    let (line, big) = (ui.u(16.0), ui.u(26.0));
+    let h = big + line * rows.len() as f32;
+    let (outer, inner) = super::panels::fit(ui, crate::widgets::Anchor::TopLeft, ui.u(220.0), h, ui.u(6.0));
+    ui.panel(outer);
+    let head = R::new(inner.x, inner.y, inner.w, big);
+    ui.text_in(head, "FPS", t.micro_size, Align::Left, t.text_dim, Weight::Regular);
+    let fps = fr.fps.map_or(alloc::string::String::from("--"), |v| crate::sfmt!("{:.1}", v));
+    ui.text_in(head, &fps, t.heading_size, Align::Right, t.text, Weight::Bold);
+    for (i, (k, v)) in rows.iter().enumerate() {
+        let r = R::new(inner.x, inner.y + big + i as f32 * line, inner.w, line);
+        ui.text_in(r, k, t.micro_size, Align::Left, t.text_dim, Weight::Regular);
+        ui.text_in(r, v, t.small_size, Align::Right, t.text, Weight::Regular);
+    }
 }
 
 /// The external textures the rings and footprints draw from, one per engine texture

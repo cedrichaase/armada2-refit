@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.70.0 — 2026-10-29
+
+### Added
+- `ui-leftovers-2`: the pointed unit's damaged systems, the warp cursor over the
+  minimap, the shot director's scenes in the tactical view and the frame rate
+  (`FRAMERATE_DISPLAY=1` in the clone) drawn by the UI, with the engine drawing
+  nothing in the mission (ui 0.24.0).
+
+Installed, not yet seen in game.
+
 ## 3.69.0 — 2026-10-25
 
 ### Added
