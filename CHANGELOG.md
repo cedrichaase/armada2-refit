@@ -5,6 +5,16 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.42.3 — 2026-10-29
+
+Layers: ui 0.25.1.
+
+### Fixed
+- The minimap showed no nebulae (issue 10): the engine's map picture is drawn
+  additively now. `0f38f33`
+
+Installed, not yet seen in game.
+
 ## 13.42.2 — 2026-10-30
 
 Layers: render3d 0.29.1.
