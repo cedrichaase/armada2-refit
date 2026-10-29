@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.23.1 — 2026-10-29
+
+### Changed
+- `gfx::attach` learns of a new device or a `Reset` from Display8's
+  `display8_device_epoch` when Display8 is present (`Gpu::device_epoch`); without the
+  export it takes the backend's new-device flag as before.
+
+Installed, not yet seen in game.
+
 ## 0.23.0 — 2026-10-25
 
 ### Fixed

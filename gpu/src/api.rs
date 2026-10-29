@@ -50,12 +50,14 @@ pub struct Gpu {
     early: Cell<bool>,
     /// Display8's exports, looked up once.
     disp: Cell<Option<Display8>>,
+    /// `display8_device_epoch`, looked up once: 0 not yet, 1 absent, else the address.
+    epoch_fn: Cell<usize>,
 }
 
 impl Gpu {
     /// Direct3D 9 only (no Display8 is asked).
     pub const fn new(log: Log) -> Gpu {
-        Gpu { log, d9: d3d9::Gpu::new(log), vk: vulkan::Gpu::new(log), dx: dx12::Gpu::new(log), lookup: None, mode: Cell::new(D3D9), seen: Cell::new(0), early: Cell::new(false), disp: Cell::new(None) }
+        Gpu { log, d9: d3d9::Gpu::new(log), vk: vulkan::Gpu::new(log), dx: dx12::Gpu::new(log), lookup: None, mode: Cell::new(D3D9), seen: Cell::new(0), early: Cell::new(false), disp: Cell::new(None), epoch_fn: Cell::new(0) }
     }
 
     /// On the backend Display8 says, through `lookup` (the plugin's `GetProcAddress` on
@@ -71,7 +73,27 @@ impl Gpu {
             seen: Cell::new(0),
             early: Cell::new(false),
             disp: Cell::new(None),
+            epoch_fn: Cell::new(0),
         }
+    }
+
+    /// Display8's device epoch (`display8_device_epoch`: it moves on at every
+    /// `CreateDevice`, every `Reset` that succeeds and when the device goes), looked up
+    /// once. None without Display8 or with one that lacks it: the caller tells a new
+    /// device by the device itself, as before.
+    pub fn device_epoch(&self) -> Option<u32> {
+        let mut f = self.epoch_fn.get();
+        if f == 0 {
+            f = match self.lookup.map_or(0, |l| l("display8_device_epoch")) {
+                0 => 1,
+                p => p,
+            };
+            self.epoch_fn.set(f);
+        }
+        if f == 1 {
+            return None;
+        }
+        Some(unsafe { core::mem::transmute::<usize, extern "C" fn() -> u32>(f) }())
     }
 
     fn mode(&self) -> u8 {

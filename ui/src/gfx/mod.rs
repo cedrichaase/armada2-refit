@@ -590,6 +590,9 @@ pub fn gpu() -> &'static gpu::Gpu {
     unsafe { &GPU }
 }
 
+/// Display8's device epoch `attach` last saw.
+static mut EPOCH: Option<u32> = None;
+
 /// The game's device, attached to `gpu`: the Direct3D 9 one behind the engine's, or
 /// Display8's Vulkan device; None without either (DXVK's own d3d8, GOG's build). The
 /// stock front end re-creates the device at every switch between the shell's display
@@ -598,7 +601,15 @@ pub fn gpu() -> &'static gpu::Gpu {
 pub fn attach() -> Option<gpu::Attached> {
     let dev8 = crate::engine::d3d8_device();
     let a = gpu().attach_engine(dev8)?;
-    if a.new && !dev8.is_null() {
+    // A new device or a `Reset` is Display8's epoch moving on; without it, the device.
+    let fresh = match gpu().device_epoch() {
+        Some(e) => {
+            let seen = unsafe { core::mem::replace(&mut *core::ptr::addr_of_mut!(EPOCH), Some(e)) };
+            seen != Some(e)
+        }
+        None => a.new,
+    };
+    if fresh && !dev8.is_null() {
         crate::engine::device::hook_reset(dev8);
     }
     Some(a)

@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.36.2 — 2026-10-29
+
+Layers: render3d 0.27.1, ui 0.23.1.
+
+### Changed
+- render3d and the UI notice a new device or a Reset through Display8's device epoch
+  (the shared `gpu` crate resolves the export once); the per-frame device comparison
+  stays as the fallback without Display8.
+
+Installed, not yet seen in game.
+
 ## 13.36.1 — 2026-10-28
 
 Layers: gui-installer 2.1.1.
