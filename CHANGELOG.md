@@ -5,6 +5,21 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.37.0 — 2026-10-29
+
+Layers: display 0.10.0, render3d 0.28.0, ui 0.23.1, testbench 3.70.0.
+
+### Added
+- display: passthrough on Vulkan (`Passthrough=1`, shipped): the engine's own draws in
+  stub mode are drawn by Display8 through a fixed-function emulation, into render3d's
+  scene pass or the engine's targets, so a render3d module switched off or a model it
+  hands back shows as stock instead of vanishing. ROADMAP phase 4, first slice.
+- gpu: `display8_vk_pass` and `VkPass8` in the display contract; render3d publishes its
+  pass, every `gpu` says when a `Cmd` begins and ends.
+- testbench: `display-passthrough`, `display-passthrough-forward`.
+
+Installed, not yet seen in game.
+
 ## 13.36.1 — 2026-10-28
 
 Layers: gui-installer 2.1.1.

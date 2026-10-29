@@ -4,6 +4,15 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.23.1 — 2026-10-29
+
+### Changed
+- Built with `gpu`'s pass events: on Vulkan each `Cmd` tells Display8 when it begins
+  and ends (`display8_vk_pass`), so its passthrough never records inside the UI's
+  recording (display 0.10.0).
+
+Installed, not yet seen in game.
+
 ## 0.23.0 — 2026-10-25
 
 ### Fixed

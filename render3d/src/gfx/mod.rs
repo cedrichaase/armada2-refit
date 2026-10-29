@@ -29,8 +29,10 @@ fn display_export(name: &str) -> usize {
 
 /// render3d's `gpu` context (each plugin keeps its own) and the frame it records into,
 /// moved on after each main view. Its backend is Direct3D 9, or Vulkan when Display8
-/// draws on it (gpu/README.md).
-static mut GPU: gpu::Gpu = gpu::Gpu::with_display(log_line, display_export);
+/// draws on it (gpu/README.md). On Vulkan it publishes its pass now to Display8, whose
+/// passthrough draws what render3d hands back to the engine into the scene pass
+/// (display/README.md, "Passthrough").
+static mut GPU: gpu::Gpu = gpu::Gpu::with_display_publishing(log_line, display_export);
 static mut FRAME: gpu::Frame = gpu::Frame::new();
 
 #[allow(static_mut_refs)]

@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.70.0 — 2026-10-29
+
+### Added
+- `display-passthrough`: render3d's hulls module off on Display8's stub with
+  `Passthrough=1`; the ships the engine draws must show, drawn into render3d's scene.
+  `display-passthrough-forward` is the same scene through the forward chain, its
+  reference (`baseline record`/`compare`).
+
+Installed, not yet seen in game.
+
 ## 3.69.0 — 2026-10-25
 
 ### Added

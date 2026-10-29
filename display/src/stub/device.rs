@@ -64,6 +64,37 @@ pub fn make(pp: PresentParams) -> *mut SObj {
     rs[25] = 8; // ALPHAFUNC always
     rs[137] = 1; // LIGHTING
     rs[141] = 1; // COLORVERTEX
+    // What the passthrough reads before the engine sets it (passthrough.rs).
+    rs[16] = 1; // LASTPIXEL
+    rs[60] = 0xffff_ffff; // TEXTUREFACTOR
+    rs[136] = 1; // CLIPPING
+    rs[142] = 1; // LOCALVIEWER
+    rs[145] = 1; // DIFFUSEMATERIALSOURCE colour 1
+    rs[146] = 2; // SPECULARMATERIALSOURCE colour 2
+    rs[168] = 0xf; // COLORWRITEENABLE
+    rs[171] = 1; // BLENDOP add
+    // Each stage as Direct3D sets it at the start: stage 0 modulates its texture with
+    // the diffuse colour and takes the texture's alpha, the others are off; coordinates
+    // by the stage's number, wrapped, point-sampled without mips.
+    let mut tss = [[0u32; 32]; 8];
+    for (i, t) in tss.iter_mut().enumerate() {
+        t[1] = if i == 0 { 4 } else { 1 }; // COLOROP
+        t[2] = 2; // COLORARG1 texture
+        t[3] = 1; // COLORARG2 current
+        t[4] = if i == 0 { 2 } else { 1 }; // ALPHAOP
+        t[5] = 2; // ALPHAARG1
+        t[6] = 1; // ALPHAARG2
+        t[11] = i as u32; // TEXCOORDINDEX
+        t[13] = 1; // ADDRESSU wrap
+        t[14] = 1; // ADDRESSV
+        t[16] = 1; // MAGFILTER point
+        t[17] = 1; // MINFILTER point
+        t[21] = 1; // MAXANISOTROPY
+        t[25] = 1; // ADDRESSW
+        t[26] = 1; // COLORARG0 current
+        t[27] = 1; // ALPHAARG0
+        t[28] = 1; // RESULTARG current
+    }
     let mut gamma = [0u16; 768];
     for i in 0..256 {
         let v = (i as u16) * 257;
@@ -74,7 +105,7 @@ pub fn make(pp: PresentParams) -> *mut SObj {
     let dev = Box::new(Dev {
         pp: given,
         rs,
-        tss: [[0; 32]; 8],
+        tss,
         textures: [core::ptr::null_mut(); 8],
         transforms: Vec::new(),
         viewport: [0, 0, w, h, 0, 1.0f32.to_bits()],
@@ -248,6 +279,7 @@ unsafe extern "system" fn present(this: *mut SObj, src: P, dst: P, wnd: P, dirty
     let t0 = crate::rt::now();
     let hr = super::present(dev(this), src, dst, wnd, dirty);
     crate::api::presented();
+    crate::drop::present();
     trace::frame_end(crate::rt::now() - t0);
     crate::detail::present();
     hr
@@ -380,7 +412,9 @@ unsafe extern "system" fn get_depth_stencil_surface(this: *mut SObj, out: Out) -
 }
 
 unsafe extern "system" fn begin_scene(this: *mut SObj) -> HRESULT {
-    trace::call(frame!(), Kind::Device, 34);
+    let fp = frame!();
+    trace::call(fp, Kind::Device, 34);
+    crate::passthrough::begin_scene(fp);
     if let Some(v) = crate::vk::get() {
         v.frame();
     }
@@ -682,13 +716,15 @@ unsafe extern "system" fn get_current_texture_palette(this: *mut SObj, n: *mut u
     S_OK
 }
 
-/// Draws: counted (the inventory), detailed on request, never drawn.
+/// Draws: counted (the inventory), detailed on request, and drawn by the passthrough
+/// when it is on (`passthrough.rs`), else dropped.
 macro_rules! drawn {
     ($slot:literal $name:ident($($a:ident: $t:ty),*)) => {
-        unsafe extern "system" fn $name(_this: *mut SObj $(, $a: $t)*) -> HRESULT {
+        unsafe extern "system" fn $name(this: *mut SObj $(, $a: $t)*) -> HRESULT {
             let fp = frame!();
             trace::call(fp, Kind::Device, $slot);
             crate::detail::draw(fp, $slot, &[$($a as usize),*]);
+            crate::passthrough::draw(this, fp, $slot, &[$($a as usize),*]);
             S_OK
         }
     };

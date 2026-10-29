@@ -61,10 +61,22 @@ impl Gpu {
     /// On the backend Display8 says, through `lookup` (the plugin's `GetProcAddress` on
     /// `d3d8.dll`; 0 for a name it lacks).
     pub const fn with_display(log: Log, lookup: fn(&str) -> usize) -> Gpu {
+        Self::on_display_of(log, lookup, false)
+    }
+
+    /// As `with_display`, publishing the pass now to Display8 at each `Cmd`'s end on
+    /// Vulkan, so that the engine's draws Display8 passes through land in it
+    /// (gpu/src/display.rs, "Passthrough"): render3d's, whose scene pass the draws it
+    /// hands back to the engine belong in.
+    pub const fn with_display_publishing(log: Log, lookup: fn(&str) -> usize) -> Gpu {
+        Self::on_display_of(log, lookup, true)
+    }
+
+    const fn on_display_of(log: Log, lookup: fn(&str) -> usize, publish: bool) -> Gpu {
         Gpu {
             log,
             d9: d3d9::Gpu::new(log),
-            vk: vulkan::Gpu::new(log),
+            vk: if publish { vulkan::Gpu::publishing(log) } else { vulkan::Gpu::new(log) },
             dx: dx12::Gpu::new(log),
             lookup: Some(lookup),
             mode: Cell::new(UNDECIDED),
