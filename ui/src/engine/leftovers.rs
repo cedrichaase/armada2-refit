@@ -47,6 +47,14 @@
 //!   width (`ST3D_Sprite::DrawScaled2D`). Its two callers (in `CinematicView`) are
 //!   wrapped to note the rectangle, and the three draws are re-pointed at functions
 //!   that draw nothing; the UI draws the bars and the frame from the same texture.
+//! - **The frame rate** (`FRAMERATE_DISPLAY`, an `RTS_CFG.h` setting, 0 as shipped):
+//!   `Armada_RenderFrame` then prints, in the default font at the top left, the
+//!   triangles drawn this frame (`ST3D_Font::PrintString`, "Tri = %d") and calls
+//!   `Armada_DisplayFrameRate`, which prints the frame rate (`Storm3D+0x88`, unless it
+//!   is -1), the total frame rate (`Storm3D+0x80`) and every `FrameStats` slot's name
+//!   and average time. Both calls (cdecl, `call rel32`) are re-pointed at ours, which
+//!   record the same numbers and print nothing; the triangle count and the high-water
+//!   marks the code around them keeps stay the engine's.
 use super::{field, hook, rd, storm3d};
 use alloc::vec::Vec;
 
@@ -94,6 +102,24 @@ const BINK_WIDTH: usize = 0x736770;
 const BINK_HEIGHT: usize = 0x736774;
 /// `ST3D_Sprite::GetTexture()`, thiscall.
 const FN_SPRITE_TEXTURE: usize = 0x63b150;
+
+/// `Armada_RenderFrame`'s two prints while `FRAMERATE_DISPLAY` is set: the triangle
+/// count (`call ST3D_Font::PrintString`) and `call Armada_DisplayFrameRate`.
+const SITE_FPS_TRI: usize = 0x5989a6;
+const FN_PRINT_STRING: usize = 0x628890;
+const SITE_FPS: usize = 0x5989b0;
+const FN_DISPLAY_FRAME_RATE: usize = 0x599300;
+/// `FRAMERATE_DISPLAY` (an int).
+const FRAMERATE_DISPLAY: usize = 0x6fc8a8;
+/// `Storm3D+0x88`: the frame rate (-1 before there is one); `+0x80`: the total frame
+/// rate.
+const S3D_FPS: usize = 0x88;
+const S3D_TOTAL_FPS: usize = 0x80;
+/// `FrameStats::GetSlotName(int)` and `GetTimeAvg(int)` (cdecl), and the number of
+/// slots (`sm_nameArray`'s size, at its `+0x8`).
+const FN_SLOT_NAME: usize = 0x653950;
+const FN_TIME_AVG: usize = 0x653990;
+const SLOT_COUNT: usize = 0x7aec38;
 
 /// `ST3D_Camera`: its projection (a 4x4 matrix) and its viewport (left, top, width,
 /// height, in pixels).
@@ -209,6 +235,32 @@ pub struct Frame {
     pub video: Vec<Video>,
 }
 
+/// What `FRAMERATE_DISPLAY` prints: the triangles of the frame, the frame rate (None
+/// while the engine has none), the total frame rate, and each `FrameStats` slot's name
+/// and average time in milliseconds.
+pub struct FrameRate {
+    pub at: f64,
+    pub triangles: i32,
+    pub fps: Option<f32>,
+    pub total_fps: f32,
+    pub slots: Vec<(alloc::string::String, f32)>,
+}
+
+static mut FPS: FrameRate = FrameRate { at: -10.0, triangles: 0, fps: None, total_fps: 0.0, slots: Vec::new() };
+static mut FPS_ON: bool = false;
+
+/// The last numbers the engine would have printed, while it prints them (None when it
+/// stopped more than half a second ago, or the prints are the engine's).
+#[allow(static_mut_refs)]
+pub fn frame_rate() -> Option<&'static FrameRate> {
+    unsafe {
+        if !FPS_ON || rd::<i32>(FRAMERATE_DISPLAY) == 0 || crate::rt::now() - FPS.at > 0.5 {
+            return None;
+        }
+        Some(&FPS)
+    }
+}
+
 /// The drag box: left, top, width, height in pixels, its colour and the viewport.
 #[derive(Clone, Copy)]
 pub struct Line4 {
@@ -252,8 +304,23 @@ pub fn drag_on() -> bool {
 
 /// Patches the draws asked for; each stands down on its own when its site is not
 /// stock. Returns how many are ours.
-pub fn install(overview: bool, fade: bool, video: bool) -> u32 {
+pub fn install(overview: bool, fade: bool, video: bool, frame_rate: bool) -> u32 {
     let mut n = 0;
+    if frame_rate {
+        // Both or neither, so the text is never half the engine's.
+        let stock = hook::call_target(SITE_FPS_TRI) == Some(FN_PRINT_STRING)
+            && hook::call_target(SITE_FPS) == Some(FN_DISPLAY_FRAME_RATE)
+            && super::starts(FN_SLOT_NAME, &[0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x8b, 0x0d, 0x30, 0xec, 0x7a, 0x00])
+            && super::starts(FN_TIME_AVG, &[0x55, 0x8b, 0xec, 0xdd, 0x05]);
+        if stock {
+            hook::patch_call(SITE_FPS_TRI, FN_PRINT_STRING, fps_triangles as *const () as usize);
+            hook::patch_call(SITE_FPS, FN_DISPLAY_FRAME_RATE, fps_display as *const () as usize);
+            unsafe { FPS_ON = true };
+            n += 1;
+        } else {
+            crate::log!("leftovers: Armada_RenderFrame's frame-rate prints are not stock: the engine prints them");
+        }
+    }
     if overview {
         if hook::patch_call(SITE_DRAG_BOX, FN_WIREFRAME_RECT, drag_box as *const () as usize) {
             unsafe { DRAG_ON = true };
@@ -602,5 +669,43 @@ unsafe extern "thiscall" fn video_sprite(sprite: usize, _pos: *const [f32; 3], _
     let f = unsafe { &mut *core::ptr::addr_of_mut!(FRAME) };
     if f.video.len() < 4 {
         f.video.push(Video { rect, texture: tex, size });
+    }
+}
+
+// ---- the frame rate ---------------------------------------------------------------
+
+/// `ST3D_Font::PrintString(const Vector2&, const char*, ...)` as `Armada_RenderFrame`
+/// calls it for "Tri = %d": the count is the one argument after the format.
+unsafe extern "C" fn fps_triangles(_font: usize, _pos: usize, _fmt: usize, triangles: i32) {
+    unsafe { (*core::ptr::addr_of_mut!(FPS)).triangles = triangles };
+}
+
+/// `Armada_DisplayFrameRate(int *y, int line)`: the numbers it prints, read as it
+/// reads them.
+unsafe extern "C" fn fps_display(_y: *mut i32, _line: i32) {
+    let s3d = storm3d();
+    if s3d == 0 {
+        return;
+    }
+    let f = unsafe { &mut *core::ptr::addr_of_mut!(FPS) };
+    let fps: f32 = unsafe { rd(s3d + S3D_FPS) };
+    f.fps = if fps == -1.0 || !fps.is_finite() { None } else { Some(fps) };
+    let total: f32 = unsafe { rd(s3d + S3D_TOTAL_FPS) };
+    f.total_fps = if total.is_finite() { total } else { 0.0 };
+    f.slots.clear();
+    if f.fps.is_some() {
+        let n = unsafe { rd::<i32>(SLOT_COUNT) }.clamp(0, 32);
+        let name: unsafe extern "C" fn(i32) -> usize = unsafe { core::mem::transmute(FN_SLOT_NAME) };
+        let avg: unsafe extern "C" fn(i32) -> f64 = unsafe { core::mem::transmute(FN_TIME_AVG) };
+        for i in 0..n {
+            let label = super::buttons::latin1(unsafe { name(i) }, 64);
+            let ms = unsafe { avg(i) } as f32;
+            f.slots.push((label, if ms.is_finite() { ms } else { 0.0 }));
+        }
+    }
+    let first = f.at < 0.0;
+    f.at = crate::rt::now();
+    if first {
+        crate::log!("leftovers: frame rate {:.1} fps, total {:.1}, {} triangles, {} timing slots", f.fps.unwrap_or(-1.0), f.total_fps, f.triangles, f.slots.len());
     }
 }

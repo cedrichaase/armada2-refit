@@ -272,6 +272,19 @@ pub fn run(ui: &mut Ui) {
         ui.draw.stroke(R::new(cx - rad, cy - rad, 2.0 * rad, 2.0 * rad), Corners::round(rad), w, fade(t.warn, 0.9));
         ui.draw.line((cx, cy), (ex, ey), w, fade(t.warn, 0.9));
     }
+    // The tactical view: the places the shot director would film (the fights), each
+    // ringed faintly in stock's grey, here the theme's dim text (`[HUD] ShotScenes`).
+    if crate::config::get().hud.shot_scenes {
+        let scenes = radar::shot_scenes(r);
+        let w = ui.u(1.0).max(1.0);
+        for &((u, v), rad) in &scenes {
+            let (cx, cy) = at(u, v);
+            let rad = (rad * sq.w).max(ui.u(3.0));
+            let rr = R::new(cx - rad, cy - rad, 2.0 * rad, 2.0 * rad);
+            ui.draw.stroke(rr, Corners::round(rad), w, fade(t.text_dim, 0.75));
+        }
+        log_scenes(scenes.len());
+    }
     ui.draw.pop_clip();
     ui.draw.stroke(sq, Corners::SQUARE, ui.u(1.0).max(1.0), fade(t.panel_edge, 0.8));
 
@@ -412,6 +425,18 @@ fn mouse(ui: &mut Ui, sq: R) {
         radar::queue_camera(uv.0, uv.1, tactical);
         if !tactical {
             s.drag = Some(cam_b);
+        }
+    }
+}
+
+/// UI.log says when the number of the shot director's scenes ringed changes (the
+/// bench reads it: "minimap: 2 shot scenes ringed").
+fn log_scenes(n: usize) {
+    static mut LAST: usize = 0;
+    unsafe {
+        if LAST != n {
+            LAST = n;
+            crate::log!("minimap: {} shot scenes ringed", n);
         }
     }
 }

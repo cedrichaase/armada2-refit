@@ -149,6 +149,28 @@ fn note_shape(ctx: Context, name: &str) {
     }
 }
 
+/// The cursor over our minimap's square, or None for the engine's choice (the arrow:
+/// the pointer is over a panel of ours, so no stock component owns it).
+///
+/// With `[HUD] MinimapCursor=1`, the one stock's minimap shows (`radar::action_cursor`:
+/// what a command click there would order, the move cursor, patrol, the "cannot"
+/// cursors...). A plain move there goes at warp (`GO_WARP`, QOL-8), whose cursor in
+/// stock is `c_warp` whatever is selected; ours is `c_warp` only while a selected
+/// ship of the player's can warp, and the move cursor while none can.
+fn minimap_cursor(sq: R, (mx, my): (f32, f32)) -> Option<&'static str> {
+    let warp = || if crate::engine::selection::warp_functions_stock() { crate::engine::selection::move_cursor() } else { None };
+    if !crate::config::get().hud.minimap_cursor || !crate::engine::radar::action_cursors_stock() {
+        return None;
+    }
+    let r = crate::engine::radar::radar();
+    let uv = (((mx - sq.x) / sq.w).clamp(0.0, 1.0), ((my - sq.y) / sq.h).clamp(0.0, 1.0));
+    let (action, name) = crate::engine::radar::action_cursor(r, uv.0, uv.1)?;
+    if action & 0xfff == 0x2b && action & 0x4000 == 0 {
+        return warp().or(Some(name));
+    }
+    Some(name)
+}
+
 /// Draws the cursor on top of this frame's UI, and hides the one that would double it.
 pub fn draw(ctx: Context, ui: &mut Ui) {
     if !crate::config::get().cursor {
@@ -178,13 +200,8 @@ pub fn draw(ctx: Context, ui: &mut Ui) {
                 None if crate::hud::panels::box_shown() => "c_arrow",
                 None => return,
             };
-            // Over the minimap a right click orders the selection there at warp: the
-            // warp cursor while a selected ship can warp, the move cursor while none
-            // can (the engine shows the arrow over the HUD).
             match crate::hud::minimap_square(ui) {
-                Some(sq) if sq.contains((mx, my)) && !crate::hud::panels::box_shown() && crate::engine::selection::warp_functions_stock() => {
-                    crate::engine::selection::move_cursor().unwrap_or(shape)
-                }
+                Some(sq) if sq.contains((mx, my)) && !crate::hud::panels::box_shown() => minimap_cursor(sq, (mx, my)).unwrap_or(shape),
                 _ => shape,
             }
         }

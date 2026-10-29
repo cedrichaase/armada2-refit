@@ -5,6 +5,20 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.42.0 — 2026-10-29
+
+Layers: ui 0.25.0, testbench 3.74.0.
+
+### Added
+- ui: the last of what the stock overlay and minimap drew that ours left out, and the
+  frame rate: the pointed unit's damaged systems (`[HUD] SystemIcons`), the shot
+  director's scenes on the minimap in the tactical view (`ShotScenes`), the action
+  cursor over the minimap (`MinimapCursor`) and `FRAMERATE_DISPLAY`'s text
+  (`FrameRate`), each on as shipped. `80ce17f`
+- testbench: `ui-leftovers-2` (testbench 3.74.0).
+
+Installed, not yet seen in game.
+
 ## 13.41.0 — 2026-10-29
 
 Layers: render3d 0.29.0, ui 0.24.0, display 0.11.0, testbench 3.73.0.

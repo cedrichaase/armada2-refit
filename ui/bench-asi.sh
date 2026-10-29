@@ -25,6 +25,9 @@
 #                 name): `--for joiner Loading.Hold=6` holds one game's load only
 #   --online      also online/bench-asi.sh --server: Online.asi's own transport for
 #                 Internet - Online, with a bench a2online-server (after --dplay)
+#   --rts K=V     sets `int K = V;` in the clone's RTS_CFG.h (FRAMERATE_DISPLAY=1).
+#                 The clone only: network games compare the file's CRC, so a player's
+#                 copy is never edited (CLAUDE.md, qol)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,6 +39,7 @@ scene=
 menus=0
 dplay=0
 online=0
+rts=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --demo)
@@ -47,6 +51,7 @@ while [ $# -gt 0 ]; do
         --menus) menus=1; sets+=("Menus.Enable=1"); shift ;;
         --dplay) dplay=1; shift ;;
         --online) online=1; shift ;;
+        --rts) rts+=("${2:?--rts needs KEY=VALUE}"); shift 2 ;;
         --for)
             who="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print((d.get("label") or "").split("/")[-1])' "$state")"
             [ "$who" = "${2:?--for needs a player}" ] && sets+=("${3:?--for needs S.K=V}")
@@ -96,6 +101,12 @@ open(path, "w").write("\r\n".join(out) + "\r\n")
 PY
 done
 echo "UI.asi -> $work/game/ ${sets[*]:-}"
+for kv in "${rts[@]}"; do
+    k="${kv%%=*}" v="${kv#*=}"
+    grep -qE "^int +$k *=" "$work/game/RTS_CFG.h" || { echo "RTS_CFG.h has no int $k" >&2; exit 1; }
+    sed -i -E "s/^(int +$k *= *)[-0-9]+;/\\1$v;/" "$work/game/RTS_CFG.h"
+    echo "RTS_CFG.h: $(grep -E "^int +$k *=" "$work/game/RTS_CFG.h" | tr -d '\r')"
+done
 A2_GAME="$work/game" bash "$here/supersede.sh"
 if [ -n "$scene" ]; then
     bash "$here/../testbench/scene/bench-setup.sh" "$state" "$scene"

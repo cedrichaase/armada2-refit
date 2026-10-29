@@ -116,7 +116,11 @@ pub fn synchronous() -> bool {
 /// hook): that is when this frame's choice has reached the device. None when no cursor
 /// is shown.
 pub fn shape() -> Option<&'static str> {
-    let sprite = field(device(), DEV_CURSOR);
+    element_name(field(device(), DEV_CURSOR))
+}
+
+/// A cursor sprite's `cursor.spr` name; None for no sprite.
+pub fn element_name(sprite: usize) -> Option<&'static str> {
     let name = field(sprite, ELEMENT_NAME);
     if name == 0 {
         return None;

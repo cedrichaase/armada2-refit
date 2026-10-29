@@ -518,7 +518,8 @@ corners (`ST3D_GraphicsEngine+0xfc`, the camera in use outside
 as the far plane's when it is not between the near and far planes, and draws the four
 sides. In the tactical view (1) stock draws a ring about the point the camera turns
 about, through its eye (`gTacticalCamera+0x98` / `+0xa0` and `+0x8c` / `+0x94`, x and
-z), and ours does too. The shot director's grey rings in that view are not drawn.
+z), and ours does too, and the shot director's grey rings (`ShotScenes=1`: "What the
+stock overlay and minimap drew that ours left out").
 
 **Clicks** are `RadarComponent::Simulate`'s (0x4e8a90), which stock calls from the
 panel's focus-step, at the point under the pointer in the world. With something
@@ -575,7 +576,8 @@ is pointed at or of the pointed unit's team (`+0x88`, the pointed unit's `+0xec`
 `+0x8c` has faded in above 0.5. The gauges (for a craft, `GameObject+0x14` bit 3): the
 hull `+0x158` (a fraction, while the maximum `+0x160` is above 0.1), the shields
 `Craft+0x1c8` of `+0x1cc`, the special energy `+0x164` (while `+0x168` is above 0.1),
-and the damaged systems' icons (`RepairIcon`s at `+0x54`). Stock draws no brackets: the
+and the damaged systems' icons (`RepairIcon`s at `+0x54`; ours with `SystemIcons=1`, "What
+the stock overlay and minimap drew that ours left out"). Stock draws no brackets: the
 selection is the 3D bubble.
 
 **Where.** `SelectionDisplay::ComputeContainerRect` (0x5081b0, called) projects the
@@ -1173,11 +1175,107 @@ sprite's rectangle of `MBuild`). `UI.log` says each time the footprint's state c
 ("placement: footprint blocked, 280 cells not clear, 12 under the footprint, drawn in
 the theme"); `testbench/scenarios/ui-placement.md` checks both states.
 
-**Not taken**: the damaged systems' icons
-over a pointed unit, the shot director's rings, the action cursor over the minimap,
-and the frame rate and team data `Armada_RenderFrame` prints (`FRAMERATE_DISPLAY`,
-off in a normal game). The editor's own drag box (`mEditModeRender`,
-`mSelectionBox`) stays the engine's.
+### What the stock overlay and minimap drew that ours left out, and the frame rate
+
+ui 0.25.0. Three of these were not the engine's to draw any more: they were parts of
+`SelectionDisplay::Render` and of the stock radar's `Render` and focus-step, which the
+panel switch skips whole while the overlay and the minimap are ours, so nobody drew
+them. The fourth is a print of `Armada_RenderFrame`'s, taken at its calls as the
+draws above are. (The team data printed after `RenderAll` was already ours:
+`TeamTexts`, "The trade status and the team message".)
+
+    [HUD]
+    SystemIcons=1    ; with Selection=1: the pointed unit's damaged systems under its brackets
+    ShotScenes=1     ; with Minimap=1: the shot director's scenes ringed in the tactical view
+    MinimapCursor=1  ; with Minimap=1 and [UI] Cursor=1: the action cursor over the minimap
+    FrameRate=1      ; what FRAMERATE_DISPLAY prints, in a panel of ours
+
+**The systems' icons** (`engine::overlay::systems`, `hud/overlay.rs`). After the hull
+and shield gauges, for a craft (`GameObject+0x14` bit 3) whose gauges show (the fade
+`+0x8c` above 0.5: so the pointed unit and its team), `SelectionDisplay::Render` lays
+out a row of icons (`mDrawSystemInformation`, inlined there): for each system in
+`SystemOrder` (0x70dce0, five `eSystem`s), unless the craft's system record (the list
+at `Craft+0x1e0`, 0x30 bytes a system) has a size of 0 (`+0x4`: the craft has no such
+system) or its flag at `+0x0` is set while the craft's `+0x1bf` is not, it points that
+system's `RepairIcon` (`selectionDisplay+0x54`, one per `eSystem`) at the craft
+(`+0x28`), gives it the fade less a half (`+0x38`) and renders it at a point 28 pixels
+further along the row (`StandardComponent::RenderAt`, vtable `+0x14`), under the
+gauges by `SELECT_SHIELD_BAR_HEIGHT` and 30. `RepairIcon::Render` draws its icon
+(`+0x34`) dark grey, then green by the system's strength (`+0x18`, a double, of the
+size `+0x4`) as a pie (`DrawSystemRepairLeft`), red while the system is out with what
+is left to repair (`Craft::mComputeRepairLeft`, as the info panel reads it), and
+yellow on its flash (`+0x40`, `RepairIcon::Flash`, from the overlay's
+`AlwaysGameSimulate`) while it is being repaired (the craft's repair list at `+0x30`,
+or a repair under way at the system's `+0x28`). Ours reads the same records, for every unit whose
+gauges ours shows (stock's, and with `SelectionGauges=1` the selected units), and
+draws a row of chips under the bottom brackets, only for the systems
+that are not whole (a whole system, not out and not repaired, is left out: stock draws
+it plain green): the system's icon from its `RepairIcon`, `bad` while it is out, `warn`
+on the flash while repaired, else coloured by strength as the hull gauge is, with a bar
+under it (repaired so far while out, else the strength). `UI.log`: "overlay: systems of
+<class>: 2 out 40% ..." each time the row changes.
+
+**The shot director's scenes** (`engine::radar::shot_scenes`, `hud/minimap.rs`). In
+the tactical view (`View_Record` 1) the stock radar's `RenderCameraViewFrustum`, after
+the camera's yellow ring, rings in grey (`ST3D_Colour_Grey`, `DrawCircle2D`) every
+scene of `shotDirector` (0x763608, checked by its vtable): its `+0x28` is a
+`std::list` of `ShotDirector::Scene`s (each node's `+0` the next, the scene at `+8`),
+which `ShotDirector::AddShot` gathers the shots the game offers it into, a scene for
+shots within a radius of each other (`Scene::MAXIMUM_RADIUS_SQUARED`): its centre at
+`+0x0c` (x, y, z) and its radius at `+0x18`, in world units, scaled to the square by
+its side (`RadarComponent+0x5c`). These are the places the cinematic camera can film,
+which in play means the fights. Ours rings each in the theme's dim text, faint, a
+unit wide. `UI.log`: "minimap: N shot scenes ringed" when the count changes.
+
+**The action cursor over the minimap** (`engine::radar::action_cursor`, `cursor.rs`).
+Stock's minimap is a component that owns the pointer while it is over it; its
+focus-step (`MapRadar::FocusSimulate`) names its own cursor first
+(`minimapDefaultCursor`, `standard_cursor`, the arrow: `MapRadar+0x34`, into
+`iCursor+0x2c`), then calls `RadarComponent::Simulate`, which, with something selected
+and the pointer on the map, asks `ActionMode::GetAction` (no target, the point) what a
+command click there means, makes a plain move without Alt a `GO_WARP` (0x2b, keeping
+the "cannot" bit 0x4000) and names it to the overview (`SetCursorAiAction`, vtable
+`+0xc8`, 0x526b60). That picks the cursor from a table of 20-byte entries per action
+(`& 0xfff`) at 0x70fbd8, the action's cursor sprite at `+0xc` and its "cannot" cursor
+at `+0x10` (bit 0x4000), the first entry's (`c_select`) when an action has none, and
+puts it in `iCursor+0x2c`. So stock shows `c_warp` for a plain move, `c_patrol` with
+the patrol button armed, `c_nomove` where the move cannot go, and so on. `GetAction`
+only reads the selection and the armed mode, so ours asks it in the UI frame for the
+point under the pointer (checked to be stock, with `SetCursorAiAction`'s two reads of
+the table), reads the same table, and draws that cursor by its `cursor.spr` name. For
+the plain move it keeps the minimap's refinement (above, "The cursor over it"):
+`c_warp` only while a selected ship of the player's can warp, `c_move` while none can,
+where stock shows `c_warp` whatever is selected. With nothing selected, off the map or
+`MinimapCursor=0`, the engine's choice stands: the arrow (no stock component owns the
+pointer over a panel of ours). `UI.log`: "cursor: Mission draws c_patrol" and the like.
+
+**The frame rate.** `FRAMERATE_DISPLAY` (0x6fc8a8) is an `RTS_CFG.h` setting, 0 as
+shipped; `RTS_Configure` reads it and nothing in the game's keys toggles it
+(`Toggle_Framerate` is not called). While it is set, `Armada_RenderFrame` (after
+`RenderAll` and `RenderUserTeamData`) adds the device's triangle count
+(`ST3D_Device::GetRenderedTriangleCount`) to `total_polys_drawn` and `high_poly_count`,
+prints "Tri = %d" with the default font (`g_pDefaultFont`) at x 5, 45 down (545 in the
+map editor) through `ST3D_Font::PrintString` (cdecl, at 0x5989a6), and calls
+`Armada_DisplayFrameRate(int *y, int line)` (at 0x5989b0), which, unless the frame
+rate (`Storm3D+0x88`) is -1, prints it, the total frame rate (`Storm3D+0x80`) and,
+for every `FrameStats` slot (`sm_nameArray`'s size), the slot's name
+(`GetSlotName`) and average time (`GetTimeAvg`, over the last ten frames). Both
+calls are re-pointed at ours (both or neither, each checked to be the stock call),
+which record the same numbers by the same functions and print nothing; the counters
+around them stay the engine's. Ours draws them in a panel of the theme at the top
+left: the frame rate large, then the total frame rate, the triangles and a line a
+slot. Shown while the engine still prints (`FRAMERATE_DISPLAY` set and our call reached
+within half a second). `UI.log`: "leftovers: frame rate ... fps, ... triangles, N
+timing slots" once. Setting it is for the bench (`ui/bench-asi.sh --rts
+FRAMERATE_DISPLAY=1`): an edited `RTS_CFG.h` keeps a player out of network games.
+
+The editor's own drag box (`mEditModeRender`, `mSelectionBox`) stays the engine's.
+**Not taken** (found on the bench by `ui-leftovers-2`): in the tactical view the
+engine still draws the tactical camera's pivot marker, a small flat 3D object (some
+100 triangles, through the trifan flush) where the camera turns about:
+`TacticalCamera::Render` renders the object at its `+0xe0` (vtable `+0x18`) while its
+`+0xe4` is set and `View_Record` is 1. It is a 3D draw rather than the HUD's, seen
+when the camera's pivot is off the units.
 
 ## Not done
 
@@ -1194,7 +1292,7 @@ off in a normal game). The editor's own drag box (`mEditModeRender`,
   while it holds the lock; ours never holds it. Not seen to matter.
 - The bar: only the Borg had been seen, at 1280x720, before the info panel's runs (Federation, Borg, Klingon themes).
 - Only the Borg have been seen, at 1280x720.
-- **Minimap / overlay**: the damaged systems' icons over a pointed unit, the shot
-  director's rings in the tactical view and the pointer's action cursor over the
-  minimap (ours shows the arrow) are not drawn; `UnitView` is unseen; the bar still
-  places itself by the stock radar's rectangle.
+- **Minimap / overlay**: `UnitView` is unseen; the bar still places itself by the
+  stock radar's rectangle. (The damaged systems' icons, the shot director's rings and
+  the action cursor over the minimap: "What the stock overlay and minimap drew that
+  ours left out".)

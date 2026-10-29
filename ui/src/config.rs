@@ -132,6 +132,15 @@ pub struct Hud {
     pub placement: bool,
     pub fade: bool,
     pub unit_video: bool,
+    /// The leftovers of ui 0.25.0 (HUD.md, "The engine's last draws"): `SystemIcons`,
+    /// the pointed unit's damaged systems over it (with `Selection`); `ShotScenes`,
+    /// the shot director's scenes ringed on the minimap in the tactical view (with
+    /// `Minimap`); `MinimapCursor`, the action cursor over the minimap (with
+    /// `Minimap` and `[UI] Cursor`); `FrameRate`, what `FRAMERATE_DISPLAY` prints.
+    pub system_icons: bool,
+    pub shot_scenes: bool,
+    pub minimap_cursor: bool,
+    pub frame_rate: bool,
     /// `[HUD] LayoutLog`: for the test bench, every panel's rectangle written to UI.log
     /// when the layout changes (`hud::layout`). 0 in play.
     pub layout_log: bool,
@@ -189,6 +198,10 @@ pub fn load() -> Config {
             placement: ini.int("HUD", "Placement", 1) != 0,
             fade: ini.int("HUD", "Fade", 1) != 0,
             unit_video: ini.int("HUD", "UnitVideo", 1) != 0,
+            system_icons: ini.int("HUD", "SystemIcons", 1) != 0,
+            shot_scenes: ini.int("HUD", "ShotScenes", 1) != 0,
+            minimap_cursor: ini.int("HUD", "MinimapCursor", 1) != 0,
+            frame_rate: ini.int("HUD", "FrameRate", 1) != 0,
             layout_log: ini.int("HUD", "LayoutLog", 0) != 0,
         },
         menus: ini.int("Menus", "Enable", 1) != 0,

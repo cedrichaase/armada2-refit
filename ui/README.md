@@ -607,6 +607,7 @@ is checked to be stock. `UI.log`: "cursor: the engine's cursor is kept square".
 | `[Demo] Style` | 0 | the style gallery (`STYLE.md`) in place of the demos: every theme and widget state in the front end (the Credits' place) and over a mission, the loading look on the loading screen |
 | `[HUD] Enable`, `Bar`, `BarKeys`, `BarLabels` | 1, 1, 1, 1 | the HUD's panels of ours, one key per panel ([`HUD.md`](HUD.md)), every one on |
 | `[HUD] Overview`, `Fade`, `UnitVideo` | 1, 1, 1 | the engine's last draws in a mission drawn by us: the drag box, height posts, order ring and placement markers, the scripts' fade, the unit view's video (`HUD.md`, "The engine's last draws") |
+| `[HUD] SystemIcons`, `ShotScenes`, `MinimapCursor`, `FrameRate` | 1, 1, 1, 1 | what the stock overlay and minimap drew that ours left out, and the frame rate: the pointed unit's damaged systems, the shot director's scenes on the minimap in the tactical view, the action cursor over the minimap, `FRAMERATE_DISPLAY`'s text (`HUD.md`, "What the stock overlay and minimap drew that ours left out") |
 | `[HUD] Placement` | 1 | with `Overview=1`, a placement's markers (the footprint, the cells other objects take) in the theme; 0 with the engine's sprites (`HUD.md`, "The placement markers") |
 | `[HUD] UnitView`, `UnitViewSize` | 1, 260 | the unit view placed by us, a square of that many units at the bottom right, in our frame (`HUD.md`, "The unit view") |
 | `[Menus] Enable` | 1 | the UI hosts the shell's dialogs (`MENUS.md`); stands down while Menus.asi is loaded |
