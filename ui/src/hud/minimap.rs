@@ -173,11 +173,15 @@ pub fn run(ui: &mut Ui) {
     // The map: space, the engine's picture of the map's features, warp suppression.
     ui.draw.fill(sq, Corners::SQUARE, rgba(4, 6, 12, 255));
     ui.draw.push_clip(sq);
+    // Both are sprites of the 'additive' material in stock (the texels are light to add,
+    // black adds nothing; their alpha is not coverage), so they are added here.
+    let corners = [(sq.x, sq.y), (sq.right(), sq.y), (sq.right(), sq.bottom()), (sq.x, sq.bottom())];
+    let uv = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
     if let Some(m) = ext_texture(&mut s.map, radar::map_texture()) {
-        ui.draw.image(m, sq, 0xffffffff);
+        ui.draw.quad_additive(m, corners, uv, 0xffffffff);
     }
     if let Some(w) = ext_texture(&mut s.warp, radar::warp_texture()) {
-        ui.draw.image(w, sq, 0xffffffff);
+        ui.draw.quad_additive(w, corners, uv, 0xffffffff);
     }
     let at = |u: f32, v: f32| (sq.x + u * sq.w, sq.y + v * sq.h);
     // A texel of the stock radar's 128-texel map, at our size.

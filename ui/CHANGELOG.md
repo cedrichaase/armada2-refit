@@ -4,6 +4,16 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.25.1 — 2026-10-29
+
+### Fixed
+- Nebulae (and every other feature the engine's map picture carries, the warp
+  suppression field too) were missing from the minimap of `[HUD] Minimap=1`: both
+  textures are sprites of stock's `additive` material, and ours drew them as alpha
+  images, so texels with no alpha added nothing. They are now added
+  (`hud/minimap.rs`). Scenario `ui-hud-minimap-nebula` (scene `ui-minimap-nebula`).
+  Fixes #10. Installed, not yet seen in game.
+
 ## 0.25.0 — 2026-10-29
 
 ### Added
