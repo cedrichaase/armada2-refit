@@ -5,6 +5,17 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.70.0 — 2026-10-29
+
+### Added
+- `display-inventory-modes`: phase 0 of the display plan's remaining contexts, with
+  Display8 in forward mode and tracing: a mission in the showcase scene, a display mode
+  chosen in Graphics Settings (the engine's `CreateDevice` at 800x600) and right-drag
+  pans (`SetCursorPos` and its callers), each a marked context. Its stub variant
+  (`display/stub-scenario.sh`) stops at the mode box: the stub offers one mode.
+
+Installed, not yet seen in game.
+
 ## 3.69.0 — 2026-10-25
 
 ### Added
