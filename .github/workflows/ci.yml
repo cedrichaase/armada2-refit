@@ -54,7 +54,9 @@ jobs:
 
   # render3d builds Render3D.asi from Rust (no_std, i686-pc-windows-msvc, lld-link) and
   # tests its asset readers on the host (the tests that need a game install skip).
-  # The shaders are committed with a stamp, so no HLSL compiler is needed here.
+  # The shaders are committed with a stamp, so no HLSL compiler is needed here: the
+  # "shaders" job below is the one that rebuilds them. UI.asi and Display8 (d3d8.dll) are
+  # built here the same way.
   render3d:
     runs-on: ubuntu-24.04
     steps:
@@ -81,8 +83,47 @@ jobs:
           echo "$RUNNER_TEMP/lld" >> "$GITHUB_PATH"
       - name: Build Render3D.asi
         run: CARGO="$(command -v cargo)" render3d/build.sh
+      - name: Build UI.asi
+        run: CARGO="$(command -v cargo)" ui/build.sh
+      - name: Build Display8 (d3d8.dll)
+        run: CARGO="$(command -v cargo)" display/build.sh
       - name: a2fmt on the host
         run: cargo test --release --target x86_64-unknown-linux-gnu --manifest-path render3d/a2fmt/Cargo.toml
+
+  # Every generated shader file rebuilt from its HLSL with the pinned compilers, and a
+  # difference from the committed file (or its stamp) fails the job: d3dbc by vkd3d-compiler
+  # 1.19 (gpu/shaders/fetch-vkd3d.sh, built from the release tarball by sha256), SPIR-V and
+  # DXIL by dxc 1.9.2609 (gpu/shaders/fetch-dxc.sh, by sha256); then gpu's SPIR-V patches
+  # and links on every module (gpu/spirv-selftest.sh). gpu/shaders/verify-generated.sh.
+  shaders:
+    runs-on: ubuntu-24.04
+    env:
+      A2_DATA: ${{ github.workspace }}/.a2data
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build tools and spirv-val
+        run: |
+          sudo apt-get update -qq
+          # libjson-perl: vkd3d's configure; spirv-tools: spirv-val.
+          sudo apt-get install -y -qq build-essential flex bison pkg-config libjson-perl spirv-tools curl
+      - name: The pinned compilers, cached by their scripts
+        uses: actions/cache@v5
+        with:
+          path: .a2data/tools
+          key: shader-compilers-${{ hashFiles('gpu/shaders/fetch-dxc.sh', 'gpu/shaders/fetch-vkd3d.sh') }}
+      - name: Fetch dxc and vkd3d-compiler
+        run: |
+          gpu/shaders/fetch-dxc.sh
+          gpu/shaders/fetch-vkd3d.sh
+      - name: Rebuild every shader and compare with the committed files
+        run: gpu/shaders/verify-generated.sh
+      - name: Show the difference
+        if: failure()
+        run: git diff --stat
+      - name: Rust for the host
+        run: rustup toolchain install stable --profile minimal
+      - name: gpu's SPIR-V reflection and patches on every module (spirv-val)
+        run: gpu/spirv-selftest.sh
 
   package:
     runs-on: ubuntu-24.04
