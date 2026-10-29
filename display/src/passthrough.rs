@@ -55,6 +55,48 @@ pub struct Layout {
     pub specular: Option<u32>,
     /// Each texture coordinate set: (offset, floats).
     pub tex: [Option<(u32, u32)>; 8],
+    /// Drawn through the Borg bump shader (`BORG_BUMP`): the offsets in stream 0 of its
+    /// position, coordinates, tangent, binormal and normal.
+    pub bump: Option<[u32; 5]>,
+}
+
+/// The hash (`stub::device::token_hash`) of the engine's one vertex shader's function
+/// tokens: the Borg hulls' bump pass, ported by hand as `vs_bump` in `shaders/ff.hlsl`
+/// (ROADMAP 4d). Any other shader is refused and logged.
+pub const BORG_BUMP: u32 = 0xaaa1_e806;
+
+/// A vertex shader's layout, when it is one the passthrough has a port of: its
+/// declaration read for where each input register is in stream 0 (`D3DVSD_REG`; float1
+/// to float4 and colours; every register in stream 0).
+fn shader_layout(dv: &Dev) -> Option<Layout> {
+    let sh = dv.shaders.iter().find(|s| s.handle == dv.vs)?;
+    if sh.hash != BORG_BUMP {
+        return None;
+    }
+    let mut at = 0u32;
+    let mut reg = [None::<u32>; 16];
+    for &t in &sh.decl {
+        match t >> 28 {
+            0x2 if t & 0xf != 0 => return None, // a stream other than 0
+            0x2 => {}
+            0x4 => {
+                let size = match (t >> 16) & 0xf {
+                    0 => 4,
+                    1 => 8,
+                    2 => 12,
+                    3 => 16,
+                    4 => 4,
+                    _ => return None,
+                };
+                reg[(t & 0xf) as usize] = Some(at);
+                at += size;
+            }
+            0x5 => at += 4 * ((t >> 16) & 0xf), // skip
+            0xf if t == 0xffff_ffff => break,
+            _ => {}
+        }
+    }
+    Some(Layout { size: at, bump: Some([reg[0]?, reg[2]?, reg[3]?, reg[4]?, reg[5]?]), ..Layout::default() })
 }
 
 /// The FVF's layout. None: not one of fixed function's (a vertex shader's handle).
@@ -177,8 +219,8 @@ pub fn draw(this: *mut SObj, fp: usize, slot: u32, a: &[usize]) {
         once(&sfmt!("PASSTHROUGH a draw into a target of the engine's own (not its back buffer): not drawn, by {}", crate::trace::caller(fp)));
         return;
     }
-    let Some(lay) = layout(dv.vs) else {
-        once(&sfmt!("PASSTHROUGH a draw through a vertex shader ({:#x}): not drawn (ROADMAP 4d), by {}", dv.vs, crate::trace::caller(fp)));
+    let Some(lay) = layout(dv.vs).or_else(|| shader_layout(dv)) else {
+        once(&sfmt!("PASSTHROUGH a draw through a vertex shader ({:#x}): not one the passthrough has a port of: not drawn, by {}", dv.vs, crate::trace::caller(fp)));
         return;
     };
     let prim = a[0] as u32;

@@ -116,7 +116,7 @@ pub fn vk_device() -> &'static str {
 
 /// Whether the game runs in a test bench clone (a game directory under
 /// `a2test\sessions\`).
-fn bench_clone() -> bool {
+pub fn bench_clone() -> bool {
     rt::lower(rt::game_dir()).contains("\\a2test\\sessions\\")
 }
 

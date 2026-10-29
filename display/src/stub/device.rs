@@ -31,6 +31,12 @@ pub struct Dev {
     pub vs: u32,
     pub ps: u32,
     pub stream0: (P, u32),
+    /// Streams 1 to 3 (a vertex shader's declaration may read them).
+    pub streams: [(P, u32); 3],
+    /// The vertex shaders the engine made (the passthrough reads them: `vk/pass.rs`).
+    pub shaders: Vec<VShader>,
+    /// The vertex shader constants, `c0` to `c95`.
+    pub vs_const: Vec<[f32; 4]>,
     pub indices: (P, u32),
     pub next_handle: u32,
     pub gamma: [u16; 768],
@@ -40,6 +46,26 @@ pub struct Dev {
     pub target: *mut SObj,
     pub zbuffer: *mut SObj,
     pub in_scene: bool,
+}
+
+/// A vertex shader the engine made: its declaration and function tokens as given, and
+/// a hash of the function's, which is what the passthrough knows a shader by.
+pub struct VShader {
+    pub handle: u32,
+    pub decl: Vec<u32>,
+    pub func: Vec<u32>,
+    pub hash: u32,
+}
+
+/// FNV-1a over the tokens.
+pub fn token_hash(t: &[u32]) -> u32 {
+    let mut h = 0x811c_9dc5u32;
+    for w in t {
+        for b in w.to_le_bytes() {
+            h = (h ^ b as u32).wrapping_mul(0x0100_0193);
+        }
+    }
+    h
 }
 
 /// A new device of ours for the engine, with its back buffer and depth surface.
@@ -115,6 +141,9 @@ pub fn make(pp: PresentParams) -> *mut SObj {
         vs: 0,
         ps: 0,
         stream0: (core::ptr::null_mut(), 0),
+        streams: [(core::ptr::null_mut(), 0); 3],
+        shaders: Vec::new(),
+        vs_const: alloc::vec![[0.0; 4]; 96],
         indices: (core::ptr::null_mut(), 0),
         next_handle: 0x1000,
         gamma,
@@ -735,7 +764,7 @@ drawn!(72 draw_primitive_up(pt: u32, n: u32, v: P, stride: u32));
 drawn!(73 draw_indexed_primitive_up(pt: u32, min: u32, nv: u32, n: u32, ix: P, fmt: u32, v: P, stride: u32));
 ok!(74 process_vertices(src: u32, dst: u32, n: u32, vb: P, flags: u32));
 
-unsafe extern "system" fn create_vertex_shader(this: *mut SObj, _decl: *const u32, _func: *const u32, h: *mut u32, _usage: u32) -> HRESULT {
+unsafe extern "system" fn create_vertex_shader(this: *mut SObj, decl: *const u32, func: *const u32, h: *mut u32, _usage: u32) -> HRESULT {
     trace::call(frame!(), Kind::Device, 75);
     if h.is_null() {
         return D3DERR_INVALIDCALL;
@@ -743,7 +772,32 @@ unsafe extern "system" fn create_vertex_shader(this: *mut SObj, _decl: *const u3
     // Odd: a handle, not an FVF (FVF bit 0 is reserved), as Direct3D 8 tells them apart.
     let d = dev(this);
     d.next_handle += 2;
-    unsafe { *h = d.next_handle | 1 };
+    let handle = d.next_handle | 1;
+    unsafe { *h = handle };
+    // The tokens, kept for the passthrough: the declaration up to D3DVSD_END, the
+    // function up to its end token (each bounded, in case of garbage).
+    let read = |p: *const u32, end: u32| {
+        let mut v = Vec::new();
+        if !p.is_null() {
+            for i in 0..8192 {
+                let t = unsafe { *p.add(i) };
+                v.push(t);
+                if t == end {
+                    break;
+                }
+            }
+        }
+        v
+    };
+    let decl = read(decl, 0xffff_ffff);
+    let func = read(func, 0x0000_ffff);
+    let hash = token_hash(&func);
+    once(&sfmt!("STUB vertex shader {:#010x}: {} function tokens, declaration {:x?}", hash, func.len(), decl));
+    if crate::bench_clone() && crate::passthrough::on() {
+        // On the test bench only, for porting it (ROADMAP 4d): the tokens in the log.
+        once(&sfmt!("STUB vertex shader {:#010x} tokens {:08x?}", hash, func));
+    }
+    d.shaders.push(VShader { handle, decl, func, hash });
     S_OK
 }
 unsafe extern "system" fn set_vertex_shader(this: *mut SObj, h: u32) -> HRESULT {
@@ -759,8 +813,25 @@ unsafe extern "system" fn get_vertex_shader(this: *mut SObj, h: *mut u32) -> HRE
     }
     S_OK
 }
-ok!(78 delete_vertex_shader(h: u32));
-ok!(79 set_vertex_shader_constant(reg: u32, p: P, n: u32));
+unsafe extern "system" fn delete_vertex_shader(this: *mut SObj, h: u32) -> HRESULT {
+    trace::call(frame!(), Kind::Device, 78);
+    dev(this).shaders.retain(|s| s.handle != h);
+    S_OK
+}
+unsafe extern "system" fn set_vertex_shader_constant(this: *mut SObj, reg: u32, p: P, n: u32) -> HRESULT {
+    trace::call(frame!(), Kind::Device, 79);
+    if p.is_null() {
+        return D3DERR_INVALIDCALL;
+    }
+    let c = &mut dev(this).vs_const;
+    for i in 0..n {
+        let r = (reg + i) as usize;
+        if r < c.len() {
+            c[r] = unsafe { *(p as *const [f32; 4]).add(i as usize) };
+        }
+    }
+    S_OK
+}
 ok!(80 get_vertex_shader_constant(reg: u32, p: P, n: u32));
 ok!(81 get_vertex_shader_declaration(h: u32, p: P, n: *mut u32));
 ok!(82 get_vertex_shader_function(h: u32, p: P, n: *mut u32));
@@ -768,6 +839,17 @@ ok!(82 get_vertex_shader_function(h: u32, p: P, n: *mut u32));
 unsafe extern "system" fn set_stream_source(this: *mut SObj, n: u32, vb: P, stride: u32) -> HRESULT {
     trace::call(frame!(), Kind::Device, 83);
     crate::detail::set_stream(n, vb, stride);
+    if (1..4).contains(&n) {
+        let d = dev(this);
+        if !vb.is_null() {
+            obj::add_ref(vb as *mut SObj);
+        }
+        let old = d.streams[n as usize - 1].0;
+        d.streams[n as usize - 1] = (vb, stride);
+        if !old.is_null() {
+            obj::release(old as *mut SObj);
+        }
+    }
     if n == 0 {
         let d = dev(this);
         if !vb.is_null() {

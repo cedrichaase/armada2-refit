@@ -1,4 +1,4 @@
-// entries: vs_ff:vs_3_0:VS_FF:dxc ps_ff:ps_3_0:PS_FF:dxc
+// entries: vs_ff:vs_3_0:VS_FF:dxc vs_bump:vs_3_0:VS_BUMP:dxc ps_ff:ps_3_0:PS_FF:dxc
 // Passthrough (README.md, "Passthrough"): the engine's own Direct3D 8 draws, drawn by
 // Display8 the way Direct3D 8's fixed function draws them. One vertex shader for both
 // kinds of vertex the engine sends (pre-transformed screen positions, and positions in
@@ -119,6 +119,44 @@ VO vs_ff(VI i)
     return o;
 }
 
+// The engine's one vertex shader (ROADMAP 4d), the Borg hulls' bump pass, ported by
+// hand and known by a hash of its tokens (src/passthrough.rs, `BORG_BUMP`). What it
+// does: the position through the four rows the engine sets in its constants 2 to 5;
+// the light direction of constant 6 taken into the vertex's tangent frame (tangent,
+// binormal, normal), normalised, offset by constant 0 and scaled by constant 1 into
+// the diffuse colour (a normal-map pass's light, which the texture stages dot with the
+// normal map), whose alpha is constant 0's; the texture coordinates as they are. The
+// engine's constants 0 to 6 are in this block's registers 16 to 22.
+cbuffer ff_bump : register(b0)
+{
+    float4 vsc[7] : CREG(16);
+};
+
+struct VB {
+    float4 pos : POSITION;
+    float2 uv : TEXCOORD0;
+    float3 tangent : TANGENT;
+    float3 binormal : BINORMAL;
+    float3 normal : NORMAL;
+};
+
+VO vs_bump(VB i)
+{
+    VO o;
+    float4 c = float4(dot(i.pos, vsc[2]), dot(i.pos, vsc[3]), dot(i.pos, vsc[4]), dot(i.pos, vsc[5]));
+    c.x += vpz.z * 2.0 / vp.z * c.w;
+    c.y -= vpz.z * 2.0 / vp.w * c.w;
+    o.pos = c;
+    float3 l = float3(dot(i.tangent, vsc[6].xyz), dot(i.binormal, vsc[6].xyz), dot(i.normal, vsc[6].xyz));
+    float4 r = float4(l, dot(l, l));
+    r = r * rsqrt(r.w);
+    o.diffuse = saturate(float4(((r + vsc[0]) * vsc[1]).xyz, vsc[0].w));
+    o.specular = float4(0.0, 0.0, 0.0, 0.0);
+    o.uv0 = i.uv;
+    o.uv1 = i.uv;
+    return o;
+}
+
 cbuffer ff_ps : register(b1)
 {
     float4 st0 : CREG(0);   // stage 0: colour op, arg 1, arg 2, alpha op
@@ -231,6 +269,7 @@ float4 ps_ff(VO i) : SV_Target
 
 // vkd3d (Direct3D 9) never builds these: the entries are dxc's alone.
 float4 vs_ff(float4 p : POSITION) : POSITION { return p; }
+float4 vs_bump(float4 p : POSITION) : POSITION { return p; }
 float4 ps_ff() : COLOR { return float4(0.0, 0.0, 0.0, 0.0); }
 
 #endif

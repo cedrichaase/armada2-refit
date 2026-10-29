@@ -249,11 +249,11 @@ engine's device, and draw the whole frame on it.
 
 ## Passthrough
 
-`Passthrough=1` in `Display8.ini` (shipped; 0 in the code, and the stub drops every
-engine draw as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
+`Passthrough=1` in `Display8.ini` (shipped, since the GPU runs below passed; 0 in the
+code, and the stub drops every engine draw as before): in stub mode on Vulkan the engine's own Direct3D 8 draws are
 drawn after all, on Display8's device, the way Direct3D 8's fixed function draws them
 (`src/passthrough.rs`, `src/vk/pass.rs`, `shaders/ff.hlsl`). It is ROADMAP phase 4's
-first slice (4a, 4b, most of 4c, 4e and 4f on Vulkan). Without it, whatever render3d
+first slice (4a, 4b, most of 4c, 4d, 4e and 4f on Vulkan). Without it, whatever render3d
 or the UI does not draw itself vanishes in stub mode: a module switched off
 (`[Modules] hulls=0`), a SOD render3d hands back (one that does not load, a hologram's
 class that is not a plain database), an effect class it does not know, specials with
@@ -270,7 +270,8 @@ through `gpu`), so routing is simple: every one is drawn, except
   (`drop::in_loading`) marks its frame. Without the UI the engine's loading screen is
   the only one and is drawn;
 - a draw into a render target of the engine's own other than its back buffer (none seen);
-- a draw through a vertex shader (the Borg bump, ROADMAP 4d), logged once;
+- a draw through a vertex shader other than the one it has a port of (below), logged
+  once;
 - a draw made while a plugin's `Cmd` is recording (a plugin calling the engine with a
   `Cmd` alive): logged once with its caller, never recorded into another recorder's
   render pass.
@@ -330,7 +331,20 @@ textures arriving at once do not grow the upload ring, whose chunks live as long
 device. A texture of another format than A8R8G8B8 and X8R8G8B8 (none seen), a cube or a
 volume, is drawn with white and logged once.
 
-**What is not done yet** (ROADMAP phase 4): the Borg bump vertex shader (4d); claims as
+**The engine's one vertex shader** (ROADMAP 4d) is the Borg hulls' bump pass. Display8
+keeps every vertex shader's declaration and function tokens at `CreateVertexShader`, the
+vertex shader constants at `SetVertexShaderConstant` and streams 1 to 3, and knows the
+shader by an FNV-1a hash of its function tokens (`passthrough::BORG_BUMP`); where its
+declaration puts each input in stream 0 is read off the declaration. Its port by hand is
+`vs_bump` in `shaders/ff.hlsl`: the position through the four rows the engine sets in
+constants 2 to 5, and the light direction of constant 6 taken into the vertex's tangent
+frame, normalised, offset and scaled by constants 0 and 1 into the diffuse colour, which
+the texture stages dot with the normal map (`DOTPRODUCT3`). The engine draws a Borg hull
+in three passes this way (two lights added, then the base texture multiplied over them),
+all of which the stage interpreter runs. Any other shader is refused and logged once with
+its hash; on the test bench its tokens are logged too, for porting.
+
+**What is not done yet** (ROADMAP phase 4): claims as
 the routing (4g, after phase 3); Direct3D 12 and the stub's Direct3D 9 (phase 10; the
 latter is to go). Specular lighting, spot cones, texture transforms, a third stage and
 `ZBIAS` are not drawn, each logged once when the engine uses it; none was seen in the
@@ -348,6 +362,24 @@ validation message, no draw made inside a plugin's recording. The Borg cubes are
 missing (their bump vertex shader, 4d), which makes the whole frame's RMSE 22.9. With
 every module on, `port-showcase` on the stub draws the same frame with `Passthrough=1`
 as with 0 (RMSE 0): the engine draws nothing there.
+
+**On the GPU** (RX 5700, RADV, the validation layer on; `A2TEST_VULKAN_GPU=1`), the same
+scene against the same forward frame, RMSE in 1/255:
+
+| | Galaxy | Sovereign | Borg cube | whole frame |
+|---|---|---|---|---|
+| before the bump port | 3.54 | 3.96 | missing | 22.83 |
+| with it | 3.54 | 3.96 | 18.78 | 6.81 |
+| with it, `PixelCentres=d3d9` | 3.04 | 3.79 | 1.37 | 1.64 |
+
+The cube's 18.8 is half a pixel: the engine's transformed draws keep Vulkan's pixel
+centres, as render3d's own scene does, unless `PixelCentres=d3d9`, and the cube's fine
+plating shows a half-pixel shift that much; with Direct3D 9's centres it is the forward
+frame within 1.4. No validation message in any run. `display-stub` (the whole game:
+intro to Exit, a campaign mission, save and load, an Instant Action match, the Credits)
+and `display-drop` both passed on the GPU with `Passthrough=1` and the layer, with no
+validation message; with every module on, the engine drew into the passthrough only
+once, in the shell, into its own targets.
 
 ## VSync
 

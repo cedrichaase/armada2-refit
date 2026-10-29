@@ -30,7 +30,7 @@ use ash::vk;
 use core::ffi::c_void;
 use gpu::display::{VkPass8, PASS_ENTER, PASS_PUBLISH};
 
-use crate::shaders::ff_spv::{PS_FF_SPV, VS_FF_SPV};
+use crate::shaders::ff_spv::{PS_FF_SPV, VS_BUMP_SPV, VS_FF_SPV};
 
 /// Bytes of the vertex block (56 registers) and the pixel block (7), and where the
 /// pixel block starts in their one allocation.
@@ -90,6 +90,7 @@ pub struct Pt {
     dsl: [vk::DescriptorSetLayout; 2],
     layout: vk::PipelineLayout,
     vs: vk::ShaderModule,
+    vs_bump: vk::ShaderModule,
     ps: vk::ShaderModule,
     pipelines: Vec<(Key, vk::Pipeline)>,
     passes: Vec<(RpKey, vk::RenderPass)>,
@@ -189,10 +190,11 @@ fn make(v: &Vk) -> bool {
         let layout = d.create_pipeline_layout(&vk::PipelineLayoutCreateInfo::default().set_layouts(&dsl), None).ok()?;
         let vs = d.create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&VS_FF_SPV), None).ok()?;
         let ps = d.create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&PS_FF_SPV), None).ok()?;
+        let vs_bump = d.create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&VS_BUMP_SPV), None).ok()?;
         let white = v.image(1, 1, 1, vk::Format::B8G8R8A8_UNORM, vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST, vk::ImageAspectFlags::COLOR).ok()?;
-        Some((dsl, layout, vs, ps, white))
+        Some((dsl, layout, vs, vs_bump, ps, white))
     })();
-    let Some((dsl, layout, vs, ps, white)) = made else {
+    let Some((dsl, layout, vs, vs_bump, ps, white)) = made else {
         log!("passthrough: its pipeline layout or shaders could not be made: the engine's draws are dropped");
         return false;
     };
@@ -202,6 +204,7 @@ fn make(v: &Vk) -> bool {
             dsl,
             layout,
             vs,
+            vs_bump,
             ps,
             pipelines: Vec::new(),
             passes: Vec::new(),
@@ -355,6 +358,16 @@ fn compare(f: u32) -> vk::CompareOp {
 fn attributes(k: &Key) -> Vec<vk::VertexInputAttributeDescription> {
     use vk::Format as F;
     let l = &k.layout;
+    if let Some(o) = l.bump {
+        // vs_bump: position, coordinates, tangent, binormal, normal.
+        return alloc::vec![
+            vk::VertexInputAttributeDescription { location: 0, binding: 0, format: F::R32G32B32_SFLOAT, offset: o[0] },
+            vk::VertexInputAttributeDescription { location: 1, binding: 0, format: F::R32G32_SFLOAT, offset: o[1] },
+            vk::VertexInputAttributeDescription { location: 2, binding: 0, format: F::R32G32B32_SFLOAT, offset: o[2] },
+            vk::VertexInputAttributeDescription { location: 3, binding: 0, format: F::R32G32B32_SFLOAT, offset: o[3] },
+            vk::VertexInputAttributeDescription { location: 4, binding: 0, format: F::R32G32B32_SFLOAT, offset: o[4] },
+        ];
+    }
     let a = |loc: u32, own: Option<(u32, F)>, dflt: (u32, F)| {
         let (binding, (offset, format)) = match own {
             Some(o) => (0, o),
@@ -381,7 +394,11 @@ fn pipeline(v: &Vk, p: &mut Pt, k: &Key) -> vk::Pipeline {
     }
     let rp = render_pass(v, p, k.rp);
     let stages = [
-        vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::VERTEX).module(p.vs).name(c"vs_ff"),
+        if k.layout.bump.is_some() {
+            vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::VERTEX).module(p.vs_bump).name(c"vs_bump")
+        } else {
+            vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::VERTEX).module(p.vs).name(c"vs_ff")
+        },
         vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::FRAGMENT).module(p.ps).name(c"ps_ff"),
     ];
     let vb = [
@@ -587,6 +604,12 @@ fn blocks(v: &Vk, dv: &Dev, d: &Draw, vp: [u32; 6]) -> [u8; VS_BYTES + PS_BYTES]
     f4(&mut b, 13, [m[12], m[13], m[14], m[15]]);
     f4(&mut b, 14, color(rs[139]));
     f4(&mut b, 15, [rs[145] as f32, rs[147] as f32, rs[148] as f32, 0.0]);
+    if d.layout.bump.is_some() {
+        // The bump shader's constants 0 to 6 (vs_bump).
+        for r in 0..7 {
+            f4(&mut b, 16 + r, dv.vs_const[r]);
+        }
+    }
     for (i, l) in lights.iter().enumerate() {
         // D3DLIGHT8: type; diffuse, specular, ambient (4 each); position, direction (3
         // each); range, falloff, attenuation 0, 1, 2, theta, phi.
