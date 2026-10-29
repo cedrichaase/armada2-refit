@@ -235,11 +235,12 @@ impl Vk {
         let surface = unsafe { w32.create_win32_surface(&sci, None) }.map_err(|_| "vkCreateWin32SurfaceKHR failed")?;
         part.surface = surface;
 
-        // A device with one family that draws and presents; a discrete one first, or
-        // only one whose name has `Device=` in it (the bench: lavapipe, never the GPU).
+        // A device with one family that draws and presents; discrete first, then
+        // integrated, virtual, other, and a CPU (software) device last; or only one whose
+        // name has `Device=` in it (the bench: lavapipe, with --vulkan-device lavapipe).
         let pdevs = unsafe { instance.enumerate_physical_devices() }.map_err(|_| "no physical devices")?;
         let want = crate::rt::lower(crate::vk_device());
-        let mut pick: Option<(vk::PhysicalDevice, u32, bool)> = None;
+        let mut pick: Option<(vk::PhysicalDevice, u32, u32)> = None;
         for &pd in &pdevs {
             let props = unsafe { instance.get_physical_device_properties(pd) };
             let pname = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
@@ -251,17 +252,30 @@ impl Vk {
             for (i, f) in fams.iter().enumerate() {
                 let present = unsafe { surface_fn.get_physical_device_surface_support(pd, i as u32, surface) }.unwrap_or(false);
                 if f.queue_flags.contains(vk::QueueFlags::GRAPHICS) && present {
-                    let discrete = props.device_type == vk::PhysicalDeviceType::DISCRETE_GPU;
-                    if pick.is_none() || (discrete && !pick.unwrap().2) {
-                        pick = Some((pd, i as u32, discrete));
+                    let rank = match props.device_type {
+                        vk::PhysicalDeviceType::DISCRETE_GPU => 4,
+                        vk::PhysicalDeviceType::INTEGRATED_GPU => 3,
+                        vk::PhysicalDeviceType::VIRTUAL_GPU => 2,
+                        vk::PhysicalDeviceType::CPU => 0,
+                        _ => 1,
+                    };
+                    log!("vulkan:   type {}, rank {}", props.device_type.as_raw(), rank);
+                    if pick.is_none() || rank > pick.unwrap().2 {
+                        pick = Some((pd, i as u32, rank));
                     }
                     break;
                 }
             }
         }
-        let (pdev, qfam, _) = pick.ok_or(if want.is_empty() { "no device that draws and presents on the window" } else { "no device named as Device= says that draws and presents" })?;
+        let (pdev, qfam, rank) = pick.ok_or(if want.is_empty() { "no device that draws and presents on the window" } else { "no device named as Device= says that draws and presents" })?;
         let props = unsafe { instance.get_physical_device_properties(pdev) };
         let name = unsafe { crate::rt::cstr_at(props.device_name.as_ptr() as *const u8, 256) };
+        log!(
+            "vulkan: chose {} (type {}, rank {}; discrete > integrated > virtual > other > cpu)",
+            name,
+            props.device_type.as_raw(),
+            rank
+        );
         log!(
             "vulkan: {} (Vulkan {}.{}.{}, driver {:#x}), queue family {}",
             name,

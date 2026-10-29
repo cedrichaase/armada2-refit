@@ -33,13 +33,20 @@ while [ $# -gt 0 ] && [[ "$1" == *=* ]]; do
     sed -i "s/^$key=.*/${1//\//\\/}/" "$ini"
     shift
 done
-# On Vulkan the bench draws on lavapipe with the validation layer, never on the GPU
-# (README.md, "Vulkan"; the bench sets the drivers in the game's environment):
-# Device=llvmpipe unless a Device= was given, and Validate=1. Backend=auto is Vulkan first
-# here, and a list may name it.
-if grep -qiE '^Backend=.*(vulkan|auto)' "$ini" && [ "${A2TEST_VULKAN_GPU:-}" != 1 ]; then
-    grep -q '^Device=.' "$ini" || sed -i 's/^Device=.*/Device=llvmpipe/' "$ini"
-    sed -i 's/^Validate=.*/Validate=1/' "$ini"
+# On Vulkan the bench draws on the GPU with the validation layer (README.md, "Vulkan";
+# the bench sets the layer in the game's environment): Validate=1 unless
+# A2TEST_VULKAN_VALIDATE=0. A2TEST_VULKAN_DEVICE=lavapipe (a2test --vulkan-device
+# lavapipe) puts it on the CPU instead: Device=llvmpipe unless a Device= was given.
+# Backend=auto is Vulkan first here, and a list may name it.
+if grep -qiE '^Backend=.*(vulkan|auto)' "$ini"; then
+    if [ "${A2TEST_VULKAN_DEVICE:-gpu}" = lavapipe ]; then
+        grep -q '^Device=.' "$ini" || sed -i 's/^Device=.*/Device=llvmpipe/' "$ini"
+    fi
+    if [ "${A2TEST_VULKAN_VALIDATE:-1}" = 0 ]; then
+        sed -i 's/^Validate=.*/Validate=0/' "$ini"
+    else
+        sed -i 's/^Validate=.*/Validate=1/' "$ini"
+    fi
 fi
 echo "Display8: Mode=$mode in $ini"
 if [ $# -gt 0 ]; then

@@ -4,6 +4,17 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.9.1 — 2026-10-29
+
+### Changed
+- Vulkan picks its physical device by type: discrete, integrated, virtual, other, CPU
+  last (it took the first when none was discrete, so a software device could win), and
+  logs every candidate's rank and the device it `chose`. `bench-mode.sh` leaves
+  `Device=` empty unless `A2TEST_VULKAN_DEVICE=lavapipe` (the bench's Vulkan is on the
+  GPU now, testbench 3.70.0).
+
+Installed, not yet seen in game.
+
 ## 0.9.0 — 2026-10-25
 
 ### Added

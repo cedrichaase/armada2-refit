@@ -118,12 +118,26 @@ def checkout_provenance(path):
 LAVAPIPE_ICD = '/usr/share/vulkan/icd.d/lvp_icd.json'
 
 
+def vulkan_device():
+    """Where a bench game's Vulkan draws: `gpu` (the default, the physical GPU DXVK uses)
+    or `lavapipe` (Mesa's CPU Vulkan), by `--vulkan-device` / `A2TEST_VULKAN_DEVICE`."""
+    return 'lavapipe' if os.environ.get('A2TEST_VULKAN_DEVICE', '').lower() == 'lavapipe' else 'gpu'
+
+
+def vulkan_validate():
+    """The Khronos validation layer on a Vulkan game: on unless `--no-validate` /
+    `A2TEST_VULKAN_VALIDATE=0` (timing runs)."""
+    return os.environ.get('A2TEST_VULKAN_VALIDATE', '1') != '0'
+
+
 def vulkan_env(game_dir, logs=None):
     """The environment of a game whose Display8 draws on Vulkan (`Mode=stub`,
     `Backend=vulkan` in its Display8.ini): Mesa's CPU Vulkan (lavapipe) as the only
-    driver and the Khronos validation layer, so a bench game never puts new Vulkan code
-    on the user's GPU (display/README.md, "Vulkan"). `A2TEST_VULKAN_GPU=1` leaves the
-    drivers as they are, for a deliberate run on the GPU.
+    driver and the Khronos validation layer. Since testbench 3.70.0 the default is the
+    physical GPU with the layer on (it catches errors before they can hang the GPU);
+    `--vulkan-device lavapipe` (`A2TEST_VULKAN_DEVICE=lavapipe`) gives the CPU driver
+    and `--no-validate` (`A2TEST_VULKAN_VALIDATE=0`) drops the layer (display/README.md,
+    "Vulkan").
 
     On `Backend=d3d12` (vkd3d-proton, on the GPU) with `Validate=1`: the Khronos
     validation layer under vkd3d-proton (`VK_INSTANCE_LAYERS`), writing its errors and
@@ -135,7 +149,8 @@ def vulkan_env(game_dir, logs=None):
     default from display 0.8.0): the drivers as they are, so the default game runs on
     the GPU as a player's does; with `Validate=1` the Khronos layer too, which Display8's
     messenger reports. `display/bench-mode.sh` puts such a Vulkan on lavapipe by
-    `Device=llvmpipe` instead, keeping the GPU for the backends after it."""
+    `Device=llvmpipe` when `--vulkan-device lavapipe` asks, keeping the GPU for the
+    backends after it."""
     ini = Path(game_dir) / 'Display8.ini'
     try:
         text = ini.read_text(errors='replace')
@@ -153,11 +168,15 @@ def vulkan_env(game_dir, logs=None):
         return {}
     order = {w.strip() for w in keys.get('backend', '').split(',')}
     if keys.get('backend') != 'vulkan':
-        if order & {'vulkan', 'auto'} and keys.get('validate') == '1':
+        if order & {'vulkan', 'auto'} and keys.get('validate') == '1' and vulkan_validate():
             return {'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation'}
         return {}
-    env = {'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation'}
-    if os.environ.get('A2TEST_VULKAN_GPU') != '1':
+    env = {}
+    if vulkan_validate():
+        env['VK_INSTANCE_LAYERS'] = 'VK_LAYER_KHRONOS_validation'
+    else:
+        env = {}
+    if vulkan_device() == 'lavapipe':
         env.update(VK_DRIVER_FILES=LAVAPIPE_ICD, VK_ICD_FILENAMES=LAVAPIPE_ICD)
     return env
 
