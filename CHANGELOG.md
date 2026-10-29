@@ -12,7 +12,7 @@ Layers: render3d 0.29.1.
 ### Fixed
 - render3d: with `[Modules] hulls=0` the menu scene shows its ships again (drawn by the
   hulls module for the menu scene only; missions unchanged, every hull the engine's
-  through passthrough). COMMIT
+  through passthrough). `b1ff913`
 
 Installed, not yet seen in game.
 

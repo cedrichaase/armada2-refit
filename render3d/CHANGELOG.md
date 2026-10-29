@@ -10,7 +10,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 - `[Modules] hulls=0` no longer empties the menu scene of ships: the engine draws
   nothing in the front end, so the module stays loaded for the menu scene only
   (`hulls::MenuOnly`) and draws its ships as with `hulls=1`; missions keep every hull
-  the engine's. COMMIT
+  the engine's. `b1ff913`
 
 Installed, not yet seen in game.
 
