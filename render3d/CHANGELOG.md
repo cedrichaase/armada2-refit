@@ -10,7 +10,7 @@ in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 - A frame of render3d's `gpu` calls can be recorded for a replay with no game
   (`gpu/README.md`, "Record and replay"): asked for with `Gpu.record` beside the exe, on
   Display8's Vulkan backend only, written to `Dumps\<name>\Render3D.asi.a2s`. Idle, it
-  costs two flags per call and a read of the clock per command list.
+  costs two flags per call and a read of the clock per command list. `239f29c`
 
 Installed, not yet seen in game.
 

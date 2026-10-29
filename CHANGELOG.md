@@ -18,7 +18,7 @@ Layers: render3d 0.28.0, ui 0.24.0, display 0.10.0, testbench 3.70.0.
   on lavapipe with the validation layer, through Display8 on Vulkan, Direct3D 9 (DXVK) or
   Direct3D 12 (vkd3d-proton), and writes `replay-<backend>.ppm` for `a2test baseline
   diff`. The showcase frame replays on Vulkan identical to the game's (RMSE 0).
-  `gpu/replay/inspect.py` lists a recording. Off by default; idle, two flags per call.
+  `gpu/replay/inspect.py` lists a recording. Off by default; idle, two flags per call. `239f29c`
 
 Installed, not yet seen in game.
 

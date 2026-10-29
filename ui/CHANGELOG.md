@@ -11,7 +11,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
   (`gpu/README.md`, "Record and replay"): asked for with `Gpu.record` beside the exe, on
   Display8's Vulkan backend only, written to `Dumps\<name>\UI.asi.a2s`. The recorded
   frame ends at the engine's `Present`, where the UI dumps it as presented
-  (`Dumps\<name>-game-*-present.ppm`) for the replay to be compared with.
+  (`Dumps\<name>-game-*-present.ppm`) for the replay to be compared with. `239f29c`
 
 Installed, not yet seen in game.
 

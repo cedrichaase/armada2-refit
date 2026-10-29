@@ -11,7 +11,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `a2test drive record NAME` (`bench/record.py`): one frame of the plugins' `gpu` calls
   on Display8's Vulkan backend, moved with the frame as presented (`game.ppm`) and the
   clone's settings into `$A2_DATA/replays/NAME/`, for `gpu/replay.sh` (`README.md`,
-  "Recording a frame of gpu calls").
+  "Recording a frame of gpu calls"). `239f29c`
 
 Installed, not yet seen in game.
 

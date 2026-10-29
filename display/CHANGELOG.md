@@ -9,7 +9,7 @@ in [`README.md`](README.md).
 ### Added
 - On Vulkan, the mirrors of engine textures can be copied from (`TRANSFER_SRC`), so a
   recorded `gpu` frame reads back the mirrors it samples (`gpu/README.md`, "Record and
-  replay").
+  replay"). `239f29c`
 
 Installed, not yet seen in game.
 
