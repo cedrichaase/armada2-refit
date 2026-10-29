@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.28.0 — 2026-10-29
+
+### Added
+- A frame of render3d's `gpu` calls can be recorded for a replay with no game
+  (`gpu/README.md`, "Record and replay"): asked for with `Gpu.record` beside the exe, on
+  Display8's Vulkan backend only, written to `Dumps\<name>\Render3D.asi.a2s`. Idle, it
+  costs two flags per call and a read of the clock per command list.
+
+Installed, not yet seen in game.
+
 ## 0.27.0 — 2026-10-23
 
 ### Changed

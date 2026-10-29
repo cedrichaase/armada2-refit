@@ -480,6 +480,31 @@ shot (2 to 3, 10 to 13, 80 to 90, 255 to 255), and mapped through that curve the
 were identical. Something after `Present` (the swapchain, the compositor; a gamma ramp
 would do it) lifts the frame. So compare dumps with dumps, and shots with shots.
 
+## Recording a frame of gpu calls
+
+    ./a2test drive --session ID record NAME    # one frame of render3d's and the UI's calls
+    gpu/replay.sh NAME                         # drawn again with no game: vulkan, d3d9
+    ./a2test baseline diff $A2_DATA/replays/NAME/game.ppm $A2_DATA/replays/NAME/replay-vulkan.ppm
+
+`record` (`bench/record.py`) writes the trigger `Gpu.record` (the name and a time, so
+each request is new) and waits up to 180 s for every installed plugin to write its
+stream and the UI to dump the frame it recorded, then moves the recording from the
+clone's `Dumps\NAME\` into `$A2_DATA/replays/NAME/` (a time is added when that exists),
+with `game.ppm` (the frame as the game presented it), the clone's `Display8.ini`,
+`dxvk.conf`, `Render3D.ini` and `UI.ini` (the replay draws with the same Display8
+settings) and `meta.json` (the session, its installs, the time). It prints each
+plugin's sidecar: records, snapshots, and what could not be read back. A recording holds
+the game's textures, so it lives in `A2_DATA`, never in a checkout.
+
+The plugins record only on Display8's **Vulkan backend** (`display/bench-mode.sh stub
+Backend=vulkan PixelCentres=d3d9 ...`, which puts the game on lavapipe); on another
+backend `record` fails, saying so. It was proven on a paused mission scene. To compare the replay on
+Direct3D 9 with the others, record with render3d's `[Lights] Clustered=0` in the clone's
+`Render3D.ini`: clustered lights are compute, which Direct3D 9 does not have. What is
+recorded, how it replays and what it cannot hold: `gpu/README.md`, "Record and replay".
+The replays run on lavapipe with the validation layer, never on the GPU, and need no
+session: `gpu/replay.sh` brings up a headless display of its own.
+
 ## The stretch measurement
 
 Every aspect fix in this project keeps the vertical axis as stock draws it and corrects

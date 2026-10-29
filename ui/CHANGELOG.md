@@ -4,6 +4,17 @@
 our own code (`PLAN.md`). Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. Details are in [`README.md`](README.md).
 
+## 0.24.0 — 2026-10-29
+
+### Added
+- A frame of the UI's `gpu` calls can be recorded for a replay with no game
+  (`gpu/README.md`, "Record and replay"): asked for with `Gpu.record` beside the exe, on
+  Display8's Vulkan backend only, written to `Dumps\<name>\UI.asi.a2s`. The recorded
+  frame ends at the engine's `Present`, where the UI dumps it as presented
+  (`Dumps\<name>-game-*-present.ppm`) for the replay to be compared with.
+
+Installed, not yet seen in game.
+
 ## 0.23.0 — 2026-10-25
 
 ### Fixed

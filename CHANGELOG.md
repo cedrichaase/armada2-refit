@@ -5,6 +5,23 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.38.0 — 2026-10-29
+
+Layers: render3d 0.28.0, ui 0.24.0, display 0.10.0, testbench 3.70.0.
+
+### Added
+- Record and replay of a `gpu` frame (`gpu/README.md`, "Record and replay"): the
+  interface records one frame of render3d's and the UI's calls, in the order they were
+  made, with the contents of what the frame finds made, to `$A2_DATA/replays/<name>/`
+  (`a2test drive record NAME`, trigger `Gpu.record`); `gpu/replay.sh` draws it again
+  with no game in `a2replay.exe` (`gpu/replay/`, `no_std` Rust linking `gpu`) under Wine
+  on lavapipe with the validation layer, through Display8 on Vulkan, Direct3D 9 (DXVK) or
+  Direct3D 12 (vkd3d-proton), and writes `replay-<backend>.ppm` for `a2test baseline
+  diff`. The showcase frame replays on Vulkan identical to the game's (RMSE 0).
+  `gpu/replay/inspect.py` lists a recording. Off by default; idle, two flags per call.
+
+Installed, not yet seen in game.
+
 ## 13.36.1 — 2026-10-28
 
 Layers: gui-installer 2.1.1.

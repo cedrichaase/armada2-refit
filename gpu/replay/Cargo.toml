@@ -1,0 +1,25 @@
+[package]
+name = "a2replay"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "a2replay: draws a recorded gpu frame again, with no game, on the backend Display8 is set to (../README.md, \"Record and replay\")"
+license = "MIT"
+
+[[bin]]
+name = "a2replay"
+path = "src/main.rs"
+
+[dependencies]
+gpu = { path = ".." }
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true
+codegen-units = 1
+debug = 1
+
+[profile.dev]
+panic = "abort"
+opt-level = 1

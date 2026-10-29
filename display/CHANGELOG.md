@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md).
 
+## 0.10.0 — 2026-10-29
+
+### Added
+- On Vulkan, the mirrors of engine textures can be copied from (`TRANSFER_SRC`), so a
+  recorded `gpu` frame reads back the mirrors it samples (`gpu/README.md`, "Record and
+  replay").
+
+Installed, not yet seen in game.
+
 ## 0.9.0 — 2026-10-25
 
 ### Added

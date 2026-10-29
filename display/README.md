@@ -358,6 +358,8 @@ the swap chain's image, submits and presents.
   same command buffer again (its pool reset): a plugin's read-back (the frame dumps).
 - **Mirrors** are the engine textures a plugin samples (`display8_vk_mirror`), as the
   Direct3D 9 mirror table has them, brought up to date when the frame is asked for.
+  They can be copied from (`TRANSFER_SRC`), so a recorded frame (`gpu/README.md`,
+  "Record and replay") reads back the mirrors it samples as they were.
 - **`Device=`** takes only a device whose name has it (the test bench: `llvmpipe`,
   Mesa's CPU Vulkan, never the GPU); **`Validate=1`** the Khronos validation layer, its
   warnings and errors in `Display8.log` (`vulkan 0x...:`); **`PixelCentres=d3d9`**

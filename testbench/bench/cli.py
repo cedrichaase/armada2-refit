@@ -67,6 +67,9 @@ a2test -- run Armada II headless and test it end to end
   a2test drive dump [NAME]             Render3D.asi's targets (PFM) and UI.asi's presented
                                        frame (PPM), read back in the game, into dumps/NAME/
                                        with PNG previews (testbench/README.md, "Frame dumps")
+  a2test drive record [NAME]           one frame of the plugins' gpu calls (Display8 on Vulkan),
+                                       into $A2_DATA/replays/NAME/ for gpu/replay.sh
+                                       (gpu/README.md, "Record and replay")
   a2test drive note "TEXT"             say what you are doing now (the session's intent on
                                        the dashboard); again whenever it changes
   a2test drive running | log NAME | launch [ARGS] | quit
@@ -687,6 +690,13 @@ def cmd_drive(argv):
         st, text, previews = dumps.take(s, name)
         log.action(f'dump "{name}"', status='fail' if st == 'fail' else 'warn' if st == 'warn' else 'ok',
                    detail=text, shots=previews)
+        print(text)
+        return 1 if st == 'fail' else 0
+    elif sub == 'record':
+        from . import record
+        name = rest[0] if rest else 'record'
+        st, text = record.take(s, name)
+        log.action(f'record "{name}"', status='fail' if st == 'fail' else 'warn' if st == 'warn' else 'ok', detail=text)
         print(text)
         return 1 if st == 'fail' else 0
     elif sub == 'scene':

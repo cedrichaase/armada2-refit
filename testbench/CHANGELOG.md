@@ -5,6 +5,16 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.70.0 — 2026-10-29
+
+### Added
+- `a2test drive record NAME` (`bench/record.py`): one frame of the plugins' `gpu` calls
+  on Display8's Vulkan backend, moved with the frame as presented (`game.ppm`) and the
+  clone's settings into `$A2_DATA/replays/NAME/`, for `gpu/replay.sh` (`README.md`,
+  "Recording a frame of gpu calls").
+
+Installed, not yet seen in game.
+
 ## 3.69.0 — 2026-10-25
 
 ### Added

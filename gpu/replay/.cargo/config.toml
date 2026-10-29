@@ -1,0 +1,16 @@
+# a2replay.exe is a 32-bit Windows program with no C runtime, linked like vkprobe
+# (display/vkprobe/.cargo/config.toml): lld-link, /nodefaultlib, kernel32 and user32
+# through import libraries that build.rs generates. A GUI program entered at `start`,
+# and not large-address-aware, as Armada2.exe is not: it has the game's 2 GB.
+[build]
+target = "i686-pc-windows-msvc"
+
+[target.i686-pc-windows-msvc]
+linker = "lld-link"
+rustflags = [
+    "-C", "target-feature=+sse2",
+    "-C", "link-arg=/nodefaultlib",
+    "-C", "link-arg=/entry:start",
+    "-C", "link-arg=/subsystem:windows",
+    "-C", "link-arg=/largeaddressaware:no",
+]
