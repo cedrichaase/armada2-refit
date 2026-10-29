@@ -14,7 +14,7 @@ in [`README.md`](README.md).
   publishes (its scene) or the engine's targets. What render3d or the UI does not draw
   (a module off, a SOD handed back) shows as stock instead of vanishing. ROADMAP
   phase 4, first slice; the Borg bump vertex shader, Direct3D 12 and claims are still
-  to come (README.md, "Passthrough").
+  to come (README.md, "Passthrough"). `24be351`
 - `display8_vk_pass` export: a plugin's `Cmd` begins, ends, or ends with its pass
   published (`gpu/src/display.rs`, `VkPass8`).
 - Every engine texture a passed-through draw reads is mirrored; a mirror upload over

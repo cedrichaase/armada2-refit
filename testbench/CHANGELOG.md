@@ -11,7 +11,7 @@ versions". Newest first. The why is in [`README.md`](README.md).
 - `display-passthrough`: render3d's hulls module off on Display8's stub with
   `Passthrough=1`; the ships the engine draws must show, drawn into render3d's scene.
   `display-passthrough-forward` is the same scene through the forward chain, its
-  reference (`baseline record`/`compare`).
+  reference (`baseline record`/`compare`). `24be351`
 
 Installed, not yet seen in game.
 

@@ -9,7 +9,7 @@ versions". Newest first. Details are in [`README.md`](README.md).
 ### Changed
 - Built with `gpu`'s pass events: on Vulkan each `Cmd` tells Display8 when it begins
   and ends (`display8_vk_pass`), so its passthrough never records inside the UI's
-  recording (display 0.10.0).
+  recording (display 0.10.0). `24be351`
 
 Installed, not yet seen in game.
 
