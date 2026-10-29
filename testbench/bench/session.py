@@ -301,6 +301,8 @@ class Session:
         w, h = self.res
         set_prf_resolution(self.game_dir / 'ARMADA.PRF', w, h)
         self.log.action(f'ARMADA.PRF resolution set to {w}x{h}')
+        set_prf_interface_mode(self.game_dir / 'ARMADA.PRF', 1)
+        self.log.action('ARMADA.PRF interface mode set to 1 (no unit view)')
         data = config.DATA
         if self.s.get('assets') == 'none':
             data = self.work / 'no-assets'
@@ -1219,6 +1221,21 @@ def set_prf_resolution(prf, w, h):
         raise GameError(f'unexpected ARMADA.PRF line 5: {lines[4]!r}')
     f[6], f[7] = str(w).encode(), str(h).encode()
     lines[4] = b' '.join(f)
+    Path(prf).write_bytes(b'\r\n'.join(lines))
+
+
+def set_prf_interface_mode(prf, mode):
+    """ARMADA.PRF line 6 is `1 0 1 <interface mode> <seconds>`: Game Settings' Interface
+    Mode, which Ctrl+I steps through 0..3 (ui/HUD.md, "When it shows").  The clone
+    inherits the player's, so the scenarios that press Ctrl+I three times to reach mode 0
+    (the unit view) started anywhere and ended in a mode that hides the whole HUD."""
+    data = Path(prf).read_bytes()
+    lines = data.split(b'\r\n')
+    f = lines[5].split(b' ') if len(lines) > 5 else []
+    if len(f) < 5 or not f[3].isdigit():
+        raise GameError(f'unexpected ARMADA.PRF line 6: {lines[5:6]!r}')
+    f[3] = str(mode).encode()
+    lines[5] = b' '.join(f)
     Path(prf).write_bytes(b'\r\n'.join(lines))
 
 

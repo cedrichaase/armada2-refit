@@ -58,7 +58,7 @@ settings screens; Exit.
 32. Click "Invasion".
 33. Wait 1 second.
 34. Click "O.K.".
-35. Wait 6 seconds.
+35. Wait 2 seconds.
 36. Take a screenshot called "loading".
 37. Check that the screen is a loading screen drawn by the UI (a sky picture behind, a title, a progress bar), not the engine's grey logo panel.
 38. Wait up to 300 seconds for the briefing.
@@ -94,7 +94,7 @@ settings screens; Exit.
 68. Take a screenshot called "paused".
 69. Press Pause.
 70. Wait 2 seconds.
-71. Click at hud-right 1502,55.
+71. Click at hud-right 1555,55.
 72. Wait 2 seconds.
 73. Take a screenshot called "objectives".
 74. Check that a window of the UI's style lists the mission's objectives with check boxes.

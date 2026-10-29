@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.36.2 — 2026-10-29
+
+Layers: testbench 3.69.1.
+
+### Fixed
+- Bench scenarios `ui-whole-game` and `render3d-mode-switch` brought up to date (the clone's
+  interface mode, a loading-screen wait, the objectives button, forward chain and a longer
+  wait for the mode switch); `ui-whole-game` passes at 1024x768 again. `6de8947`
+
+Installed, not yet seen in game.
+
 ## 13.36.1 — 2026-10-28
 
 Layers: gui-installer 2.1.1.
