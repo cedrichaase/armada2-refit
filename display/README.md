@@ -90,11 +90,11 @@ as before:
 | `display8_backend()` | what the plugins draw on: Direct3D 9, Vulkan, Direct3D 12 or none (`gpu/src/display.rs`, `BACKEND_*`) |
 | `display8_vk*`, `display8_dx12*`, `display8_engine_viewport`, `display8_engine_transform` | stub mode on Vulkan and Direct3D 12: the device, the frame, the upload ring, deferred frees, the engine's targets and mirrors, a flush, and the engine's state the plugins read. The contract is `gpu/src/display.rs` (its doc comment is the specification); `src/vk/exports.rs` and `src/dx12/exports.rs` implement it |
 
-The first four are the forward mode's (`src/api.rs`). No plugin reads
-`display8_device_epoch` yet: on Direct3D 9 render3d and the UI still tell a new device
-by the Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`), which they need
-on the chains without Display8 too; the epoch replaces that polling once the Direct3D 9
-backend goes (the display plan's last phase).
+The first four are the forward mode's (`src/api.rs`). render3d (`frame::begin`) and the
+UI (`gfx::attach`) tell a new device or a `Reset` by `display8_device_epoch`
+(`gpu::Gpu::device_epoch`, resolved once); on a `d3d8.dll` without it they compare the
+Direct3D 9 device behind the engine's (`gpu::Gpu::engine_id`) as before, until the
+Direct3D 9 backend goes (the display plan's last phase).
 
 ## How it works
 

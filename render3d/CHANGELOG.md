@@ -4,6 +4,15 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.27.1 — 2026-10-29
+
+### Changed
+- A new device or a `Reset` is learned from Display8's `display8_device_epoch` when
+  Display8 is present (`frame::begin`, through `Gpu::device_epoch`); without the
+  export, the device pointer is compared every frame as before.
+
+Installed, not yet seen in game.
+
 ## 0.27.0 — 2026-10-23
 
 ### Changed

@@ -39,6 +39,8 @@ type Reset8 = unsafe extern "system" fn(*mut c_void, *mut c_void) -> HRESULT;
 struct Frame {
     /// The engine's device it was made for (`gpu::Gpu::engine_id`).
     dev: usize,
+    /// Display8's device epoch it was made at (`Gpu::device_epoch`); None without Display8.
+    epoch: Option<u32>,
     post: Option<Post>,
     targets: Option<Targets>,
     /// Targets could not be made at this size: stock until the size changes.
@@ -351,7 +353,10 @@ fn begin(cfg: &Config, over: Option<gpu::Viewport>) -> Option<Saved> {
     let g = gfx::gpu();
     let dev = g.engine_id(dev8)?;
     let f = frame();
-    if f.as_ref().is_none_or(|f| f.dev != dev) {
+    // A new device or a `Reset` is Display8's epoch moving on; without it, the device.
+    let epoch = g.device_epoch();
+    let changed = |f: &Frame| f.dev == 0 || if epoch.is_some() { f.epoch != epoch } else { f.dev != dev };
+    if f.as_ref().is_none_or(changed) {
         if f.is_some() {
             log!("frame: a new device");
             forget();
@@ -363,7 +368,7 @@ fn begin(cfg: &Config, over: Option<gpu::Viewport>) -> Option<Saved> {
                 }
             }
         }
-        *f = Some(Frame { dev, post: None, targets: None, failed: None, frames: 0, logged: [None; 3] });
+        *f = Some(Frame { dev, epoch, post: None, targets: None, failed: None, frames: 0, logged: [None; 3] });
         hook_reset(dev8);
         crate::mods::device();
     }
