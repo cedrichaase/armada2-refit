@@ -30,6 +30,7 @@ pub extern "C" fn display8_vk() -> *const VkDevice8 {
 pub extern "C" fn display8_vk_frame() -> *const VkFrame8 {
     match get() {
         Some(v) => {
+            super::pass::close(v);
             crate::stub::flush_mirrors();
             v.frame() as *const VkFrame8
         }
@@ -105,4 +106,11 @@ pub extern "C" fn display8_engine_transform(state: u32, out: *mut [f32; 16]) -> 
     let ident = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
     unsafe { *out = crate::stub::device::state(d as *mut SObj).transforms.iter().find(|t| t.0 == state).map_or(ident, |t| t.1) };
     true
+}
+
+/// A plugin's `Cmd` begins or ends, or ends with its pass now published (gpu/src/display.rs;
+/// the passthrough, `pass.rs`).
+#[unsafe(no_mangle)]
+pub extern "C" fn display8_vk_pass(event: u32, pass: *const gpu::display::VkPass8) {
+    super::pass::event(event, pass);
 }

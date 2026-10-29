@@ -406,7 +406,7 @@ kills the game while it loads, on `Backend=vulkan` and on `Backend=d3d9` (DXVK) 
 as the nebulae are baked; on the GPU both pass. Every allocation of a CPU driver is
 host memory, likely mapped into the 32-bit process's address space, which a mission's
 textures and nebula volumes fill. So the whole game on Vulkan is a run on the GPU
-(`A2TEST_VULKAN_GPU=1`), after the port scenes have come through the validation layer
+(the bench's default since testbench 3.70.0), after the port scenes have come through the validation layer
 clean on lavapipe.
 
 ## The Direct3D 12 backend

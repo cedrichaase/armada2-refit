@@ -20,6 +20,7 @@ pub mod com;
 pub mod d3d8;
 pub mod detail;
 pub mod drop;
+pub mod passthrough;
 pub mod dx12;
 pub mod trace;
 pub mod stub;
@@ -115,7 +116,7 @@ pub fn vk_device() -> &'static str {
 
 /// Whether the game runs in a test bench clone (a game directory under
 /// `a2test\sessions\`).
-fn bench_clone() -> bool {
+pub fn bench_clone() -> bool {
     rt::lower(rt::game_dir()).contains("\\a2test\\sessions\\")
 }
 
@@ -258,6 +259,9 @@ fn startup() {
     unsafe { CONFIG = Some(cfg) };
     d3d8::install();
     drop::load(&ini);
+    if STUB_ASKED_NOW() {
+        passthrough::configure(&ini);
+    }
     detail::configure(&ini);
     if config().trace {
         trace::start();

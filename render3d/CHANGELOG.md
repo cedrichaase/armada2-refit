@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.28.0 — 2026-10-29
+
+### Added
+- On Vulkan its `gpu` publishes its pass now to Display8 at each `Cmd`'s end
+  (`gpu::Gpu::with_display_publishing`), so Display8's passthrough draws what render3d
+  hands back to the engine (a module off, a SOD it cannot draw) into the scene pass,
+  tone-mapped and bloomed with the rest (display 0.10.0). `24be351`
+
+Installed, not yet seen in game.
+
 ## 0.27.1 — 2026-10-29
 
 ### Changed
