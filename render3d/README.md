@@ -294,6 +294,17 @@ sections below: `effects`, `ordnance`, `specials`, `sky`, `overlays`, `particles
 `Armada2.exe` at the step as without the module.** There is no plugin to fall back to
 any more, so the old plugins' looks exist only as these modules.
 
+The menu scene is the exception, since it is render3d's own and has no engine draw to
+leave anything to: in the front end there are no game objects and the engine draws
+nothing (`Display8.log`: `0 engine draws` in `"start"`), so Display8's passthrough has
+nothing to show either. With `hulls=0` the scene's ships were simply missing. So
+`hulls=0` loads the module for the menu scene only (`hulls::MenuOnly`; Render3D.log:
+`module hulls: on, for the menu scene only`): the menu's ships are drawn with the hull
+look as with `hulls=1`, pixel for pixel, and in a mission it takes nothing (no step, no
+object, no `draw_instance` or `placeholder`, no shadow map lent to the gas, not
+`running("hulls")`), so every hull there is the engine's. A stock look in the menu
+would need the engine to draw SODs in the shell, which it never does.
+
 ## Timing
 
 `Timing=1` (`src/timing.rs`) times each view as a run of marks: the seam, our targets,

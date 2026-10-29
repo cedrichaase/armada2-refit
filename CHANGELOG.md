@@ -5,6 +5,17 @@ changes that belong to no single layer (`a2mod`, the repo layout, cross-layer
 conventions). Each layer keeps its own `CHANGELOG.md` in its folder. Versioning rules:
 [`CLAUDE.md`](CLAUDE.md), "Changelogs and versions". Newest first.
 
+## 13.42.2 — 2026-10-30
+
+Layers: render3d 0.29.1.
+
+### Fixed
+- render3d: with `[Modules] hulls=0` the menu scene shows its ships again (drawn by the
+  hulls module for the menu scene only; missions unchanged, every hull the engine's
+  through passthrough). `b1ff913`
+
+Installed, not yet seen in game.
+
 ## 13.42.1 — 2026-10-29
 
 Layers: testbench 3.74.1.

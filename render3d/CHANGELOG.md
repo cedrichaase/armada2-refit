@@ -4,6 +4,16 @@
 [`CLAUDE.md`](../CLAUDE.md), "Changelogs and versions". Newest first. The reasoning is
 in [`README.md`](README.md), the plan in [`PLAN.md`](PLAN.md).
 
+## 0.29.1 — 2026-10-30
+
+### Fixed
+- `[Modules] hulls=0` no longer empties the menu scene of ships: the engine draws
+  nothing in the front end, so the module stays loaded for the menu scene only
+  (`hulls::MenuOnly`) and draws its ships as with `hulls=1`; missions keep every hull
+  the engine's. `b1ff913`
+
+Installed, not yet seen in game.
+
 ## 0.29.0 — 2026-10-29
 
 ### Added
