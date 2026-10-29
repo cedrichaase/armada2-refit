@@ -18,7 +18,7 @@ in [`README.md`](README.md).
 - The engine's one vertex shader, the Borg hulls' bump pass, through the passthrough:
   vertex shaders' tokens, constants and streams 1 to 3 are kept, the shader is known by
   a hash of its tokens and drawn by a port of it (`vs_bump` in `shaders/ff.hlsl`); any
-  other shader is refused and logged (ROADMAP 4d).
+  other shader is refused and logged (ROADMAP 4d). `7771201`
 - `display8_vk_pass` export: a plugin's `Cmd` begins, ends, or ends with its pass
   published (`gpu/src/display.rs`, `VkPass8`).
 - Every engine texture a passed-through draw reads is mirrored; a mirror upload over
