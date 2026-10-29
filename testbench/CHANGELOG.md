@@ -5,6 +5,15 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.69.1 — 2026-10-29
+
+### Fixed
+- The audio guard no longer stops the game for a corked stream on a real output:
+  winepulse's start-up "format test stream", opened corked on every sink and closed
+  within milliseconds, was the "game is no longer running" at launch (`_silence`).
+
+Installed, not yet seen in game.
+
 ## 3.69.0 — 2026-10-25
 
 ### Added
