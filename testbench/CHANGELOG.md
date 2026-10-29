@@ -5,6 +5,26 @@ scenarios, screenshots and reports. It installs nothing into the game: every cas
 on a reflink clone. Versioning rules: [`CLAUDE.md`](../CLAUDE.md), "Changelogs and
 versions". Newest first. The why is in [`README.md`](README.md).
 
+## 3.69.1 — 2026-10-29
+
+Provisional number: whichever merge lands second renumbers.
+
+### Fixed
+- `prepare` sets the clone's `ARMADA.PRF` interface mode to 1 (`set_prf_interface_mode`):
+  the clone inherited the player's, and `ui-whole-game` and the `display-*` scenarios,
+  which press Ctrl+I three times to reach mode 0 (the unit view), ended in a mode that
+  hides the whole HUD when the player's was 0 (steps 54, 56, 61, 74, 75 failed).
+- `ui-whole-game`: the loading-screen check waits 2 s after "O.K." instead of 6 s (the
+  mission now loads in about 4 s, so the shot caught the fade into the mission); the
+  objectives button is `hud-right 1555,55` (1502 is the view toggle since the button row
+  gained its idle button).
+- `render3d-mode-switch` runs on the forward chain (`Setup: display/bench-mode.sh
+  forward ...`: the stub offers only the desktop's mode, so "800x600x32" is not in the
+  list) and waits 10 s before the "after" shot (the log lines come at once, the first
+  frame at the new size seconds later; 3.47.0's wait for logs had dropped the 10 s).
+
+Installed, not yet seen in game.
+
 ## 3.69.0 — 2026-10-25
 
 ### Added
